@@ -77,33 +77,42 @@ sealed interface Value {
     data class Number(val number: Double) : Value
     data class Flag(val on: Boolean) : Value
     data class OfTwin(val twin: Twin) : Value
+    data class OfTransition(val transition: Transition) : Value
 }
+
+/**
+ * `transition=` (060-render-p3 A1): how long a change into the state its style is of takes, [ms]
+ * (0–600), and its curve, one of [Values.EASINGS] (CSS's names).
+ */
+data class Transition(val ms: Int, val easing: String)
 
 /** Reading a style property's value: null where it is not one of that property. */
 object Values {
     private val DP = Regex("(-?[0-9]+(\\.[0-9]+)?)dp|0")
-    private val SP = Regex("([0-9]+(\\.[0-9])?)sp")
+    private val SP = Regex("([0-9]+(\\.[0-9]+)?)sp")
     private val PCT = Regex("([0-9]+(\\.[0-9]+)?)%")
     // "system" a name like any other: Kotlin/JS takes the first alternative that starts a match and
     // wants it whole, so "system|…" refused "systemui" there
     private val FONT = Regex("[a-zA-Z][a-zA-Z0-9_-]{0,31}")
     private val IMAGE = Regex("image\\(([^,()]+), ?([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4})(?:, ?([1-8])x)?(?:, ?(.+))?\\)")
-    private val PICTURE = Regex("picture(?:\\(([0-9]{1,2})dp, ?([0-9]{1,3})%(?:, ?(.+))?\\))?")
-    private val LINEAR = Regex("linear\\((-?[0-9]{1,3})deg, ?(.+)\\)")
-    private const val MAX_LENGTH_DP = 24.0
-    private const val MAX_OFFSET_DP = 16.0
-    private const val MAX_BORDER_DP = 3.0
-    private const val MIN_SCALE = 85.0
-    private const val MAX_SCALE = 130.0
+    private val PICTURE = Regex("picture(?:\\(([0-9]{1,2}(?:\\.[0-9]+)?)dp, ?([0-9]{1,3}(?:\\.[0-9]+)?)%(?:, ?(.+))?\\))?")
+    private val LINEAR = Regex("linear\\((-?[0-9]{1,3}(?:\\.[0-9]+)?)deg, ?(.+)\\)")
+    internal const val MAX_LENGTH_DP = 24.0
+    internal const val MAX_OFFSET_DP = 16.0
+    internal const val MAX_BORDER_DP = 3.0
+    internal const val MIN_SCALE = 85.0
+    internal const val MAX_SCALE = 130.0
     private const val MAX_SP = 48.0
-    private const val MAX_BLUR_DP = 25
+    internal const val MAX_BLUR_DP = 25.0
     private const val MAX_PERCENT = 100.0
     private const val FOUR = 4
-    private const val MAX_DEPTH_DP = 8.0
+    internal const val MAX_DEPTH_DP = 8.0
     private const val MIN_BUBBLE = 100.0
     private const val MAX_BUBBLE = 160.0
-    private const val MIN_SPACING_EM = -0.1
-    private const val MAX_SPACING_EM = 0.5
+    internal const val MIN_SPACING_EM = -0.1
+    internal const val MAX_SPACING_EM = 0.5
+    internal const val MIN_STOPS = 2
+    internal const val MAX_STOPS = 8
     private val EM = Regex("-?[0-9](\\.[0-9]{1,3})?em")
     private val ICON_SHOWN = Regex("icon\\(([a-z0-9]+(-[a-z0-9]+)*)\\)")
     private val TEXT_SHOWN = Regex("text\\(([^()]{1,32})\\)")
@@ -126,6 +135,8 @@ object Values {
         "underline", "cursor-color",
         // T7b: the voice mask's frosted glass (engine/PanelLooks), the handwriting pad's ink and grid
         "blur", "ink-color", "ink-width", "grid-color", "grid",
+        // A1: a key's motion (the scene's Motion)
+        "transition", "press-scale", "press-sink",
     ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
 
     private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
@@ -156,10 +167,7 @@ object Values {
         "width" to form(LEN),
         "side-padding" to form(LEN_OR_PERCENT),
         "bottom-padding" to form(LEN_OR_PERCENT),
-        // A1–A3: motion
-        "transition" to form("$MS (linear|ease|ease-in|ease-out|ease-in-out)"),
-        "press-scale" to form(PERCENT_FORM),
-        "press-sink" to form(LEN),
+        // A2–A3: motion
         "appear" to form("(fade|scale|rise) $MS"),
         "effect" to form("none|ripple-image\\($FILE, ?$PERCENT_FORM, ?$MS\\)|particles\\($FILE, ?[0-9]{1,2}, ?$LEN, ?$MS\\)"),
         // §16's second tier: a key's sticker layer
@@ -227,11 +235,31 @@ object Values {
         else -> textOnAKey(property, raw) ?: capAndBubble(property, raw) ?: panel(property, raw)
     }
 
+    /** `transition=`'s curves (CSS's) and longest, ms; `press-scale=`'s range, %; `press-sink=`'s most, dp. */
+    val EASINGS = listOf("linear", "ease", "ease-in", "ease-out", "ease-in-out")
+    const val MAX_TRANSITION_MS = 600
+    const val MIN_PRESS_SCALE = 85.0
+    const val MAX_PRESS_SCALE = 110.0
+    const val MAX_PRESS_SINK_DP = 4.0
+    private val TRANSITION = Regex("([0-9]{1,3})ms ([a-z-]+)")
+
+    // A1's: a key's transition into a state, its pressed face's scale and sink
+    private fun motion(property: String, raw: String): Value? = when (property) {
+        "transition" -> TRANSITION.matchEntire(raw)?.let { m ->
+            val ms = m.groupValues[1].toInt()
+            val easing = m.groupValues[2]
+            if (ms <= MAX_TRANSITION_MS && easing in EASINGS) Value.OfTransition(Transition(ms, easing)) else null
+        }
+        "press-scale" -> percent(raw)?.takeIf { it in MIN_PRESS_SCALE..MAX_PRESS_SCALE }?.let(Value::Number)
+        "press-sink" -> dp(raw, MAX_PRESS_SINK_DP)?.let(Value::Number)
+        else -> null
+    }
+
     // T6b's: the code being typed's underline (a border's form, or none) and cursor
     private fun preedit(property: String, raw: String): Value? = when (property) {
         "underline" -> border(raw)?.let(Value::OfBorder)
         "cursor-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
-        else -> null
+        else -> motion(property, raw)
     }
 
     /** The voice mask's frosted glass at most (`blur`), dp: as the keyboard's picture's. */
@@ -339,15 +367,17 @@ object Values {
         IMAGE.matchEntire(raw)?.let { m ->
             val g = m.groupValues
             val fallback = g[7].ifEmpty { null }?.let { ColorExpr.parse(it.trim()) ?: return null }
-            return Fill.Image(g[1].trim(), (2..5).map { g[it].toInt() }, g[6].ifEmpty { "1" }.toInt(), fallback)
+            // a file named as a <picture>'s or a <font>'s is
+            val file = g[1].trim().takeIf(ThemeReader.FILE::matches) ?: return null
+            return Fill.Image(file, (2..5).map { g[it].toInt() }, g[6].ifEmpty { "1" }.toInt(), fallback)
         }
         PICTURE.matchEntire(raw)?.let { m ->
-            val blur = m.groupValues[1].ifEmpty { null }?.toInt()
+            val blur = m.groupValues[1].ifEmpty { null }?.toDouble()
             val bright = m.groupValues[2].ifEmpty { null }?.toDouble()
             val tooBlurred = blur != null && blur > MAX_BLUR_DP
             if (tooBlurred || bright != null && bright > MAX_PERCENT) return null
             val over = m.groupValues[3].ifEmpty { null }?.let { ColorExpr.parse(it.trim()) ?: return null }
-            return Fill.Picture(blur?.toDouble(), bright, over)
+            return Fill.Picture(blur, bright, over)
         }
         LINEAR.matchEntire(raw)?.let { m ->
             val stops = ColorExpr.splitTop(m.groupValues[2])?.map { stop ->
@@ -356,7 +386,7 @@ object Values {
                 val at = percent(t.substringAfterLast(' '))?.takeIf { it <= MAX_PERCENT } ?: return null
                 color to at
             } ?: return null
-            return if (stops.size in 2..8) Fill.Linear(m.groupValues[1].toDouble(), stops) else null
+            return if (stops.size in MIN_STOPS..MAX_STOPS) Fill.Linear(m.groupValues[1].toDouble(), stops) else null
         }
         return null
     }

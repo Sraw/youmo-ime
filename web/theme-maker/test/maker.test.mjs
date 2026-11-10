@@ -3,7 +3,7 @@
 // Run: ./gradlew :lib:keyboard-scene:youmoEngine, then node --test web/theme-maker/test/maker.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -15,6 +15,13 @@ const src = join(here, '..', 'src');
 const testdata = join(here, 'testdata');
 vm.runInThisContext(readFileSync(join(src, 'lib.js'), 'utf8'), { filename: 'lib.js' });
 vm.runInThisContext(readFileSync(join(src, 'maker.js'), 'utf8'), { filename: 'maker.js' });
+vm.runInThisContext(readFileSync(join(src, 'form.js'), 'utf8'), { filename: 'form.js' });
+globalThis.YoumoPanels = [];
+for (const f of readdirSync(join(src, 'panels')).sort()) vm.runInThisContext(readFileSync(join(src, 'panels', f), 'utf8'), { filename: f });
+const F = globalThis.YoumoForm;
+const P = Object.fromEntries(globalThis.YoumoPanels.map((p) => [p.id, p]));
+// a picture made the keyboard's as the 背景 page makes one: the picture and its two cuts, of [image] ([type])
+const withPicture = (d, image, type) => P.background.ops.setPicture(d, { type, src: image, cuts: { portrait: { bytes: image, type, rect: null }, landscape: { bytes: image, type, rect: null } } });
 const L = globalThis.YoumoLib;
 const M = globalThis.YoumoMaker;
 globalThis.Path2D = class { constructor(d) { this.d = d; } };
@@ -75,20 +82,20 @@ test('a bare theme.xml opens; a zip past the limits or not a theme is refused', 
 });
 
 test('a picture made the keyboard\'s: the file in the pack, the engine draws it', () => {
-  const d = M.withPicture(M.fromBuiltin(E, 'material'), new Uint8Array([9]), 'jpg');
+  const d = withPicture(M.fromBuiltin(E, 'material'), new Uint8Array([9]), 'jpg');
   assert.ok('picture.jpg' in d.files);
   const r = E.readTheme(d.xml, null, null);
   assert.ok(r.ok, JSON.stringify(r.problems));
-  assert.match(d.xml, /<style select="keyboard" fill="picture"\/>/);
+  assert.equal(F.valueOf(d.xml, 'keyboard', 'fill'), 'picture');
   // a second picture replaces the first
-  const twice = M.withPicture(d, new Uint8Array([8]), 'png');
+  const twice = withPicture(d, new Uint8Array([8]), 'png');
   assert.equal(twice.xml.match(/<picture\b/g).length, 1);
   assert.equal(twice.xml.match(/fill="picture"/g).length, 1, 'the keyboard style not added twice');
-  assert.ok(!('picture.jpg' in twice.files), 'the old picture file goes with it');
+  assert.ok(!('picture.jpg' in twice.files) && !('picture-portrait.jpg' in twice.files), 'the old picture files go with it');
   assert.ok(E.readTheme(twice.xml, null, null).ok);
   // a self-closing picture and one inside a comment
   const odd = M.doc(d.xml.replace(/<picture\b[\s\S]*?<\/picture>/, '<!-- <picture src="c.png"/> --><picture src="old.png"/>'), { 'old.png': new Uint8Array([1]) });
-  const fixed = M.withPicture(odd, new Uint8Array([8]), 'png');
+  const fixed = withPicture(odd, new Uint8Array([8]), 'png');
   assert.ok(!('old.png' in fixed.files));
   assert.match(fixed.xml, /<!-- <picture src="c.png"\/> -->/);
   assert.equal(fixed.xml.replace(/<!--[\s\S]*?-->/g, '').match(/<picture\b/g).length, 1);
@@ -141,11 +148,11 @@ test('save refuses what the app would: the name, files missing, images past thei
   for (const name of ['a/b', '.hidden', 'x#dark', 'y#light', '']) {
     assert.equal(M.saveProblems(E, L, FORMAT, M.doc(M.withName(ok.xml, name))).length, 1, name);
   }
-  const pic = M.withPicture(ok, pngHeader(100, 100), 'png');
+  const pic = withPicture(ok, pngHeader(100, 100), 'png');
   assert.deepEqual(M.saveProblems(E, L, FORMAT, pic), []);
   assert.match(M.saveProblems(E, L, FORMAT, M.doc(pic.xml)).map((p) => p.message).join(), /缺少文件 picture.png/);
-  assert.match(M.saveProblems(E, L, FORMAT, M.withPicture(ok, pngHeader(5000, 10), 'png'))[0].message, /太大/);
-  assert.match(M.saveProblems(E, L, FORMAT, M.withPicture(ok, new Uint8Array([1]), 'png'))[0].message, /不是 App 认得的图片/);
+  assert.match(M.saveProblems(E, L, FORMAT, withPicture(ok, pngHeader(5000, 10), 'png'))[0].message, /太大/);
+  assert.match(M.saveProblems(E, L, FORMAT, withPicture(ok, new Uint8Array([1]), 'png'))[0].message, /不是 App 认得的图片/);
   // the app's ThemePackCheck.hidesRequired: blank keys refused, a key faced with its own image let be
   const hide = (styles) => M.saveProblems(E, L, FORMAT, M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'))).length;
   assert.equal(hide('<style select="key.enter" hidden="true"/>'), 1);
@@ -297,7 +304,7 @@ test('the page saves from-maker.theme, byte for byte', () => {
   assert.deepEqual(new Uint8Array(made), bytes('from-maker.theme'));
 });
 
-// and from-maker-picture.theme (a picture's save, a real 4×4 PNG) and from-maker-30.theme (the app's own 3.0
+// and from-maker-picture.theme (the panels' save: a real 4×4 PNG cut for each orientation, keys see-through, a gradient, an icon) and from-maker-30.theme (the app's own 3.0
 // export converted: its Return an image, the label hidden, as 3.0 drew it)
 test('a 3.0 theme the app takes converts and saves to a pack the app takes', async () => {
   for (const f of ['from-web.theme', 'from-app.theme', 'from-app-2.1.theme']) {
@@ -311,7 +318,14 @@ test('a 3.0 theme the app takes converts and saves to a pack the app takes', asy
 
 test('the page saves from-maker-picture.theme, byte for byte', () => {
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGPQCFgARwzEcQC/wxGBfpfKIQAAAABJRU5ErkJggg==', 'base64');
-  const made = M.save(L, M.withPicture(M.fromBuiltin(E, 'nord'), new Uint8Array(png), 'png')).bytes;
+  // made as the panels make one: a picture with its two cuts, the keys see-through, a gradient, an icon of its own
+  const px = new Uint8Array(png);
+  let d = P.background.ops.setPicture(M.fromBuiltin(E, 'nord'), { type: 'png', src: px, cuts: { portrait: { bytes: px, type: 'png', rect: [0, 0, 4, 2] }, landscape: { bytes: px, type: 'png', rect: [0, 1, 4, 2] } } });
+  d = P.background.ops.through(d, true);
+  d = P.keys.ops.fill(d, 'key.letter', { kind: 'linear', angle: 90, stops: [['#ff0000', 0], ['#0000ff', 100]] });
+  d = P.text.ops.setIcon(d, 'backspace', enc('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 12l6-6h14v12H8z"/></svg>'));
+  assert.deepEqual(M.saveProblems(E, L, FORMAT, d), []);
+  const made = M.save(L, d).bytes;
   if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker-picture.theme'), made);
   assert.deepEqual(new Uint8Array(made), bytes('from-maker-picture.theme'));
 });

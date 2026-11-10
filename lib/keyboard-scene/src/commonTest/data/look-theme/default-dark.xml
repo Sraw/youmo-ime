@@ -51,4 +51,7 @@
   <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
   <style select="menu:selected" overlay="@keyPressHighlight"/>
   <style select="@floating keyboard" radius="7dp"/>
+  <style select="@landscape @floating keyboard" radius="7dp"/>
+  <style select="@floating @flat keyboard" radius="3dp"/>
+  <style select="@landscape @floating @flat keyboard" radius="3dp"/>
 </theme>

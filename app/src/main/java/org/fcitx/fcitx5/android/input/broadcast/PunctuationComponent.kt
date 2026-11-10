@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.broadcast
 
 import org.fcitx.fcitx5.android.host.FullWidth
+import org.fcitx.fcitx5.android.input.keyboard.isAsciiMark
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.manager.ManagedHandler
@@ -26,13 +27,15 @@ class PunctuationComponent :
      * What each punctuation key types now, the host's less the keys typing themselves: a keyboard attached
      * again takes it (KeyboardWindow.attachLayout), and shows on its keys what they type.
      */
-    val mapping: Map<String, String>
-        get() {
-            val base = if (asTyped.isEmpty()) loaded else loaded - asTyped
-            if (!fullWidth) return base
-            // full width: every key's mark, or its own character, typed full width (FullWidth's commit filter)
-            return (base.keys + ASCII_MARKS).associateWith { FullWidth.convert(base[it] ?: it) }
-        }
+    var mapping: Map<String, String> = emptyMap()
+        private set
+
+    // worked out once each time the host's marks, their as-typed keys or full width change: read on every bubble
+    private fun remap() {
+        val base = if (asTyped.isEmpty()) loaded else loaded - asTyped
+        // full width: every key's mark, or its own character, typed full width (FullWidth's commit filter)
+        mapping = if (!fullWidth) base else (base.keys + ASCII_MARKS).associateWith { FullWidth.convert(base[it] ?: it) }
+    }
 
     // full width on (HostEvent.StatusArea.fullWidth): applied in the same event as the marks
     private var fullWidth = false
@@ -60,6 +63,7 @@ class PunctuationComponent :
         if (keys == loaded && fullWidth == this.fullWidth) return
         loaded = keys
         this.fullWidth = fullWidth
+        remap()
         broadcaster.onPunctuationUpdate(mapping)
     }
 
@@ -67,11 +71,13 @@ class PunctuationComponent :
     fun updateAsTyped(marks: Set<String>) {
         if (marks == asTyped) return
         asTyped = marks
+        remap()
         broadcaster.onPunctuationUpdate(mapping)
     }
 
     private companion object {
-        // the keys' own characters full width turns: ASCII's marks (not letters or digits, which are not punctuation keys)
-        val ASCII_MARKS = ('!'..'~').filterNot { it.isLetterOrDigit() }.map { it.toString() }
+        // the keys' own characters full width turns: ASCII's marks (not letters or digits, which are not
+        // punctuation keys), the same the keyboard holds back while the marks are not known
+        val ASCII_MARKS = ('!'..'~').filter { isAsciiMark(it.code) }.map { it.toString() }
     }
 }

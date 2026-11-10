@@ -2,7 +2,7 @@
 <!--
   表情面板（PickerLayout panel=false，emojiPicker，rules C9.12）下面的一行键，板 emoji（060-render-p2 S8a：旧 View 删掉时补上）。
   ABC 15、搜索 10（emoji-search:on）、颜文字 10（:-)）、空格、. 10、⌫ 15、回车 15。
-  , . 是 PunctuationKey：只按下打出，没有长按、没有气泡（popups="off"）；键面按标点映射显示（{punct:,}，中文下 ，。），和打出的一致。空格不写输入法名（PickerLayout 不调 onInputMethodUpdate）。
+  . 是 PunctuationKey：只按下打出，没有长按、没有气泡（popups="off"）；键面按标点映射显示（{punct:.}，中文下 。），和打出的一致。空格不写输入法名（PickerLayout 不调 onInputMethodUpdate）。
   不画快捷角标：面板的键没有快捷键（BaseKeyboard 的 shortcuts 关）。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="emoji" name="表情" family="symbols" columns="100" popups="off">

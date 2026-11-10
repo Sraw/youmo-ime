@@ -88,6 +88,9 @@ class ShapeTest {
     @Test
     fun aPathReadsAsSvgs() {
         val square = assertNotNull(ShapePath.parse("M0 0 H1 V1 H0 Z"))
+        // an exponent is read; an 'e' with no digits is no number
+        assertNotNull(ShapePath.parse("M0 0 H1e0 V5e-1 H0 Z"))
+        assertNull(ShapePath.parse("M0 0 H1e V1 H0 Z"))
         val box = Box(10.0, 20.0, 110.0, 70.0)
         assertEquals(
             listOf(MoveTo(10.0, 20.0), LineTo(110.0, 20.0), LineTo(110.0, 70.0), LineTo(10.0, 70.0), Close),
@@ -120,7 +123,7 @@ class ShapeTest {
             "M0 0 L1.5 0 L1 1 Z", "M0 0 L1 0 L1 -0.1 Z", "M.5 .5 l.6 0 l0 .1 z", // out of the box, relative too
             "M0 0 Q2 0 1 1 Z", // a control point out of it
             "M0 0 L1 0 L1", "M0 0 C1 0 1 1 Z", // too few numbers
-            "M0 0 A.5 .5 0 0 1 1 1 Z", "M0 0 S1 1 0 1 Z", "M0 0 L1e0 0 L1 1 Z", "M0 0 L1 0 L1 1 Z x", // arcs, smooth curves, exponents
+            "M0 0 A.5 .5 0 0 1 1 1 Z", "M0 0 S1 1 0 1 Z", "M0 0 L1 0 L1 1 Z x", // arcs, smooth curves
             "M0 0 L. 0 L1 1 Z", "M0 0 L- 0 L1 1 Z",
         ).forEach { assertNull(ShapePath.parse(it), "\"$it\"") }
         // 256 points at most, a curve's control points counted

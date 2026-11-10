@@ -61,6 +61,9 @@ class FakeHostApi : HostApi {
     var enabledIme: Array<InputMethodEntry> = emptyArray()
 
     private val imOptions = mutableMapOf<String, Map<String, String>>()
+
+    /** What [setImOptions] stored, by input method: a test reads the values set, not only that a set happened. */
+    val imOptionsSet: Map<String, Map<String, String>> get() = imOptions
     private val punctuationMaps = mutableMapOf<String, List<PunctuationMapEntry>>()
 
     override suspend fun save() {

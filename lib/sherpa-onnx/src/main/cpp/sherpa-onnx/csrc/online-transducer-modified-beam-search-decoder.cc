@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -71,6 +72,9 @@ void OnlineTransducerModifiedBeamSearchDecoder::StripLeadingBlanks(
         r->nbest_tokens.end()) {
       continue;
     }
+    // an all-blank path behind a best that heard something is no reading of
+    // it: dropped (were it kept, a rerank could pick "" and lose the segment)
+    if (tokens.empty() && &h != &topk[0]) continue;
     r->nbest_tokens.push_back(std::move(tokens));
     r->nbest_scores.push_back(h.TotalLogProb() / h.ys.size());
   }
@@ -199,10 +203,11 @@ void OnlineTransducerModifiedBeamSearchDecoder::Decode(
       for (int32_t h = hyps_row_splits[b]; h != hyps_row_splits[b + 1]; ++h) {
         // every stream with a block graph roots its hyps' states
         // (InitOnlineStream, Reset): a null one is a caller that did not
-        // (SHERPA_ONNX_CHECK is off in our builds)
+        // (SHERPA_ONNX_CHECK is off in our builds): thrown, decode's SafeJNI
+        // makes it a Java exception voice input reports, not an _Exit
         if (prev[h].block_state == nullptr) {
           SHERPA_ONNX_LOGE("a block graph without its hyps' states rooted");
-          SHERPA_ONNX_EXIT(-1);
+          throw std::logic_error("a block graph without its hyps' states rooted");
         }
         const auto &completing = block_graph->CompletingTokens(prev[h].block_state);
         for (auto token : completing) {

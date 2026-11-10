@@ -76,11 +76,11 @@ class KeyboardPerfBaselineTest {
     val timeout: Timeout = Timeout.seconds(1_800)
 
     private lateinit var scenario: ActivityScenario<TypingHostActivity>
-    private lateinit var service: FcitxInputMethodService
-    private lateinit var frames: KeyboardFrames
+    internal lateinit var service: FcitxInputMethodService
+    internal lateinit var frames: KeyboardFrames
 
-    private val runs = InstrumentationRegistry.getArguments().getString("perfRuns")?.toInt() ?: 20
-    private val warmUp = 3
+    internal val runs = InstrumentationRegistry.getArguments().getString("perfRuns")?.toInt() ?: 20
+    internal val warmUp = 3
     private val only = InstrumentationRegistry.getArguments().getString("perfOnly")?.split(',')
 
     // perfScreenshot=true: the picture theme's keyboard captured once, to see the picture is drawn
@@ -89,13 +89,16 @@ class KeyboardPerfBaselineTest {
     // put back after the test, each once changed
     private var deviceIme: String? = null
     private var deviceImeEnabled = false
+    // the system's list as it was: the disable and enable below move this input method to its end, and `ime reset`
+    // would put the device's default list in its place
+    private var enabledIms: String? = null
     private var spellChecker: String? = null
     private var imsWere: Array<String>? = null
     private var imWas: String? = null
     private var pinyinKeyboardWas: PinyinKeyboard? = null
-    private var followSystemWas: Boolean? = null
-    private var themeWas: Theme? = null
-    private val themesMade = mutableListOf<String>()
+    internal var followSystemWas: Boolean? = null
+    internal var themeWas: Theme? = null
+    internal val themesMade = mutableListOf<String>()
 
     @Test
     fun keyboardDrawingBaseline() {
@@ -112,7 +115,8 @@ class KeyboardPerfBaselineTest {
             if ("popup" in only) popupSlide()
             if ("rebuild" in only) rebuilds()
             if ("anim" in only || "idle" in only) idleRows()
-            // the §4.3 rows that need motion in the engine (A1-A4): told, not measured
+            if ("anim" in only) motionRows()
+            // the §4.3 rows that need motion in the engine (A2-A4): told, not measured
             if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return
         }
@@ -131,6 +135,7 @@ class KeyboardPerfBaselineTest {
         shiftWithLowerFaces()
         popupSlide()
         idleRows()
+        motionRows()
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()
@@ -142,13 +147,15 @@ class KeyboardPerfBaselineTest {
     private fun selectThisInputMethod() {
         deviceIme = shell("settings get secure default_input_method").takeIf { it.isNotEmpty() && it != "null" }
         val self = ComponentName.unflattenFromString(imeId)
-        deviceImeEnabled = shell("settings get secure enabled_input_methods").split(':')
+        enabledIms = shell("settings get secure enabled_input_methods").takeIf { it.isNotEmpty() && it != "null" }
+        deviceImeEnabled = enabledIms.orEmpty().split(':')
             .any { ComponentName.unflattenFromString(it.substringBefore(';')) == self }
         // the system's spell checker would underline what the runs type, a frame of its own in the field
         spellChecker = shell("settings get secure spell_checker_enabled")
         shell("settings put secure spell_checker_enabled 0")
         shell("ime enable $imeId")
         shell("ime set $imeId")
+        bindInThisProcess(imeId, imePkg, ::shell)
     }
 
     private fun launch() {
@@ -184,7 +191,7 @@ class KeyboardPerfBaselineTest {
     fun putBack() {
         runCatching { if (::frames.isInitialized) onMain { frames.close() } }
         runCatching { putThemesBack() }
-        pinyinKeyboardWas?.let { onMain { AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(it) } }
+        runCatching { pinyinKeyboardWas?.let { onMain { AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(it) } } }
         runCatching {
             host {
                 imsWere?.let { setEnabledIme(it) }
@@ -194,6 +201,7 @@ class KeyboardPerfBaselineTest {
         if (::scenario.isInitialized) scenario.close()
         deviceIme.let { if (it == null) shell("ime reset") else shell("ime set $it") }
         if (!deviceImeEnabled) shell("ime disable $imeId")
+        enabledIms?.let { shell("settings put secure enabled_input_methods $it") }
         spellChecker.let {
             if (it.isNullOrEmpty() || it == "null") shell("settings delete secure spell_checker_enabled")
             else shell("settings put secure spell_checker_enabled $it")
@@ -261,7 +269,7 @@ class KeyboardPerfBaselineTest {
     }
 
     // a fresh input view on the 26 keys: none of the others made yet
-    private fun fresh() {
+    internal fun fresh() {
         pick(Board.KEYS14)
         pick(Board.FULL)
     }
@@ -374,7 +382,11 @@ class KeyboardPerfBaselineTest {
         repeat(warmUp + runs) { i ->
             val radius = (flat.look.keys.radiusDp + 1 + i) % (Keys.MAX_RADIUS_DP + 1)
             val new = Theme.Custom("$UNSEEN-$i", isDark = false, look = flat.look.copy(keys = flat.look.keys.copy(radiusDp = radius)))
-            assumeTrue("a theme could not be saved", onMain { ThemeManager.saveTheme(new) })
+            // one not saved: that sample alone left out, the runs after it measured
+            if (!onMain { ThemeManager.saveTheme(new) }) {
+                log("theme\t${new.name} could not be saved: left out")
+                return@repeat
+            }
             themesMade += new.name
             settle()
             val sample = theme(new)
@@ -384,7 +396,7 @@ class KeyboardPerfBaselineTest {
         row("theme", "block → a flat one not seen before", unseen)
     }
 
-    private fun theme(to: Theme): KeyboardFrames.Sample {
+    internal fun theme(to: Theme): KeyboardFrames.Sample {
         val before = onMain { keyboardFrame() }
         // the 26 keys in the new frame, as a build's: the frame shown alone, its keyboard not yet in it, is not the switch done
         return measure({ keyboardFrame().let { it !== before && shows(it, Board.FULL) } }) { ThemeManager.setNormalModeTheme(to) }
@@ -474,7 +486,7 @@ class KeyboardPerfBaselineTest {
         settle()
     }
 
-    private fun presses(marks: DownMarks, keys: List<PointF>, gapMs: Long): List<KeyboardFrames.Sample> {
+    internal fun presses(marks: DownMarks, keys: List<PointF>, gapMs: Long): List<KeyboardFrames.Sample> {
         marks.marks.clear()
         marks.recording = true
         val heap = Heap.now()
@@ -495,7 +507,7 @@ class KeyboardPerfBaselineTest {
     }
 
     // what was typed committed and the field emptied, for the next run to start alike
-    private fun endTyping(space: PointF) {
+    internal fun endTyping(space: PointF) {
         val down = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, space, down, down)
         inject(MotionEvent.ACTION_UP, space, down, SystemClock.uptimeMillis())
@@ -540,7 +552,7 @@ class KeyboardPerfBaselineTest {
         log("scene\tasked again, nothing changed (pinyin's first key)\t${stats(timed(view::invalidateScene))}")
     }
 
-    private fun shiftTap(at: PointF): KeyboardFrames.Sample {
+    internal fun shiftTap(at: PointF): KeyboardFrames.Sample {
         // Shift's state is the canvas's now (no button_caps view to ask): its scene made anew is the tap shown
         val scene = onMain { canvasView()?.scene }
         val mark = onMain { frames.mark(0) { canvasView()?.scene.let { it != null && it !== scene } } }
@@ -554,7 +566,7 @@ class KeyboardPerfBaselineTest {
         return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
     }
 
-    private fun canvasView(): KeyboardCanvasView? = keyboardFrame()?.let(::all)?.filterIsInstance<KeyboardCanvasView>()?.firstOrNull()
+    internal fun canvasView(): KeyboardCanvasView? = keyboardFrame()?.let(::all)?.filterIsInstance<KeyboardCanvasView>()?.firstOrNull()
 
     private fun textKeyboard(): TextKeyboard = keyboardFrame()!!.let(::all).filterIsInstance<TextKeyboard>().first()
 
@@ -648,30 +660,37 @@ class KeyboardPerfBaselineTest {
         val space = keyAt(onKeyboard().res(imePkg, "button_space"))
         val moved = mutableListOf<KeyboardFrames.Sample>()
         var undrawn = 0
-        repeat(warmUp + runs) { i ->
-            val down = SystemClock.uptimeMillis()
-            inject(MotionEvent.ACTION_DOWN, e, down, down)
-            SystemClock.sleep(LONG_PRESS_MS)
-            settle()
-            val path = (1..POPUP_MOVES) + (POPUP_MOVES - 1 downTo 0)
-            val samples = mutableListOf<KeyboardFrames.Sample>()
-            val heap = Heap.now()
-            for (n in path) {
-                val at = PointF(e.x + step * n, e.y)
-                val mark = onMain { frames.mark(0) }
-                val time = SystemClock.uptimeMillis()
-                mark.from = time * DownMarks.NS_PER_MS
-                inject(MotionEvent.ACTION_MOVE, at, down, time)
-                val sample = runCatching { frames.await(mark, POPUP_FRAME_WAIT_MS) }.getOrNull()
-                if (sample == null) undrawn++ else samples += sample
-                SystemClock.sleep(POPUP_GAP_MS)
+        // each move's mark made as the window gets it (a mark made before it would take a traversal already due)
+        val marks = onMain { DownMarks(service.window.window!!.callback, frames, MotionEvent.ACTION_MOVE).also { service.window.window!!.callback = it } }
+        try {
+            repeat(warmUp + runs) { i ->
+                val down = SystemClock.uptimeMillis()
+                inject(MotionEvent.ACTION_DOWN, e, down, down)
+                SystemClock.sleep(LONG_PRESS_MS)
+                settle()
+                val path = (1..POPUP_MOVES) + (POPUP_MOVES - 1 downTo 0)
+                val samples = mutableListOf<KeyboardFrames.Sample>()
+                val heap = Heap.now()
+                for (n in path) {
+                    val at = PointF(e.x + step * n, e.y)
+                    marks.marks.clear()
+                    marks.recording = true
+                    inject(MotionEvent.ACTION_MOVE, at, down, SystemClock.uptimeMillis())
+                    marks.recording = false
+                    val mark = marks.marks.firstOrNull()
+                    val sample = mark?.let { runCatching { frames.await(it, POPUP_FRAME_WAIT_MS) }.getOrNull() }
+                    if (sample == null) undrawn++ else samples += sample
+                    SystemClock.sleep(POPUP_GAP_MS)
+                }
+                val alloc = Heap.now() - heap
+                samples.forEach { it.heap(alloc, samples.size) }
+                inject(MotionEvent.ACTION_UP, e, down, SystemClock.uptimeMillis())
+                settle()
+                endTyping(space)
+                if (i >= warmUp) moved += samples
             }
-            val alloc = Heap.now() - heap
-            samples.forEach { it.heap(alloc, samples.size) }
-            inject(MotionEvent.ACTION_UP, e, down, SystemClock.uptimeMillis())
-            settle()
-            endTyping(space)
-            if (i >= warmUp) moved += samples
+        } finally {
+            onMain { service.window.window!!.callback = marks.original }
         }
         if (undrawn > 0) log("popup\t$undrawn moves drew no frame")
         row("popup", "focus moved a choice", moved)
@@ -685,7 +704,7 @@ class KeyboardPerfBaselineTest {
      * hidden (`anim | hidden`'s reference: no frame, CPU about 0). The process's CPU is its share of a
      * core over the wall time ([ProcessCpu]).
      */
-    private fun idleRows() {
+    internal fun idleRows() {
         fresh()
         val letters = "nihaoshiji"
         val at = letters.toSet().associateWith { keyAt(onKeyboard().text("$it")) }
@@ -715,18 +734,7 @@ class KeyboardPerfBaselineTest {
 
     // ---- 4. memory
 
-    private fun memory(label: String) {
-        repeat(2) {
-            Runtime.getRuntime().gc()
-            SystemClock.sleep(GC_WAIT_MS)
-        }
-        val samples = (1..MEMORY_SAMPLES).map {
-            SystemClock.sleep(GC_WAIT_MS)
-            Memory.parse(shell("dumpsys meminfo ${Process.myPid()}"))
-        }
-        fun median(of: (Memory) -> Int) = Stats(samples.map { of(it).toDouble() }).median.toInt()
-        log("memory\t$label\tjava ${median { it.javaHeap }} kB\tnative ${median { it.nativeHeap }} kB\tgraphics ${median { it.graphics }} kB\ttotal pss ${median { it.totalPss }} kB")
-    }
+    private fun memory(label: String) = log(memoryLine(label, ::shell))
 
     private fun hideKeyboard() {
         scenario.onActivity { context.inputMethodManager.hideSoftInputFromWindow(it.field.windowToken, 0) }
@@ -763,19 +771,19 @@ class KeyboardPerfBaselineTest {
     }
 
     // the main thread idle, and a little more for what is posted after a frame (the bar, a11y)
-    private fun settle() {
+    internal fun settle() {
         instrumentation.waitForIdleSync()
         SystemClock.sleep(SETTLE_MS)
     }
 
-    private fun onKeyboard() = By.pkg(imePkg).hasAncestor(By.res(imePkg, "keyboard_view"))
+    internal fun onKeyboard() = By.pkg(imePkg).hasAncestor(By.res(imePkg, "keyboard_view"))
 
     private fun find(selector: BySelector) = device.wait(Until.findObject(selector), 10_000) ?: error("not on screen: $selector")
 
     // a key's centre on the screen, found as TalkBack and the UAT find it
-    private fun keyAt(selector: BySelector) = find(selector).visibleBounds.let { PointF(it.exactCenterX(), it.exactCenterY()) }
+    internal fun keyAt(selector: BySelector) = find(selector).visibleBounds.let { PointF(it.exactCenterX(), it.exactCenterY()) }
 
-    private fun row(what: String, label: String, samples: List<KeyboardFrames.Sample>, extra: String = "") {
+    internal fun row(what: String, label: String, samples: List<KeyboardFrames.Sample>, extra: String = "") {
         fun stats(of: (KeyboardFrames.Sample) -> Double?) = Stats(samples.mapNotNull(of))
         val withMetrics = samples.count { it.toDone != null }
         // a press's event to the window, and from there: the system's part and the app's
@@ -789,17 +797,15 @@ class KeyboardPerfBaselineTest {
         )
     }
 
-    private fun log(line: String) {
-        Log.i(TAG, line)
-    }
+    internal fun log(line: String) = Unit.also { Log.i(TAG, line) }
 
-    private fun <T> onMain(block: () -> T): T {
+    internal fun <T> onMain(block: () -> T): T {
         var result: Result<T>? = null
         instrumentation.runOnMainSync { result = runCatching(block) }
         return result!!.getOrThrow()
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "KeyboardPerf"
         const val PINYIN = InputMethodCatalog.PINYIN
         const val HANDWRITING = InputMethodCatalog.HANDWRITING
@@ -820,8 +826,6 @@ class KeyboardPerfBaselineTest {
         const val KIB = 1024.0
         const val FAST_GAP_MS = 80L
         const val SETTLE_MS = 150L
-        const val GC_WAIT_MS = 500L
-        const val MEMORY_SAMPLES = 3
         const val SCREENSHOT_WAIT_MS = 1_000L
         const val IDLE_LEAD_MS = 300L
         const val IDLE_AFTER_MS = 2_000L
@@ -842,4 +846,38 @@ class KeyboardPerfBaselineTest {
             HostDaemon.disconnect(TAG)
         }
     }
+}
+
+// bound anew in this process (as SoftKeyboardTest.selectThisInputMethod): am instrument force-stops this
+// package, and `ime set` on the one already chosen binds nothing anew on API 36: no keyboard to measure.
+// Out of the class, as [memoryLine]: its size (detekt LargeClass)
+private fun bindInThisProcess(imeId: String, imePkg: String, shell: (String) -> String) {
+    // the input method's service up in this process (the system's record of it, with this process's pid)
+    fun running() = shell("dumpsys activity services $imePkg").let {
+        FcitxInputMethodService::class.java.name in it && " ${Process.myPid()}:$imePkg" in it.replace("{", " ").replace("/", " ")
+    }
+    if (running()) return
+    shell("ime disable $imeId")
+    shell("ime enable $imeId")
+    shell("ime set $imeId")
+    val deadline = SystemClock.uptimeMillis() + 30_000
+    while (!running() && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(200)
+    check(running()) { "input method not running in this process" }
+}
+
+private const val GC_WAIT_MS = 500L
+private const val MEMORY_SAMPLES = 3
+
+// a [memory] row's line: the process's heaps, the median of MEMORY_SAMPLES after two collections
+private fun memoryLine(label: String, shell: (String) -> String): String {
+    repeat(2) {
+        Runtime.getRuntime().gc()
+        SystemClock.sleep(GC_WAIT_MS)
+    }
+    val samples = (1..MEMORY_SAMPLES).map {
+        SystemClock.sleep(GC_WAIT_MS)
+        Memory.parse(shell("dumpsys meminfo ${Process.myPid()}"))
+    }
+    fun median(of: (Memory) -> Int) = Stats(samples.map { of(it).toDouble() }).median.toInt()
+    return "memory\t$label\tjava ${median { it.javaHeap }} kB\tnative ${median { it.nativeHeap }} kB\tgraphics ${median { it.graphics }} kB\ttotal pss ${median { it.totalPss }} kB"
 }

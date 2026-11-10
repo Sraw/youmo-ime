@@ -33,7 +33,7 @@ object ThemeAssetLimits {
     const val MAX_PREVIEW_BYTES = 512L * 1024
     const val MAX_PREVIEW_SIDE = 2048
 
-    /** An SVG icon: a path and its fill take a few KB; more is a drawing, not an icon ([SvgSubset]). */
+    /** An SVG icon: a path and its fill take a few KB; more is a drawing, not an icon (scene.theme.SvgSubset). */
     const val MAX_ICON_BYTES = 64L * 1024
 
     /**

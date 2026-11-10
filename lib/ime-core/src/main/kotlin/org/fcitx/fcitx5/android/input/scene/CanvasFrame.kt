@@ -24,7 +24,7 @@ object CanvasFrame {
      * nothing), so both stay drawn and a press only changes their alpha, the face not shown at 0.
      */
     fun faces(pressed: Boolean, normalRecorded: Boolean, pressedRecorded: Boolean): List<Face> =
-        FACES[(if (pressed) PRESSED else 0) + (if (normalRecorded) NORMAL_RECORDED else 0) + (if (pressedRecorded) 1 else 0)]
+        FACES[(if (pressed) PRESSED else 0) + (if (normalRecorded) NORMAL_RECORDED else 0) + (if (pressedRecorded) PRESSED_RECORDED else 0)]
 
     private fun made(pressed: Boolean, normalRecorded: Boolean, pressedRecorded: Boolean): List<Face> = buildList {
         add(Face(pressed = false, alpha = if (pressed) 0f else 1f, record = !normalRecorded))
@@ -34,12 +34,13 @@ object CanvasFrame {
     // the eight answers made once: asked for each key in each frame, a list and its faces each time
     private const val PRESSED = 4
     private const val NORMAL_RECORDED = 2
-    private val FACES = List(PRESSED * 2) { i -> made(i and PRESSED != 0, i and NORMAL_RECORDED != 0, i and 1 != 0) }
+    private const val PRESSED_RECORDED = 1
+    private val FACES = List(PRESSED * 2) { i -> made(i and PRESSED != 0, i and NORMAL_RECORDED != 0, i and PRESSED_RECORDED != 0) }
 
     /**
      * The box a key's node is recorded in: its [bounds] and whatever of [ops] reaches past them (a
-     * shadow by its blur, a text by a generous guess of its ink, either turned any way about its
-     * point where it is rotated), [pad] more round it for the edges' anti-aliasing. The node is the
+     * shadow by its blur, a text by a generous guess of its ink with its letter spacing, stroke and
+     * shadow, either turned any way about its point where it is rotated), [pad] more round it for the edges' anti-aliasing. The node is the
      * key's place, not the whole view's, so what a key draws is all it holds; it does not narrow what a
      * frame redraws: a press invalidates the view, whose list of nodes is recorded again, all of it.
      */
@@ -58,8 +59,14 @@ object CanvasFrame {
                 is Op.Picture -> op.shape.bounds
                 is Op.Icon -> op.box.let { i -> if (op.rotation == 0.0) i else turned(i, (i.left + i.right) / 2, (i.top + i.bottom) / 2) }
                 is Op.Text -> {
-                    val wide = op.size * op.scaleX * (op.text.length + 1)
-                    val ink = Box(op.x - op.size, op.baseline - op.size * TEXT_UP, op.x + wide, op.baseline + op.size * TEXT_DOWN)
+                    // letter spacing (em) widens it; a stroke reaches round it, a shadow moved and blurred
+                    val spaced = op.size * op.letterSpacing.coerceAtLeast(0.0) * op.text.length
+                    val wide = op.size * op.scaleX * (op.text.length + 1) + spaced
+                    val o = op.stroke?.width ?: 0.0
+                    val glyphs = Box(op.x - op.size - o, op.baseline - op.size * TEXT_UP - o, op.x + wide + o, op.baseline + op.size * TEXT_DOWN + o)
+                    val ink = op.shadow?.let { sh ->
+                        glyphs.union(Box(glyphs.left + sh.dx - sh.blur, glyphs.top + sh.dy - sh.blur, glyphs.right + sh.dx + sh.blur, glyphs.bottom + sh.dy + sh.blur))
+                    } ?: glyphs
                     if (op.rotation == 0.0) ink else turned(ink, op.x, op.baseline)
                 }
             }

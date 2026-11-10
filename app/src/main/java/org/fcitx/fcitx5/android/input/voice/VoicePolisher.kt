@@ -11,7 +11,7 @@ import org.json.JSONObject
 
 /**
  * The polish tagger (060-voice-tagger.md: ELECTRA-small, int8, 21 MB): its model mapped from the
- * assets (`voice/polish-tagger.ort`, [OrtModel]) and its lists (`polish-tagger.json`: the
+ * voice pack (`voice/polish-tagger.ort` through AppData, [OrtModel]) and its lists (`polish-tagger.json`: the
  * characters, the ops, the marks after and the number classes). A [VoicePolishStream.Tagger] for [stream], run on the
  * thread that asks, the recognizer's; [close] when done.
  */

@@ -5,7 +5,9 @@
 package org.fcitx.fcitx5.android.eval
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -171,10 +173,12 @@ internal object VoicePostRun {
 
     fun read(file: File, source: String): List<Clip> = file.readLines().filter { it.isNotBlank() }.map { line ->
         val o = Json.parseToJsonElement(line).jsonObject
+        // `"written": null` is no written reference, not the text "null"
+        val written = (o["written"] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content
         Clip(
             o.getValue("wav").jsonPrimitive.content,
-            (o["written"] ?: o.getValue("ref")).jsonPrimitive.content,
-            "written" in o,
+            written ?: o.getValue("ref").jsonPrimitive.content,
+            written != null,
             o.getValue("stretches").jsonArray.map { s ->
                 val st = s.jsonObject
                 VoicePost.Stretch(text(st, source), (st.seconds("start") * 1000).toLong(), (st.seconds("end") * 1000).toLong())
@@ -183,7 +187,7 @@ internal object VoicePostRun {
     }
 
     private fun text(st: JsonObject, source: String) = when (source) {
-        "top" -> st.getValue("nbest").jsonArray.first().jsonPrimitive.content
+        "top" -> st.getValue("nbest").jsonArray.firstOrNull()?.jsonPrimitive?.content.orEmpty()
         else -> st.getValue("app").jsonPrimitive.content
     }
 

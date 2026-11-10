@@ -151,9 +151,11 @@ internal class KeySwipes(
     private fun swipeReached(key: KeyHandle, def: KeyDef, totalY: Int): Boolean {
         val preview = KeySwipe.preview(swipeKey(def), swipeLayers, totalY, keyboard.inPasswordField)
         if (preview == KeySwipe.Preview.Own) return false
+        val editMenu = preview == KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.EditMenu))
+        // the menu over a key the scene drawn last has not: nothing opens, so nothing felt
+        val bounds = if (editMenu) key.bounds ?: return false else null
         InputFeedbacks.hapticFeedback(key.feedback)
-        if (preview != KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.EditMenu))) return false
-        val bounds = key.bounds ?: return false
+        if (bounds == null) return false
         keyboard.onPopupAction(PopupAction.ShowEditMenuAction(key.ref, bounds, keyboard.inPasswordField))
         return true
     }

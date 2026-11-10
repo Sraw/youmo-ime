@@ -16,8 +16,6 @@ import org.fcitx.fcitx5.android.input.shortcut.EditPlan
  * text's offset, or [tracked] (the selection the service follows) where the editor gives none; else a
  * read of each side and the selection. Null where the editor gives neither.
  */
-// the API 31 calls are behind `sdk >= S`; lint cannot see through the parameter (tests pass the level)
-@SuppressLint("NewApi")
 internal fun readAround(
     ic: InputConnection,
     tracked: Int,
@@ -26,16 +24,7 @@ internal fun readAround(
     selected: Boolean,
     sdk: Int = Build.VERSION.SDK_INT,
 ): ClearedText.Read? {
-    if (sdk >= Build.VERSION_CODES.S) {
-        val around = ic.getSurroundingText(before, after, 0)
-        val start = around?.let { minOf(it.selectionStart, it.selectionEnd) } ?: -1
-        val end = around?.let { maxOf(it.selectionStart, it.selectionEnd) } ?: -1
-        if (around != null && start >= 0 && end <= around.text.length) {
-            val text = around.text.toString()
-            val at = if (around.offset >= 0) around.offset + start else tracked
-            return ClearedText.Read(EditPlan.Field(text.substring(0, start), text.substring(start, end), text.substring(end)), at)
-        }
-    }
+    if (sdk >= Build.VERSION_CODES.S) readSurrounding(ic, tracked, before, after)?.let { return it }
     return ClearedText.Read(
         EditPlan.Field(
             ic.getTextBeforeCursor(before, 0)?.toString() ?: return null,
@@ -44,4 +33,18 @@ internal fun readAround(
         ),
         tracked,
     )
+}
+
+// the text around the selection in one round trip (API 31): null where the editor gives none, or one
+// that does not hold together. Called only behind `sdk >= S`, which lint cannot see through (tests pass
+// the level): the suppression on these API 31 calls alone, not over any added to readAround
+@SuppressLint("NewApi")
+private fun readSurrounding(ic: InputConnection, tracked: Int, before: Int, after: Int): ClearedText.Read? {
+    val around = ic.getSurroundingText(before, after, 0) ?: return null
+    val start = minOf(around.selectionStart, around.selectionEnd)
+    val end = maxOf(around.selectionStart, around.selectionEnd)
+    if (start < 0 || end > around.text.length) return null
+    val text = around.text.toString()
+    val at = if (around.offset >= 0) around.offset + start else tracked
+    return ClearedText.Read(EditPlan.Field(text.substring(0, start), text.substring(start, end), text.substring(end)), at)
 }

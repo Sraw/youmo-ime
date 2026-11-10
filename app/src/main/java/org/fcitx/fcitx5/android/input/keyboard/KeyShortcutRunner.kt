@@ -36,7 +36,7 @@ class KeyShortcutRunner(
     private val tradSimp: () -> Unit,
     private val chooseKeyboard: () -> Unit,
     /** tap to talk started, or stopped, as by the bar's microphone */
-    private val voice: () -> Unit = {},
+    private val voice: () -> Unit,
     /** Whether something is typed (the engine's preedit shown): no clear is put back over it. */
     private val typing: () -> Boolean,
 ) {

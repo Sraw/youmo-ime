@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.junit.Assert.assertEquals
@@ -7,6 +11,7 @@ import java.io.File
  * A board's wiring, key by key, as committed text (060-render-p2 S5a M5): recorded from the views' KeyDef
  * (the old Layout, with the exceptions its test writes out), the scene's wiring compared against it. Each
  * line a key's id and what it does; `WIRING_RECORD=1` records them anew (review the diff before committing).
+ * contract: the committed wiring files, one line per key, id then what it does.
  */
 internal object WiringSnapshot {
     // where WIRING_RECORD=1 writes them (the module's directory the tests' working one); read from the classpath

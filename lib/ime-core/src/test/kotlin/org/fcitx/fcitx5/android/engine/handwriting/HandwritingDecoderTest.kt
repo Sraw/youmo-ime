@@ -295,7 +295,7 @@ class HandwritingDecoderTest {
         assertEquals(listOf("人"), blocking.decode(listOf(read("人"))).sentences)
     }
 
-    // 人 blocked, 天人 would show it again as its last: a character blocked is in no word either (review)
+    // 话 blocked, 谈话 would show it again as its last: a character blocked is in no word either
     @Test
     fun `a character blocked is in no word either`() {
         val hua = data.wordIndex.find("话")

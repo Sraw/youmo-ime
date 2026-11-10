@@ -13,19 +13,22 @@ package org.fcitx.fcitx5.android.input.voice
  * voice-eval's `numeval.py render_run`, but for these:
  * - a time's 半, 刻 and 整 and a bare hour stay characters (8点半, 8点一刻, 7点整, 8点), not 8:30, 7:00;
  *   an hour past 24 or minutes past 59 (八点七十), or 分 with no minutes (八点分), as said;
- * - 万/亿 at the end kept (33万, 3.5亿), where render writes the whole value;
+ * - a value's 万/亿 after a decimal kept (3.5亿), where render writes it as said;
  * - a value of two points (一点二点三) as said; a model's later part with a place by value (三点十二 3.12);
  * - a ratio with neither 比 nor 分之 as said; 百分之百 as said (百 alone reads as no number);
  * - digits with a place among them (一百二十三) read as a value, 123.
  */
 object ChineseNumbers {
 
-    /** The tagger's `num` classes, by name as its json lists them. */
+    /**
+     * The tagger's `num` classes, by name as its json lists them. A class this build does not know
+     * (a newer tagger's) is [NONE], its runs as said: the tagger's other labels still apply.
+     */
     enum class Kind {
         NONE, VALUE, DIGITS, DATE, TIME, MONEY, PERCENT, MODEL, RATIO;
 
         companion object {
-            fun of(name: String): Kind = Kind.valueOf(name.uppercase())
+            fun of(name: String): Kind = name.uppercase().let { n -> entries.firstOrNull { it.name == n } } ?: NONE
         }
     }
 
@@ -38,17 +41,23 @@ object ChineseNumbers {
 
     private const val MINUTES = 60
     private const val HOURS = 24
+    private const val HUNDRED = 100L
+
+    // the places a large value is a decimal of, smallest first
+    private val PLACES = listOf("万" to 10_000L, "亿" to 100_000_000L, "万亿" to 1_000_000_000_000L)
     private const val PERCENT = "百分之"
     private const val FRACTION = "分之"
 
     // what follows an hour's 点 and stays as said: 8点, 8点半, 8点整
     private val IN_CHARACTERS = setOf("", "半", "整")
+    private val QUARTERS = setOf("一刻", "三刻")
 
     /** [run] as [kind] writes it; as it was if it does not read so. */
     fun written(run: String, kind: Kind): String = when (kind) {
         Kind.NONE -> null
         // a place among them: the tagger's class wrong, the number read as said (一百二十三 123)
-        Kind.DIGITS -> if (run.any { it in SMALL || it in BIG }) value(run) else run.map { c -> DIGITS[c]?.let { "$it" } ?: "$c" }.joinToString("")
+        // a 点 among them: a version or an address (一九二点一六八), as a model
+        Kind.DIGITS -> if (run.any { it in SMALL || it in BIG }) value(run) else if ('点' in run) model(run) else run.map { c -> DIGITS[c]?.let { "$it" } ?: "$c" }.joinToString("")
         Kind.TIME -> time(run)
         Kind.PERCENT -> value(run.removePrefix(PERCENT))?.let { "$it%" }
         Kind.MODEL -> model(run)
@@ -68,13 +77,19 @@ object ChineseNumbers {
         return "$first.$fraction$big"
     }
 
-    /** 十点十五 10:15, 八点五分 8:05, 八点半, 八点一刻, 八点整 and 八点 in characters; null if no time. */
+    /**
+     * 十点十五 10:15, 八点五分 8:05, 八点半, 八点一刻, 八点整 and 八点 in characters; null if no time.
+     * 二十四点 is an hour, 二十四点三十 not; 八点五 (one character, no 分) may be 八点五十 misheard: as said.
+     */
     private fun time(s: String): String? {
         val point = s.indexOf('点')
         if (point < 0) return value(s)
         val hour = integerDigits(s.substring(0, point))?.takeIf { (it.toLongOrNull() ?: Long.MAX_VALUE) <= HOURS } ?: return null
         val said = s.substring(point + 1)
-        if (said in IN_CHARACTERS || said.endsWith("刻")) return "${hour}点$said"
+        // 二十四点 is a day's end, no time past it: 二十四点半 and 二十四点三十 stay as said
+        if (hour == "$HOURS" && said.isNotEmpty()) return null
+        if (said in IN_CHARACTERS || said in QUARTERS) return "${hour}点$said"
+        if (said.length == 1 && said != "十") return null
         val m = integerDigits(said.removeSuffix("分"))?.toIntOrNull()?.takeIf { it < MINUTES } ?: return null
         // not %02d, which writes the phone's language's digits (٠٥ in Arabic)
         return "$hour:" + "$m".padStart(2, '0')
@@ -100,10 +115,15 @@ object ChineseNumbers {
         return if (sep == FRACTION) "$b$out$a" else "$a$out$b"
     }
 
+    // 两 is no digit said one by one: 三点两 is no 3.2
     private fun digitByDigit(s: String): String? =
-        if (s.isNotEmpty() && s.all { it in DIGITS }) s.map { DIGITS.getValue(it) }.joinToString("") else null
+        if (s.isNotEmpty() && s.all { it in DIGITS && it != '两' }) s.map { DIGITS.getValue(it) }.joinToString("") else null
 
-    /** 三十三万 as 33万, 四百亿 as 400亿 and 三万亿 as 3万亿, as written; 十二万三千 in full. */
+    /**
+     * 三十三万 as 33万, 四百亿 as 400亿 and 三万亿 as 3万亿, as written; with more after the place, the largest
+     * place's decimal of at most two places (十二万三千 12.3万, 一亿两千三百万 1.23亿), the user's choice
+     * (2026-11-09) over 123000; in full where two places are not enough (一百二十三万四千五百六十七 1234567).
+     */
     private fun whole(raw: String): String? {
         val value = integerDigits(raw) ?: return null
         val places = raw.takeLastWhile { it in BIG }
@@ -111,7 +131,14 @@ object ChineseNumbers {
         if (places.isNotEmpty() && before.isNotEmpty() && before.none { it in BIG }) {
             integerDigits(before)?.let { return "$it$places" }
         }
-        return value
+        if (raw.none { it in BIG }) return value
+        val n = value.toLongOrNull() ?: return value
+        // 万亿 one place: 三万亿五千万 is 3000050000000, not 30000.5亿
+        val (name, unit) = PLACES.lastOrNull { it.second <= n } ?: return value
+        val hundredth = unit / HUNDRED
+        if (n % hundredth != 0L) return value
+        val fraction = "${n % unit / hundredth}".padStart(2, '0').trimEnd('0')
+        return "${n / unit}" + (if (fraction.isEmpty()) "" else ".$fraction") + name
     }
 
     /** The integer [raw] reads as, as digits; null if it does not read as one (万一, 十十, 二十亿万). */

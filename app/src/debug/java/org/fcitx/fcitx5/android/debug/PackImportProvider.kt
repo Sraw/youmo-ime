@@ -32,7 +32,8 @@ import java.io.File
  *
  * The UI's import goes through the system's file picker, which a test cannot drive the same on every
  * Android version; what it adds over this (the picker, the page's messages) is covered by
- * PacksFragment's Robolectric test. Debug builds only.
+ * PacksFragment's Robolectric test. Debug and benchmark builds (app/build.gradle.kts gives the
+ * benchmark build the debug sources too).
  */
 class PackImportProvider : ContentProvider() {
 
@@ -101,6 +102,9 @@ class PackImportProvider : ContentProvider() {
         shellOnly()
         val file = file(requireNotNull(uri.lastPathSegment) { "content://…uat.packs/<name>" })
         dir().mkdirs()
+        // a run stopped between its write and its import left that pack (up to some 180 MB) in the cache: one
+        // pack written at a time (uat.py, CI: write, import, the next), the others gone as a new one comes
+        if ('w' in mode) dir().listFiles()?.forEach { if (it.name != file.name) it.delete() }
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode))
     }
 

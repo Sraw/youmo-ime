@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.core.CoreLog
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
+import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.channels.FileChannel
@@ -152,18 +153,39 @@ class PackShelf(
      * against the keys again, and its files' sizes, not their contents (read at every start, a
      * pack's 300 MB would cost seconds): their contents were checked as they were copied, and are
      * read through after ([due], [verify]). One found damaged before, or of a size not its
-     * manifest's, is [PackStatus.Damaged].
+     * manifest's, is [PackStatus.Damaged]. With [tidy] false the leftovers stay for [tidy] to
+     * delete after: a caller waiting on the load (the app's main thread) does not wait on deletes.
      */
     @Synchronized
-    fun load() {
+    fun load(tidy: Boolean = true) {
         state = PackKind.entries.associateWith { kind -> loadOne(kind) }
+        if (tidy) tidy()
+    }
+
+    /** Deletes what [load] found left behind: anything but each pack's generation in use. */
+    @Synchronized
+    fun tidy() {
+        for (kind in PackKind.entries) {
+            val dir = File(root, kind.id)
+            // a pointer that cannot be read now (an I/O error): nothing deleted
+            val current = when (val read = currentOf(dir)) {
+                Current.Unreadable -> continue
+                is Current.Named -> read.name
+                Current.None -> null
+            }
+            // staging, older ones, a pointer half written
+            dir.listFiles()?.forEach { if (it.name != CURRENT && it.name != current) it.deleteRecursively() }
+        }
     }
 
     private fun loadOne(kind: PackKind): Held {
         val dir = File(root, kind.id)
-        val current = File(dir, CURRENT).takeIf { it.isFile }?.readText()?.trim()?.takeIf { PackManifest.safePath(it) && '/' !in it }
-        // anything but the generation in use: staging, older ones, a pointer half written
-        dir.listFiles()?.forEach { if (it.name != CURRENT && it.name != current) it.deleteRecursively() }
+        // a pointer that cannot be read now (an I/O error): no pack this time, nothing deleted
+        val current = when (val read = currentOf(dir)) {
+            Current.Unreadable -> return Held(PackStatus.Missing)
+            is Current.Named -> read.name
+            Current.None -> null
+        }
         if (current == null) return Held(PackStatus.Missing)
         val gen = File(dir, current)
         // unreadable, unsigned or unparsable: as good as none, imported anew
@@ -174,7 +196,7 @@ class PackShelf(
         }.getOrNull() ?: return Held(PackStatus.Missing)
         if (manifest.kind != kind) return Held(PackStatus.Missing)
         // found changed by a verify before, or a file of another size now (cut short, written over)
-        if (File(gen, DAMAGED).exists() || manifest.files.any { File(gen, it.path).length() != it.size }) {
+        if (File(gen, DAMAGED).exists() || manifest.files.any { File(gen, it.path).let { f -> !f.isFile || f.length() != it.size } }) {
             return Held(PackStatus.Damaged(manifest))
         }
         val status = judge(manifest)
@@ -192,9 +214,29 @@ class PackShelf(
     fun sweep() {
         for (kind in PackKind.entries) {
             val dir = File(root, kind.id)
-            val current = File(dir, CURRENT).takeIf { it.isFile }?.readText()?.trim() ?: continue
+            // none, unreadable or not a generation's name: nothing is known to be unused
+            val current = (currentOf(dir) as? Current.Named)?.name ?: continue
             dir.listFiles()?.forEach { if (it.name != CURRENT && it.name != current) it.deleteRecursively() }
         }
+    }
+
+    private sealed interface Current {
+        object None : Current
+        object Unreadable : Current
+        class Named(val name: String) : Current
+    }
+
+    // the generation [dir]'s pointer names: none if it has none or names no generation of [dir]
+    private fun currentOf(dir: File): Current {
+        val pointer = File(dir, CURRENT)
+        if (!pointer.isFile) return Current.None
+        val text = try {
+            pointer.readText().trim()
+        } catch (e: IOException) {
+            CoreLog.e("pack pointer $pointer unreadable: ${e.javaClass.simpleName}")
+            return Current.Unreadable
+        }
+        return if (PackManifest.safePath(text) && '/' !in text) Current.Named(text) else Current.None
     }
 
     /**
@@ -302,15 +344,22 @@ class PackShelf(
      */
     @Synchronized
     fun import(input: InputStream, progress: (copied: Long, total: Long) -> Unit = { _, _ -> }): ImportResult = try {
-        importZip(ZipInputStream(input), progress)
+        // the zip closed (its inflater's memory freed at once), [input] not
+        ZipInputStream(object : FilterInputStream(input) {
+            override fun close() = Unit
+        }).use { importZip(it, progress) }
     } catch (e: Refused) {
         ImportResult.Refused(e.why)
     } catch (e: IOException) {
         ImportResult.Refused(Refusal.Unreadable(e.message ?: e.javaClass.simpleName))
-    } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+    } catch (e: IllegalArgumentException) {
         // the zip itself malformed past what ZipException covers: an entry's name not UTF-8 is
         // ZipInputStream's IllegalArgumentException, which crashed the app's scope (and process)
         ImportResult.Refused(Refusal.NotAPack(e.message ?: e.javaClass.simpleName))
+    } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+        // the provider's stream failing otherwise (a SecurityException): not read, not "no pack"
+        CoreLog.e("pack import failed: ${e.javaClass.simpleName}")
+        ImportResult.Refused(Refusal.Unreadable(e.message ?: e.javaClass.simpleName))
     }
 
     private class Refused(val why: Refusal, cause: Throwable? = null) : Exception(cause)
@@ -354,11 +403,14 @@ class PackShelf(
 
         val dir = roomFor(manifest)
         val staging = File(dir, "$STAGING${System.nanoTime()}")
+        // the generation, till `current` names it: deleted if the import stops before
+        var unused: File? = null
         try {
             copyFiles(zip, manifest, staging, progress)
             File(staging, PackManifest.NAME).writeSynced(manifestBytes)
             File(staging, PackManifest.SIGNATURE).writeSynced(signature)
             val gen = File(dir, "g${System.currentTimeMillis()}-${System.nanoTime() % GEN_SPREAD}")
+            unused = gen
             staging.renameOrFail(gen)
             // a rename is the directory's change: synced, or a power cut could leave `current`
             // naming a generation whose rename was lost (then read as no pack: imported again)
@@ -367,6 +419,7 @@ class PackShelf(
             pointer.writeSynced(gen.name.toByteArray())
             // the one step that changes which pack is used
             pointer.renameOrFail(File(dir, CURRENT))
+            unused = null
             syncDir(dir)
             // not marked verified: read through at the next start (the copy checked as it was written, not as kept)
             state = state + (manifest.kind to Held(PackStatus.Ready(manifest), gen))
@@ -374,6 +427,7 @@ class PackShelf(
             // then [sweep] deletes it; a process ended before then, [load] does
         } finally {
             if (staging.exists()) staging.deleteRecursively()
+            unused?.takeIf { it.exists() }?.deleteRecursively()
         }
         return ImportResult.Imported(manifest, installed)
     }

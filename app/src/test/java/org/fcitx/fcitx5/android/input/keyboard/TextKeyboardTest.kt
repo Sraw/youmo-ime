@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.junit.Assert.assertArrayEquals
@@ -69,11 +68,6 @@ class TextKeyboardTest {
         assertEquals("/", previewOf("/", KeyRef.scene("slash", 0), shift, punctuation))
         assertEquals(".com", previewOf(".com", KeyRef.scene("domain", 0), shift, punctuation))
         // the full stop beside the space is the input method's, and a letter is as Shift has it
-        assertEquals("。", previewOf(".", KeyRef.scene("period", 0), shift, punctuation))
-        assertEquals("Q", previewOf("q", KeyRef.view(-1), shift, punctuation))
-        // the same keys the scene draws, by their names (060-render-p2 S1)
-        assertEquals(".", previewOf(".", KeyRef.scene("dot", 0), shift, punctuation))
-        assertEquals("/", previewOf("/", KeyRef.scene("slash", 0), shift, punctuation))
         assertEquals("。", previewOf(".", KeyRef.scene("period", 0), shift, punctuation))
         assertEquals("Q", previewOf("q", KeyRef.scene("q", 0), shift, punctuation))
     }

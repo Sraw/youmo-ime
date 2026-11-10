@@ -8,7 +8,7 @@ import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
-import org.fcitx.fcitx5.android.input.theme.SvgSubset
+import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.input.theme.ThemePackCheck
 import org.fcitx.fcitx5.android.scene.Parsed
@@ -230,6 +230,9 @@ object ThemePackFiles {
         return dirs.sortedByDescending { it.lastModified() }.take(ThemeAssetLimits.MAX_PACKS).flatMap { listed(it, builtins, builtIn) }
     }
 
+    /** What a kill left in [themes]' packs' SAVING cleared, as [list] with `sweep` does. */
+    fun sweepPacks(themes: File) = sweep(folder(themes))
+
     // a kill between a place's renames left the pack it replaced aside (`old-<random>/<name>`): put back where none
     // took its place; the rest (a pack half written, one being deleted, one replaced) cleared
     private fun sweep(root: File) {
@@ -269,7 +272,8 @@ object ThemePackFiles {
     }
 
     // [name] a plain file right in [dir] (a crafted name of the theme's, `..` say, never one out of it)
-    private fun inside(dir: File, name: String): Boolean {
+    @VisibleForTesting
+    internal fun inside(dir: File, name: String): Boolean {
         if (!isPlainFileName(name)) return false
         val f = File(dir, name)
         return f.isFile && try {

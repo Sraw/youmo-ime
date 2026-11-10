@@ -121,18 +121,38 @@ class PopupFocusTest {
         return at
     }
 
+    private class Slide(val why: String, val focus: () -> PopupFocus, val from: Int, val to: Int, val key: Int)
+
     @Test
-    fun towardANearEdgeTheStepsAreShorterSoTheLastKeyIsReachedOnScreen() {
-        // 3 columns in 30 less the slack of 3 and a pixel: steps of 26 / 2.5, the last by the edge
-        assertEquals(6, nearTheRight().slide(300, 330))
-        assertEquals(5, nearTheRight().slide(300, 328))
-        // halfway, the middle one; a whole step of 20 two keys at most
-        assertEquals(4, nearTheRight().slide(300, 310))
-        assertEquals(5, nearTheRight().slide(300, 320))
-        // the far side as before, a step of 20
-        assertEquals(2, nearTheRight().slide(300, 286))
-        assertEquals(3, nearTheRight().slide(300, 288))
-        assertEquals(0, nearTheRight().slide(300, 240))
+    fun aSlideFromTheStartEndsOnTheKeyItReaches() {
+        val roomy = { PopupFocus(
+            rows = listOf(intArrayOf(0, 1, 2, 3, 4, 5, 6)), startRow = 0, startColumn = 3,
+            stepX = 20f, stepY = 25f, cancelBelow = 50f, leftEdge = 0f, rightEdge = 1000f, minStepX = 10f,
+        ) }
+        val near = { nearTheRight() }
+        val atTheEdge = { nearTheRight(rightEdge = 301f) }
+        val someRoom = { nearTheRight(rightEdge = 325f) }
+        val rows = listOf(
+            // toward a near edge the steps are shorter: 3 columns in 30 less the slack of 3 and a pixel, steps of 26 / 2.5
+            Slide("near edge: the last key by the edge", near, 300, 330, 6),
+            Slide("near edge: two pixels short of it, the one before", near, 300, 328, 5),
+            Slide("near edge: halfway, the middle one", near, 300, 310, 4),
+            Slide("near edge: a whole step of 20 two keys at most", near, 300, 320, 5),
+            Slide("near edge: the far side a step of 20, not yet past it", near, 300, 288, 3),
+            Slide("near edge: the far side a step of 20, past it", near, 300, 286, 2),
+            Slide("near edge: the far side's last", near, 300, 240, 0),
+            // with room enough the steps are as before: the next key past half a step and the slack, 13
+            Slide("room enough: 12 right stays", roomy, 500, 512, 3),
+            Slide("room enough: 14 right moves", roomy, 500, 514, 4),
+            Slide("room enough: 12 left stays", roomy, 500, 488, 3),
+            Slide("room enough: 14 left moves", roomy, 500, 486, 2),
+            Slide("room enough: the last", roomy, 500, 560, 6),
+            // no step shorter than the least: the finger at the very edge, steps of half the least, 5, the slack 3 still
+            Slide("at the edge: 5 right stays", atTheEdge, 300, 305, 3),
+            Slide("at the edge: 6 right moves", atTheEdge, 300, 306, 4),
+            Slide("less room than the least: as short as it takes to reach the last", someRoom, 300, 325, 6),
+        )
+        assertRows(*rows.map { r -> r.why to { assertEquals(r.key, r.focus().slide(r.from, r.to)) } }.toTypedArray())
         // up the same as ever
         assertEquals(7, nearTheRight().apply { moveTo(300f, 0f) }.moveTo(300f, -25f))
     }
@@ -144,30 +164,5 @@ class PopupFocusTest {
         assertEquals(4, f.slide(300, 309))
         assertEquals(4, f.slide(309, 303))
         assertEquals(3, f.slide(303, 301))
-    }
-
-    @Test
-    fun withRoomEnoughTheStepsAreAsBefore() {
-        val f = { PopupFocus(
-            rows = listOf(intArrayOf(0, 1, 2, 3, 4, 5, 6)), startRow = 0, startColumn = 3,
-            stepX = 20f, stepY = 25f, cancelBelow = 50f, leftEdge = 0f, rightEdge = 1000f, minStepX = 10f,
-        ) }
-        // the next key past half a step and the slack: 13
-        assertEquals(3, f().slide(500, 512))
-        assertEquals(4, f().slide(500, 514))
-        assertEquals(3, f().slide(500, 488))
-        assertEquals(2, f().slide(500, 486))
-        assertEquals(6, f().slide(500, 560))
-    }
-
-    @Test
-    fun noStepIsShorterThanTheLeast() {
-        // the finger at the very edge: steps of half the least, 5, the slack 3 pixels still
-        val f = { nearTheRight(rightEdge = 301f) }
-        assertEquals(3, f().slide(300, 305))
-        assertEquals(4, f().slide(300, 306))
-        // with some room but less than the least: as short as it takes to reach the last
-        val g = { nearTheRight(rightEdge = 325f) }
-        assertEquals(6, g().slide(300, 325))
     }
 }

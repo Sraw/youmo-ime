@@ -49,7 +49,7 @@ adb shell am start -n org.fcitx.fcitx5.android.testbed/.MainActivity --es page b
   就比它的 `text` 和 composing 区间。这个 ContentProvider 是导出的（`content` 命令以 shell 身份调用），但只回答
   shell（uid 除以 100000 的余数是 2000，任何用户）和 root，别的 App 调用一律 SecurityException，所以不会给其他 App 开读取输入的口子；release 包里没有它。
 - WebView 页的框不在状态里：它们的事件经 `console.log` 进事件记录和 logcat（`web_input` `web_selection` 等，
-  `value` 是框的内容）。
+  `value` 是框的内容；密码框只记长度：`length`，`value` 写成「N 个字（密码只记长度）」）。
 
 ## 页面
 
@@ -94,7 +94,7 @@ adb shell am start -n org.fcitx.fcitx5.android.testbed/.MainActivity --es page b
 | `finish_composing_async` | 同上，但用 `post{}` 异步去掉 composing |
 | `phone_format` | TextWatcher 把手机号改成 3-4-4 加空格 |
 | `upper` | TextWatcher 把所有小写字母改成大写 |
-| `interval` `timed` | 按钮开始/停止：每隔 `interval` 秒（至少 1 秒）对 `timed` `setText(原文+"#")` 或 `setSelection(0)` |
+| `interval` `timed` | 按钮开始/停止：每隔 `interval` 秒（1–3600 秒）对 `timed` `setText(原文+"#")` 或 `setSelection(0)` |
 | `restart_target` | 按钮点一下对它 `restartInput` |
 | `no_digits` | InputFilter 不让输入数字 |
 | `null_extracted` | `getExtractedText`（和 API 33 的 `takeSnapshot`）返回 null。注意：幽默输入法只在横屏全屏提取时才读 extracted，竖屏下这个框看不出区别 |
@@ -118,7 +118,7 @@ assets 里的本地 `web.html`，不访问网络。框的 id：`w_text` `w_searc
 `switch_a` `switch_b` 两个框；按钮「2 秒后把焦点切到另一个框」（测说着话换框）；按钮「2 秒后跳到另一个
 Activity，再自动回来」（另一个 Activity 停 2 秒自己 finish）。
 
-定时任务和延时动作跟着页面走：换页或 Activity 销毁时取消，开着的对话框也一起关掉。
+定时任务和延时动作跟着页面走：换页或 Activity 销毁时取消，开着的对话框也一起关掉。转屏后仍停在原来的页面；在页面里按返回回到页面列表。
 
 ## 没做的
 

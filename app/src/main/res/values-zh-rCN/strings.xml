@@ -94,6 +94,8 @@
     <string name="expand_toolbar_by_default">默认展开工具栏</string>
     <string name="popup_on_key_press">按键时弹出显示字符</string>
     <string name="disable_animation">禁用动画</string>
+    <string name="keyboard_motion">键盘动效</string>
+    <string name="keyboard_motion_summary">按主题的设定让按键渐变、缩放。系统省电模式、“移除动画”或“禁用动画”时自动关闭</string>
     <string name="exception_logcat_created">Logcat 进程已创建</string>
     <string name="exception_theme_filename">只能导入主题文件（.theme）：%1$s 不是。以前导出的 .zip 主题改名成 .theme 就能导入。</string>
     <string name="theme_file_unnamed">这个文件</string>
@@ -302,7 +304,7 @@
     <string name="a11y_key_emoji">表情</string>
     <string name="voice_end_mark">语音句末句号</string>
     <string name="voice_end_mark_auto">按输入框：聊天、搜索框和单行输入框里不加</string>
-    <string name="voice_end_mark_keep">照说的保留</string>
+    <string name="voice_end_mark_keep">照说的保留（单行框仍不加）</string>
     <string name="voice_end_mark_drop">都不加</string>
     <string name="voice_input">语音输入</string>
     <string name="a11y_candidates_prev_page">上一页候选词</string>
@@ -429,6 +431,7 @@
     <string name="word_pinyin">拼音，如 you mo（留空自动填）</string>
     <string name="word_pinyin_invalid">拼音和词对不上：每个字一个音节</string>
     <string name="english_block_detail">英文 · 全小写的词不分大小写屏蔽</string>
+    <string name="english_block_detail_exact">英文 · 只屏蔽这样写的大小写</string>
     <plurals name="word_typed_times">
         <item quantity="other">%1$s · 打过 %2$d 次</item>
     </plurals>

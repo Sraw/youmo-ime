@@ -19,7 +19,7 @@ interface KeyHandle : KeyGesture.Key {
     val ref: KeyRef
 
     /**
-     * Where a popup over it is placed, in the window: the face across, to the cell's foot down
+     * Where a popup over it is placed, in the window: the face across, to the cell's foot down.
      * Null for a scene's key the scene drawn last has not: no popup over it.
      */
     val bounds: Rect?

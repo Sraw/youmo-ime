@@ -51,6 +51,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.scene.KeyRef
@@ -59,6 +60,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
@@ -566,11 +568,6 @@ class T9Keyboard(
 
     @Keep
     private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
-        showLanguageKey()
-    }
-
-    // the language key as the user has it
-    private fun showLanguageKey() {
         canvas?.invalidateScene()
     }
 
@@ -619,7 +616,6 @@ class T9Keyboard(
         // placed in onLayout, not shown before
         column.isInvisible = true
         add(column, lParams(0, 0))
-        showLanguageKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
         multiTapPref.registerOnChangeListener(multiTapListener)
         show(EngineState.T9State())
@@ -678,7 +674,6 @@ class T9Keyboard(
         if (!state.composing && was) multiTap.reset()
         columnState = state
         typing = state.composing
-        // only when it changes: setText does not skip the same text, and may lay the row out again
         val labels = labels(state, english, address)
         while (items.childCount < labels.size) items.addView(item(items.childCount))
         for (i in 0 until items.childCount) {
@@ -687,6 +682,7 @@ class T9Keyboard(
             if (view.isVisible) view.text = labels[i]
         }
         column.scrollTo(0, 0)
+        // the keys drawn anew only when typing starts or ends
         if (state.composing != was) canvas?.invalidateScene()
     }
 
@@ -726,7 +722,7 @@ class T9Keyboard(
             // a run of 连按 ends with it: the key pressed next is a letter of its own, in Shift's case
             multiTap.reset()
             shift.pressed(action.lock)
-            showShift()
+            canvas?.invalidateScene()
             super.onAction(action, source)
             return
         }
@@ -740,7 +736,7 @@ class T9Keyboard(
         val out = resolveEnglish(action, source, multiTap, time, typing, spells, shift.upper, runUpper, letters)
         if (startsLetter(out)) {
             runUpper = shift.typed()
-            showShift()
+            canvas?.invalidateScene()
             // a key English spells with: 1 right after it is an apostrophe, though the engine has not told of the word yet
             if (out !is KeyAction.CommitAction) typing = true
         }
@@ -752,18 +748,13 @@ class T9Keyboard(
 
     /** Shift on by itself where the editor [wants] a capital next, as [AutoCaps] decides; English's alone. */
     override fun applyAutoCaps(wants: Boolean) {
-        if (english && shift.auto(wants)) showShift()
+        if (english && shift.auto(wants)) canvas?.invalidateScene()
     }
 
     override fun onAttach() {
         super.onAttach()
         if (!english) return
         shift.reset()
-        showShift()
-    }
-
-    // Shift's icon, said too (as the full keyboard's), and the letters on the keys in its case
-    private fun showShift() {
         canvas?.invalidateScene()
     }
 
@@ -838,7 +829,8 @@ class T9Keyboard(
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
         // 微软's 九键双拼: scheme-types=semicolon, 1's `;` (nine.xml)
         val state = TextBoardState(semicolonScheme = shuangpin && semicolon, langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
-        val input = state.input().copy(ime = if (english) "english" else state.input().ime, composing = columnState.composing)
+        val base = state.input()
+        val input = base.copy(ime = if (english) "english" else base.ime, composing = columnState.composing)
         val texts = Texts(
             imeName = shownImeName.orEmpty(),
             returnLabel = returnAppearance.label(context).toString(),
@@ -866,7 +858,12 @@ class T9Keyboard(
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val c = canvas ?: return
-        val placed = c.slot(SIDE_KEY, columnSlot)
+        placing = true
+        val placed = try {
+            c.slot(SIDE_KEY, columnSlot)
+        } finally {
+            placing = false
+        }
         column.isInvisible = !placed
         if (!placed) return
         columnSlot.offset(c.left, c.top)
@@ -874,8 +871,8 @@ class T9Keyboard(
         // constraint pass sizing it otherwise (0×0) and this pass back would change its size each time, its
         // onSizeChanged posting a layout again, never done
         val lp = column.layoutParams as ConstraintLayout.LayoutParams
-        val at = listOf(columnSlot.left, columnSlot.top, columnSlot.width(), columnSlot.height())
-        if (listOf(lp.leftMargin, lp.topMargin, lp.width, lp.height) != at) {
+        val moved = lp.leftMargin != columnSlot.left || lp.topMargin != columnSlot.top
+        if (moved || lp.width != columnSlot.width() || lp.height != columnSlot.height()) {
             column.layoutParams = lParams(columnSlot.width(), columnSlot.height()) {
                 topOfParent(columnSlot.top)
                 leftOfParent(columnSlot.left)
@@ -887,6 +884,29 @@ class T9Keyboard(
         }
         column.layout(columnSlot.left, columnSlot.top, columnSlot.right, columnSlot.bottom)
     }
+
+    // in onLayout, which reads the scene (made there if it must be): placed already, nothing to ask
+    private var placing = false
+
+    // the scene made anew as it is drawn (a field's or an input method's scene, its spacing or padding
+    // another): the column placed by its slot again, or hidden with the keys, not left where the last
+    // layout put it
+    override fun onSceneBuilt(scene: Scene?) {
+        if (placing) return
+        // asked only when the slot moved, appeared or went: a scene made again for Shift or Return alone lays
+        // nothing out
+        val slot = scene?.slots?.firstOrNull { it.id == SIDE_KEY }
+        val c = canvas ?: return
+        if (slot == null) {
+            if (column.isVisible) requestLayout()
+            return
+        }
+        builtSlot.set(slot.bounds)
+        builtSlot.offset(c.left, c.top)
+        if (!column.isVisible || builtSlot != columnSlot) requestLayout()
+    }
+
+    private val builtSlot = Rect()
 
     // last: the scene reads the state above (the keys drawn by the scene engine, each wired as nine.xml's
     // node says; the column a native view in its slot)

@@ -69,7 +69,7 @@ class ThemeWriterTest {
         """<color name="$name" value="$value"/>"""
     }
 
-    // the canonical text itself, held: what an export writes changes only on purpose
+    // contract: the canonical text itself, held (the theme 4 text users export and share): what an export writes changes only on purpose
     @Test
     fun theCanonicalTextIsTheSnapshots() {
         val failed = listOf("material-light.xml", "writer-every.xml").mapNotNull { name ->

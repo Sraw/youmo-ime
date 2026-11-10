@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
-     Only the page's own four scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-a5cyWWJ7SHcYl1EAuuDyb+iBPKWJsPfMfCXG34DSG2w=' 'sha256-wL9khzE2V7GG6GFsnQBRcBiqPGA/uPyIZMxPbciyLJ4='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+     Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-Y+k0/rdu972SXK1xregtfqPMg6ZTmlS0Yde3J1pU1i8=' 'sha256-baOACp34qL5yASv8iXN42e426MwQumWHB3nOAV2mLx0=' 'sha256-jEIiXImw0cIGjU26fKv5AiTIr+4sfvgnp/9Kv07lCR4=' 'sha256-1MPYYfEica9EfwEBunzof3aSWcDYjpufnI1uwh8mAPQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -62,6 +62,23 @@ dialog h2 { margin: 0; font-size: 16px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
 #toast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 12px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 92vw; }
 #toast.on { opacity: 1; }
+/* the editing's forms (src/panels/) */
+.tab h3 { font-size: 13px; margin: 12px 0 4px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 0; }
+.row .what { min-width: 7em; color: var(--muted); font-size: 12px; }
+.row input[type="number"] { width: 5.5em; }
+.color { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.color input[type="color"] { width: 32px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
+.color input[type="range"] { width: 70px; }
+.color .expr { width: 12em; font: 12px ui-monospace, Menlo, monospace; }
+.clear { padding: 0 6px; }
+.selector code { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; }
+.group { border-left: 2px solid var(--line); padding-left: 6px; margin: 4px 0; }
+.sources { border-collapse: collapse; font-size: 12px; width: 100%; }
+.sources td { border-top: 1px solid var(--line); padding: 2px 4px; vertical-align: top; word-break: break-all; }
+.sources a { color: var(--accent); }
+.crop-canvas { max-width: 100%; touch-action: none; display: block; }
+.warnings { color: var(--warn); font-size: 12px; margin: 4px 0 8px; padding-left: 18px; }
 </style>
 <!-- the engine's fonts (tools/subset-fonts.py: Roboto's and Noto Sans SC's characters a keyboard shows) -->
 <style id="youmo-fonts">
@@ -72,7 +89,7 @@ dialog h2 { margin: 0; font-size: 16px; }
 </style>
 </head>
 <body>
-<header id="top">
+<header id="top" inert>
   <button id="file" aria-haspopup="menu">文件</button>
   <div id="file-menu" class="menu" role="menu" hidden>
     <button data-act="new" role="menuitem">新建…</button>
@@ -87,7 +104,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   <button id="env">环境</button>
   <a class="link" href="classic/">旧版</a>
 </header>
-<main id="main">
+<main id="main" inert>
   <section id="preview-area">
     <canvas id="preview" aria-label="键盘预览"></canvas>
     <div id="picked" class="muted"></div>
@@ -117,6 +134,11 @@ dialog h2 { margin: 0; font-size: 16px; }
     <label>键盘 <select id="env-board"></select></label>
     <label>形态 <select id="env-form-kind"></select></label>
     <label>Shift <select id="env-shift"><option value="none">关</option><option value="once">一次</option><option value="lock">锁定</option></select></label>
+    <label>输入框 <select id="env-field"><option value="text">文本</option><option value="password">密码</option><option value="url">网址</option><option value="number">数字</option><option value="email">邮箱</option></select></label>
+    <label>输入法 <select id="env-ime"><option value="pinyin">拼音</option><option value="shuangpin">双拼</option><option value="english">英文</option><option value="wubi">五笔</option><option value="cangjie">仓颉</option><option value="handwriting">手写</option></select></label>
+    <label>显示 <select id="env-show"><option value="">只有键盘</option><option value="preview">按键气泡</option><option value="keys">长按弹出</option><option value="menu">菜单</option></select></label>
+    <label>候选栏样例 <select id="env-bar"><option value="">不显示</option><option value="idle">空闲（工具栏）</option><option value="typing">输入中（候选词）</option></select></label>
+    <label>面板样例 <select id="env-sheet"><option value="">不显示</option><option value="clipboard">剪贴板</option><option value="picker">符号、表情</option><option value="editing">编辑</option><option value="voice">语音</option></select></label>
     <button value="close">完成</button>
   </form>
 </dialog>
@@ -125,8 +147,9 @@ dialog h2 { margin: 0; font-size: 16px; }
     <h2>新建主题</h2>
     <p>从内置主题开始：</p>
     <div id="builtins" class="cards"></div>
-    <p>从一张图片开始（图片做键盘背景）。配色用：</p>
+    <p>从一张图片开始（图片做键盘背景，之后在「背景」里裁切、在「配色」里取色）。先用这套配色：</p>
     <div id="image-base" class="cards" role="radiogroup" aria-label="图片主题的配色"></div>
+    <div class="cards" role="radiogroup" aria-label="浅色还是深色"><label><input type="radio" name="image-tone" value="light" checked> 浅色</label><label><input type="radio" name="image-tone" value="dark"> 深色</label></div>
     <button type="button" id="from-image">选图片…</button>
     <p>或者 <button type="button" id="from-file">打开文件…</button>（.theme：4.0、3.0、2.1）</p>
     <button value="cancel">取消</button>
@@ -139,6 +162,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   </form>
 </dialog>
 <input id="open-input" type="file" accept=".theme,.zip,.xml,application/zip" hidden>
+<input id="any-input" type="file" hidden>
 <input id="image-input" type="file" accept="image/png,image/jpeg,image/webp" hidden>
 <div id="toast" role="status" aria-live="polite"></div>
 <!-- generated by the app's tests (ThemeMakerFormatTest, ThemeMakerLayoutTest, EnginePaintTest): not edited by hand; -PupdateThemeMaker writes them -->
@@ -320,6 +344,7 @@ dialog h2 { margin: 0; font-size: 16px; }
         "pictureSide": 4096,
         "keyImageSide": 1024,
         "keyImageBytes": 2097152,
+        "iconBytes": 65536,
         "overrides": 400,
         "boardImageBytes": 12582912
     },
@@ -1738,42 +1763,8 @@ dialog h2 { margin: 0; font-size: 16px; }
     return doc(withName(xml, id + '-mine'));
   }
 
-  const PICTURE = /<picture\b[^>]*?(?:\/>|>[\s\S]*?<\/picture>)/;
-  const KEYBOARD_PICTURE = '<style select="keyboard" fill="picture"/>';
   // the comments of [xml] blanked (same length), so what is looked for is never found inside one
   const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => ' '.repeat(c.length));
-
-  /**
-   * A new document of [base] (a document) with [image] (its bytes, [type] png/jpg/webp: [pictureFile]'s) as the
-   * keyboard's picture: the source and each orientation's cut the same file, the keyboard showing it. The colours
-   * stay [base]'s (picking them from the picture comes with the page's crop and colours, M2/M3). A picture [base] had is replaced, its
-   * files dropped where nothing else names them.
-   */
-  function withPicture(base, image, type) {
-    const file = 'picture.' + type;
-    const picture = '  <picture src="' + file + '">\n    <cut orientation="portrait" file="' + file + '"/>\n    <cut orientation="landscape" file="' + file + '"/>\n  </picture>';
-    let xml = base.xml;
-    const files = doc('', base.files).files;
-    const old = PICTURE.exec(uncommented(xml));
-    if (old) {
-      const was = xml.slice(old.index, old.index + old[0].length);
-      xml = xml.slice(0, old.index).replace(/[ \t]*$/, '') + xml.slice(old.index + old[0].length).replace(/^[ \t]*\n/, '');
-      for (const m of was.matchAll(/\b(?:src|file)="([^"]+)"/g)) if (!xml.includes('"' + m[1] + '"')) delete files[m[1]];
-    }
-    // after the last <colors> (a theme of two versions has one for each), else after <theme …>: before fonts and styles
-    const plain = uncommented(xml);
-    const colors = plain.lastIndexOf('</colors>');
-    const open = /<theme\b[^>]*>/.exec(plain);
-    if (colors < 0 && !open) throw new Error('no <theme> to put a picture in');
-    const at = colors >= 0 ? colors + '</colors>'.length : open.index + open[0].length;
-    xml = xml.slice(0, at) + '\n' + picture + xml.slice(at);
-    if (!uncommented(xml).includes(KEYBOARD_PICTURE)) {
-      const end = uncommented(xml).lastIndexOf('</theme>');
-      xml = xml.slice(0, end).replace(/\s*$/, '') + '\n  ' + KEYBOARD_PICTURE + '\n' + xml.slice(end);
-    }
-    files[file] = image;
-    return doc(xml, files, base.layouts);
-  }
 
   // a picture the user picks is never kept as it was (the user's ruling, 2026-11-09): always encoded anew, its long
   // side no more than longSide (never made bigger), JPEG at quality; PNG only where it has transparency
@@ -1816,6 +1807,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     const named = new Set();
     for (const m of xml.matchAll(/<(picture|cut|font|icon)\b[^>]*?\b(src|file)="([^"]+)"/g)) named.add(m[3] + '|' + m[1]);
     for (const m of xml.matchAll(/\bimage\(\s*([^,)\s]+)/g)) named.add(m[1].replace(/^["']|["']$/g, '') + '|image');
+    for (const m of xml.matchAll(/<meta\b[^>]*?\bpreview="([^"]+)"/g)) named.add(m[1] + '|preview');
     for (const key of named) {
       const [file, role] = key.split('|');
       const bytes = d.files[file];
@@ -1826,6 +1818,19 @@ dialog h2 { margin: 0; font-size: 16px; }
         if (!s) bad(file + ' 不是 App 认得的图片');
         else if (Math.max(s[0], s[1]) > side) bad(file + ' 太大：' + s[0] + '×' + s[1] + '，最多 ' + side);
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
+      } else if (role === 'preview') {
+        // the app's ThemeAssetLimits.preview
+        const s = L.imageSize(bytes);
+        if (!s || !['png', 'webp'].includes(L.imageType(bytes))) bad(file + ' 不是 PNG 或 WebP');
+        else if (Math.max(s[0], s[1]) > 2048 || bytes.length > 512 * 1024) bad(file + ' 太大：预览图最大 2048×2048、512 KB');
+      } else if (role === 'icon') {
+        // the app keeps an icon only as an SVG of filled paths (SvgSubset, the engine's readIcon)
+        let text = null;
+        try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch (e) { /* not text: no SVG */ }
+        const r = text == null ? null : E.readIcon(text);
+        if (lim.iconBytes != null && bytes.length > lim.iconBytes) bad(file + ' 超过 ' + lim.iconBytes + ' 字节');
+        else if (!r) bad(file + ' 不是 SVG（App 只收 SVG 图标）');
+        else if (!r.ok) bad(file + '：' + r.problems[0].message);
       }
     }
     // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
@@ -2052,7 +2057,18 @@ dialog h2 { margin: 0; font-size: 16px; }
   const BOARDS = ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols', 'handwriting'];
 
   /** The environment's choices as the page starts. */
-  const ENV = { device: 'oneplus-6t', w: 1080, h: 2340, density: 2.625, landscape: false, board: 'qwerty', form: 'normal', dark: false, shift: 'none' };
+  /**
+   * The preview's environment (060-render-p3 §5.1 预览环境): the device, the board and its form; the field and the
+   * input method typed in (the theme's `@field=`, `@im=`); what is shown besides the keys: a popup (`show`: preview,
+   * keys, menu), the bar (`bar`: idle, typing) and a panel over the keys (`panel`: clipboard, picker, editing, voice).
+   */
+  const ENV = {
+    device: 'oneplus-6t', w: 1080, h: 2340, density: 2.625, landscape: false, board: 'qwerty', form: 'normal', dark: false, shift: 'none',
+    field: 'text', ime: 'pinyin', show: '', bar: 'idle', panel: '',
+  };
+  /** The fields and input methods the environment offers: the engine's (Selector.FIELDS, Selector.IMS). */
+  const FIELDS = ['text', 'password', 'url', 'number', 'email'];
+  const IMES = ['pinyin', 'shuangpin', 'english', 'wubi', 'cangjie', 'handwriting'];
 
   /** [e] (the page's choices) as the engine's EnvJson: the keyboard's width and height in px, the form's flags. */
   function envJson(e) {
@@ -2065,6 +2081,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     if (e.landscape) out.landscape = true;
     if (e.dark) out.dark = true;
     if (e.shift && e.shift !== 'none') out.shift = e.shift;
+    if ((e.field && e.field !== 'text') || (e.ime && e.ime !== 'pinyin')) out.input = { field: e.field || 'text', ime: e.ime || 'pinyin' };
     if (e.form === 'compact') out.compact = true;
     else if (e.form === 'floating') out.floating = 1;
     else if (e.form === 'left' || e.form === 'right') out.oneHanded = e.form;
@@ -2098,9 +2115,1766 @@ dialog h2 { margin: 0; font-size: 16px; }
   }
 
   root.YoumoMaker = {
-    THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV,
-    doc, themeName, withName, fromBuiltin, withPicture, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check,
+    THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check,
   };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script id="youmo-form">
+// youmo-form: what the editing's forms do to theme.xml (060-render-p3 §5.1, M2), apart from the page so node
+// tests it. A form edit finds the <style> whose select= is exactly the text it writes and changes that
+// attribute; none: a new style at the end. A style left with nothing but its select= goes. Everything else of
+// the text (comments, the user's own styles, their spacing) is kept as it was: only the attribute changed moves.
+(function (root) {
+  'use strict';
+
+  // the comments of [xml] blanked (same length), so what is looked for is never found inside one
+  const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '));
+  const unescape = (v) => v.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const escape = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const lineAt = (xml, i) => xml.slice(0, i).split('\n').length;
+  const ATTR = /([\w:-]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
+
+  /** [tag]'s attributes in order: `[[name, value]]`, values unescaped. */
+  function attrsOf(tag) {
+    const out = [];
+    for (const m of tag.matchAll(ATTR)) out.push([m[1], unescape(m[3] ?? m[4])]);
+    return out;
+  }
+
+  /** The elements named [name] of [xml], not in comments: `[{start, end, line, tag, attrs}]` (end: past the element). */
+  function elements(xml, name) {
+    const plain = uncommented(xml);
+    const re = new RegExp('<' + name + '\\b[^>]*?(\\/>|>)', 'g');
+    const out = [];
+    for (const m of plain.matchAll(re)) {
+      let end = m.index + m[0].length;
+      if (m[1] === '>') {
+        const close = plain.indexOf('</' + name + '>', end);
+        end = close < 0 ? end : close + name.length + 3;
+      }
+      out.push({ start: m.index, end, line: lineAt(xml, m.index), tag: xml.slice(m.index, m.index + m[0].length), attrs: attrsOf(xml.slice(m.index, m.index + m[0].length)) });
+    }
+    return out;
+  }
+
+  /** The theme's styles in order: `[{start, end, line, select, attrs: [[name, value]]}]` (attrs without select). */
+  function styles(xml) {
+    return elements(xml, 'style').map((e) => ({ ...e, select: (e.attrs.find((a) => a[0] === 'select') || [])[1] ?? null, attrs: e.attrs.filter((a) => a[0] !== 'select') }));
+  }
+
+  // [xml] with [start, end) replaced by [text]; a removal takes its line's indent and its line break with it
+  function splice(xml, start, end, text) {
+    if (text === '') {
+      const before = xml.slice(0, start).replace(/[ \t]*$/, '');
+      const after = xml.slice(end);
+      if (/\n$/.test(before) || before === '') return before + after.replace(/^[ \t]*\n/, '');
+      return before + after;
+    }
+    return xml.slice(0, start) + text + xml.slice(end);
+  }
+
+  // an element's tag with attribute [name] [value] (null: gone): changed in place, a new one at its end
+  function withAttr(tag, name, value) {
+    const re = new RegExp('(\\s)' + name.replace(/[-]/g, '\\-') + '\\s*=\\s*("[^"]*"|\'[^\']*\')');
+    if (re.test(tag)) {
+      if (value == null) return tag.replace(new RegExp('\\s+' + name.replace(/[-]/g, '\\-') + '\\s*=\\s*("[^"]*"|\'[^\']*\')'), '');
+      return tag.replace(re, (all, sp) => sp + name + '="' + escape(value) + '"');
+    }
+    if (value == null) return tag;
+    return tag.replace(/\s*(\/?>)$/, (all, close) => ' ' + name + '="' + escape(value) + '"' + close);
+  }
+
+  // two select= the same text but for their spacing (the engine reads " key  .letter " as "key .letter")
+  const spaced = (s) => String(s).trim().replace(/\s+/g, ' ');
+  const sameSelect = (a, b) => a != null && b != null && spaced(a) === spaced(b);
+
+  /** The style [select] gives [prop], null where no style of that select= (but for spacing) gives it (the last such style's). */
+  function valueOf(xml, select, prop) {
+    for (const s of styles(xml).reverse()) {
+      if (!sameSelect(s.select, select)) continue;
+      const a = s.attrs.find((x) => x[0] === prop);
+      if (a) return a[1];
+    }
+    return null;
+  }
+
+  // the order theme.xml's elements go in (ThemeReader): one put in goes after the last of its kind or before
+  const ORDER = ['meta', 'colors', 'picture', 'font', 'style', 'icon'];
+
+  /** [xml] with [text] (an element) put in where [kind]'s go: after the last of it or of a kind before it, else first in <theme>. */
+  function insert(xml, kind, text) {
+    const plain = uncommented(xml);
+    let at = -1;
+    for (const k of ORDER.slice(0, ORDER.indexOf(kind) + 1)) for (const e of elements(xml, k)) at = Math.max(at, e.end);
+    if (at < 0) {
+      const open = /<theme\b[^>]*>/.exec(plain);
+      if (!open) throw new Error('no <theme>');
+      at = open.index + open[0].length;
+    }
+    return xml.slice(0, at) + '\n  ' + text + xml.slice(at);
+  }
+
+  /**
+   * [xml] with the style of exactly [select] giving [prop] [value] (null: not giving it). The last style of that
+   * select= that gives it is changed, else the last of that select=, else a new one at the end of the styles.
+   * A style left with only its select= is taken out.
+   */
+  function setProp(xml, select, prop, value) {
+    const all = styles(xml).filter((s) => sameSelect(s.select, select));
+    const target = [...all].reverse().find((s) => s.attrs.some((a) => a[0] === prop)) || all[all.length - 1];
+    if (!target) {
+      if (value == null) return xml;
+      return insert(xml, 'style', '<style select="' + escape(select) + '" ' + prop + '="' + escape(value) + '"/>');
+    }
+    if (value == null && !target.attrs.some((a) => a[0] === prop)) return xml;
+    const tag = withAttr(target.tag, prop, value);
+    const left = attrsOf(tag).filter((a) => a[0] !== 'select');
+    const selfClosing = /\/>$/.test(target.tag);
+    if (!left.length && selfClosing) return splice(xml, target.start, target.end, '');
+    return splice(xml, target.start, target.start + target.tag.length, tag);
+  }
+
+  /** Several of [setProp]: `{prop: value}` on [select]. */
+  function setProps(xml, select, values) {
+    for (const [p, v] of Object.entries(values)) xml = setProp(xml, select, p, v);
+    return xml;
+  }
+
+  // ---- colours ----
+
+  /** The named colours (060-render-v2 §6), in the groups the 配色 page shows them. */
+  const COLOR_GROUPS = [
+    ['键盘', ['background', 'keyboard', 'spaceBar']],
+    ['按键', ['key', 'altKey', 'accentKey', 'keyPressHighlight', 'keyShadow', 'keyBorder']],
+    ['文字', ['keyText', 'altKeyText', 'accentKeyText', 'keyHint']],
+    ['候选栏', ['bar', 'candidateText', 'candidateLabel', 'candidateComment', 'toolbarIcon']],
+    ['弹出层', ['popupBackground', 'popupText', 'genericActiveBackground', 'genericActiveForeground']],
+    ['其它', ['divider', 'clipboardEntry']],
+  ];
+
+  // the <colors> of [variant] ('light': the one without variant=)
+  function colorsBlock(xml, variant) {
+    return elements(xml, 'colors').find((e) => ((e.attrs.find((a) => a[0] === 'variant') || [])[1] || 'light') === variant) || null;
+  }
+
+  /** [variant]'s colours as written: `{name: value}` (the text: `#…`, `@name`, `darker(@key, 8%)`…). */
+  function colors(xml, variant = 'light') {
+    const b = colorsBlock(xml, variant);
+    const out = {};
+    if (!b) return out;
+    for (const c of elements(xml.slice(0, b.end), 'color').filter((e) => e.start > b.start)) {
+      const a = Object.fromEntries(c.attrs);
+      if (a.name) out[a.name] = a.value;
+    }
+    return out;
+  }
+
+  /** [xml] with colour [name] of [variant] [value] (null: taken out); a <colors> made where there is none. */
+  function setColor(xml, name, value, variant = 'light') {
+    let b = colorsBlock(xml, variant);
+    // a <colors …/> with nothing in it: an open and a close, so a colour has where to go
+    if (b && /\/>$/.test(b.tag)) {
+      if (value == null) return xml;
+      xml = splice(xml, b.start, b.end, b.tag.replace(/\s*\/>$/, '>') + '\n  </colors>');
+      b = colorsBlock(xml, variant);
+    }
+    if (!b) {
+      if (value == null) return xml;
+      xml = insert(xml, 'colors', variant === 'light' ? '<colors>\n  </colors>' : '<colors variant="' + variant + '">\n  </colors>');
+      b = colorsBlock(xml, variant);
+    }
+    const inside = elements(xml.slice(0, b.end), 'color').filter((e) => e.start > b.start);
+    const own = inside.find((c) => c.attrs.some((a) => a[0] === 'name' && a[1] === name));
+    if (own) return value == null ? splice(xml, own.start, own.end, '') : splice(xml, own.start, own.start + own.tag.length, withAttr(own.tag, 'value', value));
+    if (value == null) return xml;
+    const close = xml.lastIndexOf('</colors>', b.end);
+    const indent = inside.length ? (/[ \t]*$/.exec(xml.slice(0, inside[0].start))[0]) : '    ';
+    const at = inside.length ? inside[inside.length - 1].end : close;
+    const text = '<color name="' + escape(name) + '" value="' + escape(value) + '"/>';
+    return inside.length ? xml.slice(0, at) + '\n' + indent + text + xml.slice(at) : xml.slice(0, at).replace(/[ \t]*$/, '') + indent + text + '\n  ' + xml.slice(at);
+  }
+
+  /** The <theme>'s variants= (`["light"]` where it says none). */
+  function variants(xml) {
+    const t = elements(xml, 'theme')[0];
+    const v = t && (t.attrs.find((a) => a[0] === 'variants') || [])[1];
+    return v ? v.split(/\s+/).filter(Boolean) : ['light'];
+  }
+
+  /**
+   * [xml] with a dark version or without: on, variants="light dark" and a <colors variant="dark"> as a copy of the
+   * light colours where it has none; off, variants="light" and the dark colours gone.
+   */
+  function withDark(xml, on) {
+    const t = elements(xml, 'theme')[0];
+    if (!t) throw new Error('no <theme>');
+    xml = splice(xml, t.start, t.start + t.tag.length, withAttr(t.tag, 'variants', on ? 'light dark' : 'light'));
+    const dark = colorsBlock(xml, 'dark');
+    if (on && !dark) {
+      const light = colors(xml, 'light');
+      xml = insert(xml, 'colors', '<colors variant="dark">\n  </colors>');
+      for (const [n, v] of Object.entries(light)) xml = setColor(xml, n, v, 'dark');
+    } else if (!on && dark) xml = splice(xml, dark.start, dark.end, '');
+    return xml;
+  }
+
+  /** `#rrggbb` (or `#aarrggbb`) of a colour picker's `#rrggbb` and an opacity 0–100. */
+  function hexOf(rgb, opacity = 100) {
+    const a = Math.round(Math.max(0, Math.min(100, opacity)) * 255 / 100);
+    return a === 255 ? rgb.toLowerCase() : '#' + a.toString(16).padStart(2, '0') + rgb.slice(1).toLowerCase();
+  }
+
+  /** `{rgb: "#rrggbb", opacity}` of a literal colour, null for any other text (a name, an expression). */
+  function parseHex(v) {
+    const m = /^#([0-9a-f]{6}|[0-9a-f]{8})$/i.exec(String(v || '').trim());
+    if (!m) return null;
+    const h = m[1].toLowerCase();
+    return h.length === 6 ? { rgb: '#' + h, opacity: 100 } : { rgb: '#' + h.slice(2), opacity: Math.round(parseInt(h.slice(0, 2), 16) * 100 / 255) };
+  }
+
+  // ---- the picture ----
+
+  /** The theme's <picture>: `{src, brightness, blur, cuts: {portrait: {file, rect}, landscape: …}}`, null for none. */
+  function picture(xml) {
+    const p = elements(xml, 'picture')[0];
+    if (!p) return null;
+    const a = Object.fromEntries(p.attrs);
+    const cuts = {};
+    for (const c of elements(xml.slice(0, p.end), 'cut').filter((e) => e.start > p.start)) {
+      const ca = Object.fromEntries(c.attrs);
+      if (ca.orientation) cuts[ca.orientation] = { file: ca.file, rect: ca.rect ? ca.rect.split(/\s+/).map(Number) : null };
+    }
+    return { src: a.src, brightness: a.brightness ? parseFloat(a.brightness) : 100, blur: a.blur ? parseFloat(a.blur) : 0, cuts };
+  }
+
+  /**
+   * [xml] with [p] as its <picture> (null: none). One there is changed in place: its src=, brightness=, blur= and
+   * each cut's file= and rect=, so what else it says (an attribute of a later app's, a comment) is kept; none there, one
+   * written. `{xml, gone}`: the files the old picture named that nothing names any more.
+   */
+  function setPicture(xml, p) {
+    const old = elements(xml, 'picture')[0];
+    const before = old ? xml.slice(old.start, old.end) : '';
+    const cutText = (o, c) => '<cut orientation="' + o + '" file="' + escape(c.file) + '"' + (c.rect ? ' rect="' + c.rect.map(Math.round).join(' ') + '"' : '') + '/>';
+    if (old && p) {
+      let tag = withAttr(old.tag, 'src', p.src);
+      tag = withAttr(tag, 'brightness', p.brightness != null && p.brightness !== 100 ? p.brightness + '%' : null);
+      tag = withAttr(tag, 'blur', p.blur ? p.blur + 'dp' : null);
+      // a <picture …/>: an open and a close, so a cut has where to go
+      const closed = /\/>$/.test(old.tag);
+      let body = closed ? '\n  </picture>' : xml.slice(old.start + old.tag.length, old.end);
+      if (closed) tag = tag.replace(/\s*\/>$/, '>');
+      for (const o of ['portrait', 'landscape']) {
+        const c = p.cuts[o];
+        const cut = elements(body, 'cut').find((e) => e.attrs.some((a) => a[0] === 'orientation' && a[1] === o));
+        if (cut && !c) body = splice(body, cut.start, cut.end, '');
+        else if (cut) {
+          const t = withAttr(withAttr(cut.tag, 'file', c.file), 'rect', c.rect ? c.rect.map(Math.round).join(' ') : null);
+          body = body.slice(0, cut.start) + t + body.slice(cut.start + cut.tag.length);
+        } else if (c) {
+          const close = body.lastIndexOf('</picture>');
+          body = body.slice(0, close).replace(/\s*$/, '') + '\n    ' + cutText(o, c) + '\n  ' + body.slice(close);
+        }
+      }
+      xml = xml.slice(0, old.start) + tag + body + xml.slice(old.end);
+    } else {
+      let text = '';
+      if (p) {
+        text = '<picture src="' + escape(p.src) + '"' + (p.brightness != null && p.brightness !== 100 ? ' brightness="' + p.brightness + '%"' : '') +
+          (p.blur ? ' blur="' + p.blur + 'dp"' : '') + '>';
+        for (const o of ['portrait', 'landscape']) if (p.cuts[o]) text += '\n    ' + cutText(o, p.cuts[o]);
+        text += '\n  </picture>';
+      }
+      if (old) xml = splice(xml, old.start, old.end, text);
+      else if (text) xml = insert(xml, 'picture', text);
+    }
+    const named = uncommented(xml);
+    const gone = [...before.matchAll(/\b(?:src|file)="([^"]+)"/g)].map((m) => m[1]).filter((f) => !named.includes('"' + f + '"') && !named.includes('(' + f));
+    return { xml, gone: [...new Set(gone)] };
+  }
+
+  /**
+   * The crop on a picture [w]×[h] for a keyboard [ratio] (width / height): the biggest box of that ratio, made
+   * [zoom] (≥ 1) times smaller, its centre at ([cx], [cy]) (0–1 of the picture) kept inside it. `[l, t, r, b]` px.
+   */
+  function cropRect(w, h, ratio, zoom = 1, cx = 0.5, cy = 0.5) {
+    let cw = Math.min(w, h * ratio);
+    let ch = cw / ratio;
+    const z = Math.max(1, zoom);
+    cw /= z;
+    ch /= z;
+    const l = Math.max(0, Math.min(w - cw, cx * w - cw / 2));
+    const t = Math.max(0, Math.min(h - ch, cy * h - ch / 2));
+    return [l, t, l + cw, t + ch].map((v) => Math.round(v));
+  }
+
+  // ---- the forms' values ----
+
+  /**
+   * The bounds the engine reads a style's numbers in (its Values; YoumoEngine.limits() says the same, form.test
+   * holds the two together): what the forms offer and write.
+   */
+  const LIMITS = {
+    lengthDp: 24, offsetDp: 16, borderDp: 3, blurDp: 25, depthDp: 8, scale: [85, 130], spacingEm: [-0.1, 0.5], stops: [2, 8],
+  };
+
+  /** [v] kept within [lo]..[hi] and rounded to [digits] decimals: a number as the engine reads it. */
+  function clamp(v, lo, hi, digits = 0) {
+    const k = 10 ** digits;
+    return Math.round(Math.max(lo, Math.min(hi, +v || 0)) * k) / k;
+  }
+
+  /**
+   * A fill's text: `{kind: solid, color}`, `{kind: linear, angle, stops: [[color, at%]]}`, `{kind: picture, blur?,
+   * brightness?, over?}`; its numbers kept to what the engine reads (an angle of 3 digits, 0–100 %, a blur to 25 dp).
+   */
+  function fillText(f) {
+    if (f.kind === 'solid') return f.color;
+    if (f.kind === 'linear') return 'linear(' + clamp(f.angle, -360, 360) + 'deg, ' + f.stops.map(([c, at]) => c + ' ' + clamp(at, 0, 100) + '%').join(', ') + ')';
+    if (f.kind === 'picture') return 'picture(' + clamp(f.blur ?? 0, 0, LIMITS.blurDp, 1) + 'dp, ' + clamp(f.brightness ?? 100, 0, 100) + '%' + (f.over ? ', ' + f.over : '') + ')';
+    if (f.kind === 'image') {
+      return 'image(' + f.file + ', ' + f.insets.map((v) => clamp(v, 0, 9999)).join(' ') + (f.scale && f.scale !== 1 ? ', ' + clamp(f.scale, 1, 8) + 'x' : '') + (f.fallback ? ', ' + f.fallback : '') + ')';
+    }
+    throw new Error('no fill of kind ' + f.kind);
+  }
+
+  /** [text] (a fill=) as fillText takes it; `{kind: other, text}` for what the form does not edit (an image). */
+  function parseFill(text) {
+    if (text == null) return null;
+    const t = text.trim();
+    let m = /^linear\((-?\d+)deg,\s*(.+)\)$/.exec(t);
+    if (m) {
+      const stops = splitTop(m[2]).map((s) => { const x = /^(.*\S)\s+(-?[\d.]+)%$/.exec(s.trim()); return x ? [x[1], +x[2]] : null; });
+      if (stops.every(Boolean)) return { kind: 'linear', angle: +m[1], stops };
+    }
+    m = /^picture\(([\s\S]*)\)$/.exec(t);
+    if (m) {
+      const [blur, brightness, over] = splitTop(m[1]).map((s) => s.trim());
+      return { kind: 'picture', blur: parseFloat(blur) || 0, brightness: brightness ? parseFloat(brightness) : 100, over: over || null };
+    }
+    m = /^image\(([^,()]+),\s*(\d{1,4}) (\d{1,4}) (\d{1,4}) (\d{1,4})(?:,\s*([1-8])x)?(?:,\s*(.+))?\)$/.exec(t);
+    if (m) return { kind: 'image', file: m[1].trim(), insets: [+m[2], +m[3], +m[4], +m[5]], scale: m[6] ? +m[6] : 1, fallback: m[7] ? m[7].trim() : null };
+    if (/^(image|nine)\(/.test(t)) return { kind: 'other', text: t };
+    return { kind: 'solid', color: t };
+  }
+
+  // [s] split at its commas not inside brackets
+  function splitTop(s) {
+    const out = [];
+    let depth = 0;
+    let from = 0;
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '(') depth++;
+      else if (s[i] === ')') depth--;
+      else if (s[i] === ',' && depth === 0) { out.push(s.slice(from, i)); from = i + 1; }
+    }
+    out.push(s.slice(from));
+    return out;
+  }
+
+  /** `dx dy blur colour` (dp) of a shadow, `none` where it has no colour. */
+  function shadowText(s) {
+    const o = LIMITS.offsetDp;
+    return s && s.color ? clamp(s.dx, -o, o, 1) + 'dp ' + clamp(s.dy, -o, o, 1) + 'dp ' + clamp(s.blur, 0, o, 1) + 'dp ' + s.color : 'none';
+  }
+
+  /** A shadow= text read: `{dx, dy, blur, color}`, null for none or what is not one. */
+  function parseShadow(t) {
+    const m = /^(-?[\d.]+)(?:dp)?\s+(-?[\d.]+)(?:dp)?\s+([\d.]+)(?:dp)?\s+(.+)$/.exec(String(t || '').trim());
+    return m ? { dx: +m[1], dy: +m[2], blur: +m[3], color: m[4] } : null;
+  }
+
+  /** A border=/stroke= text: `width colour`, `none` for no width. */
+  function borderText(b) {
+    return b && b.width > 0 && b.color ? clamp(b.width, 0, LIMITS.borderDp, 1) + 'dp ' + b.color : 'none';
+  }
+
+  function parseBorder(t) {
+    const m = /^([\d.]+)(?:dp)?\s+(.+)$/.exec(String(t || '').trim());
+    return m ? { width: +m[1], color: m[2] } : null;
+  }
+
+  /** An inset= (or padding=) text read: `[top, right, bottom, left]` dp, null for what is none (CSS's 1, 2 or 4 values). */
+  function parseInset(t) {
+    const v = String(t ?? '').trim().split(/\s+/).map((x) => (x === '0' ? 0 : /^-?[\d.]+dp$/.test(x) ? parseFloat(x) : NaN));
+    if (!t || !v.every(Number.isFinite)) return null;
+    if (v.length === 1) return [v[0], v[0], v[0], v[0]];
+    if (v.length === 2) return [v[0], v[1], v[0], v[1]];
+    return v.length === 4 ? v : null;
+  }
+
+  /** `[top, right, bottom, left]` as the shortest inset= text that says it. */
+  function insetText(v, max = LIMITS.lengthDp) {
+    const [t, r, b, l] = v.map((x) => clamp(x, 0, max, 1) + 'dp');
+    if (t === b && r === l) return t === r ? t : t + ' ' + r;
+    return [t, r, b, l].join(' ');
+  }
+
+  /** A radius= text read: its four corners dp (top left, top right, bottom right, bottom left); null for none or `50%`. */
+  function parseRadius(t) {
+    const v = String(t ?? '').trim().split(/\s+/).map((x) => (x === '0' ? 0 : /^[\d.]+dp$/.test(x) ? parseFloat(x) : NaN));
+    if (!t || !v.every(Number.isFinite)) return null;
+    if (v.length === 1) return [v[0], v[0], v[0], v[0]];
+    return v.length === 4 ? v : null;
+  }
+
+  /** Four corners as the shortest radius= text. */
+  function radiusText(v) {
+    const c = v.map((x) => clamp(x, 0, LIMITS.lengthDp, 1) + 'dp');
+    return c.every((x) => x === c[0]) ? c[0] : c.join(' ');
+  }
+
+  // ---- the theme's <meta> ----
+
+  /** The <meta>'s attributes (author, version, license, min-app, preview): `{name: value}`, {} for none. */
+  function meta(xml) {
+    const m = elements(xml, 'meta')[0];
+    return m ? Object.fromEntries(m.attrs) : {};
+  }
+
+  /** [xml] with <meta>'s [name] [value] (null or empty: taken out); a <meta/> made first where none, one left empty taken out. */
+  function setMeta(xml, name, value) {
+    if (value === '') value = null;
+    let m = elements(xml, 'meta')[0];
+    if (!m) {
+      if (value == null) return xml;
+      xml = insert(xml, 'meta', '<meta/>');
+      m = elements(xml, 'meta')[0];
+    }
+    const tag = withAttr(m.tag, name, value);
+    if (!attrsOf(tag).length && /\/>$/.test(tag)) return splice(xml, m.start, m.end, '');
+    return splice(xml, m.start, m.start + m.tag.length, tag);
+  }
+
+  // ---- selectors ----
+
+  /** A key's name in a selector: `\` before what would be read as the grammar's (a comma, a star, a colon…). */
+  const keyName = (id) => id.replace(/[\\,*:.[\]@\s/]/g, (c) => '\\' + c);
+
+  /** The ranges the 按键 and 字和图标 pages edit: what of the keyboard a style selects. */
+  const RANGES = [
+    ['all', '全部键'], ['letter', '字母'], ['function', '功能'], ['space', '空格'], ['enter', '回车'], ['picked', '选中的这个键'], ['board', '这块键盘的全部'],
+  ];
+  /** The scenes a range may be narrowed to (`@…`). */
+  const SCENES = [['', '任何时候'], ['compact', '紧凑时'], ['landscape', '横屏时'], ['flat', '平铺时'], ['floating', '悬浮时'], ['split', '分体时'], ['one-handed', '单手时'], ['dark', '深色时'], ['field=password', '密码框里']];
+  /** The states (`:…`). */
+  const STATES = [['', '普通'], ['pressed', '按下'], ['locked', '锁定'], ['shifted', 'Shift']];
+
+  /**
+   * The selector a page's choices write: [range] (RANGES) of [board] (and [key], the picked one's id), in [scene]
+   * (SCENES), in [state] (STATES), of [part] (a key's part, none: its face). Null where the range needs a key or a board it has not.
+   */
+  function selector({ range, board, key, scene = '', state = '', part = '' }) {
+    let w;
+    if (range === 'all') w = 'key';
+    else if (range === 'picked') { if (!board || !key) return null; w = board + '/' + keyName(key); }
+    else if (range === 'board') { if (!board) return null; w = board + '/*'; }
+    else w = 'key.' + range;
+    return (scene ? '@' + scene + ' ' : '') + w + (state ? ':' + state : '') + (part ? ' ' + part : '');
+  }
+
+  root.YoumoForm = {
+    uncommented, styles, elements, valueOf, setProp, setProps, insert, sameSelect, LIMITS, clamp,
+    COLOR_GROUPS, colors, setColor, variants, withDark, hexOf, parseHex,
+    picture, setPicture, cropRect,
+    fillText, parseFill, shadowText, parseShadow, borderText, parseBorder, parseInset, insetText, parseRadius, radiusText,
+    meta, setMeta,
+    keyName, RANGES, SCENES, STATES, selector,
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script id="youmo-panels">
+// youmo-panels: the editing's tabs (060-render-p3 §5.1, panels 1–11), one file each under src/panels/, put in
+// the page in their files' order (tools/assemble.mjs). Each pushes `{id, label, ops, render(el, api)}` onto
+// YoumoPanels: ops are what it does to a document (`{xml, files, layouts}` in, a new one out; node tests them),
+// render draws its form into el from api's document and environment, again after every change. This file: the
+// small form controls they share (none of them in node: no document there).
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels || (root.YoumoPanels = []);
+
+  /** A document like [d] with [xml] and [files] (d's own where none). */
+  panels.next = (d, xml, files = d.files) => ({ xml, files, layouts: d.layouts });
+
+  /** [files] without [names]: a copy. */
+  panels.without = (files, names) => {
+    const out = Object.create(null);
+    for (const k of Object.keys(files)) if (!names.includes(k)) out[k] = files[k];
+    return out;
+  };
+
+  /**
+   * A form's value as the text theme.xml has for a property of [kind] (panels 5–9, the widgets' rows): null where it
+   * is not set. `dp`/`percent` a number kept to [o].min..[o].max, `signed` too; `flag` true or false; `radius` one
+   * corner or four, `inset` four sides (F's), `twin` portrait and landscape (`[p, l]`, [o].unit); `ms` a duration.
+   * Every other kind (a colour, a word) is its text as it is.
+   */
+  panels.text = (F, kind, v, o = {}) => {
+    if (v == null || v === '') return null;
+    const n = (x) => F.clamp(x, o.min ?? 0, o.max ?? 9999, o.digits ?? 1);
+    switch (kind) {
+      case 'dp': return n(v) + 'dp';
+      case 'percent': return n(v) + '%';
+      case 'ms': return n(v) + 'ms';
+      case 'flag': return v ? 'true' : 'false';
+      case 'radius': return F.radiusText(Array.isArray(v) ? v : [v, v, v, v]);
+      case 'inset': return F.insetText(v, o.max);
+      case 'twin': return v[0] === v[1] ? n(v[0]) + o.unit : n(v[0]) + o.unit + ' ' + n(v[1]) + o.unit;
+      case 'border': return F.borderText(v);
+      case 'shadow': return F.shadowText(v);
+      default: return String(v);
+    }
+  };
+
+  /** [d] with [select]'s [prop] [v] (a form's value of [kind]; null: not set). */
+  panels.setProp = (d, F, select, prop, kind, v, o) => panels.next(d, F.setProp(d.xml, select, prop, panels.text(F, kind, v, o)));
+
+  /**
+   * A tab of widgets' styles (栏, 弹出, 面板和窗口): [def] `{id, label, parts: [{id, title, select, props, note?}],
+   * scenes?}` (props as ui.propRows takes them). The page chooses a part and a scene (`@…`, [def].scenes of F.SCENES:
+   * where the widget may differ), and edits the style of exactly that select=. Its ops (node tests them): `set(d,
+   * select, prop, kind, v, o)`, `selector(part, scene)`, the parts.
+   */
+  // [base] (a picked file's name) made a theme file's: `<prefix><base cleaned>.<type>`, a -2, -3 … where another file
+  // has that name already (never overwritten: another style may name it)
+  panels.fileName = (files, prefix, base, type) => {
+    let name = base.toLowerCase().replace(/\.[^.]*$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'image';
+    for (let i = 2; (prefix + name + '.' + type) in files; i++) name = name.replace(/-\d+$/, '') + '-' + i;
+    return prefix + name + '.' + type;
+  };
+
+  panels.widgetTab = (def) => {
+    const F = root.YoumoForm;
+    const chosen = { part: def.parts[0].id, scene: '' };
+    const selector = (part, scene) => (scene ? '@' + scene + ' ' : '') + part.select;
+    const ops = { set: (d, select, prop, kind, v, o) => panels.setProp(d, F, select, prop, kind, v, o), selector, parts: def.parts };
+    const scenes = F.SCENES.filter(([v]) => !def.scenes || v === '' || def.scenes.includes(v));
+    function render(el, api) {
+      const { h, row, select, propRows } = panels.ui;
+      const part = def.parts.find((x) => x.id === chosen.part) || def.parts[0];
+      el.append(row('部件', select(def.parts.map((x) => [x.id, x.title]), part.id, (v) => { chosen.part = v; api.rerender(); })));
+      if (!part.fixed) el.append(row('场景', select(scenes, chosen.scene, (v) => { chosen.scene = v; api.rerender(); })));
+      const sel = part.fixed ? part.select : selector(part, chosen.scene);
+      el.append(h('p', { className: 'selector' }, '这些改动写成 ', h('code', { textContent: sel })));
+      if (part.note) el.append(h('p', { className: 'muted', textContent: part.note }));
+      propRows(el, api, F, sel, part.props);
+      if (def.after) def.after(el, api, part);
+    }
+    panels.push({ id: def.id, label: def.label, ops, render });
+    return ops;
+  };
+
+  if (typeof document === 'undefined') return;
+
+  const h = (tag, props = {}, ...kids) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === 'on') for (const [ev, f] of Object.entries(v)) e.addEventListener(ev, f);
+      else if (k in e && k !== 'list') e[k] = v;
+      else e.setAttribute(k, v);
+    }
+    e.append(...kids.flat().filter((x) => x != null));
+    return e;
+  };
+
+  /** A labelled row. */
+  const row = (label, ...controls) => h('label', { className: 'row' }, h('span', { className: 'what' }, label), ...controls);
+
+  /** A select of [[value, text]], [value] chosen, [change] its value. */
+  const select = (options, value, change) => {
+    const s = h('select', { on: { change: () => change(s.value) } }, options.map(([v, t]) => h('option', { value: v, textContent: t })));
+    s.value = value;
+    return s;
+  };
+
+  /**
+   * A number field ([unit] after it); empty means not set (null). What is typed past [min]..[max] is taken as
+   * the bound (min= and max= do not stop typing); what is not a number (`1.2.3`, `-`) is not taken at all.
+   */
+  const number = (value, change, { min, max, step = 1, unit = '' } = {}) => {
+    const i = h('input', { type: 'number', value: value ?? '', on: { change: () => {
+      if (i.validity.badInput) return;
+      if (i.value === '') { change(null); return; }
+      let v = +i.value;
+      if (min != null && v < min) v = min;
+      if (max != null && v > max) v = max;
+      if (v !== +i.value) i.value = v;
+      change(v);
+    } } });
+    if (min != null) i.min = min;
+    if (max != null) i.max = max;
+    i.step = step;
+    return h('span', { className: 'num' }, i, unit ? ' ' + unit : '');
+  };
+
+  /**
+   * A colour: a picker and its opacity for a literal colour, a text field for anything (`@key`,
+   * `darker(@key, 8%)`, `system(primary, #…)`); [change] the text, null where it was emptied.
+   */
+  const color = (value, change, F) => {
+    const hex = F.parseHex(value);
+    const text = h('input', { type: 'text', className: 'expr', value: value ?? '', placeholder: '#rrggbb、@名字、darker(@key, 8%)…' });
+    const pick = h('input', { type: 'color', value: hex ? hex.rgb : '#000000' });
+    const alpha = h('input', { type: 'range', min: 0, max: 100, value: hex ? hex.opacity : 100, title: '不透明度' });
+    // an expression (`@key`, `darker(@key, 8%)`) is no colour the picker could show: touching it would write black
+    if (value != null && !hex) {
+      pick.disabled = true;
+      alpha.disabled = true;
+      pick.title = '这是表达式，在右边的文字框里改';
+    }
+    const fromPicker = () => change(F.hexOf(pick.value, +alpha.value));
+    pick.addEventListener('change', fromPicker);
+    alpha.addEventListener('change', fromPicker);
+    text.addEventListener('change', () => change(text.value.trim() === '' ? null : text.value.trim()));
+    return h('span', { className: 'color' }, pick, alpha, text);
+  };
+
+  const clear = (change) => h('button', { type: 'button', className: 'clear', textContent: '×', title: '不设（用别的样式的）', on: { click: () => change(null) } });
+
+  /**
+   * The rows of [props] for the style of exactly [sel] (`[{prop, label, kind, …}]`, kinds as panels.text has them,
+   * `choice` with [options], `flag`), each control writing when used and reading the document then (a tab is left
+   * as it is while a field of it is typed in: ui.js refreshTab). Under them what the engine warns of those styles
+   * (a property the widget does not read, in that state): the theme's own warnings of their lines.
+   */
+  const propRows = (el, api, F, sel, props, quiet = false) => {
+    const d = api.doc();
+    const val = (p) => F.valueOf(d.xml, sel, p);
+    const now = (p) => F.valueOf(api.doc().xml, sel, p);
+    const put = (p, kind, o) => (v) => api.apply((x) => panels.setProp(x, F, sel, p.prop, kind, v, o));
+    for (const p of props) {
+      const v = val(p.prop);
+      const o = p;
+      let controls;
+      if (p.kind === 'color') controls = [color(v, put(p, 'color'), F)];
+      else if (p.kind === 'dp' || p.kind === 'percent' || p.kind === 'ms') {
+        const unit = { dp: 'dp', percent: '%', ms: 'ms' }[p.kind];
+        controls = [number(v == null ? null : parseFloat(v), put(p, p.kind, o), { min: p.min ?? 0, max: p.max, step: p.step ?? 1, unit }), v != null && !Number.isFinite(parseFloat(v)) ? h('code', { textContent: v }) : null];
+      } else if (p.kind === 'choice') controls = [select([['', '不设']].concat(p.options), v ?? '', (x) => put(p, 'choice')(x || null))];
+      else if (p.kind === 'flag') controls = [select([['', '不设'], ['true', '是'], ['false', '否']], v ?? '', (x) => put(p, 'choice')(x || null))];
+      else if (p.kind === 'radius') {
+        const r = F.parseRadius(v);
+        const one = r && r.every((c) => c === r[0]);
+        // one corner while they are alike, the four (top left, top right, bottom right, bottom left) once they are not
+        const corner = (k) => (x) => {
+          if (x == null) { put(p, 'radius')(null); return; }
+          const was = F.parseRadius(now(p.prop)) || [0, 0, 0, 0];
+          was[k] = x;
+          put(p, 'radius')(was);
+        };
+        const opts = { min: 0, max: F.LIMITS.lengthDp, step: 0.5 };
+        controls = r && !one ? ['左上', '右上', '右下', '左下'].map((c, k) => number(r[k], corner(k), Object.assign({ unit: 'dp ' + c }, opts)))
+          : [number(one ? r[0] : null, put(p, 'radius'), Object.assign({ unit: 'dp' }, opts)), v != null && !r ? h('code', { textContent: v }) : null];
+      } else if (p.kind === 'inset') {
+        const i = F.parseInset(v);
+        controls = ['上', '右', '下', '左'].map((side, k) => number(i ? i[k] : null, (x) => {
+          if (x == null) { put(p, 'inset')(null); return; }
+          const was = F.parseInset(now(p.prop)) || [0, 0, 0, 0];
+          was[k] = x;
+          put(p, 'inset', o)(was);
+        }, { min: 0, max: p.max ?? F.LIMITS.lengthDp, step: 0.5, unit: 'dp ' + side }));
+      } else if (p.kind === 'twin') {
+        const parts = (v || '').trim().split(/\s+/).map(parseFloat);
+        const tw = v ? [parts[0], parts[parts.length - 1]] : null;
+        controls = ['竖', '横'].map((side, k) => number(tw ? tw[k] : null, (x) => {
+          if (x == null) { put(p, 'twin', o)(null); return; }
+          const t = (now(p.prop) || '').trim().split(/\s+/).map(parseFloat);
+          const was = t.length && Number.isFinite(t[0]) ? [t[0], t[t.length - 1]] : [x, x];
+          was[k] = x;
+          put(p, 'twin', o)(was);
+        }, { min: p.min ?? 0, max: p.max, step: p.step ?? 1, unit: p.unit + ' ' + side }));
+      } else if (p.kind === 'border') {
+        const b = F.parseBorder(v);
+        const putB = (patch) => put(p, 'border')(Object.assign({ width: 1, color: '#33000000' }, F.parseBorder(now(p.prop)), patch));
+        controls = [number(b ? b.width : null, (w) => (w ? putB({ width: w }) : put(p, 'choice')(null)), { min: 0, max: F.LIMITS.borderDp, step: 0.5, unit: 'dp' }),
+          b ? color(b.color, (c) => (c ? putB({ color: c }) : put(p, 'choice')(null)), F) : null];
+      } else if (p.kind === 'shadow') {
+        const sh = F.parseShadow(v);
+        const putS = (patch) => put(p, 'shadow')(Object.assign({ dx: 0, dy: 1, blur: 2, color: '#33000000' }, F.parseShadow(now(p.prop)), patch));
+        const lim = F.LIMITS.offsetDp;
+        controls = [number(sh ? sh.dy : null, (x) => (x == null ? put(p, 'choice')(null) : putS({ dy: x })), { min: -lim, max: lim, step: 0.5, unit: 'dp 偏移' }),
+          number(sh ? sh.blur : null, (x) => putS({ blur: x ?? 0 }), { min: 0, max: lim, step: 0.5, unit: 'dp 模糊' }),
+          sh ? color(sh.color, (c) => (c ? putS({ color: c }) : put(p, 'choice')(null)), F) : null];
+      } else controls = [h('input', { type: 'text', value: v ?? '', on: { change: (e) => put(p, 'text')(e.target.value.trim() || null) } })];
+      el.append(row(p.label, ...controls, p.note ? h('span', { className: 'muted', textContent: p.note }) : null));
+    }
+    if (!quiet) warnings(el, api, F, sel);
+  };
+
+  /** What the engine warns of the styles of exactly [sel] (their lines), one line each; nothing where none. */
+  const warnings = (el, api, F, sel) => {
+    const lines = new Set(F.styles(api.doc().xml).filter((s) => F.sameSelect(s.select, sel)).map((s) => s.line));
+    const said = api.problems().filter((p) => lines.has(p.line));
+    if (!said.length) return;
+    const ul = h('ul', { className: 'warnings' });
+    for (const p of said) ul.append(h('li', { className: p.level, textContent: '第 ' + p.line + ' 行：' + p.message }));
+    el.append(ul);
+  };
+
+  panels.ui = { h, row, select, number, color, clear, propRows, warnings };
+})(typeof window !== 'undefined' ? window : globalThis);
+// 配色 (060-render-p3 §5.1 panel 1): the named colours by group and the theme's own, a picker or an expression
+// each; the dark version's switch; colours worked out of the background picture.
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const F = root.YoumoForm;
+
+  // the version a colour is written to: the dark one where the theme has it and the preview shows it
+  const version = (xml, dark) => (dark && F.variants(xml).includes('dark') ? 'dark' : 'light');
+
+  const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  // WCAG's contrast of two colours' relative luminance (sRGB made linear)
+  const linear = (c) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const rel = ([r, g, b]) => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+  const contrast = (x, y) => { const [hi, lo] = [rel(x), rel(y)].sort((m, n) => n - m); return (hi + 0.05) / (lo + 0.05); };
+  // [over] (`[r, g, b, a]`, a 0–1) laid on [under]
+  const over = ([r, g, b, a], u) => [r * a + u[0] * (1 - a), g * a + u[1] * (1 - a), b * a + u[2] * (1 - a)];
+  const DARK_INK = [32, 33, 36];
+  const LIGHT_INK = [241, 243, 244];
+
+  /**
+   * Colours for keys over a picture whose pixels are [samples] (`[[r, g, b]]`), for its light or [dark] version:
+   * see-through keys (white veils light, black veils dark), the text whichever of the two inks reads better on a key
+   * as laid over the picture's middle, the accent the mean of its most vivid tenth (one noisy pixel is never it),
+   * its text the ink that reads on it. `{name: "#…"}`.
+   */
+  function fromPicture(samples, dark = null) {
+    if (!samples.length) return {};
+    const sorted = samples.map(lum).sort((x, y) => x - y);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const light = dark == null ? median > 0.5 : !dark;
+    const mean = [0, 1, 2].map((i) => samples.reduce((t, px) => t + px[i], 0) / samples.length);
+    const hex = ([r, g, b]) => '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+    const score = (px) => { const max = Math.max(...px); return max ? ((max - Math.min(...px)) / max) * max : 0; };
+    const vivid = [...samples].sort((x, y) => score(y) - score(x)).slice(0, Math.max(1, Math.ceil(samples.length / 10)));
+    const accent = [0, 1, 2].map((i) => vivid.reduce((t, px) => t + px[i], 0) / vivid.length);
+    const veil = light ? [255, 255, 255, 0.4] : [0, 0, 0, 0.3];
+    const keyOn = over(veil, mean);
+    const ink = contrast(DARK_INK, keyOn) >= contrast(LIGHT_INK, keyOn) ? DARK_INK : LIGHT_INK;
+    const inkHex = hex(ink);
+    const accentInk = contrast(DARK_INK, accent) >= contrast([255, 255, 255], accent) ? '#202124' : '#ffffff';
+    return {
+      key: light ? '#66ffffff' : '#4d000000',
+      altKey: light ? '#40ffffff' : '#66000000',
+      spaceBar: light ? '#66ffffff' : '#4d000000',
+      accentKey: hex(accent),
+      keyText: inkHex,
+      altKeyText: inkHex,
+      accentKeyText: accentInk,
+      keyHint: '#99' + inkHex.slice(1),
+      keyShadow: '#00000000',
+      keyPressHighlight: light ? '#1f000000' : '#33ffffff',
+    };
+  }
+
+  const ops = {
+    /** [d] with colour [name] [value] (null: taken out) in the version [dark] shows. */
+    set: (d, name, value, dark) => panels.next(d, F.setColor(d.xml, name, value, version(d.xml, dark))),
+    /** [d] with its dark version on or off. */
+    dark: (d, on) => panels.next(d, F.withDark(d.xml, on)),
+    /** [d] with [colors] (fromPicture's) written in the version [dark] shows. */
+    many: (d, colors, dark) => {
+      let xml = d.xml;
+      for (const [n, v] of Object.entries(colors)) xml = F.setColor(xml, n, v, version(xml, dark));
+      return panels.next(d, xml);
+    },
+    /** [d] with fromPicture's colours of [samples] in each version it has, each worked out for its own (light, dark; a theme of one version: [dark], null as the picture is). */
+    fromPictureAll: (d, samples, dark = null) => {
+      let xml = d.xml;
+      const vs = F.variants(xml);
+      for (const v of vs) for (const [n, c] of Object.entries(fromPicture(samples, vs.length > 1 ? v === 'dark' : dark))) xml = F.setColor(xml, n, c, v);
+      return panels.next(d, xml);
+    },
+    fromPicture, contrast,
+  };
+
+  function render(el, api) {
+    const { h, row, color } = panels.ui;
+    const d = api.doc();
+    const which = version(d.xml, api.env().dark);
+    const own = F.colors(d.xml, which);
+    const hasDark = F.variants(d.xml).includes('dark');
+    const darkBox = h('input', { type: 'checkbox', checked: hasDark, on: { change: () => api.apply((x) => ops.dark(x, darkBox.checked)) } });
+    el.append(
+      h('p', { className: 'muted' }, '写的是' + (which === 'dark' ? '深色' : '浅色') + '版的颜色' + (hasDark ? '（顶栏切浅/深）' : '') + '。可以用取色器，也可以写表达式：@key、darker(@key, 8%)、system(primary, #6750a4)。'),
+      row('这个主题有深色版', darkBox),
+    );
+    const pictureButton = h('button', { type: 'button', textContent: '从背景图取色', disabled: !F.picture(d.xml), on: { click: async () => {
+      const samples = await api.pictureSamples();
+      if (!samples || !samples.length) { api.toast('背景图还没读进来'); return; }
+      api.apply((x) => ops.fromPictureAll(x, samples));
+      api.toast('已按背景图重算按键和文字的颜色（可撤销）');
+    } } });
+    el.append(h('p', {}, pictureButton));
+    const named = new Set();
+    for (const [group, names] of F.COLOR_GROUPS) {
+      el.append(h('h3', { textContent: group }));
+      for (const n of names) {
+        named.add(n);
+        el.append(row(n, color(own[n] ?? null, (v) => api.apply((x) => ops.set(x, n, v, api.env().dark)), F)));
+      }
+    }
+    const extra = Object.keys(own).filter((n) => !named.has(n));
+    el.append(h('h3', { textContent: '自己加的' }));
+    for (const n of extra) el.append(row(n, color(own[n], (v) => api.apply((x) => ops.set(x, n, v, api.env().dark)), F)));
+    const name = h('input', { type: 'text', placeholder: '名字（字母开头）' });
+    el.append(row('加一个', name, h('button', { type: 'button', textContent: '加', on: { click: () => {
+      const n = name.value.trim();
+      if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(n)) { api.toast('名字要字母开头，只用字母、数字、- 和 _'); return; }
+      api.apply((x) => ops.set(x, n, '#808080', api.env().dark));
+    } } })));
+  }
+
+  panels.push({ id: 'colors', label: '配色', ops, render });
+})(typeof window !== 'undefined' ? window : globalThis);
+// 背景 (060-render-p3 §5.1 panel 2): the keyboard's picture, a crop for portrait and one for landscape (a box of
+// the keyboard's shape, moved and zoomed on the picture; each cut its own file, as the app draws the cut), its
+// brightness and blur, the keys see-through to it.
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const F = root.YoumoForm;
+  const ORIENTATIONS = [['portrait', '竖屏'], ['landscape', '横屏']];
+  const THROUGH = 'picture(0dp, 100%, #66ffffff)';
+  // the keys 透出 makes see-through (060-render-p3 §5.1 panel 2), each with the colour it has again when turned off
+  const THROUGH_KEYS = [['key', 'key'], ['key.function', 'altKey'], ['key.enter', 'accentKey'], ['key.space', 'key']];
+
+  // [xml] with every THROUGH_KEYS style see-through ([on]), or those whose fill [was] says back to their colour
+  // (the theme's colour of that name; none: the fill taken out, the wider style's shows)
+  function seeThrough(xml, on, was = (f) => f === THROUGH) {
+    const colors = F.colors(xml);
+    for (const [sel, color] of THROUGH_KEYS) {
+      if (on) xml = F.setProp(xml, sel, 'fill', THROUGH);
+      else {
+        const f = F.valueOf(xml, sel, 'fill');
+        if (f != null && was(f)) xml = F.setProp(xml, sel, 'fill', color in colors ? '@' + color : null);
+      }
+    }
+    return xml;
+  }
+
+  const ops = {
+    /**
+     * [d] with [p] its picture: `{type, src: bytes, cuts: {portrait: {bytes, type, rect}, landscape: …}}` (the
+     * picture and its cuts made as the page encodes pictures), the keyboard showing it; null: none, the keyboard its
+     * colour again. Files the old one had that nothing else names go.
+     */
+    setPicture(d, p) {
+      let files = Object.assign(Object.create(null), d.files);
+      let xml = d.xml;
+      let written = null;
+      if (p) {
+        const src = 'picture.' + p.type;
+        const cuts = {};
+        for (const [o] of ORIENTATIONS) {
+          const c = p.cuts[o];
+          if (!c) continue;
+          cuts[o] = { file: 'picture-' + o + '.' + c.type, rect: c.rect };
+        }
+        written = { src, brightness: 100, blur: 0, cuts };
+        const old = F.picture(xml);
+        if (old) Object.assign(written, { brightness: old.brightness, blur: old.blur });
+      }
+      const set = F.setPicture(xml, written);
+      xml = set.xml;
+      files = panels.without(files, set.gone);
+      if (p) {
+        files[written.src] = p.src;
+        for (const [o, c] of Object.entries(written.cuts)) files[c.file] = p.cuts[o].bytes;
+        xml = F.setProp(xml, 'keyboard', 'fill', 'picture');
+      } else {
+        // keys see-through to a picture there no longer is: their colours again
+        xml = seeThrough(xml, false, (f) => /^\s*picture\(/.test(f));
+      }
+      if (!p && F.valueOf(xml, 'keyboard', 'fill') === 'picture') {
+        xml = F.setProp(xml, 'keyboard', 'fill', 'background' in F.colors(xml) ? '@background' : null);
+      }
+      return { xml, files, layouts: d.layouts };
+    },
+
+    /** [d] with one orientation's cut made anew: [cut] `{bytes, type, rect}`. */
+    setCut(d, orientation, cut) {
+      const p = F.picture(d.xml);
+      if (!p) return d;
+      const file = 'picture-' + orientation + '.' + cut.type;
+      p.cuts[orientation] = { file, rect: cut.rect };
+      const set = F.setPicture(d.xml, p);
+      const files = panels.without(d.files, set.gone);
+      files[file] = cut.bytes;
+      return { xml: set.xml, files, layouts: d.layouts };
+    },
+
+    /** [d] with its picture's brightness (%) and blur (dp) as [t] has them. */
+    tune(d, t) {
+      const p = F.picture(d.xml);
+      if (!p) return d;
+      return panels.next(d, F.setPicture(d.xml, Object.assign(p, t)).xml);
+    },
+
+    /** [d] with every key see-through to the picture (a light veil over it), or its fill its colour again. */
+    through(d, on) {
+      return panels.next(d, seeThrough(d.xml, on));
+    },
+
+    /** The keyboard's width over its height in [env] (the page's: its device and orientation): the crop's shape. */
+    ratio(env) {
+      const j = root.YoumoMaker.envJson(Object.assign({}, env, { form: 'normal' }));
+      return j.width / j.height;
+    },
+  };
+
+  // a crop moved or zoomed and not yet cut (用这个裁切), by its box's key: the tab drawn again (another edit, a key
+  // tapped on the preview) shows it where it was left
+  const moved = new Map();
+
+  // the crop box on the picture: a canvas of it, the box dragged, a slider zooms
+  function cropper(api, d, orientation) {
+    const { h, row } = panels.ui;
+    const p = F.picture(d.xml);
+    const bmp = api.bitmap(p.src);
+    const box = h('div', { className: 'crop' });
+    if (!bmp) return h('p', { className: 'muted', textContent: '图片还没读进来' });
+    const env = Object.assign({}, api.env(), { landscape: orientation === 'landscape' });
+    const ratio = ops.ratio(env);
+    const was = p.cuts[orientation] && p.cuts[orientation].rect;
+    const bytes = d.files[p.src];
+    const key = [orientation, p.src, bytes ? api.lib.contentId(bytes) : '', bmp.width + 'x' + bmp.height, ratio, String(was)].join('|');
+    const state = moved.get(key) || { zoom: 1, cx: 0.5, cy: 0.5 };
+    moved.set(key, state);
+    if (was && state.zoom === 1 && state.cx === 0.5 && state.cy === 0.5) {
+      const full = F.cropRect(bmp.width, bmp.height, ratio);
+      state.zoom = Math.max(1, (full[2] - full[0]) / Math.max(1, was[2] - was[0]));
+      state.cx = (was[0] + was[2]) / 2 / bmp.width;
+      state.cy = (was[1] + was[3]) / 2 / bmp.height;
+    }
+    const c = h('canvas', { className: 'crop-canvas' });
+    const scale = Math.min(1, 480 / Math.max(bmp.width, bmp.height));
+    c.width = Math.round(bmp.width * scale);
+    c.height = Math.round(bmp.height * scale);
+    const g = c.getContext('2d');
+    const rect = () => F.cropRect(bmp.width, bmp.height, ratio, state.zoom, state.cx, state.cy);
+    const draw = () => {
+      g.drawImage(bmp, 0, 0, c.width, c.height);
+      const [l, t, r, b] = rect().map((v) => v * scale);
+      g.fillStyle = 'rgba(0,0,0,.5)';
+      g.fillRect(0, 0, c.width, t);
+      g.fillRect(0, b, c.width, c.height - b);
+      g.fillRect(0, t, l, b - t);
+      g.fillRect(r, t, c.width - r, b - t);
+      g.strokeStyle = '#fff';
+      g.lineWidth = 2;
+      g.strokeRect(l, t, r - l, b - t);
+    };
+    let drag = null;
+    c.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, cx: state.cx, cy: state.cy }; c.setPointerCapture(e.pointerId); });
+    c.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const r = c.getBoundingClientRect();
+      state.cx = drag.cx + (e.clientX - drag.x) / r.width;
+      state.cy = drag.cy + (e.clientY - drag.y) / r.height;
+      // kept where the box can be: its centre inside the room it has
+      const [l, t, rr, b] = rect();
+      state.cx = (l + rr) / 2 / bmp.width;
+      state.cy = (t + b) / 2 / bmp.height;
+      draw();
+    });
+    c.addEventListener('pointerup', () => { drag = null; });
+    const zoom = h('input', { type: 'range', min: 1, max: 4, step: 0.05, value: state.zoom, on: { input: () => { state.zoom = +zoom.value; draw(); } } });
+    const done = h('button', { type: 'button', textContent: '用这个裁切', on: { click: async () => {
+      try {
+        const cut = await api.cutPicture(p.src, rect());
+        moved.delete(key);
+        api.apply((x) => ops.setCut(x, orientation, cut));
+      } catch (e) {
+        api.toast('裁切失败：' + (e.message || e));
+      }
+    } } });
+    draw();
+    box.append(c, row('放大', zoom), done);
+    // what its handlers hold (the picture decoded, its crop, the keyboard's shape): another, and the tab's in-place
+    // update (ui.js sync) puts this box in whole instead of keeping the old one's canvas and handlers
+    box.dataset.key = key;
+    return box;
+  }
+
+  function render(el, api) {
+    const { h, row, number } = panels.ui;
+    const d = api.doc();
+    const p = F.picture(d.xml);
+    el.append(h('p', {}, h('button', { type: 'button', textContent: p ? '换一张图片…' : '选图片…', on: { click: async () => {
+      const made = await api.choosePicture();
+      if (made) api.apply((x) => ops.setPicture(x, made));
+    } } }), ' ', p ? h('button', { type: 'button', textContent: '去掉图片', on: { click: () => api.apply((x) => ops.setPicture(x, null)) } }) : null));
+    el.append(h('p', { className: 'muted', textContent: '图片：PNG、JPEG、WebP；保存时重新编码，长边不超过 2560，JPEG（有透明的用 PNG）。动画 WebP 还不支持（动态背景在后面的版本）。' }));
+    if (!p) return;
+    el.append(
+      row('亮度', number(p.brightness, (v) => api.apply((x) => ops.tune(x, { brightness: Math.max(0, Math.min(100, v ?? 100)) })), { min: 0, max: 100, unit: '%' })),
+      row('模糊', number(p.blur, (v) => api.apply((x) => ops.tune(x, { blur: Math.max(0, Math.min(25, v ?? 0)) })), { min: 0, max: 25, unit: 'dp' })),
+    );
+    const through = F.valueOf(d.xml, 'key', 'fill') === THROUGH;
+    const box = h('input', { type: 'checkbox', checked: through, on: { change: () => api.apply((x) => ops.through(x, box.checked)) } });
+    el.append(row('键透出背景（字母、功能、回车、空格键都半透明，透出图片）', box));
+    for (const [o, label] of ORIENTATIONS) {
+      el.append(h('h3', { textContent: label + '裁切（框是这台设备' + label + '键盘的形状，拖动、放大）' }));
+      el.append(cropper(api, d, o));
+    }
+  }
+
+  panels.push({ id: 'background', label: '背景', ops, render });
+})(typeof window !== 'undefined' ? window : globalThis);
+// 按键 (060-render-p3 §5.1 panel 3): a range of keys (all, letters, function, space, Return, the picked key, the
+// board's every key), a scene, a state, then the face's properties; the line on top says which select= the
+// changes go to, the cascade check under it where each of the picked key's values comes from (the engine's own answer).
+// Every control reads the document when it is used, not when it was drawn: the page leaves a tab as it is while a
+// field of it is typed in (ui.js refreshTab), so a control drawn before the last change must still do the right thing.
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const F = root.YoumoForm;
+  const LIM = F.LIMITS;
+
+  // the properties' texts as theme.xml has them (060-render-v2 §5, ThemeReader), kept to what the engine reads
+  const TEXT = {
+    radius: (v) => F.clamp(v, 0, LIM.lengthDp, 1) + 'dp',
+    depth: (v) => F.clamp(v, 0, LIM.depthDp, 1) + 'dp',
+    border: (v) => F.borderText(v),
+    shadow: (v) => F.shadowText(v),
+    'inner-shadow': (v) => F.shadowText(v),
+    inset: ([y, x]) => F.clamp(y, 0, LIM.lengthDp, 1) + 'dp ' + F.clamp(x, 0, LIM.lengthDp, 1) + 'dp',
+  };
+
+  const ops = {
+    /** [d] with [select]'s fill [fill] (F.fillText's; null: not set). At most 8 stops (the engine's). */
+    fill: (d, select, fill) => {
+      if (fill && fill.kind === 'linear' && fill.stops.length > LIM.stops[1]) fill = Object.assign({}, fill, { stops: fill.stops.slice(0, LIM.stops[1]) });
+      return panels.next(d, F.setProp(d.xml, select, 'fill', fill ? F.fillText(fill) : null));
+    },
+    /**
+     * [d] with [select]'s [prop] [v] (a form's value): null not set (the wider style's shows), 'none' none (a
+     * border or a shadow taken off over a wider style's).
+     */
+    set: (d, select, prop, v) => panels.next(d, F.setProp(d.xml, select, prop, v == null ? null : v === 'none' ? 'none' : TEXT[prop] ? TEXT[prop](v) : String(v))),
+    /**
+     * The cascade check: where key [target].key of [board] gets each property in [env] ([target] as E.sources
+     * takes it: `{key, part?, states?}`): `[{property, value, select, line}]`, the value as the winning style
+     * writes it, the style found by its place among the styles (two on one line are two).
+     */
+    sources(E, F, d, theme, board, env, target) {
+      const r = E.sources(board, theme, env, Object.assign({ widget: 'key' }, target));
+      if (!r.ok) return [];
+      const all = F.styles(d.xml);
+      return r.sources.map((s) => {
+        const style = all[s.order];
+        const a = style && style.attrs.find((x) => x[0] === s.property);
+        return { property: s.property, value: a ? a[1] : null, select: style ? style.select : null, line: s.line };
+      });
+    },
+    /** The theme's key images (files named `key-…`, what addKeyImage makes, and any an image() fill names). */
+    keyImages: (d) => Object.keys(d.files).filter((n) => /^key-/.test(n) || F.uncommented(d.xml).includes('image(' + n)).sort(),
+    /**
+     * [d] with [bytes] ([name]) a key's image, `key-<name>`: refused (throws) where the app would (a PNG, JPEG or WebP,
+     * its long side and bytes in [lim]'s keyImageSide, keyImageBytes). `{…d, file}`.
+     */
+    addKeyImage(d, L, lim, name, bytes) {
+      const type = L.imageType(bytes);
+      const s = L.imageSize(bytes);
+      if (!['png', 'jpg', 'webp'].includes(type) || !s) throw new Error(name + ' 不是 PNG、JPEG 或 WebP');
+      if (Math.max(s[0], s[1]) > lim.keyImageSide) throw new Error(name + ' 太大：最大 ' + lim.keyImageSide + '×' + lim.keyImageSide);
+      if (bytes.length > lim.keyImageBytes) throw new Error(name + ' 超过 ' + lim.keyImageBytes + ' 字节');
+      const file = panels.fileName(d.files, 'key-', name, type);
+      const files = Object.assign(Object.create(null), d.files);
+      files[file] = bytes;
+      return { xml: d.xml, files, layouts: d.layouts, file };
+    },
+    /** The preview's environment [env] (the page's) as the scene [scene] (F.SCENES') has it: where the cascade check looks. */
+    envOf(env, scene) {
+      const e = Object.assign({}, env);
+      if (scene === 'landscape') e.landscape = true;
+      else if (scene === 'dark') e.dark = true;
+      else if (scene === 'one-handed') e.form = 'left';
+      else if (['compact', 'flat', 'floating', 'split'].includes(scene)) e.form = scene;
+      return e;
+    },
+  };
+
+  // what the page chose, kept while the page is open
+  const chosen = { range: 'all', scene: '', state: '' };
+
+  /** The range/scene/state choosers and the select= line: shared with 字和图标. */
+  function chooser(el, api, rerender, part = '') {
+    const { h, row, select } = panels.ui;
+    const picked = api.picked();
+    const ranges = F.RANGES.filter(([v]) => v !== 'picked' || picked);
+    if (!ranges.some(([v]) => v === chosen.range)) chosen.range = 'all';
+    el.append(
+      row('范围', select(ranges.map(([v, t]) => [v, v === 'picked' && picked ? t + '（' + picked.key + '）' : t]), chosen.range, (v) => { chosen.range = v; rerender(); })),
+      row('场景', select(F.SCENES, chosen.scene, (v) => { chosen.scene = v; rerender(); })),
+      row('状态', select(F.STATES, chosen.state, (v) => { chosen.state = v; rerender(); })),
+    );
+    const sel = F.selector(Object.assign({}, chosen, { board: picked && picked.board, key: picked && picked.key, part }));
+    el.append(h('p', { className: 'selector' }, '这些改动写成 ', h('code', { textContent: sel || '—' })));
+    return sel;
+  }
+
+  // the scene and state chosen, as the table's title says them
+  const label = (list, v) => (list.find(([x]) => x === v) || [, v])[1];
+
+  function sourcesTable(el, api, part) {
+    const { h } = panels.ui;
+    const picked = api.picked();
+    const theme = api.theme();
+    if (!picked || !theme) {
+      el.append(h('p', { className: 'muted', textContent: '在预览上点一个键，这里列出它每个值来自哪条样式。' }));
+      return;
+    }
+    const env = api.envJson(ops.envOf(api.env(), chosen.scene));
+    const rows = ops.sources(api.engine, F, api.doc(), theme, picked.board, env, { key: picked.key, part: part || null, states: chosen.state ? [chosen.state] : [] });
+    const where = [chosen.scene ? label(F.SCENES, chosen.scene) : '', chosen.state ? label(F.STATES, chosen.state) : ''].filter(Boolean).join('、');
+    el.append(h('h3', { textContent: '「' + picked.key + '」' + (part ? ' ' + part : '') + (where ? '（' + where + '）' : '') + '实际生效的值' }));
+    if (chosen.scene === 'field=password') el.append(h('p', { className: 'muted', textContent: '密码框按预览的输入框算' }));
+    const t = h('table', { className: 'sources' });
+    for (const r of rows) {
+      t.append(h('tr', {}, h('td', { textContent: r.property }), h('td', { textContent: r.value ?? '' }),
+        h('td', {}, h('a', { href: '#', textContent: (r.select || '?') + '（第 ' + r.line + ' 行）', on: { click: (e) => { e.preventDefault(); api.goToLine(r.line); } } }))));
+    }
+    el.append(t);
+  }
+
+  function fillForm(api, sel, value) {
+    const { h, row, select, number, color, clear } = panels.ui;
+    const f = F.parseFill(value) || { kind: 'none' };
+    // the fill as the document has it now (a control drawn before the last change reads it anew)
+    const now = () => F.parseFill(F.valueOf(api.doc().xml, sel, 'fill')) || f;
+    const out = h('div', { className: 'group' });
+    const set = (fill) => api.apply((x) => ops.fill(x, sel, fill));
+    const kinds = [['none', '不设'], ['solid', '纯色'], ['linear', '渐变'], ['picture', '透出背景图'], ['image', '九宫格图片']];
+    if (f.kind === 'other') kinds.push(['other', '图片（在源码里改）']);
+    out.append(row('填充', select(kinds, f.kind, (k) => {
+      const c = now();
+      if (k === 'none') set(null);
+      else if (k === 'solid') set({ kind: 'solid', color: c.kind === 'solid' ? c.color : '@key' });
+      else if (k === 'linear') set({ kind: 'linear', angle: 90, stops: [[c.kind === 'solid' ? c.color : '#ffffff', 0], ['#c0c0c0', 100]] });
+      else if (k === 'picture') set({ kind: 'picture', blur: 0, brightness: 100, over: '#66ffffff' });
+      else if (k === 'image') {
+        const file = ops.keyImages(api.doc())[0];
+        if (file) set({ kind: 'image', file, insets: [0, 0, 0, 0], scale: 3, fallback: c.kind === 'solid' ? c.color : null });
+        else api.toast('先上传一张键面图片（下面的按钮）');
+      }
+    })));
+    if (f.kind === 'none' || f.kind === 'solid' || f.kind === 'image') out.append(uploadImage(api, sel));
+    if (f.kind === 'solid') out.append(row('颜色', color(f.color, (c) => set(c ? { kind: 'solid', color: c } : null), F)));
+    if (f.kind === 'linear') {
+      const patch = (fn) => { const c = now(); if (c.kind === 'linear') set(fn(c)); };
+      out.append(row('角度', number(f.angle, (a) => patch((c) => Object.assign({}, c, { angle: a ?? 90 })), { min: -360, max: 360, unit: '°' })));
+      f.stops.forEach(([c, at], i) => {
+        const stop = (fn) => patch((g) => Object.assign({}, g, { stops: g.stops.map((s, j) => (j === i ? fn(s) : s)) }));
+        out.append(row('颜色 ' + (i + 1), color(c, (v) => stop(([, p]) => [v || '#000000', p]), F), number(at, (v) => stop(([cc]) => [cc, v ?? 0]), { min: 0, max: 100, unit: '%' }),
+          f.stops.length > LIM.stops[0] ? clear(() => patch((g) => Object.assign({}, g, { stops: g.stops.filter((s, j) => j !== i) }))) : null));
+      });
+      if (f.stops.length < LIM.stops[1]) {
+        out.append(h('button', { type: 'button', textContent: '加一个颜色', on: { click: () => patch((g) => (g.stops.length < LIM.stops[1] ? Object.assign({}, g, { stops: g.stops.concat([['#808080', 100]]) }) : g)) } }));
+      }
+    }
+    if (f.kind === 'picture') {
+      const patch = (p) => { const c = now(); if (c.kind === 'picture') set(Object.assign({}, c, p)); };
+      out.append(
+        row('模糊', number(f.blur, (v) => patch({ blur: v ?? 0 }), { min: 0, max: LIM.blurDp, step: 0.5, unit: 'dp' })),
+        row('亮度', number(f.brightness, (v) => patch({ brightness: v ?? 100 }), { min: 0, max: 100, unit: '%' })),
+        row('盖一层颜色', color(f.over, (v) => patch({ over: v }), F)),
+      );
+    }
+    if (f.kind === 'image') {
+      const patch = (p) => { const c = now(); if (c.kind === 'image') set(Object.assign({}, c, p)); };
+      const files = ops.keyImages(api.doc());
+      out.append(row('图片', select(files.concat(files.includes(f.file) ? [] : [f.file]).map((n) => [n, n]), f.file, (file) => patch({ file }))));
+      out.append(row('四角不拉伸', ...['上', '右', '下', '左'].map((side, k) => number(f.insets[k], (v) => { const c = now(); if (c.kind !== 'image') return; const ins = c.insets.slice(); ins[k] = v ?? 0; patch({ insets: ins }); }, { min: 0, max: 9999, unit: 'px ' + side }))));
+      out.append(row('图片密度', number(f.scale, (v) => patch({ scale: v ?? 1 }), { min: 1, max: 8, unit: '倍（像素每 dp）' })));
+      out.append(row('图片没有时的颜色', color(f.fallback, (v) => patch({ fallback: v }), F)));
+    }
+    return out;
+  }
+
+  // a key's image put in the theme and made the fill: PNG, JPEG or WebP within the app's side and bytes for a key's
+  function uploadImage(api, sel) {
+    const { h } = panels.ui;
+    return h('button', { type: 'button', textContent: '上传键面图片…', on: { click: async () => {
+      const f = await api.pickFile('image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp');
+      if (!f) return;
+      // the image and the fill it is, one step (undone together: no file left that nothing names)
+      api.apply((x) => {
+        const made = ops.addKeyImage(x, api.lib, api.limits(), f.name, new Uint8Array(f.bytes));
+        const c = F.parseFill(F.valueOf(made.xml, sel, 'fill')) || { kind: 'none' };
+        return ops.fill(made, sel, c.kind === 'image' ? Object.assign({}, c, { file: made.file }) : { kind: 'image', file: made.file, insets: [0, 0, 0, 0], scale: 3, fallback: c.kind === 'solid' ? c.color : null });
+      });
+    } } });
+  }
+
+  /**
+   * A border's or a shadow's 有/无/不设: 不设 the wider style's shows (the property taken out), 无 none over it
+   * (`none`), 有 its fields: [p] of [made].sel, [text] its text as drawn, [made].fresh what 有 writes first.
+   */
+  function onOff(api, p, text, made) {
+    const { select } = panels.ui;
+    const kind = text == null ? '' : text === 'none' ? 'none' : 'set';
+    return select([['', '不设（用更宽的样式）'], ['none', '无'], ['set', '有']], kind, (k) => {
+      if (k === '') api.apply((x) => ops.set(x, made.sel, p, null));
+      else if (k === 'none') api.apply((x) => ops.set(x, made.sel, p, 'none'));
+      else api.apply((x) => ops.set(x, made.sel, p, made.fresh));
+    });
+  }
+
+  function render(el, api) {
+    const { h, row, select, number, color, clear } = panels.ui;
+    const rerender = () => api.rerender();
+    const sel = chooser(el, api, rerender);
+    if (!sel) return;
+    const xml = api.doc().xml;
+    const val = (p) => F.valueOf(xml, sel, p);
+    const now = (p) => F.valueOf(api.doc().xml, sel, p);
+    const set = (p) => (v) => api.apply((x) => ops.set(x, sel, p, v));
+    el.append(fillForm(api, sel, val('fill')));
+    panels.ui.propRows(el, api, F, sel, [{ prop: 'radius', label: '圆角', kind: 'radius' }], true);
+
+    const borderText = val('border');
+    const border = F.parseBorder(borderText);
+    const putBorder = (patch) => { const b = F.parseBorder(now('border')) || { width: 1, color: '#33000000' }; set('border')(Object.assign({}, b, patch)); };
+    el.append(row('描边', onOff(api, 'border', borderText, { sel, fresh: { width: 1, color: '#33000000' } }),
+      border ? number(border.width, (w) => (w ? putBorder({ width: w }) : set('border')('none')), { min: 0, max: LIM.borderDp, step: 0.5, unit: 'dp' }) : null,
+      border ? color(border.color, (c) => (c ? putBorder({ color: c }) : set('border')('none')), F) : null));
+
+    for (const [p, label] of [['shadow', '阴影'], ['inner-shadow', '内阴影']]) {
+      const text = val(p);
+      const s = F.parseShadow(text);
+      const fresh = { dx: 0, dy: 1, blur: 2, color: '#33000000' };
+      const put = (patch) => set(p)(Object.assign({}, fresh, F.parseShadow(now(p)), patch));
+      const o = LIM.offsetDp;
+      el.append(row(label, onOff(api, p, text, { sel, fresh }),
+        s ? number(s.dy, (v) => put({ dy: v ?? 0 }), { min: -o, max: o, step: 0.5, unit: 'dp 偏移' }) : null,
+        s ? number(s.blur, (v) => put({ blur: v ?? 0 }), { min: 0, max: o, step: 0.5, unit: 'dp 模糊' }) : null,
+        s ? color(s.color, (c) => (c ? put({ color: c }) : set(p)('none')), F) : null));
+    }
+    const depth = val('depth');
+    el.append(row('厚度', number(depth ? parseFloat(depth) : null, set('depth'), { min: 0, max: LIM.depthDp, step: 0.5, unit: 'dp' }), h('span', { className: 'muted', textContent: '颜色 ' }), color(val('depth-color'), set('depth-color'), F)));
+
+    panels.ui.propRows(el, api, F, sel, [{ prop: 'inset', label: '内缩', kind: 'inset' }], true);
+    el.append(row('形状', select([['', '不设'], ['rect', '方块'], ['circle', '圆'], ['bar', '条']], val('shape') || '', (v) => set('shape')(v || null))));
+    el.append(row('按下效果', select([['', '不设'], ['tint', '变色'], ['ripple', '涟漪'], ['face', '换面']], val('press') || '', (v) => set('press')(v || null))));
+    el.append(row('按下时盖的颜色', color(val('overlay'), set('overlay'), F), clear(set('overlay'))));
+    sourcesTable(el, api, '');
+  }
+
+  panels.push({ id: 'keys', label: '按键', ops, render, chooser, sourcesTable });
+})(typeof window !== 'undefined' ? window : globalThis);
+// 字和图标 (060-render-p3 §5.1 panel 4): the main word, the mark, the shortcut, the root, the hint, the badge apart
+// (a key's parts), each its colour, font (the theme's own, at most 4 uploaded), weight, size, place, spacing, outline
+// and shadow; the app's icons replaced by name, each an SVG of filled paths (what the app imports: SvgSubset, the
+// engine's readIcon says what is wrong with one). Controls read the document when used (30-keys.js says why).
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const F = root.YoumoForm;
+  const LIM = F.LIMITS;
+  const MAX_FONTS = 4;
+  const PARTS = [['', '整个键（各部分都跟着）'], ['label', '主字'], ['mark', '角标'], ['shortcut', '快捷图标'], ['root', '字根'], ['hint', '提示字'], ['badge', '徽标'], ['icon', '图标']];
+  // a font's name as the engine reads one (Values' FONT): a letter, then at most 31 of letters, digits, - and _
+  const FONT_NAME = 32;
+
+  const TEXT = {
+    scale: (v) => F.clamp(v, LIM.scale[0], LIM.scale[1]) + '%',
+    'letter-spacing': (v) => F.clamp(v, LIM.spacingEm[0], LIM.spacingEm[1], 3) + 'em',
+    stroke: (v) => F.borderText(v),
+    'text-shadow': (v) => F.shadowText(v),
+  };
+
+  // what is wrong with [bytes] as an <icon>, by the engine's own rule (SvgSubset) and the app's size: `[message]`
+  function iconProblems(E, bytes, maxBytes) {
+    if (maxBytes != null && bytes.length > maxBytes) return ['超过 ' + maxBytes + ' 字节'];
+    let text;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch (e) {
+      return ['不是 SVG（App 只收 SVG 图标）'];
+    }
+    const r = E.readIcon(text);
+    return r.ok ? [] : r.problems.map((p) => (p.line ? '第 ' + p.line + ' 行：' : '') + p.message);
+  }
+
+  const ops = {
+    /** [d] with [select]'s [prop] [v] (a form's value; null: not set), kept to what the engine reads. */
+    set: (d, select, prop, v) => panels.next(d, F.setProp(d.xml, select, prop, v == null ? null : TEXT[prop] ? TEXT[prop](v) : String(v))),
+
+    /**
+     * [d] with font file [file] ([bytes]) as `<font name="…">`, its name the file's without its type (as the engine
+     * reads a font's name), its type what its bytes are (a WOFF named .ttf is none). At most 4.
+     */
+    addFont(d, file, bytes, L) {
+      const fonts = F.elements(d.xml, 'font');
+      if (fonts.length >= MAX_FONTS) throw new Error('最多 ' + MAX_FONTS + ' 个字体');
+      const type = L ? L.fontType(bytes) : (/\.(ttf|otf)$/i.exec(file) || [, null])[1];
+      if (!type) throw new Error('不是 TrueType 或 OpenType 字体（App 只收 .ttf、.otf）');
+      let name = file.replace(/\.[^.]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'font';
+      if (!/^[a-z]/.test(name)) name = 'f-' + name;
+      name = name.slice(0, FONT_NAME - 2).replace(/-+$/, '');
+      const taken = (n) => fonts.some((f) => f.attrs.some((a) => a[0] === 'name' && a[1] === n)) || (n + '.' + type) in d.files;
+      for (let i = 2; taken(name); i++) name = name.replace(/-\d+$/, '') + '-' + i;
+      const files = Object.assign(Object.create(null), d.files);
+      files[name + '.' + type] = bytes;
+      return { xml: F.insert(d.xml, 'font', '<font name="' + name + '" src="' + name + '.' + type + '"/>'), files, layouts: d.layouts };
+    },
+
+    /** [d] with the app's icon [name] replaced by [bytes] (an SVG file's); null bytes: the app's again. */
+    setIcon(d, name, bytes) {
+      const own = F.elements(d.xml, 'icon').find((e) => e.attrs.some((a) => a[0] === 'name' && a[1] === name));
+      let xml = d.xml;
+      let files = Object.assign(Object.create(null), d.files);
+      if (own) {
+        const src = (own.attrs.find((a) => a[0] === 'src') || [])[1];
+        xml = xml.slice(0, own.start).replace(/[ \t]*$/, '').replace(/\n$/, '') + xml.slice(own.end);
+        if (src && !F.uncommented(xml).includes('"' + src + '"')) files = panels.without(files, [src]);
+      }
+      if (bytes) {
+        const file = 'icon-' + name + '.svg';
+        files[file] = bytes;
+        xml = F.insert(xml, 'icon', '<icon name="' + name + '" src="' + file + '"/>');
+      }
+      return { xml, files, layouts: d.layouts };
+    },
+
+    /** The theme's own icons: `{name: src}`. */
+    icons: (xml) => Object.fromEntries(F.elements(xml, 'icon').map((e) => Object.fromEntries(e.attrs)).map((a) => [a.name, a.src])),
+    iconProblems,
+    MAX_FONTS,
+  };
+
+  const chosen = { part: 'label' };
+
+  function render(el, api) {
+    const { h, row, select, number, color } = panels.ui;
+    const keys = panels.find((p) => p.id === 'keys');
+    el.append(row('哪部分', select(PARTS, chosen.part, (v) => { chosen.part = v; api.rerender(); })));
+    const sel = keys.chooser(el, api, () => api.rerender(), chosen.part);
+    if (!sel) return;
+    const d = api.doc();
+    const val = (p) => F.valueOf(d.xml, sel, p);
+    const now = (p) => F.valueOf(api.doc().xml, sel, p);
+    const set = (p) => (v) => api.apply((x) => ops.set(x, sel, p, v));
+    el.append(row('颜色', color(val('color'), set('color'), F)));
+    el.append(row('图标颜色', color(val('icon-color'), set('icon-color'), F)));
+    const fonts = F.elements(d.xml, 'font').map((f) => Object.fromEntries(f.attrs).name).filter(Boolean);
+    el.append(row('字体', select([['', '不设'], ['system', '系统']].concat(fonts.map((f) => [f, f])), val('font') || '', (v) => set('font')(v || null)),
+      fonts.length < MAX_FONTS ? h('button', { type: 'button', textContent: '上传字体…', on: { click: async () => {
+        const f = await api.pickFile('.ttf,.otf,font/ttf,font/otf');
+        if (f) api.apply((x) => ops.addFont(x, f.name, new Uint8Array(f.bytes), api.lib));
+      } } }) : h('span', { className: 'muted', textContent: '（最多 4 个）' })));
+    el.append(row('字重', select([['', '不设'], ['300', '细'], ['400', '常规'], ['700', '粗']], val('weight') || '', (v) => set('weight')(v || null))));
+    const scale = val('scale');
+    el.append(row('大小', number(scale ? parseFloat(scale) : null, set('scale'), { min: LIM.scale[0], max: LIM.scale[1], step: 5, unit: '%' })));
+    el.append(row('位置', select([['', '不设'], ['center', '居中'], ['top-left', '左上'], ['top-center', '上中']], val('align') || '', (v) => set('align')(v || null))));
+    const ls = val('letter-spacing');
+    el.append(row('字距', number(ls ? parseFloat(ls) : null, set('letter-spacing'), { min: LIM.spacingEm[0], max: LIM.spacingEm[1], step: 0.01, unit: 'em' })));
+    const stroke = F.parseBorder(val('stroke'));
+    const putStroke = (patch) => set('stroke')(Object.assign({ width: 1, color: '#000000' }, F.parseBorder(now('stroke')), patch));
+    el.append(row('描边', number(stroke ? stroke.width : null, (w) => (w ? putStroke({ width: w }) : set('stroke')(null)), { min: 0, max: LIM.borderDp, step: 0.5, unit: 'dp' }),
+      stroke ? color(stroke.color, (c) => (c ? putStroke({ color: c }) : set('stroke')(null)), F) : null));
+    const sh = F.parseShadow(val('text-shadow'));
+    const putShadow = (patch) => set('text-shadow')(Object.assign({ dx: 0, dy: 1, blur: 2, color: '#80000000' }, F.parseShadow(now('text-shadow')), patch));
+    const o = LIM.offsetDp;
+    el.append(row('投影', number(sh ? sh.dy : null, (v) => (v == null ? set('text-shadow')(null) : putShadow({ dy: v })), { min: -o, max: o, step: 0.5, unit: 'dp 偏移' }),
+      number(sh ? sh.blur : null, (v) => putShadow({ blur: v ?? 0 }), { min: 0, max: o, step: 0.5, unit: 'dp 模糊' }), sh ? color(sh.color, (c) => (c ? putShadow({ color: c }) : set('text-shadow')(null)), F) : null));
+    const hidden = h('input', { type: 'checkbox', checked: val('hidden') === 'true', on: { change: () => set('hidden')(hidden.checked ? true : null) } });
+    el.append(row('藏起来', hidden));
+    keys.sourcesTable(el, api, chosen.part);
+
+    el.append(h('h3', { textContent: '换图标（SVG，按名字）' }));
+    el.append(h('p', { className: 'muted', textContent: 'App 只收只有填充路径的 SVG：<svg>、<g>、<path> 和 fill 一类的属性，没有 transform、style、描边、渐变；不能用的会在这里说，也存不了。' }));
+    const own = ops.icons(d.xml);
+    for (const name of api.iconNames()) {
+      const problems = own[name] && d.files[own[name]] ? iconProblems(api.engine, d.files[own[name]], api.limits().iconBytes) : [];
+      el.append(row(name, h('span', { className: problems.length ? 'bad' : 'muted', textContent: own[name] ? own[name] + (problems.length ? '：' + problems[0] : '') : 'App 自带' }),
+        h('button', { type: 'button', textContent: '换…', on: { click: async () => {
+          const f = await api.pickFile('image/svg+xml,.svg');
+          if (!f) return;
+          const bytes = new Uint8Array(f.bytes);
+          const wrong = iconProblems(api.engine, bytes, api.limits().iconBytes);
+          if (wrong.length) api.toast(f.name + ' 用不了：' + wrong[0]);
+          else api.apply((x) => ops.setIcon(x, name, bytes));
+        } } }),
+        own[name] ? h('button', { type: 'button', textContent: '用 App 的', on: { click: () => api.apply((x) => ops.setIcon(x, name, null)) } }) : null));
+    }
+  }
+
+  panels.push({ id: 'text', label: '字和图标', ops, render });
+})(typeof window !== 'undefined' ? window : globalThis);
+// 栏 (060-render-p3 §5.1 panel 5): the candidate bar, its candidates and their parts, the lines between them, the
+// expanded candidates' panel, the code being typed and the toolbar's buttons (T6a, T6b: what BarLook reads). The
+// preview shows the bar above the keyboard (环境 → 候选栏样例).
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const fill = { prop: 'fill', label: '底色', kind: 'color' };
+  const color = { prop: 'color', label: '文字颜色', kind: 'color' };
+  const PARTS = [
+    { id: 'bar', title: '候选栏', select: 'bar', props: [
+      Object.assign({}, fill, { note: '颜色或 picture(…)（透出背景图）；渐变、图片画不出来' }),
+      { prop: 'height', label: '高度', kind: 'percent', min: 80, max: 140, note: '按候选字号算出的高度的百分比' },
+    ] },
+    { id: 'candidate', title: '候选词', select: 'candidate', props: [
+      fill, color, { prop: 'radius', label: '圆角', kind: 'radius' },
+      { prop: 'inset', label: '底色内缩', kind: 'inset' },
+      { prop: 'padding', label: '字两边留白', kind: 'inset', note: '只看左右' },
+      { prop: 'gap', label: '间距', kind: 'dp', max: 24, step: 0.5 },
+      { prop: 'weight', label: '字重', kind: 'choice', options: [['300', '细'], ['400', '常规'], ['700', '粗']] },
+      { prop: 'label-style', label: '序号', kind: 'choice', options: [['none', '没有'], ['number', '数字'], ['dot', '圆点']] },
+    ] },
+    { id: 'first', title: '第一个候选', select: 'candidate:first', props: [fill, color] },
+    { id: 'selected', title: '选中的候选（实体键盘）', select: 'candidate:selected', props: [fill, color] },
+    { id: 'pressed', title: '按下的候选', select: 'candidate:pressed', props: [{ prop: 'overlay', label: '盖的颜色', kind: 'color' }] },
+    { id: 'label', title: '候选的序号', select: 'candidate label', props: [color] },
+    { id: 'comment', title: '候选的注释', select: 'candidate comment', props: [color] },
+    { id: 'divider', title: '分隔线', select: 'candidates-divider', props: [Object.assign({}, fill, { label: '颜色' })] },
+    { id: 'panel', title: '展开候选的面板', select: 'candidates-panel', props: [fill] },
+    { id: 'preedit', title: '预编辑（正在打的字）', select: 'preedit', props: [
+      color, { prop: 'underline', label: '下划线', kind: 'border' }, { prop: 'cursor-color', label: '光标颜色', kind: 'color' },
+    ] },
+    { id: 'toolbar', title: '工具栏按钮', select: 'toolbar', props: [fill, { prop: 'radius', label: '圆角', kind: 'radius', note: '不设是圆' }, { prop: 'icon-color', label: '图标颜色', kind: 'color' }] },
+    { id: 'toolbar-pressed', title: '工具栏按钮按下', select: 'toolbar:pressed', props: [{ prop: 'overlay', label: '盖的颜色', kind: 'color' }] },
+    { id: 'toolbar-on', title: '工具栏按钮开着', select: 'toolbar:selected', props: [fill, { prop: 'icon-color', label: '图标颜色', kind: 'color' }] },
+  ];
+
+  // the bar is one over every window form: only these scenes tell it apart (ThemeReader's unplacedBar)
+  panels.widgetTab({ id: 'bar', label: '栏', parts: PARTS, scenes: ['compact', 'landscape', 'flat', 'dark', 'field=password'] });
+})(typeof window !== 'undefined' ? window : globalThis);
+// 弹出 (060-render-p3 §5.1 panel 6): the key's bubble (`preview`, T4b's shape, tail, size and offset), the long
+// press's keys (`popup`, the one in focus `:selected`) and the menu (`menu`). The preview shows each (环境 → 显示).
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const face = [
+    { prop: 'fill', label: '底色', kind: 'color' },
+    { prop: 'color', label: '文字颜色', kind: 'color' },
+    { prop: 'radius', label: '圆角', kind: 'radius' },
+    { prop: 'border', label: '描边', kind: 'border' },
+    { prop: 'shadow', label: '阴影', kind: 'shadow' },
+  ];
+  const PARTS = [
+    { id: 'preview', title: '按键气泡', select: 'preview', props: face.concat([
+      { prop: 'shape', label: '形状', kind: 'choice', options: [['rect', '方块'], ['bubble', '气泡（带尾巴）']] },
+      { prop: 'tail', label: '尾巴', kind: 'flag', note: '只对气泡形状' },
+      { prop: 'size', label: '大小', kind: 'percent', min: 100, max: 160, step: 5 },
+      { prop: 'offset', label: '上移', kind: 'dp', min: -24, max: 24, step: 0.5 },
+    ]) },
+    { id: 'popup', title: '长按弹出', select: 'popup', props: face },
+    { id: 'popup-selected', title: '长按弹出里选中的', select: 'popup:selected', props: [face[0], face[1], face[2]] },
+    { id: 'menu', title: '菜单', select: 'menu', props: [face[0], face[1], face[2]] },
+    { id: 'menu-selected', title: '菜单里选中的', select: 'menu:selected', props: [face[0], face[1]] },
+    { id: 'menu-disabled', title: '菜单里不能选的', select: 'menu:disabled', props: [face[1]] },
+  ];
+
+  panels.widgetTab({ id: 'popup', label: '弹出', parts: PARTS });
+})(typeof window !== 'undefined' ? window : globalThis);
+// 面板和窗口 (060-render-p3 §5.1 panel 7): the window round the keys (T7a: the floating keyboard's frame and handle,
+// the buttons beside a one-handed board, the split's gap, the navigation bar) and the app's panels (T7b: the
+// clipboard, the symbols' and emoji's picker, the editing panel, the voice mask, the handwriting pad). What each
+// reads is the engine's (ThemeReader's WINDOW_READS, PANEL_READS); the preview shows a sample (环境 → 面板样例).
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const fill = { prop: 'fill', label: '底色', kind: 'color' };
+  const color = { prop: 'color', label: '文字颜色', kind: 'color' };
+  const icon = { prop: 'icon-color', label: '图标颜色', kind: 'color' };
+  const radius = { prop: 'radius', label: '圆角', kind: 'radius' };
+  const PARTS = [
+    { id: 'frame', title: '悬浮外框', select: 'frame', props: [radius, { prop: 'border', label: '描边', kind: 'border' },
+      { prop: 'shadow', label: '阴影', kind: 'shadow', note: '只看模糊（系统的投影）' }] },
+    { id: 'handle', title: '悬浮拖动条', select: 'handle', props: [fill, Object.assign({}, color, { label: '颜色' }), icon,
+      { prop: 'width', label: '握把宽', kind: 'dp', max: 160 }, { prop: 'height', label: '握把高', kind: 'dp', max: 24 }] },
+    { id: 'side-button', title: '单手、分体旁边的按钮', select: 'side-button', props: [fill, icon,
+      { prop: 'shape', label: '形状', kind: 'choice', options: [['circle', '圆'], ['rect', '方块'], ['bar', '条']] }, radius] },
+    { id: 'side-button-pressed', title: '旁边的按钮按下', select: 'side-button:pressed', props: [{ prop: 'overlay', label: '盖的颜色', kind: 'color' }] },
+    { id: 'split-gap', title: '分体中间', select: 'split-gap', props: [fill, radius] },
+    { id: 'navbar', title: '导航栏', select: 'navbar', props: [{ prop: 'color', label: '颜色', kind: 'color', note: '写 follow 是跟键盘底色' }] },
+    { id: 'clipboard', title: '剪贴板的条目', select: 'clipboard', props: [fill, radius, color] },
+    { id: 'picker', title: '符号、表情面板', select: 'picker', props: [fill, color] },
+    { id: 'picker-categories', title: '符号、表情的分类栏', select: 'picker categories', props: [fill, color] },
+    { id: 'picker-selected', title: '分类栏里选中的', select: 'picker:selected categories', props: [fill, color] },
+    { id: 'editing', title: '编辑面板', select: 'editing', props: [fill, radius] },
+    { id: 'voice', title: '语音', select: 'voice', props: [fill, { prop: 'blur', label: '毛玻璃', kind: 'dp', max: 25, step: 0.5 }, icon] },
+    { id: 'voice-mic', title: '语音的话筒', select: 'voice mic', props: [fill, icon] },
+    { id: 'pad', title: '手写板', select: 'handwriting/pad', props: [
+      { prop: 'ink-color', label: '笔迹颜色', kind: 'color' }, { prop: 'ink-width', label: '笔迹粗细', kind: 'dp', min: 1, max: 8, step: 0.5 },
+      { prop: 'grid-color', label: '格子颜色', kind: 'color' }, { prop: 'grid', label: '格子', kind: 'flag' },
+    ] },
+  ];
+
+  panels.widgetTab({ id: 'window', label: '面板和窗口', parts: PARTS });
+})(typeof window !== 'undefined' ? window : globalThis);
+// 尺寸 (060-render-p3 §5.1 panel 8, v2 §15 主题管尺寸): the keyboard's height and its side and bottom room,
+// portrait and landscape, set on `keyboard` alone (Values.KEYBOARD_SIZES, in the settings' own ranges), and the
+// keys' gaps (`key inset=`). What the user picked in the app's settings is over these.
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const PARTS = [
+    { id: 'keyboard', title: '键盘', select: 'keyboard', fixed: true, note: '用户在 App 设置里选了具体值的，会盖过这里。', props: [
+      { prop: 'height', label: '高度', kind: 'twin', unit: '%', min: 10, max: 90, note: '屏幕高度的百分比' },
+      { prop: 'side-padding', label: '两侧边距', kind: 'twin', unit: 'dp', min: 0, max: 300 },
+      { prop: 'bottom-padding', label: '底部边距', kind: 'twin', unit: 'dp', min: 0, max: 100 },
+    ] },
+    { id: 'gap', title: '键缝', select: 'key', props: [{ prop: 'inset', label: '键缝（每个键四边缩进）', kind: 'inset' }] },
+  ];
+
+  panels.widgetTab({ id: 'size', label: '尺寸', parts: PARTS });
+})(typeof window !== 'undefined' ? window : globalThis);
+// 动效 (060-render-p3 §5.1 panel 9, §4.2): a key's state changes (`transition`), its press (`press-scale`,
+// `press-sink`), the popups' appearing (`appear`) and a press's effect (`effect`: a ripple image, particles). The
+// properties and where each goes are MOTION's; whether this engine draws one is the engine's own answer (supported:
+// a style of it read with no "not supported" warning), so a stage that makes one work (A1–A4) shows here as drawn
+// with no change to this file. 试一下 plays it on the preview (ui.js play: an approximation, not the app's pixels).
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const F = root.YoumoForm;
+  const EASINGS = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'];
+  const APPEARS = [['fade', '淡入'], ['scale', '放大'], ['rise', '升起']];
+  // A3's limits of an effect's image (060-render-p3 A3): A3 moves them into youmo-format's limits
+  const EFFECT_IMAGE = { side: 256, bytes: 128 * 1024 };
+
+  /**
+   * The motion properties (§4.2): [prop] on [select]s, [sample] a value of it the engine must read (the support probe).
+   * `kind`: transition `ms easing`, scale %, sink dp, appear `kind ms`, effect.
+   */
+  const MOTION = [
+    { prop: 'transition', label: '状态过渡', selects: [['key', '按键'], ['popup', '长按弹出'], ['preview', '按键气泡']], kind: 'transition', sample: '120ms ease-out' },
+    { prop: 'press-scale', label: '按下缩放', selects: [['key:pressed', '按下的键']], kind: 'percent', min: 85, max: 110, sample: '95%' },
+    { prop: 'press-sink', label: '按下下沉', selects: [['key:pressed', '按下的键']], kind: 'dp', min: 0, max: 4, sample: '1dp' },
+    { prop: 'appear', label: '出现动画', selects: [['preview', '按键气泡'], ['popup', '长按弹出'], ['menu', '菜单']], kind: 'appear', sample: 'fade 120ms' },
+    { prop: 'effect', label: '按键特效', selects: [['key:pressed', '按下的键']], kind: 'effect', sample: 'none' },
+  ];
+
+  /** `{ms, easing}` of a transition= text, null for none. */
+  const parseTransition = (t) => { const m = /^(\d{1,3})ms (\S+)$/.exec(String(t ?? '').trim()); return m ? { ms: +m[1], easing: m[2] } : null; };
+  const transitionText = (v) => (v ? F.clamp(v.ms, 0, 600) + 'ms ' + (EASINGS.includes(v.easing) ? v.easing : 'ease') : null);
+  /** `{kind, ms}` of an appear= text. */
+  const parseAppear = (t) => { const m = /^(fade|scale|rise) (\d{1,3})ms$/.exec(String(t ?? '').trim()); return m ? { kind: m[1], ms: +m[2] } : null; };
+  const appearText = (v) => (v ? v.kind + ' ' + F.clamp(v.ms, 0, 250) + 'ms' : null);
+  /** An effect= read: `{kind: none}`, `{kind: ripple-image, file, radius, ms}`, `{kind: particles, file, count, spread, ms}`. */
+  function parseEffect(t) {
+    const s = String(t ?? '').trim();
+    if (s === 'none') return { kind: 'none' };
+    let m = /^ripple-image\(([^,()]+), ?([\d.]+)%, ?(\d{1,3})ms\)$/.exec(s);
+    if (m) return { kind: 'ripple-image', file: m[1], radius: +m[2], ms: +m[3] };
+    m = /^particles\(([^,()]+), ?(\d{1,2}), ?(-?[\d.]+)dp, ?(\d{1,3})ms\)$/.exec(s);
+    if (m) return { kind: 'particles', file: m[1], count: +m[2], spread: +m[3], ms: +m[4] };
+    return null;
+  }
+  function effectText(v) {
+    if (!v) return null;
+    if (v.kind === 'none') return 'none';
+    if (v.kind === 'ripple-image') return 'ripple-image(' + v.file + ', ' + F.clamp(v.radius, 0, 300) + '%, ' + F.clamp(v.ms, 0, 600) + 'ms)';
+    return 'particles(' + v.file + ', ' + F.clamp(v.count, 1, 12) + ', ' + F.clamp(v.spread, 0, 48, 1) + 'dp, ' + F.clamp(v.ms, 0, 600) + 'ms)';
+  }
+
+  const TEXT = { transition: transitionText, appear: appearText, effect: effectText };
+
+  // which MOTION properties this engine draws: a theme with each read, a warning naming it "not supported" says no
+  const drawn = new WeakMap();
+  function supported(E, base) {
+    if (drawn.has(E)) return drawn.get(E);
+    const out = {};
+    for (const m of MOTION) {
+      const xml = F.setProp(base, m.selects[0][0], m.prop, m.sample);
+      const r = E.readTheme(xml, null, null);
+      out[m.prop] = r.ok && !r.warnings.some((w) => w.message.startsWith(m.prop + '= is not supported'));
+    }
+    drawn.set(E, out);
+    return out;
+  }
+
+  /** What is wrong with [bytes] ([name]) as an effect's image (A3: PNG or WebP, ≤ 256×256, ≤ 128 KB); null for nothing. */
+  function effectImageProblem(L, name, bytes) {
+    const type = L.imageType(bytes);
+    if (type !== 'png' && type !== 'webp') return name + ' 不是 PNG 或 WebP';
+    if (bytes.length > EFFECT_IMAGE.bytes) return name + ' 超过 128 KB';
+    const s = L.imageSize(bytes);
+    if (!s || Math.max(s[0], s[1]) > EFFECT_IMAGE.side) return name + ' 超过 256×256';
+    return null;
+  }
+
+  const ops = {
+    /** [d] with [select]'s motion [prop] the form's [v] (null: not set). */
+    set: (d, select, prop, v) => {
+      const m = MOTION.find((x) => x.prop === prop);
+      const text = v == null ? null : TEXT[m.kind] ? TEXT[m.kind](v) : panels.text(F, m.kind, v, m);
+      return panels.next(d, F.setProp(d.xml, select, prop, text));
+    },
+    /** [d] with an effect image [name] ([bytes]) as a file of its own: `effect-<name>`; refused (throws) where A3 would refuse it. */
+    addEffectImage(d, L, name, bytes) {
+      const wrong = effectImageProblem(L, name, bytes);
+      if (wrong) throw new Error(wrong);
+      const file = panels.fileName(d.files, 'effect-', name, L.imageType(bytes));
+      const files = Object.assign(Object.create(null), d.files);
+      files[file] = bytes;
+      return { xml: d.xml, files, layouts: d.layouts, file };
+    },
+    MOTION, parseTransition, parseAppear, parseEffect, transitionText, appearText, effectText, supported, effectImageProblem, EFFECT_IMAGE,
+    /** What 试一下 plays of [xml]: the motion values the key's and the bubble's styles give (the plain select='s). */
+    sample(xml) {
+      return {
+        transition: parseTransition(F.valueOf(xml, 'key', 'transition')),
+        scale: parseFloat(F.valueOf(xml, 'key:pressed', 'press-scale')) || 100,
+        sink: parseFloat(F.valueOf(xml, 'key:pressed', 'press-sink')) || 0,
+        appear: parseAppear(F.valueOf(xml, 'preview', 'appear')),
+      };
+    },
+  };
+
+  const chosen = {};
+
+  function render(el, api) {
+    const { h, row, select, number, warnings } = panels.ui;
+    const d = api.doc();
+    const ok = supported(api.engine, root.YoumoMaker.fromBuiltin(api.engine, 'material').xml);
+    el.append(h('p', {}, h('button', { type: 'button', textContent: '试一下', on: { click: () => api.play(ops.sample(api.doc().xml)) } }),
+      h('span', { className: 'muted', textContent: ' 在预览上按一个键、弹一个气泡（近似效果，不是手机上的像素）' })));
+    el.append(h('p', { className: 'muted', textContent: '按下那一刻不渐变：过渡只用在松开、Shift、锁定这些状态变化上。内置主题不带动效；用户在 App 里关了「键盘动效」或开了省电时都不播。' }));
+    for (const m of MOTION) {
+      const sel = chosen[m.prop] || m.selects[0][0];
+      const now = () => F.valueOf(api.doc().xml, sel, m.prop);
+      const put = (v) => api.apply((x) => ops.set(x, sel, m.prop, v));
+      el.append(h('h3', { textContent: m.label }));
+      if (!ok[m.prop]) el.append(h('p', { className: 'muted', textContent: '这个版本的引擎还不画它：写上会被现在的 App 忽略（有一条警告），以后的版本会用。' }));
+      if (m.selects.length > 1) el.append(row('用在', select(m.selects, sel, (v) => { chosen[m.prop] = v; api.rerender(); })));
+      const v = F.valueOf(d.xml, sel, m.prop);
+      if (m.kind === 'transition') {
+        const t = parseTransition(v);
+        el.append(row(m.label, number(t ? t.ms : null, (ms) => put(ms == null ? null : { ms, easing: (parseTransition(now()) || {}).easing || 'ease' }), { min: 0, max: 600, step: 10, unit: 'ms' }),
+          select(EASINGS.map((e) => [e, e]), t ? t.easing : 'ease', (e) => put({ ms: (parseTransition(now()) || { ms: 120 }).ms, easing: e }))));
+      } else if (m.kind === 'appear') {
+        const a = parseAppear(v);
+        el.append(row(m.label, select([['', '不设']].concat(APPEARS), a ? a.kind : '', (k) => put(k ? { kind: k, ms: (parseAppear(now()) || { ms: 120 }).ms } : null)),
+          a ? number(a.ms, (ms) => put({ kind: (parseAppear(now()) || a).kind, ms: ms ?? 0 }), { min: 0, max: 250, step: 10, unit: 'ms' }) : null));
+      } else if (m.kind === 'effect') {
+        const e = parseEffect(v);
+        const files = Object.keys(d.files).filter((n) => n.startsWith('effect-'));
+        const patch = (p) => { const c = parseEffect(now()); if (c && c.kind !== 'none') put(Object.assign({}, c, p)); };
+        // the effect and the files read when chosen, not as the tab was drawn (an image uploaded since is one)
+        const effectFiles = () => Object.keys(api.doc().files).filter((n) => n.startsWith('effect-'));
+        el.append(row('特效', select([['', '不设'], ['none', '无'], ['ripple-image', '涟漪图片'], ['particles', '粒子']], e ? e.kind : '', (k) => {
+          const c = parseEffect(now());
+          const file = (c && c.file) || effectFiles()[0];
+          if (!k) put(null);
+          else if (k === 'none') put({ kind: 'none' });
+          else if (!file) api.toast('先上传一张特效图片');
+          else if (k === 'ripple-image') put({ kind: k, file, radius: 100, ms: 300 });
+          else put({ kind: k, file, count: 8, spread: 24, ms: 400 });
+        }), h('button', { type: 'button', textContent: '上传特效图片…', on: { click: async () => {
+          const f = await api.pickFile('image/png,image/webp,.png,.webp');
+          if (!f) return;
+          // the image and the effect using it, one step
+          api.apply((x) => {
+            const made = ops.addEffectImage(x, api.lib, f.name, new Uint8Array(f.bytes));
+            const c = parseEffect(F.valueOf(made.xml, sel, m.prop));
+            return c && c.kind !== 'none' ? ops.set(made, sel, m.prop, Object.assign({}, c, { file: made.file })) : made;
+          });
+        } } })));
+        if (e && e.kind !== 'none') {
+          el.append(row('图片', select(files.map((n) => [n, n]).concat(files.includes(e.file) ? [] : [[e.file, e.file + '（缺）']]), e.file, (file) => patch({ file }))));
+          if (e.kind === 'ripple-image') el.append(row('最大半径', number(e.radius, (r) => patch({ radius: r ?? 100 }), { min: 0, max: 300, step: 10, unit: '% 键宽' })));
+          else {
+            el.append(row('个数', number(e.count, (c) => patch({ count: c ?? 8 }), { min: 1, max: 12, unit: '个' })));
+            el.append(row('散开', number(e.spread, (s) => patch({ spread: s ?? 0 }), { min: 0, max: 48, unit: 'dp' })));
+          }
+          el.append(row('时长', number(e.ms, (ms) => patch({ ms: ms ?? 0 }), { min: 0, max: 600, step: 10, unit: 'ms' })));
+        }
+        el.append(h('p', { className: 'muted', textContent: '特效图片：PNG 或 WebP，不超过 256×256、128 KB。现在的 App 还不认特效图片，导入时会丢掉它（画特效的版本会收）。' }));
+      } else {
+        el.append(row(m.label, number(v == null ? null : parseFloat(v), put, { min: m.min, max: m.max, step: m.kind === 'dp' ? 0.5 : 1, unit: m.kind === 'dp' ? 'dp' : '%' })));
+      }
+      warnings(el, api, F, sel);
+    }
+  }
+
+  panels.push({ id: 'motion', label: '动效', ops, render });
+})(typeof window !== 'undefined' ? window : globalThis);
+// 信息 (060-render-p3 §5.1 panel 10): the theme's name (its file's: what the app lists and an import keys on) and its
+// <meta>: author, version, license, the least app version, a preview image (taken from the preview by default).
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const F = root.YoumoForm;
+  // the app's (ThemeAssetLimits.MAX_PREVIEW_SIDE, MAX_PREVIEW_BYTES); a preview is taken at most PREVIEW_TAKE across
+  const PREVIEW = { side: 2048, bytes: 512 * 1024 };
+  const PREVIEW_TAKE = 720;
+  const META = [['author', '作者'], ['version', '版本'], ['license', '许可']];
+
+  const ops = {
+    /** [d] named [name] (the <theme>'s name=). */
+    name: (d, name) => panels.next(d, root.YoumoMaker.withName(d.xml, name)),
+    /** [d] with <meta>'s [attr] [value] (empty: taken out). */
+    meta: (d, attr, value) => panels.next(d, F.setMeta(d.xml, attr, value == null ? null : String(value).trim())),
+    /**
+     * [d] with [bytes] (a PNG or WebP) its preview image, `preview.<type>`; null: none, its file gone where nothing else
+     * names it. Refused (throws) where the app would refuse it.
+     */
+    preview(d, L, bytes) {
+      const old = F.meta(d.xml).preview;
+      let files = Object.assign(Object.create(null), d.files);
+      let xml = d.xml;
+      if (bytes) {
+        const type = L.imageType(bytes);
+        if (type !== 'png' && type !== 'webp') throw new Error('预览图只能是 PNG 或 WebP');
+        const s = L.imageSize(bytes);
+        if (!s || Math.max(s[0], s[1]) > PREVIEW.side) throw new Error('预览图最大 ' + PREVIEW.side + '×' + PREVIEW.side);
+        if (bytes.length > PREVIEW.bytes) throw new Error('预览图不能超过 512 KB');
+        const file = 'preview.' + type;
+        files[file] = bytes;
+        xml = F.setMeta(xml, 'preview', file);
+        if (old && old !== file && !F.uncommented(xml).includes('"' + old + '"')) files = panels.without(files, [old]);
+      } else {
+        xml = F.setMeta(xml, 'preview', null);
+        if (old && !F.uncommented(xml).includes('"' + old + '"')) files = panels.without(files, [old]);
+      }
+      return { xml, files, layouts: d.layouts };
+    },
+    PREVIEW, PREVIEW_TAKE,
+  };
+
+  function render(el, api) {
+    const { h, row } = panels.ui;
+    const d = api.doc();
+    const m = F.meta(d.xml);
+    const text = (value, change, placeholder = '') => {
+      const i = h('input', { type: 'text', value: value ?? '', placeholder, on: { change: () => change(i.value) } });
+      return i;
+    };
+    // a name emptied is not taken (a theme has one): the field shows the theme's again
+    const nameField = text(root.YoumoMaker.themeName(d.xml), (v) => {
+      if (v.trim()) api.apply((x) => ops.name(x, v.trim()));
+      else nameField.value = root.YoumoMaker.themeName(api.doc().xml);
+    });
+    el.append(row('名称', nameField,
+      h('span', { className: 'muted', textContent: '也是文件名；和 App 里已有的同名会覆盖它' })));
+    for (const [a, label] of META) el.append(row(label, text(m[a], (v) => api.apply((x) => ops.meta(x, a, v)), '最多 64 个字')));
+    el.append(row('最低 App 版本', text(m['min-app'], (v) => api.apply((x) => ops.meta(x, 'min-app', v)), '如 0.6.0')));
+    el.append(row('预览图', h('span', { className: 'muted', textContent: m.preview ? m.preview : '没有（App 用自己画的）' }),
+      h('button', { type: 'button', textContent: '从预览截一张', on: { click: async () => {
+        try {
+          const bytes = await api.previewImage(PREVIEW_TAKE, PREVIEW.bytes);
+          api.apply((x) => ops.preview(x, api.lib, bytes));
+        } catch (e) {
+          api.toast('截不了：' + (e.message || e));
+        }
+      } } }),
+      h('button', { type: 'button', textContent: '上传…', on: { click: async () => {
+        const f = await api.pickFile('image/png,image/webp,.png,.webp');
+        if (f) api.apply((x) => ops.preview(x, api.lib, new Uint8Array(f.bytes)));
+      } } }),
+      m.preview ? h('button', { type: 'button', textContent: '去掉', on: { click: () => api.apply((x) => ops.preview(x, api.lib, null)) } }) : null));
+  }
+
+  panels.push({ id: 'info', label: '信息', ops, render });
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script id="youmo-ui">
@@ -2112,6 +3886,8 @@ dialog h2 { margin: 0; font-size: 16px; }
   const E = globalThis['youmo-engine'] && globalThis['youmo-engine'].YoumoEngine;
   const L = window.YoumoLib;
   const M = window.YoumoMaker;
+  const F = window.YoumoForm;
+  const PANELS = window.YoumoPanels || [];
   const json = (id) => JSON.parse(document.getElementById(id).textContent);
   const FORMAT = json('youmo-format');
   const ICONS = json('youmo-engine-icons');
@@ -2127,10 +3903,19 @@ dialog h2 { margin: 0; font-size: 16px; }
   let env = Object.assign({}, M.ENV);
   let scene = null;
   let pressed = null;
+  let picked = null; // the key tapped last: {board, key}, the 按键 page's 选中的这个键
+  let theme = null; // the engine's reading of the document as the preview last drew it
+  let tab = PANELS.length ? PANELS[0].id : 'source';
   let assets = { key: null, images: {}, fonts: {}, cuts: {} };
   let loading = 0; // which loadAssets is the latest: an older one finishing late is dropped
   let edited = false; // the draft is kept only once the user has changed something
   let keeping = null;
+  let problems = []; // the problems the preview last listed: a tab shows those of its styles
+  let barH = 0; // the bar's sample's height over the keys on the preview canvas (px), the keys under it
+  let playing = null; // 试一下's frame: {key, scale, sink, alpha, appear} while it plays
+  // the pictures picked this session as they were picked (L9): a cut is made from them, not from the re-encoded file.
+  // By the saved file's content id: `{bytes, scale}` (the picked one's decoded width over the saved one's)
+  const originals = new Map();
   const store = (() => { try { return M.idbStore(window.indexedDB); } catch (e) { return null; } })();
 
   function toast(text) {
@@ -2147,7 +3932,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     if (fresh || !history) history = new M.History(d);
     else if (!history.push(d)) return;
     else edited = true;
-    changed();
+    changed(fresh);
   }
 
   // the draft written a moment after the last change, not on every key
@@ -2157,21 +3942,115 @@ dialog h2 { margin: 0; font-size: 16px; }
     keeping = setTimeout(() => M.keepDraft(store, history.current, env), 500);
   }
 
-  function changed() {
+  function changed(external = false) {
     const d = history.current;
     if ($('source').value !== d.xml) $('source').value = d.xml;
     $('name').textContent = M.themeName(d.xml) || '（无名）';
+    // the page answers only once there is a document (m1-review L6): until then its buttons are inert
+    $('top').inert = $('main').inert = false;
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
     keep();
-    return loadAssets(d).then((current) => { if (current) preview(); });
+    return loadAssets(d).then((current) => { if (current) { preview(); refreshTab(external); } });
+  }
+
+  // a field the user types in: what a value written over it would take the typing from
+  const typedIn = (el) => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
+  const CONTROLS = 'input, select, textarea, button';
+
+  // [to] made to show what [from] (the tab drawn anew, off the page) shows, its nodes kept: a control's value,
+  // a text; a part with no control replaced whole by the new one (its handlers, a canvas drawn). False where the controls differ (one more stop, a field
+  // gone): the tab is then drawn anew. [skip] keeps its value (the field being typed in).
+  function sync(to, from, skip) {
+    if (to.nodeType !== from.nodeType || to.nodeName !== from.nodeName) return false;
+    if (to.nodeType === Node.TEXT_NODE) { if (to.data !== from.data) to.data = from.data; return true; }
+    if (to.nodeType !== Node.ELEMENT_NODE) return true;
+    // a control's handlers hold what it was drawn for: the row's name (a colour's, a stop's), a box's data-key
+    // (a picture decoded, its crop). Another, and the part is put in whole, never kept with old handlers
+    const what = (e) => (e.matches('label.row') ? e.querySelector('.what')?.textContent ?? null : null);
+    if (to.dataset.key !== from.dataset.key || what(to) !== what(from)) {
+      if (to.contains(skip)) return false;
+      to.replaceWith(from);
+      return true;
+    }
+    const kids = to.childNodes.length === from.childNodes.length;
+    if (!to.matches(CONTROLS) && !to.querySelector(CONTROLS) && !from.querySelector(CONTROLS)) {
+      if (!kids || !to.isEqualNode(from)) to.replaceWith(from);
+      return true;
+    }
+    if (!kids || (to.tagName === 'INPUT' && to.type !== from.type)) return false;
+    for (let i = from.childNodes.length - 1; i >= 0; i--) if (!sync(to.childNodes[i], from.childNodes[i], skip)) return false;
+    if (to.className !== from.className) to.className = from.className;
+    if (to.matches(CONTROLS) && to !== skip) {
+      if ('value' in from && to.value !== from.value) to.value = from.value;
+      if (to.checked !== from.checked) to.checked = from.checked;
+      to.disabled = from.disabled;
+      to.title = from.title;
+    }
+    return true;
+  }
+
+  // the tab after a change: a value edited changes values in place, never the tab under the user (a tab drawn
+  // anew took the field or box just tapped, its focus and its click, or the characters typed into it: on touch
+  // the old field's change comes once the new one is tapped). The field being typed in keeps what it has, but
+  // not where the change is not its own ([external]: undo, redo, a draft): then it shows the document's.
+  function refreshTab(external = false) {
+    const el = $('tab-' + tab);
+    const panel = PANELS.find((p) => p.id === tab);
+    if (!panel || !history || !el || el.hidden) { showTab(); return; }
+    const fresh = document.createElement('div');
+    try {
+      panel.render(fresh, api);
+    } catch (e) {
+      showTab();
+      return;
+    }
+    const active = document.activeElement;
+    const skip = !external && el.contains(active) && typedIn(active) ? active : null;
+    const key = el.contains(active) && active.matches(CONTROLS) ? controlKey(active) : null;
+    const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
+    if (!same) { rebuildSoon(); return; }
+    // a row or box put in whole took the focused control with it (用这个裁切's button): focus its like in the new one
+    if (key && !el.contains(document.activeElement)) {
+      const again = [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
+      if (again) again.focus({ preventScroll: true });
+    }
+  }
+
+  // a change that adds or takes away controls (a border's colour once it has a width) draws the tab anew, but a task
+  // later: on touch the old field's change comes inside the next tap's mousedown, before focus moves, so drawn at
+  // once the tab lost the field tapped. By then the focus is on it: showTab focuses its like by controlKey, and what
+  // was typed into it and not yet committed is kept with its caret
+  let rebuilding = null;
+  function rebuildSoon() {
+    clearTimeout(rebuilding);
+    rebuilding = setTimeout(() => {
+      const a = document.activeElement;
+      const typed = typedIn(a) && $('tab-' + tab).contains(a) ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, key: controlKey(a) } : null;
+      showTab();
+      const b = document.activeElement;
+      if (typed && typedIn(b) && controlKey(b) === typed.key && b.value !== typed.value) {
+        b.value = typed.value;
+        try { b.setSelectionRange(typed.from, typed.to); } catch (e) { /* a number field has no caret */ }
+      }
+    }, 0);
+  }
+
+  // a control's place in a tab, the same in the tab drawn anew: its row's label, its place in the row (else its text)
+  function controlKey(c) {
+    const row = c.closest('label.row, .group, p, li, tr');
+    const what = row && row.querySelector('.what');
+    const inRow = row ? [...row.querySelectorAll(CONTROLS)].indexOf(c) : -1;
+    return c.tagName + '|' + (what ? what.textContent : '') + '|' + inRow + '|' + (what ? '' : c.textContent || c.type);
   }
 
   // the theme's files as the painter takes them: its images decoded, its fonts loaded under a family of their own
   // an image is decoded only where its header says the app would take it: a pack's bytes are not trusted, and a
   // decode past the browser's memory takes the tab down (a draft restored would do it again each time)
   async function loadAssets(d) {
-    if (assets.key === d.files) return true;
+    // the same files (an edit of theme.xml copies the object, not the bytes): nothing decoded again
+    const same = (a, b) => a === b || (a && Object.keys(a).length === Object.keys(b).length && Object.keys(b).every((k) => a[k] === b[k]));
+    if (same(assets.key, d.files)) return true;
     const mine = ++loading;
     const images = {};
     const fonts = {};
@@ -2213,21 +4092,19 @@ dialog h2 { margin: 0; font-size: 16px; }
     return out;
   }
 
-  // the theme's picture, the scene's size: its orientation's cut centre-cropped, blurred and dimmed as asked
-  function pictureOf(xml) {
-    const p = /<picture\b[^>]*>([\s\S]*?)<\/picture>/.exec(xml);
+  // the theme's picture, the scene's size: its orientation's cut (made the keyboard's shape by the 背景 page's crop)
+  // centre-cropped, blurred and dimmed as asked; read by the engine, as the app reads it
+  function pictureOf() {
+    const p = theme && theme.info(env.dark).picture;
     if (!p) return null;
-    const attr = (re, dflt) => { const m = re.exec(p[0]); return m ? parseFloat(m[1]) : dflt; };
-    const ownBlur = attr(/\bblur="([\d.]+)dp"/, 0);
-    const ownBright = attr(/\bbrightness="([\d.]+)%"/, 100);
-    const cut = new RegExp('<cut\\b[^>]*orientation="' + (env.landscape ? 'landscape' : 'portrait') + '"[^>]*file="([^"]+)"').exec(p[1]) ||
-      /<cut\b[^>]*file="([^"]+)"/.exec(p[1]);
-    const bmp = cut && assets.cuts[cut[1]];
+    const cuts = p.cuts || {};
+    const file = cuts[env.landscape ? 'landscape' : 'portrait'] || cuts.portrait || cuts.landscape;
+    const bmp = file && assets.cuts[file];
     if (!bmp || !scene) return null;
     const made = new Map();
     return (blurDp, brightness) => {
-      const b = blurDp == null ? ownBlur : blurDp;
-      const l = brightness == null ? ownBright : brightness;
+      const b = blurDp == null ? p.blurDp : blurDp;
+      const l = brightness == null ? p.brightness : brightness;
       const key = b + '/' + l;
       if (made.has(key)) return made.get(key);
       const c = document.createElement('canvas');
@@ -2242,6 +4119,143 @@ dialog h2 { margin: 0; font-size: 16px; }
     };
   }
 
+  // the bar's sample over the keys (环境 → 候选栏样例): the candidates typing, the toolbar's buttons idle; the code
+  // being typed over it. Its height in px, 0 for none
+  const PREEDIT_DP = 24;
+  function barOf(m) {
+    if (!env.bar || !theme) return null;
+    const r = E.buildBar(theme, M.envJson(env), m);
+    const l = E.looks(theme, M.envJson(env));
+    if (!r.ok || !l.ok) return null;
+    const pre = env.bar === 'typing' ? Math.round(PREEDIT_DP * env.density) : 0;
+    return { scene: r.scene, looks: l.looks, pre, height: pre + r.scene.height };
+  }
+
+  const css = (argb) => {
+    if (!argb) return null;
+    const v = argb.replace('#', '');
+    const a = parseInt(v.slice(0, 2), 16) / 255;
+    return 'rgba(' + parseInt(v.slice(2, 4), 16) + ',' + parseInt(v.slice(4, 6), 16) + ',' + parseInt(v.slice(6, 8), 16) + ',' + a.toFixed(3) + ')';
+  };
+
+  function drawBar(ctx, bar, state, fonts) {
+    const dp = env.density;
+    const lk = bar.looks;
+    ctx.save();
+    if (bar.pre) {
+      // the code being typed: its text, the underline fcitx asks for, the cursor at its end
+      const size = Math.round(14 * dp);
+      ctx.font = size + 'px ' + fonts.key;
+      ctx.fillStyle = css(lk.preedit.color) || '#000';
+      ctx.textBaseline = 'middle';
+      const text = 'you mo';
+      const x = 12 * dp;
+      const y = bar.pre / 2;
+      ctx.fillText(text, x, y);
+      const w = ctx.measureText(text).width;
+      if (lk.preedit.underline) {
+        ctx.fillStyle = css(lk.preedit.underline.color) || css(lk.preedit.color);
+        ctx.fillRect(x, y + size * 0.6, w, Math.max(1, lk.preedit.underline.widthDp * dp));
+      }
+      if (lk.preedit.cursor) {
+        ctx.fillStyle = css(lk.preedit.cursor);
+        ctx.fillRect(x + w + 1, y - size / 2, Math.max(1, dp), size);
+      }
+    }
+    ctx.translate(0, bar.pre);
+    if (env.bar === 'typing') E.paint(bar.scene, ctx, state);
+    else {
+      // idle: the bar's base and five toolbar buttons (a circle, or the toolbar's radius), the second one on
+      const h = bar.scene.height;
+      if (lk.bar) { ctx.fillStyle = css(lk.bar); ctx.fillRect(0, 0, bar.scene.width, h); }
+      const size = Math.min(h - 8 * dp, 36 * dp);
+      const step = bar.scene.width / 6;
+      for (let i = 0; i < 5; i++) {
+        const cx = step * (i + 0.5) + step / 2;
+        const on = i === 1;
+        const fill = on ? lk.toolbar.onFill : lk.toolbar.fill;
+        const r = lk.toolbar.radiusDp == null ? size / 2 : Math.min(size / 2, lk.toolbar.radiusDp * dp);
+        if (fill) {
+          ctx.fillStyle = css(fill);
+          ctx.beginPath();
+          ctx.roundRect(cx - size / 2, (h - size) / 2, size, size, r);
+          ctx.fill();
+        }
+        ctx.fillStyle = css(on ? lk.toolbar.onIcon : lk.toolbar.icon);
+        ctx.beginPath();
+        ctx.arc(cx, h / 2, size / 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // a panel over the keys (环境 → 面板样例): blocks of what the app's views take of the theme (the engine's looks)
+  function drawPanel(ctx, lk, w, h) {
+    const dp = env.density;
+    const round = (x, y, ww, hh, r, fill) => { if (!fill) return; ctx.fillStyle = css(fill); ctx.beginPath(); ctx.roundRect(x, y, ww, hh, Math.max(0, r)); ctx.fill(); };
+    const text = (t, x, y, color) => { ctx.fillStyle = css(color) || '#000'; ctx.font = Math.round(13 * dp) + 'px "Youmo Han", sans-serif'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y); };
+    ctx.save();
+    const p = 8 * dp;
+    if (env.panel === 'clipboard') {
+      const c = lk.clipboard;
+      for (let i = 0; i < 4; i++) {
+        const x = p + (i % 2) * (w / 2);
+        const y = p + Math.floor(i / 2) * 64 * dp;
+        round(x, y, w / 2 - 2 * p, 56 * dp, c.radiusDp * dp, c.fill);
+        text(['复制的一段文字', '幽默输入法', 'https://…', '12345'][i], x + p, y + 28 * dp, c.color);
+      }
+    } else if (env.panel === 'picker') {
+      const c = lk.picker;
+      round(0, 0, w, h, 0, c.fill);
+      const bar = 40 * dp;
+      round(0, h - bar, w, bar, 0, c.categories);
+      const tabs = ['常用', '中文', '英文', '数学', '箭头'];
+      tabs.forEach((t, i) => {
+        if (i === 0) round(i * w / tabs.length, h - bar, w / tabs.length, bar, 0, c.selected);
+        text(t, i * w / tabs.length + p, h - bar / 2, i === 0 ? c.selectedColor : c.color);
+      });
+      '，。、？！：；“”（）《》'.split('').forEach((t, i) => text(t, p + (i % 6) * (w / 6), p + 20 * dp + Math.floor(i / 6) * 48 * dp, c.color));
+    } else if (env.panel === 'editing') {
+      const c = lk.editing;
+      round(0, 0, w, h, 0, c.fill);
+      ['全选', '复制', '粘贴', '剪切', '←', '→'].forEach((t, i) => {
+        const x = p + (i % 3) * (w - p) / 3;
+        const y = p + Math.floor(i / 3) * (h - p) / 2;
+        round(x, y, (w - p) / 3 - p, (h - p) / 2 - p, c.radiusDp * dp, lk.clipboard.fill);
+        text(t, x + p, y + ((h - p) / 2 - p) / 2, lk.clipboard.color);
+      });
+    } else if (env.panel === 'voice') {
+      const c = lk.voice;
+      round(0, 0, w, h, 0, c.fill);
+      const r = 36 * dp;
+      round(w / 2 - r, h / 2 - r, 2 * r, 2 * r, r, c.mic);
+      round(w / 2 - r / 4, h / 2 - r / 2, r / 2, r, r / 4, c.micColor);
+    }
+    ctx.restore();
+  }
+
+  // the popup 环境 → 显示 asks for, over the key picked (or the keyboard's middle key): `{scene, x, y}` px on the keys
+  function popupOf(m) {
+    if (!env.show || !scene || !theme) return null;
+    const keys = scene.json().keys;
+    const k = (picked && picked.board === env.board && keys.find((x) => x.id === picked.key)) || keys[Math.floor(keys.length / 3)];
+    if (!k) return null;
+    const [l, t, r] = k.bounds;
+    const label = k.label || 'a';
+    let req;
+    if (env.show === 'preview') req = { kind: 'preview', text: label, keyWidth: r - l };
+    else if (env.show === 'keys') req = { kind: 'keys', labels: ['à', 'á', 'â', 'ä', 'ā'], rows: [[0, 1, 2, 3, 4]], columns: 5, selected: 1 };
+    else req = { kind: 'menu', cells: [{ label: '剪贴板' }, { label: '表情' }, { label: '编辑' }, { label: '设置' }], order: [0, 1, 2, 3], selected: 0 };
+    const got = E.buildPopup(theme, M.envJson(env), req, m);
+    if (!got.ok) return null;
+    const p = got.scene;
+    const cx = (l + r) / 2;
+    const x = env.show === 'menu' ? (scene.width - p.width) / 2 : Math.max(0, Math.min(scene.width - p.width, cx - p.width / 2));
+    const y = env.show === 'menu' ? (scene.height - p.height) / 2 : t - p.height;
+    return { scene: p, x, y };
+  }
+
   function preview() {
     const d = history.current;
     const canvas = $('preview');
@@ -2249,19 +4263,136 @@ dialog h2 { margin: 0; font-size: 16px; }
     const m = E.canvasMeasurer(canvas.getContext('2d'), fonts);
     const r = M.check(E, d, env.board, M.envJson(env), m.ok ? m.measurer : null);
     scene = r.scene;
+    theme = r.theme;
     showProblems(r.problems);
     if (!scene) return;
+    let bar = null;
+    let popup = null;
+    try {
+      bar = barOf(m.ok ? m.measurer : null);
+      popup = popupOf(m.ok ? m.measurer : null);
+    } catch (e) {
+      // a sample the engine could not make: the keys drawn without it
+    }
+    barH = bar ? bar.height : 0;
     canvas.width = scene.width;
-    canvas.height = scene.height;
+    canvas.height = scene.height + barH;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const state = { pressed, icons: ICONS, images: assets.images, fonts };
-    const picture = pictureOf(d.xml);
+    const picture = pictureOf();
     if (picture) state.picture = picture;
-    E.paint(scene, ctx, state);
+    if (bar) drawBar(ctx, bar, Object.assign({}, state, { pressed: null }), fonts);
+    ctx.save();
+    ctx.translate(0, barH);
+    const looks = env.panel && theme ? E.looks(theme, M.envJson(env)) : null;
+    if (looks && looks.ok) {
+      E.paint(scene, ctx, Object.assign({}, state, { pressed: null }));
+      drawPanel(ctx, looks.looks, scene.width, scene.height);
+    } else E.paint(scene, ctx, state);
+    if (popup) {
+      ctx.translate(popup.x, popup.y);
+      E.paint(popup.scene, ctx, state);
+    }
+    ctx.restore();
+  }
+
+  // ---- 试一下 (动效): the press and its release, the bubble appearing, by requestAnimationFrame ----
+
+  // a frame of what plays ([c]: what play made once for it): the keys, the played key drawn pressed (scaled and sunk
+  // about its middle, see-through as it fades back), the bubble over it as it appears
+  function playFrame(ctx, c) {
+    ctx.drawImage(c.keys, 0, 0);
+    const [l, t, r, b] = c.bounds;
+    ctx.save();
+    ctx.globalAlpha = playing.alpha;
+    const cx = (l + r) / 2;
+    const cy = (t + b) / 2 + playing.sink * env.density;
+    ctx.translate(cx, cy);
+    ctx.scale(playing.scale, playing.scale);
+    ctx.drawImage(c.pressed, l, t, r - l, b - t, -(r - l) / 2, -(b - t) / 2, r - l, b - t);
+    ctx.restore();
+    if (playing.appear != null && c.bubble) {
+      const p = c.bubble;
+      const a = playing.appear;
+      ctx.save();
+      const kind = playing.appearKind;
+      ctx.globalAlpha = kind === 'fade' ? a : 1;
+      const x = Math.max(0, Math.min(scene.width - p.width, cx - p.width / 2));
+      const y = t - p.height + (kind === 'rise' ? (1 - a) * 12 * env.density : 0);
+      ctx.translate(x + p.width / 2, y + p.height);
+      if (kind === 'scale') ctx.scale(0.5 + a / 2, 0.5 + a / 2);
+      ctx.translate(-p.width / 2, -p.height);
+      E.paint(p, ctx, c.state);
+      ctx.restore();
+    }
+  }
+
+  const EASE = {
+    linear: (x) => x, ease: (x) => x * x * (3 - 2 * x), 'ease-in': (x) => x * x, 'ease-out': (x) => 1 - (1 - x) * (1 - x), 'ease-in-out': (x) => (x < 0.5 ? 2 * x * x : 1 - 2 * (1 - x) * (1 - x)),
+  };
+
+  /**
+   * [m] (动效's sample: transition, scale, sink, appear) played on the preview: pressed at once (never faded in),
+   * held, then faded back over the transition's time; the bubble appearing over its own. Stops when done.
+   */
+  function play(m) {
+    if (!scene) return;
+    const keys = scene.json().keys;
+    const k = (picked && keys.find((x) => x.id === picked.key)) || keys.find((x) => x.kind === 'letter') || keys[0];
+    if (!k) return;
+    const HOLD = 220;
+    const back = m.transition ? m.transition.ms : 0;
+    const ease = EASE[m.transition ? m.transition.easing : 'linear'] || EASE.linear;
+    const pressMs = Math.min(80, back || 80);
+    const appearMs = m.appear ? m.appear.ms : 0;
+    // drawn once for the play, not each frame (the theme read again, the scene built again: frames dropped on a phone)
+    const fonts = Object.assign({ key: '"Youmo Latin", "Youmo Han", sans-serif' }, fontFamilies(history.current.xml));
+    const state = { pressed: null, icons: ICONS, images: assets.images, fonts };
+    const picture = pictureOf();
+    if (picture) state.picture = picture;
+    const layer = (pressedKey) => {
+      const o = document.createElement('canvas');
+      o.width = scene.width;
+      o.height = scene.height;
+      E.paint(scene, o.getContext('2d'), Object.assign({}, state, { pressed: pressedKey }));
+      return o;
+    };
+    const got = E.buildPopup(theme, M.envJson(env), { kind: 'preview', text: k.label || 'a', keyWidth: k.bounds[2] - k.bounds[0] }, null);
+    const cache = { keys: layer(null), pressed: layer(k.id), bounds: k.bounds, bubble: got.ok ? got.scene : null, state };
+    const canvas = $('preview');
+    const ctx = canvas.getContext('2d');
+    const t0 = performance.now();
+    const step = (now) => {
+      const t = now - t0;
+      const pressIn = Math.min(1, t / pressMs);
+      const release = t < HOLD ? 0 : back ? Math.min(1, (t - HOLD) / back) : 1;
+      playing = {
+        key: k.id,
+        // the press's scale and sink come in over at most 80 ms (§4.1), its colour at once
+        scale: 1 + (m.scale / 100 - 1) * pressIn * (1 - ease(release)),
+        sink: m.sink * pressIn * (1 - ease(release)),
+        alpha: 1 - ease(release),
+        appear: t < HOLD + back ? (appearMs ? Math.min(1, t / appearMs) : 1) : null,
+        appearKind: m.appear ? m.appear.kind : 'fade',
+      };
+      if (t >= HOLD + back) {
+        playing = null;
+        preview();
+        return;
+      }
+      ctx.clearRect(0, barH, canvas.width, canvas.height - barH);
+      ctx.save();
+      ctx.translate(0, barH);
+      playFrame(ctx, cache);
+      ctx.restore();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   function showProblems(list) {
+    problems = list;
     const ul = $('problems');
     ul.textContent = '';
     for (const p of list) {
@@ -2276,6 +4407,8 @@ dialog h2 { margin: 0; font-size: 16px; }
   }
 
   function goToLine(line) {
+    tab = 'source';
+    showTab();
     const ta = $('source');
     const lines = ta.value.split('\n');
     const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
@@ -2312,15 +4445,17 @@ dialog h2 { margin: 0; font-size: 16px; }
 
   // the picture decoded (upright, as its EXIF says), drawn at sizeOf its decoded sides and encoded: JPEG, or PNG
   // where any pixel is see-through
-  async function encodePicture(bytes, sizeOf, quality) {
+  // [rect] (l t r b of the decoded picture): only that part of it
+  async function encodePicture(bytes, sizeOf, quality, rect = null) {
     const bmp = await createImageBitmap(new Blob([bytes]));
     try {
-      const [w, h] = sizeOf(bmp.width, bmp.height);
+      const [l, t, r, b] = rect || [0, 0, bmp.width, bmp.height];
+      const [w, h] = sizeOf(r - l, b - t);
       const c = document.createElement('canvas');
       c.width = w;
       c.height = h;
       const g = c.getContext('2d');
-      g.drawImage(bmp, 0, 0, w, h);
+      g.drawImage(bmp, l, t, r - l, b - t, 0, 0, w, h);
       const px = g.getImageData(0, 0, w, h).data;
       let alpha = false;
       for (let i = 3; i < px.length && !alpha; i += 4) alpha = px[i] < 255;
@@ -2332,18 +4467,173 @@ dialog h2 { margin: 0; font-size: 16px; }
     }
   }
 
-  async function fromImage() {
+  // a picture the user picks as the 背景 page takes it: the picture made a file the app takes, and a cut of the
+  // keyboard's shape for each orientation, cropped at its middle (the 背景 page moves them)
+  async function choosePicture() {
     const f = await pick($('image-input'));
-    if (!f) return;
-    const chosen = document.querySelector('input[name="image-base"]:checked');
+    if (!f) return null;
     try {
-      const made = await M.pictureFile(L, FORMAT, new Uint8Array(await f.arrayBuffer()), encodePicture);
-      set(M.withPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made.bytes, made.type));
-      $('new-panel').close();
-      toast('图片已做键盘背景；配色可在源码里改');
+      const picked = new Uint8Array(await f.arrayBuffer());
+      const made = await M.pictureFile(L, FORMAT, picked, encodePicture);
+      const size = L.imageSize(made.bytes);
+      // the picked picture kept for this session's cuts (a cut of the saved JPEG would be a second generation)
+      if (size) {
+        const bmp = await createImageBitmap(new Blob([picked]));
+        originals.clear();
+        originals.set(L.contentId(made.bytes), { bytes: picked, scale: bmp.width / size[0] });
+        bmp.close();
+      }
+      const bg = PANELS.find((p) => p.id === 'background').ops;
+      const cuts = {};
+      for (const o of ['portrait', 'landscape']) {
+        const rect = F.cropRect(size[0], size[1], bg.ratio(Object.assign({}, env, { landscape: o === 'landscape' })));
+        cuts[o] = await cutOf(made.bytes, rect);
+      }
+      return { type: made.type, src: made.bytes, cuts };
     } catch (e) {
       toast(e && e.code === 'limit' ? '图片太大，打不开' : '这张图片用不了（只认 PNG、JPEG、WebP）');
+      return null;
     }
+  }
+
+  // [rect] of the picture [bytes] as a file of its own, encoded as every picture is
+  async function cutOf(bytes, rect) {
+    const side = Math.min(M.PICTURE_SAVE.longSide, FORMAT.limits.pictureSide);
+    // [rect] is of the saved picture; the picked one it was made from (this session's) is cut instead, at its scale
+    const first = originals.get(L.contentId(bytes));
+    const from = first ? first.bytes : bytes;
+    const at = first ? rect.map((v) => v * first.scale) : rect;
+    const made = await encodePicture(from, (w, h) => L.resizeInside(w, h, side, side), M.PICTURE_SAVE.quality, at);
+    return { bytes: made.bytes, type: made.type, rect };
+  }
+
+  async function fromImage() {
+    const chosen = document.querySelector('input[name="image-base"]:checked');
+    const made = await choosePicture();
+    if (!made) return;
+    const bg = PANELS.find((p) => p.id === 'background').ops;
+    const colors = PANELS.find((p) => p.id === 'colors').ops;
+    // 浅/深 (060-render-p3 §5.1 新建 2): the version shown and the colours worked out of the picture for it
+    const dark = !!(document.querySelector('input[name="image-tone"]:checked') || {}).value?.startsWith('dark');
+    env.dark = dark;
+    fillEnvForm();
+    let d = bg.setPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made);
+    // sampled from the picture just made (the preview's is still the last one's until it is drawn), as one step
+    const cut = made.cuts.portrait || { bytes: made.src };
+    const bmp = await createImageBitmap(new Blob([cut.bytes]));
+    d = colors.fromPictureAll(d, samplesOf(bmp), dark);
+    bmp.close();
+    set(asDoc(d));
+    $('new-panel').close();
+    tab = 'background';
+    showTab();
+    toast('图片已做键盘背景：在「背景」里调裁切，「配色」里可以从图片取色');
+  }
+
+  // ---- the editing's tabs ----
+
+  const asDoc = (x) => M.doc(x.xml, x.files, x.layouts);
+
+  const api = {
+    engine: E,
+    doc: () => history.current,
+    env: () => env,
+    envJson: (e = env) => M.envJson(e),
+    theme: () => theme,
+    picked: () => picked,
+    // an op that throws (a document it cannot change: no <theme>) says so instead of failing silently
+    apply: (fn) => {
+      if (!history) return;
+      let next;
+      try {
+        next = fn(history.current);
+      } catch (e) {
+        toast(e.message || String(e));
+        return;
+      }
+      set(asDoc(next));
+    },
+    rerender: () => showTab(),
+    problems: () => problems,
+    play,
+    // the preview as a PNG at most [width] px across (信息's preview image)
+    // the preview as an image at most [width] px across and [bytes] long (信息's preview image): a PNG where one fits,
+    // else WebP at falling quality, then smaller, until it does (a picture background's PNG is past the App's 512 KB)
+    async previewImage(width, bytes = Infinity) {
+      const c = $('preview');
+      const encode = async (w, type, q) => {
+        const k = Math.min(1, w / c.width);
+        const o = document.createElement('canvas');
+        o.width = Math.max(1, Math.round(c.width * k));
+        o.height = Math.max(1, Math.round(c.height * k));
+        o.getContext('2d').drawImage(c, 0, 0, o.width, o.height);
+        const blob = await new Promise((ok) => o.toBlob(ok, type, q));
+        return blob && blob.type === type ? new Uint8Array(await blob.arrayBuffer()) : null;
+      };
+      let out = await encode(width, 'image/png');
+      for (let w = width; out && out.length > bytes && w >= 120; w = Math.round(w * 0.8)) {
+        for (const q of [0.9, 0.8, 0.7, 0.6]) {
+          out = (await encode(w, 'image/webp', q)) || (await encode(w, 'image/png')) || out;
+          if (out.length <= bytes) break;
+        }
+      }
+      return out;
+    },
+    toast,
+    lib: L,
+    limits: () => FORMAT.limits,
+    goToLine,
+    bitmap: (name) => assets.cuts[name] || null,
+    iconNames: () => Object.keys(ICONS).sort(),
+    choosePicture,
+    cutPicture: (src, rect) => cutOf(history.current.files[src], rect),
+    async pickFile(accept) {
+      const input = $('any-input');
+      input.accept = accept;
+      const f = await pick(input);
+      return f ? { name: f.name, bytes: await f.arrayBuffer() } : null;
+    },
+    // the portrait cut's colours, a few hundred of its pixels
+    async pictureSamples() {
+      const p = theme && theme.info(env.dark).picture;
+      const bmp = p && assets.cuts[(p.cuts || {}).portrait || p.src];
+      return bmp ? samplesOf(bmp) : null;
+    },
+  };
+
+  // a few hundred of [bmp]'s pixels, `[[r, g, b]]`
+  function samplesOf(bmp) {
+    const c = document.createElement('canvas');
+    c.width = 24;
+    c.height = 16;
+    const g = c.getContext('2d');
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    const px = g.getImageData(0, 0, c.width, c.height).data;
+    const out = [];
+    for (let i = 0; i < px.length; i += 4) out.push([px[i], px[i + 1], px[i + 2]]);
+    return out;
+  }
+
+  // the tab shown drawn anew from the document (the source tab is the text area, kept as it is typed)
+  function showTab() {
+    for (const b of $('tabs').children) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+    for (const el of document.querySelectorAll('#edit .tab')) el.hidden = el.id !== 'tab-' + tab;
+    const panel = PANELS.find((p) => p.id === tab);
+    if (!panel || !history) return;
+    const el = $('tab-' + tab);
+    const scroll = $('edit').scrollTop;
+    // the control that had focus (a select just changed, a box ticked) has it again in the tab drawn anew, where
+    // it still is: found by its row and place (controlKey), not its index (a row added or gone moves that)
+    const key = el.contains(document.activeElement) && document.activeElement.matches(CONTROLS) ? controlKey(document.activeElement) : null;
+    el.textContent = '';
+    try {
+      panel.render(el, api);
+    } catch (e) {
+      el.textContent = '这一页出错了：' + (e.message || e);
+    }
+    const again = key && [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
+    if (again) again.focus({ preventScroll: true });
+    $('edit').scrollTop = scroll;
   }
 
   function save() {
@@ -2376,6 +4666,11 @@ dialog h2 { margin: 0; font-size: 16px; }
     $('env-board').value = env.board;
     $('env-form-kind').value = env.form;
     $('env-shift').value = env.shift;
+    $('env-field').value = env.field;
+    $('env-ime').value = env.ime;
+    $('env-show').value = env.show;
+    $('env-bar').value = env.bar;
+    $('env-sheet').value = env.panel;
     $('dark').setAttribute('aria-pressed', String(env.dark));
     $('dark').textContent = env.dark ? '深色' : '浅色';
   }
@@ -2390,10 +4685,13 @@ dialog h2 { margin: 0; font-size: 16px; }
       Object.assign(env, { w: num('env-w', env.w), h: num('env-h', env.h), density: num('env-density', env.density) });
       if (e && /env-(w|h|density)/.test(e.target.id)) env.device = 'custom';
     }
-    Object.assign(env, { landscape: $('env-landscape').checked, board: $('env-board').value, form: $('env-form-kind').value, shift: $('env-shift').value });
+    Object.assign(env, {
+      landscape: $('env-landscape').checked, board: $('env-board').value, form: $('env-form-kind').value, shift: $('env-shift').value,
+      field: $('env-field').value, ime: $('env-ime').value, show: $('env-show').value, bar: $('env-bar').value, panel: $('env-sheet').value,
+    });
     fillEnvForm();
     keep();
-    if (history) preview();
+    if (history) { preview(); showTab(); }
   }
 
   // ---- start ----
@@ -2427,6 +4725,19 @@ dialog h2 { margin: 0; font-size: 16px; }
       b.addEventListener('click', () => { set(M.fromBuiltin(E, id)); $('new-panel').close(); });
       cards.append(b);
     }
+    // the panels' tabs before the source's, in their order
+    for (const p of PANELS) {
+      const b = Object.assign(document.createElement('button'), { textContent: p.label });
+      b.setAttribute('role', 'tab');
+      b.dataset.tab = p.id;
+      $('tabs').lastElementChild.before(b);
+      const el = document.createElement('div');
+      el.id = 'tab-' + p.id;
+      el.className = 'tab';
+      $('tab-source').before(el);
+    }
+    $('tabs').addEventListener('click', (e) => { if (e.target.dataset.tab) { tab = e.target.dataset.tab; showTab(); } });
+    showTab();
     $('from-image').addEventListener('click', fromImage);
     $('from-file').addEventListener('click', openFile);
 
@@ -2438,8 +4749,8 @@ dialog h2 { margin: 0; font-size: 16px; }
       else if (act === 'open') openFile();
       else if (act === 'save') save();
     });
-    $('undo').addEventListener('click', () => { if (history && history.canUndo) { history.undo(); edited = true; changed(); } });
-    $('redo').addEventListener('click', () => { if (history && history.canRedo) { history.redo(); edited = true; changed(); } });
+    $('undo').addEventListener('click', () => { if (history && history.canUndo) { history.undo(); edited = true; changed(true); } });
+    $('redo').addEventListener('click', () => { if (history && history.canRedo) { history.redo(); edited = true; changed(true); } });
     document.addEventListener('keydown', (e) => {
       if (!(e.ctrlKey || e.metaKey) || e.target === $('source')) return;
       if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
@@ -2457,14 +4768,16 @@ dialog h2 { margin: 0; font-size: 16px; }
     const keyAt = (e) => {
       if (!scene) return null;
       const r = canvas.getBoundingClientRect();
-      const k = scene.keyAt((e.clientX - r.left) * scene.width / r.width, (e.clientY - r.top) * scene.height / r.height);
+      const k = scene.keyAt((e.clientX - r.left) * canvas.width / r.width, (e.clientY - r.top) * canvas.height / r.height - barH);
       return k >= 0 ? scene.json().keys[k].id : null;
     };
     canvas.addEventListener('pointerdown', (e) => {
       if (!history) return;
       pressed = keyAt(e);
-      $('picked').textContent = pressed ? '选中的键：' + pressed : '';
+      if (pressed) picked = { board: env.board, key: pressed };
+      $('picked').textContent = picked ? '选中的键：' + picked.key + '（' + (BOARD_LABEL[picked.board] || picked.board) + '）' : '';
       preview();
+      showTab();
     });
     const up = () => { if (pressed && history) { pressed = null; preview(); } };
     canvas.addEventListener('pointerup', up);
@@ -2495,7 +4808,7 @@ dialog h2 { margin: 0; font-size: 16px; }
           if (kept.env) env = Object.assign({}, M.ENV, kept.env);
           fillEnvForm();
           history = new M.History(kept.doc);
-          await changed();
+          await changed(true);
           return;
         } catch (e) {
           history = null;

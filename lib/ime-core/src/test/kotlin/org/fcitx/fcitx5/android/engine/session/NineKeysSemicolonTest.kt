@@ -152,10 +152,10 @@ class NineKeysSemicolonTest {
         assertEquals(NINE_SP, NineKeyLetters.grouped(old))
         assertEquals(NINE_SP.tag(), Kinds.keysTag(Kinds.shuangpinKeys("ms", NINE_SP.tag())))
         // 2 to 9's codes as they were; 5 now jkl alone, ; a code of its own
-        assertEquals("", NINE_SP.codes)
-        assertEquals("jkl", NINE_SP.letters(''))
-        assertEquals('', NINE_SP.key(';'))
-        assertEquals("jkl ;", NINE_SP.shown(""))
+        assertEquals("\uF8F4\uF8F5\uF8F6\uF8F7\uF8F8\uF8F9\uF8FA\uF8FB\uF8FC", NINE_SP.codes)
+        assertEquals("jkl", NINE_SP.letters('\uF8F7'))
+        assertEquals('\uF8FC', NINE_SP.key(';'))
+        assertEquals("jkl ;", NINE_SP.shown("\uF8F7\uF8FC"))
         assertNull(NineKeyLetters.ofCode(0xF8FD))
     }
 }

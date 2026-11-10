@@ -51,3 +51,20 @@ dialog h2 { margin: 0; font-size: 16px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
 #toast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 12px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 92vw; }
 #toast.on { opacity: 1; }
+/* the editing's forms (src/panels/) */
+.tab h3 { font-size: 13px; margin: 12px 0 4px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 0; }
+.row .what { min-width: 7em; color: var(--muted); font-size: 12px; }
+.row input[type="number"] { width: 5.5em; }
+.color { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.color input[type="color"] { width: 32px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
+.color input[type="range"] { width: 70px; }
+.color .expr { width: 12em; font: 12px ui-monospace, Menlo, monospace; }
+.clear { padding: 0 6px; }
+.selector code { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; }
+.group { border-left: 2px solid var(--line); padding-left: 6px; margin: 4px 0; }
+.sources { border-collapse: collapse; font-size: 12px; width: 100%; }
+.sources td { border-top: 1px solid var(--line); padding: 2px 4px; vertical-align: top; word-break: break-all; }
+.sources a { color: var(--accent); }
+.crop-canvas { max-width: 100%; touch-action: none; display: block; }
+.warnings { color: var(--warn); font-size: 12px; margin: 4px 0 8px; padding-left: 18px; }

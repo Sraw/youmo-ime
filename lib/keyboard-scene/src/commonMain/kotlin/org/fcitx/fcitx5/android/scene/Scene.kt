@@ -33,8 +33,9 @@ class Scene(
 ) {
     /**
      * The key a finger at ([x], [y]) presses: the one whose [KeyNode.hit] holds it; none in a gap.
-     * A touch on the scene's right or bottom edge, or past it (a finger's centre the system reports a
-     * pixel out), counts as just inside: the edge keys' hits stop short of their right and bottom.
+     * A touch on the scene's right or bottom edge, or past any of its four edges (a finger's centre the
+     * system reports a pixel out), counts as just inside: the edge keys' hits stop short of their right
+     * and bottom, and a touch left of or above the scene goes to the left or top edge's key.
      */
     fun keyAt(x: Double, y: Double): KeyNode? {
         val cx = x.coerceIn(0.0, maxOf(0.0, width - EDGE))
@@ -68,7 +69,7 @@ enum class KeyState(val xml: String) {
  * middle for glide typing and popups; [up] the way a swipe up goes (a unit vector, the screen's up).
  *
  * What the app needs to work it, so it never goes back to the layout: [label] and [alt] as shown (the
- * bindings read; null where there is none), [altRaw] the alt as written (`{punct:~}`), its long
+ * bindings read; null where there is none), [altRaw] the alt as written (`{punct:~}`; snapshots and tests only), its long
  * press's [popup] as written (null: PopupPreset's by its label and send; [Scene.popups] off: none at
  * all) and [menu], the [sound] it clicks with, the [shortcut] its swipes' symbols are kept under.
  */
@@ -102,9 +103,29 @@ class KeyNode(
     /** Its layout's say over its face (`face=`) and its gap (`margin=`): what an exporter of the layout (the theme maker's) passes on. */
     val face: org.fcitx.fcitx5.android.scene.layout.Face = org.fcitx.fcitx5.android.scene.layout.Face.Default,
     val margin: Boolean = true,
+    /** How it moves between its faces (060-render-p3 A1); null: it does not, each shown at once (every theme without motion). */
+    val motion: Motion? = null,
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)
+}
+
+/**
+ * A key's motion (060-render-p3 §4, A1), plain data: [transition] how its pressed face fades out when
+ * let go and its state's face fades in when the state changes (Shift, locked), its look's `transition`
+ * in [KeyNode.states]; [press] how long its pressed face takes to scale to [pressScale] and sink
+ * [pressSink] px, the pressed look's `transition` no longer than [MAX_PRESS_MS] (none: at once). The
+ * pressed face itself is shown whole at once, never faded in.
+ */
+data class Motion(
+    val transition: org.fcitx.fcitx5.android.scene.theme.Transition?,
+    val press: org.fcitx.fcitx5.android.scene.theme.Transition?,
+    val pressScale: Double = 1.0,
+    val pressSink: Double = 0.0,
+) {
+    companion object {
+        const val MAX_PRESS_MS = 80
+    }
 }
 
 /**

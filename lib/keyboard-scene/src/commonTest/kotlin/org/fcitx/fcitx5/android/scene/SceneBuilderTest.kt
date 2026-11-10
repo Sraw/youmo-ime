@@ -13,7 +13,9 @@ import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
+import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.Cascades
+import org.fcitx.fcitx5.android.scene.theme.Selector
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -29,7 +31,6 @@ class SceneBuilderTest {
         "<keyboard xmlns=\"$ns\" id=\"t\" name=\"t\" family=\"$family\" columns=\"10\">\n$rows\n</keyboard>",
     ).ok()
 
-    // review M-5: the app always says which pad; a board read without it is the full one, said so
     // the phases a profiler is told, in order, each ended; the scene the same as told nothing
     @Test
     fun itsPhasesTold() {
@@ -50,6 +51,20 @@ class SceneBuilderTest {
         assertEquals(plain.base, scene.base)
     }
 
+    // the maker's cascade check: a key's every property from the style the scene's cascade takes it from
+    @Test
+    fun sourcesAreTheKeysCascade() {
+        val t = Fixtures.materialLight
+        val b = SceneBuilder(t, Fixtures.portrait, FakeMeasurer)
+        val c = Cascade(t, Fixtures.portrait.scenes)
+        val q = Selector.Target("key", "qwerty", "q", null, setOf("letter"), emptySet())
+        assertEquals(c.sources(q), b.sources(Fixtures.qwerty, emptyMap(), "q", null, emptySet()))
+        assertEquals(c.sources(q.copy(states = setOf("pressed"), part = "label")), b.sources(Fixtures.qwerty, emptyMap(), "q", "label", setOf("pressed")))
+        val pressed = b.sources(Fixtures.qwerty, emptyMap(), "q", null, setOf("pressed"))
+        assertEquals(c.of(q.copy(states = setOf("pressed"))).keys, pressed.keys)
+        assertEquals(emptyMap(), b.sources(Fixtures.qwerty, emptyMap(), "none", null, emptySet()))
+    }
+
     // a theme's cascades kept from scene to scene (TextKeyboard's) make each scene as a fresh one does:
     // every snapshot's scene, in turn, through one theme's cascades, the same text as made alone
     @Test
@@ -66,6 +81,7 @@ class SceneBuilderTest {
         assertFailsWith<IllegalArgumentException> { SceneBuilder(Forms.materialDark, Fixtures.portrait, FakeMeasurer, cascades = Cascades(Fixtures.materialLight)) }
     }
 
+    // the app always says which pad; a board read without it is the full one, said so
     @Test
     fun aNumberPadWithNoPadIsTheFullOne() {
         val pads = board(
@@ -99,9 +115,23 @@ class SceneBuilderTest {
     @Test
     fun buildingNeverThrows() {
         val broken = TextMeasurer { _, _, _, _ -> error("no fonts") }
-        val built = SceneBuilder(Fixtures.materialLight, Fixtures.portrait, broken).build(Fixtures.qwerty)
+        // each phase begun ended too, the build failing in one (a profiler's sections left open otherwise)
+        var open = 0
+        var begun = 0
+        val phases = object : Phases {
+            override fun begin(name: String) {
+                open++
+                begun++
+            }
+
+            override fun end() {
+                open--
+            }
+        }
+        val built = SceneBuilder(Fixtures.materialLight, Fixtures.portrait, broken, phases = phases).build(Fixtures.qwerty)
         assertIs<Parsed.Failed>(built)
         assertTrue(built.problems.single().message.contains("IllegalStateException"), "${built.problems}")
+        assertTrue(begun > 0 && open == 0, "begun $begun, open $open")
     }
 
     // round 3: read as theme 3.0 read them, the space with the input method's name, a label spelt only on a group key

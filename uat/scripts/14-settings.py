@@ -328,7 +328,7 @@ case("ST-20", needs="jvm:SettingsEffectUatTest.noLanguageKeyAWiderSpace")(lambda
 case("ST-21", needs="jvm:SettingsEffectUatTest.aCharacterMadeFirstIsTheCornerAndTheSwipe")(lambda d: None)
 
 
-case("ST-22", needs="jvm:SettingsEffectUatTest.charactersAddedThenTheDefaultBack、KotlinHostKeyboardTest.aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText、KotlinHostKeyboardTest.aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText、PopupOverridesFragmentTest$Dialog.aKeyCodeAloneIsRefusedAndTheDialogStays")(lambda d: None)
+case("ST-22", needs="jvm:SettingsEffectUatTest.charactersAddedThenTheDefaultBack、KotlinHostKeyboardTest.aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText、KotlinHostKeyboardTest.aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText、PopupOverridesFragmentTest$Dialog.aKeyCodeAloneIsRefusedAndTheDialogStays、KeyCapsTest.theEnginesCapFadesItsWordsAloneAndOutlinesItsFace")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 其他
@@ -594,9 +594,15 @@ case("ST-61", needs="jvm:PacksUatTest.aTextPackTooOldSaysWhichVersionIsNeeded")(
 
 
 case("ST-62", needs="jvm:PacksUatTest.thePageListsEachPacksStateAndWhatItIsFor")(lambda d: None)
+case("ST-68", needs="manual:要另做一个同名、换了字体和背景图的主题文件，看键盘的字体")(lambda d: None)
+case("ST-69", needs="manual:要真麦克风说话，用过语音后再导入语音包")(lambda d: None)
+case("ST-70", needs="manual:按键字符里选中一项左移、删除，看轮廓和删掉的是哪个")(lambda d: None)
 
 
-case("ST-63", needs="release,scripted:发布包每次重置都经文件选择器导入文字包（import_packs_ui）；结果的说法在 JVM 上：PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles")(lambda d: None)
+case("ST-63", needs="release:多选文字包、语音包和一个非包文件导入，读逐文件的结果框、看下载里的原文件还在；结果框出现时转屏只一个框，点确定后再转屏、切到别的应用再回来不再弹出（手工）；结果的说法在 JVM 上：PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles")(lambda d: None)
+
+
+case("ST-67", needs="release:覆盖安装 0.5.x→0.6.0 和恢复 0.5.x 的备份，发版时的升级检查里手工跑；JVM 见 ThemePrefsMigrationTest、ThemePrefsTest、KeyboardAreaTest")(lambda d: None)
 
 
 case("ST-64", needs="release:要上一版（0.5.x）的包覆盖安装；方法见 dev/design/060-asset-packs.md 的实现记录")(lambda d: None)
@@ -624,7 +630,9 @@ def st66(d):
             check(r is not None, f"滚到底看不到「{last}」")
             bottom = r.b[3]
         else:   # the theme list: its lowest item
-            bottom = max(n.b[3] for n in s.app() if n.clickable and n.pkg == PKG)
+            bottom = max((n.b[3] for n in s.app() if n.clickable and n.pkg == PKG), default=None)
+            if bottom is None:
+                raise Blocked(f"{tab}：主题页上没有可点的项：{s.texts()[:6]}")
         check(bottom <= top + 2, f"{tab}：最后一行底 {bottom} 在导航栏顶 {top} 下面")
         out.append(f"{tab} 最后一行底 {bottom} ≤ 导航栏顶 {top}")
     return "；".join(out)

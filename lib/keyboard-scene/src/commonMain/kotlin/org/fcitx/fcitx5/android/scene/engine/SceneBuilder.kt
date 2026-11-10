@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene.engine
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.Motion
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Point
@@ -27,6 +28,7 @@ import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
+import org.fcitx.fcitx5.android.scene.theme.Style
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.Theme
 
@@ -64,28 +66,28 @@ class SceneBuilder(
      * out here. Never throws: a fault of the engine's own is a problem too, so a bad file a user
      * imported cannot take the keyboard down.
      */
-    // anything at all: the caller is the keyboard drawing itself, which has nowhere to send a throw
+    // any exception (an Error, out of memory, is not a layout's fault): the caller is the keyboard drawing itself, which has nowhere to send a throw
     @Suppress("TooGenericExceptionCaught")
     fun build(layout: Layout, fragments: Map<String, Fragment> = emptyMap()): Parsed<Scene> = try {
         scene(layout, fragments)
-    } catch (e: Throwable) {
-        Parsed.Failed(0, "the scene could not be built: ${e::class.simpleName}")
+    } catch (e: Exception) {
+        Parsed.Failed(0, "the scene could not be built: ${fault(e)}")
     }
 
     /**
      * A key's preview bubble (rules D §4, [PopupBuilder.preview]): [text] over a key [keyWidth] px
      * across, at [size] px (a shortcut's words fitted), else a character's size. Never throws.
      */
-    fun preview(text: String, keyWidth: Double, size: Double? = null): Parsed<Scene> = safely { popups.preview(text, keyWidth, size) }
+    fun preview(text: String, keyWidth: Double, size: Double? = null): Parsed<Scene> = safely("preview") { popups.preview(text, keyWidth, size) }
 
     /** The bubble's words' size and the least they shrink to, px (PreviewLabel fits them). Never throws. */
-    fun previewWordsSize(): Parsed<Pair<Double, Double>> = safely { popups.wordsSize() }
+    fun previewWordsSize(): Parsed<Pair<Double, Double>> = safely("preview words size") { popups.wordsSize() }
 
     /** The space each side of the bubble's text, px. Never throws. */
-    fun previewPadding(): Parsed<Double> = safely { popups.padding() }
+    fun previewPadding(): Parsed<Double> = safely("preview padding") { popups.padding() }
 
     /** How wide [text] is drawn in the bubble at [size] px. Never throws. */
-    fun previewWidth(text: String, size: Double): Parsed<Double> = safely { popups.previewWidth(text, size) }
+    fun previewWidth(text: String, size: Double): Parsed<Double> = safely("preview width") { popups.previewWidth(text, size) }
 
     /**
      * A long press's keys' size for [labels] [columns] across in [room] px ([PopupBuilder.popupKeys]):
@@ -97,26 +99,29 @@ class SceneBuilder(
         room: Double?,
         minWidth: Double = Popups.px(Popups.KEY_MIN_WIDTH_DP, env.density),
         height: Double = Popups.px(Popups.KEY_HEIGHT_DP, env.density),
-    ): Parsed<PopupKeys> = safely { popups.popupKeys(labels, columns, room, minWidth, height) }
+    ): Parsed<PopupKeys> = safely("popup keys") { popups.popupKeys(labels, columns, room, minWidth, height) }
 
     /** A long press's keys ([PopupBuilder.popup]): [rows] of [labels]' indices, the bottom one first, [selected] in focus. Never throws. */
     fun popup(labels: List<String>, rows: List<List<Int>>, keys: PopupKeys, selected: Int): Parsed<Scene> =
-        safely { popups.popup(labels, rows, keys, selected) }
+        safely("popup") { popups.popup(labels, rows, keys, selected) }
 
     /** A menu's cells' size ([PopupBuilder.menuKeys]). Never throws. */
-    fun menuKeys(cells: List<MenuCell>): Parsed<PopupKeys> = safely { popups.menuKeys(cells) }
+    fun menuKeys(cells: List<MenuCell>): Parsed<PopupKeys> = safely("menu keys") { popups.menuKeys(cells) }
 
     /** A menu ([PopupBuilder.menu]): [cells] in [order] across, [selected] in focus, [disabled] faded. Never throws. */
     fun menu(cells: List<MenuCell>, order: List<Int>, selected: Int, disabled: Set<Int> = emptySet()): Parsed<Scene> =
-        safely { popups.menu(cells, order, selected, disabled) }
+        safely("menu") { popups.menu(cells, order, selected, disabled) }
 
     // as build: a fault of the engine's own is a problem, never a throw into the keyboard drawing it
     @Suppress("TooGenericExceptionCaught")
-    private fun <T> safely(make: () -> T): Parsed<T> = try {
+    private fun <T> safely(what: String, make: () -> T): Parsed<T> = try {
         Parsed.Ok(make())
-    } catch (e: Throwable) {
-        Parsed.Failed(0, "the popup could not be built: ${e::class.simpleName}")
+    } catch (e: Exception) {
+        Parsed.Failed(0, "the $what could not be built: ${fault(e)}")
     }
+
+    // the only trace a fault leaves (the keyboard logs it and draws nothing): its class, message and stack
+    private fun fault(e: Exception): String = e.stackTraceToString()
 
     private fun scene(layout: Layout, fragments: Map<String, Fragment>): Parsed<Scene> {
         val warnings = Problems()
@@ -290,15 +295,8 @@ class SceneBuilder(
         roles: Set<String>,
         stateSets: List<Set<KeyState>>,
     ): List<Pair<ExpandedKey, Set<KeyState>>> {
-        // the keys as the scene has them: a layout that does not expand here draws no keys here (its own
-        // problems are the layout check's)
-        val placement = placement(layout)
-        val splitSide = placement?.side?.takeIf { env.split }?.name?.lowercase()
-        // as [scene] expands it: a number pad the app named no pad for, the full one
-        val expanding = if (layout.family == "number" && env.input.pad == null) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
-        val rows = Expand.rows(layout, fragments, expanding, splitSide).getOr { return emptyList() }
         val out = ArrayList<Pair<ExpandedKey, Set<KeyState>>>()
-        for (key in rows.flatMap { it.items }.filterIsInstance<ExpandedKey>()) {
+        for (key in expandedKeys(layout, fragments)) {
             if (key.attrs.role !in roles) continue
             val c = if (key.attrs.face == Face.Keep) unflat else cascade
             val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
@@ -313,6 +311,28 @@ class SceneBuilder(
             }
         }
         return out
+    }
+
+    // the keys as the scene has them: a layout that does not expand here draws no keys here (its own problems
+    // are the layout check's); expanded as [scene] does: a number pad the app named no pad for, the full one
+    private fun expandedKeys(layout: Layout, fragments: Map<String, Fragment>): List<ExpandedKey> {
+        val splitSide = placement(layout)?.side?.takeIf { env.split }?.name?.lowercase()
+        val expanding = if (layout.family == "number" && env.input.pad == null) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
+        val rows = Expand.rows(layout, fragments, expanding, splitSide).getOr { return emptyList() }
+        return rows.flatMap { it.items }.filterIsInstance<ExpandedKey>()
+    }
+
+    /**
+     * Which style each of key [id]'s properties ([part]'s, null the key's own) comes from on [layout] here, as
+     * [styled] cascades it, in [states] (theme.xml's names: `pressed`, `locked`…) besides the ones the key is in
+     * (the maker's cascade check). Empty where the key is not on it here.
+     */
+    internal fun sources(layout: Layout, fragments: Map<String, Fragment>, id: String, part: String?, states: Set<String>): Map<String, Style> {
+        val key = expandedKeys(layout, fragments).firstOrNull { it.key.id == id } ?: return emptyMap()
+        val c = if (key.attrs.face == Face.Keep) unflat else cascade
+        val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
+        val all = statesOf(key).mapTo(HashSet()) { it.xml } + states
+        return c.sources(Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, all, part))
     }
 
     // the key's face's layers in each state
@@ -400,7 +420,8 @@ class SceneBuilder(
         }
         fun fits(f: Drawn) = f.ink.width * least + (f.grows(measurer)?.at(least)?.let { it.left + it.right } ?: 0.0) <= room.width
         // measured at the class's most, not scaled (§8b): a font's ink can be wider there than scaled
-        if (g.ink.width <= room.width || fits(g)) return g
+        // no room at all (insets wider than the face): unshrunk, never by a negative scale, which mirrors it
+        if (room.width <= 0 || g.ink.width <= room.width || fits(g)) return g
         val s = minOf(1.0, room.width / (g.ink.width * least))
         val fit = shrunk(s)
         if (fits(fit)) return fit
@@ -490,7 +511,19 @@ class SceneBuilder(
             lean = k.key.key.leans,
             face = k.key.attrs.face ?: Face.Default,
             margin = k.key.attrs.margin ?: true,
+            motion = motion(k.looks.getValue(k.states), k.looks.getValue(k.states + KeyState.Pressed)),
         )
+    }
+
+    // 060-render-p3 A1: the key's look's transition, the pressed look's (80 ms at most), scale and sink; null where none moves
+    private fun motion(normal: KeyLook, pressed: KeyLook): Motion? {
+        val transition = normal.transition?.takeIf { it.ms > 0 }
+        val scale = pressed.pressScale
+        val sink = pressed.pressSink * env.density
+        val press = pressed.transition?.takeIf { it.ms > 0 && (scale != 1.0 || sink != 0.0) }
+            ?.let { it.copy(ms = minOf(it.ms, Motion.MAX_PRESS_MS)) }
+        if (transition == null && scale == 1.0 && sink == 0.0) return null
+        return Motion(transition, press, scale, sink)
     }
 
     companion object {

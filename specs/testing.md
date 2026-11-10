@@ -33,6 +33,8 @@ Minimum before a commit: `./gradlew :lib:keyboard-scene:check :lib:ime-core:chec
 and `cd uat/tools && python3 -m unittest test_uat` when `uat/` changed, plus
 the tool or build-logic tests (`./gradlew -p build-logic test`) if those changed. Unit tests need no NDK or CMake.
 
+Gesture records (`app/src/test/resources/gestures/*.txt`, `GestureSnapshot`): what each key of a board does, line by line; recorded anew by `GESTURES_RECORD=1 ./gradlew :app:testDebugUnitTest --tests '<class>'` (review the diff before committing). `WindowThemeTest`'s T7a pictures are drawn only with `WINDOW_SHOTS=1`.
+
 The app's test tasks run two test JVMs at once (`maxParallelForks`, `-PtestForks=<n>` for another
 count; `1` to rule out one test's state reaching another), each a fresh one every 40 classes. A test
 that leaves a preference, a file or a static set where the next test in its JVM reads it fails only
@@ -367,14 +369,15 @@ field, every icon there). The test task takes `web/theme-maker` as an
 input, so a change to the page reruns it. Nothing in those blocks is edited by hand.
 
 Two pages (060-render-p3 M1): `index.html`, the maker (`src/`: `page.html` with slots for the rest,
-`style.css`, `maker.js`: the document, held to the engine by `test/maker.test.mjs`, `ui.js`: the
-page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
+`style.css`, `maker.js`: the document, held to the engine by `test/maker.test.mjs`, `form.js` and
+`panels/*.js`: the editing's forms (M2: one file a tab, put in as one script in their names' order),
+held to the engine by `test/form.test.mjs`, `ui.js`: the page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
 `page.html`, `style.css`, `ui.js`); both run `src/lib.js` (everything the tests hold to the app's
 3.0 rules and zip). Edit them, then `node web/theme-maker/tools/assemble.mjs`, which writes both: the
 sources put in, each page's generated blocks kept from that page as it is (each carries only the ones
 its `page.html` has a slot for: the maker `youmo-format` and `youmo-engine-icons`, classic
 `youmo-format`, `youmo-presets`, `youmo-layout`, `youmo-icons` and no engine; `ThemeMakerTestdata.block`
-writes a block into every page that has it), and the Content-Security-Policy's `script-src` set to each script's SHA-256 (four on the maker,
+writes a block into every page that has it), and the Content-Security-Policy's `script-src` set to each script's SHA-256 (six on the maker,
 two on classic; nothing else runs, a script not hashed is refused, an edit by hand breaks them).
 The page's test fails when either page is not what assemble makes of its sources and the fonts, and
 when the CSP's hashes are not its scripts'. Commit `src/` and both pages together.
@@ -385,7 +388,11 @@ back (a failing store is no draft, never a throw), every board and form of the p
 environment builds; a picture picked always encoded anew (`PICTURE_SAVE`: long side ≤ 2560, JPEG
 0.85, PNG only with transparency; one not an image refused before a decode), only images within the
 app's limits decoded, save refusing what the import would (`saveProblems`), a pack's odd entries
-opened as the app unpacks them. `from-maker.theme` and `from-maker-picture.theme` (a real PNG) are
+opened as the app unpacks them. `test/form.test.mjs` (the same): each tab's form operations write
+the style text meant (a form edit changes the `<style>` of exactly that `select=`, the last that gives
+the property, else adds one at the end; a style left with only its `select=` goes; what the form does
+not know, comments and spacing kept), the engine reads every result, and the cascade check
+(`YoumoEngine.sources`, `Cascade.sources`) names the style each value comes from; the forms write numbers within the engine's bounds (`YoumoEngine.limits`), and an icon the app would refuse (a PNG, an SVG past `SvgSubset`, which the engine's `readIcon` runs) is named and blocks the save. `from-maker.theme` and `from-maker-picture.theme` (the panels' save: a real PNG cut for each orientation, see-through keys, a gradient, an SVG icon) are
 its saves, which `ThemePackImportTest` imports. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
 `fonts/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
@@ -397,7 +404,9 @@ theme 4 or a layout with problems as values, build a scene or a popup in an envi
 JSON (`scene/json/EnvJson`), paint it on a 2D context (`web/CanvasPainter`, ScenePainter op for
 op), convert a theme 3.0, write a theme, the built-in layouts and themes (`web/BuiltIns` over
 `BuiltInFiles`, which the `builtInFiles` task writes of `src/commonMain/layouts` and `themes`), the
-browser's `TextMeasurer` (`web/CanvasMeasurer`, measureText's boxes)).
+browser's `TextMeasurer` (`web/CanvasMeasurer`, measureText's boxes), and where a key gets each
+property (`sources`: the line of the winning style, `Cascade.sources` laid over as `Cascade.of` is;
+the maker's cascade check)).
 `./gradlew :lib:keyboard-scene:youmoEngine` writes `build/youmo-engine/youmo-engine.js` (UMD, global
 `youmo-engine`; indents and the source map's line dropped, `<!--` and `</` escaped). The engine is not
 in git: the `index.html` committed has `NO_ENGINE` (a comment) in its `youmo-engine` script, so a
@@ -450,6 +459,7 @@ What holds the library to the app:
   `CHROMIUM=`) draws six groups of shots in Chromium through `dev/engine.html` and compares them
   with `app/build/w1-pixel/`: under 2% of pixels off by more than 48, under 0.2% in 5x5 areas off by
   more than 16 (the plain board against the app's with q pressed must fail it, and does).
+- `node web/theme-maker/test/panels-smoke.mjs` (local, the same Chromium) drives the maker's 字和图标 tab by mouse and by touch: a field edited, then the next field typed into or a box tapped, both kept (a value edit updates the controls in place, never draws the tab anew); after undo with a field focused every field shows the document; a colour row after undoing a rename edits the colour it names, and the crop shows a picture replaced by one of its size (a row of another name, a box of another data-key is put in whole). After 用这个裁切 replaces its box the focus stays in the tab; the tabs 栏, 弹出, 面板和窗口, 尺寸, 动效 and 信息 each draw, an 信息 edit keeps the next field focused, 试一下 plays, and the environment's typing bar grows the preview.
 - `node web/theme-maker/dev/serve.mjs` serves `dev/engine.html`, a preview of any board, theme,
   size and form drawn by the engine; development only, never published.
 

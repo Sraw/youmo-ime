@@ -116,7 +116,7 @@ class TextKeyboard(
                 SymbolKey("*", 0.1f, viewId = R.id.button_star),
             ),
             listOf(
-                // a table's 拼 key in Shift's place, one of the two shown as its lookup is (showLookUpKey)
+                // a table's 拼 key in Shift's place, one of the two shown as its lookup is (drawn by the scene)
                 CapsKey(),
                 LookUpKey(on = false),
                 LookUpKey(on = true),
@@ -146,7 +146,7 @@ class TextKeyboard(
                 AddressKey(AddressKeys.DOMAINS.first(), R.id.button_domain, 0.14f, AddressKeys.DOMAINS),
                 LanguageKey(),
                 ReturnKey(),
-                // a table's while a code is typed, in Return's place (showConfirmKey)
+                // a table's while a code is typed, in Return's place (drawn by the scene)
                 ConfirmKey(),
             )
         )
@@ -167,7 +167,7 @@ class TextKeyboard(
 
     @Keep
     private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
-        updateLangSwitchKey()
+        canvas?.invalidateScene()
     }
 
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
@@ -181,7 +181,7 @@ class TextKeyboard(
 
     @Keep
     private val popupOverridesListener = ManagedPreference.OnChangeListener<String> { _, _ ->
-        updatePunctuationKeys()
+        canvas?.invalidateScene()
         // a swipe changed may type a table's code key no more, or now
         showSemicolonKey()
     }
@@ -207,19 +207,6 @@ class TextKeyboard(
     private var rootsShownOn: KeyRef? = null
 
     private var scope: CoroutineScope? = null
-
-    init {
-        // hidden until an input method says it types on it: shown, every one's A row had an 11th key
-        // at a cold start, before fcitx reported the first
-        showSemicolonKey()
-        updateLangSwitchKey()
-        showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
-        popupOverridesPref.registerOnChangeListener(popupOverridesListener)
-        showLookUpKey()
-        showConfirmKey()
-        // the keys drawn by the scene engine, each wired as qwerty.xml's node says (U4 B)
-        drawKeysWithScene(LAYOUT)
-    }
 
     // what the keys show now, as the scene engine's environment: the screen's and the settings' as every
     // keyboard's (SceneEnvs), this one's state, Shift, texts and marks its own
@@ -341,22 +328,10 @@ class TextKeyboard(
         // another table's roots as well: 五笔's 键名 to 仓颉's, both NAMES, told before the switch shows
         val relabels = shown?.labels != table?.labels || shown?.roots !== table?.roots
         table = shown
-        showLookUpKey()
-        if (relabels) {
-            updatePunctuationKeys()
-            showSwipeMarks()
-        }
+        // the keys' labels: the table's roots or none; another table's roots relabel the swipe marks too
+        canvas?.invalidateScene()
+        if (relabels) showSwipeMarks()
         showSemicolonKey()
-    }
-
-    // a table's 拼 key, dark while it looks up, in Shift's place; Shift elsewhere
-    private fun showLookUpKey() {
-        canvas?.invalidateScene()
-    }
-
-    // 确定 in Return's place while a table has a code typed: what Return does then, said
-    private fun showConfirmKey() {
-        canvas?.invalidateScene()
     }
 
     private var capsState: CapsState = CapsState.None
@@ -404,8 +379,7 @@ class TextKeyboard(
         }
         if (next == capsState) return
         capsState = next
-        updateCapsButtonIcon()
-        updatePunctuationKeys()
+        canvas?.invalidateScene()
     }
 
     private fun transformAlphabet(c: String): String {
@@ -457,23 +431,21 @@ class TextKeyboard(
     }
 
     override fun onAttach() {
-        canvas?.invalidateScene()
         capsState = CapsState.None
         autoCaps.changed()
-        updateCapsButtonIcon()
-        updatePunctuationKeys()
+        canvas?.invalidateScene()
         // the scheme may have changed in the settings with 双拼 kept, which reports no input method
         showSemicolonKey()
     }
 
     override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
         returnAppearance = appearance
-        showConfirmKey()
+        canvas?.invalidateScene()
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
         punctuationMapping = mapping
-        updatePunctuationKeys()
+        canvas?.invalidateScene()
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
@@ -482,8 +454,6 @@ class TextKeyboard(
         canvas?.invalidateScene()
         // what the engine said last, if of this one: a table's state comes with its first answer
         showTable(EngineState.tableKeyboard.value)
-        showLookUpKey()
-        showConfirmKey()
         showSemicolonKey()
         glides = InputMethodCatalog.glides(ime.uniqueName)
         if (capsState != CapsState.None) {
@@ -552,17 +522,7 @@ class TextKeyboard(
                     else -> CapsState.None
                 }
             }
-        updateCapsButtonIcon()
-        // a letter's corner is its swipe, which follows Shift (swipeOverride)
-        updatePunctuationKeys()
-    }
-
-    // Shift's icon and what it says of its state are the scene's (SceneA11y): drawn anew
-    private fun updateCapsButtonIcon() {
-        canvas?.invalidateScene()
-    }
-
-    private fun updateLangSwitchKey() {
+        // Shift's icon, and a letter's corner, which is its swipe and follows Shift (swipeOverride)
         canvas?.invalidateScene()
     }
 
@@ -572,13 +532,8 @@ class TextKeyboard(
         return table?.rootsOf(letter)?.joinToString(" ")
     }
 
-    // the corners (cornerOf) and the punctuation's labels as the scene's env reads them now
-    private fun updatePunctuationKeys() {
-        canvas?.invalidateScene()
-    }
-
     // a letter's swipe is the first of its long press, as built in (q: 1, then Q) and as the user
-    // changed it: one thing, drawn in its corner too (updatePunctuationKeys); none when the user
+    // changed it: one thing, drawn in its corner too (drawn by the scene); none when the user
     // turned its long press off
     override fun swipeText(def: KeyDef): SwipeChoice =
         SwipeChoice.of(if (def is SceneKeyDef) swipeOverride(def.behavior.id) else (def.appearance as? KeyDef.Appearance.AltText)?.let(::swipeOverride))
@@ -592,6 +547,16 @@ class TextKeyboard(
         return PopupOverridesCache.user.current.swipeOf(letter, transformAlphabet(letter))
     }
 
+    // last, after every field its scene reads (sceneEnv: altsMade, letterDefs, capsState, punctuationMapping)
+    init {
+        // hidden until an input method says it types on it: shown, every one's A row had an 11th key
+        // at a cold start, before fcitx reported the first
+        showSemicolonKey()
+        showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
+        popupOverridesPref.registerOnChangeListener(popupOverridesListener)
+        // the keys drawn by the scene engine, each wired as qwerty.xml's node says (U4 B)
+        drawKeysWithScene(LAYOUT)
+    }
 }
 
 /** What [label]'s long press offers: the user's list, else the built-in one; null where it is off. */
@@ -604,11 +569,10 @@ private val ADDRESS_NAMES = setOf("slash", "at", "dot", "domain", "semicolon", "
 // the bottom row's own keys a table's code may have: the comma and the full stop
 private val BOTTOM_ROW_KEYS = setOf(',', '.')
 
-
 /**
  * What the preview bubble of the key [key] shows for [content]: a letter as Shift has it
  * ([letter]), punctuation as the input method maps it ([punctuation]); an address's keys what they
- * commit, . not 。, as their labels show (TextKeyboard.updatePunctuationKeys).
+ * commit, . not 。, as their labels show (TextKeyboard's scene).
  */
 internal fun previewOf(content: String, key: KeyRef, letter: (String) -> String, punctuation: (String) -> String): String = when {
     content.length != 1 || key.id in ADDRESS_NAMES -> content

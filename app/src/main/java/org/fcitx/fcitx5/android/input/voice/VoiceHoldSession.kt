@@ -29,6 +29,9 @@ class VoiceHoldSession(
 
     val over get() = session.over
 
+    /** the field the talk started in still the one being typed into (input restarted in it) */
+    val sameField get() = session.sameField
+
     /** lifted, the rest the recognizer's: the finger has nothing more to say */
     val released get() = hold.released
 

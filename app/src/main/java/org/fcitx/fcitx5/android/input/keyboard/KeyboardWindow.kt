@@ -208,14 +208,17 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val spaceKeys = SpaceKeyInputMethod()
 
-    // a punctuation key while what it types is not known (a first install, the host not up): held back, a tap felt
-    // once, as no face could show what it would type (060-render-p2 S7a)
     // the last run's keys read after this keyboard was made (the service's read on its thread, slower): taken now
     private fun known(): Boolean {
         if (!punctuation.known) punctuation.update(PunctuationStartKeys.known)
         return punctuation.known
     }
 
+    // the tap felt once while the punctuation keys are held back
+    private var heldBackFelt = false
+
+    // a punctuation key while what it types is not known (a first install, the host not up): held back, a tap felt
+    // once, as no face could show what it would type (060-render-p2 S7a)
     private fun heldBack(action: KeyAction): Boolean {
         if (known()) return false
         val c = when (action) {
@@ -231,15 +234,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         return true
     }
 
-    private var heldBackFelt = false
-
     private val keyActionListener = KeyActionListener { it, source ->
-        if (heldBack(it)) {
-            Unit
-        } else if (it is KeyAction.LayoutSwitchAction) {
-            switchLayout(it.act)
-        } else {
-            commonKeyActionListener.listener.onKeyAction(it, source)
+        when {
+            heldBack(it) -> {}
+            it is KeyAction.LayoutSwitchAction -> switchLayout(it.act)
+            else -> commonKeyActionListener.listener.onKeyAction(it, source)
         }
     }
 

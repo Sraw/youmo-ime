@@ -120,6 +120,9 @@ def run(tag, path, a, out):
     finally:
         if a.trace:
             adb('shell', 'atrace', '--async_stop', out=f'{out}/{tag}.trace', check=False)
+        # the anim rows' battery saver undone here too: a test killed midway leaves the phone "unplugged"
+        adb('shell', 'cmd', 'power', 'set-mode', '0', check=False)
+        adb('shell', 'dumpsys', 'battery', 'reset', check=False)
     inst = open(f'{out}/{tag}.inst.log', errors='ignore').read()
     if FAILED.search(inst) or 'OK (' not in inst:
         raise RuntimeError(f'{tag}: the test failed, see {tag}.inst.log')

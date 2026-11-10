@@ -43,7 +43,10 @@ class HandwritingRecognition internal constructor(
 
     /** What reads the strokes, on the worker. */
     internal interface Reader {
-        /** False once it could not be loaded, for good: nothing is asked of it then. Read on the main thread. */
+        /**
+         * False once it could not be loaded: nothing is asked of it then, till the text pack's folder changes
+         * (another text pack imported). Read on the main thread.
+         */
         val loadable: Boolean
 
         /** Loaded, if it is not yet. */
@@ -211,7 +214,7 @@ internal class LoadingReader(
     }
 
     private fun cannotLoad(e: Throwable): Nothing? {
-        Timber.e(e, "handwriting cannot load: not tried again till the app restarts or a pack is imported")
+        Timber.e(e, "handwriting cannot load: not tried again till the app restarts or a text pack is imported")
         broken = true
         // of no use from now on, whether it failed loading or reading (a LinkageError): not held open for the process
         letGo()

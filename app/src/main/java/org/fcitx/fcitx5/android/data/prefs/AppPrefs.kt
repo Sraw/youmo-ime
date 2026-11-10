@@ -140,6 +140,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val ignoreSystemCursor = hidden { switch(R.string.ignore_sys_cursor, "ignore_system_cursor", false) }
         val hideKeyConfig = hidden { switch(R.string.hide_key_config, "hide_key_config", true) }
         val disableAnimation = switch(R.string.disable_animation, "disable_animation", false)
+
+        /** 键盘动效 (060-render-p3 A1): a theme's keys move as it says (KeyMotionSwitch); off, they are drawn as a theme without motion. */
+        val keyboardMotion = switch(R.string.keyboard_motion, "keyboard_motion", true, R.string.keyboard_motion_summary)
         val keyboardHeightPercentBase = hidden {
             enumList(
                 R.string.keyboard_height_percent_base,
@@ -214,7 +217,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 listOf(Level(R.string.level_short, 200), Level(R.string.level_medium, 300), Level(R.string.level_long, 450))
             )
         }
-        // voice input, as Sogou's long press on the space (without the voice pack, it asks for it)
+        // voice input, as Sogou's long press on the space (without the voice pack holding the space types a space, as 0.5's
+        // text build; the toolbar's microphone is what asks for the pack)
         val spaceKeyLongPressBehavior = enumList(
             R.string.space_long_press_behavior,
             "space_long_press_behavior",
@@ -750,6 +754,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 internal.toolbarButtons,
                 advanced.ignoreSystemCursor,
                 advanced.disableAnimation,
+                advanced.keyboardMotion,
             ).forEach {
                 it.putValueTo(this@edit)
             }
@@ -773,8 +778,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     fun dropRetired() {
         // gone with the old drawing (060-render-p2 S8): 0.6's betas' switch of the redraw, vivo's touch routing to
         // the key views (the scene's keys always take their touches so), and 扩大按键触摸区 (the engine always
-        // gives a key its cell to the edge); a stored one, of any type, read by nothing
-        RETIRED.filter { sharedPreferences.contains(it) }.takeIf { it.isNotEmpty() }?.let { keys -> sharedPreferences.edit { keys.forEach(::remove) } }
+        // gives a key its cell to the edge); and voice_polish, the voice's 整理 switch, gone with it always on;
+        // a stored one, of any type, read by nothing
+        val stale = RETIRED.filter(sharedPreferences::contains)
+        if (stale.isNotEmpty()) sharedPreferences.edit { stale.forEach(::remove) }
         migrateSwipe()
         migrateKeyDrawing()
         settleMarkPositions()

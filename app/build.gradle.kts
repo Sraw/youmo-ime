@@ -210,7 +210,9 @@ android {
     // what the JVM tests and the instrumented ones both run: ClipboardScale's benchmark, numbers on a device too
     sourceSets.getByName("test").kotlin.srcDir("src/sharedTest/java")
     sourceSets.getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
-    // the benchmark build types into debug's field (TypingHostActivity) and has its manifest
+    // the benchmark build types into debug's field (TypingHostActivity) and has its manifest: the shell's
+    // providers (packs, voice clips, idle) come with it, though the voice clips are heard only in a debug
+    // build (VoiceListener reads them under BuildConfig.DEBUG)
     sourceSets.getByName("benchmark") {
         kotlin.srcDir("src/debug/java")
         manifest.srcFile("src/debug/AndroidManifest.xml")

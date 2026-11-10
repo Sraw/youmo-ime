@@ -41,6 +41,9 @@ OnlineTransducerDecoderResult &OnlineTransducerDecoderResult::operator=(
   lm_probs = other.lm_probs;
   context_scores = other.context_scores;
 
+  nbest_tokens = other.nbest_tokens;
+  nbest_scores = other.nbest_scores;
+
   return *this;
 }
 
@@ -67,6 +70,9 @@ OnlineTransducerDecoderResult &OnlineTransducerDecoderResult::operator=(
   ys_probs = std::move(other.ys_probs);
   lm_probs = std::move(other.lm_probs);
   context_scores = std::move(other.context_scores);
+
+  nbest_tokens = std::move(other.nbest_tokens);
+  nbest_scores = std::move(other.nbest_scores);
 
   return *this;
 }

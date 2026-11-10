@@ -12,7 +12,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -54,12 +53,9 @@ class SwipePopupScreenshotTest {
             .serialize(),
     )
 
-    // [label]'s key, whichever draws it (a key view, the canvas's scene key): a finger goes where it is
-    private fun KeyboardHarness.keyOf(label: String): ShownKey = key(label)
-
     // [label]'s key swiped up past the threshold and held there, the bubble shown
     private fun KeyboardHarness.held(label: String, name: String) {
-        val key = keyOf(label)
+        val key = key(label)
         val finger = finger(key, at(key))
         for (i in 1..5) finger.move(at(key, dy = -10f * i, ms = 16))
         capture("SwipePopupScreenshotTest/$name", inputView)
@@ -69,7 +65,7 @@ class SwipePopupScreenshotTest {
     // [label]'s key swiped down to its symbol and held: a character in the bubble, scaled as the keys' text
     // (紧凑, floating). Held still, the long press would show its keys over it before the shot
     private fun KeyboardHarness.symbolHeld(label: String, name: String) {
-        val key = keyOf(label)
+        val key = key(label)
         val finger = finger(key, at(key))
         for (i in 1..5) finger.move(at(key, dy = 10f * i, ms = 16))
         capture("SwipePopupScreenshotTest/$name", inputView)
@@ -86,7 +82,7 @@ class SwipePopupScreenshotTest {
 
     private fun shoot(suffix: String) {
         longShortcuts()
-        // the keys drawn by the canvas, their popups by the engine (060-render-p2 S2); named canvas_ since the views' were beside them
+        // the keys drawn by the canvas, their popups by the engine (060-render-p2 S2); canvas_ kept so the goldens' names stay as recorded
         val prefix = "canvas_"
         // the edit menu's test copies "hello": its entry, kept in the app's object, would show in the bar of a later shot,
         // and one stored late (the clipboard's own thread, a test run before in the same JVM) would still reach the bar

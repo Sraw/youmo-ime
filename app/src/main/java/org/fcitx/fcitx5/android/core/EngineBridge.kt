@@ -211,6 +211,15 @@ class EngineBridge {
         EngineState.reset()
     }
 
+    // the text pack read through on this thread, the keys queued behind it waiting: its time logged, a slow
+    // device's wait found in the log
+    private fun verifyTimed(e: Throwable): Boolean {
+        val start = System.nanoTime()
+        return PackStore.verifyAfterFailure(PackKind.TEXT, e).also {
+            Timber.i("text pack checked after a failure in %d ms: %s", (System.nanoTime() - start) / 1_000_000, if (it) "damaged" else "not found damaged")
+        }
+    }
+
     // what cannot load is not loaded again on every key: the keys go to the app, the user told once
     internal val unloadable = Unloadable { im, e ->
         Timber.e("%s cannot load (%s): not called again till the engine is reloaded", im, e.javaClass.name)
@@ -220,7 +229,7 @@ class EngineBridge {
         EngineNotices.failed(
             when {
                 pack != null -> R.string.pack_text_needed_short
-                PackStore.verifyAfterFailure(PackKind.TEXT, e) -> R.string.pack_text_damaged
+                verifyTimed(e) -> R.string.pack_text_damaged
                 else -> R.string.engine_unloadable
             },
         )

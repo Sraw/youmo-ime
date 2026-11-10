@@ -23,6 +23,7 @@ import kotlin.test.assertTrue
  */
 class LookThemeTextTest {
 
+    // contract: the theme 3.0 text users exported and shared reads back as these files
     @Test
     fun theTextIsTheFiles() {
         val failed = LOOKS.mapNotNull { (name, look) ->

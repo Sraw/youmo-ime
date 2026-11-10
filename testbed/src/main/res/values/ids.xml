@@ -50,8 +50,6 @@
     <item name="pw_web" type="id" />
     <item name="restart_target" type="id" />
     <item name="shared" type="id" />
-    <item name="shared_a" type="id" />
-    <item name="shared_b" type="id" />
     <item name="sheet_field" type="id" />
     <item name="short_message" type="id" />
     <item name="signed" type="id" />

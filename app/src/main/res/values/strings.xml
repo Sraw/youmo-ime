@@ -94,6 +94,8 @@
     <string name="expand_toolbar_by_default">Expand toolbar by default</string>
     <string name="popup_on_key_press">Popup on key press</string>
     <string name="disable_animation">Disable animation</string>
+    <string name="keyboard_motion">Keyboard motion</string>
+    <string name="keyboard_motion_summary">Keys fade and move as the theme says. Off in battery saver, when system animations are removed and with Disable animation</string>
     <string name="exception_logcat_created">Logcat process is already created</string>
     <string name="exception_theme_filename">Only theme files (.theme) can be imported: %1$s is not one. A theme exported as .zip before can be renamed to .theme.</string>
     <string name="theme_file_unnamed">this file</string>
@@ -306,7 +308,7 @@
     <string name="a11y_key_emoji">Emoji</string>
     <string name="voice_end_mark">Full stop at the end of voice text</string>
     <string name="voice_end_mark_auto">By the field: none in chats, search boxes and one-line fields</string>
-    <string name="voice_end_mark_keep">As spoken</string>
+    <string name="voice_end_mark_keep">As spoken (one-line fields still none)</string>
     <string name="voice_end_mark_drop">Never</string>
     <string name="voice_input">Voice input</string>
     <string name="a11y_candidates_prev_page">Previous candidates</string>
@@ -437,6 +439,7 @@
     <string name="word_pinyin">Pinyin, e.g. you mo (blank: filled in for you)</string>
     <string name="word_pinyin_invalid">The pinyin does not match the word: one syllable for each character</string>
     <string name="english_block_detail">English · a word all in lower case is blocked in any case</string>
+    <string name="english_block_detail_exact">English · blocked as written, in this case alone</string>
     <plurals name="word_typed_times">
         <item quantity="one">%1$s · typed once</item>
         <item quantity="other">%1$s · typed %2$d times</item>

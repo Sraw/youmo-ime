@@ -39,6 +39,7 @@ class ThemeTest {
 
     private fun withStyle(style: String) = source.replace("</theme>", "$style\n</theme>")
 
+    // contract: the committed example theme reads as written; a reader change that breaks a shipped or shared theme fails here
     @Test
     fun theMaterialLightExampleReads() {
         val t = Fixtures.materialLight
@@ -366,8 +367,6 @@ class ThemeTest {
         assertTrue(ThemeReader.theme(s, appVersion = "0.6.0") is Parsed.Ok)
         assertTrue(ThemeReader.theme(s, appVersion = "0.6.1-beta2") is Parsed.Ok)
         assertTrue(ThemeReader.theme(s, appVersion = "0.5.2").problems().single().message.contains("needs the app 0.6.0"))
-        assertTrue(ThemeReader.newer("0.10.0", "0.9.9"))
-        assertTrue(!ThemeReader.newer("0.6.0", "0.6.0-beta1"))
         assertTrue(problems(s.replace("preview.png", "preview.jpg")).isNotEmpty())
         assertTrue(problems(s.replace("Ann", "A".repeat(65))).isNotEmpty())
         assertTrue(problems(s.replace("0.6.0", "six")).isNotEmpty())
@@ -381,7 +380,7 @@ class ThemeTest {
         val reserved = listOf(
             "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
             "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"",
-            "transition=\"150ms ease-out\"", "press-scale=\"95%\"", "press-sink=\"2dp\"", "appear=\"scale 150ms\"",
+            "appear=\"scale 150ms\"",
             "effect=\"particles(star.png, 12, 24dp, 600ms)\"", "sticker=\"cat.png\"",
         )
         assertEquals(Values.RESERVED.size, reserved.map { it.substringBefore('=') }.toSet().size, "every one tried")
@@ -390,7 +389,7 @@ class ThemeTest {
             assertTrue(w.single().contains("${attr.substringBefore('=')}= is not supported"), "$attr: $w")
         }
         // with a property of today: that one works
-        val t = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"#123456\" press-sink=\"2dp\"/>")).getOr { error("$it") }
+        val t = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"#123456\" sticker=\"cat.png\"/>")).getOr { error("$it") }
         assertTrue(t.styles.last().values.keys == setOf("fill"))
         // no later stage's value of a property of today is left: T4b's path(…), bubble and a bubble's size in %
         // read (ThemeTest's shapes), T7a's color="follow" the navigation bar's (WindowLooksTest)
@@ -463,7 +462,8 @@ class ThemeTest {
         val letter = KeyLook(c.of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet())), t)
         assertEquals(3.0, letter.depth)
         assertEquals(Argb(0x40000000), letter.depthColor, "a gradient: a translucent black")
-        val plain = KeyLook(Cascade(ThemeReader.theme(source).ok(), emptySet()).of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet())), t)
+        val untouched = ThemeReader.theme(source).ok()
+        val plain = KeyLook(Cascade(untouched, emptySet()).of(Selector.Target("key", "qwerty", "a", "letter", setOf("letter"), emptySet())), untouched)
         assertEquals(0.0, plain.depth)
         assertNull(plain.path)
         assertNull(plain.innerShadow)
@@ -544,6 +544,7 @@ class ThemeTest {
         assertTrue(warnings(withStyle("<style select=\"key label\" align=\"top-left\"/><style select=\"*/enter icon\" return-icon-go=\"text(Go)\"/>")).isEmpty())
     }
 
+    // contract: a theme written for a later stage (names reserved now) still imports in this app
     @Test
     fun aThemeOfEveryLaterStageImports() {
         // reserved.xml: theme-4.xsd's example of T1 (xmllint-checked), T4a's, T4b's and T5's names (read now), T6a–A3's and a sound pack in it
@@ -554,11 +555,15 @@ class ThemeTest {
         assertEquals("0.6.0", t.value.meta?.minApp)
         // T5 made its scenes and the keyboard's size work: no warning of them
         val ignored = listOf(
-            "83|<sounds>", "79|transition=",
+            "83|<sounds>",
         ).map { "$it is not supported by this version, ignored" } +
+            // A1 made a key's transition work: the clipboard and a candidate's part have none
+            "79|transition= on clipboard does nothing: it reads fill radius color" +
             // T6a's candidate:first comment selects: a fill does nothing on a part, its colour alone read
             "79|fill= on candidate:first comment does nothing: it reads color" +
-            listOf("80|press-scale=", "80|effect=", "80|sticker=", "81|appear=").map { "$it is not supported by this version, ignored" } +
+            "79|transition= on candidate:first comment does nothing: it reads color" +
+            listOf("80|effect=", "80|sticker=").map { "$it is not supported by this version, ignored" } +
+            "81|appear= is not supported by this version, ignored" +
             // its preview a path with a tail, which only a bubble has
             "81|tail= does nothing beside a shape that is no bubble: only a bubble has a tail"
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })
@@ -659,6 +664,8 @@ class ThemeTest {
         assertTrue(!ThemeReader.newer("0.6.0", "dev"), "garbage: cannot tell")
         assertTrue(!ThemeReader.newer("0.6.0", ""))
         assertTrue(!ThemeReader.newer("1.0.0", "0.6.0.1"))
+        assertTrue(ThemeReader.newer("0.10.0", "0.9.9"), "numbers, not text")
+        assertTrue(!ThemeReader.newer("0.6.0", "0.6.0-beta1"), "a beta of the version is not older")
     }
 
     @Test
