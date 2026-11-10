@@ -7,7 +7,7 @@
 // generated blocks, which mutation of either side cannot see.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, copyFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -643,8 +643,8 @@ test("index.html holds no engine; the page built holds the build's, and no bigge
   const engine = blockOf(built(), 'youmo-engine');
   assert.equal(engine, engineText(), 'the page built has another engine');
   // the plan's 600 KB is not met without a minifier (none without npm here): 1.09 MB as built, held below 1.2 MB
-  // so that it grows only on purpose
-  assert.ok(Buffer.byteLength(engine) <= 1_200_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
+  // so that it grows only on purpose (1.20 MB with SvgSubset, the icons the page checks as the app does: 1.25 MB)
+  assert.ok(Buffer.byteLength(engine) <= 1_250_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   // the global a page reads it by (build.gradle.kts: the library's link names it)
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
   // all else as index.html: the engine's script and the CSP's hash of it the only difference
@@ -681,7 +681,8 @@ test('assemble.mjs refuses a page it cannot make, and puts in text that looks li
   const src = join(here, '..', 'src');
   const dir = mkdtempSync(join(tmpdir(), 'youmo-assemble-'));
   try {
-    for (const f of ['style.css', 'maker.js', 'ui.js']) copyFileSync(join(src, f), join(dir, f));
+    for (const f of ['style.css', 'maker.js', 'form.js', 'ui.js']) copyFileSync(join(src, f), join(dir, f));
+    cpSync(join(src, 'panels'), join(dir, 'panels'), { recursive: true });
     const page = readFileSync(join(src, 'page.html'), 'utf8');
     const made = (p, old = html) => { writeFileSync(join(dir, 'page.html'), p); return assemble(dir, old); };
     assert.throws(() => made(page.replace('{{ui}}', '')), /no \{\{ui\}\}/, 'a slot missing');
@@ -726,7 +727,7 @@ test('an image is decoded only within what it may be: the source a photo, a cut 
 
 test('each page runs only its own scripts, by their hashes, as git keeps it and as built', () => {
   const classic = classicHtml;
-  for (const [what, page, count] of [['index.html', html, 4], ['the page built', built(), 4], ['classic', classic, 2], ['classic built', assemble(CLASSIC_SRC, classic, ENGINE), 2]]) {
+  for (const [what, page, count] of [['index.html', html, 6], ['the page built', built(), 6], ['classic', classic, 2], ['classic built', assemble(CLASSIC_SRC, classic, ENGINE), 2]]) {
     const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(page);
     assert.ok(m, 'no CSP meta in ' + what);
     const csp = m[1];
