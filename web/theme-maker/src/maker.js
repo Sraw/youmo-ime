@@ -313,25 +313,34 @@
   // the files apart from the text: written again only when they changed (an edit of theme.xml shares its files
   // object with the document before it), not megabytes of pictures each time a value is typed
   // the text names its files record by id (each set of files kept under its own key): the files are written
-  // first, then the text naming them, then the record the text named before is let go. A text read with files
+  // first, then the text naming them, then this page's records before it are let go. A text read with files
   // not its own is no draft, never a mix; two tabs each write their own files again when the other wrote last
   const DRAFT_FILES = 'draft-files'; // the one files record of the pages before (drafts 2 and 3)
   const filesKey = (id) => DRAFT_FILES + '-' + id;
-  const keptFiles = new WeakMap(); // the store → { files, id } last written to it
+  // the store → { files, id, own }: the files last written to it, and the ids of the files records this page
+  // wrote and has not let go yet (a record of a write cut before its text, or the one an earlier text named)
+  const keptFiles = new WeakMap();
   async function keepDraft(store, d, env) {
     try {
       const before = await store.get(DRAFT);
       const prev = before && before.v === 4 ? before.files : null;
+      const first = !keptFiles.has(store);
       let kept = keptFiles.get(store);
       // files changed, or another tab's text is there now (its files may have replaced ours): written anew
       if (!kept || kept.files !== d.files || prev !== kept.id) {
-        kept = { files: d.files, id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) };
-        keptFiles.delete(store);
-        await store.put(filesKey(kept.id), { id: kept.id, files: d.files });
+        const id = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+        kept = { files: d.files, id, own: (kept ? kept.own : []).concat(id) };
         keptFiles.set(store, kept);
+        await store.put(filesKey(id), { id, files: d.files });
       }
       await store.put(DRAFT, { v: 4, doc: { xml: d.xml, layouts: d.layouts }, files: kept.id, env, at: Date.now() });
-      if (prev && prev !== kept.id) await store.remove(filesKey(prev));
+      // only this page's own records are let go: another open tab may have read its text before we wrote and
+      // write it after, naming its record (removing that record lost its draft). The record of a page closed
+      // before is let go by the first write of the next page
+      const gone = kept.own.filter((x) => x !== kept.id);
+      if (first && prev && prev !== kept.id) gone.push(prev);
+      kept.own = [kept.id];
+      for (const x of gone) await store.remove(filesKey(x));
       if (before && before.v !== 4) await store.remove(DRAFT_FILES);
       return true;
     } catch (e) {
@@ -362,6 +371,8 @@
       const v = await store.get(DRAFT);
       await store.remove(DRAFT);
       if (v && v.v === 4) await store.remove(filesKey(v.files));
+      const kept = keptFiles.get(store);
+      for (const x of kept ? kept.own : []) await store.remove(filesKey(x));
       await store.remove(DRAFT_FILES);
       keptFiles.delete(store);
     } catch (e) {

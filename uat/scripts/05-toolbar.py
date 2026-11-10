@@ -357,6 +357,7 @@ case("TB-45", needs="jvm:ClipboardLimitUatTest.unlimitedIsTheLimitsButtonAndLowe
 
 
 case("TB-46", needs="jvm:ToolbarUatTest.piecesPickedByTapsCommittedInTapOrder")(lambda d: None)
+case("TB-46a", needs="manual:选中块的底色和字在浅色、深色主题下看得清，要人眼看")(lambda d: None)
 
 
 case("TB-47", needs="jvm:KeyboardPickerUatTest.eachInputMethodsKeyboardsPickedFromTheStatusArea")(lambda d: None)

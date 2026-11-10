@@ -357,8 +357,15 @@
 - **预期**：预览里图标画在键的中间，不偏上一整个键；和导入 App 后看到的一样。
 - **JVM**：没有；画法由 lib/keyboard-scene 的 `CanvasPainterTest.anIconsViewBoxOriginIsMovedToTheCorner`（jsTest）查，这一条在电脑浏览器上手工跑。
 
+### ST-81 [P2] 主题制作网页：关掉再打开，恢复刚才的草稿；两个标签页各存各的
+- **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
+- **前提**：电脑浏览器（Chrome 或 Firefox）打开 `web/theme-maker/index.html`。
+- **操作**：改一个颜色，换一张背景图，关掉标签页再打开；再开第二个标签页，改另一个颜色、换另一张图；回第一个标签页改一处文字；关掉两个标签页再打开。
+- **预期**：第一次重开恢复的是改后的颜色和那张图；最后重开恢复的是最后改过的那个标签页的内容，背景图是它自己的那张，不是另一个标签页的图，也不是空白。
+- **JVM**：没有；存取规则由 web/theme-maker 的 `names-and-files.test.mjs`（草稿按 id 分记录、两个标签页交错写、写到一半中断、旧版草稿）查，这一条在电脑浏览器上手工跑。
+
 ### ST-78 [P2] 系统取色变了，用系统取色的主题包跟着换色
-- **前提**：API 31+ 模拟器；导入一个按键颜色用系统取色的 4.0 主题包并选用：内置 Nord 的 `theme.xml`（`lib/keyboard-scene/src/commonMain/themes/nord.xml`），`name` 改成 `uat-system`，`<color name="key">` 的值改成 `system(primary, #eceff4)`，打包成 `.theme`。
+- **前提**：API 31+ 模拟器；导入一个按键颜色用系统取色的 4.0 主题包并选用：内置 Nord 的 `theme.xml`（`lib/keyboard-scene/src/commonMain/themes/nord.xml`），`name` 改成 `uat-system`，两个 `<color name="key">`（浅色、深色各一个）的值分别改成 `system(primary, #eceff4)` 和 `system(primary, #4c566a)`，打包成 `.theme`。
 - **操作**：记下键色；换壁纸（或 `adb shell cmd overlay` 换取色方案）；回到任意输入框调出键盘。
 - **预期**：键色换成新取色对应的颜色，不是换之前的旧色；进设置再回来也一样。
 - **JVM**：`SceneThemesPackTest.aCopyEqualToAnOlderPackDrawsItsOwnTheme`（相等的新副本画自己的颜色）；设备上手动走一遍。

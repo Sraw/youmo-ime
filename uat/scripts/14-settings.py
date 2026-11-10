@@ -225,7 +225,11 @@ def st09(d):
     d.step("导入")
     # the pushed file is a 3.0 theme: it goes straight in, only a 4.0 pack asks first
     import_theme(d, "uat-theme", confirm=False)
-    check(not d.wait_text("导入主题", timeout=3, where="all", contains=True), "导入 3.0 主题弹出了确认框")
+    # looked at once after a pause, not waited for: wait_text blocks when the text never comes, which is the pass;
+    # the 4.0 dialog's title is 导入主题 <name>？ (the 新增主题 sheet's 导入主题文件 is not it)
+    time.sleep(2)
+    check(not any(t.startswith("导入主题") and t.endswith("？") for t in d.screen().texts("all")),
+          "导入 3.0 主题弹出了确认框")
     appearance_tab(d, "主题")
     item = custom_item(d)
     check(item, "导入后主题列表里没有它")
@@ -618,6 +622,7 @@ case("ST-77", needs="manual:要另做一个回车键自带图片、按下纯色�
 case("ST-78", needs="manual:要在 API 31+ 上换壁纸改系统取色，看键色")(lambda d: None)
 case("ST-79", needs="manual:要另做一个只给九键回车键换图片的主题包")(lambda d: None)
 case("ST-80", needs="manual:主题制作网页；在电脑浏览器上手工跑（看 SVG 图标的位置）")(lambda d: None)
+case("ST-81", needs="manual:主题制作网页；在电脑浏览器上手工跑（关页重开、两个标签页的草稿）")(lambda d: None)
 case("ST-69", needs="manual:要真麦克风说话，用过语音后再导入语音包")(lambda d: None)
 case("ST-70", needs="manual:按键字符里选中一项左移、删除，看轮廓和删掉的是哪个")(lambda d: None)
 case("ST-73", needs="manual:要从制作页导出动效示例主题，按键的缩放、下沉、渐隐要人眼看")(lambda d: None)
