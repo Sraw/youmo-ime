@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-dzuZUZRtmpWvNpk91Hcu88kPuXP6SX8P4irIqgGqPF4=' 'sha256-JGWjtZfn9GYRwo9Hj4MyEPqVsnAsqQVO/Yss1iIIBPg=' 'sha256-tgRB4l4FPHX21AjmIo7Tvt/wg6IuCnATy+v5PLpXxCs=' 'sha256-Ze5wqygp4qz8mZ6P2X9lexjgm2kPP6XWPPwHUfZrsg4='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-dzuZUZRtmpWvNpk91Hcu88kPuXP6SX8P4irIqgGqPF4=' 'sha256-JGWjtZfn9GYRwo9Hj4MyEPqVsnAsqQVO/Yss1iIIBPg=' 'sha256-9NYmSrF84QhSu9wM2ITEDmTgWWBPiRIZ5noYVVK9z/o=' 'sha256-NafgJfWOhf1Erlw1D1C37kAcPKc3rbgkXLDBeeYYFCM='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -2854,6 +2854,10 @@ dialog h2 { margin: 0; font-size: 16px; }
     } } });
     draw();
     box.append(c, row('放大', zoom), done);
+    // what its handlers hold (the picture decoded, its crop, the keyboard's shape): another, and the tab's in-place
+    // update (ui.js sync) puts this box in whole instead of keeping the old one's canvas and handlers
+    const bytes = d.files[p.src];
+    box.dataset.key = [orientation, p.src, bytes ? api.lib.contentId(bytes) : '', bmp.width + 'x' + bmp.height, ratio, String(was)].join('|');
     return box;
   }
 
@@ -3318,6 +3322,14 @@ dialog h2 { margin: 0; font-size: 16px; }
     if (to.nodeType !== from.nodeType || to.nodeName !== from.nodeName) return false;
     if (to.nodeType === Node.TEXT_NODE) { if (to.data !== from.data) to.data = from.data; return true; }
     if (to.nodeType !== Node.ELEMENT_NODE) return true;
+    // a control's handlers hold what it was drawn for: the row's name (a colour's, a stop's), a box's data-key
+    // (a picture decoded, its crop). Another, and the part is put in whole, never kept with old handlers
+    const what = (e) => (e.matches('label.row') ? e.querySelector('.what').textContent : null);
+    if (to.dataset.key !== from.dataset.key || what(to) !== what(from)) {
+      if (to.contains(skip)) return false;
+      to.replaceWith(from);
+      return true;
+    }
     const kids = to.childNodes.length === from.childNodes.length;
     if (!to.matches(CONTROLS) && !to.querySelector(CONTROLS) && !from.querySelector(CONTROLS)) {
       if (!kids || !to.isEqualNode(from)) to.replaceWith(from);

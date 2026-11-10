@@ -154,6 +154,10 @@
     } } });
     draw();
     box.append(c, row('放大', zoom), done);
+    // what its handlers hold (the picture decoded, its crop, the keyboard's shape): another, and the tab's in-place
+    // update (ui.js sync) puts this box in whole instead of keeping the old one's canvas and handlers
+    const bytes = d.files[p.src];
+    box.dataset.key = [orientation, p.src, bytes ? api.lib.contentId(bytes) : '', bmp.width + 'x' + bmp.height, ratio, String(was)].join('|');
     return box;
   }
 

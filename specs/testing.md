@@ -459,7 +459,7 @@ What holds the library to the app:
   `CHROMIUM=`) draws six groups of shots in Chromium through `dev/engine.html` and compares them
   with `app/build/w1-pixel/`: under 2% of pixels off by more than 48, under 0.2% in 5x5 areas off by
   more than 16 (the plain board against the app's with q pressed must fail it, and does).
-- `node web/theme-maker/test/panels-smoke.mjs` (local, the same Chromium) drives the maker's 字和图标 tab by mouse and by touch: a field edited, then the next field typed into or a box tapped, both kept (a value edit updates the controls in place, never draws the tab anew); after undo with a field focused every field shows the document.
+- `node web/theme-maker/test/panels-smoke.mjs` (local, the same Chromium) drives the maker's 字和图标 tab by mouse and by touch: a field edited, then the next field typed into or a box tapped, both kept (a value edit updates the controls in place, never draws the tab anew); after undo with a field focused every field shows the document; a colour row after undoing a rename edits the colour it names, and the crop shows a picture replaced by one of its size (a row of another name, a box of another data-key is put in whole).
 - `node web/theme-maker/dev/serve.mjs` serves `dev/engine.html`, a preview of any board, theme,
   size and form drawn by the engine; development only, never published.
 

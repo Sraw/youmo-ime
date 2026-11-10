@@ -77,6 +77,14 @@
     if (to.nodeType !== from.nodeType || to.nodeName !== from.nodeName) return false;
     if (to.nodeType === Node.TEXT_NODE) { if (to.data !== from.data) to.data = from.data; return true; }
     if (to.nodeType !== Node.ELEMENT_NODE) return true;
+    // a control's handlers hold what it was drawn for: the row's name (a colour's, a stop's), a box's data-key
+    // (a picture decoded, its crop). Another, and the part is put in whole, never kept with old handlers
+    const what = (e) => (e.matches('label.row') ? e.querySelector('.what').textContent : null);
+    if (to.dataset.key !== from.dataset.key || what(to) !== what(from)) {
+      if (to.contains(skip)) return false;
+      to.replaceWith(from);
+      return true;
+    }
     const kids = to.childNodes.length === from.childNodes.length;
     if (!to.matches(CONTROLS) && !to.querySelector(CONTROLS) && !from.querySelector(CONTROLS)) {
       if (!kids || !to.isEqualNode(from)) to.replaceWith(from);

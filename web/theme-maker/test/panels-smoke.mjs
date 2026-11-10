@@ -138,6 +138,49 @@ async function main() {
     await tap('颜色');
     await wait(300);
     check(/scale="120%"/.test(await style()), 'undo: a step after it goes from the document\'s value: ' + await style());
+    await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+
+    // a colour renamed in the source, then undone on 配色: its row edits the colour it names, not the one it was drawn for
+    await js(`document.querySelector('#tabs [data-tab=colors]').click()`);
+    await wait(200);
+    await click('加一个');
+    await type('aaa');
+    await js(`[...document.querySelectorAll('#tab-colors button')].find((x) => x.textContent === '加').click()`);
+    await wait(300);
+    await js(`(() => { const s = document.getElementById('source'); s.value = s.value.replace('name="aaa"', 'name="bbb"'); s.dispatchEvent(new Event('input')); })()`);
+    await wait(700);
+    await js(`document.querySelector('#tabs [data-tab=colors]').click()`);
+    await wait(200);
+    await js(`document.getElementById('undo').click()`);
+    await wait(300);
+    await click('aaa', 'input.expr');
+    await js(`document.activeElement.select()`);
+    await type('#123456');
+    await click('加一个');
+    await wait(300);
+    const src = await source();
+    check(/name="aaa" value="#123456"/.test(src) && !/name="bbb"/.test(src), 'undo a rename: the row edits the colour it shows');
+
+    // a picture replaced by another of its size: the crop shows the new one
+    await js(`document.querySelector('#tabs [data-tab=background]').click()`);
+    await wait(200);
+    const choose = (color) => js(`(async () => {
+      const oc = new OffscreenCanvas(800, 400); const g = oc.getContext('2d'); g.fillStyle = '${color}'; g.fillRect(0, 0, 800, 400);
+      const blob = await oc.convertToBlob({ type: 'image/png' });
+      const inp = document.getElementById('image-input');
+      inp.click = function () { const dt = new DataTransfer(); dt.items.add(new File([blob], 'p.png', { type: 'image/png' })); this.files = dt.files; this.onchange(); };
+      [...document.querySelectorAll('#tab-background button')].find((x) => /图片…/.test(x.textContent)).click();
+      return 1;
+    })()`);
+    const centre = () => js(`(() => { const c = document.querySelector('#tab-background canvas.crop-canvas'); if (!c) return 'none'; const d = c.getContext('2d').getImageData(c.width / 2 | 0, c.height / 2 | 0, 1, 1).data; return d[0] + ',' + d[1] + ',' + d[2]; })()`);
+    await choose('#ff0000');
+    for (let i = 0; i < 50 && (await centre()) === 'none'; i++) await wait(200);
+    await wait(800);
+    const red = await centre();
+    await choose('#0000ff');
+    await wait(2500);
+    const blue = await centre();
+    check(/^25[45],0,0$/.test(red) && /^0,0,25[45]$/.test(blue), 'a picture replaced: the crop shows the new one (' + red + ' then ' + blue + ')');
   } finally {
     b.close();
     server.close();
