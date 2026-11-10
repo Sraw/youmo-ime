@@ -364,6 +364,38 @@
 - **预期**：第一次重开恢复的是 `tab1`、改后的颜色和那张图；最后重开的询问和恢复的都是 `tab1b`，背景图是第一个标签页的那张，不是第二个标签页的图，也不是空白。再用文件直接打开（`file://…/index.html`，浏览器可能不给锁，草稿照常写）把同样的步骤走一遍，结果相同。
 - **JVM**：没有；存取规则由 web/theme-maker 的 `names-and-files.test.mjs`（草稿按 id 分记录、两个标签页交错写、写到一半中断、旧版草稿）查，这一条在电脑浏览器上手工跑。
 
+### ST-89 [P1] 三种格式的按键音在 Android 10 上载入并放出（先 youmo29，再 API 34+）
+- **前提**：debug 版；按键音 **启用**，按键音音色 **跟随主题**；**跟随系统夜间模式** 关掉。"下载"里有 `uat-sounds-icons.theme`：`uat/fixtures/theme-sounds-icons/` 的 `theme.xml`、四个 SVG 和五个声音打成的包（脚本的 `push_icons_pack(d, sounds=True)`；`short.mp3` 不放进去）。五个声音参数各不相同：`letter.wav` 16 位 44.1 kHz 单声道，`function.wav` 8 位 8 kHz 单声道，`space.ogg` Vorbis 48 kHz 双声道，`enter.ogg` Vorbis 8 kHz 单声道，`backspace.mp3` MPEG-1 44.1 kHz 双声道带 Xing。
+- **操作**：先在 youmo29（API 29）上：`adb logcat -c`，导入并选用它，回测试页依次按字母、`123`（功能键）、空格、回车、退格；`adb logcat -d | grep "theme sound"`。再在一台 API 34+ 的模拟器或真机上同样走一遍。
+- **预期**：两台上 logcat 都有五条 `theme sound <类别> <格式> status=0`（letter wav、function wav、space ogg、enter ogg、backspace mp3），没有非 0 的；五类键各放各的声音（真机靠人耳听，模拟器看 logcat）。
+- **JVM**：`ThemeSoundsTest`（`ShadowSoundPool`，按类别放、没加载完放系统声）；Android 10 的 MediaExtractor 能不能解这三种格式只有设备上能看。
+
+### ST-90 [P1] 主题包换的图标画在键上，换回内置主题恢复自带图标
+- **前提**：B0-设置；**跟随系统夜间模式** 关掉；"下载"里有 `uat-sounds-icons.theme`，同 ST-89 但不带 `<sounds>` 和声音文件（脚本的 `push_icons_pack(d)`）。
+- **操作**：**主题 → 新增主题** 导入并选用它；回测试页看退格、回车、Shift 和空格；按住 Shift 看三态（单次、锁定）；在搜索框里看回车；切到深色（**跟随系统夜间模式** 打开并让系统用深色）再看一遍；最后长按这个主题 **删除**，回测试页再看。
+- **预期**：退格是主题的 Material 风格退格（`viewBox="0 -960 960 960"`，画在键中间）；换行时的回车是主题的宽箭头，等比缩小居中（不被拉扁）；Shift 未按时是主题的箭头，下面一横是橙色、不跟 `icon-color` 变；Shift 单次、锁定和搜索框里的回车（主题没换这三个）是自带图标；空格上画着星，星中间半透明的红圆不跟 `icon-color` 变，按下时也不变色。深色版同样。删掉主题后换回内置主题，四个键都是自带图标，空格上没有红色。
+- **JVM**：`PackIconsTest`（app）、`CanvasPainterTest`（jsTest：写死颜色的半透明路径、等比居中）、`SvgSubsetTest`、`IconPathTest`；模拟器上脚本只断言空格上星的红色（选用后有、删掉后没有），截图给人看其它几个键。
+
+### ST-91 [P2] 坏的图标和声音导入被拒，各说出原因
+- **前提**：B0-设置；按 ST-89 的包改出几个包，每个只坏一处，坏的文件在 `uat/fixtures/theme-sounds-icons/bad/`：`big.wav`（120 KB 以上）、`deep.wav`（24 位 PCM）、`junk-tail.mp3`（帧后面有不认识的数据）当某一类的声音；`no-fill.svg`（全部 `fill="none"`）、`zero-opacity.svg`（全部在 `opacity="0"` 的组里）当退格图标。（Opus、2 秒长、扩展名和内容不符的声音见 ST-88。）
+- **操作**：逐个导入。
+- **预期**：每个都被拒绝，什么都不留下；提示里说出原因：声音超过 100 KB、只收 8/16 位 PCM、文件尾有不认识的数据；图标没有要画的东西（每条路径都不填充、透明或只有移动）。
+- **JVM**：`SoundFileTest`、`SvgSubsetTest`（keyboard-scene）、`ThemePackImportTest`（app）。
+
+### ST-92 [P2] 主题制作网页：换的图标画在预览上；按键音标签选文件、试听、提示
+- **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
+- **前提**：电脑浏览器（Chrome，另用 Safari 看一遍 Ogg）打开 `web/theme-maker/index.html`，从 Nord 开始；`uat/fixtures/theme-sounds-icons/` 里的文件。
+- **操作**：**字和图标 → 换图标** 给 backspace 选 `backspace.svg`、enter 选 `enter.svg`、shift 选 `shift.svg`，看预览；再给 backspace 选 `bad/no-fill.svg`。**按键音** 标签里五行分别选 `letter.wav`、`function.wav`、`space.ogg`、`enter.ogg`、`backspace.mp3`，逐个点 **试听**；再给字母键选 `bad/big.wav`、`bad/deep.wav`、`bad/junk-tail.mp3`；把 **源码** 里一个 `<sound>` 的文件名改成包里没有的，点保存；改回来，点 **去掉** 去掉全部五个，看源码。
+- **预期**：预览里退格、回车、Shift 换成选的 SVG：退格在键中间，宽的回车等比居中，Shift 下面的一横是橙色；`no-fill.svg` 放不进去并说原因。五个声音都放得进去，每行显示格式、时长、声道、采样率，试听都响（Safari 放不了 Ogg 时提示「这个浏览器放不了，App 里能放」）；选了 MP3 提示开头约 25 ms 空白、建议 WAV 或 Ogg。三个坏文件放不进去，各给出原因；缺文件时保存被拦下。全部去掉后源码里没有 `<sounds>`，包里也没有这些文件。
+- **JVM**：没有；规则由 web/theme-maker 的 `form.test.mjs`、`maker.test.mjs`、`engine.test.mjs`、`panels-smoke.mjs` 查，这一条在电脑浏览器上手工跑。
+
+### ST-93 [P2] 主题制作网页：选动画 WebP 做背景，原样保留成动态背景
+- **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
+- **前提**：两张动画 WebP：一张在 App 的限制内（例如 480×320、30 帧、每帧 100 ms），一张超过（例如长边 1080）。
+- **操作**：**背景** 里选第一张，看源码里的 `<picture>`，保存 `.theme` 导入 App 并选用，看键盘；再在 **背景** 里选第二张，看源码。
+- **预期**：第一张：`<picture src="picture.webp" … animated="true">`，`picture.webp` 和选的文件一样大（没重新编码），两个裁切框照常能调（只管静态图）；App 里键盘背景在动，居中铺满，不按裁切框。第二张：`<picture>` 没有 `animated`，图片重新编码成 JPEG/PNG（静态，第一帧）。
+- **JVM**：没有；`maker.test.mjs` 查保留规则（限制内保留、超过不保留，`animated="true"` 写上和去掉），这一条在电脑浏览器和设备上手工跑。
+
 ### ST-78 [P2] 系统取色变了，用系统取色的主题包跟着换色
 - **前提**：API 31+ 模拟器；导入一个按键颜色用系统取色的 4.0 主题包并选用：内置 Nord 的 `theme.xml`（`lib/keyboard-scene/src/commonMain/themes/nord.xml`），`name` 改成 `uat-system`，两个 `<color name="key">`（浅色、深色各一个）的值分别改成 `system(primary, #eceff4)` 和 `system(primary, #4c566a)`，打包成 `.theme`。
 - **操作**：记下键色；换壁纸（或 `adb shell cmd overlay` 换取色方案）；回到任意输入框调出键盘。
