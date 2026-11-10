@@ -135,6 +135,8 @@ class ThemeMakerFormatTest {
         put("keyImageBytes", ThemeAssetLimits.MAX_KEY_IMAGE_BYTES)
         put("iconBytes", ThemeAssetLimits.MAX_ICON_BYTES)
         put("overrides", ThemeAssetLimits.MAX_OVERRIDES)
+        put("layouts", ThemeAssetLimits.MAX_LAYOUTS)
+        put("layoutBytes", ThemeAssetLimits.MAX_LAYOUT_BYTES)
         put("boardImageBytes", KeyImageBudget.LIMIT_BYTES)
     }
 

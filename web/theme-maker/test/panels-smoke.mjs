@@ -141,6 +141,17 @@ async function main() {
     check(/scale="120%"/.test(await style()), 'undo: a step after it goes from the document\'s value: ' + await style());
     await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
 
+    // Ctrl+Z in a field typed in and not committed is the field's own undo, not the document's (m3 L-a)
+    await click('大小');
+    await js(`document.activeElement.select()`);
+    await type('133');
+    const steps = await js(`document.getElementById('undo').disabled`);
+    for (const t of ['rawKeyDown', 'keyUp']) await b.send('Input.dispatchKeyEvent', { type: t, key: 'z', code: 'KeyZ', windowsVirtualKeyCode: 90, modifiers: 2 });
+    await wait(300);
+    check(/scale="120%"/.test(await style()) && steps === await js(`document.getElementById('undo').disabled`), 'Ctrl+Z in a field typed in leaves the document: ' + await style());
+    await js(`document.activeElement.blur()`);
+    await wait(300);
+
     // a colour renamed in the source, then undone on 配色: its row edits the colour it names, not the one it was drawn for
     await js(`document.querySelector('#tabs [data-tab=colors]').click()`);
     await wait(200);
@@ -292,6 +303,38 @@ async function main() {
     await js(`[...document.querySelectorAll('#tab-info button')].find((x) => x.textContent === '从预览截一张').click()`);
     for (let i = 0; i < 50 && !/preview="/.test(await source()); i++) await wait(100);
     check(/<meta [^>]*preview="preview\.(png|webp)"/.test(await source()), '信息: a preview taken over a noisy picture fits the App\'s 512 KB: ' + ((/preview="[^"]*"/.exec(await source()) || ['none'])[0]));
+
+    // M4: an example started from; help; the check before a save (a warning asks, an error stops)
+    await js(`(() => { const p = document.getElementById('new-panel'); if (!p.open) p.showModal(); document.querySelectorAll('#examples button')[0].click(); })()`);
+    await wait(1500);
+    check(/name="晚霞"/.test(await source()) && !(await js(`document.getElementById('new-panel').open`)), '从示例开始: 晚霞 opened');
+    await js(`document.getElementById('help-button').click()`);
+    await wait(200);
+    const help = await js(`document.getElementById('help-panel').open ? [...document.querySelectorAll('#help-panel a')].map((a) => a.href).join(' ') : ''`);
+    check(/docs\/theme-maker\.md/.test(help) && /docs\/theme-format\.md/.test(help), 'help: open with its links: ' + help);
+    await js(`document.getElementById('help-panel').close()`);
+    await js(`(() => { window.__saved = 0; const u = URL.createObjectURL; URL.createObjectURL = (b) => { window.__saved++; return u(b); }; })()`);
+    const edit = (f) => js(`(() => { const s = document.getElementById('source'); s.value = (${f})(s.value); s.dispatchEvent(new Event('input')); })()`);
+    await edit(`(t) => t.replace('<style select="key"', '<style select="key" sticker="none"')`);
+    await wait(800);
+    const ask = async (button) => {
+      await js(`document.querySelector('#file-menu [data-act=save]').click()`);
+      await wait(300);
+      const open = await js(`document.getElementById('export-panel').open`);
+      if (button === 'esc') await js(`document.getElementById('export-panel').close()`);
+      else await js(`document.querySelector('#export-panel button[value=${button}]').click()`);
+      await wait(300);
+      return open;
+    };
+    check(await ask('cancel') && (await js(`window.__saved`)) === 0, '保存 with a warning: asked; 回去改 saves nothing');
+    check(await ask('esc') && (await js(`window.__saved`)) === 0, '保存 with a warning: Esc saves nothing');
+    check(await ask('save') && (await js(`window.__saved`)) === 1, '保存 with a warning: 仍然保存 saves');
+    await edit(`(t) => t.replace('<style select="key"', '<style select="key:pressed" fill="image(nope.png, 0dp)"/><style select="key"')`);
+    await wait(800);
+    await js(`document.querySelector('#file-menu [data-act=save]').click()`);
+    await wait(300);
+    const stopped = await js(`[!document.getElementById('export-panel').open, window.__saved, document.getElementById('problems').textContent]`);
+    check(stopped[0] && stopped[1] === 1 && /nope\.png/.test(stopped[2]), '保存 with an error: nothing saved, the error in 问题: ' + JSON.stringify(stopped.slice(0, 2)));
   } finally {
     b.close();
     server.close();

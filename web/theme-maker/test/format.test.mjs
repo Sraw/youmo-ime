@@ -624,7 +624,8 @@ test('contrast is Contrast.ratio, a colour reads dark as the page guesses, a cut
 
 test('each page carries only the generated blocks it reads, and classic no engine', () => {
   const ids = (page) => [...page.matchAll(/<script type="application\/json" id="([\w-]+)">/g)].map((m) => m[1]);
-  assert.deepEqual(ids(html), ['youmo-format', 'youmo-engine-icons']);
+  // and the maker its examples (examples/, put in by assemble.mjs, not the app's)
+  assert.deepEqual(ids(html), ['youmo-format', 'youmo-engine-icons', 'youmo-examples']);
   assert.deepEqual(ids(classicHtml), ['youmo-format', 'youmo-presets', 'youmo-layout', 'youmo-icons']);
   assert.equal(blockOf(classicHtml, 'youmo-engine'), null);
   assert.equal(blockOf(html, 'youmo-format'), blockOf(classicHtml, 'youmo-format'), 'the app writes the format into both');
@@ -644,8 +645,9 @@ test("index.html holds no engine; the page built holds the build's, and no bigge
   assert.equal(engine, engineText(), 'the page built has another engine');
   // the plan's 600 KB is not met without a minifier (none without npm here): 1.09 MB as built, held below 1.2 MB
   // so that it grows only on purpose (1.20 MB with SvgSubset, the icons the page checks as the app does: 1.25 MB; M3's bar
-  // sample and the window's and panels' looks for the preview: 1.264 MB, held below 1.28 MB)
-  assert.ok(Buffer.byteLength(engine) <= 1_280_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
+  // sample and the window's and panels' looks for the preview: 1.264 MB; M4, the built-in layouts kept without their
+  // comments and indents: 1.239 MB; A1's motion: 1.250 MB; the compiler's line comments left out: 1.127 MB, held below 1.15 MB)
+  assert.ok(Buffer.byteLength(engine) <= 1_150_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   // the global a page reads it by (build.gradle.kts: the library's link names it)
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
   // all else as index.html: the engine's script and the CSP's hash of it the only difference
