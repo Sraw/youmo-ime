@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.data.theme
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.AnimatedBoardDrawable
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
@@ -371,7 +370,7 @@ object ThemePackFiles {
         checkFiles(from, files, checks)
         val layouts = checkLayouts(File(from, LAYOUTS), checks)
         val still = theme.picture?.takeIf { it.animated }?.let { p ->
-            runCatching { AnimatedBoardDrawable.limits(File(from, p.src)) }.getOrElse { ThemeAssetLimits.Still.Unread }
+            ThemeAssetLimits.animated(File(from, p.src))
         }
         val warnings = read.warnings.map { it.toString() } +
             listOfNotNull(checks.lowContrast(ThemePackCheck.lowContrast(theme)), still?.let { checks.animatedStill() })

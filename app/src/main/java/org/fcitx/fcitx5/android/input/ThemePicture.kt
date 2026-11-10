@@ -16,8 +16,10 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.util.SparseArray
 import android.view.View
+import android.view.ViewGroup
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.theme.PictureWindow
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.scene.look.BoardBase
@@ -29,10 +31,29 @@ import java.lang.ref.WeakReference
  * The theme's picture under a keyboard: laid over [base] (the view under the whole keyboard) as
  * CENTER_CROP lays it, so a view anywhere over it — a key, the bar — shows the part under it, as
  * the theme maker draws it ([PictureWindow]). Found by the views over it through [host]'s tag.
- * [animated]: the base plays the picture (060-render-p3 A4, [AnimatedBoardDrawable]); a view showing it is
- * see-through then, only darkened to its brightness ([seeThrough]), never blurred.
+ * [animated]: the base plays the picture (060-render-p3 A4, [AnimatedBoardDrawable], given by [play] once
+ * decoded); a view showing it is see-through then, only darkened to its brightness ([seeThrough]), never blurred.
  */
-class PictureHost(private val look: ThemeLook, val base: View, private val landscape: Boolean, val animated: AnimatedBoardDrawable? = null) {
+class PictureHost(private val look: ThemeLook, val base: View, private val landscape: Boolean) {
+
+    var animated: AnimatedBoardDrawable? = null
+        private set
+
+    /**
+     * [frames] played under the keyboard from now on: the views showing the picture under [base]'s parent
+     * drawn again see-through (the keys' canvas recorded again, on a layer of its own: the frames under it
+     * change, not the keys).
+     */
+    fun play(frames: AnimatedBoardDrawable) {
+        animated = frames
+        (base as? PictureBaseView)?.play(frames) ?: run { base.background = frames }
+        (base.parent as? ViewGroup)?.let { redraw(it) }
+    }
+
+    private fun redraw(view: View) {
+        if (view is KeyboardCanvasView) view.pictureChanged() else view.invalidate()
+        if (view is ViewGroup) for (i in 0 until view.childCount) redraw(view.getChildAt(i))
+    }
 
     private val dark = Paint()
 
@@ -237,13 +258,12 @@ class ThemePictureDrawable(
 
     companion object {
         /**
-         * Under [look]'s keyboard: its picture as cut for it, or the colour ([ThemeColors.board]); [animated]
-         * the picture playing (A4), where it plays.
+         * Under [look]'s keyboard: its picture as cut for it, or the colour ([ThemeColors.board]); an
+         * animated one its still picture till its frames are decoded ([PictureHost.play]).
          */
-        fun board(look: ThemeLook, animated: AnimatedBoardDrawable? = null): Drawable {
+        fun board(look: ThemeLook): Drawable {
             val color = ThemeColors.board(look.palette, look.keys)
             val p = look.picture
-            if (animated != null && p != null && look.base == BoardBase.Picture) return animated
             return if (p != null && look.base == BoardBase.Picture) {
                 ThemePictureDrawable(p.blurDp, p.brightness, 0, color)
             } else {

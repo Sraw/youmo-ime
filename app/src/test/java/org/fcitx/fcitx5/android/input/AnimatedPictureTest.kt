@@ -9,12 +9,16 @@ import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.PixelFormat
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import android.os.Looper
 import android.os.PowerManager
 import android.view.View
 import android.widget.FrameLayout
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyMotionSwitch
@@ -37,6 +41,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * 060-render-p3 A4: the animated picture plays only while it is shown and motion is allowed: the keyboard
@@ -150,12 +155,67 @@ class AnimatedPictureTest {
     @Test
     fun aPictureThatCannotPlayIsDrawnStill() {
         val still = folder.newFile("still.webp").apply { writeBytes(ByteArray(64)) }
-        assertEquals(ThemeAssetLimits.Still.Unread, AnimatedBoardDrawable.limits(still))
         val big = folder.newFile("big.webp").apply { writeBytes(ByteArray((ThemeAssetLimits.MAX_ANIMATED_BYTES + 1).toInt())) }
-        assertEquals(ThemeAssetLimits.Still.Size, AnimatedBoardDrawable.limits(big))
-        fun picture(f: File, animated: Boolean) = Picture(f.path, Crop(f.path, null, 0), null, 100, 0, animated)
-        assertNull(AnimatedBoardDrawable.of(picture(still, true), appContext))
-        assertNull(AnimatedBoardDrawable.of(picture(still, false), appContext))
-        assertNull(AnimatedBoardDrawable.of(picture(File(folder.root, "none.webp"), true), appContext))
+        assertEquals(ThemeAssetLimits.Still.Size, ThemeAssetLimits.animated(big))
+        assertNull(AnimatedBoardDrawable.decode(picture(still, true), 400, 100))
+        assertNull(AnimatedBoardDrawable.decode(picture(big, true), 400, 100))
+        assertNull(AnimatedBoardDrawable.decode(picture(File(folder.root, "none.webp"), true), 400, 100))
+    }
+
+    private fun picture(f: File, animated: Boolean) = Picture(f.path, Crop(f.path, null, 0), null, 100, 0, animated)
+
+    // the keyboard made: nothing read or decoded on the main thread; the frames handed over on it once
+    // decoded, not to a keyboard let go meanwhile, nor for a picture not animated
+    @Test
+    fun theFramesAreDecodedOffTheMainThread() {
+        val io = Executors.newSingleThreadExecutor()
+        try {
+            val p = picture(folder.newFile("a.webp"), true)
+            val decodedOn = mutableListOf<Boolean>()
+            val decode = { _: Picture, w: Int, h: Int -> decodedOn += Looper.myLooper() == Looper.getMainLooper(); assertEquals(400, w); assertEquals(100, h); FakeFrames() }
+            fun load(base: View, picture: Picture): MutableList<AnimatedBoardDrawable> {
+                val got = mutableListOf<AnimatedBoardDrawable>()
+                AnimatedBoardDrawable.later(picture, 0, base, scope, io.asCoroutineDispatcher(), decode) { got += it }
+                return got
+            }
+            val base = shown(ColorDrawable(0))
+            val got = load(base, p)
+            assertTrue(load(base, picture(File(p.src), false)).isEmpty())
+            waitFor { got.isNotEmpty() }
+            assertEquals(listOf(false), decodedOn)
+            // a keyboard let go before its frames came: none handed over
+            val gone = shown(ColorDrawable(0))
+            (gone.parent as FrameLayout).removeView(gone)
+            gone.layout(0, 0, 400, 100)
+            val none = load(gone, p)
+            waitFor { decodedOn.size == 2 }
+            repeat(3) { idle() }
+            assertTrue(none.isEmpty())
+        } finally {
+            io.shutdown()
+        }
+    }
+
+    private val scope = CoroutineScope(SupervisorJob())
+
+    private fun waitFor(done: () -> Boolean) {
+        val until = System.currentTimeMillis() + 5000
+        while (!done()) {
+            assertTrue("in time", System.currentTimeMillis() < until)
+            idle()
+            Thread.sleep(5)
+        }
+    }
+
+    @Test
+    fun playedItIsShownAtOnceAndLetGoWithItsView() {
+        val view = shown(ColorDrawable(0)) as PictureBaseView
+        val frames = FakeFrames()
+        val board = AnimatedBoardDrawable(frames, 100, appContext)
+        view.play(board)
+        assertTrue(board.isRunning)
+        (view.parent as FrameLayout).removeView(view)
+        assertFalse(board.isRunning)
+        assertNull(view.background)
     }
 }

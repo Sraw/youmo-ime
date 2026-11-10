@@ -87,6 +87,7 @@ import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.CodeStripPlacement
 import org.fcitx.fcitx5.android.input.preedit.FloatingCodeStrip
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.scene.engine.section
@@ -413,21 +414,26 @@ class InputView(
         broadcaster.onImeUpdate(fcitx.runImmediately { inputMethodEntryCached })
 
         // the theme's picture or its colour, under it all; the picture lies where each key showing it finds it
-        // played where it is animated and fits the limits (A4), stopped as the keyboard hides or the view goes
-        val animated = ThemeManager.shownLook(theme).takeIf { it.base == BoardBase.Picture }?.picture?.let { AnimatedBoardDrawable.of(it, context) }
-        customBackground.background = ThemePictureDrawable.board(ThemeManager.shownLook(theme), animated)
+        val look = ThemeManager.shownLook(theme)
+        customBackground.background = ThemePictureDrawable.board(look)
+        val pictureHost = look.picture?.let {
+            PictureHost(look, customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+        }
+        // an animated one played where it fits the limits (A4): read and decoded off the main thread, the
+        // still picture till then; stopped as the keyboard hides or the view goes
+        val animated = look.picture?.takeIf { look.base == BoardBase.Picture }
+        if (animated != null && pictureHost != null) {
+            AnimatedBoardDrawable.later(animated, ThemeColors.board(look.palette, look.keys), customBackground, viewScope) {
+                pictureHost.play(it)
+            }
+        }
 
         keyboardView = constraintLayout {
             // allow MotionEvent to be delivered to keyboard while pressing on padding views.
             // although it should be default for apps targeting Honeycomb (3.0, API 11) and higher,
             // but it's not the case on some devices ... just set it here
             isMotionEventSplittingEnabled = true
-            PictureHost.install(
-                this,
-                ThemeManager.shownLook(theme).picture?.let {
-                    PictureHost(ThemeManager.shownLook(theme), customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE, animated)
-                },
-            )
+            PictureHost.install(this, pictureHost)
             add(customBackground, lParams {
                 centerVertically()
                 centerHorizontally()

@@ -14,22 +14,41 @@ import android.graphics.drawable.Animatable
 import android.graphics.drawable.AnimatedImageDrawable
 import android.graphics.drawable.Drawable
 import android.view.View
+import androidx.annotation.WorkerThread
+import androidx.core.view.doOnLayout
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyMotionSwitch
-import org.fcitx.fcitx5.android.input.theme.AnimatedWebp
 import org.fcitx.fcitx5.android.input.theme.PictureWindow
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.scene.look.Picture
 import timber.log.Timber
 import java.io.File
-import java.io.RandomAccessFile
+import kotlin.coroutines.CoroutineContext
+import kotlin.math.roundToInt
 
 /** The view under the keyboard: tells its [AnimatedBoardDrawable] background whether it is shown. */
 class PictureBaseView(context: Context) : View(context) {
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
         (background as? AnimatedBoardDrawable)?.shown(isVisible)
+    }
+
+    /** [frames] put under it once decoded (the still picture till then), playing at once where it is shown. */
+    fun play(frames: AnimatedBoardDrawable) {
+        background = frames
+        frames.shown(isAttachedToWindow && windowVisibility == VISIBLE && isShown)
+    }
+
+    // the frames and their decoder let go with the view (a theme changed, the keyboard made again), not
+    // left to the GC while the next keyboard decodes its own (stopped already: its visibility told)
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        if (background is AnimatedBoardDrawable) background = null
     }
 }
 
@@ -44,12 +63,16 @@ class AnimatedBoardDrawable(
     private val frames: Drawable,
     val brightness: Int,
     private val context: Context,
+    board: Int = 0,
     private val allowed: () -> Boolean = { KeyMotionSwitch.on(context) },
 ) : Drawable(), Drawable.Callback {
 
     private val play = frames as Animatable
     private val dark = Paint().apply { color = android.graphics.Color.argb((100 - brightness) * 255 / 100, 0, 0, 0) }
     private var listening = false
+
+    // under the frames: an animated WebP may have alpha (the still picture's drawable has the board's colour too)
+    private val under = Paint().apply { color = board }
 
     init {
         frames.callback = this
@@ -104,6 +127,7 @@ class AnimatedBoardDrawable(
     }
 
     override fun draw(canvas: Canvas) {
+        if (under.alpha != 0) canvas.drawRect(bounds, under)
         canvas.save()
         canvas.clipRect(bounds)
         frames.draw(canvas)
@@ -122,39 +146,60 @@ class AnimatedBoardDrawable(
     override fun setColorFilter(colorFilter: ColorFilter?) = Unit
 
     @Deprecated("Deprecated in Java")
-    override fun getOpacity() = PixelFormat.OPAQUE
+    override fun getOpacity() = PixelFormat.TRANSLUCENT
 
     companion object {
         /**
-         * [picture]'s frames to play, or null where it is drawn still (its cut, as a picture that does not
-         * move): none animated, past [ThemeAssetLimits]' animated limits, or not decoded as an animation.
-         * Only the file's chunk heads are read before it is decoded.
+         * Decodes [picture]'s frames off the main thread once [base] is laid out (its size the frames' target),
+         * then, on the main thread, hands them to [ready] where [base] is still attached ([scope] is the
+         * keyboard's: cancelled as it is let go, so nothing lands on a keyboard made again). Nothing for a
+         * picture not animated, past [ThemeAssetLimits]' animated limits or not decoded: the still picture stays.
          */
-        fun of(picture: Picture, context: Context): AnimatedBoardDrawable? {
-            if (!picture.animated) return null
+        fun later(
+            picture: Picture,
+            board: Int,
+            base: View,
+            scope: CoroutineScope,
+            io: CoroutineContext = Dispatchers.IO,
+            decode: (Picture, Int, Int) -> Drawable? = ::decode,
+            ready: (AnimatedBoardDrawable) -> Unit,
+        ) {
+            if (!picture.animated) return
+            base.doOnLayout {
+                val w = base.width
+                val h = base.height
+                scope.launch(io) {
+                    val frames = decode(picture, w, h) ?: return@launch
+                    withContext(Dispatchers.Main) {
+                        if (base.isAttachedToWindow) ready(AnimatedBoardDrawable(frames, picture.brightness, base.context, board))
+                    }
+                }
+            }
+        }
+
+        /**
+         * [picture]'s frames, sized to cover [w]×[h] (no larger than the file's), or null where it is drawn
+         * still. Reads and decodes a file of up to 4 MB: never on the main thread.
+         */
+        @WorkerThread
+        fun decode(picture: Picture, w: Int, h: Int): Drawable? {
             val file = File(picture.src)
-            val still = runCatching { limits(file) }.getOrElse { ThemeAssetLimits.Still.Unread }
+            val still = ThemeAssetLimits.animated(file)
             if (still != null) {
                 Timber.w("animated picture ${file.name} drawn still: $still")
                 return null
             }
-            val frames = runCatching { ImageDecoder.decodeDrawable(ImageDecoder.createSource(file)) }
-                .onFailure { Timber.w(it, "animated picture ${file.name} drawn still: not decoded") }
-                .getOrNull() as? AnimatedImageDrawable ?: return null
-            return AnimatedBoardDrawable(frames, picture.brightness, context)
-        }
-
-        /** Why [file] is drawn still, null where it may play. */
-        fun limits(file: File): ThemeAssetLimits.Still? {
-            val bytes = file.length()
-            if (bytes > ThemeAssetLimits.MAX_ANIMATED_BYTES) return ThemeAssetLimits.Still.Size
-            val header = RandomAccessFile(file, "r").use { f ->
-                AnimatedWebp.header({ at, into ->
-                    f.seek(at)
-                    f.read(into).coerceAtLeast(0)
-                }, bytes, ThemeAssetLimits.MAX_ANIMATED_FRAMES)
-            }
-            return ThemeAssetLimits.animated(bytes, header)
+            return runCatching {
+                ImageDecoder.decodeDrawable(ImageDecoder.createSource(file)) { decoder, info, _ ->
+                    val iw = info.size.width
+                    val ih = info.size.height
+                    // what the decoder reads, not only what the header said
+                    check(maxOf(iw, ih) <= ThemeAssetLimits.MAX_ANIMATED_SIDE) { "${iw}x$ih past the limit" }
+                    val scale = if (w > 0 && h > 0) minOf(1f, maxOf(w.toFloat() / iw, h.toFloat() / ih)) else 1f
+                    if (scale < 1f) decoder.setTargetSize(maxOf(1, (iw * scale).roundToInt()), maxOf(1, (ih * scale).roundToInt()))
+                }
+            }.onFailure { Timber.w(it, "animated picture ${file.name} drawn still: not decoded") }
+                .getOrNull() as? AnimatedImageDrawable
         }
     }
 }
