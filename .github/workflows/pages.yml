@@ -54,12 +54,13 @@ jobs:
       - name: Run theme maker tests
         run: node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs
 
-      # the site: web/ as it is, the page's tests, sources, tools, fonts (in index.html), dev pages and build
-      # left out (index.html is all it needs), its index.html the page with its engine
+      # the site: web/ as it is, the page's tests, sources, tools, fonts and examples (in index.html), dev pages and
+      # build left out (index.html is all it needs), its index.html the page with its engine; the maker before 0.6.0
+      # beside it at classic/ (060-render-p3 §5.1, kept till 0.6.x ends)
       - name: Pack the site
         run: |
           mkdir _site
-          tar -C web --exclude='./*/test' --exclude='./*/src' --exclude='./*/tools' --exclude='./*/fonts' --exclude='./*/dev' --exclude='./*/build' -cf - . | tar -C _site -xf -
+          tar -C web --exclude='./*/test' --exclude='./*/src' --exclude='./*/tools' --exclude='./*/fonts' --exclude='./*/examples' --exclude='./*/dev' --exclude='./*/build' -cf - . | tar -C _site -xf -
           node web/theme-maker/tools/assemble.mjs --engine _site/theme-maker/index.html
           grep -q "globalThis\['youmo-engine'\] = factory(" _site/theme-maker/index.html
           test ! -e _site/theme-maker/build
@@ -68,6 +69,9 @@ jobs:
           test ! -e _site/theme-maker/tools
           test ! -e _site/theme-maker/fonts
           test ! -e _site/theme-maker/dev
+          test ! -e _site/theme-maker/examples
+          grep -q 'id="youmo-examples"' _site/theme-maker/index.html
+          grep -q 'id="youmo-presets"' _site/theme-maker/classic/index.html
 
       - name: Upload the site
         uses: actions/upload-pages-artifact@v4

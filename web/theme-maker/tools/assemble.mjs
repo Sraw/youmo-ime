@@ -64,6 +64,29 @@ export function fontFaces(dir = join(root, 'fonts')) {
   }).join('\n');
 }
 
+/** The examples' folder: examples.json (`[{id, label, note}]`) and a folder of each, its theme.xml, files and layouts/. */
+export const EXAMPLES = join(root, 'examples');
+
+/**
+ * The page's youmo-examples block: each example of [dir] as `{id, label, note, xml, files: {name: base64}, layouts: {name: xml}}`
+ * (youmo-maker's exampleDoc), its files by name order. The page has them in it: it asks for nothing (its CSP).
+ */
+export function examplesJson(dir = EXAMPLES) {
+  const list = JSON.parse(readFileSync(join(dir, 'examples.json'), 'utf8'));
+  return JSON.stringify(list.map(({ id, label, note }) => {
+    const at = join(dir, id);
+    const files = {};
+    const layouts = {};
+    for (const f of readdirSync(at).sort()) {
+      if (f === 'theme.xml' || f === 'layouts') continue;
+      files[f] = readFileSync(join(at, f)).toString('base64');
+    }
+    if (existsSync(join(at, 'layouts'))) for (const f of readdirSync(join(at, 'layouts')).sort()) layouts[f] = readFileSync(join(at, 'layouts', f), 'utf8');
+    return { id, label, note, xml: readFileSync(join(at, 'theme.xml'), 'utf8'), files, layouts };
+  // every < as <: an XML comment's <!-- or a </script> in it would end or escape the script element
+  })).replace(/</g, '\\u003c');
+}
+
 /**
  * The page made of [src]'s files, the generated blocks taken from [old] (the index.html as it is), the
  * engine of [engine] (its file; null: NO_ENGINE, index.html as git keeps it), the fonts of [fonts] (their folder).
@@ -76,6 +99,8 @@ export function assemble(src = join(root, 'src'), old = readFileSync(src === CLA
   const text = { css: read(join(src, 'style.css')), lib: read(lib), ui: read(join(src, 'ui.js')), fonts: fontFaces(fonts) };
   // the engine and the generated blocks: only where page.html has a slot for them
   if (seen.has('engine')) text.engine = engine == null ? NO_ENGINE : engineText(engine);
+  // the examples (060-render-p3 M4, 从示例开始): examples/, each a pack's files, in examples.json's order
+  if (seen.has('examples')) text.examples = examplesJson();
   // the editing's tabs (060-render-p3 §5.1): every file of src/panels/, in their names' order, in one script
   if (seen.has('panels')) text.panels = readdirSync(join(src, 'panels')).filter((f) => f.endsWith('.js')).sort().map((f) => read(join(src, 'panels', f))).join('\n');
   // a page's other scripts (the maker's maker.js): each slot of page.html no other text fills, src/<slot>.js

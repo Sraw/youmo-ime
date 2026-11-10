@@ -10,6 +10,7 @@
   const PANELS = window.YoumoPanels || [];
   const json = (id) => JSON.parse(document.getElementById(id).textContent);
   const FORMAT = json('youmo-format');
+  const EXAMPLES = json('youmo-examples');
   const ICONS = json('youmo-engine-icons');
   const $ = (id) => document.getElementById(id);
 
@@ -74,6 +75,10 @@
     return loadAssets(d).then((current) => { if (current) { preview(); refreshTab(external); } });
   }
 
+  // the tab's field typed in since its last commit (input after its change): Ctrl+Z there is the field's own undo
+  // (m3 L-a), and only its text is kept over a rebuild (m3 L-b: a field committed shows the document's value)
+  let dirty = null;
+
   // a field the user types in: what a value written over it would take the typing from
   const typedIn = (el) => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
   const CONTROLS = 'input, select, textarea, button';
@@ -126,7 +131,7 @@
       return;
     }
     const active = document.activeElement;
-    const skip = !external && el.contains(active) && typedIn(active) ? active : null;
+    const skip = !external && el.contains(active) && typedIn(active) && active === dirty ? active : null;
     const key = el.contains(active) && active.matches(CONTROLS) ? controlKey(active) : null;
     const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
     if (!same) { rebuildSoon(); return; }
@@ -146,11 +151,12 @@
     clearTimeout(rebuilding);
     rebuilding = setTimeout(() => {
       const a = document.activeElement;
-      const typed = typedIn(a) && $('tab-' + tab).contains(a) ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, key: controlKey(a) } : null;
+      const typed = typedIn(a) && a === dirty && $('tab-' + tab).contains(a) ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, key: controlKey(a) } : null;
       showTab();
       const b = document.activeElement;
       if (typed && typedIn(b) && controlKey(b) === typed.key && b.value !== typed.value) {
         b.value = typed.value;
+        dirty = b;
         try { b.setSelectionRange(typed.from, typed.to); } catch (e) { /* a number field has no caret */ }
       }
     }, 0);
@@ -756,13 +762,26 @@
     $('edit').scrollTop = scroll;
   }
 
-  function save() {
+  // 保存 (060-render-p3 M4): checked first on every board, light and dark, and as the app imports. An error stops
+  // it (the problems list shows them all, each a click from its line); warnings are listed, the user's to ignore
+  async function save() {
     if (!history) return;
     const d = history.current;
-    const bad = M.check(E, d, env.board, M.envJson(env), null).problems.filter((p) => p.level === 'error');
-    if (bad.length) { toast('有 ' + bad.length + ' 个错误，App 导入不了，先改好'); return; }
-    const refused = M.saveProblems(E, L, FORMAT, d);
-    if (refused.length) { toast('App 会拒绝导入：' + refused.map((p) => p.message).join('；')); return; }
+    const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(env));
+    if (errors.length) {
+      showProblems([...errors, ...warnings]);
+      $('problems-area').scrollIntoView({ block: 'nearest' });
+      toast('有 ' + errors.length + ' 个错误，App 导入不了，先改好（见「问题」）');
+      return;
+    }
+    if (warnings.length) {
+      $('export-text').textContent = warnings.length + ' 个警告。App 能导入，但这些地方可能和你想的不一样：';
+      $('export-list').replaceChildren(...warnings.slice(0, 50).map((p) => Object.assign(document.createElement('li'), { textContent: (p.line ? '第 ' + p.line + ' 行：' : '') + p.message })));
+      $('export-panel').returnValue = '';
+      $('export-panel').showModal();
+      const answer = await new Promise((ok) => $('export-panel').addEventListener('close', () => ok($('export-panel').returnValue), { once: true }));
+      if (answer !== 'save') return;
+    }
     const { name, bytes } = M.save(L, d);
     const a = document.createElement('a');
     // octet-stream, as the app exports it: a browser adds no .zip to a name it takes for a zip (specs/app.md)
@@ -837,6 +856,19 @@
       label.append(r, ' ' + (THEME_LABEL[id] || id));
       $('image-base').append(label);
     }
+    for (const ex of EXAMPLES) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = ex.label;
+      b.title = ex.note;
+      b.addEventListener('click', () => {
+        set(M.exampleDoc(ex));
+        $('new-panel').close();
+        if (Object.keys(ex.layouts).length) toast('带自定义布局：' + Object.keys(ex.layouts).map((n) => n.replace(/\.xml$/, '')).join('、') + '，保存时原样保留');
+      });
+      $('examples').append(b);
+    }
+    $('help-button').addEventListener('click', () => $('help-panel').showModal());
     const cards = $('builtins');
     for (const id of E.themes()) {
       const b = document.createElement('button');
@@ -871,8 +903,17 @@
     });
     $('undo').addEventListener('click', () => { if (history && history.canUndo) { history.undo(); edited = true; changed(true); } });
     $('redo').addEventListener('click', () => { if (history && history.canRedo) { history.redo(); edited = true; changed(true); } });
+    $('edit').addEventListener('input', (e) => { if (typedIn(e.target)) dirty = e.target; });
+    $('edit').addEventListener('change', (e) => { if (e.target === dirty) dirty = null; }, true);
+    // typed back to what it was: no change event, so the field is let go on leaving it
+    // (only then: a field left with other text commits by its change, which needs it still dirty)
+    let focusValue = null;
+    $('edit').addEventListener('focusin', (e) => { focusValue = e.target.value; });
+    $('edit').addEventListener('focusout', (e) => { if (e.target === dirty && e.target.value === focusValue) dirty = null; });
     document.addEventListener('keydown', (e) => {
-      if (!(e.ctrlKey || e.metaKey) || e.target === $('source')) return;
+      if (!(e.ctrlKey || e.metaKey) || e.target === $('source') || e.target === dirty) return;
+      // not under a dialog: the save's would write what it checked, not what an undo made
+      if (document.querySelector('dialog[open]')) return;
       if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
       else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); $('redo').click(); }
     });
