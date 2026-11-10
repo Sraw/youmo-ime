@@ -81,6 +81,11 @@ class IconPathTest {
         assertEquals(-2.0, r(small[0].y))
         // negative radii are their size
         assertEquals(ok("M0 0A1 1 0 0 1 2 0"), ok("M0 0A-1 -1 0 0 1 2 0"))
+        // radii or a chord so small their squares come to 0: no centre found, NaN cubics that Skia draws nothing of and
+        // Path2D stops reading at; drawn as a line, and what follows goes on from its end
+        assertEquals(listOf(Move(0.0, 0.0), Line(1.0, 1.0)), ok("M0 0A1e-200 1e-200 0 0 1 1 1"))
+        assertEquals(listOf(Move(0.0, 0.0), Line(1e-170, 0.0)), ok("M0 0A1 1 0 0 1 1e-170 0"))
+        assertEquals(listOf(Move(0.0, 0.0), Line(1.0, 1.0), Line(2.0, 1.0)), ok("M0 0A1e-200 1e-200 0 0 1 1 1h1"))
     }
 
     @Test

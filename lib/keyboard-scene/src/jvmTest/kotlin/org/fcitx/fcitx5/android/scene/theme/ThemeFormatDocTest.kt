@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.theme
 
+import org.fcitx.fcitx5.android.scene.Icons
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -86,11 +87,22 @@ class ThemeFormatDocTest {
         )
     }
 
+    // the built-in icon names' table under 替换自带图标 (its rows `| 用在 | `a`、`b` |` up to the first line not a row)
+    // is Icons.ALL, so an icon added to the code cannot leave the authors' list behind
+    @Test
+    fun builtInIconTableIsIcons() {
+        val table = doc.substringAfter("自带图标的名字：\n").lines().map { it.trim() }.dropWhile { it.isEmpty() }.takeWhile { it.startsWith("|") }
+        val documented = table.flatMap { row -> NAME.findAll(row).map { it.groupValues[1] } }.toSet()
+        assertTrue(table.size > 2, "docs/theme-format.md has no table after 自带图标的名字：")
+        assertEquals(Icons.ALL, documented, "docs/theme-format.md 自带图标的名字 and Icons.ALL")
+    }
+
     private companion object {
         val SYSTEM_ROW = Regex("(?m)^\\| `([a-z0-9-]+(?:-N)?)` \\|")
         val NUMBER = Regex("`([0-9]+)`")
         const val RESERVED_LINE = "另外的保留写法"
         val ELEMENT = Regex("`<([a-z-]+)>`")
+        val NAME = Regex("`([a-z][a-z-]*)`")
 
         val ROW = Regex("(?m)^\\| `([a-z][a-z-]*)` \\|")
     }

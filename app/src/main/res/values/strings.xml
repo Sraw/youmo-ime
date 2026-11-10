@@ -940,7 +940,6 @@
     <string name="shared_section_chinese">Chinese input methods</string>
     <string name="shared_section_pinyin">Pinyin (full, shuangpin, 9 keys)</string>
     <string name="im_not_for">Not for %s.</string>
-    <string name="im_not_for_separator">", "</string>
     <string name="list_separator">", "</string>
     <string name="clipboard_and_emoji">Clipboard and emoji</string>
     <string name="hardware_keyboard">Physical keyboard</string>

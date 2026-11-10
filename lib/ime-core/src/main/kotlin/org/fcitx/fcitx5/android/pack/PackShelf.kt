@@ -391,10 +391,9 @@ class PackShelf(
         null
     } catch (_: IOException) {
         null
-    } catch (_: IllegalArgumentException) {
-        null
     } catch (@Suppress("TooGenericExceptionCaught") _: RuntimeException) {
-        // the provider's stream failing otherwise (as [import] takes it): said by the import that follows
+        // a malformed zip (IllegalArgumentException), or the provider's stream failing otherwise (as
+        // [import] takes it): said by the import that follows
         null
     }
 

@@ -522,7 +522,7 @@ object InputMethodSettings {
     // "不适用：英文、手写。": the input methods by the names the app gives them
     private fun notForText(context: Context, notFor: List<String>): String? =
         if (notFor.isEmpty()) null
-        else context.getString(R.string.im_not_for, notFor.joinToString(context.getString(R.string.im_not_for_separator)) { InputMethodNames.of(context, it, it) })
+        else context.getString(R.string.im_not_for, notFor.joinToString(context.getString(R.string.list_separator)) { InputMethodNames.of(context, it, it) })
 
     private fun page(context: Context, item: Page, open: (SettingsRoute) -> Unit) = Preference(context).apply {
         key = item.key

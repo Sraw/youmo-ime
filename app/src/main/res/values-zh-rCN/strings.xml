@@ -917,7 +917,6 @@
     <string name="shared_section_chinese">中文输入法</string>
     <string name="shared_section_pinyin">拼音（全拼、双拼、九键）</string>
     <string name="im_not_for">不适用：%s。</string>
-    <string name="im_not_for_separator">、</string>
     <string name="list_separator">、</string>
     <string name="clipboard_and_emoji">剪贴板与表情</string>
     <string name="hardware_keyboard">实体键盘</string>

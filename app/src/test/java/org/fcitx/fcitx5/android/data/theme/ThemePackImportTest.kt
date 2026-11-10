@@ -332,6 +332,8 @@ class ThemePackImportTest : ThemePackFixture() {
         val long = "主".repeat(90) // 270 bytes
         // 82 × 3 bytes + `-1.json`: 253; one more would be 256
         assertEquals("主".repeat(82) + "-1", ThemeFilesManager.suffixed(long, "-1"))
+        // 4-byte characters (two UTF-16 units each) are cut whole, never half of one: 61 × 4 bytes + `-12.json` is 252
+        assertEquals("😀".repeat(61) + "-12", ThemeFilesManager.suffixed("😀".repeat(70), "-12"))
     }
 
     @Test

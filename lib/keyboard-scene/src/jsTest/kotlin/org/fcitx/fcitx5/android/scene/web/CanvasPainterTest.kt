@@ -286,6 +286,9 @@ class CanvasPainterTest {
             listOf("fillStyle=rgba(0,0,255,${128 / 255.0})", "fillStyle=rgba(255,0,0,${128 / 255.0})"),
             calls.filter { it.startsWith("fillStyle") },
         )
+        // the faded alpha rounded, not cut: 200 × 200 / 255 is 156.86
+        val faded = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), Argb.of(200, 255, 0, 0)), Assets(icons = mapOf("x" to js("({ vw: 24, vh: 24, paths: [{ d: 'M0 0L1 1Z', fill: 0xc80000ff | 0 }] })"))))
+        assertEquals(listOf("fillStyle=rgba(0,0,255,${157 / 255.0})"), faded.filter { it.startsWith("fillStyle") })
         // a transparent icon-color hides the whole icon, its own colours too
         val none = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), Argb.TRANSPARENT), Assets(icons = mapOf("x" to icon)))
         assertTrue(none.none { it.startsWith("fill") }, "$none")

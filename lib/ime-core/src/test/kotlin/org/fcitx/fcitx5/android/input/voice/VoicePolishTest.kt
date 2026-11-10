@@ -245,6 +245,11 @@ class VoicePolishTest {
         numTags.guarded(perfect, IntArray(perfect.size), IntArray(perfect.size), num)
         // the idiom no number, the 三 after it still one
         assertEquals("十全十美3个", numTags.apply(perfect, IntArray(perfect.size), IntArray(perfect.size), num = num))
+        // a number's character replaced still is: only deleting one is undone (二个 written 两个)
+        val two = codePoints("二个")
+        val twoOp = intArrayOf(tags.ops.indexOf("两"), 0)
+        tags.guarded(two, twoOp, IntArray(two.size))
+        assertEquals("两个", tags.apply(two, twoOp, IntArray(two.size)))
         // the stream guards the model's numbers too
         val stream = VoicePolishStream(numTags, { w ->
             VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code) 1 else 0 })
@@ -262,11 +267,13 @@ class VoicePolishTest {
             VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code) 1 else 0 })
         })
         assertEquals(before + "十全十美" + after, stream.finish(before + "十全十美" + after))
-        // a number just before the window's start still is one: only an idiom is looked for there
+        // a number at the window's start, an idiom ending just before it, still is one: only an idiom
+        // across the start unmarks (the 十 at 32 is first tagged in the second window, with 全十美 before it)
         val numbered = VoicePolishStream(numTags, { w ->
-            VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code) 1 else 0 })
+            VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code && it + 1 < w.size && w[it + 1] == '个'.code) 1 else 0 })
         })
-        assertEquals("好".repeat(31) + "10个" + after, numbered.finish("好".repeat(31) + "十个" + after))
+        val idiomBefore = "好".repeat(28) + "十全十美"
+        assertEquals(idiomBefore + "10个" + after, numbered.finish(idiomBefore + "十个" + after))
     }
 
     @Test

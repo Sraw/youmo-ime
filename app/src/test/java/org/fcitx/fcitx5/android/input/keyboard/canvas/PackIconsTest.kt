@@ -96,6 +96,31 @@ class PackIconsTest {
         assertEquals(Color.BLUE, drawn(icons, painter = painter).getPixel(4, 12))
     }
 
+    // a pack's files written over while one is read: its waiting view drawn again, the stale read not kept
+    @Test
+    fun aForgetWhileAnIconIsReadRedrawsItsViewAndDropsTheRead() {
+        val queued = ArrayList<Runnable>()
+        ThemeAssets.runner = { queued += it }
+        val icons = icon("""<svg><path d="M0 0h12v24h-12z" fill="#00f"/></svg>""")
+        var asked = 0
+        val view = object : View(context) {
+            override fun invalidate() {
+                asked++
+                super.invalidate()
+            }
+        }
+        val painter = ScenePainter(view, look, BoardImages.NONE, SceneFonts(look), icons)
+        drawn(icons, painter = painter)
+        assertEquals(1, queued.size)
+        val before = asked
+        ScenePainter.forgetIcons()
+        assertTrue(asked > before)
+        queued.single().run()
+        assertTrue(icons.outline(icons.file(name)!!) == null)
+        // read afresh, not the one read before the forget
+        assertEquals(2, queued.size)
+    }
+
     @Test
     fun aPathsOwnColourIsKeptAndTheTintsAlphaApplied() {
         // the left half in its own blue (CSS's #rgba: alpha last), the right in the tint

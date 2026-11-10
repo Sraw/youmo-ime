@@ -511,6 +511,12 @@ test('readSound reads each of the three formats, and says why a file is not one'
   assert.deepEqual(JSON.parse(JSON.stringify(E.readSound('space.ogg', bytes('space.ogg')).info)), { format: 'ogg', channels: 2, rate: 48000, ms: 120 });
   assert.deepEqual(JSON.parse(JSON.stringify(E.readSound('function.wav', bytes('function.wav')).info)), { format: 'wav', channels: 1, rate: 8000, ms: 100 });
   assert.equal(E.readSound('short.mp3', bytes('short.mp3')).info.rate, 22050);
+  // a bare ArrayBuffer, and a view into a larger buffer, read as the same bytes do
+  const wav = { format: 'wav', channels: 1, rate: 8000, ms: 100 };
+  assert.deepEqual(JSON.parse(JSON.stringify(E.readSound('function.wav', bytes('function.wav').buffer).info)), wav);
+  const inner = bytes('function.wav'), outer = new Uint8Array(inner.length + 7);
+  outer.set(inner, 3);
+  assert.deepEqual(JSON.parse(JSON.stringify(E.readSound('function.wav', outer.subarray(3, 3 + inner.length)).info)), wav);
   const named = E.readSound('short.wav', bytes('short.mp3'));
   assert.equal(named.ok, false);
   assert.match(named.problems[0].message, /extension and its content differ/);

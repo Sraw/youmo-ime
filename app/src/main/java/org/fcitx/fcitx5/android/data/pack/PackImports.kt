@@ -127,6 +127,13 @@ object PackImports {
         done.value = outcomes
     }
 
+    /** Tests that ran [importAll] themselves: nothing left running or asked for the tests after them ([start] clears its own). */
+    @VisibleForTesting
+    internal fun reset() {
+        runningNow.value = null
+        replaceQuestionNow.value = null
+    }
+
     /** The results shown: not shown again. */
     fun seen() {
         done.value = null

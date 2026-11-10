@@ -229,7 +229,7 @@ class SettingsUatTest {
 
     // the line under an option naming the input methods it is no use to
     private fun notFor(vararg ims: String) =
-        st.s(R.string.im_not_for, ims.joinToString(s(R.string.im_not_for_separator)) { InputMethodNames.of(activity, it, it) })
+        st.s(R.string.im_not_for, ims.joinToString(s(R.string.list_separator)) { InputMethodNames.of(activity, it, it) })
 
     private fun summary(title: Int) = st.pref(title).summary.toString()
 

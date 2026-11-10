@@ -18,7 +18,6 @@ import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
 import org.fcitx.fcitx5.android.input.voice.VoicePolishTags
-import org.fcitx.fcitx5.android.input.voice.VoiceSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -124,7 +123,13 @@ class VoiceTapUatTest : VoiceTapUat() {
         h.hide()
         h.advance(300)
         assertTrue(text(), text().startsWith("你好"))
-        assertFalse(VoiceSession.polishHinted.toString(), VoiceSession.PolishFailure.RUN in VoiceSession.polishHinted)
+        assertFalse(shown().toString(), string(R.string.voice_polish_failed) in shown())
+        // the next talk, its card seen, says it
+        h.start(MULTI_LINE)
+        tapMic()
+        voice.said += "再见"
+        tapMic()
+        assertTrue(shown().toString(), string(R.string.voice_polish_failed) in shown())
     }
 
     @Test

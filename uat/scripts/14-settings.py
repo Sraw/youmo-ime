@@ -771,12 +771,46 @@ def st90(d):
     check(item, "导入后主题列表里没有它")
     d.tap(item.c, 1.5)
     d.step("看键")
-    d.open_page("text")
+    d.open_page("text")   # no auto capitals: Shift unpressed
     space = d.keys(refresh=True).get("space")
     check(space, "键盘上找不到空格键（空格上画着星、没有字，靠 rid 或「空格」描述找）")
     n = reds(d, space)
-    d.shot("full", "主题的退格、回车、Shift，空格上的星")
+    d.shot("full", "主题的退格、未按的 Shift，空格上的星")
     check(n > 30, f"空格键上没有星的红色圆（{n} 个红点）")
+    d.open_page("long")   # a textarea: Return is 换行, the theme's enter
+    d.shot("full", "多行框：回车是主题的宽箭头，等比缩小居中")
+    d.open_page("text")
+    k = d.keys(refresh=True)
+    for name, note in (("bksp", "按住退格"), ("enter", "按住回车"), ("shift", "按住 Shift")):
+        if name not in k:
+            continue
+        x, y = k[name].c
+        # the finger down while the screen is taken: a pressed key's look and its bubble, if the theme gives it one
+        d.sh(f"input motionevent DOWN {x} {y}; sleep 0.15; screencap -p /sdcard/uat-p.png; input motionevent UP {x} {y}")
+        d.shot("kb", note + "：按下的样子（有气泡时气泡上也是主题的图标）",
+               png=d.adb("exec-out", "cat", "/sdcard/uat-p.png", binary=True))
+    if "shift" in k:
+        d.tap(k["shift"].c, 0.6)
+        d.shot("kb", "Shift 单次：自带图标（主题没换 shift-once）")
+        d.tap(k["shift"].c, 0.6)
+        d.shot("kb", "再点：锁定或回到未按，都看图标是不是对应的那个（只有未按是主题的）")
+    if "enter" in k:
+        x, y = k["enter"].c
+        # Return's in-keyboard menu (Emoji): drawn by the keyboard; its icon is emoji, which the theme does not replace
+        d.touch(("down", x, y), ("sleep", 0.9))
+        d.shot("full", "长按回车：键盘里画的菜单（Emoji 是自带图标，主题没换 emoji），菜单用主题的颜色")
+        d.touch(("up", x, y))
+        time.sleep(0.5)   # the menu left open: the next page's keyboard comes up afresh
+    d.open_page("search")   # Return's action is search: the theme replaced enter only
+    d.shot("full", "搜索框：回车是自带的搜索图标；工具栏是自带图标")
+    d.step("深色")
+    d.sh("cmd uimode night yes")
+    time.sleep(1.5)
+    d.open_page("long")
+    d.keys(refresh=True)
+    d.shot("full", "系统深色：这个主题的深色版，退格、回车、Shift、星仍是主题的")
+    d.sh("cmd uimode night no")
+    time.sleep(1.5)
     d.step("换回内置")
     delete_custom(d)
     d.open_page("text")

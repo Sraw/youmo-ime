@@ -675,6 +675,9 @@ class ThemeTest {
         assertTrue(!ThemeReader.laterBuilds("$head version=\"4.0\"><colors/>", "0.6.0"), "no XML: cannot tell")
         assertTrue(!ThemeReader.laterBuilds("<layout version=\"9.0\"/>", "0.6.0"), "no theme")
         assertTrue(!ThemeReader.laterBuilds("$head version=\"x\"/>", "0.6.0"))
+        // a dev build (no app version): the format still checked, any min-app taken
+        assertTrue(ThemeReader.laterBuilds("$head version=\"5.0\"><colors/></theme>", null), "a later format, in a dev build")
+        assertTrue(!ThemeReader.laterBuilds("$head version=\"4.0\"><meta min-app=\"9.0.0\"/></theme>", null), "a dev build reads any app's")
     }
 
     @Test

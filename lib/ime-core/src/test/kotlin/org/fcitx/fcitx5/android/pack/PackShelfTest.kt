@@ -98,6 +98,8 @@ class PackShelfTest {
         assertEquals(4, shelf.manifestOf(ByteArrayInputStream(text(version = 4)))!!.version)
         assertNull("another key's", shelf.manifestOf(ByteArrayInputStream(TestPacks().pack(PackKind.TEXT, TEXT_FILES, 4, 2))))
         assertNull("no zip", shelf.manifestOf(ByteArrayInputStream(byteArrayOf(1, 2, 3))))
+        // the provider's stream failing other than by I/O: none, said by the import that follows (not thrown out of it)
+        assertNull("a SecurityException", shelf.manifestOf(object : InputStream() { override fun read(): Int = throw SecurityException("denied") }))
         shelf.take(text(version = 4))
         assertEquals(4, shelf.installed(PackKind.TEXT)!!.version)
     }

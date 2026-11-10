@@ -511,7 +511,7 @@ test('背景: an animated WebP the app plays is kept as picked (animated="true")
   const lim = FORMAT.limits;
   const playing = animWebp(100, 100, [60, 70]);
   assert.ok(M.keepsAnimated(lim, playing));
-  // the reasons one is drawn still are animatedStill's test; here one is enough
+  // the reasons one is drawn still are the test "an animated picture past the app's limits … is warned of as drawn still" (check calls animatedStill); here one is enough
   assert.ok(!M.keepsAnimated(lim, bytes('tiny.ttf')));
   const cut = { bytes: enc('cut'), type: 'png', rect: [0, 0, 10, 10] };
   const d = P.background.ops.setPicture(M.fromBuiltin(E, 'nord'), { type: 'webp', src: playing, cuts: { portrait: cut, landscape: cut }, animated: true });

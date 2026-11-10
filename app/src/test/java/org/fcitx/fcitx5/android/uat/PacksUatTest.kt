@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.pack.PackImports
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.pack.TestShelves
@@ -257,6 +258,26 @@ class PacksUatTest {
             val shown = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<android.widget.TextView>().joinToString("\n") { it.text }
             assertTrue(shown, st.s(R.string.pack_import_done_hint) in shown)
             assertFalse(shown, st.s(R.string.pack_unchanged_hint) in shown)
+            dialog.dismiss()
+            st.idle()
+            // the hint by what came of the files: "done, may be deleted" only where each is in; "unchanged" where none was taken
+            val kept = PackImports.Outcome("old.youmopack", ImportResult.KeptNewer(v1, v3))
+            val already = PackImports.Outcome("same.youmopack", ImportResult.AlreadyThere(v1))
+            fun hintShown(results: List<PackImports.Outcome>): List<Boolean> {
+                PackImports.finished(results)
+                st.idle()
+                val d = ShadowDialog.getLatestDialog()
+                val text = KeyboardHarness.all(d.window!!.decorView).filterIsInstance<android.widget.TextView>().joinToString("\n") { it.text }
+                d.dismiss()
+                st.idle()
+                return listOf(st.s(R.string.pack_import_done_hint) in text, st.s(R.string.pack_unchanged_hint) in text)
+            }
+            assertRows(
+                "all kept (保留): nothing taken, so unchanged, not done" to { assertEquals(listOf(false, true), hintShown(listOf(kept))) },
+                "kept and already there: still nothing taken" to { assertEquals(listOf(false, true), hintShown(listOf(kept, already))) },
+                "all already there: each file is in, done" to { assertEquals(listOf(true, false), hintShown(listOf(already))) },
+                "one imported, one kept: neither said" to { assertEquals(listOf(false, false), hintShown(outcomes.take(1) + kept)) },
+            )
         }
     }
 
@@ -279,6 +300,7 @@ class PacksUatTest {
             assertTrue(outcomes[1].result is ImportResult.Imported)
         } finally {
             PackImports.importer = importer
+            PackImports.reset()
         }
     }
 

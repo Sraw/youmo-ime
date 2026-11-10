@@ -303,7 +303,7 @@
     const was = before && (before.attrs.find((a) => a[0] === 'src') || [])[1];
     const tag = '<sound key="' + escape(key) + '" src="' + escape(src) + '"/>';
     // a later app's attributes on the one replaced are kept: only its src= changes
-    if (before) xml = xml.slice(0, before.start) + withAttr(before.tag, 'src', src) + xml.slice(before.end);
+    if (before) xml = xml.slice(0, before.start) + withAttr(before.tag, 'src', src) + xml.slice(before.start + before.tag.length);
     else {
       const box = elements(xml, 'sounds')[0];
       if (!box) xml = insert(xml, 'sounds', '<sounds>\n    ' + tag + '\n  </sounds>');

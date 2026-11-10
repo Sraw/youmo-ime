@@ -523,4 +523,8 @@ test('按键音: a sound goes in <sounds> after the icons, one per key, its old 
   // a key given twice (the engine refuses that): the one listed is the one changed
   const twice = nord.replace('</theme>', '  <sounds>\n    <sound key="space" src="a.ogg"/>\n    <sound key="space" src="b.ogg"/>\n  </sounds>\n</theme>');
   assert.equal(F.sounds(F.setSound(twice, 'space', 'c.ogg').xml).space, 'c.ogg');
+  // a hand-written <sound></sound>: only its open tag changes, its close stays and the file reads back
+  const paired = F.setSound(nord.replace('</theme>', '  <sounds>\n    <sound key="space" src="a.ogg"></sound>\n  </sounds>\n</theme>'), 'space', 'b.ogg').xml;
+  assert.match(paired, /<sound key="space" src="b.ogg"><\/sound>/);
+  assert.deepEqual(JSON.parse(JSON.stringify(read(paired).theme.info(false).sounds)), [{ key: 'space', src: 'b.ogg' }]);
 });

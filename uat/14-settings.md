@@ -398,7 +398,7 @@
 - **前提**：三个 4.0 主题包，按键音分别是 `uat/fixtures/theme-sounds-icons/bad/` 的 `opus.ogg`（Opus）、`long.wav`（2 秒）、`wav-named.mp3`（WAV 内容、扩展名 `.mp3`）。
 - **操作**：逐个导入。
 - **预期**：都被拒绝，提示「主题的按键音不合格…」并说出原因，什么都不留下。
-- **JVM**：keyboard-scene `SoundFileTest.opusRefused`、`SoundFileTest.shared`（时长、扩展名和内容）；`ThemePackImportTest.aKeySoundNotTakenIsRefused`。
+- **JVM**：keyboard-scene `SoundFileTest.realOggs`（Opus 被拒）、`SoundFileTest.shared`（时长、扩展名和内容）；`ThemePackImportTest.aKeySoundNotTakenIsRefused`。
 
 ### ST-89 [P1] 三种格式的按键音在 Android 10 上载入并放出（先 youmo29，再 API 34+）
 - **前提**：debug 版；按键音 **启用**，按键音音色 **跟随主题**；**跟随系统夜间模式** 关掉。"下载"里有 `uat-sounds-icons.theme`：`uat/fixtures/theme-sounds-icons/` 的 `theme.xml`、四个 SVG 和五个声音打成的包（脚本的 `push_icons_pack(d, sounds=True)`；`short.mp3` 不放进去）。五个声音参数各不相同：`letter.wav` 16 位 44.1 kHz 单声道，`function.wav` 8 位 8 kHz 单声道，`space.ogg` Vorbis 48 kHz 双声道，`enter.ogg` Vorbis 8 kHz 单声道，`backspace.mp3` MPEG-1 44.1 kHz 双声道带 Xing。
@@ -408,9 +408,9 @@
 
 ### ST-90 [P1] 主题包换的图标画在键上，换回内置主题恢复自带图标
 - **前提**：B0-设置；**跟随系统夜间模式** 关掉；"下载"里有 `uat-sounds-icons.theme`，同 ST-89 但不带 `<sounds>` 和声音文件（脚本的 `push_icons_pack(d)`）。
-- **操作**：**主题 → 新增主题** 导入并选用它；回测试页看退格、回车、Shift 和空格；按住 Shift 看三态（单次、锁定）；在搜索框里看回车；按住退格、回车、Shift 看按下时的气泡，长按一个弹出层上有这几个图标的键、打开键盘里画的菜单层看图标，再看工具栏；切到深色（**跟随系统夜间模式** 仍关着，把系统切到深色：两版的主题包自己跟着系统换）再看一遍；最后长按这个主题 **删除**，回测试页再看。
-- **预期**：退格是主题的 Material 风格退格（`viewBox="0 -960 960 960"`，画在键中间）；换行时的回车是主题的宽箭头，等比缩小居中（不被拉扁）；Shift 未按时是主题的箭头，下面一横是橙色、不跟 `icon-color` 变；Shift 单次、锁定和搜索框里的回车（主题没换这三个）是自带图标；空格上画着星，星中间半透明的红圆不跟 `icon-color` 变，按下时也不变色。按下气泡、长按弹出和键盘里画的菜单上，退格、回车、Shift 也是主题的图标；工具栏仍是自带图标。深色版同样（是这个主题的深色版，不是内置深色主题）。删掉主题后换回内置主题，四个键都是自带图标，空格上没有红色。
-- **JVM**：`PackIconsTest`（app）、`CanvasPainterTest`（jsTest：写死颜色的半透明路径、等比居中）、`SvgSubsetTest`、`IconPathTest`；模拟器上脚本只断言空格上星的红色（选用后有、删掉后没有），截图给人看其它几个键。
+- **操作**：**主题 → 新增主题** 导入并选用它；在测试页 `#text` 看退格、Shift 和空格；在 `#long`（多行框，回车是换行）看回车；回 `#text` 依次按住退格、回车、Shift 看按下的样子和气泡（有气泡时）；点 Shift 一次（单次）、再点一次（锁定）；长按回车打开键盘里画的菜单（只有 Emoji 一项）；在 `#search` 看回车和工具栏；`adb shell cmd uimode night yes` 把系统切到深色（**跟随系统夜间模式** 仍关着：两版的主题包自己跟着系统换），在 `#long` 再看一遍，再 `cmd uimode night no`；最后长按这个主题 **删除**，回 `#text` 再看。
+- **预期**：退格是主题的 Material 风格退格（`viewBox="0 -960 960 960"`，画在键中间）；换行时的回车是主题的宽箭头，等比缩小居中（不被拉扁）；Shift 未按时是主题的箭头，下面一横是橙色、不跟 `icon-color` 变；Shift 单次、锁定和搜索框里的回车（主题没换这三个）是自带图标；空格上画着星，星中间半透明的红圆不跟 `icon-color` 变，按下时也不变色。按住退格、回车、Shift 时键上仍是主题的图标（有气泡时气泡上也是）；回车的菜单用主题的颜色画，里面的 Emoji 是自带图标（主题没换 `emoji`；内置布局的长按弹出和菜单里没有退格、回车、Shift，它们换不换由 JVM 查）；工具栏仍是自带图标。深色版同样（是这个主题的深色版，不是内置深色主题）。删掉主题后换回内置主题，四个键都是自带图标，空格上没有红色。
+- **JVM**：`PackIconsTest`（app）、`CanvasPainterTest`（jsTest：写死颜色的半透明路径、等比居中）、`SvgSubsetTest`、`IconPathTest`；模拟器上脚本只断言空格上星的红色（选用后有、删掉后没有），其余按上面的顺序截图给人看：未按、多行框的回车、按住三个键、Shift 单次和再点、回车菜单、搜索框和工具栏、深色版、删掉后。
 
 ### ST-91 [P2] 坏的图标和声音导入被拒，各说出原因
 - **前提**：B0-设置；按 ST-89 的包改出几个包，每个只坏一处，坏的文件在 `uat/fixtures/theme-sounds-icons/bad/`：`big.wav`（超过 100 KB，约 113 KB）、`deep.wav`（24 位 PCM）、`junk-tail.mp3`（帧后面有不认识的数据）当某一类的声音；`no-fill.svg`（全部 `fill="none"`）、`zero-opacity.svg`（全部在 `opacity="0"` 的组里）当退格图标。（Opus、2 秒长、扩展名和内容不符的声音见 ST-88。）
@@ -422,14 +422,14 @@
 - **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
 - **前提**：电脑浏览器（Chrome，另用 Safari 看一遍 Ogg）打开 `web/theme-maker/index.html`，从 Nord 开始；`uat/fixtures/theme-sounds-icons/` 里的文件。
 - **操作**：**字和图标 → 换图标** 给 backspace 选 `backspace.svg`、enter 选 `enter.svg`、shift 选 `shift.svg`，看预览；再给 backspace 选 `bad/no-fill.svg`。**按键音** 标签里五行分别选 `letter.wav`、`function.wav`、`space.ogg`、`enter.ogg`、`backspace.mp3`，逐个点 **试听**；再给字母键选 `bad/big.wav`、`bad/deep.wav`、`bad/junk-tail.mp3`；把 **源码** 里一个 `<sound>` 的文件名改成包里没有的，点保存；改回来，点 **去掉** 去掉全部五个，看源码。
-- **预期**：预览里退格、回车、Shift 换成选的 SVG：退格在键中间，宽的回车等比居中，Shift 下面的一横是橙色；`no-fill.svg` 放不进去并说原因。五个声音都放得进去，每行显示格式、时长、声道、采样率，试听都响（Safari 放不了 Ogg 时提示「这个浏览器放不了，App 里能放」）；选了 MP3 提示开头约 25 ms 空白、建议 WAV 或 Ogg。三个坏文件放不进去，各给出原因；缺文件时保存被拦下。全部去掉后源码里没有 `<sounds>`，包里也没有这些文件。
+- **预期**：预览里退格、回车、Shift 换成选的 SVG：退格在键中间，宽的回车等比居中，Shift 下面的一横是橙色；`no-fill.svg` 放不进去并说原因。五个声音都放得进去，每行显示格式、时长、声道、采样率和大小（如「…，44100 Hz，12 KB」），试听都响（Safari 放不了 Ogg 时提示「这个浏览器放不了，App 里能放」）；选了 MP3 不弹提示，那一行下面出现灰字说明开头约 25 ms 空白、建议 WAV 或 Ogg。三个坏文件放不进去，各给出原因（提示以文件名开头）；缺文件时保存被拦下。全部去掉后源码里没有 `<sounds>`，包里也没有这些文件。
 - **JVM**：没有；规则由 web/theme-maker 的 `form.test.mjs`、`maker.test.mjs`、`engine.test.mjs`、`panels-smoke.mjs` 查，这一条在电脑浏览器上手工跑。
 
 ### ST-93 [P2] 主题制作网页：选动画 WebP 做背景，原样保留成动态背景
 - **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
 - **前提**：两张动画 WebP：一张在 App 的限制内（例如 480×320、30 帧、每帧 100 ms），一张超过（例如长边 1080）。
-- **操作**：**背景** 里选第一张，看源码里的 `<picture>`，保存 `.theme` 导入 App 并选用，看键盘；再在 **背景** 里选第二张，看源码。
-- **预期**：第一张：`<picture src="picture.webp" … animated="true">`，`picture.webp` 和选的文件一样大（没重新编码），两个裁切框照常能调（只管静态图）；App 里键盘背景在动，居中铺满，不按裁切框。第二张：`<picture>` 没有 `animated`，图片重新编码成 JPEG/PNG（静态，第一帧）。
+- **操作**：**背景** 里选第一张，看源码里的 `<picture>`，保存 `.theme` 导入 App 并选用，看键盘；再在 **背景** 里选第二张，看源码。最后先选一张静态 JPEG/PNG，把 **模糊** 调到 10、**亮度** 调成不是默认的值，再选第一张动画 WebP，看源码和 **模糊**。
+- **预期**：第一张：`<picture src="picture.webp" … animated="true">`，`picture.webp` 和选的文件一样大（没重新编码），两个裁切框照常能调（只管静态图）；App 里键盘背景在动，居中铺满，不按裁切框。第二张：`<picture>` 没有 `animated`，图片重新编码成 JPEG/PNG（静态，第一帧）。静态图换成动画 WebP 后：`<picture>` 不带模糊（没有 `blur` 或为 0），**模糊** 回到 0（App 不给动态背景做模糊），亮度保留原来调的值。
 - **JVM**：没有；`maker.test.mjs` 查保留规则（限制内保留、超过不保留，`animated="true"` 写上和去掉），这一条在电脑浏览器和设备上手工跑。
 
 ### ST-78 [P2] 系统取色变了，用系统取色的主题包跟着换色
@@ -498,8 +498,8 @@
 ### ST-82 [P1] 导入比手机上旧的资源包先问
 - **前提**：B0-设置，导入了文字包 v2；"下载"里有文字包 v1（`:app:packs` 用 `-PtextPackVersion` 之类做不出来时，用 `TestShelves` 的做法签一个 v1；做不出就记阻塞）。
 - **操作**：**资源包 → 导入资源包** 选 v1；在问的框里点 **保留**；再导入一次 v1，这次点 **替换**；再导一次 v1，问框出来时转屏。
-- **预期**：复制开始前先弹框「手机上是更新的 v2，要换成 v1 吗？」，按钮 **替换**、**保留**；点 **保留** 后结果是「文字包：保留了更新的 v2，没有导入 v1」，页上文字包仍是 v2；点 **替换** 后照常导入，结果「文字包：已用 v1 替换了更新的 v2」；转屏后问框还在（只一个），按返回算保留。导入更新的或手机上没有的包不问。
-- **JVM**：`PackStoreChangedTest.anOlderPackReplacesTheNewerOneOnlyWhereTheAnswerIsYes`（问、保留、替换、新的不问）；ime-core `PackShelfTest`（只读包头的清单）；问框是界面，设备上跑。
+- **预期**：复制开始前先弹框：第一行是选的文件名（如 `youmo-text-v1.youmopack`），空一行后是「手机上是更新的 v2，要换成 v1 吗？」，按钮 **替换**、**保留**；点 **保留** 后结果框是「文字包：保留了更新的 v2，没有导入 v1」，下面写「原来的资源包没有变化。」，没有「导入完成…可以删掉」，页上文字包仍是 v2；点 **替换** 后照常导入，结果「文字包：已用 v1 替换了更新的 v2」，下面是「导入完成。选的 .youmopack 文件已经用不到了，可以删掉。」；转屏后问框还在（只一个），按返回算保留。导入更新的或手机上没有的包不问。
+- **JVM**：`PackStoreChangedTest.anOlderPackReplacesTheNewerOneOnlyWhereTheAnswerIsYes`（问、保留、替换、新的不问）；`PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles`（都保留时结果框说原来的没有变化、不说可以删掉）；ime-core `PackShelfTest`（只读包头的清单）；问框是界面，设备上跑。
 
 ### ST-64 [P0] 升级后资源包和设置、学过的词都还在
 - **前提**：装 0.5.x，改几项设置、学几个词；"下载"里有 0.6.0 的 APK 和文字包。
