@@ -46,15 +46,16 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
     val marks = onMain { DownMarks(service.window.window!!.callback, frames).also { service.window.window!!.callback = it } }
     fun made() = onMain { canvasView()?.animatorsMade ?: 0 }
 
-    // [runs] 10-key runs: each key's press, every frame of them, the frames of the 2 s after, animators made
-    fun runs(label: String) {
+    // [runs] 10-key runs: each key's press, every frame of them, the frames of the 2 s after, animators made. At
+    // FAST_GAP_MS (80) a key comes sooner than the 150 ms fade, so it does not move (typed fast); at SLOW_GAP_MS each fades
+    fun runs(label: String, gapMs: Long = FAST_GAP_MS, run: String = "10-key run") {
         val made = made()
         val samples = mutableListOf<KeyboardFrames.Sample>()
         val all = mutableListOf<KeyboardFrames.Frame>()
         val after = mutableListOf<Double>()
         repeat(warmUp + runs) { i ->
             val from = System.nanoTime()
-            val ten = presses(marks, letters.map(at::getValue), gapMs = FAST_GAP_MS)
+            val ten = presses(marks, letters.map(at::getValue), gapMs = gapMs)
             // the last release's fade (150 ms) within the lead, then 2 s that should draw nothing
             SystemClock.sleep(IDLE_LEAD_MS)
             val still = System.nanoTime()
@@ -66,8 +67,8 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
             }
             endTyping(space)
         }
-        row("anim", "$label, 10-key run, every key", samples, "animators ${made() - made}")
-        log("anim\t$label, 10-key run, every frame\t${frames.summary(all)}")
+        row("anim", "$label, $run, every key", samples, "animators ${made() - made}")
+        log("anim\t$label, $run, every frame\t${frames.summary(all)}")
         log("anim\t$label, idle after\tframes in 2 s ${Stats(after)} (median / p90)\tmax ${after.maxOrNull()?.toInt()}")
     }
 
@@ -87,11 +88,13 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
         onMain { advanced.keyboardMotion.setValue(true) }
         single("pack without motion")
         runs("pack without motion")
+        runs("pack without motion", SLOW_GAP_MS, SLOW_RUN)
         shiftRows("pack without motion")
         theme(moving)
         fresh()
         single("press scale")
         runs("release fade")
+        runs("release fade", SLOW_GAP_MS, SLOW_RUN)
         shiftRows("shift transition")
         onMain { advanced.keyboardMotion.setValue(false) }
         runs("switch off")
@@ -135,6 +138,10 @@ private fun KeyboardPerfBaselineTest.shiftRows(label: String) {
 
 private const val MOVING = "perf-moving"
 private const val STILL = "perf-still"
+
+// slower than the fade (150 ms) between keys: each key's release fade plays (typed faster, it would not)
+private const val SLOW_GAP_MS = 200L
+private const val SLOW_RUN = "slow 10-key run (200 ms)"
 private val MOTION = listOf(
     "<style select=\"key\" transition=\"150ms ease-out\"/>",
     "<style select=\"key:pressed\" transition=\"60ms linear\" press-scale=\"90%\" press-sink=\"2dp\"/>",
