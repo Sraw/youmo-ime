@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.os.Looper
+import android.text.InputType
 import android.view.accessibility.AccessibilityManager
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
@@ -12,6 +13,7 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
@@ -108,7 +110,7 @@ class KeyHandwritingUatTest {
         assertTrue("ink shown", board().keyInkForTest!!.shown)
         // the pause: the piece finished
         h.advance(1500)
-        until("finished") { h.api.calls.any { it.startsWith("inkFinished(") && "keys" in it } }
+        until("finished") { h.api.calls.any { it.startsWith("inkFinished(") && ", keys" in it } }
         assertEquals(0, board().keyInkForTest!!.pad.finished.size)
     }
 
@@ -171,6 +173,8 @@ class KeyHandwritingUatTest {
         h.api.calls.clear()
         draw(h.key("t"))
         h.advance(100)
+        // the reads run on the recognizer's own thread: drained, so a read let through lands before this
+        h.idle()
         assertEquals(emptyList<String>(), inks())
     }
 
@@ -201,12 +205,16 @@ class KeyHandwritingUatTest {
         h.api.calls.clear()
         draw(h.key("t"))
         h.advance(100)
+        // the reads run on the recognizer's own thread: drained, so a read let through lands before this
+        h.idle()
         assertEquals(emptyList<String>(), inks())
         board().inPasswordField = false
         val a11y = board().context.getSystemService(AccessibilityManager::class.java)
         shadowOf(a11y).setTouchExplorationEnabled(true)
         draw(h.key("t"))
         h.advance(100)
+        // the reads run on the recognizer's own thread: drained, so a read let through lands before this
+        h.idle()
         assertEquals(emptyList<String>(), inks())
         shadowOf(a11y).setTouchExplorationEnabled(false)
         h.close()
@@ -215,6 +223,41 @@ class KeyHandwritingUatTest {
         h.api.calls.clear()
         draw(h.key("t"))
         h.advance(100)
+        // the reads run on the recognizer's own thread: drained, so a read let through lands before this
+        h.idle()
         assertEquals(emptyList<String>(), inks())
+    }
+
+    @Test
+    fun aTablesKeysAreWrittenOnToo() {
+        harness(InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false))
+        h.api.calls.clear()
+        draw(h.key("t"))
+        until("read on 五笔") { inks().isNotEmpty() }
+    }
+
+    @Test
+    fun notInAUrlNorAnEmailField() {
+        harness()
+        for (variation in listOf(InputType.TYPE_TEXT_VARIATION_URI, InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)) {
+            h.restart(InputType.TYPE_CLASS_TEXT or variation)
+            h.idle()
+            h.api.calls.clear()
+            draw(h.key("t"))
+            h.advance(100)
+            // the reads run on the recognizer's own thread: drained, so a read let through lands before this
+            h.idle()
+            assertEquals("field $variation", emptyList<String>(), inks())
+        }
+    }
+
+    @Test
+    fun aShortSwipeIsAStrokeNotTheKeysCorner() {
+        harness()
+        h.api.calls.clear()
+        // nothing typed: a short swipe down on w is written, not w's corner symbol
+        draw(h.key("w"), down = 0.6f)
+        until("read") { inks().isNotEmpty() }
+        assertEquals(emptyList<String>(), keysSent())
     }
 }

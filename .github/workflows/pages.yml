@@ -16,7 +16,11 @@ on:
       - "lib/keyboard-scene/**"
       # what the engine is built with: the Kotlin version, the build's own plugins
       - "gradle/libs.versions.toml"
+      - "gradle/wrapper/**"
       - "build-logic/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "kotlin-js-store/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

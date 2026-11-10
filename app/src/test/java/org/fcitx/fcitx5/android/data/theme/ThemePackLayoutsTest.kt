@@ -10,16 +10,16 @@ import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
-import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
-import org.fcitx.fcitx5.android.scene.Parsed
-import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
+import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.layout.Key
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.Row
+import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemePackDialogs
 import org.fcitx.fcitx5.android.utils.appContext
-import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -46,9 +46,18 @@ class ThemePackLayoutsTest {
 
     private val dir get() = ThemeFilesManager.themeDir
     private val builtIn by lazy { BuiltInLayouts(appContext) }
+    private val realRecheck = ThemePackFiles.recheck
+
+    // the settings as they were before the test, put back after it
+    private var followBefore = false
+    private var normalBefore: Theme? = null
 
     @Before
     fun empty() {
+        followBefore = ThemeManager.prefs.followSystemDayNightTheme.getValue()
+        normalBefore = ThemeManager.prefs.normalModeTheme.getValue()
+        // a listing's check again at once: what it refuses is left out of that listing
+        ThemePackFiles.recheck = { it.run() }
         phoneStorage()
         dir.deleteRecursively()
         dir.mkdirs()
@@ -60,8 +69,9 @@ class ThemePackLayoutsTest {
 
     @After
     fun builtInAgain() {
-        ThemeManager.prefs.followSystemDayNightTheme.setValue(ThemeManager.prefs.followSystemDayNightTheme.defaultValue)
-        ThemeManager.setNormalModeTheme(ThemeManager.prefs.normalModeTheme.defaultValue)
+        ThemePackFiles.recheck = realRecheck
+        ThemeManager.prefs.followSystemDayNightTheme.setValue(followBefore)
+        ThemeManager.setNormalModeTheme(normalBefore ?: ThemeManager.prefs.normalModeTheme.defaultValue)
         dir.deleteRecursively()
         ThemeManager.refreshThemes()
         SceneLayouts.invalidate()

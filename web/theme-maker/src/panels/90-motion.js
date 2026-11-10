@@ -9,8 +9,11 @@
   const F = root.YoumoForm;
   const EASINGS = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'];
   const APPEARS = [['fade', '淡入'], ['scale', '放大'], ['rise', '升起']];
-  // A3's limits of an effect's image (060-render-p3 A3): A3 moves them into youmo-format's limits
+  // an effect's image as the app takes it (ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE, _BYTES)
   const EFFECT_IMAGE = { side: 256, bytes: 128 * 1024 };
+  // effect='s ranges the engine reads (Values.MIN_RIPPLE_RADIUS, MAX_RIPPLE_RADIUS, MAX_PARTICLES, MAX_SPREAD_DP,
+  // MAX_EFFECT_MS): a value past them makes the whole effect= unread
+  const EFFECT = { radius: [10, 200], count: 12, spreadDp: 64, ms: [1, 600] };
 
   /**
    * The motion properties (§4.2): [prop] on [select]s, [sample] a value of it the engine must read (the support probe).
@@ -36,15 +39,16 @@
     if (s === 'none') return { kind: 'none' };
     let m = /^ripple-image\(([^,()]+), ?([\d.]+)%, ?(\d{1,3})ms\)$/.exec(s);
     if (m) return { kind: 'ripple-image', file: m[1], radius: +m[2], ms: +m[3] };
-    m = /^particles\(([^,()]+), ?(\d{1,2}), ?(-?[\d.]+)dp, ?(\d{1,3})ms\)$/.exec(s);
-    if (m) return { kind: 'particles', file: m[1], count: +m[2], spread: +m[3], ms: +m[4] };
+    // a spread is a length: dp, or a bare 0
+    m = /^particles\(([^,()]+), ?(\d{1,2}), ?(?:(-?[\d.]+)dp|(0)), ?(\d{1,3})ms\)$/.exec(s);
+    if (m) return { kind: 'particles', file: m[1], count: +m[2], spread: +(m[3] ?? m[4]), ms: +m[5] };
     return null;
   }
   function effectText(v) {
     if (!v) return null;
     if (v.kind === 'none') return 'none';
-    if (v.kind === 'ripple-image') return 'ripple-image(' + v.file + ', ' + F.clamp(v.radius, 0, 300) + '%, ' + F.clamp(v.ms, 0, 600) + 'ms)';
-    return 'particles(' + v.file + ', ' + F.clamp(v.count, 1, 12) + ', ' + F.clamp(v.spread, 0, 48, 1) + 'dp, ' + F.clamp(v.ms, 0, 600) + 'ms)';
+    if (v.kind === 'ripple-image') return 'ripple-image(' + v.file + ', ' + F.clamp(v.radius, ...EFFECT.radius) + '%, ' + F.clamp(v.ms, ...EFFECT.ms) + 'ms)';
+    return 'particles(' + v.file + ', ' + F.clamp(v.count, 1, EFFECT.count) + ', ' + F.clamp(v.spread, 0, EFFECT.spreadDp, 1) + 'dp, ' + F.clamp(v.ms, ...EFFECT.ms) + 'ms)';
   }
 
   const TEXT = { transition: transitionText, appear: appearText, effect: effectText };
@@ -85,7 +89,7 @@
       const wrong = effectImageProblem(L, name, bytes);
       if (wrong) throw new Error(wrong);
       const file = panels.fileName(d.files, 'effect-', name, L.imageType(bytes));
-      const files = Object.assign(Object.create(null), d.files);
+      const files = panels.filesOf(d);
       files[file] = bytes;
       return { xml: d.xml, files, layouts: d.layouts, file };
     },
@@ -137,7 +141,7 @@
           const file = (c && c.file) || effectFiles()[0];
           if (!k) put(null);
           else if (k === 'none') put({ kind: 'none' });
-          else if (!file) api.toast('先上传一张特效图片');
+          else if (!file) { api.toast('先上传一张特效图片'); api.rerender(); } // the choice not made: the select shows what is
           else if (k === 'ripple-image') put({ kind: k, file, radius: 100, ms: 300 });
           else put({ kind: k, file, count: 8, spread: 24, ms: 400 });
         }), h('button', { type: 'button', textContent: '上传特效图片…', on: { click: async () => {
@@ -152,14 +156,14 @@
         } } })));
         if (e && e.kind !== 'none') {
           el.append(row('图片', select(files.map((n) => [n, n]).concat(files.includes(e.file) ? [] : [[e.file, e.file + '（缺）']]), e.file, (file) => patch({ file }))));
-          if (e.kind === 'ripple-image') el.append(row('最大半径', number(e.radius, (r) => patch({ radius: r ?? 100 }), { min: 0, max: 300, step: 10, unit: '% 键宽' })));
+          if (e.kind === 'ripple-image') el.append(row('最大半径', number(e.radius, (r) => patch({ radius: r ?? 100 }), { min: EFFECT.radius[0], max: EFFECT.radius[1], step: 10, unit: '% 键宽' })));
           else {
-            el.append(row('个数', number(e.count, (c) => patch({ count: c ?? 8 }), { min: 1, max: 12, unit: '个' })));
-            el.append(row('散开', number(e.spread, (s) => patch({ spread: s ?? 0 }), { min: 0, max: 48, unit: 'dp' })));
+            el.append(row('个数', number(e.count, (c) => patch({ count: c ?? 8 }), { min: 1, max: EFFECT.count, unit: '个' })));
+            el.append(row('散开', number(e.spread, (s) => patch({ spread: s ?? 0 }), { min: 0, max: EFFECT.spreadDp, unit: 'dp' })));
           }
-          el.append(row('时长', number(e.ms, (ms) => patch({ ms: ms ?? 0 }), { min: 0, max: 600, step: 10, unit: 'ms' })));
+          el.append(row('时长', number(e.ms, (ms) => patch({ ms: ms ?? 300 }), { min: EFFECT.ms[0], max: EFFECT.ms[1], step: 10, unit: 'ms' })));
         }
-        el.append(h('p', { className: 'muted', textContent: '特效图片：PNG 或 WebP，不超过 256×256、128 KB。现在的 App 还不认特效图片，导入时会丢掉它（画特效的版本会收）。' }));
+        el.append(h('p', { className: 'muted', textContent: '特效图片：PNG 或 WebP，不超过 256×256、128 KB；超出的话 App 导入时会拒收整个主题。' }));
       } else {
         el.append(row(m.label, number(v == null ? null : parseFloat(v), put, { min: m.min, max: m.max, step: m.kind === 'dp' ? 0.5 : 1, unit: m.kind === 'dp' ? 'dp' : '%' })));
       }

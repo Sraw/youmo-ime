@@ -112,9 +112,15 @@ class ThemeAssetLimitsTest {
         assertNull(l.animated(10, AnimatedWebp.header(webp(10, 10, listOf(50), junk = 8), l.MAX_ANIMATED_FRAMES)))
         val padded = webp(10, 10, listOf(50), junk = (l.MAX_ANIMATED_BYTES / 8 - 1000).toInt())
         val file = java.io.File.createTempFile("padded", ".webp").apply { deleteOnExit(); writeBytes(padded) }
-        val start = System.nanoTime()
         assertEquals(ThemeAssetLimits.Still.Unread, l.animated(file))
-        assertTrue("a padded file read and refused at once", (System.nanoTime() - start) / 1_000_000 < 200)
+        // refused after so many chunks, counted not timed: the RIFF head, then at most the frames asked and a few others
+        var reads = 0
+        val source = AnimatedWebp.Source { at, into ->
+            reads++
+            if (at >= padded.size) 0 else minOf(into.size, padded.size - at.toInt()).also { padded.copyInto(into, 0, at.toInt(), at.toInt() + it) }
+        }
+        assertNull(AnimatedWebp.header(source, padded.size.toLong(), l.MAX_ANIMATED_FRAMES))
+        assertTrue("$reads reads", reads <= 1 + l.MAX_ANIMATED_FRAMES + AnimatedWebp.OTHER_CHUNKS)
         val big = java.io.File.createTempFile("big", ".webp").apply { deleteOnExit(); writeBytes(ByteArray(l.MAX_ANIMATED_BYTES.toInt() + 1)) }
         assertEquals(ThemeAssetLimits.Still.Size, l.animated(big))
     }

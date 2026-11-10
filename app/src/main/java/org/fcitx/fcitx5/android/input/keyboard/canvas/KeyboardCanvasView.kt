@@ -154,6 +154,9 @@ class KeyboardCanvasView(
     private var failed = false
     // the pack the scene drawn is of (Drawn.pack)
     private var pack: PackDrawGuard.Key? = null
+
+    // the scene built is not a pack's (not one already drawn, whose [pack] is cleared once drawn)
+    private var notPack = true
     private var faces: List<Faces> = emptyList()
     private var base: RenderNode? = null
     private val speech = Speech()
@@ -248,6 +251,7 @@ class KeyboardCanvasView(
             drawnUnder = under
             built = s
             pack = drawn.pack
+            notPack = drawn.pack == null
             var said: MutableList<Int>? = null
             var worded: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
@@ -373,6 +377,8 @@ class KeyboardCanvasView(
         // a pack's first frame of the process about to be drawn, shown: marked till it is (PackDrawGuard), one
         // that takes the keyboard down not drawn again on its own. A pack built and not drawn marks nothing
         if (pack?.let(PackDrawGuard::drawing) == false) pack = null
+        // another theme shown: a pack's mark left pending (hidden before its frame committed) is no longer what is drawn
+        else if (notPack) PackDrawGuard.notDrawing()
         // an image or the picture in since it was recorded: recorded again
         if (painter.missed) {
             painter.missed = false

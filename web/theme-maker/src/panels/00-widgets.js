@@ -10,6 +10,9 @@
   /** A document like [d] with [xml] and [files] (d's own where none). */
   panels.next = (d, xml, files = d.files) => ({ xml, files, layouts: d.layouts });
 
+  /** [d]'s files, a copy to change (own keys only: a file named __proto__ stays a file). */
+  panels.filesOf = (d) => Object.assign(Object.create(null), d.files);
+
   /** [files] without [names]: a copy. */
   panels.without = (files, names) => {
     const out = Object.create(null);
@@ -43,12 +46,6 @@
   /** [d] with [select]'s [prop] [v] (a form's value of [kind]; null: not set). */
   panels.setProp = (d, F, select, prop, kind, v, o) => panels.next(d, F.setProp(d.xml, select, prop, panels.text(F, kind, v, o)));
 
-  /**
-   * A tab of widgets' styles (栏, 弹出, 面板和窗口): [def] `{id, label, parts: [{id, title, select, props, note?}],
-   * scenes?}` (props as ui.propRows takes them). The page chooses a part and a scene (`@…`, [def].scenes of F.SCENES:
-   * where the widget may differ), and edits the style of exactly that select=. Its ops (node tests them): `set(d,
-   * select, prop, kind, v, o)`, `selector(part, scene)`, the parts.
-   */
   // [base] (a picked file's name) made a theme file's: `<prefix><base cleaned>.<type>`, a -2, -3 … where another file
   // has that name already (never overwritten: another style may name it)
   panels.fileName = (files, prefix, base, type) => {
@@ -57,6 +54,12 @@
     return prefix + name + '.' + type;
   };
 
+  /**
+   * A tab of widgets' styles (栏, 弹出, 面板和窗口): [def] `{id, label, parts: [{id, title, select, props, note?}],
+   * scenes?}` (props as ui.propRows takes them). The page chooses a part and a scene (`@…`, [def].scenes of F.SCENES:
+   * where the widget may differ), and edits the style of exactly that select=. Its ops (node tests them): `set(d,
+   * select, prop, kind, v, o)`, `selector(part, scene)`, the parts.
+   */
   panels.widgetTab = (def) => {
     const F = root.YoumoForm;
     const chosen = { part: def.parts[0].id, scene: '' };
@@ -200,7 +203,7 @@
       } else if (p.kind === 'border') {
         const b = F.parseBorder(v);
         const putB = (patch) => put(p, 'border')(Object.assign({ width: 1, color: '#33000000' }, F.parseBorder(now(p.prop)), patch));
-        controls = [number(b ? b.width : null, (w) => (w ? putB({ width: w }) : put(p, 'choice')(null)), { min: 0, max: F.LIMITS.borderDp, step: 0.5, unit: 'dp' }),
+        controls = [number(b ? b.width : null, (w) => (w ? putB({ width: w }) : put(p, 'choice')(w === 0 ? 'none' : null)), { min: 0, max: F.LIMITS.borderDp, step: 0.5, unit: 'dp' }),
           b ? color(b.color, (c) => (c ? putB({ color: c }) : put(p, 'choice')(null)), F) : null];
       } else if (p.kind === 'shadow') {
         const sh = F.parseShadow(v);

@@ -42,6 +42,9 @@ class CandidateReadingsUatTest {
     fun close() {
         harness?.close()
         EngineState.candidateReadingState.value = ReadingStyle.OFF
+        // the service writes the style shown here as the last used (FcitxInputMethodService): left at zhuyin, the
+        // next test's 注 key turns zhuyin on, and PrefsRule there puts it back after each of its tests
+        AppPrefs.getInstance().internal.lastCandidateReading.setValue("")
         ThemeManager.prefs.candidateTextSize.let { it.setValue(it.defaultValue) }
     }
 

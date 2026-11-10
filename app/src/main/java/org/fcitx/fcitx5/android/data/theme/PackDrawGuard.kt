@@ -38,6 +38,9 @@ object PackDrawGuard {
     private val drawn = HashSet<Key>()
     private var pending: Key? = null
 
+    // the frames asked for while a pack's mark is pending ([askFrame]), a pack
+    private val asked = HashMap<Key, Int>()
+
     private fun mark() = File(dir(), MARK)
 
     /**
@@ -56,6 +59,16 @@ object PackDrawGuard {
         return true
     }
 
+    /**
+     * A theme not a pack's drawn in a frame shown: a pack's mark still pending (its window hidden before its frame
+     * committed, another theme picked since) cleared, as that pack is no longer what is shown. On the main thread.
+     */
+    fun notDrawing() {
+        if (pending == null) return
+        pending = null
+        mark().delete()
+    }
+
     /** The frame [drawing] marked [key] for committed: its mark gone. Another's frame clears nothing. On the main thread. */
     fun frameDrawn(key: Key) {
         if (pending != key) return
@@ -63,9 +76,6 @@ object PackDrawGuard {
         drawn.add(key)
         mark().delete()
     }
-
-    // the frames asked for while a pack's mark is pending ([askFrame]), a pack
-    private val asked = HashMap<Key, Int>()
 
     /**
      * Whether the view drawing [key]'s pending frame may ask for another, whose commit tells that one drawn: the

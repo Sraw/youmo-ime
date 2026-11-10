@@ -310,13 +310,24 @@ class Engines(
     private var inkEndedBefore = HandwritingSession.NO_PIECE
 
     // every handwriting session made: handwriting's own and those written over the keys ([InkOver])
-    private fun handwritings(): List<HandwritingSession> = sessions.values.mapNotNull { (it as? HandwritingSession) ?: (it as? InkOver)?.handwritingMade }
+    private fun handwritingOf(s: Session): HandwritingSession? = (s as? HandwritingSession) ?: (s as? InkOver)?.handwritingMade
+
+    // the most of [of] over them and what the dropped ended, no list made: the pad asks at every stroke ([inkEnded])
+    private inline fun inkMost(of: (HandwritingSession) -> Int): Int =
+        sessions.values.fold(inkEndedBefore) { m, s -> handwritingOf(s)?.let { maxOf(m, of(it)) } ?: m }
 
     // the latest piece any of them heard of: one made now starts with it ended, a pad numbering its pieces on across them
-    private fun latestPiece(): Int = handwritings().fold(inkEndedBefore) { m, h -> maxOf(m, h.latestPiece) }
+    private fun latestPiece(): Int = inkMost { it.latestPiece }
 
     // the session [im]'s ink goes to: handwriting's own, or the one [im] shows (a pair's keyed one)
     private fun inkedSession(im: String) = if (im == HANDWRITING) im else pairs.shownSession(im)
+
+    // the input method's session as made, under what [SessionFactory.make] wraps it in (InkOver, StrokeFilter), whichever order
+    private tailrec fun innermost(s: Session): Session = when (s) {
+        is InkOver -> innermost(s.session)
+        is StrokeFilter -> innermost(s.session)
+        else -> s
+    }
 
     /**
      * Every session made anew at its next use, what was typed dropped, and what they share
@@ -357,9 +368,12 @@ class Engines(
             if (value == field) return
             val readingOnly = value == field.copy(candidateReading = value.candidateReading)
             val ownKeysOnly = value == field.copy(ownKeys = value.ownKeys)
+            val hadOwnKeys = ownKeys
             field = value
-            // a layout's own keyboard told (060-render-p3 T9b): the one its codes are read by from now on
+            // a layout's own keyboard told (060-render-p3 T9b): the one its codes are read by from now on;
+            // none told after one was: none read by it any more (NineKeyLetters.ofCode), not the last one kept
             ownKeys = value.ownKeyboard?.also(NineKeyLetters::inUse) != null
+            if (hadOwnKeys && !ownKeys) NineKeyLetters.clearInUse()
             if (readingOnly) return
             // told at the field's first key, after its context (review M1): the other sessions, what they
             // typed and knew, and what the decoders share stay; the text before the cursor reaches the new one
@@ -373,6 +387,8 @@ class Engines(
 
     // the session typing on a layout's own groups alone: made anew at its next code, on the groups told now
     private fun dropOwnKeys() {
+        // its handwriting's pieces ended with it, as [dropSessions] has them: a late reading not let in by the one made next
+        inkEndedBefore = latestPiece()
         pairs.getValue(PINYIN).dropKeyed(PINYIN_KEYS_OWN)
         keyboards.remove(PINYIN_KEYS_OWN)
         sessions.remove(PINYIN_KEYS_OWN)
@@ -598,7 +614,7 @@ class Engines(
     fun glide(im: String, glide: Glide): Action.Glide? {
         hostThread.check()
         if (!glides(im)) return null
-        return when (val s = session(pairs[im]?.glidedBy(glide.layout) ?: im).let { (it as? InkOver)?.session ?: it }.let { (it as? StrokeFilter)?.session ?: it }) {
+        return when (val s = session(pairs[im]?.glidedBy(glide.layout) ?: im).let(::innermost)) {
             is EnglishSession -> Action.Glide(glide)
             is GlideSession -> s.read(glide)
             else -> null
@@ -613,7 +629,7 @@ class Engines(
     fun typedOnKeys(im: String): Boolean = checked { (sessions[inkedSession(im)] as? InkOver)?.typing == true }
 
     /** The latest piece of handwriting ended ([HandwritingSession.ended]; of those written over the keys too, [InkOver]), for the pad to wipe; on the fcitx thread. */
-    val inkEnded: Int get() = checked { handwritings().fold(inkEndedBefore) { m, h -> maxOf(m, h.ended) } }
+    val inkEnded: Int get() = checked { inkMost { it.ended } }
 
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */
     fun candidates(im: String, from: Int, count: Int): List<Choice> = checked {

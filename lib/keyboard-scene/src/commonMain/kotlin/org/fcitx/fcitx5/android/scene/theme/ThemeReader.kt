@@ -175,7 +175,8 @@ object ThemeReader {
     }
 
     private const val FORMAT_MAJOR = 4
-    private val FORMAT = Regex("([0-9]{1,4})\\.[0-9]{1,4}")
+    // `5.0`, or `5` alone: either a later format
+    private val FORMAT = Regex("([0-9]{1,4})(?:\\.[0-9]{1,4})?")
 
     /**
      * Whether [version] (`0.6.0`) is newer than [app] (`0.5.2`; a leading `v` and what follows a `-`
@@ -440,6 +441,10 @@ object ThemeReader {
         else -> emptyList()
     }
 
+    // whether [widget] is warned of by what it reads, a table's (the window's, a panel, the bar's: unreadByWindow,
+    // unreadByPanel, unreadByBar); every other check leaves it to them, so a widget is told of once
+    private fun readByTable(widget: String) = widget in WINDOW_READS || widget in Selector.PANEL_WIDGETS || widget in Selector.BAR_WIDGETS
+
     // what the window's widgets, the panels and the candidates have no use for (T7a, T7b, T6a)
     private fun unread(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
         unreadByWindow(selectors, values.keys, line, p)
@@ -461,7 +466,7 @@ object ThemeReader {
     private fun unreadMotion(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
         val moving = MOTION.filter { it in props }
         if (moving.isEmpty()) return
-        val others = selectors.filter { it.widget !in Selector.BAR_WIDGETS && it.widget !in Selector.PANEL_WIDGETS && it.widget !in WINDOW_READS }
+        val others = selectors.filter { !readByTable(it.widget) }
         for (w in others.map { it.widget }.filter { it != "key" }.distinct()) {
             moving.filter { it !in POPUP_MOTION[w].orEmpty() }.forEach {
                 p.warn(line, when {
@@ -482,8 +487,8 @@ object ThemeReader {
         // press-scale and press-sink on a key in any state are read: a style selects a pressed key too (`key`, `key:shifted`)
     }
 
-    // what a popup's widgets read of the motion (A2)
-    private val POPUP_MOTION = mapOf("popup" to setOf("transition", "appear"), "preview" to setOf("transition", "appear"), "menu" to setOf("appear"))
+    /** What of the motion each window that comes up moves by: a menu comes up, never fades going (PopupBuilder.motion reads it too). */
+    internal val POPUP_MOTION = mapOf("popup" to setOf("transition", "appear"), "preview" to setOf("transition", "appear"), "menu" to setOf("appear"))
 
     private val MOTION = listOf("transition", "press-scale", "press-sink", "effect", "appear")
 
@@ -503,7 +508,7 @@ object ThemeReader {
                 else -> continue
             }
             // the window's widgets and the candidates' warned of already, by what they read (unreadByWindow, unreadByBar)
-            selectors.map { it.widget }.filter { it != widget && it !in Selector.PANEL_WIDGETS && it !in WINDOW_READS && it !in Selector.BAR_WIDGETS }.distinct()
+            selectors.map { it.widget }.filter { it != widget && !readByTable(it) }.distinct()
                 .forEach { p.warn(line, "$prop= on $it does nothing: it is $whose") }
         }
     }
@@ -560,7 +565,7 @@ object ThemeReader {
     private fun unreadByBar(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
         // the window's and the panels' warned of by what they read (unreadByWindow, unreadByPanel)
         val others = selectors.map { it.widget }.distinct()
-            .filter { it !in Selector.BAR_WIDGETS && it !in Selector.RESERVED_WIDGETS && it !in WINDOW_READS && it !in Selector.PANEL_WIDGETS }
+            .filter { !readByTable(it) && it !in Selector.RESERVED_WIDGETS }
         for (w in others) CANDIDATE_ONLY.filter { it in values }.forEach { p.warn(line, "$it= on $w does nothing: only a candidate has it") }
         for (w in others) PREEDIT_ONLY.filter { it in values }.forEach { p.warn(line, "$it= on $w does nothing: only the code being typed (preedit) has it") }
         unplacedBar(selectors, line, p)

@@ -118,8 +118,9 @@ def push_theme(d):
     time.sleep(1)
 
 
-def import_theme(d, name):
-    """新增主题, which opens the system's picker straight away: the file [name] there (it opens at 下载 or the recent ones)"""
+def import_theme(d, name, confirm=True):
+    """新增主题 → 导入主题文件 → the file [name] in the system's picker (it opens at 下载 or the recent ones);
+    a 4.0 pack then asks 导入主题 <name>？, answered 导入 unless [confirm] is False (the dialog is left open)"""
     appearance_tab(d, "主题")
     d.tap_text("新增主题", after=3.0)
     s = d.screen()
@@ -137,7 +138,7 @@ def import_theme(d, name):
     d.tap(n.c, 3.0)
     # a 4.0 pack (what 导出 writes since T8a) is checked and asked first: 导入主题 <name>？ 导入
     s = d.screen()
-    if any(t.startswith("导入主题") and t.endswith("？") for t in s.texts("all")):
+    if confirm and any(t.startswith("导入主题") and t.endswith("？") for t in s.texts("all")):
         d.tap_text("导入", where="all", scroll=False, after=3.0)
 
 
@@ -221,6 +222,12 @@ def st09(d):
     d.sh("rm -f /sdcard/Download/uat-zip.zip")
     appearance_tab(d, "主题")
     check(not custom_item(d), "选 .zip 后主题列表里多了主题")
+    d.step("取消")
+    import_theme(d, "uat-theme", confirm=False)
+    check(d.wait_text("导入主题", timeout=5, where="all", contains=True), "选 .theme 没有弹出导入确认框")
+    d.tap_text("取消", where="all", scroll=False, after=2.0)
+    appearance_tab(d, "主题")
+    check(not custom_item(d), "确认框点了取消，主题列表里多了主题")
     d.step("导入")
     import_theme(d, "uat-theme")
     appearance_tab(d, "主题")
@@ -253,7 +260,7 @@ def st09(d):
     d.open_page("text")
     o, b = kb_picture(d)
     check(o > 40 and b > 40, f"选用导入的主题后键盘背景不是那张图（橙 {o} 蓝 {b} / 1800）")
-    return f"选 .zip 被拒；导入、选用是那张图；导出 {files[0]}；删除后回到默认（亮度 {lum:.0f}）；导入后选用是那张图"
+    return f"选 .zip 被拒；确认框取消不留；导入、选用是那张图；导出 {files[0]}；删除后回到默认（亮度 {lum:.0f}）；导入后选用是那张图"
 
 
 
@@ -601,6 +608,8 @@ case("ST-62", needs="jvm:PacksUatTest.thePageListsEachPacksStateAndWhatItIsFor")
 case("ST-68", needs="manual:要另做一个同名、换了字体和背景图的主题文件，看键盘的字体")(lambda d: None)
 case("ST-69", needs="manual:要真麦克风说话，用过语音后再导入语音包")(lambda d: None)
 case("ST-70", needs="manual:按键字符里选中一项左移、删除，看轮廓和删掉的是哪个")(lambda d: None)
+case("ST-73", needs="manual:要从制作页导出动效示例主题，按键的缩放、下沉、渐隐要人眼看")(lambda d: None)
+case("ST-74", needs="manual:要从制作页导出 17 键示例主题，按它的分组打拼音、看学到的列表")(lambda d: None)
 
 
 case("ST-63", needs="release:多选文字包、语音包和一个非包文件导入，读逐文件的结果框、看下载里的原文件还在；结果框出现时转屏只一个框，点确定后再转屏、切到别的应用再回来不再弹出（手工）；结果的说法在 JVM 上：PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles")(lambda d: None)
@@ -669,13 +678,13 @@ def push_layouts_pack(d):
 
 
 @case("ST-72", base="B0-设置", mutates=True)
-def st68(d):
+def st72(d):
     from uat import gear
     appearance_tab(d, "大小与样式")
     d.switch("跟随系统夜间模式", False)
     push_layouts_pack(d)
     d.step("导入")
-    import_theme(d, "uat-layouts")
+    import_theme(d, "uat-layouts", confirm=False)
     # the app's 26 keys' four (/ @ . .com) and q's; k14 does not read
     for told in ("此主题包含自定义布局：k18, qwerty（其中 5 个动作直接输入布局里写的文字）", "缺键盘必需的键，或不是已有的键盘）：k14"):
         check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:10]}")

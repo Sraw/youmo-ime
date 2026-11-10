@@ -63,13 +63,18 @@ class SmallBoardsSceneGesturesTest {
     // panel commits mapped the same way, no bubble (popups="off"): with Chinese punctuation 。, without it .
     @Test
     @Uat("PAN-24")
-    fun thePickersFullStopShowsWhatItTypes() = KeyboardHarness().start().use { h ->
+    fun thePickersFullStopShowsWhatItTypes() {
+        // the last picker remembered as it was before any tap here, put back after (the emoticon page's tap sets it)
+        val last = AppPrefs.getInstance().internal.lastPickerType
+        prefs.set(last, last.getValue())
+        thePickersFullStopShows()
+    }
+
+    private fun thePickersFullStopShows() = KeyboardHarness().start().use { h ->
         h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
         h.relayout()
         h.typesAsShown("period", "。", ".")
-        // the emoticon page's comma the same (emoticon.xml); remembered as the last picker, put back after
-        val last = AppPrefs.getInstance().internal.lastPickerType
-        prefs.set(last, last.getValue())
+        // the emoticon page's comma the same (emoticon.xml)
         h.tap(h.key(":-)"))
         h.relayout()
         h.typesAsShown("comma", "，", ",")

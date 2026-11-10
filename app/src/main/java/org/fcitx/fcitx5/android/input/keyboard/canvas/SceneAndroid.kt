@@ -192,7 +192,8 @@ private const val LRU_LOAD = 0.75f
 object SceneThemes {
     private const val KEPT = 4
 
-    private class Made(val theme: Theme) {
+    // [pack]: the pack instance whose drawn this is (a pack's alone)
+    private class Made(val theme: Theme, val pack: AppTheme.Pack? = null) {
         val cascades = Cascades(theme)
     }
 
@@ -226,8 +227,10 @@ object SceneThemes {
     fun of(theme: AppTheme, look: ThemeLook): Theme? {
         if (theme !is AppTheme.Pack) return of(look, theme.name, theme.isDark)
         val key = theme to ThemePackFiles.systemColors
-        packs[key]?.let { return it.theme }
-        return theme.drawn.also { packs[key] = Made(it) }
+        // this instance's drawn alone: a copy() equal to an older one (the system's colours set anew) has
+        // its own, an old instance asked after the colours changed not kept as the new one's
+        packs[key]?.takeIf { it.pack === theme }?.let { return it.theme }
+        return theme.drawn.also { packs[key] = Made(it, theme) }
     }
 
     fun of(look: ThemeLook, name: String, dark: Boolean): Theme? {

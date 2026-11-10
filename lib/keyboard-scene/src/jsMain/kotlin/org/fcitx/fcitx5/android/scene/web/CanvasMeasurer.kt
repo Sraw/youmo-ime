@@ -80,10 +80,10 @@ internal class CanvasMeasurer(
 
 // whether the page's fonts of [font] (a canvas's font) are in: a page's FontFaceSet says; none (node, a worker
 // without one) is a yes, a font it cannot read a no
-private fun fontLoaded(font: String): Boolean {
-    val check: dynamic = js(
-        "(function (f) { var s = typeof document !== 'undefined' ? document.fonts : (typeof self !== 'undefined' ? self.fonts : null); " +
-            "if (!s) return true; try { return s.check(f); } catch (e) { return false; } })",
-    )
-    return check(font) as Boolean
-}
+private fun fontLoaded(font: String): Boolean = FONT_CHECK(font) as Boolean
+
+// made once, not a function a measure
+private val FONT_CHECK: dynamic = js(
+    "(function (f) { var s = typeof document !== 'undefined' ? document.fonts : (typeof self !== 'undefined' ? self.fonts : null); " +
+        "if (!s) return true; try { return s.check(f); } catch (e) { return false; } })",
+)

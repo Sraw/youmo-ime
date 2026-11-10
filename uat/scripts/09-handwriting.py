@@ -165,6 +165,14 @@ def key_write(d, ch, wait=1.6, strokes=None):
     time.sleep(wait)
 
 
+def tap_then_write(d, key, strokes):
+    """a tap on [key] and [strokes] after it in one shell, within the pause; what the field and candidates then hold"""
+    k = d.keys(refresh=True)[key]
+    d.sh("; ".join(["input tap %d %d" % k, "sleep 0.15"] + key_strokes(d, strokes)))
+    time.sleep(1.6)
+    return d.field_text(), d.preedit(), d.cands()
+
+
 @case("HW-32", base="B0-设置", mutates=True)
 def hw32(d):
     glide_on(d, option="键盘手写")
@@ -180,25 +188,16 @@ def hw32(d):
 @case("HW-33", base="B0-设置", mutates=True)
 def hw33(d):
     glide_on(d, option="键盘手写")
-    d.step("点 t 再写六的其余三笔")
-    t = d.keys(refresh=True)["t"]
-    # the tap and the strokes in one shell: within the pause
-    d.sh("; ".join(["input tap %d %d" % t, "sleep 0.15"] + key_strokes(d, STROKES["六"][1:])))
-    time.sleep(1.6)
-    f = d.field_text()
-    c = d.cands()
-    check("t" not in f.lower(), f"t 没删：框里「{f}」")
-    check("六" in c[:5] or "六" in f, f"候选 {c[:5]}，框里「{f}」")
-    d.clear()
-    d.step("点 a 再写六的其余三笔（a 是整音节，拼音点完会再排一次候选）")
-    a = d.keys(refresh=True)["a"]
-    d.sh("; ".join(["input tap %d %d" % a, "sleep 0.15"] + key_strokes(d, STROKES["六"][1:])))
-    time.sleep(1.6)
-    fa = d.field_text()
-    ca = d.cands()
-    check("a" not in fa.lower(), f"a 没删：框里「{fa}」")
-    check("六" in ca[:5] or "六" in fa, f"候选 {ca[:5]}，框里「{fa}」")
-    d.clear()
+    # the tapped letter is pinyin's composing input, shown in the composing row, not in the field (see HW-35)
+    fs = []
+    for key, why in (("t", ""), ("a", "（a 是整音节，拼音点完会再排一次候选）")):
+        d.step(f"点 {key} 再写六的其余三笔{why}")
+        f, p, c = tap_then_write(d, key, STROKES["六"][1:])
+        check(key not in p.lower() and key not in f.lower(), f"{key} 没删：组字「{p}」，框里「{f}」")
+        check("六" in c[:5] or "六" in f, f"候选 {c[:5]}，框里「{f}」")
+        fs.append(f)
+        d.clear()
+    f, fa = fs
     d.step("打着 ni 时划一横")
     d.type("ni")
     key_write(d, None, wait=1.0, strokes=[[(0.2, 0.5), (0.8, 0.5)]])

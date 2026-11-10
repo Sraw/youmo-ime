@@ -8,11 +8,9 @@ import androidx.preference.PreferenceManager
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
-import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.scene.look.Crop
 import org.fcitx.fcitx5.android.scene.look.Insets
 import org.fcitx.fcitx5.android.scene.look.KeyFill
@@ -23,21 +21,16 @@ import org.fcitx.fcitx5.android.scene.look.Keys
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.NineSlice
 import org.fcitx.fcitx5.android.scene.look.Picture
-import org.fcitx.fcitx5.android.scene.theme.Argb
-import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeCards
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemePackDialogs
 import org.fcitx.fcitx5.android.utils.appContext
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotSame
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -48,13 +41,6 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-// an image is a file of "<w>x<h>", a font one of "font": what an import reads of them, off Android
-private object PackProbe : ThemeFilesManager.AssetProbe {
-    override fun imageSize(file: File): Pair<Int, Int>? = file.readText().split('x').takeIf { it.size == 2 }
-        ?.let { (w, h) -> w.toIntOrNull()?.let { a -> h.toIntOrNull()?.let { b -> a to b } } }
-
-    override fun fontReads(file: File) = file.readText() == "font"
-}
 
 /**
  * A theme 4.0 pack (060-render-p3 T8a) imported: shown first, taken whole into `v4/<name>/`, a 3.0 theme still
@@ -63,93 +49,7 @@ private object PackProbe : ThemeFilesManager.AssetProbe {
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
-class ThemePackImportTest {
-
-    private val dir get() = ThemeFilesManager.themeDir
-    private val packs get() = File(dir, ThemePackFiles.FOLDER)
-    private val unpacking get() = File(appContext.cacheDir, "theme-import")
-    private val real = ThemeFilesManager.probe
-
-    @Before
-    fun empty() {
-        phoneStorage()
-        dir.deleteRecursively()
-        dir.mkdirs()
-        ThemeFilesManager.probe = PackProbe
-        ThemeFilesManager.replacingFile().delete()
-        // the theme in use the normal mode's, not the day's or night's
-        ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
-        ThemeFilesManager.listThemes()
-        ThemeManager.refreshThemes()
-    }
-
-    @After
-    fun realProbe() {
-        ThemeFilesManager.probe = real
-        ThemePackFiles.beforeInPlace = null
-        ThemeManager.prefs.followSystemDayNightTheme.setValue(ThemeManager.prefs.followSystemDayNightTheme.defaultValue)
-        ThemeManager.setNormalModeTheme(ThemeManager.prefs.normalModeTheme.defaultValue)
-        dir.deleteRecursively()
-        ThemeManager.refreshThemes()
-    }
-
-    // a built-in theme's file of two versions, as a user's of [name]: [meta] before its colours, [before] ahead of
-    // its first style (a picture, fonts), [styles] and [icons] at its end
-    private val nord by lazy { BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_nord) }
-
-    private fun xml(name: String = "mine", meta: String = "", before: String = "", styles: String = "", icons: String = ""): String {
-        var x = nord.replace("name=\"nord\"", "name=\"$name\"").replace("<colors>", "$meta<colors>")
-        val first = x.indexOf("<style ")
-        x = x.substring(0, first) + before + x.substring(first)
-        return x.replace("</theme>", "$styles$icons</theme>")
-    }
-
-    private val svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0L24 24Z" fill="#fff"/></svg>"""
-
-    private val sampleXml = xml(
-        meta = """<meta author="Ann" version="1.2" license="CC-BY-4.0" min-app="0.5.0" preview="preview.png"/>""",
-        before = """<picture src="photo.jpg" brightness="80%"><cut orientation="portrait" file="p.webp"/>""" +
-            """<cut orientation="landscape" file="l.webp"/></picture><font name="round" src="round.ttf"/>""",
-        styles = """<style select="key.enter" fill="image(enter.png, 4 4 4 4)"/><style select="key" font="round"/>""",
-        icons = """<icon name="star" src="star.svg"/>""",
-    )
-
-    // [more] over the sample's own of their names
-    private fun sample(xml: String = sampleXml, vararg more: Pair<String, String>) = zip(*(sampleEntries(xml).toMap() + more).toList().toTypedArray())
-
-    private fun sampleEntries(xml: String) = arrayOf(
-        "theme.xml" to xml, "preview.png" to "100x50", "photo.jpg" to "3000x2000", "p.webp" to "1080x720", "l.webp" to "2000x700",
-        "enter.png" to "64x64", "round.ttf" to "font", "star.svg" to svg, "layouts/" to "", "layouts/qwerty.xml" to "<layout/>",
-        // what it does not name, and a Mac's attributes: not taken
-        "readme.txt" to "hello", "__MACOSX/._enter.png" to "attr",
-    )
-
-    private fun zip(vararg entries: Pair<String, String>) = ByteArrayOutputStream().also { bytes ->
-        ZipOutputStream(bytes).use { zip ->
-            for ((name, text) in entries) {
-                zip.putNextEntry(ZipEntry(name))
-                if (!name.endsWith("/")) zip.write(text.encodeToByteArray())
-            }
-        }
-    }.toByteArray()
-
-    private fun open(bytes: ByteArray, themes: List<Theme> = ThemeManager.getAllThemes()) = ThemeFilesManager.openTheme(bytes.inputStream(), themes)
-
-    private fun opened(bytes: ByteArray) = open(bytes).getOrThrow() as ThemeFilesManager.Opened.Pack
-
-    // imported and listed, as the settings' list does after ([ThemeManager.packPlaced])
-    private fun placed(bytes: ByteArray) = opened(bytes).commit().getOrThrow().also { ThemeManager.packPlaced(it[0].file) }
-
-    private fun refusal(bytes: ByteArray, themes: List<Theme> = ThemeManager.getAllThemes()) = open(bytes, themes).exceptionOrNull()!!.message
-
-    private fun tree(root: File): Map<String, String> =
-        root.walkTopDown().filter { it.isFile }.associate { it.relativeTo(root).path to it.readText() }
-
-    private fun nothingLeft() {
-        assertEquals(emptyMap<String, String>(), tree(packs))
-        assertEquals(emptyList<String>(), unpacking.list().orEmpty().toList())
-    }
-
+class ThemePackImportTest : ThemePackFixture() {
     @Test
     fun aPackIsShownFirstThenTakenWholeIntoItsFolder() {
         val pack = opened(sample())
@@ -449,8 +349,41 @@ class ThemePackImportTest {
         assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
     }
 
-    // D1: a 3.0 theme beside a pack of its name no import replaced (an older backup restored over the phone's pack):
-    // left be as listed, its json, its picture and the slot naming it kept (it is found by the name, as before)
+    // a pack of one version `mine`, from the dark 3.0 theme's look
+    private fun singleMine(): Theme.Pack {
+        val one = TestThemes.TransparentDark.deriveCustomNoBackground("mine")
+        return placed(zip("theme.xml" to ThemePackFiles.of(one.look, "mine", one.isDark).first)).single()
+    }
+
+    @Test
+    fun aSlotNamingAPackOfOneVersionNamesItsVersionOfTheSameLightnessOnceThePackHasTwo() {
+        val single = singleMine()
+        assertEquals("mine", single.name)
+        ThemeManager.setNormalModeTheme(ThemeManager.getTheme("mine")!!)
+        val versions = placed(sample())
+        val same = versions.single { it.isDark == single.isDark }
+        assertEquals(same.name, ThemeManager.prefs.normalModeTheme.getValue().name)
+        assertEquals(same, ThemeManager.activeTheme)
+    }
+
+    @Test
+    fun deletingAPackOrA30ThemeOfTheSameNameDeletesThatOneAlone() {
+        singleMine()
+        ThemeFilesManager.saveThemeFiles(TestThemes.TransparentDark.deriveCustomNoBackground("mine"))
+        ThemeManager.refreshThemes()
+        val custom = ThemeManager.getAllThemes().single { it is Theme.Custom && it.name == "mine" }
+        assertTrue(ThemeManager.deleteTheme(custom))
+        // the 3.0 theme gone, the pack of its name kept
+        assertFalse(File(dir, "mine.json").exists())
+        assertEquals(listOf("mine"), ThemeManager.Packs.map { it.name })
+        // and the other way round
+        ThemeFilesManager.saveThemeFiles(TestThemes.TransparentDark.deriveCustomNoBackground("mine"))
+        ThemeManager.refreshThemes()
+        val pack = ThemeManager.getAllThemes().single { it is Theme.Pack && it.name == "mine" }
+        assertTrue(ThemeManager.deleteTheme(pack))
+        assertEquals(emptyList<Theme.Pack>(), ThemeManager.Packs)
+        assertTrue(File(dir, "mine.json").exists())
+    }
     @Test
     fun aTheme30RestoredBesideAPackOfItsNameIsLeftBe() {
         opened(sample()).commit().getOrThrow()
@@ -591,187 +524,5 @@ class ThemePackImportTest {
         assertEquals(appContext.getString(R.string.exception_theme_picture_side, side.toString()), big)
         assertEquals(appContext.getString(R.string.exception_theme_image, "photo.jpg"), refusal(sample(sampleXml, "photo.jpg" to "photo")))
         nothingLeft()
-    }
-
-    @Test
-    fun aPackFolderNotListedIsReplacedUnlessALaterBuilds() {
-        val kept = appContext.getString(R.string.exception_theme_newer_kept)
-        File(packs, "mine").mkdirs()
-        // a later build's not read here (a newer app's, a later format's): kept, said so (one that reads is listed)
-        val later = listOf(
-            xml(meta = """<meta min-app="99.0.0"/>""", styles = "<later/>"),
-            """<theme xmlns="${ThemeReader.NAMESPACE}" name="mine" version="5.0"><sound/></theme>""",
-        )
-        for (text in later) {
-            File(packs, "mine/theme.xml").writeText(text)
-            ThemeManager.refreshThemes()
-            assertEquals(kept, refusal(sample()))
-            assertEquals(text, File(packs, "mine/theme.xml").readText())
-        }
-        // one past a pack's theme.xml limit is not read whole to tell: replaced
-        val huge = "<!--" + "x".repeat(ThemeAssetLimits.MAX_THEME_XML_BYTES.toInt()) + "--></theme>"
-        File(packs, "mine/theme.xml").writeText(later[0].replace("</theme>", huge))
-        ThemeManager.refreshThemes()
-        opened(sample()).apply { assertTrue(replaces) }.discard()
-        // one cut short (a restore killed half way: a file it names missing), or that no longer reads: not
-        // listed, so not to be deleted; imported again, replaced and listed
-        val cutShort: () -> Unit = { File(packs, "mine/round.ttf").delete() }
-        val broken: () -> Unit = { File(packs, "mine/theme.xml").writeText("<theme") }
-        for (spoil in listOf(cutShort, broken)) {
-            File(packs, "mine").deleteRecursively()
-            placed(sample())
-            spoil()
-            ThemeManager.refreshThemes()
-            assertTrue(ThemeManager.Packs.none { it.file == "mine" })
-            val pack = opened(sample())
-            assertTrue(pack.replaces)
-            pack.commit().getOrThrow().also { ThemeManager.packPlaced(it[0].file) }
-            assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
-        }
-    }
-
-    @Test
-    fun aNewPackPastTheMostIsRefusedOneReplacingIsNot() {
-        val most = (1..ThemeAssetLimits.MAX_PACKS).map { Theme.Pack("p$it", false, "p$it", File(packs, "p$it").path, 0) }
-        assertEquals(appContext.getString(R.string.exception_theme_packs, ThemeAssetLimits.MAX_PACKS.toString()), refusal(sample(), most))
-        nothingLeft()
-        placed(sample())
-        val mine = ThemeManager.Packs
-        assertTrue(open(sample(), most.drop(1) + mine).isSuccess)
-    }
-
-    @Test
-    fun aListingReadsTheNewestMostPacks() {
-        val source = xml(name = "p0")
-        (0..ThemeAssetLimits.MAX_PACKS).forEach { i ->
-            File(packs, "p$i").mkdirs()
-            File(packs, "p$i/theme.xml").writeText(source.replace("name=\"p0\"", "name=\"p$i\""))
-            File(packs, "p$i").setLastModified(1_000_000_000_000L + i * 1000L)
-        }
-        val listed = ThemeFilesManager.listPacks().map { it.file }.distinct()
-        assertEquals(ThemeAssetLimits.MAX_PACKS, listed.size)
-        assertFalse("p0" in listed)
-    }
-
-    // a restored backup's, a later build's: listed as an import would take it, or not at all
-    @Test
-    fun aPackAnImportWouldRefuseIsNotListed() {
-        fun planted(folder: String, text: String) {
-            File(packs, folder).mkdirs()
-            File(packs, "$folder/theme.xml").writeText(text)
-        }
-        planted("pixel", xml(name = "pixel"))
-        planted("MaterialLight", xml(name = "MaterialLight"))
-        planted("x#dark", xml(name = "x#dark"))
-        planted("hides", xml(name = "hides", styles = """<style select="key.function" hidden="true"/>"""))
-        assertEquals(emptyList<Theme.Pack>(), ThemeFilesManager.listPacks())
-        ThemeManager.refreshThemes()
-        // the built-in theme of that name still the one the settings name
-        assertTrue(ThemeManager.getTheme("pixel#dark") is Theme.Builtin)
-    }
-
-    @Test
-    fun aPackWhoseFileNoLongerReadsIsDrawnAsTheBuiltInTheme() {
-        val dark = opened(sample()).commit().getOrThrow()[1]
-        File(packs, "mine/theme.xml").writeText("<theme")
-        assertEquals("pixel", dark.scene.name)
-        assertEquals(ThemeManager.builtin("pixel#dark").palette(), dark.look.palette)
-    }
-
-    @Test
-    fun aPacksBarAndPanelsAreDrawnFromItsOwnFile() {
-        val dark = placed(sample(xml(styles = """<style select="candidate" gap="7dp"/><style select="bar" height="120%"/>""")))[1]
-        assertEquals(7.0, SceneBar.of(appContext, dark).gapDp, 0.0)
-        // the bar's height (T6b) its file's too, in use
-        ThemeManager.setNormalModeTheme(dark)
-        assertEquals(120.0, SceneBar.heightPercent(appContext), 0.0)
-    }
-
-    @Test
-    fun aPackInUseReplacedIsToldAsChanged() {
-        val first = placed(sample())
-        ThemeManager.setNormalModeTheme(first[1])
-        val told = mutableListOf<Theme>()
-        val listener = ThemeManager.OnThemeChangeListener { told += it }
-        ThemeManager.addOnChangedListener(listener)
-        try {
-            placed(sample(xml(styles = """<style select="candidate" gap="7dp"/>""")))
-            assertEquals(listOf("mine#dark"), told.map { it.name }.distinct())
-            assertEquals(7.0, SceneBar.of(appContext, ThemeManager.activeTheme).gapDp, 0.0)
-        } finally {
-            ThemeManager.removeOnChangedListener(listener)
-        }
-    }
-
-    @Test
-    fun aPackIsReadAgainOnlyWhenTheSystemsColoursChange() {
-        // a pack of system() colours, in use
-        val monet = BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_monet).replace("name=\"monet\"", "name=\"mine\"")
-        val dark = placed(zip("theme.xml" to monet))[1]
-        ThemeManager.setNormalModeTheme(dark)
-        val told = mutableListOf<Theme>()
-        val listener = ThemeManager.OnThemeChangeListener { told += it }
-        ThemeManager.addOnChangedListener(listener)
-        val config = appContext.resources.configuration
-        try {
-            // turned, say: the same colours, nothing read or drawn anew
-            val scene = (ThemeManager.activeTheme as Theme.Pack).scene
-            ThemeManager.onSystemPlatteChange(config)
-            assertEquals(emptyList<Theme>(), told)
-            assertSame(scene, (ThemeManager.activeTheme as Theme.Pack).scene)
-            // the wallpaper's colours changed: read again with them, drawn anew
-            val now = ThemePackFiles.systemColors
-            ThemePackFiles.systemColors = SystemColors(mapOf("primary" to Argb(0xff123456.toInt())), emptyMap())
-            ThemeManager.onSystemPlatteChange(config)
-            assertEquals(listOf("mine#dark"), told.map { it.name })
-            assertEquals(now, ThemePackFiles.systemColors)
-            assertNotEquals(true, scene === (ThemeManager.activeTheme as Theme.Pack).scene)
-        } finally {
-            ThemeManager.removeOnChangedListener(listener)
-        }
-    }
-
-    @Test
-    fun aKillBetweenAPlacesRenamesLosesNoPack() {
-        placed(sample())
-        val before = tree(File(packs, "mine"))
-        // failing between them: the pack it replaced put back
-        ThemePackFiles.beforeInPlace = { throw java.io.IOException("killed") }
-        assertTrue(opened(sample(xml(styles = """<style select="candidate" gap="7dp"/>"""))).commit().isFailure)
-        ThemePackFiles.beforeInPlace = null
-        assertEquals(before, tree(File(packs, "mine")))
-        assertEquals(emptyList<String>(), File(packs, ".saving").list().orEmpty().toList())
-        // killed between them: the one aside put back at the next start's listing, the new one half written cleared
-        File(packs, "mine").renameTo(File(packs, ".saving/old-1c2d/mine").also { it.parentFile!!.mkdirs() })
-        File(packs, ".saving/new-3e4f").mkdirs()
-        File(packs, ".saving/new-3e4f/theme.xml").writeText("half")
-        ThemeFilesManager.forgetSwept()
-        ThemeFilesManager.listThemes()
-        assertEquals(listOf("mine#light", "mine#dark"), ThemeFilesManager.listPacks().map { it.name })
-        assertEquals(before, tree(File(packs, "mine")))
-        assertFalse(File(packs, ".saving").exists())
-        // one aside whose place another took: cleared, not put over it
-        File(packs, ".saving/old-5a6b/mine").mkdirs()
-        File(packs, ".saving/old-5a6b/mine/theme.xml").writeText("older")
-        ThemeFilesManager.forgetSwept()
-        ThemeFilesManager.listPacks()
-        assertEquals(before, tree(File(packs, "mine")))
-        assertFalse(File(packs, ".saving").exists())
-    }
-
-    @Test
-    fun whatAKillLeftOfAPackBeingWrittenIsClearedAtTheFirstListing() {
-        File(packs, ".saving/0c1d").apply { mkdirs() }.resolve("theme.xml").writeText("half")
-        ThemeFilesManager.forgetSwept()
-        ThemeFilesManager.listThemes()
-        assertEquals(emptyList<Theme.Pack>(), ThemeFilesManager.listPacks())
-        assertFalse(File(packs, ".saving").exists())
-        // one whose theme.xml does not read, or is another's name: not listed, left as it is
-        File(packs, "broken").mkdirs()
-        File(packs, "broken/theme.xml").writeText("<theme")
-        File(packs, "other").mkdirs()
-        File(packs, "other/theme.xml").writeText(xml(name = "else"))
-        assertEquals(emptyList<Theme.Pack>(), ThemeFilesManager.listPacks())
-        assertTrue(File(packs, "broken/theme.xml").exists())
     }
 }

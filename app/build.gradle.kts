@@ -79,6 +79,7 @@ fun Test.unitTestSettings() {
     systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
     // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
     systemProperty("themeMaker.testdata", rootProject.file("web/theme-maker/test/testdata").path)
+    systemProperty("enginePaint.out", layout.buildDirectory.dir("w1-pixel").get().asFile.path)
     systemProperty("themeMaker.update", project.hasProperty("updateThemeMaker").toString())
     // the built-in themes' files (src/commonMain/themes) and Transparent's, test data (src/commonTest/data): TestThemes
     systemProperty("scene.src", rootProject.file("lib/keyboard-scene/src").path)

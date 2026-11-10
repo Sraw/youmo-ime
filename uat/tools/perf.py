@@ -12,7 +12,7 @@ connected task: it uninstalls the app, and the pack with it), KeyboardPerfBaseli
 Writes DIR/<run>.perf.log, DIR/rows.tsv (a line a row and run) and DIR/table.md: each row's mean ms,
 p90 ms, KiB a step and GCs a step, the runs' mean, B against A in percent; the frame, idle and anim
 lines as they are. --trace: built profileable, the process stopped before atrace starts, and the
-`canvas anim` sections of the main thread (A1 on) summed up from DIR/<run>.trace.
+`canvas anim` sections of every thread (A1 on) summed up from DIR/<run>.trace.
 
 Device: ANDROID_SERIAL (default 127.0.0.1:5599). --lock DIR: a mkdir mutex held for each run.
 """
@@ -75,7 +75,7 @@ def tree(rev, name, out):
 
 
 def build(path, trace):
-    args = ['./gradlew', ':app:assembleBenchmark', ':app:assembleBenchmarkAndroidTest', ':app:packs',
+    args = ['./gradlew', ':app:assembleBenchmark', ':app:assembleBenchmarkAndroidTest', ':app:packTextPack',
             '-Pyoumo.testBuildType=benchmark', '-PbuildABI=' + ABI]
     if trace:
         args.append('-PbuildProfileable=true')
@@ -89,14 +89,22 @@ def apks(path):
     test = [os.path.join(out, 'androidTest/benchmark', f) for f in os.listdir(os.path.join(out, 'androidTest/benchmark')) if f.endswith('.apk')]
     if len(app) != 1 or len(test) != 1:
         raise RuntimeError(f'want one {ABI} benchmark APK and one test APK in {out}: {app} {test}')
-    pack = os.path.join(path, 'app/build/packs/youmo-text-v1.youmopack')
+    # the newest listing names the pack, as uat.py's pack_files: the version is not always v1
+    packs = os.path.join(path, 'app/build/packs')
+    listings = sorted((f for f in (os.listdir(packs) if os.path.isdir(packs) else [])
+                       if f.startswith('youmo-text-v') and f.endswith('.json')),
+                      key=lambda f: os.path.getmtime(os.path.join(packs, f)))
+    if not listings:
+        raise RuntimeError(f'no text pack listing in {packs}')
+    with open(os.path.join(packs, listings[-1])) as f:
+        pack = os.path.join(packs, json.load(f)['file'])
     return app[0], test[0], pack
 
 
 FAILED = re.compile(r'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|shortMsg|INSTRUMENTATION_CODE: 0')
 
 
-def run(tag, path, a, out):
+def run(tag, path, args, out):
     app, test, pack = apks(path)
     adb('uninstall', PKG, check=False, stdout=subprocess.DEVNULL)
     adb('uninstall', PKG + '.test', check=False, stdout=subprocess.DEVNULL)
@@ -107,8 +115,12 @@ def run(tag, path, a, out):
         adb('shell', 'content', 'write', '--uri', f'content://{PKG}.uat.packs/{name}', stdin=f)
     adb('shell', 'content', 'call', '--uri', f'content://{PKG}.uat.packs', '--method', 'import', '--arg', name,
         out=f'{out}/{tag}.import.log')
-    extra = ['-e', 'perfRuns', str(a.runs)] + (['-e', 'perfOnly', a.only] if a.only else [])
-    if a.trace:
+    # a refused import still exits 0: without the text pack the run would measure the gate
+    imported = open(f'{out}/{tag}.import.log', errors='ignore').read()
+    if 'imported:text' not in imported and 'already:text' not in imported:
+        raise RuntimeError(f'{tag}: the text pack was not imported, see {tag}.import.log')
+    extra = ['-e', 'perfRuns', str(args.runs)] + (['-e', 'perfOnly', args.only] if args.only else [])
+    if args.trace:
         # a non-debuggable app's own sections show only when atrace names it, and it is running anew
         adb('shell', 'am', 'force-stop', PKG)
         adb('shell', 'atrace', '--async_start', '-b', '32768', '-a', PKG, 'view', 'gfx', 'dalvik', 'sched', 'input')
@@ -118,7 +130,7 @@ def run(tag, path, a, out):
             out=f'{out}/{tag}.inst.log', check=False)
         adb('logcat', '-d', '-s', 'KeyboardPerf:I', out=f'{out}/{tag}.perf.log')
     finally:
-        if a.trace:
+        if args.trace:
             adb('shell', 'atrace', '--async_stop', out=f'{out}/{tag}.trace', check=False)
         # the anim rows' battery saver undone here too: a test killed midway leaves the phone "unplugged"
         adb('shell', 'cmd', 'power', 'set-mode', '0', check=False)
@@ -200,13 +212,13 @@ def table(runs, out, commits, failed):
         vs = [parsed[t][0][k] for t in runs if t[0] == side and k in parsed[t][0]]
         return (tuple(statistics.mean(x) for x in zip(*vs)), len(vs)) if vs else None
 
+    want = {s: sum(1 for t in runs if t[0] == s) for s in sides}
+
     def cell(c, side):
         if not c:
             return '—'
         (m, p, k, g), n = c
         return '%.1f / %.1f / %.0f / %.2f' % (m, p, k, g) + ('' if n == want[side] else f' (n {n})')
-
-    want = {s: sum(1 for t in runs if t[0] == s) for s in sides}
     lines = ['Commits measured: ' + ', '.join(f'{s} = {commits.get(s, "?")}' for s in sides), '',
              'Each cell: mean ms / p90 ms / KiB a step / GCs a step, the mean of the runs that passed (%s);'
              ' (n k): a row only k of them have.' % ', '.join(runs)]
@@ -249,52 +261,52 @@ def main():
     p.add_argument('--dry-run', action='store_true', help='check out the trees and print the commits and the order, nothing built or run')
     p.add_argument('--no-build', action='store_true', help='use what the trees have built')
     p.add_argument('--table', action='store_true', help='only write the table from the runs in --out')
-    a = p.parse_args()
+    args = p.parse_args()
     os.environ.setdefault('ANDROID_SERIAL', '127.0.0.1:5599')
-    os.makedirs(a.out, exist_ok=True)
-    if a.b:
-        order = [('A', 1), ('B', 1)] + [x for i in range(1, a.pairs) for x in
+    os.makedirs(args.out, exist_ok=True)
+    if args.b:
+        order = [('A', 1), ('B', 1)] + [x for i in range(1, args.pairs) for x in
                                        ([('B', i + 1), ('A', i + 1)] if i % 2 else [('A', i + 1), ('B', i + 1)])]
     else:
-        order = [('A', i + 1) for i in range(a.pairs)]
+        order = [('A', i + 1) for i in range(args.pairs)]
     runs = ['%s%d' % x for x in order]
     failed, commits = {}, {}
-    if not a.table:
-        trees = {'A': tree(a.a, 'a', a.out)}
-        if a.b:
-            trees['B'] = tree(a.b, 'b', a.out)
+    if not args.table:
+        trees = {'A': tree(args.a, 'a', args.out)}
+        if args.b:
+            trees['B'] = tree(args.b, 'b', args.out)
         commits = {s: c for s, (_, c) in trees.items()}
-        open(f'{a.out}/commits.txt', 'w').write(''.join(f'{s} {c}\n' for s, c in commits.items()))
+        open(f'{args.out}/commits.txt', 'w').write(''.join(f'{s} {c}\n' for s, c in commits.items()))
         print('commits:', commits, 'order:', ' '.join(runs))
-        if a.dry_run:
+        if args.dry_run:
             return
-        if not a.no_build:
+        if not args.no_build:
             for t, _ in trees.values():
-                build(t, a.trace)
+                build(t, args.trace)
         try:
             for r in runs:
                 for attempt in (1, 2):
-                    if a.lock:
-                        lock(a.lock)
+                    if args.lock:
+                        lock(args.lock)
                     try:
-                        run(r, trees[r[0]][0], a, a.out)
+                        run(r, trees[r[0]][0], args, args.out)
                         failed.pop(r, None)
                         break
                     except Exception as e:  # a run failed: once more, then told in the table
                         failed[r] = f'{type(e).__name__}: {e}'
                         print(f'{r} attempt {attempt} failed: {failed[r]}', file=sys.stderr)
                     finally:
-                        if a.lock:
-                            unlock(a.lock)
+                        if args.lock:
+                            unlock(args.lock)
         finally:
-            json.dump(failed, open(f'{a.out}/failed.json', 'w'))
-            table(runs, a.out, commits, failed)
+            json.dump(failed, open(f'{args.out}/failed.json', 'w'))
+            table(runs, args.out, commits, failed)
         return
-    if os.path.exists(f'{a.out}/commits.txt'):
-        commits = dict(l.split() for l in open(f'{a.out}/commits.txt') if l.strip())
-    if os.path.exists(f'{a.out}/failed.json'):
-        failed = json.load(open(f'{a.out}/failed.json'))
-    table(runs, a.out, commits, failed)
+    if os.path.exists(f'{args.out}/commits.txt'):
+        commits = dict(l.split() for l in open(f'{args.out}/commits.txt') if l.strip())
+    if os.path.exists(f'{args.out}/failed.json'):
+        failed = json.load(open(f'{args.out}/failed.json'))
+    table(runs, args.out, commits, failed)
 
 
 def lock(path):

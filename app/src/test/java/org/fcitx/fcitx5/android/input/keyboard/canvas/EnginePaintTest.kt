@@ -71,7 +71,7 @@ class EnginePaintTest {
     fun theLibrarysShotsAreDrawnAsWrittenDown() {
         val shots = readShots()
         val out = StringBuilder()
-        val pixels = File("build/w1-pixel").apply { mkdirs() }
+        val pixels = File(System.getProperty("enginePaint.out") ?: "build/w1-pixel").apply { mkdirs() }
         for ((name, pressed) in PAINTED) {
             val shot = shots[name.removePrefix(PRESSED_PREFIX)] ?: error("no shot $name in shots.json")
             val scene = scene(shot)

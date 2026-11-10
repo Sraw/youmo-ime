@@ -215,15 +215,18 @@ class PopupComponent :
         // read once for a theme's scenes in an environment (its size, and the input method, field, orientation… that
         // `@im=`-like styles are scoped by: an Env is a value), not a SceneBuilder made for each bubble shown
         val env = s.env()
-        val at = s to env
-        val known = motions?.takeIf { it.first == at }?.second ?: HashMap<String, PopupMotion?>().also { motions = at to it }
+        val known = motions?.takeIf { it.scenes == s && it.env == env }?.byWidget
+            ?: HashMap<String, PopupMotion?>().also { motions = MotionCache(s, env, it) }
         // none kept too (getOrPut would ask again for a null)
         if (widget !in known) known[widget] = s.made("popup's motion", s.builder(env)?.popupMotion(widget))
         val m = known[widget] ?: return null
         return m.takeIf { KeyMotionSwitch.on(context) }
     }
 
-    private var motions: Pair<Pair<PopupScenes, Env>, HashMap<String, PopupMotion?>>? = null
+    // the widgets' motions read for a theme's scenes in an environment ([motionOf])
+    private class MotionCache(val scenes: PopupScenes, val env: Env, val byWidget: HashMap<String, PopupMotion?>)
+
+    private var motions: MotionCache? = null
 
     // [view] gone from [root] in its fade, or at once ([atOnce], none set, or motion off now); then [gone]
     private fun goAway(view: View, atOnce: Boolean, gone: () -> Unit) {

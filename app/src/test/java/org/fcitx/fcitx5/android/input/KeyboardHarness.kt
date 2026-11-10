@@ -5,8 +5,6 @@
 package org.fcitx.fcitx5.android.input
 
 import android.app.Activity
-import org.fcitx.fcitx5.android.WAIT_MS
-import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -37,8 +35,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.WAIT_MS
 import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.FakeHostConnection
@@ -783,6 +783,8 @@ class KeyboardHarness(
             val cm = org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
             cm.purgeMarked(*cm.deleteAll(skipPinned = false))
         }
+        // the recognizer's reads posted back run first: their count, the JVM's, kept were they dropped with the looper
+        runCatching { idle() }
         // destroyed first: it learns the last field's address
         destroy()
         // Robolectric keeps every dialog shown till the test method ends (ShadowDialog.shownDialogs): the

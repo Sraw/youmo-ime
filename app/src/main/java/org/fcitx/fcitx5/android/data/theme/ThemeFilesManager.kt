@@ -2,6 +2,7 @@ package org.fcitx.fcitx5.android.data.theme
 
 import android.graphics.BitmapFactory
 import android.graphics.fonts.Font
+import android.icu.text.ListFormatter
 import androidx.annotation.VisibleForTesting
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -17,6 +18,7 @@ import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.scene.look.KeyFill
 import org.fcitx.fcitx5.android.scene.look.KeyPressed
 import org.fcitx.fcitx5.android.scene.look.LegacyLook
+import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
@@ -195,7 +197,7 @@ object ThemeFilesManager {
                 ThemePackFiles.sweepPacks(dir)
             }
         }
-        return ThemePackFiles.list(dir, false, builtins)
+        return ThemePackFiles.list(dir, builtins)
     }
 
     // the imports writing in SAVING now (off the main thread); the sweeps wait till none is
@@ -384,16 +386,34 @@ object ThemeFilesManager {
      * `theme.xml` gives them; Monet's as it is now, its colours fixed ([Theme.Builtin.toCustom]).
      */
     fun exportTheme(theme: Theme, dest: OutputStream): Result<Unit> = runCatching {
-        when (theme) {
-            is Theme.Pack -> ThemePackFiles.export(theme, dest)
-            is Theme.Custom -> exportCustom(theme, dest)
-            is Theme.Builtin -> exportCustom(theme.toCustom(), dest)
+        // closed also where a read fails before the zip is opened (the caller's document left open else)
+        dest.use {
+            when (theme) {
+                is Theme.Pack -> ThemePackFiles.export(theme, it)
+                is Theme.Custom -> exportCustom(theme, it)
+                is Theme.Builtin -> exportCustom(theme.toCustom(), it)
+            }
         }
+    }
+
+    /**
+     * A 3.0 theme's [name] as its exported pack's, one a pack's import takes ([ThemePackFiles.badName]): no `/`, not
+     * `.`-led, not a version's (`x#dark`), cut to a theme 4's length; `theme` where nothing is left.
+     */
+    @VisibleForTesting
+    internal fun packName(name: String): String {
+        fun unversioned(n: String): String {
+            var v = n
+            while (v.endsWith("#light") || v.endsWith("#dark")) v = v.substringBeforeLast('#')
+            return v
+        }
+        val n = unversioned(LookTheme.themeName(unversioned(name.replace('/', '_').trimStart('.'))).trimStart('.'))
+        return n.takeUnless { it.isBlank() || ThemePackFiles.badName(it) } ?: "theme"
     }
 
     private fun exportCustom(theme: Theme.Custom, dest: OutputStream) {
         ownFiles(theme, dest)
-        val (xml, names) = ThemePackFiles.of(exportedLook(theme.look), theme.name, theme.isDark)
+        val (xml, names) = ThemePackFiles.of(exportedLook(theme.look), packName(theme.name), theme.isDark)
         ZipOutputStream(dest.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(ThemePackFiles.THEME_XML))
             zip.write(xml.encodeToByteArray())
@@ -558,6 +578,7 @@ object ThemeFilesManager {
 
     @Volatile
     private var unpackingSwept = false
+    private const val STALE_UNPACKED_MS = 60 * 60 * 1000L
 
     /**
      * Opens the theme zip [src] ([themes] as [importTheme]'s): one with a `theme.xml` at its top is a theme 4.0
@@ -568,10 +589,11 @@ object ThemeFilesManager {
     fun openTheme(src: InputStream, themes: List<Theme> = ThemeManager.getAllThemes()): Result<Opened> =
         runCatching {
             if (!writable) notSettled()
-            if (!unpackingSwept) {
-                unpackingSwept = true
-                unpacking.deleteRecursively()
-            }
+            // what a kill left cleared at the first open; later, what a dialog closed otherwise than by its buttons
+            // left (an hour old: no dialog open so long), as the input method's process may live for days
+            val stale = System.currentTimeMillis() - STALE_UNPACKED_MS
+            unpacking.listFiles()?.forEach { if (!unpackingSwept || it.lastModified() < stale) it.deleteRecursively() }
+            unpackingSwept = true
             val temp = File(unpacking, UUID.randomUUID().toString())
             if (!temp.mkdirs()) throw IOException("Cannot create '${temp.name}'")
             var kept = false
@@ -614,7 +636,9 @@ object ThemeFilesManager {
                 if (low.isEmpty()) {
                     null
                 } else {
-                    val versions = low.joinToString("、") { appContext.getString(if (it) R.string.theme_pack_dark else R.string.theme_pack_light) }
+                    val names = low.map { appContext.getString(if (it) R.string.theme_pack_dark else R.string.theme_pack_light) }
+                    // joined as the app's language joins a list (`light and dark`, `浅色和深色`)
+                    val versions = ListFormatter.getInstance(appContext.resources.configuration.locales[0]).format(names)
                     appContext.getString(R.string.theme_pack_low_contrast, versions)
                 }
             },

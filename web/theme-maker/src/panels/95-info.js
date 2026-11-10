@@ -20,7 +20,7 @@
      */
     preview(d, L, bytes) {
       const old = F.meta(d.xml).preview;
-      let files = Object.assign(Object.create(null), d.files);
+      let files = panels.filesOf(d);
       let xml = d.xml;
       if (bytes) {
         const type = L.imageType(bytes);
@@ -31,10 +31,10 @@
         const file = 'preview.' + type;
         files[file] = bytes;
         xml = F.setMeta(xml, 'preview', file);
-        if (old && old !== file && !F.uncommented(xml).includes('"' + old + '"')) files = panels.without(files, [old]);
+        if (old && old !== file && !F.isNamed(xml, old)) files = panels.without(files, [old]);
       } else {
         xml = F.setMeta(xml, 'preview', null);
-        if (old && !F.uncommented(xml).includes('"' + old + '"')) files = panels.without(files, [old]);
+        if (old && !F.isNamed(xml, old)) files = panels.without(files, [old]);
       }
       return { xml, files, layouts: d.layouts };
     },
@@ -55,7 +55,7 @@
       else nameField.value = root.YoumoMaker.themeName(api.doc().xml);
     });
     el.append(row('名称', nameField,
-      h('span', { className: 'muted', textContent: '也是文件名；和 App 里已有的同名会覆盖它' })));
+      h('span', { className: 'muted', textContent: '也是文件名；和 App 内置主题同名的 App 不收；和自己导入过的同名会覆盖它' })));
     for (const [a, label] of META) el.append(row(label, text(m[a], (v) => api.apply((x) => ops.meta(x, a, v)), '最多 64 个字')));
     el.append(row('最低 App 版本', text(m['min-app'], (v) => api.apply((x) => ops.meta(x, 'min-app', v)), '如 0.6.0')));
     el.append(row('预览图', h('span', { className: 'muted', textContent: m.preview ? m.preview : '没有（App 用自己画的）' }),

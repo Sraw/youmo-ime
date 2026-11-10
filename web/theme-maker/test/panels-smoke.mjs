@@ -16,11 +16,21 @@ async function browser(shell) {
   const dir = mkdtempSync(join(tmpdir(), 'panels-smoke-'));
   const proc = spawn(shell, ['--headless', '--disable-gpu', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
   const file = join(dir, 'DevToolsActivePort');
-  for (let i = 0; i < 100 && !existsSync(file); i++) await wait(100);
-  const port = readFileSync(file, 'utf8').split('\n')[0];
-  const pages = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
-  const ws = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
-  await new Promise((r) => ws.addEventListener('open', r));
+  let ws;
+  try {
+    for (let i = 0; i < 100 && !existsSync(file); i++) await wait(100);
+    if (!existsSync(file)) throw new Error(shell + ' did not start (no DevToolsActivePort in 10 s)');
+    const port = readFileSync(file, 'utf8').split('\n')[0];
+    const pages = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
+    ws = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
+    await new Promise((r) => ws.addEventListener('open', r));
+  } catch (e) {
+    // a browser that never came up: no orphan Chromium, no profile left behind
+    proc.kill();
+    rmSync(dir, { recursive: true, force: true });
+    e.notRun = true;
+    throw e;
+  }
   let id = 0;
   const waiting = new Map();
   ws.addEventListener('message', (e) => {
@@ -42,8 +52,18 @@ async function main() {
     console.log('no headless Chromium (Playwright\'s headless shell, or CHROMIUM=<path>): not run');
     return 2;
   }
-  const server = await serve(0);
-  const b = await browser(shell);
+  let server = null;
+  let b = null;
+  try {
+    server = await serve(0);
+    b = await browser(shell);
+  } catch (e) {
+    if (b) b.close();
+    if (server) server.close();
+    if (!e.notRun) throw e;
+    console.log(e.message + ': not run');
+    return 2;
+  }
   const js = async (expr) => {
     const r = await b.send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
     if (r.exceptionDetails) throw new Error(expr + ': ' + JSON.stringify(r.exceptionDetails.exception && r.exceptionDetails.exception.description));

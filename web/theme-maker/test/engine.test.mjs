@@ -53,7 +53,8 @@ function built(s) {
 test('every snapshot is what the library builds of its ask (the JVM wrote them, the library is held to them)', () => {
   const all = [...shots.shots, ...shots.popups];
   // bar-*: T6a's BarSample scenes, built straight from the sample, not asked of the facade
-  assert.equal(all.length, readdirSync(join(data, 'snapshots')).filter((f) => !f.startsWith('bar-')).length, 'a shot for every snapshot');
+  const names = all.map((s) => s.name + '.txt').sort();
+  assert.deepEqual(names, readdirSync(join(data, 'snapshots')).filter((f) => !f.startsWith('bar-')).sort(), 'a shot for every snapshot, each once');
   const wrong = all.filter((s) => built(s).text() !== read(data, 'snapshots', s.name + '.txt')).map((s) => s.name);
   assert.deepEqual(wrong, []);
 });
@@ -108,6 +109,7 @@ test('a theme is written as the JVM writes it; a bad one is its problems with th
   assert.ok(E.readTheme(read(data, 'material-light.xml'), { light: { primary: '#ff0000' }, dark: {} }, null).ok);
 });
 
+// also: the built-in themes and layouts are what the build put in (lib/keyboard-scene builtInFiles)
 test("the app's layouts are the library's, a layout of a page's reads with its own fragments or the app's", () => {
   const dir = join(scene, 'commonMain', 'layouts');
   const files = readdirSync(dir).filter((f) => f.endsWith('.xml')).map((f) => f.slice(0, -4)).sort();
@@ -318,13 +320,20 @@ class RecordingContext {
     this.lines.push('icon ' + p.d + ' ' + RecordingContext.box(RecordingContext.bounds(corners)) + ' ' + argb(this.s.fillStyle));
   }
 
+  // a stroked text's line is its stroke's; the fill right after it must be the same text at the same place in the
+  // colour set before the stroke, or a fill gone wrong (moved, its colour left as another's) would pass unseen
   fillText(text, x, y) {
-    if (this.stroked === text) { this.stroked = null; return; }
+    const st = this.stroked;
+    this.stroked = null;
+    if (st && st.text === text) {
+      assert.deepEqual([x, y, [...this.s.m], argb(this.s.fillStyle)], [st.x, st.y, st.m, st.fill], 'the fill of stroked ' + text);
+      return;
+    }
     this.text(text, x, y, argb(this.s.fillStyle), '');
   }
 
   strokeText(text, x, y) {
-    this.stroked = text;
+    this.stroked = { text, x, y, m: [...this.s.m], fill: argb(this.s.fillStyle) };
     const [a, b] = this.s.m;
     this.text(text, x, y, argb(this.s.strokeStyle), ' stroke=' + n(this.s.lineWidth * Math.hypot(a, b)));
   }
@@ -345,6 +354,9 @@ class RecordingContext {
     if (sh) { px += sh[1]; py += sh[2]; color = sh[0]; blur = sh[3]; }
     this.lines.push({ t: 'text', text, x: px, y: py, w: m[1], size, sx, ls: spacing / Number(m[2]), color, stroke, blur, rot: Math.round(angle * 180 / Math.PI) });
   }
+
+  // a text's width, for the area a text's layer takes (the painter's textArea): no fonts here, a half em a letter
+  measureText(text) { return { width: text.length * (parseFloat(this.s.font.split('px')[0].split(' ').at(-1)) || 10) / 2 }; }
 
   createLinearGradient() { return { addColorStop() {} }; }
 
@@ -477,11 +489,6 @@ test("the facade's answers to values of the wrong type are problems, never a thr
   assert.ok(E.buildScene('qwerty', t, JSON.stringify(env), fixed).ok);
   assert.equal(E.buildPopup(t, env, { kind: 'nope' }, fixed).problems[0].message, 'no popup of kind "nope"');
   assert.ok(E.paint(scene, new RecordingContext(), { pressed: ['q'] }).ok);
-});
-
-test('the built-in themes and layouts are what the build put in (lib/keyboard-scene builtInFiles)', () => {
-  assert.ok(E.layouts().includes('qwerty') && E.layouts().includes('nine'));
-  assert.equal(E.layoutSource('grouped-bottom'), packed(read(scene, 'commonMain', 'layouts', 'grouped-bottom.xml')));
 });
 
 test("the bar's sample and the app's views' looks for the maker's preview (M3): of the theme, its height the bar's", () => {

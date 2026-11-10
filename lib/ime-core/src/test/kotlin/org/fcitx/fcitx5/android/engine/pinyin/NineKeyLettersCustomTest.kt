@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -14,6 +15,13 @@ import org.junit.Test
 
 /** Any layout's letter groups as a grouped keyboard ([NineKeyLetters.custom]) and a tap's place on a key's letters in two dimensions (060-render-p3 T9a). */
 class NineKeyLettersCustomTest {
+
+    // the keyboard in use is process-wide (NineKeyLetters.inUse): none of this test's left for the next
+    @After
+    fun noneInUse() {
+        NineKeyLetters.clearInUse()
+    }
+
 
     // the 17 keys of the sample layout (keyboard-scene's commonTest data k17.xml)
     private val k17 = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")

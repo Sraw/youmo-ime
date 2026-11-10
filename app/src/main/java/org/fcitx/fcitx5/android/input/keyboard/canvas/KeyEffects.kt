@@ -53,6 +53,11 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         val clip = RenderNode("ripple clip").apply { setHasOverlappingRendering(false) }
         val inner = RenderNode("ripple").apply { setHasOverlappingRendering(false) }
         var scale = 1f
+
+        // the path it is clipped to, its own and set again each press (no press allocates); [clipped] false: its
+        // outline's rounded rectangle clips it
+        val clipPath = Path()
+        var clipped = false
     }
 
     private class Particle : Playing() {
@@ -80,9 +85,6 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
 
     private val ticker = TimeAnimator().apply { setTimeListener { _, _, _ -> tick(SystemClock.uptimeMillis()) } }
 
-    // the path each playing ripple is clipped to (null: its outline's rounded rectangle), for a test
-    private val clipPaths = HashMap<Ripple, Path?>()
-
     /** Nodes the pools hold: never more than [MAX_RIPPLES] + [MAX_PARTICLES]. */
     @get:VisibleForTesting
     val pooled: Int get() = ripples.size + particles.size
@@ -109,9 +111,9 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
 
     /** The path each ripple playing now is clipped to in its node; null where its outline (a rounded rectangle's) clips it. */
     @VisibleForTesting
-    fun rippleClipPaths(): List<Path?> = ripples.filter { it.live }.map { clipPaths[it] }
+    fun rippleClipPaths(): List<Path?> = ripples.filter { it.live }.map { r -> if (r.clipped) Path(r.clipPath) else null }
 
-    /** [effect] played over [face] (its key's [shape]) from ([x], [y]) in the view; nothing where its image is not in. */
+    /** [effect] played over its key's face ([shape]) from ([x], [y]) in the view; nothing where its image is not in. */
     fun play(effect: KeyEffect, shape: Shape, x: Float, y: Float) {
         val sprite = sprite(effect.file) ?: return
         val now = SystemClock.uptimeMillis()
@@ -234,7 +236,8 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         } finally {
             r.clip.endRecording()
         }
-        clipPaths[r] = if (radius == null) Path(path) else null
+        r.clipped = radius == null
+        if (r.clipped) r.clipPath.set(path)
     }
 
     // [shape] into [path], at [left], [top] (its box in [box])
@@ -312,7 +315,6 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
     fun stop() {
         ripples.forEach { it.live = false }
         particles.forEach { it.live = false }
-        clipPaths.clear()
         if (ticker.isStarted) ticker.end()
     }
 

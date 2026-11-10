@@ -5,6 +5,16 @@
 (function (root) {
   'use strict';
 
+  // the comments of [xml] blanked (same length), so what is looked for is never found inside one
+  const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => ' '.repeat(c.length));
+  const unescape = (v) => v.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const escape = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // a file named by an attribute: either quote, spaces around '=' (as XML has it and the app reads it)
+  const srcOf = (tag, attr) => new RegExp('<(' + tag + ')\\b[^>]*?\\b(' + attr + ')\\s*=\\s*(?:"([^"]+)"|\'([^\']+)\')', 'g');
+  const fileOf = (m) => unescape(m[3] ?? m[4]);
+  // the image a style's function names: a key's image(…), an effect's ripple-image(…) or particles(…)
+  const IMAGE_FN = /(?<![\w-])(image|ripple-image|particles)\(\s*([^,)\s]+)/g;
+
   const THEME_XML = 'theme.xml';
   const LAYOUTS = 'layouts/';
   const UNDO_LIMIT = 100;
@@ -18,14 +28,18 @@
 
   /** The <theme>'s name= of [xml], null for none. */
   function themeName(xml) {
-    const m = /<theme\b[^>]*?\sname="([^"]*)"/.exec(xml);
-    return m ? m[1] : null;
+    const m = /<theme\b(?:[^>"']|"[^"]*"|'[^']*')*?\sname\s*=\s*("([^"]*)"|'([^']*)')/.exec(uncommented(xml));
+    return m ? unescape(m[2] ?? m[3]) : null;
   }
 
   /** [xml] with its <theme>'s name= [name] (one put in where it has none). */
   function withName(xml, name) {
-    if (themeName(xml) != null) return xml.replace(/(<theme\b[^>]*?\sname=")[^"]*(")/, (all, a, b) => a + name + b);
-    return xml.replace(/<theme\b/, (t) => t + ' name="' + name + '"');
+    const t = /<theme\b(?:[^>"']|"[^"]*"|'[^']*')*?\/?>/.exec(uncommented(xml));
+    if (!t) return xml;
+    const tag = xml.slice(t.index, t.index + t[0].length);
+    const attr = /(\s)name\s*=\s*("[^"]*"|'[^']*')/;
+    const named = attr.test(tag) ? tag.replace(attr, (all, sp) => sp + 'name="' + escape(name) + '"') : tag.replace(/^<theme\b/, '<theme name="' + escape(name) + '"');
+    return xml.slice(0, t.index) + named + xml.slice(t.index + t[0].length);
   }
 
   /** A new document of the app's theme [id] (engine's themeSource), named apart from it so an import adds a theme. */
@@ -35,8 +49,6 @@
     return doc(withName(xml, id + '-mine'));
   }
 
-  // the comments of [xml] blanked (same length), so what is looked for is never found inside one
-  const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => ' '.repeat(c.length));
 
   // a picture the user picks is never kept as it was (the user's ruling, 2026-11-09): always encoded anew, its long
   // side no more than longSide (never made bigger), JPEG at quality; PNG only where it has transparency
@@ -75,11 +87,13 @@
     if (!read.ok) return read.problems.map((p) => ({ level: 'error', line: p.line || 0, message: p.message }));
     const name = read.theme.name;
     if (name == null || !L.isPlainFileName(name) || name.startsWith('.') || /#(light|dark)$/.test(name)) bad('主题名 "' + name + '" 不能做文件名');
+    // the app refuses a pack named as a built-in theme (ThemeFilesManager.packClash): the names the page is given
+    else if ((format.builtinNames || []).includes(name)) bad('主题名 "' + name + '" 是 App 内置主题的名字，App 不会收；换一个名字');
     const xml = uncommented(d.xml);
     const named = new Set();
-    for (const m of xml.matchAll(/<(picture|cut|font|icon)\b[^>]*?\b(src|file)="([^"]+)"/g)) named.add(m[3] + '|' + m[1]);
-    for (const m of xml.matchAll(/\bimage\(\s*([^,)\s]+)/g)) named.add(m[1].replace(/^["']|["']$/g, '') + '|image');
-    for (const m of xml.matchAll(/<meta\b[^>]*?\bpreview="([^"]+)"/g)) named.add(m[1] + '|preview');
+    for (const m of xml.matchAll(srcOf('picture|cut|font|icon', 'src|file'))) named.add(fileOf(m) + '|' + m[1]);
+    for (const m of xml.matchAll(IMAGE_FN)) named.add(m[2].replace(/^["']|["']$/g, '') + '|' + (m[1] === 'image' ? 'image' : 'effect'));
+    for (const m of xml.matchAll(srcOf('meta', 'preview'))) named.add(fileOf(m) + '|preview');
     for (const key of named) {
       const [file, role] = key.split('|');
       const bytes = d.files[file];
@@ -90,6 +104,13 @@
         if (!s) bad(file + ' 不是 App 认得的图片');
         else if (Math.max(s[0], s[1]) > side) bad(file + ' 太大：' + s[0] + '×' + s[1] + '，最多 ' + side);
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
+      } else if (role === 'effect') {
+        // the app's ThemeAssetLimits.checkEffectImage: PNG or WebP by its name, its sides and bytes
+        const s = L.imageSize(bytes);
+        if (!/\.(png|webp)$/i.test(file)) bad(file + '：特效图片只能是 .png 或 .webp');
+        else if (!s) bad(file + ' 不是 App 认得的图片');
+        else if (lim.effectImageSide != null && Math.max(s[0], s[1]) > lim.effectImageSide) bad(file + ' 太大：' + s[0] + '×' + s[1] + '，特效图片最多 ' + lim.effectImageSide);
+        else if (lim.effectImageBytes != null && bytes.length > lim.effectImageBytes) bad(file + ' 超过 ' + lim.effectImageBytes + ' 字节（特效图片）');
       } else if (role === 'preview') {
         // the app's ThemeAssetLimits.preview
         const s = L.imageSize(bytes);
@@ -106,12 +127,12 @@
       }
     }
     // an animated <picture> (060-render-p3 A4): past the app's limits it is drawn still, with a warning on import
-    // either quote, spaces around '=': as XML has it and the app reads it
-    const anim = /<picture\b[^>]*?\banimated\s*=\s*(["'])true\1[^>]*>/.exec(xml);
-    const animSrc = anim && /\bsrc\s*=\s*(["'])(.+?)\1/.exec(anim[0]);
-    if (animSrc && d.files[animSrc[2]]) {
-      const why = animatedStill(lim, d.files[animSrc[2]]);
-      if (why) out.push({ level: 'warning', line: 0, message: animSrc[2] + ' 在 App 里会显示成静态图：' + why });
+    // the engine's reading of it (info().picture.animated), each version's
+    const animSrcs = new Set([false, true].map((dark) => read.theme.info(dark).picture).filter((p) => p && p.animated).map((p) => p.src));
+    for (const animSrc of animSrcs) {
+      if (!d.files[animSrc]) continue;
+      const why = animatedStill(lim, d.files[animSrc]);
+      if (why) out.push({ level: 'warning', line: 0, message: animSrc + ' 在 App 里会显示成静态图：' + why });
     }
     // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
     const layouts = Object.create(null);
@@ -131,6 +152,9 @@
       const id = n.replace(/\.xml$/, '');
       if (!boards.has(id) && E.layoutSource(id) == null) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：App 没有这个键盘，不会用它' });
     }
+    // the app's ThemeAssetLimits.MAX_THEME_XML_BYTES
+    const xmlBytes = enc.encode(d.xml).length;
+    if (lim.themeXmlBytes != null && xmlBytes > lim.themeXmlBytes) bad('theme.xml 有 ' + xmlBytes + ' 字节，App 最多收 ' + lim.themeXmlBytes + ' 字节');
     let total = 0;
     const sizes = [enc.encode(d.xml).length, ...Object.values(d.files).map((b) => b.length), ...Object.values(d.layouts).map((t) => enc.encode(t).length)];
     for (const [i, size] of sizes.entries()) {
@@ -153,9 +177,10 @@
     const xml = uncommented(d.xml);
     const roles = new Map();
     const name = (n, role) => { if (!roles.has(n)) roles.set(n, role); };
-    for (const m of xml.matchAll(/<picture\b[^>]*?\bsrc="([^"]+)"/g)) name(m[1], 'source');
-    for (const m of xml.matchAll(/<cut\b[^>]*?\bfile="([^"]+)"/g)) name(m[1], 'picture');
-    for (const m of xml.matchAll(/\bimage\(\s*([^,)\s]+)/g)) name(m[1].replace(/^["']|["']$/g, ''), 'key');
+    for (const m of xml.matchAll(srcOf('picture', 'src'))) name(fileOf(m), 'source');
+    for (const m of xml.matchAll(srcOf('cut', 'file'))) name(fileOf(m), 'picture');
+    // an effect's image is not drawn by the preview: not decoded
+    for (const m of xml.matchAll(IMAGE_FN)) if (m[1] === 'image') name(m[2].replace(/^["']|["']$/g, ''), 'key');
     let spent = 0;
     const out = [];
     for (const [n, role] of roles) {
@@ -236,7 +261,7 @@
       const kx = Object.keys(x).sort();
       const ky = Object.keys(y).sort();
       if (kx.join('\n') !== ky.join('\n')) return false;
-      return kx.every((k) => (byte ? x[k].length === y[k].length && x[k].every((v, i) => v === y[k][i]) : x[k] === y[k]));
+      return kx.every((k) => (byte ? x[k] === y[k] || (x[k].length === y[k].length && x[k].every((v, i) => v === y[k][i])) : x[k] === y[k]));
     };
     return eq(a.files, b.files, true) && eq(a.layouts, b.layouts, false);
   }
@@ -281,9 +306,17 @@
    * page without drafts, never one that stops.
    */
   const DRAFT = 'draft';
+  // the files apart from the text: written again only when they changed (an edit of theme.xml shares its files
+  // object with the document before it), not megabytes of pictures each time a value is typed
+  const DRAFT_FILES = 'draft-files';
+  const keptFiles = new WeakMap(); // the store → the files object last written to it
   async function keepDraft(store, d, env) {
     try {
-      await store.put(DRAFT, { v: 1, doc: { xml: d.xml, files: d.files, layouts: d.layouts }, env, at: Date.now() });
+      if (keptFiles.get(store) !== d.files) {
+        await store.put(DRAFT_FILES, d.files);
+        keptFiles.set(store, d.files);
+      }
+      await store.put(DRAFT, { v: 2, doc: { xml: d.xml, layouts: d.layouts }, env, at: Date.now() });
       return true;
     } catch (e) {
       return false;
@@ -292,8 +325,10 @@
   async function draft(store) {
     try {
       const v = await store.get(DRAFT);
-      if (!v || v.v !== 1 || !v.doc || typeof v.doc.xml !== 'string') return null;
-      return { doc: doc(v.doc.xml, v.doc.files || {}, v.doc.layouts || {}), env: v.env || null, at: v.at };
+      if (!v || (v.v !== 1 && v.v !== 2) || !v.doc || typeof v.doc.xml !== 'string') return null;
+      // 1: the files kept with the text (the page before they were kept apart)
+      const files = v.v === 1 ? v.doc.files : await store.get(DRAFT_FILES);
+      return { doc: doc(v.doc.xml, files || {}, v.doc.layouts || {}), env: v.env || null, at: v.at };
     } catch (e) {
       return null;
     }
@@ -301,6 +336,8 @@
   async function dropDraft(store) {
     try {
       await store.remove(DRAFT);
+      await store.remove(DRAFT_FILES);
+      keptFiles.delete(store);
     } catch (e) {
       // nothing kept: nothing to drop
     }
@@ -346,7 +383,6 @@
   const FORMS = ['normal', 'compact', 'floating', 'left', 'right', 'split', 'flat'];
   const BOARDS = ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols', 'handwriting'];
 
-  /** The environment's choices as the page starts. */
   /**
    * The preview's environment (060-render-p3 §5.1 预览环境): the device, the board and its form; the field and the
    * input method typed in (the theme's `@field=`, `@im=`); what is shown besides the keys: a popup (`show`: preview,

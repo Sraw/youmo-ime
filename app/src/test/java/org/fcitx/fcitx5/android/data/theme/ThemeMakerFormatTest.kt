@@ -142,6 +142,9 @@ class ThemeMakerFormatTest {
         put("animatedSide", ThemeAssetLimits.MAX_ANIMATED_SIDE)
         put("animatedFrames", ThemeAssetLimits.MAX_ANIMATED_FRAMES)
         put("animatedFrameMs", ThemeAssetLimits.MIN_ANIMATED_FRAME_MS)
+        put("effectImageSide", ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE)
+        put("effectImageBytes", ThemeAssetLimits.MAX_EFFECT_IMAGE_BYTES)
+        put("themeXmlBytes", ThemeAssetLimits.MAX_THEME_XML_BYTES)
     }
 
     @Test
@@ -155,6 +158,8 @@ class ThemeMakerFormatTest {
             put("older", JsonArray(CustomThemeSerializer.knownVersions.filter { it != current && it != "2.1" }.map(::JsonPrimitive)))
             put("types", types())
             put("limits", limits())
+            // the names a pack may not take (ThemePackFiles.builtinClash): each built-in version's 0.5 name, ref and file
+            put("builtinNames", JsonArray(TestThemes.builtins.flatMap { (old, t) -> listOf(old, t.name, t.file) }.distinct().map(::JsonPrimitive)))
             put("defaults", buildJsonObject {
                 put("keys", pretty.encodeToJsonElement(KeysJson.of(LookDefaults.KEYS)))
                 put("text", pretty.encodeToJsonElement(TextJson.of(LookDefaults.TEXT)))

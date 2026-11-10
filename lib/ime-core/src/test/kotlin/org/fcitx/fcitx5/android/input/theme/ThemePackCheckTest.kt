@@ -4,23 +4,23 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
-import java.io.File
-import org.fcitx.fcitx5.android.scene.layout.LayoutReader
-import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.input.theme.LookFixtures.PALETTE
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.scene.look.LookTheme
+import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
-// the app's boards: keyboard-scene's files, read from here (the module's directory)
 // what the blank-key check may take on an import at its worst (a phone is some times slower than this JVM)
 private const val CHECK_BUDGET_MS = 3000
 
+// the app's boards: keyboard-scene's files, read from here (the module's directory)
 private const val LAYOUTS = "../keyboard-scene/src/commonMain/layouts"
 
 class ThemePackCheckTest {
@@ -73,6 +73,7 @@ class ThemePackCheckTest {
         val fragments = mapOf("grouped-bottom" to (LayoutReader.fragment(File(dir, "grouped-bottom.xml").readText()) as Parsed.Ok).value)
         dir.listFiles().orEmpty().filter { it.name != "grouped-bottom.xml" }.sortedBy { it.name }
             .map { BlankKeys.Board((LayoutReader.layout(it.readText()) as Parsed.Ok).value, fragments) }
+            .also { check(it.isNotEmpty()) { "no boards under ${dir.absolutePath}" } }
     }
 
     @Test
@@ -151,7 +152,6 @@ class ThemePackCheckTest {
         val start = System.nanoTime()
         assertEquals(emptyList<BlankKeys.Blank>(), ThemePackCheck.hidesRequired(t, boards))
         val ms = (System.nanoTime() - start) / 1_000_000
-        println("BlankKeys worst: $ms ms")
         assertTrue("$ms ms", ms < CHECK_BUDGET_MS)
     }
 

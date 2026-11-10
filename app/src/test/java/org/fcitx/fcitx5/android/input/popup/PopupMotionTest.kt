@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.utils.appContext
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
@@ -41,6 +42,7 @@ import org.robolectric.annotation.Config
 import splitties.dimensions.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
 import java.io.ByteArrayOutputStream
 import java.time.Duration
 import java.util.zip.ZipEntry
@@ -90,13 +92,19 @@ class PopupMotionTest {
         )
     }
 
+    // the IME's scopes the popups were made with: cancelled as the test ends, no bubble's job outliving it
+    private val imes = mutableListOf<CoroutineScope>()
+
+    @After
+    fun cancelImes() = imes.forEach { it.cancel() }
+
     private fun popups(theme: Theme = moving): PopupComponent {
         val popup = PopupComponent()
         val scope = DynamicScope()
         scope += ContextThemeWrapper(RuntimeEnvironment.getApplication(), android.R.style.Theme_DeviceDefault).wrapToUniqueComponent()
         scope += theme.wrapToUniqueComponent()
         // a bubble let go sooner than 100 ms after it came up goes later, on the IME's scope
-        val ime: CoroutineScope = MainScope()
+        val ime: CoroutineScope = MainScope().also { imes += it }
         scope += ime.wrapToUniqueComponent()
         scope += PunctuationComponent()
         scope += popup

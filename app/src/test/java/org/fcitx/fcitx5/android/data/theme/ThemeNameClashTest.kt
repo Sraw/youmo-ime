@@ -200,8 +200,8 @@ class ThemeNameClashTest {
         assertEquals(setOf("mine.json", uuid("monokai") + ".json"), jsons())
     }
 
-    // Android's sepolicy denies apps hard links (`neverallow all_untrusted_apps file_type:file link`): a JVM test
-    // links fine, so the json move is held to not using one here
+    // contract: Android's sepolicy denies apps hard links (`neverallow all_untrusted_apps file_type:file link`): a
+    // JVM test links fine, so no run here can tell; the source is read instead, the json move held to not using one
     @Test
     fun aJsonIsMovedWithoutAHardLink() {
         val source = File("src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeFilesManager.kt").readText()

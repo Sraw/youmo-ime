@@ -96,7 +96,8 @@ abstract class BaseKeyboard(
     protected val keyImages: BoardImages by lazy {
         val look = ThemeManager.shownLook(theme)
         // a pack's: every image its styles name (060-render-p3 T8a; a few, ThemeAssetLimits holds each)
-        (theme as? Theme.Pack)?.let { return@lazy ThemeAssets.boardImages(look, themeBoard, ThemePackFiles.images(it.drawn)) }
+        // every board of it one set, shared (no board in the key: the same files decoded once, not once a board)
+        (theme as? Theme.Pack)?.let { return@lazy ThemeAssets.boardImages(look, null, ThemePackFiles.images(it.drawn)) }
         // no board name (the number row, a search's keys): the kinds' and the roles' images still
         val board = themeBoard
         // its keys' and the places it draws apart from them (the nine keys' column)
@@ -197,6 +198,9 @@ abstract class BaseKeyboard(
      * [KeyDrawing]), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
      * one: sent as the engine's stroke key (Keyboard.strokeKey), the shape StrokeShape's; one it
      * reads as none is dropped.
+     *
+     * Made also: the keyboard's 键盘手写 ([keyInk], the input method's [writes]); a keyboard that never calls
+     * this writes nothing on its keys ([onAction], [restartInk] and the pad's showing all go by it).
      */
     protected fun glideInput(
         letters: () -> List<Pair<Char, KeyPlace>>,
@@ -212,19 +216,19 @@ abstract class BaseKeyboard(
         ).also { keyInk = it }
         inkIm = writes
         return GlideInput(
-        this, theme,
-        enabled = { keyDrawing.getValue() == KeyDrawing.Glide && wordField() && enabled() },
-        letters = letters,
-        longPressMillis = { longPressDelay.toLong() },
-        down = down,
-        strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
-        stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction(KeySym(UNICODE + Keyboard.strokeKey(it)), KeyStates.Virtual)) } },
-        ink = ink,
-        // 键盘手写: an input method written in [writes] says, in a field where words are typed, not in a
-        // temporary mode; not while TalkBack explores by touch, the finger feeling for keys, not writing
-        writes = { writing() && !tempMode && !touchExploring() && PackStore.ready(PackKind.TEXT) && writes() },
-        typed = { EngineState.keysTyped.value.typed },
-        glided = glided,
+            this, theme,
+            enabled = { keyDrawing.getValue() == KeyDrawing.Glide && wordField() && enabled() },
+            letters = letters,
+            longPressMillis = { longPressDelay.toLong() },
+            down = down,
+            strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
+            stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction(KeySym(UNICODE + Keyboard.strokeKey(it)), KeyStates.Virtual)) } },
+            ink = ink,
+            // 键盘手写: an input method written in [writes] says, in a field where words are typed, not in a
+            // temporary mode; not while TalkBack explores by touch, the finger feeling for keys, not writing
+            writes = { writing() && !tempMode && !touchExploring() && PackStore.ready(PackKind.TEXT) && writes() },
+            typed = { EngineState.keysTyped.value.typed },
+            glided = glided,
         )
     }
 
@@ -755,7 +759,7 @@ abstract class BaseKeyboard(
             inkScope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
                 s.launch { EngineState.handwritingEnded.collect(ink::ended) }
                 // every answer, the same or not: a tap's mark replaced (KeyInkGesture.engineTyped)
-                s.launch { EngineState.keysTyped.collect { ink.gesture.engineTyped(it.typed) } }
+                s.launch { EngineState.keysTyped.collect { ink.gesture.engineTyped(it.typed, it.keysHeard) } }
             }
         }
     }

@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.utils.WeakHashSet
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.isDarkMode
+import org.fcitx.fcitx5.android.utils.snapshot
 import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 import java.io.IOException
@@ -92,12 +93,7 @@ object ThemeManager {
             // named bare, the pack of two versions: its version of the same lightness
             val to = if (versions.any { it.name == name }) null else (versions.firstOrNull { it.isDark == custom.isDark } ?: versions.first()).name
             val named = to != null && prefs.namesTheme(name)
-            finishing = true
-            val written = try {
-                !named || prefs.renameThemeRefs(name, to!!)
-            } finally {
-                finishing = false
-            }
+            val written = !named || quietly { prefs.renameThemeRefs(name, to!!) }
             if (!written) Timber.w("Settings naming theme $name not written: replaced by its pack at the next listing")
             if (named && written) renamed = true
             written && replacedDeleted(custom).also { if (it) customThemes.remove(custom) }
@@ -113,6 +109,15 @@ object ThemeManager {
 
     // the slots being written by [finishReplacements]: the change fired once the list is, not with the theme replaced
     private var finishing = false
+
+    private inline fun <T> quietly(write: () -> T): T {
+        finishing = true
+        try {
+            return write()
+        } finally {
+            finishing = false
+        }
+    }
 
     private fun replacedDeleted(custom: Theme.Custom): Boolean = try {
         ThemeFilesManager.deleteThemeFiles(custom).also { if (!it) Timber.w("Theme ${custom.name} replaced by its pack not deleted") }
@@ -166,7 +171,8 @@ object ThemeManager {
         val themes = ThemeFilesManager.moveClashing(
             ThemeFilesManager.listThemes(prefs.legacyLook()),
             clashes = { BuiltinThemeFiles.find(builtinThemes, it) != null },
-            repoint = { from, to -> prefs.renameThemeRefs(from, to).also { changed = changed || it } },
+            // written quietly, as finishReplacements' are: the theme in use read once the list has the moved one
+            repoint = { from, to -> quietly { prefs.renameThemeRefs(from, to) }.also { changed = changed || it } },
         )
         val customs = themes.mapTo(HashSet()) { it.name }
         customs += ThemeFilesManager.mayHoldThemes(BuiltinThemeFiles.LEGACY.keys)
@@ -244,7 +250,7 @@ object ThemeManager {
 
     private fun fireChange() {
         prefetch()
-        onChangeListeners.forEach { it.onThemeChange(_activeTheme) }
+        onChangeListeners.snapshot().forEach { it.onThemeChange(_activeTheme) }
     }
 
     // the theme's picture decoded ahead, off the main thread, as wide as the screen (the keyboard's, nearly)
@@ -303,12 +309,24 @@ object ThemeManager {
     }
 
     /**
+     * Deletes [theme] alone: a 3.0 theme beside a pack of its name (a backup restored) keeps the other. As [deleteTheme]
+     * by name else.
+     */
+    fun deleteTheme(theme: Theme): Boolean = when (theme) {
+        is Theme.Pack -> deleteTheme(theme.name, ofCustom = false, ofPack = true)
+        is Theme.Custom -> deleteTheme(theme.name, ofCustom = true, ofPack = false)
+        else -> deleteTheme(theme.name)
+    }
+
+    /**
      * Deletes the theme [name] (a pack's version: the pack, each of its versions); whether it was let, none while
      * the themes are not settled (the user told).
      */
-    fun deleteTheme(name: String): Boolean {
+    fun deleteTheme(name: String): Boolean = deleteTheme(name, ofCustom = true, ofPack = true)
+
+    private fun deleteTheme(name: String, ofCustom: Boolean, ofPack: Boolean): Boolean {
         if (refuseIfNotSettled()) return false
-        customThemes.find { it.name == name }?.also {
+        if (ofCustom) customThemes.find { it.name == name }?.also {
             // its json not deleted: still listed (the next listing reads it), not shown as gone
             if (!ThemeFilesManager.deleteThemeFiles(it)) {
                 Timber.w("Theme $name not deleted")
@@ -316,7 +334,7 @@ object ThemeManager {
             }
             customThemes.remove(it)
         }
-        val pack = packs.find { it.name == name }?.also { pack ->
+        val pack = if (!ofPack) null else packs.find { it.name == name }?.also { pack ->
             ThemeFilesManager.deletePack(pack.file)
             packs = packs.filter { it.file != pack.file }
         }
@@ -351,7 +369,25 @@ object ThemeManager {
 
     /** The pack [file] imported (put in place, a pack of its name replaced): listed again, the keyboard drawn anew if it is in use. */
     fun packPlaced(file: String) {
-        filesChanged((_activeTheme as? Theme.Pack)?.takeIf { it.file == file }?.name ?: file) { refreshThemes() }
+        // a pack of one version replaced by one of two: a slot naming it bare names its version of the same
+        // lightness, as a 3.0 theme replaced (finishReplacements): the theme picked not lost
+        val single = packs.singleOrNull { it.file == file && it.name == file }
+        filesChanged((_activeTheme as? Theme.Pack)?.takeIf { it.file == file }?.name ?: file) {
+            refreshThemes()
+            if (single != null && repointBare(file, single.isDark)) {
+                syncToDeviceEncryptedStorage()
+                activeTheme = evaluateActiveTheme()
+            }
+        }
+    }
+
+    // the slots naming the pack [file] bare, where the pack placed has two versions, renamed to the one [dark] or not
+    // (the list has it); whether one was
+    private fun repointBare(file: String, dark: Boolean): Boolean {
+        val versions = packs.filter { it.file == file }
+        if (versions.size < 2 || !prefs.namesTheme(file)) return false
+        val to = (versions.firstOrNull { it.isDark == dark } ?: versions.first()).name
+        return quietly { prefs.renameThemeRefs(file, to) }.also { if (!it) Timber.w("Settings naming theme pack $file not renamed to $to") }
     }
 
     fun setNormalModeTheme(theme: Theme) {

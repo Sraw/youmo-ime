@@ -487,7 +487,8 @@ class GroupedKeyboard private constructor(
     // a layout's own groups told the engine as this keyboard is shown, before any of its keys is tapped
     // (KeyboardWindow attaches a keyboard as it makes it): a keyboard kept while another's own groups were
     // shown tells its own again (EngineState.ownKeys). Not as it is made: one made and never shown (a
-    // preview) would change the groups the keyboard shown is read by (review L2)
+    // preview) would change the groups the keyboard shown is read by. A built-in grouping leaves it as it is, on
+    // purpose (sticky): only a layout of its own sends the codes those groups read, so the stale ones read nothing
     override fun onAttach() {
         super.onAttach()
         grouping.own?.let { EngineState.ownKeys = it }

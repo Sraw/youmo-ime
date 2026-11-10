@@ -44,9 +44,9 @@
 
 ### VO-06 [P1] 数字按习惯写
 - **前提**：B0-语音。
-- **操作**：按住空格说"二零零二年"，松开；再按住说"百分之五十七"，松开。
-- **预期**：框里是「2002年57%」（或中间带标点）。
-- **JVM**：`VoiceHoldUatTest.numbersAreWrittenInDigits`（识别出的「二零零二年」「百分之五十七」经整理模型的数字头（测试里的小标注器）和 ChineseNumbers 上屏为「2002年57%」；`aTaggerFailingTypesTheRawText`：整理失败时原样上屏「二零零二年」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；数字写法的细则（「二十四点半」「二十四点三十」「八点五」「三点两」照说的，「一九二点一六八」写作 192.168）见 `ChineseNumbersTest.whatDoesNotReadAsItsKindStaysAsSaid`、`ChineseNumbersTest.digitsAreDigitByDigit`（`lib/ime-core`）；设备上不跑。听不听得出是 `~/voice-eval` 的基准。
+- **操作**：按住空格说"二零零二年"，松开；再按住说"百分之五十七"，松开。再分别说"十二万三千""一百二十三万四千五百六十七"。
+- **预期**：框里是「2002年57%」（或中间带标点）；后两句写成「12.3万」「1234567」（万、亿后面还有数时最多两位小数，两位不够精确就写全）。
+- **JVM**：`VoiceHoldUatTest.numbersAreWrittenInDigits`（识别出的「二零零二年」「百分之五十七」经整理模型的数字头（测试里的小标注器）和 ChineseNumbers 上屏为「2002年57%」；`aTaggerFailingTypesTheRawText`：整理失败时原样上屏「二零零二年」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；数字写法的细则（「二十四点半」「二十四点三十」「八点五」「三点两」照说的，「一九二点一六八」写作 192.168，十二万三千 → 12.3万、一百二十三万四千五百六十七 → 1234567）见 `ChineseNumbersTest.whatDoesNotReadAsItsKindStaysAsSaid`、`ChineseNumbersTest.moreAfterABigPlaceIsItsDecimalOfAtMostTwoPlaces`、`ChineseNumbersTest.digitsAreDigitByDigit`（`lib/ime-core`）；设备上不跑。听不听得出是 `~/voice-eval` 的基准。
 
 ### VO-07 [P1] 不是数字的不乱改
 - **前提**：B0-语音。

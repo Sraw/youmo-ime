@@ -31,6 +31,8 @@ SAMPLES = (
     '你好你呢尼拟妮泥倪逆明天下午三点开会收到谢谢快速输入发送这条消息的了是我不在有人中大上个'
     '拼音注音五笔仓颉双拼手写符号表情颜文字搜索英文数字空格换行确定返回发送前往完成下一步上一步锁定撤销重做全选剪切复制粘贴关'
     '，。、；：？！…—～·“”‘’（）《》【】「」『』〈〉￥'
+    # the page's own previews (src/ui.js): the clipboard's, the symbol picker's tabs, the editing panel's arrows
+    '复制的一段文字幽默输入法常用中文英文数学箭头全选粘贴剪切←→'
 )
 
 # Latin: ASCII, Latin-1, general punctuation, the euro; Han: the CJK punctuation, the full-width forms, 注音 and its tone marks
@@ -90,11 +92,12 @@ def main(where):
     total = 0
     for weight, roboto, noto in ((400, 'Roboto-Regular.ttf', 'NotoSansCJK-Regular.ttc'), (700, 'Roboto-Bold.ttf', 'NotoSansCJK-Bold.ttc')):
         r = TTFont(io.BytesIO(source(where, roboto)))
-        total += cut(r, latin & set(r.getBestCmap()), OUT / f'latin-{weight}.woff2')
-        # face 2 of the collection: Noto Sans CJK SC
+        has = set(r.getBestCmap())
+        total += cut(r, latin & has, OUT / f'latin-{weight}.woff2')
+        # face 2 of the collection: Noto Sans CJK SC; it also takes what Roboto lacks below U+2E80 (arrows, ⌫, ⇧)
         n = TTCollection(io.BytesIO(source(where, noto))).fonts[2]
         assert 'SC' in n['name'].getDebugName(4), n['name'].getDebugName(4)
-        total += cut(n, han & set(n.getBestCmap()), OUT / f'han-{weight}.woff2')
+        total += cut(n, (han | (latin - has)) & set(n.getBestCmap()), OUT / f'han-{weight}.woff2')
     print(OUT, total, 'bytes;', len(latin), 'Latin and', len(han), 'Han code points asked')
 
 

@@ -164,7 +164,10 @@ object SceneLayouts {
         val fragments = HashMap<String, Fragment>()
         for (src in layout.parts.filterIsInstance<Include>().map { it.src }.distinct()) {
             val t = runCatching { source.text(src) ?: back.takeIf { it.key != source.key }?.text(src) }
-                .getOrElse { return null.also { _ -> Timber.e(it, "scene layout %s: fragment %s unread", id, src) } }
+                .getOrElse { e ->
+                    Timber.e(e, "scene layout %s: fragment %s unread", id, src)
+                    return null
+                }
                 ?: return null.also { Timber.e("scene layout %s: no fragment %s", id, src) }
             when (val f = LayoutReader.fragment(t)) {
                 is Parsed.Ok -> fragments[src] = f.value

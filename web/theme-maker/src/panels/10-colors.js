@@ -107,6 +107,8 @@
     el.append(row('加一个', name, h('button', { type: 'button', textContent: '加', on: { click: () => {
       const n = name.value.trim();
       if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(n)) { api.toast('名字要字母开头，只用字母、数字、- 和 _'); return; }
+      // a name the theme has already: set it above, not reset to grey here
+      if (n in own || named.has(n)) { api.toast('已经有「' + n + '」了，在上面改它'); return; }
       api.apply((x) => ops.set(x, n, '#808080', api.env().dark));
     } } })));
   }

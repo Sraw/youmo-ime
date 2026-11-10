@@ -279,7 +279,9 @@ class KeyEffectTest {
                 it.write(png(side + 1))
             }
         }.toByteArray()
-        val refused = ThemeFilesManager.openTheme(zip.inputStream(), ThemeManager.getAllThemes()).exceptionOrNull()!!.message
+        val opened = ThemeFilesManager.openTheme(zip.inputStream(), ThemeManager.getAllThemes())
+        assertTrue("a theme over the images' limit imported", opened.isFailure)
+        val refused = opened.exceptionOrNull()!!.message
         assertEquals(appContext.getString(R.string.exception_theme_effect_image_side, side.toString()), refused)
     }
 

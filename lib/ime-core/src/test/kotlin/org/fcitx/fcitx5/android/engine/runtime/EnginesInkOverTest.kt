@@ -54,6 +54,8 @@ class EnginesInkOverTest : EnginesFixture() {
         // English is written on by none: nothing held, nothing typed there
         engines.ink(Action.Ink(1, InkReading(listOf("你"), DoubleArray(1))), shown = false, im = InputMethodCatalog.ENGLISH)
         assertFalse(engines.typedOnKeys(InputMethodCatalog.ENGLISH))
+        // nor held for pinyin's writing: the next Ink with no piece shows what it showed, nothing added
+        assertEquals("好", engines.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(HandwritingSession.NO_PIECE)).preedit)
     }
 
     @Test
@@ -153,8 +155,8 @@ class EnginesInkOverTest : EnginesFixture() {
     fun aGlideStillReadsUnderTheInk() {
         val engines = Engines(::load, null, warmUps = inPlace)
         engines.onEvent(PINYIN, EngineEvent.RESET, 0)
-        // made, wrapped: still a glide's session under it
+        // made, wrapped: still a glide's session under it, which reads the glide (English's would pass it on unread)
         val g = Glide(floatArrayOf(0f, 0f, 1f, 0f), GlideLayout.QWERTY)
-        assertTrue(engines.glide(PINYIN, g) != null)
+        assertTrue(engines.glide(PINYIN, g)?.readings != null)
     }
 }

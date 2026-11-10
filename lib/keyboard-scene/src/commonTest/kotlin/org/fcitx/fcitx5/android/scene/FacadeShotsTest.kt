@@ -31,6 +31,7 @@ import kotlin.test.assertTrue
  */
 class FacadeShotsTest {
 
+    // contract: the files web/theme-maker/test/engine.test.mjs reads (shots.json), written here
     @Test
     fun theShotsAreWrittenForTheLibrary() {
         val text = FacadeShots.json()
@@ -44,6 +45,7 @@ class FacadeShotsTest {
 
     // the theme 3.0 the page's tests have (look-3.0.json) made 4.0 as the app makes it, its files' names: the
     // library's convert30 is held to these
+    // contract: look-3.0.xml and look-3.0-files.txt, which web/theme-maker/test/engine.test.mjs compares with
     @Test
     fun aTheme30IsMade40ForTheLibrary() {
         val file = ThemeLookReader.read(testData("look-3.0.json")).ok()
@@ -203,10 +205,10 @@ object FacadeShots {
         )
     }
 
-    /** [ask] as the library's buildPopup takes it, its sizes in px of [Forms]' density. */
+    /** [ask] as the library's buildPopup takes it, its sizes in px of [env]'s density, as PopupAsk.Preview.scene has them. */
     private fun request(ask: PopupAsk, env: Env): String = when (ask) {
         is PopupAsk.Preview -> obj(
-            "kind" to str("preview"), "text" to str(ask.text), "keyWidth" to num(ask.keyDp * Forms.DENSITY),
+            "kind" to str("preview"), "text" to str(ask.text), "keyWidth" to num(ask.keyDp * env.density),
             "size" to (if (ask.words) str("words") else null),
         )
         is PopupAsk.Keys -> obj(

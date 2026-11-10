@@ -52,7 +52,8 @@ object AnimatedWebp {
                     height = chunk.le24(CHUNK_HEAD + VP8X_HEIGHT) + 1
                 }
                 chunk.text(0, "ANMF") -> {
-                    if (got < CHUNK_HEAD + ANMF_HEAD) return null
+                    // a frame shorter than its own head says nothing of itself (its duration would be the next chunk's bytes)
+                    if (size < ANMF_HEAD || got < CHUNK_HEAD + ANMF_HEAD) return null
                     frames++
                     shortest = minOf(shortest, chunk.le24(CHUNK_HEAD + ANMF_DURATION))
                     if (frames > maxFrames) break
@@ -65,8 +66,19 @@ object AnimatedWebp {
         return Header(width, height, frames, shortest)
     }
 
-    /** [file] read once (it is no bigger than [ThemeAssetLimits.MAX_ANIMATED_BYTES] where this is asked) as [header] reads it. */
-    fun header(file: java.io.File, maxFrames: Int = Int.MAX_VALUE): Header? = header(file.readBytes(), maxFrames)
+    /** [file] as [header] reads a [Source]: each chunk's head read where it is, not the file's bytes. */
+    fun header(file: java.io.File, maxFrames: Int = Int.MAX_VALUE): Header? = java.io.RandomAccessFile(file, "r").use { f ->
+        header({ at, into ->
+            f.seek(at)
+            var n = 0
+            while (n < into.size) {
+                val r = f.read(into, n, into.size - n)
+                if (r < 0) break
+                n += r
+            }
+            n
+        }, f.length(), maxFrames)
+    }
 
     /** [bytes] as [header] reads a file. */
     fun header(bytes: ByteArray, maxFrames: Int = Int.MAX_VALUE): Header? = header({ at, into ->
