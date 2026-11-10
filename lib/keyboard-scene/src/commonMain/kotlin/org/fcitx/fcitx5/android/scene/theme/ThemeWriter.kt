@@ -9,7 +9,7 @@ package org.fcitx.fcitx5.android.scene.theme
  * file it was read from and however, and [ThemeReader] reads it back as the same theme (its
  * [Theme.styles] at other lines). What an export and the theme maker save.
  *
- * - The elements in the reader's order (meta, colors, the dark colors, picture, font, style, icon),
+ * - The elements in the reader's order (meta, colors, the dark colors, picture, font, style, icon, sounds),
  *   two spaces an indent, a line each.
  * - Colours as [Theme] holds them, resolved: `<colors>` the light version's (or the only one's), the
  *   24 of [ThemeReader.REQUIRED_COLORS] first and in that order, the theme's own after them by name;
@@ -22,7 +22,7 @@ package org.fcitx.fcitx5.android.scene.theme
  *   [value] writes it. A style that sets nothing is left out.
  * - A `path(…)` absolute (`M0 0 L1 0 Q1 1 0 1 Z`), a command to each segment; a bubble's size in %, a
  *   depth and offset in dp; a handle's grip, its width and height, in dp.
- * - Fonts and icons by name.
+ * - Fonts and icons by name; sounds as written ([Theme.soundFiles]), in their order.
  *
  * Not a faithful exporter of a 4.0 file whose `<colors>` use `system()` or other colours (`@name`,
  * `darker(@key, 10%)`): a theme read keeps their values only, resolved with the system's colours of
@@ -72,6 +72,12 @@ object ThemeWriter {
             element("  ", "style", listOf("select" to s.selectors.joinToString(", ", transform = ::selector)) + props)
         }
         theme.icons.entries.sortedBy { it.key }.forEach { (name, src) -> element("  ", "icon", listOf("name" to name, "src" to src)) }
+        // as written, a key of a later version too: its file is in the pack
+        if (theme.soundFiles.isNotEmpty()) {
+            appendLine("  <sounds>")
+            theme.soundFiles.forEach { (key, src) -> element("    ", "sound", listOf("key" to key, "src" to src)) }
+            appendLine("  </sounds>")
+        }
         appendLine("</theme>")
     }
 

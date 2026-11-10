@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
 import org.fcitx.fcitx5.android.scene.theme.IconPath
+import org.fcitx.fcitx5.android.scene.theme.SoundFile
 import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.Values
@@ -48,6 +49,8 @@ import org.fcitx.fcitx5.android.scene.web.PaintAssets
 import org.fcitx.fcitx5.android.scene.web.SceneJs
 import org.fcitx.fcitx5.android.scene.web.SceneJs.obj
 import org.fcitx.fcitx5.android.scene.web.SceneJs.problems
+import org.khronos.webgl.ArrayBuffer
+import org.khronos.webgl.Int8Array
 
 /** A theme read ([YoumoEngine.readTheme]): what [YoumoEngine.buildScene] draws with, its dark or light version as the environment is. */
 @JsExport
@@ -63,7 +66,7 @@ class YoumoTheme internal constructor(internal val theme: Theme) {
 
     /**
      * What a page shows of it besides its look: its colours by name (`#aarrggbb`, the version [dark] asks; its
-     * only one where it has one), fonts and icons by name (their files), its picture, its meta.
+     * only one where it has one), fonts and icons by name (their files), its sounds, its picture, its meta.
      */
     fun info(dark: Boolean): dynamic {
         val t = theme.variant(dark)
@@ -74,6 +77,8 @@ class YoumoTheme internal constructor(internal val theme: Theme) {
             "colors" to SceneJs.map(t.colors.mapValues { it.value.toString() }),
             "fonts" to SceneJs.map(t.fonts),
             "icons" to SceneJs.map(t.icons),
+            // as written, a later version's class too (`[{key, src}]`): the maker keeps and saves them all
+            "sounds" to t.soundFiles.map { (k, f) -> obj("key" to k, "src" to f) }.toTypedArray(),
             "picture" to t.picture?.let { p ->
                 obj("src" to p.src, "brightness" to p.brightness, "blurDp" to p.blurDp, "cuts" to SceneJs.map(p.cuts), "animated" to p.animated)
             },
@@ -255,6 +260,19 @@ object YoumoEngine {
             "warnings" to emptyArray<dynamic>(),
             "sources" to found.entries.sortedBy { it.key }.map { (p, s) -> obj("property" to p, "line" to s.line, "order" to s.order) }.toTypedArray(),
         )
+    }
+
+    /**
+     * [bytes] (a `Uint8Array` or `Int8Array`) as the theme's sound file [name] ([SoundFile], what the app imports):
+     * `{ok: false, problems}` where it is not one, else `{ok, info: {format: "ogg"|"wav"|"mp3", channels, rate, ms}}`.
+     */
+    fun readSound(name: dynamic, bytes: dynamic): dynamic = checked {
+        val view: dynamic = bytes
+        if (view == null || jsTypeOf(view.byteLength) != "number") throw NotOfType("bytes: not a Uint8Array")
+        val signed: ByteArray = Int8Array(view.buffer.unsafeCast<ArrayBuffer>(), view.byteOffset as Int, view.byteLength as Int).unsafeCast<ByteArray>()
+        result(SoundFile.read(text(name, "name"), signed)) { i ->
+            "info" to obj("format" to i.format.name.lowercase(), "channels" to i.channels, "rate" to i.rate, "ms" to i.ms)
+        }
     }
 
     /**

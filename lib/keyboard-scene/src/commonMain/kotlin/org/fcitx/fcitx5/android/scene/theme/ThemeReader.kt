@@ -30,6 +30,8 @@ object ThemeReader {
     // no control character, nor a name all dots
     internal val FILE = Regex("(?!\\.+$)[^/\\\\:*?\"<>| \\x00-\\x1F\\u00A0][^/\\\\:*?\"<>|\\x00-\\x1F]{0,127}")
     private val ICON = Regex("[a-z0-9]+(-[a-z0-9]+)*")
+    // a sound's class: a known one (SoundKey) or a later version's, worded alike
+    private val SOUND_KEY = Regex("[a-z][a-z0-9-]{0,31}")
 
     /** The colours the app's own widgets take by name (theme 3.0's, less their Color suffix). */
     val REQUIRED_COLORS = listOf(
@@ -40,10 +42,10 @@ object ThemeReader {
     )
 
     /**
-     * Elements of a later stage of 0.6.0 (060-render-p3; §16's second tier: a sound pack), read and
-     * ignored with a warning, whatever they hold; a stage that makes one work moves it out.
+     * Elements of a later version, read and ignored with a warning, whatever they hold; a version that
+     * makes one work moves it out. None now: `<sounds>` (060-theme-sounds-icons) is read.
      */
-    val RESERVED_ELEMENTS = setOf("sounds", "sound")
+    val RESERVED_ELEMENTS: Set<String> = emptySet()
 
     /**
      * [source] read, `system()` colours from [systemColors] (none: each its fallback; the light
@@ -78,9 +80,9 @@ object ThemeReader {
         val variants = variants(a)
         val version = a.matching("version", VERSION, "4.x") ?: a.required("version")
         a.done()
-        val order = listOf("meta", "colors", "picture", "font", "style", "icon")
+        val order = listOf("meta", "colors", "picture", "font", "style", "icon", "sounds")
         root.children.filter { it.name in order }.zipWithNext().firstOrNull { (x, y) -> order.indexOf(x.name) > order.indexOf(y.name) }
-            ?.let { (_, y) -> p.add(y.line, "<${y.name}> is out of order (meta, colors, picture, font, style, icon)") }
+            ?.let { (_, y) -> p.add(y.line, "<${y.name}> is out of order (meta, colors, picture, font, style, icon, sounds)") }
         root.children.filter { it.name !in order }.forEach {
             if (it.name in RESERVED_ELEMENTS) p.warn(it.line, ignored("<${it.name}>")) else p.add(it.line, "<${it.name}> is not allowed in <theme>")
         }
@@ -97,11 +99,15 @@ object ThemeReader {
         val styleEls = root.all("style")
         if (styleEls.size > maxStyles) p.add(styleEls[maxStyles].line, "over $maxStyles styles")
         // the rest not read: the file is refused already, and a million styles would each be a problem
-        val styles = styleEls.take(maxStyles).mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys) }
+        val styles = styleEls.take(maxStyles).mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys, icons.keys) }
+        undrawnIcons(root.all("icon"), icons.keys, styles, p)
+        val soundsEls = root.all("sounds")
+        if (soundsEls.size > 1) p.add(soundsEls[1].line, "<sounds> given twice")
+        val soundFiles = soundsEls.firstOrNull()?.let { sounds(it, p) }.orEmpty()
         if (picture?.animated == true) seeThroughWarnings(styles, picture.brightness, p)
         return p.result {
             val drawn = if (dark) darkColors ?: colors else colors
-            Theme(name.orEmpty(), dark, version.orEmpty(), drawn, styles, fonts, icons, picture, variants, colors, darkColors, meta, system)
+            Theme(name.orEmpty(), dark, version.orEmpty(), drawn, styles, fonts, icons, picture, variants, colors, darkColors, meta, system, soundFiles)
         }
     }
 
@@ -310,7 +316,41 @@ object ThemeReader {
         return if (name != null && src != null) name to src else null
     }
 
-    private fun style(el: XmlElement, order: Int, p: Problems, colors: Set<String>, fonts: Set<String>): Style? {
+    // <sounds>: its <sound key src>s as written; a key or an attribute of a later version warned of, its file kept
+    private fun sounds(el: XmlElement, p: Problems): List<Pair<String, String>> {
+        el.attributes.keys.filter { it != "xmlns" && !it.startsWith("xmlns:") && !it.startsWith("xsi:") }
+            .forEach { p.warn(el.line, ignored("<sounds $it=>")) }
+        val out = ArrayList<Pair<String, String>>()
+        for (s in atMost(el.children, SoundFile.MAX_SOUNDS, p, "sounds")) {
+            val (key, src) = sound(s, p) ?: continue
+            if (out.any { it.first == key }) p.add(s.line, "the sound $key is given twice")
+            if (SoundKey.of(key) == null) p.warn(s.line, ignored("<sound key=\"$key\">"))
+            out += key to src
+        }
+        return out
+    }
+
+    private fun sound(s: XmlElement, p: Problems): Pair<String, String>? {
+        if (s.name != "sound") return null.also { p.add(s.line, "<${s.name}> is not allowed in <sounds>") }
+        val a = Attributes(s, p)
+        val key = a.matching("key", SOUND_KEY, "a sound's class") ?: a.required("key")
+        val src = a.matching("src", FILE, "a file name") ?: a.required("src")
+        s.attributes.keys.filter { it != "key" && it != "src" && it != "xmlns" && !it.startsWith("xmlns:") && !it.startsWith("xsi:") }
+            .forEach { p.warn(s.line, ignored("<sound $it=>")) }
+        return if (key != null && src != null) key to src else null
+    }
+
+    // an <icon> whose name is no app's icon and no icon() names: drawn nowhere (a layout of the theme's own may)
+    private fun undrawnIcons(els: List<XmlElement>, icons: Set<String>, styles: List<Style>, p: Problems) {
+        val used = styles.flatMap { it.values.values }.mapNotNull { ((it as? Value.OfShown)?.shown as? Shown.Icon)?.name }.toSet()
+        for (name in icons) {
+            if (name in Icons.ALL || name in used) continue
+            val line = els.firstOrNull { it["name"] == name }?.line ?: 0
+            p.warn(line, "<icon name=\"$name\"> is no icon of the app's and no icon() names it: it is not drawn")
+        }
+    }
+
+    private fun style(el: XmlElement, order: Int, p: Problems, colors: Set<String>, fonts: Set<String>, icons: Set<String>): Style? {
         val a = Attributes(el, p)
         val select = a.required("select")
         val selectors = select?.let { Selector.parseList(it) ?: null.also { a.problem("select=\"$select\" is no selector") } }
@@ -331,7 +371,7 @@ object ThemeReader {
         a.done()
         selectors?.let { selectorWarnings(el, p, it) }
         selectors?.let { frame(it, values, el.line, p) }
-        named(values, a, colors, fonts)
+        named(values, a, colors, fonts, icons)
         selectors?.let { readElsewhere(it, values.keys, el.line, p) }
         reserved += selectors?.let { shapes(it, values, el.line, p) } ?: 0
         selectors?.let { unread(it, values, el.line, p) }
@@ -394,8 +434,8 @@ object ThemeReader {
             .forEach { p.warn(el.line, "@$it is no input method of this app: it selects nothing") }
     }
 
-    // what a style's [values] name is there: its colours in <colors>, its fonts a <font>, its icons the app's
-    private fun named(values: Map<String, Value>, a: Attributes, colors: Set<String>, fonts: Set<String>) {
+    // what a style's [values] name is there: its colours in <colors>, its fonts a <font>, its icons the app's or an <icon>
+    private fun named(values: Map<String, Value>, a: Attributes, colors: Set<String>, fonts: Set<String>, icons: Set<String>) {
         for (v in values.values) {
             colorsOf(v).flatMap { it.refs() }.filter { it !in colors }.forEach { a.problem("@$it is no colour") }
         }
@@ -403,7 +443,8 @@ object ThemeReader {
             (values[font] as? Value.Word)?.word?.takeIf { it != "system" && it !in fonts }?.let { a.problem("$font=\"$it\" is no <font>") }
         }
         for ((prop, v) in values) {
-            ((v as? Value.OfShown)?.shown as? Shown.Icon)?.name?.takeIf { it !in Icons.ALL }?.let { a.problem("$prop=\"icon($it)\" is no icon of the app's") }
+            ((v as? Value.OfShown)?.shown as? Shown.Icon)?.name?.takeIf { it !in Icons.ALL && it !in icons }
+                ?.let { a.problem("$prop=\"icon($it)\" is no icon of the app's nor an <icon> of the theme's") }
         }
     }
 

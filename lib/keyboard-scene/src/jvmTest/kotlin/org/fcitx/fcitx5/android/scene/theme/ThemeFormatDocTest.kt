@@ -50,6 +50,20 @@ class ThemeFormatDocTest {
     @Test
     fun reservedTableIsValuesReserved() = check("保留名单", Values.RESERVED.keys, "Values.RESERVED")
 
+    // 060-theme-sounds-icons: the reserved elements' line (另外的保留写法：元素 `<a>`、`<b>`…) names ThemeReader.RESERVED_ELEMENTS,
+    // and is not there where it has none
+    @Test
+    fun reservedElementsLineIsThemeReaders() {
+        val section = doc.split("\n## ").first { it.startsWith("保留名单\n") }
+        val line = section.lines().firstOrNull { it.startsWith(RESERVED_LINE) }
+        if (ThemeReader.RESERVED_ELEMENTS.isEmpty()) {
+            assertTrue(line == null, "docs/theme-format.md ## 保留名单 lists reserved elements, ThemeReader.RESERVED_ELEMENTS has none: remove \"$line\"")
+        } else {
+            val documented = ELEMENT.findAll(line ?: "").map { it.groupValues[1] }.toSet()
+            assertEquals(ThemeReader.RESERVED_ELEMENTS, documented, "docs/theme-format.md ## 保留名单's $RESERVED_LINE")
+        }
+    }
+
     @Test
     fun rowsAreRead() {
         // the parse itself: a table it no longer finds would pass an empty engine list, never ours
@@ -75,6 +89,8 @@ class ThemeFormatDocTest {
     private companion object {
         val SYSTEM_ROW = Regex("(?m)^\\| `([a-z0-9-]+(?:-N)?)` \\|")
         val NUMBER = Regex("`([0-9]+)`")
+        const val RESERVED_LINE = "另外的保留写法"
+        val ELEMENT = Regex("`<([a-z-]+)>`")
 
         val ROW = Regex("(?m)^\\| `([a-z][a-z-]*)` \\|")
     }
