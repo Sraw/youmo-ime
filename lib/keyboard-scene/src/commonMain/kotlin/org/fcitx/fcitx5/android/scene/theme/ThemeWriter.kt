@@ -142,6 +142,7 @@ object ThemeWriter {
         is Value.OfPath -> "path(${path(v.path)})"
         is Value.OfShown -> shown(v.shown)
         is Value.OfTransition -> "${v.transition.ms}ms ${v.transition.easing}"
+        is Value.OfAppear -> "${v.appear.kind} ${v.appear.ms}ms"
         // one value where upright and turned are alike
         is Value.OfTwin -> listOf(v.twin.portrait, v.twin.landscape).distinct()
             .joinToString(" ") { if (property == "height") "${number(it)}%" else length(it) }

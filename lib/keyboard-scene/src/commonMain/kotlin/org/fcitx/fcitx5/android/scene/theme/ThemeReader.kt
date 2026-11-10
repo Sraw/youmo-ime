@@ -422,26 +422,29 @@ object ThemeReader {
         unreadMotion(selectors, values.keys, line, p)
     }
 
-    // A1's motion a key's alone, not a part's; a pressed face's scale and sink in a pressed state alone. The window's,
-    // the panels' and the bar's widgets warned of by what they read (above)
+    // A1's motion a key's alone, not a part's; a pressed face's scale and sink in a pressed state alone. A2's: a
+    // popup's and a bubble's transition (how it goes), their and a menu's appear. The window's, the panels' and
+    // the bar's widgets warned of by what they read (above)
     private fun unreadMotion(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
         val moving = MOTION.filter { it in props }
         if (moving.isEmpty()) return
         val others = selectors.filter { it.widget !in Selector.BAR_WIDGETS && it.widget !in Selector.PANEL_WIDGETS && it.widget !in WINDOW_READS }
         for (w in others.map { it.widget }.filter { it != "key" }.distinct()) {
-            // a popup's and a preview's transition a later stage's (A2): ignored as a reserved name is, not wrong
-            if (w in LATER_MOTION && "transition" in moving) p.warn(line, "transition= on $w is not supported by this version, ignored")
-            moving.filter { w !in LATER_MOTION || it != "transition" }.forEach { p.warn(line, "$it= on $w does nothing: only a key moves") }
+            moving.filter { it !in POPUP_MOTION[w].orEmpty() }.forEach {
+                p.warn(line, if (it == "appear") "appear= on $w does nothing: only a popup, a preview or a menu comes up" else "$it= on $w does nothing: only a key moves")
+            }
         }
         for (part in others.filter { it.widget == "key" }.mapNotNull { it.part }.distinct()) {
-            moving.forEach { p.warn(line, "$it= on a key's $part does nothing: the key moves as a whole") }
+            moving.filter { it != "appear" }.forEach { p.warn(line, "$it= on a key's $part does nothing: the key moves as a whole") }
         }
+        if ("appear" in moving && others.any { it.widget == "key" }) p.warn(line, "appear= on key does nothing: only a popup, a preview or a menu comes up")
         // press-scale and press-sink on a key in any state are read: a style selects a pressed key too (`key`, `key:shifted`)
     }
 
-    private val LATER_MOTION = setOf("popup", "preview")
+    // what a popup's widgets read of the motion (A2)
+    private val POPUP_MOTION = mapOf("popup" to setOf("transition", "appear"), "preview" to setOf("transition", "appear"), "menu" to setOf("appear"))
 
-    private val MOTION = listOf("transition", "press-scale", "press-sink")
+    private val MOTION = listOf("transition", "press-scale", "press-sink", "appear")
 
     // a panel's property it has no use for (`clipboard shadow=`), as the window's; the voice mask's blur and the
     // handwriting pad's ink and grid set on what does not read them, too

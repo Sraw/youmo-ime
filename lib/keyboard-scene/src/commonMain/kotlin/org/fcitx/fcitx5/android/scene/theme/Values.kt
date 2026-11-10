@@ -78,6 +78,7 @@ sealed interface Value {
     data class Flag(val on: Boolean) : Value
     data class OfTwin(val twin: Twin) : Value
     data class OfTransition(val transition: Transition) : Value
+    data class OfAppear(val appear: Appear) : Value
 }
 
 /**
@@ -85,6 +86,12 @@ sealed interface Value {
  * (0–600), and its curve, one of [Values.EASINGS] (CSS's names).
  */
 data class Transition(val ms: Int, val easing: String)
+
+/**
+ * `appear=` (060-render-p3 A2): how a popup, a key's bubble or a menu comes up, [kind] `fade`, `scale`
+ * (grown from the key) or `rise` (up from below), each faded in too, in [ms] (0–250).
+ */
+data class Appear(val kind: String, val ms: Int)
 
 /** Reading a style property's value: null where it is not one of that property. */
 object Values {
@@ -135,6 +142,8 @@ object Values {
         "blur", "ink-color", "ink-width", "grid-color", "grid",
         // A1: a key's motion (the scene's Motion)
         "transition", "press-scale", "press-sink",
+        // A2: how a popup, a bubble or a menu comes up
+        "appear",
     ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
 
     private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
@@ -165,8 +174,7 @@ object Values {
         "width" to form(LEN),
         "side-padding" to form(LEN_OR_PERCENT),
         "bottom-padding" to form(LEN_OR_PERCENT),
-        // A2–A3: motion
-        "appear" to form("(fade|scale|rise) $MS"),
+        // A3: motion
         "effect" to form("none|ripple-image\\($FILE, ?$PERCENT_FORM, ?$MS\\)|particles\\($FILE, ?[0-9]{1,2}, ?$LEN, ?$MS\\)"),
         // §16's second tier: a key's sticker layer
         "sticker" to form("none|$FILE"),
@@ -241,6 +249,11 @@ object Values {
     const val MAX_PRESS_SINK_DP = 4.0
     private val TRANSITION = Regex("([0-9]{1,3})ms ([a-z-]+)")
 
+    /** `appear=`'s kinds and longest, ms (A2). */
+    val APPEARS = listOf("fade", "scale", "rise")
+    const val MAX_APPEAR_MS = 250
+    private val APPEAR = Regex("(fade|scale|rise) ([0-9]{1,3})ms")
+
     // A1's: a key's transition into a state, its pressed face's scale and sink
     private fun motion(property: String, raw: String): Value? = when (property) {
         "transition" -> TRANSITION.matchEntire(raw)?.let { m ->
@@ -250,6 +263,9 @@ object Values {
         }
         "press-scale" -> percent(raw)?.takeIf { it in MIN_PRESS_SCALE..MAX_PRESS_SCALE }?.let(Value::Number)
         "press-sink" -> dp(raw, MAX_PRESS_SINK_DP)?.let(Value::Number)
+        "appear" -> APPEAR.matchEntire(raw)?.let { m ->
+            m.groupValues[2].toInt().takeIf { it <= MAX_APPEAR_MS }?.let { Value.OfAppear(Appear(m.groupValues[1], it)) }
+        }
         else -> null
     }
 

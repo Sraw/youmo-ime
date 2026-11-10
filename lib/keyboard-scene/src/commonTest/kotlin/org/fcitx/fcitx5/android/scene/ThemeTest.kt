@@ -381,7 +381,6 @@ class ThemeTest {
         val reserved = listOf(
             "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
             "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"",
-            "appear=\"scale 150ms\"",
             "effect=\"particles(star.png, 12, 24dp, 600ms)\"", "sticker=\"cat.png\"",
         )
         assertEquals(Values.RESERVED.size, reserved.map { it.substringBefore('=') }.toSet().size, "every one tried")
@@ -562,7 +561,6 @@ class ThemeTest {
             "79|fill= on candidate:first comment does nothing: it reads color" +
             "79|transition= on candidate:first comment does nothing: it reads color" +
             listOf("80|effect=", "80|sticker=").map { "$it is not supported by this version, ignored" } +
-            "81|appear= is not supported by this version, ignored" +
             // its preview a path with a tail, which only a bubble has
             "81|tail= does nothing beside a shape that is no bubble: only a bubble has a tail"
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })

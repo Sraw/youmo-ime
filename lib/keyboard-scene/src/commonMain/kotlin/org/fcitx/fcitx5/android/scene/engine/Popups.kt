@@ -12,12 +12,14 @@ import org.fcitx.fcitx5.android.scene.Point
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.rules.KeyTextScale
+import org.fcitx.fcitx5.android.scene.theme.Appear
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.ShapePath
 import org.fcitx.fcitx5.android.scene.theme.TextLook
+import org.fcitx.fcitx5.android.scene.theme.Transition
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.Values
 import kotlin.math.abs
@@ -91,6 +93,12 @@ object Popups {
 /** A long press's keys as the engine sizes them, px: each [width] × [height], their text at [size]. */
 data class PopupKeys(val width: Double, val height: Double, val size: Double)
 
+/**
+ * How a popup comes up and goes (060-render-p3 A2): its look's [appear] (null: as ever) and, a long press's
+ * keys' and a bubble's, its `transition` the fade it goes in ([going], null: at once, as ever).
+ */
+data class PopupMotion(val appear: Appear?, val going: Transition?)
+
 /** A menu's cell: [icon] the icon's name, or null for [label] in words; [label] what it is called (what a screen reader says). */
 data class MenuCell(val label: String, val icon: String?)
 
@@ -126,6 +134,14 @@ internal class PopupBuilder(
     private fun look(widget: String, states: Set<KeyState> = emptySet()): Pair<KeyLook, TextLook> {
         val v = cascade.of(Selector.Target(widget, states = states.mapTo(HashSet()) { it.xml }))
         return KeyLook(v, theme) to TextLook(v, theme)
+    }
+
+    /** [widget]'s (`popup`, `preview` or `menu`) motion; null where none: a menu's going never fades. */
+    fun motion(widget: String): PopupMotion? {
+        val look = look(widget).first
+        val appear = look.appear?.takeIf { it.ms > 0 }
+        val going = look.transition?.takeIf { it.ms > 0 && widget != "menu" }
+        return if (appear == null && going == null) null else PopupMotion(appear, going)
     }
 
     /** The bubble's words' size and the least they shrink to, px: as the keys' text is scaled (紧凑, floating). */
