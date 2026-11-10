@@ -82,6 +82,9 @@ class SceneBuilder(
      */
     fun preview(text: String, keyWidth: Double, size: Double? = null): Parsed<Scene> = safely("preview") { popups.preview(text, keyWidth, size) }
 
+    /** How `popup`, `preview` or `menu` ([widget]) comes up and goes (060-render-p3 A2); null: as ever. Never throws. */
+    fun popupMotion(widget: String): Parsed<PopupMotion?> = safely("popup motion") { popups.motion(widget) }
+
     /** The bubble's words' size and the least they shrink to, px (PreviewLabel fits them). Never throws. */
     fun previewWordsSize(): Parsed<Pair<Double, Double>> = safely("preview words size") { popups.wordsSize() }
 

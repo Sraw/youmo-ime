@@ -316,7 +316,7 @@ internal class Stats(values: List<Double>) {
 
 /** design 060-render-p3 §4.3's rows that need motion in the engine, and the stage that brings it. */
 internal val ANIM_NOT_YET = listOf(
-    "popup appear" to "A2", "picture idle" to "A4", "picture + press" to "A4",
+    "picture idle" to "A4", "picture + press" to "A4",
 )
 
 /**

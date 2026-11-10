@@ -210,10 +210,11 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 | `ink-width` | 手写笔迹粗细，1–8dp |
 | `grid-color` | 颜色：手写田字格 |
 | `grid` | `true`、`false`：显示田字格 |
-| `transition` | 键变到这个状态时的过渡：`时长ms 缓动`，如 `150ms ease-out`；时长 0–600ms，缓动 `linear`、`ease`、`ease-in`、`ease-out`、`ease-in-out`（弹出层、气泡上的还不生效，会提醒） |
+| `transition` | 键变到这个状态时的过渡：`时长ms 缓动`，如 `150ms ease-out`；时长 0–600ms，缓动 `linear`、`ease`、`ease-in`、`ease-out`、`ease-in-out`；写在 `popup`、`preview` 上是它消失时淡出的时长和缓动（`menu` 上不生效，会提醒） |
 | `press-scale` | 按下时键面缩放（`key:pressed`），85%–110% |
 | `press-sink` | 按下时键面下沉（`key:pressed`），0–4dp |
 | `effect` | 按下时的特效（`key:pressed`）：`none`；`ripple-image(文件, 半径%, 时长ms)`，从手指按下处长大、裁在键面里并淡出的图片，半径是键面半条对角线的 10%–200%；`particles(文件, 个数, 散开dp, 时长ms)`，从按下处飞散并淡出的图片，1–12 个，散开 0–64dp（每 dp 画图片的 3 像素）；时长 1–600ms。打字快时也每次播放 |
+| `appear` | 弹出层（`popup`）、气泡（`preview`）、菜单（`menu`）出现的动画：`fade|scale|rise 时长ms`，淡入、从键中间放大或向上升起，时长 0–250ms |
 | `return-icon-send` | 回车键在「发送」时显示的：`icon(图标名)` 或 `text(文字)`（写在 `icon` 部位上，下同） |
 | `return-icon-search` | 回车键在「搜索」时显示的 |
 | `return-icon-go` | 回车键在「前往」时显示的 |
@@ -237,7 +238,6 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 | `width` | 除 `handle` 外 | 如 `4dp` |
 | `side-padding` | 除 `keyboard` 外 | 如 `4dp` 或 `40%`，一个或两个 |
 | `bottom-padding` | 除 `keyboard` 外 | 如 `4dp` 或 `40%`，一个或两个 |
-| `appear` | 弹出的出现动画（`popup`、`preview`、`menu`） | `fade|scale|rise 时长ms` |
 | `sticker` | 键上的贴纸层 | `none` 或文件名 |
 
 另外两个保留写法：元素 `<sounds>`、`<sound>`（按键音包），以及 `<picture animated="true">`（动态背景）。
