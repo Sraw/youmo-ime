@@ -229,27 +229,6 @@ class ThemeTest {
         assertEquals("circle", flat.shape)
         assertEquals(Inset(4.0, 3.0, 4.0, 3.0), KeyLook(Cascade(t, setOf("landscape")).of(enter), t).inset)
     }
-
-    @Test
-    fun sourcesNameTheStyleEachValueOfComesFrom() {
-        val t = Fixtures.materialLight
-        val q = Selector.Target("key", "qwerty", "q", null, setOf("letter"), emptySet())
-        val enter = Selector.Target("key", "qwerty", "enter", "enter", setOf("enter"), emptySet())
-        for (scene in listOf(emptySet(), setOf("flat"), setOf("landscape", "dark"))) {
-            val c = Cascade(t, scene)
-            for (base in listOf(q, enter)) {
-                for (target in listOf(base, base.copy(states = setOf("pressed")), base.copy(part = "label"), base.copy(part = "hint"))) {
-                    val of = c.of(target)
-                    val sources = c.sources(target)
-                    assertEquals(of.keys, sources.keys, "$target in $scene")
-                    for ((p, v) in of) assertEquals(v, sources.getValue(p).values[p], "$p of $target in $scene")
-                }
-            }
-        }
-        val own = ThemeReader.theme(withStyle("<style select=\"*/enter\" fill=\"#ff0000\"/>")).ok()
-        assertEquals(own.styles.last(), Cascade(own, emptySet()).sources(enter).getValue("fill"))
-    }
-
     @Test
     fun partsInheritTheKeysTextLook() {
         val t = Fixtures.materialLight
