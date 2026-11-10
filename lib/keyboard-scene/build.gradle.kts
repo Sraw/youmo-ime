@@ -145,6 +145,7 @@ dependencies {
 // The tests read src/commonTest/data (the example layouts and themes; the snapshots, which they also
 // write), src/commonMain/layouts (the layouts the app draws) and src/commonMain/themes (its built-in themes) on both targets: told where by a system property (JVM) or the environment (node), so no
 // absolute path of this machine is compiled into anything
+val themeDoc = rootProject.layout.projectDirectory.file("docs/theme-format.md")
 val testData: String = layout.projectDirectory.dir("src/commonTest/data").asFile.absolutePath
 tasks.withType<org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest>().configureEach {
     environment("SCENE_TEST_DATA", testData)
@@ -173,6 +174,9 @@ tasks.withType<Test>().configureEach {
     // run then compares with what the JVM wrote, so the two agree or fail)
     systemProperty("snapshots.record", providers.gradleProperty("snapshots.record").getOrElse("false"))
     systemProperty("scene.testData", testData)
+    // docs/theme-format.md, whose property table a JVM test holds to Values (ThemeFormatDocTest)
+    systemProperty("scene.themeDoc", themeDoc.asFile.absolutePath)
+    inputs.file(themeDoc).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("themeDoc")
     testLogging {
         events("failed")
     }
