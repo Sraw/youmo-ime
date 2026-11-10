@@ -741,6 +741,7 @@
     <string name="im_auto_caps_summary">Shift at the start of a sentence, where the app asks for it</string>
     <string name="key_drawing">Drawing on keys</string>
     <string name="key_drawing_handwriting">Handwriting on keys</string>
+    <string name="key_drawing_needs_text_pack">%1$s (needs the text pack)</string>
     <string name="glide_typing">Glide typing</string>
     <string name="stroke_filter">Stroke filter</string>
     <string name="status_punctuation_chinese">Chinese punctuation</string>

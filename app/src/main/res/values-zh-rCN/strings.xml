@@ -722,6 +722,7 @@
     <string name="im_auto_caps_summary">在句子开头自动打开 Shift（应用的输入框要求时）</string>
     <string name="key_drawing">在键上划</string>
     <string name="key_drawing_handwriting">键盘手写</string>
+    <string name="key_drawing_needs_text_pack">%1$s（需要文字包）</string>
     <string name="glide_typing">滑行输入</string>
     <string name="stroke_filter">笔画筛选</string>
     <string name="status_punctuation_chinese">中文标点</string>
