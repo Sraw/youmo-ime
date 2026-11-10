@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.prefs
 
 import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.utils.WeakHashSet
+import org.fcitx.fcitx5.android.utils.snapshot
 
 abstract class ManagedPreferenceProvider {
 
@@ -42,7 +43,7 @@ abstract class ManagedPreferenceProvider {
         val preference = _managedPreferences[key] ?: return
         // a copy: a listener may add or remove one (a theme change makes the input view anew, whose
         // listeners go and come), and the set must not change while it is gone through
-        onChangeListeners.toList().forEach { it.onChange(key) }
+        onChangeListeners.snapshot().forEach { it.onChange(key) }
         preference.fireChange()
     }
 
