@@ -46,6 +46,7 @@ class AppHostStrings(context: Context) : HostStrings {
         Offer.PIN to res.getString(R.string.host_offer_pin),
         Offer.UNPIN to res.getString(R.string.host_offer_delete_phrase),
         Offer.DELETE_PHRASE to res.getString(R.string.host_offer_delete_phrase),
+        Offer.DELETE_COMMON_WORD to res.getString(R.string.host_offer_delete_common_word),
         Offer.BLOCK to res.getString(R.string.host_offer_block),
     )
 

@@ -643,6 +643,8 @@ class KeyRouter(
             Offer.BLOCK to EngineEvent.BLOCK,
             // a custom phrase (a built-in date too) goes by the unpin's event, as in v0.3.0 (UAT PY-49)
             Offer.DELETE_PHRASE to EngineEvent.UNPIN,
+            // a common word's replacement too (060-common-words)
+            Offer.DELETE_COMMON_WORD to EngineEvent.UNPIN,
         )
 
         // what a session that cannot load, or failed, answers: the key is not taken, nothing shown

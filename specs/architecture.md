@@ -58,8 +58,8 @@ One process. Inside it:
   after the first Unicode trigger.
 - **IO / Default dispatchers**: file work (imports, backups, the clipboard database), and the
   engine's own background saves.
-- **`engine-phrases`** (`EngineBridge`): one thread saving the custom phrases file, one save at a
-  time, in order.
+- **`engine-phrases`** (`EngineBridge`): one thread saving the custom phrases file and the common
+  words file (`WordsFile`, a replacement deleted from the keyboard), one save at a time, in order.
 - **`record-compaction`** (`Engines`' `background`, `JvmThreads.each` unless a test gives its own): a daemon thread for each
   compaction of a user log (`RecordStore`), at most every few thousand records, and each backup's write. The host thread, which learns, reads the
   counts; this thread writes and syncs them to a new file, which the next append on the host
@@ -172,7 +172,7 @@ gives the router the page size and English suggestions and the engines the rest 
 | fcitx's built-in data (the zh_CN punctuation table, quick phrase's emoji and LaTeX tables, `charselectdata`) | APK assets under `pkgdata/`, read from assets (`charselectdata` whole into the heap the first time Unicode input is opened, the tables parsed; `KotlinHost.BUILT_IN`; sources and SHA-256 in `app/src/main/host-assets.md`) | repository |
 | What the engine learned | `files/engine/` (`EngineBridge.userDir`): pinyin's user log, each table's and English's, the word lists (added, blocked) | engine: append-only logs (`RecordStore`), lists written whole |
 | fcitx config | `files/host-config/` (`ConfigHome.DIR`, `HostConfigDir`): the profile, `conf/*.conf` incl. the input methods' options. Up to 0.4 it was `config/` on the external files dir (or `files/config` at a start without one); the first start that can moves that in once (`ConfigHome.settle`: copied, read back, renamed in, then the old deleted), so a cleaner emptying `Android/data` or a start without the external storage no longer resets 通用输入 | the host (`ConfigWriter`) |
-| fcitx data | `files/host-data/` (`ConfigHome.DATA`, `HostConfigDir.inUse`): `pinyin/customphrase`, `pinyin/dictionaries/` (imported dictionaries, as text, and `merged.ymd` compiled from those on; not in a backup), `data/quickphrase.d`, `punctuation/punc.mb.*`. Up to 0.4 `data/` on the external files dir; moved in as the config is, by the host's start or whichever editor asks first | the host, the app's managers |
+| fcitx data | `files/host-data/` (`ConfigHome.DATA`, `HostConfigDir.inUse`): `pinyin/customphrase`, `pinyin/commonwords.txt` (常用词: `CommonWordsManager`, the settings page and the keyboard each laying its change over the file as it is then), `pinyin/dictionaries/` (imported dictionaries, as text, and `merged.ymd` compiled from those on; not in a backup), `data/quickphrase.d`, `punctuation/punc.mb.*`. Up to 0.4 `data/` on the external files dir; moved in as the config is, by the host's start or whichever editor asks first | the host, the app's managers |
 | themes | `files/host-theme/` (`ConfigHome.THEME`): the custom themes. Up to 0.4 `theme/` on the external files dir; moved in as the config is, by the theme list at the app's start | `ThemeFilesManager` |
 | App preferences | `shared_prefs` (`AppPrefs`, `ThemePrefs`) | app |
 | Clipboard | Room database in `databases/` (`ClipboardManager`) | app |

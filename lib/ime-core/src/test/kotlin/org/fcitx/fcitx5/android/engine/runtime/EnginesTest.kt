@@ -344,6 +344,33 @@ class EnginesTest : EnginesFixture() {
         assertEquals(emptyList<IOException>(), errors)
     }
 
+    // 常用词 (060-common-words): read from the additions, offered in 全拼 and 双拼 by their keys, none
+    // while the habits are off (借手机), a replacement deleted saved whole; a reload reads the file again
+    @Test
+    fun theCommonWordsAreTheAdditionsAndOffWithTheHabits() {
+        val saved = ArrayList<String>()
+        var file = "# youmo-common-words 1\n你[ni]\t泥\n"
+        val additions = { Engines.Additions("", "", dictionary = { null }, commonWords = file, saveCommonWords = { saved += it.format() }) }
+        Engines(::load, null, additions = additions).use { engines ->
+            assertEquals("泥", engines.type(InputMethodCatalog.PINYIN, "ni").candidates.first())
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            assertEquals("泥", engines.type(InputMethodCatalog.SHUANGPIN, "ni").candidates.first())
+            engines.onEvent(InputMethodCatalog.SHUANGPIN, EngineEvent.RESET, 0)
+            engines.useHabits = false
+            assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            engines.useHabits = true
+            engines.type(InputMethodCatalog.PINYIN, "ni")
+            assertEquals(setOf(Offer.DELETE_COMMON_WORD), engines.offers(InputMethodCatalog.PINYIN, 0))
+            assertEquals(listOf("你", "拟"), engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.UNPIN, 0).candidates)
+            assertEquals(listOf("# youmo-common-words 1\n"), saved)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            file = "你[ni]\t妮\n"
+            engines.reload()
+            assertEquals("妮", engines.type(InputMethodCatalog.PINYIN, "ni").candidates.first())
+        }
+    }
+
     // a pin and a custom phrase of the same text under the code (a 0.4.0 install moved its order-1 phrases
     // to pins, and the user may add the phrase back): shown once, the pin first, ahead of the phrase before it
     @Test

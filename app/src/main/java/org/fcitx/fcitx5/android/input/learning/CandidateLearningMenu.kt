@@ -91,6 +91,7 @@ class CandidateLearningMenu(
             Row.PIN -> R.string.learning_pin
             Row.UNPIN -> R.string.learning_unpin
             Row.DELETE_PHRASE -> R.string.learning_delete_phrase
+            Row.DELETE_COMMON_WORD -> R.string.learning_delete_common_word
             Row.NO_PREDICT -> R.string.learning_no_predict
             Row.WHY -> R.string.learning_why
         }
@@ -104,6 +105,7 @@ class CandidateLearningMenu(
             Row.PIN -> R.string.learning_done_pin
             Row.UNPIN -> R.string.learning_done_unpin
             Row.DELETE_PHRASE -> R.string.learning_done_delete_phrase
+            Row.DELETE_COMMON_WORD -> R.string.learning_done_delete_common_word
             Row.NO_PREDICT -> R.string.learning_done_no_predict
             // listed so a new row must say its own: 为什么 explains, it is never acted on
             Row.WHY -> error("WHY is not an act")

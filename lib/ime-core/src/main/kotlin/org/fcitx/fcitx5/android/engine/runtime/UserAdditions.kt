@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.engine.phrase.CommonWordBook
+import org.fcitx.fcitx5.android.engine.phrase.CommonWords
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
@@ -89,6 +91,18 @@ internal class UserAdditions(
         }
     }.also { phrases = it }
 
+    private var commonWords: CommonWordBook? = null
+
+    /** The common words, read once as the phrases are; a line not read (no reading) left out. */
+    fun commonWords(): CommonWordBook = commonWords ?: CommonWordBook(CommonWords.parse(added()?.commonWords.orEmpty()).words) {
+        try {
+            additions?.saveCommonWords?.invoke(it)
+        } catch (e: IOException) {
+            onError(e)
+            throw e
+        }
+    }.also { commonWords = it }
+
     /** As a fresh install has them: the built-in phrases alone, the user's left out (U-93). */
     fun freshPhrases(): PhraseBook = PhraseBook(CustomPhrases.parse(""), CustomPhrases.BUILT_IN) {}
 
@@ -97,6 +111,7 @@ internal class UserAdditions(
         val before = additions?.dictionaries.orEmpty()
         addedRead = false
         phrases = null
+        commonWords = null
         return before
     }
 }

@@ -50,6 +50,7 @@ class ResourceHostStrings(res: File, qualifier: String) : HostStrings {
             Offer.FORGET -> "host_offer_forget"
             Offer.PIN -> "host_offer_pin"
             Offer.UNPIN, Offer.DELETE_PHRASE -> "host_offer_delete_phrase"
+            Offer.DELETE_COMMON_WORD -> "host_offer_delete_common_word"
             Offer.BLOCK -> "host_offer_block"
         },
     )

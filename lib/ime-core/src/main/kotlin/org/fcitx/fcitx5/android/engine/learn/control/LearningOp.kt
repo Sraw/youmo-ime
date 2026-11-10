@@ -163,7 +163,7 @@ enum class WordKind {
 }
 
 /** A long press's items, in the menu's order. */
-enum class MenuItem { DELETE, BLOCK, PIN, UNPIN, DELETE_PHRASE, NO_PREDICT, WHY }
+enum class MenuItem { DELETE, BLOCK, PIN, UNPIN, DELETE_PHRASE, DELETE_COMMON_WORD, NO_PREDICT, WHY }
 
 /** Where a block reaches, for its confirmation (U-82, C12). */
 enum class BlockScope {

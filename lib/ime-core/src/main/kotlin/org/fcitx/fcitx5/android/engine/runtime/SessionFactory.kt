@@ -43,6 +43,7 @@ import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnClock
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.Simplifier
+import org.fcitx.fcitx5.android.engine.phrase.CommonWordBook
 import org.fcitx.fcitx5.android.engine.phrase.PartsLookup
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -385,7 +386,7 @@ internal class SessionFactory(
         return PinyinSession(
             assets.pinyinData, segmenter, spell = spell,
             pageSize = s.pageSize, user = user, prediction = s.prediction, prior = lexicon.prior(), phraseBook = phraseBook(),
-            builtInPhrases = s.builtInPhrases,
+            builtInPhrases = s.builtInPhrases, commonWords = commonWords(),
             reranker = reranker(), refiner = refiner(), block = lexicon::block, emoji = emoji(), chaizi = chaizi, now = learnClock::calendar,
             charReadings = assets::charSyllables, extensions = { assets.decoderExtensions(user) }, addedWords = ::addedNow, coarse = coarse(),
             learnTo = LearnTo(learner.habitsNow(), kind, simplified::simplify),
@@ -465,6 +466,9 @@ internal class SessionFactory(
 
     // the custom phrases every session but handwriting offers: the built-in ones alone while habits are off (U-93)
     private fun phraseBook() = if (learner.useHabits) lexicon.added.phrases() else lexicon.added.freshPhrases()
+
+    // the user's, as their phrases: none where their habits are not used (U-93's 借手机)
+    private fun commonWords() = if (learner.useHabits) lexicon.added.commonWords() else CommonWordBook.none()
 
     // the words added by hand, as the sessions offer them: none while habits are off (U-93)
     private fun addedNow(): Set<String> = if (learner.useHabits) lexicon.addedTexts() else emptySet()

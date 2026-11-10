@@ -36,4 +36,13 @@ fun interface Segmenter {
      * syllable's: false in 双拼, where `sj` and `xq` spell syllables (san, xiu in 自然码) whose words they would push down.
      */
     val spellsFullPinyin: Boolean get() = true
+
+    /**
+     * How [syllable] is typed in letters, as a common word's key has it (CommonWords): its pinyin;
+     * 双拼's two keys, as the scheme teaches them. Null where it cannot be typed so.
+     */
+    fun typedAs(syllable: Int): String? = Syllables.spelling(syllable)
+
+    /** What [typedAs] differs by among segmenters: two alike type alike (an index of the keys kept for it). */
+    val typing: Any get() = Syllables
 }

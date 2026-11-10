@@ -102,6 +102,7 @@ interface HostStrings {
                 Offer.FORGET -> "Forget word"
                 Offer.PIN -> "Pin to top as custom phrase"
                 Offer.UNPIN, Offer.DELETE_PHRASE -> "Delete from custom phrase"
+                Offer.DELETE_COMMON_WORD -> "Delete from common words"
                 Offer.BLOCK -> "Never show this word"
             }
         }

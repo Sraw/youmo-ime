@@ -23,6 +23,8 @@ import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases.Phrase
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
+import org.fcitx.fcitx5.android.engine.phrase.CommonWordBook
+import org.fcitx.fcitx5.android.engine.phrase.CommonWords
 import org.fcitx.fcitx5.android.engine.phrase.AsideCandidates
 import org.fcitx.fcitx5.android.engine.phrase.PartsLookup
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
@@ -105,6 +107,11 @@ class PinyinSession(
      * under their keys where the [segmenter] [spells full pinyin][Segmenter.spellsFullPinyin], their words' (日期) everywhere.
      */
     private val builtInPhrases: Boolean = true,
+    /**
+     * 常用词: the replacements of a word whose key (its pinyin, its first three characters', its
+     * initials) is what is left of the input, first of all, a pin after them (060-common-words).
+     */
+    private val commonWords: CommonWordBook = CommonWordBook.none(),
     /** The emoji a word stands for ([EmojiCandidates]); none, the setting off. */
     private val emoji: (String) -> List<String> = { emptyList() },
     /**
@@ -141,6 +148,7 @@ class PinyinSession(
     // last, so a test's picker can follow as a lambda
     private val reranker: SentencePicker? = null,
 ) : Session {
+
     /** Picked text, its words, where it ends in the input, how its words read (null if some is no word), and as the learning record takes it. */
     private class Piece(val text: String, val words: IntArray, val end: Int, val entries: List<Entry>?, val learned: CommitRows.Pick?)
 
@@ -168,6 +176,7 @@ class PinyinSession(
         val decoded: Decoded? = null,
         val time: Calendar? = null, // when the phrases were filled in, if the input has any: the same as more words are read
         val placed: Map<String, Phrase> = emptyMap(), // the phrases among the candidates, by text
+        val common: Map<String, CommonWords.Found> = emptyMap(), // the common words' replacements first among them, by text
         val preedit: String = "",
         val restShown: String = "", // the end of the preedit: what is left of the input, as shown
         val places: PreeditPlaces = PreeditPlaces.NONE,
@@ -492,6 +501,8 @@ class PinyinSession(
     override fun offers(index: Int): Set<Offer> {
         val c = candidates.getOrNull(index) ?: return emptySet()
         if (predicting) return predictionOffers(c)
+        // a common word's replacement: deleted from them, nothing else (060-common-words Q5)
+        if (owned.common(c) != null) return setOf(Offer.DELETE_COMMON_WORD)
         val phrase = lastRead.placed[c.text]?.takeIf { NO_WORD in c.words }
         // a word pinned is unpinned, any other word may be (U-83); a phrase is the settings' (custom
         // phrases), but deleted from them here, as v0.3.0 did (从自定义词组中删除, docs/words.md; UAT PY-49)
@@ -551,12 +562,7 @@ class PinyinSession(
     private fun unpin(index: Int): Snapshot {
         val c = candidates.getOrNull(index)
         val pinned = c?.let(::pinnedHere)
-        val phrase = c?.let { lastRead.placed[it.text]?.takeIf { _ -> NO_WORD in it.words } }
-        if (pinned == null && phrase != null && !predicting) {
-            phraseBook.remove(phrase.key, phrase.value)
-            read()
-            return snapshot()
-        }
+        owned.remove(c, pinned != null)?.let { return it }
         if (pinned == null || predicting) return snapshot()
         recorder.pin(pinned.text, on = false) { spanCode(c) to null }
         return again()
@@ -666,8 +672,7 @@ class PinyinSession(
     // [c], picked, as the learning record takes it: see CommitRecorder.pick. A phrase, an
     // emoji or a character by its parts is no word picked (PLAN §2.7 U-66, U-67): its commit learns nothing
     private fun toLearn(c: Candidate) = if (!learning || !recorder.learns || shownAside(c)) null else recorder.pick(
-        c, readFrom(), input.length - readFrom(), entries(c), candidates, shownAside, ::text, nineKeys?.anyTaken == true, pieces.isEmpty(),
-        lastRead.ranks[c]?.original == true,
+        c, readFrom(), input.length - readFrom(), entries(c), candidates, shownAside, ::text, nineKeys?.anyTaken == true, pieces.isEmpty(), lastRead.ranks[c]?.original == true,
     )
 
     /** Whether the keys kept for the learning record cover the input a place each, as they must: for tests. */
@@ -675,7 +680,7 @@ class PinyinSession(
 
     // the phrases, emoji and characters by their parts among the candidates: none the first of the words shown.
     // A phrase is its own candidate, text: one of the decoder's of the same text is a word (impl/PLAN.md §2.7)
-    private val shownAside = { c: Candidate -> c.text in lastRead.aside || NO_WORD in c.words && c.text in lastRead.placed }
+    private val shownAside = { c: Candidate -> c.text in lastRead.aside || NO_WORD in c.words && (c.text in lastRead.placed || c.text in lastRead.common) }
 
     /**
      * [word], read [reading], committed by a glide over this though held back here ([GlideReading]):
@@ -890,7 +895,8 @@ class PinyinSession(
         // nothing set aside: the list worked out for that is the one listed
         val listed = if (withAside.candidates === read) readPlaced else withPhrases(withAside.candidates)
         val held = if (withAside.candidates === read) readHeld else coarseCandidates.held(listed, pageSize, kept)
-        val shownOrder = coarseCandidates.order(listed, pageSize, held)
+        // the common words' replacements first, a pin after them; one of their text elsewhere is them (Q2)
+        val (shownOrder, shownCommon) = owned.first(key, coarseCandidates.order(listed, pageSize, held), asText)
         // the first reading of all the input shown: the preedit, the syllables offered and Enter's text go
         // by it, as ranked (impl/design-1b.md §2). Every one held, that is the candidate shown first, the
         // rest of the input as typed after it
@@ -904,6 +910,7 @@ class PinyinSession(
             decoded = decoded,
             time = time,
             placed = placed,
+            common = shownCommon,
             preedit = picked + restShown,
             restShown = restShown,
             places = shown.places(picked.length, input.length),
@@ -960,6 +967,37 @@ class PinyinSession(
             syllablesId = nineKeys?.id ?: 0,
             cursor = if (cursor >= input.length) -1 else lastRead.places.preeditAt(cursor),
         )
+    }
+
+    // the texts the settings own among the candidates: 常用词' replacements (060-common-words), custom
+    // phrases; one deleted (an inner class, for the session's size)
+    private val owned = Owned()
+
+    private inner class Owned {
+        /** [list] with the replacements [key] is a key of first, and those by their text. */
+        fun first(key: String, list: List<Candidate>, asText: (String) -> Candidate): Pair<List<Candidate>, Map<String, CommonWords.Found>> {
+            val found = commonWords.typed(key, segmenter.typing, segmenter::typedAs, keyed?.letters, { keyed?.phraseWays(it) }) { keyed?.takenAs(it).orEmpty() }
+            return CommonWordBook.first(found, list, { it.text }, asText) to found.associateBy { it.text }
+        }
+
+        /** The replacement [c] is, if it is one: text, not a word, of the input read. */
+        fun common(c: Candidate?) = c?.takeIf { NO_WORD in it.words && !predicting }?.let { lastRead.common[it.text] }
+
+        /**
+         * [c] deleted from the settings, a common word's replacement or else, not [pinned], a custom
+         * phrase ([Offer.DELETE_PHRASE]), and the input read again; null if it is neither.
+         */
+        fun remove(c: Candidate?, pinned: Boolean): Snapshot? {
+            common(c)?.let { return readAfter { commonWords.remove(it.word, it.text) } }
+            val phrase = c?.takeIf { !pinned && !predicting && NO_WORD in it.words }?.let { lastRead.placed[it.text] } ?: return null
+            return readAfter { phraseBook.remove(phrase.key, phrase.value) }
+        }
+
+        private fun readAfter(change: () -> Unit): Snapshot {
+            change()
+            read()
+            return snapshot()
+        }
     }
 
     // how the input shows: its syllables, as typed, spelt (an inner class, for the session's size)

@@ -25,7 +25,8 @@ class LearningMenuTest {
     fun theDeleteIsNamedByWhatTheWordIs() {
         val rows = mapOf(
             MenuItem.DELETE to Row.FORGET, MenuItem.BLOCK to Row.BLOCK, MenuItem.PIN to Row.PIN, MenuItem.UNPIN to Row.UNPIN,
-            MenuItem.DELETE_PHRASE to Row.DELETE_PHRASE, MenuItem.NO_PREDICT to Row.NO_PREDICT, MenuItem.WHY to Row.WHY,
+            MenuItem.DELETE_PHRASE to Row.DELETE_PHRASE, MenuItem.DELETE_COMMON_WORD to Row.DELETE_COMMON_WORD, MenuItem.NO_PREDICT to Row.NO_PREDICT,
+            MenuItem.WHY to Row.WHY,
         )
         // each item its row, in the menu's order whatever the enum's
         assertEquals(MenuItem.entries.map(rows::getValue), LearningMenu.rows(menu(WordKind.DICTIONARY)))

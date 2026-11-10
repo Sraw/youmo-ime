@@ -939,6 +939,9 @@
     <string name="section_phrases">短语</string>
     <string name="punctuation_map_summary">中文输入时每个标点打成什么，比如 , 打成 ，</string>
     <string name="custom_phrases_summary">打拼音时打一个缩写出一段话，比如 dz 出你的地址；长的、多行的、偶尔用的，存到「快速输入」</string>
+    <string name="host_offer_delete_common_word">从常用词中删除</string>
+    <string name="learning_delete_common_word">从常用词中删除</string>
+    <string name="learning_done_delete_common_word">已从常用词中删除「%1$s」</string>
     <string name="im_page_size_summary">只用于实体键盘的候选窗，所有输入法都用，包括英文</string>
     <string name="home_input_methods_summary">添加、排序，每种输入法自己的选项</string>
     <string name="home_shared_input_summary">各输入法共用：联想、表情、滑行、模糊音、标点</string>

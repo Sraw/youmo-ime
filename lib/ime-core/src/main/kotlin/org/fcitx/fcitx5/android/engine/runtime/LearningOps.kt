@@ -188,7 +188,7 @@ internal class LearningOps(
             is LearningOp.Block -> if (Offer.BLOCK in offers) blockAlike(im, s, op, shown, act) else LearningResult.Unavailable
             is LearningOp.Pin -> event(Offer.PIN, EngineEvent.PIN)
             // a phrase's file holds it, not the learning record: no undo
-            is LearningOp.Unpin -> if (Offer.DELETE_PHRASE in offers) {
+            is LearningOp.Unpin -> if (Offer.DELETE_PHRASE in offers || Offer.DELETE_COMMON_WORD in offers) {
                 if (act(EngineEvent.UNPIN, op.index, op.text)) LearningResult.Done(LearningResult.NO_UNDO) else LearningResult.Unavailable
             } else {
                 event(Offer.UNPIN, EngineEvent.UNPIN)
@@ -305,11 +305,12 @@ internal class LearningOps(
             if (Offer.PIN in offers && im != InputMethodCatalog.HANDWRITING) add(MenuItem.PIN)
             if (Offer.UNPIN in offers) add(MenuItem.UNPIN)
             if (Offer.DELETE_PHRASE in offers) add(MenuItem.DELETE_PHRASE)
+            if (Offer.DELETE_COMMON_WORD in offers) add(MenuItem.DELETE_COMMON_WORD)
             if (prediction(s, op.index) != null) add(MenuItem.NO_PREDICT)
             // English ranks by its own rules, not the habits' tiers; where nothing may be done
             // (a field that learns nothing) there is no menu, nor for a phrase alone (UAT PY-49); nor where the
             // session cannot say (review-int-runtime M2)
-            if (im != InputMethodCatalog.ENGLISH && any { it != MenuItem.DELETE_PHRASE } && why != null) add(MenuItem.WHY)
+            if (im != InputMethodCatalog.ENGLISH && any { it !in TEXT_ONLY } && why != null) add(MenuItem.WHY)
         }
         // a table blocks its candidate under the code typed alone (U-28, stream C; review-E-ui Q1);
         // what may follow, as pinyin's, everywhere
@@ -396,5 +397,8 @@ internal class LearningOps(
 
         // how far the list is looked through for a word shown alike: past any page the menu is on
         const val ALIKE_SCAN = 200
+
+        // the rows of a text the settings own (a custom phrase, a common word's replacement): no 为什么 for them alone
+        val TEXT_ONLY = setOf(MenuItem.DELETE_PHRASE, MenuItem.DELETE_COMMON_WORD)
     }
 }

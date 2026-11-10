@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.learn.backup.AddressData
 import org.fcitx.fcitx5.android.engine.learn.backup.Backups
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.phrase.CommonWords
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -157,6 +158,9 @@ class Engines(
          * forgets no learning, as when [dictionary] does not open (review M4).
          */
         val dictionaryPending: () -> Boolean = { false },
+        /** The common words' file as read ([CommonWords.format]), and where the keyboard's deleting one goes, as [savePhrases]. */
+        val commonWords: String = "",
+        val saveCommonWords: (CommonWords) -> Unit = {},
     )
 
     private val assets = EngineAssets(blobs, onError, kernel, emojiShows, textShows)

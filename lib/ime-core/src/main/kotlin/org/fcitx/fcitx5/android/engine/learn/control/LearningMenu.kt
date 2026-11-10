@@ -26,6 +26,9 @@ object LearningMenu {
 
         /** 从自定义词组中删除: a custom phrase, a built-in date too. */
         DELETE_PHRASE,
+
+        /** 从常用词中删除: a common word's replacement. */
+        DELETE_COMMON_WORD,
         NO_PREDICT,
         WHY,
     }
@@ -37,6 +40,7 @@ object LearningMenu {
             MenuItem.PIN -> Row.PIN
             MenuItem.UNPIN -> Row.UNPIN
             MenuItem.DELETE_PHRASE -> Row.DELETE_PHRASE
+            MenuItem.DELETE_COMMON_WORD -> Row.DELETE_COMMON_WORD
             MenuItem.NO_PREDICT -> Row.NO_PREDICT
             MenuItem.WHY -> Row.WHY
         }
@@ -51,7 +55,7 @@ object LearningMenu {
             Row.DELETE, Row.FORGET -> LearningOp.Delete(index, text)
             Row.BLOCK -> LearningOp.Block(index, text)
             Row.PIN -> LearningOp.Pin(index, text)
-            Row.UNPIN, Row.DELETE_PHRASE -> LearningOp.Unpin(index, text)
+            Row.UNPIN, Row.DELETE_PHRASE, Row.DELETE_COMMON_WORD -> LearningOp.Unpin(index, text)
             Row.NO_PREDICT -> LearningOp.NoPredict(index, text)
             Row.WHY -> return null
         }

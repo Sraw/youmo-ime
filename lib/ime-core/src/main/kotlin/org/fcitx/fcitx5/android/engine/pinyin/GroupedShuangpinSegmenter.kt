@@ -30,6 +30,10 @@ class GroupedShuangpinSegmenter(
 
     override val spellsFullPinyin: Boolean get() = false
 
+    override fun typedAs(syllable: Int): String? = scheme.encode(syllable)
+
+    override val typing: Any get() = scheme
+
     private val pairs = HashMap<String, SyllableMatches>()
     private val leads = HashMap<Char, SyllableMatches>()
     private val vowels = HashMap<Char, SyllableMatches>()

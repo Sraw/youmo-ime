@@ -28,6 +28,10 @@ class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> 
 
     override val spellsFullPinyin: Boolean get() = false
 
+    override fun typedAs(syllable: Int): String? = scheme.encode(syllable)
+
+    override val typing: Any get() = scheme
+
     private val pairs = arrayOfNulls<SyllableMatches>(KEYS * KEYS)
     private val leads = arrayOfNulls<SyllableMatches>(KEYS)
     private val vowels = arrayOfNulls<SyllableMatches>(KEYS)

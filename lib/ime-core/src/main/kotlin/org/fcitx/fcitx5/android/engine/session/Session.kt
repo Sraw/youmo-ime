@@ -159,6 +159,9 @@ enum class Offer(val bit: Int) {
 
     /** A custom phrase (a built-in date too) taken off the settings' list, by [Action.Unpin]: no word to unpin is one. */
     DELETE_PHRASE(1 shl 4),
+
+    /** A common word's replacement taken off its word (从常用词中删除), by [Action.Unpin], as [DELETE_PHRASE]. */
+    DELETE_COMMON_WORD(1 shl 5),
 }
 
 /** A candidate as a host lists it, with its [hint] (see [Snapshot.hints]) and [readings] (see [Snapshot.readings]). */

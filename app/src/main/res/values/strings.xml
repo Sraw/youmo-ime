@@ -962,6 +962,9 @@
     <string name="section_phrases">Phrases</string>
     <string name="punctuation_map_summary">What each punctuation key types in Chinese, such as ， for ,</string>
     <string name="custom_phrases_summary">A short code for a longer text as you type pinyin, such as dz for your address; long, many-line or now-and-then text goes in Quick input</string>
+    <string name="host_offer_delete_common_word">Delete from common words</string>
+    <string name="learning_delete_common_word">Delete from common words</string>
+    <string name="learning_done_delete_common_word">Deleted “%1$s” from common words</string>
     <string name="im_page_size_summary">Only in the physical keyboard\'s candidate window; every input method\'s, English too</string>
     <string name="home_input_methods_summary">Add and order them, and each one\'s own options</string>
     <string name="home_shared_input_summary">Shared by every input method: prediction, emoji, glide typing, fuzzy pinyin, punctuation</string>
