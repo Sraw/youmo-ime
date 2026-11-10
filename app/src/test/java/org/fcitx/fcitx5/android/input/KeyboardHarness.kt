@@ -789,6 +789,9 @@ class KeyboardHarness(
         val idleFailed = runCatching { idle() }.exceptionOrNull()
         // destroyed first: it learns the last field's address
         destroy()
+        // and what its destroying set off waited for too: the keyboard taken off the window finishes what the pad
+        // holds behind the reads (afterReads), whose count a post dropped with this test's looper would keep for good
+        val destroyFailed = runCatching { idle() }.exceptionOrNull()
         // Robolectric keeps every dialog shown till the test method ends (ShadowDialog.shownDialogs): the
         // input method's window, and through its mService the whole service, views and themes, of each
         // harness a test made. ThemeMakerLayoutTest makes a hundred and more: a full run's heap out (the
@@ -812,7 +815,7 @@ class KeyboardHarness(
         codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
         HostDaemon.testConnection = null
         scope.cancel()
-        idleFailed?.let { throw it }
+        (idleFailed ?: destroyFailed)?.let { throw it }
     }
 
     // the daemon's connection to a real host, which answers on its own thread
