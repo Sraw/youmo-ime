@@ -139,6 +139,18 @@ off, battery saver off (kept from `ACTION_POWER_SAVE_MODE_CHANGED`, not asked of
 `ValueAnimator.areAnimatorsEnabled()`; not, or a theme without motion (every built-in one), no `Moving` and no animator
 is made and the keys draw as before. Detached or its window hidden (the keyboard hidden keeps the view attached), every animation stops; a key's motion not carried into a new scene stops too. `KeyMotionTest`.
 
+A theme's popups move too (060-render-p3 A2), asked of the engine (`SceneBuilder.popupMotion`, a `PopupMotion`):
+`appear` on `popup`, `preview` or `menu` (`fade`, `scale` from 60% or `rise` 12dp, each faded in, 0–250 ms, the
+app's enter curve) and `transition` on `popup` or `preview`, the fade it goes in. `PopupComponent` plays them by the
+view's `animate()` (`PopupMoves`: alpha, scale about the key's middle, translation; nothing drawn again); a focus
+moved is a new scene in the same view and plays nothing again, and a finger slides over a long press's keys while
+they come up (focus follows the finger's position, not the view's scale). Without `appear` a long press's keys and a
+menu pop in as ever (`popIn`) and a bubble shows at once; without `transition` a popup goes at once. A bubble
+replaced by a long press's keys or a menu goes at once. Like keys typed fast, a bubble that comes up sooner after the
+last than its own motion (the longer of its `appear` and `transition`) neither comes up nor goes moving, and a new
+bubble ends any fading out at once. Asked of `KeyMotionSwitch` only for a theme that moves; off, everything as before.
+`PopupMotionTest`.
+
 ### Keys
 
 A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `NumberKeyboard`, `HandwritingKeyboard`):
