@@ -90,20 +90,22 @@ object Values {
     private val IMAGE = Regex("image\\(([^,()]+), ?([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4})(?:, ?([1-8])x)?(?:, ?(.+))?\\)")
     private val PICTURE = Regex("picture(?:\\(([0-9]{1,2}(?:\\.[0-9]+)?)dp, ?([0-9]{1,3}(?:\\.[0-9]+)?)%(?:, ?(.+))?\\))?")
     private val LINEAR = Regex("linear\\((-?[0-9]{1,3}(?:\\.[0-9]+)?)deg, ?(.+)\\)")
-    private const val MAX_LENGTH_DP = 24.0
-    private const val MAX_OFFSET_DP = 16.0
-    private const val MAX_BORDER_DP = 3.0
-    private const val MIN_SCALE = 85.0
-    private const val MAX_SCALE = 130.0
+    internal const val MAX_LENGTH_DP = 24.0
+    internal const val MAX_OFFSET_DP = 16.0
+    internal const val MAX_BORDER_DP = 3.0
+    internal const val MIN_SCALE = 85.0
+    internal const val MAX_SCALE = 130.0
     private const val MAX_SP = 48.0
-    private const val MAX_BLUR_DP = 25.0
+    internal const val MAX_BLUR_DP = 25.0
     private const val MAX_PERCENT = 100.0
     private const val FOUR = 4
-    private const val MAX_DEPTH_DP = 8.0
+    internal const val MAX_DEPTH_DP = 8.0
     private const val MIN_BUBBLE = 100.0
     private const val MAX_BUBBLE = 160.0
-    private const val MIN_SPACING_EM = -0.1
-    private const val MAX_SPACING_EM = 0.5
+    internal const val MIN_SPACING_EM = -0.1
+    internal const val MAX_SPACING_EM = 0.5
+    internal const val MIN_STOPS = 2
+    internal const val MAX_STOPS = 8
     private val EM = Regex("-?[0-9](\\.[0-9]{1,3})?em")
     private val ICON_SHOWN = Regex("icon\\(([a-z0-9]+(-[a-z0-9]+)*)\\)")
     private val TEXT_SHOWN = Regex("text\\(([^()]{1,32})\\)")
@@ -358,7 +360,7 @@ object Values {
                 val at = percent(t.substringAfterLast(' '))?.takeIf { it <= MAX_PERCENT } ?: return null
                 color to at
             } ?: return null
-            return if (stops.size in 2..8) Fill.Linear(m.groupValues[1].toDouble(), stops) else null
+            return if (stops.size in MIN_STOPS..MAX_STOPS) Fill.Linear(m.groupValues[1].toDouble(), stops) else null
         }
         return null
     }

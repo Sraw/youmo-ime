@@ -230,6 +230,7 @@ class ThemeTest {
         assertEquals("circle", flat.shape)
         assertEquals(Inset(4.0, 3.0, 4.0, 3.0), KeyLook(Cascade(t, setOf("landscape")).of(enter), t).inset)
     }
+
     @Test
     fun partsInheritTheKeysTextLook() {
         val t = Fixtures.materialLight

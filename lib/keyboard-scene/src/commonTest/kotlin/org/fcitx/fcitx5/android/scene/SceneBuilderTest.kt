@@ -58,11 +58,11 @@ class SceneBuilderTest {
         val b = SceneBuilder(t, Fixtures.portrait, FakeMeasurer)
         val c = Cascade(t, Fixtures.portrait.scenes)
         val q = Selector.Target("key", "qwerty", "q", null, setOf("letter"), emptySet())
-        assertEquals(c.sources(q), b.sources(Fixtures.qwerty, emptyMap(), "q", null, false))
-        assertEquals(c.sources(q.copy(states = setOf("pressed"), part = "label")), b.sources(Fixtures.qwerty, emptyMap(), "q", "label", true))
-        val pressed = b.sources(Fixtures.qwerty, emptyMap(), "q", null, true)
+        assertEquals(c.sources(q), b.sources(Fixtures.qwerty, emptyMap(), "q", null, emptySet()))
+        assertEquals(c.sources(q.copy(states = setOf("pressed"), part = "label")), b.sources(Fixtures.qwerty, emptyMap(), "q", "label", setOf("pressed")))
+        val pressed = b.sources(Fixtures.qwerty, emptyMap(), "q", null, setOf("pressed"))
         assertEquals(c.of(q.copy(states = setOf("pressed"))).keys, pressed.keys)
-        assertEquals(emptyMap(), b.sources(Fixtures.qwerty, emptyMap(), "none", null, false))
+        assertEquals(emptyMap(), b.sources(Fixtures.qwerty, emptyMap(), "none", null, emptySet()))
     }
 
     // a theme's cascades kept from scene to scene (TextKeyboard's) make each scene as a fresh one does:
