@@ -66,6 +66,11 @@ internal class CanvasPainter(
     // a canvas without the context's letterSpacing (Safari before 18.4, Firefox before 115) has letters set one by one
     private val spaces: Boolean = hasLetterSpacing(ctx)
 
+    init {
+        // layers, areas and text outlines all size themselves by it; fail here, not midway through a scene
+        check(ctx.canvas != null && ctx.canvas != undefined) { "a painter needs a context with a canvas" }
+    }
+
     fun draw(ops: List<Op>) = ops.forEach(::draw)
 
     fun draw(op: Op) {
@@ -178,7 +183,6 @@ internal class CanvasPainter(
     // the layer for [laid]: a canvas the size of the context's, kept for the next paint of it
     private fun layer(): dynamic {
         val canvas = ctx.canvas
-        check(canvas != null && canvas != undefined) { "a layer needs the context's canvas" }
         val w = canvas.width as Int
         val h = canvas.height as Int
         val kept = LAYERS.get(canvas)

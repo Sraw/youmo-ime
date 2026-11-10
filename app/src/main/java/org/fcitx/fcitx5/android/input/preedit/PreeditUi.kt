@@ -181,17 +181,21 @@ open class PreeditUi(
              * [start] to [end]'s stretch on each line it is on, the code wrapped (the floating strip): a line it
              * goes on past ends at the line's end edge, right or left by its paragraph's direction, not at the
              * offset there, which is the next line's start; a span ending at a wrap draws nothing on the next line.
+             * The end edge is the line's text measured whole, the space it wrapped at too (getLineRight and
+             * getLineLeft leave a trailing space out, which the underline then stopped short of).
              */
             fun segments(layout: Layout, start: Int, end: Int): List<Segment> {
                 if (end <= start) return emptyList()
                 return (layout.getLineForOffset(start)..layout.getLineForOffset(end - 1)).map { l ->
-                    val from = layout.getPrimaryHorizontal(maxOf(start, layout.getLineStart(l)))
+                    val lineStart = layout.getLineStart(l)
+                    val from = layout.getPrimaryHorizontal(maxOf(start, lineStart))
                     val rtl = layout.getParagraphDirection(l) == Layout.DIR_RIGHT_TO_LEFT
                     val wraps = end >= layout.getLineEnd(l) && l < layout.lineCount - 1
-                    val to = when {
-                        !wraps -> layout.getPrimaryHorizontal(end)
-                        rtl -> layout.getLineLeft(l)
-                        else -> layout.getLineRight(l)
+                    val to = if (wraps) {
+                        val whole = Layout.getDesiredWidth(layout.text, lineStart, layout.getLineEnd(l), layout.paint)
+                        layout.getPrimaryHorizontal(lineStart) + if (rtl) -whole else whole
+                    } else {
+                        layout.getPrimaryHorizontal(end)
                     }
                     Segment(l, minOf(from, to), maxOf(from, to))
                 }

@@ -145,14 +145,15 @@ class GroupedKeyboard private constructor(
          * (SceneGroups.taken, 060-render-p3 T9b): [builtIn]'s; a layout's own where [own] lets them be; any other
          * logged with why, and the layout as the app has it drawn instead ([SceneLayouts.builtIn]), the block gone by.
          */
-        internal fun grouping(context: Context, builtIn: NineKeyLetters, own: Boolean): Grouping {
+        internal fun grouping(context: Context, builtIn: NineKeyLetters, own: Boolean, log: Boolean = true): Grouping {
             val id = layoutOf(builtIn)
             val shown = SceneLayouts.of(context, id) ?: return Grouping(builtIn, null, null)
             return when (val taken = SceneGroups.taken(shown.layout, builtIn, own, shown.fragments)) {
                 SceneGroups.Taken.BuiltIn -> Grouping(builtIn, null, shown)
                 is SceneGroups.Taken.Own -> Grouping(taken.letters, taken.written, shown)
                 is SceneGroups.Taken.Refused -> {
-                    Timber.e("scene layout %s: %s", id, taken.why)
+                    // a settings page asks on each refresh ([KeyboardLabels]): the keyboard made logs it
+                    if (log) Timber.e("scene layout %s: %s", id, taken.why)
                     Grouping(builtIn, null, SceneLayouts.builtIn(context, id))
                 }
             }

@@ -18,9 +18,6 @@ import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.FlexboxHori
 import splitties.dimensions.dp
 import splitties.views.dsl.core.wrapContent
 
-// rows as tall as the bar: 候选字号 sizes the words here too (design §6)
-private val rowDp get() = KawaiiBarComponent.heightDp()
-
 class FlexboxExpandedCandidateWindow :
     BaseExpandedCandidateWindow<FlexboxExpandedCandidateWindow>() {
 
@@ -31,7 +28,8 @@ class FlexboxExpandedCandidateWindow :
                     itemView.apply {
                         minimumWidth = dp(CandidateSpacing.TOUCH_FLOOR_DP)
                         SceneBar.padding(context, ui.bar).let { (left, right) -> setPadding(left, 0, right, 0) }
-                        layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, dp(rowDp))
+                        // rows as tall as the bar, of this window's scenes: 候选字号 sizes the words here too (design §6)
+                        layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, dp(KawaiiBarComponent.heightDp(context)))
                             .apply { flexGrow = 1f }
                     }
                 }
