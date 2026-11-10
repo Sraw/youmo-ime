@@ -440,14 +440,15 @@ class KeyboardCanvasView(
         invalidate()
     }
 
-    // the other keys' release fades ended (at rest) as a key goes down: typing fast, a key's frame draws no fades with it
     // the last key's down (uptime ms): a key pressed within its fade's length of it is typed fast
     private var lastDownAt = Long.MIN_VALUE / 2
 
+    // the other keys' release fades and crossfades (Shift's) ended (at rest) as a key goes down: typing fast, a key's
+    // frame draws no fades with it
     private fun endFades(pressed: Faces) {
         for (o in faces) {
             val m = o.moving ?: continue
-            if (o !== pressed && m.releasing) m.anim?.end()
+            if (o !== pressed && (m.releasing || m.leaving != null)) m.anim?.end()
         }
     }
 
@@ -510,12 +511,13 @@ class KeyboardCanvasView(
         val alpha = if (fading) old!!.alpha else 1f
         old?.stop()
         val motion = f.node.motion ?: return
-        if (still || !KeyMotionSwitch.on(context)) return
+        if (!KeyMotionSwitch.on(context)) return
         if (f.down) {
-            // held: its new pressed face as pressed as the old one was, not back to whole
+            // held (laid out anew or relabelled too): its new pressed face as pressed as the old one was, not back to whole
             f.moving = Moving().also { it.scale = motion.pressScale.toFloat(); it.sink = motion.pressSink.toFloat() }
             return
         }
+        if (still) return
         val t = motion.transition ?: return
         from ?: return
         val m = Moving().also { f.moving = it }

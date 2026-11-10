@@ -265,6 +265,20 @@ class KeyMotionTest {
     }
 
     @Test
+    fun heldThroughALayoutItStaysPressed() = harness().use { h ->
+        val c = h.canvas()
+        c.press("q")
+        frames(200)
+        assertEquals(0.9f, c.pressedNode("q")!!.scaleX, 1e-4f)
+        // laid out anew in the same state while held: still at its press scale, not back to whole
+        c.layout(c.left, c.top, c.right - 40, c.bottom)
+        c.scene
+        assertEquals(0.9f, c.pressedNode("q")!!.scaleX, 1e-4f)
+        c.press("q", down = false)
+        h.idle()
+    }
+
+    @Test
     fun hiddenItMovesNoMore() = harness().use { h ->
         val c = h.canvas()
         c.press("q")

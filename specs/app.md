@@ -130,7 +130,9 @@ where the key was draws the face it had over the new one, fading (from where a r
 anew (a size, one-handed) or relabelled in its state is shown at once, and a held key keeps its press scale. A `ValueAnimator` each (`Moving`), its frames setting the nodes'
 `alpha`/`scaleX`/`scaleY`/`translationY` alone and asking a frame (trace section `canvas anim`): nothing recorded or
 laid out; ended, nothing asked. A press while it moves jumps to pressed, and any key's press ends the other keys'
-release fades (typing fast, a key's frame draws no fade with it). The nodes have no overlapping rendering, so a fading
+release fades and crossfades (typing fast, a key's frame draws no fade with it). A key pressed sooner after the last
+key's press than its own `transition` (typed fast) does not move at all: pressed at its press scale at once, let go
+with no fade, as with motion off; so a long `transition` plays only on keys typed slower than it. The nodes have no overlapping rendering, so a fading
 one is drawn at its alpha straight, not through a layer each frame. `KeyMotionSwitch` says whether keys may move
 now, asked at each press of a key that has motion: 键盘动效 (`AppPrefs.advanced.keyboardMotion`, default on) on, 禁用动画
 off, battery saver off (kept from `ACTION_POWER_SAVE_MODE_CHANGED`, not asked of `PowerManager` on a keystroke) and
