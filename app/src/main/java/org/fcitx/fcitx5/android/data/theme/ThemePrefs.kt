@@ -25,7 +25,6 @@ import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
-import org.fcitx.fcitx5.android.scene.look.Gap
 
 class ThemePrefs(sharedPreferences: SharedPreferences) :
     ManagedPreferenceCategory(R.string.theme, sharedPreferences) {
@@ -164,9 +163,12 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     // 0.5.0's three, each over the theme's or following it (the user, 2026-11-04); new keys, as
     // ThemeLookMigration reads 0.5.0's to tell whether to move them into the theme. Following is the
-    // default: what 0.5.0 had set is in the theme in use already, so an upgrade looks as it did
+    // default: what 0.5.0 had set is in the theme in use already, so an upgrade looks as it did.
+    // The spacing two since 0.6.0, across and up and down (the user, 2026-11-06), 0.5.2's one moved
+    // into both (migrateKeySpacing)
     val keyBorderChoice = enumList(R.string.key_border, "key_border_choice", KeyBorderChoice.FollowTheme)
-    val keySpacingChoice = enumList(R.string.key_spacing, "key_spacing_choice", KeySpacingChoice.FollowTheme)
+    val keyHSpacingChoice = enumList(R.string.key_h_spacing, KEY_H_SPACING, KeyHSpacingChoice.FollowTheme)
+    val keyVSpacingChoice = enumList(R.string.key_v_spacing, KEY_V_SPACING, KeyVSpacingChoice.FollowTheme)
     val keyRadiusChoice = enumList(R.string.key_radius, "key_radius_choice", KeyRadiusChoice.FollowTheme)
 
     init {
@@ -176,9 +178,28 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     /** What the three set over a theme's keys ([ThemeManager.shownLook]). */
     fun keyStyleChoice() = KeyStyleChoice(
         keyBorderChoice.getValue().blocks,
-        keySpacingChoice.getValue().gap,
+        keyHSpacingChoice.getValue().spacing,
+        keyVSpacingChoice.getValue().spacing,
         keyRadiusChoice.getValue().radiusDp,
     )
+
+    /**
+     * 0.5.2's one 按键间距 (`key_spacing_choice`) as the two, each the same level (the levels are named alike);
+     * one of the two stored already is kept. A value not a level's name (a damaged backup) is following, as
+     * it read. The old key dropped all the same. A backup of 0.5.2 or 0.6.0-beta1 brought back is moved at
+     * the start after it (the restore restarts the process).
+     */
+    fun migrateKeySpacing() {
+        if (!sharedPreferences.contains(KEY_SPACING_052)) return
+        // stored as another type: read as unset, never a crash at every start
+        val old = runCatching { sharedPreferences.getString(KEY_SPACING_052, null) }.getOrNull()
+        val level = KeyHSpacingChoice.entries.firstOrNull { it.name == old } ?: KeyHSpacingChoice.FollowTheme
+        sharedPreferences.edit {
+            if (!sharedPreferences.contains(KEY_H_SPACING)) putString(KEY_H_SPACING, level.name)
+            if (!sharedPreferences.contains(KEY_V_SPACING)) putString(KEY_V_SPACING, KeyVSpacingChoice.valueOf(level.name).name)
+            remove(KEY_SPACING_052)
+        }
+    }
 
     enum class KeyBorderChoice(override val stringRes: Int, val blocks: Boolean?) : ManagedPreferenceEnum {
         FollowTheme(R.string.follow_theme, null),
@@ -186,11 +207,23 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         Off(R.string.key_border_off, false),
     }
 
-    enum class KeySpacingChoice(override val stringRes: Int, val gap: Gap?) : ManagedPreferenceEnum {
+    /** 横向间距: the room left and right of a key. */
+    enum class KeyHSpacingChoice(override val stringRes: Int, val spacing: KeyStyleChoice.Spacing?) : ManagedPreferenceEnum {
         FollowTheme(R.string.follow_theme, null),
-        Compact(R.string.level_compact, KeyStyleChoice.GAP_COMPACT),
-        Standard(R.string.level_standard, KeyStyleChoice.GAP_STANDARD),
-        Loose(R.string.level_loose, KeyStyleChoice.GAP_LOOSE),
+        Compact(R.string.level_compact, KeyStyleChoice.H_COMPACT),
+        Standard(R.string.level_standard, KeyStyleChoice.H_STANDARD),
+        Loose(R.string.level_loose, KeyStyleChoice.H_LOOSE),
+    }
+
+    /**
+     * 纵向间距: the room above and below a key; at the keyboard height 紧凑 less (Gap.vCompact). Its levels
+     * are named as [KeyHSpacingChoice]'s, which [migrateKeySpacing] reads 0.5.2's one by.
+     */
+    enum class KeyVSpacingChoice(override val stringRes: Int, val spacing: KeyStyleChoice.Spacing?) : ManagedPreferenceEnum {
+        FollowTheme(R.string.follow_theme, null),
+        Compact(R.string.level_compact, KeyStyleChoice.V_COMPACT),
+        Standard(R.string.level_standard, KeyStyleChoice.V_STANDARD),
+        Loose(R.string.level_loose, KeyStyleChoice.V_LOOSE),
     }
 
     enum class KeyRadiusChoice(override val stringRes: Int, val radiusDp: Int?) : ManagedPreferenceEnum {
@@ -327,5 +360,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     companion object {
         /** [migrateSizeFollow] done. */
         const val SIZES_FOLLOW_MIGRATED = "keyboard_sizes_follow_migrated"
+
+        /** 0.5.2's one 按键间距, which [migrateKeySpacing] moves into the two. */
+        const val KEY_SPACING_052 = "key_spacing_choice"
+        const val KEY_H_SPACING = "key_h_spacing_choice"
+        const val KEY_V_SPACING = "key_v_spacing_choice"
     }
 }

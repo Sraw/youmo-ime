@@ -924,7 +924,8 @@
     <string name="section_animation">動畫</string>
     <string name="section_key_style">按鍵樣式</string>
     <string name="key_border">按鍵邊框</string>
-    <string name="key_spacing">按鍵間距</string>
+    <string name="key_h_spacing">橫向間距</string>
+    <string name="key_v_spacing">縱向間距</string>
     <string name="key_radius">按鍵圓角</string>
     <string name="follow_theme">跟隨主題</string>
     <string name="key_border_on">有邊框</string>

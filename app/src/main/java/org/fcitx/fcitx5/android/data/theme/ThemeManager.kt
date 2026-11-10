@@ -52,6 +52,8 @@ object ThemeManager {
         ThemeLookMigration.monetLook = it.monetLook()
         // before the keyboard's size is read
         it.migrateSizeFollow()
+        // before the key style is read (keyStyle below)
+        it.migrateKeySpacing()
     }
 
     // before the themes, which an older format's are read with (the key style settings before 3.0)
@@ -274,7 +276,7 @@ object ThemeManager {
     @Volatile
     private var keyStyle = prefs.keyStyleChoice()
 
-    private val keyStyleKeys = setOf(prefs.keyBorderChoice.key, prefs.keySpacingChoice.key, prefs.keyRadiusChoice.key)
+    private val keyStyleKeys = setOf(prefs.keyBorderChoice.key, prefs.keyHSpacingChoice.key, prefs.keyVSpacingChoice.key, prefs.keyRadiusChoice.key)
 
     /**
      * [theme]'s look as the keyboard draws it: the key style settings (大小与样式) over its keys. All the

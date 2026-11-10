@@ -121,15 +121,16 @@ class ThemePrefsTest {
         assertEquals(LegacyLook(keyBorder = false, keyRadius = 9), prefs.legacyLook())
     }
 
-    // the three over the theme, shown, then the line on following it; 0.5.0's keys are not set here (the migration's)
+    // the four over the theme, shown in this order, then the line on following it; 0.5.0's keys are not set
+    // here (the migration's), nor 0.5.2's one spacing (migrateKeySpacing's)
     @Test
-    fun theKeyStyleSectionIsItsThreeAndALine() {
+    fun theKeyStyleSectionIsItsFourAndALine() {
         val keys = ThemePrefs(sp).managedPreferencesUi.map { it.key }
         val note = keys.indexOf("key_style_note")
         assertTrue(note >= 0)
-        for (shown in listOf("key_border_choice", "key_spacing_choice", "key_radius_choice")) {
-            assertTrue(shown, keys.indexOf(shown) in 0 until note)
-        }
-        for (gone in listOf("key_border", "key_spacing_level", "key_radius_level")) assertFalse(gone, gone in keys)
+        val shown = listOf("key_border_choice", "key_h_spacing_choice", "key_v_spacing_choice", "key_radius_choice")
+        assertEquals(shown, keys.filter { it in shown })
+        for (key in shown) assertTrue(key, keys.indexOf(key) in 0 until note)
+        for (gone in listOf("key_border", "key_spacing_level", "key_radius_level", "key_spacing_choice")) assertFalse(gone, gone in keys)
     }
 }

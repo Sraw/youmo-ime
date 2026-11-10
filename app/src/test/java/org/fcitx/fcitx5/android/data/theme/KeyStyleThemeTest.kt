@@ -8,10 +8,12 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyBorderChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyRadiusChoice
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeySpacingChoice
+import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyHSpacingChoice
+import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyVSpacingChoice
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -35,7 +37,8 @@ class KeyStyleThemeTest {
     @After
     fun followTheTheme() {
         prefs.keyBorderChoice.setValue(KeyBorderChoice.FollowTheme)
-        prefs.keySpacingChoice.setValue(KeySpacingChoice.FollowTheme)
+        prefs.keyHSpacingChoice.setValue(KeyHSpacingChoice.FollowTheme)
+        prefs.keyVSpacingChoice.setValue(KeyVSpacingChoice.FollowTheme)
         prefs.keyRadiusChoice.setValue(KeyRadiusChoice.FollowTheme)
     }
 
@@ -49,10 +52,16 @@ class KeyStyleThemeTest {
         assertEquals(0, ThemeManager.shownLook(theme).keys.radiusDp)
         // asked again, the same object: what is decoded of a look is kept by it
         assertSame(ThemeManager.shownLook(theme), ThemeManager.shownLook(theme))
-        prefs.keySpacingChoice.setValue(KeySpacingChoice.Loose)
+        // up and down alone: across the theme's
+        prefs.keyVSpacingChoice.setValue(KeyVSpacingChoice.Loose)
+        ThemeManager.shownLook(theme).keys.gap.let {
+            assertEquals(KeyStyleChoice.V_LOOSE, KeyStyleChoice.Spacing(it.v, it.vLand))
+            assertEquals(theme.look.keys.gap.h to theme.look.keys.gap.hLand, it.h to it.hLand)
+        }
+        prefs.keyHSpacingChoice.setValue(KeyHSpacingChoice.Compact)
         prefs.keyBorderChoice.setValue(KeyBorderChoice.Off)
         ThemeManager.shownLook(theme).keys.let {
-            assertEquals(KeyStyleChoice.GAP_LOOSE, it.gap)
+            assertEquals(Gap(2, 9, 2, 6), it.gap)
             assertEquals(false, it.blocks)
         }
         // the theme's own (exported, saved) is not changed: a built-in one's are the defaults

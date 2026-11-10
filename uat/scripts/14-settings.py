@@ -8,7 +8,7 @@ import tempfile
 import time
 import zipfile
 
-from uat import (PKG, Blocked, case, check, choose, home, script)
+from uat import (PKG, Blocked, case, check, choose, home, pinyin_keyboard, script)
 
 
 def kb_box(d, s=None):
@@ -644,6 +644,77 @@ case("ST-64", needs="release:要上一版（0.5.x）的包覆盖安装；方法�
 
 
 case("ST-65", needs="jvm:PacksUatTest.aPackDamagedSinceItsImportIsSaidSoAndImportedAgainMended")(lambda d: None)
+
+
+def key_gaps(d):
+    """(up and down, across) dp between the full keyboard's key faces: w over s, q beside w, read off the
+    screen's pixels (a face's colour against the keyboard's between them; a key's 1 dp shadow counts as
+    the gap's, within the tolerance)"""
+    k = d.keys(refresh=True)
+    if not all(c in k for c in "qws"):
+        raise Blocked(f"全键盘上找不到 q、w、s：{sorted(k)[:12]}")
+    im = d.png()
+    (qx, qy), (wx, wy), (sx, sy) = k["q"], k["w"], k["s"]
+
+    def far(a, b):
+        return sum(abs(x - y) for x, y in zip(a, b)) > 24
+
+    def gap(points):
+        # from inside the first face to inside the second: the run that is not the first face's colour
+        face = im.getpixel(points[0])
+        out = [i for i, p in enumerate(points) if far(im.getpixel(p), face)]
+        if not out:
+            raise Blocked("键面之间读不出缝")
+        return (out[-1] - out[0] + 1) / d.dpx()
+    # down a column in w's right half and s's left half (not their glyphs nor their corner marks), from below
+    # w's middle to above s's
+    x = (wx + sx) // 2
+    up_down = gap([(x, y) for y in range(wy + (sy - wy) // 4, sy - (sy - wy) // 4)])
+    # across a row below the letters, from q's right part to w's left
+    y = qy + (sy - qy) // 4
+    across = gap([(x2, y) for x2 in range(qx + (wx - qx) // 4, wx - (wx - qx) // 4)])
+    return round(up_down, 1), round(across, 1)
+
+
+@case("ST-95", base="B0-设置", mutates=True, visual=True)
+def st95(d):
+    d.open_page("text")
+    v0, h0 = key_gaps(d)
+    d.shot("kb", "标准高度")
+    appearance_tab(d, "大小与样式")
+    texts = d.all_texts()
+    check("横向间距" in texts and "纵向间距" in texts, "按键样式里没有横向间距、纵向间距")
+    check("按键间距" not in texts, "还有一项「按键间距」")
+    choose(d, "键盘高度", "紧凑")
+    d.open_page("text")
+    v1, h1 = key_gaps(d)
+    d.shot("kb", "紧凑：全键盘")
+    d.step("九键")
+    pinyin_keyboard(d, "九键")
+    d.open_page("text")
+    d.shot("kb", "紧凑：九键")
+    pinyin_keyboard(d, "全键盘")
+    d.step("纵向间距宽松")
+    appearance_tab(d, "大小与样式")
+    choose(d, "纵向间距", "宽松")
+    d.open_page("text")
+    v2, h2 = key_gaps(d)
+    d.shot("kb", "紧凑，纵向宽松")
+    d.step("横向间距宽松")
+    appearance_tab(d, "大小与样式")
+    choose(d, "横向间距", "宽松")
+    d.open_page("text")
+    v3, h3 = key_gaps(d)
+    d.shot("kb", "紧凑，纵向、横向都宽松")
+    seen = f"上下/左右缝 dp：标准 {v0}/{h0}，紧凑 {v1}/{h1}，纵向宽松 {v2}/{h2}，横向也宽松 {v3}/{h3}"
+
+    def near(got, want):
+        return abs(got - want) <= 1.6
+    check(near(v0, 14) and near(h0, 6), f"标准高度的缝不是约 14/6：{seen}")
+    check(near(v1, 6) and near(h1, 6), f"紧凑时的缝不是约 6/6：{seen}")
+    check(near(v2, 8) and near(h2, 6), f"纵向宽松后的缝不是约 8/6：{seen}")
+    check(near(v3, 8) and near(h3, 10), f"横向也宽松后的缝不是约 8/10：{seen}")
+    return seen
 
 
 @case("ST-66", base="B0-设置")
