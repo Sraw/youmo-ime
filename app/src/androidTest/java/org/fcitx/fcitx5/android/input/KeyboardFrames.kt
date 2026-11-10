@@ -227,15 +227,20 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
 
     /** [lengthMs] of nothing done (not the main thread): the frames drawn and the process's share of a core ([ProcessCpu]). */
     fun idle(lengthMs: Long): String {
+        val threads = ProcessCpu.threads()
         val cpu = ProcessCpu.ms()
         val from = System.nanoTime()
         SystemClock.sleep(lengthMs)
         val to = System.nanoTime()
         val used = ProcessCpu.ms() - cpu
+        val byThread = ProcessCpu.threads()
         // the last frames' metrics come a little later, on their own thread
         SystemClock.sleep(METRICS_WAIT_MS)
         val share = 100 * used / ms(to - from)
-        return "%d s\tframes %d\tprocess cpu %.2f%% of a core".format(Locale.ROOT, lengthMs / 1000, between(from, to).size, share)
+        // the busiest threads over the window alone (A5: which of decoding, RenderThread, main it is)
+        val top = byThread.map { (k, v) -> k to v - (threads[k] ?: 0.0) }.sortedByDescending { it.second }.take(TOP_THREADS)
+            .joinToString(", ") { (k, v) -> "%s %.1f%%".format(Locale.ROOT, k.substringAfter(' '), 100 * v / ms(to - from)) }
+        return "%d s\tframes %d\tprocess cpu %.2f%% of a core\tthreads %s".format(Locale.ROOT, lengthMs / 1000, between(from, to).size, share, top)
     }
 
     override fun close() {
@@ -245,6 +250,7 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
 
     private companion object {
         const val MAX_FRAMES = 400
+        const val TOP_THREADS = 4
         const val METRICS_WAIT_MS = 1_000L
         const val DEFAULT_HZ = 60f
 
@@ -330,6 +336,15 @@ internal object ProcessCpu {
         val after = File("/proc/self/stat").readText().substringAfterLast(')').trim().split(' ')
         return (after[UTIME].toLong() + after[UTIME + 1].toLong()) * tick
     }
+
+    /** Each thread's CPU ms so far, by "tid name". */
+    fun threads(): Map<String, Double> = File("/proc/self/task").listFiles().orEmpty().mapNotNull { t ->
+        runCatching {
+            val text = File(t, "stat").readText()
+            val after = text.substringAfterLast(')').trim().split(' ')
+            "${t.name} ${text.substringAfter('(').substringBeforeLast(')')}" to (after[UTIME].toLong() + after[UTIME + 1].toLong()) * tick
+        }.getOrNull()
+    }.toMap()
 
     private const val UTIME = 11
 }

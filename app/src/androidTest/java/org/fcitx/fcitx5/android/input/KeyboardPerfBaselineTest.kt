@@ -117,6 +117,8 @@ class KeyboardPerfBaselineTest {
             if ("anim" in only || "idle" in only) idleRows()
             // A4's rows after A1's (PictureRows); perfOnly=anim,soak: the animated picture played 10 minutes instead
             if ("anim" in only) motionRows().also { pictureRows(soak = "soak" in only) }
+            // perfOnly=picture: the animated picture's rows alone (A5: one change to it measured in minutes)
+            if ("picture" in only && "anim" !in only) pictureRows(soak = false)
             // the §4.3 rows that need motion in the engine (A2-A4): told, not measured
             if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return
