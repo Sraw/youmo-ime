@@ -229,6 +229,27 @@ class VoicePolishTest {
     }
 
     @Test
+    fun aNumbersCharacterIsNeverDeletedNorAnIdiomMarkedANumber() {
+        // N-kd3b (060-voice-tagger.md): 「一点一点」 lost an 一 to a del, 「十全十美」 written 10全十美
+        val slowly = codePoints("一点一点黑")
+        val op = intArrayOf(VoicePolishTags.DEL, VoicePolishTags.DEL, 0, 0, VoicePolishTags.DEL)
+        val none = IntArray(slowly.size)
+        val (gop, gafter) = numTags.guarded(slowly, op, none.copyOf())
+        // the number's characters kept; any other still goes
+        assertEquals("一点一点", numTags.apply(slowly, gop, gafter))
+        val perfect = codePoints("十全十美三个")
+        val num = classes("1.1.1.")
+        numTags.guarded(perfect, IntArray(perfect.size), IntArray(perfect.size), num)
+        // the idiom no number, the 三 after it still one
+        assertEquals("十全十美3个", numTags.apply(perfect, IntArray(perfect.size), IntArray(perfect.size), num = num))
+        // the stream guards the model's numbers too
+        val stream = VoicePolishStream(numTags, { w ->
+            VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code) 1 else 0 })
+        })
+        assertEquals("十全十美，10个", stream.finish("十全十美，十个"))
+    }
+
+    @Test
     fun theStreamFreezesNumberClassesWithTheRest() {
         var kind = 3
         val tagger = VoicePolishStream.Tagger { w ->
