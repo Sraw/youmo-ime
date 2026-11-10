@@ -797,9 +797,7 @@ class KeyboardPerfBaselineTest {
         )
     }
 
-    internal fun log(line: String) {
-        Log.i(TAG, line)
-    }
+    internal fun log(line: String) = Unit.also { Log.i(TAG, line) }
 
     internal fun <T> onMain(block: () -> T): T {
         var result: Result<T>? = null
