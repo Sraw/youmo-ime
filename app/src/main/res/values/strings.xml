@@ -130,6 +130,9 @@
     <string name="exception_theme_preview_size">The theme\'s preview image is over %1$s KB</string>
     <string name="exception_theme_preview_side">The theme\'s preview image is over %1$s pixels a side</string>
     <string name="exception_theme_icon_size">An icon of the theme is over %1$s KB</string>
+    <string name="exception_theme_effect_image_side">An effect image of the theme is over %1$s pixels a side</string>
+    <string name="exception_theme_effect_image_size">An effect image of the theme is over %1$s KB</string>
+    <string name="exception_theme_effect_image_type" formatted="false">An effect image of the theme is not a PNG or WebP</string>
     <string name="theme_pack_light">light</string>
     <string name="theme_pack_dark">dark</string>
     <string name="theme_pack_low_contrast">The keys\' text may be hard to read on them (%1$s version)</string>
@@ -741,6 +744,7 @@
     <string name="im_auto_caps_summary">Shift at the start of a sentence, where the app asks for it</string>
     <string name="key_drawing">Drawing on keys</string>
     <string name="key_drawing_handwriting">Handwriting on keys</string>
+    <string name="key_drawing_needs_text_pack">%1$s (needs the text pack)</string>
     <string name="glide_typing">Glide typing</string>
     <string name="stroke_filter">Stroke filter</string>
     <string name="status_punctuation_chinese">Chinese punctuation</string>

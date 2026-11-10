@@ -470,7 +470,7 @@ object ThemeReader {
     // what a popup's widgets read of the motion (A2)
     private val POPUP_MOTION = mapOf("popup" to setOf("transition", "appear"), "preview" to setOf("transition", "appear"), "menu" to setOf("appear"))
 
-    private val MOTION = listOf("transition", "press-scale", "press-sink", "appear")
+    private val MOTION = listOf("transition", "press-scale", "press-sink", "effect", "appear")
 
     // a panel's property it has no use for (`clipboard shadow=`), as the window's; the voice mask's blur and the
     // handwriting pad's ink and grid set on what does not read them, too

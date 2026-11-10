@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
+import org.fcitx.fcitx5.android.pack.PackKind
 import android.content.Context
 import android.widget.ArrayAdapter
 import android.widget.ListView
@@ -22,6 +23,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.ShuangpinNames
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.EnglishKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
@@ -216,13 +218,9 @@ object InputMethodSettings {
             R.string.shared_section_all, listOf(
                 // the keyboard's, one of: a word by gliding across its keys (InputMethodCatalog.glides), a stroke
                 // filtering pinyin's and 双拼's candidates (InputMethodCatalog.filtersByStrokes), or off; which input
-                // methods read each is the docs' (the summary is the choice alone). 键盘手写 not offered till it is wired.
-                AppChoice(
-                    AppPrefs.KEY_DRAWING, R.string.key_drawing, 0, KeyDrawing.entries,
-                    offered = { KeyDrawing.entries - KeyDrawing.Handwriting },
-                    // stored by a later version's backup: the keyboard draws nothing for it yet
-                    instead = { _, _ -> KeyDrawing.Off },
-                ) { AppPrefs.getInstance().keyboard.keyDrawing },
+                // methods read each is the docs' (the summary is the choice alone). 键盘手写 always listed, said to need
+                // the text pack while it is missing (keyboardLabel): a ListPreference cannot disable one entry
+                AppChoice(AppPrefs.KEY_DRAWING, R.string.key_drawing, 0, KeyDrawing.entries) { AppPrefs.getInstance().keyboard.keyDrawing },
                 AppToggle(AppPrefs.AUTO_PAIRS, R.string.auto_pairs, 0) { AppPrefs.getInstance().keyboard.autoPairs },
                 AppToggle(AppPrefs.CALCULATION_REPLACES_SUM, R.string.calculation_replaces_sum, 0) {
                     AppPrefs.getInstance().keyboard.calculationReplacesSum
@@ -727,6 +725,9 @@ object InputMethodSettings {
             is PinyinKeyboard -> InputMethodCatalog.PINYIN to choice.keyboard
             is ShuangpinKeyboard -> InputMethodCatalog.SHUANGPIN to choice.keyboard
             is EnglishKeyboard -> InputMethodCatalog.ENGLISH to choice.keyboard
+            // its recognizer is the text pack's
+            KeyDrawing.Handwriting ->
+                return if (PackStore.ready(PackKind.TEXT)) own else context.getString(R.string.key_drawing_needs_text_pack, own)
             else -> return own
         }
         return KeyboardLabels.label(context, im, keyboard, own)

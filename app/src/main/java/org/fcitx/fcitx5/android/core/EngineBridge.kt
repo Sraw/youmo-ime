@@ -70,8 +70,9 @@ class EngineBridge {
      * sent. On the fcitx thread.
      *
      * [onKeys]: written on the letter keys (键盘手写): [current]'s own handwriting's (InkOver), sent while
-     * it writes on its keys; another input method's by now (switched meanwhile), dropped: its piece is of
-     * what that one showed.
+     * it writes on its keys. Switched meanwhile, the piece goes to the input method now current: dropped
+     * where that writes on no keys, else read there (piece numbers are global; a rare slip, not worth
+     * carrying the input method written on with every reading).
      */
     fun sendInk(piece: Action.Ink, current: String, onKeys: Boolean = false, send: () -> Unit): Boolean {
         if (onKeys) {

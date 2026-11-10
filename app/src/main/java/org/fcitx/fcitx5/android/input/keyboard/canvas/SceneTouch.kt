@@ -69,6 +69,10 @@ class SceneKey(
 
     override val timers: CoroutineScope by lazy { keyboard.findViewTreeLifecycleOwner()!!.lifecycleScope }
 
+    // where the finger came down, in the canvas: a press effect plays from there (060-render-p3 A3). [frame] is the key's
+    // cell in the keyboard, the canvas laid in it at its own place
+    override fun hotspot(x: Float, y: Float) = canvas.touchedAt(ref, frame.left + x - canvas.left, frame.top + y - canvas.top)
+
     override fun showPressed(pressed: Boolean) {
         if (this.pressed == pressed) return
         this.pressed = pressed

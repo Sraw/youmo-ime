@@ -151,6 +151,20 @@ last than its own motion (the longer of its `appear` and `transition`) neither c
 bubble ends any fading out at once. With TalkBack's touch exploration on, a popup goes at once (a fading one would take the hover over it). The engine is asked only where a style sets popup motion (`PopupScenes.moves`, once a theme), and `KeyMotionSwitch` only then; off, everything as before.
 `PopupMotionTest`.
 
+A key's press effect (A3, `effect=` on its pressed look: `ripple-image(file, radius%, ms)`, the radius of the face's half
+diagonal, 10–200%; `particles(file, count ≤ 12, spread ≤ 64dp, ms)`; 1–600 ms; `none`) is the scene's `Motion.effect`
+(`KeyEffect`, px), played by `KeyEffects` over every key at each press, from where the finger came down (`SceneKey.hotspot` →
+`touchedAt`; a press without a touch, the key's middle). Each image (a pack's file, ≤ 256 px a side, ≤ 128 KB, PNG or WebP,
+`ThemeAssetLimits`; decoded with the key images, `ThemePackFiles.images`) is recorded once into a node; a ripple is a node at the
+key's face clipped to it (a rounded rectangle of one radius by its outline, `RenderNode.setClipToOutline`; another shape by its
+path, even-odd, recorded in the node at each press: an outline's path clips from API 33 alone) round a node drawing the image (filtered), scaled 0 → the radius (ease-out) and fading; a particle is a node drawing the image (3 of
+its file's px a dp, however it was decoded) flying to its end (`KeyEffect.Particles.ends`, seeded by the view's press count: the same presses, the same flights,
+JVM and JS alike) and fading. Pools of at most 8 ripples and 48 particles, the one taken longest ago taken past them; the fading nodes drawn with no layer
+of their own (`setHasOverlappingRendering(false)`); made at the first effect played (none for a theme without effects); one `TimeAnimator` while any
+plays whose frames set alpha, scale and translation alone (trace `canvas anim`), ended when none does. Effects play on every press,
+typed fast too (unlike the press scale and the release fade: the pools bound them), where `KeyMotionSwitch` says keys may move;
+hidden or detached, they stop (detached, every node's drawing let go). `KeyEffectTest`.
+
 ### Keys
 
 A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `NumberKeyboard`, `HandwritingKeyboard`):
@@ -419,8 +433,9 @@ password is neither read nor learned; the space a glide puts before its word wou
 Keys there are typed as they are, and a finger sliding across them never starts a glide.
 
 The same touch is a stroke (笔画筛选) where that is chosen instead: one setting,
-`AppPrefs.keyboard.keyDrawing` (`KeyDrawing`: Off, Glide, StrokeFilter; its Handwriting not offered
-on the settings page yet), so the two are never both on and English glides none while strokes are
+`AppPrefs.keyboard.keyDrawing` (`KeyDrawing`: Off, Glide, StrokeFilter, Handwriting; the page lists
+Handwriting always, labelled as needing the text pack while that is not ready, as a ListPreference
+cannot disable one entry), so the two are never both on and English glides none while strokes are
 chosen. 0.5's two switches (`glide_typing`, 0.4's key too, and `stroke_filter`) move over at the
 start (`AppPrefs.migrateKeyDrawing`, a backup's at the start after its import): glide if it was on,
 else strokes if they were, else off (both on, which only a backup or a hand edit holds, is glide),
@@ -438,6 +453,23 @@ as none (up, up to the left) is dropped. A stroke may also start between a split
 from where the letters are, so only the 26 keys split have it), passed to `GlideTouch.down` as
 `inGap`, and `GlideInput` keeps that down though no key takes it (else its moves would go nowhere);
 a tap there still does nothing, and a glide starts on a letter only.
+
+Writing on the keys (键盘手写, `KeyDrawing.Handwriting`; design 060-kbd-handwriting) is `GlideInput`'s
+third mode, decided at the down (`writes`: the setting, a word field, no temporary mode, TalkBack's
+touch exploration off, `InputMethodCatalog.writesOnKeys` of the keyboard's input method, the
+recognizer loadable). `KeyInk` (`input/keyboard`, one per keyboard made with its glide) holds the
+pad (`InkPad`), the gesture (ime-core's `KeyInkGesture`, fed by `GlideTouch`) and the ink drawn over
+the keys after them in `dispatchDraw` (the pad's colour by default: key text, 3.5 dp; faded over
+150 ms as a piece ends). The recognizer is the shared one (`HandwritingRecognition.shared`), made
+and warmed up the first time a touch may start a stroke, never for English. Keys go through
+`InkKeys` (shared with `HandwritingKeyboard`: in order behind the reads, backspace a stroke first, a
+key for the engine wiping the piece) only once the keyboard was written on and in an input method
+that writes. Readings go out through `KeyboardWindow` as `HostApi.offerInk(onKeys = true)`, the first
+of a piece whose first dot was a tap taken back marked `takesBack` (the engine deletes the letter if
+that tap alone is typed: no backspace is sent from here); pieces the engine ended come back through
+`EngineState.handwritingEnded`, and `EngineState.keysTyped` (re-emitted after every key) tells the
+gesture whether the input method has its own input typed. `restartInk` drops the pad at each new
+input; detaching finishes it.
 
 The 060 redraw (`input/keyboard/canvas/`; the only drawing since 060-render-p2 S8a, which deleted the
 key views and the 开发者 → 新绘制键盘 switch, its stored key retired): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14

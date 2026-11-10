@@ -58,6 +58,13 @@ kotlin {
  * has the app's files in it, read when asked for (BuiltIns), not a copy of them kept by hand.
  */
 abstract class BuiltInFilesTask : DefaultTask() {
+    // a layout as the library keeps it (060-render-p3 M4, the page's engine under its size budget): its comments
+    // (notes for the app's developers, a quarter of it) and each line's indent and trailing blanks gone, its lines
+    // kept, so a problem's line is the file's. Themes are kept as written: the maker shows them as its source.
+    // BuiltInsTest and the page's engine.test.mjs pack a file the same way
+    private fun packed(xml: String) = xml.replace(Regex("<!--[\\s\\S]*?-->")) { c -> "\n".repeat(c.value.count { it == '\n' }) }
+        .replace(Regex("(?m)^[ \\t]+|[ \\t]+$"), "")
+
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val layouts: ConfigurableFileCollection
@@ -87,8 +94,8 @@ abstract class BuiltInFilesTask : DefaultTask() {
             }
             append('"')
         }
-        fun map(files: Set<File>) = files.filter { it.extension == "xml" }.sortedBy { it.name }
-            .joinToString(",\n", prefix = "mapOf(\n", postfix = ",\n    )") { "        ${literal(it.nameWithoutExtension)} to ${literal(it.readText())}" }
+        fun map(files: Set<File>, text: (String) -> String = { it }) = files.filter { it.extension == "xml" }.sortedBy { it.name }
+            .joinToString(",\n", prefix = "mapOf(\n", postfix = ",\n    )") { "        ${literal(it.nameWithoutExtension)} to ${literal(text(it.readText()))}" }
             .let { if (files.none { f -> f.extension == "xml" }) "emptyMap()" else it }
         val dir = out.get().asFile.resolve("org/fcitx/fcitx5/android/scene/web")
         dir.deleteRecursively()
@@ -99,7 +106,7 @@ abstract class BuiltInFilesTask : DefaultTask() {
             |package org.fcitx.fcitx5.android.scene.web
             |
             |internal object BuiltInFiles {
-            |    val layouts: Map<String, String> = ${map(layouts.files)}
+            |    val layouts: Map<String, String> = ${map(layouts.files, ::packed)}
             |
             |    val themes: Map<String, String> = ${map(themes.files)}
             |}
@@ -112,8 +119,8 @@ abstract class BuiltInFilesTask : DefaultTask() {
 // The theme maker's library as the page takes it (060-render-p3 W1): build/youmo-engine/youmo-engine.js,
 // which web/theme-maker/tools/assemble.mjs puts in the page as its youmo-engine block (the page's test
 // holds the two alike, and the block to its size budget). The production library, its lines' indents gone
-// (a sixth of it; Kotlin writes no string over two lines, so none is cut) and its source map's comment (the
-// page has no map). There is no minifier here: one is npm's, and the page's block is checked against this
+// (a sixth of it; Kotlin writes no string over two lines, so none is cut) and its line comments, the source
+// map's among them (the page has no map). There is no minifier here: one is npm's, and the page's block is checked against this
 // file in CI.
 val engineLink = tasks.named<org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile>("compileProductionLibraryKotlinJs") {
     // the global a page reads it by (UMD's): `youmo-engine`, not the project's path. The library's link
@@ -124,10 +131,15 @@ val engineLink = tasks.named<org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile>
 val youmoEngine = tasks.register<Copy>("youmoEngine") {
     from(engineLink.flatMap { it.destinationDirectory }) { include("youmo-engine.js") }
     into(layout.buildDirectory.dir("youmo-engine"))
+    // Gradle does not see a filter's lambda: change this with the filter, or the engine built before stays
+    inputs.property("filter", "2")
     // and nothing a script element in a page ends or escapes at (the layouts' comments are in it, `<!--`): `<\!--`
     // and `<\/` are those texts again in a string or a regex, the only places Kotlin writes them
     filter { line: String ->
-        if (line.startsWith("//# sourceMappingURL=")) "" else line.trimStart().replace("<!--", "<\\!--").replace("</", "<\\/")
+        // the compiler's own line comments (`// Inline function 'kotlin.collections.map' call`, a tenth of it) gone too:
+        // a whole line of comment, never a string's (none goes over two lines)
+        val text = line.trimStart()
+        if (text.startsWith("//")) "" else text.replace("<!--", "<\\!--").replace("</", "<\\/")
     }
 }
 

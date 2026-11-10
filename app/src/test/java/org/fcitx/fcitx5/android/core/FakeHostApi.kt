@@ -188,8 +188,8 @@ class FakeHostApi : HostApi {
     }
 
     // written on the keys: marked so ([onKeys]), with its first reading
-    override suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean): Boolean {
-        calls += if (onKeys) "offerInk($piece, keys, ${reading.texts.firstOrNull()})" else "offerInk($piece)"
+    override suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean, takesBack: Boolean): Boolean {
+        calls += if (onKeys) "offerInk($piece, keys, ${reading.texts.firstOrNull()}${if (takesBack) ", takesBack" else ""})" else "offerInk($piece)"
         return true
     }
 

@@ -249,9 +249,10 @@ sealed class Action {
      * Handwriting: what the pad read of its [piece], [reading], or, none, that [piece] finished;
      * shown with those held before it (HandwritingSession.hold). Sent with the key that carries it
      * ([Keyboard.INK]), so that it comes in order with the keys and taps around it; nothing to any
-     * other session.
+     * other session. [takesBack]: written on the letter keys (InkOver), the first reading of a piece whose
+     * first dot was a tap: that tap's letter is deleted first, if it alone is what is typed (else nothing is).
      */
-    data class Ink(val piece: Int, val reading: InkReading? = null) : Action()
+    data class Ink(val piece: Int, val reading: InkReading? = null, val takesBack: Boolean = false) : Action()
 
     /**
      * Glide typing: the keyboard's [glide] (EnglishSession commits its word), or its [readings] as

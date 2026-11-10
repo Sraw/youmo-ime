@@ -14,6 +14,7 @@ import androidx.preference.SwitchPreferenceCompat
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
@@ -217,23 +218,30 @@ class InputMethodSettingsScreenTest {
         assertTrue(AppPrefs.ENGLISH_AUTO_CAPS !in cfg.flattened())
     }
 
-    // 在键上划: one list of 滑行输入, 笔画筛选 and off (键盘手写 not offered yet), its summary the choice alone;
-    // a choice stored as it is picked
+    // 在键上划: one list of 滑行输入, 笔画筛选, 键盘手写 and off, its summary the choice alone; a choice stored as
+    // it is picked; 键盘手写 said to need the text pack while it is missing
     @Test
     fun keyDrawingIsOneChoiceSummarizedByItself() {
         val keyboard = AppPrefs.getInstance().keyboard
         try {
+            TestShelves.use()
             keyboard.keyDrawing.setValue(KeyDrawing.Glide)
             val drawing = create(InputMethodSettings.SHARED).findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!
-            assertEquals(listOf(KeyDrawing.Glide, KeyDrawing.StrokeFilter, KeyDrawing.Off).map { it.name }, drawing.entryValues.map { it.toString() })
+            assertEquals(listOf(KeyDrawing.Glide, KeyDrawing.StrokeFilter, KeyDrawing.Handwriting, KeyDrawing.Off).map { it.name }, drawing.entryValues.map { it.toString() })
+            val own = PlaceholderStrings(RuntimeEnvironment.getApplication()).getString(R.string.key_drawing_handwriting)
+            assertEquals(own, drawing.entries[2].toString())
             assertEquals(KeyDrawing.Glide.name, drawing.value)
             assertEquals(drawing.entry.toString(), drawing.summary?.toString())
             assertTrue(drawing.callChangeListener(KeyDrawing.StrokeFilter.name))
             assertEquals(KeyDrawing.StrokeFilter, keyboard.keyDrawing.getValue())
-            // one this version does not offer (a later version's backup) shows as off, as the keyboard reads it
-            keyboard.keyDrawing.setValue(KeyDrawing.Handwriting)
-            assertEquals(KeyDrawing.Off.name, create(InputMethodSettings.SHARED).findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!.value)
+            assertTrue(drawing.callChangeListener(KeyDrawing.Handwriting.name))
+            assertEquals(KeyDrawing.Handwriting, keyboard.keyDrawing.getValue())
+            TestShelves.use(text = false, voice = true)
+            val gated = create(InputMethodSettings.SHARED).findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!
+            assertEquals(PlaceholderStrings(RuntimeEnvironment.getApplication()).getString(R.string.key_drawing_needs_text_pack, own), gated.entries[2].toString())
+            assertEquals(KeyDrawing.Handwriting.name, gated.value)
         } finally {
+            TestShelves.use()
             keyboard.keyDrawing.setValue(KeyDrawing.Off)
         }
     }

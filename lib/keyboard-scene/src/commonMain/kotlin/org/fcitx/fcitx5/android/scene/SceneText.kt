@@ -49,6 +49,11 @@ object SceneText {
         k.motion?.let { m ->
             fun t(t: org.fcitx.fcitx5.android.scene.theme.Transition?) = t?.let { "${it.ms}ms,${it.easing}" } ?: "-"
             appendLine("  motion transition=${t(m.transition)} press=${t(m.press)} scale=${n(m.pressScale)} sink=${n(m.pressSink)}")
+            when (val e = m.effect) {
+                null -> {}
+                is KeyEffect.Ripple -> appendLine("  effect ripple ${q(e.file)} radius=${n(e.radius)} ${e.ms}ms")
+                is KeyEffect.Particles -> appendLine("  effect particles ${q(e.file)} ${e.count} spread=${n(e.spread)} ${e.ms}ms")
+            }
         }
         val normal = k.ops(pressed = false)
         appendLine("  normal")

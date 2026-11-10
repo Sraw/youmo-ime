@@ -112,8 +112,18 @@
       if (where === '*') bad('键的样式用的场景组合太多，没法逐一检查 Shift、退格、空格和回车会不会成空白键（App 会拒收）');
       else bad(where + '：字藏了，键面又不是图片——Shift、退格、空格或回车会是空白键');
     }
-    let total = 0;
     const enc = new TextEncoder();
+    // the pack's layouts as the app takes them (ThemePackFiles.checkLayouts, ThemeAssetLimits.layouts; ThemePackLayouts.report)
+    const names = Object.keys(d.layouts);
+    for (const n of names) if (!n.endsWith('.xml') || !L.isPlainFileName(n)) bad('layouts/' + n + ' 不是 App 认得的布局文件名（<键盘>.xml）');
+    if (names.length > lim.layouts) bad('自带的键盘布局 ' + names.length + ' 个，App 最多收 ' + lim.layouts + ' 个');
+    for (const n of names) if (enc.encode(d.layouts[n]).length > lim.layoutBytes) bad('layouts/' + n + ' 超过 ' + lim.layoutBytes + ' 字节');
+    const boards = new Set(E.layouts());
+    for (const n of names) {
+      const id = n.replace(/\.xml$/, '');
+      if (!boards.has(id) && E.layoutSource(id) == null) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：App 没有这个键盘，不会用它' });
+    }
+    let total = 0;
     const sizes = [enc.encode(d.xml).length, ...Object.values(d.files).map((b) => b.length), ...Object.values(d.layouts).map((t) => enc.encode(t).length)];
     for (const [i, size] of sizes.entries()) {
       const breach = L.entryBreach(lim, i + 1, size, total);
@@ -380,14 +390,66 @@
     add('error', r.problems);
     add('warning', r.warnings);
     if (!r.ok) return { problems, theme: null, scene: null };
-    const s = E.buildScene(board, r.theme, env, measurer || E.fixedMeasurer());
+    const s = E.buildScene(layoutOf(E, d, board, (list) => add('warning', list)), r.theme, env, measurer || E.fixedMeasurer());
     add('error', s.problems);
     add('warning', s.ok ? s.scene.json().warnings : s.warnings);
     return { problems, theme: r.theme, scene: s.ok ? s.scene : null };
   }
 
+  /**
+   * The keyboard [board] is drawn with: the pack's own `layouts/<board>.xml` where it has one that reads (its includes
+   * from the pack's other files there, else the app's), else the app's (its id). One that does not read is [warn]ed
+   * of, the app's drawn, as the app does (ThemePackLayouts: logged, its own drawn).
+   */
+  function layoutOf(E, d, board, warn) {
+    const own = d.layouts[board + '.xml'];
+    if (own == null) return board;
+    const fragments = Object.create(null);
+    // the pack's fragments the app reads: only under an id of its own (ThemePackLayouts.read)
+    for (const [n, t] of Object.entries(d.layouts)) if (n !== board + '.xml' && n.endsWith('.xml') && E.layoutSource(n.slice(0, -4)) != null) fragments[n.slice(0, -4)] = t;
+    const l = E.readLayout(own, fragments);
+    if (!l.ok) {
+      warn(l.problems.map((p) => ({ line: 0, message: 'layouts/' + board + '.xml' + (p.line ? ' 第 ' + p.line + ' 行' : '') + '：' + p.message + '（App 会用自己的这个键盘）' })));
+      return board;
+    }
+    // as typable as the app's, else the app's drawn (ThemePackLayouts.judge, the same rule: PackLayouts)
+    const why = E.refuses(board, l.layout);
+    if (why == null) return l.layout;
+    warn([{ line: 0, message: 'layouts/' + board + '.xml：App 不会用它（' + why + '），会用自己的这个键盘' }]);
+    return board;
+  }
+
+  /**
+   * What stands before a save (060-render-p3 M4): every problem of [d] on each of the app's boards ([boards]), in
+   * [env] (EnvJson) light and dark, and what the app refuses on import (saveProblems), each once.
+   * `{errors, warnings}`: an error stops the save, a warning is the user's to ignore.
+   */
+  function exportCheck(E, L, format, d, boards, env) {
+    const all = [];
+    const seen = new Set();
+    const add = (p) => { const k = p.level + '|' + p.line + '|' + p.message; if (!seen.has(k)) { seen.add(k); all.push(p); } };
+    for (const board of boards) {
+      for (const dark of [false, true]) {
+        const e = Object.assign({}, env);
+        if (dark) e.dark = true; else delete e.dark;
+        // the number board as the app shows it (a field's pad named): not the engine's warning of a pad not given
+        if (board === 'number') e.input = Object.assign({ field: 'number', ime: 'pinyin' }, e.input, { pad: 'full' });
+        for (const p of check(E, d, board, e, null).problems) add(p);
+      }
+    }
+    if (!all.some((p) => p.level === 'error')) for (const p of saveProblems(E, L, format, d)) add(p);
+    return { errors: all.filter((p) => p.level === 'error'), warnings: all.filter((p) => p.level !== 'error') };
+  }
+
+  /** An example (the page's youmo-examples block: `{id, label, note, xml, files: {name: base64}, layouts}`) as a document. */
+  function exampleDoc(ex) {
+    const files = Object.create(null);
+    for (const [n, b64] of Object.entries(ex.files || {})) files[n] = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return doc(ex.xml, files, ex.layouts || {});
+  }
+
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

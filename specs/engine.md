@@ -810,8 +810,14 @@ and the pieces ended over a drop of the sessions count every handwriting session
 on the letters is a stroke is `KeyInkGesture` (`input/keyboard`), which `GlideTouch.down` takes (`ink`,
 and `typed`: `Engines.typedOnKeys`, false while what shows is handwriting's): 0.3 of a key any way,
 then every touch a stroke from its down till the pause; a tap that started the input (nothing typed
-at its down), a stroke within the pause after it and no other key between, taken back as the first
-dot (`takeTapped`), by state, not by text, as the nine keys and zhuyin show no letter of the key.
+at its down), a stroke within the pause after it and no other key between (a long press, a cancel, a
+second finger, a touch in the gap forget it), taken back as the first dot (`takeTapped`), by state,
+not by text, as the nine keys and zhuyin show no letter of the key. The keyboard sends no backspace
+for it: the piece's first reading carries `Action.Ink.takesBack`, and `InkOver` deletes the letter
+(a Backspace to the wrapped session) only when that session's input is the one action that started
+it (`typedActions == 1`); anything else typed, picked or committed between, and nothing is deleted
+(the Ink then dropped as any while typing). Decided on the fcitx thread, where what was typed is
+known, not from the UI thread's guess of it.
 
 ## Handwriting
 

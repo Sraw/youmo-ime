@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.scene.look.Palette
 import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.scene.look.Text
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.theme.Effect
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.Selector
@@ -161,7 +162,12 @@ object ThemePackFiles {
      */
     fun drawn(scene: SceneTheme, dir: String): SceneTheme {
         fun path(name: String) = File(dir, name).path
-        fun value(v: Value): Value = ((v as? Value.OfFill)?.fill as? Fill.Image)?.let { Value.OfFill(it.copy(file = path(it.file))) } ?: v
+        fun value(v: Value): Value = when (val e = (v as? Value.OfEffect)?.effect) {
+            // A3: a press effect's image by its path too
+            is Effect.Ripple -> Value.OfEffect(e.copy(file = path(e.file)))
+            is Effect.Particles -> Value.OfEffect(e.copy(file = path(e.file)))
+            null -> ((v as? Value.OfFill)?.fill as? Fill.Image)?.let { Value.OfFill(it.copy(file = path(it.file))) } ?: v
+        }
         val styles = scene.styles.map { s -> Style(s.selectors, s.values.mapValues { (_, v) -> value(v) }, s.order, s.line) }
         val picture = scene.picture?.let { p -> ScenePicture(path(p.src), p.brightness, p.blurDp, p.cuts.mapValues { path(it.value) }) }
         return SceneTheme(
@@ -172,11 +178,16 @@ object ThemePackFiles {
 
     /**
      * The key images [scene]'s styles name (its [drawn] one's: by path), each once, as ThemeAssets decodes a
-     * keyboard's (only the file is read of each: the engine places the slices).
+     * keyboard's (only the file is read of each: the engine places the slices); its keys' press effects' images
+     * with them (A3), decoded as one is.
      */
-    fun images(scene: SceneTheme): List<NineSlice> = scene.styles.flatMap { it.values.values }
-        .mapNotNull { ((it as? Value.OfFill)?.fill as? Fill.Image) }.distinctBy { it.file }
-        .map { NineSlice(it.file, Insets(0, 0, 0, 0), it.pxPerDp.coerceAtLeast(1)) }
+    fun images(scene: SceneTheme): List<NineSlice> {
+        val values = scene.styles.flatMap { it.values.values }
+        val slices = values.mapNotNull { ((it as? Value.OfFill)?.fill as? Fill.Image) }
+            .map { NineSlice(it.file, Insets(0, 0, 0, 0), it.pxPerDp.coerceAtLeast(1)) }
+        val effects = values.mapNotNull { (it as? Value.OfEffect)?.effect }.map { NineSlice(it.file, Insets(0, 0, 0, 0), 1) }
+        return (slices + effects).distinctBy { it.file }
+    }
 
     /**
      * The versions of the pack [file] in [dir], [scene] its theme read: each a [Theme.Pack], the light first, told
@@ -390,6 +401,7 @@ object ThemePackFiles {
         // the source photo too, though only its cuts are drawn: every file a pack brings is what it is named
         (files.pictures + listOfNotNull(files.source)).forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.picture(w, h)?.let(checks.refused) } }
         files.images.forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.keyImage(w, h, File(from, n).length())?.let(checks.refused) } }
+        files.effects.forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.effectImage(n, w, h, File(from, n).length())?.let(checks.refused) } }
         files.preview?.let { n -> size(n).let { (w, h) -> ThemeAssetLimits.preview(w, h, File(from, n).length())?.let(checks.refused) } }
         files.fonts.forEach { n -> if (!checks.probe.fontReads(File(from, n))) errorRuntime(R.string.exception_theme_font, n) }
         files.icons.forEach { n ->
