@@ -380,14 +380,59 @@
     add('error', r.problems);
     add('warning', r.warnings);
     if (!r.ok) return { problems, theme: null, scene: null };
-    const s = E.buildScene(board, r.theme, env, measurer || E.fixedMeasurer());
+    const s = E.buildScene(layoutOf(E, d, board, (list) => add('warning', list)), r.theme, env, measurer || E.fixedMeasurer());
     add('error', s.problems);
     add('warning', s.ok ? s.scene.json().warnings : s.warnings);
     return { problems, theme: r.theme, scene: s.ok ? s.scene : null };
   }
 
+  /**
+   * The keyboard [board] is drawn with: the pack's own `layouts/<board>.xml` where it has one that reads (its includes
+   * from the pack's other files there, else the app's), else the app's (its id). One that does not read is [warn]ed
+   * of, the app's drawn, as the app does (ThemePackLayouts: logged, its own drawn).
+   */
+  function layoutOf(E, d, board, warn) {
+    const own = d.layouts[board + '.xml'];
+    if (own == null) return board;
+    const fragments = Object.create(null);
+    for (const [n, t] of Object.entries(d.layouts)) if (n !== board + '.xml' && n.endsWith('.xml')) fragments[n.slice(0, -4)] = t;
+    const l = E.readLayout(own, fragments);
+    if (l.ok) return l.layout;
+    warn(l.problems.map((p) => ({ line: 0, message: 'layouts/' + board + '.xml' + (p.line ? ' 第 ' + p.line + ' 行' : '') + '：' + p.message + '（App 会用自己的这个键盘）' })));
+    return board;
+  }
+
+  /**
+   * What stands before a save (060-render-p3 M4): every problem of [d] on each of the app's boards ([boards]), in
+   * [env] (EnvJson) light and dark, and what the app refuses on import (saveProblems), each once.
+   * `{errors, warnings}`: an error stops the save, a warning is the user's to ignore.
+   */
+  function exportCheck(E, L, format, d, boards, env) {
+    const all = [];
+    const seen = new Set();
+    const add = (p) => { const k = p.level + '|' + p.line + '|' + p.message; if (!seen.has(k)) { seen.add(k); all.push(p); } };
+    for (const board of boards) {
+      for (const dark of [false, true]) {
+        const e = Object.assign({}, env);
+        if (dark) e.dark = true; else delete e.dark;
+        // the number board as the app shows it (a field's pad named): not the engine's warning of a pad not given
+        if (board === 'number') e.input = Object.assign({ field: 'number', ime: 'pinyin' }, e.input, { pad: 'full' });
+        for (const p of check(E, d, board, e, null).problems) add(p);
+      }
+    }
+    if (!all.some((p) => p.level === 'error')) for (const p of saveProblems(E, L, format, d)) add(p);
+    return { errors: all.filter((p) => p.level === 'error'), warnings: all.filter((p) => p.level !== 'error') };
+  }
+
+  /** An example (the page's youmo-examples block: `{id, label, note, xml, files: {name: base64}, layouts}`) as a document. */
+  function exampleDoc(ex) {
+    const files = Object.create(null);
+    for (const [n, b64] of Object.entries(ex.files || {})) files[n] = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return doc(ex.xml, files, ex.layouts || {});
+  }
+
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

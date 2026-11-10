@@ -10,6 +10,7 @@
   const PANELS = window.YoumoPanels || [];
   const json = (id) => JSON.parse(document.getElementById(id).textContent);
   const FORMAT = json('youmo-format');
+  const EXAMPLES = json('youmo-examples');
   const ICONS = json('youmo-engine-icons');
   const $ = (id) => document.getElementById(id);
 
@@ -761,13 +762,26 @@
     $('edit').scrollTop = scroll;
   }
 
-  function save() {
+  // 保存 (060-render-p3 M4): checked first on every board, light and dark, and as the app imports. An error stops
+  // it (the problems list shows them all, each a click from its line); warnings are listed, the user's to ignore
+  async function save() {
     if (!history) return;
     const d = history.current;
-    const bad = M.check(E, d, env.board, M.envJson(env), null).problems.filter((p) => p.level === 'error');
-    if (bad.length) { toast('有 ' + bad.length + ' 个错误，App 导入不了，先改好'); return; }
-    const refused = M.saveProblems(E, L, FORMAT, d);
-    if (refused.length) { toast('App 会拒绝导入：' + refused.map((p) => p.message).join('；')); return; }
+    const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(env));
+    if (errors.length) {
+      showProblems([...errors, ...warnings]);
+      $('problems-area').scrollIntoView({ block: 'nearest' });
+      toast('有 ' + errors.length + ' 个错误，App 导入不了，先改好（见「问题」）');
+      return;
+    }
+    if (warnings.length) {
+      $('export-text').textContent = warnings.length + ' 个警告。App 能导入，但这些地方可能和你想的不一样：';
+      $('export-list').replaceChildren(...warnings.slice(0, 50).map((p) => Object.assign(document.createElement('li'), { textContent: (p.line ? '第 ' + p.line + ' 行：' : '') + p.message })));
+      $('export-panel').returnValue = '';
+      $('export-panel').showModal();
+      const answer = await new Promise((ok) => $('export-panel').addEventListener('close', () => ok($('export-panel').returnValue), { once: true }));
+      if (answer !== 'save') return;
+    }
     const { name, bytes } = M.save(L, d);
     const a = document.createElement('a');
     // octet-stream, as the app exports it: a browser adds no .zip to a name it takes for a zip (specs/app.md)
@@ -842,6 +856,19 @@
       label.append(r, ' ' + (THEME_LABEL[id] || id));
       $('image-base').append(label);
     }
+    for (const ex of EXAMPLES) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = ex.label;
+      b.title = ex.note;
+      b.addEventListener('click', () => {
+        set(M.exampleDoc(ex));
+        $('new-panel').close();
+        if (Object.keys(ex.layouts).length) toast('带自定义布局：' + Object.keys(ex.layouts).map((n) => n.replace(/\.xml$/, '')).join('、') + '，保存时原样保留');
+      });
+      $('examples').append(b);
+    }
+    $('help-button').addEventListener('click', () => $('help-panel').showModal());
     const cards = $('builtins');
     for (const id of E.themes()) {
       const b = document.createElement('button');

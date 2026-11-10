@@ -624,7 +624,8 @@ test('contrast is Contrast.ratio, a colour reads dark as the page guesses, a cut
 
 test('each page carries only the generated blocks it reads, and classic no engine', () => {
   const ids = (page) => [...page.matchAll(/<script type="application\/json" id="([\w-]+)">/g)].map((m) => m[1]);
-  assert.deepEqual(ids(html), ['youmo-format', 'youmo-engine-icons']);
+  // and the maker its examples (examples/, put in by assemble.mjs, not the app's)
+  assert.deepEqual(ids(html), ['youmo-format', 'youmo-engine-icons', 'youmo-examples']);
   assert.deepEqual(ids(classicHtml), ['youmo-format', 'youmo-presets', 'youmo-layout', 'youmo-icons']);
   assert.equal(blockOf(classicHtml, 'youmo-engine'), null);
   assert.equal(blockOf(html, 'youmo-format'), blockOf(classicHtml, 'youmo-format'), 'the app writes the format into both');

@@ -30,6 +30,7 @@
   <span class="grow"></span>
   <button id="dark" aria-pressed="false">浅色</button>
   <button id="env">环境</button>
+  <button id="help-button">帮助</button>
   <a class="link" href="classic/">旧版</a>
 </header>
 <main id="main" inert>
@@ -73,6 +74,8 @@
 <dialog id="new-panel">
   <form method="dialog">
     <h2>新建主题</h2>
+    <p>从示例开始：</p>
+    <div id="examples" class="cards"></div>
     <p>从内置主题开始：</p>
     <div id="builtins" class="cards"></div>
     <p>从一张图片开始（图片做键盘背景，之后在「背景」里裁切、在「配色」里取色）。先用这套配色：</p>
@@ -81,6 +84,30 @@
     <button type="button" id="from-image">选图片…</button>
     <p>或者 <button type="button" id="from-file">打开文件…</button>（.theme：4.0、3.0、2.1）</p>
     <button value="cancel">取消</button>
+  </form>
+</dialog>
+<dialog id="export-panel">
+  <form method="dialog">
+    <h2>保存前检查</h2>
+    <p id="export-text"></p>
+    <ul id="export-list"></ul>
+    <button value="save">仍然保存</button> <button value="cancel">回去改</button>
+  </form>
+</dialog>
+<dialog id="help-panel">
+  <form method="dialog">
+    <h2>怎么做一个主题</h2>
+    <ol>
+      <li>「文件 › 新建」：从示例、内置主题或一张图片开始，或者打开一个 .theme 文件（4.0、3.0、2.1 都行）。</li>
+      <li>上面是预览，点一个键就选中它；「环境」换设备、横竖屏、键盘、深浅色。</li>
+      <li>下面的标签页逐项改：配色、背景、按键、字和图标、栏、弹出、面板和窗口、尺寸、动效、信息；「源码」是 theme.xml 全文。</li>
+      <li>「问题」里有错误时不能保存（App 会拒收），警告可以不管。点一条跳到那一行。</li>
+      <li>「文件 › 保存 .theme」，再在手机上：幽默输入法 → 主题 → 新增主题 → 导入主题文件。</li>
+    </ol>
+    <p>撤销、重做在顶栏；草稿自动存在这个浏览器里，下次打开会问要不要恢复。什么都不会上传。</p>
+    <p>主题文件每个元素、每个属性的说明：<a href="https://github.com/Sraw/youmo-ime/blob/main/docs/theme-format.md" target="_blank" rel="noopener">主题格式参考（docs/theme-format.md）</a>；
+      这个页面的用法：<a href="https://github.com/Sraw/youmo-ime/blob/main/docs/theme-maker.md" target="_blank" rel="noopener">docs/theme-maker.md</a>。</p>
+    <button value="close">知道了</button>
   </form>
 </dialog>
 <dialog id="restore-panel">
@@ -99,6 +126,10 @@
 </script>
 <script type="application/json" id="youmo-engine-icons">
 {{youmo-engine-icons}}
+</script>
+<!-- the examples (060-render-p3 M4): web/theme-maker/examples/, put in by tools/assemble.mjs -->
+<script type="application/json" id="youmo-examples">
+{{examples}}
 </script>
 <!-- the drawing engine (060-render-p3 W1): lib/keyboard-scene's library, ./gradlew :lib:keyboard-scene:youmoEngine -->
 <script id="youmo-engine">

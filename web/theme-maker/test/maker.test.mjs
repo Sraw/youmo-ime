@@ -369,3 +369,45 @@ test('a 3.0 theme the app exports with every override it allows opens, and stays
   console.log('# ' + names.length + ' overrides, ' + styles + ' styles: open ' + openMs.toFixed(0) + ' ms, check ' + checkMs.toFixed(0) + ' ms, edit and check ' + editMs.toFixed(0) + ' ms');
   assert.deepEqual(M.saveProblems(E, L, FORMAT, doc), []);
 });
+
+// 060-render-p3 M4: the examples the page starts from, as assemble.mjs puts them in
+const examples = JSON.parse(blockOf(readFileSync(join(here, '..', 'index.html'), 'utf8'), 'youmo-examples'));
+
+test('each example opens, passes the check before a save with no error, and saves to a pack that opens the same', async () => {
+  assert.deepEqual(examples.map((e) => e.id), ['gradient', 'picture', 'k17-motion']);
+  for (const ex of examples) {
+    const d = M.exampleDoc(ex);
+    const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV));
+    assert.deepEqual(errors, [], ex.id);
+    assert.deepEqual(warnings, [], ex.id);
+    const again = (await M.open(E, L, FORMAT, M.save(L, d).bytes)).doc;
+    assert.ok(M.same(d, again), ex.id);
+  }
+  const pic = M.exampleDoc(examples[1]);
+  assert.deepEqual(Object.keys(pic.files).sort(), ['picture-landscape.jpg', 'picture-portrait.jpg', 'picture.jpg']);
+  assert.ok(/<style select="keyboard" fill="linear\(/.test(examples[0].xml));
+  assert.ok(/transition="160ms ease-out"/.test(examples[2].xml) && /press-scale="92%"/.test(examples[2].xml));
+});
+
+test("a pack's own layout of a board is the one the preview draws; one that does not read is a warning, the app's drawn", () => {
+  const d = M.exampleDoc(examples[2]);
+  const keys = (doc) => M.check(E, doc, 'k18', M.envJson(M.ENV), null).scene.json().keys.filter((k) => k.kind === 'letter').map((k) => k.id);
+  assert.equal(keys(d).length, keys(M.doc(d.xml)).length - 1, 'h and jk one key');
+  const bad = M.doc(d.xml, d.files, { 'k18.xml': '<keyboard' });
+  const r = M.check(E, bad, 'k18', M.envJson(M.ENV), null);
+  assert.ok(r.problems.some((p) => p.level === 'warning' && p.message.startsWith('layouts/k18.xml')), JSON.stringify(r.problems));
+  assert.deepEqual(keys(bad), keys(M.doc(d.xml)));
+});
+
+test('the check before a save: an error of any board or version stops it, the app\'s refusals with them, each once', () => {
+  const d = M.fromBuiltin(E, 'material');
+  assert.deepEqual(M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV)), { errors: [], warnings: [] });
+  // a file named and not brought: the app refuses it
+  const missing = M.doc(F.setProp(d.xml, 'key', 'fill', 'image(nope.png, 0dp)'));
+  assert.ok(M.exportCheck(E, L, FORMAT, missing, E.layouts(), M.envJson(M.ENV)).errors.some((p) => /nope\.png/.test(p.message)));
+  // a property of a later app: a warning, once though every board and version has it
+  const later = M.doc(F.setProp(d.xml, 'key', 'sticker', 'none'));
+  const w = M.exportCheck(E, L, FORMAT, later, E.layouts(), M.envJson(M.ENV));
+  assert.deepEqual(w.errors, []);
+  assert.equal(w.warnings.filter((p) => /sticker/.test(p.message)).length, 1, JSON.stringify(w.warnings));
+});
