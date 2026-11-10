@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.scene.json.EnvJson
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
 import org.fcitx.fcitx5.android.scene.theme.Argb
@@ -118,12 +119,13 @@ object YoumoEngine {
 
     /**
      * [xml] (theme 4) read, `system()` colours from [systemColors] (`{light: {primary: "#…"}, dark: {…}}`; none:
-     * every fallback, as on an older Android), refused where it needs an app newer than [appVersion] (none: never):
+     * every fallback, as on an older Android), with as many styles as the app imports (LookTheme.MAX_STYLES: a 3.0
+     * theme it exports with every key overridden, written as 4.0), refused where it needs an app newer than [appVersion] (none: never):
      * `{ok, problems, warnings, theme}`.
      */
     fun readTheme(xml: dynamic, systemColors: dynamic, appVersion: dynamic): dynamic = checked {
         val colors = systemColors(systemColors)
-        result(ThemeReader.theme(text(xml, "theme"), colors, optionalText(appVersion, "appVersion"))) { "theme" to YoumoTheme(it) }
+        result(ThemeReader.theme(text(xml, "theme"), colors, optionalText(appVersion, "appVersion"), LookTheme.MAX_STYLES)) { "theme" to YoumoTheme(it) }
     }
 
     /** [xml] (layout 1) read, its includes from [fragments] (`{id: xml}`, a theme pack's) or the built-in ones: `{ok, problems, warnings, layout}`. */
@@ -166,6 +168,12 @@ object YoumoEngine {
 
     /** The board [id] of the app's, its includes with it; null for none. */
     fun layout(id: String): YoumoLayout? = builtIns.layout(id)?.orNull()?.let { l -> builtIns.includes(l).orNull()?.let { YoumoLayout(l, it) } }
+
+    /** Why a pack's [own] layout would not stand for the app's board [id] in the app (PackLayouts.judge, the app's own rule), null where it would. */
+    fun refuses(id: String, own: YoumoLayout): String? {
+        val app = layout(id)
+        return PackLayouts.judge(id, own.layout, own.fragments, app?.layout, app?.fragments.orEmpty())
+    }
 
     /** A built-in layout file's text (a board's or a fragment's), null for none: what the page shows and saves. */
     fun layoutSource(id: String): String? = builtIns.layoutText(id)

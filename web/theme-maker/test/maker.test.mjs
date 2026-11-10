@@ -329,3 +329,103 @@ test('the page saves from-maker-picture.theme, byte for byte', () => {
   if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker-picture.theme'), made);
   assert.deepEqual(new Uint8Array(made), bytes('from-maker-picture.theme'));
 });
+
+test('a 3.0 theme the app exports with every override it allows opens, and stays quick to edit (t10-review M2)', async () => {
+  // from-app.theme with every key of the app's boards overridden (up to format.limits.overrides), each a picture of its own, pressed and not: as 4.0
+  // past ThemeReader's 1000 styles, within what the app imports (LookTheme.MAX_STYLES), which the engine reads too
+  const opened = await L.openZip(FORMAT, bytes('from-app.theme'));
+  const t = opened.theme;
+  const ids = [];
+  const material = E.readTheme(E.themeSource('material'), null, null).theme;
+  for (const board of E.layouts()) {
+    const s = E.buildScene(board, material, { width: 1080, height: 700, density: 2.75 }, E.fixedMeasurer());
+    if (s.ok) for (const k of s.scene.json().keys) ids.push(board + '/' + k.id);
+  }
+  const names = [...new Set(ids)].slice(0, FORMAT.limits.overrides);
+  assert.ok(names.length > 250, names.length + " keys"); // every key of the app's boards (fewer than the limit)
+  t.keys.overrides = {};
+  names.forEach((n, i) => {
+    t.keys.overrides[n] = {
+      fill: { type: 'picture', blurDp: Math.floor(i / 100), brightness: i % 100 },
+      pressed: { type: 'color', argb: (0x80000000 | (i * 997)) | 0 },
+      label: i % 2 ? 'show' : 'hide',
+    };
+  });
+  const json = L.writeTheme(FORMAT, t);
+  const zip = L.writeZip([[t.name + '.json', new TextEncoder().encode(json)], ...Object.entries(opened.files)]);
+  let at = performance.now();
+  const { doc } = await M.open(E, L, FORMAT, zip);
+  const openMs = performance.now() - at;
+  const styles = (doc.xml.match(/<style /g) || []).length;
+  assert.ok(styles > 1000, styles + " styles");
+  at = performance.now();
+  const r = M.check(E, doc, 'qwerty', M.envJson(M.ENV), null);
+  const checkMs = performance.now() - at;
+  assert.deepEqual(r.problems.filter((p) => p.level === 'error'), []);
+  at = performance.now();
+  const edited = M.doc(F.setProp(doc.xml, 'key', 'radius', '9dp'), doc.files, doc.layouts);
+  assert.deepEqual(M.check(E, edited, 'qwerty', M.envJson(M.ENV), null).problems.filter((p) => p.level === 'error'), []);
+  const editMs = performance.now() - at;
+  console.log('# ' + names.length + ' overrides, ' + styles + ' styles: open ' + openMs.toFixed(0) + ' ms, check ' + checkMs.toFixed(0) + ' ms, edit and check ' + editMs.toFixed(0) + ' ms');
+  assert.deepEqual(M.saveProblems(E, L, FORMAT, doc), []);
+});
+
+// 060-render-p3 M4: the examples the page starts from, as assemble.mjs puts them in
+const examples = JSON.parse(blockOf(readFileSync(join(here, '..', 'index.html'), 'utf8'), 'youmo-examples'));
+
+test('each example opens, passes the check before a save with no error, and saves to a pack that opens the same', async () => {
+  assert.deepEqual(examples.map((e) => e.id), ['gradient', 'picture', 'k17-motion']);
+  for (const ex of examples) {
+    const d = M.exampleDoc(ex);
+    const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV));
+    assert.deepEqual(errors, [], ex.id);
+    assert.deepEqual(warnings, [], ex.id);
+    const again = (await M.open(E, L, FORMAT, M.save(L, d).bytes)).doc;
+    assert.ok(M.same(d, again), ex.id);
+  }
+  const pic = M.exampleDoc(examples[1]);
+  assert.deepEqual(Object.keys(pic.files).sort(), ['picture-landscape.jpg', 'picture-portrait.jpg', 'picture.jpg']);
+  assert.ok(/<style select="keyboard" fill="linear\(/.test(examples[0].xml));
+  assert.ok(/transition="160ms ease-out"/.test(examples[2].xml) && /press-scale="92%"/.test(examples[2].xml));
+});
+
+test("a pack's own layout of a board is the one the preview draws; one that does not read is a warning, the app's drawn", () => {
+  const d = M.exampleDoc(examples[2]);
+  const keys = (doc) => M.check(E, doc, 'k18', M.envJson(M.ENV), null).scene.json().keys.filter((k) => k.kind === 'letter').map((k) => k.id);
+  assert.equal(keys(d).length, keys(M.doc(d.xml)).length - 1, 'h and jk one key');
+  const bad = M.doc(d.xml, d.files, { 'k18.xml': '<keyboard' });
+  const r = M.check(E, bad, 'k18', M.envJson(M.ENV), null);
+  assert.ok(r.problems.some((p) => p.level === 'warning' && p.message.startsWith('layouts/k18.xml')), JSON.stringify(r.problems));
+  assert.deepEqual(keys(bad), keys(M.doc(d.xml)));
+});
+
+test('the check before a save: an error of any board or version stops it, the app\'s refusals with them, each once', () => {
+  const d = M.fromBuiltin(E, 'material');
+  assert.deepEqual(M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV)), { errors: [], warnings: [] });
+  // a file named and not brought: the app refuses it
+  const missing = M.doc(F.setProp(d.xml, 'key', 'fill', 'image(nope.png, 0dp)'));
+  assert.ok(M.exportCheck(E, L, FORMAT, missing, E.layouts(), M.envJson(M.ENV)).errors.some((p) => /nope\.png/.test(p.message)));
+  // a property of a later app: a warning, once though every board and version has it
+  const later = M.doc(F.setProp(d.xml, 'key', 'sticker', 'none'));
+  const w = M.exportCheck(E, L, FORMAT, later, E.layouts(), M.envJson(M.ENV));
+  assert.deepEqual(w.errors, []);
+  assert.equal(w.warnings.filter((p) => /sticker/.test(p.message)).length, 1, JSON.stringify(w.warnings));
+});
+
+test("a pack's layouts the app refuses on import stop a save, by the app's own limits; one it would not use is not previewed", () => {
+  const d = M.exampleDoc(examples[2]);
+  const k18 = d.layouts['k18.xml'];
+  const many = Object.fromEntries(Array.from({ length: FORMAT.limits.layouts + 1 }, (_, i) => ['k' + i + '.xml', k18]));
+  assert.ok(M.exportCheck(E, L, FORMAT, M.doc(d.xml, d.files, many), E.layouts(), M.envJson(M.ENV)).errors.some((p) => /最多收/.test(p.message)));
+  const big = M.doc(d.xml, d.files, { 'k18.xml': k18 + '<!--' + 'x'.repeat(FORMAT.limits.layoutBytes) + '-->' });
+  assert.ok(M.exportCheck(E, L, FORMAT, big, E.layouts(), M.envJson(M.ENV)).errors.some((p) => /超过 \d+ 字节/.test(p.message)));
+  // the app's qwerty under another board's name: the app keeps its own k14, so does the preview, with a warning
+  const keys = (doc, board) => M.check(E, doc, board, M.envJson(M.ENV), null).scene.json().keys.map((k) => k.id).join();
+  const wrong = M.doc(d.xml, d.files, { 'k14.xml': E.layoutSource('qwerty') });
+  const r = M.check(E, wrong, 'k14', M.envJson(M.ENV), null);
+  assert.ok(r.problems.some((p) => p.level === 'warning' && /App 不会用它（its id is qwerty）/.test(p.message)), JSON.stringify(r.problems));
+  assert.equal(keys(wrong, 'k14'), keys(M.doc(d.xml), 'k14'));
+  // and one with no backspace
+  const noBack = M.doc(d.xml, d.files, { 'qwerty.xml': E.layoutSource('qwerty').replace(/<key\b[^>]*role="backspace"[^>]*>/, '') });
+  assert.ok(M.check(E, noBack, 'qwerty', M.envJson(M.ENV), null).problems.some((p) => /it has no key \[backspace\]/.test(p.message)));
+});
