@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-1wgQQfF3+xo+ohbM0BBbXgUrWXpGbdYwpG8PRz529DU=' 'sha256-16ebXpQYnAgl9u2lSPRLdgwPR2A3omDskguIzzBoIhE=' 'sha256-ywaO7u9boc4zyTG9gTndCcQNBnAgM7raKIS4cZT1AAM=' 'sha256-ETs+YLQVlg6zlKl5D3ldT3sRXoXHz8t1+qMjX5KNgpQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-qKgtsEKFpEnfx5d1sFGkY6gy1lIJubupVqgkY/Iw1Aw=' 'sha256-16ebXpQYnAgl9u2lSPRLdgwPR2A3omDskguIzzBoIhE=' 'sha256-ywaO7u9boc4zyTG9gTndCcQNBnAgM7raKIS4cZT1AAM=' 'sha256-ETs+YLQVlg6zlKl5D3ldT3sRXoXHz8t1+qMjX5KNgpQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -2117,11 +2117,19 @@ dialog h2 { margin: 0; font-size: 16px; }
   // the store → { files, id, own }: the files last written to it, and the ids of the files records this page
   // wrote and has not let go yet (a record of a write cut before its text, or the one an earlier text named)
   const keptFiles = new WeakMap();
-  async function keepDraft(store, d, env) {
+  const wrote = new WeakSet(); // the pages whose text has gone in
+  // the tabs' writes one at a time where the store can (store.lock: the browser's Web Locks): a page's first write
+  // lets go of the record of a page closed before, which, without the lock, may be the record an open tab has read
+  // the text naming and is about to name again (its draft lost); without a lock that record is left
+  const locked = (store, act) => (store.lock ? store.lock(act) : act());
+  function keepDraft(store, d, env) {
+    return locked(store, () => keepDraftNow(store, d, env));
+  }
+  async function keepDraftNow(store, d, env) {
     try {
       const before = await store.get(DRAFT);
       const prev = before && before.v === 4 ? before.files : null;
-      const first = !keptFiles.has(store);
+      const first = !wrote.has(store);
       let kept = keptFiles.get(store);
       // files changed, or another tab's text is there now (its files may have replaced ours): written anew
       if (!kept || kept.files !== d.files || prev !== kept.id) {
@@ -2131,11 +2139,12 @@ dialog h2 { margin: 0; font-size: 16px; }
         await store.put(filesKey(id), { id, files: d.files });
       }
       await store.put(DRAFT, { v: 4, doc: { xml: d.xml, layouts: d.layouts }, files: kept.id, env, at: Date.now() });
+      wrote.add(store);
       // only this page's own records are let go: another open tab may have read its text before we wrote and
       // write it after, naming its record (removing that record lost its draft). The record of a page closed
-      // before is let go by the first write of the next page
+      // before is let go by the first write of the next page, only with the tabs' writes one at a time
       const gone = kept.own.filter((x) => x !== kept.id);
-      if (first && prev && prev !== kept.id) gone.push(prev);
+      if (first && store.lock && prev && prev !== kept.id) gone.push(prev);
       kept.own = [kept.id];
       for (const x of gone) await store.remove(filesKey(x));
       if (before && before.v !== 4) await store.remove(DRAFT_FILES);
@@ -2163,7 +2172,10 @@ dialog h2 { margin: 0; font-size: 16px; }
       return null;
     }
   }
-  async function dropDraft(store) {
+  function dropDraft(store) {
+    return locked(store, () => dropDraftNow(store));
+  }
+  async function dropDraftNow(store) {
     try {
       const v = await store.get(DRAFT);
       await store.remove(DRAFT);
@@ -2172,6 +2184,7 @@ dialog h2 { margin: 0; font-size: 16px; }
       for (const x of kept ? kept.own : []) await store.remove(filesKey(x));
       await store.remove(DRAFT_FILES);
       keptFiles.delete(store);
+      wrote.delete(store);
     } catch (e) {
       // nothing kept: nothing to drop
     }
@@ -2194,10 +2207,12 @@ dialog h2 { margin: 0; font-size: 16px; }
       tx.onerror = () => fail(tx.error);
       tx.onabort = () => fail(tx.error);
     }));
+    const locks = globalThis.navigator && navigator.locks;
     return {
       get: (k) => run('readonly', (s) => s.get(k)),
       put: (k, v) => run('readwrite', (s) => s.put(v, k)),
       remove: (k) => run('readwrite', (s) => s.delete(k)),
+      lock: locks ? (act) => locks.request('youmo-theme-maker-draft', act) : undefined,
     };
   }
 

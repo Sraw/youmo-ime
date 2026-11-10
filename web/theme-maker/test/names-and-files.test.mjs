@@ -211,8 +211,8 @@ test('the draft writes the files again only when they changed; drafts of the pag
   const cut = { get: store.get, put: async (k, v) => { if (k === 'draft') throw new Error('cut'); return store.put(k, v); }, remove: store.remove };
   assert.equal(await M.keepDraft(cut, M.doc('<z/>', { 'z.png': new Uint8Array([3]) }), M.ENV), false);
   assert.deepEqual(Object.keys((await M.draft(store)).doc.files), ['p.png']);
-  // the files of cut writes are let go by the page's next write; the record of the page that wrote before
-  // (store, still open) is its own to let go
+  // the files of cut writes are let go by the page's next write; the record of the page that wrote before is
+  // left: without the tabs' writes one at a time (no store.lock) a first write lets go of no other page's record
   const records = () => [...m.keys()].filter((k) => k.startsWith('draft-files-'));
   const fromStore = ['draft-files-' + m.get('draft').files]; // the cut writes never named theirs
   await M.keepDraft(cut, M.doc('<z/>', { 'z.png': new Uint8Array([3]) }), M.ENV);
@@ -220,11 +220,41 @@ test('the draft writes the files again only when they changed; drafts of the pag
   await M.keepDraft(cut, Object.assign({}, d, { xml: '<y/>' }), M.ENV);
   const fromCut = 'draft-files-' + m.get('draft').files;
   assert.deepEqual(records().sort(), [...fromStore, fromCut].sort(), 'no files of a cut write left behind');
-  // a page closed before: the record its text named is let go by the next page's first write
-  const nextPage = Object.create(store);
-  await M.keepDraft(nextPage, b, M.ENV);
-  assert.ok(!m.has(fromCut), records().join());
-  assert.equal(records().length, 2, 'store\'s and the new page\'s');
+  // dropped by a page whose write was cut: the files of that write go too
+  m.clear();
+  const cutAgain = { get: store.get, put: async (k, v) => { if (k === 'draft') throw new Error('cut'); return store.put(k, v); }, remove: store.remove };
+  assert.equal(await M.keepDraft(cutAgain, d, M.ENV), false);
+  assert.equal(records().length, 1);
+  await M.dropDraft(cutAgain);
+  assert.deepEqual(records(), [], 'the cut write\'s files dropped');
+  // the tabs' writes one at a time (the browser's Web Locks): a page's first write lets go of the record of a
+  // page closed before, and never of a record an open tab is about to name
+  m.clear();
+  let chain = Promise.resolve();
+  const locking = Object.create(store);
+  locking.lock = (act) => { const r = chain.then(act); chain = r.catch(() => {}); return r; };
+  await M.keepDraft(Object.create(locking), d, M.ENV); // a page, then closed
+  const closedRecord = 'draft-files-' + m.get('draft').files;
+  let during = null;
+  const openA = Object.create(locking);
+  openA.get = async (k) => {
+    const v = await store.get(k);
+    if (k === 'draft' && during) { const f = during; during = null; f(); }
+    return v;
+  };
+  await M.keepDraft(openA, b, M.ENV);
+  assert.ok(!m.has(closedRecord), 'the closed page\'s record let go by the next page\'s first write');
+  let fresh = null; // a new tab's first write, asked for while A is between reading the text and writing it
+  during = () => { fresh = M.keepDraft(Object.create(locking), M.doc('<f/>', { 'f.png': new Uint8Array([5]) }), M.ENV); };
+  await M.keepDraft(openA, Object.assign({}, b, { xml: '<a4/>' }), M.ENV); // only the text: names its record again
+  await fresh;
+  const now = await M.draft(store);
+  assert.equal(now && now.doc.xml, '<f/>', 'the new tab waited for A and wrote last');
+  assert.deepEqual(Object.keys(now.doc.files), ['f.png']);
+  await M.keepDraft(openA, Object.assign({}, b, { xml: '<a5/>' }), M.ENV);
+  const again = await M.draft(store);
+  assert.equal(again && again.doc.xml, '<a5/>');
+  assert.deepEqual(Object.keys(again.doc.files), ['b.png'], 'A wrote its files again');
   // an old draft written over: its files record goes too
   m.clear();
   m.set('draft', { v: 3, doc: { xml: '<v3/>' }, files: 'x' });
