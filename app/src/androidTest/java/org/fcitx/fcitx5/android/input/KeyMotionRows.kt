@@ -114,6 +114,8 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
             service.window.window!!.callback = marks.original
         }
     }
+    // A3's rows (a key's press effect) after A1's: called here, the test's class at detekt's LargeClass
+    effectRows()
 }
 
 // Shift tapped on and off on the moving theme: the tap's frame, then every frame of the crossfade

@@ -198,6 +198,9 @@ class KeyLook(private val v: Map<String, Value>, private val theme: Theme) {
     val pressScale: Double get() = ((v["press-scale"] as? Value.Number)?.number ?: PERCENT) / PERCENT
     val pressSink: Double get() = (v["press-sink"] as? Value.Number)?.number ?: 0.0
 
+    /** A pressed face's effect (`effect`, A3); null: none. */
+    val effect: Effect? get() = (v["effect"] as? Value.OfEffect)?.effect
+
     private fun word(name: String): String? = (v[name] as? Value.Word)?.word
 
     private companion object {

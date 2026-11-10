@@ -459,7 +459,7 @@ object ThemeReader {
 
     private val LATER_MOTION = setOf("popup", "preview")
 
-    private val MOTION = listOf("transition", "press-scale", "press-sink")
+    private val MOTION = listOf("transition", "press-scale", "press-sink", "effect")
 
     // a panel's property it has no use for (`clipboard shadow=`), as the window's; the voice mask's blur and the
     // handwriting pad's ink and grid set on what does not read them, too

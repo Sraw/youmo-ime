@@ -213,6 +213,7 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 | `transition` | 键变到这个状态时的过渡：`时长ms 缓动`，如 `150ms ease-out`；时长 0–600ms，缓动 `linear`、`ease`、`ease-in`、`ease-out`、`ease-in-out`（弹出层、气泡上的还不生效，会提醒） |
 | `press-scale` | 按下时键面缩放（`key:pressed`），85%–110% |
 | `press-sink` | 按下时键面下沉（`key:pressed`），0–4dp |
+| `effect` | 按下时的特效（`key:pressed`）：`none`；`ripple-image(文件, 半径%, 时长ms)`，从手指按下处长大、裁在键面里并淡出的图片，半径是键面半条对角线的 10%–200%；`particles(文件, 个数, 散开dp, 时长ms)`，从按下处飞散并淡出的图片，1–12 个，散开 0–64dp（每 dp 画图片的 3 像素）；时长 1–600ms。打字快时也每次播放 |
 | `return-icon-send` | 回车键在「发送」时显示的：`icon(图标名)` 或 `text(文字)`（写在 `icon` 部位上，下同） |
 | `return-icon-search` | 回车键在「搜索」时显示的 |
 | `return-icon-go` | 回车键在「前往」时显示的 |
@@ -237,7 +238,6 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 | `side-padding` | 除 `keyboard` 外 | 如 `4dp` 或 `40%`，一个或两个 |
 | `bottom-padding` | 除 `keyboard` 外 | 如 `4dp` 或 `40%`，一个或两个 |
 | `appear` | 弹出的出现动画（`popup`、`preview`、`menu`） | `fade|scale|rise 时长ms` |
-| `effect` | 按键特效（`key:pressed`） | `none`、`ripple-image(文件, 半径%, 时长ms)`、`particles(文件, 个数, 散开dp, 寿命ms)` |
 | `sticker` | 键上的贴纸层 | `none` 或文件名 |
 
 另外两个保留写法：元素 `<sounds>`、`<sound>`（按键音包），以及 `<picture animated="true">`（动态背景）。
@@ -250,6 +250,7 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 | `theme.xml` | 1 MB；样式 4100 个，颜色 200 个，字体 4 个，图标 200 个 |
 | 背景图（原图和裁剪图） | 边长 4096 像素 |
 | 键面图片（`image()`） | 边长 1024 像素，单张 2 MB |
+| 特效图片（`effect` 里的文件） | `.png` 或 `.webp`，128 KB，边长 256 像素 |
 | 预览图 | `.png` 或 `.webp`，512 KB，边长 2048 像素 |
 | 字体 | 能被系统加载；大小只受单个文件 32 MB 的限制 |
 | 图标 | SVG，64 KB，只能有 `<svg>`、`<g>`、`<path>` 和纯色填充（`fill`、`fill-rule`、`fill-opacity`、`opacity`）；`fill` 只能是 `#` 颜色、`none` 或 `currentColor`；最多 256 条路径、路径里合计 20000 个数。脚本、链接、`style`、渐变、描边、文字、变换都会被拒 |

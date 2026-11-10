@@ -33,6 +33,14 @@ object ThemeAssetLimits {
     const val MAX_PREVIEW_BYTES = 512L * 1024
     const val MAX_PREVIEW_SIDE = 2048
 
+    /**
+     * A key's press effect's image (060-render-p3 A3: a ripple, a particle): small, drawn many times a press, PNG
+     * or WebP by its name ([EFFECT_IMAGE_TYPES]).
+     */
+    const val MAX_EFFECT_IMAGE_SIDE = 256
+    const val MAX_EFFECT_IMAGE_BYTES = 128L * 1024
+    val EFFECT_IMAGE_TYPES = listOf(".png", ".webp")
+
     /** An SVG icon: a path and its fill take a few KB; more is a drawing, not an icon (scene.theme.SvgSubset). */
     const val MAX_ICON_BYTES = 64L * 1024
 
@@ -46,6 +54,7 @@ object ThemeAssetLimits {
     enum class Breach {
         Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, Overrides,
         ThemeXml, Layouts, LayoutSize, PreviewSize, PreviewSide, IconSize,
+        EffectImageSide, EffectImageSize, EffectImageType,
     }
 
     /** The [count]th entry, [size] bytes, after [total] bytes before it. */
@@ -77,6 +86,14 @@ object ThemeAssetLimits {
     fun preview(width: Int, height: Int, bytes: Long): Breach? = when {
         bytes > MAX_PREVIEW_BYTES -> Breach.PreviewSize
         maxOf(width, height) > MAX_PREVIEW_SIDE -> Breach.PreviewSide
+        else -> null
+    }
+
+    /** An effect's image [name], [width] × [height] px, [bytes] long. */
+    fun effectImage(name: String, width: Int, height: Int, bytes: Long): Breach? = when {
+        EFFECT_IMAGE_TYPES.none { name.endsWith(it, ignoreCase = true) } -> Breach.EffectImageType
+        maxOf(width, height) > MAX_EFFECT_IMAGE_SIDE -> Breach.EffectImageSide
+        bytes > MAX_EFFECT_IMAGE_BYTES -> Breach.EffectImageSize
         else -> null
     }
 

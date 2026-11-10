@@ -768,6 +768,9 @@ object ThemeFilesManager {
             ThemeAssetLimits.Breach.PreviewSize -> R.string.exception_theme_preview_size to ThemeAssetLimits.MAX_PREVIEW_BYTES / KB
             ThemeAssetLimits.Breach.PreviewSide -> R.string.exception_theme_preview_side to ThemeAssetLimits.MAX_PREVIEW_SIDE.toLong()
             ThemeAssetLimits.Breach.IconSize -> R.string.exception_theme_icon_size to ThemeAssetLimits.MAX_ICON_BYTES / KB
+            ThemeAssetLimits.Breach.EffectImageSide -> R.string.exception_theme_effect_image_side to ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE.toLong()
+            ThemeAssetLimits.Breach.EffectImageSize -> R.string.exception_theme_effect_image_size to ThemeAssetLimits.MAX_EFFECT_IMAGE_BYTES / KB
+            ThemeAssetLimits.Breach.EffectImageType -> R.string.exception_theme_effect_image_type to 0L
         }
         errorRuntime(message, limit.toString())
     }

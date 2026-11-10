@@ -139,6 +139,20 @@ off, battery saver off (kept from `ACTION_POWER_SAVE_MODE_CHANGED`, not asked of
 `ValueAnimator.areAnimatorsEnabled()`; not, or a theme without motion (every built-in one), no `Moving` and no animator
 is made and the keys draw as before. Detached or its window hidden (the keyboard hidden keeps the view attached), every animation stops; a key's motion not carried into a new scene stops too. `KeyMotionTest`.
 
+A key's press effect (A3, `effect=` on its pressed look: `ripple-image(file, radius%, ms)`, the radius of the face's half
+diagonal, 10–200%; `particles(file, count ≤ 12, spread ≤ 64dp, ms)`; 1–600 ms; `none`) is the scene's `Motion.effect`
+(`KeyEffect`, px), played by `KeyEffects` over every key at each press, from where the finger came down (`SceneKey.hotspot` →
+`touchedAt`; a press without a touch, the key's middle). Each image (a pack's file, ≤ 256 px a side, ≤ 128 KB, PNG or WebP,
+`ThemeAssetLimits`; decoded with the key images, `ThemePackFiles.images`) is recorded once into a node; a ripple is a node at the
+key's face clipped to it (a rounded rectangle of one radius by its outline, `RenderNode.setClipToOutline`; another shape by its
+path, even-odd, recorded in the node at each press: an outline's path clips from API 33 alone) round a node drawing the image (filtered), scaled 0 → the radius (ease-out) and fading; a particle is a node drawing the image (3 of
+its file's px a dp, however it was decoded) flying to its end (`KeyEffect.Particles.ends`, seeded by the view's press count: the same presses, the same flights,
+JVM and JS alike) and fading. Pools of at most 8 ripples and 48 particles, the one taken longest ago taken past them; the fading nodes drawn with no layer
+of their own (`setHasOverlappingRendering(false)`); made at the first effect played (none for a theme without effects); one `TimeAnimator` while any
+plays whose frames set alpha, scale and translation alone (trace `canvas anim`), ended when none does. Effects play on every press,
+typed fast too (unlike the press scale and the release fade: the pools bound them), where `KeyMotionSwitch` says keys may move;
+hidden or detached, they stop (detached, every node's drawing let go). `KeyEffectTest`.
+
 ### Keys
 
 A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `NumberKeyboard`, `HandwritingKeyboard`):

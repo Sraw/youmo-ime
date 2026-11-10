@@ -130,6 +130,9 @@
     <string name="exception_theme_preview_size">主題的預覽圖超過 %1$s KB</string>
     <string name="exception_theme_preview_side">主題的預覽圖邊長超過 %1$s 像素</string>
     <string name="exception_theme_icon_size">主題的某個圖示超過 %1$s KB</string>
+    <string name="exception_theme_effect_image_side">有按鍵特效圖片的邊長超過 %1$s 像素</string>
+    <string name="exception_theme_effect_image_size">有按鍵特效圖片超過 %1$s KB</string>
+    <string name="exception_theme_effect_image_type" formatted="false">按鍵特效圖片只能是 PNG 或 WebP</string>
     <string name="theme_pack_light">淺色</string>
     <string name="theme_pack_dark">深色</string>
     <string name="theme_pack_low_contrast">按鍵上的字可能不易看清（%1$s版）</string>
