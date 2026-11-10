@@ -118,29 +118,6 @@ sealed interface Shape {
             return out
         }
 
-        /**
-         * Whether it is one convex outline (A3: what a key's effect is clipped to as it is, Android's convex
-         * outline; another clipped to its box): one sub-path, every turn the same way.
-         */
-        val convex: Boolean
-            get() {
-                val polys = points()
-                if (polys.size != 1 || polys[0].size < 3) return false
-                val p = polys[0]
-                var sign = 0
-                for (i in p.indices) {
-                    val a = p[i]
-                    val b = p[(i + 1) % p.size]
-                    val c = p[(i + 2) % p.size]
-                    val cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x)
-                    val s = if (cross > EPSILON) 1 else if (cross < -EPSILON) -1 else 0
-                    if (s == 0) continue
-                    if (sign != 0 && s != sign) return false
-                    sign = s
-                }
-                return sign != 0
-            }
-
         // even-odd: a ray to the right crosses its edges an odd number of times
         override fun contains(x: Double, y: Double): Boolean {
             var inside = false
@@ -157,8 +134,5 @@ sealed interface Shape {
 
     companion object {
         val NO_RADII: List<Double> = listOf(0.0, 0.0, 0.0, 0.0)
-
-        // a turn this slight (px²) is straight on: three points in a line turn neither way
-        private const val EPSILON = 1e-6
     }
 }

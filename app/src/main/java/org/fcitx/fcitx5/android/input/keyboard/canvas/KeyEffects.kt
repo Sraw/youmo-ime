@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 import android.animation.TimeAnimator
 import android.graphics.Canvas
 import android.graphics.Outline
+import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.RenderNode
@@ -17,7 +18,6 @@ import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.scene.KeyEffect
 import org.fcitx.fcitx5.android.scene.Shape
-import timber.log.Timber
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -25,34 +25,38 @@ import kotlin.math.roundToInt
  * The keys' press effects (060-render-p3 A3) over [view]'s keys: a ripple image grown from where the finger
  * is, clipped to the key's face; particles flying out from there. Each image recorded once into a node of
  * its own ([sprites]) that every ripple and particle of it draws; a ripple a node clipped to its key's
- * outline round a node of the image, a particle a node of the image; all from pools that never grow past
+ * face (a rounded rectangle's outline, another shape's path) round a node of the image, a particle a node of the image; all from pools that never grow past
  * [MAX_RIPPLES] and [MAX_PARTICLES] (more at once: the oldest taken). A frame only sets the nodes' alpha,
  * scale and place ([tick]): nothing recorded, nothing made. One [TimeAnimator] while any plays, ended when
  * none does.
  */
 internal class KeyEffects(private val view: View, private val images: BoardImages) {
 
-    // an image recorded once, at its decoded size
-    private class Sprite(val node: RenderNode, val width: Int, val height: Int)
+    // an image recorded once, at its decoded size; [sample] its file's width over that (KeyImageBudget may decode it smaller)
+    private class Sprite(val node: RenderNode, val width: Int, val height: Int, val sample: Float)
 
     private val sprites = HashMap<String, Sprite>()
 
     private abstract class Playing {
         var sprite: Sprite? = null
         var start = 0L
+
+        // when it was taken, in order (two in the same ms told apart)
+        var taken = 0L
         var ms = 0
         var live = false
     }
 
     // a ripple: [clip] at its key's face, clipped to its outline, drawing [inner], the image about where the finger was
+    // fading nodes of one image each: drawn straight at their alpha, no layer of their own a frame (the same look)
     private class Ripple : Playing() {
-        val clip = RenderNode("ripple clip")
-        val inner = RenderNode("ripple")
+        val clip = RenderNode("ripple clip").apply { setHasOverlappingRendering(false) }
+        val inner = RenderNode("ripple").apply { setHasOverlappingRendering(false) }
         var scale = 1f
     }
 
     private class Particle : Playing() {
-        val node = RenderNode("particle")
+        val node = RenderNode("particle").apply { setHasOverlappingRendering(false) }
         var x = 0f
         var y = 0f
         var dx = 0f
@@ -62,7 +66,10 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
     private val ripples = ArrayList<Ripple>(MAX_RIPPLES)
     private val particles = ArrayList<Particle>(MAX_PARTICLES)
 
-    // a key's outline, made again for each ripple into these (no allocation a press)
+    // the nodes taken so far: each one's turn, the oldest the lowest
+    private var turns = 0L
+
+    // a key's outline or path, made again for each ripple into these (no allocation a press)
     private val outline = Outline()
     private val path = Path()
     private val box = RectF()
@@ -72,6 +79,9 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
     private var presses = 0
 
     private val ticker = TimeAnimator().apply { setTimeListener { _, _, _ -> tick(SystemClock.uptimeMillis()) } }
+
+    // the path each playing ripple is clipped to (null: its outline's rounded rectangle), for a test
+    private val clipPaths = HashMap<Ripple, Path?>()
 
     /** Nodes the pools hold: never more than [MAX_RIPPLES] + [MAX_PARTICLES]. */
     @get:VisibleForTesting
@@ -97,6 +107,10 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
     @VisibleForTesting
     fun rippleClips(): List<RenderNode> = ripples.filter { it.live }.map { it.clip }
 
+    /** The path each ripple playing now is clipped to in its node; null where its outline (a rounded rectangle's) clips it. */
+    @VisibleForTesting
+    fun rippleClipPaths(): List<Path?> = ripples.filter { it.live }.map { clipPaths[it] }
+
     /** [effect] played over [face] (its key's [shape]) from ([x], [y]) in the view; nothing where its image is not in. */
     fun play(effect: KeyEffect, shape: Shape, x: Float, y: Float) {
         val sprite = sprite(effect.file) ?: return
@@ -116,19 +130,11 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         val l = face.left.roundToInt()
         val t = face.top.roundToInt()
         r.clip.setPosition(l, t, face.right.roundToInt(), face.bottom.roundToInt())
-        clipTo(r.clip, shape, l, t)
         if (r.sprite !== sprite || !r.inner.hasDisplayList()) {
             draw(r.inner, sprite)
             r.sprite = sprite
         }
-        if (!r.clip.hasDisplayList()) {
-            val c = r.clip.beginRecording()
-            try {
-                c.drawRenderNode(r.inner)
-            } finally {
-                r.clip.endRecording()
-            }
-        }
+        clipTo(r, shape, l, t)
         r.inner.pivotX = sprite.width / 2f
         r.inner.pivotY = sprite.height / 2f
         r.inner.translationX = x - l - sprite.width / 2f
@@ -142,7 +148,7 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
 
     private fun particles(effect: KeyEffect.Particles, sprite: Sprite, x: Float, y: Float, now: Long) {
         val ends = effect.ends(presses)
-        val scale = view.resources.displayMetrics.density / PX_PER_DP
+        val scale = view.resources.displayMetrics.density / PX_PER_DP * sprite.sample
         for (i in 0 until effect.count) {
             val p = taken(particles, MAX_PARTICLES, ::Particle)
             if (p.sprite !== sprite || !p.node.hasDisplayList()) {
@@ -163,12 +169,19 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         }
     }
 
-    // one not playing from [pool], else a new one while it is short of [most], else the one that started first
+    // one not playing from [pool], else a new one while it is short of [most], else the one taken longest ago
     private fun <T : Playing> taken(pool: ArrayList<T>, most: Int, made: () -> T): T {
-        for (i in pool.indices) if (!pool[i].live) return pool[i]
-        if (pool.size < most) return made().also { pool += it }
+        var pick: T? = null
+        for (i in pool.indices) if (!pool[i].live) pick = pick ?: pool[i]
+        if (pick == null && pool.size < most) pick = made().also { pool += it }
+        val taken = pick ?: oldest(pool)
+        taken.taken = turns++
+        return taken
+    }
+
+    private fun <T : Playing> oldest(pool: ArrayList<T>): T {
         var oldest = pool[0]
-        for (i in 1 until pool.size) if (pool[i].start < oldest.start) oldest = pool[i]
+        for (i in 1 until pool.size) if (pool[i].taken < oldest.taken) oldest = pool[i]
         return oldest
     }
 
@@ -191,69 +204,59 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         node.setPosition(0, 0, bitmap.width, bitmap.height)
         val c = node.beginRecording()
         try {
-            c.drawBitmap(bitmap, 0f, 0f, null)
+            // filtered: a ripple scales its image up many times
+            c.drawBitmap(bitmap, 0f, 0f, FILTERED)
         } finally {
             node.endRecording()
         }
-        return Sprite(node, bitmap.width, bitmap.height).also { sprites[file] = it }
+        val sample = images.size(file)?.let { it[0].toFloat() / bitmap.width } ?: 1f
+        return Sprite(node, bitmap.width, bitmap.height, sample).also { sprites[file] = it }
     }
 
-    // [node] (at [left], [top]) clipped to [shape]: a rounded rectangle as one, a convex path as it is, another by its box
-    private fun clipTo(node: RenderNode, shape: Shape, left: Int, top: Int) {
+    // [r]'s clip node (at [left], [top]) recorded round its image, clipped to [shape]: a rounded rectangle of one radius
+    // by its outline (antialiased), another shape by its path in the node (an outline's path clips from API 33 alone;
+    // a path clips any shape, concave too, by the even-odd rule the key's hit test reads it by)
+    private fun clipTo(r: Ripple, shape: Shape, left: Int, top: Int) {
         val b = shape.bounds
         box.set((b.left - left).toFloat(), (b.top - top).toFloat(), (b.right - left).toFloat(), (b.bottom - top).toFloat())
+        val radius = (shape as? Shape.Rect)?.radii?.takeIf { rs -> rs.all { it == rs[0] } }?.get(0)
+        if (radius != null) {
+            outline.setRoundRect(box.left.roundToInt(), box.top.roundToInt(), box.right.roundToInt(), box.bottom.roundToInt(), radius.toFloat())
+            r.clip.setOutline(outline)
+        } else {
+            pathOf(shape, left, top)
+        }
+        r.clip.setClipToOutline(radius != null)
+        val c = r.clip.beginRecording()
+        try {
+            if (radius == null) c.clipPath(path)
+            c.drawRenderNode(r.inner)
+        } finally {
+            r.clip.endRecording()
+        }
+        clipPaths[r] = if (radius == null) Path(path) else null
+    }
+
+    // [shape] into [path], at [left], [top] (its box in [box])
+    private fun pathOf(shape: Shape, left: Int, top: Int) {
+        path.rewind()
+        path.fillType = Path.FillType.EVEN_ODD
         when (shape) {
             is Shape.Rect -> {
-                val rs = shape.radii
-                if (rs.all { it == rs[0] }) {
-                    outline.setRoundRect(box.left.roundToInt(), box.top.roundToInt(), box.right.roundToInt(), box.bottom.roundToInt(), rs[0].toFloat())
-                } else {
-                    for (i in 0 until FOUR) {
-                        radii[2 * i] = rs[i].toFloat()
-                        radii[2 * i + 1] = rs[i].toFloat()
-                    }
-                    path.rewind()
-                    path.addRoundRect(box, radii, Path.Direction.CW)
-                    convexOrBox()
+                for (i in 0 until FOUR) {
+                    radii[2 * i] = shape.radii[i].toFloat()
+                    radii[2 * i + 1] = shape.radii[i].toFloat()
+                }
+                path.addRoundRect(box, radii, Path.Direction.CW)
+            }
+            is Shape.Path -> for (op in shape.ops) {
+                when (op) {
+                    is Shape.Path.Op.MoveTo -> path.moveTo((op.x - left).toFloat(), (op.y - top).toFloat())
+                    is Shape.Path.Op.LineTo -> path.lineTo((op.x - left).toFloat(), (op.y - top).toFloat())
+                    Shape.Path.Op.Close -> path.close()
                 }
             }
-            is Shape.Path -> if (shape.convex) {
-                path.rewind()
-                for (op in shape.ops) {
-                    when (op) {
-                        is Shape.Path.Op.MoveTo -> path.moveTo((op.x - left).toFloat(), (op.y - top).toFloat())
-                        is Shape.Path.Op.LineTo -> path.lineTo((op.x - left).toFloat(), (op.y - top).toFloat())
-                        Shape.Path.Op.Close -> path.close()
-                    }
-                }
-                convexOrBox()
-            } else {
-                warnConcave()
-                outline.setRect(box.left.roundToInt(), box.top.roundToInt(), box.right.roundToInt(), box.bottom.roundToInt())
-            }
         }
-        node.setOutline(outline)
-        node.setClipToOutline(true)
-    }
-
-    // [path] as the outline; one the platform does not take as convex (API 29 checks) clipped by its box
-    @Suppress("DEPRECATION")
-    private fun convexOrBox() {
-        try {
-            outline.setConvexPath(path)
-        } catch (e: IllegalArgumentException) {
-            Timber.w(e, "Key effect: an outline not convex, clipped to its box")
-            outline.setRect(box.left.roundToInt(), box.top.roundToInt(), box.right.roundToInt(), box.bottom.roundToInt())
-        }
-    }
-
-    private var warned = false
-
-    // once a view: a concave key shape's effect is clipped to the key's box
-    private fun warnConcave() {
-        if (warned) return
-        warned = true
-        Timber.w("Key effect: a key's shape is not convex, its effect clipped to its box")
     }
 
     /** Each playing effect's nodes as they are at [now]; those done let go, the animator ended when none plays. */
@@ -308,7 +311,19 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
     fun stop() {
         ripples.forEach { it.live = false }
         particles.forEach { it.live = false }
+        clipPaths.clear()
         if (ticker.isStarted) ticker.end()
+    }
+
+    /** Stopped, and every node's drawing let go now, not at GC (the view detached); recorded again at the next press. */
+    fun release() {
+        stop()
+        sprites.values.forEach { it.node.discardDisplayList() }
+        ripples.forEach {
+            it.clip.discardDisplayList()
+            it.inner.discardDisplayList()
+        }
+        particles.forEach { it.node.discardDisplayList() }
     }
 
     companion object {
@@ -323,5 +338,6 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         private const val RADII = 8
         private const val FOUR = 4
         private const val ANIM_TRACE = "canvas anim"
+        private val FILTERED = Paint(Paint.FILTER_BITMAP_FLAG)
     }
 }

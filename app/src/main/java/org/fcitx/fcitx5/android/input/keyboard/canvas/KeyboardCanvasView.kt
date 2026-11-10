@@ -158,7 +158,9 @@ class KeyboardCanvasView(
     private val speech = Speech()
 
     // the keys' press effects (060-render-p3 A3), and where the last finger came down on which key: what they play from
-    private val effects = KeyEffects(this, images)
+    // made at the first effect played: none (no animator) for a theme without effects or with 键盘动效 off
+    private var effectsMade: KeyEffects? = null
+    private val effects: KeyEffects get() = effectsMade ?: KeyEffects(this, images).also { effectsMade = it }
     private var touched: KeyRef? = null
     private var touchedX = 0f
     private var touchedY = 0f
@@ -310,7 +312,7 @@ class KeyboardCanvasView(
         // the keyboard hidden keeps its view attached: out of sight, nothing moves on
         if (visibility != VISIBLE) {
             faces.forEach { it.moving?.stop() }
-            effects.stop()
+            effectsMade?.stop()
         }
     }
 
@@ -318,7 +320,7 @@ class KeyboardCanvasView(
         viewTreeObserver.removeOnPreDrawListener(moved)
         // a keyboard hidden moves no more: no frame asked for out of sight
         faces.forEach { it.moving?.stop() }
-        effects.stop()
+        effectsMade?.release()
         dropBase()
         faces.forEach(::discardFaces)
         super.onDetachedFromWindow()
@@ -393,7 +395,7 @@ class KeyboardCanvasView(
             f.moving?.let { drawLeaving(canvas, it) }
         }
         // over every key: a particle flies over the keys round it
-        effects.draw(canvas)
+        effectsMade?.draw(canvas)
         // what the frame's nodes draw (a pack's fonts' glyphs, its pictures) is drawn on the RenderThread
         // after this: the pack's first frame drawn once a frame is committed, not here. ViewRootImpl.performDraw
         // takes the commit callbacks before it draws, so one registered here goes with the window's next
@@ -469,7 +471,11 @@ class KeyboardCanvasView(
             lastDownAt = now
         }
         f.node.motion?.let { pressMoves(f, on, it) }
-        if (on) f.node.motion?.effect?.let { playEffect(f.node, ref, it) }
+        if (on) {
+            f.node.motion?.effect?.let { playEffect(f.node, ref, it) }
+            // a finger's place is its press's alone (a later press without a touch, a screen reader's, plays from the middle)
+            touched = null
+        }
         invalidate()
     }
 
@@ -486,7 +492,6 @@ class KeyboardCanvasView(
         if (!KeyMotionSwitch.on(context)) return
         val at = touched == ref
         effects.play(effect, k.shape, if (at) touchedX else k.anchor.x.toFloat(), if (at) touchedY else k.anchor.y.toFloat())
-        touched = null
     }
 
     /** The keys' press effects, for tests (A3). */

@@ -191,6 +191,41 @@ class KeyEffectTest {
             c.clock(5)
         }
         assertEquals(KeyEffects.MAX_RIPPLES, fx.pooled)
+        // pool full, all in the same ms: the next press takes the one pressed longest ago, each in turn
+        fx.stop()
+        val keys = "qwertyuio"
+        keys.forEach { c.showPressed(KeyRef("$it"), true) }
+        val clips = fx.rippleClips().map { it.left }
+        assertEquals(c.keyAt("o")!!.shape.bounds.left.toInt(), clips[0])
+        assertEquals(keys.drop(1).dropLast(1).map { c.keyAt("$it")!!.shape.bounds.left.toInt() }, clips.drop(1))
+    }
+
+    // API 29: a path's outline does not clip before 33, so a key not a rounded rectangle of one radius is clipped by its path
+    @Test
+    @Config(sdk = [29])
+    fun aPathKeysRippleIsClippedToItsShapeNotItsBox() =
+        KeyboardHarness(theme = theme("<style select=\"key\" shape=\"path(M.5 0 L1 1 L0 1 Z)\" effect=\"ripple-image(ring.png, 100%, 300ms)\"/>")).start().use { h ->
+            val c = h.canvas()
+            val k = c.keyAt("q")!!
+            c.press("q")
+            val clip = c.keyEffects.rippleClips().single()
+            val path = c.keyEffects.rippleClipPaths().single()!!
+            assertTrue(!clip.clipToOutline)
+            val w = clip.width
+            val h2 = clip.height
+            val region = android.graphics.Region().apply { setPath(path, android.graphics.Region(0, 0, w, h2)) }
+            // the triangle's apex in, the box's top corners out
+            assertTrue(region.contains(w / 2, h2 / 4))
+            assertTrue(!region.contains(1, 1) && !region.contains(w - 2, 1))
+            assertEquals(k.shape.bounds.left.toInt(), clip.left)
+        }
+
+    @Test
+    fun aRoundedRectanglesRippleIsClippedByItsOutline() = KeyboardHarness(theme = ripple()).start().use { h ->
+        val c = h.canvas()
+        c.press("q")
+        assertTrue(c.keyEffects.rippleClips().single().clipToOutline)
+        assertEquals(null, c.keyEffects.rippleClipPaths().single())
     }
 
     @Test
