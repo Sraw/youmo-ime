@@ -1114,6 +1114,7 @@
     <string name="quick_phrase_folder_delete">删除目录</string>
     <string name="quick_phrase_folder_delete_confirm">删除目录「%1$s」？里面的 %2$d 条移到「未分类」，不会删掉。</string>
     <string name="quick_phrase_folder_exists">已经有这个目录了</string>
+    <string name="quick_phrase_folder_reserved">「%s」是固定的分类，换个名字</string>
     <string name="quick_phrase_folder_invalid">目录名不能为空，最多 %d 个字</string>
     <string name="quick_phrase_import_keyless">%1$s；其中 %2$d 条没有英文关键词，原来的关键词放进了注释，在「待补关键词」里补上</string>
     <string name="quick_phrase_built_in">自带的</string>

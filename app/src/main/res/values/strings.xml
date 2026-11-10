@@ -1140,6 +1140,7 @@
     <string name="quick_phrase_folder_delete">Delete folder</string>
     <string name="quick_phrase_folder_delete_confirm">Delete the folder “%1$s”? Its %2$d entries move to “No folder”; none is deleted.</string>
     <string name="quick_phrase_folder_exists">There is a folder of that name</string>
+    <string name="quick_phrase_folder_reserved">“%s” is one of the page\'s own groups: pick another name</string>
     <string name="quick_phrase_folder_invalid">A folder name is not empty, at most %d characters</string>
     <string name="quick_phrase_import_keyless">%1$s; %2$d of them had a key in Chinese, now their note: give them a key under “Need a key”</string>
     <string name="quick_phrase_built_in">Built in</string>

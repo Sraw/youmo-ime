@@ -164,16 +164,38 @@ class QuickPhraseManagerTest {
         assertEquals(1, QuickPhraseManager.deleteFolder("站点", dir = dir))
         assertEquals(-1, QuickPhraseManager.deleteFolder("站点", dir = dir))
         assertEquals(QuickPhraseMine(listOf(gh, addr), listOf("空的")), QuickPhraseManager.loadAll(dir))
-        // deleted from the keyboard with its old folder, undone into it, made again
+        // deleted from the keyboard with its old folder: the one there now deleted, its time with it
         val removed = QuickPhraseManager.remove(filed, dir = dir)!!
         assertEquals(gh, removed.entry)
         assertEquals(5L, removed.usedAt)
+        assertEquals(QuickPhraseManager.Put.Saved, QuickPhraseManager.restore(removed, dir = dir))
+        assertEquals(QuickPhraseMine(listOf(gh, addr), listOf("空的")), QuickPhraseManager.loadAll(dir))
         // the export keeps folders, a computer's fcitx5 reads its keys
         QuickPhraseManager.put(null, QuickPhraseEntry("#wz", "www.baidu.com", "百度", "网址"), now = 7, dir = dir)
         assertEquals(
-            QuickPhraseFiles.HEADER + "\n" + "addr \"北京\\n3 号楼 \\\"502\\\"\"\n" + "【目录】空的\n【目录】网址\n#wz｜百度 www.baidu.com\n",
+            QuickPhraseFiles.HEADER + "\n" + "gh https://github.com\n" + "addr \"北京\\n3 号楼 \\\"502\\\"\"\n" + "【目录】空的\n【目录】网址\n#wz｜百度 www.baidu.com\n",
             QuickPhraseManager.export(dir),
         )
+    }
+
+    // the code review of 060-quick: a deletion undone after its folder was deleted meanwhile puts it
+    // back into that folder, made again, with its time of use
+    @Test
+    @Uat("QU-26")
+    fun aDeletionUndoneAfterItsFolderWentPutsItBackIntoTheFolderMadeAgain() {
+        QuickPhraseManager.addFolder("网址", dir = dir)
+        QuickPhraseManager.addFolder("空的", dir = dir)
+        val filed = gh.copy(folder = "网址")
+        QuickPhraseManager.put(null, addr, now = 1, dir = dir)
+        QuickPhraseManager.put(null, filed, now = 2, dir = dir)
+        val removed = QuickPhraseManager.remove(filed, dir = dir)!!
+        assertEquals(filed, removed.entry)
+        assertEquals(0, QuickPhraseManager.deleteFolder("网址", dir = dir))
+        assertEquals(QuickPhraseMine(listOf(addr), listOf("空的")), QuickPhraseManager.loadAll(dir))
+        assertEquals(QuickPhraseManager.Put.Saved, QuickPhraseManager.restore(removed, dir = dir))
+        assertEquals(QuickPhraseMine(listOf(filed, addr), listOf("空的", "网址")), QuickPhraseManager.loadAll(dir))
+        // a folder can be none of the page's shelves
+        assertFalse(QuickPhraseFiles.validFolder("未分类"))
     }
 
     @Test

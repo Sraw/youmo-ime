@@ -1114,6 +1114,7 @@
     <string name="quick_phrase_folder_delete">刪除目錄</string>
     <string name="quick_phrase_folder_delete_confirm">刪除目錄「%1$s」？裡面的 %2$d 條移到「未分類」，不會刪掉。</string>
     <string name="quick_phrase_folder_exists">已經有這個目錄了</string>
+    <string name="quick_phrase_folder_reserved">「%s」是固定的分類，換個名字</string>
     <string name="quick_phrase_folder_invalid">目錄名不能為空，最多 %d 個字</string>
     <string name="quick_phrase_import_keyless">%1$s；其中 %2$d 條沒有英文關鍵詞，原來的關鍵詞放進了註釋，在「待補關鍵詞」裡補上</string>
     <string name="quick_phrase_built_in">內建的</string>

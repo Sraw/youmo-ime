@@ -182,7 +182,7 @@ class QuickPhraseFragment : ProgressFragment() {
         // OK tapped before, and its entry there now
         // and the entry it changed gone: one the same added meanwhile (by the keyboard) refused the save
         val savedWas = typedWas?.takeIf { t ->
-            was.getBoolean(SAVING) && all.any { it.sameAs(t) } && was.entry(OLD).let { old -> old == null || old.sameAs(t) || old !in all }
+            was.getBoolean(SAVING) && all.any { it.sameAs(t) } && was.entry(OLD).let { old -> old == null || old.sameAs(t) || stored(old) == null }
         }
         if (savedWas != null) {
             // OK was tapped and the old page's save finished meanwhile: saved, nothing to show again
@@ -194,14 +194,14 @@ class QuickPhraseFragment : ProgressFragment() {
         } else if (args.edit && !asked) {
             asked = true
             val entry = args.entry
-            edit(entry.takeIf { args.existing && it in all }, entry)
+            editStored(entry, args.existing)
         }
         pending?.let { request ->
             pending = null
             // the restored editor up now: asked over it as takeRequest does, else (saved meanwhile) opened
             if (!takeRequest(request) && request.edit) {
                 val entry = request.entry
-                edit(entry.takeIf { request.existing && it in all }, entry)
+                editStored(entry, request.existing)
             }
         }
         return FrameLayout(ctx).apply {
@@ -366,6 +366,16 @@ class QuickPhraseFragment : ProgressFragment() {
         }
     }
 
+    // [e] as the files have it now, its folder aside: the keyboard's (a card's 编辑) may be of a read
+    // before the page moved it to another folder
+    private fun stored(e: QuickPhraseEntry): QuickPhraseEntry? = all.firstOrNull { it.unfiled == e.unfiled }
+
+    // an editor asked for from outside: of the entry still there ([existing]) as it is now, else a new one
+    private fun editStored(entry: QuickPhraseEntry, existing: Boolean) {
+        val there = if (existing) stored(entry) else null
+        edit(there, there ?: entry)
+    }
+
     private fun edit(entry: QuickPhraseEntry?, filled: QuickPhraseEntry? = entry, typed: QuickPhraseEntry? = filled) {
         val ctx = requireContext()
         val keyLabel = getString(R.string.quick_phrase_key)
@@ -457,7 +467,7 @@ class QuickPhraseFragment : ProgressFragment() {
             ed.content.requestFocus()
             return false
         }
-        val note = ed.note.str.trim()
+        val note = QuickPhraseFiles.note(ed.note.str)
         if (!QuickPhraseFiles.validNote(note)) {
             ed.note.error = getString(R.string.quick_phrase_note_too_long, QuickPhraseBook.MAX_NOTE)
             ed.note.requestFocus()
@@ -465,7 +475,7 @@ class QuickPhraseFragment : ProgressFragment() {
         }
         val new = QuickPhraseEntry(key, content, note, ed.folder)
         // the list's at once; the file's (the keyboard may have added it meanwhile) as it is saved
-        if (all.any { it != ed.entry && it.sameAs(new) }) {
+        if (all.any { it.unfiled != ed.entry?.unfiled && it.sameAs(new) }) {
             ed.content.error = getString(R.string.quick_phrase_duplicate)
             return false
         }
@@ -518,7 +528,7 @@ class QuickPhraseFragment : ProgressFragment() {
         if (request.edit) {
             confirmDiscard(ed.dialog) {
                 val entry = request.entry
-                edit(entry.takeIf { request.existing && it in all }, entry)
+                editStored(entry, request.existing)
             }
         }
         return true
@@ -554,8 +564,12 @@ class QuickPhraseFragment : ProgressFragment() {
             .setNegativeButton(android.R.string.cancel, null)
             .show()
             .onPositiveButtonClick {
-                val name = field.str.trim()
+                val name = QuickPhraseFiles.note(field.str)
                 when {
+                    name in QuickPhraseFiles.RESERVED_FOLDERS -> {
+                        field.error = getString(R.string.quick_phrase_folder_reserved, name)
+                        false
+                    }
                     !QuickPhraseFiles.validFolder(name) -> {
                         field.error = getString(R.string.quick_phrase_folder_invalid, QuickPhraseBook.MAX_FOLDER)
                         false

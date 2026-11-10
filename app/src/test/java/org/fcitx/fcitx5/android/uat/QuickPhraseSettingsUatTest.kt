@@ -245,6 +245,57 @@ class QuickPhraseSettingsUatTest {
         until("deleted, its entry kept") { QuickPhraseManager.loadAll().let { it.folders.isEmpty() && it.entries.toSet() == setOf(baidu.copy(folder = ""), gh) } }
     }
 
+    // the code review of 060-quick: a folder renamed to another's name or a shelf's is told and kept;
+    // an entry deleted in its folder and undone goes back into it; the keyboard's 编辑 of an entry
+    // the page moved since edits the one there, not a new one
+    @Test
+    @Uat("QU-26")
+    fun aFolderNameTakenIsToldAndADeletionUndoneAndAKeyboardsEditKeepTheFolder() {
+        QuickPhraseManager.addFolder("网址")
+        QuickPhraseManager.addFolder("空的")
+        val filed = gh.copy(folder = "网址")
+        open(addr, filed)
+        chip("网址").performLongClick()
+        st.idle()
+        pickItem(0)
+        for ((name, error) in listOf(
+            "空的" to s(R.string.quick_phrase_folder_exists),
+            s(R.string.quick_phrase_all) to s(R.string.quick_phrase_folder_reserved, s(R.string.quick_phrase_all)),
+            "未分类" to s(R.string.quick_phrase_folder_reserved, "未分类"),
+        )) {
+            val d = dialog()
+            fields(d).single().setText(name)
+            ok(d)
+            assertTrue(name, d.isShowing)
+            assertEquals(name, error, fields(d).single().error)
+        }
+        dialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        st.idle()
+        assertEquals(listOf("网址", "空的"), QuickPhraseManager.loadAll().folders)
+        // deleted in its folder, undone: back in it
+        chip("网址").performClick()
+        st.idle()
+        row(gh.content).performClick()
+        st.idle()
+        dialog().getButton(AlertDialog.BUTTON_NEUTRAL).performClick()
+        st.idle()
+        saved("deleted", listOf(addr))
+        until("the undo offered") { s(R.string.undo) in shown() }
+        KeyboardHarness.all(st.activity.window.decorView).first { it.isShown && it is TextView && it.text.toString() == s(R.string.undo) }.performClick()
+        st.idle()
+        saved("undone into its folder", listOf(filed, addr))
+        // the keyboard's card read it before it was filed: 编辑 opens the one there, saved in place
+        st.open(SettingsRoute.QuickPhrase(edit = true, key = gh.key, content = gh.content, existing = true))
+        until("the editor up") {
+            (ShadowDialog.getLatestDialog() as? AlertDialog)?.takeIf { it.isShowing }?.let { fields(it).size == 3 } == true
+        }
+        val d = dialog()
+        assertEquals(s(R.string.quick_phrase_folder, "网址"), KeyboardHarness.all(d.window!!.decorView).filterIsInstance<MaterialButton>().first { it.text.toString().startsWith(s(R.string.quick_phrase_folder, "")) }.text.toString())
+        fields(d)[1].setText("https://github.com/sraw")
+        ok(d)
+        until("changed in place") { QuickPhraseManager.load().toSet() == setOf(filed.copy(content = "https://github.com/sraw"), addr) }
+    }
+
     // design 060-quick-input-folders: a file of before read converted; the one whose key was all Chinese
     // listed and said, kept, and given a key on the page
     @Test
