@@ -154,12 +154,15 @@ class SettingsUatTest {
     @Test
     @Uat("ST-05")
     fun aDarkThemeTurnsPreviewAndKeyboardDark() {
-        ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
-        ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
-        // the preview as shipped, the tests' baseline embedded (OneDefaultPreferencesShadow)
+        // each set back as it was in the finally: the prefs outlive the test (Robolectric keeps the sandbox)
+        val followWas = ThemeManager.prefs.followSystemDayNightTheme.getValue()
+        val themeWas = ThemeManager.prefs.normalModeTheme.getValue()
         val codeRowWas = ThemeManager.prefs.codeRow.getValue()
-        ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Floating)
         try {
+            ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
+            ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
+            // the preview as shipped, the tests' baseline embedded (OneDefaultPreferencesShadow)
+            ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Floating)
             activity
             open(SettingsRoute.Theme)
             val list = KeyboardHarness.all(activity.window.decorView).filterIsInstance<RecyclerView>()
@@ -178,8 +181,8 @@ class SettingsUatTest {
                 assertTrue("background ${Integer.toHexString(corner)}", Color.luminance(corner) < 0.2f)
             }
         } finally {
-            ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
-            ThemeManager.prefs.followSystemDayNightTheme.setValue(ThemeManager.prefs.followSystemDayNightTheme.defaultValue)
+            ThemeManager.setNormalModeTheme(themeWas)
+            ThemeManager.prefs.followSystemDayNightTheme.setValue(followWas)
             ThemeManager.prefs.codeRow.setValue(codeRowWas)
         }
     }

@@ -167,6 +167,8 @@ class MotionNoticeUatTest {
     @Test
     @Uat("MN-04")
     fun clipboardDeleteUndoneOnTheNoticeInEitherTheme() {
+        val themeWas = ThemeManager.prefs.normalModeTheme.getValue()
+        prefs.later { ThemeManager.setNormalModeTheme(themeWas) }
         prefs.set(ThemeManager.prefs.followSystemDayNightTheme, false)
         try {
             ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
@@ -174,6 +176,7 @@ class MotionNoticeUatTest {
             ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
             deleteAndUndo("dark")
         } finally {
+            // the rest of the test in the light one
             ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
         }
         // deletes while it shows add up: a swipe, then a long press, one 撤销 for both
