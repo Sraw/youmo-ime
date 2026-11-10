@@ -35,42 +35,8 @@
     return doc(withName(xml, id + '-mine'));
   }
 
-  const PICTURE = /<picture\b[^>]*?(?:\/>|>[\s\S]*?<\/picture>)/;
-  const KEYBOARD_PICTURE = '<style select="keyboard" fill="picture"/>';
   // the comments of [xml] blanked (same length), so what is looked for is never found inside one
   const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => ' '.repeat(c.length));
-
-  /**
-   * A new document of [base] (a document) with [image] (its bytes, [type] png/jpg/webp: [pictureFile]'s) as the
-   * keyboard's picture: the source and each orientation's cut the same file, the keyboard showing it. The colours
-   * stay [base]'s (picking them from the picture comes with the page's crop and colours, M2/M3). A picture [base] had is replaced, its
-   * files dropped where nothing else names them.
-   */
-  function withPicture(base, image, type) {
-    const file = 'picture.' + type;
-    const picture = '  <picture src="' + file + '">\n    <cut orientation="portrait" file="' + file + '"/>\n    <cut orientation="landscape" file="' + file + '"/>\n  </picture>';
-    let xml = base.xml;
-    const files = doc('', base.files).files;
-    const old = PICTURE.exec(uncommented(xml));
-    if (old) {
-      const was = xml.slice(old.index, old.index + old[0].length);
-      xml = xml.slice(0, old.index).replace(/[ \t]*$/, '') + xml.slice(old.index + old[0].length).replace(/^[ \t]*\n/, '');
-      for (const m of was.matchAll(/\b(?:src|file)="([^"]+)"/g)) if (!xml.includes('"' + m[1] + '"')) delete files[m[1]];
-    }
-    // after the last <colors> (a theme of two versions has one for each), else after <theme …>: before fonts and styles
-    const plain = uncommented(xml);
-    const colors = plain.lastIndexOf('</colors>');
-    const open = /<theme\b[^>]*>/.exec(plain);
-    if (colors < 0 && !open) throw new Error('no <theme> to put a picture in');
-    const at = colors >= 0 ? colors + '</colors>'.length : open.index + open[0].length;
-    xml = xml.slice(0, at) + '\n' + picture + xml.slice(at);
-    if (!uncommented(xml).includes(KEYBOARD_PICTURE)) {
-      const end = uncommented(xml).lastIndexOf('</theme>');
-      xml = xml.slice(0, end).replace(/\s*$/, '') + '\n  ' + KEYBOARD_PICTURE + '\n' + xml.slice(end);
-    }
-    files[file] = image;
-    return doc(xml, files, base.layouts);
-  }
 
   // a picture the user picks is never kept as it was (the user's ruling, 2026-11-09): always encoded anew, its long
   // side no more than longSide (never made bigger), JPEG at quality; PNG only where it has transparency
@@ -113,6 +79,7 @@
     const named = new Set();
     for (const m of xml.matchAll(/<(picture|cut|font|icon)\b[^>]*?\b(src|file)="([^"]+)"/g)) named.add(m[3] + '|' + m[1]);
     for (const m of xml.matchAll(/\bimage\(\s*([^,)\s]+)/g)) named.add(m[1].replace(/^["']|["']$/g, '') + '|image');
+    for (const m of xml.matchAll(/<meta\b[^>]*?\bpreview="([^"]+)"/g)) named.add(m[1] + '|preview');
     for (const key of named) {
       const [file, role] = key.split('|');
       const bytes = d.files[file];
@@ -123,6 +90,11 @@
         if (!s) bad(file + ' 不是 App 认得的图片');
         else if (Math.max(s[0], s[1]) > side) bad(file + ' 太大：' + s[0] + '×' + s[1] + '，最多 ' + side);
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
+      } else if (role === 'preview') {
+        // the app's ThemeAssetLimits.preview
+        const s = L.imageSize(bytes);
+        if (!s || !['png', 'webp'].includes(L.imageType(bytes))) bad(file + ' 不是 PNG 或 WebP');
+        else if (Math.max(s[0], s[1]) > 2048 || bytes.length > 512 * 1024) bad(file + ' 太大：预览图最大 2048×2048、512 KB');
       } else if (role === 'icon') {
         // the app keeps an icon only as an SVG of filled paths (SvgSubset, the engine's readIcon)
         let text = null;
@@ -357,7 +329,18 @@
   const BOARDS = ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols', 'handwriting'];
 
   /** The environment's choices as the page starts. */
-  const ENV = { device: 'oneplus-6t', w: 1080, h: 2340, density: 2.625, landscape: false, board: 'qwerty', form: 'normal', dark: false, shift: 'none' };
+  /**
+   * The preview's environment (060-render-p3 §5.1 预览环境): the device, the board and its form; the field and the
+   * input method typed in (the theme's `@field=`, `@im=`); what is shown besides the keys: a popup (`show`: preview,
+   * keys, menu), the bar (`bar`: idle, typing) and a panel over the keys (`panel`: clipboard, picker, editing, voice).
+   */
+  const ENV = {
+    device: 'oneplus-6t', w: 1080, h: 2340, density: 2.625, landscape: false, board: 'qwerty', form: 'normal', dark: false, shift: 'none',
+    field: 'text', ime: 'pinyin', show: '', bar: 'idle', panel: '',
+  };
+  /** The fields and input methods the environment offers: the engine's (Selector.FIELDS, Selector.IMS). */
+  const FIELDS = ['text', 'password', 'url', 'number', 'email'];
+  const IMES = ['pinyin', 'shuangpin', 'english', 'wubi', 'cangjie', 'handwriting'];
 
   /** [e] (the page's choices) as the engine's EnvJson: the keyboard's width and height in px, the form's flags. */
   function envJson(e) {
@@ -370,6 +353,7 @@
     if (e.landscape) out.landscape = true;
     if (e.dark) out.dark = true;
     if (e.shift && e.shift !== 'none') out.shift = e.shift;
+    if ((e.field && e.field !== 'text') || (e.ime && e.ime !== 'pinyin')) out.input = { field: e.field || 'text', ime: e.ime || 'pinyin' };
     if (e.form === 'compact') out.compact = true;
     else if (e.form === 'floating') out.floating = 1;
     else if (e.form === 'left' || e.form === 'right') out.oneHanded = e.form;
@@ -403,7 +387,7 @@
   }
 
   root.YoumoMaker = {
-    THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV,
-    doc, themeName, withName, fromBuiltin, withPicture, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check,
+    THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -94,6 +94,10 @@
     },
   };
 
+  // a crop moved or zoomed and not yet cut (用这个裁切), by its box's key: the tab drawn again (another edit, a key
+  // tapped on the preview) shows it where it was left
+  const moved = new Map();
+
   // the crop box on the picture: a canvas of it, the box dragged, a slider zooms
   function cropper(api, d, orientation) {
     const { h, row } = panels.ui;
@@ -104,8 +108,11 @@
     const env = Object.assign({}, api.env(), { landscape: orientation === 'landscape' });
     const ratio = ops.ratio(env);
     const was = p.cuts[orientation] && p.cuts[orientation].rect;
-    const state = { zoom: 1, cx: 0.5, cy: 0.5 };
-    if (was) {
+    const bytes = d.files[p.src];
+    const key = [orientation, p.src, bytes ? api.lib.contentId(bytes) : '', bmp.width + 'x' + bmp.height, ratio, String(was)].join('|');
+    const state = moved.get(key) || { zoom: 1, cx: 0.5, cy: 0.5 };
+    moved.set(key, state);
+    if (was && state.zoom === 1 && state.cx === 0.5 && state.cy === 0.5) {
       const full = F.cropRect(bmp.width, bmp.height, ratio);
       state.zoom = Math.max(1, (full[2] - full[0]) / Math.max(1, was[2] - was[0]));
       state.cx = (was[0] + was[2]) / 2 / bmp.width;
@@ -147,6 +154,7 @@
     const done = h('button', { type: 'button', textContent: '用这个裁切', on: { click: async () => {
       try {
         const cut = await api.cutPicture(p.src, rect());
+        moved.delete(key);
         api.apply((x) => ops.setCut(x, orientation, cut));
       } catch (e) {
         api.toast('裁切失败：' + (e.message || e));
@@ -156,8 +164,7 @@
     box.append(c, row('放大', zoom), done);
     // what its handlers hold (the picture decoded, its crop, the keyboard's shape): another, and the tab's in-place
     // update (ui.js sync) puts this box in whole instead of keeping the old one's canvas and handlers
-    const bytes = d.files[p.src];
-    box.dataset.key = [orientation, p.src, bytes ? api.lib.contentId(bytes) : '', bmp.width + 'x' + bmp.height, ratio, String(was)].join('|');
+    box.dataset.key = key;
     return box;
   }
 
