@@ -90,6 +90,7 @@ import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.scene.engine.section
+import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.utils.unset
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.UniqueComponent
@@ -130,7 +131,7 @@ class InputView(
     private val codeFloats = KawaiiBarComponent.codeRowFloats()
 
     // under the whole keyboard: the theme's picture (laid as CENTER_CROP lays it, PictureHost) or its colour
-    private val customBackground = view(::View)
+    private val customBackground = view(::PictureBaseView)
 
     // the room the navigation bar takes under the keys, drawn behind it (导航栏背景 全部): the theme's `navbar`
     // colour where it sets one (060-render-p3 T7a), else none, the keyboard's under it as ever
@@ -412,7 +413,9 @@ class InputView(
         broadcaster.onImeUpdate(fcitx.runImmediately { inputMethodEntryCached })
 
         // the theme's picture or its colour, under it all; the picture lies where each key showing it finds it
-        customBackground.background = ThemePictureDrawable.board(ThemeManager.shownLook(theme))
+        // played where it is animated and fits the limits (A4), stopped as the keyboard hides or the view goes
+        val animated = ThemeManager.shownLook(theme).takeIf { it.base == BoardBase.Picture }?.picture?.let { AnimatedBoardDrawable.of(it, context) }
+        customBackground.background = ThemePictureDrawable.board(ThemeManager.shownLook(theme), animated)
 
         keyboardView = constraintLayout {
             // allow MotionEvent to be delivered to keyboard while pressing on padding views.
@@ -422,7 +425,7 @@ class InputView(
             PictureHost.install(
                 this,
                 ThemeManager.shownLook(theme).picture?.let {
-                    PictureHost(ThemeManager.shownLook(theme), customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+                    PictureHost(ThemeManager.shownLook(theme), customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE, animated)
                 },
             )
             add(customBackground, lParams {

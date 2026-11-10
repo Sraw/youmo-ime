@@ -194,4 +194,16 @@ class KeyFaceGeometryTest {
         val face = KeyFaceGeometry.of(4f, 4f, KeyKind.Letter, keys, landscape = false, density = 2f)
         assertTrue(face.face?.hasSize != true)
     }
+
+    // A4: a see-through key over the animated picture, darkened from the board's brightness to its own
+    @Test
+    fun aSeeThroughKeyIsDarkenedFromTheBoards() {
+        assertEquals(0, PictureWindow.seeThroughDarken(80, 80))
+        assertEquals(50, PictureWindow.seeThroughDarken(80, 40))
+        assertEquals(30, PictureWindow.seeThroughDarken(100, 70))
+        assertEquals(100, PictureWindow.seeThroughDarken(100, 0))
+        // never lighter than the board: none
+        assertEquals(0, PictureWindow.seeThroughDarken(60, 90))
+        assertEquals(0, PictureWindow.seeThroughDarken(0, 50))
+    }
 }

@@ -29,8 +29,24 @@ import java.lang.ref.WeakReference
  * The theme's picture under a keyboard: laid over [base] (the view under the whole keyboard) as
  * CENTER_CROP lays it, so a view anywhere over it — a key, the bar — shows the part under it, as
  * the theme maker draws it ([PictureWindow]). Found by the views over it through [host]'s tag.
+ * [animated]: the base plays the picture (060-render-p3 A4, [AnimatedBoardDrawable]); a view showing it is
+ * see-through then, only darkened to its brightness ([seeThrough]), never blurred.
  */
-class PictureHost(private val look: ThemeLook, val base: View, private val landscape: Boolean) {
+class PictureHost(private val look: ThemeLook, val base: View, private val landscape: Boolean, val animated: AnimatedBoardDrawable? = null) {
+
+    private val dark = Paint()
+
+    /**
+     * Over an [animated] base: the paint that makes a view showing the picture at [brightness] (in its
+     * coordinates, the base under it showing through), null where nothing is to be drawn over it.
+     */
+    fun seeThrough(brightness: Int): Paint? {
+        val board = animated?.brightness ?: return null
+        val darken = PictureWindow.seeThroughDarken(board, brightness)
+        if (darken == 0) return null
+        dark.color = android.graphics.Color.argb(darken * 255 / 100, 0, 0, 0)
+        return dark
+    }
 
     // a blur's picture as laid over the base at its size: asked of ThemeAssets once, not each key a frame;
     // asked again once the files were let go as changed (a theme imported again under its name, its
@@ -188,7 +204,17 @@ class ThemePictureDrawable(
 
     override fun draw(canvas: Canvas) {
         val view = callback as? View
-        val p = view?.let { v -> PictureHost.of(v)?.paint(v, blurDp, brightness, picture) }
+        val host = view?.let { PictureHost.of(it) }
+        if (host?.animated != null) {
+            // see-through to the picture playing under it
+            host.seeThrough(brightness)?.let { canvas.drawRect(bounds, it) }
+            if (over ushr 24 != 0) {
+                solid.color = over
+                canvas.drawRect(bounds, solid)
+            }
+            return
+        }
+        val p = view?.let { v -> host?.paint(v, blurDp, brightness, picture) }
         if (p == null) {
             solid.color = fallback
             canvas.drawRect(bounds, solid)
@@ -209,10 +235,14 @@ class ThemePictureDrawable(
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 
     companion object {
-        /** Under [look]'s keyboard: its picture as cut for it, or the colour ([ThemeColors.board]). */
-        fun board(look: ThemeLook): Drawable {
+        /**
+         * Under [look]'s keyboard: its picture as cut for it, or the colour ([ThemeColors.board]); [animated]
+         * the picture playing (A4), where it plays.
+         */
+        fun board(look: ThemeLook, animated: AnimatedBoardDrawable? = null): Drawable {
             val color = ThemeColors.board(look.palette, look.keys)
             val p = look.picture
+            if (animated != null && p != null && look.base == BoardBase.Picture) return animated
             return if (p != null && look.base == BoardBase.Picture) {
                 ThemePictureDrawable(p.blurDp, p.brightness, 0, color)
             } else {

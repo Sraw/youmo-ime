@@ -132,6 +132,7 @@
     <string name="theme_pack_light">浅色</string>
     <string name="theme_pack_dark">深色</string>
     <string name="theme_pack_low_contrast">按键上的字可能不易看清（%1$s版）</string>
+    <string name="theme_pack_animated_still">动态背景图将显示为静态图：不是动画 WebP，或超过 %1$s MB、边长 %2$s 像素、%3$s 帧、每秒 %4$s 帧</string>
     <string name="theme_pack_import_title">导入主题 %1$s？</string>
     <string name="theme_pack_import">导入</string>
     <string name="theme_pack_replaces">会替换你已有的同名主题。</string>
