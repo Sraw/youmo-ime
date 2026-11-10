@@ -305,8 +305,8 @@
   }
 
   /**
-   * The draft: the document as it is now, kept in [store] (`get(key)`, `put(key, value)`, `remove(key)`, each a
-   * promise) so a page opened again offers it back. A store that fails (a private window, no IndexedDB) is a
+   * The draft: the document as it is now, kept in [store] (`get(key)`, `put(key, value)`, `remove(key)`, `keys()`,
+   * each a promise; `lock(act)` where the tabs' writes can be made one at a time) so a page opened again offers it back. A store that fails (a private window, no IndexedDB) is a
    * page without drafts, never one that stops.
    */
   const DRAFT = 'draft';
@@ -362,8 +362,11 @@
       if (first && serial) {
         // under the lock any files record the text does not name is no open tab's to lose (an open tab writes its
         // files again when the text names another's): the records of pages closed before, all of them
-        const keys = store.keys ? await store.keys() : [prev && filesKey(prev)];
-        for (const k of keys) if (typeof k === 'string' && k.startsWith(DRAFT_FILES + '-') && k !== filesKey(kept.id) && !gone.includes(k.slice(DRAFT_FILES.length + 1))) gone.push(k.slice(DRAFT_FILES.length + 1));
+        for (const k of await store.keys()) {
+          if (typeof k !== 'string' || !k.startsWith(DRAFT_FILES + '-')) continue;
+          const id = k.slice(DRAFT_FILES.length + 1);
+          if (id !== kept.id && !gone.includes(id)) gone.push(id);
+        }
       }
       kept.own = [kept.id];
       for (const x of gone) await store.remove(filesKey(x));
@@ -373,7 +376,11 @@
       return false;
     }
   }
-  async function draft(store) {
+  // read under the lock too: a write in between lets go of the record the text read before it named
+  function draft(store) {
+    return locked(store, () => draftNow(store));
+  }
+  async function draftNow(store) {
     try {
       const v = await store.get(DRAFT);
       if (!v || ![1, 2, 3, 4].includes(v.v) || !v.doc || typeof v.doc.xml !== 'string') return null;

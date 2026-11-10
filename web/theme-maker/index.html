@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-G4uYeSmMeNTtllnw+68rle5oILRV6y3XX+pv2yqNbeM=' 'sha256-16ebXpQYnAgl9u2lSPRLdgwPR2A3omDskguIzzBoIhE=' 'sha256-ywaO7u9boc4zyTG9gTndCcQNBnAgM7raKIS4cZT1AAM=' 'sha256-ETs+YLQVlg6zlKl5D3ldT3sRXoXHz8t1+qMjX5KNgpQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-CGuTQjyvaI4tKqaxvm31KjH3eGmJgIURBhURESTyhTE=' 'sha256-16ebXpQYnAgl9u2lSPRLdgwPR2A3omDskguIzzBoIhE=' 'sha256-ywaO7u9boc4zyTG9gTndCcQNBnAgM7raKIS4cZT1AAM=' 'sha256-ETs+YLQVlg6zlKl5D3ldT3sRXoXHz8t1+qMjX5KNgpQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -2102,8 +2102,8 @@ dialog h2 { margin: 0; font-size: 16px; }
   }
 
   /**
-   * The draft: the document as it is now, kept in [store] (`get(key)`, `put(key, value)`, `remove(key)`, each a
-   * promise) so a page opened again offers it back. A store that fails (a private window, no IndexedDB) is a
+   * The draft: the document as it is now, kept in [store] (`get(key)`, `put(key, value)`, `remove(key)`, `keys()`,
+   * each a promise; `lock(act)` where the tabs' writes can be made one at a time) so a page opened again offers it back. A store that fails (a private window, no IndexedDB) is a
    * page without drafts, never one that stops.
    */
   const DRAFT = 'draft';
@@ -2159,8 +2159,11 @@ dialog h2 { margin: 0; font-size: 16px; }
       if (first && serial) {
         // under the lock any files record the text does not name is no open tab's to lose (an open tab writes its
         // files again when the text names another's): the records of pages closed before, all of them
-        const keys = store.keys ? await store.keys() : [prev && filesKey(prev)];
-        for (const k of keys) if (typeof k === 'string' && k.startsWith(DRAFT_FILES + '-') && k !== filesKey(kept.id) && !gone.includes(k.slice(DRAFT_FILES.length + 1))) gone.push(k.slice(DRAFT_FILES.length + 1));
+        for (const k of await store.keys()) {
+          if (typeof k !== 'string' || !k.startsWith(DRAFT_FILES + '-')) continue;
+          const id = k.slice(DRAFT_FILES.length + 1);
+          if (id !== kept.id && !gone.includes(id)) gone.push(id);
+        }
       }
       kept.own = [kept.id];
       for (const x of gone) await store.remove(filesKey(x));
@@ -2170,7 +2173,11 @@ dialog h2 { margin: 0; font-size: 16px; }
       return false;
     }
   }
-  async function draft(store) {
+  // read under the lock too: a write in between lets go of the record the text read before it named
+  function draft(store) {
+    return locked(store, () => draftNow(store));
+  }
+  async function draftNow(store) {
     try {
       const v = await store.get(DRAFT);
       if (!v || ![1, 2, 3, 4].includes(v.v) || !v.doc || typeof v.doc.xml !== 'string') return null;

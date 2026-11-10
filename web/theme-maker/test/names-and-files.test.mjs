@@ -272,8 +272,12 @@ test('the draft writes the files again only when they changed; drafts of the pag
   // a lock refused (a file:// page): written as without one, never a write that fails
   const refused = Object.create(store);
   refused.lock = async () => { throw new Error('SecurityError'); };
+  const others = [...m.keys()].filter((k) => k.startsWith('draft-files-'));
+  assert.equal(others.length, 2, 'A\'s and the new tab\'s');
   assert.equal(await M.keepDraft(refused, d, M.ENV), true);
+  for (const k of others) assert.ok(m.has(k), 'a write without the lock lets go of no other page\'s record: ' + k);
   await M.dropDraft(refused);
+  assert.equal(await M.draft(store), null, 'dropped');
   // an old draft written over: its files record goes too
   m.clear();
   m.set('draft', { v: 3, doc: { xml: '<v3/>' }, files: 'x' });
