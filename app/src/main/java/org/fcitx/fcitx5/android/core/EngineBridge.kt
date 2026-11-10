@@ -68,8 +68,19 @@ class EngineBridge {
      * [send] sending it, then [Engines.inkSent] holds it if the key never reached the session; with
      * handwriting not [current], the input method, no key, the piece only held. Whether the key was
      * sent. On the fcitx thread.
+     *
+     * [onKeys]: written on the letter keys (键盘手写): [current]'s own handwriting's (InkOver), sent while
+     * it writes on its keys; another input method's by now (switched meanwhile), dropped: its piece is of
+     * what that one showed.
      */
-    fun sendInk(piece: Action.Ink, current: String, send: () -> Unit): Boolean {
+    fun sendInk(piece: Action.Ink, current: String, onKeys: Boolean = false, send: () -> Unit): Boolean {
+        if (onKeys) {
+            if (!InputMethodCatalog.writesOnKeys(current)) return false
+            if (!handwriting(current, onKeys = true) { engines.ink(piece, shown = true, im = current) }) return false
+            send()
+            engines.inkSent(piece, current)
+            return true
+        }
         if (current != InputMethodCatalog.HANDWRITING) {
             handwriting(current) { engines.ink(piece, shown = false) }
             return false
@@ -108,11 +119,11 @@ class EngineBridge {
     // Whether it was taken: not, no Ink key is sent, which unanswered would be typed as its character.
     // Handwriting's only: a piece finished as the pad leaves for English ([current]) is told the engine,
     // but is not a key typed into keyboard-us
-    internal fun handwriting(current: String, call: () -> Unit): Boolean {
+    internal fun handwriting(current: String, onKeys: Boolean = false, call: () -> Unit): Boolean {
         if (InputMethodCatalog.HANDWRITING in unloadable) return false
         try {
             unloadable.call(InputMethodCatalog.HANDWRITING, call)
-            return current == InputMethodCatalog.HANDWRITING
+            return onKeys || current == InputMethodCatalog.HANDWRITING
         } catch (e: IOException) {
             Timber.w(e, "handwriting engine")
         } catch (e: DataFormatException) {
@@ -544,6 +555,13 @@ class EngineBridge {
     // [engines] asked only for one followed: a call answered elsewhere (a test's) makes none
     private inline fun followed(im: String, engines: () -> Engines) {
         if (im == InputMethodCatalog.HANDWRITING) EngineState.inkEnded.value = engines().inkEnded
+        // written on the keys (InkOver): its pieces ended, and whether its own input is typed, after every
+        // answer (KeyInkGesture.engineTyped: a tap's mark replaced each time, not only as it changes)
+        if (InputMethodCatalog.writesOnKeys(im) && im !in unloadable) {
+            val e = engines()
+            EngineState.inkEnded.value = e.inkEnded
+            EngineState.keysTypedState.value = EngineState.KeysTyped(EngineState.keysTypedState.value.answer + 1, e.typedOnKeys(im))
+        }
         // a table's keyboard: its 拼 key turned, its settings changed (a field's context comes as it
         // shows); none of one that could not be read, whose keys say nothing
         if (im in InputMethodCatalog.TABLES && im !in unloadable) EngineState.tableKeyboardState.value = engines().tableKeyboard(im)

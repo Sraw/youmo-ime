@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.pack.PackKind
@@ -418,6 +419,39 @@ class EngineBridgeTest {
                 bridge.unloadable.clear()
             }
         }
+
+        /**
+         * Written on the letter keys (键盘手写): an Ink key goes to the input method's own handwriting (InkOver),
+         * not handwriting's; under English, none; and every answer of such an input method says whether its
+         * own input is typed, a new value each time (KeyInkGesture.engineTyped).
+         */
+        @Test
+        fun inkWrittenOnTheKeysIsTheInputMethodsOwnAndEveryAnswerSaysWhatIsTyped() {
+            bridge.unloadable.clear()
+            var sent = 0
+            try {
+                // taken for pinyin's own: the key goes out (handwriting's data aside, a JVM's packs have no model)
+                assertTrue(bridge.handwriting(InputMethodCatalog.PINYIN, onKeys = true) {})
+                assertFalse(bridge.handwriting(InputMethodCatalog.PINYIN) {})
+                // English is not written on: nothing asked of the engine, no key
+                assertFalse(bridge.sendInk(Action.Ink(1), InputMethodCatalog.ENGLISH, onKeys = true) { sent++ })
+                assertEquals(0, sent)
+                // the engine made: its answers followed
+                assertNotNull(bridge.engines)
+                val before = EngineState.keysTyped.value.answer
+                repeat(2) { bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { emptySnapshot() } }
+                assertEquals(before + 2, EngineState.keysTyped.value.answer)
+                assertFalse(EngineState.keysTyped.value.typed)
+            } finally {
+                bridge.unloadable.clear()
+                bridge.close()
+            }
+        }
+
+        private fun emptySnapshot() = Snapshot(
+            commit = "", preedit = "", candidates = emptyList(), page = 0, hasPreviousPage = false,
+            hasNextPage = false, handled = true, predicting = false, syllables = emptyList(), syllablesId = 0,
+        )
 
         /** A piece finished as the pad leaves for English: the engine is told, but no Ink key goes into keyboard-us. */
         @Test
