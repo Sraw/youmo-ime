@@ -103,8 +103,10 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             override fun onBindViewHolder(holder: ViewHolder, position: Int) {
                 super.onBindViewHolder(holder, position)
                 val word = entries[position]
-                // the keys it is typed by in full pinyin, under it
-                val keys = CommonWords.keys(word, Syllables::spelling).joinToString(" · ") { it.second }
+                // the keys it is typed by in full pinyin, under it; a word of two's initials on the 26 keys alone
+                val keys = CommonWords.keys(word, Syllables::spelling).joinToString(" · ") { (kind, key) ->
+                    if (kind == CommonWords.Kind.INITIALS && word.syllables.size == 2) getString(R.string.common_word_keys_full_pinyin_only, key) else key
+                }
                 holder.nameText.text = "${showEntry(word)}\n$keys"
                 tapRowToEdit(holder.nameText, holder.editButton, multiselect)
             }
@@ -215,6 +217,8 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             Problem.BAD_PINYIN -> R.string.word_pinyin_invalid
             Problem.TOO_LONG -> R.string.common_word_too_long
             Problem.TOO_MANY -> R.string.common_word_too_many
+            Problem.BLANK_IN_REPLACEMENT -> R.string.common_word_blank
+            Problem.NEWER -> R.string.common_words_newer_file
         }
     )
 
@@ -233,7 +237,8 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         super.onViewCreated(view, savedInstanceState)
         read = viewLifecycleOwner.lifecycleScope.launch {
             val words = try {
-                withContext(Dispatchers.IO) { load() }
+                // a later version's file is not shown, so as not to be saved over (CommonWords.newer)
+                withContext(Dispatchers.IO) { load() }.also { if (it.newer) throw IOException(getString(R.string.common_words_newer)) }
             } catch (e: IOException) {
                 Timber.w(e, "common words")
                 requireContext().toast(e)
@@ -400,7 +405,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                 true
             } catch (e: IOException) {
                 Timber.w(e, "common words")
-                appContext.toast(e)
+                if (e is CommonWordsManager.Newer) appContext.toast(R.string.common_words_newer) else appContext.toast(e)
                 // not saved: tried again at the next stop
                 dirty = true
                 false

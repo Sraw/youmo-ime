@@ -386,7 +386,7 @@ internal class SessionFactory(
         return PinyinSession(
             assets.pinyinData, segmenter, spell = spell,
             pageSize = s.pageSize, user = user, prediction = s.prediction, prior = lexicon.prior(), phraseBook = phraseBook(),
-            builtInPhrases = s.builtInPhrases, commonWords = commonWords(),
+            builtInPhrases = s.builtInPhrases, commonWords = commonWords(kind),
             reranker = reranker(), refiner = refiner(), block = lexicon::block, emoji = emoji(), chaizi = chaizi, now = learnClock::calendar,
             charReadings = assets::charSyllables, extensions = { assets.decoderExtensions(user) }, addedWords = ::addedNow, coarse = coarse(),
             learnTo = LearnTo(learner.habitsNow(), kind, simplified::simplify),
@@ -467,8 +467,10 @@ internal class SessionFactory(
     // the custom phrases every session but handwriting offers: the built-in ones alone while habits are off (U-93)
     private fun phraseBook() = if (learner.useHabits) lexicon.added.phrases() else lexicon.added.freshPhrases()
 
-    // the user's, as their phrases: none where their habits are not used (U-93's 借手机)
-    private fun commonWords() = if (learner.useHabits) lexicon.added.commonWords() else CommonWordBook.none()
+    // the user's, as their phrases: none where their habits are not used (U-93's 借手机), nor in zhuyin, whose
+    // keys are no pinyin the user knows the words by (060-common-words §3: 全拼, 双拼 and their keyboards)
+    private fun commonWords(kind: String) =
+        if (learner.useHabits && kind != Kinds.ZHUYIN_NINE && kind != Kinds.ZHUYIN_DACHEN) lexicon.added.commonWords() else CommonWordBook.none()
 
     // the words added by hand, as the sessions offer them: none while habits are off (U-93)
     private fun addedNow(): Set<String> = if (learner.useHabits) lexicon.addedTexts() else emptySet()

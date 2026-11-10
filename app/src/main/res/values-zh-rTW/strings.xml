@@ -952,6 +952,10 @@
     <string name="common_words_import_counts">新增 %1$d 個，更新 %2$d 個，略過 %3$d 行</string>
     <string name="common_words_import_line">第 %1$d 行「%2$s」：%3$s</string>
     <string name="common_words_import_full">「%1$s」：常用詞已滿 2000 個</string>
+    <string name="common_word_keys_full_pinyin_only">%1$s（只在全拼 26 鍵）</string>
+    <string name="common_word_blank">替換項裡不能有空格，一行一個</string>
+    <string name="common_words_newer">常用詞是新版本的輸入法存的，這個版本讀不了，也不會改動它</string>
+    <string name="common_words_newer_file">是新版本的輸入法寫的，這個版本讀不了</string>
     <string name="host_offer_delete_common_word">從常用詞中刪除</string>
     <string name="learning_delete_common_word">從常用詞中刪除</string>
     <string name="learning_done_delete_common_word">已從常用詞中刪除「%1$s」</string>

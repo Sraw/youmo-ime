@@ -24,6 +24,9 @@ object CommonWordsManager {
 
     const val FILE = "pinyin/commonwords.txt"
 
+    /** The file is a later version's ([CommonWords.newer]), left as it is. */
+    class Newer : IOException("common words: written by a later version, not saved over")
+
     private fun file() = file(HostConfigDir.inUse(ConfigHome.DATA))
 
     private fun file(home: InUse) = File(home.dir, FILE)
@@ -44,12 +47,15 @@ object CommonWordsManager {
     /**
      * Saves [mine], what a writer has since it read [base], over the file as it is now
      * ([CommonWords.merged]); returns what the file then has, the next save's base.
-     * @throws IOException if the file cannot be read or written
+     * @throws IOException if the file cannot be read or written, or a later version wrote it
      */
     @Synchronized
     fun saveOver(base: CommonWords, mine: CommonWords, to: File? = null): CommonWords {
         val target = to ?: fileToSave()
-        val merged = CommonWords.merged(base, mine, load(target))
+        val theirs = load(target)
+        // a later version's: this one reads none of it, and would write it all away
+        if (theirs.newer) throw Newer()
+        val merged = CommonWords.merged(base, mine, theirs)
         write(merged, target)
         return merged
     }

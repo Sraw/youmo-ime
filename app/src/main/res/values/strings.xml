@@ -975,6 +975,10 @@
     <string name="common_words_import_counts">%1$d to add, %2$d to update, %3$d skipped</string>
     <string name="common_words_import_line">Line %1$d “%2$s”: %3$s</string>
     <string name="common_words_import_full">“%1$s”: the list is full (2000)</string>
+    <string name="common_word_keys_full_pinyin_only">%1$s (full pinyin\'s 26 keys only)</string>
+    <string name="common_word_blank">A replacement has no spaces: one a line</string>
+    <string name="common_words_newer">The common words were saved by a newer version of the keyboard: this one cannot read them, and leaves them as they are</string>
+    <string name="common_words_newer_file">written by a newer version of the keyboard, which this one cannot read</string>
     <string name="host_offer_delete_common_word">Delete from common words</string>
     <string name="learning_delete_common_word">Delete from common words</string>
     <string name="learning_done_delete_common_word">Deleted “%1$s” from common words</string>

@@ -45,8 +45,9 @@ class CommonWordsInSessionTest {
         book: CommonWordBook,
         segmenter: Segmenter = PinyinSegmenter(),
         phrases: PhraseBook = PhraseBook(),
+        prediction: Boolean = false,
     ) = PinyinSession(
-        data, segmenter, spell = segmenter !is PinyinSegmenter, pageSize = 20, prediction = false, phraseBook = phrases, commonWords = book,
+        data, segmenter, spell = segmenter !is PinyinSegmenter, pageSize = 20, prediction = prediction, phraseBook = phrases, commonWords = book,
         now = day, learnTo = LearnTo(LogHabits({ log })),
     )
 
@@ -127,6 +128,25 @@ class CommonWordsInSessionTest {
         assertTrue(written.isNotEmpty())
     }
 
+    // §4: a replacement is text, the 联想 after it as at the start; the word itself picked goes on
+    // from it as ever, and the 联想 offers no replacement
+    @Test
+    fun theLianxiangAfterAReplacementIsTheStartsAndOffersNone() {
+        val s = session(CommonWordBook(words("再[zai]\t拜\n见[jian]\t剑\n")), prediction = true)
+        assertEquals("拜", s.type("zai").first())
+        val afterWord = s.apply(Action.Pick(s.candidates(0, 20).indexOfFirst { it.text == "再" }))
+        assertEquals("再", afterWord.commit)
+        val following = s.candidates(0, 20).map { it.text }
+        assertEquals("见", following.first())
+        assertTrue(following.toString(), "剑" !in following && "拜" !in following)
+        // 见 picked from the 联想 is 见, not its replacement
+        assertEquals("见", s.apply(Action.Pick(0)).commit)
+        s.type("zai")
+        assertEquals("拜", s.apply(Action.Pick(0)).commit)
+        val afterReplacement = s.candidates(0, 20).map { it.text }
+        assertTrue(afterReplacement.toString(), afterReplacement.firstOrNull() != "见" && "剑" !in afterReplacement)
+    }
+
     @Test
     fun deletedFromTheKeyboardItsOneReplacementAlone() {
         val saved = ArrayList<CommonWords>()
@@ -155,25 +175,54 @@ class CommonWordsInSessionTest {
     }
 
     @Test
-    fun onEveryPinyinKeyboardByItsKeys() {
-        // [keys]: 你好's whole and initials as typed there
-        class Board(val name: String, val segmenter: Segmenter, val whole: String, val initials: String, val letters: NineKeyLetters? = null)
+    fun onEveryPinyinKeyboardByItsKeysTheInitialsOfTwoOnFullPinyinAlone() {
+        // [keys]: 你好's whole, and 你好吗再见's initials, as typed there
+        class Board(val name: String, val segmenter: Segmenter, val whole: String, val letters: NineKeyLetters? = null)
         val zrm = ShuangpinScheme.ZIRANMA
         val boards = listOf(
-            Board("全拼 26 键", PinyinSegmenter(), "nihao", "nh"),
-            Board("九键", T9Segmenter(abbreviations = false), "64426", "64"),
-            Board("拼音 14 键", T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14), "nihao", "nh", NineKeyLetters.G14),
+            Board("全拼 26 键", PinyinSegmenter(), "nihao"),
+            Board("九键", T9Segmenter(abbreviations = false), "nihao", NineKeyLetters.STANDARD),
+            Board("拼音 14 键", T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14), "nihao", NineKeyLetters.G14),
             // 自然码: ni ni, hao hk
-            Board("双拼 26 键", ShuangpinSegmenter(zrm), "nihk", "nh"),
-            Board("双拼 18 键", GroupedShuangpinSegmenter(zrm, NineKeyLetters.G18), "nihk", "nh", NineKeyLetters.G18),
-            Board("九键双拼", GroupedShuangpinSegmenter(zrm, NineKeyLetters.NINE_SP), "nihk", "nh", NineKeyLetters.NINE_SP),
+            Board("双拼 26 键", ShuangpinSegmenter(zrm), "nihk"),
+            Board("双拼 18 键", GroupedShuangpinSegmenter(zrm, NineKeyLetters.G18), "nihk", NineKeyLetters.G18),
+            Board("九键双拼", GroupedShuangpinSegmenter(zrm, NineKeyLetters.NINE_SP), "nihk", NineKeyLetters.NINE_SP),
         )
         for (b in boards) {
             val s = session(niHao, b.segmenter)
-            for (key in listOf(b.whole, b.initials)) {
-                val typed = b.letters?.let { l -> key.map(l::key).joinToString("") } ?: key
-                assertEquals("${b.name} $key", "您好", s.type(typed).firstOrNull())
-            }
+            fun typed(key: String) = b.letters?.let { l -> key.map(l::key).joinToString("") } ?: key
+            assertEquals("${b.name} ${b.whole}", "您好", s.type(typed(b.whole)).firstOrNull())
+            assertEquals("${b.name} nhmzj", "拜", s.type(typed("nhmzj")).firstOrNull())
+            // two initials are a syllable's keys but on full pinyin's 26: the nine keys' 64 is ni, 双拼's nh nothing else
+            val two = s.type(typed("nh"))
+            assertEquals("${b.name} nh", b.name == "全拼 26 键", two.firstOrNull() == "您好")
         }
+    }
+
+    @Test
+    fun aGlideOffersNone() {
+        val s = session(niHao)
+        s.apply(Action.Reset)
+        "nihao".forEach { s.apply(Action.Key(it, glided = true)) }
+        assertTrue("您好" !in s.candidates(0, 20).map { it.text })
+    }
+
+    @Test
+    fun aSeparatorWhereASyllableEndsAlone() {
+        val s = session(niHao)
+        assertEquals("您好", s.type("ni'hao").first())
+        assertEquals("您好", s.type("nihao'").first())
+        assertTrue("您好" !in s.type("nih'ao"))
+        assertTrue("拜" !in s.type("nihaom'a"))
+    }
+
+    @Test
+    fun lueAndNueEitherWayOnFullPinyin() {
+        val book = CommonWordBook(words("略[lve]\t掠\n虐[nve]\t疟\n绿[lv]\t緑\n"))
+        val s = session(book)
+        for (typed in listOf("lve", "lue")) assertEquals(typed, "掠", s.type(typed).first())
+        for (typed in listOf("nve", "nue")) assertEquals(typed, "疟", s.type(typed).first())
+        assertEquals("緑", s.type("lv").first())
+        assertTrue("緑" !in s.type("lu"))
     }
 }

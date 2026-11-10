@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.data.pinyin
 
 import org.fcitx.fcitx5.android.engine.phrase.CommonWords
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -45,5 +46,17 @@ class CommonWordsManagerTest {
         val saved = CommonWordsManager.saveOver(base, page, file)
         assertEquals(listOf("米字旁[mi'zi'pang] 糸", "中国[zhong'guo] 华", "木字旁[mu'zi'pang] 木"), saved.words.map { it.toString() })
         assertEquals(saved.words, CommonWordsManager.load(file).words)
+    }
+
+    // a later version's file: neither the page nor the keyboard writes over what it cannot read
+    @Test
+    fun aLaterVersionsFileIsNotSavedOver() {
+        val file = File(folder.root, "commonwords.txt")
+        val later = "# youmo-common-words 2\n米字旁[mi'zi'pang]\t米\t{\"new\": 1}\n"
+        file.writeText(later)
+        val read = CommonWordsManager.load(file)
+        assertTrue(read.newer && read.isEmpty)
+        assertThrows(CommonWordsManager.Newer::class.java) { CommonWordsManager.saveOver(read, words("木字旁[mu'zi'pang] 木\n"), file) }
+        assertEquals(later, file.readText())
     }
 }

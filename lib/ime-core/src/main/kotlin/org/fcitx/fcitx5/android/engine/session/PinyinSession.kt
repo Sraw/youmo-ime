@@ -896,7 +896,7 @@ class PinyinSession(
         val listed = if (withAside.candidates === read) readPlaced else withPhrases(withAside.candidates)
         val held = if (withAside.candidates === read) readHeld else coarseCandidates.held(listed, pageSize, kept)
         // the common words' replacements first, a pin after them; one of their text elsewhere is them (Q2)
-        val (shownOrder, shownCommon) = owned.first(key, coarseCandidates.order(listed, pageSize, held), asText)
+        val (shownOrder, shownCommon) = owned.first(decoded.graph, key, coarseCandidates.order(listed, pageSize, held), asText)
         // the first reading of all the input shown: the preedit, the syllables offered and Enter's text go
         // by it, as ranked (impl/design-1b.md §2). Every one held, that is the candidate shown first, the
         // rest of the input as typed after it
@@ -974,9 +974,29 @@ class PinyinSession(
     private val owned = Owned()
 
     private inner class Owned {
-        /** [list] with the replacements [key] is a key of first, and those by their text. */
-        fun first(key: String, list: List<Candidate>, asText: (String) -> Candidate): Pair<List<Candidate>, Map<String, CommonWords.Found>> {
-            val found = commonWords.typed(key, segmenter.typing, segmenter::typedAs, keyed?.letters, { keyed?.phraseWays(it) }) { keyed?.takenAs(it).orEmpty() }
+        // the replacements found for the input [graph] read, its [key] and the words as they were:
+        // once a reading, as a later page or a refined pick places it again
+        private var foundOf: SyllableGraph? = null
+        private var foundFor = ""
+        private var foundIn: CommonWords? = null
+        private var found: List<CommonWords.Found> = emptyList()
+
+        /**
+         * [list] with the replacements [key], what is left of the input [graph] read, is a key of
+         * first, and those by their text. None for a glide: its letters are the glide's guess at
+         * a word, no key the user typed (060-common-words §3).
+         */
+        fun first(graph: SyllableGraph, key: String, list: List<Candidate>, asText: (String) -> Candidate): Pair<List<Candidate>, Map<String, CommonWords.Found>> {
+            if (foundOf !== graph || foundFor != key || foundIn !== commonWords.words) {
+                foundOf = graph
+                foundFor = key
+                foundIn = commonWords.words
+                found = if (recorder.pressed.glided(readFrom(), input.length)) {
+                    emptyList()
+                } else {
+                    commonWords.typed(key, segmenter.typing, segmenter::typedAs, keyed?.letters, { keyed?.phraseWays(it) }) { keyed?.takenAs(it).orEmpty() }
+                }
+            }
             return CommonWordBook.first(found, list, { it.text }, asText) to found.associateBy { it.text }
         }
 

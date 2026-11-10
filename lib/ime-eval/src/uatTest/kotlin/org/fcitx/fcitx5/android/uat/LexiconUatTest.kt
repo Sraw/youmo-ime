@@ -343,5 +343,9 @@ class LexiconUatTest {
         assertEquals(listOf("米", "木", pinned), typed("mzp").take(3))
         val part = typed("mizipan")
         assertTrue("mizipan $part", "米" !in part.take(1) && "木" !in part.take(2))
+        // nothing of the common words' placed at all: the list is the one without them, 米 and 木
+        // where the decoder has them
+        commonWords("")
+        assertEquals(typed("mizipan"), part)
     }
 }

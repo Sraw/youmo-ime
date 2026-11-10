@@ -100,11 +100,11 @@ class CommonWordsTest {
     @Test
     fun shuangpinsKeysAreItsSchemesTheInitialsTheirFirstKeys() {
         val zrm = ShuangpinScheme.ZIRANMA
-        val keys = CommonWords.keys(word("中华人民共和国", "zhong'hua'ren'min'gong'he'guo", "中国")) { zrm.encode(it) }
+        val keys = CommonWords.keys(word("中华人民共和国", "zhong'hua'ren'min'gong'he'guo", "中国"), spell = { zrm.encode(it) })
         // 自然码: zhong vs, hua hw, ren rf, min mn, gong gs, he he, guo go
         assertEquals(listOf(Kind.WHOLE to "vshwrfmngshego", Kind.FIRST_THREE to "vshwrf", Kind.INITIALS to "vhrmghg"), keys)
         // a syllable the scheme cannot type (a Latin letter): no key of it
-        assertEquals(emptyList<Pair<Kind, String>>(), CommonWords.keys(word("A股", "A'gu", "股票")) { zrm.encode(it) })
+        assertEquals(emptyList<Pair<Kind, String>>(), CommonWords.keys(word("A股", "A'gu", "股票"), spell = { zrm.encode(it) }))
     }
 
     @Test
@@ -177,7 +177,50 @@ class CommonWordsTest {
         assertEquals(Problem.SAME_AS_WORD, CommonWords.problem("米字旁", s, listOf("米字旁")))
         assertEquals(Problem.NO_PINYIN, CommonWords.problem("米字旁", null, listOf("米")))
         assertNull(CommonWords.syllables("米字旁", "mi zi"))
-        // a blank inside a replacement is taken out: a word, not a sentence
-        assertEquals(listOf("米糸"), CommonWords.clean("米字旁", listOf("米 糸")))
+        // a blank inside a replacement is refused: a word, not a sentence; around one, trimmed
+        assertEquals(Problem.BLANK_IN_REPLACEMENT, CommonWords.problem("米字旁", s, listOf("米 糸")))
+        assertEquals(listOf("米"), CommonWords.clean("米字旁", listOf(" 米 ")))
+    }
+
+    @Test
+    fun theInitialsOfTwoWhereAskedAndFullPinyinsOtherWayOfLue() {
+        fun keys(text: String, pinyin: String, two: Boolean) =
+            CommonWords.keys(word(text, pinyin, "x"), this.pinyin, initialsOfTwo = two, also = CommonWords::fullPinyinAlso).map { it.second }
+        assertEquals(listOf("zhongguo"), keys("中国", "zhong'guo", two = false))
+        assertEquals(listOf("mizipang", "mzp"), keys("米字旁", "mi'zi'pang", two = false))
+        assertEquals(listOf("lvese", "luese", "ls"), keys("略色", "lve'se", two = true))
+        assertEquals(listOf("nve", "nue"), keys("虐", "nve", two = true))
+        // 绿's lv has no other way: lu is another syllable
+        assertEquals(listOf("lv"), keys("绿", "lv", two = true))
+    }
+
+    @Test
+    fun aSeparatorTypedWhereTheWordsSyllablesEnd() {
+        val index = CommonWords.of(listOf(word("西安", "xi'an", "長安"), word("先", "xian", "鲜"))).index(pinyin)
+        assertEquals(listOf("長安", "鲜"), index.foundTyped("xian").map { it.text })
+        assertEquals(listOf("長安"), index.foundTyped("xi'an").map { it.text })
+        assertEquals(listOf("長安", "鲜"), index.foundTyped("'xian'").map { it.text })
+        assertEquals(emptyList<String>(), index.foundTyped("xia'n").map { it.text })
+    }
+
+    @Test
+    fun aLaterVersionsFileIsReadAsNoneAndNotWrittenOver() {
+        val r = read("# youmo-common-words 2\n米字旁[mi'zi'pang]\t米\n")
+        assertTrue(r.words.isEmpty && r.words.newer)
+        assertEquals(listOf(1 to Problem.NEWER), r.skipped.map { it.line to it.problem })
+        assertTrue(runCatching { r.words.format() }.isFailure)
+        // a merge over it keeps it so: the writer refuses
+        assertTrue(CommonWords.merged(CommonWords.EMPTY, CommonWords.of(listOf(word("中国", "zhong'guo", "华"))), r.words).newer)
+    }
+
+    @Test
+    fun linesNotReadAreWrittenBackAsTheyWere() {
+        val r = read("# youmo-common-words 1\n米字旁 米\n中国[zhong'guo]\t华\n木字旁[mu'zi'pxng] 木\n")
+        assertEquals(listOf("米字旁 米", "木字旁[mu'zi'pxng] 木"), r.words.unread)
+        assertEquals("# youmo-common-words 1\n中国[zhong'guo]\t华\n米字旁 米\n木字旁[mu'zi'pxng] 木\n", r.words.format())
+        // the page's list, which has none of them, saved over the file: they stay
+        val page = CommonWords.of(listOf(word("中国", "zhong'guo", "華")))
+        assertEquals(r.words.unread, CommonWords.merged(r.words, page, r.words).unread)
+        assertEquals(r.words.unread, r.words.without("中国", "华").unread)
     }
 }

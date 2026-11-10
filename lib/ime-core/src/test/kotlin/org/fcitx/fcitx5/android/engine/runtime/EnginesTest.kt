@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
@@ -356,6 +357,11 @@ class EnginesTest : EnginesFixture() {
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
             assertEquals("泥", engines.type(InputMethodCatalog.SHUANGPIN, "ni").candidates.first())
             engines.onEvent(InputMethodCatalog.SHUANGPIN, EngineEvent.RESET, 0)
+            // zhuyin's keys are no pinyin the user knows the words by: none there (060-common-words §3)
+            val ni = "${ZhuyinKeys.symbolCode('ㄋ')}${ZhuyinKeys.symbolCode('ㄧ')}"
+            val zhuyin = engines.type(InputMethodCatalog.ZHUYIN, ni).candidates
+            assertTrue(zhuyin.toString(), "你" in zhuyin && "泥" !in zhuyin)
+            engines.onEvent(InputMethodCatalog.ZHUYIN, EngineEvent.RESET, 0)
             engines.useHabits = false
             assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
