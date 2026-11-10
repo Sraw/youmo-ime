@@ -85,7 +85,7 @@ abstract class ThemePackFixture {
         meta = """<meta author="Ann" version="1.2" license="CC-BY-4.0" min-app="0.5.0" preview="preview.png"/>""",
         before = """<picture src="photo.jpg" brightness="80%"><cut orientation="portrait" file="p.webp"/>""" +
             """<cut orientation="landscape" file="l.webp"/></picture><font name="round" src="round.ttf"/>""",
-        styles = """<style select="key.enter" fill="image(enter.png, 4 4 4 4)"/><style select="key" font="round"/>""",
+        styles = """<style select="key.enter" fill="image(enter.png, 4 4 4 4)"/><style select="key" font="round"/><style select="key" return-icon-send="icon(star)"/>""",
         icons = """<icon name="star" src="star.svg"/>""",
     )
 

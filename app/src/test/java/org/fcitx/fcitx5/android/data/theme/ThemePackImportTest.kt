@@ -233,6 +233,33 @@ class ThemePackImportTest : ThemePackFixture() {
         nothingLeft()
     }
 
+    // a 100 ms 8-bit PCM WAV, mono 8 kHz, of silence: every byte under 0x80, so as text it is the same bytes
+    private val wav: String = run {
+        fun le(v: Int, n: Int) = String(CharArray(n) { ((v ushr (8 * it)) and 0xff).toChar() })
+        val body = "WAVE" + "fmt " + le(16, 4) + le(1, 2) + le(1, 2) + le(8000, 4) + le(8000, 4) + le(1, 2) + le(8, 2) + "data" + le(800, 4) + le(0, 800)
+        "RIFF" + le(body.length, 4) + body
+    }
+
+    @Test
+    fun keySoundsAreImportedKeptAndToldOf() {
+        // a class this version does not know (future): kept, as a newer app's would be
+        val sounds = """<sounds><sound key="letter" src="tap.wav"/><sound key="space" src="space.wav"/><sound key="future" src="f.wav"/></sounds>"""
+        val pack = opened(sample(xml(icons = sounds), "tap.wav" to wav, "space.wav" to wav, "f.wav" to wav))
+        // the classes it knows, in their order
+        val told = appContext.getString(R.string.theme_pack_sounds, "letters, space")
+        assertTrue(ThemePackDialogs.confirmText(appContext, pack), told in ThemePackDialogs.confirmText(appContext, pack).lines())
+        pack.commit().getOrThrow()
+        assertEquals(setOf("tap.wav", "space.wav", "f.wav"), tree(packs).keys.filter { it.endsWith(".wav") }.map { File(it).name }.toSet())
+    }
+
+    @Test
+    fun aKeySoundNotTakenIsRefused() {
+        val withSound = xml(icons = """<sounds><sound key="letter" src="tap.wav"/></sounds>""")
+        assertTrue(refusal(zip("theme.xml" to withSound, "tap.wav" to "not a sound"))!!.startsWith(appContext.getString(R.string.exception_theme_sound, "")))
+        // too long, of another format, a name not its own: SoundFileTest
+        nothingLeft()
+    }
+
     @Test
     fun anIconThatIsMoreThanFilledPathsIsRefused() {
         val withIcon = xml(icons = """<icon name="star" src="star.svg"/>""")

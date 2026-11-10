@@ -9,10 +9,10 @@ import android.view.View
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
@@ -88,7 +88,8 @@ class TextEditingUi(
     val pasteButton = textButton(android.R.string.paste, altStyle = true)
 
     val backspaceButton = iconButton(R.drawable.ic_baseline_backspace_24, altStyle = true).apply {
-        soundEffect = InputFeedbacks.SoundEffect.Delete
+        soundEffect = SoundKey.BACKSPACE
+        systemSound = SoundKey.BACKSPACE
         contentDescription = ctx.getString(R.string.backspace)
     }
 

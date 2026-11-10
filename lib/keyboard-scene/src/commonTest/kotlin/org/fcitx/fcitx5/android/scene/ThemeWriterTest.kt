@@ -38,6 +38,17 @@ class ThemeWriterTest {
         }
     }
 
+    // 060-theme-sounds-icons §1.1: <sounds> written back as read, a later version's class too, in its order
+    @Test
+    fun soundsAreWrittenAsRead() {
+        val sounds = "<sounds><sound key=\"space\" src=\"s.ogg\"/><sound key=\"future\" src=\"f.wav\"/><sound key=\"letter\" src=\"t.mp3\"/></sounds>"
+        val theme = ThemeReader.theme(testData("material-light.xml").replace("</theme>", "$sounds\n</theme>")).ok()
+        val text = ThemeWriter.write(theme)
+        assertTrue(text.contains("  <sounds>\n    <sound key=\"space\" src=\"s.ogg\"/>\n    <sound key=\"future\" src=\"f.wav\"/>\n    <sound key=\"letter\" src=\"t.mp3\"/>\n  </sounds>\n</theme>"), text)
+        assertEquals(theme.soundFiles, rewritten(theme).soundFiles)
+        assertTrue("<sounds>" !in ThemeWriter.write(read("material-light.xml")))
+    }
+
     // the text is the theme's alone: written again, read back, the same text; the other version picked, the same file
     @Test
     fun theTextIsCanonical() {

@@ -287,12 +287,12 @@ class NineSceneGesturesTest {
                 assertEquals(at, popups(was), popups(now))
                 // its sound, its space's and backspace's sideways swipe, and whether it takes a touch (a blank view
                 // took none): as its view's
-                assertEquals(at, was.appearance.soundEffect, now.sound)
+                assertEquals(at, was.appearance.soundEffect, WiringSnapshot.layoutSound(now.systemSound))
                 assertEquals(at, was is SpaceKey, now.isSpace)
                 assertEquals(at, was is BackspaceKey, now.isBackspace)
                 assertEquals(at, was !is BlankKey, k.sceneKey(node)!!.keyEnabled)
                 wasLines += WiringSnapshot.line(node.id, was.shortcut, was.swipesBothWays, actions(was) + long, popups(was), was.appearance.soundEffect, was is SpaceKey, was is BackspaceKey, was !is BlankKey)
-                nowLines += WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now), popups(now), now.sound, now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
+                nowLines += WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now), popups(now), WiringSnapshot.layoutSound(now.systemSound), now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
             }
             WiringSnapshot.check("nine-${name.replace(' ', '-')}", wasLines, nowLines)
         }

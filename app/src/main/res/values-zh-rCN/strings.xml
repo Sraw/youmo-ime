@@ -130,6 +130,8 @@
     <string name="exception_theme_preview_size">主题的预览图超过 %1$s KB</string>
     <string name="exception_theme_preview_side">主题的预览图边长超过 %1$s 像素</string>
     <string name="exception_theme_icon_size">主题的某个图标超过 %1$s KB</string>
+    <string name="exception_theme_sound">主题的按键音不合格（要 Ogg Vorbis、8/16 位 PCM 的 WAV 或 MP3，不超过 1 秒）：%1$s</string>
+    <string name="exception_theme_sound_size">主题的某个按键音超过 %1$s KB</string>
     <string name="exception_theme_effect_image_side">有按键特效图片的边长超过 %1$s 像素</string>
     <string name="exception_theme_effect_image_size">有按键特效图片超过 %1$s KB</string>
     <string name="exception_theme_effect_image_type" formatted="false">按键特效图片只能是 PNG 或 WebP</string>
@@ -141,6 +143,12 @@
     <string name="theme_pack_import">导入</string>
     <string name="theme_pack_replaces">会替换你已有的同名主题。</string>
     <string name="theme_pack_layouts">此主题包含自定义布局：%1$s（其中 %2$d 个动作直接输入布局里写的文字）。</string>
+    <string name="theme_pack_sounds">带按键音：%1$s（要在 声音与振动 里开着按键音才会响；按键音跟随系统而系统触摸音关着时也不响）。</string>
+    <string name="sound_class_letter">字母</string>
+    <string name="sound_class_function">功能键</string>
+    <string name="sound_class_space">空格</string>
+    <string name="sound_class_enter">回车</string>
+    <string name="sound_class_backspace">退格</string>
     <string name="theme_pack_layouts_unused">不会使用的布局（读不出、缺键盘必需的键，或不是已有的键盘）：%1$s</string>
     <string name="keyboard_themed">%1$s（主题：%2$s）</string>
     <string name="theme_pack_warnings">注意：</string>
@@ -211,6 +219,9 @@
     <string name="following_system_settings">跟随系统设置</string>
     <string name="button_sound">按键音</string>
     <string name="button_sound_volume">按键音音量</string>
+    <string name="key_sound_source">按键音音色</string>
+    <string name="key_sound_source_theme">跟随主题</string>
+    <string name="key_sound_source_system">系统</string>
     <string name="clipboard_return_after_paste">粘贴后回到键盘</string>
     <string name="text_copied">已复制</string>
     <string name="text_cut">已剪切</string>

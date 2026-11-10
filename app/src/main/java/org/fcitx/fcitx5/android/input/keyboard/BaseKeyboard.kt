@@ -58,6 +58,7 @@ import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
@@ -343,7 +344,8 @@ abstract class BaseKeyboard(
     private fun wire(key: KeyHandle, def: KeyDef) {
         // every key is a layout's node (SceneKeys): its node's sound (060-render-p2 S4)
         val scene = def as? SceneKeyDef
-        key.keyGesture.soundEffect = scene?.sound ?: InputFeedbacks.SoundEffect.Standard
+        key.keyGesture.soundEffect = scene?.sound ?: SoundKey.LETTER
+        key.keyGesture.systemSound = scene?.systemSound ?: SoundKey.LETTER
         // the number pad's space moves the cursor too (UAT PAN-14): it had the press only
         if (scene?.isSpace == true) wireSpace(key) else if (scene?.isBackspace == true) wireBackspace(key)
         wireBehaviors(key, def)

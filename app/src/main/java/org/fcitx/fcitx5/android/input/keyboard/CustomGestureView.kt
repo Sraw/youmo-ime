@@ -70,6 +70,7 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx), KeyGesture.Key {
     var axisLock by keyGesture::axisLock
     var doubleTapEnabled by keyGesture::doubleTapEnabled
     var soundEffect by keyGesture::soundEffect
+    var systemSound by keyGesture::systemSound
 
     var onDoubleTapListener: ((View) -> Unit)? = null
     var onRepeatListener: ((View) -> Unit)? = null

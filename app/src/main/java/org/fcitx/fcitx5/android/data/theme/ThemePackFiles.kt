@@ -9,6 +9,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
+import org.fcitx.fcitx5.android.scene.theme.SoundFile
 import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.input.theme.ThemePackCheck
@@ -188,6 +189,7 @@ object ThemePackFiles {
         return SceneTheme(
             scene.name, scene.dark, scene.version, scene.colors, styles, scene.fonts.mapValues { path(it.value) },
             scene.icons.mapValues { path(it.value) }, picture, scene.variants, scene.baseColors, scene.darkColors, scene.meta, scene.systemColors,
+            scene.soundFiles.map { (key, file) -> key to path(file) },
         )
     }
 
@@ -432,6 +434,12 @@ object ThemePackFiles {
             val f = File(from, n)
             ThemeAssetLimits.icon(f.length())?.let(checks.refused)
             SvgSubset.check(f.readText()).firstOrNull()?.let { errorRuntime(R.string.exception_theme_icon, "$n: $it") }
+        }
+        // a class this version does not know too: its file is kept and exported, so held to the same
+        files.sounds.forEach { n ->
+            val f = File(from, n)
+            ThemeAssetLimits.soundSize(f.length())?.let(checks.refused)
+            SoundFile.check(n, f.readBytes()).firstOrNull()?.let { errorRuntime(R.string.exception_theme_sound, it.message) }
         }
     }
 

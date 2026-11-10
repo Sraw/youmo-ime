@@ -86,13 +86,13 @@ class TextSceneWiringTest {
                 // confirm (a table's 确认 while composing) sounds as Return does, its view as a letter did
                 // its sound, its space's and backspace's sideways swipe, and whether it takes a touch (a blank view
                 // took none): as its view's
-                assertEquals(at, if (node.id == "confirm") InputFeedbacks.SoundEffect.Return else was.appearance.soundEffect, now.sound)
+                assertEquals(at, if (node.id == "confirm") InputFeedbacks.SoundEffect.Return else was.appearance.soundEffect, WiringSnapshot.layoutSound(now.systemSound))
                 assertEquals(at, was is SpaceKey, now.isSpace)
                 assertEquals(at, was is BackspaceKey, now.isBackspace)
                 assertEquals(at, was !is BlankKey, k.sceneKey(node)!!.keyEnabled)
                 val sound = if (node.id == "confirm") InputFeedbacks.SoundEffect.Return else was.appearance.soundEffect
                 wasLines += WiringSnapshot.line(node.id, was.shortcut, was.swipesBothWays, actions(was, letter), popups(was, letter), sound, was is SpaceKey, was is BackspaceKey, was !is BlankKey)
-                nowLines += WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now, letter), popups(now, letter), now.sound, now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
+                nowLines += WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now, letter), popups(now, letter), WiringSnapshot.layoutSound(now.systemSound), now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
             }
             WiringSnapshot.check("qwerty-${form.replace(' ', '-')}", wasLines, nowLines)
             EngineState.syllablesState.value = EngineState.SyllableState()

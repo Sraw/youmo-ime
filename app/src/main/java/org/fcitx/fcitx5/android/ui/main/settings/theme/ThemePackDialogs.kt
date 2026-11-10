@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.scene.theme.Meta
+import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import splitties.dimensions.dp
 import java.io.File
 
@@ -31,6 +32,17 @@ object ThemePackDialogs {
         ctx.getString(R.string.theme_info_format, format),
     )
 
+    // Chinese lists with 、, others with a comma
+    private fun listSeparator(ctx: Context) = if (ctx.resources.configuration.locales[0].language == "zh") "、" else ", "
+
+    private fun soundClass(key: SoundKey): Int = when (key) {
+        SoundKey.LETTER -> R.string.sound_class_letter
+        SoundKey.FUNCTION -> R.string.sound_class_function
+        SoundKey.SPACE -> R.string.sound_class_space
+        SoundKey.ENTER -> R.string.sound_class_enter
+        SoundKey.BACKSPACE -> R.string.sound_class_backspace
+    }
+
     /** What the import of [pack] asks the user to take: its metadata, that it replaces one, what it warns of. */
     fun confirmText(ctx: Context, pack: ThemeFilesManager.Opened.Pack): String {
         val staged = pack.staged
@@ -39,6 +51,10 @@ object ThemePackDialogs {
         val layouts = staged.layoutReport
         if (layouts.used.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts, layouts.used.joinToString(", "), layouts.commits)
         if (layouts.unused.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts_unused, layouts.unused.joinToString(", ") { it.first })
+        val sounds = staged.theme.sounds.keys
+        if (sounds.isNotEmpty()) {
+            out += ctx.getString(R.string.theme_pack_sounds, SoundKey.entries.filter { it in sounds }.joinToString(listSeparator(ctx)) { ctx.getString(soundClass(it)) })
+        }
         if (staged.warnings.isNotEmpty()) out += ctx.getString(R.string.theme_pack_warnings) + "\n" + staged.warnings.joinToString("\n") { "· $it" }
         return out.joinToString("\n")
     }

@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.Keys
 import org.fcitx.fcitx5.android.scene.look.NineSlice
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.theme.SoundFile
 
 /**
  * How big a theme may be as it is imported: a zip is counted as it is unpacked and refused at the
@@ -68,7 +69,7 @@ object ThemeAssetLimits {
     enum class Breach {
         Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, Overrides,
         ThemeXml, Layouts, LayoutSize, PreviewSize, PreviewSide, IconSize,
-        EffectImageSide, EffectImageSize, EffectImageType,
+        EffectImageSide, EffectImageSize, EffectImageType, SoundSize,
     }
 
     /** Why an animated picture is drawn still: not refused (ThemeFilesManager's [Breach] refuses). */
@@ -139,6 +140,12 @@ object ThemeAssetLimits {
     }
 
     fun icon(bytes: Long): Breach? = if (bytes > MAX_ICON_BYTES) Breach.IconSize else null
+
+    /**
+     * A key sound's file length, compared before it is read (a 32 MB ".ogg" is never read in); the rest of
+     * it is [SoundFile.check]'s, its first problem said as it is (060-theme-sounds-icons §1.2).
+     */
+    fun soundSize(bytes: Long): Breach? = if (bytes > SoundFile.MAX_BYTES) Breach.SoundSize else null
 
     fun look(look: ThemeLook): Breach? = if (look.keys.overrides.size > MAX_OVERRIDES) Breach.Overrides else null
 }

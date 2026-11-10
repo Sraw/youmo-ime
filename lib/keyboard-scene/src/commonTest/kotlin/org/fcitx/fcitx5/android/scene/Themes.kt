@@ -20,6 +20,7 @@ internal fun assertSameTheme(expected: Theme, actual: Theme, what: String = expe
     fun fields(t: Theme) = listOf(
         "name" to t.name, "dark" to t.dark, "version" to t.version, "variants" to t.variants, "colors" to t.colors,
         "baseColors" to t.baseColors, "darkColors" to t.darkColors, "fonts" to t.fonts, "icons" to t.icons, "meta" to t.meta,
+        "soundFiles" to t.soundFiles,
         "picture" to t.picture?.let { listOf(it.src, it.brightness, it.blurDp, it.cuts) },
     )
     fields(expected).zip(fields(actual)).forEach { (e, a) -> assertEquals(e.second, a.second, "$what: ${e.first}") }

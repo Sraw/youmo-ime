@@ -559,7 +559,9 @@ touch and hands each finger (`TouchTarget`) to the `SceneKey` the scene's
 `keyAt` names (`SceneTouch.find`), a key by its `KeyRef` (id, and which copy of a split row's G or V). A
 key's touch is `KeyGesture`, `CustomGestureView`'s state machine and timers taken out of the view, read
 from the corner of the key's cell as a view's was from its own (a finger in a row's blank end is left of
-it, as it was left of A's view). `BaseKeyboard.wire` gives a `KeyHandle` its sound, the space's and
+it, as it was left of A's view). `BaseKeyboard.wire` gives a `KeyHandle` its sound (`SceneBehavior.sound`, the class a theme's `<sounds>` plays,
+and `systemSound`, the system click it always had: `InputFeedbacks.soundEffect` → `KeySoundChoice`; the
+theme's samples in `ThemeSounds`, a SoundPool on its own HandlerThread, made anew per theme and stamp), the space's and
 backspace's swipes, its press, long press, repeat, double tap, swipes (`KeySwipes`) and popups: the
 `SceneKey` made of its node's `SceneKeyDef` (`drawKeysWithScene`), so a key does what its view did
 before S8a. Its press is shown by the canvas (`showPressed(KeyRef)`), a popup over it placed

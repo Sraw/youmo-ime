@@ -29,8 +29,10 @@ object ThemePackCheck {
         val icons: Set<String>,
         val preview: String?,
         val effects: Set<String> = emptySet(),
+        /** Every `<sound>`'s file, of a class this version does not know too: kept, checked, exported all the same. */
+        val sounds: Set<String> = emptySet(),
     ) {
-        val all: Set<String> get() = pictures + images + fonts + icons + effects + listOfNotNull(source, preview)
+        val all: Set<String> get() = pictures + images + fonts + icons + effects + sounds + listOfNotNull(source, preview)
     }
 
     fun files(theme: Theme): Files = Files(
@@ -41,6 +43,7 @@ object ThemePackCheck {
         icons = theme.icons.values.toSet(),
         preview = theme.meta?.preview,
         effects = theme.styles.flatMap { it.values.values }.mapNotNull { (it as? Value.OfEffect)?.effect?.file }.toSet(),
+        sounds = theme.soundFiles.map { it.second }.toSet(),
     )
 
     /** The keys a theme must not hide the labels of: [BlankKeys.REQUIRED_ROLES]. */

@@ -400,9 +400,8 @@ class ThemeTest {
         // an effect of the wrong form (read since A3) refused; a colour named that is not there refused
         assertTrue(problems(withStyle("<style select=\"key\" effect=\"ripple-image(a.png, 50%)\"/>")).isNotEmpty())
         assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"preedit\" cursor-color=\"@keyShadw\"/>")))
-        // elements: a sound pack, whatever it holds
-        val sounds = "<sounds><sound key=\"key\" src=\"tap.ogg\"/></sounds>"
-        assertTrue(warnings(source.replace("</theme>", "$sounds\n</theme>")).single().contains("<sounds> is not supported"))
+        // elements: none reserved now (<sounds> read since 060-theme-sounds-icons)
+        assertTrue(ThemeReader.RESERVED_ELEMENTS.isEmpty())
         assertTrue(problems(source.replace("</theme>", "<noises/>\n</theme>")).single().contains("<noises> is not allowed"))
     }
 
@@ -526,7 +525,7 @@ class ThemeTest {
         // an icon the app has none of: refused, by its name
         for (name in Icons.ALL) assertEquals(Value.OfShown(Shown.Icon(name)), read("space-content=\"icon($name)\"")["space-content"])
         assertEquals(
-            "<style>: return-icon-send=\"icon(rocket)\" is no icon of the app's",
+            "<style>: return-icon-send=\"icon(rocket)\" is no icon of the app's nor an <icon> of the theme's",
             problems(withStyle("<style select=\"key\" return-icon-send=\"icon(rocket)\"/>")).single(),
         )
         // on a part they are not read from: a warning, the theme read
@@ -553,17 +552,17 @@ class ThemeTest {
         assertEquals(Argb(0xFF303030.toInt()), t.value.variant(dark = true).colors["key"])
         assertEquals("0.6.0", t.value.meta?.minApp)
         // T5 made its scenes and the keyboard's size work: no warning of them
-        val ignored = listOf(
-            "83|<sounds>",
-        ).map { "$it is not supported by this version, ignored" } +
+        val ignored =
             // A1 made a key's transition work: the clipboard and a candidate's part have none
-            "79|transition= on clipboard does nothing: it reads fill radius color" +
+            listOf("79|transition= on clipboard does nothing: it reads fill radius color") +
             // T6a's candidate:first comment selects: a fill does nothing on a part, its colour alone read
             "79|fill= on candidate:first comment does nothing: it reads color" +
             "79|transition= on candidate:first comment does nothing: it reads color" +
             listOf("80|sticker=").map { "$it is not supported by this version, ignored" } +
             // its preview a path with a tail, which only a bubble has
-            "81|tail= does nothing beside a shape that is no bubble: only a bubble has a tail"
+            "81|tail= does nothing beside a shape that is no bubble: only a bubble has a tail" +
+            // a sound of a class this version does not know (read after the styles)
+            "83|<sound key=\"key\"> is not supported by this version, ignored"
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })
         assertEquals(KeyboardSizes(height = Twin(38.0, 52.0), sidePadding = Twin(8.0, 48.0)), t.value.keyboardSizes)
     }

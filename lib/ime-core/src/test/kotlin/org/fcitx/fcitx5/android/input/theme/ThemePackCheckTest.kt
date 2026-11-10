@@ -53,9 +53,11 @@ class ThemePackCheckTest {
             styles = """<style select="key.enter" fill="image(e.png, 1 2 3 4)"/><style select="key:pressed" fill="image(p.png, 1 1 1 1, 2x)" effect="particles(s.png, 6, 12dp, 300ms)"/><style select="key.space:pressed" effect="ripple-image(r.webp, 80%, 300ms)"/>""",
             meta = """<meta author="a" preview="pre.png"/>""",
             before = """<picture src="src.jpg"><cut orientation="portrait" file="p.webp"/><cut orientation="landscape" file="l.webp"/></picture><font name="f" src="f.ttf"/>""",
-            after = """<icon name="i" src="i.svg"/>""",
+            after = """<icon name="i" src="i.svg"/><sounds><sound key="letter" src="t.wav"/><sound key="future" src="f.ogg"/></sounds>""",
         )
         val f = ThemePackCheck.files(t)
+        // a class this version does not know: its file all the same
+        assertEquals(setOf("t.wav", "f.ogg"), f.sounds)
         assertEquals(setOf("p.webp", "l.webp"), f.pictures)
         assertEquals("src.jpg", f.source)
         assertEquals(setOf("e.png", "p.png"), f.images)
@@ -63,7 +65,7 @@ class ThemePackCheckTest {
         assertEquals(setOf("i.svg"), f.icons)
         assertEquals("pre.png", f.preview)
         assertEquals(setOf("s.png", "r.webp"), f.effects)
-        assertEquals(setOf("p.webp", "l.webp", "src.jpg", "e.png", "p.png", "f.ttf", "i.svg", "s.png", "r.webp", "pre.png"), f.all)
+        assertEquals(setOf("p.webp", "l.webp", "src.jpg", "e.png", "p.png", "f.ttf", "i.svg", "s.png", "r.webp", "t.wav", "f.ogg", "pre.png"), f.all)
         assertEquals(ThemePackCheck.Files(emptySet(), null, emptySet(), emptySet(), emptySet(), null), ThemePackCheck.files(theme()))
     }
 

@@ -130,6 +130,8 @@
     <string name="exception_theme_preview_size">The theme\'s preview image is over %1$s KB</string>
     <string name="exception_theme_preview_side">The theme\'s preview image is over %1$s pixels a side</string>
     <string name="exception_theme_icon_size">An icon of the theme is over %1$s KB</string>
+    <string name="exception_theme_sound">A key sound of the theme is not taken (Ogg Vorbis, 8/16-bit PCM WAV or MP3, at most 1 s): %1$s</string>
+    <string name="exception_theme_sound_size">A key sound of the theme is over %1$s KB</string>
     <string name="exception_theme_effect_image_side">An effect image of the theme is over %1$s pixels a side</string>
     <string name="exception_theme_effect_image_size">An effect image of the theme is over %1$s KB</string>
     <string name="exception_theme_effect_image_type" formatted="false">An effect image of the theme is not a PNG or WebP</string>
@@ -141,6 +143,12 @@
     <string name="theme_pack_import">Import</string>
     <string name="theme_pack_replaces">Your theme of this name will be replaced.</string>
     <string name="theme_pack_layouts">Keyboards of its own in this theme: %1$s (actions that type text written in them: %2$d).</string>
+    <string name="theme_pack_sounds">Key sounds of its own: %1$s (they play where Sound on keypress is on in Sound &amp; vibration; with it following the system, not while the system\'s touch sounds are off).</string>
+    <string name="sound_class_letter">letters</string>
+    <string name="sound_class_function">function keys</string>
+    <string name="sound_class_space">space</string>
+    <string name="sound_class_enter">enter</string>
+    <string name="sound_class_backspace">backspace</string>
     <string name="theme_pack_layouts_unused">Layouts not used (unreadable, missing keys the keyboard needs, or not one of the app\'s keyboards): %1$s</string>
     <string name="keyboard_themed">%1$s (theme: %2$s)</string>
     <string name="theme_pack_warnings">Note:</string>
@@ -211,6 +219,9 @@
     <string name="following_system_settings">Follow system settings</string>
     <string name="button_sound">Sound on keypress</string>
     <string name="button_sound_volume">Keypress sound volume</string>
+    <string name="key_sound_source">Keypress sound tone</string>
+    <string name="key_sound_source_theme">Follow theme</string>
+    <string name="key_sound_source_system">System</string>
     <string name="clipboard_return_after_paste">Back to the keyboard after pasting</string>
     <string name="text_copied">Copied</string>
     <string name="text_cut">Cut</string>

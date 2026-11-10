@@ -364,6 +364,24 @@
 - **预期**：第一次重开恢复的是 `tab1`、改后的颜色和那张图；最后重开的询问和恢复的都是 `tab1b`，背景图是第一个标签页的那张，不是第二个标签页的图，也不是空白。再用文件直接打开（`file://…/index.html`，浏览器可能不给锁，草稿照常写）把同样的步骤走一遍，结果相同。
 - **JVM**：没有；存取规则由 web/theme-maker 的 `names-and-files.test.mjs`（草稿按 id 分记录、两个标签页交错写、写到一半中断、旧版草稿）查，这一条在电脑浏览器上手工跑。
 
+### ST-86 [P1] 主题带按键音：导入时提示，各类键放各自的声音
+- **前提**：模拟器，按键音 **启用**，按键音音色 **跟随主题**（默认）；一个 4.0 主题包，`theme.xml` 里 `<sounds><sound key="letter" src="letter.ogg"/><sound key="space" src="space.wav"/></sounds>`，两个文件各不到 1 秒、100 KB。
+- **操作**：导入它，看确认框；选用它，在输入框里按字母、空格、回车、退格。
+- **预期**：确认框有一行「带按键音：字母、空格（要在 声音与振动 里开着按键音才会响…）」；字母放 letter.ogg、空格放 space.wav，回车和退格放 letter.ogg（没带的类别退到字母）；debug 版 logcat 有 `theme sound letter ogg status=0` 和 `theme sound space wav status=0`。
+- **JVM**：ThemeSoundsTest、KeySoundChoiceTest、ThemePackImportTest。
+
+### ST-87 [P1] 按键音音色选「系统」或按键音关着：不放主题的声音
+- **前提**：选用 ST-86 的主题。
+- **操作**：设置 → 声音与振动 → 按键音音色 选 **系统**，打字；再改回 **跟随主题**，把 **按键音** 设成 **禁用**，打字；再选回内置主题、按键音 **启用**，打字。
+- **预期**：选系统时是系统按键音；按键音禁用时不响，「按键音音色」一项变灰；内置主题（没有按键音）照旧是系统按键音，和这一版之前一样。
+- **JVM**：KeySoundChoiceTest。
+
+### ST-88 [P2] 按键音不合格的主题被拒绝
+- **前提**：三个 4.0 主题包：按键音是 Opus 的 `.ogg`；是 1.5 秒的 WAV；是改了扩展名的 MP3（`x.wav`）。
+- **操作**：逐个导入。
+- **预期**：都被拒绝，提示「主题的按键音不合格…」并说出原因，什么都不留下。
+- **JVM**：SoundFileTest（keyboard-scene）。
+
 ### ST-78 [P2] 系统取色变了，用系统取色的主题包跟着换色
 - **前提**：API 31+ 模拟器；导入一个按键颜色用系统取色的 4.0 主题包并选用：内置 Nord 的 `theme.xml`（`lib/keyboard-scene/src/commonMain/themes/nord.xml`），`name` 改成 `uat-system`，两个 `<color name="key">`（浅色、深色各一个）的值分别改成 `system(primary, #eceff4)` 和 `system(primary, #4c566a)`，打包成 `.theme`。
 - **操作**：记下键色；换壁纸（或 `adb shell cmd overlay` 换取色方案）；回到任意输入框调出键盘。
