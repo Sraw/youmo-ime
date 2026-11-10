@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
@@ -290,7 +291,7 @@ class SceneTouchTest {
 
     @Test
     fun aGlidesPathAndLettersAsOnTheViews() {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         val glide = gesture(KeyboardHarness.ENGLISH) { h ->
             val keys = "hello".map { h.keyView("$it") }
             val first = h.box(keys.first())

@@ -39,6 +39,7 @@ import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
@@ -216,17 +217,15 @@ object InputMethodSettings {
     val SHARED: List<Item> = listOf(
         Section(
             R.string.shared_section_all, listOf(
-                // the keyboard's, never both on (each turns the other off): a word by gliding across its keys
-                // (InputMethodCatalog.glides; the grouped keyboards, the 14 and 18 keys and 双拼's nine keys, have
-                // none, as the summary says; pinyin's nine keys have), every input method's but handwriting's; or a
-                // stroke filtering pinyin's and 双拼's candidates on any of their keyboards (InputMethodCatalog.filtersByStrokes)
-                AppToggle(AppPrefs.GLIDE_TYPING, R.string.glide_typing, R.string.glide_typing_summary, notFor = listOf(InputMethodCatalog.HANDWRITING), turnsOff = AppPrefs.STROKE_FILTER) {
-                    AppPrefs.getInstance().keyboard.glideTyping
-                },
-                AppToggle(
-                    AppPrefs.STROKE_FILTER, R.string.stroke_filter, R.string.stroke_filter_summary,
-                    notFor = InputMethodCatalog.TABLES.keys.toList() + InputMethodCatalog.HANDWRITING + InputMethodCatalog.ENGLISH, turnsOff = AppPrefs.GLIDE_TYPING,
-                ) { AppPrefs.getInstance().keyboard.strokeFilter },
+                // the keyboard's, one of: a word by gliding across its keys (InputMethodCatalog.glides), a stroke
+                // filtering pinyin's and 双拼's candidates (InputMethodCatalog.filtersByStrokes), or off; which input
+                // methods read each is the docs' (the summary is the choice alone). 键盘手写 not offered till it is wired.
+                AppChoice(
+                    AppPrefs.KEY_DRAWING, R.string.key_drawing, 0, KeyDrawing.entries,
+                    offered = { KeyDrawing.entries - KeyDrawing.Handwriting },
+                    // stored by a later version's backup: the keyboard draws nothing for it yet
+                    instead = { _, _ -> KeyDrawing.Off },
+                ) { AppPrefs.getInstance().keyboard.keyDrawing },
                 AppToggle(AppPrefs.AUTO_PAIRS, R.string.auto_pairs, 0) { AppPrefs.getInstance().keyboard.autoPairs },
                 AppToggle(AppPrefs.CALCULATION_REPLACES_SUM, R.string.calculation_replaces_sum, 0) {
                     AppPrefs.getInstance().keyboard.calculationReplacesSum

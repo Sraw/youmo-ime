@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.assertRows as assertNamedRows
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
@@ -116,20 +117,29 @@ class AppPrefsTest {
         assertEquals(OneHanded.Left, later.registerProvider(::ThemePrefs).oneHandedSide.getValue())
     }
 
-    // 0.4's glide typing switch (glide_typing) is this version's 滑行输入 switch, under the same key:
-    // a 0.4 user's, or a 0.4 backup's, carries over as it is; 笔画筛选 off
+    // 0.5's two switches 滑行输入 (glide_typing, 0.4's key too) and 笔画筛选 (stroke_filter) as the one list
+    // 在键上划: a 0.5 user's, or a backup's read at the next start, carries over; both old keys dropped
     @Test
     @Uat("ST-43")
-    fun glideTypingCarriesOverAsItIs() {
-        class Row(val why: String, val stored: Boolean?)
-        assertRows(listOf(Row("0.4 on", true), Row("0.4 off", false), Row("never stored", null)), { it.why }) { row ->
-            sp.edit {
-                clear()
-                if (row.stored != null) putBoolean(AppPrefs.GLIDE_TYPING, row.stored)
+    fun theTwoSwitchesMoveOverToKeyDrawing() {
+        fun row(why: String, stored: SharedPreferences.Editor.() -> Unit, now: KeyDrawing) =
+            why to {
+                sp.edit { clear(); stored() }
+                val prefs = AppPrefs(sp).apply { dropRetired() }
+                assertEquals(now, prefs.keyboard.keyDrawing.getValue())
+                assertFalse("the old switches dropped", sp.contains("glide_typing") || sp.contains("stroke_filter"))
             }
-            assertEquals(row.stored == true, AppPrefs(sp).keyboard.glideTyping.getValue())
-            assertFalse(AppPrefs(sp).keyboard.strokeFilter.getValue())
-        }
+        assertNamedRows(
+            row("glide on", { putBoolean("glide_typing", true); putBoolean("stroke_filter", false) }, KeyDrawing.Glide),
+            row("strokes on", { putBoolean("glide_typing", false); putBoolean("stroke_filter", true) }, KeyDrawing.StrokeFilter),
+            row("both off", { putBoolean("glide_typing", false); putBoolean("stroke_filter", false) }, KeyDrawing.Off),
+            // the page never stored both: a backup, edited by hand; glide, the older and wider
+            row("both on: glide", { putBoolean("glide_typing", true); putBoolean("stroke_filter", true) }, KeyDrawing.Glide),
+            row("0.4's glide alone", { putBoolean("glide_typing", true) }, KeyDrawing.Glide),
+            row("never stored: off", {}, KeyDrawing.Off),
+            row("one set already is kept", { putBoolean("glide_typing", true); putString("key_drawing", "StrokeFilter") }, KeyDrawing.StrokeFilter),
+            row("stored as another type: off, no crash at every start", { putString("glide_typing", "x") }, KeyDrawing.Off),
+        )
     }
 
     // contract: the keyboard choices are stored by the constant's name under keys that never change:

@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -95,7 +96,7 @@ class EnglishCapsUatTest {
     @Test
     @Uat("EN-21")
     fun aGlideTakesShiftWhereTheFieldAsksACapitalOrItIsPressed() {
-        AppPrefs.getInstance().keyboard.glideTyping.setValue(true)
+        AppPrefs.getInstance().keyboard.keyDrawing.setValue(KeyDrawing.Glide)
         try {
             val h = KeyboardHarness(im = KeyboardHarness.ENGLISH, host = keepingGlides).also { open = it }
                 .start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
@@ -125,7 +126,7 @@ class EnglishCapsUatTest {
             q.glide('h', 'o')
             assertEquals(listOf(false, true), glides.map { it.shift })
         } finally {
-            AppPrefs.getInstance().keyboard.glideTyping.setValue(false)
+            AppPrefs.getInstance().keyboard.keyDrawing.setValue(KeyDrawing.Off)
         }
     }
 
