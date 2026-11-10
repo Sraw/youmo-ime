@@ -20,11 +20,24 @@ class ChineseNumbersTest {
         check(
             Kind.VALUE,
             "四十五" to "45", "一百二十三" to "123", "二十八" to "28", "十" to "10", "十二" to "12",
-            "四千五" to "4500", "一千二百" to "1200", "三十三万六千零五" to "336005", "十二万三千" to "123000",
+            "四千五" to "4500", "一千二百" to "1200", "三十三万六千零五" to "336005",
             // 万 and 亿 at the end stay characters
             "十四亿" to "14亿", "五万" to "5万", "三十三万" to "33万", "三万亿" to "3万亿",
             "十二点五" to "12.5", "零点五" to "0.5", "三点五亿" to "3.5亿",
         )
+    }
+
+    @Test
+    fun moreAfterABigPlaceIsItsDecimalOfAtMostTwoPlaces() {
+        check(
+            Kind.VALUE,
+            "十二万三千" to "12.3万", "三万五" to "3.5万", "一亿两千万" to "1.2亿", "一亿两千三百万" to "1.23亿",
+            "一万零五百" to "1.05万", "三万亿五千万" to "30000.5亿",
+            // three places or more to be exact: in full
+            "一百二十三万四千五百六十七" to "1234567", "一万零五" to "10005", "一亿零五万" to "100050000",
+        )
+        check(Kind.MONEY, "十二万三千" to "12.3万")
+        check(Kind.DIGITS, "十二万三千" to "12.3万")
     }
 
     @Test
