@@ -148,6 +148,18 @@ class KeyHandwritingUatTest {
         assertEquals("the dot, then the stroke", 2, board().keyInkForTest!!.pad.finished.size)
     }
 
+    // the number the gesture takes for a tap (EngineState.nextKey, told just before its key is sent) is the one the
+    // key's job hands the engine's answers as it is taken on the fcitx thread: else the keyboard reads an answer to
+    // this tap as one from before it, or the other way round
+    @Test
+    fun aTapsKeyIsTakenUnderTheNumberTheGestureTookForIt() {
+        harness()
+        val n = EngineState.nextKey()
+        touchTap(h.key("d"))
+        until("taken") { EngineState.keysHeard >= n }
+        assertEquals(n, EngineState.keysHeard)
+    }
+
     @Test
     fun aStrokeWithNoTapBeforeTakesNothingBack() {
         harness()
@@ -195,15 +207,30 @@ class KeyHandwritingUatTest {
     // a keyboard shown ([shown] opens its harness and returns the key to draw on), checked, its harness closed
     private class Board(val why: String, val shown: () -> ShownKey)
 
-    private fun onEach(rows: List<Board>, check: () -> Unit) = assertRows(rows, Board::why) { row ->
-        try {
-            val k = row.shown()
-            h.api.calls.clear()
-            draw(k)
-            check()
-        } finally {
-            open?.close()
+    // each row from the test's own state (the reader, the pinyin keyboard, touch exploration off), whatever the rows
+    // before it set; a close that fails after the row's own failure is added to it, not put in its place
+    private fun onEach(rows: List<Board>, check: () -> Unit) {
+        val pinyinKeyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
+        val keys = pinyinKeyboard.getValue()
+        // the test's reader (人 入), not the native one [reader] keeps for after the test
+        val twoReadings = shared.reader
+        assertRows(rows, Board::why) { row ->
+            val failed = runCatching {
+                val k = row.shown()
+                h.api.calls.clear()
+                draw(k)
+                check()
+            }.exceptionOrNull()
+            val o = open
             open = null
+            shared.reader = twoReadings
+            prefs.set(pinyinKeyboard, keys)
+            val closing = runCatching {
+                o?.let { shadowOf(it.keyboard.context.getSystemService(AccessibilityManager::class.java)).setTouchExplorationEnabled(false) }
+                o?.close()
+            }.exceptionOrNull()
+            if (failed != null) throw failed.apply { closing?.let(::addSuppressed) }
+            if (closing != null) throw closing
         }
     }
 
@@ -270,7 +297,6 @@ class KeyHandwritingUatTest {
                 h.idle()
                 h.key("t")
             },
-            // last: touch exploration stays on for the rest of the test
             Board("TalkBack exploring by touch") {
                 harness()
                 shadowOf(board().context.getSystemService(AccessibilityManager::class.java)).setTouchExplorationEnabled(true)

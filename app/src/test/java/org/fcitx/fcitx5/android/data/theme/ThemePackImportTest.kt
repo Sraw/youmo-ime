@@ -8,6 +8,7 @@ import androidx.preference.PreferenceManager
 import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
@@ -442,19 +443,18 @@ class ThemePackImportTest : ThemePackFixture() {
 
     @Test
     fun keysHardToReadAreToldNotRefused() {
-        val low = xml().replaceFirst("""<color name="keyText" value="#2e3440"/>""", """<color name="keyText" value="#e5e9f0"/>""")
-        val warnings = opened(zip("theme.xml" to low)).staged.warnings
+        val lightLow = xml().replaceFirst("""<color name="keyText" value="#2e3440"/>""", """<color name="keyText" value="#e5e9f0"/>""")
+        val bothLow = lightLow.replaceFirst("""<color name="keyText" value="#eceff4"/>""", """<color name="keyText" value="#4c566a"/>""")
         val light = appContext.getString(R.string.theme_pack_light)
-        assertEquals(listOf(appContext.getString(R.string.theme_pack_low_contrast, light)), warnings)
-    }
-
-    @Test
-    fun keysHardToReadInBothVersionsAreToldAsTheLanguageJoinsThem() {
-        val low = xml().replaceFirst("""<color name="keyText" value="#2e3440"/>""", """<color name="keyText" value="#e5e9f0"/>""")
-            .replaceFirst("""<color name="keyText" value="#eceff4"/>""", """<color name="keyText" value="#4c566a"/>""")
-        val warnings = opened(zip("theme.xml" to low)).staged.warnings
-        val both = "${appContext.getString(R.string.theme_pack_light)} and ${appContext.getString(R.string.theme_pack_dark)}"
-        assertEquals(listOf(appContext.getString(R.string.theme_pack_low_contrast, both)), warnings)
+        val dark = appContext.getString(R.string.theme_pack_dark)
+        fun row(theme: String, versions: String) = {
+            val warnings = opened(zip("theme.xml" to theme)).staged.warnings
+            assertEquals(listOf(appContext.getString(R.string.theme_pack_low_contrast, versions)), warnings)
+        }
+        assertRows(
+            "the light version's keys hard to read: one warning naming it, the pack still imported" to row(lightLow, light),
+            "both versions' keys hard to read: one warning naming both as the language joins them" to row(bothLow, "$light and $dark"),
+        )
     }
 
     // the input method's process may live for days: an open clears what a dialog left an hour ago, not a copy a

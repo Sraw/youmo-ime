@@ -232,7 +232,11 @@
       // the fonts this call added that the shown files do not use: out of the page (kept in faces, so a newer
       // call that found one there puts it back when it lands)
       const shown = new Set(Object.values(assets.fonts));
-      for (const family of added) if (!shown.has(family)) document.fonts.delete(faces.get(family));
+      // (a newer call that landed first may have let one go already: no face left, nothing to take out)
+      for (const family of added) {
+        const face = faces.get(family);
+        if (face && !shown.has(family)) document.fonts.delete(face);
+      }
       return false;
     }
     for (const b of Object.values(assets.cuts)) if (!Object.values(cuts).includes(b)) b.close();

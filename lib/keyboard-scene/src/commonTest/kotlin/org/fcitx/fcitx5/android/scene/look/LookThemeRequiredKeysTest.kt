@@ -12,6 +12,9 @@ import org.fcitx.fcitx5.android.scene.look.LookThemeTest.Companion.palette
 import org.fcitx.fcitx5.android.scene.look.LookThemeTest.Companion.portrait
 import org.fcitx.fcitx5.android.scene.look.LookThemeTest.Companion.themeFile
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
+import org.fcitx.fcitx5.android.scene.theme.Cascade
+import org.fcitx.fcitx5.android.scene.theme.Selector
+import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,10 +52,10 @@ class LookThemeRequiredKeysTest {
             val xml = LookTheme.xml(material.copy(keys = keys), "t", false)
             val theme = ThemeReader.theme(xml).ok()
             val drawnAs = SceneBuilder(theme, portrait, measurer).build(Fixtures.qwerty, emptyMap()).ok().keys.first { it.id == r.id }.kind
-            // the converted style unhiding its words pressed, on the key or on the kind it is drawn as: the engine
-            // settles a key's words from its unpressed face, so its pressed ops cannot show them (asked of the style)
-            val unhid = listOf("*/${r.id}:pressed label", "*/${r.id}.$drawnAs:pressed label")
-                .any { sel -> xml.lines().any { "select=\"$sel\"" in it && "hidden=\"false\"" in it } }
+            // the converted theme's words pressed, as its cascade settles them for the key drawn as its kind (the
+            // engine settles a key's words from its unpressed face, so its pressed ops cannot show them)
+            val pressed = Selector.Target("key", "qwerty", r.id, r.id, setOf(drawnAs), setOf("pressed"), part = "label")
+            val unhid = !TextLook(Cascade(theme, emptySet()).of(pressed), theme).hidden
             assertEquals(r.shown, unhid, "${r.why}: $xml")
             // never blank, so the converted theme imports
             assertEquals(emptyList<BlankKeys.Blank>(), BlankKeys.find(theme, listOf(BlankKeys.Board(Fixtures.qwerty)), limit = 10), r.why)

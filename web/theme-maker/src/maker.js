@@ -312,20 +312,27 @@
   const DRAFT = 'draft';
   // the files apart from the text: written again only when they changed (an edit of theme.xml shares its files
   // object with the document before it), not megabytes of pictures each time a value is typed
-  // the two records are written one after the other: each files record carries an id the text names, so a text
-  // read with files not its own (another tab's, or a write cut between the two) is no draft, never a mix
-  const DRAFT_FILES = 'draft-files';
+  // the text names its files record by id (each set of files kept under its own key): the files are written
+  // first, then the text naming them, then the record the text named before is let go. A text read with files
+  // not its own is no draft, never a mix; two tabs each write their own files again when the other wrote last
+  const DRAFT_FILES = 'draft-files'; // the one files record of the pages before (drafts 2 and 3)
+  const filesKey = (id) => DRAFT_FILES + '-' + id;
   const keptFiles = new WeakMap(); // the store → { files, id } last written to it
   async function keepDraft(store, d, env) {
     try {
+      const before = await store.get(DRAFT);
+      const prev = before && before.v === 4 ? before.files : null;
       let kept = keptFiles.get(store);
-      if (!kept || kept.files !== d.files) {
+      // files changed, or another tab's text is there now (its files may have replaced ours): written anew
+      if (!kept || kept.files !== d.files || prev !== kept.id) {
         kept = { files: d.files, id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) };
         keptFiles.delete(store);
-        await store.put(DRAFT_FILES, { id: kept.id, files: d.files });
+        await store.put(filesKey(kept.id), { id: kept.id, files: d.files });
         keptFiles.set(store, kept);
       }
-      await store.put(DRAFT, { v: 3, doc: { xml: d.xml, layouts: d.layouts }, files: kept.id, env, at: Date.now() });
+      await store.put(DRAFT, { v: 4, doc: { xml: d.xml, layouts: d.layouts }, files: kept.id, env, at: Date.now() });
+      if (prev && prev !== kept.id) await store.remove(filesKey(prev));
+      if (before && before.v !== 4) await store.remove(DRAFT_FILES);
       return true;
     } catch (e) {
       return false;
@@ -334,11 +341,11 @@
   async function draft(store) {
     try {
       const v = await store.get(DRAFT);
-      if (!v || ![1, 2, 3].includes(v.v) || !v.doc || typeof v.doc.xml !== 'string') return null;
-      // 1: the files kept with the text (the page before they were kept apart); 2: kept apart, with no id
+      if (!v || ![1, 2, 3, 4].includes(v.v) || !v.doc || typeof v.doc.xml !== 'string') return null;
+      // 1: the files kept with the text; 2: kept apart, with no id; 3: one record with an id; 4: a record per id
       let files = v.doc.files;
       if (v.v !== 1) {
-        const kept = await store.get(DRAFT_FILES);
+        const kept = await store.get(v.v === 4 ? filesKey(v.files) : DRAFT_FILES);
         if (v.v === 2) {
           if (kept && typeof kept.id === 'string') return null; // a newer page's files since
           files = kept;
@@ -352,7 +359,9 @@
   }
   async function dropDraft(store) {
     try {
+      const v = await store.get(DRAFT);
       await store.remove(DRAFT);
+      if (v && v.v === 4) await store.remove(filesKey(v.files));
       await store.remove(DRAFT_FILES);
       keptFiles.delete(store);
     } catch (e) {

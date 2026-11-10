@@ -378,7 +378,7 @@ class KeyboardCanvasView(
         // that takes the keyboard down not drawn again on its own. A pack built and not drawn marks nothing.
         // A mark this view left pending (hidden before its frame committed) cleared as it draws another theme or pack
         PackDrawGuard.shows(this, scenePack)
-        if (pack?.let { PackDrawGuard.drawing(it, this) } == false) pack = null
+        if (pack?.let { PackDrawGuard.drawing(it) } == false) pack = null
         // an image or the picture in since it was recorded: recorded again
         if (painter.missed) {
             painter.missed = false

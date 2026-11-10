@@ -139,34 +139,67 @@ test('a new picture over an animated one drops animated=; one only tuned keeps i
   assert.ok(/animated="true"/.test(P.background.ops.tune(d, { blur: 4 }).xml));
 });
 
-test('the draft writes the files again only when they changed; a draft of the page before still opens', async () => {
+test('the draft writes the files again only when they changed; drafts of the pages before still open', async () => {
   const m = new Map();
   const puts = [];
   const store = { get: async (k) => (m.has(k) ? structuredClone(m.get(k)) : undefined), put: async (k, v) => { puts.push(k); m.set(k, structuredClone(v)); }, remove: async (k) => { m.delete(k); } };
+  const filePuts = () => puts.filter((k) => k.startsWith('draft-files')).length;
   const d = M.doc('<a/>', { 'p.png': new Uint8Array([1, 2]) });
   await M.keepDraft(store, d, M.ENV);
   await M.keepDraft(store, M.doc('<b/>', d.files), M.ENV);
-  assert.equal(puts.filter((k) => k === 'draft-files').length, 2, 'doc() copies the files object: written again');
+  assert.equal(filePuts(), 2, 'doc() copies the files object: written again');
+  assert.deepEqual([...m.keys()].sort(), ['draft', 'draft-files-' + m.get('draft').files], 'the files the text no longer names are let go');
   const e = Object.assign({}, d, { xml: '<c/>' }); // an edit of the text sharing its files object
   await M.keepDraft(store, e, M.ENV);
   await M.keepDraft(store, Object.assign({}, e, { xml: '<d/>' }), M.ENV);
-  assert.equal(puts.filter((k) => k === 'draft-files').length, 3, 'the same files object: not written again');
+  assert.equal(filePuts(), 3, 'the same files object: not written again');
   const back = await M.draft(store);
   assert.equal(back.doc.xml, '<d/>');
   assert.deepEqual([...back.doc.files['p.png']], [1, 2]);
+  // the drafts of the pages before: each opens with its own files, never with files it does not name
+  const v1files = { 'q.png': new Uint8Array([9]) };
+  const rows = [
+    // [records, xml opened or null, why]
+    [{ draft: { v: 1, doc: { xml: '<v1/>', files: v1files, layouts: {} }, env: null, at: 1 } }, '<v1/>', 'files kept with the text'],
+    [{ draft: { v: 2, doc: { xml: '<v2/>' } }, 'draft-files': v1files }, '<v2/>', 'files apart, with no id'],
+    [{ draft: { v: 2, doc: { xml: '<v2/>' } }, 'draft-files': { id: 'x', files: v1files } }, null, 'a newer page wrote its files since'],
+    [{ draft: { v: 3, doc: { xml: '<v3/>' }, files: 'x' }, 'draft-files': { id: 'x', files: v1files } }, '<v3/>', 'one record, its id'],
+    [{ draft: { v: 3, doc: { xml: '<v3/>' }, files: 'x' }, 'draft-files': { id: 'y', files: v1files } }, null, 'one record, another id'],
+    [{ draft: { v: 4, doc: { xml: '<v4/>' }, files: 'x' }, 'draft-files-y': { id: 'y', files: v1files } }, null, 'the record it names is gone'],
+  ];
+  for (const [records, xml, why] of rows) {
+    m.clear();
+    for (const [k, v] of Object.entries(records)) m.set(k, v);
+    const got = await M.draft(store);
+    assert.equal(got && got.doc.xml, xml, why);
+    if (xml) assert.deepEqual([...got.doc.files['q.png']], [9], why);
+  }
+  // two tabs on one store: each keeps the text with its own files, and the one that wrote last opens
   m.clear();
-  m.set('draft', { v: 1, doc: { xml: '<old/>', files: { 'q.png': new Uint8Array([9]) }, layouts: {} }, env: null, at: 1 });
-  const old = await M.draft(store);
-  assert.deepEqual([...old.doc.files['q.png']], [9]);
-  // the text and its files are two writes: files not the text's own (another tab's since, a write cut between
-  // the two) make no draft, never the text with someone else's pictures
+  const tabA = Object.create(store);
+  const tabB = Object.create(store); // another page: its own memory of the files it wrote
+  const b = M.doc('<b/>', { 'b.png': new Uint8Array([7]) });
+  await M.keepDraft(tabA, d, M.ENV);
+  await M.keepDraft(tabB, b, M.ENV);
+  await M.keepDraft(tabA, Object.assign({}, d, { xml: '<a2/>' }), M.ENV); // only the text changed in A
+  const last = await M.draft(store);
+  assert.equal(last.doc.xml, '<a2/>');
+  assert.deepEqual(Object.keys(last.doc.files), ['p.png'], 'A\'s text with A\'s files');
+  assert.equal(m.size, 2, [...m.keys()].join());
+  await M.keepDraft(tabB, Object.assign({}, b, { xml: '<b2/>' }), M.ENV);
+  assert.deepEqual(Object.keys((await M.draft(store)).doc.files), ['b.png']);
+  // a write cut between the files and the text: the text before still opens with its own files
   m.clear();
   await M.keepDraft(store, d, M.ENV);
-  const other = new Map(m);
-  m.set('draft-files', Object.assign({}, other.get('draft-files'), { id: 'another-tab' }));
-  assert.equal(await M.draft(store), null, 'files of another page');
-  m.delete('draft-files');
-  assert.equal(await M.draft(store), null, 'files never written');
+  const cut = { get: store.get, put: async (k, v) => { if (k === 'draft') throw new Error('cut'); return store.put(k, v); }, remove: store.remove };
+  assert.equal(await M.keepDraft(cut, M.doc('<z/>', { 'z.png': new Uint8Array([3]) }), M.ENV), false);
+  assert.deepEqual(Object.keys((await M.draft(store)).doc.files), ['p.png']);
+  // an old draft written over: its files record goes too
+  m.clear();
+  m.set('draft', { v: 3, doc: { xml: '<v3/>' }, files: 'x' });
+  m.set('draft-files', { id: 'x', files: v1files });
+  await M.keepDraft(store, d, M.ENV);
+  assert.ok(!m.has('draft-files'));
   // dropped: nothing comes back, nothing is left in the store, and the next draft writes its files again
   m.clear();
   await M.keepDraft(store, d, M.ENV);
@@ -175,5 +208,5 @@ test('the draft writes the files again only when they changed; a draft of the pa
   assert.equal(m.size, 0, [...m.keys()].join());
   puts.length = 0;
   await M.keepDraft(store, d, M.ENV);
-  assert.deepEqual(puts, ['draft-files', 'draft']);
+  assert.deepEqual(puts.map((k) => k.replace(/-[^-]+-[^-]+$/, '-<id>')), ['draft-files-<id>', 'draft']);
 });

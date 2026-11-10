@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -23,7 +24,12 @@ class ThemeExportNameTest {
 
     @Test
     fun aThreeZeroNameIsMadeAPacksName() {
-        fun row(name: String, want: String) = { assertEquals(name, want, ThemeFilesManager.packName(name)) }
+        // each made name also one a pack's import takes (the cut-to-length one its edge)
+        fun row(name: String, want: String) = {
+            val made = ThemeFilesManager.packName(name)
+            assertEquals(name, want, made)
+            assertFalse(name, ThemePackFiles.badName(made))
+        }
         assertRows(
             "a plain name: as it is" to row("mine", "mine"),
             "a version's name: the pack's would be read as one of its versions" to row("mine#dark", "mine"),

@@ -4,9 +4,12 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import android.app.Activity
+import android.content.Context
 import android.graphics.RenderNode
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.scene.KeyNode
@@ -19,17 +22,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * A pack's draw mark left pending by the keyboard's canvas (its window hidden before the frame committed) is that
- * view's: cleared once that view draws anything other than the pack (a built-in theme, another pack even one
- * already drawn this process), so the next start resets no slot for a pack no longer shown; another canvas (a
- * settings preview, a theme card) drawing meanwhile keeps it, so a pack that then takes the keyboard down is
- * still caught.
+ * A pack's draw mark left pending by the keyboard's canvas (its window hidden before the frame committed) is the
+ * keyboard's: cleared once a keyboard canvas (that one, or one built anew as the theme changed) draws anything
+ * other than the pack (a built-in theme, another pack even one already drawn this process), so the next start
+ * resets no slot for a pack no longer shown; a canvas in an activity (a settings preview, a theme card) drawing
+ * meanwhile keeps it, so a pack that then takes the keyboard down is still caught.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -57,7 +61,7 @@ class PackDrawGuardClearTest {
     }
 
     // a canvas whose scene is of the pack [shows] names (null: a theme not a pack's), made anew as it changes
-    private class Canvas {
+    private class Canvas(context: Context = appContext) {
         var shows: PackDrawGuard.Key? = null
             set(value) {
                 field = value
@@ -65,7 +69,7 @@ class PackDrawGuardClearTest {
             }
         private val look = ThemeManager.shownLook(TestThemes.PixelLight)
         val view = KeyboardCanvasView(
-            appContext, BoardImages(),
+            context, BoardImages(),
             object : KeyboardCanvasView.Host {
                 override fun scene(width: Int, height: Int) =
                     KeyboardCanvasView.Drawn(Scene(width.toDouble(), height.toDouble(), emptyList(), emptyList(), emptyList()), look, SceneFonts(look), shows)
@@ -91,36 +95,51 @@ class PackDrawGuardClearTest {
         assertEquals(key.file, mark.readText())
     }
 
+    private fun preview() = Canvas(Robolectric.buildActivity(Activity::class.java).setup().get())
+
     @Test
-    fun theViewThatMarkedAPackClearsItAsItDrawsABuiltInTheme() {
-        val c = Canvas()
-        hiddenBeforeCommit(c, mine)
-        c.shows = null
-        c.frame()
-        assertFalse(mark.exists())
-        // shown again later: marked again, its first frame still unconfirmed
-        hiddenBeforeCommit(c, mine)
+    fun aKeyboardCanvasClearsTheMarkAsItDrawsAnythingElse() {
+        assertRows(
+            "the very canvas that marked it now drawing a built-in theme: the pack no longer shown" to {
+                empty() // each row from no mark and nothing drawn
+                val c = Canvas()
+                hiddenBeforeCommit(c, mine)
+                c.shows = null
+                c.frame()
+                assertFalse(mark.exists())
+                // shown again later: marked again, its first frame still unconfirmed
+                hiddenBeforeCommit(c, mine)
+            },
+            "the very canvas drawing a pack already drawn this process: that pack marks nothing, yet the marked one is gone" to {
+                empty() // each row from no mark and nothing drawn
+                PackDrawGuard.drawing(other)
+                PackDrawGuard.frameDrawn(other)
+                val c = Canvas()
+                hiddenBeforeCommit(c, mine)
+                c.shows = other
+                c.frame()
+                assertFalse(mark.exists())
+            },
+            "a keyboard canvas built anew (a theme change rebuilds the views) drawing a built-in theme, a preview drawing meanwhile" to {
+                empty() // each row from no mark and nothing drawn
+                hiddenBeforeCommit(Canvas(), mine)
+                preview().frame()
+                assertTrue(mark.exists())
+                val rebuilt = Canvas()
+                rebuilt.frame()
+                assertFalse(mark.exists())
+            },
+        )
     }
 
     @Test
-    fun theViewThatMarkedAPackClearsItAsItDrawsAPackAlreadyDrawn() {
-        PackDrawGuard.drawing(other)
-        PackDrawGuard.frameDrawn(other)
-        val c = Canvas()
-        hiddenBeforeCommit(c, mine)
-        c.shows = other
-        c.frame()
-        assertFalse(mark.exists())
-    }
-
-    @Test
-    fun anotherCanvasDrawingABuiltInThemeKeepsTheMark() {
+    fun aPreviewDrawingABuiltInThemeKeepsTheMark() {
         val keyboard = Canvas()
         hiddenBeforeCommit(keyboard, mine)
-        val preview = Canvas()
+        val preview = preview()
         preview.frame()
         assertTrue(mark.exists())
-        // nor does one drawing that same pack take it over: the keyboard's view still the one to clear it
+        // nor does one drawing that same pack then something else clear it: the keyboard's to clear
         preview.shows = mine
         preview.frame()
         preview.shows = null

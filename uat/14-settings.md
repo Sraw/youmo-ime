@@ -357,8 +357,8 @@
 - **预期**：预览里图标画在键的中间，不偏上一整个键；和导入 App 后看到的一样。
 - **JVM**：没有；画法由 lib/keyboard-scene 的 `CanvasPainterTest.anIconsViewBoxOriginIsMovedToTheCorner`（jsTest）查，这一条在电脑浏览器上手工跑。
 
-### ST-78 [P2] 系统取色变了，用 system: 颜色的主题包跟着换色
-- **前提**：API 31+ 模拟器；导入一个按键颜色写 `system:` 的 4.0 主题包并选用。
+### ST-78 [P2] 系统取色变了，用系统取色的主题包跟着换色
+- **前提**：API 31+ 模拟器；导入一个按键颜色用系统取色的 4.0 主题包并选用：内置 Nord 的 `theme.xml`（`lib/keyboard-scene/src/commonMain/themes/nord.xml`），`name` 改成 `uat-system`，`<color name="key">` 的值改成 `system(primary, #eceff4)`，打包成 `.theme`。
 - **操作**：记下键色；换壁纸（或 `adb shell cmd overlay` 换取色方案）；回到任意输入框调出键盘。
 - **预期**：键色换成新取色对应的颜色，不是换之前的旧色；进设置再回来也一样。
 - **JVM**：`SceneThemesPackTest.aCopyEqualToAnOlderPackDrawsItsOwnTheme`（相等的新副本画自己的颜色）；设备上手动走一遍。

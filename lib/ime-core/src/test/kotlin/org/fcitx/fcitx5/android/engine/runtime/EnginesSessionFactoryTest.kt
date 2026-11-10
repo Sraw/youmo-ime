@@ -23,12 +23,12 @@ import org.junit.Test
  */
 class EnginesSessionFactoryTest : EnginesFixture() {
 
-    private fun Engines.make(vararg ims: String) = ims.forEach { onEvent(it, EngineEvent.RESET, 0) }
+    private fun Engines.resetEach(vararg ims: String) = ims.forEach { onEvent(it, EngineEvent.RESET, 0) }
 
     @Test
     fun handwritingAndEveryTableShareOneLanguageAndEverySessionOneListOfCoarseWords() {
         Engines(::load, null, warmUps = inPlace).use { engines ->
-            engines.make(InputMethodCatalog.PINYIN, InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.HANDWRITING, InputMethodCatalog.WUBI)
+            engines.resetEach(InputMethodCatalog.PINYIN, InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.HANDWRITING, InputMethodCatalog.WUBI)
             assertEquals(1, engines.factory.languagesMade)
             assertEquals(1, engines.factory.coarseMade)
             val language = engines.factory.language()
@@ -42,14 +42,14 @@ class EnginesSessionFactoryTest : EnginesFixture() {
     fun invalidateHasEverySessionMadeAnewAndWhatTheyShare() {
         Engines(::load, null, warmUps = inPlace).use { engines ->
             assertEquals("ni", engines.type(InputMethodCatalog.PINYIN, "ni").preedit)
-            engines.make(InputMethodCatalog.WUBI)
+            engines.resetEach(InputMethodCatalog.WUBI)
             val language = engines.factory.language()
             engines.invalidate()
             // no session till the next key: none to ask of
             assertTrue(engines.candidates(InputMethodCatalog.PINYIN, 0, 5).isEmpty())
             // what was typed dropped, a new session made
             assertEquals("h", engines.type(InputMethodCatalog.PINYIN, "h").preedit)
-            engines.make(InputMethodCatalog.WUBI)
+            engines.resetEach(InputMethodCatalog.WUBI)
             assertNotSame(language, engines.factory.language())
             assertEquals(2, engines.factory.languagesMade)
             assertEquals(2, engines.factory.coarseMade)
@@ -60,10 +60,10 @@ class EnginesSessionFactoryTest : EnginesFixture() {
     @Test
     fun aWordAddedMakesTheCoarseWordsAnew() {
         Engines(::load, null, warmUps = inPlace).use { engines ->
-            engines.make(InputMethodCatalog.PINYIN)
+            engines.resetEach(InputMethodCatalog.PINYIN)
             assertEquals(1, engines.factory.coarseMade)
             assertTrue(engines.addWord("你好", "ni hao"))
-            engines.make(InputMethodCatalog.PINYIN, InputMethodCatalog.T9)
+            engines.resetEach(InputMethodCatalog.PINYIN, InputMethodCatalog.T9)
             assertEquals(2, engines.factory.coarseMade)
         }
     }
@@ -76,14 +76,14 @@ class EnginesSessionFactoryTest : EnginesFixture() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
             assertTrue(engines.addWord("拟好", "ni hao"))
             assertEquals("拟好", engines.type(InputMethodCatalog.PINYIN, "nihao").candidates.first())
-            engines.make(InputMethodCatalog.WUBI)
+            engines.resetEach(InputMethodCatalog.WUBI)
             val language = engines.factory.language()
             assertSame(language.coarse, engines.factory.lastCoarse)
             val at = engines.candidates(InputMethodCatalog.PINYIN, 0, 10).map { it.text }.indexOf("拟好")
             assertTrue(engines.learning(InputMethodCatalog.PINYIN, LearningOp.Delete(at, "拟好")) is LearningResult.Done)
             assertTrue(engines.userWords(UserWord.Kind.ADDED).isEmpty())
             // no session made anew: the tables' language and its list as they were
-            engines.make(InputMethodCatalog.T9)
+            engines.resetEach(InputMethodCatalog.T9)
             assertSame(language, engines.factory.language())
             assertEquals(2, engines.factory.coarseMade)
             assertNotSame(language.coarse, engines.factory.lastCoarse)
@@ -98,15 +98,15 @@ class EnginesSessionFactoryTest : EnginesFixture() {
     @Test
     fun turningTheHabitsOffOrOnMakesTheLanguageAnew() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
-            engines.make(InputMethodCatalog.WUBI)
+            engines.resetEach(InputMethodCatalog.WUBI)
             val on = engines.factory.language()
             engines.useHabits = false
-            engines.make(InputMethodCatalog.WUBI)
+            engines.resetEach(InputMethodCatalog.WUBI)
             val off = engines.factory.language()
             assertNotSame(on, off)
             assertNotSame(on.user, off.user)
             engines.useHabits = true
-            engines.make(InputMethodCatalog.WUBI)
+            engines.resetEach(InputMethodCatalog.WUBI)
             assertNotSame(off, engines.factory.language())
             assertEquals(3, engines.factory.languagesMade)
         }

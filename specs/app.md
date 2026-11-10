@@ -1251,9 +1251,12 @@ canvas, on a hardware one when a frame is committed (`registerFrameCommitCallbac
 drawn on the RenderThread; `ViewRootImpl.performDraw` takes the callbacks before it draws, so one registered in
 `onDraw` goes with the next frame, which `postInvalidateOnAnimation` asks for while the mark is pending, at most
 `PackDrawGuard.MAX_ASKED` (3) times a pack a process: a device that calls back no commit draws no more, the mark
-kept till a later frame's), only for the pack marked (another view's frame clears nothing). A window hidden
-before the frame after the first leaves the mark pending till the next show's first commit; a process ended in
-that gap resets the pack falsely. A pack built and
+kept till a later frame's), only for the pack marked. A pending mark is also cleared as a keyboard canvas of the
+input method (one not in an activity, whichever instance: a theme change builds the views anew) draws anything
+other than that pack (`PackDrawGuard.shows`): that pack is no longer shown; a canvas in an activity (a settings
+preview, a theme card) clears nothing. A window hidden before the frame after the first, the keyboard then not
+drawn again, leaves the mark pending till the next show's first commit; a process ended in that gap resets the
+pack falsely. A pack built and
 not drawn (the keyboard made again while hidden, a settings page's sizes) marks nothing, so a process ended
 otherwise resets nothing. Found at the first listing of the packs of a process (`ThemeManager.init`, or the
 first `refreshThemes` once the files are settled: kept till then), the slots

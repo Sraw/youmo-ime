@@ -4,12 +4,15 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.View
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
-import java.lang.ref.WeakReference
 
 /**
  * A theme 4.0 pack that took the keyboard down as it was first drawn (a font crafted to crash the text's layout,
@@ -38,8 +41,6 @@ object PackDrawGuard {
     // the packs whose first frame this process drew (no mark for them again), and the one marked, its frame awaited
     private val drawn = HashSet<Key>()
     private var pending: Key? = null
-    // the view that marked [pending] (weakly: a view gone keeps nothing alive), the only one that clears it ([shows])
-    private var owner: WeakReference<Any>? = null
 
     // the frames asked for while a pack's mark is pending ([askFrame]), a pack
     private val asked = HashMap<Key, Int>()
@@ -47,15 +48,13 @@ object PackDrawGuard {
     private fun mark() = File(dir(), MARK)
 
     /**
-     * The pack [key] about to be drawn in a frame shown by [owner] (the view drawing it): marked, till a frame of it
-     * of this process is drawn; whether one is still awaited (the frame's commit to call [frameDrawn]). A mark
-     * already pending for [key] keeps the view that set it. On the main thread.
+     * The pack [key] about to be drawn in a frame shown: marked, till a frame of it of this process is drawn;
+     * whether one is still awaited (the frame's commit to call [frameDrawn]). On the main thread.
      */
-    fun drawing(key: Key, owner: Any? = null): Boolean {
+    fun drawing(key: Key): Boolean {
         if (key in drawn) return false
         if (pending == key) return true
         pending = key
-        this.owner = owner?.let(::WeakReference)
         try {
             mark().writeText(key.file)
         } catch (e: IOException) {
@@ -65,24 +64,27 @@ object PackDrawGuard {
     }
 
     /**
-     * [owner] about to draw a frame shown of the pack [key] (null: a theme not a pack's). Where [owner] set the mark
-     * still pending (its window hidden before its frame committed) and now draws anything other than that pack (a
-     * built-in theme, another pack, even one already drawn this process), the mark is cleared: that pack is no
-     * longer what it shows. Another view (a settings preview, a theme card) clears nothing. On the main thread.
+     * [owner] about to draw a frame shown of the pack [key] (null: a theme not a pack's). Where a mark is pending
+     * (the keyboard's window hidden before its frame committed) and [owner] is a keyboard of the input method (a
+     * view not in an activity, whichever instance: a theme change builds the keyboard's views anew) drawing anything
+     * other than that pack (a built-in theme, another pack, even one already drawn this process), the mark is
+     * cleared: that pack is no longer what the keyboard shows. A view in an activity (a settings preview, a theme
+     * card) clears nothing. On the main thread.
      */
-    fun shows(owner: Any, key: Key?) {
+    fun shows(owner: View, key: Key?) {
         val p = pending ?: return
-        if (p == key || this.owner?.get() !== owner) return
+        if (p == key || inActivity(owner.context)) return
         pending = null
-        this.owner = null
         mark().delete()
     }
+
+    private fun inActivity(context: Context) =
+        generateSequence(context) { (it as? ContextWrapper)?.baseContext }.any { it is Activity }
 
     /** The frame [drawing] marked [key] for committed: its mark gone. Another's frame clears nothing. On the main thread. */
     fun frameDrawn(key: Key) {
         if (pending != key) return
         pending = null
-        owner = null
         drawn.add(key)
         mark().delete()
     }
@@ -119,6 +121,5 @@ object PackDrawGuard {
         drawn.clear()
         asked.clear()
         pending = null
-        owner = null
     }
 }

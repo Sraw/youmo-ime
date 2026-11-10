@@ -224,7 +224,8 @@ def st09(d):
     check(not custom_item(d), "选 .zip 后主题列表里多了主题")
     d.step("导入")
     # the pushed file is a 3.0 theme: it goes straight in, only a 4.0 pack asks first
-    import_theme(d, "uat-theme")
+    import_theme(d, "uat-theme", confirm=False)
+    check(not d.wait_text("导入主题", timeout=3, where="all", contains=True), "导入 3.0 主题弹出了确认框")
     appearance_tab(d, "主题")
     item = custom_item(d)
     check(item, "导入后主题列表里没有它")

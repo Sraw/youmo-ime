@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.core
 
 import android.text.TextPaint
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -98,9 +99,13 @@ class EngineBridge {
         return true
     }
 
+    /** How [sendInk] makes the session of the input method written on its keys: the engines'; a test's that throws. */
+    @VisibleForTesting
+    internal var makeOnKeys: (String) -> Unit = { engines.make(it) }
+
     // [current]'s session, which writes on its keys, made under its own latch; whether it is
     private fun madeOnKeys(current: String): Boolean = try {
-        unloadable.call(current) { engines.make(current) }
+        unloadable.call(current) { makeOnKeys(current) }
         true
     } catch (e: IOException) {
         Timber.w(e, "session of $current")

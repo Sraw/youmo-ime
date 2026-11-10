@@ -135,7 +135,9 @@ class BarUatTest {
             .first { it.name == name }.icon.endsWith("-active") != (name == "punctuation")
 
     private fun KeyboardHarness.toggled(name: String, from: Int, to: Int) {
-        assertTrue(texts(inputView).toString(), service.getString(from) in statusPanel())
+        statusPanel()
+        // the host's toggles may come after 主题 on a loaded machine: waited for, not read once
+        until("${service.getString(from)} in the panel") { shownText(service.getString(from)) }
         assertFalse(on(name))
         statusTap(from)
         // the host's toggle flipped, the panel shows it so
