@@ -62,13 +62,17 @@ class BuiltInsTest {
         assertTrue("bottom" in problem.message, problem.message)
     }
 
-    // the build's BuiltInFiles are src/commonMain's layouts and themes, by name, as written
+    // the build's BuiltInFiles are src/commonMain's layouts and themes, by name, as written (a layout packed)
     @Test
     fun theBuildPutInTheAppsFiles() {
         val main = "${testDataDir()}/../../commonMain"
         val layouts = listNames("$main/layouts").filter { it.endsWith(".xml") }.map { it.removeSuffix(".xml") }.sorted()
         assertEquals(layouts, BuiltInFiles.layouts.keys.sorted())
-        for (name in layouts) assertEquals(readText("$main/layouts/$name.xml"), BuiltInFiles.layouts[name], name)
+        // a layout without its comments and indents (the build's packed): its lines the file's
+        val packed = { xml: String ->
+            xml.replace(Regex("<!--[\\s\\S]*?-->")) { c -> "\n".repeat(c.value.count { it == '\n' }) }.replace(Regex("^[ \\t]+|[ \\t]+$", RegexOption.MULTILINE), "")
+        }
+        for (name in layouts) assertEquals(readText("$main/layouts/$name.xml")?.let(packed), BuiltInFiles.layouts[name], name)
         // none yet (T3 writes them): no folder at all is none
         val themes = if (!exists("$main/themes")) emptyList() else listNames("$main/themes").filter { it.endsWith(".xml") }.map { it.removeSuffix(".xml") }.sorted()
         assertEquals(themes, BuiltInFiles.themes.keys.sorted())

@@ -19,6 +19,8 @@ const scene = join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src');
 const data = join(scene, 'commonTest', 'data');
 const testdata = join(here, 'testdata');
 const read = (...p) => readFileSync(join(...p), 'utf8');
+// a built-in layout as the library keeps it (lib/keyboard-scene's builtInFiles, packed): no comments, no indents, its lines kept
+const packed = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => '\n'.repeat(c.split('\n').length - 1)).replace(/^[ \t]+|[ \t]+$/gm, '');
 
 // Path2D is the browser's; an icon's path here is its name (the icons below), so a fill of one says which
 globalThis.Path2D = class { constructor(d) { this.d = d; } };
@@ -111,7 +113,7 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   const files = readdirSync(dir).filter((f) => f.endsWith('.xml')).map((f) => f.slice(0, -4)).sort();
   const boards = files.filter((f) => /<keyboard[\s>]/.test(read(dir, f + '.xml')));
   assert.deepEqual([...E.layouts()], boards);
-  for (const f of files) assert.equal(E.layoutSource(f), read(dir, f + '.xml'));
+  for (const f of files) assert.equal(E.layoutSource(f), packed(read(dir, f + '.xml')));
   assert.equal(E.layoutSource('nope'), null);
   assert.equal(E.layout('grouped-bottom'), null, 'a fragment is no board');
   assert.equal(E.layout('qwerty').id, 'qwerty');
@@ -479,7 +481,7 @@ test("the facade's answers to values of the wrong type are problems, never a thr
 
 test('the built-in themes and layouts are what the build put in (lib/keyboard-scene builtInFiles)', () => {
   assert.ok(E.layouts().includes('qwerty') && E.layouts().includes('nine'));
-  assert.equal(E.layoutSource('grouped-bottom'), read(scene, 'commonMain', 'layouts', 'grouped-bottom.xml'));
+  assert.equal(E.layoutSource('grouped-bottom'), packed(read(scene, 'commonMain', 'layouts', 'grouped-bottom.xml')));
 });
 
 test("the bar's sample and the app's views' looks for the maker's preview (M3): of the theme, its height the bar's", () => {
