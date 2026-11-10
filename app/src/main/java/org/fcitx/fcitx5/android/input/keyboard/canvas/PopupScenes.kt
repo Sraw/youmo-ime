@@ -49,9 +49,9 @@ class PopupScenes(
     // the built-in where the engine makes nothing of the theme or refused its keys' scene, as the keys are (U8): popups shown still
     private val theme = SceneBoard.drawnTheme(theme)
     private val look = ThemeManager.shownLook(this.theme)
-    private val fonts = SceneFonts(look)
+    private val fonts = SceneFonts.of(this.theme, look)
     private val measurer = measuring(AndroidTextMeasurer(fonts))
-    private val sceneTheme = SceneThemes.of(look, this.theme.name, this.theme.isDark)
+    private val sceneTheme = SceneThemes.of(this.theme, look)
 
     /** Whether the theme or, where it fell back, the built-in converted: its popups drawn as scenes. */
     val ready: Boolean get() = sceneTheme != null

@@ -2,6 +2,7 @@ scene 1102.5x449
 base
   fill rect(0,0,1102.5,449 r=18.38,18.38,18.38,18.38) #ffeceff1
 slot handwriting-pad pad 0,0,937,359
+  ink #ff37474f 9.19
   shadow rect(7.88,10.5,929.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
   fill rect(7.88,10.5,929.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
 key backspace kind=function role=backspace a11y="a11y_key_backspace"

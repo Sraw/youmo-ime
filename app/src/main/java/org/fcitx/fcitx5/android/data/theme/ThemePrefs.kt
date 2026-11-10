@@ -273,18 +273,47 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      * 060-render-p3 T3: a slot ([normalModeTheme], [lightModeTheme], [darkModeTheme]) naming a built-in theme
      * by its 0.5 name (`PixelDark`, `MonetLight`) names it as it is now (`pixel#dark`, `monet#light`,
      * [BuiltinThemeFiles.LEGACY]): what each showed it shows. One naming a theme of the user's
-     * ([customs]) is left, which it was before as well (the user's first). Run at every start, no mark:
+     * ([customs]: the listed ones' names, and any a json not listed or a directory not read may hold,
+     * [ThemeFilesManager.mayHoldThemes]) is left, which it was before as well (the user's first); till it
+     * is moved, [ThemeManager.getTheme] reads an old name as the built-in theme. Run at every start and
+     * refresh, no mark:
      * no old name is written any more (an import of one is refused), so a backup of an older version
      * brought back, and the copy for before the first unlock (written by an older version, read with
      * this one's), are moved as they are read. A name of no theme (one deleted) is left: the default.
+     * Whether a slot was moved.
      */
-    fun migrateThemeRefs(customs: Set<String>) {
+    fun migrateThemeRefs(customs: Set<String>): Boolean {
         val moved = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key).mapNotNull { key ->
             // a value not a string (a damaged file) is no name: left, read as the default
             val name = runCatching { sharedPreferences.getString(key, null) }.getOrNull() ?: return@mapNotNull null
             BuiltinThemeFiles.LEGACY[name]?.takeIf { name !in customs }?.let { key to it }
         }
         if (moved.isNotEmpty()) sharedPreferences.edit { moved.forEach { (key, ref) -> putString(key, ref) } }
+        return moved.isNotEmpty()
+    }
+
+    /**
+     * Each slot naming the user's theme [from] names [to] (060-render-p3 T3: one hiding a built-in theme
+     * saved again under a new name, [ThemeFilesManager.moveClashing]); on disk before it returns, as the
+     * old theme's json is deleted next. Whether it was written.
+     */
+    /** Whether a slot names the theme [name]. */
+    fun namesTheme(name: String): Boolean = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
+        .any { runCatching { sharedPreferences.getString(it, null) }.getOrNull() == name }
+
+    fun renameThemeRefs(from: String, to: String): Boolean {
+        val keys = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
+            .filter { runCatching { sharedPreferences.getString(it, null) }.getOrNull() == from }
+        if (keys.isEmpty()) return true
+        return sharedPreferences.edit().apply { keys.forEach { putString(it, to) } }.commit()
+    }
+
+    /** The slots naming one of [refs] back to their defaults ([PackDrawGuard]): whether any was. */
+    fun dropThemeRefs(refs: Set<String>): Boolean {
+        val keys = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
+            .filter { runCatching { sharedPreferences.getString(it, null) }.getOrNull() in refs }
+        if (keys.isNotEmpty()) sharedPreferences.edit { keys.forEach(::remove) }
+        return keys.isNotEmpty()
     }
 
     val dayNightModePrefNames = setOf(

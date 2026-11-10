@@ -89,13 +89,13 @@
 - **JVM**：`EnglishUatTest.suggestionsTurnedOff`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### EN-19 [P1] 不要提示的输入框、关掉单词提示时也能划词
-- **前提**：B0-英文，打开 **滑行输入**，点「不要提示」框。
+- **前提**：B0-英文，在 **在键上划** 里选 **滑行输入**，点「不要提示」框。
 - **操作**：划 h-e-l-l-o。再到英文设置里关掉 **单词提示**，回测试页在普通框里划 h-e-l-l-o。然后在这个框里清空，打 abc，再划 h-e-l-l-o，接着按一下退格；再划 h-e-l-l-o，接着打 `,`。
 - **预期**：前两次框里都是「hello 」，没有方块、问号之类的怪字符，也不会什么都没打上。打 abc 后划出的是「abc hello 」（有空格，不粘连）；按退格后整个「 hello 」删掉，剩「abc」；再划后打逗号，是「abc hello, 」（空格移到逗号后面），候选栏不出联想词。
 - **JVM**：`KeyboardFieldsUatTest.aNoSuggestionsFieldAndSuggestionsOffStillGlide`（两种情况都交出一次划词）、`EnglishUatTest.aGlideInANoSuggestionsFieldAndWithSuggestionsOffTypesTheWord`（:lib:ime-eval:uatTest，两次都是「hello 」；关掉单词提示后打 abc 再划是「abc hello 」，退格剩「abc」，再划打逗号是「abc hello, 」）；设备上照跑（候选栏不出联想词只在设备上看）。
 
 ### EN-21 [P1] 要求大写的框里划词：句首大写，专名和 I 保持大写；手动 ⇧ 也大写
-- **前提**：B0-英文，打开 **滑行输入**，点「句子」框（这个框要求句首大写），Shift 关着。
+- **前提**：B0-英文，在 **在键上划** 里选 **滑行输入**，点「句子」框（这个框要求句首大写），Shift 关着。
 - **操作**：清空，划 h-e-l-l-o，再划 l-o-n-d-o-n；打 `.` 和空格，划 i-m（i'm）。清空，打 `so ` 再划 i-m；到「不要提示」框（不自动大写）打 `ok ` 再划 i-m。在「不要提示」框清空，点一下 ⇧，划 h-e-l-l-o。
 - **预期**：框里是「Hello London. I'm 」：句首键盘自动打开 Shift，划出的第一个词大写；London 是词本身带的大写，句中照样保留；i'm 划出来是「I'm」，和点出来的一样。句中 Shift 关着时也一样：「So I'm 」（句首的 s 照常自动大写，I'm 在句中也大写）；不自动大写的框里是「ok I'm 」，不是「i'm」。点 ⇧ 后划的是「Hello 」（Shift 开着时首字母大写）。
 - **JVM**：`EnglishCapsUatTest.aGlideTakesShiftWhereTheFieldAsksACapitalOrItIsPressed`（键盘何时带 Shift）+ `EnglishUatTest.aGlideTakesShiftAWordsOwnCapitalAndI`（引擎的大写）；设备上不跑。

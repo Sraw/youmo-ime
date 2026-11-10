@@ -10,6 +10,7 @@ import android.content.ContextWrapper
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BoardImages
+import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
@@ -92,9 +93,9 @@ class SceneBoard(
 
     private fun drawn(of: Theme, look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
         val layout = layout ?: return null
-        val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(look, of.name, of.isDark) } ?: return null
-        val measurer = measurer(look)
-        return scene(layout, sceneTheme, look, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts) }
+        val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(of, look) } ?: return null
+        val measurer = measurer(of, look)
+        return scene(layout, sceneTheme, look, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key)) }
     }
 
     // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it
@@ -133,9 +134,10 @@ class SceneBoard(
         // a theme switched back to makes no scene again and measures no text again; what a switch allocates
         // more than the views' decides whether a GC stops its first frame (specs/app.md)
         private const val KEPT_SCENES = 4
-        // a look's measurer: as many as the themes kept (SceneThemes), not the scenes
+        // a look's measurer, by the look and a pack's fonts (two packs of one look may name others):
+        // as many as the themes kept (SceneThemes), not the scenes
         private const val KEPT_LOOKS = 4
-        private val measurers = lruMap<ThemeLook, AndroidTextMeasurer>(KEPT_LOOKS)
+        private val measurers = lruMap<Pair<ThemeLook, Map<String, String>>, AndroidTextMeasurer>(KEPT_LOOKS)
         private val scenesKept = ArrayDeque<Made>()
 
         // the themes (by name and look) that made no scene, the built-in drawn instead: logged once each,
@@ -175,7 +177,8 @@ class SceneBoard(
         private var namesMade: Pair<SceneLayout, Set<String>>? = null
         private var marksMade: Pair<MarksFor, MarkSettings>? = null
 
-        private fun measurer(look: ThemeLook): AndroidTextMeasurer = measurers.getOrPut(look) { AndroidTextMeasurer(SceneFonts(look)) }
+        private fun measurer(of: Theme, look: ThemeLook): AndroidTextMeasurer =
+            measurers.getOrPut(look to (of as? Theme.Pack)?.drawn?.fonts.orEmpty()) { AndroidTextMeasurer(SceneFonts.of(of, look)) }
 
         /**
          * The theme a popup or a panel's cell draws in: [theme], or where the engine makes no theme of
@@ -186,7 +189,7 @@ class SceneBoard(
         fun drawnTheme(theme: Theme, board: String? = shownBoard): Theme {
             val look = ThemeManager.shownLook(theme)
             val refused = board != null && Triple(theme.name, look, board) in keysRefused
-            if (!refused && SceneThemes.of(look, theme.name, theme.isDark) != null) return theme
+            if (!refused && SceneThemes.of(theme, look) != null) return theme
             val builtIn = ThemeManager.builtin(if (theme.isDark) "pixel#dark" else "pixel#light")
             if (builtIn.name == theme.name) return theme
             if (firstFallBack(theme.name, look)) Timber.w("scene: no theme of %s; the built-in %s's drawn", theme.name, builtIn.name)

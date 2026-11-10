@@ -11,6 +11,7 @@ import kotlinx.parcelize.TypeParceler
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.scene.look.Palette
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import java.io.File
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 
 sealed class Theme : Parcelable {
@@ -49,8 +50,21 @@ sealed class Theme : Parcelable {
     abstract val genericActiveBackgroundColor: Int
     abstract val genericActiveForegroundColor: Int
 
-    /** All the theme draws with: a custom theme's own, a built-in one's its colours with [LookDefaults]. */
+    /**
+     * All the theme draws with: a custom theme's own, a built-in one's its colours with [LookDefaults]; a pack's
+     * what of it the views round the keys take (its keys are drawn as its file says: [Pack.scene]).
+     */
     abstract val look: ThemeLook
+
+    /**
+     * A theme of a theme 4.0 file, one of whose versions it is ([BuiltinThemeFiles.ref]: `pixel#dark`, or the
+     * file's name alone where it has one): the versions of one [file] are one card in the list.
+     */
+    interface Versioned {
+        val name: String
+        val isDark: Boolean
+        val file: String
+    }
 
     /**
      * The user's own, saved as a file: all of it is its [look] (theme file 3.0), the colours too;
@@ -98,7 +112,7 @@ sealed class Theme : Parcelable {
         override val name: String,
         override val isDark: Boolean,
         /** Its file's theme: the versions of one file are one card in the list. */
-        val file: String,
+        override val file: String,
         val followsSystem: Boolean,
         override val backgroundColor: Int,
         override val barColor: Int,
@@ -124,7 +138,7 @@ sealed class Theme : Parcelable {
         val keyBorderColor: Int,
         val keyHintColor: Int,
         val toolbarIconColor: Int,
-    ) : Theme() {
+    ) : Theme(), Versioned {
 
         /** Its colours as [ThemeLook] holds them. */
         fun palette() = Palette(
@@ -162,5 +176,63 @@ sealed class Theme : Parcelable {
                 )
             }
         }
+    }
+
+    /**
+     * A theme 4.0 pack of the user's (060-render-p3 T8a), as one of its versions: [file] its name and its folder's
+     * (`v4/<file>/` in the themes', [dir]), [stamp] its `theme.xml`'s time (a pack imported again another theme).
+     * Its keys, bar and popups are drawn as the file says ([scene], read from it when first drawn: no pack's text is
+     * kept); the views round them take its colours and what [look] makes of its picture and fonts.
+     */
+    @Parcelize
+    data class Pack(
+        override val name: String,
+        override val isDark: Boolean,
+        override val file: String,
+        val dir: String,
+        val stamp: Long,
+    ) : Theme(), Versioned {
+
+        /**
+         * Its theme as the engine reads it, this version ([ThemePackFiles.scene]: with the system's colours as they
+         * are; the built-in theme's where its file no longer reads).
+         */
+        @IgnoredOnParcel
+        val scene: SceneTheme by lazy { ThemePackFiles.scene(dir, isDark) }
+
+        /** [scene] as drawn: its files by their paths ([ThemePackFiles.drawn]). */
+        @IgnoredOnParcel
+        val drawn: SceneTheme by lazy { ThemePackFiles.drawn(scene, dir) }
+
+        @IgnoredOnParcel
+        private val palette: Palette by lazy { ThemePackFiles.palette(scene) }
+
+        @IgnoredOnParcel
+        override val look: ThemeLook by lazy { ThemePackFiles.look(scene, palette, dir) }
+
+        /** The file of it a theme 4 names [name] (by its name in the pack's folder). */
+        fun path(name: String): String = File(dir, name).path
+
+        override val backgroundColor get() = palette.backgroundColor
+        override val barColor get() = palette.barColor
+        override val keyboardColor get() = palette.keyboardColor
+        override val keyBackgroundColor get() = palette.keyBackgroundColor
+        override val keyTextColor get() = palette.keyTextColor
+        override val candidateTextColor get() = palette.candidateTextColor
+        override val candidateLabelColor get() = palette.candidateLabelColor
+        override val candidateCommentColor get() = palette.candidateCommentColor
+        override val altKeyBackgroundColor get() = palette.altKeyBackgroundColor
+        override val altKeyTextColor get() = palette.altKeyTextColor
+        override val accentKeyBackgroundColor get() = palette.accentKeyBackgroundColor
+        override val accentKeyTextColor get() = palette.accentKeyTextColor
+        override val keyPressHighlightColor get() = palette.keyPressHighlightColor
+        override val keyShadowColor get() = palette.keyShadowColor
+        override val popupBackgroundColor get() = palette.popupBackgroundColor
+        override val popupTextColor get() = palette.popupTextColor
+        override val spaceBarColor get() = palette.spaceBarColor
+        override val dividerColor get() = palette.dividerColor
+        override val clipboardEntryColor get() = palette.clipboardEntryColor
+        override val genericActiveBackgroundColor get() = palette.genericActiveBackgroundColor
+        override val genericActiveForegroundColor get() = palette.genericActiveForegroundColor
     }
 }

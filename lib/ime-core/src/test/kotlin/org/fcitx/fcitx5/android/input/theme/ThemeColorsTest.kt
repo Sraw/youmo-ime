@@ -48,14 +48,6 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun entriesAndButtonsFollowTheKeysCorners() {
-        // the defaults their own settings had: 2 and 8 dp beside the keys' 4
-        assertEquals(2f, ThemeColors.entryRadius(blocks), 0f)
-        assertEquals(8f, ThemeColors.buttonRadius(blocks), 0f)
-        assertEquals(0f, ThemeColors.buttonRadius(blocks.copy(radiusDp = 0)), 0f)
-    }
-
-    @Test
     fun panelsShowTheBarColourOnlyOverFlatKeys() {
         assertEquals(null, ThemeColors.panel(PALETTE, blocks))
         assertEquals(PALETTE.barColor, ThemeColors.panel(PALETTE, blocks.copy(blocks = false)))

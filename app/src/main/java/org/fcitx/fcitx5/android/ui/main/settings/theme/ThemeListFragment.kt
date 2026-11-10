@@ -39,7 +39,7 @@ class ThemeListFragment : Fragment() {
 
     private var followSystemDayNightTheme by ThemeManager.prefs.followSystemDayNightTheme
 
-    private var beingExported: Theme.Custom? = null
+    private var beingExported: Theme? = null
 
     @Keep
     private val onThemeChangeListener = ThemeManager.OnThemeChangeListener {
@@ -67,10 +67,16 @@ class ThemeListFragment : Fragment() {
                     try {
                         // the list read here, where it is changed, not on the thread that imports
                         val themes = ThemeManager.getAllThemes()
-                        val (newCreated, theme, migrated) = withContext(Dispatchers.IO) {
+                        val opened = withContext(Dispatchers.IO) {
                             val inputStream = cr.openInputStream(uri)!!
-                            ThemeFilesManager.importTheme(inputStream, themes).getOrThrow()
+                            ThemeFilesManager.openTheme(inputStream, themes).getOrThrow()
                         }
+                        // a theme 4.0 pack: shown, taken only if the user does (060-render-p3 T8a)
+                        if (opened is ThemeFilesManager.Opened.Pack) {
+                            confirmPack(opened)
+                            return@withLoadingDialog
+                        }
+                        val (newCreated, theme, migrated) = (opened as ThemeFilesManager.Opened.Json).imported
                         // one imported again under its name: its files new under the old names, the
                         // keyboard drawn anew if it is the one in use
                         ThemeManager.filesChanged(theme.name) { ThemeManager.refreshThemes() }
@@ -114,8 +120,9 @@ class ThemeListFragment : Fragment() {
         themeListAdapter = object : ThemeListAdapter() {
             override fun onAddNewTheme() = addTheme()
             override fun onSelectTheme(theme: Theme) = selectTheme(theme)
-            override fun onExportTheme(theme: Theme.Custom) = exportTheme(theme)
-            override fun onDeleteTheme(theme: Theme.Custom) = deleteTheme(theme)
+            override fun onExportTheme(theme: Theme) = exportTheme(theme)
+            override fun onDeleteTheme(theme: Theme) = deleteTheme(theme)
+            override fun onThemeInfo(theme: Theme) = themeInfo(theme)
         }
         ThemeManager.refreshThemes()
         themeListAdapter.setThemes(ThemeManager.getAllThemes())
@@ -138,11 +145,11 @@ class ThemeListFragment : Fragment() {
         themeListAdapter.setSelectedThemes(active, light, dark)
     }
 
-    // the app lists, picks, imports, exports and deletes themes; it makes none, so 新增主题 is the import's file picker
+    // the app makes no themes: 新增主题 imports a file, or opens the web theme maker to make one
     private fun addTheme() {
         // the themes not settled: an import would go nowhere the next start reads
         if (ThemeManager.refuseIfNotSettled()) return
-        importLauncher.launch("*/*")
+        ThemeAddMenu.show(requireContext()) { importLauncher.launch("*/*") }
     }
 
     private fun selectTheme(theme: Theme) {
@@ -166,12 +173,43 @@ class ThemeListFragment : Fragment() {
         ThemeManager.setNormalModeTheme(theme)
     }
 
-    private fun exportTheme(theme: Theme.Custom) {
+    private fun exportTheme(theme: Theme) {
         beingExported = theme
-        exportLauncher.launch(ThemeFileName.of(theme.name))
+        exportLauncher.launch(ThemeFileName.of(ThemePackDialogs.title(theme)))
     }
 
-    private fun deleteTheme(theme: Theme.Custom) {
+    // a pack unpacked and checked: its metadata, what it warns of; taken on 导入, else let go
+    private fun confirmPack(pack: ThemeFilesManager.Opened.Pack) {
+        val ctx = requireContext()
+        val title = ctx.getString(R.string.theme_pack_import_title, pack.staged.name)
+        val discard = { lifecycleScope.launch(Dispatchers.IO) { pack.discard() } }
+        ThemePackDialogs.builder(ctx, title, ThemePackDialogs.confirmText(ctx, pack), pack.staged.preview)
+            .setPositiveButton(R.string.theme_pack_import) { _, _ ->
+                lifecycleScope.withLoadingDialog(ctx) {
+                    try {
+                        withContext(Dispatchers.IO) { pack.commit().getOrThrow() }
+                        ThemeManager.packPlaced(pack.staged.name)
+                        // its versions one card, a pack it replaced gone: the list made again
+                        themeListAdapter.resetThemes(ThemeManager.getAllThemes())
+                        updateSelectedThemes()
+                    } catch (e: Exception) {
+                        ctx.importErrorDialog(e)
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ -> discard() }
+            .setOnCancelListener { discard() }
+            .show()
+    }
+
+    private fun themeInfo(theme: Theme) {
+        val ctx = requireContext()
+        ThemePackDialogs.builder(ctx, ThemePackDialogs.title(theme), ThemePackDialogs.infoText(ctx, theme), ThemePackDialogs.preview(theme))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    private fun deleteTheme(theme: Theme) {
         if (ThemeManager.refuseIfNotSettled()) return
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.delete_theme)

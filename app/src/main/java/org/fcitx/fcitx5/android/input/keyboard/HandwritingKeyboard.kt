@@ -193,6 +193,8 @@ class HandwritingKeyboard(
         if (!placed) return
         padSlot.offset(c.left, c.top)
         padView.layout(padSlot.left, padSlot.top, padSlot.right, padSlot.bottom)
+        // its strokes as the theme has them (the slot's ink; its grid the canvas draws under the pad)
+        c.slotInk(PAD_SLOT)?.let { padView.ink(it.color.value, it.width.toFloat()) }
     }
 
     private var scope: CoroutineScope? = null

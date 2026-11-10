@@ -38,6 +38,7 @@ class VoiceTapOverlay(
 ) : BaseInputView.Hold {
     private val theme = inputView.theme
     private val ctx = inputView.context
+    private val look = VoiceStyle.panel(ctx, theme)
     private val service = inputView.service
 
     private val tap = VoiceTap()
@@ -82,8 +83,8 @@ class VoiceTapOverlay(
         // what is said shows in the field as it is said; here only where the field cannot show it
         visibility = if (session.composes) View.INVISIBLE else View.VISIBLE
     }
-    private val wave = VoiceCard.wave(ctx, theme)
-    private val pill = VoiceCard.pill(ctx, wave, VoiceCard.pillColor(theme))
+    private val wave = VoiceCard.wave(ctx, look.micColor.value)
+    private val pill = VoiceCard.pill(ctx, wave, look.micFill.value)
     private val status = TextView(ctx).apply {
         textSize = 15f
         gravity = Gravity.CENTER
@@ -98,7 +99,7 @@ class VoiceTapOverlay(
         setText(R.string.voice_tap_hint)
     }
 
-    private val glass = VoiceGlass(VoiceStyle.mask(theme.keyboardColor))
+    private val glass = VoiceStyle.glass(ctx, look)
 
     private val card: FrameLayout = FrameLayout(ctx).apply {
         background = glass

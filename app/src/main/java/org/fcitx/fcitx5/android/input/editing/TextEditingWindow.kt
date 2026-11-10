@@ -19,7 +19,7 @@ import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
-import org.fcitx.fcitx5.android.input.theme.ThemeColors
+import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.scene.look.PressEffect
@@ -37,8 +37,8 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
     private val buttonRipple get() = ThemeManager.shownLook(theme).keys.press == PressEffect.Ripple
     private val buttonBorder get() = ThemeManager.shownLook(theme).keys.blocks
 
-    // as its own setting had it: its dp a number of pixels (8 beside the keys' 4 dp)
-    private val buttonRadius get() = ThemeColors.buttonRadius(ThemeManager.shownLook(theme).keys)
+    // the theme's (060-render-p3 T7b); not set, as its own setting had it: its dp a number of pixels (8 beside the keys' 4 dp)
+    private val buttons get() = ScenePanels.editing(context, theme)
 
     private var hasSelection = false
 
@@ -66,7 +66,8 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
     )
 
     private val ui by lazy {
-        TextEditingUi(context, theme, buttonRipple, buttonBorder, buttonRadius).apply {
+        val look = buttons
+        TextEditingUi(context, theme, buttonRipple, buttonBorder, ScenePanels.editingRadius(context, look), look.fill?.value).apply {
             fun CustomGestureView.onClickWithRepeating(block: () -> Unit) {
                 setOnClickListener { block() }
                 repeatEnabled = true

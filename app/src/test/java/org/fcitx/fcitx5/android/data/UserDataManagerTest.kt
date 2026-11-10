@@ -429,6 +429,38 @@ class UserDataManagerTest {
         assertFalse(File(fresh.external, "theme").exists())
     }
 
+    // 060-render-p3 T8a: a theme 4.0 pack's folder (its theme.xml, its files, its layouts/) goes with the themes and
+    // comes back whole, the phone's own packs left be (an older build restoring it lists json files only)
+    @Test
+    fun aThemePacksFolderRoundTripsThroughABackup() {
+        val phone = moved("phone")
+        phone.theme.put("mine.json", "{}")
+        phone.theme.put("v4/p/theme.xml", "<theme/>")
+        phone.theme.put("v4/p/k.png", "png")
+        phone.theme.put("v4/p/layouts/qwerty.xml", "<layout/>")
+        val zip = exported(phone).readBytes()
+        assertEquals(
+            mapOf(
+                "external/theme/mine.json" to "{}",
+                "external/theme/v4/p/theme.xml" to "<theme/>",
+                "external/theme/v4/p/k.png" to "png",
+                "external/theme/v4/p/layouts/qwerty.xml" to "<layout/>",
+            ),
+            entries(zip.inputStream()).filterKeys { it.startsWith("external/theme/") },
+        )
+        val fresh = moved("fresh")
+        fresh.theme.put("v4/q/theme.xml", "phone's")
+        // the phone's pack of a name the backup has: replaced whole, not merged (a file of it left over)
+        fresh.theme.put("v4/p/theme.xml", "phone's p")
+        fresh.theme.put("v4/p/old.png", "old")
+        UserDataManager.import(zip.inputStream(), fresh).getOrThrow()
+        assertEquals("<theme/>", File(fresh.theme, "v4/p/theme.xml").readText())
+        assertEquals("png", File(fresh.theme, "v4/p/k.png").readText())
+        assertEquals("<layout/>", File(fresh.theme, "v4/p/layouts/qwerty.xml").readText())
+        assertFalse(File(fresh.theme, "v4/p/old.png").exists())
+        assertEquals("phone's", File(fresh.theme, "v4/q/theme.xml").readText())
+    }
+
     // A4: with the config, data or themes not settled, an export would take a stand-in and a restore write
     // where the next start does not read: both refuse, the user told why, nothing written
     @Test

@@ -12,6 +12,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
+import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
@@ -23,17 +24,31 @@ import org.fcitx.fcitx5.android.scene.engine.TextMetrics
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.scene.theme.Cascades
+import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import timber.log.Timber
+import org.fcitx.fcitx5.android.data.theme.Theme as AppTheme
 
 /**
  * A scene's text in [look]'s fonts: `system` the system's, [LookTheme.KEY_FONT] the theme's key font,
- * at the weight asked (ThemeAssets); null the default one.
+ * [LookTheme.CANDIDATE_FONT] its candidates' (060-render-p3 T6a), a pack's ([files]: its fonts by name, each its
+ * file's path, T8a) any of its own, at the weight asked (ThemeAssets); null the default one.
  */
-class SceneFonts(private val look: ThemeLook) {
-    fun typeface(font: String, weight: Int): Typeface? =
-        ThemeAssets.typeface(look, if (font == LookTheme.KEY_FONT) look.text.keyFont else null, weight)
+class SceneFonts(private val look: ThemeLook, private val files: Map<String, String> = emptyMap()) {
+    fun typeface(font: String, weight: Int): Typeface? = ThemeAssets.typeface(look, files[font] ?: path(look, font), weight)
+
+    companion object {
+        /** [theme]'s fonts, [look] the one it is drawn in (ThemeManager.shownLook). */
+        fun of(theme: AppTheme, look: ThemeLook) = SceneFonts(look, (theme as? AppTheme.Pack)?.drawn?.fonts.orEmpty())
+
+        /** The file of [font] in [look]; null, the system's. */
+        fun path(look: ThemeLook, font: String): String? = when (font) {
+            LookTheme.KEY_FONT -> look.text.keyFont
+            LookTheme.CANDIDATE_FONT -> look.text.candidateFont
+            else -> null
+        }
+    }
 }
 
 /**
@@ -200,6 +215,20 @@ object SceneThemes {
             refused.clear()
         }
 
+    // the packs' (060-render-p3 T8a), read as they were listed, by the system's colours their system() took
+    private val packs = lruMap<Pair<AppTheme.Pack, SystemColors>, Made>(KEPT)
+
+    /**
+     * [theme]'s engine theme, drawn in [look] (ThemeManager.shownLook): a pack's its own file ([AppTheme.Pack.drawn]),
+     * any other's its look's ([of]).
+     */
+    fun of(theme: AppTheme, look: ThemeLook): Theme? {
+        if (theme !is AppTheme.Pack) return of(look, theme.name, theme.isDark)
+        val key = theme to ThemePackFiles.systemColors
+        packs[key]?.let { return it.theme }
+        return theme.drawn.also { packs[key] = Made(it) }
+    }
+
     fun of(look: ThemeLook, name: String, dark: Boolean): Theme? {
         val key = Triple(look, name, dark)
         made[key]?.let { return it.theme }
@@ -231,5 +260,6 @@ object SceneThemes {
     }
 
     /** [theme]'s cascades, [of]'s theme kept; a theme not kept (none [of] made), new ones. */
-    fun cascades(theme: Theme): Cascades = made.values.firstOrNull { it.theme === theme }?.cascades ?: Cascades(theme)
+    fun cascades(theme: Theme): Cascades =
+        (made.values.firstOrNull { it.theme === theme } ?: packs.values.firstOrNull { it.theme === theme })?.cascades ?: Cascades(theme)
 }

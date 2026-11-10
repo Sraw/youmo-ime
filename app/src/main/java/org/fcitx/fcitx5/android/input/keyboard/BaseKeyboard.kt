@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -86,6 +87,8 @@ abstract class BaseKeyboard(
     // drawn as their kinds till they are in (ThemeAssets)
     protected val keyImages: BoardImages by lazy {
         val look = ThemeManager.shownLook(theme)
+        // a pack's: every image its styles name (060-render-p3 T8a; a few, ThemeAssetLimits holds each)
+        (theme as? Theme.Pack)?.let { return@lazy ThemeAssets.boardImages(look, themeBoard, ThemePackFiles.images(it.drawn)) }
         // no board name (the number row, a search's keys): the kinds' and the roles' images still
         val board = themeBoard
         // its keys' and the places it draws apart from them (the nine keys' column)
@@ -141,8 +144,7 @@ abstract class BaseKeyboard(
     /** Set per field ([KeyboardWindow]): an address's has no glide typing, as no word is typed there. */
     open var address: AddressKeys = AddressKeys.NONE
 
-    private val glideTyping = prefs.keyboard.glideTyping
-    private val strokeFilter = prefs.keyboard.strokeFilter
+    private val keyDrawing = prefs.keyboard.keyDrawing
 
     /**
      * Set as the input method has something typed or not, a temporary mode's (快速输入) not counted
@@ -165,8 +167,8 @@ abstract class BaseKeyboard(
 
     /**
      * Glide typing over [letters], taken where [enabled] says and 滑行输入 is on, in a field where
-     * words are typed: not a password's or an address's. Where 笔画筛选 is on instead (the settings
-     * page keeps the two from being on together), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
+     * words are typed: not a password's or an address's. Where 笔画筛选 is chosen instead (one setting,
+     * [KeyDrawing]), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
      * one: sent as the engine's stroke key (Keyboard.strokeKey), the shape StrokeShape's; one it
      * reads as none is dropped.
      */
@@ -178,11 +180,11 @@ abstract class BaseKeyboard(
         glided: (path: FloatArray, layout: GlideLayout) -> Unit,
     ) = GlideInput(
         this, theme,
-        enabled = { glideTyping.getValue() && wordField() && enabled() },
+        enabled = { keyDrawing.getValue() == KeyDrawing.Glide && wordField() && enabled() },
         letters = letters,
         longPressMillis = { longPressDelay.toLong() },
         down = down,
-        strokes = { strokeFilter.getValue() && wordField() && imTyping && filters() },
+        strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
         stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction(KeySym(UNICODE + Keyboard.strokeKey(it)), KeyStates.Virtual)) } },
         glided = glided,
     )
@@ -275,8 +277,11 @@ abstract class BaseKeyboard(
     /** What swiping the key of [def] types where the user chose it ([TextKeyboard]): [SwipeChoice.BuiltIn] for what its key says. */
     protected open fun swipeText(def: KeyDef): SwipeChoice = SwipeChoice.BuiltIn
 
-    /** What a tap sends for its key's [action]: the action itself, but where a keyboard adds where it fell, [clickAt] ([KeyGesture.clickAt]). */
-    protected open fun pressed(clickAt: Float, action: KeyAction): KeyAction = action
+    /**
+     * What a tap sends for its key's [action]: the action itself, but where a keyboard adds where it fell,
+     * [clickAt] across and [clickDown] down ([KeyGesture.clickAt], [KeyGesture.clickDown]).
+     */
+    protected open fun pressed(clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = action
 
     /**
      * What [key] of [def], a key the scene draws (060-render-p2 S1), does: its sound, the space's and
@@ -362,7 +367,7 @@ abstract class BaseKeyboard(
         val g = key.keyGesture
         def.behaviors.forEach {
             when (it) {
-                is KeyDef.Behavior.Press -> key.onClick { k -> onAction(pressed(k.keyGesture.clickAt, it.action)) }
+                is KeyDef.Behavior.Press -> key.onClick { k -> onAction(pressed(k.keyGesture.clickAt, k.keyGesture.clickDown, it.action)) }
                 // hold to talk follows the finger that holds the space
                 is KeyDef.Behavior.LongPress -> key.onLongClick { k ->
                     val action = it.action
@@ -490,10 +495,12 @@ abstract class BaseKeyboard(
      * Called last in a keyboard's init: the scene reads its state ([sceneEnv]). Each key wired as
      * its layout's node says ([SceneKeyDef], [sceneTable] the keyboard's own words: U4 B).
      */
-    protected fun drawKeysWithScene(layoutName: String) {
+    protected fun drawKeysWithScene(layoutName: String) = drawKeysWithScene(SceneLayouts.of(context, layoutName))
+
+    /** As [drawKeysWithScene] by its id, [layout] read already (null: none read, nothing drawn): a grouped keyboard's, its groups checked first. */
+    protected fun drawKeysWithScene(layout: SceneLayout?) {
         // once, in init: a second canvas would sit under the first, the touches the new one's
         check(canvas == null) { "drawKeysWithScene called twice" }
-        val layout = SceneLayouts.of(context, layoutName)
         val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
         sceneBoard = board
         val view = board.view(keyImages, ::sceneString, { node -> sceneKey(node) }) { onSceneBuilt(it) }

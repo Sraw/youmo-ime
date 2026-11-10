@@ -200,7 +200,8 @@ class ScenePainter(
         val half = abs(b.width / 2 * dx) + abs(b.height / 2 * dy)
         val cx = (b.left + b.right) / 2
         val cy = (b.top + b.bottom) / 2
-        plain(0)
+        // opaque: a paint's alpha scales its shader's colours, and plain(0)'s none drew nothing (ScenePainterGradientTest)
+        plain(OPAQUE)
         paint.shader = LinearGradient(
             (cx - dx * half).toFloat(), (cy - dy * half).toFloat(), (cx + dx * half).toFloat(), (cy + dy * half).toFloat(),
             op.stops.map { it.first.value }.toIntArray(), op.stops.map { it.second.toFloat() }.toFloatArray(), Shader.TileMode.CLAMP,
@@ -360,6 +361,7 @@ class ScenePainter(
         const val RADII = 8
         private const val KEPT_ICONS = 64
         private const val KEPT_BLURS = 16
+        private const val OPAQUE = 0xFF000000.toInt()
 
         // the icons drawn, every painter's (main thread), the last KEPT_ICONS used: a keyboard made again (a
         // theme switched) inflates none again; let go when what inflating one reads changes (night mode,

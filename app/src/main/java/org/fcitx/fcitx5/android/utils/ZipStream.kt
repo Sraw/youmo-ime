@@ -19,11 +19,17 @@ import java.util.zip.ZipInputStream
  * its bytes read through [check] all the same, and nothing of it written (a Mac's archive of loose
  * files has a `__MACOSX/` of their attributes beside them).
  *
+ * [keep], when given, is what is unpacked instead of [flat]'s rule: the entries whose names it keeps
+ * (a theme 4.0 pack's top and its `layouts/`), the rest counted and read the same, not written. Every
+ * entry's name goes to [names], kept or not.
+ *
  * @return top-level files in zip file
  */
 fun ZipInputStream.extract(
     destDir: File,
     flat: Boolean = false,
+    keep: ((name: String) -> Boolean)? = null,
+    names: MutableCollection<String>? = null,
     check: ((count: Int, size: Long, total: Long) -> Unit)? = null,
 ): List<File> {
     var count = 0
@@ -38,14 +44,16 @@ fun ZipInputStream.extract(
             !(entry.isDirectory && canonicalPath == canonicalDest)
         ) throw SecurityException("Zip entry outside of the destination: ${entry.name}")
         count++
+        names?.add(entry.name)
         val entryCount = count
         val checked = check?.let { c -> { size: Long -> c(entryCount, size, total) } }
+        val kept = keep?.invoke(entry.name) ?: (!flat || entry.isDirectory || file.parentFile?.canonicalPath == canonicalDest)
         when {
             entry.isDirectory -> {
                 checked?.invoke(0)
-                if (!flat) file.mkdirs()
+                if (!flat && kept) file.mkdirs()
             }
-            flat && file.parentFile?.canonicalPath != canonicalDest -> total += copyChecked(Discard, checked)
+            !kept -> total += copyChecked(Discard, checked)
             else -> {
                 // a zip need not have entries for the directories of its files
                 file.parentFile?.mkdirs()

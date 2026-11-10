@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import splitties.dimensions.dp
@@ -47,6 +48,9 @@ import splitties.dimensions.dp
  */
 @SuppressLint("ViewConstructor")
 class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScrollView(context) {
+
+    // the syllables in the code's colour (the theme's `preedit`, 060-render-p3 T6b)
+    private val textColor = SceneBar.of(context, theme).preedit.color.value
 
     /** Where a tap's key goes: the keyboard's listener (PreeditComponent). */
     var onPick: ((KeyAction) -> Unit)? = null
@@ -146,7 +150,7 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
         includeFontPadding = false
         minWidth = dp(KawaiiBarComponent.MIN_TOUCH_DP)
         setPadding(dp(8), 0, dp(8), 0)
-        setTextColor(theme.keyTextColor)
+        setTextColor(textColor)
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT)
         background = pressHighlightDrawable(theme.keyPressHighlightColor)
         isClickable = true

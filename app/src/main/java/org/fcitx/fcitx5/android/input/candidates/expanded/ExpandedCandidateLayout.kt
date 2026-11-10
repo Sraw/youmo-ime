@@ -23,9 +23,10 @@ import org.fcitx.fcitx5.android.input.keyboard.SceneKeyDef
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
-import org.fcitx.fcitx5.android.input.theme.ThemeColors
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Texts
@@ -44,7 +45,7 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.recyclerview.recyclerView
 
 @SuppressLint("ViewConstructor")
-class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout(context) {
+class ExpandedCandidateLayout(context: Context, theme: Theme, bar: BarLook = SceneBar.of(context, theme)) : ConstraintLayout(context) {
 
     class Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, Layout) {
         companion object {
@@ -146,10 +147,11 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val keys = ThemeManager.shownLook(theme).keys
         val inset = dp(if (landscape) keys.gap.vLand else keys.gap.v)
-        ThemeColors.panel(ThemeManager.shownLook(theme).palette, keys)?.let {
-            backgroundColor = it
-            embeddedKeyboard.background =
-                singleSideBorderDrawable(dp(1), theme.dividerColor, Gravity.LEFT, inset)
+        // the theme's `candidates-panel` (T6a), else its panels' (the flat keys': the bar's colour, ThemeColors.panel);
+        // beside the keys, the line between candidates
+        bar.panel?.let {
+            backgroundColor = it.value
+            bar.divider?.let { line -> embeddedKeyboard.background = singleSideBorderDrawable(dp(1), line.value, Gravity.LEFT, inset) }
         }
 
         add(recyclerView, lParams {

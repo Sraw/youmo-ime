@@ -227,8 +227,8 @@ class NineSceneGesturesTest {
         assertGlidesOnTheScene("one-handed")
     }
 
-    private fun assertGlidesOnTheScene(form: String) {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+    private fun assertGlidesOnTheScene(form: String, before: (KeyboardHarness) -> Unit = {}) {
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
             val keys = "2639".map { h.nineKey("$it") }
             val first = keys.first().bounds

@@ -13,15 +13,16 @@ import com.google.android.flexbox.FlexboxLayoutManager
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.CandidateSpacing
-import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
+import org.fcitx.fcitx5.android.scene.engine.BarLook
 import splitties.dimensions.dp
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.wrapContent
-import splitties.views.setPaddingDp
 
-open class HorizontalCandidateViewAdapter(val theme: Theme) :
+/** [bar]: the theme's candidates (T6a), worked out once for every holder and the bar's lines alike. */
+open class HorizontalCandidateViewAdapter(val theme: Theme, val bar: BarLook) :
     RecyclerView.Adapter<CandidateViewHolder>() {
 
     init {
@@ -47,10 +48,10 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
 
     @CallSuper
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
-        val ui = CandidateItemUi(parent.context, theme)
+        val ui = CandidateItemUi(parent.context, theme, bar)
         ui.root.apply {
             minimumWidth = dp(CandidateSpacing.TOUCH_FLOOR_DP)
-            KawaiiBarComponent.candidatePaddingDp().let { setPaddingDp(it, 0, it, 0) }
+            SceneBar.padding(context, ui.bar).let { (left, right) -> setPadding(left, 0, right, 0) }
             layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, matchParent)
         }
         return CandidateViewHolder(ui)

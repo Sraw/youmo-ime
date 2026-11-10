@@ -104,6 +104,10 @@ class NineKeyLettersCustomTest {
         val small = NineKeyLetters.custom(listOf("abcde", "fghij", "klmno", "pqrst", "uvwxy", "z"))
         NineKeyLetters.inUse(small)
         assertNull(NineKeyLetters.ofCode(made.codes[6].code))
+        // none in use (what a test leaves after it): read as no keyboard's, a built-in one's still read
+        NineKeyLetters.clearInUse()
+        assertNull(NineKeyLetters.ofCode(made.codes[0].code))
+        assertSame(NineKeyLetters.G14, NineKeyLetters.ofCode(NineKeyLetters.G14.codes[0].code))
         NineKeyLetters.inUse(made)
         // with rows or without, the same keyboard
         assertEquals(made, NineKeyLetters.custom(k17.map { it.replace(" ", "") }))

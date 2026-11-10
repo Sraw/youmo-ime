@@ -30,8 +30,9 @@ class ThemeListAdapterTest {
     private fun adapter(vararg themes: Theme) = object : ThemeListAdapter() {
         override fun onAddNewTheme() = Unit
         override fun onSelectTheme(theme: Theme) = Unit
-        override fun onDeleteTheme(theme: Theme.Custom) = Unit
-        override fun onExportTheme(theme: Theme.Custom) = Unit
+        override fun onDeleteTheme(theme: Theme) = Unit
+        override fun onExportTheme(theme: Theme) = Unit
+        override fun onThemeInfo(theme: Theme) = Unit
     }.apply { setThemes(themes.toList()) }
 
     /** Each theme's name and mark, in the list's order. */

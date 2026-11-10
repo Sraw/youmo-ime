@@ -12,8 +12,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import androidx.core.graphics.ColorUtils
-import org.fcitx.fcitx5.android.data.theme.Theme
 import splitties.dimensions.dp
 
 /**
@@ -22,12 +20,9 @@ import splitties.dimensions.dp
  */
 internal object VoiceCard {
 
-    /** the pill's colour: the accent, faint */
-    fun pillColor(theme: Theme) = ColorUtils.setAlphaComponent(theme.accentKeyBackgroundColor, PILL_ALPHA)
-
-    /** the bars, in the theme's accent */
-    fun wave(ctx: Context, theme: Theme) = VoiceWaveView(ctx).apply {
-        color = theme.accentKeyBackgroundColor
+    /** the bars, in [color] (the theme's voice look's microphone colour) */
+    fun wave(ctx: Context, color: Int) = VoiceWaveView(ctx).apply {
+        this.color = color
         active = true
     }
 
@@ -50,7 +45,6 @@ internal object VoiceCard {
         }, if (message != null) VoiceSession.MESSAGE_MS else 0L)
     }
 
-    private const val PILL_ALPHA = 0x29
     private const val PILL_WIDTH = 168
     private const val PILL_HEIGHT = 52
     private const val PILL_GAP = 8

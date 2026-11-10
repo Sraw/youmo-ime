@@ -196,6 +196,18 @@ class ThemePrefsMigrationTest {
     }
 
     @Test
+    fun anOldNameNotMovedYetIsReadAsTheBuiltInTheme() {
+        // left as a theme of the user's may have it (its json unread, the directory unread: ThemeManager's start)
+        store("MonetLight", "PixelLight", "AMOLEDBlack")
+        val prefs = ThemePrefs(sp)
+        prefs.migrateThemeRefs(setOf("MonetLight", "PixelLight", "AMOLEDBlack"))
+        assertEquals(listOf("MonetLight", "PixelLight", "AMOLEDBlack"), stored())
+        assertEquals(ThemeManager.builtin("monet#light"), prefs.normalModeTheme.getValue())
+        assertEquals(ThemeManager.builtin("pixel#light"), prefs.lightModeTheme.getValue())
+        assertEquals(ThemeManager.builtin("amoled-black"), prefs.darkModeTheme.getValue())
+    }
+
+    @Test
     fun movedAtEveryStartNothingTwice() {
         store("DeepBlue", "nord#light", "AMOLEDBlack")
         val prefs = ThemePrefs(sp)

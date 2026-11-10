@@ -104,6 +104,17 @@ class ThemeLookMigrationTest {
         assertEquals(1, s.saved.size)
     }
 
+    // a 4.0 pack's keys are its file's: not copied into a 3.0 theme of its look with the old settings
+    @Test
+    fun aPackInUseIsLeftAsItIs() {
+        prefs.edit(commit = true) { putBoolean("key_border", false); putInt("key_radius", 10) }
+        val pack = Theme.Pack("p#dark", true, "p", "/nowhere/v4/p", 0)
+        val s = Slots(pack)
+        ThemeLookMigration.settle(prefs, s.slots, s.saved::add)
+        assertEquals(emptyList<Theme.Custom>(), s.saved)
+        assertSame(pack, s.chosen[0])
+    }
+
     @Test
     fun defaultSettingsCopyNothingButAreRemoved() {
         prefs.edit(commit = true) { putBoolean("key_border", true); putInt("text_editing_button_radius", 4) }

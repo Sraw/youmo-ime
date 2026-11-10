@@ -40,8 +40,8 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
     /** [toolButtons] in this order, none of them in another parent. */
     fun show(toolButtons: List<ToolButton>) {
         buttons.removeAllViews()
-        val width = ctx.dp(KawaiiBarComponent.buttonWidthDp())
-        val height = ctx.dp(KawaiiBarComponent.heightDp())
+        val width = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
+        val height = ctx.dp(KawaiiBarComponent.heightDp(ctx))
         toolButtons.forEach {
             buttons.addView(it, FlexboxLayout.LayoutParams(width, height).apply { minWidth = ctx.dp(MIN_SIZE) })
         }

@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.backup.Backups
@@ -37,6 +38,7 @@ import org.fcitx.fcitx5.android.utils.withTempDir
 import org.w3c.dom.Element
 import timber.log.Timber
 import java.io.File
+import java.io.FileFilter
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
@@ -235,6 +237,14 @@ object UserDataManager {
         }
     }
 
+    // a theme 4.0 pack is whole (ThemePackFiles.place): one the backup has replaces the phone's of its name, not
+    // merged with it (a file the backup's has not left over, named by neither)
+    private fun dropRestoredPacks(from: File, themes: File) {
+        val packs = ThemePackFiles.folder(themes)
+        ThemePackFiles.folder(from).listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") })
+            ?.forEach { File(packs, it.name).deleteRecursively() }
+    }
+
     private fun copyDir(source: File, target: File) {
         val exists = source.exists()
         val isDir = source.isDirectory
@@ -337,6 +347,7 @@ object UserDataManager {
                 val from = File(tempDir, "external-$name")
                 if (File(external, name).renameTo(from)) {
                     dir.mkdirs()
+                    if (name == ConfigHome.THEME.old) dropRestoredPacks(from, dir)
                     copyDir(from, dir)
                 }
             }

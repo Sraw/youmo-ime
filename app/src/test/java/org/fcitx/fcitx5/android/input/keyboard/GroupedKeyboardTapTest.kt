@@ -79,13 +79,13 @@ class GroupedKeyboardTapTest {
 
     private fun tap(c: Char, at: Float) = KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(c, at)), KeyStates.Virtual)
 
-    // a touch on [key]: down at [x] across it, then each move by (dx, dy) from there, then up where the last
-    // left it; to the keyboard (whose touches go to the scene's keys) at the key's place
-    private fun touch(key: ShownKey, x: Float, vararg moves: Pair<Float, Float>) {
+    // a touch on [key]: down at [x] across it ([down] its height down it), then each move by (dx, dy) from there, then
+    // up where the last left it; to the keyboard (whose touches go to the scene's keys) at the key's place
+    private fun touch(key: ShownKey, x: Float, vararg moves: Pair<Float, Float>, down: Float = 0.5f) {
         key as SceneShownKey
         // the bounds the canvas's own (no window here): its place in the keyboard added
         val (view, left, top) = Triple(keyboard, key.canvas.left + key.bounds.left, key.canvas.top + key.bounds.top)
-        val y = top + key.height / 2f
+        val y = top + key.height * down
         var time = 1_000L
         fun send(action: Int, ex: Float, ey: Float) {
             val event = MotionEvent.obtain(1_000L, time, action, ex, ey, 0)
@@ -111,6 +111,22 @@ class GroupedKeyboardTapTest {
         sent.clear()
         touch(bn, bn.width * 0.25f)
         assertEquals(listOf<KeyAction>(tap(g14Code('b'), 0.25f)), sent)
+    }
+
+    // 060-render-p3 T9b (review L5): every one of the 14 keys sends what it did before T9a and T9b, wherever down
+    // the key the finger came, at five places across: the characters as written down then (TAPS from U+F0200,
+    // 17 places a code; L and M, of one letter, their code from U+F8DA on alone), not as Keyboard reckons them now
+    @Test
+    fun theFourteenKeysTapsAreTheSameWhereverDownTheKey() = drawn {
+        val across = listOf(0.1f, 0.25f, 0.5f, 0.75f, 0.9f)
+        for ((face, expected) in FOURTEEN_TAPS) {
+            val key = key(face)
+            for ((x, sym) in across.zip(expected)) {
+                for (down in listOf(0.1f, 0.5f, 0.9f)) touch(key, key.width * x, down = down)
+                assertEquals("$face $x", List(3) { KeyAction.SymAction(KeySym(UNICODE + sym), KeyStates.Virtual) }, sent)
+                sent.clear()
+            }
+        }
     }
 
     @Test
@@ -153,8 +169,9 @@ class GroupedKeyboardTapTest {
         }
     }
 
-    // 060-render-v2 §15: groups a layout writes that are not the keyboard's (G14) make no codes of their
-    // own (P3): logged, and the keyboard's groups typed, its codes, record and leaning as ever (its lean= gone by too)
+    // 060-render-v2 §15, 060-render-p3 T9b: groups a layout writes that are not the keyboard's (G14), on a keyboard
+    // that types none of its own (made here as 双拼's is: ownGroups off), make no codes of their own: logged, and the
+    // keyboard's groups typed, its codes, record and leaning as ever (GroupedKeyboardOwnGroupsTest: pinyin's own)
     @Test
     fun aLayoutsOtherGroupsAreLoggedAndTheKeyboardsKept() {
         val builtIn = SceneLayouts.source
@@ -229,5 +246,25 @@ class GroupedKeyboardTapTest {
         assertEquals(listOf(old), replaced)
         looper.idleFor(java.time.Duration.ofSeconds(3))
         assertEquals(0, fired)
+    }
+
+    private companion object {
+        // each key's character at 0.1, 0.25, 0.5, 0.75 and 0.9 across, as e3d3edbfd sent them
+        val FOURTEEN_TAPS = listOf(
+            "QW" to listOf(0xF0312, 0xF0314, 0xF0318, 0xF031C, 0xF031E),
+            "ER" to listOf(0xF0246, 0xF0248, 0xF024C, 0xF0250, 0xF0252),
+            "TY" to listOf(0xF0345, 0xF0347, 0xF034B, 0xF034F, 0xF0351),
+            "UI" to listOf(0xF0356, 0xF0358, 0xF035C, 0xF0360, 0xF0362),
+            "OP" to listOf(0xF02F0, 0xF02F2, 0xF02F6, 0xF02FA, 0xF02FC),
+            "AS" to listOf(0xF0202, 0xF0204, 0xF0208, 0xF020C, 0xF020E),
+            "DF" to listOf(0xF0235, 0xF0237, 0xF023B, 0xF023F, 0xF0241),
+            "GH" to listOf(0xF0268, 0xF026A, 0xF026E, 0xF0272, 0xF0274),
+            "JK" to listOf(0xF029B, 0xF029D, 0xF02A1, 0xF02A5, 0xF02A7),
+            "L" to List(5) { 0xF8E5 },
+            "ZX" to listOf(0xF03AB, 0xF03AD, 0xF03B1, 0xF03B5, 0xF03B7),
+            "CV" to listOf(0xF0224, 0xF0226, 0xF022A, 0xF022E, 0xF0230),
+            "BN" to listOf(0xF0213, 0xF0215, 0xF0219, 0xF021D, 0xF021F),
+            "M" to List(5) { 0xF8E6 },
+        )
     }
 }

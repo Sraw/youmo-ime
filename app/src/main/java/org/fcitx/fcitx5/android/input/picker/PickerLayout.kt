@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.engine.Env
@@ -148,7 +149,10 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         },
     )
 
-    val grid = PickerGridView(context, theme, density)
+    // on the theme's `picker { fill }` (060-render-p3 T7b); not set, nothing: the keyboard's under it
+    val grid = PickerGridView(context, theme, density).apply {
+        ScenePanels.picker(context, theme, side = panel).fill?.let { setBackgroundColor(it.value) }
+    }
 
     val tabsUi by lazy { PickerTabsUi(context, theme) }
 

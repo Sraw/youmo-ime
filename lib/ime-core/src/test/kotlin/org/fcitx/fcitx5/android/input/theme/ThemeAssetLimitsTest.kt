@@ -35,4 +35,19 @@ class ThemeAssetLimitsTest {
         assertNull(l.look(look.copy(keys = look.keys.copy(overrides = most))))
         assertNull(l.entry(3, 1, l.MAX_TOTAL_BYTES - 1))
     }
+
+    @Test
+    fun aPacksOwnFilesHaveTheirLimits() {
+        val l = ThemeAssetLimits
+        assertNull(l.themeXml(l.MAX_THEME_XML_BYTES))
+        assertEquals(ThemeAssetLimits.Breach.ThemeXml, l.themeXml(l.MAX_THEME_XML_BYTES + 1))
+        assertNull(l.layouts(List(16) { l.MAX_LAYOUT_BYTES }))
+        assertEquals(ThemeAssetLimits.Breach.Layouts, l.layouts(List(17) { 1L }))
+        assertEquals(ThemeAssetLimits.Breach.LayoutSize, l.layouts(listOf(1, l.MAX_LAYOUT_BYTES + 1)))
+        assertNull(l.preview(2048, 2048, l.MAX_PREVIEW_BYTES))
+        assertEquals(ThemeAssetLimits.Breach.PreviewSize, l.preview(10, 10, l.MAX_PREVIEW_BYTES + 1))
+        assertEquals(ThemeAssetLimits.Breach.PreviewSide, l.preview(2049, 10, 1))
+        assertNull(l.icon(l.MAX_ICON_BYTES))
+        assertEquals(ThemeAssetLimits.Breach.IconSize, l.icon(l.MAX_ICON_BYTES + 1))
+    }
 }

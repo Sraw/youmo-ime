@@ -296,6 +296,17 @@ class HostCore(
         pipeline.reset(ic)
     }
 
+    /**
+     * The code the panel shows (pinyin's: never the field's composing text, English's word or handwriting's,
+     * which stays where it is) committed as Return commits it ([KeyRouter.enter]), no reset: the next word
+     * keeps its 前文 as after any commit. False with no code shown (联想's words alone are none).
+     */
+    fun commitCode(): Boolean = pipeline.batch {
+        val ic = contexts.active?.takeIf { it.hasFocus && it.panel.preedit.isNotEmpty() } ?: return@batch false
+        router.enter(ic, contexts.inputMethod(ic))
+        true
+    }
+
     /** What is typed dropped, nothing committed ([KeyRouter.clearTyped]): null with nothing typed. */
     fun clearTyped(keyboard: (im: String) -> Any? = { null }): Retyping? = pipeline.batch {
         // 联想's words with nothing typed are not what is typed

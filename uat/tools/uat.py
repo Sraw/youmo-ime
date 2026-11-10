@@ -1962,11 +1962,11 @@ def sym_char(d, ch):
 
 
 def glide_on(d, im=None, page="text", add=None):
-    """通用输入 → 滑行输入 on (after adding the input method add), the test page, then im"""
+    """通用输入 → 在键上划 set to 滑行输入 (after adding the input method add), the test page, then im"""
     if add:
         add_im(d, add)
     home(d, "通用输入")
-    d.switch("滑行输入", True)
+    choose(d, "在键上划", "滑行输入")
     d.open_page(page)
     if im:
         d.switch_im(im)

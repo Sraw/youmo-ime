@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
+import android.annotation.SuppressLint
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.RecyclerView
@@ -35,6 +36,16 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
     fun setThemes(themes: List<Theme>) {
         cards = ThemeCards(themes)
         notifyItemRangeInserted(OFFSET, entries.size)
+    }
+
+    /** The list made again of [themes] (a pack imported: its versions one card); the marks set again after ([setSelectedThemes]). */
+    @SuppressLint("NotifyDataSetChanged")
+    fun resetThemes(themes: List<Theme>) {
+        cards = ThemeCards(themes)
+        activeIndex = -1
+        lightIndex = -1
+        darkIndex = -1
+        notifyDataSetChanged()
     }
 
     /**
@@ -136,7 +147,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
                 }
                 root.setOnLongClickListener {
                     when {
-                        theme is Theme.Custom -> onThemeActions(theme)
+                        theme is Theme.Custom || theme is Theme.Pack -> onThemeActions(theme)
                         // Monet's: its look the wallpaper's colours now, its key style with them: a fixed copy
                         theme is Theme.Builtin && theme.followsSystem -> onExportTheme(theme.toCustom())
                         else -> return@setOnLongClickListener false
@@ -156,15 +167,22 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
 
     abstract fun onSelectTheme(theme: Theme)
 
-    abstract fun onExportTheme(theme: Theme.Custom)
+    abstract fun onExportTheme(theme: Theme)
 
-    abstract fun onDeleteTheme(theme: Theme.Custom)
+    abstract fun onDeleteTheme(theme: Theme)
 
-    /** A theme of the user's long pressed: export it or delete it. */
-    private fun ThemeThumbnailUi.onThemeActions(theme: Theme.Custom) {
+    abstract fun onThemeInfo(theme: Theme)
+
+    /** A theme of the user's (a 3.0 one, a pack) long pressed: what it is (信息), export it or delete it. */
+    private fun ThemeThumbnailUi.onThemeActions(theme: Theme) {
+        val actions = arrayOf(ctx.getString(R.string.theme_info), ctx.getString(R.string.export), ctx.getString(R.string.delete))
         AlertDialog.Builder(ctx)
-            .setItems(arrayOf(ctx.getString(R.string.export), ctx.getString(R.string.delete))) { _, i ->
-                if (i == 0) onExportTheme(theme) else onDeleteTheme(theme)
+            .setItems(actions) { _, i ->
+                when (i) {
+                    0 -> onThemeInfo(theme)
+                    1 -> onExportTheme(theme)
+                    else -> onDeleteTheme(theme)
+                }
             }
             .show()
     }

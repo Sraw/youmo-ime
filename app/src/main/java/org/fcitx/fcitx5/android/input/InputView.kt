@@ -55,6 +55,7 @@ import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.BaseExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
@@ -138,7 +139,7 @@ class InputView(
     // the bar's base, under the bar and the row above it for the code being typed: one taller bar.
     // None (the keyboard's base seen through), its colour, or the picture's part there
     private val barBackground = view(::View) {
-        background = ThemePictureDrawable.bar(ThemeManager.shownLook(theme))
+        background = SceneBar.background(SceneBar.of(context, theme))
     }
 
     private val placeholderOnClickListener = OnClickListener { }
@@ -455,7 +456,7 @@ class InputView(
                     // start and end set in updateKeyboardSize, as the bar's
                 })
             }
-            add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.heightDp())) {
+            add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.heightDp(context))) {
                 when {
                     top != null -> below(top)
                     floatingHandle != null && !handleAtBottom -> below(floatingHandle)

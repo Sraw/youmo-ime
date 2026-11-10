@@ -27,6 +27,12 @@ class LearnedItemsFragmentTest {
 
     private fun kind(kind: String) = LearnedItemsFragment.kind(Code(kind, "ab"))
 
+    private companion object {
+        // a theme's 17 keys (keyboard-scene's test data k17.xml): the 14 keys' groups and three more, a on two keys
+        val OWN_GROUPS = NineKeyLetters.G14.tag().split(',') + listOf("pq rs", "abc", "xyz")
+        val OWN = NineKeyLetters.custom(OWN_GROUPS)
+    }
+
     // a pin says which keyboard it is of, by the kind's prefix: each kind Kinds makes, named
     @Test
     @Uat("SP-19")
@@ -45,6 +51,8 @@ class LearnedItemsFragmentTest {
         assertEquals(R.string.learning_kind_shuangpin_keys14, kind(Kinds.shuangpinKeys("Ziranma", NineKeyLetters.G14.tag())))
         // a character blocked under the strokes typed (笔画查字): a strokes block, not a table's
         assertEquals(R.string.learning_kind_strokes, kind(Kinds.table(StrokeLookup.BLOCK_TABLE)))
+        // 060-render-p3 T9b: pinyin on a theme's keys of its own groups, whichever
+        assertEquals(R.string.learning_kind_keys_own, kind(Kinds.keys(OWN.tag())))
     }
 
     // a 14-key pin's keys are the 14 keys' codes (g14), shown as the letters on each key; the nine keys' digits stay digits
@@ -55,6 +63,8 @@ class LearnedItemsFragmentTest {
         // the separator key's ' is in the keys as typed, shown as itself
         assertEquals("zx ui ' as bn", LearnedItemsFragment.keys(Code(Kinds.keys(NineKeyLetters.G14.tag()), "${g14("zx")}${g14("ui")}'${g14("as")}${g14("bn")}")))
         assertEquals("64", LearnedItemsFragment.keys(Code(Kinds.nineKeys("pinyin"), "64")))
+        // a theme's keys of its own groups (060-render-p3 T9b): their codes as their letters, a letter on two keys each its own
+        assertEquals("bn ui as abc", LearnedItemsFragment.keys(Code(Kinds.keys(OWN.tag()), listOf("bn", "ui", "as", "abc").joinToString("") { OWN.codes[OWN_GROUPS.indexOf(it)].toString() })))
         // a tag of no grouped keyboard this version knows: as stored, not misread through another's letters
         assertEquals(g14("bn ui"), LearnedItemsFragment.keys(Code(Kinds.keys("ab,cd"), g14("bn ui"))))
         // 双拼's: the 18 keys' and the nine keys' private-use codes, as their letters
@@ -91,6 +101,7 @@ class LearnedItemsFragmentTest {
             assertTrue(label(Kinds.shuangpin("Ziranma")).startsWith(ctx.getString(R.string.learning_kind_shuangpin) + " · "))
             // the other kinds as before, no scheme added
             assertEquals(ctx.getString(R.string.learning_kind_keys14), label(Kinds.keys(NineKeyLetters.G14.tag())))
+            assertEquals("Pinyin, a theme's keys", label(Kinds.keys(OWN.tag())))
         }
     }
 }

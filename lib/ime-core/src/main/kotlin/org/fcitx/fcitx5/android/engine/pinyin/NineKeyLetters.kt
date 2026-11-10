@@ -310,6 +310,11 @@ class NineKeyLetters private constructor(
             if (keyboard.codes.firstOrNull()?.code in CUSTOM_BLOCK) current = keyboard
         }
 
+        /** None in use: a custom block's code read as no keyboard's ([ofCode]) till the next [inUse]; what a test leaves after it. */
+        fun clearInUse() {
+            current = null
+        }
+
         // filedAs's keyboard of each tag asked (a few: the layouts used), null for none: SpelledForm
         // asks for each code of each word read, the record's rows of several tags in turn
         private val filed = ConcurrentHashMap<String, Filed>()

@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.EngineOptions
@@ -99,6 +100,8 @@ class KotlinHostTest {
         AppPrefs.getInstance().internal.nineKeysMerged.run { setValue(defaultValue) }
         // published by the host, read by the keyboard window: not the next test's
         EngineState.traditionalIms = null
+        EngineState.ownKeys = null
+        NineKeyLetters.clearInUse()
         EngineNotices.sayer = null
         directBoot(false)
     }

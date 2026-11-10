@@ -25,11 +25,13 @@ import androidx.core.view.accessibility.AccessibilityEventCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
 import org.fcitx.fcitx5.android.data.theme.BoardImages
+import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.input.PictureHost
 import org.fcitx.fcitx5.android.input.scene.CanvasFrame
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneA11y
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Ink
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Op
@@ -67,9 +69,10 @@ class KeyboardCanvasView(
     /**
      * A [scene] and the look it was made in ([shownLook], ThemeManager.shownLook's), with its [fonts]:
      * what paints it. The theme's, or the built-in theme's a theme that makes no scene falls back to
-     * (060-render-p2 U8), the whole of it.
+     * (060-render-p2 U8), the whole of it. [pack]: the theme 4.0 pack it is of, its first frame guarded
+     * ([PackDrawGuard]); null, another theme's.
      */
-    class Drawn(val scene: Scene, val shownLook: ThemeLook, val fonts: SceneFonts)
+    class Drawn(val scene: Scene, val shownLook: ThemeLook, val fonts: SceneFonts, val pack: PackDrawGuard.Key? = null)
 
     interface Host {
         /**
@@ -113,6 +116,8 @@ class KeyboardCanvasView(
     private var builtFor = 0 to 0
     private var dirty = true
     private var failed = false
+    // the pack the scene drawn is of (Drawn.pack)
+    private var pack: PackDrawGuard.Key? = null
     private var faces: List<Faces> = emptyList()
     private var base: RenderNode? = null
     private val speech = Speech()
@@ -197,6 +202,7 @@ class KeyboardCanvasView(
             if (repainted || under != drawnUnder) dropBase()
             drawnUnder = under
             built = s
+            pack = drawn.pack
             var said: MutableList<Int>? = null
             var worded: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
@@ -286,6 +292,9 @@ class KeyboardCanvasView(
     override fun onDraw(canvas: Canvas) {
         val s = scene ?: return
         val painter = painter ?: return
+        // a pack's first frame of the process about to be drawn, shown: marked till it is (PackDrawGuard), one
+        // that takes the keyboard down not drawn again on its own. A pack built and not drawn marks nothing
+        if (pack?.let(PackDrawGuard::drawing) == false) pack = null
         // an image or the picture in since it was recorded: recorded again
         if (painter.missed) {
             painter.missed = false
@@ -297,6 +306,8 @@ class KeyboardCanvasView(
             painter.missed = false
             painter.draw(canvas, drawnUnder)
             faces.forEach { painter.draw(canvas, it.node.ops(it.down)) }
+            // drawn, glyphs and pictures, here and now
+            pack?.let(PackDrawGuard::frameDrawn)
             return
         }
         canvas.drawRenderNode(base.live() ?: record("base", Box(0.0, 0.0, width.toDouble(), height.toDouble()), drawnUnder).also { base = it })
@@ -313,6 +324,16 @@ class KeyboardCanvasView(
                 node.alpha = face.alpha
                 canvas.drawRenderNode(node)
             }
+        }
+        // what the frame's nodes draw (a pack's fonts' glyphs, its pictures) is drawn on the RenderThread
+        // after this: the pack's first frame drawn once a frame is committed, not here. ViewRootImpl.performDraw
+        // takes the commit callbacks before it draws, so one registered here goes with the window's next
+        // frame, asked for (a keyboard shown and hidden untouched draws one): that one committed, the frames
+        // are drawn in order, this one was. Once it is, none is asked for again (drawing() false, pack null),
+        // nor past a few (PackDrawGuard.askFrame: a device that calls back none draws no more)
+        pack?.let { p ->
+            viewTreeObserver.registerFrameCommitCallback { PackDrawGuard.frameDrawn(p) }
+            if (PackDrawGuard.askFrame(p)) postInvalidateOnAnimation()
         }
     }
 
@@ -398,6 +419,9 @@ class KeyboardCanvasView(
         out.set(s.bounds)
         return true
     }
+
+    /** The handwriting pad's ink in slot [id] as the scene has it (060-render-p3 T7b); null where it has no such slot. */
+    fun slotInk(id: String): Ink? = scene?.slots?.firstOrNull { it.id == id }?.ink
 
     /**
      * Where a popup over key [ref] is placed, in the window, into [out]: its face across and its cell

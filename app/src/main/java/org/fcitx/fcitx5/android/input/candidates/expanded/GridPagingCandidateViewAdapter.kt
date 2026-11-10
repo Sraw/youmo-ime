@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input.candidates.expanded
 
+import android.content.Context
 import android.content.res.Resources
 import android.graphics.Paint
 import android.graphics.Rect
@@ -23,6 +24,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.candidates.ReadingSpan
 import splitties.dimensions.dp
 import splitties.views.dsl.core.matchParent
@@ -52,17 +54,23 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
     fun measureWidth(position: Int): Float {
         // the span lookup reads ahead of what is shown: getItem would have Paging load for it
         val candidate = peek(position) ?: return 0f
-        if (candidate.readings.isEmpty()) return measuredWidths[candidate.textWithComment()] * textScale
+        // the number or dot before it a theme asks for (T6a), as wide as drawn
+        val label = SceneBar.label(bar?.labelStyle, position + offset).let { if (it.isEmpty()) 0f else measuredWidths[it] * textScale }
+        if (candidate.readings.isEmpty()) return label + measuredWidths[candidate.textWithComment()] * textScale
         val hint = EngineState.candidateReading.value == ReadingStyle.OFF
         val key = listOf(hint, candidate.text, candidate.readings.joinToString("\u0001"), candidate.comment, candidate.spaceBetweenComment)
             .joinToString("\u0000")
-        return annotatedWidths[key] ?: annotatedWidth(candidate, hint).also { annotatedWidths.put(key, it) }
+        return label + (annotatedWidths[key] ?: annotatedWidth(candidate, hint).also { annotatedWidths.put(key, it) })
     }
 
     // the widths of words with readings, measured once each as the grid lays out again and again
     private val annotatedWidths = LruCache<String, Float>(200)
 
     private val readingPaint = TextPaint()
+
+    // the theme's `bar height=` (T6b): the rows a bar's height each, as the bar and the flexbox window's; with no
+    // bar yet, the window's own [context]'s scenes where there is one (a row made), the app's where none (measuring)
+    private fun barPercent(context: Context? = null): Double = bar?.heightPercent ?: context?.let(SceneBar::heightPercent) ?: SceneBar.heightPercent()
 
     /**
      * [candidate]'s width with its readings ([ReadingSpan]): measured as CandidateItemUi draws them, at the
@@ -77,7 +85,7 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
         val annotated = SpannableStringBuilder()
         if (hint) {
             val fm = paint.fontMetrics
-            val bar = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, CandidateBarHeight.dp(textSp).toFloat(), metrics)
+            val bar = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, CandidateBarHeight.dp(textSp, ReadingStyle.OFF, barPercent()).toFloat(), metrics)
             val baseline = (bar - (fm.bottom - fm.top)) / 2 - fm.top
             ReadingSpan.annotate(annotated, candidate.text, candidate.readings, 0, ReadingSpan.hintSize(paint, baseline, floor), baseline)
         } else {
@@ -90,7 +98,7 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
         return super.onCreateViewHolder(parent, viewType).apply {
             itemView.apply {
-                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(CandidateBarHeight.dp(textSp, EngineState.candidateReading.value)))
+                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(CandidateBarHeight.dp(textSp, EngineState.candidateReading.value, barPercent(context))))
             }
         }
     }

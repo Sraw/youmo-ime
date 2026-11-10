@@ -32,7 +32,7 @@ object KeyboardArea {
     @VisibleForTesting
     internal var themeSizes: () -> ThemeSizes = {
         val theme = ThemeManager.activeTheme
-        SceneThemes.of(ThemeManager.shownLook(theme), theme.name, theme.isDark)?.keyboardSizes ?: ThemeSizes()
+        SceneThemes.of(theme, ThemeManager.shownLook(theme))?.keyboardSizes ?: ThemeSizes()
     }
 
     /** The three settings, each following the theme or not, and the theme's sizes. */
@@ -80,7 +80,7 @@ object KeyboardArea {
     fun keysHeight(ctx: Context, codeRowDp: Int, handle: Int = 0): Int = KeyboardHeightCap.keysHeight(
         requestedHeight(ctx),
         ctx.resources.displayMetrics.heightPixels,
-        ctx.dp(KawaiiBarComponent.heightDp() + codeRowDp),
+        ctx.dp(KawaiiBarComponent.heightDp(ctx) + codeRowDp),
         bottomPadding(ctx),
         handleHeight = handle,
     )

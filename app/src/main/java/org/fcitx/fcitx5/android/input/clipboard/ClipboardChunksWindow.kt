@@ -24,7 +24,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardChunks.Chunk
@@ -33,9 +32,10 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
-import org.fcitx.fcitx5.android.input.theme.ThemeColors
+import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -66,7 +66,7 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
     private val shown = ClipboardChunks.cut(text, MAX_CHARS)
 
     private val ui by lazy {
-        ClipboardChunksUi(context, theme, ThemeColors.entryRadius(ThemeManager.shownLook(theme).keys), shown, cut = shown.length < text.length) {
+        ClipboardChunksUi(context, theme, ScenePanels.clipboard(context, theme), shown, cut = shown.length < text.length) {
             service.commitOverEngine(it)
             if (returnAfterPaste) windowManager.attachWindow(KeyboardWindow)
         }
@@ -96,8 +96,8 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
     private val extension by lazy {
         context.horizontalLayout {
             gravity = Gravity.END
-            add(ui.resetButton, lParams(wrapContent, dp(KawaiiBarComponent.heightDp())))
-            add(ui.commitButton, lParams(wrapContent, dp(KawaiiBarComponent.heightDp())))
+            add(ui.resetButton, lParams(wrapContent, dp(KawaiiBarComponent.heightDp(context))))
+            add(ui.commitButton, lParams(wrapContent, dp(KawaiiBarComponent.heightDp(context))))
         }
     }
 
@@ -132,7 +132,7 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
 class ClipboardChunksUi(
     override val ctx: Context,
     private val theme: Theme,
-    radiusDp: Float,
+    private val look: PanelLooks.Clipboard,
     private val text: String,
     private val cut: Boolean,
     private val onCommit: (String) -> Unit,
@@ -143,7 +143,7 @@ class ClipboardChunksUi(
     /** The pieces picked, in the order tapped or swept (a sweep's appended in text order). */
     val picked = ArrayList<Chunk>()
 
-    private val radius = ctx.dp(radiusDp)
+    private val radius = ScenePanels.clipboardRadius(ctx, look)
 
     private fun barButton(label: Int, onClick: () -> Unit) = TextView(ctx).apply {
         text = ctx.getString(label)
@@ -180,7 +180,7 @@ class ClipboardChunksUi(
                 minWidth = dp(40)
                 gravity = Gravity.CENTER
                 setPaddingDp(10, 6, 10, 6)
-                setTextColor(theme.keyTextColor)
+                setTextColor(look.color.value)
             }
             val badge = TextView(ctx).apply {
                 textSize = 10f
@@ -220,7 +220,7 @@ class ClipboardChunksUi(
             holder.label.alpha = 1f
             holder.badge.isVisible = order >= 0
             holder.badge.text = (order + 1).toString()
-            holder.cell.background = background(if (order >= 0) theme.genericActiveBackgroundColor else theme.clipboardEntryColor)
+            holder.cell.background = background(if (order >= 0) theme.genericActiveBackgroundColor else look.fill.value)
             holder.cell.setOnClickListener { pick(if (order >= 0) picked - piece else picked + piece) }
         }
     }

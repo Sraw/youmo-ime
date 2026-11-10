@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.scene.layout.Face
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
+import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.scene.theme.Cascade
@@ -155,7 +156,8 @@ class SceneBuilder(
         }
         val slots = placed.mapNotNull { p ->
             val s = (p.item as? ExpandedSlot)?.slot ?: return@mapNotNull null
-            SlotNode(s.kind, s.id, p.cell, surface(layout.id, s.id, s.look, s.classes, s.face, p.cell, slot = true))
+            val face = surface(layout.id, s.id, s.look, s.classes, s.face, p.cell, slot = true)
+            if (s.kind == Pads.KIND) pad(layout.id, s, p.cell, face) else SlotNode(s.kind, s.id, p.cell, face)
         }
         // a key's place the board has no key for (the number pads'): a key that takes no press, `:disabled`
         // and faded as theme 3.0's disabled blank view was (its whole view at android:disabledAlpha)
@@ -222,6 +224,17 @@ class SceneBuilder(
         val c = if (face == Face.Keep) unflat else cascade
         val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, states, slot = slot)), theme)
         return paint.face(Faces.of(cell, l, face, true, env.flat && face != Face.Keep, env.density), l, false)
+    }
+
+    // the handwriting pad: its face, the grid over it the theme shows, the ink its strokes are drawn in (060-render-p3 T7b)
+    private fun pad(board: String, s: Slot, cell: Box, face: List<Op>): SlotNode {
+        val target = Selector.Target("key", board, s.id, null, setOfNotNull(s.look) + s.classes, emptySet(), slot = true)
+        val v = cascade.of(target)
+        val c = if (s.face == Face.Keep) unflat else cascade
+        val box = s.look?.takeIf { s.face != Face.None }?.let {
+            Faces.of(cell, KeyLook(c.of(target), theme), s.face, true, env.flat && s.face != Face.Keep, env.density).face?.bounds
+        } ?: cell
+        return SlotNode(s.kind, s.id, cell, face + Pads.grid(v, theme, box, env.density), Pads.ink(v, theme, env.density))
     }
 
     private class Prepared(

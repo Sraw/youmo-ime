@@ -119,7 +119,7 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
          * as stored; any other kind's as stored.
          */
         fun keys(code: Code): String = if (code.kind == STROKES && code.keys.all { it in Strokes.KEYS }) Strokes.shown(code.keys)
-            else Kinds.keysTag(code.kind)?.let { NineKeyLetters.grouped(it) }?.shown(code.keys) ?: code.keys
+            else Kinds.keysOf(code.kind)?.shown(code.keys) ?: code.keys
 
         // a character blocked under the strokes typed (笔画查字), filed as a table's block is
         private val STROKES = Kinds.table(StrokeLookup.BLOCK_TABLE)
@@ -153,9 +153,12 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
                 else -> R.string.learning_kind_shuangpin_keys18
             }
             code.kind.startsWith(Kinds.nineKeys("")) || code.kind.startsWith(Kinds.nineKeysMultiTap("")) -> R.string.learning_kind_nine_keys
-            // pinyin's 18 keys and 14 keys, by the kind's tag (I1)
-            code.kind.startsWith(KEYS) ->
-                if (Kinds.keysTag(code.kind) == NineKeyLetters.G18.tag()) R.string.learning_kind_keys18 else R.string.learning_kind_keys14
+            // pinyin's 18 keys and 14 keys, by the kind's tag (I1); a theme's keys of its own groups (060-render-p3 T9b)
+            code.kind.startsWith(KEYS) -> when (Kinds.keysOf(code.kind)) {
+                NineKeyLetters.G18 -> R.string.learning_kind_keys18
+                NineKeyLetters.G14 -> R.string.learning_kind_keys14
+                else -> R.string.learning_kind_keys_own
+            }
             else -> R.string.learning_kind_table
         }
     }

@@ -14,11 +14,15 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
-import { assemble, blockOf } from '../tools/assemble.mjs';
+import { assemble, blockOf, ENGINE, engineText, fontFaces, FONTS, NO_ENGINE } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const data = join(here, 'testdata');
 const html = readFileSync(join(here, '..', 'index.html'), 'utf8');
+// the page as the site has it (pages.yml): index.html with the build's engine put in; made when a test asks, so
+// that only those tests fail where the engine is not built (./gradlew :lib:keyboard-scene:youmoEngine)
+let builtPage = null;
+const built = () => (builtPage ??= assemble(undefined, html, ENGINE));
 
 function block(id) {
   const text = blockOf(html, id);
@@ -620,6 +624,47 @@ test('index.html is what tools/assemble.mjs makes of src/ (src/ changed, the pag
   assert.ok(assemble() === html, 'index.html is not src/ assembled: node web/theme-maker/tools/assemble.mjs');
 });
 
+// 060-render-p3 W1: the engine is not in git (a change to its code would have to make the page again); the
+// page built is the build's engine as it is, within its budget, the rest index.html's; the fonts are fonts/
+test("index.html holds no engine; the page built holds the build's, and no bigger than its budget", () => {
+  assert.equal(blockOf(html, 'youmo-engine'), NO_ENGINE);
+  const engine = blockOf(built(), 'youmo-engine');
+  assert.equal(engine, engineText(), 'the page built has another engine');
+  // the plan's 600 KB is not met without a minifier (none without npm here): 1.09 MB as built, held below 1.2 MB
+  // so that it grows only on purpose
+  assert.ok(Buffer.byteLength(engine) <= 1_200_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
+  // the global a page reads it by (build.gradle.kts: the library's link names it)
+  assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
+  // all else as index.html: the engine's script and the CSP's hash of it the only difference
+  const rest = (page) => page.replace(/<script id="youmo-engine">[\s\S]*?<\/script>/, '').replace(/script-src [^;]*;/, '');
+  assert.equal(rest(built()), rest(html));
+});
+
+test("the page's fonts are fonts/, each family's two weights, put in whole", () => {
+  const css = /<style id="youmo-fonts">\n([\s\S]*?)\n<\/style>/.exec(html);
+  assert.ok(css, 'no youmo-fonts style');
+  assert.equal(css[1], fontFaces());
+  assert.deepEqual(FONTS.map(([f, w]) => f + ' ' + w), ['Youmo Latin 400', 'Youmo Latin 700', 'Youmo Han 400', 'Youmo Han 700']);
+  for (const [, , file] of FONTS) assert.equal(readFileSync(join(here, '..', 'fonts', file)).subarray(0, 4).toString('latin1'), 'wOF2', file);
+  const total = FONTS.reduce((n, [, , file]) => n + readFileSync(join(here, '..', 'fonts', file)).length, 0);
+  assert.ok(total <= 250_000, 'the fonts are ' + total + ' bytes');
+});
+
+test('an engine that would end its script element, or none at all, is refused', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'youmo-engine-'));
+  try {
+    assert.throws(() => engineText(join(dir, 'none.js')), /youmoEngine/);
+    for (const bad of ['a("</script>")', 'a("<!--")', 'a("<SCRIPT>")']) {
+      writeFileSync(join(dir, 'e.js'), bad);
+      assert.throws(() => engineText(join(dir, 'e.js')), /ends or escapes/, bad);
+    }
+    writeFileSync(join(dir, 'e.js'), 'a("<\\/script>")\n\n');
+    assert.equal(engineText(join(dir, 'e.js')), 'a("<\\/script>")');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('assemble.mjs refuses a page it cannot make, and puts in text that looks like a slot as it is', () => {
   const src = join(here, '..', 'src');
   const dir = mkdtempSync(join(tmpdir(), 'youmo-assemble-'));
@@ -630,7 +675,7 @@ test('assemble.mjs refuses a page it cannot make, and puts in text that looks li
     assert.throws(() => made(page.replace('{{ui}}', '')), /no \{\{ui\}\}/, 'a slot missing');
     assert.throws(() => made(page.replace('{{css}}', '{{css}}{{css}}')), /2 \{\{css\}\}/, 'a slot twice');
     assert.throws(() => made(page, html.replace('id="youmo-icons"', 'id="youmo-other"')), /no youmo-icons block/, 'a generated block missing');
-    assert.throws(() => made(page.replace(/<script id="youmo-ui">/, '<script>')), /not two scripts/, 'a script not hashed');
+    assert.throws(() => made(page.replace(/<script id="youmo-ui">/, '<script>')), /not three scripts/, 'a script not hashed');
     // a slot's name inside what is put in is text, not a slot
     writeFileSync(join(dir, 'style.css'), '/* {{lib}} $& */');
     const out = made(page);
@@ -667,18 +712,20 @@ test('an image is decoded only within what it may be: the source a photo, a cut 
   assert.ok(!L.decodable(L.imageSize(huge.files[theme.picture.src]), L.decodeCaps(format, L.fileRole(huge.theme, huge.theme.picture.src))));
 });
 
-test('the page runs only its own two scripts, by their hashes', () => {
-  const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html);
-  assert.ok(m, 'no CSP meta in index.html');
-  const csp = m[1];
-  const dirs = Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
-  assert.deepEqual(dirs['default-src'], ["'none'"]);
-  assert.deepEqual(dirs['base-uri'], ["'none'"]);
-  assert.deepEqual(dirs['form-action'], ["'none'"]);
-  assert.ok(!dirs['script-src'].includes("'unsafe-inline'"));
-  const run = [...html.matchAll(/<script(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-  assert.equal(run.length, 2);
-  assert.deepEqual(dirs['script-src'], run.map((t) => "'sha256-" + createHash('sha256').update(t).digest('base64') + "'"));
+test('the page runs only its own three scripts, by their hashes, as git keeps it and as built', () => {
+  for (const [what, page] of [['index.html', html], ['the page built', built()]]) {
+    const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(page);
+    assert.ok(m, 'no CSP meta in ' + what);
+    const csp = m[1];
+    const dirs = Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
+    assert.deepEqual(dirs['default-src'], ["'none'"]);
+    assert.deepEqual(dirs['base-uri'], ["'none'"]);
+    assert.deepEqual(dirs['form-action'], ["'none'"]);
+    assert.ok(!dirs['script-src'].includes("'unsafe-inline'"));
+    const run = [...page.matchAll(/<script(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    assert.equal(run.length, 3, what);
+    assert.deepEqual(dirs['script-src'], run.map((t) => "'sha256-" + createHash('sha256').update(t).digest('base64') + "'"), what);
+  }
 });
 
 test('the zip is written byte for byte the same, its names UTF-8, CRCs right', async () => {
@@ -864,4 +911,17 @@ test('the measured layout and icons have what the preview draws', () => {
   for (const b of ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols']) {
     assert.ok(layout.views.some((v) => v.phone === layout.phones[0].id && !v.land && v.board === b && v.mode === 'normal' && v.state === 'idle'), b);
   }
+});
+
+// dev/serve.mjs (the engine's preview, pixel-smoke's server): a path it cannot read is no file, never the server down
+test('the dev server answers a malformed or outside path with no file, and the page with its engine', async () => {
+  const { answer } = await import('../dev/serve.mjs');
+  assert.equal(answer('/fonts/%E0%A4%A'), null);
+  assert.equal(answer('/data/%2e%2e%2fsecret.xml'), null);
+  assert.equal(answer('/fonts/..%2Flatin-400.woff2'), null);
+  assert.equal(answer('/nothing'), null);
+  assert.equal(answer('/fonts/latin-400.woff2')[0], 'font/woff2');
+  const [type, page] = answer('/page.html');
+  assert.equal(type, 'text/html; charset=utf-8');
+  assert.equal(page, built());
 });

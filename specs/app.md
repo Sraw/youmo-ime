@@ -251,6 +251,67 @@ keys has it (`InputView.navbarStrip`), and 仅颜色 sets the window's bar colou
 `SceneWindow.darkButtonsOn`; a mid grey's luminance is 0.22, yet black on it stands out more). The
 hardware keyboard's bar (its candidates alone) is the theme's whatever the floating setting says.
 
+The candidate bar, the expanded candidates and the hardware keyboard's window are drawn by their views
+as the theme's `candidate`, `candidates-divider`, `bar` and `candidates-panel` say (060-render-p3 T6a):
+the engine works out a `BarLook` (keyboard-scene `engine/BarLook`: per candidate plain, `:first`,
+`:selected` and both, its fill, pressed overlay, colours of the words, `label` and `comment`, font and
+weight; the corners, the inset from the cell, the padding, the `gap`, `label-style`, the lines' colour,
+the bar's base and the panel's) in the window's scenes but floating (`SceneWindow.scenes`), and
+`candidates/SceneBar` turns it into drawables, a typeface and px (`(dp × density).toInt()`, as the
+engine's sample bar). A theme setting none of it, every built-in one, has the bar as before: no fill,
+the pressed colour over the whole cell, 3.0's candidate colours and font (LookTheme writes 3.0's candidate
+font and weight as the theme's `candidate` style, its font `<font name="candidate">`; a font's name is read
+as the keys' are, `SceneFonts`: `candidate`, `key`, else the system's till a theme's own fonts are, T8a), the padding of 候选字号
+(`KawaiiBarComponent.candidatePaddingDp`), the divider's 1 dp line, the panel the bar's colour over flat
+keys; a look that made no theme the same of its colours (`SceneBar.plain`). A candidate's shape is a
+`LayerDrawable` inset, not an `InsetDrawable`, whose inset a view takes as its padding. Corners not all the same
+(`radius="12 0 0 0"`) are clamped differently: the engine (`Faces.radii`, the sample bar and the web's preview) keeps each
+to half the box's shorter side, while `GradientDrawable` (Skia's round rect) keeps them as written unless two on one side add
+up to more than it, then scales all down together; so a corner over half the height but not over the side is rounder on the phone
+than in the preview (060-render-p3 T6a review L3, kept: the same where every corner fits, as every built-in theme's do). `gap` widens
+the horizontal bar's room between two (the line in its middle, `FlexboxVerticalDecoration`); a
+transparent divider draws nothing but keeps its room. `label-style` (number: 1 2 3 of the whole list,
+the expanded grid's numbers going on from the bar's; dot: •; none, the default) stands before the
+words, a space after it; the hardware keyboard's window, whose default is fcitx's own label, shows
+fcitx's label for number; a screen reader reads the candidate without the theme's number or dot (the
+text's content description). `:first` is the list's first in the bar (scrolled, it is still the list's
+first, out of sight), the page's first in the hardware keyboard's window (each page's), and never in the
+expanded grid (its cells go on past the bar's). `gap` is the horizontal bar's alone; `padding` the bar's
+and the flexbox expanded window's (the grid one and the hardware keyboard's window keep their own); the
+hardware keyboard's window has no pressed colour.
+One BarLook is worked out for a bar and handed to its holders (`HorizontalCandidateViewAdapter.bar`,
+`PagingCandidateViewAdapter.bar`, `PagedCandidatesUi`). `CandidateViewHolder` draws a holder bound at another index again where its
+look or label differs (the first's own look, its number). The candidate's size is still 候选字号's
+(the bar's height and the grid's rows follow it): a theme's `size` there is warned of, not read.
+`BarThemeTest` holds the views to the theme, and to `BarSample.scene` (the engine's sample bar, its
+snapshots `bar-*.txt`): each candidate's box within a pixel, its fill and colours the same, of a theme of
+none of it, pills and a dotted one, a candidate with a comment among them. The sample is the bar at its words'
+own widths (`NeverFillWidth`); filling its width (Auto, Always), the app stretches each candidate, which the
+web's preview does not show.
+
+T6b adds three to `BarLook`. `bar height=` (80%–140%, on a style of bars alone, a scene allowed) scales the
+bar 候选字号 gives (`CandidateBarHeight.dp(…, percent)`, rounded to a dp; a line of pinyin readings is added
+after, unscaled): `KawaiiBarComponent.heightDp(context)` takes the active theme's in the window's scenes of
+that context (`SceneBar.heightPercent`, kept per theme file and scenes), so every view sized by the bar follows,
+the expanded grid's rows and a hint reading's baseline (CandidateItemUi, the grid's measure) too; the keys
+keep their height, the keyboard grows by the difference (the 70% cap, `KeyboardHeightCap`, counts the bar as
+before), docked, floating and one-handed alike (`BarToolbarThemeTest`). The bar is one over every window
+form (`SceneWindow.scenes` is never floating, split or one-handed), so a bar widget's selector under
+`@floating`, `@split` or `@one-handed` never matches and is warned of. `toolbar` (fill, radius, icon-color;
+`:pressed` overlay; `:selected`, a toggle on, fill and icon-color) is every `ToolButton`'s (IdleUi works it
+out once for the bar's buttons): nothing set, the press highlight's circle and `toolbarIcon`, on `accentKey`,
+as before; a state with a fill or a radius is a shape (`SceneBar.shape`; no radius: a circle in the button's
+middle, `ToolButton.Circle`) with the overlay over it pressed, a state with neither the press highlight as
+ever (`toolbar:selected fill` alone leaves every button off as it was; `ToolButton.setOn`). `preedit` (color, cursor-color,
+underline) is the code row's, the floating strip's and the hardware keyboard window's code (`PreeditUi`)
+and the syllables' text colour: nothing set, `keyText` and fcitx's `UnderlineSpan`; an `underline` of the
+theme is drawn by `PreeditUi.PreeditTextView` under each span fcitx underlines, at the font's underline
+position (`Paint.underlinePosition`, API 29), to each line's end edge where it wraps (`segments`): no public
+API sets an underline's colour or thickness (`TextPaint.underlineColor`, `underlineThickness` are hidden at
+every level). `none`, or 0 wide, none. The floating code strip's colour and the settings
+page's preview bar (its base and height, of the theme shown) are the theme's `bar` too. A candidate's
+`size` stays unread: 候选字号 is the user's setting, and the bar's height the theme's.
+
 Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
 much shorter (85% at least), with `FloatingHandle` at the bottom (24 dp: a short bar and the dock button;
@@ -327,10 +388,13 @@ is no word (a domain, a user name, a password); a wrong guess in a password is n
 password is neither read nor learned; the space a glide puts before its word would break an address.
 Keys there are typed as they are, and a finger sliding across them never starts a glide.
 
-The same touch is a stroke (笔画筛选) where its switch is on (`AppPrefs.keyboard.strokeFilter`
-beside `glideTyping`, which keeps 0.4's `glide_typing` key, so a 0.4 user's glide carries over). The
-two are never both on: the shared page's `AppToggle.turnsOff` turns the other off as one is turned on,
-its switch flipped where it is seen, no dialog; so English glides none while strokes are on.
+The same touch is a stroke (笔画筛选) where that is chosen instead: one setting,
+`AppPrefs.keyboard.keyDrawing` (`KeyDrawing`: Off, Glide, StrokeFilter; its Handwriting not offered
+on the settings page yet), so the two are never both on and English glides none while strokes are
+chosen. 0.5's two switches (`glide_typing`, 0.4's key too, and `stroke_filter`) move over at the
+start (`AppPrefs.migrateKeyDrawing`, a backup's at the start after its import): glide if it was on,
+else strokes if they were, else off (both on, which only a backup or a hand edit holds, is glide),
+the two old keys dropped. The page's row is an `AppChoice` whose summary is the choice alone.
 `GlideInput` decides at the finger's down (`strokes`): the switch, a word field, pinyin typed (`BaseKeyboard.imTyping`, which
 `KeyboardWindow` sets from the preedit, not in a temporary mode: its panel alone has an aux line above) and a keyboard whose input method filters (`filters`:
 `InputMethodCatalog.filtersByStrokes` of the one shown, on `TextKeyboard`, `T9Keyboard` and
@@ -474,10 +538,20 @@ How a keyboard is drawn by the scene (060-render-p2 S4: the 14/18 keys first, S4
 drawing since S8a: no switch, no key views). A keyboard whose layout does not read still gets the canvas and
 draws nothing (logged once; never the views again, U8: `SceneKeyDefTest.aMovedKeyboardWhoseLayoutDoesNotReadDrawsNothing`).
 The layouts are read through a `LayoutSource` by id (`BuiltInLayouts`: `lib/keyboard-scene/src/commonMain/layouts/<id>.xml`,
-copied by the build as raw resources `scene_layout_<id>`, `-` made `_`; P3 a theme pack's first), each
+copied by the build as raw resources `scene_layout_<id>`, `-` made `_`), each
 once a process with the fragments it includes, kept by the source's key and the id: `SceneLayouts.source`'s
 first, and where it has none or it does not read, one step back to the app's own (`fallback`);
-`invalidate(key)` has a source's read again (P3, on a theme change); ids stay as the theme format names the boards (`k14/r1c1`,
+`invalidate(key)` has a source's read again. The source is asked each time (`ThemePackLayouts.current`): while a
+theme 4.0 pack is in use, `ThemePackLayouts` (key `theme:<file>@<theme.xml's time>`, so a pack imported again is read
+again; a theme change makes the input view anew) reads its `layouts/<id>.xml`, only for an id the app has
+(`BuiltInLayouts.has`: a pack replaces keyboards, never adds one), and refuses (`LayoutSource.refuses`, logged once,
+the app's drawn) one that is not as typable as the app's of that id (`ThemePackLayouts.judge`: its `id` and `family`,
+and every slot kind, function key of role backspace/enter/lang and digit key the app's has, its includes in place); a
+fragment it includes that the pack has not is the app's, a fragment of the pack's is read only by the pack's own
+keyboards. Block by block: a bad `k14.xml` falls back alone (`ThemePackLayoutsTest`). `SceneLayouts.of` drops what was
+read of other sources once the source's key changes. The keyboard choices (the input method pages, ⋯'s 键盘) name
+the theme's layout a keyboard is drawn with (`KeyboardLabels`, `keyboard_themed`, `18 键（主题：17 键）`, the name cut
+at 24 characters; not where T9b draws the app's instead, 双拼 on own groups, which it does not log for them); ids stay as the theme format names the boards (`k14/r1c1`,
 `ThemeKeyNamesTest.aSceneLayoutsKeysAreItsBoardsNames`). `SceneBoard` makes the canvas view and its scenes
 (the U8 fallback, the kept scenes, the marks' settings) for any keyboard; the keyboard gives its state as
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
@@ -507,16 +581,31 @@ A group key writes its letters (`letters="qw"`, 060-render-v2 §15): its tap is 
 keyboard's `sceneTable.group`, as `wire` sends it, its place added by `pressed`), its long press with no
 `popup` written (or `from="group"`) the letters' row the views' was (`sceneTable.groupPopup`). The
 app collects a layout's groups (`SceneGroups.of`, row by row, a fragment's where included) into a
-`NineKeyLetters` and holds it to the keyboard's (G14, G18): any other is logged and the keyboard's own
-kept, so codes, learning and `wire` never change by a layout (`SceneBehaviorTest`). The engine makes a
-keyboard of other groupings (`SceneGroups.letters` over `SceneGroups.written`, `NineKeyLetters.custom`;
-engine.md), which the app does not use yet (T9b). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
+`NineKeyLetters` and takes it as the keyboard is made (`GroupedKeyboard.grouping`, `SceneGroups.taken`,
+060-render-p3 T9b): the keyboard's own groups (G14, G18) as always, their codes, `wire` and learning
+unchanged; on pinyin's 14 and 18 keys (`ownGroups`, KeyboardWindow) a grouping of its own that makes a
+keyboard (`NineKeyLetters.custom` over `SceneGroups.written`, engine.md) is typed as such: each key's code
+its key's place among the keyboard's groups (`SceneGroups.ids`, by the node's id; `CUSTOM_BLOCK`, sent as
+it is, no `wire`; a letter, or the same letters, on two keys each key its own), a leaning tap `Keyboard.tapKey(code, x, y)` with where across and down its scene cell the
+finger came down (`KeyGesture.clickAt`, `clickDown`; a click no touch made, the code alone), and the groups
+told the engine as the keyboard is shown, not as it is made (`onAttach`, `EngineState.ownKeys`; the bridge's `syncOwnKeys` before
+each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them). Other groups told while
+a code is typed on the ones before (`EngineBridge.replaces`: groups told before, now others): the code is committed first
+as Return commits it (`HostCore.commitCode`, pinyin's letters as typed), not lost with the session made anew; no reset, so
+the next word keeps its 前文. The field's composing text (handwriting's, English's word) is no such code and is left alone
+(`KotlinHostOwnKeysTest`).
+Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
+groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
+keyboards (`GroupedKeyboardOwnGroupsTest`, `KeyboardCustomTest`). The theme's board stays `k14`/`k18`.
+A group key's long press is made as it opens only where its layout wrote none (or `from="group"`); a key
+that swipes no corner gets its letters alone (`longPressOf`). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
 where a tap leans and, P3, where the default label draws; the built-ins write their labels (`QW`, one
 word centred), so no label is drawn by the rows yet. Whether a tap leans (按落点加权) is the layout's:
 a group of two letters or more without `lean="off"` (`SceneGroups.leaning`, read whichever draws the
 keys), the 18 keys writing `lean="off"`; a layout whose groups are not the keyboard's, or none read, leans
-as built in (`SceneGroups.leaningOf`: G14's two-letter groups); the engine places taps of G14's codes alone (`Keyboard.placesTaps`),
-so 双拼's 14 keys (sent as `shuangpin14Key`) and any 18 keys send the code only, as before.
+as built in (`SceneGroups.leaningOf`: G14's two-letter groups); the engine places taps of G14's codes and a
+layout's own codes alone (`Keyboard.placesTaps`), so 双拼's 14 keys (sent as `shuangpin14Key`) and the built-in
+18 keys send the code only, as before; the built-in 14 keys' taps are their `TAPS` character, wherever down the key.
 
 The number keyboard (S4b) is one layout, `number.xml`, for all seven pads: `NumberKeyboard` gives its
 `NumberPad` as `Input.pad` (`full`, `signed-decimal`…) and the keys beside the digits are chosen by
@@ -922,6 +1011,29 @@ colour only over flat keys (`ThemeColors.panel`). Key text is `keyScale` of its 
 font (`ThemeAssets.typeface`, the weight asked); hints, marks and the bar's icons take
 `keyHintColor` and `toolbarIconColor`.
 
+The app's own panels take what the theme in use sets of them (060-render-p3 T7b; §16: their native
+views know the colours and a few properties), read through `ScenePanels` (input/keyboard/canvas) from the
+engine's `PanelLooks`, whose defaults are the look the app worked out itself before, so a theme 3.0's
+looks as it did; the scenes are the window's (`SceneWindow.scenes`: not `@floating` nor a placement's), a fill a
+colour alone (a picture's warned of and ignored), and a look that made no theme has that
+look of before worked out of its colours. `clipboard` (fill, radius, color): an entry's card and a split
+entry's pieces (`ClipboardEntryUi`, `ClipboardChunksUi`), not set the `clipboardEntry` colour, the keys'
+text, half the keys' radius (as 按键圆角 sets it, whatever `@flat`: the P2 rule, once
+`ThemeColors.entryRadius`). `picker` (fill, under the grid) and its part `categories` (fill, color; the one
+shown `picker:selected categories`): the symbols' column (`PickerSideUi`: the bar's colour, the one shown
+the keyboard's, the text the keys' at 60% and, shown, opaque) and the emoji's tabs (`PickerTabsUi`: on the bar, at 50%).
+`editing` (fill, radius): its buttons (`TextEditingButton`), not set the keys' colours, blocks or the flat
+grid of lines as the keys (a radius then nothing), the corners twice the keys' dp as as many px (its old
+setting's look), pills where the keys are; a fill set is a block whatever the keys. `voice` (fill, blur 0–25 dp) and its part `mic` (fill, icon-color): the mask's
+colour (not set, the keyboard's at `PanelLooks.MASK_ALPHA`), its frosted glass (`VoiceGlass.Blur.of`: three
+box blurs of the radius, as the picture's, on the keys taken 2 to 8 times smaller, under 4 px a little more; 0, none, the keys plain
+under the colour; not set, the glass of before), the microphone's bubble and bars (the accent colour at
+`MIC_ALPHA`, and whole). The glass is one picture of the keys taken once on every API: RenderEffect is API 31's
+and blurs a view's own drawing, not what is under it. The handwriting pad's `ink-color`, `ink-width` (1–8 dp)
+and `grid` / `grid-color` are on its slot's style (`handwriting/pad`, as its fill): the engine puts the
+strokes' `Ink` on the slot (`HandwritingKeyboard` gives it to `HandwritingPadView`; not set, the keys' text,
+3.5 dp) and a 田字格 of 1 dp lines over the pad's face in its ops (`engine/Pads`; not set, none).
+
 `ThemeAssets` (`data/theme/`) decodes off the main thread and caches for one theme's files at a time:
 the picture once an orientation at the width it is drawn (halved while wider, and till it is at most
 2048² pixels and 4096 high, so a 4096 cut is not held whole), its blurs from that (`BoxBlur`), each
@@ -945,15 +1057,19 @@ window asked only under a scaled view); `KeyFaceDrawable` lays a key image's nin
 The theme list's thumbnails (`ThemeAssets.thumbnail`) are its portrait cut decoded 160 dp wide on the
 same thread, blurred as on the keyboard, 12 MB of them kept; one that does not read is not kept.
 
-The app does not edit themes (user, 2026-11-03) and in 0.5.x does not link the web theme maker
-(user, 2026-11-04: making themes moves to a later version, now 0.6.0): 新增主题 opens the import picker directly, no menu; the page
-(`web/theme-maker`) stays on GitHub Pages for 0.6.0, unlinked from the app and the user docs. A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). The format version is unchanged. The theme list
+The app does not edit themes (user, 2026-11-03). 新增主题 is a menu (`ThemeAddMenu`, 060-render-p3 M5,
+replacing 0.5.x's import picker opened directly): 导入主题文件, the import picker; 在网页上制作 (a second
+line 做好后回到这里导入), the web theme maker (`web/theme-maker`, `Const.themeMakerUrl`,
+https://sraw.github.io/youmo-ime/theme-maker/ as `pages.yml` publishes it) opened in a browser by
+`openUrl`: the app has no network permission, so no WebView. The user docs link the page too. A theme file is `<name>.theme`, a zip inside (user, 2026-11-04, so it is not taken for any zip): exported under that name as `application/octet-stream` (a provider may add `.zip` for `application/zip`), and the import picker shows every file (`*/*`, `.theme` has no MIME type) and takes only a display name ending `.theme` (ime-core's `ThemeFileName`; `.zip`, an earlier 0.5.1's or the page's, or no name, is refused with `exception_theme_filename`, which says to rename it). An export is always a theme 4.0 pack (below). The theme list
 applies, imports, and on a long press exports or deletes one of the user's (Monet exports
 `Theme.Builtin.toCustom()`: its colours now and the key style it keeps, fixed, named as 0.5 named it,
 `MonetLight#<primary>`). A built-in theme of two versions is one card (`ThemeCards`, the theme page's
-list and the light and dark slots' dialogs alike): a small 浅/深 on its thumbnail shows the other version,
-a tap on the card picks the one shown; the version a slot or the theme in use is shows, and its mark
-only while it is shown (dark over light over in use; a slot's dialog opens on the slot's version). The fcitx edit page
+list and the light and dark slots' dialogs alike): a small 浅/深 on its thumbnail shows the other version
+and picks nothing (its touch target 48 dp, the chip in its corner; read out as the version shown and what a
+tap does, `theme_version_*_switch`), a tap on the card picks the one shown; the version a slot or the theme
+in use is shows, and its mark only while it is shown (dark over light over in use; a slot's dialog opens on
+the slot's version and keeps the theme picked, not the card: `SimpleThemeListAdapter.selectedTheme`). The fcitx edit page
 (`CustomThemeActivity`, its cropper) went with the old 选择图片… and 复制内置主题…; themes made by them
 before are listed, used, exported and deleted like any other. Thumbnails (`ThemeThumbnailUi`) draw four rows of the
 theme's keys in little (`ThemeThumbnailKeys`, colours only: no key image decoded) over its base
@@ -969,20 +1085,36 @@ those as before) drawn as `LookDefaults` with them, which is what the files' sty
 the colours were held to the deleted `ThemePreset`/`Theme.Monet` by `BuiltinThemesPresetTest`, commit
 bb317aba3). Monet's colours are `system(role, fallback)`: `ThemeMonet.systemColors` gives the roles from
 Android 14 (the light bar `surface-container-highest`, the dark `surface-container-high`), on 12 and 13
-the palette tones 0.5 approximated them with, before 12 none (the fallbacks: 0.5's static MD3 colours);
+the palette tones 0.5 approximated them with (every role, the two 0.5 had none for, the light high and
+the dark highest, the tones nearest Material's between their neighbours), before 12 none (the fallbacks: 0.5's static MD3 colours);
 re-read on a configuration change (`onSystemPlatteChange`) and when the key style is settled. Transparent's
 two are no built-in theme: test data, `commonTest/data/transparent.xml`.
 
 The settings name a built-in theme by **reference**: its file's name and version, `pixel#dark`, or its
 name alone where it has one (`deep-blue`; `deep-blue#dark` finds it too). `ThemeManager.getTheme` finds
-the user's theme of that name first, then the built-in. `ThemePrefs.migrateThemeRefs` (from
-`ThemeManager`'s start, the custom themes listed) moves a slot (`normal_mode_theme`, `light_mode_theme`,
-`dark_mode_theme`) naming one by its 0.5 name (`PixelDark`, `MonetLight`, `BuiltinThemeFiles.LEGACY`)
-to its reference, unless a theme of the user's has that name; a name of no theme stays (the default). No
+the user's theme of that name first, then the built-in, then the built-in of that 0.5 name (a slot not
+moved yet). `ThemeManager.listCustomThemes` lists the user's themes and sets the slots right with them,
+at the start and at every `refreshThemes` (themes not settled at the start may be since, A4; a refresh
+that changed a slot syncs the device-encrypted copy). A json whose file name is not its theme's name (put
+there by hand) is renamed to `<name>.json` as it is listed (not listed where that is another's json), as
+save, delete and the moves write that file. A theme of the user's named as a reference is now
+(`monokai`, `pixel#dark`: 0.5's import refused only 0.5's names) would hide the built-in one, so before
+the slots are moved `ThemeFilesManager.moveClashing` saves it again under a UUID of its name (its files
+as they are, its json's age kept), `ThemePrefs.renameThemeRefs` points every slot naming it at the copy
+(committed), and only then its old json goes: a kill anywhere leaves each slot on a json there is, the
+next start finishes onto the same UUID (where that name holds another theme already, the first of
+`<name>#1`, `<name>#2`… free or holding this copy). Not while the themes are not settled or before the
+first unlock (none listed). Then `ThemePrefs.migrateThemeRefs` moves a slot (`normal_mode_theme`,
+`light_mode_theme`, `dark_mode_theme`) naming one by its 0.5 name (`PixelDark`, `MonetLight`,
+`BuiltinThemeFiles.LEGACY`) to its reference, unless a theme of the user's has that name or may have it
+(`ThemeFilesManager.mayHoldThemes`, the directory read once: its json there unread, or the directory not
+read; such a slot is read as the built-in theme meanwhile); a name of no theme stays (the default). No
 mark: no old name is written any more and an import of one (or of a reference) is refused
 (`exception_theme_name_clash`), so it runs at every start and a backup of an older version, or the
 device-encrypted copy an older version wrote, is moved as it is read; `syncToDeviceEncryptedStorage`
-copies the references as they are now.
+copies the references as they are now. Before the first unlock nothing is moved, so a user's theme name
+there that is a reference now (`monokai`, in a copy synced before the theme was moved) reads as the
+built-in theme until the unlock.
 
 Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only
 (never a path, never a `.json`, never `.saving`); it checks all before copying any, so a refusal leaves nothing.
@@ -1008,10 +1140,98 @@ the files into place and the json last, and only then deletes the files the them
 it does not name (never one another theme names, a json or `.saving`); if any step fails, the files it added are deleted (one of the old theme's renamed
 over by then keeps the new bytes: only a rename in one directory can fail there). A migration saved
 again while listing that fails (a full disk) is logged and drawn migrated all the same, saved at the
-next start; `ThemeManager.saveTheme` tells the user (`theme_not_saved`, no path) and returns false. Export writes each named file once (only files of the theme dir:
-a planted json's other paths are refused before anything is written), then the json; delete removes
+next start; `ThemeManager.saveTheme` tells the user (`theme_not_saved`, no path) and returns false. Export (a 3.0 theme's, now as 4.0: below)
+takes only files of the theme dir (a planted json's other paths are refused before anything is written); 3.0's own zip
+(`exportJson`, each named file once, then the json) stays for the web theme maker's fixtures only; delete removes
 the json and every named file that is in the theme dir. Listing skips a theme with a file missing, and
 one that does not read (told once, `user_data_unreadable`), leaving its file as it is.
+
+### Theme 4.0 packs (060-render-p3 T8a)
+
+A pack is `files/host-theme/v4/<name>/`: its `theme.xml` (keyboard-scene's theme format 4, `ThemeReader`), the
+files it names (picture and cuts, `image()` fills, fonts, icons, the `<meta preview>`) and `layouts/*.xml`
+(`ThemePackFiles`). Each version of it (`variants`) is a `Theme.Pack` named as a built-in's are, `<name>#light`;
+one of no variants is `<name>`. Its keys, bar and popups are the engine's drawing of its own file (`Pack.drawn`:
+the file as read, its files' names made paths in its folder; `SceneThemes.of`, kept by the pack and the system
+colours, as `system()` colours are re-read on `onSystemPlatteChange`), not a look written again; the views drawn
+from a look (the theme page's preview, the thumbnail, the picture under the keys, key text font) read
+`Pack.look`: `LookDefaults` with its 24 colours, its picture, and the fonts its plain `key` and `candidate`
+styles name. Icons are checked and kept but not drawn yet (the engine draws its built-in icons by name).
+The list is packs, then 3.0 themes, then built-ins; a pack's versions are one card (`ThemeCards`);
+`getTheme` finds a 3.0 theme of the name first, then a pack's version, then a built-in, then the built-in of
+that 0.5 name (a pack is never named as either: refused at import, skipped at listing). A `Theme.Pack` keeps
+no text of its file (its `stamp` is the file's time, so one imported again is another theme): `scene` reads
+`theme.xml` when first drawn, and one that no longer reads is drawn as the built-in Pixel theme
+(`ThemePackFiles.scene`, `user_data_unreadable` told once). The bar and panels are drawn from the pack's own
+file too (`SceneBar`, `ScenePanels`: `SceneThemes.of(theme, look)`). `PackDrawGuard` writes
+`noBackupFilesDir/theme-pack-drawing` (the pack's name; written, not synced: a crash keeps it) as a
+`KeyboardCanvasView` is about to draw a pack's first frame of a process (`onDraw`, keyed by name and file
+time: one imported again is guarded again) and deletes it once that frame is drawn: at once on a software
+canvas, on a hardware one when a frame is committed (`registerFrameCommitCallback`, its glyphs and pictures
+drawn on the RenderThread; `ViewRootImpl.performDraw` takes the callbacks before it draws, so one registered in
+`onDraw` goes with the next frame, which `postInvalidateOnAnimation` asks for while the mark is pending, at most
+`PackDrawGuard.MAX_ASKED` (3) times a pack a process: a device that calls back no commit draws no more, the mark
+kept till a later frame's), only for the pack marked (another view's frame clears nothing). A window hidden
+before the frame after the first leaves the mark pending till the next show's first commit; a process ended in
+that gap resets the pack falsely. A pack built and
+not drawn (the keyboard made again while hidden, a settings page's sizes) marks nothing, so a process ended
+otherwise resets nothing. Found at the first listing of the packs of a process (`ThemeManager.init`, or the
+first `refreshThemes` once the files are settled: kept till then), the slots
+naming that pack's versions are reset to their defaults (`ThemePrefs.dropThemeRefs`) and
+`theme_pack_draw_failed` toasted; the pack is kept. `onSystemPlatteChange` reads the packs again (and draws
+a pack in use anew) only when `ThemeMonet.systemColors` differ from the ones they took.
+
+Import (`ThemeFilesManager.openTheme`): a zip with a top-level `theme.xml` is a pack, else it is 3.0
+(`importTheme`, as above). A pack is unpacked under `cacheDir/theme-import/<uuid>` (swept at the process's
+first open): its top-level files and `layouts/` only (`ZipStream.extract(keep = ...)`), the rest counted and
+metered as above; a folder but `layouts/` or `__MACOSX/`, or one in `layouts/`, is refused, and a zip whose
+`theme.xml` is only in a folder says it must be at the top (`exception_theme_xml_top`). It is checked whole before the user is
+asked (`ThemePackFiles.check`; `ThemeAssetLimits`): `theme.xml` read at this app's version (refused: does not
+read, the first five problems with their lines; `min-app` newer, said as such; `hidden` on Shift, Backspace,
+Space or Enter's text, `ThemePackCheck.hidesRequired`), at most 1 MB, `LookTheme.MAX_STYLES` (4100: a 3.0
+theme of 400 single keys written as 4.0) styles, 4 fonts, 200 icons (the reader's); its name plain, not
+`.`-led, not ending `#light`/`#dark`, no built-in's file or reference, no 0.5 name
+(`ThemePackFiles.builtinClash`). A 3.0 theme of the user's named by one of its references is replaced by it
+(`Opened.Pack.customs`; their names recorded in `noBackupFilesDir/theme-pack-replaces` before the pack is placed,
+the record put back as it was where the place fails; finished on the main thread once the pack is listed, `ThemeManager.finishReplacements`
+at `packPlaced`, or at the next start's listing after a kill, for the recorded names only: a 3.0 theme beside a
+pack of its name no import recorded, as a backup restored over the pack leaves, is kept and found by its name;
+a recorded name no pack lists has its record dropped at a start's listing, not later, as an import may be
+placing it then; the slots written with the change fired once, as the list has the pack, and the copy for before
+the first unlock synced only where a slot named the theme: the slots keep the name, which then finds the
+pack; a theme named `mine` replaced by a pack `mine` of two versions, the slots naming it name its version of
+the same lightness, `mine#dark`, and the copy for before the first unlock is synced; then its json and the files
+no other theme names are deleted, not where the slots were not written: tried again at the next listing, the
+3.0 theme found by its name till then), while a 3.0 import named as a pack's reference is refused. A folder of its name there but not listed is refused only where its
+`theme.xml` is a later build's (`ThemeReader.laterBuilds`: a format past 4.x, or a newer `min-app`;
+`exception_theme_newer_kept`; a `theme.xml` past 1 MB is not read for it, so not); any other (one that no longer reads, misses a file, hides required text, past
+the packs listed) is replaced, as it could not be deleted otherwise. A new pack past `ThemeAssetLimits.MAX_PACKS` (100) too
+(`exception_theme_packs`). Every file it names inside its folder (never `theme.xml`) and present; pictures
+(the source photo too) and key images as a 3.0 theme's, a preview `.png`/`.webp` of 512 KB and 2048 px a side, fonts that load, icons of 64 KB in
+`SvgSubset` (paths and plain fills only, numbers within ±1e6 and viewBox sides from 1e-3; no script, link, style or entity: `Xml.parse` takes no DTD); at most
+16 layouts, `.xml`, 64 KB each. Warnings (not refusals): what the reader skips (a later version's names), and
+key text under 3:1 on its keys in a version (`ThemePackCheck`'s contrast). The confirmation
+(`ThemePackDialogs`) shows the preview, author, version, license, the format, that it replaces a pack or a
+3.0 theme of the name, the keyboards it replaces as they would be drawn (`ThemePackLayouts.report`: read by the
+engine's reader and judged as above) with the count of their `commit:` actions (from the parsed layouts and the
+pack's fragments they include, each once: keys', variants', defaults', popup items' `send`, menu items' `do`; a
+character reference counts as what it reads as), the files never used (not an app id, unreadable, refused, a fragment
+no keyboard used includes), and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
+
+Placing (`ThemePackFiles.place`) copies it into `v4/.saving/new-<uuid>/`, each file synced, renames an old
+pack of the name aside into `v4/.saving/old-<uuid>/<name>`, renames the new one into place, syncs `v4/`, and
+only then deletes the old; a failure deletes what it wrote and puts the old back. A kill between the renames
+leaves the old aside: the first listing of a process puts each `old-*/<name>` back where no `v4/<name>` took
+its place, then clears `v4/.saving`. A listing reads the newest `MAX_PACKS` folders and skips (logged, told
+once) a pack an import would refuse: one that does not read, whose name is not its folder's, a bad or a
+built-in's name, hiding the required keys' labels, or missing a file, leaving it as it is. Delete (either
+version) removes the folder. Export writes `theme.xml`, its files by name, then `layouts/`; a 3.0 theme
+exports as `LookTheme.theme` of its look through `ThemeWriter` (`ThemePackFiles.of`, its files named by
+`LookTheme.fileNames`, its candidates' font and weight as T6a's `candidate` style), Monet's as its
+colours now. Backups take `v4/` with the themes; a restore replaces each pack the backup has whole (the phone's folder of
+its name deleted first, `UserDataManager.dropRestoredPacks`), the phone's others kept; an older build restoring
+one lists json only. A 3.0 theme whose source photo is past `MAX_PICTURE_SIDE` exports with its portrait cut
+as the source (`ThemeFilesManager.exportedLook`), so the pack imports.
 
 ## Persistence and backups
 

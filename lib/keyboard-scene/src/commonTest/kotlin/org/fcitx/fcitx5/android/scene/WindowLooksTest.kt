@@ -175,7 +175,8 @@ class WindowLooksTest {
         assertTrue(problems(withStyle("<style select=\"handle\" height=\"25dp\"/>")).any { it.contains("is not 0–24dp") })
         assertTrue(problems(withStyle("<style select=\"handle\" height=\"30%\"/>")).isNotEmpty())
         assertTrue(warnings(withStyle("<style select=\"handle, bar\" height=\"6dp\"/>")).single().contains("height= is not supported"))
-        assertTrue(warnings(withStyle("<style select=\"bar\" height=\"6dp\"/>")).single().contains("height= is not supported"))
+        // the bar's its own, in % (T6b: ThemeScenesTest)
+        assertTrue(problems(withStyle("<style select=\"bar\" height=\"6dp\"/>")).any { it.contains("is not 80%–140%") })
         // a grip's height is not the keyboard's size
         assertEquals(null, theme(withStyle("<style select=\"handle\" height=\"6dp\"/>")).keyboardSizes.height)
         // follow: the navigation bar's alone

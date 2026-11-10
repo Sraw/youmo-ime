@@ -30,6 +30,7 @@
     <cut orientation="portrait" file="port.png"/>
     <cut orientation="landscape" file="land.png"/>
   </picture>
+  <font name="candidate" src="candidates.ttf"/>
   <font name="key" src="font.ttf"/>
   <style select="keyboard" fill="picture"/>
   <style select="bar" fill="picture(12dp, 60%)"/>
@@ -60,4 +61,5 @@
   <style select="@landscape @floating keyboard" radius="11dp"/>
   <style select="@floating @flat keyboard" radius="3dp"/>
   <style select="@landscape @floating @flat keyboard" radius="3dp"/>
+  <style select="candidate" font="candidate" weight="300"/>
 </theme>

@@ -45,8 +45,9 @@ class VoiceHoldOverlay(
     private val main = Handler(Looper.getMainLooper())
     private var gone = false
 
-    private val talkColor = VoiceStyle.mask(theme.keyboardColor)
-    private val glass = VoiceGlass(talkColor)
+    private val look = VoiceStyle.panel(ctx, theme)
+    private val talkColor = look.fill.value
+    private val glass = VoiceStyle.glass(ctx, look)
     private var colorAnimator: ValueAnimator? = null
     private var currentColor = talkColor
 
@@ -56,10 +57,10 @@ class VoiceHoldOverlay(
         VoiceStyle.heard(this)
         setTextColor(theme.keyTextColor)
     }
-    private val wave = VoiceCard.wave(ctx, theme)
+    private val wave = VoiceCard.wave(ctx, look.micColor.value)
 
     // the bars on a pill of their own, as a bubble the voice is in
-    private val pillColor = VoiceCard.pillColor(theme)
+    private val pillColor = look.micFill.value
     private val pill = VoiceCard.pill(ctx, wave, pillColor)
     // what the status line says (listeningText): ready before silent
     // the microphone's first sample not zero come: what 正在听 waits for
@@ -198,7 +199,7 @@ class VoiceHoldOverlay(
         status.setTextColor(text)
         heard.setTextColor(text)
         hint.visibility = if (cancel) View.INVISIBLE else View.VISIBLE
-        wave.color = if (cancel) CANCEL_TEXT else theme.accentKeyBackgroundColor
+        wave.color = if (cancel) CANCEL_TEXT else look.micColor.value
         (pill.background as GradientDrawable).setColor(if (cancel) CANCEL_PILL else pillColor)
         colorAnimator?.cancel()
         colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentColor, if (cancel) VoiceStyle.CANCEL_RED else talkColor).apply {

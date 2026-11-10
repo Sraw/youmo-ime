@@ -232,7 +232,7 @@ class ThemeMakerFormatTest {
     fun whatTheAppExportsOfItImportsTheSame() {
         val (_, theme, _) = ThemeFilesManager.importTheme(fromWeb.inputStream()).getOrThrow()
         val out = ByteArrayOutputStream()
-        ThemeFilesManager.exportTheme(theme, out).getOrThrow()
+        ThemeFilesManager.exportJson(theme, out).getOrThrow()
         val exported = out.toByteArray()
         val (_, again, migrated) = ThemeFilesManager.importTheme(exported.inputStream()).getOrThrow()
         assertFalse(migrated)

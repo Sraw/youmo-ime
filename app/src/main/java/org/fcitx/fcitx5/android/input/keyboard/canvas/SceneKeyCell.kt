@@ -52,9 +52,9 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
     // back after it was made (or no longer), its scene made again in theirs
     private inner class DrawnIn(val theme: Theme) {
         val shownLook = ThemeManager.shownLook(theme)
-        val fonts = SceneFonts(shownLook)
+        val fonts = SceneFonts.of(theme, shownLook)
         val measurer = AndroidTextMeasurer(fonts)
-        val sceneTheme = SceneThemes.of(shownLook, theme.name, theme.isDark)
+        val sceneTheme = SceneThemes.of(theme, shownLook)
         val painter = ScenePainter(this@SceneKeyCell, shownLook, BoardImages.NONE, fonts)
     }
 

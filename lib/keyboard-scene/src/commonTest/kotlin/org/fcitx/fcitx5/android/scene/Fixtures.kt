@@ -5,10 +5,10 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.FixedMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
-import org.fcitx.fcitx5.android.scene.engine.TextMetrics
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
@@ -16,32 +16,8 @@ import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.fail
 
-/**
- * A font of fixed sizes, the same on every platform (060-render-v2 §6 step 5's fake): a Latin
- * character 0.6 of the size across, a wide (CJK) one 1.0, bold 5% wider; ink from 0.05 of the size
- * in from each side, cap height 0.7, descenders 0.2; the font's extent 1.05 above, 0.3 below. Widths go by
- * UTF-16 unit: a character past the BMP (😀, 𠀀) counts twice; no test measures one.
- */
-object FakeMeasurer : TextMeasurer {
-    override fun measure(text: String, font: String, weight: Int, size: Double): TextMetrics {
-        val bold = if (weight >= BOLD) BOLD_WIDER else 1.0
-        val advance = text.sumOf { (if (it.code >= WIDE_FROM) WIDE else NARROW) * size * bold }
-        val descends = text.any { it in "gjpqy,;" }
-        val ink = Box(size * SIDE, -size * CAP, maxOf(size * SIDE, advance - size * SIDE), if (descends) size * DESCENT else 0.0)
-        return TextMetrics(advance, ink, -size * TOP, size * BOTTOM)
-    }
-
-    private const val BOLD = 700
-    private const val BOLD_WIDER = 1.05
-    private const val WIDE_FROM = 0x2E80
-    private const val WIDE = 1.0
-    private const val NARROW = 0.6
-    private const val SIDE = 0.05
-    private const val CAP = 0.7
-    private const val DESCENT = 0.2
-    private const val TOP = 1.05
-    private const val BOTTOM = 0.3
-}
+/** The engine's font of fixed sizes ([FixedMeasurer]), which the snapshots are of. */
+val FakeMeasurer: TextMeasurer = FixedMeasurer
 
 /** The examples (dev/design/060-render-xsd/examples, copied into src/commonTest/data) and the four sizes the snapshots are of. */
 object Fixtures {
