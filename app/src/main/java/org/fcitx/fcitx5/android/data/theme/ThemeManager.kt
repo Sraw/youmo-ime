@@ -75,7 +75,11 @@ object ThemeManager {
      * be under way. Whether a slot was renamed.
      */
     private fun finishReplacements(atStart: Boolean = false): Boolean {
-        val recorded = ThemeFilesManager.replacing()
+        // one that does not read is kept as it is, tried again at the next listing
+        val recorded = runCatching { ThemeFilesManager.replacing() }.getOrElse {
+            Timber.w(it, "Themes replaced by packs not read")
+            return false
+        }
         if (!ThemeFilesManager.writable || recorded.isEmpty()) return false
         var renamed = false
         val done = recorded.filterTo(HashSet()) { name ->
@@ -97,7 +101,8 @@ object ThemeManager {
             if (named && written) renamed = true
             written && replacedDeleted(custom).also { if (it) customThemes.remove(custom) }
         }
-        ThemeFilesManager.replaced(done)
+        // one not written (a full disk) is done again next time; thrown, every start would crash in onCreate
+        runCatching { ThemeFilesManager.replaced(done) }.onFailure { Timber.w(it, "Themes replaced by packs not recorded as done") }
         return renamed
     }
 
@@ -109,8 +114,7 @@ object ThemeManager {
     private var finishing = false
 
     private fun replacedDeleted(custom: Theme.Custom): Boolean = try {
-        ThemeFilesManager.deleteThemeFiles(custom)
-        true
+        ThemeFilesManager.deleteThemeFiles(custom).also { if (!it) Timber.w("Theme ${custom.name} replaced by its pack not deleted") }
     } catch (e: IOException) {
         Timber.w(e, "Theme ${custom.name} replaced by its pack not deleted")
         false
@@ -304,7 +308,11 @@ object ThemeManager {
     fun deleteTheme(name: String): Boolean {
         if (refuseIfNotSettled()) return false
         customThemes.find { it.name == name }?.also {
-            ThemeFilesManager.deleteThemeFiles(it)
+            // its json not deleted: still listed (the next listing reads it), not shown as gone
+            if (!ThemeFilesManager.deleteThemeFiles(it)) {
+                Timber.w("Theme $name not deleted")
+                return false
+            }
             customThemes.remove(it)
         }
         val pack = packs.find { it.name == name }?.also { pack ->
