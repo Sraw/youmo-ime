@@ -1,0 +1,142 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input
+
+import android.content.res.Resources
+import android.os.SystemClock
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
+import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest.Companion.FAST_GAP_MS
+import org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest.Companion.HOLD_MS
+import org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest.Companion.IDLE_AFTER_MS
+import org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest.Companion.IDLE_LEAD_MS
+import org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest.Companion.SHIFT_APART_MS
+import org.fcitx.fcitx5.android.input.KeyboardPerfBaselineTest.Companion.shell
+import java.io.ByteArrayOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
+/**
+ * 060-render-p3 §4.3's rows of A1 (a key's motion), on a user's pack with motion (material's look, keys fading
+ * out in 150 ms, pressed 90% and 2dp down in 60 ms, Shift's faces crossfading in 200 ms): a single press (the
+ * press's frame, scaled from whole), 10-key runs (the release fades and every frame), the 2 s after a run,
+ * Shift tapped, and the runs again with 键盘动效 off and with battery saver on (animators made: none). Kept out
+ * of the test's class for its size (detekt LargeClass).
+ */
+internal fun KeyboardPerfBaselineTest.motionRows() {
+    val advanced = AppPrefs.getInstance().advanced
+    val motionWas = advanced.keyboardMotion.getValue()
+    if (themeWas == null) themeWas = ThemeManager.prefs.normalModeTheme.getValue()
+    val moving = onMain { movingTheme(service.resources) }
+    themesMade += moving.name
+    theme(moving)
+    fresh()
+    val letters = "nihaoshiji"
+    val at = (letters.toSet() + 'a').associateWith { keyAt(onKeyboard().text("$it")) }
+    val space = keyAt(onKeyboard().res(KeyboardPerfBaselineTest.imePkg, "button_space"))
+    val marks = onMain { DownMarks(service.window.window!!.callback, frames).also { service.window.window!!.callback = it } }
+    fun made() = onMain { canvasView()?.animatorsMade ?: 0 }
+
+    // [runs] 10-key runs: each key's press, every frame of them, the frames of the 2 s after, animators made
+    fun runs(label: String) {
+        val made = made()
+        val samples = mutableListOf<KeyboardFrames.Sample>()
+        val all = mutableListOf<KeyboardFrames.Frame>()
+        val after = mutableListOf<Double>()
+        repeat(warmUp + runs) { i ->
+            val from = System.nanoTime()
+            val ten = presses(marks, letters.map(at::getValue), gapMs = FAST_GAP_MS)
+            // the last release's fade (150 ms) within the lead, then 2 s that should draw nothing
+            SystemClock.sleep(IDLE_LEAD_MS)
+            val still = System.nanoTime()
+            SystemClock.sleep(IDLE_AFTER_MS)
+            if (i >= warmUp) {
+                samples += ten
+                all += frames.between(from, still)
+                after += frames.between(still, System.nanoTime()).size.toDouble()
+            }
+            endTyping(space)
+        }
+        row("anim", "$label, 10-key run, every key", samples, "animators ${made() - made}")
+        log("anim\t$label, 10-key run, every frame\t${frames.summary(all)}")
+        log("anim\t$label, idle after\tframes in 2 s ${Stats(after)} (median / p90)\tmax ${after.maxOrNull()?.toInt()}")
+    }
+
+    try {
+        onMain { advanced.keyboardMotion.setValue(true) }
+        // a key pressed alone: its press's frame (the pressed face whole at once), then let go to fade
+        val made = made()
+        val single = mutableListOf<KeyboardFrames.Sample>()
+        repeat(warmUp + runs) { i ->
+            val one = presses(marks, listOf(at.getValue('a')), gapMs = HOLD_MS * 2)
+            endTyping(space)
+            if (i >= warmUp) single += one
+        }
+        row("anim", "press scale, single key", single, "animators ${made() - made}")
+        runs("release fade")
+        shiftRows()
+        onMain { advanced.keyboardMotion.setValue(false) }
+        runs("switch off")
+        onMain { advanced.keyboardMotion.setValue(true) }
+        shell("cmd power set-mode 1")
+        settle()
+        runs("power save")
+    } finally {
+        runCatching { shell("cmd power set-mode 0") }
+        onMain {
+            advanced.keyboardMotion.setValue(motionWas)
+            service.window.window!!.callback = marks.original
+        }
+    }
+}
+
+// Shift tapped on and off on the moving theme: the tap's frame, then every frame of the crossfade
+private fun KeyboardPerfBaselineTest.shiftRows() {
+    val shift = keyAt(onKeyboard().res(KeyboardPerfBaselineTest.imePkg, "button_caps"))
+    val taps = mutableListOf<KeyboardFrames.Sample>()
+    val all = mutableListOf<KeyboardFrames.Frame>()
+    repeat(warmUp + runs) { i ->
+        repeat(2) {
+            val from = System.nanoTime()
+            val sample = shiftTap(shift)
+            SystemClock.sleep(SHIFT_APART_MS)
+            if (i >= warmUp) {
+                taps += sample
+                all += frames.between(from, System.nanoTime())
+            }
+        }
+    }
+    row("anim", "shift transition, tap", taps)
+    log("anim\tshift transition, every frame\t${frames.summary(all)}")
+}
+
+private const val MOVING = "perf-moving"
+
+// a user's pack with motion (none of the built-in themes has any): material's file under a name of its own
+private fun movingTheme(resources: Resources): Theme {
+    val styles = listOf(
+        "<style select=\"key\" transition=\"150ms ease-out\"/>",
+        "<style select=\"key:pressed\" transition=\"60ms linear\" press-scale=\"90%\" press-sink=\"2dp\"/>",
+        "<style select=\"key:shifted, key:locked\" transition=\"200ms ease-in-out\"/>",
+    )
+    val text = BuiltinThemeFiles.text(resources, R.raw.scene_theme_material)
+        .replace("name=\"material\"", "name=\"$MOVING\"")
+        .replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>"))
+    val zip = ByteArrayOutputStream().also { bytes ->
+        ZipOutputStream(bytes).use {
+            it.putNextEntry(ZipEntry("theme.xml"))
+            it.write(text.encodeToByteArray())
+        }
+    }.toByteArray()
+    val opened = ThemeFilesManager.openTheme(zip.inputStream(), ThemeManager.getAllThemes()).getOrThrow() as ThemeFilesManager.Opened.Pack
+    val versions = opened.commit().getOrThrow()
+    ThemeManager.packPlaced(versions[0].file)
+    return versions.first { !it.isDark }
+}
+

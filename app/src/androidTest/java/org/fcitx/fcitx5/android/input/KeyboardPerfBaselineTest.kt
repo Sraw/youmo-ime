@@ -76,11 +76,11 @@ class KeyboardPerfBaselineTest {
     val timeout: Timeout = Timeout.seconds(1_800)
 
     private lateinit var scenario: ActivityScenario<TypingHostActivity>
-    private lateinit var service: FcitxInputMethodService
-    private lateinit var frames: KeyboardFrames
+    internal lateinit var service: FcitxInputMethodService
+    internal lateinit var frames: KeyboardFrames
 
-    private val runs = InstrumentationRegistry.getArguments().getString("perfRuns")?.toInt() ?: 20
-    private val warmUp = 3
+    internal val runs = InstrumentationRegistry.getArguments().getString("perfRuns")?.toInt() ?: 20
+    internal val warmUp = 3
     private val only = InstrumentationRegistry.getArguments().getString("perfOnly")?.split(',')
 
     // perfScreenshot=true: the picture theme's keyboard captured once, to see the picture is drawn
@@ -93,9 +93,9 @@ class KeyboardPerfBaselineTest {
     private var imsWere: Array<String>? = null
     private var imWas: String? = null
     private var pinyinKeyboardWas: PinyinKeyboard? = null
-    private var followSystemWas: Boolean? = null
-    private var themeWas: Theme? = null
-    private val themesMade = mutableListOf<String>()
+    internal var followSystemWas: Boolean? = null
+    internal var themeWas: Theme? = null
+    internal val themesMade = mutableListOf<String>()
 
     @Test
     fun keyboardDrawingBaseline() {
@@ -112,7 +112,8 @@ class KeyboardPerfBaselineTest {
             if ("popup" in only) popupSlide()
             if ("rebuild" in only) rebuilds()
             if ("anim" in only || "idle" in only) idleRows()
-            // the §4.3 rows that need motion in the engine (A1-A4): told, not measured
+            if ("anim" in only) motionRows()
+            // the §4.3 rows that need motion in the engine (A2-A4): told, not measured
             if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return
         }
@@ -131,6 +132,7 @@ class KeyboardPerfBaselineTest {
         shiftWithLowerFaces()
         popupSlide()
         idleRows()
+        motionRows()
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()
@@ -261,7 +263,7 @@ class KeyboardPerfBaselineTest {
     }
 
     // a fresh input view on the 26 keys: none of the others made yet
-    private fun fresh() {
+    internal fun fresh() {
         pick(Board.KEYS14)
         pick(Board.FULL)
     }
@@ -382,7 +384,7 @@ class KeyboardPerfBaselineTest {
         row("theme", "block → a flat one not seen before", unseen)
     }
 
-    private fun theme(to: Theme): KeyboardFrames.Sample {
+    internal fun theme(to: Theme): KeyboardFrames.Sample {
         val before = onMain { keyboardFrame() }
         // the 26 keys in the new frame, as a build's: the frame shown alone, its keyboard not yet in it, is not the switch done
         return measure({ keyboardFrame().let { it !== before && shows(it, Board.FULL) } }) { ThemeManager.setNormalModeTheme(to) }
@@ -472,7 +474,7 @@ class KeyboardPerfBaselineTest {
         settle()
     }
 
-    private fun presses(marks: DownMarks, keys: List<PointF>, gapMs: Long): List<KeyboardFrames.Sample> {
+    internal fun presses(marks: DownMarks, keys: List<PointF>, gapMs: Long): List<KeyboardFrames.Sample> {
         marks.marks.clear()
         marks.recording = true
         val heap = Heap.now()
@@ -493,7 +495,7 @@ class KeyboardPerfBaselineTest {
     }
 
     // what was typed committed and the field emptied, for the next run to start alike
-    private fun endTyping(space: PointF) {
+    internal fun endTyping(space: PointF) {
         val down = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, space, down, down)
         inject(MotionEvent.ACTION_UP, space, down, SystemClock.uptimeMillis())
@@ -538,7 +540,7 @@ class KeyboardPerfBaselineTest {
         log("scene\tasked again, nothing changed (pinyin's first key)\t${stats(timed(view::invalidateScene))}")
     }
 
-    private fun shiftTap(at: PointF): KeyboardFrames.Sample {
+    internal fun shiftTap(at: PointF): KeyboardFrames.Sample {
         // Shift's state is the canvas's now (no button_caps view to ask): its scene made anew is the tap shown
         val scene = onMain { canvasView()?.scene }
         val mark = onMain { frames.mark(0) { canvasView()?.scene.let { it != null && it !== scene } } }
@@ -552,7 +554,7 @@ class KeyboardPerfBaselineTest {
         return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
     }
 
-    private fun canvasView(): KeyboardCanvasView? = keyboardFrame()?.let(::all)?.filterIsInstance<KeyboardCanvasView>()?.firstOrNull()
+    internal fun canvasView(): KeyboardCanvasView? = keyboardFrame()?.let(::all)?.filterIsInstance<KeyboardCanvasView>()?.firstOrNull()
 
     private fun textKeyboard(): TextKeyboard = keyboardFrame()!!.let(::all).filterIsInstance<TextKeyboard>().first()
 
@@ -683,7 +685,7 @@ class KeyboardPerfBaselineTest {
      * hidden (`anim | hidden`'s reference: no frame, CPU about 0). The process's CPU is its share of a
      * core over the wall time ([ProcessCpu]).
      */
-    private fun idleRows() {
+    internal fun idleRows() {
         fresh()
         val letters = "nihaoshiji"
         val at = letters.toSet().associateWith { keyAt(onKeyboard().text("$it")) }
@@ -761,19 +763,19 @@ class KeyboardPerfBaselineTest {
     }
 
     // the main thread idle, and a little more for what is posted after a frame (the bar, a11y)
-    private fun settle() {
+    internal fun settle() {
         instrumentation.waitForIdleSync()
         SystemClock.sleep(SETTLE_MS)
     }
 
-    private fun onKeyboard() = By.pkg(imePkg).hasAncestor(By.res(imePkg, "keyboard_view"))
+    internal fun onKeyboard() = By.pkg(imePkg).hasAncestor(By.res(imePkg, "keyboard_view"))
 
     private fun find(selector: BySelector) = device.wait(Until.findObject(selector), 10_000) ?: error("not on screen: $selector")
 
     // a key's centre on the screen, found as TalkBack and the UAT find it
-    private fun keyAt(selector: BySelector) = find(selector).visibleBounds.let { PointF(it.exactCenterX(), it.exactCenterY()) }
+    internal fun keyAt(selector: BySelector) = find(selector).visibleBounds.let { PointF(it.exactCenterX(), it.exactCenterY()) }
 
-    private fun row(what: String, label: String, samples: List<KeyboardFrames.Sample>, extra: String = "") {
+    internal fun row(what: String, label: String, samples: List<KeyboardFrames.Sample>, extra: String = "") {
         fun stats(of: (KeyboardFrames.Sample) -> Double?) = Stats(samples.mapNotNull(of))
         val withMetrics = samples.count { it.toDone != null }
         // a press's event to the window, and from there: the system's part and the app's
@@ -787,17 +789,17 @@ class KeyboardPerfBaselineTest {
         )
     }
 
-    private fun log(line: String) {
+    internal fun log(line: String) {
         Log.i(TAG, line)
     }
 
-    private fun <T> onMain(block: () -> T): T {
+    internal fun <T> onMain(block: () -> T): T {
         var result: Result<T>? = null
         instrumentation.runOnMainSync { result = runCatching(block) }
         return result!!.getOrThrow()
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "KeyboardPerf"
         const val PINYIN = InputMethodCatalog.PINYIN
         const val HANDWRITING = InputMethodCatalog.HANDWRITING
