@@ -324,11 +324,23 @@
   // the tabs' writes one at a time where the store can (store.lock: the browser's Web Locks): a page's first write
   // lets go of the record of a page closed before, which, without the lock, may be the record an open tab has read
   // the text naming and is about to name again (its draft lost); without a lock that record is left
-  const locked = (store, act) => (store.lock ? store.lock(act) : act());
-  function keepDraft(store, d, env) {
-    return locked(store, () => keepDraftNow(store, d, env));
+  // (a lock refused, as browsers may for a file:// page, is a write without it; the write on hiding the page waits
+  // for another tab's write, a few IndexedDB transactions: a page closed while another tab writes may lose its
+  // last change)
+  async function locked(store, act) {
+    if (store.lock) {
+      try {
+        return await store.lock(() => act(true));
+      } catch (e) {
+        // no lock to be had: written as without one (act itself never throws)
+      }
+    }
+    return act(false);
   }
-  async function keepDraftNow(store, d, env) {
+  function keepDraft(store, d, env) {
+    return locked(store, (serial) => keepDraftNow(store, d, env, serial));
+  }
+  async function keepDraftNow(store, d, env, serial) {
     try {
       const before = await store.get(DRAFT);
       const prev = before && before.v === 4 ? before.files : null;
@@ -347,7 +359,12 @@
       // write it after, naming its record (removing that record lost its draft). The record of a page closed
       // before is let go by the first write of the next page, only with the tabs' writes one at a time
       const gone = kept.own.filter((x) => x !== kept.id);
-      if (first && store.lock && prev && prev !== kept.id) gone.push(prev);
+      if (first && serial) {
+        // under the lock any files record the text does not name is no open tab's to lose (an open tab writes its
+        // files again when the text names another's): the records of pages closed before, all of them
+        const keys = store.keys ? await store.keys() : [prev && filesKey(prev)];
+        for (const k of keys) if (typeof k === 'string' && k.startsWith(DRAFT_FILES + '-') && k !== filesKey(kept.id) && !gone.includes(k.slice(DRAFT_FILES.length + 1))) gone.push(k.slice(DRAFT_FILES.length + 1));
+      }
       kept.own = [kept.id];
       for (const x of gone) await store.remove(filesKey(x));
       if (before && before.v !== 4) await store.remove(DRAFT_FILES);
@@ -415,6 +432,7 @@
       get: (k) => run('readonly', (s) => s.get(k)),
       put: (k, v) => run('readwrite', (s) => s.put(v, k)),
       remove: (k) => run('readwrite', (s) => s.delete(k)),
+      keys: () => run('readonly', (s) => s.getAllKeys()),
       lock: locks ? (act) => locks.request('youmo-theme-maker-draft', act) : undefined,
     };
   }

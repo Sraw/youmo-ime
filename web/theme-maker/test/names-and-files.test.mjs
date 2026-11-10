@@ -142,7 +142,7 @@ test('a new picture over an animated one drops animated=; one only tuned keeps i
 test('the draft writes the files again only when they changed; drafts of the pages before still open', async () => {
   const m = new Map();
   const puts = [];
-  const store = { get: async (k) => (m.has(k) ? structuredClone(m.get(k)) : undefined), put: async (k, v) => { puts.push(k); m.set(k, structuredClone(v)); }, remove: async (k) => { m.delete(k); } };
+  const store = { get: async (k) => (m.has(k) ? structuredClone(m.get(k)) : undefined), put: async (k, v) => { puts.push(k); m.set(k, structuredClone(v)); }, remove: async (k) => { m.delete(k); }, keys: async () => [...m.keys()] };
   const filePuts = () => puts.filter((k) => k.startsWith('draft-files')).length;
   const d = M.doc('<a/>', { 'p.png': new Uint8Array([1, 2]) });
   await M.keepDraft(store, d, M.ENV);
@@ -235,15 +235,29 @@ test('the draft writes the files again only when they changed; drafts of the pag
   locking.lock = (act) => { const r = chain.then(act); chain = r.catch(() => {}); return r; };
   await M.keepDraft(Object.create(locking), d, M.ENV); // a page, then closed
   const closedRecord = 'draft-files-' + m.get('draft').files;
+  m.set('draft-files-gone', { id: 'gone', files: {} }); // a page closed while another tab's text was there
   let during = null;
   const openA = Object.create(locking);
   openA.get = async (k) => {
     const v = await store.get(k);
-    if (k === 'draft' && during) { const f = during; during = null; f(); }
+    if (k === 'draft' && during) {
+      const f = during;
+      during = null;
+      f();
+      await new Promise((r) => setTimeout(r, 0)); // time for the other write to finish, were it not made to wait
+    }
     return v;
   };
+  // A's first write cut: it lets go of nothing of another page's, and its first write that goes in still does
+  const cutPut = openA.put;
+  openA.put = async (k, v) => { if (k === 'draft') throw new Error('cut'); return store.put(k, v); };
+  assert.equal(await M.keepDraft(openA, b, M.ENV), false);
+  assert.ok(m.has(closedRecord) && m.has('draft-files-gone'), 'a cut write lets go of nothing');
+  openA.put = cutPut;
   await M.keepDraft(openA, b, M.ENV);
+  assert.deepEqual([...m.keys()].filter((k) => k.startsWith('draft-files-')), ['draft-files-' + m.get('draft').files], 'nor the cut write\'s files left');
   assert.ok(!m.has(closedRecord), 'the closed page\'s record let go by the next page\'s first write');
+  assert.ok(!m.has('draft-files-gone'), 'and any other the text does not name');
   let fresh = null; // a new tab's first write, asked for while A is between reading the text and writing it
   during = () => { fresh = M.keepDraft(Object.create(locking), M.doc('<f/>', { 'f.png': new Uint8Array([5]) }), M.ENV); };
   await M.keepDraft(openA, Object.assign({}, b, { xml: '<a4/>' }), M.ENV); // only the text: names its record again
@@ -255,6 +269,11 @@ test('the draft writes the files again only when they changed; drafts of the pag
   const again = await M.draft(store);
   assert.equal(again && again.doc.xml, '<a5/>');
   assert.deepEqual(Object.keys(again.doc.files), ['b.png'], 'A wrote its files again');
+  // a lock refused (a file:// page): written as without one, never a write that fails
+  const refused = Object.create(store);
+  refused.lock = async () => { throw new Error('SecurityError'); };
+  assert.equal(await M.keepDraft(refused, d, M.ENV), true);
+  await M.dropDraft(refused);
   // an old draft written over: its files record goes too
   m.clear();
   m.set('draft', { v: 3, doc: { xml: '<v3/>' }, files: 'x' });
