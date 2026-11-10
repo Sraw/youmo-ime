@@ -135,6 +135,10 @@ def import_theme(d, name):
     if not n:
         raise Blocked(f"文件选择里没有 {name}：{s.texts()[:8]}")
     d.tap(n.c, 3.0)
+    # a 4.0 pack (what 导出 writes since T8a) is checked and asked first: 导入主题 <name>？ 导入
+    s = d.screen()
+    if any(t.startswith("导入主题") and t.endswith("？") for t in s.texts("all")):
+        d.tap_text("导入", where="all", scroll=False, after=3.0)
 
 
 def theme_items(d, s=None):

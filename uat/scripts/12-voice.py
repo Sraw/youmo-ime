@@ -633,11 +633,17 @@ def vo28(d):
     ex, ey = enter.c
     d.touch(("down", ex, ey), ("sleep", 0.05), ("up", ex, ey))
     time.sleep(2)
-    s = d.screen()
-    box = d.field_text(s) or ""
     # the page's log skips an empty send, so an empty ↵ before the sentence shows as the sentence
     # left in the box, not as a line of its own
-    sent = sum((n.text or "").count("我们走吧") for n in s.app() if n.cls != "EditText")
+    def sent_in(s):
+        return sum((n.text or "").count("我们走吧") for n in s.app() if n.cls != "EditText")
+    # a long-running Dumper's UiAutomation keeps the WebView's old node for the log (2026-11-10: still
+    # empty 8 s after the send, while a fresh connection reads the line at once): read again anew
+    s = d.screen()
+    if not sent_in(s) and d.start_dumper():
+        s = d.screen()
+    box = d.field_text(s) or ""
+    sent = sent_in(s)
     check(sent == 1 and not plain(box), f"聊天记录里「我们走吧」{sent} 次，聊天框「{box}」")
     return "发出「我们走吧」一次，聊天框已清空"
 
