@@ -116,17 +116,26 @@ class ThemePackReplacementTest {
         }
     }
 
-    // a record that does not read is not taken as empty: kept as it is for the next listing, not thrown
+    // a record that does not read: not read by an import replacing nothing; set aside (not written over, not taken as
+    // empty) by one replacing a theme, which then goes ahead: no import blocked for good
     @Test
-    fun aRecordThatDoesNotReadIsKept() {
-        mine()
-        val record = ThemeFilesManager.replacingFile().apply { delete(); mkdirs() }
+    fun aRecordThatDoesNotReadIsSetAsideNotWrittenOver() {
+        val record = ThemeFilesManager.replacingFile().apply { writeText("old\n") }
+        val bad = File(record.path + ".bad").apply { delete() }
         try {
+            // root reads anyway: a skip there (F4987), not a failure
+            assumeTrue("a file not readable (not as root)", record.setReadable(false) && !record.canRead())
+            assertTrue(opened().commit().isSuccess)
+            assertFalse(bad.exists())
             ThemeManager.refreshThemes()
-            assertTrue(record.isDirectory)
-            assertTrue(File(dir, "mine.json").exists())
+            mine()
+            assertTrue(opened().commit().isSuccess)
+            assertTrue(bad.exists())
+            assertEquals(setOf("mine"), ThemeFilesManager.replacing())
         } finally {
-            record.deleteRecursively()
+            record.setReadable(true)
+            bad.setReadable(true)
+            bad.delete()
         }
     }
 

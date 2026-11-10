@@ -189,10 +189,10 @@ object ThemeFilesManager {
         // Q1: not while an import writes in SAVING (the first sweep can come after a start not settled, A4,
         // from the listing an import's packPlaced asks for): a later listing sweeps once none does
         synchronized(writes) {
-            // swept under the lock, as listThemes does: no import begins writing meanwhile
+            // swept under the lock, as listThemes does: no import begins writing meanwhile; the packs read after
             if (writable && !packsSwept && writing == 0) {
                 packsSwept = true
-                return ThemePackFiles.list(dir, true, builtins)
+                ThemePackFiles.sweepPacks(dir)
             }
         }
         return ThemePackFiles.list(dir, false, builtins)
@@ -531,7 +531,17 @@ object ThemeFilesManager {
     // the ones not in it already
     @Synchronized
     private fun recordAdding(names: Set<String>): Set<String> {
-        val before = replacing()
+        if (names.isEmpty()) return names
+        // one that does not read set aside (kept, logged): else no later import that replaces a theme could take
+        val before = try {
+            replacing()
+        } catch (e: IOException) {
+            val file = replacingFile()
+            val aside = file.renameTo(File(file.parentFile, file.name + ".bad"))
+            Timber.w(e, "Record of the themes replaced not read: set aside $aside")
+            if (!aside) throw e
+            emptySet()
+        }
         return (names - before).also { if (it.isNotEmpty()) record(before + it) }
     }
 
