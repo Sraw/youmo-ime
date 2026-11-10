@@ -46,7 +46,7 @@
     if (fresh || !history) history = new M.History(d);
     else if (!history.push(d)) return;
     else edited = true;
-    changed();
+    changed(fresh);
   }
 
   // the draft written a moment after the last change, not on every key
@@ -56,36 +56,71 @@
     keeping = setTimeout(() => M.keepDraft(store, history.current, env), 500);
   }
 
-  function changed() {
+  function changed(external = false) {
     const d = history.current;
     if ($('source').value !== d.xml) $('source').value = d.xml;
     $('name').textContent = M.themeName(d.xml) || '（无名）';
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
     keep();
-    return loadAssets(d).then((current) => { if (current) { preview(); refreshTab(); } });
+    return loadAssets(d).then((current) => { if (current) { preview(); refreshTab(external); } });
   }
 
-  // a field the user types in: what a rebuild of its tab under it would take the typing from
+  // a field the user types in: what a value written over it would take the typing from
   const typedIn = (el) => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
-  let stale = false; // the tab shown is older than the document: rebuilt when the field typed in is left
+  const CONTROLS = 'input, select, textarea, button';
 
-  // the tab drawn anew after a change, unless a field of it is being typed in: a field commits on leaving it
-  // (change), so a rebuild then would take the field or button just tapped away (focus lost, its click never
-  // comes) or, done later (pictures and fonts decoded first), the characters typed into the next field; the
-  // controls read the document when used, not when drawn, so a tab left as it is still does the right thing
-  // a pointer held on the tab: a field left by pressing on another control commits (change) between the press
-  // and the release, and a tab drawn then would take the control pressed, its focus and its click
-  let held = false;
-  function refreshTab() {
-    const el = $('tab-' + tab);
-    if (held || (el && el.contains(document.activeElement) && typedIn(document.activeElement))) { stale = true; return; }
-    showTab();
+  // [to] made to show what [from] (the tab drawn anew, off the page) shows, its nodes kept: a control's value,
+  // a text; a part with no control replaced whole by the new one (its handlers, a canvas drawn). False where the controls differ (one more stop, a field
+  // gone): the tab is then drawn anew. [skip] keeps its value (the field being typed in).
+  function sync(to, from, skip) {
+    if (to.nodeType !== from.nodeType || to.nodeName !== from.nodeName) return false;
+    if (to.nodeType === Node.TEXT_NODE) { if (to.data !== from.data) to.data = from.data; return true; }
+    if (to.nodeType !== Node.ELEMENT_NODE) return true;
+    const kids = to.childNodes.length === from.childNodes.length;
+    if (!to.matches(CONTROLS) && !to.querySelector(CONTROLS) && !from.querySelector(CONTROLS)) {
+      if (!kids || !to.isEqualNode(from)) to.replaceWith(from);
+      return true;
+    }
+    if (!kids || (to.tagName === 'INPUT' && to.type !== from.type)) return false;
+    for (let i = from.childNodes.length - 1; i >= 0; i--) if (!sync(to.childNodes[i], from.childNodes[i], skip)) return false;
+    if (to.className !== from.className) to.className = from.className;
+    if (to.matches(CONTROLS) && to !== skip) {
+      if ('value' in from && to.value !== from.value) to.value = from.value;
+      if (to.checked !== from.checked) to.checked = from.checked;
+      to.disabled = from.disabled;
+      to.title = from.title;
+    }
+    return true;
   }
-  // once the press is over (its click dispatched) a tab left stale is drawn anew, unless a field of it is typed in
-  function released() {
-    held = false;
-    setTimeout(() => { if (stale && !held) refreshTab(); }, 0);
+
+  // the tab after a change: a value edited changes values in place, never the tab under the user (a tab drawn
+  // anew took the field or box just tapped, its focus and its click, or the characters typed into it: on touch
+  // the old field's change comes once the new one is tapped). The field being typed in keeps what it has, but
+  // not where the change is not its own ([external]: undo, redo, a draft): then it shows the document's.
+  function refreshTab(external = false) {
+    const el = $('tab-' + tab);
+    const panel = PANELS.find((p) => p.id === tab);
+    if (!panel || !history || !el || el.hidden) { showTab(); return; }
+    const fresh = document.createElement('div');
+    try {
+      panel.render(fresh, api);
+    } catch (e) {
+      showTab();
+      return;
+    }
+    const active = document.activeElement;
+    const skip = !external && el.contains(active) && typedIn(active) ? active : null;
+    const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
+    if (!same) showTab();
+  }
+
+  // a control's place in a tab, the same in the tab drawn anew: its row's label, its place in the row (else its text)
+  function controlKey(c) {
+    const row = c.closest('label.row, .group, p, li, tr');
+    const what = row && row.querySelector('.what');
+    const inRow = row ? [...row.querySelectorAll(CONTROLS)].indexOf(c) : -1;
+    return c.tagName + '|' + (what ? what.textContent : '') + '|' + inRow + '|' + (what ? '' : c.textContent || c.type);
   }
 
   // the theme's files as the painter takes them: its images decoded, its fonts loaded under a family of their own
@@ -361,18 +396,17 @@
     if (!panel || !history) return;
     const el = $('tab-' + tab);
     const scroll = $('edit').scrollTop;
-    // the control that had focus (a select just changed, a box ticked) has it again in the tab drawn anew: the
-    // same place among the tab's controls
-    const controls = () => [...el.querySelectorAll('input, select, textarea, button')];
-    const focused = controls().indexOf(document.activeElement);
-    stale = false;
+    // the control that had focus (a select just changed, a box ticked) has it again in the tab drawn anew, where
+    // it still is: found by its row and place (controlKey), not its index (a row added or gone moves that)
+    const key = el.contains(document.activeElement) && document.activeElement.matches(CONTROLS) ? controlKey(document.activeElement) : null;
     el.textContent = '';
     try {
       panel.render(el, api);
     } catch (e) {
       el.textContent = '这一页出错了：' + (e.message || e);
     }
-    if (focused >= 0 && controls()[focused]) controls()[focused].focus({ preventScroll: true });
+    const again = key && [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
+    if (again) again.focus({ preventScroll: true });
     $('edit').scrollTop = scroll;
   }
 
@@ -469,14 +503,6 @@
       $('tab-source').before(el);
     }
     $('tabs').addEventListener('click', (e) => { if (e.target.dataset.tab) { tab = e.target.dataset.tab; showTab(); } });
-    // a tab left stale while its field was typed in (refreshTab) drawn anew once focus leaves the tab
-    $('edit').addEventListener('focusout', (e) => {
-      const el = $('tab-' + tab);
-      if (stale && !held && el && !(e.relatedTarget && el.contains(e.relatedTarget))) showTab();
-    });
-    $('edit').addEventListener('pointerdown', () => { held = true; }, true);
-    window.addEventListener('pointerup', released, true);
-    window.addEventListener('pointercancel', released, true);
     showTab();
     $('from-image').addEventListener('click', fromImage);
     $('from-file').addEventListener('click', openFile);
@@ -489,8 +515,8 @@
       else if (act === 'open') openFile();
       else if (act === 'save') save();
     });
-    $('undo').addEventListener('click', () => { if (history && history.canUndo) { history.undo(); edited = true; changed(); } });
-    $('redo').addEventListener('click', () => { if (history && history.canRedo) { history.redo(); edited = true; changed(); } });
+    $('undo').addEventListener('click', () => { if (history && history.canUndo) { history.undo(); edited = true; changed(true); } });
+    $('redo').addEventListener('click', () => { if (history && history.canRedo) { history.redo(); edited = true; changed(true); } });
     document.addEventListener('keydown', (e) => {
       if (!(e.ctrlKey || e.metaKey) || e.target === $('source')) return;
       if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
@@ -548,7 +574,7 @@
           if (kept.env) env = Object.assign({}, M.ENV, kept.env);
           fillEnvForm();
           history = new M.History(kept.doc);
-          await changed();
+          await changed(true);
           return;
         } catch (e) {
           history = null;

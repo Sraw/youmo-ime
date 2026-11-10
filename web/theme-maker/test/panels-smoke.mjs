@@ -94,6 +94,50 @@ async function main() {
     await wait(300);
     const t = await style();
     check(/scale="110%"/.test(t) && /hidden="true"/.test(t), 'a click right after an edit acts: ' + t);
+
+    // the same on touch: there the old field's change comes after the new field's pointerup
+    const tap = async (label) => {
+      const { x, y } = await at(label);
+      await b.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      await wait(60);
+      await b.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await wait(60);
+    };
+    await b.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+    await click('藏起来');
+    await tap('大小');
+    await js(`document.activeElement.select()`);
+    await type('115');
+    await tap('字距');
+    await js(`document.activeElement.select()`);
+    await type('0.2');
+    await wait(500);
+    const touched = await js(`document.activeElement.value + ' ' + (document.activeElement.closest('label.row') || {}).textContent`);
+    check(/^0.2 字距/.test(touched), 'touch: the next field keeps what is typed into it: ' + touched);
+    await tap('颜色');
+    await wait(300);
+    const u = await style();
+    check(/scale="115%"/.test(u) && /letter-spacing="0.2em"/.test(u), 'touch: both edits written: ' + u);
+    await tap('大小');
+    await js(`document.activeElement.select()`);
+    await type('105');
+    await tap('藏起来');
+    await wait(300);
+    const v = await style();
+    check(/scale="105%"/.test(v) && /hidden="true"/.test(v), 'touch: a tap right after an edit acts: ' + v);
+
+    // undo with a field focused: every field shows the document undone, the focused one too
+    await tap('大小');
+    await js(`document.getElementById('undo').click()`);
+    await js(`document.getElementById('undo').click()`);
+    await wait(300);
+    const shown = await js(`[...document.querySelectorAll('#edit .tab:not([hidden]) label.row')].find((r) => r.querySelector('.what').textContent === '大小').querySelector('input').value`);
+    check(/scale="115%"/.test(await style()) && shown === '115', 'undo: the focused field shows the document\'s ' + shown);
+    await b.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'ArrowUp', code: 'ArrowUp', windowsVirtualKeyCode: 38 });
+    await b.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowUp', code: 'ArrowUp', windowsVirtualKeyCode: 38 });
+    await tap('颜色');
+    await wait(300);
+    check(/scale="120%"/.test(await style()), 'undo: a step after it goes from the document\'s value: ' + await style());
   } finally {
     b.close();
     server.close();
