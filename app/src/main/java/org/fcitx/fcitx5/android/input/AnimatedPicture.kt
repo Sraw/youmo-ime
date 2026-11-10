@@ -135,20 +135,30 @@ class AnimatedBoardDrawable(
         if (run && !play.isRunning) play.start() else if (!run && play.isRunning) play.stop()
     }
 
+    // where the frames go: their own size, placed and scaled by the canvas. Not by their bounds: API 29's
+    // AnimatedImageDrawable draws at its own size from the canvas's origin whatever its bounds (T10 on
+    // youmo29: a 480 px animation in the board's top-left corner), API 31+ honours them
+    private var dx = 0f
+    private var dy = 0f
+    private var scale = 1f
+
     override fun onBoundsChange(bounds: android.graphics.Rect) {
         val w = frames.intrinsicWidth
         val h = frames.intrinsicHeight
         if (w <= 0 || h <= 0 || bounds.isEmpty) return
         val p = PictureWindow.centerCrop(w, h, bounds.width().toFloat(), bounds.height().toFloat())
-        val left = bounds.left + p.dx.toInt()
-        val top = bounds.top + p.dy.toInt()
-        frames.setBounds(left, top, left + (w * p.scale).toInt() + 1, top + (h * p.scale).toInt() + 1)
+        dx = bounds.left + p.dx
+        dy = bounds.top + p.dy
+        scale = p.scale
+        frames.setBounds(0, 0, w, h)
     }
 
     override fun draw(canvas: Canvas) {
         if (under.alpha != 0) canvas.drawRect(bounds, under)
         canvas.save()
         canvas.clipRect(bounds)
+        canvas.translate(dx, dy)
+        canvas.scale(scale, scale)
         frames.draw(canvas)
         canvas.restore()
         if (brightness < 100) canvas.drawRect(bounds, dark)
