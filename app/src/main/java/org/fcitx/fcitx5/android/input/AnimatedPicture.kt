@@ -13,6 +13,7 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.AnimatedImageDrawable
 import android.graphics.drawable.Drawable
+import android.os.PowerManager
 import android.view.View
 import androidx.annotation.WorkerThread
 import androidx.core.view.doOnLayout
@@ -48,6 +49,8 @@ class PictureBaseView(context: Context) : View(context) {
     /** [frames] put under it once decoded (the still picture till then), playing at once where it is shown. */
     fun play(frames: AnimatedBoardDrawable) {
         background = frames
+        // decoded with the screen gone off already: no screen event comes till it is on again
+        frames.screen(context.getSystemService(PowerManager::class.java)?.isInteractive != false)
         frames.shown(isAttachedToWindow && windowVisibility == VISIBLE && isShown)
     }
 

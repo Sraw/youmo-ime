@@ -456,6 +456,10 @@ test("an animated picture past the app's limits (youmo-format's, the app's Theme
   };
   assert.equal(warned(animWebp(1080, 720, [50, 80])), '');
   assert.match(warned(animWebp(1080, 720, [50, 33])), /短于 50 ms/);
+  // single quotes, spaces around '=': XML all the same, read by the app
+  for (const attrs of ["animated='true' ", 'animated = "true" ']) {
+    assert.ok(check(animWebp(1080, 720, [50, 33]), attrs).warnings.some((p) => /短于 50 ms/.test(p.message)), attrs);
+  }
   assert.match(warned(animWebp(1441, 720, [50])), /长边/);
   assert.match(warned(animWebp(100, 100, [50], { frames: 301 })), /300 帧/);
   assert.match(warned(animWebp(100, 100, [50], { flag: false })), /不是动画 WebP/);
