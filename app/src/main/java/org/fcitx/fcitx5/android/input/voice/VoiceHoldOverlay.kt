@@ -105,8 +105,8 @@ class VoiceHoldOverlay(
         addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(v: View) = Unit
 
-            // the keyboard thrown away under it (hidden, rotated): nothing typed
-            override fun onViewDetachedFromWindow(v: View) = session.drop()
+            // the keyboard thrown away under it (hidden, rotated): what was heard typed, as a tap's
+            override fun onViewDetachedFromWindow(v: View) = session.fieldLeft()
         })
     }
 
@@ -153,13 +153,13 @@ class VoiceHoldOverlay(
     }
 
     /**
-     * Another field, the keyboard hidden: nothing typed, the microphone closed. The same field's
-     * input restarted (a WebView, the app's restartInput) while the finger is down: the hold goes
-     * on, what is said kept, as a tap's talk does.
+     * Another field, the keyboard hidden: what was heard typed into the field it was said in, the
+     * microphone closed, as a tap's talk does. The same field's input restarted (a WebView, the app's
+     * restartInput) while the finger is down: the hold goes on, what is said kept.
      */
     override fun inputEnded(how: BaseInputView.Hold.InputEnd) {
         if (how == BaseInputView.Hold.InputEnd.STARTED && session.sameField) return
-        session.drop()
+        session.fieldLeft()
     }
 
     override fun ready() {

@@ -44,6 +44,21 @@ class FakeRecognizer : VoiceSession.Listening {
     /** the polish failing at the end: what was said comes back as the raw text, as VoiceListener's then */
     var finishRaw = false
 
+    /** 语音整理's model not read in: the raw text throughout, as VoiceListener's then */
+    var polishNotLoaded = false
+
+    override val polishFailure
+        get() = when {
+            polishNotLoaded -> VoiceSession.PolishFailure.LOAD
+            finishRaw -> VoiceSession.PolishFailure.RUN
+            else -> null
+        }
+
+    // a test's own: the causes said already are the process's
+    init {
+        VoiceSession.polishHinted.clear()
+    }
+
     /** the microphone's first sample not zero comes as it opens; false: only when [on] says so */
     var warm = true
 

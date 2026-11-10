@@ -57,6 +57,15 @@ class VoiceHoldSession(
         if (hold.released) session.cut()
     }
 
-    /** Dropped, whatever was heard: another field, the keyboard gone, the touch taken away. */
+    /** Dropped, whatever was heard: the touch taken away. */
     fun drop() = session.drop()
+
+    /**
+     * The field left before the talk ended (another field, the keyboard hidden or thrown away): what
+     * was heard typed into it now, as a tap's talk does (the owner's, 060-pending-decisions L490); slid
+     * into the cancel zone, dropped, as lifting there would.
+     */
+    fun fieldLeft() {
+        if (!hold.released && hold.zone == VoiceHold.Zone.Cancel) session.drop() else session.typeNow()
+    }
 }

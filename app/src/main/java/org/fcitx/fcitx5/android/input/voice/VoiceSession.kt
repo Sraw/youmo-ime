@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
+import java.util.EnumSet
 
 /**
  * One talk, whatever starts and stops it (the space key held, [VoiceHoldSession]; the bar's
@@ -152,10 +153,10 @@ class VoiceSession(
             if (text != null) {
                 // it replaces what composes in the field: not taken away first, no flicker
                 put(text)
-                end(null)
+                end(polishHint())
             } else {
                 // typed as it was said: not "nothing heard", though nothing is left
-                end(if (talk.typedAny) null else R.string.voice_hold_nothing)
+                end(if (talk.typedAny) polishHint() else R.string.voice_hold_nothing)
             }
         }
     }
@@ -230,6 +231,14 @@ class VoiceSession(
         return VoiceEnd.apply(text, kind, AppPrefs.getInstance().keyboard.voiceEndMark.getValue().mode)
     }
 
+    // 语音整理 not applied, the raw text typed: said once a cause, for as long as the keyboard's process
+    // lives (060-pending-decisions L112/L170, the owner's); the failure itself is logged where it happened
+    @StringRes
+    private fun polishHint(): Int? {
+        val why = listener?.polishFailure ?: return null
+        return if (polishHinted.add(why)) R.string.voice_polish_failed else null
+    }
+
     private fun end(@StringRes message: Int?) {
         if (over) return
         over = true
@@ -243,6 +252,9 @@ class VoiceSession(
         ui.ended(message)
     }
 
+    /** Why 语音整理 did not apply: its model not read in (no polish at all), or failing on this talk. */
+    enum class PolishFailure { LOAD, RUN }
+
     /** What [VoiceListener] is to a session: the microphone and the recognizer behind [VoiceListener.Events]. */
     interface Listening {
         fun load()
@@ -254,6 +266,9 @@ class VoiceSession(
          * back), raw: the recognizer's text, the polish having failed
          */
         fun finish(stoppedAt: Long, done: (said: String?, raw: Boolean) -> Unit)
+
+        /** why 语音整理 did not apply to this talk, if it did not: read once [finish] is done */
+        val polishFailure: PolishFailure? get() = null
 
         /** the microphone closed now, what was heard still recognized */
         fun cut()
@@ -268,6 +283,10 @@ class VoiceSession(
          */
         @VisibleForTesting
         internal var listening: ((VoiceListener.Events) -> Listening)? = null
+
+        // the causes [polishHint] said already; the main thread's
+        @VisibleForTesting
+        internal val polishHinted: MutableSet<PolishFailure> = EnumSet.noneOf(PolishFailure::class.java)
 
         private const val FINISH_MS = 15_000L
 

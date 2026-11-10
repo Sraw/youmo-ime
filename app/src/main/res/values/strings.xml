@@ -1143,6 +1143,7 @@
     <string name="voice_hold_nothing">Didn\'t catch that</string>
     <string name="voice_tap_hint">Tap here or the microphone to stop</string>
     <string name="voice_tap_cut_short">The last words may be missing</string>
+    <string name="voice_polish_failed">Voice clean-up didn\'t apply</string>
     <!-- resource packs (dev/design/060-asset-packs.md) -->
     <string name="packs">Resource packs</string>
     <string name="home_packs_summary">The dictionaries and models: import the text pack (and the voice pack)</string>

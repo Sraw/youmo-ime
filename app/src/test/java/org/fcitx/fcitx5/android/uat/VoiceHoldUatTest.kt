@@ -440,6 +440,19 @@ class VoiceHoldUatTest {
         h.start()
         say("二零零二年")
         assertEquals("二零零二年", text())
+        // said on the card, once a cause (060-pending-decisions L112/L170)
+        assertTrue(shown().toString(), string(R.string.voice_polish_failed) in shown())
+        h.advance(3000)
+        say("百分之五十七")
+        assertEquals("二零零二年百分之五十七", text())
+        assertFalse(shown().toString(), string(R.string.voice_polish_failed) in shown())
+        // the model not read in: another cause, said once too
+        voice.finishRaw = false
+        voice.polish = null
+        voice.polishNotLoaded = true
+        h.advance(3000)
+        say("你好")
+        assertTrue(shown().toString(), string(R.string.voice_polish_failed) in shown())
     }
 
     // the tagger's number head as the model has it: 二零零二 a date, 百分之五十七 a percentage
@@ -499,12 +512,12 @@ class VoiceHoldUatTest {
         assertEquals("", first.text.toString())
     }
 
-    // heard while the space is held, then another field: the hold dropped (VoiceHoldOverlay.inputEnded),
-    // what was heard with it; neither field gets it (a tap's talk, unlike a hold, types it into the first) (R20 F6354).
+    // heard while the space is held, then another field: what was heard typed into the first, as a tap's
+    // talk does (060-pending-decisions L490, the owner's); the new field gets nothing, nor what the lift brings.
     // Its own test, not a row beside onlyTheFieldItWasSaidForGetsIt's: rows would share one recognizer and harness
     @Test
     @Uat("VO-12")
-    fun whatWasHeardBeforeAnotherFieldGoesWithTheHold() {
+    fun whatWasHeardBeforeAnotherFieldGoesIntoTheFirst() {
         allowMicrophone()
         h.start()
         val first = h.field
@@ -512,8 +525,29 @@ class VoiceHoldUatTest {
         voice.heard("你好")
         h.advance(100)
         h.start()
+        h.advance(500)
+        assertEquals("你好", first.text.toString())
+        assertEquals("", h.field.text.toString())
         f.lift()
         h.advance(500)
+        assertEquals("你好", first.text.toString())
+        assertEquals("", h.field.text.toString())
+    }
+
+    // slid into the cancel zone, then another field: dropped, as lifting there would
+    @Test
+    @Uat("VO-12")
+    fun anotherFieldWhileInTheCancelZoneTypesNothing() {
+        allowMicrophone()
+        h.start()
+        val first = h.field
+        val f = holdSpace()
+        voice.heard("你好")
+        val up = h.keyboard.height / h.service.resources.displayMetrics.density * 0.4f
+        f.move(h.at(space, dy = -up))
+        h.start()
+        h.advance(500)
+        f.lift(dy = -up)
         assertEquals("", first.text.toString())
         assertEquals("", h.field.text.toString())
     }

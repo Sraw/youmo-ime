@@ -1117,6 +1117,7 @@
     <string name="voice_hold_nothing">沒有聽清</string>
     <string name="voice_tap_hint">點這裡或麥克風 結束</string>
     <string name="voice_tap_cut_short">最後幾個字可能沒辨識完</string>
+    <string name="voice_polish_failed">語音整理沒有生效</string>
     <!-- resource packs (dev/design/060-asset-packs.md) -->
     <string name="packs">資源包</string>
     <string name="home_packs_summary">詞庫和模型：匯入文字包（和語音包）</string>
