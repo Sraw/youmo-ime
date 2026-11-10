@@ -248,8 +248,10 @@ object ThemeReader {
         val src = a.matching("src", FILE, "a file name") ?: a.required("src")
         val brightness = a.value("brightness", "0%–100%") { Values.percent(it)?.takeIf { v -> v <= PERCENT } } ?: PERCENT
         val blur = a.value("blur", "0dp–25dp") { Values.dp(it, MAX_BLUR) } ?: 0.0
-        if (a.oneOf("animated", listOf("true", "false")) == "true") p.warn(el.line, ignored("<picture animated=\"true\">"))
+        val animated = a.oneOf("animated", listOf("true", "false")) == "true"
         a.done()
+        // played frame by frame, not blurred: a blur a frame costs too much battery (060-render-p3 §8)
+        if (animated && blur > 0) p.warn(el.line, "blur= on an animated <picture> is not drawn: its frames are not blurred")
         val cuts = el.children.mapNotNull { cut ->
             if (cut.name != "cut") return@mapNotNull null.also { p.add(cut.line, "<${cut.name}> is not allowed in <picture>") }
             val ca = Attributes(cut, p)
@@ -261,7 +263,7 @@ object ThemeReader {
             if (orientation != null && file != null) orientation to file else null
         }.toMap()
         if (cuts.isEmpty()) p.add(el.line, "<picture> needs a <cut>")
-        return src?.let { Picture(it, brightness, blur, cuts) }
+        return src?.let { Picture(it, brightness, blur, cuts, animated) }
     }
 
     private const val MAX_BLUR = 25.0

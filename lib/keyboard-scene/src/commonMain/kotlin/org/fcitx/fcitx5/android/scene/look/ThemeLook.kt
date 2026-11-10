@@ -132,6 +132,8 @@ data class Crop(val file: String, val cropRect: Box?, val rotation: Int) {
 /**
  * The theme's picture: [src] as picked, cut once for portrait and once for landscape ([landscape]
  * null: the portrait cut, centre cropped, as before 3.0), at [brightness] percent, blurred [blurDp].
+ * [animated]: a theme 4.0's animated `<picture>` (060-render-p3 A4), [src] the animated WebP the keyboard
+ * plays, centre cropped, [blurDp] not drawn while it plays; the cuts its still picture. No 3.0 file has one.
  */
 data class Picture(
     val src: String,
@@ -139,6 +141,7 @@ data class Picture(
     val landscape: Crop?,
     val brightness: Int,
     val blurDp: Int,
+    val animated: Boolean = false,
 ) {
     init {
         requireBrightness(brightness)
