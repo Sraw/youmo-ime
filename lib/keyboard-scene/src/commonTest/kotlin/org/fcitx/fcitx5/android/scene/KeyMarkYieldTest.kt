@@ -107,7 +107,7 @@ class KeyMarkYieldTest {
                     near(m.width, m.height, "square $at")
                     assertEquals(slot.left, m.left + m.right < k.w, "its side $at: $m")
                     assertEquals(slot.bottom, m.top + m.bottom > k.h, "its edge $at: $m")
-                    assertTrue(!m.meets(s.glyph, 1.0 * d), "clear of the glyph $at")
+                    assertTrue(!m.meets(s.glyph, 1.0 * d - KeyMarkYield.FIT_SLACK), "clear of the glyph $at")
                 }
                 assertTrue(s.glyph.width >= glyph.width * least - 1e-6, "the glyph no smaller than the class's least $at")
             }
@@ -130,13 +130,13 @@ class KeyMarkYieldTest {
                 val s = KeyMarkYield.key(glyph, listOf(k.mark(Slot.TopRight)), k.room, 1.0 * d, k.edge)
                 val at = "at $d, r $r, $over dp over"
                 val m = s.marks[0]
-                if (k.room.right + over * d <= edge + 1e-6) {
+                if (k.room.right + over * d - KeyMarkYield.FIT_SLACK <= edge + 1e-6) {
                     near(glyph.width, s.glyph.width, "the glyph its size $at")
-                    near(k.room.right + over * d, assertNotNull(m, "kept $at").right, "out as far as it must $at")
+                    near(k.room.right + over * d - KeyMarkYield.FIT_SLACK, assertNotNull(m, "kept $at").right, "out as far as it must $at")
                     near(k.room.top, m.top, "its top inset kept $at")
                 } else if (m != null) {
                     // in along the arc, or the glyph smaller
-                    assertTrue(!m.meets(s.glyph, 1.0 * d), "clear $at")
+                    assertTrue(!m.meets(s.glyph, 1.0 * d - KeyMarkYield.FIT_SLACK), "clear $at")
                     assertTrue(m.right <= k.w - 0.25 * d + 1e-6, "no further than the edge $at")
                 } else {
                     // past saving: its class asks nothing of it, the glyph its size (060-render-p2 S4e)
@@ -293,7 +293,7 @@ class KeyMarkYieldTest {
             val s = KeyMarkYield.key(tall(k, over), listOf(k.mark(Slot.TopRight)), k.room, 1.0 * d, k.edge)
             val m = s.marks[0] ?: continue
             withinArcs(k, s, "at $d, $over dp over")
-            assertTrue(!m.meets(s.glyph, 1.0 * d - 1e-6), "at $d, $over dp over: clear of the glyph: $m ${s.glyph}")
+            assertTrue(!m.meets(s.glyph, 1.0 * d - KeyMarkYield.FIT_SLACK - 1e-6), "at $d, $over dp over: clear of the glyph: $m ${s.glyph}")
         }
     }
 

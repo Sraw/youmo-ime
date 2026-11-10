@@ -587,8 +587,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     shadow rect(2200.88,327.5,2332.13,415.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2200.88,327.5,2332.13,412.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 2235,338.5,2298,401.5 #ff7a858a
-    icon delete-sweep 2203.24,333.15,2232.24,362.15 #ff7a858a
-    icon restore 2203.24,378.58,2232.24,407.58 #ff7a858a
+    icon delete-sweep 2203.74,333.15,2232.74,362.15 #ff7a858a
+    icon restore 2203.74,378.58,2232.74,407.58 #ff7a858a
   pressed
     +2 fill rect(2200.88,327.5,2332.13,412.5 r=10.5,10.5,10.5,10.5) #1f000000
 key symbols kind=function role=symbols a11y="符"

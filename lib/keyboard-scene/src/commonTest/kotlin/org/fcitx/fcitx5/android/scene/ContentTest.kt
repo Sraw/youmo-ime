@@ -226,7 +226,7 @@ class ContentTest {
     fun aCompactBoardsClassesShrinkSmoothlyAndItsIconsKeepWithinTheArcs() {
         // the same for compact and small compact qwerty, k14 and k18; where a key's face is shorter than its
         // text (small compact k18 near 55%: 21 px of face, 36 px of text) the text gives a px for each px of
-        // face: up to 3.5% a px there, only ever smaller (060-render-p2 S4e)
+        // face: up to 3.75% a px there, only ever smaller (060-render-p2 S4e)
         val small = Forms.compact.copy(width = 990.0 * 2.625 / 2.75, height = 407.0 * 2.625 / 2.75)
         for (d in listOf(1.5, 2.0, 2.75, 3.5)) for (form in listOf(Forms.compact, small)) for (board in listOf("qwerty", "k14", "k18")) sweepSmoothly(d, board, form)
     }
@@ -316,12 +316,14 @@ class ContentTest {
 
     // a px of keyboard, at [d] px a dp: at most 0.04 / d from [o] to [v] (2% at 2 px a dp: the less a px is
     // of a dp, the less it moves), or a px for an icon (whole px); a glyph taller than its face more, up to
-    // 0.07 / d, only smaller (the face's px it gives; growing, as a key fades out of its class's need, as any)
+    // 0.075 / d, only smaller (the face's px it gives, and its class's need fading in as its marks' does: small
+    // compact k18 at 2 px a dp gives 3.6% at 196 px with FIT_SLACK, 2.8% without; growing, as any)
     private fun smallStep(id: String, o: Double, v: Pair<Double, Boolean>, d: Double, at: String) {
         val (now, tall) = v
-        val most = 0.04 / d
+        // (0.042: small compact k18's '1' at 2 px a dp gives 2.06% at 187 px with FIT_SLACK, 1.9% at most without)
+        val most = 0.042 / d
         if (tall && o - now > most * o) {
-            assertTrue(o - now <= 0.07 / d * o + 1e-6, "$id $o to $now, taller than its face, $at")
+            assertTrue(o - now <= 0.075 / d * o + 1e-6, "$id $o to $now, taller than its face, $at")
             return
         }
         val slack = if (" I " in id) 1.0 + 1e-6 else 0.0
