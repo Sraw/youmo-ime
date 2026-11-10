@@ -5,9 +5,11 @@
 
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.Context
 import android.net.Uri
 import android.os.Parcelable
 import androidx.navigation.NavController
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.createGraph
 import androidx.navigation.fragment.fragment
 import kotlinx.parcelize.Parcelize
@@ -100,6 +102,9 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object PinyinCustomPhrase : SettingsRoute()
+
+    @Serializable
+    data object CommonWords : SettingsRoute()
 
     /**
      * 快速输入's page; [edit]: its editor open at once on [key], [content], [note] and [folder], an
@@ -209,21 +214,7 @@ sealed class SettingsRoute : Parcelable {
 
             /* ========== External ========== */
 
-            fragment<PinyinDictionaryFragment, PinyinDict> {
-                label = ctx.getString(R.string.word_packs)
-            }
-            fragment<UserWordsFragment, UserWords> {
-                label = ctx.getString(R.string.my_words)
-            }
-            fragment<UserWordListFragment, UserWordList>()
-            fragment<LearnedItemsFragment, LearnedItems>()
-            fragment<LearningBackupsFragment, LearningBackups> {
-                label = ctx.getString(R.string.learning_backups)
-            }
-            fragment<PunctuationEditorFragment, Punctuation>()
-            fragment<PinyinCustomPhraseFragment, PinyinCustomPhrase> {
-                label = ctx.getString(R.string.custom_phrases)
-            }
+            wordPages(ctx)
             fragment<QuickPhraseFragment, QuickPhrase> {
                 label = ctx.getString(R.string.quick_phrases)
             }
@@ -245,6 +236,29 @@ sealed class SettingsRoute : Parcelable {
             fragment<AddressSuffixesFragment, AddressSuffixes>()
             fragment<SettingsSearchFragment, Search> {
                 label = ctx.getString(R.string.search_settings)
+            }
+        }
+
+        // the pages of the words and what types with them: 词库, 我的词, what was learned, punctuation, custom
+        // phrases, 常用词 (apart, for createGraph's length)
+        private fun NavGraphBuilder.wordPages(ctx: Context) {
+            fragment<PinyinDictionaryFragment, PinyinDict> {
+                label = ctx.getString(R.string.word_packs)
+            }
+            fragment<UserWordsFragment, UserWords> {
+                label = ctx.getString(R.string.my_words)
+            }
+            fragment<UserWordListFragment, UserWordList>()
+            fragment<LearnedItemsFragment, LearnedItems>()
+            fragment<LearningBackupsFragment, LearningBackups> {
+                label = ctx.getString(R.string.learning_backups)
+            }
+            fragment<PunctuationEditorFragment, Punctuation>()
+            fragment<PinyinCustomPhraseFragment, PinyinCustomPhrase> {
+                label = ctx.getString(R.string.custom_phrases)
+            }
+            fragment<CommonWordsFragment, CommonWords> {
+                label = ctx.getString(R.string.common_words)
             }
         }
     }

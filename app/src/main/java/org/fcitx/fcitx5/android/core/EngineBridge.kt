@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.data.RecentlyUsed
 import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.pack.PackUnavailableException
+import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
@@ -25,6 +26,7 @@ import org.fcitx.fcitx5.android.engine.learn.Simplifier
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.phrase.CommonWords
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
@@ -332,6 +334,16 @@ class EngineBridge {
             read = false
             ""
         }
+        val wordsFile = File(dir, CommonWordsManager.FILE.substringAfter('/'))
+        var wordsRead = true
+        val commonWords = try {
+            wordsFile.takeIf { it.isFile }?.readText().orEmpty()
+        } catch (e: IOException) {
+            Timber.e(e, "common words: kept as they are, not written this run")
+            unreadable()
+            wordsRead = false
+            ""
+        }
         val dictionaryDir = File(dir, "dictionaries")
         // where the data is not settled, nothing written: no libime file converted, no file compiled,
         // what is there read as it is (where that is, the next start may not read)
@@ -355,7 +367,31 @@ class EngineBridge {
             indexes = JvmFiles(dictionaryDir),
             dictionaryStale = seen.stale,
             dictionaryPending = { MergedDictionary.pending(dictionaryDir) },
+            commonWords = commonWords,
+            saveCommonWords = WordsFile(wordsFile, commonWords, wordsRead && writable, phraseSaves)::save,
         )
+    }
+
+    /**
+     * The common words the engine read from [file] as [text], saved there as the keyboard deletes
+     * one ([Engines.Additions.saveCommonWords]), on [saves], as [PhraseFile] saves the phrases; not
+     * where the file was not read or the data is not settled ([writable] false).
+     */
+    internal class WordsFile(private val file: File, private val text: String, private val writable: Boolean, private val saves: Executor) {
+        private var base: CommonWords? = null
+
+        fun save(words: CommonWords) {
+            if (!writable) throw IOException("common words were not read, or where fcitx's data is is not settled")
+            saves.execute {
+                try {
+                    CommonWordsManager.saveOver(base ?: CommonWords.parse(text).words, words, file)
+                    // what the engine has, the base of its next: only once saved, as the phrases'
+                    base = words
+                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                    Timber.w(e, "common words")
+                }
+            }
+        }
     }
 
     // the engine's phrases saved off the fcitx thread, which takes the keys too; one at a time, in order.

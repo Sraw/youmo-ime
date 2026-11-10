@@ -267,6 +267,9 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         phrases.addPreference(R.string.custom_phrases, R.string.custom_phrases_summary) {
             navigateWithAnim(SettingsRoute.PinyinCustomPhrase)
         }
+        phrases.addPreference(R.string.common_words, R.string.common_words_summary) {
+            navigateWithAnim(SettingsRoute.CommonWords)
+        }
         phrases.addPreference(R.string.quick_phrases, R.string.quick_phrases_summary) {
             navigateWithAnim(SettingsRoute.QuickPhrase())
         }

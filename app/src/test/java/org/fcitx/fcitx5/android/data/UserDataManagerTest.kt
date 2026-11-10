@@ -415,6 +415,7 @@ class UserDataManagerTest {
         val phone = moved("phone")
         phone.config.put("conf/androidengine.conf", "PageSize=9\n")
         phone.data.put("pinyin/customphrase", "dz,1=北京\n")
+        phone.data.put("pinyin/commonwords.txt", "米字旁[mi'zi'pang]\t米\n")
         phone.data.put("pinyin/dictionaries/mine.txt.gz", "gz")
         phone.data.put("pinyin/dictionaries/merged.ymd", "compiled")
         phone.data.put("punctuation/punc.mb.zh_CN", ", 、\n")
@@ -427,6 +428,7 @@ class UserDataManagerTest {
             mapOf(
                 "external/config/conf/androidengine.conf" to "PageSize=9\n",
                 "external/data/pinyin/customphrase" to "dz,1=北京\n",
+                "external/data/pinyin/commonwords.txt" to "米字旁[mi'zi'pang]\t米\n",
                 "external/data/pinyin/dictionaries/mine.txt.gz" to "gz",
                 "external/data/punctuation/punc.mb.zh_CN" to ", 、\n",
                 "external/theme/mine.json" to "{}",
@@ -440,6 +442,7 @@ class UserDataManagerTest {
         UserDataManager.import(zip.inputStream(), fresh).getOrThrow()
         assertEquals("PageSize=9\n", File(fresh.config, "conf/androidengine.conf").readText())
         assertEquals("dz,1=北京\n", File(fresh.data, "pinyin/customphrase").readText())
+        assertEquals("米字旁[mi'zi'pang]\t米\n", File(fresh.data, "pinyin/commonwords.txt").readText())
         assertEquals(", 、\n", File(fresh.data, "punctuation/punc.mb.zh_CN").readText())
         // dictionaries and themes merged with the phone's; the text files the user edits follow the backup
         assertEquals("phone's", File(fresh.data, "pinyin/dictionaries/theirs.txt.gz").readText())
@@ -518,8 +521,8 @@ class UserDataManagerTest {
     @Test
     fun theUsersTextFilesFollowTheBackupItsCollectionsAndDotEntriesStay() {
         val phoneOwn = listOf(
-            "data/pinyin/customphrase", "data/data/quickphrase.d/mine.mb", "data/punctuation/punc.mb.zh_CN",
-            "config/conf/pinyin.conf",
+            "data/pinyin/customphrase", "data/pinyin/commonwords.txt", "data/data/quickphrase.d/mine.mb",
+            "data/punctuation/punc.mb.zh_CN", "config/conf/pinyin.conf",
         )
         fun phone(name: String) = install(name).also { dirs ->
             (phoneOwn + listOf("config/.libime/conf/pinyin.conf", "data/punctuation/.libime/x", "data/pinyin/dictionaries/mine.txt"))

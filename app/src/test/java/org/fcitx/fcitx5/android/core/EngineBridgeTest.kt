@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.pack.TestShelves
+import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
@@ -22,6 +23,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.phrase.CommonWords
 import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -133,6 +135,33 @@ class EngineBridgeTest {
         blocker.delete()
         saves.save(pinned.without("dh", "电话"))
         assertEquals(listOf(PinyinCustomPhrase("yx", 1, "信箱"), email), CustomPhraseManager.load(file))
+    }
+
+    // 常用词: read with the phrases; a replacement deleted on the keyboard saved over the file as it is
+    // then (the settings page may have added a word meanwhile); refused where data is not settled
+    @Test
+    fun theCommonWordsAreReadAndTheKeyboardsDeleteSavedOverTheFile() {
+        val file = File(folder.root, "commonwords.txt")
+        CommonWordsManager.write(CommonWords.parse("米字旁[mi'zi'pang] 米 糸\n").words, file)
+        val added = bridge.additions(folder.root)
+        val read = CommonWords.parse(added.commonWords).words
+        assertEquals(listOf("米字旁[mi'zi'pang] 米 糸"), read.words.map { it.toString() })
+        // the page added 中国 since the engine read the file
+        CommonWordsManager.write(CommonWords.parse("米字旁[mi'zi'pang] 米 糸\n中国[zhong'guo] 华\n").words, file)
+        added.saveCommonWords(read.without("米字旁", "米"))
+        until { CommonWordsManager.load(file).words.firstOrNull()?.replacements == listOf("糸") }
+        assertEquals(listOf("米字旁[mi'zi'pang] 糸", "中国[zhong'guo] 华"), CommonWordsManager.load(file).words.map { it.toString() })
+        val unsettled = bridge.additions(folder.root, writable = false)
+        assertThrows(IOException::class.java) { unsettled.saveCommonWords(CommonWords.EMPTY) }
+        assertEquals(2, CommonWordsManager.load(file).words.size)
+    }
+
+    private fun until(test: () -> Boolean) {
+        val end = System.currentTimeMillis() + 5_000
+        while (!test()) {
+            check(System.currentTimeMillis() < end) { "not saved" }
+            Thread.sleep(20)
+        }
     }
 
     @Test
