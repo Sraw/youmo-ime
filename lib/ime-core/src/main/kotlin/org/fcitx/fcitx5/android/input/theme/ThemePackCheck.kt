@@ -18,7 +18,7 @@ object ThemePackCheck {
     /**
      * The files [theme] names, each by what it is: read as that before it is taken. [images] the
      * nine-slice key images of its styles, [pictures] its picture's source photo apart, [preview] its
-     * `<meta preview>`.
+     * `<meta preview>`, [effects] the images its keys' press effects play (060-render-p3 A3).
      */
     data class Files(
         val pictures: Set<String>,
@@ -27,8 +27,9 @@ object ThemePackCheck {
         val fonts: Set<String>,
         val icons: Set<String>,
         val preview: String?,
+        val effects: Set<String> = emptySet(),
     ) {
-        val all: Set<String> get() = pictures + images + fonts + icons + listOfNotNull(source, preview)
+        val all: Set<String> get() = pictures + images + fonts + icons + effects + listOfNotNull(source, preview)
     }
 
     fun files(theme: Theme): Files = Files(
@@ -38,6 +39,7 @@ object ThemePackCheck {
         fonts = theme.fonts.values.toSet(),
         icons = theme.icons.values.toSet(),
         preview = theme.meta?.preview,
+        effects = theme.styles.flatMap { it.values.values }.mapNotNull { (it as? Value.OfEffect)?.effect?.file }.toSet(),
     )
 
     /**

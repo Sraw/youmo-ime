@@ -40,7 +40,7 @@ class ThemePackCheckTest {
     @Test
     fun theFilesATheme4NamesAreEachByWhatTheyAre() {
         val t = theme(
-            styles = """<style select="key.enter" fill="image(e.png, 1 2 3 4)"/><style select="key:pressed" fill="image(p.png, 1 1 1 1, 2x)"/>""",
+            styles = """<style select="key.enter" fill="image(e.png, 1 2 3 4)"/><style select="key:pressed" fill="image(p.png, 1 1 1 1, 2x)" effect="particles(s.png, 6, 12dp, 300ms)"/><style select="key.space:pressed" effect="ripple-image(r.webp, 80%, 300ms)"/>""",
             meta = """<meta author="a" preview="pre.png"/>""",
             before = """<picture src="src.jpg"><cut orientation="portrait" file="p.webp"/><cut orientation="landscape" file="l.webp"/></picture><font name="f" src="f.ttf"/>""",
             after = """<icon name="i" src="i.svg"/>""",
@@ -52,7 +52,8 @@ class ThemePackCheckTest {
         assertEquals(setOf("f.ttf"), f.fonts)
         assertEquals(setOf("i.svg"), f.icons)
         assertEquals("pre.png", f.preview)
-        assertEquals(setOf("p.webp", "l.webp", "src.jpg", "e.png", "p.png", "f.ttf", "i.svg", "pre.png"), f.all)
+        assertEquals(setOf("s.png", "r.webp"), f.effects)
+        assertEquals(setOf("p.webp", "l.webp", "src.jpg", "e.png", "p.png", "f.ttf", "i.svg", "s.png", "r.webp", "pre.png"), f.all)
         assertEquals(ThemePackCheck.Files(emptySet(), null, emptySet(), emptySet(), emptySet(), null), ThemePackCheck.files(theme()))
     }
 

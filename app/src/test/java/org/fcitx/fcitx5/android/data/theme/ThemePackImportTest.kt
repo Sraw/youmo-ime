@@ -550,6 +550,23 @@ class ThemePackImportTest {
     }
 
     @Test
+    fun aPacksEffectImagesAreHeldToTheirLimitsAndDrawnByPath() {
+        val styles = """<style select="key.enter" fill="image(enter.png, 4 4 4 4)"/><style select="key:pressed" effect="particles(spark.png, 6, 12dp, 300ms)"/>"""
+        val x = xml(styles = styles)
+        val side = ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE
+        assertEquals(appContext.getString(R.string.exception_theme_effect_image_side, side.toString()), refusal(sample(x, "spark.png" to "${side + 1}x10")))
+        assertEquals(appContext.getString(R.string.exception_theme_file, "spark.png"), refusal(sample(x)))
+        // 10×10 by its size, past the bytes ("0…010" reads as 10)
+        val big = "10x" + "0".repeat(ThemeAssetLimits.MAX_EFFECT_IMAGE_BYTES.toInt()) + "10"
+        assertEquals(appContext.getString(R.string.exception_theme_effect_image_size, "128"), refusal(sample(x, "spark.png" to big)))
+        nothingLeft()
+        val pack = placed(sample(x, "spark.png" to "32x32"))[0]
+        val folder = File(pack.dir)
+        // decoded with the key images, by its path
+        assertEquals(listOf("enter.png", "spark.png").map { File(folder, it).path }, ThemePackFiles.images(pack.drawn).map { it.file })
+    }
+
+    @Test
     fun aPacksSourcePhotoIsHeldToAPicturesLimit() {
         val side = ThemeAssetLimits.MAX_PICTURE_SIDE
         val big = refusal(sample(sampleXml, "photo.jpg" to "${side + 1}x10"))
