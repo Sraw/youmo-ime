@@ -30,8 +30,8 @@
 
   const ops = {
     /**
-     * [d] with [p] its picture: `{type, src: bytes, cuts: {portrait: {bytes, type, rect}, landscape: …}}` (the
-     * picture and its cuts made as the page encodes pictures), the keyboard showing it; null: none, the keyboard its
+     * [d] with [p] its picture: `{type, src: bytes, cuts: {portrait: {bytes, type, rect}, landscape: …}, animated?}`
+     * (the picture and its cuts made as the page encodes pictures; an animated one kept as picked), the keyboard showing it; null: none, the keyboard its
      * colour again. Files the old one had that nothing else names go.
      */
     setPicture(d, p) {
@@ -46,8 +46,9 @@
           if (!c) continue;
           cuts[o] = { file: 'picture-' + o + '.' + c.type, rect: c.rect };
         }
-        // a picture picked is encoded anew (never animated): an animated="true" of the one it replaces goes
-        written = { src, brightness: 100, blur: 0, cuts, animated: false };
+        // a picture picked says whether it is animated (an animated WebP the app plays, kept as it is: ui.js
+        // choosePicture); an animated="true" of the one it replaces goes with it otherwise
+        written = { src, brightness: 100, blur: 0, cuts, animated: !!p.animated };
         const old = F.picture(xml);
         if (old) Object.assign(written, { brightness: old.brightness, blur: old.blur });
       }
@@ -177,11 +178,12 @@
     const { h, row, number } = panels.ui;
     const d = api.doc();
     const p = F.picture(d.xml);
+    const lim = api.limits();
     el.append(h('p', {}, h('button', { type: 'button', textContent: p ? '换一张图片…' : '选图片…', on: { click: async () => {
       const made = await api.choosePicture();
       if (made) api.apply((x) => ops.setPicture(x, made));
     } } }), ' ', p ? h('button', { type: 'button', textContent: '去掉图片', on: { click: () => api.apply((x) => ops.setPicture(x, null)) } }) : null));
-    el.append(h('p', { className: 'muted', textContent: '图片：PNG、JPEG、WebP；保存时重新编码，长边不超过 2560，JPEG（有透明的用 PNG）。动画 WebP 在这里选会存成静态图（第一帧）。' }));
+    el.append(h('p', { className: 'muted', textContent: '图片：PNG、JPEG、WebP；保存时重新编码，长边不超过 2560，JPEG（有透明的用 PNG）。动画 WebP（在 App 的限制内：' + Math.round(lim.animatedBytes / 1048576) + ' MB、长边 ' + lim.animatedSide + '、' + lim.animatedFrames + ' 帧、每帧至少 ' + lim.animatedFrameMs + ' ms）原样保留成动态背景，App 里居中铺满播放、不按裁切框；裁切框只管静态图（第一帧，键盘不动时显示）。超过限制的存成静态图（第一帧）。' }));
     if (!p) return;
     el.append(
       row('亮度', number(p.brightness, (v) => api.apply((x) => ops.tune(x, { brightness: Math.max(0, Math.min(100, v ?? 100)) })), { min: 0, max: 100, unit: '%' })),

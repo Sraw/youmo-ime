@@ -485,3 +485,28 @@ test('an uploaded key or effect image never overwrites a file: a name taken gets
   assert.equal(e1.file, 'effect-image.png');
   assert.equal(P.motion.ops.addEffectImage(e1, L, '星.png', PNG4).file, 'effect-image-2.png');
 });
+
+test('按键音: a sound goes in <sounds> after the icons, one per key, its old file gone; the last taken out takes <sounds> with it', () => {
+  const s = P.sounds.ops;
+  const wav = new Uint8Array(readFileSync(join(here, 'testdata', 'function.wav')));
+  const ogg = new Uint8Array(readFileSync(join(here, 'testdata', 'space.ogg')));
+  const icon = '\n  <icon name="star" src="star.svg"/>\n</theme>';
+  let d = { xml: nord.replace('</theme>', icon), files: { 'star.svg': new TextEncoder().encode('<svg/>') }, layouts: {} };
+  d = s.setSound(d, E, 'letter', 'Tap!.wav', wav);
+  d = s.setSound(d, E, 'space', 'x.ogg', ogg);
+  assert.deepEqual(F.sounds(d.xml), { letter: 'sound-letter.wav', space: 'sound-space.ogg' });
+  assert.ok(d.xml.indexOf('<sounds>') > d.xml.indexOf('<icon '));
+  const r = read(d.xml);
+  assert.deepEqual(JSON.parse(JSON.stringify(r.theme.info(false).sounds)), [{ key: 'letter', src: 'sound-letter.wav' }, { key: 'space', src: 'sound-space.ogg' }]);
+  d = s.setSound(d, E, 'letter', 'b.ogg', ogg);
+  assert.equal(F.sounds(d.xml).letter, 'sound-letter.ogg');
+  assert.ok(!('sound-letter.wav' in d.files));
+  assert.throws(() => s.setSound(d, E, 'enter', 'a.mp3', wav), /extension and its content differ/);
+  d = s.removeSound(s.removeSound(d, 'letter'), 'space');
+  assert.ok(!/<sounds?\b/.test(d.xml));
+  assert.deepEqual(Object.keys(d.files), ['star.svg']);
+  // a key a later app knows: kept as it is, taken out alone
+  const later = F.setSound(F.setSound(nord, 'future', 'f.wav').xml, 'space', 's.ogg').xml;
+  assert.deepEqual(F.removeSound(later, 'space').gone, ['s.ogg']);
+  assert.match(F.removeSound(later, 'space').xml, /<sounds>\s*<sound key="future" src="f.wav"\/>\s*<\/sounds>/);
+});

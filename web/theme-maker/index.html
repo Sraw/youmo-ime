@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-Kilmu92zDioIG92/jMBeNFFS0us3TsbNV5+YjzcTG/w=' 'sha256-16ebXpQYnAgl9u2lSPRLdgwPR2A3omDskguIzzBoIhE=' 'sha256-ywaO7u9boc4zyTG9gTndCcQNBnAgM7raKIS4cZT1AAM=' 'sha256-ETs+YLQVlg6zlKl5D3ldT3sRXoXHz8t1+qMjX5KNgpQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-EFN4xsWsHGQ8tjHuJHHvKgd0HyJKogfzU+w2QHAetYQ=' 'sha256-N0NIDaiSMelcKQjt/oWF6xPRN2VyPosoFNEXXzsO/oI=' 'sha256-UmIhsPrRX2ZM7wqLSPLOqarwTrO/KJ3+hwhyn1e8kpU=' 'sha256-xer/XQB7g+yEaJ1fk4Ah/SiTJhzMbPAN6jztynXEpIY='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -1892,7 +1892,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     else if ((format.builtinNames || []).includes(name)) bad('主题名 "' + name + '" 是 App 内置主题的名字，App 不会收；换一个名字');
     const xml = uncommented(d.xml);
     const named = new Set();
-    for (const m of xml.matchAll(srcOf('picture|cut|font|icon', 'src|file'))) named.add(fileOf(m) + '|' + m[1]);
+    for (const m of xml.matchAll(srcOf('picture|cut|font|icon|sound', 'src|file'))) named.add(fileOf(m) + '|' + m[1]);
     for (const m of xml.matchAll(IMAGE_FN)) named.add(m[2].replace(/^["']|["']$/g, '') + '|' + (m[1] === 'image' ? 'image' : 'effect'));
     for (const m of xml.matchAll(srcOf('meta', 'preview'))) named.add(fileOf(m) + '|preview');
     for (const key of named) {
@@ -1925,6 +1925,10 @@ dialog h2 { margin: 0; font-size: 16px; }
         if (lim.iconBytes != null && bytes.length > lim.iconBytes) bad(file + ' 超过 ' + lim.iconBytes + ' 字节');
         else if (!r) bad(file + ' 不是 SVG（App 只收 SVG 图标）');
         else if (!r.ok) bad(file + '：' + r.problems[0].message);
+      } else if (role === 'sound') {
+        // the app's ThemeAssetLimits.sound: the engine's SoundFile, the one rule (its limits, its formats)
+        const r = E.readSound(file, bytes);
+        if (!r.ok) bad(r.problems[0].message);
       }
     }
     // an animated <picture> (060-render-p3 A4): past the app's limits it is drawn still, with a warning on import
@@ -2338,6 +2342,28 @@ dialog h2 { margin: 0; font-size: 16px; }
   }
 
   /**
+   * The icons the preview draws: [base] (the app's, by name) with the theme's own <icon>s of [d] over them, each as the
+   * engine reads it (readIcon, what the app draws: 060-theme-sounds-icons §2.2). One that does not read is left out, so
+   * the app's of that name is drawn (as the app does with a broken file). Read once per file's bytes ([cache], a WeakMap).
+   */
+  function iconsOf(E, base, d, cache) {
+    const out = Object.assign({}, base);
+    const attr = (tag, n) => { const m = new RegExp('\\s' + n + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')').exec(tag); return m ? unescape(m[1] ?? m[2]) : null; };
+    for (const m of uncommented(d.xml).matchAll(/<icon\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
+      const name = attr(m[0], 'name');
+      const bytes = d.files[attr(m[0], 'src')];
+      if (!name || !bytes) continue;
+      if (!cache.has(bytes)) {
+        let r = null;
+        try { r = E.readIcon(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); } catch (e) { /* not text: not drawn */ }
+        cache.set(bytes, r && r.ok ? r.icon : null);
+      }
+      if (cache.get(bytes)) out[name] = cache.get(bytes);
+    }
+    return out;
+  }
+
+  /**
    * An animated WebP's header as the app reads it (AnimatedWebp.header): `{width, height, frames, shortestMs}`, null where
    * it is none (no VP8X first with its animation flag, no frame) or cut short; at most [maxFrames] + 64 chunks walked.
    */
@@ -2367,6 +2393,12 @@ dialog h2 { margin: 0; font-size: 16px; }
     }
     return animated && frames > 0 ? { width: w, height: h, frames, shortestMs: shortest } : null;
   }
+
+  /**
+   * Whether a picture picked on the 背景 page is kept as it is, its file the picked one's: an animated WebP the app plays
+   * ([animatedStill] none). Every other picture is encoded anew; the cuts (the still ones) are made either way.
+   */
+  const keepsAnimated = (lim, bytes) => animatedStill(lim, bytes) == null;
 
   /** Why the app draws [bytes] still (ThemeAssetLimits.animated, the limits of youmo-format), null where it plays. */
   function animatedStill(lim, bytes) {
@@ -2410,7 +2442,7 @@ dialog h2 { margin: 0; font-size: 16px; }
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, animatedWebp, animatedStill, exampleDoc,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -2495,7 +2527,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   }
 
   // the order theme.xml's elements go in (ThemeReader): one put in goes after the last of its kind or before
-  const ORDER = ['meta', 'colors', 'picture', 'font', 'style', 'icon'];
+  const ORDER = ['meta', 'colors', 'picture', 'font', 'style', 'icon', 'sounds'];
 
   /** [xml] with [text] (an element) put in where [kind]'s go: after the last of it or of a kind before it, else first in <theme>. */
   function insert(xml, kind, text) {
@@ -2679,7 +2711,7 @@ dialog h2 { margin: 0; font-size: 16px; }
       let text = '';
       if (p) {
         text = '<picture src="' + escape(p.src) + '"' + (p.brightness != null && p.brightness !== 100 ? ' brightness="' + p.brightness + '%"' : '') +
-          (p.blur ? ' blur="' + p.blur + 'dp"' : '') + '>';
+          (p.blur ? ' blur="' + p.blur + 'dp"' : '') + (p.animated ? ' animated="true"' : '') + '>';
         for (const o of ['portrait', 'landscape']) if (p.cuts[o]) text += '\n    ' + cutText(o, p.cuts[o]);
         text += '\n  </picture>';
       }
@@ -2688,6 +2720,47 @@ dialog h2 { margin: 0; font-size: 16px; }
     }
     const gone = [...before.matchAll(/\b(?:src|file)\s*=\s*(?:"([^"]+)"|'([^']+)')/g)].map((m) => unescape(m[1] ?? m[2])).filter((f) => !isNamed(xml, f));
     return { xml, gone: [...new Set(gone)] };
+  }
+
+  // the <sound> of [key] in [xml], null where none
+  const soundOf = (xml, key) => elements(xml, 'sound').find((e) => e.attrs.some((a) => a[0] === 'key' && a[1] === key)) || null;
+
+  /** The theme's key sounds: `{key: src}` (a key the app does not know yet too: it keeps those). */
+  const sounds = (xml) => Object.fromEntries(elements(xml, 'sound').map((e) => Object.fromEntries(e.attrs)).filter((a) => a.key).map((a) => [a.key, a.src]));
+
+  /**
+   * [xml] without the <sound> of [key]; its <sounds> taken out too once it holds none (060-theme-sounds-icons §1.5).
+   * `{xml, gone}`: the file it named where nothing names it any more.
+   */
+  function removeSound(xml, key) {
+    const old = soundOf(xml, key);
+    if (!old) return { xml, gone: [] };
+    const src = (old.attrs.find((a) => a[0] === 'src') || [])[1];
+    xml = splice(xml, old.start, old.end, '');
+    const box = elements(xml, 'sounds')[0];
+    if (box && !elements(xml.slice(box.start, box.end), 'sound').length) xml = splice(xml, box.start, box.end, '');
+    return { xml, gone: src && !isNamed(xml, src) ? [src] : [] };
+  }
+
+  /**
+   * [xml] with [src] the sound of [key], in its <sounds> (one made where there is none, in ThemeReader's order).
+   * `{xml, gone}` as removeSound's: the file the key had before.
+   */
+  function setSound(xml, key, src) {
+    const before = soundOf(xml, key);
+    const was = before && (before.attrs.find((a) => a[0] === 'src') || [])[1];
+    const tag = '<sound key="' + escape(key) + '" src="' + escape(src) + '"/>';
+    if (before) xml = xml.slice(0, before.start) + tag + xml.slice(before.end);
+    else {
+      const box = elements(xml, 'sounds')[0];
+      if (!box) xml = insert(xml, 'sounds', '<sounds>\n    ' + tag + '\n  </sounds>');
+      else if (/\/>$/.test(box.tag)) xml = xml.slice(0, box.start) + box.tag.replace(/\s*\/>$/, '>') + '\n    ' + tag + '\n  </sounds>' + xml.slice(box.end);
+      else {
+        const close = box.end - '</sounds>'.length;
+        xml = xml.slice(0, close).replace(/\s*$/, '') + '\n    ' + tag + '\n  ' + xml.slice(close);
+      }
+    }
+    return { xml, gone: was && was !== src && !isNamed(xml, was) ? [was] : [] };
   }
 
   /**
@@ -2886,7 +2959,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   root.YoumoForm = {
     uncommented, styles, elements, valueOf, setProp, setProps, insert, sameSelect, LIMITS, clamp,
     COLOR_GROUPS, colors, setColor, variants, withDark, hexOf, parseHex,
-    picture, setPicture, cropRect, isNamed,
+    picture, setPicture, cropRect, isNamed, sounds, setSound, removeSound,
     fillText, parseFill, shadowText, parseShadow, borderText, parseBorder, parseInset, insetText, parseRadius, radiusText,
     meta, setMeta,
     keyName, RANGES, SCENES, STATES, selector,
@@ -3275,8 +3348,8 @@ dialog h2 { margin: 0; font-size: 16px; }
 
   const ops = {
     /**
-     * [d] with [p] its picture: `{type, src: bytes, cuts: {portrait: {bytes, type, rect}, landscape: …}}` (the
-     * picture and its cuts made as the page encodes pictures), the keyboard showing it; null: none, the keyboard its
+     * [d] with [p] its picture: `{type, src: bytes, cuts: {portrait: {bytes, type, rect}, landscape: …}, animated?}`
+     * (the picture and its cuts made as the page encodes pictures; an animated one kept as picked), the keyboard showing it; null: none, the keyboard its
      * colour again. Files the old one had that nothing else names go.
      */
     setPicture(d, p) {
@@ -3291,8 +3364,9 @@ dialog h2 { margin: 0; font-size: 16px; }
           if (!c) continue;
           cuts[o] = { file: 'picture-' + o + '.' + c.type, rect: c.rect };
         }
-        // a picture picked is encoded anew (never animated): an animated="true" of the one it replaces goes
-        written = { src, brightness: 100, blur: 0, cuts, animated: false };
+        // a picture picked says whether it is animated (an animated WebP the app plays, kept as it is: ui.js
+        // choosePicture); an animated="true" of the one it replaces goes with it otherwise
+        written = { src, brightness: 100, blur: 0, cuts, animated: !!p.animated };
         const old = F.picture(xml);
         if (old) Object.assign(written, { brightness: old.brightness, blur: old.blur });
       }
@@ -3422,11 +3496,12 @@ dialog h2 { margin: 0; font-size: 16px; }
     const { h, row, number } = panels.ui;
     const d = api.doc();
     const p = F.picture(d.xml);
+    const lim = api.limits();
     el.append(h('p', {}, h('button', { type: 'button', textContent: p ? '换一张图片…' : '选图片…', on: { click: async () => {
       const made = await api.choosePicture();
       if (made) api.apply((x) => ops.setPicture(x, made));
     } } }), ' ', p ? h('button', { type: 'button', textContent: '去掉图片', on: { click: () => api.apply((x) => ops.setPicture(x, null)) } }) : null));
-    el.append(h('p', { className: 'muted', textContent: '图片：PNG、JPEG、WebP；保存时重新编码，长边不超过 2560，JPEG（有透明的用 PNG）。动画 WebP 在这里选会存成静态图（第一帧）。' }));
+    el.append(h('p', { className: 'muted', textContent: '图片：PNG、JPEG、WebP；保存时重新编码，长边不超过 2560，JPEG（有透明的用 PNG）。动画 WebP（在 App 的限制内：' + Math.round(lim.animatedBytes / 1048576) + ' MB、长边 ' + lim.animatedSide + '、' + lim.animatedFrames + ' 帧、每帧至少 ' + lim.animatedFrameMs + ' ms）原样保留成动态背景，App 里居中铺满播放、不按裁切框；裁切框只管静态图（第一帧，键盘不动时显示）。超过限制的存成静态图（第一帧）。' }));
     if (!p) return;
     el.append(
       row('亮度', number(p.brightness, (v) => api.apply((x) => ops.tune(x, { brightness: Math.max(0, Math.min(100, v ?? 100)) })), { min: 0, max: 100, unit: '%' })),
@@ -4125,6 +4200,96 @@ dialog h2 { margin: 0; font-size: 16px; }
 
   panels.push({ id: 'motion', label: '动效', ops, render });
 })(typeof window !== 'undefined' ? window : globalThis);
+// 按键音 (060-theme-sounds-icons §1.5): a sound file for each of the five kinds of key (<sounds>, <sound key src>),
+// each checked by the engine's readSound (SoundFile: what the app imports, its formats and limits) before it goes
+// in, listened to here by WebAudio alone (decodeAudioData fetches nothing, so the page's CSP stays as it is). Taps on
+// the preview make no sound: the app plays them. A key the app does not know yet (a later app's) is kept and listed.
+(function (root) {
+  'use strict';
+  const panels = root.YoumoPanels;
+  const F = root.YoumoForm;
+  const KEYS = [['letter', '字母键'], ['function', '功能键'], ['space', '空格'], ['enter', '回车'], ['backspace', '退格']];
+  const MP3_NOTE = 'MP3 开头有约 25 ms 的空白，想按下就响用 WAV 或 Ogg';
+
+  const ops = {
+    KEYS,
+    MP3_NOTE,
+    /** [bytes] as the sound file [name] by the engine's rule: `{ok, info}` or `{ok: false, problems}` (readSound's). */
+    read: (E, name, bytes) => E.readSound(name, bytes),
+
+    /**
+     * [d] with the file [name] ([bytes]) the sound of [key], kept as `sound-<key>.<its format>`; the file the key had
+     * before goes where nothing else names it. Throws, saying why, where the app would refuse the file.
+     */
+    setSound(d, E, key, name, bytes) {
+      const r = E.readSound(name, bytes);
+      if (!r.ok) throw new Error(r.problems[0].message);
+      let files = panels.filesOf(d);
+      const file = panels.fileName(files, 'sound-', key, r.info.format);
+      files[file] = bytes;
+      const set = F.setSound(d.xml, key, file);
+      files = panels.without(files, set.gone);
+      return { xml: set.xml, files, layouts: d.layouts };
+    },
+
+    /** [d] without a sound for [key] (the app's own plays), its file gone where nothing else names it. */
+    removeSound(d, key) {
+      const set = F.removeSound(d.xml, key);
+      return { xml: set.xml, files: panels.without(d.files, set.gone), layouts: d.layouts };
+    },
+  };
+
+  // one AudioContext for the page, made on the first 试听 (a browser lets one start only after a click)
+  let audio = null;
+  async function listen(api, bytes) {
+    try {
+      audio = audio || new (root.AudioContext || root.webkitAudioContext)();
+      // decodeAudioData takes (detaches) its buffer: a copy, the document's bytes kept
+      const buffer = await audio.decodeAudioData(bytes.slice().buffer);
+      const s = audio.createBufferSource();
+      s.buffer = buffer;
+      s.connect(audio.destination);
+      s.start();
+    } catch (e) {
+      // some browsers decode no Ogg (Safari before 17): the file is fine for the app
+      api.toast('这个浏览器放不了，App 里能放');
+    }
+  }
+
+  const CHANNELS = { 1: '单声道', 2: '双声道' };
+  const describe = (i) => i.format.toUpperCase() + '，' + i.ms + ' ms，' + (CHANNELS[i.channels] || i.channels + ' 声道') + '，' + i.rate + ' Hz';
+
+  function render(el, api) {
+    const { h, row } = panels.ui;
+    const d = api.doc();
+    el.append(h('p', { className: 'muted', textContent: '每类键一个声音：Ogg Vorbis、WAV（8/16 位 PCM）或 MP3，单个不超过 100 KB、1 秒，1–2 声道，8000–48000 Hz。' +
+      '主题没给的类别用字母键的声音。App 里要在「声音与振动」开着按键音、按键音音色选「跟随主题」才会响；预览上点键不出声。' }));
+    const own = F.sounds(d.xml);
+    const known = KEYS.map((k) => k[0]);
+    const rows = KEYS.concat(Object.keys(own).filter((k) => !known.includes(k)).map((k) => [k, k + '（这版 App 不认识，保留）']));
+    for (const [key, label] of rows) {
+      const file = own[key];
+      const bytes = file ? d.files[file] : null;
+      const r = bytes ? ops.read(api.engine, file, bytes) : null;
+      const says = !file ? (key === 'letter' ? '没有（放系统按键音）' : '没有（用字母键的）') : !bytes ? file + '：缺少文件' : r.ok ? file + '：' + describe(r.info) : file + '：' + r.problems[0].message;
+      el.append(row(label, h('span', { className: file && (!bytes || !r.ok) ? 'bad' : 'muted', textContent: says }),
+        known.includes(key) ? h('button', { type: 'button', textContent: '选文件…', on: { click: async () => {
+          const f = await api.pickFile('.ogg,.wav,.mp3,audio/ogg,audio/wav,audio/mpeg');
+          if (!f) return;
+          const picked = new Uint8Array(f.bytes);
+          const got = ops.read(api.engine, f.name, picked);
+          if (!got.ok) { api.toast(f.name + ' 用不了：' + got.problems[0].message); return; }
+          api.apply((x) => ops.setSound(x, api.engine, key, f.name, picked));
+          if (got.info.format === 'mp3') api.toast(MP3_NOTE);
+        } } }) : null,
+        bytes ? h('button', { type: 'button', textContent: '试听', on: { click: () => listen(api, bytes) } }) : null,
+        file ? h('button', { type: 'button', textContent: '去掉', on: { click: () => api.apply((x) => ops.removeSound(x, key)) } }) : null));
+      if (r && r.ok && r.info.format === 'mp3') el.append(h('p', { className: 'muted', textContent: '（' + label + '）' + MP3_NOTE }));
+    }
+  }
+
+  panels.push({ id: 'sounds', label: '按键音', ops, render });
+})(typeof window !== 'undefined' ? window : globalThis);
 // 信息 (060-render-p3 §5.1 panel 10): the theme's name (its file's: what the app lists and an import keys on) and its
 // <meta>: author, version, license, the least app version, a preview image (taken from the preview by default).
 (function (root) {
@@ -4219,6 +4384,9 @@ dialog h2 { margin: 0; font-size: 16px; }
   const FORMAT = json('youmo-format');
   const EXAMPLES = json('youmo-examples');
   const ICONS = json('youmo-engine-icons');
+  // the theme's own icons as the engine reads them, by their files' bytes (M.iconsOf)
+  const iconCache = new WeakMap();
+  const iconsNow = () => M.iconsOf(E, ICONS, history.current, iconCache);
   const $ = (id) => document.getElementById(id);
 
   const THEME_LABEL = { material: 'Material', pixel: 'Pixel', nord: 'Nord', 'deep-blue': 'Deep Blue', monokai: 'Monokai', 'amoled-black': 'AMOLED', monet: '系统取色' };
@@ -4713,7 +4881,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     canvas.height = scene.height + barH;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const state = { pressed, icons: ICONS, images: assets.images, fonts };
+    const state = { pressed, icons: iconsNow(), images: assets.images, fonts };
     const picture = pictureOf();
     if (picture) state.picture = picture;
     if (bar) drawBar(ctx, bar, Object.assign({}, state, { pressed: null, picture: pictureAt(picture, 0, 0, scene.width, bar.height) }), fonts);
@@ -4783,7 +4951,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     const appearMs = m.appear ? m.appear.ms : 0;
     // drawn once for the play, not each frame (the theme read again, the scene built again: frames dropped on a phone)
     measurerFor($('preview'), history.current.xml);
-    const state = { pressed: null, icons: ICONS, images: assets.images, fonts: measured.fonts };
+    const state = { pressed: null, icons: iconsNow(), images: assets.images, fonts: measured.fonts };
     const picture = pictureOf();
     if (picture) state.picture = picture;
     const layer = (pressedKey) => {
@@ -4941,7 +5109,12 @@ dialog h2 { margin: 0; font-size: 16px; }
       let bmp = null;
       const jpg = L.imageType(picked) === 'jpg';
       try {
-        const made = await M.pictureFile(L, FORMAT, picked, async (bytes, sizeOf, quality) => encodePicture(bmp ??= await createImageBitmap(new Blob([bytes])), sizeOf, quality, null, jpg));
+        // an animated WebP the app plays is kept as it is (it plays centred, filling the keyboard: the crop is only
+        // the still cuts'); its first frame is what the cuts are made of
+        const animated = M.keepsAnimated(FORMAT.limits, picked);
+        const made = animated ? { bytes: picked, type: 'webp' }
+          : await M.pictureFile(L, FORMAT, picked, async (bytes, sizeOf, quality) => encodePicture(bmp ??= await createImageBitmap(new Blob([bytes])), sizeOf, quality, null, jpg));
+        bmp ??= await createImageBitmap(new Blob([picked]));
         const size = L.imageSize(made.bytes);
         if (!size) throw new Error('no size');
         const scale = bmp.width / size[0];
@@ -4957,7 +5130,7 @@ dialog h2 { margin: 0; font-size: 16px; }
         // the one before let go only now that this one is made
         originals.clear();
         originals.set(L.contentId(made.bytes), { bytes: picked, scale });
-        return { type: made.type, src: made.bytes, cuts };
+        return { type: made.type, src: made.bytes, cuts, animated };
       } finally {
         if (bmp) bmp.close();
       }

@@ -478,3 +478,44 @@ test("an animated picture past the app's limits (youmo-format's, the app's Theme
   const uncut = d.xml.replace('<picture ', '<picture animated="true" ').replace(/<cut\b[^>]*\/>/g, '');
   assert.ok(M.exportCheck(E, L, FORMAT, M.doc(uncut, d.files, d.layouts), ['qwerty'], M.envJson(M.ENV)).errors.some((p) => /needs a <cut>/.test(p.message)));
 });
+
+test('a sound the app would refuse cannot be saved; one it takes can (the engine\'s readSound, nothing of the page\'s)', () => {
+  const ok = P.sounds.ops.setSound(M.fromBuiltin(E, 'nord'), E, 'space', 'a.ogg', bytes('space.ogg'));
+  assert.deepEqual(M.saveProblems(E, L, FORMAT, ok), []);
+  // a <sound> of a key the app does not know yet: its file checked the same
+  for (const [key, file, data] of [['space', 'sound-space.ogg', enc('not a sound')], ['future', 'f.mp3', bytes('function.wav')]]) {
+    const xml = F.setSound(ok.xml, key, file).xml;
+    const bad = M.saveProblems(E, L, FORMAT, { xml, files: Object.assign({}, ok.files, { [file]: data }), layouts: {} });
+    assert.equal(bad.length, 1, JSON.stringify(bad));
+    assert.ok(bad[0].message.startsWith(file), bad[0].message);
+  }
+});
+
+test("the preview draws the theme's own icons over the app's, by name; one that does not read is the app's", () => {
+  const svg = enc('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path fill="#ff000080" d="M0-960h960v960H0z"/></svg>');
+  const d = { xml: M.fromBuiltin(E, 'nord').xml.replace('</theme>', '  <icon name="backspace" src="b.svg"/>\n  <icon name="star" src="s.svg"/>\n  <!-- <icon name="enter" src="b.svg"/> -->\n</theme>'), files: { 'b.svg': svg, 's.svg': enc('<svg/>') }, layouts: {} };
+  const base = { backspace: 'app', enter: 'app' };
+  const cache = new WeakMap();
+  const icons = M.iconsOf(E, base, d, cache);
+  assert.equal(icons.backspace.vy, -960);
+  assert.equal(icons.backspace.paths[0].fill >>> 0, 0x80ff0000);
+  assert.equal(icons.enter, 'app');
+  assert.ok(!('star' in icons));
+  assert.equal(M.iconsOf(E, base, d, cache).backspace, icons.backspace, 'read once per file');
+  assert.equal(base.backspace, 'app');
+});
+
+test('背景: an animated WebP the app plays is kept as picked (animated="true"); one past its limits is not', () => {
+  const lim = FORMAT.limits;
+  const playing = animWebp(100, 100, [60, 70]);
+  assert.ok(M.keepsAnimated(lim, playing));
+  assert.ok(!M.keepsAnimated(lim, animWebp(100, 100, [20])));
+  assert.ok(!M.keepsAnimated(lim, animWebp(1000, 100, [60])));
+  assert.ok(!M.keepsAnimated(lim, bytes('tiny.ttf')));
+  const cut = { bytes: enc('cut'), type: 'png', rect: [0, 0, 10, 10] };
+  const d = P.background.ops.setPicture(M.fromBuiltin(E, 'nord'), { type: 'webp', src: playing, cuts: { portrait: cut, landscape: cut }, animated: true });
+  assert.match(d.xml, /<picture src="picture.webp"[^>]* animated="true"/);
+  assert.equal(d.files['picture.webp'], playing);
+  const again = P.background.ops.setPicture(d, { type: 'jpg', src: enc('jpg'), cuts: { portrait: cut, landscape: cut } });
+  assert.ok(!/animated=/.test(again.xml));
+});

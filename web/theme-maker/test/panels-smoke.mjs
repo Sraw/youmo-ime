@@ -222,7 +222,7 @@ async function main() {
     check(focused !== 'body' && !!(await js(`document.getElementById('tab-background').contains(document.activeElement)`)), '用这个裁切: the focus stays in the tab (' + focused + ')');
 
     // M3's tabs: each draws; an edit on one writes its style and keeps the tab (the row synced in place)
-    for (const id of ['bar', 'popup', 'window', 'size', 'motion', 'info']) {
+    for (const id of ['bar', 'popup', 'window', 'size', 'motion', 'sounds', 'info']) {
       await js(`document.querySelector('#tabs [data-tab=${id}]').click()`);
       await wait(300);
       const rows = await js(`document.querySelectorAll('#tab-${id} label.row').length`);

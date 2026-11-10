@@ -504,3 +504,22 @@ test("the bar's sample and the app's views' looks for the maker's preview (M3): 
   assert.match(l.looks.preedit.color, /^#[0-9a-f]{8}$/);
   assert.equal(E.buildBar(light, { width: 1080 }, fixed).ok, false, 'an environment without its height');
 });
+
+// 060-theme-sounds-icons: what the maker checks a sound by (SoundFile) and draws a theme's icon from (IconPath, its fill)
+test('readSound reads each of the three formats, and says why a file is not one', () => {
+  const bytes = (n) => new Uint8Array(readFileSync(join(testdata, n)));
+  assert.deepEqual(JSON.parse(JSON.stringify(E.readSound('space.ogg', bytes('space.ogg')).info)), { format: 'ogg', channels: 2, rate: 48000, ms: 120 });
+  assert.deepEqual(JSON.parse(JSON.stringify(E.readSound('function.wav', bytes('function.wav')).info)), { format: 'wav', channels: 1, rate: 8000, ms: 100 });
+  assert.equal(E.readSound('short.mp3', bytes('short.mp3')).info.rate, 22050);
+  const named = E.readSound('short.wav', bytes('short.mp3'));
+  assert.equal(named.ok, false);
+  assert.match(named.problems[0].message, /extension and its content differ/);
+});
+
+test('readIcon gives each path its own colour (CSS order, alpha last) or null, and its d made absolute', () => {
+  const r = E.readIcon('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m2 2h4v4z"/><path fill="#ff000080" d="M0 0H1V1Z"/></svg>');
+  assert.ok(r.ok);
+  assert.equal(r.icon.paths[0].fill, null);
+  assert.match(r.icon.paths[0].d, /^M2 2 ?L6 2/);
+  assert.equal(r.icon.paths[1].fill >>> 0, 0x80ff0000);
+});
