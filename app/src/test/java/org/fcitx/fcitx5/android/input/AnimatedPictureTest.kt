@@ -112,6 +112,17 @@ class AnimatedPictureTest {
     }
 
     @Test
+    fun theScreenOffStopsIt() {
+        val board = AnimatedBoardDrawable(FakeFrames(), 100, appContext)
+        val view = shown(board)
+        assertTrue(board.isRunning)
+        view.onScreenStateChanged(View.SCREEN_STATE_OFF)
+        assertFalse("the screen off, the keyboard still up", board.isRunning)
+        view.onScreenStateChanged(View.SCREEN_STATE_ON)
+        assertTrue(board.isRunning)
+    }
+
+    @Test
     fun theSwitchesStopItAtOnce() {
         val frames = FakeFrames()
         val board = AnimatedBoardDrawable(frames, 100, appContext)

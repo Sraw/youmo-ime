@@ -38,6 +38,13 @@ class PictureBaseView(context: Context) : View(context) {
         (background as? AnimatedBoardDrawable)?.shown(isVisible)
     }
 
+    // the screen off with the keyboard up (no keyguard): the window stays visible, but RenderThread would go on
+    // decoding frames nobody sees
+    override fun onScreenStateChanged(screenState: Int) {
+        super.onScreenStateChanged(screenState)
+        (background as? AnimatedBoardDrawable)?.screen(screenState == SCREEN_STATE_ON)
+    }
+
     /** [frames] put under it once decoded (the still picture till then), playing at once where it is shown. */
     fun play(frames: AnimatedBoardDrawable) {
         background = frames
@@ -96,6 +103,14 @@ class AnimatedBoardDrawable(
         update()
     }
 
+    private var screenOn = true
+
+    /** The screen on or off (its view's [View.onScreenStateChanged]). */
+    fun screen(on: Boolean) {
+        screenOn = on
+        update()
+    }
+
     private fun listen(on: Boolean) {
         if (on == listening) return
         listening = on
@@ -112,7 +127,7 @@ class AnimatedBoardDrawable(
     }
 
     private fun update() {
-        val run = shown && allowed()
+        val run = shown && screenOn && allowed()
         if (run && !play.isRunning) play.start() else if (!run && play.isRunning) play.stop()
     }
 
