@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.KeyEffect
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Motion
@@ -25,6 +26,7 @@ import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.Cascades
+import org.fcitx.fcitx5.android.scene.theme.Effect
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.TextLook
@@ -454,25 +456,36 @@ class SceneBuilder(
             lean = k.key.key.leans,
             face = k.key.attrs.face ?: Face.Default,
             margin = k.key.attrs.margin ?: true,
-            motion = motion(k.looks.getValue(k.states), k.looks.getValue(k.states + KeyState.Pressed)),
+            motion = motion(k.looks.getValue(k.states), k.looks.getValue(k.states + KeyState.Pressed), (normal.face ?: normal.pressed).bounds),
         )
     }
 
     // 060-render-p3 A1: the key's look's transition, the pressed look's (80 ms at most), scale and sink; null where none moves
-    private fun motion(normal: KeyLook, pressed: KeyLook): Motion? {
+    private fun motion(normal: KeyLook, pressed: KeyLook, face: Box): Motion? {
         val transition = normal.transition?.takeIf { it.ms > 0 }
         val scale = pressed.pressScale
         val sink = pressed.pressSink * env.density
         val press = pressed.transition?.takeIf { it.ms > 0 && (scale != 1.0 || sink != 0.0) }
             ?.let { it.copy(ms = minOf(it.ms, Motion.MAX_PRESS_MS)) }
-        if (transition == null && scale == 1.0 && sink == 0.0) return null
-        return Motion(transition, press, scale, sink)
+        val effect = effect(pressed.effect, face)
+        val m = Motion(transition, press, scale, sink, effect)
+        return m.takeUnless { it == STILL }
+    }
+
+    // A3: a pressed look's effect in px, a ripple's radius of the face's half diagonal
+    private fun effect(e: Effect?, face: Box): KeyEffect? = when (e) {
+        null -> null
+        is Effect.Ripple -> KeyEffect.Ripple(e.file, e.radius / EFFECT_PERCENT * kotlin.math.hypot(face.width, face.height) / 2, e.ms)
+        is Effect.Particles -> KeyEffect.Particles(e.file, e.count, e.spread * env.density, e.ms)
     }
 
     companion object {
         // §8a: a label shrunk alone that does not fit as its size scaled says, searched for between this much of
         // that and it, in so many halvings
         private const val FIT_LEAST = 0.5
+        private const val EFFECT_PERCENT = 100.0
+        // a key that does not move: no transition, no press, scaled 1, no sink, no effect
+        private val STILL = Motion(null, null)
         // a double's rounding over a box's width
         private const val ROUNDING = 1e-6
 

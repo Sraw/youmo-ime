@@ -121,9 +121,48 @@ data class Motion(
     val press: org.fcitx.fcitx5.android.scene.theme.Transition?,
     val pressScale: Double = 1.0,
     val pressSink: Double = 0.0,
+    /** What plays over it each press (A3), px; null: nothing. */
+    val effect: KeyEffect? = null,
 ) {
     companion object {
         const val MAX_PRESS_MS = 80
+    }
+}
+
+/**
+ * A key's press effect as drawn (060-render-p3 A3): the theme's `effect` ([org.fcitx.fcitx5.android.scene.theme.Effect])
+ * in px, its image [file] played [ms] long from where the finger is.
+ */
+sealed interface KeyEffect {
+    val file: String
+    val ms: Int
+
+    /** The image grown to [radius] px across its middle, fading, clipped to the key's face. */
+    data class Ripple(override val file: String, val radius: Double, override val ms: Int) : KeyEffect
+
+    /** [count] copies of the image flying out up to [spread] px each ([ends]), fading. */
+    data class Particles(override val file: String, val count: Int, val spread: Double, override val ms: Int) : KeyEffect {
+        /**
+         * Where each of them ends, (dx, dy) px from where it starts, for press [seed]: the same seed the same
+         * flight on every platform (kotlin.random's generator is common code), spread round evenly, each a little off.
+         */
+        fun ends(seed: Int): DoubleArray {
+            val r = kotlin.random.Random(seed)
+            val out = DoubleArray(count * 2)
+            for (i in 0 until count) {
+                val angle = (i + r.nextDouble() * JITTER) * 2 * kotlin.math.PI / count
+                val d = spread * (NEAREST + (1 - NEAREST) * r.nextDouble())
+                out[2 * i] = d * kotlin.math.cos(angle)
+                out[2 * i + 1] = d * kotlin.math.sin(angle)
+            }
+            return out
+        }
+
+        private companion object {
+            // how far round from its even place a particle may go (of its share), and the shortest flight (of the spread)
+            const val JITTER = 0.6
+            const val NEAREST = 0.5
+        }
     }
 }
 

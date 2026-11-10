@@ -142,6 +142,11 @@ object ThemeWriter {
         is Value.OfPath -> "path(${path(v.path)})"
         is Value.OfShown -> shown(v.shown)
         is Value.OfTransition -> "${v.transition.ms}ms ${v.transition.easing}"
+        is Value.OfEffect -> when (val e = v.effect) {
+            null -> "none"
+            is Effect.Ripple -> "ripple-image(${e.file}, ${number(e.radius)}%, ${e.ms}ms)"
+            is Effect.Particles -> "particles(${e.file}, ${e.count}, ${length(e.spread)}, ${e.ms}ms)"
+        }
         // one value where upright and turned are alike
         is Value.OfTwin -> listOf(v.twin.portrait, v.twin.landscape).distinct()
             .joinToString(" ") { if (property == "height") "${number(it)}%" else length(it) }
