@@ -156,3 +156,5 @@ def ax12(d):
     box = (0, 0, w, h)
     return explore(d, box=box, skip=lambda n: n.b in before, want=["屏蔽"], least=2)
 
+
+case("AX-13", needs="jvm:KeyHandwritingUatTest.notInAPasswordNorEnglishNorWhileTalkBackExplores")(lambda d: None)

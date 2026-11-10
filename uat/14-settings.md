@@ -285,8 +285,8 @@
 ### ST-46 [P1] 在键上划是一个单选
 - **前提**：B0-设置。
 - **操作**：打开 **通用输入**，看 **在键上划**；点开它，选 **笔画筛选**；返回再进来看。
-- **预期**：默认 **关**，下面只写着选了哪个，没有别的说明。点开是单选：滑行输入、笔画筛选、关（键盘手写这一版还没有）。选了笔画筛选，下面马上写着笔画筛选；返回再进来照旧。
-- **JVM**：`SettingsUatTest.keyDrawingIsOneListOfItsChoices`（三项、默认关、摘要只是选项、选了存下、再进来照旧）；输入法页的同一行见 `InputMethodSettingsScreenTest.keyDrawingIsOneChoiceSummarizedByItself`；设备上不跑。
+- **预期**：默认 **关**，下面只写着选了哪个，没有别的说明。点开是单选：滑行输入、笔画筛选、键盘手写、关。选了笔画筛选，下面马上写着笔画筛选；返回再进来照旧。没导入文字包时第三项是「键盘手写（需要文字包）」。
+- **JVM**：`SettingsUatTest.keyDrawingIsOneListOfItsChoices`（四项、默认关、摘要只是选项、选了存下、再进来照旧、没有文字包时的标注）；输入法页的同一行见 `InputMethodSettingsScreenTest.keyDrawingIsOneChoiceSummarizedByItself`；设备上不跑。
 
 ### ST-47 [P1] 搜到藏起来的九键设置、网址邮箱的一行，跳到能看到它的地方
 - **前提**：B0-设置，拼音的 **键盘** 是全键盘（九键一栏不显示）。
