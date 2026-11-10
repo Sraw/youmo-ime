@@ -123,6 +123,10 @@ def import_theme(d, name):
     appearance_tab(d, "主题")
     d.tap_text("新增主题", after=3.0)
     s = d.screen()
+    # 0.6.0's 新增主题 asks first: a file to import, or the web page to make one (M5)
+    if s.find(text="导入主题文件"):
+        d.tap(s.find(text="导入主题文件").c, 3.0)
+        s = d.screen()
     n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
     if not n and s.find(text="下载"):
         d.tap(s.find(text="下载").c, 2.0)
@@ -624,3 +628,67 @@ def st66(d):
         check(bottom <= top + 2, f"{tab}：最后一行底 {bottom} 在导航栏顶 {top} 下面")
         out.append(f"{tab} 最后一行底 {bottom} ≤ 导航栏顶 {top}")
     return "；".join(out)
+
+
+SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "lib", "keyboard-scene", "src", "commonMain")
+
+
+def push_layouts_pack(d):
+    """uat-layouts.theme in 下载: Nord as a pack of its own with a 26 keys whose q types 你好, an 18 keys of
+    another name and a k14 that does not read"""
+    import zipfile
+
+    def read(*p):
+        with open(os.path.join(SCENE, *p), encoding="utf-8") as f:
+            return f.read()
+    qwerty = read("layouts", "qwerty.xml").replace('name="26 键"', 'name="主题 26 键"') \
+        .replace('label="{case:q}" alt="{alt:q}" send="q"', 'label="{case:q}" alt="{alt:q}" send="commit:你好"')
+    k18 = read("layouts", "k18.xml").replace('name="18 键"', 'name="主题 18 键"')
+    layouts = {"qwerty.xml": qwerty, "k18.xml": k18, "k14.xml": "<keyboard/>"}
+    p = os.path.join(tempfile.gettempdir(), f"uat-layouts-{d.port}.theme")
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("theme.xml", read("themes", "nord.xml").replace('name="nord"', 'name="uat-layouts"', 1))
+        for n, t in layouts.items():
+            z.writestr("layouts/" + n, t)
+    d.sh("rm -f /sdcard/Download/uat-layouts*.theme")
+    d.adb("push", p, "/sdcard/Download/uat-layouts.theme")
+    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-layouts.theme")
+    time.sleep(1)
+
+
+@case("ST-72", base="B0-设置", mutates=True)
+def st68(d):
+    from uat import gear
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统夜间模式", False)
+    push_layouts_pack(d)
+    d.step("导入")
+    import_theme(d, "uat-layouts")
+    # the app's 26 keys' four (/ @ . .com) and q's; k14 does not read
+    for told in ("此主题包含自定义布局：k18, qwerty（其中 5 个动作直接输入布局里写的文字）", "缺键盘必需的键，或不是已有的键盘）：k14"):
+        check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:10]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "导入后主题列表里没有它")
+    d.tap(item.c, 1.5)
+    d.step("打字")
+    d.open_page("text")
+    d.type("q")
+    d.expect_field("你好", msg="点 q 没有输入布局里写的「你好」")
+    d.step("切键盘")
+    gear(d, "拼音")
+    d.tap_text("键盘", after=1.0)
+    opts = d.screen().texts("all")
+    d.back(after=0.5)
+    for want in ("全键盘（主题：主题 26 键）", "18 键（主题：主题 18 键）", "14 键"):
+        check(want in opts, f"键盘选项里没有「{want}」：{opts[:12]}")
+    out = []
+    for option in ("18 键（主题：主题 18 键）", "14 键"):
+        gear(d, "拼音")
+        choose(d, "键盘", option)
+        d.open_page("text")
+        n = len(d.keys(refresh=True))
+        check(n > 10, f"{option} 没弹出（{n} 个键）")
+        out.append(f"{option} {n} 键")
+    return "提示 5 个 commit:、k14 不用；q 打出你好；" + "、".join(out)

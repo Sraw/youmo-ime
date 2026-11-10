@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import android.content.Context
 import android.widget.ArrayAdapter
 import android.widget.ListView
@@ -701,7 +702,7 @@ object InputMethodSettings {
             dialogTitle = title
             fun refresh() {
                 val offered = item.offered(options)
-                entries = offered.map { context.getString(it.stringRes) }.toTypedArray()
+                entries = offered.map { keyboardLabel(context, it) }.toTypedArray()
                 entryValues = offered.map { it.name }.toTypedArray()
                 // one set and not offered now (双拼's 14 keys under 微软) shows as the one the keyboard types
                 val set = pref.getValue()
@@ -718,6 +719,18 @@ object InputMethodSettings {
                 true
             }
         }
+
+    // a keyboard's name, with the theme's layout's it is drawn with (KeyboardLabels.label); any other choice's own
+    private fun keyboardLabel(context: Context, choice: ManagedPreferenceEnum): String {
+        val own = context.getString(choice.stringRes)
+        val (im, keyboard) = when (choice) {
+            is PinyinKeyboard -> InputMethodCatalog.PINYIN to choice.keyboard
+            is ShuangpinKeyboard -> InputMethodCatalog.SHUANGPIN to choice.keyboard
+            is EnglishKeyboard -> InputMethodCatalog.ENGLISH to choice.keyboard
+            else -> return own
+        }
+        return KeyboardLabels.label(context, im, keyboard, own)
+    }
 
     private fun appToggle(context: Context, item: AppToggle) = SwitchPreferenceCompat(context).apply {
         val pref = item.pref()
