@@ -481,3 +481,17 @@ test('the built-in themes and layouts are what the build put in (lib/keyboard-sc
   assert.ok(E.layouts().includes('qwerty') && E.layouts().includes('nine'));
   assert.equal(E.layoutSource('grouped-bottom'), read(scene, 'commonMain', 'layouts', 'grouped-bottom.xml'));
 });
+
+test("the bar's sample and the app's views' looks for the maker's preview (M3): of the theme, its height the bar's", () => {
+  const light = theme({ file: 'material-light.xml' });
+  const env = { width: 1080, height: 702, density: 2.625 };
+  const bar = E.buildBar(light, env, fixed);
+  assert.ok(bar.ok, JSON.stringify(bar.problems));
+  assert.equal(bar.scene.width, 1080);
+  assert.equal(bar.scene.height, Math.trunc(40 * 2.625), "the bar's 40dp at 100%");
+  const l = E.looks(light, env);
+  assert.ok(l.ok);
+  for (const k of ['preedit', 'toolbar', 'frame', 'handle', 'sideButton', 'clipboard', 'picker', 'editing', 'voice']) assert.ok(l.looks[k], k);
+  assert.match(l.looks.preedit.color, /^#[0-9a-f]{8}$/);
+  assert.equal(E.buildBar(light, { width: 1080 }, fixed).ok, false, 'an environment without its height');
+});

@@ -13,11 +13,15 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problem
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.SceneText
+import org.fcitx.fcitx5.android.scene.engine.BarLook
+import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.FixedMeasurer
 import org.fcitx.fcitx5.android.scene.engine.MenuCell
+import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.scene.json.EnvJson
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
@@ -27,7 +31,9 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
+import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
+import org.fcitx.fcitx5.android.scene.theme.Values
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
@@ -204,6 +210,139 @@ object YoumoEngine {
     }
 
     /**
+     * Where a widget of [layout] (as [buildScene] takes it) gets each property from, drawn by [theme] in [env]:
+     * [target] `{widget: "key", key, part?, states?}`, [part] `label`, `mark`… (none: the key's face), [states]
+     * theme.xml's (`pressed`, `locked`…) besides the ones the key is in. `{ok, problems, sources: [{property,
+     * line, order}]}`, the line and order (the n-th `<style>`, from 0) of the style whose value wins, the
+     * properties in name order; none where the key is not on the board there (060-render-p3 §5.1: the cascade
+     * check). Only keys so far: another widget is a problem.
+     */
+    fun sources(layout: dynamic, theme: dynamic, env: dynamic, target: dynamic): dynamic = checked {
+        val widget = optionalText(member(target, "widget"), "widget") ?: "key"
+        if (widget != "key") return@checked failed(listOf(Problem(0, "sources of a $widget: only keys so far")))
+        val l: YoumoLayout = if (jsTypeOf(layout) == "string") {
+            YoumoEngine.layout(layout as String) ?: return@checked failed(listOf(Problem(0, "no built-in layout \"$layout\"")))
+        } else {
+            layout as? YoumoLayout ?: throw NotOfType("layout: not a layout")
+        }
+        val e = when (val read = env(env)) {
+            is Parsed.Failed -> return@checked failed(read.problems)
+            is Parsed.Ok -> read.value
+        }
+        val given: dynamic = member(target, "states")
+        val states = if (given == null) emptySet() else array(given, "states").mapTo(HashSet()) { text(it, "a state") }
+        val key = text(member(target, "key"), "key")
+        val found = builder(theme, e, null).sources(l.layout, l.fragments, key, optionalText(member(target, "part"), "part"), states)
+        obj(
+            "ok" to true,
+            "problems" to emptyArray<dynamic>(),
+            "warnings" to emptyArray<dynamic>(),
+            "sources" to found.entries.sortedBy { it.key }.map { (p, s) -> obj("property" to p, "line" to s.line, "order" to s.order) }.toTypedArray(),
+        )
+    }
+
+    /**
+     * [source] as a theme's `<icon>` (an SVG of filled paths: [SvgSubset], what the app imports): `{ok, problems}`
+     * where it is not one (each `{line, message, level}`), else `{ok, icon: {vw, vh, paths: [{d, rule, alpha}]}}`,
+     * as `paint`'s `icons` takes an icon (060-render-p3 §5.1 panel 4).
+     */
+    fun readIcon(source: dynamic): dynamic = checked {
+        result(SvgSubset.read(text(source, "source"))) { icon ->
+            "icon" to obj(
+                "vw" to icon.width,
+                "vh" to icon.height,
+                "paths" to icon.paths.map { p -> obj("d" to p.d, "rule" to if (p.evenOdd) "evenodd" else "nonzero", "alpha" to p.alpha) }.toTypedArray(),
+            )
+        }
+    }
+
+    /**
+     * The bounds the engine reads a key's and its text's values in (Values: what a form offers, 060-render-p3 M1):
+     * `{lengthDp, offsetDp, borderDp, blurDp, depthDp, scale: [min, max], spacingEm: [min, max], stops: [min, max]}`.
+     */
+    fun limits(): dynamic = obj(
+        "lengthDp" to Values.MAX_LENGTH_DP,
+        "offsetDp" to Values.MAX_OFFSET_DP,
+        "borderDp" to Values.MAX_BORDER_DP,
+        "blurDp" to Values.MAX_BLUR_DP,
+        "depthDp" to Values.MAX_DEPTH_DP,
+        "scale" to arrayOf(Values.MIN_SCALE, Values.MAX_SCALE),
+        "spacingEm" to arrayOf(Values.MIN_SPACING_EM, Values.MAX_SPACING_EM),
+        "stops" to arrayOf(Values.MIN_STOPS, Values.MAX_STOPS),
+    )
+
+    /**
+     * The candidate bar of [BarSample]'s candidates as [theme] has it in [env] (its width, its density, its
+     * scenes; the height the app's of 候选字号 [BAR_DP] times the theme's `bar height=`), measured by
+     * [measurer]: `{ok, problems, scene}` (060-render-p3 §5.1: the preview's 候选栏样例). The app draws its bar with
+     * views; this is what BarThemeTest holds them to.
+     */
+    fun buildBar(theme: dynamic, env: dynamic, measurer: dynamic): dynamic = checked {
+        val e = when (val read = env(env)) {
+            is Parsed.Failed -> return@checked failed(read.problems)
+            is Parsed.Ok -> read.value
+        }
+        val t = theme as? YoumoTheme ?: throw NotOfType("theme: not a theme")
+        val m = if (measurer == null) defaultMeasurer else (measurer as? YoumoMeasurer ?: throw NotOfType("measurer: not a measurer")).measurer
+        val look = BarLook.of(t.cascades(e.dark), e.scenes)
+        val metrics = BarSample.Metrics(
+            width = e.width, height = (BAR_DP * look.heightPercent / FULL * e.density).toInt().toDouble(), density = e.density,
+            textSize = BAR_TEXT_SP * e.density, paddingDp = BAR_PADDING_DP, minWidthDp = BAR_MIN_DP,
+        )
+        obj("ok" to true, "problems" to emptyArray<dynamic>(), "warnings" to emptyArray<dynamic>(), "scene" to YoumoScene(BarSample.scene(look, metrics, m), e.density))
+    }
+
+    /**
+     * What the app's own views take of [theme] in [env], colours `#aarrggbb` (null: none), lengths dp: the code
+     * being typed's and the toolbar's ([BarLook]), the window's ([WindowLooks]) and the panels' ([PanelLooks]).
+     * The preview's 面板样例 draws its blocks of it (060-render-p3 §5.1); `{ok, problems, looks}`.
+     */
+    fun looks(theme: dynamic, env: dynamic): dynamic = checked {
+        val e = when (val read = env(env)) {
+            is Parsed.Failed -> return@checked failed(read.problems)
+            is Parsed.Ok -> read.value
+        }
+        val t = theme as? YoumoTheme ?: throw NotOfType("theme: not a theme")
+        val c = t.cascades(e.dark)
+        val s = e.scenes
+        val bar = BarLook.of(c, s)
+        val w = WindowLooks(c)
+        val p = PanelLooks(c)
+        fun col(a: Argb?): String? = a?.toString()
+        val frame = w.frame(s)
+        val handle = w.handle(s, top = true)
+        val side = w.sideButton(s)
+        val clip = p.clipboard(s)
+        val picker = p.picker(s, side = false)
+        val editing = p.editing(s)
+        val voice = p.voice(s)
+        val base = when (val b = bar.base) {
+            is BarLook.Base.Solid -> b.color
+            is BarLook.Base.Picture -> b.fallback
+            null -> null
+        }
+        val looks = obj(
+            "bar" to col(base),
+            "preedit" to obj("color" to col(bar.preedit.color), "cursor" to col(bar.preedit.cursor),
+                "underline" to bar.preedit.underline?.let { obj("widthDp" to it.widthDp, "color" to col(it.color)) }),
+            "toolbar" to obj("fill" to col(bar.toolbar.fill), "radiusDp" to bar.toolbar.radius?.corners?.first(), "icon" to col(bar.toolbar.icon),
+                "onFill" to col(bar.toolbar.onFill), "onIcon" to col(bar.toolbar.onIcon)),
+            "panel" to col(bar.panel),
+            "frame" to obj("radiusDp" to frame.radiusDp, "border" to frame.border?.let { obj("widthDp" to it.widthDp, "color" to col(it.color)) },
+                "elevationDp" to frame.elevationDp, "shadow" to col(frame.shadowColor)),
+            "handle" to obj("fill" to col(handle.fill), "color" to col(handle.color), "widthDp" to handle.widthDp, "heightDp" to handle.heightDp),
+            "sideButton" to obj("fill" to col(side.fill), "icon" to col(side.iconColor), "circle" to side.circle, "radiusDp" to side.radiusDp),
+            "navbar" to col(w.navbar(s)),
+            "clipboard" to obj("fill" to col(clip.fill), "radiusDp" to clip.radiusDp, "color" to col(clip.color)),
+            "picker" to obj("fill" to col(picker.fill), "categories" to col(picker.categories.fill), "color" to col(picker.categories.color),
+                "selected" to col(picker.selected.fill), "selectedColor" to col(picker.selected.color)),
+            "editing" to obj("fill" to col(editing.fill), "radiusDp" to (editing.radiusDp ?: editing.keyRadiusDp)),
+            "voice" to obj("fill" to col(voice.fill), "blurDp" to voice.blurDp, "mic" to col(voice.micFill), "micColor" to col(voice.micColor)),
+        )
+        obj("ok" to true, "problems" to emptyArray<dynamic>(), "warnings" to emptyArray<dynamic>(), "looks" to looks)
+    }
+
+    /**
      * A popup drawn by [theme] in [env]: [request] `{kind: "preview", text, keyWidth, size?: px | "words"}` (a
      * key's bubble), `{kind: "keys", labels, rows, columns, room?, selected}` (a long press's keys, [rows] of
      * [labels]' indices, the bottom one first, -1 a gap), `{kind: "menu", cells: [{label, icon?}], order,
@@ -284,6 +423,13 @@ object YoumoEngine {
 
     // a value of a page's not of the type asked for: a problem of the answer's, never out of the facade
     private class NotOfType(message: String) : Exception(message)
+
+    // the bar's sample as the app's of the default 候选字号 (SceneBar): 40dp high, 18sp text, 9dp each side, 32dp at least
+    private const val BAR_DP = 40.0
+    private const val BAR_TEXT_SP = 18.0
+    private const val BAR_PADDING_DP = 9.0
+    private const val BAR_MIN_DP = 32.0
+    private const val FULL = 100.0
 
     private inline fun checked(answer: () -> dynamic): dynamic = try {
         answer()

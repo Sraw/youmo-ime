@@ -13,7 +13,7 @@ package org.fcitx.fcitx5.android.input.voice
  * voice-eval's `numeval.py render_run`, but for these:
  * - a time's 半, 刻 and 整 and a bare hour stay characters (8点半, 8点一刻, 7点整, 8点), not 8:30, 7:00;
  *   an hour past 24 or minutes past 59 (八点七十), or 分 with no minutes (八点分), as said;
- * - 万/亿 at the end kept (33万, 3.5亿), where render writes the whole value;
+ * - a value's 万/亿 after a decimal kept (3.5亿), where render writes it as said;
  * - a value of two points (一点二点三) as said; a model's later part with a place by value (三点十二 3.12);
  * - a ratio with neither 比 nor 分之 as said; 百分之百 as said (百 alone reads as no number);
  * - digits with a place among them (一百二十三) read as a value, 123.
@@ -41,6 +41,10 @@ object ChineseNumbers {
 
     private const val MINUTES = 60
     private const val HOURS = 24
+    private const val HUNDRED = 100L
+
+    // the places a large value is a decimal of, smallest first
+    private val PLACES = listOf("万" to 10_000L, "亿" to 100_000_000L, "万亿" to 1_000_000_000_000L)
     private const val PERCENT = "百分之"
     private const val FRACTION = "分之"
 
@@ -115,7 +119,11 @@ object ChineseNumbers {
     private fun digitByDigit(s: String): String? =
         if (s.isNotEmpty() && s.all { it in DIGITS && it != '两' }) s.map { DIGITS.getValue(it) }.joinToString("") else null
 
-    /** 三十三万 as 33万, 四百亿 as 400亿 and 三万亿 as 3万亿, as written; 十二万三千 in full. */
+    /**
+     * 三十三万 as 33万, 四百亿 as 400亿 and 三万亿 as 3万亿, as written; with more after the place, the largest
+     * place's decimal of at most two places (十二万三千 12.3万, 一亿两千三百万 1.23亿), the user's choice
+     * (2026-11-09) over 123000; in full where two places are not enough (一百二十三万四千五百六十七 1234567).
+     */
     private fun whole(raw: String): String? {
         val value = integerDigits(raw) ?: return null
         val places = raw.takeLastWhile { it in BIG }
@@ -123,7 +131,14 @@ object ChineseNumbers {
         if (places.isNotEmpty() && before.isNotEmpty() && before.none { it in BIG }) {
             integerDigits(before)?.let { return "$it$places" }
         }
-        return value
+        if (raw.none { it in BIG }) return value
+        val n = value.toLongOrNull() ?: return value
+        // 万亿 one place: 三万亿五千万 is 3000050000000, not 30000.5亿
+        val (name, unit) = PLACES.lastOrNull { it.second <= n } ?: return value
+        val hundredth = unit / HUNDRED
+        if (n % hundredth != 0L) return value
+        val fraction = "${n % unit / hundredth}".padStart(2, '0').trimEnd('0')
+        return "${n / unit}" + (if (fraction.isEmpty()) "" else ".$fraction") + name
     }
 
     /** The integer [raw] reads as, as digits; null if it does not read as one (万一, 十十, 二十亿万). */

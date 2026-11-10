@@ -210,6 +210,9 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 | `ink-width` | 手写笔迹粗细，1–8dp |
 | `grid-color` | 颜色：手写田字格 |
 | `grid` | `true`、`false`：显示田字格 |
+| `transition` | 键变到这个状态时的过渡：`时长ms 缓动`，如 `150ms ease-out`；时长 0–600ms，缓动 `linear`、`ease`、`ease-in`、`ease-out`、`ease-in-out`（弹出层、气泡上的还不生效，会提醒） |
+| `press-scale` | 按下时键面缩放（`key:pressed`），85%–110% |
+| `press-sink` | 按下时键面下沉（`key:pressed`），0–4dp |
 | `return-icon-send` | 回车键在「发送」时显示的：`icon(图标名)` 或 `text(文字)`（写在 `icon` 部位上，下同） |
 | `return-icon-search` | 回车键在「搜索」时显示的 |
 | `return-icon-go` | 回车键在「前往」时显示的 |
@@ -233,9 +236,6 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 | `width` | 除 `handle` 外 | 如 `4dp` |
 | `side-padding` | 除 `keyboard` 外 | 如 `4dp` 或 `40%`，一个或两个 |
 | `bottom-padding` | 除 `keyboard` 外 | 如 `4dp` 或 `40%`，一个或两个 |
-| `transition` | 状态之间的过渡动画（`key`、`popup`、`preview`） | `时长ms 缓动`，缓动 `linear`、`ease`、`ease-in`、`ease-out`、`ease-in-out` |
-| `press-scale` | 按下时缩放（`key:pressed`） | `n%` |
-| `press-sink` | 按下时下沉（`key:pressed`） | 如 `4dp` |
 | `appear` | 弹出的出现动画（`popup`、`preview`、`menu`） | `fade|scale|rise 时长ms` |
 | `effect` | 按键特效（`key:pressed`） | `none`、`ripple-image(文件, 半径%, 时长ms)`、`particles(文件, 个数, 散开dp, 寿命ms)` |
 | `sticker` | 键上的贴纸层 | `none` 或文件名 |

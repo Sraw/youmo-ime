@@ -1,5 +1,5 @@
 // Builds the site's two pages, each one file that needs nothing else: index.html (the maker, 060-render-p3 M1)
-// from src/ (page.html with style.css, lib.js, maker.js and ui.js put in) and classic/index.html (the maker
+// from src/ (page.html with style.css, lib.js, maker.js, form.js, src/panels/*.js and ui.js put in) and classic/index.html (the maker
 // before 0.6.0, kept till 0.6.x ends) from src/classic/ (its page.html, style.css and ui.js, src/lib.js shared),
 // the CSP's script hashes worked out, and the generated blocks (youmo-format,
 // youmo-presets, youmo-layout, youmo-icons, youmo-engine-icons: the app's tests write them, never by
@@ -15,7 +15,7 @@
 // The pages with the engine: node web/theme-maker/tools/assemble.mjs --engine [out]   (out: build/index.html,
 // classic beside it at classic/index.html)
 // The page's test fails when a page is not what this makes of src/ and the fonts.
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,6 +76,8 @@ export function assemble(src = join(root, 'src'), old = readFileSync(src === CLA
   const text = { css: read(join(src, 'style.css')), lib: read(lib), ui: read(join(src, 'ui.js')), fonts: fontFaces(fonts) };
   // the engine and the generated blocks: only where page.html has a slot for them
   if (seen.has('engine')) text.engine = engine == null ? NO_ENGINE : engineText(engine);
+  // the editing's tabs (060-render-p3 §5.1): every file of src/panels/, in their names' order, in one script
+  if (seen.has('panels')) text.panels = readdirSync(join(src, 'panels')).filter((f) => f.endsWith('.js')).sort().map((f) => read(join(src, 'panels', f))).join('\n');
   // a page's other scripts (the maker's maker.js): each slot of page.html no other text fills, src/<slot>.js
   for (const slot of seen.keys()) {
     if (!(slot in text) && !GENERATED.includes(slot) && slot !== 'script-hashes' && slot !== 'engine') text[slot] = read(join(src, slot + '.js'));
@@ -93,7 +95,7 @@ export function assemble(src = join(root, 'src'), old = readFileSync(src === CLA
   const fill = (values) => page.replace(/\{\{([\w-]+)\}\}/g, (all, slot) => (slot in values ? values[slot] : all));
   // the CSP lets only these run: each script element's text, as the browser hashes it
   const filled = fill(text);
-  const hashes = [...filled.matchAll(/<script id="youmo-(?:lib|ui|engine|maker)">([\s\S]*?)<\/script>/g)]
+  const hashes = [...filled.matchAll(/<script id="youmo-(?:lib|ui|engine|maker|form|panels)">([\s\S]*?)<\/script>/g)]
     .map((m) => "'sha256-" + createHash('sha256').update(m[1]).digest('base64') + "'");
   const scripts = [...filled.matchAll(/<script(?![^>]*type="application\/json")[^>]*>/g)].length;
   if (hashes.length !== scripts) throw new Error('a script not hashed: ' + hashes.length + ' of ' + scripts);
