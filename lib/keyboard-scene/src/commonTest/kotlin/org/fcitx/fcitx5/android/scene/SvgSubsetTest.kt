@@ -5,6 +5,10 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.ShapePath.Segment.Close
+import org.fcitx.fcitx5.android.scene.theme.ShapePath.Segment.Line
+import org.fcitx.fcitx5.android.scene.theme.ShapePath.Segment.Move
 import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,13 +38,59 @@ class SvgSubsetTest {
             """<path d="M2 2h1v1z" fill="none"/></g><path d="M4 4h1v1z"/></svg>"""
         val read = SvgSubset.read(icon)
         assertIs<Parsed.Ok<SvgSubset.Icon>>(read)
+        fun square(x: Double) = listOf(Move(x, x), Line(x + 1, x), Line(x + 1, x + 1), Close)
         assertEquals(
-            SvgSubset.Icon(48.0, 32.0, listOf(SvgSubset.Path("M0 0h1v1z", true, 0.25), SvgSubset.Path("M4 4h1v1z", false, 1.0))),
+            SvgSubset.Icon(48.0, 32.0, listOf(SvgSubset.Path(square(0.0), true, 0.25), SvgSubset.Path(square(4.0), false, 1.0))),
             read.value,
         )
-        assertEquals(24.0, (SvgSubset.read("""<svg><path d="M0 0"/></svg>""") as Parsed.Ok).value.width)
-        assertEquals(10.0, (SvgSubset.read("""<svg width="10px" height="12"><path d="M0 0"/></svg>""") as Parsed.Ok).value.width)
-        assertIs<Parsed.Failed>(SvgSubset.read("""<svg><path d="M0 0" transform="scale(2)"/></svg>"""))
+        assertEquals(24.0, SvgSubset.read("""<svg><path d="M0 0h1"/></svg>""").ok().width)
+        assertEquals(10.0, SvgSubset.read("""<svg width="10px" height="12"><path d="M0 0h1"/></svg>""").ok().width)
+        assertIs<Parsed.Failed>(SvgSubset.read("""<svg><path d="M0 0h1" transform="scale(2)"/></svg>"""))
+    }
+
+    // CSS's byte order, alpha last: #f008 is red at 0x88, not the project's #aarrggbb (a transparent-ish blue-less nothing)
+    @Test
+    fun aPathsOwnColourIsReadAlphaLast() {
+        fun color(fill: String) = SvgSubset.read("""<svg><path d="M0 0h1" fill="$fill"/></svg>""").ok().paths.single().color
+        assertEquals(Argb.of(255, 0xff, 0, 0), color("#f00"))
+        assertEquals(Argb.of(0x88, 0xff, 0, 0), color("#f008"))
+        assertEquals(Argb.of(255, 0x12, 0x34, 0x56), color("#123456"))
+        assertEquals(Argb.of(0x80, 0x12, 0x34, 0x56), color("#12345680"))
+        // no fill, or currentColor, inherited or not: the key's icon-color
+        assertEquals(null, color("currentColor"))
+        assertEquals(null, SvgSubset.read("""<svg><path d="M0 0h1"/></svg>""").ok().paths.single().color)
+        assertEquals(Argb.of(255, 0, 0xff, 0), SvgSubset.read("""<svg fill="#0f0"><g><path d="M0 0h1"/></g></svg>""").ok().paths.single().color)
+    }
+
+    // a replaced required key would be blank: an icon must draw something
+    @Test
+    fun anIconThatDrawsNothingIsRefused() {
+        val nothing = listOf(
+            """<path d="M0 0h1" fill="none"/>""",
+            """<g fill="none"><path d="M0 0h1"/></g>""",
+            """<path d="M0 0h1" opacity="0"/>""",
+            """<path d="M0 0h1" fill-opacity="0"/>""",
+            """<path d="M0 0h1" fill="#f000"/>""",
+            """<path d="M0 0 M5 5"/>""",
+            """<path d="M0 0 z"/>""",
+            """<path d="M0 0 a1 1 0 0 0 0 0"/>""",
+            "",
+        )
+        for (paths in nothing) assertEquals(listOf(SvgSubset.NOTHING_DRAWN), problems("<svg>$paths</svg>"), paths)
+        // one that draws among them is enough; a zero-area one counts (its area is not worked out)
+        assertEquals(emptyList<String>(), problems("""<svg><path d="M0 0" /><path d="M0 0L1 0Z"/></svg>"""))
+        assertEquals(1, SvgSubset.read("""<svg><path d="M0 0" /><path d="M0 0L1 0Z"/></svg>""").ok().paths.size)
+    }
+
+    // xMidYMid meet: alike both ways, centred, the viewBox's origin at the box's corner
+    @Test
+    fun anIconFitsItsBoxCentredAndUnstretched() {
+        val wide = SvgSubset.Icon(48.0, 24.0, emptyList())
+        assertEquals(SvgSubset.Fit(0.5, 10.0, 26.0), wide.fit(Box(10.0, 20.0, 34.0, 44.0)))
+        val tall = SvgSubset.Icon(10.0, 40.0, emptyList(), 5.0, -10.0)
+        assertEquals(SvgSubset.Fit(1.0, 2.0, 10.0), tall.fit(Box(0.0, 0.0, 24.0, 40.0)))
+        val square = SvgSubset.Icon(24.0, 24.0, emptyList())
+        assertEquals(SvgSubset.Fit(2.0, 0.0, 0.0), square.fit(Box(0.0, 0.0, 48.0, 48.0)))
     }
 
     @Test
@@ -105,7 +155,7 @@ class SvgSubsetTest {
             assertTrue(SvgSubset.check("""<svg width="$side"><path d="M0 0"/></svg>""").single().message.startsWith("width="), side)
             assertTrue(SvgSubset.check("""<svg height="$side"><path d="M0 0"/></svg>""").single().message.startsWith("height="), side)
         }
-        assertEquals(emptyList<Problem>(), SvgSubset.check("""<svg width="0.001" height="1e6"><path d="M0 0"/></svg>"""))
+        assertEquals(emptyList<Problem>(), SvgSubset.check("""<svg width="0.001" height="1e6"><path d="M0 0h1"/></svg>"""))
     }
 
     @Test
@@ -113,14 +163,14 @@ class SvgSubsetTest {
         // Material Symbols draw above y=0: without the origin the preview put the icon a whole key higher
         val icon = SvgSubset.read("""<svg viewBox="0 -960 960 960"><path d="M0 -480 h960"/></svg>""").ok()
         assertEquals(listOf(0.0, -960.0, 960.0, 960.0), listOf(icon.x, icon.y, icon.width, icon.height))
-        assertEquals(listOf(0.0, 0.0), SvgSubset.read("""<svg width="10"><path d="M0 0"/></svg>""").ok().let { listOf(it.x, it.y) })
+        assertEquals(listOf(0.0, 0.0), SvgSubset.read("""<svg width="10"><path d="M0 0h1"/></svg>""").ok().let { listOf(it.x, it.y) })
     }
 
     @Test
     fun aGroupsFillOpacityIsInheritedLikeItsFill() {
         // fill-opacity is inherited in SVG: the nearest one's counts, opacity multiplies on top
         val icon = SvgSubset.read(
-            """<svg><g fill-opacity="0.5" opacity="0.5"><path d="M0 0"/><path d="M1 1" fill-opacity="1"/></g></svg>""",
+            """<svg><g fill-opacity="0.5" opacity="0.5"><path d="M0 0h1"/><path d="M1 1h1" fill-opacity="1"/></g></svg>""",
         ).ok()
         assertEquals(listOf(0.25, 0.5), icon.paths.map { it.alpha })
     }

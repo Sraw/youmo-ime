@@ -318,7 +318,7 @@ data class ShapePath(val segments: List<Segment>) {
 
         // where a number starting at [start] ends: a sign, digits, a point and digits (a second point starts
         // the next number, SVG's "0.5.5"); -1 where there is none
-        private fun number(s: String, start: Int): Int {
+        internal fun number(s: String, start: Int): Int {
             var i = start
             if (s[i] == '-' || s[i] == '+') i++
             fun digits(): Int {
@@ -344,7 +344,7 @@ data class ShapePath(val segments: List<Segment>) {
 
         // a coordinate's steps: six decimals, each at most 8 characters written ("0.123456")
         private const val GRID = 1e6
-        private const val SPACES = " ,\t\n\r"
+        internal const val SPACES = " ,\t\n\r"
         private const val CUBIC_POINTS = 3
         private const val COMMANDS = "MmLlHhVvCcQqZz"
 

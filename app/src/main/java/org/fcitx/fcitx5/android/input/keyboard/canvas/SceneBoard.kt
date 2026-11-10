@@ -95,7 +95,7 @@ class SceneBoard(
         val layout = layout ?: return null
         val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(of, look) } ?: return null
         val measurer = measurer(of, look)
-        return scene(layout, sceneTheme, look, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key)) }
+        return scene(layout, sceneTheme, look, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key), PackIcons.of(of)) }
     }
 
     // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it

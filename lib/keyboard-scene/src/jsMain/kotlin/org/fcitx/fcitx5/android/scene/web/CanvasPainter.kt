@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.TextStroke
 import org.fcitx.fcitx5.android.scene.theme.Argb
+import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -380,7 +381,8 @@ internal class CanvasPainter(
 
     private fun icon(op: Op.Icon) {
         val icon = assets.icon(op.name)
-        if (icon == null || icon == undefined) return
+        // a transparent icon-color hides the icon, a theme's own coloured paths too
+        if (icon == null || icon == undefined || op.tint.transparent) return
         // whole pixels, as the drawable's bounds
         val b = op.box
         val left = b.left.roundToInt()
@@ -394,9 +396,14 @@ internal class CanvasPainter(
             c.rotate(op.rotation * PI / HALF_TURN)
             c.translate(-w / 2.0, -h / 2.0)
         }
-        c.scale(w / (icon.vw as Number).toDouble(), h / (icon.vh as Number).toDouble())
-        // the viewBox's origin at the box's top left (a theme's own SVG's: Material Symbols' is 0 -960); the app's icons have none
-        c.translate(-((icon.vx as Number?)?.toDouble() ?: 0.0), -((icon.vy as Number?)?.toDouble() ?: 0.0))
+        // scaled alike both ways and centred (a theme's SVG may be wide), its viewBox's origin at the box's top left
+        // (Material Symbols' is 0 -960); the app's icons are square and have none
+        val fit = SvgSubset.Icon(
+            (icon.vw as Number).toDouble(), (icon.vh as Number).toDouble(), emptyList(),
+            (icon.vx as Number?)?.toDouble() ?: 0.0, (icon.vy as Number?)?.toDouble() ?: 0.0,
+        ).fit(Box(0.0, 0.0, w.toDouble(), h.toDouble()))
+        c.translate(fit.dx, fit.dy)
+        c.scale(fit.scale, fit.scale)
         val tint = css(op.tint)
         val paths: Array<dynamic> = icon.paths.unsafeCast<Array<dynamic>>()
         for (p in paths) {
@@ -414,7 +421,9 @@ internal class CanvasPainter(
                 c.miterLimit = MITER_LIMIT
                 c.stroke(path)
             } else {
-                c.fillStyle = tint
+                // a theme SVG's own colour keeps its hue, faded by the icon-color's alpha as the tinted paths are
+                val own = p.fill as Number?
+                c.fillStyle = own?.let { Argb(it.toInt()).let { f -> css(Argb.of(f.alpha * op.tint.alpha / OPAQUE_ALPHA, f.red, f.green, f.blue)) } } ?: tint
                 c.fill(path, (p.rule as String?) ?: "nonzero")
             }
             c.restore()
