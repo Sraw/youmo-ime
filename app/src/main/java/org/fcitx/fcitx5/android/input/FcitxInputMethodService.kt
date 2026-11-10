@@ -17,6 +17,7 @@ import android.graphics.drawable.Icon
 import android.hardware.input.InputManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Size
@@ -955,10 +956,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun select(start: Int, end: Int) = editingSession.select(start, end)
 
     /** The field around the selection as 滑选 begins, for its characters, and where it read the cursor; none in a password, whose text is not read. */
-    // none either with a selection predicted the editor has not reported: below Android 12 a read's
-    // cursor is the tracked one (FieldRead), so a read of a field the tracking is behind would pass for it
-    fun readForSwipeSelect(): ClearedText.Read? =
-        if (inPasswordField || !selection.settled) null else readAround(SwipeSelection.READ, SwipeSelection.READ, selected = selection.latest.isNotEmpty())
+    // none either where its place is only the tracked cursor (FieldRead: below Android 12, or no offset
+    // given) and a selection predicted is not yet reported: the tracking may be behind the field read
+    fun readForSwipeSelect(): ClearedText.Read? {
+        if (inPasswordField) return null
+        val ic = currentInputConnection ?: return null
+        val tracked = if (selection.settled) selection.latest.let { minOf(it.start, it.end) } else -1
+        return readAround(ic, tracked, SwipeSelection.READ, SwipeSelection.READ, selected = selection.latest.isNotEmpty())?.takeIf { it.at >= 0 }
+    }
 
     /** The selection the editor last reported, none predicted since taken into account: what 滑选's steps past the field's known end wait for. */
     val reportedSelection: CursorRange
@@ -967,6 +972,34 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** Whether the editor reported every selection predicted: a report of 滑选's step past the known end is of that step, not an older one. */
     val selectionSettled: Boolean
         get() = selection.settled
+
+    // waiting in [whenSelectionSettled], each also posted to run at its time-out
+    private val settleWaiters = ArrayList<Runnable>()
+    private val settleTimeouts by lazy { Handler(Looper.getMainLooper()) }
+
+    /**
+     * [block] run on the main thread once the editor reported every selection predicted (now, if it
+     * has), or [timeoutMs] on where it does not: 滑选 begun after what is typed is committed, its read
+     * of the field placed by the tracked cursor below Android 12, true only once that is reported.
+     */
+    fun whenSelectionSettled(timeoutMs: Long, block: () -> Unit) {
+        if (selection.settled) return block()
+        val waiter = object : Runnable {
+            override fun run() {
+                if (settleWaiters.remove(this)) block()
+            }
+        }
+        settleWaiters += waiter
+        settleTimeouts.postDelayed(waiter, timeoutMs)
+    }
+
+    private fun wakeSettled() {
+        if (settleWaiters.isEmpty() || !selection.settled) return
+        for (waiter in settleWaiters.toList()) {
+            settleTimeouts.removeCallbacks(waiter)
+            waiter.run()
+        }
+    }
 
     /**
      * [range], set by 滑选 past the field's known end, no longer predicted where the editor never
@@ -1336,6 +1369,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
+        wakeSettled()
         val isNullType = attribute.isTypeNull()
         if (!isNullType) hardwareKeyboard.fieldStarted()
         // wait until InputContext created/activated
@@ -1434,6 +1468,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (update != EditingSession.CursorUpdate.None) inputView?.cursorMoved()
         if (quoteReset && update == EditingSession.CursorUpdate.None) tellContextLater()
         inputView?.updateSelection(newSelStart, newSelEnd)
+        wakeSettled()
     }
 
     private val contentSize = floatArrayOf(0f, 0f)

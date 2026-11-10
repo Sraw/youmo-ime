@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.view.inputmethod.EditorInfo
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CompletableDeferred
@@ -111,14 +112,29 @@ class CommonKeyActionListener :
 
     private fun select(range: CursorRange) = service.select(range.start, range.end)
 
-    // the field 滑选 began in: a step in another (the field changed mid-touch) ends it
-    private var swipeSelectField: Any? = null
+    // the field 滑选 began in: a step in another (the field changed mid-touch) ends it. The same field
+    // restarted (an app's restartInput, after a commit maybe) is the same: its EditorInfo alone is new
+    private var swipeSelectField: EditorInfo? = null
+
+    private fun inSwipeSelectField() = service.sameVoiceField(swipeSelectField, service.startedField)
 
     // 滑选's touch over, [lifted] (the steps before it began still taken) or not: a selection it set
     // past the field's known end that the editor never took no longer predicted, in its field
     private fun endSwipeSelect(lifted: Boolean = false) {
-        val untaken = (if (lifted) swipeSelection.end() else swipeSelection.cancel()) ?: return
-        if (service.startedField === swipeSelectField) service.forgetSelection(untaken)
+        val reported = service.reportedSelection
+        val settled = service.selectionSettled
+        val untaken = (if (lifted) swipeSelection.end(reported, settled) else swipeSelection.cancel(reported, settled)) ?: return
+        if (inSwipeSelectField()) service.forgetSelection(untaken)
+    }
+
+    // 滑选 begun once the editor reported what was committed first: below Android 12 the field's read
+    // has no place of its own, only the tracked one, true once all predicted is reported. Not reported
+    // a while on (an editor that never does), begun by UTF-16 units
+    private fun beginSwipeSelect(touch: Int) = service.whenSelectionSettled(SETTLE_MS) {
+        if (inSwipeSelectField()) {
+            val read = service.readForSwipeSelect()
+            swipeSelection.begin(touch, service.currentInputSelection, read?.field, read?.at ?: -1)?.let(::select)
+        }
     }
 
     private fun showInputMethodPicker() {
@@ -224,17 +240,13 @@ class CommonKeyActionListener :
                     swipeSelectField = service.startedField
                     val touch = swipeSelection.reached()
                     afterPendingInput {
-                        ContextCompat.getMainExecutor(context).execute execute@{
-                            if (service.startedField !== swipeSelectField) return@execute
-                            val read = service.readForSwipeSelect()
-                            swipeSelection.begin(touch, service.currentInputSelection, read?.field, read?.at ?: -1)?.let(::select)
-                        }
+                        ContextCompat.getMainExecutor(context).execute { beginSwipeSelect(touch) }
                     }
                 }
                 // ended above, as by any other key action
                 is EndSwipeSelectAction -> {}
                 // felt only where it moved: not at the field's end, nor past it waiting for the editor
-                is SwipeSelectAction -> if (service.startedField !== swipeSelectField) {
+                is SwipeSelectAction -> if (!inSwipeSelectField()) {
                     endSwipeSelect()
                 } else {
                     val range = swipeSelection.move(action.steps, service.reportedSelection, service.selectionSettled)
@@ -385,3 +397,6 @@ internal fun typeAsIsOrSend(
 
 private fun takenAsIs(key: String, address: Boolean, reads: (Int) -> Boolean): String? =
     key.takeIf { PendingInputPolicy.typesAsIs(it, address, reads) }
+
+// 滑选's begin waiting at most for the editor's report of what was committed first
+private const val SETTLE_MS = 200L

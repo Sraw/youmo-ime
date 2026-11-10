@@ -152,6 +152,28 @@ class SwipeSelectionTest {
         assertNull("ended before it began", pending.begin(touch, CursorRange(5, 5), null))
     }
 
+    // lifted on a probe the editor reported taking: kept, the next touch going on from it
+    @Test
+    fun endedOnAProbeTakenKeepsItsAnchor() {
+        val s = SwipeSelection()
+        assertNull(s.begin(s.reached(), CursorRange(3, 3), null))
+        assertEquals("3..4", s.move(1, CursorRange(3, 3), settled = true).text())
+        assertNull("taken: nothing given back", s.end(CursorRange(3, 4), settled = true))
+        assertNull(s.begin(s.reached(), CursorRange(3, 4), null))
+        assertEquals("the anchor kept at 3", "3..3", s.move(-1).text())
+    }
+
+    // given up at the lift, its report late: the next touch beginning on it still goes on from it
+    @Test
+    fun aProbeGivenUpButTakenLateKeepsItsAnchor() {
+        val s = SwipeSelection()
+        assertNull(s.begin(s.reached(), CursorRange(3, 3), null))
+        assertEquals("3..4", s.move(1, CursorRange(3, 3), settled = true).text())
+        assertEquals("not reported yet: given back", "3..4", s.end(CursorRange(3, 3), settled = false).text())
+        assertNull(s.begin(s.reached(), CursorRange(3, 4), null))
+        assertEquals("the anchor kept at 3", "3..3", s.move(-1).text())
+    }
+
     // lifted before it began (the host busy committing what was typed): the steps moved still taken
     // as it begins, none past what is known, nothing after the lift
     @Test

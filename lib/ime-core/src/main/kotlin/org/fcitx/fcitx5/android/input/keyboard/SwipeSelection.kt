@@ -63,6 +63,10 @@ class SwipeSelection {
     private var leftEnd = -1
     private var leftAnchor = 0
 
+    // a probe the last touch gave up at its end unconfirmed (none: -1): the editor may yet report it
+    // taken (its report late, not ignored), the selection from [leftAnchor] to it gone on from as well
+    private var leftProbe = -1
+
     /** A touch reached 滑选: its number, for [begin]; steps from here on wait for it. */
     fun reached(): Int {
         touch++
@@ -77,30 +81,46 @@ class SwipeSelection {
      * there (what is typed committed first may take the host longer than a quick swipe), none past
      * what is known to be in the field. The selection last set where it was a [probe] the editor has
      * not reported taking, or null: the editor may never take it (one past the field's end), so the
-     * caller stops predicting it; the next touch goes on from where the editor was.
+     * caller stops predicting it; the next touch goes on from where the editor was. A probe the
+     * editor did report taking ([reported] and [settled] as for [move]) is kept, the next touch going
+     * on from it.
      */
-    fun end(): CursorRange? {
+    fun end(reported: CursorRange? = null, settled: Boolean = false): CursorRange? {
         live = false
-        return giveBack()
+        return giveBack(reported, settled)
     }
 
     /** As [end], the touch no longer to begin either: another key acted (a second finger), the field changed. */
-    fun cancel(): CursorRange? {
+    fun cancel(reported: CursorRange? = null, settled: Boolean = false): CursorRange? {
         live = false
         pending = 0
         if (!begun) touch++
-        return giveBack()
+        return giveBack(reported, settled)
     }
 
-    private fun giveBack(): CursorRange? {
+    private fun giveBack(reported: CursorRange?, settled: Boolean): CursorRange? {
         queued = 0
         untaken = null
         if (!begun || probe < 0) return null
-        val given = giveUp()
+        if (settled && reported?.endsAt(probe) == true) {
+            sure = probe
+            probe = -1
+            leave()
+            return null
+        }
+        val given = probe
+        val range = giveUp()
+        leave()
+        leftProbe = given
+        return range
+    }
+
+    // the selection from [anchor] to [head] the one this touch leaves
+    private fun leave() {
         leftStart = min(anchor, head)
         leftEnd = max(anchor, head)
         leftAnchor = anchor
-        return given
+        leftProbe = -1
     }
 
     // the probe not taken: the head back where the editor still has it, the probe's selection given back
@@ -127,6 +147,10 @@ class SwipeSelection {
         if (leftStart == start && leftEnd == end) {
             anchor = leftAnchor
             head = if (anchor == start) end else start
+        } else if (leftProbe >= 0 && min(leftAnchor, leftProbe) == start && max(leftAnchor, leftProbe) == end) {
+            // the probe given up taken after all, its report late
+            anchor = leftAnchor
+            head = leftProbe
         } else {
             anchor = end
             head = start
@@ -135,6 +159,7 @@ class SwipeSelection {
         leftStart = start
         leftEnd = end
         leftAnchor = anchor
+        leftProbe = -1
         probe = -1
         queued = 0
         // the selection read is the one the editor has, where the read says (a cursor tracked behind
@@ -199,9 +224,7 @@ class SwipeSelection {
         if (probe >= 0) queued = left
         if (h == head) return null
         head = h
-        leftStart = min(anchor, head)
-        leftEnd = max(anchor, head)
-        leftAnchor = anchor
+        leave()
         return CursorRange(leftStart, leftEnd)
     }
 

@@ -327,6 +327,19 @@ class KeyShortcutsHostTest {
         until("the family selected") { selected() == "1..${1 + family.length}" }
     }
 
+    // begun right after what is typed is committed, before the editor reports it: the field is still
+    // read, so an emoji before what was typed is stepped over whole
+    @Test
+    fun swipeSelectRightAfterPinyinStillStepsOverAnEmojiWhole() {
+        swipeSelectOnQ()
+        val family = "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"
+        start(family)
+        synced()
+        type("nihao")
+        swipeSelect(-31f)
+        until("你好 and the family selected") { h.field.text.toString() == "${family}你好" && selected() == "0..${family.length + 2}" }
+    }
+
     // the touch taken by the system: the selection stays; the key's next touch is a touch of its own, a tap a tap
     @Test
     fun swipeSelectCancelledKeepsTheSelectionAndTheNextTouchIsATap() {
@@ -403,6 +416,20 @@ class KeyShortcutsHostTest {
         until("t selected") { selected() == "5..6" }
         h.tap(backspace)
         until("the t deleted") { h.field.text.toString() == "secre" }
+    }
+
+    // a touch whose last step went right where the field's end is not known (a password), the editor
+    // having taken it: the next goes on from the same anchor
+    @Test
+    fun swipeSelectAfterATouchEndingRightKeepsItsAnchor() {
+        passwordSecret()
+        h.field.setSelection(3)
+        synced()
+        swipeSelect(0f, 11f, 21f) { synced() }
+        until("ret's re selected") { selected() == "3..5" }
+        synced()
+        swipeSelect(0f, -11f) { if (it == 0) synced() }
+        until("back to r, the anchor kept") { selected() == "3..4" }
     }
 
     // the steps moved before it begins (the host still busy) taken together as it begins, past the end too
