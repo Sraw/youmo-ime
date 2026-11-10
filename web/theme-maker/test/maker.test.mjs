@@ -329,3 +329,43 @@ test('the page saves from-maker-picture.theme, byte for byte', () => {
   if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker-picture.theme'), made);
   assert.deepEqual(new Uint8Array(made), bytes('from-maker-picture.theme'));
 });
+
+test('a 3.0 theme the app exports with every override it allows opens, and stays quick to edit (t10-review M2)', async () => {
+  // from-app.theme with every key of the app's boards overridden (up to format.limits.overrides), each a picture of its own, pressed and not: as 4.0
+  // past ThemeReader's 1000 styles, within what the app imports (LookTheme.MAX_STYLES), which the engine reads too
+  const opened = await L.openZip(FORMAT, bytes('from-app.theme'));
+  const t = opened.theme;
+  const ids = [];
+  const material = E.readTheme(E.themeSource('material'), null, null).theme;
+  for (const board of E.layouts()) {
+    const s = E.buildScene(board, material, { width: 1080, height: 700, density: 2.75 }, E.fixedMeasurer());
+    if (s.ok) for (const k of s.scene.json().keys) ids.push(board + '/' + k.id);
+  }
+  const names = [...new Set(ids)].slice(0, FORMAT.limits.overrides);
+  assert.ok(names.length > 250, names.length + " keys"); // every key of the app's boards (fewer than the limit)
+  t.keys.overrides = {};
+  names.forEach((n, i) => {
+    t.keys.overrides[n] = {
+      fill: { type: 'picture', blurDp: Math.floor(i / 100), brightness: i % 100 },
+      pressed: { type: 'color', argb: (0x80000000 | (i * 997)) | 0 },
+      label: i % 2 ? 'show' : 'hide',
+    };
+  });
+  const json = L.writeTheme(FORMAT, t);
+  const zip = L.writeZip([[t.name + '.json', new TextEncoder().encode(json)], ...Object.entries(opened.files)]);
+  let at = performance.now();
+  const { doc } = await M.open(E, L, FORMAT, zip);
+  const openMs = performance.now() - at;
+  const styles = (doc.xml.match(/<style /g) || []).length;
+  assert.ok(styles > 1000, styles + " styles");
+  at = performance.now();
+  const r = M.check(E, doc, 'qwerty', M.envJson(M.ENV), null);
+  const checkMs = performance.now() - at;
+  assert.deepEqual(r.problems.filter((p) => p.level === 'error'), []);
+  at = performance.now();
+  const edited = M.doc(F.setProp(doc.xml, 'key', 'radius', '9dp'), doc.files, doc.layouts);
+  assert.deepEqual(M.check(E, edited, 'qwerty', M.envJson(M.ENV), null).problems.filter((p) => p.level === 'error'), []);
+  const editMs = performance.now() - at;
+  console.log('# ' + names.length + ' overrides, ' + styles + ' styles: open ' + openMs.toFixed(0) + ' ms, check ' + checkMs.toFixed(0) + ' ms, edit and check ' + editMs.toFixed(0) + ' ms');
+  assert.deepEqual(M.saveProblems(E, L, FORMAT, doc), []);
+});

@@ -118,12 +118,13 @@ object YoumoEngine {
 
     /**
      * [xml] (theme 4) read, `system()` colours from [systemColors] (`{light: {primary: "#…"}, dark: {…}}`; none:
-     * every fallback, as on an older Android), refused where it needs an app newer than [appVersion] (none: never):
+     * every fallback, as on an older Android), with as many styles as the app imports (LookTheme.MAX_STYLES: a 3.0
+     * theme it exports with every key overridden, written as 4.0), refused where it needs an app newer than [appVersion] (none: never):
      * `{ok, problems, warnings, theme}`.
      */
     fun readTheme(xml: dynamic, systemColors: dynamic, appVersion: dynamic): dynamic = checked {
         val colors = systemColors(systemColors)
-        result(ThemeReader.theme(text(xml, "theme"), colors, optionalText(appVersion, "appVersion"))) { "theme" to YoumoTheme(it) }
+        result(ThemeReader.theme(text(xml, "theme"), colors, optionalText(appVersion, "appVersion"), LookTheme.MAX_STYLES)) { "theme" to YoumoTheme(it) }
     }
 
     /** [xml] (layout 1) read, its includes from [fragments] (`{id: xml}`, a theme pack's) or the built-in ones: `{ok, problems, warnings, layout}`. */
