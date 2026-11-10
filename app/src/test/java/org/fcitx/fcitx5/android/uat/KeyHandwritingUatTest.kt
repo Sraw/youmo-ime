@@ -39,7 +39,7 @@ import org.fcitx.fcitx5.android.until as waitUntil
  * The keyboard's half of 键盘手写 (design 060-kbd-handwriting, S3): a stroke drawn over the letters is put
  * on the keyboard's pad, read, and offered as the input method's own handwriting (offerInk onKeys), no key
  * pressed; the piece finished at the pause; a tap just before taken back as its first dot (its letter
- * deleted); ⌫ takes a stroke back; space commits the piece. Not in a password, not in English, not while
+ * deleted by the engine, the first reading marked takesBack, no backspace sent); ⌫ takes a stroke back; space commits the piece. Not in a password, not in English, not while
  * TalkBack explores by touch. What the engine does with it is InkOver's (ime-core).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -65,6 +65,8 @@ class KeyHandwritingUatTest {
 
     @After
     fun close() {
+        // whatever a test left the engine's answer at: not typed, as a fresh process starts
+        EngineState.keysTypedState.value = EngineState.KeysTyped(EngineState.keysTyped.value.answer + 1, false)
         shared.reader = reader
         open?.close()
     }
@@ -133,8 +135,28 @@ class KeyHandwritingUatTest {
         h.api.calls.clear()
         draw(h.key("t"))
         until("read") { inks().isNotEmpty() }
-        assertEquals(keysSent().toString(), 1, keysSent().count { backspace in it })
+        // the engine deletes the letter, if that tap alone is typed (InkOver): no backspace from here
+        assertEquals(keysSent().toString(), 0, keysSent().count { backspace in it })
+        assertTrue(inks().toString(), ", takesBack" in inks().first())
+        assertTrue(inks().toString(), inks().drop(1).none { ", takesBack" in it })
         assertEquals("the dot, then the stroke", 2, board().keyInkForTest!!.pad.finished.size)
+    }
+
+    @Test
+    fun aStrokeWithNoTapBeforeTakesNothingBack() {
+        harness()
+        draw(h.key("t"))
+        until("read") { inks().isNotEmpty() }
+        assertTrue(inks().toString(), inks().none { ", takesBack" in it })
+    }
+
+    @Test
+    fun englishKeysGoStraightOnTheRecognizerNotMade() {
+        harness(KeyboardHarness.ENGLISH)
+        touchTap(h.key("t"))
+        h.tap(h.describedKey("Backspace"))
+        assertFalse("not written on", board().keyInkForTest!!.writtenOn)
+        assertEquals(keysSent().toString(), 2, keysSent().size)
     }
 
     @Test
@@ -150,8 +172,6 @@ class KeyHandwritingUatTest {
         draw(h.key("t"))
         h.advance(100)
         assertEquals(emptyList<String>(), inks())
-        EngineState.keysTypedState.value =
-            EngineState.KeysTyped(EngineState.keysTyped.value.answer + 1, false)
     }
 
     @Test

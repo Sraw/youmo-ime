@@ -78,6 +78,24 @@ sealed interface Value {
     data class Flag(val on: Boolean) : Value
     data class OfTwin(val twin: Twin) : Value
     data class OfTransition(val transition: Transition) : Value
+    data class OfAppear(val appear: Appear) : Value
+    /** `effect=` (A3): [effect] null for `none`, a style taking a key's effect away. */
+    data class OfEffect(val effect: Effect?) : Value
+}
+
+/**
+ * A key's press effect (060-render-p3 A3), `effect=` on its pressed look: an image of the pack's [file]
+ * played over the key once each press, [ms] long.
+ */
+sealed interface Effect {
+    val file: String
+    val ms: Int
+
+    /** The image grown from where the finger is to [radius] % of the key's half diagonal, fading, clipped to the key. */
+    data class Ripple(override val file: String, val radius: Double, override val ms: Int) : Effect
+
+    /** [count] copies of the image flying from where the finger is, up to [spread] dp, fading. */
+    data class Particles(override val file: String, val count: Int, val spread: Double, override val ms: Int) : Effect
 }
 
 /**
@@ -85,6 +103,12 @@ sealed interface Value {
  * (0–600), and its curve, one of [Values.EASINGS] (CSS's names).
  */
 data class Transition(val ms: Int, val easing: String)
+
+/**
+ * `appear=` (060-render-p3 A2): how a popup, a key's bubble or a menu comes up, [kind] `fade`, `scale`
+ * (grown from the key) or `rise` (up from below), each faded in too, in [ms] (0–250).
+ */
+data class Appear(val kind: String, val ms: Int)
 
 /** Reading a style property's value: null where it is not one of that property. */
 object Values {
@@ -135,8 +159,10 @@ object Values {
         "underline", "cursor-color",
         // T7b: the voice mask's frosted glass (engine/PanelLooks), the handwriting pad's ink and grid
         "blur", "ink-color", "ink-width", "grid-color", "grid",
-        // A1: a key's motion (the scene's Motion)
-        "transition", "press-scale", "press-sink",
+        // A1: a key's motion (the scene's Motion); A3: its press effect
+        "transition", "press-scale", "press-sink", "effect",
+        // A2: how a popup, a bubble or a menu comes up
+        "appear",
     ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
 
     private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
@@ -167,9 +193,6 @@ object Values {
         "width" to form(LEN),
         "side-padding" to form(LEN_OR_PERCENT),
         "bottom-padding" to form(LEN_OR_PERCENT),
-        // A2–A3: motion
-        "appear" to form("(fade|scale|rise) $MS"),
-        "effect" to form("none|ripple-image\\($FILE, ?$PERCENT_FORM, ?$MS\\)|particles\\($FILE, ?[0-9]{1,2}, ?$LEN, ?$MS\\)"),
         // §16's second tier: a key's sticker layer
         "sticker" to form("none|$FILE"),
     )
@@ -243,6 +266,11 @@ object Values {
     const val MAX_PRESS_SINK_DP = 4.0
     private val TRANSITION = Regex("([0-9]{1,3})ms ([a-z-]+)")
 
+    /** `appear=`'s kinds and longest, ms (A2). */
+    val APPEARS = listOf("fade", "scale", "rise")
+    const val MAX_APPEAR_MS = 250
+    private val APPEAR = Regex("(${APPEARS.joinToString("|")}) ([0-9]{1,3})ms")
+
     // A1's: a key's transition into a state, its pressed face's scale and sink
     private fun motion(property: String, raw: String): Value? = when (property) {
         "transition" -> TRANSITION.matchEntire(raw)?.let { m ->
@@ -252,7 +280,36 @@ object Values {
         }
         "press-scale" -> percent(raw)?.takeIf { it in MIN_PRESS_SCALE..MAX_PRESS_SCALE }?.let(Value::Number)
         "press-sink" -> dp(raw, MAX_PRESS_SINK_DP)?.let(Value::Number)
+        "appear" -> APPEAR.matchEntire(raw)?.let { m ->
+            m.groupValues[2].toInt().takeIf { it <= MAX_APPEAR_MS }?.let { Value.OfAppear(Appear(m.groupValues[1], it)) }
+        }
+        "effect" -> effect(raw)
         else -> null
+    }
+
+    /** `effect=`'s ranges (A3): a ripple's radius, %; particles a press, how far they fly, dp; how long either plays, ms. */
+    const val MIN_RIPPLE_RADIUS = 10.0
+    const val MAX_RIPPLE_RADIUS = 200.0
+    const val MAX_PARTICLES = 12
+    const val MAX_SPREAD_DP = 64.0
+    const val MAX_EFFECT_MS = 600
+    private val RIPPLE = Regex("ripple-image\\(($FILE), ?([0-9]+(\\.[0-9]+)?%), ?([0-9]{1,3})ms\\)")
+    private val PARTICLES = Regex("particles\\(($FILE), ?([0-9]{1,2}), ?($LEN), ?([0-9]{1,3})ms\\)")
+
+    private fun effect(raw: String): Value? {
+        if (raw == "none") return Value.OfEffect(null)
+        RIPPLE.matchEntire(raw)?.let { m ->
+            val radius = percent(m.groupValues[2])?.takeIf { it in MIN_RIPPLE_RADIUS..MAX_RIPPLE_RADIUS } ?: return null
+            val ms = m.groupValues[4].toInt().takeIf { it in 1..MAX_EFFECT_MS } ?: return null
+            return Value.OfEffect(Effect.Ripple(m.groupValues[1], radius, ms))
+        }
+        PARTICLES.matchEntire(raw)?.let { m ->
+            val count = m.groupValues[2].toInt().takeIf { it in 1..MAX_PARTICLES } ?: return null
+            val spread = dp(m.groupValues[3], MAX_SPREAD_DP) ?: return null
+            val ms = m.groupValues.last().toInt().takeIf { it in 1..MAX_EFFECT_MS } ?: return null
+            return Value.OfEffect(Effect.Particles(m.groupValues[1], count, spread, ms))
+        }
+        return null
     }
 
     // T6b's: the code being typed's underline (a border's form, or none) and cursor

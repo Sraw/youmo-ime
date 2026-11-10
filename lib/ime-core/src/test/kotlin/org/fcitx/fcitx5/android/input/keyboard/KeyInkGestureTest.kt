@@ -134,6 +134,41 @@ class KeyInkGestureTest {
     }
 
     @Test
+    fun aLongPressBetweenTheTapAndTheStrokeTakesNothingBack() {
+        down(0)
+        t.up(50f, 70f, cancelled = false, time = 40)
+        // another letter long pressed (its popup's letter typed), lifted after the long press
+        down(80, typed = true)
+        assertEquals(Route.KEYS, t.move(50f, 71f, 400))
+        t.up(50f, 71f, cancelled = false, time = 450)
+        // a stroke within the pause of the first tap: input typed, no tap to take back, no writing
+        down(480, typed = true)
+        assertEquals(Route.KEYS, t.move(50f, 115f, 500))
+        assertNull(ink.takeTapped())
+    }
+
+    @Test
+    fun aCancelledTouchOrASecondFingerAfterTheTapTakesNothingBack() {
+        down(0)
+        t.up(50f, 70f, cancelled = false, time = 40)
+        down(80, typed = true)
+        t.up(50f, 70f, cancelled = true, time = 100)
+        down(150, typed = true)
+        assertEquals(Route.KEYS, t.move(50f, 115f, 170))
+        assertNull(ink.takeTapped())
+        t.up(50f, 115f, cancelled = false, time = 180)
+
+        down(1000)
+        t.up(50f, 70f, cancelled = false, time = 1040)
+        down(1080, typed = true)
+        assertEquals(Route.KEYS, t.otherDown())
+        t.up(50f, 70f, cancelled = false, time = 1100)
+        down(1150, typed = true)
+        assertEquals(Route.KEYS, t.move(50f, 115f, 1170))
+        assertNull(ink.takeTapped())
+    }
+
+    @Test
     fun aKeyHeldPastItsLongPressIsNoTap() {
         down(0)
         t.up(50f, 70f, cancelled = false, time = 400)

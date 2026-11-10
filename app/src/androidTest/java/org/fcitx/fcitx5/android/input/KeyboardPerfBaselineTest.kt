@@ -764,7 +764,7 @@ class KeyboardPerfBaselineTest {
         return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
     }
 
-    private fun inject(action: Int, at: PointF, down: Long, time: Long) {
+    internal fun inject(action: Int, at: PointF, down: Long, time: Long) {
         val event = MotionEvent.obtain(down, time, action, at.x, at.y, 0)
         event.source = InputDevice.SOURCE_TOUCHSCREEN
         check(instrumentation.uiAutomation.injectInputEvent(event, true)) { "not injected" }

@@ -105,6 +105,8 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
     /** Another finger down: the glide's if it glides; else no glide comes of this touch. */
     fun otherDown(): Route {
         if (gliding) return Route.GLIDE
+        // two fingers: the tap before is no first dot
+        ink?.forgetTap()
         reset()
         return Route.KEYS
     }
@@ -127,6 +129,8 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
         val was = g.gliding
         // its long press came up: the key's from now on, and nothing more kept
         if (!was && time - t0 > longPressMillis) {
+            // a long press is no tap: what it types is not the tap's before it, which is no first dot now
+            ink?.forgetTap()
             reset()
             return Route.KEYS
         }
@@ -156,10 +160,16 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
     fun up(x: Float, y: Float, cancelled: Boolean, time: Long = 0L): Route {
         if (!gliding) {
             // a tap on a letter: the first dot of what may be written next (KeyInkGesture)
-            // held past its long press, it was no tap
-            if (!cancelled && gesture != null && time - t0 <= longPressMillis) ink?.let {
-                // a tap in the gap sends no key: nothing typed, nothing to take back
-                if (onLetterDown) { add(x, y); it.tapped(time, points, count) } else it.forgetTap()
+            // held past its long press, cancelled, in the gap (no key sent), or none kept: no tap, and
+            // the one before is no first dot either (what this typed, if anything, is after it)
+            val onLetter = gesture != null && onLetterDown
+            ink?.let {
+                if (!cancelled && onLetter && time - t0 <= longPressMillis) {
+                    add(x, y)
+                    it.tapped(time, points, count)
+                } else {
+                    it.forgetTap()
+                }
             }
             reset()
             return Route.KEYS

@@ -6,8 +6,10 @@ package org.fcitx.fcitx5.android.input.popup
 
 import android.content.res.Configuration
 import android.graphics.Rect
+import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityManager
 import android.widget.FrameLayout
 import androidx.annotation.VisibleForTesting
 import java.util.LinkedList
@@ -25,6 +27,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyMotionSwitch
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
@@ -32,7 +35,9 @@ import org.fcitx.fcitx5.android.input.keyboard.keyTextScale
 import org.fcitx.fcitx5.android.input.keyboard.longPressOf
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.scene.engine.PopupMotion
 import org.fcitx.fcitx5.android.scene.engine.Popups
+import org.fcitx.fcitx5.android.scene.theme.Transition
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.utils.popIn
 import org.mechdancer.dependency.Dependent
@@ -59,6 +64,14 @@ class PopupComponent :
     private val freeEntryUi = LinkedList<PopupEntryUi>()
 
     private val showingContainerUi = HashMap<KeyRef, PopupContainerUi>()
+
+    // 060-render-p3 A2: how each popup shown goes (its theme's `transition`, null: at once), and the views
+    // fading out now, each with what is done once it has gone
+    private val goings = HashMap<View, Transition>()
+    private val fading = HashMap<View, () -> Unit>()
+
+    // when the last bubble came up: one sooner than its motion after it does not move (as a key typed fast, A1)
+    private var lastPreviewAt = Long.MIN_VALUE / 2
 
     private val keyBottomMargin by lazy {
         val gap = ThemeManager.shownLook(theme).keys.gap
@@ -145,15 +158,18 @@ class PopupComponent :
             dismissJobs[key]?.also {
                 dismissJobs.remove(key)?.cancel()
             }
-            lastShowTime = System.currentTimeMillis()
+            lastShowTime = SystemClock.uptimeMillis()
+            lastPreviewAt = SystemClock.uptimeMillis()
             // not one with what it showed before: none, as below
-            if (!show(this, content, null, bounds.width())) return dismissPopupEntry(key, this)
+            if (!show(this, content, null, bounds.width())) return dismissPopupEntry(key, this, atOnce = true)
             place(this, bounds)
             return
         }
         val scenes = scenesFor(key) ?: return
+        // a bubble fading back to the pool first, to be taken again (after scenesFor: a theme changed clears the pool)
+        endFades()
         val popup = (freeEntryUi.pollFirst() ?: PopupEntryUi(context, scenes)).apply {
-            lastShowTime = System.currentTimeMillis()
+            lastShowTime = SystemClock.uptimeMillis()
         }
         if (!show(popup, content, null, bounds.width())) {
             // the engine could not make it (logged): no bubble this time
@@ -161,6 +177,7 @@ class PopupComponent :
             return
         }
         place(popup, bounds)
+        PopupMoves.settle(popup.root)
         // make sure that popup.root does not have parent view before adding it under root container
         // it's wired that on some devices it would have a parent view despite it was newly created
         // or just polled from freeEntryUi
@@ -171,6 +188,53 @@ class PopupComponent :
             root.addView(popup.root)
         }
         showingEntryUi[key] = popup
+        previewMoves(popup, bounds)
+    }
+
+    // a new bubble coming up as its theme says, unless it comes sooner than the motion after the last (any
+    // fading out ended in showPopup, as a key's press ends the others' fades, A1)
+    private fun previewMoves(popup: PopupEntryUi, bounds: Rect) {
+        val now = SystemClock.uptimeMillis()
+        val since = now - lastPreviewAt
+        lastPreviewAt = now
+        val m = motionOf("preview") ?: return
+        if (since < maxOf(m.appear?.ms ?: 0, m.going?.ms ?: 0)) return
+        m.going?.let { goings[popup.root] = it }
+        val a = m.appear ?: return
+        val lp = popup.root.layoutParams as FrameLayout.LayoutParams
+        PopupMoves.appear(popup.root, a, (bounds.centerX() - lp.leftMargin).toFloat(), (bounds.centerY() - lp.topMargin).toFloat())
+    }
+
+    /**
+     * [widget]'s motion (`popup`, `preview`, `menu`) in its theme, null where none or where nothing may move
+     * now (键盘动效, battery saver: [KeyMotionSwitch], asked only of a theme that moves).
+     */
+    private fun motionOf(widget: String): PopupMotion? {
+        val s = scenes.takeIf { it.ready && it.moves } ?: return null
+        val m = s.made("popup's motion", s.builder()?.popupMotion(widget)) ?: return null
+        return m.takeIf { KeyMotionSwitch.on(context) }
+    }
+
+    // [view] gone from [root] in its fade, or at once ([atOnce], none set, or motion off now); then [gone]
+    private fun goAway(view: View, atOnce: Boolean, gone: () -> Unit) {
+        val t = goings.remove(view)
+        val done = { root.removeView(view); PopupMoves.settle(view); gone() }
+        // TalkBack: a view fading out would still take the hover over it (its keys read, the key under not)
+        if (atOnce || t == null) return done()
+        if (!KeyMotionSwitch.on(context) || exploring()) return done()
+        fading[view] = done
+        PopupMoves.go(view, t) { fading.remove(view)?.invoke() }
+    }
+
+    private fun exploring() = context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
+
+    // every fade out ended at once: its view gone
+    private fun endFades() {
+        if (fading.isEmpty()) return
+        fading.keys.toList().forEach { v ->
+            v.animate().cancel()
+            fading.remove(v)?.invoke()
+        }
     }
 
     // [text] in [popup] over a key [keyWidth] px across, as [fit] has it (null: a character, its
@@ -189,7 +253,7 @@ class PopupComponent :
             if (!show(this, text, fit, trigger.width())) {
                 // not the text before left up while a lift types this one: none, as showPopup's
                 dismissJobs.remove(key)?.cancel()
-                return dismissPopupEntry(key, this)
+                return dismissPopupEntry(key, this, atOnce = true)
             }
             place(this, trigger)
         }
@@ -306,9 +370,9 @@ class PopupComponent :
         if (keyboardUi.unmade) return
         showingEntryUi[key]?.let {
             dismissJobs.remove(key)?.cancel()
-            dismissPopupEntry(key, it)
+            dismissPopupEntry(key, it, atOnce = true)
         }
-        showPopupContainer(key, keyboardUi)
+        showPopupContainer(key, keyboardUi, "popup")
     }
 
     private fun showMenu(key: KeyRef, menu: KeyDef.Popup.Menu, bounds: Rect) {
@@ -325,9 +389,9 @@ class PopupComponent :
         )
         if (menuUi.unmade) return
         showingEntryUi[key]?.let {
-            dismissPopupEntry(key, it)
+            dismissPopupEntry(key, it, atOnce = true)
         }
-        showPopupContainer(key, menuUi)
+        showPopupContainer(key, menuUi, "menu")
     }
 
     private fun showEditMenu(key: KeyRef, bounds: Rect, password: Boolean) {
@@ -359,16 +423,16 @@ class PopupComponent :
         )
         if (menuUi.unmade) return
         showingEntryUi[key]?.let {
-            dismissPopupEntry(key, it)
+            dismissPopupEntry(key, it, atOnce = true)
         }
         if (at != null) {
             menuAbove = key
             onMenuShown(Rect(at.left, at.top, at.left + cell * cells.size, at.top + cell))
         }
-        showPopupContainer(key, menuUi)
+        showPopupContainer(key, menuUi, "menu")
     }
 
-    private fun showPopupContainer(key: KeyRef, ui: PopupContainerUi) {
+    private fun showPopupContainer(key: KeyRef, ui: PopupContainerUi, widget: String) {
         // a scene's room round it for its shadow: its box where the views' would be
         val out = (ui.root as? PopupSceneView)?.outset ?: NO_OUTSET
         root.apply {
@@ -387,11 +451,14 @@ class PopupComponent :
         }
         showingContainerUi[key] = ui
         // out of the key pressed (its middle, in the container's pixels); it goes at once, the
-        // character picked typed already. Focus follows the finger by position, not by its scale
-        ui.root.popIn(
-            (ui.triggerBounds.width() / 2 - ui.offsetX + out.left).toFloat(),
-            (ui.triggerBounds.height() / 2 - ui.offsetY + out.top).toFloat(),
-        )
+        // character picked typed already, or in its theme's fade (A2). Focus follows the finger by
+        // position, not by its scale: a finger slides over it as it comes up
+        val pivotX = (ui.triggerBounds.width() / 2 - ui.offsetX + out.left).toFloat()
+        val pivotY = (ui.triggerBounds.height() / 2 - ui.offsetY + out.top).toFloat()
+        val m = motionOf(widget)
+        m?.going?.let { goings[ui.root] = it }
+        val a = m?.appear
+        if (a != null) PopupMoves.appear(ui.root, a, pivotX, pivotY) else ui.root.popIn(pivotX, pivotY)
     }
 
     private fun changeFocus(key: KeyRef, x: Float, y: Float): Boolean {
@@ -405,7 +472,7 @@ class PopupComponent :
     private fun dismissPopup(key: KeyRef) {
         dismissPopupContainer(key)
         showingEntryUi[key]?.also {
-            val timeLeft = it.lastShowTime + hideThreshold - System.currentTimeMillis()
+            val timeLeft = it.lastShowTime + hideThreshold - SystemClock.uptimeMillis()
             if (timeLeft <= 0L) {
                 dismissPopupEntry(key, it)
             } else {
@@ -421,7 +488,7 @@ class PopupComponent :
     private fun dismissPopupContainer(key: KeyRef) {
         showingContainerUi[key]?.also {
             showingContainerUi.remove(key)
-            root.removeView(it.root)
+            goAway(it.root, atOnce = false) {}
         }
         menuGone(key)
     }
@@ -432,15 +499,15 @@ class PopupComponent :
         onMenuGone()
     }
 
-    private fun dismissPopupEntry(key: KeyRef, popup: PopupEntryUi) {
+    private fun dismissPopupEntry(key: KeyRef, popup: PopupEntryUi, atOnce: Boolean = false) {
         showingEntryUi.remove(key)
-        root.removeView(popup.root)
-        pool(popup)
+        goAway(popup.root, atOnce) { pool(popup) }
     }
 
     // back to the pool only if made in the theme drawn now: one showing when it changed would
     // otherwise come back from the pool drawing in the old
     private fun pool(popup: PopupEntryUi) {
+        PopupMoves.settle(popup.root)
         if (popup.scenes === scenesMade?.second) freeEntryUi.add(popup)
     }
 
@@ -450,6 +517,8 @@ class PopupComponent :
             job.cancel()
         }
         dismissJobs.clear()
+        endFades()
+        goings.clear()
         // too
         showingContainerUi.forEach { (_, container) ->
             root.removeView(container.root)

@@ -7,7 +7,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hw_strokes import STROKES  # noqa: E402
 
-from uat import Blocked, block_candidate, case, check  # noqa: E402
+from uat import Blocked, block_candidate, case, check, glide_on  # noqa: E402
 
 
 def pad(d):
@@ -132,3 +132,96 @@ def hw31(d):
     check("人" not in after, f"屏蔽后候选还有「人」：{after[:6]}")
     check(after, "屏蔽后候选空了")
     return f"「天」「人」的菜单都有屏蔽；屏蔽后候选 {after[:4]}（设置里恢复由 JVM 管）"
+
+
+# ---- 键盘手写 (HW-32..37): written over the letters of the pinyin keyboard
+
+
+def letters_box(d):
+    """the three rows of letters, q to m: left, top, right, bottom"""
+    k = d.keys(refresh=True)
+    for c in "qpm":
+        if c not in k:
+            raise Blocked(f"键盘上找不到 {c}")
+    return k["q"][0], k["q"][1], k["p"][0], k["m"][1]
+
+
+def key_strokes(d, strokes, gap=0.05):
+    x0, y0, x1, y1 = letters_box(d)
+    cmds = []
+    for st in strokes:
+        pts = [(int(x0 + (x1 - x0) * x), int(y0 + (y1 - y0) * y)) for x, y in st]
+        cmds.append("input motionevent DOWN %d %d" % pts[0])
+        for (a, b), (c, e) in zip(pts, pts[1:]):
+            for i in range(1, 7):
+                cmds.append("input motionevent MOVE %d %d" % (a + (c - a) * i / 6, b + (e - b) * i / 6))
+        cmds.append("input motionevent UP %d %d" % pts[-1])
+        cmds.append(f"sleep {gap}")
+    return cmds
+
+
+def key_write(d, ch, wait=1.6, strokes=None):
+    d.sh("; ".join(key_strokes(d, strokes if strokes is not None else STROKES[ch])))
+    time.sleep(wait)
+
+
+@case("HW-32", base="B0-设置", mutates=True)
+def hw32(d):
+    glide_on(d, option="键盘手写")
+    key_write(d, "人")
+    c = d.cands()
+    check("人" in c[:5], f"候选 {c[:5]}")
+    d.space()
+    t = d.field_text()
+    check(t == "人", f"框里「{t}」")
+    return f"「{t}」"
+
+
+@case("HW-33", base="B0-设置", mutates=True)
+def hw33(d):
+    glide_on(d, option="键盘手写")
+    d.step("点 t 再写六的其余三笔")
+    t = d.keys(refresh=True)["t"]
+    # the tap and the strokes in one shell: within the pause
+    d.sh("; ".join(["input tap %d %d" % t, "sleep 0.15"] + key_strokes(d, STROKES["六"][1:])))
+    time.sleep(1.6)
+    f = d.field_text()
+    c = d.cands()
+    check("t" not in f.lower(), f"t 没删：框里「{f}」")
+    check("六" in c[:5] or "六" in f, f"候选 {c[:5]}，框里「{f}」")
+    d.clear()
+    d.step("点 a 再写六的其余三笔（a 是整音节，拼音点完会再排一次候选）")
+    a = d.keys(refresh=True)["a"]
+    d.sh("; ".join(["input tap %d %d" % a, "sleep 0.15"] + key_strokes(d, STROKES["六"][1:])))
+    time.sleep(1.6)
+    fa = d.field_text()
+    ca = d.cands()
+    check("a" not in fa.lower(), f"a 没删：框里「{fa}」")
+    check("六" in ca[:5] or "六" in fa, f"候选 {ca[:5]}，框里「{fa}」")
+    d.clear()
+    d.step("打着 ni 时划一横")
+    d.type("ni")
+    key_write(d, None, wait=1.0, strokes=[[(0.2, 0.5), (0.8, 0.5)]])
+    p = d.preedit()
+    check("ni" in p.replace(" ", "").replace("'", ""), f"组字「{p}」")
+    return f"「{f}」，点 a 后「{fa}」，打着 ni 时「{p}」"
+
+
+case("HW-34", needs="jvm:KeyHandwritingUatTest.whileWritingATapIsAStrokeBackspaceTakesOneBackAndSpaceCommits")(lambda d: None)
+
+
+@case("HW-35", base="B0-设置", mutates=True)
+def hw35(d):
+    glide_on(d, option="键盘手写")
+    key_write(d, "人")
+    d.type("n")
+    f = d.field_text()
+    p = d.preedit()
+    # pinyin's input is shown in the composing row, not in the field
+    check(f == "人" and p.lower().startswith("n"), f"框里「{f}」，组字「{p}」")
+    return f"「{f}」+「{p}」"
+
+
+case("HW-36", needs="jvm:KeyHandwritingUatTest.theNineAndFourteenKeysAreWrittenOnToo")(lambda d: None)
+
+case("HW-37", needs="jvm:KeyHandwritingUatTest.notInAPasswordNorEnglishNorWhileTalkBackExplores、KeyHandwritingUatTest.englishKeysGoStraightOnTheRecognizerNotMade")(lambda d: None)

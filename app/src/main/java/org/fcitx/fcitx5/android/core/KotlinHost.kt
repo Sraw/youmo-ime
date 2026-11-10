@@ -274,7 +274,8 @@ class KotlinHost(
         }
     }
 
-    override suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean) = onHost { inkKey(Action.Ink(piece, reading), onKeys) }
+    override suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean, takesBack: Boolean) =
+        onHost { inkKey(Action.Ink(piece, reading, takesBack = onKeys && takesBack), onKeys) }
 
     override suspend fun inkFinished(piece: Int, onKeys: Boolean) = onHost { inkKey(Action.Ink(piece), onKeys) }
 

@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -368,18 +369,22 @@ class SettingsUatTest {
         }
     }
 
-    // 在键上划: one list, off till chosen, of 滑行输入, 笔画筛选 and off (键盘手写 not offered yet); its summary
-    // the choice alone; a choice stored, the page opened again showing it
+    // 在键上划: one list, off till chosen, of 滑行输入, 笔画筛选, 键盘手写 and off; its summary the choice alone; a
+    // choice stored, the page opened again showing it. 键盘手写 says it needs the text pack while that is missing
     @Test
     @Uat("ST-46")
     fun keyDrawingIsOneListOfItsChoices() {
         val keyboard = AppPrefs.getInstance().keyboard
         try {
+            TestShelves.use()
             pages()
             activity
             open(SettingsRoute.SharedInput)
             val drawing = listed(R.string.key_drawing)
-            assertEquals(listOf(R.string.glide_typing, R.string.stroke_filter, R.string.swipe_off).map(::s), drawing.entries.map { it.toString() })
+            assertEquals(
+                listOf(R.string.glide_typing, R.string.stroke_filter, R.string.key_drawing_handwriting, R.string.swipe_off).map(::s),
+                drawing.entries.map { it.toString() },
+            )
             assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
             if (drawing.callChangeListener(KeyDrawing.StrokeFilter.name)) drawing.value = KeyDrawing.StrokeFilter.name
             idle()
@@ -387,7 +392,12 @@ class SettingsUatTest {
             assertEquals(s(R.string.stroke_filter), summary(R.string.key_drawing))
             open(SettingsRoute.SharedInput)
             assertEquals(s(R.string.stroke_filter), summary(R.string.key_drawing))
+            TestShelves.use(text = false, voice = true)
+            open(SettingsRoute.SharedInput)
+            val needs = activity.getString(R.string.key_drawing_needs_text_pack, s(R.string.key_drawing_handwriting))
+            assertEquals(needs, listed(R.string.key_drawing).entries[2].toString())
         } finally {
+            TestShelves.use()
             keyboard.keyDrawing.setValue(KeyDrawing.Off)
         }
     }

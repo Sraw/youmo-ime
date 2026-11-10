@@ -144,9 +144,11 @@ interface TypingApi {
      * What the handwriting pad read of its [piece], shown by the Ink key that carries it: see
      * [Engines.ink]. Whether the Ink key was sent: not where handwriting cannot load or is not the
      * current input method (the engine told all the same, holding it for its next). [onKeys]: written on
-     * the letter keys (键盘手写), for the current input method's own handwriting (InkOver), not handwriting's.
+     * the letter keys (键盘手写), for the current input method's own handwriting (InkOver), not handwriting's;
+     * [takesBack], the letter typed by a tap taken back as the first dot deleted first if that alone is typed
+     * (Action.Ink.takesBack: decided on the fcitx thread, where what was typed is known).
      */
-    suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean = false): Boolean
+    suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean = false, takesBack: Boolean = false): Boolean
 
     /**
      * A glide across the letters, read as the current input method reads it and carried by the
