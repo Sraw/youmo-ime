@@ -40,6 +40,11 @@ class KeyInkGesture {
 
     private var taken: FloatArray? = null
 
+    // a letter tapped and sent, the engine not yet heard from since: the keyboard's [mayWrite] typed, read
+    // on the UI thread, can be older than the key (Engines.typedOnKeys is the fcitx thread's), and a fast
+    // dot then stroke must see the input the dot started
+    private var sentTyped = false
+
     /** Whether a touch down at [time] is a stroke from its down: the writing goes on. */
     fun writing(time: Long): Boolean = drawing || lastUp != NONE && time - lastUp < pauseMillis
 
@@ -48,7 +53,8 @@ class KeyInkGesture {
      * input typed: whether it may become a stroke once it moves. With input typed, only where the tap
      * just before started it, within the pause ([takeTapped] then gives that tap's places once it does).
      */
-    fun mayWrite(time: Long, typed: Boolean): Boolean {
+    fun mayWrite(time: Long, typedSeen: Boolean): Boolean {
+        val typed = typedSeen || sentTyped
         tapTakable = typed && tapPoints != null && time - tapUp < pauseMillis
         if (!tapTakable) forgetTap()
         startsInput = !typed
@@ -58,6 +64,8 @@ class KeyInkGesture {
     /** The touch became a stroke: the writing starts, or goes on; a tap that may be its first dot taken back. */
     fun strokeStarted() {
         drawing = true
+        // the letter taken back, or none typed: nothing of it is typed now
+        sentTyped = false
         if (tapTakable) taken = tapPoints
         forgetTap()
     }
@@ -71,9 +79,18 @@ class KeyInkGesture {
     /** A tap lifted at [time], its [count] [points] (pixels): a first dot if it started the input and a stroke follows. */
     fun tapped(time: Long, points: FloatArray, count: Int) {
         forgetTap()
+        sentTyped = true
         if (!startsInput) return
         tapUp = time
         tapPoints = points.copyOf(count)
+    }
+
+    /**
+     * What the engine says once it has the keys sent so far (Engines.typedOnKeys): nothing typed clears
+     * the mark a tap left; the caller tells it only after the engine handled the tap's key.
+     */
+    fun engineTyped(typed: Boolean) {
+        if (!typed) sentTyped = false
     }
 
     /** The places of the tap taken back as this stroke's first dot, once: delete its letter, then put them on the pad. */

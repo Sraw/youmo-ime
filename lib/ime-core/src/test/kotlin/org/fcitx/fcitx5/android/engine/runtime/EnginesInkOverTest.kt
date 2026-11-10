@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.junit.Assert.assertEquals
@@ -80,6 +81,21 @@ class EnginesInkOverTest : EnginesFixture() {
         assertEquals("好", engines.write(PINYIN, 1, "好").preedit)
     }
 
+    // the first dot taken back on the nine keys and the 14 keys: one key typed, deleted, then written
+    @Test
+    fun aKeyTakenBackAsTheFirstDotOnTheNineAndThe14Keys() {
+        fun takenBack(im: String, key: Int) {
+            val engines = Engines(::load, null, warmUps = inPlace)
+            engines.onEvent(im, EngineEvent.CHAR, key)
+            assertTrue(im, engines.typedOnKeys(im))
+            engines.onEvent(im, EngineEvent.BACKSPACE, 0)
+            assertFalse(im, engines.typedOnKeys(im))
+            assertEquals(im, "主", engines.write(im, 0, "主").preedit)
+        }
+        takenBack(InputMethodCatalog.T9, '6'.code)
+        takenBack(PINYIN, NineKeyLetters.G14.key('n').code)
+    }
+
     // U-03: a sentence written over the keys and deleted as soon as it was put in is taken back, as on the pad
     @Test
     fun aSentenceDeletedAtOnceIsNotLearned() {
@@ -98,6 +114,27 @@ class EnginesInkOverTest : EnginesFixture() {
         }
         assertTrue(learned(deleted = false))
         assertFalse(learned(deleted = true))
+    }
+
+    // pinyin typed after the sentence: backspaces then delete pinyin's text, not the sentence, which stays learned
+    @Test
+    fun aSentenceFollowedByPinyinStaysLearnedThroughItsBackspaces() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
+            repeat(2) { n ->
+                engines.onEvent(PINYIN, EngineEvent.RESET, 0)
+                engines.context(PINYIN, "")
+                engines.write(PINYIN, 2 * n, "好")
+                engines.write(PINYIN, 2 * n + 1, "拟")
+                assertEquals("好拟", engines.onEvent(PINYIN, EngineEvent.PICK, 0).commit)
+                val ma = engines.type(PINYIN, "ma")
+                val put = engines.onEvent(PINYIN, EngineEvent.PICK, 0).commit
+                assertTrue(ma.toString(), put.isNotEmpty())
+                repeat(put.length) { engines.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
+            }
+            engines.onEvent(PINYIN, EngineEvent.RESET, 0)
+            engines.context(PINYIN, "")
+            assertTrue("好拟" in engines.userWords(UserWord.Kind.LEARNED).map { it.text })
+        }
     }
 
     // a word added drops the sessions: the piece ended stays ended, over the keys as on the pad

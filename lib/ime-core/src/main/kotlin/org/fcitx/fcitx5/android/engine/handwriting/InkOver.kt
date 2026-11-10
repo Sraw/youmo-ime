@@ -118,9 +118,13 @@ class InkOver(
     }
 
     private fun innerApply(action: Action): Snapshot = session.apply(action).also {
-        if (it.commit.isNotEmpty() || it.deleteBefore > 0) innerWrote = true
+        val changed = it.commit.isNotEmpty() || it.deleteBefore > 0
+        if (changed) innerWrote = true
         wrote(it)
         inner = it
+        // what [session] put in told the handwriting at once: its journal then knows the text after its
+        // sentence is not its own, and a backspace deletes that first (U-03)
+        if (it.commit.isNotEmpty()) made?.apply(Action.Context(written))?.let { h -> inked = h }
         // a backspace the app does (nothing typed): the handwriting hears of it too, to take back a
         // sentence it put in and that is deleted at once (U-03, its FieldJournal)
         if (action == Action.Backspace && !it.handled) made?.apply(action)?.let { h -> inked = h }

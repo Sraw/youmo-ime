@@ -145,8 +145,22 @@ class KeyInkGestureTest {
     fun aStrokeWithNothingTypedTakesNoTapBack() {
         down(0)
         t.up(50f, 70f, cancelled = false, time = 40)
-        // the letter went in at once (no input kept): nothing to take back
+        // the letter went in at once (no input kept), as the engine says: nothing to take back
+        ink.engineTyped(false)
         stroke(100)
+        assertNull(ink.takeTapped())
+    }
+
+    @Test
+    fun aFastDotThenStrokeIsTakenBackThoughTheEngineWasNotHeardFromYet() {
+        down(0)
+        t.up(50f, 70f, cancelled = false, time = 40)
+        // what the keyboard last heard is from before the tap's key: nothing typed
+        assertEquals(Route.GLIDE, stroke(60, typed = false))
+        assertArrayEquals(floatArrayOf(50f, 70f, 50f, 70f), ink.takeTapped(), 0f)
+        // the next stroke of the writing takes nothing more back
+        down(100)
+        assertEquals(Route.GLIDE, t.up(50f, 71f, cancelled = false, time = 110))
         assertNull(ink.takeTapped())
     }
 
