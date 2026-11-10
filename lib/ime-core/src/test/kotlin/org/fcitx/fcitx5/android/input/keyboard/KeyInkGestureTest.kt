@@ -165,6 +165,28 @@ class KeyInkGestureTest {
     }
 
     @Test
+    fun aTapInTheGapSendsNothingSoNothingIsTakenBackAndWritingGoesOn() {
+        down(0, gap = true)
+        t.up(50f, 70f, cancelled = false, time = 40)
+        // within the pause: a stroke, no tap taken back
+        assertEquals(Route.GLIDE, stroke(60))
+        assertNull(ink.takeTapped())
+        // after the pause: writing still allowed
+        assertEquals(Route.GLIDE, stroke(1000))
+        assertNull(ink.takeTapped())
+    }
+
+    @Test
+    fun theEnginesWordReplacesATapsMark() {
+        down(0)
+        t.up(50f, 70f, cancelled = false, time = 40)
+        ink.engineTyped(true)
+        ink.engineTyped(false)
+        // past the pause, the engine said nothing typed: a stroke writes
+        assertEquals(Route.GLIDE, stroke(1000))
+    }
+
+    @Test
     fun anUndoCountsThePauseAnewAndTheEndEndsIt() {
         stroke(0)
         ink.undone(400)

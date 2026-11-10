@@ -86,11 +86,12 @@ class KeyInkGesture {
     }
 
     /**
-     * What the engine says once it has the keys sent so far (Engines.typedOnKeys): nothing typed clears
-     * the mark a tap left; the caller tells it only after the engine handled the tap's key.
+     * What the engine says once it has the keys sent so far (Engines.typedOnKeys): it replaces the mark a
+     * tap left, so the mark cannot stick. The caller tells it after every key the engine handled, not
+     * only when the answer changes.
      */
     fun engineTyped(typed: Boolean) {
-        if (!typed) sentTyped = false
+        sentTyped = typed
     }
 
     /** The places of the tap taken back as this stroke's first dot, once: delete its letter, then put them on the pad. */
