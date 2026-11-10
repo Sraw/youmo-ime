@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.scene.json.EnvJson
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
 import org.fcitx.fcitx5.android.scene.theme.Argb
@@ -167,6 +168,12 @@ object YoumoEngine {
 
     /** The board [id] of the app's, its includes with it; null for none. */
     fun layout(id: String): YoumoLayout? = builtIns.layout(id)?.orNull()?.let { l -> builtIns.includes(l).orNull()?.let { YoumoLayout(l, it) } }
+
+    /** Why a pack's [own] layout would not stand for the app's board [id] in the app (PackLayouts.judge, the app's own rule), null where it would. */
+    fun refuses(id: String, own: YoumoLayout): String? {
+        val app = layout(id)
+        return PackLayouts.judge(id, own.layout, own.fragments, app?.layout, app?.fragments.orEmpty())
+    }
 
     /** A built-in layout file's text (a board's or a fragment's), null for none: what the page shows and saves. */
     fun layoutSource(id: String): String? = builtIns.layoutText(id)

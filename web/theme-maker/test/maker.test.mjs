@@ -411,3 +411,21 @@ test('the check before a save: an error of any board or version stops it, the ap
   assert.deepEqual(w.errors, []);
   assert.equal(w.warnings.filter((p) => /sticker/.test(p.message)).length, 1, JSON.stringify(w.warnings));
 });
+
+test("a pack's layouts the app refuses on import stop a save, by the app's own limits; one it would not use is not previewed", () => {
+  const d = M.exampleDoc(examples[2]);
+  const k18 = d.layouts['k18.xml'];
+  const many = Object.fromEntries(Array.from({ length: FORMAT.limits.layouts + 1 }, (_, i) => ['k' + i + '.xml', k18]));
+  assert.ok(M.exportCheck(E, L, FORMAT, M.doc(d.xml, d.files, many), E.layouts(), M.envJson(M.ENV)).errors.some((p) => /最多收/.test(p.message)));
+  const big = M.doc(d.xml, d.files, { 'k18.xml': k18 + '<!--' + 'x'.repeat(FORMAT.limits.layoutBytes) + '-->' });
+  assert.ok(M.exportCheck(E, L, FORMAT, big, E.layouts(), M.envJson(M.ENV)).errors.some((p) => /超过 \d+ 字节/.test(p.message)));
+  // the app's qwerty under another board's name: the app keeps its own k14, so does the preview, with a warning
+  const keys = (doc, board) => M.check(E, doc, board, M.envJson(M.ENV), null).scene.json().keys.map((k) => k.id).join();
+  const wrong = M.doc(d.xml, d.files, { 'k14.xml': E.layoutSource('qwerty') });
+  const r = M.check(E, wrong, 'k14', M.envJson(M.ENV), null);
+  assert.ok(r.problems.some((p) => p.level === 'warning' && /App 不会用它（its id is qwerty）/.test(p.message)), JSON.stringify(r.problems));
+  assert.equal(keys(wrong, 'k14'), keys(M.doc(d.xml), 'k14'));
+  // and one with no backspace
+  const noBack = M.doc(d.xml, d.files, { 'qwerty.xml': E.layoutSource('qwerty').replace(/<key\b[^>]*role="backspace"[^>]*>/, '') });
+  assert.ok(M.check(E, noBack, 'qwerty', M.envJson(M.ENV), null).problems.some((p) => /it has no key \[backspace\]/.test(p.message)));
+});

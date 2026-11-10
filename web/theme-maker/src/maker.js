@@ -112,8 +112,18 @@
       if (where === '*') bad('键的样式用的场景组合太多，没法逐一检查 Shift、退格、空格和回车会不会成空白键（App 会拒收）');
       else bad(where + '：字藏了，键面又不是图片——Shift、退格、空格或回车会是空白键');
     }
-    let total = 0;
     const enc = new TextEncoder();
+    // the pack's layouts as the app takes them (ThemePackFiles.checkLayouts, ThemeAssetLimits.layouts; ThemePackLayouts.report)
+    const names = Object.keys(d.layouts);
+    for (const n of names) if (!n.endsWith('.xml') || !L.isPlainFileName(n)) bad('layouts/' + n + ' 不是 App 认得的布局文件名（<键盘>.xml）');
+    if (names.length > lim.layouts) bad('自带的键盘布局 ' + names.length + ' 个，App 最多收 ' + lim.layouts + ' 个');
+    for (const n of names) if (enc.encode(d.layouts[n]).length > lim.layoutBytes) bad('layouts/' + n + ' 超过 ' + lim.layoutBytes + ' 字节');
+    const boards = new Set(E.layouts());
+    for (const n of names) {
+      const id = n.replace(/\.xml$/, '');
+      if (!boards.has(id) && E.layoutSource(id) == null) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：App 没有这个键盘，不会用它' });
+    }
+    let total = 0;
     const sizes = [enc.encode(d.xml).length, ...Object.values(d.files).map((b) => b.length), ...Object.values(d.layouts).map((t) => enc.encode(t).length)];
     for (const [i, size] of sizes.entries()) {
       const breach = L.entryBreach(lim, i + 1, size, total);
@@ -395,10 +405,17 @@
     const own = d.layouts[board + '.xml'];
     if (own == null) return board;
     const fragments = Object.create(null);
-    for (const [n, t] of Object.entries(d.layouts)) if (n !== board + '.xml' && n.endsWith('.xml')) fragments[n.slice(0, -4)] = t;
+    // the pack's fragments the app reads: only under an id of its own (ThemePackLayouts.read)
+    for (const [n, t] of Object.entries(d.layouts)) if (n !== board + '.xml' && n.endsWith('.xml') && E.layoutSource(n.slice(0, -4)) != null) fragments[n.slice(0, -4)] = t;
     const l = E.readLayout(own, fragments);
-    if (l.ok) return l.layout;
-    warn(l.problems.map((p) => ({ line: 0, message: 'layouts/' + board + '.xml' + (p.line ? ' 第 ' + p.line + ' 行' : '') + '：' + p.message + '（App 会用自己的这个键盘）' })));
+    if (!l.ok) {
+      warn(l.problems.map((p) => ({ line: 0, message: 'layouts/' + board + '.xml' + (p.line ? ' 第 ' + p.line + ' 行' : '') + '：' + p.message + '（App 会用自己的这个键盘）' })));
+      return board;
+    }
+    // as typable as the app's, else the app's drawn (ThemePackLayouts.judge, the same rule: PackLayouts)
+    const why = E.refuses(board, l.layout);
+    if (why == null) return l.layout;
+    warn([{ line: 0, message: 'layouts/' + board + '.xml：App 不会用它（' + why + '），会用自己的这个键盘' }]);
     return board;
   }
 
