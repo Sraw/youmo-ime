@@ -17,8 +17,10 @@ lines as they are. --trace: built profileable, the process stopped before atrace
 Device: ANDROID_SERIAL (default 127.0.0.1:5599). --lock DIR: a mkdir mutex held for each run.
 """
 import argparse
+import json
 import os
 import re
+import socket
 import statistics
 import subprocess
 import sys
@@ -55,7 +57,11 @@ def tree(rev, name, out):
         return path, git(path, 'rev-parse', '--short=9', 'HEAD') + ('+' if dirty else '')
     sha = git(ROOT, 'rev-parse', '--verify', rev + '^{commit}')
     path = os.path.join(out, 'wt-' + name)
-    if os.path.isdir(path):
+    if os.path.exists(path):
+        # only a worktree of its own: git -C in a plain directory would act on the repository above it
+        top = subprocess.run(['git', '-C', path, 'rev-parse', '--show-toplevel'], capture_output=True, text=True).stdout.strip()
+        if not os.path.isfile(os.path.join(path, '.git')) or os.path.realpath(top) != os.path.realpath(path):
+            sys.exit(f'{path} exists and is not a git worktree of its own: move it away or pick another --out')
         sh('git', '-C', path, 'checkout', '--detach', '--force', sha)
     else:
         sh('git', '-C', ROOT, 'worktree', 'add', '--detach', path, sha)
@@ -236,8 +242,7 @@ def main():
     p.add_argument('--only', help='perfOnly: theme,shift,build,press,popup,rebuild,idle,anim')
     p.add_argument('--trace', action='store_true')
     p.add_argument('--out', default=os.path.join(ROOT, 'build/perf'))
-    p.add_argument('--lock', help='a directory made (mkdir) as a mutex for each run; one older than --stale-lock h is taken over')
-    p.add_argument('--stale-lock', type=float, default=2.0)
+    p.add_argument('--lock', help='a directory made (mkdir) as a mutex for each run; waited for, never taken over')
     p.add_argument('--dry-run', action='store_true', help='check out the trees and print the commits and the order, nothing built or run')
     p.add_argument('--no-build', action='store_true', help='use what the trees have built')
     p.add_argument('--table', action='store_true', help='only write the table from the runs in --out')
@@ -267,7 +272,7 @@ def main():
             for r in runs:
                 for attempt in (1, 2):
                     if a.lock:
-                        lock(a.lock, a.stale_lock)
+                        lock(a.lock)
                     try:
                         run(r, trees[r[0]][0], a, a.out)
                         failed.pop(r, None)
@@ -277,35 +282,41 @@ def main():
                         print(f'{r} attempt {attempt} failed: {failed[r]}', file=sys.stderr)
                     finally:
                         if a.lock:
-                            os.rmdir(a.lock)
+                            unlock(a.lock)
         finally:
+            json.dump(failed, open(f'{a.out}/failed.json', 'w'))
             table(runs, a.out, commits, failed)
         return
     if os.path.exists(f'{a.out}/commits.txt'):
         commits = dict(l.split() for l in open(f'{a.out}/commits.txt') if l.strip())
+    if os.path.exists(f'{a.out}/failed.json'):
+        failed = json.load(open(f'{a.out}/failed.json'))
     table(runs, a.out, commits, failed)
 
 
-def lock(path, stale_h):
+def lock(path):
+    """mkdir as a mutex (other sessions use the same directory with mkdir/rmdir): waited for, never taken."""
     told = False
     while True:
         try:
             os.mkdir(path)
-            return
+            break
         except FileExistsError:
-            try:
-                age = time.time() - os.stat(path).st_mtime
-            except FileNotFoundError:
-                continue
-            if age > stale_h * 3600:
-                print(f'{path} left {age / 3600:.1f} h ago: taken over', file=sys.stderr)
-                os.rmdir(path)
-                continue
             if not told:
-                print(f'waiting for {path}', file=sys.stderr)
+                try:
+                    who = open(os.path.join(path, 'owner')).read().strip()
+                except OSError:
+                    who = 'unknown (no owner file)'
+                print(f'waiting for {path}, held by {who}', file=sys.stderr)
                 told = True
             time.sleep(30)
+    with open(os.path.join(path, 'owner'), 'w') as f:
+        f.write(f'perf.py pid {os.getpid()} on {socket.gethostname()} since {time.strftime("%Y-%m-%d %H:%M:%S")}\n')
 
+
+def unlock(path):
+    os.remove(os.path.join(path, 'owner'))
+    os.rmdir(path)
 
 if __name__ == '__main__':
     main()
