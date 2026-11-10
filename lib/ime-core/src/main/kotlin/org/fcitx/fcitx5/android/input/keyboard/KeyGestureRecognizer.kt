@@ -114,32 +114,9 @@ class KeyGestureRecognizer {
     var swipeRepeatTriggered: Boolean = false
         private set
 
-    /** One axis of a swipe: where the finger last was, what is carried toward the next step, and the steps so far. */
-    private class SwipeAxis {
-        var last = -1f
-        var unconsumed = 0f
-        var total = 0
-
-        /**
-         * How many whole [threshold]s the finger crossed since the last sample, carrying the
-         * remainder forward so a slow drag still accumulates.
-         */
-        fun consume(current: Float, threshold: Float): Int {
-            val moved = current - last + unconsumed
-            unconsumed = moved % threshold
-            val count = (moved / threshold).toInt()
-            total += count
-            return count
-        }
-
-        fun reset() {
-            unconsumed = 0f
-            total = 0
-        }
-    }
-
-    private val swipeX = SwipeAxis()
-    private val swipeY = SwipeAxis()
+    // one axis of a swipe each: where the finger last was, what is carried toward the next step, the steps so far
+    private val swipeX = SwipeSteps()
+    private val swipeY = SwipeSteps()
 
     val swipeTotalX: Int get() = swipeX.total
 
