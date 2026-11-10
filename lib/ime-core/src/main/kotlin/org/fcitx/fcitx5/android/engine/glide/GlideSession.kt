@@ -166,6 +166,8 @@ class GlideSession(
         if (!session.learning) return unchanged()
         val block = blockOther?.invoke(reading) ?: return unchanged()
         block()
+        // gone from this glide's others for good: a block taken back (its undo, the settings) shows
+        // the word again from the next glide, not in this one's list
         others = others - reading
         return unchanged()
     }
@@ -202,10 +204,9 @@ class GlideSession(
     }
 
     // another reading's word may be blocked, where [session] learns (not in a password field)
-    override fun offers(index: Int): Set<Offer> = when {
-        others(index) == null -> session.offers(inner(index))
-        session.learning && others(index)?.let { blockOther?.invoke(it) } != null -> setOf(Offer.BLOCK)
-        else -> emptySet()
+    override fun offers(index: Int): Set<Offer> {
+        val other = others(index) ?: return session.offers(inner(index))
+        return if (session.learning && blockOther?.invoke(other) != null) setOf(Offer.BLOCK) else emptySet()
     }
 
     // the others are no candidates [session] ranked; its own a place on for each (review-int-runtime S2)

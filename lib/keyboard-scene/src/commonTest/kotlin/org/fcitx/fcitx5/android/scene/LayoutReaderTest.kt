@@ -32,6 +32,7 @@ class LayoutReaderTest {
 
     private fun problems(source: String) = LayoutReader.layout(source).problems().map { it.toString() }
 
+    // contract: the committed example layout reads as written; a reader change that breaks a shared layout fails here
     @Test
     fun theQwertyExampleReads() {
         val l = Fixtures.qwerty
@@ -77,9 +78,16 @@ class LayoutReaderTest {
     }
 
     @Test
+    fun aKeyIdStartingViewIsRefused() {
+        // view: names an old View key to KeyRef; a scene key of that id would be routed as one
+        val p = problems(board("<row><key id=\"view:3\" label=\"a\"/></row>"))
+        assertTrue(p.single().contains("not starting view:"), "$p")
+    }
+
+    @Test
     fun keysAcrossRowsAreRead() {
         val p = problems(board("<row><key id=\"a\" label=\"a\" rows=\"2\"/></row>"))
-        assertTrue(p.none { "rows" in it }, "$p")
+        assertEquals(emptyList(), p)
     }
 
     @Test

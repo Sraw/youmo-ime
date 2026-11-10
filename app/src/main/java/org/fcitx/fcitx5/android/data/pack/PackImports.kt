@@ -10,10 +10,12 @@ import android.net.Uri
 import android.text.format.Formatter
 import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.pack.ImportResult
@@ -71,7 +73,8 @@ object PackImports {
     private suspend fun importOne(resolver: ContentResolver, uri: Uri): Outcome {
         var name = uri.lastPathSegment.orEmpty()
         val result = try {
-            name = resolver.queryFileName(uri) ?: name
+            // a provider's binder call, perhaps over the network: not on the main thread
+            name = withContext(Dispatchers.IO) { resolver.queryFileName(uri) } ?: name
             runningNow.value = Running(name, 0)
             importer(resolver, uri) { copied, total ->
                 val percent = if (total > 0) (copied * PERCENT / total).toInt() else 0
@@ -80,7 +83,9 @@ object PackImports {
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-            Timber.w(e, "pack import")
+            // for the log: no paths, no names of the user's (a provider's message may carry them)
+            // (its frames kept: an importer's own bug is found by them)
+            Timber.w(Throwable(e.javaClass.name).apply { stackTrace = e.stackTrace }, "pack import")
             ImportResult.Refused(Refusal.Unreadable(e.message ?: e.javaClass.simpleName))
         }
         return Outcome(name, result)

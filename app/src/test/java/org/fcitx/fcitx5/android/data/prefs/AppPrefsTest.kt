@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.assertRows as assertNamedRows
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
@@ -27,6 +28,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.File
 
 /**
  * A setting moved out of the settings page kept what an older version or a backup set, with
@@ -116,20 +118,43 @@ class AppPrefsTest {
         assertEquals(OneHanded.Left, later.registerProvider(::ThemePrefs).oneHandedSide.getValue())
     }
 
-    // 0.4's glide typing switch (glide_typing) is this version's 滑行输入 switch, under the same key:
-    // a 0.4 user's, or a 0.4 backup's, carries over as it is; 笔画筛选 off
+    // 0.5's two switches 滑行输入 (glide_typing, 0.4's key too) and 笔画筛选 (stroke_filter) as the one list
+    // 在键上划: a 0.5 user's, or a backup's read at the next start, carries over; both old keys dropped
     @Test
     @Uat("ST-43")
-    fun glideTypingCarriesOverAsItIs() {
-        class Row(val why: String, val stored: Boolean?)
-        assertRows(listOf(Row("0.4 on", true), Row("0.4 off", false), Row("never stored", null)), { it.why }) { row ->
-            sp.edit {
-                clear()
-                if (row.stored != null) putBoolean(AppPrefs.GLIDE_TYPING, row.stored)
+    fun theTwoSwitchesMoveOverToKeyDrawing() {
+        fun row(why: String, stored: SharedPreferences.Editor.() -> Unit, now: KeyDrawing) =
+            why to {
+                sp.edit { clear(); stored() }
+                val prefs = AppPrefs(sp).apply { dropRetired() }
+                assertEquals(now, prefs.keyboard.keyDrawing.getValue())
+                assertFalse("the old switches dropped", sp.contains("glide_typing") || sp.contains("stroke_filter"))
             }
-            assertEquals(row.stored == true, AppPrefs(sp).keyboard.glideTyping.getValue())
-            assertFalse(AppPrefs(sp).keyboard.strokeFilter.getValue())
-        }
+        assertNamedRows(
+            row("glide on", { putBoolean("glide_typing", true); putBoolean("stroke_filter", false) }, KeyDrawing.Glide),
+            row("strokes on", { putBoolean("glide_typing", false); putBoolean("stroke_filter", true) }, KeyDrawing.StrokeFilter),
+            row("both off", { putBoolean("glide_typing", false); putBoolean("stroke_filter", false) }, KeyDrawing.Off),
+            // the page never stored both: a backup, edited by hand; glide, the older and wider
+            row("both on: glide", { putBoolean("glide_typing", true); putBoolean("stroke_filter", true) }, KeyDrawing.Glide),
+            row("0.4's glide alone", { putBoolean("glide_typing", true) }, KeyDrawing.Glide),
+            row("never stored: off", {}, KeyDrawing.Off),
+            row("one set already is kept", { putBoolean("glide_typing", true); putString("key_drawing", "StrokeFilter") }, KeyDrawing.StrokeFilter),
+            row("stored as another type: off, no crash at every start", { putString("glide_typing", "x") }, KeyDrawing.Off),
+        )
+    }
+
+    // a 0.5 backup imported: the start after it resets the hidden settings (the import's marker) and then
+    // drops the retired ones, in FcitxApplication.onCreate's order; the two switches still move over
+    @Test
+    fun anImportedBackupsSwitchesMoveOverAtTheStartAfter() {
+        sp.edit { clear(); putBoolean("glide_typing", false); putBoolean("stroke_filter", true) }
+        val marker = File.createTempFile("imported", null)
+        val prefs = AppPrefs(sp)
+        FcitxApplication.resetHiddenSettings(prefs, directBoot = false) { marker }
+        prefs.dropRetired()
+        assertFalse("the marker gone", marker.exists())
+        assertEquals(KeyDrawing.StrokeFilter, prefs.keyboard.keyDrawing.getValue())
+        assertFalse(sp.contains("glide_typing") || sp.contains("stroke_filter"))
     }
 
     // contract: the keyboard choices are stored by the constant's name under keys that never change:
@@ -161,6 +186,12 @@ class AppPrefsTest {
                     "双拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys"), ShuangpinKeyboard.entries, "shuangpin_keyboard", AppPrefs.SHUANGPIN_KEYBOARD,
                     { it.keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys) }, "NineKeys", "Keys16",
                     { it.keyboard.shuangpinKeyboard.getValue() }, ShuangpinKeyboard.Full,
+                ),
+                // 在键上划 since 0.6; Handwriting stored before it is offered (a later version's backup)
+                Row(
+                    "在键上划", listOf("Glide", "StrokeFilter", "Handwriting", "Off"), KeyDrawing.entries, "key_drawing", AppPrefs.KEY_DRAWING,
+                    { it.keyboard.keyDrawing.setValue(KeyDrawing.StrokeFilter) }, "StrokeFilter", "Strokes",
+                    { it.keyboard.keyDrawing.getValue() }, KeyDrawing.Off,
                 ),
                 Row(
                     "English's keyboard", listOf("Full", "NineKeys"), EnglishKeyboard.entries, "english_keyboard", AppPrefs.ENGLISH_KEYBOARD,
@@ -238,11 +269,11 @@ class AppPrefsTest {
         AppPrefs(sp).apply { dropRetired() }.let { assertEquals(KeyMarkPosition.BottomLeft, it.keyboard.punctuationPosition.getValue()) }
     }
 
-    // the old drawing's settings (the redraw's switch of 0.6's betas, vivo's touch routing, 扩大按键触摸区), stored
-    // as either type: dropped, read by nothing, no crash
+    // the old drawing's settings (the redraw's switch of 0.6's betas, vivo's touch routing, 扩大按键触摸区) and the
+    // voice's 整理 switch (voice_polish), stored as either type: dropped, read by nothing, no crash
     @Test
-    fun theOldDrawingsSettingsStoredAreDropped() {
-        for (key in listOf("canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area")) {
+    fun theRetiredSettingsStoredAreDropped() {
+        for (key in listOf("canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area", "voice_polish")) {
             for (put in listOf<SharedPreferences.Editor.() -> Unit>({ putBoolean(key, true) }, { putString(key, "x") })) {
                 sp.edit { clear(); put() }
                 AppPrefs(sp).dropRetired()

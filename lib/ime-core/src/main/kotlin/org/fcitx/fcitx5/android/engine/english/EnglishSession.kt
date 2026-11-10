@@ -218,12 +218,13 @@ class EnglishSession(
             action == Action.Backspace -> unglide(g, null)
             action is Action.Pick -> g.words.getOrNull(action.index)?.let { unglide(g, it) } ?: snapshot()
             action is Action.Select && pager.at(action.index) >= 0 -> g.words.getOrNull(pager.at(action.index))?.let { unglide(g, it) } ?: snapshot()
+            action is Action.Block -> blockGlided(g, action.index)
             else -> act(action)
         }
     }
 
     private fun keepsGlided(action: Action) = when (action) {
-        is Action.Pick, is Action.Select, Action.Backspace, Action.NextPage, Action.PreviousPage -> true
+        is Action.Pick, is Action.Select, is Action.Block, Action.Backspace, Action.NextPage, Action.PreviousPage -> true
         else -> false
     }
 
@@ -254,12 +255,13 @@ class EnglishSession(
         Action.Refine, is Action.Ink, is Action.Stroke, is Action.Pin, is Action.Syllable, is Action.Letter, Action.LookUp -> snapshot()
     }
 
-    // 从自定义词组中删除 is an unpin (LearningMenu), on a phrase: nothing else is pinned here
     private fun cursor(at: Int): Snapshot {
         if (input.isEmpty() || nineKeyed()) return snapshot(handled = false)
         cursor = at.coerceIn(0, input.length)
         return snapshot()
     }
+
+    // 从自定义词组中删除 is an unpin (LearningMenu), on a phrase: nothing else is pinned here
 
     private fun unpin(index: Int): Snapshot = also { if (phrases.delete(candidates, index)) read() }.snapshot()
 
@@ -416,16 +418,27 @@ class EnglishSession(
 
     private fun blocked(word: String) = blocks?.has(word) == true
 
-    // a word offered, as shown; not the letters typed, which are kept as typed whatever is blocked
+    // a word offered, as shown; not the letters typed, which are kept as typed whatever is blocked. On
+    // the nine keys what is typed is the decoder's first word, itself blockable: only the letters
+    // pinned as typed (no digit among them) are kept so; nor the word a glide just committed, in the text as typed
     private fun blockable(index: Int): Boolean {
         val word = candidates.getOrNull(index) ?: return false
-        return learning && blocks != null && EnglishText.isWord(word) && !(input.isNotEmpty() && word == typed())
+        val asTyped = if (nineKeyed()) input.none { it in '2'..'9' } && word == capitalI(input.toString()) else word == typed()
+        return learning && blocks != null && EnglishText.isWord(word) && !(input.isNotEmpty() && asTyped) && !(input.isEmpty() && glided?.takeIf { it.committed == last }?.committed == "$word ")
     }
 
-    // as written, the data's or the user's, not as the input's case shows it
-    private fun block(index: Int): Snapshot = shownWithout(
-        candidates.getOrNull(index)?.takeIf { blockable(index) }?.also { checkNotNull(blocks).blockShown(it) { w -> (data?.id(w) ?: -1) >= 0 || user.count(w) > 0f } },
-    )
+    // as written, the data's or the user's, not as the input's case shows it: the word blocked, or null
+    private fun blockAt(index: Int): String? =
+        candidates.getOrNull(index)?.takeIf { blockable(index) }?.also { checkNotNull(blocks).blockShown(it) { w -> (data?.id(w) ?: -1) >= 0 || user.count(w) > 0f } }
+
+    private fun block(index: Int): Snapshot = shownWithout(blockAt(index))
+
+    // a glide's other blocked: gone from what it offers, the rest still there to take the glided word's place
+    private fun blockGlided(g: Glided, index: Int): Snapshot {
+        val word = blockAt(index) ?: return snapshot()
+        glided = Glided(g.committed, g.words - word, g.lead, g.edge, g.seqs)
+        return also { candidates = candidates - word }.snapshot()
+    }
 
     private fun forget(index: Int): Snapshot = shownWithout(candidates.getOrNull(index)?.let(::learnedAs)?.also(user::forget))
 
@@ -507,16 +520,7 @@ class EnglishSession(
             last = ""
             return snapshot()
         }
-        val made = when {
-            before == null -> null
-            // twice after a word: a full stop
-            c == ' ' && word -> ". "
-            // in place of the space, and one after it: "word, " then "?" is "word? ", "?! " after "? "
-            c in SWAPPED && (word || mark) -> "$c "
-            // a bracket closed, likewise ("(see above.) ", "hello:) "), and a quote where one is open
-            c in CLOSING || c in QUOTES && quoteOpen(c) -> "$c "
-            else -> null
-        }
+        val made = madeAfterOwnSpace(c, before, word, mark) { quoteOpen(c) }
         if (made == null) {
             clear()
             last = ""
@@ -800,7 +804,7 @@ class EnglishSession(
         val found = offeredOf(SUGGESTED + 1, ::offered) { nine.decoder.suggest(keys, context, it, exactFirst = true) }
             .map { NineKeyWords.Found(data.word(it.word), it.score, it.completes) }
         refreshUser(data)
-        val own = userOnly.filterNot(::blocked).mapNotNull { nine.own(it, keys, user.score(Float.NEGATIVE_INFINITY, prev, it)) }
+        val own = userOnly.mapNotNull { if (blocked(it)) null else nine.own(it, keys, user.score(Float.NEGATIVE_INFINITY, prev, it)) }
         val words = nine.ordered(found + own, input).map { nine.inCase(capitalI(it), input, upperKeys) }
         // every letter pinned: that word first, as typed, though the data has longer ones it starts
         val pinnedWord = listOfNotNull(capitalI(input.toString()).takeIf { input.none { it in '2'..'9' } })
@@ -903,12 +907,6 @@ class EnglishSession(
         /** How many words are suggested besides the one typed. */
         const val SUGGESTED = 9
 
-        // after these, not the session's, a glide's word has a space before it
-        private const val SPACED_AFTER = ".,!?;:"
-
-        // words a glide's search keeps, before those never offered are left out
-        private const val GLIDE_SEARCHED = 30
-
         /** The most a slip may cost ([TypingCosts]) for space to correct it: a key far from the one meant. */
         const val MAX_CORRECTION = 3.0f
 
@@ -920,27 +918,46 @@ class EnglishSession(
 
         /** How much likelier (log10) a word must be than the word typed, one too, to be put in its place: a hundred times. */
         const val KNOWN_MARGIN = 2f
-
-        /** Punctuation that takes the place of the space after a word, a space after it. */
-        private const val SWAPPED = ".,!?;:"
-
-        // brackets that close, and quotes that may: in the place of the session's space, a space after them
-        private const val CLOSING = ")]}"
-        private const val QUOTES = "\"'"
-
-        // what the session's own space may follow besides a word: a space typed after it is that one
-        private const val MARKS = SWAPPED + CLOSING + QUOTES
-
-        // a word committed as typed, or for it: corrected, unless the correction was taken back ([keepTyped])
-        private fun howOf(word: String, typed: String, keepTyped: Boolean) = when {
-            keepTyped && word == typed -> EnCommit.REVERTED
-            word != typed -> EnCommit.AUTOCORRECTED
-            else -> EnCommit.TYPED
-        }
     }
 }
 
 // brackets a quote after opens one: ("hi")
+// after these, not the session's, a glide's word has a space before it
+private const val SPACED_AFTER = ".,!?;:"
+
+// words a glide's search keeps, before those never offered are left out
+private const val GLIDE_SEARCHED = 30
+
+/** Punctuation that takes the place of the space after a word, a space after it. */
+private const val SWAPPED = ".,!?;:"
+
+// brackets that close, and quotes that may: in the place of the session's space, a space after them
+private const val CLOSING = ")]}"
+private const val QUOTES = "\"'"
+
+// what the session's own space may follow besides a word: a space typed after it is that one
+private const val MARKS = SWAPPED + CLOSING + QUOTES
+
+// a word committed as typed, or for it: corrected, unless the correction was taken back ([keepTyped])
+private fun howOf(word: String, typed: String, keepTyped: Boolean) = when {
+    keepTyped && word == typed -> EnCommit.REVERTED
+    word != typed -> EnCommit.AUTOCORRECTED
+    else -> EnCommit.TYPED
+}
+
+// what [c] typed after the session's own space makes in its place, [before] it, a [word]'s end or a
+// [mark]; null, nothing: the space stays and [c] is typed after it
+private fun madeAfterOwnSpace(c: Char, before: Char?, word: Boolean, mark: Boolean, quoteOpen: () -> Boolean): String? = when {
+    before == null -> null
+    // twice after a word: a full stop
+    c == ' ' && word -> ". "
+    // in place of the space, and one after it: "word, " then "?" is "word? ", "?! " after "? "
+    c in SWAPPED && (word || mark) -> "$c "
+    // a bracket closed, likewise ("(see above.) ", "hello:) "), and a quote where one is open
+    c in CLOSING || c in QUOTES && quoteOpen() -> "$c "
+    else -> null
+}
+
 private const val OPENING = "([{"
 
 // whether a quote [q] is open at the end of [text]: the last of them not in a word (don't, 90's)

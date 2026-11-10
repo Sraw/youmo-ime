@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN_KEYS18
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN_NINE
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.T9
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.filtersByStrokes
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.writesOnKeys
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.TABLES
 import org.fcitx.fcitx5.android.engine.TableMethod
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
@@ -27,12 +28,12 @@ import org.fcitx.fcitx5.android.engine.english.EnglishPhrases
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.english.EnglishUser
 import org.fcitx.fcitx5.android.engine.glide.GlideReading
-import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.engine.glide.GlideSession
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.glide.TableGlide
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
+import org.fcitx.fcitx5.android.engine.handwriting.InkOver
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -66,6 +67,7 @@ import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
+import org.fcitx.fcitx5.android.engine.user.WordLists
 
 /**
  * Makes the session of each input method as [settings] and the user's habits have it ([Engines]
@@ -132,8 +134,27 @@ internal class SessionFactory(
     }
 
     // each of [glides] made a GlideSession or an EnglishSession, which Engines.glide reads the glide for;
-    // each that [filtersByStrokes] wrapped, last, in a StrokeFilter, which filters what is shown
-    fun make(im: String): Session = made(im).let { if (filtersByStrokes(im)) StrokeFilter(it, assets::strokes, settings().pageSize) else it }
+    // each that [filtersByStrokes] wrapped in a StrokeFilter, which filters what is shown; each that
+    // [writesOnKeys] wrapped, last, in an InkOver, whose handwriting's candidates are none to filter
+    fun make(im: String): Session = made(im)
+        .let { if (filtersByStrokes(im)) StrokeFilter(it, assets::strokes, settings().pageSize) else it }
+        .let { if (writesOnKeys(im)) InkOver(it, ::handwritingSession) else it }
+
+    /** Handwriting's session, as the input method has it and as an [InkOver] writes with. */
+    fun handwritingSession(): HandwritingSession {
+        val s = settings()
+        // read as pinyin reads a sentence: its words, the user's among them, and their counts
+        val language = language()
+        val data = language.data
+        val decoder = HandwritingDecoder(
+            data.dictionary, data.vocabulary, data.wordIndex, language.scorer,
+            assets::charSyllables, language.user, language.coarse,
+        )
+        return HandwritingSession(
+            decoder, TextWords(data.model, data.wordIndex), s.pageSize, language.user, language.predictor, reranker(), refiner(),
+            block = lexicon::block, forgotten = { learner.forgottenEverywhere(it) }, ended = inkEndedBefore(), habits = learner.habitsNow(), simplify = simplified::simplify,
+        )
+    }
 
     private fun made(im: String): Session {
         val s = settings()
@@ -144,7 +165,13 @@ internal class SessionFactory(
                     latin = if (s.latinWords) assets.latinWords else null, userLatin = if (s.latinWords) latinWords else null,
                 )
                 val pinyin = pinyinSession(segmenter, spell = false, chaizi = chaizi())
-                val looked = ForgetsInTables(StrokeLookup(pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll, blockedUnder = { strokes -> learner.openHabits().blockedUnder(strokeCode(strokes)) }, blockUnder = { strokes, text -> learner.openHabits().blockUnder(strokeCode(strokes), text, on = true) }))
+                val looked = ForgetsInTables(
+                    StrokeLookup(
+                        pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll,
+                        blockedUnder = { strokes -> learner.openHabits().blockedUnder(strokeCode(strokes)) },
+                        blockUnder = { strokes, text -> learner.openHabits().blockUnder(strokeCode(strokes), text, on = true) },
+                    ),
+                )
                 GlideSession(looked, syllableBoundary, blocked = glideHeldBack(), heldBack = heldBack(pinyin), blockOther = ::blockOtherReading) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
             // the 14 keys: no glide, nor 笔画查字 (u is on UI, no stroke key of its own). 简拼 only where nothing
@@ -173,19 +200,7 @@ internal class SessionFactory(
                     phrases = EnglishPhrases(phraseBook(), learnClock::calendar), blocks = lexicon.englishBlocks,
                 )
             }
-            HANDWRITING -> {
-                // read as pinyin reads a sentence: its words, the user's among them, and their counts
-                val language = language()
-                val data = language.data
-                val decoder = HandwritingDecoder(
-                    data.dictionary, data.vocabulary, data.wordIndex, language.scorer,
-                    assets::charSyllables, language.user, language.coarse,
-                )
-                HandwritingSession(
-                    decoder, TextWords(data.model, data.wordIndex), s.pageSize, language.user, language.predictor, reranker(), refiner(),
-                    block = lexicon::block, forgotten = { learner.forgottenEverywhere(it) }, ended = inkEndedBefore(), habits = learner.habitsNow(), simplify = simplified::simplify,
-                )
-            }
+            HANDWRITING -> handwritingSession()
             // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
             // glided as full pinyin, over the digits' keys: each letter typed as itself, as one chosen from a key's long press
             T9 -> {

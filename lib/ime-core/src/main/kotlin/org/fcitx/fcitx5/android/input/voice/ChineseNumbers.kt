@@ -20,12 +20,15 @@ package org.fcitx.fcitx5.android.input.voice
  */
 object ChineseNumbers {
 
-    /** The tagger's `num` classes, by name as its json lists them. */
+    /**
+     * The tagger's `num` classes, by name as its json lists them. A class this build does not know
+     * (a newer tagger's) is [NONE], its runs as said: the tagger's other labels still apply.
+     */
     enum class Kind {
         NONE, VALUE, DIGITS, DATE, TIME, MONEY, PERCENT, MODEL, RATIO;
 
         companion object {
-            fun of(name: String): Kind = Kind.valueOf(name.uppercase())
+            fun of(name: String): Kind = name.uppercase().let { n -> entries.firstOrNull { it.name == n } } ?: NONE
         }
     }
 
@@ -47,12 +50,14 @@ object ChineseNumbers {
 
     // what follows an hour's 点 and stays as said: 8点, 8点半, 8点整
     private val IN_CHARACTERS = setOf("", "半", "整")
+    private val QUARTERS = setOf("一刻", "三刻")
 
     /** [run] as [kind] writes it; as it was if it does not read so. */
     fun written(run: String, kind: Kind): String = when (kind) {
         Kind.NONE -> null
         // a place among them: the tagger's class wrong, the number read as said (一百二十三 123)
-        Kind.DIGITS -> if (run.any { it in SMALL || it in BIG }) value(run) else run.map { c -> DIGITS[c]?.let { "$it" } ?: "$c" }.joinToString("")
+        // a 点 among them: a version or an address (一九二点一六八), as a model
+        Kind.DIGITS -> if (run.any { it in SMALL || it in BIG }) value(run) else if ('点' in run) model(run) else run.map { c -> DIGITS[c]?.let { "$it" } ?: "$c" }.joinToString("")
         Kind.TIME -> time(run)
         Kind.PERCENT -> value(run.removePrefix(PERCENT))?.let { "$it%" }
         Kind.MODEL -> model(run)
@@ -72,13 +77,19 @@ object ChineseNumbers {
         return "$first.$fraction$big"
     }
 
-    /** 十点十五 10:15, 八点五分 8:05, 八点半, 八点一刻, 八点整 and 八点 in characters; null if no time. */
+    /**
+     * 十点十五 10:15, 八点五分 8:05, 八点半, 八点一刻, 八点整 and 八点 in characters; null if no time.
+     * 二十四点 is an hour, 二十四点三十 not; 八点五 (one character, no 分) may be 八点五十 misheard: as said.
+     */
     private fun time(s: String): String? {
         val point = s.indexOf('点')
         if (point < 0) return value(s)
         val hour = integerDigits(s.substring(0, point))?.takeIf { (it.toLongOrNull() ?: Long.MAX_VALUE) <= HOURS } ?: return null
         val said = s.substring(point + 1)
-        if (said in IN_CHARACTERS || said.endsWith("刻")) return "${hour}点$said"
+        // 二十四点 is a day's end, no time past it: 二十四点半 and 二十四点三十 stay as said
+        if (hour == "$HOURS" && said.isNotEmpty()) return null
+        if (said in IN_CHARACTERS || said in QUARTERS) return "${hour}点$said"
+        if (said.length == 1 && said != "十") return null
         val m = integerDigits(said.removeSuffix("分"))?.toIntOrNull()?.takeIf { it < MINUTES } ?: return null
         // not %02d, which writes the phone's language's digits (٠٥ in Arabic)
         return "$hour:" + "$m".padStart(2, '0')
@@ -104,8 +115,9 @@ object ChineseNumbers {
         return if (sep == FRACTION) "$b$out$a" else "$a$out$b"
     }
 
+    // 两 is no digit said one by one: 三点两 is no 3.2
     private fun digitByDigit(s: String): String? =
-        if (s.isNotEmpty() && s.all { it in DIGITS }) s.map { DIGITS.getValue(it) }.joinToString("") else null
+        if (s.isNotEmpty() && s.all { it in DIGITS && it != '两' }) s.map { DIGITS.getValue(it) }.joinToString("") else null
 
     /**
      * 三十三万 as 33万, 四百亿 as 400亿 and 三万亿 as 3万亿, as written; with more after the place, the largest

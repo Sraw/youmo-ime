@@ -87,6 +87,8 @@ class PacksFragment : PaddingPreferenceFragment() {
         }
     }
 
+    // on the main thread: PackStore.status reads the shelf loaded at the app's start (FcitxApplication warms it);
+    // the page opened before that is done waits for it once, a settings page's moment, not the keyboard's
     private fun show() {
         val ctx = context ?: return
         for ((kind, row) in rows) {
@@ -105,10 +107,13 @@ class PacksFragment : PaddingPreferenceFragment() {
         }
     }
 
+    private var resultsDialog: AlertDialog? = null
+
     private fun results(outcomes: List<PackImports.Outcome>) {
         val ctx = context ?: return
-        PackImports.seen()
-        if (outcomes.isEmpty()) return
+        if (outcomes.isEmpty()) return PackImports.seen()
+        // the results collected again (back from the background) while their dialog is up: one dialog
+        if (resultsDialog?.isShowing == true) return
         val lines = outcomes.map { PackImports.describe(ctx, it) }
         // the user's files are never deleted: they are told they may, once all of them are in
         val hint = when {
@@ -116,10 +121,14 @@ class PacksFragment : PaddingPreferenceFragment() {
             outcomes.none { it.result is ImportResult.Imported } -> ctx.getString(R.string.pack_unchanged_hint)
             else -> null
         }
-        AlertDialog.Builder(ctx)
+        resultsDialog = AlertDialog.Builder(ctx)
             .setTitle(R.string.pack_import_results)
             .setMessage((lines + listOfNotNull(hint)).joinToString("\n\n"))
             .setPositiveButton(android.R.string.ok, null)
+            // seen once read: a rotation (the activity recreated) takes the dialog away unread, and the
+            // results stay to be shown again (a refused file's reason seen nowhere else). Kept in memory
+            // only: a process killed loses them
+            .setOnDismissListener { PackImports.seen() }
             .show()
         show()
     }

@@ -117,7 +117,8 @@
     <string name="exception_theme_folder">主题里有文件夹 %1$s：4.0 主题只能有它的文件和 layouts/</string>
     <string name="exception_theme_invalid">主题的 theme.xml 读不了：\n%1$s</string>
     <string name="exception_theme_min_app">这个主题需要本输入法 %1$s 或更新的版本：更新后才能用</string>
-    <string name="exception_theme_hidden_required">主题把 Shift、退格、空格或回车的字隐藏了（第 %1$s 行的样式）：这些键会是空白的</string>
+    <string name="exception_theme_too_many_scenes">主题给键设的场景组合太多，没法逐一检查 Shift、退格、空格和回车会不会成空白键</string>
+    <string name="exception_theme_hidden_required">主题让 Shift、退格、空格或回车成了空白键（%1$s：字藏了，键面又不是图片）</string>
     <string name="exception_theme_pack_name">%1$s 不能用作这里的主题名</string>
     <string name="exception_theme_icon">主题的图标不是只有填充路径的简单 SVG：%1$s</string>
     <string name="exception_theme_layout">主题的 layouts/ 里有 %1$s，它不是布局（.xml）</string>
@@ -133,6 +134,9 @@
     <string name="theme_pack_import_title">导入主题 %1$s？</string>
     <string name="theme_pack_import">导入</string>
     <string name="theme_pack_replaces">会替换你已有的同名主题。</string>
+    <string name="theme_pack_layouts">此主题包含自定义布局：%1$s（其中 %2$d 个动作直接输入布局里写的文字）。</string>
+    <string name="theme_pack_layouts_unused">不会使用的布局（读不出、缺键盘必需的键，或不是已有的键盘）：%1$s</string>
+    <string name="keyboard_themed">%1$s（主题：%2$s）</string>
     <string name="theme_pack_warnings">注意：</string>
     <string name="theme_info">信息</string>
     <string name="theme_info_author">作者：%1$s</string>
@@ -298,7 +302,7 @@
     <string name="a11y_key_emoji">表情</string>
     <string name="voice_end_mark">语音句末句号</string>
     <string name="voice_end_mark_auto">按输入框：聊天、搜索框和单行输入框里不加</string>
-    <string name="voice_end_mark_keep">照说的保留</string>
+    <string name="voice_end_mark_keep">照说的保留（单行框仍不加）</string>
     <string name="voice_end_mark_drop">都不加</string>
     <string name="voice_input">语音输入</string>
     <string name="a11y_candidates_prev_page">上一页候选词</string>
@@ -425,6 +429,7 @@
     <string name="word_pinyin">拼音，如 you mo（留空自动填）</string>
     <string name="word_pinyin_invalid">拼音和词对不上：每个字一个音节</string>
     <string name="english_block_detail">英文 · 全小写的词不分大小写屏蔽</string>
+    <string name="english_block_detail_exact">英文 · 只屏蔽这样写的大小写</string>
     <plurals name="word_typed_times">
         <item quantity="other">%1$s · 打过 %2$d 次</item>
     </plurals>
@@ -713,10 +718,10 @@
     <string name="im_word_hint_summary">显示以已打字母开头的单词，以及拼错时的改正；关闭后按键直接上屏</string>
     <string name="im_auto_caps">句首自动大写</string>
     <string name="im_auto_caps_summary">在句子开头自动打开 Shift（应用的输入框要求时）</string>
+    <string name="key_drawing">在键上划</string>
+    <string name="key_drawing_handwriting">键盘手写</string>
     <string name="glide_typing">滑行输入</string>
-    <string name="glide_typing_summary">手指不离开键盘，依次划过一个词的键（拼音划字母，九键划数字键，码表划编码；14 键、18 键、九键双拼上没有）。网址、邮箱、密码框里不滑行。和笔画筛选只能开一个：打开这个会关掉笔画筛选</string>
     <string name="stroke_filter">笔画筛选</string>
-    <string name="stroke_filter_summary">打了拼音后在键盘上画一笔（横、竖、撇、点、折），只留第一个字这样起笔的候选，再画就按这个字的笔顺往下筛。网址、邮箱、密码框里不能画。和滑行输入只能开一个：打开这个会关掉滑行输入</string>
     <string name="status_punctuation_chinese">中文标点</string>
     <string name="status_punctuation_english">英文标点</string>
     <string name="status_full_width">全角</string>

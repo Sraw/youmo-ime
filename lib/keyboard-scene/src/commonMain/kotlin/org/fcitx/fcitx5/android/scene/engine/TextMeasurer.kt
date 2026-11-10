@@ -23,9 +23,10 @@ fun interface TextMeasurer {
      */
     fun measure(text: String, font: String, weight: Int, size: Double, letterSpacing: Double): TextMetrics {
         val m = measure(text, font, weight, size)
-        if (letterSpacing == 0.0) return m
-        val space = letterSpacing * size
+        // by code points, not Android's grapheme clusters: a combining mark or ZWJ emoji spaces a little wider here than on a device
         val n = Content.codePoints(text)
+        if (letterSpacing == 0.0 || n == 0) return m
+        val space = letterSpacing * size
         val ink = m.ink
         return m.copy(advance = m.advance + n * space, ink = Box(ink.left + space / 2, ink.top, ink.right + (n - 0.5) * space, ink.bottom))
     }

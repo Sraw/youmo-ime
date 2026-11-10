@@ -82,21 +82,21 @@ sealed interface Value {
 /** Reading a style property's value: null where it is not one of that property. */
 object Values {
     private val DP = Regex("(-?[0-9]+(\\.[0-9]+)?)dp|0")
-    private val SP = Regex("([0-9]+(\\.[0-9])?)sp")
+    private val SP = Regex("([0-9]+(\\.[0-9]+)?)sp")
     private val PCT = Regex("([0-9]+(\\.[0-9]+)?)%")
     // "system" a name like any other: Kotlin/JS takes the first alternative that starts a match and
     // wants it whole, so "system|…" refused "systemui" there
     private val FONT = Regex("[a-zA-Z][a-zA-Z0-9_-]{0,31}")
     private val IMAGE = Regex("image\\(([^,()]+), ?([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4}) ([0-9]{1,4})(?:, ?([1-8])x)?(?:, ?(.+))?\\)")
-    private val PICTURE = Regex("picture(?:\\(([0-9]{1,2})dp, ?([0-9]{1,3})%(?:, ?(.+))?\\))?")
-    private val LINEAR = Regex("linear\\((-?[0-9]{1,3})deg, ?(.+)\\)")
+    private val PICTURE = Regex("picture(?:\\(([0-9]{1,2}(?:\\.[0-9]+)?)dp, ?([0-9]{1,3}(?:\\.[0-9]+)?)%(?:, ?(.+))?\\))?")
+    private val LINEAR = Regex("linear\\((-?[0-9]{1,3}(?:\\.[0-9]+)?)deg, ?(.+)\\)")
     private const val MAX_LENGTH_DP = 24.0
     private const val MAX_OFFSET_DP = 16.0
     private const val MAX_BORDER_DP = 3.0
     private const val MIN_SCALE = 85.0
     private const val MAX_SCALE = 130.0
     private const val MAX_SP = 48.0
-    private const val MAX_BLUR_DP = 25
+    private const val MAX_BLUR_DP = 25.0
     private const val MAX_PERCENT = 100.0
     private const val FOUR = 4
     private const val MAX_DEPTH_DP = 8.0
@@ -339,15 +339,17 @@ object Values {
         IMAGE.matchEntire(raw)?.let { m ->
             val g = m.groupValues
             val fallback = g[7].ifEmpty { null }?.let { ColorExpr.parse(it.trim()) ?: return null }
-            return Fill.Image(g[1].trim(), (2..5).map { g[it].toInt() }, g[6].ifEmpty { "1" }.toInt(), fallback)
+            // a file named as a <picture>'s or a <font>'s is
+            val file = g[1].trim().takeIf(ThemeReader.FILE::matches) ?: return null
+            return Fill.Image(file, (2..5).map { g[it].toInt() }, g[6].ifEmpty { "1" }.toInt(), fallback)
         }
         PICTURE.matchEntire(raw)?.let { m ->
-            val blur = m.groupValues[1].ifEmpty { null }?.toInt()
+            val blur = m.groupValues[1].ifEmpty { null }?.toDouble()
             val bright = m.groupValues[2].ifEmpty { null }?.toDouble()
             val tooBlurred = blur != null && blur > MAX_BLUR_DP
             if (tooBlurred || bright != null && bright > MAX_PERCENT) return null
             val over = m.groupValues[3].ifEmpty { null }?.let { ColorExpr.parse(it.trim()) ?: return null }
-            return Fill.Picture(blur?.toDouble(), bright, over)
+            return Fill.Picture(blur, bright, over)
         }
         LINEAR.matchEntire(raw)?.let { m ->
             val stops = ColorExpr.splitTop(m.groupValues[2])?.map { stop ->

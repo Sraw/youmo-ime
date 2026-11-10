@@ -7,7 +7,7 @@
 | The APK, debug | `./gradlew :app:assembleDebug` |
 | The two resource packs (below) | `./gradlew :app:packs` → `app/build/packs/` |
 | One ABI only (much faster) | add `-PbuildABI=arm64-v8a` (phones) (also an arm64 emulator) or `-PbuildABI=x86_64` (an x86_64 emulator, redroid) |
-| Release as shipped: the APK, the packs signed with the release key, the two bundles and the pack listing | `./gradlew :app:releaseBundles -PbuildABI=arm64-v8a` (with `youmo.packKey` set) |
+| Release as shipped: the APK, the packs signed with the release key, the two bundles and the pack listing | `./gradlew :app:releaseBundles -PbuildABI=arm64-v8a` (with `youmo.packKey` set; the first release with packs, 0.6.0, adds `-PfirstPackRelease`, below) |
 | A test build for profiling (simpleperf from the shell on an unrooted phone; never a release) | add `-PbuildProfileable=true` |
 | Engine data alone | `./gradlew :app:compileEngineData` (and `:app:compileEnglishData`, `:app:copySentenceModels`) |
 | Build-logic's own tests | `./gradlew -p build-logic test` |
@@ -49,7 +49,7 @@ BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles 
 | `AndroidLib…`, `AndroidBase…` | library and shared Android defaults |
 | `EngineDataPlugin` | downloads (SHA-256 pinned) and compiles the engine's data into generated assets, stored uncompressed (see below) |
 | `AssetPacksPlugin` | the resource packs (below): `packTextPack`, `packVoicePack` (`packs` both), `releaseBundles`; the trusted public keys into `BuildConfig.PACK_KEYS` |
-| `VoiceDataPlugin` | the voice pack's files: the recognizer's models, the polish tagger (from `youmo.voiceModelDir`, which an APK build needs for now: the pinned release is the offline model), hotword list |
+| `VoiceDataPlugin` | the voice pack's files: the recognizer's models, the polish tagger (from `youmo.voiceModelDir`, which the voice pack's build needs for now: the pinned release is the offline model; the APK and the text pack build without it), hotword list |
 | `HandwritingDataPlugin` | `:lib:handwriting` (onnxruntime, `pickFirst` with sherpa-onnx's identical copy) and the handwriting models (the text pack's) |
 | `BuildMetadataPlugin` | build time and git hash into `BuildConfig` (the data release names are `EngineDataPlugin`'s fields) |
 | `DetektConventionPlugin` | detekt on every Kotlin module, one config, a baseline per module |
@@ -135,7 +135,7 @@ Decided by the owner (2026-10-15), for every model the app ships, the ones to co
   `session.use_ort_model_bytes_for_initializers`, and `session.disable_prepacking`, as prepacking
   copies weights to the heap (`OrtModel`, lib/sherpa-onnx's README); `.data` and `.safetensors`
   through `EngineBridge.asset`. Never read a model into a byte array. Checked with `dumpsys meminfo`:
-  the model's size shows under `.apk mmap`, not in the private columns.
+  the model's size shows as a mapped file (`.apk mmap` for one in the APK, `Other mmap` for a pack's file under the app's files), not in the private columns.
 - **One onnxruntime version** for the runtime the app links (`ortVersion` in
   `lib/handwriting/build.gradle.kts` and `lib/sherpa-onnx/src/main/cpp/cmake/onnxruntime-android-*.cmake`,
   which that build script checks pin the same archive: onnxruntime-libs' prebuilt), the converter
@@ -171,7 +171,7 @@ with the system's picker (several at once); the app keeps no network permission.
 | Pack | Holds (asset paths, `PackKind`) | Without it |
 |---|---|---|
 | `text` (文字包) | `engine/pinyin.data`, `english.data`, `sentence-model*`, `stroke.data`, `table/`, `handwriting/` | the keyboard is `PackGateView`: 需要导入文字包, a tap opens the page, its 切换输入法 button the system's keyboard picker |
-| `voice` (语音包) | `voice/` (recognizer, VAD, hotwords, polish tagger) | the microphone and the space's hold say 语音输入需要导入语音包; a tap opens the page |
+| `voice` (语音包) | `voice/` (recognizer, VAD, hotwords, polish tagger) | the microphone says 语音输入需要导入语音包 and a tap opens the page; the space's hold does nothing (it is not voice without the pack) |
 
 What stays in the APK (assets 6.7 MB of a 21 MB release APK; 0.6.0's text pack is 311 MB, the voice pack 185 MB): what the
 app reads with no pack or is small and belongs to no input method's data: `engine/emoji.data` (the emoji panel), `chaizi.data`,
@@ -288,8 +288,8 @@ trap in [pitfalls.md](pitfalls.md#kotlin-ic-and-interface-delegation) before bui
 
 | Workflow | When | Runs |
 |---|---|---|
-| `unit_test.yml` | push, PR | four jobs side by side (setup in `.github/actions/setup-build`): `:lib:ime-core:check`, dict-tool and eval tests, build-logic tests, `:app:testDebugUnitTest` and the same at SDK 29 (a job each, `-PskipExhaustive`, two test JVMs at once), sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
-| `key_marks.yml` | push, PR changing the keys' marks or drawing (its `paths`); Tue 03:37; on demand | `KeyMarksEverywhereUatTest` alone at SDK 35 and 29, which the app jobs above leave out (half their time) |
-| `pull_request.yml` | PR | `assembleRelease` and `packs` on Ubuntu (the APK unsigned, the packs with the test key) |
+| `unit_test.yml` | push, PR | three jobs side by side (setup in `.github/actions/setup-build`): `core` (`:lib:ime-core:check`, `:lib:keyboard-scene:check`, dict-tool and eval tests, eval's UAT tests compiled, build-logic tests, the uat/parity/gate tool tests, the theme maker's node tests), `app` (`:app:testDebugUnitTest`) and `app_29` (the same at SDK 29) (each `-PskipExhaustive`, two test JVMs at once), sherpa-onnx's host tests, Python tool tests (`lexicon/tools`, `lib/ime-eval/tools`), detekt, Kover reports, test failures annotated |
+| `key_marks.yml` | push, PR changing the keys' marks or drawing (its `paths`, lib/keyboard-scene's commonMain among them: yield rules, scene layout); Tue 03:37; on demand | `KeyMarksEverywhereUatTest` alone at SDK 35 and 29, which the app jobs above leave out (half their time) |
+| `pull_request.yml` | PR | `assembleRelease` and `packTextPack` on Ubuntu (the APK unsigned, the packs with the test key) |
 | `engine_downloads.yml` | push to main changing `EngineDataPlugin.kt`, `HandwritingDataPlugin.kt`, `lib/handwriting/build.gradle.kts` or the workflow; Mon/Thu 04:41; on demand | the engine data's download tasks alone (the handwriting models and onnxruntime too, a cache of their own), saving the `engine-downloads-*` cache a new pull request's build reads |
-| `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`HostTest`, `SoftKeyboardTest`, `VoiceEngineTest` …) on API 35 and API 29 (minSdk) emulators, the two packs imported first through `PackImportProvider` |
+| `emulator_test.yml` | weekly, and PRs labelled `emulator` | instrumented tests (`HostTest`, `SoftKeyboardTest`, `VoiceEngineTest` …) on API 35 and API 29 (minSdk) emulators, the text pack (`:app:packTextPack`) imported first through `PackImportProvider`; CI has no voice model, so the voice cases run locally only |

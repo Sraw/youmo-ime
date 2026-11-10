@@ -53,6 +53,7 @@ class TextSceneWiringTest {
     fun reset() {
         EngineState.tableKeyboardState.value = null
         EngineState.shuangpinScheme = ShuangpinScheme.XIAOHE
+        EngineState.syllablesState.value = EngineState.SyllableState()
     }
 
     private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", "", name.take(1), "zh_CN", "androidengine", false)
@@ -148,7 +149,8 @@ class TextSceneWiringTest {
             val q = h.keys().single { it.id == "q" }
             h.swipe(q, 0f, q.bounds.height().toFloat())
             h.idle()
-            assertTrue(h.api.calls.toString(), h.api.calls.any { "⒜" in it } && h.api.calls.none { "(1" in it || "\"1\"" in it })
+            // FakeHostApi's sendKey of 1 (by char, key name or keysym): the built-in's 1 not typed
+            assertTrue(h.api.calls.toString(), h.api.calls.any { "⒜" in it } && h.api.calls.none { it.startsWith("sendKey(char=1,") || it.startsWith("sendKey(key=1,") || it.startsWith("sendKey(sym=49,") })
         }
     }
 
@@ -198,7 +200,11 @@ class TextSceneWiringTest {
             keys.byNodes(canvas, object : SceneKeyDef.Table {}) { }
             val q = canvas.keyAt("q")!!
             fun labelled(l: String) = with(q) {
-                KeyNode(id, copy, kind, role, shape, bounds, hit, anchor, up, states, faces, a11y, actions, l, alt, altRaw, popup, menu, sound, shortcut, letters, lean)
+                KeyNode(
+                    id = id, copy = copy, kind = kind, role = role, shape = shape, bounds = bounds, hit = hit, anchor = anchor, up = up,
+                    states = states, faces = faces, a11y = a11y, actions = actions, label = l, alt = alt, altRaw = altRaw, popup = popup,
+                    menu = menu, sound = sound, shortcut = shortcut, letters = letters, lean = lean, face = face, margin = margin,
+                )
             }
             val first = keys.of(labelled("q"))!!
             val again = keys.of(labelled("Q"))
@@ -211,7 +217,7 @@ class TextSceneWiringTest {
     // far apart as the keys shown
     @Test
     fun aGlideIsReadOnTheScene() {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
             val keys = "qpzm".map { h.key("$it") }
             val first = keys.first().bounds
@@ -233,7 +239,7 @@ class TextSceneWiringTest {
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
     fun aSplitGlideReadsBothCopiesOfG() {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
             val q = h.keys().single { it.id == "q" }

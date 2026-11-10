@@ -117,7 +117,8 @@
     <string name="exception_theme_folder">The theme has a folder %1$s: a theme 4.0 has only its files and layouts/</string>
     <string name="exception_theme_invalid">The theme\'s theme.xml cannot be read:\n%1$s</string>
     <string name="exception_theme_min_app">This theme needs version %1$s of this keyboard or newer: update it to use the theme</string>
-    <string name="exception_theme_hidden_required">The theme hides the labels of Shift, Backspace, Space or Return (its style at line %1$s): those keys would be blank</string>
+    <string name="exception_theme_too_many_scenes">The theme styles its keys in too many scenes together to check that Shift, Backspace, Space and Return stay visible</string>
+    <string name="exception_theme_hidden_required">The theme leaves Shift, Backspace, Space or Return blank (%1$s: its label hidden and its face no image)</string>
     <string name="exception_theme_pack_name">%1$s cannot be a theme\'s name here</string>
     <string name="exception_theme_icon">An icon of the theme is not a plain SVG of filled paths: %1$s</string>
     <string name="exception_theme_layout">The theme\'s layouts/ has %1$s, which is no layout (.xml)</string>
@@ -133,6 +134,9 @@
     <string name="theme_pack_import_title">Import theme %1$s?</string>
     <string name="theme_pack_import">Import</string>
     <string name="theme_pack_replaces">Your theme of this name will be replaced.</string>
+    <string name="theme_pack_layouts">Keyboards of its own in this theme: %1$s (actions that type text written in them: %2$d).</string>
+    <string name="theme_pack_layouts_unused">Layouts not used (unreadable, missing keys the keyboard needs, or not one of the app\'s keyboards): %1$s</string>
+    <string name="keyboard_themed">%1$s (theme: %2$s)</string>
     <string name="theme_pack_warnings">Note:</string>
     <string name="theme_info">Info</string>
     <string name="theme_info_author">Author: %1$s</string>
@@ -302,7 +306,7 @@
     <string name="a11y_key_emoji">Emoji</string>
     <string name="voice_end_mark">Full stop at the end of voice text</string>
     <string name="voice_end_mark_auto">By the field: none in chats, search boxes and one-line fields</string>
-    <string name="voice_end_mark_keep">As spoken</string>
+    <string name="voice_end_mark_keep">As spoken (one-line fields still none)</string>
     <string name="voice_end_mark_drop">Never</string>
     <string name="voice_input">Voice input</string>
     <string name="a11y_candidates_prev_page">Previous candidates</string>
@@ -433,6 +437,7 @@
     <string name="word_pinyin">Pinyin, e.g. you mo (blank: filled in for you)</string>
     <string name="word_pinyin_invalid">The pinyin does not match the word: one syllable for each character</string>
     <string name="english_block_detail">English · a word all in lower case is blocked in any case</string>
+    <string name="english_block_detail_exact">English · blocked as written, in this case alone</string>
     <plurals name="word_typed_times">
         <item quantity="one">%1$s · typed once</item>
         <item quantity="other">%1$s · typed %2$d times</item>
@@ -732,10 +737,10 @@
     <string name="im_word_hint_summary">Words that start with what is typed, and fixes of a misspelling. Off, the keys type themselves</string>
     <string name="im_auto_caps">Capitalize sentences</string>
     <string name="im_auto_caps_summary">Shift at the start of a sentence, where the app asks for it</string>
+    <string name="key_drawing">Drawing on keys</string>
+    <string name="key_drawing_handwriting">Handwriting on keys</string>
     <string name="glide_typing">Glide typing</string>
-    <string name="glide_typing_summary">Slide across a word\'s keys without lifting your finger (its letters, on 9 keys their digit keys, in a table its code; not on the 14 keys, 18 keys or 9-key Shuangpin). Not in address, email or password fields. Only one of this and Stroke filter is on: turning this on turns Stroke filter off</string>
     <string name="stroke_filter">Stroke filter</string>
-    <string name="stroke_filter_summary">After typing pinyin, draw a stroke on the keyboard (horizontal, vertical, left-falling, dot, turning) to keep the candidates whose first character starts with it; more strokes follow that character\'s stroke order. Not in address, email or password fields. Only one of this and Glide typing is on: turning this on turns Glide typing off</string>
     <string name="status_punctuation_chinese">Chinese punctuation</string>
     <string name="status_punctuation_english">English punctuation</string>
     <string name="status_full_width">Full-width</string>

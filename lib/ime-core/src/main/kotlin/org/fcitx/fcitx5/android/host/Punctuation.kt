@@ -49,9 +49,11 @@ class Punctuation(
 
     private val stateProperty = IcProperty { State() }
 
-    // the marks last told through [asTyped], and the context they were told for: one focused anew is told
-    // whatever was told before (another context's state, or the keyboard's of an earlier host)
-    private var told: Set<String> = emptySet()
+    // the marks last told through [asTyped] (bit i: AS_TYPED[i] types as itself) and the context they
+    // were told for: another context's are told anew. One focused anew is told whatever was told
+    // before (another context's state, or the keyboard's of an earlier host)
+    private var told = 0
+    private var toldFor: InputContext? = null
     private var focused: InputContext? = null
 
     var profile: PunctuationProfile = profile
@@ -97,18 +99,26 @@ class Punctuation(
 
     // the marks [typesAsItself] now, told when they change
     private fun tell(ic: InputContext, always: Boolean = false) {
-        val now = AS_TYPED.filter { typesAsItself(ic, it.code) }.mapTo(HashSet()) { it.toString() }
-        if (now == told && !always) return
+        // no set made a key: the marks' bits compared, the set made when they are told
+        var now = 0
+        for (i in AS_TYPED.indices) if (typesAsItself(ic, AS_TYPED[i].code)) now = now or (1 shl i)
+        // nothing told yet: none is what the keyboard has, no need to tell it
+        val sameContext = ic === toldFor || toldFor == null
+        if (now == told && sameContext && !always) return
         told = now
-        asTyped(ic, now)
+        toldFor = ic
+        asTyped(ic, AS_TYPED.filterIndexed { i, _ -> now and (1 shl i) != 0 }.mapTo(HashSet()) { it.toString() })
     }
 
     /** `setEnabled` (`punctuation.h:150-155`): saved, and the action shown anew. */
     fun setEnabled(enabled: Boolean, ic: InputContext) {
         if (enabled == config.enabled) return
+        // the focused context's status and marks setConfig sends
         setConfig(config.copy(enabled = enabled))
-        action.updateOn(ic)
-        if (ic !== focused) tell(ic)
+        if (ic !== focused) {
+            action.updateOn(ic)
+            tell(ic)
+        }
     }
 
     /**
@@ -117,9 +127,9 @@ class Punctuation(
      */
     fun keys(ic: InputContext): Map<String, String> = keys(inWhiteList(ic))
 
-    /** [keys] for an input method [chinese] or not, before a context has one (the host's start). */
-    fun keys(chinese: Boolean): Map<String, String> {
-        if (!enabled || !chinese) return emptyMap()
+    /** [keys] for an input method that has the toggle ([hasToggle]: a Chinese one) or not, before a context has one (the host's start). */
+    fun keys(hasToggle: Boolean): Map<String, String> {
+        if (!enabled || !hasToggle) return emptyMap()
         val map = LinkedHashMap<String, String>()
         profile.entries.forEach { map.putIfAbsent(it.key, it.mapping) }
         return map
@@ -232,9 +242,9 @@ class Punctuation(
 
         private fun isAsciiLetterOrDigit(c: Char) = c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9'
 
-        private fun dontConvertWhenEn(c: Int) = c == '.'.code || c == ','.code
-
-        // the keys [dontConvertWhenEn] takes
+        // the keys left as typed after a letter or digit (`:444-448`), the one place they are written
         private const val AS_TYPED = ".,"
+
+        private fun dontConvertWhenEn(c: Int) = AS_TYPED.any { it.code == c }
     }
 }

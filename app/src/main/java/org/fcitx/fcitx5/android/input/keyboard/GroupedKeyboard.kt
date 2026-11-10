@@ -145,14 +145,15 @@ class GroupedKeyboard private constructor(
          * (SceneGroups.taken, 060-render-p3 T9b): [builtIn]'s; a layout's own where [own] lets them be; any other
          * logged with why, and the layout as the app has it drawn instead ([SceneLayouts.builtIn]), the block gone by.
          */
-        internal fun grouping(context: Context, builtIn: NineKeyLetters, own: Boolean): Grouping {
+        internal fun grouping(context: Context, builtIn: NineKeyLetters, own: Boolean, log: Boolean = true): Grouping {
             val id = layoutOf(builtIn)
             val shown = SceneLayouts.of(context, id) ?: return Grouping(builtIn, null, null)
             return when (val taken = SceneGroups.taken(shown.layout, builtIn, own, shown.fragments)) {
                 SceneGroups.Taken.BuiltIn -> Grouping(builtIn, null, shown)
                 is SceneGroups.Taken.Own -> Grouping(taken.letters, taken.written, shown)
                 is SceneGroups.Taken.Refused -> {
-                    Timber.e("scene layout %s: %s", id, taken.why)
+                    // a settings page asks on each refresh ([KeyboardLabels]): the keyboard made logs it
+                    if (log) Timber.e("scene layout %s: %s", id, taken.why)
                     Grouping(builtIn, null, SceneLayouts.builtIn(context, id))
                 }
             }
@@ -339,21 +340,16 @@ class GroupedKeyboard private constructor(
 
     @Keep
     private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
-        showLanguageKey()
-    }
-
-    private fun showLanguageKey() {
         canvas?.invalidateScene()
     }
 
     init {
-        showLanguageKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
     }
 
     // the groups' keys where the scene draws them: each key's letters= (060-render-v2 §15), its first letter's
     private fun groupPlaces(): List<Pair<Char, KeyPlace>> =
-        canvas?.shownKeys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id) } }
+        canvas?.shownKeys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id, k.copy == 1) } }
 
     // no glide: a stroke drawn alone (笔画筛选), over the group keys, each its first letter's
     override val glide = glideInput(
@@ -411,7 +407,8 @@ class GroupedKeyboard private constructor(
     public override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = previewOf(cased(action.content), action.key, { it }, ::mapped))
-            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(cased(action.content), action.key, { it }, ::mapped))
+            // a swipe's shortcut named (words) shows as the user named it: the case rule is the letters'
+            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(if (action.words) action.content else cased(action.content), action.key, { it }, ::mapped))
             is PopupAction.ShowKeyboardAction -> groupOf(action.key)?.let { (group, corner) ->
                 action.copy(keyboard = longPressOf(group, corner, ::symbolsOf))
             } ?: action

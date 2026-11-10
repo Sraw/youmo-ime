@@ -2,7 +2,7 @@
 <!--
   分组键盘（14、18 键）和注音（大千、注音九键）共用的底行（GroupedKeyboard.bottomRow，rules C §4），宽度为行宽的百分之几。
   , . 按标点映射显示（{punct:,}，中文下 ，。），地址框里让给 / @ . .com（BaseKeyboard.kt:135-141）；空格填满，地址框剩 17。
-  没有中/英键；123 长按 Unicode（九键、手写的 123 没有长按，rules C 疑问 3）。
+  没有中/英键；123 长按 Unicode（各板的 123 都是）。
 -->
 <fragment xmlns="https://youmo-ime/layout/1" id="grouped-bottom">
   <row>

@@ -165,8 +165,8 @@ class PopupKeyboardUi(
     private val keyOrders = groups.flatMapIndexed { g, group ->
         // the row in order as it is, from rowStart, the slots either side empty; the others round
         // the column in focus
-        val inOrder = g == 0 && inRow >= 0
-        val order = if (inOrder) IntArray(columnCount) { (it - rowStart).takeIf { at -> at in 0 until group.count() } ?: -1 } else columnOrder
+        val ordered = g == 0 && inRow >= 0
+        val order = if (ordered) IntArray(columnCount) { (it - rowStart).takeIf { at -> at in 0 until group.count() } ?: -1 } else columnOrder
         List(groupRows[g]) { r ->
             // a slot past its group's keys is empty: -1
             IntArray(columnCount) { col ->

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 import android.content.Context
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.theme.ThemePackLayouts
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Include
@@ -29,6 +30,12 @@ interface LayoutSource {
      * pack's by the pack's id, so a pack changed is read again by its key and no other's.
      */
     val key: String
+
+    /**
+     * Why [layout], read as [id] from this source, is not taken (the app's drawn instead, logged once); null where it
+     * is: a theme pack's held to what the app's of [id] must have to be typed on ([ThemePackLayouts.judge]).
+     */
+    fun refuses(id: String, layout: Layout, fragments: Map<String, Fragment>): String? = null
 }
 
 /**
@@ -77,7 +84,7 @@ class SceneLayout(val id: String, val layout: Layout, val fragments: Map<String,
  * read too (logged once): [source]'s, and where it has none or it does not read, the app's own
  * ([BuiltInLayouts]; P3, a theme pack's first). A keyboard whose layout the app has is drawn by the
  * canvas where it is on (060-render-p2 S4): one whose layout does not read, nothing drawn, logged
- * (never its views again, U8); one whose layout the app has not, by its views still.
+ * (never its views again, U8); one whose layout the app has not, nothing (logged).
  */
 object SceneLayouts {
     private sealed interface Read {
@@ -89,9 +96,15 @@ object SceneLayouts {
     // by the source's key and the layout's id
     private val read = HashMap<Pair<String, String>, Read>()
 
-    /** Where the layouts come from first: the app's ([BuiltInLayouts]); a test's own. Set, those read are read again. */
+    // the key of the source [of] read from last
+    private var current: String? = null
+
+    /**
+     * Where the layouts come from first: the theme pack in use's, else the app's ([ThemePackLayouts.current]: asked each
+     * time, so a theme changed is followed, the input view made again); a test's own. Set, those read are read again.
+     */
     @VisibleForTesting
-    var source: (Context) -> LayoutSource = ::BuiltInLayouts
+    var source: (Context) -> LayoutSource = ThemePackLayouts::current
         set(value) {
             field = value
             read.clear()
@@ -109,27 +122,40 @@ object SceneLayouts {
     fun of(context: Context, id: String): SceneLayout? {
         val app = context.applicationContext ?: context
         val first = source(app)
-        return readFrom(first, id) ?: readFrom(fallback(app), id)
+        val back = fallback(app)
+        // a pack left (re-imported, another in use): what was read of it dropped
+        if (first.key != current) {
+            current = first.key
+            read.keys.removeAll { it.first != first.key && it.first != back.key }
+        }
+        return readFrom(first, id, back) ?: readFrom(back, id, back)
     }
 
     /**
      * The layout [id] as the app has it ([fallback]'s), whatever [source] has: what a keyboard that cannot
      * take its source's layout draws instead, the block gone by whole (a grouping it cannot type, 060-render-p3 T9b).
      */
-    fun builtIn(context: Context, id: String): SceneLayout? = readFrom(fallback(context.applicationContext ?: context), id)
+    fun builtIn(context: Context, id: String): SceneLayout? = fallback(context.applicationContext ?: context).let { readFrom(it, id, it) }
+
+    /** The app's layout [id] read anew, the cache (main thread only) left alone: for checks off the main thread (a pack's import). */
+    fun parseBuiltIn(context: Context, id: String): SceneLayout? = fallback(context.applicationContext ?: context).let { load(it, id, it) }
+
+    /** How many layouts are kept read (tests). */
+    internal val cached: Int get() = read.size
 
     /** The layouts read from the source of [key] (all of them where null) read again when next asked for: P3, a theme pack changed. */
     fun invalidate(key: String? = null) {
         if (key == null) read.clear() else read.keys.removeAll { it.first == key }
     }
 
-    private fun readFrom(source: LayoutSource, id: String): SceneLayout? =
-        when (val r = read.getOrPut(source.key to id) { load(source, id)?.let(Read::Ok) ?: Read.Unread }) {
+    private fun readFrom(source: LayoutSource, id: String, back: LayoutSource): SceneLayout? =
+        when (val r = read.getOrPut(source.key to id) { load(source, id, back)?.let(Read::Ok) ?: Read.Unread }) {
             is Read.Ok -> r.layout
             Read.Unread -> null
         }
 
-    private fun load(source: LayoutSource, id: String): SceneLayout? {
+    // a fragment the source has not, [back]'s (a pack's k18 including the app's grouped-bottom)
+    private fun load(source: LayoutSource, id: String, back: LayoutSource): SceneLayout? {
         val text = runCatching { source.text(id) }.onFailure { Timber.e(it, "scene layout %s unread", id) }.getOrNull() ?: return null
         val layout = when (val l = LayoutReader.layout(text)) {
             is Parsed.Ok -> l.value
@@ -137,11 +163,16 @@ object SceneLayouts {
         }
         val fragments = HashMap<String, Fragment>()
         for (src in layout.parts.filterIsInstance<Include>().map { it.src }.distinct()) {
-            val t = runCatching { source.text(src) }.getOrNull() ?: return null.also { Timber.e("scene layout %s: no fragment %s", id, src) }
+            val t = runCatching { source.text(src) ?: back.takeIf { it.key != source.key }?.text(src) }
+                .onFailure { Timber.e(it, "scene layout %s: fragment %s unread", id, src) }.getOrNull()
+                ?: return null.also { Timber.e("scene layout %s: no fragment %s", id, src) }
             when (val f = LayoutReader.fragment(t)) {
                 is Parsed.Ok -> fragments[src] = f.value
                 is Parsed.Failed -> return null.also { Timber.e("scene layout %s: fragment %s: %s", id, src, f.problems) }
             }
+        }
+        source.refuses(id, layout, fragments)?.let { why ->
+            return null.also { Timber.e("scene layout %s of %s not taken: %s", id, source.key, why) }
         }
         return SceneLayout(id, layout, fragments)
     }

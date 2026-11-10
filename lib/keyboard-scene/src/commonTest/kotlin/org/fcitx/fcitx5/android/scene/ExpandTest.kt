@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.LetterCase
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.Text
 import kotlin.test.Test
@@ -33,7 +34,7 @@ class ExpandTest {
         assertEquals("semicolon", ids(shuangpin, 1).last())
         val table = env.copy(input = Input(ime = "table", table = "wubi", tableExtra = "star"))
         assertEquals("star", ids(table, 1).last())
-        assertEquals("lookup", ids(table, 2).first(), "TextKeyboard.kt:300-306: 拼 instead of ⇧")
+        assertEquals("lookup", ids(table, 2).first(), "a table's lookup key: 拼 instead of ⇧")
         assertEquals("lookup-on", ids(table.copy(input = table.input.copy(lookingUp = true)), 2).first())
         val url = env.copy(input = Input(field = "url"))
         assertEquals(listOf("symbols", "numbers", "slash", "space", "dot", "domain", "lang", "enter"), ids(url, 3))
@@ -220,5 +221,13 @@ class ExpandTest {
         assertEquals("Q", keys(env.copy(texts = env.texts.copy(letterCase = LetterCase.Upper)))[0].label)
         assertEquals("q", shown[0].a11y)
         assertEquals("Q W, 1", shown[1].a11y)
+    }
+
+    @Test
+    fun aSpaceWithNoNameIsStillSaid() {
+        // an input method with no name, or a scene built before it is known: TalkBack says "Space", not nothing
+        assertEquals("a11y_key_space", Expand.spoken(KeyAttrs(role = "space"), false, "", null, Texts()))
+        // a name not known at all (null): the same
+        assertEquals("a11y_key_space", Expand.spoken(KeyAttrs(role = "space"), false, null, null, Texts()))
     }
 }

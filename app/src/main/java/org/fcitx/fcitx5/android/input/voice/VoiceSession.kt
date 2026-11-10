@@ -196,24 +196,28 @@ class VoiceSession(
 
     // given up (15 s with nothing back) or failed: typed as it was said, what was heard last is
     // typed too (what was said stays, the user's rule), and "nothing heard" said only if nothing
-    // went in: else that the end may be cut short
+    // went in: else that the end may be cut short. A hold's and a tap's alike, typing as it goes or
+    // not (fcitx composing English): what was heard is what was said either way
     private fun endTypingWhatWasHeard(@StringRes message: Int) {
         if (over) return
-        val rest = if (asItGoes) typed(talk.restNow()) else null
-        rest?.let(::put)
-        val some = talk.typedAny || rest != null
+        val put = typed(talk.restNow())?.let(::put) == true
+        val some = talk.typedAny || put
         end(if (some && message == R.string.voice_hold_nothing) R.string.voice_tap_cut_short else message)
     }
 
     // [text] into the field: as its own commit (through fcitx: the bar's suggestions after it), or
-    // the keyboard hidden, straight in while the field's connection is still there
-    private fun put(text: String) {
+    // the keyboard hidden, straight in while the field's connection is still there. False if it
+    // could not go in (hidden, the connection gone)
+    private fun put(text: String): Boolean {
         composing = false
         if (!direct) {
             commit(text)
         } else if (service.currentInputConnection != null) {
             service.commitVoice(text)
+        } else {
+            return false
         }
+        return true
     }
 
     // [said] (what is left of it) to type, its end as the field has it; null if nothing, or not into this field

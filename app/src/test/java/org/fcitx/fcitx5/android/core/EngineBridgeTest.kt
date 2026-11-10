@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.core
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
@@ -29,6 +31,8 @@ import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.host.EngineOptions
+import org.fcitx.fcitx5.android.pack.PackKind
+import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -51,6 +55,8 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * The engine's custom phrases saved from the keyboard: never over what the editor saved since it
@@ -383,7 +389,7 @@ class EngineBridgeTest {
 
         /**
          * A fresh install has no files/engine: nothing made it, so the learning record could not be
-         * opened (ENOENT) and what was learned lived in memory only, gone with the next host. Made now.
+         * opened (ENOENT) and what was learned lived in memory only, gone with the next host. Made now (314dbf8e9).
          */
         @Test
         fun aFreshInstallsLearningIsKeptWhenTheHostIsMadeAnew() {
@@ -449,30 +455,30 @@ class EngineBridgeTest {
          */
         @Test
         fun anEngineThatCannotLoadADamagedTextPackSaysItIsDamaged() {
-            val shelf = org.fcitx.fcitx5.android.data.pack.TestShelves.shelf(org.fcitx.fcitx5.android.pack.PackKind.TEXT)
+            val shelf = TestShelves.shelf(PackKind.TEXT)
             val said = ArrayList<String>()
-            val restart = org.fcitx.fcitx5.android.data.pack.PackStore.restartHost
-            val restarted = java.util.concurrent.CountDownLatch(1)
-            org.fcitx.fcitx5.android.data.pack.PackStore.restartHost = { restarted.countDown(); true }
+            val restart = PackStore.restartHost
+            val restarted = CountDownLatch(1)
+            PackStore.restartHost = { restarted.countDown(); true }
             bridge.unloadable.clear()
             try {
-                org.fcitx.fcitx5.android.data.pack.PackStore.useShelf(shelf)
+                PackStore.useShelf(shelf)
                 EngineNotices.sayer = EngineNotices.Sayer { message, _ -> said += message; true }
-                val file = File(shelf.dir(org.fcitx.fcitx5.android.pack.PackKind.TEXT)!!, "handwriting/test.txt")
+                val file = File(shelf.dir(PackKind.TEXT)!!, "handwriting/test.txt")
                 file.writeBytes(file.readBytes().also { it[0] = (it[0].toInt() xor 1).toByte() })
                 assertThrows(DataFormatException::class.java) {
                     bridge.unloadable.call(InputMethodCatalog.PINYIN) { throw DataFormatException("not pinyin data") }
                 }
                 org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
                 assertEquals(listOf(appContext.getString(org.fcitx.fcitx5.android.R.string.pack_text_damaged)), said)
-                assertTrue(org.fcitx.fcitx5.android.data.pack.PackStore.status(org.fcitx.fcitx5.android.pack.PackKind.TEXT) is org.fcitx.fcitx5.android.pack.PackStatus.Damaged)
+                assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
                 // the host restarted (off this thread): its engines no longer on the damaged files
-                assertTrue(restarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                assertTrue(restarted.await(5, TimeUnit.SECONDS))
             } finally {
-                org.fcitx.fcitx5.android.data.pack.PackStore.restartHost = restart
+                PackStore.restartHost = restart
                 EngineNotices.sayer = null
                 bridge.unloadable.clear()
-                org.fcitx.fcitx5.android.data.pack.TestShelves.use()
+                TestShelves.use()
             }
         }
 

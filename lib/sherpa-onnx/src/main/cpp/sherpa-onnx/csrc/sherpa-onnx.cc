@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -63,7 +64,6 @@ for a list of pre-trained models to download.
 
   sherpa_onnx::ParseOptions po(kUsageMessage);
   sherpa_onnx::OnlineRecognizerConfig config;
-  std::string language;
   std::string blocked;  // youmo
   bool endpoints = false;  // youmo
 
@@ -71,10 +71,6 @@ for a list of pre-trained models to download.
   float right_padding_second = 0.8;
 
   config.Register(&po);
-  po.Register("language", &language,
-              "Per-stream language hint for prompt-conditioned multilingual "
-              "models, e.g., en, fr, ja, or auto. Empty means auto.");
-
   po.Register("blocked", &blocked,
               "youmo: \"/\"-separated phrases no result contains "
               "(modified_beam_search only)");
@@ -90,6 +86,12 @@ for a list of pre-trained models to download.
               "Number of seconds for right padding");
 
   po.Read(argc, argv);
+  // without endpoint detection IsEndpoint is never true: one long segment,
+  // not the results asked for
+  if (endpoints && !config.enable_endpoint) {
+    fprintf(stderr, "Error! --endpoints needs --enable-endpoint=true\n");
+    SHERPA_ONNX_EXIT(EXIT_FAILURE);
+  }
   if (po.NumArgs() < 1) {
     po.PrintUsage();
     fprintf(stderr, "Error! Please provide at lease 1 wav file\n");
@@ -140,9 +142,6 @@ for a list of pre-trained models to download.
     const float duration = samples.size() / static_cast<float>(sampling_rate);
 
     auto s = recognizer.CreateStream("", blocked);
-    if (!language.empty()) {
-      s->SetOption("language", language);
-    }
 
     std::vector<float> left_paddings(
         static_cast<int>(left_padding_second * sampling_rate), 0);

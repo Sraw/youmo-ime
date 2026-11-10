@@ -20,6 +20,8 @@ import org.robolectric.annotation.Config
 import java.util.zip.ZipInputStream
 
 /**
+ * contract: one theme file format read by two readers, and the theme maker's test data (ThemeMakerTestdata).
+ *
  * The engine's reader of theme file 3.0 (keyboard-scene's ThemeLookReader, for the web) reads every
  * file as the app's kotlinx one (CustomThemeSerializer, ThemeLookJson) does, field by field: the five
  * sample themes light and dark, every built-in theme exported, the theme maker's files. Text no maker
@@ -63,12 +65,13 @@ class ThemeLookReaderParityTest {
 
     @Test
     fun everyBuiltInThemeExported() {
-        val presets = listOf(
-            TestThemes.MaterialLight, TestThemes.MaterialDark, TestThemes.PixelLight, TestThemes.PixelDark,
-            TestThemes.DeepBlue, TestThemes.AMOLEDBlack, TestThemes.NordLight, TestThemes.NordDark,
-            TestThemes.Monokai, TestThemes.TransparentDark, TestThemes.TransparentLight,
-        )
+        // every one the app has, a new one too
+        val presets = ThemeManager.BuiltinThemes
+        assertTrue(presets.size >= 11)
         for (p in presets) same(exported(Theme.Custom(p.name, p.isDark, p.look)), p.name)
+        // Transparent's two, test data since Monet's took their places (R20 F6638): their translucent colours
+        // read alike too, which no built-in one has
+        for (p in listOf(TestThemes.TransparentLight, TestThemes.TransparentDark)) same(exported(Theme.Custom(p.name, p.isDark, p.look)), p.name)
     }
 
     // what is no file of the form: whether each reads it (true) or refuses it, the app's then the engine's

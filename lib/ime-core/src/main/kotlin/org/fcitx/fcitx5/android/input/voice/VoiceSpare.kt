@@ -70,10 +70,23 @@ class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
 
     val ready get() = spare.get() != null
 
-    /** [made] kept for the next use; released if one is already there. Whether it was kept */
-    fun offer(made: T, wanted: Boolean = true): Boolean {
+    /** [clear]s so far: read before what decides an [offer]'s `wanted`, and given to it */
+    val clears: Int get() = cleared.get()
+
+    /**
+     * [made] kept for the next use; released if one is already there. Whether it was kept.
+     * [clearsBefore]: [clears] read before [wanted] was decided; a clear since (the decision
+     * stale) undoes the keep, as in [build].
+     */
+    fun offer(made: T, wanted: Boolean = true, clearsBefore: Int? = null): Boolean {
         // not wanted: nothing holds the models (a talk whose models failed), so nothing would let it go
-        if (wanted && spare.compareAndSet(null, made)) return true
+        if (wanted && spare.compareAndSet(null, made)) {
+            if (clearsBefore != null && cleared.get() != clearsBefore && spare.compareAndSet(made, null)) {
+                release(made)
+                return false
+            }
+            return true
+        }
         release(made)
         return false
     }

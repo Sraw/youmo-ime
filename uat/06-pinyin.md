@@ -78,7 +78,7 @@
 
 ### PY-77b [P1] 滑行打过两次的词，简拼下排到第三
 <!-- learning: U-20 D32 -->
-- **前提**：B0，**通用输入** 里打开 **滑行输入**。点 f h，看前五个里没有「奉化」，点 ⌫ 删光。
+- **前提**：B0，**通用输入** 的 **在键上划** 里选 **滑行输入**。点 f h，看前五个里没有「奉化」，点 ⌫ 删光。
 - **操作**：打「他」，滑 f-e-n-g-h-u-a，选「奉化」，点 **。**；再做一次；打「他」，点 f h。
 - **预期**：「奉化」在前三（滑行算全拼的完整拼音）。
 - **JVM**：`PinyinUatTest.aWordGlidedTwiceGoesThirdUnderItsInitials`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
@@ -184,8 +184,8 @@
 
 ### PY-115 [P1] 表情、拆字、笔画查字、滑行的其他读法也能屏蔽
 <!-- learning: U-82 U-28 -->
-- **前提**：B0；表情候选、拆字开着；滑行那一步先打开 **滑行输入**。
-- **操作**：点 d i a n z a n，长按候选里的表情 👍；点 u n v z i，长按「好」；点 u h s 后长按查出的一个字；打开滑行，划 n-i-h-a-o，长按第二个候选（另一种读法的词）。每个都选 **屏蔽**、确认，再打一次同样的键看；表情屏蔽后重启输入法（杀掉进程再弹出键盘），再点 d i a n z a n；最后在 **屏蔽的词**（笔画查字的在页顶"码表里按码屏蔽的"里，写着"笔画查字"）里逐个恢复，再打一次。
+- **前提**：B0；表情候选、拆字开着；滑行那一步先在 **通用输入** 的 **在键上划** 里选 **滑行输入**。
+- **操作**：点 d i a n z a n，长按候选里的表情 👍；点 u n v z i，长按「好」；点 u h s 后长按查出的一个字；打开滑行，划 n-i-h-a-o，长按第二个候选（另一种读法的词）。每个都选 **屏蔽**、确认，再打一次同样的键看；表情屏蔽后重启输入法（杀掉进程再弹出键盘），再点 d i a n z a n；最后在 **屏蔽的词**（笔画查字的在页顶"码表里按码屏蔽的"里，写着"笔画查字"，码显示成笔画，如 u h s 是「一丨」）里逐个恢复，再打一次。
 - **预期**：四个菜单里都有 **屏蔽**；笔画查字的确认写"打这串码不再出现"，多打一笔、打拼音还出这个字；其余写"以后打字……都不再出现"。屏蔽后同样的键不再出它，表情重启输入法后也不出（👍🏻 这种码位比音节多的表情也一样），恢复后又出。
 - **JVM**：`EnginesEmojiBlockTest`（码位和音节数对不上的表情：重启、设置里恢复、撤销、备份往返）、`AsideBlockUatTest.anEmojiAndACharacterByStrokesAreBlockedFromTheKeyboard`（:lib:ime-eval:uatTest，真数据，经宿主的长按动作）、`EnginesAsideBlockTest`（表情、拆字）、`EnginesStrokeBlockTest`、`EnginesGlideBlockTest`。设备上跑过（2026-11-08，emulator-5574）。
 
@@ -195,6 +195,13 @@
 - **操作**：点 g u o j i a，长按「國家」，选 **屏蔽**、确认；清空再点 g u o j i a；切回 **简体** 再点一次。
 - **预期**：菜单里有 **屏蔽**，能用；屏蔽后繁體下 guojia 不再出「國家」（词库里另有一个本来就是繁体的「國家」，显示一样，一起屏蔽），简体下不再出「国家」（屏蔽记的是原文「国家」）。
 - **JVM**：`EnginesConvertedMenuTest`（菜单、屏蔽、撤销按引擎里的简体做，显示一样的候选一起屏蔽、删除，固定只管按的那个；宿主经 `HostCore.shownText` 把转换函数传给 `Engines.learning`）。设备上跑过（2026-11-08，emulator-5574；修之前菜单里没有屏蔽）。
+
+### PY-117 [P1] 拼音下屏蔽的英文/拉丁词重启后还屏蔽着
+<!-- learning: U-82 -->
+- **前提**：B0；中英混输开着。
+- **操作**：点 i p h o n e，长按候选「iPhone」选 **屏蔽**；杀掉进程再弹出键盘，再点 i p h o n e；在 **屏蔽的词** 里看它，恢复，再打。
+- **预期**：重启后不出「iPhone」，屏蔽的词里列着它；恢复后又出现。
+- **JVM**：`WordListsTest.aBlockedLatinWordReadsBackAsItsLetters`（只查屏蔽文件的读回）、`EnginesUserWordsTest.aLatinWordBlockedInPinyinStaysBlockedAfterARestartTillRestored`（拼音下屏蔽「iPhone」、同一目录重开后不出、恢复后又出）；设备上不跑。
 
 ### PY-31 [P1] 固定首位，再取消固定
 <!-- learning: U-83 -->
@@ -247,7 +254,7 @@
 - **JVM**：`HostCasesUatTest.backspaceInTheMiddleOfThePinyin`（点 shi 后退格三下：拼音 ni wo zui xi huan de、光标在 ni 后，空格「你我最喜欢的」）；设备上不跑。
 
 ### PY-41 [P1] 空格键左右滑动移动拼音里的光标，长拼音跟着滚动
-- **前提**：B0，**按键 → 划动空格键以移动光标** 开着（默认）；先把 **长按空格** 设为"无"（它默认是语音输入，长按后手指归语音）。
+- **前提**：B0，**按键 → 划动空格键以移动光标** 开着（默认）；先把 **按键 → 空格键长按行为** 设为"无"（它默认是语音输入，长按后手指归语音）。
 - **操作**：点一串很长的拼音，例如 w o x i a n g z h i d a o j i n t i a n w a n s h a n g w o m e n q u n a l i c h i f a n；按住空格键不松手，用约 4 秒、很慢地（每秒不到一个键宽）往左拖大约三分之一个屏宽。
 - **预期**：开始拖以后（哪怕过了长按的时间才动）拼音行里的光标一格一格往前移，不弹出长按菜单，框里的光标不动；光标走到行的左边缘外时，这一行自动往右滚，光标一直看得见。用手指在拼音行上左右拖，也能滚动这一行。
 - **JVM**：`KeyboardUatTest.aSlowSpaceDragMovesThePinyinCursorAndTheRowFollowsIt`（空格慢拖（过了长按时间才动）发 ←、不弹长按、框里不动，拼音行随引擎的光标滚动，手指拖行也滚；光标在拼音里怎么走是引擎的（HostCasesUatTest））；设备上不跑。
@@ -297,7 +304,7 @@
 - **JVM**：`PinyinUatTest.aBuiltInPhraseDeletedIsOneTurnedOffInTheCustomPhrases`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### PY-50 [P1] 全拼滑行
-- **前提**：B0-设置，**通用输入** 里打开 **滑行输入**（默认关），回测试页。
+- **前提**：B0-设置，**通用输入** 的 **在键上划** 里选 **滑行输入**（默认关），回测试页。
 - **操作**：手指按在 n 上，不抬手依次划过 i、h、a、o，在 o 上抬起；看候选；点 ⌫ 删光，再划 w-o，接着划 m-e-n，看候选，删光；再划 n-i-h-a-o，点第一个候选后面那个另一种读法的词（例如「鸟」）。再把 **候选词注音** 选「拼音」，划 y-i-n-h-a-n-g，看「银行」上方。
 - **预期**：划的时候画出线；抬手后拼音行是 `ni'hao`（滑行的拼音用 ' 分开，见 docs/pinyin.md），候选第一个是「你好」，后面跟着另外读法的词（如「鸟」）；划 wo 再划 men 后候选有「我们」；点另一种读法的词后框里是那个词（例如「鸟」），拼音行清空。划 yinhang 后「银行」上方是 yín háng（按划出的读音，不是 yín xíng），后面另外读法的词按它们自己的字注音。
 - **JVM**：`PinyinUatTest.pinyinGlide`（滑出的拼音和候选、点另一读法，真数据）、`GlideSessionTest.readingsAndLookupsAreTheSessionsShiftedPastTheOthers`（滑行的注音按所打读音，插进来的另外读法按字）、`GlideUatTest.pinyinsGlideIsDrawnAsTheFingerGoes`（划的时候画出线，Roborazzi 金图）；设备上不跑。
@@ -405,12 +412,12 @@
 ### PY-89 [P1] 长按分组键
 - **前提**：B0-14键。
 - **操作**：长按 QW 看弹出的一排；松开不选（往下滑走）。点 BN UI，长按 QW，滑到 q 松开。
-- **预期**：最下面一行是 `Q W 1 q w`，手指一开始在 1 上；上面几行是 q、w 在全键盘上长按出的符号（不含数字、字母和角标的 1）：q、w 长按只有数字和大写，所以 QW 上面没有别的行；长按 AS 时最下面一行是 `A S 6 a s`，上面有 `@` `*`（a、s 在全键盘上长按出的符号）。打字中选 q：框里是第一个候选，后面跟着 q。
-- **JVM**：`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`（QW 只有 `Q W 1 q w`，原地松开打出 1；AS 最下 `A S 6 a s`、上面 @ *；打字中从长按选字母（测试选 w，和 q 同一路）：先 reset 再上字母）、`KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate`（uatTest，真数据：第一候选后跟字母）；设备上不跑。
+- **预期**：最下面一行是 `Q W 1 q w`，手指一开始在 1 上；上面几行是 q、w 在全键盘上长按出的符号（不含数字、字母和角标的 1）：q、w 长按只有数字和大写，所以 QW 上面没有别的行；长按 AS 时最下面一行是 `A S 6 a s`，上面有 `@` `*`（a、s 在全键盘上长按出的符号）。打字中选 q：框里是第一个候选，后面跟着 q。靠屏幕边的键（QW 在最左、L 在最右）长按后往边上滑，能选到那一行最边上的字母（离屏幕边 4dp 内就选中，不用滑出屏幕）。
+- **JVM**：`GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge`（键缝宽的主题里 QW 在最左边，滑到屏幕边选到 Q）、`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`（QW 只有 `Q W 1 q w`，原地松开打出 1；AS 最下 `A S 6 a s`、上面 @ *；打字中从长按选字母（测试选 w，和 q 同一路）：先 reset 再上字母）、`KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate`（uatTest，真数据：第一候选后跟字母）；设备上不跑。
 
 ### PY-90 [P1] 14 键和全键盘分开学，学成的词两边都有
 <!-- learning: qk: 和全拼各学各的；你的词共用 -->
-- **前提**：B0-14键，**通用输入** 里打开 **滑行输入**。
+- **前提**：B0-14键，**通用输入** 的 **在键上划** 里选 **滑行输入**。
 - **操作**：
   1. 点 AS GH UI（shi），记下全键盘上 s h i 的首选应是什么（没学之前，两边首选相同）；选候选里第一个以外的一个字 W，点 **。**；再来一次；第三次点 AS GH UI，看候选。
   2. 清空，点 QW AS BN GH ZX UI AS OP M UI BN GH（wangxiaoming），在候选里依次选「汪」「小明」；清空再来一次。
@@ -460,7 +467,7 @@
 - **JVM**：`Keys14UatTest.syllablesTakenGoBackLastFirstAndATapInTheCodeOnlyMovesTheCursor`（定音节顺序、退格逐个退回、点预编辑只移光标、中间退格删键、定音节后在其后退格不退音节）；设备上不跑。
 
 ### PY-98 [P1] 14 键不滑行
-- **前提**：B0-14键，**通用输入** 里打开 **滑行输入**。
+- **前提**：B0-14键，**通用输入** 的 **在键上划** 里选 **滑行输入**。
 - **操作**：回测试页，手指不离开屏幕，从 BN 划过 UI 到 GH 再松开。
 - **预期**：键盘上没有滑行的轨迹，候选不是滑行猜出的词：滑动只按一个键的滑动处理（打出 BN 的角标 `@`，或者当作点了 BN）。
 - **JVM**：`GroupedKeyboardUatTest.theFourteenKeysDoNotGlide`（滑行开着，从 BN 划过 UI 到 GH：没有 offerGlide，最多一个键的动作，金图 keys14_dragged 无轨迹）；设备上不跑。
@@ -487,7 +494,7 @@
 
 ## 笔画筛选
 
-前提里的 **笔画筛选**：在 **通用输入** 里打开 **笔画筛选**。一笔是在键盘上从按下到抬起划的一道：横向右（或向左），竖向下，撇向左下，点（捺）向右下，折是中途拐弯的一道；向上划不算。
+前提里的 **笔画筛选**：在 **通用输入** 的 **在键上划** 里选 **笔画筛选**。一笔是在键盘上从按下到抬起划的一道：横向右（或向左），竖向下，撇向左下，点（捺）向右下，折是中途拐弯的一道；向上划不算。
 
 ### PY-103 [P1] 多笔按同一个字的笔顺筛：xi 画四笔出「曦」
 - **前提**：B0，另外笔画筛选。
@@ -554,6 +561,6 @@
 
 ### PY-113 [P1] 多音字按所打的读音注音
 - **前提**：B0，**候选词注音** 选「拼音」。
-- **操作**：打 h a n g，看「行」上方；清空，在 **通用输入** 里打开 **笔画筛选**，打 h a n g 再在键盘上画一撇（「行」的第一笔），「行」留在候选里，看「行」上方；清空，把 **候选词注音** 换成「注音」，再打 h a n g。
+- **操作**：打 h a n g，看「行」上方；清空，在 **通用输入** 的 **在键上划** 里选 **笔画筛选**，打 h a n g 再在键盘上画一撇（「行」的第一笔），「行」留在候选里，看「行」上方；清空，把 **候选词注音** 换成「注音」，再打 h a n g。
 - **预期**：三次「行」上方都是 háng（注音是 ㄏㄤˊ），从不是 xíng（ㄒㄧㄥˊ）。
 - **JVM**：`EnginesReadingsTest.eachCandidateIsReadAsTyped`、`EnginesReadingsTest.aCharacterOfTwoReadingsIsReadAsTypedThroughFullPinyinsWrappers`（全拼和笔画查字、笔画筛选这些包着它的都按所打读音）、`StrokeFilterTest.readingsAndLookupsOfAKeptCandidateAreOfItsOwnPlace`；设备上不跑。

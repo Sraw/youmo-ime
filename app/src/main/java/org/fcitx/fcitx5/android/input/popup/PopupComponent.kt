@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.keyTextScale
 import org.fcitx.fcitx5.android.input.keyboard.longPressOf
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
@@ -65,8 +66,29 @@ class PopupComponent :
     }
     private val hideThreshold = 100L
 
-    // the popups of the keys the canvas draws, the engine's scenes (060-render-p2 S2)
-    private val scenes by lazy { PopupScenes(root, theme, measuring) }
+    // the popups of the keys the canvas draws, the engine's scenes (060-render-p2 S2), in the theme they
+    // draw in now: made again where it changed (the keyboard shown now refused its keys' scene, or no
+    // longer: another keyboard, a rotation), the pooled popups made for the old let go with them
+    private var scenesMade: Pair<String, PopupScenes>? = null
+    private val scenes: PopupScenes
+        get() {
+            val drawn = SceneBoard.drawnTheme(theme).name
+            scenesMade?.takeIf { it.first == drawn }?.let { return it.second }
+            freeEntryUi.clear()
+            return PopupScenes(root, theme, measuring).also { scenesMade = drawn to it }
+        }
+
+    /** The popups' engine as they would draw now: a test's, that it follows the keys' theme. */
+    @VisibleForTesting
+    internal val scenesNow: PopupScenes get() = scenes
+
+    /** The popups kept for the next: a test's, that none made in an old theme is. */
+    @VisibleForTesting
+    internal val pooled: List<PopupEntryUi> get() = freeEntryUi
+
+    /** [key]'s bubble up now: a test's, that it draws in the theme the keys do. */
+    @VisibleForTesting
+    internal fun showing(key: KeyRef): PopupEntryUi? = showingEntryUi[key]
 
     /** The engine's text measured through this: a test's, to make it fail. */
     @VisibleForTesting
@@ -77,7 +99,7 @@ class PopupComponent :
      * did not convert: no popup then, logged, never another drawing (060: the views are gone).
      */
     private fun scenesFor(key: KeyRef): PopupScenes? =
-        scenes.takeIf { it.ready } ?: null.also { Timber.w("no popup for %s: the theme's scene did not convert", key) }
+        scenes.takeIf { it.ready } ?: null.also { Timber.w("no popup for %s: neither the theme's scene nor the built-in's converted", key) }
 
     // [dp] in px as the engine's rules size a scene's popup ([Popups.px])
     private fun PopupScenes.px(dp: Double) = Popups.px(dp, density).toInt()
@@ -135,7 +157,7 @@ class PopupComponent :
         }
         if (!show(popup, content, null, bounds.width())) {
             // the engine could not make it (logged): no bubble this time
-            freeEntryUi.add(popup)
+            pool(popup)
             return
         }
         place(popup, bounds)
@@ -185,7 +207,7 @@ class PopupComponent :
         return sceneWordsFit(label, width)?.also { lastFit = FitFor(label, scale, width, it) }
     }
 
-    // the engine's: its sizes dp, measured as the scene draws them ([PopupScenes]); none where it
+    // the engine's: its sizes px, measured as the scene draws them ([PopupScenes]); none where it
     // could not say, the label then shown as a character is
     private fun sceneWordsFit(label: String, width: Int): PreviewLabel.Fit? {
         val b = scenes.builder() ?: return null
@@ -235,7 +257,6 @@ class PopupComponent :
 
     private fun FrameLayout.LayoutParams.isAt(width: Int, height: Int, left: Int, top: Int) =
         this.width == width && this.height == height && leftMargin == left && topMargin == top
-
 
     private fun showKeyboard(key: KeyRef, keyboard: KeyDef.Popup.Keyboard, bounds: Rect, faceInset: Int = 0) {
         var keys: Array<String>
@@ -414,7 +435,13 @@ class PopupComponent :
     private fun dismissPopupEntry(key: KeyRef, popup: PopupEntryUi) {
         showingEntryUi.remove(key)
         root.removeView(popup.root)
-        freeEntryUi.add(popup)
+        pool(popup)
+    }
+
+    // back to the pool only if made in the theme drawn now: one showing when it changed would
+    // otherwise come back from the pool drawing in the old
+    private fun pool(popup: PopupEntryUi) {
+        if (popup.scenes === scenesMade?.second) freeEntryUi.add(popup)
     }
 
     fun dismissAll() {
@@ -432,7 +459,7 @@ class PopupComponent :
         // too too
         showingEntryUi.forEach { (_, entry) ->
             root.removeView(entry.root)
-            freeEntryUi.add(entry)
+            pool(entry)
         }
         showingEntryUi.clear()
     }

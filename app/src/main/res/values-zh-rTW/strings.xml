@@ -117,7 +117,8 @@
     <string name="exception_theme_folder">主題裡有資料夾 %1$s：4.0 主題只能有它的檔案和 layouts/</string>
     <string name="exception_theme_invalid">主題的 theme.xml 讀不了：\n%1$s</string>
     <string name="exception_theme_min_app">這個主題需要本輸入法 %1$s 或更新的版本：更新後才能用</string>
-    <string name="exception_theme_hidden_required">主題把 Shift、退格、空格或換行的字隱藏了（第 %1$s 行的樣式）：這些鍵會是空白的</string>
+    <string name="exception_theme_too_many_scenes">主題給鍵設的場景組合太多，沒法逐一檢查 Shift、退格、空格和換行會不會成空白鍵</string>
+    <string name="exception_theme_hidden_required">主題讓 Shift、退格、空格或換行成了空白鍵（%1$s：字藏了，鍵面又不是圖片）</string>
     <string name="exception_theme_pack_name">%1$s 不能用作這裡的主題名</string>
     <string name="exception_theme_icon">主題的圖示不是只有填充路徑的簡單 SVG：%1$s</string>
     <string name="exception_theme_layout">主題的 layouts/ 裡有 %1$s，它不是佈局（.xml）</string>
@@ -133,6 +134,9 @@
     <string name="theme_pack_import_title">匯入主題 %1$s？</string>
     <string name="theme_pack_import">匯入</string>
     <string name="theme_pack_replaces">會取代你已有的同名主題。</string>
+    <string name="theme_pack_layouts">此主題包含自訂佈局：%1$s（其中 %2$d 個動作直接輸入佈局裡寫的文字）。</string>
+    <string name="theme_pack_layouts_unused">不會使用的佈局（讀不出、缺鍵盤必需的鍵，或不是已有的鍵盤）：%1$s</string>
+    <string name="keyboard_themed">%1$s（主題：%2$s）</string>
     <string name="theme_pack_warnings">注意：</string>
     <string name="theme_info">資訊</string>
     <string name="theme_info_author">作者：%1$s</string>
@@ -294,7 +298,7 @@
     <string name="a11y_key_emoji">表情</string>
     <string name="voice_end_mark">語音句末句號</string>
     <string name="voice_end_mark_auto">按輸入框：聊天、搜尋框和單行輸入框裡不加</string>
-    <string name="voice_end_mark_keep">照說的保留</string>
+    <string name="voice_end_mark_keep">照說的保留（單行框仍不加）</string>
     <string name="voice_end_mark_drop">都不加</string>
     <string name="voice_input">語音輸入</string>
     <string name="a11y_candidates_prev_page">上一頁候選詞</string>
@@ -425,6 +429,7 @@
     <string name="word_pinyin">拼音，如 you mo（留空自動填）</string>
     <string name="word_pinyin_invalid">拼音和詞對不上：每個字一個音節</string>
     <string name="english_block_detail">英文 · 全小寫的詞不分大小寫封鎖</string>
+    <string name="english_block_detail_exact">英文 · 只封鎖這樣寫的大小寫</string>
     <plurals name="word_typed_times">
         <item quantity="other">%1$s · 打過 %2$d 次</item>
     </plurals>
@@ -713,10 +718,10 @@
     <string name="im_word_hint_summary">顯示以已打字母開頭的單詞，以及拼錯時的改正；關閉後按鍵直接上屏</string>
     <string name="im_auto_caps">句首自動大寫</string>
     <string name="im_auto_caps_summary">在句子開頭自動開啟 Shift（應用的輸入框要求時）</string>
+    <string name="key_drawing">在鍵上劃</string>
+    <string name="key_drawing_handwriting">鍵盤手寫</string>
     <string name="glide_typing">滑行輸入</string>
-    <string name="glide_typing_summary">手指不離開鍵盤，依序劃過一個詞的鍵（拼音劃字母，九鍵劃數字鍵，碼表劃編碼；14 鍵、18 鍵、九鍵雙拼上沒有）。網址、電子郵件、密碼框裡不滑行。和筆畫篩選只能開一個：打開這個會關掉筆畫篩選</string>
     <string name="stroke_filter">筆畫篩選</string>
-    <string name="stroke_filter_summary">打了拼音後在鍵盤上畫一筆（橫、豎、撇、點、折），只留第一個字這樣起筆的候選，再畫就按這個字的筆順往下篩。網址、電子郵件、密碼框裡不能畫。和滑行輸入只能開一個：打開這個會關掉滑行輸入</string>
     <string name="status_punctuation_chinese">中文標點</string>
     <string name="status_punctuation_english">英文標點</string>
     <string name="status_full_width">全形</string>

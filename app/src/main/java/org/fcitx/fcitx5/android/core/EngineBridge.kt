@@ -200,6 +200,15 @@ class EngineBridge {
         EngineState.reset()
     }
 
+    // the text pack read through on this thread, the keys queued behind it waiting: its time logged, a slow
+    // device's wait found in the log
+    private fun verifyTimed(e: Throwable): Boolean {
+        val start = System.nanoTime()
+        return PackStore.verifyAfterFailure(PackKind.TEXT, e).also {
+            Timber.i("text pack checked after a failure in %d ms: %s", (System.nanoTime() - start) / 1_000_000, if (it) "damaged" else "not found damaged")
+        }
+    }
+
     // what cannot load is not loaded again on every key: the keys go to the app, the user told once
     internal val unloadable = Unloadable { im, e ->
         Timber.e("%s cannot load (%s): not called again till the engine is reloaded", im, e.javaClass.name)
@@ -209,7 +218,7 @@ class EngineBridge {
         EngineNotices.failed(
             when {
                 pack != null -> R.string.pack_text_needed_short
-                PackStore.verifyAfterFailure(PackKind.TEXT, e) -> R.string.pack_text_damaged
+                verifyTimed(e) -> R.string.pack_text_damaged
                 else -> R.string.engine_unloadable
             },
         )
@@ -474,14 +483,20 @@ class EngineBridge {
     private var inUseOf: List<String>? = null
 
     /**
+     * Whether [own] replaces other own groups [syncOwnKeys] told, whose session may be typing: none told before
+     * (the first own keyboard, a glide or ink before any key) is no change of what anything was typed on.
+     */
+    fun replaces(own: List<String>?): Boolean = inUseOf != null && own != inUseOf
+
+    /**
      * The groups of the layout of its own a keyboard shows ([EngineState.ownKeys], 060-render-p3 T9b) told
      * where they changed: the keyboard in use for their codes ([NineKeyLetters.inUse]: a temporary mode's
      * letters too, no engine needed), and the engine's settings, its sessions made anew with them (an engine
      * made again after [close] too). Before each key, on the fcitx thread: the keyboard wrote them before any
-     * of its keys could be tapped. The same ones (the same list, as a rule): nothing to do.
+     * of its keys could be tapped. The same ones (the same list, as a rule): nothing to do. [own] read once
+     * by the caller, [replaces] asked of the same.
      */
-    fun syncOwnKeys() {
-        val own = EngineState.ownKeys
+    fun syncOwnKeys(own: List<String>? = EngineState.ownKeys) {
         if (own != inUseOf) {
             inUseOf = own
             own?.takeIf { NineKeyLetters.problem(it) == null }?.let(NineKeyLetters::custom)?.let(NineKeyLetters::inUse)

@@ -7,8 +7,6 @@ package org.fcitx.fcitx5.android.input.popup
 import android.graphics.Paint
 import android.graphics.Rect
 import android.view.View
-import android.view.ViewGroup
-import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
@@ -80,7 +78,6 @@ class PopupKeyboardUiTest {
         )
     }
 
-    private fun View.label(): String? = ((this as? ViewGroup)?.getChildAt(0) as? TextView)?.text?.toString()
 
     // the canvas's: the scene drawn
     private fun PopupKeyboardUi.scene(): Scene = (root as PopupSceneView).scene!!

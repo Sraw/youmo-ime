@@ -50,7 +50,8 @@ function built(s) {
 
 test('every snapshot is what the library builds of its ask (the JVM wrote them, the library is held to them)', () => {
   const all = [...shots.shots, ...shots.popups];
-  assert.equal(all.length, readdirSync(join(data, 'snapshots')).length, 'a shot for every snapshot');
+  // bar-*: T6a's BarSample scenes, built straight from the sample, not asked of the facade
+  assert.equal(all.length, readdirSync(join(data, 'snapshots')).filter((f) => !f.startsWith('bar-')).length, 'a shot for every snapshot');
   const wrong = all.filter((s) => built(s).text() !== read(data, 'snapshots', s.name + '.txt')).map((s) => s.name);
   assert.deepEqual(wrong, []);
 });

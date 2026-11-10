@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.keyboard.VoiceEndMark
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -213,7 +214,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 listOf(Level(R.string.level_short, 200), Level(R.string.level_medium, 300), Level(R.string.level_long, 450))
             )
         }
-        // voice input, as Sogou's long press on the space (without the voice pack, it asks for it)
+        // voice input, as Sogou's long press on the space (without the voice pack holding the space types a space, as 0.5's
+        // text build; the toolbar's microphone is what asks for the pack)
         val spaceKeyLongPressBehavior = enumList(
             R.string.space_long_press_behavior,
             "space_long_press_behavior",
@@ -293,15 +295,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)
 
         /**
-         * Shown on the page of what every input method shares (InputMethodSettings.SHARED), two
-         * switches for what a finger drawn across the keys does (GlideInput), one or the other, never
-         * both (the page turns the other off): a word glided across its keys in every input method
-         * that glides (InputMethodCatalog.glides), or a stroke drawn while pinyin is typed that
-         * filters its candidates (笔画筛选, InputMethodCatalog.filtersByStrokes). Both off till
-         * chosen: a fast tap may glide. The glide's key is 0.4's, so its switch carries over as it is.
+         * Shown on the page of what every input method shares (InputMethodSettings.SHARED), one list
+         * for what a finger drawn across the keys does ([KeyDrawing], GlideInput): a word glided across
+         * its keys in every input method that glides (InputMethodCatalog.glides), a stroke drawn while
+         * pinyin is typed that filters its candidates (笔画筛选, InputMethodCatalog.filtersByStrokes),
+         * or nothing. Off till chosen: a fast tap may glide. 0.5's two switches move over ([dropRetired]).
          */
-        val glideTyping = bool(GLIDE_TYPING, false)
-        val strokeFilter = bool(STROKE_FILTER, false)
+        val keyDrawing = stringLike(KEY_DRAWING, object : ManagedPreference.StringLikeCodec<KeyDrawing> {
+            override fun decode(raw: String) = KeyDrawing.entries.firstOrNull { it.name == raw }
+        }, KeyDrawing.Off)
 
         /** Shown on the shared page too: every input method types a bracket or a quote. */
         val autoPairs = bool(AUTO_PAIRS, true)
@@ -772,9 +774,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     fun dropRetired() {
         // gone with the old drawing (060-render-p2 S8): 0.6's betas' switch of the redraw, vivo's touch routing to
         // the key views (the scene's keys always take their touches so), and 扩大按键触摸区 (the engine always
-        // gives a key its cell to the edge); a stored one, of any type, read by nothing
-        RETIRED.filter { sharedPreferences.contains(it) }.takeIf { it.isNotEmpty() }?.let { keys -> sharedPreferences.edit { keys.forEach(::remove) } }
+        // gives a key its cell to the edge); and voice_polish, the voice's 整理 switch, gone with it always on;
+        // a stored one, of any type, read by nothing
+        val stale = RETIRED.filter(sharedPreferences::contains)
+        if (stale.isNotEmpty()) sharedPreferences.edit { stale.forEach(::remove) }
         migrateSwipe()
+        migrateKeyDrawing()
         settleMarkPositions()
     }
 
@@ -803,6 +808,29 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 putString(SWIPE_LAYERS, SwipeLayersChoice.of(SwipeLayers.fromLegacy(legacy)).name)
             }
             remove(SWIPE_SYMBOL_BEHAVIOR)
+        }
+    }
+
+    /**
+     * 0.5's two switches 滑行输入 and 笔画筛选 as 在键上划: glide if it was on, else the stroke filter if
+     * that was, else off. Both on (the page never stored that: a backup, edited by hand) reads as glide, the
+     * older and wider of the two. One set already is kept, the old two dropped all the same.
+     */
+    private fun migrateKeyDrawing() {
+        if (!sharedPreferences.contains(GLIDE_TYPING) && !sharedPreferences.contains(STROKE_FILTER)) return
+        // stored as another type: read as off, never a crash at every start
+        fun on(key: String) = runCatching { sharedPreferences.getBoolean(key, false) }.getOrDefault(false)
+        sharedPreferences.edit {
+            if (!sharedPreferences.contains(KEY_DRAWING)) {
+                val drawing = when {
+                    on(GLIDE_TYPING) -> KeyDrawing.Glide
+                    on(STROKE_FILTER) -> KeyDrawing.StrokeFilter
+                    else -> KeyDrawing.Off
+                }
+                putString(KEY_DRAWING, drawing.name)
+            }
+            remove(GLIDE_TYPING)
+            remove(STROKE_FILTER)
         }
     }
 
@@ -843,8 +871,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         const val SWIPE_LAYERS = "swipe_layers"
 
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
-        const val GLIDE_TYPING = "glide_typing"
-        const val STROKE_FILTER = "stroke_filter"
+        // 0.5's two switches, and 0.6's one list that took their place
+        private const val GLIDE_TYPING = "glide_typing"
+        private const val STROKE_FILTER = "stroke_filter"
+        const val KEY_DRAWING = "key_drawing"
 
         const val AUTO_PAIRS = "auto_pairs"
         const val CALCULATION_REPLACES_SUM = "calculation_replaces_sum"

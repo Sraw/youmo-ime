@@ -49,6 +49,8 @@ class PunctuationMapUatTest {
         home.deleteRecursively()
         // the map a test saved, cached for the process
         PunctuationManager.forget()
+        // and the start keys it wrote, kept for the process too: else a later InputView reads this test's comma
+        PunctuationStartKeys.forget(appContext)
     }
 
     private fun until(what: String, done: () -> Boolean) = waitUntil(what, step = { if (::h.isInitialized) h.idle() }, done = done)
@@ -90,22 +92,21 @@ class PunctuationMapUatTest {
             val shown = { faceAndBubble(comma) }
             val twice = { c: String -> listOf(c, c) }
             // the first press at once, the start's statuses not waited for: its mark shown and typed
-            val p = ""
             assertEquals(what, twice("，"), shown())
-            until("the mark typed") { h.field.text.toString() == p + "，" }
+            until("the mark typed") { h.field.text.toString() == "，" }
             // a letter the engine leaves (the scripted one composes only a to z): typed as itself, the A of shift's
             h.tap(h.keyNamed("shift"))
             h.tap(h.key("A"))
-            until("A typed") { h.field.text.toString() == p + "，A" }
+            until("A typed") { h.field.text.toString() == "，A" }
             val half = if (on) "," else "，"
             assertEquals(what, twice(half), shown())
-            until("the mark typed") { h.field.text.toString() == p + "，A$half" }
+            until("the mark typed") { h.field.text.toString() == "，A$half" }
             // a Chinese word after it: the comma back to its mark
             h.tap(h.key("a"))
             runBlocking { fcitx.select(0) }
             until("the word typed") { h.field.text.endsWith("你好") }
             assertEquals(what, twice("，"), shown())
-            until("the mark typed") { h.field.text.toString() == p + "，A${half}你好，" }
+            until("the mark typed") { h.field.text.toString() == "，A${half}你好，" }
             h.close(); fcitx.stop()
         }
     }

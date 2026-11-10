@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -38,7 +39,9 @@ static void CheckTransducerOnly(const OnlineRecognizerConfig &config) {
   if (provider == "rknn" || provider == "qnn") {
     SHERPA_ONNX_LOGE("%s is not built (youmo: lib/sherpa-onnx/README.md).",
                      provider.c_str());
-    SHERPA_ONNX_EXIT(-1);
+    // youmo: thrown, not _Exit: the recognizer's making is under SafeJNI,
+    // voice input then reports it
+    throw std::invalid_argument("provider not built: " + provider);
   }
   if (config.model_config.transducer.encoder.empty() ||
       (!config.model_config.model_type.empty() &&
@@ -46,7 +49,7 @@ static void CheckTransducerOnly(const OnlineRecognizerConfig &config) {
     SHERPA_ONNX_LOGE(
         "Only streaming zipformer2 transducers are supported, model_type: '%s'",
         config.model_config.model_type.c_str());
-    SHERPA_ONNX_EXIT(-1);
+    throw std::invalid_argument("only streaming zipformer2 transducers");
   }
 }
 

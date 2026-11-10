@@ -56,6 +56,8 @@ jobs:
 
       - name: Set up the build
         uses: ./.github/actions/setup-build
+        with:
+          npm: "true"
 
       # :lib:ime-core is a plain JVM module: no Android SDK, no resource merging, seconds to
       # run. `check` = tests, the Android API level guard (animal-sniffer, which Android lint cannot
@@ -125,7 +127,7 @@ jobs:
         if: success() || failure()
         run: |
           node web/theme-maker/tools/assemble.mjs --engine
-          node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs
+          node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs
 
       # Findings already present are frozen in config/detekt/baseline-*.xml; this fails on new ones
       # only. Syntax rules only: type resolution does not work on this toolchain (see detekt.yml).
@@ -149,6 +151,8 @@ jobs:
             lib/ime-core/build/reports/animalsniffer/
             lib/ime-core/build/reports/kover/
             lib/ime-core/build/test-results/
+            lib/keyboard-scene/build/reports/
+            lib/keyboard-scene/build/test-results/
             lib/ime-dict-tool/build/reports/tests/
             lib/ime-dict-tool/build/reports/kover/
             lib/ime-dict-tool/build/test-results/
@@ -162,7 +166,8 @@ jobs:
   app:
     name: App JVM tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # above Test.timeout (40 min): a cancelled job skips the failure steps (heap dump, annotations)
+    timeout-minutes: 45
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
@@ -224,7 +229,8 @@ jobs:
   app_29:
     name: App JVM tests at SDK 29
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # above Test.timeout (40 min): a cancelled job skips the failure steps (heap dump, annotations)
+    timeout-minutes: 45
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7

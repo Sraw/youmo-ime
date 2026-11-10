@@ -13,11 +13,13 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -36,6 +38,13 @@ class FloatingControllerTest {
     private val noAnimation = AppPrefs.getInstance().advanced.disableAnimation
 
     private val internal = AppPrefs.getInstance().internal
+
+    // where a test put the keyboard: put back as it was (FloatingUatTest and MotionNoticeUatTest do the same)
+    @get:Rule
+    val prefsBack = PrefsRule().apply {
+        set(internal.floatingKeyboardX, internal.floatingKeyboardX.getValue())
+        set(internal.floatingKeyboardY, internal.floatingKeyboardY.getValue())
+    }
 
     // [before] runs ahead of the first layout, as a grab from the docked keyboard does
     private fun floating(before: (FloatingController) -> Unit = {}): Pair<FloatingController, View> {
@@ -59,9 +68,6 @@ class FloatingControllerTest {
     fun tearDown() {
         noAnimation.setValue(false)
         floatingPref.setValue(false)
-        // where a test put the keyboard: not the next test's (FloatingUatTest and MotionNoticeUatTest do the same)
-        internal.floatingKeyboardX.setValue(internal.floatingKeyboardX.defaultValue)
-        internal.floatingKeyboardY.setValue(internal.floatingKeyboardY.defaultValue)
     }
 
     @Test

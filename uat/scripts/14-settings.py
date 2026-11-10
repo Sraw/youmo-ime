@@ -123,6 +123,10 @@ def import_theme(d, name):
     appearance_tab(d, "主题")
     d.tap_text("新增主题", after=3.0)
     s = d.screen()
+    # 0.6.0's 新增主题 asks first: a file to import, or the web page to make one (M5)
+    if s.find(text="导入主题文件"):
+        d.tap(s.find(text="导入主题文件").c, 3.0)
+        s = d.screen()
     n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
     if not n and s.find(text="下载"):
         d.tap(s.find(text="下载").c, 2.0)
@@ -324,7 +328,7 @@ case("ST-20", needs="jvm:SettingsEffectUatTest.noLanguageKeyAWiderSpace")(lambda
 case("ST-21", needs="jvm:SettingsEffectUatTest.aCharacterMadeFirstIsTheCornerAndTheSwipe")(lambda d: None)
 
 
-case("ST-22", needs="jvm:SettingsEffectUatTest.charactersAddedThenTheDefaultBack、KotlinHostKeyboardTest.aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText、KotlinHostKeyboardTest.aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText、PopupOverridesFragmentTest$Dialog.aKeyCodeAloneIsRefusedAndTheDialogStays")(lambda d: None)
+case("ST-22", needs="jvm:SettingsEffectUatTest.charactersAddedThenTheDefaultBack、KotlinHostKeyboardTest.aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText、KotlinHostKeyboardTest.aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText、PopupOverridesFragmentTest$Dialog.aKeyCodeAloneIsRefusedAndTheDialogStays、KeyCapsTest.theEnginesCapFadesItsWordsAloneAndOutlinesItsFace")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 其他
@@ -519,7 +523,7 @@ case("ST-41", needs="jvm:GroupedKeyboardUatTest.theCodeRowIsTallOnlyInPinyinOnTh
 case("ST-42", needs="jvm:SettingsUatTest.shuangpinsKeyboardUnderItsScheme、KeyboardChoiceUatTest.shuangpinsEighteenThenNineKeysChosenAreThereAtTheNextFocus")(lambda d: None)
 
 
-case("ST-43", needs="jvm:AppPrefsTest.glideTypingCarriesOverAsItIs")(lambda d: None)
+case("ST-43", needs="jvm:AppPrefsTest.theTwoSwitchesMoveOverToKeyDrawing")(lambda d: None)
 
 
 case("ST-44", needs="jvm:AddressSettingsUatTest.theAddressPageItsListsAndRememberedAddresses")(lambda d: None)
@@ -527,7 +531,7 @@ case("ST-44", needs="jvm:AddressSettingsUatTest.theAddressPageItsListsAndRemembe
 
 case("ST-45", needs="jvm:SettingsUatTest.theNineKeysSettingsAreASectionOfEachKeyboardsPage")(lambda d: None)
 
-case("ST-46", needs="jvm:SettingsUatTest.glideTypingAndStrokeFilterTurnEachOtherOff")(lambda d: None)
+case("ST-46", needs="jvm:SettingsUatTest.keyDrawingIsOneListOfItsChoices")(lambda d: None)
 
 case("ST-47", needs="jvm:SettingsMenuUatTest.searchingFindsTheNineKeysAndTheAddressRows")(lambda d: None)
 
@@ -590,9 +594,15 @@ case("ST-61", needs="jvm:PacksUatTest.aTextPackTooOldSaysWhichVersionIsNeeded")(
 
 
 case("ST-62", needs="jvm:PacksUatTest.thePageListsEachPacksStateAndWhatItIsFor")(lambda d: None)
+case("ST-68", needs="manual:要另做一个同名、换了字体和背景图的主题文件，看键盘的字体")(lambda d: None)
+case("ST-69", needs="manual:要真麦克风说话，用过语音后再导入语音包")(lambda d: None)
+case("ST-70", needs="manual:按键字符里选中一项左移、删除，看轮廓和删掉的是哪个")(lambda d: None)
 
 
-case("ST-63", needs="release,scripted:发布包每次重置都经文件选择器导入文字包（import_packs_ui）；结果的说法在 JVM 上：PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles")(lambda d: None)
+case("ST-63", needs="release:多选文字包、语音包和一个非包文件导入，读逐文件的结果框、看下载里的原文件还在；结果框出现时转屏只一个框，点确定后再转屏、切到别的应用再回来不再弹出（手工）；结果的说法在 JVM 上：PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles")(lambda d: None)
+
+
+case("ST-67", needs="release:覆盖安装 0.5.x→0.6.0 和恢复 0.5.x 的备份，发版时的升级检查里手工跑；JVM 见 ThemePrefsMigrationTest、ThemePrefsTest、KeyboardAreaTest")(lambda d: None)
 
 
 case("ST-64", needs="release:要上一版（0.5.x）的包覆盖安装；方法见 dev/design/060-asset-packs.md 的实现记录")(lambda d: None)
@@ -620,7 +630,73 @@ def st66(d):
             check(r is not None, f"滚到底看不到「{last}」")
             bottom = r.b[3]
         else:   # the theme list: its lowest item
-            bottom = max(n.b[3] for n in s.app() if n.clickable and n.pkg == PKG)
+            bottom = max((n.b[3] for n in s.app() if n.clickable and n.pkg == PKG), default=None)
+            if bottom is None:
+                raise Blocked(f"{tab}：主题页上没有可点的项：{s.texts()[:6]}")
         check(bottom <= top + 2, f"{tab}：最后一行底 {bottom} 在导航栏顶 {top} 下面")
         out.append(f"{tab} 最后一行底 {bottom} ≤ 导航栏顶 {top}")
     return "；".join(out)
+
+
+SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "lib", "keyboard-scene", "src", "commonMain")
+
+
+def push_layouts_pack(d):
+    """uat-layouts.theme in 下载: Nord as a pack of its own with a 26 keys whose q types 你好, an 18 keys of
+    another name and a k14 that does not read"""
+    import zipfile
+
+    def read(*p):
+        with open(os.path.join(SCENE, *p), encoding="utf-8") as f:
+            return f.read()
+    qwerty = read("layouts", "qwerty.xml").replace('name="26 键"', 'name="主题 26 键"') \
+        .replace('label="{case:q}" alt="{alt:q}" send="q"', 'label="{case:q}" alt="{alt:q}" send="commit:你好"')
+    k18 = read("layouts", "k18.xml").replace('name="18 键"', 'name="主题 18 键"')
+    layouts = {"qwerty.xml": qwerty, "k18.xml": k18, "k14.xml": "<keyboard/>"}
+    p = os.path.join(tempfile.gettempdir(), f"uat-layouts-{d.port}.theme")
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("theme.xml", read("themes", "nord.xml").replace('name="nord"', 'name="uat-layouts"', 1))
+        for n, t in layouts.items():
+            z.writestr("layouts/" + n, t)
+    d.sh("rm -f /sdcard/Download/uat-layouts*.theme")
+    d.adb("push", p, "/sdcard/Download/uat-layouts.theme")
+    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-layouts.theme")
+    time.sleep(1)
+
+
+@case("ST-72", base="B0-设置", mutates=True)
+def st68(d):
+    from uat import gear
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统夜间模式", False)
+    push_layouts_pack(d)
+    d.step("导入")
+    import_theme(d, "uat-layouts")
+    # the app's 26 keys' four (/ @ . .com) and q's; k14 does not read
+    for told in ("此主题包含自定义布局：k18, qwerty（其中 5 个动作直接输入布局里写的文字）", "缺键盘必需的键，或不是已有的键盘）：k14"):
+        check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:10]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "导入后主题列表里没有它")
+    d.tap(item.c, 1.5)
+    d.step("打字")
+    d.open_page("text")
+    d.type("q")
+    d.expect_field("你好", msg="点 q 没有输入布局里写的「你好」")
+    d.step("切键盘")
+    gear(d, "拼音")
+    d.tap_text("键盘", after=1.0)
+    opts = d.screen().texts("all")
+    d.back(after=0.5)
+    for want in ("全键盘（主题：主题 26 键）", "18 键（主题：主题 18 键）", "14 键"):
+        check(want in opts, f"键盘选项里没有「{want}」：{opts[:12]}")
+    out = []
+    for option in ("18 键（主题：主题 18 键）", "14 键"):
+        gear(d, "拼音")
+        choose(d, "键盘", option)
+        d.open_page("text")
+        n = len(d.keys(refresh=True))
+        check(n > 10, f"{option} 没弹出（{n} 个键）")
+        out.append(f"{option} {n} 键")
+    return "提示 5 个 commit:、k14 不用；q 打出你好；" + "、".join(out)

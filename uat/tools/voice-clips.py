@@ -1,5 +1,5 @@
 """The spoken phrases of uat/12-voice.md as WAVs, for 12-voice.py on the emulator (its microphone is
-the voice debug build's clip microphone, VoiceClipProvider, that uat.py's Device.say writes them into). Made on this machine, offline: Kokoro
+the debug build's clip microphone, VoiceClipProvider, that uat.py's Device.say writes them into). Made on this machine, offline: Kokoro
 v1.1-zh through sherpa-onnx (the models of ~/voice-eval, VOICE_EVAL to move it), each checked by the
 X-ASR model of the same place so a clip that the recognizer cannot follow is not taken for the app's
 fault. A cough is filtered noise; `room` 3 s of pink noise at some -60 dBFS, `room-long` 10 s of it (VO-09:

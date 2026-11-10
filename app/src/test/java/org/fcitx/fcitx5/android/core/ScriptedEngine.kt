@@ -47,6 +47,13 @@ class ScriptedEngine(private val home: File) : KotlinHost.EngineSide, EngineHost
                 typed = ""
             }
             EngineEvent.RESET -> typed = ""
+            // Return: what is typed committed as it is (pinyin's raw letters)
+            EngineEvent.ENTER -> if (typed.isNotEmpty()) {
+                commit = typed
+                typed = ""
+            } else {
+                return idle()
+            }
             else -> return idle()
         }
         val shown = if (typed.isEmpty()) emptyList() else WORDS

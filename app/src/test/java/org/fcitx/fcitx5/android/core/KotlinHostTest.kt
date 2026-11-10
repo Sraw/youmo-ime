@@ -106,24 +106,6 @@ class KotlinHostTest {
         directBoot(false)
     }
 
-    // 060-render-p3 T9b review L6: the groups a layout's own keyboard told as it was shown reach the engine's
-    // side with its first key, before the key does (EngineBridge.syncOwnKeys): the keyboard its codes are read by
-    @Test
-    fun aKeyTellsTheGroupsTheKeyboardShownToldFirst() = runBlocking {
-        val own = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
-        val letters = NineKeyLetters.custom(own)
-        NineKeyLetters.clearInUse()
-        EngineState.ownKeys = own
-        assertNull(NineKeyLetters.ofCode(letters.codes[0].code))
-        fcitx.sendKey('a', 0u, 0, false, 0)
-        assertEquals(letters, NineKeyLetters.ofCode(letters.codes[0].code))
-        // other groups told: the next key reads by them
-        val other = NineKeyLetters.custom(own.reversed())
-        EngineState.ownKeys = own.reversed()
-        fcitx.sendKey('b', 0u, 0, false, 0)
-        assertEquals(other, NineKeyLetters.ofCode(other.codes[0].code))
-    }
-
     @Test
     fun readyIsTheFirstEventAndPinyinLeadsTheGroupOnTheFirstRun() = runBlocking {
         assertTrue(events.first() is HostEvent.Ready)

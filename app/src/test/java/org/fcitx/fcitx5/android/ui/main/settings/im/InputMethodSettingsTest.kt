@@ -113,7 +113,7 @@ class InputMethodSettingsTest {
     @Test
     fun theSharedOptionsAreOnTheSharedPageAlone() {
         val shared = listOf(
-            AppPrefs.GLIDE_TYPING, AppPrefs.STROKE_FILTER, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM, InputMethodSettings.ADDRESSES,
+            AppPrefs.KEY_DRAWING, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM, InputMethodSettings.ADDRESSES,
             EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.BUILT_IN_PHRASES, EngineSettings.MODEL_LEVEL, EngineSettings.CANDIDATE_READING, InputMethodSettings.PUNCTUATION,
             "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", EngineSettings.FUZZY,
         )
@@ -163,10 +163,8 @@ class InputMethodSettingsTest {
             is InputMethodSettings.Titled -> row.notFor
             else -> error("$row")
         }
-        // a finger drawn on the keyboard: a glide, every input method's that glides; a stroke, those that filter by one
-        assertEquals(appInputMethods.filterNot(InputMethodCatalog::glides), notFor(AppPrefs.GLIDE_TYPING))
-        assertEquals(listOf(InputMethodCatalog.HANDWRITING), notFor(AppPrefs.GLIDE_TYPING))
-        assertEquals(appInputMethods.filterNot(InputMethodCatalog::filtersByStrokes), notFor(AppPrefs.STROKE_FILTER))
+        // a finger drawn on the keyboard: one list whose choices reach different input methods, said in the docs, not under it
+        assertEquals(emptyList<String>(), notFor(AppPrefs.KEY_DRAWING))
         assertEquals(emptyList<String>(), notFor(AppPrefs.AUTO_PAIRS))
         assertEquals(emptyList<String>(), notFor(AppPrefs.CALCULATION_REPLACES_SUM))
         // the Chinese input methods' section says English for all of it: under a row, only an exception within it

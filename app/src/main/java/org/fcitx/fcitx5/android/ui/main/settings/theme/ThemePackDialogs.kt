@@ -36,6 +36,9 @@ object ThemePackDialogs {
         val staged = pack.staged
         val out = lines(ctx, staged.theme.meta, staged.theme.version).toMutableList()
         if (pack.replaces) out += ctx.getString(R.string.theme_pack_replaces)
+        val layouts = staged.layoutReport
+        if (layouts.used.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts, layouts.used.joinToString(", "), layouts.commits)
+        if (layouts.unused.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts_unused, layouts.unused.joinToString(", ") { it.first })
         if (staged.warnings.isNotEmpty()) out += ctx.getString(R.string.theme_pack_warnings) + "\n" + staged.warnings.joinToString("\n") { "· $it" }
         return out.joinToString("\n")
     }

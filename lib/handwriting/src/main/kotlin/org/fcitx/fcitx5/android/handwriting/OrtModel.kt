@@ -4,10 +4,7 @@
  */
 package org.fcitx.fcitx5.android.handwriting
 
-import java.io.File
-import java.io.FileInputStream
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -16,10 +13,10 @@ import kotlin.concurrent.write
  * One onnxruntime model of one input, floats ([run]) or int64s ([runLongs], the voice polish
  * tagger's character ids), and float outputs, an ORT-format file (a resource pack's): mapped and
  * read where it lies, not onto the heap. [run] may be called from any thread, also at once; [close]
- * waits for runs under way.
+ * waits for runs under way. The mapping the session reads in place is held by the native side (a
+ * global reference) till [close], not by a field here that R8 could drop.
  */
-// [bytes]: the mapping the session reads in place, held as long as it is
-class OrtModel private constructor(private var handle: Long, @Suppress("unused") private val bytes: ByteBuffer) : AutoCloseable {
+class OrtModel private constructor(private var handle: Long) : AutoCloseable {
 
     // how many outputs it has: runLongs' room for their dimensions
     private val outputs = nativeOutputs(handle)
@@ -59,14 +56,13 @@ class OrtModel private constructor(private var handle: Long, @Suppress("unused")
             System.loadLibrary("youmo-handwriting")
         }
 
-        /** The model file [file], mapped, run on [threads] threads. */
-        fun open(file: File, threads: Int = 1): OrtModel =
-            open(FileInputStream(file).channel.use { it.map(FileChannel.MapMode.READ_ONLY, 0, it.size()) }, threads)
-
-        /** The model in [bytes], a direct buffer (a mapped file), used in place: not changed while open. */
+        /**
+         * The model in [bytes], a direct buffer (a mapped file), used in place: not changed while open.
+         * The whole buffer is the model, whatever its position and limit.
+         */
         fun open(bytes: ByteBuffer, threads: Int = 1): OrtModel {
             require(bytes.isDirect) { "a direct buffer: the session reads it in place" }
-            return OrtModel(nativeOpen(bytes, threads), bytes)
+            return OrtModel(nativeOpen(bytes, threads))
         }
 
         @JvmStatic

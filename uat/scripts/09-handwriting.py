@@ -112,7 +112,7 @@ case("HW-29", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAnd
 case("HW-30", needs="jvm:HandwritingUatTest.copyPutsTheCharacterAloneOnTheClipboardAndCommitIsATap")(lambda d: None)
 
 
-@case("HW-31", base="B0-手写", mutates="learn")
+@case("HW-31", base="B0-手写", mutates=True)
 def hw31(d):
     d.wait(lambda *_: d.screen().find(desc="手写板", where="ime"), 10, what="书写板")
     write(d, "天")
@@ -130,4 +130,5 @@ def hw31(d):
     after = d.cands()
     d.shot("kb", "屏蔽「人」后")
     check("人" not in after, f"屏蔽后候选还有「人」：{after[:6]}")
+    check(after, "屏蔽后候选空了")
     return f"「天」「人」的菜单都有屏蔽；屏蔽后候选 {after[:4]}（设置里恢复由 JVM 管）"

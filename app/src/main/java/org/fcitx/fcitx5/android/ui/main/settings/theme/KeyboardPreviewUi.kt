@@ -62,9 +62,6 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private val navbarBackground = ThemeManager.prefs.navbarBackground
     private val keyboardBottomFlush = keyboardPrefs.keyboardBottomFlush
-    private val followPrefs = with(keyboardPrefs) {
-        listOf(keyboardHeightFollowTheme, keyboardSidePaddingFollowTheme, keyboardBottomPaddingFollowTheme)
-    }
 
     private val sizeChangeListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         recalculateSize()
@@ -105,7 +102,6 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         override fun onAttachedToWindow() {
             super.onAttachedToWindow()
             recalculateSize()
-            onSizeMeasured?.invoke(intrinsicWidth, intrinsicHeight)
             navbarBackground.registerOnChangeListener(sizeChangeListener)
             keyboardBottomFlush.registerOnChangeListener(sizeChangeListener)
             // the docked handle is counted in the height cap (keyboardWindowAspectRatio)
@@ -113,8 +109,6 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             ThemeManager.prefs.codeRow.registerOnChangeListener(sizeChangeListener)
             // the bar's height follows the candidate text size (KawaiiBarComponent.heightDp)
             ThemeManager.prefs.candidateTextSize.registerOnChangeListener(sizeChangeListener)
-            // 跟随主题 picked or left: a level of the numbers already stored changes the flag alone
-            followPrefs.forEach { it.registerOnChangeListener(sizeChangeListener) }
         }
 
         override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -129,12 +123,9 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             ThemeManager.prefs.alwaysShowHandle.unregisterOnChangeListener(sizeChangeListener)
             ThemeManager.prefs.codeRow.unregisterOnChangeListener(sizeChangeListener)
             ThemeManager.prefs.candidateTextSize.unregisterOnChangeListener(sizeChangeListener)
-            followPrefs.forEach { it.unregisterOnChangeListener(sizeChangeListener) }
             super.onDetachedFromWindow()
         }
     }
-
-    var onSizeMeasured: ((Int, Int) -> Unit)? = null
 
     private fun keyboardWindowAspectRatio(): Pair<Int, Int> {
         val resources = ctx.resources
@@ -205,11 +196,12 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         // the bar as the input view has it, the theme's `bar` (SceneBar)
         fakeKawaiiBar.background = SceneBar.background(SceneBar.of(ctx, theme))
         shownTheme = theme
-        makeKeyboard()
-        if (!switched) return
-        // another theme's keyboard size where the settings follow it (KeyboardArea.sizes)
+        if (!switched) return makeKeyboard()
+        // another theme's keyboard size where the settings follow it (KeyboardArea.sizes), measured first: a
+        // size into or out of 紧凑 makes the keys itself, else they are made here, once either way
+        val compact = compactShown
         recalculateSize()
-        onSizeMeasured?.invoke(intrinsicWidth, intrinsicHeight)
+        if (compactShown == compact) makeKeyboard()
     }
 
     // what setTheme was last given: lateinit, as the init block above sets it

@@ -79,7 +79,6 @@ abstract class BaseKeyboard(
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceKeys = mutableListOf<KeyHandle>()
 
-
     /** Holding the space talks here ([updateSpaceBadges]): the microphone on it. Before init, which sets it. */
     protected var holdsToTalk = false
         private set
@@ -145,8 +144,7 @@ abstract class BaseKeyboard(
     /** Set per field ([KeyboardWindow]): an address's has no glide typing, as no word is typed there. */
     open var address: AddressKeys = AddressKeys.NONE
 
-    private val glideTyping = prefs.keyboard.glideTyping
-    private val strokeFilter = prefs.keyboard.strokeFilter
+    private val keyDrawing = prefs.keyboard.keyDrawing
 
     /**
      * Set as the input method has something typed or not, a temporary mode's (快速输入) not counted
@@ -169,8 +167,8 @@ abstract class BaseKeyboard(
 
     /**
      * Glide typing over [letters], taken where [enabled] says and 滑行输入 is on, in a field where
-     * words are typed: not a password's or an address's. Where 笔画筛选 is on instead (the settings
-     * page keeps the two from being on together), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
+     * words are typed: not a password's or an address's. Where 笔画筛选 is chosen instead (one setting,
+     * [KeyDrawing]), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
      * one: sent as the engine's stroke key (Keyboard.strokeKey), the shape StrokeShape's; one it
      * reads as none is dropped.
      */
@@ -182,11 +180,11 @@ abstract class BaseKeyboard(
         glided: (path: FloatArray, layout: GlideLayout) -> Unit,
     ) = GlideInput(
         this, theme,
-        enabled = { glideTyping.getValue() && wordField() && enabled() },
+        enabled = { keyDrawing.getValue() == KeyDrawing.Glide && wordField() && enabled() },
         letters = letters,
         longPressMillis = { longPressDelay.toLong() },
         down = down,
-        strokes = { strokeFilter.getValue() && wordField() && imTyping && filters() },
+        strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
         stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction(KeySym(UNICODE + Keyboard.strokeKey(it)), KeyStates.Virtual)) } },
         glided = glided,
     )
@@ -291,18 +289,11 @@ abstract class BaseKeyboard(
      * swipes ([KeySwipes]), its popups.
      */
     private fun wire(key: KeyHandle, def: KeyDef) {
-        key.keyGesture.soundEffect = when (def) {
-            // a layout's key: its node's sound (060-render-p2 S4)
-            is SceneKeyDef -> def.sound
-            is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
-            is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
-            is BackspaceKey -> InputFeedbacks.SoundEffect.Delete
-            is ReturnKey -> InputFeedbacks.SoundEffect.Return
-            else -> InputFeedbacks.SoundEffect.Standard
-        }
+        // every key is a layout's node (SceneKeys): its node's sound (060-render-p2 S4)
+        val scene = def as? SceneKeyDef
+        key.keyGesture.soundEffect = scene?.sound ?: InputFeedbacks.SoundEffect.Standard
         // the number pad's space moves the cursor too (UAT PAN-14): it had the press only
-        val space = def is SpaceKey || def is MiniSpaceKey || (def is SceneKeyDef && def.isSpace)
-        if (space) wireSpace(key) else if (def is BackspaceKey || (def is SceneKeyDef && def.isBackspace)) wireBackspace(key)
+        if (scene?.isSpace == true) wireSpace(key) else if (scene?.isBackspace == true) wireBackspace(key)
         wireBehaviors(key, def)
         // set as its long press shows a popup, which then has the touch: no swipe of the key's after that
         val longPopup = LongPopup()
@@ -508,6 +499,8 @@ abstract class BaseKeyboard(
 
     /** As [drawKeysWithScene] by its id, [layout] read already (null: none read, nothing drawn): a grouped keyboard's, its groups checked first. */
     protected fun drawKeysWithScene(layout: SceneLayout?) {
+        // once, in init: a second canvas would sit under the first, the touches the new one's
+        check(canvas == null) { "drawKeysWithScene called twice" }
         val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
         sceneBoard = board
         val view = board.view(keyImages, ::sceneString, { node -> sceneKey(node) }) { onSceneBuilt(it) }
@@ -537,6 +530,7 @@ abstract class BaseKeyboard(
 
     /** A scene made anew for the canvas ([scene]; null, none drawn): what a keyboard places by it, placed again. */
     internal open fun onSceneBuilt(scene: Scene?) {}
+
     /** The keyboard's own words for a string its layout names ([KeyboardCanvasView.Host.string]): null, the app's shared ones. */
     protected open fun sceneString(name: String): String? = null
 

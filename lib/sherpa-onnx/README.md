@@ -28,11 +28,13 @@ Each change is made to both recognizers, the offline (`OfflineRecognizer`) and t
   matched within a segment: an endpoint's `Reset` puts every hypothesis back at the graph's root.
 - **N-best:** the results' `nbest` and `nbestScores`, the beam's hypotheses best first (in
   `AsJsonString` too). The app ranks them again with its pinyin model (`VoiceRerank`). Streaming,
-  `GetResult` gives the n-best so far, at any time, each text once (after an endpoint, hypotheses
+  `GetResult` gives the n-best so far, at any time, each token sequence once (the app's `VoiceRerank` makes texts distinct; after an endpoint, hypotheses
   that differed only before it can write the next segment alike), none before anything is heard.
   At an endpoint each carried hypothesis's log prob is taken less the best's, so a segment's
   scores and its best (ranked by log prob over length) are its own; upstream's divided the earlier
   segments' sum by the new one's length, which favoured longer hypotheses.
+  Unlike upstream, the new segment's beam also holds the blank hypothesis at 0, level with the best
+  carried one (upstream's was far ahead of them all).
 - **Hotwords graph:** `CreateStream(hotwords)` keeps the graph of the last hotwords it was given and
   returns it again for the same ones, rather than building the pack's hotwords into a new graph for
   each stream. The user's words are not written to the log, where upstream's streaming recognizer

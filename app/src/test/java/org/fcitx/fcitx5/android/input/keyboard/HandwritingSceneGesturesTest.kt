@@ -13,14 +13,16 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
-import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -30,10 +32,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The handwriting keyboard drawn by the scene does what its views did (060-render-p2 S5b): each key's
- * tap and long press, what reaches the engine; the pad in the scene's slot `pad`, written on; 注 on as
- * its key's state (KeyState.On) and said as its view said it. ，and 。 are the one thing meant to
- * differ (§5.3 S5b): shown as they type (punctuation's mapping), where the views showed them full width.
+ * The handwriting keyboard drawn by the scene (060-render-p2 S5b): each key's tap and long press, what
+ * reaches the engine and the field, held to the committed record ([GestureSnapshot]); the pad in the
+ * scene's slot `pad`, written on, a stroke keeping every point a frame batched; 注 on as its key's state
+ * (KeyState.On) and said by its state. ，and 。 shown as they type (punctuation's mapping, §5.3 S5b).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -80,19 +82,22 @@ class HandwritingSceneGesturesTest {
                         h.tap(h.keyNamed(id))
                     }
                     h.idle()
-                    out += "$id ${if (held) "long press sent" else "tap"}: " +
-                        h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("triggerUnicode") } +
-                        " field ${h.field.text}"
+                    val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("triggerUnicode") }
+                    // ⌫ held repeats, how many times as the press falls in the frame: the record keeps that it
+                    // repeats and what, not the count
+                    val shown = if (held && id == "backspace") "repeats ${sent.distinct()}".also { assertTrue(sent.toString(), sent.size >= MIN_REPEATS) } else "$sent"
+                    out += "$id ${if (held) "long press sent" else "tap"}: " + shown + " field ${h.field.text}"
                 }
             }
         }
         return out
     }
 
-    // the one difference meant (060-render-p2 §5.3, C 疑问 3): 123 held is Unicode input, as on every board; its view had no long press
+    // each key against the record; 123 held is Unicode input, as on every board (060-render-p2 §5.3, C 疑问 3)
     @Test
-    fun everyKeyAsItsView() {
+    fun everyKeyDoesWhatItDid() {
         val scene = gestures()
+        GestureSnapshot.check("handwriting", scene)
         assertTrue(scene.toString(), scene.any { it.startsWith("numbers long press sent: [triggerUnicode()]") })
     }
 
@@ -240,6 +245,26 @@ class HandwritingSceneGesturesTest {
         }
     }
 
+    // a new gesture's first finger (id 0, as always) on the pad while the keys still hold a finger with
+    // id 0 (its stream cut short, no UP): the keys' side cancelled all the same, ⌫ repeats no more (R20 F5886)
+    @Test
+    fun aNewGestureCancelsASideLeftWithTheSameFingerId() {
+        harness().use { h ->
+            val pad = h.pad()
+            val f = Fingers(h)
+            f.down(0, f.at(h.keyNamed("backspace")))
+            f.lose(0)
+            f.down(0, f.at(pad, 0.3f, 0.3f))
+            val keys = { h.api.calls.count { it.startsWith("sendKey") } }
+            h.idle()
+            val after = keys()
+            h.after(2000)
+            h.idle()
+            assertEquals(after, keys())
+            assertEquals(true, pad.pad.drawing)
+        }
+    }
+
     // no scene (060-render-p2 U8): nothing of the keyboard shown, the pad neither; a scene again, the pad again
     @Test
     fun thePadHiddenWhileTheSceneFails() {
@@ -258,8 +283,26 @@ class HandwritingSceneGesturesTest {
         }
     }
 
-    // a stroke's points as the pad got them under the views: one MOVE's batched samples (between frames) each a point
-    private fun strokePoints(): String = harness().use { h ->
+    // R20 F5888: the scene made anew as it is drawn, not in a layout: none (failed) with the pad shown asks for a
+    // layout (which hides it); the same slot as placed asks nothing (a scene made again for Return alone)
+    @Test
+    fun aSceneMadeAsItIsDrawnPlacesThePadAgainOnlyWhenItsSlotChanged() {
+        harness().use { h ->
+            val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
+            val scene = checkNotNull(KeyboardHarness.boardCanvas(kb)!!.scene)
+            h.relayout()
+            assertFalse(kb.isLayoutRequested)
+            kb.onSceneBuilt(scene)
+            assertFalse("the slot where the pad is: nothing asked", kb.isLayoutRequested)
+            kb.onSceneBuilt(null)
+            assertTrue("no scene, the pad shown: a layout asked", kb.isLayoutRequested)
+        }
+    }
+
+    // one MOVE's batched samples (between frames) each a point of the stroke, as the pad gets them through the
+    // keyboard (HandwritingKeyboard.send rebuilds the history): dropped, a stroke loses points and reads worse
+    @Test
+    fun aStrokeKeepsTheSamplesBatchedBetweenFrames() = harness().use { h ->
         val kb = KeyboardHarness.find<HandwritingKeyboard>(h.keyboard)!!
         val pad = h.pad()
         val x0 = pad.left + pad.width * 0.3f
@@ -280,7 +323,10 @@ class HandwritingSceneGesturesTest {
         send(android.view.MotionEvent.obtain(t, t + 24, android.view.MotionEvent.ACTION_UP, pad.right + 30f, y0, 0))
         h.idle()
         val s = pad.pad.strokes
-        "strokes=${s.size} points=${s.map { it.size / 2 }} calls=${h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }}"
+        assertEquals("strokes", 1, s.size)
+        // DOWN, the 3 batched and the MOVE's own at least (the move out of the pad may add its own)
+        assertTrue("points ${s.single().size / 2}", s.single().size / 2 >= 5)
+        assertTrue("${h.api.calls}", h.api.calls.none { it.startsWith("sendKey") || it.startsWith("commit") })
     }
 
     // ，。 as they type: with Chinese punctuation on, full width; off (the mapping empty), what is typed is half width
@@ -298,52 +344,46 @@ class HandwritingSceneGesturesTest {
     }
 
     @Test
-    fun readingKeyOnAsItsStateAndSaidAsItsView() {
-        val said = listOf(true).map { _ ->
-            harness().use { h ->
-                val off = h.keyNamed("reading").description
-                EngineState.candidateReadingState.value = ReadingStyle.PINYIN
-                h.idle()
-                h.relayout()
-                run {
-                    val node = KeyboardHarness.boardCanvas(h.keyboard)!!.keyAt("reading")!!
-                    assertTrue(node.states.toString(), org.fcitx.fcitx5.android.scene.KeyState.On in node.states)
-                }
-                val on = h.keyNamed("reading").description
-                EngineState.candidateReadingState.value = ReadingStyle.OFF
-                listOf(off, on)
-            }
+    fun readingKeyOnAsItsStateAndSaidByIt() {
+        val said = harness().use { h ->
+            val off = h.keyNamed("reading").description
+            EngineState.candidateReadingState.value = ReadingStyle.PINYIN
+            h.idle()
+            h.relayout()
+            val node = KeyboardHarness.boardCanvas(h.keyboard)!!.keyAt("reading")!!
+            assertTrue(node.states.toString(), org.fcitx.fcitx5.android.scene.KeyState.On in node.states)
+            val on = h.keyNamed("reading").description
+            EngineState.candidateReadingState.value = ReadingStyle.OFF
+            listOf(off, on)
         }
-        val name = org.robolectric.RuntimeEnvironment.getApplication().getString(R.string.im_candidate_reading)
         val app = org.robolectric.RuntimeEnvironment.getApplication()
-        assertEquals(listOf(app.getString(R.string.hw_reading_key_off, name), app.getString(R.string.hw_reading_key_on, name)), said[0])
+        val name = app.getString(R.string.im_candidate_reading)
+        assertEquals(listOf(app.getString(R.string.hw_reading_key_off, name), app.getString(R.string.hw_reading_key_on, name)), said)
     }
 
-    // 注 found by its view's name (button_reading) on either drawing: uat and TalkBack's tools look it up by it
+    // 注 found by its view's name (button_reading): uat and TalkBack's tools look it up by it
     @Test
     fun readingKeyByItsViewsName() {
-        run {
-            harness().use { h -> assertEquals("button_reading", h.keyNamed("reading").resourceName) }
-        }
+        harness().use { h -> assertEquals("button_reading", h.keyNamed("reading").resourceName) }
     }
 
-    // ，held and ？ picked: what reaches the engine and the field the same on either drawing
+    // ，held and ？ picked: a choice reaches the engine (or the field), no ，
     @Test
-    fun aPickFromTheCommasLongPressAsItsView() {
-        val sent = listOf(true).map { _ ->
-            harness().use { h ->
-                val choices = h.longPress(h.keyNamed("comma"))
-                assertTrue("$choices", "？" in choices)
-                h.api.calls.clear()
-                h.longPress(h.keyNamed("comma"), pick = "？")
-                h.idle()
-                h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } + "field ${h.field.text}"
-            }
-        }
-        assertTrue(sent[0].toString(), sent[0].size > 1)
+    fun aPickFromTheCommasLongPressTypesIt() = harness().use { h ->
+        val choices = h.longPress(h.keyNamed("comma"))
+        assertTrue("$choices", "？" in choices)
+        h.api.calls.clear()
+        h.longPress(h.keyNamed("comma"), pick = "？")
+        h.idle()
+        val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
+        // a choice of the popup reaches the engine, not the comma tapped. Which one: the popup's focus follows the
+        // finger's moves in steps (PopupFocus), which the harness's straight slide does not land exactly
+        assertTrue("$sent field ${h.field.text}", sent.isNotEmpty() || h.field.text.isNotEmpty())
+        // the comma goes out as key=,, (gestures/handwriting.txt's comma tap): a pick falling back to it fails here (R20 F6507)
+        assertTrue("$sent", sent.none { "，" in it || "char=,," in it || "key=,," in it })
     }
 
-    // 注's long press on the scene: each style in the settings' words, the one picked set
+    // 注's long press on the scene: each style in the settings' words, the one picked set (拼音, not the 关 it is at)
     @Test
     fun readingsMenuAsTheSettingsWordIt() {
         harness().use { h ->
@@ -351,24 +391,18 @@ class HandwritingSceneGesturesTest {
             val words = listOf(R.string.im_candidate_reading_off, R.string.im_candidate_reading_pinyin, R.string.im_candidate_reading_zhuyin).map(app::getString)
             assertEquals(words.toSet(), h.longPress(h.keyNamed("reading")).toSet())
             h.api.calls.clear()
-            h.longPress(h.keyNamed("reading"), pick = words[0])
-            // set once what the recognizer is reading is in (its own thread): waited for in real time
-            val until = System.currentTimeMillis() + SET_WITHIN_MS
-            while (h.api.calls.none { it.startsWith("setImOptions") } && System.currentTimeMillis() < until) {
-                Thread.sleep(POLL_MS)
-                h.idle()
-            }
-            assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("setImOptions") })
+            h.longPress(h.keyNamed("reading"), pick = words[1])
+            // set once what the recognizer is reading is in (its own thread)
+            h.waitFor("the reading style set") { h.api.calls.any { it.startsWith("setImOptions") } }
+            assertEquals(ReadingStyle.PINYIN.key, h.api.imOptionsSet[InputMethodCatalog.PINYIN]?.get(EngineSettings.CANDIDATE_READING))
         }
     }
 
     @Test
     fun theLanguageKeyHiddenAsTheSettingSays() {
-        run {
-            prefs.set(AppPrefs.getInstance().keyboard.showLangSwitchKey, false)
-            harness().use { h ->
-                assertTrue(h.keys().none { it.id == "lang" && it.enabled && !it.bounds.isEmpty })
-            }
+        prefs.set(AppPrefs.getInstance().keyboard.showLangSwitchKey, false)
+        harness().use { h ->
+            assertTrue(h.keys().none { it.id == "lang" && it.enabled && !it.bounds.isEmpty })
         }
     }
 
@@ -404,7 +438,7 @@ class HandwritingSceneGesturesTest {
     }
 
     private companion object {
-        const val SET_WITHIN_MS = 5_000L
-        const val POLL_MS = 10L
+        // a hold of ⌫ deletes over and over: more than the one of a tap
+        const val MIN_REPEATS = 2
     }
 }

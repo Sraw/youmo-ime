@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.until as waitUntil
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -175,7 +176,7 @@ class KeyShortcutsHostTest {
         start("给 A 的话")
         val asked = h.service.startedField
         h.start(fieldId = 2, prefill = { it.setText("给 B 的话"); it.setSelection(it.text.length) })
-        val runner = KeyShortcutRunner(h.service, InputWindowManager(), {}, {}) { false }
+        val runner = KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}) { false }
         runner.clear(null, asked)
         runner.clear(HostCore.Retyping(InputMethodCatalog.PINYIN, emptyList()), asked)
         synced()
@@ -305,9 +306,15 @@ class KeyShortcutsHostTest {
         val clipboard = appContext.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(android.content.ClipData.newPlainText(null, "旧的"))
         start("")
+        // each said (the empty field's branch run, not a swipe that never reached the command)
+        fun said(): List<String> = org.robolectric.Shadows.shadowOf(appContext as android.app.Application).latestPopupWindow
+            ?.contentView?.let { v -> KeyboardHarness.all(v).filterIsInstance<android.widget.TextView>().map { it.text.toString() }.toList() }.orEmpty()
         swipe(h.key("c"), up = true)
+        synced()
+        assertTrue(said().toString(), appContext.getString(R.string.nothing_to_copy) in said())
         swipe(h.key("x"), up = true)
         synced()
+        assertTrue(said().toString(), appContext.getString(R.string.nothing_to_cut) in said())
         assertEquals("旧的", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
     }
 

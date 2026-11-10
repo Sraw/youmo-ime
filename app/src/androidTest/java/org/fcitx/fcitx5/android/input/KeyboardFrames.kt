@@ -6,10 +6,13 @@ package org.fcitx.fcitx5.android.input
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
 import android.os.Debug
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
+import android.system.Os
+import android.system.OsConstants
 import android.view.Choreographer
 import android.view.FrameMetrics
 import android.view.MotionEvent
@@ -17,6 +20,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.Window
+import java.io.File
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.ceil
@@ -65,8 +69,16 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
         val draw: Long,
         val sync: Long,
         val issue: Long,
+        val input: Long,
+        val animation: Long,
+        val swap: Long,
+        // API 31+: the frame's deadline (FrameMetrics.DEADLINE); 0 before
+        val deadline: Long,
     ) {
         val done get() = intended + total
+
+        // the CPU's part of a frame, as Jetpack Macrobenchmark's FrameTimingMetric sums it (frameDurationCpuMs)
+        val cpu get() = input + animation + layoutMeasure + draw + sync + issue + swap
     }
 
     /** One frame asked for: the time it is counted [from] (System.nanoTime), and what was seen of it. */
@@ -77,6 +89,9 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
 
         // when an input event reached the window (DownMarks), 0 for anything else
         @Volatile var dispatched = 0L
+
+        // given up on ([await] timed out): its frame callback and pre-draw listener let go
+        @Volatile var cancelled = false
     }
 
     /** A mark's frame, in milliseconds from its [Mark.from]: to the frame done, null without its metrics. */
@@ -119,6 +134,10 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
             m.getMetric(FrameMetrics.DRAW_DURATION),
             m.getMetric(FrameMetrics.SYNC_DURATION),
             m.getMetric(FrameMetrics.COMMAND_ISSUE_DURATION),
+            m.getMetric(FrameMetrics.INPUT_HANDLING_DURATION),
+            m.getMetric(FrameMetrics.ANIMATION_DURATION),
+            m.getMetric(FrameMetrics.SWAP_BUFFERS_DURATION),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) m.getMetric(FrameMetrics.DEADLINE) else 0L,
         )
         // a long run keeps only the recent ones: marks are looked up within seconds
         if (frames.size > MAX_FRAMES) frames.subList(0, frames.size - MAX_FRAMES / 2).clear()
@@ -140,11 +159,15 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
         choreographer.postFrameCallback(object : Choreographer.FrameCallback {
             override fun doFrame(frameTimeNanos: Long) {
                 frameTime = frameTimeNanos
-                if (mark.preDraw == 0L) choreographer.postFrameCallback(this)
+                if (mark.preDraw == 0L && !mark.cancelled) choreographer.postFrameCallback(this)
             }
         })
         root.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
             override fun onPreDraw(): Boolean {
+                if (mark.cancelled) {
+                    root.viewTreeObserver.removeOnPreDrawListener(this)
+                    return true
+                }
                 if (!ready()) return true
                 root.viewTreeObserver.removeOnPreDrawListener(this)
                 mark.vsync = frameTime
@@ -161,7 +184,10 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
     fun await(mark: Mark, timeoutMs: Long = 5_000): Sample {
         val deadline = SystemClock.uptimeMillis() + timeoutMs
         while (mark.committed == 0L) {
-            check(SystemClock.uptimeMillis() < deadline) { "no frame drawn within $timeoutMs ms" }
+            if (SystemClock.uptimeMillis() >= deadline) {
+                mark.cancelled = true
+                error("no frame drawn within $timeoutMs ms")
+            }
             SystemClock.sleep(2)
         }
         // the metrics come a little after the frame, on their own thread
@@ -179,6 +205,39 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
     private fun frameOf(mark: Mark): Frame? = frames.lastOrNull { it.vsync == mark.vsync }
         ?: frames.lastOrNull { it.intended <= mark.preDraw && it.done >= mark.preDraw }.takeIf { mark.vsync == 0L }
 
+    /** The frames whose intended vsync is in [from, to) (System.nanoTime), as far as they are kept. */
+    fun between(from: Long, to: Long): List<Frame> = frames.filter { it.intended in from until to }
+
+    /**
+     * [frames] summed up as design 060-render-p3 §4.3 asks: the CPU's part a frame (p50/p90/p99 ms) and
+     * the share of frames over their deadline: TOTAL_DURATION past DEADLINE from API 31, past one
+     * refresh period before (an approximation, compared on the same device only).
+     */
+    fun summary(frames: List<Frame>): String {
+        if (frames.isEmpty()) return "frames 0"
+        val cpu = Stats(frames.map { ms(it.cpu) })
+        val period = (1e9 / (window.decorView.display?.refreshRate ?: DEFAULT_HZ)).toLong()
+        val over = frames.map { ms(it.total - (if (it.deadline > 0) it.deadline else period)) }
+        val late = over.count { it > 0 }
+        val approx = if (frames.all { it.deadline > 0 }) "" else " (API 30: past a refresh period, overcounts)"
+        return "frames ${frames.size}\tcpu ms %.2f / %.2f / %.2f\toverrun p90 %.2f ms\tlate %.1f%%$approx".format(
+            Locale.ROOT, cpu.median, cpu.p90, cpu.p99, Stats(over).p90, 100.0 * late / frames.size,
+        )
+    }
+
+    /** [lengthMs] of nothing done (not the main thread): the frames drawn and the process's share of a core ([ProcessCpu]). */
+    fun idle(lengthMs: Long): String {
+        val cpu = ProcessCpu.ms()
+        val from = System.nanoTime()
+        SystemClock.sleep(lengthMs)
+        val to = System.nanoTime()
+        val used = ProcessCpu.ms() - cpu
+        // the last frames' metrics come a little later, on their own thread
+        SystemClock.sleep(METRICS_WAIT_MS)
+        val share = 100 * used / ms(to - from)
+        return "%d s\tframes %d\tprocess cpu %.2f%% of a core".format(Locale.ROOT, lengthMs / 1000, between(from, to).size, share)
+    }
+
     override fun close() {
         window.removeOnFrameMetricsAvailableListener(listener)
         thread.quitSafely()
@@ -187,6 +246,7 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
     private companion object {
         const val MAX_FRAMES = 400
         const val METRICS_WAIT_MS = 1_000L
+        const val DEFAULT_HZ = 60f
 
         fun ms(ns: Long) = ns / 1e6
     }
@@ -198,14 +258,19 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
  * (when it was made, so the system's way to the window is in). Put in as the window's callback, the
  * first that sees a touch there whatever draws the keys.
  */
-internal class DownMarks(val original: Window.Callback, private val frames: KeyboardFrames) : Window.Callback by original {
+internal class DownMarks(
+    val original: Window.Callback,
+    private val frames: KeyboardFrames,
+    // the events marked: a finger down, or (a popup's focus moved) each move
+    private val action: Int = MotionEvent.ACTION_DOWN,
+) : Window.Callback by original {
 
     @Volatile var recording = false
     val marks = CopyOnWriteArrayList<KeyboardFrames.Mark>()
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (recording && event.actionMasked == MotionEvent.ACTION_DOWN) {
-            // the press is drawn by the traversal after this event: the mark is in before it
+        if (recording && event.actionMasked == action) {
+            // the press (the move) is drawn by the traversal after this event: the mark is in before it
             marks += frames.mark(event.eventTime * NS_PER_MS).also { it.dispatched = System.nanoTime() }
         }
         return original.dispatchTouchEvent(event)
@@ -241,9 +306,34 @@ internal class Stats(values: List<Double>) {
         n % 2 == 1 -> sorted[n / 2]
         else -> (sorted[n / 2 - 1] + sorted[n / 2]) / 2
     }
-    val p90: Double = if (sorted.isEmpty()) Double.NaN else sorted[ceil(0.9 * n).toInt() - 1]
+    val p90: Double = rank(0.9)
+    val p99: Double = rank(0.99)
+
+    private fun rank(q: Double) = if (sorted.isEmpty()) Double.NaN else sorted[ceil(q * n).toInt() - 1]
 
     override fun toString() = "%.1f / %.1f".format(Locale.ROOT, median, p90)
+}
+
+/** design 060-render-p3 §4.3's rows that need motion in the engine, and the stage that brings it. */
+internal val ANIM_NOT_YET = listOf(
+    "release fade" to "A1", "press scale" to "A1", "shift transition" to "A1", "switch off" to "A1", "power save" to "A1",
+    "popup appear" to "A2", "ripple image" to "A3", "particles" to "A3", "picture idle" to "A4", "picture + press" to "A4",
+)
+
+/**
+ * The CPU time this process has used, user and system ([/proc/self/stat]'s utime + stime), in ms:
+ * one minus another over a wall time is the process's share of a core.
+ */
+internal object ProcessCpu {
+    private val tick = 1000.0 / Os.sysconf(OsConstants._SC_CLK_TCK)
+
+    fun ms(): Double {
+        // the name (field 2) may hold spaces: the fields after its closing parenthesis, utime the 12th of them
+        val after = File("/proc/self/stat").readText().substringAfterLast(')').trim().split(' ')
+        return (after[UTIME].toLong() + after[UTIME + 1].toLong()) * tick
+    }
+
+    private const val UTIME = 11
 }
 
 /** The process's memory as `dumpsys meminfo` sums it up (App Summary), in kB. */
