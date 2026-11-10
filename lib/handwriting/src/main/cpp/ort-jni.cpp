@@ -36,6 +36,9 @@ struct Model {
     std::string input;
     ONNXTensorElementDataType inputType;
     std::vector<std::string> outputs;
+    // the buffer the session reads in place: held here, a global reference, till closed, so its
+    // mapping lives as long as the session whatever R8 makes of OrtModel's fields
+    jobject bytes = nullptr;
 
     Model(const void *data, size_t size, const Ort::SessionOptions &opts)
             : session(env(), data, size, opts) {
@@ -89,6 +92,10 @@ jfloatArray outputOf(JNIEnv *jni, std::vector<Ort::Value> &out, size_t i, jlongA
     for (size_t k = 0; k < dims.size(); k++) d[k] = dims[k];
     jni->SetLongArrayRegion(jdims, at, rank, d.data());
     size_t count = info.GetElementCount();
+    if (count > static_cast<size_t>(INT32_MAX)) {
+        raise(jni, "java/lang/IllegalStateException", "output of more values than an array holds");
+        return nullptr;
+    }
     jfloatArray result = jni->NewFloatArray(static_cast<jsize>(count));
     if (result) jni->SetFloatArrayRegion(result, 0, static_cast<jsize>(count), out[i].GetTensorData<float>());
     return result;
@@ -99,7 +106,8 @@ jfloatArray outputOf(JNIEnv *jni, std::vector<Ort::Value> &out, size_t i, jlongA
 extern "C" JNIEXPORT jlong JNICALL
 Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeOpen(
         JNIEnv *jni, jclass, jobject jbytes, jint threads) {
-    // a direct buffer (a mapped file): its bytes stay where they are, OrtModel holding it till closed
+    // a direct buffer (a mapped file), the whole of it: its bytes stay where they are, the Model
+    // holding it till closed
     const void *data = jni->GetDirectBufferAddress(jbytes);
     jlong capacity = jni->GetDirectBufferCapacity(jbytes);
     if (!data || capacity <= 0) {
@@ -119,7 +127,14 @@ Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeOpen(
         opts.AddConfigEntry("session.use_ort_model_bytes_directly", "1");
         opts.AddConfigEntry("session.use_ort_model_bytes_for_initializers", "1");
         opts.AddConfigEntry("session.disable_prepacking", "1");
-        return reinterpret_cast<jlong>(new Model(data, static_cast<size_t>(capacity), opts));
+        auto *model = new Model(data, static_cast<size_t>(capacity), opts);
+        model->bytes = jni->NewGlobalRef(jbytes);
+        if (!model->bytes) {
+            delete model;
+            raise(jni, "java/lang/OutOfMemoryError", "no global reference for the model's buffer");
+            return 0;
+        }
+        return reinterpret_cast<jlong>(model);
     } catch (const std::exception &e) {
         raise(jni, "java/lang/IllegalStateException", e.what());
         return 0;
@@ -187,6 +202,7 @@ Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeRunLongs(
         jclass floats = jni->FindClass("[F");
         if (!floats) return nullptr;
         jobjectArray result = jni->NewObjectArray(static_cast<jsize>(outputs), floats, nullptr);
+        jni->DeleteLocalRef(floats);
         if (!result) return nullptr;
         for (size_t i = 0; i < outputs; i++) {
             jfloatArray values = outputOf(jni, out, i, jdims, static_cast<jsize>(i) * rank, rank);
@@ -207,6 +223,10 @@ Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeOutputs(JNIEnv *, jclas
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeClose(JNIEnv *, jclass, jlong handle) {
-    delete reinterpret_cast<Model *>(handle);
+Java_org_fcitx_fcitx5_android_handwriting_OrtModel_nativeClose(JNIEnv *jni, jclass, jlong handle) {
+    auto *model = reinterpret_cast<Model *>(handle);
+    jobject bytes = model->bytes;
+    // the session first: it reads the buffer till it is gone
+    delete model;
+    if (bytes) jni->DeleteGlobalRef(bytes);
 }

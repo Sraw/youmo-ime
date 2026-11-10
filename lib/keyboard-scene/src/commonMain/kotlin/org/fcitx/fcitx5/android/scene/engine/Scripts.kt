@@ -15,7 +15,11 @@ package org.fcitx.fcitx5.android.scene.engine
  * forms (！？Ａ１) — what a CJK font is drawn for. Latin: ASCII's printing characters (letters, digits,
  * punctuation) and the Latin letters beyond (é, ß, ā). The rest (emoji, 注音, symbols) is in the key's
  * `font`. A space (any Unicode space, a no-break one too) is of no script: it goes with the run before
- * it, or the one after it where it leads, so `拼音 Pinyin` is two runs, not three.
+ * it, or the one after it where it leads, so `拼音 Pinyin` is two runs, not three. So is what only
+ * changes the character before it (a combining mark, a keycap's enclosing mark, a variation selector,
+ * a zero-width joiner, a skin tone): `1️⃣`, `ê̄`, an ideograph's variant stay one glyph, in its font.
+ * Not Han: the general punctuation a Chinese text also uses (“ ” … — ·), nor the half-width katakana
+ * and Hangul among the full-width forms' block; the later CJK extensions (H, I) and strokes neither.
  */
 object Scripts {
     enum class Script { Han, Latin, Other }
@@ -29,8 +33,8 @@ object Scripts {
         var i = 0
         while (i < text.length) {
             val cp = codePointAt(text, i)
-            // a space: the run it is in goes on (a leading one's is the first run that has a font)
-            val f = if (cp <= MAX_BMP && cp.toChar().isWhitespace()) {
+            // a space or a joiner: the run it is in goes on (a leading one's is the first run that has a font)
+            val f = if (cp <= MAX_BMP && cp.toChar().isWhitespace() || JOINERS.any { cp in it }) {
                 null
             } else {
                 when (of(cp)) {
@@ -77,8 +81,18 @@ object Scripts {
         0x3400..0x4DBF, // extension A
         0x4E00..0x9FFF, // unified ideographs
         0xF900..0xFAFF, // compatibility ideographs
-        0xFF00..0xFFEF, // half- and full-width forms
+        0xFF00..0xFF64, // full-width forms, half-width CJK punctuation (not the half-width katakana, Hangul)
+        0xFFE0..0xFFEF, // full-width signs (￥￠), half-width arrows
         0x20000..0x3134F, // extensions B–G, compatibility supplement
+    )
+
+    private val JOINERS = listOf(
+        0x0300..0x036F, // combining diacritical marks
+        0x200D..0x200D, // zero-width joiner
+        0x20D0..0x20FF, // combining marks for symbols (U+20E3, a keycap)
+        0xFE00..0xFE0F, // variation selectors
+        0x1F3FB..0x1F3FF, // skin tone modifiers
+        0xE0100..0xE01EF, // variation selectors supplement
     )
 
     private val LATIN = listOf(

@@ -92,8 +92,9 @@ enum class SpelledForm {
 
         /**
          * The letters [code] types on the nine keys of [keyboard], whose layout's tag ([Kinds.nineKeys]) has
-         * each key's letters apart by commas; or the 14 keys' code ([Kinds.keys], BN's: bn) as that keyboard
-         * has it ([NineKeyLetters.grouped]), whose codes the tag does not say. Not grouped 双拼's: its rows
+         * each key's letters apart by commas; or a grouped keyboard's code ([Kinds.keys], BN's: bn) as the
+         * keyboard its tag files ([NineKeyLetters.filedAs]: the 14 or 18 keys, or a layout's own; never
+         * 双拼's) has it, whose codes the tag does not say. Not grouped 双拼's: its rows
          * are filed by the code itself ([filedUnder]), so its letters would look where none is.
          */
         fun nineKeyLetters(keyboard: String, code: Char): String = when {

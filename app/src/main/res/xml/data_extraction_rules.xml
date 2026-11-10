@@ -4,9 +4,11 @@
      stays on the phone, and the one made in device-protected storage (device_database) by a start
      before the first unlock: it holds clips marked sensitive, a password from a password manager say,
      which the app's own export takes out (UserDataManager) and these rules cannot. The resource packs
-     (PackStore, device_file packs/, some 300-500 MB) are over cloud backup's 25 MB, which would lose
-     the whole backup; a phone-to-phone transfer takes them, so the new phone need not import again
-     (their signatures are checked again when loaded) -->
+     (PackStore, device_file packs/, some 300-500 MB) are over cloud backup's 25 MB. The manifest's
+     allowBackup="false" turns cloud backup off anyway; the exclusion stays as a guard should it be turned
+     on. A phone-to-phone transfer (Android 12 and later, where these rules apply despite allowBackup)
+     takes the packs, so the new phone need not import again: their signature and file sizes are checked
+     when loaded, their content at the next periodic (30-day) check -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude

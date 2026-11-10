@@ -56,7 +56,7 @@ class EnginesEnglishBlockTest : EnginesFixture() {
             assertTrue("the" in e.typed("th"))
             e.onEvent(ENGLISH, EngineEvent.BLOCK, 1)
             assertFalse("the" in e.typed("th"))
-            // in any case: The at a sentence's start
+            // the one word blocked, counted once
             assertEquals(mapOf(UserWord.Kind.ADDED to 0, UserWord.Kind.LEARNED to 0, UserWord.Kind.BLOCKED to 1), e.userWordCounts())
         }
         // kept in the user directory, a file of its own; pinyin's list untouched
@@ -78,6 +78,19 @@ class EnginesEnglishBlockTest : EnginesFixture() {
             assertEquals("thw ", e.typed("thw").let { e.onEvent(ENGLISH, EngineEvent.CHAR, ' '.code).commit })
             e.removeWord(the)
             assertEquals("the ", e.typed("thw").let { e.onEvent(ENGLISH, EngineEvent.CHAR, ' '.code).commit })
+        }
+    }
+
+    // blocked, the corrector goes to the next likeliest word, not to the letters typed (R20 F5935)
+    @Test
+    fun aWordBlockedTheNextLikeliestIsCorrectedTo() {
+        // thy one letter off thw as the is, less likely
+        english = englishWith("thy")
+        engines().use { e ->
+            val at = e.typed("thw").indexOf("the")
+            assertTrue(at >= 0)
+            e.onEvent(ENGLISH, EngineEvent.BLOCK, at)
+            assertEquals("thy ", e.typed("thw").let { e.onEvent(ENGLISH, EngineEvent.CHAR, ' '.code).commit })
         }
     }
 
@@ -106,6 +119,20 @@ class EnginesEnglishBlockTest : EnginesFixture() {
             e.onEvent(ENGLISH, EngineEvent.BLOCK, 1)
             val done = e.learning(null, LearningOp.RemoveWords(listOf(the))) as LearningResult.Done
             assertEquals(emptyList<UserWord>(), e.blocked())
+            e.learning(null, LearningOp.Undo(done.undo))
+            assertEquals(listOf(the), e.blocked())
+        }
+    }
+
+    // a word removed as the list does not write it ("The", "the" on it): an undo blocks nothing it did not unblock (R20 F6084)
+    @Test
+    fun removingAWordNotAsWrittenBlocksNothingOnAnUndo() {
+        engines().use { e ->
+            e.typed("th")
+            e.onEvent(ENGLISH, EngineEvent.BLOCK, 1)
+            assertEquals(listOf(the), e.blocked())
+            val done = e.learning(null, LearningOp.RemoveWords(listOf(UserWord("The", "", UserWord.Kind.BLOCKED)))) as LearningResult.Done
+            assertEquals(listOf(the), e.blocked())
             e.learning(null, LearningOp.Undo(done.undo))
             assertEquals(listOf(the), e.blocked())
         }

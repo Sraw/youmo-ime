@@ -40,9 +40,12 @@ class XmlTest {
     @Test
     fun strayTextAndNonAsciiNamesAreProblems() {
         // nothing the formats read is text: a stray word is a slip (L7)
-        val p = assertIs<Parsed.Failed>(Xml.parse("<a>\n<b/>\n  oops\n</a>"))
-        assertEquals(3, p.problems.single().line)
-        assertTrue(p.problems.single().message.contains("oops"), "${p.problems}")
+        // a line ended by LF, by a lone CR (XML 1.0 §2.11), or by CRLF (one line, not two): the stray word on line 3
+        for (nl in listOf("\n", "\r", "\r\n")) {
+            val p = assertIs<Parsed.Failed>(Xml.parse("<a>$nl<b/>$nl  oops$nl</a>"))
+            assertEquals(3, p.problems.single().line, "line end ${nl.map { it.code }}")
+            assertTrue(p.problems.single().message.contains("oops"), "${p.problems}")
+        }
         assertIs<Parsed.Failed>(Xml.parse("<键/>"))
         assertIs<Parsed.Failed>(Xml.parse("<a 名=\"1\"/>"))
         assertIs<Parsed.Failed>(Xml.parse("<a>&#99999999;</a>"))
@@ -82,5 +85,34 @@ class XmlTest {
     fun tooDeepIsAProblem() {
         val deep = "<a>".repeat(Xml.MAX_DEPTH + 1) + "</a>".repeat(Xml.MAX_DEPTH + 1)
         assertTrue(Xml.parse(deep).problems().isNotEmpty())
+    }
+
+    @Test
+    fun anAttributeValuesLineBreaksAndTabsAreSpacesButReferencesStay() {
+        // XML 1.0 §3.3.3: a select= or shadow= written over two lines still reads as one list
+        val a = Xml.parse("<a x=\"1\n2\r\n3\r4\t5\" y=\"6&#10;7\">\n</a>").ok()
+        assertEquals("1 2 3 4 5", a["x"])
+        assertEquals("6\n7", a["y"])
+    }
+
+    @Test
+    fun referencesToWhatXmlForbidsAreProblems() {
+        for (r in listOf("&#1;", "&#x8;", "&#xB;", "&#x1F;", "&#xFFFE;", "&#xFFFF;")) {
+            assertIs<Parsed.Failed>(Xml.parse("<a x=\"$r\"/>"), r)
+        }
+        Xml.parse("<a x=\"&#9;&#xA;&#xD;&#x20;\"/>").ok()
+        // past Unicode, NUL, or a lone surrogate (which would put half a pair in a value): problems, not text
+        for (r in listOf("&#0;", "&#1114112;", "&#x110000;", "&#xD800;", "&#xDFFF;")) {
+            assertIs<Parsed.Failed>(Xml.parse("<a x=\"$r\"/>"), r)
+        }
+        Xml.parse("<a x=\"&#x10FFFF;\"/>").ok()
+    }
+
+    @Test
+    fun theSizeLimitADoubleHyphenInACommentAndALeadingBom() {
+        // a theme comes from anywhere: these are its guards
+        assertIs<Parsed.Failed>(Xml.parse("<a>" + " ".repeat(Xml.MAX_CHARS) + "</a>"))
+        assertIs<Parsed.Failed>(Xml.parse("<!-- a -- b --><a/>"))
+        assertEquals("a", Xml.parse("\uFEFF<a/>").ok().name)
     }
 }

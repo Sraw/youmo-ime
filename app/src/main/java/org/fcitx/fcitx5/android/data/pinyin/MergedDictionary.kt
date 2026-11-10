@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.data.pack.PackStore
-import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFile
@@ -23,6 +22,7 @@ import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.runtime.BackgroundWork
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
+import org.fcitx.fcitx5.android.pack.PackKind
 import timber.log.Timber
 import java.io.EOFException
 import java.io.File
@@ -177,7 +177,7 @@ object MergedDictionary {
 
     /**
      * The pinyin data typing reads, the text pack's (AppData): a word it has is kept out of the
-     * merged file's trie, offered from the base alone; none without the pack, nor in a test.
+     * merged file's trie, offered from the base alone; none without the pack.
      */
     @Volatile
     var base: () -> Base? = { packBase() }
@@ -190,7 +190,7 @@ object MergedDictionary {
 
     /** Reads the text pack's base: a test's hook, to count the reads. */
     @VisibleForTesting
-    internal var readPackBase: () -> Base? = { assetBase() }
+    internal var readPackBase: () -> Base? = { textPackBase() }
 
     @VisibleForTesting
     internal fun packBase(): Base? {
@@ -201,9 +201,9 @@ object MergedDictionary {
 
     private fun mapped(): ByteBuffer = AppData.map(InputMethodCatalog.PINYIN_DATA)
 
-    // its length and a CRC of its ends (the header, the last section's tail): another build's data
+    // its length and a CRC of its ends (the header, the last section's tail): another pack's data
     // of the same length is told apart without reading its 100 MB through
-    private fun assetBase(): Base? = try {
+    private fun textPackBase(): Base? = try {
         val data = mapped()
         val crc = CRC32()
         crc.update(data.duplicate().apply { limit(minOf(FINGERPRINT_BYTES, capacity())) })

@@ -11,8 +11,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The polish tagger as packaged (the voice pack, imported on the device first), through the app's onnxruntime (OrtModel.runLongs: int64 in, two
- * outputs): what it does to spoken text is the evaluation's; here, that it runs and does something.
+ * The polish tagger as packaged (the voice pack, imported on the device first), through the app's onnxruntime (OrtModel.runLongs: int64 in, three
+ * outputs: op, after, num): what it does to spoken text is the evaluation's; here, that it runs and does something.
  */
 class VoicePolisherTest {
 

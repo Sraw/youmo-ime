@@ -179,13 +179,15 @@ case("TBL-50", needs="jvm:TablesKeysUatTest.erbisSemicolonHasAKey")(lambda d: No
 case("TBL-51", needs="jvm:TablesKeysUatTest.wubisAllRootsAreItsNamesAtCompact、TableRootsTest.atCompactAllTheRootsAreShownAsTheirNames")(lambda d: None)
 
 
-@case("TBL-52", base="B0-五笔", mutates="learn")
+@case("TBL-52", base="B0-五笔", mutates=True)   # 你 blocked stays blocked
 def tbl52(d):
     d.type("zni")
-    c = d.cands()
-    c = [x.split()[0] for x in c if x]
+    raw = d.cands()
+    c = [x.split()[0] for x in raw if x]
     check("你" in c, f"z n i 的候选 {c[:6]}")
-    menu = block_candidate(d, 1 + c.index("你"), "五笔反查 z n i，长按「你」的菜单")
+    # the position in the list as shown (an empty item counts), not in the filtered one
+    at = next(i for i, x in enumerate(raw) if x and x.split()[0] == "你")
+    menu = block_candidate(d, 1 + at, "五笔反查 z n i，长按「你」的菜单")
     check("固定首位" not in menu, "反查的菜单里有固定首位")
     d.clear()
     d.type("zni")

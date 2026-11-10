@@ -5,7 +5,8 @@
 package org.fcitx.fcitx5.android.scene.rules
 
 /**
- * Copied from ime-core's `input.keyboard.KeyMarks` for P1 (060-render-v2 §6), unchanged but its package;
+ * Copied from ime-core's `input.keyboard.KeyMarks` for P1 (060-render-v2 §6), less its `elsewhere()`
+ * (removed here in 060-render-p2 S4e; S8c merges the two, so they are not the same rules);
  * P2 moves ime-core and the app onto this one and deletes that.
  *
  * Where a key draws what its swipes reach, as slots of its face ([Slot]), from two settings with one
@@ -22,7 +23,7 @@ package org.fcitx.fcitx5.android.scene.rules
  * 紧凑's keys are too low for either ([onKeys]): the symbol's 底部 there is the top right (the bottom
  * right where the shortcuts are), the shortcut's the first corner of [LowOrder] the symbol's place is
  * not. A shortcut that still has no room on its key gives way in its own corner, then is left out
- * (KeyMarkYield; the views' KeyView tries the key's other free corners first).
+ * (KeyMarkYield).
  *
  * A function key has no symbol: its up shortcut in the chosen slot, its down one in that slot mirrored
  * top for bottom ([placeFunction]); one alone in the chosen slot.

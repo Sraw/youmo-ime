@@ -168,8 +168,9 @@ data class ShapePath(val segments: List<Segment>) {
 
         /**
          * [data] (what is between `path(` and `)`) read: every coordinate 0–1 when made absolute, at most
-         * [MAX_POINTS] points, starting with a move, and some sub-path enclosing something (an outline, not a
-         * line there and back: `M0 0 L1 1 Z` is none); null where it is not (a theme's problem, not a crash).
+         * [MAX_POINTS] points, starting with a move, and some sub-path whose points are not all in one line
+         * (`M0 0 L1 1 Z` is refused; a line there and back off it, `M0 0 L1 0 L1 1 L1 0 Z`, encloses nothing
+         * yet passes, as a bowtie must); null where it is not (a theme's problem, not a crash).
          */
         fun parse(data: String): ShapePath? {
             if (data.length > MAX_LENGTH) return null
@@ -330,7 +331,15 @@ data class ShapePath(val segments: List<Segment>) {
                 i++
                 n += digits()
             }
-            return if (n == 0) -1 else i
+            if (n == 0) return -1
+            // an exponent, as SVG tools write (5e-7); an 'e' with no digits after it is not one
+            if (i < s.length && (s[i] == 'e' || s[i] == 'E')) {
+                val mantissa = i
+                i++
+                if (i < s.length && (s[i] == '-' || s[i] == '+')) i++
+                if (digits() == 0) i = mantissa
+            }
+            return i
         }
 
         // a coordinate's steps: six decimals, each at most 8 characters written ("0.123456")

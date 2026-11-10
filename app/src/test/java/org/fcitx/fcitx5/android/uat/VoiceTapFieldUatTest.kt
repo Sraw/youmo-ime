@@ -65,7 +65,7 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         assertEquals("今天天气，很好", text())
         voice.held = true
         voice.said += "我们走吧"
-        h.service.onFinishInputView(false)
+        h.hide()
         h.advance(100)
         // stopped as by a tap: what composed taken away, not left as text; the tail still recorded
         assertEquals("今天天气，", text())

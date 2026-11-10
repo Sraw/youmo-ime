@@ -38,9 +38,9 @@ any change to behaviour or settings.
 | App JVM tests (Robolectric where needed) | `./gradlew :app:testDebugUnitTest` |
 | The same at SDK 29 (Android 10, minSdk: must keep working; specs/testing.md) | `./gradlew :app:testDebugUnitTestAt29` |
 | Engine UAT replay (uat/ cases through Engines with the app's data; not in check, minutes the first time) | `./gradlew :lib:ime-eval:uatTest` |
-| The two resource packs (signed with `youmo.packKey` of local.properties if set, else the committed test key, which only debug builds trust) | `./gradlew :app:packs` → `app/build/packs/` |
+| The two resource packs (signed with `youmo.packKey` of local.properties if set, else the committed test key, which only debug and benchmark builds trust; the voice pack needs `youmo.voiceModelDir`, absolute or `~/`, in ~/.gradle/gradle.properties: without it `:app:packTextPack`, the text pack alone) | `./gradlew :app:packs` → `app/build/packs/` |
 | A release's downloads: the APK with the text pack (文字版), with both (语音版), and which packs changed (`-PbuildABI=arm64-v8a`, the release key) | `./gradlew :app:releaseBundles` |
-| Import the built packs into a debug build on a device (`--no-voice`: the text pack only) | `uat/tools/uat.py packs --port <port>` |
+| Import the built packs into a debug build on an emulator (`--no-voice`: the text pack only; installs the debug APK first; a phone imports in Settings → 资源包) | `uat/tools/uat.py packs --port <port>` |
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |
 | The testbed app (every kind of field and app behaviour, for emulator and phone tests; uat/TESTBED.md) | `./gradlew :testbed:installDebug` |

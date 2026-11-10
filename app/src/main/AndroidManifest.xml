@@ -147,12 +147,13 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
-        <!-- an input method cannot ask for a permission itself: this asks, and closes -->
+        <!-- an input method cannot ask for a permission itself: this asks, and closes (finish() in the answer's
+             callback). Not noHistory: an activity without history may get no result from one it started, and
+             the permission request is one; the answer's callback is the only way to the app's settings -->
         <activity
             android:name=".input.voice.VoicePermissionActivity"
             android:excludeFromRecents="true"
             android:exported="false"
-            android:noHistory="true"
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <!-- true only in a test build (-PbuildProfileable=true): simpleperf from the shell -->

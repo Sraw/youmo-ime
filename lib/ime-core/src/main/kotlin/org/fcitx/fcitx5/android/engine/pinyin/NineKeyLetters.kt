@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -146,8 +147,9 @@ class NineKeyLetters private constructor(
         /** The most groups a layout's own keyboard ([custom]) has: its codes' block, [CUSTOM_BLOCK]. */
         const val CUSTOM_MAX = 30
 
-        // a two dimensional place: x plus twice (1 + its row of [PLACE_ROWS] places); a one dimensional one is x alone, 0 to 1
-        private const val PLACE_ROWS = 9
+        // a two dimensional place: x plus twice (1 + its row of [PLACE_ROWS] places); a one dimensional one is x alone, 0 to 1.
+        // Keyboard.TAP_ROWS is this: a tap's row sent is read back here
+        internal const val PLACE_ROWS = 9
         private const val PLACE_SPAN = 2f
 
         /**
@@ -283,21 +285,26 @@ class NineKeyLetters private constructor(
         /**
          * The grouped keyboard of [groups] (a layout's `letters=`, rows apart by a space; [problem]
          * none, else IllegalArgumentException): [G14] or [G18] where their letters are those
-         * keyboards' (their codes, their record, so the built-in 14 and 18 keys move nothing),
-         * otherwise one of its own, its codes from [CUSTOM_BLOCK], filed under its [tag].
+         * keyboards' (their codes, their record, so the built-in 14 and 18 keys move nothing; equal
+         * to them, and written in rows, those rows kept: a tap across alone then leans to no letter
+         * of a key stacked, rather than to the wrong one), otherwise one of its own, its codes from
+         * [CUSTOM_BLOCK], filed under its [tag].
          */
         fun custom(groups: List<String>): NineKeyLetters {
             problem(groups)?.let { throw IllegalArgumentException(it) }
             val keys = groups.map { it.replace(" ", "") }
-            listOf(G14, G18).firstOrNull { it.keys == keys }?.let { return it }
             val rows = groups.map { it.split(' ') }.takeIf { r -> r.any { it.size > 1 } }
+            listOf(G14, G18).firstOrNull { it.keys == keys }?.let { k ->
+                return if (rows == null) k else NineKeyLetters(k.keys, k.codes, k.separator, k.filedAs, rows)
+            }
             return NineKeyLetters(keys, keys.indices.map { FIRST_CUSTOM_CODE + it }.joinToString(""), separator = null, rows = rows)
         }
 
         /**
          * [keyboard], a layout's own ([custom]), as the one in use: its codes are read as its keys
-         * ([ofCode], Keyboard.typedLetter) until another is. The session that types on it says so
-         * when it is made; nothing else sets it (made, compared and filed keyboards do not).
+         * ([ofCode], Keyboard.typedLetter) until another is. The session that types on it is to say
+         * so when it is made (T9b wires it: till then only tests call it, and [ofCode] reads no
+         * custom code); nothing else sets it (made, compared and filed keyboards do not).
          */
         fun inUse(keyboard: NineKeyLetters) {
             if (keyboard.codes.firstOrNull()?.code in CUSTOM_BLOCK) current = keyboard
@@ -308,9 +315,13 @@ class NineKeyLetters private constructor(
             current = null
         }
 
-        // filedAs's last tag and keyboard: SpelledForm asks for each code of each word read
-        @Volatile
-        private var lastFiled: Pair<String, NineKeyLetters?>? = null
+        // filedAs's keyboard of each tag asked (a few: the layouts used), null for none: SpelledForm
+        // asks for each code of each word read, the record's rows of several tags in turn. Bounded
+        // (KEPT_FILED, all let go past it): a damaged record may name any number of tags
+        private val filed = ConcurrentHashMap<String, Filed>()
+        private const val KEPT_FILED = 16
+
+        private class Filed(val keyboard: NineKeyLetters?)
 
         /**
          * The grouped keyboard what is learnt under `qk:` [tag] was typed on: [G14] or [G18], else a
@@ -318,10 +329,11 @@ class NineKeyLetters private constructor(
          * of its groups is a keyboard of its own here.
          */
         fun filedAs(tag: String): NineKeyLetters? {
-            lastFiled?.let { (t, k) -> if (t == tag) return k }
-            val found = listOf(G14, G18).firstOrNull { it.tag() == tag } ?: tag.split(',').takeIf { problem(it) == null }?.let(::custom)
-            lastFiled = tag to found
-            return found
+            filed[tag]?.let { return it.keyboard }
+            if (filed.size >= KEPT_FILED) filed.clear()
+            return filed.getOrPut(tag) {
+                Filed(listOf(G14, G18).firstOrNull { it.tag() == tag } ?: tag.split(',').takeIf { problem(it) == null }?.let(::custom))
+            }.keyboard
         }
 
         /**

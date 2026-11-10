@@ -14,7 +14,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import org.fcitx.fcitx5.android.R
@@ -41,7 +40,8 @@ class VoiceHoldOverlay(
 
     private val downY = inputView.downY(pointer)
 
-    private val session = VoiceHoldSession(inputView.service, inputView.fcitx, VoiceHold(keyboard.height * CANCEL_SHARE), this, commit)
+    // the finger's moves are the input view's pixels: the share of the keyboard as it is seen (scaled, floating)
+    private val session = VoiceHoldSession(inputView.service, inputView.fcitx, VoiceHold(keyboard.height * keyboard.scaleY * CANCEL_SHARE), this, commit)
     private val main = Handler(Looper.getMainLooper())
     private var gone = false
 
@@ -57,20 +57,11 @@ class VoiceHoldOverlay(
         VoiceStyle.heard(this)
         setTextColor(theme.keyTextColor)
     }
-    private val wave = VoiceWaveView(ctx).apply {
-        color = look.micColor.value
-        active = true
-    }
+    private val wave = VoiceCard.wave(ctx, look.micColor.value)
 
     // the bars on a pill of their own, as a bubble the voice is in
     private val pillColor = look.micFill.value
-    private val pill = FrameLayout(ctx).apply {
-        background = GradientDrawable().apply {
-            cornerRadius = ctx.dp(PILL_HEIGHT / 2).toFloat()
-            setColor(pillColor)
-        }
-        addView(wave, FrameLayout.LayoutParams(ctx.dp(WAVE_WIDTH), ctx.dp(WAVE_HEIGHT), Gravity.CENTER))
-    }
+    private val pill = VoiceCard.pill(ctx, wave, pillColor)
     // what the status line says (listeningText): ready before silent
     // the microphone's first sample not zero come: what 正在听 waits for
     private var ready = false
@@ -102,7 +93,7 @@ class VoiceHoldOverlay(
         val pad = ctx.dp(12)
         setPadding(pad, pad, pad, 0)
         addView(heard, LinearLayout.LayoutParams(-1, 0, 1f))
-        addView(pill, LinearLayout.LayoutParams(ctx.dp(PILL_WIDTH), ctx.dp(PILL_HEIGHT)).apply { topMargin = ctx.dp(8) })
+        addView(pill, VoiceCard.pillParams(ctx))
         addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(8) })
         addView(hint, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(2) })
         // under the finger: nothing there, it would not be seen. The keyboard's view runs under
@@ -161,8 +152,15 @@ class VoiceHoldOverlay(
         }
     }
 
-    /** another field, the keyboard hidden, input restarted: nothing typed, the microphone closed */
-    override fun inputEnded(how: BaseInputView.Hold.InputEnd) = session.drop()
+    /**
+     * Another field, the keyboard hidden: nothing typed, the microphone closed. The same field's
+     * input restarted (a WebView, the app's restartInput) while the finger is down: the hold goes
+     * on, what is said kept, as a tap's talk does.
+     */
+    override fun inputEnded(how: BaseInputView.Hold.InputEnd) {
+        if (how == BaseInputView.Hold.InputEnd.STARTED && session.sameField) return
+        session.drop()
+    }
 
     override fun ready() {
         ready = true
@@ -228,9 +226,7 @@ class VoiceHoldOverlay(
         // it took the next press on the space under it and the long press never fired (VO-16)
         card.isClickable = false
         message?.let { status.setText(it) }
-        main.postDelayed({
-            card.animate().alpha(0f).setDuration(VoiceStyle.ANIMATE_MS).withEndAction { (card.parent as? ViewGroup)?.removeView(card) }.start()
-        }, if (message != null) VoiceSession.MESSAGE_MS else 0L)
+        VoiceCard.fadeOut(card, main, message)
     }
 
     companion object {
@@ -241,10 +237,6 @@ class VoiceHoldOverlay(
         private const val FINGER = 32
         private const val CANCEL_PILL = 0x33FFFFFF
         private const val CANCEL_TEXT = 0xFFFFFFFF.toInt()
-        private const val PILL_WIDTH = 168
-        private const val PILL_HEIGHT = 52
-        private const val WAVE_WIDTH = 104
-        private const val WAVE_HEIGHT = 32
         private const val APPEAR_SCALE = 0.85f
     }
 }

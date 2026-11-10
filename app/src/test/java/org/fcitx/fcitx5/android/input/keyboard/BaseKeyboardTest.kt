@@ -111,6 +111,34 @@ class BaseKeyboardTest {
         }
     }
 
+    // a long press that takes the touch (Enumerate; Voice with its pack in): a slow drag on the space past the slop,
+    // then held past the delay, is a swipe, its long press never fired (the scene's touch path, KeyGesture;
+    // PY-41, R20 F5928: KeyboardUatTest's PY-41 rows are holds that do nothing, this one's takes the touch)
+    @Test
+    fun aSlowDragOnTheSpaceKeepsTheLongPressFromFiring() {
+        for (behavior in listOf(SpaceLongPressBehavior.Enumerate, SpaceLongPressBehavior.Voice)) told { t ->
+            prefs.set(AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior, behavior)
+            val h = t.h
+            val space = h.keyNamed("space")
+            val root = IntArray(2).also(h.inputView::getLocationInWindow)
+            val x0 = space.bounds.exactCenterX() - root[0]
+            val y0 = space.bounds.exactCenterY() - root[1]
+            val slop = ViewConfiguration.get(h.inputView.context).scaledTouchSlop
+            val down = SystemClock.uptimeMillis()
+            fun send(action: Int, x: Float) = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y0, 0)
+                .also { h.inputView.dispatchTouchEvent(it); it.recycle() }
+            send(MotionEvent.ACTION_DOWN, x0)
+            // slowly: a step at a time, under the delay, past the slop in all
+            for (i in 1..4) {
+                h.after(50L)
+                send(MotionEvent.ACTION_MOVE, x0 + slop * i)
+            }
+            h.after(ViewConfiguration.getLongPressTimeout() + 500L)
+            assertTrue("$behavior: ${t.actions}", t.actions.none { it is KeyAction.SpaceLongPressAction })
+            send(MotionEvent.ACTION_UP, x0 + slop * 4)
+        }
+    }
+
     // 滑动 at its default (shortcuts up, symbols down): a's select all up, its symbol down, s with nothing up a tap
     @Test
     @Uat("KB-61")

@@ -45,7 +45,7 @@ class ExpandedKey(
     val icon: String?,
     val badge: String?,
     val a11y: String,
-    /** [alt] as the layout wrote it, a binding unread (`{punct:~}`): what the app offers in a long press. */
+    /** [alt] as the layout wrote it, a binding unread (`{punct:~}`): read by snapshots, exports and tests; the app reads [alt] and [popup]. */
     val altRaw: String? = null,
 ) : Item {
     override val width: Width get() = attrs.width ?: Width.Units(1.0)
@@ -142,14 +142,14 @@ object Expand {
 
     /**
      * What a screen reader says of a key the layout gives no a11y, as theme 3.0's keys said it: the
-     * space with the input method's name ([Texts.a11ySpace], BaseKeyboard's a11y_key_space_with_ime:
+     * space with the input method's name (with none, plain `a11y_key_space`) ([Texts.a11ySpace], BaseKeyboard's a11y_key_space_with_ime:
      * TalkBack reads the description, not the name drawn); a group key's letters one by one in
      * capitals (a key with letters=), a `;` kept (GroupedKeyboard's "Q W", "L ;": TalkBack read the face "QW" as a word),
      * any other label as it is (Rime, Fn, ABC); then the alt as shown ([Texts.a11yGrouped]'s
      * a11y_key_grouped: "Q W, 1", "ABC, 2"; in Chinese "Q W，1", "ABC，2", on every keyboard that passes it).
      */
     fun spoken(attrs: KeyAttrs, group: Boolean, label: String?, alt: String?, texts: Texts): String {
-        if (attrs.role == SPACE && !label.isNullOrEmpty()) return texts.a11ySpace.replace(ARG1, label)
+        if (attrs.role == SPACE) return if (label.isNullOrEmpty()) A11Y_SPACE else texts.a11ySpace.replace(ARG1, label)
         val said = label?.let { if (group) it.uppercase().toList().joinToString(" ") else it }.orEmpty()
         return when {
             alt == null -> said
@@ -160,6 +160,9 @@ object Expand {
 
     private const val SPACE = "space"
     private const val ARG1 = "%1\$s"
+
+    // the space with no name to say (an input method with none, a scene built before the name is known): the app's "Space"
+    private const val A11Y_SPACE = "a11y_key_space"
     private const val ARG2 = "%2\$s"
 
     private fun written(t: Text): String = when (t) {

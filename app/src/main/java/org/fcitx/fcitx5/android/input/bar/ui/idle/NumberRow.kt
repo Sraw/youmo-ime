@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
-import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import splitties.dimensions.dp
 import timber.log.Timber
@@ -27,7 +26,6 @@ import kotlin.math.abs
 class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
 
     private var gestureStartEvent: MotionEvent? = null
-    private var collapseGestureTriggered: Boolean = false
 
     // a swipe this far collapses the row: read once, not at each move (the bar height is a preference)
     private val collapseDistance = dp(KawaiiBarComponent.heightDp(ctx))
@@ -43,9 +41,8 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
             val cx = ev.getX(ev.actionIndex) * dir
             val shouldCollapse = cx > sx && abs(cx - sx) > collapseDistance
             if (shouldCollapse) {
-                Timber.d("NumberRow: intercepted gesture from child keyboard to handle swipe")
+                Timber.d("NumberRow: swipe to collapse")
                 resetState()
-                collapseGestureTriggered = true
                 return true
             }
         }
@@ -55,18 +52,6 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
     private fun resetState() {
         gestureStartEvent?.recycle()
         gestureStartEvent = null
-        collapseGestureTriggered = false
-    }
-
-    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> gestureStartEvent = MotionEvent.obtain(ev)
-            MotionEvent.ACTION_MOVE -> {
-                if (checkGesture(ev)) return true
-            }
-            MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_UP -> resetState()
-        }
-        return super.onInterceptTouchEvent(ev)
     }
 
     // the keys drawn by the scene take every touch here (BaseKeyboard routes them to the scene's keys,
@@ -112,7 +97,7 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
 
     // no marks: the row's keys reach no shortcut
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
-        SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = MarkSettings(shortcuts = emptyMap()))
+        SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneEnvs.NO_MARKS)
 
     // last: the scene reads the keyboard's state
     init {

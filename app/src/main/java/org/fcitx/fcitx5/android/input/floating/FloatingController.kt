@@ -21,7 +21,6 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingSwitch.Bounds
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
-import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.motion.Motion
 import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.utils.interpolator
@@ -98,7 +97,6 @@ class FloatingController(
                 bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
             })
         }
-        val frame = frame()
         FloatingCorners.frame(keyboard, ::cornerPx, SceneWindow.px(context, frame.elevationDp), frame.shadowColor?.value)
         frame.border?.let { FloatingCorners.border(keyboard, SceneWindow.px(context, it.widthDp), it.color.value, ::cornerPx) }
         placer = FloatingPlacer(root, keyboard).also { it.onZone = ::showDockMark }
@@ -243,30 +241,23 @@ class FloatingController(
         }
     }
 
-    // the theme's frame (`frame`) in the scenes now: not set, as round as the keys on their margins, which a
-    // turn of the screen changes (WindowLooks.cornerDp), square where the keys are (按键圆角 直角). Asked for
-    // each outline and border drawn: worked out once a screen ([screen]), its corner once a size too
-    private var framed: Pair<List<Int>, WindowLooks.Frame>? = null
-    private var cornered: Pair<List<Int>, Float>? = null
-
-    // what the frame's scenes change with: the screen turned or resized, the keyboard's height (`@compact`)
-    private fun screen() = context.resources.configuration.let {
-        listOf(it.orientation, it.screenWidthDp, it.screenHeightDp, if (keyboardCompact()) 1 else 0)
-    }
-
-    private fun frame(): WindowLooks.Frame {
-        val at = screen()
-        framed?.let { (on, frame) -> if (on == at) return frame }
-        return SceneWindow.frame(theme, SceneWindow.scenes(context, theme, floating = true)).also { framed = at to it }
-    }
+    // the theme's frame (`frame`) in the scenes now: not set, as round as the keys on their margins
+    // (WindowLooks.cornerDp), square where the keys are (按键圆角 直角). Worked out once: a turn of the
+    // screen, another size or 紧凑 (`@compact`) makes the input view, and this controller, anew, which its
+    // border, shadow and elevation (set once in setUp) rely on too. The corner once a keyboard size: asked
+    // for each outline and border drawn
+    private val frame: WindowLooks.Frame by lazy { SceneWindow.frame(theme, SceneWindow.scenes(context, theme, floating = true)) }
+    private var corneredWidth = -1
+    private var corneredHeight = -1
+    private var corneredPx = 0f
 
     private fun cornerPx(): Float {
-        val at = screen() + listOf(keyboard.width, keyboard.height)
-        cornered?.let { (on, px) -> if (on == at) return px }
-        val f = frame()
-        val px = if (f.round) minOf(keyboard.width, keyboard.height) / 2f else SceneWindow.px(context, f.radiusDp)
-        cornered = at to px
-        return px
+        if (keyboard.width == corneredWidth && keyboard.height == corneredHeight) return corneredPx
+        val f = frame
+        corneredPx = if (f.round) minOf(keyboard.width, keyboard.height) / 2f else SceneWindow.px(context, f.radiusDp)
+        corneredWidth = keyboard.width
+        corneredHeight = keyboard.height
+        return corneredPx
     }
 
     private fun View.bounds() = Bounds(left.toFloat(), top.toFloat(), width.toFloat(), height.toFloat())

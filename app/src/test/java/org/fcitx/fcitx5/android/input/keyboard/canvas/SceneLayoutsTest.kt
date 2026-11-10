@@ -26,6 +26,7 @@ import org.robolectric.annotation.Config
 @Config(application = FcitxApplication::class)
 class SceneLayoutsTest {
 
+    // contract: every layout file shipped in keyboard-scene reads with no problem
     @Test
     fun everyBuiltInLayoutReads() {
         val context = RuntimeEnvironment.getApplication()

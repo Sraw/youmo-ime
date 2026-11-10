@@ -7,16 +7,16 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.scene.SceneBehavior
+import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
-import org.fcitx.fcitx5.android.uat.PrefsRule
-import org.fcitx.fcitx5.android.data.InputFeedbacks
-import org.fcitx.fcitx5.android.input.scene.SceneBehavior
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -27,8 +27,8 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * The number keyboard builds, its space an image key (MiniSpaceKey): a text key's accessor of it
  * threw ClassCastException at its first read. Under the app, whose preferences the keys read; the
- * keys' descriptions are placeholders, as the tests have none of the app's strings. Each pad shows
- * the same keys drawn by its views as by the canvas (number.xml's, 060-render-p2 S4b).
+ * keys' descriptions are placeholders, as the tests have none of the app's strings. Each pad's keys
+ * drawn by the canvas (number.xml's, 060-render-p2 S4b), each named, read and sized.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -49,10 +49,9 @@ class NumberKeyboardTest {
         assertEquals("space", k.shownKeyWithId(R.id.button_mini_space)?.id)
     }
 
-    // every pad: its keys shown, each named, read and sized (compared with the views' till S8a deleted them); a blank
-    // takes no press (the canvas's no key)
+    // every pad: its keys shown, each named, read and sized; a blank takes no press (the canvas's no key)
     @Test
-    fun eachPadShowsTheSameKeys() {
+    fun eachPadShowsItsKeysNamedReadAndSized() {
         for (pad in NumberPad.entries) {
             val keys = keyboard(pad).shownKeys().filter { it.enabled }
             assertTrue("$pad", keys.isNotEmpty())

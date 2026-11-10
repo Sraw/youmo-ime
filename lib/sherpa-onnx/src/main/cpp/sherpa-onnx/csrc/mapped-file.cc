@@ -8,7 +8,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cerrno>
+#include <cstring>
 #include <stdexcept>
+#include <string>
 
 namespace sherpa_onnx {
 
@@ -18,15 +21,25 @@ MappedFile::~MappedFile() {
 
 std::unique_ptr<MappedFile> MapFile(const std::string &filename) {
   auto file = std::make_unique<MappedFile>();
+  // why it failed, for the log: a missing file, EACCES, ENOMEM, or empty
+  std::string why = "empty";
   int fd = open(filename.c_str(), O_RDONLY | O_CLOEXEC);
   struct stat st {};
-  if (fd >= 0 && fstat(fd, &st) == 0 && st.st_size > 0) {
+  if (fd < 0 || fstat(fd, &st) != 0) {
+    why = strerror(errno);
+  } else if (st.st_size > 0) {
     file->size = static_cast<size_t>(st.st_size);
     void *data = mmap(nullptr, file->size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (data != MAP_FAILED) file->data = data;
+    if (data != MAP_FAILED) {
+      file->data = data;
+    } else {
+      why = strerror(errno);
+    }
   }
   if (fd >= 0) close(fd);
-  if (!file->data) throw std::runtime_error("cannot map '" + filename + "'");
+  if (!file->data) {
+    throw std::runtime_error("cannot map '" + filename + "': " + why);
+  }
   return file;
 }
 

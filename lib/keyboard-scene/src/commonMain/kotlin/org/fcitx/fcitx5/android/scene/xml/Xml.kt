@@ -72,7 +72,8 @@ private class Reader(private val s: String) {
 
     private fun advance(n: Int) {
         repeat(n) {
-            if (i < s.length && s[i] == '\n') line++
+            // a line ends at LF, CRLF (counted at its LF) or a CR alone
+            if (endsLine(i)) line++
             i++
         }
     }
@@ -161,7 +162,7 @@ private class Reader(private val s: String) {
                     val first = t.indexOfFirst { !it.isXmlSpace() }
                     if (first >= 0) {
                         // the line the word is on, not the one the whitespace before it started
-                        throw XmlException(textLine + t.take(first).count { it == '\n' }, "text in <$qName>: \"${t.trim().take(TEXT_SHOWN)}\"")
+                        throw XmlException(textLine + t.take(first).replace("\r\n", "\n").count { it == '\n' || it == '\r' }, "text in <$qName>: \"${t.trim().take(TEXT_SHOWN)}\"")
                     }
                     text.append(t)
                 }
@@ -185,7 +186,7 @@ private class Reader(private val s: String) {
             val quote = s.getOrNull(i)
             if (quote != '"' && quote != '\'') fail("a quoted value expected for $name")
             advance(1)
-            val value = chars(quote)
+            val value = chars(quote, attribute = true)
             if (i >= s.length) fail("the value of $name not closed")
             advance(1)
             if (name in out) fail("$name given twice")
@@ -193,10 +194,19 @@ private class Reader(private val s: String) {
         }
     }
 
-    // text up to [end] (not taken), references read; '<' is never in a value
-    private fun chars(end: Char): String {
+    // text up to [end] (not taken), references read; '<' is never in a value. A literal tab, LF or CR (CRLF as
+    // one) is a space, as XML 1.0 §3.3.3 normalises an attribute value; one written as a reference stays
+    private fun endsLine(at: Int): Boolean {
+        val c = s.getOrNull(at)
+        return c == '\n' || c == '\r' && s.getOrNull(at + 1) != '\n'
+    }
+
+    // what ends a run of plain characters: [end], a reference, an attribute's line break
+    private fun plainEnds(c: Char, end: Char, attribute: Boolean) = c == end || c == '&' || attribute && c in BREAKS
+
+    private fun chars(end: Char, attribute: Boolean = false): String {
         val start = i
-        while (i < s.length && s[i] != end && s[i] != '&') {
+        while (i < s.length && !plainEnds(s[i], end, attribute)) {
             if (s[i] == '<') fail("'<' in a value")
             advance(1)
         }
@@ -207,7 +217,10 @@ private class Reader(private val s: String) {
             when (val c = s[i]) {
                 '&' -> b.append(reference())
                 '<' -> fail("'<' in a value")
-                else -> {
+                else -> if (attribute && c in BREAKS) {
+                    b.append(' ')
+                    advance(if (c == '\r' && s.getOrNull(i + 1) == '\n') 2 else 1)
+                } else {
                     b.append(c)
                     advance(1)
                 }
@@ -230,14 +243,19 @@ private class Reader(private val s: String) {
     }
 
     private fun codePoint(c: Int?): String {
-        if (c == null || c !in 1..MAX_CODE_POINT || c in SURROGATES) fail("a character reference to no character")
+        if (c == null || c !in 1..MAX_CODE_POINT) fail("a character reference to no character")
+        if (c in SURROGATES || c in NOT_XML) fail("a character reference to no character")
         if (c < SUPPLEMENTARY) return c.toChar().toString()
         val v = c - SUPPLEMENTARY
         return charArrayOf((HIGH_SURROGATE + (v shr TEN_BITS)).toChar(), (LOW_SURROGATE + (v and LOW_MASK)).toChar()).concatToString()
     }
 
-
     private companion object {
+        const val BREAKS = "\t\n\r"
+
+        // XML 1.0 §2.2: the C0 controls but tab, LF and CR, and U+FFFE and U+FFFF, are not characters
+        val NOT_XML = ((0x1..0x8) + listOf(0xB, 0xC) + (0xE..0x1F) + listOf(0xFFFE, 0xFFFF)).toSet()
+
         val PREDEFINED = mapOf("lt" to "<", "gt" to ">", "amp" to "&", "quot" to "\"", "apos" to "'")
         const val MAX_REFERENCE = 12
         const val TEXT_SHOWN = 20

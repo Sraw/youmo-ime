@@ -91,10 +91,13 @@
   <style select="*/backspace.enter:pressed, qwerty/a.enter:pressed, qwerty/q.enter:pressed" fill="#112233" press="face"/>
   <style select="*/backspace.space:pressed, qwerty/a.space:pressed, qwerty/q.space:pressed" fill="image(down.png, 1 1 1 1, 1x, @key)" press="face"/>
   <style select="@flat */backspace.space:pressed, @flat qwerty/a.space:pressed, @flat qwerty/q.space:pressed" fill="image(down.png, 1 1 1 1, 1x, @spaceBar)" press="face"/>
-  <style select="*/space label, qwerty/r label, qwerty/w label" hidden="true"/>
+  <style select="qwerty/r label, qwerty/w label" hidden="true"/>
   <style select="preview, popup" fill="@popupBackground" radius="4dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
   <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
   <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
   <style select="menu:selected" overlay="@keyPressHighlight"/>
   <style select="@floating keyboard" radius="7dp"/>
+  <style select="@landscape @floating keyboard" radius="7dp"/>
+  <style select="@floating @flat keyboard" radius="3dp"/>
+  <style select="@landscape @floating @flat keyboard" radius="3dp"/>
 </theme>

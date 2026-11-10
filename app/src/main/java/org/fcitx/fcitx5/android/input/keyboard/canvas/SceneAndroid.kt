@@ -68,9 +68,7 @@ class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
 
     // the least recently asked let go first (access order), so a table's roots or another font for a
     // while do not keep growing it
-    private val kept = object : LinkedHashMap<Asked, TextMetrics>(KEPT, LOAD, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Asked, TextMetrics>) = size > KEPT
-    }
+    private val kept = lruMap<Asked, TextMetrics>(KEPT)
 
     /** The texts measured with Paint, not found kept: for tests. */
     @VisibleForTesting
@@ -107,7 +105,6 @@ class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
     companion object {
         // the 26 keys' texts in each state with Shift's and a table's: a few hundred
         const val KEPT = 512
-        private const val LOAD = 0.75f
     }
 }
 
@@ -179,6 +176,13 @@ object SceneIcons {
     fun returnName(@DrawableRes icon: Int): String = returns.entries.firstOrNull { it.value == icon }?.key ?: "enter"
 }
 
+/** A map of the last [max] entries asked for (or put), the least recently used dropped as one more is put. */
+internal fun <K, V> lruMap(max: Int): LinkedHashMap<K, V> = object : LinkedHashMap<K, V>(max, LRU_LOAD, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?) = size > max
+}
+
+private const val LRU_LOAD = 0.75f
+
 /**
  * A theme 3.0 look as the engine's theme ([LookTheme]), and its [Cascades], kept for the last
  * [KEPT] looks (main thread). A theme switched back to (day and night, the settings' preview and
@@ -193,11 +197,11 @@ object SceneThemes {
     }
 
     // in the order last asked for, the oldest first
-    private val made = LinkedHashMap<Triple<ThemeLook, String, Boolean>, Made>(KEPT, 0.75f, true)
+    private val made = lruMap<Triple<ThemeLook, String, Boolean>, Made>(KEPT)
 
     // the looks that made no theme: not read again, nor logged again, each scene asked of them (every
     // key that changes what shows, Shift, Return); a look edited is another look, read
-    private val refused = LinkedHashMap<Triple<ThemeLook, String, Boolean>, Unit>(KEPT, 0.75f, true)
+    private val refused = lruMap<Triple<ThemeLook, String, Boolean>, Unit>(KEPT)
 
     /**
      * A look's theme file ([LookTheme]); a test's own, one setting more than a look can (060-render-p3
@@ -209,10 +213,11 @@ object SceneThemes {
             field = value
             made.clear()
             refused.clear()
+            packs.clear()
         }
 
     // the packs' (060-render-p3 T8a), read as they were listed, by the system's colours their system() took
-    private val packs = LinkedHashMap<Pair<AppTheme.Pack, SystemColors>, Made>(KEPT, 0.75f, true)
+    private val packs = lruMap<Pair<AppTheme.Pack, SystemColors>, Made>(KEPT)
 
     /**
      * [theme]'s engine theme, drawn in [look] (ThemeManager.shownLook): a pack's its own file ([AppTheme.Pack.drawn]),
@@ -222,27 +227,38 @@ object SceneThemes {
         if (theme !is AppTheme.Pack) return of(look, theme.name, theme.isDark)
         val key = theme to ThemePackFiles.systemColors
         packs[key]?.let { return it.theme }
-        return theme.drawn.also {
-            packs[key] = Made(it)
-            if (packs.size > KEPT) packs.remove(packs.keys.first())
-        }
+        return theme.drawn.also { packs[key] = Made(it) }
     }
 
     fun of(look: ThemeLook, name: String, dark: Boolean): Theme? {
         val key = Triple(look, name, dark)
         made[key]?.let { return it.theme }
         if (refused.containsKey(key)) return null
-        return when (val t = ThemeReader.theme(source(look, name, dark), maxStyles = LookTheme.MAX_STYLES)) {
-            is Parsed.Ok -> t.value.also {
-                made[key] = Made(it)
-                if (made.size > KEPT) made.remove(made.keys.first())
-            }
-            is Parsed.Failed -> null.also {
-                Timber.e("scene theme $name: ${t.problems}")
-                refused[key] = Unit
-                if (refused.size > KEPT) refused.remove(refused.keys.first())
-            }
+        // writing the look's theme file can throw (a broken 3.0 theme); that look is refused as an
+        // unreadable one is, not a crash in onDraw or layout
+        val xml = runCatching { source(look, name, dark) }
+            .onFailure { Timber.e(it, "scene theme $name: not written") }
+            .getOrNull()
+        val t = xml?.let { ThemeReader.theme(it, maxStyles = LookTheme.MAX_STYLES) }
+        if (t is Parsed.Ok) {
+            made[key] = Made(t.value)
+            return t.value
         }
+        if (t is Parsed.Failed) Timber.e("scene theme $name: ${t.problems}")
+        refused[key] = Unit
+        return null
+    }
+
+    /**
+     * Everything kept by a look let go: the themes, the measurers (their fonts), the icons and the
+     * scenes. A look names its files by path, so a theme's file written over in place changes no look.
+     */
+    fun forgetAll() {
+        made.clear()
+        refused.clear()
+        packs.clear()
+        ScenePainter.forgetIcons()
+        SceneBoard.forgetLooks()
     }
 
     /** [theme]'s cascades, [of]'s theme kept; a theme not kept (none [of] made), new ones. */

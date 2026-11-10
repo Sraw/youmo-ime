@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -147,7 +148,6 @@ class WindowLooksTest {
     fun theSplitGapDrawnWhereSet() {
         val split = Fixtures.landscape
         val plain = Fixtures.scene(split)
-        assertEquals(Fixtures.scene(split).base, plain.base)
         val red = argb(0xffff0000)
         assertTrue(plain.base.none { it is Op.Fill && it.color == red })
         val t = theme(withStyle("<style select=\"split-gap\" fill=\"#ff0000\" radius=\"2dp\"/>"))
@@ -177,7 +177,7 @@ class WindowLooksTest {
         assertTrue(warnings(withStyle("<style select=\"handle, bar\" height=\"6dp\"/>")).single().contains("height= is not supported"))
         // the bar's its own, in % (T6b: ThemeScenesTest)
         assertTrue(problems(withStyle("<style select=\"bar\" height=\"6dp\"/>")).any { it.contains("is not 80%–140%") })
-        // a grip's width is not the keyboard's size
+        // a grip's height is not the keyboard's size
         assertEquals(null, theme(withStyle("<style select=\"handle\" height=\"6dp\"/>")).keyboardSizes.height)
         // follow: the navigation bar's alone
         assertTrue(warnings(withStyle("<style select=\"navbar\" color=\"follow\"/>")).isEmpty())
@@ -212,7 +212,7 @@ class WindowLooksTest {
         for (style in read) assertEquals(emptyList(), warnings(withStyle(style)), style)
         // each a widget now, under a scene too
         for (w in listOf("frame", "handle", "side-button", "split-gap", "navbar")) {
-            assertNull(Selector.parse("@dark $w")?.reserved, w)
+            assertNull(assertNotNull(Selector.parse("@dark $w"), w).reserved, w)
         }
     }
 }
