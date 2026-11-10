@@ -1,5 +1,5 @@
 """The animated picture of KeyboardPerfBaselineTest's A4 rows (design 060-render-p3 §4.3): a gradient
-sliding and dots moving, 1080x720, each frame 33 ms (30 fps). Needs Pillow with WebP.
+sliding and dots moving, 1080x720, each frame 50 ms (20 fps, the fastest A4 plays). Needs Pillow with WebP.
 
   python3 uat/tools/perf_picture.py app/src/androidTest/assets/perf-picture.webp 30 50   # frames, quality
 """
@@ -22,5 +22,5 @@ for i in range(N):
         r = 20 + j % 7 * 9
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 255, 255))
     frames.append(im)
-frames[0].save(sys.argv[1], 'WEBP', save_all=True, append_images=frames[1:], duration=33, loop=0, quality=int(sys.argv[3]), method=4)
+frames[0].save(sys.argv[1], 'WEBP', save_all=True, append_images=frames[1:], duration=50, loop=0, quality=int(sys.argv[3]), method=4)
 im = Image.open(sys.argv[1]); print(im.size, im.n_frames)
