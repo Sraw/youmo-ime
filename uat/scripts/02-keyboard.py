@@ -231,3 +231,6 @@ case("KB-68", needs="jvm:LetterCaseScreenshotTest、LetterCaseRuleTest")(lambda 
 
 
 case("KB-67", needs="jvm:KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherUpright、KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherTurned、KeyMarkYieldTest")(lambda d: None)
+
+
+case("KB-69", needs="jvm:KeyShortcutsHostTest.swipeSelectSelectsFromTheCursorAsTheFingerMovesSideways、KeyShortcutsHostTest.swipeSelectCommitsWhatIsTypedFirst、KeyShortcutsHostTest.swipeSelectStepsOverAnEmojiWhole、SwipeSelectionTest、SwipeStepsTest")(lambda d: None)

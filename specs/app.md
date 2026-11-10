@@ -202,7 +202,13 @@ wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, 
 on `UndoChipPlacement`'s place, which `InputView` hands `PopupComponent.menuRoom`; over the bar where
 that is off the view), 粘贴 across from the key, not under the finger (the user, 0.5.1's test build),
 picked by how far the finger moves (`PopupFocus`), a notice shown put away or, a failure, hidden till the menu goes (`onMenuShown`, `onMenuGone`,
-`UndoChip.covered`/`uncovered`). A
+`UndoChip.covered`/`uncovered`). 滑选 (`KeyCommand.SwipeSelect`) reached there takes the touch
+instead: its sideways steps (`SwipeSteps`, the same counting and the same 10 dp threshold the
+backspace's selection gets from `KeyGestureRecognizer`) go to `CommonKeyActionListener`'s
+`SwipeSelection` (ime-core), which begins after what is typed is committed (`afterPendingInput`, the
+steps meanwhile kept), reads the field around the selection once (`readAround`, not in a password)
+to step a grapheme a step, and sets the selection from its anchor (`EditingSession.select`); the
+lift runs nothing and leaves the selection. A
 shortcut named in the key's bubble (`PopupAction.PreviewUpdateAction.words`) is fitted by
 `PreviewLabel`: a function key's size scaled as the keys' text (a letter's too, `engine/Popups.SYMBOL_DP`),
 characters counted and cut as seen (`BreakIterator` graphemes: a flag, a family, an accent are one), a bubble five of them wide, smaller
