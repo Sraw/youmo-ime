@@ -315,7 +315,10 @@ def lock(path):
 
 
 def unlock(path):
-    os.remove(os.path.join(path, 'owner'))
+    try:
+        os.remove(os.path.join(path, 'owner'))
+    except FileNotFoundError:
+        pass   # a lock taken by another tool (plain mkdir) has no owner file
     os.rmdir(path)
 
 if __name__ == '__main__':
