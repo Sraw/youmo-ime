@@ -154,6 +154,22 @@ class MotionTest {
     }
 
     @Test
+    fun aPathIsConvexWhenItTurnsOneWayAlone() {
+        fun path(vararg xy: Double, close: Boolean = true) = Shape.Path(
+            listOf(Shape.Path.Op.MoveTo(xy[0], xy[1])) + (2 until xy.size step 2).map { Shape.Path.Op.LineTo(xy[it], xy[it + 1]) } +
+                listOfNotNull(Shape.Path.Op.Close.takeIf { close }),
+        )
+        assertTrue(path(0.0, 0.0, 10.0, 0.0, 10.0, 10.0, 0.0, 10.0).convex)
+        // either way round, a point on an edge straight on
+        assertTrue(path(0.0, 0.0, 0.0, 10.0, 5.0, 10.0, 10.0, 10.0, 10.0, 0.0).convex)
+        // a notch, two outlines, a line
+        assertTrue(!path(0.0, 0.0, 10.0, 0.0, 5.0, 3.0, 10.0, 10.0, 0.0, 10.0).convex)
+        val two = Shape.Path(path(0.0, 0.0, 1.0, 0.0, 1.0, 1.0).ops + path(5.0, 5.0, 6.0, 5.0, 6.0, 6.0).ops)
+        assertTrue(!two.convex)
+        assertTrue(!path(0.0, 0.0, 5.0, 0.0, 10.0, 0.0).convex)
+    }
+
+    @Test
     fun effectWhereItDoesNothingWarned() {
         assertEquals(emptyList(), warnings("<style select=\"key:pressed\" effect=\"particles(star.png, 3, 8dp, 300ms)\"/>"))
         assertEquals(listOf("effect= on popup does nothing: only a key moves"), warnings("<style select=\"popup\" effect=\"particles(star.png, 3, 8dp, 300ms)\"/>"))

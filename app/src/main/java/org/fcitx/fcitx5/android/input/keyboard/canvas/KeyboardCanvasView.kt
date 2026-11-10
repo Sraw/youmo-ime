@@ -35,6 +35,7 @@ import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneA11y
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Ink
+import org.fcitx.fcitx5.android.scene.KeyEffect
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Op
@@ -155,6 +156,12 @@ class KeyboardCanvasView(
     private var faces: List<Faces> = emptyList()
     private var base: RenderNode? = null
     private val speech = Speech()
+
+    // the keys' press effects (060-render-p3 A3), and where the last finger came down on which key: what they play from
+    private val effects = KeyEffects(this, images)
+    private var touched: KeyRef? = null
+    private var touchedX = 0f
+    private var touchedY = 0f
 
     // where the view was over the picture's base, and the base's size, when the picture was recorded
     private val pictureAt = IntArray(PICTURE_PLACE)
@@ -296,13 +303,17 @@ class KeyboardCanvasView(
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
         // the keyboard hidden keeps its view attached: out of sight, nothing moves on
-        if (visibility != VISIBLE) faces.forEach { it.moving?.stop() }
+        if (visibility != VISIBLE) {
+            faces.forEach { it.moving?.stop() }
+            effects.stop()
+        }
     }
 
     override fun onDetachedFromWindow() {
         viewTreeObserver.removeOnPreDrawListener(moved)
         // a keyboard hidden moves no more: no frame asked for out of sight
         faces.forEach { it.moving?.stop() }
+        effects.stop()
         super.onDetachedFromWindow()
     }
 
@@ -375,6 +386,8 @@ class KeyboardCanvasView(
             }
             f.moving?.let { drawLeaving(canvas, it) }
         }
+        // over every key: a particle flies over the keys round it
+        effects.draw(canvas)
         // what the frame's nodes draw (a pack's fonts' glyphs, its pictures) is drawn on the RenderThread
         // after this: the pack's first frame drawn once a frame is committed, not here. ViewRootImpl.performDraw
         // takes the commit callbacks before it draws, so one registered here goes with the window's next
@@ -437,8 +450,29 @@ class KeyboardCanvasView(
             lastDownAt = now
         }
         f.node.motion?.let { pressMoves(f, on, it) }
+        if (on) f.node.motion?.effect?.let { playEffect(f.node, ref, it) }
         invalidate()
     }
+
+    /** Where a finger came down on key [ref], in this view: what its press's effect plays from (A3). */
+    fun touchedAt(ref: KeyRef, x: Float, y: Float) {
+        touched = ref
+        touchedX = x
+        touchedY = y
+    }
+
+    // A3: a key's effect played at each press, typed fast too (its pools bound it); where 键盘动效 may move keys
+    // alone, from where the finger came down on it (a screen reader's or a test's press: its middle)
+    private fun playEffect(k: KeyNode, ref: KeyRef, effect: KeyEffect) {
+        if (!KeyMotionSwitch.on(context)) return
+        val at = touched == ref
+        effects.play(effect, k.shape, if (at) touchedX else k.anchor.x.toFloat(), if (at) touchedY else k.anchor.y.toFloat())
+        touched = null
+    }
+
+    /** The keys' press effects, for tests (A3). */
+    @get:VisibleForTesting
+    internal val keyEffects: KeyEffects get() = effects
 
     // the last key's down (uptime ms): a key pressed within its fade's length of it is typed fast
     private var lastDownAt = Long.MIN_VALUE / 2
