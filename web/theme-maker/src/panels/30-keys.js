@@ -236,6 +236,11 @@
     el.append(row('厚度', number(depth ? parseFloat(depth) : null, set('depth'), { min: 0, max: LIM.depthDp, step: 0.5, unit: 'dp' }), h('span', { className: 'muted', textContent: '颜色 ' }), color(val('depth-color'), set('depth-color'), F)));
 
     panels.ui.propRows(el, api, F, sel, [{ prop: 'inset', label: '内缩', kind: 'inset' }], true);
+    // a theme started from a built-in one keeps its rows closer at the keyboard height 紧凑 (LookTheme's
+    // @compact key insets, 060-key-spacing): said, so an inset changed here is not taken to be the whole of it
+    if (/select="@compact (@landscape )?key"[^>]*\binset=/.test(xml)) {
+      el.append(h('p', { className: 'muted', textContent: '这个主题另有键盘高度「紧凑」时的内缩（@compact key、@compact @landscape key，内置主题带的：上下缩到四成），改这里的内缩不改它们；要一起改，在「源码」里改那两条或删掉。' }));
+    }
     el.append(row('形状', select([['', '不设'], ['rect', '方块'], ['circle', '圆'], ['bar', '条']], val('shape') || '', (v) => set('shape')(v || null))));
     el.append(row('按下效果', select([['', '不设'], ['tint', '变色'], ['ripple', '涟漪'], ['face', '换面']], val('press') || '', (v) => set('press')(v || null))));
     el.append(row('按下时盖的颜色', color(val('overlay'), set('overlay'), F), clear(set('overlay'))));
