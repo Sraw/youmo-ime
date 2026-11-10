@@ -905,8 +905,15 @@
     $('redo').addEventListener('click', () => { if (history && history.canRedo) { history.redo(); edited = true; changed(true); } });
     $('edit').addEventListener('input', (e) => { if (typedIn(e.target)) dirty = e.target; });
     $('edit').addEventListener('change', (e) => { if (e.target === dirty) dirty = null; }, true);
+    // typed back to what it was: no change event, so the field is let go on leaving it
+    // (only then: a field left with other text commits by its change, which needs it still dirty)
+    let focusValue = null;
+    $('edit').addEventListener('focusin', (e) => { focusValue = e.target.value; });
+    $('edit').addEventListener('focusout', (e) => { if (e.target === dirty && e.target.value === focusValue) dirty = null; });
     document.addEventListener('keydown', (e) => {
       if (!(e.ctrlKey || e.metaKey) || e.target === $('source') || e.target === dirty) return;
+      // not under a dialog: the save's would write what it checked, not what an undo made
+      if (document.querySelector('dialog[open]')) return;
       if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
       else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); $('redo').click(); }
     });
