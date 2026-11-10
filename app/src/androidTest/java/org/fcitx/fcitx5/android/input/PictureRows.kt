@@ -23,13 +23,6 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * 060-render-p3 §4.3's rows of A4 (the animated picture): a pack whose picture is an animated WebP (720 px,
- * the widest one plays at, 20 fps, [ASSET]) against the same pack with its first frame still, shown and left
- * alone 30 s (frames, the process's CPU, memory), a 10-key run over it, and hidden 10 s (no frame; the picture stopped). With
- * `perfOnly=anim,soak`, instead, it plays [SOAK_MS] (10 minutes) and the memory is told at its start and each [SOAK_STEP_MS]
- * (a decoder's leak: §4 A4). Kept out of the test's class for its size (detekt LargeClass).
- */
-/**
  * perfOnly's motion rows: anim, A1's (motionRows) then A4's; anim,soak: the animated picture played 10 minutes
  * instead; picture: A4's alone (A5: one change to it measured in minutes).
  */
@@ -38,6 +31,13 @@ internal fun KeyboardPerfBaselineTest.animRows(only: List<String>) {
     if ("anim" in only || "picture" in only) pictureRows(soak = "soak" in only)
 }
 
+/**
+ * 060-render-p3 §4.3's rows of A4 (the animated picture): a pack whose picture is an animated WebP (720 px,
+ * the widest one plays at, 20 fps, [ASSET]) against the same pack with its first frame still, shown and left
+ * alone 30 s (frames, the process's CPU, memory), a 10-key run over it, and hidden 10 s (no frame; the picture stopped). With
+ * `perfOnly=anim,soak`, instead, it plays [SOAK_MS] (10 minutes) and the memory is told at its start and each [SOAK_STEP_MS]
+ * (a decoder's leak: §4 A4). Kept out of the test's class for its size (detekt LargeClass).
+ */
 internal fun KeyboardPerfBaselineTest.pictureRows(soak: Boolean) {
     if (themeWas == null) themeWas = ThemeManager.prefs.normalModeTheme.getValue()
     val (animated, still) = onMain { pictured(service.resources, ANIMATED, true) to pictured(service.resources, STILL_PICTURE, false) }

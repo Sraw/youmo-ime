@@ -134,6 +134,21 @@ class PopupMotionTest {
     }
 
     @Test
+    fun aBubblesMotionFollowsTheEnvironmentItsStylesAreScopedBy() {
+        // `@landscape` as `@im=` or `@field=`: what changes with the root's size the same
+        val p = popups(pack("<style select=\"preview\" appear=\"rise 100ms\"/>", "<style select=\"@landscape preview\" appear=\"fade 100ms\"/>"))
+        p.send(PopupAction.PreviewAction(ID, "q", key))
+        assertEquals(p.last().dp(PopupMoves.RISE_DP).toFloat(), p.last().translationY, 0f)
+        p.send(PopupAction.DismissAction(ID))
+        frames(1000)
+        RuntimeEnvironment.setQualifiers("+land")
+        p.send(PopupAction.PreviewAction(ID, "w", key))
+        // faded in, not risen: the motion read again in the new environment
+        assertEquals(0f, p.last().translationY, 0f)
+        assertEquals(0f, p.last().alpha, 0f)
+    }
+
+    @Test
     fun withTouchExplorationAPopupGoesAtOnce() {
         val p = popups()
         val am = appContext.getSystemService(android.view.accessibility.AccessibilityManager::class.java)

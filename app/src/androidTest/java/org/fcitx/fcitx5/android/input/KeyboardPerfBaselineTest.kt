@@ -106,7 +106,7 @@ class KeyboardPerfBaselineTest {
         log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp")
         selectThisInputMethod()
         if (only != null) {
-            // perfOnly=theme,shift,build,press,popup: those parts alone, for a trace short enough to read (or an A/B of a few)
+            // perfOnly=theme,shift,build,press,popup,anim,picture: those parts alone, for a trace short enough to read (or an A/B of a few)
             launch()
             if ("theme" in only) switchThemes()
             if ("shift" in only) sceneCosts()

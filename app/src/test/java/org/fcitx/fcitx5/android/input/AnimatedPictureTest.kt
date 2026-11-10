@@ -233,12 +233,12 @@ class AnimatedPictureTest {
     @Test
     fun decodedWithTheScreenOffItWaitsForTheScreen() {
         val view = shown(ColorDrawable(0)) as PictureBaseView
-        val power = shadowOf(view.context.getSystemService(android.os.PowerManager::class.java))
-        power.turnScreenOn(false)
+        val display = shadowOf(view.display)
+        display.setState(android.view.Display.STATE_OFF)
         val board = AnimatedBoardDrawable(FakeFrames(), 100, appContext)
         view.play(board)
         assertFalse("the screen off as it is handed over", board.isRunning)
-        power.turnScreenOn(true)
+        display.setState(android.view.Display.STATE_ON)
         view.onScreenStateChanged(View.SCREEN_STATE_ON)
         assertTrue(board.isRunning)
     }

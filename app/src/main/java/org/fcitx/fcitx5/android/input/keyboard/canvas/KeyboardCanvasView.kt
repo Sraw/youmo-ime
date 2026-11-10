@@ -420,13 +420,13 @@ class KeyboardCanvasView(
         }
     }
 
-    // the face a state change left, fading over the new one; one the renderer let go of dropped
     // a crossfade's old face, its fade over: its display list (the theme's bitmaps) freed now, not at GC; never
     // one a key shows still
     private fun letGoOf(node: RenderNode) {
         if (faces.none { it.normal === node || it.pressed === node }) node.discardDisplayList()
     }
 
+    // the face a state change left, fading over the new one; one the renderer let go of dropped
     private fun drawLeaving(canvas: Canvas, m: Moving) {
         val leaving = m.leaving ?: return
         if (leaving.hasDisplayList()) canvas.drawRenderNode(leaving) else m.leaving = null

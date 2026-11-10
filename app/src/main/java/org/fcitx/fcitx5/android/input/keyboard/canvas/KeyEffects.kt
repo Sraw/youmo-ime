@@ -215,7 +215,7 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
 
     // [r]'s clip node (at [left], [top]) recorded round its image, clipped to [shape]: a rounded rectangle of one radius
     // by its outline (antialiased), another shape by its path in the node (an outline's path clips from API 33 alone;
-    // a path clips any shape, concave too, by the even-odd rule the key's hit test reads it by)
+    // a path clips any shape, concave too, by the non-zero rule its face is painted by; the hit test is still even-odd)
     private fun clipTo(r: Ripple, shape: Shape, left: Int, top: Int) {
         val b = shape.bounds
         box.set((b.left - left).toFloat(), (b.top - top).toFloat(), (b.right - left).toFloat(), (b.bottom - top).toFloat())
