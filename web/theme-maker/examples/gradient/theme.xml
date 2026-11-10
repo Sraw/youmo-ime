@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  内置主题 Material，浅色、深色两版（0.5 的 MaterialLight、MaterialDark）。
-  3.0 的内置主题只给颜色，外观全是 LookDefaults（块状、圆角 4dp、阴影 1dp、键缝 h3 v7、横屏 v4、按下 Tint）；
-  下面的样式就是 LookTheme 把它们写成 4.0 的样子，App 也照这些画（BuiltinThemeEquivalenceTest 逐字比场景）。
-  keyBorder、keyHint、toolbarIcon 3.0 没单给，取 Palette 的默认（= keyShadow、altKeyText、altKeyText）。
--->
-<!--
   示例「晚霞」（060-render-p3 M4）：键盘是从上到下的渐变（两个自己加的颜色 skyTop、skyBottom，浅色、深色各一套），
   键是半透明的白，回车键另有一道斜的渐变。
 -->

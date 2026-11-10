@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  内置主题 Pixel，浅色、深色两版（0.5 的 PixelLight、PixelDark）；新装时的默认。
-  3.0 的内置主题只给颜色，外观全是 LookDefaults（块状、圆角 4dp、阴影 1dp、键缝 h3 v7、横屏 v4、按下 Tint）；
-  下面的样式就是 LookTheme 把它们写成 4.0 的样子，App 也照这些画（BuiltinThemeEquivalenceTest 逐字比场景）。
-  keyBorder、keyHint、toolbarIcon 3.0 没单给，取 Palette 的默认（= keyShadow、altKeyText、altKeyText）。
--->
-<!--
   示例「薄荷 17 键」（060-render-p3 M4）：包里带自己的 18 键键盘 layouts/k18.xml，H 和 JK 并成一个键，成了 17 键；
   动效：键在状态之间 160 ms 过渡（松开时按下的样子淡出，Shift 切换时新旧两面交叉淡），按下缩到 92%、下沉 1dp。
   以后（0.6.0 的 A2–A4 合进来后）这个示例还会用上：气泡和长按弹出的出现动画（popup/preview 的 appear=）、

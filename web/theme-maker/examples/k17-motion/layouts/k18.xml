@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 17 键：App 的 18 键（k18），第 2 行 H 和 JK 并成一个键（示例「薄荷 17 键」）。键盘 id 仍是 k18：主题包只换键盘，不加键盘 -->
+<!-- 17 键：App 的 18 键（k18），第 2 行 H 和 JK 并成一个键（示例「薄荷 17 键」）；JK 键上的 ) 和它的上划随之去掉，快捷页上它占 H 的位置（g18/h）；字是写死的 HJK，{group:} 只收一两个字母。键盘 id 仍是 k18：主题包只换键盘，不加键盘 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="k18" name="17 键" family="grouped" columns="100">
 <defaults kind="letter" text-size="20" width="fill"/>
 <row>

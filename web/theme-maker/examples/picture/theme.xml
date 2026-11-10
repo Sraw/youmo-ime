@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  内置主题 Nord，浅色、深色两版（0.5 的 NordLight、NordDark）。
-  3.0 的内置主题只给颜色，外观全是 LookDefaults（块状、圆角 4dp、阴影 1dp、键缝 h3 v7、横屏 v4、按下 Tint）；
-  下面的样式就是 LookTheme 把它们写成 4.0 的样子，App 也照这些画（BuiltinThemeEquivalenceTest 逐字比场景）。
-  keyBorder、keyHint、toolbarIcon 3.0 没单给，取 Palette 的默认（= keyShadow、altKeyText、altKeyText）。
--->
-<!--
   示例「夜湖」（060-render-p3 M4）：一张图片做键盘背景，竖屏、横屏各裁一块（<cut>），
   颜色是「配色 › 从背景图取色」算的（键是压在图上的一层半透明黑）。图片是程序画的，可以自由使用。
 -->

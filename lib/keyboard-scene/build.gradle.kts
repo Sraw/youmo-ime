@@ -131,6 +131,8 @@ val engineLink = tasks.named<org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile>
 val youmoEngine = tasks.register<Copy>("youmoEngine") {
     from(engineLink.flatMap { it.destinationDirectory }) { include("youmo-engine.js") }
     into(layout.buildDirectory.dir("youmo-engine"))
+    // Gradle does not see a filter's lambda: change this with the filter, or the engine built before stays
+    inputs.property("filter", "2")
     // and nothing a script element in a page ends or escapes at (the layouts' comments are in it, `<!--`): `<\!--`
     // and `<\/` are those texts again in a string or a regex, the only places Kotlin writes them
     filter { line: String ->
