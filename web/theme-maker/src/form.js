@@ -226,24 +226,46 @@
   }
 
   /**
-   * [xml] with [p] as its <picture> (null: none), in place of the one it had. `{xml, gone}`: the files the old
-   * picture named that nothing names any more.
+   * [xml] with [p] as its <picture> (null: none). One there is changed in place: its src=, brightness=, blur= and
+   * each cut's file= and rect=, so what else it says (an attribute of a later app's, a comment) is kept; none there, one
+   * written. `{xml, gone}`: the files the old picture named that nothing names any more.
    */
   function setPicture(xml, p) {
     const old = elements(xml, 'picture')[0];
     const before = old ? xml.slice(old.start, old.end) : '';
-    let text = '';
-    if (p) {
-      text = '<picture src="' + escape(p.src) + '"' + (p.brightness != null && p.brightness !== 100 ? ' brightness="' + p.brightness + '%"' : '') +
-        (p.blur ? ' blur="' + p.blur + 'dp"' : '') + '>';
+    const cutText = (o, c) => '<cut orientation="' + o + '" file="' + escape(c.file) + '"' + (c.rect ? ' rect="' + c.rect.map(Math.round).join(' ') + '"' : '') + '/>';
+    if (old && p) {
+      let tag = withAttr(old.tag, 'src', p.src);
+      tag = withAttr(tag, 'brightness', p.brightness != null && p.brightness !== 100 ? p.brightness + '%' : null);
+      tag = withAttr(tag, 'blur', p.blur ? p.blur + 'dp' : null);
+      // a <picture …/>: an open and a close, so a cut has where to go
+      const closed = /\/>$/.test(old.tag);
+      let body = closed ? '\n  </picture>' : xml.slice(old.start + old.tag.length, old.end);
+      if (closed) tag = tag.replace(/\s*\/>$/, '>');
       for (const o of ['portrait', 'landscape']) {
         const c = p.cuts[o];
-        if (c) text += '\n    <cut orientation="' + o + '" file="' + escape(c.file) + '"' + (c.rect ? ' rect="' + c.rect.map(Math.round).join(' ') + '"' : '') + '/>';
+        const cut = elements(body, 'cut').find((e) => e.attrs.some((a) => a[0] === 'orientation' && a[1] === o));
+        if (cut && !c) body = splice(body, cut.start, cut.end, '');
+        else if (cut) {
+          const t = withAttr(withAttr(cut.tag, 'file', c.file), 'rect', c.rect ? c.rect.map(Math.round).join(' ') : null);
+          body = body.slice(0, cut.start) + t + body.slice(cut.start + cut.tag.length);
+        } else if (c) {
+          const close = body.lastIndexOf('</picture>');
+          body = body.slice(0, close).replace(/\s*$/, '') + '\n    ' + cutText(o, c) + '\n  ' + body.slice(close);
+        }
       }
-      text += '\n  </picture>';
+      xml = xml.slice(0, old.start) + tag + body + xml.slice(old.end);
+    } else {
+      let text = '';
+      if (p) {
+        text = '<picture src="' + escape(p.src) + '"' + (p.brightness != null && p.brightness !== 100 ? ' brightness="' + p.brightness + '%"' : '') +
+          (p.blur ? ' blur="' + p.blur + 'dp"' : '') + '>';
+        for (const o of ['portrait', 'landscape']) if (p.cuts[o]) text += '\n    ' + cutText(o, p.cuts[o]);
+        text += '\n  </picture>';
+      }
+      if (old) xml = splice(xml, old.start, old.end, text);
+      else if (text) xml = insert(xml, 'picture', text);
     }
-    if (old) xml = splice(xml, old.start, old.end, text);
-    else if (text) xml = insert(xml, 'picture', text);
     const named = uncommented(xml);
     const gone = [...before.matchAll(/\b(?:src|file)="([^"]+)"/g)].map((m) => m[1]).filter((f) => !named.includes('"' + f + '"') && !named.includes('(' + f));
     return { xml, gone: [...new Set(gone)] };
@@ -288,6 +310,9 @@
     if (f.kind === 'solid') return f.color;
     if (f.kind === 'linear') return 'linear(' + clamp(f.angle, -360, 360) + 'deg, ' + f.stops.map(([c, at]) => c + ' ' + clamp(at, 0, 100) + '%').join(', ') + ')';
     if (f.kind === 'picture') return 'picture(' + clamp(f.blur ?? 0, 0, LIMITS.blurDp, 1) + 'dp, ' + clamp(f.brightness ?? 100, 0, 100) + '%' + (f.over ? ', ' + f.over : '') + ')';
+    if (f.kind === 'image') {
+      return 'image(' + f.file + ', ' + f.insets.map((v) => clamp(v, 0, 9999)).join(' ') + (f.scale && f.scale !== 1 ? ', ' + clamp(f.scale, 1, 8) + 'x' : '') + (f.fallback ? ', ' + f.fallback : '') + ')';
+    }
     throw new Error('no fill of kind ' + f.kind);
   }
 
@@ -305,6 +330,8 @@
       const [blur, brightness, over] = splitTop(m[1]).map((s) => s.trim());
       return { kind: 'picture', blur: parseFloat(blur) || 0, brightness: brightness ? parseFloat(brightness) : 100, over: over || null };
     }
+    m = /^image\(([^,()]+),\s*(\d{1,4}) (\d{1,4}) (\d{1,4}) (\d{1,4})(?:,\s*([1-8])x)?(?:,\s*(.+))?\)$/.exec(t);
+    if (m) return { kind: 'image', file: m[1].trim(), insets: [+m[2], +m[3], +m[4], +m[5]], scale: m[6] ? +m[6] : 1, fallback: m[7] ? m[7].trim() : null };
     if (/^(image|nine)\(/.test(t)) return { kind: 'other', text: t };
     return { kind: 'solid', color: t };
   }
@@ -345,6 +372,58 @@
     return m ? { width: +m[1], color: m[2] } : null;
   }
 
+  /** An inset= (or padding=) text read: `[top, right, bottom, left]` dp, null for what is none (CSS's 1, 2 or 4 values). */
+  function parseInset(t) {
+    const v = String(t ?? '').trim().split(/\s+/).map((x) => (x === '0' ? 0 : /^-?[\d.]+dp$/.test(x) ? parseFloat(x) : NaN));
+    if (!t || !v.every(Number.isFinite)) return null;
+    if (v.length === 1) return [v[0], v[0], v[0], v[0]];
+    if (v.length === 2) return [v[0], v[1], v[0], v[1]];
+    return v.length === 4 ? v : null;
+  }
+
+  /** `[top, right, bottom, left]` as the shortest inset= text that says it. */
+  function insetText(v, max = LIMITS.lengthDp) {
+    const [t, r, b, l] = v.map((x) => clamp(x, 0, max, 1) + 'dp');
+    if (t === b && r === l) return t === r ? t : t + ' ' + r;
+    return [t, r, b, l].join(' ');
+  }
+
+  /** A radius= text read: its four corners dp (top left, top right, bottom right, bottom left); null for none or `50%`. */
+  function parseRadius(t) {
+    const v = String(t ?? '').trim().split(/\s+/).map((x) => (x === '0' ? 0 : /^[\d.]+dp$/.test(x) ? parseFloat(x) : NaN));
+    if (!t || !v.every(Number.isFinite)) return null;
+    if (v.length === 1) return [v[0], v[0], v[0], v[0]];
+    return v.length === 4 ? v : null;
+  }
+
+  /** Four corners as the shortest radius= text. */
+  function radiusText(v) {
+    const c = v.map((x) => clamp(x, 0, LIMITS.lengthDp, 1) + 'dp');
+    return c.every((x) => x === c[0]) ? c[0] : c.join(' ');
+  }
+
+  // ---- the theme's <meta> ----
+
+  /** The <meta>'s attributes (author, version, license, min-app, preview): `{name: value}`, {} for none. */
+  function meta(xml) {
+    const m = elements(xml, 'meta')[0];
+    return m ? Object.fromEntries(m.attrs) : {};
+  }
+
+  /** [xml] with <meta>'s [name] [value] (null or empty: taken out); a <meta/> made first where none, one left empty taken out. */
+  function setMeta(xml, name, value) {
+    if (value === '') value = null;
+    let m = elements(xml, 'meta')[0];
+    if (!m) {
+      if (value == null) return xml;
+      xml = insert(xml, 'meta', '<meta/>');
+      m = elements(xml, 'meta')[0];
+    }
+    const tag = withAttr(m.tag, name, value);
+    if (!attrsOf(tag).length && /\/>$/.test(tag)) return splice(xml, m.start, m.end, '');
+    return splice(xml, m.start, m.start + m.tag.length, tag);
+  }
+
   // ---- selectors ----
 
   /** A key's name in a selector: `\` before what would be read as the grammar's (a comma, a star, a colon…). */
@@ -376,7 +455,8 @@
     uncommented, styles, elements, valueOf, setProp, setProps, insert, sameSelect, LIMITS, clamp,
     COLOR_GROUPS, colors, setColor, variants, withDark, hexOf, parseHex,
     picture, setPicture, cropRect,
-    fillText, parseFill, shadowText, parseShadow, borderText, parseBorder,
+    fillText, parseFill, shadowText, parseShadow, borderText, parseBorder, parseInset, insetText, parseRadius, radiusText,
+    meta, setMeta,
     keyName, RANGES, SCENES, STATES, selector,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
