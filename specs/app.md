@@ -384,10 +384,13 @@ is no word (a domain, a user name, a password); a wrong guess in a password is n
 password is neither read nor learned; the space a glide puts before its word would break an address.
 Keys there are typed as they are, and a finger sliding across them never starts a glide.
 
-The same touch is a stroke (笔画筛选) where its switch is on (`AppPrefs.keyboard.strokeFilter`
-beside `glideTyping`, which keeps 0.4's `glide_typing` key, so a 0.4 user's glide carries over). The
-two are never both on: the shared page's `AppToggle.turnsOff` turns the other off as one is turned on,
-its switch flipped where it is seen, no dialog; so English glides none while strokes are on.
+The same touch is a stroke (笔画筛选) where that is chosen instead: one setting,
+`AppPrefs.keyboard.keyDrawing` (`KeyDrawing`: Off, Glide, StrokeFilter; its Handwriting not offered
+on the settings page yet), so the two are never both on and English glides none while strokes are
+chosen. 0.5's two switches (`glide_typing`, 0.4's key too, and `stroke_filter`) move over at the
+start (`AppPrefs.migrateKeyDrawing`, a backup's at the start after its import): glide if it was on,
+else strokes if they were, else off (both on, which only a backup or a hand edit holds, is glide),
+the two old keys dropped. The page's row is an `AppChoice` whose summary is the choice alone.
 `GlideInput` decides at the finger's down (`strokes`): the switch, a word field, pinyin typed (`BaseKeyboard.imTyping`, which
 `KeyboardWindow` sets from the preedit, not in a temporary mode: its panel alone has an aux line above) and a keyboard whose input method filters (`filters`:
 `InputMethodCatalog.filtersByStrokes` of the one shown, on `TextKeyboard`, `T9Keyboard` and
@@ -533,10 +536,20 @@ keyboard is moved (the app has its layout, `BuiltInLayouts.has`; a keyboard not 
 views). A moved keyboard whose layout does not read still gets the canvas, its views' rows invisible, and
 draws nothing (logged once; never the views again, U8: `SceneKeyDefTest.aMovedKeyboardWhoseLayoutDoesNotReadDrawsNothing`).
 The layouts are read through a `LayoutSource` by id (`BuiltInLayouts`: `lib/keyboard-scene/src/commonMain/layouts/<id>.xml`,
-copied by the build as raw resources `scene_layout_<id>`, `-` made `_`; P3 a theme pack's first), each
+copied by the build as raw resources `scene_layout_<id>`, `-` made `_`), each
 once a process with the fragments it includes, kept by the source's key and the id: `SceneLayouts.source`'s
 first, and where it has none or it does not read, one step back to the app's own (`fallback`);
-`invalidate(key)` has a source's read again (P3, on a theme change); ids stay as the theme format names the boards (`k14/r1c1`,
+`invalidate(key)` has a source's read again. The source is asked each time (`ThemePackLayouts.current`): while a
+theme 4.0 pack is in use, `ThemePackLayouts` (key `theme:<file>@<theme.xml's time>`, so a pack imported again is read
+again; a theme change makes the input view anew) reads its `layouts/<id>.xml`, only for an id the app has
+(`BuiltInLayouts.has`: a pack replaces keyboards, never adds one), and refuses (`LayoutSource.refuses`, logged once,
+the app's drawn) one that is not as typable as the app's of that id (`ThemePackLayouts.judge`: its `id` and `family`,
+and every slot kind, function key of role backspace/enter/lang and digit key the app's has, its includes in place); a
+fragment it includes that the pack has not is the app's, a fragment of the pack's is read only by the pack's own
+keyboards. Block by block: a bad `k14.xml` falls back alone (`ThemePackLayoutsTest`). `SceneLayouts.of` drops what was
+read of other sources once the source's key changes. The keyboard choices (the input method pages, ⋯'s 键盘) name
+the theme's layout a keyboard is drawn with (`KeyboardLabels`, `keyboard_themed`, `18 键（主题：17 键）`, the name cut
+at 24 characters; not where T9b draws the app's instead, 双拼 on own groups, which it does not log for them); ids stay as the theme format names the boards (`k14/r1c1`,
 `ThemeKeyNamesTest.aSceneLayoutsKeysAreItsBoardsNames`). `SceneBoard` makes the canvas view and its scenes
 (the U8 fallback, the kept scenes, the marks' settings) for any keyboard; the keyboard gives its state as
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
@@ -1275,7 +1288,11 @@ the packs listed) is replaced, as it could not be deleted otherwise. A new pack 
 16 layouts, `.xml`, 64 KB each. Warnings (not refusals): what the reader skips (a later version's names), and
 key text under 3:1 on its keys in a version (`ThemePackCheck`'s contrast). The confirmation
 (`ThemePackDialogs`) shows the preview, author, version, license, the format, that it replaces a pack or a
-3.0 theme of the name, and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
+3.0 theme of the name, the keyboards it replaces as they would be drawn (`ThemePackLayouts.report`: read by the
+engine's reader and judged as above) with the count of their `commit:` actions (from the parsed layouts and the
+pack's fragments they include, each once: keys', variants', defaults', popup items' `send`, menu items' `do`; a
+character reference counts as what it reads as), the files never used (not an app id, unreadable, refused, a fragment
+no keyboard used includes), and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
 
 Placing (`ThemePackFiles.place`) copies it into `v4/.saving/new-<uuid>/`, each file synced, renames an old
 pack of the name aside into `v4/.saving/old-<uuid>/<name>`, renames the new one into place, syncs `v4/`, and

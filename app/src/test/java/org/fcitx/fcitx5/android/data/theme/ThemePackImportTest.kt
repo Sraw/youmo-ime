@@ -257,7 +257,8 @@ class ThemePackImportTest {
             ctx.getString(R.string.theme_info_format, "4.0"),
         )
         val pack = opened(sample())
-        assertEquals(meta, ThemePackDialogs.confirmText(ctx, pack).lines())
+        // its layouts said too (T8b): its qwerty.xml does not read
+        assertEquals(meta + ctx.getString(R.string.theme_pack_layouts_unused, "qwerty"), ThemePackDialogs.confirmText(ctx, pack).lines())
         val versions = pack.commit().getOrThrow()
         ThemeManager.refreshThemes()
         assertEquals(meta.joinToString("\n"), ThemePackDialogs.infoText(ctx, versions[0]))

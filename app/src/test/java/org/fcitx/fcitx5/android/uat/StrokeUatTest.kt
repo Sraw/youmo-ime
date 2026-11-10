@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.input.keyboard.GlideInput
 import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
@@ -56,8 +57,7 @@ class StrokeUatTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    private val glideTyping = AppPrefs.getInstance().keyboard.glideTyping
-    private val strokeFilter = AppPrefs.getInstance().keyboard.strokeFilter
+    private val keyDrawing = AppPrefs.getInstance().keyboard.keyDrawing
     private var open: KeyboardHarness? = null
     private val h get() = open!!
 
@@ -70,8 +70,7 @@ class StrokeUatTest {
     private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
 
     private fun harness(im: InputMethodEntry, glide: Boolean = false, keyboards: ImKeyboards.Chosen? = null): KeyboardHarness {
-        prefs.set(strokeFilter, !glide)
-        prefs.set(glideTyping, glide)
+        prefs.set(keyDrawing, if (glide) KeyDrawing.Glide else KeyDrawing.StrokeFilter)
         return KeyboardHarness(TestThemes.PixelLight, im, keyboards = keyboards).also { open = it }.start()
     }
 

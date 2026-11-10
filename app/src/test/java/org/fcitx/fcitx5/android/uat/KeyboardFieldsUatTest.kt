@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -76,7 +77,7 @@ class KeyboardFieldsUatTest {
     @Test
     @Uat("KB-33")
     fun aGlideDrawsTheFingersTrail() {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         val h = english()
         h.glideHello(lift = false)
         // still down: nothing offered yet, the trail drawn over the keys
@@ -87,7 +88,7 @@ class KeyboardFieldsUatTest {
     @Test
     @Uat("KB-36")
     fun noGlideInAPasswordAnAddressOrAnEmail() {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         for (variation in listOf(
             InputType.TYPE_TEXT_VARIATION_PASSWORD,
             InputType.TYPE_TEXT_VARIATION_URI,
@@ -112,7 +113,7 @@ class KeyboardFieldsUatTest {
     @Test
     @Uat("EN-19")
     fun aNoSuggestionsFieldAndSuggestionsOffStillGlide() {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         english(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS).glideHello()
         assertEquals(harness!!.api.calls.toString(), 1, harness!!.api.calls.count { it == "offerGlide" })
         harness?.close()

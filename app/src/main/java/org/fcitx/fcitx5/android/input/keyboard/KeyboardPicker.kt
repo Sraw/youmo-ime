@@ -38,7 +38,7 @@ class KeyboardPicker(private val context: Context, private val im: () -> String)
         return PopupMenu(context, anchor).apply {
             for ((i, keyboard) in choices.withIndex()) {
                 // the keyboards' names as each page lists them (全键盘, 18 键, 14 键, 九键)
-                menu.add(GROUP, i, i, labelOf(name, keyboard)).apply {
+                menu.add(GROUP, i, i, KeyboardLabels.label(context, name, keyboard, context.getString(labelOf(name, keyboard)))).apply {
                     isCheckable = true
                     isChecked = keyboard == current
                 }
