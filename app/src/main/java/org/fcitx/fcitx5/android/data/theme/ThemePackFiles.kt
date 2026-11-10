@@ -225,6 +225,17 @@ object ThemePackFiles {
         File(dir, THEME_XML).takeIf { it.length() <= ThemeAssetLimits.MAX_THEME_XML_BYTES }?.readText()?.removePrefix(BOM)
     }.getOrNull()?.let { ThemeReader.laterBuilds(it, appVersion) } == true
 
+    /**
+     * The version a pack's `min-app` is checked against for the app named [versionName], or null for none.
+     * A release (`0.6.0`) and a pre-release at its tag (`0.6.0-beta1`) are their numeric core
+     * ([ThemeReader.newer] compares no more). A build past a tag (`0.5.2-791-gabc1234`) or with no tag
+     * (`-untagged`) is the code going to the next version, not its last tag's: checked against nothing, so
+     * the packs made for that next version can be tried on it.
+     */
+    fun minAppVersion(versionName: String): String? = versionName.takeUnless { DEV_BUILD.containsMatchIn(it) }
+
+    private val DEV_BUILD = Regex("-[0-9]+-g[0-9a-f]+$|-untagged$")
+
     /** How the settings would refer to the versions of a pack named [name] of [variants] ([BuiltinThemeFiles.ref]). */
     fun refs(name: String, variants: Set<Boolean>): List<String> =
         listOf(false, true).filter { it in variants }.map { BuiltinThemeFiles.ref(name, it, variants.size > 1) }
@@ -464,7 +475,9 @@ object ThemePackFiles {
         return PackLayouts.drawn(builtInLayouts.map { BlankKeys.Board(it.layout, it.fragments) }, texts) { BuiltInLayouts(appContext).text(it) }
     }
 
-    private fun builtInBoards(): List<SceneLayout> = BuiltInLayouts.RAW.keys.mapNotNull { SceneLayouts.parseBuiltIn(appContext, it) }
+    // the keyboards only: a fragment (grouped-bottom) read as a layout is refused, logged as broken
+    private fun builtInBoards(): List<SceneLayout> =
+        (BuiltInLayouts.RAW.keys - BuiltInLayouts.FRAGMENTS).mapNotNull { SceneLayouts.parseBuiltIn(appContext, it) }
 
     /** How many times the blank-key check ran, not answered by a pack's stamp: a test's count. */
     @VisibleForTesting

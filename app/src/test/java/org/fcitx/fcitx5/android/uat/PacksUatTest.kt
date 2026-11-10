@@ -265,7 +265,7 @@ class PacksUatTest {
         val app = RuntimeEnvironment.getApplication()
         val manifest = org.fcitx.fcitx5.android.pack.PackManifest.parse(TestShelves.packs.manifest(PackKind.VOICE, mapOf("voice/test.txt" to "x".toByteArray())))
         val importer = PackImports.importer
-        PackImports.importer = { _, uri, _ ->
+        PackImports.importer = { _, uri, _, _ ->
             // what escaped an import (a malformed zip's IllegalArgumentException) crashed the app's scope
             if (uri.lastPathSegment == "bad.youmopack") throw IllegalArgumentException("MALFORMED")
             ImportResult.Imported(manifest, null)

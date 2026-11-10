@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import android.content.res.Configuration
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
@@ -219,6 +220,39 @@ class ThemePackListingTest : ThemePackFixture() {
             }
         } finally {
             ThemeManager.removeOnChangedListener(listener)
+        }
+    }
+
+    // 明暗两套 (060-render-p3 §16-1): a pack of both versions follows the system whatever the slot names
+    @Test
+    fun aPackOfBothVersionsFollowsTheSystemABuiltInPairKeepsItsSlots() {
+        val (light, dark) = placed(sample())
+        val darkSlot = ThemeManager.prefs.darkModeTheme.getValue()
+        val day = Configuration(appContext.resources.configuration).apply {
+            uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or Configuration.UI_MODE_NIGHT_NO
+        }
+        val night = Configuration(day).apply {
+            uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or Configuration.UI_MODE_NIGHT_YES
+        }
+        try {
+            ThemeManager.onSystemPlatteChange(day)
+            ThemeManager.setNormalModeTheme(dark)
+            assertEquals("mine#light", ThemeManager.activeTheme.name)
+            ThemeManager.onSystemPlatteChange(night)
+            assertEquals("mine#dark", ThemeManager.activeTheme.name)
+            assertEquals(ThemeManager.packPair(light), light to dark)
+            // following: the slots as they are (selectTheme fills both with a pack's two), a pack's taking the system's
+            ThemeManager.prefs.darkModeTheme.setValue(light)
+            ThemeManager.prefs.followSystemDayNightTheme.setValue(true)
+            assertEquals("mine#dark", ThemeManager.activeTheme.name)
+            ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
+            // a built-in pair: the version named, as before 0.6.0 (pending L189)
+            ThemeManager.setNormalModeTheme(ThemeManager.builtin("material#light"))
+            assertEquals("material#light", ThemeManager.activeTheme.name)
+            assertEquals(null, ThemeManager.packPair(ThemeManager.builtin("material#light")))
+        } finally {
+            ThemeManager.prefs.darkModeTheme.setValue(darkSlot)
+            ThemeManager.onSystemPlatteChange(appContext.resources.configuration)
         }
     }
 

@@ -178,6 +178,7 @@
     <string name="theme_add_web_hint">做好后回到这里导入</string>
     <string name="skip">跳过</string>
     <string name="theme_migrated">主题已迁移到当前版本</string>
+    <string name="theme_imported_renamed">“%1$s”和别的主题重名，已存为“%2$s”</string>
     <string name="keep_keyboard_letters_uppercase">键盘字母保持大写</string>
     <string name="choose_input_method">选择输入法</string>
     <string name="edit_clipboard">编辑剪贴板</string>
@@ -1128,6 +1129,7 @@
     <string name="voice_hold_nothing">没有听清</string>
     <string name="voice_tap_hint">点这里或麦克风 结束</string>
     <string name="voice_tap_cut_short">最后几个字可能没识别完</string>
+    <string name="voice_polish_failed">语音整理没有生效</string>
     <!-- resource packs (dev/design/060-asset-packs.md) -->
     <string name="packs">资源包</string>
     <string name="home_packs_summary">词库和模型：导入文字包（和语音包）</string>
@@ -1148,6 +1150,10 @@
     <string name="pack_imported">%1$s：已导入 v%2$d</string>
     <string name="pack_imported_older">%1$s：已用 v%2$d 替换了更新的 v%3$d</string>
     <string name="pack_already_there">%1$s：v%2$d 已经导入过，没有变化</string>
+    <string name="pack_kept_newer">%1$s：保留了更新的 v%2$d，没有导入 v%3$d</string>
+    <string name="pack_replace_newer">手机上是更新的 v%1$d，要换成 v%2$d 吗？</string>
+    <string name="pack_replace">替换</string>
+    <string name="pack_keep_newer">保留</string>
     <string name="pack_not_a_pack">%1$s 不是幽默输入法的资源包</string>
     <string name="pack_bad_signature">%1$s：签名不对。不是给这个应用发布的资源包，或者文件已损坏，请重新下载。</string>
     <string name="pack_bad_file">%1$s：其中的文件 %2$s 已损坏，请重新下载。</string>

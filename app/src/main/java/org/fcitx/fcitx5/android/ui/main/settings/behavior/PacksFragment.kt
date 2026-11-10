@@ -83,6 +83,7 @@ class PacksFragment : PaddingPreferenceFragment() {
                 launch { PackStore.state.collect { show() } }
                 launch { PackImports.running.collect { show() } }
                 launch { PackImports.results.collect { it?.let(::results) } }
+                launch { PackImports.older.collect { it?.let(::askOlder) } }
             }
         }
     }
@@ -108,6 +109,23 @@ class PacksFragment : PaddingPreferenceFragment() {
     }
 
     private var resultsDialog: AlertDialog? = null
+
+    private var olderDialog: AlertDialog? = null
+
+    // an older pack would replace the newer one there (pending L8): replaced only on 替换, kept on 保留 or
+    // back. Gone with the activity (a rotation), unanswered: asked again by the page made anew. One collected
+    // again while its dialog is up: one dialog
+    private fun askOlder(question: PackImports.Older) {
+        val ctx = context ?: return
+        if (olderDialog?.isShowing == true) return
+        olderDialog = AlertDialog.Builder(ctx)
+            .setTitle(PackImports.name(ctx, question.kind))
+            .setMessage(ctx.getString(R.string.pack_replace_newer, question.installed, question.version))
+            .setPositiveButton(R.string.pack_replace) { _, _ -> PackImports.answer(question, true) }
+            .setNegativeButton(R.string.pack_keep_newer) { _, _ -> PackImports.answer(question, false) }
+            .setOnCancelListener { PackImports.answer(question, false) }
+            .show()
+    }
 
     private fun results(outcomes: List<PackImports.Outcome>) {
         val ctx = context ?: return

@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.Keep
@@ -88,6 +89,8 @@ class ThemeListFragment : Fragment() {
                         if (migrated) {
                             ctx.toast(R.string.theme_migrated)
                         }
+                        // its name another theme's (a built-in one's since 0.6.0): said under which it is
+                        opened.imported.renamedFrom?.let { ctx.toast(ctx.getString(R.string.theme_imported_renamed, it, theme.name), Toast.LENGTH_LONG) }
                     } catch (e: Exception) {
                         ctx.importErrorDialog(e)
                     }
@@ -153,6 +156,15 @@ class ThemeListFragment : Fragment() {
     }
 
     private fun selectTheme(theme: Theme) {
+        // a pack with both versions follows the system itself (ThemeManager.systemVersion): taken by both
+        // slots, not refused as a theme of one version is while following
+        val pair = ThemeManager.packPair(theme)
+        if (followSystemDayNightTheme && pair != null) {
+            ThemeManager.prefs.lightModeTheme.setValue(pair.first)
+            ThemeManager.prefs.darkModeTheme.setValue(pair.second)
+            updateSelectedThemes()
+            return
+        }
         if (followSystemDayNightTheme) {
             val ctx = requireContext()
             AlertDialog.Builder(ctx)

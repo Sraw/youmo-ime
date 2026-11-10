@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.data.pack
 
+import android.net.Uri
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.assertRows
@@ -16,7 +17,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.File
 import java.nio.file.Files
 
 // a pack imported through the store (F6301, F5988): the host restarted only for the text pack (it reads no
@@ -93,6 +96,37 @@ class PackStoreChangedTest {
             PackStore.tidyAtStart(shelf) { false }
             assertFalse("$replaced", replaced.exists())
         } finally {
+            root.deleteRecursively()
+        }
+    }
+    // pending L8: an older pack over a newer one asked first, nothing copied before; kept unless the answer is yes
+    @Test
+    fun anOlderPackReplacesTheNewerOneOnlyWhereTheAnswerIsYes() {
+        val root = Files.createTempDirectory("packs").toFile()
+        val restart = PackStore.restartHost
+        PackStore.restartHost = { true }
+        try {
+            val shelf = PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT, version = 2).inputStream()) is ImportResult.Imported)
+            PackStore.useShelf(shelf)
+            val file = File(root, "old.youmopack").apply { writeBytes(TestShelves.pack(PackKind.TEXT)) }
+            val resolver = RuntimeEnvironment.getApplication().contentResolver
+            val asked = mutableListOf<Pair<Int, Int>>()
+            fun import(yes: Boolean) = runBlocking {
+                PackStore.import(resolver, Uri.fromFile(file)) { new, there -> asked += new.version to there.version; yes }
+            }
+            val kept = import(false) as ImportResult.KeptNewer
+            assertEquals(1 to 2, kept.manifest.version to kept.installed.version)
+            assertEquals(2, shelf.installed(PackKind.TEXT)!!.version)
+            val taken = import(true) as ImportResult.Imported
+            assertEquals(1 to 2, taken.manifest.version to taken.replaced!!.version)
+            assertEquals(listOf(1 to 2, 1 to 2), asked)
+            // a newer one, or none there: not asked
+            val newer = File(root, "new.youmopack").apply { writeBytes(TestShelves.pack(PackKind.TEXT, version = 3)) }
+            assertTrue(runBlocking { PackStore.import(resolver, Uri.fromFile(newer)) { _, _ -> error("asked") } } is ImportResult.Imported)
+        } finally {
+            PackStore.restartHost = restart
+            TestShelves.use()
             root.deleteRecursively()
         }
     }

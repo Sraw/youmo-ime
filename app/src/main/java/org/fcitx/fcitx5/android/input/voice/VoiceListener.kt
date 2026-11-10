@@ -92,6 +92,11 @@ class VoiceListener(
     // of it decoded; true: the raw text, the polish having failed
     private val said = CompletableDeferred<Pair<String, Boolean>?>()
 
+    // set on the decoder before [said] completes, read on the main thread once it has
+    @Volatile
+    override var polishFailure: VoiceSession.PolishFailure? = null
+        private set
+
     private var acquired = false
     private var decoding: Job? = null
     private var capture: Job? = null
@@ -265,9 +270,14 @@ class VoiceListener(
         }
         val recognizer = models.recognizer
         val live = VoiceLive(models.polisher?.stream())
+        // its model not read in (logged as VoiceEngine read it): the raw text throughout
+        if (models.polisher == null) polishFailure = VoiceSession.PolishFailure.LOAD
         // the polish failing: the raw text as it is after this step (read once the step has run), told as such
         fun polished(step: () -> VoiceLive.Heard) =
-            show(orFallback<VoiceLive.Heard?>("voice polish", null) { step() } ?: VoiceLive.Heard(live.raw, 0, fallback = true))
+            show(
+                orFallback<VoiceLive.Heard?>("voice polish", null) { step() }
+                    ?: VoiceLive.Heard(live.raw, 0, fallback = true).also { polishFailure = VoiceSession.PolishFailure.RUN }
+            )
         val stream = try {
             VoiceEngine.stream(recognizer, words)
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
@@ -296,6 +306,7 @@ class VoiceListener(
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
             // the polish failing: the raw text, told as such (what was typed as it was said is polished)
             val polished = orFallback<String?>("voice polish", null) { live.finished() }
+            if (polished == null) polishFailure = VoiceSession.PolishFailure.RUN
             said.complete(if (polished != null) polished to false else live.raw to true)
         } catch (e: CancellationException) {
             throw e

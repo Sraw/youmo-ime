@@ -4,12 +4,14 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
+import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.zip.ZipEntry
@@ -24,6 +26,8 @@ private object PackProbe : ThemeFilesManager.AssetProbe {
 }
 
 /** What the theme pack tests share: an empty theme folder, the probe off Android, a sample pack and its zips. */
+// at night: the packs' dark versions the tests use are the ones a slot naming either shows (ThemeManager.systemVersion)
+@Config(qualifiers = "night")
 abstract class ThemePackFixture {
 
     protected val dir get() = ThemeFilesManager.themeDir
@@ -49,6 +53,8 @@ abstract class ThemePackFixture {
         dir.deleteRecursively()
         dir.mkdirs()
         ThemeFilesManager.probe = PackProbe
+        // a release's: a debug build's own name (past its tag) checks no min-app
+        ThemeFilesManager.versionName = "0.6.0"
         ThemeFilesManager.replacingFile().delete()
         // the theme in use the normal mode's, not the day's or night's
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
@@ -59,6 +65,7 @@ abstract class ThemePackFixture {
     @After
     fun realProbe() {
         ThemeFilesManager.probe = real
+        ThemeFilesManager.versionName = BuildConfig.VERSION_NAME
         ThemePackFiles.beforeInPlace = null
         ThemePackFiles.recheck = realRecheck
         ThemePackFiles.onRefused = realOnRefused

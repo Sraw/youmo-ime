@@ -88,6 +88,7 @@ class PackImportProvider : ContentProvider() {
         is ImportResult.Imported -> "imported:${result.manifest.kind.id}:v${result.manifest.version}"
         is ImportResult.AlreadyThere -> "already:${result.manifest.kind.id}:v${result.manifest.version}"
         is ImportResult.Refused -> "refused:${result.why.javaClass.simpleName}"
+        is ImportResult.KeptNewer -> "kept:${result.installed.kind.id}:v${result.installed.version}"
     }
 
     private fun describe(status: PackStatus) = when (status) {

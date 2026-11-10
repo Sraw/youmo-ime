@@ -78,6 +78,9 @@ class ProjectExtensionsTest {
     fun theVersionAtItsTagIsTheBareNumber() {
         assertEquals("0.1.0", appVersionName("v0.1.0-0-gabc1234", "0.1.0"))
         assertEquals("0.1.0-4-gabc1234", appVersionName("v0.1.0-4-gabc1234", "0.1.0"))
+        // a pre-release's tag: its name, which the min-app check reads as 0.6.0 (ThemePackMinAppTest)
+        assertEquals("0.6.0-beta1", appVersionName("v0.6.0-beta1-0-gabc1234", "0.5.2"))
+        assertEquals("0.6.0-beta1", Versions.checkedVersionName("0.6.0-beta1"))
         // no tag: runCmd's default, and not the release v0.1.0's name
         assertEquals("0.1.0-untagged", appVersionName("", "0.1.0"))
     }

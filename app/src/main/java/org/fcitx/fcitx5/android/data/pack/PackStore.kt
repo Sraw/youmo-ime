@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.pack.ImportResult
 import org.fcitx.fcitx5.android.pack.PackKind
+import org.fcitx.fcitx5.android.pack.PackManifest
 import org.fcitx.fcitx5.android.pack.PackRequirement
 import org.fcitx.fcitx5.android.pack.PackShelf
 import org.fcitx.fcitx5.android.pack.PackStatus
@@ -231,10 +232,25 @@ object PackStore {
     private fun charging(): Boolean =
         appContext.getSystemService(Context.BATTERY_SERVICE)?.let { (it as BatteryManager).isCharging } == true
 
-    /** [uri] (a file the user picked) imported; [progress] told on the worker as it copies. */
-    suspend fun import(resolver: ContentResolver, uri: Uri, progress: (Long, Long) -> Unit = { _, _ -> }): ImportResult =
+    /**
+     * [uri] (a file the user picked) imported; [progress] told on the worker as it copies. A pack older than
+     * the one there replaces it only if [replaceNewer] (its manifest, the one there's) says so, asked before
+     * anything is copied (pending L8: a few hundred MB put in by a wrong tap in the downloads); else kept.
+     */
+    suspend fun import(
+        resolver: ContentResolver,
+        uri: Uri,
+        progress: (Long, Long) -> Unit = { _, _ -> },
+        replaceNewer: suspend (PackManifest, PackManifest) -> Boolean = { _, _ -> true },
+    ): ImportResult =
         withContext(Dispatchers.IO) {
             try {
+                // its head only, read once more by the import: what it would replace known first
+                val manifest = resolver.openInputStream(uri)?.use { shelf.manifestOf(it.buffered(BUFFER)) }
+                val newer = manifest?.let { shelf.installed(it.kind) }?.takeIf { it.version > manifest.version }
+                if (manifest != null && newer != null && !replaceNewer(manifest, newer)) {
+                    return@withContext ImportResult.KeptNewer(manifest, newer).also { Timber.i("pack import: %s", describe(it)) }
+                }
                 val input = resolver.openInputStream(uri) ?: return@withContext ImportResult.Refused(Refusal.Unreadable("cannot open"))
                 input.use { import(it, progress) }
             } catch (e: IOException) {
@@ -311,6 +327,7 @@ object PackStore {
         is ImportResult.Imported -> "${result.manifest.kind.id} v${result.manifest.version} imported"
         is ImportResult.AlreadyThere -> "${result.manifest.kind.id} v${result.manifest.version} already there"
         is ImportResult.Refused -> "refused: ${result.why.javaClass.simpleName}"
+        is ImportResult.KeptNewer -> "${result.manifest.kind.id} v${result.manifest.version} not taken over v${result.installed.version}"
     }
 
     private const val BUFFER = 1 shl 16

@@ -37,8 +37,10 @@ class SceneLayoutsTest {
         assertEquals(built, BuiltInLayouts.RAW)
         SceneLayouts.source = ::BuiltInLayouts
         SceneLayouts.fallback = ::BuiltInLayouts
-        val read = BuiltInLayouts.RAW.keys.mapNotNull { id -> SceneLayouts.of(context, id)?.let { id to it } }.toMap()
+        val read = (BuiltInLayouts.RAW.keys - BuiltInLayouts.FRAGMENTS).mapNotNull { id -> SceneLayouts.of(context, id)?.let { id to it } }.toMap()
         val included = read.values.flatMap { l -> l.layout.parts.filterIsInstance<Include>().map { it.src } }.toSet()
+        // the fragments are said so: read as a layout (the import's blank-key check did) each is logged as broken
+        assertEquals(included, BuiltInLayouts.FRAGMENTS)
         for (id in BuiltInLayouts.RAW.keys) {
             if (id in included) {
                 assertTrue("fragment $id read by no layout", read.values.any { id in it.fragments })

@@ -6,7 +6,7 @@
   const panels = root.YoumoPanels;
   const PARTS = [
     { id: 'keyboard', title: '键盘', select: 'keyboard', fixed: true, note: '用户在 App 设置里选了具体值的，会盖过这里。', props: [
-      { prop: 'height', label: '高度', kind: 'twin', unit: '%', min: 10, max: 90, note: '屏幕高度的百分比' },
+      { prop: 'height', label: '高度', kind: 'twin', unit: '%', min: 20, max: 90, note: '屏幕高度的百分比' },
       { prop: 'side-padding', label: '两侧边距', kind: 'twin', unit: 'dp', min: 0, max: 300 },
       { prop: 'bottom-padding', label: '底部边距', kind: 'twin', unit: 'dp', min: 0, max: 100 },
     ] },

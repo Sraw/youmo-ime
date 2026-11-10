@@ -45,14 +45,14 @@
 ### VO-06 [P1] 数字按习惯写
 - **前提**：B0-语音。
 - **操作**：按住空格说"二零零二年"，松开；再按住说"百分之五十七"，松开。再分别说"十二万三千""一百二十三万四千五百六十七"。
-- **预期**：框里是「2002年57%」（或中间带标点）；后两句写成「12.3万」「1234567」（万、亿后面还有数时最多两位小数，两位不够精确就写全）。
-- **JVM**：`VoiceHoldUatTest.numbersAreWrittenInDigits`（识别出的「二零零二年」「百分之五十七」经整理模型的数字头（测试里的小标注器）和 ChineseNumbers 上屏为「2002年57%」；`aTaggerFailingTypesTheRawText`：整理失败时原样上屏「二零零二年」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；数字写法的细则（「二十四点半」「二十四点三十」「八点五」「三点两」照说的，「一九二点一六八」写作 192.168，十二万三千 → 12.3万、一百二十三万四千五百六十七 → 1234567）见 `ChineseNumbersTest.whatDoesNotReadAsItsKindStaysAsSaid`、`ChineseNumbersTest.moreAfterABigPlaceIsItsDecimalOfAtMostTwoPlaces`、`ChineseNumbersTest.digitsAreDigitByDigit`（`lib/ime-core`）；设备上不跑。听不听得出是 `~/voice-eval` 的基准。
+- **预期**：框里是「2002年57%」（或中间带标点）；后两句写成「12.3万」「1234567」（万、亿后面还有数时最多两位小数，两位不够精确就写全）。整理模型加载失败或出错时（真机上难造，只在 JVM 测）：照识别的原样上屏、数字保持汉字，语音卡片或那一层上提示一次「语音整理没有生效」，之后同一原因不再提示（直到输入法进程重启）。口语钱数（「十二块五」）可能保持汉字，是已知问题。
+- **JVM**：`VoiceHoldUatTest.numbersAreWrittenInDigits`（识别出的「二零零二年」「百分之五十七」经整理模型的数字头（测试里的小标注器）和 ChineseNumbers 上屏为「2002年57%」；`aTaggerFailingTypesTheRawText`：整理失败时原样上屏「二零零二年」，卡片上提示「语音整理没有生效」，同一原因（出错、模型没加载）只提示一次（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；数字写法的细则（「二十四点半」「二十四点三十」「八点五」「三点两」照说的，「一九二点一六八」写作 192.168，十二万三千 → 12.3万、一百二十三万四千五百六十七 → 1234567）见 `ChineseNumbersTest.whatDoesNotReadAsItsKindStaysAsSaid`、`ChineseNumbersTest.moreAfterABigPlaceIsItsDecimalOfAtMostTwoPlaces`、`ChineseNumbersTest.digitsAreDigitByDigit`（`lib/ime-core`）；设备上不跑。听不听得出是 `~/voice-eval` 的基准。
 
 ### VO-07 [P1] 不是数字的不乱改
 - **前提**：B0-语音。
-- **操作**：按住空格说"这个电影十分有趣"，松开。
-- **预期**：框里是「这个电影十分有趣」，"十分"没被写成 10 分。
-- **JVM**：`VoiceHoldUatTest.wordsWithNumeralsAreLeftAlone`（整理模型一个字都没标成数字时，「十分有趣」原样上屏（假识别器加一个什么都不标的小标注器，其后整条链是 App 的；`:app:testDebugUnitTest`））。「十分」算不算数字由整理模型判断，在 voice-eval 的 `num-data/cases-N.tsv` 里量；设备上不跑。
+- **操作**：按住空格说"这个电影十分有趣"，松开。再分别说"十全十美是不可能的""天慢慢一点一点黑下来了"。
+- **预期**：框里是「这个电影十分有趣」，"十分"没被写成 10 分。后两句照说的写：「十全十美」不写成「10全十美」，「一点一点」两个「一」都在。
+- **JVM**：`VoiceHoldUatTest.wordsWithNumeralsAreLeftAlone`（整理模型一个字都没标成数字时，「十分有趣」原样上屏（假识别器加一个什么都不标的小标注器，其后整条链是 App 的；`:app:testDebugUnitTest`））；`VoicePolishTest.aNumbersCharacterIsNeverDeletedNorAnIdiomMarkedANumber`（模型删数字的字不删、成语里标成数字的不转，和模型无关；`lib/ime-core`）。「十分」算不算数字由整理模型判断，在 voice-eval 的 `num-data/cases-N.tsv` 里量；设备上不跑。
 
 ### VO-08 [P1] 中英夹杂
 - **前提**：B0-语音。
@@ -82,8 +82,8 @@
 ### VO-12 [P1] 只上屏到开始说话时的输入框
 - **前提**：B0-语音。
 - **操作**：打开测试页的全部输入框（地址不带 `#`），在「普通文本」框长按空格说"你好"，不松手……说完前用另一只手点下面的「句子」框，再松开。
-- **预期**：「你好」不会出现在「句子」框里。同一个框被应用 restartInput（测试台（uat/TESTBED.md，`./gradlew :testbed:installDebug` 装）的 `restart_target` 框按住空格说"你好"，另一只手点它的按钮（对它 `restartInput`）后再松开）：语音卡片不关，松开后「你好」上屏一次。
-- **JVM**：`VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt`（说完前换到另一个框，松开后两个框都没有「你好」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；`VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesWithTheHold`（按住时已听到「你好」再换框：按住作废，两个框都没有）、`VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid`（按住时同一个框 restartInput：接着听，松开后上屏一次）；设备上不跑。
+- **预期**：「你好」不会出现在「句子」框里；松手前已经听到的「你好」上屏到「普通文本」框（和点麦克风说话一样，VO-30）。按住时先上滑到「松开手指，取消输入」再点别的框：两个框都没有。同一个框被应用 restartInput（测试台（uat/TESTBED.md，`./gradlew :testbed:installDebug` 装）的 `restart_target` 框按住空格说"你好"，另一只手点它的按钮（对它 `restartInput`）后再松开）：语音卡片不关，松开后「你好」上屏一次。
+- **JVM**：`VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt`（说完前、还没听到时换到另一个框，松开后两个框都没有「你好」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；`VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesIntoTheFirst`（按住时已听到「你好」再换框：「你好」上屏到原来的框，新框没有）、`VoiceHoldUatTest.anotherFieldWhileInTheCancelZoneTypesNothing`（上滑到取消区再换框：都没有）、`VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid`（按住时同一个框 restartInput：接着听，松开后上屏一次）；设备上不跑。
 
 ### VO-13 [P1] 改掉空格长按行为
 - **前提**：B0-设置（导入了语音包），**按键 → 空格键长按行为** 改成"显示输入法选择对话框"。
