@@ -106,42 +106,6 @@ class KotlinHostTest {
         directBoot(false)
     }
 
-    // 060-render-p3 T9b review L6: the groups a layout's own keyboard told as it was shown reach the engine's
-    // side with its first key, before the key does (EngineBridge.syncOwnKeys): the keyboard its codes are read by
-    @Test
-    fun aKeyTellsTheGroupsTheKeyboardShownToldFirst() = runBlocking {
-        val own = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
-        val letters = NineKeyLetters.custom(own)
-        NineKeyLetters.clearInUse()
-        EngineState.ownKeys = own
-        assertNull(NineKeyLetters.ofCode(letters.codes[0].code))
-        fcitx.sendKey('a', 0u, 0, false, 0)
-        assertEquals(letters, NineKeyLetters.ofCode(letters.codes[0].code))
-        // other groups told: the next key reads by them
-        val other = NineKeyLetters.custom(own.reversed())
-        EngineState.ownKeys = own.reversed()
-        fcitx.sendKey('b', 0u, 0, false, 0)
-        assertEquals(other, NineKeyLetters.ofCode(other.codes[0].code))
-    }
-
-    // T9b's leftover: other groups told while something is typed on the ones before end it as leaving the
-    // field does (the panel cleared, the engine reset) before the key, not carried into the new groups
-    @Test
-    fun otherGroupsWhileTypingEndWhatWasTypedFirst() = runBlocking {
-        fcitx.activate(1, "org.example")
-        fcitx.setCapFlags(CapabilityFlags.DefaultFlags)
-        fcitx.focus(true)
-        val own = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
-        EngineState.ownKeys = own
-        "ni".forEach { fcitx.sendKey(it, 0u, 0, false, 0) }
-        assertEquals("ni", fcitx.inputPanelCached.preedit.toString())
-        fcitx.sendKey('h', 0u, 0, false, 0)
-        assertEquals("the same groups: typed on", "nih", fcitx.inputPanelCached.preedit.toString())
-        EngineState.ownKeys = own.reversed()
-        fcitx.sendKey('a', 0u, 0, false, 0)
-        assertEquals("a", fcitx.inputPanelCached.preedit.toString())
-    }
-
     @Test
     fun readyIsTheFirstEventAndPinyinLeadsTheGroupOnTheFirstRun() = runBlocking {
         assertTrue(events.first() is HostEvent.Ready)

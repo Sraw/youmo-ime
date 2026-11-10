@@ -52,14 +52,17 @@ object SceneBar {
         val file = SceneThemes.of(theme, look)
         val scenes = SceneWindow.scenes(context, theme)
         // asked for by each tool button as it is made (T6b review): worked out once while the same
-        shownBar?.let { if (it.theme === theme && it.look === look && it.file === file && it.scenes == scenes) return it.bar }
+        shownBar?.takeIf { it.of(theme, look, file, scenes) }?.let { return it.bar }
         val bar = file?.let { BarLook.of(SceneThemes.cascades(it), scenes) } ?: plain(theme)
         shownBar = ShownBar(theme, look, file, scenes, bar)
         return bar
     }
 
     // the last bar worked out ([of]) and what it was of: the theme, its look and file (another made anew, another), the scenes
-    private class ShownBar(val theme: Theme, val look: Any, val file: Any?, val scenes: Set<String>, val bar: BarLook)
+    private class ShownBar(val theme: Theme, val shown: Any, val file: Any?, val scenes: Set<String>, val bar: BarLook) {
+        fun of(theme: Theme, shown: Any, file: Any?, scenes: Set<String>) =
+            listOf(this.theme, this.shown, this.file).zip(listOf(theme, shown, file)).all { (a, b) -> a === b } && this.scenes == scenes
+    }
 
     private var shownBar: ShownBar? = null
 
