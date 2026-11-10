@@ -267,6 +267,8 @@ class PacksUatTest {
                 PackImports.finished(results)
                 st.idle()
                 val d = ShadowDialog.getLatestDialog()
+                // a new results dialog each time: the last row's, dismissed, would pass anything
+                assertTrue("no results dialog shown", d.isShowing)
                 val text = KeyboardHarness.all(d.window!!.decorView).filterIsInstance<android.widget.TextView>().joinToString("\n") { it.text }
                 d.dismiss()
                 st.idle()

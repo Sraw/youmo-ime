@@ -790,10 +790,14 @@ def st90(d):
         d.shot("kb", note + "：按下的样子（有气泡时气泡上也是主题的图标）",
                png=d.adb("exec-out", "cat", "/sdcard/uat-p.png", binary=True))
     if "shift" in k:
-        d.tap(k["shift"].c, 0.6)
+        x, y = k["shift"].c
+        # the "按住 Shift" above was a tap of its own: Shift is 单次 now
         d.shot("kb", "Shift 单次：自带图标（主题没换 shift-once）")
-        d.tap(k["shift"].c, 0.6)
-        d.shot("kb", "再点：锁定或回到未按，都看图标是不是对应的那个（只有未按是主题的）")
+        d.tap((x, y), 0.6)
+        d.shot("kb", "再点一次：回到未按，主题的箭头")
+        d.touch(("down", x, y), ("up", x, y), ("down", x, y), ("up", x, y))
+        time.sleep(0.6)
+        d.shot("kb", "双击：锁定，自带图标（主题没换 shift-lock；仍是单次的样子就是双击没赶上，手点一次看）")
     if "enter" in k:
         x, y = k["enter"].c
         # Return's in-keyboard menu (Emoji): drawn by the keyboard; its icon is emoji, which the theme does not replace
@@ -805,11 +809,14 @@ def st90(d):
     d.shot("full", "搜索框：回车是自带的搜索图标；工具栏是自带图标")
     d.step("深色")
     d.sh("cmd uimode night yes")
-    time.sleep(1.5)
-    d.open_page("long")
-    d.keys(refresh=True)
-    d.shot("full", "系统深色：这个主题的深色版，退格、回车、Shift、星仍是主题的")
-    d.sh("cmd uimode night no")
+    try:
+        time.sleep(1.5)
+        d.open_page("long")
+        d.keys(refresh=True)
+        d.shot("full", "系统深色：这个主题的深色版，退格、回车、Shift、星仍是主题的")
+    finally:
+        # back to light even when a step above fails: the next case expects it
+        d.sh("cmd uimode night no")
     time.sleep(1.5)
     d.step("换回内置")
     delete_custom(d)

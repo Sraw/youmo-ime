@@ -137,6 +137,7 @@ class PackStoreChangedTest {
             }
             val once = runBlocking { PackStore.import(resolver, oneShot) { _, _ -> error("asked") } }
             assertTrue("$once", once is ImportResult.Imported)
+            // what the bug was: a second open of a file whose provider gives it once
             assertEquals(1, opened)
         } finally {
             PackStore.restartHost = restart

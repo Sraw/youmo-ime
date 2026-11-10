@@ -542,7 +542,24 @@ class VoiceHoldUatTest {
     // after it types nothing more
     @Test
     @Uat("VO-12")
-    fun theViewsMadeAnewWhileHoldingTypeWhatWasHeardOnce() {
+    fun theViewsMadeAnewWhileHoldingTypeWhatWasHeardOnce() = heardWhileTheViewsAreMadeAnew {
+        ThemeManager.prefs.floatingKeyboard.setValue(true)
+        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+    }
+
+    // the screen turned with the finger still down (super makes the views anew): the same, by
+    // another way in (onConfigurationChanged ends the hold itself)
+    @Test
+    @Uat("VO-12")
+    fun theScreenTurnedWhileHoldingTypesWhatWasHeardOnce() = heardWhileTheViewsAreMadeAnew {
+        val turned = Configuration(h.service.resources.configuration).apply {
+            orientation = if (orientation == Configuration.ORIENTATION_LANDSCAPE) Configuration.ORIENTATION_PORTRAIT else Configuration.ORIENTATION_LANDSCAPE
+        }
+        h.service.onConfigurationChanged(turned)
+    }
+
+    /** "你好" heard under a held space, then [makeAnew] replaces the input view: typed once, at once */
+    private fun heardWhileTheViewsAreMadeAnew(makeAnew: () -> Unit) {
         allowMicrophone()
         h.start()
         val f = holdSpace()
@@ -565,45 +582,7 @@ class VoiceHoldUatTest {
                 }
             })
         }, 0)
-        ThemeManager.prefs.floatingKeyboard.setValue(true)
-        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
-        h.idle()
-        h.relayout()
-        h.advance(500)
-        assertEquals("你好", text())
-        f.lift()
-        h.advance(500)
-        assertEquals("你好", text())
-    }
-
-    // the screen turned with the finger still down (super makes the views anew): what was heard typed
-    // once, the lift after it types nothing more
-    @Test
-    @Uat("VO-12")
-    fun theScreenTurnedWhileHoldingTypesWhatWasHeardOnce() {
-        allowMicrophone()
-        h.start()
-        val f = holdSpace()
-        voice.heard("你好")
-        h.advance(100)
-        // the old view's detach cancels the touch first, as in theViewsMadeAnewWhileHoldingTypeWhatWasHeardOnce
-        val old = h.inputView
-        old.addView(View(old.context).apply {
-            addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-                override fun onViewAttachedToWindow(v: View) = Unit
-                override fun onViewDetachedFromWindow(v: View) {
-                    val now = SystemClock.uptimeMillis()
-                    MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL, 0f, 0f, 0).also {
-                        old.dispatchTouchEvent(it)
-                        it.recycle()
-                    }
-                }
-            })
-        }, 0)
-        val turned = Configuration(h.service.resources.configuration).apply {
-            orientation = if (orientation == Configuration.ORIENTATION_LANDSCAPE) Configuration.ORIENTATION_PORTRAIT else Configuration.ORIENTATION_LANDSCAPE
-        }
-        h.service.onConfigurationChanged(turned)
+        makeAnew()
         h.idle()
         h.relayout()
         assertNotSame(old, h.inputView)
