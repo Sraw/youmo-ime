@@ -137,6 +137,12 @@ object SceneLayouts {
      */
     fun builtIn(context: Context, id: String): SceneLayout? = fallback(context.applicationContext ?: context).let { readFrom(it, id, it) }
 
+    /** The app's layout [id] read anew, the cache (main thread only) left alone: for checks off the main thread (a pack's import). */
+    fun parseBuiltIn(context: Context, id: String): SceneLayout? = fallback(context.applicationContext ?: context).let { load(it, id, it) }
+
+    /** How many layouts are kept read (tests). */
+    internal val cached: Int get() = read.size
+
     /** The layouts read from the source of [key] (all of them where null) read again when next asked for: P3, a theme pack changed. */
     fun invalidate(key: String? = null) {
         if (key == null) read.clear() else read.keys.removeAll { it.first == key }

@@ -350,7 +350,7 @@ object ThemePackFiles {
         checkFiles(from, files, checks)
         val layouts = checkLayouts(File(from, LAYOUTS), checks)
         val warnings = read.warnings.map { it.toString() } + listOfNotNull(checks.lowContrast(ThemePackCheck.lowContrast(theme)))
-        val report = ThemePackLayouts.report(File(from, LAYOUTS), layouts, { SceneLayouts.builtIn(appContext, it) }, BuiltInLayouts(appContext)::text)
+        val report = ThemePackLayouts.report(File(from, LAYOUTS), layouts, { SceneLayouts.parseBuiltIn(appContext, it) }, BuiltInLayouts(appContext)::text)
         return Staged(theme, source, from, files.all, layouts, report, warnings, files.preview?.let { File(from, it) })
     }
 

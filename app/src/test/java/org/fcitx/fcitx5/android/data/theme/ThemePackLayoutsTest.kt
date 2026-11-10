@@ -158,7 +158,7 @@ class ThemePackLayoutsTest {
         assertEquals(setOf("mine", "k14", "grouped-bottom"), report.unused.map { it.first }.toSet())
         val text = ThemePackDialogs.confirmText(appContext, pack)
         assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts, "qwerty", 7)))
-        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts_unused, "")))
+        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts_unused, report.unused.joinToString(", ") { it.first })))
     }
 
     @Test
@@ -169,6 +169,8 @@ class ThemePackLayoutsTest {
         val both = opened("mine", mapOf("k14.xml" to k14, "k18.xml" to k18, "grouped-bottom.xml" to bottom)).staged.layoutReport
         assertEquals(listOf("k14", "k18"), both.used.sorted())
         assertTrue(both.unused.isEmpty())
+        // the bottom row's four (k14 and k18 have none of their own), once though both include it
+        assertEquals(4, both.commits)
         val broken = opened("other", mapOf("k18.xml" to k18, "grouped-bottom.xml" to "<fragment/>")).staged.layoutReport
         assertTrue(broken.used.isEmpty())
         inUse("third", mapOf("k18.xml" to k18.replace("name=\"18 键\"", "name=\"x\""), "grouped-bottom.xml" to "<fragment/>"))
@@ -190,6 +192,14 @@ class ThemePackLayoutsTest {
         // in use: the app's drawn
         inUse("mine", mapOf("qwerty.xml" to qwerty().replace("role=\"backspace\" ", "")))
         assertSame(app, SceneLayouts.of(appContext, "qwerty"))
+    }
+
+    @Test
+    fun theImportsCheckLeavesTheCacheAlone() {
+        // the check runs off the main thread; the cache is the main thread's
+        SceneLayouts.invalidate()
+        opened("mine", mapOf("qwerty.xml" to qwerty(), "k18.xml" to builtIn.text("k18")!!))
+        assertEquals(0, SceneLayouts.cached)
     }
 
     @Test
