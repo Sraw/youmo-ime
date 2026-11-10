@@ -90,6 +90,9 @@ object UatEngines {
     /** The custom phrases file, as the app keeps it (`dz,1=北京市海淀区` a line): read by the engine on [Engines.reload]. */
     var phrases: String = ""
 
+    /** The common words file, as the app keeps it (an export's text): read by the engine on [Engines.reload]. */
+    var commonWords: String = ""
+
     // what a case's user dir errors were: a case fails on one, as the app would log and go on
     private val errors = ArrayList<IOException>()
 
@@ -128,6 +131,8 @@ object UatEngines {
                 savePhrases = { phrases = CustomPhrases.format(it.all) },
                 dictionary = { dictionary() },
                 indexes = indexes?.let(::JvmFiles),
+                commonWords = commonWords,
+                saveCommonWords = { commonWords = it.format() },
             )
         },
         // on the caller's thread: what a case sees does not depend on a warm-up's timing
@@ -154,6 +159,7 @@ object UatEngines {
         installFile.delete()
         Clock.reset()
         phrases = ""
+        commonWords = ""
         dictionary = { null }
         indexes = null
         val left = synchronized(errors) { errors.toList().also { errors.clear() } }

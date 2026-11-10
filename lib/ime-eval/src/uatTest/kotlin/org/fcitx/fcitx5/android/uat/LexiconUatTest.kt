@@ -288,4 +288,60 @@ class LexiconUatTest {
         assertEquals("nihao $candidates", 1, candidates.count { it == "你好" })
         assertEquals("nihao $candidates", "您好呀", candidates[2])
     }
+    // 常用词 (060-common-words): 米字旁 → 米、糸 and 中华人民共和国 → 中国 as the settings page saves them
+    private fun EngineReplay.commonWords(text: String) {
+        UatEngines.commonWords = text
+        engines.reload()
+    }
+
+    private val miZiPang = "米字旁[mi'zi'pang]\t米\t糸\n中华人民共和国[zhong'hua'ren'min'gong'he'guo]\t中国\n"
+
+    @Test
+    @Uat("WD-39")
+    fun aCommonWordsReplacementsFirstByItsPinyinInitialsAndFirstThree() = with(EngineReplay()) {
+        commonWords(miZiPang)
+        for (keys in listOf("mizipang", "mzp")) {
+            val shown = typed(keys)
+            assertEquals("$keys $shown", listOf("米", "糸"), shown.take(2))
+        }
+        // the word itself after them as ever (no dictionary word of mzp: its initials alone offer it none)
+        assertTrue("米字旁" in typed("mizipang"))
+        // its first three: the replacement alone, the word not typed whole
+        assertEquals("中国", typed("zhonghuaren").first())
+        focus("")
+        type("mzp")
+        space()
+        expectText("米")
+    }
+
+    @Test
+    @Uat("WD-40")
+    fun aCommonWordOnTheNineAnd14KeysAndInShuangpin() = assertRows(
+        listOf(
+            InputMethodCatalog.PINYIN to EngineReplay.nineKeys("697"),
+            InputMethodCatalog.PINYIN to "mzp".map(NineKeyLetters.G14::key).joinToString(""),
+            // 自然码: pang is ph
+            InputMethodCatalog.SHUANGPIN to "miziph",
+        ),
+        { "${it.first} ${it.second}" },
+    ) { (im, keys) ->
+        with(EngineReplay(im = im)) {
+            commonWords(miZiPang)
+            focus("")
+            type(keys)
+            assertEquals("$im $keys ${candidates.take(3)}", "米", candidates.first())
+        }
+    }
+
+    @Test
+    @Uat("WD-41")
+    fun commonWordsOfOneKeyBeforeAPinNoneForAPart() = with(EngineReplay()) {
+        commonWords("米字旁[mi'zi'pang]\t米\n木字旁[mu'zi'pang]\t木\n")
+        type("mzp")
+        val pinned = candidates.drop(2).first()
+        engines.learning(im, LearningOp.Pin(candidates.indexOf(pinned), pinned))
+        assertEquals(listOf("米", "木", pinned), typed("mzp").take(3))
+        val part = typed("mizipan")
+        assertTrue("mizipan $part", "米" !in part.take(1) && "木" !in part.take(2))
+    }
 }

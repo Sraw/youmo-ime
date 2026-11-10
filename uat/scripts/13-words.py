@@ -786,3 +786,88 @@ case("WD-30", needs="jvm:SettingsPagesUatTest.searchDeleteSeveralAndTakeThemBack
 
 
 case("WD-38", needs="jvm:DictionaryFormatTest.aFewWordsAloneInAGbkFileWithPinyinRefuseNothing")(lambda d: None)
+
+
+# ---------------------------------------------------------------- 常用词 (060-common-words)
+
+def common_menu(d, item):
+    """常用词 → ⋮ → item (导入 or 导出): the file picker, once the page has read its file"""
+    d.hide_keyboard()
+    home(d, "词库与短语", "常用词")
+    d.wait(lambda s: any(n.cls.endswith("ActionButton") for n in s.app()) or None, timeout=15, step=0.3, what="常用词页读完（+）")
+    more = d.screen().find(desc="更多选项", where="all")
+    if not more:
+        raise Blocked("常用词页没有 ⋮")
+    d.tap(more.c, 0.8)
+    d.tap_text(item, where="all", scroll=False, after=0.3)
+    in_picker(d)
+    if "documentsui" not in d.top_activity():
+        raise Blocked(f"没出文件选择：{d.top_activity()}")
+
+
+def import_common(d, name):
+    """常用词 → 导入 name; returns the confirmation's message, then 确定"""
+    push(d, name)
+    common_menu(d, "导入")
+    pick_in_download(d, name)
+    s = d.wait(lambda s: messages(s) and s, timeout=15, step=0.3, what="导入的确认框")
+    said = "\n".join(messages(s))
+    d.shot("full", "导入常用词的确认框", png=d.adb("exec-out", "screencap", "-p", binary=True))
+    ok(d)
+    return said
+
+
+@case("WD-39", base="B0-设置", mutates=True)
+def wd39(d):
+    d.step("前提")
+    said = import_common(d, "common-words.txt")
+    check("新增 2 个" in said, f"确认框：{said!r}")
+    for code in ("mizipang", "mzp"):
+        c = words(page_cands(d, code))
+        d.clear()
+        check(c[:2] == ["米", "糸"], f"{code} {c[:4]}")
+        if code == "mizipang":
+            check("米字旁" in c, f"{code} 后面有米字旁：{c[:8]}")
+    c = words(page_cands(d, "zhonghuaren"))
+    d.clear()
+    check(first(c) == "中国", f"zhonghuaren {c[:4]}")
+    page_cands(d, "mzp")
+    d.space()
+    check(d.field_text() == "米", f"mzp 空格：{d.field_text()!r}")
+    d.clear()
+
+
+case("WD-40", needs="jvm:LexiconUatTest.aCommonWordOnTheNineAnd14KeysAndInShuangpin、CommonWordsInSessionTest.onEveryPinyinKeyboardByItsKeys")(lambda d: None)
+
+
+case("WD-41", needs="jvm:LexiconUatTest.commonWordsOfOneKeyBeforeAPinNoneForAPart")(lambda d: None)
+
+
+@case("WD-42", base="B0-设置", mutates=True)
+def wd42(d):
+    d.step("导入")
+    said = import_common(d, "common-words-mixed.txt")
+    check("新增 2 个，更新 0 个，跳过 1 行" in said, f"确认框：{said!r}")
+    check("第 4 行" in said and "至少填一个替换项" in said, f"跳过的原因：{said!r}")
+    shown = d.all_texts()
+    check(any("木字旁 → 木" in t for t in shown) and any("中华人民共和国 → 中国" in t for t in shown), f"列表：{shown}")
+    d.step("导出")
+    before = set(d.sh(f"ls -1 {DOWNLOAD}").splitlines())
+    common_menu(d, "导出")
+    if not any(n.cls == "EditText" for n in d.screen().app()):
+        raise Blocked("保存界面里没有文件名")
+    d.tap_text("保存", where="all", scroll=False, after=0.5)
+    def written(_):
+        names = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
+        return names if len(names) == 1 and d.sh(f"stat -c %s '{DOWNLOAD}/{names[0]}'").strip() not in ("", "0") else None
+    try:
+        new = d.wait(written, timeout=15, step=0.5, what="导出的文件写好")
+    except Blocked:
+        new = sorted(set(d.sh(f"ls -1 {DOWNLOAD}").splitlines()) - before)
+    check(len(new) == 1 and new[0].startswith("youmo-common-words-"), f"下载里新文件 {new}")
+    if len(new) == 1:
+        with tempfile.TemporaryDirectory() as tmp:
+            local = os.path.join(tmp, "out.txt")
+            d.adb("pull", f"{DOWNLOAD}/{new[0]}", local)
+            text = open(local, encoding="utf-8").read()
+        check(text.startswith("# youmo-common-words 1\n") and "木字旁[mu'zi'pang]\t木\n" in text, f"导出的 {new[0]}：{text[:160]!r}")
