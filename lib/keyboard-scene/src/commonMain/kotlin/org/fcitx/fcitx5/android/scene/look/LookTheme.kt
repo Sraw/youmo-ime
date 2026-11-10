@@ -253,7 +253,12 @@ object LookTheme {
         // a 3.0 theme the app took must convert to one it takes
         overrides.filter { (k, o) -> hidesLabel(k, o) }
             .keys.toList().takeIf { it.isNotEmpty() }
-            ?.let { add(it.of(part = "label"), "hidden" to Value.Flag(true)) }
+            ?.let { hid ->
+                add(hid.of(part = "label"), "hidden" to Value.Flag(true))
+                // flat draws no face (3.0's flat): a required key whose image is gone there keeps its words
+                hid.filter { (it.key ?: it.starRole) in REQUIRED_KEYS }.takeIf { it.isNotEmpty() }
+                    ?.let { add(it.of(FLAT, part = "label"), "hidden" to Value.Flag(false)) }
+            }
         // a board's key that shows its label where its role's on every board hides theirs: as an id, it wins
         named.keys.filter { n -> resolved.getValue(n).label == KeyLabel.Show && role(named, n)?.label == KeyLabel.Hide }
             .takeIf { it.isNotEmpty() }?.let { ns -> add(ns.map { selector(it).with(part = "label") }, "hidden" to Value.Flag(false)) }

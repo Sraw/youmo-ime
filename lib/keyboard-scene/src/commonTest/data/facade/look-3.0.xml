@@ -68,6 +68,7 @@
   <style select="*/enter.function:pressed, k20/r1c1.function:pressed" fill="#5e97f6" press="face"/>
   <style select="*/enter.enter:pressed, k20/r1c1.enter:pressed" fill="image(full-enter-down.png, 8 6 8 6, 2x, @accentKey)" press="face"/>
   <style select="*/enter label" hidden="true"/>
+  <style select="@flat */enter label" hidden="false"/>
   <style select="preview, popup" fill="@popupBackground" radius="8dp" shadow="0 2dp 2dp #33000000" color="@popupText"/>
   <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
   <style select="menu" fill="@accentKey" radius="50%" color="@accentKeyText" icon-color="@accentKeyText"/>
