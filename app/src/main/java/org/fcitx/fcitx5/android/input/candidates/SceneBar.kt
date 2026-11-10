@@ -47,10 +47,24 @@ object SceneBar {
      * The bar's look in the window's scenes (SceneWindow's: landscape, compact, the flat keys, dark; not
      * floating, the bar the same over a floating keyboard and a docked one).
      */
-    fun of(context: Context, theme: Theme): BarLook =
-        SceneThemes.of(theme, ThemeManager.shownLook(theme))
-            ?.let { BarLook.of(SceneThemes.cascades(it), SceneWindow.scenes(context, theme)) }
-            ?: plain(theme)
+    fun of(context: Context, theme: Theme): BarLook {
+        val look = ThemeManager.shownLook(theme)
+        val file = SceneThemes.of(theme, look)
+        val scenes = SceneWindow.scenes(context, theme)
+        // asked for by each tool button as it is made (T6b review): worked out once while the same
+        shownBar?.takeIf { it.of(theme, look, file, scenes) }?.let { return it.bar }
+        val bar = file?.let { BarLook.of(SceneThemes.cascades(it), scenes) } ?: plain(theme)
+        shownBar = ShownBar(theme, look, file, scenes, bar)
+        return bar
+    }
+
+    // the last bar worked out ([of]) and what it was of: the theme, its look and file (another made anew, another), the scenes
+    private class ShownBar(val theme: Theme, val shown: Any, val file: Any?, val scenes: Set<String>, val bar: BarLook) {
+        fun of(theme: Theme, shown: Any, file: Any?, scenes: Set<String>) =
+            listOf(this.theme, this.shown, this.file).zip(listOf(theme, shown, file)).all { (a, b) -> a === b } && this.scenes == scenes
+    }
+
+    private var shownBar: ShownBar? = null
 
     /** The bar as the app drew it of theme 3.0's colours: what a theme setting none of it has. */
     fun plain(theme: Theme): BarLook {

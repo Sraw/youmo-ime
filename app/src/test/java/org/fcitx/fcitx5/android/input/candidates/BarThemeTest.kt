@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.input.candidates.floating.LabeledCandidateItemUi
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
+import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
@@ -37,6 +38,7 @@ import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -212,11 +214,29 @@ class BarThemeTest {
     @Test
     fun aCandidatesFontIsNamedAsTheKeys() {
         val shown = ThemeManager.shownLook(ThemeManager.activeTheme)
-        val look = shown.copy(text = shown.text.copy(keyFont = "/t/k.ttf", candidateFont = "/t/c.ttf"))
+        val look = shown.copy(text = shown.text.copy(keyFont = "/t/k.ttf", candidateFont = "/t/c.ttf", candidateWeight = 700))
         assertEquals("/t/c.ttf", SceneFonts.path(look, LookTheme.CANDIDATE_FONT))
+        // the typeface the bar resolves for `candidate` at the look's weight (SceneBar.typeface) is the one the
+        // code being typed is drawn in (ThemeAssets.candidateTypeface): one font, not two alike
+        assertSame(
+            ThemeAssets.candidateTypeface(look),
+            ThemeAssets.typeface(look, SceneFonts.path(look, LookTheme.CANDIDATE_FONT), look.text.candidateWeight),
+        )
         assertEquals("/t/k.ttf", SceneFonts.path(look, LookTheme.KEY_FONT))
         assertNull(SceneFonts.path(look, "system"))
         assertNull(SceneFonts.path(look, "kai"))
+    }
+
+    // each tool button asks for the bar's look as it is made (T6b review): one worked out while nothing changed,
+    // another for another theme's file
+    @Test
+    fun theBarsLookIsWorkedOutOnceWhileTheSame() {
+        val first = SceneBar.of(ctx, ThemeManager.activeTheme)
+        assertSame(first, SceneBar.of(ctx, ThemeManager.activeTheme))
+        styled(CAPSULES)
+        val capsules = SceneBar.of(ctx, ThemeManager.activeTheme)
+        assertTrue(capsules !== first)
+        assertEquals(0xFF00897B.toInt(), capsules.first.fill!!.value)
     }
 
     @Test
@@ -290,6 +310,8 @@ class BarThemeTest {
             // the comment's space is the sample's run's and no span of the view's: the runs by their text, trimmed
             val texts = ops.filterIsInstance<Op.Text>().map { it.text.trim() to it.color.value }
             assertEquals("$what $i's text", texts, runs(text(v)).map { (t, c) -> t.trim() to c })
+            // and the whole, spaces and all: what trimming the runs would let by
+            assertEquals("$what $i's whole text", ops.filterIsInstance<Op.Text>().joinToString("") { it.text }, text(v).text.toString())
         }
     }
 

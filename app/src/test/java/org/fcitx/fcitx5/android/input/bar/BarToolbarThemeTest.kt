@@ -215,14 +215,16 @@ class BarToolbarThemeTest {
         // across the wrap: to the first line's right end, then from the second's start
         val across = PreeditUi.PreeditTextView.segments(ltr, 2, 7)
         assertEquals(listOf(0, 1), across.map { it.line })
-        assertEquals(ltr.getLineRight(0), across[0].right, 0.5f)
+        // the space it wrapped at underlined too, which the line's right (its ink's) leaves out
+        assertEquals(paint.measureText("aaaa "), across[0].right, 0.5f)
+        assertTrue(across[0].right > ltr.getLineRight(0) + 1)
         assertEquals(ltr.getLineLeft(1), across[1].left, 0.5f)
         // right to left: the first line goes on to its left end
         val hebrew = "\u05d0\u05d0\u05d0\u05d0 \u05d1\u05d1\u05d1\u05d1"
         val rtl = StaticLayout.Builder.obtain(hebrew, 0, 9, paint, paint.measureText(hebrew.take(5)).toInt() + 1).build()
         assertEquals(2, rtl.lineCount)
         val back = PreeditUi.PreeditTextView.segments(rtl, 2, 7)
-        assertEquals(rtl.getLineLeft(0), back[0].left, 0.5f)
+        assertEquals(rtl.getPrimaryHorizontal(0) - paint.measureText(hebrew.take(5)), back[0].left, 0.5f)
         assertEquals(rtl.getPrimaryHorizontal(2), back[0].right, 0.5f)
     }
 

@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.scene.TextStroke
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -47,6 +48,13 @@ class CanvasPainterTest {
     private fun drawn(op: Op, assets: Assets = Assets(), ctx: dynamic = recorder()): List<String> {
         CanvasPainter(ctx, assets, 2.0, 400.0, 300.0).draw(op)
         return (ctx.calls as Array<String>).toList()
+    }
+
+    // a context with no canvas (an offscreen one made wrong) fails as the painter is made, before any op is half drawn
+    @Test
+    fun aContextWithoutACanvasFailsAtOnce() {
+        val ctx: dynamic = js("({})")
+        assertFailsWith<IllegalStateException> { CanvasPainter(ctx, Assets(), 2.0, 400.0, 300.0) }
     }
 
     @Test
