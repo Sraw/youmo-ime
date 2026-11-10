@@ -12,6 +12,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -88,8 +89,9 @@ class ThemePackReplacementTest {
     fun aReplacedThemeNotDeletedIsTriedAgain() {
         mine()
         opened().commit().getOrThrow()
-        dir.setWritable(false)
         try {
+            // root deletes anyway: a skip there (F4987), not a failure
+            assumeTrue("a directory not writable (not as root)", dir.setWritable(false) && !dir.canWrite())
             ThemeManager.refreshThemes()
             assertTrue(File(dir, "mine.json").exists())
             assertEquals(setOf("mine"), ThemeFilesManager.replacing())
@@ -99,6 +101,33 @@ class ThemePackReplacementTest {
         ThemeManager.refreshThemes()
         assertFalse(File(dir, "mine.json").exists())
         assertEquals(emptySet<String>(), ThemeFilesManager.replacing())
+    }
+
+    // the user's delete whose json is not deleted: told as not done, still listed (not gone till the next start)
+    @Test
+    fun aDeleteThatDidNotDeleteKeepsTheThemeListed() {
+        mine()
+        try {
+            assumeTrue("a directory not writable (not as root)", dir.setWritable(false) && !dir.canWrite())
+            assertFalse(ThemeManager.deleteTheme("mine"))
+            assertTrue(ThemeManager.getAllThemes().any { it is Theme.Custom && it.name == "mine" })
+        } finally {
+            dir.setWritable(true)
+        }
+    }
+
+    // a record that does not read is not taken as empty: kept as it is for the next listing, not thrown
+    @Test
+    fun aRecordThatDoesNotReadIsKept() {
+        mine()
+        val record = ThemeFilesManager.replacingFile().apply { delete(); mkdirs() }
+        try {
+            ThemeManager.refreshThemes()
+            assertTrue(record.isDirectory)
+            assertTrue(File(dir, "mine.json").exists())
+        } finally {
+            record.deleteRecursively()
+        }
     }
 
     // Q1: a process's first sweep while an import writes its pack in .saving (a start not settled, then a listing):

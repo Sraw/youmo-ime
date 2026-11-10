@@ -31,7 +31,6 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.channels.FileChannel
-import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import java.util.UUID
@@ -100,7 +99,7 @@ object ThemeFilesManager {
     // a json whole or not at all: writeText cut short (a full disk, a power cut) left an empty or half
     // file, which no start reads again, the theme lost
     private fun writeWhole(theme: Theme.Custom, modified: Long? = null) {
-        stageJson(theme, modified).renameOver(themeFile(theme))
+        stageJson(theme, modified).let { synchronized(writes) { it.renameOver(themeFile(theme)) } }
         syncDir()
     }
 
@@ -189,8 +188,14 @@ object ThemeFilesManager {
     fun listPacks(builtins: List<Theme.Builtin> = ThemeManager.BuiltinThemes): List<Theme.Pack> {
         // Q1: not while an import writes in SAVING (the first sweep can come after a start not settled, A4,
         // from the listing an import's packPlaced asks for): a later listing sweeps once none does
-        val sweep = synchronized(writes) { (writable && !packsSwept && writing == 0).also { if (it) packsSwept = true } }
-        return ThemePackFiles.list(dir, sweep, builtins)
+        synchronized(writes) {
+            // swept under the lock, as listThemes does: no import begins writing meanwhile
+            if (writable && !packsSwept && writing == 0) {
+                packsSwept = true
+                return ThemePackFiles.list(dir, true, builtins)
+            }
+        }
+        return ThemePackFiles.list(dir, false, builtins)
     }
 
     // the imports writing in SAVING now (off the main thread); the sweeps wait till none is
@@ -257,7 +262,7 @@ object ThemeFilesManager {
                 // (put there by hand: `foo.json` holding `monokai`) is moved to it, or not listed where that
                 // is another's json (a second theme of the name) or the move failed. Read as it is while
                 // nothing may be written: nothing writes it then
-                if (writable && it.nameWithoutExtension != theme.name && !movedTo(it, File(dir, "${theme.name}.json"))) {
+                if (writable && it.nameWithoutExtension != theme.name && !movedTo(it, theme, File(dir, "${theme.name}.json"))) {
                     return@decode null
                 }
                 val here = theme.foundIn(dir) { f -> f.isThemeAsset() } ?: run {
@@ -288,26 +293,28 @@ object ThemeFilesManager {
             }.toMutableList()
     }
 
-    // [file] (a json named otherwise than its theme) moved to [named], never over one there: linked, which
-    // refuses one there in a single step (an import may be writing it), then let go; its age kept. A copy of
-    // [named]'s bytes is deleted, else it would bring the theme back once that is deleted. Whether it moved
-    private fun movedTo(file: File, named: File): Boolean {
-        try {
-            Files.createLink(named.toPath(), file.toPath())
-        } catch (_: FileAlreadyExistsException) {
-            if (runCatching { named.readBytes().contentEquals(file.readBytes()) }.getOrDefault(false)) {
+    // [file] (a json of [theme] named otherwise) moved to [named], never over one there: checked and renamed under
+    // the lock an import's json is put in place under (no hard link: Android's sepolicy denies apps `link`), its age
+    // kept. One that reads as the same theme as [named] is deleted, else it would bring the theme back once that is
+    // deleted; one of another theme of the name is left, not listed. Whether it moved
+    private fun movedTo(file: File, theme: Theme.Custom, named: File): Boolean = synchronized(writes) {
+        if (named.exists()) {
+            val same = runCatching { Json.decodeFromString(CustomThemeSerializer, named.readText()) == theme }.getOrDefault(false)
+            if (same) {
                 file.delete()
                 Timber.w("Theme file ${file.absolutePath} deleted: a copy of ${named.name}")
             } else {
                 Timber.w("Theme file ${file.absolutePath} not listed: ${named.name} is another's")
             }
             return false
+        }
+        try {
+            Files.move(file.toPath(), named.toPath())
         } catch (e: IOException) {
             EngineNotices.failedOnce(R.string.user_data_unreadable)
             Timber.w(e, "Theme file ${file.absolutePath} not listed: not moved to ${named.name}")
             return false
         }
-        file.delete()
         return true
     }
 
@@ -509,7 +516,8 @@ object ThemeFilesManager {
 
     /** The 3.0 themes a pack's import replaces, recorded before it was placed and not finished yet (ThemeManager). */
     @Synchronized
-    fun replacing(): Set<String> = runCatching { replacingFile().readLines().filter { it.isNotEmpty() }.toSet() }.getOrDefault(emptySet())
+    // @throws IOException if it is there but does not read: not taken as empty, which a write would then make so
+    fun replacing(): Set<String> = replacingFile().let { if (it.exists()) it.readLines().filter { l -> l.isNotEmpty() }.toSet() else emptySet() }
 
     /** [names] finished (or nothing to finish): their record gone. */
     @Synchronized
@@ -531,7 +539,7 @@ object ThemeFilesManager {
     private fun record(names: Set<String>) {
         val file = replacingFile()
         val temp = File(file.parentFile, file.name + ".new")
-        temp.writeText(names.joinToString("\n", postfix = "\n"))
+        FileOutputStream(temp).use { it.write(names.joinToString("\n", postfix = "\n").encodeToByteArray()); it.fd.sync() }
         if (!temp.renameTo(file)) throw IOException("cannot record the themes replaced")
     }
 
@@ -698,7 +706,8 @@ object ThemeFilesManager {
             files.forEach { (name, from) -> staged[name] = stage { out -> from.inputStream().use { it.copyTo(out) } } }
             json = stageJson(theme)
             staged.forEach { (name, temp) -> File(dir, name).also { temp.renameOver(it); placed += it } }
-            json.renameOver(themeFile(theme))
+            // under the lock listThemes moves a json named otherwise under: neither renames over the other
+            synchronized(writes) { json.renameOver(themeFile(theme)) }
             done = true
         } finally {
             if (!done) {

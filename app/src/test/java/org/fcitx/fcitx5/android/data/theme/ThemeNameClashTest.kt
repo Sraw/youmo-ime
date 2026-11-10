@@ -174,10 +174,12 @@ class ThemeNameClashTest {
         saved("monokai", 1_000_000_000_000)
         File(dir, "monokai.json").renameTo(File(dir, "foo.json"))
         saved("mine", 1_000_000_001_000)
-        // a second json of a name listed already: not listed; a copy of its bytes deleted (else it would bring the
-        // theme back once that is deleted), one of other bytes left as it is
+        // a second json of a name listed already: not listed; one reading as the same theme deleted (else it would bring
+        // the theme back once that is deleted), one of another theme of the name left as it is
         File(dir, "mine.json").copyTo(File(dir, "bar.json"))
-        File(dir, "qux.json").writeText(File(dir, "mine.json").readText().replaceFirst("{", "{ "))
+        File(dir, "baz.json").writeText(File(dir, "mine.json").readText().replaceFirst("{", "{ "))
+        val another = TestThemes.TransparentLight.deriveCustomNoBackground("mine")
+        File(dir, "qux.json").writeText(kotlinx.serialization.json.Json.encodeToString(CustomThemeSerializer, another))
         store("monokai", "mine", "x")
         val moved = move()
         assertEquals(listOf("mine", uuid("monokai")), moved.map { it.name })
@@ -196,6 +198,14 @@ class ThemeNameClashTest {
         ThemeFilesManager.deleteThemeFiles(ThemeFilesManager.listThemes().single { it.name == "other" })
         assertEquals(listOf("mine", uuid("monokai")), ThemeFilesManager.listThemes().map { it.name })
         assertEquals(setOf("mine.json", uuid("monokai") + ".json"), jsons())
+    }
+
+    // Android's sepolicy denies apps hard links (`neverallow all_untrusted_apps file_type:file link`): a JVM test
+    // links fine, so the json move is held to not using one here
+    @Test
+    fun aJsonIsMovedWithoutAHardLink() {
+        val source = File("src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeFilesManager.kt").readText()
+        assertFalse(source.contains("createLink") || source.contains("Os.link"))
     }
 
     // a json that does not read (a later build's), not listed. The user told it does not read: said here,
