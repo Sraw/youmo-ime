@@ -55,7 +55,25 @@ class ThemeFormatDocTest {
         assertEquals("height", rows("保留名单").first())
     }
 
+    @Test
+    fun systemColorsAreSystemNames() {
+        // the table under 系统颜色 (up to the next heading), its `group-N` rows expanded by the line N 取: …
+        val section = doc.substringAfter("#### 系统颜色\n").substringBefore("\n#")
+        val suffixes = section.lines().first { it.startsWith("N 取") }.let { line -> NUMBER.findAll(line).map { it.groupValues[1] }.toList() }
+        val documented = SYSTEM_ROW.findAll(section).map { it.groupValues[1] }
+            .flatMap { if (it.endsWith("-N")) suffixes.map { n -> it.removeSuffix("N") + n } else listOf(it) }.toSet()
+        val missing = ColorExpr.SYSTEM_NAMES - documented
+        val extra = documented - ColorExpr.SYSTEM_NAMES
+        assertTrue(
+            missing.isEmpty() && extra.isEmpty(),
+            "docs/theme-format.md 系统颜色 and ColorExpr.SYSTEM_NAMES differ: missing $missing, not in the code $extra",
+        )
+    }
+
     private companion object {
+        val SYSTEM_ROW = Regex("(?m)^\\| `([a-z0-9-]+(?:-N)?)` \\|")
+        val NUMBER = Regex("`([0-9]+)`")
+
         val ROW = Regex("(?m)^\\| `([a-z][a-z-]*)` \\|")
     }
 }
