@@ -25,6 +25,8 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -587,34 +589,39 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
     }
 
     /**
-     * [block] under a [ProgressBarDialog] titled [title]: it sets what the dialog says and how far
-     * (text to percent); its cancel sets the flag [block] checks and calls [cancel]. A cancel
-     * ends it as a CancellationException, as one that is not imported is not an error to show.
-     */
-    /**
      * Words alone read as the dictionary reads them, a batch at a time on the analysing IO thread (the
-     * host's own thread doing it). Cancel and the page going ([cancelled]) stop the wait; a host not
-     * ready in [GUESS_WAIT_MS] gives up, this batch and all after it unread (thrown: DictionaryFormat
-     * skips them), never a dialog stuck on it.
+     * host's own thread doing it). Cancel and the page going ([cancelled]) stop the wait at once; a host
+     * not ready in [GUESS_WAIT_MS] gives up, this batch and all after it unread (thrown: DictionaryFormat
+     * skips them), never a dialog stuck on it. Only the wait for the host is timed, not its reading: a
+     * slow phone's batch of 4096 words is no host that never got ready.
      */
     private fun guessing(cancelled: AtomicBoolean): (List<String>) -> Map<String, String?> {
         var gaveUp = false
         return { texts ->
             check(!gaveUp) { "the engine did not get ready" }
-            runBlocking {
-                val asked = async { viewModel.fcitx.runOnReady { pinyinsOf(texts) } }
-                val waited = withTimeoutOrNull(GUESS_WAIT_MS) {
-                    while (!asked.isCompleted) {
-                        if (cancelled.get()) {
-                            asked.cancel()
-                            throw CancellationException("cancelled")
-                        }
-                        withTimeoutOrNull(CANCEL_POLL_MS) { asked.join() }
-                    }
+            val fcitx = viewModel.fcitx
+            val ready = CompletableDeferred<Unit>()
+            // not a child of the wait below: a cancel or a give-up returns at once, the host finishing a
+            // read it began on its own thread rather than the dialog waiting for it
+            val asked = CoroutineScope(Dispatchers.IO).async {
+                fcitx.runOnReady {
+                    ready.complete(Unit)
+                    pinyinsOf(texts)
                 }
-                if (waited == null) {
-                    gaveUp = true
-                    asked.cancel()
+            }
+            runBlocking {
+                val until = System.nanoTime() + GUESS_WAIT_MS * 1_000_000
+                while (!asked.isCompleted) {
+                    if (cancelled.get()) {
+                        asked.cancel()
+                        throw CancellationException("cancelled")
+                    }
+                    if (!ready.isCompleted && System.nanoTime() - until >= 0) {
+                        gaveUp = true
+                        asked.cancel()
+                        break
+                    }
+                    withTimeoutOrNull(CANCEL_POLL_MS) { asked.join() }
                 }
                 check(!gaveUp) { "the engine did not get ready" }
                 asked.await()
@@ -622,6 +629,11 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         }
     }
 
+    /**
+     * [block] under a [ProgressBarDialog] titled [title]: it sets what the dialog says and how far
+     * (text to percent); its cancel sets the flag [block] checks and calls [cancel]. A cancel
+     * ends it as a CancellationException, as one that is not imported is not an error to show.
+     */
     private suspend fun <T> withProgress(
         ctx: Context,
         @StringRes title: Int,

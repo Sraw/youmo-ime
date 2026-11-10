@@ -124,7 +124,7 @@ class KeyMarkYieldTest {
             val rp = r * d
             val arc = if (rp > d) rp - sqrt(rp * rp - (rp - d) * (rp - d)) else 0.0
             val edge = k.w - maxOf(0.25 * d, arc)
-                    var gone = 0
+            var gone = 0
             for (over in listOf(0.5, 1.0, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 6.0, 8.0)) {
                 val glyph = tall(k, over)
                 val s = KeyMarkYield.key(glyph, listOf(k.mark(Slot.TopRight)), k.room, 1.0 * d, k.edge)
@@ -188,7 +188,7 @@ class KeyMarkYieldTest {
                 if (m == null) gone = true else assertTrue(!gone, "left out, then kept again $at")
                 // smaller about its middle: a px more of it on one side, two px of its width
                 val was = last?.scale ?: g.scale
-                assertTrue(was - g.scale <= 2.0 / glyph.width + 0.002, "no jump in size $at: $was to ${g.scale}")
+                assertTrue(abs(was - g.scale) <= 2.0 / glyph.width + 0.002, "no jump in size $at: $was to ${g.scale}")
                 // a px out, and down along the arc as it goes, steeper near its end: no more than a dp
                 val om = last?.keys?.get(0)?.marks?.get(0)
                 if (om != null && m != null) assertTrue(abs(m.left - om.left) <= 1.0 + 1e-6 && abs(m.top - om.top) <= d, "the mark a px out at most $at: $om to $m")
@@ -218,11 +218,7 @@ class KeyMarkYieldTest {
             // over all: all left out, the symbol too (the long press still works)
             val all = KeyMarkYield.key(Ink(-k.w, -k.h, 2 * k.w, 2 * k.h), marks, k.room, 1.0 * d, k.edge)
             assertEquals(listOf<Ink?>(null, null, null), all.marks, "at $d")
-            // two meeting each other, the key too short for both: the down one left out
-            val short = Key(30 * d, 14 * d, d)
-            val two = KeyMarkYield.key(short.glyph(2.0, 2.0), listOf(short.mark(Slot.TopLeft), short.mark(Slot.BottomLeft, KeyMarkYield.DROP_DOWN_SHORTCUT)), short.room, 1.0 * d, short.edge)
-            assertNotNull(two.marks[0], "the up one kept at $d")
-            assertNull(two.marks[1], "the down one left out at $d")
+            // two meeting each other: theMarkMostExpendableIsLeftOutFirst
         }
     }
 
@@ -304,7 +300,7 @@ class KeyMarkYieldTest {
     @Test
     fun aMarkPlacedOutOfItsArcIsMovedInTheLeast() {
         // a 16 dp icon 2 dp in from the side of a face 19 dp tall rounded 8: its bottom corner out of the bottom
-        // arc as placed, nothing meeting it: moved in the least, on one axis
+        // arc as placed, nothing meeting it: moved in the least
         val d = 2.0
         val k = Key(56 * d, 19 * d, d, 8.0)
         val ink = Ink(4 * d, 2 * d, 20 * d, 18 * d)
@@ -475,11 +471,15 @@ class KeyMarkYieldTest {
             val (_, was) = stacked(d, 40.0)
             val key = was.copy(marks = was.marks.map { it.copy(ink = it.ink.moved(0.4, -0.3)) })
             val b = KeyMarkYield.board(listOf(was), 1.0 * d)
-            assertEquals(key.marks.map { it.ink }, KeyMarkYield.onto(key, was, b, b.keys[0]).marks, "unmoved at $d")
+            val unmoved = KeyMarkYield.onto(key, was, b, b.keys[0])
+            assertEquals(key.marks.map { it.ink }, unmoved.marks, "unmoved at $d")
+            assertTrue(b.keys[0].glyph.let { e -> listOf(e.left - unmoved.glyph.left, e.top - unmoved.glyph.top, e.right - unmoved.glyph.right, e.bottom - unmoved.glyph.bottom).all { abs(it) < 1e-9 } }, "its glyph where it settled at $d")
             val (_, short) = stacked(d, 15.0)
             val off = short.copy(marks = short.marks.map { it.copy(ink = it.ink.moved(0.4, -0.3)) })
             val s = KeyMarkYield.board(listOf(short), 1.0 * d)
-            assertEquals(s.keys[0].marks, KeyMarkYield.onto(off, short, s, s.keys[0]).marks, "moved at $d")
+            val moved = KeyMarkYield.onto(off, short, s, s.keys[0])
+            assertEquals(s.keys[0].marks, moved.marks, "moved at $d")
+            assertTrue(s.keys[0].glyph.let { e -> listOf(e.left - moved.glyph.left, e.top - moved.glyph.top, e.right - moved.glyph.right, e.bottom - moved.glyph.bottom).all { abs(it) < 1e-9 } }, "its glyph where it settled, moved at $d")
         }
     }
 }

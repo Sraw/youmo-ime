@@ -118,8 +118,7 @@ class SettingsHarness(
 
     fun pref(title: Int) = pref(s(title))
 
-    /** Every text shown in the activity's window. */
-    /** Every text shown, depth first: a text view's, and each a key cap the engine draws (SceneKeyCell) draws. */
+    /** Every text shown in the activity's window, depth first: a text view's, and those of each key cap the engine draws (SceneKeyCell). */
     fun texts(): List<String> = KeyboardHarness.all(activity.window.decorView)
         .filter { it.visibility == View.VISIBLE && it.isShown }
         .flatMap { v ->
@@ -151,11 +150,15 @@ class SettingsHarness(
         // (InvalidateOnAnimationRunnable, posted once and never run on the paused looper): the theme page's
         // previews, rebuilt on each theme preference ThemeMakerLayoutTest set, 78 000 views a window, three
         // windows a full run's 3 GB out (S4c's gate, the heap dump of 2026-11-07)
-        if (lazyController.isInitialized()) {
-            controller.close()
-            idle()
+        // the fake connection given back even when the activity's teardown throws: else every later test of the fork has it
+        try {
+            if (lazyController.isInitialized()) {
+                controller.close()
+                idle()
+            }
+        } finally {
+            HostDaemon.testConnection = before
+            scope.cancel()
         }
-        HostDaemon.testConnection = before
-        scope.cancel()
     }
 }

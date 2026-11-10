@@ -9,7 +9,7 @@
 幽默输入法不申请网络权限，无法联网，也不发通知。它申请两个权限：
 
 - **振动**：用于按键振动。
-- **录音**：只在你第一次用语音输入时才问；只在你说话时录音，语音在手机上识别，录音不保存、不发送。
+- **录音**：只在你第一次用语音输入时才问；只在语音输入进行时录音（按住空格到松开；或点麦克风到再点一下结束、收起键盘、60 秒没听到说话），语音在手机上识别，录音不保存、不发送。
 
 词典和模型在你自己导入的资源包里（设置 → 资源包）：应用只读你在文件选择器里选的那几个文件，检查签名后复制到自己的目录，不删也不改原文件。
 
@@ -31,7 +31,7 @@ Youmo IME collects no data, and uploads none to us or to anyone else.
 Youmo IME asks for no network permission and cannot go online; it posts no notifications either. It asks for two permissions:
 
 - **Vibrate**: for key feedback.
-- **Microphone**: asked for only when you first use voice input; used only while you talk; speech is recognized on the phone,
+- **Microphone**: asked for only when you first use voice input; used only while voice input runs (from holding the space to letting go, or from tapping the microphone till you tap again, hide the keyboard or 60 s pass with nothing said); speech is recognized on the phone,
   and the recording is neither kept nor sent.
 
 The dictionaries and models are in the resource packs you import yourself (Settings → Resource packs): the app reads only the

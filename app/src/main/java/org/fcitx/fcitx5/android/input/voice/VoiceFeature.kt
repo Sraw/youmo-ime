@@ -26,8 +26,9 @@ object VoiceFeature {
 
     /**
      * Hold to talk: the long press on space has fired, its finger ([pointer]) still down; what is
-     * said is [commit]ted once it lifts. Without the voice pack, says so; without the microphone
-     * permission, asks for it instead.
+     * said is [commit]ted once it lifts. Without the voice pack nothing happens (its caller does not
+     * hold for voice then; checked again here, the pack gone meanwhile, with a tip only); without the
+     * microphone permission, asks for it instead.
      */
     fun hold(inputView: InputView, pointer: Int, commit: (String) -> Unit) {
         // a talk going on already (tapped, then the space held): that one goes on
@@ -58,17 +59,15 @@ object VoiceFeature {
     // the voice pack there, one this app reads; else said on the keyboard, and the packs' page opened if [open]
     private fun packReady(context: Context, open: Boolean): Boolean {
         val status = PackStore.status(PackKind.VOICE)
-        if (status is PackStatus.Ready) return true
-        if (status is PackStatus.NeedsUpdate) {
-            EngineNotices.tip(context.getString(R.string.pack_voice_needed_update, status.needed.minVersion))
-        } else if (status is PackStatus.NeedsNewerApp) {
+        val tip = when (status) {
+            is PackStatus.Ready -> return true
+            is PackStatus.NeedsUpdate -> context.getString(R.string.pack_voice_needed_update, status.needed.minVersion)
             // the pack is newer than this app reads: the app is what needs updating, not the pack
-            EngineNotices.tip(context.getString(R.string.pack_voice_needed_app, status.manifest.version))
-        } else if (status is PackStatus.Damaged) {
-            EngineNotices.tip(context.getString(R.string.pack_voice_damaged))
-        } else {
-            EngineNotices.tip(context.getString(R.string.pack_voice_needed))
+            is PackStatus.NeedsNewerApp -> context.getString(R.string.pack_voice_needed_app, status.manifest.version)
+            is PackStatus.Damaged -> context.getString(R.string.pack_voice_damaged)
+            PackStatus.Missing -> context.getString(R.string.pack_voice_needed)
         }
+        EngineNotices.tip(tip)
         if (open) AppUtil.launchMainToPacks(context)
         return false
     }

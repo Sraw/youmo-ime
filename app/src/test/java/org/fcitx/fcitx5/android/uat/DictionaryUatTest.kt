@@ -303,6 +303,39 @@ class DictionaryUatTest {
         assertTrue(listed().isEmpty())
     }
 
+    // 0.6.0 #5: into the base, words alone get the readings a guess gives (the page passes the base lexicon's)
+    @Test
+    @Uat("WD-14q")
+    fun wordsAloneGuessedAreCountedAndTheBaseTakesThem() {
+        val readings = mapOf(
+            "氪喵无音" to "ke miao wu yin", "鲸喵" to "jing miao", "氪喵" to "ke miao", "量子" to "liang zi",
+            "星港" to "xing gang", "糖铺" to "tang pu", "书屋" to "shu wu", "灯塔" to "deng ta",
+        )
+        val guess: (List<String>) -> Map<String, String?> = { it.associateWith(readings::get) }
+        fun guessed(name: String, without: Set<String> = emptySet()) = fixture(name).let { f ->
+            PinyinDictManager.prepare(f.inputStream(), name, f.length(), { words -> guess(words).mapValues { (w, r) -> r.takeIf { w !in without } } })
+        }
+        guessed("no-pinyin-some.txt").use {
+            val d = it.analysis as DictionaryFormat.Detected
+            assertEquals(61, d.words)
+            assertEquals(1, d.guessed)
+        }
+        // one word alone the guess cannot read: skipped and counted, the file still goes into the base
+        guessed("no-pinyin-most.txt", setOf("灯塔")).use {
+            val d = it.analysis as DictionaryFormat.Detected
+            assertEquals(1, d.unguessed)
+            assertEquals(null, d.refusedForBase)
+        }
+        guessed("no-pinyin-most.txt").use {
+            val d = it.analysis as DictionaryFormat.Detected
+            assertEquals(10, d.words)
+            assertEquals(7, d.guessed)
+            assertEquals(null, d.refusedForBase)
+            assertTrue(PinyinDictManager.importPrepared(it, Incoming("no-pinyin-most.txt").name).isSuccess)
+        }
+        assertTrue(listed().isNotEmpty())
+    }
+
     // ------------------------------------------------------------------ an older build's, upgraded
 
     // a dictionary as 0.3.1 kept it, text in libime's format: rime-frost's stand-in, a word of it and big-words' thousand

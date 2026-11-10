@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.SchemeMigration
+import org.fcitx.fcitx5.android.engine.stroke.StrokeLookup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -48,6 +49,8 @@ class LearnedItemsFragmentTest {
         // I1's: pinyin's 18 keys, 双拼's 14
         assertEquals(R.string.learning_kind_keys18, kind(Kinds.keys(NineKeyLetters.G18.tag())))
         assertEquals(R.string.learning_kind_shuangpin_keys14, kind(Kinds.shuangpinKeys("Ziranma", NineKeyLetters.G14.tag())))
+        // a character blocked under the strokes typed (笔画查字): a strokes block, not a table's
+        assertEquals(R.string.learning_kind_strokes, kind(Kinds.table(StrokeLookup.BLOCK_TABLE)))
         // 060-render-p3 T9b: pinyin on a theme's keys of its own groups, whichever
         assertEquals(R.string.learning_kind_keys_own, kind(Kinds.keys(OWN.tag())))
     }
@@ -71,6 +74,10 @@ class LearnedItemsFragmentTest {
         // pinyin's 18 and 双拼's 14 alike
         assertEquals("bn io", LearnedItemsFragment.keys(Code(Kinds.keys(g18.tag()), "${g18.key('n')}${g18.key('o')}")))
         assertEquals("bn ui", LearnedItemsFragment.keys(Code(Kinds.shuangpinKeys("Ziranma", NineKeyLetters.G14.tag()), g14("bn ui"))))
+        // a strokes block's keys as the strokes they draw
+        assertEquals("一丨丿丶乛", LearnedItemsFragment.keys(Code(Kinds.table(StrokeLookup.BLOCK_TABLE), "hspnz")))
+        // anything else in it (hand-edited, damaged) as stored, not the whole list failing (R20 F5796)
+        assertEquals("hx", LearnedItemsFragment.keys(Code(Kinds.table(StrokeLookup.BLOCK_TABLE), "hx")))
     }
 
     // Robolectric for the label's strings, this test alone: the rest stay plain JVM

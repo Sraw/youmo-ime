@@ -42,9 +42,16 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
 
     private var hasSelection = false
 
-    // the report may lag a select-all just made: its text asked for too, only when it says none
-    private fun nothingSelected(start: Int, end: Int) =
-        start == end && service.currentInputConnection?.getSelectedText(0).isNullOrEmpty()
+    /**
+     * How much is selected: the tracked selection's, or, where it says none, the editor's own
+     * selected text's (the report may lag a select-all just made). getSelectedText's null is none
+     * (its contract: "null if no text is selected"), as an editor without it or the binder's timeout
+     * cannot be told from that. A binder call on the main thread, the framework's 2 s at worst, only
+     * on a tap of cut or copy with the tracked selection collapsed.
+     */
+    private fun selectedLength(start: Int, end: Int): Int =
+        if (start != end) maxOf(start, end) - minOf(start, end)
+        else service.currentInputConnection?.getSelectedText(0)?.length ?: 0
 
     private var userSelection = false
 
@@ -98,17 +105,18 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
                 val range = service.currentInputSelection
                 // the panel's cut and copy take the selection alone: with none, the clipboard kept,
                 // 选择 left as it was (it shows the state; nothing done changes it)
-                if (nothingSelected(range.start, range.end)) return@setOnClickListener service.say(R.string.nothing_to_cut)
+                val selected = selectedLength(range.start, range.end)
+                if (selected == 0) return@setOnClickListener service.say(R.string.nothing_to_cut)
                 // deactivate select button after operation
                 userSelection = false
                 service.performContextMenuAction(android.R.id.cut)
-                if (range.start != range.end && copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_cut)
+                // said where something is cut, the tracked selection lagging or not
+                if (copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_cut)
             }
             copyButton.setOnClickListener {
                 val ic = service.currentInputConnection ?: return@setOnClickListener
-                service.currentInputSelection.let {
-                    if (nothingSelected(it.start, it.end)) return@setOnClickListener service.say(R.string.nothing_to_copy)
-                }
+                val selected = service.currentInputSelection.let { selectedLength(it.start, it.end) }
+                if (selected == 0) return@setOnClickListener service.say(R.string.nothing_to_copy)
                 userSelection = false
                 ic.performContextMenuAction(android.R.id.copy)
                 // 选择 off after a copy: the selection gone, >| moves the cursor and 粘贴 inserts at it
@@ -117,10 +125,11 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
                 val range = service.currentInputSelection
                 // the copy shows nowhere else (the bar's hint is behind this window): say so; not in a
                 // hidden password, whose editor copies nothing (a shown one copies, so it is said)
-                cursorAfterCopy(range.start, range.end)?.let {
-                    ic.setSelection(it, it)
-                    if (copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_copied)
-                }
+                // The tracked selection lagging (collapsed though text is selected): said all the
+                // same, the selection left as the editor has it, its end not known here
+                val collapseAt = cursorAfterCopy(range.start, range.end)
+                if (collapseAt != null) ic.setSelection(collapseAt, collapseAt)
+                if (copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_copied)
                 updateSelection(hasSelection, false)
             }
             pasteButton.setOnClickListener {

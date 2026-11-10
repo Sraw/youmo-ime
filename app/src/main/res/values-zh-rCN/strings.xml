@@ -302,7 +302,7 @@
     <string name="a11y_key_emoji">表情</string>
     <string name="voice_end_mark">语音句末句号</string>
     <string name="voice_end_mark_auto">按输入框：聊天、搜索框和单行输入框里不加</string>
-    <string name="voice_end_mark_keep">照说的保留</string>
+    <string name="voice_end_mark_keep">照说的保留（单行框仍不加）</string>
     <string name="voice_end_mark_drop">都不加</string>
     <string name="voice_input">语音输入</string>
     <string name="a11y_candidates_prev_page">上一页候选词</string>
@@ -429,6 +429,7 @@
     <string name="word_pinyin">拼音，如 you mo（留空自动填）</string>
     <string name="word_pinyin_invalid">拼音和词对不上：每个字一个音节</string>
     <string name="english_block_detail">英文 · 全小写的词不分大小写屏蔽</string>
+    <string name="english_block_detail_exact">英文 · 只屏蔽这样写的大小写</string>
     <plurals name="word_typed_times">
         <item quantity="other">%1$s · 打过 %2$d 次</item>
     </plurals>

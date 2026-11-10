@@ -13,6 +13,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -240,11 +241,15 @@ class PackShelfTest {
         damage(shelf, PackKind.TEXT, "engine/pinyin.data")
         var found: Boolean? = null
         val verify = Thread { found = shelf.verify(PackKind.TEXT) }.apply { start() }
-        assertTrue(reached.await(5, java.util.concurrent.TimeUnit.SECONDS))
         val files = TEXT_FILES + ("engine/english.data" to "en".toByteArray())
-        assertTrue(shelf.take(text(version = 4, files = files)) is ImportResult.Imported)
-        go.countDown()
+        try {
+            assertTrue(reached.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue(shelf.take(text(version = 4, files = files)) is ImportResult.Imported)
+        } finally {
+            go.countDown()
+        }
         verify.join(5000)
+        assertFalse("the verify still runs", verify.isAlive)
         assertEquals(false, found)
         assertReady(shelf, PackKind.TEXT, 4, files)
         assertSame(VerifyDue.UNVERIFIED, shelf.due(PackKind.TEXT))
@@ -605,7 +610,7 @@ class PackShelfTest {
         val status = shelf().status(PackKind.TEXT)
         assertTrue("$status", status is PackStatus.Damaged)
         // the pointer naming nothing, or something unsafe
-        File(root, "text/current").writeText("../voice")
+        File(root, "${PackKind.TEXT.id}/${PackShelf.CURRENT}").writeText("../voice")
         assertSame(PackStatus.Missing, shelf().status(PackKind.TEXT))
     }
 
@@ -633,5 +638,68 @@ class PackShelfTest {
         assertTrue(runCatching { PackShelf(root, emptyList(), needs) }.isFailure)
         assertTrue(runCatching { PackShelf(root, listOf(ByteArray(31)), needs) }.isFailure)
         assertTrue(runCatching { PackShelf(root, listOf(packs.publicKey), needs - PackKind.VOICE) }.isFailure)
+    }
+
+    // load(tidy = false) leaves what an import left behind; tidy() deletes it after (R20 F5931)
+    @Test
+    fun `a load not tidying leaves the leftovers to tidy after`() {
+        shelf().take(text())
+        val dir = File(root, PackKind.TEXT.id)
+        File(dir, ".staging-1/engine").mkdirs()
+        File(dir, "g9-9/engine").mkdirs()
+        File(dir, "${PackShelf.CURRENT}.tmp").writeText("g9-9")
+        val next = PackShelf(root, listOf(packs.publicKey), needs, 0).apply { load(tidy = false) }
+        assertReady(next, PackKind.TEXT, 3, TEXT_FILES)
+        assertEquals(4, leftovers(PackKind.TEXT).size)
+        next.tidy()
+        assertEquals(listOf(next.dir(PackKind.TEXT)!!.name), leftovers(PackKind.TEXT))
+    }
+
+    // a pointer that cannot be read now: no pack this time, and nothing deleted (R20 F5932/F6047)
+    @Test
+    fun `a pointer that cannot be read is no pack and deletes nothing`() {
+        shelf().take(text())
+        val dir = File(root, PackKind.TEXT.id)
+        File(dir, ".staging-1").mkdirs()
+        val pointer = File(dir, PackShelf.CURRENT)
+        pointer.setReadable(false)
+        try {
+            assumeTrue("running as a user who reads it anyway", !pointer.canRead())
+            val before = leftovers(PackKind.TEXT).toSet()
+            assertSame(PackStatus.Missing, shelf().status(PackKind.TEXT))
+            assertEquals(before, leftovers(PackKind.TEXT).toSet())
+        } finally {
+            pointer.setReadable(true)
+        }
+        assertReady(shelf(), PackKind.TEXT, 3, TEXT_FILES)
+    }
+
+    // the pointer's step failing after the generation's rename: the renamed generation deleted, the old pack kept (R20 F6172)
+    @Test
+    fun `a failure after the generation's rename deletes it`() {
+        shelf().take(text())
+        val failing = PackShelf(root, listOf(packs.publicKey), needs, 0) { throw IOException("sync") }.apply { load() }
+        failing.take(text(version = 4)).refused<Refusal.Unreadable>()
+        assertReady(failing, PackKind.TEXT, 3, TEXT_FILES)
+        assertEquals(1, leftovers(PackKind.TEXT).size)
+    }
+
+    // a 0-byte file the manifest lists, gone: damaged, not ready (R20 F6389)
+    @Test
+    fun `an empty file gone reads as damaged`() {
+        val shelf = shelf()
+        shelf.take(text(files = TEXT_FILES + ("engine/table/empty.data" to ByteArray(0))))
+        File(shelf.dir(PackKind.TEXT)!!, "engine/table/empty.data").delete()
+        val status = shelf().status(PackKind.TEXT)
+        assertTrue("$status", status is PackStatus.Damaged)
+    }
+
+    // the provider's stream failing other than by I/O (a SecurityException): unreadable, not "no pack" (R20 F6048)
+    @Test
+    fun `a stream that throws a runtime exception is unreadable`() {
+        val denied = object : InputStream() {
+            override fun read(): Int = throw SecurityException("denied")
+        }
+        assertEquals("denied", shelf().import(denied).refused<Refusal.Unreadable>().detail)
     }
 }

@@ -19,16 +19,21 @@ JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineStream_acceptWaveform(
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(ptr);
 
   jfloat *p = env->GetFloatArrayElements(samples, nullptr);
+  if (!p) return;  // OutOfMemoryError pending
   jsize n = env->GetArrayLength(samples);
-  stream->AcceptWaveform(sample_rate, p, n);
+  // youmo: a C++ exception out of a JNI frame ends the process: a Java
+  // RuntimeException instead, caught by voice input
+  SafeJNI(env, "OnlineStream_acceptWaveform",
+          [&]() { stream->AcceptWaveform(sample_rate, p, n); });
   env->ReleaseFloatArrayElements(samples, p, JNI_ABORT);
 }
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineStream_inputFinished(
-    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
+    JNIEnv *env, jobject /*obj*/, jlong ptr) {
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(ptr);
-  stream->InputFinished();
+  SafeJNI(env, "OnlineStream_inputFinished",
+          [&]() { stream->InputFinished(); });
 }
 
 SHERPA_ONNX_EXTERN_C

@@ -100,6 +100,7 @@ class EnginesConvertedMenuTest : EnginesFixture() {
             e.learning(PINYIN, LearningOp.Pin(native, menu.text), traditional) as LearningResult.Done
             val list = e.typed()
             assertEquals("國家", list.first())
+            assertTrue("$list", "国家" in list && "过家" in list)
             assertTrue("$list", list.indexOf("国家") < list.indexOf("过家"))
         }
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->

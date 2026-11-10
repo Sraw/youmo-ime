@@ -25,7 +25,8 @@ internal class Paint(private val theme: Theme, private val density: Double) {
     fun fill(shape: Shape, fill: Fill?): Op? = when (fill) {
         null -> null
         is Fill.Solid -> theme.color(fill.color).takeUnless { it.transparent }?.let { Op.Fill(shape, it) }
-        is Fill.Linear -> Op.Gradient(shape, fill.angle, fill.stops.map { (c, at) -> theme.color(c) to at })
+        is Fill.Linear -> fill.stops.map { (c, at) -> theme.color(c) to at }
+            .takeUnless { stops -> stops.all { it.first.transparent } }?.let { Op.Gradient(shape, fill.angle, it) }
         is Fill.Image -> Op.NineSlice(shape, fill.file, fill.insets, fill.pxPerDp, fill.fallback?.let(theme::color)?.takeUnless { it.transparent })
         is Fill.Picture -> Op.Picture(shape, fill.blurDp, fill.brightness, fill.over?.let(theme::color)?.takeUnless { it.transparent })
     }

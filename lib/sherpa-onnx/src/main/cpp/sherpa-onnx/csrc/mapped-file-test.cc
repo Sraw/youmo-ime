@@ -4,6 +4,7 @@
 // says so), not _Exit (the keyboard's process gone).
 #include "sherpa-onnx/csrc/mapped-file.h"
 
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
@@ -26,11 +27,29 @@ TEST(MappedFile, AFileIsMappedAsItIs) {
 }
 
 TEST(MappedFile, OneThatCannotBeMappedThrows) {
-  EXPECT_THROW(MapFile(testing::TempDir() + "no-such-model.ort"), std::runtime_error);
+  std::string missing = testing::TempDir() + "no-such-model.ort";
+  try {
+    MapFile(missing);
+    ADD_FAILURE() << "a missing file mapped";
+  } catch (const std::runtime_error &e) {
+    // the path and why (strerror's ENOENT text) are in the message
+    std::string what = e.what();
+    EXPECT_NE(what.find(missing), std::string::npos) << what;
+    EXPECT_NE(what.find(strerror(ENOENT)), std::string::npos) << what;
+  }
   // empty: nothing to map
   std::string path = testing::TempDir() + "mapped-file-empty.ort";
-  fclose(fopen(path.c_str(), "wb"));
-  EXPECT_THROW(MapFile(path), std::runtime_error);
+  FILE *f = fopen(path.c_str(), "wb");
+  ASSERT_NE(f, nullptr);
+  fclose(f);
+  try {
+    MapFile(path);
+    ADD_FAILURE() << "an empty file mapped";
+  } catch (const std::runtime_error &e) {
+    std::string what = e.what();
+    ASSERT_GE(what.size(), 7u);
+    EXPECT_EQ(what.substr(what.size() - 7), ": empty") << what;
+  }
   remove(path.c_str());
 }
 

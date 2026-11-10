@@ -6,20 +6,21 @@ package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.view.ContextThemeWrapper
 import android.view.View
-import org.junit.Assert.assertTrue
 import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.theme.Argb
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.uat.PrefsRule
+import org.fcitx.fcitx5.android.utils.styledColor
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +36,7 @@ import kotlin.math.roundToInt
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class KeyCapsTest {
 
     @get:Rule
@@ -110,10 +112,10 @@ class KeyCapsTest {
     // the symbol as they are, never a disabled key's fading; edited, outlined along the face drawn in the keyboard
     // theme's accent
     @Test
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Uat("ST-22")
     fun theEnginesCapFadesItsWordsAloneAndOutlinesItsFace() {
-        fun cap(marked: Boolean, dimmed: Boolean): SceneKeyCell =
-            KeyCaps.key(ctx, "W", "2", marked = marked, dimmed = dimmed).let { k ->
+        fun cap(marked: Boolean, dimmed: Boolean, selected: Boolean = false): SceneKeyCell =
+            KeyCaps.key(ctx, "W", "2", marked = marked, dimmed = dimmed, selected = selected).let { k ->
                 k.measure(View.MeasureSpec.makeMeasureSpec(W, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(H, View.MeasureSpec.EXACTLY))
                 k.layout(0, 0, W, H)
                 (0 until k.childCount).map(k::getChildAt).filterIsInstance<SceneKeyCell>().single()
@@ -137,12 +139,18 @@ class KeyCapsTest {
         val line = drawn.last() as Op.Stroke
         assertEquals(edited.keyNode!!.shape, line.shape)
         assertEquals(Argb(ThemeManager.activeTheme.accentKeyBackgroundColor), line.color)
+        // the item acted on (selected) outlined in the settings' colour, alone or over the marked outline (R20 F6504)
+        val primary = Argb(ctx.styledColor(android.R.attr.colorPrimary))
+        for (marked in listOf(false, true)) {
+            val ops = cap(marked = marked, dimmed = false, selected = true).drawn()
+            assertEquals(plain, ops.dropLast(1))
+            assertEquals("marked=$marked", primary, (ops.last() as Op.Stroke).color)
+        }
     }
 
     // a cap is the keyboard's key made at its size and drawn shrunk to the cap (060-pending-decisions, the
     // shortcut page's marks where the keyboard puts them): its ops the key's at the keyboard's height
     @Test
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theEnginesCapIsTheKeyboardsKeyShrunkToIt() {
         val k = KeyCaps.keyboardKeyHeight(ctx)
         assertTrue("$k", k > H)

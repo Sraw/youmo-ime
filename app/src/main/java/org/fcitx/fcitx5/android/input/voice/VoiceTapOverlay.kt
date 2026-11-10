@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.graphics.Rect
-import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -84,17 +83,8 @@ class VoiceTapOverlay(
         // what is said shows in the field as it is said; here only where the field cannot show it
         visibility = if (session.composes) View.INVISIBLE else View.VISIBLE
     }
-    private val wave = VoiceWaveView(ctx).apply {
-        color = look.micColor.value
-        active = true
-    }
-    private val pill = FrameLayout(ctx).apply {
-        background = GradientDrawable().apply {
-            cornerRadius = ctx.dp(PILL_HEIGHT / 2).toFloat()
-            setColor(look.micFill.value)
-        }
-        addView(wave, FrameLayout.LayoutParams(ctx.dp(WAVE_WIDTH), ctx.dp(WAVE_HEIGHT), Gravity.CENTER))
-    }
+    private val wave = VoiceCard.wave(ctx, look.micColor.value)
+    private val pill = VoiceCard.pill(ctx, wave, look.micFill.value)
     private val status = TextView(ctx).apply {
         textSize = 15f
         gravity = Gravity.CENTER
@@ -119,7 +109,7 @@ class VoiceTapOverlay(
             val pad = ctx.dp(12)
             setPadding(pad, pad, pad, pad)
             addView(heard, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(pill, LinearLayout.LayoutParams(ctx.dp(PILL_WIDTH), ctx.dp(PILL_HEIGHT)).apply { topMargin = ctx.dp(8) })
+            addView(pill, VoiceCard.pillParams(ctx))
             addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(8) })
             addView(hint, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(2) })
             // the pill a little above the middle, not pushed to the bottom
@@ -217,15 +207,7 @@ class VoiceTapOverlay(
             status.setText(it)
             hint.visibility = View.INVISIBLE
         }
-        main.postDelayed({
-            card.animate().alpha(0f).setDuration(VoiceStyle.ANIMATE_MS).withEndAction { (card.parent as? ViewGroup)?.removeView(card) }.start()
-        }, if (message != null) VoiceSession.MESSAGE_MS else 0L)
+        VoiceCard.fadeOut(card, main, message)
     }
 
-    companion object {
-        private const val PILL_WIDTH = 168
-        private const val PILL_HEIGHT = 52
-        private const val WAVE_WIDTH = 104
-        private const val WAVE_HEIGHT = 32
-    }
 }

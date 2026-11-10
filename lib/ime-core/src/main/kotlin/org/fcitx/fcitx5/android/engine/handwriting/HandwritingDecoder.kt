@@ -245,8 +245,9 @@ class HandwritingDecoder(
         // but where every reading is, the ink's best alone, as above (review M2): once a position, not a path through it (review R2 L6)
         shut = Array(minOf(positions.size - start, MAX_WORD)) { k ->
             val texts = positions[start + k].texts
-            val all = BooleanArray(texts.size) { blocked(index.find(texts[it])) }
-            if (all.all { it }) BooleanArray(texts.size) { it != 0 } else all
+            // the start's ids found above
+            val blockedAt = BooleanArray(texts.size) { blocked(if (k == 0) ids[it] else index.find(texts[it])) }
+            if (blockedAt.all { it }) BooleanArray(texts.size) { it != 0 } else blockedAt
         }
         foundTexts.clear()
         extend(start, dictionary.root, user?.root ?: -1, user?.mergedWords?.root ?: -1, StringBuilder(), 0.0)
@@ -311,10 +312,10 @@ class HandwritingDecoder(
         if (at == searched.size || at - searchStart == MAX_WORD) return
         val p = searched[at]
         val map = readings()
-        val shut = shut[at - searchStart]
+        val shutHere = shut[at - searchStart]
         for (i in 0 until minOf(alternatives, p.texts.size)) {
             val c = p.texts[i]
-            val syllables = map[c.codePointAt(0)]?.takeUnless { shut[i] } ?: continue
+            val syllables = map[c.codePointAt(0)]?.takeUnless { shutHere[i] } ?: continue
             val scored = ink + inkWeight * p.scores[i]
             text.append(c)
             for (s in syllables) {

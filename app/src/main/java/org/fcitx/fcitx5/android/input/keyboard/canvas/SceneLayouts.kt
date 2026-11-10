@@ -84,7 +84,7 @@ class SceneLayout(val id: String, val layout: Layout, val fragments: Map<String,
  * read too (logged once): [source]'s, and where it has none or it does not read, the app's own
  * ([BuiltInLayouts]; P3, a theme pack's first). A keyboard whose layout the app has is drawn by the
  * canvas where it is on (060-render-p2 S4): one whose layout does not read, nothing drawn, logged
- * (never its views again, U8); one whose layout the app has not, by its views still.
+ * (never its views again, U8); one whose layout the app has not, nothing (logged).
  */
 object SceneLayouts {
     private sealed interface Read {
@@ -163,7 +163,8 @@ object SceneLayouts {
         }
         val fragments = HashMap<String, Fragment>()
         for (src in layout.parts.filterIsInstance<Include>().map { it.src }.distinct()) {
-            val t = runCatching { source.text(src) ?: back.takeIf { it.key != source.key }?.text(src) }.getOrNull()
+            val t = runCatching { source.text(src) ?: back.takeIf { it.key != source.key }?.text(src) }
+                .onFailure { Timber.e(it, "scene layout %s: fragment %s unread", id, src) }.getOrNull()
                 ?: return null.also { Timber.e("scene layout %s: no fragment %s", id, src) }
             when (val f = LayoutReader.fragment(t)) {
                 is Parsed.Ok -> fragments[src] = f.value

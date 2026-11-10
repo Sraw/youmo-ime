@@ -25,9 +25,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The 14 and 18 keys drawn by the scene do what their views did (060-render-p2 S4a, U4 B): every key's
- * tap, swipes and long press, what reaches the engine and what the long press offers, the same with
- * each key wired from its layout's node (letters=, send=, popup) as from its old KeyDef.
+ * The 14 and 18 keys drawn by the scene (060-render-p2 S4a, U4 B): every key's tap, swipes and long
+ * press, what reaches the engine and the field and what the long press offers, each key wired from its
+ * layout's node (letters=, send=, popup), held to the committed record ([GestureSnapshot]).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -92,39 +92,39 @@ class GroupedSceneGesturesTest {
                     sent("$id long press")
                 }
             }
-            // ⌫ held: deletes over and over, as many either way
-            val held = h.field.text.length
+            // ⌫ held: deletes over and over, at least MIN_REPEATS times; the record keeps what it sends, not
+            // how many (that depends on where in a frame the press fell) nor the field it left (R20 F6506)
             h.press(h.keyNamed("backspace"))
             h.after(HOLD_MS)
             h.release()
-            val deletes = h.api.calls.count { it.startsWith("sendKey") }
+            val held = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
+            val deletes = held.count { it.startsWith("sendKey") }
             assertTrue("$deletes deletes", deletes >= MIN_REPEATS)
-            sent("backspace held $deletes from $held")
+            out += "backspace held: ${held.distinct()}"
+            h.api.calls.clear()
             out
         }
     }
 
-    private fun assertSame(
+    // what each key does, the keys [shown] and not [hidden], ⌫ held repeating: as recorded under [name]
+    private fun matchesRecord(
+        name: String,
         im: InputMethodEntry,
         inputType: Int = InputType.TYPE_CLASS_TEXT,
         shown: Set<String> = emptySet(),
         hidden: Set<String> = emptySet(),
-    ) {
-        // what each key does, run through: the keys [shown] and not [hidden], ⌫ held repeating (compared with their
-        // views' till S8a deleted them)
-        gestures(im, inputType, shown, hidden)
-    }
+    ) = GestureSnapshot.check("grouped-$name", gestures(im, inputType, shown, hidden))
 
     @Test
     fun pinyinsFourteenKeys() {
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard.Keys14)
-        assertSame(KeyboardHarness.PINYIN)
+        matchesRecord("pinyin14", KeyboardHarness.PINYIN)
     }
 
     @Test
     fun pinyinsEighteenKeys() {
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard.Keys18)
-        assertSame(KeyboardHarness.PINYIN)
+        matchesRecord("pinyin18", KeyboardHarness.PINYIN)
     }
 
     // 双拼's 18 keys under a scheme that types `;`: L; shows its semicolon
@@ -132,7 +132,7 @@ class GroupedSceneGesturesTest {
     fun shuangpinsEighteenKeysUnderMicrosoft() {
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard.Keys18)
         EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
-        assertSame(shuangpin)
+        matchesRecord("shuangpin18-microsoft", shuangpin)
     }
 
     // 双拼's 18 keys under a scheme of no `;` (Name18Plain): L alone
@@ -140,7 +140,7 @@ class GroupedSceneGesturesTest {
     fun shuangpinsEighteenKeysPlain() {
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard.Keys18)
         EngineState.shuangpinScheme = ShuangpinScheme.ZIRANMA
-        assertSame(shuangpin)
+        matchesRecord("shuangpin18-plain", shuangpin)
     }
 
     // an address field's keys: .com and @ for the separator and the rest, their long presses (the domains)
@@ -149,26 +149,26 @@ class GroupedSceneGesturesTest {
         for (keys in listOf(org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard.Keys14, org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard.Keys18)) {
             prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, keys)
             // a URL's / . and domains, no @; an address's @ . and domains, no /; neither a , or 。 of its own
-            assertSame(KeyboardHarness.PINYIN, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, setOf("slash", "dot", "domain"), setOf("at", "comma", "period"))
-            assertSame(KeyboardHarness.PINYIN, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, setOf("at", "dot", "domain"), setOf("slash", "comma", "period"))
+            matchesRecord("$keys-url", KeyboardHarness.PINYIN, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, setOf("slash", "dot", "domain"), setOf("at", "comma", "period"))
+            matchesRecord("$keys-email", KeyboardHarness.PINYIN, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, setOf("at", "dot", "domain"), setOf("slash", "comma", "period"))
         }
     }
 
     @Test
     fun shuangpinsFourteenKeys() {
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard.Keys14)
-        assertSame(shuangpin)
+        matchesRecord("shuangpin14", shuangpin)
     }
 
     private companion object {
         val SWITCHING = setOf("symbols", "numbers", "lang")
 
-        // the groups and the bottom row: a key missing on one side is caught by the ids compared
+        // the groups and the bottom row at least; which ones, the record says
         const val MOST_KEYS_AT_LEAST = 18
 
         const val TEXT = "hello world, again"
 
-        // ⌫ held this long repeats: some deletes at least, the same count each side
+        // ⌫ held this long repeats: some deletes at least
         const val HOLD_MS = 1500L
         const val MIN_REPEATS = 3
     }

@@ -230,6 +230,9 @@ object ThemePackFiles {
         return dirs.sortedByDescending { it.lastModified() }.take(ThemeAssetLimits.MAX_PACKS).flatMap { listed(it, builtins, builtIn) }
     }
 
+    /** What a kill left in [themes]' packs' SAVING cleared, as [list] with `sweep` does. */
+    fun sweepPacks(themes: File) = sweep(folder(themes))
+
     // a kill between a place's renames left the pack it replaced aside (`old-<random>/<name>`): put back where none
     // took its place; the rest (a pack half written, one being deleted, one replaced) cleared
     private fun sweep(root: File) {

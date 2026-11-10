@@ -89,6 +89,9 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
 
         // when an input event reached the window (DownMarks), 0 for anything else
         @Volatile var dispatched = 0L
+
+        // given up on ([await] timed out): its frame callback and pre-draw listener let go
+        @Volatile var cancelled = false
     }
 
     /** A mark's frame, in milliseconds from its [Mark.from]: to the frame done, null without its metrics. */
@@ -156,11 +159,15 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
         choreographer.postFrameCallback(object : Choreographer.FrameCallback {
             override fun doFrame(frameTimeNanos: Long) {
                 frameTime = frameTimeNanos
-                if (mark.preDraw == 0L) choreographer.postFrameCallback(this)
+                if (mark.preDraw == 0L && !mark.cancelled) choreographer.postFrameCallback(this)
             }
         })
         root.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
             override fun onPreDraw(): Boolean {
+                if (mark.cancelled) {
+                    root.viewTreeObserver.removeOnPreDrawListener(this)
+                    return true
+                }
                 if (!ready()) return true
                 root.viewTreeObserver.removeOnPreDrawListener(this)
                 mark.vsync = frameTime
@@ -177,7 +184,10 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
     fun await(mark: Mark, timeoutMs: Long = 5_000): Sample {
         val deadline = SystemClock.uptimeMillis() + timeoutMs
         while (mark.committed == 0L) {
-            check(SystemClock.uptimeMillis() < deadline) { "no frame drawn within $timeoutMs ms" }
+            if (SystemClock.uptimeMillis() >= deadline) {
+                mark.cancelled = true
+                error("no frame drawn within $timeoutMs ms")
+            }
             SystemClock.sleep(2)
         }
         // the metrics come a little after the frame, on their own thread
@@ -248,14 +258,19 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
  * (when it was made, so the system's way to the window is in). Put in as the window's callback, the
  * first that sees a touch there whatever draws the keys.
  */
-internal class DownMarks(val original: Window.Callback, private val frames: KeyboardFrames) : Window.Callback by original {
+internal class DownMarks(
+    val original: Window.Callback,
+    private val frames: KeyboardFrames,
+    // the events marked: a finger down, or (a popup's focus moved) each move
+    private val action: Int = MotionEvent.ACTION_DOWN,
+) : Window.Callback by original {
 
     @Volatile var recording = false
     val marks = CopyOnWriteArrayList<KeyboardFrames.Mark>()
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (recording && event.actionMasked == MotionEvent.ACTION_DOWN) {
-            // the press is drawn by the traversal after this event: the mark is in before it
+        if (recording && event.actionMasked == action) {
+            // the press (the move) is drawn by the traversal after this event: the mark is in before it
             marks += frames.mark(event.eventTime * NS_PER_MS).also { it.dispatched = System.nanoTime() }
         }
         return original.dispatchTouchEvent(event)

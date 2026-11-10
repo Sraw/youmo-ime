@@ -111,6 +111,9 @@ class GroupedKeyboardUatTest {
     // fcitx's Chinese punctuation, as its addon has it on
     private fun chinesePunctuation(im: InputMethodEntry, vararg marks: Pair<String, String>) {
         val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+        // cached as the real host caches what it sent: an input view made anew replays these
+        h.api.statusAreaCached = active
+        h.api.punctuationCached = marks.toMap()
         h.emit(HostEvent.StatusArea(active, im, marks.toMap()))
     }
 
@@ -502,7 +505,6 @@ class GroupedKeyboardUatTest {
         noPrivateUse()
     }
 
-    // the keyboard's half: 九键双拼's popups, its code row and the 123 page's strip; what a syllable
     // 九键's right side: the row (6's capitals, 6, its letters) wider than the symbols above, pushed
     // in from the edge on a narrow screen, left the last letter more steps right than the finger had
     // room for. The steps right are shorter where the room is: a slide to the screen's last pixel
@@ -526,6 +528,7 @@ class GroupedKeyboardUatTest {
         assertEquals("${row.map { it.text }}", row.last().text, h.field.text.toString())
     }
 
+    // the keyboard's half: 九键双拼's popups, its code row and the 123 page's strip; what a syllable
     // picked makes of the code is KeyboardHalvesUatTest's
     @Test
     @Uat("SP-24")

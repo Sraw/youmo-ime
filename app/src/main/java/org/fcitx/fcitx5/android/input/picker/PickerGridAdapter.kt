@@ -167,6 +167,9 @@ class PickerGridAdapter(
     }
 
     private fun bind(key: SceneKeyCell, item: String) = key.apply {
+        // a popup knows its key by the view's id: each cell its own, so two fingers on two cells
+        // each drive their own popup (an id-less cell would share the one ref "view:-1")
+        if (id == View.NO_ID) id = View.generateViewId()
         val transformed = transforms.getOrPut(item) { policy.transform(item) }
         label(this, transformed)
         setOnClickListener { commit(transformed) }

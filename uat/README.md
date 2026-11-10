@@ -91,7 +91,7 @@
 
 ### 重置
 
-把应用恢复成刚装好、导入过资源包的样子（不用卸载重装）。资源包（文字包约 311 MB、语音包约 184 MB，
+把应用恢复成刚装好、导入过资源包的样子（不用卸载重装）。资源包（文字包约 311 MB、语音包约 185 MB，
 `./gradlew :app:packs` 打在 `app/build/packs/`）每台设备只导入一次：
 
 ```sh
@@ -103,12 +103,12 @@ uat/tools/uat.py packs --port 5554    # 装 debug 包并导入两个包（已是
 `--method state` 查每个包的状态。debug 包信任仓库里的测试密钥和正式密钥。
 
 重置时不能用 `pm clear`：它连资源包一起删，每条用例再导一次要多好几秒。debug 包可以 `run-as`，运行器就先停掉输入法、
-`am force-stop`、收回录音权限，再用 App 自己的身份删掉数据目录里除 `files/packs` 以外的一切（设置、词、剪贴板、主题），
+`am force-stop`、收回录音权限、删掉外部存储里 App 的目录，再用 App 自己的身份删掉数据目录里除 `files/packs` 以外的一切（设置、词、剪贴板、主题），
 效果和 `pm clear` 一样，只留下资源包：
 
 ```sh
 P=io.github.sraw.youmo.debug; IME=$P/org.fcitx.fcitx5.android.input.FcitxInputMethodService
-adb shell "ime disable $IME; am force-stop $P"
+adb shell "ime disable $IME; am force-stop $P; pm revoke $P android.permission.RECORD_AUDIO; rm -rf /sdcard/Android/data/$P/*"
 adb shell "run-as $P sh -c 'find /data/user/0/$P -mindepth 1 -maxdepth 1 -exec rm -rf {} + ; cd /data/user_de/0/$P && find . -mindepth 1 -maxdepth 1 ! -name files -exec rm -rf {} + ; cd files && find . -mindepth 1 -maxdepth 1 ! -name packs -exec rm -rf {} +'"
 adb shell "ime enable $IME; ime set $IME"
 ```
@@ -210,12 +210,12 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | `voice:…` | 导入了语音包的 debug 包（默认就是；`--no-voice` 时、发布包上在别处跑：发布包没有片段麦克风） | 12 语音 |
 | `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v、QU-20 |
 | `release,scripted:…` | 发版时用发布包脚本跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
-| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24 |
+| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24、ST-68、ST-69、ST-70、TB-53、VO-37 |
 | `jvm:<测试>` | JVM 上的测试（`:app:testDebugUnitTest`、`:app:testDebugUnitTestAt29` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 664 条（P0 122、P1 507、P2 35）：模拟器上跑 53 条（其中 24 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 611 条（JVM 568、发版时 20、真机或手工 10、语音 13）。
+现在共 702 条（P0 126、P1 539、P2 37）：模拟器上跑 76 条（其中 34 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 626 条（JVM 577、发版时 21、真机或手工 15、语音 13）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 
@@ -236,7 +236,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 运行器要 Pillow（截图、拼图）：不往系统 python 装，建个 venv（`python3 -m venv <目录> && <目录>/bin/pip install Pillow`），用 `<目录>/bin/python uat/tools/uat.py …` 跑。
 
 ```sh
-BUILD_ABI=arm64-v8a ./gradlew :app:assembleDebug :app:packs   # 没有 debug 包或资源包时（运行器只要 arm64-v8a）
+BUILD_ABI=arm64-v8a ./gradlew :app:assembleDebug :app:packs   # 没有 debug 包或资源包时（运行器只要 arm64-v8a）；:app:packs 的语音包要 ~/.gradle/gradle.properties 里的 youmo.voiceModelDir，没有就用 :app:packTextPack 和 uat.py packs --no-voice
 uat/tools/uat.py up --port 5554             # 第一台 emulator-5554；不带 --port 是第二台 5556
 uat/tools/uat.py up
 uat/tools/uat.py run [--areas 14,06] [--ids PY-01,ST-02] [--devices 5554,5556]

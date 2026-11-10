@@ -31,7 +31,6 @@ class SceneBuilderTest {
         "<keyboard xmlns=\"$ns\" id=\"t\" name=\"t\" family=\"$family\" columns=\"10\">\n$rows\n</keyboard>",
     ).ok()
 
-    // review M-5: the app always says which pad; a board read without it is the full one, said so
     // the phases a profiler is told, in order, each ended; the scene the same as told nothing
     @Test
     fun itsPhasesTold() {
@@ -82,6 +81,7 @@ class SceneBuilderTest {
         assertFailsWith<IllegalArgumentException> { SceneBuilder(Forms.materialDark, Fixtures.portrait, FakeMeasurer, cascades = Cascades(Fixtures.materialLight)) }
     }
 
+    // the app always says which pad; a board read without it is the full one, said so
     @Test
     fun aNumberPadWithNoPadIsTheFullOne() {
         val pads = board(
@@ -115,9 +115,23 @@ class SceneBuilderTest {
     @Test
     fun buildingNeverThrows() {
         val broken = TextMeasurer { _, _, _, _ -> error("no fonts") }
-        val built = SceneBuilder(Fixtures.materialLight, Fixtures.portrait, broken).build(Fixtures.qwerty)
+        // each phase begun ended too, the build failing in one (a profiler's sections left open otherwise)
+        var open = 0
+        var begun = 0
+        val phases = object : Phases {
+            override fun begin(name: String) {
+                open++
+                begun++
+            }
+
+            override fun end() {
+                open--
+            }
+        }
+        val built = SceneBuilder(Fixtures.materialLight, Fixtures.portrait, broken, phases = phases).build(Fixtures.qwerty)
         assertIs<Parsed.Failed>(built)
         assertTrue(built.problems.single().message.contains("IllegalStateException"), "${built.problems}")
+        assertTrue(begun > 0 && open == 0, "begun $begun, open $open")
     }
 
     // round 3: read as theme 3.0 read them, the space with the input method's name, a label spelt only on a group key

@@ -7,8 +7,14 @@
 ### VO-01 [P0] 第一次用时请求麦克风权限
 - **前提**：B0（导入了语音包），刚重置，没给过麦克风权限。
 - **操作**：长按空格。
-- **预期**：短暂打开一个页面请求麦克风权限；点"允许"后回到原来的输入框，再长按空格可以说话。
+- **预期**：短暂打开一个页面请求麦克风权限；点"允许"后回到原来的输入框，再长按空格可以说话。（拒绝、关掉、转屏、不再询问是 VO-37，手工跑。）
 - **JVM**：`VoiceHoldUatTest.theFirstHoldAsksForTheMicrophone`（没权限时长按空格打开请求页、不开麦；请求页要 RECORD_AUDIO；给了以后再长按就能说（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；模拟器上（导入了语音包）也跑一遍：系统的权限对话框和点允许后回到输入框是框架的，JVM 上没有。
+
+### VO-37 [P1] 麦克风权限：拒绝、关掉对话框、转屏、不再询问
+- **前提**：B0（导入了语音包），刚重置，没给过麦克风权限；真机或模拟器。
+- **操作**：长按空格，请求时点对话框外面关掉它；再长按，点"拒绝"；再长按，对话框显示时转屏再点"允许"，按住说话。重置后拒绝两次（Android 10 上勾"不再询问"后拒绝），再长按空格。
+- **预期**：关掉或拒绝时请求页关掉、回到输入框，不打开应用设置、不开麦；转屏后点允许照常能说，不弹应用设置页；拒绝两次以后系统不再弹对话框，直接打开本应用的应用信息页，不开麦，请求页不留在最近任务里。
+- 手工跑（系统权限对话框的几种关法），不在自动跑里。
 
 ### VO-02 [P0] 按住空格说话，松开上屏
 - **前提**：B0-语音。
@@ -18,9 +24,9 @@
 
 ### VO-03 [P1] 说话时上滑取消
 - **前提**：B0-语音。
-- **操作**：长按空格说"你好"，手指上滑再松开。
-- **预期**：什么都不上屏，框里为空。
-- **JVM**：`VoiceHoldUatTest.slidingUpDropsIt`（上滑过键盘高度的四分之一显示「松开取消」，松开什么都不上屏，也不续录（松开时不调 `finish`）（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；设备上不跑。
+- **操作**：长按空格说"你好"，手指上滑再松开。再在工具栏 **⋯** 里开 **悬浮键盘** 并缩小，长按空格说话、慢慢上滑，看「松开手指，取消输入」出现的位置，松开。
+- **预期**：什么都不上屏，框里为空。悬浮键盘缩小后，同样要上滑过看得见的键盘高度的四分之一才显示「松开手指，取消输入」。
+- **JVM**：`VoiceHoldUatTest.slidingUpDropsIt`（上滑过键盘高度的四分之一显示「松开取消」，松开什么都不上屏，也不续录（松开时不调 `finish`）（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））、`VoiceHoldUatTest.onAScaledKeyboardTheCancelDistanceIsTheKeyboardAsSeen`（缩小的悬浮键盘上取消距离按看得见的键盘高度算）；设备上不跑。
 
 ### VO-04 [P1] 点工具栏麦克风说话
 - **前提**：B0-语音。
@@ -34,12 +40,13 @@
 - **操作**：点工具栏上的麦克风；再长按空格（不说话），手指上滑到取消区停一下再滑回。
 - **预期**：那一层下面的键是模糊的，只看得出大致的形状和颜色，位置和键盘对得上（悬浮、横屏、图片背景、圆角都一样）；「正在听…」和提示文字清楚，不和键帽上的字叠在一起；点按说话的那一层上没有 ×，只能点麦克风或这一层结束（不想要的结束后自己删）。长按空格的卡片同样是毛玻璃，上滑到取消区变红，滑回恢复。
 - **JVM**：`VoiceGlassTest`（盒式模糊的结果、缩小和放大的坐标换算、键盘画进缩小图时不画那一层自己）、`VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt`（那一层上没有按钮）（`:app:testDebugUnitTest`）；真机上照"操作"截图看。
+- **真机**：截图看盖层的毛玻璃（手工）。
 
 ### VO-06 [P1] 数字按习惯写
 - **前提**：B0-语音。
 - **操作**：按住空格说"二零零二年"，松开；再按住说"百分之五十七"，松开。
 - **预期**：框里是「2002年57%」（或中间带标点）。
-- **JVM**：`VoiceHoldUatTest.numbersAreWrittenInDigits`（识别出的「二零零二年」「百分之五十七」经整理模型的数字头（测试里的小标注器）和 ChineseNumbers 上屏为「2002年57%」；`aTaggerFailingTypesTheRawText`：整理失败时原样上屏「二零零二年」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；设备上不跑。听不听得出是 `~/voice-eval` 的基准。
+- **JVM**：`VoiceHoldUatTest.numbersAreWrittenInDigits`（识别出的「二零零二年」「百分之五十七」经整理模型的数字头（测试里的小标注器）和 ChineseNumbers 上屏为「2002年57%」；`aTaggerFailingTypesTheRawText`：整理失败时原样上屏「二零零二年」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；数字写法的细则（「二十四点半」「二十四点三十」「八点五」「三点两」照说的，「一九二点一六八」写作 192.168）见 `ChineseNumbersTest.whatDoesNotReadAsItsKindStaysAsSaid`、`ChineseNumbersTest.digitsAreDigitByDigit`（`lib/ime-core`）；设备上不跑。听不听得出是 `~/voice-eval` 的基准。
 
 ### VO-07 [P1] 不是数字的不乱改
 - **前提**：B0-语音。
@@ -75,8 +82,8 @@
 ### VO-12 [P1] 只上屏到开始说话时的输入框
 - **前提**：B0-语音。
 - **操作**：打开测试页的全部输入框（地址不带 `#`），在「普通文本」框长按空格说"你好"，不松手……说完前用另一只手点下面的「句子」框，再松开。
-- **预期**：「你好」不会出现在「句子」框里。
-- **JVM**：`VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt`（说完前换到另一个框，松开后两个框都没有「你好」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；设备上不跑。
+- **预期**：「你好」不会出现在「句子」框里。同一个框被应用 restartInput（测试台（uat/TESTBED.md，`./gradlew :testbed:installDebug` 装）的 `restart_target` 框按住空格说"你好"，另一只手点它的按钮（对它 `restartInput`）后再松开）：语音卡片不关，松开后「你好」上屏一次。
+- **JVM**：`VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt`（说完前换到另一个框，松开后两个框都没有「你好」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；`VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesWithTheHold`（按住时已听到「你好」再换框：按住作废，两个框都没有）、`VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid`（按住时同一个框 restartInput：接着听，松开后上屏一次）；设备上不跑。
 
 ### VO-13 [P1] 改掉空格长按行为
 - **前提**：B0-设置（导入了语音包），**按键 → 空格键长按行为** 改成"显示输入法选择对话框"。
@@ -196,7 +203,7 @@
 - **前提**：B0-语音；手机连着电脑的 adb（Android 12+）。先 `adb shell cmd sensor_privacy enable 0 microphone` 关掉麦克风。
 - **操作**：长按空格不放 3 秒；手指不松，在电脑上 `adb shell cmd sensor_privacy disable 0 microphone` 打开麦克风（从下拉栏或别的应用打开会把这次按住打断），对着手机说"你好"，松开。
 - **预期**：约 2 秒后显示「麦克风没有声音」；有声音后变回「正在听…」，框里是「你好」。
-- **JVM**：`VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce`（2 秒全零报一次，之后的第一个非零采样仍是开麦；`lib/ime-core`）、`VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound`、`VoiceTapUatTest.aSilentMicrophoneIsSaid`（`:app:testDebugUnitTest`）；设备上不跑：模拟器空闲时本来就读到全零，量不出"没声音"和"没开始说"的区别，真机上照"操作"跑一遍。
+- **JVM**：`VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce`（2 秒全零报一次，之后的第一个非零采样仍是开麦；`lib/ime-core`）、`VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound`、`VoiceTapUatTest.aSilentMicrophoneIsSaid`（`:app:testDebugUnitTest`）；设备上不跑：要用真机系统的麦克风开关（`sensor_privacy`）；模拟器的片段麦克风在片段之间也送一点底噪，读不到 2 秒全零，真机上照"操作"跑一遍。
 
 ### VO-28 [P1] 点麦克风说话后发送
 - **前提**：B0-语音。
@@ -206,10 +213,10 @@
 - **模拟器**：只做冒烟：聊天框里点麦克风，播 `zouba`，播完点那一层结束，等那一层收起后点键盘的回车；只看聊天记录里「我们走吧」正好一条、聊天框空了。
 
 ### VO-29 [P1] 点麦克风说话，定下来的边说边上屏
-- **前提**：B0-语音，多行的「普通文本」框。
+- **前提**：B0-语音，多行的「句子」框（textarea）。
 - **操作**：点工具栏上的麦克风，连着说几句（中间正常停顿），比如"今天天气很好 我们出去走走 晚上回来吃饭"，说的时候看框里，最后点麦克风结束。
-- **预期**：说着的时候，前面已经定下来的句子变成普通文字（没有下划线），只有最后还在变的一段带下划线；结束后整段是说的话，没有重复、没有漏字，句末按输入框加不加句号（只在结束时加）。说着的时候点框里别的位置：带下划线的那段撤掉，接着说的从新位置开始，结束后不重复。在聊天框里说着时应用把框清空（发出去了）：已经说过的不会再上屏一遍。结束时整理失败（退回原文）也只补后面的，不重复。
-- **JVM**：`VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid`（一段话在下一段开始前整段待定，下一段一来前一段连标点上屏，最后只补剩下的、句号只在结束时加）、`VoiceTapUatTest.polishedTheFrozenPartIsTypedAsItIsSaid`（语音整理冻结的部分边说边上屏）、`VoiceTapUatTest.polishedThenThePolishFailingAtTheEndOnlyWhatFollowsIsTyped`（已上屏「我到了。」，结束时原文「嗯我到了马上走」，只补「马上走」）、`VoiceTapUatTest.underEnglishWhatIsSaidIsTypedOnce`（英文输入法：结束时不把待定文字原地定成文字再上屏一遍）、`VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent`、`VoiceTapUatTest.whatTheAppSentIsNotTypedAgain`（说着时框被清空，结束后框还是空的）、`VoiceTapUatTest.whatTheAppRewroteIsNotTypedAgainTheTalkGoesOn`、`VoiceLiveTest`、`VoiceTalkTest`（ime-core：只算关了的段、整理已冻结的部分、停在标点后；改写过的只补公共前缀以后的；原文按子序列对齐，只补后面的；应用拿走的不再打；整理失败后不再边说边上屏）、`EditingSessionTest.aProvisionalCompositionTheAppTookIsNotTakenAgain`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`）；真机上照"操作"跑一遍（整理冻结的时机看真的模型；微信里发送后框清空）。
+- **预期**：说着的时候，前面已经定下来的句子变成普通文字（没有下划线），只有最后还在变的一段带下划线；结束后整段是说的话，没有重复、没有漏字，句末按输入框加不加句号（只在结束时加）。说着的时候点框里别的位置：带下划线的那段撤掉，接着说的从新位置开始，结束后不重复。在聊天框里说着时应用把框清空（发出去了）：已经说过的不会再上屏一遍。结束时整理失败（退回原文）也只补后面的，不重复；已经用数字上屏的（如「3个苹果」「50%」「8:05」，原文是汉字）后整理失败也一样。说着的时候转屏或切深色模式（键盘的 View 重建）：结束后整段只出现一次。
+- **JVM**：`VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid`（一段话在下一段开始前整段待定，下一段一来前一段连标点上屏，最后只补剩下的、句号只在结束时加）、`VoiceTapUatTest.polishedTheFrozenPartIsTypedAsItIsSaid`（语音整理冻结的部分边说边上屏）、`VoiceTapUatTest.polishedThenThePolishFailingAtTheEndOnlyWhatFollowsIsTyped`（已上屏「我到了。」，结束时原文「嗯我到了马上走」，只补「马上走」）、`VoiceTapUatTest.underEnglishWhatIsSaidIsTypedOnce`（英文输入法：结束时不把待定文字原地定成文字再上屏一遍）、`VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent`、`VoiceTapUatTest.whatTheAppSentIsNotTypedAgain`（说着时框被清空，结束后框还是空的）、`VoiceTapUatTest.whatTheAppRewroteIsNotTypedAgainTheTalkGoesOn`、`VoiceTapUatTest.theViewsMadeAnewWhileTalkingTheTailIsTypedOnce`（说着时转屏、换主题：重建 View 时撤掉待定的尾巴，结束后只上屏一次）、`VoiceTalkTest.thePolishFailingAfterANumberWrittenInDigitsTypesWhatFollowsItOnce`（已用数字上屏（3、50%、8:05）后整理失败，只补后面的）、`VoiceLiveTest`、`VoiceTalkTest`（ime-core：只算关了的段、整理已冻结的部分、停在标点后；改写过的只补公共前缀以后的；原文按子序列对齐，只补后面的；应用拿走的不再打；整理失败后不再边说边上屏）、`EditingSessionTest.aProvisionalCompositionTheAppTookIsNotTakenAgain`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`）；真机上照"操作"跑一遍（整理冻结的时机看真的模型；微信里发送后框清空；转屏：`adb shell settings put system user_rotation 1`）。
 
 ### VO-30 [P1] 点麦克风说话时换输入框、收起键盘
 - **前提**：B0-语音。
@@ -220,11 +227,23 @@
 ### VO-31 [P2] 点麦克风说话后一分钟没说话自动结束
 - **前提**：B0-语音。
 - **操作**：点工具栏上的麦克风，说"你好"，然后不说话，等 1 分钟多一点。
-- **预期**：最后一次听到说话后约 60 秒自动结束，「你好」上屏，那一层没了。（停止后 15 秒还没识别完就放弃：把最后听到的上屏，有东西上屏过（边说边上屏的或这次补的）就提示「最后几个字可能没识别完」；什么都没听到的提示「没有听清」。）
-- **JVM**：`VoiceTapFieldUatTest.aMinuteWithNothingSaidStopsIt`、`VoiceTapFieldUatTest.givenUpWhatWasHeardIsTypedAfterWhatWent`、`VoiceTapFieldUatTest.givenUpWithNothingTypedSaysNothingWasHeard`、`VoiceTapFieldUatTest.givenUpWithOnlyTheTailHeardItIsTypedAndSaidCutShort`（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`）；设备上不跑。
+- **预期**：最后一次听到说话后约 60 秒自动结束，「你好」上屏，那一层没了。（停止后 15 秒还没识别完就放弃：把最后听到的上屏，有东西上屏过（边说边上屏的或这次补的）就提示「最后几个字可能没识别完」；什么都没听到的提示「没有听清」。按住空格说话、英文下点麦克风说话也一样：松开或结束后 15 秒还没识别完，已听到的上屏并提示「最后几个字可能没识别完」。）
+- **JVM**：`VoiceTapFieldUatTest.aMinuteWithNothingSaidStopsIt`、`VoiceTapFieldUatTest.givenUpWhatWasHeardIsTypedAfterWhatWent`、`VoiceTapFieldUatTest.givenUpWithNothingTypedSaysNothingWasHeard`、`VoiceTapFieldUatTest.givenUpWithOnlyTheTailHeardItIsTypedAndSaidCutShort`、`VoiceHoldUatTest.aHoldCutShortTypesWhatWasHeard`（按住说话识别器不答：放弃时已听到的上屏并提示）（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`）；设备上不跑。
 
 ### VO-34 [P0] 没有语音包时麦克风提示导入
 - **前提**：B0，导入了文字包、没导入语音包。
-- **操作**：点候选栏的麦克风；再长按空格。
+- **操作**：点工具栏上的麦克风；再长按空格。
 - **预期**：键盘照常能打字。点麦克风时提示「语音输入需要导入语音包：设置 → 资源包」并打开资源包页，不问录音权限；语音包版本太旧时提示要更新到哪一版；语音包比应用新（格式更新）时提示「语音包 vN 是给更新版应用的：请更新幽默输入法」；语音包已损坏时提示重新导入。长按空格什么都不做（和 0.5.x 文字版一样）：没有提示、不打开页面，空格上没有麦克风角标，按住后照样能左右慢拖移动光标。导入语音包后空格上出现麦克风角标，长按就能说话。
 - **JVM**：`PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing`、`aVoicePackForANewerAppAsksForTheAppsUpdate`、`KeyboardUatTest.withoutTheVoicePackTheDefaultHoldLeavesTheSlowDragItsCursor`（`:app:testDebugUnitTest`）。
+
+### VO-35 [P1] 句末句号按输入框，语音整理去掉口头禅
+- **前提**：B0-语音（**按键 → 语音句末句号** 是默认的"按输入框"）。
+- **操作**：在测试页的「聊天」框、「搜索」框（单行）、多行的「句子」框里各长按空格说"嗯 我到了"，松开；再说"你到了吗"。把 **语音句末句号** 改成"照说的保留（单行框仍不加）"、再改成"都不加"，在三个框里各说一遍"我到了"。
+- **预期**：口头禅「嗯」不上屏。默认时：聊天框里是「我到了」（句号去掉）、「你到了吗？」（问号保留）；搜索框里句末不带任何标点（「我到了」「你到了吗」）；句子框里照说的「我到了。」。"照说的保留（单行框仍不加）"时聊天框、句子框都是「我到了。」，搜索框仍不带标点；"都不加"时三个框都是「我到了」。
+- **JVM**：`VoiceEndTest.aChatLosesItsClosingMarkAQuestionKeepsItsOwn`、`VoiceEndTest.aLineLosesEveryEndMark`（单行框不管选哪项都去掉句末标点）、`VoiceEndTest.elsewhereTheTextEndsAsSaidUnlessDropped`、`VoiceEndTest.aSearchAnAddressOrOneLineIsALine`、`VoicePolishTest.appliesAsPython`（语音整理去掉口头禅、加标点，和评测脚本逐字一致；`lib/ime-core`）；真机上照"操作"跑一遍（真的模型）。
+
+### VO-36 [P1] 英文听写的标点是英文的
+- **前提**：B0-语音。
+- **操作**：长按空格说 "Yes, I know."，松开；再长按空格说"我买了 iPhone，很好用"，松开。
+- **预期**：框里是「Yes, I know.」：逗号和句号是半角 `,` `.`，逗号后有空格；没有「，」「。」，也没有「。。」。中文句里英文词后面说的全角逗号保持全角（「我买了iPhone，很好用」）。
+- **JVM**：`VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn`（半角、全角照识别器写的）、`VoicePolishTest.nothingIsWrittenAfterAFullStop`（句号后不再加，没有「。。」）（`lib/ime-core`）；设备上不跑（还没有英文整句的语音片段）。

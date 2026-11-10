@@ -33,6 +33,8 @@ Minimum before a commit: `./gradlew :lib:keyboard-scene:check :lib:ime-core:chec
 and `cd uat/tools && python3 -m unittest test_uat` when `uat/` changed, plus
 the tool or build-logic tests (`./gradlew -p build-logic test`) if those changed. Unit tests need no NDK or CMake.
 
+Gesture records (`app/src/test/resources/gestures/*.txt`, `GestureSnapshot`): what each key of a board does, line by line; recorded anew by `GESTURES_RECORD=1 ./gradlew :app:testDebugUnitTest --tests '<class>'` (review the diff before committing). `WindowThemeTest`'s T7a pictures are drawn only with `WINDOW_SHOTS=1`.
+
 The app's test tasks run two test JVMs at once (`maxParallelForks`, `-PtestForks=<n>` for another
 count; `1` to rule out one test's state reaching another), each a fresh one every 40 classes. A test
 that leaves a preference, a file or a static set where the next test in its JVM reads it fails only

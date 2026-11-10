@@ -63,8 +63,8 @@ class Ed25519Test {
             assertTrue(Ed25519.verify(a.publicKey, message, signature))
             assertFalse(Ed25519.verify(b.publicKey, message, signature))
             if (message.isNotEmpty()) {
-                val other = message.copyOf().also { it[random.nextInt(it.size)] = (it[0].toInt() + 1).toByte() }
-                if (!other.contentEquals(message)) assertFalse(Ed25519.verify(a.publicKey, other, signature))
+                val other = message.copyOf().also { val i = random.nextInt(it.size); it[i] = (it[i].toInt() xor 1).toByte() }
+                assertFalse(Ed25519.verify(a.publicKey, other, signature))
             }
         }
     }
@@ -85,7 +85,7 @@ class Ed25519Test {
             update(message)
             runCatching { verify(malleable) }.getOrDefault(false)
         }
-        assertEquals(jdk, false)
+        assertFalse("the JDK refuses it too", jdk)
     }
 
     @Test

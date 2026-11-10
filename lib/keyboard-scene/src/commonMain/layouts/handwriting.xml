@@ -45,7 +45,7 @@
     <key id="enter" role="enter" kind="enter" face="special" width="15" icon="{return-icon}" a11y="{return}"
          sound="return" send="sym:Return" shortcut="return">
       <menu>
-        <item label="emoji" icon="emoji" do="picker:Emoji"/>
+        <item label="Emoji" icon="emoji" do="picker:"/>
       </menu>
     </key>
   </row>
