@@ -153,20 +153,7 @@ class KeyboardPerfBaselineTest {
         shell("settings put secure spell_checker_enabled 0")
         shell("ime enable $imeId")
         shell("ime set $imeId")
-        // bound anew in this process (as SoftKeyboardTest.selectThisInputMethod): am instrument force-stops this
-        // package, and `ime set` on the one already chosen binds nothing anew on API 36: no keyboard to measure
-        if (running()) return
-        shell("ime disable $imeId")
-        shell("ime enable $imeId")
-        shell("ime set $imeId")
-        val deadline = SystemClock.uptimeMillis() + 30_000
-        while (!running() && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(200)
-        check(running()) { "input method not running in this process" }
-    }
-
-    // the input method's service up in this process (the system's record of it, with this process's pid)
-    private fun running(): Boolean = shell("dumpsys activity services $imePkg").let {
-        FcitxInputMethodService::class.java.name in it && " ${Process.myPid()}:$imePkg" in it.replace("{", " ").replace("/", " ")
+        bindInThisProcess(imeId, imePkg, ::shell)
     }
 
     private fun launch() {
@@ -745,18 +732,7 @@ class KeyboardPerfBaselineTest {
 
     // ---- 4. memory
 
-    private fun memory(label: String) {
-        repeat(2) {
-            Runtime.getRuntime().gc()
-            SystemClock.sleep(GC_WAIT_MS)
-        }
-        val samples = (1..MEMORY_SAMPLES).map {
-            SystemClock.sleep(GC_WAIT_MS)
-            Memory.parse(shell("dumpsys meminfo ${Process.myPid()}"))
-        }
-        fun median(of: (Memory) -> Int) = Stats(samples.map { of(it).toDouble() }).median.toInt()
-        log("memory\t$label\tjava ${median { it.javaHeap }} kB\tnative ${median { it.nativeHeap }} kB\tgraphics ${median { it.graphics }} kB\ttotal pss ${median { it.totalPss }} kB")
-    }
+    private fun memory(label: String) = log(memoryLine(label, ::shell))
 
     private fun hideKeyboard() {
         scenario.onActivity { context.inputMethodManager.hideSoftInputFromWindow(it.field.windowToken, 0) }
@@ -850,8 +826,6 @@ class KeyboardPerfBaselineTest {
         const val KIB = 1024.0
         const val FAST_GAP_MS = 80L
         const val SETTLE_MS = 150L
-        const val GC_WAIT_MS = 500L
-        const val MEMORY_SAMPLES = 3
         const val SCREENSHOT_WAIT_MS = 1_000L
         const val IDLE_LEAD_MS = 300L
         const val IDLE_AFTER_MS = 2_000L
@@ -872,4 +846,38 @@ class KeyboardPerfBaselineTest {
             HostDaemon.disconnect(TAG)
         }
     }
+}
+
+// bound anew in this process (as SoftKeyboardTest.selectThisInputMethod): am instrument force-stops this
+// package, and `ime set` on the one already chosen binds nothing anew on API 36: no keyboard to measure.
+// Out of the class, as [memoryLine]: its size (detekt LargeClass)
+private fun bindInThisProcess(imeId: String, imePkg: String, shell: (String) -> String) {
+    // the input method's service up in this process (the system's record of it, with this process's pid)
+    fun running() = shell("dumpsys activity services $imePkg").let {
+        FcitxInputMethodService::class.java.name in it && " ${Process.myPid()}:$imePkg" in it.replace("{", " ").replace("/", " ")
+    }
+    if (running()) return
+    shell("ime disable $imeId")
+    shell("ime enable $imeId")
+    shell("ime set $imeId")
+    val deadline = SystemClock.uptimeMillis() + 30_000
+    while (!running() && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(200)
+    check(running()) { "input method not running in this process" }
+}
+
+private const val GC_WAIT_MS = 500L
+private const val MEMORY_SAMPLES = 3
+
+// a [memory] row's line: the process's heaps, the median of MEMORY_SAMPLES after two collections
+private fun memoryLine(label: String, shell: (String) -> String): String {
+    repeat(2) {
+        Runtime.getRuntime().gc()
+        SystemClock.sleep(GC_WAIT_MS)
+    }
+    val samples = (1..MEMORY_SAMPLES).map {
+        SystemClock.sleep(GC_WAIT_MS)
+        Memory.parse(shell("dumpsys meminfo ${Process.myPid()}"))
+    }
+    fun median(of: (Memory) -> Int) = Stats(samples.map { of(it).toDouble() }).median.toInt()
+    return "memory\t$label\tjava ${median { it.javaHeap }} kB\tnative ${median { it.nativeHeap }} kB\tgraphics ${median { it.graphics }} kB\ttotal pss ${median { it.totalPss }} kB"
 }

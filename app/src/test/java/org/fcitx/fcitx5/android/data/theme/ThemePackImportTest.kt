@@ -275,9 +275,9 @@ class ThemePackImportTest {
         // an entry out of where it is unpacked
         assertTrue(open(zip("theme.xml" to sampleXml, "../out.txt" to "x")).exceptionOrNull() is SecurityException)
         assertFalse(File(unpacking, "out.txt").exists())
-        // a file the theme names out of its folder (the engine's file names may be `..`)
+        // a file the theme names out of its folder: `..` is no file name to the engine's reader since R20
         val out = xml(before = """<font name="f" src=".."/>""", styles = """<style select="key" font="f"/>""")
-        assertEquals(appContext.getString(R.string.exception_theme_file, ".."), refusal(zip("theme.xml" to out)))
+        assertTrue(refusal(zip("theme.xml" to out))!!.contains("src=\"..\" is not a file name"))
         // a folder of its own but layouts/, or one in layouts/ (its files would not be taken)
         assertEquals(appContext.getString(R.string.exception_theme_folder, "images"), refusal(zip("theme.xml" to xml(), "images/a.png" to "1x1")))
         assertEquals(
