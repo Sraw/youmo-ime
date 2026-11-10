@@ -71,7 +71,8 @@ class AnimatedPictureTest {
         override fun isRunning() = running
         override fun getIntrinsicWidth() = 200
         override fun getIntrinsicHeight() = 100
-        override fun draw(canvas: Canvas) = Unit
+        var onDraw = {}
+        override fun draw(canvas: Canvas) = onDraw()
         override fun setAlpha(alpha: Int) = Unit
         override fun setColorFilter(colorFilter: ColorFilter?) = Unit
         @Deprecated("Deprecated in Java")
@@ -151,15 +152,28 @@ class AnimatedPictureTest {
         assertEquals(0, frames.starts)
     }
 
+    // placed by the canvas, not by the frames' bounds: API 29's AnimatedImageDrawable ignores its bounds
     @Test
     fun itsFramesAreLaidAsCenterCropLaysThem() {
         val frames = FakeFrames()
         val board = AnimatedBoardDrawable(frames, 100, appContext)
         board.setBounds(0, 0, 400, 100)
+        assertEquals(android.graphics.Rect(0, 0, 200, 100), frames.bounds)
+        // the canvas's moves until the frames are drawn (Robolectric's canvas keeps no matrix)
+        val moves = mutableListOf<String>()
+        val canvas = object : Canvas() {
+            override fun translate(dx: Float, dy: Float) {
+                moves += "translate $dx $dy"
+            }
+
+            override fun scale(sx: Float, sy: Float) {
+                moves += "scale $sx $sy"
+            }
+        }
+        frames.onDraw = { moves += "draw" }
+        board.draw(canvas)
         // 200×100 over 400×100: twice, its top and bottom cut
-        assertEquals(0, frames.bounds.left)
-        assertEquals(-50, frames.bounds.top)
-        assertTrue(frames.bounds.width() >= 400)
+        assertEquals(listOf("translate 0.0 -50.0", "scale 2.0 2.0", "draw"), moves)
     }
 
     // a file that is no animated WebP, or past the limits: drawn still (no frames made)
