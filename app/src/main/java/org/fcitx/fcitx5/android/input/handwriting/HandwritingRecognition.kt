@@ -127,8 +127,16 @@ class HandwritingRecognition internal constructor(
                 Executor { main.post(it) },
                 { EngineState.handwritingEnded.value },
                 LoadingReader(AssetRecognizer::open, AssetRecognizer::told, ::textPack),
-            )
+            ).also { made = true }
         }
+
+        // whether [shared] was made: a JVM test's wait for its reads does not make it
+        @Volatile
+        private var made = false
+
+        /** Whether [shared] is made and [busy]: a JVM test's main looper not idle till its reads are in; on the main thread. */
+        @VisibleForTesting
+        internal val sharedBusy: Boolean get() = made && shared.busy
 
         /**
          * What the recognizer's files are of: the text pack's directory, a new one at each import of
