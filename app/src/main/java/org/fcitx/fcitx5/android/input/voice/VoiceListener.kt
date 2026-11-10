@@ -306,7 +306,13 @@ class VoiceListener(
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
             // the polish failing: the raw text, told as such (what was typed as it was said is polished)
             val polished = orFallback<String?>("voice polish", null) { live.finished() }
-            if (polished == null) polishFailure = VoiceSession.PolishFailure.RUN
+            // a live step's failure only showed raw text for a moment: the whole of it polished now
+            // is what is typed, so 语音整理 did apply
+            if (polished == null) {
+                polishFailure = VoiceSession.PolishFailure.RUN
+            } else if (polishFailure == VoiceSession.PolishFailure.RUN) {
+                polishFailure = null
+            }
             said.complete(if (polished != null) polished to false else live.raw to true)
         } catch (e: CancellationException) {
             throw e

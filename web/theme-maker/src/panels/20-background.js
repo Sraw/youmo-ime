@@ -50,7 +50,7 @@
         // choosePicture); an animated="true" of the one it replaces goes with it otherwise
         written = { src, brightness: 100, blur: 0, cuts, animated: !!p.animated };
         const old = F.picture(xml);
-        if (old) Object.assign(written, { brightness: old.brightness, blur: old.blur });
+        if (old) Object.assign(written, { brightness: old.brightness, blur: p.animated ? 0 : old.blur }); // the app blurs no animated one
       }
       const set = F.setPicture(xml, written);
       xml = set.xml;

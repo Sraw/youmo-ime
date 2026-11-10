@@ -85,7 +85,7 @@
 - 真机或模拟器上手工跑（要在制作页做两个包），不在自动跑里。
 
 ### ST-83 [P1] 主题：带浅深两版的主题包跟着系统深色模式换
-- **前提**：B0-设置；"下载"里有一个浅深两版的 4.0 主题包（`variants="light dark"`，如 QA 用的「渐变与形状」，`min-app` 不高于本包版本）；系统浅色模式。
+- **前提**：B0-设置；"下载"里有一个浅深两版的 4.0 主题包（`variants="light dark"`，如 `web/theme-maker/examples/gradient` 的「晚霞」，`min-app` 不高于本包版本）；系统浅色模式。
 - **操作**：**跟随系统夜间模式** 开着（默认），**主题 → 新增主题** 导入它（确认框点 **导入**），在主题列表点它；回测试页看键盘；系统切到深色模式，再看键盘；回 **外观**，把 **跟随系统夜间模式** 关掉，在主题列表点它，系统切回浅色、再切深色，各看一次键盘；再点一个内置的 Material 浅色卡，系统切深色看键盘。
 - **预期**：跟随开着时点它不弹「配置」框，直接选上（亮色、暗色两个主题都变成它）；浅色时键盘是它的浅色版，系统切深色后是它的深色版（不是内置深色主题）；关掉跟随后照样跟着系统换版本；内置的 Material 浅色选上后系统切深色仍是浅色（内置的两版主题按选的那一版）。只有一版的主题包和以前一样：跟随开着时点它弹「配置」框。
 - **JVM**：`ThemePackListingTest.aPackOfBothVersionsFollowsTheSystemABuiltInPairKeepsItsSlots`；点卡片和系统切换在设备上跑。
@@ -383,22 +383,22 @@
 - **JVM**：没有；存取规则由 web/theme-maker 的 `names-and-files.test.mjs`（草稿按 id 分记录、两个标签页交错写、写到一半中断、旧版草稿）查，这一条在电脑浏览器上手工跑。
 
 ### ST-86 [P1] 主题带按键音：导入时提示，各类键放各自的声音
-- **前提**：模拟器，按键音 **启用**，按键音音色 **跟随主题**（默认）；一个 4.0 主题包，`theme.xml` 里 `<sounds><sound key="letter" src="letter.ogg"/><sound key="space" src="space.wav"/></sounds>`，两个文件各不到 1 秒、100 KB。
+- **前提**：模拟器，按键音 **启用**，按键音音色 **跟随主题**（默认）；一个 4.0 主题包，`theme.xml` 里 `<sounds><sound key="letter" src="letter.wav"/><sound key="space" src="space.ogg"/></sounds>`，两个文件是 `uat/fixtures/theme-sounds-icons/` 的 `letter.wav`、`space.ogg`。
 - **操作**：导入它，看确认框；选用它，在输入框里按字母、空格、回车、退格。
-- **预期**：确认框有一行「带按键音：字母、空格（要在 声音与振动 里开着按键音才会响…）」；字母放 letter.ogg、空格放 space.wav，回车和退格放 letter.ogg（没带的类别退到字母）；debug 版 logcat 有 `theme sound letter ogg status=0` 和 `theme sound space wav status=0`。
-- **JVM**：ThemeSoundsTest、KeySoundChoiceTest、ThemePackImportTest。
+- **预期**：确认框有一行「带按键音：字母、空格（要在 声音与振动 里开着按键音才会响…）」；字母放 letter.wav、空格放 space.ogg，回车和退格放 letter.wav（没带的类别退到字母）；debug 版 logcat 有 `theme sound letter wav status=0` 和 `theme sound space ogg status=0`。
+- **JVM**：`ThemeSoundsTest.eachClassPlaysItsOwnOnceLoaded`、`KeySoundChoiceTest.whichSoundAndHowLoud`、`ThemePackImportTest.keySoundsAreImportedKeptAndToldOf`。
 
 ### ST-87 [P1] 按键音音色选「系统」或按键音关着：不放主题的声音
 - **前提**：选用 ST-86 的主题。
 - **操作**：设置 → 声音与振动 → 按键音音色 选 **系统**，打字；再改回 **跟随主题**，把 **按键音** 设成 **禁用**，打字；再选回内置主题、按键音 **启用**，打字。
 - **预期**：选系统时是系统按键音；按键音禁用时不响，「按键音音色」一项变灰；内置主题（没有按键音）照旧是系统按键音，和这一版之前一样。
-- **JVM**：KeySoundChoiceTest。
+- **JVM**：`KeySoundChoiceTest.whichSoundAndHowLoud`。
 
 ### ST-88 [P2] 按键音不合格的主题被拒绝
-- **前提**：三个 4.0 主题包：按键音是 Opus 的 `.ogg`；是 1.5 秒的 WAV；是改了扩展名的 MP3（`x.wav`）。
+- **前提**：三个 4.0 主题包，按键音分别是 `uat/fixtures/theme-sounds-icons/bad/` 的 `opus.ogg`（Opus）、`long.wav`（2 秒）、`wav-named.mp3`（WAV 内容、扩展名 `.mp3`）。
 - **操作**：逐个导入。
 - **预期**：都被拒绝，提示「主题的按键音不合格…」并说出原因，什么都不留下。
-- **JVM**：SoundFileTest（keyboard-scene）。
+- **JVM**：keyboard-scene `SoundFileTest.opusRefused`、`SoundFileTest.shared`（时长、扩展名和内容）；`ThemePackImportTest.aKeySoundNotTakenIsRefused`。
 
 ### ST-89 [P1] 三种格式的按键音在 Android 10 上载入并放出（先 youmo29，再 API 34+）
 - **前提**：debug 版；按键音 **启用**，按键音音色 **跟随主题**；**跟随系统夜间模式** 关掉。"下载"里有 `uat-sounds-icons.theme`：`uat/fixtures/theme-sounds-icons/` 的 `theme.xml`、四个 SVG 和五个声音打成的包（脚本的 `push_icons_pack(d, sounds=True)`；`short.mp3` 不放进去）。五个声音参数各不相同：`letter.wav` 16 位 44.1 kHz 单声道，`function.wav` 8 位 8 kHz 单声道，`space.ogg` Vorbis 48 kHz 双声道，`enter.ogg` Vorbis 8 kHz 单声道，`backspace.mp3` MPEG-1 44.1 kHz 双声道带 Xing。
@@ -408,12 +408,12 @@
 
 ### ST-90 [P1] 主题包换的图标画在键上，换回内置主题恢复自带图标
 - **前提**：B0-设置；**跟随系统夜间模式** 关掉；"下载"里有 `uat-sounds-icons.theme`，同 ST-89 但不带 `<sounds>` 和声音文件（脚本的 `push_icons_pack(d)`）。
-- **操作**：**主题 → 新增主题** 导入并选用它；回测试页看退格、回车、Shift 和空格；按住 Shift 看三态（单次、锁定）；在搜索框里看回车；切到深色（**跟随系统夜间模式** 打开并让系统用深色）再看一遍；最后长按这个主题 **删除**，回测试页再看。
-- **预期**：退格是主题的 Material 风格退格（`viewBox="0 -960 960 960"`，画在键中间）；换行时的回车是主题的宽箭头，等比缩小居中（不被拉扁）；Shift 未按时是主题的箭头，下面一横是橙色、不跟 `icon-color` 变；Shift 单次、锁定和搜索框里的回车（主题没换这三个）是自带图标；空格上画着星，星中间半透明的红圆不跟 `icon-color` 变，按下时也不变色。深色版同样。删掉主题后换回内置主题，四个键都是自带图标，空格上没有红色。
+- **操作**：**主题 → 新增主题** 导入并选用它；回测试页看退格、回车、Shift 和空格；按住 Shift 看三态（单次、锁定）；在搜索框里看回车；按住退格、回车、Shift 看按下时的气泡，长按一个弹出层上有这几个图标的键、打开键盘里画的菜单层看图标，再看工具栏；切到深色（**跟随系统夜间模式** 仍关着，把系统切到深色：两版的主题包自己跟着系统换）再看一遍；最后长按这个主题 **删除**，回测试页再看。
+- **预期**：退格是主题的 Material 风格退格（`viewBox="0 -960 960 960"`，画在键中间）；换行时的回车是主题的宽箭头，等比缩小居中（不被拉扁）；Shift 未按时是主题的箭头，下面一横是橙色、不跟 `icon-color` 变；Shift 单次、锁定和搜索框里的回车（主题没换这三个）是自带图标；空格上画着星，星中间半透明的红圆不跟 `icon-color` 变，按下时也不变色。按下气泡、长按弹出和键盘里画的菜单上，退格、回车、Shift 也是主题的图标；工具栏仍是自带图标。深色版同样（是这个主题的深色版，不是内置深色主题）。删掉主题后换回内置主题，四个键都是自带图标，空格上没有红色。
 - **JVM**：`PackIconsTest`（app）、`CanvasPainterTest`（jsTest：写死颜色的半透明路径、等比居中）、`SvgSubsetTest`、`IconPathTest`；模拟器上脚本只断言空格上星的红色（选用后有、删掉后没有），截图给人看其它几个键。
 
 ### ST-91 [P2] 坏的图标和声音导入被拒，各说出原因
-- **前提**：B0-设置；按 ST-89 的包改出几个包，每个只坏一处，坏的文件在 `uat/fixtures/theme-sounds-icons/bad/`：`big.wav`（120 KB 以上）、`deep.wav`（24 位 PCM）、`junk-tail.mp3`（帧后面有不认识的数据）当某一类的声音；`no-fill.svg`（全部 `fill="none"`）、`zero-opacity.svg`（全部在 `opacity="0"` 的组里）当退格图标。（Opus、2 秒长、扩展名和内容不符的声音见 ST-88。）
+- **前提**：B0-设置；按 ST-89 的包改出几个包，每个只坏一处，坏的文件在 `uat/fixtures/theme-sounds-icons/bad/`：`big.wav`（超过 100 KB，约 113 KB）、`deep.wav`（24 位 PCM）、`junk-tail.mp3`（帧后面有不认识的数据）当某一类的声音；`no-fill.svg`（全部 `fill="none"`）、`zero-opacity.svg`（全部在 `opacity="0"` 的组里）当退格图标。（Opus、2 秒长、扩展名和内容不符的声音见 ST-88。）
 - **操作**：逐个导入。
 - **预期**：每个都被拒绝，什么都不留下；提示里说出原因：声音超过 100 KB、只收 8/16 位 PCM、文件尾有不认识的数据；图标没有要画的东西（每条路径都不填充、透明或只有移动）。
 - **JVM**：`SoundFileTest`、`SvgSubsetTest`（keyboard-scene）、`ThemePackImportTest`（app）。
@@ -485,9 +485,15 @@
 ### ST-63 [P0] 导入时每个文件说结果，原文件不删
 - **前提**：B0-设置；"下载"里有文字包、语音包，和一个不是资源包的文件。
 - **操作**：**资源包 → 导入资源包**，在文件选择器里多选这几个文件导入。
-- **预期**：导入时这一行显示正在导入哪个文件和百分比；结束后一个对话框逐个文件说结果：「X：已导入 vN」（导入的比已有的旧时先问，见 ST-82：换了是「X：已用 vN 替换了更新的 vM」，没换是「X：保留了更新的 vM，没有导入 vN」）、「X：vN 已经导入过，没有变化」、「X 不是幽默输入法的资源包」、「X：签名不对。……」、「X：其中的文件 Y 已损坏，请重新下载。」、版本不兼容（「X 是文字包 vN，这个版本的应用需要 vM 或更新的。」）、空间不够（「空间不够，导入 X 需要 … 可用空间，现在只有 …。」）。全部成功时说「导入完成。选的 .youmopack 文件已经用不到了，可以删掉。」；全部没成功时说「原来的资源包没有变化。」下载里的原文件都还在。结果框出现时转屏：仍只有这一个框，没有第二个；点确定后再转屏、或切到别的应用再回来：不再弹出。
+- **预期**：导入时这一行显示正在导入哪个文件和百分比；结束后一个对话框逐个文件说结果：「X：已导入 vN」（导入的比已有的旧时先问，见 ST-82：换了是「X：已用 vN 替换了更新的 vM」，没换是「X：保留了更新的 vM，没有导入 vN」）、「X：vN 已经导入过，没有变化」、「X 不是幽默输入法的资源包」、「X：签名不对。……」、「X：其中的文件 Y 已损坏，请重新下载。」、版本不兼容（「X 是文字包 vN，这个版本的应用需要 vM 或更新的。」）、空间不够（「空间不够，导入 X 需要 … 可用空间，现在只有 …。」）。每个文件都已导入或已经导入过时说「导入完成。选的 .youmopack 文件已经用不到了，可以删掉。」；一个也没导入（都没成功，或都保留了更新的）时说「原来的资源包没有变化。」下载里的原文件都还在。结果框出现时转屏：仍只有这一个框，没有第二个；点确定后再转屏、或切到别的应用再回来：不再弹出。
 - **JVM**：`PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles`（结果的说法和提示）；ime-core `PackShelfTest`（好包、坏签名、某个文件哈希不对、格式不兼容、空间不够、导入中途被杀、同一个包再导一次、先导语音包）。
 - **发版**：发布包上手工跑：多选文字包、语音包和一个非包文件，看逐文件结果框和下载里的原文件；结果框出现时转屏（只一个框），点确定后再转屏、切到别的应用再回来（不再弹出）；模拟器的发布包运行每次重置都经文件选择器导入文字包，但不算这条。
+
+### ST-94 [P2] 键盘高度低于 20% 的主题包被拒绝
+- **前提**：B0-设置；一个 4.0 主题包，`<style select="keyboard" height="15%"/>`（这一版以前下限是 10%，能导入）。
+- **操作**：**主题 → 新增主题** 导入它。
+- **预期**：被拒绝，什么都不留下，提示里说出键盘高度要在 20%–90%；改成 `height="20%"` 再导入能导入。
+- 真机或模拟器上手工跑（要自己打包），不在自动跑里。
 
 ### ST-82 [P1] 导入比手机上旧的资源包先问
 - **前提**：B0-设置，导入了文字包 v2；"下载"里有文字包 v1（`:app:packs` 用 `-PtextPackVersion` 之类做不出来时，用 `TestShelves` 的做法签一个 v1；做不出就记阻塞）。

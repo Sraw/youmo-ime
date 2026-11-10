@@ -331,7 +331,7 @@ def vo10(d):
 case("VO-11", needs="jvm:VoiceKeyboardUatTest.aPasswordFieldHasNoVoice")(lambda d: None)
 
 
-case("VO-12", needs="jvm:VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt、VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesWithTheHold、VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid")(lambda d: None)
+case("VO-12", needs="jvm:VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt、VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesIntoTheFirst、VoiceHoldUatTest.anotherFieldWhileInTheCancelZoneTypesNothing、VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid、VoiceHoldUatTest.theViewsMadeAnewWhileHoldingTypeWhatWasHeardOnce、VoiceHoldUatTest.theKeyboardHiddenWhileHoldingTypesWhatWasHeardOnce、VoiceHoldUatTest.theKeyboardHiddenAfterTheLiftStillTypesTheTail")(lambda d: None)
 
 
 case("VO-13", needs="jvm:VoiceHoldUatTest.holdingTheSpaceForThePickerDoesNotTalk")(lambda d: None)

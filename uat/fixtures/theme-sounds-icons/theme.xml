@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  内置主题 Nord，浅色、深色两版（0.5 的 NordLight、NordDark）。
-  3.0 的内置主题只给颜色，外观全是 LookDefaults（块状、圆角 4dp、阴影 1dp、键缝 h3 v7、横屏 v4、按下 Tint）；
-  下面的样式就是 LookTheme 把它们写成 4.0 的样子，App 也照这些画（BuiltinThemeEquivalenceTest 逐字比场景）。
-  keyBorder、keyHint、toolbarIcon 3.0 没单给，取 Palette 的默认（= keyShadow、altKeyText、altKeyText）。
+  UAT 夹具 uat-sounds-icons（uat/14-settings.md 的 ST-89–ST-92）：内置 Nord（lib/keyboard-scene/src/commonMain/themes/nord.xml）
+  的拷贝，改名，末尾加了空格上的 icon(star)、四个 <icon> 和五类 <sounds>。只是测试用的包，不和内置 Nord 逐字比；
+  Nord 改了样式这里不必跟着改。
 -->
 <theme xmlns="https://youmo-ime/theme/4" name="uat-sounds-icons" variants="light dark" version="4.0">
   <colors>

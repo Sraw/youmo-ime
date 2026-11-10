@@ -274,7 +274,8 @@
   }
 
   // the <sound> of [key] in [xml], null where none
-  const soundOf = (xml, key) => elements(xml, 'sound').find((e) => e.attrs.some((a) => a[0] === 'key' && a[1] === key)) || null;
+  // the last of [key]'s, as sounds() lists it (a hand-written theme may give a key twice)
+  const soundOf = (xml, key) => elements(xml, 'sound').findLast((e) => e.attrs.some((a) => a[0] === 'key' && a[1] === key)) || null;
 
   /** The theme's key sounds: `{key: src}` (a key the app does not know yet too: it keeps those). */
   const sounds = (xml) => Object.fromEntries(elements(xml, 'sound').map((e) => Object.fromEntries(e.attrs)).filter((a) => a.key).map((a) => [a.key, a.src]));
@@ -301,7 +302,8 @@
     const before = soundOf(xml, key);
     const was = before && (before.attrs.find((a) => a[0] === 'src') || [])[1];
     const tag = '<sound key="' + escape(key) + '" src="' + escape(src) + '"/>';
-    if (before) xml = xml.slice(0, before.start) + tag + xml.slice(before.end);
+    // a later app's attributes on the one replaced are kept: only its src= changes
+    if (before) xml = xml.slice(0, before.start) + withAttr(before.tag, 'src', src) + xml.slice(before.end);
     else {
       const box = elements(xml, 'sounds')[0];
       if (!box) xml = insert(xml, 'sounds', '<sounds>\n    ' + tag + '\n  </sounds>');

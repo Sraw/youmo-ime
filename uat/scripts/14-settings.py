@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import zipfile
 
 from uat import (PKG, Blocked, case, check, choose, home, script)
 
@@ -78,12 +79,19 @@ THEME_ZIP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
                          "from-app.theme")
 
 
+def push_download(d, local_path, name):
+    """[local_path] into 下载 as <name>.theme (older copies of it gone), scanned so the file picker lists it"""
+    d.sh(f"rm -f /sdcard/Download/{name}*.theme")
+    d.adb("push", local_path, f"/sdcard/Download/{name}.theme")
+    d.sh(f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/{name}.theme")
+    time.sleep(1)
+
+
 def push_theme(d):
     """a theme file (.theme, a zip inside) in 下载: the testdata theme (3.0) with a striped picture,
     drawn sharp and at full brightness so the keyboard shows its orange and blue"""
     import io
     import json
-    import zipfile
     from PIL import Image, ImageDraw
 
     def striped(w, h):
@@ -112,10 +120,7 @@ def push_theme(d):
             elif name.endswith("-landscape.png"):
                 data = striped(1440, 600)
             dst.writestr(name, data)
-    d.sh("rm -f /sdcard/Download/uat-theme*.theme")
-    d.adb("push", p, "/sdcard/Download/uat-theme.theme")
-    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-theme.theme")
-    time.sleep(1)
+    push_download(d, p, "uat-theme")
 
 
 def import_theme(d, name, confirm=True):
@@ -674,8 +679,6 @@ SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "li
 def push_layouts_pack(d):
     """uat-layouts.theme in 下载: Nord as a pack of its own with a 26 keys whose q types 你好, an 18 keys of
     another name and a k14 that does not read"""
-    import zipfile
-
     def read(*p):
         with open(os.path.join(SCENE, *p), encoding="utf-8") as f:
             return f.read()
@@ -688,10 +691,7 @@ def push_layouts_pack(d):
         z.writestr("theme.xml", read("themes", "nord.xml").replace('name="nord"', 'name="uat-layouts"', 1))
         for n, t in layouts.items():
             z.writestr("layouts/" + n, t)
-    d.sh("rm -f /sdcard/Download/uat-layouts*.theme")
-    d.adb("push", p, "/sdcard/Download/uat-layouts.theme")
-    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-layouts.theme")
-    time.sleep(1)
+    push_download(d, p, "uat-layouts")
 
 
 @case("ST-72", base="B0-设置", mutates=True)
@@ -738,7 +738,6 @@ SOUNDS_ICONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "f
 def push_icons_pack(d, sounds=False):
     """uat-sounds-icons.theme in 下载, made of uat/fixtures/theme-sounds-icons: Nord with its own backspace, enter,
     shift and a star on the space key ([sounds]: its five key sounds too; without, its <sounds> left out)"""
-    import zipfile
     with open(os.path.join(SOUNDS_ICONS, "theme.xml"), encoding="utf-8") as f:
         xml = f.read()
     names = [n for n in os.listdir(SOUNDS_ICONS) if n.endswith(".svg")]
@@ -751,10 +750,7 @@ def push_icons_pack(d, sounds=False):
         z.writestr("theme.xml", xml)
         for n in names:
             z.write(os.path.join(SOUNDS_ICONS, n), n)
-    d.sh("rm -f /sdcard/Download/uat-sounds-icons*.theme")
-    d.adb("push", p, "/sdcard/Download/uat-sounds-icons.theme")
-    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-sounds-icons.theme")
-    time.sleep(1)
+    push_download(d, p, "uat-sounds-icons")
 
 
 def reds(d, c, r=60):
@@ -763,7 +759,7 @@ def reds(d, c, r=60):
     return sum(1 for R, G, B in im.getdata() if R > G + 50 and R > B + 50)
 
 
-@case("ST-90", base="B0-设置", mutates=True)
+@case("ST-90", base="B0-设置", mutates=True, visual=True)
 def st90(d):
     appearance_tab(d, "大小与样式")
     d.switch("跟随系统夜间模式", False)
@@ -776,20 +772,31 @@ def st90(d):
     d.tap(item.c, 1.5)
     d.step("看键")
     d.open_page("text")
-    k = d.keys(refresh=True)
-    n = reds(d, k["space"])
+    space = d.keys(refresh=True).get("space")
+    check(space, "键盘上找不到空格键（空格上画着星、没有字，靠 rid 或「空格」描述找）")
+    n = reds(d, space)
     d.shot("full", "主题的退格、回车、Shift，空格上的星")
     check(n > 30, f"空格键上没有星的红色圆（{n} 个红点）")
     d.step("换回内置")
     delete_custom(d)
     d.open_page("text")
-    m = reds(d, d.keys(refresh=True)["space"])
+    space = d.keys(refresh=True).get("space")
+    check(space, "换回内置主题后键盘上找不到空格键")
+    m = reds(d, space)
     d.shot("full", "内置主题，自带图标")
     check(m < 5, f"删掉主题后空格键上还有红色（{m} 个红点）")
     return f"空格上星的红点 {n}，换回内置后 {m}"
 
 
-case("ST-89", needs="block:按键音的播放（S3）在另一个分支，合入后在 youmo29 上看 logcat 的 load status，再在 API 34+ 上听")(lambda d: None)
-case("ST-91", needs="block:按键音的导入检查（S3）在另一个分支，合入后跑；要逐个打坏的主题包")(lambda d: None)
+case("ST-82", needs="release:要一个比手机上旧的签名文字包（v1）；发版时在发布包上手工跑（问框、保留、替换、转屏）")(lambda d: None)
+case("ST-83", needs="manual:要切系统深色模式并点主题卡；规则由 ThemePackListingTest 查，在模拟器或真机上手工跑")(lambda d: None)
+case("ST-84", needs="manual:要从 from-app.theme 改出 monokai.theme；规则由 ThemePackImportTest 查，提示在设备上手工看")(lambda d: None)
+case("ST-85", needs="release:要打 v0.6.0-beta1 标签构建的包；发测试版时跑，规则由 ThemePackMinAppTest 查")(lambda d: None)
+case("ST-86", needs="manual:要听各类键的声音、看 logcat 的 theme sound；包用 push_icons_pack(d, sounds=True)")(lambda d: None)
+case("ST-87", needs="manual:要听系统按键音和主题声音的区别；规则由 KeySoundChoiceTest 查")(lambda d: None)
+case("ST-88", needs="manual:要逐个打 bad/ 里坏声音的主题包导入；规则由 SoundFileTest 查")(lambda d: None)
+case("ST-94", needs="manual:要自己打一个 height=\"15%\" 的主题包导入；规则由 keyboard-scene 的主题读取查")(lambda d: None)
+case("ST-89", needs="manual:要在 youmo29（API 29）和 API 34+ 上各走一遍，看 logcat 的 theme sound … status=0、真机上听")(lambda d: None)
+case("ST-91", needs="manual:要逐个打 bad/ 里坏文件的主题包导入；规则由 SoundFileTest、SvgSubsetTest、ThemePackImportTest 查")(lambda d: None)
 case("ST-92", needs="manual:主题制作网页；在电脑浏览器上手工跑（图标预览、按键音试听）")(lambda d: None)
 case("ST-93", needs="manual:主题制作网页；在电脑浏览器上手工跑（选动画 WebP 做背景，导入 App 看）")(lambda d: None)

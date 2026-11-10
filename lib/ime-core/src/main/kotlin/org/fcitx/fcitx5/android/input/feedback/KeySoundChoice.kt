@@ -19,7 +19,7 @@ object KeySoundChoice {
 
         data class Theme(val key: SoundKey, override val volume: Float) : Choice
 
-        /** The system's click of [key]; [volume] −1: the system's own (AudioManager.playSoundEffect's). */
+        /** The system's click of [key]; [volume] [SYSTEM_VOLUME]: the system's own. */
         data class System(val key: SoundKey, override val volume: Float) : Choice
     }
 
@@ -29,7 +29,13 @@ object KeySoundChoice {
      */
     const val THEME_DEFAULT_VOLUME = 0.5f
 
+    /** AudioManager.playSoundEffect's volume for the system's own. */
+    const val SYSTEM_VOLUME = -1f
+
     private const val PERCENT = 100f
+
+    /** The system's click's volume at 按键音音量 [percent] (0 the system default). */
+    fun systemVolume(percent: Int): Float = if (percent == 0) SYSTEM_VOLUME else percent / PERCENT
 
     /**
      * [key] pressed: the theme's sounds [given] (by class), [loaded] those of them ready to play,
@@ -46,7 +52,7 @@ object KeySoundChoice {
         return if (own != null && own in loaded) {
             Choice.Theme(own, if (volumePercent == 0) THEME_DEFAULT_VOLUME else volumePercent / PERCENT)
         } else {
-            Choice.System(system, if (volumePercent == 0) -1f else volumePercent / PERCENT)
+            Choice.System(system, systemVolume(volumePercent))
         }
     }
 }

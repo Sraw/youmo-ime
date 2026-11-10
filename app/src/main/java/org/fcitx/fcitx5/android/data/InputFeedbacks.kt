@@ -132,9 +132,10 @@ object InputFeedbacks {
             ThemeSounds.sync(plays && fromTheme)
             if (!plays) return
             val sounds = ThemeSounds.shared
-            when (val c = KeySoundChoice.choose(key, sounds.given, sounds.loaded, fromTheme, soundOnKeyPressVolume, system)) {
-                is KeySoundChoice.Choice.Theme -> if (!sounds.play(c.key, c.volume)) system(system, soundOnKeyPressVolume)
-                is KeySoundChoice.Choice.System -> audioManager.playSoundEffect(fx(c.key), c.volume)
+            when (val choice = KeySoundChoice.choose(key, sounds.given, sounds.loaded, fromTheme, soundOnKeyPressVolume, system)) {
+                is KeySoundChoice.Choice.Theme ->
+                    if (!sounds.play(choice.key, choice.volume)) playSystemClick(system, KeySoundChoice.systemVolume(soundOnKeyPressVolume))
+                is KeySoundChoice.Choice.System -> playSystemClick(choice.key, choice.volume)
             }
         } finally {
             Trace.endSection()
@@ -150,8 +151,7 @@ object InputFeedbacks {
     /** The selected theme's sounds loaded ahead of the first press, where they would play (the keyboard shown). */
     fun syncSounds() = ThemeSounds.sync(soundPlays() && keySoundSource == KeySoundSource.FollowTheme)
 
-    private fun system(key: SoundKey, volumePercent: Int) =
-        audioManager.playSoundEffect(fx(key), if (volumePercent == 0) -1f else volumePercent / 100f)
+    private fun playSystemClick(key: SoundKey, volume: Float) = audioManager.playSoundEffect(fx(key), volume)
 
     // a function key clicks as the standard one: the system has no click of its own for it
     private fun fx(key: SoundKey): Int = when (key) {

@@ -12,11 +12,8 @@
   const ops = {
     KEYS,
     MP3_NOTE,
-    /** [bytes] as the sound file [name] by the engine's rule: `{ok, info}` or `{ok: false, problems}` (readSound's). */
-    read: (E, name, bytes) => E.readSound(name, bytes),
-
     /**
-     * [d] with the file [name] ([bytes]) the sound of [key], kept as `sound-<key>.<its format>`; the file the key had
+     * [d] with the file [name] ([bytes]) the sound of [key], kept as `sound-<key>.<its format>` (`sound-<key>-2.<format>` where that name is taken, as when replacing one of the same format); the file the key had
      * before goes where nothing else names it. Throws, saying why, where the app would refuse the file.
      */
     setSound(d, E, key, name, bytes) {
@@ -43,6 +40,7 @@
     try {
       audio = audio || new (root.AudioContext || root.webkitAudioContext)();
       // decodeAudioData takes (detaches) its buffer: a copy, the document's bytes kept
+      await audio.resume(); // suspended after a long idle (and on iOS until resumed)
       const buffer = await audio.decodeAudioData(bytes.slice().buffer);
       const s = audio.createBufferSource();
       s.buffer = buffer;
@@ -55,7 +53,15 @@
   }
 
   const CHANNELS = { 1: '单声道', 2: '双声道' };
-  const describe = (i) => i.format.toUpperCase() + '，' + i.ms + ' ms，' + (CHANNELS[i.channels] || i.channels + ' 声道') + '，' + i.rate + ' Hz';
+  const describe = (i, size) => i.format.toUpperCase() + '，' + i.ms + ' ms，' + (CHANNELS[i.channels] || i.channels + ' 声道') + '，' + i.rate + ' Hz，' + Math.ceil(size / 1024) + ' KB';
+
+  // a row's status: what the key plays, or why its file does not (readSound's messages start with the file's name)
+  function status(key, file, bytes, r) {
+    if (!file) return { text: key === 'letter' ? '没有（放系统按键音）' : '没有（用字母键的）', bad: false };
+    if (!bytes) return { text: file + '：缺少文件', bad: true };
+    if (!r.ok) return { text: r.problems[0].message, bad: true };
+    return { text: file + '：' + describe(r.info, bytes.length), bad: false };
+  }
 
   function render(el, api) {
     const { h, row } = panels.ui;
@@ -68,17 +74,16 @@
     for (const [key, label] of rows) {
       const file = own[key];
       const bytes = file ? d.files[file] : null;
-      const r = bytes ? ops.read(api.engine, file, bytes) : null;
-      const says = !file ? (key === 'letter' ? '没有（放系统按键音）' : '没有（用字母键的）') : !bytes ? file + '：缺少文件' : r.ok ? file + '：' + describe(r.info) : file + '：' + r.problems[0].message;
-      el.append(row(label, h('span', { className: file && (!bytes || !r.ok) ? 'bad' : 'muted', textContent: says }),
+      const r = bytes ? api.engine.readSound(file, bytes) : null;
+      const s = status(key, file, bytes, r);
+      el.append(row(label, h('span', { className: s.bad ? 'bad' : 'muted', textContent: s.text }),
         known.includes(key) ? h('button', { type: 'button', textContent: '选文件…', on: { click: async () => {
           const f = await api.pickFile('.ogg,.wav,.mp3,audio/ogg,audio/wav,audio/mpeg');
           if (!f) return;
           const picked = new Uint8Array(f.bytes);
-          const got = ops.read(api.engine, f.name, picked);
-          if (!got.ok) { api.toast(f.name + ' 用不了：' + got.problems[0].message); return; }
+          // setSound reads it by the engine's rule and throws why where the app would refuse it (apply toasts that,
+          // the message naming the file); an MP3's note shows under its row once the panel is drawn again
           api.apply((x) => ops.setSound(x, api.engine, key, f.name, picked));
-          if (got.info.format === 'mp3') api.toast(MP3_NOTE);
         } } }) : null,
         bytes ? h('button', { type: 'button', textContent: '试听', on: { click: () => listen(api, bytes) } }) : null,
         file ? h('button', { type: 'button', textContent: '去掉', on: { click: () => api.apply((x) => ops.removeSound(x, key)) } }) : null));

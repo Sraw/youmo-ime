@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
-import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -14,7 +13,7 @@ import org.junit.Test
 class ThemePackMinAppTest {
     // a pack's min-app refused by the app named so: what the import does with the two
     private fun refuses(minApp: String, versionName: String) =
-        ThemePackFiles.minAppVersion(versionName)?.let { ThemeReader.newer(minApp, it) } == true
+        ThemePackFiles.minAppRefused(minApp, ThemePackFiles.minAppVersion(versionName))
 
     @Test
     fun aReleaseAndItsPreReleasesTakeThePacksOfTheirVersion() {

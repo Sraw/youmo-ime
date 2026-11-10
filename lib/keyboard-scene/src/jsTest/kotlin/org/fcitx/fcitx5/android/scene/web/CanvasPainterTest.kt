@@ -261,10 +261,19 @@ class CanvasPainterTest {
     // a wide theme SVG keeps its shape, centred down the box (SVG's xMidYMid meet), not stretched
     @Test
     fun aWideIconIsScaledAlikeAndCentred() {
-        val icon: dynamic = js("({ vw: 48, vh: 24, paths: [{ d: 'M0 0L48 24Z' }] })")
+        val icon: dynamic = js("({ vx: 0, vy: 0, vw: 48, vh: 24, paths: [{ d: 'M0 0L48 24Z' }] })")
         val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), red), Assets(icons = mapOf("x" to icon)))
         val scale = calls.indexOfFirst { it.startsWith("scale(") }
         assertEquals(listOf("translate(0,6)", "scale(0.5,0.5)"), calls.subList(scale - 1, scale + 1), "$calls")
+    }
+
+    // the app's own icons (no vx) fill the box as their VectorDrawable's bounds do, a box a px wider than tall too
+    @Test
+    fun anAppIconIsStretchedToItsBox() {
+        val icon: dynamic = js("({ vw: 24, vh: 24, paths: [{ d: 'M0 0L24 24Z' }] })")
+        val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 25.0, 24.0), red), Assets(icons = mapOf("x" to icon)))
+        assertTrue("scale(1.042,1)" in calls, "$calls")
+        assertTrue(calls.none { it == "translate(0.5,0)" }, "$calls")
     }
 
     // a theme path's own colour (an ARGB integer from readIcon) keeps its hue, faded by the tint's alpha; one without takes the tint

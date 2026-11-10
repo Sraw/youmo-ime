@@ -263,13 +263,18 @@ object YoumoEngine {
     }
 
     /**
-     * [bytes] (a `Uint8Array` or `Int8Array`) as the theme's sound file [name] ([SoundFile], what the app imports):
+     * [bytes] (a `Uint8Array`, `Int8Array` or `ArrayBuffer`) as the theme's sound file [name] ([SoundFile], what the app imports):
      * `{ok: false, problems}` where it is not one, else `{ok, info: {format: "ogg"|"wav"|"mp3", channels, rate, ms}}`.
      */
     fun readSound(name: dynamic, bytes: dynamic): dynamic = checked {
         val view: dynamic = bytes
         if (view == null || jsTypeOf(view.byteLength) != "number") throw NotOfType("bytes: not a Uint8Array")
-        val signed: ByteArray = Int8Array(view.buffer.unsafeCast<ArrayBuffer>(), view.byteOffset as Int, view.byteLength as Int).unsafeCast<ByteArray>()
+        // an ArrayBuffer has a byteLength too, but no buffer: taken whole (no instanceof: the page's realm may not be ours)
+        val signed: ByteArray = if (view.buffer == null) {
+            Int8Array(view.unsafeCast<ArrayBuffer>()).unsafeCast<ByteArray>()
+        } else {
+            Int8Array(view.buffer.unsafeCast<ArrayBuffer>(), view.byteOffset as Int, view.byteLength as Int).unsafeCast<ByteArray>()
+        }
         result(SoundFile.read(text(name, "name"), signed)) { i ->
             "info" to obj("format" to i.format.name.lowercase(), "channels" to i.channels, "rate" to i.rate, "ms" to i.ms)
         }

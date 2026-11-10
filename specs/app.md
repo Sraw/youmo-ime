@@ -1286,7 +1286,7 @@ first open): its top-level files and `layouts/` only (`ZipStream.extract(keep = 
 metered as above; a folder but `layouts/` or `__MACOSX/`, or one in `layouts/`, is refused, and a zip whose
 `theme.xml` is only in a folder says it must be at the top (`exception_theme_xml_top`). It is checked whole before the user is
 asked (`ThemePackFiles.check`; `ThemeAssetLimits`): `theme.xml` read at this app's version (refused: does not
-read, the first five problems with their lines; `min-app` newer, said as such; Shift, Backspace,
+read, the first five problems with their lines; `min-app` newer, said as such (`ThemePackFiles.minAppVersion`: a pre-release `0.6.0-beta1` compared as 0.6.0, a development build's `-<n>-g<hash>` or `-untagged` not checked); Shift, Backspace,
 Space or Enter left blank, its words and icon hidden and its face no image, as the engine resolves the key
 (`BlankKeys`, `SceneBuilder.blanks`) on the app's boards and the pack's own, by role, in every union of at most three
 key styles' scene sets and state sets (exact: the three deciding styles win there too; sets the app is never in at
@@ -1306,7 +1306,7 @@ the first unlock synced only where a slot named the theme: the slots keep the na
 pack; a theme named `mine` replaced by a pack `mine` of two versions, the slots naming it name its version of
 the same lightness, `mine#dark`, and the copy for before the first unlock is synced; then its json and the files
 no other theme names are deleted, not where the slots were not written: tried again at the next listing, the
-3.0 theme found by its name till then), while a 3.0 import named as a pack's reference is refused. A folder of its name there but not listed is refused only where its
+3.0 theme found by its name till then), while a 3.0 import named as a built-in theme, a 0.5 name the settings move to one, or a pack's reference is saved as `<name>-N` (`importJson`; `Imported.renamedFrom`, told by a toast, 060-pending-decisions). A folder of its name there but not listed is refused only where its
 `theme.xml` is a later build's (`ThemeReader.laterBuilds`: a format past 4.x, or a newer `min-app`;
 `exception_theme_newer_kept`; a `theme.xml` past 1 MB is not read for it, so not); any other (one that no longer reads, misses a file, hides required text, past
 the packs listed) is replaced, as it could not be deleted otherwise. A new pack past `ThemeAssetLimits.MAX_PACKS` (100) too

@@ -66,12 +66,14 @@ class VoicePolishTest {
         op[0] = tags.ops.indexOf("的")
         val after = IntArray(text.size)
         after[text.size - 1] = tags.afters.indexOf("。")
-        val (gop, gafter) = tags.guarded(text, op, after)
-        // no spaces passed: the letters and marks only
-        assertEquals("I'msorry.", tags.apply(text, gop, gafter))
+        tags.guarded(text, op, after)
+        // no spaces passed: the letters and marks only (guarded changed the labels in place)
+        assertEquals("I'msorry.", tags.apply(text, op, after))
         // a Chinese character's labels still apply, a digit's too (「2个」 to 「两个」)
         val zh = VoicePolishTags.norm("嗯2个")
-        val (zop, zafter) = tags.guarded(zh, intArrayOf(VoicePolishTags.DEL, tags.ops.indexOf("两"), 0), intArrayOf(0, 0, tags.afters.indexOf("。")))
+        val zop = intArrayOf(VoicePolishTags.DEL, tags.ops.indexOf("两"), 0)
+        val zafter = intArrayOf(0, 0, tags.afters.indexOf("。"))
+        tags.guarded(zh, zop, zafter)
         assertEquals("两个。", tags.apply(zh, zop, zafter))
         // the stream guards what the model says: 「I'm sorry.」 polished as it was said
         val stream = VoicePolishStream(tags, { t ->
@@ -234,9 +236,10 @@ class VoicePolishTest {
         val slowly = codePoints("一点一点黑")
         val op = intArrayOf(VoicePolishTags.DEL, VoicePolishTags.DEL, 0, 0, VoicePolishTags.DEL)
         val none = IntArray(slowly.size)
-        val (gop, gafter) = numTags.guarded(slowly, op, none.copyOf())
+        val after = none.copyOf()
+        numTags.guarded(slowly, op, after)
         // the number's characters kept; any other still goes
-        assertEquals("一点一点", numTags.apply(slowly, gop, gafter))
+        assertEquals("一点一点", numTags.apply(slowly, op, after))
         val perfect = codePoints("十全十美三个")
         val num = classes("1.1.1.")
         numTags.guarded(perfect, IntArray(perfect.size), IntArray(perfect.size), num)
@@ -247,6 +250,29 @@ class VoicePolishTest {
             VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code) 1 else 0 })
         })
         assertEquals("十全十美，10个", stream.finish("十全十美，十个"))
+    }
+
+    @Test
+    fun anIdiomCutByAStreamWindowsStartIsStillNoNumber() {
+        // a dictation longer than a window: the second step's window starts at 32, inside 十全十美 at 30..33,
+        // and its tail tagged without its head was written 十全10美
+        val before = "好".repeat(30)
+        val after = "好".repeat(70)
+        val stream = VoicePolishStream(numTags, { w ->
+            VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code) 1 else 0 })
+        })
+        assertEquals(before + "十全十美" + after, stream.finish(before + "十全十美" + after))
+        // a number just before the window's start still is one: only an idiom is looked for there
+        val numbered = VoicePolishStream(numTags, { w ->
+            VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code) 1 else 0 })
+        })
+        assertEquals("好".repeat(31) + "10个" + after, numbered.finish("好".repeat(31) + "十个" + after))
+    }
+
+    @Test
+    fun eachIdiomIsListedOnce() {
+        val idioms = VoicePolishTags.IDIOMS
+        assertEquals(idioms.groupBy { it }.filterValues { it.size > 1 }.keys.toString(), idioms.size, idioms.toSet().size)
     }
 
     @Test

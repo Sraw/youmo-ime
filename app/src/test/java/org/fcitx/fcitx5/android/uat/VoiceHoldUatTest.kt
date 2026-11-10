@@ -8,6 +8,7 @@ import android.Manifest
 import android.graphics.Rect
 import android.os.SystemClock
 import android.text.InputType
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
@@ -532,6 +533,82 @@ class VoiceHoldUatTest {
         h.advance(500)
         assertEquals("你好", first.text.toString())
         assertEquals("", h.field.text.toString())
+    }
+
+    // the views made anew under the held finger (a theme's rebuild): what was heard is typed at
+    // once, as on another field, not dropped by the cancel detaching the old view sends; the lift
+    // after it types nothing more
+    @Test
+    @Uat("VO-12")
+    fun theViewsMadeAnewWhileHoldingTypeWhatWasHeardOnce() {
+        allowMicrophone()
+        h.start()
+        val f = holdSpace()
+        voice.heard("你好")
+        h.advance(100)
+        // as a device's: detaching the old view cancels the touch it held before anything under it
+        // hears of the detach (ViewGroup.removeViewInternal: cancelTouchTarget, then detached). The
+        // harness's finger goes straight to the input view, so its parent has no touch target to
+        // cancel: a first child sends that cancel as it goes, ahead of the card's own detach
+        val old = h.inputView
+        old.addView(View(old.context).apply {
+            addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) = Unit
+                override fun onViewDetachedFromWindow(v: View) {
+                    val now = SystemClock.uptimeMillis()
+                    MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL, 0f, 0f, 0).also {
+                        old.dispatchTouchEvent(it)
+                        it.recycle()
+                    }
+                }
+            })
+        }, 0)
+        ThemeManager.prefs.floatingKeyboard.setValue(true)
+        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        h.idle()
+        h.relayout()
+        h.advance(500)
+        assertEquals("你好", text())
+        f.lift()
+        h.advance(500)
+        assertEquals("你好", text())
+    }
+
+    // the keyboard hidden with the finger still down: what was heard typed at once, the lift after
+    // it types nothing more
+    @Test
+    @Uat("VO-12")
+    fun theKeyboardHiddenWhileHoldingTypesWhatWasHeardOnce() {
+        allowMicrophone()
+        h.start()
+        val f = holdSpace()
+        voice.heard("你好")
+        h.advance(100)
+        h.hide()
+        h.advance(500)
+        assertEquals("你好", text())
+        f.lift()
+        h.advance(500)
+        assertEquals("你好", text())
+    }
+
+    // lifted, then the keyboard hidden while the tail is still recorded: as a tap's talk, the
+    // recognizer waited for and all of it typed, not only what was heard before the hide
+    @Test
+    @Uat("VO-12")
+    fun theKeyboardHiddenAfterTheLiftStillTypesTheTail() {
+        allowMicrophone()
+        h.start(MULTI_LINE)
+        voice.held = true
+        val f = holdSpace()
+        voice.said += "今天天气很好。"
+        f.lift()
+        h.hide()
+        h.advance(300)
+        assertEquals("", text())
+        voice.release()
+        h.advance(300)
+        assertEquals("今天天气很好。", text())
     }
 
     // slid into the cancel zone, then another field: dropped, as lifting there would

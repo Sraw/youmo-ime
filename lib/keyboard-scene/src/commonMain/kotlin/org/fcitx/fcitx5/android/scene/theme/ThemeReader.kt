@@ -171,13 +171,13 @@ object ThemeReader {
     /**
      * Whether [source] is a later build's theme, whether or not it reads here: its root's `version=` a later
      * format's than 4.x (`5.0`), or its `<meta min-app>` newer than [app]. A file that is no XML, or says
-     * neither, is not ([newer]: what cannot tell is not).
+     * neither, is not ([newer]: what cannot tell is not). [app] null (a dev build): only the format is checked.
      */
-    fun laterBuilds(source: String, app: String): Boolean {
+    fun laterBuilds(source: String, app: String?): Boolean {
         val root = (Xml.parse(source) as? Parsed.Ok)?.value?.takeIf { it.name == "theme" } ?: return false
         val format = root["version"]?.let(FORMAT::matchEntire)?.groupValues?.get(1)?.toIntOrNull()
         if (format != null && format > FORMAT_MAJOR) return true
-        return root.all("meta").any { meta -> meta["min-app"]?.let { newer(it, app) } == true }
+        return app != null && root.all("meta").any { meta -> meta["min-app"]?.let { newer(it, app) } == true }
     }
 
     private const val FORMAT_MAJOR = 4
@@ -318,7 +318,7 @@ object ThemeReader {
 
     // <sounds>: its <sound key src>s as written; a key or an attribute of a later version warned of, its file kept
     private fun sounds(el: XmlElement, p: Problems): List<Pair<String, String>> {
-        el.attributes.keys.filter { it != "xmlns" && !it.startsWith("xmlns:") && !it.startsWith("xsi:") }
+        el.attributes.keys.filter { !namespace(it) }
             .forEach { p.warn(el.line, ignored("<sounds $it=>")) }
         val out = ArrayList<Pair<String, String>>()
         for (s in atMost(el.children, SoundFile.MAX_SOUNDS, p, "sounds")) {
@@ -335,10 +335,13 @@ object ThemeReader {
         val a = Attributes(s, p)
         val key = a.matching("key", SOUND_KEY, "a sound's class") ?: a.required("key")
         val src = a.matching("src", FILE, "a file name") ?: a.required("src")
-        s.attributes.keys.filter { it != "key" && it != "src" && it != "xmlns" && !it.startsWith("xmlns:") && !it.startsWith("xsi:") }
+        s.attributes.keys.filter { it != "key" && it != "src" && !namespace(it) }
             .forEach { p.warn(s.line, ignored("<sound $it=>")) }
         return if (key != null && src != null) key to src else null
     }
+
+    // an XML namespace's attribute, never a later version's
+    private fun namespace(name: String): Boolean = name == "xmlns" || name.startsWith("xmlns:") || name.startsWith("xsi:")
 
     // an <icon> whose name is no app's icon and no icon() names: drawn nowhere (a layout of the theme's own may)
     private fun undrawnIcons(els: List<XmlElement>, icons: Set<String>, styles: List<Style>, p: Problems) {

@@ -53,13 +53,18 @@ object Versions {
      * one's version code ([baseVersionCode] follows the name), which an updater comparing codes takes
      * for no update.
      */
-    fun checkedVersionName(versionName: String): String {
-        check(!RELEASE_NAME.matches(versionName) || versionName == baseVersionName) {
-            "built at v$versionName with baseVersionName $baseVersionName: raise baseVersionName in Versions.kt (baseVersionCode follows it)"
+    fun checkedVersionName(versionName: String, base: String = baseVersionName): String {
+        // a pre-release at its tag (0.6.0-beta1) is that version's too: its number before the dash
+        val release = RELEASE_NAME.matchEntire(versionName)?.value ?: PRE_RELEASE_NAME.matchEntire(versionName)?.groupValues?.get(1)
+        check(release == null || release == base) {
+            "built at v$versionName with baseVersionName $base: raise baseVersionName in Versions.kt (baseVersionCode follows it)"
         }
         return versionName
     }
 
     // a release's name at its tag: 0.1.0, not 0.1.0-5-gabc1234 past it nor 0.1.0-untagged
     private val RELEASE_NAME = Regex("\\d+(\\.\\d+)*")
+
+    // a pre-release's at its tag: 0.6.0-beta1, 0.6.0-rc.2; not 0.6.0-beta1-3-gabc1234 past it nor 0.6.0-untagged
+    private val PRE_RELEASE_NAME = Regex("(\\d+(?:\\.\\d+)*)-(?!untagged$)[A-Za-z][0-9A-Za-z.]*")
 }

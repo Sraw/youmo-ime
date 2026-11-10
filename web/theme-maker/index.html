@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-EFN4xsWsHGQ8tjHuJHHvKgd0HyJKogfzU+w2QHAetYQ=' 'sha256-N0NIDaiSMelcKQjt/oWF6xPRN2VyPosoFNEXXzsO/oI=' 'sha256-wbRyapGHs9X2vw2MhaQao8KY5IwxUhXUE+rClmJiqIs=' 'sha256-xer/XQB7g+yEaJ1fk4Ah/SiTJhzMbPAN6jztynXEpIY='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-OwdO4Ew6l8dK8BA/5FwxDBracEY5FGpVhl3vDXw4Qvs=' 'sha256-AEUf1R0MDpva8bkI96qZH1MjL2tkPXbi8gtEFeVk4Ws=' 'sha256-8A1/61iLpefGptky7oCt5acaez7WbVlxDuVTsEEcekY=' 'sha256-xer/XQB7g+yEaJ1fk4Ah/SiTJhzMbPAN6jztynXEpIY='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -1852,7 +1852,8 @@ dialog h2 { margin: 0; font-size: 16px; }
 
 
   // a picture the user picks is never kept as it was (the user's ruling, 2026-11-09): always encoded anew, its long
-  // side no more than longSide (never made bigger), JPEG at quality; PNG only where it has transparency
+  // side no more than longSide (never made bigger), JPEG at quality; PNG only where it has transparency. The one
+  // exception: an animated WebP the app plays (keepsAnimated) is kept as picked
   const PICTURE_SAVE = { longSide: 2560, quality: 0.85 };
 
   /**
@@ -2723,7 +2724,8 @@ dialog h2 { margin: 0; font-size: 16px; }
   }
 
   // the <sound> of [key] in [xml], null where none
-  const soundOf = (xml, key) => elements(xml, 'sound').find((e) => e.attrs.some((a) => a[0] === 'key' && a[1] === key)) || null;
+  // the last of [key]'s, as sounds() lists it (a hand-written theme may give a key twice)
+  const soundOf = (xml, key) => elements(xml, 'sound').findLast((e) => e.attrs.some((a) => a[0] === 'key' && a[1] === key)) || null;
 
   /** The theme's key sounds: `{key: src}` (a key the app does not know yet too: it keeps those). */
   const sounds = (xml) => Object.fromEntries(elements(xml, 'sound').map((e) => Object.fromEntries(e.attrs)).filter((a) => a.key).map((a) => [a.key, a.src]));
@@ -2750,7 +2752,8 @@ dialog h2 { margin: 0; font-size: 16px; }
     const before = soundOf(xml, key);
     const was = before && (before.attrs.find((a) => a[0] === 'src') || [])[1];
     const tag = '<sound key="' + escape(key) + '" src="' + escape(src) + '"/>';
-    if (before) xml = xml.slice(0, before.start) + tag + xml.slice(before.end);
+    // a later app's attributes on the one replaced are kept: only its src= changes
+    if (before) xml = xml.slice(0, before.start) + withAttr(before.tag, 'src', src) + xml.slice(before.end);
     else {
       const box = elements(xml, 'sounds')[0];
       if (!box) xml = insert(xml, 'sounds', '<sounds>\n    ' + tag + '\n  </sounds>');
@@ -3368,7 +3371,7 @@ dialog h2 { margin: 0; font-size: 16px; }
         // choosePicture); an animated="true" of the one it replaces goes with it otherwise
         written = { src, brightness: 100, blur: 0, cuts, animated: !!p.animated };
         const old = F.picture(xml);
-        if (old) Object.assign(written, { brightness: old.brightness, blur: old.blur });
+        if (old) Object.assign(written, { brightness: old.brightness, blur: p.animated ? 0 : old.blur }); // the app blurs no animated one
       }
       const set = F.setPicture(xml, written);
       xml = set.xml;
@@ -4214,11 +4217,8 @@ dialog h2 { margin: 0; font-size: 16px; }
   const ops = {
     KEYS,
     MP3_NOTE,
-    /** [bytes] as the sound file [name] by the engine's rule: `{ok, info}` or `{ok: false, problems}` (readSound's). */
-    read: (E, name, bytes) => E.readSound(name, bytes),
-
     /**
-     * [d] with the file [name] ([bytes]) the sound of [key], kept as `sound-<key>.<its format>`; the file the key had
+     * [d] with the file [name] ([bytes]) the sound of [key], kept as `sound-<key>.<its format>` (`sound-<key>-2.<format>` where that name is taken, as when replacing one of the same format); the file the key had
      * before goes where nothing else names it. Throws, saying why, where the app would refuse the file.
      */
     setSound(d, E, key, name, bytes) {
@@ -4245,6 +4245,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     try {
       audio = audio || new (root.AudioContext || root.webkitAudioContext)();
       // decodeAudioData takes (detaches) its buffer: a copy, the document's bytes kept
+      await audio.resume(); // suspended after a long idle (and on iOS until resumed)
       const buffer = await audio.decodeAudioData(bytes.slice().buffer);
       const s = audio.createBufferSource();
       s.buffer = buffer;
@@ -4257,7 +4258,15 @@ dialog h2 { margin: 0; font-size: 16px; }
   }
 
   const CHANNELS = { 1: '单声道', 2: '双声道' };
-  const describe = (i) => i.format.toUpperCase() + '，' + i.ms + ' ms，' + (CHANNELS[i.channels] || i.channels + ' 声道') + '，' + i.rate + ' Hz';
+  const describe = (i, size) => i.format.toUpperCase() + '，' + i.ms + ' ms，' + (CHANNELS[i.channels] || i.channels + ' 声道') + '，' + i.rate + ' Hz，' + Math.ceil(size / 1024) + ' KB';
+
+  // a row's status: what the key plays, or why its file does not (readSound's messages start with the file's name)
+  function status(key, file, bytes, r) {
+    if (!file) return { text: key === 'letter' ? '没有（放系统按键音）' : '没有（用字母键的）', bad: false };
+    if (!bytes) return { text: file + '：缺少文件', bad: true };
+    if (!r.ok) return { text: r.problems[0].message, bad: true };
+    return { text: file + '：' + describe(r.info, bytes.length), bad: false };
+  }
 
   function render(el, api) {
     const { h, row } = panels.ui;
@@ -4270,17 +4279,16 @@ dialog h2 { margin: 0; font-size: 16px; }
     for (const [key, label] of rows) {
       const file = own[key];
       const bytes = file ? d.files[file] : null;
-      const r = bytes ? ops.read(api.engine, file, bytes) : null;
-      const says = !file ? (key === 'letter' ? '没有（放系统按键音）' : '没有（用字母键的）') : !bytes ? file + '：缺少文件' : r.ok ? file + '：' + describe(r.info) : file + '：' + r.problems[0].message;
-      el.append(row(label, h('span', { className: file && (!bytes || !r.ok) ? 'bad' : 'muted', textContent: says }),
+      const r = bytes ? api.engine.readSound(file, bytes) : null;
+      const s = status(key, file, bytes, r);
+      el.append(row(label, h('span', { className: s.bad ? 'bad' : 'muted', textContent: s.text }),
         known.includes(key) ? h('button', { type: 'button', textContent: '选文件…', on: { click: async () => {
           const f = await api.pickFile('.ogg,.wav,.mp3,audio/ogg,audio/wav,audio/mpeg');
           if (!f) return;
           const picked = new Uint8Array(f.bytes);
-          const got = ops.read(api.engine, f.name, picked);
-          if (!got.ok) { api.toast(f.name + ' 用不了：' + got.problems[0].message); return; }
+          // setSound reads it by the engine's rule and throws why where the app would refuse it (apply toasts that,
+          // the message naming the file); an MP3's note shows under its row once the panel is drawn again
           api.apply((x) => ops.setSound(x, api.engine, key, f.name, picked));
-          if (got.info.format === 'mp3') api.toast(MP3_NOTE);
         } } }) : null,
         bytes ? h('button', { type: 'button', textContent: '试听', on: { click: () => listen(api, bytes) } }) : null,
         file ? h('button', { type: 'button', textContent: '去掉', on: { click: () => api.apply((x) => ops.removeSound(x, key)) } }) : null));

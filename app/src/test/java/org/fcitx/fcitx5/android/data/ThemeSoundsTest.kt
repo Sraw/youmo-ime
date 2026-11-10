@@ -42,7 +42,7 @@ class ThemeSoundsTest {
 
     private fun idle() = shadowOf(thread.looper).idle()
 
-    // a 100 ms 8-bit PCM WAV of [bytes] samples at 8 kHz, mono
+    // a 100 ms 8-bit PCM WAV of [data] zero-byte samples (full negative; 8-bit PCM silence is 0x80) at 8 kHz, mono
     private fun wav(name: String, data: Int = 800): File {
         fun le(v: Int, n: Int) = ByteArray(n) { (v ushr (8 * it)).toByte() }
         val fmt = "fmt ".toByteArray() + le(16, 4) + le(1, 2) + le(1, 2) + le(8000, 4) + le(8000, 4) + le(1, 2) + le(8, 2)
@@ -135,11 +135,45 @@ class ThemeSoundsTest {
             mapOf(SoundKey.LETTER to big.path, SoundKey.SPACE to long.path, SoundKey.ENTER to missing.path, SoundKey.BACKSPACE to good.path)
         }
         idle()
-        // only the good one handed to the pool: the shadow knows no load of the others
-        for (f in listOf(big, long, missing)) {
-            assertTrue(runCatching { shadowOf(sounds.currentPool!!).notifyPathLoaded(f.path, true) }.isFailure)
-        }
         loaded(good)
+        // only the good one loaded: the others' classes play the system's click
         assertEquals(setOf(SoundKey.BACKSPACE), sounds.loaded)
+        for (key in listOf(SoundKey.LETTER, SoundKey.SPACE, SoundKey.ENTER)) assertFalse(sounds.play(key, 1f))
+    }
+
+    @Test
+    fun aPlayPostedBeforeThePoolIsReplacedIsDropped() {
+        val letter = wav("letter.wav")
+        sounds.use("a") { mapOf(SoundKey.LETTER to letter.path) }
+        idle()
+        loaded(letter)
+        val old = sounds.currentPool!!
+        // the sound thread held, so the play stays posted until the new ask (it runs freely otherwise)
+        shadowOf(thread.looper).pause()
+        assertTrue(sounds.play(SoundKey.LETTER, 1f))
+        // another theme asked for before the play ran: its sample is not the new pool's
+        sounds.use("b") { mapOf(SoundKey.LETTER to letter.path) }
+        // until the new pool is built nothing is loaded: the caller plays the system's click
+        assertTrue(sounds.loaded.isEmpty())
+        assertFalse(sounds.play(SoundKey.LETTER, 1f))
+        shadowOf(thread.looper).unPause()
+        idle()
+        assertFalse(shadowOf(old).wasPathPlayed(letter.path))
+        assertFalse(shadowOf(sounds.currentPool!!).wasPathPlayed(letter.path))
+    }
+
+    @Test
+    fun aLoadOfTheOldPoolAfterANewAskIsNotLoaded() {
+        val letter = wav("letter.wav")
+        sounds.use("a") { mapOf(SoundKey.LETTER to letter.path) }
+        idle()
+        val old = sounds.currentPool!!
+        // the theme changed on the main thread; the old pool's load lands before the rebuild runs
+        sounds.use("b") { mapOf(SoundKey.LETTER to letter.path) }
+        shadowOf(old).notifyPathLoaded(letter.path, true)
+        assertTrue(sounds.loaded.isEmpty())
+        assertFalse(sounds.play(SoundKey.LETTER, 1f))
+        idle()
+        assertTrue(sounds.loaded.isEmpty())
     }
 }

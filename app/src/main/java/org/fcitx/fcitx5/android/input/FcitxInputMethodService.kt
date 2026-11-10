@@ -348,6 +348,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         textBuilt = text is PackStatus.Ready
         voiceBuilt = PackStore.ready(PackKind.VOICE)
         if (!textBuilt) newInputView.overKeys(PackGateView(this, theme, text), underBar = false)
+        // a hold to talk on the old view ended as leaving the field ends it, what was heard typed,
+        // before detaching it sends the hold a cancel that would drop it
+        endVoiceHold()
         SceneTrace.section("setInputView") {
             setInputView(newInputView)
             inputDeviceMgr.setInputView(newInputView)
@@ -360,6 +363,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             currentInputEditorInfo?.let { SceneTrace.section("startInput") { newInputView.startInput(it, capabilityFlags) } }
         }
         newInputView
+    }
+
+    // the input view about to be thrown away while a hold to talk is on it: as another field
+    private fun endVoiceHold() {
+        inputView?.hold?.inputEnded(BaseInputView.Hold.InputEnd.LEFT)
     }
 
     private fun replaceCandidateView(theme: Theme): CandidatesView = SceneTrace.section("replaceCandidateView") {
@@ -1013,6 +1021,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
          * https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r36/core/java/android/inputmethodservice/InputMethodService.java#1876
          */
         if (diff and f != diff) {
+            // super throws the views away (setContentView) before it makes them anew
+            endVoiceHold()
             super.onConfigurationChanged(newConfig)
         }
         lastKnownConfig = newConfig

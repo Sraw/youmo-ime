@@ -393,6 +393,9 @@ class PackShelf(
         null
     } catch (_: IllegalArgumentException) {
         null
+    } catch (@Suppress("TooGenericExceptionCaught") _: RuntimeException) {
+        // the provider's stream failing otherwise (as [import] takes it): said by the import that follows
+        null
     }
 
     private class Refused(val why: Refusal, cause: Throwable? = null) : Exception(cause)

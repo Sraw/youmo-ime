@@ -37,27 +37,29 @@ data class PackIcons(val files: Map<String, String>) {
      */
     fun outline(file: String, ready: () -> Unit = {}): Outline? {
         kept[file]?.let { return it.takeIf { it !== NONE } }
-        val waiting = pending[file]
+        val waiting = waiters[file]
         if (waiting != null) {
             waiting += ready
             return null
         }
-        pending[file] = mutableListOf(ready)
+        waiters[file] = mutableListOf(ready)
         val generation = forgotten
         ThemeAssets.runner {
-            val read = read(file) ?: NONE
+            // anything a read throws (not only an unreadable file) is no icon: left waiting, every frame would miss
+            val read = runCatching { read(file) }.onFailure { Timber.w(it, "theme icon %s unread; the app's drawn", file) }.getOrNull() ?: NONE
             ThemeAssets.poster {
                 // read before a forget (a pack's files written over): neither kept nor waited on any more
                 if (generation != forgotten) return@poster
                 kept[file] = read
-                pending.remove(file)?.forEach { it() }
+                waiters.remove(file)?.forEach { it() }
             }
         }
+        // in already where the runner and poster ran at once (tests)
         return kept[file]?.takeIf { it !== NONE }
     }
 
     /** Whether [file] is being read now: drawn as the app's icon this frame, again once it is in. */
-    fun pending(file: String): Boolean = file in pending
+    fun pending(file: String): Boolean = file in waiters
 
     /** [icon] and its paths as Android draws them, in the SVG's own units ([SvgSubset.Icon.fit] places them). */
     class Outline(val icon: SvgSubset.Icon, val paths: List<Path>)
@@ -70,15 +72,20 @@ data class PackIcons(val files: Map<String, String>) {
 
         private const val KEPT = 256
         private val kept = lruMap<String, Outline>(KEPT)
-        private val pending = HashMap<String, MutableList<() -> Unit>>()
+        private val waiters = HashMap<String, MutableList<() -> Unit>>()
         private var forgotten = 0
         private val NONE = Outline(SvgSubset.Icon(1.0, 1.0, emptyList()), emptyList())
 
-        /** The icons read let go: a pack's files written over in place ([SceneThemes.forgetAll]). */
+        /**
+         * The icons read let go: a pack's files written over in place ([SceneThemes.forgetAll]). The views waiting on a
+         * read are told to draw again, as they would have been once it was in.
+         */
         fun forget() {
             kept.clear()
-            pending.clear()
+            val waiting = waiters.values.flatten()
+            waiters.clear()
             forgotten++
+            waiting.forEach { it() }
         }
 
         // [file] read as an icon, null where it is not (now)

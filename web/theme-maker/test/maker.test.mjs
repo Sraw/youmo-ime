@@ -482,8 +482,10 @@ test("an animated picture past the app's limits (youmo-format's, the app's Theme
 test('a sound the app would refuse cannot be saved; one it takes can (the engine\'s readSound, nothing of the page\'s)', () => {
   const ok = P.sounds.ops.setSound(M.fromBuiltin(E, 'nord'), E, 'space', 'a.ogg', bytes('space.ogg'));
   assert.deepEqual(M.saveProblems(E, L, FORMAT, ok), []);
-  // a <sound> of a key the app does not know yet: its file checked the same
-  for (const [key, file, data] of [['space', 'sound-space.ogg', enc('not a sound')], ['future', 'f.mp3', bytes('function.wav')]]) {
+  for (const [key, file, data] of [
+    ['space', 'sound-space.ogg', enc('not a sound')], // a known key's file whose content is no sound
+    ['future', 'f.mp3', bytes('function.wav')], // a key the app does not know yet: its file checked the same (a WAV named .mp3)
+  ]) {
     const xml = F.setSound(ok.xml, key, file).xml;
     const bad = M.saveProblems(E, L, FORMAT, { xml, files: Object.assign({}, ok.files, { [file]: data }), layouts: {} });
     assert.equal(bad.length, 1, JSON.stringify(bad));
@@ -509,8 +511,7 @@ test('背景: an animated WebP the app plays is kept as picked (animated="true")
   const lim = FORMAT.limits;
   const playing = animWebp(100, 100, [60, 70]);
   assert.ok(M.keepsAnimated(lim, playing));
-  assert.ok(!M.keepsAnimated(lim, animWebp(100, 100, [20])));
-  assert.ok(!M.keepsAnimated(lim, animWebp(1000, 100, [60])));
+  // the reasons one is drawn still are animatedStill's test; here one is enough
   assert.ok(!M.keepsAnimated(lim, bytes('tiny.ttf')));
   const cut = { bytes: enc('cut'), type: 'png', rect: [0, 0, 10, 10] };
   const d = P.background.ops.setPicture(M.fromBuiltin(E, 'nord'), { type: 'webp', src: playing, cuts: { portrait: cut, landscape: cut }, animated: true });

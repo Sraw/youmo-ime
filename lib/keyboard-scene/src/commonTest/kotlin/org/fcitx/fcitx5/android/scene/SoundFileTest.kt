@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.scene
 import org.fcitx.fcitx5.android.scene.theme.SoundFile
 import org.fcitx.fcitx5.android.scene.theme.SoundFile.Format
 import org.fcitx.fcitx5.android.scene.theme.SoundFile.Info
-import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -24,11 +23,12 @@ class SoundFileTest {
 
     // ---- Ogg
 
+    // contract: what ffmpeg's libvorbis and libopus write (SoundSamples), which files made here stand in for only
     @Test
-    fun realVorbis() = assertEquals(Info(Format.OGG, 2, 8000, 56), ok("tap.ogg", SoundSamples.VORBIS))
-
-    @Test
-    fun opusRefused() = refused("tap.ogg", SoundSamples.OPUS, "Opus")
+    fun realOggs() {
+        assertEquals(Info(Format.OGG, 2, 8000, 56), ok("tap.ogg", SoundSamples.VORBIS))
+        refused("tap.ogg", SoundSamples.OPUS, "Opus")
+    }
 
     @Test
     fun syntheticVorbis() {
@@ -40,7 +40,7 @@ class SoundFileTest {
     @Test
     fun oggGranules() {
         refused("a.ogg", vorbis(8000, 1, listOf(-1L, 1L shl 40)), "over 1000 ms")
-        refused("a.ogg", vorbis(8000, 1, listOf(-1L, -5L)), "over 1000 ms")
+        refused("a.ogg", vorbis(8000, 1, listOf(-1L, -5L)), "bad granule -5")
         // the last granule given, not the largest: 8001 samples at 8 kHz is over a second
         refused("a.ogg", vorbis(8000, 1, listOf(-1L, 8001L)), "over 1000 ms")
         assertEquals(1000, ok("a.ogg", vorbis(8000, 1, listOf(-1L, 8000L))).ms)
@@ -71,6 +71,12 @@ class SoundFileTest {
         val one = vorbis(8000, 1, listOf(-1L, 100L))
         refused("a.ogg", one + one.copyOfRange(0, 30), "truncated")
         refused("a.ogg", one.copyOf().also { it[4] = 1 }, "Ogg version 1")
+        // the headers' pages alone (granule 0, or -1 after): no audio, not a 0 ms sound
+        refused("a.ogg", vorbis(8000, 1, emptyList()), "no audio in the Ogg stream")
+        refused("a.ogg", vorbis(8000, 1, listOf(-1L)), "no audio in the Ogg stream")
+        // a first packet of another codec (FLAC's, Speex's), and a Vorbis of a later version
+        refused("a.ogg", page(BOS, 0, seq = 0, body = "\u007fFLAC".encodeToByteArray() + ByteArray(40)) + page(0, 100L, seq = 1, body = ByteArray(8)), "not Ogg Vorbis")
+        refused("a.ogg", vorbis(8000, 1, listOf(-1L, 100L), version = 1), "Vorbis version 1")
     }
 
     // ---- WAV
@@ -96,6 +102,12 @@ class SoundFileTest {
         refused("a.wav", wav(data = 100).let { it.copyOf(it.size - 10) }, "its data runs past")
         refused("a.wav", wav(dataFirst = true), "data before fmt")
         refused("a.wav", wav(rate = 4000), "4000 Hz")
+        refused("a.wav", wav(channels = 3), "3 channels")
+        // the RIFF header alone; a fmt and no data; a fmt too short to hold PCM's fields; data of no samples
+        refused("a.wav", wav().copyOf(12), "no fmt chunk")
+        refused("a.wav", wav(data = 0).let { it.copyOf(it.size - 8) }, "no data chunk")
+        refused("a.wav", riff(chunk("fmt ", ByteArray(14)) + chunk("data", ByteArray(8))), "fmt chunk too short")
+        refused("a.wav", wav(data = 0), "no audio")
     }
 
     @Test
@@ -109,6 +121,7 @@ class SoundFileTest {
 
     // ---- MP3
 
+    // contract: what lame and ffmpeg write (SoundSamples), an Info frame among them
     @Test
     fun realMp3s() {
         // lame's Info frame counted as a frame: its frame count is never taken
@@ -131,6 +144,8 @@ class SoundFileTest {
         assertEquals(262, ok("a.mp3", id3(20, footer = true) + frames(MPEG1, 10)).ms)
         // MPEG-2 at 22.05 kHz: 576 samples a frame
         assertEquals(Info(Format.MP3, 2, 22050, 262), ok("a.mp3", frames(MPEG2, 10)))
+        // MPEG-2.5 at 11.025 kHz (the rates shifted twice), 576 samples a frame: 5760 samples, 523 ms
+        assertEquals(Info(Format.MP3, 2, 11025, 523), ok("a.mp3", frames(MPEG25, 10)))
     }
 
     @Test
@@ -154,6 +169,10 @@ class SoundFileTest {
         refused("a.mp3", id3(20) + ByteArray(1) + frames(MPEG1, 2), "no MPEG frame")
         // MPEG-2 at 24 kHz, 8 kb/s: 24-byte frames, 4097 of them under 100 KB
         refused("a.mp3", frames(MPEG2_SMALL, 4097), "over 4096 frames")
+        // an ID3v2 cut short (its header, or the size it gives), and one whose size has a byte's top bit set
+        refused("a.mp3", id3(20).copyOf(6), "truncated ID3v2")
+        refused("a.mp3", id3(20).copyOf(15), "truncated ID3v2")
+        refused("a.mp3", (id3(20) + frames(MPEG1, 2)).also { it[6] = 0x80.toByte() }, "not sync-safe")
     }
 
     @Test
@@ -180,18 +199,14 @@ class SoundFileTest {
         refused("a.wav", wav(rate = 8000, bits = 8, channels = 1, data = 8008), "over 1000 ms long (1001 ms)")
     }
 
+    // every prefix of a real file read without a bug of ours showing ("could not be read": an index past the bytes)
     @Test
-    fun soundKeys() {
-        assertEquals(SoundKey.SPACE, SoundKey.of("space", "function"))
-        assertEquals(SoundKey.BACKSPACE, SoundKey.of("delete", "function"))
-        assertEquals(SoundKey.ENTER, SoundKey.of("return", "letter"))
-        assertEquals(SoundKey.ENTER, SoundKey.of("standard", "enter"))
-        assertEquals(SoundKey.SPACE, SoundKey.of("standard", "space"))
-        assertEquals(SoundKey.FUNCTION, SoundKey.of("standard", "function"))
-        assertEquals(SoundKey.LETTER, SoundKey.of("standard", "letter"))
-        assertEquals(SoundKey.LETTER, SoundKey.of("standard", "anything"))
-        assertEquals(SoundKey.BACKSPACE, SoundKey.of("backspace"))
-        assertEquals(null, SoundKey.of("future"))
+    fun cutShortNeverCrashes() {
+        val wrong = listOf("a.ogg" to SoundSamples.VORBIS, "a.ogg" to SoundSamples.OPUS, "a.mp3" to SoundSamples.MP3_XING, "a.mp3" to SoundSamples.MP3_PLAIN,
+            "a.wav" to wav(data = 160))
+            .flatMap { (name, b) -> (0 until b.size).map { n -> "$name ${b.size} cut to $n" to SoundFile.check(name, b.copyOf(n)) } }
+            .filter { (_, problems) -> problems.any { "could not be read" in it.message } }
+        assertEquals(emptyList<Pair<String, List<Problem>>>(), wrong)
     }
 
     // ---- files made here
@@ -221,8 +236,8 @@ class SoundFileTest {
     }
 
     // an identification page, then a page of each granule (the first the comment and setup's, -1)
-    private fun vorbis(rate: Int, channels: Int, granules: List<Long>, data: ByteArray = ByteArray(8)): ByteArray {
-        val id = byteArrayOf(1) + "vorbis".encodeToByteArray() + le(0, 4) + byteArrayOf(channels.toByte()) + le(rate.toLong(), 4) + ByteArray(13) +
+    private fun vorbis(rate: Int, channels: Int, granules: List<Long>, data: ByteArray = ByteArray(8), version: Int = 0): ByteArray {
+        val id = byteArrayOf(1) + "vorbis".encodeToByteArray() + le(version.toLong(), 4) + byteArrayOf(channels.toByte()) + le(rate.toLong(), 4) + ByteArray(13) +
             byteArrayOf(1)
         var file = page(BOS, 0, seq = 0, body = id)
         granules.forEachIndexed { i, g -> file += page(0, g, seq = i + 1, body = data) }
@@ -239,7 +254,11 @@ class SoundFileTest {
         val fmt = chunk("fmt ", le(tag.toLong(), 2) + le(channels.toLong(), 2) + le(rate.toLong(), 4) + le(byteRate.toLong(), 4) + le(align.toLong(), 2) + le(bits.toLong(), 2))
         val others = extra.fold(ByteArray(0)) { acc, n -> acc + chunk("LIST", ByteArray(n)) }
         val d = chunk("data", ByteArray(data))
-        val body = "WAVE".encodeToByteArray() + if (dataFirst) d + fmt else fmt + others + d
+        return riff(if (dataFirst) d + fmt else fmt + others + d)
+    }
+
+    private fun riff(chunks: ByteArray): ByteArray {
+        val body = "WAVE".encodeToByteArray() + chunks
         return "RIFF".encodeToByteArray() + le(body.size.toLong(), 4) + body
     }
 
@@ -271,9 +290,10 @@ class SoundFileTest {
         const val MPEG1_48K = 0xFFFB9400.toInt() // 48 kHz: 384 bytes
         const val MPEG2 = 0xFFF31000.toInt() // MPEG-2 Layer III, 8 kb/s, 22.05 kHz: 26 bytes
         const val MPEG2_SMALL = 0xFFF31400.toInt() // MPEG-2, 8 kb/s, 24 kHz: 24 bytes
+        const val MPEG25 = 0xFFE31000.toInt() // MPEG-2.5 Layer III, 8 kb/s, 11.025 kHz: 52 bytes
         const val LAYER_II = 0xFFFD9000.toInt()
         const val FREE = 0xFFFB0000.toInt()
         const val RESERVED = 0xFFEB9000.toInt()
-        val FRAME_LENGTHS = mapOf(MPEG1 to 417, MPEG1_MONO to 417, MPEG1_48K to 384, MPEG2 to 26, MPEG2_SMALL to 24)
+        val FRAME_LENGTHS = mapOf(MPEG1 to 417, MPEG1_MONO to 417, MPEG1_48K to 384, MPEG2 to 26, MPEG2_SMALL to 24, MPEG25 to 52)
     }
 }

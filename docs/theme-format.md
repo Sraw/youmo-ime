@@ -68,7 +68,7 @@
 
 ### `<meta>`（可选，最多一个）
 
-`author`、`version`、`license` 各 1–64 个字符；`min-app` 是最低输入法版本（如 `0.6.0`，更旧的输入法拒绝导入；只比数字部分，`0.6.0-beta1` 这样的测试版算 0.6.0；自己从源码编的、版本名带 `-<提交数>-g<哈希>` 的开发包不检查）；`preview` 是导入时显示的预览图，`.png` 或 `.webp`。
+`author`、`version`、`license` 各 1–64 个字符；`min-app` 是最低输入法版本（如 `0.6.0`，更旧的输入法拒绝导入；只比数字部分，`0.6.0-beta1` 这样的测试版算 0.6.0；自己从源码编的、版本名带 `-<提交数>-g<哈希>` 或 `-untagged` 的开发包不检查）；`preview` 是导入时显示的预览图，`.png` 或 `.webp`。
 
 ### `<colors>`
 
@@ -123,7 +123,13 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 `<font name src>` 定义一个字体，最多 4 个，样式里用 `font="名字"` 引用；`system` 是系统字体，不用定义。
 `<icon name src>` 定义一个图标，最多 200 个，名字是小写字母、数字和 `-`，文件只能是 SVG（限制见文末）。
 
-- **替换自带图标**：名字和输入法自带的图标相同时，键盘上凡是画这个图标的地方都换成主题的：键上的图标、角标、Shift 的三种状态、回车随动作变的图标、按键气泡、长按弹出和键盘里画的菜单弹出层。工具栏、剪贴板和编辑这些面板、系统样式的长按菜单不换。
+- **替换自带图标**：名字和输入法自带的图标相同时，键盘上凡是画这个图标的地方都换成主题的：键上的图标、角标、Shift 的三种状态、回车随动作变的图标、按键气泡、长按弹出和键盘里画的菜单弹出层。工具栏、剪贴板和编辑这些面板、系统样式的长按菜单不换。每个状态、每种动作是一个名字，只换写了的那个：`shift` 只换没按下时的 Shift，单次和锁定是 `shift-once`、`shift-locked`；`enter` 只换换行时的回车。自带图标的名字：
+
+  | 用在 | 名字 |
+  |---|---|
+  | 回车（随输入框要的动作） | `enter`（换行）、`go`、`search`、`send`、`next`、`done`、`previous` |
+  | 键 | `backspace`、`language`、`space`、`shift`、`shift-once`、`shift-locked`、`number-pad`、`lock`、`lock-open`、`emoji`、`voice`、`arrow-upward`、`arrow-downward` |
+  | 快捷键的命令 | `select-all`、`content-copy`、`content-cut`、`content-paste`、`undo`、`redo`、`delete-sweep`、`restore`、`field-start`、`field-end`、`cursor-move`、`clipboard`、`quick-input`、`emoji`、`voice`、`trad-simp`、`choose-keyboard`、`hide-keyboard` |
 - **新名字**：不是自带的名字，可以在 `icon(名字)`（`space-content`、`return-icon-*`）和主题自带布局的 `icon=` 里用。一个 `<icon>` 既不是自带的名字、又没被任何 `icon()` 用到时给警告「不会画」（只被主题布局用到的也会收到这条警告）。
 - **颜色**：路径没写 `fill`（自己的或从 `<g>`、`<svg>` 继承的）或写 `currentColor` 时，用部件的 `icon-color` 着色——注意浏览器里没写 fill 是黑色，这里不是。写了 `#颜色` 的路径保留这个颜色。SVG 的颜色按 CSS 的写法读：`#rgb`、`#rgba`、`#rrggbb`、`#rrggbbaa`，**透明度在最后**，和主题里 `#aarrggbb` 的写法相反。`icon-color` 的透明度乘到所有路径上；`icon-color` 是 `transparent` 时整个图标不画。
 - **透明度**：`opacity`、`fill-opacity` 乘到每条路径上。`<g opacity>` 是分别乘到组里的每条路径，重叠的地方会比浏览器里看到的深（浏览器先合成整个组再变透明）；网页预览和键盘上画的一样。

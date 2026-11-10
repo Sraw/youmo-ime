@@ -217,11 +217,15 @@ object ThemePackFiles {
             .map { dark -> Theme.Pack(BuiltinThemeFiles.ref(file, dark, paired), dark, file, dir.path, stamp) }
     }
 
+    /** Whether a theme asking for app [minApp] is refused by app [appVersion] (null: a dev build, which takes all). */
+    fun minAppRefused(minApp: String, appVersion: String?): Boolean =
+        appVersion != null && ThemeReader.newer(minApp, appVersion)
+
     /**
      * Whether the pack folder [dir] holds a later build's file than the app [appVersion]'s ([ThemeReader.laterBuilds]);
      * one not read, or past a pack's [ThemeAssetLimits.MAX_THEME_XML_BYTES] (not read whole), not.
      */
-    fun laterBuilds(dir: File, appVersion: String): Boolean = runCatching {
+    fun laterBuilds(dir: File, appVersion: String?): Boolean = runCatching {
         File(dir, THEME_XML).takeIf { it.length() <= ThemeAssetLimits.MAX_THEME_XML_BYTES }?.readText()?.removePrefix(BOM)
     }.getOrNull()?.let { ThemeReader.laterBuilds(it, appVersion) } == true
 
@@ -426,8 +430,7 @@ object ThemePackFiles {
             is Parsed.Failed -> {
                 // one this version is too old for, said so (the update is what helps), not as a broken file
                 val minApp = (parse(source) as? Parsed.Ok)?.value?.meta?.minApp
-                val app = checks.appVersion
-                if (minApp != null && app != null && ThemeReader.newer(minApp, app)) errorRuntime(R.string.exception_theme_min_app, minApp)
+                if (minApp != null && minAppRefused(minApp, checks.appVersion)) errorRuntime(R.string.exception_theme_min_app, minApp)
                 errorRuntime(R.string.exception_theme_invalid, read.problems.take(SHOWN).joinToString("\n"))
             }
         }

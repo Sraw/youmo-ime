@@ -10,6 +10,7 @@ import android.graphics.Matrix
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -159,7 +160,12 @@ class VoiceHoldOverlay(
      */
     override fun inputEnded(how: BaseInputView.Hold.InputEnd) {
         if (how == BaseInputView.Hold.InputEnd.STARTED && session.sameField) return
-        session.fieldLeft()
+        // lifted already: hidden, the rest still comes, as a tap's does
+        if (how == BaseInputView.Hold.InputEnd.HIDDEN && session.released) {
+            session.hidden(SystemClock.uptimeMillis())
+        } else {
+            session.fieldLeft()
+        }
     }
 
     override fun ready() {

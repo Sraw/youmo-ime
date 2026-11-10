@@ -918,6 +918,7 @@
     <string name="shared_section_pinyin">拼音（全拼、雙拼、九鍵）</string>
     <string name="im_not_for">不適用：%s。</string>
     <string name="im_not_for_separator">、</string>
+    <string name="list_separator">、</string>
     <string name="clipboard_and_emoji">剪貼簿與表情</string>
     <string name="hardware_keyboard">實體鍵盤</string>
     <string name="section_emoji">表情</string>

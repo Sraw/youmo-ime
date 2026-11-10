@@ -66,6 +66,8 @@ object SoundFile {
             Format.WAV -> wav(b)
             Format.MP3 -> mp3(b)
         }
+        // a WAV's empty data: nothing to play (its loading would fail and the system's click play, unsaid why)
+        if (samples == 0L) bad("no audio")
         val ms = (samples * MS_PER_S + rate - 1) / rate
         if (ms > MAX_MS) bad("over $MAX_MS ms long ($ms ms)")
         return Info(byContent, channels, rate, ms.toInt())
@@ -119,13 +121,15 @@ object SoundFile {
             }
             val g = b.i64(at + OGG_GRANULE)
             if (g != -1L) {
-                if (g < 0 || g > Int.MAX_VALUE) bad("over $MAX_MS ms long (granule $g)")
+                if (g < 0) bad("bad granule $g")
+                if (g > Int.MAX_VALUE) bad("over $MAX_MS ms long (granule $g)")
                 granule = g
             }
             pages++
             at += length
         }
-        if (granule < 0) bad("no audio in the Ogg stream")
+        // the headers' pages say granule 0: a stream of them alone holds no audio
+        if (granule <= 0) bad("no audio in the Ogg stream")
         return Audio(channels, rate, granule)
     }
 

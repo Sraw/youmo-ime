@@ -7,6 +7,7 @@ import org.gradle.testfixtures.ProjectBuilder
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -80,7 +81,12 @@ class ProjectExtensionsTest {
         assertEquals("0.1.0-4-gabc1234", appVersionName("v0.1.0-4-gabc1234", "0.1.0"))
         // a pre-release's tag: its name, which the min-app check reads as 0.6.0 (ThemePackMinAppTest)
         assertEquals("0.6.0-beta1", appVersionName("v0.6.0-beta1-0-gabc1234", "0.5.2"))
-        assertEquals("0.6.0-beta1", Versions.checkedVersionName("0.6.0-beta1"))
+        assertEquals("0.6.0-beta1", Versions.checkedVersionName("0.6.0-beta1", base = "0.6.0"))
+        // a pre-release tagged before baseVersionName was raised would carry the last release's version code
+        assertThrows(IllegalStateException::class.java) { Versions.checkedVersionName("0.6.0-beta1", base = "0.5.2") }
+        // past the pre-release's tag, or untagged: not checked
+        assertEquals("0.6.0-beta1-3-gabc1234", Versions.checkedVersionName("0.6.0-beta1-3-gabc1234", base = "0.5.2"))
+        assertEquals("0.6.0-untagged", Versions.checkedVersionName("0.6.0-untagged", base = "0.5.2"))
         // no tag: runCmd's default, and not the release v0.1.0's name
         assertEquals("0.1.0-untagged", appVersionName("", "0.1.0"))
     }

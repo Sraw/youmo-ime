@@ -235,6 +235,8 @@ class VoiceSession(
     // lives (060-pending-decisions L112/L170, the owner's); the failure itself is logged where it happened
     @StringRes
     private fun polishHint(): Int? {
+        // the keyboard hidden: the card with it, a hint there unseen, kept for one that is (060-pending-decisions L658)
+        if (direct) return null
         val why = listener?.polishFailure ?: return null
         return if (polishHinted.add(why)) R.string.voice_polish_failed else null
     }

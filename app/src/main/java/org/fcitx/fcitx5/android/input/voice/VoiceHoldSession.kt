@@ -57,6 +57,12 @@ class VoiceHoldSession(
         if (hold.released) session.cut()
     }
 
+    /**
+     * The keyboard hidden after the lift: as a tap's talk, the recognizer waited for and the rest,
+     * polished, typed straight into the field ([VoiceSession.hidden]).
+     */
+    fun hidden(at: Long) = session.hidden(at)
+
     /** Dropped, whatever was heard: the touch taken away. */
     fun drop() = session.drop()
 

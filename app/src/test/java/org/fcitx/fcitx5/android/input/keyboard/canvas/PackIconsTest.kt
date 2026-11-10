@@ -75,15 +75,25 @@ class PackIconsTest {
         ThemeAssets.runner = { queued += it }
         val icons = icon("""<svg><path d="M0 0h12v24h-12z" fill="#00f"/></svg>""")
         val app = drawn(PackIcons.EMPTY)
-        val painter = painter(icons)
+        var asked = 0
+        val view = object : View(context) {
+            override fun invalidate() {
+                asked++
+                super.invalidate()
+            }
+        }
+        val painter = ScenePainter(view, look, BoardImages.NONE, SceneFonts(look), icons)
         assertTrue(app.sameAs(drawn(icons, painter = painter)))
         assertTrue(painter.missed)
         assertEquals(1, queued.size)
         // asked again while it is read: not read twice
         drawn(icons, painter = painter)
         assertEquals(1, queued.size)
+        val before = asked
         queued.single().run()
-        assertEquals(Color.BLUE, drawn(icons).getPixel(4, 12))
+        // the waiting painter's view told to draw again, and that painter draws the icon now
+        assertTrue(asked > before)
+        assertEquals(Color.BLUE, drawn(icons, painter = painter).getPixel(4, 12))
     }
 
     @Test

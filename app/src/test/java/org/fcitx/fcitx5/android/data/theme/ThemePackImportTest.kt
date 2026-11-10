@@ -233,7 +233,7 @@ class ThemePackImportTest : ThemePackFixture() {
         nothingLeft()
     }
 
-    // a 100 ms 8-bit PCM WAV, mono 8 kHz, of silence: every byte under 0x80, so as text it is the same bytes
+    // a 100 ms 8-bit PCM WAV, mono 8 kHz, of zero bytes (8-bit PCM is unsigned: full negative, not silence, which is 0x80): every byte under 0x80, so as text it is the same bytes
     private val wav: String = run {
         fun le(v: Int, n: Int) = String(CharArray(n) { ((v ushr (8 * it)) and 0xff).toChar() })
         val body = "WAVE" + "fmt " + le(16, 4) + le(1, 2) + le(1, 2) + le(8000, 4) + le(8000, 4) + le(1, 2) + le(8, 2) + "data" + le(800, 4) + le(0, 800)
@@ -322,6 +322,16 @@ class ThemePackImportTest : ThemePackFixture() {
         assertEquals("PixelDark-1", import("PixelDark").theme.name)
         // its own name: as ever
         assertEquals(null, import("own").renamedFrom)
+    }
+
+    // a renamed theme's json past the file system's 255-byte file names failed as a bare import error: its
+    // name is cut short (by whole characters) for the suffix to fit
+    @Test
+    fun aRenamedThemesNameIsCutShortToFitAFileName() {
+        assertEquals("monokai-1", ThemeFilesManager.suffixed("monokai", "-1"))
+        val long = "主".repeat(90) // 270 bytes
+        // 82 × 3 bytes + `-1.json`: 253; one more would be 256
+        assertEquals("主".repeat(82) + "-1", ThemeFilesManager.suffixed(long, "-1"))
     }
 
     @Test

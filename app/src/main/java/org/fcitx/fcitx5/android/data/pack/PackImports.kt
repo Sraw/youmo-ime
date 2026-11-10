@@ -27,6 +27,10 @@ import org.fcitx.fcitx5.android.pack.Refusal
 import org.fcitx.fcitx5.android.utils.queryFileName
 import timber.log.Timber
 
+/** Imports a file: (resolver, uri, progress(copied, total), replaceNewer(file's, installed) asked before an older replaces a newer). */
+internal typealias PackImporter =
+    suspend (ContentResolver, Uri, (Long, Long) -> Unit, suspend (PackManifest, PackManifest) -> Boolean) -> ImportResult
+
 /**
  * The files the user picked on the 资源包 page, imported one after another on the app's scope: a
  * rotation, or the page left, does not stop them. The page shows [running] and, once all are done,
@@ -44,23 +48,23 @@ object PackImports {
     private val done = MutableStateFlow<List<Outcome>?>(null)
     val results: StateFlow<List<Outcome>?> = done.asStateFlow()
 
-    /** The file [file], a pack of [kind] v[version], would replace the newer v[installed]: the page asks, [answer] takes it. */
-    class Older(val file: String, val kind: PackKind, val version: Int, val installed: Int) {
+    /** A question waiting for the page: the file [file], a pack of [kind] v[version], would replace the newer v[installed]; [answer] takes the reply. */
+    class ReplaceNewerQuestion(val file: String, val kind: PackKind, val version: Int, val installed: Int) {
         internal val answer = CompletableDeferred<Boolean>()
     }
 
-    private val asking = MutableStateFlow<Older?>(null)
-    val older: StateFlow<Older?> = asking.asStateFlow()
+    private val replaceQuestionNow = MutableStateFlow<ReplaceNewerQuestion?>(null)
+    val replaceQuestion: StateFlow<ReplaceNewerQuestion?> = replaceQuestionNow.asStateFlow()
 
-    /** The page's answer to [older]: replace the newer pack or keep it. One asked no more is let be. */
-    fun answer(question: Older, replace: Boolean) {
+    /** The page's answer to [replaceQuestion]: replace the newer pack or keep it. One asked no more is let be. */
+    fun answer(question: ReplaceNewerQuestion, replace: Boolean) {
         question.answer.complete(replace)
-        asking.compareAndSet(question, null)
+        replaceQuestionNow.compareAndSet(question, null)
     }
 
     /** What imports a file: [PackStore]'s; a test's that throws, to see the files after it imported all the same. */
     @VisibleForTesting
-    internal var importer: suspend (ContentResolver, Uri, (Long, Long) -> Unit, suspend (PackManifest, PackManifest) -> Boolean) -> ImportResult =
+    internal var importer: PackImporter =
         { resolver, uri, progress, replaceNewer -> PackStore.import(resolver, uri, progress, replaceNewer) }
 
     /** [uris] imported in turn; false (nothing started) if an import is under way. */
@@ -98,12 +102,12 @@ object PackImports {
             }
             // an older pack over a newer one: asked on the page (shown again when it is opened again), answered there
             importer(resolver, uri, progress) { manifest, installed ->
-                val question = Older(name, manifest.kind, manifest.version, installed.version)
-                asking.value = question
+                val question = ReplaceNewerQuestion(name, manifest.kind, manifest.version, installed.version)
+                replaceQuestionNow.value = question
                 try {
                     question.answer.await()
                 } finally {
-                    asking.compareAndSet(question, null)
+                    replaceQuestionNow.compareAndSet(question, null)
                 }
             }
         } catch (e: CancellationException) {

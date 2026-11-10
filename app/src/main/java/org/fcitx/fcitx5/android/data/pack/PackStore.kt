@@ -236,6 +236,8 @@ object PackStore {
      * [uri] (a file the user picked) imported; [progress] told on the worker as it copies. A pack older than
      * the one there replaces it only if [replaceNewer] (its manifest, the one there's) says so, asked before
      * anything is copied (pending L8: a few hundred MB put in by a wrong tap in the downloads); else kept.
+     * With a pack there the file is opened twice (its head, then the import): a provider whose stream
+     * opens only once is refused as unreadable then.
      */
     suspend fun import(
         resolver: ContentResolver,
@@ -245,8 +247,13 @@ object PackStore {
     ): ImportResult =
         withContext(Dispatchers.IO) {
             try {
-                // its head only, read once more by the import: what it would replace known first
-                val manifest = resolver.openInputStream(uri)?.use { shelf.manifestOf(it.buffered(BUFFER)) }
+                // its head only, read once more by the import: what it would replace known first. Nothing
+                // there, nothing to replace: the file opened once (a provider that gives its stream only once)
+                val manifest = if (PackKind.entries.none { shelf.installed(it) != null }) {
+                    null
+                } else {
+                    resolver.openInputStream(uri)?.use { shelf.manifestOf(it.buffered(BUFFER)) }
+                }
                 val newer = manifest?.let { shelf.installed(it.kind) }?.takeIf { it.version > manifest.version }
                 if (manifest != null && newer != null && !replaceNewer(manifest, newer)) {
                     return@withContext ImportResult.KeptNewer(manifest, newer).also { Timber.i("pack import: %s", describe(it)) }

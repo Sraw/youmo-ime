@@ -396,14 +396,20 @@ internal class CanvasPainter(
             c.rotate(op.rotation * PI / HALF_TURN)
             c.translate(-w / 2.0, -h / 2.0)
         }
-        // scaled alike both ways and centred (a theme's SVG may be wide), its viewBox's origin at the box's top left
-        // (Material Symbols' is 0 -960); the app's icons are square and have none
-        val fit = SvgSubset.Icon(
-            (icon.vw as Number).toDouble(), (icon.vh as Number).toDouble(), emptyList(),
-            (icon.vx as Number?)?.toDouble() ?: 0.0, (icon.vy as Number?)?.toDouble() ?: 0.0,
-        ).fit(Box(0.0, 0.0, w.toDouble(), h.toDouble()))
-        c.translate(fit.dx, fit.dy)
-        c.scale(fit.scale, fit.scale)
+        val vw = (icon.vw as Number).toDouble()
+        val vh = (icon.vh as Number).toDouble()
+        if (icon.vx == null) {
+            // the app's own icons (no viewBox origin given) stretched to the box as its VectorDrawable's bounds are:
+            // a box a px wider than tall, its sides rounded apart, is filled the same on both
+            c.scale(w / vw, h / vh)
+        } else {
+            // a theme's SVG scaled alike both ways and centred (it may be wide), its viewBox's origin at the box's
+            // top left (Material Symbols' is 0 -960), as the app's PackIconDrawable fits it
+            val fit = SvgSubset.Icon(vw, vh, emptyList(), (icon.vx as Number).toDouble(), (icon.vy as Number).toDouble())
+                .fit(Box(0.0, 0.0, w.toDouble(), h.toDouble()))
+            c.translate(fit.dx, fit.dy)
+            c.scale(fit.scale, fit.scale)
+        }
         val tint = css(op.tint)
         val paths: Array<dynamic> = icon.paths.unsafeCast<Array<dynamic>>()
         for (p in paths) {
@@ -421,9 +427,10 @@ internal class CanvasPainter(
                 c.miterLimit = MITER_LIMIT
                 c.stroke(path)
             } else {
-                // a theme SVG's own colour keeps its hue, faded by the icon-color's alpha as the tinted paths are
+                // a theme SVG's own colour keeps its hue, faded by the icon-color's alpha as the tinted paths are,
+                // rounded as the app's PackIconDrawable rounds it
                 val own = p.fill as Number?
-                c.fillStyle = own?.let { Argb(it.toInt()).let { f -> css(Argb.of(f.alpha * op.tint.alpha / OPAQUE_ALPHA, f.red, f.green, f.blue)) } } ?: tint
+                c.fillStyle = own?.let { Argb(it.toInt()).let { f -> css(Argb.of((f.alpha * op.tint.alpha / OPAQUE_ALPHA.toDouble()).roundToInt(), f.red, f.green, f.blue)) } } ?: tint
                 c.fill(path, (p.rule as String?) ?: "nonzero")
             }
             c.restore()

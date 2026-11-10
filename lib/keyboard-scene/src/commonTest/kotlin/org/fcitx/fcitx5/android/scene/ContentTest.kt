@@ -320,7 +320,8 @@ class ContentTest {
     // compact k18 at 2 px a dp gives 3.6% at 196 px with FIT_SLACK, 2.8% without; growing, as any)
     private fun smallStep(id: String, o: Double, v: Pair<Double, Boolean>, d: Double, at: String) {
         val (now, tall) = v
-        // (0.042: small compact k18's '1' at 2 px a dp gives 2.06% at 187 px with FIT_SLACK, 1.9% at most without)
+        // (0.042: small compact k18's '1' at 2 px a dp gives 2.06% at 187 px with FIT_SLACK, 1.9% at most without;
+        // both bounds measured, not derived: a change to FIT_SLACK, the marks or the fonts re-measures them)
         val most = 0.042 / d
         if (tall && o - now > most * o) {
             assertTrue(o - now <= 0.075 / d * o + 1e-6, "$id $o to $now, taller than its face, $at")

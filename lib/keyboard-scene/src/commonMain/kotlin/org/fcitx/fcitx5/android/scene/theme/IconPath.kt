@@ -49,7 +49,8 @@ object IconPath {
         }
     }
 
-    // a whole number without ".0" (JS and the JVM write doubles differently otherwise only in that)
+    // a whole number without ".0"; for the web's Path2D only (jsMain): the JVM writes 1e7 and past, and below 1e-3,
+    // as "1.0E7", which is no path data, where JS writes "10000000" (and 1e-7 as "1e-7", which is)
     private fun n(v: Double): String = if (v == kotlin.math.floor(v) && abs(v) < WHOLE) v.toLong().toString() else v.toString()
 
     /** Whether [segments] draw anything: some segment past a move (a lone M, or Ms only, fills nothing). */
@@ -80,45 +81,49 @@ object IconPath {
         // the last segment's second control point when it was a cubic (S reflects it) or its control when a quad (T does)
         private var lastCubic: Pair<Double, Double>? = null
         private var lastQuad: Pair<Double, Double>? = null
-        private var error: String? = null
+
+        // why the last number or flag was not read (null: none was there, too few numbers)
+        private var error: Read? = null
+
+        // the command that takes the numbers that follow
+        private var cmd: Char? = null
 
         fun read(): Read {
             skip()
             if (i >= d.length) return Read.Bad("empty")
-            var cmd: Char? = null
             while (true) {
                 skip()
                 if (i >= d.length) return Read.Ok(out, numbers)
-                cmd = step(cmd).getOrElse { return (it as Failed).read }
+                step()?.let { return it }
             }
         }
 
-        // the next command or argument group read and drawn; the command that takes the numbers after it, or why not
-        private fun step(current: Char?): Result<Char?> {
+        // the next command or argument group read and drawn, [cmd] the one taking the numbers after it; else why not
+        private fun step(): Read? {
             val ch = d[i]
-            var cmd = current
+            var c = cmd
             if (ch in COMMANDS) {
-                if (cmd == null && ch != 'M' && ch != 'm') return fail(Read.Bad("a path starts with M"))
+                if (c == null && ch != 'M' && ch != 'm') return Read.Bad("a path starts with M")
                 i++
                 if (ch == 'Z' || ch == 'z') {
                     close()
-                    return Result.success(ch)
+                    cmd = ch
+                    return null
                 }
-                cmd = ch
-            } else if (cmd == null) {
-                return fail(Read.Bad(if (ShapePath.number(d, i) < 0) noCommand() else "a path starts with M"))
-            } else if (cmd == 'Z' || cmd == 'z') {
-                return fail(Read.Bad("${shown()} at ${i + 1}: Z takes no numbers"))
+                c = ch
+            } else if (c == null) {
+                return Read.Bad(if (ShapePath.number(d, i) < 0) noCommand() else "a path starts with M")
+            } else if (c == 'Z' || c == 'z') {
+                return Read.Bad("${shown()} at ${i + 1}: Z takes no numbers")
             }
-            segment(cmd, args(cmd) ?: return fail(error?.let { if (it == TOO_MANY) Read.TooMany else Read.Bad(it) } ?: Read.Bad(incomplete(cmd))))
+            segment(c, args(c) ?: return error ?: Read.Bad(incomplete(c)))
             // more pairs after a move are lines (SVG's)
-            return Result.success(
-                when (cmd) {
-                    'M' -> 'L'
-                    'm' -> 'l'
-                    else -> cmd
-                },
-            )
+            cmd = when (c) {
+                'M' -> 'L'
+                'm' -> 'l'
+                else -> c
+            }
+            return null
         }
 
         // [cmd]'s argument group, or null with [error] saying why (none: too few numbers)
@@ -130,10 +135,6 @@ object IconPath {
             }
             return args
         }
-
-        private class Failed(val read: Read) : Exception()
-
-        private fun fail(read: Read): Result<Char?> = Result.failure(Failed(read))
 
         private fun skip() {
             while (i < d.length && d[i] in ShapePath.SPACES) i++
@@ -150,17 +151,17 @@ object IconPath {
             if (i >= d.length || d[i] in COMMANDS) return null
             val end = ShapePath.number(d, i)
             if (end < 0) {
-                error = noCommand()
+                error = Read.Bad(noCommand())
                 return null
             }
             val text = d.substring(i, end)
             val v = text.toDoubleOrNull()
             if (v == null || abs(v) > SvgSubset.MAX_NUMBER) {
-                error = "$text at ${i + 1} is past a number's range"
+                error = Read.Bad("$text at ${i + 1} is past a number's range")
                 return null
             }
             if (++numbers > budget) {
-                error = TOO_MANY
+                error = Read.TooMany
                 return null
             }
             i = end
@@ -170,11 +171,11 @@ object IconPath {
         // an arc's flag: one character, 0 or 1, which needs nothing after it ("a1 1 0 011 1")
         private fun flag(): Double? {
             if (i >= d.length || (d[i] != '0' && d[i] != '1')) {
-                error = if (i < d.length && d[i] !in COMMANDS) "${shown()} at ${i + 1} is no arc flag (0 or 1)" else null
+                error = if (i < d.length && d[i] !in COMMANDS) Read.Bad("${shown()} at ${i + 1} is no arc flag (0 or 1)") else null
                 return null
             }
             if (++numbers > budget) {
-                error = TOO_MANY
+                error = Read.TooMany
                 return null
             }
             return (d[i++] - '0').toDouble()
@@ -278,6 +279,7 @@ object IconPath {
             val step = delta / n
             // a cubic's control arms for a unit circle's arc of [step]
             val t = 4.0 / 3 * tan(step / 4)
+            val from = out.size
             var a0 = theta
             for (j in 0 until n) {
                 val a1 = a0 + step
@@ -290,9 +292,18 @@ object IconPath {
                 out += Segment.Cubic(p0x + t * d0x, p0y + t * d0y, p3x - t * d1x, p3y - t * d1y, p3x, p3y)
                 a0 = a1
             }
+            // radii or a chord so small their squares are 0 (1e-200): no centre is found, the cubics are NaN, which
+            // Skia draws nothing of and Path2D stops reading at; such an arc is as good as a line (F.6.2's spirit)
+            if (!out.subList(from, out.size).all { it is Segment.Cubic && finite(it) }) {
+                while (out.size > from) out.removeAt(out.size - 1)
+                return line(ex, ey)
+            }
             x = ex
             y = ey
         }
+
+        private fun finite(s: Segment.Cubic): Boolean =
+            s.c1x.isFinite() && s.c1y.isFinite() && s.c2x.isFinite() && s.c2y.isFinite() && s.x.isFinite() && s.y.isFinite()
 
         private fun point(cx: Double, cy: Double, rx: Double, ry: Double, cosP: Double, sinP: Double, ca: Double, sa: Double): Pair<Double, Double> {
             val (u, v) = turn(rx * ca, ry * sa, cosP, sinP)
@@ -311,5 +322,4 @@ object IconPath {
     private const val ARC_Y = 6
     private const val HALF_TURN = 180.0
     private const val EPSILON = 1e-9
-    private const val TOO_MANY = "\u0000too many"
 }

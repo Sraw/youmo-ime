@@ -617,7 +617,8 @@ object ThemeFilesManager {
                 // one there not listed of a later build is kept, as a 3.0 theme's json is (importJson); any other
                 // not listed (one that no longer reads, misses a file, past the packs listed) is replaced, the
                 // natural repair: not listed, it could not be deleted
-                val laterBuilds = ThemePackFiles.minAppVersion(versionName)?.let { ThemePackFiles.laterBuilds(folder, it) } == true
+                // a later format is checked on any build; min-app not on a dev build (minAppVersion null)
+                val laterBuilds = ThemePackFiles.laterBuilds(folder, ThemePackFiles.minAppVersion(versionName))
                 if (there && packs.none { it.file == staged.name } && laterBuilds) {
                     errorRuntime(R.string.exception_theme_newer_kept)
                 }
@@ -686,9 +687,11 @@ object ThemeFilesManager {
         val packs = themes.filterIsInstance<Theme.Pack>()
         fun taken(name: String) = BuiltinThemeFiles.find(ThemeManager.BuiltinThemes, name) != null || name in BuiltinThemeFiles.LEGACY ||
             BuiltinThemeFiles.find(packs, name) != null || packs.any { it.file == name }
+        // a name a renamed one may take: none of those, no theme listed, no json here
+        fun free(name: String) = !taken(name) && themes.none { it.name == name } && !File(dir, "$name.json").exists()
         val renamed = taken(read.name)
-        val decoded = if (!renamed) read else generateSequence(1) { it + 1 }.map { read.copy(name = "${read.name}-$it") }
-            .first { !taken(it.name) && themes.none { t -> t.name == it.name } && !themeFile(it).exists() }
+        val decoded = if (!renamed) read else generateSequence(1) { it + 1 }.map { read.copy(name = suffixed(read.name, "-$it")) }
+            .first { free(it.name) }
         val oldTheme = themes.find { it.name == decoded.name } as? Theme.Custom
         val newCreated = oldTheme == null
         // a json of that name not listed: a later build's is kept (this one cannot read it, nor
@@ -711,6 +714,16 @@ object ThemeFilesManager {
         // Never another theme's (a json not listed may name any), nor a json or SAVING (importedFile's rule)
         (oldFiles - files.keys - others).mapNotNull(::importedFile).forEach { it.delete() }
         return Imported(newCreated, newTheme, migrated, read.name.takeIf { renamed })
+    }
+
+    // [name] + [suffix], [name] cut short (by whole code points) so its json's file name stays within the file system's 255 bytes
+    @VisibleForTesting
+    internal fun suffixed(name: String, suffix: String): String {
+        var base = name
+        while (base.isNotEmpty() && "$base$suffix.json".toByteArray().size > MAX_FILE_NAME_BYTES) {
+            base = base.substring(0, base.offsetByCodePoints(base.length, -1))
+        }
+        return base + suffix
     }
 
     // every file of [look] found among [extracted] (by name in dir) and checked before any is copied:
@@ -824,6 +837,7 @@ object ThemeFilesManager {
     private const val MB = 1024L * 1024
     private const val KB = 1024L
     private const val MS_A_SECOND = 1000
+    private const val MAX_FILE_NAME_BYTES = 255
 
 }
 

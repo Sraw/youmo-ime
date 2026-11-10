@@ -39,13 +39,17 @@ class ThemeSounds(private val handler: Handler) {
     var given: Set<SoundKey> = emptySet()
         private set
 
-    // written on the sound thread, read on the main one: the samples ready to play
+    // the asks of [use] and [release], one more each (main thread): a pool built for an earlier ask is not
+    // the one wanted now
     @Volatile
-    private var ready: Map<SoundKey, Int> = emptyMap()
+    private var asked = 0
 
-    // the pool's number, one more each made: a play posted for one since replaced is dropped
+    /** The samples ready to play in the pool built for the ask [asked]: written whole on the sound thread alone. */
+    private class Ready(val asked: Int, val ids: Map<SoundKey, Int>)
+
+    // read once by each reader: what it reads of the ask and its samples is one pool's
     @Volatile
-    private var generation = 0
+    private var ready = Ready(0, emptyMap())
 
     // the sound thread's alone
     private var pool: SoundPool? = null
@@ -56,7 +60,10 @@ class ThemeSounds(private val handler: Handler) {
     private val pending = HashMap<Int, SoundKey>()
 
     /** The classes ready to play now. */
-    val loaded: Set<SoundKey> get() = ready.keys
+    val loaded: Set<SoundKey> get() = current()?.ids?.keys.orEmpty()
+
+    // the samples of the pool built for the ask now, null where its rebuild has not run yet
+    private fun current(): Ready? = ready.takeIf { it.asked == asked }
 
     /**
      * Wants the sounds [files] of the theme [identity] (a theme's file and its stamp: one imported again is
@@ -65,28 +72,23 @@ class ThemeSounds(private val handler: Handler) {
     fun use(identity: Any?, files: () -> Map<SoundKey, String>) {
         val now = wanted
         if (identity == null) {
-            if (now == null) return
-            wanted = null
-            given = emptySet()
-            ready = emptyMap()
-            handler.post { rebuild(emptyMap()) }
+            if (now != null) drop()
             return
         }
         if (now != null && now.first == identity) return
         val sounds = files()
         wanted = identity to sounds
         given = sounds.keys
-        ready = emptyMap()
-        handler.post { rebuild(sounds) }
+        ask(sounds)
     }
 
     /** Plays [key]'s sample at [volume] on the sound thread; false where it is not loaded (the caller plays the system's). */
     fun play(key: SoundKey, volume: Float): Boolean {
-        val id = ready[key] ?: return false
-        val of = generation
+        val of = current() ?: return false
+        val id = of.ids[key] ?: return false
         handler.post {
-            // a pool made since: its samples are others
-            if (generation != of) return@post
+            // a pool made or asked for since: its samples are others
+            if (ready.asked != of.asked || asked != of.asked) return@post
             Trace.beginSection("SoundPool.play")
             try {
                 pool?.play(id, volume, volume, 1, 0, 1f)
@@ -98,19 +100,25 @@ class ThemeSounds(private val handler: Handler) {
     }
 
     /** No pool held (the service destroyed): the next [use] makes one again. */
-    fun release() {
+    fun release() = drop()
+
+    private fun drop() {
         wanted = null
         given = emptySet()
-        ready = emptyMap()
-        handler.post { rebuild(emptyMap()) }
+        ask(emptyMap())
     }
 
-    private fun rebuild(sounds: Map<SoundKey, String>) {
+    // a pool anew for [sounds]: until it is built nothing is [loaded]
+    private fun ask(sounds: Map<SoundKey, String>) {
+        val n = ++asked
+        handler.post { rebuild(n, sounds) }
+    }
+
+    private fun rebuild(n: Int, sounds: Map<SoundKey, String>) {
         pool?.release()
         pool = null
-        generation++
         pending.clear()
-        ready = emptyMap()
+        ready = Ready(n, emptyMap())
         if (sounds.isEmpty()) return
         val p = SoundPool.Builder()
             .setMaxStreams(MAX_STREAMS)
@@ -127,7 +135,7 @@ class ThemeSounds(private val handler: Handler) {
             if (from !== pool) return@setOnLoadCompleteListener
             val key = pending.remove(id) ?: return@setOnLoadCompleteListener
             if (BuildConfig.DEBUG) Timber.d("theme sound ${key.word} ${sounds[key]?.substringAfterLast('.')} status=$status")
-            if (status == 0) ready = ready + (key to id) else Timber.w("Theme sound ${sounds[key]} did not load: status $status")
+            if (status == 0) ready = Ready(n, ready.ids + (key to id)) else Timber.w("Theme sound ${sounds[key]} did not load: status $status")
         }
         for ((key, path) in sounds) {
             if (!checked(path)) continue
@@ -141,7 +149,11 @@ class ThemeSounds(private val handler: Handler) {
         val problem = when {
             !f.isFile -> "missing"
             f.length() > SoundFile.MAX_BYTES -> "over ${SoundFile.MAX_BYTES} bytes"
-            else -> SoundFile.check(f.name, f.readBytes()).firstOrNull()?.message
+            // gone or replaced since it was looked at (the theme deleted or imported again): unreadable, not a crash
+            else -> runCatching { f.readBytes() }.fold(
+                { SoundFile.check(f.name, it).firstOrNull()?.message },
+                { "unreadable: ${it.message}" },
+            )
         }
         if (problem != null) Timber.w("Theme sound $path not loaded: $problem")
         return problem == null

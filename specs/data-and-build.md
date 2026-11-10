@@ -203,8 +203,10 @@ they stay: a pack carries no code.
   checked, after a free-space check against the manifest's sizes; only when all are right is the
   `current` pointer swapped atomically (rename; the pack's directory fsynced after each rename, so a power cut keeps them). A pack already there at that version (the same
   manifest) is not copied again if its files in use, read through then (the import's progress
-  telling the read), still are it; else (one changed, gone, or not readable now) it is copied anew. An older version over a newer one is imported (a pack gone wrong taken back; it must
-  still meet the app's `minVersion`), the result saying 已用 vX 替换了更新的 vN. The generation replaced is deleted only once the host is up
+  telling the read), still are it; else (one changed, gone, or not readable now) it is copied anew. An older version over a newer one is asked first (060-pending-decisions): `PackStore.import` reads the manifest's head and calls
+  `replaceNewer` before copying; yes imports it (a pack gone wrong taken back; it must still meet the app's `minVersion`), the result saying
+  已用 vX 替换了更新的 vN; no (or Back) imports nothing, `ImportResult.KeptNewer`, saying 保留了更新的 vN，没有导入 vX; the question
+  stays pending while the page is closed or turned. The debug `PackImportProvider` does not ask: it replaces. The generation replaced is deleted only once the host is up
   on the new one (`HostDaemon.restartIfRunning` waits for it, and for a host still starting before
   restarting it: that one may have read the old files), then `PackShelf.sweep`; a host still starting
   after 10 s (before or after the restart) is not known to have left them: not deleted then, left

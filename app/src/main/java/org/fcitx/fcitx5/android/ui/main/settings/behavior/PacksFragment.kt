@@ -83,7 +83,7 @@ class PacksFragment : PaddingPreferenceFragment() {
                 launch { PackStore.state.collect { show() } }
                 launch { PackImports.running.collect { show() } }
                 launch { PackImports.results.collect { it?.let(::results) } }
-                launch { PackImports.older.collect { it?.let(::askOlder) } }
+                launch { PackImports.replaceQuestion.collect { it?.let(::askOlder) } }
             }
         }
     }
@@ -115,12 +115,13 @@ class PacksFragment : PaddingPreferenceFragment() {
     // an older pack would replace the newer one there (pending L8): replaced only on 替换, kept on 保留 or
     // back. Gone with the activity (a rotation), unanswered: asked again by the page made anew. One collected
     // again while its dialog is up: one dialog
-    private fun askOlder(question: PackImports.Older) {
+    private fun askOlder(question: PackImports.ReplaceNewerQuestion) {
         val ctx = context ?: return
         if (olderDialog?.isShowing == true) return
         olderDialog = AlertDialog.Builder(ctx)
             .setTitle(PackImports.name(ctx, question.kind))
-            .setMessage(ctx.getString(R.string.pack_replace_newer, question.installed, question.version))
+            // the file named: of several picked at once, which one is asked
+            .setMessage(question.file + "\n\n" + ctx.getString(R.string.pack_replace_newer, question.installed, question.version))
             .setPositiveButton(R.string.pack_replace) { _, _ -> PackImports.answer(question, true) }
             .setNegativeButton(R.string.pack_keep_newer) { _, _ -> PackImports.answer(question, false) }
             .setOnCancelListener { PackImports.answer(question, false) }
@@ -135,7 +136,9 @@ class PacksFragment : PaddingPreferenceFragment() {
         val lines = outcomes.map { PackImports.describe(ctx, it) }
         // the user's files are never deleted: they are told they may, once all of them are in
         val hint = when {
-            outcomes.all { it.result !is ImportResult.Refused } -> ctx.getString(R.string.pack_import_done_hint)
+            // a newer pack kept (保留) is no file used: not "done"
+            outcomes.all { it.result is ImportResult.Imported || it.result is ImportResult.AlreadyThere } ->
+                ctx.getString(R.string.pack_import_done_hint)
             outcomes.none { it.result is ImportResult.Imported } -> ctx.getString(R.string.pack_unchanged_hint)
             else -> null
         }
@@ -149,6 +152,18 @@ class PacksFragment : PaddingPreferenceFragment() {
             .setOnDismissListener { PackImports.seen() }
             .show()
         show()
+    }
+
+    // the view gone (a rotation): the dialogs go with it, unanswered and unseen, shown again by the page made anew
+    override fun onDestroyView() {
+        for (dialog in listOfNotNull(olderDialog, resultsDialog)) {
+            dialog.setOnCancelListener(null)
+            dialog.setOnDismissListener(null)
+            dialog.dismiss()
+        }
+        olderDialog = null
+        resultsDialog = null
+        super.onDestroyView()
     }
 
     companion object {

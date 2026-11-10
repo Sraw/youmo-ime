@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
 import org.fcitx.fcitx5.android.input.voice.VoicePolishTags
+import org.fcitx.fcitx5.android.input.voice.VoiceSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -108,6 +109,22 @@ class VoiceTapUatTest : VoiceTapUat() {
         assertEquals("我们走吧", text())
         assertFalse(talking)
         assertEquals(1, voice.closes)
+    }
+
+    // the keyboard hidden ends the talk where its card cannot be seen: 语音整理's failure not said
+    // there, its one hint a process kept for a talk whose card shows
+    @Test
+    fun hiddenThePolishHintIsKeptForATalkThatShowsIt() {
+        allowMicrophone()
+        voice.finishRaw = true
+        h.start(MULTI_LINE)
+        tapMic()
+        voice.said += "你好"
+        h.advance(100)
+        h.hide()
+        h.advance(300)
+        assertTrue(text(), text().startsWith("你好"))
+        assertFalse(VoiceSession.polishHinted.toString(), VoiceSession.PolishFailure.RUN in VoiceSession.polishHinted)
     }
 
     @Test

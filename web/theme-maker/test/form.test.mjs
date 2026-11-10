@@ -509,4 +509,18 @@ test('按键音: a sound goes in <sounds> after the icons, one per key, its old 
   const later = F.setSound(F.setSound(nord, 'future', 'f.wav').xml, 'space', 's.ogg').xml;
   assert.deepEqual(F.removeSound(later, 'space').gone, ['s.ogg']);
   assert.match(F.removeSound(later, 'space').xml, /<sounds>\s*<sound key="future" src="f.wav"\/>\s*<\/sounds>/);
+  // a hand-written <sounds/> opens into a pair that reads back
+  const empty = F.setSound(nord.replace('</theme>', '  <sounds/>\n</theme>'), 'space', 's.ogg').xml;
+  assert.match(empty, /<sounds>\s*<sound key="space" src="s.ogg"\/>\s*<\/sounds>/);
+  assert.deepEqual(JSON.parse(JSON.stringify(read(empty).theme.info(false).sounds)), [{ key: 'space', src: 's.ogg' }]);
+  // the same format twice: the new file is sound-space-2.ogg, the old one gone (one file left)
+  let same = s.setSound({ xml: nord, files: {}, layouts: {} }, E, 'space', 'a.ogg', ogg);
+  same = s.setSound(same, E, 'space', 'b.ogg', ogg);
+  assert.deepEqual(Object.keys(same.files).filter((f) => f.startsWith('sound-space')), ['sound-space-2.ogg']);
+  // replacing keeps a later app's attributes on the <sound>: only src= changes
+  const extra = F.setSound(F.setSound(nord, 'space', 'a.ogg').xml.replace('src="a.ogg"', 'src="a.ogg" volume="50"'), 'space', 'b.ogg').xml;
+  assert.match(extra, /<sound key="space" src="b.ogg" volume="50"\/>/);
+  // a key given twice (the engine refuses that): the one listed is the one changed
+  const twice = nord.replace('</theme>', '  <sounds>\n    <sound key="space" src="a.ogg"/>\n    <sound key="space" src="b.ogg"/>\n  </sounds>\n</theme>');
+  assert.equal(F.sounds(F.setSound(twice, 'space', 'c.ogg').xml).space, 'c.ogg');
 });

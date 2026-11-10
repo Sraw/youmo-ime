@@ -55,7 +55,8 @@
 
 
   // a picture the user picks is never kept as it was (the user's ruling, 2026-11-09): always encoded anew, its long
-  // side no more than longSide (never made bigger), JPEG at quality; PNG only where it has transparency
+  // side no more than longSide (never made bigger), JPEG at quality; PNG only where it has transparency. The one
+  // exception: an animated WebP the app plays (keepsAnimated) is kept as picked
   const PICTURE_SAVE = { longSide: 2560, quality: 0.85 };
 
   /**

@@ -32,8 +32,8 @@ object ThemePackDialogs {
         ctx.getString(R.string.theme_info_format, format),
     )
 
-    // Chinese lists with 、, others with a comma
-    private fun listSeparator(ctx: Context) = if (ctx.resources.configuration.locales[0].language == "zh") "、" else ", "
+    // as each translation joins a list (Chinese with 、, others with a comma)
+    private fun listSeparator(ctx: Context) = ctx.getString(R.string.list_separator)
 
     private fun soundClass(key: SoundKey): Int = when (key) {
         SoundKey.LETTER -> R.string.sound_class_letter

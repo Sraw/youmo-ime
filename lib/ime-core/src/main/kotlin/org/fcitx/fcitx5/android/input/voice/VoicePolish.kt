@@ -91,16 +91,20 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
      * Two more that hold whatever the model (060-pending-decisions L574, the owner's, 2026-11-10; N-kd3b broke
      * both, and which edge sentences a retrain gets right varies run to run): a Chinese number's character
      * ([NUMBER_CHARS]) is never deleted (「一点一点」 lost an 一), and [num] (if given) marks nothing inside an
-     * idiom of [IDIOMS] (「十全十美」 written 10全十美).
+     * idiom of [IDIOMS] (「十全十美」 written 10全十美). A number character's replacement still applies: the rule
+     * is no deletion, and an op writing another word for it (二 as 两, a misheard 十 as 是) is the polish's.
+     *
+     * [op], [after] and [num] are changed in place. [lead] is the text just before [text] (a stream window's
+     * start cuts an idiom): an idiom found across it unmarks its characters in [text] only.
      */
-    fun guarded(text: IntArray, op: IntArray, after: IntArray, num: IntArray? = null): Pair<IntArray, IntArray> {
+    fun guarded(text: IntArray, op: IntArray, after: IntArray, num: IntArray? = null, lead: IntArray = IntArray(0)) {
         for (i in text.indices) {
             if (text[i] < 0x80 && Character.isLetter(text[i])) op[i] = KEEP
             if (text[i] in STOPS) after[i] = 0
             if (op[i] == DEL && text[i] in NUMBER_CHARS) op[i] = KEEP
         }
-        if (num != null) for (span in idioms(text)) span.forEach { num[it] = 0 }
-        return op to after
+        if (num == null) return
+        for (span in idioms(lead + text)) for (i in span) if (i >= lead.size) num[i - lead.size] = 0
     }
 
     companion object {
@@ -129,7 +133,8 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
          * nothing in them is marked a number ([guarded]). A list here, not the pinyin dictionary: that is
          * the native engine's, which the voice path (and voice-eval's numeval.py, which checks the same) has
          * no reach to, and these are a closed set; four characters and more, so a real number beside one
-         * (「三个一心一意的人」) is not taken for it.
+         * (「三个一心一意的人」) is not taken for it. Nothing ties this list to numeval.py's: a change here
+         * goes there by hand. Each once (VoicePolishTest checks).
          */
         val IDIOMS: List<String> = """
             十全十美 一心一意 七上八下 三心二意 一五一十 四面八方 五颜六色 乱七八糟 一模一样 万无一失 一干二净
@@ -137,18 +142,21 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
             五花八门 六神无主 百发百中 千军万马 千变万化 千家万户 万紫千红 十拿九稳 九死一生 一清二楚 不三不四
             丢三落四 颠三倒四 低三下四 说三道四 朝三暮四 四分五裂 七零八落 八九不离十 百里挑一 一日千里 一刀两断
             三长两短 一穷二白 一差二错 一来二去 两全其美 一分为二 一时半刻 三三两两 七七八八 千千万万 万万千千
-            一五一十 五湖四海 三头六臂 四平八稳 一言九鼎 一字千金 一诺千金 千篇一律 万众一心 一呼百应 举一反三
-            一劳永逸 一本正经 一帆风顺 一路顺风 一干二净 二话不说 三思而行 十字路口 九九归一 八仙过海 七十二变
+            五湖四海 三头六臂 四平八稳 一言九鼎 一字千金 一诺千金 千篇一律 万众一心 一呼百应 举一反三
+            一劳永逸 一本正经 一帆风顺 一路顺风 二话不说 三思而行 十字路口 九九归一 八仙过海 七十二变
             三更半夜 五光十色 十有八九 十万八千里 一千零一夜
-        """.trim().split(Regex("\\s+")).distinct()
+        """.trim().split(Regex("\\s+"))
 
         private val IDIOM_CODES = IDIOMS.map { it.codePoints().toArray() }
+
+        /** the longest idiom's length: how far back of a stream window idioms are looked for */
+        internal val IDIOM_LONGEST = IDIOM_CODES.maxOf { it.size }
 
         // each place an idiom is in [text], as the indices it covers
         private fun idioms(text: IntArray): List<IntRange> {
             val found = ArrayList<IntRange>()
-            for (w in IDIOM_CODES) for (i in 0..text.size - w.size) {
-                if ((w.indices).all { text[i + it] == w[it] }) found += i until i + w.size
+            for (idiom in IDIOM_CODES) for (i in 0..text.size - idiom.size) {
+                if (idiom.indices.all { text[i + it] == idiom[it] }) found += i until i + idiom.size
             }
             return found
         }
@@ -365,7 +373,8 @@ class VoicePolishStream(
         val after = labels.after
         val num = labels.num
         check(op.size == end - start && after.size == end - start && num.size == end - start) { "a label each of ${end - start} characters" }
-        if (guard) tags.guarded(part, op, after, num)
+        // an idiom the window's start cuts is looked for with what is before it
+        if (guard) tags.guarded(part, op, after, num, text.copyOfRange(maxOf(0, start - (VoicePolishTags.IDIOM_LONGEST - 1)), start))
         // a frozen character keeps its labels, though tagged again in the window
         op.copyInto(seenOp, frozen, frozen - start, op.size)
         after.copyInto(seenAfter, frozen, frozen - start, after.size)

@@ -53,6 +53,7 @@ class SvgSubsetTest {
     fun aPathsOwnColourIsReadAlphaLast() {
         fun color(fill: String) = SvgSubset.read("""<svg><path d="M0 0h1" fill="$fill"/></svg>""").ok().paths.single().color
         assertEquals(Argb.of(255, 0xff, 0, 0), color("#f00"))
+        // on JS, Regex.matches once refused #f008 (four digits) though the JVM took it: this row keeps the web's reading
         assertEquals(Argb.of(0x88, 0xff, 0, 0), color("#f008"))
         assertEquals(Argb.of(255, 0x12, 0x34, 0x56), color("#123456"))
         assertEquals(Argb.of(0x80, 0x12, 0x34, 0x56), color("#12345680"))
@@ -76,7 +77,9 @@ class SvgSubsetTest {
             """<path d="M0 0 a1 1 0 0 0 0 0"/>""",
             "",
         )
-        for (paths in nothing) assertEquals(listOf(SvgSubset.NOTHING_DRAWN), problems("<svg>$paths</svg>"), paths)
+        // every row checked, the wrong ones said together
+        val wrong = nothing.map { it to problems("<svg>$it</svg>") }.filter { (_, got) -> got != listOf(SvgSubset.NOTHING_DRAWN) }
+        assertEquals(emptyList<Pair<String, List<String>>>(), wrong)
         // one that draws among them is enough; a zero-area one counts (its area is not worked out)
         assertEquals(emptyList<String>(), problems("""<svg><path d="M0 0" /><path d="M0 0L1 0Z"/></svg>"""))
         assertEquals(1, SvgSubset.read("""<svg><path d="M0 0" /><path d="M0 0L1 0Z"/></svg>""").ok().paths.size)
@@ -95,24 +98,26 @@ class SvgSubsetTest {
 
     @Test
     fun whatReachesOutOrRunsIsRefused() {
-        fun refused(svg: String) = assertTrue(problems(svg).isNotEmpty(), svg)
-        refused("""<svg><script>alert(1)</script></svg>""")
-        refused("""<svg><image href="http://x/y.png"/></svg>""")
-        refused("""<svg><use href="#a"/></svg>""")
-        refused("""<svg><path d="M0 0" onclick="x()"/></svg>""")
-        refused("""<svg><path d="M0 0" style="fill:red"/></svg>""")
-        refused("""<svg><path d="M0 0" stroke="#000"/></svg>""")
-        refused("""<svg><path d="M0 0" transform="scale(2)"/></svg>""")
-        refused("""<svg><path d="M0 0" fill="url(#g)"/></svg>""")
-        refused("""<svg><svg/></svg>""")
-        refused("""<svg><text>hi</text></svg>""")
-        refused("""<svg>words</svg>""")
-        refused("""<svg xmlns="http://example.com/x"/>""")
-        refused("""<html/>""")
+        // each with a path that draws, and refused for something else than drawing nothing: the check it is about
+        fun refused(svg: String) = assertTrue(problems(svg).any { it != SvgSubset.NOTHING_DRAWN }, "$svg: ${problems(svg)}")
+        val draws = """<path d="M0 0h1"/>"""
+        refused("""<svg>$draws<script>alert(1)</script></svg>""")
+        refused("""<svg>$draws<image href="http://x/y.png"/></svg>""")
+        refused("""<svg>$draws<use href="#a"/></svg>""")
+        refused("""<svg><path d="M0 0h1" onclick="x()"/></svg>""")
+        refused("""<svg><path d="M0 0h1" style="fill:red"/></svg>""")
+        refused("""<svg><path d="M0 0h1" stroke="#000"/></svg>""")
+        refused("""<svg><path d="M0 0h1" transform="scale(2)"/></svg>""")
+        refused("""<svg><path d="M0 0h1" fill="url(#g)"/></svg>""")
+        refused("""<svg>$draws<svg/></svg>""")
+        refused("""<svg>$draws<text>hi</text></svg>""")
+        refused("""<svg>${draws}words</svg>""")
+        refused("""<svg xmlns="http://example.com/x">$draws</svg>""")
+        refused("""<html>$draws</html>""")
         // a DTD's entities: the billion laughs and XXE never get past the reader
-        refused("""<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg>&a;</svg>""")
-        refused("""<!DOCTYPE svg SYSTEM "file:///etc/passwd"><svg/>""")
-        refused("""<svg><path d="M0 0" xlink:href="x"/></svg>""")
+        refused("""<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg>$draws&a;</svg>""")
+        refused("""<!DOCTYPE svg SYSTEM "file:///etc/passwd"><svg>$draws</svg>""")
+        refused("""<svg><path d="M0 0h1" xlink:href="x"/></svg>""")
     }
 
     @Test

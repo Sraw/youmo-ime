@@ -54,6 +54,10 @@ class ScenePainter(
     private val fonts: SceneFonts,
     private val packIcons: PackIcons = PackIcons.EMPTY,
 ) {
+
+    // a theme icon read: this painter's view drawn again; one reference a painter, not one an icon a frame (not
+    // holding the view: the icon cache outlives it)
+    private val redraw: () -> Unit = WeakReference(view).let { drawn -> { drawn.get()?.invalidate() } }
     var missed = false
 
     // asked to be told when the images are in (BoardImages.whenReady): once
@@ -354,8 +358,7 @@ class ScenePainter(
         // then), or for good where its file is gone or broken since its import
         val file = packIcons.file(op.name)
         val outline = file?.let { f ->
-            val drawn = WeakReference(view)
-            packIcons.outline(f) { drawn.get()?.invalidate() }.also { if (it == null && packIcons.pending(f)) missed = true }
+            packIcons.outline(f, redraw).also { if (it == null && packIcons.pending(f)) missed = true }
         }
         val source = file.takeIf { outline != null }
         val d = icons.getOrPut(IconKey(op.name, source, op.tint.value, w, h, pw, ph)) {
