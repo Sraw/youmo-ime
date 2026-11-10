@@ -12,8 +12,10 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.WUBI
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.reading.ReadingData
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -130,21 +132,40 @@ class EnginesReadingsTest : EnginesFixture() {
         assertEquals(listOf("hǎo"), coded.readings[coded.candidates.indexOf("好")])
     }
 
-    // a hint that is no reading (a character by its parts with two readings: "xing/hang") is no
-    // reading to draw above: it stays beside the candidate with 候选词注音 on, as with it off
+    // a polyphone found by its parts or strokes is hinted all its readings ("xing/hang/heng"): drawn above as
+    // one, toned, as any candidate is (A5, the user, 2026-11-06), the one it has after what was put before it
+    // (银 then 行: háng), else its commonest (xíng); no hint left beside it, 候选词注音 on or off
     @Test
-    @Uat("PY-111")
-    fun aHintThatIsNoReadingStaysWithTheReadingsOn() {
-        pinyin = PinyinDataBuilder()
-            .unigram("<unk>", -7f, 0f).unigram("行", -3f, 0f)
-            .entry("行", syl("xing")).entry("行", syl("hang"), weight = -1f)
-            .build().toByteArray()
-        chaizi = Chaizi.format(mapOf("ercun" to listOf("行"))).toByteArray()
-        val e = engines(ReadingStyle.PINYIN)
-        val s = e.type(PINYIN, "uercun")
-        val at = s.candidates.indexOf("行")
-        assertTrue(s.toString(), at >= 0)
-        assertTrue(s.toString(), "/" in s.hints[at])
-        assertEquals(s.hints[at], e.candidates(PINYIN, 0, 10).single { it.text == "行" }.hint)
+    @Uat("PY-111", "PY-118")
+    fun aPolyphoneFoundByItsPartsOrStrokesIsReadOnceAbove() {
+        pinyin = ReadingData.bytes
+        chaizi = Chaizi.format(mapOf("chichu" to listOf("行"))).toByteArray()
+        strokes = Strokes.read("...\n行\tppshhs\n".reader().buffered(), "stroke").build().toByteArray()
+        for ((style, alone, after) in listOf(
+            Triple(ReadingStyle.PINYIN, "xíng", "háng"),
+            Triple(ReadingStyle.OFF, "xíng", "háng"),
+            Triple(ReadingStyle.ZHUYIN, "ㄒㄧㄥˊ", "ㄏㄤˊ"),
+        )) {
+            for (keys in listOf("uchichu", "uppshhs")) {
+                val e = engines(style)
+                val s = e.type(PINYIN, keys)
+                val at = s.candidates.indexOf("行")
+                assertTrue("$style $keys $s", at >= 0)
+                assertEquals("$style $keys $s", listOf(alone), s.readings[at])
+                assertEquals("$style $keys", "", s.hints.getOrElse(at) { "" })
+                assertEquals(Choice("行", "", listOf(alone)), e.candidates(PINYIN, 0, 10).single { it.text == "行" })
+            }
+            // 银 picked, then 行 by its parts after it
+            val e = engines(style)
+            val typed = e.type(PINYIN, "yinuchichu")
+            val yin = typed.candidates.indexOf("银")
+            assertTrue("$style $typed", yin >= 0)
+            val s = e.onEvent(PINYIN, EngineEvent.PICK, yin)
+            val at = s.candidates.indexOf("行")
+            assertTrue("$style $s", at >= 0)
+            assertEquals("$style $s", listOf(after), s.readings[at])
+            assertEquals("", s.hints.getOrElse(at) { "" })
+            assertEquals(listOf(after), e.candidates(PINYIN, 0, 10).single { it.text == "行" }.readings)
+        }
     }
 }

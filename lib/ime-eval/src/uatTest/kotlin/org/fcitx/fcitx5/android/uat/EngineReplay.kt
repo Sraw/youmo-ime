@@ -243,6 +243,9 @@ class EngineReplay(
      */
     fun readingOf(text: String): String = choice(text).readings.joinToString(" ")
 
+    /** The hint beside the candidate [text] (a table's code, an emoji's name), "" for none. */
+    fun hintOf(text: String): String = choice(text).hint
+
     private fun choice(text: String) = engines.candidates(im, 0, if (panel.total >= 0) panel.total else ALL).first { it.text == text }
 
     /** Another input method, as the globe key or the language key switches: what was typed committed as typed (deactivate's Enter). */

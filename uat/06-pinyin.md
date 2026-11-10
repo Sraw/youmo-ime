@@ -550,8 +550,14 @@
 ### PY-111 [P1] 读音提示标在字上方，候选栏不变高
 - **前提**：B0，**候选词注音** 是「关闭」。
 - **操作**：点 j i a o s e，看候选栏；清空，点 u n v z i；清空，把 **候选字号** 依次调成最小、最大，各打一次 j i a o s e；横屏再打一次；打开悬浮候选窗再打一次。字号调回默认，竖屏打 j i a o s e 点 ⌄ 展开候选网格看「角色」那格；把 **候选词注音** 选「拼音」再看一次，候选字号最大时再看一次。**候选词注音** 仍是「拼音」，清空，打 u c h i c h u（彳 chi、亍 chu 拆「行」），看「行」。
-- **预期**：「角色」字的上方标着 jué sè，字体、颜色、居中和拼音注音一样，只是字小一些；它和旁边没有提示的候选字在同一条水平线上；候选栏的高度和不打字时一样，提示出现、消失时栏不跳。拆字出的「好」上方标 hǎo。字号最小时提示不小于 7sp，可能略碰到字顶。悬浮窗里每个候选一样高。码表的编码提示仍在候选右边。展开的网格里「角色」那格放得下上方的 jué sè，读音不截断、不和相邻格重叠（注音关、开拼音、字号最大三种都是）。开着注音时拆出的「行」有两个读音，它们作为提示留在候选右边（如 `xing/hang`），上方不画读音。
-- **JVM**：`CandidateHintsUatTest`（栏高、和旁边候选的基线一样、悬浮窗候选同高；浅色深色、竖屏横屏、14/20/28sp 的图）、`EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates`（ime-core：笔画、拆字的提示变成读音）、`CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones`、`CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds`；两个读音的提示开着注音也留在右边 `EnginesReadingsTest.aHintThatIsNoReadingStaysWithTheReadingsOn`；展开网格的格宽按画出来的量 `GridReadingWidthTest.aWordWithReadingsIsMeasuredAsItIsDrawnInEachStyle`；设备上不跑。
+- **预期**：「角色」字的上方标着 jué sè，字体、颜色、居中和拼音注音一样，只是字小一些；它和旁边没有提示的候选字在同一条水平线上；候选栏的高度和不打字时一样，提示出现、消失时栏不跳。拆字出的「好」上方标 hǎo。字号最小时提示不小于 7sp，可能略碰到字顶。悬浮窗里每个候选一样高。码表的编码提示仍在候选右边。展开的网格里「角色」那格放得下上方的 jué sè，读音不截断、不和相邻格重叠（注音关、开拼音、字号最大三种都是）。拆出的「行」是多音字，开着注音时上方只标一个带调的读音 xíng，候选右边没有 `xing/hang` 这样的提示。
+- **JVM**：`CandidateHintsUatTest`（栏高、和旁边候选的基线一样、悬浮窗候选同高；浅色深色、竖屏横屏、14/20/28sp 的图）、`EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates`（ime-core：笔画、拆字的提示变成读音）、`CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones`、`CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds`；多音字的提示变成上方一个读音（按前面选定的字成词，否则最常见的）`EnginesReadingsTest.aPolyphoneFoundByItsPartsOrStrokesIsReadOnceAbove`、`CandidateReadingsTest.aHintOfACharactersSeveralReadingsIsTheOneItHasThere`、`PolyphoneReadingUatTest.aPolyphoneIsReadOnceAboveAsItsWordHasIt`（真数据：了 le、能 néng、行 xíng，银之后 háng；好了、了解、银行、行走按词标）；展开网格的格宽按画出来的量 `GridReadingWidthTest.aWordWithReadingsIsMeasuredAsItIsDrawnInEachStyle`；设备上不跑。
+
+### PY-118 [P1] 笔画查字、拆字出的多音字只标一个读音，在字上方
+- **前提**：B0，**候选词注音** 选「拼音」。
+- **操作**：点 u z（第一笔是折的字），看候选里的「了」「能」；清空，点 u c h i c h u（彳亍拆「行」），看「行」；清空，点 y i n u c h i c h u，点「银」，看「行」。
+- **预期**：「了」上方是 le，「能」上方是 néng，拆出的「行」上方是 xíng，先选了「银」以后的「行」上方是 háng；每个多音字只标一个带调的读音，在字的上方，和单音字（也 yě、好 hǎo）一样；候选右边没有 le/liao、neng/nai、xing/hang 这样用「/」连起来的读音（用户 2026-11-06 截图里的问题）。
+- **JVM**：`PolyphoneReadingUatTest.aPolyphoneIsReadOnceAboveAsItsWordHasIt`（真数据：拼音、关闭、注音三种；了 le、能 néng、行 xíng，银之后 háng；好了、了解、银行、行走、能按词标）、`EnginesReadingsTest.aPolyphoneFoundByItsPartsOrStrokesIsReadOnceAbove`、`CandidateReadingsTest.aHintOfACharactersSeveralReadingsIsTheOneItHasThere`、`CandidateReadingsTest.aPolyphoneInAWordIsReadAsTheWordHasIt`；设备上照跑（看图）。
 
 ### PY-112 [P1] 注音全键盘的快捷键：按键位套用全键盘的
 - **前提**：B0-注音全键盘，滑动是默认（上滑快捷键），测试页输入框里有字。

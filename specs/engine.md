@@ -312,7 +312,8 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   hints (all readings) go while it is on. The host keeps them only while the shown text (traditional)
   has a code point for each; the bar is taller for pinyin (`CandidateBarHeight.dp(textSp, style)`).
   While it is off, those hints become `readings` instead (`CandidateReadings.ofHint`: a misreading's
-  toned syllables as they are, a part's or stroke lookup's toneless one toned by the character's table),
+  toned syllables as they are, a part's or stroke lookup's toneless one toned by the character's table;
+  a polyphone's several, `xing/hang`, as one: `ordered(cp, Session.lookedUp)`'s first, A5; on or off alike),
   their hint emptied; the views draw them as pinyin above in the bar's own height (`ReadingSpan`'s hint
   mode, sized by `CandidateBarHeight.hintSize`, floor `HINT_FLOOR_SP`), the baseline unmoved. An emoji's
   or a table's hint, no syllable a Han character, stays a hint.

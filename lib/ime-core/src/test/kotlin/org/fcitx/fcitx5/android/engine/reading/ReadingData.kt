@@ -13,7 +13,8 @@ import java.nio.ByteBuffer
 
 /**
  * Pinyin data with a few characters' readings as Unihan's five fields list them (pinyin-data's text,
- * in the order the app's build reads them) and words reading them: 行's four, 和's many, 子 zi beside zǐ.
+ * in the order the app's build reads them) and words reading them: 行's four, 和's many, 子 zi beside zǐ,
+ * 了 le and liǎo, 能 néng and nài.
  */
 object ReadingData {
 
@@ -47,6 +48,9 @@ object ReadingData {
             U+4E7E: qián  # 乾
             U+957F: cháng  # 长
             U+5927: dà  # 大
+            U+4E86: le  # 了
+            U+80FD: néng  # 能
+            U+89E3: jiě  # 解
         """,
         ReadingSource.PINLU to """
             U+884C: xíng,háng  # 行
@@ -59,6 +63,8 @@ object ReadingData {
             U+8FD8: hái,huán  # 还
             U+4EEC: men  # 们
             U+5DE5: gōng  # 工
+            U+4E86: le,liǎo  # 了
+            U+80FD: néng  # 能
         """,
         ReadingSource.XHC to """
             U+884C: háng,hàng,héng,xíng  # 行
@@ -67,6 +73,8 @@ object ReadingData {
             U+5934: tóu,tou  # 头
             U+4E7E: gān,qián  # 乾
             U+957F: cháng,zhǎng  # 长
+            U+4E86: le,liǎo,liào  # 了
+            U+80FD: nài,néng  # 能
         """,
         ReadingSource.TGHZ to """
             U+884C: háng,héng,xíng  # 行
@@ -97,6 +105,8 @@ object ReadingData {
         道行: dào héng
         和平: hé píng
         还是: hái shì
+        了解: liǎo jiě
+        好了: hǎo le
     """.trimIndent()
 
     private fun syl(vararg s: String) = IntArray(s.size) { Syllables.id(s[it]) }
@@ -111,15 +121,18 @@ object ReadingData {
             Triple("银", "yin", -3f), Triple("江", "jiang", -3f), Triple("还是", "hai shi", -3f),
             // the model's, not a dictionary's: two words run together, commoner than 和平 but no example
             Triple("荣和", "rong he", -2f),
+            // 了 and 能, a polyphone each (A5): 了 le alone, liǎo in 了解
+            Triple("好了", "hao le", -2.6f), Triple("了解", "liao jie", -3f), Triple("了", "le", -1.5f), Triple("能", "neng", -2f),
             // the model's alone, yet what puts 长's zhǎng before cháng
             Triple("长大", "zhang da", -2f),
         ).forEach { (w, r, p) -> b.unigram(w, p, 0f).entry(w, syl(*r.split(' ').toTypedArray())) }
         // a word the model has after 行 and 银行: something offered once either is put in
         b.bigram("行", "江", -1f, 0f).bigram("银行", "江", -1f, 0f)
         // a rarer reading of the word, by the dictionary's weight: no example of it
+        b.entry("了", syl("liao"), -3f).entry("能", syl("nai"), -5f)
         b.entry("行", syl("hang"), -1f).entry("行", syl("heng"), -3f).entry("银行", syl("yin", "xing"), -2f)
         // each character as the dictionary has it alone, which reads a word by its text (Predictor.reading)
-        for ((c, r) in listOf("大" to "da", "荣" to "rong", "道" to "dao", "树" to "shu", "子" to "zi", "进" to "jin", "走" to "zou", "爱" to "ai", "人" to "ren", "平" to "ping", "好" to "hao")) {
+        for ((c, r) in listOf("大" to "da", "荣" to "rong", "道" to "dao", "树" to "shu", "子" to "zi", "进" to "jin", "走" to "zou", "爱" to "ai", "人" to "ren", "平" to "ping", "好" to "hao", "解" to "jie")) {
             b.entry(c, syl(r))
         }
         for ((source, text) in SOURCES) {

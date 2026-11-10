@@ -333,7 +333,8 @@ internal class EngineAssets(
         return strokeTable
     }
 
-    // a character to its readings, the likeliest first, for the stroke lookup to show
+    // a character to its readings, the likeliest first, for the stroke lookup and the parts to hint: a
+    // polyphone's drawn above as one of them (CandidateReadings.ofHint), and a part's blocked by them
     private val charReadings: Map<String, String> by lazy {
         val dictionary = pinyinData.dictionary
         val vocabulary = pinyinData.vocabulary

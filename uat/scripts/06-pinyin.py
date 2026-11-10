@@ -2,7 +2,7 @@
 前提/操作/预期."""
 import time
 
-from uat import (PKG, Blocked, block_candidate, case, check, first, grouped_keys, open_url, script)
+from uat import (PKG, Blocked, block_candidate, case, check, choose, first, grouped_keys, open_url, script)
 
 
 # ---------------------------------------------------------------- 打字
@@ -323,7 +323,34 @@ def py109(d):
 case("PY-110", needs="jvm:PinyinUatTest.aReadingIsInItsCharactersOwnTones、ToneTableTest.aWordsNeutralToneIsItsCharactersOwn")(lambda d: None)
 
 
-case("PY-111", needs="jvm:CandidateHintsUatTest、EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates、CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones、CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds、EnginesReadingsTest.aHintThatIsNoReadingStaysWithTheReadingsOn、GridReadingWidthTest.aWordWithReadingsIsMeasuredAsItIsDrawnInEachStyle")(lambda d: None)
+case("PY-111", needs="jvm:CandidateHintsUatTest、EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates、CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones、CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds、EnginesReadingsTest.aPolyphoneFoundByItsPartsOrStrokesIsReadOnceAbove、CandidateReadingsTest.aHintOfACharactersSeveralReadingsIsTheOneItHasThere、PolyphoneReadingUatTest.aPolyphoneIsReadOnceAboveAsItsWordHasIt、GridReadingWidthTest.aWordWithReadingsIsMeasuredAsItIsDrawnInEachStyle")(lambda d: None)
+
+
+@case("PY-118", base="B0-设置", mutates=True, visual=True)
+def py118(d):
+    """the readings are drawn, not in the bar's accessibility: the machine checks the characters are
+    there, the shots show each polyphone's one reading above it and nothing beside it"""
+    d.goto("通用输入")
+    choose(d, "候选词注音", "拼音")
+    d.open_page("text")
+    seen = []
+    # uz: the characters whose first stroke is 折, as in the user's screenshot (也 对 好 了 能)
+    for keys, chars, note in (("uz", ("了", "能"), "了 上方 le、能 上方 néng，和 也 yě、好 hǎo 一样；右边没有 le/liao、neng/nai"),
+                              ("uchichu", ("行",), "拆出的 行 上方 xíng，右边没有 xing/hang")):
+        d.type(keys)
+        c = d.cands(want=chars[-1])
+        for char in chars:
+            check(char in c, f"{keys}：候选里没有「{char}」：{c[:8]}")
+        d.shot("kb", note)
+        seen += chars
+        d.clear()
+    d.type("yinuchichu")
+    d.cands()
+    d.pick("银")   # past the bar's sentences (一怒斥出…): pick looks through the expanded list too
+    c = d.cands(want="行")
+    check("行" in c, f"选了银以后候选里没有「行」：{c[:8]}")
+    d.shot("kb", "银 之后的 行 上方 háng")
+    return "、".join(seen) + "、银+行 都在候选里，读音看图"
 
 
 case("PY-112", needs="jvm:ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboardsShortcutsByPlace、ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts")(lambda d: None)

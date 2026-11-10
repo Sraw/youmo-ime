@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.reading
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -109,6 +110,39 @@ class CandidateReadingsTest {
         assertEquals(listOf("ㄒㄧㄥˊ"), readings.ofHint("行", "xing", ReadingStyle.ZHUYIN))
         assertEquals(listOf("ㄏㄜ"), readings.ofHint("𠀀", "he", ReadingStyle.ZHUYIN))
     }
+
+    // the readings of 了, 能, 行 and their words as Unihan and the dictionaries have them
+    private val polyphones = ReadingData.data.let { d -> CandidateReadings(d, d.tones) { Predictor.charReadingsOf(d.dictionary, d.vocabulary) } }
+
+    // a polyphone's several readings hinted (a part's or a stroke lookup's "le/liao"): one, toned, the one it has
+    // after what was put before it, else its commonest (A5, the user, 2026-11-06)
+    @Test
+    @Uat("PY-111", "PY-118")
+    fun aHintOfACharactersSeveralReadingsIsTheOneItHasThere() = assertRows(
+        "了 alone: le" to { assertEquals(listOf("le"), polyphones.ofHint("了", "le/liao")) },
+        "了 after 好 (好了): le" to { assertEquals(listOf("le"), polyphones.ofHint("了", "le/liao", before = "好")) },
+        "能 alone: néng" to { assertEquals(listOf("néng"), polyphones.ofHint("能", "neng/nai")) },
+        "行 alone: xíng" to { assertEquals(listOf("xíng"), polyphones.ofHint("行", "xing/hang/heng")) },
+        "行 after 银 (银行): háng" to { assertEquals(listOf("háng"), polyphones.ofHint("行", "xing/hang/heng", before = "银")) },
+        "行 after 进 (进行): xíng" to { assertEquals(listOf("xíng"), polyphones.ofHint("行", "hang/xing", before = "进")) },
+        "in zhuyin" to { assertEquals(listOf("ㄏㄤˊ"), polyphones.ofHint("行", "xing/hang", ReadingStyle.ZHUYIN, before = "银")) },
+        "no reading known: the hint's first" to { assertEquals(listOf("he"), polyphones.ofHint("𠀀", "he/huo")) },
+        "no syllables, or more than a character: no reading" to {
+            assertEquals(emptyList<String>(), polyphones.ofHint("行", "xing/~"))
+            assertEquals(emptyList<String>(), polyphones.ofHint("银行", "yin/hang"))
+        },
+    )
+
+    // a word read by its text (a table's, a prediction's): each polyphone as the word has it
+    @Test
+    @Uat("PY-118")
+    fun aPolyphoneInAWordIsReadAsTheWordHasIt() = assertRows(
+        "好了" to { assertEquals(listOf("hǎo", "le"), polyphones.of("好了", ReadingStyle.PINYIN)) },
+        "了解" to { assertEquals(listOf("liǎo", "jiě"), polyphones.of("了解", ReadingStyle.PINYIN)) },
+        "银行" to { assertEquals(listOf("yín", "háng"), polyphones.of("银行", ReadingStyle.PINYIN)) },
+        "行走" to { assertEquals(listOf("xíng", "zǒu"), polyphones.of("行走", ReadingStyle.PINYIN)) },
+        "能" to { assertEquals(listOf("néng"), polyphones.of("能", ReadingStyle.PINYIN)) },
+    )
 
     @Test
     fun whatIsNoReadingOfEachCharacterStaysAHint() {

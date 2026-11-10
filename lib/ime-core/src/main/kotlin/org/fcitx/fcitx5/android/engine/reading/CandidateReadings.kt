@@ -118,9 +118,15 @@ class CandidateReadings(
      * a character, written as [style] has it (pinyin while 候选词注音 is off): the hint's own tones where it has
      * them, else its syllables with the tones they have in [text], toneless where none is known; empty if [text]
      * is not all Han or [hint] is no syllable a character (an emoji's name stays a hint).
+     *
+     * A hint of one character's several readings ("le/liao", a polyphone a part or a stroke lookup found)
+     * is drawn as one reading too, as any candidate's is (A5, the user, 2026-11-06): the one [ordered]
+     * puts first after [before], what was put before the character (银 then 行: háng), else its commonest.
      */
-    fun ofHint(text: String, hint: String, style: ReadingStyle = ReadingStyle.PINYIN): List<String> {
+    fun ofHint(text: String, hint: String, style: ReadingStyle = ReadingStyle.PINYIN, before: String = ""): List<String> {
         if (hint.isBlank() || !text.codePoints().allMatch(Character::isIdeographic)) return emptyList()
+        val several = hint.trim().split(SEPARATOR)
+        if (several.size > 1) return oneOf(text, several, style, before)
         val parts = hint.trim().split(' ')
         if (parts.size != text.codePointCount(0, text.length) || parts.any { p -> p.isEmpty() || !p.all(Char::isLetter) }) return emptyList()
         val toned = parts.any { p -> p.any { it.code > ASCII } }
@@ -130,6 +136,14 @@ class CandidateReadings(
         val known = if (toned) null else table.tones(text, ids)
         val tones = IntArray(ids.size) { if (toned) ToneMark.parse(parts[it])?.second ?: ToneMark.NONE else known?.get(it)?.toInt() ?: ToneMark.NONE }
         return ids.mapIndexed { i, id -> Zhuyin.of(id)?.let { ToneMark.zhuyin(it, tones[i]) }.orEmpty() }
+    }
+
+    // one character's [several] readings hinted as one, written as [style] has it: [ordered]'s first after
+    // [before]; the hint's first where the data has none of the character's own, or no way to write it
+    private fun oneOf(text: String, several: List<String>, style: ReadingStyle, before: String): List<String> {
+        if (text.codePointCount(0, text.length) != 1 || several.any { p -> p.isEmpty() || !p.all(Char::isLetter) }) return emptyList()
+        val first = ordered(text.codePointAt(0), before).firstOrNull()?.let { written(it.syllable, it.tone, style) }
+        return if (!first.isNullOrEmpty()) listOf(first) else ofHint(text, several.first(), style)
     }
 
     // [parts], toneless syllables of [text], with the tones they have in it where known
@@ -178,7 +192,7 @@ class CandidateReadings(
     }
 
     companion object {
-        /** Between a character's readings, as [allOf] writes them: xíng/háng. */
+        /** Between a character's readings, as [allOf] writes them (xíng/háng) and a hint of them reads (EngineAssets.charReading). */
         const val SEPARATOR = '/'
 
         /** After them, when the character has more than are shown: hé/hè…. */

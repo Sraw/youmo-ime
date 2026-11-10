@@ -458,13 +458,13 @@ class Engines(
      * The reading drawn above the candidate [text] at [index] of [session]'s, and the hint left beside
      * it; the one place the snapshot and the candidates read ([candidates]) work them out. A pinyin's or
      * 双拼's [hint] that is a reading (a misreading's true one, 角色 typed jiaose: jué sè; a character by
-     * its parts', a stroke lookup's) is drawn above, 候选词注音 on or off (off: as its pinyin, in the bar's
-     * height, the user, 2026-11-02), and leaves no hint; any other hint stays. While 候选词注音 is on
+     * its parts', a stroke lookup's, one reading of a polyphone's several: A5) is drawn above, 候选词注音 on
+     * or off (off: as its pinyin, in the bar's height, the user, 2026-11-02), and leaves no hint; any other hint stays. While 候选词注音 is on
      * ([session] not null) a candidate with no such hint is read as the session typed it.
      */
     private fun readingAndHint(im: String, session: Session?, index: Int, text: String, hint: String): Pair<List<String>, String> {
         val style = settings.candidateReading
-        val above = if (im in pairs) hintAbove(text, hint, if (style == ReadingStyle.OFF) ReadingStyle.PINYIN else style) else emptyList()
+        val above = if (im in pairs) hintAbove(im, index, text, hint, if (style == ReadingStyle.OFF) ReadingStyle.PINYIN else style) else emptyList()
         if (above.isNotEmpty()) return above to ""
         return (if (session == null) emptyList() else read(im, session, index, text, style)) to hint
     }
@@ -490,8 +490,12 @@ class Engines(
         CharCard.of(text, before, candidateReadings, assets.pinyinData.charReadings, assets.charInfo, assets.strokes())
     }
 
-    private fun hintAbove(text: String, hint: String, style: ReadingStyle = ReadingStyle.PINYIN): List<String> =
-        if (hint.isEmpty()) emptyList() else candidateReadings.ofHint(text, hint, style)
+    // a character's several readings hinted are drawn as the one it has after what was put before it (Session.lookedUp)
+    private fun hintAbove(im: String, index: Int, text: String, hint: String, style: ReadingStyle): List<String> {
+        if (hint.isEmpty()) return emptyList()
+        val before = if (CandidateReadings.SEPARATOR in hint) sessions[pairs.shownSession(im)]?.lookedUp(index).orEmpty() else ""
+        return candidateReadings.ofHint(text, hint, style, before)
+    }
 
     private fun keyboard(im: String): Keyboard = keyboards[im] ?: Keyboard(session(im), nineKeys = im in KeyboardPair.KEYED).also {
         keyboards[im] = it
