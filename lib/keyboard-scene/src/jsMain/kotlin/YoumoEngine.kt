@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
+import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
@@ -48,6 +49,9 @@ class YoumoTheme internal constructor(internal val theme: Theme) {
     internal fun cascades(dark: Boolean): Cascades = theme.variant(dark).let { t -> cascades.getOrPut(t.dark) { Cascades(t) } }
 
     val name: String get() = theme.name
+
+    /** The lines of its styles that would leave Shift, Backspace, Space or Return blank: the app refuses it (BlankKeys). */
+    fun hidesRequired(): Array<Int> = BlankKeys.hidesRequired(theme).toTypedArray()
 
     /** Its versions: `["light"]`, `["dark"]` or both. */
     val variants: Array<String> get() = listOf(false, true).filter { it in theme.variants }.map { if (it) "dark" else "light" }.toTypedArray()

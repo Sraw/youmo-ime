@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own four scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-oCkLrYrM9PpaghYzSm3SwL0PMU9sZxvaN1j+ZYDkz/c=' 'sha256-HuCVm1FUKiXA20BXu4gdXyDP9t14rc1cHQAnroGWPjI='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-etn17N5G9K+XYiabv8Jq/mizs6WWuqTlyNhq81aJx2A=' 'sha256-wL9khzE2V7GG6GFsnQBRcBiqPGA/uPyIZMxPbciyLJ4='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -1782,7 +1782,9 @@ dialog h2 { margin: 0; font-size: 16px; }
   /**
    * A picture the user picked ([bytes]) made a file the app takes: refused (ThemeError) where it is no image the
    * app reads or too big to decode; else always [encode]d anew no bigger than PICTURE_SAVE.longSide
-   * (`async (bytes, width, height, quality) => {bytes, type}`, the browser's canvas: jpg, or png where it has alpha).
+   * (`async (bytes, sizeOf, quality) => {bytes, type}`, the browser's canvas: jpg, or png where it has alpha). The
+   * encoder sizes it by what it decoded (`sizeOf(width, height)`), not the file's header: a photo the camera tagged
+   * as turned (EXIF) is decoded upright, its sides swapped.
    * `{bytes, type}`.
    */
   async function pictureFile(L, format, bytes, encode) {
@@ -1791,8 +1793,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     if (!size || !['png', 'jpg', 'webp'].includes(type)) throw new L.ThemeError('image', 'not a PNG, JPEG or WebP picture');
     if (!L.decodable(size, L.decodeCaps(format, 'source'))) throw new L.ThemeError('limit', 'pictureSide');
     const side = Math.min(PICTURE_SAVE.longSide, format.limits.pictureSide);
-    const [w, h] = L.resizeInside(size[0], size[1], side, side);
-    const made = await encode(bytes, w, h, PICTURE_SAVE.quality);
+    const made = await encode(bytes, (bw, bh) => L.resizeInside(bw, bh, side, side), PICTURE_SAVE.quality);
     const got = L.imageSize(made.bytes);
     if (!got || Math.max(got[0], got[1]) > side) throw new L.ThemeError('limit', 'pictureSide');
     return made;
@@ -1802,11 +1803,14 @@ dialog h2 { margin: 0; font-size: 16px; }
    * What the app refuses on import that the engine does not see (ThemePackFiles.check): the name, the files the
    * theme names and does not bring, images past their sides, entries past the zip's limits. `[{level: "error", line: 0, message}]`.
    */
-  function saveProblems(L, format, d) {
+  function saveProblems(E, L, format, d) {
     const lim = format.limits;
     const out = [];
     const bad = (message) => out.push({ level: 'error', line: 0, message });
-    const name = themeName(d.xml);
+    // the engine's reading of it (the name as the app reads it, the blank keys by the app's own rule: BlankKeys)
+    const read = E.readTheme(d.xml, null, null);
+    if (!read.ok) return read.problems.map((p) => ({ level: 'error', line: p.line || 0, message: p.message }));
+    const name = read.theme.name;
     if (name == null || !L.isPlainFileName(name) || name.startsWith('.') || /#(light|dark)$/.test(name)) bad('主题名 "' + name + '" 不能做文件名');
     const xml = uncommented(d.xml);
     const named = new Set();
@@ -1824,7 +1828,7 @@ dialog h2 { margin: 0; font-size: 16px; }
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
       }
     }
-    for (const line of hidesRequired(xml)) bad('第 ' + line + ' 行把 Shift、退格、空格或回车的字藏了：这些键会是空白');
+    for (const line of read.theme.hidesRequired()) bad('第 ' + line + ' 行把 Shift、退格、空格或回车的字藏了：这些键会是空白');
     let total = 0;
     const enc = new TextEncoder();
     const sizes = [enc.encode(d.xml).length, ...Object.values(d.files).map((b) => b.length), ...Object.values(d.layouts).map((t) => enc.encode(t).length)];
@@ -1836,38 +1840,32 @@ dialog h2 { margin: 0; font-size: 16px; }
     return out;
   }
 
-  // ThemePackCheck.hidesRequired's rule (lib/ime-core) on the text, which is all the page has of it: a style hiding
-  // the words of a key one cannot type without (by kind, role or name, not when pressed) is refused, unless it is
-  // aimed at one key whose resting face is an image of its own (a 3.0 theme converted draws that key so)
-  const REQUIRED = ['shift', 'backspace', 'space', 'enter'];
-  const REQUIRED_KINDS = ['function', 'space', 'enter'];
-  function hidesRequired(xml) {
-    const styles = [...xml.matchAll(/<style\b[^>]*>/g)].map((m) => ({ tag: m[0], line: xml.slice(0, m.index).split('\n').length, sel: (/\sselect="([^"]*)"/.exec(m[0]) || [])[1] || '' }));
-    const faced = new Set();
-    for (const st of styles) if (/\sfill="image\(/.test(st.tag)) for (const one of st.sel.split(',')) if (/^\s*[\w*-]+\/[\w-]+\s*$/.test(one)) faced.add(one.trim());
-    const lines = [];
-    for (const st of styles) {
-      if (!/\shidden="true"/.test(st.tag)) continue;
-      const hits = st.sel.split(',').some((one) => {
-        const m = /^\s*(?:@[\w-]+\s+)*([\w*-]+\/)?([\w*-]+)((?:\.[\w-]+|\[role=[\w-]+\])*)(?:\s+(label|icon))?\s*$/.exec(one);
-        if (!m || /:/.test(one)) return false;
-        const [, board, name, rest] = m;
-        const classes = [...rest.matchAll(/\.([\w-]+)/g)].map((c) => c[1]);
-        const roles = [...rest.matchAll(/\[role=([\w-]+)\]/g)].map((c) => c[1]);
-        if (!board && name !== 'key') return false;
-        if (board && name !== '*' && !REQUIRED.includes(name)) return false;
-        if (!classes.every((c) => REQUIRED_KINDS.includes(c)) || !roles.every((r) => REQUIRED.includes(r))) return false;
-        return !(board && name !== '*' && faced.has(board + name));
-      });
-      if (hits) lines.push(st.line);
-    }
-    return lines;
-  }
+  // the pixels the page decodes of a theme at most, all its images together (64 MP, ~256 MB of bitmaps)
+  const DECODE_BUDGET = 64 * 1000 * 1000;
 
-  /** Which of [files] the page may decode (images whose headers are within what the app takes): a pack's bytes are not trusted. */
-  function decodableImages(L, format, files) {
-    const caps = L.decodeCaps(format, 'source');
-    return Object.keys(files).filter((n) => /\.(png|jpe?g|webp)$/i.test(n) && L.decodable(L.imageSize(files[n]), caps));
+  /**
+   * Which of [d]'s files the page may decode: only images the theme names, each within its role's sides (the
+   * picture's source, its cuts, a key's image: youmo-lib's decodeCaps), and all of them within DECODE_BUDGET, the
+   * first named first. A pack's bytes are not trusted: a decode past the browser's memory takes the tab down.
+   */
+  function decodableImages(L, format, d) {
+    const xml = uncommented(d.xml);
+    const roles = new Map();
+    const name = (n, role) => { if (!roles.has(n)) roles.set(n, role); };
+    for (const m of xml.matchAll(/<picture\b[^>]*?\bsrc="([^"]+)"/g)) name(m[1], 'source');
+    for (const m of xml.matchAll(/<cut\b[^>]*?\bfile="([^"]+)"/g)) name(m[1], 'picture');
+    for (const m of xml.matchAll(/\bimage\(\s*([^,)\s]+)/g)) name(m[1].replace(/^["']|["']$/g, ''), 'key');
+    let spent = 0;
+    const out = [];
+    for (const [n, role] of roles) {
+      const bytes = d.files[n];
+      const size = bytes && /\.(png|jpe?g|webp)$/i.test(n) ? L.imageSize(bytes) : null;
+      if (!size || !L.decodable(size, L.decodeCaps(format, role))) continue;
+      if (spent + size[0] * size[1] > DECODE_BUDGET) continue;
+      spent += size[0] * size[1];
+      out.push(n);
+    }
+    return out;
   }
 
   const decode = (bytes) => new TextDecoder().decode(bytes);
@@ -2095,7 +2093,7 @@ dialog h2 { margin: 0; font-size: 16px; }
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV,
-    doc, themeName, withName, fromBuiltin, withPicture, PICTURE_SAVE, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check,
+    doc, themeName, withName, fromBuiltin, withPicture, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -2160,7 +2158,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
     keep();
-    loadAssets(d).then((current) => { if (current) preview(); });
+    return loadAssets(d).then((current) => { if (current) preview(); });
   }
 
   // the theme's files as the painter takes them: its images decoded, its fonts loaded under a family of their own
@@ -2172,7 +2170,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     const images = {};
     const fonts = {};
     const cuts = {};
-    const safe = new Set(M.decodableImages(L, FORMAT, d.files));
+    const safe = new Set(M.decodableImages(L, FORMAT, d));
     for (const [name, bytes] of Object.entries(d.files)) {
       try {
         if (IMAGE.test(name)) {
@@ -2306,10 +2304,12 @@ dialog h2 { margin: 0; font-size: 16px; }
     }
   }
 
-  // the picture drawn at [w]×[h] and encoded: JPEG, or PNG where any pixel is see-through
-  async function encodePicture(bytes, w, h, quality) {
+  // the picture decoded (upright, as its EXIF says), drawn at sizeOf its decoded sides and encoded: JPEG, or PNG
+  // where any pixel is see-through
+  async function encodePicture(bytes, sizeOf, quality) {
     const bmp = await createImageBitmap(new Blob([bytes]));
     try {
+      const [w, h] = sizeOf(bmp.width, bmp.height);
       const c = document.createElement('canvas');
       c.width = w;
       c.height = h;
@@ -2345,7 +2345,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     const d = history.current;
     const bad = M.check(E, d, env.board, M.envJson(env), null).problems.filter((p) => p.level === 'error');
     if (bad.length) { toast('有 ' + bad.length + ' 个错误，App 导入不了，先改好'); return; }
-    const refused = M.saveProblems(L, FORMAT, d);
+    const refused = M.saveProblems(E, L, FORMAT, d);
     if (refused.length) { toast('App 会拒绝导入：' + refused.map((p) => p.message).join('；')); return; }
     const { name, bytes } = M.save(L, d);
     const a = document.createElement('a');
@@ -2488,9 +2488,8 @@ dialog h2 { margin: 0; font-size: 16px; }
         try {
           if (kept.env) env = Object.assign({}, M.ENV, kept.env);
           fillEnvForm();
-          set(kept.doc, { fresh: true });
-          await loadAssets(kept.doc);
-          preview();
+          history = new M.History(kept.doc);
+          await changed();
           return;
         } catch (e) {
           history = null;

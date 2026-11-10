@@ -109,10 +109,21 @@ function jpegHeader(w, h) {
 test('a picture picked is always encoded anew, its long side at most PICTURE_SAVE.longSide; one not an image is refused', async () => {
   assert.deepEqual(M.PICTURE_SAVE, { longSide: 2560, quality: 0.85 });
   const asked = [];
-  const encode = async (b, w, h, q) => { asked.push([w, h, q]); return { bytes: jpegHeader(w, h), type: 'jpg' }; };
+  // an encoder that decodes the header's sides as they are, and one that decodes them turned (EXIF 6/8)
+  const encoder = (turned) => async (b, sizeOf, q) => {
+    const s = L.imageSize(b);
+    const [w, h] = turned ? sizeOf(s[1], s[0]) : sizeOf(s[0], s[1]);
+    asked.push([w, h, q]);
+    return { bytes: jpegHeader(w, h), type: 'jpg' };
+  };
+  const encode = encoder(false);
   const big = await M.pictureFile(L, FORMAT, jpegHeader(4608, 3456), encode);
   assert.deepEqual(asked.pop(), [2560, 1920, 0.85]);
   assert.equal(big.type, 'jpg');
+  // a portrait photo stored landscape with an EXIF turn: sized by what decodes, upright, not squashed
+  const turned = await M.pictureFile(L, FORMAT, jpegHeader(4608, 3456), encoder(true));
+  assert.deepEqual(asked.pop(), [1920, 2560, 0.85]);
+  assert.deepEqual(L.imageSize(turned.bytes), [1920, 2560]);
   // within the side: encoded all the same, never made bigger
   await M.pictureFile(L, FORMAT, pngHeader(800, 600), encode);
   assert.deepEqual(asked.pop(), [800, 600, 0.85]);
@@ -126,29 +137,48 @@ test('a picture picked is always encoded anew, its long side at most PICTURE_SAV
 
 test('save refuses what the app would: the name, files missing, images past their sides, the zip\'s limits', () => {
   const ok = M.fromBuiltin(E, 'nord');
-  assert.deepEqual(M.saveProblems(L, FORMAT, ok), []);
+  assert.deepEqual(M.saveProblems(E, L, FORMAT, ok), []);
   for (const name of ['a/b', '.hidden', 'x#dark', 'y#light', '']) {
-    assert.equal(M.saveProblems(L, FORMAT, M.doc(M.withName(ok.xml, name))).length, 1, name);
+    assert.equal(M.saveProblems(E, L, FORMAT, M.doc(M.withName(ok.xml, name))).length, 1, name);
   }
   const pic = M.withPicture(ok, pngHeader(100, 100), 'png');
-  assert.deepEqual(M.saveProblems(L, FORMAT, pic), []);
-  assert.match(M.saveProblems(L, FORMAT, M.doc(pic.xml)).map((p) => p.message).join(), /缺少文件 picture.png/);
-  assert.match(M.saveProblems(L, FORMAT, M.withPicture(ok, pngHeader(5000, 10), 'png'))[0].message, /太大/);
-  assert.match(M.saveProblems(L, FORMAT, M.withPicture(ok, new Uint8Array([1]), 'png'))[0].message, /不是 App 认得的图片/);
+  assert.deepEqual(M.saveProblems(E, L, FORMAT, pic), []);
+  assert.match(M.saveProblems(E, L, FORMAT, M.doc(pic.xml)).map((p) => p.message).join(), /缺少文件 picture.png/);
+  assert.match(M.saveProblems(E, L, FORMAT, M.withPicture(ok, pngHeader(5000, 10), 'png'))[0].message, /太大/);
+  assert.match(M.saveProblems(E, L, FORMAT, M.withPicture(ok, new Uint8Array([1]), 'png'))[0].message, /不是 App 认得的图片/);
   // the app's ThemePackCheck.hidesRequired: blank keys refused, a key faced with its own image let be
-  const hide = (styles) => M.saveProblems(L, FORMAT, M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'))).length;
+  const hide = (styles) => M.saveProblems(E, L, FORMAT, M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'))).length;
   assert.equal(hide('<style select="key.enter" hidden="true"/>'), 1);
   assert.equal(hide('<style select="*/backspace label" hidden="true"/>'), 1);
   assert.equal(hide('<style select="key.letter" hidden="true"/>'), 0);
   assert.equal(hide('<style select="*/enter" fill="image(nope.png, 0 0 0 0, 3x)"/><style select="*/enter label" hidden="true"/>'), 1, 'only the file missing');
-  assert.equal(hide('<style select="*/enter:pressed" fill="#fff"/><style select="*/enter label" hidden="true"/>'), 1);
+  assert.equal(hide('<style select="*/enter:pressed" fill="#ffffffff"/><style select="*/enter label" hidden="true"/>'), 1);
+  // the image must be the face that wins (the app's BlankKeys, through the engine)
+  const img = '<style select="*/enter" fill="image(e.png, 0 0 0 0, 3x)"/>';
+  const hid = '<style select="*/enter label" hidden="true"/>';
+  const withE = (styles) => M.saveProblems(E, L, FORMAT, M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'), { 'e.png': pngHeader(10, 10) })).length;
+  assert.equal(withE(img + hid), 0);
+  assert.equal(withE(img + '<style select="*/enter" fill="#ffffffff"/>' + hid), 1);
+  assert.equal(withE(img + '<style select="qwerty/enter" fill="#ffffffff"/>' + hid), 1);
+  assert.equal(withE(img + '<style select="@dark */enter" fill="#ffffffff"/>' + hid), 1);
+  assert.equal(withE('<style select="*/enter:pressed label" hidden="true"/>'), 1, 'hiding while pressed: the app refuses it too');
+  // the name as the app reads it: single quotes are a name
+  assert.deepEqual(M.saveProblems(E, L, FORMAT, M.doc(ok.xml.replace(/name="nord-mine"/, "name='nord-mine'"))), []);
   const files = Object.fromEntries(Array.from({ length: FORMAT.limits.entries }, (_, i) => ['f' + i + '.bin', new Uint8Array(1)]));
-  assert.match(M.saveProblems(L, FORMAT, M.doc(ok.xml, files))[0].message, /限制/);
+  assert.match(M.saveProblems(E, L, FORMAT, M.doc(ok.xml, files))[0].message, /限制/);
 });
 
-test('only images the app would take are decoded: a pack\'s headers are not trusted', () => {
-  const files = { 'a.png': pngHeader(100, 100), 'b.png': pngHeader(60000, 60000), 'c.jpg': new Uint8Array([1]), 'd.ttf': new Uint8Array([0]) };
-  assert.deepEqual(M.decodableImages(L, FORMAT, files), ['a.png']);
+test('only images the theme names are decoded, each within its role\'s sides, all within a budget', () => {
+  const xml = '<theme name="t"><picture src="src.png"><cut orientation="portrait" file="cut.png"/></picture>' +
+    '<style select="key" fill="image(k.png, 0 0 0 0, 3x)"/><style select="*/space" fill="image(big-key.png, 0 0 0 0, 3x)"/></theme>';
+  const files = { 'src.png': pngHeader(6000, 4000), 'cut.png': pngHeader(2000, 1000), 'k.png': pngHeader(100, 100), 'big-key.png': pngHeader(2000, 2000), 'loose.png': pngHeader(10, 10), 'c.jpg': new Uint8Array([1]) };
+  assert.deepEqual(M.decodableImages(L, FORMAT, M.doc(xml, files)), ['src.png', 'cut.png', 'k.png'], 'a key image past keyImageSide, an unnamed file: not');
+  assert.deepEqual(M.decodableImages(L, FORMAT, M.doc(xml, { ...files, 'cut.png': pngHeader(6000, 6000) })), ['src.png', 'k.png'], 'a cut past pictureSide: not');
+  // many big images: decoded only while the budget lasts
+  const many = Array.from({ length: 10 }, (_, i) => 'p' + i + '.png');
+  const all = '<theme name="t">' + many.map((n) => '<style select="qwerty/' + n[1] + '" fill="image(' + n + ', 0 0 0 0, 3x)"/>').join('') + '</theme>';
+  const got = M.decodableImages(L, { ...FORMAT, limits: { ...FORMAT.limits, keyImageSide: 4096 } }, M.doc(all, Object.fromEntries(many.map((n) => [n, pngHeader(4000, 4000)]))));
+  assert.equal(got.length, Math.floor(M.DECODE_BUDGET / 16e6));
 });
 
 test('a pack of odd entries opens as the app unpacks it: the last theme.xml, paths resolved, the rest dropped', async () => {
@@ -256,7 +286,7 @@ test('the page saves from-maker.theme, byte for byte', () => {
 test('a 3.0 theme the app takes converts and saves to a pack the app takes', async () => {
   for (const f of ['from-web.theme', 'from-app.theme', 'from-app-2.1.theme']) {
     const { doc } = await M.open(E, L, FORMAT, bytes(f));
-    assert.deepEqual(M.saveProblems(L, FORMAT, doc), [], f);
+    assert.deepEqual(M.saveProblems(E, L, FORMAT, doc), [], f);
   }
   const made = M.save(L, (await M.open(E, L, FORMAT, bytes('from-app.theme'))).doc).bytes;
   if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker-30.theme'), made);

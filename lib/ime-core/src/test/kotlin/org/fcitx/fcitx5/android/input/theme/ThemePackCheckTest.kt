@@ -77,6 +77,14 @@ class ThemePackCheckTest {
         // an image only when pressed, or on another key: still blank
         assertEquals(1, found("""<style select="*/enter:pressed" fill="image(e.png, 0 0 0 0, 3x)"/><style select="*/enter label" hidden="true"/>"""))
         assertEquals(1, found("""<style select="*/space" fill="image(e.png, 0 0 0 0, 3x)"/><style select="*/enter label" hidden="true"/>"""))
+        // the image must be the face that wins: not a later tie, not a board's own key, not a scene's
+        val img = """<style select="*/enter" fill="image(e.png, 0 0 0 0, 3x)"/>"""
+        val hide = """<style select="*/enter label" hidden="true"/>"""
+        assertEquals(1, found(img + """<style select="*/enter" fill="#ffffffff"/>""" + hide))
+        assertEquals(1, found(img + """<style select="qwerty/enter" fill="#ffffffff"/>""" + hide))
+        assertEquals(1, found(img + """<style select="@dark */enter" fill="#ffffffff"/>""" + hide))
+        // flat drawing no face is 3.0's: a converted theme's flat transparency is let be
+        assertEquals(0, found(img + """<style select="@flat */enter" fill="#00000000"/><style select="*/enter.enter" fill="image(e.png, 0 0 0 0, 3x)"/>""" + hide))
         assertEquals(0, found("""<style select="key mark" hidden="true"/>"""))
         assertEquals(0, found("""<style select="key" hidden="false"/>"""))
     }

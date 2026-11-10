@@ -58,7 +58,7 @@
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
     keep();
-    loadAssets(d).then((current) => { if (current) preview(); });
+    return loadAssets(d).then((current) => { if (current) preview(); });
   }
 
   // the theme's files as the painter takes them: its images decoded, its fonts loaded under a family of their own
@@ -70,7 +70,7 @@
     const images = {};
     const fonts = {};
     const cuts = {};
-    const safe = new Set(M.decodableImages(L, FORMAT, d.files));
+    const safe = new Set(M.decodableImages(L, FORMAT, d));
     for (const [name, bytes] of Object.entries(d.files)) {
       try {
         if (IMAGE.test(name)) {
@@ -204,10 +204,12 @@
     }
   }
 
-  // the picture drawn at [w]×[h] and encoded: JPEG, or PNG where any pixel is see-through
-  async function encodePicture(bytes, w, h, quality) {
+  // the picture decoded (upright, as its EXIF says), drawn at sizeOf its decoded sides and encoded: JPEG, or PNG
+  // where any pixel is see-through
+  async function encodePicture(bytes, sizeOf, quality) {
     const bmp = await createImageBitmap(new Blob([bytes]));
     try {
+      const [w, h] = sizeOf(bmp.width, bmp.height);
       const c = document.createElement('canvas');
       c.width = w;
       c.height = h;
@@ -243,7 +245,7 @@
     const d = history.current;
     const bad = M.check(E, d, env.board, M.envJson(env), null).problems.filter((p) => p.level === 'error');
     if (bad.length) { toast('有 ' + bad.length + ' 个错误，App 导入不了，先改好'); return; }
-    const refused = M.saveProblems(L, FORMAT, d);
+    const refused = M.saveProblems(E, L, FORMAT, d);
     if (refused.length) { toast('App 会拒绝导入：' + refused.map((p) => p.message).join('；')); return; }
     const { name, bytes } = M.save(L, d);
     const a = document.createElement('a');
@@ -386,9 +388,8 @@
         try {
           if (kept.env) env = Object.assign({}, M.ENV, kept.env);
           fillEnvForm();
-          set(kept.doc, { fresh: true });
-          await loadAssets(kept.doc);
-          preview();
+          history = new M.History(kept.doc);
+          await changed();
           return;
         } catch (e) {
           history = null;
