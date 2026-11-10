@@ -118,6 +118,9 @@ class NineKeyLettersCustomTest {
         assertSame(made, NineKeyLetters.ofCode(made.codes[0].code))
         assertSame(NineKeyLetters.G14, NineKeyLetters.filedAs(NineKeyLetters.G14.tag()))
         assertNull(NineKeyLetters.filedAs("ab,cd"))
+        // a record of many tags (damaged, say) keeps no keyboard of each: past the few kept, read anew alike
+        repeat(100) { NineKeyLetters.filedAs("bad$it") }
+        assertEquals(made.codes, NineKeyLetters.filedAs(made.tag())?.codes)
         // 双拼's nine keys' tag under qk: is a layout of those groups, not NINE_SP
         val nineSp = NineKeyLetters.filedAs(NineKeyLetters.NINE_SP.tag())
         assertNotNull(nineSp)

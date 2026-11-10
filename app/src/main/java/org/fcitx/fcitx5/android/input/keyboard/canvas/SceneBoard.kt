@@ -135,7 +135,8 @@ class SceneBoard(
         // more than the views' decides whether a GC stops its first frame (specs/app.md)
         private const val KEPT_SCENES = 4
         // a look's measurer, by the look and a pack's fonts (two packs of one look may name others):
-        // as many as the themes kept (SceneThemes), not the scenes
+        // as many as one kind of theme SceneThemes keeps (its looks' or its packs', 4 each), not the
+        // scenes; with packs and built-ins alternating a measurer may go first and is measured anew
         private const val KEPT_LOOKS = 4
         private val measurers = lruMap<Pair<ThemeLook, Map<String, String>>, AndroidTextMeasurer>(KEPT_LOOKS)
         private val scenesKept = ArrayDeque<Made>()

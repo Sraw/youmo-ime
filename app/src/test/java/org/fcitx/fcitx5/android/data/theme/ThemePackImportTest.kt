@@ -33,6 +33,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -233,6 +234,10 @@ class ThemePackImportTest {
         assertSame(dark.drawn, drawn)
         assertSame(drawn, SceneThemes.of(dark, look))
         assertSame(SceneThemes.cascades(drawn), SceneThemes.cascades(drawn))
+        // a pack's kept too is let go with every look's (filesChanged): its cascades made anew
+        val kept = SceneThemes.cascades(drawn)
+        SceneThemes.forgetAll()
+        assertNotSame(kept, SceneThemes.cascades(SceneThemes.of(dark, look)!!))
         // its fonts by their names, each its file in its folder
         val asked = mutableListOf<String>()
         val before = ThemeAssets.decoder
