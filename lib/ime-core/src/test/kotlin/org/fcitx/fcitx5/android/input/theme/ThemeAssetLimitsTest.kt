@@ -123,10 +123,11 @@ class ThemeAssetLimitsTest {
     fun anAnimatedPicturePastItsLimitsIsDrawnStill() {
         val l = ThemeAssetLimits
         fun of(w: Int, h: Int, frames: Int, ms: Int) = AnimatedWebp.header(webp(w, h, List(frames) { ms }))
-        assertNull(l.animated(l.MAX_ANIMATED_BYTES, of(1440, 1080, 300, 50)))
+        assertNull(l.animated(l.MAX_ANIMATED_BYTES, of(720, 480, 300, 50)))
         assertEquals(ThemeAssetLimits.Still.Size, l.animated(l.MAX_ANIMATED_BYTES + 1, of(10, 10, 1, 40)))
         assertEquals(ThemeAssetLimits.Still.Unread, l.animated(10, null))
-        assertEquals(ThemeAssetLimits.Still.Side, l.animated(10, of(10, 1441, 1, 40)))
+        assertEquals(ThemeAssetLimits.Still.Side, l.animated(10, of(10, 721, 1, 40)))
+        assertEquals(ThemeAssetLimits.Still.Side, l.animated(10, of(1080, 720, 1, 50)))
         assertEquals(ThemeAssetLimits.Still.Frames, l.animated(10, of(10, 10, 301, 50)))
         assertEquals(ThemeAssetLimits.Still.FrameRate, l.animated(10, of(10, 10, 2, 49)))
         assertEquals(ThemeAssetLimits.Still.FrameRate, l.animated(10, of(10, 10, 2, 0)))
