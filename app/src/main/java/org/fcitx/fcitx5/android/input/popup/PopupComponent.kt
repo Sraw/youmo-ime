@@ -220,7 +220,8 @@ class PopupComponent :
         val t = goings.remove(view)
         val done = { root.removeView(view); PopupMoves.settle(view); gone() }
         // TalkBack: a view fading out would still take the hover over it (its keys read, the key under not)
-        if (atOnce || t == null || !KeyMotionSwitch.on(context) || exploring()) return done()
+        if (atOnce || t == null) return done()
+        if (!KeyMotionSwitch.on(context) || exploring()) return done()
         fading[view] = done
         PopupMoves.go(view, t) { fading.remove(view)?.invoke() }
     }
