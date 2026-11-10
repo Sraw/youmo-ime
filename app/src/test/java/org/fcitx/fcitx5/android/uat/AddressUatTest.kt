@@ -235,6 +235,8 @@ class AddressUatTest {
         val ways = listOf<Pair<String, () -> Unit>>(
             "hidden" to ::hideAndShow,
             "rebuilt" to {
+                // a setting that makes the keyboard anew (recreateInputViewPrefs) and changes nothing here: a
+                // space more is still the standard letters (NineKeyLetters.parse); PrefsRule puts it back
                 prefs.set(keyboard.t9Letters, keyboard.t9Letters.getValue() + " ")
                 h.idle()
                 h.relayout()

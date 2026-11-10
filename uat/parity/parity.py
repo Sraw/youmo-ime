@@ -238,6 +238,10 @@ def prepare(d, apk):
         d.sh(f"pm grant {e} android.permission.DUMP")
     install(d, apk)
     d.sh(f"pm clear {PKG}")
+    # pm clear took the resource packs too (device-protected files/packs): without the text pack
+    # the keyboard only asks for it. The snapshot below is of /data/data, so the packs, in
+    # /data/user_de, stay through each restore
+    uat.import_packs(d, voice=False)
     uat.ensure_ime(d)
     drv = Driver(d)
     drv.editor("text", 0)   # the engine's first load waited for on the letters, in the editor

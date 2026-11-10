@@ -23,11 +23,13 @@ cd youmo-ime
 ./gradlew :app:assembleDebug :app:packs
 ```
 
+`:app:packs` 也做语音包，要在 `~/.gradle/gradle.properties` 里写 `youmo.voiceModelDir`（本机放语音模型的目录，绝对路径或 `~/` 开头）；没有它就只做文字包：`./gradlew :app:packTextPack`（导入时用 `uat.py packs --no-voice`）。
+
 只有一个安装包，不申请网络权限，录音权限在第一次用语音输入时才问。词典和模型不在安装包里，而在两个**资源包**里：
 `app/build/packs/` 下的 `youmo-text-v<N>.youmopack`（文字包：拼音、英文、形码、笔画、句子模型、手写）和
-`youmo-voice-v<N>.youmopack`（语音包，可选：语音识别模型），装好应用后在 **设置 → 资源包** 里导入（debug 包也可以用
-`uat/tools/uat.py packs --port <端口>` 从电脑导入）。资源包用 Ed25519 签名：local.properties 里写了 `youmo.packKey`（正式私钥的路径）
-就用它签，否则用仓库里的测试密钥签；正式版只认正式公钥（`app/pack-keys/release.pub`），debug 包两种都认。
+`youmo-voice-v<N>.youmopack`（语音包，可选：语音识别模型），装好应用后在 **设置 → 资源包** 里导入（只在模拟器上也可以用
+`uat/tools/uat.py packs --port <端口>` 从电脑导入，它会先装上 debug 包；真机在设置里导入）。资源包用 Ed25519 签名：local.properties 里写了 `youmo.packKey`（正式私钥的路径）
+就用它签，否则用仓库里的测试密钥签；正式版只认正式公钥（`app/pack-keys/release.pub`），debug 和 benchmark 包两种都认；所以自己打正式版时，要把自己的公钥放进 `app/pack-keys/release.pub` 并设好 `youmo.packKey`，否则它不认自己做出的资源包。
 `./gradlew :app:assembleRelease` 打正式版。默认四种 ABI 都编，只编一种快得多：手机加 `-PbuildABI=arm64-v8a`（发布的安装包就是这样打的），
 Apple 芯片上的 arm64 模拟器同样用 arm64-v8a；x86_64 的模拟器或 redroid 加 `-PbuildABI=x86_64`。
 
@@ -46,7 +48,7 @@ rm -rf lib/fcitx5 lib/fcitx5-chinese-addons
 
 - libime 发布的词典和码表文本源，rime-stroke 的笔画表；
 - Unicode 的 `emoji-test.txt`、CLDR 的 `annotations/zh.xml`（表情），kfcd/chaizi 的 `chaizi-jt.txt`（拆字）；字卡的笔顺不下载，是仓库里的 `lexicon/stroke-order.tsv`；
-- 语音包还有 X-ASR 原版模型包（取其中的词表）和 silero VAD；
+- 语音包的模型、词表和标点模型不下载，取自 `youmo.voiceModelDir` 指的本机目录；
 - 本仓库 release 里的数据，每类一个，版本写在 `build-logic` 里：
 
 | release | 内容 | 放进资源包的 |
@@ -55,10 +57,9 @@ rm -rf lib/fcitx5 lib/fcitx5-chinese-addons
 | `words-*` | 新词包 | 拼音词典的新词层 |
 | `sentence-models-*` | 两个句子模型（4M 和 25M 参数） | `engine/sentence-model*.safetensors` |
 | `english-data-*` | 英文词表和语言模型 | `engine/english.data` |
-| `voice-models-*` | 转成 ORT 格式的语音识别模型（语音包） | `voice/*.ort` |
 | `handwriting-models-*` | 手写识别模型（ORT 格式）、字表和字频 | `handwriting/*` |
 
-第一次构建，文字包约下载 500 MB，语音包再多约 260 MB（拼音语言模型解开后占 1 GB 磁盘）。编译拼音数据大约要 2 分钟、5 GB 内存。
+第一次构建，文字包约下载 500 MB，语音包不下载（拼音语言模型解开后占 1 GB 磁盘）。编译拼音数据大约要 2 分钟、5 GB 内存。
 
 每个数据 release 里都有 `manifest.txt`，写明它从哪些数据、用什么命令生成。重新生成的方法见
 [specs/data-and-build.md](specs/data-and-build.md)：拼音语言模型用 `lib/ime-dict-tool/engine-data.sh`，英文用
@@ -121,12 +122,14 @@ cd youmo-ime
 ./gradlew :app:assembleDebug :app:packs
 ```
 
+`:app:packs` also makes the voice pack and needs `youmo.voiceModelDir` (the local directory of the voice models, absolute or starting `~/`) in `~/.gradle/gradle.properties`; without it, make the text pack alone: `./gradlew :app:packTextPack` (and import with `uat.py packs --no-voice`).
+
 There is one APK, with no network permission; the microphone is asked for on first voice use. The dictionaries and models are not in
 it but in two **resource packs** under `app/build/packs/`: `youmo-text-v<N>.youmopack` (pinyin, English, shape codes, strokes, sentence
 models, handwriting) and the optional `youmo-voice-v<N>.youmopack` (the speech recognizer), imported under **Settings → Resource packs**
-(into a debug build also from the computer: `uat/tools/uat.py packs --port <port>`). Packs are Ed25519-signed: with the release
+(on an emulator only, also from the computer: `uat/tools/uat.py packs --port <port>`, which installs the debug APK first; on a phone, in Settings). Packs are Ed25519-signed: with the release
 key's path as `youmo.packKey` in local.properties, by it, else by the repository's test key; a release build trusts the release
-key alone (`app/pack-keys/release.pub`), a debug build both. `./gradlew :app:assembleRelease` makes the release APK. All four ABIs are built by default; one is much faster:
+key alone (`app/pack-keys/release.pub`), a debug or benchmark build both; so a release build of your own needs your public key in `app/pack-keys/release.pub` and `youmo.packKey` set, else it refuses the packs it builds. `./gradlew :app:assembleRelease` makes the release APK. All four ABIs are built by default; one is much faster:
 `-PbuildABI=arm64-v8a` for phones (as the released APKs are built) and an arm64 emulator (Apple silicon), `-PbuildABI=x86_64` for an x86_64 emulator or redroid.
 
 Updating a checkout of 0.3.x (native fcitx5 and chinese-addons are deleted, and with them the fcitx5 submodule): run this once
@@ -155,10 +158,9 @@ The build downloads its data and checks the SHA-256 of each file:
 | `words-*` | The new-word pack | the pinyin dictionary's layer of new words |
 | `sentence-models-*` | The two sentence models (4M and 25M parameters) | `engine/sentence-model*.safetensors` |
 | `english-data-*` | English words and language model | `engine/english.data` |
-| `voice-models-*` | The speech recognizer in ORT format (the voice pack) | `voice/*.ort` |
 | `handwriting-models-*` | The handwriting recognizers in ORT format, their characters and frequencies | `handwriting/*` |
 
-The first build downloads about 500 MB for the text pack and some 260 MB more for the voice pack (the pinyin model takes 1 GB of disk unpacked). Compiling the pinyin data takes about 2 minutes and 5 GB of memory.
+The first build downloads about 500 MB for the text pack; the voice pack downloads nothing (the pinyin model takes 1 GB of disk unpacked). Compiling the pinyin data takes about 2 minutes and 5 GB of memory.
 
 Each data release has a `manifest.txt` saying what it was made from and by which command. How to make them again is in
 [specs/data-and-build.md](specs/data-and-build.md): the pinyin model by `lib/ime-dict-tool/engine-data.sh`, English by

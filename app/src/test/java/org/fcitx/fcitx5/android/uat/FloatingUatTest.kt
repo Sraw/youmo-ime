@@ -122,12 +122,21 @@ class FloatingUatTest {
         return Outline().also { card.outlineProvider.getOutline(card, it) }.radius
     }
 
+    // the keyboard's background as its scene draws it behind the keys (`@floating keyboard`'s radius): its corners
+    private fun drawnRadius(k: KeyboardHarness): Double {
+        val scene = checkNotNull(KeyboardHarness.boardCanvas(k.inputView)?.scene)
+        val back = scene.base.filterIsInstance<org.fcitx.fcitx5.android.scene.Op.Fill>().first()
+        return ((back.shape as org.fcitx.fcitx5.android.scene.Shape.Rect).radii).max()
+    }
+
     @Test
     @Uat("TB-32")
     fun squareKeysASquareFloatingKeyboard() {
         prefs.set(floating, true)
         h.start()
         assertTrue("rounded by default", cornerRadius(h) > 0f)
+        // the background drawn behind the keys as round (R20 F6557)
+        assertTrue("drawn rounded by default", drawnRadius(h) > 0.0)
         h.close()
         // a theme of square keys (the edit page's 直角)
         val light = TestThemes.PixelLight.look
@@ -135,6 +144,7 @@ class FloatingUatTest {
         try {
             square.start()
             assertEquals(0f, cornerRadius(square), 0f)
+            assertEquals(0.0, drawnRadius(square), 0.0)
         } finally {
             square.close()
         }

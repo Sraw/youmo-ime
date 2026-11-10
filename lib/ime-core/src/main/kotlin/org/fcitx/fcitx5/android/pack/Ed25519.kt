@@ -57,7 +57,8 @@ object Ed25519 {
         digest.update(publicKey)
         digest.update(message)
         val k = littleEndian(digest.digest()).mod(L)
-        return same(times(BASE, s), add(r, times(a, k)))
+        // [s]B = R + [k]A as [s]B + [k](-A) = R: one pass over the bits for both (Straus), not two
+        return same(sumOfTimes(BASE, s, negate(a), k), r)
     }
 
     private fun littleEndian(bytes: ByteArray): BigInteger = BigInteger(1, bytes.reversedArray())
@@ -104,11 +105,21 @@ object Ed25519 {
         return Point(e.multiply(f).mod(P), g.multiply(h).mod(P), f.multiply(g).mod(P), e.multiply(h).mod(P))
     }
 
-    private fun times(p: Point, n: BigInteger): Point {
+    private fun negate(p: Point): Point = Point(P.subtract(p.x).mod(P), p.y, p.z, P.subtract(p.t).mod(P))
+
+    // [n]p + [m]q, their doublings shared
+    private fun sumOfTimes(p: Point, n: BigInteger, q: Point, m: BigInteger): Point {
+        val both = add(p, q)
         var result = IDENTITY
-        for (i in n.bitLength() - 1 downTo 0) {
+        for (i in maxOf(n.bitLength(), m.bitLength()) - 1 downTo 0) {
             result = add(result, result)
-            if (n.testBit(i)) result = add(result, p)
+            val inN = n.testBit(i)
+            val inM = m.testBit(i)
+            when {
+                inN && inM -> result = add(result, both)
+                inN -> result = add(result, p)
+                inM -> result = add(result, q)
+            }
         }
         return result
     }

@@ -71,8 +71,8 @@ internal class LearningOps(
      * Does [op] in [im], the input method in use (null where none is: the settings); [act] has the
      * host send the long press's event (an [EngineEvent]) for the candidate at an index of all,
      * the engine's text there given: the host does nothing (false) where it does not show that.
+     * [shown]: a candidate's text as the host shows it (繁體: chttrans's output filter), as the menu's text is.
      */
-    // [shown]: a candidate's text as the host shows it (繁體: chttrans's output filter), the menu's text that
     fun apply(im: String?, op: LearningOp, shown: (String) -> String = { it }, act: (event: Int, index: Int, text: String) -> Boolean): LearningResult = when (op) {
         // the backups' own (stream D): listed, restored, made
         is BackupOp -> backup(op)
@@ -138,7 +138,9 @@ internal class LearningOps(
         val blocked = entries(UserWord.Kind.BLOCKED)
         // English's, no reading to them (review M1): those blocked now blocked again on an undo
         val english = lexicon.englishBlocks
-        val englishBlocked = words.filter { it.kind == UserWord.Kind.BLOCKED && it.pinyin.isEmpty() && english.has(it.text) }.map { it.text }
+        // as written: "The" is not on the list where "the" is, though has() says it is blocked
+        val englishNow = english.blocked.toSet()
+        val englishBlocked = words.filter { it.kind == UserWord.Kind.BLOCKED && it.pinyin.isEmpty() && it.text in englishNow }.map { it.text }
         val forgets = tableForgets()
         val token = control.undoable(inverse = {
             lexicon.reAdd(added)
@@ -241,7 +243,8 @@ internal class LearningOps(
         val done = ArrayList<String>()
         for ((at, t) in words.sortedByDescending { it.index }) {
             val s = session(im) ?: break
-            if (offer in s.offers(at) && act(event, at, t)) done += t
+            // an act before may have moved the list: only the candidate still the engine's [t] there
+            if (s.candidates(at, 1).firstOrNull()?.text == t && offer in s.offers(at) && act(event, at, t)) done += t
         }
         return done
     }
@@ -250,8 +253,9 @@ internal class LearningOps(
     // the words shown alike; [act] the texts deleted, none where the first was not
     private fun delete(texts: List<String>, whole: String, act: () -> List<String>): LearningResult {
         // a word added by hand comes off the list with it (Engines.changed): put back if taken back,
-        // of those deleted only. Not for a whole phrase, which takes no word with it, the rest's nor its own (U-73)
-        val added = if (whole.isEmpty()) lexicon.addedPlaces(texts.flatMap { lexicon.addedOf(it) }) else emptyList()
+        // of those deleted only. A whole phrase takes no word with it, the rest's nor its own (U-73)
+        // the words shown alike are words though the pressed one is a phrase's rest: theirs put back too
+        val added = lexicon.addedPlaces((if (whole.isEmpty()) texts else texts.drop(1)).flatMap { lexicon.addedOf(it) })
         val forgets = tableForgets()
         var done = emptyList<String>()
         val token = acted(inverse = { lexicon.reAdd(added.filter { it.value.text in done }) }, wrote = { done.isNotEmpty() }) {

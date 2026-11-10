@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat.Detected
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat.Order
@@ -362,7 +363,11 @@ class DictionaryFormatTest {
         val reads: (List<String>) -> Map<String, String?> = { texts -> texts.associateWith { readings[it] } }
         val big5 = traditional.joinToString("\n") { it.first }.toByteArray(charset("Big5"))
         // some of its pairs no Han as GBK reads them (lines of no word), the rest characters the guess does not read
-        assertTrue(DictionaryFormat.analyse({ big5.inputStream() }, guess = reads) is Refused)
+        val refused = DictionaryFormat.analyse({ big5.inputStream() }, guess = reads) as Refused
+        // either refusal, by design: as GBK one line is a private-use character (no word) and four are Han the guess
+        // does not read, so which check stops it first (a sample too unreadable, or the readings not holding) is the
+        // two charsets' accident, not the rule this pins; both tell the user the file is not what it says
+        assertTrue("${refused.reason}", refused.reason in setOf(Reason.UNREADABLE, Reason.MISMATCH))
         // Han all through as GBK reads it, but not words the dictionary reads: a mismatch
         val gbk = traditional.joinToString("\n") { it.first }.toByteArray(WordLists.GB18030)
         val readsNone: (List<String>) -> Map<String, String?> = { texts -> texts.associateWith { null } }
@@ -372,6 +377,21 @@ class DictionaryFormatTest {
         // the same in UTF-8 reads
         val utf8 = traditional.joinToString("\n") { it.first }.toByteArray()
         assertEquals(5, (DictionaryFormat.analyse({ utf8.inputStream() }, guess = reads) as Detected).guessed)
+    }
+
+    // a GBK export with pinyin and a line the dictionary cannot read (a rare name): not refused for it; the words
+    // alone the file's most are held to the guess (the Big5 test above) (R20 F5924)
+    @Test
+    @Uat("WD-38")
+    fun aFewWordsAloneInAGbkFileWithPinyinRefuseNothing() {
+        val pairs = listOf("你好" to "ni'hao", "幽默" to "you'mo", "输入法" to "shu'ru'fa", "词库" to "ci'ku", "拼音" to "pin'yin")
+        val lines = List(20) { pairs }.flatten().map { (t, p) -> "$t $p" } + "幽默输入"
+        val bytes = lines.joinToString("\n", postfix = "\n").toByteArray(WordLists.GB18030)
+        val readsNone: (List<String>) -> Map<String, String?> = { texts -> texts.associateWith { null } }
+        assertEquals(1, (DictionaryFormat.analyse({ bytes.inputStream() }, guess = readsNone) as Detected).unguessed)
+        // the words alone the file's most, though a line has pinyin: held to the guess as before
+        val most = (List(30) { "幽默输入" } + "你好 ni'hao").joinToString("\n", postfix = "\n").toByteArray(WordLists.GB18030)
+        assertEquals(Reason.MISMATCH, (DictionaryFormat.analyse({ most.inputStream() }, guess = readsNone) as Refused).reason)
     }
 
     @Test

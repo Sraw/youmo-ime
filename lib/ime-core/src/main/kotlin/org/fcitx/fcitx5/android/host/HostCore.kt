@@ -447,10 +447,9 @@ class HostCore(
         }
     }
 
-    /** The input method of the active context (`currentIme`). */
     /**
      * What each punctuation key types now: on the active context as its status says, or before one is focused, under
-     * [currentInputMethod] (the keyboard's at the host's start, and after a new table).
+     * the group's first input method (the keyboard's at the host's start, and after a new table).
      */
     fun punctuationKeys(): Map<String, String> {
         val p = modules.punctuation ?: return emptyMap()
@@ -458,7 +457,7 @@ class HostCore(
     }
 
     /**
-     * [punctuationKeys] as a host started now would have them before any context: under [currentInputMethod], full
+     * [punctuationKeys] as a host started now would have them before any context: under the group's first input method, full
      * width off (it is not saved). What the app keeps for its next start, to draw the keys before the host is up.
      */
     fun startPunctuationKeys(): Map<String, String> =
@@ -468,6 +467,7 @@ class HostCore(
     /** [block]'s changes as one event: the status, however often changed in it, sent once at its end. */
     fun <T> batch(block: () -> T): T = pipeline.batch(block)
 
+    /** The input method of the active context (`currentIme`). */
     fun currentInputMethod(): String = contexts.active?.let(contexts::inputMethod) ?: contexts.group.inputMethods.firstOrNull().orEmpty()
 
     private fun changedProfile() {

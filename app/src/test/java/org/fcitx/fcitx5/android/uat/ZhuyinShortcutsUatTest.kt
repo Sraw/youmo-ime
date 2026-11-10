@@ -71,10 +71,9 @@ class ZhuyinShortcutsUatTest {
         assertEquals(1, m.drawnIcons)
         assertEquals(0, h.key("ㄋ").drawnIcons)
         for (face in listOf("ㄏ", "ㄌ", "ㄒ", "ㄈ", "ㄗ")) assertEquals(face, 1, h.key(face).drawnIcons)
-        // at the standard height only symbols whose ink meets their icon's give way: the icon into
-        // its corner first (ㄇ's and ㄈ's enough), then the symbol down a little (ㄌ under the
-        // scissors the most), none smaller; ㄋ, no icon, and the rest as they were: told by the
-        // symbol's top against its row's highest, whichever draws the keys
+        // at the standard height only the icons give way, into their corners, where a symbol's ink
+        // meets theirs (ㄇ's and ㄈ's, ㄌ under the scissors); no symbol moved off its row's baseline,
+        // none smaller; ㄋ, no icon, as it was: told by the symbol's top against its row's highest
         val symbols = h.keys().filter { k -> k.label.singleOrNull()?.let { it in ZhuyinKeys.SYMBOLS || it in ZhuyinKeys.MARKS } == true }
         val size = symbols.map { it.textSize(it.label) }.toSet()
         assertEquals(size.toString(), 1, size.size)
@@ -82,24 +81,16 @@ class ZhuyinShortcutsUatTest {
             val top = row.minOf { it.drawn(it.label)!!.top }
             row.map { it to it.drawn(it.label)!!.top - top }.filter { it.second > 0.5f }
         }
-        val yielding = setOf("ㄌ", "ㄏ", "ㄒ", "ㄗ")
-        val canvas = KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE }
-        if (canvas) {
-            // the scene's symbols are its main characters: never moved off their row's baseline, the icons give
-            // way in their corners (060-render-p2 S4e)
-            assertTrue(moved.toString(), moved.isEmpty())
-        } else {
-            assertEquals(yielding, moved.map { it.first.label }.toSet())
-        }
-        for ((k, down) in moved) assertTrue("${k.label} $down", down < k.height / 4f)
+        assertTrue(KeyboardHarness.all(h.keyboard).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE })
+        // the scene's symbols are its main characters: never moved off their row's baseline, the icons give
+        // way in their corners (060-render-p2 S4e)
+        assertTrue(moved.toString(), moved.isEmpty())
         // none sideways: each symbol as far in from its key's left as on the keys with no shortcut (below), the
         // scene's text at its full width. The scene's told by its middle: its class is one size for every key
         // (S4e) and may be smaller where the shortcuts are drawn than with none, which moves a glyph's left in but
         // not its middle; within a px, the scene placing its text on its edges before they are rounded
-        val inFrom = symbols.associate { it.label to it.drawn(it.label)!!.let { r -> if (canvas) r.centerX() else r.left } - it.bounds.left }
-        if (canvas) {
-            for (k in symbols) assertEquals(k.label, 1.0, (k as SceneShownKey).node.ops(false).filterIsInstance<Op.Text>().single { it.text == k.label }.scaleX, 0.0)
-        }
+        val inFrom = symbols.associate { it.label to it.drawn(it.label)!!.centerX() - it.bounds.left }
+        for (k in symbols) assertEquals(k.label, 1.0, (k as SceneShownKey).node.ops(false).filterIsInstance<Op.Text>().single { it.text == k.label }.scaleX, 0.0)
         h.captureBoard("ZhuyinShortcutsUatTest/dachen")
         h.swipe(m, 0f, -m.height * 1.3f)
         h.idle()
@@ -118,9 +109,9 @@ class ZhuyinShortcutsUatTest {
         val bare = harness(ImKeyboard.ZHUYIN_FULL)
         assertEquals(0, bare.key("ㄇ").drawnIcons)
         val bareFrom = bare.keys().filter { k -> k.label in inFrom }
-            .associate { it.label to it.drawn(it.label)!!.let { r -> if (canvas) r.centerX() else r.left } - it.bounds.left }
+            .associate { it.label to it.drawn(it.label)!!.centerX() - it.bounds.left }
         assertEquals(inFrom.keys, bareFrom.keys)
-        for ((label, x) in inFrom) assertEquals(label, bareFrom.getValue(label), x, if (canvas) 1f else 0.01f)
+        for ((label, x) in inFrom) assertEquals(label, bareFrom.getValue(label), x, 1f)
     }
 
     private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }

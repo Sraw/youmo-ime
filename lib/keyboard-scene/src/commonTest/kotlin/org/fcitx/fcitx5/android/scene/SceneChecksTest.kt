@@ -65,7 +65,8 @@ class SceneChecksTest {
     private fun leeway(shot: Shot, k: KeyNode, c: Drawn, all: List<Drawn>): String? = when {
         shot.env.flat && k.kind == "space" && c.part == Part.MARK -> FLAT_SPACE
         c.part == Part.ICON && all.none { it.text } &&
-            kotlin.math.abs(c.box.height - ICON_DP * shot.env.density) < EDGE -> ICON_ON_COMPACT
+            kotlin.math.abs(c.box.height - ICON_DP * shot.env.density) < EDGE &&
+            (c.box.height > k.shape.bounds.height + EDGE || c.box.width > k.shape.bounds.width + EDGE) -> ICON_ON_COMPACT
         else -> null
     }
 

@@ -223,6 +223,7 @@ class BarUatTest {
     // the toolbar expanded by hand over a copy's suggestion stays expanded when the bar is next evaluated (the
     // field's input restarted): the clip let go, not taken back to it
     @Test
+    @Uat("TB-52")
     fun theToolbarExpandedOverAClipStaysExpanded() {
         val h = harness().start()
         h.copied("公园")

@@ -45,6 +45,6 @@ body:
     attributes:
       label: 应用版本 / App Version
       description: 设置首页右上角菜单 → 关于，以及 设置 → 资源包 里两个包的版本（没导入的写"未导入"）。 / Settings, top-right menu → About, and the two packs' versions under Settings → Resource packs ("not imported" if one is not).
-      placeholder: 0.1.0 voice
+      placeholder: 0.6.0，文字包 v1，语音包 未导入
     validations:
       required: true

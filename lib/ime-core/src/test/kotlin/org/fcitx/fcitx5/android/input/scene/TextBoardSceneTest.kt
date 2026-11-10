@@ -82,6 +82,8 @@ class TextBoardSceneTest {
                 is Include -> listOfNotNull(part.condition)
             }
         }
+        // an include's own parts are not walked here: there are none to miss
+        assertTrue("qwerty.xml includes nothing", layout.parts.none { it is Include })
         val asking = conditions.filter { c -> c.anyOf.flatten().any { it.name == "composing" } }
         assertTrue("qwerty.xml asks composing somewhere", asking.isNotEmpty())
         for (c in asking) {

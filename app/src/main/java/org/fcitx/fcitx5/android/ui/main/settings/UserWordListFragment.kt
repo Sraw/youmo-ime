@@ -662,8 +662,9 @@ internal class PinyinWords(private val kind: UserWord.Kind) : WordSource(
             val times = word.count.roundToInt().coerceAtLeast(1)
             res.getQuantityString(R.plurals.word_typed_times, times, word.pinyin, times)
         } else if (word.kind == UserWord.Kind.BLOCKED && word.pinyin.isEmpty()) {
-            // English's, no reading: how its case is matched (EnglishBlocks)
-            res.getString(R.string.english_block_detail)
+            // English's, no reading: how its case is matched (EnglishBlocks): one all in lower case in any case,
+            // any other (iPhone) as written
+            res.getString(if (word.text == word.text.lowercase()) R.string.english_block_detail else R.string.english_block_detail_exact)
         } else {
             word.pinyin
         }

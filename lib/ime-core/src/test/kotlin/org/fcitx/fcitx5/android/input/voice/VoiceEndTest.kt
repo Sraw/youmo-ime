@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.voice
 import org.fcitx.fcitx5.android.input.editing.EditorTraits
 import org.fcitx.fcitx5.android.input.voice.VoiceEnd.Field
 import org.fcitx.fcitx5.android.input.voice.VoiceEnd.Mode
+import org.fcitx.fcitx5.android.Uat
 import org.junit.Test
 import org.junit.Assert.assertEquals
 
@@ -28,6 +29,7 @@ class VoiceEndTest {
         assertEquals(Field.OTHER, VoiceEnd.field(multi, "com.example.notes"))
     }
 
+    @Uat("VO-35")
     @Test
     fun aSearchAnAddressOrOneLineIsALine() {
         assertEquals(Field.LINE, VoiceEnd.field(EditorTraits(), null))
@@ -39,6 +41,7 @@ class VoiceEndTest {
         assertEquals(Field.LINE, VoiceEnd.field(EditorTraits(isNumber = true), null))
     }
 
+    @Uat("VO-35")
     @Test
     fun aChatLosesItsClosingMarkAQuestionKeepsItsOwn() {
         assertEquals("明天见", VoiceEnd.apply("明天见。", Field.CHAT, Mode.AUTO))
@@ -67,6 +70,7 @@ class VoiceEndTest {
         assertEquals("等等…", VoiceEnd.apply("等等…", Field.CHAT, Mode.AUTO))
     }
 
+    @Uat("VO-35")
     @Test
     fun aLineLosesEveryEndMark() {
         assertEquals("明天天气怎么样", VoiceEnd.apply("明天天气怎么样？", Field.LINE, Mode.AUTO))
@@ -75,6 +79,7 @@ class VoiceEndTest {
         assertEquals("example.com", VoiceEnd.apply("example.com.", Field.LINE, Mode.KEEP))
     }
 
+    @Uat("VO-35")
     @Test
     fun elsewhereTheTextEndsAsSaidUnlessDropped() {
         assertEquals("今天开会。", VoiceEnd.apply("今天开会。", Field.OTHER, Mode.AUTO))

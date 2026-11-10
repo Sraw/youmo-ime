@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -217,11 +218,14 @@ class SettingsEffectUatTest {
     @Uat("ST-20")
     fun noLanguageKeyAWiderSpace() {
         h.start()
+        val language = h.service.getString(R.string.a11y_key_switch_language)
+        // the key is there before, so its absence after is the setting's
+        assertTrue(h.keys().any { it.description == language })
         val wide = space().bounds.width()
         fresh()
         prefs.set(keyboard.showLangSwitchKey, false)
         h.start()
-        assertTrue(KeyboardHarness.all(h.inputView).none { h.shown(it) && it.contentDescription == "Switch language" })
+        assertTrue(h.keys().none { it.description == language })
         assertTrue(space().bounds.width() > wide)
     }
 

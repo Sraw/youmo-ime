@@ -7,9 +7,9 @@ does). Each recognizer segment is judged by each rule; the talk's text is what i
 
 Rules: base (none, d4d0981c6), r1 (077374d11: the whole talk's 3rd loudest window -50 dBFS or 8 dB
 over its floor), a (rise 6 dB, 3 windows in a row, the floor without windows under -90), b2 (silero
-0.2 heard any speech in the talk), h2 (946ccd433: a short Latin segment typed only if loud and
-voiced), h3 (VoiceQuiet now: a short Latin segment typed if its 3rd loudest window is -50 dBFS or
-louder, or 8 dB over the floor and voiced).
+0.2 heard any speech in the talk), h2 (VoiceQuiet now, since 9b98ecda4; first 946ccd433: a short
+Latin segment typed only if voiced and its 3rd loudest window -50 dBFS or louder or 8 dB over the
+floor), h3 (measured, not taken: as h2 but -50 dBFS or louder typed unvoiced too).
 
 Sets (voice-eval's sets, VOICE_EVAL; the UAT's clips, dev/uat-out/voice-clips): sp (aishell 0-39),
 ascend (0-39, Chinese with English), en (Kokoro's English phrases, voices 0-2, made by en_clips()),
@@ -88,9 +88,7 @@ class Talk:
         return seg[-3] if len(seg) >= 3 else None
 
     def h2(s, t, a, b):
-        if not latin_short(t): return True
-        l = s.third(a, b)
-        return l is not None and any(s.voiced[a // W:-(-b // W)]) and (l >= LOUD or l - s.floor() >= RISE)
+        return not latin_short(t) or s.loud_voiced(a, b)
 
     def loud_voiced(s, a, b):
         l = s.third(a, b)
@@ -302,7 +300,7 @@ def table(path):
         v = [r for r in rs if r['set'] in ('merge', 'pre2') and r['R'] == R]
         for s in ('merge', 'pre2'):
             w = [r for r in v if r['set'] == s]
-            if w: print(f"{s} R{R}: Latin typed with the Chinese (h3) {sum(bool(re.search('[A-Za-z]', r['out']['h3'])) for r in w)}/{len(w)}")
+            if w: print(f"{s} R{R}: Latin typed with the Chinese (h2) {sum(bool(re.search('[A-Za-z]', r['out']['h2'])) for r in w)}/{len(w)}")
 
 
 if __name__ == '__main__':

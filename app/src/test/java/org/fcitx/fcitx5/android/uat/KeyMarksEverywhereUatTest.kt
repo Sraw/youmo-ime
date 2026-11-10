@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.content.res.Configuration
 import android.graphics.RectF
 import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
@@ -48,8 +49,8 @@ import org.robolectric.annotation.GraphicsMode
  * the settings page lets be chosen and as the keys are drawn (standard, 紧凑, floating, one-handed,
  * landscape): what each key draws, its label or icon, its symbol and its shortcuts' marks, as drawn
  * (as the scene placed them, docs/keyboard.md), never two over each other. Their ink: a text's glyphs, an
- * icon's box. 滑动 is not gone through: it moves no mark. No symbol is left out (those left out are
- * printed, the report's numbers).
+ * icon's box. 滑动 is not gone through: it moves no mark. A symbol is left out only where it does not fit
+ * at its class's size (those left out are printed, the report's numbers).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -133,7 +134,8 @@ class KeyMarksEverywhereUatTest {
     )
 
     private companion object {
-        // Content's and SceneBuilder's (rules B §5, §8)
+        // Content's and SceneBuilder's (rules B §5, §8; Content.kt's symbol and mark placing), written out here
+        // on purpose: changed there, this checks the old geometry until copied again
         const val SYMBOL_DP = 10.666667
         const val SYMBOL_SIDE_DP = 4.0
         const val BELOW_DP = 2.0
@@ -203,7 +205,7 @@ class KeyMarksEverywhereUatTest {
         val edge = KeyMarkYield.Edge(face.toInk(), radii, MARK_EDGE_DP * dp + line, line)
         val room = KeyMarkYield.Ink(face.left + 2 * dp, face.top + dp, face.right - 2 * dp, face.bottom - dp)
         val others = d.filter { it.first != "label" && it.first != "symbol" }.map { (_, r) ->
-            KeyMarkYield.Mark(KeyMarkYield.Ink(r.left.toDouble(), r.top.toDouble(), r.right.toDouble(), r.bottom.toDouble()), shortcutAt.corner ?: KeyMarks.Slot.Bottom)
+            KeyMarkYield.Mark(KeyMarkYield.Ink(r.left.toDouble(), r.top.toDouble(), r.right.toDouble(), r.bottom.toDouble()), KeyMarks.shortcutSlot(shortcutAt) ?: KeyMarks.Slot.Bottom)
         }
         val size = if (least) nominal * KeyMarkYield.MIN_MARK_SCALE else drawn.size
         fun stays(f: Double): Boolean {
@@ -294,9 +296,14 @@ class KeyMarksEverywhereUatTest {
             val shown = h.keys().filterIsInstance<SceneShownKey>()
             // the symbols' font and size as drawn on this board: what a left-out one would be drawn in
             val symbol = shown.flatMap { k -> k.node.ops(false).filterIsInstance<Op.Text>().filter { it.text == k.alt } }.maxByOrNull { it.size }
-            val slot = KeyMarks.symbolSlot(KeyMarks.At.valueOf(symbolAt.name), KeyMarks.At.valueOf(shortcutAt.name), landscape = false, compact = "紧凑" in mode.name)
+            // where the engine puts them: landscape (from the configuration, as SceneEnvs) moves the marks to corners
+            val landscape = h.service.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val compact = "紧凑" in mode.name
+            val at = KeyMarks.At.valueOf(symbolAt.name)
+            val shortcutOn = KeyMarks.onKeys(at, KeyMarks.At.valueOf(shortcutAt.name), landscape, compact).shortcut
+            val slot = KeyMarks.symbolSlot(at, KeyMarks.At.valueOf(shortcutAt.name), landscape, compact)
             val before = dropped.size
-            for (k in shown) checkKey(case, k, symbolAt != KeyMarkPosition.None, symbol, slot, KeyMarks.At.valueOf(shortcutAt.name), "紧凑" in mode.name)
+            for (k in shown) checkKey(case, k, symbolAt != KeyMarkPosition.None, symbol, slot, shortcutOn, compact)
             if (dropped.size > before) println("KeyMarksEverywhere $case: ${dropped.size - before} left out")
             keys += shown.size
         }

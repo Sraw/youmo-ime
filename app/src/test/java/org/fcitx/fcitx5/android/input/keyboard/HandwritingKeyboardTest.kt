@@ -61,10 +61,9 @@ class HandwritingKeyboardTest {
     private val sent = ArrayList<KeyAction>()
     private val finished = ArrayList<Int>()
     private val readings = ArrayList<ReadingStyle>()
-
-    // in a window, as on a phone: a held key is dropped once the keyboard is not
     private val delivered = ArrayList<String>()
 
+    // in a window, as on a phone: a held key is dropped once the keyboard is not
     private fun keyboard(recognition: HandwritingRecognition = this.recognition) = HandwritingKeyboard(
         PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark,
         deliver = { reading, _ -> delivered += reading.texts }, finished = { finished += it }, recognition = recognition, setReading = { readings += it },
@@ -73,7 +72,6 @@ class HandwritingKeyboardTest {
         Robolectric.buildActivity(Activity::class.java).setup().get().setContentView(it)
         it.laidOut()
     }
-
 
     // the key whose view had [id], as the scene draws it now
     private fun HandwritingKeyboard.key(id: Int): ShownKey = checkNotNull(shownKeyWithId(id))

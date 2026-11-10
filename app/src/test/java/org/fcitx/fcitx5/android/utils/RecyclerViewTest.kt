@@ -9,7 +9,6 @@ import android.app.Activity
 import android.content.Context
 import android.widget.FrameLayout
 import androidx.core.graphics.Insets
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.FcitxApplication

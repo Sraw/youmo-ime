@@ -74,12 +74,12 @@ import org.fcitx.fcitx5.android.core.plus
 import org.fcitx.fcitx5.android.core.toSpannedString
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.HostDaemon
-import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -98,20 +98,20 @@ import org.fcitx.fcitx5.android.input.editing.EditingSession
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
 import org.fcitx.fcitx5.android.input.editing.ForwardedKeys
 import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
-import org.fcitx.fcitx5.android.input.editing.WatchedEditor
 import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
+import org.fcitx.fcitx5.android.input.editing.WatchedEditor
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
-import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
+import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
+import org.fcitx.fcitx5.android.input.voice.VoiceCommit
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
-import org.fcitx.fcitx5.android.input.voice.VoiceCommit
 import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.Locales
@@ -333,8 +333,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         listOf(keyboardHeightPercent, keyboardHeightPercentLandscape, keyboardHeightFollowTheme)
     }
 
-    // whether the keyboard was made under PackGateView: made anew when the text pack's readiness changes
-    private var gateBuilt = false
+    // whether the keyboard was made with the text pack ready (else under PackGateView): made anew when that changes
+    private var textBuilt = false
 
     // whether it was made with the voice pack: the space's hold to talk, its microphone badge, with it only
     private var voiceBuilt = false
@@ -345,9 +345,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val newInputView = SceneTrace.section("new InputView") { InputView(this, fcitx, theme) }
         // no text pack (or not one this app reads): the keyboard cannot type, and says so over all of it
         val text = PackStore.status(PackKind.TEXT)
-        gateBuilt = text !is PackStatus.Ready
+        textBuilt = text is PackStatus.Ready
         voiceBuilt = PackStore.ready(PackKind.VOICE)
-        if (gateBuilt) newInputView.overKeys(PackGateView(this, theme, text), underBar = false)
+        if (!textBuilt) newInputView.overKeys(PackGateView(this, theme, text), underBar = false)
         SceneTrace.section("setInputView") {
             setInputView(newInputView)
             inputDeviceMgr.setInputView(newInputView)
@@ -403,8 +403,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             return
         }
         // the field's composing text kept there as text, as onFinishInputView does: with
-        // ClientUnfocusCommit fcitx drops its client preedit on focus out rather than commit it
-        finishComposing()
+        // ClientUnfocusCommit fcitx drops its client preedit on focus out rather than commit it.
+        // Voice's tail still to come is taken away instead: the talk types it once, as the old
+        // view's end tells it (left as text here, it would be typed twice)
+        if (editingSession.provisional) editingSession.updateComposingText(FormattedText.Empty) else finishComposing()
         postFcitxJob { focusOutIn() }
         if (currentInputEditorInfo?.isTypeNull() == false) tellContext()
     }
@@ -421,14 +423,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val uid = binding.uid
         val pkgName = pkgNameCache.forUid(uid)
         val info = currentInputEditorInfo
-        val field = currentInputStarted && info != null && !info.isTypeNull()
+        // a raw-key field's (TYPE_NULL) capabilities set too, as onStartInput sets every field's; only the focus is a text field's
+        val started = currentInputStarted && info != null
+        val field = info != null && started && !info.isTypeNull()
         val flags = capabilityFlags
         postFcitxJob {
             activate(uid, pkgName)
-            if (field) {
-                setCapFlags(flags)
-                focus(true)
-            }
+            if (started) setCapFlags(flags)
+            if (field) focus(true)
         }
         if (field) tellContext()
     }
@@ -522,7 +524,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     generation = it.generation
                     refocus()
                 }
-                if (inputView == null || (it.ready(PackKind.TEXT) != gateBuilt && it.ready(PackKind.VOICE) == voiceBuilt)) return@collect
+                if (inputView == null || (it.ready(PackKind.TEXT) == textBuilt && it.ready(PackKind.VOICE) == voiceBuilt)) return@collect
                 rebuilding(ViewRebuild.SETTING)
                 replaceInputView(ThemeManager.activeTheme, start = true)
             }

@@ -85,6 +85,8 @@ def set01(d):
     d.step("没有文字包时键盘上提示导入")
     d.wait(lambda x: x.find(contains="需要导入文字包", where="ime"), 20, what="键盘上的「需要导入文字包」")
     import_packs(d, d.voice)
+    # a release build imports through the 资源包 page and is left on the settings: the field again
+    d.open_page("text")
     # then it loads its data: the space key reads （不可用） for a while
     end = time.time() + 60
     while "拼音" not in d.im_label() and time.time() < end:

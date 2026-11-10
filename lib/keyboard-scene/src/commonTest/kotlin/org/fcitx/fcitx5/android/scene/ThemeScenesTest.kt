@@ -68,7 +68,7 @@ class ThemeScenesTest {
 
     // what the input method, the field and the board make of a theme's cascades: none more where it names
     // none of them, and for one that does, one for each set of those it names met together (060-render-p3 T5),
-    // each of the input methods and fields there is met
+    // each of the input methods and fields there is met (the input methods a sample, not all of Selector.IMS: the counts hold for this theme)
     @Test
     fun cascadesAreKeptByTheScenesAThemeNames() {
         val ims = listOf(Input(ime = "pinyin"), Input(ime = "shuangpin"), Input(ime = "english"), Input(ime = "table", table = "wubi"),
@@ -111,6 +111,8 @@ class ThemeScenesTest {
         val sets = (0 until 64).map { bits -> names.filterIndexedTo(HashSet()) { i, _ -> bits shr i and 1 == 1 } }
         val c = Cascades(many)
         val made = sets.associateWith { c.of(it) }
+        // the indices here are for 32 kept of 64: a new cap is a new test
+        assertEquals(32, Cascades.KEPT, "the cap these indices assume")
         // the last 32 kept, 32 to 63, the oldest first
         assertEquals(Cascades.KEPT, c.size)
         assertTrue(made.getValue(sets[63]) === c.of(sets[63]))

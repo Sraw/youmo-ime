@@ -67,7 +67,13 @@ sealed interface SceneAction {
         fun of(raw: String): SceneAction? {
             if (raw.isNotEmpty() && raw.codePointCount(0, raw.length) == 1) return Key(raw)
             val m = NAMED.matchEntire(raw)
-            if (m == null) return if (raw == "caps") Caps(false) else if (raw == "reading") Reading(null) else Command(raw)
+            if (m == null) {
+                return when (raw) {
+                    "caps" -> Caps(false)
+                    "reading" -> Reading(null)
+                    else -> Command(raw)
+                }
+            }
             val (kind, arg) = m.destructured
             return named(raw, kind, arg).also { if (it == null) CoreLog.e("scene action: \"$raw\" is none the app has") }
         }

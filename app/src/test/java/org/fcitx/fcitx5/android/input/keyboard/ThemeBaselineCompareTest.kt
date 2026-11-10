@@ -333,6 +333,7 @@ class ThemeBaselineCompareTest {
             File(f.path.removeSuffix(".png") + ".now.png").outputStream().use { drawn.bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         } else {
             f.delete()
+            File(f.path.removeSuffix(".png") + ".now.png").delete()
         }
         return percent
     }
@@ -412,6 +413,7 @@ class ThemeBaselineCompareTest {
 
     private fun fmt(p: Double) = String.format(Locale.ROOT, "%.3f", p)
 
+    // contract: the committed record's files (index.tsv, limits.tsv, the pictures), which mutation cannot see.
     // the record whole: every picture there, read, indexed once, planned here; every one with a limit
     @Test
     fun theRecordIsWholeAndEveryPictureHasALimit() {

@@ -326,12 +326,13 @@ case("TB-28", needs="jvm:ToolbarUatTest.copyingNothingLeavesTheCursor")(lambda d
 case("TB-29", needs="jvm:ToolbarUatTest.holdingTheCandidatesExpandButtonHides")(lambda d: None)
 
 
-case("TB-30", needs="jvm:ToolbarUatTest.copyAndCutSaidNothingCopiedNotSaid")(lambda d: None)
+case("TB-30", needs="jvm:ToolbarUatTest.copyAndCutSaidNothingToCopySaid、EditingLagUatTest.copyWithTheSelectionReportLagging")(lambda d: None)
 
 case("TB-31", needs="jvm:ToolbarUatTest.pasteStaysInTheClipboardWhenSoSet")(lambda d: None)
 
 
 case("TB-32", needs="jvm:FloatingUatTest.squareKeysASquareFloatingKeyboard")(lambda d: None)
+case("TB-53", needs="manual:平面键时悬浮键盘竖屏、横屏的四角，看图")(lambda d: None)
 
 
 @case("TB-41", mutates=True)
@@ -368,6 +369,7 @@ case("TB-49", needs="jvm:ClipboardSplitUatTest.piecesPickedBySweepingAcross")(la
 
 
 case("TB-50", needs="jvm:ClipboardOrderUatTest.entriesPastedFromThePanelMoveFirstWhenItCloses、ClipboardDaoTest.anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays")(lambda d: None)
+case("TB-52", needs="jvm:BarUatTest.theToolbarExpandedOverAClipStaysExpanded")(lambda d: None)
 
 
 @case("TB-51", visual=True)
