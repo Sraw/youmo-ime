@@ -171,7 +171,7 @@
 ### HW-35 [P1] 写完再点字母：先上屏写好的再打字母
 - **前提**：键盘手写开。
 - **操作**：在键上写「人」，停笔约 1 秒；点 n。
-- **预期**：「人」上屏，框里是「人」后面跟着正在打的 n。
+- **预期**：「人」上屏，框里是「人」，编码行里是正在打的 n。
 - **JVM**：`InkOverTest.aLetterAfterTheWritingPutsTheBestInThenTypesIt`（ime-core）。
 
 ### HW-36 [P1] 九键、14 键上也能写

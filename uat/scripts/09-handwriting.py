@@ -207,8 +207,10 @@ def hw35(d):
     key_write(d, "人")
     d.type("n")
     f = d.field_text()
-    check(f.startswith("人") and f[1:].strip().lower().startswith("n"), f"框里「{f}」")
-    return f"「{f}」"
+    p = d.preedit()
+    # pinyin's input is shown in the composing row, not in the field
+    check(f == "人" and p.lower().startswith("n"), f"框里「{f}」，组字「{p}」")
+    return f"「{f}」+「{p}」"
 
 
 case("HW-36", needs="jvm:KeyHandwritingUatTest.theNineAndFourteenKeysAreWrittenOnToo")(lambda d: None)
