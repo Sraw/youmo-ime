@@ -113,6 +113,75 @@ class EditingSessionTest {
 
     // endregion
 
+    // region commitText of a text too long for one call (CommitPieces)
+
+    private fun pieced(text: String = "", cursor: Int = text.length): Pair<EditingSession, FakeEditor> {
+        val editor = FakeEditor(text, cursor)
+        val session = EditingSession(editor, commitPiece = 4)
+        session.selection.resetTo(cursor)
+        return session to editor
+    }
+
+    @Test
+    fun aLongTextGoesInPiecesInOneBatchTheEditorReadBetween() {
+        val (s, e) = pieced("<>", cursor = 1)
+        s.commitText("abcdefghij")
+        assertEquals("<abcdefghij>", e.text)
+        assertEquals(
+            listOf(
+                "beginBatchEdit()",
+                "commitText(abcd, 1)", "textBeforeCursor(1)",
+                "commitText(efgh, 1)", "textBeforeCursor(1)",
+                "commitText(ij, 1)",
+                "endBatchEdit()",
+            ),
+            e.calls,
+        )
+        assertTrue("the cursor is predicted after the whole text", s.selection.latest.rangeEquals(11))
+    }
+
+    @Test
+    fun theEditorReportingAPiecesEndIsExpected() {
+        val (s, _) = pieced()
+        s.commitText("abcdefghij")
+        assertTrue("a report between pieces is one predicted", s.selection.consume(4))
+        assertTrue(s.selection.latest.rangeEquals(10))
+        assertTrue(s.selection.consume(10))
+        assertTrue(s.selection.settled)
+    }
+
+    @Test
+    fun aTextOfOnePieceGoesAsBefore() {
+        val (s, e) = pieced()
+        s.commitText("abcd")
+        assertEquals(listOf("commitText(abcd, 1)"), e.calls)
+        assertTrue(s.selection.latest.rangeEquals(4))
+    }
+
+    @Test
+    fun aLongTextWithAnExplicitCursorLeavesItThereAfterThePieces() {
+        val (s, e) = pieced("<>", cursor = 1)
+        s.commitText("abcdefghij", cursor = 2)
+        assertEquals("<abcdefghij>", e.text)
+        assertEquals(listOf("setSelection(3, 3)", "endBatchEdit()"), e.calls.takeLast(2))
+        assertEquals(3, e.selectionStart)
+        assertTrue(s.selection.latest.rangeEquals(3))
+    }
+
+    @Test
+    fun aLongTextReplacesTheCompositionWithItsFirstPiece() {
+        val (s, e) = pieced("<>", cursor = 1)
+        e.setComposingText("xy")
+        s.compose("xy", start = 1)
+        e.calls.clear()
+        s.commitText("abcdefghij")
+        assertEquals("<abcdefghij>", e.text)
+        assertTrue(s.composing.isEmpty())
+        assertTrue(s.selection.latest.rangeEquals(11))
+    }
+
+    // endregion
+
     // region commitText while composing
 
     @Test

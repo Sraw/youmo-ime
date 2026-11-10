@@ -27,6 +27,8 @@ import kotlin.math.max
  */
 class EditingSession(
     private val editor: InputEditor,
+    // units a commit goes to the editor in at most ([CommitPieces]); smaller in tests
+    private val commitPiece: Int = CommitPieces.MAX,
     private val checkThread: () -> Unit = {},
 ) {
 
@@ -375,7 +377,8 @@ class EditingSession(
 
     /**
      * Commits [text], replacing the composing region if there is one, the selection if there
-     * is one, or simply inserting before the cursor.
+     * is one, or simply inserting before the cursor. A text too long for one call (a long paste)
+     * goes in pieces in one batch edit ([CommitPieces]).
      *
      * @param cursor where to leave the cursor within [text]; `-1` means after its last
      * character, which is the common case and lets the editor place the cursor itself.
@@ -402,7 +405,10 @@ class EditingSession(
         }
         val start = if (composing.isEmpty()) selection.latest.start else composing.start
         resetComposingState()
-        if (cursor == -1) {
+        val pieces = CommitPieces.split(text, commitPiece)
+        if (pieces.size > 1) {
+            commitPieces(start, pieces, cursor)
+        } else if (cursor == -1) {
             selection.predict(start + text.length)
             editor.commitText(text, 1)
         } else {
@@ -411,6 +417,28 @@ class EditingSession(
             editor.batchEdit {
                 editor.commitText(text, 1)
                 editor.setSelection(target, target)
+            }
+        }
+    }
+
+    // a long text ([CommitPieces]) in one batch edit, each piece's end predicted: an editor may
+    // report the cursor between them, and a report of the last alone passes the others. Between
+    // pieces a read waits for the editor: one-way calls sent at once all hold binder buffer until
+    // each is taken, and 450 000 characters sent as 14 pieces at once lost 3 in the middle. The
+    // read's answer is not needed, nor is it if it times out: by then the pieces have been taken.
+    // The keyboard waits meanwhile (a second for 450 000), as long as the app is busy taking them
+    private fun commitPieces(start: Int, pieces: List<String>, cursor: Int) {
+        editor.batchEdit {
+            var end = start
+            pieces.forEachIndexed { i, piece ->
+                if (i > 0) editor.textBeforeCursor(1)
+                end += piece.length
+                selection.predict(end)
+                editor.commitText(piece, 1)
+            }
+            if (cursor != -1) {
+                selection.predict(start + cursor)
+                editor.setSelection(start + cursor, start + cursor)
             }
         }
     }

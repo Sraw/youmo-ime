@@ -100,6 +100,16 @@ minSdk is 29 and the tests ran at 35 alone till 0.5.1, which crashed on Android 
 (`NoSuchMethodError`; lint's `NewApi`, now fatal). Never `.use {}` a framework type unless it is
 `Closeable` at 29; recycle a `TypedArray` by hand. The tests at SDK 29 (testing.md) catch both.
 
+### A long commit does not fit the binder
+
+`InputConnection.commitText` is a one-way binder call, and one-way calls into a process share half
+of its 1 MB binder buffer. A clip of 297 000 characters pasted from the clipboard panel (a 567 KB
+parcel) failed with `FAILED BINDER TRANSACTION` in logcat and nothing in the field, while the
+IME's cursor prediction moved on; the editor's own paste of it worked (it reads the clipboard
+itself). Several one-way calls sent at once hold their buffers together until each is taken: 14
+pieces of 32 K sent back to back lost 3 in the middle. `EditingSession.commitText` sends a text of
+more than `CommitPieces.MAX` units in pieces, a read between them (`CommitPieces`).
+
 ### Direct boot
 
 Before the first unlock there is no credential-protected storage: `EngineBridge.userDir()` is null,
