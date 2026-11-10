@@ -211,9 +211,16 @@ class PopupComponent :
      */
     private fun motionOf(widget: String): PopupMotion? {
         val s = scenes.takeIf { it.ready && it.moves } ?: return null
-        val m = s.made("popup's motion", s.builder()?.popupMotion(widget)) ?: return null
+        // read once for a theme's scenes at a size (the builder's environment), not a SceneBuilder made for each bubble shown
+        val at = Triple(s, root.width, root.height)
+        val known = motions?.takeIf { it.first == at }?.second ?: HashMap<String, PopupMotion?>().also { motions = at to it }
+        // none kept too (getOrPut would ask again for a null)
+        if (widget !in known) known[widget] = s.made("popup's motion", s.builder()?.popupMotion(widget))
+        val m = known[widget] ?: return null
         return m.takeIf { KeyMotionSwitch.on(context) }
     }
+
+    private var motions: Pair<Triple<PopupScenes, Int, Int>, HashMap<String, PopupMotion?>>? = null
 
     // [view] gone from [root] in its fade, or at once ([atOnce], none set, or motion off now); then [gone]
     private fun goAway(view: View, atOnce: Boolean, gone: () -> Unit) {

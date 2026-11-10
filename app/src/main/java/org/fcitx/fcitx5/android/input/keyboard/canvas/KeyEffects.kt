@@ -240,7 +240,8 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
     // [shape] into [path], at [left], [top] (its box in [box])
     private fun pathOf(shape: Shape, left: Int, top: Int) {
         path.rewind()
-        path.fillType = Path.FillType.EVEN_ODD
+        // as the faces fill it (ScenePainter: non-zero): a self-crossing shape clipped with no hole the face has not
+        path.fillType = Path.FillType.WINDING
         when (shape) {
             is Shape.Rect -> {
                 for (i in 0 until FOUR) {

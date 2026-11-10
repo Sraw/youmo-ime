@@ -214,6 +214,7 @@ class KeyEffectTest {
             val clip = c.keyEffects.rippleClips().single()
             val path = c.keyEffects.rippleClipPaths().single()!!
             assertTrue(!clip.clipToOutline)
+            assertEquals(android.graphics.Path.FillType.WINDING, path.fillType)
             val w = clip.width
             val h2 = clip.height
             val region = android.graphics.Region().apply { setPath(path, android.graphics.Region(0, 0, w, h2)) }
