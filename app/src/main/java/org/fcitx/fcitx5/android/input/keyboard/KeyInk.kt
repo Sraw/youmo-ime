@@ -51,8 +51,9 @@ class KeyInk(
     // the piece whose first dot was a tap taken back, till its first reading is delivered
     private var takingBack = NO_PIECE
 
-    /** Whether written on yet: then the keys go in order with the pad ([keys]); else straight on. */
-    val writtenOn: Boolean get() = reads.isInitialized()
+    /** Whether a stroke was ever put on the pad: then the keys go in order with it ([keys]); else straight on. */
+    var writtenOn = false
+        private set
 
     /**
      * Whether strokes can be read now: the recognizer not given up (no stroke starts else, the touch a
@@ -106,6 +107,7 @@ class KeyInk(
         view.removeCallbacks(finishCheck)
         pad.finishMillis = pause()
         gesture.pauseMillis = pad.finishMillis
+        writtenOn = true
         pad.down(x, y)
     }
 

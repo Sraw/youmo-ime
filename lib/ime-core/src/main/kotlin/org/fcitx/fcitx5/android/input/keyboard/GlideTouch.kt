@@ -162,8 +162,9 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
             // a tap on a letter: the first dot of what may be written next (KeyInkGesture)
             // held past its long press, cancelled, in the gap (no key sent), or none kept: no tap, and
             // the one before is no first dot either (what this typed, if anything, is after it)
+            val onLetter = gesture != null && onLetterDown
             ink?.let {
-                if (!cancelled && gesture != null && onLetterDown && time - t0 <= longPressMillis) {
+                if (!cancelled && onLetter && time - t0 <= longPressMillis) {
                     add(x, y)
                     it.tapped(time, points, count)
                 } else {

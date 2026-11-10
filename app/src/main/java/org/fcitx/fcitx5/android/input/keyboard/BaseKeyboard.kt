@@ -683,7 +683,7 @@ abstract class BaseKeyboard(
     ) {
         val ink = keyInk
         // straight on unless written on, in an input method that writes (English's keys never wait on its reads)
-        if (ink == null || !ink.writtenOn || !writing() || !inkIm()) return keyActionListener?.onKeyAction(action, source) ?: Unit
+        if (ink?.writtenOn != true || !writing() || !inkIm()) return keyActionListener?.onKeyAction(action, source) ?: Unit
         // in order with what is written on the keys: after its readings, backspace its strokes' first (InkKeys)
         ink.keys.onAction({ isAttachedToWindow }) { if (!ink.keys.took(action)) keyActionListener?.onKeyAction(action, source) }
     }
