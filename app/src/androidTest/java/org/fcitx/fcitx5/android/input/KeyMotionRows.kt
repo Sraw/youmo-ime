@@ -141,7 +141,7 @@ private fun KeyboardPerfBaselineTest.shiftRows(label: String) {
     log("anim\t$label, shift, every frame\t${frames.summary(all)}")
 }
 
-// E held till its popup is up, every frame from its long press for POPUP_FRAMES_MS (the 150 ms scale and more),
+// E held till its popup is up, every frame from its down to POPUP_FRAMES_MS past LONG_PRESS_MS (the press, the popup, its 150 ms scale),
 // then a move a choice right and back, lifted, the field emptied
 private fun KeyboardPerfBaselineTest.popupRows(label: String) {
     val e = keyAt(onKeyboard().text("e"))
@@ -149,11 +149,11 @@ private fun KeyboardPerfBaselineTest.popupRows(label: String) {
     val space = keyAt(onKeyboard().res(KeyboardPerfBaselineTest.imePkg, "button_space"))
     val all = mutableListOf<KeyboardFrames.Frame>()
     repeat(warmUp + runs) { i ->
+        // from the down: the long press's own time (a setting) is shorter than LONG_PRESS_MS, the wait
+        val from = System.nanoTime()
         val down = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, e, down, down)
-        SystemClock.sleep(LONG_PRESS_MS - POPUP_LEAD_MS)
-        val from = System.nanoTime()
-        SystemClock.sleep(POPUP_LEAD_MS + POPUP_FRAMES_MS)
+        SystemClock.sleep(LONG_PRESS_MS + POPUP_FRAMES_MS)
         if (i >= warmUp) all += frames.between(from, System.nanoTime())
         inject(MotionEvent.ACTION_MOVE, PointF(r.x, e.y), down, SystemClock.uptimeMillis())
         inject(MotionEvent.ACTION_MOVE, e, down, SystemClock.uptimeMillis())
@@ -164,7 +164,6 @@ private fun KeyboardPerfBaselineTest.popupRows(label: String) {
     log("anim\t$label, long press, every frame\t${frames.summary(all)}")
 }
 
-private const val POPUP_LEAD_MS = 50L
 private const val POPUP_FRAMES_MS = 300L
 
 private const val MOVING = "perf-moving"
