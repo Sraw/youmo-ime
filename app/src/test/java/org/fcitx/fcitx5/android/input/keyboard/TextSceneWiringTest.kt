@@ -211,7 +211,7 @@ class TextSceneWiringTest {
     // far apart as the keys shown
     @Test
     fun aGlideIsReadOnTheScene() {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
             val keys = "qpzm".map { h.key("$it") }
             val first = keys.first().bounds
@@ -233,7 +233,7 @@ class TextSceneWiringTest {
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
     fun aSplitGlideReadsBothCopiesOfG() {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
             val q = h.keys().single { it.id == "q" }

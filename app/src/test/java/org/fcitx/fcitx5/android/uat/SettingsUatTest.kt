@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
@@ -256,13 +257,12 @@ class SettingsUatTest {
         assertEquals(groups, st.titles().filter { it in groups })
         assertTrue(summary(R.string.im_emoji).endsWith(notFor(c.HANDWRITING)))
         assertTrue(summary(R.string.im_built_in_phrases).endsWith(notFor(c.HANDWRITING)))
-        // glide: handwriting has none, the grouped keyboards' none the summary says; strokes: pinyin's and 双拼's alone
-        assertTrue(summary(R.string.glide_typing).endsWith(notFor(c.HANDWRITING)))
-        assertTrue(summary(R.string.stroke_filter).endsWith(notFor(*(c.TABLES.keys.toList() + c.HANDWRITING + c.ENGLISH).toTypedArray())))
+        // 在键上划: the choice alone, which input methods each choice reaches the docs say
+        assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
         assertTrue(summary(R.string.im_typos).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.SHUANGPIN_NINE, c.ZHUYIN_NINE, c.ZHUYIN)))
-        // no 不适用 line names English but 笔画筛选's: the Chinese section's title says it for its rows, and
-        // every input method's other rows are English's too
-        val chinese = st.preferences().filter { it.key != AppPrefs.STROKE_FILTER }.map { it.summary.toString() }
+        // no 不适用 line names English: the Chinese section's title says it for its rows, and every input
+        // method's other rows are English's too
+        val chinese = st.preferences().map { it.summary.toString() }
         assertTrue(chinese.flatMap { it.lines() }.none { c.ENGLISH.let { e -> InputMethodNames.of(activity, e, e) } in it && "Not for" in it })
         // 模糊音's u ↔ v: no use on the nine keys, still tickable
         st.pref(R.string.im_fuzzy).performClick()
@@ -362,48 +362,33 @@ class SettingsUatTest {
             idle()
             assertEquals(nine, setting.getValue())
             open(SettingsRoute.SharedInput)
-            assertTrue(summary(R.string.glide_typing).contains(s(R.string.glide_typing_summary)))
+            assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
         } finally {
             setting.setValue(setting.defaultValue)
         }
     }
 
-    // 滑行输入 and 笔画筛选: never both on, the one turned on turns the other off where it is seen, no dialog;
-    // turned off, it leaves the other off
+    // 在键上划: one list, off till chosen, of 滑行输入, 笔画筛选 and off (键盘手写 not offered yet); its summary
+    // the choice alone; a choice stored, the page opened again showing it
     @Test
     @Uat("ST-46")
-    fun glideTypingAndStrokeFilterTurnEachOtherOff() {
+    fun keyDrawingIsOneListOfItsChoices() {
         val keyboard = AppPrefs.getInstance().keyboard
         try {
             pages()
             activity
             open(SettingsRoute.SharedInput)
-            assertFalse(checked(R.string.glide_typing))
-            assertFalse(checked(R.string.stroke_filter))
-            assertTrue(summary(R.string.glide_typing).contains(s(R.string.glide_typing_summary)))
-            assertTrue(summary(R.string.stroke_filter).contains(s(R.string.stroke_filter_summary)))
-            st.pref(R.string.glide_typing).performClick()
+            val drawing = listed(R.string.key_drawing)
+            assertEquals(listOf(R.string.glide_typing, R.string.stroke_filter, R.string.swipe_off).map(::s), drawing.entries.map { it.toString() })
+            assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
+            if (drawing.callChangeListener(KeyDrawing.StrokeFilter.name)) drawing.value = KeyDrawing.StrokeFilter.name
             idle()
-            assertTrue(checked(R.string.glide_typing) && keyboard.glideTyping.getValue())
-            assertFalse(checked(R.string.stroke_filter) || keyboard.strokeFilter.getValue())
-            st.pref(R.string.stroke_filter).performClick()
-            idle()
-            assertNull(ShadowDialog.getLatestDialog())
-            assertTrue(checked(R.string.stroke_filter) && keyboard.strokeFilter.getValue())
-            assertFalse(checked(R.string.glide_typing) || keyboard.glideTyping.getValue())
-            st.pref(R.string.stroke_filter).performClick()
-            idle()
-            assertFalse(checked(R.string.stroke_filter) || keyboard.strokeFilter.getValue())
-            assertFalse(checked(R.string.glide_typing) || keyboard.glideTyping.getValue())
-            // the page opened again shows what is stored
-            st.pref(R.string.glide_typing).performClick()
-            idle()
+            assertEquals(KeyDrawing.StrokeFilter, keyboard.keyDrawing.getValue())
+            assertEquals(s(R.string.stroke_filter), summary(R.string.key_drawing))
             open(SettingsRoute.SharedInput)
-            assertTrue(checked(R.string.glide_typing))
-            assertFalse(checked(R.string.stroke_filter))
+            assertEquals(s(R.string.stroke_filter), summary(R.string.key_drawing))
         } finally {
-            keyboard.glideTyping.setValue(false)
-            keyboard.strokeFilter.setValue(false)
+            keyboard.keyDrawing.setValue(KeyDrawing.Off)
         }
     }
 

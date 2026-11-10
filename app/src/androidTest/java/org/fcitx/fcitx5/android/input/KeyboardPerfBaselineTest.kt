@@ -286,9 +286,11 @@ class KeyboardPerfBaselineTest {
         val up = SystemClock.uptimeMillis()
         mark.from = up * DownMarks.NS_PER_MS
         inject(MotionEvent.ACTION_UP, key, down, up)
-        val sample = runCatching { frames.await(mark) }.getOrElse {
+        val sample = try {
+            frames.await(mark)
+        } catch (it: IllegalStateException) {
             val shown = onMain { keyboardFrame()?.let { f -> (0 until f.childCount).map { f.getChildAt(it).javaClass.simpleName } } }
-            error("$board not shown after the tap at $key: the keyboard's frame holds $shown")
+            throw IllegalStateException("$board not shown after the tap at $key: the keyboard's frame holds $shown", it)
         }
         return sample.also { settle() }.heap(Heap.now() - heap)
     }

@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -434,9 +435,8 @@ class KeyboardUatTest {
     @Test
     @Uat("KB-32")
     fun glideIsOffByDefault() {
-        // both of the finger's switches off: no glide, no stroke
-        assertFalse(AppPrefs.getInstance().keyboard.glideTyping.getValue())
-        assertFalse(AppPrefs.getInstance().keyboard.strokeFilter.getValue())
+        // 在键上划 off: no glide, no stroke
+        assertEquals(KeyDrawing.Off, AppPrefs.getInstance().keyboard.keyDrawing.getValue())
         val h = harness(KeyboardHarness.ENGLISH).start()
         // h across to o: a finger's path over e and l
         val o = h.box(h.key("o"))
@@ -447,8 +447,8 @@ class KeyboardUatTest {
     @Test
     @Uat("KB-35")
     fun tapsShortSwipesAndHoldsAreNoGlide() {
-        val glides = AppPrefs.getInstance().keyboard.glideTyping
-        glides.setValue(true)
+        val glides = AppPrefs.getInstance().keyboard.keyDrawing
+        glides.setValue(KeyDrawing.Glide)
         try {
             val h = harness(KeyboardHarness.ENGLISH).start()
             h.tap(h.key("o"))
@@ -460,7 +460,7 @@ class KeyboardUatTest {
             assertTrue(shown.toString(), shown.size > 1)
             assertFalse(h.api.calls.toString(), "offerGlide" in h.api.calls)
         } finally {
-            glides.setValue(false)
+            glides.setValue(KeyDrawing.Off)
         }
     }
 
