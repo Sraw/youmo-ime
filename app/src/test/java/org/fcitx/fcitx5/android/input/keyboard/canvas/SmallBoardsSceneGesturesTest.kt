@@ -10,6 +10,7 @@ import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -63,7 +64,9 @@ class SmallBoardsSceneGesturesTest {
         h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
         h.relayout()
         h.typesAsShown("period", "。", ".")
-        // the emoticon page's comma the same (emoticon.xml)
+        // the emoticon page's comma the same (emoticon.xml); remembered as the last picker, put back after
+        val last = AppPrefs.getInstance().internal.lastPickerType
+        prefs.set(last, last.getValue())
         h.tap(h.key(":-)"))
         h.relayout()
         h.typesAsShown("comma", "，", ",")
