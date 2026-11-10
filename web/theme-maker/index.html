@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-Y+k0/rdu972SXK1xregtfqPMg6ZTmlS0Yde3J1pU1i8=' 'sha256-baOACp34qL5yASv8iXN42e426MwQumWHB3nOAV2mLx0=' 'sha256-yClIKAguiNSobQ8pLWuzBdNZPXoSsbridcVQSW+ezCk=' 'sha256-yRQVFPbW0AyeiLM3KzkHTcNGN7YCSN8LItLGoF1yoTg='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-Y+k0/rdu972SXK1xregtfqPMg6ZTmlS0Yde3J1pU1i8=' 'sha256-baOACp34qL5yASv8iXN42e426MwQumWHB3nOAV2mLx0=' 'sha256-jEIiXImw0cIGjU26fKv5AiTIr+4sfvgnp/9Kv07lCR4=' 'sha256-1MPYYfEica9EfwEBunzof3aSWcDYjpufnI1uwh8mAPQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -2636,6 +2636,14 @@ dialog h2 { margin: 0; font-size: 16px; }
    * where the widget may differ), and edits the style of exactly that select=. Its ops (node tests them): `set(d,
    * select, prop, kind, v, o)`, `selector(part, scene)`, the parts.
    */
+  // [base] (a picked file's name) made a theme file's: `<prefix><base cleaned>.<type>`, a -2, -3 … where another file
+  // has that name already (never overwritten: another style may name it)
+  panels.fileName = (files, prefix, base, type) => {
+    let name = base.toLowerCase().replace(/\.[^.]*$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'image';
+    for (let i = 2; (prefix + name + '.' + type) in files; i++) name = name.replace(/-\d+$/, '') + '-' + i;
+    return prefix + name + '.' + type;
+  };
+
   panels.widgetTab = (def) => {
     const F = root.YoumoForm;
     const chosen = { part: def.parts[0].id, scene: '' };
@@ -3175,7 +3183,7 @@ dialog h2 { margin: 0; font-size: 16px; }
       if (!['png', 'jpg', 'webp'].includes(type) || !s) throw new Error(name + ' 不是 PNG、JPEG 或 WebP');
       if (Math.max(s[0], s[1]) > lim.keyImageSide) throw new Error(name + ' 太大：最大 ' + lim.keyImageSide + '×' + lim.keyImageSide);
       if (bytes.length > lim.keyImageBytes) throw new Error(name + ' 超过 ' + lim.keyImageBytes + ' 字节');
-      const file = 'key-' + name.toLowerCase().replace(/\.[^.]*$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) + '.' + type;
+      const file = panels.fileName(d.files, 'key-', name, type);
       const files = Object.assign(Object.create(null), d.files);
       files[file] = bytes;
       return { xml: d.xml, files, layouts: d.layouts, file };
@@ -3255,7 +3263,7 @@ dialog h2 { margin: 0; font-size: 16px; }
         else api.toast('先上传一张键面图片（下面的按钮）');
       }
     })));
-    if (f.kind === 'none' || f.kind === 'solid' || f.kind === 'image') out.append(uploadImage(api, sel, set, now));
+    if (f.kind === 'none' || f.kind === 'solid' || f.kind === 'image') out.append(uploadImage(api, sel));
     if (f.kind === 'solid') out.append(row('颜色', color(f.color, (c) => set(c ? { kind: 'solid', color: c } : null), F)));
     if (f.kind === 'linear') {
       const patch = (fn) => { const c = now(); if (c.kind === 'linear') set(fn(c)); };
@@ -3289,16 +3297,17 @@ dialog h2 { margin: 0; font-size: 16px; }
   }
 
   // a key's image put in the theme and made the fill: PNG, JPEG or WebP within the app's side and bytes for a key's
-  function uploadImage(api, sel, set, now) {
+  function uploadImage(api, sel) {
     const { h } = panels.ui;
     return h('button', { type: 'button', textContent: '上传键面图片…', on: { click: async () => {
       const f = await api.pickFile('image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp');
       if (!f) return;
-      let made = null;
-      api.apply((x) => { made = ops.addKeyImage(x, api.lib, api.limits(), f.name, new Uint8Array(f.bytes)); return made; });
-      if (!made) return;
-      const c = now();
-      set(c.kind === 'image' ? Object.assign({}, c, { file: made.file }) : { kind: 'image', file: made.file, insets: [0, 0, 0, 0], scale: 3, fallback: c.kind === 'solid' ? c.color : null });
+      // the image and the fill it is, one step (undone together: no file left that nothing names)
+      api.apply((x) => {
+        const made = ops.addKeyImage(x, api.lib, api.limits(), f.name, new Uint8Array(f.bytes));
+        const c = F.parseFill(F.valueOf(made.xml, sel, 'fill')) || { kind: 'none' };
+        return ops.fill(made, sel, c.kind === 'image' ? Object.assign({}, c, { file: made.file }) : { kind: 'image', file: made.file, insets: [0, 0, 0, 0], scale: 3, fallback: c.kind === 'solid' ? c.color : null });
+      });
     } } });
   }
 
@@ -3704,7 +3713,7 @@ dialog h2 { margin: 0; font-size: 16px; }
     addEffectImage(d, L, name, bytes) {
       const wrong = effectImageProblem(L, name, bytes);
       if (wrong) throw new Error(wrong);
-      const file = 'effect-' + name.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+/, '');
+      const file = panels.fileName(d.files, 'effect-', name, L.imageType(bytes));
       const files = Object.assign(Object.create(null), d.files);
       files[file] = bytes;
       return { xml: d.xml, files, layouts: d.layouts, file };
@@ -3750,8 +3759,11 @@ dialog h2 { margin: 0; font-size: 16px; }
         const e = parseEffect(v);
         const files = Object.keys(d.files).filter((n) => n.startsWith('effect-'));
         const patch = (p) => { const c = parseEffect(now()); if (c && c.kind !== 'none') put(Object.assign({}, c, p)); };
+        // the effect and the files read when chosen, not as the tab was drawn (an image uploaded since is one)
+        const effectFiles = () => Object.keys(api.doc().files).filter((n) => n.startsWith('effect-'));
         el.append(row('特效', select([['', '不设'], ['none', '无'], ['ripple-image', '涟漪图片'], ['particles', '粒子']], e ? e.kind : '', (k) => {
-          const file = (e && e.file) || files[0];
+          const c = parseEffect(now());
+          const file = (c && c.file) || effectFiles()[0];
           if (!k) put(null);
           else if (k === 'none') put({ kind: 'none' });
           else if (!file) api.toast('先上传一张特效图片');
@@ -3760,9 +3772,12 @@ dialog h2 { margin: 0; font-size: 16px; }
         }), h('button', { type: 'button', textContent: '上传特效图片…', on: { click: async () => {
           const f = await api.pickFile('image/png,image/webp,.png,.webp');
           if (!f) return;
-          let made = null;
-          api.apply((x) => { made = ops.addEffectImage(x, api.lib, f.name, new Uint8Array(f.bytes)); return made; });
-          if (made) patch({ file: made.file });
+          // the image and the effect using it, one step
+          api.apply((x) => {
+            const made = ops.addEffectImage(x, api.lib, f.name, new Uint8Array(f.bytes));
+            const c = parseEffect(F.valueOf(made.xml, sel, m.prop));
+            return c && c.kind !== 'none' ? ops.set(made, sel, m.prop, Object.assign({}, c, { file: made.file })) : made;
+          });
         } } })));
         if (e && e.kind !== 'none') {
           el.append(row('图片', select(files.map((n) => [n, n]).concat(files.includes(e.file) ? [] : [[e.file, e.file + '（缺）']]), e.file, (file) => patch({ file }))));
@@ -3773,7 +3788,7 @@ dialog h2 { margin: 0; font-size: 16px; }
           }
           el.append(row('时长', number(e.ms, (ms) => patch({ ms: ms ?? 0 }), { min: 0, max: 600, step: 10, unit: 'ms' })));
         }
-        el.append(h('p', { className: 'muted', textContent: '特效图片：PNG 或 WebP，不超过 256×256、128 KB。' }));
+        el.append(h('p', { className: 'muted', textContent: '特效图片：PNG 或 WebP，不超过 256×256、128 KB。现在的 App 还不认特效图片，导入时会丢掉它（画特效的版本会收）。' }));
       } else {
         el.append(row(m.label, number(v == null ? null : parseFloat(v), put, { min: m.min, max: m.max, step: m.kind === 'dp' ? 0.5 : 1, unit: m.kind === 'dp' ? 'dp' : '%' })));
       }
@@ -3834,14 +3849,19 @@ dialog h2 { margin: 0; font-size: 16px; }
       const i = h('input', { type: 'text', value: value ?? '', placeholder, on: { change: () => change(i.value) } });
       return i;
     };
-    el.append(row('名称', text(root.YoumoMaker.themeName(d.xml), (v) => { if (v.trim()) api.apply((x) => ops.name(x, v.trim())); }),
+    // a name emptied is not taken (a theme has one): the field shows the theme's again
+    const nameField = text(root.YoumoMaker.themeName(d.xml), (v) => {
+      if (v.trim()) api.apply((x) => ops.name(x, v.trim()));
+      else nameField.value = root.YoumoMaker.themeName(api.doc().xml);
+    });
+    el.append(row('名称', nameField,
       h('span', { className: 'muted', textContent: '也是文件名；和 App 里已有的同名会覆盖它' })));
     for (const [a, label] of META) el.append(row(label, text(m[a], (v) => api.apply((x) => ops.meta(x, a, v)), '最多 64 个字')));
     el.append(row('最低 App 版本', text(m['min-app'], (v) => api.apply((x) => ops.meta(x, 'min-app', v)), '如 0.6.0')));
     el.append(row('预览图', h('span', { className: 'muted', textContent: m.preview ? m.preview : '没有（App 用自己画的）' }),
       h('button', { type: 'button', textContent: '从预览截一张', on: { click: async () => {
         try {
-          const bytes = await api.previewImage(PREVIEW_TAKE);
+          const bytes = await api.previewImage(PREVIEW_TAKE, PREVIEW.bytes);
           api.apply((x) => ops.preview(x, api.lib, bytes));
         } catch (e) {
           api.toast('截不了：' + (e.message || e));
@@ -3989,12 +4009,31 @@ dialog h2 { margin: 0; font-size: 16px; }
     const skip = !external && el.contains(active) && typedIn(active) ? active : null;
     const key = el.contains(active) && active.matches(CONTROLS) ? controlKey(active) : null;
     const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
-    if (!same) { showTab(); return; }
+    if (!same) { rebuildSoon(); return; }
     // a row or box put in whole took the focused control with it (用这个裁切's button): focus its like in the new one
     if (key && !el.contains(document.activeElement)) {
       const again = [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
       if (again) again.focus({ preventScroll: true });
     }
+  }
+
+  // a change that adds or takes away controls (a border's colour once it has a width) draws the tab anew, but a task
+  // later: on touch the old field's change comes inside the next tap's mousedown, before focus moves, so drawn at
+  // once the tab lost the field tapped. By then the focus is on it: showTab focuses its like by controlKey, and what
+  // was typed into it and not yet committed is kept with its caret
+  let rebuilding = null;
+  function rebuildSoon() {
+    clearTimeout(rebuilding);
+    rebuilding = setTimeout(() => {
+      const a = document.activeElement;
+      const typed = typedIn(a) && $('tab-' + tab).contains(a) ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, key: controlKey(a) } : null;
+      showTab();
+      const b = document.activeElement;
+      if (typed && typedIn(b) && controlKey(b) === typed.key && b.value !== typed.value) {
+        b.value = typed.value;
+        try { b.setSelectionRange(typed.from, typed.to); } catch (e) { /* a number field has no caret */ }
+      }
+    }, 0);
   }
 
   // a control's place in a tab, the same in the tab drawn anew: its row's label, its place in the row (else its text)
@@ -4118,8 +4157,10 @@ dialog h2 { margin: 0; font-size: 16px; }
         ctx.fillStyle = css(lk.preedit.underline.color) || css(lk.preedit.color);
         ctx.fillRect(x, y + size * 0.6, w, Math.max(1, lk.preedit.underline.widthDp * dp));
       }
-      ctx.fillStyle = css(lk.preedit.cursor);
-      ctx.fillRect(x + w + 1, y - size / 2, Math.max(1, dp), size);
+      if (lk.preedit.cursor) {
+        ctx.fillStyle = css(lk.preedit.cursor);
+        ctx.fillRect(x + w + 1, y - size / 2, Math.max(1, dp), size);
+      }
     }
     ctx.translate(0, bar.pre);
     if (env.bar === 'typing') E.paint(bar.scene, ctx, state);
@@ -4248,10 +4289,8 @@ dialog h2 { margin: 0; font-size: 16px; }
     if (looks && looks.ok) {
       E.paint(scene, ctx, Object.assign({}, state, { pressed: null }));
       drawPanel(ctx, looks.looks, scene.width, scene.height);
-    } else if (playing) {
-      playFrame(ctx, state);
     } else E.paint(scene, ctx, state);
-    if (popup && !playing) {
+    if (popup) {
       ctx.translate(popup.x, popup.y);
       E.paint(popup.scene, ctx, state);
     }
@@ -4260,29 +4299,21 @@ dialog h2 { margin: 0; font-size: 16px; }
 
   // ---- 试一下 (动效): the press and its release, the bubble appearing, by requestAnimationFrame ----
 
-  // a frame of what plays: the keys, the played key drawn pressed (scaled and sunk about its middle, see-through as it
-  // fades back), the bubble over it as it appears
-  function playFrame(ctx, state) {
-    E.paint(scene, ctx, Object.assign({}, state, { pressed: null }));
-    const k = scene.json().keys.find((x) => x.id === playing.key);
-    if (!k) return;
-    const [l, t, r, b] = k.bounds;
-    const off = document.createElement('canvas');
-    off.width = scene.width;
-    off.height = scene.height;
-    E.paint(scene, off.getContext('2d'), Object.assign({}, state, { pressed: playing.key }));
+  // a frame of what plays ([c]: what play made once for it): the keys, the played key drawn pressed (scaled and sunk
+  // about its middle, see-through as it fades back), the bubble over it as it appears
+  function playFrame(ctx, c) {
+    ctx.drawImage(c.keys, 0, 0);
+    const [l, t, r, b] = c.bounds;
     ctx.save();
     ctx.globalAlpha = playing.alpha;
     const cx = (l + r) / 2;
     const cy = (t + b) / 2 + playing.sink * env.density;
     ctx.translate(cx, cy);
     ctx.scale(playing.scale, playing.scale);
-    ctx.drawImage(off, l, t, r - l, b - t, -(r - l) / 2, -(b - t) / 2, r - l, b - t);
+    ctx.drawImage(c.pressed, l, t, r - l, b - t, -(r - l) / 2, -(b - t) / 2, r - l, b - t);
     ctx.restore();
-    if (playing.appear != null) {
-      const got = E.buildPopup(theme, M.envJson(env), { kind: 'preview', text: k.label || 'a', keyWidth: r - l }, null);
-      if (!got.ok) return;
-      const p = got.scene;
+    if (playing.appear != null && c.bubble) {
+      const p = c.bubble;
       const a = playing.appear;
       ctx.save();
       const kind = playing.appearKind;
@@ -4292,7 +4323,7 @@ dialog h2 { margin: 0; font-size: 16px; }
       ctx.translate(x + p.width / 2, y + p.height);
       if (kind === 'scale') ctx.scale(0.5 + a / 2, 0.5 + a / 2);
       ctx.translate(-p.width / 2, -p.height);
-      E.paint(p, ctx, state);
+      E.paint(p, ctx, c.state);
       ctx.restore();
     }
   }
@@ -4315,6 +4346,22 @@ dialog h2 { margin: 0; font-size: 16px; }
     const ease = EASE[m.transition ? m.transition.easing : 'linear'] || EASE.linear;
     const pressMs = Math.min(80, back || 80);
     const appearMs = m.appear ? m.appear.ms : 0;
+    // drawn once for the play, not each frame (the theme read again, the scene built again: frames dropped on a phone)
+    const fonts = Object.assign({ key: '"Youmo Latin", "Youmo Han", sans-serif' }, fontFamilies(history.current.xml));
+    const state = { pressed: null, icons: ICONS, images: assets.images, fonts };
+    const picture = pictureOf();
+    if (picture) state.picture = picture;
+    const layer = (pressedKey) => {
+      const o = document.createElement('canvas');
+      o.width = scene.width;
+      o.height = scene.height;
+      E.paint(scene, o.getContext('2d'), Object.assign({}, state, { pressed: pressedKey }));
+      return o;
+    };
+    const got = E.buildPopup(theme, M.envJson(env), { kind: 'preview', text: k.label || 'a', keyWidth: k.bounds[2] - k.bounds[0] }, null);
+    const cache = { keys: layer(null), pressed: layer(k.id), bounds: k.bounds, bubble: got.ok ? got.scene : null, state };
+    const canvas = $('preview');
+    const ctx = canvas.getContext('2d');
     const t0 = performance.now();
     const step = (now) => {
       const t = now - t0;
@@ -4329,9 +4376,17 @@ dialog h2 { margin: 0; font-size: 16px; }
         appear: t < HOLD + back ? (appearMs ? Math.min(1, t / appearMs) : 1) : null,
         appearKind: m.appear ? m.appear.kind : 'fade',
       };
-      if (t >= HOLD + back) playing = null;
-      preview();
-      if (playing) requestAnimationFrame(step);
+      if (t >= HOLD + back) {
+        playing = null;
+        preview();
+        return;
+      }
+      ctx.clearRect(0, barH, canvas.width, canvas.height - barH);
+      ctx.save();
+      ctx.translate(0, barH);
+      playFrame(ctx, cache);
+      ctx.restore();
+      requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
   }
@@ -4424,6 +4479,7 @@ dialog h2 { margin: 0; font-size: 16px; }
       // the picked picture kept for this session's cuts (a cut of the saved JPEG would be a second generation)
       if (size) {
         const bmp = await createImageBitmap(new Blob([picked]));
+        originals.clear();
         originals.set(L.contentId(made.bytes), { bytes: picked, scale: bmp.width / size[0] });
         bmp.close();
       }
@@ -4461,10 +4517,13 @@ dialog h2 { margin: 0; font-size: 16px; }
     const dark = !!(document.querySelector('input[name="image-tone"]:checked') || {}).value?.startsWith('dark');
     env.dark = dark;
     fillEnvForm();
-    const d = bg.setPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made);
+    let d = bg.setPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made);
+    // sampled from the picture just made (the preview's is still the last one's until it is drawn), as one step
+    const cut = made.cuts.portrait || { bytes: made.src };
+    const bmp = await createImageBitmap(new Blob([cut.bytes]));
+    d = colors.fromPictureAll(d, samplesOf(bmp), dark);
+    bmp.close();
     set(asDoc(d));
-    const samples = await api.pictureSamples();
-    if (samples) set(asDoc(colors.fromPictureAll(history.current, samples, dark)));
     $('new-panel').close();
     tab = 'background';
     showTab();
@@ -4498,15 +4557,27 @@ dialog h2 { margin: 0; font-size: 16px; }
     problems: () => problems,
     play,
     // the preview as a PNG at most [width] px across (信息's preview image)
-    async previewImage(width) {
+    // the preview as an image at most [width] px across and [bytes] long (信息's preview image): a PNG where one fits,
+    // else WebP at falling quality, then smaller, until it does (a picture background's PNG is past the App's 512 KB)
+    async previewImage(width, bytes = Infinity) {
       const c = $('preview');
-      const k = Math.min(1, width / c.width);
-      const o = document.createElement('canvas');
-      o.width = Math.round(c.width * k);
-      o.height = Math.round(c.height * k);
-      o.getContext('2d').drawImage(c, 0, 0, o.width, o.height);
-      const blob = await new Promise((ok) => o.toBlob(ok, 'image/png'));
-      return new Uint8Array(await blob.arrayBuffer());
+      const encode = async (w, type, q) => {
+        const k = Math.min(1, w / c.width);
+        const o = document.createElement('canvas');
+        o.width = Math.max(1, Math.round(c.width * k));
+        o.height = Math.max(1, Math.round(c.height * k));
+        o.getContext('2d').drawImage(c, 0, 0, o.width, o.height);
+        const blob = await new Promise((ok) => o.toBlob(ok, type, q));
+        return blob && blob.type === type ? new Uint8Array(await blob.arrayBuffer()) : null;
+      };
+      let out = await encode(width, 'image/png');
+      for (let w = width; out && out.length > bytes && w >= 120; w = Math.round(w * 0.8)) {
+        for (const q of [0.9, 0.8, 0.7, 0.6]) {
+          out = (await encode(w, 'image/webp', q)) || (await encode(w, 'image/png')) || out;
+          if (out.length <= bytes) break;
+        }
+      }
+      return out;
     },
     toast,
     lib: L,
@@ -4526,18 +4597,22 @@ dialog h2 { margin: 0; font-size: 16px; }
     async pictureSamples() {
       const p = theme && theme.info(env.dark).picture;
       const bmp = p && assets.cuts[(p.cuts || {}).portrait || p.src];
-      if (!bmp) return null;
-      const c = document.createElement('canvas');
-      c.width = 24;
-      c.height = 16;
-      const g = c.getContext('2d');
-      g.drawImage(bmp, 0, 0, c.width, c.height);
-      const px = g.getImageData(0, 0, c.width, c.height).data;
-      const out = [];
-      for (let i = 0; i < px.length; i += 4) out.push([px[i], px[i + 1], px[i + 2]]);
-      return out;
+      return bmp ? samplesOf(bmp) : null;
     },
   };
+
+  // a few hundred of [bmp]'s pixels, `[[r, g, b]]`
+  function samplesOf(bmp) {
+    const c = document.createElement('canvas');
+    c.width = 24;
+    c.height = 16;
+    const g = c.getContext('2d');
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    const px = g.getImageData(0, 0, c.width, c.height).data;
+    const out = [];
+    for (let i = 0; i < px.length; i += 4) out.push([px[i], px[i + 1], px[i + 2]]);
+    return out;
+  }
 
   // the tab shown drawn anew from the document (the source tab is the text area, kept as it is typed)
   function showTab() {

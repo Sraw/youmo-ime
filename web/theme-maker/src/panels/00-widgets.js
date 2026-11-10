@@ -49,6 +49,14 @@
    * where the widget may differ), and edits the style of exactly that select=. Its ops (node tests them): `set(d,
    * select, prop, kind, v, o)`, `selector(part, scene)`, the parts.
    */
+  // [base] (a picked file's name) made a theme file's: `<prefix><base cleaned>.<type>`, a -2, -3 … where another file
+  // has that name already (never overwritten: another style may name it)
+  panels.fileName = (files, prefix, base, type) => {
+    let name = base.toLowerCase().replace(/\.[^.]*$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'image';
+    for (let i = 2; (prefix + name + '.' + type) in files; i++) name = name.replace(/-\d+$/, '') + '-' + i;
+    return prefix + name + '.' + type;
+  };
+
   panels.widgetTab = (def) => {
     const F = root.YoumoForm;
     const chosen = { part: def.parts[0].id, scene: '' };

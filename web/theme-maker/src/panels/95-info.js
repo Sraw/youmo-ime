@@ -49,14 +49,19 @@
       const i = h('input', { type: 'text', value: value ?? '', placeholder, on: { change: () => change(i.value) } });
       return i;
     };
-    el.append(row('名称', text(root.YoumoMaker.themeName(d.xml), (v) => { if (v.trim()) api.apply((x) => ops.name(x, v.trim())); }),
+    // a name emptied is not taken (a theme has one): the field shows the theme's again
+    const nameField = text(root.YoumoMaker.themeName(d.xml), (v) => {
+      if (v.trim()) api.apply((x) => ops.name(x, v.trim()));
+      else nameField.value = root.YoumoMaker.themeName(api.doc().xml);
+    });
+    el.append(row('名称', nameField,
       h('span', { className: 'muted', textContent: '也是文件名；和 App 里已有的同名会覆盖它' })));
     for (const [a, label] of META) el.append(row(label, text(m[a], (v) => api.apply((x) => ops.meta(x, a, v)), '最多 64 个字')));
     el.append(row('最低 App 版本', text(m['min-app'], (v) => api.apply((x) => ops.meta(x, 'min-app', v)), '如 0.6.0')));
     el.append(row('预览图', h('span', { className: 'muted', textContent: m.preview ? m.preview : '没有（App 用自己画的）' }),
       h('button', { type: 'button', textContent: '从预览截一张', on: { click: async () => {
         try {
-          const bytes = await api.previewImage(PREVIEW_TAKE);
+          const bytes = await api.previewImage(PREVIEW_TAKE, PREVIEW.bytes);
           api.apply((x) => ops.preview(x, api.lib, bytes));
         } catch (e) {
           api.toast('截不了：' + (e.message || e));

@@ -84,7 +84,7 @@
     addEffectImage(d, L, name, bytes) {
       const wrong = effectImageProblem(L, name, bytes);
       if (wrong) throw new Error(wrong);
-      const file = 'effect-' + name.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+/, '');
+      const file = panels.fileName(d.files, 'effect-', name, L.imageType(bytes));
       const files = Object.assign(Object.create(null), d.files);
       files[file] = bytes;
       return { xml: d.xml, files, layouts: d.layouts, file };
@@ -130,8 +130,11 @@
         const e = parseEffect(v);
         const files = Object.keys(d.files).filter((n) => n.startsWith('effect-'));
         const patch = (p) => { const c = parseEffect(now()); if (c && c.kind !== 'none') put(Object.assign({}, c, p)); };
+        // the effect and the files read when chosen, not as the tab was drawn (an image uploaded since is one)
+        const effectFiles = () => Object.keys(api.doc().files).filter((n) => n.startsWith('effect-'));
         el.append(row('特效', select([['', '不设'], ['none', '无'], ['ripple-image', '涟漪图片'], ['particles', '粒子']], e ? e.kind : '', (k) => {
-          const file = (e && e.file) || files[0];
+          const c = parseEffect(now());
+          const file = (c && c.file) || effectFiles()[0];
           if (!k) put(null);
           else if (k === 'none') put({ kind: 'none' });
           else if (!file) api.toast('先上传一张特效图片');
@@ -140,9 +143,12 @@
         }), h('button', { type: 'button', textContent: '上传特效图片…', on: { click: async () => {
           const f = await api.pickFile('image/png,image/webp,.png,.webp');
           if (!f) return;
-          let made = null;
-          api.apply((x) => { made = ops.addEffectImage(x, api.lib, f.name, new Uint8Array(f.bytes)); return made; });
-          if (made) patch({ file: made.file });
+          // the image and the effect using it, one step
+          api.apply((x) => {
+            const made = ops.addEffectImage(x, api.lib, f.name, new Uint8Array(f.bytes));
+            const c = parseEffect(F.valueOf(made.xml, sel, m.prop));
+            return c && c.kind !== 'none' ? ops.set(made, sel, m.prop, Object.assign({}, c, { file: made.file })) : made;
+          });
         } } })));
         if (e && e.kind !== 'none') {
           el.append(row('图片', select(files.map((n) => [n, n]).concat(files.includes(e.file) ? [] : [[e.file, e.file + '（缺）']]), e.file, (file) => patch({ file }))));
@@ -153,7 +159,7 @@
           }
           el.append(row('时长', number(e.ms, (ms) => patch({ ms: ms ?? 0 }), { min: 0, max: 600, step: 10, unit: 'ms' })));
         }
-        el.append(h('p', { className: 'muted', textContent: '特效图片：PNG 或 WebP，不超过 256×256、128 KB。' }));
+        el.append(h('p', { className: 'muted', textContent: '特效图片：PNG 或 WebP，不超过 256×256、128 KB。现在的 App 还不认特效图片，导入时会丢掉它（画特效的版本会收）。' }));
       } else {
         el.append(row(m.label, number(v == null ? null : parseFloat(v), put, { min: m.min, max: m.max, step: m.kind === 'dp' ? 0.5 : 1, unit: m.kind === 'dp' ? 'dp' : '%' })));
       }

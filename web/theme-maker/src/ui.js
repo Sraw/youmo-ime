@@ -129,12 +129,31 @@
     const skip = !external && el.contains(active) && typedIn(active) ? active : null;
     const key = el.contains(active) && active.matches(CONTROLS) ? controlKey(active) : null;
     const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
-    if (!same) { showTab(); return; }
+    if (!same) { rebuildSoon(); return; }
     // a row or box put in whole took the focused control with it (用这个裁切's button): focus its like in the new one
     if (key && !el.contains(document.activeElement)) {
       const again = [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
       if (again) again.focus({ preventScroll: true });
     }
+  }
+
+  // a change that adds or takes away controls (a border's colour once it has a width) draws the tab anew, but a task
+  // later: on touch the old field's change comes inside the next tap's mousedown, before focus moves, so drawn at
+  // once the tab lost the field tapped. By then the focus is on it: showTab focuses its like by controlKey, and what
+  // was typed into it and not yet committed is kept with its caret
+  let rebuilding = null;
+  function rebuildSoon() {
+    clearTimeout(rebuilding);
+    rebuilding = setTimeout(() => {
+      const a = document.activeElement;
+      const typed = typedIn(a) && $('tab-' + tab).contains(a) ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, key: controlKey(a) } : null;
+      showTab();
+      const b = document.activeElement;
+      if (typed && typedIn(b) && controlKey(b) === typed.key && b.value !== typed.value) {
+        b.value = typed.value;
+        try { b.setSelectionRange(typed.from, typed.to); } catch (e) { /* a number field has no caret */ }
+      }
+    }, 0);
   }
 
   // a control's place in a tab, the same in the tab drawn anew: its row's label, its place in the row (else its text)
@@ -258,8 +277,10 @@
         ctx.fillStyle = css(lk.preedit.underline.color) || css(lk.preedit.color);
         ctx.fillRect(x, y + size * 0.6, w, Math.max(1, lk.preedit.underline.widthDp * dp));
       }
-      ctx.fillStyle = css(lk.preedit.cursor);
-      ctx.fillRect(x + w + 1, y - size / 2, Math.max(1, dp), size);
+      if (lk.preedit.cursor) {
+        ctx.fillStyle = css(lk.preedit.cursor);
+        ctx.fillRect(x + w + 1, y - size / 2, Math.max(1, dp), size);
+      }
     }
     ctx.translate(0, bar.pre);
     if (env.bar === 'typing') E.paint(bar.scene, ctx, state);
@@ -388,10 +409,8 @@
     if (looks && looks.ok) {
       E.paint(scene, ctx, Object.assign({}, state, { pressed: null }));
       drawPanel(ctx, looks.looks, scene.width, scene.height);
-    } else if (playing) {
-      playFrame(ctx, state);
     } else E.paint(scene, ctx, state);
-    if (popup && !playing) {
+    if (popup) {
       ctx.translate(popup.x, popup.y);
       E.paint(popup.scene, ctx, state);
     }
@@ -400,29 +419,21 @@
 
   // ---- 试一下 (动效): the press and its release, the bubble appearing, by requestAnimationFrame ----
 
-  // a frame of what plays: the keys, the played key drawn pressed (scaled and sunk about its middle, see-through as it
-  // fades back), the bubble over it as it appears
-  function playFrame(ctx, state) {
-    E.paint(scene, ctx, Object.assign({}, state, { pressed: null }));
-    const k = scene.json().keys.find((x) => x.id === playing.key);
-    if (!k) return;
-    const [l, t, r, b] = k.bounds;
-    const off = document.createElement('canvas');
-    off.width = scene.width;
-    off.height = scene.height;
-    E.paint(scene, off.getContext('2d'), Object.assign({}, state, { pressed: playing.key }));
+  // a frame of what plays ([c]: what play made once for it): the keys, the played key drawn pressed (scaled and sunk
+  // about its middle, see-through as it fades back), the bubble over it as it appears
+  function playFrame(ctx, c) {
+    ctx.drawImage(c.keys, 0, 0);
+    const [l, t, r, b] = c.bounds;
     ctx.save();
     ctx.globalAlpha = playing.alpha;
     const cx = (l + r) / 2;
     const cy = (t + b) / 2 + playing.sink * env.density;
     ctx.translate(cx, cy);
     ctx.scale(playing.scale, playing.scale);
-    ctx.drawImage(off, l, t, r - l, b - t, -(r - l) / 2, -(b - t) / 2, r - l, b - t);
+    ctx.drawImage(c.pressed, l, t, r - l, b - t, -(r - l) / 2, -(b - t) / 2, r - l, b - t);
     ctx.restore();
-    if (playing.appear != null) {
-      const got = E.buildPopup(theme, M.envJson(env), { kind: 'preview', text: k.label || 'a', keyWidth: r - l }, null);
-      if (!got.ok) return;
-      const p = got.scene;
+    if (playing.appear != null && c.bubble) {
+      const p = c.bubble;
       const a = playing.appear;
       ctx.save();
       const kind = playing.appearKind;
@@ -432,7 +443,7 @@
       ctx.translate(x + p.width / 2, y + p.height);
       if (kind === 'scale') ctx.scale(0.5 + a / 2, 0.5 + a / 2);
       ctx.translate(-p.width / 2, -p.height);
-      E.paint(p, ctx, state);
+      E.paint(p, ctx, c.state);
       ctx.restore();
     }
   }
@@ -455,6 +466,22 @@
     const ease = EASE[m.transition ? m.transition.easing : 'linear'] || EASE.linear;
     const pressMs = Math.min(80, back || 80);
     const appearMs = m.appear ? m.appear.ms : 0;
+    // drawn once for the play, not each frame (the theme read again, the scene built again: frames dropped on a phone)
+    const fonts = Object.assign({ key: '"Youmo Latin", "Youmo Han", sans-serif' }, fontFamilies(history.current.xml));
+    const state = { pressed: null, icons: ICONS, images: assets.images, fonts };
+    const picture = pictureOf();
+    if (picture) state.picture = picture;
+    const layer = (pressedKey) => {
+      const o = document.createElement('canvas');
+      o.width = scene.width;
+      o.height = scene.height;
+      E.paint(scene, o.getContext('2d'), Object.assign({}, state, { pressed: pressedKey }));
+      return o;
+    };
+    const got = E.buildPopup(theme, M.envJson(env), { kind: 'preview', text: k.label || 'a', keyWidth: k.bounds[2] - k.bounds[0] }, null);
+    const cache = { keys: layer(null), pressed: layer(k.id), bounds: k.bounds, bubble: got.ok ? got.scene : null, state };
+    const canvas = $('preview');
+    const ctx = canvas.getContext('2d');
     const t0 = performance.now();
     const step = (now) => {
       const t = now - t0;
@@ -469,9 +496,17 @@
         appear: t < HOLD + back ? (appearMs ? Math.min(1, t / appearMs) : 1) : null,
         appearKind: m.appear ? m.appear.kind : 'fade',
       };
-      if (t >= HOLD + back) playing = null;
-      preview();
-      if (playing) requestAnimationFrame(step);
+      if (t >= HOLD + back) {
+        playing = null;
+        preview();
+        return;
+      }
+      ctx.clearRect(0, barH, canvas.width, canvas.height - barH);
+      ctx.save();
+      ctx.translate(0, barH);
+      playFrame(ctx, cache);
+      ctx.restore();
+      requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
   }
@@ -564,6 +599,7 @@
       // the picked picture kept for this session's cuts (a cut of the saved JPEG would be a second generation)
       if (size) {
         const bmp = await createImageBitmap(new Blob([picked]));
+        originals.clear();
         originals.set(L.contentId(made.bytes), { bytes: picked, scale: bmp.width / size[0] });
         bmp.close();
       }
@@ -601,10 +637,13 @@
     const dark = !!(document.querySelector('input[name="image-tone"]:checked') || {}).value?.startsWith('dark');
     env.dark = dark;
     fillEnvForm();
-    const d = bg.setPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made);
+    let d = bg.setPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made);
+    // sampled from the picture just made (the preview's is still the last one's until it is drawn), as one step
+    const cut = made.cuts.portrait || { bytes: made.src };
+    const bmp = await createImageBitmap(new Blob([cut.bytes]));
+    d = colors.fromPictureAll(d, samplesOf(bmp), dark);
+    bmp.close();
     set(asDoc(d));
-    const samples = await api.pictureSamples();
-    if (samples) set(asDoc(colors.fromPictureAll(history.current, samples, dark)));
     $('new-panel').close();
     tab = 'background';
     showTab();
@@ -638,15 +677,27 @@
     problems: () => problems,
     play,
     // the preview as a PNG at most [width] px across (信息's preview image)
-    async previewImage(width) {
+    // the preview as an image at most [width] px across and [bytes] long (信息's preview image): a PNG where one fits,
+    // else WebP at falling quality, then smaller, until it does (a picture background's PNG is past the App's 512 KB)
+    async previewImage(width, bytes = Infinity) {
       const c = $('preview');
-      const k = Math.min(1, width / c.width);
-      const o = document.createElement('canvas');
-      o.width = Math.round(c.width * k);
-      o.height = Math.round(c.height * k);
-      o.getContext('2d').drawImage(c, 0, 0, o.width, o.height);
-      const blob = await new Promise((ok) => o.toBlob(ok, 'image/png'));
-      return new Uint8Array(await blob.arrayBuffer());
+      const encode = async (w, type, q) => {
+        const k = Math.min(1, w / c.width);
+        const o = document.createElement('canvas');
+        o.width = Math.max(1, Math.round(c.width * k));
+        o.height = Math.max(1, Math.round(c.height * k));
+        o.getContext('2d').drawImage(c, 0, 0, o.width, o.height);
+        const blob = await new Promise((ok) => o.toBlob(ok, type, q));
+        return blob && blob.type === type ? new Uint8Array(await blob.arrayBuffer()) : null;
+      };
+      let out = await encode(width, 'image/png');
+      for (let w = width; out && out.length > bytes && w >= 120; w = Math.round(w * 0.8)) {
+        for (const q of [0.9, 0.8, 0.7, 0.6]) {
+          out = (await encode(w, 'image/webp', q)) || (await encode(w, 'image/png')) || out;
+          if (out.length <= bytes) break;
+        }
+      }
+      return out;
     },
     toast,
     lib: L,
@@ -666,18 +717,22 @@
     async pictureSamples() {
       const p = theme && theme.info(env.dark).picture;
       const bmp = p && assets.cuts[(p.cuts || {}).portrait || p.src];
-      if (!bmp) return null;
-      const c = document.createElement('canvas');
-      c.width = 24;
-      c.height = 16;
-      const g = c.getContext('2d');
-      g.drawImage(bmp, 0, 0, c.width, c.height);
-      const px = g.getImageData(0, 0, c.width, c.height).data;
-      const out = [];
-      for (let i = 0; i < px.length; i += 4) out.push([px[i], px[i + 1], px[i + 2]]);
-      return out;
+      return bmp ? samplesOf(bmp) : null;
     },
   };
+
+  // a few hundred of [bmp]'s pixels, `[[r, g, b]]`
+  function samplesOf(bmp) {
+    const c = document.createElement('canvas');
+    c.width = 24;
+    c.height = 16;
+    const g = c.getContext('2d');
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    const px = g.getImageData(0, 0, c.width, c.height).data;
+    const out = [];
+    for (let i = 0; i < px.length; i += 4) out.push([px[i], px[i + 1], px[i + 2]]);
+    return out;
+  }
 
   // the tab shown drawn anew from the document (the source tab is the text area, kept as it is typed)
   function showTab() {

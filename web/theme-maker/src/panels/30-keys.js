@@ -57,7 +57,7 @@
       if (!['png', 'jpg', 'webp'].includes(type) || !s) throw new Error(name + ' 不是 PNG、JPEG 或 WebP');
       if (Math.max(s[0], s[1]) > lim.keyImageSide) throw new Error(name + ' 太大：最大 ' + lim.keyImageSide + '×' + lim.keyImageSide);
       if (bytes.length > lim.keyImageBytes) throw new Error(name + ' 超过 ' + lim.keyImageBytes + ' 字节');
-      const file = 'key-' + name.toLowerCase().replace(/\.[^.]*$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) + '.' + type;
+      const file = panels.fileName(d.files, 'key-', name, type);
       const files = Object.assign(Object.create(null), d.files);
       files[file] = bytes;
       return { xml: d.xml, files, layouts: d.layouts, file };
@@ -137,7 +137,7 @@
         else api.toast('先上传一张键面图片（下面的按钮）');
       }
     })));
-    if (f.kind === 'none' || f.kind === 'solid' || f.kind === 'image') out.append(uploadImage(api, sel, set, now));
+    if (f.kind === 'none' || f.kind === 'solid' || f.kind === 'image') out.append(uploadImage(api, sel));
     if (f.kind === 'solid') out.append(row('颜色', color(f.color, (c) => set(c ? { kind: 'solid', color: c } : null), F)));
     if (f.kind === 'linear') {
       const patch = (fn) => { const c = now(); if (c.kind === 'linear') set(fn(c)); };
@@ -171,16 +171,17 @@
   }
 
   // a key's image put in the theme and made the fill: PNG, JPEG or WebP within the app's side and bytes for a key's
-  function uploadImage(api, sel, set, now) {
+  function uploadImage(api, sel) {
     const { h } = panels.ui;
     return h('button', { type: 'button', textContent: '上传键面图片…', on: { click: async () => {
       const f = await api.pickFile('image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp');
       if (!f) return;
-      let made = null;
-      api.apply((x) => { made = ops.addKeyImage(x, api.lib, api.limits(), f.name, new Uint8Array(f.bytes)); return made; });
-      if (!made) return;
-      const c = now();
-      set(c.kind === 'image' ? Object.assign({}, c, { file: made.file }) : { kind: 'image', file: made.file, insets: [0, 0, 0, 0], scale: 3, fallback: c.kind === 'solid' ? c.color : null });
+      // the image and the fill it is, one step (undone together: no file left that nothing names)
+      api.apply((x) => {
+        const made = ops.addKeyImage(x, api.lib, api.limits(), f.name, new Uint8Array(f.bytes));
+        const c = F.parseFill(F.valueOf(made.xml, sel, 'fill')) || { kind: 'none' };
+        return ops.fill(made, sel, c.kind === 'image' ? Object.assign({}, c, { file: made.file }) : { kind: 'image', file: made.file, insets: [0, 0, 0, 0], scale: 3, fallback: c.kind === 'solid' ? c.color : null });
+      });
     } } });
   }
 

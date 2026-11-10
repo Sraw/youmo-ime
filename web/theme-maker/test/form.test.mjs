@@ -436,3 +436,16 @@ test('从背景图取色: one noisy pixel is not the accent; both versions each 
   }
   read(both.xml);
 });
+
+test('an uploaded key or effect image never overwrites a file: a name taken gets -2, one of no letters a name', () => {
+  const L = globalThis.YoumoLib;
+  const lim = { keyImageSide: 1024, keyImageBytes: 2097152 };
+  const one = P.keys.ops.addKeyImage({ xml: nord, files: {}, layouts: {} }, L, lim, 'a.png', PNG4);
+  const two = P.keys.ops.addKeyImage(one, L, lim, 'A.png', PNG4);
+  assert.equal(two.file, 'key-a-2.png');
+  assert.ok('key-a.png' in two.files);
+  assert.equal(P.keys.ops.addKeyImage(one, L, lim, '按键.png', PNG4).file, 'key-image.png');
+  const e1 = P.motion.ops.addEffectImage(one, L, '火花.png', PNG4);
+  assert.equal(e1.file, 'effect-image.png');
+  assert.equal(P.motion.ops.addEffectImage(e1, L, '星.png', PNG4).file, 'effect-image-2.png');
+});

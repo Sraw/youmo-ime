@@ -69,6 +69,7 @@ async function main() {
   try {
     await b.send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/page.html' });
     for (let i = 0; i < 100 && !(await js(`!!document.querySelector('#builtins button')`)); i++) await wait(100);
+    await js(`document.fonts.ready.then(() => 1)`);
     await js(`(document.getElementById('new-panel').open || document.getElementById('new-panel').showModal(), document.querySelector('#builtins button').click())`);
     await js(`document.querySelector('#tabs [data-tab=text]').click()`);
     await wait(300);
@@ -216,6 +217,81 @@ async function main() {
     await js(`(() => { const s = document.getElementById('env-show'); s.value = 'preview'; s.dispatchEvent(new Event('change', { bubbles: true })); const t = document.getElementById('env-sheet'); t.value = 'clipboard'; t.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await wait(500);
     check(h1 > h0, '环境: typing: the code strip over the bar (' + h0 + ' → ' + h1 + ')');
+
+    // an edit that adds controls (描边's colour once it has a width) draws the tab anew: the field tapped or clicked
+    // next keeps its focus and what is typed into it (touch and mouse)
+    await js(`document.querySelector('#tabs [data-tab=popup]').click()`);
+    await wait(300);
+    const pos = (label, nth) => js(`(() => { const row = [...document.querySelectorAll('#edit .tab:not([hidden]) label.row')].find((r) => r.querySelector('.what').textContent === ${JSON.stringify(label)}); const e = row.querySelectorAll('input')[${nth}]; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    const press = async (touch, label, nth = 0) => {
+      const { x, y } = await pos(label, nth);
+      if (touch) {
+        await b.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+        await wait(60);
+        await b.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      } else for (const t of ['mousePressed', 'mouseReleased']) await b.send('Input.dispatchMouseEvent', { type: t, x, y, button: 'left', clickCount: 1 });
+      await wait(60);
+    };
+    const bubble = async () => (/<style select="preview"[^>]*\/>/.exec(await source()) || [''])[0];
+    for (const touch of [true, false]) {
+      const how = touch ? 'touch' : 'mouse';
+      await b.send('Emulation.setTouchEmulationEnabled', { enabled: touch, maxTouchPoints: 5 });
+      while (/border=|shadow=/.test(await bubble()) && !(await js(`document.getElementById('undo').disabled`))) { await js(`document.getElementById('undo').click()`); await wait(200); }
+      await press(touch, '描边');
+      await js(`document.activeElement.select && document.activeElement.select()`);
+      await type('1');
+      await press(touch, '阴影', 0);
+      await js(`document.activeElement.select && document.activeElement.select()`);
+      await type('2');
+      await wait(400);
+      const on = await js(`document.activeElement.value + ' ' + document.activeElement.closest('label.row')?.querySelector('.what')?.textContent`);
+      check(/^2 阴影$/.test(on), how + ': a tab drawn anew keeps the field tapped and what is typed into it: ' + on);
+      await press(touch, '圆角');
+      for (let i = 0; i < 20 && !/shadow=/.test(await bubble()); i++) await wait(100);
+      const st = await bubble();
+      check(/border="1dp/.test(st) && /shadow="0dp 2dp/.test(st), how + ': both written: ' + st);
+    }
+    await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+
+    // 从一张图片开始 twice, with pictures of two colours: each time the colours are the new picture's, in one step
+    const fromImage = (colour) => js(`(async () => {
+      const panel = document.getElementById('new-panel'); if (!panel.open) panel.showModal();
+      document.querySelector('input[name=image-tone][value=dark]').click();
+      const oc = new OffscreenCanvas(800, 400); const g = oc.getContext('2d'); g.fillStyle = '${colour}'; g.fillRect(0, 0, 800, 400);
+      const blob = await oc.convertToBlob({ type: 'image/png' });
+      const inp = document.getElementById('image-input');
+      inp.click = function () { const dt = new DataTransfer(); dt.items.add(new File([blob], 'p.png', { type: 'image/png' })); this.files = dt.files; this.onchange(); };
+      document.getElementById('from-image').click();
+      return 1;
+    })()`);
+    for (const [colour, accent] of [['#e05010', /#e0501[01]/], ['#1040e0', /#1040e[01]/]]) {
+      await fromImage(colour);
+      for (let i = 0; i < 50 && !accent.test((/<color name="accentKey"[^>]*>/.exec(await source()) || [''])[0]); i++) await wait(100);
+      const got = (/<color name="accentKey"[^>]*>/.exec(await source()) || [''])[0];
+      check(accent.test(got) && (await source()).includes('#4d000000'), '从一张图片开始 ' + colour + ': the colours are the new picture\'s (' + got + ')');
+    }
+    await js(`document.getElementById('undo').click()`);
+    await wait(500);
+    check(/#e0501[01]/.test((/<color name="accentKey"[^>]*>/.exec(await source()) || [''])[0]), '从一张图片开始: the picture and its colours one step (one undo: the first picture\'s)');
+
+    // 信息 › 从预览截一张 over a photo-like picture (noise: its PNG is past 512 KB): taken smaller or as WebP, within the App's limit
+    await js(`(async () => {
+      const panel = document.getElementById('new-panel'); if (!panel.open) panel.showModal();
+      const oc = new OffscreenCanvas(1600, 1000); const g = oc.getContext('2d'); const im = g.createImageData(1600, 1000);
+      for (let i = 0; i < im.data.length; i++) im.data[i] = (i & 3) === 3 ? 255 : Math.random() * 256;
+      g.putImageData(im, 0, 0);
+      const blob = await oc.convertToBlob({ type: 'image/png' });
+      const inp = document.getElementById('image-input');
+      inp.click = function () { const dt = new DataTransfer(); dt.items.add(new File([blob], 'n.png', { type: 'image/png' })); this.files = dt.files; this.onchange(); };
+      document.getElementById('from-image').click();
+      return 1;
+    })()`);
+    await wait(4000);
+    await js(`document.querySelector('#tabs [data-tab=info]').click()`);
+    await wait(300);
+    await js(`[...document.querySelectorAll('#tab-info button')].find((x) => x.textContent === '从预览截一张').click()`);
+    for (let i = 0; i < 50 && !/preview="/.test(await source()); i++) await wait(100);
+    check(/<meta [^>]*preview="preview\.(png|webp)"/.test(await source()), '信息: a preview taken over a noisy picture fits the App\'s 512 KB: ' + ((/preview="[^"]*"/.exec(await source()) || ['none'])[0]));
   } finally {
     b.close();
     server.close();
