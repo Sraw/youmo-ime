@@ -270,6 +270,29 @@ class CommonWordsPageUatTest {
         }
     }
 
+    // an edit dialog open as the page comes back and reads the file anew: what it saves goes to the
+    // row of its word as listed now, not to where the word was
+    @Test
+    @Uat("WD-39")
+    fun anEditOpenAsTheFileIsReadAgainGoesToItsWordsRow() {
+        val base = CommonWords.parse(miZiPang).words
+        CommonWordsManager.write(base)
+        try {
+            commonWordsPage()
+            val (d, fields) = editRow("米字旁 → 米、糸\nmizipang · mzp")
+            // the keyboard took 糸 off: the word the dialog opened with is listed no more
+            activityStopped { CommonWordsManager.saveOver(base, base.without("米字旁", "糸")) }
+            until("read again") { rowsOfWords() == listOf("米字旁 → 米", "木字旁 → 木") }
+            fields[2].setText("米\n丝")
+            d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            idle()
+            until("edited") { rowsOfWords() == listOf("米字旁 → 米、丝", "木字旁 → 木") }
+            assertEquals(listOf("米字旁[mi'zi'pang] 米 丝", "木字旁[mu'zi'pang] 木"), commonWordsSaved())
+        } finally {
+            CommonWordsManager.write(CommonWords.EMPTY)
+        }
+    }
+
     // what happens while the page is away, another app over it
     private fun activityStopped(meanwhile: () -> Unit) = st.leaveAndReturn(meanwhile)
 

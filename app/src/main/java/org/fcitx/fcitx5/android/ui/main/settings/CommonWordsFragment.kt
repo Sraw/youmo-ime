@@ -168,7 +168,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             .setNegativeButton(android.R.string.cancel, null)
             .apply {
                 if (entry != null) setNeutralButton(R.string.delete) { _, _ ->
-                    ui.indexItem(entry).takeIf { it >= 0 }?.let { ui.removeItem(it) }
+                    rowOf(entry).takeIf { it >= 0 }?.let { ui.removeItem(it) }
                 }
             }
             .show()
@@ -205,13 +205,27 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                 }
                 val word = CommonWords.Word(text, checkNotNull(syllables), CommonWords.clean(text, replacements))
                 // one text, one word: edit the one listed
-                if (ui.entries.any { it.text == text && it !== entry }) {
+                if (ui.entries.any { it.text == text && it.text != entry?.text }) {
                     textField.error = getString(R.string.common_word_listed)
                     return@onClick false
                 }
-                block(word)
+                if (entry == null) block(word) else saveOver(entry, word)
                 true
             }
+    }
+
+    private fun rowOf(entry: CommonWords.Word) = ui.entries.indexOfFirst { it.text == entry.text }
+
+    /**
+     * [entry] edited into [word], in its row as listed now: the file read again ([readAgain]) may
+     * have put a new list in while the dialog was open, the entry it opened with no longer in it.
+     */
+    private fun saveOver(entry: CommonWords.Word, word: CommonWords.Word) {
+        val at = rowOf(entry)
+        when {
+            at < 0 -> ui.addItem(item = word)
+            ui.entries[at] != word -> ui.updateItem(at, word)
+        }
     }
 
     private fun said(problem: Problem) = getString(
