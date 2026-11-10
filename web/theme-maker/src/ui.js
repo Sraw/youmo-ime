@@ -66,6 +66,8 @@
     const d = history.current;
     if ($('source').value !== d.xml) $('source').value = d.xml;
     $('name').textContent = M.themeName(d.xml) || '（无名）';
+    // the page answers only once there is a document (m1-review L6): until then its buttons are inert
+    $('top').inert = $('main').inert = false;
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
     keep();

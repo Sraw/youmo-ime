@@ -82,7 +82,7 @@ async function main() {
     const typed = await js(`document.activeElement.tagName + ' ' + document.activeElement.value + ' ' + (document.activeElement.closest('label.row') || {}).textContent`);
     check(/ 0.1 /.test(typed), 'the next field keeps what is typed into it after an edit: ' + typed);
     await click('颜色');
-    await wait(300);
+    for (let i = 0; i < 20 && !/scale="120%"/.test(await style()); i++) await wait(100);
     const s = await style();
     check(/scale="120%"/.test(s) && /letter-spacing="0.1em"/.test(s), 'both edits written: ' + s);
 
@@ -181,6 +181,13 @@ async function main() {
     await wait(2500);
     const blue = await centre();
     check(/^25[45],0,0$/.test(red) && /^0,0,25[45]$/.test(blue), 'a picture replaced: the crop shows the new one (' + red + ' then ' + blue + ')');
+
+    // 用这个裁切 replaces the crop's box whole: the focus goes to the new box's button, not to the page (R8)
+    await js(`(() => { const c = document.querySelector('#tab-background canvas.crop-canvas'); c.dispatchEvent(new PointerEvent('pointerdown', { clientX: 10, clientY: 10, bubbles: true })); c.dispatchEvent(new PointerEvent('pointermove', { clientX: 30, clientY: 20, bubbles: true })); c.dispatchEvent(new PointerEvent('pointerup', { clientX: 30, clientY: 20, bubbles: true })); })()`);
+    await js(`(() => { const x = [...document.querySelectorAll('#tab-background button')].find((y) => y.textContent === '用这个裁切'); x.focus(); x.click(); })()`);
+    await wait(1500);
+    const focused = await js(`document.activeElement === document.body ? 'body' : document.activeElement.tagName + ' ' + document.activeElement.textContent`);
+    check(focused !== 'body' && !!(await js(`document.getElementById('tab-background').contains(document.activeElement)`)), '用这个裁切: the focus stays in the tab (' + focused + ')');
 
     // M3's tabs: each draws; an edit on one writes its style and keeps the tab (the row synced in place)
     for (const id of ['bar', 'popup', 'window', 'size', 'motion', 'info']) {

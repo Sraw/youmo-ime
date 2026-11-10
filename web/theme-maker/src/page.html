@@ -17,7 +17,7 @@
 </style>
 </head>
 <body>
-<header id="top">
+<header id="top" inert>
   <button id="file" aria-haspopup="menu">文件</button>
   <div id="file-menu" class="menu" role="menu" hidden>
     <button data-act="new" role="menuitem">新建…</button>
@@ -32,7 +32,7 @@
   <button id="env">环境</button>
   <a class="link" href="classic/">旧版</a>
 </header>
-<main id="main">
+<main id="main" inert>
   <section id="preview-area">
     <canvas id="preview" aria-label="键盘预览"></canvas>
     <div id="picked" class="muted"></div>
