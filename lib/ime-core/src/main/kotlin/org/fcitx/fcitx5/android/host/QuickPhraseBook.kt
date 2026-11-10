@@ -218,6 +218,9 @@ object QuickPhraseFiles {
 
     /** What a folder cannot be named: the page's shelves of entries in none, and of all. */
     val RESERVED_FOLDERS = setOf("全部", "未分类", "未分類", "All", "No folder")
+
+    /** Whether [name] is one of [RESERVED_FOLDERS], case aside (`all` too). */
+    fun reservedFolder(name: String): Boolean = RESERVED_FOLDERS.any { it.equals(name, ignoreCase = true) }
     private const val FIRST_KEY_CHAR = 0x21
     private const val LAST_KEY_CHAR = 0x7E
 
@@ -232,11 +235,13 @@ object QuickPhraseFiles {
      * spaces spaces again. One rule for both versions: a key of before (version 1) has its notes
      * typed into it, so `#wz百度` is `#wz` with 百度 and `地址` no key with 地址; and a version 2 file
      * a build before 0.6.0 wrote again (the version line gone, `#wz｜百度` kept) reads as it was meant,
-     * not as 「｜百度」.
+     * not as 「｜百度」. A bar with nothing after it is the note itself: 0.5.x took `｜` as a key, kept
+     * as an entry to give a key ([joined] writes it `｜｜`), not dropped for having neither.
      */
     fun split(joined: String): Pair<String, String> {
         val at = joined.indexOfFirst { !keyChar(it) }.let { if (it < 0) joined.length else it }
-        return joined.substring(0, at) to unspaced(joined.substring(at).removePrefix(NOTE_MARK.toString()))
+        val rest = joined.substring(at)
+        return joined.substring(0, at) to unspaced(if (rest.length > 1) rest.removePrefix(NOTE_MARK.toString()) else rest)
     }
 
     /**
@@ -369,7 +374,7 @@ object QuickPhraseFiles {
      */
     fun validFolder(name: String): Boolean =
         name.isNotEmpty() && name == note(name) && name.codePointCount(0, name.length) <= QuickPhraseBook.MAX_FOLDER &&
-            name !in RESERVED_FOLDERS
+            !reservedFolder(name)
 
     /**
      * What [merge] made: [entries] after it, the [folders], and how many lines it skipped as already
@@ -386,8 +391,9 @@ object QuickPhraseFiles {
     )
 
     /**
-     * [lines] of a `.mb` file ([parse]) added after [mine]: the ones whose key is good ([validKey], or
-     * none, the old key in the note), whose note is ([validNote]), whose content is not longer than
+     * [lines] of a `.mb` file ([parse]) added after [mine], each note as [note] keeps it (a computer's
+     * file may have an ideographic or no-break space in a key): the ones whose key is good
+     * ([validKey], or none, the old key in the note), whose note is ([validNote]), whose content is not longer than
      * [QuickPhraseBook.MAX_CONTENT], and that are not there already ([QuickPhraseEntry.sameAs]); their
      * folders after [folders], one of the same name the same folder.
      */
@@ -403,7 +409,8 @@ object QuickPhraseFiles {
         var tooLong = 0
         var badKey = 0
         var keyless = 0
-        for (e in lines) {
+        for (line in lines) {
+            val e = line.copy(note = note(line.note))
             when {
                 // a line of no content (only a quoted "" gives one) is no line at all, its key whatever
                 // it is. A picture picked for the file never gets here: parse drops its lines (no

@@ -566,7 +566,7 @@ class QuickPhraseFragment : ProgressFragment() {
             .onPositiveButtonClick {
                 val name = QuickPhraseFiles.note(field.str)
                 when {
-                    name in QuickPhraseFiles.RESERVED_FOLDERS -> {
+                    QuickPhraseFiles.reservedFolder(name) -> {
                         field.error = getString(R.string.quick_phrase_folder_reserved, name)
                         false
                     }

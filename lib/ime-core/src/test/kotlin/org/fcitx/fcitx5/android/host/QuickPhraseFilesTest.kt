@@ -122,7 +122,8 @@ class QuickPhraseFilesTest {
         assertFalse(QuickPhraseFiles.validNote(" a"))
         assertTrue(QuickPhraseFiles.validNote("长".repeat(QuickPhraseBook.MAX_NOTE)))
         assertFalse(QuickPhraseFiles.validNote("长".repeat(QuickPhraseBook.MAX_NOTE + 1)))
-        for (shelf in listOf("全部", "未分类", "未分類", "All", "No folder")) assertFalse(shelf, QuickPhraseFiles.validFolder(shelf))
+        for (shelf in listOf("全部", "未分类", "未分類", "All", "all", "ALL", "No folder", "no folder")) assertFalse(shelf, QuickPhraseFiles.validFolder(shelf))
+        assertTrue(QuickPhraseFiles.validFolder("Allure"))
         assertFalse(QuickPhraseFiles.validFolder("a\u00a0b"))
         assertTrue(QuickPhraseFiles.validFolder("网址"))
         assertFalse(QuickPhraseFiles.validFolder(" 网址"))
@@ -145,17 +146,36 @@ class QuickPhraseFilesTest {
         assertEquals(text.replace("【目录】网址\n", ""), QuickPhraseFiles.formatMine(back.entries, back.folders))
     }
 
+    // the code reviews of 060-quick: 0.5.x took `｜` alone as a key; it is kept as a note, an entry to
+    // give a key, and written back so; one made elsewhere with neither key nor note is no entry
     @Test
     @Uat("QU-27")
-    fun aLineWithNeitherKeyNorNoteIsNoEntryReadOrImported() {
-        val file = (QuickPhraseFiles.HEADER + "\n｜ 内容 有空格\n｜ 内容\nx｜ y\n").toByteArray()
-        assertEquals(listOf(QuickPhraseEntry("x", "y")), QuickPhraseFiles.readMine(file).entries)
-        assertEquals(listOf(QuickPhraseEntry("x", "y")), QuickPhraseFiles.parse("｜ 内容\nx｜ y\n".toByteArray()).entries)
-        // one made elsewhere and merged all the same: skipped as a bad key, never written as ` 内容`
-        val merged = QuickPhraseFiles.merge(emptyList(), listOf(QuickPhraseEntry("", "内容"), home))
+    fun aKeyThatWasABarAloneIsKeptAsItsNoteAndOneWithNeitherIsNoEntry() {
+        val bar = QuickPhraseEntry("", "内容 有空格", "｜")
+        assertEquals("" to "｜", QuickPhraseFiles.split("｜"))
+        assertEquals("" to "｜", QuickPhraseFiles.split("｜｜"))
+        assertEquals("" to "x", QuickPhraseFiles.split("｜x"))
+        val old = "｜ 内容 有空格\nx｜ y\n".toByteArray()
+        assertEquals(listOf(bar, QuickPhraseEntry("x", "y", "｜")), QuickPhraseFiles.readMine(old).entries)
+        val text = QuickPhraseFiles.formatMine(listOf(bar))
+        assertTrue(text.startsWith(QuickPhraseFiles.HEADER + "\n｜｜ "))
+        assertEquals(listOf(bar), QuickPhraseFiles.readMine(text.toByteArray()).entries)
+        val merged = QuickPhraseFiles.merge(emptyList(), QuickPhraseFiles.parse(old).entries + QuickPhraseEntry("", "内容"))
         assertEquals(1, merged.badKey)
-        assertEquals(listOf(home), merged.entries)
-        assertEquals(emptyMap<QuickPhraseEntry, Long>(), QuickPhraseFiles.parseUsed(QuickPhraseFiles.USED_HEADER + "\n5\t｜\tx\n"))
+        assertEquals(1, merged.keyless)
+        assertEquals(listOf(bar, QuickPhraseEntry("x", "y", "｜")), merged.entries)
+        assertEquals(emptyMap<QuickPhraseEntry, Long>(), QuickPhraseFiles.parseUsed(QuickPhraseFiles.USED_HEADER + "\n5\t\tx\n"))
+    }
+
+    // the code review of 060-quick: a computer's key with an ideographic space or a no-break space at
+    // its end imports, the note as it is kept
+    @Test
+    @Uat("QU-27")
+    fun anImportTakesANoteOfOtherSpacesAsItIsKept() {
+        val file = "地址\u3000家 北京\nab首页\u00a0 x\n".toByteArray()
+        val merged = QuickPhraseFiles.merge(emptyList(), QuickPhraseFiles.parse(file).entries)
+        assertEquals(0, merged.badKey)
+        assertEquals(listOf(QuickPhraseEntry("", "北京", "地址 家"), QuickPhraseEntry("ab", "x", "首页")), merged.entries)
     }
 
     @Test
