@@ -29,6 +29,15 @@ import java.util.zip.ZipOutputStream
  * `perfOnly=anim,soak`, instead, it plays [SOAK_MS] (10 minutes) and the memory is told at its start and each [SOAK_STEP_MS]
  * (a decoder's leak: §4 A4). Kept out of the test's class for its size (detekt LargeClass).
  */
+/**
+ * perfOnly's motion rows: anim, A1's (motionRows) then A4's; anim,soak: the animated picture played 10 minutes
+ * instead; picture: A4's alone (A5: one change to it measured in minutes).
+ */
+internal fun KeyboardPerfBaselineTest.animRows(only: List<String>) {
+    if ("anim" in only) motionRows()
+    if ("anim" in only || "picture" in only) pictureRows(soak = "soak" in only)
+}
+
 internal fun KeyboardPerfBaselineTest.pictureRows(soak: Boolean) {
     if (themeWas == null) themeWas = ThemeManager.prefs.normalModeTheme.getValue()
     val (animated, still) = onMain { pictured(service.resources, ANIMATED, true) to pictured(service.resources, STILL_PICTURE, false) }
