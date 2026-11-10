@@ -152,11 +152,12 @@ adb shell am start -a android.intent.action.VIEW -d http://127.0.0.1:8000/fields
 adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.input.TypingHostActivity --ez next true
 #   --ez next true：「第一项」（回车是下一项）和下面的「第二项」；--ez noLearning true：不要个性化学习；
 #   --es sensitiveClip mima1234：打开时把这段文字标成敏感放上剪贴板
+#   --es clip <文字> --ei clipTimes 3000：打开时把这段文字重复 3000 遍放上剪贴板（像别的应用复制那样，不标敏感）
 ```
 
 （模拟器上 `adb root` 之后直接 `adb shell am start …`；脚本里是 `open_host(d, next=True)` 这样。）真机上也可以照用例里写的，
-用 Chrome 的无痕标签页、真的密码管理器。KB-21、PR-07、PR-08、PR-12 原来用它，现在都在 JVM 上断言（`needs="jvm:…"`），
-没有脚本再调 `open_host`；宿主留给手工在设备上看这几种框。
+用 Chrome 的无痕标签页、真的密码管理器。KB-21、PR-07、PR-08、PR-12 原来用它，现在都在 JVM 上断言（`needs="jvm:…"`）；
+脚本里现在只有 TB-54 用它放几十万字的剪贴板（JVM 上没有 binder 的限制）；宿主也留给手工在设备上看这几种框。
 
 ## 设备
 
@@ -215,7 +216,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 740 条（P0 129、P1 562、P2 49）：模拟器上跑 84 条（其中 42 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 656 条（JVM 584、发版时 23、真机或手工 36、语音 13）。
+现在共 741 条（P0 129、P1 563、P2 49）：模拟器上跑 85 条（其中 42 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 656 条（JVM 584、发版时 23、真机或手工 36、语音 13）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 

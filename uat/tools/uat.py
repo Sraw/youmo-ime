@@ -2059,7 +2059,7 @@ def open_host(d, **extras):
     """the debug build's TypingHostActivity, a native EditText with what a web field cannot have:
     next=True (an IME_ACTION_NEXT field and a second one under it), noLearning=True
     (IME_FLAG_NO_PERSONALIZED_LEARNING), sensitiveClip="…" (that text on the clipboard marked
-    sensitive). Not exported: started as root. A release run (UAT_BUILD=release) has no debug package:
+    sensitive), clip="…" with clipTimes=n (that text n times over on the clipboard, as any app copies). Not exported: started as root. A release run (UAT_BUILD=release) has no debug package:
     it is installed for this case as a host app only, its own input method disabled so the system
     has one 幽默输入法, and removed when the case ends (SET-01's wizard must see one)"""
     if BUILD == "release":
@@ -2078,13 +2078,14 @@ def open_host(d, **extras):
             d.adb("install", "-r", apks[-1], check=True, timeout=600)
         d.sh(f"ime disable {HOST_PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService")
         ensure_ime(d)
-    args = " ".join(f"--ez {k} true" if v is True else f"--es {k} {shlex.quote(v)}" for k, v in extras.items())
+    args = " ".join(f"--ez {k} true" if v is True else f"--ei {k} {v}" if isinstance(v, int) else f"--es {k} {shlex.quote(v)}"
+                    for k, v in extras.items())
     # a new task each time: the extras of this start, not an instance left from another case
     d.root(f"am start -W -f 0x10008000 -n {HOST} {args}")
     d.wait(lambda s: s.find(rid="keyboard_view", where="ime") and d.field(s), 15, what="the test host's field")
     d.page = None
     # started afresh by clear() as a page is reloaded; the clip is not put on the clipboard again
-    d.host = {k: v for k, v in extras.items() if k != "sensitiveClip"}
+    d.host = {k: v for k, v in extras.items() if k not in ("sensitiveClip", "clip", "clipTimes")}
     d._keys = None
 
 

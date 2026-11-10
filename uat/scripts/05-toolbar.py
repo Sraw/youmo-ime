@@ -1,7 +1,7 @@
 """uat/05-toolbar.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import BAR_BOTTOM, Blocked, case, check, open_url
+from uat import BAR_BOTTOM, TESTBED, Blocked, case, check, open_host, open_url
 
 LONG = "今天天气很好，我们一起去公园散步吧。"
 
@@ -386,3 +386,65 @@ def tb51(d):
     check(before != after, f"翻页前后一样 {before[:6]}")
     d.shot("kb", "下一页")
     return f"翻页 {before[:3]} → {after[:3]}"
+
+
+# 99 characters, no newline: put on the clipboard 3000 times over by the test host
+CLIP_UNIT = "今天天气很好，我们一起去公园散步吧。The quick brown fox jumps over the lazy dog. 第123号文件已经发送到邮箱，请查收。明天见，再会吧朋友们。okay!!"
+
+
+def testbed_multiline(d):
+    """the testbed's 多行 field, empty (the app started afresh) and tapped: the keyboard is up"""
+    d.sh(f"am force-stop {TESTBED}")
+    d.testbed("types")
+    n = d.wait(lambda s: next((x for x in s.app() if x.rid == "multiline" and x.pkg == TESTBED), None), 15,
+               what="the testbed's 多行 field")
+    d.tap(n.c, 1.5)
+    d.page = None
+    d.host = None
+    d._keys = None
+
+
+def multiline_length(d, want, timeout=40):
+    """the 多行 field's text once it holds want characters or has stopped growing: read from the
+    testbed (the screen's text stops at 100 000 characters), the app laying it out for seconds"""
+    end = time.time() + timeout
+    last, same = -1, 0
+    while time.time() < end:
+        try:
+            t = d.testbed_state()["multiline"]["text"]
+        except Blocked:
+            t = None   # still inside the IME's batch edit
+        if t is not None:
+            if len(t) >= want:
+                return t
+            same = same + 1 if len(t) == last else 0
+            last = len(t)
+            if same >= 4:
+                return t
+        time.sleep(1.0)
+    raise Blocked(f"等了 {timeout} 秒框里还在变（{last} 字）")
+
+
+@case("TB-54", mutates=True)
+def tb54(d):
+    times = 3000
+    want = len(CLIP_UNIT) * times
+    got = []
+    for way in ("候选栏的建议", "剪贴板面板"):
+        d.step(way)
+        open_host(d, clip=CLIP_UNIT, clipTimes=times)
+        testbed_multiline(d)
+        if way == "候选栏的建议":
+            ime(d, text=CLIP_UNIT[:6], contains=True, after=1.0)
+        else:
+            clip_panel(d)
+            item = clip_item(d, CLIP_UNIT[:6])
+            if not item:
+                raise Blocked(f"剪贴板面板里没有这一条：{[n.text[:10] for n in clip_items(d)][:4]}")
+            d.tap(item.c, 1.0)
+        t = multiline_length(d, want)
+        check(len(t) == want and t.startswith(CLIP_UNIT) and t.endswith(CLIP_UNIT),
+              f"{way}：框里 {len(t)} 字，应有 {want} 字")
+        got.append(len(t))
+        d.shot("kb", f"{way}粘贴后")
+    return f"候选栏 {got[0]} 字、面板 {got[1]} 字，都整段"

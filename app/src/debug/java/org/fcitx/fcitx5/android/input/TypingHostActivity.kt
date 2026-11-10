@@ -29,7 +29,9 @@ import java.util.concurrent.CopyOnWriteArrayList
  * action is "next" with a second field under it that the action moves to (the WebView test browser
  * ignores an input method's "next", so a native field shows it); [EXTRA_NO_LEARNING], the field
  * asks for no personalized learning (what an incognito tab's fields ask); [EXTRA_SENSITIVE_CLIP],
- * that text put on the clipboard marked sensitive, as a password manager copies a password.
+ * that text put on the clipboard marked sensitive, as a password manager copies a password;
+ * [EXTRA_CLIP], that text put on the clipboard as any app copies, [EXTRA_CLIP_TIMES] times over
+ * (`--ei`: a long clip without a command line as long, for pasting long text).
  */
 class TypingHostActivity : Activity() {
 
@@ -87,6 +89,10 @@ class TypingHostActivity : Activity() {
         field.requestFocus()
         // once per start: not again when a configuration change (the UAT's landscape) recreates it
         if (savedInstanceState == null) intent.getStringExtra(EXTRA_SENSITIVE_CLIP)?.let(::putSensitiveClip)
+        if (savedInstanceState == null) intent.getStringExtra(EXTRA_CLIP)?.let {
+            val times = intent.getIntExtra(EXTRA_CLIP_TIMES, 1).coerceAtLeast(1)
+            getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("uat", it.repeat(times)))
+        }
     }
 
     private fun putSensitiveClip(text: String) {
@@ -106,6 +112,8 @@ class TypingHostActivity : Activity() {
         const val EXTRA_NEXT = "next"
         const val EXTRA_NO_LEARNING = "noLearning"
         const val EXTRA_SENSITIVE_CLIP = "sensitiveClip"
+        const val EXTRA_CLIP = "clip"
+        const val EXTRA_CLIP_TIMES = "clipTimes"
         const val FIRST_FIELD = "第一项"
         const val SECOND_FIELD = "第二项"
     }
