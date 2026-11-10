@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.data.theme
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.input.theme.AnimatedWebp
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.utils.appContext
@@ -41,6 +42,8 @@ class ThemePackAnimatedImportTest {
 
     @Before
     fun empty() {
+        // the themes settled writable whatever ran before in this JVM
+        phoneStorage()
         dir.deleteRecursively()
         dir.mkdirs()
         ThemeFilesManager.probe = WebpProbe
