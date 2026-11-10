@@ -10,6 +10,7 @@ import android.os.Looper
 import android.os.SystemClock
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -60,6 +61,8 @@ class KeyEffectTest {
     @Before
     fun decodeAtOnce() {
         ThemeAssets.runner = { it.run() }
+        // it writes a user's pack: the themes settled writable whatever ran before in this JVM (phoneStorage)
+        phoneStorage()
     }
 
     @After
