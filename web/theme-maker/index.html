@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-CGuTQjyvaI4tKqaxvm31KjH3eGmJgIURBhURESTyhTE=' 'sha256-16ebXpQYnAgl9u2lSPRLdgwPR2A3omDskguIzzBoIhE=' 'sha256-ywaO7u9boc4zyTG9gTndCcQNBnAgM7raKIS4cZT1AAM=' 'sha256-ETs+YLQVlg6zlKl5D3ldT3sRXoXHz8t1+qMjX5KNgpQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-Kilmu92zDioIG92/jMBeNFFS0us3TsbNV5+YjzcTG/w=' 'sha256-16ebXpQYnAgl9u2lSPRLdgwPR2A3omDskguIzzBoIhE=' 'sha256-ywaO7u9boc4zyTG9gTndCcQNBnAgM7raKIS4cZT1AAM=' 'sha256-ETs+YLQVlg6zlKl5D3ldT3sRXoXHz8t1+qMjX5KNgpQ='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -2103,8 +2103,8 @@ dialog h2 { margin: 0; font-size: 16px; }
 
   /**
    * The draft: the document as it is now, kept in [store] (`get(key)`, `put(key, value)`, `remove(key)`, `keys()`,
-   * each a promise; `lock(act)` where the tabs' writes can be made one at a time) so a page opened again offers it back. A store that fails (a private window, no IndexedDB) is a
-   * page without drafts, never one that stops.
+   * each a promise; `lock(act)` where the tabs' writes can be made one at a time) so a page opened again offers it
+   * back. A store that fails (a private window, no IndexedDB) is a page without drafts, never one that stops.
    */
   const DRAFT = 'draft';
   // the files apart from the text: written again only when they changed (an edit of theme.xml shares its files

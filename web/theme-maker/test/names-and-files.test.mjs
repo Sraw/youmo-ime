@@ -278,6 +278,12 @@ test('the draft writes the files again only when they changed; drafts of the pag
   for (const k of others) assert.ok(m.has(k), 'a write without the lock lets go of no other page\'s record: ' + k);
   await M.dropDraft(refused);
   assert.equal(await M.draft(store), null, 'dropped');
+  // a read under the lock waits for another tab's write in flight: never a text whose files that write lets go
+  const w = M.keepDraft(Object.create(locking), M.doc('<w/>', { 'w.png': new Uint8Array([7]) }), M.ENV);
+  const read = await M.draft(locking);
+  await w;
+  assert.equal(read && read.doc.xml, '<w/>', 'read after the write');
+  assert.deepEqual(Object.keys(read.doc.files), ['w.png']);
   // an old draft written over: its files record goes too
   m.clear();
   m.set('draft', { v: 3, doc: { xml: '<v3/>' }, files: 'x' });

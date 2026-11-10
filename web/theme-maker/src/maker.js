@@ -306,8 +306,8 @@
 
   /**
    * The draft: the document as it is now, kept in [store] (`get(key)`, `put(key, value)`, `remove(key)`, `keys()`,
-   * each a promise; `lock(act)` where the tabs' writes can be made one at a time) so a page opened again offers it back. A store that fails (a private window, no IndexedDB) is a
-   * page without drafts, never one that stops.
+   * each a promise; `lock(act)` where the tabs' writes can be made one at a time) so a page opened again offers it
+   * back. A store that fails (a private window, no IndexedDB) is a page without drafts, never one that stops.
    */
   const DRAFT = 'draft';
   // the files apart from the text: written again only when they changed (an edit of theme.xml shares its files
