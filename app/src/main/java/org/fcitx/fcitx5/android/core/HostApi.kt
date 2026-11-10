@@ -143,9 +143,10 @@ interface TypingApi {
     /**
      * What the handwriting pad read of its [piece], shown by the Ink key that carries it: see
      * [Engines.ink]. Whether the Ink key was sent: not where handwriting cannot load or is not the
-     * current input method (the engine told all the same, holding it for its next).
+     * current input method (the engine told all the same, holding it for its next). [onKeys]: written on
+     * the letter keys (键盘手写), for the current input method's own handwriting (InkOver), not handwriting's.
      */
-    suspend fun offerInk(reading: InkReading, piece: Int): Boolean
+    suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean = false): Boolean
 
     /**
      * A glide across the letters, read as the current input method reads it and carried by the
@@ -155,7 +156,7 @@ interface TypingApi {
     suspend fun offerGlide(glide: Glide): Boolean
 
     /** The handwriting pad's [piece] finished, told by the Ink key that carries it: see [Engines.ink]; taken as [offerInk]. */
-    suspend fun inkFinished(piece: Int): Boolean
+    suspend fun inkFinished(piece: Int, onKeys: Boolean = false): Boolean
 
     /** The keys no letter the table input method [im] reads now, as its session has them: see [Engines.tableKeys]. */
     suspend fun tableKeys(im: String): Set<Char>
