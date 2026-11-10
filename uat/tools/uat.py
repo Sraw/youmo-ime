@@ -1961,12 +1961,12 @@ def sym_char(d, ch):
     raise Blocked(f"符号面板里找不到「{ch}」")
 
 
-def glide_on(d, im=None, page="text", add=None):
-    """通用输入 → 在键上划 set to 滑行输入 (after adding the input method add), the test page, then im"""
+def glide_on(d, im=None, page="text", add=None, option="滑行输入"):
+    """通用输入 → 在键上划 set to option (滑行输入; 键盘手写 too) after adding the input method add, the test page, then im"""
     if add:
         add_im(d, add)
     home(d, "通用输入")
-    choose(d, "在键上划", "滑行输入")
+    choose(d, "在键上划", option)
     d.open_page(page)
     if im:
         d.switch_im(im)

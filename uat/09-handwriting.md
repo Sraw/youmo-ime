@@ -145,3 +145,43 @@
 - **操作**：写「天」，长按候选里的「天」看菜单；再接着写「人」（不上屏），长按候选里的「人」看菜单，选 **屏蔽**，确认；然后在 **屏蔽的词** 里恢复「人」，再写一遍「人」。
 - **预期**：两次菜单里都有 **屏蔽**（屏蔽的是候选上显示的那个字：连写时候选栏显示的是最后一段写的字的几种可能，屏蔽的就是它；前面的字在它是最后一个时一样能长按屏蔽）；屏蔽后候选里不再有「人」，最后那段换成别的读法，候选不空；屏蔽的词里列着「人」；恢复后又写得出「人」。
 - **JVM**：`HandwritingEngineUatTest.theLastCharacterWrittenIsBlockedFromTheKeyboard`（:lib:ime-eval:uatTest，真数据：写「天」「人」，屏蔽「人」后「天人」这个词也不再把「人」带出来）、`HandwritingSessionTest`「a long press on what may follow or on a candidate forgets what was learned of it or blocks it」「a character blocked then unblocked comes back when what is written is read again」。设备上跑过（2026-11-08，emulator-5574）。
+
+## 键盘手写
+
+前提里的 **键盘手写开**：B0-设置，在 **通用输入** 的 **在键上划** 里选 **键盘手写**，回测试页点「普通文本」框（拼音全键盘）。"在键上写「X」"指用手指在字母区（q 到 m 三排）按笔顺写一个占满这三排的 X，写完停笔。
+
+### HW-32 [P0] 在字母键上写字，空格上屏
+- **前提**：键盘手写开。
+- **操作**：什么都没打时在键上写「人」，停笔约 1 秒；看候选栏；点空格。
+- **预期**：写的时候键上画出笔迹（颜色和手写板一样），键照常显示，没有按键预览、没有打出字母；停笔后笔迹淡出，框里出现带下划线的「人」，候选里有「人」；点空格后框里是「人」。
+- **JVM**：`KeyHandwritingUatTest.aStrokeOnTheLettersIsReadAsTheInputMethodsHandwritingNoKeyPressed`（笔画放到键盘的书写板上、读出来交给引擎、没发按键、停笔后片段写完）、`InkOverTest.anInkIsWrittenItsCandidatesPickedAndWhatWasPutInToldPinyin`（ime-core）。
+
+### HW-33 [P1] 第一笔是点的字：先点的字母收回当第一笔
+- **前提**：键盘手写开。
+- **操作**：点一下 t（打出 t），马上（停笔时间内）在键上接着写「六」剩下的三笔；停笔。再清空，打 ni 后在停笔时间内在键上划一横；再清空，点 t，长按 g 选一个字母，马上划一横。
+- **预期**：第一次 t 被删掉，框里是带下划线的「六」（或候选里有「六」），没有多删框里别的字。打着 ni 时划一横不写字、ni 还在。点 t 再长按 g 后划一横：t 和长按打的字母都还在，什么都没删。
+- **JVM**：`KeyHandwritingUatTest.aTapThenAStrokeWithinThePauseTakesTheTapBackAsTheFirstDot`（点按放进书写板当第一笔，第一个读出带 takesBack，键盘不发退格）、`KeyInkGestureTest.aLongPressBetweenTheTapAndTheStrokeTakesNothingBack`、`KeyInkGestureTest.aCancelledTouchOrASecondFingerAfterTheTapTakesNothingBack`、`InkOverTest.anInkTakingBackDeletesTheOneLetterTypedThenIsWritten`、`InkOverTest.anInkTakingBackDeletesNothingWhereMoreThanTheTapIsTyped`、`InkOverTest.anInkTakingBackDeletesNothingOnceTheTapIsPickedAway`（ime-core：引擎只在正在打的正好是这一个字母时删）。
+
+### HW-34 [P1] 写字中途 ⌫ 撤一笔，空格先写完再上屏
+- **前提**：键盘手写开，**手写** 设置里停笔时间选最长。
+- **操作**：在键上写「大」的前两笔，马上点 ⌫；再写那一笔；点空格。
+- **预期**：⌫ 撤掉最后一笔（键上的笔迹少一笔），没有删框里的字；空格把这个字写完并上屏「大」。
+- **JVM**：`KeyHandwritingUatTest.whileWritingATapIsAStrokeBackspaceTakesOneBackAndSpaceCommits`；设备上不跑（adb 的触摸间隔掐不准停笔时间）。
+
+### HW-35 [P1] 写完再点字母：先上屏写好的再打字母
+- **前提**：键盘手写开。
+- **操作**：在键上写「人」，停笔约 1 秒；点 n。
+- **预期**：「人」上屏，框里是「人」后面跟着正在打的 n。
+- **JVM**：`InkOverTest.aLetterAfterTheWritingPutsTheBestInThenTypesIt`（ime-core）。
+
+### HW-36 [P1] 九键、14 键上也能写
+- **前提**：键盘手写开，**输入法 → 拼音** 的 **键盘** 分别选九键、14 键。
+- **操作**：在键上写「人」。
+- **预期**：和全键盘一样写出「人」。
+- **JVM**：`KeyHandwritingUatTest.theNineAndFourteenKeysAreWrittenOnToo`；设备上不跑。
+
+### HW-37 [P1] 密码框、英文、触摸浏览时不写
+- **前提**：键盘手写开。
+- **操作**：在「密码」框里在键上划一道；换到英文在键上划一道；打开 TalkBack 后在拼音键盘上划一道。
+- **预期**：都不出笔迹、不写字，键照原来的点按和划动处理。英文里按键直接打出，不等识别。
+- **JVM**：`KeyHandwritingUatTest.notInAPasswordNorEnglishNorWhileTalkBackExplores`、`KeyHandwritingUatTest.englishKeysGoStraightOnTheRecognizerNotMade`；设备上不跑。

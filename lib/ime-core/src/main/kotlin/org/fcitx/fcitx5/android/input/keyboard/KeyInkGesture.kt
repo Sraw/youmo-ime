@@ -19,7 +19,7 @@ import org.fcitx.fcitx5.android.input.handwriting.InkPad
  * stroke is a dot (主, 六): a tap that started the input (nothing typed at its down), and a stroke
  * within [pauseMillis] after it with no other key between, takes the tap back as that first stroke
  * ([takeTapped]; told by state, not by text, as the nine keys or zhuyin show no letter of the key:
- * the app deletes the letter and puts the tap's places on the pad first). No tap waits to see what
+ * the tap's places go on the pad first, and the engine deletes its letter if that alone is typed, InkOver). No tap waits to see what
  * follows: typing would slow down.
  */
 class KeyInkGesture {

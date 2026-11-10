@@ -407,8 +407,9 @@ password is neither read nor learned; the space a glide puts before its word wou
 Keys there are typed as they are, and a finger sliding across them never starts a glide.
 
 The same touch is a stroke (笔画筛选) where that is chosen instead: one setting,
-`AppPrefs.keyboard.keyDrawing` (`KeyDrawing`: Off, Glide, StrokeFilter; its Handwriting not offered
-on the settings page yet), so the two are never both on and English glides none while strokes are
+`AppPrefs.keyboard.keyDrawing` (`KeyDrawing`: Off, Glide, StrokeFilter, Handwriting; the page lists
+Handwriting always, labelled as needing the text pack while that is not ready, as a ListPreference
+cannot disable one entry), so the two are never both on and English glides none while strokes are
 chosen. 0.5's two switches (`glide_typing`, 0.4's key too, and `stroke_filter`) move over at the
 start (`AppPrefs.migrateKeyDrawing`, a backup's at the start after its import): glide if it was on,
 else strokes if they were, else off (both on, which only a backup or a hand edit holds, is glide),
@@ -426,6 +427,23 @@ as none (up, up to the left) is dropped. A stroke may also start between a split
 from where the letters are, so only the 26 keys split have it), passed to `GlideTouch.down` as
 `inGap`, and `GlideInput` keeps that down though no key takes it (else its moves would go nowhere);
 a tap there still does nothing, and a glide starts on a letter only.
+
+Writing on the keys (键盘手写, `KeyDrawing.Handwriting`; design 060-kbd-handwriting) is `GlideInput`'s
+third mode, decided at the down (`writes`: the setting, a word field, no temporary mode, TalkBack's
+touch exploration off, `InputMethodCatalog.writesOnKeys` of the keyboard's input method, the
+recognizer loadable). `KeyInk` (`input/keyboard`, one per keyboard made with its glide) holds the
+pad (`InkPad`), the gesture (ime-core's `KeyInkGesture`, fed by `GlideTouch`) and the ink drawn over
+the keys after them in `dispatchDraw` (the pad's colour by default: key text, 3.5 dp; faded over
+150 ms as a piece ends). The recognizer is the shared one (`HandwritingRecognition.shared`), made
+and warmed up the first time a touch may start a stroke, never for English. Keys go through
+`InkKeys` (shared with `HandwritingKeyboard`: in order behind the reads, backspace a stroke first, a
+key for the engine wiping the piece) only once the keyboard was written on and in an input method
+that writes. Readings go out through `KeyboardWindow` as `HostApi.offerInk(onKeys = true)`, the first
+of a piece whose first dot was a tap taken back marked `takesBack` (the engine deletes the letter if
+that tap alone is typed: no backspace is sent from here); pieces the engine ended come back through
+`EngineState.handwritingEnded`, and `EngineState.keysTyped` (re-emitted after every key) tells the
+gesture whether the input method has its own input typed. `restartInk` drops the pad at each new
+input; detaching finishes it.
 
 The 060 redraw (`input/keyboard/canvas/`; the only drawing since 060-render-p2 S8a, which deleted the
 key views and the 开发者 → 新绘制键盘 switch, its stored key retired): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
