@@ -221,10 +221,13 @@ is `selectCandidate(ic, globalIndex)`. Paging constants (5 a page, Up/Down, Tab/
   `#youmo-quickphrase-v2` and folder lines `【目录】name` (no whitespace: fcitx skips them; read through
   `QuickPhraseTable.parse(bytes, bare, each)`), entry lines `key｜note content` (the note after a
   full-width bar, its spaces as U+00A0). A key splits from its note at its first character that is
-  not visible ASCII (`split`); version 1 (no first line: a file of before, an old backup, a
-  computer's `.mb`) keeps the rest as the note as it is, so `#wz百度` reads as `#wz` + 百度, and a key
-  Chinese from its start as no key (`keyless`) with the old key as the note: listed with nothing
-  typed, found by none, said on the page (待补关键词) until given a key. A read never writes; the
+  not visible ASCII (`split`), one `｜` at the note's start dropped and its U+00A0 spaces again,
+  the same for version 1 (no first line: a file of before, an old backup, a computer's `.mb`, or one
+  of now a build before 0.6.0 wrote again): `#wz百度` reads as `#wz` + 百度, and a key Chinese from
+  its start as no key (`keyless`) with the old key as the note: listed with nothing typed, found by
+  none, said on the page (待补关键词) until given a key. A line with neither key nor note is no entry,
+  read or imported. Notes and folder names keep no whitespace but spaces (`note`), so they read back
+  as written; a folder cannot take a shelf's name (`RESERVED_FOLDERS`). A read never writes; the
   next change writes version 2. `mine.used` (`#youmo-quickphrase-used-v2`, then
   `millis<TAB>key｜note<TAB>content escaped as fcitx's value`) keys times by the entry out of its folder,
   so a move keeps its time; one without its first line splits as version 1. Of the user's directory

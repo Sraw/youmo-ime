@@ -195,7 +195,9 @@ class QuickPhraseBook(
  *   One with no entries is a line all the same, so a folder is kept empty.
  *
  * A note's and a folder's spaces are written as no-break spaces: a line's key ends at its first
- * ASCII whitespace. `mine.used` is [USED_HEADER], then a line `millis<TAB>key and note<TAB>escaped
+ * ASCII whitespace. So a note keeps no no-break space or tab of its own: each is a space ([note]).
+ * Builds before 0.6.0 skip a line whose key has one when they import it (their keys had no
+ * whitespace), and keep it when they read their own `mine.mb`. `mine.used` is [USED_HEADER], then a line `millis<TAB>key and note<TAB>escaped
  * content` each, the key and note joined as in `mine.mb`; its times are by entry out of its folder.
  */
 object QuickPhraseFiles {
@@ -213,6 +215,9 @@ object QuickPhraseFiles {
     const val FOLDER_MARK = "【目录】"
 
     private const val NBSP = ' '
+
+    /** What a folder cannot be named: the page's shelves of entries in none, and of all. */
+    val RESERVED_FOLDERS = setOf("全部", "未分类", "未分類", "All", "No folder")
     private const val FIRST_KEY_CHAR = 0x21
     private const val LAST_KEY_CHAR = 0x7E
 
@@ -223,16 +228,24 @@ object QuickPhraseFiles {
 
     /**
      * A line's key [joined] as an entry's key and note: the key up to its first character that cannot
-     * be in one ([keyChar]), the rest the note. Version 1 (no notes yet): the rest as it is, so
-     * `#wz百度` is `#wz` with 百度, and `地址` no key with 地址. Version 2 ([v2]): the [NOTE_MARK]
-     * written before the note dropped, its no-break spaces spaces again.
+     * be in one ([keyChar]), the rest the note, one [NOTE_MARK] at its start dropped and its no-break
+     * spaces spaces again. One rule for both versions: a key of before (version 1) has its notes
+     * typed into it, so `#wz百度` is `#wz` with 百度 and `地址` no key with 地址; and a version 2 file
+     * a build before 0.6.0 wrote again (the version line gone, `#wz｜百度` kept) reads as it was meant,
+     * not as 「｜百度」.
      */
-    fun split(joined: String, v2: Boolean): Pair<String, String> {
+    fun split(joined: String): Pair<String, String> {
         val at = joined.indexOfFirst { !keyChar(it) }.let { if (it < 0) joined.length else it }
-        val rest = joined.substring(at)
-        val note = if (v2) unspaced(rest.removePrefix(NOTE_MARK.toString())) else rest
-        return joined.substring(0, at) to note
+        return joined.substring(0, at) to unspaced(joined.substring(at).removePrefix(NOTE_MARK.toString()))
     }
+
+    /**
+     * [raw] as a note is kept: each whitespace character (a tab, a no-break space, a line break) a
+     * space, the ends trimmed. The file writes a note's spaces as no-break spaces, so this is what
+     * reads back.
+     */
+    fun note(raw: String): String =
+        String(CharArray(raw.length) { raw[it].let { c -> if (c.isWhitespace() || c == NBSP) ' ' else c } }).trim()
 
     /** [entry]'s key and note as a line's key ([split] of version 2 reads it back). */
     fun joined(entry: QuickPhraseEntry): String =
@@ -258,15 +271,17 @@ object QuickPhraseFiles {
         QuickPhraseTable.parse(text, bare = { line ->
             when {
                 line == HEADER -> v2 = true
+                // a name that cannot be one (a file made elsewhere): its entries in none
                 line.startsWith(FOLDER_MARK) -> {
-                    folder = unspaced(line.substring(FOLDER_MARK.length)).trim()
+                    folder = unspaced(line.substring(FOLDER_MARK.length)).trim().takeIf(::validFolder).orEmpty()
                     if (folder.isNotEmpty()) folders += folder
                 }
             }
         }) { lines += folder to it }
-        val entries = lines.map { (f, line) ->
-            val (key, note) = split(line.first, v2)
-            QuickPhraseEntry(key, line.second, note, f)
+        // a line with neither key nor note (`｜ x`) has nothing to write it back by: no entry
+        val entries = lines.mapNotNull { (f, line) ->
+            val (key, note) = split(line.first)
+            QuickPhraseEntry(key, line.second, note, f).takeUnless { key.isEmpty() && note.isEmpty() }
         }
         return Parsed(entries, folders.toList(), v2)
     }
@@ -320,14 +335,13 @@ object QuickPhraseFiles {
     /** `mine.used`'s times, by entry out of its folder; a line that does not read is skipped. */
     fun parseUsed(text: String): Map<QuickPhraseEntry, Long> {
         val out = HashMap<QuickPhraseEntry, Long>()
-        val v2 = text.lineSequence().firstOrNull() == USED_HEADER
         for (line in text.lineSequence()) {
             val parts = line.split('\t', limit = 3).takeIf { it.size == 3 }
             val at = parts?.get(0)?.toLongOrNull()
             val content = parts?.get(2)?.let(FcitxUtils::unescapeForValue)
             if (at != null && content != null) {
-                val (key, note) = split(parts[1], v2)
-                out[QuickPhraseEntry(key, content, note)] = at
+                val (key, note) = split(parts[1])
+                if (key.isNotEmpty() || note.isNotEmpty()) out[QuickPhraseEntry(key, content, note)] = at
             }
         }
         return out
@@ -343,13 +357,19 @@ object QuickPhraseFiles {
     /** Whether [key] can be a key: 1 to [QuickPhraseBook.MAX_KEY] visible ASCII characters ([keyChar]), no space. */
     fun validKey(key: String): Boolean = key.isNotEmpty() && key.length <= QuickPhraseBook.MAX_KEY && key.all(::keyChar)
 
-    /** Whether [note] can be a note: one line of at most [QuickPhraseBook.MAX_NOTE] characters. */
-    fun validNote(note: String): Boolean = note.codePointCount(0, note.length) <= QuickPhraseBook.MAX_NOTE && note.none { it == '\n' || it == '\r' }
+    /**
+     * Whether [note] can be a note: at most [QuickPhraseBook.MAX_NOTE] characters, as [note] keeps it
+     * (no whitespace but spaces, none at the ends), so it reads back as it is written.
+     */
+    fun validNote(note: String): Boolean = note.codePointCount(0, note.length) <= QuickPhraseBook.MAX_NOTE && note == note(note)
 
-    /** Whether [name] can be a folder's: not blank, one line of at most [QuickPhraseBook.MAX_FOLDER] characters, trimmed. */
+    /**
+     * Whether [name] can be a folder's: not blank, at most [QuickPhraseBook.MAX_FOLDER] characters, as
+     * [note] keeps it (reads back as it is written), and not one of [RESERVED_FOLDERS].
+     */
     fun validFolder(name: String): Boolean =
-        name.isNotBlank() && name == name.trim() && name.codePointCount(0, name.length) <= QuickPhraseBook.MAX_FOLDER &&
-            name.none { it == '\n' || it == '\r' }
+        name.isNotEmpty() && name == note(name) && name.codePointCount(0, name.length) <= QuickPhraseBook.MAX_FOLDER &&
+            name !in RESERVED_FOLDERS
 
     /**
      * What [merge] made: [entries] after it, the [folders], and how many lines it skipped as already
@@ -389,7 +409,8 @@ object QuickPhraseFiles {
                 // it is. A picture picked for the file never gets here: parse drops its lines (no
                 // value after a space, or not UTF-8), so it is said as not a 快速输入 file
                 e.content.isEmpty() -> {}
-                !(e.keyless || validKey(e.key)) || !validNote(e.note) -> badKey++
+                // no key and no note: nothing to write it back by
+                !(e.keyless || validKey(e.key)) || !validNote(e.note) || (e.keyless && e.note.isEmpty()) -> badKey++
                 e.content.length > QuickPhraseBook.MAX_CONTENT -> tooLong++
                 !seen.add(e.identity) -> duplicates++
                 else -> {
