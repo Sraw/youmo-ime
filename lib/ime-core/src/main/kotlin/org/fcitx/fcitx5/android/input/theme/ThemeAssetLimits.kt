@@ -42,11 +42,25 @@ object ThemeAssetLimits {
      */
     const val MAX_PACKS = 100
 
+    /**
+     * An animated `<picture>` (060-render-p3 A4): one past these is not refused but drawn as a still
+     * picture (its first frame), with a warning: memory and battery, a decoder held while it plays.
+     */
+    const val MAX_ANIMATED_BYTES = 4L * 1024 * 1024
+    const val MAX_ANIMATED_SIDE = 1440
+    const val MAX_ANIMATED_FRAMES = 300
+
+    /** 30 fps at most: a frame shown no shorter than this (a frame of 0 ms, played as fast as it can, too). */
+    const val MIN_ANIMATED_FRAME_MS = 33
+
     /** A limit passed, and by what. */
     enum class Breach {
         Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, Overrides,
         ThemeXml, Layouts, LayoutSize, PreviewSize, PreviewSide, IconSize,
     }
+
+    /** Why an animated picture is drawn still: not refused (ThemeFilesManager's [Breach] refuses). */
+    enum class Still { Size, Unread, Side, Frames, FrameRate }
 
     /** The [count]th entry, [size] bytes, after [total] bytes before it. */
     fun entry(count: Int, size: Long, total: Long): Breach? = when {
@@ -77,6 +91,19 @@ object ThemeAssetLimits {
     fun preview(width: Int, height: Int, bytes: Long): Breach? = when {
         bytes > MAX_PREVIEW_BYTES -> Breach.PreviewSize
         maxOf(width, height) > MAX_PREVIEW_SIDE -> Breach.PreviewSide
+        else -> null
+    }
+
+    /**
+     * An animated WebP of [bytes] whose header ([AnimatedWebp.header]) is [header] (null: it reads as none):
+     * null where it may play.
+     */
+    fun animated(bytes: Long, header: AnimatedWebp.Header?): Still? = when {
+        bytes > MAX_ANIMATED_BYTES -> Still.Size
+        header == null -> Still.Unread
+        maxOf(header.width, header.height) > MAX_ANIMATED_SIDE -> Still.Side
+        header.frames > MAX_ANIMATED_FRAMES -> Still.Frames
+        header.shortestFrameMs < MIN_ANIMATED_FRAME_MS -> Still.FrameRate
         else -> null
     }
 
