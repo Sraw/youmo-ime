@@ -735,10 +735,10 @@
     <string name="im_word_hint_summary">Words that start with what is typed, and fixes of a misspelling. Off, the keys type themselves</string>
     <string name="im_auto_caps">Capitalize sentences</string>
     <string name="im_auto_caps_summary">Shift at the start of a sentence, where the app asks for it</string>
+    <string name="key_drawing">Drawing on keys</string>
+    <string name="key_drawing_handwriting">Handwriting on keys</string>
     <string name="glide_typing">Glide typing</string>
-    <string name="glide_typing_summary">Slide across a word\'s keys without lifting your finger (its letters, on 9 keys their digit keys, in a table its code; not on the 14 keys, 18 keys or 9-key Shuangpin). Not in address, email or password fields. Only one of this and Stroke filter is on: turning this on turns Stroke filter off</string>
     <string name="stroke_filter">Stroke filter</string>
-    <string name="stroke_filter_summary">After typing pinyin, draw a stroke on the keyboard (horizontal, vertical, left-falling, dot, turning) to keep the candidates whose first character starts with it; more strokes follow that character\'s stroke order. Not in address, email or password fields. Only one of this and Glide typing is on: turning this on turns Glide typing off</string>
     <string name="status_punctuation_chinese">Chinese punctuation</string>
     <string name="status_punctuation_english">English punctuation</string>
     <string name="status_full_width">Full-width</string>

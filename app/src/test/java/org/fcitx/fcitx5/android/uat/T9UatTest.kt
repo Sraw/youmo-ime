@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.lettersOf
@@ -176,7 +177,7 @@ class T9UatTest {
     @Test
     @Uat("T9-17")
     fun aShortSwipeWithGlideOnIsStillTheDigit() {
-        AppPrefs.getInstance().keyboard.glideTyping.setValue(true)
+        AppPrefs.getInstance().keyboard.keyDrawing.setValue(KeyDrawing.Glide)
         try {
             val h = harness().start()
             val five = h.nineKey("5")
@@ -187,7 +188,7 @@ class T9UatTest {
             assertEquals(listOf("sendKey(sym=${UNICODE + Keyboard.pinyinNineKey('5')}, states=536870912, code=0, up=false)"), h.sent())
             assertFalse(h.api.calls.toString(), "offerGlide" in h.api.calls)
         } finally {
-            AppPrefs.getInstance().keyboard.glideTyping.setValue(false)
+            AppPrefs.getInstance().keyboard.keyDrawing.setValue(KeyDrawing.Off)
         }
     }
 

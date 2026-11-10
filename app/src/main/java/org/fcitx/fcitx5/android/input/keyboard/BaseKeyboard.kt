@@ -145,8 +145,7 @@ abstract class BaseKeyboard(
     /** Set per field ([KeyboardWindow]): an address's has no glide typing, as no word is typed there. */
     open var address: AddressKeys = AddressKeys.NONE
 
-    private val glideTyping = prefs.keyboard.glideTyping
-    private val strokeFilter = prefs.keyboard.strokeFilter
+    private val keyDrawing = prefs.keyboard.keyDrawing
 
     /**
      * Set as the input method has something typed or not, a temporary mode's (快速输入) not counted
@@ -169,8 +168,8 @@ abstract class BaseKeyboard(
 
     /**
      * Glide typing over [letters], taken where [enabled] says and 滑行输入 is on, in a field where
-     * words are typed: not a password's or an address's. Where 笔画筛选 is on instead (the settings
-     * page keeps the two from being on together), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
+     * words are typed: not a password's or an address's. Where 笔画筛选 is chosen instead (one setting,
+     * [KeyDrawing]), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
      * one: sent as the engine's stroke key (Keyboard.strokeKey), the shape StrokeShape's; one it
      * reads as none is dropped.
      */
@@ -182,11 +181,11 @@ abstract class BaseKeyboard(
         glided: (path: FloatArray, layout: GlideLayout) -> Unit,
     ) = GlideInput(
         this, theme,
-        enabled = { glideTyping.getValue() && wordField() && enabled() },
+        enabled = { keyDrawing.getValue() == KeyDrawing.Glide && wordField() && enabled() },
         letters = letters,
         longPressMillis = { longPressDelay.toLong() },
         down = down,
-        strokes = { strokeFilter.getValue() && wordField() && imTyping && filters() },
+        strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
         stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction(KeySym(UNICODE + Keyboard.strokeKey(it)), KeyStates.Virtual)) } },
         glided = glided,
     )

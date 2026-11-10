@@ -523,7 +523,7 @@ case("ST-41", needs="jvm:GroupedKeyboardUatTest.theCodeRowIsTallOnlyInPinyinOnTh
 case("ST-42", needs="jvm:SettingsUatTest.shuangpinsKeyboardUnderItsScheme、KeyboardChoiceUatTest.shuangpinsEighteenThenNineKeysChosenAreThereAtTheNextFocus")(lambda d: None)
 
 
-case("ST-43", needs="jvm:AppPrefsTest.glideTypingCarriesOverAsItIs")(lambda d: None)
+case("ST-43", needs="jvm:AppPrefsTest.theTwoSwitchesMoveOverToKeyDrawing")(lambda d: None)
 
 
 case("ST-44", needs="jvm:AddressSettingsUatTest.theAddressPageItsListsAndRememberedAddresses")(lambda d: None)
@@ -531,7 +531,7 @@ case("ST-44", needs="jvm:AddressSettingsUatTest.theAddressPageItsListsAndRemembe
 
 case("ST-45", needs="jvm:SettingsUatTest.theNineKeysSettingsAreASectionOfEachKeyboardsPage")(lambda d: None)
 
-case("ST-46", needs="jvm:SettingsUatTest.glideTypingAndStrokeFilterTurnEachOtherOff")(lambda d: None)
+case("ST-46", needs="jvm:SettingsUatTest.keyDrawingIsOneListOfItsChoices")(lambda d: None)
 
 case("ST-47", needs="jvm:SettingsMenuUatTest.searchingFindsTheNineKeysAndTheAddressRows")(lambda d: None)
 
