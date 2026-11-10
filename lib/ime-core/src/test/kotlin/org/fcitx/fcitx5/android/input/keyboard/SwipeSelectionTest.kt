@@ -1,0 +1,123 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.input.keyboard
+
+import org.fcitx.fcitx5.android.input.cursor.CursorRange
+import org.fcitx.fcitx5.android.input.shortcut.EditPlan
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class SwipeSelectionTest {
+
+    private fun CursorRange?.text() = this?.let { "${it.start}..${it.end}" }
+
+    // "hello world|": a field read whole, the cursor at its end
+    private fun begun(before: String = "hello world", after: String = "", selected: String = ""): SwipeSelection {
+        val s = SwipeSelection()
+        val start = before.length
+        assertNull(s.begin(s.reached(), CursorRange(start, start + selected.length), EditPlan.Field(before, selected, after)))
+        return s
+    }
+
+    @Test
+    fun leftGrowsFromTheCursorRightShrinksThenGrowsPastIt() {
+        val s = begun(before = "hello", after = " world")
+        assertEquals("3..5", s.move(-2).text())
+        assertEquals("4..5", s.move(1).text())
+        assertEquals("past the anchor, the other way", "5..7", s.move(3).text())
+        assertEquals("5..6", s.move(-1).text())
+        assertEquals("back at the anchor: a cursor", "5..5", s.move(-1).text())
+    }
+
+    @Test
+    fun theFieldsEndsStopIt() {
+        val s = begun(before = "ab", after = "c")
+        assertEquals("0..2", s.move(-5).text())
+        assertNull("nothing further left", s.move(-1))
+        assertEquals("2..3", s.move(9).text())
+        assertNull("nothing further right", s.move(1))
+    }
+
+    @Test
+    fun aCharacterIsWhatIsSeenAsOne() {
+        // a flag, a family (ZWJ), an accent combined: one step each
+        val flag = "🇨🇳"
+        val family = "👨‍👩‍👧"
+        val accent = "é"
+        val before = "a$flag$family$accent"
+        val s = begun(before = before)
+        val end = before.length
+        assertEquals("${end - 2}..$end", s.move(-1).text())
+        assertEquals("${end - 2 - family.length}..$end", s.move(-1).text())
+        assertEquals("1..$end", s.move(-1).text())
+        assertEquals("0..$end", s.move(-1).text())
+    }
+
+    @Test
+    fun nothingReadIsUnitsFromTheStartOfTheFieldNoEndKnown() {
+        val s = SwipeSelection()
+        assertNull(s.begin(s.reached(), CursorRange(2, 2), null))
+        assertEquals("0..2", s.move(-3).text())
+        assertEquals("2..12", s.move(12).text())
+    }
+
+    @Test
+    fun pastWhatWasReadUnitsGoOn() {
+        val before = "x".repeat(SwipeSelection.READ)
+        val s = SwipeSelection()
+        val at = 1000
+        s.begin(s.reached(), CursorRange(at, at), EditPlan.Field(before, "", "yz"))
+        assertEquals("the read's start, then a unit", "${at - SwipeSelection.READ - 1}..$at", s.move(-(SwipeSelection.READ + 1)).text())
+    }
+
+    @Test
+    fun aReadNotOfThisSelectionIsNotUsed() {
+        val s = SwipeSelection()
+        // the editor gave no selected text for a selection of two: positions not trusted to the text
+        s.begin(s.reached(), CursorRange(4, 6), EditPlan.Field("😀😀", "", ""))
+        assertEquals("units", "3..6", s.move(-1).text())
+    }
+
+    @Test
+    fun aSelectionThereGoesOnFromItsStartTheAnchorItsEnd() {
+        val s = begun(before = "hello ", selected = "wor", after = "ld")
+        assertEquals("5..9", s.move(-1).text())
+        assertEquals("7..9", s.move(2).text())
+    }
+
+    @Test
+    fun theSelectionTheLastTouchLeftKeepsItsAnchor() {
+        val s = begun(before = "hello", after = " world")
+        assertEquals("5..8", s.move(3).text())
+        // the next touch on it: the anchor still at 5, the right end still the free one
+        assertNull(s.begin(s.reached(), CursorRange(5, 8), EditPlan.Field("hello", " wo", "rld")))
+        assertEquals("5..9", s.move(1).text())
+        // another selection: from its end as any
+        assertNull(s.begin(s.reached(), CursorRange(1, 3), EditPlan.Field("h", "el", "lo world")))
+        assertEquals("2..3", s.move(1).text())
+    }
+
+    @Test
+    fun stepsBeforeItBeginsAreTakenAsItBegins() {
+        val s = SwipeSelection()
+        val touch = s.reached()
+        assertNull(s.move(-1))
+        assertNull(s.move(-2))
+        assertEquals("2..5", s.begin(touch, CursorRange(5, 5), EditPlan.Field("hello", "", "")).text())
+        assertNull("once", s.begin(touch, CursorRange(2, 5), null))
+    }
+
+    @Test
+    fun anOlderTouchBeginsNothing() {
+        val s = SwipeSelection()
+        val old = s.reached()
+        s.move(-1)
+        val now = s.reached()
+        assertNull(s.begin(old, CursorRange(5, 5), null))
+        assertNull("the new touch's steps start at none", s.begin(now, CursorRange(5, 5), null))
+        assertEquals("4..5", s.move(-1).text())
+    }
+}

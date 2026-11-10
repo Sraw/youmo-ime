@@ -10,6 +10,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.keyboardOn
@@ -253,6 +254,66 @@ class KeyShortcutsHostTest {
         swipe(h.key("q"), up = true)
         until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
         assertEquals("", preedit)
+    }
+
+    // 滑选 on q: up past the threshold, then sideways to each of [dxs] (dp from the key's middle; a
+    // character each 10 dp, the backspace's selection's step), lifted at the last
+    private fun swipeSelect(vararg dxs: Float, then: (Int) -> Unit = {}) {
+        val q = h.key("q")
+        val finger = h.finger(q, h.at(q))
+        for (i in 1..6) finger.move(h.at(q, dy = -10f * i, ms = 16))
+        dxs.forEachIndexed { i, dx ->
+            finger.move(h.at(q, dx = dx, dy = -60f, ms = 16))
+            then(i)
+        }
+        finger.up(h.at(q, dx = dxs.last(), dy = -60f))
+    }
+
+    private fun swipeSelectOnQ() =
+        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.SwipeSelect)).serialize())
+
+    private fun selected() = "${h.field.selectionStart}..${h.field.selectionEnd}"
+
+    // KB-69: left grows the selection from the cursor a character a step, right shrinks it and
+    // past the cursor grows it the other way; lifted, it stays, nothing typed
+    @Test
+    @Uat("KB-69")
+    fun swipeSelectSelectsFromTheCursorAsTheFingerMovesSideways() {
+        swipeSelectOnQ()
+        start()
+        h.start(prefill = { it.setText("hello world"); it.setSelection(5) })
+        synced()
+        swipeSelect(-31f, 21f) { i ->
+            if (i == 0) until("llo selected") { selected() == "2..5" }
+        }
+        until("past the cursor: \" w\" selected") { selected() == "5..7" }
+        synced()
+        assertEquals("nothing typed", "hello world", h.field.text.toString())
+        assertEquals("lifted, it stays", "5..7", selected())
+    }
+
+    // KB-69: what is typed is committed first, as for any shortcut; the steps moved meanwhile are taken
+    @Test
+    @Uat("KB-69")
+    fun swipeSelectCommitsWhatIsTypedFirst() {
+        swipeSelectOnQ()
+        start()
+        type("nihao")
+        swipeSelect(-21f)
+        until("committed, then selected") { h.field.text.toString() == "你好" && selected() == "0..2" }
+        assertEquals("", preedit)
+    }
+
+    // KB-69: an emoji (a family, ZWJ) is one character
+    @Test
+    @Uat("KB-69")
+    fun swipeSelectStepsOverAnEmojiWhole() {
+        swipeSelectOnQ()
+        val family = "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"
+        start("a$family")
+        synced()
+        swipeSelect(-11f)
+        until("the family selected") { selected() == "1..${1 + family.length}" }
     }
 
     private fun backspaces(n: Int, leaving: String) {

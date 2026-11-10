@@ -105,10 +105,12 @@ import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
+import org.fcitx.fcitx5.android.input.keyboard.SwipeSelection
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
+import org.fcitx.fcitx5.android.input.shortcut.EditPlan
 import org.fcitx.fcitx5.android.input.voice.VoiceCommit
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
@@ -949,6 +951,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         fieldEditor.quietly { editingSession.applySelectionOffset(offsetStart, offsetEnd) }
 
     fun cancelSelection() = editingSession.cancelSelection()
+
+    /** 滑选's selection, set from where it began ([org.fcitx.fcitx5.android.input.keyboard.SwipeSelection]): a cursor moved, as the user's own selecting. */
+    fun select(start: Int, end: Int) = editingSession.select(start, end)
+
+    /** The field around the selection as 滑选 begins, for its characters; none in a password, whose text is not read. */
+    fun readForSwipeSelect(): EditPlan.Field? =
+        if (inPasswordField) null else readAround(SwipeSelection.READ, SwipeSelection.READ, selected = selection.latest.isNotEmpty())?.field
 
     private lateinit var lastKnownConfig: Configuration
 

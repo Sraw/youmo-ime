@@ -262,7 +262,7 @@ abstract class BaseKeyboard(
     // a rather large threshold effectively disables swipe of the direction
     private val disabledSwipeThreshold = dp(800f)
 
-    private val swipes = KeySwipes(this, shortcuts, inputSwipeThreshold, disabledSwipeThreshold, object : KeySwipes.Keyboard {
+    private val swipes = KeySwipes(this, shortcuts, inputSwipeThreshold, disabledSwipeThreshold, selectionSwipeThreshold, object : KeySwipes.Keyboard {
         override val inPasswordField get() = this@BaseKeyboard.inPasswordField
         override val charShortcutMarks get() = this@BaseKeyboard.charShortcutMarks
         override fun swipeText(def: KeyDef) = this@BaseKeyboard.swipeText(def)

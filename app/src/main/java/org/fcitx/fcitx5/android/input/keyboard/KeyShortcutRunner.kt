@@ -80,6 +80,8 @@ class KeyShortcutRunner(
             KeyCommand.FieldEnd -> fieldEdge(KeyEvent.KEYCODE_MOVE_END)
             // the menu opens as the swipe passes its threshold; a lift that got here without it, the panel
             KeyCommand.EditMenu -> windowManager.attachWindow(TextEditingWindow())
+            // selects as a swipe that reached it moves on (KeySwipes); run any other way, nothing to select by
+            KeyCommand.SwipeSelect -> {}
             KeyCommand.Clipboard -> windowManager.attachWindow(ClipboardWindow())
             // a key's swipe opens it in CommonKeyActionListener, as 符's long press; from here (a menu's) the same
             KeyCommand.QuickInput -> service.postFcitxJob { triggerQuickPhrase() }

@@ -458,6 +458,20 @@ class EditingSession(
         editor.setSelection(start, end)
     }
 
+    /**
+     * Selects [start] to [end] (start ≤ end, clamped at the start of the buffer), as 滑选 moves it:
+     * from where it began, not by offsets from a report that may lag or have been clamped. The end
+     * is not clamped, as in [applySelectionOffset].
+     */
+    fun select(start: Int, end: Int) {
+        checkThread()
+        if (!editor.isAvailable) return
+        val from = max(start, 0)
+        val to = max(end, from)
+        selection.predict(from, to)
+        editor.setSelection(from, to)
+    }
+
     /** Collapses a selection to its end, leaving a plain cursor. */
     fun cancelSelection() {
         checkThread()

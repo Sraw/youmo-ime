@@ -1067,6 +1067,7 @@
     <string name="shortcut_field_start">To the start</string>
     <string name="shortcut_field_end">To the end</string>
     <string name="shortcut_edit_menu">Edit menu</string>
+    <string name="shortcut_swipe_select">Swipe to select</string>
     <string name="shortcut_clipboard">Clipboard</string>
     <string name="shortcut_emoji">Emoji</string>
     <string name="shortcut_voice">Voice input</string>

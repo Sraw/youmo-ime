@@ -26,7 +26,9 @@ import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.dialog.AddMoreInputMethodsPrompt
 import org.fcitx.fcitx5.android.input.dialog.InputMethodPickerDialog
+import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.BeginSelectionSwipeAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.BeginSwipeSelectAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteSelectionAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.HostKeyAction
@@ -38,6 +40,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction.QuickPhraseAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ShortcutAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ShowInputMethodPickerAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SpaceLongPressAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SwipeSelectAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SymAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.UnicodeAction
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -78,6 +81,8 @@ class CommonKeyActionListener :
 
     private val backspaceSwipe = BackspaceSwipeBehavior()
 
+    private val swipeSelection = SwipeSelection()
+
     // the next input method: each on its own keyboard, the nine keys' English one of English's (I1)
     private suspend fun HostApi.nextInputMethod() = enumerateIme()
 
@@ -102,6 +107,8 @@ class CommonKeyActionListener :
      * in as the emoji's does (a pinyin being typed committed first, not overwritten).
      */
     fun voiceTap() = VoiceFeature.tap(inputView) { listener.onKeyAction(CommitAction(it), KeyActionListener.Source.Keyboard) }
+
+    private fun select(range: CursorRange) = service.select(range.start, range.end)
 
     private fun showInputMethodPicker() {
         fcitx.launchOnReady {
@@ -155,6 +162,8 @@ class CommonKeyActionListener :
                     KeyCommand.Restore -> shortcutRunner.restore()
                     // as 符's long press: on the host's thread straight after, no key let in between
                     KeyCommand.QuickInput -> afterPendingInput { triggerQuickPhrase() }
+                    // only a swipe's, which selects as it moves (BeginSwipeSelectAction): a tap's is nothing
+                    KeyCommand.SwipeSelect -> {}
                     else -> afterPendingInput {
                         ContextCompat.getMainExecutor(context).execute { shortcutRunner.run(action.shortcut) }
                     }
@@ -196,6 +205,16 @@ class CommonKeyActionListener :
                         BackspaceSwipeBehavior.MoveEffect.None -> {}
                     }
                 }
+                // what is typed in first, as for any shortcut; the steps moved meanwhile are kept till it begins
+                is BeginSwipeSelectAction -> {
+                    val touch = swipeSelection.reached()
+                    afterPendingInput {
+                        ContextCompat.getMainExecutor(context).execute {
+                            swipeSelection.begin(touch, service.currentInputSelection, service.readForSwipeSelect())?.let(::select)
+                        }
+                    }
+                }
+                is SwipeSelectAction -> swipeSelection.move(action.steps)?.let(::select)
                 is DeleteSelectionAction -> {
                     when (backspaceSwipe.onRelease(action.totalCnt)) {
                         // the engine first forgets what it committed, maybe deleted with the

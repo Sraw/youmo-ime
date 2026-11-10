@@ -1041,6 +1041,7 @@
     <string name="shortcut_field_start">游標到開頭</string>
     <string name="shortcut_field_end">游標到結尾</string>
     <string name="shortcut_edit_menu">編輯選單</string>
+    <string name="shortcut_swipe_select">滑選</string>
     <string name="shortcut_clipboard">剪貼簿</string>
     <string name="shortcut_emoji">表情</string>
     <string name="shortcut_voice">語音輸入</string>

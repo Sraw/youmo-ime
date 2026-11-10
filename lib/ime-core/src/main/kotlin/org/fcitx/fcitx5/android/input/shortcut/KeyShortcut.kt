@@ -47,6 +47,9 @@ enum class KeyCommand(val key: String, val group: Group) {
     FieldStart("field_start", Group.Edit),
     FieldEnd("field_end", Group.Edit),
     EditMenu("edit_menu", Group.Edit),
+
+    /** Only reached by a swipe, which then selects as the finger moves sideways (SwipeSelection); run any other way, nothing. */
+    SwipeSelect("swipe_select", Group.Edit),
     Clipboard("clipboard", Group.Panel),
     QuickInput("quick_input", Group.Panel),
     Emoji("emoji", Group.Panel),

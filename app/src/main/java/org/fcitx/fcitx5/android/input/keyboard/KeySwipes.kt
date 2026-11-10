@@ -32,6 +32,8 @@ internal class KeySwipes(
     private val shortcuts: Boolean,
     private val threshold: Float,
     private val disabledThreshold: Float,
+    /** 滑选's step sideways: the backspace's selection's, a character there as far as one it deletes. */
+    private val selectThreshold: Float,
     private val keyboard: Keyboard,
 ) {
     /** What of [BaseKeyboard] a swipe reads and acts on. */
@@ -53,6 +55,10 @@ internal class KeySwipes(
     private val prefs = AppPrefs.getInstance()
     private val swipeLayersChoice by prefs.keyboard.swipeLayers
     private val swipeLayers: SwipeLayers get() = swipeLayersChoice.layers
+    private val hapticOnRepeat by prefs.keyboard.hapticOnRepeat
+
+    /** The key whose touch 滑选 has: its bubble names 滑选 till the lift, wherever the finger drifts up or down. */
+    private var selecting: KeyRef? = null
 
     @Keep
     private val swipeLayersListener = ManagedPreference.OnChangeListener<SwipeLayersChoice> { _, _ -> showMarks() }
@@ -84,7 +90,7 @@ internal class KeySwipes(
 
     /** What the preview of [key] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
     fun preview(key: KeyHandle, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview, content: String = popup.content): PopupAction.PreviewUpdateAction =
-        when (val preview = KeySwipe.preview(swipeKey(def), swipeLayers, totalY, keyboard.inPasswordField)) {
+        when (val preview = if (selecting == key.ref) SWIPE_SELECT else KeySwipe.preview(swipeKey(def), swipeLayers, totalY, keyboard.inPasswordField)) {
             KeySwipe.Preview.Symbol -> PopupAction.PreviewUpdateAction(key.ref, keyboard.swipeText(def).preview(popup.alternative))
             is KeySwipe.Preview.Shortcut -> PopupAction.PreviewUpdateAction(key.ref, shortcutLabel(preview.shortcut), words = true)
             KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(key.ref, content)
@@ -111,52 +117,88 @@ internal class KeySwipes(
         g.swipeThresholdY = threshold
         if (!both) g.swipeThresholdX = disabledThreshold
         g.axisLock = both
-        var menu = false
+        val held = Held()
         val old = key.gestureListener
         key.gestureListener = { v, event ->
             when (event.type) {
                 GestureType.Down -> {
-                    menu = false
+                    held.menu = false
+                    // a touch taken without an Up (BaseKeyboard's cancel) may have left 滑选 on
+                    selectLifted(v, held)
                     longPopup.shown = false
                     false
                 }
                 GestureType.Move -> when {
-                    // the menu has the touch: no cursor moved under it either
-                    menu -> {
-                        keyboard.onPopupChangeFocus(v.ref, event.x, event.y)
-                        true
-                    }
+                    held.menu || held.select -> moved(v, event, held)
                     longPopup.shown || event.countY == 0 || event.totalY - event.countY != 0 -> false
-                    else -> {
-                        menu = swipeReached(v, def, event.totalY)
-                        menu
-                    }
+                    else -> swipeReached(v, def, event, held)
                 }
-                GestureType.Up -> if (menu) {
-                    menu = false
-                    // let go over nothing (a greyed cell, back down on the key): the menu gone, no tap
-                    if (!keyboard.onPopupTrigger(v.ref, event.cancelled)) keyboard.onPopupAction(PopupAction.DismissAction(v.ref))
-                    true
-                } else {
-                    lifted(v, def, event, builtIn, longPopup.shown)
+                GestureType.Up -> when {
+                    held.menu -> menuLifted(v, event, held)
+                    held.select -> selectLifted(v, held)
+                    else -> lifted(v, def, event, builtIn, longPopup.shown)
                 }
             } || old?.invoke(v, event) ?: false
         }
     }
 
+    /** What has a key's touch since its swipe passed the threshold: the edit menu, or 滑选 with its steps sideways. */
+    private class Held {
+        var menu = false
+        var select = false
+        val steps = SwipeSteps()
+    }
+
+    // the finger moved on, [held]: the menu's cell picked by where it is (no cursor moved under it either), or 滑选's steps
+    private fun moved(key: KeyHandle, event: CustomGestureView.Event, held: Held): Boolean {
+        if (held.menu) {
+            keyboard.onPopupChangeFocus(key.ref, event.x, event.y)
+            return true
+        }
+        val n = held.steps.step(event.x, selectThreshold)
+        if (n != 0) {
+            keyboard.onAction(KeyAction.SwipeSelectAction(n))
+            if (hapticOnRepeat) InputFeedbacks.hapticFeedback(key.feedback)
+        }
+        return true
+    }
+
+    // let go over nothing (a greyed cell, back down on the key): the menu gone, no tap
+    private fun menuLifted(key: KeyHandle, event: CustomGestureView.Event, held: Held): Boolean {
+        held.menu = false
+        if (!keyboard.onPopupTrigger(key.ref, event.cancelled)) keyboard.onPopupAction(PopupAction.DismissAction(key.ref))
+        return true
+    }
+
+    // the selection stays as the finger left it, cancelled or not: nothing run, no tap
+    private fun selectLifted(key: KeyHandle, held: Held): Boolean {
+        held.select = false
+        if (selecting == key.ref) selecting = null
+        return true
+    }
+
     /** The keys' marks made again by the scene as the settings are now: their symbols and their shortcuts. */
     fun showMarks() = keyboard.marksChanged()
 
-    // the threshold just passed ([attach]): a buzz where it reaches anything; whether it opened the edit menu
-    private fun swipeReached(key: KeyHandle, def: KeyDef, totalY: Int): Boolean {
-        val preview = KeySwipe.preview(swipeKey(def), swipeLayers, totalY, keyboard.inPasswordField)
+    // the threshold just passed ([attach]): a buzz where it reaches anything; whether it took the touch, [held]
+    // by the edit menu opened, or by 滑选, its steps counted from here
+    private fun swipeReached(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, held: Held): Boolean {
+        val preview = KeySwipe.preview(swipeKey(def), swipeLayers, event.totalY, keyboard.inPasswordField)
         if (preview == KeySwipe.Preview.Own) return false
         val editMenu = preview == KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.EditMenu))
         // the menu over a key the scene drawn last has not: nothing opens, so nothing felt
         val bounds = if (editMenu) key.bounds ?: return false else null
         InputFeedbacks.hapticFeedback(key.feedback)
+        if (preview == SWIPE_SELECT) {
+            held.select = true
+            selecting = key.ref
+            held.steps.start(event.x)
+            keyboard.onAction(KeyAction.BeginSwipeSelectAction)
+            return true
+        }
         if (bounds == null) return false
         keyboard.onPopupAction(PopupAction.ShowEditMenuAction(key.ref, bounds, keyboard.inPasswordField))
+        held.menu = true
         return true
     }
 
@@ -179,4 +221,8 @@ internal class KeySwipes(
             }
             KeySwipe.Outcome.None -> false
         }
+
+    private companion object {
+        val SWIPE_SELECT = KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.SwipeSelect))
+    }
 }

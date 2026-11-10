@@ -294,6 +294,38 @@ class EditingSessionTest {
 
     // endregion
 
+    // region select
+
+    // 滑选's: where it says, the start held at 0, never inside out
+    @Test
+    fun selectSetsTheRangeAsGiven() = assertRows(
+        "as given" to {
+            val (s, e) = session("abcdef", cursor = 4)
+            s.select(1, 4)
+            assertTrue(s.selection.latest.rangeEquals(1, 4))
+            assertEquals("setSelection(1, 4)", e.calls.last())
+            assertEquals(1, e.selectionStart)
+            assertEquals(4, e.selectionEnd)
+        },
+        "the start held at the buffer's" to {
+            val (s, e) = session("abc", cursor = 1)
+            s.select(-2, 1)
+            assertEquals("setSelection(0, 1)", e.calls.last())
+        },
+        "an end before its start is a cursor at the start" to {
+            val (s, e) = session("abc", cursor = 1)
+            s.select(2, 1)
+            assertEquals("setSelection(2, 2)", e.calls.last())
+        },
+        "no editor, nothing predicted" to {
+            val (s, e) = session("abc", cursor = 1)
+            e.isAvailable = false
+            s.select(0, 1)
+            assertTrue(s.selection.latest.rangeEquals(1, 1))
+            assertTrue(e.calls.isEmpty())
+        },
+    )
+
     // region cancelSelection
 
     @Test
@@ -706,6 +738,7 @@ class EditingSessionTest {
             put("deleteSelection") { deleteSelection() }
             put("applySelectionOffset") { applySelectionOffset(0) }
             put("cancelSelection") { cancelSelection() }
+            put("select") { select(1, 3) }
             put("deleteSurrounding") { deleteSurrounding(1, 0, inCodePoints = false) }
             put("replaceAround") { replaceAround(1, 0, "x") }
             put("backspace") { backspace(EditorTraits()) }

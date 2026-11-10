@@ -45,6 +45,12 @@ sealed class KeyAction {
     /** A touch began on the key that swipes to select; precedes its [MoveSelectionAction]s. */
     data object BeginSelectionSwipeAction : KeyAction()
 
+    /** A key's swipe reached 滑选 ([org.fcitx.fcitx5.android.input.shortcut.KeyCommand.SwipeSelect]): the selection starts at the cursor; precedes its [SwipeSelectAction]s. */
+    data object BeginSwipeSelectAction : KeyAction()
+
+    /** 滑选's free end moved [steps] characters, negative to the left. */
+    data class SwipeSelectAction(val steps: Int) : KeyAction()
+
     data class PickerSwitchAction(val key: PickerWindow.Key? = null) : KeyAction()
 
     /** [pointer]: the finger holding the key, which hold to talk follows */
