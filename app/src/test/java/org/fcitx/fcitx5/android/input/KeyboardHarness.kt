@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.input
 
 import android.app.Activity
+import org.fcitx.fcitx5.android.WAIT_MS
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -328,9 +330,17 @@ class KeyboardHarness(
         // setting off another) fails here and now, not a test hung at 100% CPU
         val looper = shadowOf(Looper.getMainLooper())
         var ran = 0
-        while (!looper.isIdle) {
-            check(++ran <= IDLE_TASKS) { "the main looper never idles: $IDLE_TASKS tasks run, more posted each time" }
-            looper.runOneTask()
+        // the handwriting recognizer's reads, and the keys and settings held behind them, run on its own thread and
+        // come back posted: not idle till they are, however long that thread takes on a loaded machine
+        val end = System.currentTimeMillis() + WAIT_MS
+        while (true) {
+            while (!looper.isIdle) {
+                check(++ran <= IDLE_TASKS) { "the main looper never idles: $IDLE_TASKS tasks run, more posted each time" }
+                looper.runOneTask()
+            }
+            if (!HandwritingRecognition.sharedBusy) break
+            check(System.currentTimeMillis() < end) { "the handwriting recognizer's reads not in after $WAIT_MS ms" }
+            Thread.sleep(1)
         }
         selectionDelivered()
     }

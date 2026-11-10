@@ -55,6 +55,14 @@ class PunctuationMapUatTest {
 
     private fun until(what: String, done: () -> Boolean) = waitUntil(what, step = { if (::h.isInitialized) h.idle() }, done = done)
 
+    // what the main thread posted to the host done, and what it told back shown
+    private fun synced() {
+        var done = false
+        h.service.postFcitxJob { done = true }
+        until("the host's queue done") { done }
+        h.idle()
+    }
+
     @Test
     @Uat("ST-28")
     fun theCommaMappedToAnotherMarkTypesIt() {
@@ -99,12 +107,15 @@ class PunctuationMapUatTest {
             h.tap(h.key("A"))
             until("A typed") { h.field.text.toString() == "，A" }
             val half = if (on) "," else "，"
+            // the A typed back to the field before the host told the keys what the comma now types: that told first
+            synced()
             assertEquals(what, twice(half), shown())
             until("the mark typed") { h.field.text.toString() == "，A$half" }
             // a Chinese word after it: the comma back to its mark
             h.tap(h.key("a"))
             runBlocking { fcitx.select(0) }
             until("the word typed") { h.field.text.endsWith("你好") }
+            synced()
             assertEquals(what, twice("，"), shown())
             until("the mark typed") { h.field.text.toString() == "，A${half}你好，" }
             h.close(); fcitx.stop()
