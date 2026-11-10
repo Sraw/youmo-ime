@@ -107,9 +107,9 @@ class SceneCellFallBackTest {
             val layout = if (refused) SceneLayout(id, LayoutReader.layout(TOO_WIDE.replace("ID", id)).let { it as? Parsed.Ok ?: error((it as Parsed.Failed).problems.toString()) }.value, emptyMap()) else SceneLayouts.of(context, id)!!
             return SceneBoard(context, t, layout) { look, _, w, h -> SceneEnvs.of(View(context), look, false, w, h, Input()) }
         }
-        fun preview(id: String): SceneBoard {
-            val layout = SceneLayout(id, LayoutReader.layout(TOO_WIDE.replace("ID", id)).let { it as? Parsed.Ok ?: error((it as Parsed.Failed).problems.toString()) }.value, emptyMap())
+        fun preview(id: String, refused: Boolean = true): SceneBoard {
             val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+            val layout = if (refused) SceneLayout(id, LayoutReader.layout(TOO_WIDE.replace("ID", id)).let { it as? Parsed.Ok ?: error((it as Parsed.Failed).problems.toString()) }.value, emptyMap()) else SceneLayouts.of(activity, id)!!
             return SceneBoard(activity, t, layout) { look, _, w, h -> SceneEnvs.of(View(activity), look, false, w, h, Input()) }
         }
         fun draw(b: SceneBoard) = b.view(BoardImages.NONE, key = { null }).apply { layout(0, 0, 1080, 700) }.scene
@@ -127,6 +127,9 @@ class SceneCellFallBackTest {
         val keptScene = kept.scene
         assertNull(draw(board("qwerty", refused = true)))
         assertEquals(builtIn.name, SceneBoard.drawnTheme(t).name)
+        // the preview drawing the same keyboard fine doesn't clear the input method's refusal
+        assertNotNull(draw(preview("qwerty", refused = false)))
+        assertEquals(builtIn.name, SceneBoard.drawnTheme(t, "qwerty").name)
         assertTrue(PopupScenes(View(context), t).ready)
         assertTrue(cell(t).drawn().isNotEmpty())
         assertTrue(kept.drawn().isNotEmpty())
