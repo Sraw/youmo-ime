@@ -115,10 +115,8 @@ class KeyboardPerfBaselineTest {
             if ("popup" in only) popupSlide()
             if ("rebuild" in only) rebuilds()
             if ("anim" in only || "idle" in only) idleRows()
-            if ("anim" in only) motionRows()
-            if ("anim" in only || "picture" in only) pictureRows(soak = false)
-            // perfOnly=soak: the animated picture played 10 minutes, its memory told (A4's leak check)
-            if ("soak" in only) pictureRows(soak = true)
+            // A4's rows after A1's (PictureRows); perfOnly=anim,soak: the animated picture played 10 minutes instead
+            if ("anim" in only) motionRows().also { pictureRows(soak = "soak" in only) }
             // the §4.3 rows that need motion in the engine (A2-A4): told, not measured
             if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return
@@ -138,8 +136,7 @@ class KeyboardPerfBaselineTest {
         shiftWithLowerFaces()
         popupSlide()
         idleRows()
-        motionRows()
-        pictureRows(soak = false)
+        motionRows().also { pictureRows(soak = false) }
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()

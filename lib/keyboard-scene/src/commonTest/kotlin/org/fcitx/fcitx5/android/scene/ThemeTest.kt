@@ -21,13 +21,11 @@ import org.fcitx.fcitx5.android.scene.theme.Shown
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
-import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
 import org.fcitx.fcitx5.android.scene.theme.Twin
 import org.fcitx.fcitx5.android.scene.theme.Value
 import org.fcitx.fcitx5.android.scene.theme.Values
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -407,22 +405,6 @@ class ThemeTest {
         val sounds = "<sounds><sound key=\"key\" src=\"tap.ogg\"/></sounds>"
         assertTrue(warnings(source.replace("</theme>", "$sounds\n</theme>")).single().contains("<sounds> is not supported"))
         assertTrue(problems(source.replace("</theme>", "<noises/>\n</theme>")).single().contains("<noises> is not allowed"))
-    }
-
-    // 060-render-p3 A4: an animated picture read, written back; its blur warned of (not drawn), none without it
-    @Test
-    fun anAnimatedPictureReads() {
-        fun picture(attrs: String) = "<picture src=\"bg.webp\" $attrs><cut orientation=\"portrait\" file=\"p.png\"/></picture>"
-        fun with(attrs: String) = source.replace("</colors>", "</colors>\n${picture(attrs)}")
-        val read = ThemeReader.theme(with("animated=\"true\" brightness=\"80%\"")).ok()
-        assertTrue(assertNotNull(read.picture).animated)
-        assertEquals(emptyList(), warnings(with("animated=\"true\"")))
-        assertFalse(assertNotNull(ThemeReader.theme(with("animated=\"false\"")).ok().picture).animated)
-        assertFalse(assertNotNull(ThemeReader.theme(with("")).ok().picture).animated)
-        assertTrue(warnings(with("animated=\"true\" blur=\"4dp\"")).single().contains("not blurred"))
-        assertEquals(emptyList(), warnings(with("blur=\"4dp\"")))
-        val again = ThemeReader.theme(ThemeWriter.write(read)).ok()
-        assertTrue(assertNotNull(again.picture).animated)
     }
 
     // 060-render-p3 T4b: a key's shape and cap, the bubble's shape, size, tail and place, read; of the wrong

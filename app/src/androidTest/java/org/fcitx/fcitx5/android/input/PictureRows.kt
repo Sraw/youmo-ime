@@ -29,7 +29,7 @@ import java.util.zip.ZipOutputStream
  * 060-render-p3 §4.3's rows of A4 (the animated picture): a pack whose picture is an animated WebP (1080 px
  * wide, 30 fps) against the same pack with its first frame still, shown and left alone 30 s (frames, the
  * process's CPU, memory), a 10-key run over it, and hidden 10 s (no frame; the picture stopped). With
- * `perfOnly=soak`, it plays [SOAK_MS] (10 minutes) and the memory is told at its start and each [SOAK_STEP_MS]
+ * `perfOnly=anim,soak`, instead, it plays [SOAK_MS] (10 minutes) and the memory is told at its start and each [SOAK_STEP_MS]
  * (a decoder's leak: §4 A4). Kept out of the test's class for its size (detekt LargeClass).
  */
 internal fun KeyboardPerfBaselineTest.pictureRows(soak: Boolean) {
