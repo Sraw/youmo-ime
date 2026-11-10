@@ -117,7 +117,8 @@
     <string name="exception_theme_folder">主題裡有資料夾 %1$s：4.0 主題只能有它的檔案和 layouts/</string>
     <string name="exception_theme_invalid">主題的 theme.xml 讀不了：\n%1$s</string>
     <string name="exception_theme_min_app">這個主題需要本輸入法 %1$s 或更新的版本：更新後才能用</string>
-    <string name="exception_theme_hidden_required">主題把 Shift、退格、空格或換行的字隱藏了（第 %1$s 行的樣式）：這些鍵會是空白的</string>
+    <string name="exception_theme_too_many_scenes">主題給鍵設的場景組合太多，沒法逐一檢查 Shift、退格、空格和換行會不會成空白鍵</string>
+    <string name="exception_theme_hidden_required">主題讓 Shift、退格、空格或換行成了空白鍵（%1$s：字藏了，鍵面又不是圖片）</string>
     <string name="exception_theme_pack_name">%1$s 不能用作這裡的主題名</string>
     <string name="exception_theme_icon">主題的圖示不是只有填充路徑的簡單 SVG：%1$s</string>
     <string name="exception_theme_layout">主題的 layouts/ 裡有 %1$s，它不是佈局（.xml）</string>

@@ -203,6 +203,11 @@ object LookTheme {
     // share its styles (a list of selectors), and the styles go in this order for the ties: a key's, its
     // function kind's, flat none, then Return's and the flat space's. [named]: by the keys' names, each as 3.0
     // drew it ([resolved]).
+    private val REQUIRED_KEYS = setOf("shift", "backspace", "space", "enter")
+
+    private fun hidesLabel(k: Selector, o: KeyOverride) =
+        o.label == KeyLabel.Hide && ((k.key ?: k.starRole) !in REQUIRED_KEYS || o.fill is KeyFill.Image)
+
     private fun Styles.overrides(keys: Keys, named: Map<String, KeyOverride>) {
         val resolved = resolved(named)
         val overrides = resolved.entries.associate { (n, o) -> selector(n) to o }
@@ -243,8 +248,20 @@ object LookTheme {
         }
         darkened(keys, darkened, beforeFlat = false)
         kindsPressed(keys, overrides)
-        overrides.filterValues { it.label == KeyLabel.Hide }.keys.toList().takeIf { it.isNotEmpty() }
-            ?.let { add(it.of(part = "label"), "hidden" to Value.Flag(true)) }
+        // a key one cannot type without (Shift, Backspace, Space, Return) keeps its words unless its face is an
+        // image of its own, which is then what it shows: 4.0 refuses a blank one (ThemePackCheck.hidesRequired), and
+        // a 3.0 theme the app took must convert to one it takes
+        overrides.filter { (k, o) -> hidesLabel(k, o) }
+            .keys.toList().takeIf { it.isNotEmpty() }
+            ?.let { hid ->
+                add(hid.of(part = "label"), "hidden" to Value.Flag(true))
+                // flat draws no face (3.0's flat): a required key whose image is gone there keeps its words
+                // (Return's and the space bar's kinds keep their image flat, above: hidden there still)
+                hid.filter { (it.key ?: it.starRole) in REQUIRED_KEYS }.takeIf { it.isNotEmpty() }?.let {
+                    add(it.of(FLAT, part = "label"), "hidden" to Value.Flag(false))
+                    add(it.of(FLAT, "enter", part = "label") + it.of(FLAT, "space", part = "label"), "hidden" to Value.Flag(true))
+                }
+            }
         // a board's key that shows its label where its role's on every board hides theirs: as an id, it wins
         named.keys.filter { n -> resolved.getValue(n).label == KeyLabel.Show && role(named, n)?.label == KeyLabel.Hide }
             .takeIf { it.isNotEmpty() }?.let { ns -> add(ns.map { selector(it).with(part = "label") }, "hidden" to Value.Flag(false)) }
