@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-HyDT23blCZ5bBGX+0+3pYY+gEdr/O+tHtpoUGR1vMm8=' 'sha256-baOACp34qL5yASv8iXN42e426MwQumWHB3nOAV2mLx0=' 'sha256-jEIiXImw0cIGjU26fKv5AiTIr+4sfvgnp/9Kv07lCR4=' 'sha256-mV8Ppohn7nsNEzOMmpqn+M0YNPzly9wTvCpb3DaEw1A='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-jWixz42Dx7N2vA9pMl5ILrHeErYyM43hIdJ0Rm6Glhs=' 'sha256-baOACp34qL5yASv8iXN42e426MwQumWHB3nOAV2mLx0=' 'sha256-jEIiXImw0cIGjU26fKv5AiTIr+4sfvgnp/9Kv07lCR4=' 'sha256-mV8Ppohn7nsNEzOMmpqn+M0YNPzly9wTvCpb3DaEw1A='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -1870,6 +1870,13 @@ dialog h2 { margin: 0; font-size: 16px; }
         else if (!r.ok) bad(file + '：' + r.problems[0].message);
       }
     }
+    // an animated <picture> (060-render-p3 A4): past the app's limits it is drawn still, with a warning on import
+    const anim = /<picture\b[^>]*?\banimated="true"[^>]*>/.exec(xml);
+    const animSrc = anim && /\bsrc="([^"]+)"/.exec(anim[0]);
+    if (animSrc && d.files[animSrc[1]]) {
+      const why = animatedStill(lim, d.files[animSrc[1]]);
+      if (why) out.push({ level: 'warning', line: 0, message: animSrc[1] + ' 在 App 里会显示成静态图：' + why });
+    }
     // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
     const layouts = Object.create(null);
     for (const [n, t] of Object.entries(d.layouts)) layouts[n] = t;
@@ -2185,6 +2192,48 @@ dialog h2 { margin: 0; font-size: 16px; }
   }
 
   /**
+   * An animated WebP's header as the app reads it (AnimatedWebp.header): `{width, height, frames, shortestMs}`, null where
+   * it is none (no VP8X first with its animation flag, no frame) or cut short; at most [maxFrames] + 64 chunks walked.
+   */
+  function animatedWebp(bytes, maxFrames) {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const tag = (at) => String.fromCharCode(bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]);
+    const u24 = (at) => bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16);
+    if (bytes.length < 12 || tag(0) !== 'RIFF' || tag(8) !== 'WEBP') return null;
+    const end = Math.min(bytes.length, 8 + dv.getUint32(4, true));
+    let at = 12; let chunks = 0; let animated = false; let w = 0; let h = 0; let frames = 0; let shortest = Infinity;
+    while (at + 8 <= end) {
+      if (++chunks > maxFrames + 64) return null;
+      const size = dv.getUint32(at + 4, true);
+      const t = tag(at);
+      if (t === 'VP8X') {
+        if (at !== 12 || at + 18 > bytes.length) return null;
+        animated = (bytes[at + 8] & 2) !== 0;
+        w = u24(at + 12) + 1;
+        h = u24(at + 15) + 1;
+      } else if (t === 'ANMF') {
+        if (at + 24 > bytes.length) return null;
+        frames++;
+        shortest = Math.min(shortest, u24(at + 20));
+        if (frames > maxFrames) break;
+      }
+      at += 8 + size + (size & 1);
+    }
+    return animated && frames > 0 ? { width: w, height: h, frames, shortestMs: shortest } : null;
+  }
+
+  /** Why the app draws [bytes] still (ThemeAssetLimits.animated, the limits of youmo-format), null where it plays. */
+  function animatedStill(lim, bytes) {
+    if (bytes.length > lim.animatedBytes) return '超过 ' + (lim.animatedBytes / 1048576) + ' MB';
+    const h = animatedWebp(bytes, lim.animatedFrames);
+    if (!h) return '不是动画 WebP';
+    if (Math.max(h.width, h.height) > lim.animatedSide) return '长边超过 ' + lim.animatedSide + ' 像素';
+    if (h.frames > lim.animatedFrames) return '超过 ' + lim.animatedFrames + ' 帧';
+    if (h.shortestMs < lim.animatedFrameMs) return '有一帧短于 ' + lim.animatedFrameMs + ' ms（最快 ' + Math.floor(1000 / lim.animatedFrameMs) + ' 帧/秒）';
+    return null;
+  }
+
+  /**
    * What stands before a save (060-render-p3 M4): every problem of [d] on each of the app's boards ([boards]), in
    * [env] (EnvJson) light and dark, and what the app refuses on import (saveProblems), each once.
    * `{errors, warnings}`: an error stops the save, a warning is the user's to ignore.
@@ -2215,7 +2264,7 @@ dialog h2 { margin: 0; font-size: 16px; }
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, exampleDoc,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, animatedWebp, animatedStill, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
