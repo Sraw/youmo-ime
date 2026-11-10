@@ -54,6 +54,9 @@ class PopupScenes(
     private val measurer = measuring(AndroidTextMeasurer(fonts))
     private val sceneTheme = SceneThemes.of(this.theme, look)
 
+    // the drawn theme's own icons, the keys' (none where they fell back to the built-in)
+    private val icons = PackIcons.of(this.theme)
+
     /**
      * Whether any of the theme's styles sets a popup's motion (`appear`, `transition` on popup, preview or menu,
      * 060-render-p3 A2): asked once, so a theme with none (every built-in one) asks the engine nothing more.
@@ -92,7 +95,7 @@ class PopupScenes(
     val density: Double get() = view.resources.displayMetrics.density.toDouble()
 
     /** A view drawing a popup's scene. */
-    fun view(context: Context): PopupSceneView = PopupSceneView(context) { ScenePainter(it, look, BoardImages.NONE, fonts) }
+    fun view(context: Context): PopupSceneView = PopupSceneView(context) { ScenePainter(it, look, BoardImages.NONE, fonts, icons) }
 }
 
 /**

@@ -78,7 +78,14 @@ class KeyboardCanvasView(
      * (060-render-p2 U8), the whole of it. [pack]: the theme 4.0 pack it is of, its first frame guarded
      * ([PackDrawGuard]); null, another theme's.
      */
-    class Drawn(val scene: Scene, val shownLook: ThemeLook, val fonts: SceneFonts, val pack: PackDrawGuard.Key? = null)
+    class Drawn(
+        val scene: Scene,
+        val shownLook: ThemeLook,
+        val fonts: SceneFonts,
+        val pack: PackDrawGuard.Key? = null,
+        /** The `<icon>`s of the theme the scene is of: the built-in's (none) where it fell back. */
+        val icons: PackIcons = PackIcons.EMPTY,
+    )
 
     interface Host {
         /**
@@ -145,6 +152,9 @@ class KeyboardCanvasView(
     // the look of the scene drawn, and what paints in it: another look (the built-in's, U8), another painter
     private var painter: ScenePainter? = null
     private var painted: ThemeLook? = null
+
+    // the icons [painter] draws the theme's own in: another set (an in-place import keeps the look), another painter
+    private var paintedIcons = PackIcons.EMPTY
     private var built: Scene? = null
 
     // what is drawn under the keys of [built] ([under]), made once a scene: compared and drawn each frame
@@ -240,10 +250,11 @@ class KeyboardCanvasView(
                 return null
             }
             // painted in another look: nothing recorded in the last is kept
-            val repainted = drawn.shownLook != painted
+            val repainted = drawn.shownLook != painted || drawn.icons != paintedIcons
             if (repainted) {
-                painter = ScenePainter(this, drawn.shownLook, images, drawn.fonts)
+                painter = ScenePainter(this, drawn.shownLook, images, drawn.fonts, drawn.icons)
                 painted = drawn.shownLook
+                paintedIcons = drawn.icons
             }
             val old = faces
             val under = s.under(drawsBase)

@@ -526,6 +526,19 @@ translucent face and a star's inner shadow by pixels.
 `Paint.letterSpacing` on Android 10 leaves the last character's spacing out of `measureText` (its ink the same; later
 versions keep it), so there a spaced label is that much narrower than the engine's arithmetic has it.
 An icon name the app has no drawable of (a layout's) draws nothing and is logged once a process (`SceneIcons.of`).
+A theme's `<icon>` (060-theme-sounds-icons §2) is drawn in place of the app's of its name, or under a name of its own:
+`PackIcons.of(theme)` of the theme the keys are actually drawn in (`SceneBoard.drawnTheme`; the built-in's, none, where they
+fell back), made with the painter in `SceneBoard.drawn` (carried by `KeyboardCanvasView.Drawn`, the painter made anew when the
+look or the icons change), `PopupScenes` and `SceneKeyCell`. A file is read the first time an icon of it is drawn, on
+`ThemeAssets`' decode thread (`ThemeAssets.runner`): its length checked first (64 KB), then `SvgSubset.read` (the import's
+checks again: a restored backup's pack was never held to them) and its `IconPath` segments made `android.graphics.Path`s,
+kept by path on the main thread (the last 256, every keyboard's). Till it is in, the app's icon of that name is drawn, the
+painter `missed` and the view invalidated once it is (as a key image). Gone, too long or broken: the app's icon (none:
+nothing), logged once till the icons are let go. `PackIconDrawable` rasters it once at the size it shows (the canvas's
+scale applied) in the tint, a path's own colour kept and faded by the tint's alpha, placed by `SvgSubset.Icon.fit`
+(uniform, centred) as the web's `CanvasPainter.icon` places it. Why not on the main thread (060-theme-sounds-icons §2.4):
+on youmo29 (API 29 emulator, a dex of keyboard-scene run with `app_process`) 15 worst-case icons (64 KB of arcs, 20 000
+numbers, 11 400 cubics each) read and made Paths in 786 ms the first time, 220 ms warm, against a frame's 16 ms.
 The theme's styles matched to a key (`Cascade.of`) are kept by target, a key no selector names
 as one with no key (the 26 letters share theirs), with what it inherits; `Cascades` keeps a theme's
 cascade by the scenes it names (`flat` and not; what is typed only where the theme names it, so a
@@ -535,8 +548,9 @@ a key (`Cascade.kept`: by board, id, role, classes and states, a `Cascade.KeptKe
 kept under it). Kept a process too (main thread), for
 a keyboard made again (each theme switch builds the input view): `SceneThemes` the last 4 themes read
 and their `Cascades`, `TextKeyboard` a look's `AndroidTextMeasurer` and the last 4 scenes made,
-`ScenePainter` the last 64 icons it inflated, the least used let go first (all let go when night mode,
-density or font scale changes, not for the rest of the configuration). A theme switched back to
+`ScenePainter` the last 64 icons it inflated or rastered (`IconKey`: name, the theme icon's file or none, tint and
+sizes), the least used let go first (all let go when night mode, density or font scale changes, not for the rest of the
+configuration; with the theme icons read, by `SceneThemes.forgetAll`, when a theme's files are written over in place). A theme switched back to
 reads, matches, measures and builds nothing again. The `Env` asked again on every change the views
 show (a key typed) makes none of its slow parts again: `TextKeyboard` keeps a layout's shortcut names,
 the marks' settings by what they are made of (the shortcuts by identity, the swipe layers, where marks

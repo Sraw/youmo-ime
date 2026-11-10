@@ -55,7 +55,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         val fonts = SceneFonts.of(theme, shownLook)
         val measurer = AndroidTextMeasurer(fonts)
         val sceneTheme = SceneThemes.of(theme, shownLook)
-        val painter = ScenePainter(this@SceneKeyCell, shownLook, BoardImages.NONE, fonts)
+        val painter = ScenePainter(this@SceneKeyCell, shownLook, BoardImages.NONE, fonts, PackIcons.of(theme))
     }
 
     private var drawnIn = DrawnIn(SceneBoard.drawnTheme(given))

@@ -39,7 +39,8 @@ import kotlin.math.sin
  * Draws a scene's ops ([Op]) on a canvas, in [view]'s coordinates: it computes nothing of where
  * anything goes (the engine did), only how Android draws each. The theme's files are [look]'s,
  * named as the theme written names them ([LookTheme.fileNames]); its key images [images]', the
- * picture [PictureHost]'s under [view].
+ * picture [PictureHost]'s under [view]; the theme's own icons [packIcons]' (those of the theme actually drawn),
+ * drawn in place of the app's of the same name.
  *
  * [missed] is set when something was not drawn as it will be: an image or the picture still being
  * decoded, which draws the view again once in; what was recorded then is to be recorded again. Not
@@ -51,6 +52,7 @@ class ScenePainter(
     private val look: ThemeLook,
     private val images: BoardImages,
     private val fonts: SceneFonts,
+    private val packIcons: PackIcons = PackIcons.EMPTY,
 ) {
     var missed = false
 
@@ -68,9 +70,11 @@ class ScenePainter(
 
     // an icon's drawable by what it is drawn as, not where: one a size, drawn moved to its place
     // [pixelWidth], [pixelHeight]: the size it is drawn at on the device, the canvas's scale applied (a settings page's
-    // smaller preview, a key's own): a vector keeps the raster of its first draw, which another scale would stretch
+    // smaller preview, a key's own): a vector keeps the raster of its first draw, which another scale would stretch.
+    // [source]: a theme's icon's file (two themes' icons of one name are two), null the app's own
     private data class IconKey(
         val name: String,
+        val source: String?,
         val tint: Int,
         val width: Int,
         val height: Int,
@@ -346,11 +350,20 @@ class ScenePainter(
         // a scale not finite (a matrix gone NaN) taken as 1: roundToInt throws on NaN, and this is the draw
         val pw = (w * scaleOf(scaleValues[Matrix.MSCALE_X])).roundToInt()
         val ph = (h * scaleOf(scaleValues[Matrix.MSCALE_Y])).roundToInt()
-        val d = icons.getOrPut(IconKey(op.name, op.tint.value, w, h, pw, ph)) {
-            SceneIcons.of(op.name)?.let { ContextCompat.getDrawable(view.context, it)?.mutate() }?.also {
-                it.setTint(op.tint.value)
-                it.setBounds(0, 0, w, h)
-            } ?: NO_ICON
+        // a theme's icon: read on the decode thread, the app's of that name drawn till it is in (and drawn again
+        // then), or for good where its file is gone or broken since its import
+        val file = packIcons.file(op.name)
+        val outline = file?.let { f ->
+            val drawn = WeakReference(view)
+            packIcons.outline(f) { drawn.get()?.invalidate() }.also { if (it == null && packIcons.pending(f)) missed = true }
+        }
+        val source = file.takeIf { outline != null }
+        val d = icons.getOrPut(IconKey(op.name, source, op.tint.value, w, h, pw, ph)) {
+            outline?.let { PackIconDrawable(it, op.tint, pw, ph).apply { setBounds(0, 0, w, h) } }
+                ?: SceneIcons.of(op.name)?.let { ContextCompat.getDrawable(view.context, it)?.mutate() }?.also {
+                    it.setTint(op.tint.value)
+                    it.setBounds(0, 0, w, h)
+                } ?: NO_ICON
         }.takeIf { it !== NO_ICON } ?: return
         canvas.save()
         canvas.translate(left.toFloat(), top.toFloat())
@@ -374,7 +387,10 @@ class ScenePainter(
         private val icons = lruMap<IconKey, Drawable>(KEPT_ICONS)
 
         /** The icons kept let go ([SceneThemes.forgetAll]). */
-        fun forgetIcons() = icons.clear()
+        fun forgetIcons() {
+            icons.clear()
+            PackIcons.forget()
+        }
 
         // kept for a name with no icon (none in SceneIcons, or none inflated): not looked for again each frame
         private val NO_ICON: Drawable = ColorDrawable()
