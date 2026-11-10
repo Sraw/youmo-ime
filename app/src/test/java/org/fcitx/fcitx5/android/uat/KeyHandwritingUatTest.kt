@@ -160,7 +160,7 @@ class KeyHandwritingUatTest {
         assertTrue(KeyboardHarness.find<T9Keyboard>(h.keyboard) != null)
         draw(h.nineKey("5"))
         until("read on the nine keys") { inks().isNotEmpty() }
-        close()
+        h.close()
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
         shared.reader = object : HandwritingRecognition.Reader {
             override val loadable = true
@@ -189,7 +189,7 @@ class KeyHandwritingUatTest {
         h.advance(100)
         assertEquals(emptyList<String>(), inks())
         shadowOf(a11y).setTouchExplorationEnabled(false)
-        close()
+        h.close()
         harness(KeyboardHarness.ENGLISH)
         assertTrue(KeyboardHarness.find<TextKeyboard>(h.keyboard) != null)
         h.api.calls.clear()

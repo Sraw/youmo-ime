@@ -106,7 +106,7 @@ class GlideInput(
     private fun down(event: MotionEvent): GlideTouch.Route {
         stroking = strokes()
         // writing on the keys: not over a tap or a long press the recognizer cannot read
-        inking = ink?.takeIf { !stroking && it.loadable && writes() }
+        inking = ink?.takeIf { !stroking && writes() && it.loadable }
         fed = -1
         val drawn = stroking || inking != null
         val keys = if (drawn || enabled()) letters() else emptyList()

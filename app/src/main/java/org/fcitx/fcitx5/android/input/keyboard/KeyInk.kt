@@ -29,9 +29,10 @@ class KeyInk(
     private val view: View,
     theme: Theme,
     private val pause: () -> Long,
-    deliver: (InkReading, piece: Int) -> Unit,
-    finished: (piece: Int) -> Unit,
-    private val recognition: HandwritingRecognition = HandwritingRecognition.shared,
+    private val deliver: (InkReading, piece: Int) -> Unit,
+    private val finished: (piece: Int) -> Unit,
+    // asked for once written on: a keyboard of one who never writes makes no recognizer (its thread)
+    recognition: () -> HandwritingRecognition = { HandwritingRecognition.shared },
 ) : InkKeys.Pad {
 
     override val pad = InkPad()
@@ -40,10 +41,17 @@ class KeyInk(
     val gesture = KeyInkGesture()
 
     /** The keys typed while the pad is read, in order with it. */
-    val keys = InkKeys(recognition, this, deliver, finished)
+    val keys: InkKeys by lazy { InkKeys(reads.value, this, deliver, finished) }
+
+    private val reads = lazy(recognition)
 
     /** Whether strokes can be read now: the recognizer not given up (no stroke starts else, the touch a tap as ever). */
-    val loadable: Boolean get() = recognition.loadable
+    val loadable: Boolean get() = reads.value.loadable
+
+    /** Another input started: what was written dropped (InkKeys.restart); nothing to drop if never written on. */
+    fun restart() {
+        if (reads.isInitialized()) keys.restart() else next()
+    }
 
     // the theme's ink as the handwriting pad's when its theme says none (HandwritingPadView)
     private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {

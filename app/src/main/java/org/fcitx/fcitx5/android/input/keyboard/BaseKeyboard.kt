@@ -231,7 +231,7 @@ abstract class BaseKeyboard(
 
     /** Another input started (a field): what was written on the keys dropped, as the handwriting keyboard's pad is. */
     fun restartInk() {
-        keyInk?.keys?.restart()
+        keyInk?.restart()
     }
 
     private fun wordField() = !inPasswordField && address == AddressKeys.NONE
