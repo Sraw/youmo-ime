@@ -1265,9 +1265,11 @@ metered as above; a folder but `layouts/` or `__MACOSX/`, or one in `layouts/`, 
 asked (`ThemePackFiles.check`; `ThemeAssetLimits`): `theme.xml` read at this app's version (refused: does not
 read, the first five problems with their lines; `min-app` newer, said as such; Shift, Backspace,
 Space or Enter left blank, its words and icon hidden and its face no image, as the engine resolves the key
-(`BlankKeys`, `SceneBuilder.blanks`) on the app's boards and the pack's own, by role, in every set of the scenes
-the styles name and every key state, said as `board/key`; `ThemePackCheck.hidesRequired`, the theme maker's
-`blankKeys` too), at most 1 MB, `LookTheme.MAX_STYLES` (4100: a 3.0
+(`BlankKeys`, `SceneBuilder.blanks`) on the app's boards and the pack's own, by role, in every union of at most three
+key styles' scene sets and state sets (exact: the three deciding styles win there too; sets the app is never in at
+once skipped; past 512 scene sets refused, `exception_theme_too_many_scenes`), said as `board/key`;
+`ThemePackCheck.hidesRequired`, the theme maker's `blankKeys` too; a pack that passes keeps a `.checked` stamp,
+a hash of theme.xml, its layouts, `BlankKeys.RULE` and the build, so a listing checks only a pack without one), at most 1 MB, `LookTheme.MAX_STYLES` (4100: a 3.0
 theme of 400 single keys written as 4.0) styles, 4 fonts, 200 icons (the reader's); its name plain, not
 `.`-led, not ending `#light`/`#dark`, no built-in's file or reference, no 0.5 name
 (`ThemePackFiles.builtinClash`). A 3.0 theme of the user's named by one of its references is replaced by it

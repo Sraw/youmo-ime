@@ -32,27 +32,47 @@ object BlankKeys {
 
     /** A key left blank: on [board], its id [key], in [scenes], in [states]. */
     data class Blank(val board: String, val key: String, val scenes: Set<String>, val states: Set<KeyState>) {
-        override fun toString() = "$board/$key" + scenes.sorted().joinToString("") { " @$it" } + states.joinToString("") { ":" + it.xml }
+        override fun toString() = if (board == "*") "too many scenes together to check" else "$board/$key" + scenes.sorted().joinToString("") { " @$it" } + states.joinToString("") { ":" + it.xml }
     }
 
     // the scenes of the keyboard's form, each an Env flag; any other a theme names (im=…, field=…) is typed
     private val FORMS = listOf("compact", "landscape", "floating", "split", "one-handed", "dark", "flat")
 
-    // the scene sets tried at most: every set of the scenes a theme names, up to this many of them; past it the
-    // sets of at most MAX_TOGETHER (a crafted theme of many scenes must not make an import take minutes)
-    private const val MAX_ALL = 8
-    private const val MAX_TOGETHER = 3
+    /** Said in place of the blanks when a theme's key styles name too many scenes together to try them all. */
+    val TOO_MANY = Blank("*", "*", emptySet(), emptySet())
 
-    /** The keys [theme] leaves blank on [boards], the first [limit] found. */
+    /** Bumped when what is found changes: a pack checked under another rule is checked again (the app's stamp). */
+    const val RULE = 2
+
+    // the scene sets tried at most; a theme past it is refused (TOO_MANY), never let through half asked
+    private const val MAX_SCENE_SETS = 512
+
+    // at most this many styles decide a key: its face, its words hidden, its icon hidden
+    private const val DECIDING = 3
+
+    /**
+     * The keys [theme] leaves blank on [boards], the first [limit] found; [TOO_MANY] alone where the scenes to try
+     * are too many.
+     *
+     * Exact, not sampled: the styles that win a key's face and hide its words and icon in some environment win
+     * them too in the scenes and states those three styles name together (a narrower environment: whatever beats
+     * them there matches in the wider one too). So the scene sets tried are the unions of at most three of the
+     * key styles' (those setting `fill` or `hidden`), and the state sets likewise; sets that cannot be at once
+     * (two input methods, floating and split, one-handed with either) are not.
+     */
     fun find(theme: Theme, boards: List<Board>, limit: Int = 1): List<Blank> {
+        val deciding = theme.styles.filter { "fill" in it.values || "hidden" in it.values }
+            .flatMap { it.selectors }.filter { it.widget == "key" }
+        val sceneSets = unions(deciding.map { it.scenes }.toSet()).filter(::possible)
+        if (sceneSets.size > MAX_SCENE_SETS) return listOf(TOO_MANY)
+        val stateSets = unions(deciding.map { sel -> sel.states.mapNotNullTo(HashSet()) { KeyState.of(it) } - KeyState.Pressed }.toSet())
         // the versions share their styles (only colours differ): one is asked
         val cascades = Cascades(theme)
         val out = ArrayList<Blank>()
-        for (scenes in sceneSets(theme)) {
-            val env = env(scenes)
-            val builder = SceneBuilder(theme, env, FixedMeasurer, cascades = cascades)
+        for (scenes in sceneSets) {
+            val builder = SceneBuilder(theme, env(scenes), FixedMeasurer, cascades = cascades)
             for (b in boards) {
-                for ((key, states) in builder.blanks(b.layout, b.fragments, REQUIRED_ROLES)) {
+                for ((key, states) in builder.blanks(b.layout, b.fragments, REQUIRED_ROLES, stateSets)) {
                     out += Blank(b.layout.id, key.key.id, scenes, states)
                     if (out.size >= limit) return out
                 }
@@ -61,13 +81,20 @@ object BlankKeys {
         return out
     }
 
-    // every set of the scenes [theme]'s selectors name (none among them)
-    private fun sceneSets(theme: Theme): List<Set<String>> {
-        val named = theme.styles.flatMap { s -> s.selectors.flatMap { it.scenes } }.toSet().sorted()
-        val most = if (named.size <= MAX_ALL) named.size else MAX_TOGETHER
-        var sets = listOf(emptySet<String>())
-        for (n in named) sets = sets + sets.filter { it.size < most }.map { it + n }
-        return sets
+    // every union of at most DECIDING of [sets], the empty one first
+    private fun <T> unions(sets: Set<Set<T>>): List<Set<T>> {
+        val each = sets.filter { it.isNotEmpty() }
+        var out = linkedSetOf(emptySet<T>())
+        repeat(DECIDING) { out = (out + out.flatMap { u -> each.map { u + it } }).toCollection(LinkedHashSet()) }
+        return out.toList()
+    }
+
+    // what the app can be in at once: one value of each typed scene; floating, split and one-handed apart
+    // (Env.isOneHanded: neither floating nor split; a floating keyboard is never split)
+    private fun possible(scenes: Set<String>): Boolean {
+        val typed = scenes.filter { '=' in it }
+        if (typed.map { it.substringBefore('=') }.toSet().size < typed.size) return false
+        return scenes.count { it == "floating" || it == "split" || it == "one-handed" } <= 1
     }
 
     private fun env(scenes: Set<String>) = Env(

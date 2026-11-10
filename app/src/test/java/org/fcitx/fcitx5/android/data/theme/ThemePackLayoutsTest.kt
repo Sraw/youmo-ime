@@ -98,6 +98,19 @@ class ThemePackLayoutsTest {
     private fun keyQ(id: String) = SceneLayouts.of(appContext, id)!!.layout.parts.filterIsInstance<Row>()
         .flatMap { it.cells }.filterIsInstance<Key>().first { it.id == "q" }
 
+    // the blank-key check runs at import, its pass stamped: a listing does not run it again, unless the pack (its
+    // theme.xml, its layouts) changed
+    @Test
+    fun aListingTrustsThePacksStamp() {
+        val pack = opened("mine", mapOf("qwerty.xml" to qwerty())).commit().getOrThrow()[0]
+        ThemePackFiles.blankChecks = 0
+        repeat(2) { ThemeFilesManager.listPacks() }
+        assertEquals(0, ThemePackFiles.blankChecks)
+        File(pack.dir, "layouts/qwerty.xml").appendText("\n")
+        repeat(2) { assertEquals(listOf("mine"), ThemeFilesManager.listPacks().map { it.file }.distinct()) }
+        assertEquals(1, ThemePackFiles.blankChecks)
+    }
+
     @Test
     fun aPacksQwertyReplacesThe26Keys() {
         inUse("mine", mapOf("qwerty.xml" to qwerty()))

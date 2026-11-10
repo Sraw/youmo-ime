@@ -280,11 +280,16 @@ class SceneBuilder(
     }
 
     /**
-     * The keys of [roles] on [layout] that this scene would draw blank: their label hidden and their face, as
-     * [styled] cascades it, not an image, in the state the environment puts them in, each other state a key can
-     * be in alone, and pressed; Shift in each of its own. `board/id` and the states for each, for [BlankKeys].
+     * The keys of [roles] on [layout] that this scene would draw blank: their words and icon hidden and their
+     * face, as [styled] cascades it, not an image, in the states the environment puts them in plus each of
+     * [stateSets], each pressed and not. `board/id` and the states for each, for [BlankKeys].
      */
-    internal fun blanks(layout: Layout, fragments: Map<String, Fragment>, roles: Set<String>): List<Pair<ExpandedKey, Set<KeyState>>> {
+    internal fun blanks(
+        layout: Layout,
+        fragments: Map<String, Fragment>,
+        roles: Set<String>,
+        stateSets: List<Set<KeyState>>,
+    ): List<Pair<ExpandedKey, Set<KeyState>>> {
         // the keys as the scene has them: a layout that does not expand here draws no keys here (its own
         // problems are the layout check's)
         val placement = placement(layout)
@@ -298,8 +303,7 @@ class SceneBuilder(
             val c = if (key.attrs.face == Face.Keep) unflat else cascade
             val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
             val own = statesOf(key)
-            val alone = KeyState.entries.filter { it != KeyState.Pressed }.map { own + it }
-            for (states in (listOf(own) + alone).distinct().flatMap { listOf(it, it + KeyState.Pressed) }) {
+            for (states in stateSets.map { own + it }.distinct().flatMap { listOf(it, it + KeyState.Pressed) }) {
                 val whole = Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, states.mapTo(HashSet()) { it.xml })
                 // what the key shows (its words, its icon) all hidden by the theme; one that shows neither is the layout's
                 fun hides(part: Part) = TextLook(c.of(whole.copy(part = part.xml)), theme).hidden

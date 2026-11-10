@@ -116,13 +116,26 @@ class ThemePackCheckTest {
         val shift = """<style select="*/shift" fill="image(s.png, 0 0 0 0, 3x)"/><style select="*/shift label, */shift icon" hidden="true"/>"""
         assertEquals(0, found(shift))
         assertEquals(1, found(shift + """<style select="*/shift:locked" fill="#ffffffff"/>"""))
+        // two states at once
+        assertEquals(1, found(shift + """<style select="*/shift:locked:on" fill="#ffffffff"/>"""))
+        // four scenes at once, however many scenes the rest of the theme names (the keyboard's: no key's)
+        val padding = (1..6).joinToString("") { """<style select="@im=x$it keyboard" fill="#ff000000"/>""" }
+        assertEquals(1, found(img + padding + """<style select="@dark @landscape @compact @flat */enter" fill="#ffffffff"/>""" + hide))
+        // scenes that cannot be at once: no blank there
+        val apart = """<style select="@floating */enter" fill="#ffffffff"/><style select="@split */enter label, @split */enter icon" hidden="true"/>"""
+        assertEquals(0, found(img + apart))
+        assertEquals(0, found(img + """<style select="@im=a */enter" fill="#ffffffff"/><style select="@im=b */enter label, @im=b */enter icon" hidden="true"/>"""))
+        // too many to try: refused as such, not let through
+        val scenes = (1..10).flatMap { listOf("im=s$it", "keyboard=k$it") } + listOf("dark", "flat", "compact", "landscape")
+        val many = scenes.joinToString("") { """<style select="@$it */comma" fill="#ff000000"/>""" }
+        assertEquals(listOf(BlankKeys.TOO_MANY), ThemePackCheck.hidesRequired(theme(styles = many), boards))
     }
 
-    // the worst a pack can ask: the largest built-in theme, its styles naming as many scenes as are all tried
-    // (2^8 scene sets, every board), within the time an import may take
+    // the worst a pack can ask short of being refused: the largest built-in theme, its key styles naming scenes
+    // whose sets to try come near the most tried, within the time an import may take
     @Test
     fun theCheckTakesLittleTimeAtItsWorst() {
-        val scenes = listOf("dark", "flat", "landscape", "compact", "split", "floating", "one-handed", "im=pinyin")
+        val scenes = (1..4).flatMap { listOf("im=s$it", "keyboard=k$it") } + listOf("dark", "flat", "landscape", "compact", "split")
         val xml = File("../keyboard-scene/src/commonMain/themes/amoled-black.xml").readText()
             .replace("</theme>", scenes.joinToString("") { """<style select="@$it */comma" fill="#ff000000"/>""" } + "</theme>")
         val t = (ThemeReader.theme(xml) as Parsed.Ok).value

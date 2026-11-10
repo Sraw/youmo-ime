@@ -169,6 +169,10 @@ test('save refuses what the app would: the name, files missing, images past thei
   const shift = '<style select="*/shift" fill="image(e.png, 0 0 0 0, 3x)"/><style select="*/shift label, */shift icon" hidden="true"/>';
   assert.equal(withE(shift), 0);
   assert.equal(withE(shift + '<style select="*/shift:locked" fill="#ffffffff"/>'), 1);
+  assert.equal(withE(shift + '<style select="*/shift:locked:on" fill="#ffffffff"/>'), 1, 'two states at once');
+  const padding = [1, 2, 3, 4, 5, 6].map((i) => '<style select="@im=x' + i + ' keyboard" fill="#ff000000"/>').join('');
+  assert.equal(withE(img + padding + '<style select="@dark @landscape @compact @flat */enter" fill="#ffffffff"/>' + hid), 1, 'four scenes, the keyboard\'s styles naming more');
+  assert.equal(withE(img + '<style select="@floating */enter" fill="#ffffffff"/><style select="@split */enter label, @split */enter icon" hidden="true"/>'), 0, 'scenes never at once');
   // a pack's own board, its Return named go: asked by its role
   const own = { 'qwerty.xml': E.layoutSource("qwerty").replace('id="enter"', 'id="go"') };
   const ownDoc = (styles) => M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'), { 'e.png': pngHeader(10, 10) }, own);

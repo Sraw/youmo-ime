@@ -167,7 +167,7 @@ class ThemePackImportTest {
         assertEquals(listOf("mine#light", "mine#dark"), versions.map { it.name })
         val folder = File(packs, "mine")
         assertEquals(
-            setOf("theme.xml", "preview.png", "photo.jpg", "p.webp", "l.webp", "enter.png", "round.ttf", "star.svg", "layouts/qwerty.xml"),
+            setOf("theme.xml", "preview.png", "photo.jpg", "p.webp", "l.webp", "enter.png", "round.ttf", "star.svg", "layouts/qwerty.xml", ".checked"),
             tree(folder).keys,
         )
         assertEquals(sampleXml, File(folder, "theme.xml").readText())

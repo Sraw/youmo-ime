@@ -128,7 +128,10 @@
     // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
     const layouts = Object.create(null);
     for (const [n, t] of Object.entries(d.layouts)) layouts[n] = t;
-    for (const where of E.blankKeys(read.theme, layouts)) bad(where + '：字藏了，键面又不是图片——Shift、退格、空格或回车会是空白键');
+    for (const where of E.blankKeys(read.theme, layouts)) {
+      if (where.startsWith('too many')) bad('键的样式用的场景组合太多，没法逐一检查 Shift、退格、空格和回车会不会成空白键（App 会拒收）');
+      else bad(where + '：字藏了，键面又不是图片——Shift、退格、空格或回车会是空白键');
+    }
     let total = 0;
     const enc = new TextEncoder();
     const sizes = [enc.encode(d.xml).length, ...Object.values(d.files).map((b) => b.length), ...Object.values(d.layouts).map((t) => enc.encode(t).length)];
