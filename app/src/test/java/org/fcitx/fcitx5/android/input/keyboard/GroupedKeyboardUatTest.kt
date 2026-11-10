@@ -309,7 +309,7 @@ class GroupedKeyboardUatTest {
     @Test
     @Uat("PY-98")
     fun theFourteenKeysDoNotGlide() {
-        prefs.set(AppPrefs.getInstance().keyboard.glideTyping, true)
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         keys14().start()
         val ui = h.box(group("UI"))
         val gh = h.box(group("GH"))

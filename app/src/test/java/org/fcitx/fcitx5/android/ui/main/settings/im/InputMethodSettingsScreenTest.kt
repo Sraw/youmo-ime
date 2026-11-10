@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.host.ConfigTree
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.modified.hasDefault
@@ -216,35 +217,24 @@ class InputMethodSettingsScreenTest {
         assertTrue(AppPrefs.ENGLISH_AUTO_CAPS !in cfg.flattened())
     }
 
-    // 滑行输入 and 笔画筛选, never both on: the one turned on turns the other off, its switch shown off too;
-    // one turned off leaves the other as it is
+    // 在键上划: one list of 滑行输入, 笔画筛选 and off (键盘手写 not offered yet), its summary the choice alone;
+    // a choice stored as it is picked
     @Test
-    fun glideTypingAndStrokeFilterTurnEachOtherOff() {
+    fun keyDrawingIsOneChoiceSummarizedByItself() {
         val keyboard = AppPrefs.getInstance().keyboard
         try {
-            keyboard.glideTyping.setValue(true)
-            keyboard.strokeFilter.setValue(false)
-            val shared = create(InputMethodSettings.SHARED)
-            val glide = shared.findPreference<SwitchPreferenceCompat>(AppPrefs.GLIDE_TYPING)!!
-            val strokes = shared.findPreference<SwitchPreferenceCompat>(AppPrefs.STROKE_FILTER)!!
-            assertTrue(glide.isChecked)
-            assertFalse(strokes.isChecked)
-            assertTrue(strokes.callChangeListener(true))
-            strokes.isChecked = true
-            assertTrue(keyboard.strokeFilter.getValue())
-            assertFalse(keyboard.glideTyping.getValue())
-            assertFalse(glide.isChecked)
-            assertTrue(glide.callChangeListener(true))
-            glide.isChecked = true
-            assertTrue(keyboard.glideTyping.getValue())
-            assertFalse(keyboard.strokeFilter.getValue())
-            assertFalse(strokes.isChecked)
-            assertTrue(glide.callChangeListener(false))
-            glide.isChecked = false
-            assertFalse(keyboard.glideTyping.getValue() || keyboard.strokeFilter.getValue() || strokes.isChecked)
+            keyboard.keyDrawing.setValue(KeyDrawing.Glide)
+            val drawing = create(InputMethodSettings.SHARED).findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!
+            assertEquals(listOf(KeyDrawing.Glide, KeyDrawing.StrokeFilter, KeyDrawing.Off).map { it.name }, drawing.entryValues.map { it.toString() })
+            assertEquals(KeyDrawing.Glide.name, drawing.value)
+            assertEquals(drawing.entry.toString(), drawing.summary?.toString())
+            assertTrue(drawing.callChangeListener(KeyDrawing.StrokeFilter.name))
+            assertEquals(KeyDrawing.StrokeFilter, keyboard.keyDrawing.getValue())
+            // one this version does not offer (a later version's backup) shows as off, as the keyboard reads it
+            keyboard.keyDrawing.setValue(KeyDrawing.Handwriting)
+            assertEquals(KeyDrawing.Off.name, create(InputMethodSettings.SHARED).findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!.value)
         } finally {
-            keyboard.glideTyping.setValue(false)
-            keyboard.strokeFilter.setValue(false)
+            keyboard.keyDrawing.setValue(KeyDrawing.Off)
         }
     }
 
@@ -320,8 +310,9 @@ class InputMethodSettingsScreenTest {
         assertEquals(placeholder(R.string.im_prediction_summary), shared.titled(R.string.im_prediction).summary?.toString())
         assertEquals("${placeholder(R.string.im_emoji_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.im_emoji).summary?.toString())
         assertNull(shared.titled(R.string.auto_pairs).summary)
-        assertEquals("${placeholder(R.string.glide_typing_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.glide_typing).summary?.toString())
-        assertEquals("${placeholder(R.string.stroke_filter_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.stroke_filter).summary?.toString())
+        // 在键上划: the choice alone, which input methods each reaches is the docs'
+        val drawing = shared.findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!
+        assertEquals(drawing.entry.toString(), drawing.summary?.toString())
         val level = shared.findPreference<ListPreference>(EngineSettings.MODEL_LEVEL)!!
         assertEquals("${level.entry}\n${placeholder(R.string.im_model_level_summary)}", level.summary?.toString())
         // pinyin's own: not for the 14 keys (the hardware keyboard still types full pinyin)

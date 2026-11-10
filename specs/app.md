@@ -384,10 +384,13 @@ is no word (a domain, a user name, a password); a wrong guess in a password is n
 password is neither read nor learned; the space a glide puts before its word would break an address.
 Keys there are typed as they are, and a finger sliding across them never starts a glide.
 
-The same touch is a stroke (笔画筛选) where its switch is on (`AppPrefs.keyboard.strokeFilter`
-beside `glideTyping`, which keeps 0.4's `glide_typing` key, so a 0.4 user's glide carries over). The
-two are never both on: the shared page's `AppToggle.turnsOff` turns the other off as one is turned on,
-its switch flipped where it is seen, no dialog; so English glides none while strokes are on.
+The same touch is a stroke (笔画筛选) where that is chosen instead: one setting,
+`AppPrefs.keyboard.keyDrawing` (`KeyDrawing`: Off, Glide, StrokeFilter; its Handwriting not offered
+on the settings page yet), so the two are never both on and English glides none while strokes are
+chosen. 0.5's two switches (`glide_typing`, 0.4's key too, and `stroke_filter`) move over at the
+start (`AppPrefs.migrateKeyDrawing`, a backup's at the start after its import): glide if it was on,
+else strokes if they were, else off (both on, which only a backup or a hand edit holds, is glide),
+the two old keys dropped. The page's row is an `AppChoice` whose summary is the choice alone.
 `GlideInput` decides at the finger's down (`strokes`): the switch, a word field, pinyin typed (`BaseKeyboard.imTyping`, which
 `KeyboardWindow` sets from the preedit, not in a temporary mode: its panel alone has an aux line above) and a keyboard whose input method filters (`filters`:
 `InputMethodCatalog.filtersByStrokes` of the one shown, on `TextKeyboard`, `T9Keyboard` and

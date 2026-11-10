@@ -39,6 +39,7 @@ import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
@@ -127,16 +128,12 @@ object InputMethodSettings {
         val pref: () -> ManagedPreference.PStringLike<T>,
     ) : Titled where T : Enum<T>, T : ManagedPreferenceEnum
 
-    /**
-     * A switch over the app's own preference [pref], as [AppChoice] is a list. [turnsOff], the key
-     * of another on the same page that this one turns off as it is turned on: the two are never on together.
-     */
+    /** A switch over the app's own preference [pref], as [AppChoice] is a list. */
     class AppToggle(
         override val key: String,
         @StringRes override val title: Int,
         @StringRes override val summary: Int,
         override val notFor: List<String> = emptyList(),
-        val turnsOff: String? = null,
         val pref: () -> ManagedPreference<Boolean>,
     ) : Titled
 
@@ -216,17 +213,15 @@ object InputMethodSettings {
     val SHARED: List<Item> = listOf(
         Section(
             R.string.shared_section_all, listOf(
-                // the keyboard's, never both on (each turns the other off): a word by gliding across its keys
-                // (InputMethodCatalog.glides; the grouped keyboards, the 14 and 18 keys and 双拼's nine keys, have
-                // none, as the summary says; pinyin's nine keys have), every input method's but handwriting's; or a
-                // stroke filtering pinyin's and 双拼's candidates on any of their keyboards (InputMethodCatalog.filtersByStrokes)
-                AppToggle(AppPrefs.GLIDE_TYPING, R.string.glide_typing, R.string.glide_typing_summary, notFor = listOf(InputMethodCatalog.HANDWRITING), turnsOff = AppPrefs.STROKE_FILTER) {
-                    AppPrefs.getInstance().keyboard.glideTyping
-                },
-                AppToggle(
-                    AppPrefs.STROKE_FILTER, R.string.stroke_filter, R.string.stroke_filter_summary,
-                    notFor = InputMethodCatalog.TABLES.keys.toList() + InputMethodCatalog.HANDWRITING + InputMethodCatalog.ENGLISH, turnsOff = AppPrefs.GLIDE_TYPING,
-                ) { AppPrefs.getInstance().keyboard.strokeFilter },
+                // the keyboard's, one of: a word by gliding across its keys (InputMethodCatalog.glides), a stroke
+                // filtering pinyin's and 双拼's candidates (InputMethodCatalog.filtersByStrokes), or off; which input
+                // methods read each is the docs' (the summary is the choice alone). 键盘手写 not offered till it is wired.
+                AppChoice(
+                    AppPrefs.KEY_DRAWING, R.string.key_drawing, 0, KeyDrawing.entries,
+                    offered = { KeyDrawing.entries - KeyDrawing.Handwriting },
+                    // stored by a later version's backup: the keyboard draws nothing for it yet
+                    instead = { _, _ -> KeyDrawing.Off },
+                ) { AppPrefs.getInstance().keyboard.keyDrawing },
                 AppToggle(AppPrefs.AUTO_PAIRS, R.string.auto_pairs, 0) { AppPrefs.getInstance().keyboard.autoPairs },
                 AppToggle(AppPrefs.CALCULATION_REPLACES_SUM, R.string.calculation_replaces_sum, 0) {
                     AppPrefs.getInstance().keyboard.calculationReplacesSum
@@ -653,7 +648,7 @@ object InputMethodSettings {
                     refreshers += refresh
                 })
                 is Action -> into(action(context, item, act, confirm))
-                is AppToggle -> into(appToggle(context, item, group))
+                is AppToggle -> into(appToggle(context, item))
             }
         }
         items.forEach { add(it, group::addPreference) }
@@ -724,7 +719,7 @@ object InputMethodSettings {
             }
         }
 
-    private fun appToggle(context: Context, item: AppToggle, page: PreferenceGroup) = SwitchPreferenceCompat(context).apply {
+    private fun appToggle(context: Context, item: AppToggle) = SwitchPreferenceCompat(context).apply {
         val pref = item.pref()
         key = item.key
         // the app's preference set by hand: this screen's store is fcitx's config
@@ -735,12 +730,7 @@ object InputMethodSettings {
         summary = summaryOf(context, item.summary, item.notFor)
         isChecked = pref.getValue()
         setOnPreferenceChangeListener { _, value ->
-            // the other flips where it is seen, no dialog asked: its own listener stores it off, before
-            // this one is stored on, so the two are never both stored on
-            val on = value as Boolean
-            val other = item.turnsOff?.takeIf { on }?.let { page.findPreference<SwitchPreferenceCompat>(it) }
-            if (other != null && other.callChangeListener(false)) other.isChecked = false
-            pref.setValue(on)
+            pref.setValue(value as Boolean)
             true
         }
     }

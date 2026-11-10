@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -30,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class GlideUatTest {
 
-    private val glides = AppPrefs.getInstance().keyboard.glideTyping
+    private val glides = AppPrefs.getInstance().keyboard.keyDrawing
     // the harness open, closed after each test (the tests name theirs h)
     private var open: KeyboardHarness? = null
 
@@ -41,7 +42,7 @@ class GlideUatTest {
     }
 
     private fun harness(im: InputMethodEntry, keyboards: ImKeyboards.Chosen? = null): KeyboardHarness {
-        glides.setValue(true)
+        glides.setValue(KeyDrawing.Glide)
         return KeyboardHarness(im = im, keyboards = keyboards).also { open = it }.start()
     }
 
