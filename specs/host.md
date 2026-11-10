@@ -210,15 +210,30 @@ is `selectCandidate(ic, globalIndex)`. Paging constants (5 a page, Up/Down, Tab/
   field; `withMine` false (借手机) hides them. `Panel.quickPhrase` tells the app the panel is quick
   input's (the handwriting pad swaps for the full keyboard); `HostCore.quickPhraseAt` gives the
   entry under a long press.
-- `QuickPhraseBook`: the user's entries (`data/quickphrase.d/mine.mb`, fcitx's `.mb`, so the export is
-  the file) in order of use (`mine.used`, `millis<TAB>key<TAB>content escaped as fcitx's value`), then the built-in
-  `QuickPhraseTable`; the user's match by key prefix case aside, the built-in ones case kept. Two
-  entries whose keys differ only in case and whose content is the same are one (`QuickPhraseEntry.sameAs`):
-  refused when saved, skipped when imported, the first kept when read. Of the
-  user's directory only `mine.*` and `*.disable` are read. `mine.mb` is read with a leading UTF-8 BOM
-  dropped; the lines fcitx skips, a duplicate, and a content over `MAX_CONTENT` (5000 UTF-16 units, the
-  page's limit) are left out, and so are gone from the file at its next write. The app's
-  `QuickPhraseManager` writes both files whole under one lock (page and keyboard both write).
+- `QuickPhraseBook`: the user's entries (`data/quickphrase.d/mine.mb`) in order of use (`mine.used`), then the built-in
+  `QuickPhraseTable`; the user's match by key prefix case aside, the built-in ones case kept. An entry
+  (`QuickPhraseEntry`) is an ASCII key (visible characters, `QuickPhraseFiles.validKey`), its content, a
+  note (the candidate's comment, else the key) and a folder (the settings page's alone: matching and
+  order ignore it). Two entries whose keys differ only in case and whose note and content are the
+  same are one (`sameAs`): refused when saved, skipped when imported, the first kept when read.
+- `QuickPhraseFiles`, version 2 (design 060-quick-input-folders): `mine.mb` is still fcitx's `.mb`, so
+  fcitx5 on a computer and older builds read it and the export is the same format: a first line
+  `#youmo-quickphrase-v2` and folder lines `【目录】name` (no whitespace: fcitx skips them; read through
+  `QuickPhraseTable.parse(bytes, bare, each)`), entry lines `key｜note content` (the note after a
+  full-width bar, its spaces as U+00A0). A key splits from its note at its first character that is
+  not visible ASCII (`split`); version 1 (no first line: a file of before, an old backup, a
+  computer's `.mb`) keeps the rest as the note as it is, so `#wz百度` reads as `#wz` + 百度, and a key
+  Chinese from its start as no key (`keyless`) with the old key as the note: listed with nothing
+  typed, found by none, said on the page (待补关键词) until given a key. A read never writes; the
+  next change writes version 2. `mine.used` (`#youmo-quickphrase-used-v2`, then
+  `millis<TAB>key｜note<TAB>content escaped as fcitx's value`) keys times by the entry out of its folder,
+  so a move keeps its time; one without its first line splits as version 1. Of the user's directory
+  only `mine.*` and `*.disable` are read. `mine.mb` is read with a leading UTF-8 BOM dropped; the
+  lines fcitx skips, a duplicate, and a content over `MAX_CONTENT` (5000 UTF-16 units, the page's
+  limit) are left out, and so are gone from the file at its next write; the entries are written
+  grouped by folder (none first, then the folders in order, an empty one a line alone). The app's
+  `QuickPhraseManager` writes both files whole under one lock (page and keyboard both write), and
+  finds the keyboard's entry (used, deleted) by key, note and content, its folder aside.
   `HostCore.refreshQuickPhrase` (after `reloadConfig`) shows an open quick input's list again from
   the new book, so an entry deleted from its card goes at once.
 - `QuickPhraseTable` (`quickphraseprovider.cpp:29-104`): `data/QuickPhrase.mb` from the first

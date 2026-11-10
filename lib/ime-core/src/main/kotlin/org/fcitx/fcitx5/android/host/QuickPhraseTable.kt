@@ -111,6 +111,14 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
             return out
         }
 
+        /**
+         * [parse], and every line [load] skips only for having no whitespace, trimmed, valid UTF-8, to
+         * [bare] in its place among the others: the user's own file marks its version and its folders
+         * with such lines ([QuickPhraseFiles]), which fcitx and older builds pass over.
+         */
+        internal fun parse(bytes: ByteArray, bare: (String) -> Unit, each: (Pair<String, String>) -> Unit) =
+            eachLine(bytes, bare, each)
+
         /** `std::filesystem::path::extension`: from the last dot, unless the name starts with it. */
         private fun extension(name: String): String {
             val dot = name.lastIndexOf('.')
@@ -123,7 +131,7 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
         private fun loadInto(map: TreeMap<String, MutableList<String>>, bytes: ByteArray) =
             eachLine(bytes) { (key, value) -> map.getOrPut(key) { ArrayList(1) }.add(value) }
 
-        private inline fun eachLine(bytes: ByteArray, each: (Pair<String, String>) -> Unit) {
+        private inline fun eachLine(bytes: ByteArray, noinline bare: ((String) -> Unit)? = null, each: (Pair<String, String>) -> Unit) {
             // one decoder for the file: made per line, it was most of a cold start's 0.4 s on a debug build
             val decoder = Charsets.UTF_8.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPORT)
@@ -132,13 +140,13 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
             while (start < bytes.size) {
                 var end = start
                 while (end < bytes.size && bytes[end] != '\n'.code.toByte()) end++
-                parseLine(decoder, bytes, start, end)?.let(each)
+                parseLine(decoder, bytes, start, end, bare)?.let(each)
                 start = end + 1
             }
         }
 
         @Suppress("ReturnCount")
-        private fun parseLine(decoder: CharsetDecoder, bytes: ByteArray, from: Int, to: Int): Pair<String, String>? {
+        private fun parseLine(decoder: CharsetDecoder, bytes: ByteArray, from: Int, to: Int, bare: ((String) -> Unit)?): Pair<String, String>? {
             var s = from
             var e = to
             while (s < e && isWhitespace(bytes[s])) s++
@@ -146,7 +154,10 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
             if (s == e) return null
             val text = decodeStrict(decoder, bytes, s, e) ?: return null
             val pos = text.indexOfFirst { it.code < 0x80 && isWhitespace(it.code.toByte()) }
-            if (pos < 0) return null
+            if (pos < 0) {
+                bare?.invoke(text)
+                return null
+            }
             val word = (pos until text.length).firstOrNull { !(text[it].code < 0x80 && isWhitespace(text[it].code.toByte())) }
                 ?: return null
             val value = FcitxUtils.unescapeForValue(text.substring(word)) ?: return null

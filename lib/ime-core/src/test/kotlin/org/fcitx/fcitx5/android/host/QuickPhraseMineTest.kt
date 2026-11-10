@@ -70,6 +70,34 @@ class QuickPhraseMineTest {
         assertEquals(addr, rig.quickPhrase.entryAt(rig.ic, 1)!!.entry)
     }
 
+    // design 060-quick-input-folders: #wz百度 and #wz新浪 of before are #wz with two notes, both found
+    // by #wz, each shown with its note; one whose old key was all Chinese is listed but found by none
+    @Test
+    @Uat("QU-25", "QU-27")
+    fun notesShowBesideTheContentAndAKeylessOneIsListedButNeverFound() {
+        val baidu = QuickPhraseEntry("#wz", "www.baidu.com", "百度", folder = "网址")
+        val sina = QuickPhraseEntry("#wz", "www.sina.com.cn", "新浪")
+        val home = QuickPhraseEntry("", "北京市海淀区", "地址")
+        val noted = QuickPhraseBook(builtIn, listOf(baidu, sina, home))
+        val r = TempModeRig(QuickPhraseTable.EMPTY, { null }, hooks = hooks, book = { noted })
+        fun notes() = r.panel.candidates!!.let { l -> (0 until l.size).map { l.candidate(it).comment } }
+        r.press(TempKeys.GRAVE, KeyStates.SUPER)
+        assertEquals(listOf("www.baidu.com", "www.sina.com.cn", "北京市海淀区", "+ Add"), r.page)
+        assertEquals(listOf("百度", "新浪", "地址", ""), notes())
+        r.type("#wz")
+        assertEquals(listOf("www.baidu.com", "www.sina.com.cn"), r.page)
+        assertEquals(listOf("百度", "新浪"), notes())
+        r.quickPhrase.selectCandidate(r.ic, 1)
+        assertEquals(listOf("www.sina.com.cn"), r.commits())
+        // its use kept with its note, so the right one of the two goes first
+        assertEquals(listOf(sina to 100L), hooks.used)
+        assertEquals(listOf(sina, baidu, home), noted.mine)
+        // the note is no key: 百度's letters find nothing of mine
+        r.press(TempKeys.GRAVE, KeyStates.SUPER)
+        r.type("bd")
+        assertTrue(r.panel.candidates == null || (0 until r.panel.candidates!!.size).none { r.quickPhrase.entryAt(r.ic, it)?.mine == true })
+    }
+
     @Test
     fun spaceWithNothingTypedLeavesAndTypesASpace() {
         open()

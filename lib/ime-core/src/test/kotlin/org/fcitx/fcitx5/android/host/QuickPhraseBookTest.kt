@@ -40,7 +40,7 @@ class QuickPhraseBookTest {
         assertEquals(odd, QuickPhraseFiles.parseMine(text.toByteArray()))
         // fcitx's own reader takes the file as it is: the export is what fcitx5 on a computer reads
         assertEquals(odd.map { it.key to it.content }, QuickPhraseTable.parse(text.toByteArray()))
-        assertTrue(text.startsWith("addr \"北京市海淀区\\n3 号楼 502\"\n"))
+        assertTrue(text.startsWith(QuickPhraseFiles.HEADER + "\naddr \"北京市海淀区\\n3 号楼 502\"\n"))
     }
 
     // review L5, L11: Notepad's BOM is no part of a key; the same key in another case is the same entry

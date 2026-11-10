@@ -6,15 +6,31 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.core.FcitxUtils
 
-/** One of the user's own quick phrases: [key] typed to find it, [content] what it puts in. */
-data class QuickPhraseEntry(val key: String, val content: String) {
+/**
+ * One of the user's own quick phrases: [key] typed to find it (ASCII, [QuickPhraseFiles.validKey]),
+ * [content] what it puts in, [note] shown beside it in the candidates (any text: `#wz` with 百度 and
+ * with 新浪 for two sites), [folder] the one it is kept in on the settings page ("": none). Folders
+ * sort the page alone: typing finds an entry whatever its folder.
+ */
+data class QuickPhraseEntry(val key: String, val content: String, val note: String = "", val folder: String = "") {
     /**
      * The same entry to the user: the key case aside, as typing finds it ([QuickPhraseBook.find]), the
-     * content as it is. Two such would be listed for the same keys with the same text.
+     * note and content as they are; the folder aside, a move being no new entry. Two such would be
+     * listed for the same keys with the same text and note.
      */
-    fun sameAs(other: QuickPhraseEntry): Boolean = content == other.content && folded(key) == folded(other.key)
+    fun sameAs(other: QuickPhraseEntry): Boolean = content == other.content && note == other.note && folded(key) == folded(other.key)
 
-    internal val identity: Pair<String, String> get() = folded(key) to content
+    internal val identity: Triple<String, String, String> get() = Triple(folded(key), note, content)
+
+    /** Out of any folder: what its time of use is kept by (`mine.used`), and what finds it again after a move. */
+    val unfiled: QuickPhraseEntry get() = if (folder.isEmpty()) this else copy(folder = "")
+
+    /**
+     * No key: an old one that was Chinese from its first character, moved whole into [note] when the
+     * file was read ([QuickPhraseFiles.split]). Listed with nothing typed, found by no key, until the
+     * user gives it one.
+     */
+    val keyless: Boolean get() = key.isEmpty()
 
     private companion object {
         // each code point lowered as find lowers them, not String.lowercase's locale and special cases
@@ -31,6 +47,13 @@ data class QuickPhraseEntry(val key: String, val content: String) {
     }
 }
 
+/** The user's entries ([entries], grouped by folder as the file is) and their folders in order, empty ones too. */
+data class QuickPhraseMine(val entries: List<QuickPhraseEntry>, val folders: List<String>) {
+    companion object {
+        val EMPTY = QuickPhraseMine(emptyList(), emptyList())
+    }
+}
+
 /**
  * What quick input offers: the user's own entries ([mine], `data/quickphrase.d/mine.mb` of the
  * user's data) and the app's tables ([builtIn]). The user's are in order of use, the one used,
@@ -42,6 +65,7 @@ class QuickPhraseBook(
     mine: List<QuickPhraseEntry> = emptyList(),
     used: Map<QuickPhraseEntry, Long> = emptyMap(),
 ) {
+    // by each entry out of its folder, as mine.used keeps them
     private val times = HashMap(used)
 
     // the file's order, the tie-break between two never used
@@ -51,7 +75,7 @@ class QuickPhraseBook(
     private var ordered: List<QuickPhraseEntry> = order()
 
     private fun order() = entries.withIndex().sortedWith(
-        compareByDescending<IndexedValue<QuickPhraseEntry>> { times[it.value] ?: 0L }.thenBy { it.index },
+        compareByDescending<IndexedValue<QuickPhraseEntry>> { times[it.value.unfiled] ?: 0L }.thenBy { it.index },
     ).map { it.value }
 
     /** The user's entries, the last used first. */
@@ -61,7 +85,7 @@ class QuickPhraseBook(
     @Synchronized
     fun use(entry: QuickPhraseEntry, at: Long) {
         if (entry !in entries) return
-        times[entry] = at
+        times[entry.unfiled] = at
         ordered = order()
     }
 
@@ -75,7 +99,7 @@ class QuickPhraseBook(
         if (typed.isEmpty()) return emptyList()
         val lowered = typed.map { set -> set.mapTo(HashSet()) { Character.toLowerCase(it) } }
         val out = ArrayList<Found>()
-        if (withMine) mine.filter { starts(it.key, lowered, ignoreCase = true) }.mapTo(out) { Found(it.key, it.content, true) }
+        if (withMine) mine.filter { starts(it.key, lowered, ignoreCase = true) }.mapTo(out) { Found.of(it) }
         builtInFound(typed).mapTo(out) { Found(it.first, it.second, false) }
         return out
     }
@@ -88,9 +112,13 @@ class QuickPhraseBook(
         return builtIn.populate(prefix.toString())
     }
 
-    /** A match: [mine] one of the user's entries, else a built-in table's. */
-    data class Found(val key: String, val content: String, val mine: Boolean) {
-        val entry get() = QuickPhraseEntry(key, content)
+    /** A match: [mine] one of the user's entries (with its [note] and [folder]), else a built-in table's. */
+    data class Found(val key: String, val content: String, val mine: Boolean, val note: String = "", val folder: String = "") {
+        val entry get() = QuickPhraseEntry(key, content, note, folder)
+
+        companion object {
+            fun of(entry: QuickPhraseEntry) = Found(entry.key, entry.content, true, entry.note, entry.folder)
+        }
     }
 
     companion object {
@@ -102,6 +130,12 @@ class QuickPhraseBook(
 
         /** The longest key: quick input takes at most 30 characters ([QuickPhrase]). */
         const val MAX_KEY = 30
+
+        /** The longest note, in code points: an old key's 30 moved into it fit. */
+        const val MAX_NOTE = 30
+
+        /** The longest folder name, in code points: its chip on the settings page. */
+        const val MAX_FOLDER = 20
 
         /**
          * The longest content, in UTF-16 units: what the page saves and an import takes. One longer
@@ -141,91 +175,231 @@ class QuickPhraseBook(
 }
 
 /**
- * The user's quick phrase files. `mine.mb` is fcitx's `.mb`, a line `key content` each, the content
- * through fcitx's escaping (several lines as `"…\n…"`), so the file is the export and fcitx5 on a
- * computer reads it as it is. `mine.used` is a line `millis<TAB>key<TAB>escaped content` each.
+ * The user's quick phrase files (design 060-quick-input-folders). `mine.mb` is fcitx's `.mb`, a line
+ * `key content` each, the content through fcitx's escaping (several lines as `"…\n…"`), so fcitx5 on
+ * a computer and older builds read it, and the export is the same file:
+ *
+ * ```
+ * #youmo-quickphrase-v2
+ * #wz｜百度 www.baidu.com
+ * ｜地址 "北京市海淀区\n3 号楼"
+ * 【目录】网址
+ * gh https://github.com
+ * ```
+ *
+ * - [HEADER], the version: a line with no whitespace, which fcitx skips. A file without it is
+ *   version 1, of the builds before notes, or a computer's; it reads by the same rule ([split]).
+ * - A line's key is the entry's key, then [NOTE_MARK] and its note when it has one: the computer
+ *   shows `#wz｜百度` beside the content, telling the two `#wz` apart.
+ * - [FOLDER_MARK] and a name: the entries after it are in that folder, those before any in none.
+ *   One with no entries is a line all the same, so a folder is kept empty.
+ *
+ * A note's and a folder's spaces are written as no-break spaces: a line's key ends at its first
+ * ASCII whitespace. `mine.used` is [USED_HEADER], then a line `millis<TAB>key and note<TAB>escaped
+ * content` each, the key and note joined as in `mine.mb`; its times are by entry out of its folder.
  */
 object QuickPhraseFiles {
 
+    /** `mine.mb`'s first line from version 2 on (notes and folders). */
+    const val HEADER = "#youmo-quickphrase-v2"
+
+    /** `mine.used`'s first line from version 2 on. */
+    const val USED_HEADER = "#youmo-quickphrase-used-v2"
+
+    /** Between a line's key and the entry's note. */
+    const val NOTE_MARK = '｜'
+
+    /** A folder's line: this, then its name. */
+    const val FOLDER_MARK = "【目录】"
+
+    private const val NBSP = ' '
+    private const val FIRST_KEY_CHAR = 0x21
+    private const val LAST_KEY_CHAR = 0x7E
+
     private val BOM = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
 
-    /**
-     * The lines of a `.mb` file as entries, in order, lines fcitx skips left out; a UTF-8 BOM at its
-     * start (a file saved by Windows' Notepad) is not part of the first key.
-     */
-    fun parseLines(bytes: ByteArray): List<QuickPhraseEntry> {
-        val text = if (bytes.size >= BOM.size && (BOM.indices).all { bytes[it] == BOM[it] }) bytes.copyOfRange(BOM.size, bytes.size) else bytes
-        return QuickPhraseTable.parse(text).map { (k, v) -> QuickPhraseEntry(k, v) }
-    }
+    /** Whether [c] can be in a key: visible ASCII, what the keyboard types into quick input. */
+    fun keyChar(c: Char): Boolean = c.code in FIRST_KEY_CHAR..LAST_KEY_CHAR
 
     /**
-     * The user's entries of `mine.mb`: [parseLines], each once ([distinct]), none longer than
-     * [QuickPhraseBook.MAX_CONTENT] (only a file made elsewhere has one). What is left out here is
-     * gone from the file at its next write.
+     * A line's key [joined] as an entry's key and note: the key up to its first character that cannot
+     * be in one ([keyChar]), the rest the note. Version 1 (no notes yet): the rest as it is, so
+     * `#wz百度` is `#wz` with 百度, and `地址` no key with 地址. Version 2 ([v2]): the [NOTE_MARK]
+     * written before the note dropped, its no-break spaces spaces again.
      */
-    fun parseMine(bytes: ByteArray): List<QuickPhraseEntry> =
-        distinct(parseLines(bytes).filter { it.content.length <= QuickPhraseBook.MAX_CONTENT })
+    fun split(joined: String, v2: Boolean): Pair<String, String> {
+        val at = joined.indexOfFirst { !keyChar(it) }.let { if (it < 0) joined.length else it }
+        val rest = joined.substring(at)
+        val note = if (v2) unspaced(rest.removePrefix(NOTE_MARK.toString())) else rest
+        return joined.substring(0, at) to note
+    }
+
+    /** [entry]'s key and note as a line's key ([split] of version 2 reads it back). */
+    fun joined(entry: QuickPhraseEntry): String =
+        if (entry.note.isEmpty()) entry.key else entry.key + NOTE_MARK + spaced(entry.note)
+
+    private fun spaced(text: String) = String(CharArray(text.length) { text[it].let { c -> if (c.code < 0x80 && c.isWhitespace()) NBSP else c } })
+
+    private fun unspaced(text: String) = text.replace(NBSP, ' ')
+
+    /** What a `.mb` file holds: its entries in order, each in its folder, its folders in order, and whether it was [v2]. */
+    class Parsed(val entries: List<QuickPhraseEntry>, val folders: List<String>, val v2: Boolean)
+
+    /**
+     * A `.mb` file's [bytes] as entries, lines fcitx skips left out but for [HEADER] and folders; a
+     * UTF-8 BOM at its start (a file saved by Windows' Notepad) is not part of the first key.
+     */
+    fun parse(bytes: ByteArray): Parsed {
+        val text = if (bytes.size >= BOM.size && (BOM.indices).all { bytes[it] == BOM[it] }) bytes.copyOfRange(BOM.size, bytes.size) else bytes
+        val lines = ArrayList<Pair<String, Pair<String, String>>>()
+        val folders = LinkedHashSet<String>()
+        var v2 = false
+        var folder = ""
+        QuickPhraseTable.parse(text, bare = { line ->
+            when {
+                line == HEADER -> v2 = true
+                line.startsWith(FOLDER_MARK) -> {
+                    folder = unspaced(line.substring(FOLDER_MARK.length)).trim()
+                    if (folder.isNotEmpty()) folders += folder
+                }
+            }
+        }) { lines += folder to it }
+        val entries = lines.map { (f, line) ->
+            val (key, note) = split(line.first, v2)
+            QuickPhraseEntry(key, line.second, note, f)
+        }
+        return Parsed(entries, folders.toList(), v2)
+    }
+
+    /** [parse]'s entries alone. */
+    fun parseLines(bytes: ByteArray): List<QuickPhraseEntry> = parse(bytes).entries
+
+    /**
+     * The user's `mine.mb`: [parse], each entry once ([distinct]), none longer than
+     * [QuickPhraseBook.MAX_CONTENT] (only a file made elsewhere has one), grouped by folder. What is
+     * left out here is gone from the file at its next write.
+     */
+    fun readMine(bytes: ByteArray): QuickPhraseMine {
+        val parsed = parse(bytes)
+        return grouped(distinct(parsed.entries.filter { it.content.length <= QuickPhraseBook.MAX_CONTENT }), parsed.folders)
+    }
+
+    /** [readMine]'s entries alone. */
+    fun parseMine(bytes: ByteArray): List<QuickPhraseEntry> = readMine(bytes).entries
 
     /** [entries] each once ([QuickPhraseEntry.sameAs]), the first of each kept. */
     fun distinct(entries: List<QuickPhraseEntry>): List<QuickPhraseEntry> = entries.distinctBy { it.identity }
 
-    /** [entries] as a `.mb` file reads them back ([parseMine]). */
-    fun formatMine(entries: List<QuickPhraseEntry>): String =
-        entries.joinToString("") { "${it.key} ${FcitxUtils.escapeForValue(it.content)}\n" }
+    /**
+     * [entries] grouped as the file keeps them: those in no folder, then each of [folders]' in its
+     * order, each group in the order given; a folder of an entry missing from [folders] added after them.
+     */
+    fun grouped(entries: List<QuickPhraseEntry>, folders: List<String>): QuickPhraseMine {
+        val all = (folders + entries.map { it.folder }).filter { it.isNotEmpty() }.distinct()
+        val rank = all.withIndex().associate { (i, f) -> f to i + 1 }
+        return QuickPhraseMine(entries.sortedBy { rank[it.folder] ?: 0 }, all)
+    }
 
-    /** `mine.used`'s times; a line that does not read is skipped. */
+    /** [entries] and [folders] as a `.mb` file [readMine] reads back, grouped as [grouped] puts them. */
+    fun formatMine(entries: List<QuickPhraseEntry>, folders: List<String> = emptyList()): String {
+        val mine = grouped(entries, folders)
+        val byFolder = mine.entries.groupBy { it.folder }
+        val out = StringBuilder(HEADER).append('\n')
+        byFolder[""]?.forEach { line(out, it) }
+        for (f in mine.folders) {
+            out.append(FOLDER_MARK).append(spaced(f)).append('\n')
+            byFolder[f]?.forEach { line(out, it) }
+        }
+        return out.toString()
+    }
+
+    private fun line(out: StringBuilder, e: QuickPhraseEntry) {
+        out.append(joined(e)).append(' ').append(FcitxUtils.escapeForValue(e.content)).append('\n')
+    }
+
+    /** `mine.used`'s times, by entry out of its folder; a line that does not read is skipped. */
     fun parseUsed(text: String): Map<QuickPhraseEntry, Long> {
         val out = HashMap<QuickPhraseEntry, Long>()
+        val v2 = text.lineSequence().firstOrNull() == USED_HEADER
         for (line in text.lineSequence()) {
             val parts = line.split('\t', limit = 3).takeIf { it.size == 3 }
             val at = parts?.get(0)?.toLongOrNull()
             val content = parts?.get(2)?.let(FcitxUtils::unescapeForValue)
-            if (at != null && content != null) out[QuickPhraseEntry(parts[1], content)] = at
+            if (at != null && content != null) {
+                val (key, note) = split(parts[1], v2)
+                out[QuickPhraseEntry(key, content, note)] = at
+            }
         }
         return out
     }
 
     /** [used] as `mine.used`, only the times of [entries] (one changed or deleted goes). */
     fun formatUsed(used: Map<QuickPhraseEntry, Long>, entries: Collection<QuickPhraseEntry>): String {
-        val kept = entries.toSet()
-        return used.entries.filter { it.key in kept }.sortedBy { it.value }
-            .joinToString("") { "${it.value}\t${it.key.key}\t${FcitxUtils.escapeForValue(it.key.content)}\n" }
+        val kept = entries.mapTo(HashSet()) { it.unfiled }
+        return USED_HEADER + "\n" + used.entries.filter { it.key in kept }.sortedBy { it.value }
+            .joinToString("") { "${it.value}\t${joined(it.key)}\t${FcitxUtils.escapeForValue(it.key.content)}\n" }
     }
 
-    /** Whether [key] can be a key: not empty, no whitespace (a `.mb` line's key ends at the first), at most [QuickPhraseBook.MAX_KEY]. */
-    fun validKey(key: String): Boolean =
-        key.isNotEmpty() && key.none { it.isWhitespace() } && key.codePointCount(0, key.length) <= QuickPhraseBook.MAX_KEY
+    /** Whether [key] can be a key: 1 to [QuickPhraseBook.MAX_KEY] visible ASCII characters ([keyChar]), no space. */
+    fun validKey(key: String): Boolean = key.isNotEmpty() && key.length <= QuickPhraseBook.MAX_KEY && key.all(::keyChar)
+
+    /** Whether [note] can be a note: one line of at most [QuickPhraseBook.MAX_NOTE] characters. */
+    fun validNote(note: String): Boolean = note.codePointCount(0, note.length) <= QuickPhraseBook.MAX_NOTE && note.none { it == '\n' || it == '\r' }
+
+    /** Whether [name] can be a folder's: not blank, one line of at most [QuickPhraseBook.MAX_FOLDER] characters, trimmed. */
+    fun validFolder(name: String): Boolean =
+        name.isNotBlank() && name == name.trim() && name.codePointCount(0, name.length) <= QuickPhraseBook.MAX_FOLDER &&
+            name.none { it == '\n' || it == '\r' }
 
     /**
-     * What [merge] made: [entries] after it, and how many lines it skipped as already there, too long,
-     * or with a key that cannot be one ([validKey]).
+     * What [merge] made: [entries] after it, the [folders], and how many lines it skipped as already
+     * there, too long, or with a key that cannot be one; [keyless] of those added had a key Chinese
+     * from its start, now their note ([QuickPhraseEntry.keyless]).
      */
-    data class Merged(val entries: List<QuickPhraseEntry>, val duplicates: Int, val tooLong: Int, val badKey: Int)
+    data class Merged(
+        val entries: List<QuickPhraseEntry>,
+        val duplicates: Int,
+        val tooLong: Int,
+        val badKey: Int,
+        val folders: List<String> = emptyList(),
+        val keyless: Int = 0,
+    )
 
     /**
-     * [lines] of a `.mb` file ([parseLines]) added after [mine]: the ones whose key is good
-     * ([validKey]), whose content is not longer than [QuickPhraseBook.MAX_CONTENT], and that are not
-     * there already ([QuickPhraseEntry.sameAs]).
+     * [lines] of a `.mb` file ([parse]) added after [mine]: the ones whose key is good ([validKey], or
+     * none, the old key in the note), whose note is ([validNote]), whose content is not longer than
+     * [QuickPhraseBook.MAX_CONTENT], and that are not there already ([QuickPhraseEntry.sameAs]); their
+     * folders after [folders], one of the same name the same folder.
      */
-    fun merge(mine: List<QuickPhraseEntry>, lines: List<QuickPhraseEntry>): Merged {
+    fun merge(
+        mine: List<QuickPhraseEntry>,
+        lines: List<QuickPhraseEntry>,
+        folders: List<String> = emptyList(),
+        newFolders: List<String> = emptyList(),
+    ): Merged {
         val out = ArrayList(mine)
         val seen = mine.mapTo(HashSet()) { it.identity }
         var duplicates = 0
         var tooLong = 0
         var badKey = 0
+        var keyless = 0
         for (e in lines) {
             when {
                 // a line of no content (only a quoted "" gives one) is no line at all, its key whatever
-                // it is. A picture picked for the file never gets here: parseLines drops its lines (no
+                // it is. A picture picked for the file never gets here: parse drops its lines (no
                 // value after a space, or not UTF-8), so it is said as not a 快速输入 file
                 e.content.isEmpty() -> {}
-                !validKey(e.key) -> badKey++
+                !(e.keyless || validKey(e.key)) || !validNote(e.note) -> badKey++
                 e.content.length > QuickPhraseBook.MAX_CONTENT -> tooLong++
                 !seen.add(e.identity) -> duplicates++
-                else -> out += e
+                else -> {
+                    out += e
+                    if (e.keyless) keyless++
+                }
             }
         }
-        return Merged(out, duplicates, tooLong, badKey)
+        val all = (folders + newFolders + out.map { it.folder }).filter { it.isNotEmpty() }.distinct()
+        return Merged(out, duplicates, tooLong, badKey, all, keyless)
     }
 }
 

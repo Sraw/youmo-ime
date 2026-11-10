@@ -50,7 +50,7 @@ interface QuickPhraseHooks {
  * This app's own besides (design 051-quickphrase): the user's entries ([QuickPhraseBook.mine]) listed
  * with nothing typed, the last used first, then ＋添加; a key of several letters (the nine keys', the
  * 14 and 18 keys') any of them ([QuickPhraseKeys]); an entry shown as its first line's start
- * ([QuickPhraseExcerpt]) with its key as the comment, committed whole and as it is (no traditional,
+ * ([QuickPhraseExcerpt]) with its note (else its key) as the comment, committed whole and as it is (no traditional,
  * no full width: [TempModeHost.commitAsIs]); its use kept, but not in a password field.
  *
  * [book] is read once by the caller ([QuickPhraseBook.load]) and replaced with [reload]; it is
@@ -324,7 +324,7 @@ class QuickPhrase(
         val empty = s.buffer.isEmpty()
         val found: List<QuickPhraseBook.Found?> = if (empty) {
             // the whole notebook, then the way to add to it: the built-in tables are thousands, not listed
-            if (withMine) book.mine.map { QuickPhraseBook.Found(it.key, it.content, true) } + null else emptyList()
+            if (withMine) book.mine.map { QuickPhraseBook.Found.of(it) } + null else emptyList()
         } else {
             book.find(s.keys, withMine)
         }
@@ -357,8 +357,9 @@ class QuickPhrase(
                 reset(c)
             }
         }
-        // put in as it is, so shown so too: no traditional of the user's own words
-        return TempCandidate(QuickPhraseExcerpt.of(f.content), { f.key }, asIs = true, select = { c ->
+        // put in as it is, so shown so too: no traditional of the user's own words. Its note beside it
+        // when it has one: the key typed is the same for `#wz` 百度 and `#wz` 新浪, the note tells them apart
+        return TempCandidate(QuickPhraseExcerpt.of(f.content), { f.note.ifEmpty { f.key } }, asIs = true, select = { c ->
             host.commitAsIs(c, f.content)
             // a password field's use is not kept: nothing typed in one leaves a trace
             if (!c.has(Capability.PASSWORD_OR_SENSITIVE)) {
