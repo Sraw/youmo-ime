@@ -84,6 +84,9 @@ class HandwritingRecognition internal constructor(
         }
     }
 
+    /** Whether the reader can read: false once it could not be loaded, for good; on the main thread. */
+    val loadable: Boolean get() = reader.loadable
+
     /** Whether a reading asked for is not handed on yet, or an action held behind one not run; on the main thread. */
     val busy: Boolean get() = pending > 0 || held > 0
 
