@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemePackDialogs
 import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -31,6 +32,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -109,6 +111,25 @@ class ThemePackLayoutsTest {
         File(pack.dir, "layouts/qwerty.xml").appendText("\n")
         repeat(2) { assertEquals(listOf("mine"), ThemeFilesManager.listPacks().map { it.file }.distinct()) }
         assertEquals(1, ThemePackFiles.blankChecks)
+    }
+
+    // a pack bringing a stamp of its own, made as the app makes one, its keys blank: checked all the same, refused
+    @Test
+    fun aPacksOwnStampIsNotTrusted() {
+        val blank = nord.replace("name=\"nord\"", "name=\"forged\"").replace("</theme>", """<style select="key" hidden="true"/></theme>""")
+        val md = MessageDigest.getInstance("SHA-256")
+        md.update("${BlankKeys.RULE}\n$blank".toByteArray())
+        val stamp = md.digest().joinToString("") { "%02x".format(it) }
+        val bytes = ByteArrayOutputStream().also { out ->
+            ZipOutputStream(out).use { zip ->
+                zip.putNextEntry(ZipEntry("theme.xml"))
+                zip.write(blank.encodeToByteArray())
+                zip.putNextEntry(ZipEntry(".checked"))
+                zip.write(stamp.encodeToByteArray())
+            }
+        }.toByteArray()
+        val refused = ThemeFilesManager.openTheme(bytes.inputStream(), ThemeManager.getAllThemes()).exceptionOrNull()
+        assertEquals(appContext.getString(R.string.exception_theme_hidden_required, "qwerty/shift"), refused?.message)
     }
 
     @Test

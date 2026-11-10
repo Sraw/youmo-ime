@@ -141,7 +141,7 @@ object YoumoEngine {
     /**
      * Where [theme] leaves Shift, Backspace, Space or Return blank (BlankKeys, the app's own import check): on the
      * app's boards, each replaced by one of [layouts] (`{"<id>.xml": xml}`, a pack's `layouts/`) of its id. The first
-     * found, as text (`qwerty/enter @flat`), none: an empty array. A layout of [layouts] that does not read is left
+     * found, as text (`qwerty/enter @flat`), none: an empty array; too many scenes to try: `["*"]`. A layout of [layouts] that does not read is left
      * out (readLayout says why).
      */
     fun blankKeys(theme: YoumoTheme, layouts: dynamic): Array<String> = run {
@@ -151,7 +151,8 @@ object YoumoEngine {
         val ownBoards = own.values.mapNotNull { LayoutReader.layout(it).orNull() }
         val boards = builtIns.layouts.filter { id -> ownBoards.none { it.id == id } }.mapNotNull { builtIns.layout(it)?.orNull() } + ownBoards
         val withFragments = boards.mapNotNull { l -> builtIns.includes(l, fragments).orNull()?.let { BlankKeys.Board(l, it) } }
-        BlankKeys.find(theme.theme, withFragments).map { it.toString() }.toTypedArray()
+        // too many to try: its code, "*", the page says what it means
+        BlankKeys.find(theme.theme, withFragments).map { if (it == BlankKeys.TOO_MANY) "*" else it.toString() }.toTypedArray()
     }
 
     /** The app's boards' ids (`qwerty`, `nine`…). */

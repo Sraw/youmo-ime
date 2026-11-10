@@ -129,7 +129,7 @@
     const layouts = Object.create(null);
     for (const [n, t] of Object.entries(d.layouts)) layouts[n] = t;
     for (const where of E.blankKeys(read.theme, layouts)) {
-      if (where.startsWith('too many')) bad('键的样式用的场景组合太多，没法逐一检查 Shift、退格、空格和回车会不会成空白键（App 会拒收）');
+      if (where === '*') bad('键的样式用的场景组合太多，没法逐一检查 Shift、退格、空格和回车会不会成空白键（App 会拒收）');
       else bad(where + '：字藏了，键面又不是图片——Shift、退格、空格或回车会是空白键');
     }
     let total = 0;

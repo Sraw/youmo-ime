@@ -128,7 +128,14 @@ class ThemePackCheckTest {
         // too many to try: refused as such, not let through
         val scenes = (1..10).flatMap { listOf("im=s$it", "keyboard=k$it") } + listOf("dark", "flat", "compact", "landscape")
         val many = scenes.joinToString("") { """<style select="@$it */comma" fill="#ff000000"/>""" }
+        val start = System.nanoTime()
         assertEquals(listOf(BlankKeys.TOO_MANY), ThemePackCheck.hidesRequired(theme(styles = many), boards))
+        // and soon: the sets counted as they are made, not all made first; nor many values of one scene
+        val many2 = (1..120).joinToString("") { """<style select="@im=x$it */comma" fill="#ff000000"/>""" } +
+            (1..40).joinToString("") { """<style select="@keyboard=k$it */comma" fill="#ff000000"/>""" }
+        assertEquals(listOf(BlankKeys.TOO_MANY), ThemePackCheck.hidesRequired(theme(styles = many2), boards))
+        val ms = (System.nanoTime() - start) / 1_000_000
+        assertTrue("$ms ms", ms < CHECK_BUDGET_MS)
     }
 
     // the worst a pack can ask short of being refused: the largest built-in theme, its key styles naming scenes

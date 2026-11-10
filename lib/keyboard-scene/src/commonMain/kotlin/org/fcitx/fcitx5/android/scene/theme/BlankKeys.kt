@@ -63,9 +63,9 @@ object BlankKeys {
     fun find(theme: Theme, boards: List<Board>, limit: Int = 1): List<Blank> {
         val deciding = theme.styles.filter { "fill" in it.values || "hidden" in it.values }
             .flatMap { it.selectors }.filter { it.widget == "key" }
-        val sceneSets = unions(deciding.map { it.scenes }.toSet()).filter(::possible)
-        if (sceneSets.size > MAX_SCENE_SETS) return listOf(TOO_MANY)
+        val sceneSets = unions(deciding.map { it.scenes }.toSet(), ::possible) ?: return listOf(TOO_MANY)
         val stateSets = unions(deciding.map { sel -> sel.states.mapNotNullTo(HashSet()) { KeyState.of(it) } - KeyState.Pressed }.toSet())
+            ?: return listOf(TOO_MANY)
         // the versions share their styles (only colours differ): one is asked
         val cascades = Cascades(theme)
         val out = ArrayList<Blank>()
@@ -81,11 +81,25 @@ object BlankKeys {
         return out
     }
 
-    // every union of at most DECIDING of [sets], the empty one first
-    private fun <T> unions(sets: Set<Set<T>>): List<Set<T>> {
-        val each = sets.filter { it.isNotEmpty() }
-        var out = linkedSetOf(emptySet<T>())
-        repeat(DECIDING) { out = (out + out.flatMap { u -> each.map { u + it } }).toCollection(LinkedHashSet()) }
+    // every union of at most DECIDING of [sets] that is [possible], the empty one first; null past MAX_SCENE_SETS,
+    // found as they are made (a theme of many scenes stops here, not after making them all)
+    private fun <T> unions(sets: Set<Set<T>>, possible: (Set<T>) -> Boolean = { true }): List<Set<T>>? {
+        val each = sets.filter { it.isNotEmpty() && possible(it) }
+        val out = linkedSetOf(emptySet<T>())
+        var last: List<Set<T>> = listOf(emptySet())
+        repeat(DECIDING) {
+            val next = ArrayList<Set<T>>()
+            for (u in last) {
+                for (s in each) {
+                    val v = u + s
+                    if (possible(v) && out.add(v)) {
+                        next += v
+                        if (out.size > MAX_SCENE_SETS) return null
+                    }
+                }
+            }
+            last = next
+        }
         return out.toList()
     }
 

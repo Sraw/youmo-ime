@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.data.theme
 
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
-import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.input.theme.SvgSubset
@@ -280,10 +279,14 @@ object ThemePackFiles {
         }
     }
 
-    /** The folders a zip's entry [name] (a directory's ending in `/`) may be unpacked into: its top, and `layouts/`'s files. */
+    /**
+     * The folders a zip's entry [name] (a directory's ending in `/`) may be unpacked into: its top, and `layouts/`'s
+     * files; a dot file never (the app's own, [CHECKED], is written by its check alone).
+     */
     fun unpacked(name: String): Boolean {
         val parts = name.split('/')
         return when {
+            parts.last().startsWith(".") -> false
             parts.size == 1 -> true
             parts.size == 2 && parts[0] == LAYOUTS -> true
             else -> false
@@ -351,7 +354,7 @@ object ThemePackFiles {
         val source = xml.readText().removePrefix(BOM)
         val read = readChecked(source, checks)
         val theme = read.value
-        blankKeys(from, theme, source, lazy { builtInBoards() }).firstOrNull()?.let {
+        blankKeys(from, theme, source, lazy { builtInBoards() }, trustStamp = false).firstOrNull()?.let {
             if (it == BlankKeys.TOO_MANY) errorRuntime(R.string.exception_theme_too_many_scenes)
             errorRuntime(R.string.exception_theme_hidden_required, it.toString())
         }
@@ -432,13 +435,21 @@ object ThemePackFiles {
 
     /**
      * [ThemePackCheck.hidesRequired] of the pack in [dir], asked once: a pack that passes is stamped ([CHECKED]: a
-     * hash of its theme.xml, its layouts, the rule's version and this build's), and a listing finds the stamp
+     * hash of its theme.xml, its layouts and the rule's version: an app update checks again only where the rule changed), and a listing finds the stamp
      * instead of asking again (the check takes a good part of a second; a listing may hold 100 packs).
      */
-    private fun blankKeys(dir: File, theme: SceneTheme, source: String, builtIn: Lazy<List<SceneLayout>>): List<BlankKeys.Blank> {
+    private fun blankKeys(
+        dir: File,
+        theme: SceneTheme,
+        source: String,
+        builtIn: Lazy<List<SceneLayout>>,
+        trustStamp: Boolean = true,
+    ): List<BlankKeys.Blank> {
         val stamp = File(dir, CHECKED)
         val want = stampOf(dir, source)
-        if (stamp.isFile && stamp.readText() == want) return emptyList()
+        // an import asks always: a stamp is the app's word, never a pack's
+        if (trustStamp && stamp.isFile && stamp.readText() == want) return emptyList()
+        stamp.delete()
         blankChecks++
         val found = ThemePackCheck.hidesRequired(theme, boards(dir, builtIn.value))
         if (found.isEmpty()) runCatching { stamp.writeText(want) }.onFailure { Timber.w(it, "cannot stamp ${dir.name}") }
@@ -447,7 +458,7 @@ object ThemePackFiles {
 
     private fun stampOf(dir: File, source: String): String {
         val md = MessageDigest.getInstance("SHA-256")
-        md.update("${BlankKeys.RULE} ${BuildConfig.VERSION_CODE}\n${source.removePrefix(BOM)}".toByteArray())
+        md.update("${BlankKeys.RULE}\n${source.removePrefix(BOM)}".toByteArray())
         File(dir, LAYOUTS).listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }.forEach {
             md.update("\n${it.name}\n".toByteArray())
             md.update(it.readBytes())
