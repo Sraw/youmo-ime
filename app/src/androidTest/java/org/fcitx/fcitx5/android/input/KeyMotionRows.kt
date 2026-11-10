@@ -34,9 +34,11 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
     val advanced = AppPrefs.getInstance().advanced
     val motionWas = advanced.keyboardMotion.getValue()
     if (themeWas == null) themeWas = ThemeManager.prefs.normalModeTheme.getValue()
-    val moving = onMain { movingTheme(service.resources) }
-    themesMade += moving.name
-    theme(moving)
+    // the same pack with no motion styles: what motion adds is measured against it, not against a built-in theme
+    val still = onMain { pack(service.resources, STILL, emptyList()) }
+    val moving = onMain { pack(service.resources, MOVING, MOTION) }
+    themesMade += listOf(still.name, moving.name)
+    theme(still)
     fresh()
     val letters = "nihaoshiji"
     val at = (letters.toSet() + 'a').associateWith { keyAt(onKeyboard().text("$it")) }
@@ -69,9 +71,8 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
         log("anim\t$label, idle after\tframes in 2 s ${Stats(after)} (median / p90)\tmax ${after.maxOrNull()?.toInt()}")
     }
 
-    try {
-        onMain { advanced.keyboardMotion.setValue(true) }
-        // a key pressed alone: its press's frame (the pressed face whole at once), then let go to fade
+    // a key pressed alone: its press's frame (the pressed face whole at once), then let go (to fade)
+    fun single(label: String) {
         val made = made()
         val single = mutableListOf<KeyboardFrames.Sample>()
         repeat(warmUp + runs) { i ->
@@ -79,9 +80,19 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
             endTyping(space)
             if (i >= warmUp) single += one
         }
-        row("anim", "press scale, single key", single, "animators ${made() - made}")
+        row("anim", "$label, single key", single, "animators ${made() - made}")
+    }
+
+    try {
+        onMain { advanced.keyboardMotion.setValue(true) }
+        single("pack without motion")
+        runs("pack without motion")
+        shiftRows("pack without motion")
+        theme(moving)
+        fresh()
+        single("press scale")
         runs("release fade")
-        shiftRows()
+        shiftRows("shift transition")
         onMain { advanced.keyboardMotion.setValue(false) }
         runs("switch off")
         onMain { advanced.keyboardMotion.setValue(true) }
@@ -103,7 +114,7 @@ internal fun KeyboardPerfBaselineTest.motionRows() {
 }
 
 // Shift tapped on and off on the moving theme: the tap's frame, then every frame of the crossfade
-private fun KeyboardPerfBaselineTest.shiftRows() {
+private fun KeyboardPerfBaselineTest.shiftRows(label: String) {
     val shift = keyAt(onKeyboard().res(KeyboardPerfBaselineTest.imePkg, "button_caps"))
     val taps = mutableListOf<KeyboardFrames.Sample>()
     val all = mutableListOf<KeyboardFrames.Frame>()
@@ -118,21 +129,22 @@ private fun KeyboardPerfBaselineTest.shiftRows() {
             }
         }
     }
-    row("anim", "shift transition, tap", taps)
-    log("anim\tshift transition, every frame\t${frames.summary(all)}")
+    row("anim", "$label, shift tap", taps)
+    log("anim\t$label, shift, every frame\t${frames.summary(all)}")
 }
 
 private const val MOVING = "perf-moving"
+private const val STILL = "perf-still"
+private val MOTION = listOf(
+    "<style select=\"key\" transition=\"150ms ease-out\"/>",
+    "<style select=\"key:pressed\" transition=\"60ms linear\" press-scale=\"90%\" press-sink=\"2dp\"/>",
+    "<style select=\"key:shifted, key:locked\" transition=\"200ms ease-in-out\"/>",
+)
 
-// a user's pack with motion (none of the built-in themes has any): material's file under a name of its own
-private fun movingTheme(resources: Resources): Theme {
-    val styles = listOf(
-        "<style select=\"key\" transition=\"150ms ease-out\"/>",
-        "<style select=\"key:pressed\" transition=\"60ms linear\" press-scale=\"90%\" press-sink=\"2dp\"/>",
-        "<style select=\"key:shifted, key:locked\" transition=\"200ms ease-in-out\"/>",
-    )
+// a user's pack (motion is never a built-in theme's): material's file under [name], [styles] put last
+private fun pack(resources: Resources, name: String, styles: List<String>): Theme {
     val text = BuiltinThemeFiles.text(resources, R.raw.scene_theme_material)
-        .replace("name=\"material\"", "name=\"$MOVING\"")
+        .replace("name=\"material\"", "name=\"$name\"")
         .replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>"))
     val zip = ByteArrayOutputStream().also { bytes ->
         ZipOutputStream(bytes).use {
