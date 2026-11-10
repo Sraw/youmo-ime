@@ -32,7 +32,23 @@ object KeyMotionSwitch {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             powerSave = context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
+            changes.toList().forEach { it() }
         }
+    }
+
+    // what plays on its own till told to stop (A4's animated picture), told of battery saver as it changes;
+    // the main thread's (the broadcast's and the views')
+    private val changes = ArrayList<() -> Unit>()
+
+    /** [f] called as battery saver turns on or off, till [unlisten]: what keys read at a press, a picture playing must be told. */
+    fun listen(context: Context, f: () -> Unit) {
+        val app = context.applicationContext
+        if (watching !== app) watch(app)
+        changes.add(f)
+    }
+
+    fun unlisten(f: () -> Unit) {
+        changes.remove(f)
     }
 
     fun on(context: Context): Boolean {

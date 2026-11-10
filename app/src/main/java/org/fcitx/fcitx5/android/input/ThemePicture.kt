@@ -16,8 +16,10 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.util.SparseArray
 import android.view.View
+import android.view.ViewGroup
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.theme.PictureWindow
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.scene.look.BoardBase
@@ -29,8 +31,43 @@ import java.lang.ref.WeakReference
  * The theme's picture under a keyboard: laid over [base] (the view under the whole keyboard) as
  * CENTER_CROP lays it, so a view anywhere over it — a key, the bar — shows the part under it, as
  * the theme maker draws it ([PictureWindow]). Found by the views over it through [host]'s tag.
+ * [animated]: the base plays the picture (060-render-p3 A4, [AnimatedBoardDrawable], given by [play] once
+ * decoded); a view showing it is see-through then, only darkened to its brightness ([seeThrough]), never blurred.
  */
 class PictureHost(private val look: ThemeLook, val base: View, private val landscape: Boolean) {
+
+    var animated: AnimatedBoardDrawable? = null
+        private set
+
+    /**
+     * [frames] played under the keyboard from now on: the views showing the picture under [base]'s parent
+     * drawn again see-through (the keys' canvas recorded again, on a layer of its own: the frames under it
+     * change, not the keys).
+     */
+    fun play(frames: AnimatedBoardDrawable) {
+        animated = frames
+        (base as? PictureBaseView)?.play(frames) ?: run { base.background = frames }
+        (base.parent as? ViewGroup)?.let { redraw(it) }
+    }
+
+    private fun redraw(view: View) {
+        if (view is KeyboardCanvasView) view.pictureChanged() else view.invalidate()
+        if (view is ViewGroup) for (i in 0 until view.childCount) redraw(view.getChildAt(i))
+    }
+
+    private val dark = Paint()
+
+    /**
+     * Over an [animated] base: the paint that makes a view showing the picture at [brightness] (in its
+     * coordinates, the base under it showing through), null where nothing is to be drawn over it.
+     */
+    fun seeThrough(brightness: Int): Paint? {
+        val board = animated?.brightness ?: return null
+        val darken = PictureWindow.seeThroughDarken(board, brightness)
+        if (darken == 0) return null
+        dark.color = android.graphics.Color.argb(darken * 255 / 100, 0, 0, 0)
+        return dark
+    }
 
     // a blur's picture as laid over the base at its size: asked of ThemeAssets once, not each key a frame;
     // asked again once the files were let go as changed (a theme imported again under its name, its
@@ -189,7 +226,17 @@ class ThemePictureDrawable(
 
     override fun draw(canvas: Canvas) {
         val view = callback as? View
-        val p = view?.let { v -> PictureHost.of(v)?.paint(v, blurDp, brightness, picture) }
+        val host = view?.let { PictureHost.of(it) }
+        if (host?.animated != null) {
+            // see-through to the picture playing under it
+            host.seeThrough(brightness)?.let { canvas.drawRect(bounds, it) }
+            if (over ushr 24 != 0) {
+                solid.color = over
+                canvas.drawRect(bounds, solid)
+            }
+            return
+        }
+        val p = view?.let { v -> host?.paint(v, blurDp, brightness, picture) }
         if (p == null) {
             solid.color = fallback
             canvas.drawRect(bounds, solid)
@@ -210,7 +257,10 @@ class ThemePictureDrawable(
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 
     companion object {
-        /** Under [look]'s keyboard: its picture as cut for it, or the colour ([ThemeColors.board]). */
+        /**
+         * Under [look]'s keyboard: its picture as cut for it, or the colour ([ThemeColors.board]); an
+         * animated one its still picture till its frames are decoded ([PictureHost.play]).
+         */
         fun board(look: ThemeLook): Drawable {
             val color = ThemeColors.board(look.palette, look.keys)
             val p = look.picture

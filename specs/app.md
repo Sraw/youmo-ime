@@ -138,6 +138,22 @@ now, asked at each press of a key that has motion: 键盘动效 (`AppPrefs.advan
 off, battery saver off (kept from `ACTION_POWER_SAVE_MODE_CHANGED`, not asked of `PowerManager` on a keystroke) and
 `ValueAnimator.areAnimatorsEnabled()`; not, or a theme without motion (every built-in one), no `Moving` and no animator
 is made and the keys draw as before. Detached or its window hidden (the keyboard hidden keeps the view attached), every animation stops; a key's motion not carried into a new scene stops too. `KeyMotionTest`.
+A theme 4.0's animated `<picture animated="true">` (A4, `input/AnimatedPicture.kt`): InputView's base is a
+`PictureBaseView` whose background is the still picture till `AnimatedBoardDrawable.later` has read the file once
+(`ThemeAssetLimits.animated(File)`: the header walk bounded, a padded file refused) and decoded it by `ImageDecoder`, off
+the main thread, sized to the board, into an `AnimatedImageDrawable` (RenderThread steps its frames: no main-thread
+frame); `PictureHost.play` then puts it under the keyboard, the views showing the picture drawn again see-through and
+the keys' canvas on a hardware layer. It is laid as `PictureWindow.centerCrop` lays
+it (the `src`, not a cut: the cuts are its still picture), black over it at the picture's brightness, never blurred. It
+plays only while the view is shown (`onVisibilityAggregated`: the window hidden, the view detached as a theme changes,
+it stops) and `KeyMotionSwitch.on` (键盘动效, 禁用动画, battery saver, the system's animations); the prefs and battery
+saver turned while shown (`KeyMotionSwitch.listen`) stop or start it at once. A key, the bar or anything else showing the
+picture (`Op.Picture`, `ThemePictureDrawable`) over it draws no picture of its own: see-through, only black over it to
+take it from the board's brightness to its own (`PictureWindow.seeThroughDarken`; never lighter). One past
+`ThemeAssetLimits`' animated limits (4 MB, 1440 px a side, 300 frames, a frame under 50 ms; read from its chunk heads,
+`AnimatedWebp`), or not decoded as an animation, is drawn as a still picture (its cuts, as any picture), a warning as the
+pack is imported (`theme_pack_animated_still`). Elsewhere (the settings' preview, thumbnails, the voice glass, the
+floating code strip) it is still. `AnimatedPictureTest`.
 
 A theme's popups move too (060-render-p3 A2), asked of the engine (`SceneBuilder.popupMotion`, a `PopupMotion`):
 `appear` on `popup`, `preview` or `menu` (`fade`, `scale` from 60% or `rise` 12dp, each faded in, 0–250 ms, the

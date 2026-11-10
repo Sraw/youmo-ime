@@ -341,6 +341,15 @@ class KeyboardCanvasView(
         return true
     }
 
+    /**
+     * The picture under it now played (060-render-p3 A4): what shows it recorded again see-through, and the
+     * keys on a hardware layer, so each frame under them composites one texture, not every key's node again.
+     */
+    fun pictureChanged() {
+        setLayerType(LAYER_TYPE_HARDWARE, null)
+        dropPictures()
+    }
+
     // what shows the picture recorded again, where it is now (the frame about to be drawn draws it)
     private fun dropPictures() {
         var any = false

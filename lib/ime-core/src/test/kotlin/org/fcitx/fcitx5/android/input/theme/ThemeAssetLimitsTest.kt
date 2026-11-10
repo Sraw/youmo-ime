@@ -10,7 +10,9 @@ import org.fcitx.fcitx5.android.scene.look.KeyOverride
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
 
 class ThemeAssetLimitsTest {
 
@@ -55,5 +57,78 @@ class ThemeAssetLimitsTest {
         assertEquals(ThemeAssetLimits.Breach.PreviewSide, l.preview(2049, 10, 1))
         assertNull(l.icon(l.MAX_ICON_BYTES))
         assertEquals(ThemeAssetLimits.Breach.IconSize, l.icon(l.MAX_ICON_BYTES + 1))
+    }
+
+    // an animated WebP's head as a file has it: RIFF, VP8X (animation flag), ANIM, its frames (each a few bytes of data)
+    private fun webp(w: Int, h: Int, durations: List<Int>, animated: Boolean = true, oddData: Boolean = false, junk: Int = 0, vp8xLate: Boolean = false): ByteArray {
+        val out = ByteArrayOutputStream()
+        fun le(o: ByteArrayOutputStream, v: Int, n: Int) = repeat(n) { o.write((v shr (8 * it)) and 0xff) }
+        fun chunk(tag: String, data: ByteArray) {
+            out.write(tag.toByteArray())
+            le(out, data.size, 4)
+            out.write(data)
+            if (data.size % 2 == 1) out.write(0)
+        }
+        fun bytes(f: (ByteArrayOutputStream) -> Unit) = ByteArrayOutputStream().also(f).toByteArray()
+        out.write("RIFF".toByteArray())
+        le(out, 0, 4)
+        out.write("WEBP".toByteArray())
+        if (vp8xLate) chunk("ICCP", ByteArray(2))
+        chunk("VP8X", bytes { o -> o.write(if (animated) 0x02 else 0); le(o, 0, 3); le(o, w - 1, 3); le(o, h - 1, 3) })
+        chunk("ANIM", ByteArray(6))
+        // empty chunks of no known kind, which libwebp passes over
+        repeat(junk) { chunk("JUNK", ByteArray(0)) }
+        durations.forEach { d ->
+            chunk("ANMF", bytes { o -> le(o, 0, 6); le(o, w - 1, 3); le(o, h - 1, 3); le(o, d, 3); o.write(0); o.write(ByteArray(if (oddData) 5 else 4)) })
+        }
+        return out.toByteArray().also { b ->
+            val size = b.size - 8
+            repeat(4) { b[4 + it] = (size shr (8 * it)).toByte() }
+        }
+    }
+
+    @Test
+    fun anAnimatedWebpsHeadIsReadWithoutItsFrames() {
+        val h = AnimatedWebp.header(webp(1080, 720, listOf(40, 33, 50), oddData = true))!!
+        assertEquals(1080, h.width)
+        assertEquals(720, h.height)
+        assertEquals(3, h.frames)
+        assertEquals(33, h.shortestFrameMs)
+        // a still WebP, no frame, not a WebP, cut short: none
+        assertNull(AnimatedWebp.header(webp(10, 10, listOf(40), animated = false)))
+        assertNull(AnimatedWebp.header(webp(10, 10, emptyList())))
+        assertNull(AnimatedWebp.header("GIF89a......".toByteArray()))
+        assertNull(AnimatedWebp.header(webp(10, 10, listOf(40)).copyOf(20)))
+        // counting stops past the limit asked
+        assertEquals(3, AnimatedWebp.header(webp(10, 10, List(50) { 40 }), maxFrames = 2)!!.frames)
+        // VP8X not first, as libwebp refuses it
+        assertNull(AnimatedWebp.header(webp(10, 10, listOf(40), vp8xLate = true)))
+    }
+
+    @Test
+    fun aFilePaddedWithChunksIsRefusedWithoutWalkingThemAll() {
+        val l = ThemeAssetLimits
+        // a few unknown chunks pass; 4 MB of empty ones (half a million) are not walked one by one
+        assertNull(l.animated(10, AnimatedWebp.header(webp(10, 10, listOf(50), junk = 8), l.MAX_ANIMATED_FRAMES)))
+        val padded = webp(10, 10, listOf(50), junk = (l.MAX_ANIMATED_BYTES / 8 - 1000).toInt())
+        val file = java.io.File.createTempFile("padded", ".webp").apply { deleteOnExit(); writeBytes(padded) }
+        val start = System.nanoTime()
+        assertEquals(ThemeAssetLimits.Still.Unread, l.animated(file))
+        assertTrue("a padded file read and refused at once", (System.nanoTime() - start) / 1_000_000 < 200)
+        val big = java.io.File.createTempFile("big", ".webp").apply { deleteOnExit(); writeBytes(ByteArray(l.MAX_ANIMATED_BYTES.toInt() + 1)) }
+        assertEquals(ThemeAssetLimits.Still.Size, l.animated(big))
+    }
+
+    @Test
+    fun anAnimatedPicturePastItsLimitsIsDrawnStill() {
+        val l = ThemeAssetLimits
+        fun of(w: Int, h: Int, frames: Int, ms: Int) = AnimatedWebp.header(webp(w, h, List(frames) { ms }))
+        assertNull(l.animated(l.MAX_ANIMATED_BYTES, of(1440, 1080, 300, 50)))
+        assertEquals(ThemeAssetLimits.Still.Size, l.animated(l.MAX_ANIMATED_BYTES + 1, of(10, 10, 1, 40)))
+        assertEquals(ThemeAssetLimits.Still.Unread, l.animated(10, null))
+        assertEquals(ThemeAssetLimits.Still.Side, l.animated(10, of(10, 1441, 1, 40)))
+        assertEquals(ThemeAssetLimits.Still.Frames, l.animated(10, of(10, 10, 301, 50)))
+        assertEquals(ThemeAssetLimits.Still.FrameRate, l.animated(10, of(10, 10, 2, 49)))
+        assertEquals(ThemeAssetLimits.Still.FrameRate, l.animated(10, of(10, 10, 2, 0)))
     }
 }

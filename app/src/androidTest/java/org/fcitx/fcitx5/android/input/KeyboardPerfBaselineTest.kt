@@ -115,7 +115,8 @@ class KeyboardPerfBaselineTest {
             if ("popup" in only) popupSlide()
             if ("rebuild" in only) rebuilds()
             if ("anim" in only || "idle" in only) idleRows()
-            if ("anim" in only) motionRows()
+            // A4's rows after A1's (PictureRows); perfOnly=anim,soak: the animated picture played 10 minutes instead
+            if ("anim" in only) motionRows().also { pictureRows(soak = "soak" in only) }
             // the §4.3 rows that need motion in the engine (A2-A4): told, not measured
             if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return
@@ -135,7 +136,7 @@ class KeyboardPerfBaselineTest {
         shiftWithLowerFaces()
         popupSlide()
         idleRows()
-        motionRows()
+        motionRows().also { pictureRows(soak = false) }
         hideKeyboard()
         memory("after the runs (handwriting's models loaded), hidden")
         showKeyboard()
@@ -734,15 +735,15 @@ class KeyboardPerfBaselineTest {
 
     // ---- 4. memory
 
-    private fun memory(label: String) = log(memoryLine(label, ::shell))
+    internal fun memory(label: String) = log(memoryLine(label, ::shell))
 
-    private fun hideKeyboard() {
+    internal fun hideKeyboard() {
         scenario.onActivity { context.inputMethodManager.hideSoftInputFromWindow(it.field.windowToken, 0) }
         device.wait(Until.gone(By.pkg(imePkg).res(imePkg, "keyboard_view")), 5_000)
         settle()
     }
 
-    private fun showKeyboard() {
+    internal fun showKeyboard() {
         scenario.onActivity {
             it.field.requestFocus()
             context.inputMethodManager.showSoftInput(it.field, 0)

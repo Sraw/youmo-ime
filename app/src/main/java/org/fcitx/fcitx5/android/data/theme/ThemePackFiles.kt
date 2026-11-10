@@ -140,7 +140,7 @@ object ThemePackFiles {
             val portrait = p.cuts["portrait"] ?: p.cuts.getValue("landscape")
             Picture(
                 path(p.src), Crop(path(portrait), null, 0), p.cuts["landscape"]?.let { Crop(path(it), null, 0) },
-                p.brightness.toInt().coerceIn(0, PERCENT), p.blurDp.toInt().coerceIn(0, MAX_BLUR),
+                p.brightness.toInt().coerceIn(0, PERCENT), p.blurDp.toInt().coerceIn(0, MAX_BLUR), p.animated,
             )
         }
         fun font(widget: String) = (plain(scene, widget, "font") as? Value.Word)?.word?.let { scene.fonts[it] }?.let(::path)
@@ -169,7 +169,7 @@ object ThemePackFiles {
             null -> ((v as? Value.OfFill)?.fill as? Fill.Image)?.let { Value.OfFill(it.copy(file = path(it.file))) } ?: v
         }
         val styles = scene.styles.map { s -> Style(s.selectors, s.values.mapValues { (_, v) -> value(v) }, s.order, s.line) }
-        val picture = scene.picture?.let { p -> ScenePicture(path(p.src), p.brightness, p.blurDp, p.cuts.mapValues { path(it.value) }) }
+        val picture = scene.picture?.let { p -> ScenePicture(path(p.src), p.brightness, p.blurDp, p.cuts.mapValues { path(it.value) }, p.animated) }
         return SceneTheme(
             scene.name, scene.dark, scene.version, scene.colors, styles, scene.fonts.mapValues { path(it.value) },
             scene.icons.mapValues { path(it.value) }, picture, scene.variants, scene.baseColors, scene.darkColors, scene.meta, scene.systemColors,
@@ -353,6 +353,8 @@ object ThemePackFiles {
         val refused: (ThemeAssetLimits.Breach) -> Nothing,
         val appVersion: String?,
         val lowContrast: (List<Boolean>) -> String?,
+        // an animated picture drawn still (A4): not refused, said
+        val animatedStill: () -> String = { "animated picture drawn still" },
     )
 
     /**
@@ -378,7 +380,11 @@ object ThemePackFiles {
         val files = ThemePackCheck.files(theme)
         checkFiles(from, files, checks)
         val layouts = checkLayouts(File(from, LAYOUTS), checks)
-        val warnings = read.warnings.map { it.toString() } + listOfNotNull(checks.lowContrast(ThemePackCheck.lowContrast(theme)))
+        val still = theme.picture?.takeIf { it.animated }?.let { p ->
+            ThemeAssetLimits.animated(File(from, p.src))
+        }
+        val warnings = read.warnings.map { it.toString() } +
+            listOfNotNull(checks.lowContrast(ThemePackCheck.lowContrast(theme)), still?.let { checks.animatedStill() })
         val report = ThemePackLayouts.report(File(from, LAYOUTS), layouts, { SceneLayouts.parseBuiltIn(appContext, it) }, BuiltInLayouts(appContext)::text)
         return Staged(theme, source, from, files.all, layouts, report, warnings, files.preview?.let { File(from, it) })
     }

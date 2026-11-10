@@ -264,6 +264,11 @@ class ScenePainter(
         val blur = op.blurDp?.roundToInt() ?: p.blurDp
         val brightness = op.brightness?.roundToInt() ?: p.brightness
         val host = PictureHost.of(view) ?: return
+        if (host.animated != null) {
+            // see-through to the picture playing under the keys, darkened alone: no frame blurred (A4)
+            host.seeThrough(brightness)?.let { canvas.drawPath(pathOf(op.shape), it) }
+            return
+        }
         val paint = host.paint(view, blur, brightness, picture)
         if (paint == null) {
             // drawn as nothing till it is in (the host draws the view again then); none that reads, nothing

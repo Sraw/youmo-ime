@@ -608,14 +608,24 @@ object ThemeFilesManager {
         }
 
     private val packChecks
-        get() = ThemePackFiles.Checks(probe, ::refused, BuildConfig.VERSION_NAME) { low ->
-            if (low.isEmpty()) {
-                null
-            } else {
-                val versions = low.joinToString("、") { appContext.getString(if (it) R.string.theme_pack_dark else R.string.theme_pack_light) }
-                appContext.getString(R.string.theme_pack_low_contrast, versions)
-            }
-        }
+        get() = ThemePackFiles.Checks(
+            probe, ::refused, BuildConfig.VERSION_NAME,
+            lowContrast = { low ->
+                if (low.isEmpty()) {
+                    null
+                } else {
+                    val versions = low.joinToString("、") { appContext.getString(if (it) R.string.theme_pack_dark else R.string.theme_pack_light) }
+                    appContext.getString(R.string.theme_pack_low_contrast, versions)
+                }
+            },
+            animatedStill = {
+                val l = ThemeAssetLimits
+                appContext.getString(
+                    R.string.theme_pack_animated_still, (l.MAX_ANIMATED_BYTES / MB).toString(), l.MAX_ANIMATED_SIDE.toString(),
+                    l.MAX_ANIMATED_FRAMES.toString(), (MS_A_SECOND / l.MIN_ANIMATED_FRAME_MS).toString(),
+                )
+            },
+        )
 
     /**
      * A pack named as a built-in theme is ([ThemePackFiles.builtinClash]: the settings name one theme by it). One
@@ -777,6 +787,7 @@ object ThemeFilesManager {
 
     private const val MB = 1024L * 1024
     private const val KB = 1024L
+    private const val MS_A_SECOND = 1000
 
 }
 

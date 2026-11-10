@@ -58,7 +58,7 @@ object ThemeWriter {
             appendLine("  </colors>")
         }
         theme.picture?.let { p ->
-            appendLine("""  <picture src="${escape(p.src)}" brightness="${number(p.brightness)}%" blur="${length(p.blurDp)}">""")
+            appendLine("""  <picture src="${escape(p.src)}" brightness="${number(p.brightness)}%" blur="${length(p.blurDp)}"${if (p.animated) " animated=\"true\"" else ""}>""")
             // portrait first: the two orientations the reader takes, then any other it would refuse anyway
             p.cuts.entries.sortedBy { (o, _) -> CUTS.indexOf(o).takeIf { it >= 0 } ?: CUTS.size }.forEach { (o, file) ->
                 appendLine("""    <cut orientation="${escape(o)}" file="${escape(file)}"/>""")

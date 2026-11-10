@@ -105,6 +105,13 @@
         else if (!r.ok) bad(file + '：' + r.problems[0].message);
       }
     }
+    // an animated <picture> (060-render-p3 A4): past the app's limits it is drawn still, with a warning on import
+    const anim = /<picture\b[^>]*?\banimated="true"[^>]*>/.exec(xml);
+    const animSrc = anim && /\bsrc="([^"]+)"/.exec(anim[0]);
+    if (animSrc && d.files[animSrc[1]]) {
+      const why = animatedStill(lim, d.files[animSrc[1]]);
+      if (why) out.push({ level: 'warning', line: 0, message: animSrc[1] + ' 在 App 里会显示成静态图：' + why });
+    }
     // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
     const layouts = Object.create(null);
     for (const [n, t] of Object.entries(d.layouts)) layouts[n] = t;
@@ -420,6 +427,48 @@
   }
 
   /**
+   * An animated WebP's header as the app reads it (AnimatedWebp.header): `{width, height, frames, shortestMs}`, null where
+   * it is none (no VP8X first with its animation flag, no frame) or cut short; at most [maxFrames] + 64 chunks walked.
+   */
+  function animatedWebp(bytes, maxFrames) {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const tag = (at) => String.fromCharCode(bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]);
+    const u24 = (at) => bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16);
+    if (bytes.length < 12 || tag(0) !== 'RIFF' || tag(8) !== 'WEBP') return null;
+    const end = Math.min(bytes.length, 8 + dv.getUint32(4, true));
+    let at = 12; let chunks = 0; let animated = false; let w = 0; let h = 0; let frames = 0; let shortest = Infinity;
+    while (at + 8 <= end) {
+      if (++chunks > maxFrames + 64) return null;
+      const size = dv.getUint32(at + 4, true);
+      const t = tag(at);
+      if (t === 'VP8X') {
+        if (at !== 12 || at + 18 > bytes.length) return null;
+        animated = (bytes[at + 8] & 2) !== 0;
+        w = u24(at + 12) + 1;
+        h = u24(at + 15) + 1;
+      } else if (t === 'ANMF') {
+        if (at + 24 > bytes.length) return null;
+        frames++;
+        shortest = Math.min(shortest, u24(at + 20));
+        if (frames > maxFrames) break;
+      }
+      at += 8 + size + (size & 1);
+    }
+    return animated && frames > 0 ? { width: w, height: h, frames, shortestMs: shortest } : null;
+  }
+
+  /** Why the app draws [bytes] still (ThemeAssetLimits.animated, the limits of youmo-format), null where it plays. */
+  function animatedStill(lim, bytes) {
+    if (bytes.length > lim.animatedBytes) return '超过 ' + (lim.animatedBytes / 1048576) + ' MB';
+    const h = animatedWebp(bytes, lim.animatedFrames);
+    if (!h) return '不是动画 WebP';
+    if (Math.max(h.width, h.height) > lim.animatedSide) return '长边超过 ' + lim.animatedSide + ' 像素';
+    if (h.frames > lim.animatedFrames) return '超过 ' + lim.animatedFrames + ' 帧';
+    if (h.shortestMs < lim.animatedFrameMs) return '有一帧短于 ' + lim.animatedFrameMs + ' ms（最快 ' + Math.floor(1000 / lim.animatedFrameMs) + ' 帧/秒）';
+    return null;
+  }
+
+  /**
    * What stands before a save (060-render-p3 M4): every problem of [d] on each of the app's boards ([boards]), in
    * [env] (EnvJson) light and dark, and what the app refuses on import (saveProblems), each once.
    * `{errors, warnings}`: an error stops the save, a warning is the user's to ignore.
@@ -450,6 +499,6 @@
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, exampleDoc,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, animatedWebp, animatedStill, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

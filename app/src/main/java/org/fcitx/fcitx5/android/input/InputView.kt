@@ -87,9 +87,11 @@ import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.preedit.CodeStripPlacement
 import org.fcitx.fcitx5.android.input.preedit.FloatingCodeStrip
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
+import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.scene.engine.section
+import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.utils.unset
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.UniqueComponent
@@ -130,7 +132,7 @@ class InputView(
     private val codeFloats = KawaiiBarComponent.codeRowFloats()
 
     // under the whole keyboard: the theme's picture (laid as CENTER_CROP lays it, PictureHost) or its colour
-    private val customBackground = view(::View)
+    private val customBackground = view(::PictureBaseView)
 
     // the room the navigation bar takes under the keys, drawn behind it (导航栏背景 全部): the theme's `navbar`
     // colour where it sets one (060-render-p3 T7a), else none, the keyboard's under it as ever
@@ -412,19 +414,26 @@ class InputView(
         broadcaster.onImeUpdate(fcitx.runImmediately { inputMethodEntryCached })
 
         // the theme's picture or its colour, under it all; the picture lies where each key showing it finds it
-        customBackground.background = ThemePictureDrawable.board(ThemeManager.shownLook(theme))
+        val look = ThemeManager.shownLook(theme)
+        customBackground.background = ThemePictureDrawable.board(look)
+        val pictureHost = look.picture?.let {
+            PictureHost(look, customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+        }
+        // an animated one played where it fits the limits (A4): read and decoded off the main thread, the
+        // still picture till then; stopped as the keyboard hides or the view goes
+        val animated = look.picture?.takeIf { look.base == BoardBase.Picture }
+        if (animated != null && pictureHost != null) {
+            AnimatedBoardDrawable.later(animated, ThemeColors.board(look.palette, look.keys), customBackground, viewScope) {
+                pictureHost.play(it)
+            }
+        }
 
         keyboardView = constraintLayout {
             // allow MotionEvent to be delivered to keyboard while pressing on padding views.
             // although it should be default for apps targeting Honeycomb (3.0, API 11) and higher,
             // but it's not the case on some devices ... just set it here
             isMotionEventSplittingEnabled = true
-            PictureHost.install(
-                this,
-                ThemeManager.shownLook(theme).picture?.let {
-                    PictureHost(ThemeManager.shownLook(theme), customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
-                },
-            )
+            PictureHost.install(this, pictureHost)
             add(customBackground, lParams {
                 centerVertically()
                 centerHorizontally()

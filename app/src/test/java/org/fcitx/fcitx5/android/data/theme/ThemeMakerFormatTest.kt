@@ -138,6 +138,10 @@ class ThemeMakerFormatTest {
         put("layouts", ThemeAssetLimits.MAX_LAYOUTS)
         put("layoutBytes", ThemeAssetLimits.MAX_LAYOUT_BYTES)
         put("boardImageBytes", KeyImageBudget.LIMIT_BYTES)
+        put("animatedBytes", ThemeAssetLimits.MAX_ANIMATED_BYTES)
+        put("animatedSide", ThemeAssetLimits.MAX_ANIMATED_SIDE)
+        put("animatedFrames", ThemeAssetLimits.MAX_ANIMATED_FRAMES)
+        put("animatedFrameMs", ThemeAssetLimits.MIN_ANIMATED_FRAME_MS)
     }
 
     @Test

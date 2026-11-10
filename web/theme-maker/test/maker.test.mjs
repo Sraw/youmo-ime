@@ -429,3 +429,42 @@ test("a pack's layouts the app refuses on import stop a save, by the app's own l
   const noBack = M.doc(d.xml, d.files, { 'qwerty.xml': E.layoutSource('qwerty').replace(/<key\b[^>]*role="backspace"[^>]*>/, '') });
   assert.ok(M.check(E, noBack, 'qwerty', M.envJson(M.ENV), null).problems.some((p) => /it has no key \[backspace\]/.test(p.message)));
 });
+
+// an animated WebP's head (RIFF, VP8X with the animation flag, its frames of [ms] each), as the app's ThemeAssetLimitsTest makes one
+function animWebp(w, h, ms, { frames = ms.length, flag = true, pad = 0 } = {}) {
+  const parts = [];
+  const le = (v, n) => Array.from({ length: n }, (_, i) => (v >> (8 * i)) & 255);
+  const chunk = (t, data) => { parts.push(...enc(t), ...le(data.length, 4), ...data); if (data.length & 1) parts.push(0); };
+  chunk('VP8X', [flag ? 2 : 0, 0, 0, 0, ...le(w - 1, 3), ...le(h - 1, 3)]);
+  chunk('ANIM', [0, 0, 0, 0, 0, 0]);
+  for (let i = 0; i < pad; i++) chunk('JUNK', []);
+  for (let i = 0; i < frames; i++) chunk('ANMF', [...le(0, 6), ...le(w - 1, 3), ...le(h - 1, 3), ...le(ms[i % ms.length], 3), 0, 0, 0, 0, 0]);
+  return new Uint8Array([...enc('RIFF'), ...le(parts.length + 4, 4), ...enc('WEBP'), ...parts]);
+}
+
+test("an animated picture past the app's limits (youmo-format's, the app's ThemeAssetLimits) is warned of as drawn still", () => {
+  const lim = FORMAT.limits;
+  assert.deepEqual([lim.animatedBytes, lim.animatedSide, lim.animatedFrames, lim.animatedFrameMs], [4194304, 1440, 300, 50]);
+  const check = (image, attrs = 'animated="true" ') => {
+    const d = withPicture(M.fromBuiltin(E, 'nord'), image, 'webp');
+    return M.exportCheck(E, L, FORMAT, M.doc(d.xml.replace('<picture ', '<picture ' + attrs), d.files, d.layouts), ['qwerty'], M.envJson(M.ENV));
+  };
+  const warned = (image) => {
+    const { errors, warnings } = check(image);
+    assert.deepEqual(errors, []);
+    return warnings.filter((p) => /静态图/.test(p.message)).map((p) => p.message).join();
+  };
+  assert.equal(warned(animWebp(1080, 720, [50, 80])), '');
+  assert.match(warned(animWebp(1080, 720, [50, 33])), /短于 50 ms/);
+  assert.match(warned(animWebp(1441, 720, [50])), /长边/);
+  assert.match(warned(animWebp(100, 100, [50], { frames: 301 })), /300 帧/);
+  assert.match(warned(animWebp(100, 100, [50], { flag: false })), /不是动画 WebP/);
+  // padded with chunks: not walked one by one, refused
+  assert.match(warned(animWebp(100, 100, [50], { pad: 400 })), /不是动画 WebP/);
+  assert.equal(M.animatedWebp(animWebp(100, 100, [60, 70]), 300).shortestMs, 60);
+  // a blur on it: the engine's warning; a <picture> without its still <cut>: refused
+  assert.ok(check(animWebp(100, 100, [50]), 'animated="true" blur="4dp" ').warnings.some((p) => /not blurred/.test(p.message)));
+  const d = withPicture(M.fromBuiltin(E, 'nord'), animWebp(100, 100, [50]), 'webp');
+  const uncut = d.xml.replace('<picture ', '<picture animated="true" ').replace(/<cut\b[^>]*\/>/g, '');
+  assert.ok(M.exportCheck(E, L, FORMAT, M.doc(uncut, d.files, d.layouts), ['qwerty'], M.envJson(M.ENV)).errors.some((p) => /needs a <cut>/.test(p.message)));
+});

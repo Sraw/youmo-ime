@@ -136,6 +136,7 @@
     <string name="theme_pack_light">light</string>
     <string name="theme_pack_dark">dark</string>
     <string name="theme_pack_low_contrast">The keys\' text may be hard to read on them (%1$s version)</string>
+    <string name="theme_pack_animated_still">The animated picture is shown still: it is not an animated WebP, or is over %1$s MB, %2$s pixels a side, %3$s frames or %4$s frames a second</string>
     <string name="theme_pack_import_title">Import theme %1$s?</string>
     <string name="theme_pack_import">Import</string>
     <string name="theme_pack_replaces">Your theme of this name will be replaced.</string>

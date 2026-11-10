@@ -154,6 +154,16 @@ object PictureWindow {
         return Placement(scale, (boardWidth - picWidth * scale) / 2, (boardHeight - picHeight * scale) / 2)
     }
 
+    /**
+     * Over an animated picture (060-render-p3 A4) a key or the bar showing it is see-through, the picture
+     * under the keyboard showing at [board] percent brightness: how dark (percent of black over it) to make
+     * it show at [brightness] instead. None brighter than the board's: it is darkened only.
+     */
+    fun seeThroughDarken(board: Int, brightness: Int): Int =
+        if (board <= 0 || brightness >= board) 0 else PERCENT - brightness * PERCENT / board
+
+    private const val PERCENT = 100
+
     /** The picture's pixels under [area] of the keyboard. */
     fun under(p: Placement, area: Area) = Area(
         (area.left - p.dx) / p.scale,

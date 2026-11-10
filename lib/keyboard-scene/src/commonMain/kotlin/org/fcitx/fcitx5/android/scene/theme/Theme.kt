@@ -78,7 +78,12 @@ data class KeyboardSizes(val height: Twin? = null, val sidePadding: Twin? = null
 /** A `<style>`: its selectors, its properties as read, and where it is (later wins a tie). */
 class Style(val selectors: List<Selector>, val values: Map<String, Value>, val order: Int, val line: Int)
 
-class Picture(val src: String, val brightness: Double, val blurDp: Double, val cuts: Map<String, String>)
+/**
+ * `<picture>`: [src] under the keyboard, cut for each orientation ([cuts]: a file each). [animated]
+ * (060-render-p3 A4): [src] an animated WebP the keyboard plays (its cuts the still one, drawn where it
+ * does not play), not blurred, the keys over it see-through by brightness alone.
+ */
+class Picture(val src: String, val brightness: Double, val blurDp: Double, val cuts: Map<String, String>, val animated: Boolean = false)
 
 /** `<meta>`: who made it, which of theirs, its licence, the oldest app it is for (`0.6.0`), its preview picture. */
 data class Meta(val author: String?, val version: String?, val license: String?, val minApp: String?, val preview: String?)

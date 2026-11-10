@@ -400,7 +400,7 @@ class ThemeTest {
         // an effect of the wrong form (read since A3) refused; a colour named that is not there refused
         assertTrue(problems(withStyle("<style select=\"key\" effect=\"ripple-image(a.png, 50%)\"/>")).isNotEmpty())
         assertEquals(listOf("<style>: @keyShadw is no colour"), problems(withStyle("<style select=\"preedit\" cursor-color=\"@keyShadw\"/>")))
-        // elements: a sound pack, whatever it holds; an animated picture
+        // elements: a sound pack, whatever it holds
         val sounds = "<sounds><sound key=\"key\" src=\"tap.ogg\"/></sounds>"
         assertTrue(warnings(source.replace("</theme>", "$sounds\n</theme>")).single().contains("<sounds> is not supported"))
         assertTrue(problems(source.replace("</theme>", "<noises/>\n</theme>")).single().contains("<noises> is not allowed"))
