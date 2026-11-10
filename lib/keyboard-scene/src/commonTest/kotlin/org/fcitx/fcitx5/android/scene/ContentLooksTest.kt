@@ -253,4 +253,20 @@ class ContentLooksTest {
         assertEquals(listOf("y"), texts(mark, "y").map { it.text })
         assertEquals(icons(plain, "y").map { it.name }, icons(mark, "y").map { it.name }, "the shortcut kept")
     }
+
+    @Test
+    fun aHiddenShortcutIsLeftOutOfCharacterKeysOnly() {
+        val plain = Fixtures.scene(env)
+        val shortcut = Fixtures.scene(env, theme = styled("<style select=\"key shortcut\" hidden=\"true\"/>"))
+        assertTrue(icons(plain, "y").isNotEmpty(), "the fixture's y has a shortcut")
+        assertTrue(icons(plain, "space").isNotEmpty(), "the fixture's space has its swipes")
+        // key, icons drawn with `key shortcut { hidden }`, why
+        val rows = listOf(
+            Triple("y", emptyList<String>(), "a character key's shortcut is the shortcut part"),
+            Triple("space", icons(plain, "space").map { it.name }, "a function key's swipes are the hint part"),
+            Triple("backspace", icons(plain, "backspace").map { it.name }, "its sweep too"),
+        )
+        for ((id, want, why) in rows) assertEquals(want, icons(shortcut, id).map { it.name }, "$id: $why")
+        assertEquals(texts(plain, "y"), texts(shortcut, "y"), "the symbol is the mark part, kept")
+    }
 }

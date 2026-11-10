@@ -85,8 +85,8 @@ class Looks(private val of: (Part) -> TextLook) {
  * instead of its middle, by the same box; `letter-spacing` sets characters apart, measured; `font-han`
  * and `font-latin` set each script's run in its own font ([Scripts]), measured run by run;
  * `space-content` and `return-icon-<action>` give the space and Return a text, an icon or nothing of
- * the theme's; `key mark { hidden }` leaves the symbol out, `key hint { hidden }` a function key's
- * swipe marks.
+ * the theme's; `key mark { hidden }` leaves the symbol out, `key shortcut { hidden }` a character key's
+ * shortcut, `key hint { hidden }` a function key's swipe marks (drawn as shortcuts: `key shortcut` styles them).
  */
 class Content(private val env: Env, private val measurer: TextMeasurer, private val icons: IconSizes = IconSizes.MATERIAL) {
     private val d = env.density
@@ -251,7 +251,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val name = key.attrs.shortcut
         if (name == null || '/' in name) {
             val symbol = key.alt?.takeIf { m.symbols && key.attrs.mark != false && !hidden && !looks.mark.hidden }
-            val shortcut = name?.let { m.shortcuts[it] }?.takeIf { m.charShortcuts }
+            val shortcut = name?.let { m.shortcuts[it] }?.takeIf { m.charShortcuts && !looks.shortcut.hidden }
             // KeyMarks.place's slots, by what each is: a symbol in the shortcut's slot takes it
             val symbolSlot = symbol?.let { KeyMarks.symbolSlot(m.symbolAt, m.shortcutAt, env.landscape, env.compact) }
             val shortcutSlot = shortcut?.let { KeyMarks.shortcutSlot(KeyMarks.onKeys(m.symbolAt, m.shortcutAt, env.landscape, env.compact).shortcut) }

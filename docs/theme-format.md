@@ -204,7 +204,7 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 
 **状态**：`:pressed`、`:locked`、`:shifted`、`:disabled`、`:selected`、`:on`、`:first`（第一个候选）。
 
-**部位**：键的 `label`（主字）、`mark`、`shortcut`、`root`（字根）、`icon`、`hint`、`badge`；候选的 `label`（序号）、`comment`；`picker categories`（符号面板的分类栏）、`voice mic`（语音面板的话筒）。
+**部位**：键的 `label`（主字）、`mark`、`shortcut`（快捷图标，功能键的滑动提示也按它着色；`hidden` 只藏字符键上的）、`root`（字根）、`icon`、`hint`（只用 `hidden`：藏起功能键的滑动提示，如空格的光标、⌫ 的清除）、`badge`；候选的 `label`（序号）、`comment`；`picker categories`（符号面板的分类栏）、`voice mic`（语音面板的话筒）。
 
 **场景**（写在最前，`@` 开头）：`@compact`、`@landscape`、`@floating`、`@split`、`@one-handed`、`@dark`、`@flat`（平铺按键样式）；
 `@im=<输入方式>`（`pinyin`、`shuangpin`、`english`、`table`、`handwriting`，或码表名 `wubi`、`cangjie`、`ziranma`、`erbi`、`wubipinyin`）；
