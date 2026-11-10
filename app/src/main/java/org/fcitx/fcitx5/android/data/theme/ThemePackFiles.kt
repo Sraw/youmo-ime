@@ -12,6 +12,8 @@ import org.fcitx.fcitx5.android.input.theme.SvgSubset
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.input.theme.ThemePackCheck
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.layout.Include
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.look.Crop
 import org.fcitx.fcitx5.android.scene.look.Insets
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
@@ -21,6 +23,7 @@ import org.fcitx.fcitx5.android.scene.look.Palette
 import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.scene.look.Text
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.Style
@@ -248,7 +251,7 @@ object ThemePackFiles {
         when {
             name != dir.name -> return skipped(dir, "is named $name", R.string.user_data_unreadable)
             badName(name) || builtinClash(name, theme.variants, builtins) -> return skipped(dir, "has a built-in's name", R.string.user_data_unreadable)
-            ThemePackCheck.hidesRequired(theme).isNotEmpty() -> return skipped(dir, "hides the keys' labels", R.string.user_data_unreadable)
+            ThemePackCheck.hidesRequired(theme, boards(dir)).isNotEmpty() -> return skipped(dir, "leaves keys blank", R.string.user_data_unreadable)
         }
         val missing = ThemePackCheck.files(theme).all.firstOrNull { !inside(dir, it) }
         if (missing != null) return skipped(dir, "misses its file $missing", R.string.theme_file_missing)
@@ -343,7 +346,7 @@ object ThemePackFiles {
         val source = xml.readText().removePrefix(BOM)
         val read = readChecked(source, checks)
         val theme = read.value
-        ThemePackCheck.hidesRequired(theme).firstOrNull()?.let { errorRuntime(R.string.exception_theme_hidden_required, it.toString()) }
+        ThemePackCheck.hidesRequired(theme, boards(from)).firstOrNull()?.let { errorRuntime(R.string.exception_theme_hidden_required, it.toString()) }
         val name = theme.name
         if (badName(name)) errorRuntime(R.string.exception_theme_pack_name, name)
         val files = ThemePackCheck.files(theme)
@@ -388,6 +391,29 @@ object ThemePackFiles {
             ?.let { errorRuntime(R.string.exception_theme_layout, it.name) }
         ThemeAssetLimits.layouts(all.map { it.length() })?.let(checks.refused)
         return all.map { it.name }.sorted()
+    }
+
+    /**
+     * The boards a pack in [dir] may be shown on, for [ThemePackCheck.hidesRequired]: the app's, each replaced by the
+     * pack's own of its id (`layouts/<id>.xml`, its fragments the pack's, else the app's). One that does not read is
+     * left out: the layout checks refuse it.
+     */
+    internal fun boards(dir: File): List<BlankKeys.Board> {
+        val own = File(dir, LAYOUTS)
+        fun text(id: String) = File(own, "$id.xml").takeIf { it.isFile }?.readText()?.removePrefix(BOM)
+        val ownLayouts = own.listFiles().orEmpty().mapNotNull { f ->
+            (LayoutReader.layout(f.readText().removePrefix(BOM)) as? Parsed.Ok)?.value
+        }
+        val builtIn = BuiltInLayouts.RAW.keys.mapNotNull { SceneLayouts.parseBuiltIn(appContext, it) }
+            .filter { b -> ownLayouts.none { it.id == b.id } }
+            .map { BlankKeys.Board(it.layout, it.fragments) }
+        return builtIn + ownLayouts.map { l ->
+            val fragments = l.parts.filterIsInstance<Include>().map { it.src }.distinct().mapNotNull { src ->
+                val t = text(src) ?: BuiltInLayouts(appContext).text(src) ?: return@mapNotNull null
+                (LayoutReader.fragment(t) as? Parsed.Ok)?.value?.let { src to it }
+            }.toMap()
+            BlankKeys.Board(l, fragments)
+        }
     }
 
     // a file saved with a byte-order mark (Windows' Notepad): the engine's reader wants `<` first

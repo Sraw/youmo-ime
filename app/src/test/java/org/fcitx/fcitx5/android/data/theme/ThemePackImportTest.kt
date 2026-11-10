@@ -355,8 +355,8 @@ class ThemePackImportTest {
     @Test
     fun aPackLeavingTheKeysOneCannotTypeWithoutBlankIsRefused() {
         val hidden = xml(styles = """<style select="key.function" hidden="true"/>""")
-        val line = hidden.lines().indexOfFirst { "hidden=\"true\"" in it } + 1
-        assertEquals(appContext.getString(R.string.exception_theme_hidden_required, line.toString()), refusal(zip("theme.xml" to hidden)))
+        // where the engine finds it first: the board, the key
+        assertEquals(appContext.getString(R.string.exception_theme_hidden_required, "qwerty/shift"), refusal(zip("theme.xml" to hidden)))
         nothingLeft()
     }
 

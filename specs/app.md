@@ -1263,8 +1263,11 @@ first open): its top-level files and `layouts/` only (`ZipStream.extract(keep = 
 metered as above; a folder but `layouts/` or `__MACOSX/`, or one in `layouts/`, is refused, and a zip whose
 `theme.xml` is only in a folder says it must be at the top (`exception_theme_xml_top`). It is checked whole before the user is
 asked (`ThemePackFiles.check`; `ThemeAssetLimits`): `theme.xml` read at this app's version (refused: does not
-read, the first five problems with their lines; `min-app` newer, said as such; `hidden` on Shift, Backspace,
-Space or Enter's text, `ThemePackCheck.hidesRequired`), at most 1 MB, `LookTheme.MAX_STYLES` (4100: a 3.0
+read, the first five problems with their lines; `min-app` newer, said as such; Shift, Backspace,
+Space or Enter left blank, its words and icon hidden and its face no image, as the engine resolves the key
+(`BlankKeys`, `SceneBuilder.blanks`) on the app's boards and the pack's own, by role, in every set of the scenes
+the styles name and every key state, said as `board/key`; `ThemePackCheck.hidesRequired`, the theme maker's
+`blankKeys` too), at most 1 MB, `LookTheme.MAX_STYLES` (4100: a 3.0
 theme of 400 single keys written as 4.0) styles, 4 fonts, 200 icons (the reader's); its name plain, not
 `.`-led, not ending `#light`/`#dark`, no built-in's file or reference, no 0.5 name
 (`ThemePackFiles.builtinClash`). A 3.0 theme of the user's named by one of its references is replaced by it

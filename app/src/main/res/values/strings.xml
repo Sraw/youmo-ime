@@ -117,7 +117,7 @@
     <string name="exception_theme_folder">The theme has a folder %1$s: a theme 4.0 has only its files and layouts/</string>
     <string name="exception_theme_invalid">The theme\'s theme.xml cannot be read:\n%1$s</string>
     <string name="exception_theme_min_app">This theme needs version %1$s of this keyboard or newer: update it to use the theme</string>
-    <string name="exception_theme_hidden_required">The theme hides the labels of Shift, Backspace, Space or Return (its style at line %1$s): those keys would be blank</string>
+    <string name="exception_theme_hidden_required">The theme leaves Shift, Backspace, Space or Return blank (%1$s: its label hidden and its face no image)</string>
     <string name="exception_theme_pack_name">%1$s cannot be a theme\'s name here</string>
     <string name="exception_theme_icon">An icon of the theme is not a plain SVG of filled paths: %1$s</string>
     <string name="exception_theme_layout">The theme\'s layouts/ has %1$s, which is no layout (.xml)</string>

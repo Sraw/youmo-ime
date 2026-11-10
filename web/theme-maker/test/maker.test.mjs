@@ -149,19 +149,31 @@ test('save refuses what the app would: the name, files missing, images past thei
   // the app's ThemePackCheck.hidesRequired: blank keys refused, a key faced with its own image let be
   const hide = (styles) => M.saveProblems(E, L, FORMAT, M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'))).length;
   assert.equal(hide('<style select="key.enter" hidden="true"/>'), 1);
-  assert.equal(hide('<style select="*/backspace label" hidden="true"/>'), 1);
+  assert.equal(hide('<style select="*/backspace label, */backspace icon" hidden="true"/>'), 1);
   assert.equal(hide('<style select="key.letter" hidden="true"/>'), 0);
-  assert.equal(hide('<style select="*/enter" fill="image(nope.png, 0 0 0 0, 3x)"/><style select="*/enter label" hidden="true"/>'), 1, 'only the file missing');
-  assert.equal(hide('<style select="*/enter:pressed" fill="#ffffffff"/><style select="*/enter label" hidden="true"/>'), 1);
+  assert.equal(hide('<style select="*/enter" fill="image(nope.png, 0 0 0 0, 3x)"/><style select="*/enter label, */enter icon" hidden="true"/>'), 1, 'only the file missing');
+  assert.equal(hide('<style select="*/enter:pressed" fill="#ffffffff"/><style select="*/enter label, */enter icon" hidden="true"/>'), 1);
   // the image must be the face that wins (the app's BlankKeys, through the engine)
   const img = '<style select="*/enter" fill="image(e.png, 0 0 0 0, 3x)"/>';
-  const hid = '<style select="*/enter label" hidden="true"/>';
+  const hid = '<style select="*/enter label, */enter icon" hidden="true"/>';
   const withE = (styles) => M.saveProblems(E, L, FORMAT, M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'), { 'e.png': pngHeader(10, 10) })).length;
   assert.equal(withE(img + hid), 0);
   assert.equal(withE(img + '<style select="*/enter" fill="#ffffffff"/>' + hid), 1);
   assert.equal(withE(img + '<style select="qwerty/enter" fill="#ffffffff"/>' + hid), 1);
   assert.equal(withE(img + '<style select="@dark */enter" fill="#ffffffff"/>' + hid), 1);
-  assert.equal(withE('<style select="*/enter:pressed label" hidden="true"/>'), 1, 'hiding while pressed: the app refuses it too');
+  assert.equal(withE('<style select="*/enter:pressed label, */enter:pressed icon" hidden="true"/>'), 1, 'hiding while pressed: the app refuses it too');
+  // two scenes, a board's every key in a scene, a class the key has, Shift locked
+  assert.equal(withE(img + '<style select="@dark @landscape */enter" fill="#ffffffff"/>' + hid), 1);
+  assert.equal(withE(img + '<style select="@dark qwerty/*" fill="#ffffffff"/>' + hid), 1);
+  assert.equal(withE(img + '<style select="*/enter.enter" fill="#ffffffff"/>' + hid), 1);
+  const shift = '<style select="*/shift" fill="image(e.png, 0 0 0 0, 3x)"/><style select="*/shift label, */shift icon" hidden="true"/>';
+  assert.equal(withE(shift), 0);
+  assert.equal(withE(shift + '<style select="*/shift:locked" fill="#ffffffff"/>'), 1);
+  // a pack's own board, its Return named go: asked by its role
+  const own = { 'qwerty.xml': E.layoutSource("qwerty").replace('id="enter"', 'id="go"') };
+  const ownDoc = (styles) => M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'), { 'e.png': pngHeader(10, 10) }, own);
+  assert.equal(M.saveProblems(E, L, FORMAT, ownDoc(img + hid)).length, 0);
+  assert.match(M.saveProblems(E, L, FORMAT, ownDoc(img + '<style select="qwerty/go" fill="#ffffffff"/>' + hid))[0].message, /qwerty\/go/);
   // the name as the app reads it: single quotes are a name
   assert.deepEqual(M.saveProblems(E, L, FORMAT, M.doc(ok.xml.replace(/name="nord-mine"/, "name='nord-mine'"))), []);
   const files = Object.fromEntries(Array.from({ length: FORMAT.limits.entries }, (_, i) => ['f' + i + '.bin', new Uint8Array(1)]));

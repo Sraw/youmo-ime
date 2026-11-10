@@ -44,8 +44,11 @@ object ThemePackCheck {
     /** The keys a theme must not hide the labels of: [BlankKeys.REQUIRED_ROLES]. */
     val REQUIRED_ROLES = BlankKeys.REQUIRED_ROLES
 
-    /** The lines of the styles that would leave those keys blank: [BlankKeys.hidesRequired], the page's rule too. */
-    fun hidesRequired(theme: Theme): List<Int> = BlankKeys.hidesRequired(theme)
+    /**
+     * Where [theme] would leave those keys blank on [boards] (the app's and the pack's own), the first found:
+     * [BlankKeys.find], the engine's own drawing asked, the theme maker's rule too.
+     */
+    fun hidesRequired(theme: Theme, boards: List<BlankKeys.Board>): List<BlankKeys.Blank> = BlankKeys.find(theme, boards)
 
     /** The least contrast between a key's words and its face a theme is let in without a warning (WCAG's for large text). */
     const val MIN_CONTRAST = 3.0

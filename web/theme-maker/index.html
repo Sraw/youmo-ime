@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own four scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-etn17N5G9K+XYiabv8Jq/mizs6WWuqTlyNhq81aJx2A=' 'sha256-wL9khzE2V7GG6GFsnQBRcBiqPGA/uPyIZMxPbciyLJ4='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-RkMmHMMU5YOvpbAOWXP4YzOPJuBFNbimmuFrR8vRBvY=' 'sha256-RVmqCf+aFU8OpJbf4LXdC3rjLjysHkyxvCFJ3tYbj2M=' 'sha256-wL9khzE2V7GG6GFsnQBRcBiqPGA/uPyIZMxPbciyLJ4='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -1828,7 +1828,10 @@ dialog h2 { margin: 0; font-size: 16px; }
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
       }
     }
-    for (const line of read.theme.hidesRequired()) bad('第 ' + line + ' 行把 Shift、退格、空格或回车的字藏了：这些键会是空白');
+    // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
+    const layouts = Object.create(null);
+    for (const [n, t] of Object.entries(d.layouts)) layouts[n] = t;
+    for (const where of E.blankKeys(read.theme, layouts)) bad(where + '：字藏了，键面又不是图片——Shift、退格、空格或回车会是空白键');
     let total = 0;
     const enc = new TextEncoder();
     const sizes = [enc.encode(d.xml).length, ...Object.values(d.files).map((b) => b.length), ...Object.values(d.layouts).map((t) => enc.encode(t).length)];

@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.Cascades
+import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.TextLook
@@ -276,6 +277,38 @@ class SceneBuilder(
             parts[s] = { part -> byPart.getOrPut(part) { TextLook(c.of(whole.copy(part = part.xml)), theme) } }
         }
         return Styled(states, looks, parts)
+    }
+
+    /**
+     * The keys of [roles] on [layout] that this scene would draw blank: their label hidden and their face, as
+     * [styled] cascades it, not an image, in the state the environment puts them in, each other state a key can
+     * be in alone, and pressed; Shift in each of its own. `board/id` and the states for each, for [BlankKeys].
+     */
+    internal fun blanks(layout: Layout, fragments: Map<String, Fragment>, roles: Set<String>): List<Pair<ExpandedKey, Set<KeyState>>> {
+        // the keys as the scene has them: a layout that does not expand here draws no keys here (its own
+        // problems are the layout check's)
+        val placement = placement(layout)
+        val splitSide = placement?.side?.takeIf { env.split }?.name?.lowercase()
+        // as [scene] expands it: a number pad the app named no pad for, the full one
+        val expanding = if (layout.family == "number" && env.input.pad == null) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
+        val rows = Expand.rows(layout, fragments, expanding, splitSide).getOr { return emptyList() }
+        val out = ArrayList<Pair<ExpandedKey, Set<KeyState>>>()
+        for (key in rows.flatMap { it.items }.filterIsInstance<ExpandedKey>()) {
+            if (key.attrs.role !in roles) continue
+            val c = if (key.attrs.face == Face.Keep) unflat else cascade
+            val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
+            val own = statesOf(key)
+            val alone = KeyState.entries.filter { it != KeyState.Pressed }.map { own + it }
+            for (states in (listOf(own) + alone).distinct().flatMap { listOf(it, it + KeyState.Pressed) }) {
+                val whole = Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, states.mapTo(HashSet()) { it.xml })
+                // what the key shows (its words, its icon) all hidden by the theme; one that shows neither is the layout's
+                fun hides(part: Part) = TextLook(c.of(whole.copy(part = part.xml)), theme).hidden
+                val shown = (key.label != null && !hides(Part.Label)) || (key.icon != null && !hides(Part.Icon))
+                val hidden = !shown && (key.label != null || key.icon != null)
+                if (hidden && KeyLook(c.of(whole), theme).fill !is Fill.Image) out += key to states
+            }
+        }
+        return out
     }
 
     // the key's face's layers in each state

@@ -4,63 +4,88 @@
  */
 package org.fcitx.fcitx5.android.scene.theme
 
+import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.FixedMeasurer
+import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.layout.Fragment
+import org.fcitx.fcitx5.android.scene.layout.Layout
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
+
 /**
- * The keys without which nothing can be typed or put right, and the styles that would leave them blank: the
- * app refuses such a pack on import (ThemePackCheck), the theme maker before it saves one (YoumoEngine).
- * Here, so the two cannot disagree.
+ * The keys without which nothing can be typed or put right, and whether a theme leaves one blank: its label
+ * hidden and its face no image. Asked of the engine itself ([SceneBuilder.blanks], the cascade that draws the
+ * key) on every board the theme can be shown on and in every scene its styles tell apart, so it is what the
+ * keyboard would draw, not a guess at it. The app refuses such a pack on import (ThemePackCheck), the theme maker
+ * before it saves one (YoumoEngine): one rule, here.
+ *
+ * An image that shows nothing (all transparent, a body that does not decode) still passes: only its header is
+ * read at import, as 3.0 read it.
  */
 object BlankKeys {
 
-    /** The keys a theme must not hide the labels (`hidden`) of. */
+    /** The keys, by role, a theme must not leave blank. */
     val REQUIRED_ROLES = setOf("shift", "backspace", "space", "enter")
 
-    // the kinds those keys are of: a selector of another kind (letter, alt-text) never matches one
-    private val REQUIRED_KINDS = setOf("function", "space", "enter")
+    /** A board the theme may be shown on: the app's own, or a pack's (`layouts/`), with the fragments it includes. */
+    class Board(val layout: Layout, val fragments: Map<String, Fragment> = emptyMap())
 
-    // what `hidden` hides of a key: its words and icon, not a mark or a hint alone
-    private val HIDING_PARTS = setOf(null, "label", "icon")
-
-    // flat draws no faces of function keys by design (3.0's face=null), so a key's image is not asked of it there
-    private const val FLAT = "flat"
-
-    /**
-     * The lines of the styles that hide the labels of a key of [REQUIRED_ROLES] (or may: `key { hidden }`). A hide
-     * aimed at one key by its name or role whose resting face, the fill that wins the cascade on each board it is
-     * named on and in each scene the theme styles, is an image is not: the image is what the key shows, as theme
-     * 3.0 drew a key with an image and its label hidden, and a 3.0 theme the app takes must stay one it takes once
-     * converted. An image that shows nothing (all transparent, a body that does not decode) still passes: only its
-     * header is read at import, as 3.0 read it.
-     */
-    fun hidesRequired(theme: Theme): List<Int> = theme.styles.filter { style ->
-        (style.values["hidden"] as? Value.Flag)?.on == true && style.selectors.any { s ->
-            s.widget == "key" && s.reserved == null && s.part in HIDING_PARTS && s.classes.all { it in REQUIRED_KINDS } &&
-                s.roles.all { it in REQUIRED_ROLES } && (s.starRole == null || s.starRole in REQUIRED_ROLES) &&
-                (s.key == null || s.key in REQUIRED_ROLES) && !imageFaced(theme, s)
-        }
-    }.map { it.line }
-
-    // [s] names one key, and on every board, scene and kind it can be in, the fill winning the cascade for its
-    // resting face is an image
-    private fun imageFaced(theme: Theme, s: Selector): Boolean {
-        val name = s.key ?: s.starRole ?: return false
-        val selectors = theme.styles.flatMap { it.selectors }
-        val boards = if (s.board != null) setOf(s.board) else selectors.filter { it.key == name }.mapNotNull { it.board }.toSet() + ANY_BOARD
-        val scenes = listOf(emptySet<String>()) + selectors.flatMap { it.scenes }.toSet().minus(FLAT).map { setOf(it) }
-        return boards.all { board ->
-            scenes.all { scene ->
-                REQUIRED_KINDS.all { kind -> restingFill(theme, Selector.Target("key", board, name, name, setOf(kind)), scene) is Fill.Image }
-            }
-        }
+    /** A key left blank: on [board], its id [key], in [scenes], in [states]. */
+    data class Blank(val board: String, val key: String, val scenes: Set<String>, val states: Set<KeyState>) {
+        override fun toString() = "$board/$key" + scenes.sorted().joinToString("") { " @$it" } + states.joinToString("") { ":" + it.xml }
     }
 
-    // a board no style names: the key as every board but those has it
-    private const val ANY_BOARD = "\u0000"
+    // the scenes of the keyboard's form, each an Env flag; any other a theme names (im=…, field=…) is typed
+    private val FORMS = listOf("compact", "landscape", "floating", "split", "one-handed", "dark", "flat")
 
-    private fun restingFill(theme: Theme, target: Selector.Target, scene: Set<String>): Fill? = theme.styles
-        .mapNotNull { style ->
-            val fill = (style.values["fill"] as? Value.OfFill)?.fill ?: return@mapNotNull null
-            style.selectors.filter { it.selects(target) && scene.containsAll(it.scenes) && it.reserved == null }
-                .maxOfOrNull { it.specificity }?.let { Triple(it, style.order, fill) }
+    // the scene sets tried at most: every set of the scenes a theme names, up to this many of them; past it the
+    // sets of at most MAX_TOGETHER (a crafted theme of many scenes must not make an import take minutes)
+    private const val MAX_ALL = 8
+    private const val MAX_TOGETHER = 3
+
+    /** The keys [theme] leaves blank on [boards], the first [limit] found. */
+    fun find(theme: Theme, boards: List<Board>, limit: Int = 1): List<Blank> {
+        // the versions share their styles (only colours differ): one is asked
+        val cascades = Cascades(theme)
+        val out = ArrayList<Blank>()
+        for (scenes in sceneSets(theme)) {
+            val env = env(scenes)
+            val builder = SceneBuilder(theme, env, FixedMeasurer, cascades = cascades)
+            for (b in boards) {
+                for ((key, states) in builder.blanks(b.layout, b.fragments, REQUIRED_ROLES)) {
+                    out += Blank(b.layout.id, key.key.id, scenes, states)
+                    if (out.size >= limit) return out
+                }
+            }
         }
-        .maxWithOrNull(compareBy({ it.first }, { it.second }))?.third
+        return out
+    }
+
+    // every set of the scenes [theme]'s selectors name (none among them)
+    private fun sceneSets(theme: Theme): List<Set<String>> {
+        val named = theme.styles.flatMap { s -> s.selectors.flatMap { it.scenes } }.toSet().sorted()
+        val most = if (named.size <= MAX_ALL) named.size else MAX_TOGETHER
+        var sets = listOf(emptySet<String>())
+        for (n in named) sets = sets + sets.filter { it.size < most }.map { it + n }
+        return sets
+    }
+
+    private fun env(scenes: Set<String>) = Env(
+        width = WIDTH,
+        height = HEIGHT,
+        density = DENSITY,
+        landscape = "landscape" in scenes,
+        compact = "compact" in scenes,
+        floating = if ("floating" in scenes) 1.0 else null,
+        split = "split" in scenes,
+        oneHanded = if ("one-handed" in scenes) SplitKeyboard.Dock.LEFT else SplitKeyboard.Dock.FULL,
+        dark = "dark" in scenes,
+        flat = "flat" in scenes,
+        typed = scenes.filterTo(HashSet()) { it !in FORMS },
+    )
+
+    // a phone's keyboard: the sizes do not change what is styled, only that the keys are laid out
+    private const val WIDTH = 1080.0
+    private const val HEIGHT = 700.0
+    private const val DENSITY = 2.75
 }

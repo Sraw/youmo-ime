@@ -117,7 +117,7 @@
     <string name="exception_theme_folder">主题里有文件夹 %1$s：4.0 主题只能有它的文件和 layouts/</string>
     <string name="exception_theme_invalid">主题的 theme.xml 读不了：\n%1$s</string>
     <string name="exception_theme_min_app">这个主题需要本输入法 %1$s 或更新的版本：更新后才能用</string>
-    <string name="exception_theme_hidden_required">主题把 Shift、退格、空格或回车的字隐藏了（第 %1$s 行的样式）：这些键会是空白的</string>
+    <string name="exception_theme_hidden_required">主题让 Shift、退格、空格或回车成了空白键（%1$s：字藏了，键面又不是图片）</string>
     <string name="exception_theme_pack_name">%1$s 不能用作这里的主题名</string>
     <string name="exception_theme_icon">主题的图标不是只有填充路径的简单 SVG：%1$s</string>
     <string name="exception_theme_layout">主题的 layouts/ 里有 %1$s，它不是布局（.xml）</string>

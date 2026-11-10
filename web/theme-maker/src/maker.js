@@ -125,7 +125,10 @@
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
       }
     }
-    for (const line of read.theme.hidesRequired()) bad('第 ' + line + ' 行把 Shift、退格、空格或回车的字藏了：这些键会是空白');
+    // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
+    const layouts = Object.create(null);
+    for (const [n, t] of Object.entries(d.layouts)) layouts[n] = t;
+    for (const where of E.blankKeys(read.theme, layouts)) bad(where + '：字藏了，键面又不是图片——Shift、退格、空格或回车会是空白键');
     let total = 0;
     const enc = new TextEncoder();
     const sizes = [enc.encode(d.xml).length, ...Object.values(d.files).map((b) => b.length), ...Object.values(d.layouts).map((t) => enc.encode(t).length)];

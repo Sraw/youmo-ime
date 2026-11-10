@@ -50,9 +50,6 @@ class YoumoTheme internal constructor(internal val theme: Theme) {
 
     val name: String get() = theme.name
 
-    /** The lines of its styles that would leave Shift, Backspace, Space or Return blank: the app refuses it (BlankKeys). */
-    fun hidesRequired(): Array<Int> = BlankKeys.hidesRequired(theme).toTypedArray()
-
     /** Its versions: `["light"]`, `["dark"]` or both. */
     val variants: Array<String> get() = listOf(false, true).filter { it in theme.variants }.map { if (it) "dark" else "light" }.toTypedArray()
 
@@ -139,6 +136,22 @@ object YoumoEngine {
         val layout = LayoutReader.layout(text(xml, "layout"))
         if (layout !is Parsed.Ok) return@checked result(layout) { "layout" to null }
         result(builtIns.includes(layout.value, own)) { "layout" to YoumoLayout(layout.value, it) }
+    }
+
+    /**
+     * Where [theme] leaves Shift, Backspace, Space or Return blank (BlankKeys, the app's own import check): on the
+     * app's boards, each replaced by one of [layouts] (`{"<id>.xml": xml}`, a pack's `layouts/`) of its id. The first
+     * found, as text (`qwerty/enter @flat`), none: an empty array. A layout of [layouts] that does not read is left
+     * out (readLayout says why).
+     */
+    fun blankKeys(theme: YoumoTheme, layouts: dynamic): Array<String> = run {
+        val own = HashMap<String, String>()
+        if (layouts != null) for (name in keys(layouts, "layouts")) own[name.removeSuffix(".xml")] = text(layouts[name], "layout $name")
+        val fragments = own.mapNotNull { (id, t) -> LayoutReader.fragment(t).orNull()?.let { id to it } }.toMap()
+        val ownBoards = own.values.mapNotNull { LayoutReader.layout(it).orNull() }
+        val boards = builtIns.layouts.filter { id -> ownBoards.none { it.id == id } }.mapNotNull { builtIns.layout(it)?.orNull() } + ownBoards
+        val withFragments = boards.mapNotNull { l -> builtIns.includes(l, fragments).orNull()?.let { BlankKeys.Board(l, it) } }
+        BlankKeys.find(theme.theme, withFragments).map { it.toString() }.toTypedArray()
     }
 
     /** The app's boards' ids (`qwerty`, `nine`…). */
