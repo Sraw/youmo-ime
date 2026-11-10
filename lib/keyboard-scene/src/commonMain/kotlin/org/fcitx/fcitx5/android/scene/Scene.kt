@@ -103,9 +103,29 @@ class KeyNode(
     /** Its layout's say over its face (`face=`) and its gap (`margin=`): what an exporter of the layout (the theme maker's) passes on. */
     val face: org.fcitx.fcitx5.android.scene.layout.Face = org.fcitx.fcitx5.android.scene.layout.Face.Default,
     val margin: Boolean = true,
+    /** How it moves between its faces (060-render-p3 A1); null: it does not, each shown at once (every theme without motion). */
+    val motion: Motion? = null,
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)
+}
+
+/**
+ * A key's motion (060-render-p3 §4, A1), plain data: [transition] how its pressed face fades out when
+ * let go and its state's face fades in when the state changes (Shift, locked), its look's `transition`
+ * in [KeyNode.states]; [press] how long its pressed face takes to scale to [pressScale] and sink
+ * [pressSink] px, the pressed look's `transition` no longer than [MAX_PRESS_MS] (none: at once). The
+ * pressed face itself is shown whole at once, never faded in.
+ */
+data class Motion(
+    val transition: org.fcitx.fcitx5.android.scene.theme.Transition?,
+    val press: org.fcitx.fcitx5.android.scene.theme.Transition?,
+    val pressScale: Double = 1.0,
+    val pressSink: Double = 0.0,
+) {
+    companion object {
+        const val MAX_PRESS_MS = 80
+    }
 }
 
 /**

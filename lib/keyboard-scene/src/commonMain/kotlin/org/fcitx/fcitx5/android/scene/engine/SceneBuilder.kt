@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene.engine
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.Motion
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Point
@@ -510,7 +511,19 @@ class SceneBuilder(
             lean = k.key.key.leans,
             face = k.key.attrs.face ?: Face.Default,
             margin = k.key.attrs.margin ?: true,
+            motion = motion(k.looks.getValue(k.states), k.looks.getValue(k.states + KeyState.Pressed)),
         )
+    }
+
+    // 060-render-p3 A1: the key's look's transition, the pressed look's (80 ms at most), scale and sink; null where none moves
+    private fun motion(normal: KeyLook, pressed: KeyLook): Motion? {
+        val transition = normal.transition?.takeIf { it.ms > 0 }
+        val scale = pressed.pressScale
+        val sink = pressed.pressSink * env.density
+        val press = pressed.transition?.takeIf { it.ms > 0 && (scale != 1.0 || sink != 0.0) }
+            ?.let { it.copy(ms = minOf(it.ms, Motion.MAX_PRESS_MS)) }
+        if (transition == null && scale == 1.0 && sink == 0.0) return null
+        return Motion(transition, press, scale, sink)
     }
 
     companion object {

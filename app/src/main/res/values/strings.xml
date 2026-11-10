@@ -94,6 +94,8 @@
     <string name="expand_toolbar_by_default">Expand toolbar by default</string>
     <string name="popup_on_key_press">Popup on key press</string>
     <string name="disable_animation">Disable animation</string>
+    <string name="keyboard_motion">Keyboard motion</string>
+    <string name="keyboard_motion_summary">Keys fade and move as the theme says. Off in battery saver, when system animations are removed and with Disable animation</string>
     <string name="exception_logcat_created">Logcat process is already created</string>
     <string name="exception_theme_filename">Only theme files (.theme) can be imported: %1$s is not one. A theme exported as .zip before can be renamed to .theme.</string>
     <string name="theme_file_unnamed">this file</string>
