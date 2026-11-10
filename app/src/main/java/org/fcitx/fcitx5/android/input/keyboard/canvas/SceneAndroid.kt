@@ -213,6 +213,7 @@ object SceneThemes {
             field = value
             made.clear()
             refused.clear()
+            packs.clear()
         }
 
     // the packs' (060-render-p3 T8a), read as they were listed, by the system's colours their system() took
@@ -255,6 +256,7 @@ object SceneThemes {
     fun forgetAll() {
         made.clear()
         refused.clear()
+        packs.clear()
         ScenePainter.forgetIcons()
         SceneBoard.forgetLooks()
     }

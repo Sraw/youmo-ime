@@ -316,8 +316,10 @@ class NineKeyLetters private constructor(
         }
 
         // filedAs's keyboard of each tag asked (a few: the layouts used), null for none: SpelledForm
-        // asks for each code of each word read, the record's rows of several tags in turn
+        // asks for each code of each word read, the record's rows of several tags in turn. Bounded
+        // (KEPT_FILED, all let go past it): a damaged record may name any number of tags
         private val filed = ConcurrentHashMap<String, Filed>()
+        private const val KEPT_FILED = 16
 
         private class Filed(val keyboard: NineKeyLetters?)
 
@@ -327,6 +329,8 @@ class NineKeyLetters private constructor(
          * of its groups is a keyboard of its own here.
          */
         fun filedAs(tag: String): NineKeyLetters? {
+            filed[tag]?.let { return it.keyboard }
+            if (filed.size >= KEPT_FILED) filed.clear()
             return filed.getOrPut(tag) {
                 Filed(listOf(G14, G18).firstOrNull { it.tag() == tag } ?: tag.split(',').takeIf { problem(it) == null }?.let(::custom))
             }.keyboard

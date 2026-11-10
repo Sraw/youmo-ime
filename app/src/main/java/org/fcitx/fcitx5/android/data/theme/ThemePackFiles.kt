@@ -272,7 +272,8 @@ object ThemePackFiles {
     }
 
     // [name] a plain file right in [dir] (a crafted name of the theme's, `..` say, never one out of it)
-    private fun inside(dir: File, name: String): Boolean {
+    @VisibleForTesting
+    internal fun inside(dir: File, name: String): Boolean {
         if (!isPlainFileName(name)) return false
         val f = File(dir, name)
         return f.isFile && try {
