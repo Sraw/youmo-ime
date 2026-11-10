@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.theme
 
+import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problem
 import org.fcitx.fcitx5.android.scene.xml.Xml
@@ -34,64 +35,111 @@ object SvgSubset {
 
     private val NUMBER = Regex("[+-]?(?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
     private val LENGTH = Regex("${NUMBER.pattern}(?:px)?")
-    private val COLOR = Regex("#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
-    private const val COMMANDS = "MmLlHhVvCcSsQqTtAaZz"
+    // longest first: JS's matches() takes the first alternative that matches a prefix and never tries the rest (#f008 was refused)
+    private val COLOR = Regex("#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})")
 
     /** What is wrong with [source] as an icon, each with its line; none: it is one. */
-    fun check(source: String): List<Problem> {
+    fun check(source: String): List<Problem> = when (val read = read(source)) {
+        is Parsed.Failed -> read.problems
+        is Parsed.Ok -> emptyList()
+    }
+
+    /**
+     * An icon's outline as a drawer takes it: its viewBox's sides and the paths it draws; [x], [y] the
+     * viewBox's origin (Material Symbols' `0 -960 960 960`).
+     */
+    data class Icon(val width: Double, val height: Double, val paths: List<Path>, val x: Double = 0.0, val y: Double = 0.0) {
+        /**
+         * Where it goes in [box] (the engine's icon box, a built-in icon's size whatever the SVG's): scaled alike
+         * both ways and centred, SVG's `xMidYMid meet`, so a wide icon is not stretched; both drawers use it.
+         */
+        fun fit(box: Box): Fit {
+            val scale = minOf(box.width / width, box.height / height)
+            return Fit(scale, box.left + (box.width - width * scale) / 2 - x * scale, box.top + (box.height - height * scale) / 2 - y * scale)
+        }
+    }
+
+    /** A point (u, v) of the icon is drawn at ([dx] + [scale]·u, [dy] + [scale]·v). */
+    data class Fit(val scale: Double, val dx: Double, val dy: Double)
+
+    /**
+     * A path it draws: [segments] its `d=` made absolute ([IconPath]), [evenOdd] its rule, [alpha] its opacity
+     * (its fill-opacity, its own or a group's, times its groups' opacity), [color] its own `#` fill, null where it
+     * takes the key's icon-color (no fill, or currentColor: Material icons write none).
+     */
+    data class Path(val segments: List<ShapePath.Segment>, val evenOdd: Boolean, val alpha: Double, val color: Argb? = null)
+
+    /**
+     * [source] as an [Icon] where it is one: the sides its viewBox's (else width and height, else 24), the paths
+     * that draw, each with the rule, opacity and colour its groups give it. Refused where nothing would be drawn
+     * (every path filled none, of no opacity, or moves only): a required key replaced by it would be blank.
+     */
+    fun read(source: String): Parsed<Icon> {
         val root = when (val xml = Xml.parse(source)) {
-            is Parsed.Failed -> return xml.problems
+            is Parsed.Failed -> return xml
             is Parsed.Ok -> xml.value
         }
-        if (root.name != "svg") return listOf(Problem(root.line, "the root is <${root.name}>, not <svg>"))
+        if (root.name != "svg") return Parsed.Failed(listOf(Problem(root.line, "the root is <${root.name}>, not <svg>")))
         val problems = ArrayList<Problem>()
         val count = Count()
         element(root, problems, count)
         if (count.paths > MAX_PATHS) problems += Problem(0, "over $MAX_PATHS paths")
         if (count.numbers > MAX_NUMBERS) problems += Problem(0, "over $MAX_NUMBERS numbers in the paths")
-        return problems
-    }
-
-    /**
-     * An icon's outline as a drawer takes it: its viewBox's sides and its filled paths, in one tint; [x], [y] the
-     * viewBox's origin, the point drawn at the box's top left (Material Symbols' `0 -960 960 960`).
-     */
-    data class Icon(val width: Double, val height: Double, val paths: List<Path>, val x: Double = 0.0, val y: Double = 0.0)
-
-    /** A filled path: [d] as SVG has it, [evenOdd] its rule, [alpha] its opacity (its fill-opacity, its own or a group's, times its groups' opacity). */
-    data class Path(val d: String, val evenOdd: Boolean, val alpha: Double)
-
-    /**
-     * [source] as an [Icon] where [check] finds nothing wrong with it: the sides its viewBox's (else width and
-     * height, else 24), the paths not filled `none`, each with the rule and opacity its groups give it. The
-     * theme maker's preview draws a theme's own icons with it (060-render-p3 §5.1 panel 4).
-     */
-    fun read(source: String): Parsed<Icon> {
-        val problems = check(source)
         if (problems.isNotEmpty()) return Parsed.Failed(problems)
-        val root = (Xml.parse(source) as Parsed.Ok).value
         val box = root["viewBox"]?.trim()?.split(Regex("[\\s,]+"))?.map(String::toDouble)
         val w = box?.get(2) ?: root["width"]?.removeSuffix("px")?.toDouble() ?: DEFAULT_SIDE
         val h = box?.get(3) ?: root["height"]?.removeSuffix("px")?.toDouble() ?: DEFAULT_SIDE
+        val paths = drawn(root, count)
+        if (paths.isEmpty()) return Parsed.Failed(listOf(Problem(root.line, NOTHING_DRAWN)))
+        return Parsed.Ok(Icon(w, h, paths, box?.get(0) ?: 0.0, box?.get(1) ?: 0.0))
+    }
+
+    // the paths of [root] that draw: fill, fill-rule and fill-opacity inherited as SVG's are (the nearest one's), opacity multiplied
+    private fun drawn(root: XmlElement, count: Count): List<Path> {
         val paths = ArrayList<Path>()
-        // fill, fill-rule and fill-opacity inherited as SVG's are (the nearest one's), opacity multiplied
         fun walk(el: XmlElement, fill: String?, rule: String?, fillOpacity: Double, alpha: Double) {
             val f = el["fill"] ?: fill
             val r = el["fill-rule"] ?: rule
             val fo = el["fill-opacity"]?.toDouble() ?: fillOpacity
             val a = alpha * (el["opacity"]?.toDouble() ?: 1.0)
-            if (el.name == "path" && f != "none") paths += Path(el["d"]!!, r == "evenodd", a * fo)
+            if (el.name == "path" && f != "none") {
+                val color = f?.takeIf { it.startsWith("#") }?.let(::cssColor)
+                val segments = count.segments.getValue(el)
+                if (a * fo * (color?.alpha ?: OPAQUE) > 0 && IconPath.draws(segments)) paths += Path(segments, r == "evenodd", a * fo, color)
+            }
             el.children.forEach { walk(it, f, r, fo, a) }
         }
         walk(root, null, null, 1.0, 1.0)
-        return Parsed.Ok(Icon(w, h, paths, box?.get(0) ?: 0.0, box?.get(1) ?: 0.0))
+        return paths
     }
+
+    /** Why an icon of no path that draws is refused. Zero-area paths (`M0 0L1 0Z`) still count: their area is not worked out. */
+    const val NOTHING_DRAWN = "nothing to draw: every path is filled none, of no opacity, or moves only"
+
+    /**
+     * A `#` fill as CSS writes it, `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`: its alpha LAST, the other way
+     * round from the project's own `#aarrggbb` ([ColorExpr]), so it is read here and never by that.
+     */
+    fun cssColor(hex: String): Argb {
+        val h = hex.removePrefix("#")
+        val full = if (h.length <= SHORT_RGBA) h.map { "$it$it" }.joinToString("") else h
+        fun ch(k: Int) = full.substring(2 * k, 2 * k + 2).toInt(HEX)
+        return Argb.of(if (full.length == LONG_RGBA) ch(ALPHA_LAST) else OPAQUE, ch(0), ch(1), ch(2))
+    }
+
+    private const val SHORT_RGBA = 4
+    private const val LONG_RGBA = 8
+    private const val ALPHA_LAST = 3
+    private const val HEX = 16
+    private const val OPAQUE = 255
 
     private const val DEFAULT_SIDE = 24.0
 
     private class Count {
         var paths = 0
         var numbers = 0
+        var tooMany = false
+        val segments = HashMap<XmlElement, List<ShapePath.Segment>>()
     }
 
     private fun element(el: XmlElement, p: MutableList<Problem>, count: Count) {
@@ -111,7 +159,22 @@ object SvgSubset {
         if (el.name == "path") {
             count.paths++
             val d = el["d"]
-            if (d == null) p += Problem(el.line, "<path> needs d=") else path(d, count)?.let { p += Problem(el.line, "d=: $it") }
+            if (d == null) {
+                p += Problem(el.line, "<path> needs d=")
+            } else if (!count.tooMany) {
+                when (val read = IconPath.parse(d, MAX_NUMBERS - count.numbers)) {
+                    is IconPath.Read.Ok -> {
+                        count.numbers += read.numbers
+                        count.segments[el] = read.segments
+                    }
+                    is IconPath.Read.Bad -> p += Problem(el.line, "d=: ${read.message}")
+                    // said once, as [MAX_NUMBERS]'s problem
+                    IconPath.Read.TooMany -> {
+                        count.tooMany = true
+                        count.numbers = MAX_NUMBERS + 1
+                    }
+                }
+            }
         }
         el.children.forEach { child ->
             if (child.name == "svg") p += Problem(child.line, "<svg> is not allowed in an icon's <svg>") else element(child, p, count)
@@ -150,31 +213,6 @@ object SvgSubset {
 
     private val FILL_WORDS = setOf("none", "currentColor")
     private val FILL_RULES = setOf("nonzero", "evenodd")
-
-    // [d] as SVG's path data: commands and numbers, a move first; what is wrong with it, null if nothing
-    private fun path(d: String, count: Count): String? {
-        var i = 0
-        var first = true
-        while (i < d.length) {
-            val c = d[i]
-            when {
-                c.isWhitespace() || c == ',' -> i++
-                c in COMMANDS -> {
-                    if (first && c != 'M' && c != 'm') return "a path starts with M"
-                    first = false
-                    i++
-                }
-                else -> {
-                    if (first) return "a path starts with M"
-                    val number = NUMBER.matchAt(d, i) ?: return "'${d[i]}' at ${i + 1} is no command or number"
-                    if (!inRange(number.value.toDouble())) return "${number.value} at ${i + 1} is past a number's range"
-                    count.numbers++
-                    i = number.range.last + 1
-                }
-            }
-        }
-        return if (first) "empty" else null
-    }
 
     private const val NAMESPACE = "http://www.w3.org/2000/svg"
     private const val VIEW_BOX = 4

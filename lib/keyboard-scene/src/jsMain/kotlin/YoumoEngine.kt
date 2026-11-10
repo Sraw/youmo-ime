@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
+import org.fcitx.fcitx5.android.scene.theme.IconPath
 import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.Values
@@ -258,8 +259,9 @@ object YoumoEngine {
 
     /**
      * [source] as a theme's `<icon>` (an SVG of filled paths: [SvgSubset], what the app imports): `{ok, problems}`
-     * where it is not one (each `{line, message, level}`), else `{ok, icon: {vw, vh, paths: [{d, rule, alpha}]}}`,
-     * as `paint`'s `icons` takes an icon (060-render-p3 §5.1 panel 4).
+     * where it is not one (each `{line, message, level}`), else `{ok, icon: {vw, vh, vx, vy, paths: [{d, rule, alpha, fill}]}}`,
+     * as `paint`'s `icons` takes an icon (060-render-p3 §5.1 panel 4): `d` the path made absolute M L Q C Z ([IconPath], what
+     * the app draws too), `fill` its own colour as an ARGB integer, null where it takes the key's icon-color.
      */
     fun readIcon(source: dynamic): dynamic = checked {
         result(SvgSubset.read(text(source, "source"))) { icon ->
@@ -268,7 +270,12 @@ object YoumoEngine {
                 "vh" to icon.height,
                 "vx" to icon.x,
                 "vy" to icon.y,
-                "paths" to icon.paths.map { p -> obj("d" to p.d, "rule" to if (p.evenOdd) "evenodd" else "nonzero", "alpha" to p.alpha) }.toTypedArray(),
+                "paths" to icon.paths.map { p -> obj(
+                        "d" to IconPath.text(p.segments),
+                        "rule" to if (p.evenOdd) "evenodd" else "nonzero",
+                        "alpha" to p.alpha,
+                        "fill" to p.color?.value,
+                    ) }.toTypedArray(),
             )
         }
     }

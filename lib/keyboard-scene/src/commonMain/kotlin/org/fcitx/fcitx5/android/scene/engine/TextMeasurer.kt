@@ -41,7 +41,8 @@ data class TextMetrics(val advance: Double, val ink: Box, val top: Double, val b
 
 /**
  * An icon's own size, dp across and down: its drawable's, which an icon key draws it at (rules B §5,
- * ImageKeyView's wrap_content). Only the platform has the drawables; a theme's icon is its file's.
+ * ImageKeyView's wrap_content). Only the platform has the drawables. A theme's `<icon>` that replaces one
+ * is drawn in the same box whatever its SVG's size, scaled alike and centred ([SvgSubset.Icon.fit]).
  */
 fun interface IconSizes {
     fun dp(name: String): Pair<Double, Double>

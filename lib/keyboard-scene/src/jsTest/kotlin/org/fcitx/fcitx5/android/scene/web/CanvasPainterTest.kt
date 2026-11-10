@@ -248,15 +248,38 @@ class CanvasPainterTest {
         assertEquals(listOf("letterSpacing=2px", "translate(11,50)", "fillText(ab,0,0)"), with.filter { it.startsWith("translate") || it.startsWith("fillText") || it.startsWith("letterSpacing") })
     }
 
-    // VectorDrawable's stroke (after the viewBox's origin, translate(0,0) here): butt ends, mitred joins, its miter limit 4, whatever was set before
-    // a viewBox whose origin is not 0 0 (Material Symbols' 0 -960 960 960): moved to the key's corner after the
-    // scale, else the icon is drawn a whole key higher
+    // a viewBox whose origin is not 0 0 (Material Symbols' 0 -960 960 960): moved to the key's corner, else the
+    // icon is drawn a whole key higher
     @Test
     fun anIconsViewBoxOriginIsMovedToTheCorner() {
         val icon: dynamic = js("({ vx: 0, vy: -960, vw: 960, vh: 960, paths: [{ d: 'M0 0' }] })")
         val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), red), Assets(icons = mapOf("x" to icon)))
         val scale = calls.indexOfFirst { it.startsWith("scale(") }
-        assertEquals("translate(0,960)", calls.getOrNull(scale + 1), "$calls")
+        assertEquals(listOf("translate(0,24)", "scale(0.025,0.025)"), calls.subList(scale - 1, scale + 1), "$calls")
+    }
+
+    // a wide theme SVG keeps its shape, centred down the box (SVG's xMidYMid meet), not stretched
+    @Test
+    fun aWideIconIsScaledAlikeAndCentred() {
+        val icon: dynamic = js("({ vw: 48, vh: 24, paths: [{ d: 'M0 0L48 24Z' }] })")
+        val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), red), Assets(icons = mapOf("x" to icon)))
+        val scale = calls.indexOfFirst { it.startsWith("scale(") }
+        assertEquals(listOf("translate(0,6)", "scale(0.5,0.5)"), calls.subList(scale - 1, scale + 1), "$calls")
+    }
+
+    // a theme path's own colour (an ARGB integer from readIcon) keeps its hue, faded by the tint's alpha; one without takes the tint
+    @Test
+    fun anIconPathsOwnFillIsKeptAndTheTintsAlphaApplied() {
+        val icon: dynamic = js("({ vw: 24, vh: 24, paths: [{ d: 'M0 0L1 1Z', fill: 0xff0000ff | 0 }, { d: 'M0 0L2 2Z' }] })")
+        val halfRed = Argb.of(128, 255, 0, 0)
+        val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), halfRed), Assets(icons = mapOf("x" to icon)))
+        assertEquals(
+            listOf("fillStyle=rgba(0,0,255,${128 / 255.0})", "fillStyle=rgba(255,0,0,${128 / 255.0})"),
+            calls.filter { it.startsWith("fillStyle") },
+        )
+        // a transparent icon-color hides the whole icon, its own colours too
+        val none = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), Argb.TRANSPARENT), Assets(icons = mapOf("x" to icon)))
+        assertTrue(none.none { it.startsWith("fill") }, "$none")
     }
 
     @Test
@@ -265,7 +288,7 @@ class CanvasPainterTest {
         val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), red), Assets(icons = mapOf("x" to icon)))
         assertEquals(
             listOf("save()", "strokeStyle=rgba(255,0,0,1)", "lineWidth=2", "lineCap=butt", "lineJoin=miter", "miterLimit=4", "stroke(PATH M0 0L24 24)", "restore()"),
-            calls.dropWhile { it != "scale(1,1)" }.drop(2).dropLast(1),
+            calls.dropWhile { it != "scale(1,1)" }.drop(1).dropLast(1),
         )
     }
 }
