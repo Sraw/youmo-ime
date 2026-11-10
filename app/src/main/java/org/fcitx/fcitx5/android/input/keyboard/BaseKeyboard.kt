@@ -222,7 +222,7 @@ abstract class BaseKeyboard(
         ink = ink,
         // 键盘手写: an input method written in [writes] says, in a field where words are typed, not in a
         // temporary mode; not while TalkBack explores by touch, the finger feeling for keys, not writing
-        writes = { writing() && !tempMode && !touchExploring() && writes() },
+        writes = { writing() && !tempMode && !touchExploring() && PackStore.ready(PackKind.TEXT) && writes() },
         typed = { EngineState.keysTyped.value.typed },
         glided = glided,
         )

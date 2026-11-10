@@ -93,12 +93,14 @@ class InkOver(
         return innerApply(action).also { innerWrote = false }
     }
 
-    private fun ink(action: Action.Ink): Snapshot {
+    // [takeBack] apart from the action: the action itself is what the handwriting keeps as taken (its took, Engines.inkSent)
+    private fun ink(action: Action.Ink, takeBack: Boolean = action.takesBack): Snapshot {
         // a tap taken back as the first dot (KeyInkGesture): decided here, where what was typed is known, so a
-        // backspace deletes that tap's letter and nothing else (another key between, a pick, a long press: kept)
-        if (action.takesBack && typing && typedActions == 1) {
+        // backspace deletes that tap's letter and nothing else (another key between, a pick, a long press: kept).
+        // One action's input that one Backspace leaves typed (none known) loses that much and the Ink is dropped
+        if (takeBack && typing && typedActions == 1) {
             val back = innerApply(Action.Backspace)
-            if (!typing) return ink(action.copy(takesBack = false)).let { it.copy(deleteBefore = it.deleteBefore + back.deleteBefore) }
+            if (!typing) return ink(action, takeBack = false).let { it.copy(deleteBefore = it.deleteBefore + back.deleteBefore) }
         }
         if (typing) {
             // dropped: taken, so not held for the next (Engines.inkSent), its piece ended, so the pad wipes it
@@ -134,7 +136,8 @@ class InkOver(
         typedActions = when {
             !innerTyped(it) -> 0
             !was -> 1
-            action is Action.Context -> typedActions
+            // the input as it was: its candidates told again, or reordered (a refine some 30 ms after a, o, e)
+            action is Action.Context || action == Action.Refine -> typedActions
             else -> typedActions + 1
         }
         val changed = it.commit.isNotEmpty() || it.deleteBefore > 0

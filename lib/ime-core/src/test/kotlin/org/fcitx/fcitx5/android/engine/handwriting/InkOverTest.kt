@@ -201,6 +201,39 @@ class InkOverTest {
     }
 
     @Test
+    fun aVowelRefinedAfterItsKeyIsStillTakenBack() {
+        // pinyin refines a, o, e (whole syllables) a moment after the key: the input is still the tap's
+        for ((i, v) in "aoe".withIndex()) {
+            over.apply(Action.Reset)
+            type(v.toString())
+            over.apply(Action.Refine)
+            val s = over.apply(Action.Ink(i, read("天"), takesBack = true))
+            assertEquals("$v", "天", s.preedit)
+            assertEquals("$v", "", pinyin.input)
+            over.apply(Action.Reset)
+        }
+    }
+
+    @Test
+    fun aTakenBackInkIsTheOneTheHandwritingTook() {
+        type("n")
+        val ink = Action.Ink(0, read("天"), takesBack = true)
+        over.apply(ink)
+        // Engines.inkSent asks with the action sent: not held again
+        assertEquals(true, over.handwritingMade?.took(ink))
+    }
+
+    @Test
+    fun aCursorMoveOrAResetBetweenTakesNothingBack() {
+        type("n")
+        over.apply(Action.Cursor(0))
+        assertEquals("n", over.apply(Action.Ink(0, read("天"), takesBack = true)).preedit)
+        over.apply(Action.Reset)
+        over.apply(Action.Ink(1, read("天"), takesBack = true))
+        assertFalse(pinyin.actions.contains(Action.Backspace))
+    }
+
+    @Test
     fun anInkTakingBackAfterABackspaceAndALetterAgainCountsOnlyTheNewInput() {
         type("n")
         over.apply(Action.Backspace)

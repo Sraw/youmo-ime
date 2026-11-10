@@ -57,11 +57,25 @@ class InkKeys(
     fun onAction(attached: () -> Boolean, act: () -> Unit) {
         if (recognition.busy) {
             val at = since
-            recognition.afterReads { if (attached() && at == since) act() }
+            // what the pad held as the key was pressed: strokes drawn while it waited (a tap's dot taken back
+            // and the stroke after it) are not the piece it commits
+            val pressed = pad.pad.piece.takeIf { pad.pad.finished.isNotEmpty() } ?: NONE
+            recognition.afterReads {
+                if (!attached() || at != since) return@afterReads
+                commits = pressed
+                try {
+                    act()
+                } finally {
+                    commits = null
+                }
+            }
         } else {
             act()
         }
     }
+
+    // a held key's turn: the piece it commits ([NONE]: none), as the pad was when it was pressed; null, now
+    private var commits: Int? = null
 
     /**
      * [action] in its turn, before the engine has it: true where the pad took it (backspace with a
@@ -72,7 +86,12 @@ class InkKeys(
      */
     fun took(action: KeyAction): Boolean {
         if (action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace && pad.undo()) return true
-        if ((action is KeyAction.SymAction || action is KeyAction.HostKeyAction) && pad.pad.finished.isNotEmpty()) pad.next()
+        val wipes = commits?.let { it == pad.pad.piece } ?: pad.pad.finished.isNotEmpty()
+        if ((action is KeyAction.SymAction || action is KeyAction.HostKeyAction) && wipes) pad.next()
         return false
+    }
+
+    private companion object {
+        const val NONE = Int.MIN_VALUE
     }
 }
