@@ -12,6 +12,9 @@
   const FORMAT = json('youmo-format');
   const EXAMPLES = json('youmo-examples');
   const ICONS = json('youmo-engine-icons');
+  // the theme's own icons as the engine reads them, by their files' bytes (M.iconsOf)
+  const iconCache = new WeakMap();
+  const iconsNow = () => M.iconsOf(E, ICONS, history.current, iconCache);
   const $ = (id) => document.getElementById(id);
 
   const THEME_LABEL = { material: 'Material', pixel: 'Pixel', nord: 'Nord', 'deep-blue': 'Deep Blue', monokai: 'Monokai', 'amoled-black': 'AMOLED', monet: '系统取色' };
@@ -506,7 +509,7 @@
     canvas.height = scene.height + barH;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const state = { pressed, icons: ICONS, images: assets.images, fonts };
+    const state = { pressed, icons: iconsNow(), images: assets.images, fonts };
     const picture = pictureOf();
     if (picture) state.picture = picture;
     if (bar) drawBar(ctx, bar, Object.assign({}, state, { pressed: null, picture: pictureAt(picture, 0, 0, scene.width, bar.height) }), fonts);
@@ -576,7 +579,7 @@
     const appearMs = m.appear ? m.appear.ms : 0;
     // drawn once for the play, not each frame (the theme read again, the scene built again: frames dropped on a phone)
     measurerFor($('preview'), history.current.xml);
-    const state = { pressed: null, icons: ICONS, images: assets.images, fonts: measured.fonts };
+    const state = { pressed: null, icons: iconsNow(), images: assets.images, fonts: measured.fonts };
     const picture = pictureOf();
     if (picture) state.picture = picture;
     const layer = (pressedKey) => {
@@ -734,7 +737,12 @@
       let bmp = null;
       const jpg = L.imageType(picked) === 'jpg';
       try {
-        const made = await M.pictureFile(L, FORMAT, picked, async (bytes, sizeOf, quality) => encodePicture(bmp ??= await createImageBitmap(new Blob([bytes])), sizeOf, quality, null, jpg));
+        // an animated WebP the app plays is kept as it is (it plays centred, filling the keyboard: the crop is only
+        // the still cuts'); its first frame is what the cuts are made of
+        const animated = M.keepsAnimated(FORMAT.limits, picked);
+        const made = animated ? { bytes: picked, type: 'webp' }
+          : await M.pictureFile(L, FORMAT, picked, async (bytes, sizeOf, quality) => encodePicture(bmp ??= await createImageBitmap(new Blob([bytes])), sizeOf, quality, null, jpg));
+        bmp ??= await createImageBitmap(new Blob([picked]));
         const size = L.imageSize(made.bytes);
         if (!size) throw new Error('no size');
         const scale = bmp.width / size[0];
@@ -750,7 +758,7 @@
         // the one before let go only now that this one is made
         originals.clear();
         originals.set(L.contentId(made.bytes), { bytes: picked, scale });
-        return { type: made.type, src: made.bytes, cuts };
+        return { type: made.type, src: made.bytes, cuts, animated };
       } finally {
         if (bmp) bmp.close();
       }

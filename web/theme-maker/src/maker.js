@@ -95,7 +95,7 @@
     else if ((format.builtinNames || []).includes(name)) bad('主题名 "' + name + '" 是 App 内置主题的名字，App 不会收；换一个名字');
     const xml = uncommented(d.xml);
     const named = new Set();
-    for (const m of xml.matchAll(srcOf('picture|cut|font|icon', 'src|file'))) named.add(fileOf(m) + '|' + m[1]);
+    for (const m of xml.matchAll(srcOf('picture|cut|font|icon|sound', 'src|file'))) named.add(fileOf(m) + '|' + m[1]);
     for (const m of xml.matchAll(IMAGE_FN)) named.add(m[2].replace(/^["']|["']$/g, '') + '|' + (m[1] === 'image' ? 'image' : 'effect'));
     for (const m of xml.matchAll(srcOf('meta', 'preview'))) named.add(fileOf(m) + '|preview');
     for (const key of named) {
@@ -128,6 +128,10 @@
         if (lim.iconBytes != null && bytes.length > lim.iconBytes) bad(file + ' 超过 ' + lim.iconBytes + ' 字节');
         else if (!r) bad(file + ' 不是 SVG（App 只收 SVG 图标）');
         else if (!r.ok) bad(file + '：' + r.problems[0].message);
+      } else if (role === 'sound') {
+        // the app's ThemeAssetLimits.sound: the engine's SoundFile, the one rule (its limits, its formats)
+        const r = E.readSound(file, bytes);
+        if (!r.ok) bad(r.problems[0].message);
       }
     }
     // an animated <picture> (060-render-p3 A4): past the app's limits it is drawn still, with a warning on import
@@ -541,6 +545,28 @@
   }
 
   /**
+   * The icons the preview draws: [base] (the app's, by name) with the theme's own <icon>s of [d] over them, each as the
+   * engine reads it (readIcon, what the app draws: 060-theme-sounds-icons §2.2). One that does not read is left out, so
+   * the app's of that name is drawn (as the app does with a broken file). Read once per file's bytes ([cache], a WeakMap).
+   */
+  function iconsOf(E, base, d, cache) {
+    const out = Object.assign({}, base);
+    const attr = (tag, n) => { const m = new RegExp('\\s' + n + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')').exec(tag); return m ? unescape(m[1] ?? m[2]) : null; };
+    for (const m of uncommented(d.xml).matchAll(/<icon\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
+      const name = attr(m[0], 'name');
+      const bytes = d.files[attr(m[0], 'src')];
+      if (!name || !bytes) continue;
+      if (!cache.has(bytes)) {
+        let r = null;
+        try { r = E.readIcon(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); } catch (e) { /* not text: not drawn */ }
+        cache.set(bytes, r && r.ok ? r.icon : null);
+      }
+      if (cache.get(bytes)) out[name] = cache.get(bytes);
+    }
+    return out;
+  }
+
+  /**
    * An animated WebP's header as the app reads it (AnimatedWebp.header): `{width, height, frames, shortestMs}`, null where
    * it is none (no VP8X first with its animation flag, no frame) or cut short; at most [maxFrames] + 64 chunks walked.
    */
@@ -570,6 +596,12 @@
     }
     return animated && frames > 0 ? { width: w, height: h, frames, shortestMs: shortest } : null;
   }
+
+  /**
+   * Whether a picture picked on the 背景 page is kept as it is, its file the picked one's: an animated WebP the app plays
+   * ([animatedStill] none). Every other picture is encoded anew; the cuts (the still ones) are made either way.
+   */
+  const keepsAnimated = (lim, bytes) => animatedStill(lim, bytes) == null;
 
   /** Why the app draws [bytes] still (ThemeAssetLimits.animated, the limits of youmo-format), null where it plays. */
   function animatedStill(lim, bytes) {
@@ -613,6 +645,6 @@
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, animatedWebp, animatedStill, exampleDoc,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

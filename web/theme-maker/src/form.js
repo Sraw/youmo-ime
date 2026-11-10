@@ -78,7 +78,7 @@
   }
 
   // the order theme.xml's elements go in (ThemeReader): one put in goes after the last of its kind or before
-  const ORDER = ['meta', 'colors', 'picture', 'font', 'style', 'icon'];
+  const ORDER = ['meta', 'colors', 'picture', 'font', 'style', 'icon', 'sounds'];
 
   /** [xml] with [text] (an element) put in where [kind]'s go: after the last of it or of a kind before it, else first in <theme>. */
   function insert(xml, kind, text) {
@@ -262,7 +262,7 @@
       let text = '';
       if (p) {
         text = '<picture src="' + escape(p.src) + '"' + (p.brightness != null && p.brightness !== 100 ? ' brightness="' + p.brightness + '%"' : '') +
-          (p.blur ? ' blur="' + p.blur + 'dp"' : '') + '>';
+          (p.blur ? ' blur="' + p.blur + 'dp"' : '') + (p.animated ? ' animated="true"' : '') + '>';
         for (const o of ['portrait', 'landscape']) if (p.cuts[o]) text += '\n    ' + cutText(o, p.cuts[o]);
         text += '\n  </picture>';
       }
@@ -271,6 +271,47 @@
     }
     const gone = [...before.matchAll(/\b(?:src|file)\s*=\s*(?:"([^"]+)"|'([^']+)')/g)].map((m) => unescape(m[1] ?? m[2])).filter((f) => !isNamed(xml, f));
     return { xml, gone: [...new Set(gone)] };
+  }
+
+  // the <sound> of [key] in [xml], null where none
+  const soundOf = (xml, key) => elements(xml, 'sound').find((e) => e.attrs.some((a) => a[0] === 'key' && a[1] === key)) || null;
+
+  /** The theme's key sounds: `{key: src}` (a key the app does not know yet too: it keeps those). */
+  const sounds = (xml) => Object.fromEntries(elements(xml, 'sound').map((e) => Object.fromEntries(e.attrs)).filter((a) => a.key).map((a) => [a.key, a.src]));
+
+  /**
+   * [xml] without the <sound> of [key]; its <sounds> taken out too once it holds none (060-theme-sounds-icons §1.5).
+   * `{xml, gone}`: the file it named where nothing names it any more.
+   */
+  function removeSound(xml, key) {
+    const old = soundOf(xml, key);
+    if (!old) return { xml, gone: [] };
+    const src = (old.attrs.find((a) => a[0] === 'src') || [])[1];
+    xml = splice(xml, old.start, old.end, '');
+    const box = elements(xml, 'sounds')[0];
+    if (box && !elements(xml.slice(box.start, box.end), 'sound').length) xml = splice(xml, box.start, box.end, '');
+    return { xml, gone: src && !isNamed(xml, src) ? [src] : [] };
+  }
+
+  /**
+   * [xml] with [src] the sound of [key], in its <sounds> (one made where there is none, in ThemeReader's order).
+   * `{xml, gone}` as removeSound's: the file the key had before.
+   */
+  function setSound(xml, key, src) {
+    const before = soundOf(xml, key);
+    const was = before && (before.attrs.find((a) => a[0] === 'src') || [])[1];
+    const tag = '<sound key="' + escape(key) + '" src="' + escape(src) + '"/>';
+    if (before) xml = xml.slice(0, before.start) + tag + xml.slice(before.end);
+    else {
+      const box = elements(xml, 'sounds')[0];
+      if (!box) xml = insert(xml, 'sounds', '<sounds>\n    ' + tag + '\n  </sounds>');
+      else if (/\/>$/.test(box.tag)) xml = xml.slice(0, box.start) + box.tag.replace(/\s*\/>$/, '>') + '\n    ' + tag + '\n  </sounds>' + xml.slice(box.end);
+      else {
+        const close = box.end - '</sounds>'.length;
+        xml = xml.slice(0, close).replace(/\s*$/, '') + '\n    ' + tag + '\n  ' + xml.slice(close);
+      }
+    }
+    return { xml, gone: was && was !== src && !isNamed(xml, was) ? [was] : [] };
   }
 
   /**
@@ -469,7 +510,7 @@
   root.YoumoForm = {
     uncommented, styles, elements, valueOf, setProp, setProps, insert, sameSelect, LIMITS, clamp,
     COLOR_GROUPS, colors, setColor, variants, withDark, hexOf, parseHex,
-    picture, setPicture, cropRect, isNamed,
+    picture, setPicture, cropRect, isNamed, sounds, setSound, removeSound,
     fillText, parseFill, shadowText, parseShadow, borderText, parseBorder, parseInset, insetText, parseRadius, radiusText,
     meta, setMeta,
     keyName, RANGES, SCENES, STATES, selector,

@@ -730,3 +730,66 @@ def st72(d):
         check(n > 10, f"{option} 没弹出（{n} 个键）")
         out.append(f"{option} {n} 键")
     return "提示 5 个 commit:、k14 不用；q 打出你好；" + "、".join(out)
+
+
+SOUNDS_ICONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures", "theme-sounds-icons")
+
+
+def push_icons_pack(d, sounds=False):
+    """uat-sounds-icons.theme in 下载, made of uat/fixtures/theme-sounds-icons: Nord with its own backspace, enter,
+    shift and a star on the space key ([sounds]: its five key sounds too; without, its <sounds> left out)"""
+    import zipfile
+    with open(os.path.join(SOUNDS_ICONS, "theme.xml"), encoding="utf-8") as f:
+        xml = f.read()
+    names = [n for n in os.listdir(SOUNDS_ICONS) if n.endswith(".svg")]
+    if sounds:
+        names += [n for n in os.listdir(SOUNDS_ICONS) if n.rsplit(".", 1)[-1] in ("wav", "ogg", "mp3") and n != "short.mp3"]
+    else:
+        xml = re.sub(r"\s*<sounds>.*?</sounds>", "", xml, flags=re.S)
+    p = os.path.join(tempfile.gettempdir(), f"uat-sounds-icons-{d.port}.theme")
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("theme.xml", xml)
+        for n in names:
+            z.write(os.path.join(SOUNDS_ICONS, n), n)
+    d.sh("rm -f /sdcard/Download/uat-sounds-icons*.theme")
+    d.adb("push", p, "/sdcard/Download/uat-sounds-icons.theme")
+    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-sounds-icons.theme")
+    time.sleep(1)
+
+
+def reds(d, c, r=60):
+    """the star's half-see-through red circle: pixels within [r] of [c] far redder than they are green or blue"""
+    im = d.png().crop((c[0] - r, c[1] - r // 2, c[0] + r, c[1] + r // 2)).convert("RGB")
+    return sum(1 for R, G, B in im.getdata() if R > G + 50 and R > B + 50)
+
+
+@case("ST-90", base="B0-设置", mutates=True)
+def st90(d):
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统夜间模式", False)
+    push_icons_pack(d)
+    d.step("导入")
+    import_theme(d, "uat-sounds-icons")
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "导入后主题列表里没有它")
+    d.tap(item.c, 1.5)
+    d.step("看键")
+    d.open_page("text")
+    k = d.keys(refresh=True)
+    n = reds(d, k["space"])
+    d.shot("full", "主题的退格、回车、Shift，空格上的星")
+    check(n > 30, f"空格键上没有星的红色圆（{n} 个红点）")
+    d.step("换回内置")
+    delete_custom(d)
+    d.open_page("text")
+    m = reds(d, d.keys(refresh=True)["space"])
+    d.shot("full", "内置主题，自带图标")
+    check(m < 5, f"删掉主题后空格键上还有红色（{m} 个红点）")
+    return f"空格上星的红点 {n}，换回内置后 {m}"
+
+
+case("ST-89", needs="block:按键音的播放（S3）在另一个分支，合入后在 youmo29 上看 logcat 的 load status，再在 API 34+ 上听")(lambda d: None)
+case("ST-91", needs="block:按键音的导入检查（S3）在另一个分支，合入后跑；要逐个打坏的主题包")(lambda d: None)
+case("ST-92", needs="manual:主题制作网页；在电脑浏览器上手工跑（图标预览、按键音试听）")(lambda d: None)
+case("ST-93", needs="manual:主题制作网页；在电脑浏览器上手工跑（选动画 WebP 做背景，导入 App 看）")(lambda d: None)
