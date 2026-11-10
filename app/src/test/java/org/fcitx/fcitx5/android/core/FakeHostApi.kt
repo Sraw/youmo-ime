@@ -187,8 +187,9 @@ class FakeHostApi : HostApi {
             (if (started) ", started" else "") + (after?.let { ", after $it" } ?: "") + (if (selected) ", selected" else "") + (if (said) ", said)" else ")")
     }
 
-    override suspend fun offerInk(reading: InkReading, piece: Int): Boolean {
-        calls += "offerInk($piece)"
+    // written on the keys: marked so ([onKeys]), with its first reading
+    override suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean): Boolean {
+        calls += if (onKeys) "offerInk($piece, keys, ${reading.texts.firstOrNull()})" else "offerInk($piece)"
         return true
     }
 
@@ -209,8 +210,8 @@ class FakeHostApi : HostApi {
         return true
     }
 
-    override suspend fun inkFinished(piece: Int): Boolean {
-        calls += "inkFinished($piece)"
+    override suspend fun inkFinished(piece: Int, onKeys: Boolean): Boolean {
+        calls += if (onKeys) "inkFinished($piece, keys)" else "inkFinished($piece)"
         return true
     }
 

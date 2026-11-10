@@ -294,3 +294,158 @@ test('从背景图取色: see-through keys of the picture\'s lightness, text tha
   assert.equal(r.theme.info(false).colors.accentKey, '#ffff3366');
   assert.equal(F.colors(made.xml, 'dark').accentKey, '#88c0d0', 'the light version shown: the dark one kept');
 });
+
+// ---- M3: 栏, 弹出, 面板和窗口, 尺寸, 动效, 信息, 源码 ----
+
+const PNG4 = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGPQCFgARwzEcQC/wxGBfpfKIQAAAABJRU5ErkJggg==', 'base64'));
+
+// a value the form would write of [p] (its kind's middle)
+function sampleOf(p) {
+  switch (p.kind) {
+    case 'color': return '#ff123456';
+    case 'dp': return Math.min(p.max ?? 24, Math.max(p.min ?? 0, 2));
+    case 'percent': return Math.round(((p.min ?? 0) + (p.max ?? 100)) / 2);
+    case 'ms': return Math.round(((p.min ?? 0) + (p.max ?? 600)) / 2);
+    case 'choice': return p.options[p.options.length - 1][0];
+    case 'flag': return false;
+    case 'radius': return 6;
+    case 'inset': return [1, 2, 3, 4];
+    case 'twin': return [p.min + 10, p.min + 20];
+    case 'border': return { width: 1, color: '#ff000000' };
+    case 'shadow': return { dx: 0, dy: 1, blur: 2, color: '#33000000' };
+    default: return null;
+  }
+}
+
+test('栏, 弹出, 面板和窗口, 尺寸: every property each part offers, written as its form writes it, is one the engine reads there', () => {
+  for (const id of ['bar', 'popup', 'window', 'size']) {
+    const ops = P[id].ops;
+    for (const part of ops.parts) {
+      let d = { xml: nord, files: {}, layouts: {} };
+      const props = part.props.filter((p) => sampleOf(p) != null);
+      for (const p of props) d = ops.set(d, part.select, p.prop, p.kind, sampleOf(p), p);
+      const r = read(d.xml);
+      const said = r.warnings.filter((w) => /does nothing|not supported/.test(w.message) && props.some((p) => w.message.startsWith(p.prop + '=')));
+      assert.deepEqual(said, [], id + ' ' + part.select);
+      for (const p of props) assert.notEqual(F.valueOf(d.xml, part.select, p.prop), null, part.select + ' ' + p.prop);
+    }
+  }
+});
+
+test('the widgets\' values as theme.xml writes them: shortest radius and inset, a size of two orientations, null not set', () => {
+  const T = (kind, v, o) => globalThis.YoumoPanels.text(F, kind, v, o);
+  assert.equal(T('radius', [4, 4, 4, 4]), '4dp');
+  assert.equal(T('inset', [2, 2, 2, 2]), '2dp');
+  assert.equal(T('inset', [1, 2, 3, 4]), '1dp 2dp 3dp 4dp');
+  assert.equal(T('dp', null), null);
+  assert.deepEqual(F.parseInset('1dp 2dp 3dp 4dp'), [1, 2, 3, 4]);
+  assert.deepEqual(F.parseRadius('1dp 2dp 3dp 4dp'), [1, 2, 3, 4]);
+  assert.equal(F.parseRadius(F.radiusText([4, 4, 0, 0])).join(), '4,4,0,0');
+  assert.equal(F.parseInset(F.insetText([1, 2, 3, 4])).join(), '1,2,3,4');
+});
+
+test('按键: a key image is a nine-slice fill the engine reads; one past the app\'s limits refused', () => {
+  const L = globalThis.YoumoLib;
+  const lim = { keyImageSide: 1024, keyImageBytes: 2097152 };
+  const made = P.keys.ops.addKeyImage({ xml: nord, files: {}, layouts: {} }, L, lim, 'My Key.PNG', PNG4);
+  assert.equal(made.file, 'key-my-key.png');
+  assert.deepEqual(P.keys.ops.keyImages(made), ['key-my-key.png']);
+  assert.throws(() => P.keys.ops.addKeyImage(made, L, { keyImageSide: 2, keyImageBytes: 99 }, 'a.png', PNG4), /太大/);
+  assert.throws(() => P.keys.ops.addKeyImage(made, L, lim, 'a.png', new Uint8Array([1, 2, 3])), /不是/);
+  const fill = { kind: 'image', file: made.file, insets: [1, 1, 1, 1], scale: 2, fallback: '#ff0000' };
+  const d = P.keys.ops.fill(made, 'key.letter', fill);
+  assert.deepEqual(F.parseFill(F.valueOf(d.xml, 'key.letter', 'fill')), fill);
+  read(d.xml);
+});
+
+test('动效: each property written as the format writes it; whether this engine draws it is the engine\'s answer', () => {
+  const ops = P.motion.ops;
+  let d = { xml: nord, files: {}, layouts: {} };
+  d = ops.set(d, 'key', 'transition', { ms: 120, easing: 'ease-out' });
+  d = ops.set(d, 'preview', 'appear', { kind: 'rise', ms: 120 });
+  assert.deepEqual(ops.parseTransition(F.valueOf(d.xml, 'key', 'transition')), { ms: 120, easing: 'ease-out' });
+  assert.deepEqual(ops.parseAppear(F.valueOf(d.xml, 'preview', 'appear')), { kind: 'rise', ms: 120 });
+  const r = E.readTheme(d.xml, null, null);
+  assert.ok(r.ok, JSON.stringify(r.problems));
+  const ok = ops.supported(E, nord);
+  for (const p of ['transition', 'appear']) assert.equal(ok[p], !r.warnings.some((w) => w.message.startsWith(p + '= is not supported')), p);
+  assert.equal(ops.sample(d.xml).appear.kind, 'rise');
+  const L = globalThis.YoumoLib;
+  assert.ok(ops.addEffectImage(d, L, 'Dot.png', PNG4).file.startsWith('effect-'));
+  assert.throws(() => ops.addEffectImage(d, L, 'x.jpg', new Uint8Array([0xff, 0xd8, 0xff])));
+});
+
+test('信息: the name and <meta> written in place, taken out when emptied; a preview image the app takes', () => {
+  const ops = P.info.ops;
+  let d = { xml: nord, files: {}, layouts: {} };
+  d = ops.meta(d, 'author', 'Me & you');
+  d = ops.meta(d, 'version', '1.0');
+  d = ops.name(d, 'my-nord');
+  read(d.xml);
+  assert.deepEqual(F.meta(d.xml), { author: 'Me & you', version: '1.0' });
+  d = ops.meta(d, 'author', '');
+  d = ops.meta(d, 'version', null);
+  assert.deepEqual(F.meta(d.xml), {});
+  const L = globalThis.YoumoLib;
+  const withPreview = ops.preview(d, L, PNG4);
+  assert.equal(F.meta(withPreview.xml).preview, 'preview.png');
+  assert.ok('preview.png' in withPreview.files);
+  read(withPreview.xml);
+  const none = ops.preview(withPreview, L, null);
+  assert.ok(!('preview.png' in none.files) && F.meta(none.xml).preview == null);
+  assert.throws(() => ops.preview(d, L, new Uint8Array([0xff, 0xd8, 0xff])), /PNG 或 WebP/);
+});
+
+test('源码: styles the form does not know, comments and spacing are kept verbatim through every new panel\'s edits', () => {
+  const hand = '  <!-- my own -->\n  <style select="key.letter , key.function"   fill="#010203"/>\n';
+  const xml = nord.replace('</theme>', hand + '</theme>');
+  let d = { xml, files: {}, layouts: {} };
+  for (const id of ['bar', 'popup', 'window', 'size']) {
+    const part = P[id].ops.parts[0];
+    const p = part.props.find((x) => sampleOf(x) != null);
+    d = P[id].ops.set(d, part.select, p.prop, p.kind, sampleOf(p), p);
+  }
+  d = P.motion.ops.set(d, 'key', 'transition', { ms: 100, easing: 'ease' });
+  d = P.info.ops.meta(d, 'license', 'CC0');
+  assert.ok(d.xml.includes(hand), 'the hand-written lines as they were');
+  read(d.xml);
+});
+
+test('the picture changed in place: an attribute and a comment of the user\'s kept', () => {
+  const xml = nord.replace('<style', '<picture src="a.png" rotation="0">\n    <!-- mine -->\n    <cut orientation="portrait" file="a.png" note="x"/>\n  </picture>\n  <style');
+  const p = F.picture(xml);
+  p.brightness = 80;
+  p.cuts.portrait = { file: 'b.png', rect: [0, 0, 10, 5] };
+  const out = F.setPicture(xml, p);
+  const x = out.xml ?? out;
+  assert.match(x, /rotation="0"/);
+  assert.match(x, /<!-- mine -->/);
+  assert.match(x, /note="x"/);
+  assert.match(x, /file="b.png"/);
+});
+
+test('从背景图取色: one noisy pixel is not the accent; both versions each worked out for its own', () => {
+  const ops = P.colors.ops;
+  const greys = Array.from({ length: 50 }, () => [120, 120, 120]);
+  assert.notEqual(ops.fromPicture(greys.concat([[255, 0, 0]])).accentKey, '#ff0000');
+  const both = ops.fromPictureAll({ xml: F.withDark ? F.withDark(nord, true) : nord, files: {}, layouts: {} }, [[20, 20, 20], [40, 40, 40]]);
+  const vs = F.variants(both.xml);
+  if (vs.length > 1) {
+    assert.equal(F.colors(both.xml, 'light').key, '#66ffffff');
+    assert.equal(F.colors(both.xml, 'dark').key, '#4d000000');
+  }
+  read(both.xml);
+});
+
+test('an uploaded key or effect image never overwrites a file: a name taken gets -2, one of no letters a name', () => {
+  const L = globalThis.YoumoLib;
+  const lim = { keyImageSide: 1024, keyImageBytes: 2097152 };
+  const one = P.keys.ops.addKeyImage({ xml: nord, files: {}, layouts: {} }, L, lim, 'a.png', PNG4);
+  const two = P.keys.ops.addKeyImage(one, L, lim, 'A.png', PNG4);
+  assert.equal(two.file, 'key-a-2.png');
+  assert.ok('key-a.png' in two.files);
+  assert.equal(P.keys.ops.addKeyImage(one, L, lim, '按键.png', PNG4).file, 'key-image.png');
+  const e1 = P.motion.ops.addEffectImage(one, L, '火花.png', PNG4);
+  assert.equal(e1.file, 'effect-image.png');
+  assert.equal(P.motion.ops.addEffectImage(e1, L, '星.png', PNG4).file, 'effect-image-2.png');
+});

@@ -1180,6 +1180,8 @@ one that does not read (told once, `user_data_unreadable`), leaving its file as 
 
 ### Theme 4.0 packs (060-render-p3 T8a)
 
+What a theme author may write (elements, selectors, properties, limits) is [docs/theme-format.md](../docs/theme-format.md); keep it true with any change to the reader or the import's limits.
+
 A pack is `files/host-theme/v4/<name>/`: its `theme.xml` (keyboard-scene's theme format 4, `ThemeReader`), the
 files it names (picture and cuts, `image()` fills, fonts, icons, the `<meta preview>`) and `layouts/*.xml`
 (`ThemePackFiles`). Each version of it (`variants`) is a `Theme.Pack` named as a built-in's are, `<name>#light`;
