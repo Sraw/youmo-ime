@@ -605,6 +605,13 @@ class Engines(
         }
     }
 
+    /**
+     * Whether [im] has input of its own typed, not what is written over its keys ([InkOver.typing]): then
+     * the keyboard starts no stroke there (KeyInkGesture.mayWrite). False where nothing is written over
+     * the keys. On the fcitx thread.
+     */
+    fun typedOnKeys(im: String): Boolean = checked { (sessions[inkedSession(im)] as? InkOver)?.typing == true }
+
     /** The latest piece of handwriting ended ([HandwritingSession.ended]; of those written over the keys too, [InkOver]), for the pad to wipe; on the fcitx thread. */
     val inkEnded: Int get() = checked { handwritings().fold(inkEndedBefore) { m, h -> maxOf(m, h.ended) } }
 

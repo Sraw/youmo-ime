@@ -131,12 +131,36 @@ class InkOverTest {
     @Test
     fun nothingIsWrittenWhilePinyinHasSomethingTyped() {
         type("ni")
-        val s = write(0, "天")
+        assertTrue(over.typing)
+        val ink = Action.Ink(0, read("天"))
+        val s = over.apply(ink)
         assertEquals("ni", s.preedit)
-        assertEquals(0, made)
-        assertNull(over.handwritingMade)
         assertFalse(over.inking)
         assertEquals(listOf("你", "泥"), over.candidates(0, 5).map { it.text })
+        // dropped: taken (not held again), its piece ended (the pad wipes it)
+        assertEquals(true, over.handwritingMade?.took(ink))
+        assertEquals(0, over.handwritingMade?.ended)
+    }
+
+    @Test
+    fun whatHandwritingShowsIsNoInputTyped() {
+        assertNull(over.handwritingMade)
+        write(0, "天")
+        assertFalse(over.typing)
+        assertEquals(2, write(1, "人").preedit.length)
+    }
+
+    @Test
+    fun aSentenceWrittenAfterPinyinPutTextInGoesOnFromIt() {
+        val gao = InkOver(FakePinyin(mapOf("gao" to listOf("高")))) {
+            HandwritingSession(handwritingDecoder(), TextWords(handwritingData.model, handwritingData.wordIndex))
+        }
+        gao.apply(Action.Ink(0, read("天")))
+        assertEquals("天", gao.apply(Action.Pick(0)).commit)
+        "gao".forEach { gao.apply(Action.Key(it)) }
+        assertEquals("高", gao.apply(Action.Pick(0)).commit)
+        // 山 after 高 (the model's bigram), though 人 is likelier alone: the text before told anew
+        assertEquals("山", gao.apply(Action.Ink(1, read("人", "山", step = 0.1))).preedit)
     }
 
     @Test

@@ -14,9 +14,11 @@ import org.fcitx.fcitx5.android.input.handwriting.InkPad
  * down, a dot too, no long press, another finger ignored. Outside it the keys are tapped and long
  * pressed as ever.
  *
- * Nothing is written while something is typed ([down]'s preedit): a move then is the key's. But for
- * a character whose first stroke is a dot (主, 六): a tap that typed a letter that is all the input,
- * and a stroke within [pauseMillis] after it, takes the tap back as that first stroke ([takeTapped]:
+ * Nothing is written while the input method has input typed ([mayWrite]'s typed: its own, not what
+ * handwriting shows, Engines.typedOnKeys): a move then is the key's. But for a character whose first
+ * stroke is a dot (主, 六): a tap that started the input (nothing typed at its down), and a stroke
+ * within [pauseMillis] after it with no other key between, takes the tap back as that first stroke
+ * ([takeTapped]; told by state, not by text, as the nine keys or zhuyin show no letter of the key:
  * the app deletes the letter and puts the tap's places on the pad first). No tap waits to see what
  * follows: typing would slow down.
  */
@@ -29,9 +31,10 @@ class KeyInkGesture {
     private var lastUp = NONE
     private var drawing = false
 
-    // the last tap on a letter: its letter, lift and places (pixels, x and y in turn)
-    private var tapLetter: Char? = null
+    // the last tap on a letter that started the input: its lift and places (pixels, x and y in turn)
     private var tapUp = NONE
+    // whether the touch down now would start the input, if a tap
+    private var startsInput = false
     private var tapPoints: FloatArray? = null
     private var tapTakable = false
 
@@ -41,14 +44,15 @@ class KeyInkGesture {
     fun writing(time: Long): Boolean = drawing || lastUp != NONE && time - lastUp < pauseMillis
 
     /**
-     * A touch down on a letter ([letter], null in a split keyboard's gap) at [time], [preedit] what is
-     * typed: whether it may become a stroke once it moves. With something typed, only where that is the
-     * letter just tapped, within the pause ([takeTapped] then gives that tap's places once it does).
+     * A touch down on a letter or a split keyboard's gap at [time], [typed] whether the input method has
+     * input typed: whether it may become a stroke once it moves. With input typed, only where the tap
+     * just before started it, within the pause ([takeTapped] then gives that tap's places once it does).
      */
-    fun mayWrite(time: Long, preedit: String): Boolean {
-        tapTakable = tapLetter != null && time - tapUp < pauseMillis && preedit.equals(tapLetter.toString(), ignoreCase = true)
+    fun mayWrite(time: Long, typed: Boolean): Boolean {
+        tapTakable = typed && tapPoints != null && time - tapUp < pauseMillis
         if (!tapTakable) forgetTap()
-        return preedit.isEmpty() || tapTakable
+        startsInput = !typed
+        return !typed || tapTakable
     }
 
     /** The touch became a stroke: the writing starts, or goes on; a tap that may be its first dot taken back. */
@@ -64,12 +68,12 @@ class KeyInkGesture {
         lastUp = time
     }
 
-    /** A tap on [letter] (null if it typed none) lifted at [time], its [count] [points] (pixels): a first dot if a stroke follows. */
-    fun tapped(letter: Char?, time: Long, points: FloatArray, count: Int) {
-        tapLetter = letter
+    /** A tap lifted at [time], its [count] [points] (pixels): a first dot if it started the input and a stroke follows. */
+    fun tapped(time: Long, points: FloatArray, count: Int) {
+        forgetTap()
+        if (!startsInput) return
         tapUp = time
         tapPoints = points.copyOf(count)
-        tapTakable = false
     }
 
     /** The places of the tap taken back as this stroke's first dot, once: delete its letter, then put them on the pad. */
@@ -87,8 +91,8 @@ class KeyInkGesture {
         forgetTap()
     }
 
-    private fun forgetTap() {
-        tapLetter = null
+    /** Another key touched (not a letter): the tap before is no first dot. */
+    fun forgetTap() {
         tapPoints = null
         tapUp = NONE
         tapTakable = false

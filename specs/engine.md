@@ -800,13 +800,18 @@ unwraps). An `Action.Ink` goes to a `HandwritingSession` of its own, made at the
 handwriting's is (`SessionFactory.handwritingSession`); while that shows anything (what is written,
 its 联想) every action is its, but a letter, which puts its best sentence in and is typed into the
 wrapped session in the same snapshot; what it put in is told the wrapped session as an
-`Action.Context`. An Ink while the wrapped session has input typed is dropped; one while it offers
-联想 starts writing and drops the offer. `Engines.ink`/`inkSent` take the input method (its shown
-session, a pair's keyed one), and `inkEnded` and the pieces ended over a drop of the sessions count
-every handwriting session made. When a touch on the letters is a stroke is `KeyInkGesture`
-(`input/keyboard`), which `GlideTouch.down` takes (`ink`, with the preedit and the letter under the
-finger): 0.3 of a key any way, then every touch a stroke from its down till the pause; a tap whose
-letter is all the input, a stroke within the pause after it, taken back as the first dot (`takeTapped`).
+`Action.Context`, and a new sentence written after the wrapped session put text in is told the text
+before anew. An Ink while the wrapped session has input typed (`InkOver.typing`, `Engines.typedOnKeys`)
+is dropped (`HandwritingSession.drop`: taken, so `inkSent` holds it not, its piece ended); one while it
+offers 联想 starts writing and drops the offer. A Backspace the app does and a key passed on reach
+the handwriting too, so a sentence it put in and deleted at once is taken back (U-03).
+`Engines.ink`/`inkSent` take the input method (its shown session, a pair's keyed one), and `inkEnded`
+and the pieces ended over a drop of the sessions count every handwriting session made. When a touch
+on the letters is a stroke is `KeyInkGesture` (`input/keyboard`), which `GlideTouch.down` takes (`ink`,
+and `typed`: `Engines.typedOnKeys`, false while what shows is handwriting's): 0.3 of a key any way,
+then every touch a stroke from its down till the pause; a tap that started the input (nothing typed
+at its down), a stroke within the pause after it and no other key between, taken back as the first
+dot (`takeTapped`), by state, not by text, as the nine keys and zhuyin show no letter of the key.
 
 ## Handwriting
 

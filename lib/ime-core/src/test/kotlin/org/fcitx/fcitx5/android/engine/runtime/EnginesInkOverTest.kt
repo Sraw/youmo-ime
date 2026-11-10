@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -49,10 +50,54 @@ class EnginesInkOverTest : EnginesFixture() {
         engines.ink(Action.Ink(0, InkReading(listOf("好"), DoubleArray(1))), shown = false, im = PINYIN)
         val s = engines.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(HandwritingSession.NO_PIECE))
         assertEquals("好", s.preedit)
-        // sent and taken: not held again
-        engines.inkSent(Action.Ink(HandwritingSession.NO_PIECE), im = PINYIN)
-        // English is written on by none
-        engines.ink(Action.Ink(1), shown = false, im = InputMethodCatalog.ENGLISH)
+        // English is written on by none: nothing held, nothing typed there
+        engines.ink(Action.Ink(1, InkReading(listOf("你"), DoubleArray(1))), shown = false, im = InputMethodCatalog.ENGLISH)
+        assertFalse(engines.typedOnKeys(InputMethodCatalog.ENGLISH))
+    }
+
+    @Test
+    fun twoCharactersWrittenWithAPauseBetweenAreOneSentence() {
+        val engines = Engines(::load, null, warmUps = inPlace)
+        engines.write(PINYIN, 0, "好")
+        // what shows is handwriting's: pinyin has nothing typed, so the keyboard writes on
+        assertFalse(engines.typedOnKeys(PINYIN))
+        assertEquals("好拟", engines.write(PINYIN, 1, "拟").preedit)
+        engines.type(PINYIN, "n")
+        // a letter put it in and typed: pinyin's own now
+        assertTrue(engines.typedOnKeys(PINYIN))
+    }
+
+    // a reading come while pinyin is typed is dropped: sent and taken, not held to come back in the next writing
+    @Test
+    fun anInkDroppedWhilePinyinIsTypedComesNeverBack() {
+        val engines = Engines(::load, null, warmUps = inPlace)
+        engines.type(PINYIN, "n")
+        val late = Action.Ink(0, InkReading(listOf("人"), DoubleArray(1)))
+        assertEquals("n", engines.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = late).preedit)
+        engines.inkSent(late, im = PINYIN)
+        assertEquals(0, engines.inkEnded)
+        engines.onEvent(PINYIN, EngineEvent.BACKSPACE, 0)
+        assertEquals("好", engines.write(PINYIN, 1, "好").preedit)
+    }
+
+    // U-03: a sentence written over the keys and deleted as soon as it was put in is taken back, as on the pad
+    @Test
+    fun aSentenceDeletedAtOnceIsNotLearned() {
+        fun learned(deleted: Boolean): Boolean = Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
+            repeat(2) { n ->
+                engines.onEvent(PINYIN, EngineEvent.RESET, 0)
+                engines.context(PINYIN, "")
+                engines.write(PINYIN, 2 * n, "好")
+                engines.write(PINYIN, 2 * n + 1, "拟")
+                assertEquals("好拟", engines.onEvent(PINYIN, EngineEvent.PICK, 0).commit)
+                if (deleted) repeat(2) { engines.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
+            }
+            engines.onEvent(PINYIN, EngineEvent.RESET, 0)
+            engines.context(PINYIN, "")
+            "好拟" in engines.userWords(UserWord.Kind.LEARNED).map { it.text }
+        }
+        assertTrue(learned(deleted = false))
+        assertFalse(learned(deleted = true))
     }
 
     // a word added drops the sessions: the piece ended stays ended, over the keys as on the pad

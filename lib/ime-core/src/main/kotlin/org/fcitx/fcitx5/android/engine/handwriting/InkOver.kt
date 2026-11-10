@@ -57,7 +57,14 @@ class InkOver(
     /** Whether the handwriting shows anything: then every action is its. */
     val inking: Boolean get() = inked?.let { it.preedit.isNotEmpty() || it.candidates.isNotEmpty() } == true
 
-    private val typing: Boolean get() = inner?.let { it.preedit.isNotEmpty() && !it.predicting } == true
+    /**
+     * Whether [session] has input typed, not what the handwriting shows: then nothing is written (the
+     * keyboard starts no stroke, KeyInkGesture.mayWrite's typed; Engines.typedOnKeys).
+     */
+    val typing: Boolean get() = !inking && inner?.let { it.preedit.isNotEmpty() && !it.predicting } == true
+
+    // [session] put text in or deleted since the handwriting last heard of the text before
+    private var innerWrote = false
 
     override var learning: Boolean
         get() = session.learning
@@ -78,13 +85,22 @@ class InkOver(
         written = if (action is Action.Context) action.before.takeLast(Action.Context.HOST_CHARS) else ""
         made?.apply(action)
         inked = null
-        return innerApply(action)
+        return innerApply(action).also { innerWrote = false }
     }
 
     private fun ink(action: Action.Ink): Snapshot {
-        if (typing && !inking) inner?.let { return it.copy(commit = "", deleteBefore = 0, handled = true) }
-        // what [session] offered goes: told the text before again, its input none
-        if (!inking && inner?.predicting == true) innerApply(Action.Context(written))
+        if (typing) {
+            // dropped: taken, so not held for the next (Engines.inkSent), its piece ended, so the pad wipes it
+            handwriting().drop(action)
+            inner?.let { return it.copy(commit = "", deleteBefore = 0, handled = true) }
+        }
+        if (!inking) {
+            // what [session] offered goes: told the text before again, its input none
+            if (inner?.predicting == true) innerApply(Action.Context(written))
+            // a new sentence goes on from the text before the cursor, as [session] left it (design §5)
+            if (innerWrote) made?.apply(Action.Context(written))
+            innerWrote = false
+        }
         return inkApply(action)
     }
 
@@ -102,8 +118,12 @@ class InkOver(
     }
 
     private fun innerApply(action: Action): Snapshot = session.apply(action).also {
+        if (it.commit.isNotEmpty() || it.deleteBefore > 0) innerWrote = true
         wrote(it)
         inner = it
+        // a backspace the app does (nothing typed): the handwriting hears of it too, to take back a
+        // sentence it put in and that is deleted at once (U-03, its FieldJournal)
+        if (action == Action.Backspace && !it.handled) made?.apply(action)?.let { h -> inked = h }
     }
 
     private fun inkApply(action: Action): Snapshot {
@@ -138,7 +158,7 @@ class InkOver(
 
     override fun reread(): Snapshot? = made?.takeIf { inking }?.let { h -> h.reread()?.also { inked = it } } ?: session.reread()
 
-    override val rereads: Boolean get() = session.rereads || made != null
+    override val rereads: Boolean get() = if (inking) true else session.rereads
 
     override val takesEveryCharacter: Boolean get() = !inking && session.takesEveryCharacter
 
@@ -150,7 +170,9 @@ class InkOver(
         made?.fieldFlags(flags)
     }
 
+    // both hear of a key the app took: the handwriting's journal and 联想 as on its own keyboard
     override fun passedOn() {
-        shown.passedOn()
+        if (!inking) session.passedOn()
+        made?.passedOn()
     }
 }

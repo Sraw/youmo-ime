@@ -31,7 +31,6 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
     // writing on the keys: the touch's, and whether it is a stroke from its down (the writing goes on)
     private var ink: KeyInkGesture? = null
     private var inkFromDown = false
-    private var letter: Char? = null
 
     /** The finger that may glide, [NO_POINTER] if none. */
     var pointer = NO_POINTER
@@ -64,23 +63,28 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
      *
      * Writing on the keys ([ink], [KeyInkGesture]): a touch is a stroke at [GlideGesture.STROKE], any
      * way; while the writing goes on one is [gliding] from its down, so the caller presses no key (it
-     * asks right after this). [preedit], what is typed, and the [letter] under the finger say whether
-     * one may start ([KeyInkGesture.mayWrite]); give [up] and [pointerUp] their times.
+     * asks right after this). [typed], whether the input method has its own input typed (not what
+     * handwriting shows), says whether one may start ([KeyInkGesture.mayWrite]); give [up] and [pointerUp]
+     * their times. The ink's places are the caller's to put on the pad from the events, in pixels:
+     * [takeGlided] is in key units, scaled apart across and down, for the glide decoder alone.
      */
     fun down(
         pointerId: Int, x: Float, y: Float, time: Long, onLetter: Boolean, keyWidth: Float, keyHeight: Float, longPressMillis: Long,
-        stroke: Boolean = false, inGap: Boolean = false, ink: KeyInkGesture? = null, preedit: String = "", letter: Char? = null,
+        stroke: Boolean = false, inGap: Boolean = false, ink: KeyInkGesture? = null, typed: Boolean = false,
     ) {
         reset()
         glided = null
         this.ink = ink
-        this.letter = letter
         val drawn = stroke || ink != null
         val starts = onLetter || drawn && inGap
-        if (!starts || keyWidth <= 0f || keyHeight <= 0f) return
+        if (!starts || keyWidth <= 0f || keyHeight <= 0f) {
+            // another key between a tap and a stroke: that tap is no first dot
+            ink?.forgetTap()
+            return
+        }
         if (ink != null) {
             inkFromDown = ink.writing(time)
-            if (inkFromDown) ink.strokeStarted() else if (!ink.mayWrite(time, preedit)) return
+            if (inkFromDown) ink.strokeStarted() else if (!ink.mayWrite(time, typed)) return
         }
         val same = made != null && keyWidth == this.keyWidth && keyHeight == this.keyHeight && longPressMillis == this.longPressMillis &&
             drawn == this.stroke
@@ -149,7 +153,8 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
     fun up(x: Float, y: Float, cancelled: Boolean, time: Long = 0L): Route {
         if (!gliding) {
             // a tap on a letter: the first dot of what may be written next (KeyInkGesture)
-            if (!cancelled && gesture != null) ink?.let { add(x, y); it.tapped(letter, time, points, count) }
+            // held past its long press, it was no tap
+            if (!cancelled && gesture != null && time - t0 <= longPressMillis) ink?.let { add(x, y); it.tapped(time, points, count) }
             reset()
             return Route.KEYS
         }

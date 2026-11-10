@@ -17,13 +17,13 @@ class KeyInkGestureTest {
     private val ink = KeyInkGesture().apply { pauseMillis = 500 }
     private val t = GlideTouch()
 
-    // keys 100 by 140, the long press at 300 ms
-    private fun down(time: Long, x: Float = 50f, y: Float = 70f, preedit: String = "", letter: Char? = 'a', pointer: Int = 0) =
-        t.down(pointer, x, y, time, onLetter = letter != null, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, inGap = letter == null, ink = ink, preedit = preedit, letter = letter)
+    // keys 100 by 140, the long press at 300 ms; [letter] false: another key, [gap]: a split keyboard's gap
+    private fun down(time: Long, typed: Boolean = false, letter: Boolean = true, gap: Boolean = false) =
+        t.down(0, 50f, 70f, time, onLetter = letter && !gap, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, inGap = gap, ink = ink, typed = typed)
 
     // a stroke of 0.3 key down, from [time]
-    private fun stroke(time: Long, preedit: String = ""): Route {
-        down(time, preedit = preedit)
+    private fun stroke(time: Long, typed: Boolean = false): Route {
+        down(time, typed = typed)
         assertEquals(Route.KEYS, t.move(50f, 80f, time + 10))
         assertEquals(Route.CANCEL_KEYS, t.move(50f, 115f, time + 20))
         return t.up(50f, 120f, cancelled = false, time = time + 30)
@@ -56,6 +56,14 @@ class KeyInkGestureTest {
     }
 
     @Test
+    fun afterThePauseWritingGoesOnWhileWhatShowsIsHandwritings() {
+        stroke(0)
+        // the pause over, the character written shows: the engine says the input method has nothing typed of its own
+        assertFalse(ink.writing(600))
+        assertEquals(Route.GLIDE, stroke(600, typed = false))
+    }
+
+    @Test
     fun inTheWritingNoLongPressAndASecondFingerIsIgnored() {
         stroke(0)
         down(100)
@@ -77,47 +85,65 @@ class KeyInkGestureTest {
 
     @Test
     fun aStrokeMayStartInASplitKeyboardsGap() {
-        down(0, letter = null)
+        down(0, gap = true)
         assertEquals(Route.CANCEL_KEYS, t.move(50f, 115f, 20))
     }
 
     @Test
     fun nothingIsWrittenWhileSomethingIsTyped() {
-        down(0, preedit = "ni")
+        down(0, typed = true)
         assertEquals(Route.KEYS, t.move(50f, 140f, 20))
         assertFalse(ink.writing(30))
     }
 
     @Test
-    fun aTapThatTypedAllTheInputIsTakenBackAsTheFirstDot() {
-        down(0, letter = 'd')
+    fun aTapThatStartedTheInputIsTakenBackAsTheFirstDot() {
+        down(0)
         assertEquals(Route.KEYS, t.up(52f, 72f, cancelled = false, time = 40))
-        // within the pause, the input that letter: a stroke may start, and takes the tap back
-        assertEquals(Route.GLIDE, stroke(300, preedit = "d"))
+        // within the pause, the input that tap's, whatever it shows (the nine keys' or zhuyin's own spelling)
+        assertEquals(Route.GLIDE, stroke(300, typed = true))
         assertArrayEquals(floatArrayOf(50f, 70f, 52f, 72f), ink.takeTapped(), 0f)
         // given once
         assertNull(ink.takeTapped())
     }
 
     @Test
-    fun aTapIsNotTakenBackLateOrWhereTheInputIsMore() {
-        down(0, letter = 'd')
+    fun aTapIsNotTakenBackLateOrAfterAnotherKey() {
+        down(0)
         t.up(50f, 70f, cancelled = false, time = 40)
         // past the pause
-        down(600, preedit = "d")
+        down(600, typed = true)
         assertEquals(Route.KEYS, t.move(50f, 140f, 620))
         t.up(50f, 140f, cancelled = false, time = 630)
-        // the input more than the letter
-        down(700, letter = 'a')
+        // a second letter started no input: the next touch takes nothing back
+        down(700)
         t.up(50f, 70f, cancelled = false, time = 720)
-        down(800, preedit = "da")
+        down(750, typed = true)
+        t.up(50f, 70f, cancelled = false, time = 760)
+        down(800, typed = true)
         assertEquals(Route.KEYS, t.move(50f, 140f, 820))
+        t.up(50f, 140f, cancelled = false, time = 830)
+        // a key not a letter between (backspace): that tap is no first dot
+        down(900)
+        t.up(50f, 70f, cancelled = false, time = 920)
+        down(930, letter = false)
+        t.up(50f, 70f, cancelled = false, time = 940)
+        down(950, typed = true)
+        assertEquals(Route.KEYS, t.move(50f, 140f, 970))
         assertNull(ink.takeTapped())
     }
 
     @Test
+    fun aKeyHeldPastItsLongPressIsNoTap() {
+        down(0)
+        t.up(50f, 70f, cancelled = false, time = 400)
+        down(450, typed = true)
+        assertEquals(Route.KEYS, t.move(50f, 140f, 470))
+    }
+
+    @Test
     fun aStrokeWithNothingTypedTakesNoTapBack() {
-        down(0, letter = 'd')
+        down(0)
         t.up(50f, 70f, cancelled = false, time = 40)
         // the letter went in at once (no input kept): nothing to take back
         stroke(100)
