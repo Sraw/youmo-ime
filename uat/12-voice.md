@@ -7,8 +7,14 @@
 ### VO-01 [P0] 第一次用时请求麦克风权限
 - **前提**：B0（导入了语音包），刚重置，没给过麦克风权限。
 - **操作**：长按空格。
-- **预期**：短暂打开一个页面请求麦克风权限；点"允许"后回到原来的输入框，再长按空格可以说话。（真机另做，不在自动跑里：）请求时点对话框外面关掉它，或点"拒绝"：请求页关掉、回到输入框，不打开应用设置、不开麦；对话框显示时转屏再点"允许"：照常能说，不弹应用设置页；拒绝两次（Android 10 上勾"不再询问"后拒绝）以后再长按空格：系统不再弹对话框，直接打开本应用的应用信息页，不开麦，请求页不留在最近任务里。
+- **预期**：短暂打开一个页面请求麦克风权限；点"允许"后回到原来的输入框，再长按空格可以说话。（拒绝、关掉、转屏、不再询问是 VO-37，手工跑。）
 - **JVM**：`VoiceHoldUatTest.theFirstHoldAsksForTheMicrophone`（没权限时长按空格打开请求页、不开麦；请求页要 RECORD_AUDIO；给了以后再长按就能说（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；模拟器上（导入了语音包）也跑一遍：系统的权限对话框和点允许后回到输入框是框架的，JVM 上没有。
+
+### VO-37 [P1] 麦克风权限：拒绝、关掉对话框、转屏、不再询问
+- **前提**：B0（导入了语音包），刚重置，没给过麦克风权限；真机或模拟器。
+- **操作**：长按空格，请求时点对话框外面关掉它；再长按，点"拒绝"；再长按，对话框显示时转屏再点"允许"，按住说话。重置后拒绝两次（Android 10 上勾"不再询问"后拒绝），再长按空格。
+- **预期**：关掉或拒绝时请求页关掉、回到输入框，不打开应用设置、不开麦；转屏后点允许照常能说，不弹应用设置页；拒绝两次以后系统不再弹对话框，直接打开本应用的应用信息页，不开麦，请求页不留在最近任务里。
+- 手工跑（系统权限对话框的几种关法），不在自动跑里。
 
 ### VO-02 [P0] 按住空格说话，松开上屏
 - **前提**：B0-语音。
@@ -19,8 +25,8 @@
 ### VO-03 [P1] 说话时上滑取消
 - **前提**：B0-语音。
 - **操作**：长按空格说"你好"，手指上滑再松开。
-- **预期**：什么都不上屏，框里为空。
-- **JVM**：`VoiceHoldUatTest.slidingUpDropsIt`（上滑过键盘高度的四分之一显示「松开取消」，松开什么都不上屏，也不续录（松开时不调 `finish`）（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；设备上不跑。
+- **预期**：什么都不上屏，框里为空。悬浮键盘缩小后，同样要上滑过看得见的键盘高度的四分之一才显示「松开手指，取消输入」。
+- **JVM**：`VoiceHoldUatTest.slidingUpDropsIt`（上滑过键盘高度的四分之一显示「松开取消」，松开什么都不上屏，也不续录（松开时不调 `finish`）（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））、`VoiceHoldUatTest.onAScaledKeyboardTheCancelDistanceIsTheKeyboardAsSeen`（缩小的悬浮键盘上取消距离按看得见的键盘高度算）；设备上不跑。
 
 ### VO-04 [P1] 点工具栏麦克风说话
 - **前提**：B0-语音。
@@ -76,7 +82,7 @@
 ### VO-12 [P1] 只上屏到开始说话时的输入框
 - **前提**：B0-语音。
 - **操作**：打开测试页的全部输入框（地址不带 `#`），在「普通文本」框长按空格说"你好"，不松手……说完前用另一只手点下面的「句子」框，再松开。
-- **预期**：「你好」不会出现在「句子」框里。同一个框里网页重新开始输入（测试台（uat/TESTBED.md）的 `restart_target` 框按住空格说"你好"，另一只手点它的按钮（对它 `restartInput`）后再松开）：语音卡片不关，松开后「你好」上屏一次。
+- **预期**：「你好」不会出现在「句子」框里。同一个框被应用 restartInput（测试台（uat/TESTBED.md，`./gradlew :testbed:installDebug` 装）的 `restart_target` 框按住空格说"你好"，另一只手点它的按钮（对它 `restartInput`）后再松开）：语音卡片不关，松开后「你好」上屏一次。
 - **JVM**：`VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt`（说完前换到另一个框，松开后两个框都没有「你好」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；`VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesWithTheHold`（按住时已听到「你好」再换框：按住作废，两个框都没有）、`VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid`（按住时同一个框 restartInput：接着听，松开后上屏一次）；设备上不跑。
 
 ### VO-13 [P1] 改掉空格长按行为
@@ -238,6 +244,6 @@
 
 ### VO-36 [P1] 英文听写的标点是英文的
 - **前提**：B0-语音。
-- **操作**：长按空格说 "Yes, I know."，松开。
+- **操作**：长按空格说 "Yes, I know."，松开；再长按空格说"我买了 iPhone，很好用"，松开。
 - **预期**：框里是「Yes, I know.」：逗号和句号是半角 `,` `.`，逗号后有空格；没有「，」「。」，也没有「。。」。中文句里英文词后面说的全角逗号保持全角（「我买了iPhone，很好用」）。
-- **JVM**：`VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn`（`lib/ime-core`）；设备上不跑（还没有英文整句的语音片段）。
+- **JVM**：`VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn`（半角、全角照识别器写的）、`VoicePolishTest.nothingIsWrittenAfterAFullStop`（句号后不再加，没有「。。」）（`lib/ime-core`）；设备上不跑（还没有英文整句的语音片段）。

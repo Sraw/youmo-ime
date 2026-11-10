@@ -431,4 +431,4 @@ def py116(d):
     return f"切到「{trad}」：长按「國家」菜单 {menu}；屏蔽后繁體 {after[:4]}，简体 {simp[:4]}"
 
 
-case("PY-117", needs="jvm:WordListsTest.aBlockedLatinWordReadsBackAsItsLetters")(lambda d: None)
+case("PY-117", needs="jvm:WordListsTest.aBlockedLatinWordReadsBackAsItsLetters、EnginesUserWordsTest.aLatinWordBlockedInPinyinStaysBlockedAfterARestartTillRestored")(lambda d: None)

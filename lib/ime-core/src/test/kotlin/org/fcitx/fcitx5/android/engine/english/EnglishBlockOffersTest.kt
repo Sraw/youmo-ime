@@ -54,6 +54,7 @@ class EnglishBlockOffersTest {
 
     // the word the glide committed is in the text, as letters typed are: not offered 屏蔽, a Block of it does nothing (R20 F6632)
     @Test
+    @Uat("EN-28")
     fun aGlidesCommittedWordIsNotBlocked() {
         val blocks = EnglishBlocks(null)
         val s = EnglishSession(data, blocks = blocks).apply { apply(Action.Context("")) }

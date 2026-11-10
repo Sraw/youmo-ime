@@ -6,10 +6,14 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardCanvasViewTest
 import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Part
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
 import org.fcitx.fcitx5.android.scene.layout.Text
@@ -17,6 +21,7 @@ import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -87,20 +92,34 @@ class SceneCellFallBackTest {
         assertEquals(lines.toString(), 1, lines.count { "no theme of ${t.name}" in it })
     }
 
-    // the theme converted but its keys' scene refused (F6564): the keys' fall back followed, and let go of
-    // once the keys are drawn in it again (or the looks are forgotten: a theme written again)
+    // the theme converted but one keyboard's keys refused by the engine (its scene made a layout at a
+    // time; here a row wider than its keyboard, which the built-in is refused too): the popups and cells
+    // follow the keyboard shown, its keys falling back and coming back as they are drawn (the popups
+    // made before follow as they draw: PopupFollowsTheKeysTest)
     @Test
-    fun keysFallenBackPopupsAndCellsFollow() {
+    fun aKeyboardsKeysRefusedThePopupsAndCellsFollowTheOneShown() {
         val t = custom()
-        val look = ThemeManager.shownLook(t)
+        fun board(id: String, refused: Boolean = false): SceneBoard {
+            val layout = if (refused) SceneLayout(id, LayoutReader.layout(TOO_WIDE.replace("ID", id)).let { it as? Parsed.Ok ?: error((it as Parsed.Failed).problems.toString()) }.value, emptyMap()) else SceneLayouts.of(context, id)!!
+            return SceneBoard(context, t, layout) { look, _, w, h -> SceneEnvs.of(View(context), look, false, w, h, Input()) }
+        }
+        fun draw(b: SceneBoard) = b.view(BoardImages.NONE, key = { null }).apply { layout(0, 0, 1080, 700) }.scene
+        assertNotNull(draw(board("k18")))
         assertSame(t, SceneBoard.drawnTheme(t))
-        SceneBoard.keysFellBack(t.name, look, true)
+        assertNull(draw(board("qwerty", refused = true)))
         assertEquals(builtIn.name, SceneBoard.drawnTheme(t).name)
         assertTrue(PopupScenes(View(context), t).ready)
         assertTrue(cell(t).drawn().isNotEmpty())
-        SceneBoard.keysFellBack(t.name, look, false)
+        // the other keyboard shown: its own keys, the popups' and cells' with them
+        assertNotNull(draw(board("k18")))
         assertSame(t, SceneBoard.drawnTheme(t))
-        SceneBoard.keysFellBack(t.name, look, true)
+        // the refused one's keys drawn: the built-in's again; made again in its own: the theme's
+        draw(board("qwerty", refused = true))
+        assertEquals(builtIn.name, SceneBoard.drawnTheme(t).name)
+        assertNotNull(draw(board("qwerty")))
+        assertSame(t, SceneBoard.drawnTheme(t))
+        // a theme written again: the fall backs forgotten
+        draw(board("qwerty", refused = true))
         SceneThemes.forgetAll()
         assertSame(t, SceneBoard.drawnTheme(t))
     }
@@ -147,5 +166,12 @@ class SceneCellFallBackTest {
                 assertEquals(was, now)
             }
         }
+    }
+
+    private companion object {
+        // a row of 2 units on a keyboard of 1: read, but the engine places none of it (Parsed.Failed)
+        const val TOO_WIDE = """<keyboard xmlns="https://youmo-ime/layout/1" id="ID" name="x" family="number-row" columns="1">
+  <row><key id="a" label="a" send="sym:a" width="2"/></row>
+</keyboard>"""
     }
 }

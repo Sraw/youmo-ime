@@ -45,13 +45,35 @@ import timber.log.Timber
 @SuppressLint("ViewConstructor")
 open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
 
-    // the built-in where the engine makes nothing of the theme or refused its keys' scene, as the keys are (U8): the cells drawn still
-    private val theme = SceneBoard.drawnTheme(theme)
-    private val look = ThemeManager.shownLook(this.theme)
-    private val fonts = SceneFonts(look)
-    private val measurer = AndroidTextMeasurer(fonts)
-    private val sceneTheme = SceneThemes.of(look, this.theme.name, this.theme.isDark)
-    private val painter = ScenePainter(this, look, BoardImages.NONE, fonts)
+    private val given = theme
+
+    // what the cell draws in: the built-in where the engine makes nothing of the theme or the keyboard
+    // shown refused its keys' scene, as the keys are (U8), asked as the cell draws: the keys falling
+    // back after it was made (or no longer), its scene made again in theirs
+    private inner class DrawnIn(val theme: Theme) {
+        val shownLook = ThemeManager.shownLook(theme)
+        val fonts = SceneFonts(shownLook)
+        val measurer = AndroidTextMeasurer(fonts)
+        val sceneTheme = SceneThemes.of(shownLook, theme.name, theme.isDark)
+        val painter = ScenePainter(this@SceneKeyCell, shownLook, BoardImages.NONE, fonts)
+    }
+
+    private var drawnIn = DrawnIn(SceneBoard.drawnTheme(given))
+    private val now: DrawnIn
+        get() {
+            val t = SceneBoard.drawnTheme(given)
+            if (t.name != drawnIn.theme.name) {
+                drawnIn = DrawnIn(t)
+                made = null
+                failed = false
+            }
+            return drawnIn
+        }
+    private val theme get() = now.theme
+    private val look get() = now.shownLook
+    private val measurer get() = now.measurer
+    private val sceneTheme get() = now.sceneTheme
+    private val painter get() = now.painter
 
     /** The key: its face, its words, its marks' names. */
     var attrs: KeyAttrs = KeyAttrs()
@@ -151,6 +173,8 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
     val scene: Scene?
         get() {
             if (width <= 0 || height <= 0) return null
+            // the theme as the keys draw now: one changed drops the scene made
+            now
             if (made != null && madeFor == (width to height)) return made
             if (failed && madeFor == (width to height)) return null
             madeFor = width to height

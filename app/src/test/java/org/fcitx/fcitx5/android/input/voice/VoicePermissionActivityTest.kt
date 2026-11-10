@@ -57,9 +57,6 @@ class VoicePermissionActivityTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    private fun refusedForGood(activity: VoicePermissionActivity) =
-        VoicePermissionActivity::class.java.getDeclaredField("refusedForGood").apply { isAccessible = true }.getBoolean(activity)
-
     @Test
     fun aSecondAskRefusedAtOnceOpensTheSettings() {
         val c = started()
@@ -88,9 +85,8 @@ class VoicePermissionActivityTest {
         val first = c.get()
         c.recreate()
         drainStarted()
-        // what was known before the rebuild kept, though the prefs already say asked (a rebuild does not re-read them)
-        assertTrue(refusedForGood(c.get()))
-        // the answer came at once after the rebuild, but the dialog was up before it: the user's, not the system's
+        // the answer came at once after the rebuild, but the dialog was up before it: the user's, not the system's;
+        // what was known before the rebuild kept (the prefs already say asked, and are not re-read): no settings page
         refuse(c.get(), asked = first)
         assertNull(shadowOf(app).nextStartedActivity)
     }

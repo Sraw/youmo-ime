@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.eval.VoicePostRun.Mark
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -107,28 +108,20 @@ class VoicePostRunTest {
         assertEquals(listOf("0.00%", "0.00%"), out.lines()[1].split('\t').subList(3, 5))
     }
 
+    // a clip with no written reference in a set with them: read as none (the set's ref, written false), left out
+    // of the written scores and counted as unwritten
     @Test
-    fun aClipWithoutAWrittenReferenceInASetWithThemIsLeftOutAndCounted() {
-        val file = tmp.newFile("seg-u.jsonl")
-        file.writeText(
-            """{"wav": "1.wav", "ref": "我去", "written": "我去。", "stretches": [{"start": 0, "end": 1, "nbest": ["我去。"], "scores": [0], "app": "我去。"}]}""" + "\n" +
-                """{"wav": "2.wav", "ref": "他来", "stretches": [{"start": 0, "end": 1, "nbest": ["她来。"], "scores": [0], "app": "她来。"}]}""" + "\n",
-        )
-        val out = StringBuilder()
-        VoicePostRun.run(listOf(file.path), "app", null, out)
-        val row = out.lines()[1].split('\t')
-        assertEquals(listOf("1", "0.00%"), listOf(row[1], row[3]))
-        assertEquals("1", row.last())
-    }
+    fun aClipWithoutAWrittenReferenceInASetWithThemIsLeftOutAndCounted() = assertRows(
+        "the key missing" to { leftOutAndCounted("seg-u.jsonl", "") },
+        "\"written\": null: none, not the text \"null\"" to { leftOutAndCounted("seg-n.jsonl", "\"written\": null, ") },
+    )
 
-    @Test
-    fun aNullWrittenIsNoWrittenReference() {
-        // "written": null reads as none (the set's ref, written false), not the text "null"; in a set with written
-        // references it is left out and counted as unwritten
-        val file = tmp.newFile("seg-n.jsonl")
+    // two clips, the second's written reference given as [written] (its JSON before "stretches")
+    private fun leftOutAndCounted(name: String, written: String) {
+        val file = tmp.newFile(name)
         file.writeText(
             """{"wav": "1.wav", "ref": "我去", "written": "我去。", "stretches": [{"start": 0, "end": 1, "nbest": ["我去。"], "scores": [0], "app": "我去。"}]}""" + "\n" +
-                """{"wav": "2.wav", "ref": "他来", "written": null, "stretches": [{"start": 0, "end": 1, "nbest": ["她来。"], "scores": [0], "app": "她来。"}]}""" + "\n",
+                """{"wav": "2.wav", "ref": "他来", ${written}"stretches": [{"start": 0, "end": 1, "nbest": ["她来。"], "scores": [0], "app": "她来。"}]}""" + "\n",
         )
         val clips = VoicePostRun.read(file, "app")
         assertEquals(listOf(true, false), clips.map { it.written })

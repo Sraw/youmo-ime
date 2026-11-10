@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.data.pack
 
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.pack.ImportResult
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackShelf
@@ -52,6 +53,46 @@ class PackStoreChangedTest {
         } finally {
             PackStore.restartHost = restart
             TestShelves.use()
+            root.deleteRecursively()
+        }
+    }
+
+    // the text pack imported but the host not up anew (its restart failing or throwing): the state counted
+    // all the same, the replaced generation kept (the old host may still read it), left for the next start;
+    // the start's tidy, run after an import has begun, leaves it too
+    @Test
+    fun aRestartThatFailsCountsAndKeepsTheReplacedGeneration() {
+        val restart = PackStore.restartHost
+        try {
+            assertRows(
+                "the restart says the host is not up" to { importWithRestart { false } },
+                "the restart throws" to { importWithRestart { throw IllegalStateException("no host") } },
+            )
+        } finally {
+            PackStore.restartHost = restart
+            TestShelves.use()
+        }
+    }
+
+    private fun importWithRestart(restart: () -> Boolean) {
+        val root = Files.createTempDirectory("packs").toFile()
+        try {
+            val shelf = PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
+            PackStore.useShelf(shelf)
+            PackStore.restartHost = restart
+            val replaced = shelf.dir(PackKind.TEXT)!!
+            val before = PackStore.state.value.generation
+            val result = runBlocking { PackStore.import(TestShelves.pack(PackKind.TEXT, version = 2).inputStream()) }
+            assertTrue("$result", result is ImportResult.Imported)
+            assertEquals(before + 1, PackStore.state.value.generation)
+            assertTrue("$replaced", replaced.exists())
+            PackStore.tidyAtStart(shelf)
+            assertTrue("the start's tidy after an import: $replaced", replaced.exists())
+            // what the start's tidy would have deleted, no import begun
+            shelf.tidy()
+            assertFalse("$replaced", replaced.exists())
+        } finally {
             root.deleteRecursively()
         }
     }

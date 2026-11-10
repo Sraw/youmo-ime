@@ -118,7 +118,7 @@ def emoji_panel(d):
 @case("AX-09", base="B0", mutates=True)
 def ax09(d):
     emoji_panel(d)
-    return explore(d, want=["😀"])
+    return explore(d, want=["😀", "空格"])
 
 
 @case("AX-10", base="B0", mutates=True)
@@ -128,7 +128,7 @@ def ax10(d):
     if not k:
         raise Blocked("表情面板底行没有「:-)」")
     d.tap(k.c, 1.2)
-    return explore(d, want=[":D"])
+    return explore(d, want=[":D", "空格"])
 
 
 @case("AX-11", base="B0", mutates=True)

@@ -6,13 +6,16 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.content.Context
 import android.text.InputType
+import android.os.Vibrator
 import android.view.View
 import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.data.InputFeedbacks.InputFeedbackMode
 import org.fcitx.fcitx5.android.data.RecentlyUsed
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.core.CandidateWord
@@ -71,32 +74,49 @@ class SmallBoardsSceneGesturesTest {
     }
 
     // before what the marks type is known (none kept from the last run, the host not up): the panel's 。 types
-    // nothing, as the text keyboards' marks are held back; known, it types the mark mapped (R20 F6465)
+    // nothing, as the text keyboards' marks are held back, the first tap of it felt once (KeyboardWindow.heldBack);
+    // known, it types the mark mapped
     @Test
-    fun thePickersFullStopTypesNothingBeforeTheMarksAreKnown() = KeyboardHarness().start().use { h ->
-        h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
-        h.relayout()
-        val punctuation = h.inputView.javaClass.getDeclaredField("punctuation").apply { isAccessible = true }
-            .get(h.inputView) as PunctuationComponent
-        PunctuationStartKeys.forget(h.service)
-        PunctuationComponent::class.java.getDeclaredField("known").apply { isAccessible = true }.setBoolean(punctuation, false)
-        val kb = KeyboardHarness.all(h.inputView).filterIsInstance<PickerLayout.Keyboard>().first { h.shown(it) }
-        fun tapPeriod() {
-            h.press(h.keys(kb).single { it.id == "period" })
-            h.release()
-            h.idle()
+    @Uat("PAN-24")
+    fun thePickersFullStopTypesNothingBeforeTheMarksAreKnown() {
+        val app = RuntimeEnvironment.getApplication()
+        // felt as a buzz of its own: a key's press buzz is over before the finger lifts
+        AppPrefs.getInstance().keyboard.hapticOnKeyPress.setValue(InputFeedbackMode.Enabled)
+        AppPrefs.getInstance().keyboard.buttonPressVibrationMilliseconds.setValue(BUZZ_MS)
+        val vibrator = shadowOf(app.getSystemService(Vibrator::class.java))
+        KeyboardHarness().start().use { h ->
+            h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
+            h.relayout()
+            // not known: the harness's host tells its marks as the view is made (in its init), before a test can
+            // say otherwise, so the component is set back by hand
+            val punctuation = h.inputView.javaClass.getDeclaredField("punctuation").apply { isAccessible = true }
+                .get(h.inputView) as PunctuationComponent
+            PunctuationStartKeys.forget(app)
+            PunctuationComponent::class.java.getDeclaredField("known").apply { isAccessible = true }.setBoolean(punctuation, false)
+            val kb = KeyboardHarness.all(h.inputView).filterIsInstance<PickerLayout.Keyboard>().first { h.shown(it) }
+            // whether the lift buzzed: the press's buzz let run out first
+            fun tapPeriod(): Boolean {
+                h.press(h.keys(kb).single { it.id == "period" })
+                h.advance(BUZZ_MS * 4L)
+                h.release()
+                return vibrator.isVibrating.also { h.advance(BUZZ_MS * 4L) }
+            }
+            assertTrue("the first held back felt", tapPeriod())
+            assertFalse("felt once", tapPeriod())
+            assertEquals(h.api.calls.toString(), "", h.field.text.toString())
+            punctuation.update(mapOf("." to "。", "," to "，"))
+            h.relayout()
+            assertFalse("typed: not held back", tapPeriod())
+            assertEquals("。", h.field.text.toString())
         }
-        tapPeriod()
-        assertEquals(h.api.calls.toString(), "", h.field.text.toString())
-        punctuation.update(mapOf("." to "。", "," to "，"))
-        h.relayout()
-        tapPeriod()
-        assertEquals("。", h.field.text.toString())
     }
 
     // [id] on the picker shown: [chinese] with the Chinese punctuation mapping, [plain] with none, as its face and typed
     private fun KeyboardHarness.typesAsShown(id: String, chinese: String, plain: String) {
         val kb = KeyboardHarness.all(inputView).filterIsInstance<PickerLayout.Keyboard>().first { shown(it) }
+        // the recently used as none: what another test left is not this one's
+        val recentPrefs = FcitxApplication.getInstance().directBootAwareContext.getSharedPreferences(RecentlyUsed.PREFERENCE_NAME, Context.MODE_PRIVATE)
+        recentPrefs.edit().clear().commit()
         for ((mapping, face) in listOf(mapOf("." to "。", "," to "，") to chinese, emptyMap<String, String>() to plain)) {
             // the input method's punctuation component, which broadcasts to the panel and its keyboard
             val punctuation = inputView.javaClass.getDeclaredField("punctuation").apply { isAccessible = true }
@@ -113,9 +133,8 @@ class SmallBoardsSceneGesturesTest {
             assertEquals(api.calls.toString(), face, field.text.toString())
             assertTrue(api.calls.toString(), api.calls.none { it.startsWith("sendKey") })
             // a mark, not a symbol picked: not among the recently used (PAN-24)
-            val recent = FcitxApplication.getInstance().directBootAwareContext
-                .getSharedPreferences(RecentlyUsed.PREFERENCE_NAME, Context.MODE_PRIVATE).all.values.joinToString()
-            assertFalse(recent, face in recent)
+            // nothing kept at all (a match in the stored text would take , for the list's own commas)
+            assertEquals(face, emptyMap<String, Any?>(), recentPrefs.all)
             field.setText("")
             idle()
         }
@@ -295,5 +314,10 @@ class SmallBoardsSceneGesturesTest {
         }
         // independently: a tap on ， commits ，
         assertEquals("tap: field '，'", out[1])
+    }
+
+    private companion object {
+        // a buzz this long, ms: over before the finger lifts when let run out
+        const val BUZZ_MS = 5
     }
 }

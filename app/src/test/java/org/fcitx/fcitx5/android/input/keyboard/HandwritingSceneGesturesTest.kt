@@ -82,9 +82,11 @@ class HandwritingSceneGesturesTest {
                         h.tap(h.keyNamed(id))
                     }
                     h.idle()
-                    out += "$id ${if (held) "long press sent" else "tap"}: " +
-                        h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("triggerUnicode") } +
-                        " field ${h.field.text}"
+                    val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("triggerUnicode") }
+                    // ⌫ held repeats, how many times as the press falls in the frame: the record keeps that it
+                    // repeats and what, not the count
+                    val shown = if (held && id == "backspace") "repeats ${sent.distinct()}".also { assertTrue(sent.toString(), sent.size >= 2) } else "$sent"
+                    out += "$id ${if (held) "long press sent" else "tap"}: " + shown + " field ${h.field.text}"
                 }
             }
         }

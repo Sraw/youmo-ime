@@ -189,6 +189,8 @@ class GroupedKeyboardTest {
     }
 
     @Test
+
+    @Uat("KB-65")
     fun aSwipesShortcutShowsAsItIsNamedNotInTheLettersCase() {
         val keyboard = GroupedKeyboard(context, TestThemes.PixelDark).laidOut()
         val previews = ArrayList<PopupAction>()

@@ -71,10 +71,9 @@ class ZhuyinShortcutsUatTest {
         assertEquals(1, m.drawnIcons)
         assertEquals(0, h.key("ㄋ").drawnIcons)
         for (face in listOf("ㄏ", "ㄌ", "ㄒ", "ㄈ", "ㄗ")) assertEquals(face, 1, h.key(face).drawnIcons)
-        // at the standard height only symbols whose ink meets their icon's give way: the icon into
-        // its corner first (ㄇ's and ㄈ's enough), then the symbol down a little (ㄌ under the
-        // scissors the most), none smaller; ㄋ, no icon, and the rest as they were: told by the
-        // symbol's top against its row's highest, whichever draws the keys
+        // at the standard height only the icons give way, into their corners, where a symbol's ink
+        // meets theirs (ㄇ's and ㄈ's, ㄌ under the scissors); no symbol moved off its row's baseline,
+        // none smaller; ㄋ, no icon, as it was: told by the symbol's top against its row's highest
         val symbols = h.keys().filter { k -> k.label.singleOrNull()?.let { it in ZhuyinKeys.SYMBOLS || it in ZhuyinKeys.MARKS } == true }
         val size = symbols.map { it.textSize(it.label) }.toSet()
         assertEquals(size.toString(), 1, size.size)

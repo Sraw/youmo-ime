@@ -72,11 +72,13 @@ class SceneBoard(
     // The fallback's the built-in theme's whole: its look, its fonts, its measurer, as it draws itself
     private fun drawn(look: ThemeLook, width: Int, height: Int): KeyboardCanvasView.Drawn? {
         if (layout == null) return null
-        drawn(theme, look, width, height)?.let { return it.also { keysFellBack(theme.name, look, false) } }
+        // the keyboard drawn last is the one shown: the popups and cells follow its keys ([drawnTheme])
+        shownBoard = layout.id
+        drawn(theme, look, width, height)?.let { return it.also { keysFellBack(theme.name, look, layout.id, false) } }
         val builtIn = ThemeManager.builtin(if (theme.isDark) "pixel#dark" else "pixel#light")
         if (builtIn.name == theme.name) return null
-        // the popups and panel cells made from now on fall back with the keys ([drawnTheme])
-        keysFellBack(theme.name, look, true)
+        // the popups and panel cells fall back with this keyboard's keys while it is shown ([drawnTheme])
+        keysFellBack(theme.name, look, layout.id, true)
         // logged once a look: asked again each time what shows changes
         if (firstFallBack(theme.name, look)) Timber.w("keyboard canvas: no scene of theme %s; the built-in %s's drawn", theme.name, builtIn.name)
         return drawn(builtIn, ThemeManager.shownLook(builtIn), width, height)
@@ -135,15 +137,26 @@ class SceneBoard(
         private const val KEPT_FELL_BACK = 16
         private val fellBack = LinkedHashSet<Pair<String, ThemeLook>>()
 
-        // the themes (by name and look) whose keys the built-in draws now, the engine refusing their scene
-        // though they converted: the popups and cells made after follow the keys ([drawnTheme])
-        private val keysRefused = LinkedHashSet<Pair<String, ThemeLook>>()
+        // the keyboards (by theme name, look and board id) whose keys the built-in draws now, the engine
+        // refusing their scene though the theme converted: one keyboard's refused, another's not (the engine
+        // makes a scene a layout at a time). The popups and cells follow the one shown ([drawnTheme])
+        private val keysRefused = LinkedHashSet<Triple<String, ThemeLook, String>>()
 
-        /** That the keys of [name] in [look] are drawn in the built-in ([fell]) or their own now (the last [KEPT_FELL_BACK] kept). */
+        // the board whose keys were drawn last: the keyboard on screen, whose keys' popups show
+        private var shownBoard: String? = null
+
+        /** That the keys of [board] in [name]'s [look] are drawn in the built-in ([fell]) or their own now (the last [KEPT_FELL_BACK] kept). */
         @VisibleForTesting
-        internal fun keysFellBack(name: String, look: ThemeLook, fell: Boolean) {
-            if (!fell) keysRefused.remove(name to look)
-            else if (keysRefused.add(name to look) && keysRefused.size > KEPT_FELL_BACK) keysRefused.remove(keysRefused.first())
+        internal fun keysFellBack(name: String, look: ThemeLook, board: String, fell: Boolean) {
+            val of = Triple(name, look, board)
+            if (!fell) keysRefused.remove(of)
+            else if (keysRefused.add(of) && keysRefused.size > KEPT_FELL_BACK) keysRefused.remove(keysRefused.first())
+        }
+
+        /** The keyboard shown now, as its keys being drawn says: a test's, for a keyboard not drawn here. */
+        @VisibleForTesting
+        internal fun shown(board: String?) {
+            shownBoard = board
         }
 
         /** Whether [name] in [look] is a fall back not logged yet (the last [KEPT_FELL_BACK] kept). */
@@ -160,13 +173,14 @@ class SceneBoard(
 
         /**
          * The theme a popup or a panel's cell draws in: [theme], or where the engine makes no theme of
-         * it or the keyboard's keys of it fell back (the engine refusing their scene), the built-in of
-         * the same lightness, as the keys are (060-render-p2 U8; logged once a look, as theirs). Keys,
-         * popups and cells so draw in one theme.
+         * it or the keys of [board] (the keyboard shown now) fell back (the engine refusing their scene), the
+         * built-in of the same lightness, as the keys are (060-render-p2 U8; logged once a look, as theirs).
+         * Asked as they draw: keys, popups and cells so draw in one theme, the keyboard switched or not.
          */
-        fun drawnTheme(theme: Theme): Theme {
+        fun drawnTheme(theme: Theme, board: String? = shownBoard): Theme {
             val look = ThemeManager.shownLook(theme)
-            if ((theme.name to look) !in keysRefused && SceneThemes.of(look, theme.name, theme.isDark) != null) return theme
+            val refused = board != null && Triple(theme.name, look, board) in keysRefused
+            if (!refused && SceneThemes.of(look, theme.name, theme.isDark) != null) return theme
             val builtIn = ThemeManager.builtin(if (theme.isDark) "pixel#dark" else "pixel#light")
             if (builtIn.name == theme.name) return theme
             if (firstFallBack(theme.name, look)) Timber.w("scene: no theme of %s; the built-in %s's drawn", theme.name, builtIn.name)

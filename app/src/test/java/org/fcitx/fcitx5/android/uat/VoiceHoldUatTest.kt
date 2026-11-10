@@ -195,6 +195,8 @@ class VoiceHoldUatTest {
     }
 
     @Test
+
+    @Uat("VO-03")
     fun onAScaledKeyboardTheCancelDistanceIsTheKeyboardAsSeen() {
         allowMicrophone()
         ThemeManager.prefs.floatingKeyboard.setValue(true)

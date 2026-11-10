@@ -375,8 +375,8 @@
 ### KB-65 [P2] 滑出快捷键时键上方小框里的字
 - **前提**：B0，**按键时弹出显示字符** 开着；**按键字符和快捷键** 里把 Q 设成文字「我的邮箱是 someone@example.com」，W 设成 **快速输入**，E 设成 **恢复刚删除的**。
 - **操作**：A、W、E、Q 各上滑过阈值不松手，看键上方的小框；键盘高度换成紧凑、悬浮键盘、横屏各看一次；拼音键盘换成 14 键，给 QW 键设同样的文字快捷键，按 Shift 后上滑看小框。
-- **预期**：小框里是「全选」「快速输入」「恢复刚删除的」「我的邮箱是 s…」，字比键上的字母小一号，和底排「符」「123」差不多；框最宽约五个字，没有横跨半个键盘、也不盖住工具栏；紧凑、悬浮时字跟着键上的字缩小。14 键上小框里的字照设的写（「someone@…」不变成大写）。
-- **JVM**：`SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted`（三个键的框里的字）；`GroupedKeyboardTest.aSwipesShortcutShowsAsItIsNamedNotInTheLettersCase`（14/18 键上快捷键的字不随字母大小写变）；规则见 ime-core `PreviewLabelTest`；样子见 `SwipePopupScreenshotTest` 的 `select_all_*`、`quick_input_*`、`restore_*`、`text_*`、`trad_simp_en` 金样。
+- **预期**：小框里是「全选」「快速输入」「恢复刚删除的」「我的邮箱是 s…」，字比键上的字母小一号，和底排「符」「123」差不多；框最宽约五个字，没有横跨半个键盘、也不盖住工具栏；紧凑、悬浮时字跟着键上的字缩小。14 键上小框里的字照设的写（「someone@…」不变成大写）；字母键自己的小框照键面的大小写（ZX 键上是 X）。
+- **JVM**：`SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted`（三个键的框里的字）；`GroupedKeyboardTest.aSwipesShortcutShowsAsItIsNamedNotInTheLettersCase`（14/18 键上快捷键的字不随字母大小写变，字母键的小框照键面的大小写）；规则见 ime-core `PreviewLabelTest`；样子见 `SwipePopupScreenshotTest` 的 `select_all_*`、`quick_input_*`、`restore_*`、`text_*`、`trad_simp_en` 金样。
 
 ### KB-66 [P1] 标点和快捷键图标各在自己选的位置，两项不能选同一处，第一次打开和改过设置后一样
 - **前提**：新装（B0），第一次打开键盘，滑动、标点位置、快捷键图标位置都是默认。
@@ -394,4 +394,4 @@
 - **前提**：拼音（全键盘）、英文都已启用。
 - **操作**：**按键 → 拼音键字母大小写** 依次选总是大写、总是小写、跟随 Shift，每次回到测试页看全键盘拼音的字母、按一下 Shift 再看、按住 q 看气泡、打一个 q；切到英文看；拼音键盘换成 14 键、九键各看一遍；开 TalkBack 摸 q、QW、2。
 - **预期**：不用重开键盘就变。总是大写：拼音字母大写，Shift 关着也是，气泡 Q，打出 q；总是小写：Shift 开着字母也是小写（Shift 键自己是亮的），气泡 q，打出 Q；跟随 Shift：和以前一样。14 键、九键的字母组按设置大小写（跟随 Shift 时大写）。英文怎么选都跟着 Shift。键角小字不变。TalkBack 读法三档一样。设置页 **按键字符和快捷键** 的键、主题预览跟着变。
-- **JVM**：`LetterCaseScreenshotTest`（全键盘总是大写、总是小写 + Shift 开、跟随 Shift 开；14 键、九键总是小写；英文不受影响；读屏文字不变；气泡）；keyboard-scene `LetterCaseRuleTest`、`ExpandTest.letterCaseSettingCasesTheLetterFacesOnly`、`aScreenReaderHearsTheLetterAsFollowingShiftShowsIt`。
+- **JVM**：`LetterCaseScreenshotTest`（全键盘总是大写、总是小写 + Shift 开、跟随 Shift 开；14 键、九键总是小写；英文不受影响；读屏文字不变；气泡）；keyboard-scene `LetterCaseRuleTest`、`ExpandTest.letterCaseSettingCasesTheLetterFacesOnly`、`aScreenReaderHearsTheLetterAsFollowingShiftShowsIt`（这三个在 `:lib:keyboard-scene:check` 里跑，`uat.py jvm` 不记录）。

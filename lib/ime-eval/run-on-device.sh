@@ -23,7 +23,9 @@ if [ "${INSTALL:-1}" != 0 ]; then
         n=$(basename "$f")
         v=${n#youmo-text-v}; v=${v%.youmopack}
         # the same pack already there: not written again (hundreds of MB). The same version is not enough:
-        # a rebuild keeps text.version, so the file's SHA-256 last pushed to this device is kept on the host
+        # a rebuild keeps text.version, so the file's SHA-256 last pushed to this device is kept on the host.
+        # It assumes this script is the device's only importer: a serial used again by another AVD, or a pack
+        # of the same version imported otherwise (uat.py packs from another worktree), wants the mark deleted
         sha=$(shasum -a 256 "$f" | cut -d' ' -f1)
         mark="$HERE/build/eval/pushed-$(adb get-serialno | tr -d '\r')-$n.sha256"
         case "$state" in

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.voice.ChineseNumbers.Kind
 import org.junit.Assert.assertEquals
@@ -35,6 +36,8 @@ class ChineseNumbersTest {
     )
 
     @Test
+
+    @Uat("VO-06")
     fun digitsAreDigitByDigit() = check(
         // with 点: read as a model, an address's parts (review F6386)
         rows(Kind.DIGITS, "幺三八幺二三四五六七八" to "13812345678", "四七二九幺五" to "472915", "三零二" to "302", "一九二点一六八" to "192.168"),
@@ -69,6 +72,8 @@ class ChineseNumbersTest {
     )
 
     @Test
+
+    @Uat("VO-06")
     fun whatDoesNotReadAsItsKindStaysAsSaid() {
         check(
             rows(Kind.VALUE, "一点二点三" to "一点二点三", "万一" to "万一", "二十三四" to "二十三四", "一千零" to "一千零", "三点十" to "三点十"),

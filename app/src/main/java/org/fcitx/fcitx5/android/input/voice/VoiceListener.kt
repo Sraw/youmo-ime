@@ -188,7 +188,6 @@ class VoiceListener(
             orFallback("voice log probs", null) { language.logProbs(texts) }
     }
 
-    // voice input without them, not none
     // [block]'s result, or what it threw but a cancellation (which goes on, as cancellations must)
     private suspend fun <T> caught(block: suspend () -> T): Result<T> = try {
         Result.success(block())
@@ -198,7 +197,11 @@ class VoiceListener(
         Result.failure(e)
     }
 
-    private suspend fun userHotwords() = orFallback("voice hotwords", VoiceHotwords.Words.NONE) { hotwords() }
+    // voice input without them, not none: their read cancelled from elsewhere too (VoiceEngine's
+    // shared read, the host's scope ending), which is not this listener closing
+    private suspend fun userHotwords() = cancelledElsewhereAs(VoiceHotwords.Words.NONE) {
+        orFallback("voice hotwords", VoiceHotwords.Words.NONE) { hotwords() }
+    }
 
     /**
      * Opens the microphone, once; the caller has checked the permission. The models may still be
@@ -517,4 +520,16 @@ class VoiceListener(
         private const val BUFFER_S = 2
         private const val EMPTY_READ_WAIT_MS = 5L
     }
+}
+
+/**
+ * [block]'s result, or [fallback] where it threw a cancellation while the caller is still active: a
+ * read it awaited cancelled from elsewhere, not the caller cancelled (that one goes on, as cancellations must).
+ */
+internal suspend fun <T> cancelledElsewhereAs(fallback: T, block: suspend () -> T): T = try {
+    block()
+} catch (e: CancellationException) {
+    if (!currentCoroutineContext().isActive) throw e
+    Timber.w(e, "cancelled elsewhere")
+    fallback
 }

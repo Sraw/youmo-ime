@@ -72,13 +72,18 @@ object PackStore {
                 // not after an import: it would delete the generation the import replaced, which the old
                 // host may still read till [changed] restarts it ([PackShelf.sweep] deletes it then). The
                 // check under the shelf's own lock, the one its import takes: an import begun after it waits
-                thread(name = "packs-tidy") { synchronized(it) { if (!imported) it.tidy() } }
+                thread(name = "packs-tidy") { tidyAtStart(it) }
             }
         }
 
-    // an import begun since the start: the start's tidy left to the next start
+    // an import begun since the start: the start's tidy left to the next start (one refused or failed
+    // too: what it left is deleted then, no harm meanwhile)
     @Volatile
     private var imported = false
+
+    /** The start's tidy of [shelf]: none once an import has begun ([imported]); a test's, which runs no start. */
+    @VisibleForTesting
+    internal fun tidyAtStart(shelf: PackShelf) = synchronized(shelf) { if (!imported) shelf.tidy() }
 
     private val mutableState by lazy { MutableStateFlow(State(snapshot(), 0)) }
 

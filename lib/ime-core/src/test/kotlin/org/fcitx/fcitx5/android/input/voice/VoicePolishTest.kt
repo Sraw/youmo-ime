@@ -291,12 +291,17 @@ class VoicePolishTest {
             val num = IntArray(VoicePolishTags.norm("买了iPhone十五，").size).also { it[8] = 1; it[9] = 1 }
             assertEquals("买了iPhone15，", keptWhole("买了iPhone十五，", numTags, num))
         },
+        "an ASCII comma after a number written from Chinese is the number's, full width: the word before it is not what it follows" to {
+            val num = IntArray(VoicePolishTags.norm("买了iPhone十五,").size).also { it[8] = 1; it[9] = 1 }
+            assertEquals("买了iPhone15，", keptWhole("买了iPhone十五,", numTags, num))
+        },
         "after digits the full width comma stays (F6513)" to { assertEquals("Windows 11，", keptWhole("Windows 11，")) },
         "a non-breaking space is one to spaces as to norm (F6490)" to { assertEquals("Windows 11", keptWhole("Windows\u00a011")) },
     )
 
     // review F6280: nothing after 。 either (。。 would read as an ellipsis)
     @Test
+    @Uat("VO-36")
     fun nothingIsWrittenAfterAFullStop() {
         val stop = VoicePolishTags.norm("好。")
         val after = intArrayOf(0, tags.afters.indexOf("。"))

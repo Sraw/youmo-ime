@@ -326,7 +326,7 @@ case("TB-28", needs="jvm:ToolbarUatTest.copyingNothingLeavesTheCursor")(lambda d
 case("TB-29", needs="jvm:ToolbarUatTest.holdingTheCandidatesExpandButtonHides")(lambda d: None)
 
 
-case("TB-30", needs="jvm:ToolbarUatTest.copyAndCutSaidNothingToCopySaid")(lambda d: None)
+case("TB-30", needs="jvm:ToolbarUatTest.copyAndCutSaidNothingToCopySaid、EditingLagUatTest.copyWithTheSelectionReportLagging")(lambda d: None)
 
 case("TB-31", needs="jvm:ToolbarUatTest.pasteStaysInTheClipboardWhenSoSet")(lambda d: None)
 

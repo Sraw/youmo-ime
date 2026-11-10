@@ -389,6 +389,9 @@ class DictionaryFormatTest {
         val bytes = lines.joinToString("\n", postfix = "\n").toByteArray(WordLists.GB18030)
         val readsNone: (List<String>) -> Map<String, String?> = { texts -> texts.associateWith { null } }
         assertEquals(1, (DictionaryFormat.analyse({ bytes.inputStream() }, guess = readsNone) as Detected).unguessed)
+        // the words alone the file's most, though a line has pinyin: held to the guess as before
+        val most = (List(30) { "幽默输入" } + "你好 ni'hao").joinToString("\n", postfix = "\n").toByteArray(WordLists.GB18030)
+        assertEquals(Reason.MISMATCH, (DictionaryFormat.analyse({ most.inputStream() }, guess = readsNone) as Refused).reason)
     }
 
     @Test

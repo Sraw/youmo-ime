@@ -59,7 +59,7 @@ case("PAN-20", needs="jvm:FieldPadUatTest.leavingANumberFieldGoesBackToTheLetter
 
 
 case("PAN-21", needs="jvm:PanelUatTest.aSymbolHeldShowsItsBubble")(lambda d: None)
-case("PAN-24", needs="jvm:SmallBoardsSceneGesturesTest.thePickersFullStopShowsWhatItTypes")(lambda d: None)
+case("PAN-24", needs="jvm:SmallBoardsSceneGesturesTest.thePickersFullStopShowsWhatItTypes、SmallBoardsSceneGesturesTest.thePickersFullStopTypesNothingBeforeTheMarksAreKnown")(lambda d: None)
 
 
 def ime(d, w, after=0.6):

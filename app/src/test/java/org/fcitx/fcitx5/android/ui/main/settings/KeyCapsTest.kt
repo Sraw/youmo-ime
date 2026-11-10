@@ -112,6 +112,7 @@ class KeyCapsTest {
     // the symbol as they are, never a disabled key's fading; edited, outlined along the face drawn in the keyboard
     // theme's accent
     @Test
+    @Uat("ST-22")
     fun theEnginesCapFadesItsWordsAloneAndOutlinesItsFace() {
         fun cap(marked: Boolean, dimmed: Boolean, selected: Boolean = false): SceneKeyCell =
             KeyCaps.key(ctx, "W", "2", marked = marked, dimmed = dimmed, selected = selected).let { k ->

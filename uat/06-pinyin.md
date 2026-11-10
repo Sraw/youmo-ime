@@ -201,7 +201,7 @@
 - **前提**：B0；中英混输开着。
 - **操作**：点 i p h o n e，长按候选「iPhone」选 **屏蔽**；杀掉进程再弹出键盘，再点 i p h o n e；在 **屏蔽的词** 里看它，恢复，再打。
 - **预期**：重启后不出「iPhone」，屏蔽的词里列着它；恢复后又出现。
-- **JVM**：`WordListsTest.aBlockedLatinWordReadsBackAsItsLetters`；设备上不跑。
+- **JVM**：`WordListsTest.aBlockedLatinWordReadsBackAsItsLetters`（只查屏蔽文件的读回）、`EnginesUserWordsTest.aLatinWordBlockedInPinyinStaysBlockedAfterARestartTillRestored`（拼音下屏蔽「iPhone」、同一目录重开后不出、恢复后又出）；设备上不跑。
 
 ### PY-31 [P1] 固定首位，再取消固定
 <!-- learning: U-83 -->

@@ -48,7 +48,8 @@ object PunctuationStartKeys {
         val old = File(ctx.filesDir, FILE)
         if (ctx.getSystemService(UserManager::class.java)?.isUserUnlocked != true || !old.isFile) return
         if (f.exists()) {
-            old.delete()
+            // the two paths one file (a store with no device-protected part of its own): the only copy kept
+            if (f.absolutePath != old.absolutePath) old.delete()
             return
         }
         try {

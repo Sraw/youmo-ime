@@ -934,7 +934,7 @@ class ClearAndPacksTest(unittest.TestCase):
     def test_a_release_run_with_no_pack_built_stops_before_any_device(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(uat, "PACKS", tmp), \
                 mock.patch.object(uat, "BUILD", "release"), mock.patch.object(uat, "Device") as dev, \
-                self.assertRaises(SystemExit):
+                mock.patch.object(uat, "HTTP_PORT", uat.HTTP_PORT), self.assertRaises(SystemExit):
             uat.run_on(SimpleNamespace(no_voice=True), [], [5554])
         dev.assert_not_called()
 

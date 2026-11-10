@@ -210,6 +210,9 @@ def vo01(d):
     return f"请求权限后允许，回到框里；再说「你好」→「{t}」"
 
 
+case("VO-37", needs="manual:系统权限对话框的拒绝、关掉、转屏、不再询问，手工跑")(lambda d: None)
+
+
 @case("VO-02", base="B0-语音", mutates="learn", needs=EV)
 def vo02(d):
     shown, t = dictate(d, "jintian")
@@ -219,7 +222,7 @@ def vo02(d):
     return f"听的时候显示 {live[:2]}；框里「{t}」"
 
 
-case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt")(lambda d: None)
+case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt、VoiceHoldUatTest.onAScaledKeyboardTheCancelDistanceIsTheKeyboardAsSeen")(lambda d: None)
 
 
 def tap_mic(d):
@@ -273,7 +276,7 @@ def vo04(d):
 case("VO-05", needs="jvm:VoiceGlassTest、VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt")(lambda d: None)
 
 
-case("VO-06", needs="jvm:VoiceHoldUatTest.numbersAreWrittenInDigits")(lambda d: None)
+case("VO-06", needs="jvm:VoiceHoldUatTest.numbersAreWrittenInDigits、ChineseNumbersTest.whatDoesNotReadAsItsKindStaysAsSaid、ChineseNumbersTest.digitsAreDigitByDigit")(lambda d: None)
 
 
 case("VO-07", needs="jvm:VoiceHoldUatTest.wordsWithNumeralsAreLeftAlone")(lambda d: None)
@@ -641,4 +644,4 @@ def vo28(d):
 
 case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing")(lambda d: None)
 case("VO-35", needs="jvm:VoiceEndTest.aChatLosesItsClosingMarkAQuestionKeepsItsOwn、VoiceEndTest.aLineLosesEveryEndMark、VoiceEndTest.elsewhereTheTextEndsAsSaidUnlessDropped、VoiceEndTest.aSearchAnAddressOrOneLineIsALine、VoicePolishTest.appliesAsPython")(lambda d: None)
-case("VO-36", needs="jvm:VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn")(lambda d: None)
+case("VO-36", needs="jvm:VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn、VoicePolishTest.nothingIsWrittenAfterAFullStop")(lambda d: None)

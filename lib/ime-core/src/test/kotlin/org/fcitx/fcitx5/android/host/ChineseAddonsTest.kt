@@ -430,11 +430,6 @@ class ChineseAddonsTest {
         assertEquals(emptyList<StatusEntry>(), statusArea.entries(ic))
     }
 
-    companion object {
-        // ca/punctuation/punc.mb.zh_CN, the lines these tests read
-        const val TABLE = ". 。\n, ，\n? ？\n\" “ ”\n' ‘ ’\n[ 【\n[ 「\n[ 『\n[ ［\n"
-    }
-
     // told per context: another context in the same state is told too; one not focused told when turned off (R20 F6380)
     @Test
     fun `another context in the same state is told its keys`() {
@@ -451,5 +446,10 @@ class ChineseAddonsTest {
         // the focused context (by setConfig), then the other one
         assertEquals(told + 3, asTyped.size)
         assertEquals(setOf<String>(), asTyped.last())
+    }
+
+    companion object {
+        // ca/punctuation/punc.mb.zh_CN, the lines these tests read
+        const val TABLE = ". 。\n, ，\n? ？\n\" “ ”\n' ‘ ’\n[ 【\n[ 「\n[ 『\n[ ［\n"
     }
 }

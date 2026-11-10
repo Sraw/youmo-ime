@@ -22,7 +22,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-// the engine's geometry guards of R20 round 1, each a case its fix alone gets right
+// the engine's guards at the edges of its geometry and paint (no stop drawn, corners unequal, a squeeze on a
+// squeeze, nothing spaced), each a case only its guard gets right
 class GeometryGuardsTest {
 
     // R20 F6144: a gradient whose every stop is transparent draws nothing, as a transparent solid does

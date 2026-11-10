@@ -133,4 +133,4 @@
 - **前提**：B0，中文标点。
 - **操作**：点「表情」，看底排句号键的键面，点它；点「:-)」进颜文字，看底排逗号键，点它。切到英文标点（工具栏 **⋯** 或 Ctrl+.）后再各点一次。
 - **预期**：中文标点时键面是「。」「，」，框里打出「。」「，」；英文标点时键面是「.」「,」，打出「.」「,」。按下时没有气泡，不进最近使用。
-- **JVM**：`SmallBoardsSceneGesturesTest.thePickersFullStopShowsWhatItTypes`（`:app:testDebugUnitTest`）。
+- **JVM**：`SmallBoardsSceneGesturesTest.thePickersFullStopShowsWhatItTypes`、`thePickersFullStopTypesNothingBeforeTheMarksAreKnown`（`:app:testDebugUnitTest`）。（仅 JVM）首次启动、标点还不知道时点它不打字，第一次轻震一下；设备上抓不到这个时刻。

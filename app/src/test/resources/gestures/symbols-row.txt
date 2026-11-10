@@ -18,7 +18,7 @@ space long press sent: [] field  panel true
 backspace said: Backspace as button_backspace
 backspace tap: [sendKey(sym=65288, states=536870912, code=0, up=false)] field  panel true
 backspace long press: []
-backspace long press sent: [sendKey(sym=65288, states=536870912, code=0, up=false), sendKey(sym=65288, states=536870912, code=0, up=false), sendKey(sym=65288, states=536870912, code=0, up=false)] field  panel true
+backspace long press sent: repeats [sendKey(sym=65288, states=536870912, code=0, up=false)] field  panel true
 enter said: Done as button_return
 enter tap: [sendKey(sym=65293, states=536870912, code=0, up=false)] field  panel true
 enter long press: []

@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.data.punctuation
 
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.UserManager
 import androidx.test.core.app.ApplicationProvider
 import org.fcitx.fcitx5.android.engine.assertRows
@@ -106,7 +108,7 @@ class PunctuationStartKeysTest {
     fun theSameKeysAsPreloadedAreNotWrittenAgain() {
         val keys = mapOf("," to "、", "." to "。")
         PunctuationStartKeys.write(ctx, keys)
-        synchronizedReset()
+        asAfterARestart()
         PunctuationStartKeys.preload(ctx)
         val deadline = System.currentTimeMillis() + 5_000
         while (PunctuationStartKeys.known == null && System.currentTimeMillis() < deadline) Thread.sleep(10)
@@ -132,8 +134,25 @@ class PunctuationStartKeysTest {
         assertEquals(keys, readBack())
     }
 
+    // one store (no device-protected part of its own: the two paths one file): its only copy kept, not
+    // deleted as the old one
+    @Test
+    fun oneStoreKeepsItsOnlyCopy() {
+        val one = object : ContextWrapper(ctx) {
+            override fun createDeviceProtectedStorageContext(): Context = this
+        }
+        val only = File(one.filesDir, "punctuation-start-keys")
+        only.writeText("v1\t1\n,\t，\n")
+        try {
+            PunctuationStartKeys.migrate(one)
+            assertEquals(true, only.isFile)
+        } finally {
+            only.delete()
+        }
+    }
+
     // the in-memory state as at a process start, the file kept
-    private fun synchronizedReset() {
+    private fun asAfterARestart() {
         val text = file.readText()
         PunctuationStartKeys.forget(ctx)
         file.writeText(text)

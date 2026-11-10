@@ -79,7 +79,11 @@ class SymbolsSceneGesturesTest {
                 h.api.calls.clear()
                 out += "$id long press: " + h.longPress(h.rowKeys().single { it.id == id })
                 h.idle()
-                out += "$id long press sent: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
+                val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
+                // ⌫ held repeats, how many times as the press falls in the frame (one fewer at SDK 29): the
+                // record keeps what it sends and that it repeats, not the count
+                val shown = if (id == "backspace") "repeats ${sent.distinct()}".also { assertTrue(sent.toString(), sent.size >= MIN_REPEATS) } else "$sent"
+                out += "$id long press sent: " + shown +
                     " field ${h.field.text} panel ${KeyboardHarness.find<PickerLayout>(h.inputView)?.isAttachedToWindow == true}"
             }
         }
@@ -213,6 +217,8 @@ class SymbolsSceneGesturesTest {
     }
 
     private companion object {
+        // a hold of ⌫ deletes over and over: more than the one of a tap
+        const val MIN_REPEATS = 2
         val ROW = setOf("back", "lock", "numbers", "space", "backspace", "enter")
     }
 }

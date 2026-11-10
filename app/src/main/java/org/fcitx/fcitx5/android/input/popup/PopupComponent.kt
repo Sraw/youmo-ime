@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.keyTextScale
 import org.fcitx.fcitx5.android.input.keyboard.longPressOf
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
@@ -65,8 +66,21 @@ class PopupComponent :
     }
     private val hideThreshold = 100L
 
-    // the popups of the keys the canvas draws, the engine's scenes (060-render-p2 S2)
-    private val scenes by lazy { PopupScenes(root, theme, measuring) }
+    // the popups of the keys the canvas draws, the engine's scenes (060-render-p2 S2), in the theme they
+    // draw in now: made again where it changed (the keyboard shown now refused its keys' scene, or no
+    // longer: another keyboard, a rotation), the pooled popups made for the old let go with them
+    private var scenesMade: Pair<String, PopupScenes>? = null
+    private val scenes: PopupScenes
+        get() {
+            val drawn = SceneBoard.drawnTheme(theme).name
+            scenesMade?.takeIf { it.first == drawn }?.let { return it.second }
+            freeEntryUi.clear()
+            return PopupScenes(root, theme, measuring).also { scenesMade = drawn to it }
+        }
+
+    /** The popups' engine as they would draw now: a test's, that it follows the keys' theme. */
+    @VisibleForTesting
+    internal val scenesNow: PopupScenes get() = scenes
 
     /** The engine's text measured through this: a test's, to make it fail. */
     @VisibleForTesting
