@@ -43,7 +43,7 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
 
     companion object {
         const val PREFIX = "theme:"
-        private const val BOM = "﻿"
+        private const val BOM = "\uFEFF"
 
         /** The function keys every keyboard of the app that has them must keep: 删除, 回车, 切换 (060-render-v2 §16). */
         private val ROLES = setOf("backspace", "enter", "lang")
@@ -106,6 +106,28 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
                 }
         }
 
+        private sealed interface Taken {
+            class Yes(val layout: Layout, val fragments: Map<String, Fragment>) : Taken
+
+            /** Not a keyboard used: [why], null for a fragment (told unless a keyboard used includes it). */
+            class Not(val why: String?) : Taken
+        }
+
+        // the pack's file [id] as it would be drawn ([report])
+        private fun taken(dir: File, id: String, app: (String) -> SceneLayout?, appText: (String) -> String?): Taken {
+            val text = (if (BuiltInLayouts.has(id)) read(dir, id) else null)
+                ?: return Taken.Not(if (BuiltInLayouts.has(id)) "does not read" else "not a keyboard of the app")
+            val layout = (LayoutReader.layout(text) as? Parsed.Ok)?.value
+                ?: return Taken.Not("does not read".takeIf { LayoutReader.fragment(text) !is Parsed.Ok })
+            val fragments = HashMap<String, Fragment>()
+            for (src in layout.parts.filterIsInstance<Include>().map { it.src }.distinct()) {
+                val f = (read(dir, src) ?: appText(src))?.let { (LayoutReader.fragment(it) as? Parsed.Ok)?.value }
+                    ?: return Taken.Not("its fragment $src does not read")
+                fragments[src] = f
+            }
+            return judge(id, layout, fragments, app(id))?.let { Taken.Not(it) } ?: Taken.Yes(layout, fragments)
+        }
+
         /**
          * The pack's layout files [files] (`k18.xml`) in [dir], as they would be drawn: each keyboard the app has that
          * reads and is [judge]d typable used, its fragments the pack's where it has them; the rest with why not (a
@@ -119,31 +141,14 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
             var commits = 0
             val ids = files.map { it.removeSuffix(".xml") }
             for (id in ids) {
-                val text = if (BuiltInLayouts.has(id)) read(dir, id) else null
-                if (text == null) {
-                    unused += id to if (BuiltInLayouts.has(id)) "does not read" else "not a keyboard of the app"
-                    continue
+                when (val r = taken(dir, id, app, appText)) {
+                    is Taken.Not -> r.why?.let { unused += id to it }
+                    is Taken.Yes -> {
+                        used += id
+                        commits += commits(r.layout, emptyMap())
+                        r.fragments.filterKeys { read(dir, it) != null }.forEach { (src, f) -> included[src] = f }
+                    }
                 }
-                val layout = (LayoutReader.layout(text) as? Parsed.Ok)?.value
-                if (layout == null) {
-                    // a fragment: told below unless a keyboard used includes it
-                    if (LayoutReader.fragment(text) !is Parsed.Ok) unused += id to "does not read"
-                    continue
-                }
-                val fragments = HashMap<String, Fragment>()
-                var bad: String? = null
-                for (src in layout.parts.filterIsInstance<Include>().map { it.src }.distinct()) {
-                    val f = (read(dir, src) ?: appText(src))?.let { (LayoutReader.fragment(it) as? Parsed.Ok)?.value }
-                    if (f == null) bad = src else fragments[src] = f
-                }
-                val why = bad?.let { "its fragment $it does not read" } ?: judge(id, layout, fragments, app(id))
-                if (why != null) {
-                    unused += id to why
-                    continue
-                }
-                used += id
-                commits += commits(layout, emptyMap())
-                fragments.filterKeys { read(dir, it) != null }.forEach { (src, f) -> included[src] = f }
             }
             commits += included.values.sumOf { f -> commits(listOf(f.defaults), f.rows) }
             ids.filter { it !in used && it !in included && unused.none { u -> u.first == it } }
