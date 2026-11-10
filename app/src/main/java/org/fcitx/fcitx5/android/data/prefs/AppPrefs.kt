@@ -139,6 +139,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val ignoreSystemCursor = hidden { switch(R.string.ignore_sys_cursor, "ignore_system_cursor", false) }
         val hideKeyConfig = hidden { switch(R.string.hide_key_config, "hide_key_config", true) }
         val disableAnimation = switch(R.string.disable_animation, "disable_animation", false)
+
+        /** 键盘动效 (060-render-p3 A1): a theme's keys move as it says (KeyMotionSwitch); off, they are drawn as a theme without motion. */
+        val keyboardMotion = switch(R.string.keyboard_motion, "keyboard_motion", true, R.string.keyboard_motion_summary)
         val keyboardHeightPercentBase = hidden {
             enumList(
                 R.string.keyboard_height_percent_base,
@@ -749,6 +752,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 internal.toolbarButtons,
                 advanced.ignoreSystemCursor,
                 advanced.disableAnimation,
+                advanced.keyboardMotion,
             ).forEach {
                 it.putValueTo(this@edit)
             }

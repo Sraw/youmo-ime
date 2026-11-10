@@ -121,6 +121,19 @@ notice coming, one window for another (`InputWindowManager`, unless the window s
 idle bar's views and the ⋯ icon. Long: the candidates expanded (`BaseExpandedCandidateWindow`'s
 slide from the top) and the whole keyboard moving.
 
+A theme's own key motion (060-render-p3 A1) is apart from these: a key's `Motion` in the scene (its look's
+`transition`, 0–600 ms, CSS's five curves; the pressed look's `press-scale` 85–110% and `press-sink` 0–4dp, their
+`transition` no longer than 80 ms), drawn by `KeyboardCanvasView` on the two nodes each key has. The pressed face is
+shown whole at its first frame (CanvasFrame's alpha swap, never faded in); only its scale (about the key's middle) and
+sink move. Let go, the pressed node fades out over the normal one, scale and sink back; a state change (Shift, locked)
+draws the face it had over the new one, fading. A `ValueAnimator` each (`Moving`), its frames setting the nodes'
+`alpha`/`scaleX`/`scaleY`/`translationY` alone and asking a frame (trace section `canvas anim`): nothing recorded or
+laid out; ended, nothing asked. A press while it moves jumps to pressed. `KeyMotionSwitch` says whether keys may move
+now, asked at each press of a key that has motion: 键盘动效 (`AppPrefs.advanced.keyboardMotion`, default on) on, 禁用动画
+off, battery saver off (kept from `ACTION_POWER_SAVE_MODE_CHANGED`, not asked of `PowerManager` on a keystroke) and
+`ValueAnimator.areAnimatorsEnabled()`; not, or a theme without motion (every built-in one), no `Moving` and no animator
+is made and the keys draw as before. Detached, every animation stops. `KeyMotionTest`.
+
 ### Keys
 
 A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `NumberKeyboard`, `HandwritingKeyboard`):

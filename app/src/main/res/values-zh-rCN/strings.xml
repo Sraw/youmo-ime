@@ -94,6 +94,8 @@
     <string name="expand_toolbar_by_default">默认展开工具栏</string>
     <string name="popup_on_key_press">按键时弹出显示字符</string>
     <string name="disable_animation">禁用动画</string>
+    <string name="keyboard_motion">键盘动效</string>
+    <string name="keyboard_motion_summary">按主题的设定让按键渐变、缩放。系统省电模式或“移除动画”时自动关闭</string>
     <string name="exception_logcat_created">Logcat 进程已创建</string>
     <string name="exception_theme_filename">只能导入主题文件（.theme）：%1$s 不是。以前导出的 .zip 主题改名成 .theme 就能导入。</string>
     <string name="theme_file_unnamed">这个文件</string>
