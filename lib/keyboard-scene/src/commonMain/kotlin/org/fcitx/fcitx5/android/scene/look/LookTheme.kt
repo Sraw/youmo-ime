@@ -206,6 +206,12 @@ object LookTheme {
         s.add(of("keyboard", FLOATING).with(LANDSCAPE), "radius" to radius(floating(false, keys.gap.hLand, keys.gap.vLand)))
         s.add(of("keyboard", FLOATING).with(FLAT), "radius" to radius(floating(true, keys.gap.h, keys.gap.v)))
         s.add(of("keyboard", FLOATING).with(FLAT).with(LANDSCAPE), "radius" to radius(floating(true, keys.gap.hLand, keys.gap.vLand)))
+        // at 紧凑 the rows' margin is less (Gap.vCompact, as the keys' @compact insets): each of the four again, one
+        // scene more specific, so whichever applies is the full one
+        s.add(of("keyboard", FLOATING).with(COMPACT), "radius" to radius(floating(false, keys.gap.h, keys.gap.vCompact)))
+        s.add(of("keyboard", FLOATING).with(COMPACT).with(LANDSCAPE), "radius" to radius(floating(false, keys.gap.hLand, keys.gap.vLandCompact)))
+        s.add(of("keyboard", FLOATING).with(FLAT).with(COMPACT), "radius" to radius(floating(true, keys.gap.h, keys.gap.vCompact)))
+        s.add(of("keyboard", FLOATING).with(FLAT).with(COMPACT).with(LANDSCAPE), "radius" to radius(floating(true, keys.gap.hLand, keys.gap.vLandCompact)))
         val picture = look.picture?.let { p ->
             val cuts = listOfNotNull("portrait" to fileName(p.portrait.file), p.landscape?.let { "landscape" to fileName(it.file) }).toMap()
             Picture(fileName(p.src), p.brightness.toDouble(), p.blurDp.toDouble(), cuts, p.animated)

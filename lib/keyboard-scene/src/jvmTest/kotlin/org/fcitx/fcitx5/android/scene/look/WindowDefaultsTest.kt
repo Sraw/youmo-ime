@@ -35,8 +35,9 @@ class WindowDefaultsTest {
         return WindowLooks(Cascades(theme))
     }
 
-    // the frame's radius is of the keys' alone, the keyboard's width and compact not in it: at every radius and
-    // margin, flat or not, upright and turned (the margins of the screen turned theirs)
+    // the frame's radius is of the keys' alone, the keyboard's width not in it: at every radius and margin, flat
+    // or not, upright and turned (the margins of the screen turned theirs), compact or not (the rows' margin
+    // there Gap.vCompact, as the keys' @compact insets have it)
     @Test
     fun theFloatingCornersAreCornerDps() {
         val radii = listOf(0, 1, 4, 7, 12, Keys.MAX_RADIUS_DP)
@@ -47,14 +48,20 @@ class WindowDefaultsTest {
     // the keys [r] round, [gap] apart, [blocks]: the frame cornerDp's upright and turned
     private fun upAndTurned(r: Int, gap: Gap, blocks: Boolean) {
         val l = looks(base.copy(keys = base.keys.copy(radiusDp = r, gap = gap, blocks = blocks)))
-        for (landscape in listOf(false, true)) {
+        for (landscape in listOf(false, true)) for (compact in listOf(false, true)) {
             val scenes = buildSet {
                 add("floating")
                 if (landscape) add("landscape")
+                if (compact) add("compact")
                 if (!blocks) add("flat")
             }
             val h = if (landscape) gap.hLand else gap.h
-            val v = if (landscape) gap.vLand else gap.v
+            val v = when {
+                landscape && compact -> gap.vLandCompact
+                landscape -> gap.vLand
+                compact -> gap.vCompact
+                else -> gap.v
+            }
             assertEquals(cornerDp(r, h, v, blocks).toDouble(), l.frame(scenes).radiusDp, "r=$r $gap blocks=$blocks $scenes")
         }
     }

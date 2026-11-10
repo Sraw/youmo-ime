@@ -81,5 +81,9 @@
   <style select="@landscape @floating keyboard" radius="11dp"/>
   <style select="@floating @flat keyboard" radius="3dp"/>
   <style select="@landscape @floating @flat keyboard" radius="3dp"/>
+  <style select="@compact @floating keyboard" radius="11dp"/>
+  <style select="@compact @landscape @floating keyboard" radius="10dp"/>
+  <style select="@compact @floating @flat keyboard" radius="3dp"/>
+  <style select="@compact @landscape @floating @flat keyboard" radius="2dp"/>
   <style select="candidate" font="candidate" weight="400"/>
 </theme>

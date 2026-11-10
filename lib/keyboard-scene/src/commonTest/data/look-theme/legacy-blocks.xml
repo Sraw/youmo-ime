@@ -56,4 +56,8 @@
   <style select="@landscape @floating keyboard" radius="12dp"/>
   <style select="@floating @flat keyboard" radius="5dp"/>
   <style select="@landscape @floating @flat keyboard" radius="2dp"/>
+  <style select="@compact @floating keyboard" radius="14dp"/>
+  <style select="@compact @landscape @floating keyboard" radius="12dp"/>
+  <style select="@compact @floating @flat keyboard" radius="4dp"/>
+  <style select="@compact @landscape @floating @flat keyboard" radius="2dp"/>
 </theme>

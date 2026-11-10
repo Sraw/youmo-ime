@@ -61,7 +61,15 @@ object SceneWindow {
     fun frame(theme: Theme, scenes: Set<String>): WindowLooks.Frame =
         looks(theme)?.frame(scenes) ?: ThemeManager.shownLook(theme).keys.let { keys ->
             val land = "landscape" in scenes
-            val radius = FloatingKeyboard.cornerDp(keys.radiusDp, if (land) keys.gap.hLand else keys.gap.h, if (land) keys.gap.vLand else keys.gap.v, keys.blocks)
+            // at 紧凑 the rows' margin is less, as the keys' @compact insets (Gap.vCompact)
+            val compact = "compact" in scenes
+            val v = when {
+                land && compact -> keys.gap.vLandCompact
+                land -> keys.gap.vLand
+                compact -> keys.gap.vCompact
+                else -> keys.gap.v
+            }
+            val radius = FloatingKeyboard.cornerDp(keys.radiusDp, if (land) keys.gap.hLand else keys.gap.h, v, keys.blocks)
             WindowLooks.Frame(radius.toDouble(), false, null, WindowLooks.ELEVATION_DP, null)
         }
 
