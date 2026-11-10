@@ -10,6 +10,7 @@ import android.view.ContextThemeWrapper
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
 import org.fcitx.fcitx5.android.data.theme.TestThemes
@@ -26,6 +27,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,6 +57,10 @@ class PopupMotionTest {
 
     @get:Rule
     val prefs = PrefsRule()
+
+    // it writes a user's pack: the themes settled writable whatever ran before in this JVM (phoneStorage)
+    @Before
+    fun phone() = phoneStorage()
 
     private val key = Rect(55, 500, 95, 550)
     private val five = KeyDef.Popup.Keyboard.Explicit(arrayOf("1", "2", "3", "4", "5"))

@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Looper
 import android.os.PowerManager
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
@@ -23,6 +24,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +49,10 @@ class KeyMotionTest {
 
     @get:Rule
     val prefs = PrefsRule()
+
+    // it writes a user's pack: the themes settled writable whatever ran before in this JVM (phoneStorage)
+    @Before
+    fun phone() = phoneStorage()
 
     // a user's pack (motion is never a built-in theme's): material's file, named its own, [styles] put last; its light version
     private fun theme(vararg styles: String): Theme {
