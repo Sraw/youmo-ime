@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -333,6 +334,14 @@ class VoiceTapUatTest : VoiceTapUat() {
         allowMicrophone()
         ThemeManager.prefs.floatingKeyboard.setValue(true)
         restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        // the drag below keeps where it ended, and the preferences are one for every test of the JVM
+        // (OneDefaultPreferencesShadow): put back, or a later test measures the floating keyboard there
+        AppPrefs.getInstance().internal.run {
+            restore += {
+                floatingKeyboardX.setValue(floatingKeyboardX.defaultValue)
+                floatingKeyboardY.setValue(floatingKeyboardY.defaultValue)
+            }
+        }
         h.start()
         tapMic()
         val handle = KeyboardHarness.find<FloatingHandle>(h.inputView)!!

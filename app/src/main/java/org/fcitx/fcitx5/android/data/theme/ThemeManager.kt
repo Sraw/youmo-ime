@@ -222,6 +222,9 @@ object ThemeManager {
             fireChange()
         }
 
+    /** [activeTheme], null before [init] (a test's process that never set one up). */
+    val activeOrNull: Theme? get() = if (::_activeTheme.isInitialized) _activeTheme else null
+
     private var isDarkMode = false
 
     private val onChangeListeners = WeakHashSet<OnThemeChangeListener>()

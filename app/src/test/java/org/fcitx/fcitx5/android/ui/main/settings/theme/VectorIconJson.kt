@@ -45,7 +45,9 @@ object VectorIconJson {
                                 val stroke = attr(c, "strokeColor") != null
                                 check(fill != stroke) { "$name: a path of ${if (fill) "both a fill and a stroke" else "no colour"}, which the page draws in one tint" }
                                 for ((a, default) in STROKE_DEFAULTS) {
-                                    attr(c, a)?.let { check(it == default) { "$name: $a=\"$it\", where the page draws VectorDrawable's $default" } }
+                                    attr(c, a)?.let {
+                                        check(isDefault(it, default)) { "$name: $a=\"$it\", where the page draws VectorDrawable's $default" }
+                                    }
                                 }
                                 put("d", attr(c, "pathData") ?: "")
                                 attr(c, "fillType")?.let { put("rule", if (it == "evenOdd") "evenodd" else "nonzero") }
@@ -78,6 +80,10 @@ object VectorIconJson {
         if (listOf(tx, ty, sx - 1, sy - 1, r).all { it == 0.0 }) return null
         return "translate(${tx + px} ${ty + py}) rotate($r) scale($sx $sy) translate(${-px} ${-py})"
     }
+
+    // "1.0" is the default "1" (aapt keeps a float as written)
+    private fun isDefault(value: String, default: String) =
+        value == default || value.toDoubleOrNull()?.let { it == default.toDoubleOrNull() } == true
 
     private const val NS = "http://schemas.android.com/apk/res/android"
 

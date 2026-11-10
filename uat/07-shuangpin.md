@@ -40,7 +40,7 @@
 - **JVM**：`ShuangpinUatTest.aWordMadeInFullPinyinTypesInShuangpinItsOrderItsOwn`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### SP-09 [P1] 每种键盘都能滑：双拼、五笔、拼音的九键
-- **前提**：B0-设置，在 **通用输入** 里打开 **滑行输入**（默认关）；在 **输入法** 里添加"双拼""五笔"，在 **输入法 → 拼音** 里把 **键盘** 选成「九键」；回测试页点「普通文本」框。
+- **前提**：B0-设置，在 **通用输入** 的 **在键上划** 里选 **滑行输入**（默认关）；在 **输入法** 里添加"双拼""五笔"，在 **输入法 → 拼音** 里把 **键盘** 选成「九键」；回测试页点「普通文本」框。
 - **操作**：
   1. 点地球键切到双拼（自然码）：手指按在 n 上，不抬手依次划过 i、h、k，在 k 上抬起；看候选，删光。
   2. 切到五笔：手指按在 w 上，不抬手依次划过 q、i、y，在 y 上抬起；看候选，删光。
@@ -134,7 +134,7 @@
 - **JVM**：`GroupedKeyboardUatTest.nineKeyShuangpinsLongPressesCodeRowAndTheNumbersStrip`、`KeyboardHalvesUatTest.aSyllableTakenOnTheNumbersPageGoesIntoTheCode`（长按 5 有 J K L，没有 `;` `:`；2 键改成 ~ 后长按有「～」、点了发 ~（拼音的九键同）；编码行 32dp，字母页音节在左列不在编码行，123 页有音节条、点了发音节键；拼音全键盘 18dp（键盘半边）；123 页选的音节进编码行（引擎半边）；~ 变成全角「～」是 fcitx 中文标点的，JVM 只断言发出 ~）；设备上不跑。
 
 ### SP-25 [P1] 双拼划一竖筛候选，接着打字笔画就没了
-- **前提**：B0-双拼，另外在 **通用输入** 里打开 **笔画筛选**。
+- **前提**：B0-双拼，另外在 **通用输入** 的 **在键上划** 里选 **笔画筛选**。
 - **操作**：打 xi，看首选；在键盘上划一竖，看编码行和候选；再点 u。
 - **预期**：首选「系」。划一竖后编码行是 `xi 丨`，首选「吸」，「曦」在第一页，「系」「西」不见了。点 u 后编码行是 `xi u`，笔画没了，u 照常是下一个字的声母 sh（候选里有「系数」）。18 键、九键双拼上一样（这里只在全键盘上测；18 键、九键双拼打 xi 的键码再划一竖由 JVM 测，候选顺序不比；分组键盘上发笔画见 KB-42）。
 - **JVM**：`StrokeFilterUatTest.shuangpinXiThenADownStroke`（uatTest，真数据，自然码）、`StrokeFilterUatTest.shuangpinXiOnTheGroupedKeysThenADownStroke`（18 键、九键双拼：吸、曦在，系、西不在）；设备上不跑。
