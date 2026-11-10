@@ -27,7 +27,9 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
+import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
+import org.fcitx.fcitx5.android.scene.theme.Values
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
@@ -202,6 +204,68 @@ object YoumoEngine {
         val built = builder(theme, e, measurer).build(l.layout, l.fragments)
         result(built) { "scene" to YoumoScene(it, e.density) }
     }
+
+    /**
+     * Where a widget of [layout] (as [buildScene] takes it) gets each property from, drawn by [theme] in [env]:
+     * [target] `{widget: "key", key, part?, states?}`, [part] `label`, `mark`… (none: the key's face), [states]
+     * theme.xml's (`pressed`, `locked`…) besides the ones the key is in. `{ok, problems, sources: [{property,
+     * line, order}]}`, the line and order (the n-th `<style>`, from 0) of the style whose value wins, the
+     * properties in name order; none where the key is not on the board there (060-render-p3 §5.1: the cascade
+     * check). Only keys so far: another widget is a problem.
+     */
+    fun sources(layout: dynamic, theme: dynamic, env: dynamic, target: dynamic): dynamic = checked {
+        val widget = optionalText(member(target, "widget"), "widget") ?: "key"
+        if (widget != "key") return@checked failed(listOf(Problem(0, "sources of a $widget: only keys so far")))
+        val l: YoumoLayout = if (jsTypeOf(layout) == "string") {
+            YoumoEngine.layout(layout as String) ?: return@checked failed(listOf(Problem(0, "no built-in layout \"$layout\"")))
+        } else {
+            layout as? YoumoLayout ?: throw NotOfType("layout: not a layout")
+        }
+        val e = when (val read = env(env)) {
+            is Parsed.Failed -> return@checked failed(read.problems)
+            is Parsed.Ok -> read.value
+        }
+        val given: dynamic = member(target, "states")
+        val states = if (given == null) emptySet() else array(given, "states").mapTo(HashSet()) { text(it, "a state") }
+        val key = text(member(target, "key"), "key")
+        val found = builder(theme, e, null).sources(l.layout, l.fragments, key, optionalText(member(target, "part"), "part"), states)
+        obj(
+            "ok" to true,
+            "problems" to emptyArray<dynamic>(),
+            "warnings" to emptyArray<dynamic>(),
+            "sources" to found.entries.sortedBy { it.key }.map { (p, s) -> obj("property" to p, "line" to s.line, "order" to s.order) }.toTypedArray(),
+        )
+    }
+
+    /**
+     * [source] as a theme's `<icon>` (an SVG of filled paths: [SvgSubset], what the app imports): `{ok, problems}`
+     * where it is not one (each `{line, message, level}`), else `{ok, icon: {vw, vh, paths: [{d, rule, alpha}]}}`,
+     * as `paint`'s `icons` takes an icon (060-render-p3 §5.1 panel 4).
+     */
+    fun readIcon(source: dynamic): dynamic = checked {
+        result(SvgSubset.read(text(source, "source"))) { icon ->
+            "icon" to obj(
+                "vw" to icon.width,
+                "vh" to icon.height,
+                "paths" to icon.paths.map { p -> obj("d" to p.d, "rule" to if (p.evenOdd) "evenodd" else "nonzero", "alpha" to p.alpha) }.toTypedArray(),
+            )
+        }
+    }
+
+    /**
+     * The bounds the engine reads a key's and its text's values in (Values: what a form offers, 060-render-p3 M1):
+     * `{lengthDp, offsetDp, borderDp, blurDp, depthDp, scale: [min, max], spacingEm: [min, max], stops: [min, max]}`.
+     */
+    fun limits(): dynamic = obj(
+        "lengthDp" to Values.MAX_LENGTH_DP,
+        "offsetDp" to Values.MAX_OFFSET_DP,
+        "borderDp" to Values.MAX_BORDER_DP,
+        "blurDp" to Values.MAX_BLUR_DP,
+        "depthDp" to Values.MAX_DEPTH_DP,
+        "scale" to arrayOf(Values.MIN_SCALE, Values.MAX_SCALE),
+        "spacingEm" to arrayOf(Values.MIN_SPACING_EM, Values.MAX_SPACING_EM),
+        "stops" to arrayOf(Values.MIN_STOPS, Values.MAX_STOPS),
+    )
 
     /**
      * A popup drawn by [theme] in [env]: [request] `{kind: "preview", text, keyWidth, size?: px | "words"}` (a

@@ -52,7 +52,7 @@ jobs:
           node-version: "24"
 
       - name: Run theme maker tests
-        run: node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs
+        run: node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs
 
       # the site: web/ as it is, the page's tests, sources, tools, fonts (in index.html), dev pages and build
       # left out (index.html is all it needs), its index.html the page with its engine

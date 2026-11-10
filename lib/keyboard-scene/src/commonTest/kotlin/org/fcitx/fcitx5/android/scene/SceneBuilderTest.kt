@@ -13,7 +13,9 @@ import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
+import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.Cascades
+import org.fcitx.fcitx5.android.scene.theme.Selector
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -47,6 +49,20 @@ class SceneBuilderTest {
         val plain = Fixtures.scene(Fixtures.portrait)
         assertEquals(plain.keys.map { it.id to it.faces }, scene.keys.map { it.id to it.faces })
         assertEquals(plain.base, scene.base)
+    }
+
+    // the maker's cascade check: a key's every property from the style the scene's cascade takes it from
+    @Test
+    fun sourcesAreTheKeysCascade() {
+        val t = Fixtures.materialLight
+        val b = SceneBuilder(t, Fixtures.portrait, FakeMeasurer)
+        val c = Cascade(t, Fixtures.portrait.scenes)
+        val q = Selector.Target("key", "qwerty", "q", null, setOf("letter"), emptySet())
+        assertEquals(c.sources(q), b.sources(Fixtures.qwerty, emptyMap(), "q", null, emptySet()))
+        assertEquals(c.sources(q.copy(states = setOf("pressed"), part = "label")), b.sources(Fixtures.qwerty, emptyMap(), "q", "label", setOf("pressed")))
+        val pressed = b.sources(Fixtures.qwerty, emptyMap(), "q", null, setOf("pressed"))
+        assertEquals(c.of(q.copy(states = setOf("pressed"))).keys, pressed.keys)
+        assertEquals(emptyMap(), b.sources(Fixtures.qwerty, emptyMap(), "none", null, emptySet()))
     }
 
     // a theme's cascades kept from scene to scene (TextKeyboard's) make each scene as a fresh one does:

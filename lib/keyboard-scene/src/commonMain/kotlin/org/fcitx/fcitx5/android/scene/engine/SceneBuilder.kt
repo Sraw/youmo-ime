@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
+import org.fcitx.fcitx5.android.scene.theme.Style
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.Theme
 
@@ -293,15 +294,8 @@ class SceneBuilder(
         roles: Set<String>,
         stateSets: List<Set<KeyState>>,
     ): List<Pair<ExpandedKey, Set<KeyState>>> {
-        // the keys as the scene has them: a layout that does not expand here draws no keys here (its own
-        // problems are the layout check's)
-        val placement = placement(layout)
-        val splitSide = placement?.side?.takeIf { env.split }?.name?.lowercase()
-        // as [scene] expands it: a number pad the app named no pad for, the full one
-        val expanding = if (layout.family == "number" && env.input.pad == null) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
-        val rows = Expand.rows(layout, fragments, expanding, splitSide).getOr { return emptyList() }
         val out = ArrayList<Pair<ExpandedKey, Set<KeyState>>>()
-        for (key in rows.flatMap { it.items }.filterIsInstance<ExpandedKey>()) {
+        for (key in expandedKeys(layout, fragments)) {
             if (key.attrs.role !in roles) continue
             val c = if (key.attrs.face == Face.Keep) unflat else cascade
             val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
@@ -316,6 +310,28 @@ class SceneBuilder(
             }
         }
         return out
+    }
+
+    // the keys as the scene has them: a layout that does not expand here draws no keys here (its own problems
+    // are the layout check's); expanded as [scene] does: a number pad the app named no pad for, the full one
+    private fun expandedKeys(layout: Layout, fragments: Map<String, Fragment>): List<ExpandedKey> {
+        val splitSide = placement(layout)?.side?.takeIf { env.split }?.name?.lowercase()
+        val expanding = if (layout.family == "number" && env.input.pad == null) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
+        val rows = Expand.rows(layout, fragments, expanding, splitSide).getOr { return emptyList() }
+        return rows.flatMap { it.items }.filterIsInstance<ExpandedKey>()
+    }
+
+    /**
+     * Which style each of key [id]'s properties ([part]'s, null the key's own) comes from on [layout] here, as
+     * [styled] cascades it, in [states] (theme.xml's names: `pressed`, `locked`…) besides the ones the key is in
+     * (the maker's cascade check). Empty where the key is not on it here.
+     */
+    internal fun sources(layout: Layout, fragments: Map<String, Fragment>, id: String, part: String?, states: Set<String>): Map<String, Style> {
+        val key = expandedKeys(layout, fragments).firstOrNull { it.key.id == id } ?: return emptyMap()
+        val c = if (key.attrs.face == Face.Keep) unflat else cascade
+        val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
+        val all = statesOf(key).mapTo(HashSet()) { it.xml } + states
+        return c.sources(Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, all, part))
     }
 
     // the key's face's layers in each state

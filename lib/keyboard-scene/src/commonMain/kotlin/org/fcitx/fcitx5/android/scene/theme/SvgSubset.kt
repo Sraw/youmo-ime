@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
-package org.fcitx.fcitx5.android.input.theme
+package org.fcitx.fcitx5.android.scene.theme
 
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problem
@@ -51,6 +51,40 @@ object SvgSubset {
         if (count.numbers > MAX_NUMBERS) problems += Problem(0, "over $MAX_NUMBERS numbers in the paths")
         return problems
     }
+
+    /** An icon's outline as a drawer takes it: its viewBox's sides and its filled paths, in one tint. */
+    data class Icon(val width: Double, val height: Double, val paths: List<Path>)
+
+    /** A filled path: [d] as SVG has it, [evenOdd] its rule, [alpha] its opacity (fill-opacity times its groups'). */
+    data class Path(val d: String, val evenOdd: Boolean, val alpha: Double)
+
+    /**
+     * [source] as an [Icon] where [check] finds nothing wrong with it: the sides its viewBox's (else width and
+     * height, else 24), the paths not filled `none`, each with the rule and opacity its groups give it. The
+     * theme maker's preview draws a theme's own icons with it (060-render-p3 §5.1 panel 4).
+     */
+    fun read(source: String): Parsed<Icon> {
+        val problems = check(source)
+        if (problems.isNotEmpty()) return Parsed.Failed(problems)
+        val root = (Xml.parse(source) as Parsed.Ok).value
+        val box = root["viewBox"]?.trim()?.split(Regex("[\\s,]+"))?.map(String::toDouble)
+        val w = box?.get(2) ?: root["width"]?.removeSuffix("px")?.toDouble() ?: DEFAULT_SIDE
+        val h = box?.get(3) ?: root["height"]?.removeSuffix("px")?.toDouble() ?: DEFAULT_SIDE
+        val paths = ArrayList<Path>()
+        fun walk(el: XmlElement, fill: String?, rule: String?, alpha: Double) {
+            val f = el["fill"] ?: fill
+            val r = el["fill-rule"] ?: rule
+            val a = alpha * (el["opacity"]?.toDouble() ?: 1.0)
+            if (el.name == "path" && f != "none") {
+                paths += Path(el["d"]!!, r == "evenodd", a * (el["fill-opacity"]?.toDouble() ?: 1.0))
+            }
+            el.children.forEach { walk(it, f, r, a) }
+        }
+        walk(root, null, null, 1.0)
+        return Parsed.Ok(Icon(w, h, paths))
+    }
+
+    private const val DEFAULT_SIDE = 24.0
 
     private class Count {
         var paths = 0
