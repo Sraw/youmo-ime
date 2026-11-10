@@ -207,8 +207,11 @@ instead: its sideways steps (`SwipeSteps`, the same counting and the same 10 dp 
 backspace's selection gets from `KeyGestureRecognizer`) go to `CommonKeyActionListener`'s
 `SwipeSelection` (ime-core), which begins after what is typed is committed (`afterPendingInput`, the
 steps meanwhile kept), reads the field around the selection once (`readAround`, not in a password)
-to step a grapheme a step, and sets the selection from its anchor (`EditingSession.select`); the
-lift runs nothing and leaves the selection. A
+to step a grapheme a step (the read dropped where its cursor is not the tracked one), and sets the
+selection from its anchor (`EditingSession.select`). Right of what is known to be in the field a step
+is tried alone, the next waiting for the editor's report of it (`reportedSelection`), as one past
+the end is ignored; the buzz is the listener's, where the selection moved. Any other key action
+ends it (a second finger); the lift runs nothing and leaves the selection. A
 shortcut named in the key's bubble (`PopupAction.PreviewUpdateAction.words`) is fitted by
 `PreviewLabel`: a function key's size scaled as the keys' text (a letter's too, `engine/Popups.SYMBOL_DP`),
 characters counted and cut as seen (`BreakIterator` graphemes: a flag, a family, an accent are one), a bubble five of them wide, smaller

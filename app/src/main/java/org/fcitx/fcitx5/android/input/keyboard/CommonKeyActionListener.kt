@@ -120,6 +120,8 @@ class CommonKeyActionListener :
 
     val listener: KeyActionListener by lazy {
         KeyActionListener { action, _ ->
+            // another key acting (a second finger) ends a 滑选 under way: its steps no longer select
+            if (action !is BeginSwipeSelectAction && action !is SwipeSelectAction) swipeSelection.end()
             when (action) {
                 // as the address keys are: through the engine a digit would pick a candidate, _ be ——
                 is HostKeyAction -> {
@@ -210,11 +212,16 @@ class CommonKeyActionListener :
                     val touch = swipeSelection.reached()
                     afterPendingInput {
                         ContextCompat.getMainExecutor(context).execute {
-                            swipeSelection.begin(touch, service.currentInputSelection, service.readForSwipeSelect())?.let(::select)
+                            val read = service.readForSwipeSelect()
+                            swipeSelection.begin(touch, service.currentInputSelection, read?.field, read?.at ?: -1)?.let(::select)
                         }
                     }
                 }
-                is SwipeSelectAction -> swipeSelection.move(action.steps)?.let(::select)
+                // felt only where it moved: not at the field's end, nor past it waiting for the editor
+                is SwipeSelectAction -> swipeSelection.move(action.steps, service.reportedSelection)?.let {
+                    select(it)
+                    action.moved()
+                }
                 is DeleteSelectionAction -> {
                     when (backspaceSwipe.onRelease(action.totalCnt)) {
                         // the engine first forgets what it committed, maybe deleted with the

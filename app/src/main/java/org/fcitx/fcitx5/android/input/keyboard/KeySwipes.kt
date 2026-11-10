@@ -156,10 +156,7 @@ internal class KeySwipes(
             return true
         }
         val n = held.steps.step(event.x, selectThreshold)
-        if (n != 0) {
-            keyboard.onAction(KeyAction.SwipeSelectAction(n))
-            if (hapticOnRepeat) InputFeedbacks.hapticFeedback(key.feedback)
-        }
+        if (n != 0) keyboard.onAction(KeyAction.SwipeSelectAction(n) { if (hapticOnRepeat) InputFeedbacks.hapticFeedback(key.feedback) })
         return true
     }
 

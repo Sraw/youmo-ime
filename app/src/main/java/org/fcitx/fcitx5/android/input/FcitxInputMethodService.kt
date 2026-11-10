@@ -110,7 +110,6 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
-import org.fcitx.fcitx5.android.input.shortcut.EditPlan
 import org.fcitx.fcitx5.android.input.voice.VoiceCommit
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
@@ -955,9 +954,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     /** 滑选's selection, set from where it began ([org.fcitx.fcitx5.android.input.keyboard.SwipeSelection]): a cursor moved, as the user's own selecting. */
     fun select(start: Int, end: Int) = editingSession.select(start, end)
 
-    /** The field around the selection as 滑选 begins, for its characters; none in a password, whose text is not read. */
-    fun readForSwipeSelect(): EditPlan.Field? =
-        if (inPasswordField) null else readAround(SwipeSelection.READ, SwipeSelection.READ, selected = selection.latest.isNotEmpty())?.field
+    /** The field around the selection as 滑选 begins, for its characters, and where it read the cursor; none in a password, whose text is not read. */
+    fun readForSwipeSelect(): ClearedText.Read? =
+        if (inPasswordField) null else readAround(SwipeSelection.READ, SwipeSelection.READ, selected = selection.latest.isNotEmpty())
+
+    /** The selection the editor last reported, none predicted since taken into account: what 滑选's steps past the field's known end wait for. */
+    val reportedSelection: CursorRange
+        get() = selection.current
 
     private lateinit var lastKnownConfig: Configuration
 

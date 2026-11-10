@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.input
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.text.InputType
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.FcitxApplication
@@ -19,6 +21,9 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostCore
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutRunner
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -258,15 +263,21 @@ class KeyShortcutsHostTest {
 
     // 滑选 on q: up past the threshold, then sideways to each of [dxs] (dp from the key's middle; a
     // character each 10 dp, the backspace's selection's step), lifted at the last
-    private fun swipeSelect(vararg dxs: Float, then: (Int) -> Unit = {}) {
-        val q = h.key("q")
-        val finger = h.finger(q, h.at(q))
-        for (i in 1..6) finger.move(h.at(q, dy = -10f * i, ms = 16))
+    private fun swipeSelect(vararg dxs: Float, on: ShownKey? = null, then: (Int) -> Unit = {}) {
+        val k = on ?: h.key("q")
+        val finger = swipeSelectHeld(k, *dxs, then = then)
+        finger.up(h.at(k, dx = dxs.last(), dy = -60f))
+    }
+
+    // as [swipeSelect], the finger left down
+    private fun swipeSelectHeld(k: ShownKey, vararg dxs: Float, then: (Int) -> Unit = {}): KeyboardHarness.Finger {
+        val finger = h.finger(k, h.at(k))
+        for (i in 1..6) finger.move(h.at(k, dy = -10f * i, ms = 16))
         dxs.forEachIndexed { i, dx ->
-            finger.move(h.at(q, dx = dx, dy = -60f, ms = 16))
+            finger.move(h.at(k, dx = dx, dy = -60f, ms = 16))
             then(i)
         }
-        finger.up(h.at(q, dx = dxs.last(), dy = -60f))
+        return finger
     }
 
     private fun swipeSelectOnQ() =
@@ -314,6 +325,96 @@ class KeyShortcutsHostTest {
         synced()
         swipeSelect(-11f)
         until("the family selected") { selected() == "1..${1 + family.length}" }
+    }
+
+    // the touch taken by the system: the selection stays; the key's next touch is a touch of its own, a tap a tap
+    @Test
+    fun swipeSelectCancelledKeepsTheSelectionAndTheNextTouchIsATap() {
+        swipeSelectOnQ()
+        start("hello")
+        synced()
+        val q = h.key("q")
+        val finger = swipeSelectHeld(q, -11f, -21f)
+        until("lo selected") { selected() == "3..5" }
+        finger.send(MotionEvent.ACTION_CANCEL, h.at(q, dx = -21f, dy = -60f))
+        synced()
+        assertEquals("cancelled, it stays", "3..5", selected())
+        // typed, not taken for 滑选 again
+        type("q")
+    }
+
+    // the bubble says 滑选 till the lift, the finger drifting back down onto the key too
+    @Test
+    fun swipeSelectsBubbleStaysAsTheFingerDriftsBack() {
+        swipeSelectOnQ()
+        start("hello")
+        synced()
+        val q = h.key("q")
+        val finger = swipeSelectHeld(q, -11f)
+        finger.move(h.at(q, dx = -11f, dy = 0f, ms = 16))
+        val shown = h.popupChoices().map { it.text }.filter { it.isNotEmpty() }
+        assertTrue("滑选 in $shown", "滑选" in shown)
+        finger.up(h.at(q, dx = -11f))
+        synced()
+        assertEquals("no q typed", "", preedit)
+        assertEquals("hello", h.field.text.toString())
+    }
+
+    // a password's text is not read: units; past its end a step the editor ignores leaves no dead step back
+    @Test
+    fun swipeSelectInAPasswordGoesByUnitsAndStopsAtItsEnd() {
+        swipeSelectOnQ()
+        start()
+        h.start(
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            prefill = { it.setText("secret"); it.setSelection(6) },
+        )
+        synced()
+        swipeSelect(-21f)
+        until("et selected") { selected() == "4..6" }
+        // on from it, the right end free: three steps right reach past the end, which the editor ignores, the
+        // steps after it waiting; one back selects the t before the end, no step lost to the one ignored
+        // begun before the finger moves on (steps moved before it begins are taken together)
+        swipeSelect(0f, 31f, 41f, 51f, 39f) { if (it == 0) synced() }
+        until("t selected") { selected() == "5..6" }
+        assertEquals("secret", h.field.text.toString())
+    }
+
+    // 滑选 run by a tap (a theme's key of `shortcut swipe_select`) or from elsewhere: nothing, nothing committed
+    @Test
+    fun swipeSelectTappedOrRunElsewhereDoesNothing() {
+        start("hello")
+        type("nihao")
+        val board = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().first { h.shown(it) }
+        board.keyActionListener!!.onKeyAction(KeyAction.ShortcutAction(KeyShortcut.Command(KeyCommand.SwipeSelect)), KeyActionListener.Source.Keyboard)
+        KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}) { true }.run(KeyShortcut.Command(KeyCommand.SwipeSelect))
+        synced()
+        assertEquals("still typed", "nihao", preedit)
+        assertEquals("nothing committed", "hello", h.field.text.toString())
+        assertEquals("nothing selected", "5..5", selected())
+    }
+
+    // on space or backspace: their own sideways swipes (the cursor, the selection deleted) not run
+    @Test
+    fun swipeSelectOnSpaceOrBackspaceMovesNoCursorAndDeletesNothing() {
+        prefs.set(
+            AppPrefs.getInstance().internal.keyShortcuts,
+            KeyShortcuts.Empty.with(KeyShortcuts.functionKey("space", up = true), KeyShortcut.Command(KeyCommand.SwipeSelect))
+                .with(KeyShortcuts.functionKey("backspace", up = true), KeyShortcut.Command(KeyCommand.SwipeSelect)).serialize(),
+        )
+        start("hello world")
+        synced()
+        swipeSelect(-21f, on = h.keyNamed("space"))
+        until("ld selected") { selected() == "9..11" }
+        synced()
+        assertEquals("hello world", h.field.text.toString())
+        h.field.setSelection(5)
+        synced()
+        swipeSelect(-21f, on = backspace)
+        until("lo selected") { selected() == "3..5" }
+        synced()
+        assertEquals("nothing deleted", "hello world", h.field.text.toString())
+        assertEquals("3..5", selected())
     }
 
     private fun backspaces(n: Int, leaving: String) {
