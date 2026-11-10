@@ -214,6 +214,16 @@ internal class KeyboardFrames(private val window: Window) : AutoCloseable {
         )
     }
 
+    /** [lengthMs] of nothing done (not the main thread): the frames drawn and the process's share of a core ([ProcessCpu]). */
+    fun idle(lengthMs: Long): String {
+        val cpu = ProcessCpu.ms()
+        val from = System.nanoTime()
+        SystemClock.sleep(lengthMs)
+        val to = System.nanoTime()
+        val share = 100 * (ProcessCpu.ms() - cpu) / ms(to - from)
+        return "%d s\tframes %d\tprocess cpu %.2f%% of a core".format(Locale.ROOT, lengthMs / 1000, between(from, to).size, share)
+    }
+
     override fun close() {
         window.removeOnFrameMetricsAvailableListener(listener)
         thread.quitSafely()
@@ -284,6 +294,12 @@ internal class Stats(values: List<Double>) {
 
     override fun toString() = "%.1f / %.1f".format(Locale.ROOT, median, p90)
 }
+
+/** design 060-render-p3 §4.3's rows that need motion in the engine, and the stage that brings it. */
+internal val ANIM_NOT_YET = listOf(
+    "release fade" to "A1", "press scale" to "A1", "shift transition" to "A1", "switch off" to "A1", "power save" to "A1",
+    "popup appear" to "A2", "ripple image" to "A3", "particles" to "A3", "picture idle" to "A4", "picture + press" to "A4",
+)
 
 /**
  * The CPU time this process has used, user and system ([/proc/self/stat]'s utime + stime), in ms:

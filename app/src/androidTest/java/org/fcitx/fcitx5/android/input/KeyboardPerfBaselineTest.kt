@@ -112,7 +112,8 @@ class KeyboardPerfBaselineTest {
             if ("popup" in only) popupSlide()
             if ("rebuild" in only) rebuilds()
             if ("anim" in only || "idle" in only) idleRows()
-            if ("anim" in only) animRowsNotYet()
+            // the §4.3 rows that need motion in the engine (A1-A4): told, not measured
+            if ("anim" in only) ANIM_NOT_YET.forEach { (row, stage) -> log("anim\t$row\tnot yet ($stage)") }
             return
         }
         memory("no keyboard shown yet")
@@ -283,7 +284,11 @@ class KeyboardPerfBaselineTest {
         val up = SystemClock.uptimeMillis()
         mark.from = up * DownMarks.NS_PER_MS
         inject(MotionEvent.ACTION_UP, key, down, up)
-        return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
+        val sample = runCatching { frames.await(mark) }.getOrElse {
+            val shown = onMain { keyboardFrame()?.let { f -> (0 until f.childCount).map { f.getChildAt(it).javaClass.simpleName } } }
+            error("$board not shown after the tap at $key: the keyboard's frame holds $shown")
+        }
+        return sample.also { settle() }.heap(Heap.now() - heap)
     }
 
     private fun switchTo(im: String, board: Board): KeyboardFrames.Sample {
@@ -699,30 +704,11 @@ class KeyboardPerfBaselineTest {
             onMain { service.window.window!!.callback = marks.original }
         }
         log("anim\tidle after\tframes in 2 s ${Stats(after.map { it.toDouble() })} (median / p90)\tmax ${after.maxOrNull()}\tstatic theme")
-        idle("shown, static theme", IDLE_SHOWN_MS)
-        hideKeyboard()
-        idle("hidden, static theme", IDLE_HIDDEN_MS)
-        showKeyboard()
-    }
-
-    private fun idle(label: String, ms: Long) {
         settle()
-        val cpu = ProcessCpu.ms()
-        val from = System.nanoTime()
-        SystemClock.sleep(ms)
-        val to = System.nanoTime()
-        val used = ProcessCpu.ms() - cpu
-        val count = frames.between(from, to).size
-        log("anim\t$label\t${ms / 1000} s\tframes $count\tprocess cpu %.2f%% of a core".format(Locale.ROOT, 100 * used / ((to - from) / NANOS_A_MS)))
-    }
-
-    // the §4.3 rows that need motion in the engine (A1-A4): told, not measured
-    private fun animRowsNotYet() {
-        for ((row, stage) in listOf(
-            "release fade" to "A1", "press scale" to "A1", "shift transition" to "A1", "switch off" to "A1", "power save" to "A1",
-            "popup appear" to "A2", "ripple image" to "A3", "particles" to "A3",
-            "picture idle" to "A4", "picture + press" to "A4",
-        )) log("anim\t$row\tnot yet ($stage)")
+        log("anim\tshown, static theme\t${frames.idle(IDLE_MS)}")
+        hideKeyboard()
+        log("anim\thidden, static theme\t${frames.idle(IDLE_MS)}")
+        showKeyboard()
     }
 
     // ---- 4. memory
@@ -837,8 +823,7 @@ class KeyboardPerfBaselineTest {
         const val SCREENSHOT_WAIT_MS = 1_000L
         const val IDLE_LEAD_MS = 300L
         const val IDLE_AFTER_MS = 2_000L
-        const val IDLE_SHOWN_MS = 10_000L
-        const val IDLE_HIDDEN_MS = 10_000L
+        const val IDLE_MS = 10_000L
         const val SCREENSHOT = "/data/local/tmp/keyboard-perf-picture.png"
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()!!
