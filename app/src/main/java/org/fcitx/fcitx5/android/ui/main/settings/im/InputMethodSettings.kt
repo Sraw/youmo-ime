@@ -128,16 +128,12 @@ object InputMethodSettings {
         val pref: () -> ManagedPreference.PStringLike<T>,
     ) : Titled where T : Enum<T>, T : ManagedPreferenceEnum
 
-    /**
-     * A switch over the app's own preference [pref], as [AppChoice] is a list. [turnsOff], the key
-     * of another on the same page that this one turns off as it is turned on: the two are never on together.
-     */
+    /** A switch over the app's own preference [pref], as [AppChoice] is a list. */
     class AppToggle(
         override val key: String,
         @StringRes override val title: Int,
         @StringRes override val summary: Int,
         override val notFor: List<String> = emptyList(),
-        val turnsOff: String? = null,
         val pref: () -> ManagedPreference<Boolean>,
     ) : Titled
 
@@ -652,7 +648,7 @@ object InputMethodSettings {
                     refreshers += refresh
                 })
                 is Action -> into(action(context, item, act, confirm))
-                is AppToggle -> into(appToggle(context, item, group))
+                is AppToggle -> into(appToggle(context, item))
             }
         }
         items.forEach { add(it, group::addPreference) }
@@ -723,7 +719,7 @@ object InputMethodSettings {
             }
         }
 
-    private fun appToggle(context: Context, item: AppToggle, page: PreferenceGroup) = SwitchPreferenceCompat(context).apply {
+    private fun appToggle(context: Context, item: AppToggle) = SwitchPreferenceCompat(context).apply {
         val pref = item.pref()
         key = item.key
         // the app's preference set by hand: this screen's store is fcitx's config
@@ -734,12 +730,7 @@ object InputMethodSettings {
         summary = summaryOf(context, item.summary, item.notFor)
         isChecked = pref.getValue()
         setOnPreferenceChangeListener { _, value ->
-            // the other flips where it is seen, no dialog asked: its own listener stores it off, before
-            // this one is stored on, so the two are never both stored on
-            val on = value as Boolean
-            val other = item.turnsOff?.takeIf { on }?.let { page.findPreference<SwitchPreferenceCompat>(it) }
-            if (other != null && other.callChangeListener(false)) other.isChecked = false
-            pref.setValue(on)
+            pref.setValue(value as Boolean)
             true
         }
     }

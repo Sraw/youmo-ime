@@ -28,6 +28,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.File
 
 /**
  * A setting moved out of the settings page kept what an older version or a backup set, with
@@ -142,6 +143,20 @@ class AppPrefsTest {
         )
     }
 
+    // a 0.5 backup imported: the start after it resets the hidden settings (the import's marker) and then
+    // drops the retired ones, in FcitxApplication.onCreate's order; the two switches still move over
+    @Test
+    fun anImportedBackupsSwitchesMoveOverAtTheStartAfter() {
+        sp.edit { clear(); putBoolean("glide_typing", false); putBoolean("stroke_filter", true) }
+        val marker = File.createTempFile("imported", null)
+        val prefs = AppPrefs(sp)
+        FcitxApplication.resetHiddenSettings(prefs, directBoot = false) { marker }
+        prefs.dropRetired()
+        assertFalse("the marker gone", marker.exists())
+        assertEquals(KeyDrawing.StrokeFilter, prefs.keyboard.keyDrawing.getValue())
+        assertFalse(sp.contains("glide_typing") || sp.contains("stroke_filter"))
+    }
+
     // contract: the keyboard choices are stored by the constant's name under keys that never change:
     // one renamed would put every user's back to the full keyboard; a value this version does not know
     // (a later keyboard's) reads as the default
@@ -171,6 +186,12 @@ class AppPrefsTest {
                     "双拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys"), ShuangpinKeyboard.entries, "shuangpin_keyboard", AppPrefs.SHUANGPIN_KEYBOARD,
                     { it.keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys) }, "NineKeys", "Keys16",
                     { it.keyboard.shuangpinKeyboard.getValue() }, ShuangpinKeyboard.Full,
+                ),
+                // 在键上划 since 0.6; Handwriting stored before it is offered (a later version's backup)
+                Row(
+                    "在键上划", listOf("Glide", "StrokeFilter", "Handwriting", "Off"), KeyDrawing.entries, "key_drawing", AppPrefs.KEY_DRAWING,
+                    { it.keyboard.keyDrawing.setValue(KeyDrawing.StrokeFilter) }, "StrokeFilter", "Strokes",
+                    { it.keyboard.keyDrawing.getValue() }, KeyDrawing.Off,
                 ),
                 Row(
                     "English's keyboard", listOf("Full", "NineKeys"), EnglishKeyboard.entries, "english_keyboard", AppPrefs.ENGLISH_KEYBOARD,
