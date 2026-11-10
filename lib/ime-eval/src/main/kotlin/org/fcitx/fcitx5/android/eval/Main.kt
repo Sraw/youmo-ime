@@ -64,8 +64,8 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps",
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps",
     ) { args, _, _ ->
         val (dataPath, setPath, resultPath) = args.operands
         runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options))
@@ -238,9 +238,11 @@ internal val COMMANDS = listOf(
         out.appendLine("${converted.size} of ${samples.size} samples typed in zhuyin")
         0
     },
-    Command("slips", "<set.tsv> <slip-set.tsv>", 2..2) { args, out, _ ->
+    Command("slips", "<set.tsv> <slip-set.tsv> [--scheme <双拼 scheme>]", 2..2, "scheme") { args, out, _ ->
         val (setPath, outPath) = args.operands
-        writeSlipSet(setPath, outPath, out)
+        val scheme = args.options["scheme"]
+        if (scheme != null && scheme !in ShuangpinSet.SCHEMES) return@Command null
+        writeSlipSet(setPath, outPath, scheme, out)
     },
     Command("tune", "<pinyin.data> <set.tsv> <slip-set.tsv> [--threads <n>]", 3..3, "threads") { args, out, _ ->
         val (dataPath, setPath, slipsPath) = args.operands
@@ -434,8 +436,12 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         listOf("threads", "beam", "sentences").all { name -> valid(name) { (it.toIntOrNull() ?: 0) > 0 } },
         // only full pinyin reads slips: 双拼 and the nine keys read none
         valid("neighbours") { it in ON_OFF && (scheme == null || scheme == NO_LATIN) },
+        valid("typos") { it in ON_OFF && readsTypos(scheme) },
     ).all { it }
 }
+
+/** Whether [scheme]'s segmenter reads common slips: full pinyin's and 双拼's; the nine keys and zhuyin type keys, not letters. */
+private fun readsTypos(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES || scheme in ShuangpinSet.GROUPED
 
 private fun usage(err: Appendable): Int {
     err.appendLine(USAGE)
@@ -489,6 +495,7 @@ private class RunOptions(options: Map<String, String>) {
     private val scheme = options["scheme"]
     private val fuzzy = options["fuzzy"]?.let(::fuzzyPairs).orEmpty()
     private val neighbours = options["neighbours"] == "on"
+    private val typos = options["typos"] != "off"
     val half = options["half"]
     val beam = options["beam"]?.toInt() ?: PinyinDecoder.DEFAULT_BEAM
     /** How many whole-input readings the decoder gives the rerankers. */
@@ -513,12 +520,12 @@ private class RunOptions(options: Map<String, String>) {
      * what it was before them.
      */
     fun segmenter(data: PinyinData): Segmenter = when (scheme) {
-        null -> PinyinSegmenter(fuzzy, neighbours = neighbours, latin = LatinWords.of(data.dictionary))
-        NO_LATIN -> PinyinSegmenter(fuzzy, neighbours = neighbours)
+        null -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours, latin = LatinWords.of(data.dictionary))
+        NO_LATIN -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours)
         in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = data.tones::allows)
         in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme))
-        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy) }
-        else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy)
+        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy, typos) }
+        else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy, typos)
     }
 }
 
@@ -706,9 +713,11 @@ private fun writeShuangpinSet(scheme: String, setPath: String, outPath: String, 
     return 0
 }
 
-private fun writeSlipSet(setPath: String, outPath: String, out: Appendable): Int {
-    val slips = SlipSet.generate(readSet(setPath))
-    writeSet(outPath, "$setPath with one syllable mixed up or slipped, by `slips`; the tag says how", slips)
+private fun writeSlipSet(setPath: String, outPath: String, scheme: String?, out: Appendable): Int {
+    val samples = readSet(setPath)
+    val slips = if (scheme == null) SlipSet.generate(samples) else SlipSet.generate(samples, ShuangpinSet.SCHEMES.getValue(scheme))
+    val typed = if (scheme == null) "" else " typed in 双拼 $scheme"
+    writeSet(outPath, "$setPath$typed with one syllable mixed up or slipped, by `slips`; the tag says how", slips)
     out.appendLine("${slips.size} samples")
     return 0
 }

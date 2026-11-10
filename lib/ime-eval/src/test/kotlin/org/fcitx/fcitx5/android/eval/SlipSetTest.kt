@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.pinyin.KeyNeighbours
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -69,6 +70,40 @@ class SlipSetTest {
         val generated = SlipSet.generate(listOf(Sample("zhongguo", "中国", "daily", "我爱")))
         assertEquals(setOf("fuzzy-z_zh", "typo-gn", "typo-on", SlipSet.KEY), generated.map { it.tag }.toSet())
         assertTrue(generated.toString(), generated.all { it.context == "我爱" && it.expected == "中国" })
+    }
+
+    private fun xiaohe(input: String, expected: String) =
+        SlipSet.generate(listOf(Sample(input, expected, "daily")), ShuangpinScheme.XIAOHE).associate { it.tag to it.input }
+
+    @Test
+    fun inShuangpinTheSlipsAreTypedInTheScheme() {
+        val zhongguo = xiaohe("zhongguo", "中国")
+        // zhong vs, guo go; zong zs
+        assertEquals("zsgo", zhongguo["fuzzy-z_zh"])
+        val slipped = zhongguo.getValue(SlipSet.KEY)
+        val at = slipped.indices.single { slipped[it] != "vsgo"[it] }
+        assertTrue(slipped, slipped[at] in KeyNeighbours.of("vsgo"[at]))
+        // no ng to type gn in: 双拼 types a final with one key
+        assertEquals(setOf("fuzzy-z_zh", SlipSet.KEY), zhongguo.keys)
+        assertEquals("jv", xiaohe("ju", "句")["typo-v"])
+        // üe and ue are one key in 小鹤: xve is xue typed right
+        assertTrue("typo-v" !in xiaohe("xuexi", "学习"))
+        assertEquals("lu", xiaohe("lv", "绿")["fuzzy-v_u"])
+    }
+
+    @Test
+    fun inShuangpinASampleWithoutAnExactReadingIsLeftOut() {
+        assertEquals(emptyMap<String, String>(), xiaohe("nh", "你好"))
+    }
+
+    @Test
+    fun theCommandWritesTheSetInAScheme() {
+        val set = tmp.newFile("set.tsv").apply { writeText("zhongguo\t中国\tdaily\n") }
+        val out = tmp.newFile("slips.tsv")
+        val printed = StringBuilder()
+        assertEquals(0, runCli(arrayOf("slips", set.path, out.path, "--scheme", "xiaohe"), printed, StringBuilder()))
+        assertEquals("2 samples", printed.trim())
+        assertEquals(setOf("zsgo"), out.useLines { EvalSet.parse(it) }.filter { it.tag == "fuzzy-z_zh" }.map { it.input }.toSet())
     }
 
     @Test

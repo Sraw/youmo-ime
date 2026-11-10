@@ -156,6 +156,10 @@ class MainTest {
             arrayOf("sentences", "d", "s", "o", "--beam", "many"),
             arrayOf("ksc", "d", "s", "--threads", "many"),
             arrayOf("ksc", "d", "s", "--neighbours", "on"), // not ksc's
+            arrayOf("pinyin", "d", "s", "r", "--typos", "maybe"),
+            arrayOf("pinyin", "d", "s", "r", "--scheme", "t9", "--typos", "off"), // the nine keys read none
+            arrayOf("ksc", "d", "s", "--typos", "off"), // not ksc's
+            arrayOf("slips", "s", "o", "--scheme", "t9"), // 双拼's schemes only
             arrayOf("predict-learn", "d", "s", "--user-weight", "much"),
             // a weight, as --weight's: not negative, nor endless
             arrayOf("predict-learn", "d", "s", "--user-weight", "-1"),
@@ -358,6 +362,26 @@ class MainTest {
         }
         assertEquals("你好", first("on"))
         assertNotEquals("你好", first("off"))
+    }
+
+    @Test
+    fun typosOffReadsNoCommonSlip() {
+        // zhagn is a slip for zhang (gn for ng): 张 only with typos read
+        val data = tmp.newFile("typos.data").apply {
+            writeBytes(
+                PinyinDataBuilder().layers(listOf(WordLayers.BASE)).unigram("<unk>", -7f, 0f).unigram("张", -2f, 0f)
+                    .entry("张", syl("zhang")).build().toByteArray(),
+            )
+        }
+        val set = tmp.newFile("set.tsv").apply { writeText("zhagn\t张\tdaily\n") }
+        val result = File(tmp.root, "result.tsv")
+        fun first(vararg typos: String): String? {
+            assertEquals(0, exit("pinyin", data.path, set.path, result.path, "--scheme", "no-latin", *typos, "--threads", "1"))
+            return result.useLines { RunResultFormat.parse(it) }.single().candidates.firstOrNull()
+        }
+        assertEquals("张", first())
+        assertEquals("张", first("--typos", "on"))
+        assertNotEquals("张", first("--typos", "off"))
     }
 
     @Test
