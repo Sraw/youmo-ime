@@ -88,9 +88,9 @@
 
 ### QU-15 [P2] 设置页加、改、删、导入导出
 - **前提**：同 QU-10，**设置 → 词库与短语 → 快速输入**。
-- **操作**：快速输入页里加一条、改它、点开它按「删除」再撤销；再加一条 `zz`，让页面上有三条，点开中间那条按「删除」，再撤销；导出再导入；再导入测试页 `fixtures/fields.html`（不是 `.mb`，一条也读不出；先 `adb push uat/fixtures/fields.html /sdcard/Download/` 放进手机「下载」），再导入一个自己写的 `.mb`，里面两行关键词无效：一行关键词是 31 个字母（如 `abcdefghijklmnopqrstuvwxyzabcde 内容`），一行关键词中间是全角空格（如 `a　b 内容`，a 和 b 之间是全角空格 U+3000）。（关键词里的普通空格做不出无效行：第一个普通空格就是关键词和内容的分界，`a b 内容` 读成关键词 `a`、内容 `b 内容`。）
-- **预期**：每一步键盘上马上看得到；重复的拒绝（关键词只差大小写也算）；撤销的那条回到原来的位置（中间那条撤销后仍在中间，长按「符」看栏上也在原来的位置，不跑到末尾）；导入报加了几条、跳过几条重复的（和几条超过 5000 字的）；导入 `fields.html` 立刻提示「这个文件里没有快速输入：每行是关键词、空格、内容」，列表不变；那两行关键词无效的跳过，提示里另说「另跳过 2 条关键词无效（空的、有空格或太长）」；自带表的开关关了不弹回，能再打开。
-- **JVM**：`QuickPhraseManagerTest`（六项，撤销放回原位并带回使用时间见 `aDeletionUndoneIsPutBackWhereItWasWithItsTimeOfUse`）；`QuickPhraseSettingsUatTest.anEntryAddedChangedFoundAndDeleted`、`aBuiltInTableTurnedOffStaysOffAndTurnsOnAgain`、`theImportToastCountsEveryLineSkipped`；文件正忙时开关连拨两次不先显示第一次 `aSwitchTurnedTwiceWhileTheFilesAreBusyNeverShowsTheFirstTurn`。
+- **操作**：快速输入页里加一条、改它、点开它按「删除」再撤销；再加一条 `zz`，让页面上有三条，点开中间那条按「删除」，再撤销；导出再导入；再导入测试页 `fixtures/fields.html`（不是 `.mb`，一条也读不出；先 `adb push uat/fixtures/fields.html /sdcard/Download/` 放进手机「下载」），再导入一个自己写的 `.mb`，里面两行跳过：一行关键词是 31 个字母（如 `abcdefghijklmnopqrstuvwxyzabcde 内容`），一行关键词后面跟着 31 个汉字（如 `ab` 加 31 个「长」再空格、内容：汉字起的部分读成注释，超过 30 个字）。（关键词里的普通空格做不出无效行：第一个普通空格就是关键词和内容的分界，`a b 内容` 读成关键词 `a`、内容 `b 内容`；关键词里的中文或全角空格也不是：从它起读成注释。）编辑框里关键词打一个汉字。
+- **预期**：每一步键盘上马上看得到；重复的拒绝（关键词只差大小写也算）；撤销的那条回到原来的位置（中间那条撤销后仍在中间，长按「符」看栏上也在原来的位置，不跑到末尾）；导入报加了几条、跳过几条重复的（和几条超过 5000 字的）；导入 `fields.html` 立刻提示「这个文件里没有快速输入：每行是关键词、空格、内容」，列表不变；那两行跳过，提示里另说「另跳过 2 条关键词或注释太长（关键词最多 30 个字符，注释最多 30 个字）」；编辑框里关键词打了汉字，框下马上提示关键词只能是英文字母、数字和符号，点确定不存；自带表的开关关了不弹回，能再打开。
+- **JVM**：`QuickPhraseManagerTest`（六项，撤销放回原位并带回使用时间见 `aDeletionUndoneIsPutBackWhereItWasWithItsTimeOfUse`）；`QuickPhraseSettingsUatTest.anEntryAddedChangedFoundAndDeleted`、`aBuiltInTableTurnedOffStaysOffAndTurnsOnAgain`、`theImportToastCountsEveryLineSkipped`；关键词只许 ASCII `aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage`；文件正忙时开关连拨两次不先显示第一次 `aSwitchTurnedTwiceWhileTheFilesAreBusyNeverShowsTheFirstTurn`。
 
 ### QU-16 [P0] 条目跟着备份走
 - **前提**：同 QU-10，另在快速输入页关掉一张自带表；长按「符」点一次 addr，让它排到 gh 前面（快速输入页不能拖动排序，顺序就是用的先后）。
@@ -144,3 +144,21 @@
 - **操作**：长按「符」，打 f p，看候选，点它。
 - **预期**：候选显示「发票」（不是「發票」），上屏的也是「发票」；自己的条目不学、不联想。内置表里出中文的条目照常转成繁体（现在的内置表没有这样的条目，只在 JVM 上查）。
 - **JVM**：`HostCoreEnginesTest.quick input's own entry goes out as it is under traditional, a built-in one converted, neither learnt nor predicted from`。
+
+### QU-25 [P1] 快速输入的注释：同一个关键词的几条靠注释区分
+- **前提**：B0；快速输入的条目是旧版写的 `#wz百度 www.baidu.com`、`#wz新浪 www.sina.com.cn`（设备上直接放进 `mine.mb`，等于从 0.5.x 升级上来）。
+- **操作**：长按「符」，什么都不打，看候选栏，点栏右边的展开；点 www.sina.com.cn 那条。在设置页里另加一条：关键词 `gh`、注释「代码」、内容 https://github.com；长按「符」打 `gh`。
+- **预期**：候选是 www.baidu.com、www.sina.com.cn 两条（带注释的候选宽，栏上可能只放得下第一条，展开看全），旁边的小字分别是「百度」「新浪」（不是 `#wz百度`）；点了框里是 www.sina.com.cn。打 `#wz` 两条都列出、旁边是注释；打 `gh` 那条旁边是「代码」。注释不参与查找：打「百」什么也找不到。没写注释的条目旁边照旧是关键词。
+- **JVM**：`QuickPhraseMineTest.notesShowBesideTheContentAndAKeylessOneIsListedButNeverFound`（注释作候选旁的小字、打 `#wz` 列两条、没关键词的只在什么都不打时列出）、`QuickPhraseSettingsUatTest.aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage`（编辑框存注释）；设备上冒烟（旧文件读成注释、栏上显示、点了上屏）。
+
+### QU-26 [P2] 快速输入的目录：分类管理，不影响打字
+- **前提**：同 QU-10，**设置 → 词库与短语 → 快速输入**。
+- **操作**：点目录条上的「＋目录」建「网址」；在「网址」里点 ＋ 加 `#wz` 注释「百度」→ www.baidu.com；点「未分类」「全部」；点开这条在编辑框里点「目录：网址」改成未分类；再建一个空目录；长按「网址」改名成「站点」，再长按「删除目录」；导出看文件。长按「符」看栏上。
+- **预期**：新建的目录马上被选中，在它里面加的条目就放进它；点哪个目录只列它里面的，「全部」里每行右边小字写目录名；改名后条目跟着走；删目录前确认框说里面几条移到「未分类」，删后条目都在、目录没了；空目录也留着（导出文件里有 `【目录】名字` 一行）。键盘上的顺序和查找跟目录无关（照旧按用过的先后），挪目录不丢使用顺序。
+- **JVM**：`QuickPhraseManagerTest.foldersAreMadeRenamedAndDeletedWithNoEntryLostAndAMoveKeepsItsTime`、`QuickPhraseSettingsUatTest.aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage`、`QuickPhraseFilesTest.version2RoundTripsNotesFoldersEmptyFoldersAndKeylessOnes`；设备上不跑。
+
+### QU-27 [P0] 升级、旧备份、旧 `.mb`：关键词里的中文转成注释，转不出关键词的列出待补
+- **前提**：0.5.x 存过 `#wz百度 www.baidu.com`、`#wz新浪 www.sina.com.cn`、`地址 北京市海淀区`（关键词开头就是中文），用过其中几条。
+- **操作**：装新版覆盖升级（或在新版里恢复 0.5.x 的备份，或导入 0.5.x 导出的 / 电脑上 fcitx5 的 `.mb`）；打开快速输入页；点「待补关键词」，点开「地址」那条补关键词 `dz`；导出。
+- **预期**：`#wz百度` 变成关键词 `#wz`、注释「百度」，`#wz新浪` 同理，一条不少；用过的先后不变。`地址` 那条还在：关键词空、注释「地址」，页面上方提示「有 1 条原来的关键词是中文……」，目录条里有「待补关键词 (1)」，行上写「（没有关键词）」；键盘上什么都不打时照样列出、点了上屏，按关键词找不到。补上 `dz` 后提示和「待补关键词」消失。导入时提示另说「其中 N 条没有英文关键词……」。文件在下一次改动时写成新格式（第一行 `#youmo-quickphrase-v2`），电脑上的 fcitx5 照样读得懂（关键词 `#wz｜百度`）。
+- **JVM**：`QuickPhraseFilesTest.aFileOfBeforeHasItsKeysSplitFromTheFirstCharacterNotAsciiOnAndNoneLost`、`QuickPhraseManagerTest.filesOfBeforeAreReadConvertedAndWrittenAnewAtTheNextChange`、`QuickPhraseManagerTest.anImportOfBeforeOrAComputersIsConvertedIntoItsFoldersKeylessOnesCounted`、`QuickPhraseSettingsUatTest.aFileOfBeforeIsConvertedAndItsKeylessOnesAreListedToBeGivenAKey`、`UserDataManagerTest.quickInputOfABackupOfBeforeIsReadConvertedAndOneOfNowKeepsItsFolders`；设备上的读法见 QU-25。
