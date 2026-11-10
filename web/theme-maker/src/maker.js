@@ -123,6 +123,14 @@
         if (!s) bad(file + ' 不是 App 认得的图片');
         else if (Math.max(s[0], s[1]) > side) bad(file + ' 太大：' + s[0] + '×' + s[1] + '，最多 ' + side);
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
+      } else if (role === 'icon') {
+        // the app keeps an icon only as an SVG of filled paths (SvgSubset, the engine's readIcon)
+        let text = null;
+        try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch (e) { /* not text: no SVG */ }
+        const r = text == null ? null : E.readIcon(text);
+        if (lim.iconBytes != null && bytes.length > lim.iconBytes) bad(file + ' 超过 ' + lim.iconBytes + ' 字节');
+        else if (!r) bad(file + ' 不是 SVG（App 只收 SVG 图标）');
+        else if (!r.ok) bad(file + '：' + r.problems[0].message);
       }
     }
     // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name

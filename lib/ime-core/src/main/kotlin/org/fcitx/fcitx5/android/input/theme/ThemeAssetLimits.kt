@@ -41,7 +41,7 @@ object ThemeAssetLimits {
     const val MAX_EFFECT_IMAGE_BYTES = 128L * 1024
     val EFFECT_IMAGE_TYPES = listOf(".png", ".webp")
 
-    /** An SVG icon: a path and its fill take a few KB; more is a drawing, not an icon ([SvgSubset]). */
+    /** An SVG icon: a path and its fill take a few KB; more is a drawing, not an icon (scene.theme.SvgSubset). */
     const val MAX_ICON_BYTES = 64L * 1024
 
     /**
