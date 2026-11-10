@@ -15,6 +15,18 @@ object PackLayouts {
     /** The function keys every keyboard of the app that has them must keep: 删除, 回车, 切换 (060-render-v2 §16). */
     private val ROLES = setOf("backspace", "enter", "lang")
     private val DIGIT = Regex("[0-9]")
+    private const val BOM = "\uFEFF"
+
+    /** The most bytes of a pack's layout file the app reads (ThemeAssetLimits.MAX_LAYOUT_BYTES): a bigger one is not read. */
+    const val MAX_BYTES = 64L * 1024
+
+    /**
+     * Of a pack's layout [files] (`<id>` to its text), those the app reads (ThemePackLayouts.read): an id the app has
+     * ([has]: a board's or a fragment's), within [MAX_BYTES] as UTF-8, its byte-order mark gone. A file of another
+     * name, or bigger, is not the pack's: the app's own is drawn in its place.
+     */
+    fun readable(files: Map<String, String>, has: (String) -> Boolean): Map<String, String> =
+        files.filter { (id, text) -> has(id) && text.encodeToByteArray().size <= MAX_BYTES }.mapValues { it.value.removePrefix(BOM) }
 
     /**
      * Why the pack's [layout] (its [fragments] with it) may not stand for the app's keyboard [id] ([app], its
@@ -42,7 +54,8 @@ object PackLayouts {
      * The boards a pack is drawn on, as the app draws them (SceneLayouts.load): each of the app's [app], replaced by
      * the pack's file of its id in [own] (`<id>` to its text) only where that reads, every fragment it includes reads
      * (the pack's of [own] first, else [appText]'s) and [judge] takes it; else the app's, with the app's fragments.
-     * What the blank-key check asks, the app's import and the theme maker's page alike (BlankKeys).
+     * What the blank-key check asks, the app's import and the theme maker's page alike (BlankKeys). [own] holds only the
+     * files the app reads ([readable]): one it does not would be asked here and not drawn there.
      */
     fun drawn(app: List<BlankKeys.Board>, own: Map<String, String>, appText: (String) -> String?): List<BlankKeys.Board> =
         app.map { a -> own[a.layout.id]?.let { packBoard(a, it, own, appText) } ?: a }

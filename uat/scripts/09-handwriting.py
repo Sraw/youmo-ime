@@ -221,6 +221,6 @@ def hw35(d):
     return f"「{f}」+「{p}」"
 
 
-case("HW-36", needs="jvm:KeyHandwritingUatTest.theNineAndFourteenKeysAreWrittenOnToo")(lambda d: None)
+case("HW-36", needs="jvm:KeyHandwritingUatTest.theOtherKeyboardsAreWrittenOnToo")(lambda d: None)
 
-case("HW-37", needs="jvm:KeyHandwritingUatTest.notInAPasswordNorEnglishNorWhileTalkBackExplores、KeyHandwritingUatTest.englishKeysGoStraightOnTheRecognizerNotMade")(lambda d: None)
+case("HW-37", needs="jvm:KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores、KeyHandwritingUatTest.englishKeysGoStraightOnTheRecognizerNotMade")(lambda d: None)

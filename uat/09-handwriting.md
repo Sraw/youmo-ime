@@ -152,15 +152,15 @@
 
 ### HW-32 [P0] 在字母键上写字，空格上屏
 - **前提**：键盘手写开。
-- **操作**：什么都没打时在键上写「人」，停笔约 1 秒；看候选栏；点空格。再在 w 上往下短划一下，停笔约 1 秒。
-- **预期**：写的时候键上画出笔迹（颜色和手写板一样），键照常显示，没有按键预览、没有打出字母；停笔后笔迹淡出，框里出现带下划线的「人」，候选里有「人」；点空格后框里是「人」。w 上的短划当成一笔（写字），不打出角标「2」。
-- **JVM**：`KeyHandwritingUatTest.aStrokeOnTheLettersIsReadAsTheInputMethodsHandwritingNoKeyPressed`（笔画放到键盘的书写板上、读出来交给引擎、没发按键、停笔后片段写完）、`KeyHandwritingUatTest.aShortSwipeIsAStrokeNotTheKeysCorner`（短划不打角标）、`InkOverTest.anInkIsWrittenItsCandidatesPickedAndWhatWasPutInToldPinyin`（ime-core）；设备上不跑短划那一步。
+- **操作**：什么都没打时在键上写「人」，停笔约 1 秒；看候选栏；点空格。再在 w 上往下短划一下，停笔约 1 秒。清空，打 ni，再在 w 上往下短划一下。
+- **预期**：写的时候键上画出笔迹（颜色和手写板一样），键照常显示，没有按键预览、没有打出字母；停笔后笔迹淡出，框里出现带下划线的「人」，候选里有「人」；点空格后框里是「人」。w 上的短划当成一笔（写字），不打出角标「2」；打着 ni 时 w 上的短划打出角标「2」（ni 后面），不画笔迹、不写字。
+- **JVM**：`KeyHandwritingUatTest.aStrokeOnTheLettersIsReadAsTheInputMethodsHandwritingNoKeyPressed`（笔画放到键盘的书写板上、读出来交给引擎、没发按键、停笔后片段写完）、`KeyHandwritingUatTest.aShortSwipeIsAStrokeNotTheKeysCorner`（短划不打角标）、`KeyHandwritingUatTest.aShortSwipeWhileTypingIsTheKeysCorner`（打着字时短划打角标、不写）、`InkOverTest.anInkIsWrittenItsCandidatesPickedAndWhatWasPutInToldPinyin`（ime-core）；设备上不跑短划那两步。
 
 ### HW-33 [P1] 第一笔是点的字：先点的字母收回当第一笔
 - **前提**：键盘手写开。
 - **操作**：点一下 t（打出 t），马上（停笔时间内）在键上接着写「六」剩下的三笔；停笔。再清空，点 a（整音节，拼音点完约 30 ms 会再排一次候选）后同样写完「六」。再清空，打 ni 后在停笔时间内在键上划一横；再清空，点 t，长按 g 选一个字母，马上划一横。
 - **预期**：第一次 t 被删掉（点 a 那次 a 也被删掉），框里是带下划线的「六」（或候选里有「六」），没有多删框里别的字。打着 ni 时划一横不写字、ni 还在。点 t 再长按 g 后划一横：t 和长按打的字母都还在，什么都没删。
-- **JVM**：`KeyHandwritingUatTest.aTapThenAStrokeWithinThePauseTakesTheTapBackAsTheFirstDot`（点按放进书写板当第一笔，第一个读出带 takesBack，键盘不发退格）、`KeyInkGestureTest.aLongPressBetweenTheTapAndTheStrokeTakesNothingBack`、`KeyInkGestureTest.aCancelledTouchOrASecondFingerAfterTheTapTakesNothingBack`、`InkOverTest.anInkTakingBackDeletesTheOneLetterTypedThenIsWritten`、`InkOverTest.anInkTakingBackDeletesNothingWhereMoreThanTheTapIsTyped`、`InkOverTest.anInkTakingBackDeletesNothingOnceTheTapIsPickedAway`、`InkOverTest.aVowelRefinedAfterItsKeyIsStillTakenBack`（ime-core：引擎只在正在打的正好是这一个字母时删）、`InkKeysTest.aKeyHeldBehindReadsKeepsTheStrokesDrawnWhileItWaited`；设备上跑到「打着 ni 划一横」为止，点 t 后长按 g 那一步和「没有多删框里别的字」只在 JVM 上（adb 的长按和停笔时间掐不准）。
+- **JVM**：`KeyHandwritingUatTest.aTapThenAStrokeWithinThePauseTakesTheTapBackAsTheFirstDot`（点按放进书写板当第一笔，第一个读出带 takesBack，键盘不发退格）、`KeyInkGestureTest.aTapIsTakenBackOnlyAsTheFirstDotRightAfterIt`（长按、取消的触摸、第二个手指夹在中间时不收回）、`KeyInkGestureTest.aLateAnswerFromBeforeTheTapLeavesItsMark`、`KeyInkGestureTest.aTapNeverAnsweredHoldsItsMarkOnlyTillThePause`、`InkOverTest.anInkTakingBackDeletesTheOneLetterTypedThenIsWritten`、`InkOverTest.anInkTakingBackDeletesNothingWhereMoreThanTheTapIsTyped`（多于点的那个字母、点的字母已被选走时都不删）、`InkOverTest.aVowelRefinedAfterItsKeyIsStillTakenBack`（ime-core：引擎只在正在打的正好是这一个字母时删）、`InkKeysTest.aKeyHeldBehindReadsKeepsTheStrokesDrawnWhileItWaited`；设备上跑到「打着 ni 划一横」为止，点 t 后长按 g 那一步和「没有多删框里别的字」只在 JVM 上（adb 的长按和停笔时间掐不准）。
 
 ### HW-34 [P1] 写字中途 ⌫ 撤一笔，空格先写完再上屏
 - **前提**：键盘手写开，**手写** 设置里停笔时间选最长。
@@ -178,10 +178,10 @@
 - **前提**：键盘手写开，**输入法 → 拼音** 的 **键盘** 分别选九键、14 键；添加「五笔」「注音」。
 - **操作**：在拼音九键、14 键、五笔、注音（大千和注音九键）的键上各写「人」。
 - **预期**：和全键盘一样写出「人」。
-- **JVM**：`KeyHandwritingUatTest.theNineAndFourteenKeysAreWrittenOnToo`、`KeyHandwritingUatTest.aTablesKeysAreWrittenOnToo`、`ZhuyinKeyHandwritingTest.theDachenKeysAreWrittenOn`、`ZhuyinKeyHandwritingTest.theZhuyinNineKeysAreWrittenOn`；设备上不跑。
+- **JVM**：`KeyHandwritingUatTest.theOtherKeyboardsAreWrittenOnToo`（九键、五笔、14 键、注音大千、注音九键各一行）；设备上不跑。
 
 ### HW-37 [P1] 密码、网址、邮箱框，英文，触摸浏览时不写
 - **前提**：键盘手写开。
 - **操作**：在「密码」「网址」「邮箱」框里各在键上划一道；换到英文在键上划一道；打开 TalkBack 后在拼音键盘上划一道。
 - **预期**：都不出笔迹、不写字，键照原来的点按和划动处理。英文里按键直接打出，不等识别。
-- **JVM**：`KeyHandwritingUatTest.notInAPasswordNorEnglishNorWhileTalkBackExplores`、`KeyHandwritingUatTest.notInAUrlNorAnEmailField`、`KeyHandwritingUatTest.englishKeysGoStraightOnTheRecognizerNotMade`；设备上不跑。
+- **JVM**：`KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores`、`KeyHandwritingUatTest.englishKeysGoStraightOnTheRecognizerNotMade`；设备上不跑。

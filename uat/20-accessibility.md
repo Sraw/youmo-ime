@@ -72,7 +72,7 @@
 - **前提**：B0-设置，**在键上划** 选 **键盘手写**，回测试页；打开 TalkBack。
 - **操作**：在拼音键盘的字母上摸过去（手指移动超过小半个键）。
 - **预期**：不出笔迹、不写字，读屏照常读摸到的键。
-- **JVM**：`KeyHandwritingUatTest.notInAPasswordNorEnglishNorWhileTalkBackExplores`（触摸浏览开着时不写）；设备上不跑。
+- **JVM**：`KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores`（触摸浏览开着时不写）；设备上不跑。
 
 ## 长按候选
 

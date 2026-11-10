@@ -31,6 +31,7 @@ abstract class ThemePackFixture {
     protected val unpacking get() = File(appContext.cacheDir, "theme-import")
     internal val real = ThemeFilesManager.probe
     private val realRecheck = ThemePackFiles.recheck
+    private val realOnRefused = ThemePackFiles.onRefused
 
     // the settings as they were before the test, put back after it
     private var followBefore = false
@@ -42,6 +43,8 @@ abstract class ThemePackFixture {
         normalBefore = ThemeManager.prefs.normalModeTheme.getValue()
         // a listing's check again at once: what it refuses is left out of that listing
         ThemePackFiles.recheck = { it.run() }
+        // the checks an earlier test of this process asked or refused, and its listing's themes, not this one's
+        ThemePackFiles.forgetListings()
         phoneStorage()
         dir.deleteRecursively()
         dir.mkdirs()
@@ -58,6 +61,7 @@ abstract class ThemePackFixture {
         ThemeFilesManager.probe = real
         ThemePackFiles.beforeInPlace = null
         ThemePackFiles.recheck = realRecheck
+        ThemePackFiles.onRefused = realOnRefused
         ThemeManager.prefs.followSystemDayNightTheme.setValue(followBefore)
         ThemeManager.setNormalModeTheme(normalBefore ?: ThemeManager.prefs.normalModeTheme.defaultValue)
         dir.deleteRecursively()

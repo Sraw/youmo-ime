@@ -384,6 +384,9 @@ class ThemePackImportTest : ThemePackFixture() {
         assertEquals(emptyList<Theme.Pack>(), ThemeManager.Packs)
         assertTrue(File(dir, "mine.json").exists())
     }
+
+    // a 3.0 theme beside a pack of its name no import replaced (an older backup restored over the phone's pack):
+    // left be as listed, its json, its picture and the slot naming it kept (it is found by the name, as before)
     @Test
     fun aTheme30RestoredBesideAPackOfItsNameIsLeftBe() {
         opened(sample()).commit().getOrThrow()
@@ -443,6 +446,52 @@ class ThemePackImportTest : ThemePackFixture() {
         val warnings = opened(zip("theme.xml" to low)).staged.warnings
         val light = appContext.getString(R.string.theme_pack_light)
         assertEquals(listOf(appContext.getString(R.string.theme_pack_low_contrast, light)), warnings)
+    }
+
+    @Test
+    fun keysHardToReadInBothVersionsAreToldAsTheLanguageJoinsThem() {
+        val low = xml().replaceFirst("""<color name="keyText" value="#2e3440"/>""", """<color name="keyText" value="#e5e9f0"/>""")
+            .replaceFirst("""<color name="keyText" value="#eceff4"/>""", """<color name="keyText" value="#4c566a"/>""")
+        val warnings = opened(zip("theme.xml" to low)).staged.warnings
+        val both = "${appContext.getString(R.string.theme_pack_light)} and ${appContext.getString(R.string.theme_pack_dark)}"
+        assertEquals(listOf(appContext.getString(R.string.theme_pack_low_contrast, both)), warnings)
+    }
+
+    // the input method's process may live for days: an open clears what a dialog left an hour ago, not a copy a
+    // dialog still open may commit
+    @Test
+    fun anOpenClearsUnpackedCopiesAnHourOldNotNewerOnes() {
+        opened(sample()).discard()
+        val old = File(unpacking, "old").apply { mkdirs() }
+        old.setLastModified(System.currentTimeMillis() - 2 * 60 * 60 * 1000L)
+        val recent = File(unpacking, "recent").apply { mkdirs() }
+        opened(sample()).discard()
+        assertFalse(old.exists())
+        assertTrue(recent.exists())
+    }
+
+    private class Closing : ByteArrayOutputStream() {
+        var closed = false
+
+        override fun close() {
+            closed = true
+            super.close()
+        }
+    }
+
+    // the caller's document closed where a file is refused before the zip is opened, not left open
+    @Test
+    fun anExportFailingBeforeItsZipClosesTheStreamAllTheSame() {
+        val secret = File(appContext.filesDir, "pinyin.user").apply { writeText("secret") }
+        val planted = TestThemes.TransparentDark.deriveCustomBackground("x", secret.path, secret.path)
+        val pack = opened(sample()).commit().getOrThrow()[0]
+        File(packs, "mine/round.ttf").delete()
+        for ((theme, file) in listOf(planted to "pinyin.user", pack to "round.ttf")) {
+            val out = Closing()
+            val e = ThemeFilesManager.exportTheme(theme, out).exceptionOrNull()!!
+            assertEquals(appContext.getString(R.string.exception_theme_file, file), e.message)
+            assertTrue(file, out.closed)
+        }
     }
 
     @Test

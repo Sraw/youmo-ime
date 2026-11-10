@@ -226,45 +226,39 @@ class KeyInkGestureTest {
         assertEquals(Route.GLIDE, stroke(1000))
     }
 
-    // a tap on a letter that started the input, the engine having heard 5 keys before it
-    private fun tapAfterFiveKeys() {
-        ink.engineTyped(false, keysHeard = 5)
-        down(0)
-        t.up(50f, 70f, cancelled = false, time = 40)
-    }
-
     @Test
-    fun aLateAnswerFromBeforeTheTapLeavesItsMark() {
-        tapAfterFiveKeys()
-        // the answer to a key before the tap, heard late: not about the tap, which stays typed
-        ink.engineTyped(false, keysHeard = 5)
-        assertEquals(Route.GLIDE, stroke(100))
-        assertArrayEquals(floatArrayOf(50f, 70f, 50f, 70f), ink.takeTapped(), 0f)
-    }
-
-    @Test
-    fun theAnswerAboutTheTapReplacesItsMark() {
-        tapAfterFiveKeys()
-        // the tap's own key answered (or an ink answer after it): the letter went in at once, nothing to take back
-        ink.engineTyped(false, keysHeard = 6)
-        assertEquals(Route.GLIDE, stroke(100))
-        assertNull(ink.takeTapped())
-    }
-
-    @Test
-    fun anEngineResetReplacesTheTapsMarkWhateverWasHeard() {
-        tapAfterFiveKeys()
-        ink.engineTyped(false)
-        assertEquals(Route.GLIDE, stroke(100))
-        assertNull(ink.takeTapped())
-    }
-
-    @Test
-    fun aTapNeverAnsweredHoldsItsMarkOnlyTillThePause() {
-        tapAfterFiveKeys()
-        ink.engineTyped(false, keysHeard = 5)
-        // past the pause, the tap's key never heard: what the engine last said counts, writing is not blocked
-        assertEquals(Route.GLIDE, stroke(1000))
+    fun onlyTheAnswerToTheTapsOwnKeyOrALaterOneReplacesItsMark() {
+        // each row on a keyboard of its own: keys numbered as the keyboard sends them, 5 sent and answered,
+        // then a space (6) sent, a tap on a letter that started the input (its key 7), [then] the answers
+        // that come, and a stroke at [strokeAt]; [takenBack] whether the stroke takes the tap back
+        fun row(strokeAt: Long = 100, takenBack: Boolean, then: KeyInkGesture.() -> Unit): () -> Unit = {
+            val k = Keys()
+            var sent = 5L
+            k.ink.nextKey = { sent + 1 }
+            k.ink.engineTyped(false, keysHeard = 5)
+            sent++
+            k.down(0)
+            k.t.up(50f, 70f, cancelled = false, time = 40)
+            sent++
+            k.ink.then()
+            assertEquals(Route.GLIDE, k.stroke(strokeAt))
+            val tap = k.ink.takeTapped()
+            if (takenBack) assertArrayEquals(floatArrayOf(50f, 70f, 50f, 70f), tap, 0f) else assertNull(tap)
+        }
+        assertRows(
+            "the space's answer, sent before the tap and heard after it, is not the tap's: its mark stays" to
+                row(takenBack = true) { engineTyped(false, keysHeard = 6) },
+            "an answer to a key or context from before the space, late, leaves the mark too" to
+                row(takenBack = true) { engineTyped(false, keysHeard = 5) },
+            "the tap's own key answered: the letter went in at once, nothing to take back" to
+                row(takenBack = false) { engineTyped(false, keysHeard = 7) },
+            "an answer after the tap's key (an ink answer, a context) is about the tap too" to
+                row(takenBack = false) { engineTyped(false, keysHeard = 8) },
+            "an engine reset replaces the mark whatever was heard" to
+                row(takenBack = false) { engineTyped(false) },
+            "the tap's key never answered: its mark held only till the pause, then what the engine last said counts" to
+                row(strokeAt = 1000, takenBack = false) { engineTyped(false, keysHeard = 6) },
+        )
     }
 
     @Test

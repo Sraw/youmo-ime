@@ -122,4 +122,22 @@ class ThemeListAdapterTest {
     }
 
     // endregion
+
+    @Test
+    fun deletingAPackRemovesItsOwnCardNotA30ThemeOfItsName() {
+        val light = Theme.Pack("x#light", false, "x", "/x", 0)
+        val dark = Theme.Pack("x#dark", true, "x", "/x", 0)
+        val list = adapter(a, x, light, dark, b).apply { setSelectedThemes(b) }
+        // the pack's other version than its card shows: the pack's card all the same, the 3.0 "x" kept
+        list.removeTheme(dark as Theme)
+        assertEquals(listOf("a", "x", "b"), list.entries.map { it.name })
+        assertEquals("b" to State.Selected, list.marks().last())
+        // a theme no card shows: nothing removed
+        list.removeTheme(Theme.Pack("z", false, "z", "/z", 0) as Theme)
+        assertEquals(listOf("a", "x", "b"), list.entries.map { it.name })
+        // the 3.0 theme of the pack's name: its own card
+        list.removeTheme(x as Theme)
+        assertEquals(listOf("a", "b"), list.entries.map { it.name })
+        assertEquals(listOf("a" to State.Normal, "b" to State.Selected), list.marks())
+    }
 }

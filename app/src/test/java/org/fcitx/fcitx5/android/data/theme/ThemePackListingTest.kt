@@ -23,7 +23,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
-
 /** Theme 4.0 packs listed: the newest most, what an import would refuse left out, a stale check rechecked off its thread, a kill's leftovers cleared. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
@@ -47,8 +46,38 @@ class ThemePackListingTest : ThemePackFixture() {
         assertEquals(emptyList<Runnable>(), queued)
     }
 
-    // D1: a 3.0 theme beside a pack of its name no import replaced (an older backup restored over the phone's pack):
-    // left be as listed, its json, its picture and the slot naming it kept (it is found by the name, as before)
+    @Test
+    fun aPackTheQueuedCheckRefusesIsListedThenLeftOut() {
+        placed(sample())
+        // a key one cannot type without hidden, written after the import's check: its stamp stale
+        File(packs, "mine/theme.xml").writeText(xml(styles = """<style select="key.function" hidden="true"/>"""))
+        val queued = mutableListOf<Runnable>()
+        var told = 0
+        ThemePackFiles.recheck = { queued += it }
+        ThemePackFiles.onRefused = { told++ }
+        // listed meanwhile, the check queued
+        assertEquals(listOf("mine#light", "mine#dark"), ThemeFilesManager.listPacks().map { it.name })
+        assertEquals(1, queued.size)
+        assertEquals(0, told)
+        // run off the listing's thread: refused, the list told to be read again, which leaves it out
+        Thread(queued.removeAt(0)).apply { start() }.join()
+        assertEquals(1, told)
+        assertEquals(emptyList<Theme.Pack>(), ThemeFilesManager.listPacks())
+    }
+
+    // a listing keeps the packs it read for their draws: one whose file changed since is read from it again
+    @Test
+    fun aPackChangedSinceItWasListedIsDrawnFromItsNewFile() {
+        val dark = placed(sample())[1]
+        ThemeFilesManager.listPacks()
+        val file = File(packs, "mine/theme.xml")
+        val listedAt = file.lastModified()
+        // a style after the icons is no theme 4 reads: the new one goes before them
+        file.writeText(sampleXml.replace("<icon ", """<style select="candidate" gap="7dp"/><icon """))
+        // a later time, not the clock's: a file system's may not tell a second's writes apart
+        file.setLastModified(listedAt + 10_000L)
+        assertEquals(7.0, SceneBar.of(appContext, dark).gapDp, 0.0)
+    }
 
     @Test
     fun aPackFolderNotListedIsReplacedUnlessALaterBuilds() {

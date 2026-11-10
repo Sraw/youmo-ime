@@ -108,10 +108,26 @@ object EngineState {
         keysTypedState.value = KeysTyped(keysTypedState.value.answer + 1, typed, keysHeard)
     }
 
+    // the last number a key sent got ([keySent])
+    private val keysSentCount = java.util.concurrent.atomic.AtomicLong()
+
     /**
-     * The keys ([EngineEvent.CHAR][org.fcitx.fcitx5.android.engine.runtime.EngineEvent.CHAR]) the input methods
-     * written on the keys have handled since the process started: an answer carries it ([KeysTyped.keysHeard]),
-     * so the keyboard tells one late, from before its last tap. Only the fcitx thread writes it.
+     * The next number, for a key the keyboard sends to the engine (every key: only an input method written on the keys
+     * answers with it, [KeysTyped.keysHeard]). On the main thread as the key's job is posted; the job calls [keyTaken] with it first.
+     */
+    internal fun keySent(): Long = keysSentCount.incrementAndGet()
+
+    /** The number the next key sent gets: a tap on a letter is told (KeyInkGesture.tapped) just before its key is sent. */
+    fun nextKey(): Long = keysSentCount.get() + 1
+
+    /** On the fcitx thread, as the job sending key [n] starts: the answers from here on carry it. */
+    internal fun keyTaken(n: Long) {
+        keysHeard = maxOf(keysHeard, n)
+    }
+
+    /**
+     * The number ([keySent]) of the last key sent whose job the fcitx thread has taken: an answer carries it
+     * ([KeysTyped.keysHeard]), so the keyboard tells one late, from before its last tap. Only the fcitx thread writes it.
      */
     @Volatile
     internal var keysHeard = 0L

@@ -78,6 +78,9 @@ class EngineBridge {
         if (onKeys) {
             // an input method that cannot load writes on no keys: its session's failure is not handwriting's
             if (!InputMethodCatalog.writesOnKeys(current) || current in unloadable) return false
+            // current's own session made first, under its own latch: a code table that cannot be read fails
+            // as current, not as handwriting (whose pad would then load nowhere)
+            if (!madeOnKeys(current)) return false
             if (!handwriting(current, onKeys = true) { engines.ink(piece, shown = true, im = current) }) return false
             send()
             engines.inkSent(piece, current)
@@ -93,6 +96,18 @@ class EngineBridge {
         send()
         engines.inkSent(piece)
         return true
+    }
+
+    // [current]'s session, which writes on its keys, made under its own latch; whether it is
+    private fun madeOnKeys(current: String): Boolean = try {
+        unloadable.call(current) { engines.make(current) }
+        true
+    } catch (e: IOException) {
+        Timber.w(e, "session of $current")
+        false
+    } catch (e: DataFormatException) {
+        Timber.w(e, "session of $current")
+        false
     }
 
     /**
@@ -425,8 +440,6 @@ class EngineBridge {
         // 全拼 answer with none, which clears what they offered (a gate on them would keep it shown)
         if (event != EngineEvent.REFINE || s.handled) EngineState.syllablesState.value = EngineState.SyllableState(im, s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
         if (im == InputMethodCatalog.ENGLISH) EngineState.englishTypingState.value = s.preedit.isNotEmpty() && !s.predicting
-        // a key of an input method written on the keys heard: its answer tells the keyboard which tap it is about
-        if (event == EngineEvent.CHAR && InputMethodCatalog.writesOnKeys(im)) EngineState.keysHeard++
         // the engines that answered: none made, nothing of theirs to tell (an answer not theirs is no reason to make them)
         made?.let { e -> followed(im) { e } }
     }
@@ -564,6 +577,7 @@ class EngineBridge {
         if (InputMethodCatalog.writesOnKeys(im) && im !in unloadable) {
             val e = engines()
             EngineState.inkEnded.value = e.inkEnded
+            // with the number of the last key sent the fcitx thread took (EngineState.keyTaken): which tap it is about
             EngineState.answerKeysTyped(e.typedOnKeys(im), EngineState.keysHeard)
         }
         // a table's keyboard: its 拼 key turned, its settings changed (a field's context comes as it

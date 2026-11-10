@@ -40,8 +40,11 @@ object KeyboardLabels {
         // the grouped keyboards' letters, by the layout they are drawn with
         val letters = listOf(NineKeyLetters.G14, NineKeyLetters.G18).firstOrNull { GroupedKeyboard.layoutOf(it) == id }
         if (letters != null && GroupedKeyboard.grouping(context, letters, own = im == InputMethodCatalog.PINYIN, log = false).layout !== shown) return null
-        val name = shown.layout.name
-        // cut by characters, not UTF-16 units: an emoji or an extension-B character never cut in half
+        return shortName(shown.layout.name)
+    }
+
+    /** A layout's [name] as shown: past [NAME_MAX] characters cut, with `…`; by characters, not UTF-16 units, so an emoji or an extension-B character is never cut in half. */
+    internal fun shortName(name: String): String {
         if (name.codePointCount(0, name.length) <= NAME_MAX) return name
         return name.substring(0, name.offsetByCodePoints(0, NAME_MAX)) + "…"
     }

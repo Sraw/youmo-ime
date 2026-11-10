@@ -448,6 +448,51 @@ class EngineBridgeTest {
             }
         }
 
+        /**
+         * Every answer of an input method written on the keys carries the number of the last key sent whose job the fcitx
+         * thread took (EngineState.keyTaken), whatever its event: a space sent before a tap and answered after it carries
+         * the space's, not the tap's, so the tap's mark stays (KeyInkGesture.engineTyped).
+         */
+        @Test
+        fun anAnswerCarriesTheNumberOfTheLastKeyTaken() {
+            bridge.unloadable.clear()
+            try {
+                assertNotNull(bridge.engines)
+                val space = EngineState.keySent()
+                val tap = EngineState.keySent()
+                assertEquals(tap + 1, EngineState.nextKey())
+                EngineState.keyTaken(space)
+                bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { emptySnapshot() }
+                assertEquals(space, EngineState.keysTyped.value.keysHeard)
+                // a refining step's answer counts no key
+                bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { emptySnapshot() }
+                assertEquals(space, EngineState.keysTyped.value.keysHeard)
+                EngineState.keyTaken(tap)
+                bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { emptySnapshot() }
+                assertEquals(tap, EngineState.keysTyped.value.keysHeard)
+            } finally {
+                bridge.unloadable.clear()
+                bridge.close()
+            }
+        }
+
+        /** Ink on the keys of an input method that cannot load: no key sent, and handwriting is not marked unloadable for it. */
+        @Test
+        fun inkOnTheKeysOfAnInputMethodThatCannotLoadIsNotHandwritingsFailure() {
+            bridge.unloadable.clear()
+            var sent = 0
+            try {
+                assertThrows(FileNotFoundException::class.java) {
+                    bridge.unloadable.call(InputMethodCatalog.PINYIN) { throw FileNotFoundException("pinyin") }
+                }
+                assertFalse(bridge.sendInk(Action.Ink(1), InputMethodCatalog.PINYIN, onKeys = true) { sent++ })
+                assertEquals(0, sent)
+                assertFalse(InputMethodCatalog.HANDWRITING in bridge.unloadable)
+            } finally {
+                bridge.unloadable.clear()
+            }
+        }
+
         private fun emptySnapshot() = Snapshot(
             commit = "", preedit = "", candidates = emptyList(), page = 0, hasPreviousPage = false,
             hasNextPage = false, handled = true, predicting = false, syllables = emptyList(), syllablesId = 0,

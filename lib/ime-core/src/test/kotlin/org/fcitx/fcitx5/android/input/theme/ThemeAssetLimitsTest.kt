@@ -99,6 +99,14 @@ class ThemeAssetLimitsTest {
         assertNull(AnimatedWebp.header(webp(10, 10, emptyList())))
         assertNull(AnimatedWebp.header("GIF89a......".toByteArray()))
         assertNull(AnimatedWebp.header(webp(10, 10, listOf(40)).copyOf(20)))
+        // a frame chunk that says it is shorter than a frame's head: its duration would be the next chunk's bytes
+        val shortFrame = webp(10, 10, listOf(40, 40))
+        val at = String(shortFrame, Charsets.ISO_8859_1).indexOf("ANMF")
+        shortFrame[at + 4] = 8
+        shortFrame[at + 5] = 0
+        shortFrame[at + 6] = 0
+        shortFrame[at + 7] = 0
+        assertNull(AnimatedWebp.header(shortFrame))
         // counting stops past the limit asked
         assertEquals(3, AnimatedWebp.header(webp(10, 10, List(50) { 40 }), maxFrames = 2)!!.frames)
         // VP8X not first, as libwebp refuses it

@@ -76,6 +76,9 @@ object ThemePackFiles {
     private const val OLD = "old-"
     private const val GONE = "gone-"
     private const val MACOS = "__MACOSX"
+
+    // the listed packs whose parsed themes are kept: a screen of the theme page's cards and the one in use, mostly
+    private const val LISTED_KEPT = 16
     private val VERSIONS = listOf("#light", "#dark")
 
     /** The system's colours the packs' `system()` take now (Monet's, ThemeManager keeps them). */
@@ -98,8 +101,8 @@ object ThemePackFiles {
         ThemeReader.theme(source.removePrefix(BOM), systemColors, appVersion, LookTheme.MAX_STYLES)
 
     /**
-     * The pack in [dir], its version [dark], as it is drawn: read from its file when first drawn (no pack's text
-     * kept in memory). One that no longer reads (changed or removed since it was listed) is drawn as the built-in
+     * The pack in [dir], its version [dark], as it is drawn: the last listing's parse where it was kept and the file
+     * has not changed since ([lastListed]), else read from its file. One that no longer reads (changed or removed since it was listed) is drawn as the built-in
      * theme, the user told, never thrown where the keyboard draws.
      */
     fun scene(dir: String, dark: Boolean): SceneTheme = runCatching { (readListed(dir) ?: read(File(dir, THEME_XML).readText())).variant(dark) }
@@ -109,8 +112,9 @@ object ThemePackFiles {
             fallback(dark)
         }
 
-    // each pack as the last listing read it, its file's time and the system's colours then: its versions' first
-    // draw and the theme page's cards take it rather than read and parse the file again
+    // the newest packs ([LISTED_KEPT]) as the last listing read them, their file's time and the system's colours
+    // then: their versions' draws and the theme page's cards take it rather than read and parse the file again. A
+    // few only, replaced by the next listing: the IME's process lives long, and a hundred packs' themes are not held
     private class Listed(val stamp: Long, val colors: SystemColors, val theme: SceneTheme)
 
     private val lastListed = ConcurrentHashMap<String, Listed>()
@@ -240,8 +244,8 @@ object ThemePackFiles {
      * of its versions. Not listed, logged and the user told as a 3.0 theme's json is, a pack an import would refuse:
      * one whose `theme.xml` does not read (a later build's, one cut short), of a name not its folder's, not a pack's
      * or a built-in's ([builtins]: one restored, or a later build's built-in), hiding the keys' labels one cannot type
-     * without, or missing a file it names. [sweep]: what a kill left of a pack being written cleared first, the pack it
-     * was replacing put back ([sweepPacks], the caller's, under its lock). Newest by its `theme.xml`'s time (the
+     * without, or missing a file it names. What a kill left of a pack being written is the caller's to clear first
+     * ([sweepPacks], under its lock). Newest by its `theme.xml`'s time (the
      * import's), not the folder's: the check's stamp written in it changes that one.
      */
     fun list(themes: File, builtins: List<Theme.Builtin>): List<Theme.Pack> {
@@ -285,7 +289,7 @@ object ThemePackFiles {
         }
         val missing = ThemePackCheck.files(theme).all.firstOrNull { !inside(dir, it) }
         if (missing != null) return skipped(dir, "misses its file $missing", R.string.theme_file_missing)
-        lastListed[dir.path] = Listed(File(dir, THEME_XML).lastModified(), systemColors, theme)
+        if (lastListed.size < LISTED_KEPT) lastListed[dir.path] = Listed(File(dir, THEME_XML).lastModified(), systemColors, theme)
         return versions(theme, dir.name, dir)
     }
 
@@ -508,6 +512,14 @@ object ThemePackFiles {
     // a listing's checks again, by folder: the stamp each was asked for, and the ones refused
     private val asked = ConcurrentHashMap<String, String>()
     private val refused = ConcurrentHashMap<String, String>()
+    /** A test's own process: the checks asked, refused and the listing's kept themes forgotten. */
+    @VisibleForTesting
+    internal fun forgetListings() {
+        asked.clear()
+        refused.clear()
+        lastListed.clear()
+    }
+
     private val checker by lazy { Executors.newSingleThreadExecutor() }
 
     /** Where a listing's check again runs ([refusedByRecheck]): a worker thread; a test's at once. */

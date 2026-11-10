@@ -131,7 +131,7 @@ jobs:
       - name: Run theme maker tests
         if: success() || failure()
         run: |
-          node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs
+          node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs web/theme-maker/test/names-and-files.test.mjs
 
       # Findings already present are frozen in config/detekt/baseline-*.xml; this fails on new ones
       # only. Syntax rules only: type resolution does not work on this toolchain (see detekt.yml).

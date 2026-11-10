@@ -330,12 +330,17 @@ internal class CanvasPainter(
     private fun textArea(op: Op.Text, x: Double, y: Double, stroke: Double, blur: Double): IntArray {
         c.save()
         c.font = font(op.weight, op.size, assets.family(op.font))
-        val run = (c.measureText(op.text).width as Number).toDouble()
+        val m = c.measureText(op.text)
         c.restore()
+        val run = (m.width as Number).toDouble()
+        // marks stacked past the generous ascent or descent (Thai, Vietnamese, some emoji fonts): the ink's own
+        // reach where the canvas tells it, so no layer cuts them
+        val ascent = maxOf(op.size * ASCENT, (m.actualBoundingBoxAscent as Number?)?.toDouble() ?: 0.0)
+        val descent = maxOf(op.size * DESCENT, (m.actualBoundingBoxDescent as Number?)?.toDouble() ?: 0.0)
         val width = (run + op.letterSpacing * op.size * op.text.length) * op.scaleX
         val pad = stroke + blur * BLUR_REACH
         val lean = op.size * LEAN
-        return area(Box(x - pad - lean, y - op.size * ASCENT - pad, x + width + pad + lean, y + op.size * DESCENT + pad))
+        return area(Box(x - pad - lean, y - ascent - pad, x + width + pad + lean, y + descent + pad))
     }
 
     // the glyphs at ([x], [y]) in the styles set, outlined by [stroke] where given (its colour the fill's: FILL_AND_STROKE)

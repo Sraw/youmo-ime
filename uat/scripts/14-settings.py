@@ -222,13 +222,8 @@ def st09(d):
     d.sh("rm -f /sdcard/Download/uat-zip.zip")
     appearance_tab(d, "主题")
     check(not custom_item(d), "选 .zip 后主题列表里多了主题")
-    d.step("取消")
-    import_theme(d, "uat-theme", confirm=False)
-    check(d.wait_text("导入主题", timeout=5, where="all", contains=True), "选 .theme 没有弹出导入确认框")
-    d.tap_text("取消", where="all", scroll=False, after=2.0)
-    appearance_tab(d, "主题")
-    check(not custom_item(d), "确认框点了取消，主题列表里多了主题")
     d.step("导入")
+    # the pushed file is a 3.0 theme: it goes straight in, only a 4.0 pack asks first
     import_theme(d, "uat-theme")
     appearance_tab(d, "主题")
     item = custom_item(d)
@@ -251,6 +246,13 @@ def st09(d):
     lum = d.lum(kb_box(d))
     check(o0 < 10 and b0 < 10 and abs(lum - lum_default) < 25,
           f"键盘不是默认主题（图的橙 {o0} 蓝 {b0}，亮度 {lum:.0f}，加主题前 {lum_default:.0f}）")
+    d.step("取消")
+    # the exported file is a 4.0 pack: it asks 导入主题 <name>？ first
+    import_theme(d, files[0], confirm=False)
+    check(d.wait_text("导入主题", timeout=5, where="all", contains=True), "选导出的 .theme 没有弹出导入确认框")
+    d.tap_text("取消", where="all", scroll=False, after=2.0)
+    appearance_tab(d, "主题")
+    check(not custom_item(d), "确认框点了取消，主题列表里多了主题")
     d.step("再导入")
     import_theme(d, files[0])
     appearance_tab(d, "主题")
@@ -593,7 +595,9 @@ case("ST-54", needs="jvm:ThemeFilesManagerTest.aThemeOfALaterFormatIsSkippedAndL
 case("ST-55", needs="jvm:ThemeFilesManagerTest.aThemeWhosePictureOrFontIsGoneIsNotListedAndTheUserIsToldItIsGone")(lambda d: None)
 
 
-case("ST-56", needs="manual:主题制作网页 0.6.0 起提供；在电脑浏览器上手工跑（要一个和内置主题同名的主题文件）")(lambda d: None)
+case("ST-56", needs="manual:主题制作网页 0.6.0 起提供；在电脑浏览器上手工跑（改名成内置主题的名字再保存）")(lambda d: None)
+
+case("ST-76", needs="manual:主题制作网页；在电脑浏览器上手工跑（要手改包里的 theme.xml 和特效图片）")(lambda d: None)
 case("ST-57", needs="manual:分屏下主题页预览和键盘同时要毛玻璃图")(lambda d: None)
 case("ST-58", needs="manual:要一个平铺大圆角主题文件（从 from-app.theme 改出来，见用例），键角、边框、间距、候选栏要人眼看")(lambda d: None)
 
@@ -606,10 +610,17 @@ case("ST-61", needs="jvm:PacksUatTest.aTextPackTooOldSaysWhichVersionIsNeeded")(
 
 case("ST-62", needs="jvm:PacksUatTest.thePageListsEachPacksStateAndWhatItIsFor")(lambda d: None)
 case("ST-68", needs="manual:要另做一个同名、换了字体和背景图的主题文件，看键盘的字体")(lambda d: None)
+
+case("ST-75", needs="manual:要在制作页做同名的单版本和两版本主题包")(lambda d: None)
+
+case("ST-77", needs="manual:要另做一个回车键自带图片、按下纯色的 3.0 主题文件，导入后按住看")(lambda d: None)
+case("ST-78", needs="manual:要在 API 31+ 上换壁纸改系统取色，看键色")(lambda d: None)
+case("ST-79", needs="manual:要另做一个只给九键回车键换图片的主题包")(lambda d: None)
+case("ST-80", needs="manual:主题制作网页；在电脑浏览器上手工跑（看 SVG 图标的位置）")(lambda d: None)
 case("ST-69", needs="manual:要真麦克风说话，用过语音后再导入语音包")(lambda d: None)
 case("ST-70", needs="manual:按键字符里选中一项左移、删除，看轮廓和删掉的是哪个")(lambda d: None)
 case("ST-73", needs="manual:要从制作页导出动效示例主题，按键的缩放、下沉、渐隐要人眼看")(lambda d: None)
-case("ST-74", needs="manual:要从制作页导出 17 键示例主题，按它的分组打拼音、看学到的列表")(lambda d: None)
+case("ST-74", needs="manual:要从制作页导出 17 键示例主题，按它的分组打拼音、看固定的词")(lambda d: None)
 
 
 case("ST-63", needs="release:多选文字包、语音包和一个非包文件导入，读逐文件的结果框、看下载里的原文件还在；结果框出现时转屏只一个框，点确定后再转屏、切到别的应用再回来不再弹出（手工）；结果的说法在 JVM 上：PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles")(lambda d: None)

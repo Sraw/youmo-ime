@@ -783,8 +783,10 @@ class KeyboardHarness(
             val cm = org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
             cm.purgeMarked(*cm.deleteAll(skipPinned = false))
         }
-        // the recognizer's reads posted back run first: their count, the JVM's, kept were they dropped with the looper
-        runCatching { idle() }
+        // the recognizer's reads posted back run first: their count, the JVM's, kept were they dropped with the looper.
+        // What that throws (a posted task's failure, the reads never in) is thrown once the rest is let go: a test
+        // passing does not hide it, and one failing keeps its own failure first (use's suppressed, JUnit's both)
+        val idleFailed = runCatching { idle() }.exceptionOrNull()
         // destroyed first: it learns the last field's address
         destroy()
         // Robolectric keeps every dialog shown till the test method ends (ShadowDialog.shownDialogs): the
@@ -810,6 +812,7 @@ class KeyboardHarness(
         codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
         HostDaemon.testConnection = null
         scope.cancel()
+        idleFailed?.let { throw it }
     }
 
     // the daemon's connection to a real host, which answers on its own thread

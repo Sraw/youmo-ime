@@ -401,7 +401,7 @@ the style text meant (a form edit changes the `<style>` of exactly that `select=
 the property, else adds one at the end; a style left with only its `select=` goes; what the form does
 not know, comments and spacing kept), the engine reads every result, and the cascade check
 (`YoumoEngine.sources`, `Cascade.sources`) names the style each value comes from; the forms write numbers within the engine's bounds (`YoumoEngine.limits`), and an icon the app would refuse (a PNG, an SVG past `SvgSubset`, which the engine's `readIcon` runs) is named and blocks the save. `from-maker.theme` and `from-maker-picture.theme` (the panels' save: a real PNG cut for each orientation, see-through keys, a gradient, an SVG icon) are
-its saves, which `ThemePackImportTest` imports. The
+its saves, which `ThemePackImportTest` imports. `test/names-and-files.test.mjs` (the same): names and files as theme.xml has them: a name with XML's special characters, values with `>`, which files are still named, the effect images the app checks (≤ 256 px a side, size limit, .png/.webp only), theme.xml's size limit, the draft's files written once. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
 `fonts/`, `examples/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
 

@@ -8,7 +8,6 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -32,13 +31,10 @@ class ThemeExportNameTest {
             "`.`-led: the pack folder's own names are" to row(".hidden", "hidden"),
             "nothing left of dots: the default" to row("...", "theme"),
             "nothing left of a version's ending: the default" to row("#dark", "theme"),
+            "a `/`: a pack's folder can have none" to row("a/b", "a_b"),
+            "too long: cut to a pack's length" to row("x".repeat(ThemeReader.MAX_NAME + 10), "x".repeat(ThemeReader.MAX_NAME)),
+            "`.`-led and cut to end in a version's name: that ending gone too" to
+                row("." + "x".repeat(ThemeReader.MAX_NAME - 5) + "#dark" + "yyyy", "x".repeat(ThemeReader.MAX_NAME - 5)),
         )
-    }
-
-    @Test
-    fun aLongNameIsCutToAPacksLength() {
-        val name = ThemeFilesManager.packName("x".repeat(ThemeReader.MAX_NAME + 10))
-        assertEquals(ThemeReader.MAX_NAME, name.length)
-        assertFalse(ThemePackFiles.badName(name))
     }
 }

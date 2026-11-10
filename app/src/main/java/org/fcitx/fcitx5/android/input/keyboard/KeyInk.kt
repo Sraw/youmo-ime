@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.os.SystemClock
 import android.view.View
 import androidx.annotation.VisibleForTesting
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
@@ -39,7 +40,7 @@ class KeyInk(
     override val pad = InkPad()
 
     /** When a touch on the letters is a stroke. */
-    val gesture = KeyInkGesture()
+    val gesture = KeyInkGesture().apply { nextKey = EngineState::nextKey }
 
     /** The keys typed while the pad is read, in order with it. */
     val keys: InkKeys by lazy {

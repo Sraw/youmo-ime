@@ -152,13 +152,15 @@ object YoumoEngine {
 
     /**
      * Where [theme] leaves Shift, Backspace, Space or Return blank (BlankKeys, the app's own import check): on the
-     * app's boards, each replaced by one of [layouts] (`{"<id>.xml": xml}`, a pack's `layouts/`) of its id where the app would take it (PackLayouts.drawn). The first
+     * app's boards, each replaced by one of [layouts] (`{"<id>.xml": xml}`, a pack's `layouts/`, only those the app reads: PackLayouts.readable) of its id where the app would take it (PackLayouts.drawn). The first
      * found, as text (`qwerty/enter @flat`), none: an empty array; too many scenes to try: `["*"]`. A layout of [layouts] the app would not take is not
      * asked, the app's own in its place (readLayout and refuses say why).
      */
     fun blankKeys(theme: YoumoTheme, layouts: dynamic): Array<String> = run {
-        val own = HashMap<String, String>()
-        if (layouts != null) for (name in keys(layouts, "layouts")) own[name.removeSuffix(".xml")] = text(layouts[name], "layout $name")
+        val files = HashMap<String, String>()
+        if (layouts != null) for (name in keys(layouts, "layouts")) files[name.removeSuffix(".xml")] = text(layouts[name], "layout $name")
+        // only the files the app reads: an id it has, within its size limit (PackLayouts.readable)
+        val own = PackLayouts.readable(files) { builtIns.layoutText(it) != null }
         // the boards as the app draws them: a pack's only where the app takes it (PackLayouts.drawn), the app's
         // with the app's fragments
         val app = builtIns.layouts.mapNotNull { id ->

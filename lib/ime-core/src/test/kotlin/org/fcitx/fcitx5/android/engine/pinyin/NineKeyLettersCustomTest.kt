@@ -22,7 +22,6 @@ class NineKeyLettersCustomTest {
         NineKeyLetters.clearInUse()
     }
 
-
     // the 17 keys of the sample layout (keyboard-scene's commonTest data k17.xml)
     private val k17 = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
 

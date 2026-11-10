@@ -207,12 +207,15 @@ object ThemeManager {
         return true
     }
 
-    fun refreshThemes() {
+    fun refreshThemes() = refreshThemes { false }
+
+    // [repoint]: slots renamed once the list is read, before the theme in use is found by them (the change fired once)
+    private fun refreshThemes(repoint: () -> Boolean) {
         val (themes, changed) = listCustomThemes(prefs)
         customThemes.clear()
         customThemes.addAll(themes)
         packs = ThemeFilesManager.listPacks()
-        val renamed = finishReplacements()
+        val renamed = finishReplacements() or repoint()
         packsListed()
         // the copy for before the first unlock names what this one does (the start syncs it after init)
         if (changed || renamed) syncToDeviceEncryptedStorage()
@@ -372,12 +375,9 @@ object ThemeManager {
         // a pack of one version replaced by one of two: a slot naming it bare names its version of the same
         // lightness, as a 3.0 theme replaced (finishReplacements): the theme picked not lost
         val single = packs.singleOrNull { it.file == file && it.name == file }
+        // repointed within the listing, before the theme in use is found: not the default a moment, drawn once
         filesChanged((_activeTheme as? Theme.Pack)?.takeIf { it.file == file }?.name ?: file) {
-            refreshThemes()
-            if (single != null && repointBare(file, single.isDark)) {
-                syncToDeviceEncryptedStorage()
-                activeTheme = evaluateActiveTheme()
-            }
+            refreshThemes { single != null && repointBare(file, single.isDark) }
         }
     }
 

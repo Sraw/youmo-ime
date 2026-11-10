@@ -573,6 +573,12 @@ class Engines(
 
     private var lastTableKeyboard: LastTableKeyboard? = null
 
+    /** Makes [im]'s session if it is not yet (its data read), for a caller that tells its failure from another's (the bridge's latches). */
+    fun make(im: String) {
+        hostThread.check()
+        session(inkedSession(im))
+    }
+
     /**
      * Handwriting's session made for [ink], what the pad read or a piece of it finished, which the
      * [Keyboard.INK] sent with it ([shown]) shows; with none sent, handwriting not the input method,

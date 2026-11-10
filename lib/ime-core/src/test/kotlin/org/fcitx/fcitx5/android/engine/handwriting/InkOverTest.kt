@@ -197,6 +197,8 @@ class InkOverTest {
             assertEquals(preedit, s.preedit)
             assertEquals(deleteBefore, s.deleteBefore)
             assertFalse(p.actions.contains(Action.Backspace))
+            assertFalse(s.refines)
+            assertFalse(s.picked)
         }
         fun keys(o: InkOver, k: String) = k.forEach { o.apply(Action.Key(it)) }
         assertRows(
@@ -208,6 +210,26 @@ class InkOverTest {
             "a cursor move after the tap" to row({ keys(it, "n"); it.apply(Action.Cursor(0)) }, preedit = "n"),
             // a reset after the tap: nothing typed is left to take back
             "a reset after the tap" to row({ keys(it, "n"); it.apply(Action.Reset) }, preedit = "天"),
+        )
+    }
+
+    // a letter while the handwriting shows: what its answer deletes comes off the sentence put in first, then off the text before it
+    @Test
+    fun aLettersDeleteComesOffWhatWasPutInFirst() {
+        fun row(deletes: Int, commit: String, deleteBefore: Int): () -> Unit = {
+            val p = FakePinyin(emptyMap())
+            val o = InkOver(object : Session by p {
+                override fun apply(action: Action): Snapshot = p.apply(action).copy(deleteBefore = if (action is Action.Key) deletes else 0)
+            }) { HandwritingSession(handwritingDecoder(), TextWords(handwritingData.model, handwritingData.wordIndex)) }
+            o.apply(Action.Ink(0, read("天")))
+            val s = o.apply(Action.Key('n'))
+            assertEquals(commit, s.commit)
+            assertEquals(deleteBefore, s.deleteBefore)
+        }
+        assertRows(
+            "nothing deleted: the sentence stays" to row(0, "天", 0),
+            "one deleted: off the sentence put in" to row(1, "", 0),
+            "two deleted: the sentence, then one before it" to row(2, "", 1),
         )
     }
 

@@ -1,5 +1,6 @@
 // The maker's names and files as theme.xml has them: a theme's name with XML's special characters, a value with
 // '>' in it, which files are still named, the effect images the app checks, the draft's files written once.
+// contract: the page's youmo-format block (index.html) and the app's ThemeAssetLimits / built-in names it is held to.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -48,6 +49,10 @@ test('a theme name with &, < and quotes is written escaped and read back as type
   const single = M.withName("<theme xmlns=\"https://youmo-ime/theme/4\" name='old' version=\"4.0\"></theme>", 'new');
   assert.equal((single.match(/\bname\s*=/g) || []).length, 1);
   assert.equal(M.themeName(single), 'new');
+  // a ' name=' inside another attribute's quoted value is not the theme's name: the real name= is the one changed
+  const inside = M.withName('<theme xmlns="https://youmo-ime/theme/4" author="x name=y" name="old" version="4.0"></theme>', 'new');
+  assert.ok(inside.includes('author="x name=y"'), inside);
+  assert.equal(M.themeName(inside), 'new');
 });
 
 test('a value with ">" in it is written escaped, and an element is not cut at a ">" inside quotes', () => {
@@ -82,23 +87,27 @@ test('replacing an icon keeps a file a key image still names, and never writes o
   assert.ok(Object.keys(got.files).includes('icon-shift-2.svg'), Object.keys(got.files).join());
 });
 
-test('an effect image is checked before a save as the app checks it: PNG or WebP by name, its side and bytes', () => {
-  const lim = Object.assign({}, FORMAT.limits, { effectImageSide: 256, effectImageBytes: 128 * 1024 });
-  const format = Object.assign({}, FORMAT, { limits: lim });
+test('save refuses what the app refuses: an effect image, a theme.xml past its size, a built-in theme\'s name', () => {
+  // youmo-format's own limits (the app's ThemeAssetLimits): a block missing them would turn these checks off
+  assert.deepEqual([FORMAT.limits.effectImageSide, FORMAT.limits.effectImageBytes, FORMAT.limits.themeXmlBytes], [256, 128 * 1024, 1024 * 1024]);
+  assert.ok(FORMAT.builtinNames.includes('MaterialLight'), FORMAT.builtinNames.join());
   const base = M.fromBuiltin(E, 'material').xml;
   const withEffect = (fx) => F.setProp(base, 'key:pressed', 'effect', fx);
+  const big = M.withName(base, 'big').replace('</theme>', '<!--' + '汉'.repeat(400 * 1024) + '-->\n</theme>');
   const rows = [
-    // [effect=, files, an error naming the file?, why]
-    ['ripple-image(effect-a.png, 100%, 300ms)', { 'effect-a.png': pngHeader(64, 64) }, false, 'within its limits'],
-    ['ripple-image(effect-a.png, 100%, 300ms)', {}, true, 'not in the pack'],
-    ['particles(effect-a.png, 8, 24dp, 400ms)', { 'effect-a.png': pngHeader(512, 64) }, true, 'past 256 px, a particle image too'],
-    ['ripple-image(effect-a.png, 100%, 300ms)', { 'effect-a.png': pngHeader(64, 64, 200 * 1024) }, true, 'past 128 KB'],
-    ['ripple-image(effect-a.jpg, 100%, 300ms)', { 'effect-a.jpg': pngHeader(64, 64) }, true, 'not .png or .webp by its name'],
-    ['ripple-image(effect-a.png, 100%, 300ms)', { 'effect-a.png': pngHeader(1000, 1000) }, true, 'within a key image\'s 1024 px but past an effect\'s: the effect\'s limit'],
+    // [document, a problem matching, refused?, why]
+    [M.doc(withEffect('ripple-image(effect-a.png, 100%, 300ms)'), { 'effect-a.png': pngHeader(64, 64) }), /effect-a/, false, 'an effect image within its limits'],
+    [M.doc(withEffect('ripple-image(effect-a.png, 100%, 300ms)')), /effect-a/, true, 'an effect image not in the pack'],
+    [M.doc(withEffect('particles(effect-a.png, 8, 24dp, 400ms)'), { 'effect-a.png': pngHeader(512, 64) }), /effect-a/, true, 'past 256 px, a particle image too'],
+    [M.doc(withEffect('ripple-image(effect-a.png, 100%, 300ms)'), { 'effect-a.png': pngHeader(64, 64, 200 * 1024) }), /effect-a/, true, 'past 128 KB'],
+    [M.doc(withEffect('ripple-image(effect-a.jpg, 100%, 300ms)'), { 'effect-a.jpg': pngHeader(64, 64) }), /effect-a/, true, 'not .png or .webp by its name'],
+    [M.doc(withEffect('ripple-image(effect-a.png, 100%, 300ms)'), { 'effect-a.png': pngHeader(1000, 1000) }), /effect-a/, true, 'within a key image\'s 1024 px but past an effect\'s: the effect\'s limit'],
+    [M.doc(big), /theme\.xml/, true, 'a theme.xml past the app\'s 1 MB in bytes (UTF-8), within the engine\'s characters'],
+    [M.doc(M.withName(base, 'MaterialLight')), /内置/, true, 'named as a built-in theme: the app would take it for its own'],
   ];
-  for (const [fx, files, bad, why] of rows) {
-    const out = M.saveProblems(E, L, format, M.doc(withEffect(fx), files));
-    assert.equal(out.some((p) => p.level === 'error' && /effect-a/.test(p.message)), bad, why + ': ' + JSON.stringify(out));
+  for (const [d, what, bad, why] of rows) {
+    const out = M.saveProblems(E, L, FORMAT, d);
+    assert.equal(out.some((p) => p.level === 'error' && what.test(p.message)), bad, why + ': ' + JSON.stringify(out).slice(0, 300));
   }
   // an effect's image is not a key image the preview decodes
   const d = M.doc(withEffect('ripple-image(effect-a.png, 100%, 300ms)'), { 'effect-a.png': pngHeader(64, 64) });
@@ -106,16 +115,14 @@ test('an effect image is checked before a save as the app checks it: PNG or WebP
   assert.deepEqual(P.keys.ops.keyImages(d), []);
 });
 
-test('a theme.xml past the app\'s size is an error before a save', () => {
-  const format = Object.assign({}, FORMAT, { limits: Object.assign({}, FORMAT.limits, { themeXmlBytes: 100 }) });
-  const out = M.saveProblems(E, L, format, M.fromBuiltin(E, 'material'));
-  assert.ok(out.some((p) => /theme\.xml/.test(p.message)), JSON.stringify(out));
-});
-
-test('a theme named as a built-in theme is an error before a save', () => {
-  const format = Object.assign({}, FORMAT, { builtinNames: ['Material'] });
-  const d = M.doc(M.withName(M.fromBuiltin(E, 'material').xml, 'Material'));
-  assert.ok(M.saveProblems(E, L, format, d).some((p) => /内置/.test(p.message)));
+test('an effect the engine reads is read by the form as it is: a particle spread of a bare 0', () => {
+  const rows = [
+    // [effect=, read, why]
+    ['particles(f.png, 8, 0, 400ms)', { kind: 'particles', file: 'f.png', count: 8, spread: 0, ms: 400 }, 'a bare 0, as the engine reads it'],
+    ['particles(f.png, 8, 24dp, 400ms)', { kind: 'particles', file: 'f.png', count: 8, spread: 24, ms: 400 }, 'a spread in dp'],
+    ['particles(f.png, 8, 5, 400ms)', null, 'a bare number but 0: no unit, not read'],
+  ];
+  for (const [text, read, why] of rows) assert.deepEqual(P.motion.ops.parseEffect(text), read, why);
 });
 
 test('a fill the engine reads is read by the form as what it is: a decimal angle, a bare picture', () => {
@@ -151,4 +158,22 @@ test('the draft writes the files again only when they changed; a draft of the pa
   m.set('draft', { v: 1, doc: { xml: '<old/>', files: { 'q.png': new Uint8Array([9]) }, layouts: {} }, env: null, at: 1 });
   const old = await M.draft(store);
   assert.deepEqual([...old.doc.files['q.png']], [9]);
+  // the text and its files are two writes: files not the text's own (another tab's since, a write cut between
+  // the two) make no draft, never the text with someone else's pictures
+  m.clear();
+  await M.keepDraft(store, d, M.ENV);
+  const other = new Map(m);
+  m.set('draft-files', Object.assign({}, other.get('draft-files'), { id: 'another-tab' }));
+  assert.equal(await M.draft(store), null, 'files of another page');
+  m.delete('draft-files');
+  assert.equal(await M.draft(store), null, 'files never written');
+  // dropped: nothing comes back, nothing is left in the store, and the next draft writes its files again
+  m.clear();
+  await M.keepDraft(store, d, M.ENV);
+  await M.dropDraft(store);
+  assert.equal(await M.draft(store), null);
+  assert.equal(m.size, 0, [...m.keys()].join());
+  puts.length = 0;
+  await M.keepDraft(store, d, M.ENV);
+  assert.deepEqual(puts, ['draft-files', 'draft']);
 });

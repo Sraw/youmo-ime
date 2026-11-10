@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -36,16 +37,17 @@ import splitties.dimensions.dp
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class CandidateReadingsUatTest {
 
+    // the sizes set here, and the style shown the service writes as the last used (FcitxInputMethodService), put
+    // back as the test found them: left at zhuyin, the next test's 注 key would turn zhuyin on
+    @get:Rule
+    val prefs = PrefsRule()
+
     private var harness: KeyboardHarness? = null
 
     @After
     fun close() {
         harness?.close()
         EngineState.candidateReadingState.value = ReadingStyle.OFF
-        // the service writes the style shown here as the last used (FcitxInputMethodService): left at zhuyin, the
-        // next test's 注 key turns zhuyin on, and PrefsRule there puts it back after each of its tests
-        AppPrefs.getInstance().internal.lastCandidateReading.setValue("")
-        ThemeManager.prefs.candidateTextSize.let { it.setValue(it.defaultValue) }
     }
 
     // 东西 in 西's own tone (no 轻声, the user 2026-11-02); 呢 has no other, so its ˙ is still drawn
@@ -59,7 +61,7 @@ class CandidateReadingsUatTest {
     private val writtenZhuyin = listOf(listOf("ㄒㄧㄥˊ/ㄏㄤˊ…"), listOf("ㄧㄢˇ"), listOf("ㄐㄧㄝ"), listOf("ㄆㄤˊ/ㄈㄤˇ"), listOf("ㄏㄜˊ/ㄏㄜˋ…"))
 
     private fun shown(style: ReadingStyle, sp: Int, name: String, handwriting: Boolean = false, theme: Theme = TestThemes.PixelLight) {
-        ThemeManager.prefs.candidateTextSize.setValue(sp)
+        prefs.set(ThemeManager.prefs.candidateTextSize, sp)
         EngineState.candidateReadingState.value = style
         val h = KeyboardHarness(theme).also { harness = it }.start()
         val bar = h.described(h.service.getString(R.string.expand_toolbar)).parent as View
@@ -111,17 +113,13 @@ class CandidateReadingsUatTest {
     @Test
     fun theStyleLastUsedIsKeptFromTheSettingsToo() {
         val last = AppPrefs.getInstance().internal.lastCandidateReading
-        last.setValue("")
-        try {
-            KeyboardHarness().also { harness = it }.start()
-            EngineState.candidateReadingState.value = ReadingStyle.ZHUYIN
-            shadowOf(Looper.getMainLooper()).idle()
-            EngineState.candidateReadingState.value = ReadingStyle.OFF
-            shadowOf(Looper.getMainLooper()).idle()
-            assertEquals(ReadingStyle.ZHUYIN.key, last.getValue())
-        } finally {
-            last.setValue("")
-        }
+        prefs.set(last, "")
+        KeyboardHarness().also { harness = it }.start()
+        EngineState.candidateReadingState.value = ReadingStyle.ZHUYIN
+        shadowOf(Looper.getMainLooper()).idle()
+        EngineState.candidateReadingState.value = ReadingStyle.OFF
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(ReadingStyle.ZHUYIN.key, last.getValue())
     }
 
     // UAT HW-27: a handwritten character's readings, two and … for more, in the bar's height as for one

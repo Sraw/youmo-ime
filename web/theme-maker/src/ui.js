@@ -200,6 +200,7 @@
     const images = {};
     const fonts = {};
     const cuts = {};
+    const added = new Set(); // the fonts this call put in document.fonts
     const safe = new Set(M.decodableImages(L, FORMAT, d));
     for (const [name, bytes] of Object.entries(d.files)) {
       try {
@@ -217,6 +218,7 @@
             await face.load();
             document.fonts.add(face);
             faces.set(family, face);
+            added.add(family);
           }
           fonts[name] = family;
         }
@@ -227,12 +229,18 @@
     if (mine !== loading) {
       const ours = Object.values(assets.cuts);
       for (const b of Object.values(cuts)) if (!ours.includes(b)) b.close();
+      // the fonts this call added that the shown files do not use: out of the page (kept in faces, so a newer
+      // call that found one there puts it back when it lands)
+      const shown = new Set(Object.values(assets.fonts));
+      for (const family of added) if (!shown.has(family)) document.fonts.delete(faces.get(family));
       return false;
     }
     for (const b of Object.values(assets.cuts)) if (!Object.values(cuts).includes(b)) b.close();
     // a font no file has any more (replaced, deleted, undone) is let go
     const families = new Set(Object.values(fonts));
-    for (const [family, face] of faces) if (!families.has(family)) { document.fonts.delete(face); faces.delete(family); }
+    for (const [family, face] of faces) {
+      if (!families.has(family)) { document.fonts.delete(face); faces.delete(family); } else if (!document.fonts.has(face)) document.fonts.add(face);
+    }
     assets = { key: d.files, images, fonts, cuts };
     return true;
   }
@@ -259,7 +267,7 @@
     const bmp = file && assets.cuts[file];
     if (!bmp || !scene) return null;
     // made once for a bitmap, a size and a blur and brightness: not blurred again on every preview (each tap)
-    if (pictures.bmp !== bmp || pictures.w !== scene.width || pictures.h !== scene.height) Object.assign(pictures, { bmp, w: scene.width, h: scene.height, made: new Map() });
+    if (pictures.bmp !== bmp || pictures.w !== scene.width || pictures.h !== scene.height || pictures.density !== env.density) Object.assign(pictures, { bmp, w: scene.width, h: scene.height, density: env.density, made: new Map() });
     const made = pictures.made;
     return (blurDp, brightness) => {
       const b = blurDp == null ? p.blurDp : blurDp;
@@ -271,13 +279,33 @@
       c.height = pictures.h;
       const g = c.getContext('2d');
       const px = b * env.density;
-      // the blur's edge as the app's (its box blur clamps there): drawn past the canvas by 3σ, so no see-through
-      // pixels come in at the sides; where the browser has no filter, unblurred (the dimming is drawn, below)
+      // centre-cropped to the canvas as the app crops it (never made bigger for the blur); where the browser has
+      // no filter, unblurred (the dimming is drawn, below)
       const m = 'filter' in g && px > 0 ? Math.ceil(px * 3) : 0;
-      const s = Math.max((c.width + 2 * m) / bmp.width, (c.height + 2 * m) / bmp.height);
-      if (m) g.filter = 'blur(' + px + 'px)';
-      g.drawImage(bmp, (c.width - bmp.width * s) / 2, (c.height - bmp.height * s) / 2, bmp.width * s, bmp.height * s);
-      g.filter = 'none';
+      const s = Math.max(c.width / bmp.width, c.height / bmp.height);
+      const dw = bmp.width * s;
+      const dh = bmp.height * s;
+      const dx = (c.width - dw) / 2;
+      const dy = (c.height - dh) / 2;
+      if (!m) {
+        g.drawImage(bmp, dx, dy, dw, dh);
+      } else {
+        // the blur's edge as the app's (its box blur clamps there): the same crop on a canvas m px larger each
+        // side, its edge rows and columns stretched out over that margin, blurred, and its middle taken
+        const big = document.createElement('canvas');
+        big.width = c.width + 2 * m;
+        big.height = c.height + 2 * m;
+        const k = big.getContext('2d');
+        k.drawImage(bmp, m + dx, m + dy, dw, dh);
+        const [W, H] = [c.width, c.height];
+        k.drawImage(big, m, m, W, 1, m, 0, W, m); // top
+        k.drawImage(big, m, m + H - 1, W, 1, m, m + H, W, m); // bottom
+        k.drawImage(big, m, 0, 1, H + 2 * m, 0, 0, m, H + 2 * m); // left, corners with it
+        k.drawImage(big, m + W - 1, 0, 1, H + 2 * m, m + W, 0, m, H + 2 * m); // right
+        g.filter = 'blur(' + px + 'px)';
+        g.drawImage(big, -m, -m);
+        g.filter = 'none';
+      }
       if (l < 100) {
         g.fillStyle = 'rgba(0, 0, 0, ' + (1 - l / 100) + ')';
         g.fillRect(0, 0, c.width, c.height);
@@ -286,7 +314,7 @@
       return c;
     };
   }
-  const pictures = { bmp: null, w: 0, h: 0, made: new Map() };
+  const pictures = { bmp: null, w: 0, h: 0, density: 0, made: new Map() };
 
   // [picture] (pictureOf's) as a part of the scene at [x, y] ([w] × [h] px) sees it: that part of it, not the whole squeezed in
   function pictureAt(picture, x, y, w, h) {
@@ -651,11 +679,11 @@
   function openError(e) {
     switch (e && e.code) {
       case 'limit': return '文件太大或文件太多，超过了 App 的限制';
-      case 'newer': return '它是更新版本的幽默输入法做的（' + e.message + '），先刷新这个网页再试';
-      case 'older': return '它是很旧的版本（' + e.message + '），先导入 App 再从 App 导出';
+      case 'newer': return '它是更新版本的幽默输入法做的（' + e.detail + '），先刷新这个网页再试';
+      case 'older': return '它是很旧的版本（' + e.detail + '），先导入 App 再从 App 导出';
       case 'not-theme': return '这不是主题文件（.theme 或 theme.xml）';
-      case 'missing': return '主题里写到的文件 ' + e.message + ' 包里没有';
-      case 'bad': return '主题文件有错：' + e.message;
+      case 'missing': return '主题里写到的文件 ' + e.detail + ' 包里没有';
+      case 'bad': return '主题文件有错：' + e.detail;
       default: return (e && e.message) || String(e);
     }
   }
@@ -663,12 +691,13 @@
   // the picture decoded (upright, as its EXIF says), drawn at sizeOf its decoded sides and encoded: JPEG, or PNG
   // where any pixel is see-through
   // [rect] (l t r b of the decoded picture): only that part of it
-  // ([bytes] may be a bitmap decoded already: it is drawn, and stays the caller's to close)
-  async function encodePicture(bytes, sizeOf, quality, rect = null) {
+  // ([bytes] may be a bitmap decoded already: it is drawn, and stays the caller's to close; [jpg] then says
+  // whether it was decoded from a JPEG)
+  async function encodePicture(bytes, sizeOf, quality, rect = null, jpg = false) {
     const given = bytes instanceof ImageBitmap;
     const bmp = given ? bytes : await createImageBitmap(new Blob([bytes]));
     // a JPEG has no alpha: its pixels are not looked through
-    const opaque = !given && L.imageType(bytes) === 'jpg';
+    const opaque = given ? jpg : L.imageType(bytes) === 'jpg';
     try {
       const [l, t, r, b] = rect || [0, 0, bmp.width, bmp.height];
       const [w, h] = sizeOf(r - l, b - t);
@@ -699,8 +728,9 @@
       const picked = new Uint8Array(await f.arrayBuffer());
       // decoded once for the file and both cuts (after pictureFile's checks of its header: never one too big)
       let bmp = null;
+      const jpg = L.imageType(picked) === 'jpg';
       try {
-        const made = await M.pictureFile(L, FORMAT, picked, async (bytes, ...rest) => encodePicture(bmp ??= await createImageBitmap(new Blob([bytes])), ...rest));
+        const made = await M.pictureFile(L, FORMAT, picked, async (bytes, sizeOf, quality) => encodePicture(bmp ??= await createImageBitmap(new Blob([bytes])), sizeOf, quality, null, jpg));
         const size = L.imageSize(made.bytes);
         if (!size) throw new Error('no size');
         const scale = bmp.width / size[0];
@@ -709,7 +739,7 @@
         const cuts = {};
         for (const o of ['portrait', 'landscape']) {
           const rect = F.cropRect(size[0], size[1], bg.ratio(Object.assign({}, env, { landscape: o === 'landscape' })));
-          const c = await encodePicture(bmp, (w, h) => L.resizeInside(w, h, side, side), M.PICTURE_SAVE.quality, rect.map((v) => v * scale));
+          const c = await encodePicture(bmp, (w, h) => L.resizeInside(w, h, side, side), M.PICTURE_SAVE.quality, rect.map((v) => v * scale), jpg);
           cuts[o] = { bytes: c.bytes, type: c.type, rect };
         }
         // the picked picture kept for this session's cuts (a cut of the saved JPEG would be a second generation):

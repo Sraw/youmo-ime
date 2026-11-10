@@ -18,10 +18,11 @@ import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.junit.After
-import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -179,6 +180,17 @@ class EnginesOwnKeysTest : EnginesFixture() {
         val shown = engines.typeCodes(nihao.map { code(it, other).code })
         assertTrue(shown.candidates.toString(), "你好" in shown.candidates.take(3))
         assertEquals(other, NineKeyLetters.ofCode(other.codes[0].code))
+        engines.close()
+    }
+
+    // the keyboard told no more (another layout, no own groups): its codes no longer read by it anywhere in the
+    // process (NineKeyLetters.ofCode), not the last one kept
+    @Test
+    fun ownKeysToldNoMoreAreReadByNone() {
+        val engines = engines()
+        assertEquals(k17, NineKeyLetters.ofCode(code("bn").code))
+        engines.settings = engines.settings.copy(ownKeys = null)
+        assertNull(NineKeyLetters.ofCode(code("bn").code))
         engines.close()
     }
 

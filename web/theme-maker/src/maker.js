@@ -37,8 +37,12 @@
     const t = /<theme\b(?:[^>"']|"[^"]*"|'[^']*')*?\/?>/.exec(uncommented(xml));
     if (!t) return xml;
     const tag = xml.slice(t.index, t.index + t[0].length);
-    const attr = /(\s)name\s*=\s*("[^"]*"|'[^']*')/;
-    const named = attr.test(tag) ? tag.replace(attr, (all, sp) => sp + 'name="' + escape(name) + '"') : tag.replace(/^<theme\b/, '<theme name="' + escape(name) + '"');
+    // its attributes one by one, so a ' name=' inside another's quoted value is never the one changed
+    let at = null;
+    for (const a of tag.matchAll(/(\s)([^\s=/>]+)\s*=\s*("[^"]*"|'[^']*')/g)) if (a[2] === 'name') { at = a; break; }
+    const named = at
+      ? tag.slice(0, at.index) + at[1] + 'name="' + escape(name) + '"' + tag.slice(at.index + at[0].length)
+      : tag.replace(/^<theme\b/, '<theme name="' + escape(name) + '"');
     return xml.slice(0, t.index) + named + xml.slice(t.index + t[0].length);
   }
 
@@ -308,15 +312,20 @@
   const DRAFT = 'draft';
   // the files apart from the text: written again only when they changed (an edit of theme.xml shares its files
   // object with the document before it), not megabytes of pictures each time a value is typed
+  // the two records are written one after the other: each files record carries an id the text names, so a text
+  // read with files not its own (another tab's, or a write cut between the two) is no draft, never a mix
   const DRAFT_FILES = 'draft-files';
-  const keptFiles = new WeakMap(); // the store → the files object last written to it
+  const keptFiles = new WeakMap(); // the store → { files, id } last written to it
   async function keepDraft(store, d, env) {
     try {
-      if (keptFiles.get(store) !== d.files) {
-        await store.put(DRAFT_FILES, d.files);
-        keptFiles.set(store, d.files);
+      let kept = keptFiles.get(store);
+      if (!kept || kept.files !== d.files) {
+        kept = { files: d.files, id: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) };
+        keptFiles.delete(store);
+        await store.put(DRAFT_FILES, { id: kept.id, files: d.files });
+        keptFiles.set(store, kept);
       }
-      await store.put(DRAFT, { v: 2, doc: { xml: d.xml, layouts: d.layouts }, env, at: Date.now() });
+      await store.put(DRAFT, { v: 3, doc: { xml: d.xml, layouts: d.layouts }, files: kept.id, env, at: Date.now() });
       return true;
     } catch (e) {
       return false;
@@ -325,9 +334,17 @@
   async function draft(store) {
     try {
       const v = await store.get(DRAFT);
-      if (!v || (v.v !== 1 && v.v !== 2) || !v.doc || typeof v.doc.xml !== 'string') return null;
-      // 1: the files kept with the text (the page before they were kept apart)
-      const files = v.v === 1 ? v.doc.files : await store.get(DRAFT_FILES);
+      if (!v || ![1, 2, 3].includes(v.v) || !v.doc || typeof v.doc.xml !== 'string') return null;
+      // 1: the files kept with the text (the page before they were kept apart); 2: kept apart, with no id
+      let files = v.doc.files;
+      if (v.v !== 1) {
+        const kept = await store.get(DRAFT_FILES);
+        if (v.v === 2) {
+          if (kept && typeof kept.id === 'string') return null; // a newer page's files since
+          files = kept;
+        } else if (!kept || kept.id !== v.files) return null;
+        else files = kept.files;
+      }
       return { doc: doc(v.doc.xml, files || {}, v.doc.layouts || {}), env: v.env || null, at: v.at };
     } catch (e) {
       return null;
