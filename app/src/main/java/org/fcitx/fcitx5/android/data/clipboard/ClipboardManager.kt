@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.utils.WeakHashSet
+import org.fcitx.fcitx5.android.utils.snapshot
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.clipboardManager
 import timber.log.Timber
@@ -136,7 +137,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     // listeners first: whoever sees [lastEntry] knows what they posted to the main thread is queued already
     @VisibleForTesting
     internal fun updateLastEntry(entry: ClipboardEntry) {
-        synchronized(onUpdateListeners) { onUpdateListeners.toList() }.forEach { it.onUpdate(entry) }
+        synchronized(onUpdateListeners) { onUpdateListeners.snapshot() }.forEach { it.onUpdate(entry) }
         lastEntry = entry
     }
 

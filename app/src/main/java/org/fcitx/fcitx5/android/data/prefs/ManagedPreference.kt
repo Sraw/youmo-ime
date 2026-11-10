@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.prefs
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.utils.WeakHashSet
+import org.fcitx.fcitx5.android.utils.snapshot
 import timber.log.Timber
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
@@ -74,7 +75,7 @@ abstract class ManagedPreference<T : Any>(
         if (!::listeners.isInitialized || listeners.isEmpty()) return
         val newValue = getValue()
         // a copy, as ManagedPreferenceProvider.fireChange goes through its listeners
-        listeners.toList().forEach { it.onChange(key, newValue) }
+        listeners.snapshot().forEach { it.onChange(key, newValue) }
     }
 
     class PBool(sharedPreferences: SharedPreferences, key: String, defaultValue: Boolean) :
