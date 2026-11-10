@@ -123,7 +123,6 @@ class KeyboardCanvasView(
         var scale = 1f
         var sink = 0f
         var leaving: RenderNode? = null
-        var leavingAlpha = 0f
         var anim: ValueAnimator? = null
         // its pressed face fading as it is let go: drawn at [alpha], not at CanvasFrame's 0
         var releasing = false
@@ -217,6 +216,7 @@ class KeyboardCanvasView(
                 Timber.e("keyboard canvas: no scene of the keys %d × %d; none drawn", width, height)
                 failed = true
                 built = null
+                faces.forEach { it.moving?.stop() }
                 faces = emptyList()
                 base = null
                 speech.invalidateRoot()
@@ -249,8 +249,9 @@ class KeyboardCanvasView(
                         f.pressed = was.pressed
                         f.moving = was.moving
                     } else {
-                        // its state changed (Shift, locked): the face it had fades out over its new one
-                        crossFade(was, f, repainted)
+                        // its state changed (Shift, locked) where it was: the face it had fades out over its new one;
+                        // laid out anew (a size, one-handed) or relabelled in the same state, shown at once
+                        crossFade(was, f, repainted || was.node.states == k.states || was.node.bounds != k.bounds)
                     }
                     // its state changed (Shift once, locked): told below
                     if (was.state != f.state) (said ?: ArrayList<Int>().also { said = it }) += i
@@ -260,6 +261,9 @@ class KeyboardCanvasView(
                 // a key gone with the scene is pressed no more: nothing carries it
                 f
             }
+            // a key's motion not carried into the new faces (a key gone, its faces changed) stops: no animator left unreachable
+            val carried = faces.mapNotNullTo(HashSet()) { it.moving }
+            old.forEach { o -> o.moving?.takeIf { it !in carried }?.stop() }
             speech.reading.clear()
             speech.invalidateRoot()
             // a key's state changed told to a screen reader as a view's state description is: on the
@@ -284,6 +288,12 @@ class KeyboardCanvasView(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         viewTreeObserver.addOnPreDrawListener(moved)
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        // the keyboard hidden keeps its view attached: out of sight, nothing moves on
+        if (visibility != VISIBLE) faces.forEach { it.moving?.stop() }
     }
 
     override fun onDetachedFromWindow() {
@@ -399,6 +409,9 @@ class KeyboardCanvasView(
         val b = ceil(e.bottom).toInt()
         setPosition(l, t, r, b)
         setClipToBounds(false)
+        // a face fading (A1) drawn straight at its alpha, not through a layer of its own each frame: its fill,
+        // shadow and label blend one by one, too slight a change to see in a fade; at 0 or 1 (no motion) the same
+        setHasOverlappingRendering(false)
         val c = beginRecording(r - l, b - t)
         try {
             c.translate(-l.toFloat(), -t.toFloat())
@@ -414,8 +427,17 @@ class KeyboardCanvasView(
         val f = faces.firstOrNull { it.node.of(ref) } ?: return
         if (f.down == on) return
         f.down = on
+        if (on) endFades(f)
         f.node.motion?.let { pressMoves(f, on, it) }
         invalidate()
+    }
+
+    // the other keys' release fades ended (at rest) as a key goes down: typing fast, a key's frame draws no fades with it
+    private fun endFades(pressed: Faces) {
+        for (o in faces) {
+            val m = o.moving ?: continue
+            if (o !== pressed && m.releasing) m.anim?.end()
+        }
     }
 
     /** Animators made for the keys' motion (060-render-p3 A1): none while 键盘动效 may not move them. */
@@ -450,7 +472,7 @@ class KeyboardCanvasView(
             }
         } else {
             val fade = motion.transition
-            if (fade == null) {
+            if (fade == null || f.pressed?.hasDisplayList() != true) {
                 m.scale = 1f
                 m.sink = 0f
             } else {
@@ -469,22 +491,26 @@ class KeyboardCanvasView(
     }
 
     // the face [was] showed fading out over [f]'s new one, where its look has a transition and the key may move
-    private fun crossFade(was: Faces, f: Faces, repainted: Boolean) {
+    private fun crossFade(was: Faces, f: Faces, still: Boolean) {
         val old = was.moving
-        val t = f.node.motion?.transition
-        val still = repainted || t == null || f.down
-        if (still || !KeyMotionSwitch.on(context)) {
-            old?.stop()
+        // let go and fading still (Shift's own release): that face goes on fading from where it is, else the one it showed
+        val fading = old?.releasing == true
+        val from = (if (fading) was.pressed else was.normal).takeIf { it?.hasDisplayList() == true }
+        val alpha = if (fading) old!!.alpha else 1f
+        old?.stop()
+        val motion = f.node.motion ?: return
+        if (still || !KeyMotionSwitch.on(context)) return
+        if (f.down) {
+            // held: its new pressed face as pressed as the old one was, not back to whole
+            f.moving = Moving().also { it.scale = motion.pressScale.toFloat(); it.sink = motion.pressSink.toFloat() }
             return
         }
-        // let go and fading still (Shift's own release): that face goes on fading, else the one it showed
-        val from = (if (old?.releasing == true) was.pressed else was.normal).takeIf { it?.hasDisplayList() == true } ?: return
-        old?.stop()
+        val t = motion.transition ?: return
+        from ?: return
         val m = Moving().also { f.moving = it }
         m.leaving = from
-        m.leavingAlpha = 1f
-        from.alpha = 1f
-        animate(f, m, t, { v -> m.leavingAlpha = 1f - v; from.alpha = m.leavingAlpha }) { m.leaving = null }
+        from.alpha = alpha
+        animate(f, m, t, { v -> from.alpha = alpha * (1f - v) }) { m.leaving = null }
     }
 
     // one animator for [m]: each frame [step] (the eased fraction) then the node's properties set and a frame asked

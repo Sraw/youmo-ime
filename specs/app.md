@@ -126,13 +126,16 @@ A theme's own key motion (060-render-p3 A1) is apart from these: a key's `Motion
 `transition` no longer than 80 ms), drawn by `KeyboardCanvasView` on the two nodes each key has. The pressed face is
 shown whole at its first frame (CanvasFrame's alpha swap, never faded in); only its scale (about the key's middle) and
 sink move. Let go, the pressed node fades out over the normal one, scale and sink back; a state change (Shift, locked)
-draws the face it had over the new one, fading. A `ValueAnimator` each (`Moving`), its frames setting the nodes'
+where the key was draws the face it had over the new one, fading (from where a release fade had it); a key laid out
+anew (a size, one-handed) or relabelled in its state is shown at once, and a held key keeps its press scale. A `ValueAnimator` each (`Moving`), its frames setting the nodes'
 `alpha`/`scaleX`/`scaleY`/`translationY` alone and asking a frame (trace section `canvas anim`): nothing recorded or
-laid out; ended, nothing asked. A press while it moves jumps to pressed. `KeyMotionSwitch` says whether keys may move
+laid out; ended, nothing asked. A press while it moves jumps to pressed, and any key's press ends the other keys'
+release fades (typing fast, a key's frame draws no fade with it). The nodes have no overlapping rendering, so a fading
+one is drawn at its alpha straight, not through a layer each frame. `KeyMotionSwitch` says whether keys may move
 now, asked at each press of a key that has motion: 键盘动效 (`AppPrefs.advanced.keyboardMotion`, default on) on, 禁用动画
 off, battery saver off (kept from `ACTION_POWER_SAVE_MODE_CHANGED`, not asked of `PowerManager` on a keystroke) and
 `ValueAnimator.areAnimatorsEnabled()`; not, or a theme without motion (every built-in one), no `Moving` and no animator
-is made and the keys draw as before. Detached, every animation stops. `KeyMotionTest`.
+is made and the keys draw as before. Detached or its window hidden (the keyboard hidden keeps the view attached), every animation stops; a key's motion not carried into a new scene stops too. `KeyMotionTest`.
 
 ### Keys
 

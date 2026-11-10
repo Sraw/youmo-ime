@@ -428,13 +428,18 @@ object ThemeReader {
         val moving = MOTION.filter { it in props }
         if (moving.isEmpty()) return
         val others = selectors.filter { it.widget !in Selector.BAR_WIDGETS && it.widget !in Selector.PANEL_WIDGETS && it.widget !in WINDOW_READS }
-        for (w in others.map { it.widget }.filter { it != "key" }.distinct()) moving.forEach { p.warn(line, "$it= on $w does nothing: only a key moves") }
+        for (w in others.map { it.widget }.filter { it != "key" }.distinct()) {
+            // a popup's and a preview's transition a later stage's (A2): ignored as a reserved name is, not wrong
+            if (w in LATER_MOTION && "transition" in moving) p.warn(line, "transition= on $w is not supported by this version, ignored")
+            moving.filter { w !in LATER_MOTION || it != "transition" }.forEach { p.warn(line, "$it= on $w does nothing: only a key moves") }
+        }
         for (part in others.filter { it.widget == "key" }.mapNotNull { it.part }.distinct()) {
             moving.forEach { p.warn(line, "$it= on a key's $part does nothing: the key moves as a whole") }
         }
-        val unpressed = others.any { it.widget == "key" && it.part == null && "pressed" !in it.states }
-        if (unpressed) moving.filter { it != "transition" }.forEach { p.warn(line, "$it= on a key not pressed does nothing: it is a pressed face's (key:pressed)") }
+        // press-scale and press-sink on a key in any state are read: a style selects a pressed key too (`key`, `key:shifted`)
     }
+
+    private val LATER_MOTION = setOf("popup", "preview")
 
     private val MOTION = listOf("transition", "press-scale", "press-sink")
 

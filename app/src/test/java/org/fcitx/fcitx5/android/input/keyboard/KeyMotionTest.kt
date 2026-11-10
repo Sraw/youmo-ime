@@ -129,6 +129,7 @@ class KeyMotionTest {
         val c = h.canvas()
         c.press("q")
         frames(100)
+        c.pressedNode("q")
         c.press("q", down = false)
         at(c.animator("q")!!, 50)
         c.press("q")
@@ -161,6 +162,7 @@ class KeyMotionTest {
         val c = h.canvas()
         c.press("q")
         frames(100)
+        c.pressedNode("q")
         c.press("q", down = false)
         frames(300)
         assertEquals(2, c.animatorsMade)
@@ -208,6 +210,48 @@ class KeyMotionTest {
         assertNull(c.leavingNode("shift"))
         // the letters relabelled have no transition of theirs: shown at once
         assertNull(c.leavingNode("q"))
+    }
+
+    @Test
+    fun aKeyDownEndsTheOtherKeysFades() = harness().use { h ->
+        val c = h.canvas()
+        c.press("q")
+        frames(100)
+        val q = c.pressedNode("q")!!
+        c.press("q", down = false)
+        at(c.animator("q")!!, 30)
+        assertTrue(q.alpha > 0f)
+        // typing on: the next key's frame draws no fade with it
+        c.press("w")
+        assertNull(c.animator("q"))
+        assertEquals(0f, q.alpha, 1e-3f)
+        assertEquals(1f, q.scaleX, 1e-4f)
+        c.press("w", down = false)
+        h.idle()
+    }
+
+    @Test
+    fun laidOutAnewNothingCrossfades() = harness(theme("<style select=\"key\" transition=\"200ms linear\"/>")).use { h ->
+        val c = h.canvas()
+        c.shownNode("q")
+        // another size (one-handed, the height setting): every key's faces anew, shown at once, no old keyboard over them
+        c.layout(c.left, c.top, c.right - 40, c.bottom)
+        c.scene
+        assertTrue(c.shownKeys.none { c.leavingNode(it.id) != null })
+        assertEquals(0, c.animatorsMade)
+    }
+
+    @Test
+    fun hiddenItMovesNoMore() = harness().use { h ->
+        val c = h.canvas()
+        c.press("q")
+        frames(100)
+        c.pressedNode("q")
+        c.press("q", down = false)
+        assertTrue(c.animator("q") != null)
+        // the keyboard hidden keeps the view attached: its window not visible stops it
+        c.dispatchWindowVisibilityChanged(android.view.View.GONE)
+        assertNull(c.animator("q"))
     }
 
     // the clock run on by [ms] and the frames due in it: not the harness's after(), whose paused looper's next task

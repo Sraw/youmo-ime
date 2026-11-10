@@ -93,11 +93,9 @@ class MotionTest {
     @Test
     fun motionWhereItDoesNothingWarned() {
         assertEquals(emptyList(), warnings("<style select=\"key\" transition=\"150ms ease\"/>", "<style select=\"key:pressed\" press-scale=\"95%\" press-sink=\"1dp\"/>"))
-        assertEquals(listOf("transition= on popup does nothing: only a key moves"), warnings("<style select=\"popup\" transition=\"150ms ease\"/>"))
+        assertEquals(listOf("transition= on popup is not supported by this version, ignored"), warnings("<style select=\"popup\" transition=\"150ms ease\"/>"))
         assertEquals(listOf("transition= on a key's label does nothing: the key moves as a whole"), warnings("<style select=\"key label\" transition=\"150ms ease\"/>"))
-        assertEquals(
-            listOf("press-sink= on a key not pressed does nothing: it is a pressed face's (key:pressed)"),
-            warnings("<style select=\"key\" press-sink=\"1dp\"/>"),
-        )
+        // read on a key in any state: `key` selects a pressed key too
+        assertEquals(emptyList(), warnings("<style select=\"key\" press-sink=\"1dp\"/>"))
     }
 }

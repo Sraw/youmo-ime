@@ -95,7 +95,7 @@
     <string name="popup_on_key_press">按鍵時彈出顯示字元</string>
     <string name="disable_animation">停用動畫</string>
     <string name="keyboard_motion">鍵盤動效</string>
-    <string name="keyboard_motion_summary">按主題的設定讓按鍵漸變、縮放。系統省電模式或「移除動畫」時自動關閉</string>
+    <string name="keyboard_motion_summary">按主題的設定讓按鍵漸變、縮放。系統省電模式、「移除動畫」或「停用動畫」時自動關閉</string>
     <string name="exception_logcat_created">Logcat 程序已經建立</string>
     <string name="exception_theme_filename">只能匯入主題檔案（.theme）：%1$s 不是。以前匯出的 .zip 主題改名成 .theme 就能匯入。</string>
     <string name="theme_file_unnamed">這個檔案</string>
