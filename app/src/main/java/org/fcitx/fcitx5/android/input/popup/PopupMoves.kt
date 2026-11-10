@@ -59,5 +59,6 @@ internal object PopupMoves {
         view.scaleX = 1f
         view.scaleY = 1f
         view.translationY = 0f
+        view.resetPivot()
     }
 }

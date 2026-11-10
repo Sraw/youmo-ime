@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityManager
 import android.widget.FrameLayout
 import androidx.annotation.VisibleForTesting
 import java.util.LinkedList
@@ -165,6 +166,8 @@ class PopupComponent :
             return
         }
         val scenes = scenesFor(key) ?: return
+        // a bubble fading back to the pool first, to be taken again (after scenesFor: a theme changed clears the pool)
+        endFades()
         val popup = (freeEntryUi.pollFirst() ?: PopupEntryUi(context, scenes)).apply {
             lastShowTime = SystemClock.uptimeMillis()
         }
@@ -188,13 +191,12 @@ class PopupComponent :
         previewMoves(popup, bounds)
     }
 
-    // a new bubble coming up as its theme says, unless it comes sooner than the motion after the last; any
-    // fading out ends now, as a key's press ends the others' fades (A1)
+    // a new bubble coming up as its theme says, unless it comes sooner than the motion after the last (any
+    // fading out ended in showPopup, as a key's press ends the others' fades, A1)
     private fun previewMoves(popup: PopupEntryUi, bounds: Rect) {
         val now = SystemClock.uptimeMillis()
         val since = now - lastPreviewAt
         lastPreviewAt = now
-        endFades()
         val m = motionOf("preview") ?: return
         if (since < maxOf(m.appear?.ms ?: 0, m.going?.ms ?: 0)) return
         m.going?.let { goings[popup.root] = it }
@@ -208,8 +210,8 @@ class PopupComponent :
      * now (键盘动效, battery saver: [KeyMotionSwitch], asked only of a theme that moves).
      */
     private fun motionOf(widget: String): PopupMotion? {
-        val s = scenes.takeIf { it.ready } ?: return null
-        val m = s.made("$widget's motion", s.builder()?.popupMotion(widget)) ?: return null
+        val s = scenes.takeIf { it.ready && it.moves } ?: return null
+        val m = s.made("popup's motion", s.builder()?.popupMotion(widget)) ?: return null
         return m.takeIf { KeyMotionSwitch.on(context) }
     }
 
@@ -217,10 +219,13 @@ class PopupComponent :
     private fun goAway(view: View, atOnce: Boolean, gone: () -> Unit) {
         val t = goings.remove(view)
         val done = { root.removeView(view); PopupMoves.settle(view); gone() }
-        if (atOnce || t == null || !KeyMotionSwitch.on(context)) return done()
+        // TalkBack: a view fading out would still take the hover over it (its keys read, the key under not)
+        if (atOnce || t == null || !KeyMotionSwitch.on(context) || exploring()) return done()
         fading[view] = done
         PopupMoves.go(view, t) { fading.remove(view)?.invoke() }
     }
+
+    private fun exploring() = context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
 
     // every fade out ended at once: its view gone
     private fun endFades() {
@@ -501,6 +506,7 @@ class PopupComponent :
     // back to the pool only if made in the theme drawn now: one showing when it changed would
     // otherwise come back from the pool drawing in the old
     private fun pool(popup: PopupEntryUi) {
+        PopupMoves.settle(popup.root)
         if (popup.scenes === scenesMade?.second) freeEntryUi.add(popup)
     }
 

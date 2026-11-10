@@ -53,6 +53,14 @@ class PopupScenes(
     private val measurer = measuring(AndroidTextMeasurer(fonts))
     private val sceneTheme = SceneThemes.of(this.theme, look)
 
+    /**
+     * Whether any of the theme's styles sets a popup's motion (`appear`, `transition` on popup, preview or menu,
+     * 060-render-p3 A2): asked once, so a theme with none (every built-in one) asks the engine nothing more.
+     */
+    val moves: Boolean by lazy {
+        sceneTheme?.styles.orEmpty().any { s -> s.selectors.any { it.widget in POPUP_WIDGETS } && ("appear" in s.values || "transition" in s.values) }
+    }
+
     /** Whether the theme or, where it fell back, the built-in converted: its popups drawn as scenes. */
     val ready: Boolean get() = sceneTheme != null
 
@@ -213,3 +221,5 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
         const val IMAGE_CLASS = "android.widget.ImageView"
     }
 }
+
+private val POPUP_WIDGETS = setOf("popup", "preview", "menu")

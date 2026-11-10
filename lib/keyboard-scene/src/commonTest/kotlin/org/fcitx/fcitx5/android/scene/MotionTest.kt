@@ -99,7 +99,8 @@ class MotionTest {
         assertEquals(emptyList(), warnings("<style select=\"key\" transition=\"150ms ease\"/>", "<style select=\"key:pressed\" press-scale=\"95%\" press-sink=\"1dp\"/>"))
         // A2: a popup's and a bubble's going, their and a menu's coming up
         assertEquals(emptyList(), warnings("<style select=\"popup\" transition=\"150ms ease\" appear=\"scale 150ms\"/>", "<style select=\"preview\" transition=\"100ms linear\" appear=\"rise 80ms\"/>", "<style select=\"menu\" appear=\"fade 100ms\"/>"))
-        assertEquals(listOf("transition= on menu does nothing: only a key moves"), warnings("<style select=\"menu\" transition=\"150ms ease\"/>"))
+        assertEquals(listOf("transition= on menu does nothing: a menu goes at once"), warnings("<style select=\"menu\" transition=\"150ms ease\"/>"))
+        assertEquals(listOf("appear= on popup in a state or a part does nothing: a popup moves as a whole"), warnings("<style select=\"popup:selected\" appear=\"scale 150ms\"/>"))
         assertEquals(listOf("press-scale= on popup does nothing: only a key moves"), warnings("<style select=\"popup\" press-scale=\"95%\"/>"))
         assertEquals(listOf("appear= on key does nothing: only a popup, a preview or a menu comes up"), warnings("<style select=\"key\" appear=\"fade 100ms\"/>"))
         assertEquals(listOf("transition= on a key's label does nothing: the key moves as a whole"), warnings("<style select=\"key label\" transition=\"150ms ease\"/>"))

@@ -254,7 +254,7 @@ object Values {
     /** `appear=`'s kinds and longest, ms (A2). */
     val APPEARS = listOf("fade", "scale", "rise")
     const val MAX_APPEAR_MS = 250
-    private val APPEAR = Regex("(fade|scale|rise) ([0-9]{1,3})ms")
+    private val APPEAR = Regex("(${APPEARS.joinToString("|")}) ([0-9]{1,3})ms")
 
     // A1's: a key's transition into a state, its pressed face's scale and sink
     private fun motion(property: String, raw: String): Value? = when (property) {

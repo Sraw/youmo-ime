@@ -203,7 +203,52 @@ class PopupMotionTest {
         assertEquals(0.9f, p.last().scaleX, 1e-4f)
     }
 
+    @Test
+    fun aBubbleTakenAgainWhileFadingStartsAnew() {
+        val p = popups()
+        p.send(PopupAction.PreviewAction(ID, "q", key))
+        frames(300)
+        p.send(PopupAction.DismissAction(ID))
+        val b = p.last()
+        // the next key at once: its fade ended, the bubble back in the pool and taken again, coming up from the
+        // start (300 ms after the last bubble: not typed fast), nothing of its fade left
+        p.send(PopupAction.PreviewAction(KeyRef.view(2), "w", key))
+        assertSame(b, p.last())
+        assertEquals(1, p.root.childCount)
+        assertEquals(0f, b.alpha, 0f)
+        assertEquals(1f, b.scaleX, 0f)
+        assertEquals(b.dp(PopupMoves.RISE_DP).toFloat(), b.translationY, 0f)
+        frames(300)
+        assertEquals(1f, b.alpha, 0f)
+    }
+
+    @Test
+    fun dismissAllEndsTheFades() {
+        val p = popups()
+        p.send(PopupAction.PreviewAction(ID, "q", key))
+        p.send(PopupAction.ShowKeyboardAction(ID, five, key))
+        frames(300)
+        p.send(PopupAction.DismissAction(ID))
+        assertEquals(1, p.root.childCount)
+        p.dismissAll()
+        assertEquals(0, p.root.childCount)
+    }
+
+    @Test
+    fun aMenuFadesInAndGoesAtOnce() {
+        val p = popups()
+        p.send(PopupAction.ShowMenuAction(ID, menu, key))
+        val m = p.last()
+        assertEquals(0f, m.alpha, 0f)
+        assertEquals(1f, m.scaleX, 0f)
+        frames(300)
+        assertEquals(1f, m.alpha, 0f)
+        p.send(PopupAction.DismissAction(ID))
+        assertEquals(0, p.root.childCount)
+    }
+
     private companion object {
         val ID = KeyRef.view(1)
+        val menu = KeyDef.Popup.Menu(arrayOf(KeyDef.Popup.Menu.Item("Emoji", 0, KeyAction.CommitAction("x"))))
     }
 }

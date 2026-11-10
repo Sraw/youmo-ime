@@ -449,11 +449,19 @@ object ThemeReader {
         val others = selectors.filter { it.widget !in Selector.BAR_WIDGETS && it.widget !in Selector.PANEL_WIDGETS && it.widget !in WINDOW_READS }
         for (w in others.map { it.widget }.filter { it != "key" }.distinct()) {
             moving.filter { it !in POPUP_MOTION[w].orEmpty() }.forEach {
-                p.warn(line, if (it == "appear") "appear= on $w does nothing: only a popup, a preview or a menu comes up" else "$it= on $w does nothing: only a key moves")
+                p.warn(line, when {
+                    it == "appear" -> "appear= on $w does nothing: only a popup, a preview or a menu comes up"
+                    it == "transition" && w == "menu" -> "transition= on menu does nothing: a menu goes at once"
+                    else -> "$it= on $w does nothing: only a key moves"
+                })
             }
         }
         for (part in others.filter { it.widget == "key" }.mapNotNull { it.part }.distinct()) {
             moving.filter { it != "appear" }.forEach { p.warn(line, "$it= on a key's $part does nothing: the key moves as a whole") }
+        }
+        // a popup comes and goes as a whole: its look in a state (the one in focus) or a part's not asked
+        for (s in others.filter { it.widget in POPUP_MOTION && (it.states.isNotEmpty() || it.part != null) }) {
+            moving.filter { it in POPUP_MOTION.getValue(s.widget) }.forEach { p.warn(line, "$it= on ${s.widget} in a state or a part does nothing: a ${s.widget} moves as a whole") }
         }
         if ("appear" in moving && others.any { it.widget == "key" }) p.warn(line, "appear= on key does nothing: only a popup, a preview or a menu comes up")
         // press-scale and press-sink on a key in any state are read: a style selects a pressed key too (`key`, `key:shifted`)

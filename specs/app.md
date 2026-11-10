@@ -148,7 +148,7 @@ they come up (focus follows the finger's position, not the view's scale). Withou
 menu pop in as ever (`popIn`) and a bubble shows at once; without `transition` a popup goes at once. A bubble
 replaced by a long press's keys or a menu goes at once. Like keys typed fast, a bubble that comes up sooner after the
 last than its own motion (the longer of its `appear` and `transition`) neither comes up nor goes moving, and a new
-bubble ends any fading out at once. Asked of `KeyMotionSwitch` only for a theme that moves; off, everything as before.
+bubble ends any fading out at once. With TalkBack's touch exploration on, a popup goes at once (a fading one would take the hover over it). The engine is asked only where a style sets popup motion (`PopupScenes.moves`, once a theme), and `KeyMotionSwitch` only then; off, everything as before.
 `PopupMotionTest`.
 
 ### Keys
