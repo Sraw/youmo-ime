@@ -141,6 +141,17 @@ async function main() {
     check(/scale="120%"/.test(await style()), 'undo: a step after it goes from the document\'s value: ' + await style());
     await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
 
+    // Ctrl+Z in a field typed in and not committed is the field's own undo, not the document's (m3 L-a)
+    await click('大小');
+    await js(`document.activeElement.select()`);
+    await type('133');
+    const steps = await js(`document.getElementById('undo').disabled`);
+    for (const t of ['rawKeyDown', 'keyUp']) await b.send('Input.dispatchKeyEvent', { type: t, key: 'z', code: 'KeyZ', windowsVirtualKeyCode: 90, modifiers: 2 });
+    await wait(300);
+    check(/scale="120%"/.test(await style()) && steps === await js(`document.getElementById('undo').disabled`), 'Ctrl+Z in a field typed in leaves the document: ' + await style());
+    await js(`document.activeElement.blur()`);
+    await wait(300);
+
     // a colour renamed in the source, then undone on 配色: its row edits the colour it names, not the one it was drawn for
     await js(`document.querySelector('#tabs [data-tab=colors]').click()`);
     await wait(200);

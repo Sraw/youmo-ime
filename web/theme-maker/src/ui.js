@@ -74,6 +74,10 @@
     return loadAssets(d).then((current) => { if (current) { preview(); refreshTab(external); } });
   }
 
+  // the tab's field typed in since its last commit (input after its change): Ctrl+Z there is the field's own undo
+  // (m3 L-a), and only its text is kept over a rebuild (m3 L-b: a field committed shows the document's value)
+  let dirty = null;
+
   // a field the user types in: what a value written over it would take the typing from
   const typedIn = (el) => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
   const CONTROLS = 'input, select, textarea, button';
@@ -126,7 +130,7 @@
       return;
     }
     const active = document.activeElement;
-    const skip = !external && el.contains(active) && typedIn(active) ? active : null;
+    const skip = !external && el.contains(active) && typedIn(active) && active === dirty ? active : null;
     const key = el.contains(active) && active.matches(CONTROLS) ? controlKey(active) : null;
     const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
     if (!same) { rebuildSoon(); return; }
@@ -146,11 +150,12 @@
     clearTimeout(rebuilding);
     rebuilding = setTimeout(() => {
       const a = document.activeElement;
-      const typed = typedIn(a) && $('tab-' + tab).contains(a) ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, key: controlKey(a) } : null;
+      const typed = typedIn(a) && a === dirty && $('tab-' + tab).contains(a) ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, key: controlKey(a) } : null;
       showTab();
       const b = document.activeElement;
       if (typed && typedIn(b) && controlKey(b) === typed.key && b.value !== typed.value) {
         b.value = typed.value;
+        dirty = b;
         try { b.setSelectionRange(typed.from, typed.to); } catch (e) { /* a number field has no caret */ }
       }
     }, 0);
@@ -871,8 +876,10 @@
     });
     $('undo').addEventListener('click', () => { if (history && history.canUndo) { history.undo(); edited = true; changed(true); } });
     $('redo').addEventListener('click', () => { if (history && history.canRedo) { history.redo(); edited = true; changed(true); } });
+    $('edit').addEventListener('input', (e) => { if (typedIn(e.target)) dirty = e.target; });
+    $('edit').addEventListener('change', (e) => { if (e.target === dirty) dirty = null; }, true);
     document.addEventListener('keydown', (e) => {
-      if (!(e.ctrlKey || e.metaKey) || e.target === $('source')) return;
+      if (!(e.ctrlKey || e.metaKey) || e.target === $('source') || e.target === dirty) return;
       if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
       else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); $('redo').click(); }
     });
