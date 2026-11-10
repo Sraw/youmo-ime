@@ -204,6 +204,31 @@ object YoumoEngine {
     }
 
     /**
+     * Where key [key] of [layout] (as [buildScene] takes it) gets each property from, drawn by [theme] in [env]:
+     * [part] (`label`, `mark`…; null the key's face) [pressed] or not. `{ok, problems, sources: [{property,
+     * line, order}]}`, the line and order (the n-th `<style>`, from 0) of the style whose value wins, the
+     * properties in name order; none where the key is not on the board there (060-render-p3 §5.1: the cascade check).
+     */
+    fun sources(layout: dynamic, theme: dynamic, env: dynamic, key: dynamic, part: dynamic, pressed: dynamic): dynamic = checked {
+        val l: YoumoLayout = if (jsTypeOf(layout) == "string") {
+            YoumoEngine.layout(layout as String) ?: return@checked failed(listOf(Problem(0, "no built-in layout \"$layout\"")))
+        } else {
+            layout as? YoumoLayout ?: throw NotOfType("layout: not a layout")
+        }
+        val e = when (val read = env(env)) {
+            is Parsed.Failed -> return@checked failed(read.problems)
+            is Parsed.Ok -> read.value
+        }
+        val found = builder(theme, e, null).sources(l.layout, l.fragments, text(key, "key"), optionalText(part, "part"), pressed == true)
+        obj(
+            "ok" to true,
+            "problems" to emptyArray<dynamic>(),
+            "warnings" to emptyArray<dynamic>(),
+            "sources" to found.entries.sortedBy { it.key }.map { (p, s) -> obj("property" to p, "line" to s.line, "order" to s.order) }.toTypedArray(),
+        )
+    }
+
+    /**
      * A popup drawn by [theme] in [env]: [request] `{kind: "preview", text, keyWidth, size?: px | "words"}` (a
      * key's bubble), `{kind: "keys", labels, rows, columns, room?, selected}` (a long press's keys, [rows] of
      * [labels]' indices, the bottom one first, -1 a gap), `{kind: "menu", cells: [{label, icon?}], order,

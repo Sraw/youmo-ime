@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
+import org.fcitx.fcitx5.android.scene.theme.Style
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.Theme
 
@@ -313,6 +314,21 @@ class SceneBuilder(
             }
         }
         return out
+    }
+
+    /**
+     * Which style each of key [id]'s properties ([part]'s, null the key's own) comes from on [layout] here, as
+     * [styled] cascades it, [pressed] or not (the maker's cascade check). Empty where the key is not on it here.
+     */
+    internal fun sources(layout: Layout, fragments: Map<String, Fragment>, id: String, part: String?, pressed: Boolean): Map<String, Style> {
+        val splitSide = placement(layout)?.side?.takeIf { env.split }?.name?.lowercase()
+        val expanding = if (layout.family == "number" && env.input.pad == null) env.copy(input = env.input.copy(pad = FULL_PAD)) else env
+        val rows = Expand.rows(layout, fragments, expanding, splitSide).getOr { return emptyMap() }
+        val key = rows.flatMap { it.items }.filterIsInstance<ExpandedKey>().firstOrNull { it.key.id == id } ?: return emptyMap()
+        val c = if (key.attrs.face == Face.Keep) unflat else cascade
+        val states = statesOf(key).let { if (pressed) it + KeyState.Pressed else it }
+        val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
+        return c.sources(Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, states.mapTo(HashSet()) { it.xml }, part))
     }
 
     // the key's face's layers in each state
