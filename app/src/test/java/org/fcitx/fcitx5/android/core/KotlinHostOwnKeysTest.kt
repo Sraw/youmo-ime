@@ -100,6 +100,7 @@ class KotlinHostOwnKeysTest {
         fcitx.sendKey('n', 0u, 0, false, 0)
         fcitx.select(0, null)
         events.clear()
+        fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN, InputMethodCatalog.HANDWRITING))
         fcitx.activateIme(InputMethodCatalog.HANDWRITING)
         fcitx.sendKey('a', 0u, 0, false, 0)
         assertEquals(ScriptedEngine.WRITTEN, fcitx.clientPreeditCached.toString())
