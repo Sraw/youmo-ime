@@ -367,14 +367,15 @@ field, every icon there). The test task takes `web/theme-maker` as an
 input, so a change to the page reruns it. Nothing in those blocks is edited by hand.
 
 Two pages (060-render-p3 M1): `index.html`, the maker (`src/`: `page.html` with slots for the rest,
-`style.css`, `maker.js`: the document, held to the engine by `test/maker.test.mjs`, `ui.js`: the
-page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
+`style.css`, `maker.js`: the document, held to the engine by `test/maker.test.mjs`, `form.js` and
+`panels/*.js`: the editing's forms (M2: one file a tab, put in as one script in their names' order),
+held to the engine by `test/form.test.mjs`, `ui.js`: the page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
 `page.html`, `style.css`, `ui.js`); both run `src/lib.js` (everything the tests hold to the app's
 3.0 rules and zip). Edit them, then `node web/theme-maker/tools/assemble.mjs`, which writes both: the
 sources put in, each page's generated blocks kept from that page as it is (each carries only the ones
 its `page.html` has a slot for: the maker `youmo-format` and `youmo-engine-icons`, classic
 `youmo-format`, `youmo-presets`, `youmo-layout`, `youmo-icons` and no engine; `ThemeMakerTestdata.block`
-writes a block into every page that has it), and the Content-Security-Policy's `script-src` set to each script's SHA-256 (four on the maker,
+writes a block into every page that has it), and the Content-Security-Policy's `script-src` set to each script's SHA-256 (six on the maker,
 two on classic; nothing else runs, a script not hashed is refused, an edit by hand breaks them).
 The page's test fails when either page is not what assemble makes of its sources and the fonts, and
 when the CSP's hashes are not its scripts'. Commit `src/` and both pages together.
@@ -385,7 +386,11 @@ back (a failing store is no draft, never a throw), every board and form of the p
 environment builds; a picture picked always encoded anew (`PICTURE_SAVE`: long side ≤ 2560, JPEG
 0.85, PNG only with transparency; one not an image refused before a decode), only images within the
 app's limits decoded, save refusing what the import would (`saveProblems`), a pack's odd entries
-opened as the app unpacks them. `from-maker.theme` and `from-maker-picture.theme` (a real PNG) are
+opened as the app unpacks them. `test/form.test.mjs` (the same): each tab's form operations write
+the style text meant (a form edit changes the `<style>` of exactly that `select=`, the last that gives
+the property, else adds one at the end; a style left with only its `select=` goes; what the form does
+not know, comments and spacing kept), the engine reads every result, and the cascade check
+(`YoumoEngine.sources`, `Cascade.sources`) names the style each value comes from. `from-maker.theme` and `from-maker-picture.theme` (a real PNG) are
 its saves, which `ThemePackImportTest` imports. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
 `fonts/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
@@ -397,7 +402,9 @@ theme 4 or a layout with problems as values, build a scene or a popup in an envi
 JSON (`scene/json/EnvJson`), paint it on a 2D context (`web/CanvasPainter`, ScenePainter op for
 op), convert a theme 3.0, write a theme, the built-in layouts and themes (`web/BuiltIns` over
 `BuiltInFiles`, which the `builtInFiles` task writes of `src/commonMain/layouts` and `themes`), the
-browser's `TextMeasurer` (`web/CanvasMeasurer`, measureText's boxes)).
+browser's `TextMeasurer` (`web/CanvasMeasurer`, measureText's boxes), and where a key gets each
+property (`sources`: the line of the winning style, `Cascade.sources` laid over as `Cascade.of` is;
+the maker's cascade check)).
 `./gradlew :lib:keyboard-scene:youmoEngine` writes `build/youmo-engine/youmo-engine.js` (UMD, global
 `youmo-engine`; indents and the source map's line dropped, `<!--` and `</` escaped). The engine is not
 in git: the `index.html` committed has `NO_ENGINE` (a comment) in its `youmo-engine` script, so a

@@ -7,7 +7,7 @@
 // generated blocks, which mutation of either side cannot see.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, copyFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -681,7 +681,8 @@ test('assemble.mjs refuses a page it cannot make, and puts in text that looks li
   const src = join(here, '..', 'src');
   const dir = mkdtempSync(join(tmpdir(), 'youmo-assemble-'));
   try {
-    for (const f of ['style.css', 'maker.js', 'ui.js']) copyFileSync(join(src, f), join(dir, f));
+    for (const f of ['style.css', 'maker.js', 'form.js', 'ui.js']) copyFileSync(join(src, f), join(dir, f));
+    cpSync(join(src, 'panels'), join(dir, 'panels'), { recursive: true });
     const page = readFileSync(join(src, 'page.html'), 'utf8');
     const made = (p, old = html) => { writeFileSync(join(dir, 'page.html'), p); return assemble(dir, old); };
     assert.throws(() => made(page.replace('{{ui}}', '')), /no \{\{ui\}\}/, 'a slot missing');
@@ -726,7 +727,7 @@ test('an image is decoded only within what it may be: the source a photo, a cut 
 
 test('each page runs only its own scripts, by their hashes, as git keeps it and as built', () => {
   const classic = classicHtml;
-  for (const [what, page, count] of [['index.html', html, 4], ['the page built', built(), 4], ['classic', classic, 2], ['classic built', assemble(CLASSIC_SRC, classic, ENGINE), 2]]) {
+  for (const [what, page, count] of [['index.html', html, 6], ['the page built', built(), 6], ['classic', classic, 2], ['classic built', assemble(CLASSIC_SRC, classic, ENGINE), 2]]) {
     const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(page);
     assert.ok(m, 'no CSP meta in ' + what);
     const csp = m[1];
