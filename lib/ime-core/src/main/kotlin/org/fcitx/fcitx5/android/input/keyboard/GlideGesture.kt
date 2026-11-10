@@ -16,7 +16,7 @@ import kotlin.math.hypot
  * given, [longPressMillis] the keys'.
  *
  * A [stroke] drawn (笔画筛选) starts much sooner: once the finger is [strokeKeys] ([STROKE]) of a key from where it
- * went down, any way, keys counted as they are wide across and tall down, or [strokeCap] in the places' units. A 竖 from the bottom row
+ * went down, any way, keys counted as they are wide across and tall down, or [strokeCap] up or down in the places' units. A 竖 from the bottom row
  * has a key's height at most to go, a short 点 less still, and both must be strokes before the key's
  * swipe (its 角标, 36dp) or long press are.
  */
@@ -26,7 +26,7 @@ class GlideGesture(
     private val longPressMillis: Long,
     private val downKeys: Float = DOWN,
     private val stroke: Boolean = false,
-    // how far a stroke goes before it is one, in keys, and at most in the places' units (KeyInkGesture.START)
+    // how far a stroke goes before it is one, in keys (KeyInkGesture.START), and at most up or down in the places' units: before the key's swipe
     private val strokeKeys: Float = STROKE,
     private val strokeCap: Float = Float.POSITIVE_INFINITY,
 ) {
@@ -62,7 +62,7 @@ class GlideGesture(
             return false
         }
         gliding = if (stroke) {
-            hypot((x - x0) / keyWidth, (y - y0) / keyHeight) >= strokeKeys || hypot(x - x0, y - y0) >= strokeCap
+            hypot((x - x0) / keyWidth, (y - y0) / keyHeight) >= strokeKeys || abs(y - y0) >= strokeCap
         } else {
             abs(x - x0) >= ACROSS * keyWidth || abs(y - y0) >= downKeys * keyHeight
         }

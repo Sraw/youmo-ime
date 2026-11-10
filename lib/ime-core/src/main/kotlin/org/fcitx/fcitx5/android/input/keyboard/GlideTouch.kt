@@ -71,8 +71,8 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
      * way; while the writing goes on one is [gliding] from its down, so the caller presses no key (it
      * asks right after this). [typed], whether the input method has its own input typed (not what
      * handwriting shows), says whether one may start ([KeyInkGesture.mayWrite]); give [up] and [pointerUp]
-     * their times. A stroke drawn or written starts at [strokeCap] pixels at most, however tall the keys:
-     * before their own swipe does. The ink's places are the caller's to put on the pad from the events, in pixels:
+     * their times. A stroke written starts once [strokeCap] pixels up or down at most, however tall the keys:
+     * before their own swipe does (a stroke drawn, 笔画筛选, has no cap). The ink's places are the caller's to put on the pad from the events, in pixels:
      * [takeGlided] is in key units, scaled apart across and down, for the glide decoder alone.
      */
     fun down(
@@ -96,21 +96,27 @@ class GlideTouch(private val downKeys: Float = GlideGesture.DOWN) {
             inkFromDown = ink.writing(time)
             if (inkFromDown) ink.strokeStarted() else if (!ink.mayWrite(time, typed, x, y, keyWidth, keyHeight)) return
         }
-        // the first stroke written goes further than a stroke drawn while typing: a tap's wobble is no stroke
-        val keys = if (ink != null) KeyInkGesture.START else GlideGesture.STROKE
-        val same = made != null && keyWidth == this.keyWidth && keyHeight == this.keyHeight && longPressMillis == this.longPressMillis &&
-            drawn == this.stroke && keys == strokeKeys && strokeCap == this.strokeCap
-        if (!same) made = GlideGesture(keyWidth, keyHeight, longPressMillis, downKeys, drawn, keys, strokeCap)
-        strokeKeys = keys
-        this.strokeCap = strokeCap
+        // the first stroke written goes further than a stroke drawn while typing (a tap's wobble is no stroke),
+        // capped up or down; a stroke drawn has no cap
+        if (ink != null) make(keyWidth, keyHeight, longPressMillis, drawn, KeyInkGesture.START, strokeCap)
+        else make(keyWidth, keyHeight, longPressMillis, drawn, GlideGesture.STROKE, Float.POSITIVE_INFINITY)
         pointer = pointerId
         t0 = time
+        gesture = made?.apply { down(x, y, time, onLetter = true) }
+        add(x, y)
+    }
+
+    // the gesture for these keys and strokes: the one made before if they are the same
+    private fun make(keyWidth: Float, keyHeight: Float, longPressMillis: Long, drawn: Boolean, keys: Float, cap: Float) {
+        val same = made != null && keyWidth == this.keyWidth && keyHeight == this.keyHeight && longPressMillis == this.longPressMillis &&
+            drawn == this.stroke && keys == strokeKeys && cap == this.strokeCap
+        if (!same) made = GlideGesture(keyWidth, keyHeight, longPressMillis, downKeys, drawn, keys, cap)
+        strokeKeys = keys
+        strokeCap = cap
         this.keyWidth = keyWidth
         this.keyHeight = keyHeight
         this.longPressMillis = longPressMillis
-        this.stroke = drawn
-        gesture = made?.apply { down(x, y, time, onLetter = true) }
-        add(x, y)
+        stroke = drawn
     }
 
     /** Another finger down: the glide's if it glides; else no glide comes of this touch. */

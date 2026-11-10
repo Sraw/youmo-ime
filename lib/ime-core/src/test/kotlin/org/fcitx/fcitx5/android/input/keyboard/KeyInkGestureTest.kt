@@ -118,6 +118,16 @@ class KeyInkGestureTest {
     }
 
     @Test
+    fun theTypingLastsFiveHundredMillisecondsFromTheKeysLift() {
+        // a space lifted at 20: a drag down at 519 is the key's, at 520 a stroke
+        keys.key(0)
+        assertEquals(Route.KEYS, keys.drag(519))
+        val next = Keys()
+        next.key(0)
+        assertEquals(Route.CANCEL_KEYS, next.drag(20 + KeyInkGesture.TYPING_MILLIS))
+    }
+
+    @Test
     fun aLetterTypedWithInputGoingOnIsTypingToo() {
         // a letter where no writing may start (input typed): told as a key, and the drag right after it no stroke
         down(0, typed = true)

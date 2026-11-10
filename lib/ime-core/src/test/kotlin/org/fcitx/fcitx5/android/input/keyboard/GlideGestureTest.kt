@@ -112,5 +112,10 @@ class GlideGestureTest {
         tall.down(50f, 75f, 0, onLetter = true)
         assertFalse(tall.move(50f, 130f, 40))
         assertTrue(tall.move(50f, 135f, 50))
+        // the cap is up or down alone: across a wide key (landscape, the nine keys) still half of it
+        val wide = GlideGesture(keyWidth = 200f, keyHeight = 150f, longPressMillis = 300, stroke = true, strokeKeys = 0.5f, strokeCap = 60f)
+        wide.down(50f, 75f, 0, onLetter = true)
+        assertFalse(wide.move(140f, 75f, 40))
+        assertTrue(wide.move(150f, 75f, 50))
     }
 }

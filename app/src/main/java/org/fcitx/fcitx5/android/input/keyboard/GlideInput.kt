@@ -51,7 +51,7 @@ class GlideInput(
     private val touch = GlideTouch(down)
     private val trail = Path()
     private val rect = Rect()
-    // a stroke starts before the letters' own swipe (BaseKeyboard's 36dp), however tall the keys
+    // a stroke written starts before the letters' own swipe up or down (BaseKeyboard's 36dp), however tall the keys
     private val strokeCap = keyboard.dp(STROKE_CAP_DP)
 
     // the touch, as it went down, a stroke's

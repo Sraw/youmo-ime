@@ -34,6 +34,21 @@ class GlideTouchTest {
     }
 
     @Test
+    fun aStrokeDrawnIsAThirdOfAKeyWhateverCapIsGivenTheCapIsTheWritings() {
+        // 笔画筛选: the cap given (20 pixels) is not its own, 0.3 of a 140 pixel key down is
+        val t = GlideTouch()
+        t.down(0, 50f, 70f, 0, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, stroke = true, strokeCap = 20f)
+        assertEquals(Route.KEYS, t.move(50f, 100f, 20))
+        assertEquals(Route.CANCEL_KEYS, t.move(50f, 113f, 40))
+        t.up(50f, 113f, cancelled = false)
+        // writing on the keys: 20 pixels down starts it, under the half key's 70
+        val ink = KeyInkGesture()
+        t.down(0, 50f, 70f, 1000, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, ink = ink, strokeCap = 20f)
+        assertEquals(Route.KEYS, t.move(50f, 85f, 1020))
+        assertEquals(Route.CANCEL_KEYS, t.move(50f, 90f, 1040))
+    }
+
+    @Test
     fun aGlideCancelsTheKeysOnceThenIsItsOwn() {
         val t = touch()
         assertEquals(Route.KEYS, t.move(60f, 70f, 20))

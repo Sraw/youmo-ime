@@ -810,7 +810,7 @@ the handwriting too, so a sentence it put in and deleted at once is taken back (
 and the pieces ended over a drop of the sessions count every handwriting session made. When a touch
 on the letters is a stroke is `KeyInkGesture` (`input/keyboard`), which `GlideTouch.down` takes (`ink`,
 and `typed`: `Engines.typedOnKeys`, false while what shows is handwriting's): `START`, half a key any
-way (at most 32dp, `GlideInput`'s cap, so before the key's swipe), not within `TYPING_MILLIS` (500 ms)
+way (up or down at most 32dp, `GlideInput`'s cap, so before the key's swipe; across always half a key), not within `TYPING_MILLIS` (500 ms)
 of a key typed (a letter, or another key lifted, `keyLifted`, unless after a stroke and no letter: a
 space in the writing is no typing; design 060-kbd-handwriting-start), then every touch a stroke from
 its down till the pause; a tap that started the input (nothing typed at its down, not typing), a
