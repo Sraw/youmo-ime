@@ -438,6 +438,8 @@ class UserDataManagerTest {
         phone.theme.put("v4/p/theme.xml", "<theme/>")
         phone.theme.put("v4/p/k.png", "png")
         phone.theme.put("v4/p/layouts/qwerty.xml", "<layout/>")
+        // a stamp in the backup (the phone's, or forged): not taken for the app's check
+        phone.theme.put("v4/p/.checked", "stamp")
         val zip = exported(phone).readBytes()
         assertEquals(
             mapOf(
@@ -445,11 +447,13 @@ class UserDataManagerTest {
                 "external/theme/v4/p/theme.xml" to "<theme/>",
                 "external/theme/v4/p/k.png" to "png",
                 "external/theme/v4/p/layouts/qwerty.xml" to "<layout/>",
+                "external/theme/v4/p/.checked" to "stamp",
             ),
             entries(zip.inputStream()).filterKeys { it.startsWith("external/theme/") },
         )
         val fresh = moved("fresh")
         fresh.theme.put("v4/q/theme.xml", "phone's")
+        fresh.theme.put("v4/q/.checked", "phone's stamp")
         // the phone's pack of a name the backup has: replaced whole, not merged (a file of it left over)
         fresh.theme.put("v4/p/theme.xml", "phone's p")
         fresh.theme.put("v4/p/old.png", "old")
@@ -459,6 +463,8 @@ class UserDataManagerTest {
         assertEquals("<layout/>", File(fresh.theme, "v4/p/layouts/qwerty.xml").readText())
         assertFalse(File(fresh.theme, "v4/p/old.png").exists())
         assertEquals("phone's", File(fresh.theme, "v4/q/theme.xml").readText())
+        assertFalse(File(fresh.theme, "v4/p/.checked").exists())
+        assertFalse(File(fresh.theme, "v4/q/.checked").exists())
     }
 
     // A4: with the config, data or themes not settled, an export would take a stand-in and a restore write

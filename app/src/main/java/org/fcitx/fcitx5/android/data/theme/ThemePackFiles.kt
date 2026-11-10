@@ -435,7 +435,7 @@ object ThemePackFiles {
 
     /**
      * [ThemePackCheck.hidesRequired] of the pack in [dir], asked once: a pack that passes is stamped ([CHECKED]: a
-     * hash of its theme.xml, its layouts and the rule's version: an app update checks again only where the rule changed), and a listing finds the stamp
+     * hash of its theme.xml, its layouts, the rule's version and the app's boards: an app update checks again only where those changed), and a listing finds the stamp
      * instead of asking again (the check takes a good part of a second; a listing may hold 100 packs).
      */
     private fun blankKeys(
@@ -458,12 +458,33 @@ object ThemePackFiles {
 
     private fun stampOf(dir: File, source: String): String {
         val md = MessageDigest.getInstance("SHA-256")
-        md.update("${BlankKeys.RULE}\n${source.removePrefix(BOM)}".toByteArray())
+        md.update("${BlankKeys.RULE} ${builtInHash()}\n${source.removePrefix(BOM)}".toByteArray())
         File(dir, LAYOUTS).listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }.forEach {
             md.update("\n${it.name}\n".toByteArray())
             md.update(it.readBytes())
         }
         return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * The app's boards, as a stamp holds them: a hash of their files' bytes, once a process (not read: the stamp
+     * changes with any change to them); a test's own.
+     */
+    @VisibleForTesting
+    internal var builtInHash: () -> String = { builtInBytesHash }
+
+    private val builtInBytesHash by lazy {
+        val md = MessageDigest.getInstance("SHA-256")
+        BuiltInLayouts.RAW.toSortedMap().forEach { (id, res) ->
+            md.update("\n$id\n".toByteArray())
+            md.update(appContext.resources.openRawResource(res).use { it.readBytes() })
+        }
+        md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /** The stamps of the packs under [themes] dropped: a restored backup's are its word, not the app's. */
+    fun dropStamps(themes: File) {
+        folder(themes).listFiles(FileFilter { it.isDirectory })?.forEach { File(it, CHECKED).delete() }
     }
 
     // a pack's stamp: its blank-key check passed (a dot file: neither listed nor exported)

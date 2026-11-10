@@ -111,6 +111,15 @@ class ThemePackLayoutsTest {
         File(pack.dir, "layouts/qwerty.xml").appendText("\n")
         repeat(2) { assertEquals(listOf("mine"), ThemeFilesManager.listPacks().map { it.file }.distinct()) }
         assertEquals(1, ThemePackFiles.blankChecks)
+        // the app's boards changed (an update): checked again, once
+        val was = ThemePackFiles.builtInHash
+        try {
+            ThemePackFiles.builtInHash = { "another build's" }
+            repeat(2) { ThemeFilesManager.listPacks() }
+            assertEquals(2, ThemePackFiles.blankChecks)
+        } finally {
+            ThemePackFiles.builtInHash = was
+        }
     }
 
     // a pack bringing a stamp of its own, made as the app makes one, its keys blank: checked all the same, refused
