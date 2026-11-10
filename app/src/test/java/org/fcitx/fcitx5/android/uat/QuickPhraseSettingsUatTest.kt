@@ -11,6 +11,8 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import org.fcitx.fcitx5.android.FcitxApplication
@@ -23,6 +25,7 @@ import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
+import org.fcitx.fcitx5.android.host.QuickPhraseFiles
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.main.settings.QuickPhraseFragment
@@ -142,7 +145,7 @@ class QuickPhraseSettingsUatTest {
         // changed on its row
         row(addr.content).performClick()
         st.idle()
-        assertEquals(listOf("addr", addr.content), fields().map { it.text.toString() })
+        assertEquals(listOf("addr", addr.content), fields().take(2).map { it.text.toString() })
         fill(null, "上海市")
         ok()
         saved("changed", listOf(QuickPhraseEntry("addr", "上海市"), gh))
@@ -168,6 +171,106 @@ class QuickPhraseSettingsUatTest {
         st.idle()
         saved("undone, back where it was", listOf(QuickPhraseEntry("addr", "上海市"), gh))
         until("the keyboard told") { "reloadConfig()" in st.api.calls }
+    }
+
+    private fun chip(label: String): Chip {
+        until("$label chip shown") { KeyboardHarness.all(st.activity.window.decorView).any { it is Chip && it.isShown && it.text.toString() == label } }
+        return KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<Chip>().first { it.isShown && it.text.toString() == label }
+    }
+
+    // a list dialog's item tapped: the folder picker, a folder chip's menu
+    private fun pickItem(index: Int) {
+        val list = dialog().listView
+        list.performItemClick(list.adapter.getView(index, null, list), index, list.adapter.getItemId(index))
+        st.idle()
+    }
+
+    // design 060-quick-input-folders: a key is ASCII, told as it is typed; the note and the folder saved
+    // with the entry; a folder's chip shows its entries alone; renamed and deleted, no entry is lost
+    @Test
+    @Uat("QU-15", "QU-25", "QU-26")
+    fun aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage() {
+        open(gh)
+        chip(s(R.string.quick_phrase_folder_new)).performClick()
+        st.idle()
+        fields().single().setText("网址")
+        ok()
+        until("the folder made") { QuickPhraseManager.loadAll().folders == listOf("网址") }
+        // made from its chip, the page shows it: the new entry goes in it
+        until("its chip picked") { chip("网址").isChecked }
+        KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
+        st.idle()
+        val d = dialog()
+        fill("#wz百度", "www.baidu.com", d)
+        assertEquals(s(R.string.quick_phrase_key_invalid, QuickPhraseBook.MAX_KEY), fields(d)[0].error)
+        ok(d)
+        assertTrue(d.isShowing)
+        fill("#wz", null, d)
+        assertEquals(null, fields(d)[0].error)
+        fields(d)[2].setText("百度")
+        ok(d)
+        val baidu = QuickPhraseEntry("#wz", "www.baidu.com", "百度", "网址")
+        saved("with its note in the folder", listOf(baidu, gh))
+        until("the folder's alone") { baidu.content in shown() && gh.content !in shown() }
+        chip(s(R.string.quick_phrase_unfiled)).performClick()
+        st.idle()
+        until("those in none") { gh.content in shown() && baidu.content !in shown() }
+        // moved out of its folder from its editor: the folder picker
+        chip(s(R.string.quick_phrase_all)).performClick()
+        st.idle()
+        row(baidu.content).performClick()
+        st.idle()
+        val change = dialog()
+        assertEquals("百度", fields(change)[2].text.toString())
+        KeyboardHarness.all(change.window!!.decorView).filterIsInstance<MaterialButton>().first { it.text.toString() == s(R.string.quick_phrase_folder, "网址") }.performClick()
+        st.idle()
+        pickItem(0)
+        ok(change)
+        saved("out of the folder", listOf(baidu.copy(folder = ""), gh))
+        // renamed, then deleted: the entries all kept
+        QuickPhraseManager.put(baidu.copy(folder = ""), baidu, now = 9)
+        chip(s(R.string.quick_phrase_unfiled)).performClick()
+        st.idle()
+        chip("网址").performLongClick()
+        st.idle()
+        pickItem(0)
+        fields().single().setText("站点")
+        ok()
+        until("renamed") { QuickPhraseManager.loadAll().folders == listOf("站点") && QuickPhraseManager.load().any { it.folder == "站点" } }
+        chip("站点").performLongClick()
+        st.idle()
+        pickItem(1)
+        dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        st.idle()
+        until("deleted, its entry kept") { QuickPhraseManager.loadAll().let { it.folders.isEmpty() && it.entries.toSet() == setOf(baidu.copy(folder = ""), gh) } }
+    }
+
+    // design 060-quick-input-folders: a file of before read converted; the one whose key was all Chinese
+    // listed and said, kept, and given a key on the page
+    @Test
+    @Uat("QU-27")
+    fun aFileOfBeforeIsConvertedAndItsKeylessOnesAreListedToBeGivenAKey() {
+        val dir = File(HostConfigDir.inUse(ConfigHome.DATA).dir, QuickPhraseBook.DIR).apply { mkdirs() }
+        File(dir, QuickPhraseBook.MINE).writeText("#wz百度 www.baidu.com\n#wz新浪 www.sina.com.cn\n地址 北京市海淀区\n")
+        st.open(SettingsRoute.QuickPhrase())
+        until("the page read") { st.page.view != null && "www.baidu.com" in shown() }
+        assertTrue(s(R.string.quick_phrase_keyless_banner, 1) in shown())
+        assertTrue("#wz  百度" in shown())
+        chip(s(R.string.quick_phrase_keyless_shelf, 1)).performClick()
+        st.idle()
+        until("the keyless alone") { "北京市海淀区" in shown() && "www.baidu.com" !in shown() }
+        assertTrue(s(R.string.quick_phrase_no_key) + "  地址" in shown())
+        row("北京市海淀区").performClick()
+        st.idle()
+        assertEquals(listOf("", "北京市海淀区", "地址"), fields().map { it.text.toString() })
+        fill("dz", null)
+        ok()
+        until("given a key, nothing left to") {
+            QuickPhraseManager.load().any { it.key == "dz" && it.note == "地址" } && s(R.string.quick_phrase_keyless_banner, 1) !in shown()
+        }
+        // written as version 2 now
+        assertTrue(File(dir, QuickPhraseBook.MINE).readText().startsWith(QuickPhraseFiles.HEADER + "\n"))
+        assertTrue(chip(s(R.string.quick_phrase_all)).isChecked)
     }
 
     // review H1: the switches were bound again from the page's first read, so one turned off sprang
@@ -212,12 +315,16 @@ class QuickPhraseSettingsUatTest {
         ok(d)
         assertTrue(d.isShowing)
         assertEquals(s(R.string.quick_phrase_content_too_long, QuickPhraseBook.MAX_CONTENT), fields(d)[1].error)
-        // a key filled in is not cut either: 30 emoji are 60 UTF-16 units, a good key
-        val emoji = "😀".repeat(QuickPhraseBook.MAX_KEY)
-        fill(emoji, "x".repeat(QuickPhraseBook.MAX_CONTENT), d)
-        assertEquals(emoji, fields(d)[0].text.toString())
+        // a key filled in is not cut either: one past the limit kept, told at OK
+        val tooLongKey = "k".repeat(QuickPhraseBook.MAX_KEY + 1)
+        fill(tooLongKey, "x".repeat(QuickPhraseBook.MAX_CONTENT), d)
+        assertEquals(tooLongKey, fields(d)[0].text.toString())
         ok(d)
-        saved("the longest", listOf(QuickPhraseEntry(emoji, "x".repeat(QuickPhraseBook.MAX_CONTENT)), gh))
+        assertEquals(s(R.string.quick_phrase_key_invalid, QuickPhraseBook.MAX_KEY), fields(d)[0].error)
+        val longest = "k".repeat(QuickPhraseBook.MAX_KEY)
+        fill(longest, null, d)
+        ok(d)
+        saved("the longest", listOf(QuickPhraseEntry(longest, "x".repeat(QuickPhraseBook.MAX_CONTENT)), gh))
     }
 
     // review L1: an entry the keyboard saved meanwhile, unknown to the page, is refused by the file's
@@ -249,17 +356,17 @@ class QuickPhraseSettingsUatTest {
         QuickPhraseManager.put(null, gh, now = 1)
         st.activity
         val first = dialog()
-        assertEquals(listOf("", "从剪贴板来的"), fields(first).map { it.text.toString() })
+        assertEquals(listOf("", "从剪贴板来的"), fields(first).take(2).map { it.text.toString() })
         fill("clip", "从剪贴板来的，改过", first)
         st.recreate()
         val again = dialog()
         assertNotSame(first, again)
         assertFalse(first.isShowing)
-        assertEquals(listOf("clip", "从剪贴板来的，改过"), fields(again).map { it.text.toString() })
+        assertEquals(listOf("clip", "从剪贴板来的，改过"), fields(again).take(2).map { it.text.toString() })
         // once more: the route's ask is not answered again over what was restored
         st.recreate()
         val third = dialog()
-        assertEquals(listOf("clip", "从剪贴板来的，改过"), fields(third).map { it.text.toString() })
+        assertEquals(listOf("clip", "从剪贴板来的，改过"), fields(third).take(2).map { it.text.toString() })
         assertEquals(1, ShadowDialog.getShownDialogs().count { it.isShowing })
         third.onBackPressedDispatcher.onBackPressed()
         st.idle()
@@ -314,7 +421,7 @@ class QuickPhraseSettingsUatTest {
         fill("k".repeat(QuickPhraseBook.MAX_CONTENT * 2), "长".repeat(QuickPhraseBook.MAX_CONTENT * 4))
         st.recreate()
         val d = dialog()
-        assertEquals(listOf(QuickPhraseBook.MAX_CONTENT + 1, QuickPhraseBook.MAX_CONTENT + 1), fields(d).map { it.text.length })
+        assertEquals(listOf(QuickPhraseBook.MAX_CONTENT + 1, QuickPhraseBook.MAX_CONTENT + 1), fields(d).take(2).map { it.text.length })
         ok(d)
         assertEquals(s(R.string.quick_phrase_key_invalid, QuickPhraseBook.MAX_KEY), fields(d)[0].error)
         fill("long", null, d)
@@ -340,7 +447,7 @@ class QuickPhraseSettingsUatTest {
         st.recreate()
         assertFalse(ask.isShowing)
         val again = dialog()
-        assertEquals(listOf("gh", "https://gitlab.com"), fields(again).map { it.text.toString() })
+        assertEquals(listOf("gh", "https://gitlab.com"), fields(again).take(2).map { it.text.toString() })
         assertEquals(1, ShadowDialog.getShownDialogs().count { it.isShowing })
         // 取消 with nothing changed closes at once
         fill(null, gh.content, again)
@@ -383,6 +490,10 @@ class QuickPhraseSettingsUatTest {
                 said(R.string.quick_phrase_import_bad_key, said(R.string.quick_phrase_import_done, 0, 0), 1),
             ),
             Triple("a picture picked for the file: said to be no 快速输入 file", picture, said(R.string.quick_phrase_import_none)),
+            Triple(
+                "keyless ones added said last", QuickPhraseManager.Imported(3, 0, 0, keyless = 2),
+                said(R.string.quick_phrase_import_keyless, said(R.string.quick_phrase_import_done, 3, 0), 2),
+            ),
         )
         assertRows(rows, { it.first }) { (_, r, expected) -> assertEquals(expected, quickPhraseImportToast(app, r)) }
     }
@@ -438,21 +549,21 @@ class QuickPhraseSettingsUatTest {
         first.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
         st.idle()
         assertTrue(typing.isShowing)
-        assertEquals(listOf("k", "typed here"), fields(typing).map { it.text.toString() })
+        assertEquals(listOf("k", "typed here"), fields(typing).take(2).map { it.text.toString() })
         // discarded: the request's editor
         ask("from the clipboard")
         dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         st.idle()
         assertFalse(typing.isShowing)
         val asked = dialog()
-        assertEquals(listOf("", "from the clipboard"), fields(asked).map { it.text.toString() })
+        assertEquals(listOf("", "from the clipboard"), fields(asked).take(2).map { it.text.toString() })
         // nothing changed in it: the page opened anew for the next request, asking nothing
         ask("again")
-        until("the next request's editor") { fields().map { it.text.toString() } == listOf("", "again") }
+        until("the next request's editor") { fields().take(2).map { it.text.toString() } == listOf("", "again") }
         assertEquals(1, shownDialogs().size)
         // longer than quick input takes (another app's): ignored, the editor up left be
         ask("长".repeat(QuickPhraseBook.MAX_CONTENT + 1))
-        assertEquals(listOf("", "again"), fields().map { it.text.toString() })
+        assertEquals(listOf("", "again"), fields().take(2).map { it.text.toString() })
         assertEquals(1, shownDialogs().size)
     }
 
@@ -476,10 +587,10 @@ class QuickPhraseSettingsUatTest {
         until("asked over the editor") { shownDialogs().any(::asks) }
         val question = shownDialogs().single(::asks) as AlertDialog
         val restored = shownDialogs().single { it !== question && KeyboardHarness.all(it.window!!.decorView).any { v -> v is EditText } } as AlertDialog
-        assertEquals(listOf("k", "typed here"), fields(restored).map { it.text.toString() })
+        assertEquals(listOf("k", "typed here"), fields(restored).take(2).map { it.text.toString() })
         question.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         st.idle()
-        assertEquals(listOf("", "from the clipboard"), fields().map { it.text.toString() })
+        assertEquals(listOf("", "from the clipboard"), fields().take(2).map { it.text.toString() })
     }
 
     // a switch turned twice while the files are busy: the first turn's read back, reaching the main
@@ -539,7 +650,7 @@ class QuickPhraseSettingsUatTest {
         }
         keyboard.join(10_000)
         val again = dialog()
-        assertEquals(listOf(typed.key, typed.content), fields(again).map { it.text.toString() })
+        assertEquals(listOf(typed.key, typed.content), fields(again).take(2).map { it.text.toString() })
         assertTrue(ShadowToast.getTextOfLatestToast() != s(R.string.quick_phrase_saved))
         assertTrue(addr in QuickPhraseManager.load())
     }

@@ -13,6 +13,7 @@ import androidx.navigation.fragment.fragment
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.ui.main.AboutFragment
 import org.fcitx.fcitx5.android.ui.main.DeveloperFragment
 import org.fcitx.fcitx5.android.ui.main.LicensesFragment
@@ -101,8 +102,8 @@ sealed class SettingsRoute : Parcelable {
     data object PinyinCustomPhrase : SettingsRoute()
 
     /**
-     * 快速输入's page; [edit]: its editor open at once on [key] and [content], an entry the user has
-     * when [existing] (else a new one filled in so), as the keyboard opens it.
+     * 快速输入's page; [edit]: its editor open at once on [key], [content], [note] and [folder], an
+     * entry the user has when [existing] (else a new one filled in so), as the keyboard opens it.
      */
     @Serializable
     data class QuickPhrase(
@@ -110,7 +111,12 @@ sealed class SettingsRoute : Parcelable {
         val key: String = "",
         val content: String = "",
         val existing: Boolean = false,
-    ) : SettingsRoute()
+        val note: String = "",
+        val folder: String = "",
+    ) : SettingsRoute() {
+        /** The entry the editor opens on. */
+        val entry get() = QuickPhraseEntry(key, content, note, folder)
+    }
 
     @Serializable
     data object UserWords : SettingsRoute()

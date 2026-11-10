@@ -384,6 +384,28 @@ class UserDataManagerTest {
         assertFalse(File(dir, "emoji.mb.disable").exists())
     }
 
+    // design 060-quick-input-folders: a backup of before notes and folders restores its files as they
+    // are, read converted (notes split off the keys, a key all Chinese kept as a note); one of now keeps
+    // its folders
+    @Test
+    @Uat("QU-27")
+    fun quickInputOfABackupOfBeforeIsReadConvertedAndOneOfNowKeepsItsFolders() {
+        val phone = moved("phone")
+        val old = "#wz百度 www.baidu.com\n地址 北京\n"
+        phone.config.put("conf/androidengine.conf", "PageSize=9\n")
+        phone.data.put("data/quickphrase.d/mine.mb", old)
+        phone.data.put("data/quickphrase.d/mine.used", "5\t地址\t北京\n")
+        val fresh = moved("fresh")
+        UserDataManager.import(exported(phone), fresh).getOrThrow()
+        val dir = File(fresh.data, "data/quickphrase.d")
+        assertEquals(listOf(QuickPhraseEntry("", "北京", "地址"), QuickPhraseEntry("#wz", "www.baidu.com", "百度")), QuickPhraseManager.load(dir))
+        QuickPhraseManager.addFolder("网址", dir = dir)
+        QuickPhraseManager.put(QuickPhraseEntry("#wz", "www.baidu.com", "百度"), QuickPhraseEntry("#wz", "www.baidu.com", "百度", "网址"), now = 1, dir = dir)
+        val again = moved("again")
+        UserDataManager.import(exported(fresh), again).getOrThrow()
+        assertEquals(listOf("网址"), QuickPhraseManager.loadAll(File(again.data, "data/quickphrase.d")).folders)
+    }
+
     // A4: the config, data and themes in the app's own files go where every backup has had them
     // (external/config, external/data, external/theme: so older builds restore them and this one theirs), and
     // come back into their own directories; the older build's copies left on the external storage are not

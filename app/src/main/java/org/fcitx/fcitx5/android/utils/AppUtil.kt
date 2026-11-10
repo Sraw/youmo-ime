@@ -72,7 +72,14 @@ object AppUtil {
         }
         launchMainToDest(
             context,
-            SettingsRoute.QuickPhrase(edit = true, key = entry?.key ?: key, content = text, existing = entry != null),
+            SettingsRoute.QuickPhrase(
+                edit = true,
+                key = entry?.key ?: key,
+                content = text,
+                existing = entry != null,
+                note = entry?.note.orEmpty(),
+                folder = entry?.folder.orEmpty(),
+            ),
         )
         return true
     }

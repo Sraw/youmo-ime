@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.host.QuickPhraseFiles
+import org.fcitx.fcitx5.android.host.QuickPhraseMine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -116,5 +117,79 @@ class QuickPhraseManagerTest {
         val again = QuickPhraseManager.remove(gh, dir = dir)!!
         QuickPhraseManager.put(null, gh, now = 5, dir = dir)
         assertEquals(QuickPhraseManager.Put.Duplicate, QuickPhraseManager.restore(again, dir = dir))
+    }
+
+    // design 060-quick-input-folders: an upgrade's files of before read converted, their times kept,
+    // written as version 2 at the next change
+    @Test
+    @Uat("QU-27")
+    fun filesOfBeforeAreReadConvertedAndWrittenAnewAtTheNextChange() {
+        dir.mkdirs()
+        File(dir, "mine.mb").writeText("#wz百度 www.baidu.com\n#wz新浪 www.sina.com.cn\n地址 北京\n")
+        File(dir, "mine.used").writeText("5\t#wz新浪\twww.sina.com.cn\n")
+        val baidu = QuickPhraseEntry("#wz", "www.baidu.com", "百度")
+        val sina = QuickPhraseEntry("#wz", "www.sina.com.cn", "新浪")
+        val home = QuickPhraseEntry("", "北京", "地址")
+        assertEquals(listOf(sina, baidu, home), QuickPhraseManager.load(dir))
+        // nothing written by a read
+        assertFalse(File(dir, "mine.mb").readText().startsWith(QuickPhraseFiles.HEADER))
+        QuickPhraseManager.put(home, home.copy(key = "dz"), now = 3, dir = dir)
+        assertTrue(File(dir, "mine.mb").readText().startsWith(QuickPhraseFiles.HEADER + "\n#wz｜百度 www.baidu.com\n"))
+        assertTrue(File(dir, "mine.used").readText().startsWith(QuickPhraseFiles.USED_HEADER + "\n"))
+        assertEquals(listOf(sina, home.copy(key = "dz"), baidu), QuickPhraseManager.load(dir))
+        // the keyboard's use of before the write is still found
+        QuickPhraseManager.markUsed(baidu, 9, dir = dir)
+        assertEquals(baidu, QuickPhraseManager.load(dir).first())
+    }
+
+    @Test
+    @Uat("QU-26")
+    fun foldersAreMadeRenamedAndDeletedWithNoEntryLostAndAMoveKeepsItsTime() {
+        assertTrue(QuickPhraseManager.addFolder("网址", dir = dir))
+        assertFalse(QuickPhraseManager.addFolder("网址", dir = dir))
+        assertTrue(QuickPhraseManager.addFolder("空的", dir = dir))
+        val filed = gh.copy(folder = "网址")
+        QuickPhraseManager.put(null, filed, now = 1, dir = dir)
+        QuickPhraseManager.put(null, addr, now = 2, dir = dir)
+        assertEquals(QuickPhraseMine(listOf(addr, filed), listOf("网址", "空的")), QuickPhraseManager.loadAll(dir))
+        // the keyboard's, of a read before a move: used and deleted all the same
+        QuickPhraseManager.put(filed, gh, now = 1, dir = dir)
+        QuickPhraseManager.markUsed(filed, 5, dir = dir)
+        assertEquals(listOf(gh, addr), QuickPhraseManager.load(dir))
+        QuickPhraseManager.put(gh, filed, now = 5, dir = dir)
+        assertTrue(QuickPhraseManager.renameFolder("网址", "站点", dir = dir))
+        assertFalse(QuickPhraseManager.renameFolder("网址", "x", dir = dir))
+        assertFalse(QuickPhraseManager.renameFolder("站点", "空的", dir = dir))
+        assertEquals(QuickPhraseMine(listOf(gh.copy(folder = "站点"), addr), listOf("站点", "空的")), QuickPhraseManager.loadAll(dir))
+        assertEquals(1, QuickPhraseManager.deleteFolder("站点", dir = dir))
+        assertEquals(-1, QuickPhraseManager.deleteFolder("站点", dir = dir))
+        assertEquals(QuickPhraseMine(listOf(gh, addr), listOf("空的")), QuickPhraseManager.loadAll(dir))
+        // deleted from the keyboard with its old folder, undone into it, made again
+        val removed = QuickPhraseManager.remove(filed, dir = dir)!!
+        assertEquals(gh, removed.entry)
+        assertEquals(5L, removed.usedAt)
+        // the export keeps folders, a computer's fcitx5 reads its keys
+        QuickPhraseManager.put(null, QuickPhraseEntry("#wz", "www.baidu.com", "百度", "网址"), now = 7, dir = dir)
+        assertEquals(
+            QuickPhraseFiles.HEADER + "\n" + "addr \"北京\\n3 号楼 \\\"502\\\"\"\n" + "【目录】空的\n【目录】网址\n#wz｜百度 www.baidu.com\n",
+            QuickPhraseManager.export(dir),
+        )
+    }
+
+    @Test
+    @Uat("QU-27")
+    fun anImportOfBeforeOrAComputersIsConvertedIntoItsFoldersKeylessOnesCounted() {
+        QuickPhraseManager.addFolder("网址", dir = dir)
+        val file = "#wz百度 www.baidu.com\n地址 北京\n【目录】网址\ngh https://github.com\n"
+        assertEquals(QuickPhraseManager.Imported(3, 0, 0, keyless = 1), QuickPhraseManager.import(file.toByteArray(), dir = dir))
+        assertEquals(
+            QuickPhraseMine(
+                listOf(QuickPhraseEntry("#wz", "www.baidu.com", "百度"), QuickPhraseEntry("", "北京", "地址"), gh.copy(folder = "网址")),
+                listOf("网址"),
+            ),
+            QuickPhraseManager.loadAll(dir),
+        )
+        // our own export imported again: all there already
+        assertEquals(QuickPhraseManager.Imported(0, 3, 0), QuickPhraseManager.import(QuickPhraseManager.export(dir).toByteArray(), dir = dir))
     }
 }
