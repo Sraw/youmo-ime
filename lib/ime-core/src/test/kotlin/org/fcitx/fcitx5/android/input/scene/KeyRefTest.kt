@@ -13,14 +13,9 @@ import org.junit.Test
 class KeyRefTest {
 
     @Test
-    fun aViewsKeyIsItsId() {
-        assertEquals(42, KeyRef.view(42).viewId)
+    fun aViewsKeyIsItsIdNoIdIncluded() {
         assertEquals(KeyRef.view(42), KeyRef.view(42))
         assertNotEquals(KeyRef.view(42), KeyRef.view(43))
-    }
-
-    @Test
-    fun aViewOfNoIdIsStillAViewsKey() {
         // a picker's keys have no id: View.NO_ID, the same -1 as a scene's viewId
         assertEquals(KeyRef.NO_VIEW, KeyRef.view(-1).viewId)
         assertFalse(KeyRef.view(-1).isScene)

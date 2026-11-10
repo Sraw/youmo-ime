@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.theme
 
 import org.fcitx.fcitx5.android.input.Contrast
 import org.fcitx.fcitx5.android.scene.theme.Fill
+import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.Value
 
@@ -42,26 +43,14 @@ object ThemePackCheck {
         effects = theme.styles.flatMap { it.values.values }.mapNotNull { (it as? Value.OfEffect)?.effect?.file }.toSet(),
     )
 
+    /** The keys a theme must not hide the labels of: [BlankKeys.REQUIRED_ROLES]. */
+    val REQUIRED_ROLES = BlankKeys.REQUIRED_ROLES
+
     /**
-     * The keys without which nothing can be typed or put right: a theme hiding their labels (`hidden`)
-     * leaves a keyboard of blank keys where those are, refused.
+     * Where [theme] would leave those keys blank on [boards] (the app's and the pack's own), the first found:
+     * [BlankKeys.find], the engine's own drawing asked, the theme maker's rule too.
      */
-    val REQUIRED_ROLES = setOf("shift", "backspace", "space", "enter")
-
-    // the kinds those keys are of: a selector of another kind (letter, alt-text) never matches one
-    private val REQUIRED_KINDS = setOf("function", "space", "enter")
-
-    // what `hidden` hides of a key: its words and icon, not a mark or a hint alone
-    private val HIDING_PARTS = setOf(null, "label", "icon")
-
-    /** The lines of the styles that hide the labels of a key of [REQUIRED_ROLES] (or may: `key { hidden }`). */
-    fun hidesRequired(theme: Theme): List<Int> = theme.styles.filter { style ->
-        (style.values["hidden"] as? Value.Flag)?.on == true && style.selectors.any { s ->
-            s.widget == "key" && s.reserved == null && s.part in HIDING_PARTS && s.classes.all { it in REQUIRED_KINDS } &&
-                s.roles.all { it in REQUIRED_ROLES } && (s.starRole == null || s.starRole in REQUIRED_ROLES) &&
-                (s.key == null || s.key in REQUIRED_ROLES)
-        }
-    }.map { it.line }
+    fun hidesRequired(theme: Theme, boards: List<BlankKeys.Board>): List<BlankKeys.Blank> = BlankKeys.find(theme, boards)
 
     /** The least contrast between a key's words and its face a theme is let in without a warning (WCAG's for large text). */
     const val MIN_CONTRAST = 3.0

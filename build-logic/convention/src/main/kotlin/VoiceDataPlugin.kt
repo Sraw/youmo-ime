@@ -50,11 +50,13 @@ import javax.inject.Inject
  *   model's BPE vocabulary, which sherpa-onnx encodes them with, read out of its SentencePiece model.
  *
  * The transducer goes in as onnxruntime's own format (`.ort`), converted from sherpa-onnx's export
- * by the release `voice-models-*` of this fork (its manifest.txt says how): the recognizer uses it
- * where it lies in the APK, mapped, rather than reading it onto the heap (lib/sherpa-onnx README).
+ * by the release `voice-models-*` of this fork (its manifest.txt says how): the recognizer maps it
+ * where the voice pack's import put it, rather than reading it onto the heap (lib/sherpa-onnx README).
  *
- * Downloaded once, SHA-256 checked (DownloadTask), into `voice/` for the voice pack: mapped where
- * the pack's import put them, as the recognizer and the tagger load them.
+ * For now the transducer, its tokens and the tagger come from [LOCAL_PROPERTY]'s directory alone (the
+ * pinned release is the offline model; its download tasks stay registered, wired to nothing, for when
+ * the streaming one is released); the hotwords and the VAD are built or downloaded (SHA-256 checked,
+ * DownloadTask). All go into `voice/` of the voice pack.
  */
 class VoiceDataPlugin : Plugin<Project> {
 
@@ -65,7 +67,7 @@ class VoiceDataPlugin : Plugin<Project> {
         private const val MODEL_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$MODEL_NAME.tar.bz2"
         private const val MODEL_SHA256 = "5d02c36d7b44e886b7c8f0d8e051f8713acab96c264bb6ef9e718be39a6a2224"
 
-        /** the archive's files the assets take as they are; its bpe.model is read for bpe.vocab */
+        /** the model's files the voice pack takes as they are; its bpe.model is read for bpe.vocab */
         internal val MODEL_FILES = listOf("tokens.txt")
         internal const val BPE_MODEL = "bpe.model"
 
@@ -88,6 +90,9 @@ class VoiceDataPlugin : Plugin<Project> {
          * in ~/.gradle/gradle.properties.
          */
         const val LOCAL_PROPERTY = "youmo.voiceModelDir"
+
+        /** [value] trimmed, a leading `~/` taken as [home] (as it is, a `$` in it no group reference) */
+        fun homed(value: String, home: String): String = value.trim().replaceFirst(Regex("^~(?=/)"), Regex.escapeReplacement(home))
         internal val TAGGER_FILES = listOf("polish-tagger.ort", "polish-tagger.json")
 
         // whether a stretch heard is speech at all (VoiceQuiet): not where it ends, as before 0.6.0
@@ -109,7 +114,7 @@ class VoiceDataPlugin : Plugin<Project> {
             sha256.set(MODEL_SHA256)
             outputFile.set(downloadsDir.file("$MODEL_NAME.tar.bz2"))
         }
-        val modelDir = target.tasks.register<ExtractTask>("extractVoiceModel") {
+        target.tasks.register<ExtractTask>("extractVoiceModel") {
             archive.set(modelArchive.flatMap { it.outputFile })
             // the weights come converted from ORT_RELEASE: of the archive's 176 MB, the 0.2 MB the assets read
             members.set((MODEL_FILES + BPE_MODEL).map { "$MODEL_NAME/$it" })
@@ -121,7 +126,7 @@ class VoiceDataPlugin : Plugin<Project> {
             sha256.set(ORT_SHA256)
             outputFile.set(downloadsDir.file("$ORT_RELEASE-x-asr-ort.tar.zst"))
         }
-        val ortDir = target.tasks.register<ExtractTask>("extractVoiceOrt") {
+        target.tasks.register<ExtractTask>("extractVoiceOrt") {
             archive.set(ortArchive.flatMap { it.outputFile })
             cmake.set(target.sdkCmake)
             outputDir.set(target.layout.buildDirectory.dir("voice-ort"))
@@ -140,11 +145,9 @@ class VoiceDataPlugin : Plugin<Project> {
         }
         val localDir = target.providers.gradleProperty(LOCAL_PROPERTY)
         target.tasks.register<CopyVoiceModels>(COPY_TASK) {
+            // nothing downloaded for the model without it: copy() then fails, saying where it comes from
             if (localDir.isPresent) {
-                local.set(target.layout.projectDirectory.dir(localDir.get()))
-            } else {
-                model.set(modelDir.flatMap { it.outputDir })
-                ort.set(ortDir.flatMap { it.outputDir })
+                local.set(target.layout.projectDirectory.dir(homed(localDir.get(), System.getProperty("user.home"))))
             }
             this.hotwords.set(hotwords.flatMap { it.outputFile })
             this.vad.set(vad.flatMap { it.outputFile })
@@ -186,20 +189,10 @@ class VoiceDataPlugin : Plugin<Project> {
         }
     }
 
-    /** The model (ORT) and its tokens, the tagger (from [local]) and the hotwords, as `voice/` in the assets. */
+    /** The model (ORT), its tokens and the tagger (from [local]), the hotwords and the VAD, as `voice/` of the voice pack. */
     @DisableCachingByDefault(because = "linking is quicker than the cache would be")
     abstract class CopyVoiceModels : DefaultTask() {
-        @get:Optional
-        @get:InputDirectory
-        @get:PathSensitive(PathSensitivity.RELATIVE)
-        abstract val model: DirectoryProperty
-
-        @get:Optional
-        @get:InputDirectory
-        @get:PathSensitive(PathSensitivity.RELATIVE)
-        abstract val ort: DirectoryProperty
-
-        /** [LOCAL_PROPERTY]'s directory: [model] and [ort] are not read then */
+        /** [LOCAL_PROPERTY]'s directory (`~/` taken as home): without it [copy] fails */
         @get:Optional
         @get:InputDirectory
         @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -226,17 +219,15 @@ class VoiceDataPlugin : Plugin<Project> {
             val local = checkNotNull(local.orNull?.asFile) {
                 "voice: the streaming model and the polish tagger come from $LOCAL_PROPERTY alone for now (in ~/.gradle/gradle.properties); the pinned release is the offline model"
             }
-            val dir = local
-            val ortDir = local
-            for (name in MODEL_FILES) link(dir.resolve(name), out.resolve(name))
-            for (name in ORT_FILES) link(ortDir.resolve(name), out.resolve(name))
+            for (name in MODEL_FILES) link(local.resolve(name), out.resolve(name))
+            for (name in ORT_FILES) link(local.resolve(name), out.resolve(name))
             for (name in TAGGER_FILES) link(local.resolve(name), out.resolve(name))
-            out.resolve("bpe.vocab").writeText(vocabulary(dir.resolve(BPE_MODEL).readBytes()))
+            out.resolve("bpe.vocab").writeText(vocabulary(local.resolve(BPE_MODEL).readBytes()))
             hotwords.get().asFile.copyTo(out.resolve("hotwords.txt"))
             vad.get().asFile.copyTo(out.resolve("silero_vad.onnx"))
         }
 
-        // some 175 MB already unpacked in the build directory: a second name for it, not a second copy
+        // some 175 MB in the local directory: a second name for it, not a second copy
         private fun link(from: File, to: File) {
             try {
                 Files.createLink(to.toPath(), from.toPath())

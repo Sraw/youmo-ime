@@ -33,8 +33,9 @@ class Scene(
 ) {
     /**
      * The key a finger at ([x], [y]) presses: the one whose [KeyNode.hit] holds it; none in a gap.
-     * A touch on the scene's right or bottom edge, or past it (a finger's centre the system reports a
-     * pixel out), counts as just inside: the edge keys' hits stop short of their right and bottom.
+     * A touch on the scene's right or bottom edge, or past any of its four edges (a finger's centre the
+     * system reports a pixel out), counts as just inside: the edge keys' hits stop short of their right
+     * and bottom, and a touch left of or above the scene goes to the left or top edge's key.
      */
     fun keyAt(x: Double, y: Double): KeyNode? {
         val cx = x.coerceIn(0.0, maxOf(0.0, width - EDGE))
@@ -68,7 +69,7 @@ enum class KeyState(val xml: String) {
  * middle for glide typing and popups; [up] the way a swipe up goes (a unit vector, the screen's up).
  *
  * What the app needs to work it, so it never goes back to the layout: [label] and [alt] as shown (the
- * bindings read; null where there is none), [altRaw] the alt as written (`{punct:~}`), its long
+ * bindings read; null where there is none), [altRaw] the alt as written (`{punct:~}`; snapshots and tests only), its long
  * press's [popup] as written (null: PopupPreset's by its label and send; [Scene.popups] off: none at
  * all) and [menu], the [sound] it clicks with, the [shortcut] its swipes' symbols are kept under.
  */

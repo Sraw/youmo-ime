@@ -13,28 +13,15 @@ import java.text.BreakIterator
  * (the user, 0.5.1's test build): words are smaller, the bubble no wider than [MAX_EMS] of them.
  *
  * A label of one character (a text shortcut 你, an emoji) is not words: as large as a symbol's.
- * Words that do not fit get smaller, down to [MIN_SP]; still too long, their end is cut with
+ * Words that do not fit get smaller, down to the least size given; still too long, their end is cut with
  * [ELLIPSIS]. A text's line breaks and runs of spaces are one space: the bubble has one line.
- * Sizes and widths are the caller's units (pixels), the ratios here.
+ * Sizes and widths are the caller's units (pixels), the ratios here; the sizes themselves (a
+ * symbol's, the words', their least) are the scene's (keyboard-scene `Popups.SYMBOL_DP`, `WORDS_DP`,
+ * `MIN_WORDS_DP`).
  */
 object PreviewLabel {
 
-    /** A character's size (a letter, a symbol, a label of one), in sp before the keys' scale: a letter key's. */
-    const val SYMBOL_SP = 23f
-
-    /**
-     * A character's size at the keys' text [scale] (紧凑 0.9, floating by its width), in sp: the
-     * bubble's letter grows and shrinks with the key's under it, as the words do (team-lead, 0.5.1).
-     */
-    fun symbolSize(scale: Float): Float = SYMBOL_SP * scale
-
-    /** The words' size, in sp before the keys' scale (紧凑, floating): a function key's label's. */
-    const val WORDS_SP = 16f
-
-    /** The least the words shrink to, in sp before the keys' scale. */
-    const val MIN_SP = 12f
-
-    /** The widest a bubble of words is: this many characters of [WORDS_SP] (恢复刚清除的 shrinks a little). */
+    /** The widest a bubble of words is: this many characters of the words' size (恢复刚清除的 shrinks a little). */
     const val MAX_EMS = 5
 
     const val ELLIPSIS = "…"

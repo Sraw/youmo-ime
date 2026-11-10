@@ -10,9 +10,9 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.view.WindowInsets
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
@@ -28,8 +28,17 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        show(pageOf(intent))
+        // recreated (a rotation): the page shown then (null: the list), not the starting intent's page
+        show(if (savedInstanceState != null) savedInstanceState.getString(EXTRA_PAGE) else pageOf(intent))
     }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(EXTRA_PAGE, shown)
+    }
+
+    // the page on screen, null for the list
+    private var shown: String? = null
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -46,7 +55,7 @@ class MainActivity : Activity() {
 
     @Deprecated("the list on back, for every API level from 29")
     override fun onBackPressed() {
-        if (pageOf(intent) != null) open(null) else super.onBackPressed()
+        if (shown != null) open(null) else super.onBackPressed()
     }
 
     private var leaving: List<() -> Unit> = emptyList()
@@ -59,6 +68,8 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         leave()
+        // gone for good: the state provider no longer reports this page's fields
+        if (isFinishing) Fields.live.clear()
         super.onDestroy()
     }
 
@@ -69,6 +80,7 @@ class MainActivity : Activity() {
         leave()
         Fields.live.clear()
         val page = Pages.ALL.find { it.name == name }
+        shown = page?.name
         if (page == null) {
             setPage("输入测试台", home())
             return

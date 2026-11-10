@@ -20,6 +20,9 @@ on:
       - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/input/**"
       - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/table/**"
       - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/InputMethodCatalog.kt"
+      # the yield rules (scene.rules.KeyMarks) and the scene layout the test checks
+      - "lib/keyboard-scene/src/commonMain/**"
+      - "lib/keyboard-scene/build.gradle.kts"
       - "app/src/test/java/org/fcitx/fcitx5/android/uat/KeyMarksEverywhereUatTest.kt"
       - "app/src/test/java/org/fcitx/fcitx5/android/input/KeyboardHarness.kt"
       - "app/src/test/resources/robolectric.properties"
@@ -39,6 +42,9 @@ on:
       - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/input/**"
       - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/table/**"
       - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/InputMethodCatalog.kt"
+      # the yield rules (scene.rules.KeyMarks) and the scene layout the test checks
+      - "lib/keyboard-scene/src/commonMain/**"
+      - "lib/keyboard-scene/build.gradle.kts"
       - "app/src/test/java/org/fcitx/fcitx5/android/uat/KeyMarksEverywhereUatTest.kt"
       - "app/src/test/java/org/fcitx/fcitx5/android/input/KeyboardHarness.kt"
       - "app/src/test/resources/robolectric.properties"
@@ -70,7 +76,8 @@ jobs:
             task: testDebugUnitTest
           - sdk: 29
             task: testDebugUnitTestAt29
-    timeout-minutes: 30
+    # above Test.timeout (40 min): a cancelled job skips the failure steps (heap dump, annotations)
+    timeout-minutes: 45
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7

@@ -88,6 +88,10 @@ object KeyMarkYield {
      * point most glyphs leave empty, the arc curving away from it both ways.
      */
     data class Edge(val face: Ink, val radii: List<Double> = NO_RADII, val floor: Double = 0.0, val line: Double = 0.0) {
+        init {
+            require(radii.size == 4) { "an edge has four corner radii, not ${radii.size}" }
+        }
+
         // the radius of [slot]'s frame's top right corner ([right]) or top left
         internal fun radius(slot: Slot, right: Boolean): Double {
             val left = slot.left == right
@@ -201,7 +205,6 @@ object KeyMarkYield {
         // its marks meet it (the least that clears them, near and far by turns); the glyphs then move the least
         val keys = drawn.map { it.aside() }
         val apart = keys.map { k -> keptApart(k.marks.map { it.within(k.edge) }, k.edge) }
-        val least = 1.0 - MAX_CLASS_SHRINK
         val hopeless = minMark - HOPELESS_BAND
         // each key as it is (most are: worked out once)
         val asIs = keys.indices.map { k -> drawn[k].copy(moves = false).let { m -> place(m.glyph, apart[k].filterNotNull(), m, gap) } }
@@ -284,7 +287,10 @@ object KeyMarkYield {
      */
     fun again(key: Member, glyph: Ink, board: Board, settled: Settled, gap: Double): Settled {
         if (settled.marks.none { it != null && it.meets(glyph, gap) }) return settled.copy(glyph = glyph)
-        val marks = key.marks.mapIndexed { i, m -> settled.marks[i]?.let { m.scaled(board.markScale(m)).within(key.edge) } }
+        // kept apart first, as [board] and [onto] do: two marks that start out meeting are parted, not one left out
+        val kept = key.marks.indices.filter { settled.marks[it] != null }
+        val apart = keptApart(kept.map { i -> key.marks[i].let { m -> m.scaled(board.markScale(m)).within(key.edge) } }, key.edge)
+        val marks = key.marks.indices.map { i -> kept.indexOf(i).let { at -> if (at < 0) null else apart[at] } }
         return settle(key.copy(moves = false), glyph, marks, gap)
     }
 
@@ -391,16 +397,20 @@ object KeyMarkYield {
     // whether [i]'s corners are all within [edge]'s arcs, less its line
     private fun cornersIn(i: Ink, edge: Edge): Boolean {
         val f = edge.face
-        val corners = listOf(Triple(i.left, i.top, 0), Triple(i.right, i.top, 1), Triple(i.right, i.bottom, 2), Triple(i.left, i.bottom, 3))
-        return corners.all { (x, y, n) ->
+        // the four corners in a plain loop, no list made: this runs in the boards' searches, many times a build
+        for (n in edge.radii.indices) {
             val r = edge.radii[n]
-            if (r <= edge.line) return@all true
-            val cx = if (n == 0 || n == 3) f.left + r else f.right - r
+            if (r <= edge.line) continue
+            val left = n == 0 || n == 3
+            val x = if (left) i.left else i.right
+            val y = if (n < 2) i.top else i.bottom
+            val cx = if (left) f.left + r else f.right - r
             val cy = if (n < 2) f.top + r else f.bottom - r
-            val outX = if (n == 0 || n == 3) x < cx else x > cx
+            val outX = if (left) x < cx else x > cx
             val outY = if (n < 2) y < cy else y > cy
-            !outX || !outY || sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) <= r - edge.line + 1e-9
+            if (outX && outY && sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) > r - edge.line + 1e-9) return false
         }
+        return true
     }
 
     // this key not moving, its glyph if it moves as far from its marks' side (all of them on one) as its room goes,
@@ -409,13 +419,14 @@ object KeyMarkYield {
         val still = copy(moves = false)
         if (!moves || glyph.left.isNaN() || marks.isEmpty()) return still
         // the room's side away from the marks; smaller about it, so it stays there
-        val side = when {
-            marks.all { it.slot.left } -> room.right
-            marks.all { it.slot.right } -> room.left
+        // which way kept as a flag: a room of no width has its two sides at one coordinate
+        val toRight = when {
+            marks.all { it.slot.left } -> true
+            marks.all { it.slot.right } -> false
             else -> return still
         }
-        val dx = if (side == room.right) room.right - glyph.right else room.left - glyph.left
-        return still.copy(glyph = glyph.moved(dx, 0.0), x = side)
+        val dx = if (toRight) room.right - glyph.right else room.left - glyph.left
+        return still.copy(glyph = glyph.moved(dx, 0.0), x = if (toRight) room.right else room.left)
     }
 
     // rules B §8a: what a label wider than its room asks of its class, the class as much smaller as its widest

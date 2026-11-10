@@ -15,7 +15,7 @@ import splitties.views.dsl.core.Ui
  * A key's preview bubble: the engine's scene of it drawn (060-render-p2 S2), [sceneView] sized by
  * the engine, its text shown [showScene].
  */
-class PopupEntryUi(override val ctx: Context, private val scenes: PopupScenes) : Ui {
+class PopupEntryUi(override val ctx: Context, val scenes: PopupScenes) : Ui {
 
     var lastShowTime = -1L
 

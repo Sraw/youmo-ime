@@ -1,10 +1,11 @@
 name: Emulator Tests
 
 # Instrumented tests on an emulator: HostTest (the Kotlin host and engine on the device) and SoftKeyboardTest
-# (typing on the real keyboard into a real EditText), and VoiceEngineTest (the voice pack's models on a
-# recording). The app carries no dictionaries or models: the two resource packs (test-key signed,
-# which debug builds trust) are imported through the debug build's shell-only provider first, as
-# uat/tools/uat.py's `packs` does. They need an APK and a device, so they take
+# (typing on the real keyboard into a real EditText). The app carries no dictionaries or models: the
+# text pack (test-key signed, which debug builds trust) is imported through the debug build's shell-only
+# provider first, as uat/tools/uat.py's `packs --no-voice` does. The voice pack needs the local voice
+# model directory (youmo.voiceModelDir), which CI does not have till the streaming model is released, so
+# the voice cases (VoiceEngineTest, VoicePolisherTest: package input.voice) run locally only. They need an APK and a device, so they take
 # far longer than the JVM unit tests and do not gate every push: they run weekly, on demand,
 # and on pull requests labelled `emulator`.
 
@@ -90,14 +91,8 @@ jobs:
             .gradle/engine-downloads/onnxruntime-android-*.zip
           key: handwriting-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/HandwritingDataPlugin.kt', 'lib/handwriting/build.gradle.kts') }}
 
-      - name: Cache voice model downloads
-        uses: actions/cache@v6
-        with:
-          path: .gradle/engine-downloads/voice
-          key: voice-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/VoiceDataPlugin.kt') }}
-
       - name: Build the app and its tests
-        run: ./gradlew --build-cache :app:assembleDebug :app:assembleDebugAndroidTest :app:packs
+        run: ./gradlew --build-cache :app:assembleDebug :app:assembleDebugAndroidTest :app:packTextPack
 
       - name: Enable KVM
         run: |
@@ -118,8 +113,8 @@ jobs:
           script: |
             ./gradlew --build-cache :app:installDebug
             for f in app/build/packs/*.youmopack; do n=$(basename $f); adb shell content write --uri content://io.github.sraw.youmo.debug.uat.packs/$n < $f && adb shell content call --uri content://io.github.sraw.youmo.debug.uat.packs --method import --arg $n; done
-            adb shell content call --uri content://io.github.sraw.youmo.debug.uat.packs --method state | grep -q 'text=v' && adb shell content call --uri content://io.github.sraw.youmo.debug.uat.packs --method state | grep -q 'voice=v'
-            ./gradlew --build-cache :app:connectedDebugAndroidTest
+            adb shell content call --uri content://io.github.sraw.youmo.debug.uat.packs --method state | grep -q 'text=v'
+            ./gradlew --build-cache :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notPackage=org.fcitx.fcitx5.android.input.voice
 
       - name: Upload test report
         if: always()

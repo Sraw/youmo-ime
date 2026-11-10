@@ -158,7 +158,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     val hint = (symbol as? KeyCaps.Mark.Text)?.text.orEmpty()
                     // the engine draws a function key's very face (space blank, the comma a ,): its name beside it, so
                     // the page says which key it is
+                    // every function key has its caption (the width at least the gap), a character key none
                     val caption = captionWidth > 0
+                    val params = if (caption) lParams(0, ctx.dp(KeyHeight)) { weight = 1f } else keyParams(ctx, weight = 1f)
                     if (caption) add(KeyCaps.label(ctx, label, CAPTION_SP).apply {
                         gravity = Gravity.CENTER_VERTICAL or Gravity.START
                         maxLines = 1
@@ -166,7 +168,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     }, lParams(captionWidth, ctx.dp(KeyHeight)))
                     add(KeyCaps.key(ctx, label, hint, marked = names.any(stored::isSet), dimmed = false, said = said, shortcut = shortcut).apply {
                         setOnClickListener { editShortcuts(label, names) }
-                    }, if (caption) lParams(0, ctx.dp(KeyHeight)) { weight = 1f } else if (function) lParams(matchParent, ctx.dp(KeyHeight)) else keyParams(ctx, weight = 1f))
+                    }, params)
                 }
                 if (!function) weightSum = page.rows.maxOf { it.size }.toFloat()
             }, lParams(matchParent) { topMargin = ctx.dp(6) }) }

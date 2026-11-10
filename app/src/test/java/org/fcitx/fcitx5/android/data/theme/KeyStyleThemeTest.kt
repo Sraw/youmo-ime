@@ -9,7 +9,9 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyBorderChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyRadiusChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeySpacingChoice
+import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
+import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -20,6 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /** The key style settings (大小与样式) over the theme in use, as the keyboard reads it, and the theme left as it is. */
@@ -81,6 +84,25 @@ class KeyStyleThemeTest {
         } finally {
             ThemeManager.removeOnChangedListener(listener)
         }
+    }
+
+    // what the keyboard draws follows the choice: Square, every key's corners square on the canvas, Round
+    // rounded (a canvas reading a look that ignores the choice, cached or the theme's own, draws them as before)
+    @Uat("ST-58")
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun theKeyboardDrawnIsSquareWhenChosen() {
+        fun radii(choice: KeyRadiusChoice): List<Double> {
+            prefs.keyRadiusChoice.setValue(choice)
+            return KeyboardHarness().start().use { h ->
+                h.relayout()
+                val keys = KeyboardHarness.boardCanvas(h.keyboard)!!.scene!!.keys.map { it.shape }.filterIsInstance<Shape.Rect>()
+                assertTrue(keys.size >= 26)
+                keys.flatMap { it.radii }
+            }
+        }
+        assertTrue("square", radii(KeyRadiusChoice.Square).all { it == 0.0 })
+        assertTrue("round", radii(KeyRadiusChoice.Round).any { it > 0.0 })
     }
 
     // a reader of the theme's own look in the keyboard would draw over what is chosen: none there (specs/app.md)

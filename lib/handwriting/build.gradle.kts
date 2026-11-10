@@ -9,7 +9,7 @@ import com.android.build.gradle.tasks.ExternalNativeBuildJsonTask
  * The handwriting recognizers' runtime: onnxruntime (MIT) and a small JNI to it (OrtModel). The
  * onnxruntime is the build sherpa-onnx links for voice input, the same file (csukuangfj's
  * onnxruntime-libs v1.30.0, SHA-256 checked), so the APK packs one copy of it
- * (pickFirst in the app). Its ORT-format models are mapped from the APK, not read onto the heap.
+ * (pickFirst in the app). Its ORT-format models are mapped from their pack file, not read onto the heap.
  */
 plugins {
     id("org.fcitx.fcitx5.android.lib-convention")

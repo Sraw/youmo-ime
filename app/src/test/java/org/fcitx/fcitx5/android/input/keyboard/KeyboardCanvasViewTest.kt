@@ -157,7 +157,6 @@ class KeyboardCanvasViewTest {
         assertTrue(provider.performAction(keys.indexOfFirst { it.id == "w" }, AccessibilityNodeInfo.ACTION_CLICK, null))
         h.idle()
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
-        // the hidden views are no one's to read
     }
 
     // a theme the engine refuses (more single keys than a 3.0 file brings, each a pressed colour of its own: more
@@ -349,7 +348,7 @@ class KeyboardCanvasViewTest {
     // the keys a finger finds are the keys shown: as each state shows and hides keys, each of the scene's
     // keys found where it is
     @Test
-    fun theScenesKeysAreTheShownViewsInEveryState() = harness(WUBI).use { h ->
+    fun theScenesKeysAreFoundWhereShownInEveryState() = harness(WUBI).use { h ->
         val c = h.canvas()!!
         val board = h.textKeyboard()
         fun check(what: String) {
@@ -461,12 +460,15 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // the user's own long press first on a letter: its corner as the views show it, Shift's list under Shift
+    // the user's own long press first on a letter: its corner, the preset's where the user set none
     @Test
-    fun aCornerIsTheUsersLongPressFirst() = harness().use { h ->
-        val c = h.canvas()!!
-        assertEquals("1", c.keyAt("q")?.alt)
-        for (letter in 'a'..'z') assertEquals("$letter", h.keyView("$letter").alt, c.keyAt("$letter")?.alt)
+    fun aCornerIsTheUsersLongPressFirst() {
+        prefs.set(AppPrefs.getInstance().internal.popupOverrides, "w %")
+        harness().use { h ->
+            val c = h.canvas()!!
+            assertEquals("1", c.keyAt("q")?.alt)
+            assertEquals("%", c.keyAt("w")?.alt)
+        }
     }
 
     // two fingers down on two keys: both shown pressed, each let go alone

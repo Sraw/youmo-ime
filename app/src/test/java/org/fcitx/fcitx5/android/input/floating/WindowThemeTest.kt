@@ -79,7 +79,8 @@ class WindowThemeTest {
     private fun handle(h: KeyboardHarness): FloatingHandle = KeyboardHarness.find<FloatingHandle>(h.inputView) ?: error("no handle")
 
     private fun card(h: KeyboardHarness): View =
-        KeyboardHarness.all(h.inputView.rootView).first { it.outlineProvider?.javaClass?.name?.contains("FloatingCorners") == true }
+        KeyboardHarness.all(h.inputView.rootView).firstOrNull { it.outlineProvider?.javaClass?.name?.contains("FloatingCorners") == true }
+            ?: error("no floating card: no view with the FloatingCorners outline (renamed?)")
 
     private fun radius(v: View) = Outline().also { v.outlineProvider.getOutline(v, it) }.radius
 
@@ -89,8 +90,10 @@ class WindowThemeTest {
 
     private fun draw(v: View): Bitmap = Bitmap.createBitmap(maxOf(1, v.width), maxOf(1, v.height), Bitmap.Config.ARGB_8888).also { v.draw(Canvas(it)) }
 
-    // the picture of a mode for the reviewer's eye (060-render-p3 T7a's in place of an emulator's)
+    // the picture of a mode for the reviewer's eye (060-render-p3 T7a's in place of an emulator's), with
+    // WINDOW_SHOTS=1 only: drawn and encoded every run it costs each one for no one
     private fun keep(h: KeyboardHarness, name: String) {
+        if (System.getenv("WINDOW_SHOTS") != "1") return
         val dir = File("build/t7a-window").also { it.mkdirs() }
         File(dir, "$name.png").outputStream().use { draw(h.inputView).compress(Bitmap.CompressFormat.PNG, 100, it) }
     }

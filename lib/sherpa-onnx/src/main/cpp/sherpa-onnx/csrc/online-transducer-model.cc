@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,7 @@ static void CheckZipformer2(const OnlineModelConfig &config) {
   if (!config.model_type.empty() && config.model_type != "zipformer2") {
     SHERPA_ONNX_LOGE("Only zipformer2 is supported, model_type: '%s'",
                      config.model_type.c_str());
-    SHERPA_ONNX_EXIT(-1);
+    throw std::invalid_argument("only zipformer2 is built");
   }
 }
 

@@ -129,8 +129,8 @@ object SceneMarks {
     fun names(layout: Layout, fragments: Collection<Fragment> = emptyList()): Set<String> =
         (layout.parts.filterIsInstance<Row>() + fragments.flatMap { it.rows })
             .flatMap { it.cells }.filterIsInstance<Key>()
-        .flatMap { k -> listOf(k.attrs.shortcut) + k.variants.map { it.attrs.shortcut } }
-        .filterNotNull().toSet()
+            .flatMap { k -> listOf(k.attrs.shortcut) + k.variants.map { it.attrs.shortcut } }
+            .filterNotNull().toSet()
 
     fun content(s: KeyShortcut): MarkContent? = when (s) {
         is KeyShortcut.Command -> MarkContent.Icon(icon(s.command))

@@ -28,7 +28,6 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
-import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.look.PressEffect
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
@@ -49,7 +48,7 @@ class EmojiSearchUi(context: Context, private val theme: Theme) : LinearLayout(c
 
         // 返回 in the app's words; no marks (no key of the search has a shortcut)
         override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
-            SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = Texts(back = context.getString(R.string.picker_back)), marks = NO_MARKS)
+            SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = Texts(back = context.getString(R.string.picker_back)), marks = SceneEnvs.NO_MARKS)
 
         // laid on the search's own background (the keyboard's colour), as its views were
         override val sceneDrawsBase: Boolean get() = false
@@ -168,8 +167,6 @@ class EmojiSearchUi(context: Context, private val theme: Theme) : LinearLayout(c
 
         /** The search's letters' layout, drawn by the scene (060-render-p2 S6). */
         const val LAYOUT = "emoji-search"
-
-        private val NO_MARKS = MarkSettings(shortcuts = emptyMap())
 
         private val Backspace = KeyDef(
             BackspaceKey().appearance,

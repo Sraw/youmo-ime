@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
-import org.fcitx.fcitx5.android.engine.learn.Han
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -327,10 +326,10 @@ internal class UserLexicon(
      * A word blocked, for a table. Not a character: blocked in pinyin under one reading (了 liao),
      * a table, which has no readings, would lose it under all.
      */
-    // a word: of Han or of ASCII letters and digits (a Latin word blocked in pinyin, hidden in a table
-    // too); an emoji blocked in its word's reading is no table's word to hide (review R2 L5, R3)
+    // a word as WordLists takes one (a Latin word blocked in pinyin is hidden in a table too); an
+    // emoji blocked in its word's reading, a keycap too, is no table's word to hide
     fun isBlockedWord(text: String): Boolean =
-        text.codePointCount(0, text.length) >= 2 && (Han.any(text) || text.any { it.code < ASCII_END && it.isLetterOrDigit() }) && text in blockedTexts()
+        text.codePointCount(0, text.length) >= 2 && WordLists.isWordly(text) && text in blockedTexts()
 
     /** The user's words read again if the dictionaries are no longer as they were [before] ([UserAdditions.drop]): see [Engines.reload]. */
     fun reloadDictionaries(before: String) {
@@ -396,6 +395,3 @@ internal class UserLexicon(
         lists.blockedWords.forEach { model.block(it) }
     }
 }
-
-// below it, ASCII
-private const val ASCII_END = 0x80

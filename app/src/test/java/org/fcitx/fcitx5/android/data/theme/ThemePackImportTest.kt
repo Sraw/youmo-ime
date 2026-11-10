@@ -33,6 +33,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -167,7 +168,7 @@ class ThemePackImportTest {
         assertEquals(listOf("mine#light", "mine#dark"), versions.map { it.name })
         val folder = File(packs, "mine")
         assertEquals(
-            setOf("theme.xml", "preview.png", "photo.jpg", "p.webp", "l.webp", "enter.png", "round.ttf", "star.svg", "layouts/qwerty.xml"),
+            setOf("theme.xml", "preview.png", "photo.jpg", "p.webp", "l.webp", "enter.png", "round.ttf", "star.svg", "layouts/qwerty.xml", ".checked"),
             tree(folder).keys,
         )
         assertEquals(sampleXml, File(folder, "theme.xml").readText())
@@ -194,6 +195,36 @@ class ThemePackImportTest {
         assertEquals(emptyList<Theme.Pack>(), ThemeManager.Packs)
     }
 
+    // the theme maker's save (060-render-p3 M1: web/theme-maker/test/maker.test.mjs writes it) is a pack the app takes
+    @Test
+    fun theMakersSaveImports() {
+        val pack = opened(ThemeMakerTestdata.file("from-maker.theme").readBytes())
+        assertEquals("nord-mine", pack.staged.name)
+        assertEquals(emptyList<String>(), pack.staged.warnings)
+        val versions = pack.commit().getOrThrow()
+        assertEquals(listOf("nord-mine#light", "nord-mine#dark"), versions.map { it.name })
+        assertEquals(ThemeManager.builtin("nord#dark").palette(), versions[1].look.palette)
+    }
+
+    // and its save of a picture: a real PNG, decoded as the app does
+    @Test
+    fun theMakersPictureSaveImports() {
+        ThemeFilesManager.probe = real
+        val picture = opened(ThemeMakerTestdata.file("from-maker-picture.theme").readBytes())
+        assertEquals(emptyList<String>(), picture.staged.warnings)
+        assertEquals(listOf("nord-mine#light", "nord-mine#dark"), picture.commit().getOrThrow().map { it.name })
+    }
+
+    // and its save of the app's own 3.0 export converted (Return an image, its label hidden, as 3.0 drew it):
+    // a theme the app took stays one it takes
+    @Test
+    fun theMakersConvertedSaveImports() {
+        ThemeFilesManager.probe = real
+        val converted = opened(ThemeMakerTestdata.file("from-maker-30.theme").readBytes())
+        assertEquals("from-app", converted.staged.name)
+        assertEquals(listOf("from-app"), converted.commit().getOrThrow().map { it.name })
+    }
+
     @Test
     fun aPackIsDrawnFromItsOwnFileAndItsFolder() {
         val dark = opened(sample()).commit().getOrThrow()[1]
@@ -203,6 +234,10 @@ class ThemePackImportTest {
         assertSame(dark.drawn, drawn)
         assertSame(drawn, SceneThemes.of(dark, look))
         assertSame(SceneThemes.cascades(drawn), SceneThemes.cascades(drawn))
+        // a pack's kept too is let go with every look's (filesChanged): its cascades made anew
+        val kept = SceneThemes.cascades(drawn)
+        SceneThemes.forgetAll()
+        assertNotSame(kept, SceneThemes.cascades(SceneThemes.of(dark, look)!!))
         // its fonts by their names, each its file in its folder
         val asked = mutableListOf<String>()
         val before = ThemeAssets.decoder
@@ -275,9 +310,9 @@ class ThemePackImportTest {
         // an entry out of where it is unpacked
         assertTrue(open(zip("theme.xml" to sampleXml, "../out.txt" to "x")).exceptionOrNull() is SecurityException)
         assertFalse(File(unpacking, "out.txt").exists())
-        // a file the theme names out of its folder (the engine's file names may be `..`)
+        // a file the theme names out of its folder: `..` is no file name to the engine's reader since R20
         val out = xml(before = """<font name="f" src=".."/>""", styles = """<style select="key" font="f"/>""")
-        assertEquals(appContext.getString(R.string.exception_theme_file, ".."), refusal(zip("theme.xml" to out)))
+        assertTrue(refusal(zip("theme.xml" to out))!!.contains("src=\"..\" is not a file name"))
         // a folder of its own but layouts/, or one in layouts/ (its files would not be taken)
         assertEquals(appContext.getString(R.string.exception_theme_folder, "images"), refusal(zip("theme.xml" to xml(), "images/a.png" to "1x1")))
         assertEquals(
@@ -325,8 +360,8 @@ class ThemePackImportTest {
     @Test
     fun aPackLeavingTheKeysOneCannotTypeWithoutBlankIsRefused() {
         val hidden = xml(styles = """<style select="key.function" hidden="true"/>""")
-        val line = hidden.lines().indexOfFirst { "hidden=\"true\"" in it } + 1
-        assertEquals(appContext.getString(R.string.exception_theme_hidden_required, line.toString()), refusal(zip("theme.xml" to hidden)))
+        // where the engine finds it first: the board, the key
+        assertEquals(appContext.getString(R.string.exception_theme_hidden_required, "qwerty/shift"), refusal(zip("theme.xml" to hidden)))
         nothingLeft()
     }
 

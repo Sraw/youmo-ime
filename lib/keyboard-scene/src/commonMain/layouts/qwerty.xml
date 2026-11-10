@@ -81,7 +81,7 @@
     </key>
     <key id="domain" role="domain" kind="function" width="1.4" label=".com" text-size="16" send="commit:.com" mark="false"
          when="field=url|email">
-      <popup from="list">
+      <popup from="list" as-is="true">
         <item text=".com"/><item text=".cn"/><item text=".net"/><item text=".org"/>
       </popup>
     </key>

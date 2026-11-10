@@ -1,10 +1,9 @@
 """uat/12-voice.md (语音输入, with the voice pack: uat.py run imports it unless --no-voice). What is "said" is a clip of
-uat/tools/voice-clips.py read by the voice debug build in place of the microphone (Device.say, the
+uat/tools/voice-clips.py read by the debug build in place of the microphone (Device.say, the
 clip microphone: VoiceClipMic). The .md is the source of truth."""
 import json
 import os
 import re
-import subprocess
 import time
 
 from uat import CLIPS, OUT, PKG, Blocked, Fail, case, check, script
@@ -211,6 +210,9 @@ def vo01(d):
     return f"请求权限后允许，回到框里；再说「你好」→「{t}」"
 
 
+case("VO-37", needs="manual:系统权限对话框的拒绝、关掉、转屏、不再询问，手工跑")(lambda d: None)
+
+
 @case("VO-02", base="B0-语音", mutates="learn", needs=EV)
 def vo02(d):
     shown, t = dictate(d, "jintian")
@@ -220,7 +222,7 @@ def vo02(d):
     return f"听的时候显示 {live[:2]}；框里「{t}」"
 
 
-case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt")(lambda d: None)
+case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt、VoiceHoldUatTest.onAScaledKeyboardTheCancelDistanceIsTheKeyboardAsSeen")(lambda d: None)
 
 
 def tap_mic(d):
@@ -271,10 +273,10 @@ def vo04(d):
     return f"点麦克风结束「{t1}」；点盖层结束「{t2}」"
 
 
-case("VO-05", needs="jvm:VoiceGlassTest、VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt；真机截图看毛玻璃")(lambda d: None)
+case("VO-05", needs="jvm:VoiceGlassTest、VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt")(lambda d: None)
 
 
-case("VO-06", needs="jvm:VoiceHoldUatTest.numbersAreWrittenInDigits")(lambda d: None)
+case("VO-06", needs="jvm:VoiceHoldUatTest.numbersAreWrittenInDigits、ChineseNumbersTest.whatDoesNotReadAsItsKindStaysAsSaid、ChineseNumbersTest.digitsAreDigitByDigit")(lambda d: None)
 
 
 case("VO-07", needs="jvm:VoiceHoldUatTest.wordsWithNumeralsAreLeftAlone")(lambda d: None)
@@ -329,7 +331,7 @@ def vo10(d):
 case("VO-11", needs="jvm:VoiceKeyboardUatTest.aPasswordFieldHasNoVoice")(lambda d: None)
 
 
-case("VO-12", needs="jvm:VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt")(lambda d: None)
+case("VO-12", needs="jvm:VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt、VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesWithTheHold、VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid")(lambda d: None)
 
 
 case("VO-13", needs="jvm:VoiceHoldUatTest.holdingTheSpaceForThePickerDoesNotTalk")(lambda d: None)
@@ -370,13 +372,13 @@ case("VO-21", needs="jvm:VoiceUatTest.aWordDeletedOrBlockedIsNotListenedFor")(la
 case("VO-22", needs="jvm:VoiceUatTest.habitsOffListensForNoneOfTheirs")(lambda d: None)
 
 
-case("VO-29", needs="jvm:VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid、VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent、VoiceTapUatTest.whatTheAppSentIsNotTypedAgain")(lambda d: None)
+case("VO-29", needs="jvm:VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid、VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent、VoiceTapUatTest.whatTheAppSentIsNotTypedAgain、VoiceTapUatTest.theViewsMadeAnewWhileTalkingTheTailIsTypedOnce、VoiceTalkTest.thePolishFailingAfterANumberWrittenInDigitsTypesWhatFollowsItOnce")(lambda d: None)
 
 
 case("VO-30", needs="jvm:VoiceTapFieldUatTest.anotherFieldGetsNothingTheFirstGetsWhatWasSaid、VoiceTapFieldUatTest.theKeyboardHiddenStopsItAndTypesTheRestOnceRecognized、VoiceTapFieldUatTest.inputRestartedInTheSameFieldTalksOn")(lambda d: None)
 
 
-case("VO-31", needs="jvm:VoiceTapFieldUatTest.aMinuteWithNothingSaidStopsIt")(lambda d: None)
+case("VO-31", needs="jvm:VoiceTapFieldUatTest.aMinuteWithNothingSaidStopsIt、VoiceHoldUatTest.aHoldCutShortTypesWhatWasHeard")(lambda d: None)
 
 
 case("VO-27", needs="jvm:VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound、VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce、VoiceTapUatTest.aSilentMicrophoneIsSaid")(lambda d: None)
@@ -406,7 +408,7 @@ def keep_log(d, clip, why):
 
 def lift_early(d, clip, before_s):
     """hold space, play the clip and lift [before_s] before its speech ends; returns (field, offset ms
-    of the lift from the speech's end as the debug log puts it, whether timestamped). The lift is
+    of the lift from the speech's end as the debug log puts it). The lift is
     timed on the device from the clip microphone's "voice clip started" line: the clip's start as
     its frames are read"""
     _, end = span(clip)
@@ -428,11 +430,11 @@ def lift_early(d, clip, before_s):
     log = capture_log(d)
     check(log and log["stopAt"] is not None, f"没有调试日志的 voice capture 一行：{log}")
     if log["speechStart"] is None:   # no speech heard: the offset cannot be measured
-        return t, NOTHING_HEARD, False
+        return t, NOTHING_HEARD
     # split in two at an endpoint: a pause in the clip, the speech's end then not the clip's
     # (a build without the count: None, taken as one)
     if (log["segments"] or 1) > 1:
-        return t, NOTHING_HEARD, False
+        return t, NOTHING_HEARD
     if not plain(t):
         keep_log(d, clip, "empty")
     # the clip microphone gives no timestamp (VoiceListener): the frames read when the capture
@@ -445,7 +447,7 @@ def lift_early(d, clip, before_s):
     at = re.search(rf"voice clip started: {clip}\.wav frame=(\d+)", d.sh("logcat -d | grep 'voice clip started'"))
     check(at, "没有片段麦克风的 voice clip started 一行")
     speech_end = int(at.group(1)) + end * RATE
-    return t, (lift - speech_end) * 1000 / RATE, False
+    return t, (lift - speech_end) * 1000 / RATE
 
 
 def verdict(clip, results):
@@ -483,12 +485,12 @@ def vo23(d):
 
         def attempt(before):
             nonlocal before_s
-            t, off, stamped = lift_early(d, clip, before_s)
+            t, off = lift_early(d, clip, before_s)
             got = t[len(before):] if t.startswith(before) else t
             ok = plain(got) == want
             if off is NOTHING_HEARD:   # no speech segment, or two: says nothing about the tail
                 return ok, f"没听到语音或语音被切成两段「{got}」（不算）", False, t
-            note = f"{off:+.0f} ms{'' if stamped else '（无时间戳）'}「{got}」"
+            note = f"{off:+.0f} ms「{got}」"
             if -500 <= off <= -400:
                 return ok, note, True, t
             # off the window: not counted; the next lift moves by half what this one missed by
@@ -627,7 +629,7 @@ def vo28(d):
     time.sleep(0.3)
     # stopped on the mask (its hint), then the tail and the rest recognized, the mask gone
     d.tap(hint.c, 0.1)
-    time.sleep(3)
+    mask_gone(d)   # Enter tapped while the mask is up lands on the mask
     ex, ey = enter.c
     d.touch(("down", ex, ey), ("sleep", 0.05), ("up", ex, ey))
     time.sleep(2)
@@ -641,3 +643,5 @@ def vo28(d):
 
 
 case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing")(lambda d: None)
+case("VO-35", needs="jvm:VoiceEndTest.aChatLosesItsClosingMarkAQuestionKeepsItsOwn、VoiceEndTest.aLineLosesEveryEndMark、VoiceEndTest.elsewhereTheTextEndsAsSaidUnlessDropped、VoiceEndTest.aSearchAnAddressOrOneLineIsALine、VoicePolishTest.appliesAsPython")(lambda d: None)
+case("VO-36", needs="jvm:VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn、VoicePolishTest.nothingIsWrittenAfterAFullStop")(lambda d: None)

@@ -12,6 +12,7 @@ import android.os.SystemClock
 import android.view.View
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.sin
 
 /**
@@ -41,6 +42,8 @@ class VoiceWaveView(context: Context) : View(context) {
     // the level heard, eased towards so the bars move rather than jump
     private var target = 0f
     private var shown = 0f
+    // the last frame's uptime: the easing by the time gone, not the frame (a 120 Hz screen's twice as many)
+    private var lastFrame = 0L
 
     // the middle bars the tallest
     private val shape = FloatArray(BARS) { i -> 1f - 0.55f * abs(i - (BARS - 1) / 2f) / ((BARS - 1) / 2f) }
@@ -51,8 +54,11 @@ class VoiceWaveView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        val t = SystemClock.uptimeMillis() / 1000f
-        shown += ((if (active) target else 0f) - shown) * EASE
+        val now = SystemClock.uptimeMillis()
+        val t = now / 1000f
+        val frames = if (lastFrame == 0L) 1f else ((now - lastFrame) / FRAME_MS).coerceIn(0f, MAX_FRAMES)
+        lastFrame = now
+        shown += ((if (active) target else 0f) - shown) * (1f - (1f - EASE).pow(frames))
         val bar = width / (BARS * 2f - 1f)
         val mid = height / 2f
         for (i in 0 until BARS) {
@@ -75,7 +81,10 @@ class VoiceWaveView(context: Context) : View(context) {
 
     companion object {
         private const val BARS = 7
+        // per 60 Hz frame
         private const val EASE = 0.25f
+        private const val FRAME_MS = 1000f / 60
+        private const val MAX_FRAMES = 10f
         private const val REST = 0.12f
         private const val SWELL_HZ = 0.6f
         private const val TALK_HZ = 2.4f

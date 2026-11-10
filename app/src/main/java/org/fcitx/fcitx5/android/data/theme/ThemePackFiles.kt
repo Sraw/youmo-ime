@@ -12,6 +12,8 @@ import org.fcitx.fcitx5.android.input.theme.SvgSubset
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.input.theme.ThemePackCheck
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.layout.Include
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.look.Crop
 import org.fcitx.fcitx5.android.scene.look.Insets
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
@@ -22,6 +24,7 @@ import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.scene.look.Text
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.scene.theme.Effect
+import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.Style
@@ -30,6 +33,7 @@ import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Value
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.isPlainFileName
@@ -41,6 +45,7 @@ import java.io.IOException
 import java.io.OutputStream
 import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -231,8 +236,13 @@ object ThemePackFiles {
         val root = folder(themes)
         if (sweep) sweep(root)
         val dirs = root.listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") }) ?: return emptyList()
-        return dirs.sortedByDescending { it.lastModified() }.take(ThemeAssetLimits.MAX_PACKS).flatMap { listed(it, builtins) }
+        // the app's boards read once a listing, and only for a pack not checked yet (its stamp)
+        val builtIn = lazy { builtInBoards() }
+        return dirs.sortedByDescending { it.lastModified() }.take(ThemeAssetLimits.MAX_PACKS).flatMap { listed(it, builtins, builtIn) }
     }
+
+    /** What a kill left in [themes]' packs' SAVING cleared, as [list] with `sweep` does. */
+    fun sweepPacks(themes: File) = sweep(folder(themes))
 
     // a kill between a place's renames left the pack it replaced aside (`old-<random>/<name>`): put back where none
     // took its place; the rest (a pack half written, one being deleted, one replaced) cleared
@@ -247,7 +257,7 @@ object ThemePackFiles {
         sync(root)
     }
 
-    private fun listed(dir: File, builtins: List<Theme.Builtin>): List<Theme.Pack> {
+    private fun listed(dir: File, builtins: List<Theme.Builtin>, builtIn: Lazy<List<SceneLayout>>): List<Theme.Pack> {
         val xml = File(dir, THEME_XML)
         val source = xml.takeIf { it.isFile && it.length() <= ThemeAssetLimits.MAX_THEME_XML_BYTES }?.readText()
         val theme = when (val t = source?.let { parse(it) }) {
@@ -259,7 +269,7 @@ object ThemePackFiles {
         when {
             name != dir.name -> return skipped(dir, "is named $name", R.string.user_data_unreadable)
             badName(name) || builtinClash(name, theme.variants, builtins) -> return skipped(dir, "has a built-in's name", R.string.user_data_unreadable)
-            ThemePackCheck.hidesRequired(theme).isNotEmpty() -> return skipped(dir, "hides the keys' labels", R.string.user_data_unreadable)
+            blankKeys(dir, theme, source, builtIn).isNotEmpty() -> return skipped(dir, "leaves keys blank", R.string.user_data_unreadable)
         }
         val missing = ThemePackCheck.files(theme).all.firstOrNull { !inside(dir, it) }
         if (missing != null) return skipped(dir, "misses its file $missing", R.string.theme_file_missing)
@@ -273,7 +283,8 @@ object ThemePackFiles {
     }
 
     // [name] a plain file right in [dir] (a crafted name of the theme's, `..` say, never one out of it)
-    private fun inside(dir: File, name: String): Boolean {
+    @VisibleForTesting
+    internal fun inside(dir: File, name: String): Boolean {
         if (!isPlainFileName(name)) return false
         val f = File(dir, name)
         return f.isFile && try {
@@ -283,10 +294,14 @@ object ThemePackFiles {
         }
     }
 
-    /** The folders a zip's entry [name] (a directory's ending in `/`) may be unpacked into: its top, and `layouts/`'s files. */
+    /**
+     * The folders a zip's entry [name] (a directory's ending in `/`) may be unpacked into: its top, and `layouts/`'s
+     * files; a dot file never (the app's own, [CHECKED], is written by its check alone).
+     */
     fun unpacked(name: String): Boolean {
         val parts = name.split('/')
         return when {
+            parts.last().startsWith(".") -> false
             parts.size == 1 -> true
             parts.size == 2 && parts[0] == LAYOUTS -> true
             else -> false
@@ -354,7 +369,10 @@ object ThemePackFiles {
         val source = xml.readText().removePrefix(BOM)
         val read = readChecked(source, checks)
         val theme = read.value
-        ThemePackCheck.hidesRequired(theme).firstOrNull()?.let { errorRuntime(R.string.exception_theme_hidden_required, it.toString()) }
+        blankKeys(from, theme, source, lazy { builtInBoards() }, trustStamp = false).firstOrNull()?.let {
+            if (it == BlankKeys.TOO_MANY) errorRuntime(R.string.exception_theme_too_many_scenes)
+            errorRuntime(R.string.exception_theme_hidden_required, it.toString())
+        }
         val name = theme.name
         if (badName(name)) errorRuntime(R.string.exception_theme_pack_name, name)
         val files = ThemePackCheck.files(theme)
@@ -402,6 +420,92 @@ object ThemePackFiles {
         return all.map { it.name }.sorted()
     }
 
+    /**
+     * The boards a pack in [dir] may be shown on, for [ThemePackCheck.hidesRequired]: the app's, each replaced by the
+     * pack's own of its id (`layouts/<id>.xml`, its fragments the pack's, else the app's). One that does not read is
+     * left out: the layout checks refuse it.
+     */
+    internal fun boards(dir: File, builtInLayouts: List<SceneLayout> = builtInBoards()): List<BlankKeys.Board> {
+        val own = File(dir, LAYOUTS)
+        fun text(id: String) = File(own, "$id.xml").takeIf { it.isFile }?.readText()?.removePrefix(BOM)
+        val ownLayouts = own.listFiles().orEmpty().mapNotNull { f ->
+            (LayoutReader.layout(f.readText().removePrefix(BOM)) as? Parsed.Ok)?.value
+        }
+        val builtIn = builtInLayouts
+            .filter { b -> ownLayouts.none { it.id == b.id } }
+            .map { BlankKeys.Board(it.layout, it.fragments) }
+        return builtIn + ownLayouts.map { l ->
+            val fragments = l.parts.filterIsInstance<Include>().map { it.src }.distinct().mapNotNull { src ->
+                val t = text(src) ?: BuiltInLayouts(appContext).text(src) ?: return@mapNotNull null
+                (LayoutReader.fragment(t) as? Parsed.Ok)?.value?.let { src to it }
+            }.toMap()
+            BlankKeys.Board(l, fragments)
+        }
+    }
+
+    private fun builtInBoards(): List<SceneLayout> = BuiltInLayouts.RAW.keys.mapNotNull { SceneLayouts.parseBuiltIn(appContext, it) }
+
+    /** How many times the blank-key check ran, not answered by a pack's stamp: a test's count. */
+    @VisibleForTesting
+    internal var blankChecks = 0
+
+    /**
+     * [ThemePackCheck.hidesRequired] of the pack in [dir], asked once: a pack that passes is stamped ([CHECKED]: a
+     * hash of its theme.xml, its layouts, the rule's version and the app's boards: an app update checks again only where those changed), and a listing finds the stamp
+     * instead of asking again (the check takes a good part of a second; a listing may hold 100 packs).
+     */
+    private fun blankKeys(
+        dir: File,
+        theme: SceneTheme,
+        source: String,
+        builtIn: Lazy<List<SceneLayout>>,
+        trustStamp: Boolean = true,
+    ): List<BlankKeys.Blank> {
+        val stamp = File(dir, CHECKED)
+        val want = stampOf(dir, source)
+        // an import asks always: a stamp is the app's word, never a pack's
+        if (trustStamp && stamp.isFile && stamp.readText() == want) return emptyList()
+        stamp.delete()
+        blankChecks++
+        val found = ThemePackCheck.hidesRequired(theme, boards(dir, builtIn.value))
+        if (found.isEmpty()) runCatching { stamp.writeText(want) }.onFailure { Timber.w(it, "cannot stamp ${dir.name}") }
+        return found
+    }
+
+    private fun stampOf(dir: File, source: String): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        md.update("${BlankKeys.RULE} ${builtInHash()}\n${source.removePrefix(BOM)}".toByteArray())
+        File(dir, LAYOUTS).listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }.forEach {
+            md.update("\n${it.name}\n".toByteArray())
+            md.update(it.readBytes())
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * The app's boards, as a stamp holds them: a hash of their files' bytes, once a process (not read: the stamp
+     * changes with any change to them); a test's own.
+     */
+    @VisibleForTesting
+    internal var builtInHash: () -> String = { builtInBytesHash }
+
+    private val builtInBytesHash by lazy {
+        val md = MessageDigest.getInstance("SHA-256")
+        BuiltInLayouts.RAW.toSortedMap().forEach { (id, res) ->
+            md.update("\n$id\n".toByteArray())
+            md.update(appContext.resources.openRawResource(res).use { it.readBytes() })
+        }
+        md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /** The stamps of the packs under [themes] dropped: a restored backup's are its word, not the app's. */
+    fun dropStamps(themes: File) {
+        folder(themes).listFiles(FileFilter { it.isDirectory })?.forEach { File(it, CHECKED).delete() }
+    }
+
+    // a pack's stamp: its blank-key check passed (a dot file: neither listed nor exported)
+    private const val CHECKED = ".checked"
+
     // a file saved with a byte-order mark (Windows' Notepad): the engine's reader wants `<` first
     private const val BOM = "\uFEFF"
     private const val SHOWN = 5
@@ -423,6 +527,8 @@ object ThemePackFiles {
             need(temp.mkdirs(), "cannot make ${temp.name}")
             copy(File(staged.from, THEME_XML), File(temp, THEME_XML))
             staged.files.forEach { copy(File(staged.from, it), File(temp, it)) }
+            // the check's stamp: the listing takes its word
+            File(staged.from, CHECKED).takeIf { it.isFile }?.let { copy(it, File(temp, CHECKED)) }
             if (staged.layouts.isNotEmpty()) {
                 val layouts = File(temp, LAYOUTS).apply { mkdirs() }
                 staged.layouts.forEach { copy(File(staged.from, "$LAYOUTS/$it"), File(layouts, it)) }

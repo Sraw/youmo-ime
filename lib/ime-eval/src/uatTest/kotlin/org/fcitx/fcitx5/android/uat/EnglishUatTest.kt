@@ -186,6 +186,6 @@ class EnglishUatTest {
         type("thw")
         space()
         // corrected still, to the next likeliest (they), never to the word blocked
-        assertTrue("thw corrected to $text", text != "the ")
+        assertTrue("thw corrected to $text", text != "the " && text != "thw ")
     }
 }

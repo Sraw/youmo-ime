@@ -221,7 +221,7 @@ case("PY-87", needs="jvm:GroupedKeyboardUatTest.theSeparatorWithNothingTypedIsPa
 case("PY-88", needs="jvm:GroupedKeyboardUatTest.aSwipeDownTypesTheCornerAndWhileTypingPicksThatCandidate、KeyboardHalvesUatTest.aCornersDigitTypesItselfOrPicksThatCandidateWhileTyping")(lambda d: None)
 
 
-case("PY-89", needs="jvm:GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove、KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate")(lambda d: None)
+case("PY-89", needs="jvm:GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge、GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove、KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate")(lambda d: None)
 
 
 case("PY-90", needs="jvm:Keys14UatTest.theFourteenKeysLearnApartFromTheFullKeyboardAndYourWordsAreBoths")(lambda d: None)
@@ -332,7 +332,7 @@ case("PY-112", needs="jvm:ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboards
 case("PY-113", needs="jvm:EnginesReadingsTest.eachCandidateIsReadAsTyped、EnginesReadingsTest.aCharacterOfTwoReadingsIsReadAsTypedThroughFullPinyinsWrappers、StrokeFilterTest.readingsAndLookupsOfAKeptCandidateAreOfItsOwnPlace")(lambda d: None)
 
 
-@case("PY-114", mutates="learn")
+@case("PY-114", mutates=True)   # a word blocked stays blocked: the next case needs a reset
 def py114(d):
     d.type("azhi")
     c = d.cands()
@@ -353,7 +353,7 @@ def py114(d):
     return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}；a 有「啊」、zhi 有「之」（设置里恢复由 JVM 管）"
 
 
-@case("PY-115", mutates="learn")
+@case("PY-115", mutates=True)
 def py115(d):
     d.type("dianzan")
     c = d.cands()
@@ -375,6 +375,7 @@ def py115(d):
     d.type("uhs")
     u = d.cands()
     check(d.preedit().startswith("u"), f"打了 uhs，编码行是「{d.preedit()}」")
+    check(u, "打了 uhs 没有候选")
     ch = u[0].split()[0]
     menu = block_candidate(d, u[0], f"长按笔画查字「{ch}」的菜单")
     check(any("这串码" in t for t in menu), "笔画查字的确认没写「打这串码不再出现」")
@@ -418,7 +419,7 @@ def py116(d):
         d.type("guojia")
         after = d.cands()
         d.clear()
-        # the list may have two that show as 國家 (国家, and the dictionary's own traditional 國家): the one pressed goes
+        # the list may have two that show as 國家 (国家, and the dictionary's own traditional 國家): both go
         check("國家" not in after, f"屏蔽后繁體下 guojia 还出「國家」：{c[:6]} → {after[:6]}")
     finally:
         d.clear()
@@ -428,3 +429,6 @@ def py116(d):
     d.clear()
     check("国家" not in simp, f"屏蔽「國家」后简体下 guojia 还有「国家」：{simp[:6]}")
     return f"切到「{trad}」：长按「國家」菜单 {menu}；屏蔽后繁體 {after[:4]}，简体 {simp[:4]}"
+
+
+case("PY-117", needs="jvm:WordListsTest.aBlockedLatinWordReadsBackAsItsLetters、EnginesUserWordsTest.aLatinWordBlockedInPinyinStaysBlockedAfterARestartTillRestored")(lambda d: None)

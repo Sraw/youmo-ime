@@ -19,6 +19,8 @@ class VoiceQuietTest {
 
     private fun VoiceQuiet.feed(power: Double, times: Int, voiced: Boolean = false) = repeat(times) { window(window(power), speech = voiced) }
 
+    // contract: resources/voice/quiet-golden.tsv is written by quiet_golden.py from the rule it states on
+    // its own; a change to VoiceQuiet or to that script without the other fails here.
     // resources/voice/quiet_golden.py: real clips in a room's noise, Gain2, silero and the recognizer's
     // own segments as the app has them
     @Test
@@ -84,6 +86,11 @@ class VoiceQuietTest {
         val quiet = VoiceQuiet()
         quiet.feed(db(-45.0), 30, voiced = true)
         assertTrue(quiet.keeps("Yeah.", 0, 30L * 512))
+        // loud with no voiced window: dropped; letting loud alone through was measured and not taken
+        // (quiet_eval.py h3), a fan or traffic is loud too
+        val unvoiced = VoiceQuiet()
+        unvoiced.feed(db(-45.0), 30)
+        assertFalse(unvoiced.keeps("Yeah.", 0, 30L * 512))
     }
 
     @Test
@@ -95,6 +102,12 @@ class VoiceQuietTest {
         quiet.window(FloatArray(0))
         // an emulator's silent microphone: the recognizer's 「H」 goes
         assertFalse(quiet.keeps("H", 0, 52L * 512))
+        // garbage the VAD calls speech, past the first windows the level skips: still no sound
+        val broken = VoiceQuiet()
+        broken.feed(db(-66.0), 5)
+        broken.window(FloatArray(512) { Float.NaN }, speech = true)
+        broken.window(FloatArray(512) { Float.POSITIVE_INFINITY }, speech = true)
+        assertFalse(broken.keeps("H", 5L * 512, 7L * 512))
     }
 
     @Test
@@ -132,8 +145,11 @@ class VoiceQuietTest {
         assertTrue(odd.keeps("OK", 0, 40L * 300))
         // many windows: the record grows
         val long = VoiceQuiet()
+        long.feed(db(-40.0), 20, voiced = true)
         long.feed(db(-66.0), 1000)
-        assertFalse(long.keeps("OK", 0, 1000L * 512))
+        // the loud voiced start is still read as it was, past the record's growing
+        assertTrue(long.keeps("OK", 0, 20L * 512))
+        assertFalse(long.keeps("OK", 20L * 512, 1020L * 512))
     }
 
     @Test

@@ -102,14 +102,15 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      */
     fun migrateSizeFollow() {
         if (sizeFollowMigrated) return
-        val lists = managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>().filter { it.follow != null }
-        val stored = lists.any { sharedPreferences.contains(it.follow!!.first) }
+        // each list with its 跟随主题 flag's key
+        val lists = managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>().mapNotNull { l -> l.follow?.let { l to it.first } }
+        val stored = lists.any { (_, flag) -> sharedPreferences.contains(flag) }
         sharedPreferences.edit {
-            if (!stored) lists.forEach { list ->
+            if (!stored) lists.forEach { (list, flag) ->
                 val set = list.keys.any { (name, default) ->
                     runCatching { sharedPreferences.getInt(name, default) }.getOrNull() != default
                 }
-                putBoolean(list.follow!!.first, !set)
+                putBoolean(flag, !set)
             }
             putBoolean(SIZES_FOLLOW_MIGRATED, true)
         }
@@ -291,15 +292,15 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         return moved.isNotEmpty()
     }
 
+    /** Whether a slot names the theme [name]. */
+    fun namesTheme(name: String): Boolean = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
+        .any { runCatching { sharedPreferences.getString(it, null) }.getOrNull() == name }
+
     /**
      * Each slot naming the user's theme [from] names [to] (060-render-p3 T3: one hiding a built-in theme
      * saved again under a new name, [ThemeFilesManager.moveClashing]); on disk before it returns, as the
      * old theme's json is deleted next. Whether it was written.
      */
-    /** Whether a slot names the theme [name]. */
-    fun namesTheme(name: String): Boolean = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
-        .any { runCatching { sharedPreferences.getString(it, null) }.getOrNull() == name }
-
     fun renameThemeRefs(from: String, to: String): Boolean {
         val keys = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
             .filter { runCatching { sharedPreferences.getString(it, null) }.getOrNull() == from }

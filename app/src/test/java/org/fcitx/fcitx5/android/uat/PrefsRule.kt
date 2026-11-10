@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.junit.rules.ExternalResource
 
 /**
@@ -14,6 +16,15 @@ import org.junit.rules.ExternalResource
 class PrefsRule : ExternalResource() {
 
     private val restore = mutableListOf<() -> Unit>()
+
+    // 表情 opens the panel last shown, which app code writes and another test may have left at 颜文字 or the
+    // symbols: the emoji at each test's start (R20 F6608)
+    override fun before() {
+        set(AppPrefs.getInstance().internal.lastPickerType, PickerWindow.Key.Emoji.name)
+        // the floating keyboard's spot, which a drag's end writes: another test's drag moved the theme maker's
+        // floating shots (ThemeMakerLayoutTest)
+        AppPrefs.getInstance().internal.let { set(it.floatingKeyboardX, it.floatingKeyboardX.defaultValue); set(it.floatingKeyboardY, it.floatingKeyboardY.defaultValue) }
+    }
 
     fun <T : Any> set(pref: ManagedPreference<T>, value: T) {
         val was = pref.getValue()
