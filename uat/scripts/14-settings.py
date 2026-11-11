@@ -917,3 +917,25 @@ case("ST-89", needs="manual:要在 youmo29（API 29）和 API 34+ 上各走一�
 case("ST-91", needs="manual:要逐个打 bad/ 里坏文件的主题包导入；规则由 SoundFileTest、SvgSubsetTest、ThemePackImportTest 查")(lambda d: None)
 case("ST-92", needs="manual:主题制作网页；在电脑浏览器上手工跑（图标预览、按键音试听）")(lambda d: None)
 case("ST-93", needs="manual:主题制作网页；在电脑浏览器上手工跑（选动画 WebP 做背景，导入 App 看）")(lambda d: None)
+
+
+@case("ST-96", base="B0-设置")
+def st96(d):
+    """纠错's summary on the device: 双拼 only the ü-key slip, its 18 and 14 keys 不适用"""
+    title = "纠正错拼和按偏的键"
+    d.goto("通用输入")
+    r = None
+    for _ in range(8):
+        s = d.screen()
+        r = d.row(title, s)
+        if r is not None and any(n.rid == "summary" for n in r.walk()):
+            break
+        if not d.scroll(s):
+            break
+    check(r is not None, f"通用输入里没有「{title}」：{d.screen().texts()[:10]}")
+    summary = " ".join(n.text for n in r.walk() if n.rid == "summary" and n.text)
+    check("双拼：只认" in summary, f"说明里没有「双拼：只认」：{summary}")
+    for im in ("双拼 · 18 键", "双拼 · 14 键", "双拼 · 九键"):
+        check(im in summary.split("不适用")[-1], f"不适用里没有「{im}」：{summary}")
+    d.shot("full", "纠正错拼和按偏的键的说明")
+    return summary
