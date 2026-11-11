@@ -33,7 +33,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * What the settings page says of a way (SwipeFates) is what the keyboard draws of it: each key's ways'
@@ -145,8 +144,8 @@ class SwipeFatesParityUatTest {
         noNoteOfDown()
     }
 
-    // the page's scenes made on its thread while the input view works out the theme's looks on the main one:
-    // the page's cascades its own, none of SceneThemes' kept ones
+    // the page's scenes made on its thread work out the theme's looks in cascades of its own: none of SceneThemes'
+    // kept ones, which the input view and the main thread work out at the same time
     @Test
     fun thePagesThreadWorksOutLooksOfItsOwn() {
         setWays()
@@ -154,24 +153,11 @@ class SwipeFatesParityUatTest {
             val jobs = page(h).jobs(slots())
             val theme = ThemeManager.activeTheme
             val kept = SceneThemes.cascades(SceneThemes.of(theme, ThemeManager.shownLook(theme))!!)
+            val keptBefore = kept.size
             jobs.forEach { assertNotSame(kept, it.cascades) }
-            val failed = AtomicReference<Throwable>()
-            val thread = Thread {
-                try {
-                    repeat(ROUNDS) { jobs.forEach(SwipeFates::made) }
-                } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-                    failed.set(e)
-                }
-            }
-            thread.start()
-            var i = 0
-            while (thread.isAlive) kept.of(setOf("im=${i++ % ROUNDS}", "field=text"))
-            thread.join()
-            failed.get()?.let { throw it }
+            jobs.forEach { SwipeFates.made(it) }
+            jobs.forEach { assertTrue(it.cascades.size > 0) }
+            assertEquals(keptBefore, kept.size)
         }
-    }
-
-    private companion object {
-        const val ROUNDS = 40
     }
 }

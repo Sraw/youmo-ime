@@ -1268,6 +1268,7 @@
     <string name="swipe_fate_shortened">畫不下，鍵上顯示為「%s」</string>
     <string name="swipe_fate_sign">畫不下，鍵上顯示為圖示</string>
     <string name="swipe_fate_dropped">畫不下，鍵上不顯示（滑動照常有效）</string>
+    <string name="swipe_fate_roots">字根佔了位置，鍵上不顯示（滑動照常有效）</string>
     <string name="swipe_fate_both">直向%1$s，橫向%2$s</string>
     <string name="swipe_fate_part_as_set">照常顯示</string>
     <string name="swipe_fate_part_shortened">顯示為「%s」</string>
