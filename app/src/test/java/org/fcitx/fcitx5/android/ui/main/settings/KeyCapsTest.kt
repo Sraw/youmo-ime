@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.app.Activity
 import android.view.ContextThemeWrapper
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import org.fcitx.fcitx5.android.FcitxApplication
@@ -24,10 +26,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLooper
 import kotlin.math.roundToInt
 
 /**
@@ -71,6 +75,22 @@ class KeyCapsTest {
             side > 0 -> At.TopRight
             else -> At.TopLeft
         }
+    }
+
+    // a tap as a finger makes it, down and up: the frame's click, though the engine's cell under it is a gesture view
+    @Test
+    fun aTapOnTheKeyIsItsClick() {
+        val k = key()
+        // in a window: a view not in one queues its click for an attach that never comes
+        Robolectric.buildActivity(Activity::class.java).setup().get().setContentView(FrameLayout(ctx).apply { addView(k, SIZE, SIZE) })
+        ShadowLooper.idleMainLooper()
+        var clicks = 0
+        k.setOnClickListener { clicks++ }
+        val c = SIZE / 2f
+        k.dispatchTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, c, c, 0))
+        k.dispatchTouchEvent(MotionEvent.obtain(0, 50, MotionEvent.ACTION_UP, c, c, 0))
+        ShadowLooper.idleMainLooper()
+        assertEquals(1, clicks)
     }
 
     @Test

@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.view.MotionEvent
+import android.view.View
 import android.widget.EditText
 import android.widget.RadioButton
 import android.widget.TextView
@@ -164,6 +166,31 @@ class PopupOverridesFragmentTest {
             val dialog = ShadowDialog.getLatestDialog() as AlertDialog
             dialog.listView.performItemClick(null, index, 0)
             st.idle()
+        }
+
+        // a key tapped as a finger does, down and up through the window (not performClick): beta1's caps kept the
+        // touch in the engine's cell, a gesture view, and no dialog came
+        private fun tap(v: View) {
+            val at = IntArray(2).also(v::getLocationInWindow)
+            val x = at[0] + v.width / 2f
+            val y = at[1] + v.height / 2f
+            val root = st.activity.window.decorView
+            root.dispatchTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, x, y, 0))
+            root.dispatchTouchEvent(MotionEvent.obtain(0, 40, MotionEvent.ACTION_UP, x, y, 0))
+            st.idle()
+        }
+
+        @Test
+        fun aTappedKeyOpensItsDialogOnEveryTab() {
+            open()
+            tap(keyCalled("q"))
+            assertTrue((ShadowDialog.getLatestDialog() as AlertDialog).isShowing)
+            ShadowDialog.getLatestDialog().dismiss()
+            click(R.string.shortcut_page_g14)
+            tap(keyCalled("QW"))
+            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            assertTrue(dialog.isShowing)
+            assertTrue(KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<RadioButton>().count() == 8)
         }
 
         // a letter's dialog has its two ways below its characters: a text typed for 下滑 is what its swipe down runs

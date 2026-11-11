@@ -8,6 +8,7 @@ import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -178,7 +179,7 @@ object KeyCaps {
         state: String? = null,
         said: String? = null,
         shortcut: Shortcut? = null,
-    ) = FrameLayout(ctx).apply {
+    ): FrameLayout = KeyFrame(ctx).apply {
         isClickable = true
         isFocusable = true
         val ripple = ctx.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run {
@@ -191,5 +192,11 @@ object KeyCaps {
         // theme, its symbol and shortcut's marks placed by the engine; edited, outlined along its face
         foreground = ripple
         add(sceneKey(ctx, text, hint, marked, dimmed, selected, shortcut), lParams(matchParent, matchParent))
+    }
+
+    // the engine's cell is a gesture view and takes every touch it gets, so a tap never reached this frame's
+    // click on a device (Robolectric's performClick went straight to the frame): the frame keeps them all
+    private class KeyFrame(ctx: Context) : FrameLayout(ctx) {
+        override fun onInterceptTouchEvent(ev: MotionEvent) = true
     }
 }
