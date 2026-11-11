@@ -144,9 +144,6 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object T9Letters : SettingsRoute()
 
-    @Serializable
-    data object T9Symbols : SettingsRoute()
-
     /** 「通用输入 → 网址和邮箱」 (AddressSettingsFragment). */
     @Serializable
     data object Addresses : SettingsRoute()
@@ -223,9 +220,6 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<NineKeyLettersFragment, T9Letters> {
                 label = ctx.getString(R.string.t9_letters)
-            }
-            fragment<NineKeySymbolsFragment, T9Symbols> {
-                label = ctx.getString(R.string.t9_symbols)
             }
             fragment<ToolbarButtonsFragment, ToolbarButtons> {
                 label = ctx.getString(R.string.toolbar_buttons)

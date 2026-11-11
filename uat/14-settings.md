@@ -570,7 +570,7 @@
 - **前提**：B0-设置，**输入法 → 拼音** 的 **键盘** 选「14 键」；**按键 → 按键字符和快捷键**，14 键页。
 - **操作**：先点 QW 键看列表，不改，确定；再点 QW，添加 `①`，确定；回测试页长按 QW，再在 QW 上向上滑。再点 QW，把字符全删光，确定，回测试页长按 QW、上滑。九键（1 和 2）、18 键、注音九键、功能键页的 ，。各点一个键看列表。
 - **预期**：第一次打开列表不是空的：是键盘上长按 QW 弹出的那些（带框的第一个是 `1`，和键角小字一样，后面 Q W q w 和符号）；不改直接确定，QW 不显示改过。加了 `①` 后长按弹出的还是原来的样子（Q W 1 q w 一排，符号在上面），多一个 `①`；上滑打出 `1`。全删光后长按不弹出字符，上滑等于点这个键。九键 2 列表第一个是 `2`；九键 1 列表第一个是键角的 `1`，后面是 1 键弹出的符号，改过后弹出的符号照原样上屏（不变成全角）；注音全键盘的键本来没有长按，列表空，写着「长按这个键不弹出字符」；功能键页 ，。下面写着所有键盘共用这一组；对话框下方写着改过以后不再跟着按键字符和九键符号变。功能键页的逗号改了以后，手写键盘上长按 ，也弹出改过的。
-- **JVM**：`PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName`、`PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress`、`PopupOverridesFragmentTest$Dialog.aListBackToTheOwnStoresNothingAndOneEmptiedStoresOff`、`OwnLongPressUatTest.everyKeysEditorStartIsWhatItsKeyboardPopsUp`、`OwnLongPressUatTest.aListEmptiedTurnsTheLongPressOff`、`SwipeSlotsUatTest.aGroupKeysLongPressSetByName`、`HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers`；设备上不跑。
+- **JVM**：`PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName`、`PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress`、`PopupOverridesFragmentTest$Dialog.aListBackToTheOwnStoresNothingAndOneEmptiedKeepsItsRow`、`OwnLongPressUatTest.everyKeysEditorStartIsWhatItsKeyboardPopsUp`、`OwnLongPressUatTest.aListEmptiedTurnsTheLongPressOff`、`SwipeSlotsUatTest.aGroupKeysLongPressSetByName`、`HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers`；设备上不跑。
 
 
 ### ST-103 [P1] 0.6.0 新增的内置主题

@@ -6,69 +6,83 @@ package org.fcitx.fcitx5.android.input.popup
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PopupEditorTest {
 
-    private fun editor() = PopupEditor(listOf("2", "W", "w"))
+    // a 14 key's: its row (1 Q W) the keyboard's, its symbols the user's
+    private fun editor() = PopupEditor(listOf("1", "q", "w"), listOf("!", "@", "#"), "1")
 
     @Test
     fun aTapSelectsAndNothingMoves() {
         val e = editor()
-        e.tap(2)
-        assertEquals(listOf("2", "W", "w"), e.items)
-        assertEquals(2, e.selected)
-        e.tap(2)
+        e.tap(4)
+        assertEquals(listOf("1", "q", "w", "!", "@", "#"), e.items)
+        assertEquals(4, e.selected)
+        e.tap(4)
         assertEquals(-1, e.selected)
     }
 
+    // the row greyed: chosen as the first, never moved or deleted (060-keys-unify S5)
     @Test
-    fun makeFirstAndMovesFollowTheCharacter() {
-        val e = editor()
-        e.tap(2)
-        e.makeFirst()
-        assertEquals(listOf("w", "2", "W"), e.items)
-        assertEquals(0, e.selected)
-        e.moveRight()
-        assertEquals(listOf("2", "w", "W"), e.items)
-        assertEquals(1, e.selected)
-        e.moveLeft()
-        assertEquals(listOf("w", "2", "W"), e.items)
-    }
-
-    @Test
-    fun whatDoesNotApplyIsOff() {
-        val e = editor()
-        assertFalse(e.canDelete)
-        e.tap(0)
-        assertFalse(e.canMakeFirst)
-        assertFalse(e.canMoveLeft)
-        assertTrue(e.canMoveRight)
-        e.tap(2)
-        assertFalse(e.canMoveRight)
-        e.moveRight()
-        assertEquals(listOf("2", "W", "w"), e.items)
-    }
-
-    @Test
-    fun deleteSelectsWhatTookItsPlaceOrThePreviousOrNone() {
+    fun aRowItemCanOnlyBeMadeTheFirst() {
         val e = editor()
         e.tap(1)
+        assertTrue(e.isRow(1))
+        assertFalse(e.canDelete)
+        assertFalse(e.canMoveLeft)
+        assertFalse(e.canMoveRight)
         e.delete()
-        assertEquals(listOf("2", "w"), e.items)
-        assertEquals(1, e.selected)
-        e.delete()
-        assertEquals(0, e.selected)
-        e.delete()
-        assertEquals(-1, e.selected)
-        assertTrue(e.items.isEmpty())
+        e.moveRight()
+        assertEquals(listOf("1", "q", "w", "!", "@", "#"), e.items)
+        assertTrue(e.canMakeFirst)
+        e.makeFirst()
+        assertEquals("q", e.first)
+        assertFalse(e.canMakeFirst)
     }
 
     @Test
-    fun addKeepsEachCharacterOnce() {
+    fun symbolsMoveAmongThemselvesOnly() {
         val e = editor()
-        e.add("é é w ü")
-        assertEquals(listOf("2", "W", "w", "é", "ü"), e.items)
+        e.tap(3)
+        assertFalse("not into the row", e.canMoveLeft)
+        e.moveLeft()
+        assertEquals(listOf("!", "@", "#"), e.symbols)
+        e.moveRight()
+        assertEquals(listOf("@", "!", "#"), e.symbols)
+        assertEquals(4, e.selected)
+        e.tap(5)
+        assertFalse(e.canMoveRight)
+    }
+
+    @Test
+    fun theFirstDeletedPassesToTheFirstItemLeft() {
+        val e = PopupEditor(emptyList(), listOf("a", "b"), "b")
+        e.tap(1)
+        e.delete()
+        assertEquals("a", e.first)
+        assertEquals(0, e.selected)
+        e.delete()
+        assertNull(e.first)
+        assertEquals(-1, e.selected)
+        e.add("x y")
+        assertEquals("a list of none takes its first", "x", e.first)
+    }
+
+    @Test
+    fun addKeepsEachItemOnceAndNoneOfTheRow() {
+        val e = editor()
+        e.add("é é w ü !")
+        assertEquals(listOf("!", "@", "#", "é", "ü"), e.symbols)
+        assertEquals("1", e.first)
+    }
+
+    @Test
+    fun aFirstNotThereIsNone() {
+        assertNull(PopupEditor(listOf("1"), listOf("a"), "z").first)
+        // a symbol of the row's is the row's alone
+        assertEquals(listOf("a"), PopupEditor(listOf("1"), listOf("1", "a"), null).symbols)
     }
 }

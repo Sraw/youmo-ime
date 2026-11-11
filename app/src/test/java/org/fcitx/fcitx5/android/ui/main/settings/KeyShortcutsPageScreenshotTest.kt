@@ -19,7 +19,9 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
-import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.UserList
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -61,7 +63,7 @@ class KeyShortcutsPageScreenshotTest {
         val p = AppPrefs.getInstance().internal
         val set = more.fold(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好"))) { s, (name, shortcut) -> s.with(name, shortcut) }
         prefs.setShortcuts(set)
-        prefs.set(p.popupOverrides, PopupOverrides.Empty.with("b", emptyList()).serialize())
+        prefs.set(p.keyLists, KeyLists.of(mapOf(KeyId("full/b") to UserList.Off)).serialize())
         st.activity
         st.open(SettingsRoute.PopupOverrides)
     }
@@ -109,6 +111,7 @@ class KeyShortcutsPageScreenshotTest {
             R.string.shortcut_page_g14 to "keys14",
             R.string.shortcut_page_g18 to "keys18",
             R.string.shortcut_page_zyfull to "zhuyin_full",
+            R.string.shortcut_page_number to "number",
             R.string.shortcut_page_function to "function",
         )) {
             tab(title)

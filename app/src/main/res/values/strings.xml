@@ -370,11 +370,7 @@
     <string name="toolbar_reset">Reset to default</string>
     <string name="toolbar_trad_simp">Simplified / Traditional</string>
     <string name="reset_this_key">Restore this key\'s default</string>
-    <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it, and the small character on the key. Tap a character to select it, then use the buttons below.</string>
-    <string name="letters">Letters</string>
-    <string name="other_keys">Other keys</string>
-    <string name="add_key">Add another key</string>
-    <string name="key_label_hint">Key label, e.g. .</string>
+    <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it, and the small character on the key. The faded ones are the keyboard\'s own (a key\'s letters, its digit): they can be made the first, not moved or deleted. Tap a character to select it, then use the buttons below.</string>
     <string name="reset_all_long_press_message">Restore every key to its built-in long-press characters?</string>
     <string name="reset_all">Reset all</string>
     <string name="my_words">User dictionary</string>
@@ -687,12 +683,6 @@
     <string name="t9_letters_reset_all_message">Put every key back to its letters as on a phone?</string>
     <string name="t9_symbols">Long-press symbols</string>
     <string name="t9_symbols_summary">What a long press on a key offers besides its digit and letters</string>
-    <string name="t9_symbols_hint">Tap a key to set the symbols its long press offers too, above its digit and letters, a line between. With Chinese punctuation on, those of 2 to 9 type as Chinese punctuation (! types ！); those of 1 type as they are.</string>
-    <string name="t9_symbols_of">Long press of %1$s</string>
-    <string name="t9_symbols_field_hint">Default: %1$s</string>
-    <string name="t9_symbols_editor_hint">Apart by spaces, up to %1$d. A digit or a letter alone is not kept: a long press types those as keys, not as themselves. Emptied, the key offers none.</string>
-    <string name="t9_symbols_reset_all_message">Put every key back to its default symbols?</string>
-    <string name="t9_symbols_none_kept">None of those can be a symbol (a digit or a letter alone): the key is left as it was.</string>
     <string name="im_candidate_reading">Candidate readings</string>
     <string name="im_candidate_reading_summary">Each character\'s reading on the candidates, with its tone; the bar gets taller and the candidates wider</string>
     <string name="im_candidate_reading_off">Off</string>
@@ -818,8 +808,6 @@
     <string name="picker_flags">Flags</string>
     <string name="long_press_legend">Outlined keys are changed; on a faded key a long press offers nothing, and a swipe to its first of long press is a tap.</string>
     <string name="long_press_none">Holding this key offers nothing.</string>
-    <string name="long_press_unread">Couldn’t read this key’s long press.</string>
-    <string name="long_press_by_name_snapshot">Once edited, the list is yours: later changes to the full keyboard’s characters or the nine keys’ symbols no longer reach this key.</string>
     <string name="long_press_add_hint">Add, space between several</string>
     <string name="punctuation_page_hint">While typing Chinese, the key on the left types the punctuation on the right; a key with several offers a choice. Tap one to change or remove it.</string>
     <string name="punctuation_pair">in turn</string>
@@ -1290,7 +1278,6 @@
     <string name="swipe_preset_confirm">Every key on every keyboard goes back to this preset. You can undo it afterwards.</string>
     <string name="swipe_way_said">%1$s %2$s</string>
     <string name="swipe_ways_said">%1$s, %2$s</string>
-    <string name="swipe_select_keys_only">Only the letter keys can be selected here. Select other keyboards\' keys on their own tabs.</string>
     <string name="swipe_fate_shortened">No room: shown on the key as “%s”</string>
     <string name="swipe_fate_sign">No room: shown on the key as an icon</string>
     <string name="swipe_fate_dropped">No room: not shown on the key (the swipe still works)</string>

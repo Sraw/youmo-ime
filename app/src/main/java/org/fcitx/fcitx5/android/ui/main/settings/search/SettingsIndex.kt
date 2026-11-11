@@ -13,6 +13,7 @@ import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
@@ -56,6 +57,10 @@ object SettingsIndex {
         managed(context, R.string.virtual_keyboard, SettingsRoute.Keys, { KeysSettingsFragment.build(it) }, this)
         add(Entry(context.getString(R.string.long_press_characters), context.getString(R.string.long_press_characters_summary),
             listOf(context.getString(R.string.virtual_keyboard)), Target(SettingsRoute.PopupOverrides, null)))
+        // 九键's long press, edited on that page's 九键 tab alone (060-keys-unify S5): its old name found there, the tab opened
+        add(Entry(context.getString(R.string.t9_symbols), context.getString(R.string.t9_symbols_summary),
+            listOf(context.getString(R.string.virtual_keyboard), context.getString(R.string.long_press_characters)),
+            Target(SettingsRoute.PopupOverrides, KeyShortcutPreset.NINE)))
         add(Entry(context.getString(R.string.toolbar_buttons), context.getString(R.string.toolbar_buttons_summary),
             listOf(context.getString(R.string.virtual_keyboard)), Target(SettingsRoute.ToolbarButtons, null)))
         managed(context, R.string.section_sound_and_vibration, SettingsRoute.SoundAndVibration, { SoundSettingsFragment.build(it) }, this)

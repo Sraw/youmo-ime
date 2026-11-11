@@ -24,8 +24,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.firstShown
 import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
 import org.fcitx.fcitx5.android.input.keyboard.swipeWays
-import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
-import org.fcitx.fcitx5.android.input.popup.PopupPreset
+import org.fcitx.fcitx5.android.input.keys.KeyResolver
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
@@ -36,6 +35,7 @@ import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.utils.styledColor
+import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
@@ -108,14 +108,25 @@ object KeyCaps {
     internal fun SceneKeyCell.onBoard(ctx: Context, shortcut: Shortcut?, board: SceneKeyCell.Board?) {
         keyboardKeyHeight = keyboardKeyHeight(ctx)
         this.board = board
-        val names = board?.let { b -> SceneLayouts.of(ctx, b.layout)?.let(SceneBoard::names) } ?: listOfNotNull(shortcut?.name?.let { KeyId.of(it).name })
-        // each slot where its way's 图标位置 puts it on the keyboard, a key with no shortcut too
-        val spots = swipeSpots()
-        marks = SceneMarks.settings(
-            shortcut?.slots ?: SwipeSlotsCache.current, swipeWays(), spots.symbol, spots.shortcut,
-            shortcut?.charShortcuts ?: true, names, SceneBoard.firsts(PopupOverridesCache.byName.current, names),
-        )
+        val layout = board?.let { SceneLayouts.of(ctx, it.layout) }
+        val slots = shortcut?.slots ?: SwipeSlotsCache.current
+        val charShortcuts = shortcut?.charShortcuts ?: true
+        // the marks as the keyboard's resolver has them (060-keys-unify §1.3): each key's first from key_lists, its
+        // slots the page's being edited
+        marks = if (layout != null) {
+            SceneBoard.resolver(layout, "", slots = slots).marks(keysState()).let { if (it.charShortcuts == charShortcuts) it else it.copy(charShortcuts = charShortcuts) }
+        } else {
+            // a key alone (no board): its slots' marks, no first
+            val spots = swipeSpots()
+            SceneMarks.settings(slots, swipeWays(), spots.symbol, spots.shortcut, charShortcuts, listOfNotNull(shortcut?.name?.let { KeyId.of(it).name }), emptyMap())
+        }
     }
+
+    // the keys' state on a keyboard of no Shift and no punctuation: the swipe settings alone
+    private fun keysState() = KeysState(ways = swipeWays(), spots = swipeSpots())
+
+    /** [layout]'s resolver as the editor reads a key's list of it ([KeyResolver.edit]): its keys' defaults and the user's lists. */
+    fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.of(ctx, layout)?.let { SceneBoard.resolver(it, "") }
 
     /** A qwerty key's height on the keyboard as the height settings make it now, px (InputView's keys' area, [KeyboardArea]). */
     fun keyboardKeyHeight(ctx: Context): Int = SwipeFates.size(upright(ctx), KeyNames.QWERTY, ImKeyboards.Layout.TEXT).height / KEY_ROWS
@@ -132,14 +143,19 @@ object KeyCaps {
         val size = SwipeFates.size(upright(ctx), layout, CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT)
         // the letters' corners as the keyboard draws them (TextKeyboard.alts: the long presses' firsts, the user's
         // overrides; none where the first's way draws nothing): without them no symbol is drawn, nor does one take a mark's room
-        val alts = if (!firstShown()) emptyMap() else
-            SceneLetters.alts { c -> c.toString().let { PopupOverridesCache.user.current.resolve(it, PopupPreset[it])?.firstOrNull() } }
+        val resolver = if (firstShown()) resolver(ctx, layout) else null
+        val alts = if (resolver == null) emptyMap() else SceneLetters.alts { c -> resolver.resolve(KeyId("full/$c"), keysState()).firstShown }
         return SceneKeyCell.Board(layout, KeyId.of(shortcut).name, size.width, size.height, alts,
             AppPrefs.getInstance().keyboard.letterCase.getValue().case, size.floating, size.split)
     }
 
-    private fun defaultBoard(shortcut: String) =
-        BOARDS[shortcut.substringBefore('/', "")]?.first ?: FUNCTION_BOARDS[shortcut] ?: KeyNames.QWERTY
+    /**
+     * The board the page's key of [shortcut] is on: a character key's its form's, a function key's (`space`, `fn/retype`)
+     * the board it is on, qwerty where that has it (九键's 重输 and 0 are the nine keys', 分词 the 14 keys').
+     */
+    fun defaultBoard(shortcut: String): String = KeyId.of(shortcut).let { id ->
+        if (id.isFunction) FUNCTION_BOARDS[id.key] ?: KeyNames.QWERTY else BOARDS[id.form]?.first ?: KeyNames.QWERTY
+    }
 
     // a shortcut page's form: its board and the code row that board has
     private val BOARDS = mapOf(
