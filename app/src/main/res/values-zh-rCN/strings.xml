@@ -197,6 +197,12 @@
     <string name="theme_version_light_switch">浅色版本，点按切换到深色</string>
     <string name="theme_version_dark_switch">深色版本，点按切换到浅色</string>
     <string name="new_theme">新增主题</string>
+    <string name="theme_name_monet">动态取色</string>
+    <string name="theme_name_material">Material</string>
+    <string name="theme_name_pixel">Pixel</string>
+    <string name="theme_name_amoled_black">AMOLED 黑</string>
+    <string name="theme_name_custom">我的主题</string>
+    <string name="theme_name_custom_n">我的主题 %d</string>
     <string name="theme_add_import">导入主题文件</string>
     <string name="theme_add_web">在网页上制作</string>
     <string name="theme_add_web_hint">做好后回到这里导入</string>
