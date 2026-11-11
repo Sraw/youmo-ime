@@ -38,7 +38,7 @@ class NewThemeEntryUi(override val ctx: Context) : Ui {
         }
     }
 
-    override val root = constraintLayout {
+    val card = constraintLayout {
         foreground = styledDrawable(android.R.attr.selectableItemBackground)
         background = ctx.drawable(R.drawable.bkg_theme_choose_image)
         outlineProvider = ViewOutlineProvider.BOUNDS
@@ -55,4 +55,7 @@ class NewThemeEntryUi(override val ctx: Context) : Ui {
             bottomOfParent()
         })
     }
+
+    // as tall as a theme's card with its name: the row's cards in line, its own name inside it
+    override val root = themeCardWithName(ctx, card, themeNameView(ctx))
 }

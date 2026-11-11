@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.KeyStyleOver
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
@@ -97,13 +98,14 @@ class SceneBoard(
         val layout = layout ?: return null
         val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(of, look) } ?: return null
         val measurer = measurer(of, look)
-        return scene(layout, sceneTheme, look, measurer, width, height)?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key), PackIcons.of(of)) }
+        return scene(layout, sceneTheme, look, measurer, width, height, (of as? Theme.Pack)?.let { ThemeManager.keyStyleShown.overPack })?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key), PackIcons.of(of)) }
     }
 
     // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it
-    private fun scene(layout: SceneLayout, sceneTheme: SceneTheme, look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int): Scene? {
+    // [keyStyle]: the key style settings over a pack's own keys (a look's has them in it)
+    private fun scene(layout: SceneLayout, sceneTheme: SceneTheme, look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int, keyStyle: KeyStyleOver?): Scene? {
         // the board's id its theme's @keyboard= (060-render-p3 T5)
-        val env = SceneTrace.section("env") { env(look, layout, width, height).copy(board = layout.id) }
+        val env = SceneTrace.section("env") { env(look, layout, width, height).copy(board = layout.id, keyStyle = keyStyle) }
         // the same values make the same scene: one asked again for nothing that shows (the first key typed,
         // the word committed: Return's look unchanged) is the last one, not made again in the frame
         scenesKept.lastOrNull { it.theme === sceneTheme && it.layout === layout && it.measurer === measurer && it.env == env }?.let { return it.scene }

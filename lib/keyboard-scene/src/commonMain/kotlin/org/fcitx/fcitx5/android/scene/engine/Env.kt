@@ -55,6 +55,8 @@ data class Env(
      * `ime=pinyin` under English too). Null: as [input] says (a test, a settings page's keys).
      */
     val typed: Set<String>? = null,
+    /** The app's 按键样式 over a 4.0 theme's own keys, key by key after its cascade; null: the theme's alone (a 3.0 look has them in it, the theme maker none). */
+    val keyStyle: KeyStyleOver? = null,
 ) {
     /** The keyboard's width in dp as Android's configuration has it (a whole number, rounded down). */
     val widthDp: Int get() = (width / density + DP_EPSILON).toInt()

@@ -22,13 +22,16 @@ object BuiltinThemeFiles {
     /** Each file by its theme's name, in the list's order: Monet's first, as before. */
     val FILES: List<Pair<String, Int>> = listOf(
         MONET to R.raw.scene_theme_monet,
-        "material" to R.raw.scene_theme_material,
-        "pixel" to R.raw.scene_theme_pixel,
-        "amoled-black" to R.raw.scene_theme_amoled_black,
+        MATERIAL to R.raw.scene_theme_material,
+        PIXEL to R.raw.scene_theme_pixel,
+        AMOLED_BLACK to R.raw.scene_theme_amoled_black,
     )
 
     /** The theme whose colours are the system's (`system()`); read again when they change. */
     const val MONET = "monet"
+    const val MATERIAL = "material"
+    const val PIXEL = "pixel"
+    const val AMOLED_BLACK = "amoled-black"
 
     private const val LIGHT = "light"
     private const val DARK = "dark"
