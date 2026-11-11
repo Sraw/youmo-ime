@@ -5,6 +5,16 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.runtime.TableSettings
+import org.fcitx.fcitx5.android.ui.main.MainViewModel
+import timber.log.Timber
+import java.util.concurrent.Executors
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -60,6 +70,8 @@ import com.google.android.material.R as MaterialR
  * flipped, set to the first or nothing, put back, at once) and 撤销, which takes the last change back.
  */
 class PopupOverridesFragment : KeyCapsPageFragment() {
+
+    private val viewModel: MainViewModel by activityViewModels()
 
     private val prefs get() = AppPrefs.getInstance()
 
@@ -334,15 +346,13 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             with(content) { add(ctx.horizontalLayout {
                 gravity = if (page.leftAligned) Gravity.START else Gravity.CENTER_HORIZONTAL
                 keys.forEach { key ->
+                    val (name, slotKey, label) = pageKey(page, key)
                     val fnName = key.label.takeIf { function }
-                    val slotKey = fnName?.let(SwipeSlots::functionKey) ?: key.name
                     // the long press by the key's name: a character key's, and the function keys' with a list of characters
                     val popupName = if (function) fnName?.takeIf { it in KeyShortcutPages.FUNCTION_POPUPS } else key.name
-                    // the full keyboard's keys as its page draws them, lower-case
-            val label = if (function) functionLabel(key.label) else if (page === KeyShortcutPages.Full) key.label.lowercase() else key.label
                     val symbol = if (function) null else symbols.next()
                     // the engine's cap: a character key by its name, a function key by its own (its up and down)
-                    val shortcut = KeyCaps.Shortcut(fnName ?: key.name, stored)
+                    val shortcut = KeyCaps.Shortcut(name, stored)
                     // the symbol the engine's cap draws where the first's way puts it (its alt), as the keyboard's key
                     val hint = (symbol as? KeyCaps.Mark.Text)?.text.orEmpty()
                     // the engine draws a function key's very face (space blank, the comma a ,): its name beside it, so
@@ -367,43 +377,115 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         pageNotes(ctx, page, stored)
     }
 
-    // under the keys, each way set on the page that the keyboard draws otherwise than set: 「j 下滑：画不下，键上显示为图标」
+    /** A page's key: its engine shortcut's name (a function key's own: `space`), its slots' key, what the page labels it. */
+    private data class PageKey(val name: String, val slotKey: String, val label: String)
+
+    // the full keyboard's letters as its page draws them, lower-case (its keys are named upper-case)
+    private fun pageKey(page: KeyShortcutPages.Page, key: KeyShortcutPages.Key): PageKey = when {
+        page.form == KeyShortcuts.FUNCTION -> PageKey(key.label, SwipeSlots.functionKey(key.label), functionLabel(key.label))
+        page === KeyShortcutPages.Full -> PageKey(key.name, key.name, key.label.lowercase())
+        else -> PageKey(key.name, key.name, key.label)
+    }
+
+    // under the keys, each way set on the page that the keyboard draws otherwise than set: 「j 下滑：画不下，键上显示为图标」;
+    // the scenes made off the main thread, the notes put in when they are (none for a page rebuilt since)
     private fun pageNotes(ctx: Context, page: KeyShortcutPages.Page, stored: SwipeSlots) {
         val function = page.form == KeyShortcuts.FUNCTION
-        page.rows.flatMap { if (function) it.take(1) else it }.forEach { key ->
-            val name = if (function) key.label else key.name
-            val slotKey = if (function) SwipeSlots.functionKey(key.label) else key.name
-            // the full keyboard's keys as its page draws them, lower-case
-            val label = if (function) functionLabel(key.label) else if (page === KeyShortcutPages.Full) key.label.lowercase() else key.label
-            listOf(true, false).filter { stored.isSet(slotKey, it) }.forEach { up ->
-                val (a, b) = SwipeFates.of(ctx, name, up, stored)
-                SwipeFates.note(ctx, a, b)?.let { note ->
+        val ways = page.rows.flatMap { if (function) it.take(1) else it }.flatMap { key ->
+            val k = pageKey(page, key)
+            listOf(true, false).filter { stored.isSet(k.slotKey, it) }.map { k to it }
+        }
+        if (ways.isEmpty()) return
+        val box = ctx.verticalLayout()
+        with(content) { add(box, lParams(matchParent)) }
+        val made = ++pagesMade
+        seen(stored, { made == pagesMade }) { seen ->
+            ways.forEach { (k, up) ->
+                SwipeFates.note(ctx, seen, k.name, up)?.let { note ->
                     val way = getString(if (up) R.string.swipe_up else R.string.swipe_down)
-                    with(content) { add(text(ctx, getString(R.string.swipe_fate_key, label, way, note), body = false), lParams(matchParent) { topMargin = ctx.dp(6) }) }
+                    with(box) { add(text(ctx, getString(R.string.swipe_fate_key, k.label, way, note), body = false), lParams(matchParent) { topMargin = ctx.dp(6) }) }
                 }
             }
         }
     }
 
-    // each way's note in the editor ([SwipeFates.note]): on opening, and again a moment after each change
-    private fun notes(ctx: Context, slotKey: String, sections: List<SwipeSlotSection>) {
+    // the pages built: a page's notes come in only while it is the last
+    private var pagesMade = 0
+
+    // the keyboards the notes are of (the input methods on, read once from fcitx) and what waits for them
+    private var fatesPage: SwipeFates.Page? = null
+    private var fatesAsked = false
+    private val fatesWaiting = mutableListOf<(SwipeFates.Page) -> Unit>()
+
+    // the notes' scenes' thread: one, its measurer no other's
+    private val fatesThread = lazy { Executors.newSingleThreadExecutor() }
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun withFates(then: (SwipeFates.Page) -> Unit) {
+        fatesPage?.let { return then(it) }
+        fatesWaiting += then
+        if (fatesAsked) return
+        fatesAsked = true
+        lifecycleScope.launch {
+            val (imes, labels) = try {
+                viewModel.fcitx.runOnReady {
+                    val on = enabledIme().toList()
+                    on to on.filter { it.uniqueName in InputMethodCatalog.TABLES }.associate { im ->
+                        im.uniqueName to imOptions(im.uniqueName)?.entries?.firstOrNull { it.key.substringAfterLast('/') == TableSettings.KEY_LABELS }?.value
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                // no input methods known: the full keyboard's alone
+                Timber.w(e, "swipe fates: the input methods on")
+                emptyList<InputMethodEntry>() to emptyMap()
+            }
+            val ctx = context ?: return@launch
+            val page = SwipeFates.Page(ctx, imes, labels)
+            fatesPage = page
+            fatesWaiting.toList().also { fatesWaiting.clear() }.forEach { it(page) }
+        }
+    }
+
+    // [slots]' scenes made on the notes' thread, [done] told on the main one unless [current] no longer
+    private fun seen(slots: SwipeSlots, current: () -> Boolean, done: (List<SwipeFates.Seen>) -> Unit) = withFates { page ->
+        val jobs = page.jobs(slots)
+        fatesThread.value.execute {
+            val seen = jobs.map(SwipeFates::made)
+            mainHandler.post { if (current() && view != null) done(seen) }
+        }
+    }
+
+    override fun onDestroy() {
+        if (fatesThread.isInitialized()) fatesThread.value.shutdownNow()
+        mainHandler.removeCallbacksAndMessages(null)
+        super.onDestroy()
+    }
+
+    // each way's note in the editor ([SwipeFates.note]): on opening, and again a moment after each change, both
+    // ways from one making; none after [open] says the dialog is gone
+    private fun notes(slotKey: String, sections: List<SwipeSlotSection>, open: () -> Boolean): Runnable {
         val name = slotKey.removePrefix(SwipeSlots.functionKey(""))
-        val handler = Handler(Looper.getMainLooper())
+        var asked = 0
         val compute = Runnable {
             var s = slots
             sections.forEachIndexed { i, section -> section.peek()?.let { s = s.with(slotKey, i == 0, it) } }
-            sections.forEachIndexed { i, section ->
-                val (a, b) = SwipeFates.of(ctx, name, i == 0, s)
-                section.note(SwipeFates.note(ctx, a, b))
+            val n = ++asked
+            seen(s, { open() && n == asked }) { seen ->
+                val ctx = context ?: return@seen
+                // a way left as the keyboard has it is no one's to say of (the engine gives its fate to the set alone)
+                sections.forEachIndexed { i, section -> section.note(SwipeFates.note(ctx, seen, name, i == 0).takeIf { s.isSet(slotKey, i == 0) }) }
             }
         }
         sections.forEach { section ->
             section.onChange = {
-                handler.removeCallbacks(compute)
-                handler.postDelayed(compute, NOTE_DELAY_MS)
+                mainHandler.removeCallbacks(compute)
+                mainHandler.postDelayed(compute, NOTE_DELAY_MS)
             }
         }
         compute.run()
+        return compute
     }
 
     // each key's symbol on [page] as its keyboard draws it, in the page's order: the 14 and 18 keys'
@@ -580,7 +662,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             isSingleLine = true
         }
         val sections = slotKey?.let { k -> listOf(section(ctx, k, up = true), section(ctx, k, up = false)) }.orEmpty()
-        if (slotKey != null) notes(ctx, slotKey, sections)
+        var open = true
+        val compute = slotKey?.let { notes(it, sections) { open } }
         val layout = ctx.verticalLayout {
             val pad = ctx.dp(24)
             setPadding(pad, ctx.dp(8), pad, 0)
@@ -605,6 +688,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     slotKey?.let { slots = stored.without(listOf(it)) }
                 }
             }
+        }
+        builder.setOnDismissListener {
+            open = false
+            compute?.let(mainHandler::removeCallbacks)
         }
         builder.show().apply { setCanceledOnTouchOutside(false) }
             // a word left typed in the field counts as added; one holding a key code is said so, the dialog kept

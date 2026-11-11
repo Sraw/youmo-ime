@@ -109,9 +109,13 @@ object SceneBar {
      * The bar's height in % of what 候选字号 makes it, the active theme's in the window's scenes now
      * (KawaiiBarComponent.heightDp): 100 for a theme setting none.
      */
-    fun heightPercent(context: Context = appContext): Double {
+    fun heightPercent(context: Context = appContext): Double =
+        heightPercent(context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
+
+    /** [heightPercent] on a screen [landscape] or not (KeyboardArea.Screen). */
+    fun heightPercent(landscape: Boolean): Double {
         val theme = ThemeManager.activeTheme
-        val scenes = SceneWindow.scenes(context, theme)
+        val scenes = SceneWindow.scenes(landscape, theme)
         // the theme file SceneThemes keeps: another look, or the same made anew, another file
         val file = SceneThemes.of(theme, ThemeManager.shownLook(theme))
         shownHeight?.let { (f, s, h) -> if (f === file && s == scenes) return h }

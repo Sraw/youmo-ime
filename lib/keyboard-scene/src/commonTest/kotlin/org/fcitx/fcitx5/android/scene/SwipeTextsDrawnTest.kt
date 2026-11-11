@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
-import org.fcitx.fcitx5.android.scene.engine.MarkFate
+import org.fcitx.fcitx5.android.scene.MarkFate
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import kotlin.test.Test
@@ -92,6 +92,16 @@ class SwipeTextsDrawnTest {
         assertEquals(mapOf(false to MarkFate.AsSet), fates("qwerty", "full/j", "floating"))
         assertEquals(mapOf(false to MarkFate.Shortened("现…")), fates("qwerty", "full/j", "split"))
         assertEquals(mapOf(false to MarkFate.Sign), fates("qwerty", "full/j", "compact"))
+        // an up way's fate is under true; a key with both ways set has both, each its own
+        val both = Forms.env("qwerty", Forms.all.getValue("compact").copy(density = NARROW)).let { env ->
+            val marks = MarkSettings(
+                upAt = KeyMarks.At.Bottom, downAt = KeyMarks.At.TopLeft,
+                shortcuts = MarkSettings.PRESET + ("full/j:up" to MarkContent.Text("现在…", "现…")) + ("full/j:down" to MarkContent.Icon("content-paste")),
+                user = setOf("full/j:up", "full/j:down"),
+            )
+            Forms.scene("qwerty", env.copy(marks = marks)).keys.first { it.shortcut == "full/j" }.fates
+        }
+        assertEquals(mapOf(true to MarkFate.Sign, false to MarkFate.AsSet), both)
         // a way the user did not set says nothing
         assertEquals(emptyMap(), Forms.scene("qwerty", Forms.env("qwerty", Forms.all.getValue("block"))).keys.first { it.shortcut == "full/a" }.fates)
         // 大千 compact on a 360 dp phone: no room even for the sign on some key (NO_ROOM)
@@ -141,6 +151,8 @@ class SwipeTextsDrawnTest {
         )
         val own = sign(themed)
         assertTrue(own == null || own.top >= ink(themed).bottom || own.left >= ink(themed).right || own.right <= ink(themed).left, "a theme's sign over j: $own")
+        // left out, the settings say so; drawn, as the sign
+        assertEquals(mapOf(false to if (own == null) MarkFate.Dropped else MarkFate.Sign), themed.fates)
     }
 
     @Test

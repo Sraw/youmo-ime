@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Icons
 import org.fcitx.fcitx5.android.scene.KeyEffect
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.MarkFate
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Motion
 import org.fcitx.fcitx5.android.scene.Op

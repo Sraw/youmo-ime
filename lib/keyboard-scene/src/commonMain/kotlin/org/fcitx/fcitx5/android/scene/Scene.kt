@@ -106,7 +106,7 @@ class KeyNode(
     /** How it moves between its faces (060-render-p3 A1); null: it does not, each shown at once (every theme without motion). */
     val motion: Motion? = null,
     /** Each way the user set that it draws a mark of (true: 上滑), how it is drawn: what the settings tell of it. */
-    val fates: Map<Boolean, org.fcitx.fcitx5.android.scene.engine.MarkFate> = emptyMap(),
+    val fates: Map<Boolean, MarkFate> = emptyMap(),
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)
@@ -250,3 +250,15 @@ data class TextStroke(val width: Double, val color: Argb)
 
 /** A text's shadow: its glyphs moved ([dx], [dy]) px, blurred [blur] px (0: sharp), in [color]. */
 data class TextShadow(val dx: Double, val dy: Double, val blur: Double, val color: Argb)
+
+/**
+ * How a way the user set is drawn on its key ([KeyNode.fates]): as it is set ([AsSet], a
+ * long text as the app gives it, two characters and 「…」), a step down where it has no room ([Shortened] to its
+ * first character and 「…」, the two-line [Sign]), or not at all ([Dropped]): what the settings say of it.
+ */
+sealed interface MarkFate {
+    data object AsSet : MarkFate
+    data class Shortened(val text: String) : MarkFate
+    data object Sign : MarkFate
+    data object Dropped : MarkFate
+}

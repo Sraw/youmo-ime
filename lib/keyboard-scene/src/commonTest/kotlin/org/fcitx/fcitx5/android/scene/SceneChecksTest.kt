@@ -142,8 +142,8 @@ class SceneChecksTest {
                 val dp = if (shot.env.compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
                 // its dp in whole pixels, as its ImageView was
                 val mark = kotlin.math.abs(op.box.height - dp * shot.env.density) <= HALF_PX + EDGE
-                // the sign's ink is its two lines, as the engine keeps it apart (Fixtures' themes draw the built-in one)
-                val ink = if (op.name == Icons.SHORT_TEXT) Icons.SHORT_TEXT_INK.of(op.box) else op.box
+                // the built-in sign's ink is its two lines, as the engine keeps it apart; a theme's own, its whole square
+                val ink = if (op.name == Icons.SHORT_TEXT && Icons.SHORT_TEXT !in shot.theme.theme.icons) Icons.SHORT_TEXT_INK.of(op.box) else op.box
                 Drawn("icon ${op.name}", ink, if (mark) Part.MARK else Part.ICON)
             }
             else -> null
