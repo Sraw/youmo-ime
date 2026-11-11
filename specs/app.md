@@ -1351,6 +1351,18 @@ pack's fragments they include, each once: keys', variants', defaults', popup ite
 character reference counts as what it reads as), the files never used (not an app id, unreadable, refused, a fragment
 no keyboard used includes), and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
 
+Skins of other input methods (`ThemeFilesManager.openSkin`, picked by `ThemeFileName.isSkinFile`: `.bds`, `.bdi`,
+`.ssf`, `.flex`, `.yaml`/`.yml`, `.zip`): read whole into memory by `SkinZip.readSkin` (a lone YAML as itself, 1 MB at
+most; a ZIP holding one `.flex` and no `extension.json` as that `.flex`; a `.zip` that is no skin refused with
+`exception_theme_filename`, as a theme exported under the old name most likely is) and unpacked there by `SkinZip` (ime-core; central directory, else a local-header
+scan; `SkinLimits`: 64 MB file, 5000 entries, 32 MB an entry and 128 MB in all as they inflate, ratio 200 past 1 MB,
+no encrypted entries, a name with `..`, a leading `/` or a drive refused), converted by keyboard-scene's
+`SkinConverter` (`AndroidSkinCodec` decodes and writes PNG; an image past 12 M pixels not decoded), then its
+`theme.xml` and files written under the converter's own names into the same `theme-import/<uuid>` and checked and
+offered by the same `pack()` as a pack's; `Opened.Pack.notes` (`SkinNote`) are listed in the confirmation as not
+carried over. `SkinError.Reason` maps to `exception_skin_*`. The theme keeps the skin's name and author (no suffix:
+a name clash replaces, as a pack's does). The theme maker's web entry for skins is not done yet.
+
 Placing (`ThemePackFiles.place`) copies it into `v4/.saving/new-<uuid>/`, each file synced, renames an old
 pack of the name aside into `v4/.saving/old-<uuid>/<name>`, renames the new one into place, syncs `v4/`, and
 only then deletes the old; a failure deletes what it wrote and puts the old back. A kill between the renames
