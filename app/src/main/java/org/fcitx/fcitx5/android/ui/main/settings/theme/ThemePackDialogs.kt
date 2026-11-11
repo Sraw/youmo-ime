@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.scene.theme.Meta
+import org.fcitx.fcitx5.android.scene.skin.SkinNote
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import splitties.dimensions.dp
 import java.io.File
@@ -56,7 +57,24 @@ object ThemePackDialogs {
             out += ctx.getString(R.string.theme_pack_sounds, SoundKey.entries.filter { it in sounds }.joinToString(listSeparator(ctx)) { ctx.getString(soundClass(it)) })
         }
         if (staged.warnings.isNotEmpty()) out += ctx.getString(R.string.theme_pack_warnings) + "\n" + staged.warnings.joinToString("\n") { "· $it" }
+        if (pack.notes.isNotEmpty()) out += ctx.getString(R.string.theme_pack_skin_notes) + "\n" + pack.notes.joinToString("\n") { "· " + ctx.getString(skinNote(it)) }
         return out.joinToString("\n")
+    }
+
+    private fun skinNote(note: SkinNote): Int = when (note) {
+        SkinNote.LAYOUT -> R.string.theme_pack_skin_note_layout
+        SkinNote.DECORATION -> R.string.theme_pack_skin_note_decoration
+        SkinNote.ANIMATION -> R.string.theme_pack_skin_note_animation
+        SkinNote.TEXT_SIZE -> R.string.theme_pack_skin_note_text_size
+        SkinNote.TOOLBAR_ICONS -> R.string.theme_pack_skin_note_toolbar_icons
+        SkinNote.LETTER_IMAGES -> R.string.theme_pack_skin_note_letter_images
+        SkinNote.SOUND -> R.string.theme_pack_skin_note_sound
+        SkinNote.DARK_PICTURE -> R.string.theme_pack_skin_note_dark_picture
+        SkinNote.MORE_PERIODS -> R.string.theme_pack_skin_note_more_periods
+        SkinNote.IMAGES -> R.string.theme_pack_skin_note_images
+        SkinNote.INCLUDES -> R.string.theme_pack_skin_note_includes
+        SkinNote.MORE_THEMES -> R.string.theme_pack_skin_note_more_themes
+        SkinNote.PANELS -> R.string.theme_pack_skin_note_panels
     }
 
     /** [theme]'s 信息: a pack's metadata, a 3.0 theme's name and format. */

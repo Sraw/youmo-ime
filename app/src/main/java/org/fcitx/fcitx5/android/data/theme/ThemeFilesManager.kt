@@ -14,12 +14,21 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.host.ConfigHome
+import org.fcitx.fcitx5.android.input.theme.SkinZip
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
+import org.fcitx.fcitx5.android.input.theme.ThemeFileName
 import org.fcitx.fcitx5.android.scene.look.KeyFill
 import org.fcitx.fcitx5.android.scene.look.KeyPressed
 import org.fcitx.fcitx5.android.scene.look.LegacyLook
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.skin.Pixels
+import org.fcitx.fcitx5.android.scene.skin.SkinConverter
+import org.fcitx.fcitx5.android.scene.skin.SkinError
+import org.fcitx.fcitx5.android.scene.skin.SkinLimits
+import org.fcitx.fcitx5.android.scene.skin.SkinNote
+import org.fcitx.fcitx5.android.scene.skin.SkinOutput
+import org.fcitx.fcitx5.android.scene.skin.SkinPlatform
 import org.fcitx.fcitx5.android.scene.theme.SoundFile
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
@@ -504,6 +513,8 @@ object ThemeFilesManager {
             /** The user's 3.0 themes named as it or one of its versions: replaced by it, their json deleted once it is listed. */
             internal val customs: List<Theme.Custom>,
             private val unpacked: File,
+            /** A skin's ([openSkin]): what of it did not carry over; none for a pack's own. */
+            val notes: Set<SkinNote> = emptySet(),
         ) : Opened {
             /** A pack of its name, or a 3.0 theme named as it is, is there: taking it replaces that one. */
             val replaces: Boolean get() = packThere || customs.isNotEmpty()
@@ -591,15 +602,7 @@ object ThemeFilesManager {
     fun openTheme(src: InputStream, themes: List<Theme> = ThemeManager.getAllThemes()): Result<Opened> =
         runCatching {
             if (!writable) notSettled()
-            // what a kill left cleared at the first open; later, what a dialog closed otherwise than by its buttons
-            // left (an hour old: no dialog open so long), as the input method's process may live for days
-            val stale = System.currentTimeMillis() - STALE_UNPACKED_MS
-            unpacking.listFiles()?.forEach { if (!unpackingSwept || it.lastModified() < stale) it.deleteRecursively() }
-            unpackingSwept = true
-            val temp = File(unpacking, UUID.randomUUID().toString())
-            if (!temp.mkdirs()) throw IOException("Cannot create '${temp.name}'")
-            var kept = false
-            try {
+            unpacked { temp ->
                 val names = ArrayList<String>()
                 val extracted = ZipInputStream(src).use { zipStream ->
                     zipStream.extract(temp, keep = ThemePackFiles::unpacked, names = names) { count, size, total ->
@@ -608,30 +611,120 @@ object ThemeFilesManager {
                 }
                 // a folder zipped whole: its theme.xml in it, said so (a 3.0 theme's json read so is not a pack's)
                 if (ThemePackFiles.themeXmlInFolder(names)) errorRuntime(R.string.exception_theme_xml_top)
-                if (!File(temp, ThemePackFiles.THEME_XML).isFile) return@runCatching Opened.Json(importJson(extracted, themes))
-                val staged = ThemePackFiles.check(temp, names, packChecks)
-                packClash(staged, themes)
-                val packs = themes.filterIsInstance<Theme.Pack>()
-                val folder = File(ThemePackFiles.folder(dir), staged.name)
-                val there = folder.exists()
-                // one there not listed of a later build is kept, as a 3.0 theme's json is (importJson); any other
-                // not listed (one that no longer reads, misses a file, past the packs listed) is replaced, the
-                // natural repair: not listed, it could not be deleted
-                // a later format is checked on any build; min-app not on a dev build (minAppVersion null)
-                val laterBuilds = ThemePackFiles.laterBuilds(folder, ThemePackFiles.minAppVersion(versionName))
-                if (there && packs.none { it.file == staged.name } && laterBuilds) {
-                    errorRuntime(R.string.exception_theme_newer_kept)
-                }
-                if (!there && packs.filter { !it.builtin }.distinctBy { it.file }.size >= ThemeAssetLimits.MAX_PACKS) {
-                    errorRuntime(R.string.exception_theme_packs, ThemeAssetLimits.MAX_PACKS.toString())
-                }
-                val refs = ThemePackFiles.refs(staged.name, staged.theme.variants) + staged.name
-                val customs = themes.filterIsInstance<Theme.Custom>().filter { it.name in refs }
-                Opened.Pack(staged, there, customs, temp).also { kept = true }
-            } finally {
-                if (!kept) temp.deleteRecursively()
+                if (!File(temp, ThemePackFiles.THEME_XML).isFile) Opened.Json(importJson(extracted, themes)) else pack(temp, names, themes)
             }
         }
+
+    /**
+     * Opens another input method's skin [src] (Baidu's `.bds`/`.bdi`, Sogou's `.ssf`; [fileName] the picked file's
+     * name, the theme's where the skin names itself not), converted to a theme 4.0 pack (dev/design/060-skin-import.md):
+     * unpacked in memory and converted ([SkinZip], [SkinConverter]), its theme's files written under the converter's
+     * names, then checked and offered as any pack ([openTheme]), with what did not carry over ([Opened.Pack.notes]).
+     */
+    fun openSkin(src: InputStream, fileName: String, themes: List<Theme> = ThemeManager.getAllThemes()): Result<Opened.Pack> =
+        runCatching {
+            if (!writable) notSettled()
+            val conversion = try {
+                SkinConverter.convert(src.use { SkinZip.readSkin(it, fileName) }, skinCodec, ThemeFileName.base(fileName))
+            } catch (e: SkinError) {
+                // a .zip of no skin read here: most likely a theme exported under the old name (0.5.1's, upstream's)
+                if (e.reason == SkinError.Reason.UNKNOWN && ThemeFileName.isZip(fileName)) {
+                    errorRuntime(R.string.exception_theme_filename, fileName)
+                }
+                skinRefused(e)
+            }
+            unpacked { temp ->
+                val names = ArrayList<String>()
+                fun write(name: String, bytes: ByteArray) {
+                    // the converter's own names; checked all the same, a name never a path
+                    check(isPlainFileName(name) && name !in names) { "skin file name $name" }
+                    File(temp, name).writeBytes(bytes)
+                    names += name
+                }
+                write(ThemePackFiles.THEME_XML, conversion.themeXml.encodeToByteArray())
+                for (out in conversion.files) {
+                    when (out) {
+                        is SkinOutput.Image -> write(out.name, png(out))
+                        is SkinOutput.Bytes -> write(out.name, out.bytes)
+                    }
+                }
+                pack(temp, names, themes, conversion.notes)
+            }
+        }
+
+    /** What decodes a skin's images and writes a converted one's: Android's, a fake's in a JVM test. */
+    internal interface SkinCodec : SkinPlatform {
+        fun png(pixels: Pixels): ByteArray
+    }
+
+    @VisibleForTesting
+    internal var skinCodec: SkinCodec = AndroidSkinCodec
+
+    // [out] as PNG; one past its bytes halved till it is not, where it may be (a picture, the preview)
+    private fun png(out: SkinOutput.Image): ByteArray {
+        var p = out.pixels
+        var bytes = skinCodec.png(p)
+        fun over() = out.shrink && bytes.size > out.maxBytes
+        while (over() && p.width * p.height > 1) {
+            p = p.resized(maxOf(1, p.width / 2), maxOf(1, p.height / 2))
+            bytes = skinCodec.png(p)
+        }
+        return bytes
+    }
+
+    private fun skinRefused(e: SkinError): Nothing = when (e.reason) {
+        SkinError.Reason.NOT_ZIP -> errorRuntime(R.string.exception_skin_not_zip)
+        SkinError.Reason.UNKNOWN -> errorRuntime(R.string.exception_skin_unknown)
+        SkinError.Reason.TOO_BIG -> errorRuntime(R.string.exception_skin_too_big, (SkinLimits.MAX_ARCHIVE_BYTES / MB).toString())
+        SkinError.Reason.TOO_MANY_FILES -> errorRuntime(R.string.exception_theme_entries, SkinLimits.MAX_ENTRIES.toString())
+        SkinError.Reason.UNPACKED_TOO_BIG -> errorRuntime(R.string.exception_skin_unpacked_too_big)
+        SkinError.Reason.ENCRYPTED -> errorRuntime(R.string.exception_skin_encrypted)
+        SkinError.Reason.UNSAFE_NAME -> errorRuntime(R.string.exception_skin_unsafe_name, e.detail)
+        SkinError.Reason.SOGOU_ENCRYPTED -> errorRuntime(R.string.exception_skin_sogou_encrypted)
+        SkinError.Reason.SOGOU_PC -> errorRuntime(R.string.exception_skin_sogou_pc)
+        SkinError.Reason.NO_KEYBOARD -> errorRuntime(R.string.exception_skin_no_keyboard)
+        SkinError.Reason.BROKEN -> errorRuntime(R.string.exception_skin_not_zip)
+    }
+
+    // a folder of its own to unpack into, [use]d; gone after unless what it gives is a pack, which keeps it till taken or not
+    private fun <T : Opened> unpacked(use: (File) -> T): T {
+        // what a kill left cleared at the first open; later, what a dialog closed otherwise than by its buttons
+        // left (an hour old: no dialog open so long), as the input method's process may live for days
+        val stale = System.currentTimeMillis() - STALE_UNPACKED_MS
+        unpacking.listFiles()?.forEach { if (!unpackingSwept || it.lastModified() < stale) it.deleteRecursively() }
+        unpackingSwept = true
+        val temp = File(unpacking, UUID.randomUUID().toString())
+        if (!temp.mkdirs()) throw IOException("Cannot create '${temp.name}'")
+        var kept = false
+        try {
+            return use(temp).also { kept = it is Opened.Pack }
+        } finally {
+            if (!kept) temp.deleteRecursively()
+        }
+    }
+
+    // [temp]'s pack (its files [names]) checked whole and against the themes there, offered to be taken
+    private fun pack(temp: File, names: List<String>, themes: List<Theme>, notes: Set<SkinNote> = emptySet()): Opened.Pack {
+        val staged = ThemePackFiles.check(temp, names, packChecks)
+        packClash(staged, themes)
+        val packs = themes.filterIsInstance<Theme.Pack>()
+        val folder = File(ThemePackFiles.folder(dir), staged.name)
+        val there = folder.exists()
+        // one there not listed of a later build is kept, as a 3.0 theme's json is (importJson); any other
+        // not listed (one that no longer reads, misses a file, past the packs listed) is replaced, the
+        // natural repair: not listed, it could not be deleted
+        // a later format is checked on any build; min-app not on a dev build (minAppVersion null)
+        val laterBuilds = ThemePackFiles.laterBuilds(folder, ThemePackFiles.minAppVersion(versionName))
+        if (there && packs.none { it.file == staged.name } && laterBuilds) {
+            errorRuntime(R.string.exception_theme_newer_kept)
+        }
+        if (!there && packs.filter { !it.builtin }.distinctBy { it.file }.size >= ThemeAssetLimits.MAX_PACKS) {
+            errorRuntime(R.string.exception_theme_packs, ThemeAssetLimits.MAX_PACKS.toString())
+        }
+        val refs = ThemePackFiles.refs(staged.name, staged.theme.variants) + staged.name
+        val customs = themes.filterIsInstance<Theme.Custom>().filter { it.name in refs }
+        return Opened.Pack(staged, there, customs, temp, notes)
+    }
 
     /** The app's version name a pack's `min-app` is checked against ([ThemePackFiles.minAppVersion]); a test's release's. */
     @VisibleForTesting

@@ -58,9 +58,10 @@ class ThemeListFragment : Fragment() {
                 val cr = ctx.contentResolver
                 lifecycleScope.withLoadingDialog(ctx) {
                     // the picker shows every file (.theme has no MIME type of its own): the name decides,
-                    // and one without a name is refused as well
+                    // and one without a name is refused as well; another input method's skin is converted
                     val name = cr.queryFileName(uri)
-                    if (!ThemeFileName.isThemeFile(name)) {
+                    val skin = ThemeFileName.isSkinFile(name)
+                    if (!skin && !ThemeFileName.isThemeFile(name)) {
                         ctx.importErrorDialog(R.string.exception_theme_filename, name ?: ctx.getString(R.string.theme_file_unnamed))
                         return@withLoadingDialog
                     }
@@ -69,7 +70,11 @@ class ThemeListFragment : Fragment() {
                         val themes = ThemeManager.getAllThemes()
                         val opened = withContext(Dispatchers.IO) {
                             val inputStream = cr.openInputStream(uri)!!
-                            ThemeFilesManager.openTheme(inputStream, themes).getOrThrow()
+                            if (skin) {
+                                ThemeFilesManager.openSkin(inputStream, name!!, themes).getOrThrow()
+                            } else {
+                                ThemeFilesManager.openTheme(inputStream, themes).getOrThrow()
+                            }
                         }
                         // a theme 4.0 pack: shown, taken only if the user does (060-render-p3 T8a)
                         if (opened is ThemeFilesManager.Opened.Pack) {
