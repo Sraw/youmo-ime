@@ -421,7 +421,8 @@ def st101(d):
     v1, h1 = key_gaps(d)
     d.shot("kb", "皮肤：紧凑")
     gaps = f"上下/左右缝 dp：标准 {v0}/{h0}，紧凑 {v1}/{h1}"
-    check(1 <= v1 < v0 and abs(h1 - h0) <= 1.6, f"紧凑时皮肤的上下缝没变窄或左右缝变了：{gaps}")
+    # about four tenths (BaiduSkin's 2 dp a side to Gap.compact's 1), a pixel's rounding either way
+    check(1 <= v1 <= v0 * 0.6 and abs(h1 - h0) <= 1.6, f"紧凑时皮肤的上下缝没缩到约四成或左右缝变了：{gaps}")
     appearance_tab(d, "大小与样式")
     choose(d, "键盘高度", "标准")
     d.step("Finder 打包的 zip")
@@ -835,12 +836,16 @@ def key_gaps(d):
         return sum(abs(x - y) for x, y in zip(a, b)) > 24
 
     def gap(points):
-        # from inside the first face to inside the second: the run that is not the first face's colour
+        # from inside the first face to inside the second: the longest unbroken run that is not the first face's
+        # colour (a stray line or mark on a face is a run of its own, not counted into the gap)
         face = im.getpixel(points[0])
-        out = [i for i, p in enumerate(points) if far(im.getpixel(p), face)]
-        if not out:
+        best = run = 0
+        for p in points:
+            run = run + 1 if far(im.getpixel(p), face) else 0
+            best = max(best, run)
+        if not best:
             raise Blocked("键面之间读不出缝")
-        return (out[-1] - out[0] + 1) / d.dpx()
+        return best / d.dpx()
     # down a column in w's right half and s's left half (not their glyphs nor their corner marks), from below
     # w's middle to above s's
     x = (wx + sx) // 2

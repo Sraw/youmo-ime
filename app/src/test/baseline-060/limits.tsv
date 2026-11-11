@@ -425,13 +425,13 @@ nine_slice_font_dark/pinyin-port.png	0.298
 nine_slice_font_dark/symbols-port.png	0.162	
 nine_slice_font_dark/zhuyin_full-port.png	1.537	
 nine_slice_font_dark/zhuyin_nine-port.png	0.142	5.3: zhuyin-nine-shown-not-typed
-nine_slice_font_light/english-port.png	0.307	
-nine_slice_font_light/handwriting-port.png	0.078	5.3: handwriting-fixed-fullwidth-punct
-nine_slice_font_light/k14-port.png	0.119	
-nine_slice_font_light/k18-port.png	0.119	
-nine_slice_font_light/nine-port.png	0.193	5.3: nine-syllables-sp
-nine_slice_font_light/number-port.png	0.191	
-nine_slice_font_light/pinyin-port.png	0.307	
-nine_slice_font_light/symbols-port.png	0.164	
-nine_slice_font_light/zhuyin_full-port.png	1.574	
-nine_slice_font_light/zhuyin_nine-port.png	0.141	5.3: zhuyin-nine-shown-not-typed
+nine_slice_font_light/english-port.png	1.859	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
+nine_slice_font_light/handwriting-port.png	0.805	5.3: handwriting-fixed-fullwidth-punct; nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
+nine_slice_font_light/k14-port.png	1.387	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
+nine_slice_font_light/k18-port.png	1.467	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
+nine_slice_font_light/nine-port.png	1.422	5.3: nine-syllables-sp; nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
+nine_slice_font_light/number-port.png	1.494	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
+nine_slice_font_light/pinyin-port.png	1.859	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
+nine_slice_font_light/symbols-port.png	0.464	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
+nine_slice_font_light/zhuyin_full-port.png	3.351	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
+nine_slice_font_light/zhuyin_nine-port.png	1.545	5.3: zhuyin-nine-shown-not-typed; nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene.web
 
 import org.fcitx.fcitx5.android.scene.Box
+import kotlin.math.round
 
 /**
  * A nine-slice image cut as the app cuts it (ime-core's NineSliceLayout, which the app's ScenePainter
@@ -24,8 +25,8 @@ internal object NineSliceCut {
         val (st, sb) = fit(top.toDouble(), bottom.toDouble(), srcHeight)
         val sx = listOf(0.0, sl, srcWidth - sr, srcWidth)
         val sy = listOf(0.0, st, srcHeight - sb, srcHeight)
-        val dx = listOf(target.left, target.left + dl, target.right - dr, target.right)
-        val dy = listOf(target.top, target.top + dt, target.bottom - db, target.bottom)
+        val dx = listOf(target.left) + inner(target.left + dl, target.right - dr, target.left, target.right) + target.right
+        val dy = listOf(target.top) + inner(target.top + dt, target.bottom - db, target.top, target.bottom) + target.bottom
         val out = ArrayList<Piece>(PIECES)
         for (r in 0..2) {
             for (c in 0..2) {
@@ -41,6 +42,12 @@ internal object NineSliceCut {
         if (a + b <= room) return a to b
         val k = room / (a + b)
         return a * k to b * k
+    }
+
+    // the edges between pieces on whole pixels, as the app's: two pieces meeting mid-pixel leave a seam
+    private fun inner(a: Double, b: Double, lo: Double, hi: Double): List<Double> {
+        val x1 = round(a).coerceIn(lo, hi)
+        return listOf(x1, round(b).coerceIn(x1, hi))
     }
 
     private const val PIECES = 9

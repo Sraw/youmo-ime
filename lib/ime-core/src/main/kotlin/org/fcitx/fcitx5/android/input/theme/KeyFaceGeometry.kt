@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.look.KeyKind
 import org.fcitx.fcitx5.android.scene.look.Keys
 import org.fcitx.fcitx5.android.scene.look.NineSlice
 import kotlin.math.min
+import kotlin.math.round
 
 /** A rectangle, pixels. */
 data class Area(val left: Float, val top: Float, val right: Float, val bottom: Float) {
@@ -121,8 +122,8 @@ object NineSliceLayout {
         val (st, sb) = fit(i.top.toFloat(), i.bottom.toFloat(), srcHeight.toFloat())
         val sx = listOf(0f, sl, srcWidth - sr, srcWidth.toFloat())
         val sy = listOf(0f, st, srcHeight - sb, srcHeight.toFloat())
-        val dx = listOf(target.left, target.left + dl, target.right - dr, target.right)
-        val dy = listOf(target.top, target.top + dt, target.bottom - db, target.bottom)
+        val dx = listOf(target.left) + inner(target.left + dl, target.right - dr, target.left, target.right) + target.right
+        val dy = listOf(target.top) + inner(target.top + dt, target.bottom - db, target.top, target.bottom) + target.bottom
         val out = ArrayList<Piece>(9)
         for (r in 0..2) for (c in 0..2) {
             val src = Area(sx[c], sy[r], sx[c + 1], sy[r + 1])
@@ -136,6 +137,13 @@ object NineSliceLayout {
         if (a + b <= room) return a to b
         val k = room / (a + b)
         return a * k to b * k
+    }
+
+    // the edges between pieces on whole pixels: two anti-aliased pieces meeting mid-pixel each cover half of it,
+    // and half over half lets a quarter of what is under the key show through, a line across the face
+    private fun inner(a: Float, b: Float, lo: Float, hi: Float): List<Float> {
+        val x1 = round(a).coerceIn(lo, hi)
+        return listOf(x1, round(b).coerceIn(x1, hi))
     }
 }
 

@@ -132,6 +132,24 @@ class KeyFaceGeometryTest {
         assertEquals(listOf(NineSliceLayout.Piece(Area(0f, 0f, 64f, 32f), Area(5f, 5f, 105f, 55f))), pieces)
     }
 
+    // ST-101's imported Baidu skin: 1 px lines a quarter of the panel's colour across its keys' faces, where pieces
+    // met mid-pixel and each anti-aliased edge covered half the pixel (half over half: 75%)
+    @Test
+    fun piecesMeetOnWholePixelsLeavingNoSeam() {
+        val slice = NineSlice("f", Insets(24, 24, 24, 24), 3)
+        val target = Area(5.5f, 5.5f, 291.5f, 407.3f)
+        val pieces = NineSliceLayout.of(150, 168, slice, target, 2.75f)
+        // each pixel's cover, the pieces drawn one over another as an anti-aliased canvas draws them
+        val cover = Array(410) { DoubleArray(300) }
+        for (p in pieces) for (y in 0 until 410) for (x in 0 until 300) {
+            val a = overlap(p.dst.left, p.dst.right, x) * overlap(p.dst.top, p.dst.bottom, y)
+            cover[y][x] += (1 - cover[y][x]) * a
+        }
+        for (y in 7 until 406) for (x in 7 until 290) assertEquals("($x,$y)", 1.0, cover[y][x], 1e-6)
+    }
+
+    private fun overlap(lo: Float, hi: Float, px: Int): Double = maxOf(0.0, minOf(hi.toDouble(), px + 1.0) - maxOf(lo.toDouble(), px.toDouble()))
+
     @Test
     fun aKeyShowsThePictureUnderIt() {
         // a wide picture on a taller keyboard: fit to height, the sides cut
