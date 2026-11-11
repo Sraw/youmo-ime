@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.ui.main
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.daemon.HostDaemon
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -25,13 +27,20 @@ class MainViewModelReplacedTest {
 
     @Test
     fun theOldModelClearedLeavesTheNewOneConnected() {
+        // the real daemon's names, not a fake engine's
+        assertNull(HostDaemon.testConnection)
         val old = ViewModelStore()
         val new = ViewModelStore()
-        model(old)
-        val current = model(new)
-        old.clear()
-        // what MainActivity.onStop does
-        current.fcitx.runIfReady { save() }
-        new.clear()
+        try {
+            model(old)
+            val current = model(new)
+            old.clear()
+            // what MainActivity.onStop does
+            current.fcitx.runIfReady { save() }
+        } finally {
+            new.clear()
+        }
+        // both names gone: the host free to stop
+        assertNull(HostDaemon.getFirstConnectionOrNull())
     }
 }

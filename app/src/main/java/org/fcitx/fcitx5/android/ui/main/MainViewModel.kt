@@ -21,7 +21,7 @@ class MainViewModel : ViewModel() {
 
     // a name of this model's own: an activity made anew (a CLEAR_TASK start) gets its model before
     // the old one is cleared, and a shared name would disconnect the new one with the old
-    private val clientName = "${javaClass.name}@${System.identityHashCode(this)}"
+    private val clientName = HostDaemon.clientName(this)
 
     val fcitx: HostConnection = HostDaemon.connect(clientName)
 

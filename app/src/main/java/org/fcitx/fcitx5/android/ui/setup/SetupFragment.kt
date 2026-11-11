@@ -28,7 +28,7 @@ class SetupFragment : Fragment() {
     private var fcitx: HostConnection? = null
 
     // a name of this page's own: the page made anew connects before the old one goes and disconnects
-    private val clientName = "${javaClass.name}@${System.identityHashCode(this)}"
+    private val clientName = HostDaemon.clientName(this)
     private val restore = LearningRestore(this, { fcitx ?: HostDaemon.connect(clientName).also { fcitx = it } })
     private lateinit var pickBackup: ActivityResultLauncher<Array<String>>
 

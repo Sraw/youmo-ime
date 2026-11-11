@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.daemon.HostDaemon.disconnect
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -47,7 +48,7 @@ object HostDaemon {
     private fun mkConnection(name: String) = object : HostConnection {
 
         private inline fun <T> ensureConnected(block: () -> T) =
-            if (name in clients)
+            if (lock.withLock { name in clients })
                 block()
             else throw IllegalStateException("$name is disconnected")
 
@@ -78,6 +79,14 @@ object HostDaemon {
     private val lock = ReentrantLock()
 
     private val clients = mutableMapOf<String, HostConnection>()
+
+    private val clientSeq = AtomicLong()
+
+    /**
+     * A client name of [owner]'s own instance: one made anew connects before the old one goes and
+     * disconnects, and a shared name would disconnect both
+     */
+    fun clientName(owner: Any) = "${owner.javaClass.name}#${clientSeq.incrementAndGet()}"
 
     // fcitx reads its punctuation tables as it starts: what was cached of them before goes
     private fun start() {
