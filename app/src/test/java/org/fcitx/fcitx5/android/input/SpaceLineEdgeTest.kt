@@ -78,7 +78,7 @@ class SpaceLineEdgeTest {
             },
             // the edge jump took a read already moved for stale and skipped the line the user went to;
             // then the line was held instead and the cursor stopped a line short
-            "two Ups from the third line, the first landed: the second is sent, onto the first line" to {
+            "a rushed line the editor already applied does not skip to the edge: two Ups from the third line, the first landed, the second is sent, onto the first line" to {
                 assertEquals(3, slide("aaa\nbbb\nccc", 11, atOnce, up, 2))
             },
             // KB-71 on the emulator: the editor applies each Up before the next sample's read (the key and the

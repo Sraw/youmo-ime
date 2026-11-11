@@ -100,6 +100,21 @@ class CanvasPainterTest {
     }
 
     @Test
+    fun aNineSlicesInnerEdgesAreWholePixelsAsTheAppsAndASideWithNoInsetKeepsItsEdge() {
+        // a fractional target, the same case ThemeMakerRulesTest pins for the app's NineSliceLayout: inner edges at
+        // 80.9 and 17.65 drawn at 81 and 18; no left or bottom inset, those edges the target's own
+        val cut = NineSliceCut.of(40.0, 40.0, 0, 8, 12, 0, 2, Box(3.5, 7.25, 96.5, 60.75), 2.6)
+        assertEquals(
+            listOf(Box(3.5, 7.25, 81.0, 18.0), Box(81.0, 7.25, 96.5, 18.0), Box(3.5, 18.0, 81.0, 60.75), Box(81.0, 18.0, 96.5, 60.75)),
+            cut.map { it.dst },
+        )
+        // edges on odd halves (2.5, 18.5, 3.5, 8.5) go to the even pixel, as the app's
+        val tie = NineSliceCut.of(20.0, 20.0, 4, 4, 4, 4, 2, Box(0.5, 1.5, 20.5, 10.5), 1.0)
+        assertEquals(listOf(0.5, 2.0, 18.0), tie.take(3).map { it.dst.left })
+        assertEquals(listOf(1.5, 4.0, 8.0), listOf(tie[0], tie[3], tie[6]).map { it.dst.top })
+    }
+
+    @Test
     fun thePictureIsTheScenesSizeClippedToTheShapeItsColourOver() {
         val assets = Assets(picture = "PIC")
         val calls = drawn(Op.Picture(box, 10.4, 80.0, over = half), assets)

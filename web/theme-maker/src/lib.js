@@ -761,9 +761,13 @@
     // the inner edges on whole pixels, as the app puts them (kotlin.math.round: ties to even): two anti-aliased
     // pieces meeting mid-pixel let what is under the key show through as a line
     const rint = (x) => { const r = Math.round(x); return r - x === 0.5 && r % 2 !== 0 ? r - 1 : r; };
-    const inner = (a, b, lo, hi) => { const x1 = Math.min(Math.max(rint(a), lo), hi); return [x1, Math.min(Math.max(rint(b), x1), hi)]; };
-    const dx = [f(target[0]), ...inner(f(target[0] + dl), f(target[2] - dr), f(target[0]), f(target[2])), f(target[2])];
-    const dy = [f(target[1]), ...inner(f(target[1] + dt), f(target[3] - db), f(target[1]), f(target[3])), f(target[3])];
+    // a side with no inset keeps the target's own edge
+    const inner = (near, far, lo, hi) => {
+      const x1 = near === 0 ? lo : Math.min(Math.max(rint(f(lo + near)), lo), hi);
+      return [x1, far === 0 ? hi : Math.min(Math.max(rint(f(hi - far)), x1), hi)];
+    };
+    const dx = [f(target[0]), ...inner(dl, dr, f(target[0]), f(target[2])), f(target[2])];
+    const dy = [f(target[1]), ...inner(dt, db, f(target[1]), f(target[3])), f(target[3])];
     const out = [];
     const nonEmpty = (a) => f(a[2] - a[0]) > 0 && f(a[3] - a[1]) > 0;
     for (let r = 0; r < 3; r++) {

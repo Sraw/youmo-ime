@@ -334,6 +334,25 @@ def skin_colours(d):
             sum(1 for r, g, b in px if b > 180 and r < 70 and 60 < g < 120))
 
 
+def face_seams(d, label):
+    """pixels on lines across the letter key [label]'s face, through its nine-slice edges (the skin's corners are
+    30 of its 162x180 px, about a third from the middle), that lean to the panel's blue: a seam between two
+    pieces lets the panel show through as a thin line. Measured against the line's own middle, so a pressed
+    (darker) face is judged alike"""
+    k = d.keys(refresh=True)
+    cx, cy = k[label]
+    px_, py_ = abs(k["h"][0] - k["g"][0]), abs(k["g"][1] - k["t"][1])
+    im = d.png().convert("RGB")
+    lines = [[im.getpixel((x, cy)) for x in range(int(cx - 0.34 * px_), int(cx + 0.34 * px_) + 1)],
+             [im.getpixel((cx, y)) for y in range(int(cy - 0.34 * py_), int(cy + 0.34 * py_) + 1)]]
+    bad = []
+    for line in lines:
+        mr = sorted(p[0] for p in line)[len(line) // 2]
+        mb = sorted(p[2] for p in line)[len(line) // 2]
+        bad += [p for p in line if p[2] > mb + 30 and p[0] < mr - 20]
+    return bad
+
+
 def real_skins(d, folder):
     """each skin in [folder] imported: one taken is shot on the 26 keys, the nine keys and the symbols, then
     deleted; one refused, its reason shot. The pictures are for a person to look at"""
@@ -404,13 +423,17 @@ def st101(d):
     # held down for the shot: a pressed key darker though the skin has no pressed face (space by hand: held, it listens).
     # The shot takes about a second, past the long-press time: z's long-press bubble may show too, and what the
     # release types is cleared below
+    seams = face_seams(d, "g")
+    check(not seams, f"g 的键面上有九宫格拼缝（偏蓝的像素 {seams[:5]}）")
     z = d.keys(refresh=True)["z"]
     d.touch(("down", z[0], z[1]))
     try:
         d.shot("kb", "按住 z：变暗（长按气泡可能也弹出）")
+        pressed = face_seams(d, "z")
     finally:
         d.touch(("up", z[0], z[1]))
     d.clear()
+    check(not pressed, f"按住的 z 键面上有九宫格拼缝（偏蓝的像素 {pressed[:5]}）")
     o, b = skin_colours(d)
     check(o > 300 and b > 40, f"键盘不是皮肤的橙键蓝底（橙 {o} 蓝 {b} / 1800）")
     d.step("紧凑高度的键缝")
@@ -449,7 +472,7 @@ def st101(d):
     real = os.environ.get("UAT_SKINS")
     extra = real_skins(d, real) if real else []
     d.sh("rm -f /sdcard/Download/uat-skin.bds /sdcard/Download/uat-skin-mac.zip /sdcard/Download/uat-bad.ssf")
-    return f"皮肤收下、确认框列出没转过来的、选用是橙键蓝底（橙 {o} 蓝 {b}）；{gaps}；Finder 的 zip 也认；坏皮肤说是加密的" + \
+    return f"皮肤收下、确认框列出没转过来的、选用是橙键蓝底（橙 {o} 蓝 {b}）、键面没有拼缝；{gaps}；Finder 的 zip 也认；坏皮肤说是加密的" + \
         (f"；真皮肤：{'、'.join(extra)}" if extra else "")
 
 

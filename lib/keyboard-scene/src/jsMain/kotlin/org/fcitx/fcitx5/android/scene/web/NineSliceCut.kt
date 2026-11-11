@@ -25,8 +25,8 @@ internal object NineSliceCut {
         val (st, sb) = fit(top.toDouble(), bottom.toDouble(), srcHeight)
         val sx = listOf(0.0, sl, srcWidth - sr, srcWidth)
         val sy = listOf(0.0, st, srcHeight - sb, srcHeight)
-        val dx = listOf(target.left) + inner(target.left + dl, target.right - dr, target.left, target.right) + target.right
-        val dy = listOf(target.top) + inner(target.top + dt, target.bottom - db, target.top, target.bottom) + target.bottom
+        val dx = listOf(target.left) + inner(dl, dr, target.left, target.right) + target.right
+        val dy = listOf(target.top) + inner(dt, db, target.top, target.bottom) + target.bottom
         val out = ArrayList<Piece>(PIECES)
         for (r in 0..2) {
             for (c in 0..2) {
@@ -44,10 +44,11 @@ internal object NineSliceCut {
         return a * k to b * k
     }
 
-    // the edges between pieces on whole pixels, as the app's: two pieces meeting mid-pixel leave a seam
-    private fun inner(a: Double, b: Double, lo: Double, hi: Double): List<Double> {
-        val x1 = round(a).coerceIn(lo, hi)
-        return listOf(x1, round(b).coerceIn(x1, hi))
+    // the edges between pieces on whole pixels, as the app's: two pieces meeting mid-pixel leave a seam;
+    // a side with no inset keeps the target's own edge
+    private fun inner(near: Double, far: Double, lo: Double, hi: Double): List<Double> {
+        val x1 = if (near == 0.0) lo else round(lo + near).coerceIn(lo, hi)
+        return listOf(x1, if (far == 0.0) hi else round(hi - far).coerceIn(x1, hi))
     }
 
     private const val PIECES = 9

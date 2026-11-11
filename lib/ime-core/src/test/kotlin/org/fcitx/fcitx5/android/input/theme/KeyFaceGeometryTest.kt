@@ -148,6 +148,20 @@ class KeyFaceGeometryTest {
         for (y in 7 until 406) for (x in 7 until 290) assertEquals("($x,$y)", 1.0, cover[y][x], 1e-6)
     }
 
+    // a side with no inset has no piece there: rounding its edge moved the face's own edge in by half a pixel,
+    // a line of what is under the key along it
+    @Test
+    fun aSideWithNoInsetKeepsTheTargetsEdge() {
+        val pieces = NineSliceLayout.of(40, 40, NineSlice("f", Insets(0, 8, 12, 0), 2), Area(3.5f, 7.25f, 96.5f, 60.75f), 2.6f)
+        assertEquals(
+            listOf(
+                Area(3.5f, 7.25f, 81f, 18f), Area(81f, 7.25f, 96.5f, 18f),
+                Area(3.5f, 18f, 81f, 60.75f), Area(81f, 18f, 96.5f, 60.75f),
+            ),
+            pieces.map { it.dst },
+        )
+    }
+
     private fun overlap(lo: Float, hi: Float, px: Int): Double = maxOf(0.0, minOf(hi.toDouble(), px + 1.0) - maxOf(lo.toDouble(), px.toDouble()))
 
     @Test

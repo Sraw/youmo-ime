@@ -29,15 +29,16 @@ object SpaceCursor {
     fun sendable(line: Line, before: CharSequence?, after: CharSequence?, rushed: Int = 0): Boolean {
         val side = if (line == Line.Up) before else after
         if (side.isNullOrEmpty()) return false
-        // [rushed]: lines that went out a moment ago, the editor maybe not moved yet, so what is read is
-        // stale: another goes out only while more newlines lie that way than those lines, a line surely left
+        // [rushed]: the lines rushed a moment ago not landed yet ([LineRush.unlanded]), so what is read is
+        // stale by them: another goes out only while more newlines lie that way than those lines, a line surely left
         return rushed == 0 || side.count { it == '\n' } > rushed
     }
 
     /**
      * Whether a line [sendable] holds goes to the field's very start (end) instead: rushed lines bring the
      * cursor onto the first (last) line ([side], read before they landed, has no more newlines than
-     * [rushed]), where the key would have gone to the start (end), and [side] was read [whole] so the
+     * [rushed], the rushed lines not landed yet: all of them, as only an [LineRush.unmoved] read comes
+     * here), where the key would have gone to the start (end), and [side] was read [whole] so the
      * start (end) is where it ends. Not at the very start (end) itself, nor with no lines rushed. Only
      * for a read surely stale ([LineRush.unmoved]): read after the lines landed, the edge would skip lines.
      */
@@ -74,7 +75,10 @@ object SpaceCursor {
         /**
          * The rushed lines not landed yet, judged by [side] read now: all of them while it reads as at the
          * rush's start ([unmoved]); once it changed, at least one landed, and as many as the newlines it
-         * lost, so [sendable] counts only the rest and a line the user slid is sent, not held.
+         * lost, so [sendable] counts only the rest and a line the user slid is sent, not held. A side cut at a
+         * read limit (more than the service's LINE_REACH chars that way) reads as long each time, and its
+         * newlines are a window's, not comparable with a whole read's: there it counts all rushed lines (or
+         * one landed) as before, erring toward holding a line, never toward skipping one.
          */
         fun unlanded(line: Line, now: Long, side: CharSequence?): Int {
             val rushed = rushed(line, now)

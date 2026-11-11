@@ -158,6 +158,10 @@ class ThemeMakerRulesTest {
             Triple(64 to 32, NineSlice("f", Insets(0, 0, 0, 0), 2), Area(5f, 5f, 105f, 55f) to 3f),
             Triple(48 to 48, NineSlice("f", Insets(12, 8, 12, 16), 2), Area(3.5f, 7f, 96.5f, 153f) to 2.75f),
             Triple(30 to 30, NineSlice("f", Insets(10, 10, 10, 10), 1), Area(0f, 0f, 15f, 12f) to 2f),
+            // a fractional target with no left and no bottom inset: those edges stay the target's, the others whole
+            Triple(40 to 40, NineSlice("f", Insets(0, 8, 12, 0), 2), Area(3.5f, 7.25f, 96.5f, 60.75f) to 2.6f),
+            // inner edges on odd halves (2.5, 18.5): ties go to even, where Math.round would go up
+            Triple(20 to 20, NineSlice("f", Insets(4, 4, 4, 4), 2), Area(0.5f, 1.5f, 20.5f, 10.5f) to 1f),
         )
         for ((src, slice, target) in cases) {
             add(buildJsonObject {
