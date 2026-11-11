@@ -61,8 +61,8 @@ object VoiceEngine {
     private const val DIR = "voice"
     private const val KEEP_MS = 2 * 60 * 1000L
     // the encoder's chunk (1.92 s of audio) on a OnePlus 6T (Snapdragon 845, four big cores): 351 ms on 1
-    // thread, 228 on 2, 182 on 3, 160 on 4 (voice-eval bench/stream_bench); 3 leaves a big core to the UI
-    private const val THREADS = 3
+    // thread, 228 on 2, 182 on 3, 160 on 4 (voice-eval bench/stream_bench); 3 leaves a big core to the UI (one fewer than the cores on a smaller phone)
+    private val THREADS = minOf(3, Runtime.getRuntime().availableProcessors() - 1).coerceAtLeast(1)
     // hypotheses kept: the n-best VoiceRerank ranks again, as measured (seg_app.py)
     private const val BEAM = 16
 

@@ -347,9 +347,13 @@ class VoiceListener(
             var acceptMax = 0L
             for (samples in audio) {
                 if (closed) return
-                val t = SystemClock.uptimeMillis()
-                segment.accept(samples)
-                acceptMax = maxOf(acceptMax, SystemClock.uptimeMillis() - t)
+                if (BuildConfig.DEBUG) {
+                    val t = SystemClock.uptimeMillis()
+                    segment.accept(samples)
+                    acceptMax = maxOf(acceptMax, SystemClock.uptimeMillis() - t)
+                } else {
+                    segment.accept(samples)
+                }
             }
             if (closed) return
             val drained = SystemClock.uptimeMillis()
@@ -387,11 +391,14 @@ class VoiceListener(
     // where the time after the stop goes, numbers only (debug builds; uptime ms)
     private fun logTiming(drained: Long, tailDecoded: Long, polishedAt: Long, acceptMax: Long) {
         val end = SystemClock.uptimeMillis()
-        val stop = liftAt ?: -1L
+        // -1: not known (no lift or tap time, the capture not closed)
+        val stop = liftAt
+        val captured = capturedAt.takeIf { it > 0 }
         Timber.d(
             "voice timing: firstShownFromReadyMs=%d stopToClosedMs=%d closedToDrainedMs=%d tailDecodeMs=%d polishMs=%d homophonesMs=%d stopToSaidMs=%d acceptMaxMs=%d",
-            if (shownAt > 0 && readyAt > 0) shownAt - readyAt else -1, capturedAt - stop,
-            drained - capturedAt, tailDecoded - drained, polishedAt - tailDecoded, end - polishedAt, end - stop, acceptMax,
+            if (shownAt > 0 && readyAt > 0) shownAt - readyAt else -1, if (stop != null && captured != null) captured - stop else -1,
+            captured?.let { drained - it } ?: -1, tailDecoded - drained, polishedAt - tailDecoded, end - polishedAt,
+            stop?.let { end - it } ?: -1, acceptMax,
         )
     }
 
