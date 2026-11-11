@@ -1291,8 +1291,13 @@ A pack is `files/host-theme/v4/<name>/`: its `theme.xml` (keyboard-scene's theme
 files it names (picture and cuts, `image()` fills, fonts, icons, the `<meta preview>`) and `layouts/*.xml`
 (`ThemePackFiles`). Each version of it (`variants`) is a `Theme.Pack` named as a built-in's are, `<name>#light`;
 one of no variants is `<name>`. Its keys, bar and popups are the engine's drawing of its own file (`Pack.drawn`:
-the file as read, its files' names made paths in its folder; `SceneThemes.of`, kept by the pack and the system
-colours, as `system()` colours are re-read on `onSystemPlatteChange`), not a look written again; the views drawn
+the file as read, its files' names made paths in its folder), not a look written again, under the key style
+settings (`PackKeyStyle.over(drawn, ThemeManager.keyStyleShown)`: for the plain `key` and each `key` selector that
+sets an inset, radius or face, a style appended after the pack's in each form (none, `@landscape`, `@compact`,
+both; with `@flat` too when 无边框), its values the pack's own cascade for that selector there with the set ones
+replaced, so the order the pack wrote its styles in does not matter; 纵向 keeps the pack's bottom-minus-top;
+跟随主题 adds nothing). `SceneThemes.of` keeps it by (pack, system colours, `KeyStyleChoice`) and only for the
+same pack instance, as `system()` colours are re-read on `onSystemPlatteChange`; the views drawn
 from a look (the theme page's preview, the thumbnail, the picture under the keys, key text font) read
 `Pack.look`: `LookDefaults` with its 24 colours, its picture, and the fonts its plain `key` and `candidate`
 styles name. Icons are checked and kept but not drawn yet (the engine draws its built-in icons by name).

@@ -195,7 +195,7 @@ object SceneThemes {
     private const val KEPT = 4
 
     // [pack]: the pack instance whose drawn this is (a pack's alone)
-    private class Made(val theme: Theme, val pack: AppTheme.Pack? = null, val choice: KeyStyleChoice = KeyStyleChoice.FOLLOW) {
+    private class Made(val theme: Theme, val pack: AppTheme.Pack? = null) {
         val cascades = Cascades(theme)
     }
 
@@ -219,20 +219,21 @@ object SceneThemes {
             packs.clear()
         }
 
-    // the packs' (060-render-p3 T8a), read as they were listed, by the system's colours their system() took
-    private val packs = lruMap<Pair<AppTheme.Pack, SystemColors>, Made>(KEPT)
+    // the packs' (060-render-p3 T8a), read as they were listed, by the system's colours their system() took and
+    // the key style settings over them (PackKeyStyle): a setting changed and changed back is the drawing kept
+    private val packs = lruMap<Triple<AppTheme.Pack, SystemColors, KeyStyleChoice>, Made>(KEPT)
 
     /**
      * [theme]'s engine theme, drawn in [look] (ThemeManager.shownLook): a pack's its own file ([AppTheme.Pack.drawn]),
-     * any other's its look's ([of]). A pack's keys spaced as [choice] sets (PackKeyGap), as a look's are.
+     * any other's its look's ([of]). A pack's keys as the key style settings [choice] set (PackKeyStyle), as a look's are.
      */
     fun of(theme: AppTheme, look: ThemeLook, choice: KeyStyleChoice = ThemeManager.keyStyleShown): Theme? {
         if (theme !is AppTheme.Pack) return of(look, theme.name, theme.isDark)
-        val key = theme to ThemePackFiles.systemColors
+        val key = Triple(theme, ThemePackFiles.systemColors, choice)
         // this instance's drawn alone: a copy() equal to an older one (the system's colours set anew) has
         // its own, an old instance asked after the colours changed not kept as the new one's
-        packs[key]?.takeIf { it.pack === theme && it.choice == choice }?.let { return it.theme }
-        return PackKeyGap.over(theme.drawn, choice.hGap, choice.vGap).also { packs[key] = Made(it, theme, choice) }
+        packs[key]?.takeIf { it.pack === theme }?.let { return it.theme }
+        return PackKeyStyle.over(theme.drawn, choice).also { packs[key] = Made(it, theme) }
     }
 
     fun of(look: ThemeLook, name: String, dark: Boolean): Theme? {
