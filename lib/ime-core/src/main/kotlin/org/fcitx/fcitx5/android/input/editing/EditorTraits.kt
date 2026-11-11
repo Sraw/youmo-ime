@@ -50,6 +50,8 @@ data class EditorTraits(
     val sends: Boolean = false,
     /** A text field that takes more than one line (`TYPE_TEXT_FLAG_MULTI_LINE` or `_IME_MULTI_LINE`). */
     val isMultiLine: Boolean = false,
+    /** `TYPE_TEXT_FLAG_MULTI_LINE` alone: the field itself shows lines (the space's slide moves among them); `_IME_MULTI_LINE` is only the keyboard's. */
+    val showsLines: Boolean = false,
     /** `TYPE_TEXT_VARIATION_SHORT_MESSAGE`: an SMS or a chat's message. */
     val isShortMessage: Boolean = false,
 )

@@ -376,7 +376,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         currentKeyboard?.inPasswordField = service.inPasswordField
         val traits = info.toEditorTraits()
         address = AddressKeys.of(traits)
-        multiLine = traits.isMultiLine
+        multiLine = traits.showsLines
         typingField = SceneTyping.field(traits, service.inPasswordField)
         typingChanged()
         currentKeyboard?.address = address

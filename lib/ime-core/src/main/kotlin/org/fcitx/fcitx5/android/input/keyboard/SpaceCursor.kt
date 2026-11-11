@@ -19,4 +19,13 @@ object SpaceCursor {
     fun vertical(steps: Int, multiLine: Boolean, composing: Boolean): List<Line> =
         if (steps == 0 || !multiLine || composing) emptyList()
         else List(kotlin.math.abs(steps)) { if (steps < 0) Line.Up else Line.Down }
+
+    /**
+     * Whether the editor's Up (Down) may be sent with [before] (or [after]) the cursor: not at the
+     * very start (end), where Android's `Selection.moveUp` gives the key back and it moves the focus
+     * to another field. Elsewhere on the first (last) line it goes to the start (end), as a wrapped
+     * paragraph's lines are not told by a newline.
+     */
+    fun sendable(line: Line, before: CharSequence?, after: CharSequence?): Boolean =
+        if (line == Line.Up) !before.isNullOrEmpty() else !after.isNullOrEmpty()
 }

@@ -21,4 +21,12 @@ class SpaceCursorTest {
         assertEquals(emptyList<Line>(), SpaceCursor.vertical(-1, multiLine = false, composing = false))
         assertEquals(emptyList<Line>(), SpaceCursor.vertical(2, multiLine = true, composing = true))
     }
+
+    @Test
+    fun noKeyAtTheFieldsVeryStartOrEnd() {
+        assertEquals(false, SpaceCursor.sendable(Line.Up, "", "abc"))
+        assertEquals(false, SpaceCursor.sendable(Line.Down, "abc", null))
+        assertEquals(true, SpaceCursor.sendable(Line.Up, "c", ""))
+        assertEquals(true, SpaceCursor.sendable(Line.Down, null, "a"))
+    }
 }

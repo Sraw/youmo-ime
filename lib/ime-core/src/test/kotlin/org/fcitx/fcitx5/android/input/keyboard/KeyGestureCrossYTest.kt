@@ -44,6 +44,26 @@ class KeyGestureCrossYTest {
     }
 
     @Test
+    fun aDiagonalSampleCarriesBoth() {
+        val r = recognizer()
+        r.onDown(200f, 50f)
+        assertEquals(1, r.move(212f, 50f).countX)
+        val both = r.move(242f, 20f)
+        assertEquals(3, both.countX)
+        assertEquals(-1, both.countCrossY)
+    }
+
+    @Test
+    fun sidewaysStepsAreTheSameWithLinesOnOrOff() {
+        val path = listOf(213f to 52f, 236f to 30f, 251f to 5f, 230f to 40f, 190f to 90f, 160f to 60f, 171f to -20f)
+        fun xs(cross: Float) = recognizer(cross).run {
+            onDown(200f, 50f)
+            path.map { (x, y) -> move(x, y).countX }
+        }
+        assertEquals(xs(0f), xs(28f))
+    }
+
+    @Test
     fun upFirstIsTheSwipeUpAndNoLine() {
         val r = recognizer()
         r.onDown(200f, 80f)

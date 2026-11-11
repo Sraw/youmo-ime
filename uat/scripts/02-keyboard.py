@@ -236,8 +236,8 @@ case("KB-67", needs="jvm:KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOt
 case("KB-69", needs="jvm:KeyShortcutsHostTest.swipeSelectSelectsFromTheCursorAsTheFingerMovesSideways、KeyShortcutsHostTest.swipeSelectCommitsWhatIsTypedFirst、KeyShortcutsHostTest.swipeSelectStepsOverAnEmojiWhole、SwipeSelectionTest、SwipeStepsTest")(lambda d: None)
 
 
-@case("KB-70", visual=True)
-def kb70(d):
+def three_lines(d):
+    """the testbed's 多行 field holding aaa, bbb, ccc on three lines, the cursor at the end"""
     from uat import TESTBED
     d.sh(f"am force-stop {TESTBED}")
     d.testbed("types")
@@ -256,6 +256,12 @@ def kb70(d):
     st = d.testbed_state()["multiline"]
     t = st["text"]
     check(t == "aaa\nbbb\nccc", f"框里是 {t!r}")
+    return t
+
+
+@case("KB-70", visual=True)
+def kb70(d):
+    t = three_lines(d)
     line = lambda: t.count("\n", 0, d.testbed_state()["multiline"]["selStart"])
     x, y = d.keys(refresh=True)["space"]
     p = d.dpx()
@@ -273,3 +279,24 @@ def kb70(d):
     check(seen[0][0] < 11 and lines == [2, 1, 0, 1], f"光标 {seen}")
     check(d.testbed_state()["multiline"]["text"] == t, "没有打出字")
     return f"光标（位置, 行）{seen}"
+
+
+@case("KB-71", visual=True)
+def kb71(d):
+    t = three_lines(d)
+    ml = lambda: d.testbed_state()["multiline"]
+    x, y = d.keys(refresh=True)["space"]
+    p = d.dpx()
+    d.touch(("down", x, y), ("move", x - 8 * p, y), ("move", x - 16 * p, y), ("move", x - 25 * p, y), ("sleep", 0.3))
+    for dy in range(30, 181, 30):
+        d.touch(("move", x - 25 * p, y - dy * p))
+    d.touch(("sleep", 0.3))
+    top = ml()
+    d.shot("app", "上挪过头")
+    for dy in range(150, -21, -30):
+        d.touch(("move", x - 25 * p, y - dy * p))
+    d.touch(("up", x - 25 * p, y + 20 * p), ("sleep", 0.3))
+    end = ml()
+    check(top["focused"] and top["selStart"] == 0, f"上挪过头：{top['selStart']} focused={top['focused']}")
+    check(end["focused"] and end["selStart"] == len(t), f"下挪过头：{end['selStart']} focused={end['focused']}")
+    return f"上到 {top['selStart']}，下到 {end['selStart']}，焦点一直在多行框"

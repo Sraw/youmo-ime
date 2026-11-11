@@ -105,6 +105,7 @@ import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
+import org.fcitx.fcitx5.android.input.keyboard.SpaceCursor
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSelection
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
@@ -581,8 +582,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(EditorKeyPolicy.Direction.Left)
                         FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(EditorKeyPolicy.Direction.Right)
                         // the space's slide up and down (SpaceCursor): a line, as the editor moves it
-                        FcitxKeyMapping.FcitxKey_Up -> { clearedText.edited(); sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_UP) }
-                        FcitxKeyMapping.FcitxKey_Down -> { clearedText.edited(); sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_DOWN) }
+                        FcitxKeyMapping.FcitxKey_Up -> handleLineKey(SpaceCursor.Line.Up)
+                        FcitxKeyMapping.FcitxKey_Down -> handleLineKey(SpaceCursor.Line.Down)
                         // a keyboard's own code handed back unhandled (no focused context): never text
                         else -> if (it.unicode > 0 && !KeyCodes.isInternal(it.unicode)) {
                             commitTyped(Character.toString(it.unicode))
@@ -754,6 +755,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             is EditorKeyPolicy.ReturnAction.PerformEditorAction ->
                 currentInputConnection.performEditorAction(action.actionId)
         }
+    }
+
+    // none at the field's very start or end, where the key would move the focus away (SpaceCursor.sendable)
+    private fun handleLineKey(line: SpaceCursor.Line) {
+        val ic = currentInputConnection ?: return
+        if (!SpaceCursor.sendable(line, ic.getTextBeforeCursor(1, 0), ic.getTextAfterCursor(1, 0))) return
+        clearedText.edited()
+        sendDownUpKeyEvents(if (line == SpaceCursor.Line.Up) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN)
     }
 
     private fun handleArrowKey(direction: EditorKeyPolicy.Direction) {

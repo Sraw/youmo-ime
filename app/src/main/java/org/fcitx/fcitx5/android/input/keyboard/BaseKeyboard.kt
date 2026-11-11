@@ -412,9 +412,10 @@ abstract class BaseKeyboard(
         spaceSwipesCursor(key, spaceSwipeMoveCursor.getValue())
         key.gestureListener = { k, event ->
             when (event.type) {
-                GestureType.Move -> when (val count = event.countX) {
-                    0 -> spaceLines(k, event.countCrossY)
-                    else -> {
+                GestureType.Move -> {
+                    // one sample may carry both: sideways first, then the lines (a diagonal slide)
+                    val count = event.countX
+                    if (count != 0) {
                         val sym =
                             if (count > 0) FcitxKeyMapping.FcitxKey_Right else FcitxKeyMapping.FcitxKey_Left
                         val action = KeyAction.SymAction(KeySym(sym), KeyStates.Virtual)
@@ -422,8 +423,8 @@ abstract class BaseKeyboard(
                             onAction(action)
                             if (hapticOnRepeat) InputFeedbacks.hapticFeedback(k.feedback)
                         }
-                        true
                     }
+                    spaceLines(k, event.countCrossY) || count != 0
                 }
                 else -> false
             }
@@ -432,7 +433,7 @@ abstract class BaseKeyboard(
 
     // the space's slide up or down once it has moved the cursor sideways: a line a step (SpaceCursor)
     private fun spaceLines(k: KeyHandle, steps: Int): Boolean {
-        val lines = SpaceCursor.vertical(steps, inMultiLineField, imTyping)
+        val lines = SpaceCursor.vertical(steps, inMultiLineField, composing = imTyping || tempMode)
         lines.forEach {
             val sym = if (it == SpaceCursor.Line.Up) FcitxKeyMapping.FcitxKey_Up else FcitxKeyMapping.FcitxKey_Down
             onAction(KeyAction.SymAction(KeySym(sym), KeyStates.Virtual))

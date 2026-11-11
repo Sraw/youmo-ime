@@ -400,6 +400,20 @@ class KeyboardUatTest {
     }
 
     @Test
+    fun spaceSlidesDiagonallyMovesBothWaysInOneSample() {
+        val h = harness().start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
+        val space = space(h)
+        val f = h.finger(space, h.at(space))
+        f.move(h.at(space, dx = -25f))
+        h.api.calls.clear()
+        // one sample: further left and a line up
+        f.move(h.at(space, dx = -45f, dy = -32f))
+        f.up(h.at(space, dx = -45f, dy = -32f))
+        assertTrue(sent().toString(), sent().any { "sym=${FcitxKeyMapping.FcitxKey_Left}," in it })
+        assertTrue(sent().toString(), sent().count { "sym=${FcitxKeyMapping.FcitxKey_Up}," in it } == 1)
+    }
+
+    @Test
     fun spaceSlidesNoLineInASingleLineField() {
         val h = harness().start()
         val space = space(h)
