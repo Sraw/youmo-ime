@@ -161,5 +161,5 @@ object SceneMarks {
         else -> command.key.replace('_', '-')
     }
 
-    private fun at(a: KeyMarks.At): SceneKeyMarks.At = SceneKeyMarks.At.valueOf(a.name)
+    internal fun at(a: KeyMarks.At): SceneKeyMarks.At = SceneKeyMarks.At.valueOf(a.name)
 }

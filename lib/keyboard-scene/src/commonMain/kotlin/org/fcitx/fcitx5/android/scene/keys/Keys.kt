@@ -71,6 +71,8 @@ data class KeyboardVariant(
     val language: Language = Language.Pinyin,
     /** A nine key's letters by its digit (2 to 9), as the input method puts them (双拼's NINE_SP). */
     val nineLetters: Map<Char, String> = STANDARD_NINE,
+    /** 双拼 of a scheme typing `;` (微软's ing): the 18 keys' L group has it; else the group is L alone. */
+    val semicolon: Boolean = false,
 ) {
     enum class Form { Full, Nine, Grouped14, Grouped18, ZhuyinFull, ZhuyinNine, Handwriting, Number, Panel }
 

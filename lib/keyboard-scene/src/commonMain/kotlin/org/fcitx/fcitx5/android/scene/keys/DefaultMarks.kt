@@ -100,6 +100,7 @@ object DefaultMarks {
             val a = key.attrs.over(row.defaults.over(defaults))
             val facts = NodeFacts(
                 text = textOf(a.actions["send"]),
+                label = (a.label as? Text.Literal)?.text,
                 typing = KeyDefaults.typing(a.role, a.kind, (a.label as? Text.Literal)?.text ?: a.label?.let { "_" }, a.actions["preview"]),
                 popup = key.popup,
                 letters = key.letters?.group,

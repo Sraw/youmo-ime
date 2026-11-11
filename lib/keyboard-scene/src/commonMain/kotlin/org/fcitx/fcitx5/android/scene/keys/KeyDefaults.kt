@@ -7,13 +7,15 @@ package org.fcitx.fcitx5.android.scene.keys
 import org.fcitx.fcitx5.android.scene.layout.Popup
 
 /**
- * What a layout's key tells its default long press (060-keys-unify): its tap's character ([text]),
+ * What a layout's key tells its default long press (060-keys-unify): its tap's character ([text]) and [label],
  * whether it types ([typing]: a letter's kind with a label, a mark's role), its `<popup>`, a group's
  * [letters], the first a theme's layout wrote ([themeFirst]: its `swipe-up=`, else a literal `alt=`),
  * and a group key's [place] among the layout's groups (the built-in corners go by it).
  */
 data class NodeFacts(
     val text: String? = null,
+    /** Its label as written, where it is no binding (注音九键's groups: `ㄅㄉㄚ`). */
+    val label: String? = null,
     val typing: Boolean = false,
     val popup: Popup? = null,
     val letters: String? = null,
@@ -83,12 +85,13 @@ object KeyDefaults {
     // by the node's popup: none, a nine digit's, a group's (of letters, else 注音's), a list, a preset; no popup, a typing key's preset
     private fun made(id: KeyId?, variant: KeyboardVariant, node: NodeFacts, caps: Boolean): DefaultList? {
         val p = node.popup
-        val letters = node.letters
+        // the 18 keys' `;` on L only where the scheme types it (OwnLongPress.shown)
+        val letters = node.letters?.let { if (variant.form == KeyboardVariant.Form.Grouped18 && !variant.semicolon) it.replace(";", "") else it }
         if (letters != null && (p == null || p.from == "group")) return grouped(letters, node.themeFirst ?: corner(variant.form, node.place))
         return when (p?.from) {
             null -> if (node.typing) node.text?.let { preset(it, caps) } else null
             "nine" -> id?.key?.singleOrNull()?.let { nine(it, variant) }
-            "group" -> zhuyinGroup(node.text.orEmpty())
+            "group" -> zhuyinGroup(node.label ?: node.text.orEmpty())
             "list" -> listed(p)
             "preset" -> (p.preset ?: node.text)?.let { preset(it, caps) }
             else -> null
@@ -135,7 +138,7 @@ object KeyDefaults {
         // a digit corner is a keypad's (D7), whether built in or a theme's
         val first = corner?.takeIf { it.isNotEmpty() }?.let { c -> if (c.length == 1 && c[0] in '0'..'9') Item(c, Commit.Keypad(c[0])) else itemOf(c) }
         val symbols = group.flatMap { PresetLists.of(it.toString()).orEmpty() }
-            .filter { s -> s != first?.text && s !in upper && s.none(::isLetterOrDigit) }
+            .filter { s -> s != first?.text && s !in upper && s !in lower && s.none(::isLetterOrDigit) }
             .distinct()
         val row = upper.map(::Item) + listOfNotNull(first) + lower.map(::Item)
         // the corner under the finger, else the first lower case letter
