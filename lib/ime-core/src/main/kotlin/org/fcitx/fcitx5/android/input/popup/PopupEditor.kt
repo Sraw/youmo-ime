@@ -9,8 +9,9 @@ package org.fcitx.fcitx5.android.input.popup
  * stored: it can only be chosen as the [first]), then its symbols, which can be moved, deleted and added to;
  * one item selected (or none, -1), and its [first], what a swipe's 长按首选 types (null: none). Each action
  * keeps the selection on the item it moved, or on the one that took the place of the one removed.
+ * [defaultFirst] is the key's default first, what a deleted first falls back to while the list has it.
  */
-class PopupEditor(val row: List<String>, symbols: List<String>, first: String?) {
+class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, private val defaultFirst: String? = null) {
 
     private val list = symbols.filter { it !in row }.distinct().toMutableList()
 
@@ -53,11 +54,11 @@ class PopupEditor(val row: List<String>, symbols: List<String>, first: String?) 
         selected = to
     }
 
-    /** The selected symbol removed; the first, if it was, passed to the first item left (none with none). */
+    /** The selected symbol removed; the first, if it was, falls back to the default first where still there, else to the first symbol left (none with none). */
     fun delete() {
         if (!canDelete) return
         val gone = list.removeAt(selected - row.size)
-        if (gone == first) first = items.firstOrNull()
+        if (gone == first) first = defaultFirst?.takeIf { it in items } ?: list.firstOrNull()
         selected = if (items.isEmpty()) -1 else minOf(selected, items.lastIndex)
     }
 

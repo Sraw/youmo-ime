@@ -90,7 +90,13 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // every key's long press the user set, as the keyboards read it (the old keys migrated where key_lists is not yet)
     private var lists: KeyLists
         get() = KeyListsCache.user.current
-        set(value) = prefs.internal.keyLists.setValue(value.serialize())
+        set(value) {
+            if (!listsNewer) prefs.internal.keyLists.setValue(value.serialize())
+        }
+
+    /** A later version's key_lists (`@2`, §4.3): read as none, never written over; the long presses read-only here. */
+    private val listsNewer: Boolean
+        get() = prefs.internal.keyLists.getValue().let { KeyLists.parse(it) == null && !KeyLists.needsMigration(it) }
 
     private var slots: SwipeSlots
         get() = prefs.internal.keySwipes.getValue().let { if (it.isEmpty()) SwipeSlots.Default else SwipeSlots.parse(it) }
@@ -131,7 +137,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     private fun snapshot() = with(prefs) {
         Snapshot(
-            internal.keySwipes.getValue(), lists.serialize(),
+            internal.keySwipes.getValue(), internal.keyLists.getValue(),
             keyboard.swipeUp.getValue(), keyboard.swipeDown.getValue(), keyboard.swipeUpPosition.getValue(), keyboard.swipeDownPosition.getValue(),
         )
     }
@@ -184,6 +190,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 else -> R.string.swipe_slots_hint_page
             }
             add(text(ctx, getString(hint), body = true), lParams(matchParent) { topMargin = ctx.dp(8) })
+            if (listsNewer) add(text(ctx, getString(R.string.long_press_newer), body = true), lParams(matchParent) { topMargin = ctx.dp(8) })
             add(if (selecting) selectionBar(ctx) else actionBar(ctx), lParams(matchParent) { topMargin = ctx.dp(8) })
             slotPage(ctx, page)
             add(text(ctx, getString(R.string.long_press_legend), body = false).apply {
@@ -633,14 +640,31 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     }
 
     /**
+     * [edit]'s long press part, each view with its top margin in dp: a later version's lists said read-only (where the
+     * key has a long press), else the hint, a key turned off said so (migrated beta lists; kept off while its list is
+     * left as it is), and [chars].
+     */
+    private fun longPressViews(ctx: Context, hasLongPress: Boolean, start: KeyEdit?, editor: PopupEditor?, field: EditText): List<Pair<View, Int>> = when {
+        hasLongPress && listsNewer -> listOf(text(ctx, getString(R.string.long_press_newer), body = true) to 0)
+        start == null || editor == null -> emptyList()
+        else -> listOfNotNull(
+            text(ctx, getString(R.string.long_press_editor_hint), body = false) to 0,
+            if (start.user?.off == true) text(ctx, getString(R.string.long_press_off), body = true) to 8 else null,
+        ) + chars(ctx, editor, field, R.string.long_press_none)
+    }
+
+    /**
      * A key edited under [title]: its long press ([chars]) where [longPress] names one, its two slots
      * ([section]). [title] is the key alone as its cap shows it, on every tab (q, XC, ，键, 空格): the dialog
      * edits the slots too, so no 长按 before it.
      */
     private fun edit(title: String, slotKey: String, longPress: LongPress?) {
         val ctx = requireContext()
-        val start = longPress?.let { resolverOf(ctx, it)?.edit(it.id) }
-        val editor = start?.let { PopupEditor(it.row, it.symbols, it.first) }
+        val resolver = longPress?.let { resolverOf(ctx, it) }
+        // a later version's key_lists (§4.3) is never written over: its long presses not edited here
+        val start = longPress?.takeIf { !listsNewer }?.let { resolver?.edit(it.id) }
+        val default = longPress?.let { resolver?.defaultOf(it.id) }
+        val editor = start?.let { PopupEditor(it.row, it.symbols, it.first, default?.first?.text) }
         val field = EditText(ctx).apply {
             hint = getString(R.string.long_press_add_hint)
             inputType = InputType.TYPE_CLASS_TEXT
@@ -653,10 +677,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val layout = ctx.verticalLayout {
             val pad = ctx.dp(24)
             setPadding(pad, ctx.dp(8), pad, 0)
-            if (editor != null) {
-                add(text(ctx, getString(R.string.long_press_editor_hint), body = false), lParams(matchParent))
-                chars(ctx, editor, field, R.string.long_press_none).forEach { (view, top) -> add(view, lParams(matchParent) { topMargin = ctx.dp(top) }) }
-            }
+            longPressViews(ctx, longPress != null, start, editor, field).forEach { (view, top) -> add(view, lParams(matchParent) { topMargin = ctx.dp(top) }) }
             sections.forEach { add(it.view, lParams(matchParent)) }
         }
         val builder = AlertDialog.Builder(ctx)
@@ -665,7 +686,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
         val stored = slots
-        val edited = longPress?.let { lists[it.id] } != null
+        val edited = !listsNewer && longPress?.let { lists[it.id] } != null
         if (edited || stored.isSet(slotKey)) {
             builder.setNeutralButton(R.string.reset_this_key) { _, _ ->
                 change {
@@ -685,19 +706,31 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 val chosen = sections.map { it.chosen() ?: return@onClick false }
                 editor?.add(field.text.toString())
                 change {
-                    if (longPress != null && start != null) editor?.let { save(ctx, longPress, it, start) }
+                    if (longPress != null && start != null) editor?.let { save(ctx, longPress, it, start, default) }
                     slots = stored.with(slotKey, true, chosen[0]).with(slotKey, false, chosen[1])
                 }
                 true
             }
     }
 
-    // [editor]'s list stored for [longPress]'s key: none where it is the default on every keyboard of the page's form
-    // (KeyLists.with), its first the default's while it is the one the key started with and the user set none
-    private fun save(ctx: Context, longPress: LongPress, editor: PopupEditor, start: KeyEdit) {
+    /**
+     * [editor]'s list stored for [longPress]'s key: nothing touched while its symbols and first are as they started
+     * (a slot alone edited; a key off kept off; a key whose default differs between the form's keyboards, 九键 1 or
+     * 双拼's `;` groups, never written for being opened); none where it is the default on every keyboard of the page's
+     * form (KeyLists.with). Its first `*` only where `*` resolves to it ([default]'s first in the row, else the first
+     * symbol: KeyResolver.defaultFirst), else the item itself.
+     */
+    private fun save(ctx: Context, longPress: LongPress, editor: PopupEditor, start: KeyEdit, default: DefaultList?) {
+        if (editor.symbols == start.symbols && editor.first == start.first) return
+        val byDefault = when {
+            default == null -> editor.symbols.firstOrNull()
+            default.first == null -> null
+            default.first in default.row -> default.first?.text?.takeIf { it in editor.items }
+            else -> editor.symbols.firstOrNull()
+        }
         val first = when (val f = editor.first) {
+            byDefault -> First.Default
             null -> First.None
-            start.first -> start.user?.first?.takeIf { it != First.None } ?: First.Default
             else -> First.Literal(f)
         }
         lists = lists.with(longPress.id, UserList(off = false, symbols = editor.symbols, first = first), defaultsOf(ctx, longPress))
@@ -707,7 +740,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private fun defaultsOf(ctx: Context, longPress: LongPress): List<DefaultList?> {
         val layout = SceneLayouts.of(ctx, longPress.board) ?: return emptyList()
         val form = DefaultMarks.variantOf(layout.layout).form
-        return SceneBoard.resolver(layout, "").defaultsOn(longPress.id, KeyboardVariants.all(form, EngineState.shuangpinScheme))
+        return SceneBoard.resolver(layout, "", KeyCaps.nineLetters()).defaultsOn(longPress.id, KeyboardVariants.all(form, EngineState.shuangpinScheme))
     }
 
     /**

@@ -627,6 +627,87 @@ class PopupOverridesFragmentTest {
             }
         }
 
+        // the first the key resolves to, as the editor starts it
+        private fun firstOf(name: String): String? = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(name))!!.edit(KeyId.of(name)).first
+
+        private fun dialogOf(label: String): AlertDialog {
+            keyCalled(label).performClick()
+            st.idle()
+            return ShadowDialog.getLatestDialog() as AlertDialog
+        }
+
+        // review 1: a symbol moved to the front keeps the first (q's 1 a symbol, its default's first: `*` would be the moved one)
+        @Test
+        fun movingSymbolsKeepsTheFirst() {
+            open()
+            val symbols = own("full/q")
+            val first = firstOf("full/q")
+            assertTrue(symbols.size >= 2 && first == symbols.first())
+            dialogOf("q").apply {
+                tapItem(symbols.last())
+                repeat(symbols.size - 1) { button(R.string.long_press_move_left) }
+                ok()
+            }
+            assertEquals(symbols.last(), stored("full/q")!!.symbols.first())
+            assertEquals("the first kept", first, firstOf("full/q"))
+        }
+
+        // review 2: a slot alone changed on 九键 1 (its default differs between pinyin and English) writes no list
+        @Test
+        fun aSlotAloneChangedWritesNoList() {
+            open()
+            click(R.string.shortcut_page_nine)
+            dialogOf("1").apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().toList()[3].performClick()
+                ok()
+            }
+            assertEquals(KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
+        }
+
+        // review 3: a 注音九键 group with no default first, opened and OK'd, writes nothing (no `set !`)
+        @Test
+        fun aGroupOfNoFirstOpenedWritesNothing() {
+            open()
+            click(R.string.shortcut_page_zy9)
+            val key = KeyShortcutPages.ZhuyinNine.rows.flatten().first { k ->
+                KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(k.name))!!.let { it.defaultOf(KeyId.of(k.name))?.first == null && it.edit(KeyId.of(k.name)).row.isNotEmpty() }
+            }
+            dialogOf(key.label).ok()
+            assertEquals(KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
+        }
+
+        // review 4: a key turned off is said so, and stays off when only a slot is changed
+        @Test
+        fun anOffKeyIsSaidSoAndKeptOff() {
+            open()
+            // 九键 5: a key with a row, which a save would have turned back on
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER + "\nt9/5\toff")
+            click(R.string.shortcut_page_nine)
+            dialogOf("5").apply {
+                assertTrue(KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().any { it.isShown && it.text.toString() == st.s(R.string.long_press_off) })
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().toList()[3].performClick()
+                ok()
+            }
+            assertEquals(UserList.Off, stored("t9/5"))
+        }
+
+        // review 8: a later version's key_lists is read-only here: said so, never written over
+        @Test
+        fun aNewerVersionsListsAreNeverWritten() {
+            val newer = "@2\nfull/q\tsomething"
+            prefs.set(AppPrefs.getInstance().internal.keyLists, newer)
+            open()
+            prefs.set(AppPrefs.getInstance().internal.keyLists, newer)
+            st.open(SettingsRoute.PopupOverrides)
+            assertTrue(KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().any { it.text.toString() == st.s(R.string.long_press_newer) })
+            dialogOf("q").apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().toList()[3].performClick()
+                ok()
+            }
+            click(R.string.undo)
+            assertEquals(newer, AppPrefs.getInstance().internal.keyLists.getValue())
+        }
+
         // 数字's keys edited like any other (ST-109): 5 given ½, the number keyboard's long press reads it
         @Test
         @Uat("ST-109")

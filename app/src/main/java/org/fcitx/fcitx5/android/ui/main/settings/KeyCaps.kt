@@ -14,6 +14,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
@@ -114,7 +115,7 @@ object KeyCaps {
         // the marks as the keyboard's resolver has them (060-keys-unify §1.3): each key's first from key_lists, its
         // slots the page's being edited
         marks = if (layout != null) {
-            SceneBoard.resolver(layout, "", slots = slots).marks(keysState()).let { if (it.charShortcuts == charShortcuts) it else it.copy(charShortcuts = charShortcuts) }
+            SceneBoard.resolver(layout, "", nineLetters(), slots).marks(keysState()).let { if (it.charShortcuts == charShortcuts) it else it.copy(charShortcuts = charShortcuts) }
         } else {
             // a key alone (no board): its slots' marks, no first
             val spots = swipeSpots()
@@ -126,7 +127,11 @@ object KeyCaps {
     private fun keysState() = KeysState(ways = swipeWays(), spots = swipeSpots())
 
     /** [layout]'s resolver as the editor reads a key's list of it ([KeyResolver.edit]): its keys' defaults and the user's lists. */
-    fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.of(ctx, layout)?.let { SceneBoard.resolver(it, "") }
+    fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.of(ctx, layout)?.let { SceneBoard.resolver(it, "", nineLetters()) }
+
+    /** The nine keys' letters as the user set them (t9_letters), as 九键's keyboard has them: the editor's rows of 2 to 9. */
+    fun nineLetters(): Map<Char, String> = NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())
+        .let { l -> ('2'..'9').associateWith { l.letters(it).lowercase() } }
 
     /** A qwerty key's height on the keyboard as the height settings make it now, px (InputView's keys' area, [KeyboardArea]). */
     fun keyboardKeyHeight(ctx: Context): Int = SwipeFates.size(upright(ctx), KeyNames.QWERTY, ImKeyboards.Layout.TEXT).height / KEY_ROWS

@@ -312,8 +312,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         }
 
         /**
-         * What each of 九键's keys 1 to 9 offers on a long press besides its digit and letters
-         * ([NineKeySymbols.serialize], empty as by default): set on its own page from the 九键 section of an input method's page.
+         * 0.5's and the betas' symbols of 九键's keys 1 to 9 ([NineKeySymbols.serialize], empty as by default): no
+         * page sets it now (060-keys-unify S5: 按键字符和快捷键's 九键 tab edits key_lists); read only by the
+         * migration to key_lists, gone in S6.
          */
         val t9Symbols = string(T9_SYMBOLS, "")
 

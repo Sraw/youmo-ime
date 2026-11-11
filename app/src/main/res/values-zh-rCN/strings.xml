@@ -787,6 +787,8 @@
     <string name="picker_flags">旗帜</string>
     <string name="long_press_legend">带框的键是改过的；变淡的键长按不弹出字符，滑向长按首选等于点这个键。</string>
     <string name="long_press_none">长按这个键不弹出字符。</string>
+    <string name="long_press_off">这个键的长按已关。添加字符就重新打开。</string>
+    <string name="long_press_newer">长按字符是新版本的应用设置的：原样保留，这里不能改。</string>
     <string name="long_press_add_hint">添加字符，空格分隔</string>
     <string name="punctuation_page_hint">打中文时，按左边的键打出右边的标点；一个键对应几个标点时可以选。点一项可修改或删除。</string>
     <string name="punctuation_pair">交替</string>

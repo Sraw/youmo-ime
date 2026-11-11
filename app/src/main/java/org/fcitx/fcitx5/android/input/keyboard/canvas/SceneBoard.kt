@@ -178,8 +178,9 @@ class SceneBoard(
         // a layout's shortcut names, and the marks' settings as last made from their inputs: kept for the
         // scene asked again, the same instances making the env equal to the last at once
         private var namesMade: Pair<SceneLayout, Set<String>>? = null
-        private val resolvers = LinkedHashMap<ResolverFor, KeyResolver>()
-        private const val KEPT_RESOLVERS = 4
+        // least recently used first (access order): the keyboard's and the settings page's tabs kept apart
+        private val resolvers = LinkedHashMap<ResolverFor, KeyResolver>(16, 0.75f, true)
+        private const val KEPT_RESOLVERS = 16
 
         /**
          * A test's measurer in place of the fonts' (a fixed width a character: Robolectric measures no text), the

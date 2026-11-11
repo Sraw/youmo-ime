@@ -806,6 +806,8 @@
     <string name="picker_flags">Flags</string>
     <string name="long_press_legend">Outlined keys are changed; on a faded key a long press offers nothing, and a swipe to its first of long press is a tap.</string>
     <string name="long_press_none">Holding this key offers nothing.</string>
+    <string name="long_press_off">Holding this key offers nothing: its long press is turned off. Add a character to turn it on again.</string>
+    <string name="long_press_newer">These long presses were set by a newer version of the app: they are kept as they are and cannot be edited here.</string>
     <string name="long_press_add_hint">Add, space between several</string>
     <string name="punctuation_page_hint">While typing Chinese, the key on the left types the punctuation on the right; a key with several offers a choice. Tap one to change or remove it.</string>
     <string name="punctuation_pair">in turn</string>

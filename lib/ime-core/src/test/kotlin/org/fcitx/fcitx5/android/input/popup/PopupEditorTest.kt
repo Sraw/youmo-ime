@@ -71,6 +71,23 @@ class PopupEditorTest {
         assertEquals("a list of none takes its first", "x", e.first)
     }
 
+    // review 7: a first deleted falls back to the default first where still there, else to the first symbol, never to the row's first
+    @Test
+    fun aDeletedFirstFallsBackToTheDefaultFirstThenTheFirstSymbol() {
+        val e = PopupEditor(listOf("1", "q"), listOf("!", "@", "#"), "@", defaultFirst = "q")
+        e.tap(3)
+        e.delete()
+        assertEquals("the default first, a row item", "q", e.first)
+        val f = PopupEditor(listOf("1", "q"), listOf("!", "@", "#"), "@", defaultFirst = "%")
+        f.tap(3)
+        f.delete()
+        assertEquals("no default first in the list: the first symbol", "!", f.first)
+        val g = PopupEditor(listOf("1"), listOf("@"), "@")
+        g.tap(1)
+        g.delete()
+        assertNull("no symbol left: none, not the row's 1", g.first)
+    }
+
     @Test
     fun addKeepsEachItemOnceAndNoneOfTheRow() {
         val e = editor()
