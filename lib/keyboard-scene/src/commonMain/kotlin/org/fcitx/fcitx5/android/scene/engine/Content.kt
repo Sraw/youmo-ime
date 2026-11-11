@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Icons
+import org.fcitx.fcitx5.android.scene.MarkFate
 import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
@@ -22,7 +24,13 @@ import kotlin.math.sqrt
  * A mark as placed before any yields ([KeyMarkYield.Mark] of it); [top] its box's (a text's by the
  * font's extent, as its TextView stood: the label under it centres to it).
  */
-class MarkDrawn(val drawn: Drawn, val slot: Slot, val drop: Int, val top: Double)
+/** [user]: a way the user set; [text]: a text's ([MarkContent.Text]), which may step down where it has no room. */
+class MarkDrawn(
+    val drawn: Drawn, val slot: Slot, val drop: Int, val top: Double, val user: Boolean = false, val text: Boolean = false,
+    /** A way's: [up] the way, [fate] how it is drawn before any is left out (KeyNode.fates); null, a mark of no way the user set. */
+    val up: Boolean? = null,
+    val fate: MarkFate? = null,
+)
 
 /**
  * The classes a keyboard's glyphs are one size in (060-render-p2 S4e, KeyMarkYield.group): [Main], what
@@ -89,14 +97,24 @@ class Looks(private val of: (Part) -> TextLook) {
  * the theme's; `key mark { hidden }` leaves the symbol out, `key shortcut { hidden }` a character key's
  * shortcut, `key hint { hidden }` a function key's swipe marks (drawn as shortcuts: `key shortcut` styles them).
  */
-class Content(private val env: Env, private val measurer: TextMeasurer, private val icons: IconSizes = IconSizes.MATERIAL) {
+// [themedSign]: the theme draws its own [Icons.SHORT_TEXT], whose ink is not known: its whole square kept apart
+class Content(
+    private val env: Env,
+    private val measurer: TextMeasurer,
+    private val icons: IconSizes = IconSizes.MATERIAL,
+    private val themedSign: Boolean = false,
+) {
     private val d = env.density
     private val textScale = KeyTextScale.of(env.compact, env.floating)
 
-    fun of(key: ExpandedKey, cell: Box, content: Box, looks: Looks, face: FaceGeometry? = null, snap: Boolean = true): KeyContent {
+    /**
+     * [short]: the text marks (by index) with no room as they were (SceneBuilder), each how many steps down
+     * [MarkContent.Text.ladder] it is drawn.
+     */
+    fun of(key: ExpandedKey, cell: Box, content: Box, looks: Looks, face: FaceGeometry? = null, snap: Boolean = true, short: Map<Int, Int> = emptyMap()): KeyContent {
         val compactScale = if (env.compact) key.attrs.compactTextScale ?: 1.0 else 1.0
         val hidden = looks.label.hidden
-        val marks = marks(key, cell, content, looks, hidden, snap)
+        val marks = marks(key, cell, content, looks, hidden, snap, short)
         val below = marks.firstOrNull { it.slot == Slot.Below }
         val shows = shows(key, looks)
         val measured = shows.label?.takeIf { it.isNotEmpty() }?.let { text ->
@@ -255,7 +273,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
 
     private fun measure(text: String, look: TextLook, weight: Int, size: Double): Measured = measure(measurer, text, look, weight, size)
 
-    private fun marks(key: ExpandedKey, cell: Box, content: Box, looks: Looks, hidden: Boolean, snap: Boolean): List<MarkDrawn> {
+    private fun marks(key: ExpandedKey, cell: Box, content: Box, looks: Looks, hidden: Boolean, snap: Boolean, short: Map<Int, Int>): List<MarkDrawn> {
         val name = key.attrs.shortcut
         val char = name == null || '/' in name
         // a function key's swipes (the space's cursor, ⌫'s sweep): a theme's `key hint { hidden }` leaves them out
@@ -264,13 +282,24 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val slots = if (char) charSlots(ways) else functionSlots(ways)
         // the shortcuts first, the up one before the down one, then the symbols (as 0.5 listed them)
         var shortcuts = 0
-        return slots.entries.sortedWith(compareBy({ it.value.symbol != null }, { !it.value.up })).map { (slot, w) ->
-            if (w.symbol != null) {
+        return slots.entries.sortedWith(compareBy({ it.value.symbol != null }, { !it.value.up })).mapIndexed { i, (slot, w) ->
+            var fate: MarkFate? = null
+            val m = if (w.symbol != null) {
                 symbolMark(w.symbol, slot, content, looks)
             } else {
                 val drop = if (shortcuts++ == 0) KeyMarkYield.DROP_SHORTCUT else KeyMarkYield.DROP_DOWN_SHORTCUT
-                shortcutMark(w.shortcut!!, slot, drop, cell, content, looks, snap)
+                val s = w.shortcut!!
+                // a text its step down, the same whether laid out on whole pixels or not
+                val shown = if (s is MarkContent.Text) rung(s, short[i] ?: 0, looks) else s
+                if (w.user) fate = when {
+                    shown == MarkContent.Text.SIGN -> MarkFate.Sign
+                    s is MarkContent.Text && shown is MarkContent.Text && shown.text != s.text -> MarkFate.Shortened(shown.text)
+                    else -> MarkFate.AsSet
+                }
+                shortcutMark(shown, slot, drop, cell, content, looks, snap)
             }
+            val text = w.shortcut is MarkContent.Text
+            if (w.user || text) MarkDrawn(m.drawn, m.slot, m.drop, m.top, user = w.user, text = text, up = w.up.takeIf { w.user }, fate = fate ?: MarkFate.AsSet.takeIf { w.user }) else m
         }
     }
 
@@ -281,10 +310,11 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val shortcutsShown = !char || (m.charShortcuts && !looks.shortcut.hidden)
         return listOf(true, false).mapNotNull { up ->
             if (!(if (up) m.upOn else m.downOn)) return@mapNotNull null
+            val user = m.isUser(name, up)
             when (val c = m.of(name, char, up)) {
-                MarkContent.Corner -> key.alt?.takeIf { symbolsShown }?.let { Way(up, it, null) }
-                is MarkContent.Symbol -> c.text.takeIf { symbolsShown && it.isNotEmpty() }?.let { Way(up, it, null) }
-                is MarkContent.Icon, is MarkContent.Text -> c.takeIf { shortcutsShown }?.let { Way(up, null, it) }
+                MarkContent.Corner -> key.alt?.takeIf { symbolsShown }?.let { Way(up, it, null, user) }
+                is MarkContent.Symbol -> c.text.takeIf { symbolsShown && it.isNotEmpty() }?.let { Way(up, it, null, user) }
+                is MarkContent.Icon, is MarkContent.Text -> c.takeIf { shortcutsShown }?.let { Way(up, null, it, user) }
                 MarkContent.Empty -> null
             }
         }
@@ -318,7 +348,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
     }
 
     // a way's mark: a symbol's text, or a shortcut's
-    private class Way(val up: Boolean, val symbol: String?, val shortcut: MarkContent?)
+    private class Way(val up: Boolean, val symbol: String?, val shortcut: MarkContent?, val user: Boolean = false)
 
     private fun symbolMark(text: String, slot: Slot, content: Box, looks: Looks): MarkDrawn {
         val sizeDp = SYMBOL_DP * textScale * looks.mark.scale
@@ -330,6 +360,15 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         return MarkDrawn(drawn, slot, KeyMarkYield.DROP_SYMBOL, box.top)
     }
 
+    // [s] [steps] down its ladder: a shorter text only where it is narrower as measured, before any squeeze ("hi"
+    // is no wider than "h…": the sign next); the sign, an icon, whenever it is reached (the step that is left)
+    private fun rung(s: MarkContent.Text, steps: Int, looks: Looks): MarkContent {
+        fun width(t: String) = measure(t, looks.shortcut, looks.shortcut.weight, SHORTCUT_TEXT_DP * textScale * d).box.width
+        return s.ladder.take(steps).fold<MarkContent, MarkContent>(MarkContent.Text(s.text)) { now, t ->
+            if (t !is MarkContent.Text || now is MarkContent.Text && width(t.text) < width(now.text)) t else now
+        }
+    }
+
     // a shortcut's mark in [slot]
     private fun shortcutMark(mark: MarkContent, slot: Slot, drop: Int, cell: Box, content: Box, looks: Looks, snap: Boolean): MarkDrawn {
         val compact = env.compact
@@ -338,7 +377,10 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val drawn = when (mark) {
             is MarkContent.Icon -> {
                 val dp = if (compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
-                Drawn.of(PlacedIcon(mark.name, slotBox(slot, dp * d, dp * d, content, h, v).let { if (snap) laidOut(it) else wholeSized(it) }, Part.Shortcut))
+                val icon = PlacedIcon(mark.name, slotBox(slot, dp * d, dp * d, content, h, v).let { if (snap) laidOut(it) else wholeSized(it) }, Part.Shortcut)
+                // the sign's two lines are a thin band of its square: that band its ink, so it fits where 「T」 did
+                // (under j's descender at 底部), where the square would not; a theme's own art may fill its square
+                if (mark == MarkContent.Text.SIGN && !themedSign) Drawn(emptyList(), listOf(icon), Icons.SHORT_TEXT_INK.of(icon.box)) else Drawn.of(icon)
             }
             is MarkContent.Text -> {
                 val text = mark.text

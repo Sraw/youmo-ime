@@ -8,6 +8,7 @@ import android.content.Context
 import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
+import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
@@ -52,6 +53,16 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
         doAfterTextChanged { pick(textButton) }
     }
 
+    /** Called when what is chosen may have changed (a way picked, a command, the text typed). */
+    var onChange: (() -> Unit)? = null
+
+    // how the keyboard draws what is chosen where that is not as set (SwipeFates.note): none, hidden
+    private val noteView = TextView(ctx).apply {
+        textSize = 13f
+        setTextColor(ctx.styledColor(android.R.attr.textColorSecondary))
+        visibility = View.GONE
+    }
+
     val view: LinearLayout = ctx.verticalLayout {
         add(TextView(ctx).apply {
             text = if (off) title + ctx.getString(R.string.slot_section_off) else title
@@ -71,6 +82,7 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
         add(textButton, lParams(matchParent))
         add(field, lParams(matchParent) { marginStart = ctx.dp(32) })
         add(empty, lParams(matchParent))
+        add(noteView, lParams(matchParent) { marginStart = ctx.dp(32) })
     }
 
     init {
@@ -86,7 +98,27 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
         )
     }
 
-    private fun pick(button: RadioButton) = radios.forEach { it.isChecked = it === button }
+    private fun pick(button: RadioButton) {
+        radios.forEach { it.isChecked = it === button }
+        onChange?.invoke()
+    }
+
+    /** The page's note of how the keyboard draws it ([SwipeFates.note]); null, none. */
+    fun note(text: String?) {
+        noteView.text = text
+        noteView.visibility = if (text == null) View.GONE else View.VISIBLE
+    }
+
+    /** The note shown now, null for none: a test's. */
+    val noted: String? get() = noteView.text?.toString()?.takeIf { noteView.visibility == View.VISIBLE }
+
+    /** What is chosen, said on nothing: an empty text as nothing typed yet. */
+    fun peek(): SwipeSlot? = when {
+        first.isChecked -> SwipeSlot.First
+        commandButton.isChecked -> SwipeSlot.Command(command)
+        textButton.isChecked -> field.text.toString().takeIf { it.isNotEmpty() }?.let(SwipeSlot::Text)
+        else -> SwipeSlot.Empty
+    }
 
     private fun showCommand() {
         commandButton.text = ctx.getString(R.string.shortcut_command_is, ctx.getString(R.string.shortcut_command), ctx.getString(KeyShortcutLooks.of(command).label))

@@ -154,7 +154,7 @@ class TextBoardSceneTest {
         assertTrue("full/q" in names && "space" in names && "return" in names)
         val firsts = mapOf("comma" to "!", "t9/3" to null)
         val m = SceneMarks.settings(slots, KeySwipe.Ways.Both, KeyMarks.At.BottomLeft, KeyMarks.At.Bottom, true, names, firsts)
-        assertEquals("two characters, then an ellipsis", MarkContent.Text("he…"), m.shortcuts["full/q:down"])
+        assertEquals("two characters, then an ellipsis", MarkContent.Text("he…", "h…"), m.shortcuts["full/q:down"])
         assertEquals(MarkContent.Corner, m.shortcuts["full/q:up"])
         assertEquals(MarkContent.Empty, m.shortcuts["full/a:down"])
         assertEquals(MarkContent.Icon("content-paste"), m.shortcuts["full/s:up"])

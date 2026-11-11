@@ -1291,4 +1291,14 @@
     <string name="swipe_way_said">%1$s %2$s</string>
     <string name="swipe_ways_said">%1$s, %2$s</string>
     <string name="swipe_select_keys_only">Only the letter keys can be selected here. Select other keyboards\' keys on their own tabs.</string>
+    <string name="swipe_fate_shortened">No room: shown on the key as “%s”</string>
+    <string name="swipe_fate_sign">No room: shown on the key as an icon</string>
+    <string name="swipe_fate_dropped">No room: not shown on the key (the swipe still works)</string>
+    <string name="swipe_fate_both">Portrait: %1$s; landscape: %2$s</string>
+    <string name="swipe_fate_part_as_set">shown as usual</string>
+    <string name="swipe_fate_part_shortened">shown as “%s”</string>
+    <string name="swipe_fate_part_sign">shown as an icon</string>
+    <string name="swipe_fate_part_dropped">not shown (the swipe still works)</string>
+    <string name="swipe_fate_key">%1$s %2$s — %3$s</string>
+    <string name="swipe_fate_on">%1$s: %2$s</string>
 </resources>

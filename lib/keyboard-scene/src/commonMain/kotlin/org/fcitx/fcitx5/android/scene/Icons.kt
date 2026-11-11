@@ -20,10 +20,28 @@ object Icons {
         "choose-keyboard", "hide-keyboard", "swipe-select",
     )
 
+    /** A swipe's text with no room on its key (MarkContent.Text.SIGN): a longer line over a shorter. */
+    const val SHORT_TEXT = "short-text"
+
+    /** [SHORT_TEXT]'s ink in its 24-unit square (the app's ic_baseline_short_text_24: M4,9h16v2H4z M4,13h10v2H4z). */
+    val SHORT_TEXT_INK = Ink(4.0, 9.0, 20.0, 15.0)
+
+    /** Where an icon's paths are in its [UNITS]-unit square. */
+    data class Ink(val left: Double, val top: Double, val right: Double, val bottom: Double) {
+        /** The ink in [box], the icon's square as drawn. */
+        fun of(box: Box): Box {
+            val sx = box.width / UNITS
+            val sy = box.height / UNITS
+            return Box(box.left + left * sx, box.top + top * sy, box.left + right * sx, box.top + bottom * sy)
+        }
+    }
+
+    private const val UNITS = 24.0
+
     val ALL: Set<String> = (
         RETURN + listOf(
             "backspace", "language", "space", "shift", "shift-once", "shift-locked", "number-pad", "lock", "lock-open",
-            "emoji", "voice", "arrow-upward", "arrow-downward",
+            "emoji", "voice", "arrow-upward", "arrow-downward", SHORT_TEXT,
         ) + COMMANDS
         ).toSet()
 }

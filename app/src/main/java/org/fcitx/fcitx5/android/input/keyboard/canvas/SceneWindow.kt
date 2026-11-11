@@ -48,9 +48,13 @@ object SceneWindow {
      * typed: the window is every board's and field's.
      */
     fun scenes(context: Context, theme: Theme, floating: Boolean = false, placement: Set<String> = emptySet()): Set<String> =
+        scenes(landscape(context), theme, floating, placement)
+
+    /** [scenes] on a screen [landscape] or not: a settings page's of the keyboard upright and turned (SwipeFates). */
+    fun scenes(landscape: Boolean, theme: Theme, floating: Boolean = false, placement: Set<String> = emptySet()): Set<String> =
         buildSet {
             if (keyboardCompact()) add("compact")
-            if (landscape(context)) add("landscape")
+            if (landscape) add("landscape")
             if (floating) add("floating")
             addAll(placement)
             if (theme.isDark) add("dark")

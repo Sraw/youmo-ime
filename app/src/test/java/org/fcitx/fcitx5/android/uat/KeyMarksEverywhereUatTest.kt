@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
+import org.fcitx.fcitx5.android.scene.Icons
 import org.fcitx.fcitx5.android.scene.engine.TextMetrics
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
@@ -155,7 +156,9 @@ class KeyMarksEverywhereUatTest {
         var labelSeen = false
         return k.node.ops(false).mapNotNull { op ->
         when (op) {
-            is Op.Icon -> "icon ${op.name}" to RectF(op.box.left.toFloat(), op.box.top.toFloat(), op.box.right.toFloat(), op.box.bottom.toFloat())
+            // the built-in sign's ink is its two lines, as the engine keeps it apart; a theme's own, its whole square
+            is Op.Icon -> "icon ${op.name}" to (if (op.name == Icons.SHORT_TEXT && !themedSign) Icons.SHORT_TEXT_INK.of(op.box) else op.box)
+                .let { RectF(it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat()) }
             is Op.Text -> {
                 // measured as the engine measured it (AndroidTextMeasurer, the theme's fonts)
                 val ink = measurer.measure(op.text, op.font, op.weight, op.size).ink
@@ -171,6 +174,12 @@ class KeyMarksEverywhereUatTest {
             else -> null
         }
         }
+    }
+
+    // the theme in use draws its own short-text sign (a pack's icons)
+    private val themedSign by lazy {
+        val t = ThemeManager.activeTheme
+        org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes.of(t, ThemeManager.shownLook(t))?.let { Icons.SHORT_TEXT in it.icons } == true
     }
 
     private val measurer by lazy { AndroidTextMeasurer(SceneFonts(ThemeManager.shownLook(ThemeManager.activeTheme))) }

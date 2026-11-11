@@ -1265,4 +1265,14 @@
     <string name="swipe_way_said">%1$s %2$s</string>
     <string name="swipe_ways_said">%1$s，%2$s</string>
     <string name="swipe_select_keys_only">这一页只能选字母键；其他键盘的键在各自的分页里选。</string>
+    <string name="swipe_fate_shortened">画不下，键上显示为「%s」</string>
+    <string name="swipe_fate_sign">画不下，键上显示为图标</string>
+    <string name="swipe_fate_dropped">画不下，键上不显示（滑动照常有效）</string>
+    <string name="swipe_fate_both">竖屏%1$s，横屏%2$s</string>
+    <string name="swipe_fate_part_as_set">照常显示</string>
+    <string name="swipe_fate_part_shortened">显示为「%s」</string>
+    <string name="swipe_fate_part_sign">显示为图标</string>
+    <string name="swipe_fate_part_dropped">不显示（滑动照常有效）</string>
+    <string name="swipe_fate_key">%1$s %2$s：%3$s</string>
+    <string name="swipe_fate_on">%1$s：%2$s</string>
 </resources>
