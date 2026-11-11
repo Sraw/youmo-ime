@@ -157,6 +157,7 @@ class SwipeFatesParityUatTest {
             jobs.forEach { assertNotSame(kept, it.cascades) }
             jobs.forEach { SwipeFates.made(it) }
             jobs.forEach { assertTrue(it.cascades.size > 0) }
+            // a side check only: the kept ones may be worked out by others, but not by the page here
             assertEquals(keptBefore, kept.size)
         }
     }

@@ -182,8 +182,8 @@ object SwipeFates {
             is Parsed.Failed -> return Seen(job.label, job.landscape, null, job.ways).also { Timber.e("swipe fates: no scene of %s: %s", job.layout.id, built.problems) }
         }
         val keys = scene.keys.filter { it.copy == 0 && it.shortcut != null }
-        // a table's letters show its roots: their ways drawn nowhere
-        val roots = if (job.rootsShown) keys.filter { it.id.length == 1 && it.id[0] in 'a'..'z' }.mapTo(HashSet()) { it.shortcut!! } else emptySet()
+        // a table's roots shown: its character keys' ways drawn nowhere, as the scene has it (a name with a board, `full/j`)
+        val roots = if (job.rootsShown) keys.mapNotNullTo(HashSet()) { it.shortcut?.takeIf { n -> '/' in n } } else emptySet()
         val fates = keys.associate { node ->
             node.shortcut!! to if (node.shortcut in roots) mapOf(true to MarkFate.Dropped, false to MarkFate.Dropped) else node.fates
         }

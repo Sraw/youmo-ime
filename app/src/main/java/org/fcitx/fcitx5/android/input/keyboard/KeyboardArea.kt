@@ -103,14 +103,8 @@ object KeyboardArea {
             val nowLandscape = w > h
             // as held now, the bar measured: at the bottom, or at a side
             val now = NavBar(n.bottom, n.left + n.right)
-            // turned, not measurable: none if none now; gestures' strip at the bottom either way up, as tall as
-            // it is now (said by navigation_mode, or a bar at the bottom while landscape); else the buttons' resources
-            val gestures = Settings.Secure.getInt(ctx.contentResolver, NAVIGATION_MODE, 0) == GESTURES || (nowLandscape && now.bottom > 0)
-            val other = when {
-                now == NavBar.NONE -> NavBar.NONE
-                gestures -> NavBar(maxOf(now.bottom, now.side), 0)
-                else -> NavBar.of(!nowLandscape, minOf(w, h), density)
-            }
+            val mode = Settings.Secure.getInt(ctx.contentResolver, NAVIGATION_MODE, 0)
+            val other = otherBar(now, nowLandscape, density, mode) { NavBar.of(!nowLandscape, minOf(w, h), density) }
             val cutout = if (nowLandscape) c.left + c.right else c.top + c.bottom
             return screensOf(w, h, density, now, other, cutout, roundDp = true)
         }
@@ -146,6 +140,26 @@ object KeyboardArea {
 
     private const val HALF = 0.5f
 
+    /**
+     * The navigation bar turned, from [now] the one measured as held now ([nowLandscape]): none if none now. A bar
+     * at the bottom both ways up stays as tall turned: gesture navigation ([mode] 2), or a strip upright shorter than
+     * any buttons' bar (a ROM not saying mode 2), or a bar at the bottom while landscape (gestures, 3 buttons on a
+     * tablet or a display 600 dp or wider, a bar that does not move, the 12L taskbar). Each keeps its height turned
+     * (DisplayPolicy gives one bottom height for both, the taskbar is the same strip), so copying it is right.
+     * Else the buttons' bar by the system's resources, [buttons].
+     */
+    @VisibleForTesting
+    internal fun otherBar(now: NavBar, nowLandscape: Boolean, density: Float, mode: Int, buttons: () -> NavBar): NavBar {
+        if (now == NavBar.NONE) return NavBar.NONE
+        val bottomBothWays = mode == GESTURES ||
+            (nowLandscape && now.bottom > 0) ||
+            (!nowLandscape && now.bottom > 0 && now.bottom / density < STRIP_DP)
+        return if (bottomBothWays) NavBar(maxOf(now.bottom, now.side), 0) else buttons()
+    }
+
+    // a bar at the bottom upright shorter than this, dp, is a gesture strip (buttons' bars are 40 dp or more)
+    private const val STRIP_DP = 32
+
     /** A navigation bar a screen leaves out, px: at the bottom, or at the sides. */
     @VisibleForTesting
     internal data class NavBar(val bottom: Int, val side: Int) {
@@ -170,7 +184,8 @@ object KeyboardArea {
 
     // Settings.Secure.NAVIGATION_MODE, hidden: 0 three buttons, 1 two, 2 gestures
     private const val NAVIGATION_MODE = "navigation_mode"
-    private const val GESTURES = 2
+    @VisibleForTesting
+    internal const val GESTURES = 2
 
     private fun realSize(ctx: Context): Point = Point().also {
         @Suppress("DEPRECATION")

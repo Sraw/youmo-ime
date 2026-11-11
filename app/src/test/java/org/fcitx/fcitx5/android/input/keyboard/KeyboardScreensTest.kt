@@ -54,4 +54,26 @@ class KeyboardScreensTest {
     private companion object {
         const val D = 2.625f
     }
+
+    private val buttons = NavBar(0, 126)
+    private fun other(now: NavBar, landscape: Boolean, mode: Int = 0) = KeyboardArea.otherBar(now, landscape, D, mode) { buttons }
+
+    @Test
+    fun gestureModeCopiesTheStrip() = assertEquals(NavBar(63, 0), other(NavBar(63, 0), false, KeyboardArea.GESTURES))
+
+    @Test
+    fun aBottomBarWhileLandscapeStaysAtTheBottom() = assertEquals(NavBar(84, 0), other(NavBar(84, 0), true))
+
+    @Test
+    fun noBarNowNoneTurned() = assertEquals(NavBar.NONE, other(NavBar.NONE, false, KeyboardArea.GESTURES))
+
+    // a ROM not saying mode 2: 63 px at 2.625 is 24 dp, a strip, not buttons
+    @Test
+    fun aShortStripUprightIsGestures() = assertEquals(NavBar(63, 0), other(NavBar(63, 0), false))
+
+    @Test
+    fun threeButtonsUprightMoveToTheSide() = assertEquals(buttons, other(NavBar(126, 0), false))
+
+    @Test
+    fun threeButtonsAtTheSideComeBackFromTheResources() = assertEquals(NavBar(126, 0), KeyboardArea.otherBar(NavBar(0, 126), true, D, 0) { NavBar(126, 0) })
 }
