@@ -340,11 +340,13 @@ def face_seams(d, label):
     pieces lets the panel show through as a thin line. Measured against the line's own middle, so a pressed
     (darker) face is judged alike"""
     k = d.keys(refresh=True)
+    missing = [n for n in (label, "h", "g", "t") if n not in k]
+    check(not missing, f"量键面拼缝要的键不在屏幕上：{missing}")
     cx, cy = k[label]
     px_, py_ = abs(k["h"][0] - k["g"][0]), abs(k["g"][1] - k["t"][1])
     im = d.png().convert("RGB")
-    lines = [[im.getpixel((x, cy)) for x in range(int(cx - 0.34 * px_), int(cx + 0.34 * px_) + 1)],
-             [im.getpixel((cx, y)) for y in range(int(cy - 0.34 * py_), int(cy + 0.34 * py_) + 1)]]
+    lines = [[im.getpixel((x, cy)) for x in range(int(cx - 0.3 * px_), int(cx + 0.3 * px_) + 1)],
+             [im.getpixel((cx, y)) for y in range(int(cy - 0.3 * py_), int(cy + 0.3 * py_) + 1)]]
     bad = []
     for line in lines:
         mr = sorted(p[0] for p in line)[len(line) // 2]
@@ -422,18 +424,24 @@ def st101(d):
     d.shot("kb", "选用转换来的皮肤")
     # held down for the shot: a pressed key darker though the skin has no pressed face (space by hand: held, it listens).
     # The shot takes about a second, past the long-press time: z's long-press bubble may show too, and what the
-    # release types is cleared below
+    # release types is cleared below. z's press bubble covers its face, so the pressed face's seams are measured on
+    # 退格, which shows no bubble (held, it deletes: the field is cleared after)
     seams = face_seams(d, "g")
     check(not seams, f"g 的键面上有九宫格拼缝（偏蓝的像素 {seams[:5]}）")
     z = d.keys(refresh=True)["z"]
     d.touch(("down", z[0], z[1]))
     try:
         d.shot("kb", "按住 z：变暗（长按气泡可能也弹出）")
-        pressed = face_seams(d, "z")
     finally:
         d.touch(("up", z[0], z[1]))
+    bk = d.keys(refresh=True)["bksp"]
+    d.touch(("down", bk[0], bk[1]))
+    try:
+        pressed = face_seams(d, "bksp")
+    finally:
+        d.touch(("up", bk[0], bk[1]))
     d.clear()
-    check(not pressed, f"按住的 z 键面上有九宫格拼缝（偏蓝的像素 {pressed[:5]}）")
+    check(not pressed, f"按住的退格键面上有九宫格拼缝（偏蓝的像素 {pressed[:5]}）")
     o, b = skin_colours(d)
     check(o > 300 and b > 40, f"键盘不是皮肤的橙键蓝底（橙 {o} 蓝 {b} / 1800）")
     d.step("紧凑高度的键缝")

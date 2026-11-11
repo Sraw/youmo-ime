@@ -101,6 +101,7 @@ class CanvasPainterTest {
 
     @Test
     fun aNineSlicesInnerEdgesAreWholePixelsAsTheAppsAndASideWithNoInsetKeepsItsEdge() {
+        // R23 ST-101 seams and F7525 (a side with no inset kept whole)
         // a fractional target, the same case ThemeMakerRulesTest pins for the app's NineSliceLayout: inner edges at
         // 80.9 and 17.65 drawn at 81 and 18; no left or bottom inset, those edges the target's own
         val cut = NineSliceCut.of(40.0, 40.0, 0, 8, 12, 0, 2, Box(3.5, 7.25, 96.5, 60.75), 2.6)

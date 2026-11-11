@@ -152,6 +152,7 @@ class KeyFaceGeometryTest {
     // a line of what is under the key along it
     @Test
     fun aSideWithNoInsetKeepsTheTargetsEdge() {
+        // R23 F7525: whole-pixel rounding first moved a side with no inset in by half a pixel, losing the face's edge
         val pieces = NineSliceLayout.of(40, 40, NineSlice("f", Insets(0, 8, 12, 0), 2), Area(3.5f, 7.25f, 96.5f, 60.75f), 2.6f)
         assertEquals(
             listOf(
