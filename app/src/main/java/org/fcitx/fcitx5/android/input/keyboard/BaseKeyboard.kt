@@ -757,7 +757,8 @@ abstract class BaseKeyboard(
             if (user != null) {
                 // turned off: no long press at all
                 if (user.isEmpty()) return
-                popupActionListener?.onPopupAction(action.copy(keyboard = KeyDef.Popup.Keyboard.Explicit(user)))
+                // in the shape of the key's own (its row, as it is where that is): the user's list looks as the original
+                popupActionListener?.onPopupAction(action.copy(keyboard = OwnLongPress.shaped(user, action.keyboard)))
                 return
             }
         }

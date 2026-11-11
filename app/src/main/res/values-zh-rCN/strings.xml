@@ -793,6 +793,9 @@
     <string name="picker_flags">旗帜</string>
     <string name="long_press_legend">带框的键是改过的；变淡的键长按不弹出字符，滑向长按首选等于点这个键。</string>
     <string name="long_press_none">长按这个键不弹出字符。</string>
+    <string name="long_press_unread">读不到这个键的长按。</string>
+    <string name="long_press_by_name_snapshot">改过以后列表就是你的：之后改全键盘的按键字符或九键符号，这个键不再跟着变。</string>
+    <string name="long_press_every_keyboard">改了以后所有键盘的这个键都用这一组，手写键盘也是。</string>
     <string name="long_press_add_hint">添加字符，空格分隔</string>
     <string name="punctuation_page_hint">打中文时，按左边的键打出右边的标点；一个键对应几个标点时可以选。点一项可修改或删除。</string>
     <string name="punctuation_pair">交替</string>

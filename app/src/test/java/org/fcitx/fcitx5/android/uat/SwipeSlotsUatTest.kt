@@ -143,7 +143,9 @@ class SwipeSlotsUatTest {
         prefs.set(internal.keyPopups, "g14/qw ① ②")
         val h = harness(ImKeyboard.KEYS14)
         val qw = h.key("QW")
-        assertEquals(listOf("①", "②"), h.longPress(qw).take(2))
+        // in the own's shape (OwnLongPress.shaped): ① the row under the finger, ② above it
+        val shown = h.longPress(qw)
+        assertTrue(shown.toString(), shown.containsAll(listOf("①", "②")) && "Q" !in shown)
         h.idle()
         h.swipe(qw, 0f, -qw.height * 1.3f)
         h.idle()

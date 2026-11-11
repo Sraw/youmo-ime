@@ -812,6 +812,9 @@
     <string name="picker_flags">Flags</string>
     <string name="long_press_legend">Outlined keys are changed; on a faded key a long press offers nothing, and a swipe to its first of long press is a tap.</string>
     <string name="long_press_none">Holding this key offers nothing.</string>
+    <string name="long_press_unread">Couldn’t read this key’s long press.</string>
+    <string name="long_press_by_name_snapshot">Once edited, the list is yours: later changes to the full keyboard’s characters or the nine keys’ symbols no longer reach this key.</string>
+    <string name="long_press_every_keyboard">The comma and full stop keys share one list: changed, every keyboard uses it, the handwriting one too.</string>
     <string name="long_press_add_hint">Add, space between several</string>
     <string name="punctuation_page_hint">While typing Chinese, the key on the left types the punctuation on the right; a key with several offers a choice. Tap one to change or remove it.</string>
     <string name="punctuation_pair">in turn</string>

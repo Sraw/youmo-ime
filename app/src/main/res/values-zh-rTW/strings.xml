@@ -793,6 +793,9 @@
     <string name="picker_flags">旗幟</string>
     <string name="long_press_legend">帶框的鍵是改過的；變淡的鍵長按不彈出字元，滑向長按首選等於點這個鍵。</string>
     <string name="long_press_none">長按這個鍵不彈出字元。</string>
+    <string name="long_press_unread">讀不到這個鍵的長按。</string>
+    <string name="long_press_by_name_snapshot">改過以後列表就是你的：之後改全鍵盤的按鍵字元或九鍵符號，這個鍵不再跟著變。</string>
+    <string name="long_press_every_keyboard">改了以後所有鍵盤的這個鍵都用這一組，手寫鍵盤也是。</string>
     <string name="long_press_add_hint">新增字元，空格分隔</string>
     <string name="punctuation_page_hint">打中文時，按左邊的鍵打出右邊的標點；一個鍵對應幾個標點時可以選。點一項可修改或刪除。</string>
     <string name="punctuation_pair">交替</string>

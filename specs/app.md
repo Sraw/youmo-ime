@@ -201,7 +201,7 @@ an appearance (text, image, width, variant) and behaviours (`Press`, `LongPress`
 characters come from `PopupPreset` (built in) overridden by the user's `PopupOverrides` (the full
 keyboard's, by label, `popup_overrides`), the other keyboards' from the keyboard (`GroupedKeyboard`'s
 made as they open …) overridden by name (`key_popups`, `PopupOverridesCache.byName`: `BaseKeyboard`
-swaps a `ShowKeyboardAction`'s list for the user's, and wires one on a key that had none; the function keys' comma and period too, every keyboard's at once, `KeyShortcutPages.FUNCTION_POPUPS`; the settings' editor starts a key with none set from `OwnLongPress`, its board's node as the key cap drew it, resolved as the keyboards resolve it, the one under the finger first, and stores nothing while the list is that); the first
+swaps a `ShowKeyboardAction`'s list for the user's, and wires one on a key that had none; the function keys' comma and period too, every keyboard's at once, `KeyShortcutPages.FUNCTION_POPUPS`; the settings' editor starts a key with none set from `OwnLongPress`, its board's node as the key cap drew it, resolved as the keyboards resolve it for the first of pinyin, 双拼, English whose keyboard the tab is, the key's corner first, and stores nothing while the list is that, an empty list where every one is deleted (off); a list set by name opens in the own's shape, `OwnLongPress.shaped`: its row with the first in the middle, as-is where the own is); the first
 of them (长按首选) is the small label in its corner. Every key has two slots, up and down
 (060-swipe-slots; `SwipeSlots` in ime-core, `KeyDef.shortcut` naming the key, `fn/<name>` a function
 key; stored in `key_swipes` as `@1\t<first-up|first-down>` then a line a slot over `SwipeSlotPreset`'s),

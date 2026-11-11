@@ -421,24 +421,100 @@ class PopupOverridesFragmentTest {
         @Test
         fun theDialogIsTitledByTheKeyAlone() {
             open()
-            for ((page, label, title) in listOf(Triple(R.string.shortcut_page_full, "q", "q"), Triple(R.string.shortcut_page_g18, "XC", "XC"))) {
+            val backspace = st.s(R.string.fn_key_backspace)
+            for ((page, label) in listOf(R.string.shortcut_page_full to "q", R.string.shortcut_page_g18 to "XC", R.string.shortcut_page_function to backspace)) {
                 click(page)
                 keyCalled(label).performClick()
                 st.idle()
                 val d = ShadowDialog.getLatestDialog() as AlertDialog
-                assertTrue(title, KeyboardHarness.all(d.window!!.decorView).filterIsInstance<TextView>().any { it.text.toString() == title })
+                assertEquals(label, d.findViewById<TextView>(androidx.appcompat.R.id.alertTitle)!!.text.toString())
                 d.dismiss()
                 st.idle()
             }
+        }
+
+        private fun qwDialog(): AlertDialog {
+            keyCalled("QW").performClick()
+            st.idle()
+            return ShadowDialog.getLatestDialog() as AlertDialog
+        }
+
+        // a character in the dialog's list tapped (selected), a button of the dialog's clicked
+        private fun AlertDialog.tapItem(item: String) {
+            KeyboardHarness.all(window!!.decorView).first { it.contentDescription?.toString() == item && it.hasOnClickListeners() }.performClick()
+            st.idle()
+        }
+
+        private fun AlertDialog.button(text: Int) {
+            KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(text) }.performClick()
+            st.idle()
+        }
+
+        private fun AlertDialog.ok() {
+            getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            st.idle()
+        }
+
+        private fun qwStored() = PopupOverrides.parse(AppPrefs.getInstance().internal.keyPopups.getValue()).let { if ("g14/qw" in it.labels) it["g14/qw"].orEmpty() else null }
+
+        // moved and moved back, edited back to the keyboard's own, put back by 重置这个键: nothing stored;
+        // every one deleted: an empty list stored, the long press off (aListEmptiedTurnsTheLongPressOff)
+        @Test
+        @Uat("ST-100")
+        fun aListBackToTheOwnStoresNothingAndOneEmptiedStoresOff() {
+            open()
+            click(R.string.shortcut_page_g14)
+            qwDialog().apply {
+                tapItem("q")
+                button(R.string.long_press_move_left)
+                button(R.string.long_press_move_right)
+                ok()
+            }
+            assertEquals("moved back", null, qwStored())
+            qwDialog().apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+                ok()
+            }
+            assertEquals("①", qwStored()!!.last())
+            qwDialog().apply {
+                tapItem("①")
+                button(R.string.delete)
+                ok()
+            }
+            assertEquals("edited back to the own", null, qwStored())
+            qwDialog().apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+                ok()
+            }
+            qwDialog().apply {
+                getButton(AlertDialog.BUTTON_NEUTRAL).performClick()
+                st.idle()
+            }
+            assertEquals("重置这个键", null, qwStored())
+            qwDialog().apply {
+                while (true) {
+                    val first = KeyboardHarness.all(window!!.decorView).firstOrNull { v ->
+                        v.hasOnClickListeners() && v.contentDescription?.toString()?.let { it.isNotEmpty() && ',' !in it } == true && v.parent?.javaClass?.simpleName == "FlexboxLayout"
+                    } ?: break
+                    first.performClick()
+                    st.idle()
+                    button(R.string.delete)
+                }
+                val none = KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().single { it.text.toString() == st.s(R.string.long_press_none) }
+                assertTrue(none.isVisible)
+                ok()
+            }
+            assertEquals("every one deleted: off", emptyList<String>(), qwStored())
         }
 
         // every key of every tab but the full keyboard's starts from its keyboard's own long press (owner, 0.6.0
         // beta2): the grouped and nine keys' their corner first (the cap's small character), 注音九键's its
         // symbols, ， and 。 their preset; 注音大千's keys have none
         @Test
+        @Uat("ST-100")
         fun everyKeysEditorStartsFromItsKeyboardsOwnLongPress() {
             open()
-            val firsts = mapOf("g14/qw" to "1", "g18/q" to "1", "t9/2" to "2", "t9/9" to "9", "zy9/1" to "ㄅ")
+            val firsts = mapOf("g14/qw" to "1", "g18/q" to "1", "t9/1" to "1", "t9/2" to "2", "t9/9" to "9", "zy9/1" to "ㄅ")
             for (page in KeyShortcutPages.all - KeyShortcutPages.Full - KeyShortcutPages.Number) {
                 click(PopupOverridesFragment.pageTitle(page))
                 val keys = if (page == KeyShortcutPages.Function) KeyShortcutPages.FUNCTION_POPUPS.map { PopupOverridesFragment.FunctionLabels.getValue(it).let(st::s) to it }

@@ -383,7 +383,6 @@ class GroupedKeyboard private constructor(
     // a group's letters as its key shows them: pinyin's 18 keys' L without the `;` the engine reads it by
     private fun shown(group: String) = if (semicolon) group else group.replace(";", "")
 
-
     // a group key's (letters=) code and long press (060-render-v2 §15): the code of the engine's group its
     // first letter is in, sent as [wire] has it (a tap's place added by [pressed]); its letters around its
     // corner, made again as it opens ([onPopupAction])

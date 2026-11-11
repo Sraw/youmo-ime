@@ -470,8 +470,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     /** Whose long press a dialog edits: the full keyboard's by the key's label, the others' by the key's name. */
     private sealed interface LongPress {
         data class ByLabel(val label: String) : LongPress
-        /** [own]: what the key pops up on its keyboard with nothing set by its name ([OwnLongPress]). */
-        data class ByName(val name: String, val own: List<String>) : LongPress
+        /** [own]: what the key pops up on its keyboard with nothing set by its name ([OwnLongPress]), null where it could not be read. */
+        data class ByName(val name: String, val own: List<String>?) : LongPress
     }
 
     /**
@@ -531,9 +531,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     /**
      * A key edited under [title]: its long press ([chars]) where [longPress] names one, its two slots
-     * ([section]) where [slotKey] does (a full keyboard's key of no letter has none).
+     * ([section]) where [slotKey] does (a full keyboard's key of no letter has none). [title] is the key alone
+     * as its cap shows it, on every tab (q, XC, ，键, 空格): the dialog edits the slots too, so no 长按 before it.
      */
-    // titled by the key alone as its cap shows it, on every tab (q, XC, ，键, 空格): the dialog edits the slots too, so no 长按
     private fun edit(title: String, slotKey: String?, longPress: LongPress?) {
         val ctx = requireContext()
         val editor = longPress?.let { PopupEditor(startOf(it)) }
@@ -549,7 +549,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             setPadding(pad, ctx.dp(8), pad, 0)
             if (editor != null) {
                 add(text(ctx, getString(R.string.long_press_editor_hint), body = false), lParams(matchParent))
-                chars(ctx, editor, field, R.string.long_press_none).forEach { (view, top) -> add(view, lParams(matchParent) { topMargin = ctx.dp(top) }) }
+                (chars(ctx, editor, field, emptyText(longPress)) + notes(ctx, longPress)).forEach { (view, top) -> add(view, lParams(matchParent) { topMargin = ctx.dp(top) }) }
             }
             sections.forEach { add(it.view, lParams(matchParent)) }
         }
@@ -581,15 +581,29 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             }
     }
 
+    // a key whose own could not be read said so, not said to have none
+    private fun emptyText(longPress: LongPress?) =
+        if (longPress is LongPress.ByName && longPress.own == null) R.string.long_press_unread else R.string.long_press_none
+
+    // under a list set by name, each with its top margin in dp: an edited list is the user's from then on (the settings
+    // the keyboard's own comes from reach it no more); ， and 。 are one name on every keyboard (FUNCTION_POPUPS), handwriting's too
+    private fun notes(ctx: Context, longPress: LongPress?): List<Pair<View, Int>> {
+        if (longPress !is LongPress.ByName) return emptyList()
+        return listOfNotNull(
+            text(ctx, getString(R.string.long_press_by_name_snapshot), body = false) to 8,
+            (text(ctx, getString(R.string.long_press_every_keyboard), body = false) to 4).takeIf { longPress.name in KeyShortcutPages.FUNCTION_POPUPS },
+        )
+    }
+
     // the list shown first: the label's (its preset under it), or the name's the user set, else what its keyboard pops up
     private fun startOf(longPress: LongPress): List<String> = when (longPress) {
         is LongPress.ByLabel -> overrides.resolve(longPress.label, PopupPreset[longPress.label])?.toList().orEmpty()
-        is LongPress.ByName -> if (longPress.name in byName.labels) byName.resolve(longPress.name, null)?.toList().orEmpty() else longPress.own
+        is LongPress.ByName -> if (longPress.name in byName.labels) byName.resolve(longPress.name, null)?.toList().orEmpty() else longPress.own.orEmpty()
     }
 
-    // the key's own long press, from the node of its board the cap drew; none where the cap has no scene (logged)
-    private fun ownOf(cell: SceneKeyCell?): List<String> {
-        val node = cell?.keyNode ?: return emptyList<String>().also { Timber.w("no scene key for the long press editor") }
+    // the key's own long press, from the node of its board the cap drew; null where the cap has no scene (logged)
+    private fun ownOf(cell: SceneKeyCell?): List<String>? {
+        val node = cell?.keyNode ?: return null.also { Timber.w("no scene key for the long press editor") }
         return OwnLongPress.of(SceneBehavior.of(node).popup, node)
     }
 
@@ -603,8 +617,15 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         when (longPress) {
             is LongPress.ByLabel -> overrides = items?.let { overrides.withEdit(longPress.label, it, PopupPreset[longPress.label]) }
                 ?: overrides.without(longPress.label)
-            // the keyboard's own list kept as it is stores nothing: the key follows its keyboard (and the 九键 symbols set)
-            is LongPress.ByName -> byName = items?.takeIf { it != longPress.own }?.let { byName.withEdit(longPress.name, it, null) } ?: byName.without(longPress.name)
+            is LongPress.ByName -> byName = when {
+                // the keyboard's own list kept as it is stores nothing: the key follows its keyboard (and the 九键 symbols set)
+                items == null || items == longPress.own -> byName.without(longPress.name)
+                // an own unread and nothing added: nothing to store
+                items.isEmpty() && longPress.own == null && longPress.name !in byName.labels -> byName
+                // every one deleted: no long press, stored as an empty list (withEdit reads that as unchanged)
+                items.isEmpty() -> byName.with(longPress.name, emptyList())
+                else -> byName.withEdit(longPress.name, items, null)
+            }
         }
     }
 
