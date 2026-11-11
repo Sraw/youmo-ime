@@ -525,6 +525,12 @@
 - **预期**：**按键样式** 里有 **横向间距**、**纵向间距** 两项（没有一项叫 **按键间距** 的），默认「跟随主题」。标准高度时 w 和 s 两个键面之间的上下缝约 14 dp（一边 7 dp），q 和 w 之间的左右缝约 6 dp。紧凑时上下缝约 6 dp（缩到四成：一边 3 dp），左右缝不变，键面比上下缝不变时高（每个键约多 8 dp）；九键也一样，上下缝窄、键高。纵向选宽松后紧凑时上下缝约 8 dp（9 dp 的四成取整 4 dp 一边），左右不变；横向选宽松后左右缝约 10 dp，上下不变。
 - **JVM**：`KeySpacingMigrationTest`（0.5.2 的一项按键间距升级后两项都是那一档，恢复那时的备份一样）、`KeyStyleThemeTest.aChoiceIsOverTheThemeAndFollowingIsTheThemesOwn`（横向、纵向各盖自己那一半）、`ThemePrefsTest.theKeyStyleSectionIsItsFourAndALine`；keyboard-scene `LookThemeTest.atCompactTheRowsAreCloser`、`theCompactGapIsFortyPercentToTheNearestDp`；ime-core `KeyStyleChoiceTest.eachDirectionOfTheGapIsOverItsHalfOnly`；设备上量缝、截图（全键盘、九键）。
 
+### ST-104 [P1] 4.0 主题包上按键间距也生效
+- **前提**：B0-设置；主题选内置的 **国风·天青**。
+- **操作**：回测试页看全键盘；**外观 → 大小与样式 → 按键样式**：**横向间距** 选「宽松」、**纵向间距** 选「紧凑」，回测试页看全键盘（回车也看）；换成横屏再看；**键盘高度** 选「紧凑」再看；两项改回「跟随主题」再看。再换 **霓虹赛博**、一个导入的 `.theme` 包各做一遍。
+- **预期**：跟随主题时键缝是包里的（天青左右各 3 dp、上下各 5 dp，回车更大）；选了档后所有键（包括回车）左右各 5 dp、上下各 5 dp（横屏上下 3 dp，紧凑时上下 2 dp），和内置 Material 主题选同样档位时一样；改回跟随主题后回到包里的。
+- **JVM**：`PackKeyGapTest`（12 个内置包每种键在竖屏、横屏、紧凑下都取设置的那一档，只设一个方向时另一个方向照包里的）；设备上截图对比。
+
 ### ST-66 [P1] 外观两页滚到底，最后一行不被导航栏压住
 - **前提**：B0-设置；系统导航栏（三键或手势条）在。
 - **操作**：打开 **外观**，切到 **大小与样式**，滚到最底；再切回 **主题**，滚到最底。

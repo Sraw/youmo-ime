@@ -12,10 +12,12 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
+import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.Phases
@@ -193,7 +195,7 @@ object SceneThemes {
     private const val KEPT = 4
 
     // [pack]: the pack instance whose drawn this is (a pack's alone)
-    private class Made(val theme: Theme, val pack: AppTheme.Pack? = null) {
+    private class Made(val theme: Theme, val pack: AppTheme.Pack? = null, val choice: KeyStyleChoice = KeyStyleChoice.FOLLOW) {
         val cascades = Cascades(theme)
     }
 
@@ -222,15 +224,15 @@ object SceneThemes {
 
     /**
      * [theme]'s engine theme, drawn in [look] (ThemeManager.shownLook): a pack's its own file ([AppTheme.Pack.drawn]),
-     * any other's its look's ([of]).
+     * any other's its look's ([of]). A pack's keys spaced as [choice] sets (PackKeyGap), as a look's are.
      */
-    fun of(theme: AppTheme, look: ThemeLook): Theme? {
+    fun of(theme: AppTheme, look: ThemeLook, choice: KeyStyleChoice = ThemeManager.keyStyleShown): Theme? {
         if (theme !is AppTheme.Pack) return of(look, theme.name, theme.isDark)
         val key = theme to ThemePackFiles.systemColors
         // this instance's drawn alone: a copy() equal to an older one (the system's colours set anew) has
         // its own, an old instance asked after the colours changed not kept as the new one's
-        packs[key]?.takeIf { it.pack === theme }?.let { return it.theme }
-        return theme.drawn.also { packs[key] = Made(it, theme) }
+        packs[key]?.takeIf { it.pack === theme && it.choice == choice }?.let { return it.theme }
+        return PackKeyGap.over(theme.drawn, choice.hGap, choice.vGap).also { packs[key] = Made(it, theme, choice) }
     }
 
     fun of(look: ThemeLook, name: String, dark: Boolean): Theme? {
