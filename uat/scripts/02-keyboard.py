@@ -299,4 +299,13 @@ def kb71(d):
     end = ml()
     check(top["focused"] and top["selStart"] == 0, f"上挪过头：{top['selStart']} focused={top['focused']}")
     check(end["focused"] and end["selStart"] == len(t), f"下挪过头：{end['selStart']} focused={end['focused']}")
+    t = three_lines(d)
+    first = t.index("\n")
+    x, y = d.keys(refresh=True)["space"]
+    # one 60 dp move: two of the space's 28 dp line steps in one sample, a rush
+    d.touch(("down", x, y), ("move", x - 8 * p, y), ("move", x - 16 * p, y), ("move", x - 25 * p, y), ("sleep", 0.3),
+            ("move", x - 25 * p, y - 60 * p), ("up", x - 25 * p, y - 60 * p), ("sleep", 0.3))
+    two = ml()
+    d.shot("app", "快挪两行")
+    check(two["focused"] and 0 < two["selStart"] <= first, f"快挪两行：{two['selStart']}（第一行是 1..{first}）")
     return f"上到 {top['selStart']}，下到 {end['selStart']}，焦点一直在多行框"

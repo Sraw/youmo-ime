@@ -92,6 +92,21 @@ class SpaceCursorTest {
                 assertEquals(true, rush.unmoved(Line.Up, now = 1020, read = 9))
                 assertEquals(false, rush.unmoved(Line.Up, now = 1020, read = 5))
             },
+            // a line the editor had already applied held the next one back: the cursor stopped a line short
+            "once the side changed, only the lines it did not lose newlines for are unlanded" to {
+                val rush = SpaceCursor.LineRush()
+                rush.sent(Line.Up, now = 1000, read = 11, lines = 2)
+                rush.sent(Line.Up, now = 1010, read = 11, lines = 2)
+                assertEquals(2, rush.unlanded(Line.Up, now = 1020, side = "aaa\nbbb\nccc"))
+                assertEquals(1, rush.unlanded(Line.Up, now = 1020, side = "aaa\nbbb"))
+                assertEquals(0, rush.unlanded(Line.Up, now = 1020, side = "aaa"))
+            },
+            "a changed side that lost no newline (a wrapped line) still counts one line landed" to {
+                val rush = SpaceCursor.LineRush()
+                rush.sent(Line.Down, now = 1000, read = 20, lines = 1)
+                rush.sent(Line.Down, now = 1010, read = 20, lines = 1)
+                assertEquals(1, rush.unlanded(Line.Down, now = 1020, side = "wrapped tail\nlast"))
+            },
             "nothing rushed: nothing unlanded" to {
                 assertEquals(false, SpaceCursor.LineRush().unmoved(Line.Up, now = 1000, read = -1))
             },

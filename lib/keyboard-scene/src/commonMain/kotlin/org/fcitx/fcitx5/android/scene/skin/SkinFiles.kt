@@ -55,7 +55,8 @@ class SkinFiles(private val entries: Map<String, ByteArray>, private val platfor
 
     /**
      * All of [name]'s pixels, or null: the same [Pixels] each time (read, never drawn into). Only these are kept,
-     * not the decoded image too (unless [image] kept it already): the budget holds twice the pixels so.
+     * not the decoded image too (unless [image] kept it already): an image asked only here is counted once, not
+     * as image and pixels both.
      */
     fun pixels(name: String?): Pixels? {
         if (name == null || name !in entries) return null

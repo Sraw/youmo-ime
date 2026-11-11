@@ -791,16 +791,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // only the side the line goes to is read: a binder call each, on the main thread
         val before = if (line == SpaceCursor.Line.Up) ic.getTextBeforeCursor(LINE_REACH, 0) else null
         val after = if (line == SpaceCursor.Line.Down) ic.getTextAfterCursor(LINE_REACH, 0) else null
-        val rushed = lineRush.rushed(line, now)
+        val side = before ?: after
+        // only the rushed lines not landed yet: a read the editor already moved is not stale by those it applied
+        val rushed = lineRush.unlanded(line, now, side)
         if (!SpaceCursor.sendable(line, before, after, rushed)) {
-            val side = before ?: after
             // the edge only while none of the rushed lines landed: read after them, it would skip lines
             if (side != null && lineRush.unmoved(line, now, side.length) &&
                 SpaceCursor.toEdge(line, before, after, rushed, whole = side.length < LINE_REACH)
             ) moveToFieldEdge(ic, line)
             return
         }
-        lineRush.sent(line, now, read = (before ?: after)?.length ?: -1)
+        lineRush.sent(line, now, read = side?.length ?: -1, lines = side?.count { it == '\n' } ?: 0)
         clearedText.edited()
         sendDownUpKeyEvents(if (line == SpaceCursor.Line.Up) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN)
     }

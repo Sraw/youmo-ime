@@ -401,11 +401,13 @@ def st101(d):
     d.tap(item.c, 1.5)
     d.open_page("text")
     d.shot("kb", "选用转换来的皮肤")
-    # held down for the shot: a pressed key darker though the skin has no pressed face (space by hand: held, it listens)
+    # held down for the shot: a pressed key darker though the skin has no pressed face (space by hand: held, it listens).
+    # The shot takes about a second, past the long-press time: z's long-press bubble may show too, and what the
+    # release types is cleared below
     z = d.keys(refresh=True)["z"]
     d.touch(("down", z[0], z[1]))
     try:
-        d.shot("kb", "按住 z：变暗")
+        d.shot("kb", "按住 z：变暗（长按气泡可能也弹出）")
     finally:
         d.touch(("up", z[0], z[1]))
     d.clear()
@@ -1218,7 +1220,7 @@ def st98(d):
     check(undone == "@", f"离开页面后撤销，a 上滑不是 @：「{undone}」")
     d.clear()
     slots_page(d)
-    d.shot("full", "撤销后再打开：默认（@ 在右上）")
+    d.shot("full", "撤销后再打开：预设（@ 在右上）")
     return f"翻转后 a 下滑「{flipped}」，预设后上滑「{preset}」，离开页面后撤销上滑「{undone}」"
 
 

@@ -492,10 +492,11 @@ class SkinFormatsTest {
         // twice, the second pushed the first out)
         val fifths = (SkinLimits.MAX_KEPT_PIXELS * 2 / 5 / 4096).toInt()
         val g = SkinFiles(mapOf("a" to ByteArray(fifths), "b" to ByteArray(fifths)), platform)
+        val before = decoded
         val ga = g.pixels("a")
         g.pixels("b")
         assertTrue(ga === g.pixels("a"))
-        assertEquals(5, decoded)
+        assertEquals(2, decoded - before, "a and b decoded once each, a not again")
     }
 
     @Test

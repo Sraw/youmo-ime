@@ -58,19 +58,37 @@ object SpaceCursor {
         /** The lines rushed before one to [line] at [now] (ms). */
         fun rushed(line: Line, now: Long): Int = if (line != last || now - lastAt >= settleMs) 0 else count
 
-        // the length of the side read when the rush began: a read of another length is one the editor moved since
+        // the side read when the rush began, its length and newlines: a read of another length is one the editor moved since
         private var readAt = -1
+        private var linesAt = 0
 
         /**
          * Whether a read of [read] chars of the side [line] goes to is surely stale: lines are rushed and
          * the side reads as long as when the rush began, so none of them landed yet. A read that changed
-         * is the editor having moved some of them, how many unknown: not stale for sure.
+         * is the editor having moved some of them, how many unknown: not stale for sure. Relies on [read]
+         * being the side's whole length: a side cut at a read limit reads as long each time, so a caller
+         * that reads a capped side checks that itself (the service's `whole` for [toEdge]).
          */
         fun unmoved(line: Line, now: Long, read: Int): Boolean = rushed(line, now) > 0 && read == readAt
 
-        /** A line to [line] sent at [now], [read] the length of the side it goes to read before it. */
-        fun sent(line: Line, now: Long, read: Int = -1) {
-            if (rushed(line, now) == 0) readAt = read
+        /**
+         * The rushed lines not landed yet, judged by [side] read now: all of them while it reads as at the
+         * rush's start ([unmoved]); once it changed, at least one landed, and as many as the newlines it
+         * lost, so [sendable] counts only the rest and a line the user slid is sent, not held.
+         */
+        fun unlanded(line: Line, now: Long, side: CharSequence?): Int {
+            val rushed = rushed(line, now)
+            if (rushed == 0 || side == null || side.length == readAt) return rushed
+            val landed = (linesAt - side.count { it == '\n' }).coerceAtLeast(1)
+            return (rushed - landed).coerceAtLeast(0)
+        }
+
+        /** A line to [line] sent at [now], [read] the length of the side it goes to read before it, [lines] its newlines. */
+        fun sent(line: Line, now: Long, read: Int = -1, lines: Int = 0) {
+            if (rushed(line, now) == 0) {
+                readAt = read
+                linesAt = lines
+            }
             count = rushed(line, now) + 1
             last = line
             lastAt = now

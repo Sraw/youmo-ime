@@ -410,6 +410,10 @@
 
 ### KB-71 [P1] 空格竖滑到输入框最上、最下时不跳到别的框
 - **前提**：同 KB-70，「多行」框下面还有「短消息」框。
-- **操作**：空格左滑一点，不抬手一直往上挪过第一行（五六行那么远）；再一直往下挪过最后一行后松开。
-- **预期**：往上挪到第一行后光标到框的最前面，再挪也停在那里；往下挪到最后停在框的最后面；焦点一直在「多行」框，不会跳到「短消息」或上面的框。
-- **JVM**：ime-core `SpaceCursorTest.whetherALineKeyIsSent`（框首不发 Up、框尾不发 Down）、`SpaceCursorTest.aHeldLineGoesToTheFieldsEdge`（一口气挪过第一行时，压下的那一行改去框首、框尾）。
+- **操作**：
+  1. 空格左滑一点，不抬手一直往上挪过第一行（五六行那么远）；再一直往下挪过最后一行后松开。
+  2. 光标放回第三行末尾，空格左滑一点，很快地往上挪两行后马上松开。
+- **预期**：
+  1. 往上挪到第一行后光标到框的最前面，再挪也停在那里；往下挪到最后停在框的最后面；焦点一直在「多行」框，不会跳到「短消息」或上面的框。
+  2. 光标停在第一行上（挪了两行就走两行），不少走一行停在第二行，也不直接跳到框的最前面；再往上挪一行才到框的最前面。
+- **JVM**：ime-core `SpaceCursorTest.whetherALineKeyIsSent`（框首不发 Up、框尾不发 Down）、`SpaceCursorTest.aHeldLineGoesToTheFieldsEdge`（一口气挪过第一行时，压下的那一行改去框首、框尾）、app `SpaceLineEdgeTest.aRushedLineGoesToTheEdgeOnlyWhileNoneLanded`（框还没动时才去框首、框尾；已走了一行的，剩下的行照发，不少走、不跳过）。
