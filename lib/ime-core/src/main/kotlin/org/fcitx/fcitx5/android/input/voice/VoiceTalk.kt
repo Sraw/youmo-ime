@@ -60,6 +60,15 @@ class VoiceTalk(private val asItGoes: Boolean) {
     private fun newlySettled(heard: VoiceLive.Heard) = heard.settled > typed.length && heard.whole.startsWith(typed)
 
     /**
+     * What composed was left in the field as text (input restarted where the field could not say
+     * where its cursor is): all heard so far counts as typed, the talk goes on after it.
+     */
+    fun kept() {
+        typed = last
+        if (last.isNotEmpty()) typedAny = true
+    }
+
+    /**
      * What composed was taken from the field by the app (a chat's text sent, the field cleared): all
      * heard so far went with it, not typed again; what is heard next is a new utterance
      * ([VoiceLive.restart]), typed from its start.

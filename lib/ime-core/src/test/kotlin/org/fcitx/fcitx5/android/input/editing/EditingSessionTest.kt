@@ -962,37 +962,37 @@ class EditingSessionTest {
     fun aProvisionalCompositionTheCursorLeft() = assertRows(
         "the cursor moved past it: still there, taken away" to {
             val (s, e) = session("abc", cursor = 2)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("你好"), provisional = true)
             assertEquals("ab你好c", e.text)
             e.setSelection(5, 5)
             assertEquals(EditingSession.CursorUpdate.None, s.report(5))
-            assertEquals(listOf(false), told)
+            assertEquals(listOf(EditingSession.Taken.AWAY), told)
             assertEquals("abc", e.text)
             assertEquals(3, e.selectionStart)
         },
         "the editor dropped its composing span, the cursor moved past it: still taken away, not left as text" to {
             val (s, e) = session("abc", cursor = 2)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("你好"), provisional = true)
             // an InputFilter or a WebView ended the composition on its own: the text stays, no span
             e.finishComposingText()
             e.setSelection(5, 5)
             assertEquals(EditingSession.CursorUpdate.None, s.report(5))
-            assertEquals(listOf(false), told)
+            assertEquals(listOf(EditingSession.Taken.AWAY), told)
             assertEquals("abc", e.text)
             assertEquals(3, e.selectionStart)
         },
         "the cursor moved: taken away here, told so" to {
             val (s, e) = session("ab", cursor = 2)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("你好"), provisional = true)
             e.setSelection(1, 1)
             assertEquals(EditingSession.CursorUpdate.None, s.report(1))
-            assertEquals(listOf(false), told)
+            assertEquals(listOf(EditingSession.Taken.AWAY), told)
             assertEquals("ab", e.text)
         },
         "the cursor moved before it: taken away, the cursor where it went" to {
@@ -1035,13 +1035,13 @@ class EditingSessionTest {
     fun aProvisionalCompositionTakenByTheApp() = assertRows(
         "the field cleared (a chat's text sent)" to {
             val (s, e) = session("ab", cursor = 2)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("你好"), provisional = true)
             e.appSetsText("")
             e.calls.clear()
             assertEquals(EditingSession.CursorUpdate.None, s.report(0))
-            assertEquals(listOf(true), told)
+            assertEquals(listOf(EditingSession.Taken.GONE), told)
             assertFalse(s.provisional)
             assertTrue(s.composing.isEmpty())
             // nothing left to take away: the field read, not edited, its composing region let go
@@ -1049,24 +1049,24 @@ class EditingSessionTest {
         },
         "all of it composing, the field cleared: the cursor at its start" to {
             val (s, e) = session("", cursor = 0)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("你好"), provisional = true)
             // its own report first: the cursor at 0 after it is news, not an old echo
             s.report(2, composing = 0 to 2)
             e.appSetsText("")
             assertEquals(EditingSession.CursorUpdate.None, s.report(0))
-            assertEquals(listOf(true), told)
+            assertEquals(listOf(EditingSession.Taken.GONE), told)
             assertEquals("", e.text)
         },
         "text before it taken, it rewritten: no longer as composed" to {
             val (s, e) = session("ab", cursor = 2)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("你好"), provisional = true)
             e.appSetsText("xyz")
             assertEquals(EditingSession.CursorUpdate.None, s.report(3))
-            assertEquals(listOf(true), told)
+            assertEquals(listOf(EditingSession.Taken.GONE), told)
             assertEquals("xyz", e.text)
         },
         "the app shortened it: measured by the span reported" to {
@@ -1086,13 +1086,13 @@ class EditingSessionTest {
     fun inputRestartedOverAProvisionalComposition() = assertRows(
         "the same field, still there: taken away, to compose anew" to {
             val (s, e) = session("ab", cursor = 2)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("你好"), provisional = true)
             s.provisionalRestarted(sameField = true, 4, 4)
             assertEquals("ab", e.text)
             assertEquals(2, e.selectionStart)
-            assertEquals(listOf(false), told)
+            assertEquals(listOf(EditingSession.Taken.AWAY), told)
             assertFalse(s.provisional)
             // the cursor's report that brings is the prediction, not the user's move
             assertTrue(s.selection.latest.rangeEquals(2))
@@ -1111,14 +1111,14 @@ class EditingSessionTest {
         },
         "the same field, the app took it: not touched" to {
             val (s, e) = session("ab", cursor = 2)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("你好"), provisional = true)
             e.appSetsText("")
             e.calls.clear()
             s.provisionalRestarted(sameField = true, 0, 0)
             assertEquals("", e.text)
-            assertEquals(listOf(true), told)
+            assertEquals(listOf(EditingSession.Taken.GONE), told)
             assertTrue(e.calls.none { it.startsWith("set") || it.startsWith("commit") })
             // the editor's composing region, if it kept one over the app's text, let go
             assertTrue("finishComposingText()" in e.calls)
@@ -1135,24 +1135,34 @@ class EditingSessionTest {
             // R20 F5987: no read across the IPC of maybe the whole document
             assertTrue(e.calls.toString(), e.calls.none { it.startsWith("textBeforeCursor(") && it.removePrefix("textBeforeCursor(").removeSuffix(")").toInt() > 4096 })
         },
+        "the same field, its selection unknown: left as text, told so, not as the app's" to {
+            val (s, e) = session("ab", cursor = 2)
+            val told = mutableListOf<EditingSession.Taken>()
+            s.provisionalTaken = { told += it }
+            s.updateComposingText(formatted("你好"), provisional = true)
+            s.provisionalRestarted(sameField = true, -1, -1)
+            assertEquals("ab你好", e.text)
+            assertEquals(-1, e.composingStart)
+            assertEquals(listOf(EditingSession.Taken.LEFT), told)
+        },
         "another field: left as text" to {
             val (s, e) = session("ab", cursor = 2)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("你好"), provisional = true)
             s.provisionalRestarted(sameField = false, 0, 0)
             assertEquals("ab你好", e.text)
             assertEquals(-1, e.composingStart)
-            assertEquals(listOf(true), told)
+            assertEquals(listOf(EditingSession.Taken.LEFT), told)
         },
         "not provisional: nothing" to {
             val (s, e) = session("ab", cursor = 2)
-            val told = mutableListOf<Boolean>()
+            val told = mutableListOf<EditingSession.Taken>()
             s.provisionalTaken = { told += it }
             s.updateComposingText(formatted("ni"))
             s.provisionalRestarted(sameField = true, 4, 4)
             assertEquals("abni", e.text)
-            assertEquals(emptyList<Boolean>(), told)
+            assertEquals(emptyList<EditingSession.Taken>(), told)
         },
     )
 

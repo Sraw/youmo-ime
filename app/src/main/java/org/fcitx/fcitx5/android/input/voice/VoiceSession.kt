@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.editing.EditingSession
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import java.util.EnumSet
 
@@ -72,6 +73,10 @@ class VoiceSession(
     // the utterances the app took ([taken]): what was heard before the last of them is not this one's
     private var utterance = 0
 
+    // where the talk was at the last heard the field showed of this utterance ([VoiceLive.Mark]);
+    // null: none since the app took the last
+    private var shownUpTo: VoiceLive.Mark? = null
+
     // something composing in the field now, ours: taken away if nothing is typed
     private var composing = false
 
@@ -102,6 +107,7 @@ class VoiceSession(
         override fun heard(heard: VoiceLive.Heard) {
             // heard before the app took what was said (the recognizer not told yet): gone with it
             if (over || heard.utterance < utterance) return
+            shownUpTo = heard.upTo
             // the field composes the engine's text now (another finger typing): nothing typed as it is
             // said meanwhile, nor its text made voice's; the keyboard hidden: nothing composes
             val inField = composes && !direct && sameField && service.voiceOwnsComposing
@@ -138,14 +144,21 @@ class VoiceSession(
     }
 
     // what composed was taken from the field by others: the app took it (sent it, cleared the
-    // field), all heard so far with it, and what is said next is a new utterance, nothing of the
-    // last joined to it nor typed again; else taken away, composed anew on the next heard
-    private fun taken(consumed: Boolean) {
+    // field), all it showed with it, and what is said next is a new utterance, nothing of the last
+    // joined to it nor typed again; left there as text, counted as typed, the talk going on after
+    // it; else taken away, composed anew on the next heard
+    private fun taken(how: EditingSession.Taken) {
         if (over) return
         composing = false
-        if (!consumed) return
-        talk.consumed()
-        listener?.restart(++utterance)
+        when (how) {
+            EditingSession.Taken.AWAY -> Unit
+            EditingSession.Taken.LEFT -> talk.kept()
+            EditingSession.Taken.GONE -> {
+                talk.consumed()
+                listener?.restart(++utterance, shownUpTo)
+                shownUpTo = null
+            }
+        }
     }
 
     /** Stopped at [at] (uptime, ms: the lift's, the tap's): the tail after it counts from there, then the rest is typed. */
@@ -281,8 +294,11 @@ class VoiceSession(
         /** why 语音整理 did not apply to this talk, if it did not: read once [finish] is done */
         val polishFailure: PolishFailure? get() = null
 
-        /** what was said so far taken by the app: what is said next is utterance [to] ([VoiceLive.restart]) */
-        fun restart(to: Int)
+        /**
+         * what was said up to [upTo] (the last heard shown; null, none of this utterance) taken by
+         * the app: what is said next is utterance [to] ([VoiceLive.restart])
+         */
+        fun restart(to: Int, upTo: VoiceLive.Mark?)
 
         /** the utterance [finish]'s text is of ([VoiceLive.utterance]) */
         val utterance: Int get() = 0

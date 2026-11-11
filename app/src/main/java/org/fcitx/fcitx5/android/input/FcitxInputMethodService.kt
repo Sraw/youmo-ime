@@ -1650,9 +1650,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /**
      * Voice's composing text taken from the field by anything but voice ([EditingSession.provisionalTaken]):
-     * [taken] told whether the app took it (true) or it was taken away here. One talk at a time; null when it ends.
+     * [taken] told how ([EditingSession.Taken]). One talk at a time; null when it ends.
      */
-    fun watchVoice(taken: ((consumed: Boolean) -> Unit)?) {
+    fun watchVoice(taken: ((how: EditingSession.Taken) -> Unit)?) {
         editingSession.provisionalTaken = taken
     }
 

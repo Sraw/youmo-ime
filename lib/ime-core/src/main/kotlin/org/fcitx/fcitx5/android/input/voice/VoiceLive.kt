@@ -22,7 +22,14 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
     private var said = ""
     private var hearing = ""
 
-    // what of the segment being said went with the last utterance ([restart]): left out of it as it goes on
+    // the segment being said as the recognizer wrote it, before [gone] is left out of it
+    private var hearingRaw = ""
+
+    // segments closed so far, so a [Mark] tells whether the one being said then has closed since
+    private var closedCount = 0
+
+    // what of the segment being said went with the last utterance ([restart]), as the recognizer
+    // wrote it: left out of it as it goes on
     private var gone = ""
 
     /** how many times the talk [restart]ed: what [Heard] tells, so one from before a restart is told apart */
@@ -30,27 +37,42 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
         private set
 
     /**
-     * What was said so far was taken (the app sent it, cleared the field): what is said next is a
-     * new utterance, nothing of the last joined to it (no 「，」 before it) nor typed again. The
-     * segment being said goes on in the recognizer: what of it was heard is left out of it. To
-     * [to], as many restarts as were asked for.
+     * Where the talk was when a [Heard] was made: the closed segments joined ([said]), the one being
+     * said ([hearing] as kept, [hearingRaw] as the recognizer wrote it), and how many had closed.
+     * A [restart] leaves out that much, not what was heard after it.
      */
-    fun restart(to: Int = utterance + 1) {
+    class Mark internal constructor(val said: String, val hearing: String, val hearingRaw: String, val closed: Int)
+
+    /** Where the talk is now ([Mark]). */
+    fun mark() = Mark(said, hearing, hearingRaw, closedCount)
+
+    /**
+     * What was said up to [upTo] (the last [Heard] the field showed) was taken (the app sent it,
+     * cleared the field): what is said next is a new utterance, nothing of the last joined to it
+     * nor typed again. What was heard after [upTo] stays, the start of the new one: it never
+     * showed. The segment being said goes on in the recognizer: what of it was heard by [upTo] is
+     * left out of it, matched as [cut] does. [upTo] null: none of this utterance showed, nothing
+     * left out. To [to], however many restarts were asked for meanwhile; nothing if there already.
+     */
+    fun restart(to: Int, upTo: Mark?) {
         if (to <= utterance) return
         utterance = to
-        said = ""
-        gone = hearing
-        hearing = ""
+        if (upTo == null) return
+        // the segments closed by then; a later one may have taken the mark that ended them (join)
+        val base = upTo.said.trimEnd { it in MARKS }
+        var rest = if (said.startsWith(base)) said.substring(base.length) else ""
+        if (closedCount > upTo.closed) {
+            // the segment being said then has closed since: the start of what follows them
+            rest = cut(upTo.hearing, rest)
+        } else {
+            gone = upTo.hearingRaw
+            hearing = fresh(hearingRaw)
+        }
+        said = rest.trimStart { it in MARKS || it.isWhitespace() }
     }
 
     // [text] of the segment being said, what of it went with the last utterance left out
-    private fun fresh(text: String): String {
-        if (gone.isEmpty()) return text
-        var same = 0
-        val most = minOf(gone.length, text.length)
-        while (same < most && gone[same] == text[same]) same++
-        return text.substring(same).trimStart { it in MARKS || it.isWhitespace() }
-    }
+    private fun fresh(text: String): String = if (gone.isEmpty()) text else cut(gone, text)
 
     /** The segments closed and the one being said, as the recognizer wrote them, joined. */
     val raw: String
@@ -62,15 +84,16 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
      * many characters of [whole] stay as they are whatever is said next, so they can be typed as
      * the talk goes on (tap to talk, [VoiceTalk]). [fallback]: the polish failed on this step and
      * [whole] is the raw text instead, not in step with what was polished before. [utterance]: the
-     * [VoiceLive.utterance] it is of.
+     * [VoiceLive.utterance] it is of; [upTo], where the talk was ([restart]).
      */
-    class Heard(val whole: String, val settled: Int, val fallback: Boolean = false, val utterance: Int = 0) {
+    class Heard(val whole: String, val settled: Int, val fallback: Boolean = false, val utterance: Int = 0, val upTo: Mark? = null) {
         val text: String = VoiceText.clean(whole).orEmpty()
     }
 
     /** The segment being said is [raw] so far; what to show. */
     fun heard(raw: String): Heard {
-        hearing = fresh(raw.trim())
+        hearingRaw = raw.trim()
+        hearing = fresh(hearingRaw)
         return shown()
     }
 
@@ -81,8 +104,10 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
      */
     fun closed(raw: String): Heard {
         hearing = ""
+        hearingRaw = ""
         val text = fresh(raw.trim())
         gone = ""
+        closedCount++
         if (VoiceText.clean(text) != null) said = join(said, text)
         return shown()
     }
@@ -105,7 +130,7 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
         val shown = polish?.update(text)
         val whole = shown?.let { it.polished + it.rest } ?: text
         val fixed = polish?.frozenPrefix(VoicePolishTags.norm(stable).size) ?: stable
-        return Heard(whole, settled(whole, fixed), utterance = utterance)
+        return Heard(whole, settled(whole, fixed), utterance = utterance, upTo = mark())
     }
 
     companion object {
@@ -155,6 +180,30 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
             before.last() in MARKS -> before + after
             before.last().isAsciiWord() && after.first().isAsciiWord() -> "$before $after"
             else -> before + after
+        }
+
+        /**
+         * [text] after what of it was [prefix]: the end of [text]'s start closest to [prefix] (the
+         * fewest characters put in, left out or changed; the longest of those as close), then the
+         * marks after it. The recognizer may write a character of [prefix] otherwise as it goes on
+         * (its n-best choice at the endpoint, 吗 then 嘛): that one goes too, not typed again.
+         */
+        fun cut(prefix: String, text: String): String {
+            if (prefix.isEmpty()) return text
+            // the edit distance from prefix to each start of text, a row at a time
+            var row = IntArray(text.length + 1) { it }
+            for (i in 1..prefix.length) {
+                val next = IntArray(text.length + 1)
+                next[0] = i
+                for (j in 1..text.length) {
+                    val change = row[j - 1] + if (prefix[i - 1] == text[j - 1]) 0 else 1
+                    next[j] = minOf(change, row[j] + 1, next[j - 1] + 1)
+                }
+                row = next
+            }
+            var end = 0
+            for (j in 1..text.length) if (row[j] <= row[end]) end = j
+            return text.substring(end).trimStart { it in MARKS || it.isWhitespace() }
         }
 
         private fun Char.isAsciiWord() = this < '\u0080' && isLetterOrDigit()

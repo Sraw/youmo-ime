@@ -55,13 +55,24 @@ class EditingSession(
     var provisional = false
         private set
 
+    /** How a [provisional] composition left the field ([provisionalTaken]). */
+    enum class Taken {
+        /** the cursor left it, or input restarted over it: taken away here, its owner composes it anew */
+        AWAY,
+
+        /** no longer in the field at all: the app took it (sent it, cleared the field) */
+        GONE,
+
+        /** left in the field as text (input restarted where the field could not say where, or in another field) */
+        LEFT,
+    }
+
     /**
-     * Told when a [provisional] composition is taken from the field by anything but its owner:
-     * [consumed] true when it is no longer in the field at all (the app cleared or sent the text),
-     * false when the cursor left it and it was taken away here. Voice's session listens: text the app
-     * took is not typed again, text taken away composes anew where the cursor went.
+     * Told when a [provisional] composition is taken from the field by anything but its owner, and
+     * how ([Taken]). Voice's session listens: text the app took is not typed again and what is said
+     * next starts afresh, text taken away composes anew where the cursor went, text left stays typed.
      */
-    var provisionalTaken: ((consumed: Boolean) -> Unit)? = null
+    var provisionalTaken: ((how: Taken) -> Unit)? = null
 
     /**
      * Records [text] as the composing text without touching the editor -- for putting a session
@@ -167,7 +178,7 @@ class EditingSession(
             CoreLog.d { "a provisional composition gone from the field: taken by the app" }
             resetComposingState()
             editor.finishComposingText()
-            provisionalTaken?.invoke(true)
+            provisionalTaken?.invoke(Taken.GONE)
             return CursorUpdate.None
         }
         // the user moved the cursor, or the app changed the text: the pairs are not around it,
@@ -194,7 +205,7 @@ class EditingSession(
             CoreLog.d { "cursor left a provisional composition: taken away" }
             resetComposingState()
             takeAwayProvisional(start, end, selStart)
-            provisionalTaken?.invoke(false)
+            provisionalTaken?.invoke(Taken.AWAY)
             return CursorUpdate.None
         }
         CoreLog.d { "cursor left the composition: finish it in place, focus out/in" }
@@ -225,7 +236,15 @@ class EditingSession(
         } else {
             editor.finishComposingText()
         }
-        provisionalTaken?.invoke(!there)
+        provisionalTaken?.invoke(
+            when {
+                there -> Taken.AWAY
+                // gone from the field it was in: the app took it
+                sameField && selStart >= 0 -> Taken.GONE
+                // the selection unknown: left there as text; or another field's
+                else -> Taken.LEFT
+            }
+        )
     }
 
     /**

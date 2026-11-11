@@ -86,8 +86,16 @@ class VoiceTalkTest {
         val held = VoiceTalk(asItGoes = false)
         held.step("你好", 0)
         held.consumed()
+        // what is said next, the new utterance alone: nothing of what went
         assertNull(held.rest(""))
+        assertEquals("我们", held.rest("我们"))
         assertNull(held.restNow())
+        // left in the field as text (EditingSession.Taken.LEFT): counted as typed, the talk goes on after it
+        val left = VoiceTalk(asItGoes = false)
+        left.step("你好", 0)
+        left.kept()
+        assertTrue(left.typedAny)
+        assertEquals("我们", left.rest("你好我们"))
     }
 
     @Test

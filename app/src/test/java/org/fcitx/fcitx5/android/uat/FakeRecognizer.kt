@@ -62,21 +62,25 @@ class FakeRecognizer : VoiceSession.Listening {
     /** the microphone's first sample not zero comes as it opens; false: only when [on] says so */
     var warm = true
 
-    private var restartTo = 0
+    private var restarting: Pair<Int, VoiceLive.Mark?>? = null
     override var utterance = 0
 
+    /** the recognizer not told yet of the app taking the text: what it hears is of the last utterance */
+    var lagging = false
+
     // as VoiceListener's: brought to the utterance asked for on the next step
-    override fun restart(to: Int) {
-        restartTo = to
+    override fun restart(to: Int, upTo: VoiceLive.Mark?) {
+        val last = restarting
+        restarting = to to (upTo ?: last?.takeIf { it.first > live.utterance }?.second)
     }
 
-    private fun live() = live.also { it.restart(restartTo) }
+    private fun live() = live.also { l -> if (!lagging) restarting?.let { l.restart(it.first, it.second) } }
 
     override fun load() = Unit
     override fun start() {
         opened++
         live = VoiceLive(polish?.invoke())
-        restartTo = 0
+        restarting = null
         utterance = 0
         closed = false
         // from the capture thread, as VoiceListener's

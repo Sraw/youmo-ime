@@ -296,6 +296,51 @@ class VoiceTapUatTest : VoiceTapUat() {
         assertEquals(1, voice.closes)
     }
 
+    /** The recognizer told of the send late: what it heard before is not shown as the last utterance's, nor lost. */
+    @Test
+    @Uat("VO-29")
+    fun afterTheAppSentWhatTheRecognizerHeardBeforeItKnewIsNotLost() {
+        allowMicrophone()
+        h.start(MULTI_LINE)
+        tapMic()
+        voice.heard("今天天气，")
+        h.advance(100)
+        h.field.text.clear()
+        h.idle()
+        // heard after the send, told as the last utterance's: not shown
+        voice.lagging = true
+        voice.heard("很好")
+        h.advance(100)
+        assertEquals("", text())
+        // told: it starts the new one
+        voice.lagging = false
+        voice.hearing("我们")
+        h.advance(100)
+        assertEquals("很好我们", text())
+        voice.said += "我们走吧"
+        tapMic()
+        assertEquals("很好我们走吧", text())
+        assertEquals(1, voice.closes)
+    }
+
+    /** All recognized before the recognizer was told of the send: what comes back is what went, nothing typed. */
+    @Test
+    @Uat("VO-29")
+    fun afterTheAppSentTheLastUtterancesTextAtTheEndTypesNothing() {
+        allowMicrophone()
+        h.start(MULTI_LINE)
+        tapMic()
+        voice.heard("今天天气，")
+        h.advance(100)
+        h.field.text.clear()
+        h.idle()
+        voice.lagging = true
+        tapMic()
+        h.advance(100)
+        assertEquals("", text())
+        assertEquals(1, voice.closes)
+    }
+
     /** The polish (always on): a tagger deleting 嗯, a 。 after 了 (as VoiceLiveTest's). */
     private fun polishDroppingUmMarkingLe() {
         val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"), listOf("none"))
