@@ -140,22 +140,11 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         }
         st("panel", "fill" to "@keyboard")
         st(
-            "key", "radius" to "0", "border" to "none", "shadow" to "none", "color" to "@keyText", "icon-color" to "@keyText", "press" to "tint",
+            "key", "radius" to (look.radius?.let { "${dp(it)}dp" } ?: "0"), "border" to "none", "shadow" to "none", "color" to "@keyText", "icon-color" to "@keyText", "press" to "tint",
             "inset" to look.inset?.let { (v, h) -> "${v}dp ${h}dp" },
         )
-        var pressedFaces = false
-        for ((sel, k) in look.keys) {
-            val fill = k.fill?.let { fill(it, prefix, sel, "n", px) }
-            val color = k.color?.let(::hex)
-            st(sel, "fill" to fill, "color" to color, "icon-color" to color?.takeIf { k.icons })
-            val pressed = k.pressed?.takeIf { !same(it, k.fill) }?.let { fill(it, prefix, sel, "p", px) }
-            if (pressed != null) pressedFaces = true
-            st(
-                sel.split(',').joinToString(",") { "$it:pressed" }, "fill" to pressed, "overlay" to pressed?.let { "transparent" },
-                "color" to k.pressedColor?.takeIf { it != k.color }?.let(::hex),
-            )
-        }
-        if (!pressedFaces) st("key:pressed", "overlay" to "@keyPressHighlight")
+        val pressedFaces = look.keys.count { (sel, k) -> key(sel, k, prefix, px, ::st) }
+        if (pressedFaces == 0) st("key:pressed", "overlay" to "@keyPressHighlight")
         st("key mark, key shortcut", "color" to "@keyHint", "icon-color" to "@keyHint")
         st("candidate", "color" to "@candidateText")
         st("candidate:first", "color" to "@first")
@@ -182,6 +171,23 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         st("voice mic", "fill" to "@first", "icon-color" to "@genericActiveForeground")
         if (look.font != null && scene.isEmpty()) st("key", "font" to "skin")
         return out
+    }
+
+    // a kind of key's face and colours, by [st]; whether it has a pressed face of its own
+    private fun key(sel: String, k: SkinKey, prefix: String, px: Double, st: (String, Array<out Pair<String, String?>>) -> Unit): Boolean {
+        val fill = k.fill?.let { fill(it, prefix, sel, "n", px) }
+        // a face with its symbol in it: none of the app's on top
+        val color = if (k.drawn) "transparent" else k.color?.let(::hex)
+        st(sel, arrayOf("fill" to fill, "color" to color, "icon-color" to color?.takeIf { k.icons || k.drawn }))
+        val pressed = k.pressed?.takeIf { !same(it, k.fill) }?.let { fill(it, prefix, sel, "p", px) }
+        st(
+            sel.split(',').joinToString(",") { "$it:pressed" },
+            arrayOf(
+                "fill" to pressed, "overlay" to pressed?.let { "transparent" },
+                "color" to k.pressedColor?.takeIf { it != k.color && !k.drawn }?.let(::hex),
+            ),
+        )
+        return pressed != null
     }
 
     // a face's fill value: a colour, or an image of its own (its transparent margins cut, at most MAX_KEY_SIDE)
@@ -217,6 +223,12 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         if (t + b >= p.height) { t = 0; b = 0 }
         val n = (px * scale).roundToInt().coerceIn(1, MAX_DENSITY)
         return "image($name, $l $t $r $b, ${n}x)"
+    }
+
+    // a length in dp as written: whole, or to two places
+    private fun dp(v: Double): String {
+        val r = (v * 100).roundToInt()
+        return if (r % 100 == 0) (r / 100).toString() else (r / 100.0).toString()
     }
 
     private fun same(a: SkinFill?, b: SkinFill?): Boolean = when {

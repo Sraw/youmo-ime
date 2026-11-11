@@ -36,8 +36,18 @@ sealed interface SkinFill {
     class Image(val pixels: Pixels, val insets: Pixels.Box?) : SkinFill
 }
 
-/** A kind of key's face: [fill] and [pressed], its label's [color] and [pressedColor]; [icons] that its icons take the colour too. */
-class SkinKey(val fill: SkinFill?, val pressed: SkinFill?, var color: Int?, val pressedColor: Int?, val icons: Boolean)
+/**
+ * A kind of key's face: [fill] and [pressed], its label's [color] and [pressedColor]; [icons] that its icons take the
+ * colour too; [drawn] that its face draws its own label or symbol (none of the app's drawn over it).
+ */
+class SkinKey(
+    val fill: SkinFill?,
+    val pressed: SkinFill?,
+    var color: Int?,
+    val pressedColor: Int?,
+    val icons: Boolean,
+    val drawn: Boolean = false,
+)
 
 /**
  * One version of a skin in theme terms, filled by a [SkinSource]: [width] is the skin's pixels across the keyboard,
@@ -59,6 +69,9 @@ class SkinLook(val width: Int) {
     var hintText: Int? = null
     val sounds = LinkedHashMap<SoundKey, Pair<String, ByteArray>>()
     var font: Pair<String, ByteArray>? = null
+
+    /** The keys' corner radius in dp; null: square, as skins whose images draw their own shape. */
+    var radius: Double? = null
     val notes = LinkedHashSet<SkinNote>()
 }
 
@@ -91,8 +104,17 @@ enum class SkinNote {
     /** Periods of the day past day and night (Sogou's third and later). */
     MORE_PERIODS,
 
-    /** An image that did not decode, or was past the limits. */
+    /** An image that did not decode, was past the limits or is not in the file. */
     IMAGES,
+
+    /** Values a theme takes from other files (Trime's `__include`, `__patch`): only its own file's are read. */
+    INCLUDES,
+
+    /** More themes or colour schemes in the file than the one light and one dark taken. */
+    MORE_THEMES,
+
+    /** The styles of panels and modes the app draws its own way (clipboard, emoji, one-handed, floating, Material You). */
+    PANELS,
 }
 
 /** Why a file is no skin the app converts: [reason], with [detail] (a file's name) where one says more. */

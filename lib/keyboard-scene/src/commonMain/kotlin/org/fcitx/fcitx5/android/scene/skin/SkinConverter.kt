@@ -15,6 +15,8 @@ object SkinConverter {
     val READERS: List<Pair<(Set<String>) -> Boolean, (SkinFiles) -> SkinSource>> = listOf(
         SogouSkin::accepts to ::SogouSkin,
         BaiduSkin::accepts to ::BaiduSkin,
+        FlorisSkin::accepts to ::FlorisSkin,
+        TrimeSkin::accepts to ::TrimeSkin,
     )
 
     /**
@@ -24,9 +26,17 @@ object SkinConverter {
      * @throws SkinError where it is no skin read here, or one without a keyboard
      */
     fun convert(entries: Map<String, ByteArray>, platform: SkinPlatform, fallbackName: String): SkinConversion {
-        val files = SkinFiles(entries, platform)
+        val inner = if (READERS.any { it.first(entries.keys) }) entries else unwrapped(entries)
+        val files = SkinFiles(inner, platform)
         val reader = READERS.firstOrNull { it.first(files.names) }?.second ?: throw SkinError(SkinError.Reason.UNKNOWN)
         return guarded { SkinTheme(reader(files), files::decode, fallbackName).write() }
+    }
+
+    /** [entries] with the one folder they are all in taken off their names (a download of a theme's repository); else as they are. */
+    fun unwrapped(entries: Map<String, ByteArray>): Map<String, ByteArray> {
+        val top = entries.keys.map { it.substringBefore('/', "") }.toSet()
+        val folder = top.singleOrNull()?.takeIf { it.isNotEmpty() } ?: return entries
+        return entries.mapKeys { it.key.removePrefix("$folder/") }.filterKeys { it.isNotEmpty() }
     }
 
     // a skin's numbers past what the readers hold them to: no skin, not a crash of the import
@@ -38,5 +48,4 @@ object SkinConverter {
     } catch (e: RuntimeException) {
         throw SkinError(SkinError.Reason.BROKEN, e.message.orEmpty(), e)
     }
-
 }

@@ -15,8 +15,11 @@ import kotlin.math.roundToInt
  * band) and `default/` (sounds, fonts). The keys' places are not in the skin (they go by class), so a Sogou skin
  * fits the app's layouts as it is. The day's period (the one holding noon) is the light version, another the dark.
  *
- * Written from the format's notes and the skins inside Sogou's own app, checked on skins made for the tests: no
- * real downloaded one has been read yet.
+ * Checked on eight real skins from Sogou's own shop (dev/design/060-skin-formats.md §1): a picture under the keys
+ * may be `[Keyboard] BG_IMAGE` (a file's name or a section's), a band of six numbers as well as four, a key face
+ * `transparent.png` (the picture shows through; only the pressed face drawn), a key's `ICON=transparent.png` (its
+ * symbol drawn in its face: none of the app's drawn over it), letter pictures in `keys.ini` under suffixed names
+ * (`Key_G_L`). The preview is `phoneTheme.ini`'s `preview_square`.
  */
 class SogouSkin(private val f: SkinFiles) : SkinSource {
     private val res: String
@@ -52,7 +55,8 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
         val general = f.ini("phoneTheme.ini")["General"].orEmpty()
         name = general["skin_name"].orEmpty()
         author = general["skin_author"].orEmpty()
-        preview = f.names.sorted().firstOrNull { PREVIEW.containsMatchIn(it) }?.let(f::bytes)
+        val square = general["preview_square"]?.trim()?.takeIf { it.isNotEmpty() && it in f }
+        preview = (square ?: f.names.sorted().firstOrNull { PREVIEW.containsMatchIn(it) })?.let(f::bytes)
     }
 
     override val variants: Set<Variant> get() = roots.keys
@@ -69,23 +73,42 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             return f.first(r + n, "$res/$n", "default/$n", "default/res/$n", n)
         }
 
-        // 'file.png,left,right,top,bottom' (the stretchable band as pixel ranges): the image and its insets
+        // 'file.png,left,right,top,bottom' (the stretchable band as pixel ranges), or six numbers ('left,right,mode,
+        // top,bottom,mode'): the image and its insets
         private fun image(value: String?): SkinFill.Image? {
             val parts = value?.split(',')?.map { it.trim() } ?: return null
-            if (!IMAGE.matches(parts[0]) || parts[0].equals("transparent.png", ignoreCase = true)) return null
+            if (!IMAGE.matches(parts[0]) || transparent(parts[0])) return null
             val px = f.pixels(file(parts[0])) ?: return null
-            val band = SkinText.ints(parts.drop(1).joinToString(","), BAND)
-            val insets = band?.takeIf { parts.size == BAND + 1 && it[0] < it[1] && it[2] < it[3] }?.let {
+            val nums = parts.drop(1)
+            val band = when (nums.size) {
+                BAND -> SkinText.ints(nums.joinToString(","), BAND)
+                BAND_MODES -> SkinText.ints(listOf(nums[0], nums[1], nums[3], nums[4]).joinToString(","), BAND)
+                else -> null
+            }
+            val insets = band?.takeIf { it[0] < it[1] && it[2] < it[3] }?.let {
                 Pixels.Box(it[0], it[2], maxOf(0, px.width - it[1]), maxOf(0, px.height - it[3]))
             }
             return SkinFill.Image(px, insets)
         }
 
+        // a key face: an image, or none drawn (transparent.png, or an image all transparent: the picture under it shows)
+        private fun face(value: String?): SkinFill? {
+            val name = value?.split(',')?.firstOrNull()?.trim().orEmpty()
+            if (transparent(name)) return CLEAR
+            val img = image(value) ?: return null
+            return if (img.pixels.opaqueBounds() == null) CLEAR else img
+        }
+
+        private fun transparent(name: String) = name.equals("transparent.png", ignoreCase = true)
+
+        // a key whose symbol is in its face: its ICON transparent.png
+        private fun baked(sections: List<String>) = sections.any { skin[it]?.get("ICON")?.trim()?.let(::transparent) == true }
+
         private fun bgOf(section: String) = skin[section]?.get("BG_IMAGES")?.split(',')?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
 
-        private fun pair(section: String?): Pair<SkinFill.Image?, SkinFill.Image?> {
+        private fun pair(section: String?): Pair<SkinFill?, SkinFill?> {
             val s = skin[section ?: return null to null].orEmpty()
-            return image(s["NORMAL"]) to image(s["PRESSED"])
+            return face(s["NORMAL"]) to face(s["PRESSED"])
         }
 
         private fun textStyle(vararg names: String): Pair<Int?, Int?> {
@@ -111,27 +134,53 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             return look
         }
 
-        // one picture under the bar and the keys (RootView), the bar's own image laid over its top
+        // a BG_IMAGE: a file's name, or a section's whose NORMAL names it
+        private fun ref(value: String?): SkinFill.Image? {
+            val v = value?.trim().orEmpty()
+            return if (v in skin) image(skin[v]?.get("NORMAL")) else image(v)
+        }
+
+        // one picture under the bar and the keys (RootView), the bar's own image laid over its top; or the keyboard's
+        // own picture ([Keyboard], under the keys only) with the bar's above it
         private fun board(look: SkinLook) {
             val root = skin["RootView"].orEmpty()
-            val picture = if (root["BG_STYLE"]?.trim() == "2") null else listOf("RootView", "WALLPAPER").firstNotNullOfOrNull { image(skin[it]?.get("BG_IMAGE")) }
-            if (picture == null) look.boardColor = SkinText.color(root["BG_COLOR"])
-            val barRef = skin["CandidateView"]?.get("BG_IMAGE")?.trim().orEmpty()
-            val bar = if (barRef in skin) image(skin[barRef]?.get("NORMAL")) else image(barRef)
-            if (picture != null) {
-                val board = Pixels(picture.pixels.width, picture.pixels.height).also { it.paste(picture.pixels, 0, 0) }
-                look.boardColor = board.average(keepAlpha = false)
-                val h = if (bar != null) maxOf(1, (bar.pixels.height.toDouble() * board.width / look.width).roundToInt()) else (board.width * BAR_RATIO).roundToInt()
-                look.barHeight = minOf(h, board.height)
-                if (bar != null) {
-                    board.over(bar.pixels.nine(bar.insets, board.width, look.barHeight), 0, 0)
-                    look.barColor = board.crop(0, 0, board.width, look.barHeight)?.average(keepAlpha = false)
-                }
-                look.board = board
-            } else if (bar != null) {
-                look.barColor = bar.pixels.average(keepAlpha = false)
+            val picture = if (root["BG_STYLE"]?.trim() == "2") null else listOf("RootView", "WALLPAPER").firstNotNullOfOrNull { ref(skin[it]?.get("BG_IMAGE")) }
+            val keyboard = if (picture == null) ref(skin["Keyboard"]?.get("BG_IMAGE")) else null
+            if (picture == null) look.boardColor = SkinText.color(root["BG_COLOR"]) ?: SkinText.color(skin["Keyboard"]?.get("BG_COLOR"))
+            val bar = ref(skin["CandidateView"]?.get("BG_IMAGE"))
+            when {
+                picture != null -> under(look, picture, bar)
+                keyboard != null -> below(look, keyboard, bar)
+                bar != null -> look.barColor = bar.pixels.average(keepAlpha = false)
             }
             look.barColor = look.barColor ?: look.boardColor
+        }
+
+        private fun barHeight(bar: SkinFill.Image?, width: Int, look: SkinLook) =
+            if (bar != null) maxOf(1, (bar.pixels.height.toDouble() * width / look.width).roundToInt()) else (width * BAR_RATIO).roundToInt()
+
+        private fun under(look: SkinLook, picture: SkinFill.Image, bar: SkinFill.Image?) {
+            val board = Pixels(picture.pixels.width, picture.pixels.height).also { it.paste(picture.pixels, 0, 0) }
+            look.boardColor = board.average(keepAlpha = false)
+            look.barHeight = minOf(barHeight(bar, board.width, look), board.height)
+            if (bar != null) {
+                board.over(bar.pixels.nine(bar.insets, board.width, look.barHeight), 0, 0)
+                look.barColor = board.crop(0, 0, board.width, look.barHeight)?.average(keepAlpha = false)
+            }
+            look.board = board
+        }
+
+        private fun below(look: SkinLook, keyboard: SkinFill.Image, bar: SkinFill.Image?) {
+            val kb = keyboard.pixels.nine(keyboard.insets, keyboard.pixels.width, keyboard.pixels.height)
+            val colour = kb.average(keepAlpha = false) ?: GREY
+            val h = barHeight(bar, kb.width, look)
+            val board = Pixels.filled(kb.width, h + kb.height, colour)
+            board.over(kb, 0, h)
+            if (bar != null) board.over(bar.pixels.nine(bar.insets, kb.width, h), 0, 0)
+            look.boardColor = colour
+            look.barHeight = h
+            look.barColor = board.crop(0, 0, kb.width, h)?.average(keepAlpha = false)
+            look.board = board
         }
 
         private fun keys(look: SkinLook) {
@@ -151,7 +200,7 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
                 if (nm == null) continue
                 val icon = kind.owners.firstNotNullOfOrNull { image(skin[it]?.get("ICON")) }
                 val color = kind.colors.first ?: icon?.pixels?.glyphColor()
-                look.keys[kind.selector] = SkinKey(nm, hl, color, kind.colors.second, icons = kind.selector != "key")
+                look.keys[kind.selector] = SkinKey(nm, hl, color, kind.colors.second, icons = kind.selector != "key", drawn = baked(kind.owners))
             }
             // one letter styled on its own (Key_Q, Key_H_PY): by its name on the 26 keys
             for (section in skin.keys) {
@@ -200,10 +249,14 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
         private val PREVIEW = Regex("preview[^/]*\\.(png|jpe?g)$", RegexOption.IGNORE_CASE)
         private val IMAGE = Regex(".+\\.(png|webp|jpe?g)", RegexOption.IGNORE_CASE)
         private val SINGLE = Regex("Key_([A-Z])(?:_PY)?")
-        private val LETTER = Regex("Key_[A-Z]")
+        // Key_G, and as real skins name them, Key_G_L, Key_G_Land_Left
+        private val LETTER = Regex("Key_[A-Z](_.+)?")
         private const val BAND = 4
+        private const val BAND_MODES = 6
+        private val CLEAR = SkinFill.Color(0)
         private const val NOON = 12
         private const val BAR_RATIO = 0.115
+        private const val GREY = 0xFFD1D4DB.toInt()
         private const val MIN_WIDTH = 240
         private const val MAX_WIDTH = 4096
         private const val DEFAULT_WIDTH = 1080
