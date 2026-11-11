@@ -449,8 +449,10 @@ object ThemeManager {
      * one not following the system sees what he saw before 0.6.0).
      */
     private fun systemVersion(theme: Theme): Theme {
-        if (theme !is Theme.Pack || theme.isDark == isDarkMode) return theme
-        return allPacks.firstOrNull { it.file == theme.file && it.builtin == theme.builtin && it.isDark == isDarkMode } ?: theme
+        // a built-in pack (BuiltinPacks) keeps the version a slot names, as the built-in themes do: one moved from
+        // Nord's dark version (BuiltinThemeFiles.RETIRED) sees a dark keyboard still
+        if (theme !is Theme.Pack || theme.builtin || theme.isDark == isDarkMode) return theme
+        return packs.firstOrNull { it.file == theme.file && it.isDark == isDarkMode } ?: theme
     }
 
     /** The versions of [theme] where it is a pack's that has both, light first; else null ([systemVersion]). */

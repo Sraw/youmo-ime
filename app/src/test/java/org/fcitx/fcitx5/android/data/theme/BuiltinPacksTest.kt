@@ -47,6 +47,18 @@ class BuiltinPacksTest {
     }
 
     @Test
+    fun aBuiltInPackKeepsTheVersionPickedAsTheBuiltInThemesDo() {
+        val was = ThemeManager.prefs.normalModeTheme.getValue()
+        try {
+            // the system light (Robolectric's): the dark version all the same, not switched as an imported pair is
+            ThemeManager.setNormalModeTheme(ThemeManager.getTheme("素雅#dark")!!)
+            assertEquals("素雅#dark", ThemeManager.activeTheme.name)
+        } finally {
+            ThemeManager.setNormalModeTheme(was)
+        }
+    }
+
+    @Test
     fun unpackedOnceAVersionAndNoneWhereOneFails() {
         val root = File(appContext.cacheDir, "bp-test").apply { deleteRecursively() }
         var opened = 0
