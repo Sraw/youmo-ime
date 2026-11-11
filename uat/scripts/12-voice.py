@@ -352,6 +352,8 @@ def vo14(d):
 @case("VO-38", base="B0-设置", mutates=True, needs=EV)
 def vo38(d):
     script("13-words").add_word(d, "徐婧")
+    # 攻势 the user's too, so the common 公式 heard is one that could be replaced and is not
+    script("13-words").add_word(d, "攻势")
     d.open_page("text")
     out = []
     for clip, want, wrong in (("xujing", "徐婧", "徐静"), ("xujing3", "许静", "徐婧"), ("gongshi", "公式", "攻势")):

@@ -31,7 +31,7 @@ PIECES = {"蓝鲸花园": [("lanjinghuayuan", "蓝鲸花园")], "幽默": [("you
           # not the engine's own first for lan jing hua/gong yuan (蓝鲸花园, 蓝鲸公园)
           "澜境花园": [("lan", "澜"), ("jing", "境"), ("huayuan", "花园")],
           # VO-38: 徐 alone, then 婧 among jing's characters
-          "徐婧": [("xu", "徐"), ("jing", "婧")],
+          "徐婧": [("xu", "徐"), ("jing", "婧")], "攻势": [("gongshi", "攻势")],
           "澜境公园": [("lan", "澜"), ("jing", "境"), ("gongyuan", "公园")],
           "蓝鲸公园": [("lanjing", "蓝鲸"), ("gongyuan", "公园")], "时间": [("shijian", "时间")],
           "天气": [("tianqi", "天气")], "鲸园": [("jing", "鲸"), ("yuan", "园")],
