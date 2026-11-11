@@ -363,7 +363,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：B0-设置；把 `uat/fixtures/common-words-mixed.txt`（一行空格分隔的「木字旁 木」、一行带 [拼音] 的「中华人民共和国」、一行没有替换项的「米字旁」）推到 `/sdcard/Download/`。
 - **操作**：**词库与短语 → 常用词** ⋮ → **导入**，选它，读确认框，确定；⋮ → **导出**，在下载里保存，取回看内容；工具栏 ⋯ → **不用我的输入习惯**，打 mzp。
 - **预期**：确认框写着"新增 2 个，更新 0 个，跳过 1 行"，下面写着第 4 行「米字旁[mi'zi'pang]」没有替换项；列表里有「木字旁 → 木」「中华人民共和国 → 中国」；导出的文件第一行是 `# youmo-common-words 1`，每行用 Tab 分隔；借手机时打 mzp 前面没有「木」。
-- **JVM**：`CommonWordsPageUatTest.aCommonWordAddedImportedAndExported`（确认框的数字和原因、导出的内容）、`EnginesTest.theCommonWordsAreTheAdditionsAndOffWithTheHabits`（:lib:ime-core，借手机时不出、键盘上删除后存下）；设备上跑导入导出（真的文件选择器），借手机那半不跑。
+- **JVM**：`CommonWordsPageUatTest.aCommonWordAddedImportedAndExported`（确认框的数字和原因、导出的内容）、`EnginesTest.theCommonWordsAreTheAdditionsAndOffWithTheHabits`（:lib:ime-core，借手机时不出、键盘上删除后存下）、`CommonWordsPageUatTest.anExportKeepsTheLinesNotRead`（手机上的文件里页面读不出的行（没写 `[拼音]` 的「米字旁<Tab>米」）导出时原样带上；页面上造不出这种行，设备上不跑这一项）；设备上跑导入导出（真的文件选择器），借手机那半不跑。
 
 ### WD-43 [P1] 常用词：在候选上长按「从常用词中删除」
 - **前提**：同 WD-39（导入了「米字旁 → 米、糸」）。
@@ -371,3 +371,8 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **预期**：「糸」的长按菜单里有 **从常用词中删除**，选后提示「已从常用词中删除「糸」」；再打 mzp 时前面只有「米」，没有「糸」；常用词页那行是「米字旁 → 米」；页上改过、存过以后「糸」也没有回来。
 - **JVM**：`CommonWordsPageUatTest.whatTheKeyboardDeletedStaysDeletedThroughThePagesEdits`（键盘删掉的替换项页上照删、页上再改不放回）、ime-core `LearningMenuTest.theDeleteIsNamedByWhatTheWordIs`（菜单项「从常用词中删除」）、`EnginesTest.theCommonWordsAreTheAdditionsAndOffWithTheHabits`（键盘上删除后存下）；长按菜单和提示在设备上手工看。
 
+### WD-44 [P1] 常用词：几个词在同一个打法下给同一个替换项，删一次都去掉
+- **前提**：B0-设置；常用词只有「木字旁 → 木、米」「米字旁 → 米、糸」（都打 mzp）。
+- **操作**：打 mzp，长按候选「米」，选 **从常用词中删除**；清掉再打 mzp；到 **词库与短语 → 常用词** 看这两行。
+- **预期**：再打 mzp 时前面是「木」「糸」，没有「米」；页上是「木字旁 → 木」「米字旁 → 糸」。
+- **JVM**：ime-core `CommonWordsTest.aReplacementTwoWordsGiveIsTakenOffBoth`（同一个键下两个词都给的替换项，删一次两个词上都去掉）；设备上不跑。

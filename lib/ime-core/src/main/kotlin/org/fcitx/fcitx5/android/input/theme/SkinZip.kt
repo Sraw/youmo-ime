@@ -41,8 +41,11 @@ object SkinZip {
             return mapOf(name to b)
         }
         val entries = read(b, budget)
-        val flex = entries.keys.filter { it.endsWith(".flex", ignoreCase = true) }
-        val own = entries.keys.any { it.substringAfterLast('/') == "extension.json" }
+        // what macOS's Finder adds to a ZIP it makes (`__MACOSX/`, `._name`) is no file of the skin's: `__MACOSX/._a.flex`
+        // is not a second .flex (the same rule as SkinConverter's, which this module cannot reach)
+        val files = entries.keys.filterNot { it.startsWith("__MACOSX/") || it.substringAfterLast('/').startsWith("._") }
+        val flex = files.filter { it.endsWith(".flex", ignoreCase = true) }
+        val own = files.any { it.substringAfterLast('/') == "extension.json" }
         if (flex.size != 1 || own) return entries
         // the inner one unpacked within what the outer's files left of the one budget: both are held at once
         return read(entries.getValue(flex[0]), budget - entries.values.sumOf { it.size.toLong() })

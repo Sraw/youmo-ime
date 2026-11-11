@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
+import org.fcitx.fcitx5.android.engine.session.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.session.sessionTestData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -227,5 +228,36 @@ class CommonWordsInSessionTest {
         assertRows(listOf("lve" to "掠", "lue" to "掠", "nve" to "疟", "nue" to "疟"), { it.first }) { (typed, want) -> assertEquals(typed, want, s.type(typed).first()) }
         assertEquals("緑", s.type("lv").first())
         assertTrue("緑" !in s.type("lu"))
+    }
+
+    // a replacement two words give, deleted from the keyboard, is taken off both: deleting it from the
+    // word alone that listed it first left it offered by the other's initials
+    @Test
+    fun aReplacementTwoWordsGiveDeletedFromTheKeyboardIsGoneFromBoth() {
+        val saved = ArrayList<CommonWords>()
+        val book = CommonWordBook(words("木字旁[mu'zi'pang]\t木\t米\n米字旁[mi'zi'pang]\t米\n")) { saved += it }
+        val s = session(book)
+        val shown = s.type("mzp")
+        assertEquals(1, shown.count { it == "米" })
+        s.apply(Action.Unpin(shown.indexOf("米")))
+        val after = s.type("mzp")
+        assertTrue(after.toString(), "米" !in after && "木" in after)
+        assertTrue(saved.last().words.none { "米" in it.replacements })
+    }
+
+    // every reading of the whole input held back (coarse) and a replacement shown first: the preedit,
+    // the syllables offered and Enter go by the first candidate that is no replacement, not by the
+    // replacement's text, which has no reading
+    @Test
+    fun everyReadingHeldThePreeditIsNoReplacement() {
+        // lattice/coarse.txt's words (CoarseWords.LIST), all read bi: held past the first page
+        val held = listOf("屄", "骚屄", "嫩屄", "肉棒", "鸡巴").mapIndexed { i, w -> Triple(w, "bi", -0.1f * (i + 1)) }
+        val data = pinyinDataOf(*(held + Triple("啊", "a", -2f)).toTypedArray())
+        val s = PinyinSession(data, PinyinSegmenter(), commonWords = CommonWordBook(words("啊比[a'bi]\t阿笔\n")))
+        s.apply(Action.Reset)
+        val typed = "abi".map { s.apply(Action.Key(it)) }.last()
+        assertEquals("阿笔", typed.candidates.first())
+        // the input's syllables as the first candidate that is no replacement reads it, not 阿笔
+        assertEquals("a bi", typed.preedit)
     }
 }

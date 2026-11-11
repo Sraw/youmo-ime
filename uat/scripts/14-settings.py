@@ -287,9 +287,10 @@ def push_file(d, local_path, filename):
     time.sleep(1)
 
 
-def baidu_skin(path):
+def baidu_skin(path, finder=False):
     """a Baidu skin made here (no third party's skin in the repository): a blue panel, letters on an orange
-    face with a transparent margin (the gap between keys), named UAT 皮肤 by uat"""
+    face with a transparent margin (the gap between keys), named UAT 皮肤 by uat. [finder]: zipped as macOS
+    Finder zips a folder, with a __MACOSX/ copy of every file's ._ resource fork beside it"""
     import io
     from PIL import Image, ImageDraw
 
@@ -318,6 +319,9 @@ def baidu_skin(path):
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in files.items():
             z.writestr(name, data)
+            if finder:
+                head, _, base = name.rpartition("/")
+                z.writestr(f"__MACOSX/{head + '/' if head else ''}._{base}", b"\x00\x05\x16\x07" + bytes(80))
 
 
 def skin_colours(d):
@@ -397,6 +401,26 @@ def st101(d):
     d.shot("kb", "选用转换来的皮肤")
     o, b = skin_colours(d)
     check(o > 300 and b > 40, f"键盘不是皮肤的橙键蓝底（橙 {o} 蓝 {b} / 1800）")
+    d.step("紧凑高度的键缝")
+    v0, h0 = key_gaps(d)
+    appearance_tab(d, "大小与样式")
+    choose(d, "键盘高度", "紧凑")
+    d.open_page("text")
+    v1, h1 = key_gaps(d)
+    d.shot("kb", "皮肤：紧凑")
+    gaps = f"上下/左右缝 dp：标准 {v0}/{h0}，紧凑 {v1}/{h1}"
+    check(1 <= v1 < v0 and abs(h1 - h0) <= 1.6, f"紧凑时皮肤的上下缝没变窄或左右缝变了：{gaps}")
+    appearance_tab(d, "大小与样式")
+    choose(d, "键盘高度", "标准")
+    d.step("Finder 打包的 zip")
+    mac = os.path.join(tempfile.gettempdir(), f"uat-skin-mac-{d.port}.zip")
+    baidu_skin(mac, finder=True)
+    push_file(d, mac, "uat-skin-mac.zip")
+    os.remove(mac)
+    import_theme(d, "uat-skin-mac", confirm=False)
+    check(d.wait_text("导入主题 UAT 皮肤", timeout=8, where="all", contains=True), "带 __MACOSX/ 的 zip 没有弹出导入确认框")
+    d.shot("full", "Finder 打包的 zip 的确认框")
+    d.back(after=1.0)
     d.step("坏的皮肤")
     bad = os.path.join(tempfile.gettempdir(), f"uat-bad-{d.port}.ssf")
     with open(bad, "wb") as out:
@@ -411,8 +435,8 @@ def st101(d):
     check(custom_item(d) and custom_item(d).texts()[:1] == item.texts()[:1], "选了坏皮肤后主题列表变了")
     real = os.environ.get("UAT_SKINS")
     extra = real_skins(d, real) if real else []
-    d.sh("rm -f /sdcard/Download/uat-skin.bds /sdcard/Download/uat-bad.ssf")
-    return f"皮肤收下、确认框列出没转过来的、选用是橙键蓝底（橙 {o} 蓝 {b}）；坏皮肤说是加密的" + \
+    d.sh("rm -f /sdcard/Download/uat-skin.bds /sdcard/Download/uat-skin-mac.zip /sdcard/Download/uat-bad.ssf")
+    return f"皮肤收下、确认框列出没转过来的、选用是橙键蓝底（橙 {o} 蓝 {b}）；{gaps}；Finder 的 zip 也认；坏皮肤说是加密的" + \
         (f"；真皮肤：{'、'.join(extra)}" if extra else "")
 
 
@@ -1179,5 +1203,5 @@ case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLong
 
 
 
-case("ST-103", needs="manual:逐个点新内置主题看键盘、动态背景、按键音；列表与不能删由 BuiltinPacksTest 查")(lambda d: None)
+case("ST-103", needs="manual:逐个点新内置主题看键盘、动态背景、按键音，重启后解锁前看简蓝；列表与不能删由 BuiltinPacksTest 查")(lambda d: None)
 case("ST-102", needs="manual:要先装 0.6.0 测试版选 Nord/Deep Blue/Monokai 再覆盖安装；迁移由 ThemePrefsMigrationTest 查")(lambda d: None)

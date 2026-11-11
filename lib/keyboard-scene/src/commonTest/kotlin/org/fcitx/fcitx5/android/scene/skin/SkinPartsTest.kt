@@ -121,11 +121,32 @@ class SkinPartsTest {
         val long = assertNotNull(SkinSound.convert("x.wav", wav(3000, 48000, 2))).second
         assertTrue(long.size <= SoundFile.MAX_BYTES)
         assertTrue(SoundFile.check("x.wav", long).isEmpty())
+        // cut at SoundFile.MAX_MS, not shorter: its frames are its rate's for that long (the header's rate and align)
+        fun le(at: Int, n: Int) = (0 until n).sumOf { (long[at + it].toInt() and 0xFF) shl (8 * it) }
+        assertEquals(le(24, 4) * SoundFile.MAX_MS / 1000, (long.size - 44) / le(32, 2))
         assertNull(SkinSound.convert("x.flac", short))
         assertNull(SkinSound.convert("x.wav", ByteArray(100)))
         assertEquals("sound.ogg", SkinSound.convert("....ogg", SoundSamples.VORBIS)?.first)
         assertEquals("b.mp3", SkinSound.convert("A/B.mp3", SoundSamples.MP3_PLAIN)?.first)
         assertNull(SkinSound.convert("x.ogg", ByteArray(200)))
+    }
+
+    @Test
+    fun sameFillsByPixelsAndInsets() {
+        // same() decides whether a key's pressed look is written or only tinted: an image with other insets
+        // stretches otherwise, so it is another look even of the same pixels
+        val px = Pixels.filled(4, 4, -1)
+        val copy = Pixels.filled(4, 4, -1)
+        val box = Pixels.Box(1, 1, 1, 1)
+        val rows = listOf(
+            Triple("same pixels (a copy), same insets", SkinFill.Image(px, box) to SkinFill.Image(copy, Pixels.Box(1, 1, 1, 1)), true),
+            Triple("same pixels, other insets", SkinFill.Image(px, box) to SkinFill.Image(copy, Pixels.Box(2, 1, 1, 1)), false),
+            Triple("same pixels, insets and none", SkinFill.Image(px, box) to SkinFill.Image(px, null), false),
+            Triple("one instance", SkinFill.Image(px, box).let { it to it }, true),
+            Triple("other pixels", SkinFill.Image(px, null) to SkinFill.Image(Pixels.filled(4, 4, 0), null), false),
+            Triple("two of none", null to null, true),
+        )
+        for ((why, pair, same) in rows) assertEquals(same, SkinPatch.same(pair.first, pair.second), why)
     }
 
     @Test

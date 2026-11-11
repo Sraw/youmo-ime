@@ -19,6 +19,7 @@ import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -182,6 +183,8 @@ object VoiceEngine {
                     userWords().let { w ->
                         val homophones = try {
                             voiceHomophones(w)
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                             Timber.w(e, "voice homophones not made")
                             VoiceHomophones.NONE

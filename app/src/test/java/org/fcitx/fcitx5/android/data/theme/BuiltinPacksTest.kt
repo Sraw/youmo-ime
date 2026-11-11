@@ -77,7 +77,9 @@ class BuiltinPacksTest {
         assertEquals(BuiltinPacks.FILES.size, BuiltinPacks.list(root, ThemeManager.BuiltinThemes).distinctBy { it.file }.size)
         // a user's pack of the same name shown instead
         assertTrue(BuiltinPacks.list(root, ThemeManager.BuiltinThemes, setOf("奶油")).none { it.file == "奶油" })
-        // a new version, one asset failing: none listed (tried again at the next start)
+        // its name still one of the built-in packs': an import of that name is refused as ever
+        assertTrue("奶油" in BuiltinPacks.names(root))
+        // a new version, one asset failing: none listed (tried again ten minutes later or at the next start)
         assertFalse(BuiltinPacks.unpack(root, "v2") { if (it == "cream") throw IOException("full") else BuiltinPacks.open(appContext, it) })
         assertEquals(emptyList<Theme.Pack>(), BuiltinPacks.list(root, ThemeManager.BuiltinThemes))
         root.deleteRecursively()

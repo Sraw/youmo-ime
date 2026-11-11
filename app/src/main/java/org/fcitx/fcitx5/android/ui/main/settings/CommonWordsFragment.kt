@@ -362,12 +362,12 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             .setTitle(R.string.import_file)
             .setMessage(message)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                if (imported.added + imported.updated == 0) return@setPositiveButton
                 // merged again over the list as it is now: the file read again while the picker was up (a
                 // replacement the keyboard removed) is not put back by the merge made before
-                val now = CommonWords.of(ui.entries.toList()).importing(parsed.words).words.words
+                val now = CommonWords.of(ui.entries.toList()).importing(parsed.words)
+                if (now.added + now.updated == 0) return@setPositiveButton
                 ui.removeItems(0, ui.entries.size)
-                ui.addItems(now)
+                ui.addItems(now.words.words)
                 dirty = true
             }
             .setNegativeButton(android.R.string.cancel, null)

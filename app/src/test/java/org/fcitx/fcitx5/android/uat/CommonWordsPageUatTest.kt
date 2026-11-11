@@ -265,6 +265,33 @@ class CommonWordsPageUatTest {
         }
     }
 
+    // an import merged before its 确定 once put back a replacement the keyboard deleted while the
+    // dialog was up: it is merged again at 确定, over the list as read anew
+    @Test
+    @Uat("WD-42")
+    fun anImportConfirmedAfterTheKeyboardDeletedKeepsTheDeletion() {
+        val base = CommonWords.parse(miZiPang).words
+        CommonWordsManager.write(base)
+        try {
+            commonWordsPage()
+            val file = Uri.parse("content://words.test/import-late.txt")
+            shadowOf(activity.contentResolver).registerInputStream(file, ByteArrayInputStream("竹字头[zhu'zi'tou] 竹\n".toByteArray()))
+            (page as CommonWordsFragment).importWords(file)
+            val asked = dialog()
+            // the keyboard took 糸 off with the dialog up; the page reads the file again on its return
+            activityStopped { CommonWordsManager.saveOver(base, base.without("米字旁", "糸")) }
+            until("read again") { "米字旁 → 米" in rowsOfWords() }
+            asked.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            idle()
+            assertEquals(
+                listOf("米字旁[mi'zi'pang] 米", "木字旁[mu'zi'pang] 木", "竹字头[zhu'zi'tou] 竹"),
+                commonWordsSaved(),
+            )
+        } finally {
+            CommonWordsManager.write(CommonWords.EMPTY)
+        }
+    }
+
     // an edit dialog open as the page comes back and reads the file anew: what it saves goes to the
     // row of its word as listed now, not to where the word was
     @Test

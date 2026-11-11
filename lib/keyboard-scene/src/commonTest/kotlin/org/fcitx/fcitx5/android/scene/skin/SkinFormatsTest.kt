@@ -194,12 +194,22 @@ class SkinFormatsTest {
     }
 
     @Test
-    fun aKeyboardFontPastTheLimitIsSaid() {
-        val files = floris()
-        files["fonts/moss.ttf"] = ByteArray(SkinLimits.MAX_FONT_BYTES + 1)
-        val c = convert(files)
-        assertFalse(c.themeXml.contains("<font "))
-        assertTrue(SkinNote.TEXT_SIZE in c.notes)
+    fun aKeyboardFontPastTheLimitIsLeftOut() {
+        // each reader keeps a font of its own within SkinLimits.MAX_FONT_BYTES; one past it is left out and the text
+        // note said (Sogou's and Trime's skins set a text size of their own, so theirs is said whatever the font)
+        val rows = listOf(
+            Triple("FlorisBoard's @font", { floris() }, "fonts/moss.ttf"),
+            Triple("Sogou's TYPEFACE", { sogou() }, "default/font.ttf"),
+            Triple("Trime's key_font", { trime() }, "fonts/k.ttf"),
+        )
+        for ((why, skin, font) in rows) {
+            assertContains(convert(skin()).themeXml, "<font ", message = "$why: within the limit")
+            val files = skin()
+            files[font] = ByteArray(SkinLimits.MAX_FONT_BYTES + 1)
+            val c = convert(files)
+            assertFalse(c.themeXml.contains("<font "), "$why: past the limit")
+            assertTrue(SkinNote.TEXT_SIZE in c.notes, "$why: said")
+        }
     }
 
     @Test
@@ -443,6 +453,41 @@ class SkinFormatsTest {
         assertEquals(3, decoded)
         f.image("a")
         assertEquals(4, decoded)
+    }
+
+    @Test
+    fun wholePixelsAreOneCopyWithinTheSameBudget() {
+        var decoded = 0
+        // as above, each whole read a new 1x1 Pixels: the same one back means it was kept
+        val platform = object : SkinPlatform {
+            override fun image(bytes: ByteArray): SkinImage {
+                decoded++
+                return object : SkinImage {
+                    override val width = 4096
+                    override val height = bytes.size
+
+                    override fun pixels(x: Int, y: Int, w: Int, h: Int) = Pixels(1, 1)
+                }
+            }
+
+            override fun legacyText(bytes: ByteArray) = ""
+        }
+        val tall = (SkinLimits.MAX_KEPT_PIXELS * 2 / 3 / 4096).toInt()
+        val f = SkinFiles(mapOf("a" to ByteArray(tall), "b" to ByteArray(tall)), platform)
+        // a name not in the skin: null, nothing decoded
+        assertNull(f.pixels("none"))
+        assertNull(f.pixels(null))
+        assertEquals(0, decoded)
+        // asked twice: one decode, the same instance
+        val a = f.pixels("a")
+        assertTrue(a === f.pixels("a"))
+        assertEquals(1, decoded)
+        // b's 8 M pixels with a's 8 M are past the one budget the decoded images and whole pixels share: all let go
+        f.pixels("b")
+        assertEquals(2, decoded)
+        val again = f.pixels("a")
+        assertEquals(3, decoded)
+        assertFalse(a === again)
     }
 
     @Test

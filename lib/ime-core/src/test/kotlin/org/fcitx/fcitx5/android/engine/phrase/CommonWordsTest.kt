@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.phrase
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.phrase.CommonWords.Kind
 import org.fcitx.fcitx5.android.engine.phrase.CommonWords.Problem
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -225,7 +226,7 @@ class CommonWordsTest {
     }
 
     @Test
-    fun aCommentTheUserWroteIsWrittenBackWhereItWas() {
+    fun aCommentTheUserWroteIsKeptAfterTheWordsRead() {
         // comments were left out before the lines kept, so a save lost them
         val r = read("# youmo-common-words 1\n# my radicals\n米字旁 米\n中国[zhong'guo]\t华\n#後\n")
         assertEquals(listOf("# my radicals", "米字旁 米", "#後"), r.words.unread)
@@ -240,6 +241,7 @@ class CommonWordsTest {
     }
 
     @Test
+    @Uat("WD-44")
     fun aReplacementTwoWordsGiveIsTakenOffBoth() {
         // it was taken off the first word only, so the candidate deleted stayed under the same key
         val words = CommonWords.of(listOf(word("木字旁", "mu'zi'pang", "木", "米"), word("米字旁", "mi'zi'pang", "米", "糸")))

@@ -232,7 +232,7 @@ Right of what is known to be in the field a step is tried alone, the steps after
 editor reports it (`reportedSelection`, `selectionSettled`), as one past the end is ignored; one
 given up (the finger back off it) or still unreported at the lift is no longer predicted
 (`forgetSelection`), one reported by then kept for the next touch's anchor. The buzz is the listener's, where the selection moved. Any other key action
-or another field (not the same one restarted, `sameVoiceField`) cancels it (a second finger); the lift (`EndSwipeSelectAction`) leaves the
+or another field (not the same one restarted, `sameField`) cancels it (a second finger); the lift (`EndSwipeSelectAction`) leaves the
 selection, the steps moved before it began still taken as it begins. A
 shortcut named in the key's bubble (`PopupAction.PreviewUpdateAction.words`) is fitted by
 `PreviewLabel`: a function key's size scaled as the keys' text (a letter's too, `engine/Popups.SYMBOL_DP`),

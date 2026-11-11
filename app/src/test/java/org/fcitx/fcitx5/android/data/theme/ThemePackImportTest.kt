@@ -298,6 +298,8 @@ class ThemePackImportTest : ThemePackFixture() {
         val clash = appContext.getString(R.string.exception_theme_name_clash)
         assertEquals(clash, refusal(zip("theme.xml" to xml(name = "pixel"))))
         assertEquals(clash, refusal(zip("theme.xml" to xml(name = "MaterialLight"))))
+        // a built-in pack's (奶油), refused also where a pack of the user's of that name hides it (BuiltinPacks.names)
+        assertEquals(clash, refusal(zip("theme.xml" to xml(name = ThemeManager.BuiltinPackNames.first()))))
         assertEquals(appContext.getString(R.string.exception_theme_pack_name, "x#dark"), refusal(zip("theme.xml" to xml(name = "x#dark"))))
         // a 3.0 theme of one's own imported over a pack: the settings would name both by it, saved as another
         opened(sample()).commit().getOrThrow()

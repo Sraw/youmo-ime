@@ -29,6 +29,7 @@ import android.view.Window
 import android.view.WindowManager
 import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputMethodSubtype
@@ -789,7 +790,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // only the side the line goes to is read: a binder call each, on the main thread
         val before = if (line == SpaceCursor.Line.Up) ic.getTextBeforeCursor(LINE_REACH, 0) else null
         val after = if (line == SpaceCursor.Line.Down) ic.getTextAfterCursor(LINE_REACH, 0) else null
-        if (!SpaceCursor.sendable(line, before, after, lineRush.rushed(line, now))) return
+        val rushed = lineRush.rushed(line, now)
+        if (!SpaceCursor.sendable(line, before, after, rushed)) {
+            val side = before ?: after
+            if (side != null && SpaceCursor.toEdge(line, before, after, rushed, whole = side.length < LINE_REACH)) {
+                // after the queued lines land: the field's start, or its end (the whole text's length)
+                val end = if (line == SpaceCursor.Line.Up) 0
+                else ic.getExtractedText(ExtractedTextRequest(), 0)?.text?.length ?: return
+                clearedText.edited()
+                ic.setSelection(end, end)
+            }
+            return
+        }
         lineRush.sent(line, now)
         clearedText.edited()
         sendDownUpKeyEvents(if (line == SpaceCursor.Line.Up) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN)

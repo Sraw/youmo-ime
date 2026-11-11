@@ -165,6 +165,9 @@ class QuickPhraseFilesTest {
         assertEquals(1, merged.keyless)
         assertEquals(listOf(bar, QuickPhraseEntry("x", "y", "｜")), merged.entries)
         assertEquals(emptyMap<QuickPhraseEntry, Long>(), QuickPhraseFiles.parseUsed(QuickPhraseFiles.USED_HEADER + "\n5\t\tx\n"))
+        // a key field of no-break spaces alone is neither key nor note: no entry, in the file nor in its times
+        assertEquals(listOf("｜"), QuickPhraseFiles.parseLines("\u00a0 blank\n｜ bar\n".encodeToByteArray()).map { it.note })
+        assertEquals(emptyMap<QuickPhraseEntry, Long>(), QuickPhraseFiles.parseUsed(QuickPhraseFiles.USED_HEADER + "\n5\t\u00a0\tx\n"))
     }
 
     // the code review of 060-quick: a computer's key with an ideographic space or a no-break space at
@@ -227,11 +230,5 @@ class QuickPhraseFilesTest {
         assertEquals(1, merged.tooLong)
         assertEquals(2, merged.duplicates)
         assertEquals(4, merged.entries.size)
-    }
-
-    @Test
-    fun aKeyFieldOfNoBreakSpacesAloneIsNoEntry() {
-        // its note read blank: a keyless entry with nothing to show was kept
-        assertEquals(listOf("｜"), QuickPhraseFiles.parseLines("\u00a0 blank\n｜ bar\n".encodeToByteArray()).map { it.note })
     }
 }

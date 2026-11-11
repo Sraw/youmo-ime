@@ -35,6 +35,17 @@ object SpaceCursor {
     }
 
     /**
+     * Whether a line [sendable] holds goes to the field's very start (end) instead: rushed lines bring the
+     * cursor onto the first (last) line ([side], read before they landed, has no more newlines than
+     * [rushed]), where the key would have gone to the start (end), and [side] was read [whole] so the
+     * start (end) is where it ends. Not at the very start (end) itself, nor with no lines rushed.
+     */
+    fun toEdge(line: Line, before: CharSequence?, after: CharSequence?, rushed: Int, whole: Boolean): Boolean {
+        val side = if (line == Line.Up) before else after
+        return whole && rushed > 0 && !side.isNullOrEmpty() && side.count { it == '\n' } <= rushed
+    }
+
+    /**
      * Lines sent a moment ago, the editor maybe not moved yet: what [sendable]'s `rushed` takes. Counted
      * one way only: a line the other way reads the side it goes to stale by fewer newlines, never more.
      */

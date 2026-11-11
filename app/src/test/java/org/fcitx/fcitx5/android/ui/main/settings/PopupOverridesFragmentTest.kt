@@ -245,6 +245,32 @@ class PopupOverridesFragmentTest {
             assertEquals(SwipeSlots.Default, slots())
         }
 
+        // the bug: the dialog focusing a way's text field by itself (a key with no long press to edit has it
+        // first) chose 文字 for it, so a command kept there became an empty text on 确定. Only typing chooses it
+        @Test
+        @Uat("ST-97")
+        fun aFocusedTextFieldKeepsTheChosenCommandUntilTypedIn() {
+            prefs.set(slotsPref, SwipeSlots.Default.with("full/q", true, SwipeSlot.Command(KeyCommand.Paste)).serialize())
+            st.activity
+            st.open(SettingsRoute.PopupOverrides)
+            keyCalled("q").performClick()
+            st.idle()
+            var dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            // 上滑's text field focused as the dialog would, then 确定 untouched
+            KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<EditText>().toList().takeLast(2).first().requestFocus()
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            st.idle()
+            assertEquals(SwipeSlot.Command(KeyCommand.Paste), slots().resolve("full/q", up = true))
+            // typed in: the text chosen
+            keyCalled("q").performClick()
+            st.idle()
+            dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<EditText>().toList().takeLast(2).first().setText("x")
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            st.idle()
+            assertEquals(SwipeSlot.Text("x"), slots().resolve("full/q", up = true))
+        }
+
         // 翻转上下滑: every key's two slots swapped, the places with them, and once more back
         @Test
         @Uat("ST-98")
@@ -300,6 +326,7 @@ class PopupOverridesFragmentTest {
         // 撤销 on the snackbar, still up after the page was left: the step is put back and nothing crashes
         // (the page, no longer there, was once redrawn and threw)
         @Test
+        @Uat("ST-98")
         fun theSnackbarsStepBackWorksAfterThePageIsLeft() {
             open()
             val page = st.page as PopupOverridesFragment
@@ -308,9 +335,15 @@ class PopupOverridesFragmentTest {
             page.findNavController().popBackStack()
             st.idle()
             assertFalse(page.isAdded)
+            // the copy read before the first unlock follows: left with the page's change, then put back
+            fun deviceCopy() = androidx.preference.PreferenceManager
+                .getDefaultSharedPreferences(st.activity.applicationContext.createDeviceProtectedStorageContext())
+                .getString(slotsPref.key, "")!!.let { if (it.isEmpty()) SwipeSlots.Default else SwipeSlots.parse(it) }
+            assertEquals(slots(), deviceCopy())
             page.undoLast()
             st.idle()
             assertEquals(SwipeSlots.Default, slots())
+            assertEquals(SwipeSlots.Default, deviceCopy())
         }
 
         // a change made elsewhere since (按键's 下滑 turned off) after a flip: 撤销 has nothing to take back, the switch

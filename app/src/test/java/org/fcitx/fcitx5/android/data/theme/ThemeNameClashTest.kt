@@ -9,6 +9,7 @@ import android.os.Environment
 import android.os.Looper
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.core.phoneStorage
@@ -300,7 +301,8 @@ class ThemeNameClashTest {
     }
 
     @Test
-    fun aThemeNamedAsABuiltInPackIsMovedOffIt() {
+    @Uat("ST-84")
+    fun aThemeNamedAsABuiltInPackClashesAsABuiltInThemeDoes() {
         // a 3.0 theme named 墨灰 (monokai's slot moved to the pack) was found before the pack, both listed
         assertTrue(ThemeManager.BuiltinPackNames.isNotEmpty())
         assertTrue(ThemeManager.BuiltinPackNames.all(clashes))

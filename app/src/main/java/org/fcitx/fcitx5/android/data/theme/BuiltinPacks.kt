@@ -44,9 +44,12 @@ object BuiltinPacks {
 
     private const val ORDER = ".order"
 
-    // "<root>|<version>" of each unpack that failed in this process: not tried again (and its folder deleted again)
-    // at every refresh of the themes, only at the next start
-    private val failedHere = HashSet<String>()
+    // "<root>|<version>" of each unpack that failed in this process, with when (System.nanoTime): not tried
+    // again (and its folder deleted again) at every refresh of the themes, only [RETRY_NANOS] later, as a
+    // full disk may have been cleared while the keyboard's process lives on
+    private val failedHere = HashMap<String, Long>()
+
+    private const val RETRY_NANOS = 10L * 60 * 1_000_000_000
 
     /**
      * Where they are unpacked: the folder whose `v4/` holds them, as the themes' does the user's. Device-protected
@@ -56,7 +59,7 @@ object BuiltinPacks {
 
     /**
      * The packs unpacked into [root] from [open]'s zips (by [FILES]' ids), unless [root] has those of [version] already; whether they are
-     * there. One that does not unpack (a full disk, or a zip the build got wrong) leaves none: tried again at the next
+     * there. One that does not unpack (a full disk, or a zip the build got wrong) leaves none: tried again ten minutes later or at the next
      * start (not at each refresh of the themes), its themes not listed. A folder gone while the stamp is there is
      * unpacked again.
      */
@@ -64,7 +67,7 @@ object BuiltinPacks {
         val stamp = File(root, STAMP)
         if (stamp.isFile && runCatching { stamp.readText() }.getOrNull() == version && placed(root)) return true
         val attempt = "${root.path}|$version"
-        if (synchronized(failedHere) { attempt in failedHere }) return false
+        if (synchronized(failedHere) { failedHere[attempt]?.let { System.nanoTime() - it < RETRY_NANOS } == true }) return false
         return try {
             root.deleteRecursively()
             val v4 = ThemePackFiles.folder(root)
@@ -112,7 +115,7 @@ object BuiltinPacks {
 
     private fun failed(root: File, attempt: String, e: Throwable): Boolean {
         Timber.w(e, "Built-in theme packs not unpacked")
-        synchronized(failedHere) { failedHere += attempt }
+        synchronized(failedHere) { failedHere[attempt] = System.nanoTime() }
         root.deleteRecursively()
         return false
     }

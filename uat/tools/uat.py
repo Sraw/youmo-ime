@@ -400,12 +400,18 @@ def _load_scripts(areas, files):
         mod = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = mod   # a script may use another's helpers (uat_13_words …)
         before = set(CASES)
+
+        def own():
+            # the cases this file defined (not those of a script it loaded for its helpers meanwhile)
+            return [cid for cid in set(CASES) - before if getattr(CASES[cid].fn, "__module__", None) == spec.name]
         try:
             spec.loader.exec_module(mod)
         except BaseException:
-            sys.modules.pop(spec.name, None)   # not cached half-done: the next load retries
+            sys.modules.pop(spec.name, None)   # not cached half-done: the next load retries,
+            for cid in own():                  # its cases defined before it failed with it, not "defined twice"
+                del CASES[cid]
             raise
-        for cid in set(CASES) - before:
+        for cid in own():
             CASES[cid].area = f[:2]
         md = parse_md(os.path.join(UAT, f[:-3] + ".md"))
         for cid in md:

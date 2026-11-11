@@ -75,6 +75,18 @@ class SkinZipTest {
     }
 
     @Test
+    fun aFinderZipOfOneFlexIsUnpackedLikeAnyOther() {
+        // the bug: Finder adds __MACOSX/._ink.flex beside ink.flex; it was counted as a second .flex, so the
+        // inner one was never unpacked and the import failed with a file-name error
+        val flex = zip("extension.json" to "{}".toByteArray(), "stylesheets/a.json" to "{}".toByteArray())
+        val finder = zip("ink.flex" to flex, "__MACOSX/._ink.flex" to byteArrayOf(0, 5, 22, 7))
+        assertEquals(setOf("extension.json", "stylesheets/a.json"), SkinZip.readSkin(finder.inputStream(), "ink.zip").keys)
+        // nor is a `._extension.json` beside it an extension of the outer ZIP's own
+        val dot = zip("ink.flex" to flex, "._extension.json" to byteArrayOf(0))
+        assertEquals(setOf("extension.json", "stylesheets/a.json"), SkinZip.readSkin(dot.inputStream(), "ink.zip").keys)
+    }
+
+    @Test
     fun namesInChineseToolsEncoding() {
         val files = SkinZip.read(zip("皮肤/名.png" to byteArrayOf(1), utf8 = false))
         assertEquals(setOf("皮肤/名.png"), files.keys)

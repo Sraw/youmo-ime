@@ -152,6 +152,11 @@ class VoiceHomophones internal constructor(
         private val pinned = HashMap<Int, String>()
         private var pinnedOf = -1
 
+        // of those, each character typed already and changed, by where it is in that text: heard and
+        // put in ("和何"); put in again wherever that character is still heard there, whatever the
+        // rest of its stretch becomes (the recognizer rewriting the tail must not turn typed text back)
+        private val pinnedChars = HashMap<Int, String>()
+
         // stretches put in, as heard and as put in: "徐静\u0000徐婧"
         private val putIn = HashSet<String>()
 
@@ -168,7 +173,7 @@ class VoiceHomophones internal constructor(
         // [settled]: how much of [text] was typed already ([VoiceLive.Heard.settled])
         private suspend fun replaceTyped(text: String, lexicon: Lexicon, settled: Int): String {
             val spans = homophones.candidates(text)
-            if (spans.isEmpty()) return text
+            if (spans.isEmpty()) return keepTyped(text, text.toCharArray())
             val ask = spans.filter { it.key !in answered }.distinctBy { it.key }
             if (ask.isNotEmpty() && !silent) {
                 val said = lexicon.allowed(ask)
@@ -186,9 +191,20 @@ class VoiceHomophones internal constructor(
                 answered[span.key] = true
                 span.word.text.toCharArray(out, from)
                 putIn += pair(span)
-                if (from < settled) pinned[from] = pair(span)
+                if (from < settled) {
+                    pinned[from] = pair(span)
+                    for (k in from until minOf(settled, span.at + span.end)) {
+                        if (text[k] != out[k]) pinnedChars[k] = "${text[k]}${out[k]}"
+                    }
+                }
                 until = span.at + span.end
             }
+            return keepTyped(text, out)
+        }
+
+        // [out] with each pinned character put in again where [text] still has it as heard
+        private fun keepTyped(text: String, out: CharArray): String {
+            for ((k, pair) in pinnedChars) if (k < text.length && text[k] == pair[0]) out[k] = pair[1]
             return String(out)
         }
 
@@ -197,6 +213,7 @@ class VoiceHomophones internal constructor(
             // a new utterance's text starts again: where the last one's were typed says nothing of it
             if (heard.utterance != pinnedOf) {
                 pinned.clear()
+                pinnedChars.clear()
                 pinnedOf = heard.utterance
             }
             val whole = replaceTyped(heard.whole, lexicon, heard.settled)

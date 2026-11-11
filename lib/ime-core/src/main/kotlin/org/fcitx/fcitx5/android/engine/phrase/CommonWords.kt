@@ -139,7 +139,7 @@ class CommonWords private constructor(
 
     /**
      * A replacement offered: its [text], and the [word] it replaces, the first listed of [words], all the words
-     * under the keys that have it (米字旁 and 米字头 both 米): deleted, it is taken off each, or it is offered still.
+     * under the keys that have it (木字旁 and 米字旁 both 米 under mzp): deleted, it is taken off each, or it is offered still.
      */
     class Found(val text: String, val word: String, val words: List<String> = listOf(word))
 
@@ -288,7 +288,8 @@ class CommonWords private constructor(
          * brackets is read as [guess] reads it (the dictionary, for those of them all at once);
          * not read so, it is skipped. Two lines of one word are one, their replacements in turn.
          * Past [MAX_WORDS] words, the rest are skipped too. The lines skipped are kept as they were
-         * ([unread]), and so is each comment but the header, all in the file's order. A word's
+         * ([unread]), and so is each comment but the header, in the file's order among themselves, written after
+         * the words read ([format]), so a comment above a word no longer sits by it. A word's
          * replacements past [MAX_REPLACEMENTS] are dropped ([clean]), not kept. A file whose header
          * says a later [VERSION] is read as none ([newer]).
          */
@@ -313,7 +314,7 @@ class CommonWords private constructor(
                 val replacements = clean(l.word, before?.replacements.orEmpty() + l.replacements)
                 words[l.word] = Word(l.word, before?.syllables ?: syllables, replacements)
             }
-            // a comment the user wrote is kept too, where it was among the lines skipped; the header is written anew
+            // a comment the user wrote is kept too, in its order among the lines skipped (all after the words read); the header is written anew
             val unread = (skipped.map { it.line to it.text } + comments(text)).sortedBy { it.first }.map { it.second }
             return Read(CommonWords(words.values.toList(), unread), skipped)
         }

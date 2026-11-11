@@ -846,6 +846,7 @@ case("WD-41", needs="jvm:LexiconUatTest.commonWordsOfOneKeyBeforeAPinNoneForAPar
 
 
 case("WD-43", needs="jvm:CommonWordsPageUatTest.whatTheKeyboardDeletedStaysDeletedThroughThePagesEdits")(lambda d: None)
+case("WD-44", needs="jvm:CommonWordsTest.aReplacementTwoWordsGiveIsTakenOffBoth")(lambda d: None)
 
 
 @case("WD-42", base="B0-设置", mutates=True)

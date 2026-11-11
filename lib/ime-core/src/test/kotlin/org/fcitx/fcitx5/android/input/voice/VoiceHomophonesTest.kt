@@ -170,13 +170,34 @@ class VoiceHomophonesTest {
     }
 
     @Test
+    fun `a character typed already stays put in when the recognizer rewrites the rest of its stretch`() {
+        val hold = homophones(added("何芮")).hold()
+        val no = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { false } }
+        val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { true } }
+        // 何 typed (settled 3); the tail heard again as 平: no stretch of the word left, 何 stays typed
+        assertEquals("好，何芮", now { hold.replace(VoiceLive.Heard("好，和瑞", 3), yes) }.whole)
+        assertEquals("好，何平", now { hold.replace(VoiceLive.Heard("好，和平", 3), no) }.whole)
+    }
+
+    @Test
+    fun `a new utterance does not keep the last one's typed stretches`() {
+        val hold = homophones(added("何芮")).hold()
+        val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { true } }
+        val no = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { false } }
+        assertEquals("好，何芮", now { hold.replace(VoiceLive.Heard("好，和瑞", 3), yes) }.whole)
+        // the next utterance has 和瑞 at the same place and the engine says no: left as heard
+        assertEquals("好，和瑞典", now { hold.replace(VoiceLive.Heard("好，和瑞典", 3, utterance = 1), no) }.whole)
+    }
+
+    @Test
     fun `a stretch is asked again only as what the dictionary reads around it changes`() {
         val hold = homophones(added("徐婧")).hold()
         var asked = 0
         val text = "徐静" + "来".repeat(11)
         // the run grows past the words that could cross 徐静: not asked again
-        now { hold.replace(text) { asked++; BooleanArray(it.size) { true } } }
-        now { hold.replace(text + "来来来") { asked++; BooleanArray(it.size) { true } } }
+        // a cache that skipped asking but put in the wrong word would pass a count alone
+        assertEquals("徐婧" + "来".repeat(11), now { hold.replace(text) { asked++; BooleanArray(it.size) { true } } })
+        assertEquals("徐婧" + "来".repeat(14), now { hold.replace(text + "来来来") { asked++; BooleanArray(it.size) { true } } })
         assertEquals(1, asked)
     }
 

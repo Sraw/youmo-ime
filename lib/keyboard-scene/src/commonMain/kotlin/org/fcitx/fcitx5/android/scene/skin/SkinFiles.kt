@@ -16,9 +16,8 @@ class SkinFiles(private val entries: Map<String, ByteArray>, private val platfor
     private var keptPixels = 0L
 
     // all of an image's pixels, by name: one copy however many times it is asked for (nothing drawn into them: a
-    // reader draws into pixels of its own), within the same bound
+    // reader draws into pixels of its own), counted in the same [keptPixels] as [images]: one bound for both
     private val whole = HashMap<String, Pixels?>()
-    private var wholePixels = 0L
 
     /** Whether an image failed to decode or was past the limits (said to the user once). */
     var imageFailed = false
@@ -49,13 +48,8 @@ class SkinFiles(private val entries: Map<String, ByteArray>, private val platfor
         if (name in images) return images[name]
         val image = platform.image(entries.getValue(name))
         if (image == null) imageFailed = true
-        val size = image?.let { it.width.toLong() * it.height } ?: 0L
-        if (keptPixels + size > SkinLimits.MAX_KEPT_PIXELS) {
-            images.clear()
-            keptPixels = 0
-        }
+        keep(image?.let { it.width.toLong() * it.height } ?: 0L)
         images[name] = image
-        keptPixels += size
         return image
     }
 
@@ -64,14 +58,19 @@ class SkinFiles(private val entries: Map<String, ByteArray>, private val platfor
         if (name == null || name !in entries) return null
         if (name in whole) return whole[name]
         val px = image(name)?.let { it.pixels(0, 0, it.width, it.height) }
-        val size = px?.let { it.width.toLong() * it.height } ?: 0L
-        if (wholePixels + size > SkinLimits.MAX_KEPT_PIXELS) {
-            whole.clear()
-            wholePixels = 0
-        }
+        keep(px?.let { it.width.toLong() * it.height } ?: 0L)
         whole[name] = px
-        wholePixels += size
         return px
+    }
+
+    // [size] more pixels kept: past [SkinLimits.MAX_KEPT_PIXELS] all those kept (decoded and whole) are let go first
+    private fun keep(size: Long) {
+        if (keptPixels + size > SkinLimits.MAX_KEPT_PIXELS) {
+            images.clear()
+            whole.clear()
+            keptPixels = 0
+        }
+        keptPixels += size
     }
 
     /** [bytes] decoded as an image (a preview not named in the skin), or null. */

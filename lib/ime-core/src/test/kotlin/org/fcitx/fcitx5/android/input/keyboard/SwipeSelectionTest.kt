@@ -33,13 +33,11 @@ class SwipeSelectionTest {
     }
 
     @Test
-    fun theFieldsEndsStopIt() {
+    fun theFieldsStartStopsIt() {
+        // to the right no read says the field ends: aShortReadAfterIsNotTheEndOfTheField covers it
         val s = begun(before = "ab", after = "c")
         assertEquals("0..2", s.move(-5).text())
         assertNull("nothing further left", s.move(-1))
-        // to the right no read says the field ends: what was read, then one past it tried
-        assertEquals("2..4", s.move(9).text())
-        assertNull("the steps after it wait for the editor", s.move(1))
     }
 
     // the bug: an app that gave less after the cursor than it has stopped the selection where the

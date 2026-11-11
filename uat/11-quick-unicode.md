@@ -89,7 +89,7 @@
 ### QU-15 [P2] 设置页加、改、删、导入导出
 - **前提**：同 QU-10，**设置 → 词库与短语 → 快速输入**。
 - **操作**：快速输入页里加一条、改它、点开它按「删除」再撤销；再加一条 `zz`，让页面上有三条，点开中间那条按「删除」，再撤销；导出再导入；再导入测试页 `fixtures/fields.html`（不是 `.mb`，一条也读不出；先 `adb push uat/fixtures/fields.html /sdcard/Download/` 放进手机「下载」），再导入一个自己写的 `.mb`，里面两行跳过：一行关键词是 31 个字母（如 `abcdefghijklmnopqrstuvwxyzabcde 内容`），一行关键词后面跟着 31 个汉字（如 `ab` 加 31 个「长」再空格、内容：汉字起的部分读成注释，超过 30 个字）。（关键词里的普通空格做不出无效行：第一个普通空格就是关键词和内容的分界，`a b 内容` 读成关键词 `a`、内容 `b 内容`；关键词里的中文或全角空格也不是：从它起读成注释。）编辑框里关键词打一个汉字。
-- **预期**：每一步键盘上马上看得到；重复的拒绝（关键词只差大小写也算）；撤销的那条回到原来的位置（中间那条撤销后仍在中间，长按「符」看栏上也在原来的位置，不跑到末尾）；导入报加了几条、跳过几条重复的（和几条超过 5000 字的）；导入 `fields.html` 立刻提示「这个文件里没有快速输入：每行是关键词、空格、内容」，列表不变；那两行跳过，提示里另说「另跳过 2 条关键词或注释太长（关键词最多 30 个字符，注释最多 30 个字）」；编辑框里关键词打了汉字，框下马上提示关键词只能是英文字母、数字和符号，点确定不存；自带表的开关关了不弹回，能再打开。
+- **预期**：每一步键盘上马上看得到；重复的拒绝（关键词只差大小写也算）；撤销的那条回到原来的位置（中间那条撤销后仍在中间，长按「符」看栏上也在原来的位置，不跑到末尾）；导入报加了几条、跳过几条重复的（和几条超过 5000 字的）；导入 `fields.html` 立刻提示「这个文件里没有快速输入：每行是关键词、空格、内容」，列表不变；那两行跳过，提示里另说「另跳过 2 条没有关键词或关键词、注释太长的（关键词最多 30 个字符，注释最多 30 个字）」；编辑框里关键词打了汉字，框下马上提示关键词只能是英文字母、数字和符号，点确定不存；自带表的开关关了不弹回，能再打开。
 - **JVM**：`QuickPhraseManagerTest`（六项，撤销放回原位并带回使用时间见 `aDeletionUndoneIsPutBackWhereItWasWithItsTimeOfUse`）；`QuickPhraseSettingsUatTest.anEntryAddedChangedFoundAndDeleted`、`aBuiltInTableTurnedOffStaysOffAndTurnsOnAgain`、`theImportToastCountsEveryLineSkipped`；关键词只许 ASCII `aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage`；文件正忙时开关连拨两次不先显示第一次 `aSwitchTurnedTwiceWhileTheFilesAreBusyNeverShowsTheFirstTurn`。
 
 ### QU-16 [P0] 条目跟着备份走
@@ -153,9 +153,9 @@
 
 ### QU-26 [P2] 快速输入的目录：分类管理，不影响打字
 - **前提**：同 QU-10，**设置 → 词库与短语 → 快速输入**。
-- **操作**：点目录条上的「＋目录」建「网址」；在「网址」里点 ＋ 加 `#wz` 注释「百度」→ www.baidu.com；点「未分类」「全部」；点开这条在编辑框里点「目录：网址」改成未分类；再建一个空目录；长按「网址」改名，先试「空的」「全部」「未分类」，再改成「站点」；在「站点」里删一条再撤销；再长按「删除目录」；导出看文件。长按「符」看栏上。
-- **预期**：新建的目录马上被选中，在它里面加的条目就放进它；点哪个目录只列它里面的，「全部」里每行右边小字写目录名；改名成已有的目录名或「全部」「未分类」时框下提示、不改；改名后条目跟着走；目录里删了再撤销，回到原来的目录；删目录前确认框说里面几条移到「未分类」，删后条目都在、目录没了；空目录也留着（导出文件里有 `【目录】名字` 一行）。键盘上的顺序和查找跟目录无关（照旧按用过的先后），挪目录不丢使用顺序。
-- **JVM**：`QuickPhraseManagerTest.foldersAreMadeRenamedAndDeletedWithNoEntryLostAndAMoveKeepsItsTime`、`QuickPhraseSettingsUatTest.aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage`、`QuickPhraseFilesTest.version2RoundTripsNotesFoldersEmptyFoldersAndKeylessOnes`、`version2ReadsCrLfLinesABomAndBarsOrFolderMarksInsideContent`；撤销放回已删掉的目录（目录重建）`QuickPhraseManagerTest.aDeletionUndoneAfterItsFolderWentPutsItBackIntoTheFolderMadeAgain`；改名撞名、叫「全部」「未分类」、目录里删了再撤销、键盘上拿着挪目录前的条目点「编辑」`QuickPhraseSettingsUatTest.aFolderNameTakenIsToldAndADeletionUndoneAndAKeyboardsEditKeepTheFolder`；设备上不跑。
+- **操作**：点目录条上的「＋目录」建「网址」；在「网址」里点 ＋ 加 `#wz` 注释「百度」→ www.baidu.com；点「未分类」「全部」；点开这条在编辑框里点「目录：网址」改成未分类；再建一个空目录；点「网址」，长按它改名，先试「空的」「全部」「未分类」「待补关键词」，再改成「站点」；在「站点」里删一条再撤销；再长按「删除目录」；导出看文件。长按「符」看栏上。
+- **预期**：新建的目录马上被选中，在它里面加的条目就放进它；点哪个目录只列它里面的，「全部」里每行右边小字写目录名；改名成已有的目录名或「全部」「未分类」「待补关键词」时框下提示、不改；改名后条目跟着走，页面仍停在改了名的「站点」上（它是选中的那个），不跳回「全部」；目录里删了再撤销，回到原来的目录；删目录前确认框说里面几条移到「未分类」，删后条目都在、目录没了；空目录也留着（导出文件里有 `【目录】名字` 一行）。键盘上的顺序和查找跟目录无关（照旧按用过的先后），挪目录不丢使用顺序。
+- **JVM**：`QuickPhraseManagerTest.foldersAreMadeRenamedAndDeletedWithNoEntryLostAndAMoveKeepsItsTime`、`QuickPhraseSettingsUatTest.aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage`、正在看的目录改名后仍停在它上 `QuickPhraseSettingsUatTest.aFolderRenamedWhileShownStaysShown`、`QuickPhraseFilesTest.version2RoundTripsNotesFoldersEmptyFoldersAndKeylessOnes`、`version2ReadsCrLfLinesABomAndBarsOrFolderMarksInsideContent`；撤销放回已删掉的目录（目录重建）`QuickPhraseManagerTest.aDeletionUndoneAfterItsFolderWentPutsItBackIntoTheFolderMadeAgain`；改名撞名、叫「全部」「未分类」、目录里删了再撤销、键盘上拿着挪目录前的条目点「编辑」`QuickPhraseSettingsUatTest.aFolderNameTakenIsToldAndADeletionUndoneAndAKeyboardsEditKeepTheFolder`；设备上不跑。
 
 ### QU-27 [P0] 升级、旧备份、旧 `.mb`：关键词里的中文转成注释，转不出关键词的列出待补
 - **前提**：0.5.x 存过 `#wz百度 www.baidu.com`、`#wz新浪 www.sina.com.cn`、`地址 北京市海淀区`（关键词开头就是中文），用过其中几条。
