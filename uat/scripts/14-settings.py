@@ -277,6 +277,143 @@ def st09(d):
 
 
 
+def push_file(d, local_path, filename):
+    """[local_path] into 下载 as [filename], scanned so the file picker lists it"""
+    d.sh(f"rm -f '/sdcard/Download/{filename}'")
+    d.adb("push", local_path, f"/sdcard/Download/{filename}")
+    # adb push keeps the file's own mtime: an old one sorts it out of the picker's recent list
+    d.sh(f"touch '/sdcard/Download/{filename}'")
+    d.sh(f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d 'file:///sdcard/Download/{filename}'")
+    time.sleep(1)
+
+
+def baidu_skin(path):
+    """a Baidu skin made here (no third party's skin in the repository): a blue panel, letters on an orange
+    face with a transparent margin (the gap between keys), named UAT 皮肤 by uat"""
+    import io
+    from PIL import Image, ImageDraw
+
+    def png(im):
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        return out.getvalue()
+
+    face = Image.new("RGBA", (162, 180), (0, 0, 0, 0))
+    ImageDraw.Draw(face).rounded_rectangle((6, 6, 155, 173), 18, fill=(250, 120, 30, 255))
+    letters = "".join(f"[KEY{i}]\nVIEW_RECT={(i % 10) * 108},{i // 10 * 150},108,150\nBACK_STYLE=1\nFORE_STYLE=3\nCENTER={c}\n"
+                      for i, c in enumerate("qwertyuiopasdfghjklzxcvbnm"))
+    files = {
+        "Info.txt": "Name=UAT 皮肤\nAuthor=uat\n",
+        "demo.png": png(Image.new("RGB", (300, 200), (30, 90, 220))),
+        "res/keys.png": png(face),
+        "res/keys.til": "[IMG1]\nSOURCE_RECT=0,0,162,180\nINNER_RECT=30,30,102,120\n",
+        "res/panel.png": png(Image.new("RGB", (108, 60), (30, 90, 220))),
+        "res/panel.til": "[IMG1]\nSOURCE_RECT=0,0,108,60\n",
+        "port/res/default.css": "[STYLE1]\nNM_IMG=keys,1\nHL_COLOR=cccccc\n[STYLE2]\nNM_COLOR=aabbcc\n"
+                                "[STYLE3]\nNM_COLOR=222222\n[STYLE4]\nNM_IMG=panel,1\n",
+        "port/gen.ini": "[PANEL]\nSIZE=1080,600\nBACK_STYLE=4\n[CAND]\nVIEW_RECT=0,0,1080,126\n",
+        "port/cand1.cnd": "[CAND]\nFORE_STYLE=3\n",
+        "port/py_26.ini": letters + "[KEY90]\nBACK_STYLE=2\nFORE_STYLE=3\nCENTER=F38\n",
+    }
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in files.items():
+            z.writestr(name, data)
+
+
+def skin_colours(d):
+    """how much of the keyboard is the skin's orange (the keys) and blue (the panel)"""
+    x0, y0, x1, y1 = kb_box(d)
+    px = list(d.png().crop((x0, y0, x1, y1)).convert("RGB").resize((60, 30)).getdata())
+    return (sum(1 for r, g, b in px if r > 200 and 90 < g < 150 and b < 70),
+            sum(1 for r, g, b in px if b > 180 and r < 70 and 60 < g < 120))
+
+
+def real_skins(d, folder):
+    """each skin in [folder] imported: one taken is shot on the 26 keys, the nine keys and the symbols, then
+    deleted; one refused, its reason shot. The pictures are for a person to look at"""
+    seen = []
+    for f in sorted(os.listdir(folder)):
+        if not f.lower().endswith((".bds", ".bdi", ".ssf", ".flex", ".zip", ".yaml")):
+            continue
+        d.step(f"真皮肤 {f}")
+        ext = f.rsplit(".", 1)[1].lower()
+        stem = f"uat-real-{len(seen)}"
+        push_file(d, os.path.join(folder, f), f"{stem}.{ext}")
+        import_theme(d, stem, confirm=False)
+        time.sleep(2)
+        s = d.screen()
+        if not any(t.startswith("导入主题") and t.endswith("？") for t in s.texts("all")):
+            d.shot("full", f"{f}：拒绝")
+            seen.append(f"{f} 拒绝")
+            d.back(after=1.0)
+            d.sh(f"rm -f /sdcard/Download/{stem}.{ext}")
+            continue
+        d.shot("full", f"{f}：确认框")
+        d.tap_text("导入", where="all", scroll=False, after=3.0)
+        appearance_tab(d, "主题")
+        item = custom_item(d)
+        check(item, f"{f} 导入后主题列表里没有它")
+        d.tap(item.c, 1.5)
+        d.open_page("text")
+        d.shot("kb", f"{f}：26 键")
+        pinyin_keyboard(d, "九键")
+        d.open_page("text")
+        d.shot("kb", f"{f}：九键")
+        pinyin_keyboard(d, "全键盘")
+        d.open_page("text")
+        s = d.screen()
+        n = s.find(text="符", where="ime") or s.find(desc="符号", where="ime")
+        if n:
+            d.tap(n.c, 0.8)
+            d.shot("kb", f"{f}：符号")
+        delete_custom(d)
+        d.sh(f"rm -f /sdcard/Download/{stem}.{ext}")
+        seen.append(f"{f} 收下")
+    return seen
+
+
+@case("ST-101", base="B0-设置", mutates=True)
+def st101(d):
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统夜间模式", False)
+    p = os.path.join(tempfile.gettempdir(), f"uat-skin-{d.port}.bds")
+    baidu_skin(p)
+    push_file(d, p, "uat-skin.bds")
+    d.step("导入皮肤")
+    import_theme(d, "uat-skin", confirm=False)
+    check(d.wait_text("导入主题 UAT 皮肤", timeout=8, where="all", contains=True), "选 .bds 没有弹出导入确认框")
+    s = d.screen()
+    texts = " ".join(s.texts("all"))
+    d.shot("full", "皮肤的确认框")
+    check("uat" in texts, "确认框里没有作者 uat")
+    check("从别的输入法的皮肤转换而来" in texts and "按键的位置和大小" in texts, f"确认框没列出没转过来的：{texts[:200]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "导入后主题列表里没有它")
+    d.tap(item.c, 1.5)
+    d.open_page("text")
+    d.shot("kb", "选用转换来的皮肤")
+    o, b = skin_colours(d)
+    check(o > 300 and b > 40, f"键盘不是皮肤的橙键蓝底（橙 {o} 蓝 {b} / 1800）")
+    d.step("坏的皮肤")
+    bad = os.path.join(tempfile.gettempdir(), f"uat-bad-{d.port}.ssf")
+    with open(bad, "wb") as out:
+        out.write(b"Skin\x03\x00" + os.urandom(2000))
+    push_file(d, bad, "uat-bad.ssf")
+    import_theme(d, "uat-bad", confirm=False)
+    check(d.wait_text("这个搜狗皮肤是加密的", timeout=8, where="all", contains=True), "选加密的 .ssf 没有说原因")
+    d.shot("full", "坏皮肤的提示")
+    d.back(after=1.0)
+    appearance_tab(d, "主题")
+    check(custom_item(d) and custom_item(d).texts()[:1] == item.texts()[:1], "选了坏皮肤后主题列表变了")
+    real = os.environ.get("UAT_SKINS")
+    extra = real_skins(d, real) if real else []
+    d.sh("rm -f /sdcard/Download/uat-skin.bds /sdcard/Download/uat-bad.ssf")
+    return f"皮肤收下、确认框列出没转过来的、选用是橙键蓝底（橙 {o} 蓝 {b}）；坏皮肤说是加密的" + \
+        (f"；真皮肤：{'、'.join(extra)}" if extra else "")
+
+
 case("ST-35", needs="jvm:SettingsMenuUatTest.themesAreImportedAndOnesOwnExportedOrDeletedFromALongPress、MonetKeyStyleTest")(lambda d: None)
 
 
