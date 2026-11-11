@@ -9,10 +9,12 @@ import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -39,7 +41,9 @@ class RemakeKeyboardsTest {
     private fun KeyboardHarness.seen(): List<Any> {
         relayout()
         val bar = KeyboardHarness.all(inputView).filter { shown(it) && it.contentDescription != null }.map { it.contentDescription.toString() to box(it) }.toList()
-        return listOf(keys().map { it.label to it.bounds }, box(inputView.findViewById<View>(R.id.code_row_text)), bar)
+        // each key's face, its marks where they are drawn included: a mark left as the old setting had it shows here
+        val keys = keys().map { k -> listOf(k.label, k.bounds, k.alt, k.drawnIcons, k.drawnTexts.map { it to k.drawn(it) }) }
+        return listOf(keys, box(inputView.findViewById<View>(R.id.code_row_text)), bar)
     }
 
     private fun fresh(chosen: ImKeyboards.Chosen): List<Any> =
@@ -109,4 +113,74 @@ class RemakeKeyboardsTest {
 
     private fun rowOf(h: KeyboardHarness): View? =
         KeyboardHarness.all(h.inputView).firstOrNull { it is org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow }
+
+    /** Changed with the keyboard hidden: shown next in a number field, then a password one, as a view made with it. */
+    @Test
+    fun changedWhileHiddenShowsAsANewViewInTheNextField() {
+        val nine = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)
+        val fields = listOf(InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        val expected = fields.map { f -> KeyboardHarness(keyboards = nine).use { it.start(f); it.seen() } }
+        KeyboardHarness(keyboards = ImKeyboards.Chosen()).use { h ->
+            h.start()
+            h.hide()
+            KeyboardHarness.setKeyboards(nine)
+            h.idle()
+            fields.forEachIndexed { i, f ->
+                h.start(f)
+                assertEquals("field $f", expected[i], h.seen())
+            }
+        }
+    }
+
+    /** Changed with a panel open (the clipboard): back on the keys, as a new view starts. */
+    @Test
+    fun changedWithAPanelOpenGoesBackToTheKeys() {
+        val expected = fresh(ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14))
+        KeyboardHarness(keyboards = ImKeyboards.Chosen()).use { h ->
+            h.start()
+            h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
+            h.after(500)
+            h.tap(h.described(h.service.getString(R.string.clipboard)))
+            h.after(500)
+            KeyboardHarness.setKeyboards(ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14))
+            h.after(500)
+            assertEquals(expected, h.seen())
+        }
+    }
+
+    /** 九键's letters and symbols edited: the nine keys as a view made with them. */
+    @Test
+    fun theNineKeysLettersAndSymbolsRemakeThem() {
+        val prefs = AppPrefs.getInstance().keyboard
+        val nine = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)
+        val letters = NineKeyLetters.of(listOf("abc", "def", "gi", "jkl", "mnoh", "pqrs", "tuv", "wxyz")).serialize()
+        try {
+            KeyboardHarness(keyboards = nine).use { h ->
+                h.start()
+                for ((pref, value) in listOf(prefs.t9Letters to letters, prefs.t9Symbols to "2 ⒉")) {
+                    pref.setValue(value)
+                    h.idle()
+                    val expected = KeyboardHarness(keyboards = nine).use { it.start(); it.seen() }
+                    assertEquals(pref.key, expected, h.seen())
+                }
+            }
+        } finally {
+            prefs.t9Letters.setValue("")
+            prefs.t9Symbols.setValue("")
+        }
+    }
+
+    /** A notice with its undo (忘记's 撤销) goes with the keyboards it was over, as with the view it was in. */
+    @Test
+    fun theUndoChipGoesWithTheKeyboards() {
+        KeyboardHarness(keyboards = ImKeyboards.Chosen()).use { h ->
+            h.start()
+            h.service.say("已忘记", UndoChip.Undo({}))
+            h.after(300)
+            assertTrue("the chip shown", h.notice() != null)
+            KeyboardHarness.setKeyboards(ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS))
+            h.after(300)
+            assertEquals(null, h.notice())
+        }
+    }
 }

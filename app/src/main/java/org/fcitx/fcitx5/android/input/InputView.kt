@@ -244,11 +244,13 @@ class InputView(
      */
     fun remakeKeyboards(info: EditorInfo?, capFlags: CapabilityFlags) {
         hold?.inputEnded(Hold.InputEnd.LEFT)
+        // as the view thrown away would have them on its detach (handleEvents off)
+        dismissPopups()
         keyboardWindow.remakeKeyboards()
         windowManager.attachWindow(KeyboardWindow)
         kawaiiBar.keyboardsRemade()
         info?.let { startInput(it, capFlags) }
-        onStartHandleFcitxEvent()
+        if (handleEvents) onStartHandleFcitxEvent()
     }
 
     /** The bar's microphone, where the user sees it now; null where not. */

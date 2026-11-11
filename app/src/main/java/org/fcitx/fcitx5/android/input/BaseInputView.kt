@@ -108,11 +108,16 @@ abstract class BaseInputView(
             } else {
                 eventHandlerJob?.cancel()
                 eventHandlerJob = null
-                // the candidate events that close it are no longer collected: its index would age unchecked
-                candidateActionMenu?.dismiss()
-                undoChip?.dismiss()
+                dismissPopups()
             }
         }
+
+    // the candidate events that close the menu are no longer collected (or the keyboards under it are made
+    // anew, InputView.remakeKeyboards): its index would age unchecked, and the chip's undo with it
+    protected fun dismissPopups() {
+        candidateActionMenu?.dismiss()
+        undoChip?.dismiss()
+    }
 
     private fun triggerCandidateAction(idx: Int, actionIdx: Int, text: String) {
         fcitx.runIfReady { triggerCandidateAction(idx, actionIdx, text) }
