@@ -16,7 +16,6 @@ import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.input.theme.SkinZip
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
-import org.fcitx.fcitx5.android.input.theme.ThemeFileName
 import org.fcitx.fcitx5.android.scene.look.KeyFill
 import org.fcitx.fcitx5.android.scene.look.KeyPressed
 import org.fcitx.fcitx5.android.scene.look.LegacyLook
@@ -24,8 +23,6 @@ import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.scene.skin.Pixels
 import org.fcitx.fcitx5.android.scene.skin.SkinConverter
-import org.fcitx.fcitx5.android.scene.skin.SkinError
-import org.fcitx.fcitx5.android.scene.skin.SkinLimits
 import org.fcitx.fcitx5.android.scene.skin.SkinNote
 import org.fcitx.fcitx5.android.scene.skin.SkinOutput
 import org.fcitx.fcitx5.android.scene.skin.SkinPlatform
@@ -622,17 +619,9 @@ object ThemeFilesManager {
      * names, then checked and offered as any pack ([openTheme]), with what did not carry over ([Opened.Pack.notes]).
      */
     fun openSkin(src: InputStream, fileName: String, themes: List<Theme> = ThemeManager.getAllThemes()): Result<Opened.Pack> =
-        runCatching {
+        SkinImport.backstop(runCatching {
             if (!writable) notSettled()
-            val conversion = try {
-                SkinConverter.convert(src.use { SkinZip.readSkin(it, fileName) }, skinCodec, ThemeFileName.base(fileName))
-            } catch (e: SkinError) {
-                // a .zip of no skin read here: most likely a theme exported under the old name (0.5.1's, upstream's)
-                if (e.reason == SkinError.Reason.UNKNOWN && ThemeFileName.isZip(fileName)) {
-                    errorRuntime(R.string.exception_theme_filename, fileName)
-                }
-                skinRefused(e)
-            }
+            val conversion = SkinImport.convert(src, fileName, skinCodec)
             unpacked { temp ->
                 val names = ArrayList<String>()
                 fun write(name: String, bytes: ByteArray) {
@@ -644,21 +633,13 @@ object ThemeFilesManager {
                 write(ThemePackFiles.THEME_XML, conversion.themeXml.encodeToByteArray())
                 for (out in conversion.files) {
                     when (out) {
-                        is SkinOutput.Image -> write(out.name, png(out))
+                        is SkinOutput.Image -> write(out.name, SkinImport.png(out, skinCodec))
                         is SkinOutput.Bytes -> write(out.name, out.bytes)
                     }
                 }
                 pack(temp, names, themes, conversion.notes)
             }
-        }.recoverCatching { e ->
-            // a backstop: the readers hold a skin to SkinLimits, but one made to get past them must not take the input
-            // method (the same process) down with it, as an Error the caller's getOrThrow would throw on would
-            when (e) {
-                is OutOfMemoryError -> skinRefused(SkinError(SkinError.Reason.UNPACKED_TOO_BIG, cause = e))
-                is StackOverflowError -> skinRefused(SkinError(SkinError.Reason.BROKEN, cause = e))
-                else -> throw e
-            }
-        }
+        })
 
     /** What decodes a skin's images and writes a converted one's: Android's, a fake's in a JVM test. */
     internal interface SkinCodec : SkinPlatform {
@@ -667,32 +648,6 @@ object ThemeFilesManager {
 
     @VisibleForTesting
     internal var skinCodec: SkinCodec = AndroidSkinCodec
-
-    // [out] as PNG; one past its bytes halved till it is not, where it may be (a picture, the preview)
-    private fun png(out: SkinOutput.Image): ByteArray {
-        var p = out.pixels
-        var bytes = skinCodec.png(p)
-        fun over() = out.shrink && bytes.size > out.maxBytes
-        while (over() && p.width * p.height > 1) {
-            p = p.resized(maxOf(1, p.width / 2), maxOf(1, p.height / 2))
-            bytes = skinCodec.png(p)
-        }
-        return bytes
-    }
-
-    private fun skinRefused(e: SkinError): Nothing = when (e.reason) {
-        SkinError.Reason.NOT_ZIP -> errorRuntime(R.string.exception_skin_not_zip)
-        SkinError.Reason.UNKNOWN -> errorRuntime(R.string.exception_skin_unknown)
-        SkinError.Reason.TOO_BIG -> errorRuntime(R.string.exception_skin_too_big, (SkinLimits.MAX_ARCHIVE_BYTES / MB).toString())
-        SkinError.Reason.TOO_MANY_FILES -> errorRuntime(R.string.exception_theme_entries, SkinLimits.MAX_ENTRIES.toString())
-        SkinError.Reason.UNPACKED_TOO_BIG -> errorRuntime(R.string.exception_skin_unpacked_too_big)
-        SkinError.Reason.ENCRYPTED -> errorRuntime(R.string.exception_skin_encrypted)
-        SkinError.Reason.UNSAFE_NAME -> errorRuntime(R.string.exception_skin_unsafe_name, e.detail)
-        SkinError.Reason.SOGOU_ENCRYPTED -> errorRuntime(R.string.exception_skin_sogou_encrypted)
-        SkinError.Reason.SOGOU_PC -> errorRuntime(R.string.exception_skin_sogou_pc)
-        SkinError.Reason.NO_KEYBOARD -> errorRuntime(R.string.exception_skin_no_keyboard)
-        SkinError.Reason.BROKEN -> errorRuntime(R.string.exception_skin_not_zip)
-    }
 
     // a folder of its own to unpack into, [use]d; gone after unless what it gives is a pack, which keeps it till taken or not
     private fun <T : Opened> unpacked(use: (File) -> T): T {
