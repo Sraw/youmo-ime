@@ -98,16 +98,24 @@ object KeyCaps {
             // the label the keyboard's, shrunk as the cap is to its key, its marks where they are there (060-pending-decisions);
             // a shortcut's key the keyboard's very key, made on its board at the keys' size, every key of the board
             // with its marks, as a mark class is sized over them all (060-render-p2 S7a)
-            keyboardKeyHeight = keyboardKeyHeight(ctx)
-            board = shortcut?.let { if (it.layout != null) board(ctx, it.name, it.layout) else board(ctx, it.name) }
-            val names = board?.let { b -> SceneLayouts.of(ctx, b.layout)?.let(SceneBoard::names) } ?: listOfNotNull(shortcut?.name)
-            // each slot where its way's 图标位置 puts it on the keyboard, a key with no shortcut too
-            val spots = swipeSpots()
-            marks = SceneMarks.settings(
-                shortcut?.slots ?: SwipeSlotsCache.current, swipeWays(), spots.symbol, spots.shortcut,
-                shortcut?.charShortcuts ?: true, names, SceneBoard.firsts(PopupOverridesCache.byName.current, names),
-            )
+            onBoard(ctx, shortcut, shortcut?.let { if (it.layout != null) board(ctx, it.name, it.layout) else board(ctx, it.name) })
         }
+
+    /**
+     * [shortcut]'s key made on [board] (none: the key alone) at the keyboard's key height, its marks as the
+     * keyboard's: the settings' caps, and what the page tells of a way drawn otherwise than set (SwipeFates).
+     */
+    internal fun SceneKeyCell.onBoard(ctx: Context, shortcut: Shortcut?, board: SceneKeyCell.Board?) {
+        keyboardKeyHeight = keyboardKeyHeight(ctx)
+        this.board = board
+        val names = board?.let { b -> SceneLayouts.of(ctx, b.layout)?.let(SceneBoard::names) } ?: listOfNotNull(shortcut?.name)
+        // each slot where its way's 图标位置 puts it on the keyboard, a key with no shortcut too
+        val spots = swipeSpots()
+        marks = SceneMarks.settings(
+            shortcut?.slots ?: SwipeSlotsCache.current, swipeWays(), spots.symbol, spots.shortcut,
+            shortcut?.charShortcuts ?: true, names, SceneBoard.firsts(PopupOverridesCache.byName.current, names),
+        )
+    }
 
     /** A qwerty key's height on the keyboard as the height settings make it now, px (InputView's keys' area, [KeyboardArea]). */
     fun keyboardKeyHeight(ctx: Context): Int =

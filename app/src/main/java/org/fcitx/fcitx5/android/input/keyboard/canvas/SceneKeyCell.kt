@@ -139,6 +139,9 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         val alts: Map<String, String> = emptyMap(),
         /** 拼音键字母大小写, its letters' faces as the keyboard's (a pinyin board's: English's never drawn here). */
         val letterCase: LetterCase = LetterCase.Shift,
+        /** The keyboard floating at this text scale, or split, where the cap stands for it so (SwipeFates); null: as [SceneEnvs.of] has it. */
+        val floating: Double? = null,
+        val split: Boolean = false,
     )
 
     var board: Board? = null
@@ -220,6 +223,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         val layout = SceneLayouts.of(context, b.layout) ?: return null
         val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(alts = b.alts, letterCase = b.letterCase), marks = marks)
             .copy(board = layout.id, keyStyle = overPack())
+            .let { if (b.floating != null || b.split) it.copy(floating = b.floating ?: it.floating, split = b.split) else it }
         return when (val s = SceneBuilder(t, env, measurer, cascades = SceneThemes.cascades(t)).build(layout.layout, layout.fragments)) {
             is Parsed.Ok -> s.value.also { v -> if (v.keys.none { it.shortcut == b.shortcut }) Timber.e("key cell: no key of %s on %s", b.shortcut, b.layout) }
             is Parsed.Failed -> null.also { Timber.e("key cell: no scene of %s: %s; nothing drawn", b.layout, s.problems) }

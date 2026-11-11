@@ -24,7 +24,12 @@ import kotlin.math.sqrt
  * font's extent, as its TextView stood: the label under it centres to it).
  */
 /** [user]: a way the user set; [text]: a text's ([MarkContent.Text]), which may step down where it has no room. */
-class MarkDrawn(val drawn: Drawn, val slot: Slot, val drop: Int, val top: Double, val user: Boolean = false, val text: Boolean = false)
+class MarkDrawn(
+    val drawn: Drawn, val slot: Slot, val drop: Int, val top: Double, val user: Boolean = false, val text: Boolean = false,
+    /** A way's: [up] the way, [fate] how it is drawn before any is left out (KeyNode.fates); null, a mark of no way the user set. */
+    val up: Boolean? = null,
+    val fate: MarkFate? = null,
+)
 
 /**
  * The classes a keyboard's glyphs are one size in (060-render-p2 S4e, KeyMarkYield.group): [Main], what
@@ -277,16 +282,23 @@ class Content(
         // the shortcuts first, the up one before the down one, then the symbols (as 0.5 listed them)
         var shortcuts = 0
         return slots.entries.sortedWith(compareBy({ it.value.symbol != null }, { !it.value.up })).mapIndexed { i, (slot, w) ->
+            var fate: MarkFate? = null
             val m = if (w.symbol != null) {
                 symbolMark(w.symbol, slot, content, looks)
             } else {
                 val drop = if (shortcuts++ == 0) KeyMarkYield.DROP_SHORTCUT else KeyMarkYield.DROP_DOWN_SHORTCUT
                 val s = w.shortcut!!
                 // a text its step down, the same whether laid out on whole pixels or not
-                shortcutMark(if (s is MarkContent.Text) rung(s, short[i] ?: 0, looks) else s, slot, drop, cell, content, looks, snap)
+                val shown = if (s is MarkContent.Text) rung(s, short[i] ?: 0, looks) else s
+                if (w.user) fate = when {
+                    shown == MarkContent.Text.SIGN -> MarkFate.Sign
+                    s is MarkContent.Text && shown is MarkContent.Text && shown.text != s.text -> MarkFate.Shortened(shown.text)
+                    else -> MarkFate.AsSet
+                }
+                shortcutMark(shown, slot, drop, cell, content, looks, snap)
             }
             val text = w.shortcut is MarkContent.Text
-            if (w.user || text) MarkDrawn(m.drawn, m.slot, m.drop, m.top, user = w.user, text = text) else m
+            if (w.user || text) MarkDrawn(m.drawn, m.slot, m.drop, m.top, user = w.user, text = text, up = w.up.takeIf { w.user }, fate = fate ?: MarkFate.AsSet.takeIf { w.user }) else m
         }
     }
 

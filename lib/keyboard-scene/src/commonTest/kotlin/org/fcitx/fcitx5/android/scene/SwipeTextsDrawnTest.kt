@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
+import org.fcitx.fcitx5.android.scene.engine.MarkFate
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import kotlin.test.Test
@@ -74,6 +75,32 @@ class SwipeTextsDrawnTest {
         assertEquals(listOf("j", SIGN), rung("full/j", KeyMarks.At.Bottom, "现在…", "现…", "compact"))
         // a step no narrower is skipped: the sign next
         assertEquals(listOf("j", SIGN), rung("full/j", KeyMarks.At.Bottom, "现在…", "现在怎么…", "split"))
+    }
+
+    @Test
+    fun eachKeySaysHowItsSetWayIsDrawn() {
+        // KeyNode.fates, what the settings page tells: each rung of eachRungAsItsRoomHasIt, and a way left out
+        fun fates(board: String, key: String, form: String, density: Double? = NARROW): Map<Boolean, MarkFate> {
+            val f = Forms.all.getValue(form)
+            val env = Forms.env(board, if (density == null) f else f.copy(density = density))
+            val marks = MarkSettings(
+                upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom,
+                shortcuts = MarkSettings.PRESET + ("$key:down" to MarkContent.Text("现在…", "现…")), user = setOf("$key:down"),
+            )
+            return Forms.scene(board, env.copy(marks = marks)).keys.first { it.shortcut == key }.fates
+        }
+        assertEquals(mapOf(false to MarkFate.AsSet), fates("qwerty", "full/j", "floating"))
+        assertEquals(mapOf(false to MarkFate.Shortened("现…")), fates("qwerty", "full/j", "split"))
+        assertEquals(mapOf(false to MarkFate.Sign), fates("qwerty", "full/j", "compact"))
+        // a way the user did not set says nothing
+        assertEquals(emptyMap(), Forms.scene("qwerty", Forms.env("qwerty", Forms.all.getValue("block"))).keys.first { it.shortcut == "full/a" }.fates)
+        // 大千 compact on a 360 dp phone: no room even for the sign on some key (NO_ROOM)
+        val env = Forms.env("zhuyin", forms.getValue("compact@360dp"))
+        val dropped = Forms.scene("zhuyin", env).keys.mapNotNull { it.shortcut }.filter { '/' in it }.any { k ->
+            val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = MarkSettings.PRESET + ("$k:down" to MarkContent.Text("现在…", "现…")), user = setOf("$k:down"))
+            Forms.scene("zhuyin", env.copy(marks = marks)).keys.first { it.shortcut == k }.fates[false] == MarkFate.Dropped
+        }
+        assertTrue(dropped, "some 大千 key leaves its set text out")
     }
 
     @Test

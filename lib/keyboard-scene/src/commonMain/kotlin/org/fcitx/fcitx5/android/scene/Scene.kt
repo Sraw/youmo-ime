@@ -105,6 +105,8 @@ class KeyNode(
     val margin: Boolean = true,
     /** How it moves between its faces (060-render-p3 A1); null: it does not, each shown at once (every theme without motion). */
     val motion: Motion? = null,
+    /** Each way the user set that it draws a mark of (true: 上滑), how it is drawn: what the settings tell of it. */
+    val fates: Map<Boolean, org.fcitx.fcitx5.android.scene.engine.MarkFate> = emptyMap(),
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)

@@ -21,11 +21,13 @@ import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
+import org.fcitx.fcitx5.android.scene.engine.MarkFate
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
@@ -204,6 +206,58 @@ class PopupOverridesFragmentTest {
                 dialog.dismiss()
                 st.idle()
             }
+        }
+
+        // the owner's 「现在怎么样了」 on j's 下滑 at 底部 (360 dp, 紧凑, one-handed): the page and the dialog say what
+        // SwipeFates works out from the keyboard as made, and nothing once a command (an icon, drawn as set) is picked.
+        // Robolectric's fonts differ by SDK (35 gives a text no width, 29 measures it: the sign upright), so what is
+        // expected is what was made; the emulator shows the notes (uat ST-106)
+        @Test
+        @Config(qualifiers = "w360dp-h780dp-xxhdpi")
+        @Uat("ST-106")
+        fun eachWaysNoteIsWhatTheKeyboardMakesOfIt() {
+            val k = AppPrefs.getInstance().keyboard
+            prefs.set(k.swipeDownPosition, KeyMarkPosition.Bottom)
+            prefs.set(k.keyboardHeightPercent, 20)
+            prefs.set(k.keyboardHeightPercentLandscape, 34)
+            prefs.set(org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.oneHanded, org.fcitx.fcitx5.android.input.keyboard.OneHanded.Right)
+            prefs.set(slotsPref, SwipeSlots.Default.with("full/j", false, SwipeSlot.Text("现在怎么样了")).serialize())
+            open()
+            val ctx = st.activity
+            val (upright, turned) = SwipeFates.of(ctx, "full/j", false, slots())
+            val note = SwipeFates.note(ctx, upright, turned)
+            val line = { n: String -> st.s(R.string.swipe_fate_key, "j", st.s(R.string.swipe_down), n) }
+            val onPage = st.texts().filter { it.startsWith(line("")) }
+            assertEquals(st.texts().toString(), listOfNotNull(note?.let(line)), onPage.toList())
+            keyCalled("j").performClick()
+            st.idle()
+            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            fun shown() = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<TextView>().filter { it.visibility == View.VISIBLE }.map { it.text.toString() }.toList()
+            if (note != null) assertTrue(shown().toString(), note in shown())
+            // 下滑 set to a command: worked out again a moment later, its icon drawn as set
+            KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<RadioButton>().toList()[5].performClick()
+            org.robolectric.shadows.ShadowLooper.idleMainLooper(1, java.util.concurrent.TimeUnit.SECONDS)
+            val notes = listOf(R.string.swipe_fate_sign, R.string.swipe_fate_dropped).map { st.s(it) }
+            assertFalse(shown().toString(), shown().any { it in notes || it.startsWith(st.s(R.string.swipe_fate_both, "", "").take(2)) })
+            // a note given is shown, none hidden
+            val section = SwipeSlotSection(ctx, "", off = false, initial = SwipeSlot.Text("x"))
+            section.note("n")
+            assertEquals("n", section.noted)
+            section.note(null)
+            assertNull(section.noted)
+        }
+
+        @Test
+        fun theNoteSaysEachRungAndBothOrientations() {
+            val ctx = st.activity
+            assertNull(SwipeFates.note(ctx, MarkFate.AsSet, null))
+            assertEquals(st.s(R.string.swipe_fate_shortened, "现…"), SwipeFates.note(ctx, MarkFate.Shortened("现…"), MarkFate.Shortened("现…")))
+            assertEquals(st.s(R.string.swipe_fate_sign), SwipeFates.note(ctx, MarkFate.Sign, MarkFate.Sign))
+            assertEquals(st.s(R.string.swipe_fate_dropped), SwipeFates.note(ctx, MarkFate.Dropped, MarkFate.Dropped))
+            assertEquals(
+                st.s(R.string.swipe_fate_both, st.s(R.string.swipe_fate_part_sign), st.s(R.string.swipe_fate_part_as_set)),
+                SwipeFates.note(ctx, MarkFate.Sign, MarkFate.AsSet),
+            )
         }
 
         // the tab, 多选 and the keys chosen kept as the page is made again (a rotation)

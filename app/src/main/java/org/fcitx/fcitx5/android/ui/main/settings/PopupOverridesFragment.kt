@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -336,7 +338,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     val slotKey = fnName?.let(SwipeSlots::functionKey) ?: key.name
                     // the long press by the key's name: a character key's, and the function keys' with a list of characters
                     val popupName = if (function) fnName?.takeIf { it in KeyShortcutPages.FUNCTION_POPUPS } else key.name
-                    val label = if (function) functionLabel(key.label) else key.label
+                    // the full keyboard's keys as its page draws them, lower-case
+            val label = if (function) functionLabel(key.label) else if (page === KeyShortcutPages.Full) key.label.lowercase() else key.label
                     val symbol = if (function) null else symbols.next()
                     // the engine's cap: a character key by its name, a function key by its own (its up and down)
                     val shortcut = KeyCaps.Shortcut(fnName ?: key.name, stored)
@@ -361,6 +364,46 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 if (!function) weightSum = page.rows.maxOf { it.size }.toFloat()
             }, lParams(matchParent) { topMargin = ctx.dp(6) }) }
         }
+        pageNotes(ctx, page, stored)
+    }
+
+    // under the keys, each way set on the page that the keyboard draws otherwise than set: 「j 下滑：画不下，键上显示为图标」
+    private fun pageNotes(ctx: Context, page: KeyShortcutPages.Page, stored: SwipeSlots) {
+        val function = page.form == KeyShortcuts.FUNCTION
+        page.rows.flatMap { if (function) it.take(1) else it }.forEach { key ->
+            val name = if (function) key.label else key.name
+            val slotKey = if (function) SwipeSlots.functionKey(key.label) else key.name
+            // the full keyboard's keys as its page draws them, lower-case
+            val label = if (function) functionLabel(key.label) else if (page === KeyShortcutPages.Full) key.label.lowercase() else key.label
+            listOf(true, false).filter { stored.isSet(slotKey, it) }.forEach { up ->
+                val (a, b) = SwipeFates.of(ctx, name, up, stored)
+                SwipeFates.note(ctx, a, b)?.let { note ->
+                    val way = getString(if (up) R.string.swipe_up else R.string.swipe_down)
+                    with(content) { add(text(ctx, getString(R.string.swipe_fate_key, label, way, note), body = false), lParams(matchParent) { topMargin = ctx.dp(6) }) }
+                }
+            }
+        }
+    }
+
+    // each way's note in the editor ([SwipeFates.note]): on opening, and again a moment after each change
+    private fun notes(ctx: Context, slotKey: String, sections: List<SwipeSlotSection>) {
+        val name = slotKey.removePrefix(SwipeSlots.functionKey(""))
+        val handler = Handler(Looper.getMainLooper())
+        val compute = Runnable {
+            var s = slots
+            sections.forEachIndexed { i, section -> section.peek()?.let { s = s.with(slotKey, i == 0, it) } }
+            sections.forEachIndexed { i, section ->
+                val (a, b) = SwipeFates.of(ctx, name, i == 0, s)
+                section.note(SwipeFates.note(ctx, a, b))
+            }
+        }
+        sections.forEach { section ->
+            section.onChange = {
+                handler.removeCallbacks(compute)
+                handler.postDelayed(compute, NOTE_DELAY_MS)
+            }
+        }
+        compute.run()
     }
 
     // each key's symbol on [page] as its keyboard draws it, in the page's order: the 14 and 18 keys'
@@ -392,6 +435,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     row.forEach { add(key(ctx, it.toString(), current), keyParams(ctx, weight = 1f)) }
                 }, lParams(matchParent) { if (i > 0) topMargin = ctx.dp(6) })
             }
+            pageNotes(ctx, KeyShortcutPages.Full, slots)
 
             add(heading(ctx, R.string.other_keys), lParams(matchParent))
             add(FlexboxLayout(ctx).apply {
@@ -536,6 +580,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             isSingleLine = true
         }
         val sections = slotKey?.let { k -> listOf(section(ctx, k, up = true), section(ctx, k, up = false)) }.orEmpty()
+        if (slotKey != null) notes(ctx, slotKey, sections)
         val layout = ctx.verticalLayout {
             val pad = ctx.dp(24)
             setPadding(pad, ctx.dp(8), pad, 0)
@@ -683,6 +728,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         // a function key's name beside its engine-drawn cap: its size, and the room after the widest
         private const val CAPTION_SP = 16f
         private const val CAPTION_GAP_DP = 12
+
+        // the notes worked out again this long after the last change (a scene each way, upright and turned)
+        private const val NOTE_DELAY_MS = 300L
 
         // the function keys' names on the page ([KeyShortcutPages.FUNCTION_KEYS])
         internal val FunctionLabels = mapOf(

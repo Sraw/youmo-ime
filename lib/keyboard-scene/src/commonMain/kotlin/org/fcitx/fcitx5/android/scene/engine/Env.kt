@@ -223,6 +223,18 @@ sealed interface MarkContent {
 }
 
 /**
+ * How a way the user set is drawn on its key ([org.fcitx.fcitx5.android.scene.KeyNode.fates]): as it is set ([AsSet], a
+ * long text as the app gives it, two characters and 「…」), a step down where it has no room ([Shortened] to its
+ * first character and 「…」, the two-line [Sign]), or not at all ([Dropped]): what the settings say of it.
+ */
+sealed interface MarkFate {
+    data object AsSet : MarkFate
+    data class Shortened(val text: String) : MarkFate
+    data object Sign : MarkFate
+    data object Dropped : MarkFate
+}
+
+/**
  * The marks' settings (rules B §7, 060-swipe-slots): every key has an up and a down way, each drawn
  * at its place ([upAt], [downAt]) where that way is on ([upOn], [downOn]), by [shortcuts]' names, the
  * layout's `shortcut=` and the way: `full/a:up`, `space:down`. A character key with no name there
