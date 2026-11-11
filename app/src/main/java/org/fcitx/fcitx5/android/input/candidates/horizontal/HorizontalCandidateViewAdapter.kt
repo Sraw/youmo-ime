@@ -9,7 +9,6 @@ import android.annotation.SuppressLint
 import android.view.ViewGroup
 import androidx.annotation.CallSuper
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.flexbox.FlexboxLayoutManager
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.CandidateSpacing
@@ -52,7 +51,7 @@ open class HorizontalCandidateViewAdapter(val theme: Theme, val bar: BarLook) :
         ui.root.apply {
             minimumWidth = dp(CandidateSpacing.TOUCH_FLOOR_DP)
             SceneBar.padding(context, ui.bar).let { (left, right) -> setPadding(left, 0, right, 0) }
-            layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, matchParent)
+            layoutParams = RecyclerView.LayoutParams(wrapContent, matchParent)
         }
         return CandidateViewHolder(ui)
     }

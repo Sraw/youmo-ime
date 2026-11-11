@@ -8,9 +8,7 @@ package org.fcitx.fcitx5.android.input.candidates.horizontal
 import android.graphics.Color
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
-import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.flexbox.FlexboxLayoutManager
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -51,24 +49,12 @@ class HorizontalCandidateComponent :
 
     private val fillStyle by AppPrefs.getInstance().keyboard.horizontalCandidateStyle
 
-    private var layoutMinWidth = 0
-    private var layoutFlexGrow = 1f
-
     // English is typed: its words in three slots, as Gboard has them (the word typed, then the likeliest two)
     private var english = false
 
     override fun onImeUpdate(ime: InputMethodEntry) {
         english = ime.uniqueName == InputMethodNames.KEYBOARD
     }
-
-    /**
-     * (for [HorizontalCandidateMode.AutoFillWidth] only)
-     * Each candidate takes its natural width, so as many fit as their text allows, and they are bound
-     * stretched (flexGrow 1) to fill the small leftover beside ⌄. Only a short list that fits whole
-     * ([CandidateSpacing.stretches] false) needs a second pass, back to natural width.
-     */
-    private var secondLayoutPassNeeded = false
-    private var secondLayoutPassDone = false
 
     // Since expanded candidate window is created once the expand button was clicked,
     // we need to replay the last offset
@@ -91,10 +77,6 @@ class HorizontalCandidateComponent :
         object : HorizontalCandidateViewAdapter(theme, barLook) {
             override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
                 super.onBindViewHolder(holder, position)
-                holder.itemView.updateLayoutParams<FlexboxLayoutManager.LayoutParams> {
-                    minWidth = layoutMinWidth
-                    flexGrow = layoutFlexGrow
-                }
                 holder.itemView.setOnClickListener {
                     fcitx.launchOnReady(holder.pick())
                 }
@@ -112,33 +94,8 @@ class HorizontalCandidateComponent :
         }
     }
 
-    val layoutManager: FlexboxLayoutManager by lazy {
-        object : FlexboxLayoutManager(context) {
-            override fun canScrollVertically() = false
-            override fun canScrollHorizontally() = false
-            override fun onLayoutCompleted(state: RecyclerView.State) {
-                super.onLayoutCompleted(state)
-                val cnt = this.childCount
-                if (secondLayoutPassNeeded) {
-                    if (!CandidateSpacing.stretches(cnt, adapter.total)) {
-                        // update LayoutParams in onLayoutCompleted would trigger another
-                        // onLayoutCompleted, skip the second one to avoid infinite loop
-                        if (secondLayoutPassDone) return
-                        secondLayoutPassDone = true
-                        for (i in 0 until cnt) {
-                            getChildAt(i)!!.updateLayoutParams<LayoutParams> {
-                                flexGrow = 0f
-                            }
-                        }
-                    } else {
-                        secondLayoutPassNeeded = false
-                    }
-                }
-                refreshExpanded(cnt)
-            }
-            // no need to override `generate{,Default}LayoutParams`, because HorizontalCandidateViewAdapter
-            // guarantees ViewHolder's layoutParams to be `FlexboxLayoutManager.LayoutParams`
-        }
+    val layoutManager by lazy {
+        CandidateRowLayoutManager().apply { onLaidOut = ::refreshExpanded }
     }
 
     // the theme's candidates (T6a): the line between them, the room beside it
@@ -170,31 +127,22 @@ class HorizontalCandidateComponent :
         val candidates = data.candidates
         val total = data.total
         if (english) {
-            layoutMinWidth = view.width / ENGLISH_SLOTS - dividerDrawable.intrinsicWidth - gap
+            layoutManager.minWidth = view.width / ENGLISH_SLOTS - dividerDrawable.intrinsicWidth - gap
             // fewer words keep their slots, not the whole bar
-            layoutFlexGrow = if (candidates.size < ENGLISH_SLOTS) 0f else 1f
-            secondLayoutPassNeeded = false
-        } else when (fillStyle) {
-            NeverFillWidth -> {
-                layoutMinWidth = 0
-                layoutFlexGrow = 0f
-                secondLayoutPassNeeded = false
-            }
-            AutoFillWidth -> {
-                layoutMinWidth = 0
-                layoutFlexGrow = 1f
-                // a pass is needed only when every word may fit: then they unstretch
-                secondLayoutPassNeeded = !CandidateSpacing.stretches(candidates.size, total)
-                secondLayoutPassDone = false
-            }
-            AlwaysFillWidth -> {
-                layoutMinWidth = 0
-                layoutFlexGrow = 1f
-                secondLayoutPassNeeded = false
+            val grows = candidates.size >= ENGLISH_SLOTS
+            layoutManager.grows = { grows }
+        } else {
+            layoutManager.minWidth = 0
+            layoutManager.grows = when (fillStyle) {
+                NeverFillWidth -> { _ -> false }
+                // each word its natural width, as many as fit, stretched over the small leftover beside ⌄
+                // only when more wait behind it: a short list that fits whole stays packed
+                AutoFillWidth -> { shown -> CandidateSpacing.stretches(shown, total) }
+                AlwaysFillWidth -> { _ -> true }
             }
         }
         adapter.updateCandidates(candidates, total)
-        // not sure why empty candidates won't trigger `FlexboxLayoutManager#onLayoutCompleted()`
+        // an empty list told at once, as before: the layout after it may wait for the next frame
         if (candidates.isEmpty()) {
             refreshExpanded(0)
         }

@@ -9,7 +9,6 @@ import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.flexbox.FlexboxLayoutManager
 
 /** The lines between candidates in a row, [gap] px more room beside each (the bar's, a theme's `gap`). */
 class FlexboxVerticalDecoration(val drawable: Drawable, private val gap: Int = 0) : RecyclerView.ItemDecoration() {
@@ -23,8 +22,7 @@ class FlexboxVerticalDecoration(val drawable: Drawable, private val gap: Int = 0
     }
 
     override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
-        val layoutManager = parent.layoutManager as FlexboxLayoutManager
-        for (i in 0 until layoutManager.childCount) {
+        for (i in 0 until (parent.layoutManager?.childCount ?: 0)) {
             val view = parent.getChildAt(i)
             drawTrailingDivider(c, parent, view, drawable, gap)
         }

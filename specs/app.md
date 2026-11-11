@@ -347,7 +347,9 @@ keys; a look that made no theme the same of its colours (`SceneBar.plain`). A ca
 to half the box's shorter side, while `GradientDrawable` (Skia's round rect) keeps them as written unless two on one side add
 up to more than it, then scales all down together; so a corner over half the height but not over the side is rounder on the phone
 than in the preview (060-render-p3 T6a review L3, kept: the same where every corner fits, as every built-in theme's do). `gap` widens
-the horizontal bar's room between two (the line in its middle, `FlexboxVerticalDecoration`); a
+the horizontal bar's room between two (the line in its middle, `FlexboxVerticalDecoration`); the bar's one row is laid out
+by `CandidateRowLayoutManager` (as many as fit, then the leftover shared: FlexboxLayoutManager's first line to the pixel,
+without its lines or caches, the most of a key's layout while typing; 060-perf-cands), the expanded window keeps Flexbox; a
 transparent divider draws nothing but keeps its room. `label-style` (number: 1 2 3 of the whole list,
 the expanded grid's numbers going on from the bar's; dot: •; none, the default) stands before the
 words, a space after it; the hardware keyboard's window, whose default is fcitx's own label, shows
