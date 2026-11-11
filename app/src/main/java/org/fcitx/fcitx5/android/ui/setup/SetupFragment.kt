@@ -26,7 +26,10 @@ class SetupFragment : Fragment() {
     // 以前用过？从备份恢复 (U-106): the file picked and restored here, the settings not reached
     // before the setup is done (review-E-ui M1); fcitx run for it alone, until the page goes
     private var fcitx: HostConnection? = null
-    private val restore = LearningRestore(this, { fcitx ?: HostDaemon.connect(javaClass.name).also { fcitx = it } })
+
+    // a name of this page's own: the page made anew connects before the old one goes and disconnects
+    private val clientName = "${javaClass.name}@${System.identityHashCode(this)}"
+    private val restore = LearningRestore(this, { fcitx ?: HostDaemon.connect(clientName).also { fcitx = it } })
     private lateinit var pickBackup: ActivityResultLauncher<Array<String>>
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,7 +38,7 @@ class SetupFragment : Fragment() {
     }
 
     override fun onDestroy() {
-        if (fcitx != null) HostDaemon.disconnect(javaClass.name)
+        if (fcitx != null) HostDaemon.disconnect(clientName)
         fcitx = null
         super.onDestroy()
     }

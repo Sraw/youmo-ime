@@ -19,13 +19,17 @@ class MainViewModel : ViewModel() {
 
     val toolbarButton = MutableLiveData(ButtonMode.NONE)
 
-    val fcitx: HostConnection = HostDaemon.connect(javaClass.name)
+    // a name of this model's own: an activity made anew (a CLEAR_TASK start) gets its model before
+    // the old one is cleared, and a shared name would disconnect the new one with the old
+    private val clientName = "${javaClass.name}@${System.identityHashCode(this)}"
+
+    val fcitx: HostConnection = HostDaemon.connect(clientName)
 
     fun setToolbarTitle(title: String) {
         toolbarTitle.value = title
     }
 
     override fun onCleared() {
-        HostDaemon.disconnect(javaClass.name)
+        HostDaemon.disconnect(clientName)
     }
 }
