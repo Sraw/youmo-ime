@@ -234,7 +234,7 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 | `icon-color` | 颜色：图标的颜色 |
 | `press` | 按下效果：`tint`、`ripple`、`face` |
 | `padding` | 候选的内边距，写法同 `inset` |
-| `align` | 键上主字的位置：`center`、`top-left`、`top-center`（写在 `label` 部位上） |
+| `align` | 键上主字的位置：`center`、`top-left`、`top-center`（写在 `label` 部位上）。`top-left` 离左边 4dp，键有圆角时再往里缩到圆弧以内（圆角 50% 的圆键也不出圈） |
 | `letter-spacing` | 字距，-0.1em–0.5em |
 | `stroke` | 字的描边：`宽度 颜色`，宽度 0–3dp |
 | `text-shadow` | 字的阴影，写法同 `shadow` |

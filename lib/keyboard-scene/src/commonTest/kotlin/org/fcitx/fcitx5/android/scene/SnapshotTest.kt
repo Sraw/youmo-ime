@@ -116,6 +116,8 @@ object Shots {
         listOf(
             Shot("qwerty-align-top-left", "qwerty", block, styled("<style select=\"key\" align=\"top-left\"/>")),
             Shot("qwerty-align-top-center", "qwerty", block, styled("<style select=\"key\" align=\"top-center\"/>")),
+            // round keys (radius 50%): the glyph in from the corner's arc, not out in the box's corner
+            Shot("nine-align-top-left-round", "nine", Forms.env("nine", Forms.block), styled("<style select=\"key\" align=\"top-left\" radius=\"50%\"/>")),
             Shot("qwerty-letter-spacing", "qwerty", block, styled("<style select=\"key\" letter-spacing=\"0.2em\"/>")),
             Shot(
                 "qwerty-stroke-shadow", "qwerty", block,

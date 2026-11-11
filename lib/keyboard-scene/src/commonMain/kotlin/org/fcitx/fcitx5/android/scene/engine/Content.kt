@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.scene.rules.KeyTextScale
 import org.fcitx.fcitx5.android.scene.theme.Shown
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.Values
+import kotlin.math.sqrt
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -81,7 +82,7 @@ class Looks(private val of: (Part) -> TextLook) {
  * a side where it is wider (AutoScaleTextView's Proportional), each line centred.
  *
  * A theme's text look (060-render-p3 T4a): `align` puts the glyph (a label, a badge and its label, an
- * icon alone) at the face's top left ([SYMBOL_SIDE_DP] in, as the symbol in its corner) or its top
+ * icon alone) at the face's top left ([SYMBOL_SIDE_DP] in, as the symbol in its corner, and clear of a rounded corner's arc) or its top
  * instead of its middle, by the same box; `letter-spacing` sets characters apart, measured; `font-han`
  * and `font-latin` set each script's run in its own font ([Scripts]), measured run by run;
  * `space-content` and `return-icon-<action>` give the space and Return a text, an icon or nothing of
@@ -109,7 +110,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         val badge = key.badge
         val cy = if (below != null) (content.top + below.top) / 2 else content.centerY
         val align = looks.label.align.takeIf { !roots && (label == null || icon == null) } ?: Values.CENTER
-        val (glyph, anchor) = glyph(badge, measured, label, icon, roots, Placing(content, cy, align, looks.label))
+        val (glyph, anchor) = glyph(badge, measured, label, icon, roots, Placing(content, cy, align, looks.label, corner(content, face)))
         val room = content.inset(ROOM_H_DP * d, ROOM_V_DP * d, ROOM_H_DP * d, ROOM_V_DP * d)
         // by the key's kind (a layout's or a theme's own keys fall in by theirs) and what it shows: a function
         // key's text (符, 分词, the , . beside the space, a number pad's + -) is a function key's, whatever it types
@@ -159,13 +160,21 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
     }
 
     /** Where a key's glyph goes: centred at ([content]'s middle, [cy]), or as [align] has it in [content]. */
-    private class Placing(val content: Box, val cy: Double, val align: String, val look: TextLook)
+    private class Placing(val content: Box, val cy: Double, val align: String, val look: TextLook, val corner: Double = 0.0)
+
+    // how far a top-left glyph stays in from the face's top-left arc each way (where the arc crosses its
+    // 45° line): a rounded face's corner (a 50% radius's circle) does not cut it off
+    private fun corner(content: Box, face: FaceGeometry?): Double {
+        val r = (face?.pressed as? Shape.Rect)?.takeIf { it.box == content }?.radii?.get(0) ?: return 0.0
+        return minOf(r, minOf(content.width, content.height) / 2) * (1 - sqrt(0.5))
+    }
 
     // the middle of a box [w]×[h] placed as [p] has it, and where it stays (an aligned glyph's corner or top's middle)
     private fun placed(p: Placing, w: Double, h: Double): Pair<Pair<Double, Double>, Pair<Double, Double>?> = when (p.align) {
         Values.TOP_LEFT -> {
-            val left = p.content.left + SYMBOL_SIDE_DP * d
-            (left + w / 2 to p.content.top + h / 2) to (left to p.content.top)
+            val left = p.content.left + maxOf(SYMBOL_SIDE_DP * d, p.corner)
+            val top = p.content.top + p.corner
+            (left + w / 2 to top + h / 2) to (left to top)
         }
         Values.TOP_CENTER -> (p.content.centerX to p.content.top + h / 2) to (p.content.centerX to p.content.top)
         else -> (p.content.centerX to p.cy) to null

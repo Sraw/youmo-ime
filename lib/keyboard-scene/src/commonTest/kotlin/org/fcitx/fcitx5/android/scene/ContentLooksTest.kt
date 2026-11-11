@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Content
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.Part
 import org.fcitx.fcitx5.android.scene.engine.Scripts
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
@@ -17,6 +18,7 @@ import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -44,12 +46,21 @@ class ContentLooksTest {
     fun alignPutsTheGlyphAtTheFacesTop() {
         val left = Fixtures.scene(env, theme = styled("<style select=\"key\" align=\"top-left\"/>"))
         val q = texts(left, "q").first { it.text == "q" }
-        // its box (a character's ink across, the font's extent up) in the corner, 4 dp in as the symbol's
+        // its box (a character's ink across, the font's extent up) in the corner, 4 dp in as the symbol's,
+        // down clear of the corner's 4 dp arc (where it crosses its 45° line)
+        val arc = 4 * d * (1 - sqrt(0.5))
         near(face(left, "q").left + Content.SYMBOL_SIDE_DP * d, q.x + 0.05 * q.size, "the ink's left")
-        near(face(left, "q").top, q.baseline - 1.05 * q.size, "the extent's top")
+        near(face(left, "q").top + arc, q.baseline - 1.05 * q.size, "the extent's top")
         val shift = icons(left, "shift").single()
         near(face(left, "shift").left + Content.SYMBOL_SIDE_DP * d, shift.box.left)
-        near(face(left, "shift").top, shift.box.top)
+        near(face(left, "shift").top + arc, shift.box.top)
+        // a round face (radius 50%): the glyph's corner on its arc, not out in the box's corner
+        val round = Fixtures.scene(env, theme = styled("<style select=\"key\" align=\"top-left\" radius=\"50%\"/>"))
+        val f = face(round, "q")
+        val r = (round.keys.first { it.id == "q" }.shape as Shape.Rect).radii[0]
+        val rq = texts(round, "q").first { it.text == "q" }
+        near(f.left + r * (1 - sqrt(0.5)), rq.x + 0.05 * rq.size, "round: the ink's left")
+        near(f.top + r * (1 - sqrt(0.5)), rq.baseline - 1.05 * rq.size, "round: the extent's top")
         // centred across at the top: the glyph stays put, the class smaller about its top, its marks clear of it
         val centre = Fixtures.scene(env, theme = styled("<style select=\"key\" align=\"top-center\"/>"))
         for (id in listOf("q", "y", "a")) {
@@ -268,5 +279,15 @@ class ContentLooksTest {
         )
         for ((id, want, why) in rows) assertEquals(want, icons(shortcut, id).map { it.name }, "$id: $why")
         assertEquals(texts(plain, "y"), texts(shortcut, "y"), "the symbol is the mark part, kept")
+    }
+
+    @Test
+    fun aHiddenShortcutIsLeftOutOnTheNineKeyToo() {
+        val nine = Forms.env("nine", env).let { it.copy(marks = it.marks.copy(shortcuts = it.marks.shortcuts + ("t9/2:down" to MarkContent.Icon("content-copy")))) }
+        val plain = Forms.scene("nine", nine, styled())
+        assertEquals(listOf("content-copy"), icons(plain, "2").map { it.name }, "the fixture's 2 has a shortcut")
+        val hidden = Forms.scene("nine", nine, styled("<style select=\"key shortcut\" hidden=\"true\"/>"))
+        assertEquals(emptyList(), icons(hidden, "2").map { it.name })
+        assertEquals(texts(plain, "2"), texts(hidden, "2"), "its letters and digit kept")
     }
 }
