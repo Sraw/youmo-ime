@@ -666,6 +666,8 @@ object ThemeFilesManager {
     private fun packClash(staged: ThemePackFiles.Staged, themes: List<Theme>) {
         val builtins = themes.filterIsInstance<Theme.Builtin>().ifEmpty { ThemeManager.BuiltinThemes }
         if (ThemePackFiles.builtinClash(staged.name, staged.theme.variants, builtins)) errorRuntime(R.string.exception_theme_name_clash)
+        // a built-in pack's name (BuiltinPacks): the app's
+        if (ThemeManager.BuiltinPackThemes.any { it.file == staged.name }) errorRuntime(R.string.exception_theme_name_clash)
     }
 
     // the theme 3.0 json among [extracted] (an older one's too) imported with its files ([importTheme])
@@ -685,7 +687,7 @@ object ThemeFilesManager {
         // first that is none of those nor a json here (pending L463: a 0.5 export of `monokai` always comes back;
         // the app cannot rename a theme, nor can its user the file)
         val packs = themes.filterIsInstance<Theme.Pack>()
-        fun taken(name: String) = BuiltinThemeFiles.find(ThemeManager.BuiltinThemes, name) != null || name in BuiltinThemeFiles.LEGACY ||
+        fun taken(name: String) = BuiltinThemeFiles.find(ThemeManager.BuiltinThemes, name) != null || BuiltinThemeFiles.moved(name) != null ||
             BuiltinThemeFiles.find(packs, name) != null || packs.any { it.file == name }
         // a name a renamed one may take: none of those, no theme listed, no json here
         fun free(name: String) = !taken(name) && themes.none { it.name == name } && !File(dir, "$name.json").exists()

@@ -211,7 +211,7 @@ def delete_custom(d):
 @case("ST-09", base="B0-设置", mutates=True)
 def st09(d):
     appearance_tab(d, "大小与样式")
-    d.switch("跟随系统夜间模式", False)
+    d.switch("跟随系统深色模式", False)
     # the default to come back to, seen now: with 跟随 off it is the normal-mode theme's default
     # (PixelDark), not the light one (lum > 150) 跟随 on would give
     d.open_page("text")
@@ -280,7 +280,7 @@ def st09(d):
 case("ST-35", needs="jvm:SettingsMenuUatTest.themesAreImportedAndOnesOwnExportedOrDeletedFromALongPress、MonetKeyStyleTest")(lambda d: None)
 
 
-case("ST-36", needs="jvm:SettingsMenuUatTest.followingTheSystemAThemeTappedAsks")(lambda d: None)
+case("ST-36", needs="jvm:SettingsMenuUatTest.followingTheSystemAThemeTappedTakesBothSlots、ThemeSlotsTest")(lambda d: None)
 
 
 case("ST-10", needs="jvm:SettingsEffectUatTest.keyboardHeightFollowsTheSetting")(lambda d: None)
@@ -769,7 +769,7 @@ def push_layouts_pack(d):
 def st72(d):
     from uat import gear
     appearance_tab(d, "大小与样式")
-    d.switch("跟随系统夜间模式", False)
+    d.switch("跟随系统深色模式", False)
     push_layouts_pack(d)
     d.step("导入")
     import_theme(d, "uat-layouts", confirm=False)
@@ -833,7 +833,7 @@ def reds(d, c, r=60):
 @case("ST-90", base="B0-设置", mutates=True, visual=True)
 def st90(d):
     appearance_tab(d, "大小与样式")
-    d.switch("跟随系统夜间模式", False)
+    d.switch("跟随系统深色模式", False)
     push_icons_pack(d)
     d.step("导入")
     import_theme(d, "uat-sounds-icons")
@@ -1038,3 +1038,7 @@ case("ST-99", needs="jvm:PopupOverridesFragmentTest$Dialog.selectedKeysAreSetAtO
 
 case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
 
+
+
+case("ST-101", needs="manual:逐个点新内置主题看键盘、动态背景、按键音；列表与不能删由 BuiltinPacksTest 查")(lambda d: None)
+case("ST-102", needs="manual:要先装 0.6.0 测试版选 Nord/Deep Blue/Monokai 再覆盖安装；迁移由 ThemePrefsMigrationTest 查")(lambda d: None)

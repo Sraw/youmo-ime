@@ -61,6 +61,22 @@ object ThemeManager {
     // listing clears what a kill left of a save first
     private var packs: List<Theme.Pack> = ThemeFilesManager.listPacks(builtinThemes)
 
+    // the built-in themes that are packs (BuiltinPacks), unpacked once a version; after the user's, whose
+    // one of the same name (imported before it was built in) is shown instead
+    private var builtinPacks: List<Theme.Pack> = listBuiltinPacks()
+
+    // unpacked again where they are gone (a stamp read else), then listed
+    private fun listBuiltinPacks(): List<Theme.Pack> = BuiltinPacks.dir(appContext).let { root ->
+        BuiltinPacks.unpack(root) { BuiltinPacks.open(appContext, it) }
+        BuiltinPacks.list(root, builtinThemes, packs.mapTo(HashSet()) { it.file })
+    }
+
+    /** The built-in packs, each version one ([BuiltinPacks]). */
+    val BuiltinPackThemes: List<Theme.Pack> get() = builtinPacks
+
+    // the user's packs and the built-in ones: a version's other, the system's version, found among both
+    private val allPacks get() = packs + builtinPacks
+
     /** The user's theme 4.0 packs, each version one ([Theme.Pack]). */
     val Packs: List<Theme.Pack> get() = packs
 
@@ -170,15 +186,19 @@ object ThemeManager {
         var changed = false
         val themes = ThemeFilesManager.moveClashing(
             ThemeFilesManager.listThemes(prefs.legacyLook()),
-            clashes = { BuiltinThemeFiles.find(builtinThemes, it) != null },
+            clashes = ::clashesBuiltin,
             // written quietly, as finishReplacements' are: the theme in use read once the list has the moved one
             repoint = { from, to -> quietly { prefs.renameThemeRefs(from, to) }.also { changed = changed || it } },
         )
         val customs = themes.mapTo(HashSet()) { it.name }
-        customs += ThemeFilesManager.mayHoldThemes(BuiltinThemeFiles.LEGACY.keys)
+        customs += ThemeFilesManager.mayHoldThemes(BuiltinThemeFiles.LEGACY.keys + BuiltinThemeFiles.RETIRED.keys)
         if (prefs.migrateThemeRefs(customs)) changed = true
         return themes to changed
     }
+
+    /** Whether a theme of the user's named [name] would hide a built-in theme, or a dropped one's name ([BuiltinThemeFiles.RETIRED]). */
+    @VisibleForTesting
+    internal fun clashesBuiltin(name: String) = BuiltinThemeFiles.find(builtinThemes, name) != null || name in BuiltinThemeFiles.RETIRED
 
     /**
      * The theme [name] refers to: the user's 3.0 theme of that name, else a pack's version ([BuiltinThemeFiles.find]:
@@ -186,11 +206,14 @@ object ThemeManager {
      * [ThemePrefs.migrateThemeRefs]); null where none is.
      */
     fun getTheme(name: String): Theme? =
-        customThemes.find { it.name == name } ?: BuiltinThemeFiles.find(packs, name) ?: BuiltinThemeFiles.find(builtinThemes, name)
-            ?: BuiltinThemeFiles.LEGACY[name]?.let { BuiltinThemeFiles.find(builtinThemes, it) }
+        customThemes.find { it.name == name } ?: BuiltinThemeFiles.find(packs, name) ?: builtinRef(name)
+            ?: BuiltinThemeFiles.moved(name)?.let(::builtinRef)
 
-    /** The user's packs, the user's 3.0 themes, the built-in ones. */
-    fun getAllThemes(): List<Theme> = packs + customThemes + builtinThemes
+    // a built-in theme's or built-in pack's
+    private fun builtinRef(ref: String): Theme? = BuiltinThemeFiles.find(builtinThemes, ref) ?: BuiltinThemeFiles.find(builtinPacks, ref)
+
+    /** The user's packs, the user's 3.0 themes, the built-in ones, the built-in packs. */
+    fun getAllThemes(): List<Theme> = packs + customThemes + builtinThemes + builtinPacks
 
     // Monet's versions read again with the system's colours as they are now (and its keys' look as it is);
     // whether the packs were (the system's colours changed: a configuration's other changes leave them be)
@@ -204,6 +227,7 @@ object ThemeManager {
         // the packs' system() too: each read again (a copy reads its file anew)
         ThemePackFiles.systemColors = colors
         packs = packs.map { it.copy() }
+        builtinPacks = builtinPacks.map { it.copy() }
         return true
     }
 
@@ -215,6 +239,7 @@ object ThemeManager {
         customThemes.clear()
         customThemes.addAll(themes)
         packs = ThemeFilesManager.listPacks()
+        builtinPacks = listBuiltinPacks()
         val renamed = finishReplacements() or repoint()
         packsListed()
         // the copy for before the first unlock names what this one does (the start syncs it after init)
@@ -323,7 +348,8 @@ object ThemeManager {
      * by name else.
      */
     fun deleteTheme(theme: Theme): Boolean = when (theme) {
-        is Theme.Pack -> deleteTheme(theme.name, ofCustom = false, ofPack = true)
+        // the app's: never deleted (no action offers it)
+        is Theme.Pack -> !theme.builtin && deleteTheme(theme.name, ofCustom = false, ofPack = true)
         is Theme.Custom -> deleteTheme(theme.name, ofCustom = true, ofPack = false)
         else -> deleteTheme(theme.name)
     }
@@ -419,18 +445,18 @@ object ThemeManager {
     /**
      * The version of [theme] the system's dark mode asks for, where [theme] is a version of an imported pack that
      * has both (`variants="light dark"`: one theme following the system, docs/theme-format.md), whatever the slot
-     * naming it and 跟随系统夜间模式; else [theme]. The built-in pairs keep the version a slot names (pending L189:
+     * naming it and 跟随系统深色模式; else [theme]. The built-in pairs keep the version a slot names (pending L189:
      * one not following the system sees what he saw before 0.6.0).
      */
     private fun systemVersion(theme: Theme): Theme {
         if (theme !is Theme.Pack || theme.isDark == isDarkMode) return theme
-        return packs.firstOrNull { it.file == theme.file && it.isDark == isDarkMode } ?: theme
+        return allPacks.firstOrNull { it.file == theme.file && it.builtin == theme.builtin && it.isDark == isDarkMode } ?: theme
     }
 
     /** The versions of [theme] where it is a pack's that has both, light first; else null ([systemVersion]). */
     fun packPair(theme: Theme): Pair<Theme.Pack, Theme.Pack>? {
         if (theme !is Theme.Pack) return null
-        val versions = packs.filter { it.file == theme.file }
+        val versions = allPacks.filter { it.file == theme.file && it.builtin == theme.builtin }
         val light = versions.firstOrNull { !it.isDark } ?: return null
         val dark = versions.firstOrNull { it.isDark } ?: return null
         return light to dark

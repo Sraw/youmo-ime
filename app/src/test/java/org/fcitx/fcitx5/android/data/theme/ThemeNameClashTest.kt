@@ -80,7 +80,7 @@ class ThemeNameClashTest {
         return theme
     }
 
-    private val clashes = { name: String -> BuiltinThemeFiles.find(ThemeManager.BuiltinThemes, name) != null }
+    private val clashes = ThemeManager::clashesBuiltin
 
     private fun uuid(name: String) = UUID.nameUUIDFromBytes(name.encodeToByteArray()).toString()
 
@@ -247,7 +247,7 @@ class ThemeNameClashTest {
         // an old name alone: changed too (the copy for before the first unlock synced)
         store("DeepBlue")
         assertTrue(ThemeManager.listCustomThemes(prefs).second)
-        assertEquals("deep-blue", stored().first())
+        assertEquals("简蓝#dark", stored().first())
     }
 
     @Test
@@ -264,7 +264,9 @@ class ThemeNameClashTest {
             assertEquals(uuid("monokai"), sp.getString(key, null))
             assertEquals(uuid("monokai"), de.getString(key, null))
             assertEquals(listOf(uuid("monokai")), ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>().map { it.name })
-            assertTrue(ThemeManager.getTheme("monokai") is Theme.Builtin)
+            // a name 0.6.0 dropped (BuiltinThemeFiles.RETIRED): the built-in pack it moved to
+            assertEquals(ThemeManager.getTheme("墨灰"), ThemeManager.getTheme("monokai"))
+            assertTrue((ThemeManager.getTheme("monokai") as Theme.Pack).builtin)
         } finally {
             sp.edit(commit = true) { if (was == null) remove(key) else putString(key, was) }
             dir.listFiles()?.forEach { it.deleteRecursively() }

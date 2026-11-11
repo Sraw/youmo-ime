@@ -163,10 +163,12 @@
     <string name="exception_theme_packs">已经有 %1$s 个主题包了：先删掉一个再导入</string>
     <string name="theme_pack_draw_failed">主题 %1$s 上次显示时出错，已换回默认主题</string>
     <string name="theme_not_saved">主题没能保存：手机存储空间可能满了</string>
-    <string name="follow_system_day_night_theme">跟随系统夜间模式</string>
+    <string name="follow_system_day_night_theme">跟随系统深色模式</string>
     <string name="follow_system_day_night_theme_summary">覆盖手动主题选择</string>
-    <string name="light_mode_theme">亮色模式主题</string>
-    <string name="dark_mode_theme">暗色模式主题</string>
+    <string name="light_mode_theme">浅色模式主题</string>
+    <string name="dark_mode_theme">深色模式主题</string>
+    <string name="theme_no_dark">无深色</string>
+    <string name="theme_no_light">无浅色</string>
     <string name="theme_version_light">浅</string>
     <string name="theme_version_dark">深</string>
     <string name="theme_version_light_switch">浅色版本，点按切换到深色</string>
@@ -225,8 +227,6 @@
     <string name="clipboard_return_after_paste">粘贴后回到键盘</string>
     <string name="text_copied">已复制</string>
     <string name="text_cut">已剪切</string>
-    <string name="theme_message_follow_system_day_night_mode_enabled">“跟随系统夜间模式”已启用，不能手动更换主题。</string>
-    <string name="disable_it">禁用它</string>
     <string name="reset_keyboard_on_focus_change">焦点改变时切换回键盘</string>
     <string name="export_user_data">备份全部</string>
     <string name="import_user_data">从备份恢复</string>
@@ -526,7 +526,7 @@
         <item quantity="other">%1$d 个词</item>
     </plurals>
     <string name="section_size">大小</string>
-    <string name="section_day_night">白天与夜间</string>
+    <string name="section_day_night">浅色与深色</string>
     <string name="level_low">矮</string>
     <string name="level_standard">标准</string>
     <string name="level_tall">高</string>

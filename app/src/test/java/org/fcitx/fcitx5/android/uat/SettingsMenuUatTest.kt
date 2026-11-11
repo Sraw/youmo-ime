@@ -194,27 +194,25 @@ class SettingsMenuUatTest {
 
     @Test
     @Uat("ST-36")
-    fun followingTheSystemAThemeTappedAsks() {
-        val follow = ThemeManager.prefs.followSystemDayNightTheme
-        follow.setValue(true)
-        ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
+    fun followingTheSystemAThemeTappedTakesBothSlots() {
+        val prefs = ThemeManager.prefs
+        prefs.followSystemDayNightTheme.setValue(true)
         try {
             st.open(SettingsRoute.Theme)
-            val before = ThemeManager.activeTheme.name
+            // one of two versions: each slot its version, no dialog
             pick(TestThemes.PixelDark.name)
-            assertTrue(texts().toString() + dialogText(), st.s(R.string.theme_message_follow_system_day_night_mode_enabled) == dialogText())
-            dialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
-            st.idle()
-            assertEquals(before, ThemeManager.activeTheme.name)
-            pick(TestThemes.PixelDark.name)
-            dialog().getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
-            st.idle()
-            assertFalse(follow.getValue())
-            assertEquals(TestThemes.PixelDark.name, ThemeManager.activeTheme.name)
+            assertEquals("pixel#light", prefs.lightModeTheme.getValue().name)
+            assertEquals("pixel#dark", prefs.darkModeTheme.getValue().name)
+            // one of one version (dark only): both slots, used in the light mode too
+            pick("amoled-black")
+            assertEquals("amoled-black", prefs.lightModeTheme.getValue().name)
+            assertEquals("amoled-black", prefs.darkModeTheme.getValue().name)
+            assertEquals("amoled-black", ThemeManager.activeTheme.name)
             assertTrue(keyboardIsDark())
         } finally {
-            ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
-            follow.setValue(follow.defaultValue)
+            prefs.lightModeTheme.setValue(prefs.lightModeTheme.defaultValue)
+            prefs.darkModeTheme.setValue(prefs.darkModeTheme.defaultValue)
+            prefs.followSystemDayNightTheme.setValue(prefs.followSystemDayNightTheme.defaultValue)
         }
     }
 

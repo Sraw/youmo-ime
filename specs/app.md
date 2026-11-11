@@ -1188,9 +1188,18 @@ theme's keys in little (`ThemeThumbnailKeys`, colours only: no key image decoded
 (its colour, or its picture: `ThemeAssets.thumbnail`).
 
 **Built-in themes** (060-render-p3 T3) are theme 4.0 files, `lib/keyboard-scene/src/commonMain/themes/`
-(material, pixel, nord, monet with `variants="light dark"`; deep-blue, monokai, amoled-black dark only),
+(material, pixel, monet with `variants="light dark"`; amoled-black dark only; nord, deep-blue, monokai
+are kept there for the web's starting points and the tests' packs, not listed by the app since 0.6.0),
 which the web reads as well; the build copies them as raw resources `scene_theme_<name>` (`-` → `_`)
-beside the layouts. `BuiltinThemeFiles` reads them (`ThemeManager.BuiltinThemes`, Monet's first): each
+beside the layouts. **Built-in packs** (060-builtin-themes) are theme 4.0 packs with pictures, sounds and
+effects (简蓝 … 多巴胺), raw resources `builtin_theme_<id>.theme`: `BuiltinPacks` unpacks them once a
+version into `noBackupFilesDir/builtin-themes/v4/<name>/` and lists them as `Theme.Pack(builtin = true)`
+through the same `ThemePackFiles.list` as the user's (`ThemeManager.BuiltinPackThemes`, listed last); never
+deleted, exported as a pack is; one of the user's of the same name (imported before) is listed instead, an
+import of such a name refused. The names the settings had for the dropped ones (`BuiltinThemeFiles.RETIRED`,
+and `LEGACY`'s 0.5 names of them) move to the closest built-in pack (`ThemePrefs.migrateThemeRefs`) and stay
+reserved (`ThemeManager.clashesBuiltin`). Picked in the list while following the system (`ThemeSlots`), a theme
+of two versions sets each slot its version, one of one version both slots. `BuiltinThemeFiles` reads them (`ThemeManager.BuiltinThemes`, Monet's first): each
 version a `Theme.Builtin` of that version's 24 colours (ThemeReader.REQUIRED_COLORS; the native code reads
 those as before) drawn as `LookDefaults` with them, which is what the files' styles say
 (keyboard-scene's `BuiltinThemeEquivalenceTest`: every version × board × form × popup, scene text alike;

@@ -191,6 +191,8 @@ sealed class Theme : Parcelable {
         override val file: String,
         val dir: String,
         val stamp: Long,
+        /** One of the app's ([BuiltinPacks]): listed with the built-in themes, never deleted. */
+        val builtin: Boolean = false,
     ) : Theme(), Versioned {
 
         /**

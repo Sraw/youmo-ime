@@ -148,7 +148,21 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
      * The 浅/深 of a built-in theme of two versions, [dark] the one shown, [switch] on a tap; none (null)
      * for a theme of one.
      */
+    /**
+     * A theme of one version ([dark]'s): the chip says which it lacks (无深色/无浅色), nothing to tap; picked while
+     * 跟随系统深色模式 is on, it is used in both modes (ThemeSlots).
+     */
+    fun setOnly(dark: Boolean) {
+        version.isVisible = true
+        version.setOnClickListener(null)
+        version.isClickable = false
+        version.alpha = ONLY_ALPHA
+        versionChip.setText(if (dark) R.string.theme_no_light else R.string.theme_no_dark)
+        version.contentDescription = ctx.getString(if (dark) R.string.theme_no_light else R.string.theme_no_dark)
+    }
+
     fun setVersion(dark: Boolean?, switch: () -> Unit) {
+        version.alpha = 1f
         version.isVisible = dark != null
         if (dark == null) {
             version.setOnClickListener(null)
@@ -177,6 +191,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
 
     private companion object {
         const val BAR_DP = 14
+        const val ONLY_ALPHA = 0.7f
 
         // the picture decoded this wide: the item's 128 dp, cropped to its height from a little wider
         const val PICTURE_DP = 160

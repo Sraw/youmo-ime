@@ -25,9 +25,12 @@ class BuiltinThemeFilesTest {
     @Test
     fun theAppsResourcesAreTheFiles() {
         val loaded = BuiltinThemeFiles.load(RuntimeEnvironment.getApplication().resources, SystemColors.NONE)
-        assertEquals(themes, loaded)
+        // the app's: the files but those 0.6.0 dropped (BuiltinThemeFiles.RETIRED), kept for the web and tests
+        assertEquals(themes.filter { it.file !in retiredFiles }, loaded)
         assertEquals(BuiltinThemeFiles.FILES.map { it.first }, loaded.map { it.file }.distinct())
     }
+
+    private val retiredFiles = setOf("nord", "deep-blue", "monokai")
 
     @Test
     fun eachVersionIsNamedByItsFileAndVersion() {

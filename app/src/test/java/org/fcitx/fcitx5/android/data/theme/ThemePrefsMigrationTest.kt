@@ -145,11 +145,12 @@ class ThemePrefsMigrationTest {
         store("Monokai", "MaterialLight", "NordDark", follow = true)
         val prefs = ThemePrefs(sp)
         prefs.migrateThemeRefs(emptySet())
-        assertEquals(listOf("monokai", "material#light", "nord#dark"), stored())
+        // 0.6.0 dropped Nord and Monokai: the built-in packs closest to them (BuiltinThemeFiles.RETIRED)
+        assertEquals(listOf("墨灰", "material#light", "素雅#dark"), stored())
         assertTrue(prefs.followSystemDayNightTheme.getValue())
         assertEquals(TestThemes.MaterialLight, prefs.lightModeTheme.getValue())
-        assertEquals(TestThemes.NordDark, prefs.darkModeTheme.getValue())
-        assertEquals(TestThemes.Monokai, prefs.normalModeTheme.getValue())
+        assertEquals("素雅#dark", prefs.darkModeTheme.getValue().name)
+        assertEquals("墨灰", prefs.normalModeTheme.getValue().name)
     }
 
     @Test
@@ -168,13 +169,23 @@ class ThemePrefsMigrationTest {
     @Test
     fun everyOldNameIsABuiltInThemeOfItsLightness() {
         for ((old, ref) in BuiltinThemeFiles.LEGACY) {
-            val theme = ThemeManager.builtin(ref)
+            // a built-in theme, or a built-in pack where 0.6.0 dropped its theme (Nord, Deep Blue, Monokai)
+            val theme = ThemeManager.getTheme(ref)!!
             assertEquals(old, !old.endsWith("Light"), theme.isDark)
-            assertEquals(old, old.startsWith("Monet"), theme.followsSystem)
+            assertEquals(old, old.startsWith("Monet"), (theme as? Theme.Builtin)?.followsSystem == true)
             assertEquals(old, BuiltinThemeFiles.legacyName(ref))
+            assertEquals(theme, ThemeManager.getTheme(old))
         }
         // each built-in theme had one: every user's is one of them
-        assertEquals(ThemeManager.BuiltinThemes.map { it.name }.toSet(), BuiltinThemeFiles.LEGACY.values.toSet())
+        assertTrue(BuiltinThemeFiles.LEGACY.values.containsAll(ThemeManager.BuiltinThemes.map { it.name }))
+        // every name of a dropped one is a built-in pack's version of its lightness
+        for ((old, ref) in BuiltinThemeFiles.RETIRED) {
+            val theme = ThemeManager.getTheme(ref) as Theme.Pack
+            assertTrue(old, theme.builtin)
+            assertEquals(theme, ThemeManager.getTheme(old))
+            if (old.endsWith("#light")) assertFalse(old, theme.isDark)
+            if (old.endsWith("#dark")) assertTrue(old, theme.isDark)
+        }
     }
 
     @Test
@@ -212,9 +223,9 @@ class ThemePrefsMigrationTest {
         store("DeepBlue", "nord#light", "AMOLEDBlack")
         val prefs = ThemePrefs(sp)
         prefs.migrateThemeRefs(emptySet())
-        assertEquals(listOf("deep-blue", "nord#light", "amoled-black"), stored())
+        assertEquals(listOf("简蓝#dark", "素雅#light", "amoled-black"), stored())
         prefs.migrateThemeRefs(emptySet())
-        assertEquals(listOf("deep-blue", "nord#light", "amoled-black"), stored())
+        assertEquals(listOf("简蓝#dark", "素雅#light", "amoled-black"), stored())
         // a backup of an older version brought back: moved at the next start
         store("PixelDark", "PixelLight", "PixelDark")
         prefs.migrateThemeRefs(emptySet())
@@ -232,7 +243,7 @@ class ThemePrefsMigrationTest {
         // the copy an older version made: its names; read so before the first unlock (no theme of the user's listed)
         store("NordLight", "MonetLight", "MonetDark", follow = true, on = device)
         ThemePrefs(device).migrateThemeRefs(emptySet())
-        assertEquals(listOf("nord#light", "monet#light", "monet#dark"), stored(device))
+        assertEquals(listOf("素雅#light", "monet#light", "monet#dark"), stored(device))
         // the app's own, copied over it: as it names them now
         val prefs = ThemeManager.prefs
         val before = slots.map { PreferenceManager.getDefaultSharedPreferences(app).getString(it, null) }

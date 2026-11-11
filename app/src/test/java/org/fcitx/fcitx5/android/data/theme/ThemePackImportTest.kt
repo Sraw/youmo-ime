@@ -82,12 +82,12 @@ class ThemePackImportTest : ThemePackFixture() {
         assertEquals(File(folder, "p.webp").path, dark.look.picture!!.portrait.file)
         assertEquals(80, dark.look.picture!!.brightness)
         assertEquals(listOf(File(folder, "enter.png").path), ThemePackFiles.images(dark.drawn).map { it.file })
-        assertEquals(ThemeManager.builtin("nord#dark").palette(), dark.look.palette)
-        assertEquals(ThemeManager.builtin("nord#light").keyTextColor, versions[0].keyTextColor)
+        assertEquals(TestThemes.NordDark.palette(), dark.look.palette)
+        assertEquals(TestThemes.NordLight.keyTextColor, versions[0].keyTextColor)
         // listed and found by the settings' names, its versions one card
         ThemeManager.refreshThemes()
         assertEquals(dark, ThemeManager.getTheme("mine#dark"))
-        assertEquals(listOf(versions[0]), ThemeCards(ThemeManager.getAllThemes()).shown.filterIsInstance<Theme.Pack>())
+        assertEquals(listOf(versions[0]), ThemeCards(ThemeManager.getAllThemes()).shown.filterIsInstance<Theme.Pack>().filter { !it.builtin })
         // imported again: it replaces the one there
         assertTrue(opened(sample()).also { it.commit().getOrThrow() }.replaces)
         // deleted as one, from either version
@@ -104,7 +104,7 @@ class ThemePackImportTest : ThemePackFixture() {
         assertEquals(emptyList<String>(), pack.staged.warnings)
         val versions = pack.commit().getOrThrow()
         assertEquals(listOf("nord-mine#light", "nord-mine#dark"), versions.map { it.name })
-        assertEquals(ThemeManager.builtin("nord#dark").palette(), versions[1].look.palette)
+        assertEquals(TestThemes.NordDark.palette(), versions[1].look.palette)
     }
 
     // and its save of a picture: a real PNG, decoded as the app does

@@ -253,7 +253,7 @@ object ThemePackFiles {
      */
     fun builtinClash(name: String, variants: Set<Boolean>, builtins: List<Theme.Builtin>): Boolean {
         val refs = refs(name, variants) + name
-        return builtins.any { it.file == name } || refs.any { BuiltinThemeFiles.find(builtins, it) != null || it in BuiltinThemeFiles.LEGACY }
+        return builtins.any { it.file == name } || refs.any { BuiltinThemeFiles.find(builtins, it) != null || BuiltinThemeFiles.moved(it) != null }
     }
 
     /**

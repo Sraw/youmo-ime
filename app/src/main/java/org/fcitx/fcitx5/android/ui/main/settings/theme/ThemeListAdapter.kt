@@ -151,6 +151,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
                 setTheme(theme)
                 setChecked(stateAt(position))
                 setVersion(theme.takeIf { cards.other(it) != null }?.isDark) { switchVersion(holder.bindingAdapterPosition) }
+                if (cards.other(theme) == null) setOnly(theme.isDark)
                 root.setOnClickListener {
                     onSelectTheme(theme)
                 }
@@ -184,7 +185,11 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
 
     /** A theme of the user's (a 3.0 one, a pack) long pressed: what it is (信息), export it or delete it. */
     private fun ThemeThumbnailUi.onThemeActions(theme: Theme) {
-        val actions = arrayOf(ctx.getString(R.string.theme_info), ctx.getString(R.string.export), ctx.getString(R.string.delete))
+        // a built-in pack (BuiltinPacks) is the app's: shown and exported, not deleted
+        val actions = listOfNotNull(
+            ctx.getString(R.string.theme_info), ctx.getString(R.string.export),
+            ctx.getString(R.string.delete).takeUnless { theme is Theme.Pack && theme.builtin },
+        ).toTypedArray()
         AlertDialog.Builder(ctx)
             .setItems(actions) { _, i ->
                 when (i) {

@@ -67,7 +67,7 @@ class ThemeLookReaderParityTest {
     fun everyBuiltInThemeExported() {
         // every one the app has, a new one too
         val presets = ThemeManager.BuiltinThemes
-        assertTrue(presets.size >= 11)
+        assertTrue(presets.size >= 7)
         for (p in presets) same(exported(Theme.Custom(p.name, p.isDark, p.look)), p.name)
         // Transparent's two, test data since Monet's took their places (R20 F6638): their translucent colours
         // read alike too, which no built-in one has

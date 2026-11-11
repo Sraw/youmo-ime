@@ -28,7 +28,6 @@ import org.fcitx.fcitx5.android.utils.applyNavBarInsetsBottomPadding
 import org.fcitx.fcitx5.android.utils.importErrorDialog
 import org.fcitx.fcitx5.android.utils.queryFileName
 import org.fcitx.fcitx5.android.utils.toast
-import splitties.resources.styledDrawable
 
 class ThemeListFragment : Fragment() {
 
@@ -156,33 +155,16 @@ class ThemeListFragment : Fragment() {
     }
 
     private fun selectTheme(theme: Theme) {
-        // a pack with both versions follows the system itself (ThemeManager.systemVersion): taken by both
-        // slots, not refused as a theme of one version is while following
-        val pair = ThemeManager.packPair(theme)
-        if (followSystemDayNightTheme && pair != null) {
-            ThemeManager.prefs.lightModeTheme.setValue(pair.first)
-            ThemeManager.prefs.darkModeTheme.setValue(pair.second)
-            updateSelectedThemes()
+        // a built-in theme of two versions: each slot its version, as a pack's
+        val builtinPair = (theme as? Theme.Builtin)?.let { t -> ThemeManager.BuiltinThemes.filter { it.file == t.file } }
+            ?.takeIf { it.size == 2 }?.let { it[0] to it[1] }
+        val (light, dark) = ThemeSlots.picked(theme, ThemeManager.packPair(theme) ?: builtinPair, followSystemDayNightTheme) ?: run {
+            ThemeManager.setNormalModeTheme(theme)
             return
         }
-        if (followSystemDayNightTheme) {
-            val ctx = requireContext()
-            AlertDialog.Builder(ctx)
-                .setIcon(ctx.styledDrawable(android.R.attr.alertDialogIcon))
-                .setTitle(R.string.configure)
-                .setMessage(R.string.theme_message_follow_system_day_night_mode_enabled)
-                .setPositiveButton(android.R.string.ok, null)
-                .setNegativeButton(R.string.disable_it) { _, _ ->
-                    followSystemDayNightTheme = false
-                    lifecycleScope.launch {
-                        ThemeManager.setNormalModeTheme(theme)
-                        updateSelectedThemes()
-                    }
-                }
-                .show()
-            return
-        }
-        ThemeManager.setNormalModeTheme(theme)
+        ThemeManager.prefs.lightModeTheme.setValue(light)
+        ThemeManager.prefs.darkModeTheme.setValue(dark)
+        updateSelectedThemes()
     }
 
     private fun exportTheme(theme: Theme) {

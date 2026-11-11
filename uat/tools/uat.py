@@ -1546,7 +1546,7 @@ class Device:
             s = self.screen()
             r = self.row(title, s)
             # the pages run under the navigation bar (edge to edge): a row whose middle is behind it
-            # is not tapped there (ST-05: 跟随系统夜间模式 at the bottom once 大小与样式 grew)
+            # is not tapped there (ST-05: 跟随系统深色模式 at the bottom once 大小与样式 grew)
             nav = [n.b[1] for n in s.nodes if n.pkg == "com.android.systemui" and n.b[1] > 1200 and n.b[3] > n.b[1]]
             if r and nav and r.c[1] >= min(nav) - 10 and self.scroll(s):
                 continue

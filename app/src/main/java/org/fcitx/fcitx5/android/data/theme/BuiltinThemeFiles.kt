@@ -24,9 +24,6 @@ object BuiltinThemeFiles {
         MONET to R.raw.scene_theme_monet,
         "material" to R.raw.scene_theme_material,
         "pixel" to R.raw.scene_theme_pixel,
-        "nord" to R.raw.scene_theme_nord,
-        "deep-blue" to R.raw.scene_theme_deep_blue,
-        "monokai" to R.raw.scene_theme_monokai,
         "amoled-black" to R.raw.scene_theme_amoled_black,
     )
 
@@ -49,14 +46,32 @@ object BuiltinThemeFiles {
         "MaterialDark" to "material#dark",
         "PixelLight" to "pixel#light",
         "PixelDark" to "pixel#dark",
-        "NordLight" to "nord#light",
-        "NordDark" to "nord#dark",
-        "DeepBlue" to "deep-blue",
-        "Monokai" to "monokai",
+        "NordLight" to "素雅#light",
+        "NordDark" to "素雅#dark",
+        "DeepBlue" to "简蓝#dark",
+        "Monokai" to "墨灰",
         "AMOLEDBlack" to "amoled-black",
         "MonetLight" to "monet#light",
         "MonetDark" to "monet#dark",
     )
+
+    /**
+     * The built-in themes 0.6.0 dropped (060-builtin-themes: nord, deep-blue, monokai, in its betas) by every
+     * name the settings may have for them, each the built-in pack ([BuiltinPacks]) closest to it: a setting
+     * naming one is moved to it ([ThemePrefs.migrateThemeRefs]), and the names stay the app's (no import takes one).
+     */
+    val RETIRED: Map<String, String> = mapOf(
+        "nord" to "素雅#light",
+        "nord#light" to "素雅#light",
+        "nord#dark" to "素雅#dark",
+        "deep-blue" to "简蓝#dark",
+        "deep-blue#dark" to "简蓝#dark",
+        "monokai" to "墨灰",
+        "monokai#dark" to "墨灰",
+    )
+
+    /** Where a setting naming [name] (a 0.5 name, a dropped built-in's) is moved to; null for none. */
+    fun moved(name: String): String? = LEGACY[name] ?: RETIRED[name]
 
     /** [ref]'s 0.5 name, if it is a built-in theme 0.5 had. */
     fun legacyName(ref: String): String? = LEGACY.entries.firstOrNull { it.value == ref }?.key

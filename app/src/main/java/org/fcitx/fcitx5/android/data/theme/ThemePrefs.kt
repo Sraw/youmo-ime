@@ -319,7 +319,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         val moved = themeSlots.mapNotNull { key ->
             // a value not a string (a damaged file) is no name: left, read as the default
             val name = slotValue(key) ?: return@mapNotNull null
-            BuiltinThemeFiles.LEGACY[name]?.takeIf { name !in customs }?.let { key to it }
+            BuiltinThemeFiles.moved(name)?.takeIf { name !in customs }?.let { key to it }
         }
         if (moved.isNotEmpty()) sharedPreferences.edit { moved.forEach { (key, ref) -> putString(key, ref) } }
         return moved.isNotEmpty()

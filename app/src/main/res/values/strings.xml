@@ -167,6 +167,8 @@
     <string name="follow_system_day_night_theme_summary">Override manual theme selection</string>
     <string name="light_mode_theme">Light mode theme</string>
     <string name="dark_mode_theme">Dark mode theme</string>
+    <string name="theme_no_dark">No dark</string>
+    <string name="theme_no_light">No light</string>
     <string name="theme_version_light">Light</string>
     <string name="theme_version_dark">Dark</string>
     <string name="theme_version_light_switch">Light version, tap for the dark one</string>
@@ -225,8 +227,6 @@
     <string name="clipboard_return_after_paste">Back to the keyboard after pasting</string>
     <string name="text_copied">Copied</string>
     <string name="text_cut">Cut</string>
-    <string name="theme_message_follow_system_day_night_mode_enabled">Cannot switch theme manually while \"Follow system day/night mode\" is enabled.</string>
-    <string name="disable_it">Disable it</string>
     <string name="reset_keyboard_on_focus_change">Switch back to keyboard when the focus changes</string>
     <string name="export_user_data">Back up everything</string>
     <string name="import_user_data">Restore a backup</string>
