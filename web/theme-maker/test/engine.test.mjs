@@ -59,6 +59,17 @@ test('every snapshot is what the library builds of its ask (the JVM wrote them, 
   assert.deepEqual(wrong, []);
 });
 
+test("a board's default marks are the app's (the JVM recorded them), its own layout's too, a key's first as the punctuation shows it", () => {
+  for (const f of readdirSync(join(data, 'default-marks'))) {
+    assert.deepEqual(E.defaultMarks(f.slice(0, -5), null), JSON.parse(read(data, 'default-marks', f)), f);
+  }
+  const own = E.readLayout(read(scene, 'commonMain', 'layouts', 'qwerty.xml'), null);
+  assert.ok(own.ok, JSON.stringify(own.problems));
+  const mapped = E.defaultMarks(own.layout, { '@': '＠' });
+  assert.deepEqual(mapped.shortcuts['full/a:up'], { symbol: '＠' });
+  assert.deepEqual(mapped.shortcuts['full/c:down'], { icon: 'content-copy' });
+});
+
 test("a scene's keys, slots and size as a page reads them", () => {
   const s = built(shots.shots.find((x) => x.name === 'qwerty-block'));
   const j = s.json();

@@ -516,7 +516,10 @@
     add('error', r.problems);
     add('warning', r.warnings);
     if (!r.ok) return { problems, theme: null, scene: null };
-    const s = E.buildScene(layoutOf(E, d, board, (list) => add('warning', list)), r.theme, env, measurer || E.fixedMeasurer());
+    const layout = layoutOf(E, d, board, (list) => add('warning', list));
+    // no marks of the page's: the app's on a new install (060-keys-unify C2, each key's first and shortcuts' icons)
+    const e = env.marks ? env : Object.assign({}, env, { marks: E.defaultMarks(layout, null) });
+    const s = E.buildScene(layout, r.theme, e, measurer || E.fixedMeasurer());
     add('error', s.problems);
     add('warning', s.ok ? s.scene.json().warnings : s.warnings);
     return { problems, theme: r.theme, scene: s.ok ? s.scene : null };

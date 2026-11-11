@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.scene.json.EnvJson
+import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
@@ -174,6 +175,22 @@ object YoumoEngine {
         }
         // too many to try: its code, "*", the page says what it means
         BlankKeys.find(theme.theme, PackLayouts.drawn(app, own) { builtIns.layoutText(it) }).map { if (it == BlankKeys.TOO_MANY) "*" else it.toString() }.toTypedArray()
+    }
+
+    /**
+     * The marks [layout] (a [YoumoLayout] or a built-in's id) draws with no setting of the user's (060-keys-unify C2:
+     * a key's first in its corner, its shortcuts' icons), each key's first shown as [punctuation] maps it
+     * (`{".": "。"}`, none: as written): EnvJson's `marks` member, for an environment that gives none.
+     */
+    fun defaultMarks(layout: dynamic, punctuation: dynamic): dynamic = run {
+        val l: YoumoLayout = if (jsTypeOf(layout) == "string") {
+            YoumoEngine.layout(layout as String) ?: throw NotOfType("no built-in layout \"$layout\"")
+        } else {
+            layout as? YoumoLayout ?: throw NotOfType("layout: not a layout")
+        }
+        val map = HashMap<String, String>()
+        if (punctuation != null) for (k in keys(punctuation, "punctuation")) map[k] = text(punctuation[k], "punctuation $k")
+        JSON.parse<dynamic>(DefaultMarks.json(DefaultMarks.shortcuts(l.layout, l.fragments, punctuation = map)))
     }
 
     /** The app's boards' ids (`qwerty`, `nine`…). */

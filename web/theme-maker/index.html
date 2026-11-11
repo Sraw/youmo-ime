@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- nothing leaves the browser: no request of any kind, so the line on the page is true; a link someone adds later is refused too.
      Only the page's own scripts run (by their hashes: tools/assemble.mjs writes them, the page's test checks them) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-Gkd8qQTL7yzZ4M3Wup3RxQ94HulDEl9gzXMbFhbRKuk=' 'sha256-OwdO4Ew6l8dK8BA/5FwxDBracEY5FGpVhl3vDXw4Qvs=' 'sha256-nX25+uDJq8IbNV3J8Tn17FqnB9aDK+B630IbWvQ7dds=' 'sha256-bCkaG5UCWazHetuFveax4Rghp15J3ONW4Y9Ee40WnB0=' 'sha256-xer/XQB7g+yEaJ1fk4Ah/SiTJhzMbPAN6jztynXEpIY='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; font-src blob: data:; style-src 'unsafe-inline'; script-src 'sha256-7fmixu7WIMlnv4l5aLKvHRnWbbCFiG50dbIz9zAQnnQ=' 'sha256-Gkd8qQTL7yzZ4M3Wup3RxQ94HulDEl9gzXMbFhbRKuk=' 'sha256-yoNBuH481DnkAkFlZ/KQESuPtEVfFAAszwmQfHTkMtQ=' 'sha256-nX25+uDJq8IbNV3J8Tn17FqnB9aDK+B630IbWvQ7dds=' 'sha256-bCkaG5UCWazHetuFveax4Rghp15J3ONW4Y9Ee40WnB0=' 'sha256-xer/XQB7g+yEaJ1fk4Ah/SiTJhzMbPAN6jztynXEpIY='; connect-src blob: data:; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark">
 <title>幽默输入法 · 主题制作</title>
 <style>
@@ -2322,7 +2322,10 @@ dialog h2 { margin: 0; font-size: 16px; }
     add('error', r.problems);
     add('warning', r.warnings);
     if (!r.ok) return { problems, theme: null, scene: null };
-    const s = E.buildScene(layoutOf(E, d, board, (list) => add('warning', list)), r.theme, env, measurer || E.fixedMeasurer());
+    const layout = layoutOf(E, d, board, (list) => add('warning', list));
+    // no marks of the page's: the app's on a new install (060-keys-unify C2, each key's first and shortcuts' icons)
+    const e = env.marks ? env : Object.assign({}, env, { marks: E.defaultMarks(layout, null) });
+    const s = E.buildScene(layout, r.theme, e, measurer || E.fixedMeasurer());
     add('error', s.problems);
     add('warning', s.ok ? s.scene.json().warnings : s.warnings);
     return { problems, theme: r.theme, scene: s.ok ? s.scene : null };

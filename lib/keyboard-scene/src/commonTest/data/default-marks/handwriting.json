@@ -1,0 +1,18 @@
+{"shortcuts": {
+  "backspace:up": {"icon": "delete-sweep"},
+  "backspace:down": {"icon": "restore"},
+  "comma:up": {},
+  "comma:down": {},
+  "period:up": {},
+  "period:down": {},
+  "symbols:up": {},
+  "symbols:down": {},
+  "numbers:up": {},
+  "numbers:down": {},
+  "space:up": {"icon": "cursor-move"},
+  "space:down": {},
+  "lang:up": {},
+  "lang:down": {},
+  "return:up": {},
+  "return:down": {}
+}}
