@@ -151,9 +151,7 @@ internal class KeySwipes(
                 GestureType.Up -> when {
                     held.menu -> menuLifted(v, event, held)
                     held.select -> selectLifted(v, held)
-                    // no tap, nothing run: consumed as a swipe cancelled is
-                    wentSideways(v, def, event, held) -> true
-                    else -> lifted(v, def, event, builtIn, longPopup.shown)
+                    else -> lifted(v, def, event, held, builtIn, longPopup.shown)
                 }
             } || old?.invoke(v, event) ?: false
         }
@@ -230,8 +228,16 @@ internal class KeySwipes(
         return true
     }
 
-    private fun lifted(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, builtIn: KeyAction?, longPopup: Boolean): Boolean =
-        when (val outcome = KeySwipe.decide(swipeKey(def), ways, event.totalY, event.swipedY, event.consumed || longPopup, event.cancelled, keyboard.inPasswordField)) {
+    private fun lifted(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, held: Held, builtIn: KeyAction?, longPopup: Boolean): Boolean {
+        val outcome = KeySwipe.decide(swipeKey(def), ways, event.totalY, event.swipedY, event.consumed || longPopup, event.cancelled, keyboard.inPasswordField)
+        // a stroke off ，。 into the pad: no tap, nothing run, consumed as a swipe cancelled is. Only where the
+        // swipe reached no slot the user set: one that did runs however far the finger drifted sideways
+        val nothingSet = outcome == KeySwipe.Outcome.Tap || outcome == KeySwipe.Outcome.None
+        return if (nothingSet && wentSideways(key, def, event, held)) true else ran(key, def, outcome, builtIn)
+    }
+
+    private fun ran(key: KeyHandle, def: KeyDef, outcome: KeySwipe.Outcome, builtIn: KeyAction?): Boolean =
+        when (outcome) {
             KeySwipe.Outcome.Symbol -> {
                 // the long press's first: the key's own swipe, or the first of a long press the user set
                 when (val choice = keyboard.swipeText(def)) {

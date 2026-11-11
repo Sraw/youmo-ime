@@ -19,6 +19,8 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -389,6 +391,26 @@ class HandwritingSceneGesturesTest {
         h.swipe(comma, -comma.width * 2f, comma.height * 1.3f)
         assertEquals("a stroke off the comma", emptyList<String>(), sent())
         assertEquals("nothing written", false, h.pad().pad.drawing)
+    }
+
+    // a slot the user set on ，runs however far the swipe drifted sideways: only one that reached nothing set
+    // is a stroke into the pad
+    @Test
+    fun aSetSlotOnTheCommaRunsThoughTheSwipeDriftedSideways() {
+        prefs.set(AppPrefs.getInstance().internal.keySwipes, SwipeSlots.Default.with("fn/comma", up = true, SwipeSlot.Text("好")).serialize())
+        harness().use { h ->
+            fun sent() = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }.also { h.api.calls.clear() }
+            val comma = h.keyNamed("comma")
+            h.api.calls.clear()
+            h.swipe(comma, -comma.width * 2f, -comma.height * 1.3f)
+            h.idle()
+            val up = sent()
+            assertTrue("up, drifted: $up field ${h.field.text}", up.any { "好" in it } || h.field.text.toString() == "好")
+            // down, its slot empty: the stroke off it still types nothing
+            h.swipe(comma, -comma.width * 2f, comma.height * 1.3f)
+            h.idle()
+            assertEquals("down, drifted", emptyList<String>(), sent())
+        }
     }
 
     // 注 found by its view's name (button_reading): uat and TalkBack's tools look it up by it

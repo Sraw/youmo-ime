@@ -1260,5 +1260,5 @@
     <string name="swipe_preset_confirm">Every key on every keyboard goes back to this preset. You can undo it afterwards.</string>
     <string name="swipe_way_said">%1$s %2$s</string>
     <string name="swipe_ways_said">%1$s, %2$s</string>
-    <string name="swipe_select_keys_only">Only the letter keys can be selected here; other keyboards\' keys on their tabs.</string>
+    <string name="swipe_select_keys_only">Only the letter keys can be selected here. Select other keyboards\' keys on their own tabs.</string>
 </resources>
