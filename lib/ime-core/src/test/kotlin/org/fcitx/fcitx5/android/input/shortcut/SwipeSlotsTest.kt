@@ -149,6 +149,27 @@ class SwipeSlotsTest {
         assertEquals("🇨🇳🇯🇵…", KeyMarkText.of("🇨🇳🇯🇵🇺🇸"))
         assertEquals("a family and an accented letter, one each", "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67e\u0301…", KeyMarkText.of("\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67e\u0301x"))
         assertEquals("a…", KeyMarkText.of("a\n  b c"))
-        assertEquals(" ", KeyMarkText.of(" "))
+        // nothing but spaces and breaks: signs of them, never a key that looks unset
+        assertEquals("␣", KeyMarkText.of(" "))
+        assertEquals("↵", KeyMarkText.of("\n"))
+        assertEquals("⇥␣…", KeyMarkText.of("\t  "))
+    }
+
+    // a newer version's slots (a backup of it, a downgrade): its lines are not read, the presets stand
+    @Test
+    fun anotherVersionsSlotsAreThePresets() {
+        assertEquals(SwipeSlots.Default, SwipeSlots.parse("@2\tfirst-down\nfull/a.up\tcopy"))
+        assertEquals(SwipeSlots.Default, SwipeSlots.parse("@1\tfirst-down\n@2\nfull/a.up\tcopy"))
+        assertEquals(SwipeOrientation.FirstDown, SwipeSlots.parse("@1\tfirst-down\nfull/a.up\tcopy").orientation)
+    }
+
+    @Test
+    fun theCommaAndTheFullStopTypeACharacter() {
+        assertEquals(true, SwipeSlots.typesAChar("full/a"))
+        assertEquals(true, SwipeSlots.typesAChar("zy9/3"))
+        assertEquals(true, SwipeSlots.typesAChar("fn/comma"))
+        assertEquals(true, SwipeSlots.typesAChar("fn/period"))
+        assertEquals(false, SwipeSlots.typesAChar("fn/space"))
+        assertEquals(false, SwipeSlots.typesAChar("fn/backspace"))
     }
 }

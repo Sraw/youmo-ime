@@ -421,6 +421,9 @@ class HandwritingKeyboard(
     }
 
     // a getter: asked in init (drawKeysWithScene), before this class's own properties are made
+    // ，。 named (060-swipe-slots): swiped to an empty slot, typed as a tap
+    override val punctuationSwipesTap: Boolean get() = true
+
     override val sceneTable: SceneKeyDef.Table get() = object : SceneKeyDef.Table {
         override fun menuLabel(label: String): String = MENU_LABELS[label]?.let(context::getString) ?: label
     }

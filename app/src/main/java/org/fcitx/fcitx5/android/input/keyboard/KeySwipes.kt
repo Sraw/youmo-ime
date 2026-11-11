@@ -15,8 +15,8 @@ import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
-import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
+import kotlin.math.abs
 
 /** Whether a key's long press showed a popup in this touch: set by its popup's listener, read by its swipe. */
 internal class LongPopup {
@@ -44,6 +44,9 @@ internal class KeySwipes(
 
         /** Whether a character key's shortcut is marked on it: its swipe runs it all the same. */
         val charShortcutMarks: Boolean
+
+        /** Whether the comma's and the full stop's swipe to nothing is their tap (the handwriting keyboard's). */
+        val punctuationSwipesTap: Boolean
         fun swipeText(def: KeyDef): BaseKeyboard.SwipeChoice
         fun onAction(action: KeyAction, source: KeyActionListener.Source = KeyActionListener.Source.Keyboard)
         fun onPopupAction(action: PopupAction)
@@ -79,7 +82,8 @@ internal class KeySwipes(
 
     /**
      * What the key of [def] swipes to as the settings are now ([KeySwipe.Key]): its two slots by its name;
-     * a key of no name (a panel's), its built-in swipe up alone.
+     * a key of no name (a panel's, 注音九键's ˉ), its built-in swipe the way the slots' orientation puts a
+     * long press's first ([KeySwipe.Key.unnamed]).
      */
     private fun swipeKey(def: KeyDef): KeySwipe.Key {
         val name = def.shortcut?.takeIf { shortcuts }
@@ -89,14 +93,14 @@ internal class KeySwipes(
             BaseKeyboard.SwipeChoice.None -> false
             is BaseKeyboard.SwipeChoice.Text -> true
         }
-        if (name == null) return KeySwipe.Key(char = true, up = SwipeSlot.First, down = SwipeSlot.Empty, hasFirst = hasFirst)
         val slots = SwipeSlotsCache.current
+        if (name == null) return KeySwipe.Key.unnamed(slots.orientation, hasFirst)
         val key = SwipeSlots.keyOf(name)
-        return KeySwipe.Key(char = '/' in name, slots.resolve(key, up = true), slots.resolve(key, up = false), hasFirst)
+        return KeySwipe.Key(tapsOnNothing(key), slots.resolve(key, up = true), slots.resolve(key, up = false), hasFirst)
     }
 
-    // 上滑 and 下滑 on or off; a panel's keys (no shortcuts) swipe up to their symbol as they always did
-    private val ways: KeySwipe.Ways get() = if (shortcuts) swipeWays() else KeySwipe.Ways.Both
+    // 上滑 and 下滑 on or off: a panel's keys (no shortcuts) too, both off no swipe on any key as 0.5's 滑动 关
+    private val ways: KeySwipe.Ways get() = swipeWays()
 
     /** What the preview of [key] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
     fun preview(key: KeyHandle, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview, content: String = popup.content): PopupAction.PreviewUpdateAction =
@@ -133,6 +137,7 @@ internal class KeySwipes(
             when (event.type) {
                 GestureType.Down -> {
                     held.menu = false
+                    held.downX = event.x
                     // a touch taken without an Up (BaseKeyboard's cancel) may have left 滑选 on
                     selectLifted(v, held)
                     longPopup.shown = false
@@ -146,6 +151,8 @@ internal class KeySwipes(
                 GestureType.Up -> when {
                     held.menu -> menuLifted(v, event, held)
                     held.select -> selectLifted(v, held)
+                    // no tap, nothing run: consumed as a swipe cancelled is
+                    wentSideways(v, def, event, held) -> true
                     else -> lifted(v, def, event, builtIn, longPopup.shown)
                 }
             } || old?.invoke(v, event) ?: false
@@ -156,7 +163,20 @@ internal class KeySwipes(
     private class Held {
         var menu = false
         var select = false
+        var downX = 0f
         val steps = SwipeSteps()
+    }
+
+    // a key whose swipe to nothing is its tap: a character key's; the comma and the full stop where the keyboard says so
+    private fun tapsOnNothing(key: String) = !SwipeSlots.isFunction(key) || (keyboard.punctuationSwipesTap && SwipeSlots.typesAChar(key))
+
+    // the handwriting keyboard's ，。 beside the ink pad: a finger lifted more than half the key away
+    // sideways was a stroke begun on it, which types nothing
+    private fun wentSideways(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, held: Held): Boolean {
+        val name = def.shortcut?.takeIf { shortcuts }?.let(SwipeSlots::keyOf) ?: return false
+        if (!SwipeSlots.isFunction(name) || !tapsOnNothing(name)) return false
+        val width = key.bounds?.width() ?: return false
+        return abs(event.x - held.downX) * 2 > width
     }
 
     // the finger moved on, [held]: the menu's cell picked by where it is (no cursor moved under it either), or 滑选's steps

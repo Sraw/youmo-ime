@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.shortcut.SwipeMigration
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
@@ -285,6 +286,33 @@ class AppPrefsTest {
         val stored = sp.all
         AppPrefs(sp).dropRetired()
         assertEquals(stored, sp.all)
+    }
+
+    // a 0.6 beta's shortcuts (beta1 and on: the symbol up, shortcuts down) holding 滑选: the same slots, 滑选 kept
+    @Test
+    fun aBetasSwipeSelectStaysInItsSlot() {
+        sp.edit {
+            clear()
+            putInt("pid", 1)
+            putString("swipe_layers", SwipeLayersChoice.SymbolUpShortcutDown.name)
+            putString("key_shortcuts", "full/q\tswipe_select\nfn/space.up\tswipe_select")
+        }
+        val slots = SwipeSlots.parse(AppPrefs(sp).apply { dropRetired() }.internal.keySwipes.getValue())
+        val select = SwipeSlot.Command(KeyCommand.SwipeSelect)
+        assertEquals(SwipeOrientation.FirstUp, slots.orientation)
+        assertEquals(select, slots.resolve("full/q", up = false))
+        assertEquals(SwipeSlot.First, slots.resolve("full/q", up = true))
+        assertEquals(select, slots.resolve("fn/space", up = true))
+    }
+
+    // a newer version's slots (its backup restored here, a downgrade): read as the presets, never written over
+    @Test
+    fun aNewerVersionsSlotsAreLeftAsTheyAre() {
+        val newer = "@2\tfirst-down\nfull/a.up\tcopy"
+        sp.edit { clear(); putInt("pid", 1); putString("key_swipes", newer); putString("swipe_layers", "Off") }
+        val prefs = AppPrefs(sp).apply { dropRetired() }
+        assertEquals(newer, prefs.internal.keySwipes.getValue())
+        assertEquals(SwipeSlots.Default, SwipeSlots.parse(prefs.internal.keySwipes.getValue()))
     }
 
     // a new install: the defaults (the first up, its shortcut down), none of 0.5's; an upgrade that never set

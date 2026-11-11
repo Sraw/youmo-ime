@@ -369,6 +369,28 @@ class HandwritingSceneGesturesTest {
         harness().use { h -> assertEquals(setOf("①", "②"), h.longPress(h.keyNamed("comma")).toSet()) }
     }
 
+    // ，。 named (060-swipe-slots), so swiped: their two slots empty by default, a swipe up or down is a
+    // tap; a stroke begun on one and drawn sideways into the pad types nothing, and writes nothing
+    @Test
+    fun commaAndFullStopSwipedAreTappedAndAStrokeOffThemIsNothing() = harness().use { h ->
+        fun sent() = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }.map { it.substringBefore(", states") }
+            .also { h.api.calls.clear() }
+        val comma = h.keyNamed("comma")
+        h.swipe(comma, 0f, comma.height * 1.3f)
+        assertEquals("down", listOf("sendKey(key=,"), sent())
+        h.swipe(comma, 0f, -comma.height * 1.3f)
+        assertEquals("up", listOf("sendKey(key=,"), sent())
+        val period = h.keyNamed("period")
+        h.swipe(period, 0f, -period.height * 1.3f)
+        assertEquals("up", listOf("sendKey(key=."), sent())
+        // up and to the left, into the pad: past the swipe's threshold, but no tap
+        h.swipe(period, -period.width * 2f, -period.height * 1.3f)
+        assertEquals("a stroke off the full stop", emptyList<String>(), sent())
+        h.swipe(comma, -comma.width * 2f, comma.height * 1.3f)
+        assertEquals("a stroke off the comma", emptyList<String>(), sent())
+        assertEquals("nothing written", false, h.pad().pad.drawing)
+    }
+
     // 注 found by its view's name (button_reading): uat and TalkBack's tools look it up by it
     @Test
     fun readingKeyByItsViewsName() {

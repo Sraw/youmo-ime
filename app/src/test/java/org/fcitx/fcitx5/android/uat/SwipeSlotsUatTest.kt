@@ -97,6 +97,46 @@ class SwipeSlotsUatTest {
         assertEquals(SwipeOrientation.FirstDown, SwipeSlots.parse(internal.keySwipes.getValue()).orientation)
     }
 
+    // 注音九键's ˉ, a key no layout names: its ˙ swiped the way the orientation puts every long press's first;
+    // a 0.5 upgrade (the first down) keeps swiping down to it, and 翻转全部 flips it
+    @Test
+    fun anUnnamedKeysSwipeFollowsTheOrientation() {
+        val k = AppPrefs.getInstance().keyboard
+        // the 简繁 hint not said
+        prefs.set(internal.zhuyinTraditionalTold, true)
+        fun swiped(orientation: SwipeOrientation, down: Boolean): Pair<String, String> {
+            prefs.set(internal.keySwipes, SwipeSlots.Default.applied(orientation).serialize())
+            // as SwipeMigration leaves an upgrade: the first's mark where 标点位置 was (top right)
+            prefs.set(k.swipeUpPosition, if (orientation == SwipeOrientation.FirstUp) KeyMarkPosition.TopRight else KeyMarkPosition.TopLeft)
+            prefs.set(k.swipeDownPosition, if (orientation == SwipeOrientation.FirstUp) KeyMarkPosition.TopLeft else KeyMarkPosition.TopRight)
+            val h = harness(ImKeyboard.ZHUYIN_NINE)
+            val tone = h.key("ˉ")
+            h.api.calls.clear()
+            h.swipe(tone, 0f, (if (down) 1.3f else -1.3f) * tone.height)
+            h.idle()
+            val out = h.sent().joinToString() to h.marksOf("ˉ")
+            h.close()
+            made = null
+            return out
+        }
+        val neutralUp = swiped(SwipeOrientation.FirstUp, down = false)
+        val tappedDown = swiped(SwipeOrientation.FirstUp, down = true)
+        assertTrue("˙ and ˉ apart: $neutralUp $tappedDown", neutralUp.first.isNotEmpty() && neutralUp.first != tappedDown.first)
+        assertEquals("first down: ˙ down", neutralUp.first, swiped(SwipeOrientation.FirstDown, down = true).first)
+        assertEquals("first down: up a tap", tappedDown.first, swiped(SwipeOrientation.FirstDown, down = false).first)
+        // no corner drawn (a function key's cap), either way: nothing that says the other way
+        assertEquals("- -", neutralUp.second)
+        assertEquals("- -", swiped(SwipeOrientation.FirstDown, down = true).second)
+        // 翻转全部 from the new default: the orientation flipped, ˙ down
+        prefs.set(internal.keySwipes, SwipeSlots.Default.flippedAll(listOf("fn/space", "fn/backspace")).serialize())
+        val h = harness(ImKeyboard.ZHUYIN_NINE)
+        val tone = h.key("ˉ")
+        h.api.calls.clear()
+        h.swipe(tone, 0f, 1.3f * tone.height)
+        h.idle()
+        assertEquals(neutralUp.first, h.sent().joinToString())
+    }
+
     @Test
     @Uat("ST-98")
     fun aGroupKeysLongPressSetByName() {

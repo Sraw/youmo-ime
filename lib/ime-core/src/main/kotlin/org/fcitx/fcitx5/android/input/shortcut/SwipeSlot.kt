@@ -161,7 +161,8 @@ class SwipeSlots private constructor(
         /** A new install's: no slot set, the long press's first up. */
         val Default = SwipeSlots(SwipeOrientation.FirstUp, emptyMap())
 
-        private const val HEADER = "@1"
+        private const val VERSION = "@"
+        private const val HEADER = "${VERSION}1"
         private const val FIRST = "first"
         private const val NONE = "none"
         private const val TEXT = "text:"
@@ -175,6 +176,12 @@ class SwipeSlots private constructor(
         fun keyOf(layoutName: String) = if ('/' in layoutName) layoutName else functionKey(layoutName)
 
         fun isFunction(key: String) = KeyShortcuts.formOf(key) == KeyShortcuts.FUNCTION
+
+        /**
+         * Whether [key] types a character: a character key, and the comma and the full stop, function keys
+         * that type one (the handwriting keyboard's ，。 swiped to nothing are tapped, as a character key is).
+         */
+        fun typesAChar(key: String) = !isFunction(key) || key == functionKey("comma") || key == functionKey("period")
 
         /** [key]'s slot [up] as stored, and as [KeyShortcuts] names a way (`fn/space.up`). */
         fun wayName(key: String, up: Boolean) = key + if (up) UP else DOWN
@@ -194,7 +201,12 @@ class SwipeSlots private constructor(
             else -> KeyCommand.ofKey(value)?.let(SwipeSlot::Command)
         }
 
-        /** Never throws: the header missing or unknown is [SwipeOrientation.FirstUp]; a bad line skipped; a later one for the same slot wins. */
+        /**
+         * Never throws: the header missing or its orientation unknown is [SwipeOrientation.FirstUp]; a bad line
+         * skipped; a later one for the same slot wins. Another version's header (`@2`, a newer app's backup or
+         * a downgrade) is [Default] whole: its lines may mean something else. Nothing rewrites the stored
+         * text on reading it (only an edit on the settings page does), so the newer app finds its own again.
+         */
         fun parse(text: String): SwipeSlots {
             var orientation = SwipeOrientation.FirstUp
             val table = LinkedHashMap<String, SwipeSlot>()
@@ -202,10 +214,11 @@ class SwipeSlots private constructor(
             for (raw in text.splitToSequence('\n')) {
                 val line = raw.removeSuffix("\r")
                 val tab = line.indexOf('\t')
-                val name = if (tab < 0) "" else line.substring(0, tab)
-                val value = line.substring(tab + 1)
+                val name = if (tab < 0) line else line.substring(0, tab)
+                val value = if (tab < 0) "" else line.substring(tab + 1)
                 when {
                     name == HEADER -> SwipeOrientation.ofKey(value)?.let { orientation = it }
+                    name.startsWith(VERSION) -> return Default
                     '/' in name && (name.endsWith(UP) || name.endsWith(DOWN)) -> parseValue(value)?.let { table[name] = it }
                 }
             }
@@ -221,7 +234,8 @@ class SwipeSlots private constructor(
 /**
  * A slot's text as a key draws it (要做 1): at most its first [SHOWN] characters as seen (grapheme
  * clusters: a flag, a family, an accented letter one each, as [org.fcitx.fcitx5.android.input.popup.PreviewLabel]
- * counts them), then [ELLIPSIS] where more were left out; line breaks and runs of spaces as one space.
+ * counts them), then [ELLIPSIS] where more were left out; line breaks and runs of spaces as one space,
+ * a text of nothing else as signs of them (␣ ↵ ⇥).
  * The bubble shows it whole.
  */
 object KeyMarkText {
@@ -230,8 +244,17 @@ object KeyMarkText {
 
     private val SPACES = Regex("\\s+")
 
+    /** A text of nothing but spaces and line breaks drawn as signs of them: a key with nothing seen on it would look unset. */
+    private fun signs(text: String) = text.map {
+        when (it) {
+            '\n', '\r' -> '↵'
+            '\t' -> '⇥'
+            else -> '␣'
+        }
+    }.joinToString("")
+
     fun of(text: String): String {
-        val line = text.replace(SPACES, " ").trim().ifEmpty { text }
+        val line = text.replace(SPACES, " ").trim().ifEmpty { signs(text) }
         val bounds = BreakIterator.getCharacterInstance().apply { setText(line) }
         var end = 0
         repeat(SHOWN) {

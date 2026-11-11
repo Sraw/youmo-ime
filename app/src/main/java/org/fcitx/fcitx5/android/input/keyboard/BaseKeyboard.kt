@@ -266,9 +266,17 @@ abstract class BaseKeyboard(
     // a rather large threshold effectively disables swipe of the direction
     private val disabledSwipeThreshold = dp(800f)
 
+    /**
+     * Whether the comma's and the full stop's swipe to nothing is their tap, as a character key's (the
+     * handwriting keyboard's ，。, swiped since they were named: 060-swipe-slots); elsewhere it leaves them
+     * as they were, as 0.5 had it. Read at each lift, never while the subclass is made.
+     */
+    protected open val punctuationSwipesTap: Boolean get() = false
+
     private val swipes = KeySwipes(this, shortcuts, inputSwipeThreshold, disabledSwipeThreshold, selectionSwipeThreshold, object : KeySwipes.Keyboard {
         override val inPasswordField get() = this@BaseKeyboard.inPasswordField
         override val charShortcutMarks get() = this@BaseKeyboard.charShortcutMarks
+        override val punctuationSwipesTap get() = this@BaseKeyboard.punctuationSwipesTap
         override fun swipeText(def: KeyDef) = this@BaseKeyboard.swipeText(def)
         override fun onAction(action: KeyAction, source: KeyActionListener.Source) = this@BaseKeyboard.onAction(action, source)
         override fun onPopupAction(action: PopupAction) = this@BaseKeyboard.onPopupAction(action)

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 
 /**
@@ -27,7 +28,24 @@ object KeySwipe {
      * A key's two slots; [char] for a character key, [hasFirst] whether its long press has a first
      * (what [SwipeSlot.First] types).
      */
-    data class Key(val char: Boolean, val up: SwipeSlot, val down: SwipeSlot, val hasFirst: Boolean = true)
+    data class Key(val char: Boolean, val up: SwipeSlot, val down: SwipeSlot, val hasFirst: Boolean = true) {
+        companion object {
+            /**
+             * A key no layout names (a panel's, 注音九键's ˉ): no slot of its own to set, its long press's
+             * first the way [orientation] puts every key's preset, nothing the other way; 翻转 flips it
+             * with them, and its corner is drawn there (MarkSettings.of).
+             */
+            fun unnamed(orientation: SwipeOrientation, hasFirst: Boolean): Key {
+                val firstUp = orientation == SwipeOrientation.FirstUp
+                return Key(
+                    char = true,
+                    up = if (firstUp) SwipeSlot.First else SwipeSlot.Empty,
+                    down = if (firstUp) SwipeSlot.Empty else SwipeSlot.First,
+                    hasFirst = hasFirst,
+                )
+            }
+        }
+    }
 
     /** 上滑 and 下滑 on or off. */
     data class Ways(val up: Boolean, val down: Boolean) {
