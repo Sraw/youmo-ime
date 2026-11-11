@@ -310,7 +310,7 @@ object ThemeManager {
     @Volatile
     private var keyStyle = startKeyStyle(prefs)
 
-    /** The key style settings now: a pack's keys styled by them (SceneThemes.of), its look's by [shownLook]. */
+    /** The key style settings now: a pack's keys styled by them in the scene (SceneEnvs: Env.keyStyle), its look's by [shownLook]. */
     val keyStyleShown: KeyStyleChoice get() = keyStyle
 
     /** The key style as it is first read: 0.5.2's one spacing moved into the two before ([ThemePrefs.migrateKeySpacing]). */

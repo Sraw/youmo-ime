@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.theme
 
 import org.fcitx.fcitx5.android.input.theme.LookFixtures.PALETTE
+import org.fcitx.fcitx5.android.scene.engine.KeyStyleOver
 import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
@@ -76,5 +77,17 @@ class KeyStyleChoiceTest {
                 }
             }
         }
+    }
+
+    // over a 4.0 pack: what is set, each key after the pack's cascade (Env.keyStyle); none when all follow it
+    @Test
+    fun overAPackIsWhatIsSet() {
+        assertEquals(null, KeyStyleChoice.FOLLOW.overPack)
+        assertEquals(null, KeyStyleChoice(true, null, null, null).overPack)
+        assertEquals(
+            KeyStyleOver(KeyStyleOver.Level(5, 5), KeyStyleOver.Level(5, 3), 0.0, true),
+            KeyStyleChoice(false, KeyStyleChoice.H_LOOSE, KeyStyleChoice.V_COMPACT, KeyStyleChoice.RADIUS_SQUARE).overPack,
+        )
+        assertEquals(KeyStyleOver(radiusDp = 10.0), KeyStyleChoice(null, null, null, KeyStyleChoice.RADIUS_ROUND).overPack)
     }
 }

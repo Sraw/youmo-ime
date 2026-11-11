@@ -12,12 +12,10 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
-import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.Phases
@@ -219,21 +217,20 @@ object SceneThemes {
             packs.clear()
         }
 
-    // the packs' (060-render-p3 T8a), read as they were listed, by the system's colours their system() took and
-    // the key style settings over them (PackKeyStyle): a setting changed and changed back is the drawing kept
-    private val packs = lruMap<Triple<AppTheme.Pack, SystemColors, KeyStyleChoice>, Made>(KEPT)
+    // the packs' (060-render-p3 T8a), read as they were listed, by the system's colours their system() took
+    private val packs = lruMap<Pair<AppTheme.Pack, SystemColors>, Made>(KEPT)
 
     /**
      * [theme]'s engine theme, drawn in [look] (ThemeManager.shownLook): a pack's its own file ([AppTheme.Pack.drawn]),
-     * any other's its look's ([of]). A pack's keys as the key style settings [choice] set (PackKeyStyle), as a look's are.
+     * any other's its look's ([of]).
      */
-    fun of(theme: AppTheme, look: ThemeLook, choice: KeyStyleChoice = ThemeManager.keyStyleShown): Theme? {
+    fun of(theme: AppTheme, look: ThemeLook): Theme? {
         if (theme !is AppTheme.Pack) return of(look, theme.name, theme.isDark)
-        val key = Triple(theme, ThemePackFiles.systemColors, choice)
+        val key = theme to ThemePackFiles.systemColors
         // this instance's drawn alone: a copy() equal to an older one (the system's colours set anew) has
         // its own, an old instance asked after the colours changed not kept as the new one's
         packs[key]?.takeIf { it.pack === theme }?.let { return it.theme }
-        return PackKeyStyle.over(theme.drawn, choice).also { packs[key] = Made(it, theme) }
+        return theme.drawn.also { packs[key] = Made(it, theme) }
     }
 
     fun of(look: ThemeLook, name: String, dark: Boolean): Theme? {
