@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
@@ -187,7 +189,7 @@ class KeyMarksUatTest {
         assertEquals(marksOf("q"), changed)
     }
 
-    // either remakes the keyboard (FcitxInputMethodService.recreateInputViewPrefs): KeySwipes places
+    // either remakes the keyboards (FcitxInputMethodService.remakeKeyboardsPrefs): KeySwipes places
     // the marks of the keys it has swipes for again, but a key it has none for (a keyboard without
     // shortcuts, 五笔's every root) lays its symbol out only as it is made
     @Test
@@ -198,10 +200,10 @@ class KeyMarksUatTest {
             AppPrefs.getInstance().keyboard.swipeUpPosition to KeyMarkPosition.BottomRight,
             AppPrefs.getInstance().keyboard.swipeDownPosition to KeyMarkPosition.BottomLeft,
         )) {
-            val before = h.inputView
+            val before = h.keyboardShown()
             prefs.set(pref, position)
             h.idle()
-            assertNotSame(pref.key, before, h.inputView)
+            assertNotSame(pref.key, before, h.keyboardShown())
         }
     }
 
@@ -217,4 +219,7 @@ class KeyMarksUatTest {
         h.turn()
         assertEquals("q - TR", marksOf("q"))
     }
+
+    private fun KeyboardHarness.keyboardShown(): View =
+        inputView.findViewById<android.view.ViewGroup>(R.id.keyboard_view).getChildAt(0)
 }

@@ -413,11 +413,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 }
                 dropCalculation()
             }
-            numberRow.apply {
-                onCollapseListener = {
-                    numberRowMode = IdleUiPolicy.NumberRowMode.ForceHide
-                    evalIdleUiState(fromUser = true)
-                }
+            numberRowCollapsed = {
+                numberRowMode = IdleUiPolicy.NumberRowMode.ForceHide
+                evalIdleUiState(fromUser = true)
             }
         }
     }
@@ -543,6 +541,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     /** The keyboards made anew under the bar (InputView.remakeKeyboards): its toolbar as a new bar's, folded or not as set. */
     fun keyboardsRemade() {
+        idleUi.remakeNumberRow()
         panelActions.dismiss()
         isToolbarManuallyToggled = false
         evalIdleUiState()

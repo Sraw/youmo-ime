@@ -4,9 +4,13 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import android.text.InputType
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.junit.After
@@ -71,4 +75,38 @@ class RemakeKeyboardsTest {
             assertTrue(KeyboardHarness.all(h.inputView).any { h.shown(it) && it.contentDescription == expand })
         }
     }
+
+    /** The marks' places and the letters' case remake the keys and the password field's number row as a new view's. */
+    @Test
+    fun theMarksAndCaseRemakeTheKeysAndTheNumberRow() {
+        val prefs = AppPrefs.getInstance().keyboard
+        val password = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        val up = prefs.swipeUpPosition.getValue()
+        val case = prefs.letterCase.getValue()
+        try {
+            val changes = listOf<() -> Unit>(
+                { prefs.swipeUpPosition.setValue(KeyMarkPosition.BottomRight) },
+                { prefs.letterCase.setValue(LetterCaseChoice.entries.first { it != case }) },
+            )
+            KeyboardHarness().use { h ->
+                h.start(password)
+                val view = h.inputView
+                for (change in changes) {
+                    val row = rowOf(h)
+                    change()
+                    h.idle()
+                    assertSame(view, h.inputView)
+                    assertTrue("the number row made anew", rowOf(h) !== row)
+                    val expected = KeyboardHarness().use { f -> f.start(password); f.seen() }
+                    assertEquals(expected, h.seen())
+                }
+            }
+        } finally {
+            prefs.swipeUpPosition.setValue(up)
+            prefs.letterCase.setValue(case)
+        }
+    }
+
+    private fun rowOf(h: KeyboardHarness): View? =
+        KeyboardHarness.all(h.inputView).firstOrNull { it is org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow }
 }

@@ -187,8 +187,38 @@ class IdleUi(
 
     val calculationUi = CalculationUi(ctx, theme)
 
-    val numberRow = NumberRow(ctx, theme).apply {
+    // the password field's digits, a keyboard too: made anew with the keys for the settings they read
+    // (the marks, the long presses, the letters' case; InputView.remakeKeyboards)
+    var numberRow = newNumberRow()
+        private set
+
+    private fun newNumberRow() = NumberRow(ctx, theme).apply {
         visibility = View.GONE
+        onCollapseListener = numberRowCollapsed
+    }
+
+    /** Told as the number row is put away by its own key; kept for the one made anew. */
+    var numberRowCollapsed: (() -> Unit)? = null
+        set(value) {
+            field = value
+            numberRow.onCollapseListener = value
+        }
+
+    /** The number row made anew where it was, shown or not as it was. */
+    fun remakeNumberRow() {
+        val old = numberRow
+        val at = root.indexOfChild(old)
+        numberRow = newNumberRow().apply {
+            visibility = old.visibility
+            if (currentState == Display.NumberRow) {
+                keyActionListener = commonKeyActionListener.listener
+                popupActionListener = popup.listener
+            }
+        }
+        old.keyActionListener = null
+        old.popupActionListener = null
+        root.removeView(old)
+        root.addView(numberRow, at, old.layoutParams)
     }
 
     val inlineSuggestionsBar = InlineSuggestionsUi(ctx)

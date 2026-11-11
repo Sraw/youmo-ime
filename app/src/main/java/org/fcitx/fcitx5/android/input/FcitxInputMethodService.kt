@@ -315,7 +315,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // onFinishInputView's focus out dropped the engine's context, and no onStartInput told it since
     private var contextDropped = false
 
-    // read by the keyboards alone: they are made anew, the rest of the view kept (InputView.remakeKeyboards)
+    // read by the keyboards alone (the bar's number row among them): they are made anew, the rest of the view
+    // kept (InputView.remakeKeyboards)
     private val remakeKeyboardsPrefs: Array<ManagedPreference<*>> = arrayOf(
         // drawn on 九键's keys, and in their long press
         prefs.keyboard.t9Letters,
@@ -325,11 +326,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.keyboard.pinyinKeyboard,
         prefs.keyboard.shuangpinKeyboard,
         prefs.keyboard.englishKeyboard,
-    )
-
-    // the bar's number row is a keyboard too, and the marks and long presses are read by it as well: the whole view
-    private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
-        prefs.advanced.disableAnimation,
         // every key's marks laid out anew, those no swipe marks too; was a theme setting's
         prefs.keyboard.swipeUpPosition,
         prefs.keyboard.swipeDownPosition,
@@ -337,6 +333,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.internal.keyPopups,
         // the letters' faces (拼音键字母大小写): every keyboard made anew, its env read as it is now
         prefs.keyboard.letterCase,
+    )
+
+    // the animations' setting is read across the view, the bar's and the panels' too
+    private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
+        prefs.advanced.disableAnimation,
     )
 
     // 跟随主题 too: a level whose numbers are stored already changes only it, and the theme's height may be 紧凑
