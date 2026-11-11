@@ -1254,7 +1254,6 @@
     <string name="swipe_selected">已选 %d 个</string>
     <string name="swipe_none_selected">点键来选中。</string>
     <string name="swipe_changed">已修改</string>
-    <string name="long_press_by_name_hint">没改过时用键盘自带的长按。在这里添加字符就换成你的。</string>
     <string name="swipe_preset_confirm">所有键盘的所有键都回到这个预设。之后可以撤销。</string>
     <string name="swipe_way_said">%1$s %2$s</string>
     <string name="swipe_ways_said">%1$s，%2$s</string>

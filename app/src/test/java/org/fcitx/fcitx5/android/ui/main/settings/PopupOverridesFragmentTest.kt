@@ -11,6 +11,7 @@ import android.widget.FrameLayout
 import android.widget.RadioButton
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
 import org.fcitx.fcitx5.android.FcitxApplication
@@ -389,21 +390,59 @@ class PopupOverridesFragmentTest {
             assertTrue(st.texts().toString(), st.s(R.string.swipe_multi_select) in st.texts())
         }
 
-        // another keyboard's key: its long press set by its name, the keyboard's own kept until then
+        // another keyboard's key: its editor starts from what the key pops up on its keyboard (its corner first,
+        // as the cap's small character), kept as it is nothing is stored; a character added stores the list by name
         @Test
         @Uat("ST-100")
         fun anotherKeyboardsLongPressIsSetByName() {
             open()
             click(R.string.shortcut_page_g14)
-            keyCalled("QW").performClick()
+            fun dialog(): AlertDialog {
+                keyCalled("QW").performClick()
+                st.idle()
+                return ShadowDialog.getLatestDialog() as AlertDialog
+            }
+            var d = dialog()
+            val none = KeyboardHarness.all(d.window!!.decorView).filterIsInstance<TextView>().single { it.text.toString() == st.s(R.string.long_press_none) }
+            assertFalse("the key has a long press: not said to have none", none.isVisible)
+            d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
-            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
-            val texts = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
-            assertTrue(texts.toString(), st.s(R.string.long_press_by_name_hint) in texts)
-            KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<EditText>().first().setText("① ②")
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            assertEquals("kept as it is, nothing stored", "", AppPrefs.getInstance().internal.keyPopups.getValue())
+            d = dialog()
+            KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+            d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
-            assertEquals(listOf("①", "②"), PopupOverrides.parse(AppPrefs.getInstance().internal.keyPopups.getValue())["g14/qw"])
+            val stored = PopupOverrides.parse(AppPrefs.getInstance().internal.keyPopups.getValue())["g14/qw"]!!
+            assertEquals(listOf("1", "Q", "W", "q", "w"), stored.take(5))
+            assertEquals("①", stored.last())
+        }
+
+        // every key of every tab but the full keyboard's starts from its keyboard's own long press (owner, 0.6.0
+        // beta2): the grouped and nine keys' their corner first (the cap's small character), 注音九键's its
+        // symbols, ， and 。 their preset; 注音大千's keys have none
+        @Test
+        fun everyKeysEditorStartsFromItsKeyboardsOwnLongPress() {
+            open()
+            val firsts = mapOf("g14/qw" to "1", "g18/q" to "1", "t9/2" to "2", "t9/9" to "9", "zy9/1" to "ㄅ")
+            for (page in KeyShortcutPages.all - KeyShortcutPages.Full - KeyShortcutPages.Number) {
+                click(PopupOverridesFragment.pageTitle(page))
+                val keys = if (page == KeyShortcutPages.Function) KeyShortcutPages.FUNCTION_POPUPS.map { PopupOverridesFragment.FunctionLabels.getValue(it).let(st::s) to it }
+                else page.rows.flatten().map { it.label to it.name }
+                for ((label, name) in keys) {
+                    // a function key's name may hold a comma (", key"): its caption read whole
+                    (if (page == KeyShortcutPages.Function) KeyboardHarness.all(st.activity.window.decorView)
+                        .first { it.contentDescription?.toString()?.startsWith(label) == true && it.hasOnClickListeners() } else keyCalled(label)).performClick()
+                    st.idle()
+                    val d = ShadowDialog.getLatestDialog() as AlertDialog
+                    KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().first().setText("※")
+                    d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                    st.idle()
+                    val own = PopupOverrides.parse(AppPrefs.getInstance().internal.keyPopups.getValue())[name]!!.dropLast(1)
+                    val none = page == KeyShortcutPages.ZhuyinFull
+                    assertEquals(name, none, own.isEmpty())
+                    firsts[name]?.let { assertEquals(name, it, own.first()) }
+                }
+            }
         }
     }
 

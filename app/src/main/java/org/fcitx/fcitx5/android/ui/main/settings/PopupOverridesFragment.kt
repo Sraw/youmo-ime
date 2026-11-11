@@ -29,9 +29,12 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.OwnLongPress
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.popup.PopupEditor
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
+import org.fcitx.fcitx5.android.input.scene.SceneBehavior
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -48,6 +51,7 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapContent
 import splitties.views.dsl.core.wrapInScrollView
+import timber.log.Timber
 import com.google.android.material.R as MaterialR
 
 /**
@@ -355,7 +359,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     val marked = stored.isSet(slotKey) || popupName?.let { it in names.labels } == true
                     val state = getString(R.string.edited_x, label).takeIf { marked }
                     add(KeyCaps.key(ctx, label, hint, marked = marked, dimmed = false, selected = slotKey in selected, state = state, said = said(slotKey, stored), shortcut = shortcut).apply {
-                        setOnClickListener { tapped(slotKey) { edit(label, slotKey, popupName?.let(LongPress::ByName)) } }
+                        // the editor starts from what the key pops up on its keyboard: its board's very key, as the cap draws it
+                        val cell = getChildAt(0) as? SceneKeyCell
+                        setOnClickListener { tapped(slotKey) { edit(label, slotKey, popupName?.let { LongPress.ByName(it, ownOf(cell)) }) } }
                     }, params)
                 }
                 if (!function) weightSum = page.rows.maxOf { it.size }.toFloat()
@@ -464,7 +470,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     /** Whose long press a dialog edits: the full keyboard's by the key's label, the others' by the key's name. */
     private sealed interface LongPress {
         data class ByLabel(val label: String) : LongPress
-        data class ByName(val name: String) : LongPress
+        /** [own]: what the key pops up on its keyboard with nothing set by its name ([OwnLongPress]). */
+        data class ByName(val name: String, val own: List<String>) : LongPress
     }
 
     /**
@@ -541,9 +548,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             setPadding(pad, ctx.dp(8), pad, 0)
             if (editor != null) {
                 add(text(ctx, getString(R.string.long_press_editor_hint), body = false), lParams(matchParent))
-                // by name, an empty list is the keyboard's own (the user's removed), not no long press
-                val empty = if (longPress is LongPress.ByName) R.string.long_press_by_name_hint else R.string.long_press_none
-                chars(ctx, editor, field, empty).forEach { (view, top) -> add(view, lParams(matchParent) { topMargin = ctx.dp(top) }) }
+                chars(ctx, editor, field, R.string.long_press_none).forEach { (view, top) -> add(view, lParams(matchParent) { topMargin = ctx.dp(top) }) }
             }
             sections.forEach { add(it.view, lParams(matchParent)) }
         }
@@ -575,10 +580,16 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             }
     }
 
-    // the list shown first: the label's (its preset under it), or the name's the user set (none set: empty, the keyboard's own kept)
+    // the list shown first: the label's (its preset under it), or the name's the user set, else what its keyboard pops up
     private fun startOf(longPress: LongPress): List<String> = when (longPress) {
         is LongPress.ByLabel -> overrides.resolve(longPress.label, PopupPreset[longPress.label])?.toList().orEmpty()
-        is LongPress.ByName -> byName.resolve(longPress.name, null)?.toList().orEmpty()
+        is LongPress.ByName -> if (longPress.name in byName.labels) byName.resolve(longPress.name, null)?.toList().orEmpty() else longPress.own
+    }
+
+    // the key's own long press, from the node of its board the cap drew; none where the cap has no scene (logged)
+    private fun ownOf(cell: SceneKeyCell?): List<String> {
+        val node = cell?.keyNode ?: return emptyList<String>().also { Timber.w("no scene key for the long press editor") }
+        return OwnLongPress.of(SceneBehavior.of(node).popup, node)
     }
 
     private fun isEdited(longPress: LongPress): Boolean = when (longPress) {
@@ -591,7 +602,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         when (longPress) {
             is LongPress.ByLabel -> overrides = items?.let { overrides.withEdit(longPress.label, it, PopupPreset[longPress.label]) }
                 ?: overrides.without(longPress.label)
-            is LongPress.ByName -> byName = items?.let { byName.withEdit(longPress.name, it, null) } ?: byName.without(longPress.name)
+            // the keyboard's own list kept as it is stores nothing: the key follows its keyboard (and the 九键 symbols set)
+            is LongPress.ByName -> byName = items?.takeIf { it != longPress.own }?.let { byName.withEdit(longPress.name, it, null) } ?: byName.without(longPress.name)
         }
     }
 

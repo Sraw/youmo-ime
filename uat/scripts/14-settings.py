@@ -1292,7 +1292,7 @@ def st98(d):
 case("ST-99", needs="jvm:PopupOverridesFragmentTest$Dialog.selectedKeysAreSetAtOnce")(lambda d: None)
 
 
-case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
+case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
 
 
 

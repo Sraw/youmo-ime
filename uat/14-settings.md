@@ -556,9 +556,9 @@
 
 ### ST-100 [P1] 按键字符和快捷键：别的键盘的键改长按
 - **前提**：B0-设置，**输入法 → 拼音** 的 **键盘** 选「14 键」；**按键 → 按键字符和快捷键**，14 键页。
-- **操作**：点 QW 键，对话框里写着「没改过时用键盘自带的长按」，添加 `① ②`，确定；回测试页长按 QW，再在 QW 上向上滑。
-- **预期**：长按弹出的是 `①` `②`；上滑打出 `①`（长按首选跟着改了）。功能键页的逗号同样改了以后，手写键盘上长按 ，也弹出改过的。
-- **JVM**：`PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName`、`SwipeSlotsUatTest.aGroupKeysLongPressSetByName`、`HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers`；设备上不跑。
+- **操作**：先点 QW 键看列表，不改，确定；再点 QW，选中 `①` 以外的都删掉（或删光后添加 `① ②`），确定；回测试页长按 QW，再在 QW 上向上滑。九键、18 键、注音九键、功能键页的 ，。各点一个键看列表。
+- **预期**：第一次打开列表不是空的：是键盘上长按 QW 弹出的那些（带框的第一个是 `1`，和键角小字一样，后面 Q W q w 和符号）；不改直接确定，QW 不显示改过。改成 `①` `②` 后长按弹出的是 `①` `②`；上滑打出 `①`（长按首选跟着改了）。别的页的键同样列出键盘自带的长按，第一个是键角小字（九键 2 是 `2`）；注音全键盘的键本来没有长按，列表空，写着「长按这个键不弹出字符」。功能键页的逗号同样改了以后，手写键盘上长按 ，也弹出改过的。
+- **JVM**：`PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName`、`PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress`、`SwipeSlotsUatTest.aGroupKeysLongPressSetByName`、`HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers`；设备上不跑。
 
 
 ### ST-103 [P1] 0.6.0 新增的内置主题

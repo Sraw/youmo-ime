@@ -218,8 +218,12 @@ class GroupedKeyboard private constructor(
          * What the full keyboard's long press of [letter] offers besides letters and digits, as the
          * user changed it: the long press's rows above a group's own.
          */
-        private fun symbolsOf(letter: String): List<String> =
+        internal fun symbolsOf(letter: String): List<String> =
             PopupOverridesCache.user.current.longPressOf(letter).orEmpty().toList()
+
+        /** The corner a group key of [node] swipes (its keypad digit, its mark as typed: ~, not the ～ drawn). */
+        internal fun cornerOf(node: KeyNode): String =
+            node.actions["swipe-up"]?.let(SceneAction::of)?.let(SceneBehavior::typed).orEmpty()
 
         /**
          * [group]'s long press: Q W 1 q w, the [corner] under the finger; above, its letters'
@@ -379,9 +383,6 @@ class GroupedKeyboard private constructor(
     // a group's letters as its key shows them: pinyin's 18 keys' L without the `;` the engine reads it by
     private fun shown(group: String) = if (semicolon) group else group.replace(";", "")
 
-    // the corner a group key swipes (its keypad digit, its mark as typed: ~, not the ～ drawn)
-    private fun cornerOf(node: KeyNode): String =
-        node.actions["swipe-up"]?.let(SceneAction::of)?.let(SceneBehavior::typed).orEmpty()
 
     // a group key's (letters=) code and long press (060-render-v2 §15): the code of the engine's group its
     // first letter is in, sent as [wire] has it (a tap's place added by [pressed]); its letters around its
