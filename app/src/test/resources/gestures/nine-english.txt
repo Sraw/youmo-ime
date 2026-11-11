@@ -15,13 +15,13 @@ faces: [1=.,?!/1, 2=abc/2, 3=def/3, backspace=/null, 4=ghi/4, 5=jkl/5, 6=mno/6, 
 3 pressed: [def]
 3 tap: [sendKey(sym=17760323, states=536870912, code=0, up=false)] field ,:2
 3 down: [sendKey(sym=17760323, states=536870912, code=0, up=false)] field ,:2
-3 long press: [+, -, D, E, F, 3, d, e, f]
+3 long press: [-, +, D, E, F, d, e, f, 3]
 3 long press: [] field ,:23
 4 said: ghi, 4
 4 pressed: [ghi]
 4 tap: [sendKey(sym=17760324, states=536870912, code=0, up=false)] field ,:23
 4 down: [sendKey(sym=17760324, states=536870912, code=0, up=false)] field ,:23
-4 long press: [=, /, G, H, I, 4, g, h, i]
+4 long press: [=, /, 4, G, H, I, g, h, i]
 4 long press: [] field ,:234
 5 said: jkl, 5
 5 pressed: [jkl]
@@ -33,13 +33,13 @@ faces: [1=.,?!/1, 2=abc/2, 3=def/3, backspace=/null, 4=ghi/4, 5=jkl/5, 6=mno/6, 
 6 pressed: [mno]
 6 tap: [sendKey(sym=17760326, states=536870912, code=0, up=false)] field ,:2345
 6 down: [sendKey(sym=17760326, states=536870912, code=0, up=false)] field ,:2345
-6 long press: [\, ~, M, N, O, 6, m, n, o]
+6 long press: [~, \, M, N, O, m, n, o, 6]
 6 long press: [] field ,:23456
 7 said: pqrs, 7
 7 pressed: [pqrs]
 7 tap: [sendKey(sym=17760327, states=536870912, code=0, up=false)] field ,:23456
 7 down: [sendKey(sym=17760327, states=536870912, code=0, up=false)] field ,:23456
-7 long press: [*, P, Q, R, S, 7, p, q, r, s]
+7 long press: [*, 7, P, Q, R, S, p, q, r, s]
 7 long press: [] field ,:234567
 8 said: tuv, 8
 8 pressed: [tuv]
@@ -51,7 +51,7 @@ faces: [1=.,?!/1, 2=abc/2, 3=def/3, backspace=/null, 4=ghi/4, 5=jkl/5, 6=mno/6, 
 9 pressed: [wxyz]
 9 tap: [sendKey(sym=17760329, states=536870912, code=0, up=false)] field ,:234567,:8
 9 down: [] field 
-9 long press: [:, ', W, X, Y, Z, 9, w, x, y, z]
+9 long press: [', :, W, X, Y, Z, w, x, y, z, 9]
 9 long press: [] field 9
 0 tap: [sendKey(key=0, states=536870912, code=11, up=false)] field 9
 backspace tap: [sendKey(sym=65288, states=536870912, code=0, up=false)] field 9
