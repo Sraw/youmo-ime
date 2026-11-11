@@ -221,7 +221,7 @@ class PopupOverridesFragmentTest {
 
         // a letter's dialog has its two ways below its characters: a text typed for 下滑 is what its swipe down runs
         @Test
-        @Uat("ST-95")
+        @Uat("ST-97")
         fun aLettersSlotsAreSetInItsDialog() {
             open()
             keyCalled("q").performClick()
@@ -246,7 +246,7 @@ class PopupOverridesFragmentTest {
 
         // 翻转上下滑: every key's two slots swapped, the places with them, and once more back
         @Test
-        @Uat("ST-96")
+        @Uat("ST-98")
         fun flippingAllSwapsTheWaysAndTheirPlaces() {
             open()
             val k = AppPrefs.getInstance().keyboard
@@ -262,7 +262,7 @@ class PopupOverridesFragmentTest {
 
         // a preset puts every key back, edits too; 撤销 brings them back
         @Test
-        @Uat("ST-96")
+        @Uat("ST-98")
         fun aPresetResetsEveryKeyAndCanBeTakenBack() {
             prefs.set(slotsPref, SwipeSlots.Default.with("full/q", false, SwipeSlot.Text("Q")).serialize())
             st.activity
@@ -287,7 +287,7 @@ class PopupOverridesFragmentTest {
 
         // the user leaves the page to try the keys: back on it, 撤销 still takes the change back
         @Test
-        @Uat("ST-95")
+        @Uat("ST-97")
         fun theStepBackOutlivesThePage() {
             open()
             click(R.string.swipe_flip_all)
@@ -315,7 +315,7 @@ class PopupOverridesFragmentTest {
 
         // 多选: keys tapped are chosen, not edited; the batch sets their slots alone
         @Test
-        @Uat("ST-97")
+        @Uat("ST-99")
         fun selectedKeysAreSetAtOnce() {
             open()
             click(R.string.swipe_multi_select)
@@ -341,7 +341,7 @@ class PopupOverridesFragmentTest {
 
         // another keyboard's key: its long press set by its name, the keyboard's own kept until then
         @Test
-        @Uat("ST-98")
+        @Uat("ST-100")
         fun anotherKeyboardsLongPressIsSetByName() {
             open()
             click(R.string.shortcut_page_g14)

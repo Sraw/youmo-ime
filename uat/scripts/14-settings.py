@@ -957,8 +957,8 @@ def page_key(d, label):
     return n
 
 
-@case("ST-95", base="B0-设置", mutates=True, visual=True)
-def st95(d):
+@case("ST-97", base="B0-设置", mutates=True, visual=True)
+def st97(d):
     slots_page(d)
     d.tap(page_key(d, "q").c, 0.5)
     # the dialog is taller than the screen: 上滑's 空 at the fold, 下滑's text field under it
@@ -1005,8 +1005,8 @@ def st95(d):
     return f"q 下滑「{down}」，上滑空槽「{up}」，撤销后上滑「{back}」"
 
 
-@case("ST-96", base="B0-设置", mutates=True, visual=True)
-def st96(d):
+@case("ST-98", base="B0-设置", mutates=True, visual=True)
+def st98(d):
     slots_page(d)
     d.tap_text("翻转上下滑", scroll=False, after=1.0)
     d.open_page("text")
@@ -1031,8 +1031,8 @@ def st96(d):
     return f"翻转后 a 下滑「{flipped}」，预设后上滑「{preset}」"
 
 
-case("ST-97", needs="jvm:PopupOverridesFragmentTest$Dialog.selectedKeysAreSetAtOnce")(lambda d: None)
+case("ST-99", needs="jvm:PopupOverridesFragmentTest$Dialog.selectedKeysAreSetAtOnce")(lambda d: None)
 
 
-case("ST-98", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
+case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
 

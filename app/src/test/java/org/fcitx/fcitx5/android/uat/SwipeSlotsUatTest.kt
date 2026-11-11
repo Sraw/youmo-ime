@@ -62,7 +62,7 @@ class SwipeSlotsUatTest {
     }
 
     @Test
-    @Uat("ST-95")
+    @Uat("ST-97")
     fun aTextSlotShowsTwoCharactersAndTypesAll() {
         prefs.set(internal.keySwipes, SwipeSlots.Default.with("full/q", up = false, SwipeSlot.Text("你好世界")).with("full/q", up = true, SwipeSlot.Empty).serialize())
         val h = harness()
@@ -80,7 +80,7 @@ class SwipeSlotsUatTest {
     }
 
     @Test
-    @Uat("ST-96")
+    @Uat("ST-98")
     fun flippedTheSwipesSwapAndTheMarksStay() {
         val k = AppPrefs.getInstance().keyboard
         // as 翻转上下滑 leaves them: the slots flipped, the two places swapped
@@ -138,7 +138,7 @@ class SwipeSlotsUatTest {
     }
 
     @Test
-    @Uat("ST-98")
+    @Uat("ST-100")
     fun aGroupKeysLongPressSetByName() {
         prefs.set(internal.keyPopups, "g14/qw ① ②")
         val h = harness(ImKeyboard.KEYS14)
