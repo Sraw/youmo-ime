@@ -299,7 +299,8 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
     }
 
     // KeyMarks' slots, by what each is (a symbol's or a shortcut's), the other way's place apart from it;
-    // two in one slot: a symbol's kept (as 0.5 kept the symbol), else the up one's
+    // two in one slot: a symbol's kept (as 0.5 kept the symbol), else the up one's; unreachable once the
+    // settings are settled (KeyMarks.settled), kept for safety
     private fun charSlots(ways: List<Way>): Map<Slot, Way> {
         val m = env.marks
         val slots = LinkedHashMap<Slot, Way>()

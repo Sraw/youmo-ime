@@ -120,6 +120,8 @@ class ContentTest {
             for ((name, at) in listOf("delete-sweep" to shown(up, down), "restore" to shown(down, up))) {
                 val box = icons[name]
                 if (at == KeyMarks.At.None) assertEquals(null, box, "$form $up $down: $name not drawn")
+                // drawn wherever set, on every form: no pair of places the yield drops one of on these keys
+                assertTrue(at == KeyMarks.At.None || box != null, "$form $up $down: $name drawn at $at")
                 if (box == null) continue
                 assertAt(at, box, f, "$form $up $down: $name")
                 seen += Triple(form, name == "delete-sweep", up.takeIf { name == "delete-sweep" } ?: down)
@@ -383,7 +385,7 @@ class ContentTest {
             // the face no longer holds them beside it and the icons' class goes to its cap in a step (measured: one
             // a sweep at 1.5 to 2.75 px a dp, two at 3.5; the caller allows two)
             val icon = " I " in id
-            if (icon) assertTrue(" 945.0 compact " in at, "$id $o to $now, an icon taller than its face, $at")
+            if (icon) assertTrue(Regex(" 945(\\.0)? compact ") in at, "$id $o to $now, an icon taller than its face, $at")
             assertTrue(o - now <= (if (icon) KeyMarkYield.MAX_CLASS_SHRINK else 0.075 / d) * o + 1e-6, "$id $o to $now, taller than its face, $at")
             return icon
         }
@@ -471,34 +473,6 @@ class ContentTest {
             assertEquals(setOf("backspace", "delete-sweep", "restore"), icons.keys, "a 1 dp border, ${f.height}")
             assertTrue(icons.getValue("delete-sweep").top >= f.top + 1 * d - 0.01, "up off the border: ${icons.getValue("delete-sweep")} $f")
             assertTrue(icons.getValue("restore").bottom <= f.bottom - 1 * d + 0.01, "down off the border: ${icons.getValue("restore")} $f")
-        }
-    }
-
-    @Test
-    fun aFloatingBoardsBackspaceAtTheDefaultsSideBySideOnTop() {
-        // 上滑 右上, 下滑 左上 (the defaults): ⌫'s 清除 and 恢复 side by side on top beside its icon. The narrow ⌫s
-        // of floating 大千, 注音九键 and 手写 have no room for both after the icons' class (6%) and the marks' class
-        // (to 0.875) are smaller, and leave them out as KeyMarkYield says (恢复 first, then 清除); the swipes work
-        val drawn = mapOf(
-            "qwerty" to setOf("delete-sweep", "restore"),
-            "k14" to setOf("delete-sweep", "restore"),
-            "k18" to setOf("delete-sweep", "restore"),
-            "nine" to setOf("delete-sweep", "restore"),
-            "number" to setOf("delete-sweep", "restore"),
-            "symbols" to setOf("delete-sweep", "restore"),
-            "zhuyin" to setOf("delete-sweep"),
-            "handwriting" to setOf("delete-sweep"),
-            "zhuyin-nine" to emptySet(),
-        )
-        for (d in listOf(2.0, 2.625, 2.75, 3.5)) for ((board, marks) in drawn) {
-            val k = d / Forms.DENSITY
-            val e = Forms.env(board, Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d))
-            val s = Forms.scene(board, e)
-            val icons = icons(s, "backspace").associate { it.name to it.box }
-            assertEquals(marks + "backspace", icons.keys, "$board at $d")
-            val f = face(s, "backspace")
-            icons["delete-sweep"]?.let { assertTrue(it.left > (f.left + f.right) / 2, "$board at $d: 清除 top right $it") }
-            icons["restore"]?.let { assertTrue(it.right < (f.left + f.right) / 2, "$board at $d: 恢复 top left $it") }
         }
     }
 

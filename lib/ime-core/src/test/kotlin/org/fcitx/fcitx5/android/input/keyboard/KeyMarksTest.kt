@@ -128,6 +128,11 @@ class KeyMarksTest {
                 if (downAt == At.Bottom) assertEquals(KeyMarks.LowOrder.first { it != upAt }.corner, low.slotOf("恢复"))
             }
         }
+        // both 底部 on a low key: settled first (上滑 to 右上), then 下滑's 底部 the first corner left, 右下
+        assertEquals(Placed.of(Slot.TopRight to "清除", Slot.BottomRight to "恢复"),
+            KeyMarks.placeFunction("清除", "恢复", true, true, At.Bottom, At.Bottom, true, false))
+        assertEquals(Placed.of(Slot.TopRight to "清除", Slot.BottomRight to "恢复"),
+            KeyMarks.placeFunction("清除", "恢复", true, true, At.Bottom, At.Bottom, false, true))
         // one place in both (an import the settings page never wrote): read as settled, the up one yields
         assertEquals(Placed.of(Slot.TopRight to "清除", Slot.BottomRight to "恢复"),
             KeyMarks.placeFunction("清除", "恢复", true, true, At.BottomRight, At.BottomRight, false, false))
