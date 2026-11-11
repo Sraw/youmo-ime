@@ -30,7 +30,7 @@ class VoiceHomophones internal constructor(
     private val words: List<Word>,
     // every word of the user's (added, learned however often): never replaced, nor what is inside one
     private val own: Set<String>,
-    // each character's readings ([reading]), only those some word has
+    // each character's readings ([reading]), all of them; those no word has match nothing
     private val chars: Map<Char, IntArray>,
 ) {
     /** A user's word, the readings each of its characters may have ([reading]). */
@@ -145,7 +145,7 @@ class VoiceHomophones internal constructor(
 
         /**
          * [text] with each stretch [candidates] finds and the engine [allowed] made the word (or one
-         * this hold put in already): from the start, a stretch overlapping one already put in left
+         * this hold put in already, where the engine has not answered for it): from the start, a stretch overlapping one already put in left
          * as it is.
          */
         suspend fun replace(text: String, lexicon: Lexicon): String {
@@ -160,7 +160,11 @@ class VoiceHomophones internal constructor(
             var until = 0
             for (span in spans) {
                 val from = span.at + span.start
-                if (from < until || !(pair(span) in putIn || answered[span.key] == true)) continue
+                // the engine's answer for this stretch where it is, never overturned; one put in this
+                // hold elsewhere only for a stretch it has not answered (the raw text's other runs)
+                val yes = answered[span.key] ?: (pair(span) in putIn)
+                if (from < until || !yes) continue
+                answered[span.key] = true
                 span.word.text.toCharArray(out, from)
                 putIn += pair(span)
                 until = span.at + span.end
@@ -195,12 +199,12 @@ class VoiceHomophones internal constructor(
         /**
          * Of the user's [words] (Engines.userWords' order: added, learned most typed first,
          * blocked), [readingsOf] each that takes part (null: not known, it takes no part), each
-         * character's readings by [charReadings] (all its readings; those [needed] the ones that count).
+         * character's readings, all of them, by [charReadings].
          */
         fun of(
             words: List<UserWord>,
             readingsOf: (UserWord) -> List<IntArray>?,
-            charReadings: (needed: Set<Int>) -> Map<Char, IntArray>,
+            charReadings: () -> Map<Char, IntArray>,
         ): VoiceHomophones {
             val mine = words.filter { it.kind == UserWord.Kind.ADDED || it.kind == UserWord.Kind.LEARNED }
             // added first, then learned most typed first, whatever order they came in
@@ -211,8 +215,7 @@ class VoiceHomophones internal constructor(
                 .mapNotNull { w -> readingsOf(w)?.takeIf { r -> r.size == w.text.length && r.all { it.isNotEmpty() } }?.let { Word(w.text, it) } }
                 .toList()
             if (taking.isEmpty()) return NONE
-            val needed = taking.flatMapTo(HashSet()) { w -> w.readings.flatMap { it.asIterable() } }
-            return VoiceHomophones(taking, mine.mapTo(HashSet()) { it.text }, charReadings(needed))
+            return VoiceHomophones(taking, mine.mapTo(HashSet()) { it.text }, charReadings())
         }
 
         /**

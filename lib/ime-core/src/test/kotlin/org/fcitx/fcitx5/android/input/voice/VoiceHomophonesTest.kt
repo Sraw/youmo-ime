@@ -55,7 +55,7 @@ class VoiceHomophonesTest {
     private fun readings(w: UserWord): List<IntArray> = w.text.map { c -> chars.getValue(c).take(1).toIntArray() }
 
     private fun homophones(vararg words: UserWord) =
-        VoiceHomophones.of(words.toList(), ::readings) { needed -> chars.mapValues { (_, r) -> r.filter { it in needed }.toIntArray() }.filterValues { it.isNotEmpty() } }
+        VoiceHomophones.of(words.toList(), ::readings) { chars }
 
     private open class FakeDictionary(
         val words: Set<String> = setOf("公式", "攻势", "徐静雨", "瑞典"),
@@ -69,6 +69,9 @@ class VoiceHomophonesTest {
 
     private fun replaced(h: VoiceHomophones, text: String, dictionary: VoiceHomophones.Dictionary = FakeDictionary()): String =
         now { h.hold().replace(text) { spans -> BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], dictionary) } } }
+
+    private fun replaced(hold: VoiceHomophones.Hold, text: String, dictionary: VoiceHomophones.Dictionary = FakeDictionary()): String =
+        now { hold.replace(text) { spans -> BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], dictionary) } } }
 
     private fun learned(text: String, count: Float) = UserWord(text, "", LEARNED, count)
 
@@ -154,6 +157,14 @@ class VoiceHomophonesTest {
         // the raw text (the polish failed): no marks, the run another, 徐婧 still put in; silent now, not asked
         assertEquals("找徐婧和瑞", now { hold.replace("找徐静和瑞") { asked++; BooleanArray(it.size) { true } } })
         assertEquals(2, asked)
+    }
+
+    @Test
+    fun `a stretch the engine said no to stays as heard, the same put in elsewhere`() {
+        val hold = homophones(added("何芮")).hold()
+        // 和瑞典: a common word over its edge; 和瑞 alone put in
+        assertEquals("和瑞典，何芮", replaced(hold, "和瑞典，和瑞"))
+        assertEquals("和瑞典，何芮。", replaced(hold, "和瑞典，和瑞。"))
     }
 
     @Test
