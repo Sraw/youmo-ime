@@ -65,7 +65,7 @@ class HandwritingKeyboard(
     private val recognition: HandwritingRecognition = HandwritingRecognition.shared,
     /** 候选词注音 set from the 注 key, after what the pad wrote is in. */
     private val setReading: (ReadingStyle) -> Unit = {},
-) : BaseKeyboard(context, theme, layout(context), themeBoard = KeyNames.HANDWRITING, shortcuts = true) {
+) : BaseKeyboard(context, theme, layout(context), themeBoard = KeyNames.HANDWRITING) {
 
     companion object {
         const val Name = "Handwriting"

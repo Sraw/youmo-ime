@@ -30,6 +30,8 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.wm.EssentialWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -161,6 +163,7 @@ class PickerWindow(
         val outcome = when {
             it is KeyAction.HostKeyAction -> query.type(it.act)
             it is KeyAction.SymAction && it.sym == EmojiSearchUi.BACKSPACE -> query.backspace(it.states.has(KeyState.Repeat))
+            it is KeyAction.ShortcutAction -> queryCommand(it.shortcut)
             else -> EmojiSearchQuery.Outcome.PASSED
         }
         when (outcome) {
@@ -168,6 +171,13 @@ class PickerWindow(
             EmojiSearchQuery.Outcome.PASSED -> keyActionListener.onKeyAction(it, source)
             EmojiSearchQuery.Outcome.SWALLOWED -> Unit
         }
+    }
+
+    // ⌫'s slots' 清空 and 恢复 on the query, not the field (060-keys-unify J1); the rest the field's, as elsewhere
+    private fun queryCommand(shortcut: KeyShortcut): EmojiSearchQuery.Outcome = when ((shortcut as? KeyShortcut.Command)?.command) {
+        KeyCommand.Clear -> query.clearAll()
+        KeyCommand.Restore -> query.restore()
+        else -> EmojiSearchQuery.Outcome.PASSED
     }
 
     /** The search shown ([on]) from no query, or the emoji again. */
@@ -296,6 +306,8 @@ class PickerWindow(
         pickerLayout.embeddedKeyboard.also {
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
+            // its named keys' long presses, ，。's bubbles and the edit menu its space swipes to, as every keyboard's (060-keys-unify D5)
+            it.popupActionListener = popup.listener
             it.inPasswordField = service.inPasswordField
         }
         pickerLayout.search?.keyboard?.keyActionListener = searchKeyActionListener

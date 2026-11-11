@@ -2,21 +2,21 @@
 <!--
   颜文字面板（PickerLayout panel=false，emoticonPicker，rules C9.12）下面的一行键，板 emoji（同表情面板：主题里两个面板是一块板 KeyNames.EMOJI；060-render-p2 S8a：旧 View 删掉时补上）。
   ABC 15、, 10、表情 10（图标）、空格、. 10、⌫ 15、回车 15。
-  , . 是 PunctuationKey：只按下打出，没有长按、没有气泡（popups="off"）；键面按标点映射显示（{punct:,}，中文下 ，。），和打出的一致。空格不写输入法名（PickerLayout 不调 onInputMethodUpdate）。
-  不画快捷角标：面板的键没有快捷键（BaseKeyboard 的 shortcuts 关）。
+  , . 是 PunctuationKey：按下打出，没有气泡；长按是 fn/comma、fn/period 的列表（同各键盘的 ，。）；键面按标点映射显示（{punct:,}，中文下 ，。），和打出的一致。空格不写输入法名（PickerLayout 不调 onInputMethodUpdate）。
+  空格、⌫、回车和标点键有名字（fn/space 等，060-keys-unify D5）：长按、上下滑的槽和角标同各键盘的同名键。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="emoji" name="颜文字" family="symbols" columns="100" popups="off">
   <row>
     <key id="back" role="back" kind="function" width="15" label="ABC" text-size="16" text-style="bold" send="layout:Text"/>
-    <key id="comma" kind="function" width="10" label="{punct:,}" text-size="23" send=","/>
+    <key id="comma" kind="function" width="10" label="{punct:,}" text-size="23" send="," shortcut="comma"/>
     <key id="emoji" kind="letter" class="alt-text" width="10" icon="emoji" a11y="a11y_key_emoji" send="picker:Emoji"/>
     <key id="space" role="space" kind="space" face="special" width="fill" text-size="13" a11y="a11y_key_space" badge="{hold-badge}" sound="space" send="sym:space"
-         long-press="space-long-press" swipe-axis="both"/>
-    <key id="period" kind="function" width="10" label="{punct:.}" text-size="23" send="."/>
+         long-press="space-long-press" swipe-axis="both" shortcut="space"/>
+    <key id="period" kind="function" width="10" label="{punct:.}" text-size="23" send="." shortcut="period"/>
     <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
-         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both"/>
+         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
     <key id="enter" role="enter" kind="enter" face="special" width="15" icon="{return-icon}" a11y="{return}"
-         sound="return" send="sym:Return">
+         sound="return" send="sym:Return" shortcut="return">
       <menu>
         <item label="Emoji" icon="emoji" do="picker:"/>
       </menu>

@@ -124,7 +124,7 @@ class T9Keyboard(
     /** 九键双拼's 1 types `;` while typing, shown beside its digit: only under a scheme that types it (微软's ing). */
     private val semicolon: Boolean,
 ) : BaseKeyboard(
-    context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE, shortcuts = true,
+    context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE,
 ), AutoCapsKeys {
 
     companion object {

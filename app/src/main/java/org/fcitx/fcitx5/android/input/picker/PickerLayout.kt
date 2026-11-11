@@ -78,6 +78,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         private var punctuationMapping: Map<String, String> = emptyMap()
 
         override fun onPunctuationUpdate(mapping: Map<String, String>) {
+            super.onPunctuationUpdate(mapping)
             if (mapping == punctuationMapping) return
             punctuationMapping = mapping
             canvas?.invalidateScene()
@@ -109,8 +110,8 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
                 back = context.getString(R.string.picker_back),
                 punctuation = punctuationMapping,
             )
-            // no marks: a panel's swipes reach no shortcut (BaseKeyboard's shortcuts off), as its views drew none
-            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(holdVoice = holdsToTalk), texts = texts, marks = SceneEnvs.NO_MARKS)
+            // its named keys' marks as every keyboard's (060-keys-unify D5): ⌫'s, the space's, Return's, the punctuation's
+            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(holdVoice = holdsToTalk), texts = texts, marks = keyMarks(layout))
             return if (locked) env.copy(states = LOCKED) else env
         }
 

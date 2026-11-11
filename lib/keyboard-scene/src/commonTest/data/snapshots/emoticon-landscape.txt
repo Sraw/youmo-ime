@@ -21,6 +21,7 @@ key comma kind=function a11y="，"
   anchor 468,264.5 up 0,-1
   actions send=","
   text label="，"
+  shortcut="fn/comma"
   normal
     shadow rect(358.88,10.5,577.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(358.88,10.5,577.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -45,10 +46,11 @@ key space kind=space role=space a11y="a11y_key_space"
   hit rect(819,0,1404,529)
   anchor 1111.5,264.5 up 0,-1
   actions long-press="space-long-press" send="sym:space" swipe-axis="both"
-  sound=space
+  sound=space shortcut="fn/space"
   normal
     shadow rect(826.88,10.5,1396.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(826.88,10.5,1396.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    icon cursor-move 1359,15,1388,44 #ff7a858a
   pressed
     +2 fill rect(826.88,10.5,1396.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function a11y="。"
@@ -58,6 +60,7 @@ key period kind=function a11y="。"
   anchor 1521,264.5 up 0,-1
   actions send="."
   text label="。"
+  shortcut="fn/period"
   normal
     shadow rect(1411.88,10.5,1630.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1411.88,10.5,1630.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -70,11 +73,13 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   hit rect(1638,0,1989,529)
   anchor 1813.5,264.5 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
-  sound=delete
+  sound=delete shortcut="fn/backspace"
   normal
     shadow rect(1645.88,10.5,1981.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1645.88,10.5,1981.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 1782,233,1845,296 #ff7a858a
+    icon delete-sweep 1944,15,1973,44 #ff7a858a
+    icon restore 1653,15,1682,44 #ff7a858a
   pressed
     +2 fill rect(1645.88,10.5,1981.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
@@ -83,7 +88,7 @@ key enter kind=enter role=enter a11y="换行"
   hit rect(1989,0,2340,529)
   anchor 2164.5,264.5 up 0,-1
   actions send="sym:Return"
-  sound=return
+  sound=return shortcut="fn/return"
   menu "Emoji" icon=emoji do="picker:"
   normal
     shadow rect(1996.88,10.5,2332.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

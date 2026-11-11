@@ -358,10 +358,12 @@ key backspace kind=function a11y="a11y_key_backspace"
   hit rect(669,397,787.5,596)
   anchor 728.25,496.5 up 0,-1
   actions repeat="true" send="sym:BackSpace"
-  sound=delete
+  sound=delete shortcut="fn/backspace"
   normal
     shadow rect(676.88,415.38,779.63,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(676.88,415.38,779.63,577.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 696.75,465,759.75,528 #ff7a858a
+    icon delete-sweep 742,420,771,449 #ff7a858a
+    icon restore 684,420,713,449 #ff7a858a
   pressed
     +2 fill rect(676.88,415.38,779.63,577.63 r=10.5,10.5,10.5,10.5) #1f000000

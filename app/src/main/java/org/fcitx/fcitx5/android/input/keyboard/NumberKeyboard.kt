@@ -26,7 +26,7 @@ class NumberKeyboard(
     context: Context,
     theme: Theme,
     private val pad: NumberPad = NumberPad.FULL,
-) : BaseKeyboard(context, theme, layout(pad), themeBoard = KeyNames.NUMBER, shortcuts = true) {
+) : BaseKeyboard(context, theme, layout(pad), themeBoard = KeyNames.NUMBER) {
 
     companion object {
         const val Name = NumberPad.FULL_LAYOUT

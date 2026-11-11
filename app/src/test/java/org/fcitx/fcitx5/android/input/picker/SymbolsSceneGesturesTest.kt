@@ -79,7 +79,8 @@ class SymbolsSceneGesturesTest {
                 h.api.calls.clear()
                 out += "$id long press: " + h.longPress(h.rowKeys().single { it.id == id })
                 h.idle()
-                val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
+                // the host's own triggers too: 123's 输入 Unicode (060-keys-unify J2)
+                val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("trigger") }
                 // ⌫ held repeats, how many times as the press falls in the frame (one fewer at SDK 29): the
                 // record keeps what it sends and that it repeats, not the count
                 val shown = if (id == "backspace") "repeats ${sent.distinct()}".also { assertTrue(sent.toString(), sent.size >= MIN_REPEATS) } else "$sent"

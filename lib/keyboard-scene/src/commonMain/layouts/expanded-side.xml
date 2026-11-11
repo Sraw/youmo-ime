@@ -2,7 +2,7 @@
 <!--
   展开候选右侧的一列键（ExpandedCandidateLayout.Keyboard，060-render-p2 S6），板 expanded-side。一列四键，各占一行：
   上页、下页（action:page-up / page-down，App 翻候选列表；翻不动时 App 给 :disabled，淡出且不收触摸，同旧 View 的 isEnabled）、
-  ⌫（同字母板，旁滑选字）、回车（长按 Emoji 菜单，同各板的回车）。不弹气泡和长按键盘；不画快捷角标（旧的键盘 shortcuts=false）。
+  ⌫（同字母板，旁滑选字）、回车（长按 Emoji 菜单，同各板的回车）。不弹气泡和长按键盘；⌫、回车有名字（060-keys-unify D5）：上下滑的槽和角标同各键盘。
   板底不画：列下面是展开候选的面板色和左边的分隔线（ExpandedCandidateLayout 自己画）。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="expanded-side" name="展开候选侧列" family="expanded-side" columns="1" preview="off" popups="off">
@@ -14,10 +14,10 @@
     <key id="page-down" icon="arrow-downward" a11y="a11y_candidates_next_page" send="action:page-down"/>
   </row>
   <row>
-    <key id="backspace" role="backspace" icon="backspace" a11y="a11y_key_backspace" sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both"/>
+    <key id="backspace" role="backspace" icon="backspace" a11y="a11y_key_backspace" sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
   </row>
   <row>
-    <key id="enter" role="enter" kind="enter" face="special" icon="{return-icon}" a11y="{return}" sound="return" send="sym:Return">
+    <key id="enter" role="enter" kind="enter" face="special" icon="{return-icon}" a11y="{return}" sound="return" send="sym:Return" shortcut="return">
       <menu>
         <item label="Emoji" icon="emoji" do="picker:"/>
       </menu>

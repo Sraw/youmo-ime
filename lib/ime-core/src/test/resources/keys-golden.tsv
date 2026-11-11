@@ -735,12 +735,38 @@ num/0	number	default	-	-	-	-
 num/0	number	zh	-	-	-	-
 fn/return	number	default	-	-	-	-
 fn/return	number	zh	-	-	-	-
+fn/numbers	symbols	default	-	-	-	-
+fn/numbers	symbols	zh	-	-	-	-
 fn/space	symbols	default	-	-	i:cursor-move	-
 fn/space	symbols	zh	-	-	i:cursor-move	-
 fn/backspace	symbols	default	-	-	i:delete-sweep	i:restore
 fn/backspace	symbols	zh	-	-	i:delete-sweep	i:restore
 fn/return	symbols	default	-	-	-	-
 fn/return	symbols	zh	-	-	-	-
+fn/space	emoji	default	-	-	i:cursor-move	-
+fn/space	emoji	zh	-	-	i:cursor-move	-
+fn/period	emoji	default	| , ? ! : ; _ % $ ^ &	,	-	-
+fn/period	emoji	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/backspace	emoji	default	-	-	i:delete-sweep	i:restore
+fn/backspace	emoji	zh	-	-	i:delete-sweep	i:restore
+fn/return	emoji	default	-	-	-	-
+fn/return	emoji	zh	-	-	-	-
+fn/comma	emoticon	default	| . ? ! : ; " ' ( ) ~	.	-	-
+fn/comma	emoticon	zh	| 。 ？ ！ ： ； “ ‘ （ ） ～	。	-	-
+fn/space	emoticon	default	-	-	i:cursor-move	-
+fn/space	emoticon	zh	-	-	i:cursor-move	-
+fn/period	emoticon	default	| , ? ! : ; _ % $ ^ &	,	-	-
+fn/period	emoticon	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/backspace	emoticon	default	-	-	i:delete-sweep	i:restore
+fn/backspace	emoticon	zh	-	-	i:delete-sweep	i:restore
+fn/return	emoticon	default	-	-	-	-
+fn/return	emoticon	zh	-	-	-	-
+fn/backspace	emoji-search	default	-	-	i:delete-sweep	i:restore
+fn/backspace	emoji-search	zh	-	-	i:delete-sweep	i:restore
+fn/backspace	expanded-side	default	-	-	i:delete-sweep	i:restore
+fn/backspace	expanded-side	zh	-	-	i:delete-sweep	i:restore
+fn/return	expanded-side	default	-	-	-	-
+fn/return	expanded-side	zh	-	-	-	-
 g18/q	theme-k18	default	Q 1# q |	1#	s:1	-
 g18/q	theme-k18	zh	Q 1# q |	1#	s:1	-
 g18/we	theme-k18	default	W E 2# w e |	2#	s:2	-

@@ -34,7 +34,8 @@ key numbers kind=letter role=numbers a11y="a11y_key_numbers"
   shape rect(239.88,545.38,328.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(232,527,336,702)
   anchor 284,614.5 up 0,-1
-  actions send="layout:Number"
+  actions long-press="unicode" send="layout:Number"
+  shortcut="fn/numbers"
   normal
     shadow rect(239.88,545.38,328.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(239.88,545.38,328.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc

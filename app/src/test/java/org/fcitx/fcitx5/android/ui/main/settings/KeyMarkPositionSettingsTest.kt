@@ -11,9 +11,15 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
+import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
@@ -151,5 +157,46 @@ class KeyMarkPositionSettingsTest {
         assertEquals(KeyMarks.At.TopLeft, swipeSpots().symbol)
         assertEquals("左上", st.pref(R.string.swipe_up_position).summary)
         assertEquals(KeyMarkPosition.TopLeft, keyboard.swipeUpPosition.getValue())
+    }
+
+    // where the two settings put the marks, the keyboard floating, split or one-handed as upright (060-keys-unify
+    // §6.2): z's 撤销 and its symbol; ⌫'s 清空 (上滑) and 恢复 (下滑), a mark left out where the key has no room for it
+    // (floating's low keys: KeyMarksEverywhereUatTest's left out)
+    private fun placedIn(mode: String) {
+        prefs.set(keyboard.swipeUpPosition, KeyMarkPosition.BottomLeft)
+        prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.TopRight)
+        KeyboardHarness().use { h ->
+            h.start()
+            val z = (h.key("z") as SceneShownKey).markPlaces()
+            assertEquals(mode, listOf("TR") to "BL", z.shortcuts to z.symbol)
+            val backspace = (h.keyNamed("backspace") as SceneShownKey).node
+            val face = backspace.shape.bounds
+            fun corner(icon: String): String? = backspace.ops(false).filterIsInstance<Op.Icon>().firstOrNull { it.name == icon }?.box?.let {
+                (if (it.centerY < face.centerY) "T" else "B") + (if (it.centerX < face.centerX) "L" else "R")
+            }
+            assertEquals(mode, "BL", corner("delete-sweep"))
+            assertTrue(mode, corner("restore").let { it == null || it == "TR" })
+        }
+    }
+
+    @Test
+    @Uat("KB-66")
+    fun placedFloating() {
+        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        placedIn("悬浮")
+    }
+
+    @Test
+    @Uat("KB-66")
+    fun placedSplit() {
+        prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
+        placedIn("分开")
+    }
+
+    @Test
+    @Uat("KB-66")
+    fun placedOneHanded() {
+        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        placedIn("单手")
     }
 }

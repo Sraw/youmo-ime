@@ -91,7 +91,6 @@ class GroupedKeyboard private constructor(
 ) : BaseKeyboard(
     context, theme, layout(builtIn, builtInWire, builtInSemicolon, ::symbolsOf),
     themeBoard = shapeOf(builtIn).board,
-    shortcuts = true,
 ) {
 
     constructor(

@@ -29,7 +29,8 @@ key numbers kind=letter role=numbers a11y="a11y_key_numbers"
   shape rect(299.88,545.38,413.13,683.63)
   hit rect(292,527,421,702)
   anchor 356.5,614.5 up 0,-1
-  actions send="layout:Number"
+  actions long-press="unicode" send="layout:Number"
+  shortcut="fn/numbers"
   normal
     icon number-pad 325,583,388,646 #ff7a858a
   pressed

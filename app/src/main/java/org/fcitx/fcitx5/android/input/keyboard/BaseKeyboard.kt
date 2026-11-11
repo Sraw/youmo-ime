@@ -86,8 +86,6 @@ abstract class BaseKeyboard(
     private val keyLayout: List<List<KeyDef>>,
     /** Its keys' board in a theme ([KeyNames]: `qwerty`, `nine`…), each key named by [KeyDef.name]; null, styled by kind alone. */
     val themeBoard: String? = null,
-    /** Whether its keys' swipes reach their shortcuts ([KeyDef.shortcut]): the typing keyboards', not a panel's. */
-    private val shortcuts: Boolean = false,
 ) : ConstraintLayout(context) {
 
     var keyActionListener: KeyActionListener? = null
@@ -122,13 +120,10 @@ abstract class BaseKeyboard(
         spaceKeys.forEach { spaceSwipesCursor(it, v) }
     }
 
-    // a space with shortcuts swipes up whether it moves the cursor or not: only its sideways steps go
+    // a space swipes up and down to its slots whether it moves the cursor or not, a panel's too (060-keys-unify
+    // D5): only its sideways steps go
     private fun spaceSwipesCursor(key: KeyHandle, on: Boolean) {
         val g = key.keyGesture
-        if (!shortcuts) {
-            g.swipeEnabled = on
-            return
-        }
         g.swipeEnabled = true
         g.swipeRepeatEnabled = on
         g.swipeThresholdX = if (on) selectionSwipeThreshold else disabledSwipeThreshold
@@ -286,7 +281,7 @@ abstract class BaseKeyboard(
      */
     protected open val punctuationSwipesTap: Boolean get() = false
 
-    private val swipes = KeySwipes(this, shortcuts, inputSwipeThreshold, disabledSwipeThreshold, selectionSwipeThreshold, object : KeySwipes.Keyboard {
+    private val swipes = KeySwipes(this, inputSwipeThreshold, disabledSwipeThreshold, selectionSwipeThreshold, object : KeySwipes.Keyboard {
         override val inPasswordField get() = this@BaseKeyboard.inPasswordField
         override val charShortcutMarks get() = this@BaseKeyboard.charShortcutMarks
         override val punctuationSwipesTap get() = this@BaseKeyboard.punctuationSwipesTap
@@ -363,7 +358,7 @@ abstract class BaseKeyboard(
      * has them by the letter), else [SwipeChoice.BuiltIn] for what its key says.
      */
     protected open fun swipeText(def: KeyDef): SwipeChoice {
-        val name = def.shortcut?.takeIf { shortcuts && it in PopupOverridesCache.byName.current.labels } ?: return SwipeChoice.BuiltIn
+        val name = def.shortcut?.takeIf { it in PopupOverridesCache.byName.current.labels } ?: return SwipeChoice.BuiltIn
         return SwipeChoice.of(userLongPress(name)?.firstOrNull().orEmpty())
     }
 
@@ -406,7 +401,7 @@ abstract class BaseKeyboard(
         def.popup?.forEach { wirePopup(key, def, it, longPopup) }
         // a named key's long press is the resolver's ([onPopupAction] makes it as it opens, 060-keys-unify): one
         // with no long press of its own gets one where the resolver has a list for it now
-        val name = def.shortcut?.takeIf { shortcuts }
+        val name = def.shortcut
         if (name != null) {
             namesById[key.ref.id] = name
             placeholders[key.ref.id] = placeholderOf(def)
@@ -436,7 +431,7 @@ abstract class BaseKeyboard(
      * first; null for a key with no name, or a function key with no first (its own swipe, as the layout has it).
      */
     private fun resolvedSwipe(def: KeyDef): SwipeChoice? {
-        val name = def.shortcut?.takeIf { shortcuts } ?: return null
+        val name = def.shortcut ?: return null
         val id = KeyId.of(name)
         val r = keyResolver()?.resolve(id, keyState()) ?: return null
         val first = r.first ?: return if (id.isFunction) null else SwipeChoice.None
@@ -928,7 +923,7 @@ abstract class BaseKeyboard(
 
     /** The keys' swipe marks drawn again, as what [charShortcutMarks] or the corners read changed. */
     protected fun showSwipeMarks() {
-        if (shortcuts) swipes.showMarks()
+        swipes.showMarks()
     }
 
     open fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {

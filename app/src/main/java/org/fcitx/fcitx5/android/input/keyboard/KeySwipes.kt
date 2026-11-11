@@ -31,8 +31,6 @@ internal class LongPopup {
  */
 internal class KeySwipes(
     private val board: View,
-    /** Whether the keys' swipes reach their shortcuts: the typing keyboards', not a panel's. */
-    private val shortcuts: Boolean,
     private val threshold: Float,
     private val disabledThreshold: Float,
     /** 滑选's step sideways: the backspace's selection's, a character there as far as one it deletes. */
@@ -72,23 +70,21 @@ internal class KeySwipes(
     private val markPositionListener = ManagedPreference.OnChangeListener<KeyMarkPosition> { _, _ -> showMarks() }
 
     init {
-        // a panel's keys of no name have marks too (their built-in swipe), placed by the same two settings
+        // the keys of no name have marks too (their built-in swipe), placed by the same two settings
         prefs.keyboard.swipeUpPosition.registerOnChangeListener(markPositionListener)
         prefs.keyboard.swipeDownPosition.registerOnChangeListener(markPositionListener)
-        if (shortcuts) {
-            prefs.internal.keySwipes.registerOnChangeListener(slotsListener)
-            prefs.keyboard.swipeUp.registerOnChangeListener(waysListener)
-            prefs.keyboard.swipeDown.registerOnChangeListener(waysListener)
-        }
+        prefs.internal.keySwipes.registerOnChangeListener(slotsListener)
+        prefs.keyboard.swipeUp.registerOnChangeListener(waysListener)
+        prefs.keyboard.swipeDown.registerOnChangeListener(waysListener)
     }
 
     /**
      * What the key of [def] swipes to as the settings are now ([KeySwipe.Key]): its two slots by its name;
-     * a key of no name (a panel's, 注音九键's ˉ), its built-in swipe the way the slots' orientation puts a
+     * a key of no name (注音九键's ˉ), its built-in swipe the way the slots' orientation puts a
      * long press's first ([KeySwipe.Key.unnamed]).
      */
     private fun swipeKey(def: KeyDef): KeySwipe.Key {
-        val name = def.shortcut?.takeIf { shortcuts }
+        val name = def.shortcut
         val builtIn = def.behaviors.any { it is KeyDef.Behavior.Swipe }
         val hasFirst = when (keyboard.swipeText(def)) {
             BaseKeyboard.SwipeChoice.BuiltIn -> builtIn
@@ -101,7 +97,7 @@ internal class KeySwipes(
         return KeySwipe.Key(tapsOnNothing(key), slots.resolve(key, up = true), slots.resolve(key, up = false), hasFirst)
     }
 
-    // 上滑 and 下滑 on or off: a panel's keys (no shortcuts) too, both off no swipe on any key as 0.5's 滑动 关
+    // 上滑 and 下滑 on or off: both off no swipe on any key as 0.5's 滑动 关
     private val ways: KeySwipe.Ways get() = swipeWays()
 
     /** What the preview of [key] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
@@ -126,7 +122,7 @@ internal class KeySwipes(
      */
     fun attach(key: KeyHandle, def: KeyDef, longPopup: LongPopup) {
         val builtIn = def.behaviors.firstNotNullOfOrNull { (it as? KeyDef.Behavior.Swipe)?.action }
-        if (builtIn == null && (def.shortcut == null || !shortcuts)) return
+        if (builtIn == null && def.shortcut == null) return
         val both = def.swipesBothWays
         val g = key.keyGesture
         g.swipeEnabled = true
@@ -173,7 +169,7 @@ internal class KeySwipes(
     // the handwriting keyboard's ，。 beside the ink pad: a finger lifted more than half the key away
     // sideways was a stroke begun on it, which types nothing
     private fun wentSideways(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, held: Held): Boolean {
-        val name = def.shortcut?.takeIf { shortcuts }?.let { KeyId.of(it).name } ?: return false
+        val name = def.shortcut?.let { KeyId.of(it).name } ?: return false
         if (!SwipeSlots.isFunction(name) || !tapsOnNothing(name)) return false
         val width = key.bounds?.width() ?: return false
         return abs(event.x - held.downX) * 2 > width

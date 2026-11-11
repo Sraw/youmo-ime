@@ -39,4 +39,27 @@ class EmojiSearchQueryTest {
         assertEquals(Outcome.PASSED, query.backspace(repeat = false))
         assertEquals("", query.text)
     }
+
+    // ⌫'s slots (060-keys-unify J1): the query's, not the field's
+    @Test
+    fun clearAllThenRestoreOnce() {
+        query.type("xiao")
+        assertEquals(Outcome.CHANGED, query.clearAll())
+        assertEquals("", query.text)
+        query.type("m")
+        assertEquals(Outcome.CHANGED, query.restore())
+        assertEquals("in place of what was typed since", "xiao", query.text)
+        assertEquals(Outcome.SWALLOWED, query.restore())
+        assertEquals("xiao", query.text)
+    }
+
+    @Test
+    fun clearAllOfNothingAndRestoreAfterReopeningDoNothing() {
+        assertEquals("an empty query: nothing, the field's text kept", Outcome.SWALLOWED, query.clearAll())
+        query.type("xi")
+        query.clearAll()
+        query.clear()
+        assertEquals(Outcome.SWALLOWED, query.restore())
+        assertEquals("", query.text)
+    }
 }
