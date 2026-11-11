@@ -85,6 +85,22 @@ class ContentTest {
     }
 
     @Test
+    fun aFunctionKeysUpSwipeMarkIsOverItsDownOnesWhereverTheyArePlaced() {
+        // beta2: 下滑图标位置 右下 drew ⌫'s 恢复 (down) top right and 清除 (up) bottom right
+        val places = KeyMarks.At.entries.filter { it != KeyMarks.At.None }
+        for (up in places + KeyMarks.At.None) for (down in places + KeyMarks.At.None) for (firstUp in listOf(true, false)) {
+            if (up == down) continue
+            val s = Fixtures.scene(env.copy(marks = MarkSettings(upAt = up, downAt = down, firstUp = firstUp)))
+            val icons = icons(s, "backspace").associate { it.name to it.box }
+            val clear = icons["delete-sweep"]
+            val restore = icons["restore"]
+            if (clear != null && restore != null) {
+                assertTrue(clear.bottom <= restore.top + 0.5, "$up $down $firstUp: up's 清除 $clear over down's 恢复 $restore")
+            }
+        }
+    }
+
+    @Test
     fun theShortcutTopLeftAndTheFunctionKeysUpAndDown() {
         val s = Fixtures.scene(env)
         val redo = icons(s, "y").single()

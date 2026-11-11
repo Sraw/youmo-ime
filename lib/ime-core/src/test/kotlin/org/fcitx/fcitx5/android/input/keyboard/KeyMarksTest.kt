@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Placed
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Slot
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Spots
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -110,19 +111,22 @@ class KeyMarksTest {
     fun aFunctionKeysUpWhereChosenItsDownMirrored() {
         val expected = mapOf(
             At.TopLeft to (Slot.TopLeft to Slot.BottomLeft),
-            At.BottomLeft to (Slot.BottomLeft to Slot.TopLeft),
+            At.BottomLeft to (Slot.TopLeft to Slot.BottomLeft),
             At.TopRight to (Slot.TopRight to Slot.BottomRight),
-            At.BottomRight to (Slot.BottomRight to Slot.TopRight),
-            At.Bottom to (Slot.Bottom to Slot.Top),
+            At.BottomRight to (Slot.TopRight to Slot.BottomRight),
+            At.Bottom to (Slot.Top to Slot.Bottom),
         )
         fun f(up: String?, down: String?, upOn: Boolean, downOn: Boolean, at: At, symbolAt: At = At.TopRight, low: Boolean = false) =
             KeyMarks.placeFunction(up, down, upOn, downOn, symbolAt, at, low, false)
         for ((at, slots) in expected) {
             val (up, down) = slots
+            assertFalse("$at: the up swipe's mark over the down one's", up.bottom)
+            assertTrue("$at", down.bottom)
             assertEquals(Placed.of(up to "清除", down to "恢复"), f("清除", "恢复", true, true, at, At.None))
-            assertEquals("the down one alone where chosen", Placed.of(up to "恢复"), f("清除", "恢复", false, true, at, At.None))
-            assertEquals(Placed.of(up to "清除"), f("清除", "恢复", true, false, at, At.None))
-            assertEquals(Placed.of(up to "清除"), f("清除", null, true, true, at, At.None))
+            val alone = at.corner ?: Slot.Bottom
+            assertEquals("the down one alone where chosen", Placed.of(alone to "恢复"), f("清除", "恢复", false, true, at, At.None))
+            assertEquals(Placed.of(alone to "清除"), f("清除", "恢复", true, false, at, At.None))
+            assertEquals(Placed.of(alone to "清除"), f("清除", null, true, true, at, At.None))
             assertEquals(Placed<String>(), f(null, null, true, true, at, At.None))
         }
         assertEquals(Placed<String>(), f("清除", "恢复", true, true, At.None))

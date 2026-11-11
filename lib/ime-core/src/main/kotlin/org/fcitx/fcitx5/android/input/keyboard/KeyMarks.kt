@@ -21,8 +21,8 @@ package org.fcitx.fcitx5.android.input.keyboard
  * not. A shortcut that still has no room on its key is tried in the key's other free corners
  * ([elsewhere]) before it is left out.
  *
- * A function key has no symbol: its up shortcut in the chosen slot, its down one in that slot mirrored
- * top for bottom ([placeFunction]); one alone in the chosen slot.
+ * A function key has no symbol: its two shortcuts in the chosen slot and that slot mirrored
+ * top for bottom, the up one's the upper ([placeFunction]); one alone in the chosen slot.
  */
 object KeyMarks {
 
@@ -149,7 +149,7 @@ object KeyMarks {
 
     /**
      * A function key's: its [up] shortcut at [shortcutAt] ([onKeys], [symbolAt] where the symbols
-     * are), its [down] one in that slot mirrored, each only where that way is on ([upOn], [downOn]);
+     * are), its [down] one in that slot mirrored, the up one always the upper of the two, each only where that way is on ([upOn], [downOn]);
      * the down one alone at [shortcutAt]. 无 draws neither.
      */
     fun <T : Any> placeFunction(
@@ -159,8 +159,14 @@ object KeyMarks {
         val u = up?.takeIf { upOn }
         val d = down?.takeIf { downOn }
         val out = linkedMapOf<Slot, T>()
-        if (u != null) out[slot] = u
-        if (d != null) out[if (u != null) slot.mirrored else slot] = d
+        if (u != null && d != null) {
+            // the pair at the chosen slot and its mirror, the up one over the down one
+            val (top, bottom) = if (slot.bottom) slot.mirrored to slot else slot to slot.mirrored
+            out[top] = u
+            out[bottom] = d
+        } else {
+            (u ?: d)?.let { out[slot] = it }
+        }
         return Placed(out)
     }
 }
