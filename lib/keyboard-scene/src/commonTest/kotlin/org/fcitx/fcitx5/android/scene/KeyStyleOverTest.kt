@@ -147,7 +147,8 @@ class KeyStyleOverTest {
     // never takes a look worked out for one before
     @Test
     fun aSharedCascadeKeepsEachKeyStylesAndFormsOwnLooks() {
-        val t = theme()
+        // no scene selectors (`@landscape key`…): one cascade for every form, as only the key tells the forms apart
+        val t = theme(text = base.lines().filterNot { "select=\"@" in it }.joinToString("\n"))
         val shared = Cascades(t)
         fun built(over: KeyStyleOver?, env: Env) =
             SceneBuilder(t, env.copy(flat = over?.flat == true, keyStyle = over), FixedMeasurer, cascades = shared).build(Fixtures.qwerty).ok()
@@ -158,6 +159,8 @@ class KeyStyleOverTest {
         assertTrue(inset(portrait.key("a")) != inset(own.key("a")), "${inset(portrait.key("a"))}")
         assertTrue(face(portrait.key("a")).radii != face(own.key("a")).radii)
         assertTrue(inset(landscape.key("a"))[0] != inset(portrait.key("a"))[0], "${inset(landscape.key("a"))} ${inset(portrait.key("a"))}")
+        val compact = built(loose, Fixtures.compact)
+        assertTrue(inset(compact.key("a"))[0] != inset(portrait.key("a"))[0], "${inset(compact.key("a"))} ${inset(portrait.key("a"))}")
         // none again: the theme's own, as before any
         assertEquals(own.key("a").faces, built(null, Fixtures.portrait).key("a").faces)
         assertEquals(scene(t, null).key("a").faces, built(null, Fixtures.portrait).key("a").faces)
