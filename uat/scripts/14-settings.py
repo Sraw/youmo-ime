@@ -335,23 +335,50 @@ def skin_colours(d):
 
 
 def face_seams(d, label):
-    """pixels on lines across the letter key [label]'s face, through its nine-slice edges (the skin's corners are
-    30 of its 162x180 px, about a third from the middle), that lean to the panel's blue: a seam between two
-    pieces lets the panel show through as a thin line. Measured against the line's own middle, so a pressed
-    (darker) face is judged alike"""
+    """pixels on lines from the key [label]'s centre out to its face's edges (left, right, up, down) that lean from
+    the face's colour toward the panel's, in runs of 1-2 px with face on both sides: a seam between two nine-slice
+    pieces lets the panel show through as a thin line. Each half-line walks out until the gap round the key (4 or
+    more pixels near the panel's colour) or a key and a half's pitch, so it crosses the seams near the face's edges
+    whatever the key's width (退格 is one and a half letters wide). The face's colour is the line's middle, so a
+    pressed (darker) face is judged alike; the panel's is the gap between g and h. A pixel off the face-panel line
+    (a letter, an icon) is not a seam"""
     k = d.keys(refresh=True)
     missing = [n for n in (label, "h", "g", "t") if n not in k]
     check(not missing, f"量键面拼缝要的键不在屏幕上：{missing}")
-    cx, cy = k[label]
-    px_, py_ = abs(k["h"][0] - k["g"][0]), abs(k["g"][1] - k["t"][1])
+    cx, cy = (int(v) for v in k[label])
+    px_, py_ = int(abs(k["h"][0] - k["g"][0])), int(abs(k["g"][1] - k["t"][1]))
     im = d.png().convert("RGB")
-    lines = [[im.getpixel((x, cy)) for x in range(int(cx - 0.3 * px_), int(cx + 0.3 * px_) + 1)],
-             [im.getpixel((cx, y)) for y in range(int(cy - 0.3 * py_), int(cy + 0.3 * py_) + 1)]]
+    w, h = im.size
+    mid = [im.getpixel((x, cy)) for x in range(max(0, cx - px_ // 4), min(w, cx + px_ // 4))]
+    face = [sorted(p[c] for p in mid)[len(mid) // 2] for c in range(3)]
+    panel = im.getpixel((int((k["g"][0] + k["h"][0]) / 2), int(k["g"][1])))
+    v = [panel[c] - face[c] for c in range(3)]
+    vv = sum(a * a for a in v) or 1
+
+    def toward(p):   # 0 the face, 1 the panel; None off the line between them
+        dlt = [p[c] - face[c] for c in range(3)]
+        t = sum(dlt[c] * v[c] for c in range(3)) / vv
+        off = sum((dlt[c] - t * v[c]) ** 2 for c in range(3)) ** 0.5
+        return t if off < 0.08 * vv ** 0.5 + 8 else None
+
     bad = []
-    for line in lines:
-        mr = sorted(p[0] for p in line)[len(line) // 2]
-        mb = sorted(p[2] for p in line)[len(line) // 2]
-        bad += [p for p in line if p[2] > mb + 30 and p[0] < mr - 20]
+    for dx, dy, reach in ((1, 0, px_), (-1, 0, px_), (0, 1, py_), (0, -1, py_)):
+        run, gap = [], 0
+        for i in range(1, int(1.5 * reach)):
+            x, y = cx + dx * i, cy + dy * i
+            if not (0 <= x < w and 0 <= y < h):
+                break
+            p = im.getpixel((x, y))
+            t = toward(p)
+            gap = gap + 1 if t is not None and t > 0.6 else 0
+            if gap >= 4:   # the gap round the key: the face ends here
+                break
+            if t is not None and t > 0.12:
+                run.append(p)
+            else:
+                if 0 < len(run) <= 2:
+                    bad += run   # a thin line leaning to the panel, face on both sides: a seam
+                run = []
     return bad
 
 
