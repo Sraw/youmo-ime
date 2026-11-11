@@ -348,18 +348,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     launchClipboardTimeoutJob()
                 }
             }
-            hideKeyboardButton.apply {
-                setOnClickListener(hideKeyboardCallback)
-                swipeEnabled = true
-                swipeThresholdY = dp(heightDp(context).toFloat())
-                swipeThresholdX = swipeThresholdY
-                onGestureListener = swipeHideKeyboardCallback
-            }
-            // every button's tap, the `when` exhaustive so that a new button cannot go without one
-            ToolbarButton.entries.forEach { button ->
+            // every button's tap as it is made, the `when` exhaustive so that a new button cannot go without one
+            onButtonMade = { button, made ->
                 val action: ((View) -> Unit)? = when (button) {
-                    // set where they are made: the emoji's in IdleUi, the hide's above with its swipe
-                    ToolbarButton.Emoji, ToolbarButton.Hide -> null
+                    // set where it is made, in IdleUi
+                    ToolbarButton.Emoji -> null
+                    // below, with its swipe
+                    ToolbarButton.Hide -> null
                     ToolbarButton.Voice -> { _ -> commonKeyActionListener.voiceTap() }
                     ToolbarButton.Undo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true) }
                     ToolbarButton.Redo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true) }
@@ -381,7 +376,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                         commonKeyActionListener.listener.onKeyAction(KeyAction.QuickPhraseAction, KeyActionListener.Source.Keyboard)
                     }
                 }
-                action?.let { buttons.getValue(button).setOnClickListener(it) }
+                action?.let { made.setOnClickListener(it) }
+                if (button == ToolbarButton.Hide) made.apply {
+                    setOnClickListener(hideKeyboardCallback)
+                    swipeEnabled = true
+                    swipeThresholdY = dp(heightDp(context).toFloat())
+                    swipeThresholdX = swipeThresholdY
+                    onGestureListener = swipeHideKeyboardCallback
+                }
+                showToggle(button, made)
             }
             clipboardUi.suggestionView.apply {
                 setOnClickListener {
@@ -500,7 +503,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     /** [button]'s view where the user sees it now (the toolbar shown, the button on it); null where not. */
-    fun shownButton(button: ToolbarButton): View? = idleUi.buttons.getValue(button).takeIf {
+    fun shownButton(button: ToolbarButton): View? = idleUi.madeButton(button)?.takeIf {
         view.currentView === idleUi.root && idleUi.onScreen(button) && it.isShown
     }
 
@@ -536,6 +539,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         prefs.internal.useHabits.registerOnChangeListener(onToggleUpdateListener)
         statusEntries = fcitx.runImmediately { statusAreaCached }
         arrangeButtons()
+    }
+
+    /** The keyboards made anew under the bar (InputView.remakeKeyboards): its toolbar as a new bar's, folded or not as set. */
+    fun keyboardsRemade() {
+        panelActions.dismiss()
+        isToolbarManuallyToggled = false
+        evalIdleUiState()
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
@@ -587,19 +597,26 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         showToggles()
     }
 
-    // lit while on, as in the ⋯ panel
-    private fun showToggles() {
-        idleUi.setActive(ToolbarButton.OneHanded, panelActions.oneHanded)
-        idleUi.setActive(ToolbarButton.Floating, panelActions.floating)
-        idleUi.setActive(ToolbarButton.Habits, !panelActions.habitsOn)
-        // named for what a tap does, as the panel's entry
-        idleUi.buttons.getValue(ToolbarButton.Habits).contentDescription =
-            context.getString(if (panelActions.habitsOn) R.string.learning_habits_off else R.string.learning_habits_on)
-        val traditional = tradSimpEntry()?.icon?.endsWith("-active") == true
-        idleUi.setActive(ToolbarButton.TradSimp, traditional)
-        idleUi.buttons.getValue(ToolbarButton.TradSimp).apply {
-            setIcon(if (traditional) R.drawable.ic_fcitx_status_chttrans_trad else R.drawable.ic_fcitx_status_chttrans_simp)
-            contentDescription = context.getString(if (traditional) R.string.status_traditional else R.string.status_simplified)
+    // lit while on, as in the ⋯ panel; a button not made yet is lit as it is made
+    private fun showToggles() = idleUi.madeButtons.forEach { (button, view) -> showToggle(button, view) }
+
+    private fun showToggle(button: ToolbarButton, view: ToolButton) {
+        when (button) {
+            ToolbarButton.OneHanded -> view.setOn(panelActions.oneHanded)
+            ToolbarButton.Floating -> view.setOn(panelActions.floating)
+            ToolbarButton.Habits -> {
+                view.setOn(!panelActions.habitsOn)
+                // named for what a tap does, as the panel's entry
+                view.contentDescription =
+                    context.getString(if (panelActions.habitsOn) R.string.learning_habits_off else R.string.learning_habits_on)
+            }
+            ToolbarButton.TradSimp -> {
+                val traditional = tradSimpEntry()?.icon?.endsWith("-active") == true
+                view.setOn(traditional)
+                view.setIcon(if (traditional) R.drawable.ic_fcitx_status_chttrans_trad else R.drawable.ic_fcitx_status_chttrans_simp)
+                view.contentDescription = context.getString(if (traditional) R.string.status_traditional else R.string.status_simplified)
+            }
+            else -> {}
         }
     }
 
@@ -738,7 +755,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
          * input method [im]: the keyboard's own, as 搜狗's, so it covers nothing of the app; there
          * whether or not one is typed, so the keyboard keeps its height while typing. Tall enough to
          * tap where [im] shows the syllable strip, thin elsewhere ([CodeRowHeight]); the input view
-         * sets it anew as the input method changes, and is made anew when either keyboard setting does.
+         * sets it anew as the input method changes and as its keyboards are made anew for a keyboard setting.
          * None floating over the app (编码行 浮在键盘上方, [codeRowFloats]): the strip is outside the keyboard.
          */
         fun preeditHeight(im: String?): Int = CodeRowHeight.keyboardDp(codeLayout(im), codeRowFloats())

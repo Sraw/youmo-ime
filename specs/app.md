@@ -71,6 +71,16 @@ tell follows the last end. Floating and docked (`FLOATING`, told from a theme ch
 `floatingKeyboard` value the views were made for), the system's `onCreateInputView` and a language
 picked anew keep it.
 
+A setting only the keys read (`remakeKeyboardsPrefs`: each input method's keyboard, 九键's letters and
+symbols) does not make the view anew: `InputView.remakeKeyboards` ends what was typed the same way, drops
+`KeyboardWindow`'s keyboards and shows the letters as a new view does, folds the bar's toolbar, starts the
+field again and replays the engine's state (`onStartHandleFcitxEvent`), which picks the letters and the
+code row's height (060-render-perf-2 #1; `RemakeKeyboardsTest` holds it to what a view made with the setting shows).
+The bar's `ToolButton`s are made as they are first placed (`IdleUi.button`, wired and lit by
+`KawaiiBarComponent`'s `onButtonMade`), the toolbar's as it first opens. A component's scope key
+(`UniqueComponent.type`, the library's kotlin-reflect walk) is found once per class (`ComponentTypes`,
+`TypedComponent`).
+
 ### Notices
 
 What the keyboard says goes in one place, `UndoChip` (`input/learning/`), reached through

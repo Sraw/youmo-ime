@@ -226,8 +226,8 @@ class KeyboardPerfBaselineTest {
     private val viewsIn = linkedMapOf<Board, Pair<Int, Int>>()
 
     /**
-     * A keyboard picked in ⋯ is a setting, and the input view is made anew with it (as on a theme
-     * change): counted from the setting to its first frame. The number and symbol keyboards and the
+     * A keyboard picked in ⋯ is a setting, and the keyboards are made anew with it (the input view
+     * kept): counted from the setting to its first frame. The number and symbol keyboards and the
      * handwriting pad are made the first time a fresh input view shows them: the 26 keys made anew
      * (via 14 keys, a setting each), then counted from the tap's lift, or from handwriting asked for.
      */
@@ -275,8 +275,9 @@ class KeyboardPerfBaselineTest {
     }
 
     private fun pick(board: Board): KeyboardFrames.Sample {
-        val before = onMain { keyboardFrame() }
-        return measure({ keyboardFrame().let { it !== before && shows(it, board) } }) {
+        // the keyboard made anew (InputView.remakeKeyboards keeps the frame and the view around it)
+        val before = onMain { keyboardFrame()?.getChildAt(0) }
+        return measure({ keyboardFrame().let { it?.getChildAt(0) !== before && shows(it, board) } }) {
             AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(board.pinyin!!)
         }
     }

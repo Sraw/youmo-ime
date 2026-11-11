@@ -11,6 +11,7 @@ import androidx.transition.Fade
 import androidx.transition.Slide
 import androidx.transition.Transition
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.dependency.ComponentTypes
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.IUniqueComponent
@@ -56,7 +57,7 @@ sealed class InputWindow : Dependent {
     abstract class SimpleInputWindow<T : SimpleInputWindow<T>> : IUniqueComponent<T>,
         InputWindow() {
 
-        override val type: KClass<out IUniqueComponent<*>> by lazy { defaultType() }
+        override val type: KClass<out IUniqueComponent<*>> get() = ComponentTypes.of(this)
 
         override fun equals(other: Any?): Boolean = defaultEquals(other)
 
@@ -83,7 +84,7 @@ sealed class InputWindow : Dependent {
         @get:StringRes
         open val returnLabel: Int = R.string.back_to_keyboard
 
-        override val type: KClass<out IUniqueComponent<*>> by lazy { defaultType() }
+        override val type: KClass<out IUniqueComponent<*>> get() = ComponentTypes.of(this)
 
         override fun equals(other: Any?): Boolean = defaultEquals(other)
 

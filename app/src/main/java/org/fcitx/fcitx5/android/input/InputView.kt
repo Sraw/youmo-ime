@@ -94,7 +94,7 @@ import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.utils.unset
 import org.mechdancer.dependency.DynamicScope
-import org.mechdancer.dependency.UniqueComponent
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.wrapToUniqueComponent
 import org.mechdancer.dependency.plusAssign
 import splitties.dimensions.dp
@@ -234,6 +234,21 @@ class InputView(
                 bottomOfParent()
             }
         })
+    }
+
+    /**
+     * The keyboards made anew in this view, the rest kept (a keyboard setting changed, 060-render-perf-2 #1):
+     * shown as a new view shows them, the keyboard window, its letters, the bar's toolbar as it starts; then
+     * the field started anew where [info] is one ([FcitxInputMethodService] as it would start a new view),
+     * and the input method and status told again, which pick the letters and the code row's height.
+     */
+    fun remakeKeyboards(info: EditorInfo?, capFlags: CapabilityFlags) {
+        hold?.inputEnded(Hold.InputEnd.LEFT)
+        keyboardWindow.remakeKeyboards()
+        windowManager.attachWindow(KeyboardWindow)
+        kawaiiBar.keyboardsRemade()
+        info?.let { startInput(it, capFlags) }
+        onStartHandleFcitxEvent()
     }
 
     /** The bar's microphone, where the user sees it now; null where not. */
@@ -538,7 +553,7 @@ class InputView(
     }
 
     // told each window attached, by the broadcaster: added once the views it places are laid out
-    private inner class DockFollower : UniqueComponent<DockFollower>(), InputBroadcastReceiver {
+    private inner class DockFollower : TypedComponent<DockFollower>(), InputBroadcastReceiver {
         override fun onWindowAttached(window: InputWindow) = updateKeyboardSize()
     }
 

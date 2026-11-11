@@ -315,14 +315,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // onFinishInputView's focus out dropped the engine's context, and no onStartInput told it since
     private var contextDropped = false
 
-    private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
+    // read by the keyboards alone: they are made anew, the rest of the view kept (InputView.remakeKeyboards)
+    private val remakeKeyboardsPrefs: Array<ManagedPreference<*>> = arrayOf(
         // drawn on 九键's keys, and in their long press
         prefs.keyboard.t9Letters,
         prefs.keyboard.t9Symbols,
-        // each input method's keyboard (ImKeyboards), and the code row's height on it (KawaiiBarComponent.preeditHeight)
+        // each input method's keyboard (ImKeyboards), and the code row's height on it (KawaiiBarComponent.preeditHeight),
+        // set anew as the input method is told again
         prefs.keyboard.pinyinKeyboard,
         prefs.keyboard.shuangpinKeyboard,
         prefs.keyboard.englishKeyboard,
+    )
+
+    // the bar's number row is a keyboard too, and the marks and long presses are read by it as well: the whole view
+    private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
         prefs.advanced.disableAnimation,
         // every key's marks laid out anew, those no swipe marks too; was a theme setting's
         prefs.keyboard.swipeUpPosition,
@@ -457,6 +463,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         replaceInputView(ThemeManager.activeTheme, start = true)
     }
 
+    // a setting only the keys read: the keyboards made anew in the view there is, not the whole view
+    // (060-render-perf-2 #1, half its time was the bar's and the rest's)
+    @Keep
+    private val remakeKeyboardsListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
+        val view = inputView ?: return@OnChangeListener
+        rebuilding(ViewRebuild.SETTING)
+        SceneTrace.section("remakeKeyboards") {
+            val started = inputViewStarted && inputDeviceMgr.isVirtualKeyboard
+            view.remakeKeyboards(if (started) currentInputEditorInfo else null, capabilityFlags)
+        }
+    }
+
     // 紧凑 as the views were last made: its keys' text and marks are set as they are made (keyboardCompact)
     private var compactBuilt = keyboardCompact()
 
@@ -551,6 +569,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         getSystemService(InputManager::class.java).registerInputDeviceListener(inputDeviceListener, null)
         recreateInputViewPrefs.forEach {
             it.registerOnChangeListener(recreateInputViewListener)
+        }
+        remakeKeyboardsPrefs.forEach {
+            it.registerOnChangeListener(remakeKeyboardsListener)
         }
         prefs.candidates.registerOnChangeListener(recreateCandidatesViewListener)
         keyboardHeightPrefs.forEach { it.registerOnChangeListener(keyboardHeightListener) }
@@ -1838,6 +1859,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         getSystemService(InputManager::class.java).unregisterInputDeviceListener(inputDeviceListener)
         recreateInputViewPrefs.forEach {
             it.unregisterOnChangeListener(recreateInputViewListener)
+        }
+        remakeKeyboardsPrefs.forEach {
+            it.unregisterOnChangeListener(remakeKeyboardsListener)
         }
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
         keyboardHeightPrefs.forEach { it.unregisterOnChangeListener(keyboardHeightListener) }

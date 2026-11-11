@@ -7,13 +7,13 @@ package org.fcitx.fcitx5.android.input.broadcast
 import org.fcitx.fcitx5.android.host.FullWidth
 import org.fcitx.fcitx5.android.input.keyboard.isAsciiMark
 import org.mechdancer.dependency.Dependent
-import org.mechdancer.dependency.UniqueComponent
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must
 
 class PunctuationComponent :
-    UniqueComponent<PunctuationComponent>(), Dependent, ManagedHandler by managedHandler() {
+    TypedComponent<PunctuationComponent>(), Dependent, ManagedHandler by managedHandler() {
 
     private val broadcaster: InputBroadcaster by manager.must()
 

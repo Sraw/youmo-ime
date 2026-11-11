@@ -14,10 +14,10 @@ import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.ScopeEvent
-import org.mechdancer.dependency.UniqueComponent
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import java.util.concurrent.ConcurrentLinkedQueue
 
-class InputBroadcaster : UniqueComponent<InputBroadcaster>(), Dependent, InputBroadcastReceiver {
+class InputBroadcaster : TypedComponent<InputBroadcaster>(), Dependent, InputBroadcastReceiver {
 
     private val receivers = ConcurrentLinkedQueue<InputBroadcastReceiver>()
 

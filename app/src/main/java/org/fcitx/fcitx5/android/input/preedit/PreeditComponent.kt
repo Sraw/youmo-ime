@@ -14,7 +14,7 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.mechdancer.dependency.Dependent
-import org.mechdancer.dependency.UniqueComponent
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must
@@ -22,7 +22,7 @@ import splitties.dimensions.dp
 import splitties.views.horizontalPadding
 
 /** The code row; [floats]: in the strip over the app ([FloatingCodeStrip]), not embedded in the keyboard. */
-class PreeditComponent(private val floats: Boolean = false) : UniqueComponent<PreeditComponent>(), Dependent, InputBroadcastReceiver,
+class PreeditComponent(private val floats: Boolean = false) : TypedComponent<PreeditComponent>(), Dependent, InputBroadcastReceiver,
     ManagedHandler by managedHandler() {
 
     private val context by manager.context()

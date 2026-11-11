@@ -12,7 +12,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.mechdancer.dependency.Dependent
-import org.mechdancer.dependency.UniqueComponent
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must
@@ -42,7 +42,7 @@ data class ReturnKeyAppearance(
 }
 
 class ReturnKeyDrawableComponent :
-    UniqueComponent<ReturnKeyDrawableComponent>(), Dependent, ManagedHandler by managedHandler() {
+    TypedComponent<ReturnKeyDrawableComponent>(), Dependent, ManagedHandler by managedHandler() {
 
     companion object {
         private fun appearanceOfAction(action: Int): ReturnKeyAppearance? = when (action) {

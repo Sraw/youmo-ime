@@ -337,8 +337,27 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
     }
 
-    private val lettersLayout by lazy {
-        LettersLayout(makers.keys, TextKeyboard.Name, PickerWindow.Key.Symbol.name)
+    private var lettersLayout = newLettersLayout()
+
+    private fun newLettersLayout() = LettersLayout(makers.keys, TextKeyboard.Name, PickerWindow.Key.Symbol.name)
+
+    /**
+     * Every keyboard made anew, as a new input view would make them (a keyboard setting changed:
+     * 拼音键盘, 九键's letters, the swipe marks): the cache dropped, the letters shown, what showed
+     * forgotten. The input view tells the input method and the field after, as it starts one
+     * (InputView.remakeKeyboards), and the letters for them are shown then.
+     */
+    fun remakeKeyboards() {
+        if (!::keyboardView.isInitialized) return
+        detachCurrentLayout()
+        keyboards.clear()
+        lettersLayout = newLettersLayout()
+        standingInFor = null
+        lettersWhenStoodIn = ""
+        popup.dismissAll()
+        attachLayout(TextKeyboard.Name)
+        onLayoutShown?.invoke()
+        if (windowManager.isAttached(this)) notifyBarLayoutChanged()
     }
 
     // the pad of the number, phone or date field focused, shown for the number keyboard

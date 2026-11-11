@@ -42,7 +42,7 @@ import org.fcitx.fcitx5.android.scene.theme.Transition
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.utils.popIn
 import org.mechdancer.dependency.Dependent
-import org.mechdancer.dependency.UniqueComponent
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must
@@ -53,7 +53,7 @@ import splitties.views.dsl.core.lParams
 import timber.log.Timber
 
 class PopupComponent :
-    UniqueComponent<PopupComponent>(), Dependent, ManagedHandler by managedHandler() {
+    TypedComponent<PopupComponent>(), Dependent, ManagedHandler by managedHandler() {
 
     private val imeScope by manager.imeScope()
     private val context by manager.context()

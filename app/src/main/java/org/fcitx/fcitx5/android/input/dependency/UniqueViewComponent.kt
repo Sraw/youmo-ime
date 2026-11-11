@@ -18,7 +18,7 @@ abstract class UniqueViewComponent<T : UniqueViewComponent<T, V>, V : View> :
 
     abstract val view: V
 
-    override val type: KClass<out IUniqueComponent<*>> by lazy { defaultType() }
+    override val type: KClass<out IUniqueComponent<*>> get() = ComponentTypes.of(this)
 
     override fun equals(other: Any?): Boolean = defaultEquals(other)
 

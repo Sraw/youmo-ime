@@ -58,6 +58,7 @@ import splitties.views.dsl.core.textView
 import splitties.views.dsl.core.wrapContent
 import splitties.views.imageResource
 import timber.log.Timber
+import java.util.EnumMap
 
 class IdleUi(
     override val ctx: Context,
@@ -93,37 +94,44 @@ class IdleUi(
         updateMenuButtonContentDescription()
     }
 
-    /** Every button the user may put on the bar ([ToolbarConfig]), placed by [arrange]. */
-    val buttons: Map<ToolbarButton, ToolButton> = ToolbarButton.entries.associateWith { button ->
+    /**
+     * Told each button as it is made, to wire and light it ([KawaiiBarComponent]): a button is made
+     * the first time it is placed or asked for, not with the bar. Most of the bar's buttons sit on the
+     * toolbar, which few open; making them all took a tenth of making an input view (060-render-perf-2 #7).
+     */
+    var onButtonMade: ((ToolbarButton, ToolButton) -> Unit)? = null
+
+    private val made = EnumMap<ToolbarButton, ToolButton>(ToolbarButton::class.java)
+
+    /** [button] on the bar ([ToolbarConfig]), made now if it was not yet; placed by [arrange]. */
+    fun button(button: ToolbarButton): ToolButton = made[button] ?: makeButton(button)
+
+    /** [button] if it was made, else null: one never made is nowhere on screen. */
+    fun madeButton(button: ToolbarButton): ToolButton? = made[button]
+
+    /** The buttons made so far. */
+    val madeButtons: Map<ToolbarButton, ToolButton> get() = made
+
+    private fun makeButton(button: ToolbarButton): ToolButton {
         val looks = ToolbarButtonLooks.of(button)
-        ToolButton(ctx, looks.icon, theme, toolbar).apply {
+        val view = ToolButton(ctx, looks.icon, theme, toolbar).apply {
             contentDescription = ctx.getString(looks.label)
             fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
         }
-    }
-
-    val hideKeyboardButton = buttons.getValue(ToolbarButton.Hide)
-
-    /**
-     * The emoji, as Sogou's 表情: a long press on the comma was all there was, and nobody finds
-     * that. Opens the emoji or kaomoji, whichever was last.
-     */
-    val emojiButton = buttons.getValue(ToolbarButton.Emoji).apply {
-        setOnClickListener {
+        made[button] = view
+        // the emoji, as Sogou's 表情: a long press on the comma was all there was, and nobody finds
+        // that. Opens the emoji or kaomoji, whichever was last
+        if (button == ToolbarButton.Emoji) view.setOnClickListener {
             commonKeyActionListener.listener.onKeyAction(KeyAction.PickerSwitchAction(), KeyActionListener.Source.Keyboard)
         }
+        onButtonMade?.invoke(button, view)
+        return view
     }
-
-    /** Voice input (VoiceFeature; without the voice pack it says so): by default beside the emoji, as on Sogou's bar */
-    val voiceButton = buttons.getValue(ToolbarButton.Voice)
 
     /** Whether [button] is where the user sees it: pinned at the right, or on the toolbar while it is out. */
-    fun onScreen(button: ToolbarButton): Boolean = buttons.getValue(button).parent.let {
+    fun onScreen(button: ToolbarButton): Boolean = made[button]?.parent.let {
         it === pinnedBar || (it != null && currentState == Display.Toolbar)
     }
-
-    /** A toggle's button drawn lit while on, as its entry in the ⋯ panel is. */
-    fun setActive(button: ToolbarButton, active: Boolean) = buttons.getValue(button).setOn(active)
 
     // the bar's right, after the toolbar: there whenever the bar is idle
     private val pinnedBar = horizontalLayout()
@@ -131,6 +139,16 @@ class IdleUi(
     private var arranged: ToolbarConfig.Layout? = null
 
     private var layoutFor: ((Int) -> ToolbarConfig.Layout)? = null
+
+    // the layout whose toolbar [buttonsUi] holds; null while it holds an older one's or none
+    private var toolbarShown: ToolbarConfig.Layout? = null
+
+    private fun showToolbar() {
+        val layout = arranged ?: return
+        if (layout == toolbarShown) return
+        toolbarShown = layout
+        buttonsUi.show(layout.toolbar.map(::button))
+    }
 
     /**
      * How many buttons fit at the right beside the menu key, the middle (a clipboard suggestion,
@@ -151,11 +169,13 @@ class IdleUi(
     private fun place(layout: ToolbarConfig.Layout) {
         if (layout == arranged) return
         arranged = layout
-        buttons.values.forEach { (it.parent as? ViewGroup)?.removeView(it) }
-        buttonsUi.show(layout.toolbar.map(buttons::getValue))
+        made.values.forEach { (it.parent as? ViewGroup)?.removeView(it) }
+        // the toolbar's buttons made and put on it as it is first opened
+        toolbarShown = null
+        if (currentState == Display.Toolbar) showToolbar()
         val size = ctx.dp(KawaiiBarComponent.heightDp(ctx))
         val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
-        layout.pinned.forEach { pinnedBar.addView(buttons.getValue(it), LinearLayout.LayoutParams(buttonWidth, size)) }
+        layout.pinned.forEach { pinnedBar.addView(button(it), LinearLayout.LayoutParams(buttonWidth, size)) }
     }
 
     // what the bar shows with nothing else to: the address suggestions (AddressStrip), when there are
@@ -342,7 +362,10 @@ class IdleUi(
         }
         when (state) {
             Display.Empty -> animator.displayedChild = 0
-            Display.Toolbar -> animator.displayedChild = 1
+            Display.Toolbar -> {
+                showToolbar()
+                animator.displayedChild = 1
+            }
             Display.Clipboard -> animator.displayedChild = 2
             Display.NumberRow -> {}
             Display.InlineSuggestion -> animator.displayedChild = 3

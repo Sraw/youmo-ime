@@ -53,13 +53,13 @@ import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.switchToNextIME
 import org.mechdancer.dependency.Dependent
-import org.mechdancer.dependency.UniqueComponent
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must
 
 class CommonKeyActionListener :
-    UniqueComponent<CommonKeyActionListener>(), Dependent, ManagedHandler by managedHandler() {
+    TypedComponent<CommonKeyActionListener>(), Dependent, ManagedHandler by managedHandler() {
 
     private val context by manager.context()
     private val fcitx by manager.fcitx()
