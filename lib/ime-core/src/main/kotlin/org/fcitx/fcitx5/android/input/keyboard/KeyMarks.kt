@@ -6,10 +6,11 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 /**
  * Where a key draws what its swipes reach, as slots of its face ([Slot]), from two settings with one
- * set of choices ([At]): 标点位置 for its symbol, 快捷键图标位置 for its shortcut's mark (a command's
- * icon, a text). One place for each on every key, whichever way swipes to it: in 0.5.1's test build
- * they followed 滑动 instead (the up layer's top right, the down layer's bottom right), and a fresh
- * install's keyboard looked laid out anew once 滑动 was set the other way.
+ * set of choices ([At]): 上滑图标位置 for the up way's mark, 下滑图标位置 for the down way's, whatever
+ * the mark is (the long press's first, a command's icon, a text) and whatever the key. 翻转上下滑
+ * changes which way carries the long press's first, and swaps the two settings with it, so the
+ * letters' marks stay put. (Before 0.5 they were 标点位置 for the symbol and 快捷键图标位置 for the
+ * shortcut; a function key's two drew at one of them till 0.6.0-beta2.)
  *
  * The settings page keeps the two apart (the other's place greyed out); one place in both, as an
  * import or a backup can write, is read as [settled] says: the symbol yields. 无 draws nothing, the
@@ -25,7 +26,7 @@ package org.fcitx.fcitx5.android.input.keyboard
  */
 object KeyMarks {
 
-    /** 标点位置's and 快捷键图标位置's choices, in the settings' order; [Bottom] a shortcut's bottom edge middle, a symbol's under the letter. */
+    /** 上滑图标位置's and 下滑图标位置's choices, in the settings' order; [Bottom] a shortcut's bottom edge middle, a symbol's under the letter. */
     enum class At(val corner: Slot?) {
         TopRight(Slot.TopRight), BottomRight(Slot.BottomRight), TopLeft(Slot.TopLeft), BottomLeft(Slot.BottomLeft), Bottom(null), None(null);
 
@@ -83,7 +84,7 @@ object KeyMarks {
 
     /**
      * A place on a key's face: its four corners, the middle of its top and bottom edges, and [Below]
-     * its label, the label moved up to make room (标点位置 底部's symbol; a shortcut is never there).
+     * its label, the label moved up to make room (a way at 底部 whose mark is the long press's first; a shortcut's 底部 is the bottom edge's middle).
      */
     enum class Slot(val left: Boolean, val right: Boolean, val bottom: Boolean) {
         TopLeft(true, false, false), TopRight(false, true, false), BottomLeft(true, false, true), BottomRight(false, true, true),
