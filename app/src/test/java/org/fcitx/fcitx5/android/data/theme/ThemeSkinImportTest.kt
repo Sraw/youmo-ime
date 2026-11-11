@@ -157,6 +157,18 @@ class ThemeSkinImportTest : ThemePackFixture() {
     }
 
     @Test
+    fun aSkinThatRunsOutOfMemoryOrStackIsRefused() {
+        fun failing(error: Error) = object : ThemeFilesManager.SkinCodec by FakeCodec {
+            override fun image(bytes: ByteArray): SkinImage = throw error
+        }
+        ThemeFilesManager.skinCodec = failing(OutOfMemoryError())
+        assertEquals(appContext.getString(R.string.exception_skin_unpacked_too_big), skinRefusal(baidu()))
+        ThemeFilesManager.skinCodec = failing(StackOverflowError())
+        assertEquals(appContext.getString(R.string.exception_skin_not_zip), skinRefusal(baidu()))
+        assertFalse(unpacking.listFiles().orEmpty().any { it.list().orEmpty().isNotEmpty() })
+    }
+
+    @Test
     fun aTrimeThemeAndAFlorisBoardOneInAZip() {
         val yaml = "name: Ink\nauthor: Cy\npreset_color_schemes:\n  default: {back_color: 0x223344, key_back_color: 0xFFFFFF, key_text_color: 0x000000}\n"
         val trime = skin(yaml.toByteArray(), "ink.trime.yaml").getOrThrow()

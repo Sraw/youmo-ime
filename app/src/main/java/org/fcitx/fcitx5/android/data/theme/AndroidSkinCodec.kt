@@ -33,9 +33,15 @@ internal object AndroidSkinCodec : ThemeFilesManager.SkinCodec {
             override val width = bitmap.width
             override val height = bitmap.height
 
+            // held to the bitmap, as PixelsImage's crop is: getPixels throws past it
             override fun pixels(x: Int, y: Int, w: Int, h: Int): Pixels {
-                val out = Pixels(w, h)
-                bitmap.getPixels(out.argb, 0, w, x, y, w, h)
+                val l = x.coerceIn(0, width)
+                val t = y.coerceIn(0, height)
+                val r = (x.toLong() + w).coerceIn(l.toLong(), width.toLong()).toInt()
+                val b = (y.toLong() + h).coerceIn(t.toLong(), height.toLong()).toInt()
+                if (r <= l || b <= t) return Pixels(1, 1)
+                val out = Pixels(r - l, b - t)
+                bitmap.getPixels(out.argb, 0, out.width, l, t, out.width, out.height)
                 return out
             }
         }

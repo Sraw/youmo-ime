@@ -650,6 +650,14 @@ object ThemeFilesManager {
                 }
                 pack(temp, names, themes, conversion.notes)
             }
+        }.recoverCatching { e ->
+            // a backstop: the readers hold a skin to SkinLimits, but one made to get past them must not take the input
+            // method (the same process) down with it, as an Error the caller's getOrThrow would throw on would
+            when (e) {
+                is OutOfMemoryError -> skinRefused(SkinError(SkinError.Reason.UNPACKED_TOO_BIG, cause = e))
+                is StackOverflowError -> skinRefused(SkinError(SkinError.Reason.BROKEN, cause = e))
+                else -> throw e
+            }
         }
 
     /** What decodes a skin's images and writes a converted one's: Android's, a fake's in a JVM test. */
