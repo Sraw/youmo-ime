@@ -482,8 +482,10 @@ setting either: it reads the codes.
   range; a hardware keyboard still types the full-keyboard scheme (it reads `;`). The segmenter
   reads each syllable as the scheme's two keys turned into their groups' codes; the graph has one
   path, the ambiguity in each edge's syllables.
-- **Segmenter.** `GroupedShuangpinSegmenter(scheme, letters, fuzzy, typos)`, built as
-  `ShuangpinSegmenter` is (pairs, a key alone as PARTIAL/INITIAL, a/e/o alone, fuzzy, ü typed v).
+- **Segmenter.** `GroupedShuangpinSegmenter(scheme, letters, fuzzy)`, built as
+  `ShuangpinSegmenter` is (pairs, a key alone as PARTIAL/INITIAL, a/e/o alone, fuzzy), but reading no
+  slip, not even ü typed with its own key: the grouped keyboards correct nothing (the user's 2026-11-03;
+  纠错 says 不适用 for them and its value is ignored).
   It and `T9Segmenter` are `KeyedSegmenter`s: `letters`, `isKey`, `asTyped`, `initialsOf` (the
   bar's initials: the scheme's initials on the key's letters, 自然码's v zh) and `started` (a
   syllable not whole yet shows as its initial in 双拼, as many letters on the nine keys).

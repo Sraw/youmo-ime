@@ -254,11 +254,15 @@ object InputMethodSettings {
         ),
         Section(
             R.string.shared_section_pinyin, listOf(
-                // pinyin's grouped keyboards type keys, not letters: no letter slips onto its neighbour. 双拼's
-                // one slip read on them, ü typed v, is none on its nine keys: u and v share 8 (the 18 and 14 keys keep them apart)
+                // the grouped keyboards, pinyin's and 双拼's, correct nothing (the user's 2026-11-03): their keys are no
+                // letters to slip, and 双拼's ü typed with its own key is not read there either (GroupedShuangpinSegmenter)
                 Toggle(
                     "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary,
-                    notFor = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.SHUANGPIN_NINE, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN),
+                    notFor = listOf(
+                        InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS,
+                        InputMethodCatalog.SHUANGPIN_KEYS18, InputMethodCatalog.SHUANGPIN_KEYS14, InputMethodCatalog.SHUANGPIN_NINE,
+                        InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN,
+                    ),
                 ),
                 // u and v are both on 8 of pinyin's nine keys; zhuyin's keep ㄨ and ㄩ apart (ㄌㄨ for ㄌㄩ is a slip there)
                 Flags(EngineSettings.FUZZY, R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY, notFor = mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE))),

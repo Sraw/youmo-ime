@@ -440,8 +440,8 @@ private fun optionsValid(options: Map<String, String>): Boolean {
     ).all { it }
 }
 
-/** Whether [scheme]'s segmenter reads common slips: full pinyin's and 双拼's; the nine keys and zhuyin type keys, not letters. */
-private fun readsTypos(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES || scheme in ShuangpinSet.GROUPED
+/** Whether [scheme]'s segmenter reads common slips: full pinyin's and 双拼's; the grouped keyboards and zhuyin read none. */
+private fun readsTypos(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES
 
 private fun usage(err: Appendable): Int {
     err.appendLine(USAGE)
@@ -524,7 +524,7 @@ private class RunOptions(options: Map<String, String>) {
         NO_LATIN -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours)
         in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = data.tones::allows)
         in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme))
-        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy, typos) }
+        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy) }
         else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy, typos)
     }
 }

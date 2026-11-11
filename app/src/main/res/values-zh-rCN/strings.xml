@@ -701,7 +701,7 @@
     <string name="im_model_level_medium">中档：每次按键按整句通顺程度重排</string>
     <string name="im_model_level_high">高档：停顿时再用大模型精挑首选，最准</string>
     <string name="im_typos">纠正错拼和按偏的键</string>
-    <string name="im_typos_summary">比如把 gn 当成 ng，或按到了旁边的键</string>
+    <string name="im_typos_summary">全拼：比如把 gn 当成 ng，或按到了旁边的键。双拼：只认 j、q、x、y 后的 u 按成了 ü 的键</string>
     <string name="im_latin_words">中英混输</string>
     <string name="im_latin_words_summary">拼音里直接打英文单词，比如 iphone 出 iPhone</string>
     <string name="engine_data_libime">拼音词典和语言模型：libime</string>

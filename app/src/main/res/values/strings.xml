@@ -720,7 +720,7 @@
     <string name="im_model_level_medium">Medium: weighs the whole sentence at every key</string>
     <string name="im_model_level_high">High: a larger model picks the first again as you pause, most accurate</string>
     <string name="im_typos">Fix typos and slipped keys</string>
-    <string name="im_typos_summary">Such as gn for ng, or a key next to the one meant</string>
+    <string name="im_typos_summary">Full pinyin: such as gn for ng, or a key next to the one meant. Shuangpin: only the u after j, q, x, y typed with ü\'s key</string>
     <string name="im_latin_words">Type English words</string>
     <string name="im_latin_words_summary">In pinyin, as iphone for iPhone or app for APP</string>
     <string name="engine_data_libime">Pinyin dictionary and language model: libime</string>

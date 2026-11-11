@@ -19,13 +19,14 @@ import java.util.TreeMap
  *
  * As on [T9Segmenter], a syllable taken off the bar is in the input as its letters, then a
  * separator: read as that syllable alone, or an initial taken as that initial. No Latin letters,
- * no letter typed as itself: these keyboards have neither.
+ * no letter typed as itself: these keyboards have neither. No slip is read either, not even ü typed with
+ * its own key (`jv` for ju), which [ShuangpinSegmenter] reads: the 18, 14 and nine keys correct
+ * nothing (the user's 2026-11-03, measured in dev/design/060-correction-fuzzy-report.md).
  */
 class GroupedShuangpinSegmenter(
     private val scheme: ShuangpinScheme,
     override val letters: NineKeyLetters,
     fuzzy: Set<Fuzzy> = emptySet(),
-    typos: Boolean = true,
 ) : KeyedSegmenter {
 
     override val spellsFullPinyin: Boolean get() = false
@@ -66,9 +67,6 @@ class GroupedShuangpinSegmenter(
                     val flags = iFlags or fFlags
                     for (code in scheme.codes(i, f)) keep(code, id, flags, i)
                     if (i.isEmpty() && f.length == 2) spelt += Triple(f, id, flags)
-                    if (typos && i in SpellingIndex.U_IS_V && f.startsWith("u")) {
-                        for (code in scheme.codes(i, "v" + f.substring(1))) keep(code, id, flags or SyllableMatches.TYPO, i)
-                    }
                 }
             }
         }

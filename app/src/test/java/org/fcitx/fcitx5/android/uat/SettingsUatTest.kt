@@ -263,7 +263,8 @@ class SettingsUatTest {
         assertTrue(summary(R.string.im_built_in_phrases).endsWith(notFor(c.HANDWRITING)))
         // 在键上划: the choice alone, which input methods each choice reaches the docs say
         assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
-        assertTrue(summary(R.string.im_typos).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.SHUANGPIN_NINE, c.ZHUYIN_NINE, c.ZHUYIN)))
+        // 双拼's 18 and 14 keys too: they read no slip, ü typed with its own key either
+        assertTrue(summary(R.string.im_typos).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.SHUANGPIN_KEYS18, c.SHUANGPIN_KEYS14, c.SHUANGPIN_NINE, c.ZHUYIN_NINE, c.ZHUYIN)))
         // no 不适用 line names English: the Chinese section's title says it for its rows, and every input
         // method's other rows are English's too
         val chinese = st.preferences().map { it.summary.toString() }

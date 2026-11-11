@@ -224,8 +224,8 @@ internal class SessionFactory(
                     blockOther = ::blockOtherReading,
                 ) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
-            // the 18, 14 and nine keys: as pinyin's 14 keys, no glide nor 笔画查字; learned under spk: (CommitRecorder)
-            SHUANGPIN_KEYS18, SHUANGPIN_KEYS14, SHUANGPIN_NINE -> ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy, s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin)))
+            // the 18, 14 and nine keys: as pinyin's 14 keys, no glide nor 笔画查字 nor 纠错 (the setting is ignored); learned under spk: (CommitRecorder)
+            SHUANGPIN_KEYS18, SHUANGPIN_KEYS14, SHUANGPIN_NINE -> ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy), spell = true, kind = Kinds.shuangpin(s.shuangpin)))
             SHUANGPIN -> {
                 val spelling = PinyinGlide.Spelling.shuangpin(s.scheme)
                 val pinyin = pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin))

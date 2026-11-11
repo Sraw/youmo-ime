@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.Companion.G14
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.Companion.G18
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.Companion.NINE_SP
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.MICROSOFT
@@ -43,6 +44,30 @@ class GroupedShuangpinSegmenterTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun noSlipIsReadNotEvenUTypedWithTheKeyOfU() {
+        // the 18, 14 and nine keys correct nothing (060-correction-fuzzy-report): 小鹤's jv is no ju there, as it is on 26 keys
+        for ((name, scheme) in EngineSettings.SCHEMES) {
+            for (letters in listOf(G18, G14, NINE_SP)) {
+                val segmenter = GroupedShuangpinSegmenter(scheme, letters)
+                val keys = (('a'..'z') + ';').map(letters::key).filter(letters::isCode).distinct()
+                val slips = keys.flatMap { a -> keys.map { b -> "$a$b" } }.filter { segmenter.readsASlip(it) }
+                assertTrue("$name on $letters: $slips", slips.isEmpty())
+            }
+        }
+        assertTrue(ShuangpinSegmenter(XIAOHE).read("jv").contains("ju"))
+    }
+
+    private fun GroupedShuangpinSegmenter.readsASlip(typed: String): Boolean {
+        val g = segment(typed)
+        return g.edges(g.start).any { e -> g.matches(e).let { m -> (0 until m.size).any { m.flags(it) and SyllableMatches.TYPO != 0 } } }
+    }
+
+    private fun ShuangpinSegmenter.read(typed: String): Set<String> {
+        val g = segment(typed)
+        return g.edges(g.start).flatMap { e -> g.matches(e).let { m -> (0 until m.size).map { Syllables.spelling(m.syllable(it)) } } }.toSet()
     }
 
     @Test
