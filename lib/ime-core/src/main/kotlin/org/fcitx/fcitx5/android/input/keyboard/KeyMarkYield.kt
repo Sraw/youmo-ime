@@ -25,7 +25,7 @@ import kotlin.math.abs
  * baseline, a quarter at most ([MAX_LETTER_SHRINK]).
  *
  * Nothing of that enough: the key's shortcuts are tried in its other free corners ([Mark.elsewhere],
- * all at once, a function key's two kept mirrored), each moved and smaller there as before; what
+ * all at once), each moved and smaller there as before; what
  * still meets the glyph or another mark is left out, the most expendable first ([Mark.drop]: a
  * function key's down shortcut, then a shortcut; the swipes still work). A symbol ([DROP_SYMBOL]) is
  * never left out (the long press's first, the user's to see): a shortcut meeting it goes instead, and
@@ -54,7 +54,7 @@ object KeyMarkYield {
      * A mark's [ink] in its [slot], no smaller than [minScale] of it; [drop], how soon it is left out
      * where nothing else clears it (the higher the sooner; [DROP_SYMBOL] never); [elsewhere], the
      * slots it is tried in before that, in turn, with its ink there (a key's marks that have them, as
-     * many each, moved together: [KeyMarks.elsewhere]).
+     * many each, moved together).
      */
     data class Mark(
         val ink: Ink, val slot: Slot, val minScale: Float = 1f, val drop: Int = DROP_SHORTCUT,
@@ -188,7 +188,7 @@ object KeyMarkYield {
     }
 
     // [marks], each where [place] puts it, less those still meeting [glyph] (none: only each other) or each
-    // other: the movable ones first tried elsewhere, all at once (a function key's two stay mirrored), then
+    // other: the movable ones first tried elsewhere, all at once, then
     // the most expendable left out first; a symbol never, kept where it meets. The marks as they end up
     // (moved, before [place]) and their inks
     private fun dropped(glyph: Ink?, marks: List<Mark>, place: (Mark) -> Ink): Pair<List<Mark?>, List<Ink?>> {

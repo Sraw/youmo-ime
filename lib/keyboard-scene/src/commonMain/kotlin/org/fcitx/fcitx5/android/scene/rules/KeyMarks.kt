@@ -10,27 +10,26 @@ package org.fcitx.fcitx5.android.scene.rules
  * P2 moves ime-core and the app onto this one and deletes that.
  *
  * Where a key draws what its swipes reach, as slots of its face ([Slot]), from two settings with one
- * set of choices ([At]): 标点位置 for its symbol, 快捷键图标位置 for its shortcut's mark (a command's
- * icon, a text). One place for each on every key, whichever way swipes to it: in 0.5.1's test build
- * they followed 滑动 instead (the up layer's top right, the down layer's bottom right), and a fresh
- * install's keyboard looked laid out anew once 滑动 was set the other way.
+ * set of choices ([At]): 上滑图标位置 for the up way's mark, 下滑图标位置 for the down way's, whatever
+ * the mark is (the long press's first, a command's icon, a text) and whatever the key. 翻转上下滑
+ * changes which way carries the long press's first, and swaps the two settings with it, so the
+ * letters' marks stay put. (Before 0.5 they were 标点位置 for the symbol and 快捷键图标位置 for the
+ * shortcut; a function key's two drew at one of them till 0.6.0-beta2.)
  *
  * The settings page keeps the two apart (the other's place greyed out); one place in both, as an
  * import or a backup can write, is read as [settled] says: the symbol yields. 无 draws nothing, the
  * swipes still working.
  *
  * 底部 is under the letter for the symbol, the bottom edge's middle for the shortcut. Landscape's and
- * 紧凑's keys are too low for either ([onKeys]): the symbol's 底部 there is the top right (the bottom
- * right where the shortcuts are), the shortcut's the first corner of [LowOrder] the symbol's place is
- * not. A shortcut that still has no room on its key gives way in its own corner, then is left out
+ * 紧凑's keys are too low for either ([onKeys]): a way's 底部 there is the first corner of [LowOrder]
+ * (右上, 右下, 左上, 左下) the other way's place is not, whatever its mark. A shortcut that still has no room on its key gives way in its own corner, then is left out
  * (KeyMarkYield).
  *
- * A function key has no symbol: its up shortcut in the chosen slot, its down one in that slot mirrored
- * top for bottom ([placeFunction]); one alone in the chosen slot.
+ * A function key has no symbol: each way's shortcut at its own setting's place ([placeFunction]).
  */
 object KeyMarks {
 
-    /** 标点位置's and 快捷键图标位置's choices, in the settings' order; [Bottom] a shortcut's bottom edge middle, a symbol's under the letter. */
+    /** 上滑图标位置's and 下滑图标位置's choices, in the settings' order; [Bottom] a shortcut's bottom edge middle, a symbol's under the letter. */
     enum class At(val corner: Slot?) {
         TopRight(Slot.TopRight), BottomRight(Slot.BottomRight), TopLeft(Slot.TopLeft), BottomLeft(Slot.BottomLeft), Bottom(null), None(null);
 
@@ -61,18 +60,17 @@ object KeyMarks {
     fun settled(symbol: At, shortcut: At): Spots =
         Spots(if (symbol == shortcut && symbol != At.None) symbol.yielded else symbol, shortcut)
 
-    /** The corners a shortcut's 底部 goes to on low keys, the first the symbol does not take; and where one with no room is tried. */
-    val LowOrder = listOf(At.TopLeft, At.TopRight, At.BottomLeft, At.BottomRight)
+    /** The corners a way's 底部 goes to on low keys, whatever its mark: the first the other way's place is not. */
+    val LowOrder = listOf(At.TopRight, At.BottomRight, At.TopLeft, At.BottomLeft)
 
     /**
-     * Where the two are drawn on a keyboard [landscape] or [compact]: as [settled]; on such low keys the
-     * symbol's 底部 the top right, the bottom right where the shortcut is (the corner 0.5.0 drew symbols
-     * in, then its side's other), the shortcut's 底部 the first corner of [LowOrder] the symbol's is not.
+     * Where the two are drawn on a keyboard [landscape] or [compact]: as [settled]; on such low keys a
+     * 底部, the symbol's or the shortcut's alike, the first corner of [LowOrder] the other's is not.
      */
     fun onKeys(symbolAt: At, shortcutAt: At, landscape: Boolean, compact: Boolean): Spots {
         val s = settled(symbolAt, shortcutAt)
         if (!landscape && !compact) return s
-        val symbol = if (s.symbol != At.Bottom) s.symbol else if (s.shortcut == At.TopRight) At.BottomRight else At.TopRight
+        val symbol = if (s.symbol != At.Bottom) s.symbol else LowOrder.first { it != s.shortcut }
         val shortcut = if (s.shortcut != At.Bottom) s.shortcut else LowOrder.first { it != symbol }
         return Spots(symbol, shortcut)
     }
@@ -88,7 +86,7 @@ object KeyMarks {
 
     /**
      * A place on a key's face: its four corners, the middle of its top and bottom edges, and [Below]
-     * its label, the label moved up to make room (标点位置 底部's symbol; a shortcut is never there).
+     * its label, the label moved up to make room (a way at 底部 whose mark is the long press's first; a shortcut's 底部 is the bottom edge's middle).
      */
     enum class Slot(val left: Boolean, val right: Boolean, val bottom: Boolean) {
         TopLeft(true, false, false), TopRight(false, true, false), BottomLeft(true, false, true), BottomRight(false, true, true),
@@ -134,19 +132,22 @@ object KeyMarks {
     }
 
     /**
-     * A function key's: its [up] shortcut at [shortcutAt] ([onKeys], [symbolAt] where the symbols
-     * are), its [down] one in that slot mirrored, each only where that way is on ([upOn], [downOn]);
-     * the down one alone at [shortcutAt]. 无 draws neither.
+     * A function key's: each way's mark at its own setting, [up] at [upAt] and [down] at [downAt], as a
+     * shortcut is ([onKeys]: on low keys a 底部 goes to the first corner of [LowOrder] the other way's is
+     * not), each only where that way is on ([upOn], [downOn]); 无 draws that one not. Two in one place
+     * (an import the settings page never wrote) read as [settled]: the up one yields.
      */
     fun <T : Any> placeFunction(
-        up: T?, down: T?, upOn: Boolean, downOn: Boolean, symbolAt: At, shortcutAt: At, landscape: Boolean, compact: Boolean,
+        up: T?, down: T?, upOn: Boolean, downOn: Boolean, upAt: At, downAt: At, landscape: Boolean, compact: Boolean,
     ): Placed<T> {
-        val slot = shortcutSlot(onKeys(symbolAt, shortcutAt, landscape, compact).shortcut) ?: return Placed()
+        val out = linkedMapOf<Slot, T>()
         val u = up?.takeIf { upOn }
         val d = down?.takeIf { downOn }
-        val out = linkedMapOf<Slot, T>()
-        if (u != null) out[slot] = u
-        if (d != null) out[if (u != null) slot.mirrored else slot] = d
+        val (ua, da) = settled(upAt, downAt)
+        val upSlot = shortcutSlot(onKeys(da, ua, landscape, compact).shortcut)
+        val downSlot = shortcutSlot(onKeys(ua, da, landscape, compact).shortcut)
+        if (u != null && upSlot != null) out[upSlot] = u
+        if (d != null && downSlot != null) out[downSlot] = d
         return Placed(out)
     }
 }

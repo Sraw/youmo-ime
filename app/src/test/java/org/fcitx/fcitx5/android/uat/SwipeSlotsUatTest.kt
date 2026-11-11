@@ -95,6 +95,14 @@ class SwipeSlotsUatTest {
         assertTrue(h.sent().toString(), "key=@," in h.sent().last())
         assertEquals(SwipeSlot.Command(KeyCommand.SelectAll), SwipeSlots.parse(internal.keySwipes.getValue()).resolve("full/a", up = true))
         assertEquals(SwipeOrientation.FirstDown, SwipeSlots.parse(internal.keySwipes.getValue()).orientation)
+        // ⌫'s two stay where they were: 恢复, now up, at 上滑's top left; 清除, now down, at 下滑's top right
+        val backspace = h.keyNamed("backspace") as SceneShownKey
+        val face = backspace.node.shape.bounds
+        val icons = backspace.node.ops(false).filterIsInstance<org.fcitx.fcitx5.android.scene.Op.Icon>().associate { it.name to it.box }
+        val restore = icons.getValue("restore")
+        val clear = icons.getValue("delete-sweep")
+        assertTrue("恢复 top left: $restore", restore.centerX < face.centerX && restore.centerY < face.centerY)
+        assertTrue("清除 top right: $clear", clear.centerX > face.centerX && clear.centerY < face.centerY)
     }
 
     // 注音九键's ˉ, a key no layout names: its ˙ swiped the way the orientation puts every long press's first;

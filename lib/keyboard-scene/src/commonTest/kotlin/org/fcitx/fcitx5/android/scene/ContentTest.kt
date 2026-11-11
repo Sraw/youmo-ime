@@ -84,6 +84,54 @@ class ContentTest {
         assertEquals(Fixtures.materialLight.colors["keyHint"], one.color)
     }
 
+    // [box] in [at]'s part of the face [f]: its side (the middle for 底部) and its half
+    private fun assertAt(at: KeyMarks.At, box: Box, f: Box, what: String) {
+        val x = (box.left + box.right) / 2 - (f.left + f.right) / 2
+        val y = (box.top + box.bottom) / 2 - (f.top + f.bottom) / 2
+        val (wantX, wantBottom) = when (at) {
+            KeyMarks.At.TopLeft -> -1 to false
+            KeyMarks.At.TopRight -> 1 to false
+            KeyMarks.At.BottomLeft -> -1 to true
+            KeyMarks.At.BottomRight -> 1 to true
+            else -> 0 to true
+        }
+        assertEquals(wantBottom, y > 0, "$what at $at, $box in $f")
+        assertTrue(if (wantX == 0) abs(x) < 1.0 else x * wantX > 0, "$what at $at, $box in $f")
+    }
+
+    @Test
+    fun aFunctionKeysMarksEachWhereItsWaysSettingSays() {
+        // beta2: 上滑 右上, 下滑 右下 drew ⌫'s 恢复 (down) top right and 清除 (up) bottom right. Every 上滑 × 下滑, on
+        // tall keys and low ones (横屏, 紧凑: a 底部 the first of 右上 右下 左上 左下 the other way's is not), and
+        // 翻转上下滑 (the two places, the long press's way and every key's two swipes swapped): the marks stay
+        val places = KeyMarks.At.entries.filter { it != KeyMarks.At.None }
+        val seen = mutableSetOf<Triple<String, Boolean, KeyMarks.At>>()
+        val forms = listOf("tall" to Fixtures.portrait, "landscape" to Fixtures.landscape, "compact" to Fixtures.compact)
+        val combos = (places + KeyMarks.At.None).flatMap { up -> (places + KeyMarks.At.None).map { up to it } }.filter { it.first != it.second }
+        val flippedPreset = MarkSettings.PRESET.mapKeys { (k, _) -> if (k.endsWith(":up")) k.dropLast(3) + ":down" else k.dropLast(5) + ":up" }
+        for ((form, base) in forms) for ((up, down) in combos) {
+            val low = form != "tall"
+            fun shown(at: KeyMarks.At, other: KeyMarks.At) = if (low && at == KeyMarks.At.Bottom) KeyMarks.LowOrder.first { it != other } else at
+            val s = Fixtures.scene(base.copy(marks = MarkSettings(upAt = up, downAt = down)))
+            val flipped = Fixtures.scene(base.copy(marks = MarkSettings(upAt = down, downAt = up, firstUp = false, shortcuts = flippedPreset)))
+            val f = face(s, "backspace")
+            val icons = icons(s, "backspace").associate { it.name to it.box }
+            assertEquals(icons, icons(flipped, "backspace").associate { it.name to it.box }, "$form $up $down: 翻转 leaves them")
+            for ((name, at) in listOf("delete-sweep" to shown(up, down), "restore" to shown(down, up))) {
+                val box = icons[name]
+                if (at == KeyMarks.At.None) assertEquals(null, box, "$form $up $down: $name not drawn")
+                // drawn wherever set, on every form: no pair of places the yield drops one of on these keys
+                assertTrue(at == KeyMarks.At.None || box != null, "$form $up $down: $name drawn at $at")
+                if (box == null) continue
+                assertAt(at, box, f, "$form $up $down: $name")
+                seen += Triple(form, name == "delete-sweep", up.takeIf { name == "delete-sweep" } ?: down)
+            }
+        }
+        for ((form, _) in forms) for (upMark in listOf(true, false)) {
+            assertEquals(places.toSet(), seen.filter { it.first == form && it.second == upMark }.map { it.third }.toSet(), "$form $upMark: every place")
+        }
+    }
+
     @Test
     fun theShortcutTopLeftAndTheFunctionKeysUpAndDown() {
         val s = Fixtures.scene(env)
@@ -96,8 +144,12 @@ class ContentTest {
         near(floor(11 * d + 0.5), redo.box.width)
         val backspace = icons(s, "backspace").map { it.name }
         assertEquals(listOf("backspace", "delete-sweep", "restore").sorted(), backspace.sorted())
-        val down = icons(s, "backspace").first { it.name == "restore" }
-        assertTrue(abs(face(s, "backspace").bottom - 2 * d - down.box.bottom) < 1.0, "down's at the bottom, within its pixel")
+        // each at its own way's place: up 右上, down 左上 by default
+        val bf = face(s, "backspace")
+        val up = icons(s, "backspace").first { it.name == "delete-sweep" }.box
+        val down = icons(s, "backspace").first { it.name == "restore" }.box
+        assertTrue(up.left > (bf.left + bf.right) / 2 && up.bottom < (bf.top + bf.bottom) / 2, "up's top right: $up")
+        assertTrue(down.right < (bf.left + bf.right) / 2 && down.bottom < (bf.top + bf.bottom) / 2, "down's top left: $down")
         assertEquals("cursor-move", icons(s, "space").single().name)
     }
 
@@ -108,7 +160,8 @@ class ContentTest {
         // icon of the board as much smaller (060-render-p2 S4e), no more than the marks' cap, both drawn one over
         // the other; at 20% (43.5 px) past the cap, the down one left out
         val d = 2.75
-        fun scene(h: Double) = Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = h, density = d)))
+        // the two one over the other (上滑 左上, 下滑 左下), as a function key's are where the settings say so
+        fun scene(h: Double) = Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = h, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft))))
         assertEquals(setOf("backspace", "delete-sweep"), icons(scene(407.0), "backspace").map { it.name }.toSet(), "at 20%")
         val s = scene(420.0)
         near(45.5, face(s, "backspace").height, "the face")
@@ -140,7 +193,7 @@ class ContentTest {
         }
         for ((theme, d, size) in grid) {
             val (wDp, hDp) = size
-            val e = Forms.env("zhuyin", Fixtures.compact.copy(width = wDp * d, height = hDp * d, density = d))
+            val e = Forms.env("zhuyin", Fixtures.compact.copy(width = wDp * d, height = hDp * d, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft)))
             val s = Forms.scene("zhuyin", e, theme)
             val key = s.keys.first { it.id == "backspace" }
             val f = (key.shape as Shape.Rect).box
@@ -238,12 +291,15 @@ class ContentTest {
         var last: Map<String, Pair<Double, Boolean>>? = null
         var h = top
         var against = 0
+        var cappedSteps = 0
         while (h >= top * 0.55) {
             val sc = Forms.scene(board, Forms.env(board, form.copy(width = form.width * k, height = h, density = d)))
             val at = "at $d, ${form.width} ${if (form.compact) "compact " else ""}$board $h px"
             against += sc.keys.sumOf { iconsWithinArcs(it, at) }
             val sizes = sc.keys.flatMap { key -> key.ops(false).mapNotNull { op -> sized(key, op) } }.toMap()
-            last?.let { was -> sizes.forEach { (id, v) -> was[id]?.let { o -> smallStep(id, o.first, v, d, at) } } }
+            val capped = last?.let { was -> sizes.count { (id, v) -> was[id]?.let { o -> smallStep(id, o.first, v, d, at) } == true } } ?: 0
+            if (capped > 0) cappedSteps++
+            assertTrue(cappedSteps <= 2, "two capped steps of the icons at most $at")
             last = sizes
             h -= 1.0
         }
@@ -309,7 +365,7 @@ class ContentTest {
         val glyph = key.ops(false).filterIsInstance<Op.Text>().maxOfOrNull { it.size }
         return when (op) {
             is Op.Text -> "${key.id} T ${op.text}" to (op.size * op.scaleX to (op.size == glyph && face < op.size))
-            is Op.Icon -> "${key.id} I ${op.name}" to (op.box.width to false)
+            is Op.Icon -> "${key.id} I ${op.name}" to (op.box.width to (face < op.box.height))
             else -> null
         }
     }
@@ -318,17 +374,24 @@ class ContentTest {
     // of a dp, the less it moves), or a px for an icon (whole px); a glyph taller than its face more, up to
     // 0.075 / d, only smaller (the face's px it gives, and its class's need fading in as its marks' does: small
     // compact k18 at 2 px a dp gives 3.6% at 196 px with FIT_SLACK, 2.8% without; growing, as any)
-    private fun smallStep(id: String, o: Double, v: Pair<Double, Boolean>, d: Double, at: String) {
+    private fun smallStep(id: String, o: Double, v: Pair<Double, Boolean>, d: Double, at: String): Boolean {
         val (now, tall) = v
         // (0.042: small compact k18's '1' at 2 px a dp gives 2.06% at 187 px with FIT_SLACK, 1.9% at most without;
         // both bounds measured, not derived: a change to FIT_SLACK, the marks or the fonts re-measures them)
         val most = 0.042 / d
         if (tall && o - now > most * o) {
-            assertTrue(o - now <= 0.075 / d * o + 1e-6, "$id $o to $now, taller than its face, $at")
-            return
+            // the measured case of an icon taller than its face: small compact qwerty, k14, k18 near 55% (at 1.5 px a
+            // dp 140 px, a 14 px ⌫ face under a 36 px icon), ⌫'s two marks side by side on top (上滑 右上, 下滑 左上):
+            // the face no longer holds them beside it and the icons' class goes to its cap in a step (measured: one
+            // a sweep at 1.5 to 2.75 px a dp, two at 3.5; the caller allows two)
+            val icon = " I " in id
+            if (icon) assertTrue(Regex(" 945(\\.0)? compact ") in at, "$id $o to $now, an icon taller than its face, $at")
+            assertTrue(o - now <= (if (icon) KeyMarkYield.MAX_CLASS_SHRINK else 0.075 / d) * o + 1e-6, "$id $o to $now, taller than its face, $at")
+            return icon
         }
         val slack = if (" I " in id) 1.0 + 1e-6 else 0.0
         assertTrue(abs(now - o) <= maxOf(most * o, slack) + 1e-6, "$id $o to $now $at")
+        return false
     }
 
     // [key]'s shortcut and ⌫ icons' box corners within its face's rounded ones (less the border); how many against them
@@ -401,7 +464,7 @@ class ContentTest {
         fun theme(border: String) = ThemeReader.theme(
             testData("material-light.xml").replace("</theme>", "<style select=\"key\" radius=\"0dp\" border=\"$border\"/>\n</theme>"),
         ).ok()
-        fun scene(height: Double) = Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = height, density = d)), theme("1dp #ff112233"))
+        fun scene(height: Double) = Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = height, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft))), theme("1dp #ff112233"))
         assertEquals(setOf("backspace", "delete-sweep"), icons(scene(407.0), "backspace").map { it.name }.toSet(), "at 20%")
         for (height in listOf(420.0, 440.0)) {
             val s = scene(height)
@@ -414,13 +477,13 @@ class ContentTest {
     }
 
     @Test
-    fun aFloatingBoardsBackspaceKeepsBothItsIconsTheirClassOneSize() {
-        // every floating board at every density, its height: ⌫'s two left icons, their size, meet its icon where
+    fun aFloatingBoardsBackspaceOneOverTheOtherKeepsBothItsIconsTheirClassOneSize() {
+        // 上滑 左上, 下滑 左下: every floating board at every density, its height: ⌫'s two left icons, their size, meet its icon where
         // it is; it goes aside (its class no smaller than the cap) and both are drawn, the shortcut icons one
         // size, no larger than theirs (060-render-p2 S4e)
         for (d in listOf(2.0, 2.625, 2.75, 3.5)) for (board in listOf("qwerty", "k14", "k18", "zhuyin-nine", "number", "symbols")) {
             val k = d / Forms.DENSITY
-            val e = Forms.env(board, Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d))
+            val e = Forms.env(board, Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft)))
             val s = Forms.scene(board, e)
             val at = "$board at $d"
             val icons = icons(s, "backspace").associate { it.name to it.box }

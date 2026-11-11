@@ -50,7 +50,7 @@ key space kind=space role=space a11y="a11y_key_space"
   normal
     shadow rect(428.88,369.38,748.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(428.88,369.38,748.13,449.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon cursor-move 434,372,455,393 #ff7a858a
+    icon cursor-move 721,372,742,393 #ff7a858a
   pressed
     +2 fill rect(428.88,369.38,748.13,449.63 r=10.5,10.5,10.5,10.5) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"
@@ -64,8 +64,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     shadow rect(763.88,369.38,910.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(763.88,369.38,910.13,449.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 805.5,378,868.5,441 #ff7a858a
-    icon delete-sweep 769,372,790,393 #ff7a858a
-    icon restore 769,426,790,447 #ff7a858a
+    icon delete-sweep 883,372,904,393 #ff7a858a
+    icon restore 769,372,790,393 #ff7a858a
   pressed
     +2 fill rect(763.88,369.38,910.13,449.63 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"

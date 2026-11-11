@@ -290,16 +290,17 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         }
     }
 
-    // a function key's as 0.5 drew them: the up one at the shortcuts' place, the down one there mirrored
+    // a function key's: each way's mark at its own setting's place
     private fun functionSlots(ways: List<Way>): Map<Slot, Way> {
         val m = env.marks
         return KeyMarks.placeFunction(
-            ways.firstOrNull { it.up }, ways.firstOrNull { !it.up }, true, true, m.symbolAt, m.shortcutAt, env.landscape, env.compact,
+            ways.firstOrNull { it.up }, ways.firstOrNull { !it.up }, true, true, m.upAt, m.downAt, env.landscape, env.compact,
         ).at
     }
 
     // KeyMarks' slots, by what each is (a symbol's or a shortcut's), the other way's place apart from it;
-    // two in one slot: a symbol's kept (as 0.5 kept the symbol), else the up one's
+    // two in one slot: a symbol's kept (as 0.5 kept the symbol), else the up one's; unreachable once the
+    // settings are settled (KeyMarks.settled), kept for safety
     private fun charSlots(ways: List<Way>): Map<Slot, Way> {
         val m = env.marks
         val slots = LinkedHashMap<Slot, Way>()

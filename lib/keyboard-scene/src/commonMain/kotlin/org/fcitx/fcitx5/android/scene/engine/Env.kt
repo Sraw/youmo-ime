@@ -212,8 +212,7 @@ sealed interface MarkContent {
  * The marks' settings (rules B §7, 060-swipe-slots): every key has an up and a down way, each drawn
  * at its place ([upAt], [downAt]) where that way is on ([upOn], [downOn]), by [shortcuts]' names, the
  * layout's `shortcut=` and the way: `full/a:up`, `space:down`. A character key with no name there
- * draws its [MarkContent.Corner] the way [firstUp] says and nothing the other; a function key nothing,
- * its two drawn as 0.5 drew them ([shortcutAt]).
+ * draws its [MarkContent.Corner] the way [firstUp] says and nothing the other; a function key nothing.
  * [symbols] whether symbols are drawn at all, [charShortcuts] whether a character key's shortcuts are
  * (a table's roots take their room).
  */
@@ -227,16 +226,6 @@ data class MarkSettings(
     val firstUp: Boolean = true,
     val shortcuts: Map<String, MarkContent> = PRESET,
 ) {
-    /** Where a symbol of a character key is drawn: the long press's first's way's place. */
-    val symbolAt: KeyMarks.At get() = if (firstUp) upAt else downAt
-
-    /**
-     * Where a shortcut of a character key is drawn, the other way's place; a function key's up one too,
-     * its down one there mirrored, as 0.5 drew them (KeyMarks.placeFunction): an up swipe's mark over a
-     * down one's whichever way the slots were flipped.
-     */
-    val shortcutAt: KeyMarks.At get() = if (firstUp) downAt else upAt
-
     /** [name]'s way [up] by [shortcuts], else its default: a character key's corner the way [firstUp], else nothing. */
     fun of(name: String?, char: Boolean, up: Boolean): MarkContent =
         name?.let { shortcuts["$it:${if (up) "up" else "down"}"] } ?: if (char && up == firstUp) MarkContent.Corner else MarkContent.Empty

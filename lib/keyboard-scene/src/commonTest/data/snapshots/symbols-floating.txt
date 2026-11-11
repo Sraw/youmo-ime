@@ -25,7 +25,7 @@ key lock kind=function role=lock a11y="a11y_key_panel_lock"
   normal
     shadow rect(125.88,465.38,205.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(125.88,465.38,205.13,577.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon lock-open 134,490,197,553 #ff7a858a
+    icon lock-open 134.95,490.95,196.05,552.05 #ff7a858a
   pressed
     +2 fill rect(125.88,465.38,205.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key numbers kind=letter role=numbers a11y="a11y_key_numbers"
@@ -37,7 +37,7 @@ key numbers kind=letter role=numbers a11y="a11y_key_numbers"
   normal
     shadow rect(220.88,465.38,299.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(220.88,465.38,299.13,577.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon number-pad 228.5,490,291.5,553 #ff7a858a
+    icon number-pad 229.45,490.95,290.55,552.05 #ff7a858a
   pressed
     +2 fill rect(220.88,465.38,299.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key space kind=space role=space a11y="a11y_key_space"
@@ -50,7 +50,7 @@ key space kind=space role=space a11y="a11y_key_space"
   normal
     shadow rect(314.88,465.38,543.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(314.88,465.38,543.13,577.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon cursor-move 322,470,351,499 #ff7a858a
+    icon cursor-move 507.05,470,535,497.95 #ff7a858a
   pressed
     +2 fill rect(314.88,465.38,543.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"
@@ -63,9 +63,9 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   normal
     shadow rect(558.88,465.38,661.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(558.88,465.38,661.13,577.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 592.94,490,655.94,553 #ff7a858a
-    icon delete-sweep 562.13,470.63,591.13,499.63 #ff7a858a
-    icon restore 562.13,543.5,591.13,572.5 #ff7a858a
+    icon backspace 579.45,498.07,640.55,559.17 #ff7a858a
+    icon delete-sweep 625.8,468,653.75,495.95 #ff7a858a
+    icon restore 567,468,594.95,495.95 #ff7a858a
   pressed
     +2 fill rect(558.88,465.38,661.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
@@ -79,6 +79,6 @@ key enter kind=enter role=enter a11y="换行"
   normal
     shadow rect(676.88,465.38,779.63,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(676.88,465.38,779.63,577.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab
-    icon enter 696.75,490,759.75,553 #ffffffff
+    icon enter 697.7,490.95,758.8,552.05 #ffffffff
   pressed
     +2 fill rect(676.88,465.38,779.63,577.63 r=10.5,10.5,10.5,10.5) #1f000000

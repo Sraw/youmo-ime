@@ -89,8 +89,7 @@ class KeyMarksScreenshotTest {
         }
     }
 
-    // where a key has no room for its shortcut in the chosen place, another free corner of that key
-    // (KeyMarks.elsewhere): 紧凑单手's narrow low keys at 右下 and 左下, floating 大千's backspace at 底部
+    // where a key has no room for its shortcut in the chosen place, another free corner of that key: 紧凑单手's narrow low keys at 右下 and 左下, floating 大千's backspace at 底部
     @Test
     @Uat("KB-67")
     fun noRoomAnotherCornerOfTheKey() {
