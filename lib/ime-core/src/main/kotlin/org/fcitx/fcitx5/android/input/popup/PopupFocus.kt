@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.popup
 
 import kotlin.math.abs
-import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -24,14 +23,6 @@ import kotlin.math.roundToInt
  * @param cancelAt where, in [moveTo]'s coordinates, the key pressed ends at the bottom: [cancelBelow]
  *   is then measured from the first point [moveTo] is given, not taken as is. A press near the
  *   key's bottom edge was otherwise cancelled only a whole key's height below it.
- * @param leftEdge where, in [moveTo]'s coordinates, the finger can go no further left (the screen's
- *   edge, less a margin); [rightEdge] at the right. A side with less room from the first point than
- *   [stepX] a column to the row's end has shorter steps that way, so a finger sliding there
- *   reaches the last key by that edge; under [minStepX] only where that edge leaves no more room
- *   (never under half of it): a popup pushed in from the screen's
- *   edge left the finger at it, the keys beyond it out of reach (九键's 3: f three steps right of
- *   the digit, the finger at the screen's edge). The slack before the next key stays
- *   [HYSTERESIS] of [stepX] across, in pixels, however short the steps: a shake moves no further.
  */
 class PopupFocus(
     private val rows: List<IntArray>,
@@ -41,14 +32,7 @@ class PopupFocus(
     private val stepY: Float,
     private var cancelBelow: Float,
     private val cancelAt: Float = Float.NaN,
-    private val leftEdge: Float = Float.NEGATIVE_INFINITY,
-    private val rightEdge: Float = Float.POSITIVE_INFINITY,
-    private val minStepX: Float = stepX,
 ) {
-    // the steps each way: stepX till moveTo's first point says how much room there is
-    private var stepLeft = stepX
-    private var stepRight = stepX
-
     private var row = startRow
     private var column = startColumn
 
@@ -64,10 +48,6 @@ class PopupFocus(
             // the popup's first move: only by going on down from there, past a key's HYSTERESIS, as a
             // finger sliding across shakes a few pixels down too (F3217)
             if (!cancelAt.isNaN()) cancelBelow = (cancelAt - y).coerceAtLeast(HYSTERESIS * stepY)
-            val columns = rows.maxOf { it.size }
-            val slack = HYSTERESIS * stepX
-            stepLeft = stepWithin(x - leftEdge - slack, startColumn)
-            stepRight = stepWithin(rightEdge - x - slack, columns - 1 - startColumn)
         }
         return move(x - x0, y - y0)
     }
@@ -77,25 +57,12 @@ class PopupFocus(
         if (dy > cancelBelow) return CANCELLED
         row = settle(row, startRow - dy / stepY, rows.size, HYSTERESIS)
         val slots = rows[row]
-        val step = if (dx < 0) stepLeft else stepRight
-        // the slack in pixels, HYSTERESIS of a whole step: as it was where the step is whole
-        column = settle(column, startColumn + dx / step, slots.size, if (step == stepX) HYSTERESIS else HYSTERESIS * stepX / step)
+        column = settle(column, startColumn + dx / stepX, slots.size, HYSTERESIS)
         return nearest(slots, column)
     }
 
     /** The key in focus as [move] last left it, the first one before any. */
     val focused: Int get() = nearest(rows[row], column)
-
-    // a step that takes [columns] columns within [room] (the slack before the last already off it):
-    // sliding on, the last is picked half a step past the one before's middle and the slack, at
-    // (columns - 0.5) steps and the slack, a pixel short of the edge (no tie at the edge itself);
-    // stepX where there is room enough. Under [minStepX] the last key still comes first: steps as
-    // short as it takes, down to half that (a finger at the very edge, no room at all)
-    private fun stepWithin(room: Float, columns: Int): Float {
-        if (columns <= 0) return stepX
-        val fit = (room - 1f) / (columns - 0.5f)
-        return if (fit >= minStepX) min(stepX, fit) else fit.coerceAtLeast(minStepX / 2)
-    }
 
     // the slot [at] falls in, kept at [current] until it is past the middle by [slack] (keys): a finger
     // resting on a line between two keys would switch between them, buzzing at each
@@ -131,7 +98,5 @@ class PopupFocus(
         /** How far the finger moves for the next key, in keys: less than one, a key's way. */
         const val STEP = 0.6f
 
-        /** The shortest step toward an edge, in keys: a shake of the finger no key further. */
-        const val MIN_STEP = 0.3f
     }
 }

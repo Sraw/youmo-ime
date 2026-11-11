@@ -101,78 +101,13 @@ class PopupFocusTest {
         },
     )
 
-    // 九键's 3 at the right edge: the digit at 300, the edge 30 right of it, the left one far;
-    // steps of 20 (a key of 33), at least 10
-    private fun nearTheRight(rightEdge: Float = 330f) = PopupFocus(
-        rows = listOf(intArrayOf(0, 1, 2, 3, 4, 5, 6), intArrayOf(-1, -1, 8, 7, 9, -1, -1)),
-        startRow = 0, startColumn = 3, stepX = 20f, stepY = 25f, cancelBelow = 50f,
-        leftEdge = 0f, rightEdge = rightEdge, minStepX = 10f,
-    )
-
-    // a finger sliding a pixel at a time from [from] to [to], as a device reports it
-    private fun PopupFocus.slide(from: Int, to: Int, y: Float = 0f): Int {
-        var at = moveTo(from.toFloat(), y)
-        val dir = if (to >= from) 1 else -1
-        var x = from
-        while (x != to) {
-            x += dir
-            at = moveTo(x.toFloat(), y)
-        }
-        return at
-    }
-
-    private class Slide(val why: String, val focus: () -> PopupFocus, val from: Int, val to: Int, val key: Int)
-
-    @Test
-    fun aSlideFromTheStartEndsOnTheKeyItReaches() {
-        val roomy = { PopupFocus(
-            rows = listOf(intArrayOf(0, 1, 2, 3, 4, 5, 6)), startRow = 0, startColumn = 3,
-            stepX = 20f, stepY = 25f, cancelBelow = 50f, leftEdge = 0f, rightEdge = 1000f, minStepX = 10f,
-        ) }
-        val near = { nearTheRight() }
-        val atTheEdge = { nearTheRight(rightEdge = 301f) }
-        val someRoom = { nearTheRight(rightEdge = 325f) }
-        val rows = listOf(
-            // toward a near edge the steps are shorter: 3 columns in 30 less the slack of 3 and a pixel, steps of 26 / 2.5
-            Slide("near edge: the last key by the edge", near, 300, 330, 6),
-            Slide("near edge: two pixels short of it, the one before", near, 300, 328, 5),
-            Slide("near edge: halfway, the middle one", near, 300, 310, 4),
-            Slide("near edge: a whole step of 20 two keys at most", near, 300, 320, 5),
-            Slide("near edge: the far side a step of 20, not yet past it", near, 300, 288, 3),
-            Slide("near edge: the far side a step of 20, past it", near, 300, 286, 2),
-            Slide("near edge: the far side's last", near, 300, 240, 0),
-            // with room enough the steps are as before: the next key past half a step and the slack, 13
-            Slide("room enough: 12 right stays", roomy, 500, 512, 3),
-            Slide("room enough: 14 right moves", roomy, 500, 514, 4),
-            Slide("room enough: 12 left stays", roomy, 500, 488, 3),
-            Slide("room enough: 14 left moves", roomy, 500, 486, 2),
-            Slide("room enough: the last", roomy, 500, 560, 6),
-            // no step shorter than the least: the finger at the very edge, steps of half the least, 5, the slack 3 still
-            Slide("at the edge: 5 right stays", atTheEdge, 300, 305, 3),
-            Slide("at the edge: 6 right moves", atTheEdge, 300, 306, 4),
-            Slide("less room than the least: as short as it takes to reach the last", someRoom, 300, 325, 6),
-        )
-        assertRows(*rows.map { r -> r.why to { assertEquals(r.key, r.focus().slide(r.from, r.to)) } }.toTypedArray())
-        // up the same as ever
-        assertEquals(7, nearTheRight().apply { moveTo(300f, 0f) }.moveTo(300f, -25f))
-    }
-
-    @Test
-    fun shorterStepsKeepTheSlackOfAWholeOne() {
-        // the slack is 3 pixels, not 0.15 of the shorter step (1.6): back 6 of 9 stays on e
-        val f = nearTheRight()
-        assertEquals(4, f.slide(300, 309))
-        assertEquals(4, f.slide(309, 303))
-        assertEquals(3, f.slide(303, 301))
-    }
-
     // 060-edge-popup (用户 2026-11-10「全部按全键盘的排法」): the key's own first, the rest as listed
 
     @Test
     fun theKeysOwnComesFirstAndTheRestAsListed() {
-        // 九键's 3: D E F 3 d e f, round the focus as f d E 3 D e F
+        // 九键's 3: D E F 3 d e f, round the focus (right, left, right ...) as f d E 3 D F e
         assertEquals(listOf(3, 0, 1, 2, 4, 5, 6), PopupFocus.ownFirst(7, 3).toList())
-        // 十四键's L: L ? l
+        // 十四键's L: L 0 l, its corner first; at the screen's right l L 0
         assertEquals(listOf(1, 0, 2), PopupFocus.ownFirst(3, 1).toList())
         assertEquals(listOf(0, 1, 2), PopupFocus.ownFirst(3, 0).toList())
         assertEquals(listOf(0), PopupFocus.ownFirst(1, 0).toList())

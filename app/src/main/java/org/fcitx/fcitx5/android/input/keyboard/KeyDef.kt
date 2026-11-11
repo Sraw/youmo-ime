@@ -163,8 +163,8 @@ open class KeyDef(
              * are symbols set apart: rows of their own above the rest, each shown as Chinese
              * punctuation maps it, typed as a key the engine maps. [asIs]: every item is committed as
              * it is, never a key (none set apart then: nothing would map them). [inRow]: the items
-             * before the symbols in one row, in their order (A B C 2 a b c), the one at [inRow] under
-             * the finger first; -1, round it, the first under the finger.
+             * before the symbols in one row, the one at [inRow] (the key's own) under the finger first
+             * and the rest round it as listed, as the full keyboard's (060-edge-popup); -1, the first.
              */
             class Explicit(
                 val items: Array<String>,

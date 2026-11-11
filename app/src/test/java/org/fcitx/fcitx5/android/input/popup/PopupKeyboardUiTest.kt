@@ -241,6 +241,19 @@ class PopupKeyboardUiTest {
         }
     }
 
+    @Test
+    fun aGroupOfNoKeysOwnHasItsFirstAtTheEdge() {
+        // 注音九键's group (ZhuyinKeyboard.groupPopup: no inRow, its symbols as shown): by the screen's
+        // edge the first, the one a lift types, at that end and the rest inward (060-edge-popup)
+        val keys = arrayOf("ㄓ", "ㄔ", "ㄕ", "ㄖ")
+        for ((trigger, toRight) in listOf(Rect(960, 500, 1000, 550) to true, Rect(0, 500, 40, 550) to false)) {
+            val ui = popup(keys, trigger)
+            val row = drawn(ui).filterValues { it.first == 0 }.entries.sortedBy { it.value.second }.map { it.key }
+            assertEquals("$toRight", if (toRight) listOf("ㄖ", "ㄕ", "ㄔ", "ㄓ") else keys.toList(), row)
+            assertEquals(KeyAction.HostKeyAction("ㄓ"), ui.onTrigger())
+        }
+    }
+
     // 九键's (and 九键双拼's) own long press of [digit], as T9Keyboard makes it
     private fun nine(digit: Char, shuangpin: Boolean): KeyDef.Popup.Keyboard.Explicit = T9Keyboard.ninePopup(
         digit, T9Keyboard.lettersOn(digit, NineKeyLetters.STANDARD, english = false, shuangpin = shuangpin),

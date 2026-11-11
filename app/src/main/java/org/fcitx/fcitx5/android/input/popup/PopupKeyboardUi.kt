@@ -72,7 +72,6 @@ class PopupKeyboardUi(
     private val focusRow: Int
     internal val focusColumn: Int
 
-
     // the scene's keys' size; null, the engine could not say ([unmade])
     private val sceneKeys: PopupKeys?
 
@@ -81,14 +80,14 @@ class PopupKeyboardUi(
 
     init {
         // as wide as the widest group wants: up to 5 a row, its rows as even as may be; the first
-        // all in one row where it is in order. round() left fewer slots than entries for 13, 17,
+        // all in one row where it has a key's own ([inRow]). round() left fewer slots than entries for 13, 17,
         // 21 ... entries and hid the last ones
         val evenly = groups.drop(if (inRow >= 0) 1 else 0).maxOfOrNull { group ->
             val count = group.count().toFloat()
             ceil(count / ceil(count / 5)).toInt()
         } ?: 0
-        // in order, the first group's one row; the rest no narrower than they would be (a key of
-        // one letter or none would stack its symbols one a row)
+        // with a key's own, the first group's one row; the rest no narrower than they would be (a key
+        // of one letter or none would stack its symbols one a row)
         columnCount = if (inRow >= 0) max(groups[0].count(), evenly) else evenly
         groupRows = groups.map { ceil(it.count().toFloat() / columnCount).toInt() }
         rowCount = groupRows.sum()
@@ -99,10 +98,8 @@ class PopupKeyboardUi(
         keyWidth = sceneKeys?.width?.toInt() ?: room?.let { min(minKeyWidth, it.toInt() / columnCount) } ?: minKeyWidth
 
         focusRow = 0
-        // by the room either side, as for any popup: inRow's own place left the row's start under a
-        // key at the screen's right, the popup moved in and the finger right of every key but none
-        val wanted = calcInitialFocusedColumn(columnCount, keyWidth, outerBounds, triggerBounds)
-        focusColumn = wanted
+        // by the room either side, as for any popup: by the screen's edge the key's own at that end
+        focusColumn = calcInitialFocusedColumn(columnCount, keyWidth, outerBounds, triggerBounds)
     }
 
     /**

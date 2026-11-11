@@ -150,6 +150,28 @@ def zhuyin_hold(d, xy):
     return texts
 
 
+ZHUYIN = {chr(c) for c in range(0x3105, 0x312A)}
+
+
+@case("T9-60b", base="B0-注音九键", visual=True)
+def t960b(d):
+    kb = d.need_keyboard()
+    groups = [n for n in kb.walk() if n.clickable and n.texts() and len(n.texts()[0]) > 1 and set(n.texts()[0]) <= ZHUYIN]
+    check(groups, "找不到注音组键")
+    key = max(groups, key=lambda n: n.c[0])
+    face = key.texts()[0]
+    x, y = key.c
+    d.touch(("down", x, y), ("sleep", 0.9), ("move", x, y))
+    d.shot("kb", f"长按最右一列的 {face}：{face[0]} 在最右，其余往左")
+    shown = sorted((n for n in d.screen().nodes if n.text in set(face) and n.text and not n.clickable and n.b[3] <= kb.b[1] + (key.b[1] - kb.b[1])),
+                   key=lambda n: n.c[0])
+    d.touch(("up", x, y))
+    time.sleep(0.5)
+    row = [n.text for n in shown]
+    check(row and row[-1] == face[0], f"弹出一排 {row}，{face[0]} 应在最右")
+    return f"{face}: {row}"
+
+
 @case("T9-60", base="B0-注音九键", mutates="learn")
 def t960(d):
     k = d.keys(refresh=True)
