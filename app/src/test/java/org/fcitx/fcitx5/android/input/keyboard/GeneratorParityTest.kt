@@ -60,8 +60,10 @@ class GeneratorParityTest {
         val shapes = listOf(NineKeyLetters.G14 to GroupedKeyboard.CORNERS, NineKeyLetters.G18 to GroupedKeyboard.CORNERS18)
         for ((letters, corners) in shapes) letters.codes.forEachIndexed { i, code ->
             val group = letters.letters(code)
-            val before = GroupedKeyboard.longPressOf(group, corners[i]) { PopupPreset[it].orEmpty().toList() }
-            assertEquals(group, old(before), new(KeyDefaults.grouped(group, corners[i])))
+            val before = old(GroupedKeyboard.longPressOf(group, corners[i]) { PopupPreset[it].orEmpty().toList() })
+            // the old one had 微软's `;` twice, in L's row and among its symbols: once now (060-keys-unify §3.3)
+            val once = before.copy(second = before.second.filter { it !in before.first })
+            assertEquals(group, once, new(KeyDefaults.grouped(group, corners[i])))
         }
     }
 
