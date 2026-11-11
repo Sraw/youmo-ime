@@ -128,7 +128,7 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
   | 用在 | 名字 |
   |---|---|
   | 回车（随输入框要的动作） | `enter`（换行）、`go`、`search`、`send`、`next`、`done`、`previous` |
-  | 键 | `backspace`、`language`、`space`、`shift`、`shift-once`、`shift-locked`、`number-pad`、`lock`、`lock-open`、`emoji`、`voice`、`arrow-upward`、`arrow-downward` |
+  | 键 | `backspace`、`language`、`space`、`shift`、`shift-once`、`shift-locked`、`number-pad`、`lock`、`lock-open`、`emoji`、`voice`、`arrow-upward`、`arrow-downward`；自己设的下滑文字放不下时画的 `short-text`（两条横线） |
   | 快捷键的命令 | `select-all`、`content-copy`、`content-cut`、`content-paste`、`undo`、`redo`、`delete-sweep`、`restore`、`field-start`、`field-end`、`cursor-move`、`clipboard`、`quick-input`、`emoji`、`voice`、`trad-simp`、`choose-keyboard`、`hide-keyboard`、`swipe-select` |
 - **新名字**：不是自带的名字，可以在 `icon(名字)`（`space-content`、`return-icon-*`）和主题自带布局的 `icon=` 里用。一个 `<icon>` 既不是自带的名字、又没被任何 `icon()` 用到时给警告「不会画」（只被主题布局用到的也会收到这条警告）。
 - **颜色**：路径没写 `fill`（自己的或从 `<g>`、`<svg>` 继承的）或写 `currentColor` 时，用部件的 `icon-color` 着色——注意浏览器里没写 fill 是黑色，这里不是。写了 `#颜色` 的路径保留这个颜色。SVG 的颜色按 CSS 的写法读：`#rgb`、`#rgba`、`#rrggbb`、`#rrggbbaa`，**透明度在最后**，和主题里 `#aarrggbb` 的写法相反。`icon-color` 的透明度乘到所有路径上；`icon-color` 是 `transparent` 时整个图标不画。

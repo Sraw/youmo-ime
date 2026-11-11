@@ -1,0 +1,10 @@
+<!-- a swipe's text with no room on its key (MarkContent.Text.SIGN): Material's short_text, a longer line over a shorter -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M4,9h16v2H4zM4,13h10v2H4z" />
+</vector>

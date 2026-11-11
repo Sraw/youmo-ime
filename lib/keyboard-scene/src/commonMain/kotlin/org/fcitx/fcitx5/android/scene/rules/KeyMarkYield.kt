@@ -33,7 +33,7 @@ import kotlin.math.sqrt
  * then the whole mark class (every symbol, every shortcut, each about its corner) as much smaller, the
  * most any key with one needs, to [MIN_MARK_SCALE]; a key whose marks still meet then has them left
  * out, the most expendable first ([Mark.drop]: a function key's down shortcut, a shortcut, the symbol
- * last; the swipe and the long press still work). The glyphs first: a letter 6% smaller reads as the
+ * last, a built-in one before any the user set; the swipe and the long press still work). The glyphs first: a letter 6% smaller reads as the
  * same size, a mark 6% smaller beside its letter does not, and a mark is the lesser of the two.
  * Every step goes as far as it must, no further, in px, not whole px: whether a mark is drawn, or how
  * big the glyphs are, never turns on how a dp rounds.
@@ -68,7 +68,10 @@ object KeyMarkYield {
     }
 
     /** A mark's [ink] in its [slot]; [drop], how soon it is left out where nothing else clears it (the higher the sooner). */
-    data class Mark(val ink: Ink, val slot: Slot, val drop: Int = DROP_SHORTCUT, val grows: Grows? = null)
+    data class Mark(val ink: Ink, val slot: Slot, val drop: Int = DROP_SHORTCUT, val grows: Grows? = null, val user: Boolean = false) {
+        // how soon it is left out: a built-in one before any the user set (the user's edits win), then by [drop]
+        internal val expendable: Int get() = drop + if (user) 0 else BUILT_IN
+    }
 
     /**
      * How much more a glyph's or mark's ink is at a scale than its ink scaled (each side, out positive): its
@@ -122,6 +125,11 @@ object KeyMarkYield {
         val grows: Grows? = null,
         /** Its glyph a label, kept within [room] across (rules B §8a); an icon is as large as it is. */
         val across: Boolean = false,
+        /**
+         * A text of it drawn shorter for want of room (SceneBuilder): it asks nothing of the mark classes, what
+         * still meets left out, so one long text never makes every mark smaller.
+         */
+        val shortened: Boolean = false,
     )
 
     /** Every glyph of a class scaled by [scale] about its point; each key's [keys] settled. */
@@ -143,6 +151,9 @@ object KeyMarkYield {
 
     /** A function key's down shortcut: the first left out, the up one the one swiped more. */
     const val DROP_DOWN_SHORTCUT = 3
+
+    // past every [drop]: a built-in mark left out before any the user set
+    private const val BUILT_IN = 10
 
     /**
      * A class at most this much smaller (060-render-p2 S4e): the most a class needs where a mark eaten
@@ -243,7 +254,9 @@ object KeyMarkYield {
         val markNeed = keys.indices.map { k ->
             if (whole(k)) return@map 1.0 to 1.0
             val g = keys[k].at(scales.getValue(keys[k].glyphClass))
-            markNeed(floor, minMark) { t, u, symbol -> fit(k, g, marksAt(k, t, u, symbol)) }
+            val need = markNeed(floor, minMark) { t, u, symbol -> fit(k, g, marksAt(k, t, u, symbol)) }
+            // a key with a text drawn shorter asks the shortcuts nothing (one long text never shrinks them all), its symbols what they need
+            if (keys[k].shortened) need.first to 1.0 else need
         }
         val symbol = markNeed.minOfOrNull { it.first } ?: 1.0
         val shortcut = markNeed.minOfOrNull { it.second } ?: 1.0
@@ -300,6 +313,20 @@ object KeyMarkYield {
         val apart = keptApart(kept.map { i -> key.marks[i].let { m -> m.scaled(board.markScale(m)).within(key.edge) } }, key.edge)
         val marks = key.marks.indices.map { i -> kept.indexOf(i).let { at -> if (at < 0) null else apart[at] } }
         return settle(key.copy(moves = false), glyph, marks, gap)
+    }
+
+    /** Whether [key]'s marks, at their size and kept apart, fit about its glyph as it is: what has room needs no text drawn shorter. */
+    fun fitsWhole(key: Member, gap: Double): Boolean {
+        val apart = keptApart(key.marks.map { it.within(key.edge) }, key.edge)
+        if (apart.any { it == null }) return false
+        val marks = apart.filterNotNull()
+        return place(key.glyph, marks, key.copy(moves = false), gap) != null
+    }
+
+    /** [key]'s marks (by index) that, at their size and kept apart, meet its glyph or one another. */
+    fun crowded(key: Member, gap: Double): Set<Int> {
+        val inks = key.marks.map { it.within(key.edge).ink }
+        return inks.indices.filter { i -> inks[i].meets(key.glyph, slack(gap)) || inks.indices.any { j -> j != i && inks[j].meets(inks[i], 0.0) } }.toSet()
     }
 
     // the gap a mark is kept from the glyph by: [gap] less [FIT_SLACK]
@@ -381,7 +408,7 @@ object KeyMarkYield {
             val far = maxOf(key.edge.face.width, key.edge.face.height)
             val out = live.map { out(glyph, it, key.room, key.edge, gap, inward = far) }
             val clash = out.indices.filter { i -> out[i].meets(glyph, slack(gap)) || out.indices.any { j -> j != i && out[j].meets(out[i], 0.0) } }
-            val worst = clash.ifEmpty { live.indices.toList() }.maxBy { live[it].drop }
+            val worst = clash.ifEmpty { live.indices.toList() }.maxBy { live[it].expendable }
             kept[kept.indexOfFirst { it === live[worst] }] = null
         }
     }
@@ -502,7 +529,7 @@ object KeyMarkYield {
         while (true) {
             val clash = now.indices.filter { i -> now[i] != null && now.indices.any { j -> j != i && now[j]?.ink?.meets(now[i]!!.ink, 0.0) == true } }
             if (clash.isEmpty()) return now
-            now[clash.maxBy { marks[it].drop }] = null
+            now[clash.maxBy { marks[it].expendable }] = null
         }
     }
 

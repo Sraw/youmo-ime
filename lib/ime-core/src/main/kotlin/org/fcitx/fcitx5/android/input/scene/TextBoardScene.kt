@@ -114,9 +114,11 @@ object SceneMarks {
         firsts: Map<String, String?> = emptyMap(),
     ): MarkSettings {
         val marks = HashMap<String, MarkContent>()
+        val user = HashSet<String>()
         for (name in names) {
             val key = SwipeSlots.keyOf(name)
             for (up in listOf(true, false)) {
+                if (slots.isSet(key, up)) user += "$name:${if (up) "up" else "down"}"
                 val first = if (name in firsts) firsts[name]?.let(MarkContent::Symbol) ?: MarkContent.Empty else MarkContent.Corner
                 marks["$name:${if (up) "up" else "down"}"] = when (val slot = slots.resolve(key, up)) {
                     // a function key has no corner: its first is its long press's ([firsts]), or nothing
@@ -133,6 +135,7 @@ object SceneMarks {
             downOn = ways.down,
             firstUp = slots.orientation == SwipeOrientation.FirstUp,
             shortcuts = marks,
+            user = user,
         )
     }
 
@@ -146,7 +149,7 @@ object SceneMarks {
     fun content(s: KeyShortcut): MarkContent? = when (s) {
         is KeyShortcut.Command -> MarkContent.Icon(icon(s.command))
         // at most two characters as seen, the rest an ellipsis (要做 1): the bubble shows it whole
-        is KeyShortcut.Text -> MarkContent.Text(KeyMarkText.of(s.text))
+        is KeyShortcut.Text -> MarkContent.Text(KeyMarkText.of(s.text), KeyMarkText.shorter(s.text))
         KeyShortcut.None -> null
     }
 

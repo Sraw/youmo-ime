@@ -143,22 +143,36 @@ class SceneBuilder(
         val keyed = placed.mapNotNull { p -> (p.item as? ExpandedKey)?.let { p to it } }
         val styled = phases.section("cascade.of") { keyed.map { (_, k) -> styled(layout.id, k) } }
         val shaped = phases.section("faces") { keyed.mapIndexed { i, (p, k) -> shaped(p, k, styled[i]) } }
-        val keys = phases.section("content") { keyed.mapIndexed { i, (p, k) -> prepare(p, k, styled[i], shaped[i], warnings) } }
+        var keys = phases.section("content") { keyed.mapIndexed { i, (p, k) -> prepare(p, k, styled[i], shaped[i], warnings) } }
         // the same keys with their edges where they fall, not on whole pixels: what the marks' yields are
         // worked out on (060-render-p2 S4e), so a pixel's rounding never turns a choice; drawn on the above
-        val loose = phases.section("loose") {
-            val cells = Place.rows(rows, layout.columns, layout.onSplit, env, board, Problems(), snap = false).getOr { return Parsed.Failed(it) }
+        var cells: List<Placed> = emptyList()
+        fun looseOf(i: Int, short: Map<Int, Int>): KeyContent {
+            // a key with no marks has nothing to choose: as drawn
+            if (keys[i].content.marks.isEmpty()) return keys[i].content
+            val k = keyed[i].second
+            val cell = cells[i].cell
+            val g = Faces.of(cell, styled[i].looks.getValue(styled[i].states), k.attrs.face ?: Face.Default, k.attrs.margin ?: true, env.flat && k.attrs.face != Face.Keep, env.density)
+            return fitted(content.of(k, cell, g.content, Looks(styled[i].parts.getValue(styled[i].states)), g, snap = false, short = short))
+        }
+        var loose = phases.section("loose") {
+            cells = Place.rows(rows, layout.columns, layout.onSplit, env, board, Problems(), snap = false).getOr { return Parsed.Failed(it) }
                 .filter { it.item is ExpandedKey }
-            keyed.mapIndexed { i, (_, k) ->
-                // a key with no marks has nothing to choose: as drawn
-                if (keys[i].content.marks.isEmpty()) return@mapIndexed keys[i].content
-                val cell = cells[i].cell
-                val g = Faces.of(cell, styled[i].looks.getValue(styled[i].states), k.attrs.face ?: Face.Default, k.attrs.margin ?: true, env.flat && k.attrs.face != Face.Keep, env.density)
-                fitted(content.of(k, cell, g.content, Looks(styled[i].parts.getValue(styled[i].states)), g, snap = false))
-            }
+            keyed.indices.map { looseOf(it, emptyMap()) }
+        }
+        // a text with no room on its key as it is (left out, or asking the shortcuts all smaller): a step down its
+        // ladder at a time (its first character and 「…」, then the short-text icon), so one long text neither vanishes nor
+        // shrinks every mark; the key then asks nothing of the marks' classes (Member.shortened)
+        val short = HashMap<Int, Map<Int, Int>>()
+        for (step in 1..LADDER_STEPS) {
+            val more = keyed.indices.associateWith { i -> roomless(i, loose[i], short[i].orEmpty()) }.filterValues { it.isNotEmpty() }
+            if (more.isEmpty()) break
+            more.forEach { (i, js) -> short[i] = short[i].orEmpty() + js.associateWith { j -> (short[i]?.get(j) ?: 0) + 1 } }
+            keys = keys.mapIndexed { i, k -> if (i in more) prepare(k.placed, keyed[i].second, styled[i], shaped[i], Problems(), short.getValue(i)) else k }
+            loose = loose.mapIndexed { i, c -> if (i in more) looseOf(i, short.getValue(i)) else c }
         }
         val nodes = phases.section("paint") {
-            val settled = settle(keys, loose)
+            val settled = settle(keys, loose, short.keys)
             keys.mapIndexed { i, k -> node(k, settled[i]) }
         }
         val slots = placed.mapNotNull { p ->
@@ -362,10 +376,10 @@ class SceneBuilder(
         return styled.looks.mapValues { (_, look) -> Faces.of(placed.cell, look, face, margin, flat, env.density) }
     }
 
-    private fun prepare(placed: Placed, key: ExpandedKey, styled: Styled, geometry: Map<Set<KeyState>, FaceGeometry>, warnings: Problems): Prepared {
+    private fun prepare(placed: Placed, key: ExpandedKey, styled: Styled, geometry: Map<Set<KeyState>, FaceGeometry>, warnings: Problems, short: Map<Int, Int> = emptyMap()): Prepared {
         val looksNow = Looks(styled.parts.getValue(styled.states))
         val g = geometry.getValue(styled.states)
-        val drawn = fitted(content.of(key, placed.cell, g.content, looksNow, g), warnings)
+        val drawn = fitted(content.of(key, placed.cell, g.content, looksNow, g, short = short), warnings)
         return Prepared(placed, key, styled.states, styled.looks, styled.parts, geometry, drawn)
     }
 
@@ -379,18 +393,34 @@ class SceneBuilder(
         }
     }
 
+    // key [i]'s ([c], as worked out, its texts [at] their steps down) text marks to take a step further down: none
+    // where its marks fit at their size; else those not at their ladder's foot left out on it alone, or, where none
+    // is but the shortcuts are asked smaller, those meeting the glyph or another mark (a built-in left out
+    // shortens nothing)
+    private fun roomless(i: Int, c: KeyContent, at: Map<Int, Int>): Set<Int> {
+        val texts = c.marks.indices.filter { j -> c.marks[j].text && (at[j] ?: 0) < LADDER_STEPS }
+        if (texts.isEmpty()) return emptySet()
+        val gap = GAP_DP * env.density
+        val m = member(c, i, at.isNotEmpty())
+        if (KeyMarkYield.fitsWhole(m, gap)) return emptySet()
+        val b = KeyMarkYield.board(listOf(m), gap)
+        val dropped = texts.filter { b.keys[0].marks[it] == null }
+        if (dropped.isNotEmpty()) return dropped.toSet()
+        return if (b.shortcut < 1.0) texts.filter { it in KeyMarkYield.crowded(m, gap) }.toSet() else emptySet()
+    }
+
     // rules B §7, 060-render-p2 S4e: each class's glyphs one size (KeyMarkYield.board), their marks kept apart
     // from them; a key of no class (no glyph, a table's roots in lines) as placed, its marks of their classes
-    private fun settle(keys: List<Prepared>, loose: List<KeyContent>): List<Settled> {
+    private fun settle(keys: List<Prepared>, loose: List<KeyContent>, shortened: Set<Int>): List<Settled> {
         val gap = GAP_DP * env.density
         // a key with no glyph but marks (a space with no name) too, and one whose glyph stays as placed (a
         // table's roots in lines) as one with none: its marks are of their classes
         val members = keys.indices.filter { keys[it].content.let { c -> (c.yields && c.glyphClass != null) || c.marks.isNotEmpty() } }
-        val board = KeyMarkYield.board(members.map { member(loose[it], it) }, gap)
+        val board = KeyMarkYield.board(members.map { member(loose[it], it, it in shortened) }, gap)
         val out = arrayOfNulls<Settled>(keys.size)
         members.forEachIndexed { n, i ->
             val c = keys[i].content
-            val onto = KeyMarkYield.onto(member(c, i), member(loose[i], i), board, board.keys[n])
+            val onto = KeyMarkYield.onto(member(c, i), member(loose[i], i, i in shortened), board, board.keys[n])
             val drawn = c.glyphClass?.takeIf { c.yields }?.let { c.glyph?.drawnAt(onto.glyph.toBox(), board.scales.getValue(classOf(c, it, i)), c.glyph.grows(measurer)) }
             val glyph = drawn?.let { within(it, c.room, c.anchor?.first) } ?: c.glyph
             // moved back within its room: its marks placed again where one it kept meets it there
@@ -481,18 +511,20 @@ class SceneBuilder(
 
     // a key as its class's member: a main character about its baseline, where its row's stand, and never moved off
     // it; a glyph a theme aligns about where it stays ([KeyContent.anchor]), never moved either
-    private fun member(c: KeyContent, index: Int): KeyMarkYield.Member {
-        val cls = c.glyphClass?.takeIf { c.yields } ?: return KeyMarkYield.Member(KeyMarkYield.NO_GLYPH, 0.0, 0.0, c.marks.map(::mark), c.room.toInk(), c.edge, glyphClass = -1)
+    private fun member(c: KeyContent, index: Int, shortened: Boolean = false): KeyMarkYield.Member {
+        val cls = c.glyphClass?.takeIf { c.yields }
+            ?: return KeyMarkYield.Member(KeyMarkYield.NO_GLYPH, 0.0, 0.0, c.marks.map(::mark), c.room.toInk(), c.edge, glyphClass = -1, shortened = shortened)
         val ink = c.glyph!!.ink.toInk()
         val main = cls == GlyphClass.Main
         val (x, y) = c.anchor ?: (((ink.left + ink.right) / 2) to (if (main) c.baseline else (ink.top + ink.bottom) / 2))
         return KeyMarkYield.Member(
             ink, x, y, c.marks.map(::mark), c.room.toInk(), c.edge,
             moves = !main && c.anchor == null, glyphClass = classOf(c, cls, index), grows = c.glyph.grows(measurer), across = c.glyph.texts.isNotEmpty(),
+            shortened = shortened,
         )
     }
 
-    private fun mark(m: MarkDrawn) = KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.drop, m.drawn.grows(measurer))
+    private fun mark(m: MarkDrawn) = KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.drop, m.drawn.grows(measurer), m.user)
 
     private fun node(k: Prepared, s: Settled): KeyNode {
         val cell = k.placed.cell
@@ -569,6 +601,9 @@ class SceneBuilder(
 
         /** KeyMarkYield's: a glyph and a mark this far apart at least. */
         const val GAP_DP = 1.0
+
+        // a text's steps down where it has no room: its first character and 「…」, then the short-text icon (MarkContent.Text.ladder)
+        const val LADDER_STEPS = 2
 
         /** The slot beside a board one-handed or split at a side: the app's buttons there (rules D §2). */
         const val SIDE_BUTTONS = "side-buttons"
