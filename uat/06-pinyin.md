@@ -417,7 +417,7 @@
 
 ### PY-89b [P1] 14 键靠屏幕边的键长按，只往里滑
 - **前提**：B0-14键。
-- **操作**：长按最右的 L，弹出后截图，手指往左挪约 30dp（一个弹出键宽左右）松手；再长按 L，往右挪到屏幕边松手；长按最左的 AS，往右挪约 30dp 松手。
+- **操作**：长按最右的 L，弹出后截图，手指往左挪约 22dp（大半个弹出键宽，一步）松手；再长按 L，往右挪到屏幕边松手；长按最左的 AS，往右挪约 22dp 松手。
 - **预期**：L 的弹出一排是 `l L 0`（角标在最右，其余按全键盘的排法往左），手指一开始在角标上；往左一挪打出 L；往右挪到屏幕边打出的是角标（没有别的字在手指右边）。AS 的一排是角标在最左、`A S a s` 往右排，往右一挪打出 A。和全键盘靠边的键一个规矩（用户 2026-11-10 定：全部按全键盘的排法）。
 - **JVM**：`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`、`PopupKeyboardUiTest.atAnEdgeTheKeysOwnIsAtThatEndAndTheRestInward`、`PopupFocusTest.theKeysOwnComesFirstAndTheRestAsListed`；设备上也跑（图）。
 

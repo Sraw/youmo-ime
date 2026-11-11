@@ -243,9 +243,9 @@ def py89b(d):
     p = d.dpx()
     # the keyboard's right edge, as rotated: the screen's (it spans it)
     width = d.need_keyboard().b[2]
-    left = edge_hold(d, k["l"], -30 * p, "长按最右的 L：l L 0，角标在最右")
+    left = edge_hold(d, k["l"], -22 * p, "长按最右的 L：l L 0，角标在最右")
     edge = edge_hold(d, k["l"], width - 1 - k["l"][0])
-    as_ = edge_hold(d, k["as"], 30 * p, None)
+    as_ = edge_hold(d, k["as"], 22 * p, None)
     check(left == "L", f"L 往左一挪打出 {left!r}")
     check(edge == "0", f"L 往右到屏幕边打出 {edge!r}（应是角标 0）")
     check(as_ == "A", f"AS 往右一挪打出 {as_!r}")
