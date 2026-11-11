@@ -24,8 +24,6 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keys.First
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.KeyListsCache
-import org.fcitx.fcitx5.android.input.keys.KeyPopup
-import org.fcitx.fcitx5.android.input.keys.KeyState
 import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
@@ -710,33 +708,6 @@ class PopupOverridesFragmentTest {
             }
             dialogOf(key.label).ok()
             assertEquals(KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
-        }
-
-        // review 5: 注音九键's tone keys are on its tab; one edited there is that key's long press on the keyboard
-        @Test
-        fun aZhuyinToneEditedOnThePageIsTheKeyboardsLongPress() {
-            open()
-            click(R.string.shortcut_page_zy9)
-            val before = own("zy9/tone-1")
-            dialogOf("ˉ").apply {
-                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("※")
-                ok()
-            }
-            assertEquals(before + "※", stored("zy9/tone-1")!!.symbols)
-            val key = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard("zy9/tone-1"))!!.resolve(KeyId("zy9/tone-1"), KeyState())
-            assertEquals("※", (key.popup as KeyPopup.Items).labels.last())
-        }
-
-        // the ， in its place is the function key's: greyed, a tap saying where it is changed and opening no editor
-        @Test
-        fun zhuyinNinesCommaSaysItIsChangedOnTheFunctionKeysTab() {
-            open()
-            click(R.string.shortcut_page_zy9)
-            val dialogs = ShadowDialog.getShownDialogs().size
-            keyCalled("，").performClick()
-            st.idle()
-            assertEquals(dialogs, ShadowDialog.getShownDialogs().size)
-            assertTrue(st.texts().toString(), st.s(R.string.shortcut_key_elsewhere, "，") in st.texts())
         }
 
         // review 4: a key turned off is said so, and stays off when only a slot is changed

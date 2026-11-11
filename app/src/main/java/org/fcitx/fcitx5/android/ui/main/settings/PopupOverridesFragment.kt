@@ -197,6 +197,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             add(text(ctx, getString(R.string.long_press_legend), body = false).apply {
                 setPadding(0, ctx.dp(16), 0, 0)
             }, lParams(matchParent))
+            // the function keys drawn in place: greyed as a faded key is, though their long press is on
+            page.rows.flatten().filter(page::elsewhere).map { it.label }.distinct().forEach {
+                add(text(ctx, getString(R.string.long_press_legend_elsewhere, it), body = false), lParams(matchParent) { topMargin = ctx.dp(4) })
+            }
             if (lists.lists.isNotEmpty()) {
                 add(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
                     setText(R.string.reset_all)
@@ -367,8 +371,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 keys.forEach { key ->
                     // a function key in its place (注音九键's ，): greyed, a tap saying where it is changed
                     if (page.elsewhere(key)) {
-                        add(KeyCaps.key(ctx, key.label, "", marked = false, dimmed = true).apply {
-                            setOnClickListener { v -> Snackbar.make(v, getString(R.string.shortcut_key_elsewhere, key.label), Snackbar.LENGTH_SHORT).show() }
+                        val note = getString(R.string.shortcut_key_elsewhere, key.label)
+                        add(KeyCaps.key(ctx, key.label, "", marked = false, dimmed = true, state = note).apply {
+                            setOnClickListener { v -> Snackbar.make(v, note, Snackbar.LENGTH_SHORT).show() }
                         }, keyParams(ctx, weight = 1f))
                         return@forEach
                     }

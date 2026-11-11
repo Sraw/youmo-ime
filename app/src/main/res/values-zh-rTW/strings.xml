@@ -786,6 +786,7 @@
     <string name="picker_symbols">符號</string>
     <string name="picker_flags">旗幟</string>
     <string name="long_press_legend">帶框的鍵是改過的；變淡的鍵長按不彈出字元，滑向長按首選等於點這個鍵。</string>
+    <string name="long_press_legend_elsewhere">灰色的 %1$s 是功能鍵：長按照常可用，在功能鍵頁改。</string>
     <string name="long_press_none">長按這個鍵不彈出字元。</string>
     <string name="long_press_off">這個鍵的長按已關。改動列表（新增字元或設為首選）就重新開啟。</string>
     <string name="long_press_newer">長按字元是新版本的應用程式設定的：原樣保留，這裡不能改。</string>
