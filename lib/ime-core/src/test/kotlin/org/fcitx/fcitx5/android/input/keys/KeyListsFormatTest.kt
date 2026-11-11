@@ -6,7 +6,9 @@ package org.fcitx.fcitx5.android.input.keys
 
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KeyListsFormatTest {
@@ -64,5 +66,14 @@ class KeyListsFormatTest {
         val l = parse("zyfull//\tset\t*\tㄥ")
         assertEquals("/", l.lists.keys.single().key)
         assertEquals(l, KeyLists.parse(l.serialize()))
+    }
+
+    // what an editor or a transfer adds around the header is not another format; only none of any version's migrates
+    @Test
+    fun theHeaderAroundBlanksAndAByteOrderMarkAndWhatMigrates() {
+        assertEquals(UserList.Off, KeyLists.parse("\uFEFF @1 \r\nfull/q\toff")!![KeyId("full/q")])
+        assertEquals(UserList.Off, KeyLists.parse("\n@1\nfull/q\toff")!![KeyId("full/q")])
+        for (old in listOf(null, "", "  ", "q ! 1", "t9/2 # @")) assertTrue("$old", KeyLists.needsMigration(old))
+        for (kept in listOf("@1", "\uFEFF@1\n", "@2\nfull/q\toff", "@")) assertFalse(kept, KeyLists.needsMigration(kept))
     }
 }

@@ -95,11 +95,17 @@ class KeyLists private constructor(val lists: Map<KeyId, UserList>) {
         /** [lists] as given, each cleaned as [parse] cleans a line (the migration's, a test's). */
         fun of(lists: Map<KeyId, UserList>): KeyLists = KeyLists(lists.mapValues { (_, l) -> l.copy(symbols = items(l.symbols)) })
 
-        /** [text] as [serialize] wrote it; null where it is not of this format (none, 0.5's, an `@2` of a later one): migrate. */
+        /**
+         * Whether [text] stored is none of any version's (never stored, empty, 0.5's or a beta's, which never start
+         * with `@`): the old settings are migrated then. A later version's (`@2`) is left alone, read as [Empty].
+         */
+        fun needsMigration(text: String?): Boolean = text == null || !header(text).startsWith("@")
+
+        /** [text] as [serialize] wrote it; null where it is not of this format (none, 0.5's, an `@2` of a later one). */
         fun parse(text: String?): KeyLists? {
             if (text == null) return null
-            val lines = text.lines()
-            if (lines.first().trimEnd('\r') != HEADER) return null
+            val lines = trimmed(text).lines()
+            if (lines.first().trimEnd() != HEADER) return null
             val t = LinkedHashMap<KeyId, UserList>()
             for (line in lines.drop(1)) {
                 val parts = line.trimEnd('\r').split('\t')
@@ -114,6 +120,11 @@ class KeyLists private constructor(val lists: Map<KeyId, UserList>) {
             }
             return KeyLists(t)
         }
+
+        // the first line, around it what an editor or a backup's transfer may have added: blanks, a byte order mark
+        private fun trimmed(text: String): String = text.trimStart { it.isWhitespace() || it == '\uFEFF' }
+
+        private fun header(text: String): String = trimmed(text).lineSequence().first().trimEnd()
 
         /** A stored name as a key's: `<form>/<key>`, the form lower case letters, digits and `-`. */
         fun idOf(stored: String): KeyId? {

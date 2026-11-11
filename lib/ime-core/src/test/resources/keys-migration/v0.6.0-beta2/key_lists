@@ -1,0 +1,11 @@
+@1
+fn/comma	set	*	！
+fn/period	set	*	，
+full/q	set	*	!	1	Q
+full/w	off
+g14/qw	set	:~	~
+g18/we	set	:^	^	_
+t9/1	set	*	.	,	?
+t9/2	set	:#	#	@
+zy9/1	set	:‽	‽	¿
+zy9/question	set	*	‽	¿

@@ -37,6 +37,8 @@ import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.keyboard.VoiceEndMark
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.KeyListsMigration
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -72,7 +74,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * See [org.fcitx.fcitx5.android.input.popup.PopupOverrides] for the format. A letter's first
          * is also what swiping it types, drawn in its corner.
          */
-        val popupOverrides = string("popup_overrides", "")
+        val popupOverrides = string(POPUP_OVERRIDES, "")
 
         /**
          * See [org.fcitx.fcitx5.android.input.shortcut.SwipeSlots] for the format: every key's 上滑 and 下滑
@@ -85,7 +87,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * (`t9/2`, `g14/cv`): [org.fcitx.fcitx5.android.input.popup.PopupOverrides]' format with the name for
          * the label. 全键盘's are [popupOverrides]', by the letter.
          */
-        val keyPopups = string("key_popups", "")
+        val keyPopups = string(KEY_POPUPS, "")
+
+        /**
+         * Every key's long press the user set, of every keyboard ([org.fcitx.fcitx5.android.input.keys.KeyLists],
+         * `@1` first; 060-keys-unify §2): [popupOverrides], [keyPopups] and [Keyboard.t9Symbols] moved here once
+         * ([dropRetired]), those kept as they were for a downgrade (§4.4). A plain setting, never `hidden`: a backup's
+         * would be reset after its import and the old ones migrated again (m2). 全部恢复默认 writes [KeyLists.HEADER], the
+         * default, never removes it: the old ones would come back at the next start. Whether to migrate is read from what
+         * is stored ([storedKeyLists]), never through this, which reads the default where nothing is.
+         */
+        val keyLists = string(KEY_LISTS, KeyLists.HEADER)
 
         /**
          * The bar's buttons, their order and which show (ToolbarConfig.serialize; empty, as
@@ -303,7 +315,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * What each of 九键's keys 1 to 9 offers on a long press besides its digit and letters
          * ([NineKeySymbols.serialize], empty as by default): set on its own page from the 九键 section of an input method's page.
          */
-        val t9Symbols = string("t9_symbols", "")
+        val t9Symbols = string(T9_SYMBOLS, "")
 
         /** Shown on the English page (InputMethodSettings), not here: English's alone. */
         val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)
@@ -766,10 +778,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             listOf(
                 internal.verboseLog,
                 internal.editorInfoInspector,
-                // the long-press and swipe characters: a password may be typed with them before the first unlock
-                internal.popupOverrides,
-                // a swipe's slots, and the other keyboards' long presses, too
+                // every key's long press and swipe: a password may be typed with them before the first unlock
+                internal.keyLists,
                 internal.keySwipes,
+                // the old long presses too, while their keyboards read them (060-keys-unify S6 removes both)
+                internal.popupOverrides,
                 internal.keyPopups,
                 // the bar is there before the first unlock too
                 internal.toolbarButtons,
@@ -807,6 +820,38 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         migrateSwipeSlots()
         migrateKeyDrawing()
         settleMarkPositions()
+        migrateKeyLists()
+    }
+
+    /** `key_lists` as stored, null where it is not (or is another type): read so, nothing written back. */
+    fun storedKeyLists(): String? = runCatching { sharedPreferences.getString(KEY_LISTS, null) }.getOrNull()
+
+    /**
+     * An old long press ([POPUP_OVERRIDES], [KEY_POPUPS], [T9_SYMBOLS]) changed on its page (before 060-keys-unify S5
+     * replaces those): stored, and `key_lists` removed in the same edit, so they are migrated again at the next start
+     * and read so till then ([org.fcitx.fcitx5.android.input.keys.KeyListsCache]). Never one without the other.
+     */
+    fun setOldLongPress(key: String, text: String) = sharedPreferences.edit {
+        putString(key, text)
+        remove(KEY_LISTS)
+    }
+
+    /** An old long press as stored, null where it is not (or is another type): read so, nothing written back. */
+    fun storedOldLongPress(key: String): String? = runCatching { sharedPreferences.getString(key, null) }.getOrNull()
+
+    /**
+     * 0.5's and 0.6's betas' long presses ([Internal.popupOverrides], [Internal.keyPopups], [Keyboard.t9Symbols])
+     * as [Internal.keyLists] (KeyListsMigration, 060-keys-unify §4.3): run while it is not of the format (never
+     * stored, a 0.5 or beta backup restored), once. The old ones kept as they are, for a downgrade (§4.4).
+     */
+    private fun migrateKeyLists() {
+        val sp = sharedPreferences
+        // stored as another type (a bad backup): read as unset, never a crash at every start
+        fun storedString(key: String) = runCatching { sp.getString(key, null) }.getOrNull()
+        if (!KeyLists.needsMigration(storedKeyLists())) return
+        val moved = KeyListsMigration.migrate(storedString(POPUP_OVERRIDES), storedString(KEY_POPUPS), storedString(T9_SYMBOLS))
+        moved.lost.forEach { Timber.i("long press not kept: %s", it) }
+        sp.edit { putString(KEY_LISTS, moved.text) }
     }
 
     /**
@@ -943,6 +988,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         private const val SHORTCUT_MARK_POSITION = "shortcut_mark_position"
         private val OLD_SWIPE = listOf(SWIPE_LAYERS, KEY_SHORTCUTS, PUNCTUATION_POSITION, SHORTCUT_MARK_POSITION)
         private const val PID = "pid"
+
+        // 0.6's long presses of every key (060-keys-unify), and 0.5's and the betas' they are made of
+        const val KEY_LISTS = "key_lists"
+        const val POPUP_OVERRIDES = "popup_overrides"
+        const val KEY_POPUPS = "key_popups"
+        const val T9_SYMBOLS = "t9_symbols"
 
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
         // 0.5's two switches, and 0.6's one list that took their place
