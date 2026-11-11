@@ -57,7 +57,7 @@ class KeyListsCache(private val stored: () -> Stored) {
         val user = KeyListsCache { of(AppPrefs.getInstance()) }
 
         fun of(prefs: AppPrefs) = Stored(prefs.storedKeyLists()) {
-            Old(prefs.internal.popupOverrides.getValue(), prefs.internal.keyPopups.getValue(), prefs.keyboard.t9Symbols.getValue())
+            Old(prefs.storedOldLongPress(AppPrefs.POPUP_OVERRIDES), prefs.storedOldLongPress(AppPrefs.KEY_POPUPS), prefs.storedOldLongPress(AppPrefs.T9_SYMBOLS))
         }
     }
 }

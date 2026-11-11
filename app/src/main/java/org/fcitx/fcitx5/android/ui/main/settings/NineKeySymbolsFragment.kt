@@ -38,10 +38,7 @@ class NineKeySymbolsFragment : KeyCapsPageFragment() {
 
     // the keyboard reads it again as it is made anew (recreateInputViewPrefs)
     // key_lists made of it again (060-keys-unify S4a, till S5 replaces this page)
-    private fun save(value: NineKeySymbols) {
-        pref.setValue(value.serialize())
-        AppPrefs.getInstance().forgetKeyLists()
-    }
+    private fun save(value: NineKeySymbols) = AppPrefs.getInstance().setOldLongPress(AppPrefs.T9_SYMBOLS, value.serialize())
 
     override fun rebuild() {
         val ctx = requireContext()

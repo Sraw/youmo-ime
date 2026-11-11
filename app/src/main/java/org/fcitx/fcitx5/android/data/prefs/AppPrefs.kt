@@ -827,10 +827,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     fun storedKeyLists(): String? = runCatching { sharedPreferences.getString(KEY_LISTS, null) }.getOrNull()
 
     /**
-     * The old long presses changed on their pages (before 060-keys-unify S5 replaces those): `key_lists` removed, so
-     * they are migrated again at the next start and read so till then ([org.fcitx.fcitx5.android.input.keys.KeyListsCache]).
+     * An old long press ([POPUP_OVERRIDES], [KEY_POPUPS], [T9_SYMBOLS]) changed on its page (before 060-keys-unify S5
+     * replaces those): stored, and `key_lists` removed in the same edit, so they are migrated again at the next start
+     * and read so till then ([org.fcitx.fcitx5.android.input.keys.KeyListsCache]). Never one without the other.
      */
-    fun forgetKeyLists() = sharedPreferences.edit { remove(KEY_LISTS) }
+    fun setOldLongPress(key: String, text: String) = sharedPreferences.edit {
+        putString(key, text)
+        remove(KEY_LISTS)
+    }
+
+    /** An old long press as stored, null where it is not (or is another type): read so, nothing written back. */
+    fun storedOldLongPress(key: String): String? = runCatching { sharedPreferences.getString(key, null) }.getOrNull()
 
     /**
      * 0.5's and 0.6's betas' long presses ([Internal.popupOverrides], [Internal.keyPopups], [Keyboard.t9Symbols])

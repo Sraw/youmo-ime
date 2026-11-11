@@ -71,6 +71,14 @@ class KeyListsMigrationTest {
         assertEquals(emptyList<String>(), migrated(named = "t9/2 2 A B C a b c # @").lost)
     }
 
+    // beta2's list replaced the whole popup: its first the user's (the swipe and corner drew it), the row lost (L4)
+    @Test
+    fun beta2sSymbolsAloneKeepTheirFirst() {
+        val m = migrated(named = "t9/2 # @")
+        assertEquals(UserList(false, listOf("#", "@"), First.Literal("#")), KeyLists.parse(m.text)!![KeyId("t9/2")])
+        assertEquals(listOf("L4 t9/2 # @"), m.lost)
+    }
+
     @Test
     fun aRowChangedIsLost() {
         val m = migrated(named = "t9/3 3 F E D d e f +")

@@ -67,18 +67,12 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     private var overrides: PopupOverrides
         get() = PopupOverrides.parse(prefs.internal.popupOverrides.getValue())
-        set(value) {
-            prefs.internal.popupOverrides.setValue(value.serialize())
-            prefs.forgetKeyLists()
-        }
+        set(value) = prefs.setOldLongPress(AppPrefs.POPUP_OVERRIDES, value.serialize())
 
     // the other keyboards' long presses, by the key's name
     private var byName: PopupOverrides
         get() = PopupOverrides.parse(prefs.internal.keyPopups.getValue())
-        set(value) {
-            prefs.internal.keyPopups.setValue(value.serialize())
-            prefs.forgetKeyLists()
-        }
+        set(value) = prefs.setOldLongPress(AppPrefs.KEY_POPUPS, value.serialize())
 
     private var slots: SwipeSlots
         get() = prefs.internal.keySwipes.getValue().let { if (it.isEmpty()) SwipeSlots.Default else SwipeSlots.parse(it) }
@@ -126,9 +120,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     private fun restore(s: Snapshot) = with(prefs) {
         internal.keySwipes.setValue(s.swipes)
-        internal.popupOverrides.setValue(s.popups)
-        internal.keyPopups.setValue(s.keyPopups)
-        forgetKeyLists()
+        setOldLongPress(AppPrefs.POPUP_OVERRIDES, s.popups)
+        setOldLongPress(AppPrefs.KEY_POPUPS, s.keyPopups)
         keyboard.swipeUp.setValue(s.up)
         keyboard.swipeDown.setValue(s.down)
         keyboard.swipeUpPosition.setValue(s.upAt)
