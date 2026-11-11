@@ -81,13 +81,15 @@ object SwipeFates {
 
     /**
      * What a [Job]'s scene shows: each key's (by its shortcut name) ways' fates; null, no scene made. [ways] the
-     * ways drawn at all (on, their place not 无): a way not among them has no fate to tell.
+     * ways drawn at all (on, their place not 无): a way not among them has no fate to tell; [roots] the keys (by their
+     * shortcut names) a shape code's roots fill, their ways drawn nowhere as the user chose (全部字根).
      */
     class Seen(
         val label: String,
         val landscape: Boolean,
         val fates: Map<String, Map<Boolean, MarkFate>>?,
         val ways: Set<Boolean> = setOf(true, false),
+        val roots: Set<String> = emptySet(),
     )
 
     /** A keyboard the user types on: its own class, made once, as told its input method. */
@@ -179,12 +181,13 @@ object SwipeFates {
             is Parsed.Ok -> built.value
             is Parsed.Failed -> return Seen(job.label, job.landscape, null, job.ways).also { Timber.e("swipe fates: no scene of %s: %s", job.layout.id, built.problems) }
         }
-        val fates = scene.keys.filter { it.copy == 0 && it.shortcut != null }.associate { node ->
-            // a table's letters show its roots: their ways drawn nowhere
-            val letter = job.rootsShown && node.id.length == 1 && node.id[0] in 'a'..'z'
-            node.shortcut!! to if (letter) mapOf(true to MarkFate.Dropped, false to MarkFate.Dropped) else node.fates
+        val keys = scene.keys.filter { it.copy == 0 && it.shortcut != null }
+        // a table's roots shown: its character keys' ways drawn nowhere, as the scene has it (a name with a board, `full/j`)
+        val roots = if (job.rootsShown) keys.mapNotNullTo(HashSet()) { it.shortcut?.takeIf { n -> '/' in n } } else emptySet()
+        val fates = keys.associate { node ->
+            node.shortcut!! to if (node.shortcut in roots) mapOf(true to MarkFate.Dropped, false to MarkFate.Dropped) else node.fates
         }
-        return Seen(job.label, job.landscape, fates, job.ways)
+        return Seen(job.label, job.landscape, fates, job.ways, roots)
     }
 
     /** The size of the keys of a board ([board]: KeyNames') on [s], as InputView gives it; [floating] its text scale, [split] the letters halved. */
@@ -228,12 +231,13 @@ object SwipeFates {
             }
             val upright = fate(false)
             val turned = fate(true)
-            if (upright == null && turned == null) null else label to (upright to turned)
+            if (upright == null && turned == null) null else Triple(label, upright to turned, both.any { shortcut in it.roots })
         }
         if (per.isEmpty()) return null
-        val (label, worst) = per.maxBy { (_, f) -> rank(f.first) * RANKS + rank(f.second) }
-        val text = note(ctx, worst.first, worst.second) ?: return null
-        return if (per.map { it.second }.distinct().size > 1) ctx.getString(R.string.swipe_fate_on, label, text) else text
+        val (label, worst, roots) = per.maxBy { (_, f) -> rank(f.first) * RANKS + rank(f.second) }
+        // the roots fill the key: not drawn, as the user chose, not for want of room
+        val text = (if (roots) ctx.getString(R.string.swipe_fate_roots) else note(ctx, worst.first, worst.second)) ?: return null
+        return if (per.map { it.second to it.third }.distinct().size > 1) ctx.getString(R.string.swipe_fate_on, label, text) else text
     }
 
     // how far from as set: none, shortened, a sign, not drawn
