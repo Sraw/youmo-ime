@@ -785,8 +785,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun commitText(text: String, cursor: Int = -1) {
-        editingSession.commitText(text, cursor)
-        contextMemory.committed(text, cursor, SystemClock.elapsedRealtime())
+        // a long paste cut short: only what went in ends the field's text
+        val landed = editingSession.commitText(text, cursor)
+        contextMemory.committed(landed, if (landed.length == text.length) cursor else -1, SystemClock.elapsedRealtime())
         if (cursor == -1 && (text.endsWith('=') || text.endsWith('＝'))) offerCalculation()
     }
 

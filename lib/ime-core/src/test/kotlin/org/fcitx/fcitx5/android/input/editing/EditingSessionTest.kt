@@ -216,13 +216,33 @@ class EditingSessionTest {
     fun aPieceNeverTakenStopsTheRestAndTheirPrediction() {
         val (s, e) = pieced("<>", cursor = 1)
         e.commitFails = { it == "efgh" }
-        s.commitText("abcdefghij")
+        assertEquals("what went in", "abcd", s.commitText("abcdefghij"))
         assertEquals("no hole: what went in is the text's start", "<abcd>", e.text)
         assertEquals("the last piece not sent", 0, e.calls.count { it == "commitText(ij, 1)" })
         assertEquals("endBatchEdit()", e.calls.last())
         assertTrue("predicted no further than taken", s.selection.latest.rangeEquals(5))
         assertTrue(pauses.drop(1).sum() <= CommitPieces.RETRY_BUDGET_MS)
         assertTrue("sent again a few times first", e.calls.count { it == "commitText(efgh, 1)" } > 3)
+    }
+
+    @Test
+    fun aFirstPieceNeverTakenFinishesTheEditorsComposition() {
+        val (s, e) = pieced("<>", cursor = 1)
+        e.setComposingText("xy")
+        s.compose("xy", start = 1)
+        e.commitFails = { true }
+        assertEquals("", s.commitText("abcdefghij"))
+        assertEquals("<xy>", e.text)
+        assertEquals("not left composing in the editor", -1, e.composingStart)
+        assertTrue(s.composing.isEmpty())
+    }
+
+    @Test
+    fun aWholeTextIsReturnedAsWentIn() {
+        val (s, _) = pieced("<>", cursor = 1)
+        val text = "abcdefghij"
+        assertEquals(text, s.commitText(text))
+        assertEquals("one call: as sent", "ab", s.commitText("ab"))
     }
 
     @Test

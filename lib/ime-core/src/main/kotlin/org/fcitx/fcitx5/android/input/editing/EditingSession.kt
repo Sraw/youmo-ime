@@ -384,10 +384,12 @@ class EditingSession(
      *
      * @param cursor where to leave the cursor within [text]; `-1` means after its last
      * character, which is the common case and lets the editor place the cursor itself.
+     * @return what went in: [text], or its start when a long one was cut short. A text of one
+     * call is taken as sent whatever the editor answered (the commit never told before).
      */
-    fun commitText(text: String, cursor: Int = -1) {
+    fun commitText(text: String, cursor: Int = -1): String {
         checkThread()
-        if (!editor.isAvailable) return
+        if (!editor.isAvailable) return text
         // When the commit is exactly what is already composing, there is nothing to replace:
         // finish the composition as-is and only move the cursor if it is not already there, or on
         // its way there: a pending move (the preedit cursor's, say) is where the caret will be.
@@ -403,13 +405,13 @@ class EditingSession(
                 }
                 editor.finishComposingText()
             }
-            return
+            return text
         }
         val start = if (composing.isEmpty()) selection.latest.start else composing.start
         resetComposingState()
         val pieces = CommitPieces.split(text, commitPiece)
         if (pieces.size > 1) {
-            commitPieces(start, pieces, cursor)
+            return text.substring(0, commitPieces(start, pieces, cursor))
         } else if (cursor == -1) {
             selection.predict(start + text.length)
             editor.commitText(text, 1)
@@ -421,26 +423,35 @@ class EditingSession(
                 editor.setSelection(target, target)
             }
         }
+        return text
     }
 
     // a long text ([CommitPieces]) in one batch edit, each piece's end predicted once the editor
     // took it: an editor may report the cursor between pieces, and a report of the last alone
     // passes the others. A piece the editor did not take is sent again after a pause; when the
     // pauses are spent or the editor is gone, the rest is not sent (a hole in the middle would be
-    // worse than a paste cut short) nor predicted, and the cursor is left where the editor puts it
-    private fun commitPieces(start: Int, pieces: List<String>, cursor: Int) {
+    // worse than a paste cut short) nor predicted, and the cursor is left where the editor puts it.
+    // Returns how many units went in.
+    private fun commitPieces(start: Int, pieces: List<String>, cursor: Int): Int {
         val began = System.nanoTime()
+        var end = start
         editor.batchEdit {
-            var end = start
             var paused = 0L
             var retries = 0
             for ((i, piece) in pieces.withIndex()) {
                 if (i > 0) pause(CommitPieces.GAP_MS)
                 var wait = CommitPieces.FIRST_RETRY_MS
+                // false is a full binder buffer (the editor slow to take a piece: seen, and sent again
+                // fine) or a dead connection, the framework catching either alike. A dead one does not
+                // show in isAvailable while this loop holds the main thread (the unbind waits behind
+                // it), so it waits out the pauses, a second at most; stopping on the first false
+                // would cut short the pastes that only needed a moment
                 while (!editor.commitText(piece, 1)) {
                     if (!editor.isAvailable || paused + wait > CommitPieces.RETRY_BUDGET_MS) {
                         val all = pieces.sumOf { it.length }
                         CoreLog.e("long commit cut short: ${end - start} of $all units, piece ${i + 1} not taken")
+                        // the first piece was to replace the composition: the editor's would linger
+                        if (i == 0) editor.finishComposingText()
                         return@batchEdit
                     }
                     pause(wait)
@@ -460,6 +471,7 @@ class EditingSession(
                 editor.setSelection(start + cursor, start + cursor)
             }
         }
+        return end - start
     }
 
     /** Deletes the current selection, if any. A collapsed cursor is left alone. */
