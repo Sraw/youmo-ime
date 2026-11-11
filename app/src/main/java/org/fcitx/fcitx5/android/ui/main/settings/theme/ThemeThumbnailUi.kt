@@ -114,11 +114,12 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
 
     override val root = themeCardWithName(ctx, card, name)
 
-    fun setTheme(theme: Theme) {
+    /** Shows [theme], named as one of [among] (the list: ThemeNames.shown). */
+    fun setTheme(theme: Theme, among: List<Theme> = emptyList()) {
         card.apply {
             foreground = rippleDrawable(theme.keyPressHighlightColor)
         }
-        name.text = ThemeNames.shown(ctx, theme)
+        name.text = ThemeNames.shown(ctx, theme, among)
         val look = theme.look
         // the picture under the keyboard if it is there (decoded small off the main thread, blurred as on
         // the keyboard: ThemeAssets.thumbnail), its colour else; the bar's colour if it has one

@@ -13,8 +13,8 @@ import kotlin.math.max
 class ResponsiveThemeListView(context: Context) : RecyclerView(context) {
 
     var itemWidth = dp(128)
-    // the card 92 dp, its name under it (ThemeNames.ROW_DP)
-    var itemHeight = dp(92 + ThemeNames.ROW_DP)
+    // the card 92 dp, its name under it (ThemeNames.rowHeight: taller with a larger font)
+    var itemHeight = dp(92) + ThemeNames.rowHeight(context)
     var minMargin = dp(16)
 
     private lateinit var grid: GridLayoutManager

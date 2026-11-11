@@ -202,6 +202,7 @@
     <string name="theme_name_pixel">Pixel</string>
     <string name="theme_name_amoled_black">AMOLED 黑</string>
     <string name="theme_name_custom">我的主題</string>
+    <string name="theme_name_custom_n">我的主題 %d</string>
     <string name="theme_add_import">匯入主題檔案</string>
     <string name="theme_add_web">在網頁上製作</string>
     <string name="theme_add_web_hint">做好後回到這裡匯入</string>

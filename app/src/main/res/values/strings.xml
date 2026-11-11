@@ -202,6 +202,7 @@
     <string name="theme_name_pixel">Pixel</string>
     <string name="theme_name_amoled_black">AMOLED Black</string>
     <string name="theme_name_custom">My theme</string>
+    <string name="theme_name_custom_n">My theme %d</string>
     <string name="theme_add_import">Import a theme file</string>
     <string name="theme_add_web">Make one on the web</string>
     <string name="theme_add_web_hint">Come back here to import it when done</string>

@@ -14,9 +14,11 @@ import org.fcitx.fcitx5.android.data.theme.deriveCustomNoBackground
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /** The name under each card of the theme list (the owner, 0.6.0-beta2): what it says and how it is laid. */
@@ -50,5 +52,38 @@ class ThemeNamesTest {
         assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_YES, ui.name.importantForAccessibility)
         // the card above the name
         assertEquals(listOf(ui.card, ui.name), (0 until ui.root.childCount).map { ui.root.getChildAt(it) })
+    }
+
+    // several themes named by UUIDs: 我的主题, 我的主题 2, 3 by their UUIDs' order, whatever the list's
+    @Test
+    fun severalUnnamedThemesAreNumberedTheSameWayInAnyOrder() {
+        val ids = listOf("c0000000-0000-0000-0000-000000000000", "a0000000-0000-0000-0000-000000000000", "b0000000-0000-0000-0000-000000000000")
+        val themes = ids.map { TestThemes.MaterialLight.deriveCustomNoBackground(it) }
+        val list = themes + TestThemes.MaterialLight.deriveCustomNoBackground("我的蓝")
+        val names = { among: List<Theme> -> themes.associate { it.name to ThemeNames.shown(appContext, it, among) } }
+        val expected = mapOf(ids[1] to "我的主题", ids[2] to "我的主题 2", ids[0] to "我的主题 3")
+        assertEquals(expected, names(list))
+        assertEquals(expected, names(list.reversed()))
+        // the card reads (and TalkBack says) the same
+        val ui = ThemeThumbnailUi(appContext)
+        ui.setTheme(themes[0], list)
+        assertEquals("我的主题 3", ui.name.text.toString())
+    }
+
+    // the name row grows with the font size set (at 2.0 its 12 sp line does not fit 24 dp)
+    @Test
+    fun theNameRowGrowsWithTheFontScale() {
+        val normal = ThemeNames.rowHeight(appContext)
+        val normalItem = ResponsiveThemeListView(appContext).itemHeight
+        RuntimeEnvironment.setFontScale(2f)
+        try {
+            val large = ThemeNames.rowHeight(appContext)
+            assertTrue("$normal < $large", normal < large)
+            // its line (24 sp at 2.0) and room
+            assertTrue(themeNameView(appContext).textSize * 1.4f <= large)
+            assertEquals(normalItem - normal + large, ResponsiveThemeListView(appContext).itemHeight)
+        } finally {
+            RuntimeEnvironment.setFontScale(1f)
+        }
     }
 }

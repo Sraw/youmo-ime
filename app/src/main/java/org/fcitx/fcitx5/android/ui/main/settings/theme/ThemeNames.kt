@@ -22,26 +22,39 @@ object ThemeNames {
     /**
      * The built-in 3.0-era themes by their names in the docs (动态取色, Material, Pixel, AMOLED 黑); a 4.0
      * theme's (a built-in pack, an imported one) its file's, its versions one card; the user's own its name,
-     * one named by a UUID (fcitx5-android's in-app themes, 0.5 and before) 我的主题, a UUID meaning nothing.
+     * one named by a UUID (fcitx5-android's in-app themes, 0.5 and before) 我的主题, a UUID meaning nothing:
+     * of several in [among] (the list), 我的主题, 我的主题 2, 3 … by their UUIDs' order, which moving or adding
+     * cards does not change.
      */
-    fun shown(ctx: Context, theme: Theme): String = when {
+    fun shown(ctx: Context, theme: Theme, among: List<Theme> = emptyList()): String = when {
         theme is Theme.Builtin -> BUILTIN[theme.file]?.let(ctx::getString) ?: theme.file
         theme is Theme.Versioned -> theme.file
-        UUID.matches(theme.name) -> ctx.getString(R.string.theme_name_custom)
+        numbered(theme) -> number(theme, among).let { if (it <= 1) ctx.getString(R.string.theme_name_custom) else ctx.getString(R.string.theme_name_custom_n, it) }
         else -> theme.name
     }
 
-    private val BUILTIN = mapOf(
-        BuiltinThemeFiles.MONET to R.string.theme_name_monet,
-        "material" to R.string.theme_name_material,
-        "pixel" to R.string.theme_name_pixel,
-        "amoled-black" to R.string.theme_name_amoled_black,
-    )
+    /** Whether [theme] is named 我的主题 and a number: its name a UUID. */
+    fun numbered(theme: Theme): Boolean = theme !is Theme.Builtin && theme !is Theme.Versioned && UUID.matches(theme.name)
+
+    // 1 for the first UUID of those in [among], 1 too for one not among them
+    private fun number(theme: Theme, among: List<Theme>): Int =
+        among.filter(::numbered).map { it.name }.distinct().sorted().indexOf(theme.name) + 1
+
+    private val BUILTIN = BuiltinThemeFiles.FILES.map { it.first }.zip(
+        listOf(R.string.theme_name_monet, R.string.theme_name_material, R.string.theme_name_pixel, R.string.theme_name_amoled_black),
+    ).toMap()
 
     private val UUID = Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 
-    /** The name row's height: a line of 12 sp and room above it. */
-    const val ROW_DP = 24
+    /** The name row's height: a line of 12 sp and room above it, at least 24 dp, more as the font is set larger. */
+    fun rowHeight(ctx: Context): Int =
+        maxOf(ctx.dp(MIN_ROW_DP), kotlin.math.ceil(themeNameView(ctx).textSize * LINE).toInt() + ctx.dp(ROOM_DP))
+
+    // a line of Han characters, its size and the room above and below them
+    private const val LINE = 1.4f
+
+    private const val MIN_ROW_DP = 24
+    private const val ROOM_DP = 8
 }
 
 /** The one-line name under a card. */
@@ -62,5 +75,5 @@ internal fun themeCardWithName(ctx: Context, card: View, name: TextView) = Linea
     clipToPadding = false
     card.isDuplicateParentStateEnabled = true
     addView(card, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-    addView(name, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, ctx.dp(ThemeNames.ROW_DP)))
+    addView(name, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, ThemeNames.rowHeight(ctx)))
 }
