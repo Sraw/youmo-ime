@@ -89,7 +89,8 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         visibility = View.GONE
     }
 
-    override val root = constraintLayout {
+    /** The thumbnail itself; [root] is it with the theme's name under it. */
+    val card = constraintLayout {
         outlineProvider = ViewOutlineProvider.BOUNDS
         elevation = dp(2f)
         add(bkg, lParams(matchParent, matchParent))
@@ -108,10 +109,16 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         })
     }
 
+    // the theme's name (the owner, 0.6.0-beta2): one line, a long one ellipsized; read out with the card (its text)
+    val name = themeNameView(ctx)
+
+    override val root = themeCardWithName(ctx, card, name)
+
     fun setTheme(theme: Theme) {
-        root.apply {
+        card.apply {
             foreground = rippleDrawable(theme.keyPressHighlightColor)
         }
+        name.text = ThemeNames.shown(ctx, theme)
         val look = theme.look
         // the picture under the keyboard if it is there (decoded small off the main thread, blurred as on
         // the keyboard: ThemeAssets.thumbnail), its colour else; the bar's colour if it has one
