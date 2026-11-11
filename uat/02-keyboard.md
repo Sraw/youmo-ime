@@ -397,7 +397,7 @@
 - **JVM**：`LetterCaseScreenshotTest`（全键盘总是大写、总是小写 + Shift 开、跟随 Shift 开；14 键、九键总是小写；英文不受影响；读屏文字不变；气泡）；keyboard-scene `LetterCaseRuleTest`、`ExpandTest.letterCaseSettingCasesTheLetterFacesOnly`、`aScreenReaderHearsTheLetterAsFollowingShiftShowsIt`（这三个在 `:lib:keyboard-scene:check` 里跑，`uat.py jvm` 不记录）。
 
 ### KB-69 [P1] 快捷键「滑选」：滑到后左右挪按字选，松手留着
-- **前提**：B0，滑动是默认，**按键字符和快捷键** 里把 Q 的快捷键设成 **滑选**。
+- **前提**：B0，上滑、下滑是默认，**按键字符和快捷键** 里把 Q 的 **上滑** 设成命令 **滑选**。
 - **操作**：框里写 `hello world`，光标放在 `hello` 后面；Q 上滑过阈值不松手，往左挪约 3 个字的距离（约 30 dp），再往右挪到起点右边约 2 个字，松手。再清空框，打拼音 `nihao`（不选候选），Q 上滑不松手往左挪约 2 个字，松手。框里写 `a👨‍👩‍👧`，光标在末尾，Q 上滑不松手往左挪一个字，松手。看 Q 的键角和设置页的命令列表。
-- **预期**：Q 上滑过阈值轻振一下，键上方小框是「滑选」；往左挪选中 `llo`，往右挪选区缩回、越过光标后选中 ` w`（空格和 w），松手后仍选中 ` w`，框里还是 `hello world`，没有打出 q。打着拼音时先上屏「你好」，再选中「你好」。一家人的表情一次整个选中。Q 的左上角画着滑选的图标；命令列表里「编辑菜单」后面是「滑选」。
+- **预期**：Q 上滑过阈值轻振一下，键上方小框是「滑选」；往左挪选中 `llo`，往右挪选区缩回、越过光标后选中 ` w`（空格和 w），松手后仍选中 ` w`，框里还是 `hello world`，没有打出 q。打着拼音时先上屏「你好」，再选中「你好」。一家人的表情一次整个选中。Q 的右上角（上滑图标位置）画着滑选的图标，不再有小字 1；命令列表里「编辑菜单」后面是「滑选」。
 - **JVM**：`KeyShortcutsHostTest.swipeSelectSelectsFromTheCursorAsTheFingerMovesSideways`、`KeyShortcutsHostTest.swipeSelectCommitsWhatIsTypedFirst`、`KeyShortcutsHostTest.swipeSelectStepsOverAnEmojiWhole`（真 `KotlinHost` + 真 `EditText`）；规则（已有选中时接着选、上一次的起点、读不到框时按单位、上屏前挪的步数补上）见 ime-core `SwipeSelectionTest`，步数见 `SwipeStepsTest`；设备上 2026-11-10 在模拟器上手动看过一遍。
