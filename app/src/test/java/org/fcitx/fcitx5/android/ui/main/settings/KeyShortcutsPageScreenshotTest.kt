@@ -78,12 +78,19 @@ class KeyShortcutsPageScreenshotTest {
         .first { it.contentDescription?.toString()?.substringBefore(',') == label && it.hasOnClickListeners() }
 
 
-    private fun capture(name: String) = st.capture("KeyShortcutsPageScreenshotTest/$name")
+    // the page's notes made off the main thread (SwipeFates) and put in: waited for, no sleeping
+    private fun fatesDone() {
+        st.idle()
+        (st.page as? PopupOverridesFragment)?.awaitFates()
+        st.idle()
+    }
+
+    private fun capture(name: String): Unit = fatesDone().let { st.capture("KeyShortcutsPageScreenshotTest/$name") }
 
     // a dialog over the page: the screen's every window
     @OptIn(ExperimentalRoborazziApi::class)
     private fun captureScreen(name: String) {
-        st.idle()
+        fatesDone()
         if (!comparesScreenshots) {
             // drawn all the same (see SCREENSHOT_SDK): the page, and the dialog over it
             st.capture("KeyShortcutsPageScreenshotTest/$name")

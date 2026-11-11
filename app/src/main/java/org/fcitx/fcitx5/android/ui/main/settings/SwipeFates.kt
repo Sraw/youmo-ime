@@ -37,8 +37,6 @@ import org.fcitx.fcitx5.android.input.keyboard.lettersOf
 import org.fcitx.fcitx5.android.input.keyboard.nameOf
 import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
 import org.fcitx.fcitx5.android.input.keyboard.swipeWays
-import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
-import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.MarkFate
@@ -49,6 +47,7 @@ import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import timber.log.Timber
+import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 
 /**
@@ -156,15 +155,15 @@ object SwipeFates {
                 s.ime?.let(s.keyboard::onInputMethodUpdate)
                 // what the punctuation keys type as the host starts: English types its own
                 val english = s.ime?.uniqueName == InputMethodCatalog.ENGLISH
-                s.keyboard.onPunctuationUpdate(if (english) emptyMap() else PunctuationStartKeys.known.orEmpty())
+                val punctuation = if (english) emptyMap() else PunctuationStartKeys.known.orEmpty()
+                s.keyboard.onPunctuationUpdate(punctuation)
                 listOf(upright, turned).mapNotNull { screen ->
                     val size = size(screen, s.keyboard.themeBoard, s.codeRow)
                     val (layout, env) = s.keyboard.shownAs(look, size.width, size.height) ?: return@mapNotNull null
-                    val names = SceneBoard.names(layout)
-                    val marks = SceneMarks.settings(
-                        slots, swipeWays(), spots.symbol, spots.shortcut, !s.rootsShown, names,
-                        SceneBoard.firsts(PopupOverridesCache.byName.current, names),
-                    )
+                    // the marks as the keyboard's resolver makes them (key_lists' firsts), the ways as [slots] has them
+                    val marks = SceneBoard.resolver(layout, s.ime?.uniqueName.orEmpty(), slots = slots)
+                        .marks(KeysState(punctuation = punctuation, ways = on, spots = spots))
+                        .let { if (it.charShortcuts == !s.rootsShown) it else it.copy(charShortcuts = !s.rootsShown) }
                     val shownEnv = env.copy(
                         density = screen.density.toDouble(), landscape = screen.landscape, floating = size.floating,
                         split = size.split, marks = marks, typed = null, board = layout.id, keyStyle = keyStyle,

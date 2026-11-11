@@ -495,6 +495,12 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         }
     }
 
+    /** Every scene asked of the notes' thread so far made (tests: the notes then come with the main looper's next idle). */
+    @VisibleForTesting
+    internal fun awaitFates() {
+        if (fatesThread.isInitialized()) fatesThread.value.submit {}.get(10, java.util.concurrent.TimeUnit.SECONDS)
+    }
+
     override fun onDestroyView() {
         fatesGeneration.incrementAndGet()
         fatesRunning.forEach { it.cancel(false) }
