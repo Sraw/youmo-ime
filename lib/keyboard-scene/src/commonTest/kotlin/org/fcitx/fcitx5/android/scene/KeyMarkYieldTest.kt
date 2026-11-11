@@ -482,4 +482,36 @@ class KeyMarkYieldTest {
             assertTrue(s.keys[0].glyph.let { e -> listOf(e.left - moved.glyph.left, e.top - moved.glyph.top, e.right - moved.glyph.right, e.bottom - moved.glyph.bottom).all { abs(it) < 1e-9 } }, "its glyph where it settled, moved at $d")
         }
     }
+
+    @Test
+    fun whetherAKeysMarksFitWholeAndWhichMeet() {
+        val k = Key(40.0, 40.0, 1.0)
+        val roomy = k.letter(k.glyph(4.0, 4.0), listOf(k.mark(Slot.TopRight), k.mark(Slot.BottomLeft)))
+        assertTrue(KeyMarkYield.fitsWhole(roomy, 1.0), "a small glyph: room for both")
+        assertEquals(emptySet(), KeyMarkYield.crowded(roomy, 1.0))
+        val over = k.letter(tall(k, 2.0), listOf(k.mark(Slot.TopRight), k.mark(Slot.BottomLeft)))
+        assertTrue(!KeyMarkYield.fitsWhole(over, 1.0), "a glyph over the top right mark")
+        assertTrue(0 in KeyMarkYield.crowded(over, 1.0), "the top right one meets it")
+    }
+
+    @Test
+    fun aMarkTheUserSetOutlastsEveryBuiltInOne() {
+        val ink = Ink(0.0, 0.0, 1.0, 1.0)
+        val user = Mark(ink, Slot.TopRight, KeyMarkYield.DROP_DOWN_SHORTCUT, user = true)
+        for (drop in listOf(KeyMarkYield.DROP_SYMBOL, KeyMarkYield.DROP_SHORTCUT, KeyMarkYield.DROP_DOWN_SHORTCUT)) {
+            assertTrue(Mark(ink, Slot.TopRight, drop).expendable > user.expendable, "built in, drop $drop")
+        }
+        assertTrue(Mark(ink, Slot.TopRight, KeyMarkYield.DROP_SHORTCUT, user = true).expendable < user.expendable, "then by drop")
+    }
+
+    @Test
+    fun aShortenedKeyAsksNothingOfTheShortcuts() {
+        // a short key's two left icons meet: the shortcuts all smaller, unless it is shortened (its text a step down)
+        val short = stacked(1.0, 15.5).second
+        val roomy = stacked(1.0, 40.0).second
+        assertTrue(KeyMarkYield.board(listOf(roomy, short), 1.0).shortcut < 1.0, "as it is: the shortcuts asked smaller")
+        val b = KeyMarkYield.board(listOf(roomy, short.copy(shortened = true)), 1.0)
+        assertEquals(1.0, b.shortcut, "shortened: their size")
+        assertNull(b.keys[1].marks[1], "what still meets left out")
+    }
 }

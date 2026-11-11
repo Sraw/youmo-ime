@@ -92,6 +92,9 @@ class SwipeSlots private constructor(
     /** What [key]'s slot [up] (else down) holds: the user's, else its preset. */
     fun resolve(key: String, up: Boolean): SwipeSlot = table[wayName(key, up)] ?: SwipeSlotPreset.of(key, up, orientation)
 
+    /** Whether the user set [key]'s slot [up]. */
+    fun isSet(key: String, up: Boolean): Boolean = wayName(key, up) in table
+
     /** Whether the user set either of [key]'s slots: outlined on the settings page. */
     fun isSet(key: String): Boolean = wayName(key, true) in table || wayName(key, false) in table
 
@@ -261,5 +264,14 @@ object KeyMarkText {
             end = next
         }
         return if (end >= line.length) line else line.substring(0, end).trimEnd() + ELLIPSIS
+    }
+
+    /** What [of] draws cut to its first character and an ellipsis, where [of]'s has no room on its key; null where [of]'s is that short already. */
+    fun shorter(text: String): String? {
+        val shown = of(text)
+        val bounds = BreakIterator.getCharacterInstance().apply { setText(shown) }
+        val first = bounds.following(0).takeIf { it != BreakIterator.DONE } ?: return null
+        val cut = shown.substring(0, first).trimEnd()
+        return (cut + ELLIPSIS).takeIf { cut.isNotEmpty() && it != shown && first < shown.length }
     }
 }

@@ -22,11 +22,13 @@ import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
+import org.fcitx.fcitx5.android.scene.MarkFate
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
@@ -205,6 +207,95 @@ class PopupOverridesFragmentTest {
                 dialog.dismiss()
                 st.idle()
             }
+        }
+
+        // the owner's 「现在怎么样了」 on j's 下滑 at 底部 (360 dp, 紧凑, one-handed): the page and the dialog say how the
+        // keyboard draws it, measured by the engine's fixed measurer (Robolectric's fonts differ by SDK): a sign upright,
+        // shortened turned; nothing once a command (an icon, drawn as set) is picked (uat ST-106 on the emulator)
+        @Test
+        @Config(qualifiers = "w360dp-h780dp-xxhdpi")
+        @Uat("ST-106")
+        fun eachWaysNoteIsWhatTheKeyboardMakesOfIt() {
+            val k = AppPrefs.getInstance().keyboard
+            prefs.set(k.swipeDownPosition, KeyMarkPosition.Bottom)
+            prefs.set(k.keyboardHeightPercent, 20)
+            prefs.set(k.keyboardHeightPercentLandscape, 34)
+            prefs.set(org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.oneHanded, org.fcitx.fcitx5.android.input.keyboard.OneHanded.Right)
+            prefs.set(slotsPref, SwipeSlots.Default.with("full/j", false, SwipeSlot.Text("现在怎么样了")).serialize())
+            org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.measurerFor = { org.fcitx.fcitx5.android.scene.engine.FixedMeasurer }
+            try {
+                open()
+                val note = st.s(R.string.swipe_fate_both, st.s(R.string.swipe_fate_part_sign), st.s(R.string.swipe_fate_part_shortened, "现…"))
+                val line = st.s(R.string.swipe_fate_key, "j", st.s(R.string.swipe_down), note)
+                awaitNotes { line in st.texts() }
+                assertTrue(st.texts().toString(), line in st.texts())
+                keyCalled("j").performClick()
+                st.idle()
+                val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+                fun shown() = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<TextView>().filter { it.visibility == View.VISIBLE }.map { it.text.toString() }.toList()
+                awaitNotes { note in shown() }
+                assertTrue(shown().toString(), note in shown())
+                // 下滑 set to a command: worked out again a moment later, its icon drawn as set
+                val command = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<RadioButton>()
+                    .filter { it.text.startsWith(st.s(R.string.shortcut_command)) }.toList()
+                command.last().performClick()
+                org.robolectric.shadows.ShadowLooper.idleMainLooper(1, java.util.concurrent.TimeUnit.SECONDS)
+                awaitNotes { note !in shown() }
+                assertFalse(shown().toString(), note in shown())
+                // 上滑 left as the keyboard has it: no note of it
+                assertEquals(shown().toString(), 1, shown().count { it == st.s(R.string.swipe_fate_both, st.s(R.string.swipe_fate_part_dropped), st.s(R.string.swipe_fate_part_as_set)) || it.startsWith(st.s(R.string.swipe_fate_dropped).take(3)) || it.startsWith(st.s(R.string.swipe_fate_both, "", "").take(5)) })
+                // a note given is shown, none hidden
+                val section = SwipeSlotSection(st.activity, "", off = false, initial = SwipeSlot.Text("x"))
+                section.note("n")
+                assertEquals("n", section.noted)
+                section.note(null)
+                assertNull(section.noted)
+            } finally {
+                org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.measurerFor = null
+            }
+        }
+
+        // the notes are made on another thread and posted: waited for, a while at most
+        private fun awaitNotes(done: () -> Boolean) {
+            repeat(100) {
+                org.robolectric.shadows.ShadowLooper.idleMainLooper(20, java.util.concurrent.TimeUnit.MILLISECONDS)
+                if (done()) return
+                Thread.sleep(20)
+            }
+        }
+
+        // the keyboards that differ: the worst named; a scene not made, no claim
+        @Test
+        fun theNoteNamesTheKeyboardThatDrawsTheWayWorst() {
+            val ctx = st.activity
+            fun seen(label: String, up: MarkFate, turned: MarkFate) = listOf(
+                SwipeFates.Seen(label, false, mapOf("space" to mapOf(true to up))),
+                SwipeFates.Seen(label, true, mapOf("space" to mapOf(true to turned))),
+            )
+            val both = seen("全键盘", MarkFate.AsSet, MarkFate.AsSet) + seen("九键", MarkFate.Sign, MarkFate.AsSet)
+            val worst = SwipeFates.note(ctx, MarkFate.Sign, MarkFate.AsSet)!!
+            assertEquals(st.s(R.string.swipe_fate_on, "九键", worst), SwipeFates.note(ctx, both, "space", true))
+            // the same on both: no name
+            assertEquals(worst, SwipeFates.note(ctx, seen("全键盘", MarkFate.Sign, MarkFate.AsSet) + seen("九键", MarkFate.Sign, MarkFate.AsSet), "space", true))
+            // set, and no fate in a scene: drawn nowhere
+            assertEquals(st.s(R.string.swipe_fate_dropped), SwipeFates.note(ctx, listOf(SwipeFates.Seen("全键盘", false, mapOf("space" to emptyMap())), SwipeFates.Seen("全键盘", true, mapOf("space" to emptyMap()))), "space", false))
+            // a key on no keyboard: nothing
+            assertNull(SwipeFates.note(ctx, both, "retype", true))
+            // a scene not made: no claim
+            assertNull(SwipeFates.note(ctx, both + SwipeFates.Seen("九键", true, null), "space", true))
+        }
+
+        @Test
+        fun theNoteSaysEachRungAndBothOrientations() {
+            val ctx = st.activity
+            assertNull(SwipeFates.note(ctx, MarkFate.AsSet, null))
+            assertEquals(st.s(R.string.swipe_fate_shortened, "现…"), SwipeFates.note(ctx, MarkFate.Shortened("现…"), MarkFate.Shortened("现…")))
+            assertEquals(st.s(R.string.swipe_fate_sign), SwipeFates.note(ctx, MarkFate.Sign, MarkFate.Sign))
+            assertEquals(st.s(R.string.swipe_fate_dropped), SwipeFates.note(ctx, MarkFate.Dropped, MarkFate.Dropped))
+            assertEquals(
+                st.s(R.string.swipe_fate_both, st.s(R.string.swipe_fate_part_sign), st.s(R.string.swipe_fate_part_as_set)),
+                SwipeFates.note(ctx, MarkFate.Sign, MarkFate.AsSet),
+            )
         }
 
         // the tab, 多选 and the keys chosen kept as the page is made again (a rotation)

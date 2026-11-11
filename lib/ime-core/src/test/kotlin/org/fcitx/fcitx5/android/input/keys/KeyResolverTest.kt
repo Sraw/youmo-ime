@@ -151,7 +151,7 @@ class KeyResolverTest {
         val r = resolver("qwerty", Form.Full, slots = slots)
         val q = r.resolve(KeyId("full/q"), KeyState())
         assertEquals(KeySwipe.Key(true, SwipeSlot.First, SwipeSlot.Text("hi")), q.swipe)
-        assertEquals(MarkContent.Text("hi"), q.downMark)
+        assertEquals(MarkContent.Text("hi", "h…"), q.downMark)
         assertEquals(MarkContent.Icon("cursor-move"), r.resolve(KeyId("fn/space"), KeyState()).upMark)
         val down = resolver("qwerty", Form.Full, slots = SwipeSlots.Default.applied(SwipeOrientation.FirstDown)).resolve(KeyId("full/q"), KeyState())
         assertEquals(MarkContent.Symbol("1"), down.downMark)

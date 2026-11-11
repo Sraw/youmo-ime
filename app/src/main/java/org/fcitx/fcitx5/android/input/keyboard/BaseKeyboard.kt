@@ -689,6 +689,13 @@ abstract class BaseKeyboard(
     protected open fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
         SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = keyMarks(layout))
 
+    /**
+     * Its layout and what its keys show now as the engine's environment at [width] × [height] in [look]
+     * ([sceneEnv]): a settings page's scene of the keyboard (SwipeFates); null, no layout read.
+     */
+    internal fun shownAs(look: ThemeLook, width: Int, height: Int): Pair<SceneLayout, Env>? =
+        sceneBoard?.layout?.let { it to sceneEnv(look, it, width, height) }
+
     /** Whether the canvas draws its board's fill under the keys ([KeyboardCanvasView.drawsBase]): a row or a column laid on its own background, not. */
     protected open val sceneDrawsBase: Boolean get() = true
 

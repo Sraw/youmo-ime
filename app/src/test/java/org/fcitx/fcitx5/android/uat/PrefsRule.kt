@@ -43,7 +43,8 @@ class PrefsRule : ExternalResource() {
     fun <T : Any> set(pref: ManagedPreference<T>, value: T) {
         val was = pref.getValue()
         restore += { pref.setValue(was) }
-        pref.setValue(value)
+        // an old long press as its page stores it, `key_lists` removed with it (read migrated till S5's pages); put back after
+        if (pref.key in OLD_LONG_PRESS && value is String) AppPrefs.getInstance().setOldLongPress(pref.key, value) else pref.setValue(value)
     }
 
     /**
@@ -112,5 +113,9 @@ class PrefsRule : ExternalResource() {
             }
         }
         if (changed) e.commit()
+    }
+
+    private companion object {
+        val OLD_LONG_PRESS = setOf(AppPrefs.POPUP_OVERRIDES, AppPrefs.KEY_POPUPS, AppPrefs.T9_SYMBOLS)
     }
 }

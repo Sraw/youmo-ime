@@ -203,7 +203,19 @@ data class Texts(
  */
 sealed interface MarkContent {
     data class Icon(val name: String) : MarkContent
-    data class Text(val text: String) : MarkContent
+    /**
+     * [shorter]: what is drawn where [text] has no room on its key (its first character and 「…」), null: none
+     * shorter. Where that has none either, [SIGN], one icon for every text (two lines, a longer over a
+     * shorter): a text is here.
+     */
+    data class Text(val text: String, val shorter: String? = null) : MarkContent {
+        /** What is drawn instead, a step at a time, where there is no room (SceneBuilder). */
+        val ladder: List<MarkContent> get() = listOfNotNull(shorter?.let(::Text), SIGN)
+
+        companion object {
+            val SIGN = Icon(org.fcitx.fcitx5.android.scene.Icons.SHORT_TEXT)
+        }
+    }
     data class Symbol(val text: String) : MarkContent
     data object Corner : MarkContent
     data object Empty : MarkContent
@@ -229,7 +241,12 @@ data class MarkSettings(
     val downOn: Boolean = true,
     val firstUp: Boolean = true,
     val shortcuts: Map<String, MarkContent> = PRESET,
+    /** The ways (`full/a:down`) the user set: their marks are kept over the built-in ones where two meet. */
+    val user: Set<String> = emptySet(),
 ) {
+    /** Whether [name]'s way [up] is one the user set. */
+    fun isUser(name: String?, up: Boolean): Boolean = name != null && "$name:${if (up) "up" else "down"}" in user
+
     /** [name]'s way [up] by [shortcuts], else its default: a character key's corner the way [firstUp], else nothing. */
     fun of(name: String?, char: Boolean, up: Boolean): MarkContent =
         name?.let { shortcuts["$it:${if (up) "up" else "down"}"] } ?: if (char && up == firstUp) MarkContent.Corner else MarkContent.Empty

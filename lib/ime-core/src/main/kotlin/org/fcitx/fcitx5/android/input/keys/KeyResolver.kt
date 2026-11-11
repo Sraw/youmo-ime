@@ -125,10 +125,14 @@ class KeyResolver(
     fun marks(state: KeyState): MarkSettings {
         if (state == marksFor) marksMade?.let { return it }
         val marks = HashMap<String, MarkContent>()
+        // the ways the user set: their marks kept over a built-in one they meet, and told on the settings page (SwipeFates)
+        val user = HashSet<String>()
         for ((name, _) in nodes) {
             val r = resolve(KeyId.of(name), state)
             marks["$name:up"] = r.upMark
             marks["$name:down"] = r.downMark
+            if (slots.isSet(name, true)) user += "$name:up"
+            if (slots.isSet(name, false)) user += "$name:down"
         }
         return MarkSettings(
             upAt = SceneMarks.at(state.spots.symbol),
@@ -139,6 +143,7 @@ class KeyResolver(
             downOn = state.ways.down,
             firstUp = slots.orientation == SwipeOrientation.FirstUp,
             shortcuts = marks,
+            user = user,
         ).also {
             marksFor = state
             marksMade = it

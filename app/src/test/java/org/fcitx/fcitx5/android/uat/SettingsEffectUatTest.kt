@@ -251,7 +251,7 @@ class SettingsEffectUatTest {
         val added = h.longPress(h.key("a"))
         assertTrue(added.toString(), "α" in added && "β" in added && "⒜" in added)
         fresh()
-        AppPrefs.getInstance().internal.popupOverrides.setValue("")
+        AppPrefs.getInstance().setOldLongPress(AppPrefs.POPUP_OVERRIDES, "")
         h.start()
         val back = h.longPress(h.key("a"))
         assertTrue(back.toString(), "α" !in back && "β" !in back)

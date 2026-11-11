@@ -15,8 +15,6 @@ import android.widget.TextView
 import androidx.core.view.ViewCompat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
-import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
@@ -100,35 +98,44 @@ object KeyCaps {
             // the label the keyboard's, shrunk as the cap is to its key, its marks where they are there (060-pending-decisions);
             // a shortcut's key the keyboard's very key, made on its board at the keys' size, every key of the board
             // with its marks, as a mark class is sized over them all (060-render-p2 S7a)
-            keyboardKeyHeight = keyboardKeyHeight(ctx)
-            board = shortcut?.let { if (it.layout != null) board(ctx, it.name, it.layout) else board(ctx, it.name) }
-            val names = board?.let { b -> SceneLayouts.of(ctx, b.layout)?.let(SceneBoard::names) } ?: listOfNotNull(id?.name)
-            // each slot where its way's 图标位置 puts it on the keyboard, a key with no shortcut too
-            val spots = swipeSpots()
-            marks = SceneMarks.settings(
-                shortcut?.slots ?: SwipeSlotsCache.current, swipeWays(), spots.symbol, spots.shortcut,
-                shortcut?.charShortcuts ?: true, names, SceneBoard.firsts(PopupOverridesCache.byName.current, names),
-            )
+            onBoard(ctx, shortcut, shortcut?.let { if (it.layout != null) board(ctx, it.name, it.layout) else board(ctx, it.name) })
         }
 
+    /**
+     * [shortcut]'s key made on [board] (none: the key alone) at the keyboard's key height, its marks as the
+     * keyboard's: the settings' caps, and what the page tells of a way drawn otherwise than set (SwipeFates).
+     */
+    internal fun SceneKeyCell.onBoard(ctx: Context, shortcut: Shortcut?, board: SceneKeyCell.Board?) {
+        keyboardKeyHeight = keyboardKeyHeight(ctx)
+        this.board = board
+        val names = board?.let { b -> SceneLayouts.of(ctx, b.layout)?.let(SceneBoard::names) } ?: listOfNotNull(shortcut?.name?.let { KeyId.of(it).name })
+        // each slot where its way's 图标位置 puts it on the keyboard, a key with no shortcut too
+        val spots = swipeSpots()
+        marks = SceneMarks.settings(
+            shortcut?.slots ?: SwipeSlotsCache.current, swipeWays(), spots.symbol, spots.shortcut,
+            shortcut?.charShortcuts ?: true, names, SceneBoard.firsts(PopupOverridesCache.byName.current, names),
+        )
+    }
+
     /** A qwerty key's height on the keyboard as the height settings make it now, px (InputView's keys' area, [KeyboardArea]). */
-    fun keyboardKeyHeight(ctx: Context): Int =
-        KeyboardArea.keysHeight(ctx, CodeRowHeight.keyboardDp(ImKeyboards.Layout.TEXT, KawaiiBarComponent.codeRowFloats())) / KEY_ROWS
+    fun keyboardKeyHeight(ctx: Context): Int = SwipeFates.size(upright(ctx), KeyNames.QWERTY, ImKeyboards.Layout.TEXT).height / KEY_ROWS
+
+    // the keyboard upright on this display, as the page's notes have it (SwipeFates), whatever way the page is turned
+    private fun upright(ctx: Context) = KeyboardArea.screens(ctx).first
 
     /**
      * The keyboard the key of [shortcut] (a shortcut page's name: `full/a`, `zyfull/1`, a function key's `space`) is on,
-     * at its keys' size as InputView makes it (KeyboardArea: the height settings, the bar, the board's code row, the
-     * paddings, the cap): [layout] the board, a function key's qwerty's unless given.
+     * at its keys' size as InputView makes it upright (SwipeFates.size: the height settings, the bar, the board's code row, the
+     * paddings, the cap, one-handed, floating, split): [layout] the board, a function key's qwerty's unless given.
      */
     fun board(ctx: Context, shortcut: String, layout: String = defaultBoard(shortcut)): SceneKeyCell.Board {
-        val codeRow = CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT
-        val code = CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats())
+        val size = SwipeFates.size(upright(ctx), layout, CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT)
         // the letters' corners as the keyboard draws them (TextKeyboard.alts: the long presses' firsts, the user's
         // overrides; none where the first's way draws nothing): without them no symbol is drawn, nor does one take a mark's room
         val alts = if (!firstShown()) emptyMap() else
             SceneLetters.alts { c -> c.toString().let { PopupOverridesCache.user.current.resolve(it, PopupPreset[it])?.firstOrNull() } }
-        return SceneKeyCell.Board(layout, KeyId.of(shortcut).name, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code), alts,
-            AppPrefs.getInstance().keyboard.letterCase.getValue().case)
+        return SceneKeyCell.Board(layout, KeyId.of(shortcut).name, size.width, size.height, alts,
+            AppPrefs.getInstance().keyboard.letterCase.getValue().case, size.floating, size.split)
     }
 
     private fun defaultBoard(shortcut: String) =

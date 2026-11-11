@@ -154,6 +154,20 @@ class SwipeSlotsTest {
         assertEquals("⇥␣…", KeyMarkText.of("\t  "))
     }
 
+    // where what [KeyMarkText.of] shows has no room on its key: its first character as seen and an ellipsis
+    @Test
+    fun aMarkShorterIsItsFirstCharacterAndAnEllipsis() {
+        for ((text, shorter) in listOf(
+            "现在怎么样了" to "现…",
+            "你好" to "你…",
+            "hi" to "h…",
+            "好" to null,
+            "🇨🇳🇯🇵🇺🇸" to "🇨🇳…",
+            "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67e\u0301x" to "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67…",
+            "a\n  b c" to null,
+        )) assertEquals(text, shorter, KeyMarkText.shorter(text))
+    }
+
     // a newer version's slots (a backup of it, a downgrade): its lines are not read, the presets stand
     @Test
     fun anotherVersionsSlotsAreThePresets() {

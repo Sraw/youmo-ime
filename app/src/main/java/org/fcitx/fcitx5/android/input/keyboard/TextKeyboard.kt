@@ -74,21 +74,10 @@ class TextKeyboard(
         private const val LAYOUT = "qwerty"
 
         /** Whether the letters are split here: as the setting is, the screen as wide as it is now; floating, never. */
-        fun splits(context: Context): Boolean {
-            if (ThemeManager.prefs.floatingKeyboard.getValue()) return false
-            val config = context.resources.configuration
-            val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
-            return SplitKeyboard.splits(ThemeManager.prefs.splitKeyboard.getValue().mode, landscape, config.screenWidthDp)
-        }
+        fun splits(context: Context): Boolean = KeyboardArea.splits(KeyboardArea.screen(context))
 
         /** The keyboard's width, dp: the screen's less its side padding (InputView's), or floating its own. */
-        fun widthDp(context: Context): Int {
-            val config = context.resources.configuration
-            if (ThemeManager.prefs.floatingKeyboard.getValue()) return FloatingKeyboard.widthDp(config.screenWidthDp)
-            val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
-            // the theme's where the setting follows it (KeyboardArea.sidePadding): a fraction of a dp cut, as there
-            return (config.screenWidthDp - 2 * KeyboardArea.sizes().sidePaddingDp(landscape)).toInt()
-        }
+        fun widthDp(context: Context): Int = KeyboardArea.widthDp(KeyboardArea.screen(context))
 
         val Layout: List<List<KeyDef>> = listOf(
             listOf(

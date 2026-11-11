@@ -74,9 +74,8 @@ class KotlinHostKeyboardTest {
         if (::home.isInitialized) home.deleteRecursively()
         keyboard.pinyinKeyboard.let { it.setValue(it.defaultValue) }
         keyboard.shuangpinKeyboard.let { it.setValue(it.defaultValue) }
-        keyboard.t9Symbols.let { it.setValue(it.defaultValue) }
-        AppPrefs.getInstance().internal.popupOverrides.let { it.setValue(it.defaultValue) }
-        AppPrefs.getInstance().internal.keyPopups.let { it.setValue(it.defaultValue) }
+        // the old long presses as their pages store them, `key_lists` with them (AppPrefs.setOldLongPress)
+        for (key in listOf(AppPrefs.T9_SYMBOLS, AppPrefs.POPUP_OVERRIDES, AppPrefs.KEY_POPUPS)) AppPrefs.getInstance().setOldLongPress(key, "")
     }
 
     // the host answers on its thread, the bar is drawn on the main one: run both till [done]
@@ -118,7 +117,7 @@ class KotlinHostKeyboardTest {
     fun aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText() {
         keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14)
         // set on QW itself: q's own no longer reaches it (060-keys-unify L3)
-        AppPrefs.getInstance().internal.keyPopups.setValue("g14/qw ⒜")
+        AppPrefs.getInstance().setOldLongPress(AppPrefs.KEY_POPUPS, "g14/qw ⒜")
         start(InputMethodCatalog.PINYIN)
         h.longPress(h.key("QW"), "⒜")
         typedAsText("⒜")
@@ -128,7 +127,7 @@ class KotlinHostKeyboardTest {
     @Uat("ST-22")
     fun aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText() {
         keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys)
-        keyboard.t9Symbols.setValue("2 ⒉")
+        AppPrefs.getInstance().setOldLongPress(AppPrefs.T9_SYMBOLS, "2 ⒉")
         start(InputMethodCatalog.SHUANGPIN)
         h.longPress(h.nineKey("2"), "⒉")
         typedAsText("⒉")

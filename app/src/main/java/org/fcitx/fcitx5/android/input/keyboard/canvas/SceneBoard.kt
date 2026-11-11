@@ -102,7 +102,7 @@ class SceneBoard(
         val layout = layout ?: return null
         val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(of, look) } ?: return null
         val measurer = measurer(of, look)
-        return scene(layout, sceneTheme, look, measurer, width, height, (of as? Theme.Pack)?.let { ThemeManager.keyStyleShown.overPack })?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key), PackIcons.of(of)) }
+        return scene(layout, sceneTheme, look, measurerFor?.invoke() ?: measurer, width, height, (of as? Theme.Pack)?.let { ThemeManager.keyStyleShown.overPack })?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key), PackIcons.of(of)) }
     }
 
     // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it
@@ -180,6 +180,13 @@ class SceneBoard(
         private var namesMade: Pair<SceneLayout, Set<String>>? = null
         private val resolvers = LinkedHashMap<ResolverFor, KeyResolver>()
         private const val KEPT_RESOLVERS = 4
+
+        /**
+         * A test's measurer in place of the fonts' (a fixed width a character: Robolectric measures no text), the
+         * keyboard's and the settings page's ([org.fcitx.fcitx5.android.ui.main.settings.SwipeFates]) alike: null, the fonts'.
+         */
+        @VisibleForTesting
+        var measurerFor: (() -> TextMeasurer)? = null
 
         private fun measurer(of: Theme, look: ThemeLook): AndroidTextMeasurer =
             measurers.getOrPut(look to (of as? Theme.Pack)?.drawn?.fonts.orEmpty()) { AndroidTextMeasurer(SceneFonts.of(of, look)) }

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.content.Context
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -19,6 +20,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
+import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -114,25 +116,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private lateinit var keyboardView: FrameLayout
 
     // each made when first shown: every new input view made 九键 too, which most never use
-    private val makers: Map<String, () -> BaseKeyboard> = mapOf(
-        TextKeyboard.Name to { TextKeyboard(context, theme) },
-        T9Keyboard.Name to { nineKeys(english = false) },
-        T9Keyboard.EnglishName to { nineKeys(english = true) },
-        // pinyin's: a theme's layout of its own groups typed as such (060-render-p3 T9b); 双拼's take the built-in groups alone
-        GroupedKeyboard.Name14 to { GroupedKeyboard(context, theme, ownGroups = true) },
-        GroupedKeyboard.Name18 to { GroupedKeyboard(context, theme, NineKeyLetters.G18) },
-        GroupedKeyboard.Name18Plain to { GroupedKeyboard(context, theme, NineKeyLetters.G18, semicolon = false) },
-        GroupedKeyboard.NamePinyin18 to { GroupedKeyboard(context, theme, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false, ownGroups = true) },
-        GroupedKeyboard.NameShuangpin14 to { GroupedKeyboard(context, theme, NineKeyLetters.G14, Keyboard::shuangpin14Key) },
-        // the user's 按键字符 (its symbols) as 九键拼音 has them; its letters are 全拼's alone
-        T9Keyboard.ShuangpinName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = true) },
-        T9Keyboard.ShuangpinPlainName to { T9Keyboard(context, theme, symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = false) },
-        ZhuyinKeyboard.NameNine to { ZhuyinKeyboard(context, theme, nine = true) },
-        ZhuyinKeyboard.NameFull to { ZhuyinKeyboard(context, theme, nine = false) },
-        NumberKeyboard.Name to { NumberKeyboard(context, theme) },
-        // a number's, phone's or date's field's own (FieldPad)
-        *NumberPad.entries.filter { it != NumberPad.FULL }.map { pad -> pad.layout to { NumberKeyboard(context, theme, pad) } }.toTypedArray(),
-        HandwritingKeyboard.Name to {
+    // the window's context and theme asked as each is made: its dependencies, there once it is attached
+    private val makers: Map<String, () -> BaseKeyboard> =
+        keyboardMakers({ context }, { theme }) {
             HandwritingKeyboard(
                 context, theme,
                 deliver = { reading, piece -> ink { offerInk(reading, piece) } },
@@ -141,13 +127,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 // 注: the shared setting, as its row in the settings sets it (SharedInputFragment)
                 setReading = { style -> service.postFcitxJob { setImOptions(InputMethodCatalog.PINYIN, mapOf(EngineSettings.CANDIDATE_READING to style.key)) } },
             )
-        },
-    )
-
-    private fun nineKeys(english: Boolean): T9Keyboard {
-        val keyboard = AppPrefs.getInstance().keyboard
-        return T9Keyboard(context, theme, NineKeyLetters.parse(keyboard.t9Letters.getValue()), NineKeySymbols.parse(keyboard.t9Symbols.getValue()), english, semicolon = false)
-    }
+        }
 
     // [tell] the engine of the pad, in order with the keys; the call sends the Ink key carrying it itself (HostApi.offerInk)
     private fun ink(tell: suspend HostApi.() -> Unit) {
@@ -510,6 +490,37 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
  * row's height, which floating is none in the keyboard.
  */
 internal fun syllablesOwned(owns: Boolean, showsStrip: Boolean): Boolean = owns || !showsStrip
+
+/**
+ * Each keyboard by its name, made when asked ([handwriting] the pad's, wired to the engine where it types): the
+ * input view's, and a settings page's that tells how the keys draw (SwipeFates).
+ */
+internal fun keyboardMakers(contextOf: () -> Context, themeOf: () -> Theme, handwriting: () -> BaseKeyboard): Map<String, () -> BaseKeyboard> {
+    fun nineKeys(english: Boolean): T9Keyboard {
+        val keyboard = AppPrefs.getInstance().keyboard
+        return T9Keyboard(contextOf(), themeOf(), NineKeyLetters.parse(keyboard.t9Letters.getValue()), NineKeySymbols.parse(keyboard.t9Symbols.getValue()), english, semicolon = false)
+    }
+    return mapOf(
+        TextKeyboard.Name to { TextKeyboard(contextOf(), themeOf()) },
+        T9Keyboard.Name to { nineKeys(english = false) },
+        T9Keyboard.EnglishName to { nineKeys(english = true) },
+        // pinyin's: a theme's layout of its own groups typed as such (060-render-p3 T9b); 双拼's take the built-in groups alone
+        GroupedKeyboard.Name14 to { GroupedKeyboard(contextOf(), themeOf(), ownGroups = true) },
+        GroupedKeyboard.Name18 to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18) },
+        GroupedKeyboard.Name18Plain to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, semicolon = false) },
+        GroupedKeyboard.NamePinyin18 to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false, ownGroups = true) },
+        GroupedKeyboard.NameShuangpin14 to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G14, Keyboard::shuangpin14Key) },
+        // the user's 按键字符 (its symbols) as 九键拼音 has them; its letters are 全拼's alone
+        T9Keyboard.ShuangpinName to { T9Keyboard(contextOf(), themeOf(), symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = true) },
+        T9Keyboard.ShuangpinPlainName to { T9Keyboard(contextOf(), themeOf(), symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = false) },
+        ZhuyinKeyboard.NameNine to { ZhuyinKeyboard(contextOf(), themeOf(), nine = true) },
+        ZhuyinKeyboard.NameFull to { ZhuyinKeyboard(contextOf(), themeOf(), nine = false) },
+        NumberKeyboard.Name to { NumberKeyboard(contextOf(), themeOf()) },
+        // a number's, phone's or date's field's own (FieldPad)
+        *NumberPad.entries.filter { it != NumberPad.FULL }.map { pad -> pad.layout to { NumberKeyboard(contextOf(), themeOf(), pad) } }.toTypedArray(),
+        HandwritingKeyboard.Name to handwriting,
+    )
+}
 
 /**
  * The letters' layout of input method [ime]: its keyboard as [chosen] has it ([ImKeyboards.layoutOf]),
