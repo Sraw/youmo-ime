@@ -24,9 +24,9 @@
 
 ### LS-05 [P1] 分体时滑动和长按照常
 - **前提**：B0-横屏。
-- **操作**：在右半边的 o 上向下滑；长按左半边的 q 选 `Q`。
+- **操作**：在右半边的 o 上向上滑；长按左半边的 q 选 `Q`。
 - **预期**：框里是「9Q」。
-- **JVM**：`LandscapeUatTest.swipeAndLongPressOnTheHalves`（右半边 o 下滑发出 9、左半边长按 q 选 Q 发出 Q；上屏由引擎做）；设备上不跑。
+- **JVM**：`LandscapeUatTest.swipeAndLongPressOnTheHalves`（右半边 o 上滑发出 9、左半边长按 q 选 Q 发出 Q；上屏由引擎做）；设备上不跑。
 
 ### LS-09 [P1] 改设置马上生效
 - **前提**：B0-横屏，键盘是分体的。

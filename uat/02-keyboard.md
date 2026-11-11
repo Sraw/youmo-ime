@@ -14,11 +14,11 @@
 - **预期**：框里是「ok 」（单词后自动加了空格）。
 - **JVM**：`KeysUatTest.englishLettersTypeThemselvesASpaceAfter`（:lib:ime-eval:uatTest，真数据）（英文 ok 空格后框里「ok 」）；设备上不跑。
 
-### KB-03 [P0] 向下滑字母键打出键角的数字
+### KB-03 [P0] 向上滑字母键打出键角的数字
 - **前提**：B0。
-- **操作**：手指按在 w 键上向下滑再松开。
+- **操作**：手指按在 w 键上向上滑再松开。
 - **预期**：框里是「2」，没有拼音候选。
-- **JVM**：`KeyboardUatTest.swipingALetterDownTypesItsCorner`（下划 w 只向引擎发一次角标 2）；设备上不跑。
+- **JVM**：`KeyboardUatTest.swipingALetterUpTypesItsCorner`（上划 w 只向引擎发一次角标 2）；设备上不跑。
 
 ### KB-04 [P1] 长按字母键后直接松手打出键角的字符
 - **前提**：B0。
@@ -88,7 +88,7 @@
 
 ### KB-15 [P1] 跟在数字后面的逗号也是中文的
 - **前提**：B0。
-- **操作**：向下滑 q 键打出 1，再点底排的 **，**。
+- **操作**：向上滑 q 键打出 1，再点底排的 **，**。
 - **预期**：框里是「1，」。
 - **JVM**：`HostCasesUatTest.aCommaAfterADigitIsChinese`（「1，」）；设备上不跑。
 
@@ -148,7 +148,7 @@
 
 ### KB-25 [P1] 网址框里数字和符号原样打出
 - **前提**：B0，点「网址」框。
-- **操作**：向下滑 w 键打 2，长按 h 键选 `/`。
+- **操作**：向上滑 w 键打 2，长按 h 键选 `/`。
 - **预期**：框里是「2/」（半角）。
 - **JVM**：`HostCasesUatTest.anAddressFieldTypesDigitsAndMarksAsTheyAre`（网址框打 2、/ 得「2/」）；设备上不跑。
 
@@ -199,9 +199,9 @@
 
 ### KB-35 [P1] 快速点击、上下短划和长按不算滑行
 - **前提**：滑行开，切到英文。
-- **操作**：快速依次点 o、k；在 q 上往下短划；长按 e。
+- **操作**：快速依次点 o、k；在 q 上往上短划；长按 e。
 - **预期**：框里先是「ok」（逐个字母，没有画线）；短划打出 q 的角标符号；长按 e 照常弹出更多字母。
-- **JVM**：`KeyboardUatTest.tapsShortSwipesAndHoldsAreNoGlide`（开了滑行，点按、角标下划、长按都照常，不当成滑行）；设备上不跑。
+- **JVM**：`KeyboardUatTest.tapsShortSwipesAndHoldsAreNoGlide`（开了滑行，点按、角标上划、长按都照常，不当成滑行）；设备上不跑。
 
 ### KB-36 [P1] 密码、网址、邮箱框里不滑行
 - **前提**：滑行开，切到英文，点「密码」框。
@@ -348,45 +348,45 @@
 - **预期**：拼音栏和候选栏都是空的，没有 nih；接着打 a 只出 a 的候选。
 - **JVM**：`HostCoreContractTest.an app unbound clears the panel its focus out dropped before no context is active`（ime-core：应用先解绑再换框时，清空的面板在还有活动上下文时发出）；2026-11-02 还在 redroid 上时手动跑过一次（没在模拟器上重跑）。
 
-### KB-61 [P1] 字母上滑是快捷键，下滑是符号
-- **前提**：B0，滑动是默认（上滑快捷键，下滑符号），测试页输入框里有字。
-- **操作**：a 键上滑；s 键上滑；a 键下滑。密码框里 c 键上滑。
-- **预期**：a 上滑全选；s 没有快捷键，打出 s；a 下滑打出键角的 @；a、c、x、v、z、y 的左上角（**快捷键图标位置** 默认）画着快捷键图标，键角的小字在右上（**标点位置** 默认）。密码框里 c 上滑什么也不做。
-- **JVM**：`BaseKeyboardTest.aLettersSwipeUpIsItsShortcutAndDownItsSymbol`；设备上的冒烟见报告（真 `EditText` 里全选、复制、粘贴、撤销）。
+### KB-61 [P1] 字母下滑是快捷键，上滑是长按首选
+- **前提**：B0，上滑、下滑是默认（上滑长按首选，下滑快捷键），测试页输入框里有字。
+- **操作**：a 键下滑；s 键下滑；a 键上滑。密码框里 c 键下滑。
+- **预期**：a 下滑全选；s 没有快捷键，打出 s；a 上滑打出键角的 @；a、c、x、v、z、y 的左上角（**下滑图标位置** 默认）画着快捷键图标，键角的小字在右上（**上滑图标位置** 默认）。密码框里 c 下滑什么也不做。
+- **JVM**：`BaseKeyboardTest.aLettersSwipeDownIsItsShortcutAndUpItsFirst`；设备上的冒烟见报告（真 `EditText` 里全选、复制、粘贴、撤销）。
 
 ### KB-62 [P1] 空格上滑是编辑菜单，退格上滑清除、下滑恢复
-- **前提**：B0，滑动是默认，输入框里有字。
+- **前提**：B0，上滑、下滑是默认，输入框里有字。
 - **操作**：空格上滑不松手，左挪一格松开；框里写 `one two three`，选中 `two` 退格上滑；光标放在 `one` 后再上滑两次；退格下滑三次；打拼音 `nihao` 时退格上滑，再下滑。换到 B0-九键，打 6 4，点音节栏上第一个音节，退格上滑清除，再退格下滑。开着 TalkBack（做法同 MN-13）时空格上滑，手指在编辑菜单的格子上移动。
 - **预期**：空格上滑出一排五格（全选、剪切、复制、粘贴、撤销），在键盘上方（"已复制"这类提示出现的地方，手指挡不住），粘贴对着空格；和菜单重叠的提示先收起，按键出错的提示（「词库没装上」这类）和菜单开着时新来的提示藏到菜单后、菜单收起后出现；候选栏上的提示不受影响；左挪一格松开是复制。悬浮键盘、横屏时也在键盘上方。第一次上滑删掉 `two`，接着删掉光标前的 `one`，再删掉光标后的部分，框空了；每次提示"已清除"带撤销。下滑三次按倒序放回，最后 `two` 又是选中的。打拼音时上滑只清掉拼音串，什么都不上屏；下滑拼音串回来，候选照旧。清除后打了字再下滑，提示"没有可恢复的内容"。九键在音节栏选了音节后清除的，下滑也提示"没有可恢复的内容"，拼音不回来（14、18 键的音节栏一样）。TalkBack 按格子上的字读（全选、剪切、复制、粘贴、撤销），不读 select_all 这类内部名字。
 - **JVM**：`BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore`（弹出编辑菜单；退格上下滑发出清除、恢复）；菜单在键盘上方、提示收起、左挪一格松开复制见 `SwipePopupScreenshotTest.theEditMenuIsAboveTheKeyboardAndPicksAsBefore`，出错提示藏起再回来见 `SwipePopupScreenshotTest.aFailureIsHiddenUnderTheEditMenuAndBackAsItGoes`、`UndoChipTest.theEditMenuPutsAwayWhatWasDoneAndHidesAFailureTillItGoes`、ime-core `NoticeStateTest.theEditMenuPutsAwayOrHides`，摆放规则见 ime-core `EditPlanTest.theEditMenuGoesWhereTheNoticesGo`，竖屏、紧凑、悬浮、横屏的样子见 `SwipePopupScreenshotTest` 的 `edit_menu_*` 金样；清除和恢复对输入框做什么、倒序放回、改动后不放回见 ime-core `EditPlanTest`；只给出部分光标前文本的应用里清除只删那部分、撤销放回光标处、在光标前打了字就不放回见 `EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor`、`aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor`、`aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor`；拼音串清掉不上屏、放回同样的拼音见 `HostCoreEnginesTest`（`what is typed is cleared without a commit and typed again`），音节栏选过音节后清除的不放回见 `HostCoreEnginesTest`（`what is typed after a syllable taken off the nine keys' bar is never typed again`）、ime-core `EnginesTest.aSyllableTakenOffTheBarIsAPick`；TalkBack 读格子的字见 `SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels`；设备上的冒烟见报告。
 
 ### KB-63 [P2] 自己设的文字快捷键
-- **前提**：B0，**按键字符和快捷键** 里把 Q 的快捷键设成文字「你好」。
-- **操作**：Q 键上滑（滑出键外也一样）。
-- **预期**：打出「你好」；Q 的左上角是缩小的「你好」，右下角的 1 照旧。
+- **前提**：B0，**按键字符和快捷键** 里把 Q 的下滑设成文字「你好」。
+- **操作**：Q 键下滑（滑出键外也一样）。
+- **预期**：打出「你好」；Q 的左上角是缩小的「你好」，右上角的 1 照旧。
 - **JVM**：`BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns`。
 
 ### KB-64 [P1] 连着按退格删掉的一段，下滑整段放回
-- **前提**：B0，滑动是默认。
+- **前提**：B0，上滑、下滑是默认。
 - **操作**：框里写 `hello world`，光标在末尾按三下退格，退格下滑；再按住退格删掉 `world` 和前面的空格，下滑；再按两下退格，打一个 `x`（英文键盘，或拼音打 x 后点候选），再按一下退格，下滑两次；最后全选，退格上滑清除，按一下退格（框里没字了，什么也没删），下滑。
 - **预期**：三下退格删掉 `rld`，下滑一次整段放回，光标回到末尾；按住连删后下滑，`world` 连同空格整段回来；打了字以后只放回打字之后删掉的那一下（`x` 回来），再下滑提示"没有可恢复的内容"；最后的下滑放回清除掉的整段，仍是全选。按键字符和快捷键里这个命令叫「恢复刚删除的」。
 - **JVM**：`DeletionRunTest`（ime-core：一段连删整段放回、光标回原处；表情、国旗、组合字符按编辑器删的放回；按住连删到开头；中间打字、挪光标、引擎自己删字就重新计，打了字后不放回；左滑选中删除并入同一段；最近一次是清除就先放回清除；应用自己清空了框、成对符号一起删掉的不放回；光标前超过读的长度时按对齐处判断）；设备上的冒烟见 `dev/design/051-fix-bksp-report.md`。
 
 ### KB-65 [P2] 滑出快捷键时键上方小框里的字
 - **前提**：B0，**按键时弹出显示字符** 开着；**按键字符和快捷键** 里把 Q 设成文字「我的邮箱是 someone@example.com」，W 设成 **快速输入**，E 设成 **恢复刚删除的**。
-- **操作**：A、W、E、Q 各上滑过阈值不松手，看键上方的小框；键盘高度换成紧凑、悬浮键盘、横屏各看一次；拼音键盘换成 14 键，给 QW 键设同样的文字快捷键，按 Shift 后上滑看小框；再按住 ZX 看小框（Shift 仍是刚按的一次大写，没打字）。
+- **操作**：A、W、E、Q 各下滑过阈值不松手，看键上方的小框；键盘高度换成紧凑、悬浮键盘、横屏各看一次；拼音键盘换成 14 键，给 QW 键设同样的文字快捷键，按 Shift 后下滑看小框；再按住 ZX 看小框（Shift 仍是刚按的一次大写，没打字）。
 - **预期**：小框里是「全选」「快速输入」「恢复刚删除的」「我的邮箱是 s…」，字比键上的字母小一号，和底排「符」「123」差不多；框最宽约五个字，没有横跨半个键盘、也不盖住工具栏；紧凑、悬浮时字跟着键上的字缩小。14 键上小框里的字照设的写（「someone@…」不变成大写）；字母键自己的小框照键面的大小写（ZX 键上是 X）。
 - **JVM**：`SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted`（三个键的框里的字）；`GroupedKeyboardTest.aSwipesShortcutShowsAsItIsNamedNotInTheLettersCase`（14/18 键上快捷键的字不随字母大小写变，字母键的小框照键面的大小写）；规则见 ime-core `PreviewLabelTest`；样子见 `SwipePopupScreenshotTest` 的 `select_all_*`、`quick_input_*`、`restore_*`、`text_*`、`trad_simp_en` 金样。
 
 ### KB-66 [P1] 标点和快捷键图标各在自己选的位置，两项不能选同一处，第一次打开和改过设置后一样
-- **前提**：新装（B0），第一次打开键盘，滑动、标点位置、快捷键图标位置都是默认。
-- **操作**：看 a、z、s 和退格的键角；打开 **按键**，看 **标点位置** 和 **快捷键图标位置** 两项；**快捷键图标位置** 依次选左下、右下、底部、无，每次回来看；**标点位置** 选左上、左下、底部、无，每次回来看；在 **标点位置** 的列表里看快捷键占着的那一项，点它；**按键 → 滑动** 改成"上滑符号，下滑快捷键"再看；都改回默认；给 s 设一个文字快捷键再清掉；给 q 设一个文字快捷键，在 **按键字符和快捷键** 页清掉 q 的长按，回测试页看 q，再恢复 q 的长按回来看，每次收起键盘再打开对比；收起键盘再打开。键盘高度选 **紧凑**，标点位置选底部再看，快捷键选右上再看；标点改回右上、快捷键选底部再看。**按键字符和快捷键** 页每选一个位置也看一遍。
-- **预期**：两项挨着，选项都是"右上 / 右下 / 左上 / 左下 / 底部 / 无"，默认标点右上、快捷键左上。默认：a、z 的快捷键图标在左上角，@、「，」在右上角；s 只有右上角的 *；退格上滑的清除在左上、下滑的恢复在左下，空格的编辑菜单图标在左上。快捷键选左下：都在左下，退格的清除在左下、恢复在左上；选右下：快捷键在右下，退格清除右下、恢复右上；选底部：快捷键在键下边中间，退格的恢复在上边中间；选无：快捷键都不画，上滑照样执行。标点选左上、左下：小字在那个角；选底部：在字母下面；选无：不画，下滑照样打出。一项的列表里，另一项占着的位置是灰的，后面注「快捷键图标在这里」/「标点在这里」，点了没反应；两项都能选无。滑动改了小字和快捷键都不动。每次改完，和改成这个设置后重新打开键盘一模一样；改回默认后和第一次打开时一样。设了快捷键的 s 多一个标记。q 关掉、恢复长按时，键盘不收起看到的 q 键角和收起再打开后一样。紧凑时「底部」画在角上：标点底部、快捷键左上 → 小字右上；快捷键改右上 → 小字右下；快捷键底部画在第一个空角（按左上、右上、左下、右下，跳过标点占着的）：标点右上 → 快捷键左上，标点左上 → 快捷键右上；标记小一号，都画出来。设置页的键跟着一起变。
+- **前提**：新装（B0），第一次打开键盘，上滑、下滑、上滑图标位置、下滑图标位置都是默认。
+- **操作**：看 a、z、s 和退格的键角；打开 **按键**，看 **上滑图标位置** 和 **下滑图标位置** 两项；**下滑图标位置** 依次选左下、右下、底部、无，每次回来看；**上滑图标位置** 选左上、左下、底部、无，每次回来看；在 **上滑图标位置** 的列表里看快捷键占着的那一项，点它；**按键字符和快捷键** 点 **翻转上下滑** 再看；都改回默认；给 s 设一个文字快捷键再清掉；给 q 设一个文字快捷键，在 **按键字符和快捷键** 页清掉 q 的长按，回测试页看 q，再恢复 q 的长按回来看，每次收起键盘再打开对比；收起键盘再打开。键盘高度选 **紧凑**，上滑图标位置选底部再看，快捷键选右上再看；标点改回右上、快捷键选底部再看。**按键字符和快捷键** 页每选一个位置也看一遍。
+- **预期**：两项挨着，选项都是"右上 / 右下 / 左上 / 左下 / 底部 / 无"，默认标点右上、快捷键左上。默认：a、z 的快捷键图标在左上角，@、「，」在右上角；s 只有右上角的 *；退格上滑的清除在左上、下滑的恢复在左下，空格的编辑菜单图标在左上。快捷键选左下：都在左下，退格的清除在左下、恢复在左上；选右下：快捷键在右下，退格清除右下、恢复右上；选底部：快捷键在键下边中间，退格的恢复在上边中间；选无：快捷键都不画，上滑照样执行。标点选左上、左下：小字在那个角；选底部：在字母下面；选无：不画，下滑照样打出。一项的列表里，另一项占着的位置是灰的，后面注「下滑图标在这里」/「上滑图标在这里」，点了没反应；两项都能选无。滑动改了小字和快捷键都不动。每次改完，和改成这个设置后重新打开键盘一模一样；改回默认后和第一次打开时一样。设了快捷键的 s 多一个标记。q 关掉、恢复长按时，键盘不收起看到的 q 键角和收起再打开后一样。紧凑时「底部」画在角上：标点底部、快捷键左上 → 小字右上；快捷键改右上 → 小字右下；快捷键底部画在第一个空角（按左上、右上、左下、右下，跳过标点占着的）：标点右上 → 快捷键左上，标点左上 → 快捷键右上；标记小一号，都画出来。设置页的键跟着一起变。
 - **JVM**：`KeyMarksUatTest`（`eachWhereItsSettingSays`、`onePlaceStoredInBothTheSymbolYields`、`theFirstOpenIsAsAfterAnySettingChanges`、`eitherChangedTheKeyboardIsMadeAnew`（改两项都重建键盘）、`aLongPressTurnedOffPlacesTheMarksAsAKeyboardMadeWithIt`（键盘开着时关掉 q 的长按，标记和重开键盘后一样）、`turnedTheSymbolWhereTheNewOrientationPutsIt`）；`KeyMarkPositionSettingsTest.theTwoTogetherTheOthersPlaceGreyedOut`（两项挨着、同一组选项、另一项的位置置灰并注明、点不了）、`onePlaceStoredInBothThenTheOtherChangedTheSummaryIsTheKeyboards`（备份里两项同位置，改另一项后摘要和键盘一致）；`AppPrefsTest.theSymbolStoredInTheShortcutsPlaceStoredWhereItReads`（这种备份下次启动时存成纠正后的位置）；ime-core `KeyMarksTest`（两个设置 6×6 × 横屏 × 紧凑 × 有无小字和快捷键的全部组合；读出时同一位置的纠正）；`KeyMarksScreenshotTest`（全键盘、九键、大千、手写每个位置的截图，全键盘紧凑）；`KeyShortcutsPageScreenshotTest.theMarksWhereTheirSettingsSay`（设置页每个位置）；设备上新装后看一遍，再切几个位置看。
 
 ### KB-67 [P1] 什么设置下键上的字、小字、快捷键图标都不叠在一起
 - **前提**：任意。
-- **操作**：标点位置和快捷键图标位置的每种能选的组合（6×6 去掉两项相同的，都选无可以，共 31 种），在全键盘、九键、14 键、18 键、双拼九键 / 14 / 18、英文九键、大千、注音九键、手写、五笔两行字根、五笔键名、数字键盘、符号页上看，键盘高度标准和紧凑、悬浮、单手、横屏都看。
+- **操作**：上滑图标位置和下滑图标位置的每种能选的组合（6×6 去掉两项相同的，都选无可以，共 31 种），在全键盘、九键、14 键、18 键、双拼九键 / 14 / 18、英文九键、大千、注音九键、手写、五笔两行字根、五笔键名、数字键盘、符号页上看，键盘高度标准和紧凑、悬浮、单手、横屏都看。
 - **预期**：每个键上字（或图标）、键角小字、快捷键图标两两不叠。同一类东西整个键盘一样大；碰上时：标记在自己的角里挪（不换到别的角），再字那一类整个键盘一起缩小（最多 6%），再标记那一类一起缩小（最小到 0.875）；还碰上就不画这个标记（先省功能键下滑的，再省快捷键，最后才是键角小字），滑动照常能打出它。名义高度下大多数键盘什么都不省；紧凑 + 单手、标点选左下 / 右下 / 底部时，全键盘省掉一些键角小字（比如 a 的 `@`、w 的 `2`，共 22 个，060-pending-decisions S4e 记的；只差不到半个像素的不算碰上）。
 - **JVM**：`KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherUpright`、`noKeyDrawsTwoThingsOverEachOtherTurned`（上面每种键盘的每个键 × 31 种组合 × 标准 / 紧凑 / 悬浮 / 单手 / 紧凑单手 / 横屏 / 横屏紧凑，系统字号不影响，按画出来的墨迹量，两两不相交，省掉的标记打印出来）；`KeyMarksScreenshotTest.noRoomAnotherCornerOfTheKey`（紧凑单手全键盘右下、五笔左下，悬浮大千底部的图；测试名是旧规则（换到另一个角）留下的，现在图里标记只在自己的角里挪、放不下就不画，不换角）；keyboard-scene `KeyMarkYieldTest`（让的次序）。
 

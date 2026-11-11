@@ -19,7 +19,7 @@ def kb01(d):
 case("KB-02", needs="jvm:KeysUatTest.englishLettersTypeThemselvesASpaceAfter")(lambda d: None)
 
 
-case("KB-03", needs="jvm:KeyboardUatTest.swipingALetterDownTypesItsCorner")(lambda d: None)
+case("KB-03", needs="jvm:KeyboardUatTest.swipingALetterUpTypesItsCorner")(lambda d: None)
 
 
 case("KB-04", needs="jvm:KeyboardUatTest.aLongPressLetGoTypesTheCorner")(lambda d: None)
@@ -209,7 +209,7 @@ case("KB-59", needs="jvm:AddressUatTest.aUrlFieldsStartingHostIsNotCountedAddedO
 case("KB-60", needs="jvm:HostCoreContractTest.an app unbound clears the panel its focus out dropped before no context is active")(lambda d: None)
 
 
-case("KB-61", needs="jvm:BaseKeyboardTest.aLettersSwipeUpIsItsShortcutAndDownItsSymbol")(lambda d: None)
+case("KB-61", needs="jvm:BaseKeyboardTest.aLettersSwipeDownIsItsShortcutAndUpItsFirst")(lambda d: None)
 
 
 case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore、EditPlanTest、EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor、EditPlanTest.aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor、EditPlanTest.aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor、HostCoreEnginesTest.what is typed is cleared without a commit and typed again、HostCoreEnginesTest.what is typed after a syllable taken off the nine keys' bar is never typed again、EnginesTest.aSyllableTakenOffTheBarIsAPick、SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels")(lambda d: None)

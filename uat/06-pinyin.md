@@ -36,7 +36,7 @@
 
 ### PY-06 [P1] ' 分开音节
 - **前提**：B0。
-- **操作**：点 x i，在 z 键上向下滑打出 `'`，再点 a n。
+- **操作**：点 x i，在 z 键上向上滑打出 `'`，再点 a n。
 - **预期**：显示 `xi'an`，候选第一个是「西安」。
 - **JVM**：`PinyinUatTest.anApostropheSeparatesSyllables`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
@@ -405,9 +405,9 @@
 
 ### PY-88 [P1] 滑动出角标
 - **前提**：B0-14键。
-- **操作**：没打字时在 QW 上往下滑；在 BN 上往下滑；清空框，点 BN UI，在 ER 上往下滑。
+- **操作**：没打字时在 QW 上往上滑；在 BN 上往上滑；清空框，点 BN UI，在 ER 上往上滑。
 - **预期**：框里先后多出 `1`、`@`；打字中滑 ER 选的是第 2 个候选（框里是 BN UI 打字时候选栏的第 2 个）。
-- **JVM**：`GroupedKeyboardUatTest.aSwipeDownTypesTheCornerAndWhileTypingPicksThatCandidate`（下滑 QW、BN 送小键盘 1 和 @，打字中滑 ER 送小键盘 2）、`KeyboardHalvesUatTest.aCornersDigitTypesItselfOrPicksThatCandidateWhileTyping`（uatTest，真数据：框里 1@，打字中小键盘 2 上屏第 2 个候选）；设备上不跑。
+- **JVM**：`GroupedKeyboardUatTest.aSwipeUpTypesTheCornerAndWhileTypingPicksThatCandidate`（上滑 QW、BN 送小键盘 1 和 @，打字中滑 ER 送小键盘 2）、`KeyboardHalvesUatTest.aCornersDigitTypesItselfOrPicksThatCandidateWhileTyping`（uatTest，真数据：框里 1@，打字中小键盘 2 上屏第 2 个候选）；设备上不跑。
 
 ### PY-89 [P1] 长按分组键
 - **前提**：B0-14键。
@@ -562,7 +562,7 @@
 ### PY-112 [P1] 注音全键盘的快捷键：按键位套用全键盘的
 - **前提**：B0-注音全键盘，滑动是默认（上滑快捷键），测试页输入框里有字。
 - **操作**：看键角；ㄇ 上滑；ㄋ 上滑。
-- **预期**：ㄇ（a 的位置）、ㄏ（c）、ㄌ（x）、ㄒ（v）、ㄈ（z）、ㄗ（y）的左上角（快捷键图标位置默认）画着全选、复制、剪切、粘贴、撤销、重做的图标，别的键没有；ㄇ 上滑全选；ㄋ 没有快捷键，上滑打出 ㄋ。**按键 → 按键字符和快捷键** 的「注音全键盘」页能改。
+- **预期**：ㄇ（a 的位置）、ㄏ（c）、ㄌ（x）、ㄒ（v）、ㄈ（z）、ㄗ（y）的左上角（下滑图标位置默认）画着全选、复制、剪切、粘贴、撤销、重做的图标，别的键没有；ㄇ 下滑全选；ㄋ 没有快捷键，下滑打出 ㄋ。**按键 → 按键字符和快捷键** 的「注音全键盘」页能改。
 - **JVM**：`ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboardsShortcutsByPlace`、`ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts`；设备上不跑。
 
 ### PY-113 [P1] 多音字按所打的读音注音

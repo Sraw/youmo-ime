@@ -39,7 +39,7 @@ case("T9-05", needs="jvm:NineKeysUatTest.oneSeparatesSyllables")(lambda d: None)
 case("T9-09", needs="jvm:T9UatTest.aLongPressedLetterGoesInAsItIs")(lambda d: None)
 
 
-case("T9-10", needs="jvm:T9UatTest.aDigitKeySwipedDownTypesItsDigit")(lambda d: None)
+case("T9-10", needs="jvm:T9UatTest.aDigitKeySwipedUpTypesItsDigit")(lambda d: None)
 
 
 case("T9-11", needs="jvm:T9UatTest.startOverClearsWhatIsTyped")(lambda d: None)
@@ -69,7 +69,7 @@ case("T9-24", needs="jvm:NineKeysTapUatTest.multiTapOffByDefaultOneIsACommaEachP
 case("T9-20", needs="jvm:NineKeysUatTest.emojiOnTheNineKeys")(lambda d: None)
 
 
-case("T9-22", needs="jvm:T9UatTest.aDigitSwipedDownWhileTypingPicksItsCandidate、NineKeysHostUatTest.aSwipedDigitPicksItsCandidate、NineKeysHostUatTest.theNumberPadsDigitsAreTypedOrPick")(lambda d: None)
+case("T9-22", needs="jvm:T9UatTest.aDigitSwipedUpWhileTypingPicksItsCandidate、NineKeysHostUatTest.aSwipedDigitPicksItsCandidate、NineKeysHostUatTest.theNumberPadsDigitsAreTypedOrPick")(lambda d: None)
 
 
 case("T9-23", needs="jvm:T9UatTest.aLongPressedDigitWhileTyping、NineKeysHostUatTest.resetPutsTheFirstCandidateIn")(lambda d: None)

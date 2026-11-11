@@ -218,7 +218,7 @@ case("PY-86", needs="jvm:GroupedKeyboardUatTest.theCodeRowsSyllablesBesideTheCod
 case("PY-87", needs="jvm:GroupedKeyboardUatTest.theSeparatorWithNothingTypedIsPairedQuotes、Keys14UatTest.theSeparatorWithNothingTypedIsAQuoteAndWhileTypingSplitsXian")(lambda d: None)
 
 
-case("PY-88", needs="jvm:GroupedKeyboardUatTest.aSwipeDownTypesTheCornerAndWhileTypingPicksThatCandidate、KeyboardHalvesUatTest.aCornersDigitTypesItselfOrPicksThatCandidateWhileTyping")(lambda d: None)
+case("PY-88", needs="jvm:GroupedKeyboardUatTest.aSwipeUpTypesTheCornerAndWhileTypingPicksThatCandidate、KeyboardHalvesUatTest.aCornersDigitTypesItselfOrPicksThatCandidateWhileTyping")(lambda d: None)
 
 
 case("PY-89", needs="jvm:GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge、GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove、KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate")(lambda d: None)

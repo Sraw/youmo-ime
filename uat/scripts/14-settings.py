@@ -322,7 +322,7 @@ def st39(d):
 case("ST-12", needs="jvm:SettingsEffectUatTest.keyBorderSpacingAndCorners")(lambda d: None)
 
 
-case("ST-13", needs="jvm:SettingsEffectUatTest.punctuationPositionNoneThenBottom")(lambda d: None)
+case("ST-13", needs="jvm:SettingsEffectUatTest.swipeUpPositionNoneThenBottom")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 按键
@@ -466,7 +466,7 @@ def st26(d):
 
 
 def set_comma(d, mark):
-    """中文标点 → , set to mark, typed by its corner swipe (、 is m's corner character)"""
+    """中文标点 → , set to mark, typed by its corner swipe up (、 is m's corner character)"""
     corner = {"、": "m"}[mark]
     home(d, "通用输入", "中文标点")
     def comma(s):
@@ -488,7 +488,7 @@ def set_comma(d, mark):
     d.tap(eds[1].c, 0.8)
     d.clear()
     m = d.keys()[corner]
-    d.swipe(m, (m[0], m[1] + 130), 150)
+    d.swipe(m, (m[0], m[1] - 130), 150)
     t = d.field_text()
     if t != mark:
         raise Blocked(f"改成「{mark}」没成功：框里「{t}」")
@@ -939,3 +939,100 @@ def st96(d):
         check(im in summary.split("不适用")[-1], f"不适用里没有「{im}」：{summary}")
     d.shot("full", "纠正错拼和按偏的键的说明")
     return summary
+
+
+# ---------------------------------------------------------------- 按键字符和快捷键：上滑、下滑两槽
+
+def slots_page(d):
+    home(d, "按键", "按键字符和快捷键")
+    d.wait(lambda s: s.find(text="翻转上下滑"), 10)
+
+
+def page_key(d, label):
+    """a key on the page by what a screen reader calls it first (its label)"""
+    s = d.screen()
+    n = next((n for n in s.app() if n.clickable and re.split("[,，]", n.desc)[0] == label), None)
+    if not n:
+        raise Blocked(f"页上没有 {label} 键：{s.texts()[:12]}")
+    return n
+
+
+@case("ST-95", base="B0-设置", mutates=True, visual=True)
+def st95(d):
+    slots_page(d)
+    d.tap(page_key(d, "q").c, 0.5)
+    # the dialog is taller than the screen: 上滑's 空 at the fold, 下滑's text field under it
+    s = d.wait(lambda s: s if any(n.text == "空" for n in s.app()) else None, 5, what="q 的对话框")
+    empties = sorted((n for n in s.app() if n.text == "空"), key=lambda n: n.b[1])
+    if not empties:
+        raise Blocked(f"对话框里没有上滑一段：{s.texts()[-16:]}")
+    d.tap(empties[0].c, 0.4)
+    e = empties[0].c
+    d.swipe((e[0], e[1]), (e[0], e[1] - 600), 400, after=0.8)
+    s = d.screen()
+    texts = sorted((n for n in s.app() if n.text == "文字"), key=lambda n: n.b[1])
+    if not texts:
+        raise Blocked(f"对话框里没有下滑一段：{s.texts()[-16:]}")
+    down = texts[-1]
+    eds = [n for n in s.app() if "Edit" in n.cls and n.b[1] > down.b[1]]
+    if not eds:
+        raise Blocked(f"下滑的文字框不在屏上：{s.texts()[-16:]}")
+    d.tap(min(eds, key=lambda n: n.b[1]).c, 0.8)
+    d.type("okay")
+    d.enter()
+    d.hide_keyboard()
+    d.tap_text("确定", scroll=False, after=1.0)
+    d.open_page("text")
+    d.clear()
+    q = d.keys(refresh=True)["q"]
+    d.shot("kb", "q 左上画 ok…，没有右上的 1")
+    d.swipe(q, (q[0], q[1] + 130), 150, after=0.8)
+    down = d.field_text()
+    check(down == "okay", f"q 下滑打出的不是 okay：「{down}」")
+    d.clear()
+    d.swipe(q, (q[0], q[1] - 130), 150, after=0.8)
+    up = d.field_text()
+    check("1" not in up, f"q 上滑是空槽，却打出了「{up}」")
+    d.clear()
+    slots_page(d)
+    d.tap_text("撤销", scroll=False, after=1.0)
+    d.open_page("text")
+    d.clear()
+    q = d.keys(refresh=True)["q"]
+    d.swipe(q, (q[0], q[1] - 130), 150, after=0.8)
+    back = d.field_text()
+    check(back == "1", f"撤销后 q 上滑不是 1：「{back}」")
+    return f"q 下滑「{down}」，上滑空槽「{up}」，撤销后上滑「{back}」"
+
+
+@case("ST-96", base="B0-设置", mutates=True, visual=True)
+def st96(d):
+    slots_page(d)
+    d.tap_text("翻转上下滑", scroll=False, after=1.0)
+    d.open_page("text")
+    d.clear()
+    a = d.keys(refresh=True)["a"]
+    d.shot("kb", "翻转后 a：全选仍在左上，@ 仍在右上（位置跟着换了）")
+    d.swipe(a, (a[0], a[1] + 130), 150, after=0.8)
+    flipped = d.field_text()
+    check(flipped == "@", f"翻转后 a 下滑不是 @：「{flipped}」")
+    d.clear()
+    slots_page(d)
+    d.tap_text("预设", scroll=False, after=1.0)
+    d.tap_text("上滑长按首选，下滑快捷键", scroll=False, after=1.0)
+    d.open_page("text")
+    d.clear()
+    a = d.keys(refresh=True)["a"]
+    d.shot("kb", "预设后 a：@ 在右上，全选在左上")
+    d.swipe(a, (a[0], a[1] - 130), 150, after=0.8)
+    preset = d.field_text()
+    check(preset == "@", f"预设后 a 上滑不是 @：「{preset}」")
+    d.clear()
+    return f"翻转后 a 下滑「{flipped}」，预设后上滑「{preset}」"
+
+
+case("ST-97", needs="jvm:PopupOverridesFragmentTest$Dialog.selectedKeysAreSetAtOnce")(lambda d: None)
+
+
+case("ST-98", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
+
