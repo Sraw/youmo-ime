@@ -44,16 +44,21 @@ object VoiceHotwords {
     fun spelled(word: String): String? = HotwordSpelling.spelled(word)
 
     /** What a stream is told of the user's words: each list's words [spelled], apart by `/`. */
-    data class Words(val hotwords: String, val blocked: String) {
+    data class Words(
+        val hotwords: String,
+        val blocked: String,
+        /** the user's words put in for what was heard read alike ([VoiceHomophones]) */
+        val homophones: VoiceHomophones = VoiceHomophones.NONE,
+    ) {
         /** the blocked words as written, not [spelled] */
         val blockedWords: List<String> get() = blocked.split('/').filter { it.isNotEmpty() }.map { it.replace(" ", "") }
 
         /**
-         * As listened for with U-93's [habits]: off, none of the user's words, the blocked still
+         * As listened for with U-93's [habits]: off, none of the user's words (nor [homophones]), the blocked still
          * blocked. For words read before the switch went off (one shared, or the last read for a
          * read too late), which [ofUser] made with it on.
          */
-        fun withHabits(habits: Boolean): Words = if (habits) this else copy(hotwords = "")
+        fun withHabits(habits: Boolean): Words = if (habits) this else copy(hotwords = "", homophones = VoiceHomophones.NONE)
 
         companion object {
             val NONE = Words("", "")

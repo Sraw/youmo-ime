@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.TABLES
 import org.fcitx.fcitx5.android.engine.user.WordLists
+import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 
 /**
  * The user's words as the settings show and change them, for [Engines]: pinyin's ([UserLexicon]:
@@ -64,6 +65,12 @@ internal class LexiconFacade(
 
     /** log10 P of each of [texts] under the pinyin model (TextWords.logProb): for ranking what voice input heard. */
     fun logProbs(texts: List<String>): FloatArray = assets.logProbs(texts)
+
+    /** [EngineAssets.voiceHomophones]. */
+    fun voiceHomophones(words: List<UserWord>) = assets.voiceHomophones(words)
+
+    /** [EngineAssets.voiceHomophonesAllowed]. */
+    fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = assets.voiceHomophonesAllowed(spans)
 
     /** A character's readings as the dictionary has them, the likeliest first: `zhang/chang`; empty for none. */
     fun charReading(c: String): String = assets.charReading(c)

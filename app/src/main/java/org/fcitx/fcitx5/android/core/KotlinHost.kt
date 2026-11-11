@@ -71,6 +71,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.EmptyCoroutineContext
 import org.fcitx.fcitx5.android.host.KeyStates as HostKeyStates
+import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 
 /**
  * The Kotlin host behind [HostApi] (fcitx-replacement §4): [HostCore] on one thread
@@ -243,6 +244,8 @@ class KotlinHost(
         aTextAtATime(texts) { bridge.engines.wordBoundaries(it) }
     }
     override suspend fun logProbs(texts: List<String>) = withContext(dispatcher) { bridge.engines.logProbs(texts) }
+    override suspend fun voiceHomophones(words: List<UserWord>) = withContext(dispatcher) { bridge.engines.voiceHomophones(words) }
+    override suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = withContext(dispatcher) { bridge.engines.voiceHomophonesAllowed(spans) }
     override suspend fun addUserWord(text: String, pinyin: String) = withContext(dispatcher) { bridge.engines.addWord(text, pinyin) }
     override suspend fun blockUserWord(text: String, pinyin: String) = withContext(dispatcher) { bridge.engines.blockWord(text, pinyin) }
     override suspend fun removeUserWords(words: List<UserWord>) = withContext(dispatcher) { bridge.engines.removeWords(words) }

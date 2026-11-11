@@ -55,6 +55,12 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   boundaries (`Engines.wordBoundaries`, `TextWords.boundaries` with `splitLong`).
 - **Reranking**: the recognizer's hypotheses are rescored by the word model (`Engines.logProbs`,
   `VoiceRerank`).
+- **Homophones**: after the polish, a stretch reading exactly as a user's word (toned, char by char,
+  `CharReadings`/`ToneTable`) becomes it (徐静→徐婧; `VoiceHomophones`): added words at once, learned
+  ones typed more than 3 times; never the user's own word, a common word (unigram log10 P ≥ -5.5) or
+  one with a common word in it or across its edge, nor inside a longer dictionary word. Built with the
+  hotwords (`Engines.voiceHomophones`), each candidate checked once a hold
+  (`Engines.voiceHomophonesAllowed`); shown as it streams too, same length, so settled text holds.
 
 ## Pinyin, from keys to candidates
 

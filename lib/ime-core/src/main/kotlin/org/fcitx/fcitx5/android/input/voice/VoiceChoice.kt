@@ -21,6 +21,9 @@ object VoiceChoice {
 
         /** how likely each of [texts] is (Engines.logProbs), null if it cannot say */
         suspend fun logProbs(texts: List<String>): FloatArray?
+
+        /** [VoiceHomophones.allowed] of each of [spans] (Engines.voiceHomophonesAllowed), null if it cannot say */
+        suspend fun homophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray? = null
     }
 
     /**

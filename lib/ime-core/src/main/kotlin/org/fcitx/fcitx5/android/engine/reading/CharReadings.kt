@@ -76,6 +76,9 @@ class CharReadings internal constructor(
         return (exampleStart[r] until exampleStart[r + 1]).map { vocabulary.word(examples[it]) }
     }
 
+    /** The [index]th character it has readings for, by code point: for a walk of them all. */
+    fun codePointAt(index: Int): Int = chars[index]
+
     /** How many characters it has readings for: what the compile reports. */
     val characters: Int get() = chars.size
 

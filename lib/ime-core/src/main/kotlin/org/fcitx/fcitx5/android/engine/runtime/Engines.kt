@@ -47,6 +47,7 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.WordLists
+import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import java.io.Closeable
 import java.io.IOException
 import java.util.concurrent.Executor
@@ -254,6 +255,12 @@ class Engines(
 
     /** [LexiconFacade.logProbs]. */
     fun logProbs(texts: List<String>): FloatArray = checked { words.logProbs(texts) }
+
+    /** [LexiconFacade.voiceHomophones]. */
+    fun voiceHomophones(words: List<UserWord>): VoiceHomophones = checked { this.words.voiceHomophones(words) }
+
+    /** [LexiconFacade.voiceHomophonesAllowed]. */
+    fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray = checked { words.voiceHomophonesAllowed(spans) }
 
     /** [LexiconFacade.charReading]. */
     fun charReading(c: String): String = checked { words.charReading(c) }

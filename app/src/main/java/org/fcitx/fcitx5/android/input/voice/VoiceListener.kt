@@ -221,6 +221,9 @@ class VoiceListener(
 
         override suspend fun logProbs(texts: List<String>): FloatArray? =
             orFallback("voice log probs", null) { language.logProbs(texts) }
+
+        override suspend fun homophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray? =
+            orFallback("voice homophones", null) { language.homophonesAllowed(spans) }
     }
 
     // [block]'s result, or what it threw but a cancellation (which goes on, as cancellations must)
@@ -302,13 +305,16 @@ class VoiceListener(
         val live = VoiceLive(models.polisher?.stream())
         // its model not read in (logged as VoiceEngine read it): the raw text throughout
         if (models.polisher == null) polishFailure = VoiceSession.PolishFailure.LOAD
+        // the user's words put in for what reads as them, after the polish, as it shows and as it is
+        // typed alike (060-voice-userdict.md): what shows is what is typed, no word changing at the end
+        val homophones = words.homophones
+        val homophoneLexicon = VoiceHomophones.Lexicon { safeLanguage.homophonesAllowed(it) }
         // the polish failing: the raw text as it is after this step (read once the step has run), told as such
-        fun polished(step: () -> VoiceLive.Heard) {
+        suspend fun polished(step: () -> VoiceLive.Heard) {
             restartIn(live)
-            show(
-                orFallback<VoiceLive.Heard?>("voice polish", null) { step() }
-                    ?: VoiceLive.Heard(live.raw, 0, fallback = true, utterance = live.utterance, upTo = live.mark()).also { polishFailure = VoiceSession.PolishFailure.RUN }
-            )
+            val heard = orFallback<VoiceLive.Heard?>("voice polish", null) { step() }
+                ?: VoiceLive.Heard(live.raw, 0, fallback = true, utterance = live.utterance, upTo = live.mark()).also { polishFailure = VoiceSession.PolishFailure.RUN }
+            show(homophones.replace(heard, homophoneLexicon))
         }
         val stream = try {
             VoiceEngine.stream(recognizer, words)
@@ -347,7 +353,7 @@ class VoiceListener(
             } else if (polishFailure == VoiceSession.PolishFailure.RUN) {
                 polishFailure = null
             }
-            said.complete(if (polished != null) polished to false else live.raw to true)
+            said.complete(if (polished != null) homophones.replace(polished, homophoneLexicon) to false else homophones.replace(live.raw, homophoneLexicon) to true)
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {

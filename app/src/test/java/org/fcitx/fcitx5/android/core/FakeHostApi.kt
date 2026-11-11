@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -108,6 +109,8 @@ class FakeHostApi : HostApi {
 
     // all alike: the recognizer's order kept
     override suspend fun logProbs(texts: List<String>) = FloatArray(texts.size)
+    override suspend fun voiceHomophones(words: List<UserWord>) = VoiceHomophones.NONE
+    override suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = BooleanArray(spans.size)
 
     override suspend fun addUserWord(text: String, pinyin: String): Boolean {
         calls += "addUserWord($text, $pinyin)"

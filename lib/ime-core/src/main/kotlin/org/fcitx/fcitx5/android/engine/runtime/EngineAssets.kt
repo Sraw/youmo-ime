@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SENTENCE_MODEL
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.STROKE_DATA
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
+import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -24,6 +25,7 @@ import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.Blobs
+import org.fcitx.fcitx5.android.engine.reading.ToneMark
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
@@ -31,6 +33,7 @@ import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.imports.WordText
+import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import java.io.FileNotFoundException
 import java.io.IOException
 
@@ -254,6 +257,61 @@ internal class EngineAssets(
 
     fun logProbs(texts: List<String>): FloatArray = FloatArray(texts.size) { textWords.logProb(texts[it]) }
 
+    /**
+     * The user's [words] for voice input's homophones ([VoiceHomophones.of]): each read as typed,
+     * its tones the dictionary's for it (by its characters for a word of theirs alone), a tone not
+     * known any its character has in that syllable; each character's readings, all of them.
+     */
+    fun voiceHomophones(words: List<UserWord>): VoiceHomophones {
+        val data = pinyinData
+        return VoiceHomophones.of(
+            words,
+            readingsOf = { w ->
+                val syllables = w.pinyin.split(' ', '\'').filter { it.isNotEmpty() }.map(Syllables::id).toIntArray()
+                if (syllables.size != w.text.length || syllables.any { it < 0 }) null else {
+                    val tones = data.tones.tones(w.text, syllables, textWords.id(w.text).takeIf { it != NgramModel.NO_WORD } ?: -1)
+                    syllables.indices.map { k ->
+                        val tone = tones?.get(k)?.toInt() ?: ToneMark.NONE
+                        if (tone != ToneMark.NONE) intArrayOf(VoiceHomophones.reading(syllables[k], tone))
+                        else data.charReadings.of(w.text[k].code).filter { it.syllable == syllables[k] }.map { VoiceHomophones.reading(it.syllable, it.tone) }.toIntArray()
+                    }
+                }
+            },
+            charReadings = { needed ->
+                val out = HashMap<Char, IntArray>()
+                val readings = data.charReadings
+                for (i in 0 until readings.characters) {
+                    val cp = readings.codePointAt(i)
+                    if (cp > Char.MAX_VALUE.code) continue
+                    val of = readings.of(cp).map { VoiceHomophones.reading(it.syllable, it.tone) }.filter { it in needed }
+                    if (of.isNotEmpty()) out[cp.toChar()] = of.toIntArray()
+                }
+                out
+            },
+        )
+    }
+
+    /** [VoiceHomophones.allowed] of each of [spans], by the dictionary's words and the model's counts. */
+    fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray {
+        val data = pinyinData
+        val dictionary = object : VoiceHomophones.Dictionary {
+            override fun isWord(text: String) = textWords.id(text) != NgramModel.NO_WORD
+
+            override fun isCommon(text: String): Boolean {
+                val id = textWords.id(text)
+                return id != NgramModel.NO_WORD && data.model.score(id) >= COMMON_WORD
+            }
+
+            override fun wordReading(text: String): IntArray? {
+                val id = textWords.id(text).takeIf { it != NgramModel.NO_WORD } ?: return null
+                val syllables = WordText.readings(data.dictionary, data.vocabulary, setOf(text))[text] ?: return null
+                val tones = data.tones.tones(text, syllables, id) ?: return null
+                return IntArray(syllables.size) { VoiceHomophones.reading(syllables[it], tones[it].toInt()) }
+            }
+        }
+        return BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], dictionary) }
+    }
+
     // the words emoji stand for; none if the app has not got them
     private val emoji: EmojiData by lazy {
         try {
@@ -384,6 +442,10 @@ internal class EngineAssets(
     }
 
     private companion object {
+        // log10 P (unigram) at or above which a word of the dictionary is too common to be put in
+        // for by a user's word read alike (VoiceHomophones; 060-voice-userdict.md measured it)
+        const val COMMON_WORD = -5.5f
+
         // longer is a sentence, not a word: and the dictionary is walked as deep
         const val MAX_WORD_CHARS = 8
 

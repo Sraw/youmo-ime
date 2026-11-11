@@ -175,7 +175,11 @@ object VoiceEngine {
         // read with habits on: shared and remembered, it serves later listeners whose switch may differ;
         // each listener's own switch is applied below
         val read = remembered.shared<Deferred<VoiceHotwords.Words>>({ it.isActive }) { ticket ->
-            reading.async { remembered.read(ticket, VoiceHotwords.ofUser(fcitx.runOnReady { userWords() })) }
+            reading.async {
+                // the homophones made of the same words, at once: their words are the hotwords'
+                val words = fcitx.runOnReady { userWords().let { VoiceHotwords.ofUser(it).copy(homophones = voiceHomophones(it)) } }
+                remembered.read(ticket, words)
+            }
         }
         // how many, not which: they are the user's
         return inTimeOrLast(read, remembered, USER_WORDS_MS).withHabits(habits).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
@@ -197,6 +201,9 @@ object VoiceEngine {
 
         override suspend fun logProbs(texts: List<String>) =
             withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { logProbs(texts) } }
+
+        override suspend fun homophonesAllowed(spans: List<VoiceHomophones.Span>) =
+            withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { voiceHomophonesAllowed(spans) } }
     }
 
     // the engine busy or starting: the text as heard, not a wait

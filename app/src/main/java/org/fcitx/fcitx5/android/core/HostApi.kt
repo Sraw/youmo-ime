@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 
 /**
  * The host as the app reaches it, one interface for each of its parts (typing, the input methods,
@@ -228,6 +229,12 @@ interface LexiconApi {
 
     /** How likely each of [texts] is: see [Engines.logProbs]. */
     suspend fun logProbs(texts: List<String>): FloatArray
+
+    /** The user's [words] for voice input's homophones: see [Engines.voiceHomophones]. */
+    suspend fun voiceHomophones(words: List<UserWord>): VoiceHomophones
+
+    /** Whether each of [spans] may become its word: see [Engines.voiceHomophonesAllowed]. */
+    suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray
 
     /** How the dictionary reads [text], for the user to check: see [Engines.pinyinOf]. */
     suspend fun pinyinOf(text: String): String?

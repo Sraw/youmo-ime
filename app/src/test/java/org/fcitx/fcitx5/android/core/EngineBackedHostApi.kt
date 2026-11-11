@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 
 /**
  * [HostApi] whose engine calls go to a real [engines]: what a settings page reads and changes
@@ -37,6 +38,8 @@ class EngineBackedHostApi(
     override suspend fun charCard(index: Int, text: String, paged: Boolean) = engines.charCard(im, index, text, paged)
     override suspend fun wordBoundaries(texts: List<String>) = engines.wordBoundaries(texts)
     override suspend fun logProbs(texts: List<String>) = engines.logProbs(texts)
+    override suspend fun voiceHomophones(words: List<UserWord>) = engines.voiceHomophones(words)
+    override suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = engines.voiceHomophonesAllowed(spans)
     override suspend fun addUserWord(text: String, pinyin: String) = engines.addWord(text, pinyin)
     override suspend fun blockUserWord(text: String, pinyin: String) = engines.blockWord(text, pinyin)
     override suspend fun removeUserWords(words: List<UserWord>) = engines.removeWords(words)
