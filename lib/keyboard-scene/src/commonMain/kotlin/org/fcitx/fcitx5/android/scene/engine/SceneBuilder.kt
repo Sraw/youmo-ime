@@ -235,6 +235,7 @@ class SceneBuilder(
         states: Set<String> = emptySet(),
     ): List<Op> {
         if (look == null || face == Face.None) return emptyList()
+        // a slot's or a blank place's face: the theme's alone, the key style is for the keys (the owner's settings name keys)
         val c = cascadeFor(face)
         val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, states, slot = slot)), theme)
         return paint.face(Faces.of(cell, l, face, true, env.flat && face != Face.Keep, env.density), l, false)
@@ -271,15 +272,24 @@ class SceneBuilder(
         val parts: Map<Set<KeyState>, (Part) -> TextLook>,
     )
 
-    // what a key's looks are worked out from: the same in the next scene, its looks kept by the cascade
-    private data class StyledFor(val board: String, val id: String, val role: String?, val classes: Set<String>, val states: Set<KeyState>) :
+    // what a key's looks are worked out from: the same in the next scene, its looks kept by the cascade. [over]: the
+    // key style laid on and the form it reads (landscape, compact), null without one, as the cascade is shared by
+    // every scene of the theme (a rotation, a setting changed, the settings' key cells)
+    private data class StyledFor(
+        val board: String,
+        val id: String,
+        val role: String?,
+        val classes: Set<String>,
+        val states: Set<KeyState>,
+        val over: Triple<KeyStyleOver, Boolean, Boolean>?,
+    ) :
         Cascade.KeptKey<Styled>
 
     private fun styled(board: String, key: ExpandedKey): Styled {
         val c = cascadeFor(key.attrs.face)
         val states = statesOf(key)
         val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
-        return c.kept(StyledFor(board, key.key.id, key.attrs.role, classes, states)) { styled(c, board, key, classes, states) }
+        return c.kept(StyledFor(board, key.key.id, key.attrs.role, classes, states, over?.let { Triple(it, env.landscape, env.compact) })) { styled(c, board, key, classes, states) }
     }
 
     private fun styled(c: Cascade, board: String, key: ExpandedKey, classes: Set<String>, states: Set<KeyState>): Styled {
@@ -324,7 +334,7 @@ class SceneBuilder(
                 fun hides(part: Part) = TextLook(c.of(whole.copy(part = part.xml)), theme).hidden
                 val shown = (key.label != null && !hides(Part.Label)) || (key.icon != null && !hides(Part.Icon))
                 val hidden = !shown && (key.label != null || key.icon != null)
-                if (hidden && KeyLook(over(c.of(whole)), theme).fill !is Fill.Image) out += key to states
+                if (hidden && KeyLook(c.of(whole), theme).fill !is Fill.Image) out += key to states
             }
         }
         return out

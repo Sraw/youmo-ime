@@ -54,10 +54,6 @@ class Theme(
         KeyboardSizes(last("height"), last("side-padding"), last("bottom-padding"))
     }
 
-    /** This theme with [styles] in place of its own, all else the same (the app's key style settings over a pack's). */
-    fun withStyles(styles: List<Style>): Theme =
-        Theme(name, dark, version, colors, styles, fonts, icons, picture, variants, baseColors, darkColors, meta, systemColors, soundFiles)
-
     /** This theme drawn as its dark or light version; itself where it has only the other. */
     fun variant(dark: Boolean): Theme = if (dark == this.dark || dark !in variants) {
         this

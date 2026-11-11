@@ -199,6 +199,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         val env = SceneEnvs.of(this, look, theme.isDark, (width / shrink).roundToInt(), (height / shrink).roundToInt(), Input(), texts = Texts(), marks = marks)
             .let { if (ownSize) it.copy(compact = false, floating = null) else it }
             .let { if (states.isEmpty()) it else it.copy(states = mapOf(KEY to states)) }
+            .copy(keyStyle = overPack())
         val layout = Layout(
             KEY, KEY, KEY, 1.0, OnSplit.None, KeyAttrs(),
             listOf(Row(null, 0.0, 0.0, 1.0, null, RowSplit.Halves, KeyAttrs(), listOf(Key(KEY, null, attrs, null, emptyList(), 0)), 0)),
@@ -211,11 +212,14 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         }
     }
 
+    // the key style settings over a pack's keys, as the keyboard has them (SceneBoard)
+    private fun overPack() = (theme as? Theme.Pack)?.let { ThemeManager.keyStyleShown.overPack }
+
     // the whole keyboard of [b], as it is docked (the marks the page's)
     private fun onBoard(t: org.fcitx.fcitx5.android.scene.theme.Theme, b: Board): Scene? {
         val layout = SceneLayouts.of(context, b.layout) ?: return null
         val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(alts = b.alts, letterCase = b.letterCase), marks = marks)
-            .copy(board = layout.id)
+            .copy(board = layout.id, keyStyle = overPack())
         return when (val s = SceneBuilder(t, env, measurer, cascades = SceneThemes.cascades(t)).build(layout.layout, layout.fragments)) {
             is Parsed.Ok -> s.value.also { v -> if (v.keys.none { it.shortcut == b.shortcut }) Timber.e("key cell: no key of %s on %s", b.shortcut, b.layout) }
             is Parsed.Failed -> null.also { Timber.e("key cell: no scene of %s: %s; nothing drawn", b.layout, s.problems) }

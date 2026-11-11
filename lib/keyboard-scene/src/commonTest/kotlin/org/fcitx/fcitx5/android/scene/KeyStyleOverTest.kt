@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.scene.engine.KeyStyleOver
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.skin.SkinFixtures
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Value
@@ -22,14 +23,14 @@ import kotlin.test.assertTrue
 
 /**
  * The app's 按键样式 over a 4.0 theme's keys, laid on each real key after the cascade (the owner, 0.6.0-beta2:
- * 国风·天青's `inset` drew whatever was set): the key's own selectors, whatever their shape or order; 无边框 never
- * blanking a key whose face carries its letter (a converted skin's), and always the space a bar, Return a circle.
+ * 国风·天青's `inset` drew whatever was set): the key's own selectors, whatever their shape or order; 无边框 the
+ * same for every key, no exceptions (the owner, 2026-11-11).
  */
 class KeyStyleOverTest {
 
     private val d = Fixtures.DENSITY
 
-    // material-light less its own @flat styles and its space's and Return's: what the setting must make alone
+    // material-light less its own @flat styles and its space's and Return's: what the setting makes alone
     private val base: String by lazy {
         testData("material-light.xml").lines().filterNot { "@flat key" in it || "\"key.space\"" in it || "\"key.enter\"" in it }.joinToString("\n")
     }
@@ -140,5 +141,25 @@ class KeyStyleOverTest {
                 assertTrue(k.faces.values.flatten().none { it is Op.NineSlice }, "${t.name} ${k.id}: ${k.faces}")
             }
         }
+    }
+
+    // one theme's cascade kept across its scenes (the app's, by the theme): a scene of another key style or form
+    // never takes a look worked out for one before
+    @Test
+    fun aSharedCascadeKeepsEachKeyStylesAndFormsOwnLooks() {
+        val t = theme()
+        val shared = Cascades(t)
+        fun built(over: KeyStyleOver?, env: Env) =
+            SceneBuilder(t, env.copy(flat = over?.flat == true, keyStyle = over), FixedMeasurer, cascades = shared).build(Fixtures.qwerty).ok()
+        val own = built(null, Fixtures.portrait)
+        val loose = KeyStyleOver(across = KeyStyleOver.Level(8, 8), upDown = KeyStyleOver.Level(9, 2), radiusDp = 0.0)
+        val portrait = built(loose, Fixtures.portrait)
+        val landscape = built(loose, Fixtures.portrait.copy(landscape = true))
+        assertTrue(inset(portrait.key("a")) != inset(own.key("a")), "${inset(portrait.key("a"))}")
+        assertTrue(face(portrait.key("a")).radii != face(own.key("a")).radii)
+        assertTrue(inset(landscape.key("a"))[0] != inset(portrait.key("a"))[0], "${inset(landscape.key("a"))} ${inset(portrait.key("a"))}")
+        // none again: the theme's own, as before any
+        assertEquals(own.key("a").faces, built(null, Fixtures.portrait).key("a").faces)
+        assertEquals(scene(t, null).key("a").faces, built(null, Fixtures.portrait).key("a").faces)
     }
 }
