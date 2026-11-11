@@ -29,4 +29,12 @@ class SpaceCursorTest {
         assertEquals(true, SpaceCursor.sendable(Line.Up, "c", ""))
         assertEquals(true, SpaceCursor.sendable(Line.Down, null, "a"))
     }
+
+    @Test
+    fun aRushedLineOnlyWithANewlineThatWay() {
+        assertEquals(false, SpaceCursor.sendable(Line.Up, "aaa", "", rushed = true))
+        assertEquals(true, SpaceCursor.sendable(Line.Up, "a\nbb", "", rushed = true))
+        assertEquals(false, SpaceCursor.sendable(Line.Down, "a\nb", "cc", rushed = true))
+        assertEquals(true, SpaceCursor.sendable(Line.Down, "", "c\nd", rushed = true))
+    }
 }

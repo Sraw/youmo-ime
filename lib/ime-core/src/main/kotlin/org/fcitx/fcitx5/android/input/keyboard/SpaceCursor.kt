@@ -26,6 +26,11 @@ object SpaceCursor {
      * to another field. Elsewhere on the first (last) line it goes to the start (end), as a wrapped
      * paragraph's lines are not told by a newline.
      */
-    fun sendable(line: Line, before: CharSequence?, after: CharSequence?): Boolean =
-        if (line == Line.Up) !before.isNullOrEmpty() else !after.isNullOrEmpty()
+    fun sendable(line: Line, before: CharSequence?, after: CharSequence?, rushed: Boolean = false): Boolean {
+        val side = if (line == Line.Up) before else after
+        if (side.isNullOrEmpty()) return false
+        // [rushed]: the line before went out a moment ago and the editor may not have moved yet, so what
+        // is read is stale: another goes out only with a newline that way, a line surely left to go to
+        return !rushed || '\n' in side
+    }
 }

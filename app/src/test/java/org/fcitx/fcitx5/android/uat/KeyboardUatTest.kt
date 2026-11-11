@@ -414,6 +414,20 @@ class KeyboardUatTest {
     }
 
     @Test
+    fun spaceSlidesNoLineInQuickInput() {
+        val h = harness().start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
+        // 快速输入 on: its Up and Down would turn the candidates' pages
+        h.emit(HostEvent.InputPanel(FormattedText.Empty, FormattedText(arrayOf("快速输入: "), intArrayOf(0), -1), FormattedText.Empty, quickPhrase = true))
+        val space = space(h)
+        val f = h.finger(space, h.at(space))
+        f.move(h.at(space, dx = -25f))
+        f.move(h.at(space, dx = -25f, dy = -60f))
+        f.up(h.at(space, dx = -25f, dy = -60f))
+        assertTrue(sent().toString(), sent().any { "sym=${FcitxKeyMapping.FcitxKey_Left}," in it })
+        assertTrue(sent().toString(), sent().none { "sym=${FcitxKeyMapping.FcitxKey_Up}," in it })
+    }
+
+    @Test
     fun spaceSlidesNoLineInASingleLineField() {
         val h = harness().start()
         val space = space(h)

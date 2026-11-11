@@ -757,10 +757,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
+    private var lastLineKeyAt = 0L
+
     // none at the field's very start or end, where the key would move the focus away (SpaceCursor.sendable)
     private fun handleLineKey(line: SpaceCursor.Line) {
         val ic = currentInputConnection ?: return
-        if (!SpaceCursor.sendable(line, ic.getTextBeforeCursor(1, 0), ic.getTextAfterCursor(1, 0))) return
+        val now = SystemClock.uptimeMillis()
+        // a slide's sample may send two lines at once: the editor applies keys later, so the second reads where the first was
+        val rushed = now - lastLineKeyAt < LINE_KEY_SETTLE_MS
+        if (!SpaceCursor.sendable(line, ic.getTextBeforeCursor(LINE_REACH, 0), ic.getTextAfterCursor(LINE_REACH, 0), rushed)) return
+        lastLineKeyAt = now
         clearedText.edited()
         sendDownUpKeyEvents(if (line == SpaceCursor.Line.Up) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN)
     }
@@ -1865,6 +1871,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Suppress("ConstPropertyName")
     companion object {
+        /** How long after a line key of the space's slide the editor may not have moved yet (handleLineKey). */
+        private const val LINE_KEY_SETTLE_MS = 80L
+
+        /** How far before or after the cursor a line key looks for a newline. */
+        private const val LINE_REACH = 256
+
         const val DefaultHighlightColor = 0x008577  // material_deep_teal_500
         // what the engine reads of the text before the cursor: its last two words, and what the
         // reranker has room for
