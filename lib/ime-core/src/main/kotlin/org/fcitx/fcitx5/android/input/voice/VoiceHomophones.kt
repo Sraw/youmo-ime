@@ -30,8 +30,8 @@ class VoiceHomophones internal constructor(
     private val words: List<Word>,
     // every word of the user's (added, learned however often): never replaced, nor what is inside one
     private val own: Set<String>,
-    // each character's readings ([reading]), all of them; those no word has match nothing
-    private val chars: Map<Char, IntArray>,
+    // a character's readings ([reading]), all of them, null for none; looked up as heard, not kept
+    private val chars: (Char) -> IntArray?,
 ) {
     /** A user's word, the readings each of its characters may have ([reading]). */
     class Word(val text: String, val readings: List<IntArray>)
@@ -40,7 +40,13 @@ class VoiceHomophones internal constructor(
     class Span(val run: String, val start: Int, val end: Int, val word: Word, val at: Int = 0) {
         val text: String get() = run.substring(start, end)
 
-        internal val key: String get() = "$run\u0000$start\u0000${word.text}"
+        // what [allowed] reads of [run] (MAX_WORD on either side), not all of it: a run growing past
+        // that is not asked again (060-voice-userdict.md: a stretch asked once)
+        internal val key: String get() {
+            val from = maxOf(0, start - MAX_WORD + 1)
+            val to = minOf(run.length, end - 1 + MAX_WORD)
+            return "${run.substring(from, to)}\u0000${start - from}\u0000${word.text}"
+        }
     }
 
     /** What the dictionary says of a stretch, on the engine's thread (EngineAssets). */
@@ -91,7 +97,7 @@ class VoiceHomophones internal constructor(
 
     private fun candidatesIn(run: String, at: Int, out: MutableList<Span>) {
         for (start in 0 until run.length - 1) {
-            val firsts = chars[run[start]] ?: continue
+            val firsts = chars(run[start]) ?: continue
             val found = LinkedHashSet<Word>()
             for (r in firsts) byFirst[r]?.let(found::addAll)
             val spans = found.filter { w -> start + w.text.length <= run.length && reads(run, start, w) }
@@ -106,7 +112,7 @@ class VoiceHomophones internal constructor(
     private fun reads(run: String, start: Int, w: Word): Boolean {
         if (run.regionMatches(start, w.text, 0, w.text.length)) return false
         for (k in w.text.indices) {
-            val readings = chars[run[start + k]] ?: return false
+            val readings = chars(run[start + k]) ?: return false
             if (w.readings[k].none { it in readings }) return false
         }
         return true
@@ -129,14 +135,22 @@ class VoiceHomophones internal constructor(
     /**
      * What one hold put in, kept for all of it: what showed and was typed as it streamed stays so
      * whatever comes later. A stretch put in once (its text and word) is put in again wherever it
-     * is heard in this hold, the engine asked or not: the raw text the polish failing falls back
-     * on splits otherwise, and a word typed must not turn back (VoiceTalk retyping what follows).
-     * The engine not answering once ([Lexicon.allowed] null: busy, a timeout), it is not asked
-     * again this hold: what it has not answered stays as heard.
+     * is heard in this hold where the engine never answered for it: the raw text the polish failing
+     * falls back on splits otherwise. Where the engine answered, its answer stands, but for a
+     * stretch put in where it was typed already ([VoiceLive.Heard.settled]): that stays put in
+     * there whatever the engine says as the text grows, as a word typed must not turn back
+     * (VoiceTalk retyping what follows). The engine not answering once ([Lexicon.allowed] null:
+     * busy, a timeout), it is not asked again this hold: what it has not answered stays as heard.
      */
     class Hold internal constructor(private val homophones: VoiceHomophones) {
-        // [allowed] as answered, by [Span.key]: a stretch is asked once as each step of it streams
+        // [allowed] as answered, by [Span.key]: a stretch is asked once, again only as what is read
+        // around it changes
         private val answered = HashMap<String, Boolean>()
+
+        // stretches put in where some of them was typed already, by where they start in the
+        // utterance [pinnedOf]'s text, as [putIn] has them: put in there again whatever comes
+        private val pinned = HashMap<Int, String>()
+        private var pinnedOf = -1
 
         // stretches put in, as heard and as put in: "徐静\u0000徐婧"
         private val putIn = HashSet<String>()
@@ -145,10 +159,14 @@ class VoiceHomophones internal constructor(
 
         /**
          * [text] with each stretch [candidates] finds and the engine [allowed] made the word (or one
-         * this hold put in already, where the engine has not answered for it): from the start, a stretch overlapping one already put in left
-         * as it is.
+         * this hold put in already, where the engine has not answered for it; one put in where a
+         * [VoiceLive.Heard] had it typed already): from the start, a stretch overlapping one already put in left as
+         * it is.
          */
-        suspend fun replace(text: String, lexicon: Lexicon): String {
+        suspend fun replace(text: String, lexicon: Lexicon): String = replaceTyped(text, lexicon, 0)
+
+        // [settled]: how much of [text] was typed already ([VoiceLive.Heard.settled])
+        private suspend fun replaceTyped(text: String, lexicon: Lexicon, settled: Int): String {
             val spans = homophones.candidates(text)
             if (spans.isEmpty()) return text
             val ask = spans.filter { it.key !in answered }.distinctBy { it.key }
@@ -160,14 +178,15 @@ class VoiceHomophones internal constructor(
             var until = 0
             for (span in spans) {
                 val from = span.at + span.start
-                // the engine's answer for this stretch where it is, asked of every place while it answers,
-                // never overturned; one put in this hold elsewhere only for a place it never answered
-                // (silent since), so what was typed does not turn back
-                val yes = answered[span.key] ?: (pair(span) in putIn)
+                // one typed already stays; else the engine's answer for this stretch where it is, asked
+                // of every place while it answers, never overturned; one put in this hold elsewhere
+                // only for a place it never answered (silent since), so what was typed does not turn back
+                val yes = pinned[from] == pair(span) || (answered[span.key] ?: (pair(span) in putIn))
                 if (from < until || !yes) continue
                 answered[span.key] = true
                 span.word.text.toCharArray(out, from)
                 putIn += pair(span)
+                if (from < settled) pinned[from] = pair(span)
                 until = span.at + span.end
             }
             return String(out)
@@ -175,7 +194,12 @@ class VoiceHomophones internal constructor(
 
         /** [heard] with its text [replace]d: the same length, so what of it is settled stays so. */
         suspend fun replace(heard: VoiceLive.Heard, lexicon: Lexicon): VoiceLive.Heard {
-            val whole = replace(heard.whole, lexicon)
+            // a new utterance's text starts again: where the last one's were typed says nothing of it
+            if (heard.utterance != pinnedOf) {
+                pinned.clear()
+                pinnedOf = heard.utterance
+            }
+            val whole = replaceTyped(heard.whole, lexicon, heard.settled)
             return if (whole == heard.whole) heard else VoiceLive.Heard(whole, heard.settled, heard.fallback, heard.utterance, heard.upTo)
         }
 
@@ -184,7 +208,7 @@ class VoiceHomophones internal constructor(
 
     companion object {
         /** none of the user's words: nothing replaced */
-        val NONE = VoiceHomophones(emptyList(), emptySet(), emptyMap())
+        val NONE = VoiceHomophones(emptyList(), emptySet()) { null }
 
         /** a learned word takes part once typed more than this many times (the owner's 2026-11-10) */
         const val LEARNED_MIN = 3f
@@ -199,13 +223,13 @@ class VoiceHomophones internal constructor(
 
         /**
          * Of the user's [words] (Engines.userWords' order: added, learned most typed first,
-         * blocked), [readingsOf] each that takes part (null: not known, it takes no part), each
-         * character's readings, all of them, by [charReadings].
+         * blocked), [readingsOf] each that takes part (null: not known, it takes no part), a
+         * character's readings, all of them, by [charReadings] (null for none), asked as heard.
          */
         fun of(
             words: List<UserWord>,
             readingsOf: (UserWord) -> List<IntArray>?,
-            charReadings: () -> Map<Char, IntArray>,
+            charReadings: (Char) -> IntArray?,
         ): VoiceHomophones {
             val mine = words.filter { it.kind == UserWord.Kind.ADDED || it.kind == UserWord.Kind.LEARNED }
             // added first, then learned most typed first, whatever order they came in
@@ -216,7 +240,7 @@ class VoiceHomophones internal constructor(
                 .mapNotNull { w -> readingsOf(w)?.takeIf { r -> r.size == w.text.length && r.all { it.isNotEmpty() } }?.let { Word(w.text, it) } }
                 .toList()
             if (taking.isEmpty()) return NONE
-            return VoiceHomophones(taking, mine.mapTo(HashSet()) { it.text }, charReadings())
+            return VoiceHomophones(taking, mine.mapTo(HashSet()) { it.text }, charReadings)
         }
 
         /**

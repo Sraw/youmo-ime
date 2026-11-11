@@ -177,7 +177,18 @@ object VoiceEngine {
         val read = remembered.shared<Deferred<VoiceHotwords.Words>>({ it.isActive }) { ticket ->
             reading.async {
                 // the homophones made of the same words, at once: their words are the hotwords'
-                val words = fcitx.runOnReady { userWords().let { VoiceHotwords.ofUser(it).copy(homophones = voiceHomophones(it)) } }
+                // their failing costs the homophones only, never the hotwords
+                val words = fcitx.runOnReady {
+                    userWords().let { w ->
+                        val homophones = try {
+                            voiceHomophones(w)
+                        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                            Timber.w(e, "voice homophones not made")
+                            VoiceHomophones.NONE
+                        }
+                        VoiceHotwords.ofUser(w).copy(homophones = homophones)
+                    }
+                }
                 remembered.read(ticket, words)
             }
         }

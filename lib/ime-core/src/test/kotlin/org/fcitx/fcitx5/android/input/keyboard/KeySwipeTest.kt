@@ -103,8 +103,6 @@ class KeySwipeTest {
         assertEquals(Outcome.None, up(Key(false, first, SwipeSlot.Empty, hasFirst = false), -1))
     }
 
-    // the key's own preview where the lift does nothing as well: swiped back, or a password's copy
-    // (lifted it cancels, as swiped and back does; the preview shows no shortcut that would not run)
     // a key no layout names (注音九键's ˉ, a panel's): its built-in swipe the way the orientation puts every
     // key's long press's first, its tap the other; flipped with them (翻转全部 flips the orientation)
     @Test
@@ -121,6 +119,8 @@ class KeySwipeTest {
         assertEquals(Outcome.None, KeySwipe.decide(firstDown, Ways(up = false, down = false), 1, swiped = true, consumed = false, cancelled = false, password = false))
     }
 
+    // the key's own preview where the lift does nothing as well: swiped back, or a password's copy
+    // (lifted it cancels, as swiped and back does; the preview shows no shortcut that would not run)
     @Test
     fun thePreviewIsWhatTheLiftWouldDoTheKeysOwnWhereItDoesNothing() {
         assertEquals(Preview.Shortcut(selectAll), KeySwipe.preview(a, Ways.Both, 1, password = false))

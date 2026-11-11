@@ -815,7 +815,8 @@ class KeyboardHarness(
         codeRowWas?.let(ThemeManager.prefs.codeRow::setValue)
         HostDaemon.testConnection = null
         scope.cancel()
-        (idleFailed ?: destroyFailed)?.let { throw it }
+        // both kept: the destroy's failure not lost behind the idle's
+        (idleFailed?.also { e -> destroyFailed?.let(e::addSuppressed) } ?: destroyFailed)?.let { throw it }
     }
 
     // the daemon's connection to a real host, which answers on its own thread

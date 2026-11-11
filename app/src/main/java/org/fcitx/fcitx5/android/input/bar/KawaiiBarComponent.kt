@@ -353,8 +353,17 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 val action: ((View) -> Unit)? = when (button) {
                     // set where it is made, in IdleUi
                     ToolbarButton.Emoji -> null
-                    // below, with its swipe
-                    ToolbarButton.Hide -> null
+                    // its tap and its swipe, both the hide's
+                    ToolbarButton.Hide -> {
+                        made.apply {
+                            setOnClickListener(hideKeyboardCallback)
+                            swipeEnabled = true
+                            swipeThresholdY = dp(heightDp(context).toFloat())
+                            swipeThresholdX = swipeThresholdY
+                            onGestureListener = swipeHideKeyboardCallback
+                        }
+                        null
+                    }
                     ToolbarButton.Voice -> { _ -> commonKeyActionListener.voiceTap() }
                     ToolbarButton.Undo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true) }
                     ToolbarButton.Redo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true) }
@@ -377,13 +386,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     }
                 }
                 action?.let { made.setOnClickListener(it) }
-                if (button == ToolbarButton.Hide) made.apply {
-                    setOnClickListener(hideKeyboardCallback)
-                    swipeEnabled = true
-                    swipeThresholdY = dp(heightDp(context).toFloat())
-                    swipeThresholdX = swipeThresholdY
-                    onGestureListener = swipeHideKeyboardCallback
-                }
                 showToggle(button, made)
             }
             clipboardUi.suggestionView.apply {

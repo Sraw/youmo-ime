@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.phrase
 
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
@@ -75,7 +76,8 @@ class CommonWordsInSessionTest {
     @Test
     fun aPartOfAKeyOrMoreTypesNothing() {
         val s = session(niHao)
-        for (typed in listOf("niha", "nihaom", "nihaon", "n")) assertTrue(typed, "您好" !in s.type(typed) && "拜" !in s.type(typed))
+        // each a key cut short or run on: no replacement of a key it is not
+        assertRows(listOf("niha", "nihaom", "nihaon", "n"), { it }) { typed -> assertTrue(typed, "您好" !in s.type(typed) && "拜" !in s.type(typed)) }
     }
 
     @Test
@@ -177,10 +179,11 @@ class CommonWordsInSessionTest {
     @Test
     fun onEveryPinyinKeyboardByItsKeysTheInitialsOfTwoOnFullPinyinAlone() {
         // [keys]: 你好's whole, and 你好吗再见's initials, as typed there
-        class Board(val name: String, val segmenter: Segmenter, val whole: String, val letters: NineKeyLetters? = null)
+        // [initialsOfTwo]: whether two initials type a word of two there (full pinyin's 26 keys alone)
+        class Board(val name: String, val segmenter: Segmenter, val whole: String, val letters: NineKeyLetters? = null, val initialsOfTwo: Boolean = false)
         val zrm = ShuangpinScheme.ZIRANMA
         val boards = listOf(
-            Board("全拼 26 键", PinyinSegmenter(), "nihao"),
+            Board("全拼 26 键", PinyinSegmenter(), "nihao", initialsOfTwo = true),
             Board("九键", T9Segmenter(abbreviations = false), "nihao", NineKeyLetters.STANDARD),
             Board("拼音 14 键", T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14), "nihao", NineKeyLetters.G14),
             // 自然码: ni ni, hao hk
@@ -188,14 +191,14 @@ class CommonWordsInSessionTest {
             Board("双拼 18 键", GroupedShuangpinSegmenter(zrm, NineKeyLetters.G18), "nihk", NineKeyLetters.G18),
             Board("九键双拼", GroupedShuangpinSegmenter(zrm, NineKeyLetters.NINE_SP), "nihk", NineKeyLetters.NINE_SP),
         )
-        for (b in boards) {
+        assertRows(boards, { it.name }) { b ->
             val s = session(niHao, b.segmenter)
             fun typed(key: String) = b.letters?.let { l -> key.map(l::key).joinToString("") } ?: key
             assertEquals("${b.name} ${b.whole}", "您好", s.type(typed(b.whole)).firstOrNull())
             assertEquals("${b.name} nhmzj", "拜", s.type(typed("nhmzj")).firstOrNull())
             // two initials are a syllable's keys but on full pinyin's 26: the nine keys' 64 is ni, 双拼's nh nothing else
             val two = s.type(typed("nh"))
-            assertEquals("${b.name} nh", b.name == "全拼 26 键", two.firstOrNull() == "您好")
+            assertEquals("${b.name} nh", b.initialsOfTwo, two.firstOrNull() == "您好")
         }
     }
 
@@ -220,8 +223,8 @@ class CommonWordsInSessionTest {
     fun lueAndNueEitherWayOnFullPinyin() {
         val book = CommonWordBook(words("略[lve]\t掠\n虐[nve]\t疟\n绿[lv]\t緑\n"))
         val s = session(book)
-        for (typed in listOf("lve", "lue")) assertEquals(typed, "掠", s.type(typed).first())
-        for (typed in listOf("nve", "nue")) assertEquals(typed, "疟", s.type(typed).first())
+        // the way the dictionary spells it and the way a user types it, each its row
+        assertRows(listOf("lve" to "掠", "lue" to "掠", "nve" to "疟", "nue" to "疟"), { it.first }) { (typed, want) -> assertEquals(typed, want, s.type(typed).first()) }
         assertEquals("緑", s.type("lv").first())
         assertTrue("緑" !in s.type("lu"))
     }

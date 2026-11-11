@@ -37,8 +37,27 @@ class SwipeSelectionTest {
         val s = begun(before = "ab", after = "c")
         assertEquals("0..2", s.move(-5).text())
         assertNull("nothing further left", s.move(-1))
-        assertEquals("2..3", s.move(9).text())
-        assertNull("nothing further right", s.move(1))
+        // to the right no read says the field ends: what was read, then one past it tried
+        assertEquals("2..4", s.move(9).text())
+        assertNull("the steps after it wait for the editor", s.move(1))
+    }
+
+    // the bug: an app that gave less after the cursor than it has stopped the selection where the
+    // read ended. Past it a step is tried, and goes on once the editor reports it taken
+    @Test
+    fun aShortReadAfterIsNotTheEndOfTheField() {
+        val s = begun(before = "ab", after = "c")
+        assertEquals("the read, then one tried", "2..4", s.move(2, CursorRange(2, 2), settled = true).text())
+        assertEquals("taken: on past it", "2..5", s.move(1, CursorRange(2, 4), settled = true).text())
+    }
+
+    // the probe moves the right end alone: a report starting where it is (the cursor put there by
+    // something else) is not it taken
+    @Test
+    fun aReportStartingAtTheProbeDoesNotTakeIt() {
+        val s = begun(before = "ab")
+        assertEquals("2..3", s.move(1, CursorRange(2, 2), settled = true).text())
+        assertNull("still waiting", s.move(1, CursorRange(3, 5), settled = true))
     }
 
     @Test
@@ -122,7 +141,7 @@ class SwipeSelectionTest {
         assertNull("no probe: nothing given back", none.end())
     }
 
-    // an app that gives less than asked before the cursor (review M7): its start is not the field's
+    // an app that gives less than asked before the cursor: its start is not the field's
     @Test
     fun aShortReadBeforeIsNotTheStartOfTheField() {
         val s = SwipeSelection()

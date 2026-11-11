@@ -31,7 +31,8 @@ class FlorisSkin(private val f: SkinFiles) : SkinSource {
         if (themes.isEmpty()) throw SkinError(SkinError.Reason.NO_KEYBOARD, EXTENSION)
         fun night(t: Pair<Map<*, *>, Map<*, *>>): Boolean {
             if (t.first["isNight"] == true) return true
-            val bg = Sheet(t.second).color("window", "background") ?: Sheet(t.second).color("keyboard", "background")
+            val sheet = Sheet(t.second)
+            val bg = sheet.color("window", "background") ?: sheet.color("keyboard", "background")
             return bg != null && SkinTheme.lum(bg) < DARK
         }
         val day = themes.firstOrNull { !night(it) }
@@ -149,7 +150,11 @@ class FlorisSkin(private val f: SkinFiles) : SkinSource {
             val name = BACKTICKS.matchEntire(family.trim())?.groupValues?.get(1) ?: return
             val src = (s.rules["@font `$name`"] as? List<*>)?.firstOrNull() as? Map<*, *>
             val path = FLEX_URI.find(src?.get("src") as? String ?: return)?.groupValues?.get(1) ?: return
-            val bytes = f.bytes(path)?.takeIf { it.size <= TrimeSkin.MAX_FONT_BYTES } ?: return
+            val bytes = f.bytes(path) ?: return
+            if (bytes.size > SkinLimits.MAX_FONT_BYTES) {
+                look.notes += SkinNote.TEXT_SIZE
+                return
+            }
             look.font = path.substringAfterLast('/').lowercase() to bytes
         }
     }

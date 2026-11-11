@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input.candidates.horizontal
 
+import android.graphics.Rect
 import android.view.View
 import android.view.View.MeasureSpec
 import android.view.ViewGroup
@@ -29,6 +30,9 @@ class CandidateRowLayoutManager : RecyclerView.LayoutManager() {
 
     /** Called with the count shown after each layout. */
     var onLaidOut: (Int) -> Unit = {}
+
+    // a child's decorations, read in each layout
+    private val decor = Rect()
 
     override fun generateDefaultLayoutParams() =
         RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -61,7 +65,11 @@ class CandidateRowLayoutManager : RecyclerView.LayoutManager() {
             used += w
             shown++
         }
-        val main = if (widthMode == MeasureSpec.EXACTLY) width else min(used, width)
+        val main = when (widthMode) {
+            MeasureSpec.EXACTLY -> width
+            MeasureSpec.UNSPECIFIED -> used
+            else -> min(used, width)
+        }
         if (used < main && grows(shown)) share(main, used, shown, grow = true)
         // a lone word wider than the bar shrunk to it
         else if (used > main) share(main, used, shown, grow = false)
@@ -133,8 +141,6 @@ class CandidateRowLayoutManager : RecyclerView.LayoutManager() {
 
     private fun heightSpec(lp: RecyclerView.LayoutParams) =
         getChildMeasureSpec(height, heightMode, paddingTop + paddingBottom + lp.topMargin + lp.bottomMargin, lp.height, false)
-
-    private val decor = android.graphics.Rect()
 
     private fun exactly(size: Int) = MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY)
 }

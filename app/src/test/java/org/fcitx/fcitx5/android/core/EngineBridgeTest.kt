@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
+import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -149,19 +150,11 @@ class EngineBridgeTest {
         // the page added 中国 since the engine read the file
         CommonWordsManager.write(CommonWords.parse("米字旁[mi'zi'pang] 米 糸\n中国[zhong'guo] 华\n").words, file)
         added.saveCommonWords(read.without("米字旁", "米"))
-        until { CommonWordsManager.load(file).words.firstOrNull()?.replacements == listOf("糸") }
+        until("common words saved") { CommonWordsManager.load(file).words.firstOrNull()?.replacements == listOf("糸") }
         assertEquals(listOf("米字旁[mi'zi'pang] 糸", "中国[zhong'guo] 华"), CommonWordsManager.load(file).words.map { it.toString() })
         val unsettled = bridge.additions(folder.root, writable = false)
         assertThrows(IOException::class.java) { unsettled.saveCommonWords(CommonWords.EMPTY) }
         assertEquals(2, CommonWordsManager.load(file).words.size)
-    }
-
-    private fun until(test: () -> Boolean) {
-        val end = System.currentTimeMillis() + 5_000
-        while (!test()) {
-            check(System.currentTimeMillis() < end) { "not saved" }
-            Thread.sleep(20)
-        }
     }
 
     @Test

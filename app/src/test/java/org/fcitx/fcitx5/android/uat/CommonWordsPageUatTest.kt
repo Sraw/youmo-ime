@@ -46,11 +46,6 @@ import java.io.ByteArrayOutputStream
 import java.time.Duration
 
 /**
- * UAT cases of the settings app's pages over a fake engine (uat/01, 03, 13): the input methods,
- * the nine keys' letters and long presses, the user dictionary's lists. What the engine does with
- * what a page saves (the words typed after) is the engine's.
- */
-/**
  * 常用词's page (dev/design/060-common-words.md, WD-39, WD-42): what [SettingsPagesUatTest] has for
  * the other pages, for this one.
  */
@@ -239,7 +234,7 @@ class CommonWordsPageUatTest {
     // the keyboard deletes a replacement while the page is open, and while it is away: the page's
     // save keeps the deletion, the page shows it once back, and its next edit does not put it back
     @Test
-    @Uat("WD-39")
+    @Uat("WD-39", "WD-43")
     fun whatTheKeyboardDeletedStaysDeletedThroughThePagesEdits() {
         val base = CommonWords.parse(miZiPang).words
         CommonWordsManager.write(base)
@@ -288,6 +283,27 @@ class CommonWordsPageUatTest {
             idle()
             until("edited") { rowsOfWords() == listOf("米字旁 → 米、丝", "木字旁 → 木") }
             assertEquals(listOf("米字旁[mi'zi'pang] 米 丝", "木字旁[mu'zi'pang] 木"), commonWordsSaved())
+        } finally {
+            CommonWordsManager.write(CommonWords.EMPTY)
+        }
+    }
+
+    // an export carries the file's lines the page could not read (one with no pinyin), as the file keeps them:
+    // moved to a new phone with it, nothing is lost
+    @Test
+    @Uat("WD-42")
+    fun anExportKeepsTheLinesNotRead() {
+        val file = "# youmo-common-words 1\n木字旁[mu'zi'pang]\t木\n米字旁\t米\n"
+        CommonWordsManager.write(CommonWords.parse(file).words)
+        try {
+            open(SettingsRoute.CommonWords)
+            until("read") { shown().any { it.startsWith("木字旁") } }
+            val exportTo = Uri.parse("content://words.test/export.txt")
+            val exported = ByteArrayOutputStream()
+            shadowOf(activity.contentResolver).registerOutputStream(exportTo, exported)
+            (page as CommonWordsFragment).exportWords(exportTo)
+            until("exported") { exported.size() > 0 }
+            assertEquals(file, exported.toString(Charsets.UTF_8))
         } finally {
             CommonWordsManager.write(CommonWords.EMPTY)
         }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
@@ -400,6 +401,7 @@ class KeyboardUatTest {
     }
 
     @Test
+    @Uat("KB-70")
     fun spaceSlidesDiagonallyMovesBothWaysInOneSample() {
         val h = harness().start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
         val space = space(h)
@@ -413,29 +415,34 @@ class KeyboardUatTest {
         assertTrue(sent().toString(), sent().count { "sym=${FcitxKeyMapping.FcitxKey_Up}," in it } == 1)
     }
 
+    // sideways then up: the cursor moves sideways, no line where there is none to move to
     @Test
-    fun spaceSlidesNoLineInQuickInput() {
-        val h = harness().start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
-        // 快速输入 on: its Up and Down would turn the candidates' pages
-        h.emit(HostEvent.InputPanel(FormattedText.Empty, FormattedText(arrayOf("快速输入: "), intArrayOf(0), -1), FormattedText.Empty, quickPhrase = true))
-        val space = space(h)
-        val f = h.finger(space, h.at(space))
-        f.move(h.at(space, dx = -25f))
-        f.move(h.at(space, dx = -25f, dy = -60f))
-        f.up(h.at(space, dx = -25f, dy = -60f))
-        assertTrue(sent().toString(), sent().any { "sym=${FcitxKeyMapping.FcitxKey_Left}," in it })
-        assertTrue(sent().toString(), sent().none { "sym=${FcitxKeyMapping.FcitxKey_Up}," in it })
-    }
-
-    @Test
-    fun spaceSlidesNoLineInASingleLineField() {
-        val h = harness().start()
-        val space = space(h)
-        val f = h.finger(space, h.at(space))
-        f.move(h.at(space, dx = -25f))
-        f.move(h.at(space, dx = -25f, dy = -60f))
-        f.up(h.at(space, dx = -25f, dy = -60f))
-        assertTrue(sent().toString(), sent().none { "sym=${FcitxKeyMapping.FcitxKey_Up}," in it })
+    @Uat("KB-70")
+    fun spaceSlidesNoLine() {
+        // each row its own keyboard, closed before the next row makes one
+        fun noLine(h: KeyboardHarness) = try {
+            val space = space(h)
+            val f = h.finger(space, h.at(space))
+            f.move(h.at(space, dx = -25f))
+            f.move(h.at(space, dx = -25f, dy = -60f))
+            f.up(h.at(space, dx = -25f, dy = -60f))
+            assertTrue(sent().toString(), sent().any { "sym=${FcitxKeyMapping.FcitxKey_Left}," in it })
+            assertTrue(sent().toString(), sent().none { "sym=${FcitxKeyMapping.FcitxKey_Up}," in it })
+        } finally {
+            h.close()
+            this.h = null
+        }
+        assertRows(
+            "快速输入 on: its Up and Down would turn the candidates' pages" to {
+                val h = harness().start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
+                h.emit(HostEvent.InputPanel(FormattedText.Empty, FormattedText(arrayOf("快速输入: "), intArrayOf(0), -1), FormattedText.Empty, quickPhrase = true))
+                noLine(h)
+            },
+            "a single-line field has no line to move to" to {
+                val h = harness().start()
+                noLine(h)
+            },
+        )
     }
 
     private fun actions(h: KeyboardHarness): MutableList<Int> {

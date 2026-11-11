@@ -608,7 +608,7 @@ class PinyinSession(
 
     // what blocking [c] blocks: its words, or a sentence of them whole; an emoji or a character by its
     // parts by its text in the reading it stands for (a phrase, text kept as typed: nothing)
-    private fun blocked(c: Candidate): Entry? = lastRead.aside[c.text]?.let { aside -> AsideBlocks.entry(c.text, AsideBlocks.shown(c.text, aside) { chaizi.shownIn(it, pieces.joinToString("") { p -> p.text }) }) { lastRead.candidates.firstOrNull { it.text !in lastRead.aside && c.text in emoji(it.text) }?.let(::entries) } } ?: entries(c)?.let { it.singleOrNull() ?: Entry.of(c.text, it) }
+    private fun blocked(c: Candidate): Entry? = lastRead.aside[c.text]?.let { aside -> AsideBlocks.entry(c.text, AsideBlocks.shown(c.text, aside) { chaizi.shownIn(it, pieces.joinToString("") { p -> p.text }, aside) }) { lastRead.candidates.firstOrNull { it.text !in lastRead.aside && c.text in emoji(it.text) }?.let(::entries) } } ?: entries(c)?.let { it.singleOrNull() ?: Entry.of(c.text, it) }
 
     private fun block(index: Int): Snapshot {
         val word = candidates.getOrNull(index)?.takeIf { user != null && learning }?.let(::blocked)
@@ -899,9 +899,9 @@ class PinyinSession(
         val (shownOrder, shownCommon) = owned.first(decoded.graph, key, coarseCandidates.order(listed, pageSize, held), asText)
         // the first reading of all the input shown: the preedit, the syllables offered and Enter's text go
         // by it, as ranked (impl/design-1b.md §2). Every one held, that is the candidate shown first, the
-        // rest of the input as typed after it
+        // rest of the input as typed after it, not a common word's replacement put first (text, no reading)
         val best = read.firstOrNull { it.end == rest && it !in held }
-            ?: shownOrder.firstOrNull()?.takeIf { decoded.sentences.isNotEmpty() }?.let { throughEnd(it, decoded.graph.end) }
+            ?: shownOrder.firstOrNull { it.text !in shownCommon }?.takeIf { decoded.sentences.isNotEmpty() }?.let { throughEnd(it, decoded.graph.end) }
         val shown = if (best == null) PreeditPlaces.Builder().add(keyed.typedOrSelf(decoded.graph.input), readFrom(), input.length) else shows.preedit(decoded.graph, best)
         val picked = pieces.joinToString("") { it.text }
         val restShown = shown.rest
@@ -1008,7 +1008,7 @@ class PinyinSession(
          * phrase ([Offer.DELETE_PHRASE]), and the input read again; null if it is neither.
          */
         fun remove(c: Candidate?, pinned: Boolean): Snapshot? {
-            common(c)?.let { return readAfter { commonWords.remove(it.word, it.text) } }
+            common(c)?.let { return readAfter { commonWords.remove(it.words, it.text) } }
             val phrase = c?.takeIf { !pinned && !predicting && NO_WORD in it.words }?.let { lastRead.placed[it.text] } ?: return null
             return readAfter { phraseBook.remove(phrase.key, phrase.value) }
         }

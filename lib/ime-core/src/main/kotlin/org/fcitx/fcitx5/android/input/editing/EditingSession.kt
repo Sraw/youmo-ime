@@ -216,12 +216,13 @@ class EditingSession(
 
     /**
      * Input restarted over a [provisional] composition, which the restart's focus out would leave as
-     * text. [sameField]: taken away if still there as composed ([selStart]..[selEnd]: the restarted
-     * field's selection), for its owner to compose anew; if not there, or the selection unknown
-     * ([selStart] -1: nowhere to put the cursor), it is left as text and taken as the app's. Another
-     * field (a WebView's inputs share one view): left in place as text, its owner's to forget.
-     * Either way not it, the editor's composing region is let go. [provisionalTaken] told either
-     * way; nothing done if not provisional.
+     * text. [sameField] with the selection known ([selStart]..[selEnd]: the restarted field's
+     * selection): taken away if still there as composed, for its owner to compose anew
+     * ([Taken.AWAY]); if not there, the app took it ([Taken.GONE]). The selection unknown
+     * ([selStart] -1: nowhere to put the cursor), or another field (a WebView's inputs share one
+     * view): left in place as text, its owner's ([Taken.LEFT]). Whenever not taken away, the
+     * editor's composing region is let go. [provisionalTaken] told in every case; nothing done if
+     * not provisional.
      */
     fun provisionalRestarted(sameField: Boolean, selStart: Int, selEnd: Int) {
         checkThread()
@@ -404,11 +405,12 @@ class EditingSession(
      * @param cursor where to leave the cursor within [text]; `-1` means after its last
      * character, which is the common case and lets the editor place the cursor itself.
      * @return what went in: [text], or its start when a long one was cut short. A text of one
-     * call is taken as sent whatever the editor answered (the commit never told before).
+     * call is taken as sent whatever the editor answered (the commit never told before). Nothing
+     * with no editor: the text went nowhere.
      */
     fun commitText(text: String, cursor: Int = -1): String {
         checkThread()
-        if (!editor.isAvailable) return text
+        if (!editor.isAvailable) return ""
         // When the commit is exactly what is already composing, there is nothing to replace:
         // finish the composition as-is and only move the cursor if it is not already there, or on
         // its way there: a pending move (the preedit cursor's, say) is where the caret will be.

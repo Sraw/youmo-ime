@@ -245,7 +245,8 @@ object KeyMarkText {
     private val SPACES = Regex("\\s+")
 
     /** A text of nothing but spaces and line breaks drawn as signs of them: a key with nothing seen on it would look unset. */
-    private fun signs(text: String) = text.map {
+    // a CRLF one line break, one sign
+    private fun signs(text: String) = text.replace("\r\n", "\n").map {
         when (it) {
             '\n', '\r' -> '↵'
             '\t' -> '⇥'

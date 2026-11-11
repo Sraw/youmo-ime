@@ -298,4 +298,11 @@ class ThemeNameClashTest {
             phoneStorage()
         }
     }
+
+    @Test
+    fun aThemeNamedAsABuiltInPackIsMovedOffIt() {
+        // a 3.0 theme named 墨灰 (monokai's slot moved to the pack) was found before the pack, both listed
+        assertTrue(ThemeManager.BuiltinPackNames.isNotEmpty())
+        assertTrue(ThemeManager.BuiltinPackNames.all(clashes))
+    }
 }

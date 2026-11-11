@@ -13,7 +13,6 @@ import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.shortcut.SwipeMigration
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
-import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.ui.main.settings.PopupOverridesFragment
 import org.fcitx.fcitx5.android.utils.appContext
@@ -54,17 +53,14 @@ class PrefsRule : ExternalResource() {
     fun setShortcuts(shortcuts: KeyShortcuts) {
         val now = AppPrefs.getInstance().internal.keySwipes.getValue().let { if (it.isEmpty()) SwipeSlots.Default else SwipeSlots.parse(it) }
         val up = now.orientation == SwipeOrientation.FirstDown
-        val made = shortcuts.names.fold(now) { s, name ->
-            val slot = SwipeSlot.of(shortcuts.resolve(name))
-            if (KeyShortcuts.formOf(name) == KeyShortcuts.FUNCTION) s.with(name.substringBeforeLast('.'), name.endsWith(".up"), slot)
-            else s.with(name, up, slot)
-        }
+        val made = SwipeMigration.withShortcuts(now, shortcuts, up)
         set(AppPrefs.getInstance().internal.keySwipes, made.serialize())
     }
 
     /**
      * 0.5's 滑动 [choice] as 0.6 migrates it (SwipeMigration): the slots' orientation, the ways on, and the two
-     * places swapped where the long press's first goes down, so each mark stays where the test had it.
+     * places swapped where the long press's first goes down, so each mark stays where the test had it. The slots
+     * start again from the preset's: a [setShortcuts] before it is lost, so call it after.
      */
     fun setLayers(choice: SwipeLayersChoice) {
         val k = AppPrefs.getInstance().keyboard

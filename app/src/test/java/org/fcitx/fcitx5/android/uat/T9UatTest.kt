@@ -176,7 +176,7 @@ class T9UatTest {
 
     @Test
     @Uat("T9-17")
-    fun aShortSwipeWithGlideOnIsStillTheDigit() {
+    fun aShortSwipeDownWithGlideOnIsATapOfTheKey() {
         AppPrefs.getInstance().keyboard.keyDrawing.setValue(KeyDrawing.Glide)
         try {
             val h = harness().start()

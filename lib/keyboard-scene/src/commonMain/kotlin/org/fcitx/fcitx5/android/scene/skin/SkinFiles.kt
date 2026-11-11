@@ -15,6 +15,11 @@ class SkinFiles(private val entries: Map<String, ByteArray>, private val platfor
     private val images = HashMap<String, SkinImage?>()
     private var keptPixels = 0L
 
+    // all of an image's pixels, by name: one copy however many times it is asked for (nothing drawn into them: a
+    // reader draws into pixels of its own), within the same bound
+    private val whole = HashMap<String, Pixels?>()
+    private var wholePixels = 0L
+
     /** Whether an image failed to decode or was past the limits (said to the user once). */
     var imageFailed = false
         private set
@@ -54,8 +59,20 @@ class SkinFiles(private val entries: Map<String, ByteArray>, private val platfor
         return image
     }
 
-    /** All of [name]'s pixels, or null. */
-    fun pixels(name: String?): Pixels? = image(name)?.let { it.pixels(0, 0, it.width, it.height) }
+    /** All of [name]'s pixels, or null: the same [Pixels] each time (read, never drawn into). */
+    fun pixels(name: String?): Pixels? {
+        if (name == null || name !in entries) return null
+        if (name in whole) return whole[name]
+        val px = image(name)?.let { it.pixels(0, 0, it.width, it.height) }
+        val size = px?.let { it.width.toLong() * it.height } ?: 0L
+        if (wholePixels + size > SkinLimits.MAX_KEPT_PIXELS) {
+            whole.clear()
+            wholePixels = 0
+        }
+        whole[name] = px
+        wholePixels += size
+        return px
+    }
 
     /** [bytes] decoded as an image (a preview not named in the skin), or null. */
     fun decode(bytes: ByteArray?): Pixels? = bytes?.let(platform::image)?.let { it.pixels(0, 0, it.width, it.height) }

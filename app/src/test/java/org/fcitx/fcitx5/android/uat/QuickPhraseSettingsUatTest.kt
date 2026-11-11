@@ -245,6 +245,22 @@ class QuickPhraseSettingsUatTest {
         until("deleted, its entry kept") { QuickPhraseManager.loadAll().let { it.folders.isEmpty() && it.entries.toSet() == setOf(baidu.copy(folder = ""), gh) } }
     }
 
+    // a folder renamed while its chip is the one picked: the page stays on it under its new name, not on 全部
+    @Test
+    @Uat("QU-26")
+    fun aFolderRenamedWhileShownStaysShown() {
+        QuickPhraseManager.addFolder("网址")
+        open(gh)
+        chip("网址").performClick()
+        st.idle()
+        chip("网址").performLongClick()
+        st.idle()
+        pickItem(0)
+        fields().single().setText("站点")
+        ok()
+        until("renamed and still shown") { QuickPhraseManager.loadAll().folders == listOf("站点") && chip("站点").isChecked }
+    }
+
     // the code review of 060-quick: a folder renamed to another's name or a shelf's is told and kept;
     // an entry deleted in its folder and undone goes back into it; the keyboard's 编辑 of an entry
     // the page moved since edits the one there, not a new one
@@ -534,11 +550,11 @@ class QuickPhraseSettingsUatTest {
             ),
             Triple(
                 "bad keys said after the rest", QuickPhraseManager.Imported(2, 0, 0, badKey = 4),
-                said(R.string.quick_phrase_import_bad_key, said(R.string.quick_phrase_import_done, 2, 0), 4),
+                said(R.string.quick_phrase_import_bad_key, said(R.string.quick_phrase_import_done, 2, 0), 4, QuickPhraseBook.MAX_KEY, QuickPhraseBook.MAX_NOTE),
             ),
             Triple(
                 "only bad keys: said, not 'not a .mb file'", QuickPhraseManager.Imported(0, 0, 0, badKey = 1),
-                said(R.string.quick_phrase_import_bad_key, said(R.string.quick_phrase_import_done, 0, 0), 1),
+                said(R.string.quick_phrase_import_bad_key, said(R.string.quick_phrase_import_done, 0, 0), 1, QuickPhraseBook.MAX_KEY, QuickPhraseBook.MAX_NOTE),
             ),
             Triple("a picture picked for the file: said to be no 快速输入 file", picture, said(R.string.quick_phrase_import_none)),
             Triple(

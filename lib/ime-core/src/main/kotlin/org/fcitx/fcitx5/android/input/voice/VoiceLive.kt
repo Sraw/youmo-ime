@@ -67,7 +67,8 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
         if (closedCount > upTo.closed) {
             // the segment being said then has closed since: the start of what follows them, if it
             // went into said at all (not a sound only, nor nothing)
-            if (closedKept[upTo.closed]) rest = cut(upTo.hearing, rest)
+            // after the marks that ended the segments before it (left out of [base]): not an edit
+            if (closedKept[upTo.closed]) rest = cut(upTo.hearing, rest.trimStart { it in MARKS || it.isWhitespace() })
         } else {
             gone = upTo.hearingRaw
             hearing = fresh(hearingRaw)
@@ -192,7 +193,9 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
          * [text] after what of it was [prefix]: the end of [text]'s start closest to [prefix] (the
          * fewest characters put in, left out or changed; the longest of those as close), then the
          * marks after it. The recognizer may write a character of [prefix] otherwise as it goes on
-         * (its n-best choice at the endpoint, 吗 then 嘛): that one goes too, not typed again.
+         * (its n-best choice at the endpoint, 吗 then 嘛): a cut ending on that changed character
+         * keeps it, typed again, as it may as well be a new word's: a character typed twice is better
+         * than a new word lost. Nothing much like [prefix] at its start: all of [text] kept.
          */
         fun cut(prefix: String, text: String): String {
             if (prefix.isEmpty()) return text

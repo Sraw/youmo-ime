@@ -79,7 +79,7 @@ object ThemePackFiles {
     private const val MACOS = "__MACOSX"
 
     // the listed packs whose parsed themes are kept: a screen of the theme page's cards and the one in use, mostly
-    private const val LISTED_KEPT = 16
+    private val LISTED_KEPT = 16 + BuiltinPacks.FILES.size
     private val VERSIONS = listOf("#light", "#dark")
 
     /** The system's colours the packs' `system()` take now (Monet's, ThemeManager keeps them). */

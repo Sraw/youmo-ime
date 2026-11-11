@@ -106,31 +106,32 @@ open class InputEditorContractTest {
         )
     }
 
+    // what each commit returned compared too: a long paste's pieces go on by it (EditingSession.commitText)
     @Test
     fun commitText() = run(
         listOf(
-            Scenario("at a cursor", "abc", 1) { editor.commitText("X", 1) },
-            Scenario("over a selection", "abcdef", 1, 4) { editor.commitText("X", 1) },
-            Scenario("over a reversed selection", "abcdef", 4, 1) { editor.commitText("X", 1) },
-            Scenario("cursor 0: before the new text", "abc", 1) { editor.commitText("XY", 0) },
-            Scenario("cursor 2: one past the new text", "abcd", 1) { editor.commitText("XY", 2) },
-            Scenario("cursor -1: one before the new text", "abcd", 2) { editor.commitText("XY", -1) },
-            Scenario("cursor far past the end", "ab", 2) { editor.commitText("XYZ", 10) },
-            Scenario("cursor far before the start", "abcd", 2) { editor.commitText("X", -10) },
+            Scenario("at a cursor", "abc", 1) { it += editor.commitText("X", 1).toString() },
+            Scenario("over a selection", "abcdef", 1, 4) { it += editor.commitText("X", 1).toString() },
+            Scenario("over a reversed selection", "abcdef", 4, 1) { it += editor.commitText("X", 1).toString() },
+            Scenario("cursor 0: before the new text", "abc", 1) { it += editor.commitText("XY", 0).toString() },
+            Scenario("cursor 2: one past the new text", "abcd", 1) { it += editor.commitText("XY", 2).toString() },
+            Scenario("cursor -1: one before the new text", "abcd", 2) { it += editor.commitText("XY", -1).toString() },
+            Scenario("cursor far past the end", "ab", 2) { it += editor.commitText("XYZ", 10).toString() },
+            Scenario("cursor far before the start", "abcd", 2) { it += editor.commitText("X", -10).toString() },
             Scenario("replaces the composing region, not the selection", "abcdef", 6) {
                 editor.setComposingRegion(1, 3)
-                editor.commitText("X", 1)
+                it += editor.commitText("X", 1).toString()
             },
-            Scenario("empty text deletes a selection", "abcdef", 1, 4) { editor.commitText("", 1) },
-            Scenario("empty text with cursor 0", "abcdef", 1, 4) { editor.commitText("", 0) },
-            Scenario("cursor 0 over a selection", "abcdef", 1, 4) { editor.commitText("XY", 0) },
+            Scenario("empty text deletes a selection", "abcdef", 1, 4) { it += editor.commitText("", 1).toString() },
+            Scenario("empty text with cursor 0", "abcdef", 1, 4) { it += editor.commitText("", 0).toString() },
+            Scenario("cursor 0 over a selection", "abcdef", 1, 4) { it += editor.commitText("XY", 0).toString() },
             Scenario("cursor -1 over a composition", "abcdef", 6) {
                 editor.setComposingRegion(2, 4)
-                editor.commitText("XY", -1)
+                it += editor.commitText("XY", -1).toString()
             },
             Scenario("inside a batch, then a selection", "abc", 3) {
                 editor.batchEdit {
-                    editor.commitText("XY", 1)
+                    it += editor.commitText("XY", 1).toString()
                     editor.setSelection(1, 1)
                 }
             },

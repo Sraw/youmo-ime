@@ -345,6 +345,9 @@ def case(id, base="B0", page=None, mutates=False, clean=False, visual=False, nee
         page = "设置" if base == "B0-设置" else "text"
 
     def deco(fn):
+        # one id twice: the later would replace the earlier and its check would never run
+        if id in CASES:
+            raise ValueError(f"uat case {id} defined twice")
         CASES[id] = Case(fn, id, base, page, mutates, clean, visual, needs, heavy)
         return fn
     return deco
@@ -357,6 +360,8 @@ def parse_md(path):
         m = re.match(r"### (\S+) \[P\d\] (.*)", line)
         if m:
             cur = m.group(1)
+            if cur in out:
+                raise ValueError(f"{path}: case {cur} written twice")
             out[cur] = [m.group(2).strip(), "", ""]
         elif cur and line.startswith("- **前提**"):
             out[cur][1] = line.split("：", 1)[-1].strip()
@@ -2078,7 +2083,7 @@ def open_host(d, **extras):
             d.adb("install", "-r", apks[-1], check=True, timeout=600)
         d.sh(f"ime disable {HOST_PKG}/org.fcitx.fcitx5.android.input.FcitxInputMethodService")
         ensure_ime(d)
-    args = " ".join(f"--ez {k} true" if v is True else f"--ei {k} {v}" if isinstance(v, int) else f"--es {k} {shlex.quote(v)}"
+    args = " ".join(f"--ez {k} {str(v).lower()}" if isinstance(v, bool) else f"--ei {k} {v}" if isinstance(v, int) else f"--es {k} {shlex.quote(v)}"
                     for k, v in extras.items())
     # a new task each time: the extras of this start, not an instance left from another case
     d.root(f"am start -W -f 0x10008000 -n {HOST} {args}")

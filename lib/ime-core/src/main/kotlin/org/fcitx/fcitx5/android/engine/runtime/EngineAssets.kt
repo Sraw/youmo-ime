@@ -260,7 +260,7 @@ internal class EngineAssets(
     /**
      * The user's [words] for voice input's homophones ([VoiceHomophones.of]): each read as typed,
      * its tones the dictionary's for it (by its characters for a word of theirs alone), a tone not
-     * known any its character has in that syllable; each character's readings, all of them, made once.
+     * known any its character has in that syllable; each character's readings, all of them, as heard.
      */
     fun voiceHomophones(words: List<UserWord>): VoiceHomophones {
         val data = pinyinData
@@ -277,27 +277,20 @@ internal class EngineAssets(
                     }
                 }
             },
-            // all of them, made once: the hold's words' readings are looked up in it as heard
-            charReadings = { homophoneChars },
+            // looked up in the mapped table as heard (its reads stateless, any thread's), not copied to the heap
+            charReadings = { c ->
+                val of = data.charReadings.of(c.code)
+                if (of.isEmpty()) null else IntArray(of.size) { VoiceHomophones.reading(of[it].syllable, of[it].tone) }
+            },
         )
-    }
-
-    // every BMP character's readings (VoiceHomophones.reading), for each hold's homophones: walked once, not a hold
-    private val homophoneChars: Map<Char, IntArray> by lazy(LazyThreadSafetyMode.NONE) {
-        val readings = pinyinData.charReadings
-        val out = HashMap<Char, IntArray>(readings.characters * 2)
-        for (i in 0 until readings.characters) {
-            val cp = readings.codePointAt(i)
-            if (cp > Char.MAX_VALUE.code) continue
-            val of = readings.of(cp)
-            if (of.isNotEmpty()) out[cp.toChar()] = IntArray(of.size) { VoiceHomophones.reading(of[it].syllable, of[it].tone) }
-        }
-        out
     }
 
     /** [VoiceHomophones.allowed] of each of [spans], by the dictionary's words and the model's counts. */
     fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray {
         val data = pinyinData
+        // the readings of those that are words, one walk of the dictionary for them all
+        val wordTexts = spans.mapNotNullTo(HashSet()) { span -> span.text.takeIf { textWords.id(it) != NgramModel.NO_WORD } }
+        val readings by lazy(LazyThreadSafetyMode.NONE) { WordText.readings(data.dictionary, data.vocabulary, wordTexts) }
         val dictionary = object : VoiceHomophones.Dictionary {
             override fun isWord(text: String) = textWords.id(text) != NgramModel.NO_WORD
 
@@ -308,7 +301,7 @@ internal class EngineAssets(
 
             override fun wordReading(text: String): IntArray? {
                 val id = textWords.id(text).takeIf { it != NgramModel.NO_WORD } ?: return null
-                val syllables = WordText.readings(data.dictionary, data.vocabulary, setOf(text))[text] ?: return null
+                val syllables = readings[text] ?: return null
                 val tones = data.tones.tones(text, syllables, id) ?: return null
                 return IntArray(syllables.size) { VoiceHomophones.reading(syllables[it], tones[it].toInt()) }
             }

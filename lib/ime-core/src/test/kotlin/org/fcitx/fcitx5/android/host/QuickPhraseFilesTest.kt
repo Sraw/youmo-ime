@@ -122,7 +122,7 @@ class QuickPhraseFilesTest {
         assertFalse(QuickPhraseFiles.validNote(" a"))
         assertTrue(QuickPhraseFiles.validNote("长".repeat(QuickPhraseBook.MAX_NOTE)))
         assertFalse(QuickPhraseFiles.validNote("长".repeat(QuickPhraseBook.MAX_NOTE + 1)))
-        for (shelf in listOf("全部", "未分类", "未分類", "All", "all", "ALL", "No folder", "no folder")) assertFalse(shelf, QuickPhraseFiles.validFolder(shelf))
+        for (shelf in listOf("全部", "未分类", "未分類", "All", "all", "ALL", "No folder", "no folder", "待补关键词", "待補關鍵詞", "Need a key", "need a key")) assertFalse(shelf, QuickPhraseFiles.validFolder(shelf))
         assertTrue(QuickPhraseFiles.validFolder("Allure"))
         assertFalse(QuickPhraseFiles.validFolder("a\u00a0b"))
         assertTrue(QuickPhraseFiles.validFolder("网址"))
@@ -227,5 +227,11 @@ class QuickPhraseFilesTest {
         assertEquals(1, merged.tooLong)
         assertEquals(2, merged.duplicates)
         assertEquals(4, merged.entries.size)
+    }
+
+    @Test
+    fun aKeyFieldOfNoBreakSpacesAloneIsNoEntry() {
+        // its note read blank: a keyless entry with nothing to show was kept
+        assertEquals(listOf("｜"), QuickPhraseFiles.parseLines("\u00a0 blank\n｜ bar\n".encodeToByteArray()).map { it.note })
     }
 }

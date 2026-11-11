@@ -7,7 +7,7 @@
 Ops, `;`-separated: `d<slot> <x> <y>` a finger down at screen pixels, `m<slot> <x> <y>` it moved,
 `u<slot>` it lifted, `w<ms>` a pause. The whole sequence runs in one `adb shell`, so the gaps are
 the device's own (sendevent itself takes a few ms an event). The touchscreen is the first
-`virtio_input_multi_touch` device (`getevent -lp`), its axes 0..32767 over the screen.
+`virtio_input_multi_touch` device (`getevent -p`), its axes 0..32767 over the screen.
 """
 import argparse
 import re

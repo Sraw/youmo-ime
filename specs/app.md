@@ -211,7 +211,10 @@ once (`SwipeMigration`, from `AppPrefs.dropRetired`; an upgrade keeps 0.5's defa
 `KeySwipe` (ime-core) decides the lift: an empty slot, a first with no character, or a way off, is a
 tap; swiped past and back, a cancel; both ways off, a slide off the key takes the press back. Function
 keys (space, backspace …) reach their own up and down slots, nothing there leaving them as they were;
-space and backspace lock a touch to one axis (`KeyGestureRecognizer.axisLock`). `KeySwipes` (app)
+space and backspace lock a touch to one axis (`KeyGestureRecognizer.axisLock`); in a multi-line field the
+space slid sideways then moves a line a vertical step (`KeyGestureRecognizer.crossStepY`, `SpaceCursor`,
+060-space-2d): not while composing, and no Up at the field's very start nor Down at its end, so focus never
+leaves the field. `KeySwipes` (app)
 wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, opens the edit menu
 (`EditMenuLayout`, `PopupMenuUi.Fixed`) there: up where a notice its size goes (`EditMenuLayout.place`
 on `UndoChipPlacement`'s place, which `InputView` hands `PopupComponent.menuRoom`; over the bar where
@@ -1205,7 +1208,8 @@ are kept there for the web's starting points and the tests' packs, not listed by
 which the web reads as well; the build copies them as raw resources `scene_theme_<name>` (`-` → `_`)
 beside the layouts. **Built-in packs** (060-builtin-themes) are theme 4.0 packs with pictures, sounds and
 effects (简蓝 … 多巴胺), raw resources `builtin_theme_<id>.theme`: `BuiltinPacks` unpacks them once a
-version into `noBackupFilesDir/builtin-themes/v4/<name>/` and lists them as `Theme.Pack(builtin = true)`
+version into the device-protected storage's `noBackupFilesDir/builtin-themes/v4/<name>/`
+(`createDeviceProtectedStorageContext()`: so the packs are there before the first unlock too) and lists them as `Theme.Pack(builtin = true)`
 through the same `ThemePackFiles.list` as the user's (`ThemeManager.BuiltinPackThemes`, listed last); never
 deleted, exported as a pack is; one of the user's of the same name (imported before) is listed instead, an
 import of such a name refused. The names the settings had for the dropped ones (`BuiltinThemeFiles.RETIRED`,
@@ -1365,7 +1369,7 @@ Skins of other input methods (`ThemeFilesManager.openSkin`, picked by `ThemeFile
 `.ssf`, `.flex`, `.yaml`/`.yml`, `.zip`): read whole into memory by `SkinZip.readSkin` (a lone YAML as itself, 1 MB at
 most; a ZIP holding one `.flex` and no `extension.json` as that `.flex`; a `.zip` that is no skin refused with
 `exception_theme_filename`, as a theme exported under the old name most likely is) and unpacked there by `SkinZip` (ime-core; central directory, else a local-header
-scan; `SkinLimits`: 16 MB file, 5000 entries, 16 MB an entry and 32 MB in all as they inflate, a zipped `.flex`'s
+scan; `SkinLimits`: 64 MB file, 5000 entries, 32 MB an entry and 128 MB in all as they inflate, a zipped `.flex`'s
 counted with the ZIP's own, ratio 200 past 1 MB, no encrypted entries, a name with `..`, a leading `/` or a drive
 refused), converted by keyboard-scene's `SkinConverter` (`AndroidSkinCodec` decodes and writes PNG; an image past
 12 M pixels not decoded; `SkinFiles` keeps decoded images up to 12 M pixels in all, then lets them go; a keyboard

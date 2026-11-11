@@ -40,10 +40,9 @@ class SwipeSelection {
     private var anchor = 0
     private var head = 0
 
-    // what was read as it began: [text] from [base] in the field, whether more was there after it
+    // what was read as it began: [text] from [base] in the field
     private var text: String? = null
     private var base = 0
-    private var moreAfter = false
     private val graphemes: BreakIterator = BreakIterator.getCharacterInstance()
 
     // the field known to reach this far: the selection as it began, what was read, a probe the editor took
@@ -166,7 +165,6 @@ class SwipeSelection {
         // the editor's, its text shifted, would split a character): else its text is not what lies between
         text = read?.takeIf { it.selected.length == end - start && start - it.before.length >= 0 && (at < 0 || at == start) }?.let {
             base = start - it.before.length
-            moreAfter = it.after.length >= READ
             it.before + it.selected + it.after
         }
         text?.let(graphemes::setText)
@@ -208,7 +206,9 @@ class SwipeSelection {
         return step(n, probing = true)
     }
 
-    private fun CursorRange.endsAt(at: Int) = start == at || end == at
+    // a probe moves the right end alone (anchor <= sure < probe): its report ends there; a start
+    // there is the editor's cursor put there by something else, not the probe taken
+    private fun CursorRange.endsAt(at: Int) = end == at
 
     // [n] steps from [head]; [probing], one past what is known tried, else none
     private fun step(n: Int, probing: Boolean): CursorRange? {
@@ -239,9 +239,10 @@ class SwipeSelection {
                 if (i > 0) graphemes.preceding(i) else BreakIterator.DONE
             }
             if (edge != BreakIterator.DONE) return base + edge
-            // the field's end where all of that side was read: to the left, where the read began at
-            // its start (an app may give less than asked of a longer field, review M7)
-            if (if (right) !moreAfter else base == 0) return null
+            // the field's start where the read began at it (an app may give less than asked of a
+            // longer field). To the right no read says where the field ends, an app giving less than
+            // it has, or none: a step past it is a probe (the editor ignores one past its end)
+            if (!right && base == 0) return null
         }
         return if (right) at + 1 else (at - 1).takeIf { it >= 0 }
     }

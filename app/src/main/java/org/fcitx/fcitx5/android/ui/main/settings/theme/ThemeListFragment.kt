@@ -161,8 +161,12 @@ class ThemeListFragment : Fragment() {
 
     private fun selectTheme(theme: Theme) {
         // a built-in theme of two versions: each slot its version, as a pack's
-        val builtinPair = (theme as? Theme.Builtin)?.let { t -> ThemeManager.BuiltinThemes.filter { it.file == t.file } }
-            ?.takeIf { it.size == 2 }?.let { it[0] to it[1] }
+        val builtinPair = (theme as? Theme.Builtin)?.let { t ->
+            val versions = ThemeManager.BuiltinThemes.filter { it.file == t.file }
+            val light = versions.firstOrNull { !it.isDark }
+            val dark = versions.firstOrNull { it.isDark }
+            if (light != null && dark != null) light to dark else null
+        }
         val (light, dark) = ThemeSlots.picked(theme, ThemeManager.packPair(theme) ?: builtinPair, followSystemDayNightTheme) ?: run {
             ThemeManager.setNormalModeTheme(theme)
             return

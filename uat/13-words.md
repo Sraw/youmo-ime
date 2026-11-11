@@ -351,7 +351,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **前提**：同 WD-39；双拼方案自然码。
 - **操作**：九键打 6 9 7；14 键按 m、z、p 所在的键；双拼 26 键打 m i z i p h。
 - **预期**：三种键盘上候选第一个都是「米」。
-- **JVM**：`LexiconUatTest.aCommonWordOnTheNineAnd14KeysAndInShuangpin`（:lib:ime-eval:uatTest，真数据）、`CommonWordsInSessionTest.onEveryPinyinKeyboardByItsKeys`（18 键、九键双拼也在内）；设备上不跑。
+- **JVM**：`LexiconUatTest.aCommonWordOnTheNineAnd14KeysAndInShuangpin`（:lib:ime-eval:uatTest，真数据）、ime-core `CommonWordsInSessionTest.onEveryPinyinKeyboardByItsKeysTheInitialsOfTwoOnFullPinyinAlone`（18 键、九键双拼也在内）；设备上不跑。
 
 ### WD-41 [P1] 常用词：几条键相同、部分输入不出、固定压不过
 - **前提**：常用词只有「米字旁 → 米」「木字旁 → 木」；打 mzp，长按第三个候选选 **固定首位**。
@@ -364,4 +364,10 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **操作**：**词库与短语 → 常用词** ⋮ → **导入**，选它，读确认框，确定；⋮ → **导出**，在下载里保存，取回看内容；工具栏 ⋯ → **不用我的输入习惯**，打 mzp。
 - **预期**：确认框写着"新增 2 个，更新 0 个，跳过 1 行"，下面写着第 4 行「米字旁[mi'zi'pang]」没有替换项；列表里有「木字旁 → 木」「中华人民共和国 → 中国」；导出的文件第一行是 `# youmo-common-words 1`，每行用 Tab 分隔；借手机时打 mzp 前面没有「木」。
 - **JVM**：`CommonWordsPageUatTest.aCommonWordAddedImportedAndExported`（确认框的数字和原因、导出的内容）、`EnginesTest.theCommonWordsAreTheAdditionsAndOffWithTheHabits`（:lib:ime-core，借手机时不出、键盘上删除后存下）；设备上跑导入导出（真的文件选择器），借手机那半不跑。
+
+### WD-43 [P1] 常用词：在候选上长按「从常用词中删除」
+- **前提**：同 WD-39（导入了「米字旁 → 米、糸」）。
+- **操作**：打 mzp，长按候选「糸」，选 **从常用词中删除**；清掉再打 mzp；到 **词库与短语 → 常用词** 看「米字旁」那行，点开它把替换项「米」改成「米 粒」再存（只是随便改一下），回测试页打 mzp。
+- **预期**：「糸」的长按菜单里有 **从常用词中删除**，选后提示「已从常用词中删除「糸」」；再打 mzp 时前面只有「米」，没有「糸」；常用词页那行是「米字旁 → 米」；页上改过、存过以后「糸」也没有回来。
+- **JVM**：`CommonWordsPageUatTest.whatTheKeyboardDeletedStaysDeletedThroughThePagesEdits`（键盘删掉的替换项页上照删、页上再改不放回）、ime-core `LearningMenuTest.theDeleteIsNamedByWhatTheWordIs`（菜单项「从常用词中删除」）、`EnginesTest.theCommonWordsAreTheAdditionsAndOffWithTheHabits`（键盘上删除后存下）；长按菜单和提示在设备上手工看。
 

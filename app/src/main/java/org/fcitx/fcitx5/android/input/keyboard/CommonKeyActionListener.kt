@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
@@ -53,7 +54,6 @@ import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.switchToNextIME
 import org.mechdancer.dependency.Dependent
-import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must
@@ -116,7 +116,7 @@ class CommonKeyActionListener :
     // restarted (an app's restartInput, after a commit maybe) is the same: its EditorInfo alone is new
     private var swipeSelectField: EditorInfo? = null
 
-    private fun inSwipeSelectField() = service.sameVoiceField(swipeSelectField, service.startedField)
+    private fun inSwipeSelectField() = service.sameField(swipeSelectField, service.startedField)
 
     // 滑选's touch over, [lifted] (the steps before it began still taken) or not: a selection it set
     // past the field's known end that the editor never took no longer predicted, in its field

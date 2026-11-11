@@ -528,3 +528,23 @@ test('按键音: a sound goes in <sounds> after the icons, one per key, its old 
   assert.match(paired, /<sound key="space" src="b.ogg"><\/sound>/);
   assert.deepEqual(JSON.parse(JSON.stringify(read(paired).theme.info(false).sounds)), [{ key: 'space', src: 'b.ogg' }]);
 });
+
+test('the 内缩 note names only the scene-only key rules with an inset that outrank the select= being edited', () => {
+  const both = '<theme><style select="key" inset="2dp"/><style select="@compact key" inset="0dp 1dp"/>'
+    + '<style select="@compact @landscape key" inset="0dp 2dp"/><style select="@landscape key" inset="1dp"/></theme>';
+  const rows = [
+    // [why, xml, sel, expected]
+    ['on key: every scene-only key rule with an inset wins in its scene', both, 'key', ['@compact key', '@compact @landscape key', '@landscape key']],
+    ['on @landscape key: only the rule of more scenes than it outranks it', both, '@landscape key', ['@compact @landscape key']],
+    ['on @compact key itself: the rule being edited is not named to itself', both, '@compact key', ['@compact @landscape key']],
+    ['scene order and spacing do not matter', '<theme><style select=" @landscape  @compact key" inset="1dp"/></theme>', '@compact key', ['@landscape @compact key']],
+    ['single quotes and inset before select= are read', "<theme><style inset='1dp' select='@compact key'/></theme>", 'key', ['@compact key']],
+    ['a commented-out rule is not there', '<theme><!-- <style select="@compact key" inset="1dp"/> --></theme>', 'key', []],
+    ['a scene rule without an inset does not take it', '<theme><style select="@compact key" fill="#fff"/></theme>', 'key', []],
+    ['only the theme\'s own rules: one rule, one name', '<theme><style select="@compact key" inset="1dp"/></theme>', 'key', ['@compact key']],
+    ['a picked key or class outranks or ties by its own rules: no note', both, 'qwerty/q', []],
+    ['a class select=: no note', both, 'key.letter', []],
+    ['no theme rules: no note', '<theme/>', 'key', []],
+  ];
+  for (const [why, xml, sel, want] of rows) assert.deepEqual(F.sceneInsets(xml, sel), want, why);
+});

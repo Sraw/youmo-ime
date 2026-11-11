@@ -140,18 +140,25 @@ class CandidateReadings(
 
     /**
      * The one reading a hint of [text]'s several is drawn as ([ofHint]), [text] one character: [ordered]'s
-     * first after [before]; null for any other text, or a character the data has no reading of. Blocking
+     * first after [before], of those [hint] lists where it is given (`xing/hang`: at most EngineAssets.MAX_READINGS
+     * of them); null for any other text, or a character the data has none of those readings of. Blocking
      * it by its parts blocks it in this reading, the one shown (PinyinSession).
      */
-    fun oneOf(text: String, before: String = ""): Reading? =
-        if (text.isEmpty() || text.codePointCount(0, text.length) != 1) null else ordered(text.codePointAt(0), before).firstOrNull()
+    fun oneOf(text: String, before: String = "", hint: String? = null): Reading? {
+        if (text.isEmpty() || text.codePointCount(0, text.length) != 1) return null
+        val all = ordered(text.codePointAt(0), before)
+        if (hint == null) return all.firstOrNull()
+        val listed = hint.trim().split(SEPARATOR).mapNotNullTo(HashSet()) { p -> ToneMark.parse(p)?.first?.let(Syllables::id)?.takeIf { it >= 0 } }
+        return all.firstOrNull { it.syllable in listed }
+    }
 
-    // one character's [several] readings hinted as one, written as [style] has it: [oneOf]; the hint's
-    // first where the data has none of the character's own, or no way to write it
+    // one character's [several] readings hinted as one, written as [style] has it: [oneOf] of them; the
+    // hint's first where the data has none of them; nothing where [style] cannot write the one chosen,
+    // as it is blocked in that one (PartsLookup.shownIn) and another drawn would say otherwise
     private fun oneWritten(text: String, several: List<String>, style: ReadingStyle, before: String): List<String> {
         if (text.codePointCount(0, text.length) != 1 || several.any { p -> p.isEmpty() || !p.all(Char::isLetter) }) return emptyList()
-        val first = oneOf(text, before)?.let { written(it.syllable, it.tone, style) }
-        return if (!first.isNullOrEmpty()) listOf(first) else ofHint(text, several.first(), style)
+        val one = oneOf(text, before, several.joinToString(SEPARATOR.toString())) ?: return ofHint(text, several.first(), style)
+        return written(one.syllable, one.tone, style).let { if (it.isEmpty()) emptyList() else listOf(it) }
     }
 
     // [parts], toneless syllables of [text], with the tones they have in it where known

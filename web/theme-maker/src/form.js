@@ -77,6 +77,25 @@
     return null;
   }
 
+  /**
+   * The scene-only key rules (`@compact key`, `@landscape @compact key`, ...) that give an inset an inset written on
+   * [sel] does not reach: those whose scenes take in all of [sel]'s and more, for [sel] a plain `key` or `@scene… key`
+   * (any other select= is not outranked by them in the same simple way: none listed). Their select= text, once each.
+   */
+  function sceneInsets(xml, sel) {
+    const scenes = (s) => { const t = spaced(s).split(' '); return t.pop() === 'key' && t.every((x) => /^@\S+$/.test(x)) ? t : null; };
+    const mine = sel == null ? null : scenes(sel);
+    if (!mine) return [];
+    const out = [];
+    for (const s of styles(xml)) {
+      const theirs = s.select == null ? null : scenes(s.select);
+      if (!theirs || theirs.length <= mine.length || !mine.every((x) => theirs.includes(x))) continue;
+      if (!s.attrs.some((a) => a[0] === 'inset')) continue;
+      if (!out.some((o) => sameSelect(o, s.select))) out.push(spaced(s.select));
+    }
+    return out;
+  }
+
   // the order theme.xml's elements go in (ThemeReader): one put in goes after the last of its kind or before
   const ORDER = ['meta', 'colors', 'picture', 'font', 'style', 'icon', 'sounds'];
 
@@ -510,7 +529,7 @@
   }
 
   root.YoumoForm = {
-    uncommented, styles, elements, valueOf, setProp, setProps, insert, sameSelect, LIMITS, clamp,
+    uncommented, styles, elements, valueOf, setProp, setProps, insert, sameSelect, sceneInsets, LIMITS, clamp,
     COLOR_GROUPS, colors, setColor, variants, withDark, hexOf, parseHex,
     picture, setPicture, cropRect, isNamed, sounds, setSound, removeSound,
     fillText, parseFill, shadowText, parseShadow, borderText, parseBorder, parseInset, insetText, parseRadius, radiusText,

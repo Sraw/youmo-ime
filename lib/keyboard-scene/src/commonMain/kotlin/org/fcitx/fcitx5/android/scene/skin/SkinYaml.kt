@@ -11,10 +11,14 @@ package org.fcitx.fcitx5.android.scene.skin
  * alike: the reader takes them as it needs them); a mapping a [Map] in its order, a sequence a [List]; `~` and `null`
  * null. No tags are acted on, no other file is read. Lenient: a line it cannot place is skipped, never an error; held
  * to [MAX_DEPTH] (deeper is dropped). An alias is the anchored value itself, never a copy, so a chain of aliases costs
- * nothing.
+ * nothing; a `<<` merge does copy its keys, so a document's merges are held to [MAX_MERGED] keys in all (past it, merged
+ * no more): a large anchor merged into many mappings is no way past the text's size to memory.
  */
 object SkinYaml {
     const val MAX_DEPTH = 64
+
+    /** The keys a document's `<<` merges copy in all; a real Trime theme merges some hundreds. */
+    const val MAX_MERGED = 100_000
 
     fun parse(text: String): Any? = Parser(text).document()
 
@@ -24,6 +28,7 @@ object SkinYaml {
         private val lines = ArrayList<Line>()
         private var i = 0
         private val anchors = HashMap<String, Any?>()
+        private val merges = Merges()
 
         init {
             for (raw in text.lineSequence()) {
@@ -87,7 +92,7 @@ object SkinYaml {
                 i++
                 key(l.text)?.let { (k, rest) ->
                     val v = if (rest.isEmpty()) child(ind, depth) else value(rest, ind, depth)
-                    if (k == "<<") merge(out, v) else out[k] = v
+                    if (k == "<<") merges.into(out, v) else out[k] = v
                 }
             }
             return out
@@ -97,11 +102,6 @@ object SkinYaml {
         private fun at(ind: Int): Line? {
             while (i < lines.size && lines[i].indent > ind) i++
             return lines.getOrNull(i)?.takeIf { it.indent == ind }
-        }
-
-        private fun merge(into: MutableMap<String, Any?>, v: Any?) {
-            val maps = if (v is List<*>) v else listOf(v)
-            for (m in maps) (m as? Map<*, *>)?.forEach { (k, x) -> if (k is String && k !in into) into[k] = x }
         }
 
         // a key's value on the lines under it: deeper, or a sequence at the key's own indent
@@ -131,7 +131,7 @@ object SkinYaml {
                 t.isEmpty() && p > 0 -> child(ind, depth)
                 t.startsWith("*") -> anchors[t.substring(1).trim()]
                 BLOCK.matches(t) -> block(ind, folded = t[0] == '>')
-                t.startsWith("{") || t.startsWith("[") -> Flow(flowText(t), anchors).value(depth)
+                t.startsWith("{") || t.startsWith("[") -> Flow(flowText(t), anchors, merges).value(depth)
                 else -> scalar(t)
             }
             for (name in names) anchors[name] = v
@@ -177,7 +177,26 @@ object SkinYaml {
     }
 
     // a flow collection: {a: b, c: [d, e]}
-    private class Flow(private val s: String, private val anchors: MutableMap<String, Any?>) {
+    // what a document's merges have copied, held to MAX_MERGED
+    private class Merges {
+        private var left = MAX_MERGED
+
+        // [v]'s mappings' keys [into] lacks, copied in while the budget lasts
+        fun into(into: MutableMap<String, Any?>, v: Any?) {
+            val maps = if (v is List<*>) v else listOf(v)
+            for (m in maps) {
+                for ((k, x) in (m as? Map<*, *>) ?: continue) {
+                    if (left <= 0) return
+                    if (k is String && k !in into) {
+                        into[k] = x
+                        left--
+                    }
+                }
+            }
+        }
+    }
+
+    private class Flow(private val s: String, private val anchors: MutableMap<String, Any?>, private val merges: Merges = Merges()) {
         private var p = 0
 
         fun value(depth: Int): Any? {
@@ -234,7 +253,7 @@ object SkinYaml {
                 } else {
                     null
                 }
-                if (k == "<<") (v as? Map<*, *>)?.forEach { (a, b) -> if (a is String && a !in out) out[a] = b } else out[k] = v
+                if (k == "<<") merges.into(out, v) else out[k] = v
                 // a stray ']' where a key was to be: stepped over, never read again
                 if (p == at) p++
             }
@@ -333,8 +352,11 @@ object SkinYaml {
     // [s] up to a comment: `#` at its start or after a space, outside quotes
     private fun stripComment(s: String): String {
         var quote = ' '
+        var escaped = false
         for ((n, c) in s.withIndex()) {
             when {
+                escaped -> escaped = false
+                quote == '"' && c == '\\' -> escaped = true
                 quote != ' ' -> if (c == quote) quote = ' '
                 c in QUOTES && (n == 0 || s[n - 1] in " :{[,") -> quote = c
                 c == '#' && (n == 0 || s[n - 1] == ' ') -> return s.substring(0, n)

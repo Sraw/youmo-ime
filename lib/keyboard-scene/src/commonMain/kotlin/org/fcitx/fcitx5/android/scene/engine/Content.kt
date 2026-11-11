@@ -14,9 +14,9 @@ import org.fcitx.fcitx5.android.scene.rules.KeyTextScale
 import org.fcitx.fcitx5.android.scene.theme.Shown
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.Values
-import kotlin.math.sqrt
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.sqrt
 
 /**
  * A mark as placed before any yields ([KeyMarkYield.Mark] of it); [top] its box's (a text's by the
@@ -339,12 +339,14 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
                 val dp = if (compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
                 Drawn.of(PlacedIcon(mark.name, slotBox(slot, dp * d, dp * d, content, h, v).let { if (snap) laidOut(it) else wholeSized(it) }, Part.Shortcut))
             }
-            else -> {
-                val text = (mark as? MarkContent.Text)?.text.orEmpty()
+            is MarkContent.Text -> {
+                val text = mark.text
                 val sizeDp = SHORTCUT_TEXT_DP * textScale
                 val m = measure(text, looks.shortcut, looks.shortcut.weight, sizeDp * d).squeezed(SHORTCUT_TEXT_SHARE * cell.width)
                 m.inBox(slotBox(slot, m.box.width, m.box.height, content, h, v), Part.Shortcut)
             }
+            // ways() sends the other kinds elsewhere: one here is a caller's mistake, not a blank mark
+            else -> error("not a shortcut's mark: $mark")
         }
         // a shortcut is never under the label (KeyMarks.Slot.Below): its top centres nothing
         return MarkDrawn(drawn, slot, drop, drawn.ink.top)

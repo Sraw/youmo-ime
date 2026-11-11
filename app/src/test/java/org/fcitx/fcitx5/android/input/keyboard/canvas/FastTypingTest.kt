@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
@@ -109,72 +110,64 @@ class FastTypingTest {
         h.after(30)
         f.up(1)
         h.idle()
-        assertEquals(h.sent().toString(), 2, h.sent().size)
+        // GH's middle then L (one letter, so its plain code, no place), once each: a finger's key typed twice, or the other's lost, fails
+        assertEquals(h.sent().toString(), listOf(tapSym('g', 0.5f), UNICODE + NineKeyLetters.G14.key('l').code), h.sent().map(::symOf))
     }
 
-    // "dui"'s u then i: one key, two fingers, the second down before the first lifts
+    // "dui"'s u then i on UI, a finger each: u where the first came down (the left half), then i
+    // (the right), in that order, however the two fingers' times fall
     @Test
     @Uat("PY-119")
-    fun fourteenKeysOverlappingTapsOnOneKeyTypeBoth() {
-        val h = harness(ImKeyboard.KEYS14)
-        val ui = h.keyNamed("r1c4")
-        val f = Fingers(h)
-        f.down(0, h.spot(ui, 0.25f))
-        h.after(40)
-        f.down(1, h.spot(ui, 0.75f))
-        h.after(30)
-        f.up(0)
-        h.after(30)
-        f.up(1)
-        h.idle()
-        assertEquals(h.sent().toString(), 2, h.sent().size)
-        // u where the first finger was, i where the second: each its own half
-        // u where the first finger came down (UI's left half), then i (its right): in that order
-        assertEquals(listOf(tapSym('u', 0.25f), tapSym('i', 0.75f)), h.sent().map(::symOf))
-    }
-
-    // the first finger drifts a little while the second is down on the same key
-    @Test
-    @Uat("PY-119")
-    fun fourteenKeysOverlappingOneKeyWithDriftTypeBoth() {
-        val h = harness(ImKeyboard.KEYS14)
-        val ui = h.keyNamed("r1c4")
-        val (x0, y0) = h.spot(ui, 0.25f)
-        val f = Fingers(h)
-        f.down(0, x0 to y0)
-        h.after(30)
-        f.down(1, h.spot(ui, 0.75f))
-        for (i in 1..6) {
-            f.move(0, x0 + i to y0 - i)
-            h.after(5)
+    fun fourteenKeysTwoFingersOnOneKeyTypeEachItsHalf() {
+        fun typed(fingers: Fingers.(KeyboardHarness, Pair<Float, Float>, Pair<Float, Float>) -> Unit): List<Int> {
+            made?.close()
+            val h = harness(ImKeyboard.KEYS14)
+            val ui = h.keyNamed("r1c4")
+            Fingers(h).fingers(h, h.spot(ui, 0.25f), h.spot(ui, 0.75f))
+            h.idle()
+            return h.sent().map(::symOf)
         }
-        h.after(10)
-        f.up(0)
-        h.after(30)
-        f.up(1)
-        h.idle()
-        assertEquals(h.sent().toString(), 2, h.sent().size)
-        // u where the first finger came down (UI's left half), then i (its right): in that order
-        assertEquals(listOf(tapSym('u', 0.25f), tapSym('i', 0.75f)), h.sent().map(::symOf))
-    }
-
-    // the same key tapped twice quickly, one finger at a time: two letters, no double tap
-    @Test
-    fun fourteenKeysOneKeyTappedTwiceQuicklyTypesTwo() {
-        val h = harness(ImKeyboard.KEYS14)
-        val ui = h.keyNamed("r1c4")
-        val f = Fingers(h)
-        f.down(0, h.spot(ui, 0.25f))
-        h.after(30)
-        f.up(0)
-        h.after(40)
-        f.down(1, h.spot(ui, 0.75f))
-        h.after(30)
-        f.up(1)
-        h.idle()
-        assertEquals(h.sent().toString(), 2, h.sent().size)
-        // u where the first finger came down (UI's left half), then i (its right): in that order
-        assertEquals(listOf(tapSym('u', 0.25f), tapSym('i', 0.75f)), h.sent().map(::symOf))
+        val ui = listOf(tapSym('u', 0.25f), tapSym('i', 0.75f))
+        assertRows(
+            "the second finger down before the first lifts" to {
+                assertEquals(ui, typed { h, left, right ->
+                    down(0, left)
+                    h.after(40)
+                    down(1, right)
+                    h.after(30)
+                    up(0)
+                    h.after(30)
+                    up(1)
+                })
+            },
+            "the first finger drifts a little while the second is down: still a tap, not a swipe" to {
+                assertEquals(ui, typed { h, left, right ->
+                    val (x0, y0) = left
+                    down(0, left)
+                    h.after(30)
+                    down(1, right)
+                    for (i in 1..6) {
+                        move(0, x0 + i to y0 - i)
+                        h.after(5)
+                    }
+                    h.after(10)
+                    up(0)
+                    h.after(30)
+                    up(1)
+                })
+            },
+            "one finger at a time, quickly: two letters, not a double tap" to {
+                assertEquals(ui, typed { h, left, right ->
+                    down(0, left)
+                    h.after(30)
+                    up(0)
+                    h.after(40)
+                    down(1, right)
+                    h.after(30)
+                    up(1)
+                })
+            },
+        )
     }
 
     // three fingers rolling over the 26 keys: a down, b down, a up, c down, b up, c up
@@ -193,7 +186,8 @@ class FastTypingTest {
         h.after(20)
         f.up(0)
         h.idle()
-        assertEquals(h.sent().toString(), 3, h.sent().size)
+        // d, u, i once each in the order the fingers came down: a finger's key typed twice fails
+        assertEquals(h.sent().toString(), listOf("d", "u", "i"), h.sent().map { Regex("key=(.)").find(it)!!.groupValues[1] })
     }
 
     // ten keys 40 ms apart, a finger each, the next down before the last lifts, while the host takes
@@ -215,11 +209,14 @@ class FastTypingTest {
     }
 
     @Test
-    fun fourteenKeysTenFastKeysOnABusyHostAllArrive() {
-        // dui hui sui g: UI twice running, and other keys
+    fun fourteenKeysTenFastKeysOnABusyHostAllArriveInOrder() {
+        // UI twice running, and other keys; a letter of each key's for its tap ([tapSym])
         val ids = listOf("r2c2", "r1c4", "r1c4", "r2c3", "r1c4", "r1c4", "r2c1", "r1c4", "r1c4", "r2c3")
+        val letter = mapOf("r2c1" to 'a', "r2c2" to 'd', "r2c3" to 'g', "r1c4" to 'u')
         val sent = slowHost(ImKeyboard.KEYS14, ids)
-        assertEquals(sent.toString(), ids.size, sent.size)
+        // each key where slowHost tapped it (its left half every third, else its right), in the order typed
+        val typed = ids.mapIndexed { n, id -> tapSym(letter.getValue(id), if (n % 3 == 0) 0.25f else 0.75f) }
+        assertEquals(sent.toString(), typed, sent.map(::symOf))
     }
 
     @Test

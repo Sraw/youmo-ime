@@ -779,19 +779,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    private var lastLineKeyAt = 0L
-    private var lineKeysRushed = 0
+    // a slide's sample may send two lines at once: the editor applies keys later, so the second reads where the first was
+    private val lineRush = SpaceCursor.LineRush()
 
     // none at the field's very start or end, where the key would move the focus away (SpaceCursor.sendable)
     private fun handleLineKey(line: SpaceCursor.Line) {
         val ic = currentInputConnection ?: return
         val now = SystemClock.uptimeMillis()
-        // a slide's sample may send two lines at once: the editor applies keys later, so the second reads where the first was
-        if (now - lastLineKeyAt >= LINE_KEY_SETTLE_MS) lineKeysRushed = 0
-        val rushed = lineKeysRushed
-        if (!SpaceCursor.sendable(line, ic.getTextBeforeCursor(LINE_REACH, 0), ic.getTextAfterCursor(LINE_REACH, 0), rushed)) return
-        lastLineKeyAt = now
-        lineKeysRushed++
+        // only the side the line goes to is read: a binder call each, on the main thread
+        val before = if (line == SpaceCursor.Line.Up) ic.getTextBeforeCursor(LINE_REACH, 0) else null
+        val after = if (line == SpaceCursor.Line.Down) ic.getTextAfterCursor(LINE_REACH, 0) else null
+        if (!SpaceCursor.sendable(line, before, after, lineRush.rushed(line, now))) return
+        lineRush.sent(line, now)
         clearedText.edited()
         sendDownUpKeyEvents(if (line == SpaceCursor.Line.Up) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN)
     }
@@ -833,7 +832,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // a long paste cut short: only what went in ends the field's text
         val landed = editingSession.commitText(text, cursor)
         contextMemory.committed(landed, if (landed.length == text.length) cursor else -1, SystemClock.elapsedRealtime())
-        if (cursor == -1 && (text.endsWith('=') || text.endsWith('＝'))) offerCalculation()
+        if (cursor == -1 && (landed.endsWith('=') || landed.endsWith('＝'))) offerCalculation()
     }
 
     /**
@@ -1037,6 +1036,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         settleWaiters += waiter
         settleTimeouts.postDelayed(waiter, timeoutMs)
+    }
+
+    // the field ended or the service gone: no 滑选 begun for it later, nor the service held by the main looper
+    private fun dropSettleWaiters() {
+        if (settleWaiters.isEmpty()) return
+        settleTimeouts.removeCallbacksAndMessages(null)
+        settleWaiters.clear()
     }
 
     private fun wakeSettled() {
@@ -1384,7 +1390,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // composes it anew (or, the app having taken it, does not type it again)
         if (restarting) {
             if (editingSession.provisional) {
-                editingSession.provisionalRestarted(sameVoiceField(startedWith, attribute), attribute.initialSelStart, attribute.initialSelEnd)
+                editingSession.provisionalRestarted(sameField(startedWith, attribute), attribute.initialSelStart, attribute.initialSelEnd)
             } else {
                 currentInputConnection?.finishComposingText()
             }
@@ -1685,7 +1691,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Whether [now] is the field [said] was, though input restarted in it (a new EditorInfo): the
      * same app, view id and what it says of itself ([VoiceCommit.sameField]).
      */
-    fun sameVoiceField(said: EditorInfo?, now: EditorInfo? = currentInputEditorInfo): Boolean = said != null && now != null &&
+    fun sameField(said: EditorInfo?, now: EditorInfo? = currentInputEditorInfo): Boolean = said != null && now != null &&
         VoiceCommit.sameField(said.voiceField(), now.voiceField(), said === now)
 
     private fun EditorInfo.voiceField() =
@@ -1843,6 +1849,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // a read queued in the field, a password's maybe, is not made once the policy forgot it
         contextReads.forget()
         fieldPolicy.finish()
+        dropSettleWaiters()
     }
 
     override fun onUnbindInput() {
@@ -1871,6 +1878,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // the last field learned from as the service goes (another keyboard picked, the system stopping it): not at a hide or
         // a bar made anew, the same field maybe to come back to. A process killed outright still loses it
         addressLearning.end(AddressStore.forgotten)?.let(AddressStore::learn)
+        dropSettleWaiters()
         super.onDestroy()
         // Fcitx might be used in super.onDestroy()
         HostDaemon.disconnect(javaClass.name)
@@ -1899,9 +1907,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Suppress("ConstPropertyName")
     companion object {
-        /** How long after a line key of the space's slide the editor may not have moved yet (handleLineKey). */
-        private const val LINE_KEY_SETTLE_MS = 80L
-
         /** How far before or after the cursor a line key looks for a newline. */
         private const val LINE_REACH = 256
 

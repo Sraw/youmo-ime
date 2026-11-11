@@ -75,8 +75,9 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
 
     // each finger's own [downAt] and [downDown] by its id: typed fast, a second finger comes down on the
     // same key (14 键's UI for "ui") before the first lifts, and the first's lift is its own place, not the
-    // second's (060-fast-typing)
-    private val downs = HashMap<Int, Pair<Float, Float>>(2)
+    // second's (060-fast-typing). Two floats a pointer id (Android's are 0 to 31), NaN where none: no
+    // allocation a key's touch
+    private val downs = FloatArray(POINTER_IDS * 2) { Float.NaN }
 
     /**
      * Where across the key the touch that clicks it came down ([downAt]), for the click listener
@@ -184,7 +185,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     }
 
     fun cancelGestures() {
-        downs.clear()
+        downs.fill(Float.NaN)
         key.showPressed(false)
         stopTimers()
         // unlike a normal lift, a cancel also forgets a pending double tap (and resets the rest)
@@ -223,7 +224,10 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         touchPointer = pointerId
         downAt = across(x)
         downDown = downward(y)
-        downs[pointerId] = downAt to downDown
+        if (pointerId in 0 until POINTER_IDS) {
+            downs[pointerId * 2] = downAt
+            downs[pointerId * 2 + 1] = downDown
+        }
         clickAt = Float.NaN
         clickDown = Float.NaN
         key.hotspot(x, y)
@@ -260,7 +264,14 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     }
 
     private fun up(x: Float, y: Float, pointerId: Int, eventTime: Long) {
-        val (at, atDown) = downs.remove(pointerId) ?: (downAt to downDown)
+        var at = downAt
+        var atDown = downDown
+        if (pointerId in 0 until POINTER_IDS && !downs[pointerId * 2].isNaN()) {
+            at = downs[pointerId * 2]
+            atDown = downs[pointerId * 2 + 1]
+            downs[pointerId * 2] = Float.NaN
+            downs[pointerId * 2 + 1] = Float.NaN
+        }
         key.showPressed(false)
         InputFeedbacks.hapticFeedback(key.feedback, longPress = true, keyUp = true)
         dispatchGestureEvent(GestureType.Up, x, y)
@@ -324,5 +335,8 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     companion object {
         val longPressDelay by AppPrefs.getInstance().keyboard.longPressDelay
         const val RepeatInterval = 50L
+
+        // MotionEvent pointer ids run 0 to 31
+        private const val POINTER_IDS = 32
     }
 }

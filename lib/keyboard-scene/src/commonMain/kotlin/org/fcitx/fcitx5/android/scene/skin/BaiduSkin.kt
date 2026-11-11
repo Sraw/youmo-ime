@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene.skin
 
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * A Baidu skin of the classic engine (dev/design/060-skin-import.md §2.1): `.bds` for Android, `.bdi` for iOS. A
@@ -88,12 +89,13 @@ class BaiduSkin(private val f: SkinFiles) : SkinSource {
             return nm to hl
         }
 
-        // a fore style list's first: the label's colour and pressed colour (of the glyph where it is a picture)
-        private fun label(fore: String?): Pair<Int?, Int?> {
+        // a fore style list's first: the label's colour and pressed colour (of the glyph where it is a picture; a
+        // [letter]'s picture said as LETTER_IMAGES, an icon's or the bar's not)
+        private fun label(fore: String?, letter: Boolean = false): Pair<Int?, Int?> {
             val s = style(fore?.split(',')?.firstOrNull())
             if ("NM_COLOR" in s && "NM_IMG" !in s) return SkinText.color(s["NM_COLOR"]) to SkinText.color(s["HL_COLOR"])
             val nm = tile(s["NM_IMG"])
-            if (nm != null) letterImages = true
+            if (nm != null && letter) letterImages = true
             return nm?.pixels?.glyphColor() to tile(s["HL_IMG"])?.pixels?.glyphColor()
         }
 
@@ -130,12 +132,26 @@ class BaiduSkin(private val f: SkinFiles) : SkinSource {
         private fun board(look: SkinLook, gen: Ini, cand: Ini, pw: Int, ph: Int, ch: Int) {
             val panel = face(gen["PANEL"]?.get("BACK_STYLE")?.split(',')?.firstOrNull()).first
             val bar = face(cand["CAND"]?.get("BACK_STYLE")).first
-            look.barHeight = ch
             if (panel !is SkinFill.Image && bar !is SkinFill.Image) {
                 look.boardColor = (panel as? SkinFill.Color)?.argb
                 look.barColor = (bar as? SkinFill.Color)?.argb ?: look.boardColor
                 return
             }
+            // the picture made within MAX_PICTURE_SIDE and MAX_IMAGE_PIXELS (gen.ini's sizes are the skin's word, a
+            // few bytes for 4096×6144): never put together larger than the theme keeps it
+            val total = ch.toLong() + ph
+            val s = minOf(
+                1.0, SkinTheme.MAX_PICTURE_SIDE.toDouble() / pw, SkinTheme.MAX_PICTURE_SIDE.toDouble() / total,
+                sqrt(SkinLimits.MAX_IMAGE_PIXELS.toDouble() / (pw * total)),
+            )
+            if (s < 1) {
+                drawBoard(look, panel, bar, maxOf(1, (pw * s).roundToInt()), maxOf(1, (ph * s).roundToInt()), maxOf(1, (ch * s).roundToInt()))
+            } else {
+                drawBoard(look, panel, bar, pw, ph, ch)
+            }
+        }
+
+        private fun drawBoard(look: SkinLook, panel: SkinFill?, bar: SkinFill?, pw: Int, ph: Int, ch: Int) {
             val board = Pixels(pw, ch + ph)
             when (panel) {
                 is SkinFill.Image -> {
@@ -155,16 +171,20 @@ class BaiduSkin(private val f: SkinFiles) : SkinSource {
                 // no bar background: the keyboard's shows through it in Baidu too (panel is an image here: checked above)
                 null -> { board.paste((panel as SkinFill.Image).pixels.nine(panel.insets, pw, ch), 0, 0); look.barColor = look.boardColor }
             }
-            look.board = if (board.translucent()) {
-                Pixels.filled(pw, ch + ph, board.average(keepAlpha = false) ?: GREY).also { it.over(board, 0, 0) }
-            } else {
-                board
+            if (board.translucent()) {
+                // laid on its own mean, in place: no second picture of its size
+                val mean = board.average(keepAlpha = false) ?: GREY
+                for (y in 0 until board.height) {
+                    val laid = Pixels.filled(pw, 1, mean).also { it.over(board.crop(0, y, pw, 1)!!, 0, 0) }
+                    board.paste(laid, 0, y)
+                }
             }
+            look.board = board
         }
 
         private fun keys(look: SkinLook, pw: Int) {
             val board = f.first(r + "port/py_26.ini", r + "port/def_26.ini", r + "port/en_26.ini") ?: throw SkinError(SkinError.Reason.NO_KEYBOARD)
-            val kinds = LinkedHashMap<String, MutableList<Pair<String, String>>>()
+            val kinds = LinkedHashMap<Kind, MutableList<Pair<String, String>>>()
             val letters = ArrayList<IntArray>()
             for ((section, key) in f.ini(board)) {
                 val back = key["BACK_STYLE"]?.split(',')?.firstOrNull()?.trim()?.takeIf { section.startsWith("KEY") && it.isNotEmpty() }
@@ -174,28 +194,28 @@ class BaiduSkin(private val f: SkinFiles) : SkinSource {
                 val kind = kind(action)
                 if (back == null || kind == null) continue
                 kinds.getOrPut(kind) { ArrayList() } += back to key["FORE_STYLE"].orEmpty()
-                if (kind == LETTER) SkinText.ints(key["VIEW_RECT"], RECT)?.let { letters += it }
+                if (kind == Kind.LETTER) SkinText.ints(key["VIEW_RECT"], RECT)?.let { letters += it }
             }
             var function: Pair<String?, Int?>? = null
-            for ((kind, selector) in SELECTORS) {
+            for (kind in Kind.entries) {
                 val list = kinds[kind].orEmpty()
                 val back = list.groupingBy { it.first }.eachCount().maxByOrNull { it.value }?.key
-                val (color, pressedColor) = label(list.firstOrNull { it.first == back }?.second)
-                if (kind == "function") function = back to color
+                val (color, pressedColor) = label(list.firstOrNull { it.first == back }?.second, letter = kind == Kind.LETTER)
+                if (kind == Kind.FUNCTION) function = back to color
                 // backspace and shift as the other function keys: one style for them all
-                val asFunction = (kind == "backspace" || kind == "shift") && function == back to color
+                val asFunction = (kind == Kind.BACKSPACE || kind == Kind.SHIFT) && function == back to color
                 if (back == null || asFunction) continue
                 val (nm, hl) = face(back)
-                look.keys[selector] = SkinKey(nm, hl, color, pressedColor, icons = kind != LETTER)
+                look.keys[kind.selector] = SkinKey(nm, hl, color, pressedColor, icons = kind != Kind.LETTER)
             }
             if (KEY !in look.keys) throw SkinError(SkinError.Reason.NO_KEYBOARD)
             look.inset = inset(letters, look.keys.getValue(KEY).fill, pw)
         }
 
         // a key's kind by its action: a letter, a function key of its own style, another function key; null: none
-        private fun kind(action: String): String? = when {
-            action.length == 1 && action[0] in 'a'..'z' -> LETTER
-            else -> FUNCTION_KINDS[action] ?: if (action.matches(FUNCTION)) "function" else null
+        private fun kind(action: String): Kind? = when {
+            action.length == 1 && action[0] in 'a'..'z' -> Kind.LETTER
+            else -> FUNCTION_KINDS[action] ?: if (action.matches(FUNCTION)) Kind.FUNCTION else null
         }
 
         // the gap around a letter, dp: the row's pitch less the key's drawn body. A view rect wider than the pitch
@@ -218,7 +238,7 @@ class BaiduSkin(private val f: SkinFiles) : SkinSource {
                 val drawn = if (view > pitch * OVERLAP) body else view - (size - body)
                 return (pitch - drawn) / 2.0
             }
-            val px = pw / DP_ACROSS
+            val px = pw / SkinTheme.DP_ACROSS
             fun dp(v: Double) = (v / px).roundToInt().coerceIn(0, MAX_INSET_DP)
             return dp(gap(pitchY, vh, ih, box.height)) to dp(gap(pitchX, vw, iw, box.width))
         }
@@ -231,12 +251,17 @@ class BaiduSkin(private val f: SkinFiles) : SkinSource {
         }
     }
 
+    // the kinds of key styled on their own, in the order they are read (the function keys' before backspace's and
+    // shift's, which take theirs where it is the same), each with the theme selector it becomes
+    private enum class Kind(val selector: String) {
+        LETTER(KEY), FUNCTION("key.function"), SPACE("key.space"), ENTER("key.enter"),
+        BACKSPACE("key[role=backspace]"), SHIFT("key[role=shift]"),
+    }
+
     companion object {
         private const val GEN = "port/gen.ini"
         private const val RECT = 4
         private const val KEY = "key"
-        private const val LETTER = "letter"
-        const val DP_ACROSS = 360.0
         private const val MAX_INSET_DP = 24
         private const val OVERLAP = 1.05
         private const val DEFAULT_WIDTH = 1080
@@ -248,10 +273,8 @@ class BaiduSkin(private val f: SkinFiles) : SkinSource {
         private val FUNCTION = Regex("F\\d+")
 
         // Baidu's action codes of the keys styled on their own
-        private val FUNCTION_KINDS = mapOf("F38" to "space", "F39" to "enter", "F75" to "enter", "F36" to "backspace", "F10" to "shift", "F11" to "shift")
-        private val SELECTORS = listOf(
-            LETTER to KEY, "function" to "key.function", "space" to "key.space", "enter" to "key.enter",
-            "backspace" to "key[role=backspace]", "shift" to "key[role=shift]",
+        private val FUNCTION_KINDS = mapOf(
+            "F38" to Kind.SPACE, "F39" to Kind.ENTER, "F75" to Kind.ENTER, "F36" to Kind.BACKSPACE, "F10" to Kind.SHIFT, "F11" to Kind.SHIFT,
         )
 
         /** Whether [names] are a Baidu classic skin's. */

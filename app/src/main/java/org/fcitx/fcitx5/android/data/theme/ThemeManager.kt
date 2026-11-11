@@ -54,6 +54,13 @@ object ThemeManager {
         it.migrateSizeFollow()
     }
 
+    // the built-in packs' names ([BuiltinPacks], unpacked here first): a 3.0 theme of the user's named as one (a file
+    // from before, a backup) is moved off it as off a built-in theme's ([clashesBuiltin])
+    private val builtinPackNames: Set<String> = BuiltinPacks.dir(appContext).let { root ->
+        BuiltinPacks.unpack(root) { BuiltinPacks.open(appContext, it) }
+        BuiltinPacks.names(root).toSet()
+    }
+
     // before the themes, which an older format's are read with (the key style settings before 3.0)
     private val customThemes: MutableList<Theme.Custom> = listCustomThemes(prefs).first.toMutableList()
 
@@ -65,11 +72,14 @@ object ThemeManager {
     // one of the same name (imported before it was built in) is shown instead
     private var builtinPacks: List<Theme.Pack> = listBuiltinPacks()
 
-    // unpacked again where they are gone (a stamp read else), then listed
+    // unpacked where this version has not been (or a folder of theirs is gone), then listed
     private fun listBuiltinPacks(): List<Theme.Pack> = BuiltinPacks.dir(appContext).let { root ->
         BuiltinPacks.unpack(root) { BuiltinPacks.open(appContext, it) }
         BuiltinPacks.list(root, builtinThemes, packs.mapTo(HashSet()) { it.file })
     }
+
+    /** The built-in packs' names, those hidden by a pack of the user's of the same name too ([BuiltinPacks.names]). */
+    val BuiltinPackNames: Set<String> get() = builtinPackNames
 
     /** The built-in packs, each version one ([BuiltinPacks]). */
     val BuiltinPackThemes: List<Theme.Pack> get() = builtinPacks
@@ -196,9 +206,10 @@ object ThemeManager {
         return themes to changed
     }
 
-    /** Whether a theme of the user's named [name] would hide a built-in theme, or a dropped one's name ([BuiltinThemeFiles.RETIRED]). */
+    /** Whether a theme of the user's named [name] would hide a built-in theme or pack, or a dropped one's name ([BuiltinThemeFiles.RETIRED]). */
     @VisibleForTesting
-    internal fun clashesBuiltin(name: String) = BuiltinThemeFiles.find(builtinThemes, name) != null || name in BuiltinThemeFiles.RETIRED
+    internal fun clashesBuiltin(name: String) = BuiltinThemeFiles.find(builtinThemes, name) != null || name in BuiltinThemeFiles.RETIRED ||
+        name in builtinPackNames
 
     /**
      * The theme [name] refers to: the user's 3.0 theme of that name, else a pack's version ([BuiltinThemeFiles.find]:

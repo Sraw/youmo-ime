@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.runtime.UserWord.Kind.ADDED
 import org.fcitx.fcitx5.android.engine.runtime.UserWord.Kind.BLOCKED
@@ -55,7 +56,7 @@ class VoiceHomophonesTest {
     private fun readings(w: UserWord): List<IntArray> = w.text.map { c -> chars.getValue(c).take(1).toIntArray() }
 
     private fun homophones(vararg words: UserWord) =
-        VoiceHomophones.of(words.toList(), ::readings) { chars }
+        VoiceHomophones.of(words.toList(), ::readings) { chars[it] }
 
     private open class FakeDictionary(
         val words: Set<String> = setOf("公式", "攻势", "徐静雨", "瑞典"),
@@ -77,59 +78,37 @@ class VoiceHomophonesTest {
 
     private fun added(text: String) = UserWord(text, "", ADDED)
 
-    @Test
-    fun `a learned word typed more than three times, or one added, is put in for what reads as it`() {
-        assertEquals("找一下徐婧，", replaced(homophones(learned("徐婧", 4f)), "找一下徐静，"))
-        assertEquals("找一下徐婧，", replaced(homophones(added("徐婧")), "找一下徐静，"))
-        assertEquals("找一下徐静，", replaced(homophones(learned("徐婧", 3f)), "找一下徐静，"))
-    }
+    // what one text becomes with the user's words, the dictionary FakeDictionary's unless given: a row each
+    private fun row(why: String, words: List<UserWord>, heard: String, out: String, dictionary: VoiceHomophones.Dictionary = FakeDictionary()) =
+        why to { assertEquals(why, out, replaced(homophones(*words.toTypedArray()), heard, dictionary)) }
 
     @Test
-    fun `the tones must match too`() {
-        // 许 is xu3, 徐婧 xu2
-        assertEquals("许静来了", replaced(homophones(added("徐婧")), "许静来了"))
-    }
-
-    @Test
-    fun `a word the user has themselves is never replaced`() {
-        // they typed 徐静 once too: theirs, however often
-        assertEquals("徐静来了", replaced(homophones(added("徐婧"), learned("徐静", 1f)), "徐静来了"))
-        // nor one inside a longer word of theirs
-        assertEquals("徐静静", replaced(homophones(added("徐婧"), learned("徐静静", 1f)), "徐静静"))
-    }
-
-    @Test
-    fun `a common word of the dictionary is left alone`() {
-        assertEquals("这个公式", replaced(homophones(added("攻势")), "这个公式"))
-    }
-
-    @Test
-    fun `nothing inside a longer word of the dictionary, nor across a common one's edge`() {
-        assertEquals("徐静雨来了", replaced(homophones(added("徐婧")), "徐静雨来了"))
-        assertEquals("和瑞典", replaced(homophones(added("何芮")), "和瑞典"))
-        // 和瑞 alone: no word crosses it
-        assertEquals("何芮来了", replaced(homophones(added("何芮")), "和瑞来了"))
-    }
-
-    @Test
-    fun `a dictionary word read otherwise is left alone`() {
-        val dictionary = FakeDictionary(words = setOf("徐静"), common = emptySet(), read = mapOf("徐静" to intArrayOf(reading(xu, 2), reading(jing, 3))))
-        assertEquals("徐静", replaced(homophones(added("徐婧")), "徐静", dictionary))
-        val same = FakeDictionary(words = setOf("徐静"), common = emptySet(), read = mapOf("徐静" to intArrayOf(reading(xu, 2), reading(jing, 0))))
-        assertEquals("徐婧", replaced(homophones(added("徐婧")), "徐静", same))
-    }
-
-    @Test
-    fun `a character of several readings matches by any`() {
-        // 长 chang2 or zhang3: the user's 掌掌 zhang3 zhang3
-        assertEquals("掌掌", replaced(homophones(added("掌掌")), "长长"))
-    }
-
-    @Test
-    fun `of words read alike, the added first, then the most typed`() {
-        assertEquals("徐婧", replaced(homophones(learned("徐靖", 9f), added("徐婧")), "徐静"))
-        // learned come most typed first (Engines.userWords)
-        assertEquals("徐靖", replaced(homophones(learned("徐靖", 9f), learned("徐婧", 5f)), "徐静"))
+    fun `what reads as a word of the user's becomes it, but where the dictionary or their own words say otherwise`() {
+        val otherwise = FakeDictionary(words = setOf("徐静"), common = emptySet(), read = mapOf("徐静" to intArrayOf(reading(xu, 2), reading(jing, 3))))
+        val sameToneless = FakeDictionary(words = setOf("徐静"), common = emptySet(), read = mapOf("徐静" to intArrayOf(reading(xu, 2), reading(jing, 0))))
+        val h = listOf(added("徐婧"), added("何芮"), added("婧攻"))
+        assertRows(
+            row("a learned word typed more than three times is put in", listOf(learned("徐婧", 4f)), "找一下徐静，", "找一下徐婧，"),
+            row("an added word is put in at once", listOf(added("徐婧")), "找一下徐静，", "找一下徐婧，"),
+            row("a learned word typed three times takes no part", listOf(learned("徐婧", 3f)), "找一下徐静，", "找一下徐静，"),
+            row("the tones must match too: 许 is xu3, 徐婧 xu2", listOf(added("徐婧")), "许静来了", "许静来了"),
+            row("a word the user typed themselves, however seldom, is never replaced", listOf(added("徐婧"), learned("徐静", 1f)), "徐静来了", "徐静来了"),
+            row("nor one inside a longer word of theirs", listOf(added("徐婧"), learned("徐静静", 1f)), "徐静静", "徐静静"),
+            row("a common word of the dictionary is left alone", listOf(added("攻势")), "这个公式", "这个公式"),
+            row("nothing inside a longer word of the dictionary", listOf(added("徐婧")), "徐静雨来了", "徐静雨来了"),
+            row("nothing across a common word's edge", listOf(added("何芮")), "和瑞典", "和瑞典"),
+            row("no word crossing it: put in", listOf(added("何芮")), "和瑞来了", "何芮来了"),
+            row("a dictionary word read in other tones is left alone", listOf(added("徐婧")), "徐静", "徐静", otherwise),
+            row("a dictionary word whose tone is not known reads as any", listOf(added("徐婧")), "徐静", "徐婧", sameToneless),
+            row("a character of several readings matches by any: 长 chang2 or zhang3", listOf(added("掌掌")), "长长", "掌掌"),
+            row("of words read alike, the added first", listOf(learned("徐靖", 9f), added("徐婧")), "徐静", "徐婧"),
+            // given least typed first: the order is VoiceHomophones.of's own, not its caller's
+            row("of learned words read alike, the most typed first", listOf(learned("徐婧", 5f), learned("徐靖", 9f)), "徐静", "徐靖"),
+            row("several in one segment", h, "徐静和和瑞", "徐婧和何芮"),
+            row("of overlapping ones (徐静, 静公) the first from the start", h, "徐静公", "徐婧公"),
+            row("next to digits and letters", h, "3徐静OK", "3徐婧OK"),
+            row("a single character is no stretch", h, "a徐", "a徐"),
+        )
     }
 
     @Test
@@ -177,13 +156,28 @@ class VoiceHomophonesTest {
     }
 
     @Test
-    fun `several in one segment, overlapping ones the first, next to digits and letters`() {
-        val h = homophones(added("徐婧"), added("何芮"), added("婧攻"))
-        assertEquals("徐婧和何芮", replaced(h, "徐静和和瑞"))
-        // 徐静 and 静公 overlap: the first from the start
-        assertEquals("徐婧公", replaced(h, "徐静公"))
-        assertEquals("3徐婧OK", replaced(h, "3徐静OK"))
-        assertEquals("a徐", replaced(h, "a徐"))
+    fun `a stretch put in where it was typed already stays, though the engine says no as the text grows`() {
+        val hold = homophones(added("何芮")).hold()
+        val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], FakeDictionary()) } }
+        // 何 typed already (settled 3), then 典 makes 和瑞典 a common word over its edge: 何芮 stays,
+        // or tap to talk would type it all again
+        assertEquals("好，何芮", now { hold.replace(VoiceLive.Heard("好，和瑞", 3), yes) }.whole)
+        assertEquals("好，何芮典", now { hold.replace(VoiceLive.Heard("好，和瑞典", 3), yes) }.whole)
+        // not typed yet: the engine's no stands
+        val fresh = homophones(added("何芮")).hold()
+        assertEquals("好，何芮", now { fresh.replace(VoiceLive.Heard("好，和瑞", 2), yes) }.whole)
+        assertEquals("好，和瑞典", now { fresh.replace(VoiceLive.Heard("好，和瑞典", 2), yes) }.whole)
+    }
+
+    @Test
+    fun `a stretch is asked again only as what the dictionary reads around it changes`() {
+        val hold = homophones(added("徐婧")).hold()
+        var asked = 0
+        val text = "徐静" + "来".repeat(11)
+        // the run grows past the words that could cross 徐静: not asked again
+        now { hold.replace(text) { asked++; BooleanArray(it.size) { true } } }
+        now { hold.replace(text + "来来来") { asked++; BooleanArray(it.size) { true } } }
+        assertEquals(1, asked)
     }
 
     // the fakes never suspend: it runs to its end at once

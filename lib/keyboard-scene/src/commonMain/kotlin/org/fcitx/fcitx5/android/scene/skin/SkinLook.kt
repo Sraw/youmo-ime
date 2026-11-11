@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.scene.skin
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 
 /**
- * A skin format the converter reads ([BaiduSkin], [SogouSkin]): what it says of itself, and each of its versions
+ * A skin format the converter reads ([BaiduSkin], [SogouSkin], [TrimeSkin], [FlorisSkin]): what it says of itself, and each of its versions
  * as a [SkinLook]. A new format is one more of these and a line in [SkinConverter.READERS]; the theme is written
  * from the looks alone ([SkinTheme]).
  */
@@ -43,7 +43,7 @@ sealed interface SkinFill {
 class SkinKey(
     val fill: SkinFill?,
     val pressed: SkinFill?,
-    var color: Int?,
+    val color: Int?,
     val pressedColor: Int?,
     val icons: Boolean,
     val drawn: Boolean = false,
@@ -55,9 +55,8 @@ class SkinKey(
  * `key.function`, `key[role=backspace]`, `qwerty/q`), [inset] the gap around a key (up and down, across) in dp.
  */
 class SkinLook(val width: Int) {
-    /** The whole input method's background, the bar's part on top ([barHeight] of its pixels), or null. */
+    /** The whole input method's background, the bar's part on top, or null. */
     var board: Pixels? = null
-    var barHeight = 0
     var boardColor: Int? = null
     var barColor: Int? = null
     val keys = LinkedHashMap<String, SkinKey>()
@@ -158,13 +157,14 @@ class SkinError(val reason: Reason, val detail: String = "", cause: Throwable? =
 /**
  * The bounds the converter holds a skin to: the file, its unpacked files, an image decoded. All of it is in memory at
  * once, in the input method's process: the file, its files (a FlorisBoard extension's in a ZIP counted with the ZIP's,
- * one budget) and the images decoded. The largest of 23 real skins is 8.2 MB, 8.6 MB unpacked.
+ * one budget) and the images decoded. As decided (dev/design/060-skin-import.md §7.1): the file 64 MB, a file in it
+ * 32 MB, all unpacked 128 MB; an iOS skin's atlases unpack to some 20–30 MB.
  */
 object SkinLimits {
-    const val MAX_ARCHIVE_BYTES = 16L * 1024 * 1024
+    const val MAX_ARCHIVE_BYTES = 64L * 1024 * 1024
     const val MAX_ENTRIES = 5000
-    const val MAX_ENTRY_BYTES = 16L * 1024 * 1024
-    const val MAX_TOTAL_BYTES = 32L * 1024 * 1024
+    const val MAX_ENTRY_BYTES = 32L * 1024 * 1024
+    const val MAX_TOTAL_BYTES = 128L * 1024 * 1024
 
     /** Unpacked to packed, for a file past [RATIO_FROM] bytes: past it, a zip bomb. */
     const val MAX_RATIO = 200
@@ -178,4 +178,10 @@ object SkinLimits {
 
     /** A text file read (INI, CSS, TIL): past it, read as empty. */
     const val MAX_TEXT_BYTES = 1024 * 1024
+
+    /**
+     * A keyboard font taken, by every reader: past it, not taken and said ([SkinNote.TEXT_SIZE]). A CJK font is
+     * often 10–30 MB; half a theme pack's own 32 MB a file leaves room for the pictures in the pack's 64 MB.
+     */
+    const val MAX_FONT_BYTES = 16 * 1024 * 1024
 }

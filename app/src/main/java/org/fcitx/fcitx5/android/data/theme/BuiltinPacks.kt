@@ -42,6 +42,12 @@ object BuiltinPacks {
 
     private const val STAMP = ".unpacked"
 
+    private const val ORDER = ".order"
+
+    // "<root>|<version>" of each unpack that failed in this process: not tried again (and its folder deleted again)
+    // at every refresh of the themes, only at the next start
+    private val failedHere = HashSet<String>()
+
     /**
      * Where they are unpacked: the folder whose `v4/` holds them, as the themes' does the user's. Device-protected
      * storage: before the first unlock after a reboot the keyboard draws them still (a slot moved off Nord, say).
@@ -50,11 +56,15 @@ object BuiltinPacks {
 
     /**
      * The packs unpacked into [root] from [open]'s zips (by [FILES]' ids), unless [root] has those of [version] already; whether they are
-     * there. One that does not unpack (a full disk) leaves none: tried again at the next start, its themes not listed.
+     * there. One that does not unpack (a full disk, or a zip the build got wrong) leaves none: tried again at the next
+     * start (not at each refresh of the themes), its themes not listed. A folder gone while the stamp is there is
+     * unpacked again.
      */
     fun unpack(root: File, version: String = "${BuildConfig.VERSION_NAME}/${BuildConfig.VERSION_CODE}", open: (String) -> InputStream): Boolean {
         val stamp = File(root, STAMP)
-        if (stamp.isFile && runCatching { stamp.readText() }.getOrNull() == version) return true
+        if (stamp.isFile && runCatching { stamp.readText() }.getOrNull() == version && placed(root)) return true
+        val attempt = "${root.path}|$version"
+        if (synchronized(failedHere) { attempt in failedHere }) return false
         return try {
             root.deleteRecursively()
             val v4 = ThemePackFiles.folder(root)
@@ -71,13 +81,22 @@ object BuiltinPacks {
             stamp.writeText(version)
             true
         } catch (e: IOException) {
-            failed(root, e)
-        } catch (e: IllegalStateException) {
-            // a zip whose theme.xml does not read: the build's bug, not a crash at every start
-            failed(root, e)
-        } catch (e: SecurityException) {
-            failed(root, e)
+            failed(root, attempt, e)
+        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
+            // a zip whose theme.xml or an entry's name does not read: the build's bug, not a crash at every start
+            failed(root, attempt, e)
         }
+    }
+
+    /** The names of the packs unpacked in [root] ([unpack]), in [FILES]' order; none where they are not. */
+    fun names(root: File): List<String> =
+        if (!File(root, STAMP).isFile) emptyList() else File(root, ORDER).takeIf { it.isFile }?.let { runCatching { it.readLines() }.getOrNull() }.orEmpty()
+
+    // each folder [ORDER] names is there
+    private fun placed(root: File): Boolean {
+        val v4 = ThemePackFiles.folder(root)
+        val names = File(root, ORDER).takeIf { it.isFile }?.let { runCatching { it.readLines() }.getOrNull() } ?: return false
+        return names.all { File(v4, it).isDirectory }
     }
 
     /**
@@ -91,10 +110,9 @@ object BuiltinPacks {
             .sortedBy { p -> order.indexOf(p.file).let { if (it < 0) Int.MAX_VALUE else it } }
     }
 
-    private const val ORDER = ".order"
-
-    private fun failed(root: File, e: Throwable): Boolean {
+    private fun failed(root: File, attempt: String, e: Throwable): Boolean {
         Timber.w(e, "Built-in theme packs not unpacked")
+        synchronized(failedHere) { failedHere += attempt }
         root.deleteRecursively()
         return false
     }

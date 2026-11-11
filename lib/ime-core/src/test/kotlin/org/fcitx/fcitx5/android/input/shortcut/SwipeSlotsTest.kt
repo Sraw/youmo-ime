@@ -152,6 +152,7 @@ class SwipeSlotsTest {
         // nothing but spaces and breaks: signs of them, never a key that looks unset
         assertEquals("␣", KeyMarkText.of(" "))
         assertEquals("↵", KeyMarkText.of("\n"))
+        assertEquals("a CRLF is one line break: one sign", "↵", KeyMarkText.of("\r\n"))
         assertEquals("⇥␣…", KeyMarkText.of("\t  "))
     }
 

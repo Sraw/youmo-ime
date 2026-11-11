@@ -71,12 +71,13 @@ internal class KeySwipes(
     private val markPositionListener = ManagedPreference.OnChangeListener<KeyMarkPosition> { _, _ -> showMarks() }
 
     init {
+        // a panel's keys of no name have marks too (their built-in swipe), placed by the same two settings
+        prefs.keyboard.swipeUpPosition.registerOnChangeListener(markPositionListener)
+        prefs.keyboard.swipeDownPosition.registerOnChangeListener(markPositionListener)
         if (shortcuts) {
             prefs.internal.keySwipes.registerOnChangeListener(slotsListener)
             prefs.keyboard.swipeUp.registerOnChangeListener(waysListener)
             prefs.keyboard.swipeDown.registerOnChangeListener(waysListener)
-            prefs.keyboard.swipeUpPosition.registerOnChangeListener(markPositionListener)
-            prefs.keyboard.swipeDownPosition.registerOnChangeListener(markPositionListener)
         }
     }
 

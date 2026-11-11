@@ -125,7 +125,8 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             look.preedit = textStyle("TextStyle_Composing").first
             look.hintText = textStyle("TextStyle_Popup_Qwerty", "TextStyle_Popup").first
             skin["TextStyle_Qwerty"]?.get("TYPEFACE")?.let(::file)?.takeIf { it.lowercase().endsWith(".ttf") || it.lowercase().endsWith(".otf") }?.let {
-                look.font = it.substringAfterLast('/').lowercase() to f.bytes(it)!!
+                val bytes = f.bytes(it)!!
+                if (bytes.size <= SkinLimits.MAX_FONT_BYTES) look.font = it.substringAfterLast('/').lowercase() to bytes else look.notes += SkinNote.TEXT_SIZE
             }
             sounds(look)
             if (f.names.any { it.endsWith("anim.ini") || it.lowercase().endsWith(".webp") }) look.notes += SkinNote.ANIMATION
@@ -165,10 +166,10 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
         private fun under(look: SkinLook, picture: SkinFill.Image, bar: SkinFill.Image?) {
             val board = Pixels(picture.pixels.width, picture.pixels.height).also { it.paste(picture.pixels, 0, 0) }
             look.boardColor = board.average(keepAlpha = false)
-            look.barHeight = minOf(barHeight(bar, board.width, look), board.height)
+            val h = minOf(barHeight(bar, board.width, look), board.height)
             if (bar != null) {
-                board.over(bar.pixels.nine(bar.insets, board.width, look.barHeight), 0, 0)
-                look.barColor = board.crop(0, 0, board.width, look.barHeight)?.average(keepAlpha = false)
+                board.over(bar.pixels.nine(bar.insets, board.width, h), 0, 0)
+                look.barColor = board.crop(0, 0, board.width, h)?.average(keepAlpha = false)
             }
             look.board = board
         }
@@ -181,7 +182,6 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             board.over(kb, 0, h)
             if (bar != null) board.over(bar.pixels.nine(bar.insets, kb.width, h), 0, 0)
             look.boardColor = colour
-            look.barHeight = h
             look.barColor = board.crop(0, 0, kb.width, h)?.average(keepAlpha = false)
             look.board = board
         }
@@ -211,7 +211,7 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
                 val (nm, hl) = pair(bgOf(section))
                 if (nm != null) look.keys["qwerty/" + m.groupValues[1].lowercase()] = SkinKey(nm, hl, null, null, icons = false)
             }
-            val key = look.keys["key"] ?: throw SkinError(SkinError.Reason.NO_KEYBOARD)
+            var key = look.keys["key"] ?: throw SkinError(SkinError.Reason.NO_KEYBOARD)
             // letters drawn as pictures (keys.ini FG_IMAGES): their colour is all that carries over
             if (key.color == null) {
                 val keys = f.ini(r + "keys.ini")
@@ -219,7 +219,8 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
                     image(keys[d.getValue("FG_IMAGES").split(',')[0].trim()]?.get("NORMAL"))
                 }
                 if (glyph != null) {
-                    key.color = glyph.pixels.glyphColor()
+                    key = SkinKey(key.fill, key.pressed, glyph.pixels.glyphColor(), key.pressedColor, key.icons, key.drawn)
+                    look.keys["key"] = key
                     look.notes += SkinNote.LETTER_IMAGES
                 }
             }
@@ -227,7 +228,7 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             // written (SkinTheme), so the inset, half of it on each side
             (key.fill as? SkinFill.Image)?.pixels?.let { px ->
                 val box = px.opaqueBounds() ?: return@let
-                val scale = look.width / BaiduSkin.DP_ACROSS
+                val scale = look.width / SkinTheme.DP_ACROSS
                 fun dp(v: Int) = (v / 2.0 / scale).roundToInt().coerceIn(0, MAX_INSET_DP)
                 look.inset = dp(box.top + px.height - box.bottom) to dp(box.left + px.width - box.right)
             }
@@ -270,11 +271,10 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             SoundKey.ENTER to listOf("Key_Enter_Qwerty", "Key_Enter"), SoundKey.BACKSPACE to listOf("Key_Backspace_Qwerty", "Key_Backspace"),
         )
 
-        /** Whether [names] are a Sogou phone skin's; a computer skin's (`skin.ini`, no `phoneTheme.ini`) is said so. */
-        fun accepts(names: Set<String>): Boolean {
-            if ("phoneTheme.ini" in names) return true
-            if (names.any { it.substringAfterLast('/').equals("skin.ini", ignoreCase = true) }) throw SkinError(SkinError.Reason.SOGOU_PC)
-            return false
-        }
+        /** Whether [names] are a Sogou phone skin's. */
+        fun accepts(names: Set<String>): Boolean = "phoneTheme.ini" in names
+
+        /** Whether [names], which no reader takes, are a Sogou computer skin's (`skin.ini`): said so, not just unknown. */
+        fun isComputerSkin(names: Set<String>): Boolean = names.any { it.substringAfterLast('/').equals("skin.ini", ignoreCase = true) }
     }
 }

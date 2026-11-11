@@ -83,11 +83,11 @@ class PopupFocus(
         const val CANCELLED = -1
 
         /**
-         * The order [size] keys take round the column in focus, nearest first (the full keyboard's
-         * column order: right, left, right ...): the key's own ([own]) first, in focus, then the rest
-         * as listed. Every layout's long press is laid out so (用户 2026-11-10「全部按全键盘的排法」):
-         * by the screen's edge the key's own is at that end and the rest inward, as on the full
-         * keyboard (060-edge-popup).
+         * The order of priority of [size] keys: the key's own ([own]) first, in focus, then the rest
+         * as listed. The caller (PopupKeyboardUi's columns) places them round the column in focus,
+         * nearest first (the full keyboard's column order: right, left, right ...). Every layout's
+         * long press is laid out so (用户 2026-11-10「全部按全键盘的排法」): by the screen's edge the
+         * key's own is at that end and the rest inward, as on the full keyboard (060-edge-popup).
          */
         fun ownFirst(size: Int, own: Int): IntArray =
             (listOf(own) + (0 until size).filter { it != own }).toIntArray()

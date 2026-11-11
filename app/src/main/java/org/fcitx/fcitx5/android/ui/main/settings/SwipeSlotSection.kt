@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
@@ -46,7 +47,9 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
         inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
         filters = arrayOf(InputFilter.LengthFilter(KeyShortcut.MAX_TEXT))
         setText((initial as? SwipeSlot.Text)?.text)
-        setOnFocusChangeListener { _, focused -> if (focused) pick(textButton) }
+        // typed in: the text chosen. Not on focus, which the dialog may give it unasked (a key with no
+        // long press to edit has this field first) and so change a choice kept
+        doAfterTextChanged { pick(textButton) }
     }
 
     val view: LinearLayout = ctx.verticalLayout {
@@ -86,7 +89,7 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
     private fun pick(button: RadioButton) = radios.forEach { it.isChecked = it === button }
 
     private fun showCommand() {
-        commandButton.text = ctx.getString(R.string.shortcut_command) + "：" + ctx.getString(KeyShortcutLooks.of(command).label)
+        commandButton.text = ctx.getString(R.string.shortcut_command_is, ctx.getString(R.string.shortcut_command), ctx.getString(KeyShortcutLooks.of(command).label))
     }
 
     private fun chooseCommand() {
@@ -113,7 +116,7 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
     }
 
     companion object {
-        /** What a slot is said as (a screen reader, the page): the first's words, a command's name, a text's start; none for nothing. */
+        /** What a slot is said as (a screen reader, the page): the first's words, a command's name, a text as it is (its whole, [KeyShortcut.MAX_TEXT] at most); none for nothing. */
         fun shortLabel(ctx: Context, slot: SwipeSlot): String? = when (slot) {
             SwipeSlot.First -> ctx.getString(R.string.slot_first)
             is SwipeSlot.Command -> ctx.getString(KeyShortcutLooks.of(slot.command).label)

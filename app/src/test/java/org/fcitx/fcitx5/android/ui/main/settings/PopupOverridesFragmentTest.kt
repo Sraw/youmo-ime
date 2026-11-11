@@ -11,6 +11,7 @@ import android.widget.FrameLayout
 import android.widget.RadioButton
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -293,6 +294,22 @@ class PopupOverridesFragmentTest {
             click(R.string.swipe_flip_all)
             st.open(SettingsRoute.PopupOverrides)
             click(R.string.undo)
+            assertEquals(SwipeSlots.Default, slots())
+        }
+
+        // 撤销 on the snackbar, still up after the page was left: the step is put back and nothing crashes
+        // (the page, no longer there, was once redrawn and threw)
+        @Test
+        fun theSnackbarsStepBackWorksAfterThePageIsLeft() {
+            open()
+            val page = st.page as PopupOverridesFragment
+            click(R.string.swipe_flip_all)
+            assertTrue(slots() != SwipeSlots.Default)
+            page.findNavController().popBackStack()
+            st.idle()
+            assertFalse(page.isAdded)
+            page.undoLast()
+            st.idle()
             assertEquals(SwipeSlots.Default, slots())
         }
 

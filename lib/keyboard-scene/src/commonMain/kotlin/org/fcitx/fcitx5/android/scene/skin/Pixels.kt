@@ -126,10 +126,14 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
 
     /**
      * This drawn as a nine-patch at [w]×[h]: the corners of [insets] kept as they are, the edges stretched along,
-     * the middle both ways. Insets past half the size are cut to half.
+     * the middle both ways. Insets past half the size are cut to half; insets that leave no middle of this one along
+     * an axis (a skin's inner rect outside its source) are none along it, so nothing is left undrawn.
      */
     fun nine(insets: Box?, w: Int, h: Int): Pixels {
-        val ins = insets ?: Box(0, 0, 0, 0)
+        val given = insets ?: Box(0, 0, 0, 0)
+        val across = given.left.toLong() + given.right < width
+        val down = given.top.toLong() + given.bottom < height
+        val ins = Box(if (across) given.left else 0, if (down) given.top else 0, if (across) given.right else 0, if (down) given.bottom else 0)
         val l = min(min(ins.left, w / 2), width)
         val r = min(min(ins.right, w / 2), width - l)
         val t = min(min(ins.top, h / 2), height)

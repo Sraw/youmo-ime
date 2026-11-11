@@ -89,6 +89,8 @@ class SkinPartsTest {
         assertEquals(10 to 6, src.nine(null, 10, 6).let { it.width to it.height })
         // insets past the size: cut to half
         assertEquals(0xFFFF0000.toInt(), src.nine(Pixels.Box(9, 9, 9, 9), 4, 4)[0, 0])
+        // insets leaving no middle across (an inner rect outside its source): none across, no band left undrawn
+        assertTrue(src.nine(Pixels.Box(3, 0, 0, 0), 8, 3).argb.none { it == 0 })
         // source over: half white over black is grey, transparent over a colour is the colour
         val d = Pixels.filled(2, 1, 0xFF000000.toInt())
         d.over(Pixels(2, 1, intArrayOf(0x80FFFFFF.toInt(), 0)), 0, 0)

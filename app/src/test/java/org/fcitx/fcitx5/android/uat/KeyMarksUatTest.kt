@@ -95,10 +95,6 @@ class KeyMarksUatTest {
         at(KeyMarkPosition.Bottom)
         assertEquals("z BC TR", marksOf("z"))
         assertEquals("BC,TC", backspaceMarks())
-        // 滑动 the other way moves nothing
-        prefs.setLayers(SwipeLayersChoice.SymbolUpShortcutDown)
-        h.idle()
-        assertEquals("z BC TR", marksOf("z"))
         at(KeyMarkPosition.BottomRight)
         symbolsAt(KeyMarkPosition.TopLeft)
         assertEquals("z BR TL", marksOf("z"))
@@ -113,6 +109,19 @@ class KeyMarksUatTest {
         at(KeyMarkPosition.None)
         assertEquals("z - -", marksOf("z"))
         assertEquals("", backspaceMarks())
+    }
+
+    // the default is the long press's first up: only turning it down (the two places swapped with it) shows the
+    // marks staying where they were
+    @Test
+    @Uat("KB-66")
+    fun theSwipesTurnedTheMarksStay() {
+        h.start()
+        at(KeyMarkPosition.Bottom)
+        assertEquals("z BC TR", marksOf("z"))
+        prefs.setLayers(SwipeLayersChoice.ShortcutUpSymbolDown)
+        h.idle()
+        assertEquals("z BC TR", marksOf("z"))
     }
 
     @Test

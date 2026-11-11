@@ -106,6 +106,7 @@ class FacadeShotsTest {
         assertTrue(EnvJson.read("{\"height\": 2, \"density\": 1}") is Parsed.Failed)
         assertTrue(EnvJson.read("[1]") is Parsed.Failed)
         assertTrue(EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"marks\": {\"shortcuts\": {\"a:up\": {\"icon\": \"x\", \"text\": \"y\"}}}}") is Parsed.Failed)
+        assertTrue(EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"marks\": {\"shortcuts\": {\"a:up\": {\"corner\": false}}}}") is Parsed.Failed)
         assertTrue(EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"states\": {\"a\": [\"pressed-ish\"]}}") is Parsed.Failed)
         assertTrue(EnvJson.read("{\"width\": \"1\", \"height\": 2, \"density\": 1}") is Parsed.Failed)
         assertTrue(EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"dark\": 1}") is Parsed.Failed)

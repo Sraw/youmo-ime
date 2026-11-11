@@ -10,11 +10,11 @@ import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.ScopeEvent
-import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class InputBroadcaster : TypedComponent<InputBroadcaster>(), Dependent, InputBroadcastReceiver {

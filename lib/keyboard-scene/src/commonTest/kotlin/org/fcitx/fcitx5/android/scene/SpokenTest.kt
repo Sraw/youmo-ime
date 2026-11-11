@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.engine.Expand
@@ -8,7 +12,9 @@ import kotlin.test.assertEquals
 
 class SpokenTest {
 
-    // a label that itself reads "%2$s" stays as written: both places are filled in one pass
+    // the bug: the spoken template's two places were filled one after the other, so a label that
+    // itself reads "%2$s" had the second place's text put into it. Both are filled in one pass:
+    // the label stays as written
     @Test
     fun aLabelHoldingAPlaceholderIsReadAsWritten() {
         val said = Expand.spoken(KeyAttrs(), false, "%2\$s", "1", Texts())

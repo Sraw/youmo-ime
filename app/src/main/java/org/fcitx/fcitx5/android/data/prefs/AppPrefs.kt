@@ -832,26 +832,26 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val sp = sharedPreferences
         if (OLD_SWIPE.none(sp::contains) && sp.contains(KEY_SWIPES)) return
         // each read as unset where it is stored as another type (a bad backup): never a crash at every start
-        fun string(key: String) = runCatching { sp.getString(key, null) }.getOrNull()
-        fun at(key: String, default: KeyMarkPosition) =
-            string(key)?.let { v -> KeyMarkPosition.entries.firstOrNull { it.name == v } }?.at ?: default.at
-        val layers = string(SWIPE_LAYERS)?.let { v -> SwipeLayersChoice.entries.firstOrNull { it.name == v } }?.layers
-        val r = SwipeMigration.of(
+        fun storedString(key: String) = runCatching { sp.getString(key, null) }.getOrNull()
+        fun storedPosition(key: String, default: KeyMarkPosition) =
+            storedString(key)?.let { v -> KeyMarkPosition.entries.firstOrNull { it.name == v } }?.at ?: default.at
+        val layers = storedString(SWIPE_LAYERS)?.let { v -> SwipeLayersChoice.entries.firstOrNull { it.name == v } }?.layers
+        val moved = SwipeMigration.of(
             layers,
             upgraded = sp.contains(PID),
-            shortcuts = KeyShortcuts.parse(string(KEY_SHORTCUTS).orEmpty()),
-            symbolAt = at(PUNCTUATION_POSITION, KeyMarkPosition.TopRight),
-            shortcutAt = at(SHORTCUT_MARK_POSITION, KeyMarkPosition.TopLeft),
+            shortcuts = KeyShortcuts.parse(storedString(KEY_SHORTCUTS).orEmpty()),
+            symbolAt = storedPosition(PUNCTUATION_POSITION, KeyMarkPosition.TopRight),
+            shortcutAt = storedPosition(SHORTCUT_MARK_POSITION, KeyMarkPosition.TopLeft),
         )
         // a 0.6 setting already there (set, then a 0.5 backup's old ones merged in by hand) is the user's newer
         val keep = sp.contains(KEY_SWIPES)
         sp.edit {
             if (!keep) {
-                putString(KEY_SWIPES, r.slots.serialize())
-                if (!r.up) putBoolean(SWIPE_UP, false)
-                if (!r.down) putBoolean(SWIPE_DOWN, false)
-                if (r.upAt != KeyMarks.At.TopRight) putString(SWIPE_UP_POSITION, KeyMarkPosition.of(r.upAt).name)
-                if (r.downAt != KeyMarks.At.TopLeft) putString(SWIPE_DOWN_POSITION, KeyMarkPosition.of(r.downAt).name)
+                putString(KEY_SWIPES, moved.slots.serialize())
+                if (!moved.up) putBoolean(SWIPE_UP, false)
+                if (!moved.down) putBoolean(SWIPE_DOWN, false)
+                if (moved.upAt != KeyMarks.At.TopRight) putString(SWIPE_UP_POSITION, KeyMarkPosition.of(moved.upAt).name)
+                if (moved.downAt != KeyMarks.At.TopLeft) putString(SWIPE_DOWN_POSITION, KeyMarkPosition.of(moved.downAt).name)
             }
             OLD_SWIPE.forEach(::remove)
         }

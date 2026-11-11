@@ -375,10 +375,11 @@ def real_skins(d, folder):
 @case("ST-101", base="B0-设置", mutates=True)
 def st101(d):
     appearance_tab(d, "大小与样式")
-    d.switch("跟随系统夜间模式", False)
+    d.switch("跟随系统深色模式", False)
     p = os.path.join(tempfile.gettempdir(), f"uat-skin-{d.port}.bds")
     baidu_skin(p)
     push_file(d, p, "uat-skin.bds")
+    os.remove(p)
     d.step("导入皮肤")
     import_theme(d, "uat-skin", confirm=False)
     check(d.wait_text("导入主题 UAT 皮肤", timeout=8, where="all", contains=True), "选 .bds 没有弹出导入确认框")
@@ -401,6 +402,7 @@ def st101(d):
     with open(bad, "wb") as out:
         out.write(b"Skin\x03\x00" + os.urandom(2000))
     push_file(d, bad, "uat-bad.ssf")
+    os.remove(bad)
     import_theme(d, "uat-bad", confirm=False)
     check(d.wait_text("这个搜狗皮肤是加密的", timeout=8, where="all", contains=True), "选加密的 .ssf 没有说原因")
     d.shot("full", "坏皮肤的提示")
@@ -1177,5 +1179,5 @@ case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLong
 
 
 
-case("ST-101", needs="manual:逐个点新内置主题看键盘、动态背景、按键音；列表与不能删由 BuiltinPacksTest 查")(lambda d: None)
+case("ST-103", needs="manual:逐个点新内置主题看键盘、动态背景、按键音；列表与不能删由 BuiltinPacksTest 查")(lambda d: None)
 case("ST-102", needs="manual:要先装 0.6.0 测试版选 Nord/Deep Blue/Monokai 再覆盖安装；迁移由 ThemePrefsMigrationTest 查")(lambda d: None)

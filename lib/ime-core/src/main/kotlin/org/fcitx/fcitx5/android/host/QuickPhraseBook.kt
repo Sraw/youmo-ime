@@ -216,8 +216,8 @@ object QuickPhraseFiles {
 
     private const val NBSP = ' '
 
-    /** What a folder cannot be named: the page's shelves of entries in none, and of all. */
-    val RESERVED_FOLDERS = setOf("全部", "未分类", "未分類", "All", "No folder")
+    /** What a folder cannot be named: the page's shelves of entries in none, of all, and of those with no key. */
+    val RESERVED_FOLDERS = setOf("全部", "未分类", "未分類", "All", "No folder", "待补关键词", "待補關鍵詞", "Need a key")
 
     /** Whether [name] is one of [RESERVED_FOLDERS], case aside (`all` too). */
     fun reservedFolder(name: String): Boolean = RESERVED_FOLDERS.any { it.equals(name, ignoreCase = true) }
@@ -283,10 +283,11 @@ object QuickPhraseFiles {
                 }
             }
         }) { lines += folder to it }
-        // a line with neither key nor note (`｜ x`) has nothing to write it back by: no entry
+        // a key field of no key character is a note alone (`｜ x` is the note `｜`): kept as a keyless entry. One
+        // whose note is blank too (no-break spaces alone) has nothing to show or write it back by: no entry
         val entries = lines.mapNotNull { (f, line) ->
             val (key, note) = split(line.first)
-            QuickPhraseEntry(key, line.second, note, f).takeUnless { key.isEmpty() && note.isEmpty() }
+            QuickPhraseEntry(key, line.second, note, f).takeUnless { key.isEmpty() && note.isBlank() }
         }
         return Parsed(entries, folders.toList(), v2)
     }
@@ -346,7 +347,7 @@ object QuickPhraseFiles {
             val content = parts?.get(2)?.let(FcitxUtils::unescapeForValue)
             if (at != null && content != null) {
                 val (key, note) = split(parts[1])
-                if (key.isNotEmpty() || note.isNotEmpty()) out[QuickPhraseEntry(key, content, note)] = at
+                if (key.isNotEmpty() || note.isNotBlank()) out[QuickPhraseEntry(key, content, note)] = at
             }
         }
         return out

@@ -100,7 +100,7 @@ object SkinSound {
         val bits = le16(b, fmt + FMT_BITS)
         if (channels !in 1..2 || bits != BITS_8 && bits != BITS_16 || rate !in SoundFile.MIN_RATE..MAX_SOURCE_RATE.toInt()) return null
         val frameBytes = channels * bits / BITS_8
-        val n = minOf(dataSize, rate * frameBytes) / frameBytes * frameBytes
+        val n = minOf(dataSize, (rate.toLong() * frameBytes * SoundFile.MAX_MS / MS_PER_SECOND).toInt()) / frameBytes * frameBytes
         var s = IntArray(n / (bits / BITS_8)) { i ->
             if (bits == BITS_8) ((b[data + i].toInt() and BYTE) - SIGN) shl BITS_8 else le16(b, data + 2 * i).toShort().toInt()
         }
@@ -172,4 +172,5 @@ object SkinSound {
     private const val FMT_BITS = 14
     private const val DATA_AT = 36
     private const val WAV_HEADER_OUT = 44
+    private const val MS_PER_SECOND = 1000L
 }

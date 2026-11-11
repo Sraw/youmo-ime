@@ -413,7 +413,7 @@
 - **前提**：B0-14键。
 - **操作**：长按 QW 看弹出的一排；松开不选（往下滑走）。点 BN UI，长按 QW，滑到 q 松开。
 - **预期**：最下面一行是 `1 Q W q w`（QW 在最左，见下），手指一开始在 1 上；上面几行是 q、w 在全键盘上长按出的符号（不含数字、字母和角标的 1）：q、w 长按只有数字和大写，所以 QW 上面没有别的行；长按 AS 时最下面一行是 `6 A S a s`，上面有 `@` `*`（a、s 在全键盘上长按出的符号）。打字中选 q：框里是第一个候选，后面跟着 q。所有键盘的长按都按全键盘的排法（用户 2026-11-10 定）：角标在手指下，其余按列出的顺序右、左、右……围着它排；靠屏幕边的键，角标在靠边那头、其余往里：QW 在最左是 `1 Q W q w`，L 在最右是 `l L 0`，只要往里滑就能选到每一个，往边上滑还是角标。
-- **JVM**：`GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge`（键缝宽的主题里 QW 在最左边：1 在最左，往右一步 Q、四步 w，滑到屏幕边还是 1）、`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`（QW 在最左是 `1 Q W q w`，原地松开打出 1；AS 最下 `6 A S a s`；L 在最右 `l L 0`、左挪一步打出 L、上面 @ *；打字中从长按选字母（测试选 w，和 q 同一路）：先 reset 再上字母）、`KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate`（uatTest，真数据：第一候选后跟字母）；设备上不跑。
+- **JVM**：`GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge`（键缝宽的主题里 QW 在最左边：1 在最左，往右一步 Q、四步 w，滑到屏幕边还是 1）、`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`（QW 在最左是 `1 Q W q w`，原地松开打出 1；AS 最下 `6 A S a s`、上面 @ *；L 在最右 `l L 0`、左挪一步打出 L；打字中从长按选字母（测试选 w，和 q 同一路）：先 reset 再上字母）、`KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate`（uatTest，真数据：第一候选后跟字母）；设备上不跑。
 
 ### PY-89b [P1] 14 键靠屏幕边的键长按，只往里滑
 - **前提**：B0-14键。
@@ -503,7 +503,7 @@
 - **操作**：用两个手指打 dui：点 DF，然后一个手指按住 UI 的左半边不放，另一个手指点 UI 的右半边，再先抬起第一个手指、后抬起第二个；看编码行和候选。
 - **预期**：编码行读 dui，首选是「对」；两次按 UI 各算一个字母，第一下按它自己的落点（左半边 u），不按第二个手指的。
 - **注**：0.6.0 beta1 里第一个手指抬起时用的是第二个手指的落点，两下都偏向 i（060-fast-typing）。`adb shell input` 不能两指叠按，设备上手动。
-- **JVM**：`FastTypingTest.fourteenKeysOverlappingTapsOnOneKeyTypeBoth`、`fourteenKeysOverlappingOneKeyWithDriftTypeBoth`（两下各发一个码，落点各是各的）；不同键叠按、三指滚按、同键快点两下见同一个类。
+- **JVM**：`FastTypingTest.fourteenKeysTwoFingersOnOneKeyTypeEachItsHalf`（两下各发一个码，落点各是各的）；不同键叠按、三指滚按、同键快点两下见同一个类。
 
 ## 笔画筛选
 
@@ -573,8 +573,8 @@
 - **JVM**：`PolyphoneReadingUatTest.aPolyphoneIsReadOnceAboveAsItsWordHasIt`（真数据：拼音、关闭、注音三种；了 le、能 néng、行 xíng，银之后 háng；好了、了解、银行、行走、能按词标）、`EnginesReadingsTest.aPolyphoneFoundByItsPartsOrStrokesIsReadOnceAbove`、`CandidateReadingsTest.aHintOfACharactersSeveralReadingsIsTheOneItHasThere`、`CandidateReadingsTest.aPolyphoneInAWordIsReadAsTheWordHasIt`；设备上照跑（看图）。
 
 ### PY-112 [P1] 注音全键盘的快捷键：按键位套用全键盘的
-- **前提**：B0-注音全键盘，滑动是默认（上滑快捷键），测试页输入框里有字。
-- **操作**：看键角；ㄇ 上滑；ㄋ 上滑。
+- **前提**：B0-注音全键盘，上滑、下滑是默认（下滑快捷键），测试页输入框里有字。
+- **操作**：看键角；ㄇ 下滑；ㄋ 下滑。
 - **预期**：ㄇ（a 的位置）、ㄏ（c）、ㄌ（x）、ㄒ（v）、ㄈ（z）、ㄗ（y）的左上角（下滑图标位置默认）画着全选、复制、剪切、粘贴、撤销、重做的图标，别的键没有；ㄇ 下滑全选；ㄋ 没有快捷键，下滑打出 ㄋ。**按键 → 按键字符和快捷键** 的「注音全键盘」页能改。
 - **JVM**：`ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboardsShortcutsByPlace`、`ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts`；设备上不跑。
 

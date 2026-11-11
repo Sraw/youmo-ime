@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
 import org.fcitx.fcitx5.android.engine.phrase.CommonWords
 import org.fcitx.fcitx5.android.engine.phrase.CommonWords.Problem
@@ -195,7 +196,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                         return@onClick false
                     }
                     Problem.TOO_LONG -> {
-                        (if (text.length > CommonWords.MAX_WORD_CHARS) textField else replacementsField).error = said(problem)
+                        (if (text.codePointCount(0, text.length) > CommonWords.MAX_WORD_CHARS) textField else replacementsField).error = said(problem)
                         return@onClick false
                     }
                     else -> {
@@ -242,7 +243,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
     )
 
     // [block] on fcitx; null, said, where it failed or fcitx stopped. "" for a word of no known pinyin.
-    private suspend fun onFcitx(block: suspend org.fcitx.fcitx5.android.core.HostApi.() -> String?): String? = try {
+    private suspend fun onFcitx(block: suspend HostApi.() -> String?): String? = try {
         viewModel.fcitx.runOnReady(block).orEmpty()
     } catch (e: CancellationException) {
         throw e
@@ -340,19 +341,19 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                     Timber.w(e, "common words: the import's pinyin")
                     emptyMap()
                 }
-                val read = withContext(Dispatchers.Default) { CommonWords.parse(text) { guessed } }
-                val imported = CommonWords.of(ui.entries.toList()).importing(read.words)
-                confirmImport(read, imported)
+                val parsed = withContext(Dispatchers.Default) { CommonWords.parse(text) { guessed } }
+                val imported = CommonWords.of(ui.entries.toList()).importing(parsed.words)
+                confirmImport(parsed, imported)
             }
         }
     }
 
-    private fun confirmImport(read: CommonWords.Read, imported: CommonWords.Imported) {
-        val skipped = read.skipped.size + imported.full.size
+    private fun confirmImport(parsed: CommonWords.Read, imported: CommonWords.Imported) {
+        val skipped = parsed.skipped.size + imported.full.size
         val message = buildString {
             append(getString(R.string.common_words_import_counts, imported.added, imported.updated, skipped))
             // the first few reasons, a line each
-            val reasons = read.skipped.map { getString(R.string.common_words_import_line, it.line, it.text.take(LINE_SHOWN), said(it.problem)) } +
+            val reasons = parsed.skipped.map { getString(R.string.common_words_import_line, it.line, it.text.take(LINE_SHOWN), said(it.problem)) } +
                 imported.full.map { getString(R.string.common_words_import_full, it.text) }
             reasons.take(REASONS_SHOWN).forEach { append('\n').append(it) }
             if (reasons.size > REASONS_SHOWN) append("\n…")
@@ -362,7 +363,9 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             .setMessage(message)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 if (imported.added + imported.updated == 0) return@setPositiveButton
-                val now = imported.words.words
+                // merged again over the list as it is now: the file read again while the picker was up (a
+                // replacement the keyboard removed) is not put back by the merge made before
+                val now = CommonWords.of(ui.entries.toList()).importing(parsed.words).words.words
                 ui.removeItems(0, ui.entries.size)
                 ui.addItems(now)
                 dirty = true
@@ -378,7 +381,8 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         lifecycleScope.launch {
             read?.join()
             if (!readable) return@launch
-            val words = CommonWords.of(ui.entries.toList())
+            // the file's lines not read too, as the file keeps them: an export moved to another phone loses none
+            val words = CommonWords.merged(loaded, CommonWords.of(ui.entries.toList()), loaded)
             ctx.showingFileErrors("common words export") {
                 withContext(Dispatchers.IO) {
                     val temp = File(ctx.cacheDir, "commonwords.export")

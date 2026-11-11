@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -64,34 +65,46 @@ class VoiceLiveTest {
     }
 
     @Test
-    fun whatWasHeardAfterTheLastShownStaysForTheNextUtterance() {
-        val live = polished()
-        val shown = live.closed("今天天气不错").upTo
-        // heard after the field last showed it, before the app took the text: never shown, kept
-        live.closed("我们走吧")
-        live.heard("马上")
-        live.restart(1, shown)
-        assertEquals("我们走吧马上", live.raw)
-        // the segment being said when it showed closed since: what of it showed left out
-        val other = polished()
-        val mid = other.heard("你好").upTo
-        other.closed("你好世界")
-        other.restart(1, mid)
-        assertEquals("世界", other.raw)
-        // the segment being said then closed as a sound only (nothing kept): the next one whole
-        val sound = polished()
-        val noise = sound.heard("嗯").upTo
-        sound.closed("嗯。")
-        sound.closed("嗯好的")
-        sound.restart(1, noise)
-        assertEquals("嗯好的", sound.raw)
-        // none of the utterance shown: nothing left out
-        val none = polished()
-        none.closed("你好")
-        none.restart(1, null)
-        assertEquals(1, none.utterance)
-        assertEquals("你好", none.raw)
-    }
+    fun whatWasHeardAfterTheLastShownStaysForTheNextUtterance() = assertRows(
+        "heard after the field last showed it, before the app took the text: never shown, kept" to {
+            val live = polished()
+            val shown = live.closed("今天天气不错").upTo
+            live.closed("我们走吧")
+            live.heard("马上")
+            live.restart(1, shown)
+            assertEquals("我们走吧马上", live.raw)
+        },
+        "the segment being said when it showed closed since: what of it showed left out" to {
+            val live = polished()
+            val mid = live.heard("你好").upTo
+            live.closed("你好世界")
+            live.restart(1, mid)
+            assertEquals("世界", live.raw)
+        },
+        "the segment then closed after one ending in a mark: the mark is no edit, a short one's sent character not typed again" to {
+            val live = VoiceLive()
+            live.closed("你好。")
+            val mid = live.heard("好").upTo
+            live.closed("好的")
+            live.restart(1, mid)
+            assertEquals("的", live.raw)
+        },
+        "the segment being said then closed as a sound only (nothing kept): the next one whole" to {
+            val live = polished()
+            val noise = live.heard("嗯").upTo
+            live.closed("嗯。")
+            live.closed("嗯好的")
+            live.restart(1, noise)
+            assertEquals("嗯好的", live.raw)
+        },
+        "none of the utterance shown: nothing left out" to {
+            val live = polished()
+            live.closed("你好")
+            live.restart(1, null)
+            assertEquals(1, live.utterance)
+            assertEquals("你好", live.raw)
+        },
+    )
 
     @Test
     fun theEndpointsChoiceWritingASentCharacterOtherwiseTypesItNotAgain() {

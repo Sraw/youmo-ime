@@ -109,7 +109,8 @@ class TrimeSkin(private val f: SkinFiles) : SkinSource {
             if (h != null && v != null) look.inset = (v / 2).roundToInt().coerceIn(0, MAX_INSET) to (h / 2).roundToInt().coerceIn(0, MAX_INSET)
             (style["round_corner"] as? String)?.toDoubleOrNull()?.let { look.radius = it.coerceIn(0.0, MAX_RADIUS) }
             (style["key_font"] as? String)?.let { font -> f.first("fonts/$font") }?.let { at ->
-                f.bytes(at)?.takeIf { it.size <= MAX_FONT_BYTES }?.let { look.font = at.substringAfterLast('/').lowercase() to it }
+                // past the limit: not taken, said by TEXT_SIZE below as every Trime theme's sizes are
+                f.bytes(at)?.takeIf { it.size <= SkinLimits.MAX_FONT_BYTES }?.let { look.font = at.substringAfterLast('/').lowercase() to it }
             }
             look.notes += SkinNote.LAYOUT
             look.notes += SkinNote.TEXT_SIZE
@@ -168,7 +169,6 @@ class TrimeSkin(private val f: SkinFiles) : SkinSource {
         private const val MAX_HOPS = 12
         private const val MAX_INSET = 24
         private const val MAX_RADIUS = 32.0
-        const val MAX_FONT_BYTES = 4 * 1024 * 1024
 
         /**
          * The theme's file: the largest ([size]) `*.trime.yaml` at the top (a theme's repository has small variants and

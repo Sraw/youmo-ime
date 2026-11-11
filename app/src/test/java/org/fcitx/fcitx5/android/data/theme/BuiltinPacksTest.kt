@@ -82,4 +82,39 @@ class BuiltinPacksTest {
         assertEquals(emptyList<Theme.Pack>(), BuiltinPacks.list(root, ThemeManager.BuiltinThemes))
         root.deleteRecursively()
     }
+
+    @Test
+    fun aFolderGoneUnderTheStampIsUnpackedAgain() {
+        // the stamp alone was trusted: a pack's folder deleted (a cleaner app) stayed gone until the next version
+        val root = File(appContext.cacheDir, "bp-gone").apply { deleteRecursively() }
+        assertTrue(BuiltinPacks.unpack(root, "v1") { BuiltinPacks.open(appContext, it) })
+        val names = BuiltinPacks.names(root)
+        assertEquals(BuiltinPacks.FILES.size, names.size)
+        assertTrue(File(ThemePackFiles.folder(root), names.first()).deleteRecursively())
+        assertTrue(BuiltinPacks.unpack(root, "v1") { BuiltinPacks.open(appContext, it) })
+        assertEquals(BuiltinPacks.FILES.size, BuiltinPacks.list(root, ThemeManager.BuiltinThemes).distinctBy { it.file }.size)
+        root.deleteRecursively()
+    }
+
+    @Test
+    fun oneThatFailedIsNotTriedAgainUntilTheNextStart() {
+        // each refresh of the themes (each opening of the theme page) deleted and unpacked all of them again
+        val root = File(appContext.cacheDir, "bp-failed").apply { deleteRecursively() }
+        var opened = 0
+        val failing = { id: String -> opened++; if (id == "cream") throw IOException("full") else BuiltinPacks.open(appContext, id) }
+        assertFalse(BuiltinPacks.unpack(root, "v1", failing))
+        val once = opened
+        assertFalse(BuiltinPacks.unpack(root, "v1", failing))
+        assertEquals(once, opened)
+        root.deleteRecursively()
+    }
+
+    @Test
+    fun aZipThatDoesNotReadIsNoCrash() {
+        // only some exceptions were caught: another one out of a zip the build got wrong crashed every start
+        val root = File(appContext.cacheDir, "bp-bad").apply { deleteRecursively() }
+        assertFalse(BuiltinPacks.unpack(root, "v1") { throw IllegalArgumentException("bad entry name") })
+        assertEquals(emptyList<String>(), BuiltinPacks.names(root))
+        root.deleteRecursively()
+    }
 }

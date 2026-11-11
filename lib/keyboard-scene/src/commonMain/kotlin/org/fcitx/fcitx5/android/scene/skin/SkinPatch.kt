@@ -60,7 +60,6 @@ object SkinPatch {
             null -> Unit
         }
         look.board = out
-        look.barHeight = h
         look.boardColor = colour
         look.barColor = out.crop(0, 0, kb.width, h)?.average(keepAlpha = false) ?: colour
     }
@@ -77,9 +76,10 @@ object SkinPatch {
         return kb.resized(maxOf(1, (kb.width * s).roundToInt()), maxOf(1, (kb.height * s).roundToInt()))
     }
 
-    /** Whether two fills are the same: equal colours, or images of the same pixels. */
+    /** Whether two fills are the same (two of none too): equal colours, or images of the same pixels and insets. */
     fun same(a: SkinFill?, b: SkinFill?): Boolean = when {
-        a is SkinFill.Image && b is SkinFill.Image -> a.pixels.width == b.pixels.width && a.pixels.argb.contentEquals(b.pixels.argb)
+        a is SkinFill.Image && b is SkinFill.Image ->
+            a.insets == b.insets && a.pixels.width == b.pixels.width && (a.pixels === b.pixels || a.pixels.argb.contentEquals(b.pixels.argb))
         else -> a == b
     }
 

@@ -165,7 +165,7 @@
     <string name="exception_skin_unknown">This file is no skin the app converts: Baidu\'s (.bds, .bdi), Sogou\'s phone skins (.ssf), FlorisBoard\'s themes (.flex) and Trime\'s (.yaml) are</string>
     <string name="exception_skin_too_big">The skin file is over %1$s MB</string>
     <string name="exception_skin_unpacked_too_big">A file of the skin is too large unpacked</string>
-    <string name="exception_skin_encrypted">The skin has encrypted files, which cannot be read</string>
+    <string name="exception_skin_encrypted">The skin has files that are encrypted or packed in a way that cannot be read</string>
     <string name="exception_skin_unsafe_name">The skin has a file named as a place outside it: %1$s</string>
     <string name="exception_skin_sogou_encrypted">This Sogou skin is encrypted, as Sogou\'s computer skins are: only phone skins (.ssf) are converted</string>
     <string name="exception_skin_sogou_pc">This is a Sogou skin for computers: it has no keyboard to convert</string>
@@ -1123,6 +1123,7 @@
     <string name="nothing_to_copy">Nothing to copy</string>
     <string name="nothing_to_cut">Nothing to cut</string>
     <string name="shortcut_command">Command</string>
+    <string name="shortcut_command_is">%1$s: %2$s</string>
     <string name="shortcut_text">Text</string>
     <string name="shortcut_change">Change</string>
     <string name="shortcut_page_full">Full</string>
@@ -1188,7 +1189,7 @@
     <string name="quick_phrase_too_long_to_save">Over %d characters: too long for quick input</string>
     <string name="quick_phrase_saved">Saved</string>
     <string name="quick_phrase_import_done_too_long">%1$d imported, %2$d duplicates and %3$d over %4$d characters skipped</string>
-    <string name="quick_phrase_import_bad_key">%1$s; %2$d lines with a key or note too long (keys 30 characters at most, notes 30) skipped</string>
+    <string name="quick_phrase_import_bad_key">%1$s; %2$d lines with no key, or a key or note too long (keys %3$d characters at most, notes %4$d), skipped</string>
     <string name="quick_phrase_discard_confirm">Discard your changes?</string>
     <string name="quick_phrase_discard">Discard</string>
     <string name="quick_phrase_keep_editing">Keep editing</string>
@@ -1261,7 +1262,7 @@
     <string name="letter_case_upper">Always uppercase</string>
     <string name="slot_first">First of long press</string>
     <string name="slot_empty">Nothing</string>
-    <string name="slot_section_off"> (off now: turn it on in the keyboard settings)</string>
+    <string name="slot_section_off">" (off now: turn it on in the keyboard settings)"</string>
     <string name="swipe_slots_hint">Tap a key to change its long press characters and what swiping it up and down does.</string>
     <string name="swipe_slots_hint_page">Tap a key to change what swiping it up and down does, and its long press characters.</string>
     <string name="swipe_slots_hint_function">Tap a key to change what swiping it up and down does.</string>

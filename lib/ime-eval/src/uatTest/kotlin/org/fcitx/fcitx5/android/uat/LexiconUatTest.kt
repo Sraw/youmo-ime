@@ -288,6 +288,7 @@ class LexiconUatTest {
         assertEquals("nihao $candidates", 1, candidates.count { it == "你好" })
         assertEquals("nihao $candidates", "您好呀", candidates[2])
     }
+
     // 常用词 (060-common-words): 米字旁 → 米、糸 and 中华人民共和国 → 中国 as the settings page saves them
     private fun EngineReplay.commonWords(text: String) {
         UatEngines.commonWords = text

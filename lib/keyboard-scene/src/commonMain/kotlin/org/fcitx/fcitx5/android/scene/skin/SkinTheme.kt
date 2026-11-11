@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.scene.skin
 
+import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -19,7 +21,10 @@ import kotlin.math.roundToInt
  * - Key faces as `image(…)` nine-patches, their transparent margins cut off (the gap is the key's inset), at most
  *   [MAX_KEY_SIDE] px, drawn at the skin's pixels per dp ([SkinLook.width] / 360).
  * - Square keys with no border nor shadow, as a skin's images draw their own; a pressed face where the skin has one,
- *   else the app's press tint.
+ *   else the app's press tint (every kind without one says so itself: another's pressed face never shows through).
+ * - The key's gap, and at 紧凑 its gap up and down as the app's own themes' ([Gap.compact]).
+ * - A second version restates what the first set that it has not (a single key's face, a kind's press): a light
+ *   style never shows in the dark.
  * - The skin's own name and author; the theme's file names its own (`l-key-n.png`), never a name from the skin.
  */
 class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) -> Pixels?, private val fallbackName: String) {
@@ -28,13 +33,29 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
     // an image of the skin's written once, whichever keys have it (Baidu's styles share an atlas's tiles)
     private val written = HashMap<SkinFill.Image, String>()
 
+    // a second version's board let go as it is read (only the first's is written): one board in memory, not two;
+    // with whether that second version had a picture
+    private fun readLooks(): Pair<Map<Variant, SkinLook>, Boolean> {
+        val order = source.variants.sortedBy { it.ordinal }
+        var darkPicture = false
+        val looks = order.associateWith { v ->
+            source.look(v).also {
+                if (v != order.first()) {
+                    darkPicture = it.board != null
+                    it.board = null
+                }
+            }
+        }
+        return looks to darkPicture
+    }
+
     fun write(): SkinConversion {
-        val looks = source.variants.sortedBy { it.ordinal }.associateWith { source.look(it) }
+        val (looks, darkPicture) = readLooks()
         val first = looks.keys.first()
         val main = looks.getValue(first)
         val notes = LinkedHashSet<SkinNote>()
         looks.values.forEach { notes += it.notes }
-        if (looks.size == 2 && looks.getValue(Variant.DARK).board != null) notes += SkinNote.DARK_PICTURE
+        if (darkPicture) notes += SkinNote.DARK_PICTURE
         val palettes = looks.mapValues { palette(it.value) }
         val variants = if (looks.size == 1 && first == Variant.LIGHT && lum(main.boardColor ?: WHITE) < DARK_BOARD) "dark" else looks.keys.joinToString(" ") { it.word }
         val body = ArrayList<String>()
@@ -54,7 +75,7 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
             add(SkinOutput.Bytes(name, bytes))
             body += """  <font name="skin" src="${escape(name)}"/>"""
         }
-        for ((variant, look) in looks) body += styles(look, variant, scene = if (variant == first) "" else "@dark ")
+        for ((variant, look) in looks) body += styles(look, variant, scene = if (variant == first) "" else "@dark ", firstKeys = main.keys.keys)
         if (main.sounds.isNotEmpty()) {
             body += "  <sounds>"
             for ((key, sound) in main.sounds) {
@@ -120,10 +141,10 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         return c
     }
 
-    // one version's styles; [scene] '' for the first, '@dark ' for the second
-    private fun styles(look: SkinLook, variant: Variant, scene: String): List<String> {
+    // one version's styles; [scene] '' for the first, '@dark ' for the second, which restates each of [firstKeys]
+    private fun styles(look: SkinLook, variant: Variant, scene: String, firstKeys: Set<String>): List<String> {
         val out = ArrayList<String>()
-        val px = look.width / BaiduSkin.DP_ACROSS
+        val px = look.width / DP_ACROSS
         val prefix = variant.word.take(1)
         fun st(selectors: String, vararg attrs: Pair<String, String?>) {
             val set = attrs.filter { it.second != null }
@@ -143,8 +164,23 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
             "key", "radius" to (look.radius?.let { "${dp(it)}dp" } ?: "0"), "border" to "none", "shadow" to "none", "color" to "@keyText", "icon-color" to "@keyText", "press" to "tint",
             "inset" to look.inset?.let { (v, h) -> "${v}dp ${h}dp" },
         )
-        val pressedFaces = look.keys.count { (sel, k) -> key(sel, k, prefix, px, ::st) }
-        if (pressedFaces == 0) st("key:pressed", "overlay" to "@keyPressHighlight")
+        look.inset?.let { (v, h) -> st("@compact key", "inset" to "${Gap.compact(v)}dp ${h}dp") }
+        // the app's press tint, under any kind's pressed face of its own (more specific, or later)
+        st("key:pressed", "overlay" to "@keyPressHighlight")
+        val again = scene.isNotEmpty()
+        for ((sel, k) in look.keys) writeKey(sel, k, prefix, px, again, ::st)
+        // the first version's single keys and kinds this one has not: as this one's letters, not the first's
+        if (again) {
+            val base = look.keys["key"]
+            for (sel in firstKeys - look.keys.keys) {
+                if (base != null) {
+                    writeKey(sel, base, prefix, px, again = true, st = ::st)
+                } else {
+                    st(sel, "fill" to "@key", "color" to "@keyText", "icon-color" to "@keyText")
+                    st("$sel:pressed", "fill" to "@key", "overlay" to "@keyPressHighlight", "color" to "@keyText")
+                }
+            }
+        }
         st("key mark, key shortcut", "color" to "@keyHint", "icon-color" to "@keyHint")
         st("candidate", "color" to "@candidateText")
         st("candidate:first", "color" to "@first")
@@ -173,21 +209,27 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         return out
     }
 
-    // a kind of key's face and colours, by [st]; whether it has a pressed face of its own
-    private fun key(sel: String, k: SkinKey, prefix: String, px: Double, st: (String, Array<out Pair<String, String?>>) -> Unit): Boolean {
+    /**
+     * A kind of key's ([sel]) face and colours, by [st]: its pressed face with no tint over it, or, none, the tint
+     * (another kind's pressed face, more general or the first version's, never shows through). [again]: a second
+     * version's, which sets its pressed colour too, whatever the first version's was.
+     */
+    private fun writeKey(sel: String, k: SkinKey, prefix: String, px: Double, again: Boolean, st: (String, Array<out Pair<String, String?>>) -> Unit) {
         val fill = k.fill?.let { fill(it, prefix, sel, "n", px) }
         // a face with its symbol in it: none of the app's on top
         val color = if (k.drawn) "transparent" else k.color?.let(::hex)
         st(sel, arrayOf("fill" to fill, "color" to color, "icon-color" to color?.takeIf { k.icons || k.drawn }))
-        val pressed = k.pressed?.takeIf { !same(it, k.fill) }?.let { fill(it, prefix, sel, "p", px) }
+        val pressed = k.pressed?.takeIf { !SkinPatch.same(it, k.fill) }?.let { fill(it, prefix, sel, "p", px) }
+        val pressedColor = k.pressedColor?.takeIf { it != k.color && !k.drawn }?.let(::hex)
         st(
             sel.split(',').joinToString(",") { "$it:pressed" },
             arrayOf(
-                "fill" to pressed, "overlay" to pressed?.let { "transparent" },
-                "color" to k.pressedColor?.takeIf { it != k.color && !k.drawn }?.let(::hex),
+                // none of its own: its own face still (a more general kind's pressed face never shows through)
+                "fill" to (pressed ?: fill),
+                "overlay" to if (pressed != null) "transparent" else "@keyPressHighlight",
+                "color" to (pressedColor ?: color?.takeIf { again }),
             ),
         )
-        return pressed != null
     }
 
     // a face's fill value: a colour, or an image of its own (its transparent margins cut, at most MAX_KEY_SIDE)
@@ -208,11 +250,17 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
             )
             p = p.crop(box.left, box.top, box.width, box.height)!!
         }
-        var scale = 1.0
-        if (max(p.width, p.height) > MAX_KEY_SIDE) {
-            scale = MAX_KEY_SIDE.toDouble() / max(p.width, p.height)
-            p = p.resized(max(1, (p.width * scale).roundToInt()), max(1, (p.height * scale).roundToInt()))
+        val side = max(p.width, p.height)
+        var scale = if (side > MAX_KEY_SIDE) MAX_KEY_SIDE.toDouble() / side else 1.0
+        // drawn at a whole density (`image(…, Nx)` takes 1–8): the picture scaled to the nearest, so it draws at the
+        // skin's size (3.45 px a dp is not drawn as 3), down a step where up would pass MAX_KEY_SIDE
+        val d = px * scale
+        if (d >= 1) {
+            var whole = d.roundToInt().coerceAtMost(MAX_DENSITY)
+            if (side * scale * whole / d > MAX_KEY_SIDE) whole = floor(d).toInt().coerceIn(1, MAX_DENSITY)
+            scale *= whole / d
         }
+        if (scale != 1.0) p = p.resized(max(1, (p.width * scale).roundToInt()), max(1, (p.height * scale).roundToInt()))
         val name = (prefix + "-" + sel + "-" + which).lowercase().replace(NOT_NAME, "-").trim('-') + ".png"
         add(SkinOutput.Image(name, p, MAX_KEY_BYTES, shrink = false))
         var l = (ins.left * scale).roundToInt()
@@ -231,12 +279,6 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         return if (r % 100 == 0) (r / 100).toString() else (r / 100.0).toString()
     }
 
-    private fun same(a: SkinFill?, b: SkinFill?): Boolean = when {
-        a is SkinFill.Color && b is SkinFill.Color -> a.argb == b.argb
-        a is SkinFill.Image && b is SkinFill.Image -> a.pixels.width == b.pixels.width && a.pixels.argb.contentEquals(b.pixels.argb)
-        else -> false
-    }
-
     private fun fillColor(f: SkinFill?): Int? = when (f) {
         is SkinFill.Color -> f.argb
         is SkinFill.Image -> f.pixels.average()
@@ -253,6 +295,9 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         const val MAX_PICTURE_BYTES = 16L * 1024 * 1024
         const val MAX_PREVIEW_SIDE = 720
         const val MAX_PREVIEW_BYTES = 500L * 1024
+
+        /** A skin's width across the keyboard is this many dp: its pixels per dp, whatever the format. */
+        const val DP_ACROSS = 360.0
         private const val MAX_DENSITY = 8
         private const val MAX_META = 64
         private const val MAX_FILE_PART = 40

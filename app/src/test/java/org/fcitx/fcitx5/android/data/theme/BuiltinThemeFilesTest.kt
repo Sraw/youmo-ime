@@ -30,7 +30,7 @@ class BuiltinThemeFilesTest {
         assertEquals(BuiltinThemeFiles.FILES.map { it.first }, loaded.map { it.file }.distinct())
     }
 
-    private val retiredFiles = setOf("nord", "deep-blue", "monokai")
+    private val retiredFiles = BuiltinThemeFiles.RETIRED.keys.mapTo(HashSet()) { it.substringBefore('#') }
 
     @Test
     fun eachVersionIsNamedByItsFileAndVersion() {

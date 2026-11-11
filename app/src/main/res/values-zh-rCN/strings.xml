@@ -165,7 +165,7 @@
     <string name="exception_skin_unknown">这个文件不是能转换的皮肤：能转换的是百度（.bds、.bdi）、搜狗手机版（.ssf）的皮肤和 FlorisBoard（.flex）、同文（.yaml）的主题</string>
     <string name="exception_skin_too_big">皮肤文件超过 %1$s MB</string>
     <string name="exception_skin_unpacked_too_big">皮肤里有文件解压后太大</string>
-    <string name="exception_skin_encrypted">皮肤里有加密的文件，读不了</string>
+    <string name="exception_skin_encrypted">皮肤里有加密或用读不了的方式压缩的文件</string>
     <string name="exception_skin_unsafe_name">皮肤里有文件的名字指向皮肤以外的位置：%1$s</string>
     <string name="exception_skin_sogou_encrypted">这个搜狗皮肤是加密的（电脑版皮肤都是）：只能转换手机版皮肤（.ssf）</string>
     <string name="exception_skin_sogou_pc">这是搜狗电脑版的皮肤：里面没有键盘可以转换</string>
@@ -1097,6 +1097,7 @@
     <string name="nothing_to_copy">没有内容可以复制</string>
     <string name="nothing_to_cut">没有内容可以剪切</string>
     <string name="shortcut_command">命令</string>
+    <string name="shortcut_command_is">%1$s：%2$s</string>
     <string name="shortcut_text">文字</string>
     <string name="shortcut_change">换</string>
     <string name="shortcut_page_full">全键盘</string>
@@ -1162,7 +1163,7 @@
     <string name="quick_phrase_too_long_to_save">超过 %d 字，存不成快速输入</string>
     <string name="quick_phrase_saved">已保存</string>
     <string name="quick_phrase_import_done_too_long">导入 %1$d 条，跳过 %2$d 条重复、%3$d 条超过 %4$d 字</string>
-    <string name="quick_phrase_import_bad_key">%1$s；另跳过 %2$d 条关键词或注释太长（关键词最多 30 个字符，注释最多 30 个字）</string>
+    <string name="quick_phrase_import_bad_key">%1$s；另跳过 %2$d 条没有关键词或关键词、注释太长的（关键词最多 %3$d 个字符，注释最多 %4$d 个字）</string>
     <string name="quick_phrase_discard_confirm">放弃这次的修改？</string>
     <string name="quick_phrase_discard">放弃</string>
     <string name="quick_phrase_keep_editing">继续编辑</string>

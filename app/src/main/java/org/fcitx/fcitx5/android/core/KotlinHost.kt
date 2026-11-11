@@ -60,6 +60,7 @@ import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.host.QuickPhraseHooks
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.AppUtil
 import timber.log.Timber
@@ -71,7 +72,6 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.EmptyCoroutineContext
 import org.fcitx.fcitx5.android.host.KeyStates as HostKeyStates
-import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 
 /**
  * The Kotlin host behind [HostApi] (fcitx-replacement §4): [HostCore] on one thread

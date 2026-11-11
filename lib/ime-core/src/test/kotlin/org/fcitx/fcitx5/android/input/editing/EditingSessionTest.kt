@@ -1512,7 +1512,7 @@ class EditingSessionTest {
         s.compose("ni", start = 0)
         e.isAvailable = false
 
-        s.commitText("你")
+        assertEquals("nothing went in", "", s.commitText("你"))
 
         assertTrue("no prediction was queued", s.selection.latest.rangeEquals(2))
         assertFalse("the composition is still held", s.composing.isEmpty())

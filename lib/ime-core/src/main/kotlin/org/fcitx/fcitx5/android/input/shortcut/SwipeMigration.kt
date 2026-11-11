@@ -34,16 +34,7 @@ object SwipeMigration {
         val orientation = if (firstUp) SwipeOrientation.FirstUp else SwipeOrientation.FirstDown
         // each character key's shortcut the way its preset's shortcut is now
         val shortcutUp = !firstUp
-        var slots = SwipeSlots.Default.applied(orientation)
-        for (name in shortcuts.names) {
-            val shortcut = shortcuts.resolve(name)
-            slots = if (KeyShortcuts.formOf(name) == KeyShortcuts.FUNCTION) {
-                val up = name.endsWith(".up")
-                slots.with(name.substringBeforeLast('.'), up, SwipeSlot.of(shortcut))
-            } else {
-                slots.with(name, shortcutUp, SwipeSlot.of(shortcut))
-            }
-        }
+        val slots = withShortcuts(SwipeSlots.Default.applied(orientation), shortcuts, shortcutUp)
         // the two places apart as 0.5 read them: the symbol yielding to the shortcut
         val spots = KeyMarks.settled(symbolAt, shortcutAt)
         return Result(
@@ -54,4 +45,12 @@ object SwipeMigration {
             downAt = if (firstUp) spots.shortcut else spots.symbol,
         )
     }
+
+    /** 0.5's [shortcuts] into [slots]: a character key's on [shortcutUp]'s way, a function key's (`fn/space.up`) its own way. */
+    fun withShortcuts(slots: SwipeSlots, shortcuts: KeyShortcuts, shortcutUp: Boolean): SwipeSlots =
+        shortcuts.names.fold(slots) { s, name ->
+            val slot = SwipeSlot.of(shortcuts.resolve(name))
+            if (KeyShortcuts.formOf(name) == KeyShortcuts.FUNCTION) s.with(name.substringBeforeLast('.'), name.endsWith(".up"), slot)
+            else s.with(name, shortcutUp, slot)
+        }
 }

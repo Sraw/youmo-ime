@@ -8,6 +8,7 @@ import android.graphics.Rect
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -366,6 +367,7 @@ class HandwritingSceneGesturesTest {
     // the comma's long press set by name on 按键字符和快捷键's 功能键 page (060-swipe-slots): the handwriting one's
     // too, the user's list in place of its own
     @Test
+    @Uat("ST-100")
     fun theCommasLongPressSetByNameIsTheUsers() {
         prefs.set(AppPrefs.getInstance().internal.keyPopups, "comma ① ②")
         harness().use { h -> assertEquals(setOf("①", "②"), h.longPress(h.keyNamed("comma")).toSet()) }
@@ -405,7 +407,9 @@ class HandwritingSceneGesturesTest {
             h.swipe(comma, -comma.width * 2f, -comma.height * 1.3f)
             h.idle()
             val up = sent()
-            assertTrue("up, drifted: $up field ${h.field.text}", up.any { "好" in it } || h.field.text.toString() == "好")
+            // a text slot goes in as commitOverEngine puts it: in the field once, no key sent for it
+            assertEquals("up, drifted: $up", "好", h.field.text.toString())
+            assertEquals("up, drifted: no key", emptyList<String>(), up.filter { it.startsWith("sendKey") })
             // down, its slot empty: the stroke off it still types nothing
             h.swipe(comma, -comma.width * 2f, comma.height * 1.3f)
             h.idle()

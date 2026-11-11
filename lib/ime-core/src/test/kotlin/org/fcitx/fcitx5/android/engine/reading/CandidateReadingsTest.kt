@@ -127,6 +127,9 @@ class CandidateReadingsTest {
         "行 after 进 (进行): xíng" to { assertEquals(listOf("xíng"), polyphones.ofHint("行", "hang/xing", before = "进")) },
         "in zhuyin" to { assertEquals(listOf("ㄏㄤˊ"), polyphones.ofHint("行", "xing/hang", ReadingStyle.ZHUYIN, before = "银")) },
         "no reading known: the hint's first" to { assertEquals(listOf("he"), polyphones.ofHint("𠀀", "he/huo")) },
+        // the hint lists at most three: one it does not list is neither drawn nor blocked (oneOf, PartsLookup.shownIn)
+        "行 after 银, the hint without hang: of those it lists" to { assertEquals(listOf("xíng"), polyphones.ofHint("行", "xing/heng", before = "银")) },
+        "blocked in the one drawn" to { assertEquals("xing", polyphones.oneOf("行", "银", "xing/heng")?.let { Syllables.spelling(it.syllable) }) },
         "no syllables, or more than a character: no reading" to {
             assertEquals(emptyList<String>(), polyphones.ofHint("行", "xing/~"))
             assertEquals(emptyList<String>(), polyphones.ofHint("银行", "yin/hang"))

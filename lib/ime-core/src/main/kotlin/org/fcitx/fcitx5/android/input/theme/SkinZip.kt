@@ -31,20 +31,21 @@ object SkinZip {
     /**
      * A skin file [fileName]'s files: a lone YAML theme (Trime's) as itself, held to [SkinLimits.MAX_TEXT_BYTES]; a
      * ZIP holding one FlorisBoard `.flex` and no extension of its own (a download) as that one's; any other ZIP as [read].
+     * [budget]: the bytes unpacked in all, the outer ZIP's files and the inner's together.
      */
-    fun readSkin(input: InputStream, fileName: String): Map<String, ByteArray> {
+    fun readSkin(input: InputStream, fileName: String, budget: Long = SkinLimits.MAX_TOTAL_BYTES): Map<String, ByteArray> {
         val b = bytes(input)
         val name = fileName.substringAfterLast('/')
         if (ThemeFileName.isYaml(name)) {
             if (b.size > SkinLimits.MAX_TEXT_BYTES) fail(Reason.TOO_BIG)
             return mapOf(name to b)
         }
-        val entries = read(b)
+        val entries = read(b, budget)
         val flex = entries.keys.filter { it.endsWith(".flex", ignoreCase = true) }
         val own = entries.keys.any { it.substringAfterLast('/') == "extension.json" }
         if (flex.size != 1 || own) return entries
         // the inner one unpacked within what the outer's files left of the one budget: both are held at once
-        return read(entries.getValue(flex[0]), SkinLimits.MAX_TOTAL_BYTES - entries.values.sumOf { it.size.toLong() })
+        return read(entries.getValue(flex[0]), budget - entries.values.sumOf { it.size.toLong() })
     }
 
     private fun bytes(input: InputStream): ByteArray {
@@ -63,8 +64,12 @@ object SkinZip {
     fun read(b: ByteArray, budget: Long = SkinLimits.MAX_TOTAL_BYTES): Map<String, ByteArray> {
         if (b.size > SkinLimits.MAX_ARCHIVE_BYTES) fail(Reason.TOO_BIG)
         if (b.size >= 4 && String(b, 0, 4, Charsets.ISO_8859_1) == "Skin") fail(Reason.SOGOU_ENCRYPTED)
-        if (b.size < 4 || u32(b, 0) != LOCAL && u32(b, 0) != END) fail(Reason.NOT_ZIP)
-        val entries = central(b) ?: local(b, budget)
+        // the directory found from the end, whatever is before the first entry (a self-extractor's code); a scan from
+        // the start only where it begins as a ZIP does
+        val entries = central(b) ?: run {
+            if (u32(b, 0) != LOCAL) fail(Reason.NOT_ZIP)
+            local(b, budget)
+        }
         val out = LinkedHashMap<String, ByteArray>()
         var total = 0L
         for (e in entries) {
@@ -157,6 +162,7 @@ object SkinZip {
                 b.copyOfRange(e.data, e.data + e.packed)
             }
             DEFLATED -> inflate(b, e.data, e.packed, e.packed.toLong(), cap, e.name).first
+            // ENCRYPTED's case too, as its reason says: a file encrypted or packed in a way not read
             else -> fail(Reason.ENCRYPTED, e.name)
         }
     }
@@ -180,6 +186,8 @@ object SkinZip {
                 if (size > cap) fail(Reason.UNPACKED_TOO_BIG, name)
                 if (size > SkinLimits.RATIO_FROM && size > (packed ?: inf.bytesRead) * SkinLimits.MAX_RATIO) fail(Reason.UNPACKED_TOO_BIG, name)
             }
+            // the data ran out before the stream's end: a file cut short, never taken as whole
+            if (!inf.finished()) fail(Reason.NOT_ZIP, name)
             return out.toByteArray() to inf.bytesRead
         } catch (x: DataFormatException) {
             fail(Reason.NOT_ZIP, name, x)

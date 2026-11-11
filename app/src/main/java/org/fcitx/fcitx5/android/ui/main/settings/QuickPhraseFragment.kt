@@ -13,7 +13,6 @@ import android.text.InputType
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
-import android.widget.HorizontalScrollView
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuInflater
@@ -23,6 +22,8 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.result.ActivityResultLauncher
@@ -31,8 +32,8 @@ import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
-import androidx.core.view.isVisible
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.Lifecycle
@@ -182,7 +183,7 @@ class QuickPhraseFragment : ProgressFragment() {
         // OK tapped before, and its entry there now
         // and the entry it changed gone: one the same added meanwhile (by the keyboard) refused the save
         val savedWas = typedWas?.takeIf { t ->
-            was.getBoolean(SAVING) && all.any { it.sameAs(t) } && was.entry(OLD).let { old -> old == null || old.sameAs(t) || stored(old) == null }
+            was.getBoolean(SAVING) && all.any { it.sameAs(t) && it.folder == t.folder } && was.entry(OLD).let { old -> old == null || old.sameAs(t) || stored(old) == null }
         }
         if (savedWas != null) {
             // OK was tapped and the old page's save finished meanwhile: saved, nothing to show again
@@ -430,7 +431,8 @@ class QuickPhraseFragment : ProgressFragment() {
             .apply { if (entry != null) setNeutralButton(R.string.delete) { _, _ -> delete(entry) } }
             .show()
         val ed = Editor(
-            dialog, entry, filled ?: QuickPhraseEntry("", ""), keyField, contentField, noteField, folderButton,
+            // filled the same way: a new one from a folder deleted meanwhile, nothing typed, is not asked to be given up
+            dialog, entry, (filled ?: QuickPhraseEntry("", "")).let { f -> if (f.folder in folders) f else f.copy(folder = "") }, keyField, contentField, noteField, folderButton,
             // a folder deleted meanwhile is none
             (typed ?: filled)?.folder?.takeIf { it in folders }.orEmpty(),
         )
@@ -598,8 +600,10 @@ class QuickPhraseFragment : ProgressFragment() {
             .setItems(arrayOf(getString(R.string.quick_phrase_folder_rename), getString(R.string.quick_phrase_folder_delete))) { _, which ->
                 if (which == 0) {
                     askFolderName(name) { new ->
+                        // the folder shown, asked before: reading it back has already left it (its old name gone)
+                        val shownBefore = shelf == Shelf.In(name)
                         change("quick phrase folder", { QuickPhraseManager.renameFolder(name, new) }) { done ->
-                            if (done && shelf == Shelf.In(name)) show(Shelf.In(new))
+                            if (done && shownBefore) show(Shelf.In(new))
                         }
                     }
                 } else {
@@ -766,7 +770,7 @@ class QuickPhraseFragment : ProgressFragment() {
                 isChecked = of == shelf
                 setOnClickListener { if (of != null) show(of) else newFolder() }
                 held?.let { h -> setOnLongClickListener { h(); true } }
-                holder.chips.addView(this, android.widget.LinearLayout.LayoutParams(wrapContent, wrapContent).apply { marginEnd = ctx.dp(8) })
+                holder.chips.addView(this, LinearLayout.LayoutParams(wrapContent, wrapContent).apply { marginEnd = ctx.dp(8) })
             }
             chip(getString(R.string.quick_phrase_all), Shelf.All)
             chip(getString(R.string.quick_phrase_unfiled), Shelf.Unfiled)
@@ -924,12 +928,12 @@ private fun skippedToast(ctx: Context, r: QuickPhraseManager.Imported): String {
         // not a .mb file (a picture picked, say): said so, not "0 imported", though a line or
         // two with a bad key are still said
         return if (r.badKey == 0) ctx.getString(R.string.quick_phrase_import_none)
-        else ctx.getString(R.string.quick_phrase_import_bad_key, ctx.getString(R.string.quick_phrase_import_done, 0, 0), r.badKey)
+        else ctx.getString(R.string.quick_phrase_import_bad_key, ctx.getString(R.string.quick_phrase_import_done, 0, 0), r.badKey, QuickPhraseBook.MAX_KEY, QuickPhraseBook.MAX_NOTE)
     }
     val done = if (r.tooLong == 0) {
         ctx.getString(R.string.quick_phrase_import_done, r.added, r.duplicates)
     } else {
         ctx.getString(R.string.quick_phrase_import_done_too_long, r.added, r.duplicates, r.tooLong, QuickPhraseBook.MAX_CONTENT)
     }
-    return if (r.badKey == 0) done else ctx.getString(R.string.quick_phrase_import_bad_key, done, r.badKey)
+    return if (r.badKey == 0) done else ctx.getString(R.string.quick_phrase_import_bad_key, done, r.badKey, QuickPhraseBook.MAX_KEY, QuickPhraseBook.MAX_NOTE)
 }

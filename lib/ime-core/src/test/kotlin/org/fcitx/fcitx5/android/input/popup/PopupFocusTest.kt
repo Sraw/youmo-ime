@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.popup.PopupFocus.Companion.CANCELLED
 import org.junit.Assert.assertEquals
@@ -104,8 +105,10 @@ class PopupFocusTest {
     // 060-edge-popup (用户 2026-11-10「全部按全键盘的排法」): the key's own first, the rest as listed
 
     @Test
+    @Uat("PY-89b")
     fun theKeysOwnComesFirstAndTheRestAsListed() {
-        // 九键's 3: D E F 3 d e f, round the focus (right, left, right ...) as f d E 3 D F e
+        // 九键's 3: D E F 3 d e f, 3 first then the rest as listed (PopupKeyboardUi's columns then
+        // place them round the focus, right, left, right ..., on the screen as f d E 3 D F e)
         assertEquals(listOf(3, 0, 1, 2, 4, 5, 6), PopupFocus.ownFirst(7, 3).toList())
         // 十四键's L: L 0 l, its corner first; at the screen's right l L 0
         assertEquals(listOf(1, 0, 2), PopupFocus.ownFirst(3, 1).toList())

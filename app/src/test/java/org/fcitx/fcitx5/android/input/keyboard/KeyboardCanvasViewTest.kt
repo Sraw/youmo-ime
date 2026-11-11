@@ -316,7 +316,7 @@ class KeyboardCanvasViewTest {
             }
             changed("the first down, no swipe up") { prefs.setLayers(SwipeLayersChoice.SymbolDownOnly) }
             changed("the symbol elsewhere") { prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.BottomLeft) }
-            // the setting makes the input view anew (its other changes go with it): the corner's place is what
+            // the setting makes the keyboards anew (its other changes go with them): the corner's place is what
             // tells the marks' kept spots followed it, left of the letter and below it
             val letter = texts(was).single { it[0] == "q" }
             val at = corner(was)

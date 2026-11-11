@@ -208,17 +208,16 @@ class SettingsMenuUatTest {
             assertEquals("amoled-black", prefs.lightModeTheme.getValue().name)
             assertEquals("amoled-black", prefs.darkModeTheme.getValue().name)
             assertEquals("amoled-black", ThemeManager.activeTheme.name)
-            // the normal slot too: following turned off shows the pick
+            // the normal slot too, the one used once following is turned off
             assertEquals("amoled-black", prefs.normalModeTheme.getValue().name)
             assertTrue(keyboardIsDark())
         } finally {
             prefs.lightModeTheme.setValue(prefs.lightModeTheme.defaultValue)
             prefs.darkModeTheme.setValue(prefs.darkModeTheme.defaultValue)
+            prefs.normalModeTheme.setValue(prefs.normalModeTheme.defaultValue)
             prefs.followSystemDayNightTheme.setValue(prefs.followSystemDayNightTheme.defaultValue)
         }
     }
-
-    private fun dialogText() = dialog().findViewById<TextView>(android.R.id.message)?.text?.toString()
 
     @Test
     @Uat("ST-35")

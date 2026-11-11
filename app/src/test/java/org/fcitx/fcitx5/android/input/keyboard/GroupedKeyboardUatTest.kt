@@ -158,7 +158,7 @@ class GroupedKeyboardUatTest {
     }
 
     @Test
-    @Uat("PY-89")
+    @Uat("PY-89", "PY-89b")
     fun theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove() {
         keys14().start()
         // q and w long-press to their digit and capital alone on the full keyboard: nothing above. At

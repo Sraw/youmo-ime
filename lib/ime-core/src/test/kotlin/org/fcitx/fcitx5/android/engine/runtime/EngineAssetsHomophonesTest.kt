@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.ReadingSource
@@ -50,25 +51,12 @@ class EngineAssetsHomophonesTest : EnginesFixture() {
     }
 
     @Test
-    fun `a tone the tone table has not is the character's reading's, and tones must match`() {
-        assertEquals("找徐婧", replaced("徐婧", "xu jing", "找徐静"))
-        assertEquals("找许静", replaced("徐婧", "xu jing", "找许静"))
-    }
-
-    @Test
-    fun `a character of several readings matches by any`() {
-        assertEquals("掌掌", replaced("掌掌", "zhang zhang", "长长"))
-    }
-
-    @Test
-    fun `a common word by the model's log10 count is left, a rare one read as the word replaced`() {
-        assertEquals("这个公式", replaced("攻势", "gong shi", "这个公式"))
-        // 攻势: a word of the dictionary, read gong1 shi4 as a word too, not common
-        assertEquals("这个公式", replaced("公式", "gong shi", "这个攻势"))
-    }
-
-    @Test
-    fun `a word typed with a syllable it has no reading in takes no part`() {
-        assertEquals("找徐静", replaced("徐婧", "xu qing", "找徐静"))
-    }
+    fun `the readings, tones and counts pinyin data gives decide what is put in`() = assertRows(
+        "a tone the tone table has not is the character's reading's" to { assertEquals("找徐婧", replaced("徐婧", "xu jing", "找徐静")) },
+        "the tones must match: 许 is xu3" to { assertEquals("找许静", replaced("徐婧", "xu jing", "找许静")) },
+        "a character of several readings matches by any" to { assertEquals("掌掌", replaced("掌掌", "zhang zhang", "长长")) },
+        "a common word by the model's log10 count is left" to { assertEquals("这个公式", replaced("攻势", "gong shi", "这个公式")) },
+        "a rare word of the dictionary read as the user's (攻势 gong1 shi4) is replaced" to { assertEquals("这个公式", replaced("公式", "gong shi", "这个攻势")) },
+        "a word typed with a syllable it has no reading in takes no part" to { assertEquals("找徐静", replaced("徐婧", "xu qing", "找徐静")) },
+    )
 }

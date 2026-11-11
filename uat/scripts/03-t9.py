@@ -54,7 +54,7 @@ case("T9-13", needs="jvm:SettingsPagesUatTest.nineKeysLettersEdited")(lambda d: 
 case("T9-15", needs="jvm:HostCasesUatTest.nineKeysAKeyMissedIsTypedWhereTheRowIsTapped")(lambda d: None)
 
 
-case("T9-17", needs="jvm:T9UatTest.aShortSwipeWithGlideOnIsStillTheDigit")(lambda d: None)
+case("T9-17", needs="jvm:T9UatTest.aShortSwipeDownWithGlideOnIsATapOfTheKey")(lambda d: None)
 
 
 case("T9-18", needs="jvm:T9UatTest.theNumberPadsDigitsAreDigitsNotTheNineKeys、NineKeysHostUatTest.theNumberPadsDigitsAreTypedOrPick")(lambda d: None)
@@ -163,7 +163,8 @@ def t960b(d):
     x, y = key.c
     d.touch(("down", x, y), ("sleep", 0.9), ("move", x, y))
     d.shot("kb", f"长按最右的组键 {face}：{face[0]} 在手指下，放不下时在靠边那头")
-    shown = sorted((n for n in d.screen().nodes if n.text in set(face) and n.text and not n.clickable and n.b[3] <= kb.b[1] + (key.b[1] - kb.b[1])),
+    # the popup's row is above the key held
+    shown = sorted((n for n in d.screen().nodes if n.text in set(face) and n.text and not n.clickable and n.b[3] <= key.b[1]),
                    key=lambda n: n.c[0])
     d.touch(("up", x, y))
     time.sleep(0.5)

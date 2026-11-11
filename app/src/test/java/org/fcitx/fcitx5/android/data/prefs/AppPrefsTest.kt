@@ -15,14 +15,11 @@ import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
-import org.fcitx.fcitx5.android.input.shortcut.SwipeMigration
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
@@ -234,28 +231,30 @@ class AppPrefsTest {
     @Test
     fun theOldSwipeSettingBecomesTheTwoWays() {
         // each row from an emptied store of its own: nothing one leaves is read by the next
-        fun row(why: String, stored: SharedPreferences.Editor.() -> Unit, now: SwipeLayersChoice) =
+        fun row(why: String, stored: SharedPreferences.Editor.() -> Unit, orientation: SwipeOrientation, up: Boolean, down: Boolean) =
             why to {
                 sp.edit { clear(); stored() }
                 val prefs = AppPrefs(sp).apply { dropRetired() }
-                val want = SwipeMigration.of(now.layers, upgraded = true, KeyShortcuts.Empty, KeyMarks.At.TopRight, KeyMarks.At.TopLeft)
-                assertEquals(want.slots.orientation, SwipeSlots.parse(prefs.internal.keySwipes.getValue()).orientation)
-                assertEquals(want.up to want.down, prefs.keyboard.swipeUp.getValue() to prefs.keyboard.swipeDown.getValue())
+                // written out, not worked out by SwipeMigration: 0.5's meaning of each direction checked here on its own
+                assertEquals(orientation, SwipeSlots.parse(prefs.internal.keySwipes.getValue()).orientation)
+                assertEquals(up to down, prefs.keyboard.swipeUp.getValue() to prefs.keyboard.swipeDown.getValue())
                 assertFalse("the old setting dropped", sp.contains("swipe_symbol_behavior"))
                 assertFalse("滑动 dropped too", sp.contains("swipe_layers"))
             }
         assertNamedRows(
-            row("Down: the symbol down, shortcuts up", { putString("swipe_symbol_behavior", "Down") }, SwipeLayersChoice.ShortcutUpSymbolDown),
-            row("Up: the symbol up, shortcuts down", { putString("swipe_symbol_behavior", "Up") }, SwipeLayersChoice.SymbolUpShortcutDown),
-            row("Disabled: all off", { putString("swipe_symbol_behavior", "Disabled") }, SwipeLayersChoice.Off),
+            row("Down: the symbol down, shortcuts up", { putString("swipe_symbol_behavior", "Down") }, SwipeOrientation.FirstDown, up = true, down = true),
+            row("Up: the symbol up, shortcuts down", { putString("swipe_symbol_behavior", "Up") }, SwipeOrientation.FirstUp, up = true, down = true),
+            row("Disabled: all off", { putString("swipe_symbol_behavior", "Disabled") }, SwipeOrientation.FirstDown, up = false, down = false),
             row(
                 "one set already is kept",
                 { putString("swipe_symbol_behavior", "Up"); putString("swipe_layers", SwipeLayersChoice.Off.name) },
-                SwipeLayersChoice.Off,
+                SwipeOrientation.FirstDown,
+                up = false,
+                down = false,
             ),
             // the bug: the old key read as a String whatever it held, so a bad backup storing it as an
             // Int threw a ClassCastException in dropRetired at every start; now the default, no crash
-            row("stored as another type (a bad backup): the default, no crash at every start", { putInt("swipe_symbol_behavior", 1) }, SwipeLayersChoice.ShortcutUpSymbolDown),
+            row("stored as another type (a bad backup): the default, no crash at every start", { putInt("swipe_symbol_behavior", 1) }, SwipeOrientation.FirstDown, up = true, down = true),
         )
     }
 

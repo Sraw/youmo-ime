@@ -494,7 +494,7 @@ internal class SessionFactory(
         override fun of(letters: String) = assets.chaiziOf(letters).filterNot { lexicon.isBlocked(it.first) }
 
         // a polyphone's reading as 候选词注音 draws it, blocked in that one
-        override fun shownIn(text: String, before: String) = candidateReadings.oneOf(text, before)?.let { Syllables.spelling(it.syllable) }
+        override fun shownIn(text: String, before: String, hint: String?) = candidateReadings.oneOf(text, before, hint)?.let { Syllables.spelling(it.syllable) }
     }
 
     /**

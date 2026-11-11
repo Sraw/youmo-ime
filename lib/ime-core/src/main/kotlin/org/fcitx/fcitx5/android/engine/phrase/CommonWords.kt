@@ -76,9 +76,12 @@ class CommonWords private constructor(
     }
 
     /** These words without [replacement] of [text]'s; a word left with none goes. */
-    fun without(text: String, replacement: String): CommonWords = CommonWords(
+    fun without(text: String, replacement: String): CommonWords = without(listOf(text), replacement)
+
+    /** [replacement] taken off each of [texts]' words, as [without] one's. */
+    fun without(texts: Collection<String>, replacement: String): CommonWords = CommonWords(
         words.mapNotNull { w ->
-            if (w.text != text) w else w.replacements.filter { it != replacement }.takeIf { it.isNotEmpty() }?.let { Word(w.text, w.syllables, it) }
+            if (w.text !in texts) w else w.replacements.filter { it != replacement }.takeIf { it.isNotEmpty() }?.let { Word(w.text, w.syllables, it) }
         },
         unread,
         newer,
@@ -134,8 +137,11 @@ class CommonWords private constructor(
     // a word under a key, of [kind], its syllables ending at [ends] in it (0 and its length too)
     internal class Hit(val word: Int, val kind: Kind, val ends: IntArray)
 
-    /** A replacement offered: its [text], and the [word] it replaces. */
-    class Found(val text: String, val word: String)
+    /**
+     * A replacement offered: its [text], and the [word] it replaces, the first listed of [words], all the words
+     * under the keys that have it (米字旁 and 米字头 both 米): deleted, it is taken off each, or it is offered still.
+     */
+    class Found(val text: String, val word: String, val words: List<String> = listOf(word))
 
     /** [CommonWords] by their keys, as one way of typing spells them. */
     class Index internal constructor(val of: CommonWords, private val byKey: Map<String, List<Hit>>) {
@@ -170,9 +176,12 @@ class CommonWords private constructor(
         }
 
         private fun ofHits(hits: List<Hit>): List<Found> {
-            val seen = HashSet<String>()
-            return hits.distinctBy { it.word }.sortedWith(compareBy({ it.kind }, { it.word }))
-                .flatMap { h -> of.words[h.word].let { w -> w.replacements.filter(seen::add).map { Found(it, w.text) } } }
+            val byText = LinkedHashMap<String, MutableList<String>>()
+            for (h in hits.distinctBy { it.word }.sortedWith(compareBy({ it.kind }, { it.word }))) {
+                val w = of.words[h.word]
+                for (r in w.replacements) byText.getOrPut(r) { ArrayList(1) }.add(w.text)
+            }
+            return byText.map { (text, words) -> Found(text, words.first(), words) }
         }
     }
 
@@ -260,7 +269,7 @@ class CommonWords private constructor(
                 replacements.any { it.codePointCount(0, it.length) > MAX_REPLACEMENT_CHARS } -> Problem.TOO_LONG
                 // a word, not a sentence: one with a blank is refused, not joined up behind the user's back
                 replacements.any { r -> r.trim().any(Char::isWhitespace) } -> Problem.BLANK_IN_REPLACEMENT
-                kept.isEmpty() -> if (replacements.any { it == text }) Problem.SAME_AS_WORD else Problem.NO_REPLACEMENT
+                kept.isEmpty() -> if (replacements.any { it.trim() == text }) Problem.SAME_AS_WORD else Problem.NO_REPLACEMENT
                 syllables == null -> Problem.NO_PINYIN
                 else -> null
             }
@@ -279,7 +288,9 @@ class CommonWords private constructor(
          * brackets is read as [guess] reads it (the dictionary, for those of them all at once);
          * not read so, it is skipped. Two lines of one word are one, their replacements in turn.
          * Past [MAX_WORDS] words, the rest are skipped too. The lines skipped are kept as they were
-         * ([unread]). A file whose header says a later [VERSION] is read as none ([newer]).
+         * ([unread]), and so is each comment but the header, all in the file's order. A word's
+         * replacements past [MAX_REPLACEMENTS] are dropped ([clean]), not kept. A file whose header
+         * says a later [VERSION] is read as none ([newer]).
          */
         fun parse(text: String, guess: (List<String>) -> Map<String, String?> = { emptyMap() }): Read {
             later(text)?.let { (number, header) -> return Read(CommonWords(emptyList(), newer = true), listOf(Skipped(number, header, Problem.NEWER))) }
@@ -302,7 +313,9 @@ class CommonWords private constructor(
                 val replacements = clean(l.word, before?.replacements.orEmpty() + l.replacements)
                 words[l.word] = Word(l.word, before?.syllables ?: syllables, replacements)
             }
-            return Read(CommonWords(words.values.toList(), skipped.map { it.text }), skipped)
+            // a comment the user wrote is kept too, where it was among the lines skipped; the header is written anew
+            val unread = (skipped.map { it.line to it.text } + comments(text)).sortedBy { it.first }.map { it.second }
+            return Read(CommonWords(words.values.toList(), unread), skipped)
         }
 
         // the header's line and itself where it names a later version than this reads
@@ -325,6 +338,10 @@ class CommonWords private constructor(
             val fields = (read?.groupValues?.get(3) ?: line).trim().split(BLANKS).filter { it.isNotEmpty() }
             if (read != null) Line(i + 1, line, read.groupValues[1], read.groupValues[2], fields) else Line(i + 1, line, fields[0], null, fields.drop(1))
         }.toList()
+
+        // the comment lines of [text] but a header, by line number, trimmed as a skipped line is
+        private fun comments(text: String): List<Pair<Int, String>> = text.removePrefix("\ufeff").lineSequence().withIndex()
+            .mapNotNull { (i, raw) -> raw.trim().takeIf { it.startsWith("#") && !HEADER_LINE.matches(it) }?.let { i + 1 to it } }.toList()
 
         private val BLANKS = Regex("\\s+")
 

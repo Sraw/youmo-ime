@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
@@ -215,6 +216,7 @@ class PopupKeyboardUiTest {
     }
 
     @Test
+    @Uat("PY-89b")
     fun atAnEdgeTheKeysOwnIsAtThatEndAndTheRestInward() {
         // 18 键's L (L - l under 5 symbols), 九键's 2, 九键双拼's 5 and 9 (060-edge-popup): at an edge the
         // key's own at that end, the rest inward as listed, as the full keyboard's own key at an edge
@@ -242,6 +244,28 @@ class PopupKeyboardUiTest {
     }
 
     @Test
+    fun midScreenEveryPopupShapeHasTheKeysOwnInFocus() {
+        // the same shapes as at an edge, the trigger mid-screen: the key's own in focus and typed by a
+        // lift, its first symbol above it, every key typed where it is drawn
+        val cases = listOf(
+            arrayOf("L", "-", "l", "#0", "#1", "#2", "#3", "#4") to 1,
+        ) + listOf(nine('2', false), nine('5', true), nine('9', true)).map { it.items to it.inRow }
+        val middle = Rect(480, 500, 520, 550)
+        for ((keys, inRow) in cases) {
+            val split = 2 * inRow + 1
+            val ui = popup(keys, middle, split = split, inRow = inRow)
+            val drawn = drawn(ui)
+            val what = keys[inRow]
+            assertEquals(what, keys.size, drawn.size)
+            assertEquals(what, 0 to ui.focusColumn, drawn[keys[inRow]])
+            assertEquals(what, KeyAction.HostKeyAction(keys[inRow]), ui.onTrigger())
+            assertEquals(what, ui.focusColumn, drawn[keys[split]]!!.second)
+            drawn.forEach { (label, cell) -> assertEquals(what, PopupKeyboardUi.keyAction(label), ui.select(cell.first, cell.second)) }
+        }
+    }
+
+    @Test
+    @Uat("T9-60b")
     fun aGroupOfNoKeysOwnHasItsFirstAtTheEdge() {
         // 注音九键's group (ZhuyinKeyboard.groupPopup: no inRow, its symbols as shown): by the screen's
         // edge the first, the one a lift types, at that end and the rest inward (060-edge-popup)
@@ -288,8 +312,9 @@ class PopupKeyboardUiTest {
         val wide = 120
         val right = Rect(800, 500, 1000, 550)
         val left = Rect(0, 500, 200, 550)
-        for (insetDp in listOf(3, 9)) for (shuangpin in listOf(false, true)) for ((digits, cell) in listOf("369" to right, "47" to left)) for (d in digits) {
-            assertReachedInward(d, shuangpin, cell, cell == right, (insetDp * density).toInt(), wide)
+        // one face inset: the popup no longer takes it, only the cell's face moves with it
+        for (shuangpin in listOf(false, true)) for ((digits, cell) in listOf("369" to right, "47" to left)) for (d in digits) {
+            assertReachedInward(d, shuangpin, cell, cell == right, (3 * density).toInt(), wide)
         }
     }
 

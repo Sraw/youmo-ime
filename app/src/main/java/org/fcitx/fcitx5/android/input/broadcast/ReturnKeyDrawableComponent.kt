@@ -9,10 +9,10 @@ import android.view.inputmethod.EditorInfo
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.mechdancer.dependency.Dependent
-import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must

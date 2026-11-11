@@ -78,6 +78,7 @@ class KeyCapsTest {
     }
 
     // a tap as a finger makes it, down and up: the frame's click, though the engine's cell under it is a gesture view
+    // (the bug pinned: in 0.6.0's first beta the cell kept the touch, and tapping a key on 按键字符和快捷键 opened no dialog)
     @Test
     fun aTapOnTheKeyIsItsClick() {
         val k = key()
@@ -105,9 +106,10 @@ class KeyCapsTest {
         // the shortcuts top right: bottom right
         prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, KeyMarkPosition.TopRight)
         assertEquals(At.BottomRight, at(key()))
-        // 滑动 moves nothing
-        prefs.setLayers(SwipeLayersChoice.SymbolUpShortcutDown)
+        // the swipes turned (the two places swapped with them): the symbol stays
+        prefs.setLayers(SwipeLayersChoice.ShortcutUpSymbolDown)
         assertEquals(At.BottomRight, at(key()))
+        prefs.setLayers(SwipeLayersChoice.SymbolUpShortcutDown)
         // 无 is none whatever the height
         prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.None)
         assertEquals(At.None, at(key()))

@@ -501,3 +501,4 @@ def py116(d):
 
 
 case("PY-117", needs="jvm:WordListsTest.aBlockedLatinWordReadsBackAsItsLetters、EnginesUserWordsTest.aLatinWordBlockedInPinyinStaysBlockedAfterARestartTillRestored")(lambda d: None)
+case("PY-119", needs="jvm:FastTypingTest.fourteenKeysTwoFingersOnOneKeyTypeEachItsHalf")(lambda d: None)

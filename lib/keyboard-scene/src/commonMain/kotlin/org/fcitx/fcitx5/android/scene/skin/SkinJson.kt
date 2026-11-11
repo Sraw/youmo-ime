@@ -100,7 +100,9 @@ object SkinJson {
                 'b' -> '\b'
                 'f' -> '\u000C'
                 'u' -> {
-                    val code = s.substring(p, minOf(p + HEX_DIGITS, s.length)).takeIf { it.length == HEX_DIGITS }?.toIntOrNull(HEX)
+                    // four hex digits, no sign (`toIntOrNull` alone takes `+abc`, `-001`)
+                    val code = s.substring(p, minOf(p + HEX_DIGITS, s.length))
+                        .takeIf { d -> d.length == HEX_DIGITS && d.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' } }?.toIntOrNull(HEX)
                     need(code != null)
                     p += HEX_DIGITS
                     code!!.toChar()

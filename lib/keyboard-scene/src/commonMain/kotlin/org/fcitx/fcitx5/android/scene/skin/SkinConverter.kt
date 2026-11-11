@@ -26,11 +26,18 @@ object SkinConverter {
      * @throws SkinError where it is no skin read here, or one without a keyboard
      */
     fun convert(entries: Map<String, ByteArray>, platform: SkinPlatform, fallbackName: String): SkinConversion {
-        val inner = if (READERS.any { it.first(entries.keys) }) entries else unwrapped(entries)
+        val own = withoutMacFiles(entries)
+        val inner = if (READERS.any { it.first(own.keys) }) own else unwrapped(own)
         val files = SkinFiles(inner, platform)
-        val reader = READERS.firstOrNull { it.first(files.names) }?.second ?: throw SkinError(SkinError.Reason.UNKNOWN)
+        val reader = READERS.firstOrNull { it.first(files.names) }?.second
+            // a computer skin said so only where no reader takes it (a skin of another format may hold a skin.ini)
+            ?: throw SkinError(if (SogouSkin.isComputerSkin(files.names)) SkinError.Reason.SOGOU_PC else SkinError.Reason.UNKNOWN)
         return guarded { SkinTheme(reader(files), files::decode, fallbackName).write() }
     }
+
+    /** [entries] without what macOS's Finder adds to a ZIP it makes (`__MACOSX/`, `._name`): no file of the skin's. */
+    fun withoutMacFiles(entries: Map<String, ByteArray>): Map<String, ByteArray> =
+        entries.filterKeys { n -> !n.startsWith("__MACOSX/") && !n.substringAfterLast('/').startsWith("._") }
 
     /** [entries] with the one folder they are all in taken off their names (a download of a theme's repository); else as they are. */
     fun unwrapped(entries: Map<String, ByteArray>): Map<String, ByteArray> {

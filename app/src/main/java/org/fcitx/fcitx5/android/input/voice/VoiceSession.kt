@@ -90,7 +90,7 @@ class VoiceSession(
     var stopped = false
         private set
 
-    val sameField get() = service.sameVoiceField(field)
+    val sameField get() = service.sameField(field)
 
     private val events = object : VoiceListener.Events {
         override fun loaded() = Unit
@@ -170,7 +170,8 @@ class VoiceSession(
         main.postDelayed({ endTypingWhatWasHeard(R.string.voice_hold_nothing) }, FINISH_MS)
         listener?.finish(at) { heard, raw ->
             // all of it was said before the app took it: nothing of it left to type
-            val said = heard.takeIf { listener?.utterance?.let { it >= utterance } != false }
+            val current = listener?.let { it.utterance >= utterance } ?: true
+            val said = heard.takeIf { current }
             val text = typed(talk.rest(said, raw))
             if (text != null) {
                 // it replaces what composes in the field: not taken away first, no flicker
@@ -301,7 +302,7 @@ class VoiceSession(
         fun restart(to: Int, upTo: VoiceLive.Mark?)
 
         /** the utterance [finish]'s text is of ([VoiceLive.utterance]) */
-        val utterance: Int get() = 0
+        val utterance: Int
 
         /** the microphone closed now, what was heard still recognized */
         fun cut()

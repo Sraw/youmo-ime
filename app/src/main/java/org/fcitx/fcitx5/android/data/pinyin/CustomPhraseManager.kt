@@ -33,8 +33,10 @@ object CustomPhraseManager {
 
     /**
      * Every phrase, turned off too, as [CustomPhrases.all] lists them; none if there is no file.
+     * One [saveOver] under way is waited for: a page made again (turned, reopened) reads what the last one saved.
      * @throws IOException if there is one that cannot be read
      */
+    @Synchronized
     fun load(from: File = file()): List<PinyinCustomPhrase> {
         if (!from.isFile) return emptyList()
         return items(CustomPhrases.parse(from.readText()))

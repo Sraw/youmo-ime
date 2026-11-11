@@ -54,7 +54,6 @@ class SkinConverterTest {
         // a pressed face of its own: no tint over it
         assertContains(c.themeXml, """<style select="key:pressed" fill="image(l-key-p.png""")
         assertContains(c.themeXml, """overlay="transparent"""")
-        assertFalse(c.themeXml.contains("@keyPressHighlight\"/>"))
         // backspace and shift styled as the function keys: not written again
         assertContains(c.themeXml, """select="key.function" fill="image(l-key-function-n.png""")
         assertFalse(c.themeXml.contains("role=backspace"))
@@ -255,9 +254,10 @@ class SkinConverterTest {
         files["port/res/default.css"] = files.getValue("port/res/default.css").decodeToString().replace("NM_IMG=keys,1\nHL_IMG=keys,3", "NM_IMG=big,1").encodeToByteArray()
         val c = convert(files)
         val key = c.image("l-key-n.png").pixels
-        assertEquals(512 to 512, key.width to key.height)
-        // the inner rect's 200 px of 1200 scaled to 512: 85; 3 px a dp scaled alike, round(1.28) = 1
-        assertContains(c.themeXml, "image(l-key-n.png, 85 85 85 85, 1x)")
+        // at most 512 a side, 3 px a dp scaled alike: 1.28 px a dp, drawn at a whole 1x, so scaled again to 400 (1200 /
+        // 3); the inner rect's 200 px of 1200 alike: 67
+        assertEquals(400 to 400, key.width to key.height)
+        assertContains(c.themeXml, "image(l-key-n.png, 67 67 67 67, 1x)")
         read(c)
     }
 
@@ -268,6 +268,74 @@ class SkinConverterTest {
         read(convert(files))
         files["port/gen.ini"] = text("[PANEL]\nSIZE=-1,99999999\nBACK_STYLE=,\n[CAND]\nVIEW_RECT=a,b,c,d\n")
         read(convert(files))
+    }
+
+    // the lines of the styles of [select], one string
+    private fun SkinConversion.style(select: String) = themeXml.lines().filter { "select=\"$select\"" in it }.joinToString("\n")
+
+    @Test
+    fun aKindWithoutAPressedFaceOfItsOwnKeepsThePressTint() {
+        // the letters have a pressed face, Return none: pressing Return still shows (the letters' "no tint" is theirs)
+        val c = convert(baidu())
+        assertTrue(c.style("key:pressed").lines().any { "l-key-p.png" in it && "overlay=\"transparent\"" in it }, c.style("key:pressed"))
+        val enter = c.style("key.enter:pressed")
+        assertContains(enter, """fill="image(l-key-n.png, 24 24 24 24, 3x)"""")
+        assertContains(enter, """overlay="@keyPressHighlight"""")
+        // the tint for any key no kind names, under the kinds' own
+        assertContains(c.themeXml, """<style select="key:pressed" overlay="@keyPressHighlight"/>""")
+        read(c)
+    }
+
+    @Test
+    fun theDarkVersionRestatesWhatTheLightOneSet() {
+        // the night period without the letters' pressed face nor Q's own face: the day's never show at night
+        val files = sogou()
+        val night = "1080/status2/phoneSkin.ini"
+        files[night] = files.getValue(night).decodeToString()
+            .replace("PRESSED=key_p.png,20,86,20,136\n", "")
+            .replace("[KeyBg_Q]\nNORMAL=q.png\n[Key_Q]\nBG_IMAGES=KeyBg_Q\n", "")
+            .encodeToByteArray()
+        val c = convert(files)
+        val pressed = c.style("@dark key:pressed")
+        assertContains(pressed, """fill="image(d-key-n.png""")
+        assertContains(pressed, """overlay="@keyPressHighlight"""")
+        assertContains(c.style("@dark qwerty/q"), """fill="image(d-key-n.png""")
+        assertContains(c.style("@dark qwerty/q:pressed"), """overlay="@keyPressHighlight"""")
+        read(c)
+    }
+
+    @Test
+    fun theGapIsLessUpAndDownAtCompact() {
+        // 2 dp up and down, as the app's own themes' at 紧凑 (40%, 1 dp at least); across as it is
+        val c = convert(baidu())
+        assertContains(c.themeXml, """<style select="@compact key" inset="1dp 2dp"/>""")
+        read(c)
+    }
+
+    @Test
+    fun aBaiduBoardSizedPastAPictureIsMadeWithinIt() {
+        // a few bytes of gen.ini asking for a 4096×6144 board: put together within the picture's bounds
+        val files = baidu()
+        files["port/gen.ini"] = text("[PANEL]\nSIZE=4096,4096\nBACK_STYLE=4,5\n[CAND]\nLAYOUT_NAME=cand1\nVIEW_RECT=0,0,4096,2048\n")
+        val board = assertNotNull(BaiduSkin(SkinFiles(files, SkinFixtures.Platform())).look(Variant.LIGHT).board)
+        assertTrue(board.width <= SkinTheme.MAX_PICTURE_SIDE && board.height <= SkinTheme.MAX_PICTURE_SIDE, "${board.width}x${board.height}")
+        assertTrue(board.width.toLong() * board.height <= SkinLimits.MAX_IMAGE_PIXELS * 101 / 100, "${board.width}x${board.height}")
+    }
+
+    @Test
+    fun onlyLettersDrawnAsPicturesAreSaidSo() {
+        // the letters' labels a colour, a function key's a picture: no letter drawn as a picture
+        val files = baidu()
+        files["port/py_26.ini"] = files.getValue("port/py_26.ini").decodeToString()
+            .replace("FORE_STYLE=8", "FORE_STYLE=x").replace("FORE_STYLE=3", "FORE_STYLE=8").replace("FORE_STYLE=x", "FORE_STYLE=3")
+            .encodeToByteArray()
+        assertFalse(SkinNote.LETTER_IMAGES in convert(files).notes)
+    }
+
+    @Test
+    fun aSkinIniInAnotherFormatsSkinIsNoComputerSkin() {
+        // a Baidu skin that happens to hold a skin.ini: read as Baidu's, not refused as a Sogou computer skin
+        assertEquals("Sea Breeze", convert(baidu() + ("skin.ini" to text("[x]"))).name)
     }
 
     companion object {

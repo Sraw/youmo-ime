@@ -33,4 +33,29 @@ object SpaceCursor {
         // stale: another goes out only while more newlines lie that way than those lines, a line surely left
         return rushed == 0 || side.count { it == '\n' } > rushed
     }
+
+    /**
+     * Lines sent a moment ago, the editor maybe not moved yet: what [sendable]'s `rushed` takes. Counted
+     * one way only: a line the other way reads the side it goes to stale by fewer newlines, never more.
+     */
+    class LineRush(private val settleMs: Long = SETTLE_MS) {
+        private var lastAt = 0L
+        private var last: Line? = null
+        private var count = 0
+
+        /** The lines rushed before one to [line] at [now] (ms). */
+        fun rushed(line: Line, now: Long): Int = if (line != last || now - lastAt >= settleMs) 0 else count
+
+        /** A line to [line] sent at [now]. */
+        fun sent(line: Line, now: Long) {
+            count = rushed(line, now) + 1
+            last = line
+            lastAt = now
+        }
+
+        companion object {
+            /** How long after a line key the editor may not have moved yet. */
+            const val SETTLE_MS = 80L
+        }
+    }
 }

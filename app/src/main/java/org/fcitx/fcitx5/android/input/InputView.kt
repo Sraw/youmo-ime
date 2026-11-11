@@ -59,6 +59,7 @@ import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.BaseExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.fcitx.fcitx5.android.input.floating.BoardFollowers
 import org.fcitx.fcitx5.android.input.floating.BoardMove
 import org.fcitx.fcitx5.android.input.floating.BoardMover
@@ -94,7 +95,6 @@ import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.utils.unset
 import org.mechdancer.dependency.DynamicScope
-import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.wrapToUniqueComponent
 import org.mechdancer.dependency.plusAssign
 import splitties.dimensions.dp

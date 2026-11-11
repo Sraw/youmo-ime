@@ -10,8 +10,8 @@ fun interface PartsLookup {
     fun of(letters: String): List<Pair<String, String>>
 
     /**
-     * The one reading, toneless, a polyphone [text] is shown in after [before] (CandidateReadings.oneOf),
-     * and blocked in (AsideBlocks.shown); null where none is known.
+     * The one reading, toneless, a polyphone [text] is shown in after [before], of those [hint] (the lookup's
+     * `xing/hang`) lists (CandidateReadings.oneOf), and blocked in (AsideBlocks.shown); null where none is known.
      */
-    fun shownIn(text: String, before: String): String? = null
+    fun shownIn(text: String, before: String, hint: String? = null): String? = null
 }

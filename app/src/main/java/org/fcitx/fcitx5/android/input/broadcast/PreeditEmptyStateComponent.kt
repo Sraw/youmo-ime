@@ -5,9 +5,9 @@
 package org.fcitx.fcitx5.android.input.broadcast
 
 import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.mechdancer.dependency.Dependent
-import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must

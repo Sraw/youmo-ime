@@ -40,8 +40,10 @@ object CommonWordsManager {
 
     /**
      * The words the file has; none if there is none. A line not read (no reading) is left out.
+     * One [saveOver] under way is waited for: a page made again (turned, reopened) reads what the last one saved.
      * @throws IOException if there is one that cannot be read
      */
+    @Synchronized
     fun load(from: File = file()): CommonWords = if (from.isFile) CommonWords.parse(from.readText()).words else CommonWords.EMPTY
 
     /**

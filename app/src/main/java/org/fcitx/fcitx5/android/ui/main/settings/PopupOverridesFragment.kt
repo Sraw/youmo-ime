@@ -87,7 +87,6 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val up: Boolean, val down: Boolean, val upAt: KeyMarkPosition, val downAt: KeyMarkPosition,
     )
 
-
     /** A change: what was there [before], what it left [after] (another page's change since drops the step). */
     internal data class Step(val before: Snapshot, val after: Snapshot)
 
@@ -143,7 +142,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         undo = null
         // changed since elsewhere (按键's switches and places): nothing put back over that
         if (snapshot() == step.after) restore(step.before)
-        rebuild()
+        // 撤销 on the snackbar after the page was left: the step still put back, the page no longer there to
+        // redraw, and its onStop past, so the keyboard's device-protected copy is brought up to date here
+        if (isAdded && view != null) rebuild() else AppPrefs.getInstance().syncToDeviceEncryptedStorage()
     }
 
     private val pages get() = KeyShortcutPages.all.filter { it !== KeyShortcutPages.Number }
@@ -211,11 +212,11 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     // which way a batch sets: 上滑, 下滑, or (where [both]) the two; null for the two
     private fun askWay(both: Boolean, then: (Boolean?) -> Unit) {
-        val ways = listOfNotNull(true, false, null.takeIf { both })
+        val ways: List<Boolean?> = if (both) listOf(true, false, null) else listOf(true, false)
         val names = listOfNotNull(getString(R.string.swipe_up), getString(R.string.swipe_down), getString(R.string.swipe_both_ways).takeIf { both })
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.swipe_which_way)
-            .setItems(names.toTypedArray()) { _, i -> then(if (i < 2) ways[i] else null) }
+            .setItems(names.toTypedArray()) { _, i -> then(ways[i]) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
@@ -299,8 +300,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     }
 
     // a key's two slots as a screen reader says them: 上滑 then 下滑, a way with nothing left out
-    private fun said(slotKey: String): String? {
-        val s = slots
+    private fun said(slotKey: String, s: SwipeSlots): String? {
         val ways = listOf(true, false).mapNotNull { up ->
             SwipeSlotSection.shortLabel(requireContext(), s.resolve(slotKey, up))?.let { getString(R.string.swipe_way_said, getString(if (up) R.string.swipe_up else R.string.swipe_down), it) }
         }
@@ -354,7 +354,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     }, lParams(captionWidth, ctx.dp(KeyHeight)))
                     val marked = stored.isSet(slotKey) || popupName?.let { it in names.labels } == true
                     val state = getString(R.string.edited_x, label).takeIf { marked }
-                    add(KeyCaps.key(ctx, label, hint, marked = marked, dimmed = false, selected = slotKey in selected, state = state, said = said(slotKey), shortcut = shortcut).apply {
+                    add(KeyCaps.key(ctx, label, hint, marked = marked, dimmed = false, selected = slotKey in selected, state = state, said = said(slotKey, stored), shortcut = shortcut).apply {
                         setOnClickListener { tapped(slotKey) { edit(label, slotKey, popupName?.let(LongPress::ByName)) } }
                     }, params)
                 }
@@ -370,7 +370,6 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         return when (page.form) {
             KeyShortcutPreset.GROUPED14 -> GroupedKeyboard.CORNERS.map(KeyCaps.Mark::Text)
             KeyShortcutPreset.GROUPED18 -> GroupedKeyboard.CORNERS18.map(KeyCaps.Mark::Text)
-            KeyShortcutPreset.NUMBER -> List(n) { null }
             else -> List(n) { KeyCaps.Mark.Unshown }
         }
     }
@@ -433,7 +432,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val symbol = shown.firstOrNull()
         return KeyCaps.key(
             ctx, label, symbol.orEmpty(), marked = marked, dimmed = shown.isEmpty(), selected = name != null && name in selected,
-            state = state, said = name?.let(::said), shortcut = name?.let { KeyCaps.Shortcut(it, stored) },
+            state = state, said = name?.let { said(it, stored) }, shortcut = name?.let { KeyCaps.Shortcut(it, stored) },
         ).apply {
             setOnClickListener { tapped(name) { edit(getString(R.string.long_press_of, label), name, LongPress.ByLabel(label)) } }
         }
@@ -668,8 +667,6 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         private val Letters = ('a'..'z').map { it.toString() }.toSet()
         private const val KeyHeight = 52
         private const val OtherKeyWidth = 44
-
-        // the function keys whose long press is a list of characters, edited by name (the others' a menu, or none)
 
         internal fun pageTitle(page: KeyShortcutPages.Page) = when (page.form) {
             KeyShortcutPreset.FULL -> R.string.shortcut_page_full

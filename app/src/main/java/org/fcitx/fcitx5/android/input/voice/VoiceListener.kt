@@ -100,7 +100,7 @@ class VoiceListener(
 
     // the utterance the recognizer's VoiceLive is at
     @Volatile
-    private var at = 0
+    private var liveUtterance = 0
 
     // the utterance [said] is of: set on the decoder before it completes
     @Volatile
@@ -112,14 +112,14 @@ class VoiceListener(
     @Synchronized
     override fun restart(to: Int, upTo: VoiceLive.Mark?) {
         val last = restarting
-        restarting = Restart(to, upTo ?: last?.takeIf { it.to > at }?.upTo)
+        restarting = Restart(to, upTo ?: last?.takeIf { it.to > liveUtterance }?.upTo)
     }
 
     // on the recognizer's thread
     @Synchronized
     private fun restartIn(live: VoiceLive) {
         restarting?.let { live.restart(it.to, it.upTo) }
-        at = live.utterance
+        liveUtterance = live.utterance
     }
 
     // set on the decoder before [said] completes, read on the main thread once it has

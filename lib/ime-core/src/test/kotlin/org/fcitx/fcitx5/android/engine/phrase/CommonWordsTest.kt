@@ -223,4 +223,28 @@ class CommonWordsTest {
         assertEquals(r.words.unread, CommonWords.merged(r.words, page, r.words).unread)
         assertEquals(r.words.unread, r.words.without("中国", "华").unread)
     }
+
+    @Test
+    fun aCommentTheUserWroteIsWrittenBackWhereItWas() {
+        // comments were left out before the lines kept, so a save lost them
+        val r = read("# youmo-common-words 1\n# my radicals\n米字旁 米\n中国[zhong'guo]\t华\n#後\n")
+        assertEquals(listOf("# my radicals", "米字旁 米", "#後"), r.words.unread)
+        assertEquals("# youmo-common-words 1\n中国[zhong'guo]\t华\n# my radicals\n米字旁 米\n#後\n", r.words.format())
+    }
+
+    @Test
+    fun theWordItselfAsTheOnlyReplacementIsSaidSoBlanksAroundIt() {
+        // the settings' field may keep a blank: it was told as no replacement at all
+        val s = CommonWords.syllables("米字旁", "mizipang")
+        assertEquals(Problem.SAME_AS_WORD, CommonWords.problem("米字旁", s, listOf(" 米字旁 ")))
+    }
+
+    @Test
+    fun aReplacementTwoWordsGiveIsTakenOffBoth() {
+        // it was taken off the first word only, so the candidate deleted stayed under the same key
+        val words = CommonWords.of(listOf(word("木字旁", "mu'zi'pang", "木", "米"), word("米字旁", "mi'zi'pang", "米", "糸")))
+        val mi = words.index(pinyin).found(listOf("mzp")).single { it.text == "米" }
+        assertEquals(listOf("木字旁", "米字旁"), mi.words)
+        assertEquals(listOf("木字旁[mu'zi'pang] 木", "米字旁[mi'zi'pang] 糸"), words.without(mi.words, mi.text).words.map { it.toString() })
+    }
 }

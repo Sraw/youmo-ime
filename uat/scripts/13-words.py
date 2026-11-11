@@ -839,10 +839,13 @@ def wd39(d):
     d.clear()
 
 
-case("WD-40", needs="jvm:LexiconUatTest.aCommonWordOnTheNineAnd14KeysAndInShuangpin、CommonWordsInSessionTest.onEveryPinyinKeyboardByItsKeys")(lambda d: None)
+case("WD-40", needs="jvm:LexiconUatTest.aCommonWordOnTheNineAnd14KeysAndInShuangpin")(lambda d: None)
 
 
 case("WD-41", needs="jvm:LexiconUatTest.commonWordsOfOneKeyBeforeAPinNoneForAPart")(lambda d: None)
+
+
+case("WD-43", needs="jvm:CommonWordsPageUatTest.whatTheKeyboardDeletedStaysDeletedThroughThePagesEdits")(lambda d: None)
 
 
 @case("WD-42", base="B0-设置", mutates=True)

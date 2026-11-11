@@ -196,9 +196,17 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         val level = KeyHSpacingChoice.entries.firstOrNull { it.name == old } ?: KeyHSpacingChoice.FollowTheme
         sharedPreferences.edit {
             if (!sharedPreferences.contains(KEY_H_SPACING)) putString(KEY_H_SPACING, level.name)
-            if (!sharedPreferences.contains(KEY_V_SPACING)) putString(KEY_V_SPACING, KeyVSpacingChoice.valueOf(level.name).name)
+            if (!sharedPreferences.contains(KEY_V_SPACING)) putString(KEY_V_SPACING, vertical(level).name)
             remove(KEY_SPACING_052)
         }
+    }
+
+    // 0.5.2's one level as the vertical one: each named, so a renamed or added level does not compile rather than throw at a start
+    private fun vertical(level: KeyHSpacingChoice): KeyVSpacingChoice = when (level) {
+        KeyHSpacingChoice.FollowTheme -> KeyVSpacingChoice.FollowTheme
+        KeyHSpacingChoice.Compact -> KeyVSpacingChoice.Compact
+        KeyHSpacingChoice.Standard -> KeyVSpacingChoice.Standard
+        KeyHSpacingChoice.Loose -> KeyVSpacingChoice.Loose
     }
 
     enum class KeyBorderChoice(override val stringRes: Int, val blocks: Boolean?) : ManagedPreferenceEnum {

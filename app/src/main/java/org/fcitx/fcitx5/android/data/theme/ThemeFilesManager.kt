@@ -722,8 +722,8 @@ object ThemeFilesManager {
     private fun packClash(staged: ThemePackFiles.Staged, themes: List<Theme>) {
         val builtins = themes.filterIsInstance<Theme.Builtin>().ifEmpty { ThemeManager.BuiltinThemes }
         if (ThemePackFiles.builtinClash(staged.name, staged.theme.variants, builtins)) errorRuntime(R.string.exception_theme_name_clash)
-        // a built-in pack's name (BuiltinPacks): the app's
-        if (ThemeManager.BuiltinPackThemes.any { it.file == staged.name }) errorRuntime(R.string.exception_theme_name_clash)
+        // a built-in pack's name (BuiltinPacks): the app's, also one hidden by a pack of the user's of that name
+        if (staged.name in ThemeManager.BuiltinPackNames) errorRuntime(R.string.exception_theme_name_clash)
     }
 
     // the theme 3.0 json among [extracted] (an older one's too) imported with its files ([importTheme])

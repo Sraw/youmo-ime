@@ -165,7 +165,7 @@
     <string name="exception_skin_unknown">這個檔案不是能轉換的皮膚：能轉換的是百度（.bds、.bdi）、搜狗手機版（.ssf）的皮膚和 FlorisBoard（.flex）、同文（.yaml）的主題</string>
     <string name="exception_skin_too_big">皮膚檔案超過 %1$s MB</string>
     <string name="exception_skin_unpacked_too_big">皮膚裡有檔案解壓後太大</string>
-    <string name="exception_skin_encrypted">皮膚裡有加密的檔案，讀不了</string>
+    <string name="exception_skin_encrypted">皮膚裡有加密或用讀不了的方式壓縮的檔案</string>
     <string name="exception_skin_unsafe_name">皮膚裡有檔案的名稱指向皮膚以外的位置：%1$s</string>
     <string name="exception_skin_sogou_encrypted">這個搜狗皮膚是加密的（電腦版皮膚都是）：只能轉換手機版皮膚（.ssf）</string>
     <string name="exception_skin_sogou_pc">這是搜狗電腦版的皮膚：裡面沒有鍵盤可以轉換</string>
@@ -1097,6 +1097,7 @@
     <string name="nothing_to_copy">沒有內容可以複製</string>
     <string name="nothing_to_cut">沒有內容可以剪下</string>
     <string name="shortcut_command">命令</string>
+    <string name="shortcut_command_is">%1$s：%2$s</string>
     <string name="shortcut_text">文字</string>
     <string name="shortcut_change">換</string>
     <string name="shortcut_page_full">全鍵盤</string>
@@ -1162,7 +1163,7 @@
     <string name="quick_phrase_too_long_to_save">超過 %d 字，存不成快速輸入</string>
     <string name="quick_phrase_saved">已儲存</string>
     <string name="quick_phrase_import_done_too_long">匯入 %1$d 條，略過 %2$d 條重複、%3$d 條超過 %4$d 字</string>
-    <string name="quick_phrase_import_bad_key">%1$s；另略過 %2$d 條關鍵詞或註釋太長（關鍵詞最多 30 個字元，註釋最多 30 個字）</string>
+    <string name="quick_phrase_import_bad_key">%1$s；另略過 %2$d 條沒有關鍵詞或關鍵詞、註釋太長的（關鍵詞最多 %3$d 個字元，註釋最多 %4$d 個字）</string>
     <string name="quick_phrase_discard_confirm">放棄這次的修改？</string>
     <string name="quick_phrase_discard">放棄</string>
     <string name="quick_phrase_keep_editing">繼續編輯</string>

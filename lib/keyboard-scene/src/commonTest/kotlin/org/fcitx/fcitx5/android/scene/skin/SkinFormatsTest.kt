@@ -187,6 +187,22 @@ class SkinFormatsTest {
     }
 
     @Test
+    fun aFolderZippedByMacOsFinderIsUnwrapped() {
+        // Finder's __MACOSX/ and ._ files beside the theme's folder: not a second folder
+        val zipped = trime().mapKeys { "ink/" + it.key } + ("__MACOSX/ink/._ink.trime.yaml" to text("x")) + ("ink/._k.ttf" to text("x"))
+        assertEquals("Ink", convert(zipped).name)
+    }
+
+    @Test
+    fun aKeyboardFontPastTheLimitIsSaid() {
+        val files = floris()
+        files["fonts/moss.ttf"] = ByteArray(SkinLimits.MAX_FONT_BYTES + 1)
+        val c = convert(files)
+        assertFalse(c.themeXml.contains("<font "))
+        assertTrue(SkinNote.TEXT_SIZE in c.notes)
+    }
+
+    @Test
     fun yamlWithoutColourSchemesIsNoKeyboard() {
         val e = assertFailsWith<SkinError> { convert(mapOf("x.yaml" to text("name: x\nstyle: {}\n"))) }
         assertEquals(SkinError.Reason.NO_KEYBOARD, e.reason)
@@ -430,13 +446,33 @@ class SkinFormatsTest {
     }
 
     @Test
+    fun yamlMergesAreHeldToABudget() {
+        // an anchor of 1000 keys merged into 300 mappings: 300 000 copies asked, MAX_MERGED made
+        val anchor = (0 until 1000).joinToString(", ") { "k$it: $it" }
+        val text = "a: &a {$anchor}\nl:\n" + "- {<<: *a}\n".repeat(300)
+        val l = (SkinYaml.parse(text) as Map<*, *>)["l"] as List<*>
+        assertEquals(1000, (l[0] as Map<*, *>).size)
+        val made = l.sumOf { (it as Map<*, *>).size }
+        assertTrue(made <= SkinYaml.MAX_MERGED, "$made")
+        // a block mapping's merge alike, a small one whole
+        assertEquals(mapOf("x" to "1", "y" to "2"), (SkinYaml.parse("b: &b {x: 1}\nc:\n  <<: *b\n  y: 2\n") as Map<*, *>)["c"])
+    }
+
+    @Test
+    fun yamlCommentAfterAnEscapedQuote() {
+        // the \" inside the quotes ends nothing: the # is the text's, not a comment
+        assertEquals("a \" b # c", (SkinYaml.parse("k: \"a \\\" b # c\"\n") as Map<*, *>)["k"])
+    }
+
+    @Test
     fun json() {
         val j = SkinJson.parse("""{"a": [1, -2.5e3, true, false, null], "b": "\u4e2d\"\\\/\n", "c": {}, "d": [],}""") as Map<*, *>
         assertEquals(listOf("1", "-2.5e3", true, false, null), j["a"])
         assertEquals("中\"\\/\n", j["b"])
         assertEquals(emptyMap<String, Any?>(), j["c"])
         assertEquals(emptyList<Any?>(), j["d"])
-        for (bad in listOf("", "{", "[1 2]", "{a: 1}", "\"open", "tru", "{\"a\" 1}", "[1]x", "\"\\u12\"", "-", "\"\\")) {
+        // \u with a sign is no four hex digits
+        for (bad in listOf("", "{", "[1 2]", "{a: 1}", "\"open", "tru", "{\"a\" 1}", "[1]x", "\"\\u12\"", "-", "\"\\", "\"\\u-001\"", "\"\\u+abc\"")) {
             assertNull(SkinJson.parse(bad), bad)
         }
         assertNull(SkinJson.parse("[".repeat(1000) + "]".repeat(1000)))

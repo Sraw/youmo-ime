@@ -11,7 +11,9 @@ import java.io.IOException
 /**
  * The common words ([CommonWords]) the pinyin sessions share, and the user's deleting one of their
  * replacements from the keyboard, handed to [save] as the whole list, as the file keeps them; a
- * [save] refused (an [IOException]) takes no effect, as [PhraseBook]'s.
+ * [save] refused (an [IOException]) takes no effect, as [PhraseBook]'s. Only a refusal at once: a
+ * [save] that queues the write (the app's) and fails later (I/O, a newer file restored) leaves the
+ * replacement gone from the keyboard until the file is read again, when it is back, the write logged.
  *
  * Indexed by the way each session spells a syllable ([indexFor]): one index a spelling, made anew
  * after a change, a few kept ([MAX_INDEXES]: the keyboards switched between).
@@ -62,8 +64,11 @@ class CommonWordBook(
     }
 
     /** [replacement] no longer one of [word]'s (从常用词中删除). */
-    fun remove(word: String, replacement: String) {
-        val to = words.without(word, replacement)
+    fun remove(word: String, replacement: String) = remove(listOf(word), replacement)
+
+    /** [replacement] no longer one of any of [texts]' words: all that offered it ([CommonWords.Found.words]). */
+    fun remove(texts: Collection<String>, replacement: String) {
+        val to = words.without(texts, replacement)
         try {
             save(to)
         } catch (_: IOException) {

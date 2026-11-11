@@ -11,7 +11,6 @@ import android.view.accessibility.AccessibilityManager
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
 import androidx.constraintlayout.widget.ConstraintLayout
-import kotlin.math.absoluteValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -72,6 +71,7 @@ import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
+import kotlin.math.absoluteValue
 
 abstract class BaseKeyboard(
     context: Context,

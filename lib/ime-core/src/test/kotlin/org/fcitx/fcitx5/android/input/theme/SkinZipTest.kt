@@ -106,16 +106,45 @@ class SkinZipTest {
 
     @Test
     fun aZippedExtensionIsUnpackedWithinTheZipsBudget() {
-        // 24 MB unpacked in the .flex (within the budget alone), 12 MB in the ZIP's own files: past it together
+        // a budget of 300 KB (the rule, at a test's size): 200 KB unpacked in the .flex (within it alone), 100 KB more
+        // in the ZIP's own files: past it together
+        val budget = 300L * 1024
         val rnd = Random(3)
         fun noise(n: Int) = ByteArray(n) { rnd.nextInt(4).toByte() }
-        val mb = 1024 * 1024
-        val flex = zip("extension.json" to "{}".toByteArray(), "stylesheets/a.bin" to noise(12 * mb), "stylesheets/b.bin" to noise(12 * mb))
-        assertEquals(3, SkinZip.readSkin(ByteArrayInputStream(zip("x.flex" to flex, stored = true)), "x.zip").size)
-        val both = zip("x.flex" to flex, "pad.bin" to noise(12 * mb - flex.size), stored = true)
-        assertTrue(both.size < SkinLimits.MAX_ARCHIVE_BYTES)
-        val e = assertThrows(SkinError::class.java) { SkinZip.readSkin(ByteArrayInputStream(both), "x.zip") }
+        val kb = 1024
+        val flex = zip("extension.json" to "{}".toByteArray(), "stylesheets/a.bin" to noise(100 * kb), "stylesheets/b.bin" to noise(100 * kb))
+        assertEquals(3, SkinZip.readSkin(ByteArrayInputStream(zip("x.flex" to flex, stored = true)), "x.zip", budget).size)
+        val both = zip("x.flex" to flex, "pad.bin" to noise(100 * kb), stored = true)
+        assertTrue(both.size < budget)
+        val e = assertThrows(SkinError::class.java) { SkinZip.readSkin(ByteArrayInputStream(both), "x.zip", budget) }
         assertEquals(Reason.UNPACKED_TOO_BIG, e.reason)
+    }
+
+    @Test
+    fun aDeflatedFileCutShortIsRefused() {
+        // the directory says fewer packed bytes than the stream needs: half a file is never taken as one
+        val b = zip("a.bin" to ByteArray(20_000) { (it * 31 % 251).toByte() })
+        cen(b) { at -> for (o in 0 until 4) b[at + 20 + o] = (if (o == 0) 16 else 0).toByte() }
+        assertEquals(Reason.NOT_ZIP, reason(b))
+    }
+
+    @Test
+    fun bytesBeforeTheZipAreSteppedOver() {
+        // a self-extractor's code before the entries, the offsets counted from the file's start (as `zip -A` writes)
+        val z = zip("a.txt" to "hello".toByteArray(), "b.txt" to ByteArray(3000) { 2 })
+        val pre = ByteArray(100) { 7 }
+        val b = pre + z
+        fun add(at: Int) {
+            val v = (b[at].toInt() and 0xFF) or (b[at + 1].toInt() and 0xFF shl 8) or (b[at + 2].toInt() and 0xFF shl 16) or (b[at + 3].toInt() shl 24)
+            val n = v + pre.size
+            for (o in 0 until 4) b[at + o] = (n shr (8 * o)).toByte()
+        }
+        val end = (b.size - 22 downTo 0).first { b[it] == 0x50.toByte() && b[it + 1] == 0x4b.toByte() && b[it + 2] == 5.toByte() && b[it + 3] == 6.toByte() }
+        add(end + 16)
+        (pre.size until end).filter { b[it] == 0x50.toByte() && b[it + 1] == 0x4b.toByte() && b[it + 2] == 1.toByte() && b[it + 3] == 2.toByte() }.forEach { add(it + 42) }
+        val files = SkinZip.read(b)
+        assertEquals("hello", String(files.getValue("a.txt")))
+        assertArrayEquals(ByteArray(3000) { 2 }, files.getValue("b.txt"))
     }
 
     @Test
@@ -190,11 +219,11 @@ class SkinZipTest {
             val b = seeds[i % seeds.size].copyOf()
             repeat(1 + rnd.nextInt(8)) { b[rnd.nextInt(b.size)] = rnd.nextInt(256).toByte() }
             val x = if (i % 3 == 0) b.copyOf(rnd.nextInt(b.size + 1)) else b
-            // a skin read or refused with a reason; never another exception
+            // a skin read or refused with a reason; any other exception escapes and fails the test
             try {
                 SkinZip.read(x)
-            } catch (e: SkinError) {
-                assertTrue(e.reason.name, true)
+            } catch (_: SkinError) {
+                // refused with a reason: as it should be
             }
         }
     }
