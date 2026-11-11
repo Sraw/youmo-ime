@@ -21,9 +21,8 @@ package org.fcitx.fcitx5.android.scene.rules
  * swipes still working.
  *
  * 底部 is under the letter for the symbol, the bottom edge's middle for the shortcut. Landscape's and
- * 紧凑's keys are too low for either ([onKeys]): the symbol's 底部 there is the top right (the bottom
- * right where the shortcuts are), the shortcut's the first corner of [LowOrder] the symbol's place is
- * not. A shortcut that still has no room on its key gives way in its own corner, then is left out
+ * 紧凑's keys are too low for either ([onKeys]): a way's 底部 there is the first corner of [LowOrder]
+ * (右上, 右下, 左上, 左下) the other way's place is not, whatever its mark. A shortcut that still has no room on its key gives way in its own corner, then is left out
  * (KeyMarkYield).
  *
  * A function key has no symbol: each way's shortcut at its own setting's place ([placeFunction]).
@@ -61,18 +60,17 @@ object KeyMarks {
     fun settled(symbol: At, shortcut: At): Spots =
         Spots(if (symbol == shortcut && symbol != At.None) symbol.yielded else symbol, shortcut)
 
-    /** The corners a shortcut's 底部 goes to on low keys, the first the symbol does not take; and where one with no room is tried. */
-    val LowOrder = listOf(At.TopLeft, At.TopRight, At.BottomLeft, At.BottomRight)
+    /** The corners a way's 底部 goes to on low keys, whatever its mark: the first the other way's place is not. */
+    val LowOrder = listOf(At.TopRight, At.BottomRight, At.TopLeft, At.BottomLeft)
 
     /**
-     * Where the two are drawn on a keyboard [landscape] or [compact]: as [settled]; on such low keys the
-     * symbol's 底部 the top right, the bottom right where the shortcut is (the corner 0.5.0 drew symbols
-     * in, then its side's other), the shortcut's 底部 the first corner of [LowOrder] the symbol's is not.
+     * Where the two are drawn on a keyboard [landscape] or [compact]: as [settled]; on such low keys a
+     * 底部, the symbol's or the shortcut's alike, the first corner of [LowOrder] the other's is not.
      */
     fun onKeys(symbolAt: At, shortcutAt: At, landscape: Boolean, compact: Boolean): Spots {
         val s = settled(symbolAt, shortcutAt)
         if (!landscape && !compact) return s
-        val symbol = if (s.symbol != At.Bottom) s.symbol else if (s.shortcut == At.TopRight) At.BottomRight else At.TopRight
+        val symbol = if (s.symbol != At.Bottom) s.symbol else LowOrder.first { it != s.shortcut }
         val shortcut = if (s.shortcut != At.Bottom) s.shortcut else LowOrder.first { it != symbol }
         return Spots(symbol, shortcut)
     }
@@ -136,9 +134,8 @@ object KeyMarks {
     /**
      * A function key's: each way's mark at its own setting, [up] at [upAt] and [down] at [downAt], as a
      * shortcut is ([onKeys]: on low keys a 底部 goes to the first corner of [LowOrder] the other way's is
-     * not), each only where that way is on ([upOn], [downOn]); 无 draws that one not. The settings page
-     * keeps the two apart; two in one slot all the same (a hand-edited import) put the down one in that
-     * slot mirrored, so neither covers the other.
+     * not), each only where that way is on ([upOn], [downOn]); 无 draws that one not. Two in one place
+     * (an import the settings page never wrote) read as [settled]: the up one yields.
      */
     fun <T : Any> placeFunction(
         up: T?, down: T?, upOn: Boolean, downOn: Boolean, upAt: At, downAt: At, landscape: Boolean, compact: Boolean,
@@ -146,10 +143,11 @@ object KeyMarks {
         val out = linkedMapOf<Slot, T>()
         val u = up?.takeIf { upOn }
         val d = down?.takeIf { downOn }
-        val upSlot = shortcutSlot(onKeys(downAt, upAt, landscape, compact).shortcut)
-        val downSlot = shortcutSlot(onKeys(upAt, downAt, landscape, compact).shortcut)
+        val (ua, da) = settled(upAt, downAt)
+        val upSlot = shortcutSlot(onKeys(da, ua, landscape, compact).shortcut)
+        val downSlot = shortcutSlot(onKeys(ua, da, landscape, compact).shortcut)
         if (u != null && upSlot != null) out[upSlot] = u
-        if (d != null && downSlot != null) out[if (downSlot in out) downSlot.mirrored else downSlot] = d
+        if (d != null && downSlot != null) out[downSlot] = d
         return Placed(out)
     }
 }

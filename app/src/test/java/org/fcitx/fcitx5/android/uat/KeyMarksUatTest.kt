@@ -169,8 +169,9 @@ class KeyMarksUatTest {
             val changed = marks()
             fresh().start()
             assertEquals(choice.name, changed, marks())
-            // the letters' marks stay (the two places swapped with the ways); a function key's, whose swipes
-            // the flip leaves as they are, each go with its way's place: ⌫'s 清除 to 左上 and back
+            // 预设 turned the other way (not 翻转上下滑, which swaps every key's swipes, ⌫'s too: SwipeSlotsUatTest):
+            // the letters' marks stay (the two places swapped with the ways); a function key's swipes stay as they
+            // are, so its marks each go with its way's place: ⌫'s 清除 to 左上 and back
             val function = setOf("Backspace", "Pinyin")
             fun letters(m: List<String>) = m.filter { it.substringBefore(' ') !in function }
             assertEquals(choice.name, letters(first), letters(marks()))

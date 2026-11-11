@@ -109,7 +109,7 @@ class CompactKeyboardUatTest {
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") && "key=2," in it })
     }
 
-    // too low for the bottom edge's middle: the first corner of top left, top right, … the symbols do
+    // too low for the bottom edge's middle: the first corner of top right, bottom right, top left, bottom left the symbols do
     // not take, drawn, none left out (KeyMarks.onKeys)
     @Test
     @Uat("ST-51")
@@ -119,7 +119,7 @@ class CompactKeyboardUatTest {
         h.start()
         for (k in listOf("a", "z", "x", "c", "v")) {
             // drawn, none left out
-            assertEquals(k, listOf("TL"), h.key(k).marks().shortcuts)
+            assertEquals(k, listOf("BR"), h.key(k).marks().shortcuts)
         }
         fresh()
         prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.TopLeft)

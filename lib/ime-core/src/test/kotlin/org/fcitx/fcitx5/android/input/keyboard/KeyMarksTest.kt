@@ -47,12 +47,12 @@ class KeyMarksTest {
             assertEquals(Placed.of(Slot.BottomLeft to "全选", Slot.TopRight to "，"), place(At.Bottom, At.BottomLeft, landscape, compact))
             assertEquals(Placed.of(Slot.BottomRight to "全选", Slot.TopRight to "，"), place(At.Bottom, At.BottomRight, landscape, compact))
             assertEquals(Placed.of(Slot.TopRight to "，"), place(At.Bottom, At.None, landscape, compact))
-            // the shortcut's: top left, top right, bottom left, bottom right, the first the symbol's is not
-            assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.TopRight to "，"), place(At.TopRight, At.Bottom, landscape, compact))
+            // the shortcut's as the symbol's: top right, bottom right, top left, bottom left, the first the symbol's is not
+            assertEquals(Placed.of(Slot.BottomRight to "全选", Slot.TopRight to "，"), place(At.TopRight, At.Bottom, landscape, compact))
             assertEquals(Placed.of(Slot.TopRight to "全选", Slot.TopLeft to "，"), place(At.TopLeft, At.Bottom, landscape, compact))
-            assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.BottomLeft to "，"), place(At.BottomLeft, At.Bottom, landscape, compact))
-            assertEquals(Placed.of(Slot.TopLeft to "全选"), place(At.None, At.Bottom, landscape, compact))
-            assertEquals(Spots(At.TopRight, At.TopLeft), KeyMarks.onKeys(At.Bottom, At.Bottom, landscape, compact))
+            assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomLeft to "，"), place(At.BottomLeft, At.Bottom, landscape, compact))
+            assertEquals(Placed.of(Slot.TopRight to "全选"), place(At.None, At.Bottom, landscape, compact))
+            assertEquals(Spots(At.TopRight, At.BottomRight), KeyMarks.onKeys(At.Bottom, At.Bottom, landscape, compact))
         }
         // the other places as in portrait
         assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomLeft to "，"), place(At.BottomLeft, At.TopRight, compact = true))
@@ -128,8 +128,8 @@ class KeyMarksTest {
                 if (downAt == At.Bottom) assertEquals(KeyMarks.LowOrder.first { it != upAt }.corner, low.slotOf("恢复"))
             }
         }
-        // one place in both (a hand-edited import): both drawn all the same, apart
-        assertEquals(Placed.of(Slot.BottomRight to "清除", Slot.TopRight to "恢复"),
+        // one place in both (an import the settings page never wrote): read as settled, the up one yields
+        assertEquals(Placed.of(Slot.TopRight to "清除", Slot.BottomRight to "恢复"),
             KeyMarks.placeFunction("清除", "恢复", true, true, At.BottomRight, At.BottomRight, false, false))
         assertEquals(Placed<String>(), KeyMarks.placeFunction(null, null, true, true, At.TopRight, At.BottomRight, false, false))
     }
