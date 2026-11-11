@@ -127,14 +127,14 @@ class InputMethodSettingsTest {
     }
 
     // the nine keys' own (a section 九键 on the page of each keyboard they are, 11-01): one pref each
-    private val nineKeys = listOf(AppPrefs.T9_MULTI_TAP, InputMethodSettings.T9_LETTERS, InputMethodSettings.T9_SYMBOLS)
+    private val nineKeys = listOf(AppPrefs.T9_MULTI_TAP, InputMethodSettings.T9_LETTERS)
 
     // each page's own, and first a way to the shared page
     @Test
     fun eachPageHasItsOwnOptionsAfterTheWayToTheSharedOnes() {
         val own = mapOf(
             InputMethodCatalog.PINYIN to listOf(EngineSettings.CHAIZI, EngineSettings.LATIN_WORDS, AppPrefs.PINYIN_KEYBOARD) + nineKeys,
-            InputMethodCatalog.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE, AppPrefs.SHUANGPIN_KEYBOARD, InputMethodSettings.T9_SYMBOLS),
+            InputMethodCatalog.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE, AppPrefs.SHUANGPIN_KEYBOARD),
             InputMethodCatalog.HANDWRITING to listOf(AppPrefs.HANDWRITING_PAUSE),
             InputMethodCatalog.ENGLISH to listOf(
                 AppPrefs.ENGLISH_KEYBOARD, AppPrefs.T9_ENGLISH_TYPING, *nineKeys.toTypedArray(),
