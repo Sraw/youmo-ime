@@ -440,7 +440,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             ctx, label, symbol.orEmpty(), marked = marked, dimmed = shown.isEmpty(), selected = name != null && name in selected,
             state = state, said = name?.let { said(it, stored) }, shortcut = name?.let { KeyCaps.Shortcut(it, stored) },
         ).apply {
-            setOnClickListener { tapped(name) { edit(getString(R.string.long_press_of, label), name, LongPress.ByLabel(label)) } }
+            setOnClickListener { tapped(name) { edit(label, name, LongPress.ByLabel(label)) } }
         }
     }
 
@@ -533,6 +533,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
      * A key edited under [title]: its long press ([chars]) where [longPress] names one, its two slots
      * ([section]) where [slotKey] does (a full keyboard's key of no letter has none).
      */
+    // titled by the key alone as its cap shows it, on every tab (q, XC, ，键, 空格): the dialog edits the slots too, so no 长按
     private fun edit(title: String, slotKey: String?, longPress: LongPress?) {
         val ctx = requireContext()
         val editor = longPress?.let { PopupEditor(startOf(it)) }
@@ -635,7 +636,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     field.requestFocus()
                     return@onClick false
                 }
-                edit(getString(R.string.long_press_of, label), slotName(label), LongPress.ByLabel(label))
+                edit(label, slotName(label), LongPress.ByLabel(label))
                 true
             }
     }

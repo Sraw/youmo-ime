@@ -363,7 +363,6 @@
     <string name="toolbar_divider">Below: always on the bar\'s right</string>
     <string name="toolbar_reset">Reset to default</string>
     <string name="toolbar_trad_simp">Simplified / Traditional</string>
-    <string name="long_press_of">Long press on “%1$s”</string>
     <string name="reset_this_key">Restore this key\'s default</string>
     <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it, and the small character on the key. Tap a character to select it, then use the buttons below.</string>
     <string name="letters">Letters</string>

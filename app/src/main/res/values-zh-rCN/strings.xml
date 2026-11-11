@@ -359,7 +359,6 @@
     <string name="toolbar_divider">以下一直显示在栏的右边</string>
     <string name="toolbar_reset">恢复默认</string>
     <string name="toolbar_trad_simp">简繁切换</string>
-    <string name="long_press_of">长按“%1$s”</string>
     <string name="reset_this_key">恢复此键默认</string>
     <string name="long_press_editor_hint">带框的第一个是长按后直接松手得到的字符，也是滑动这个键输入的字符，也就是键上的小字。点一个字符选中它，再用下面的按钮调整。</string>
     <string name="letters">字母</string>

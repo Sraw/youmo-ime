@@ -417,6 +417,21 @@ class PopupOverridesFragmentTest {
             assertEquals("①", stored.last())
         }
 
+        // the dialog titled by the key alone on every tab (it edits the slots too, not the long press only)
+        @Test
+        fun theDialogIsTitledByTheKeyAlone() {
+            open()
+            for ((page, label, title) in listOf(Triple(R.string.shortcut_page_full, "q", "q"), Triple(R.string.shortcut_page_g18, "XC", "XC"))) {
+                click(page)
+                keyCalled(label).performClick()
+                st.idle()
+                val d = ShadowDialog.getLatestDialog() as AlertDialog
+                assertTrue(title, KeyboardHarness.all(d.window!!.decorView).filterIsInstance<TextView>().any { it.text.toString() == title })
+                d.dismiss()
+                st.idle()
+            }
+        }
+
         // every key of every tab but the full keyboard's starts from its keyboard's own long press (owner, 0.6.0
         // beta2): the grouped and nine keys' their corner first (the cap's small character), 注音九键's its
         // symbols, ， and 。 their preset; 注音大千's keys have none
