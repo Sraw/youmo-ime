@@ -224,6 +224,33 @@ case("PY-88", needs="jvm:GroupedKeyboardUatTest.aSwipeUpTypesTheCornerAndWhileTy
 case("PY-89", needs="jvm:GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge、GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove、KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate")(lambda d: None)
 
 
+def edge_hold(d, xy, dx, note=None):
+    """a long press on xy, the popup shot (note), the finger moved dx px across and lifted: the text added"""
+    before = d.field_text()
+    x, y = xy
+    d.touch(("down", x, y), ("sleep", 0.9), ("move", x, y))
+    if note:
+        d.shot("kb", note)
+    steps = [("move", x + dx * i // 4, y) for i in range(1, 5)]
+    d.touch(*steps, ("up", x + dx, y))
+    time.sleep(0.5)
+    return d.field_text()[len(before):]
+
+
+@case("PY-89b", base="B0-14键", visual=True)
+def py89b(d):
+    k = d.keys(refresh=True)
+    p = d.dpx()
+    width = int(d.sh("wm size").split()[-1].split("x")[0])
+    left = edge_hold(d, k["l"], -30 * p, "长按最右的 L：角标在最右，L l 往左")
+    edge = edge_hold(d, k["l"], width - 1 - k["l"][0])
+    as_ = edge_hold(d, k["as"], 30 * p, None)
+    check(left == "l", f"L 往左一挪打出 {left!r}")
+    check(edge and edge.lower() != "l", f"L 往右到屏幕边打出 {edge!r}（应是角标）")
+    check(as_ == "A", f"AS 往右一挪打出 {as_!r}")
+    return f"L←{left} L→边{edge} AS→{as_}"
+
+
 case("PY-90", needs="jvm:Keys14UatTest.theFourteenKeysLearnApartFromTheFullKeyboardAndYourWordsAreBoths")(lambda d: None)
 
 

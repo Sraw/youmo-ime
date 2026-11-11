@@ -412,8 +412,14 @@
 ### PY-89 [P1] 长按分组键
 - **前提**：B0-14键。
 - **操作**：长按 QW 看弹出的一排；松开不选（往下滑走）。点 BN UI，长按 QW，滑到 q 松开。
-- **预期**：最下面一行是 `Q W 1 q w`，手指一开始在 1 上；上面几行是 q、w 在全键盘上长按出的符号（不含数字、字母和角标的 1）：q、w 长按只有数字和大写，所以 QW 上面没有别的行；长按 AS 时最下面一行是 `A S 6 a s`，上面有 `@` `*`（a、s 在全键盘上长按出的符号）。打字中选 q：框里是第一个候选，后面跟着 q。靠屏幕边的键（QW 在最左、L 在最右）长按后往边上滑，能选到那一行最边上的字母（离屏幕边 4dp 内就选中，不用滑出屏幕）。
-- **JVM**：`GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge`（键缝宽的主题里 QW 在最左边，滑到屏幕边选到 Q）、`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`（QW 只有 `Q W 1 q w`，原地松开打出 1；AS 最下 `A S 6 a s`、上面 @ *；打字中从长按选字母（测试选 w，和 q 同一路）：先 reset 再上字母）、`KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate`（uatTest，真数据：第一候选后跟字母）；设备上不跑。
+- **预期**：最下面一行是 `1 Q W q w`（QW 在最左，见下），手指一开始在 1 上；上面几行是 q、w 在全键盘上长按出的符号（不含数字、字母和角标的 1）：q、w 长按只有数字和大写，所以 QW 上面没有别的行；长按 AS 时最下面一行是 `6 A S a s`，上面有 `@` `*`（a、s 在全键盘上长按出的符号）。打字中选 q：框里是第一个候选，后面跟着 q。靠屏幕边的键像全键盘一样，自己的字在靠边那头、其余按顺序往里排：QW 在最左是 `1 Q W q w`，L 在最右是 `L l 0`（角标在最右），手指一开始在角标上，只要往里滑就能选到每个字母，往边上滑还是角标。
+- **JVM**：`GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge`（键缝宽的主题里 QW 在最左边：1 在最左，往右一步 Q、四步 w，滑到屏幕边还是 1）、`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`（QW 在最左是 `1 Q W q w`，原地松开打出 1；AS 最下 `6 A S a s`；L 在最右 `L l 0`、左挪一步打出 l、上面 @ *；打字中从长按选字母（测试选 w，和 q 同一路）：先 reset 再上字母）、`KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate`（uatTest，真数据：第一候选后跟字母）；设备上不跑。
+
+### PY-89b [P1] 14 键靠屏幕边的键长按，只往里滑
+- **前提**：B0-14键。
+- **操作**：长按最右的 L，弹出后截图，手指往左挪约 30dp（一个弹出键宽左右）松手；再长按 L，往右挪到屏幕边松手；长按最左的 AS，往右挪约 30dp 松手。
+- **预期**：L 的弹出一排是 `L l` 再加最右的角标，手指一开始在角标上；往左一挪打出 l；往右挪到屏幕边打出的是角标（没有别的字在手指右边）。AS 的一排是角标在最左、`A S a s` 往右排，往右一挪打出 A。和全键盘靠边的键（P 在最右，`p` 在最右、其余往左）一个规矩。
+- **JVM**：`GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove`、`PopupKeyboardUiTest.aRowInOrderAtAnEdgeHasItsOwnKeyAtThatEnd`、`PopupFocusTest.atTheRightEdgeTheKeysOwnIsLastAndTheRestInOrderInward`；设备上也跑（图）。
 
 ### PY-90 [P1] 14 键和全键盘分开学，学成的词两边都有
 <!-- learning: qk: 和全拼各学各的；你的词共用 -->
