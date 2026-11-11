@@ -128,8 +128,7 @@
 - **JVM**：`ShuangpinUatTest.microsoftsScreenSemicolonIsAMarkAndAnInitialTakenKeepsItsSyllables`（你；不是 ni；，点 c 后候选没有西、前几个候选读 ci/cuo（词、次、错）、音节条全是 c 开头）；设备上不跑。
 
 ### SP-24 [P1] 九键双拼的长按、按键字符和 123
-- **前提**：B0-九键双拼，**方案** 改成"微软"；在 **输入法 → 双拼 → 九键 → 按键长按** 里把 2 键的符号改成 `~`（九键键盘的设置，拼音和双拼的九键共用）。
-<!-- verify after S6: 入口改为「按键字符和快捷键 → 九键」 -->
+- **前提**：B0-九键双拼，**方案** 改成"微软"；在 **按键 → 按键字符和快捷键 → 九键** 里把 2 键的符号改成只有 `~`（拼音、双拼、英文的九键共用这一份）。
 - **操作**：回测试页点「普通文本」框，长按 5（JKL）看弹出的一行；长按 2 看上面的符号；清空，点 6 键，量编码行，看编码行上有没有音节条；点 **123**，点音节条上的第一个音节；点 **ABC** 回来，清空，换到拼音（全键盘）打 ni，量编码行。
 - **预期**：5 键只有 JKL，弹出的一行是 J K L、5、j k l 和 5 键的符号，没有「；」「：」；微软的 `;`（ing）在 1 键上，1 键角标是 `1;`，打字时声母后面按 1 是 ing（前面拼不成 ing 时不算：4 键（GHI）后、点了 g / h / ch 后按 1，和其他方案一样是分开）；2 键的符号是改过的 `~`（显示成中文标点的「～」，点它打出的也是），和拼音的九键一样。九键双拼的编码行 32dp；字母页上音节在左边那一列，编码行上没有音节条；打字中点 123，编码行上有音节条，点一个音节拼音行就跟着改。拼音全键盘的编码行 18dp。
 - **JVM**：`GroupedKeyboardUatTest.nineKeyShuangpinsLongPressesCodeRowAndTheNumbersStrip`、`GroupedKeyboardUatTest.aNineKeyAtTheRightReachesItsLastLetterOnScreen`（右边的键长按，往右滑到屏幕边能选到最后一个字母）、`KeyboardHalvesUatTest.aSyllableTakenOnTheNumbersPageGoesIntoTheCode`（长按 5 有 J K L，没有 `;` `:`；2 键改成 ~ 后长按有「～」、点了发 ~（拼音的九键同）；编码行 32dp，字母页音节在左列不在编码行，123 页有音节条、点了发音节键；拼音全键盘 18dp（键盘半边）；123 页选的音节进编码行（引擎半边）；~ 变成全角「～」是 fcitx 中文标点的，JVM 只断言发出 ~）；设备上不跑。
