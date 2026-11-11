@@ -23,7 +23,7 @@ import org.fcitx.fcitx5.android.engine.runtime.UserWord
  *
  * Made once a hold (VoiceEngine.userHotwords, beside the hotwords) on the engine's thread; what
  * the dictionary says of a stretch ([allowed]) is asked of the engine only for one that reads as a
- * word ([candidates]) and remembered for the hold ([replace]).
+ * word ([candidates]) and remembered for the hold ([Hold]).
  */
 class VoiceHomophones internal constructor(
     // those that take part, preferred first
@@ -65,9 +65,6 @@ class VoiceHomophones internal constructor(
     }
 
     private val rank: Map<Word, Int> = words.withIndex().associate { (i, w) -> w to i }
-
-    // [allowed] as answered, for the hold: a stretch is asked again as each step of it streams
-    private val answered = HashMap<String, Boolean>()
 
     val isEmpty: Boolean get() = words.isEmpty()
 
@@ -126,35 +123,58 @@ class VoiceHomophones internal constructor(
         return false
     }
 
-    /**
-     * [text] with each stretch [candidates] finds and the engine [allowed] made the word: from the
-     * start, a stretch overlapping one already put in left as it is. [text] as it is if the engine
-     * cannot say.
-     */
-    suspend fun replace(text: String, lexicon: Lexicon): String {
-        val spans = candidates(text)
-        if (spans.isEmpty()) return text
-        val ask = spans.filter { it.key !in answered }.distinctBy { it.key }
-        if (ask.isNotEmpty()) {
-            val said = lexicon.allowed(ask) ?: return text
-            if (answered.size > MAX_ANSWERED) answered.clear()
-            ask.forEachIndexed { i, span -> answered[span.key] = said.getOrElse(i) { false } }
-        }
-        val out = text.toCharArray()
-        var until = 0
-        for (span in spans) {
-            val from = span.at + span.start
-            if (from < until || answered[span.key] != true) continue
-            span.word.text.toCharArray(out, from)
-            until = span.at + span.end
-        }
-        return String(out)
-    }
+    /** One hold's replacing ([hold]): made for each listener, on its decoder's thread alone. */
+    fun hold() = Hold(this)
 
-    /** [heard] with its text [replace]d: the same length, so what of it is settled stays so. */
-    suspend fun replace(heard: VoiceLive.Heard, lexicon: Lexicon): VoiceLive.Heard {
-        val whole = replace(heard.whole, lexicon)
-        return if (whole == heard.whole) heard else VoiceLive.Heard(whole, heard.settled, heard.fallback, heard.utterance, heard.upTo)
+    /**
+     * What one hold put in, kept for all of it: what showed and was typed as it streamed stays so
+     * whatever comes later. A stretch put in once (its text and word) is put in again wherever it
+     * is heard in this hold, the engine asked or not: the raw text the polish failing falls back
+     * on splits otherwise, and a word typed must not turn back (VoiceTalk retyping what follows).
+     * The engine not answering once ([Lexicon.allowed] null: busy, a timeout), it is not asked
+     * again this hold: what it has not answered stays as heard.
+     */
+    class Hold internal constructor(private val homophones: VoiceHomophones) {
+        // [allowed] as answered, by [Span.key]: a stretch is asked once as each step of it streams
+        private val answered = HashMap<String, Boolean>()
+
+        // stretches put in, as heard and as put in: "徐静\u0000徐婧"
+        private val putIn = HashSet<String>()
+
+        private var silent = false
+
+        /**
+         * [text] with each stretch [candidates] finds and the engine [allowed] made the word (or one
+         * this hold put in already): from the start, a stretch overlapping one already put in left
+         * as it is.
+         */
+        suspend fun replace(text: String, lexicon: Lexicon): String {
+            val spans = homophones.candidates(text)
+            if (spans.isEmpty()) return text
+            val ask = spans.filter { it.key !in answered && pair(it) !in putIn }.distinctBy { it.key }
+            if (ask.isNotEmpty() && !silent) {
+                val said = lexicon.allowed(ask)
+                if (said == null) silent = true else ask.forEachIndexed { i, span -> answered[span.key] = said.getOrElse(i) { false } }
+            }
+            val out = text.toCharArray()
+            var until = 0
+            for (span in spans) {
+                val from = span.at + span.start
+                if (from < until || !(pair(span) in putIn || answered[span.key] == true)) continue
+                span.word.text.toCharArray(out, from)
+                putIn += pair(span)
+                until = span.at + span.end
+            }
+            return String(out)
+        }
+
+        /** [heard] with its text [replace]d: the same length, so what of it is settled stays so. */
+        suspend fun replace(heard: VoiceLive.Heard, lexicon: Lexicon): VoiceLive.Heard {
+            val whole = replace(heard.whole, lexicon)
+            return if (whole == heard.whole) heard else VoiceLive.Heard(whole, heard.settled, heard.fallback, heard.utterance, heard.upTo)
+        }
+
+        private fun pair(span: Span) = span.text + "\u0000" + span.word.text
     }
 
     companion object {
@@ -167,8 +187,6 @@ class VoiceHomophones internal constructor(
         // as long as a word of the user's may be (VoiceHotwords' spelling's)
         private const val MAX_WORD = 12
 
-        private const val MAX_ANSWERED = 512
-
         /** A reading as [Word] and [Dictionary] have it: a syllable's id and its tone (1–5). */
         fun reading(syllable: Int, tone: Int): Int = syllable * 8 + tone
 
@@ -177,7 +195,7 @@ class VoiceHomophones internal constructor(
         /**
          * Of the user's [words] (Engines.userWords' order: added, learned most typed first,
          * blocked), [readingsOf] each that takes part (null: not known, it takes no part), each
-         * character's readings by [charReadings] (all its readings, of those [needed]).
+         * character's readings by [charReadings] (all its readings; those [needed] the ones that count).
          */
         fun of(
             words: List<UserWord>,

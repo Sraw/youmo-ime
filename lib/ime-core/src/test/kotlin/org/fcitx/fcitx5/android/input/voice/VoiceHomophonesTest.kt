@@ -68,7 +68,7 @@ class VoiceHomophonesTest {
     }
 
     private fun replaced(h: VoiceHomophones, text: String, dictionary: VoiceHomophones.Dictionary = FakeDictionary()): String =
-        now { h.replace(text) { spans -> BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], dictionary) } } }
+        now { h.hold().replace(text) { spans -> BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], dictionary) } } }
 
     private fun learned(text: String, count: Float) = UserWord(text, "", LEARNED, count)
 
@@ -138,10 +138,32 @@ class VoiceHomophonesTest {
     @Test
     fun `the engine not answering leaves the text as heard, and a heard text keeps its length`() {
         val h = homophones(added("徐婧"))
-        assertEquals("徐静", now { h.replace("徐静") { null } })
-        val heard = now { h.replace(VoiceLive.Heard("徐静，你好", 3)) { BooleanArray(it.size) { true } } }
+        assertEquals("徐静", now { h.hold().replace("徐静") { null } })
+        val heard = now { h.hold().replace(VoiceLive.Heard("徐静，你好", 3)) { BooleanArray(it.size) { true } } }
         assertEquals("徐婧，你好", heard.whole)
         assertEquals(3, heard.settled)
+    }
+
+    @Test
+    fun `what a hold put in stays put in, the engine silent after or the text split otherwise`() {
+        val hold = homophones(added("徐婧"), added("何芮")).hold()
+        var asked = 0
+        assertEquals("找徐婧，", now { hold.replace("找徐静，") { asked++; BooleanArray(it.size) { true } } })
+        // a timeout on the next step: what was put in stays, the new stretch stays as heard
+        assertEquals("找徐婧，和瑞", now { hold.replace("找徐静，和瑞") { asked++; null } })
+        // the raw text (the polish failed): no marks, the run another, 徐婧 still put in; silent now, not asked
+        assertEquals("找徐婧和瑞", now { hold.replace("找徐静和瑞") { asked++; BooleanArray(it.size) { true } } })
+        assertEquals(2, asked)
+    }
+
+    @Test
+    fun `several in one segment, overlapping ones the first, next to digits and letters`() {
+        val h = homophones(added("徐婧"), added("何芮"), added("婧攻"))
+        assertEquals("徐婧和何芮", replaced(h, "徐静和和瑞"))
+        // 徐静 and 静公 overlap: the first from the start
+        assertEquals("徐婧公", replaced(h, "徐静公"))
+        assertEquals("3徐婧OK", replaced(h, "3徐静OK"))
+        assertEquals("a徐", replaced(h, "a徐"))
     }
 
     // the fakes never suspend: it runs to its end at once

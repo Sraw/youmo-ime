@@ -307,7 +307,7 @@ class VoiceListener(
         if (models.polisher == null) polishFailure = VoiceSession.PolishFailure.LOAD
         // the user's words put in for what reads as them, after the polish, as it shows and as it is
         // typed alike (060-voice-userdict.md): what shows is what is typed, no word changing at the end
-        val homophones = words.homophones
+        val homophones = words.homophones.hold()
         val homophoneLexicon = VoiceHomophones.Lexicon { safeLanguage.homophonesAllowed(it) }
         // the polish failing: the raw text as it is after this step (read once the step has run), told as such
         suspend fun polished(step: () -> VoiceLive.Heard) {

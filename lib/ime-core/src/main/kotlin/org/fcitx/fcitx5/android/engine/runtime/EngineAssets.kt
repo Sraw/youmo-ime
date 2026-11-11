@@ -260,7 +260,7 @@ internal class EngineAssets(
     /**
      * The user's [words] for voice input's homophones ([VoiceHomophones.of]): each read as typed,
      * its tones the dictionary's for it (by its characters for a word of theirs alone), a tone not
-     * known any its character has in that syllable; each character's readings, all of them.
+     * known any its character has in that syllable; each character's readings, all of them, made once.
      */
     fun voiceHomophones(words: List<UserWord>): VoiceHomophones {
         val data = pinyinData
@@ -277,18 +277,22 @@ internal class EngineAssets(
                     }
                 }
             },
-            charReadings = { needed ->
-                val out = HashMap<Char, IntArray>()
-                val readings = data.charReadings
-                for (i in 0 until readings.characters) {
-                    val cp = readings.codePointAt(i)
-                    if (cp > Char.MAX_VALUE.code) continue
-                    val of = readings.of(cp).map { VoiceHomophones.reading(it.syllable, it.tone) }.filter { it in needed }
-                    if (of.isNotEmpty()) out[cp.toChar()] = of.toIntArray()
-                }
-                out
-            },
+            // all of them, made once: the hold's words' readings are looked up in it as heard
+            charReadings = { homophoneChars },
         )
+    }
+
+    // every BMP character's readings (VoiceHomophones.reading), for each hold's homophones: walked once, not a hold
+    private val homophoneChars: Map<Char, IntArray> by lazy(LazyThreadSafetyMode.NONE) {
+        val readings = pinyinData.charReadings
+        val out = HashMap<Char, IntArray>(readings.characters * 2)
+        for (i in 0 until readings.characters) {
+            val cp = readings.codePointAt(i)
+            if (cp > Char.MAX_VALUE.code) continue
+            val of = readings.of(cp)
+            if (of.isNotEmpty()) out[cp.toChar()] = IntArray(of.size) { VoiceHomophones.reading(of[it].syllable, of[it].tone) }
+        }
+        out
     }
 
     /** [VoiceHomophones.allowed] of each of [spans], by the dictionary's words and the model's counts. */
