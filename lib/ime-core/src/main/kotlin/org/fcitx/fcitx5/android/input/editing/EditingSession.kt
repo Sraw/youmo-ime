@@ -29,6 +29,8 @@ class EditingSession(
     private val editor: InputEditor,
     // units a commit goes to the editor in at most ([CommitPieces]); smaller in tests
     private val commitPiece: Int = CommitPieces.MAX,
+    // the main thread held between pieces ([CommitPieces]); recorded in tests
+    private val pause: (Long) -> Unit = { Thread.sleep(it) },
     private val checkThread: () -> Unit = {},
 ) {
 
@@ -421,20 +423,37 @@ class EditingSession(
         }
     }
 
-    // a long text ([CommitPieces]) in one batch edit, each piece's end predicted: an editor may
-    // report the cursor between them, and a report of the last alone passes the others. Between
-    // pieces a read waits for the editor: one-way calls sent at once all hold binder buffer until
-    // each is taken, and 450 000 characters sent as 14 pieces at once lost 3 in the middle. The
-    // read's answer is not needed, nor is it if it times out: by then the pieces have been taken.
-    // The keyboard waits meanwhile (a second for 450 000), as long as the app is busy taking them
+    // a long text ([CommitPieces]) in one batch edit, each piece's end predicted once the editor
+    // took it: an editor may report the cursor between pieces, and a report of the last alone
+    // passes the others. A piece the editor did not take is sent again after a pause; when the
+    // pauses are spent or the editor is gone, the rest is not sent (a hole in the middle would be
+    // worse than a paste cut short) nor predicted, and the cursor is left where the editor puts it
     private fun commitPieces(start: Int, pieces: List<String>, cursor: Int) {
+        val began = System.nanoTime()
         editor.batchEdit {
             var end = start
-            pieces.forEachIndexed { i, piece ->
-                if (i > 0) editor.textBeforeCursor(1)
+            var paused = 0L
+            var retries = 0
+            for ((i, piece) in pieces.withIndex()) {
+                if (i > 0) pause(CommitPieces.GAP_MS)
+                var wait = CommitPieces.FIRST_RETRY_MS
+                while (!editor.commitText(piece, 1)) {
+                    if (!editor.isAvailable || paused + wait > CommitPieces.RETRY_BUDGET_MS) {
+                        val all = pieces.sumOf { it.length }
+                        CoreLog.e("long commit cut short: ${end - start} of $all units, piece ${i + 1} not taken")
+                        return@batchEdit
+                    }
+                    pause(wait)
+                    paused += wait
+                    retries++
+                    wait = minOf(wait * 2, CommitPieces.LAST_RETRY_MS)
+                }
                 end += piece.length
                 selection.predict(end)
-                editor.commitText(piece, 1)
+            }
+            CoreLog.d {
+                val ms = (System.nanoTime() - began) / 1_000_000
+                "long commit: ${end - start} units, ${pieces.size} pieces, $retries sent again, ${ms}ms in all"
             }
             if (cursor != -1) {
                 selection.predict(start + cursor)

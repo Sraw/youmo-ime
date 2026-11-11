@@ -19,9 +19,9 @@ class InputConnectionEditor(private val connection: () -> InputConnection?) : In
     override val isAvailable: Boolean
         get() = connection() != null
 
-    override fun commitText(text: String, newCursorPosition: Int) {
-        connection()?.commitText(text, newCursorPosition)
-    }
+    // false also when the one-way binder call failed: the framework catches the RemoteException
+    override fun commitText(text: String, newCursorPosition: Int): Boolean =
+        connection()?.commitText(text, newCursorPosition) ?: false
 
     override fun setComposingText(text: CharSequence, newCursorPosition: Int) {
         connection()?.setComposingText(text, newCursorPosition)

@@ -106,9 +106,13 @@ minSdk is 29 and the tests ran at 35 alone till 0.5.1, which crashed on Android 
 of its 1 MB binder buffer. A clip of 297 000 characters pasted from the clipboard panel (a 567 KB
 parcel) failed with `FAILED BINDER TRANSACTION` in logcat and nothing in the field, while the
 IME's cursor prediction moved on; the editor's own paste of it worked (it reads the clipboard
-itself). Several one-way calls sent at once hold their buffers together until each is taken: 14
-pieces of 32 K sent back to back lost 3 in the middle. `EditingSession.commitText` sends a text of
-more than `CommitPieces.MAX` units in pieces, a read between them (`CommitPieces`).
+itself). Several one-way calls sent at once hold their buffers together until the editor's binder
+thread has taken each (milliseconds; not until its main thread has handled it): 14 pieces of 32 K
+sent back to back lost 3 in the middle, `commitText` returning false for those.
+`EditingSession.commitText` sends a text of more than `CommitPieces.MAX` units in pieces a short
+pause apart, sends a refused one again after a pause, and stops (predicting nothing more) when the
+pauses are spent. Waiting on a read instead blocks the main thread as long as the editor lays the
+text out, up to 2 s a read.
 
 ### Direct boot
 

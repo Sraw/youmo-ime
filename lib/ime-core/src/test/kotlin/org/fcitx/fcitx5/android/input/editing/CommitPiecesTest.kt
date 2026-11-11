@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-/** [CommitPieces]: a long paste cut for the binder, never inside a surrogate pair. */
+/** [CommitPieces]: a long paste cut for the binder, never inside a character. */
 class CommitPiecesTest {
 
     @Test
@@ -59,6 +59,22 @@ class CommitPiecesTest {
     fun piecesOfTwoStillMoveForwardOverPairs() {
         assertEquals(listOf("😀", "😀", "a"), CommitPieces.split("😀😀a", max = 2))
         assertEquals(listOf("a", "😀", "b"), CommitPieces.split("a😀b", max = 2))
+    }
+
+    @Test
+    fun aCutNeverSplitsACrlf() {
+        assertEquals(listOf("ab", "\r\nc", "d"), CommitPieces.split("ab\r\ncd", max = 3))
+    }
+
+    @Test
+    fun aCutNeverSplitsALetterFromItsCombiningMark() {
+        assertEquals(listOf("ab", "e\u0301c"), CommitPieces.split("abe\u0301c", max = 3))
+    }
+
+    @Test
+    fun aCharacterLongerThanAPieceIsCutBetweenItsCodePoints() {
+        val marks = "e" + "\u0301".repeat(5)
+        assertEquals(listOf("e\u0301\u0301", "\u0301\u0301\u0301"), CommitPieces.split(marks, max = 3))
     }
 
     @Test(expected = IllegalArgumentException::class)

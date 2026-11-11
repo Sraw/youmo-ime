@@ -28,9 +28,9 @@ class WatchedEditor(private val inner: InputEditor, private val changed: () -> U
         if (quiet == 0) changed()
     }
 
-    override fun commitText(text: String, newCursorPosition: Int) {
+    override fun commitText(text: String, newCursorPosition: Int): Boolean {
         changing()
-        inner.commitText(text, newCursorPosition)
+        return inner.commitText(text, newCursorPosition)
     }
 
     override fun setComposingText(text: CharSequence, newCursorPosition: Int) {

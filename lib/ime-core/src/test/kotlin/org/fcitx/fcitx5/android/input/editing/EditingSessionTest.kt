@@ -115,28 +115,27 @@ class EditingSessionTest {
 
     // region commitText of a text too long for one call (CommitPieces)
 
-    private fun pieced(text: String = "", cursor: Int = text.length): Pair<EditingSession, FakeEditor> {
+    private val pauses = mutableListOf<Long>()
+
+    private fun pieced(text: String = "", cursor: Int = text.length, end: Int = cursor): Pair<EditingSession, FakeEditor> {
         val editor = FakeEditor(text, cursor)
-        val session = EditingSession(editor, commitPiece = 4)
-        session.selection.resetTo(cursor)
+        editor.setSelection(cursor, end)
+        editor.calls.clear()
+        val session = EditingSession(editor, commitPiece = 4, pause = { pauses += it })
+        session.selection.resetTo(cursor, end)
         return session to editor
     }
 
     @Test
-    fun aLongTextGoesInPiecesInOneBatchTheEditorReadBetween() {
+    fun aLongTextGoesInPiecesInOneBatchAPauseBetween() {
         val (s, e) = pieced("<>", cursor = 1)
         s.commitText("abcdefghij")
         assertEquals("<abcdefghij>", e.text)
         assertEquals(
-            listOf(
-                "beginBatchEdit()",
-                "commitText(abcd, 1)", "textBeforeCursor(1)",
-                "commitText(efgh, 1)", "textBeforeCursor(1)",
-                "commitText(ij, 1)",
-                "endBatchEdit()",
-            ),
+            listOf("beginBatchEdit()", "commitText(abcd, 1)", "commitText(efgh, 1)", "commitText(ij, 1)", "endBatchEdit()"),
             e.calls,
         )
+        assertEquals(listOf(CommitPieces.GAP_MS, CommitPieces.GAP_MS), pauses)
         assertTrue("the cursor is predicted after the whole text", s.selection.latest.rangeEquals(11))
     }
 
@@ -155,7 +154,21 @@ class EditingSessionTest {
         val (s, e) = pieced()
         s.commitText("abcd")
         assertEquals(listOf("commitText(abcd, 1)"), e.calls)
+        assertTrue(pauses.isEmpty())
         assertTrue(s.selection.latest.rangeEquals(4))
+    }
+
+    @Test
+    fun theLongestTextOfOneCallGoesInOneAndOneMoreInTwo() {
+        val e = FakeEditor()
+        val s = EditingSession(e, pause = { pauses += it })
+        s.selection.resetTo(0)
+        s.commitText("a".repeat(CommitPieces.MAX))
+        assertEquals(1, e.calls.count { it.startsWith("commitText(") })
+        s.commitText("b".repeat(CommitPieces.MAX + 1))
+        assertEquals(3, e.calls.count { it.startsWith("commitText(") })
+        assertEquals(CommitPieces.MAX * 2 + 1, e.text.length)
+        assertTrue(s.selection.latest.rangeEquals(CommitPieces.MAX * 2 + 1))
     }
 
     @Test
@@ -178,6 +191,62 @@ class EditingSessionTest {
         assertEquals("<abcdefghij>", e.text)
         assertTrue(s.composing.isEmpty())
         assertTrue(s.selection.latest.rangeEquals(11))
+    }
+
+    @Test
+    fun aLongTextReplacesTheSelectionWithItsFirstPiece() {
+        val (s, e) = pieced("<xyz>", cursor = 1, end = 4)
+        s.commitText("abcdefghij")
+        assertEquals("<abcdefghij>", e.text)
+        assertTrue("each piece's end counted from the selection's start", s.selection.consume(5))
+        assertTrue(s.selection.latest.rangeEquals(11))
+    }
+
+    @Test
+    fun aLongTextInsideReplaceAroundsBatch() {
+        val (s, e) = pieced("<ab>", cursor = 3)
+        s.replaceAround(2, 1, "abcdefghij")
+        assertEquals("<abcdefghij", e.text)
+        assertEquals("the delete and the pieces are one change", 2, e.maxBatchDepth)
+        assertEquals("endBatchEdit()", e.calls.last())
+        assertTrue(s.selection.latest.rangeEquals(11))
+    }
+
+    @Test
+    fun aPieceNeverTakenStopsTheRestAndTheirPrediction() {
+        val (s, e) = pieced("<>", cursor = 1)
+        e.commitFails = { it == "efgh" }
+        s.commitText("abcdefghij")
+        assertEquals("no hole: what went in is the text's start", "<abcd>", e.text)
+        assertEquals("the last piece not sent", 0, e.calls.count { it == "commitText(ij, 1)" })
+        assertEquals("endBatchEdit()", e.calls.last())
+        assertTrue("predicted no further than taken", s.selection.latest.rangeEquals(5))
+        assertTrue(pauses.drop(1).sum() <= CommitPieces.RETRY_BUDGET_MS)
+        assertTrue("sent again a few times first", e.calls.count { it == "commitText(efgh, 1)" } > 3)
+    }
+
+    @Test
+    fun aPieceTakenAtTheSecondTryGoesOn() {
+        val (s, e) = pieced("<>", cursor = 1)
+        var failed = 0
+        e.commitFails = { it == "efgh" && failed++ == 0 }
+        s.commitText("abcdefghij")
+        assertEquals("<abcdefghij>", e.text)
+        assertEquals(listOf(CommitPieces.GAP_MS, CommitPieces.FIRST_RETRY_MS, CommitPieces.GAP_MS), pauses)
+        assertTrue(s.selection.latest.rangeEquals(11))
+    }
+
+    @Test
+    fun anEditorGoneMidwayIsNotWaitedFor() {
+        val (s, e) = pieced("<>", cursor = 1)
+        e.commitFails = { piece ->
+            // the connection went with the piece: InputConnectionEditor gives false, isAvailable false
+            (piece == "efgh").also { if (it) e.isAvailable = false }
+        }
+        s.commitText("abcdefghij")
+        assertEquals("<abcd>", e.text)
+        assertEquals("the gap before the piece, no pause after", listOf(CommitPieces.GAP_MS), pauses)
+        assertTrue(s.selection.latest.rangeEquals(5))
     }
 
     // endregion

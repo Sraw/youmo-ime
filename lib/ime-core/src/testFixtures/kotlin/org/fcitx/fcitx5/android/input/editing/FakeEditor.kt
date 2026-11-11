@@ -127,10 +127,17 @@ class FakeEditor(
         }
     }
 
-    override fun commitText(text: String, newCursorPosition: Int) {
+    /**
+     * Whether a [commitText] of this text fails: false returned and nothing changed, as a binder call
+     * that did not fit the editor's buffer. Asked once a call, so it can fail a few times and then not.
+     */
+    var commitFails: (String) -> Boolean = { false }
+
+    override fun commitText(text: String, newCursorPosition: Int): Boolean {
         calls += "commitText($text, $newCursorPosition)"
-        if (!isAvailable) return
+        if (!isAvailable || commitFails(text)) return false
         replaceText(text, newCursorPosition, composing = false)
+        return true
     }
 
     /** Styling spans are not modelled: only the characters of [text] land in the buffer. */

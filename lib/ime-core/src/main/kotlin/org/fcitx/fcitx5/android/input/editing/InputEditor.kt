@@ -24,7 +24,11 @@ interface InputEditor {
      */
     val isAvailable: Boolean
 
-    fun commitText(text: String, newCursorPosition: Int)
+    /**
+     * @return false when the editor did not take [text]: no connection, or the binder call failed
+     * (one too large for the editor's buffer, [CommitPieces]). Nothing of it went in then.
+     */
+    fun commitText(text: String, newCursorPosition: Int): Boolean
 
     /** Replaces the composing region (or else the selection) with [text], which stays composing. */
     fun setComposingText(text: CharSequence, newCursorPosition: Int)
