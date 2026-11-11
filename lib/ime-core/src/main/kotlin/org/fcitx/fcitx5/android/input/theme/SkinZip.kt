@@ -17,7 +17,7 @@ import java.util.zip.DataFormatException
 import java.util.zip.Inflater
 
 /**
- * A skin's ZIP (`.bds`, `.bdi`, `.ssf`) unpacked in memory, never to a disk: a name in it is only ever a key
+ * A skin's ZIP (`.bds`, `.bdi`, `.ssf`, `.flex`, `.zip`) unpacked in memory, never to a disk: a name in it is only ever a key
  * ([org.fcitx.fcitx5.android.scene.skin.SkinFiles]), and one that would lead out of a folder (`..`, `/x`, `C:`) is
  * refused, not cleaned. Read by its central directory, or, where that is broken (skin makers' tools write odd
  * ZIPs), entry by entry from the start. Held to [SkinLimits]: the file, the files' count, each one unpacked and all,
@@ -26,7 +26,26 @@ import java.util.zip.Inflater
  */
 object SkinZip {
     /** [input] read to its end within [SkinLimits.MAX_ARCHIVE_BYTES], then [read]. */
-    fun read(input: InputStream): Map<String, ByteArray> {
+    fun read(input: InputStream): Map<String, ByteArray> = read(bytes(input))
+
+    /**
+     * A skin file [fileName]'s files: a lone YAML theme (Trime's) as itself, held to [SkinLimits.MAX_TEXT_BYTES]; a
+     * ZIP holding one FlorisBoard `.flex` and no extension of its own (a download) as that one's; any other ZIP as [read].
+     */
+    fun readSkin(input: InputStream, fileName: String): Map<String, ByteArray> {
+        val b = bytes(input)
+        val name = fileName.substringAfterLast('/')
+        if (ThemeFileName.isYaml(name)) {
+            if (b.size > SkinLimits.MAX_TEXT_BYTES) fail(Reason.TOO_BIG)
+            return mapOf(name to b)
+        }
+        val entries = read(b)
+        val flex = entries.keys.filter { it.endsWith(".flex", ignoreCase = true) }
+        val own = entries.keys.any { it.substringAfterLast('/') == "extension.json" }
+        return if (flex.size == 1 && !own) read(entries.getValue(flex[0])) else entries
+    }
+
+    private fun bytes(input: InputStream): ByteArray {
         val out = ByteArrayOutputStream()
         val buf = ByteArray(BUFFER)
         while (true) {
@@ -35,7 +54,7 @@ object SkinZip {
             out.write(buf, 0, n)
             if (out.size() > SkinLimits.MAX_ARCHIVE_BYTES) fail(Reason.TOO_BIG)
         }
-        return read(out.toByteArray())
+        return out.toByteArray()
     }
 
     /** [b]'s files by name (`/`-separated, no directories), the first of a name twice; at least one. */

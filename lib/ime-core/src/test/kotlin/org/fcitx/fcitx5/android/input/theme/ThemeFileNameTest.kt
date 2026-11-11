@@ -22,8 +22,18 @@ class ThemeFileNameTest {
 
     @Test
     fun skinsByTheirExtensions() {
-        for (name in listOf("a.bds", "B.BDI", "x y.ssf")) assertTrue(name, ThemeFileName.isSkinFile(name))
-        for (name in listOf("a.theme", "a.ssf.zip", ".ssf", "ssf", "", null)) assertFalse(name.toString(), ThemeFileName.isSkinFile(name))
+        for (name in listOf("a.bds", "B.BDI", "x y.ssf", "c.flex", "d.trime.yaml", "e.YML", "f.zip", "a.ssf.zip")) {
+            assertTrue(name, ThemeFileName.isSkinFile(name))
+        }
+        for (name in listOf("a.theme", ".ssf", "ssf", "a.json", "", null)) assertFalse(name.toString(), ThemeFileName.isSkinFile(name))
+        assertTrue(ThemeFileName.isYaml("星天.trime.yaml"))
+        assertTrue(ThemeFileName.isYaml("a.YML"))
+        assertFalse(ThemeFileName.isYaml("a.yaml.zip"))
+        assertFalse(ThemeFileName.isYaml(".yaml"))
+        assertFalse(ThemeFileName.isYaml(null))
+        assertTrue(ThemeFileName.isZip("a.ZIP"))
+        assertFalse(ThemeFileName.isZip("a.flex"))
+        assertFalse(ThemeFileName.isZip(null))
         assertEquals("海风", ThemeFileName.base("海风.bds"))
         assertEquals("a.b", ThemeFileName.base("dir/a.b.ssf"))
         assertEquals(".ssf", ThemeFileName.base(".ssf"))

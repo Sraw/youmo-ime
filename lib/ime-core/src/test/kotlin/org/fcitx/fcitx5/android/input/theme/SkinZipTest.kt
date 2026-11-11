@@ -57,6 +57,24 @@ class SkinZipTest {
     }
 
     @Test
+    fun skinFilesByTheirKind() {
+        val yaml = "name: x\n".toByteArray()
+        assertEquals(setOf("t.trime.yaml"), SkinZip.readSkin(yaml.inputStream(), "dl/t.trime.yaml").keys)
+        assertEquals(Reason.TOO_BIG, assertThrows(SkinError::class.java) {
+            SkinZip.readSkin(ByteArray(SkinLimits.MAX_TEXT_BYTES + 1).inputStream(), "big.yaml")
+        }.reason)
+        val flex = zip("extension.json" to "{}".toByteArray(), "stylesheets/a.json" to "{}".toByteArray())
+        // a download: a folder with one .flex in it, read as that one
+        val wrapped = zip("theme-main/README.md" to byteArrayOf(1), "theme-main/a.flex" to flex)
+        assertEquals(setOf("extension.json", "stylesheets/a.json"), SkinZip.readSkin(wrapped.inputStream(), "theme-main.zip").keys)
+        // an extension of its own beside one: as it is
+        val own = zip("extension.json" to "{}".toByteArray(), "old/a.flex" to flex)
+        assertEquals(setOf("extension.json", "old/a.flex"), SkinZip.readSkin(own.inputStream(), "x.flex").keys)
+        val two = zip("a.flex" to flex, "b.flex" to flex)
+        assertEquals(setOf("a.flex", "b.flex"), SkinZip.readSkin(two.inputStream(), "x.zip").keys)
+    }
+
+    @Test
     fun namesInChineseToolsEncoding() {
         val files = SkinZip.read(zip("皮肤/名.png" to byteArrayOf(1), utf8 = false))
         assertEquals(setOf("皮肤/名.png"), files.keys)
