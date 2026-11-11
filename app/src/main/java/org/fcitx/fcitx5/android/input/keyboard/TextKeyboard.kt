@@ -59,7 +59,7 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLook
 class TextKeyboard(
     context: Context,
     theme: Theme,
-) : BaseKeyboard(context, theme, Layout, KeyNames.QWERTY, shortcuts = true), AutoCapsKeys {
+) : BaseKeyboard(context, theme, Layout, KeyNames.QWERTY), AutoCapsKeys {
 
     // the halves (the scene splits the rows, SplitKeyboard): 双拼's ing is L's long press there (LS-29),
     // a table's code key has a key of its own

@@ -275,7 +275,8 @@ class TextSceneWiringTest {
     private fun popups(def: KeyDef, letter: Boolean) = def.popup.orEmpty().map { p ->
         when (p) {
             // a letter's bubble shows its letter as Shift has it (Table.bubble, transformAlphabet)
-            is KeyDef.Popup.AltPreview -> "bubble ${if (letter) "letter" else p.content} ${p.alternative}"
+            // a named key's with no corner of the layout's (，): its corner the resolver's first as it is held, so a plain bubble
+            is KeyDef.Popup.AltPreview -> if (p.alternative.isEmpty()) "bubble ${p.content}" else "bubble ${if (letter) "letter" else p.content} ${p.alternative}"
             is KeyDef.Popup.Preview -> "bubble ${p.content}"
             is KeyDef.Popup.Keyboard.Explicit -> "keys ${p.items.toList()} ${p.symbolsFrom} ${p.asIs} ${p.inRow}"
             is KeyDef.Popup.Keyboard.Preset -> "preset ${if (letter) p.label.lowercase() else p.label} ${p.transformPunctuation}"

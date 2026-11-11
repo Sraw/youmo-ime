@@ -69,7 +69,6 @@ class ZhuyinKeyboard(
     if (nine) nineLayout() else fullLayout(keyboardCompact()),
     // 注音九键's keys are named by their place in its own 4×5 grid (the tones in the first column), ⌫ by its role
     themeBoard = if (nine) KeyNames.ZHUYIN_NINE else KeyNames.ZHUYIN,
-    shortcuts = true,
 ) {
 
     companion object {

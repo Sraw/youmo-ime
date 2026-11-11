@@ -60,7 +60,8 @@ class NumberKeyboardTest {
     }
 
     // each pad's keys wired from number.xml's nodes as their views were (U4 B): sound, the shortcut its swipes
-    // keep their symbols under, both ways' swipe, what a tap, a hold and a long press do; no bubble nor long
+    // keep their symbols under, both ways' swipe, what a tap, a hold and a long press do (the space and !?#
+    // held as every keyboard's now); no bubble nor long
     // press's keys (preview="off" popups="off"), Return's Emoji menu alone (rules C 疑问 8)
     @Test
     fun eachKeyIsWiredAsItsViewWas() {
@@ -76,7 +77,13 @@ class NumberKeyboardTest {
                 assertEquals(at, soundOf(was), WiringSnapshot.layoutSound(now.systemSound))
                 assertEquals(at, was.shortcut, now.shortcut)
                 assertEquals(at, was.swipesBothWays, now.swipesBothWays)
-                assertEquals(at, actions(was), actions(now))
+                // the long presses every keyboard's space and 符 have (060-keys-unify J2), which the pad's views had not
+                val gained = when (node.id) {
+                    "space" -> listOf("long ${KeyAction.SpaceLongPressAction()}")
+                    "symbols" -> listOf("long ${KeyAction.QuickPhraseAction}")
+                    else -> emptyList()
+                }
+                assertEquals(at, actions(was) + gained, actions(now))
                 val menus = now.popup.orEmpty().map { p -> (p as? KeyDef.Popup.Menu)?.items?.map { it.action } ?: p }
                 assertEquals(at, if (node.id == "enter") listOf(listOf(KeyAction.PickerSwitchAction())) else emptyList<Any>(), menus)
             }

@@ -127,8 +127,15 @@ class SceneBoard(
 
     private class Made(val theme: SceneTheme, val layout: SceneLayout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
 
-    // what a resolver is made from (the layout, lists and slots compared as the same instances: the caches')
-    private data class ResolverFor(val layout: SceneLayout, val variant: KeyboardVariant, val lists: KeyLists, val slots: SwipeSlots)
+    // what a resolver is made from: the layout, lists and slots compared as the same instances (the caches'), the
+    // lists' version too, and hashed so (none of their contents hashed each time a resolver is asked for)
+    private class ResolverFor(val layout: SceneLayout, val variant: KeyboardVariant, val listsVersion: Int, val lists: KeyLists, val slots: SwipeSlots) {
+        override fun equals(other: Any?): Boolean = other is ResolverFor && layout === other.layout && variant == other.variant &&
+            listsVersion == other.listsVersion && lists === other.lists && slots === other.slots
+
+        override fun hashCode(): Int =
+            ((System.identityHashCode(layout) * 31 + variant.hashCode()) * 31 + listsVersion) * 31 + System.identityHashCode(slots)
+    }
 
     companion object {
         // kept a process (main thread), as SceneThemes keeps the themes, for a keyboard made again (each
@@ -178,9 +185,8 @@ class SceneBoard(
         // a layout's shortcut names, and the marks' settings as last made from their inputs: kept for the
         // scene asked again, the same instances making the env equal to the last at once
         private var namesMade: Pair<SceneLayout, Set<String>>? = null
-        // least recently used first (access order): the keyboard's and the settings page's tabs kept apart
-        private val resolvers = LinkedHashMap<ResolverFor, KeyResolver>(16, 0.75f, true)
-        private const val KEPT_RESOLVERS = 16
+        private const val KEPT_RESOLVERS = 4
+        private val resolvers = lruMap<ResolverFor, KeyResolver>(KEPT_RESOLVERS)
 
         /**
          * A test's measurer in place of the fonts' (a fixed width a character: Robolectric measures no text), the
@@ -215,14 +221,17 @@ class SceneBoard(
         /**
          * [layout]'s keys' lists, swipes and marks for the input method [im] (KeyboardVariants.of) as the settings
          * are now (the user's lists, the swipes' slots): one resolver kept for each of the last few asked, so
-         * keyboards switched between make none again. [slots] the settings' editor's, being edited.
+         * keyboards switched between make none again (the least recently asked dropped). A keyboard keeps its own
+         * while nothing it is made of changed (KeyResolving), so this is asked as that changes, not on each touch.
+         * [slots] the settings' editor's, being edited.
          */
         fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null, slots: SwipeSlots = SwipeSlotsCache.current): KeyResolver {
             val variant = KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters)
-            val of = ResolverFor(layout, variant, KeyListsCache.user.current, slots)
+            val lists = KeyListsCache.user.current
+            val of = ResolverFor(layout, variant, KeyListsCache.user.version, lists, slots)
             return resolvers.getOrPut(of) {
                 KeyResolver(of.variant, of.lists, of.slots, DefaultMarks.nodes(layout.layout, layout.fragments))
-            }.also { if (resolvers.size > KEPT_RESOLVERS) resolvers.remove(resolvers.keys.first()) }
+            }
         }
 
         /**

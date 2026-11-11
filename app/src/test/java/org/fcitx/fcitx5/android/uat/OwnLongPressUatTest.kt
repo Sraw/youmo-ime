@@ -36,6 +36,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
+import java.io.File
 /**
  * The settings editor's start for a key (OwnLongPress) is what the key's keyboard pops up, every key set by
  * name on every keyboard the tabs stand for (0.6.0 beta2: the editor showed nothing but the user's edits),
@@ -65,20 +66,37 @@ class OwnLongPressUatTest {
         return KeyboardHarness(TestThemes.PixelLight, im, keyboards = chosen).start().also { made = it; it.relayout() }
     }
 
-    // each key named for a long press by name: its list as the editor starts it (the keyboard's resolver, 060-keys-unify
-    // S5), against what holding it pops up (the order aside: the popup's is its places'); its corner the editor's first
-    private fun checkEveryKey(h: KeyboardHarness) {
+    // the golden table's long presses (lib/ime-core's keys-golden.tsv, 060-keys-unify §6.1), with no setting of the
+    // user's and no punctuation mapped: each key's items and first shown, by its name and board
+    private val golden: Map<Pair<String, String>, Pair<List<String>, String?>> by lazy {
+        File("../lib/ime-core/src/test/resources/keys-golden.tsv").readLines().drop(1).map { it.split('\t') }
+            .filter { it[2] == "default" }
+            .associate { row ->
+                val items = row[3]
+                val first = row[4]
+                // an item's text without how it is typed (= as is, # a keypad's, @ an action)
+                fun shown(t: String) = t.replace(Regex("(?<=.)(=|#|@.*)$"), "")
+                val listed = (if (items == "-") emptyList() else items.split(' ').filter { it != "|" }).map(::shown)
+                // "-" is none, but where the list has a - (18 keys' L): the table writes both alike
+                (row[0] to row[1]) to (listed to first.takeIf { it != "-" || "-" in listed }?.let(::shown))
+            }
+    }
+
+    // each key named for a long press by name on [board] (the golden table's name of it): what holding it pops up
+    // (the order aside: the popup's is its places'), and the first the editor starts it with, as the table has them
+    private fun checkEveryKey(h: KeyboardHarness, board: String) {
         val keys = h.keys().filterIsInstance<SceneShownKey>().filter { k -> k.node.shortcut?.let(KeyShortcutPages::longPressByName) == true && k.node.copy == 0 }
         assertTrue("no key named for a long press", keys.isNotEmpty())
         val resolver = checkNotNull(h.board().keyResolver())
         for (k in keys) {
-            val node = k.node
-            val edit = resolver.edit(KeyId.of(node.shortcut!!))
+            val name = KeyId.of(k.node.shortcut!!).name
+            val (items, first) = checkNotNull(golden[name to board]) { "$name on $board: not in the golden table" }
+            assertEquals("$name on $board", first, resolver.edit(KeyId.of(name)).first)
+            // one with none (注音九键's tones off): nothing pops up, its bubble shown as it is held
+            if (items.isEmpty()) continue
             val shown = h.longPress(k)
             h.idle()
-            val corner = GroupedKeyboard.cornerOf(node)
-            if (corner.isNotEmpty() && edit.row.isNotEmpty()) assertEquals(node.shortcut, corner, edit.first)
-            assertEquals(node.shortcut, shown.sorted(), (edit.row + edit.symbols).sorted())
+            assertEquals("$name on $board", items.sorted(), shown.sorted())
         }
     }
 
@@ -90,14 +108,14 @@ class OwnLongPressUatTest {
     @Test
     @Uat("ST-100")
     fun everyKeysEditorStartIsWhatItsKeyboardPopsUp() {
-        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14)))
-        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS18)))
-        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)))
-        checkEveryKey(harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)))
-        checkEveryKey(harness(shuangpin, ImKeyboards.Chosen(shuangpin = ImKeyboard.KEYS18), ShuangpinScheme.MICROSOFT))
-        checkEveryKey(harness(shuangpin, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS)))
-        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_NINE)))
-        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.FULL)))
+        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14)), "pinyin-14")
+        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS18)), "pinyin-18")
+        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)), "pinyin-nine")
+        checkEveryKey(harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)), "english-nine")
+        checkEveryKey(harness(shuangpin, ImKeyboards.Chosen(shuangpin = ImKeyboard.KEYS18), ShuangpinScheme.MICROSOFT), "shuangpin-18-ms")
+        checkEveryKey(harness(shuangpin, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS)), "shuangpin-nine")
+        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_NINE)), "zhuyin-nine")
+        checkEveryKey(harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.FULL)), "pinyin-full")
     }
 
     // 双拼 18 键 under a scheme typing `;`: L's own with its `;` (L : - l ;), as its keyboard has it

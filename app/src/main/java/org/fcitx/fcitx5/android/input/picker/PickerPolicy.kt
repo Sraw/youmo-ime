@@ -37,9 +37,9 @@ interface PickerPolicy {
 class DefaultPickerPolicy : PickerPolicy {
     override fun filter(raw: String) = true
     override fun transform(raw: String) = raw
-    // a Preset, so a symbol's long press as the user edited it (PopupOverrides) is the picker's too
-    override fun popup(raw: String) =
-        KeyDef.Popup.Keyboard.Preset(label = raw, transformPunctuation = false)
+    // the built-in long press (060-keys-unify C1), committed as shown as the cell is
+    override fun popup(raw: String): KeyDef.Popup.Keyboard? =
+        PickerLongPress[raw]?.let { KeyDef.Popup.Keyboard.Explicit(it, asIs = true) }
 
     override fun invalidateKey() = Unit
 }

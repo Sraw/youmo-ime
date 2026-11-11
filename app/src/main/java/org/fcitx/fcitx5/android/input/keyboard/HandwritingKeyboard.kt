@@ -65,7 +65,7 @@ class HandwritingKeyboard(
     private val recognition: HandwritingRecognition = HandwritingRecognition.shared,
     /** 候选词注音 set from the 注 key, after what the pad wrote is in. */
     private val setReading: (ReadingStyle) -> Unit = {},
-) : BaseKeyboard(context, theme, layout(context), themeBoard = KeyNames.HANDWRITING, shortcuts = true) {
+) : BaseKeyboard(context, theme, layout(context), themeBoard = KeyNames.HANDWRITING) {
 
     companion object {
         const val Name = "Handwriting"
@@ -421,8 +421,8 @@ class HandwritingKeyboard(
         else -> null
     }
 
-    // ，。 named (060-swipe-slots): swiped to an empty slot, typed as a tap
-    override val punctuationSwipesTap: Boolean get() = true
+    // ，。 beside the ink pad: a stroke begun on one types nothing
+    override val strokesBeginOnKeys: Boolean get() = true
 
     // a getter: asked in init (drawKeysWithScene), before this class's own properties are made
     override val sceneTable: SceneKeyDef.Table get() = object : SceneKeyDef.Table {

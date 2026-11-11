@@ -5,7 +5,10 @@
 package org.fcitx.fcitx5.android.input.picker
 
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
-import org.junit.Assert.assertFalse
+import org.fcitx.fcitx5.android.input.popup.PopupPreset
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -19,12 +22,23 @@ class DefaultPickerPolicyTest {
     private val policy = DefaultPickerPolicy()
 
     /**
-     * The picker shows symbols the user chose literally, so its long-press popup must not
-     * re-map punctuation the way a keyboard key would.
+     * The picker shows symbols the user chose literally, so its long-press popup must not re-map punctuation
+     * the way a keyboard key would; its items the built-in ones, no setting's (060-keys-unify C1).
      */
     @Test
-    fun thePopupDoesNotTransformPunctuation() {
-        val popup = policy.popup(",") as KeyDef.Popup.Keyboard.Preset
-        assertFalse(popup.transformPunctuation)
+    fun thePopupIsBuiltInAndCommittedAsShown() {
+        val popup = policy.popup(",") as KeyDef.Popup.Keyboard.Explicit
+        assertTrue(popup.asIs)
+        assertArrayEquals(PopupPreset[","], popup.items)
+        assertArrayEquals(arrayOf("¢", "€", "£", "¥", "₹", "₽", "₺", "₩", "₱", "₿"), (policy.popup("$") as KeyDef.Popup.Keyboard.Explicit).items)
+        assertTrue((policy.popup("1") as KeyDef.Popup.Keyboard.Explicit).items.isNotEmpty())
+    }
+
+    // a letter's list is a keyboard key's, not a cell's; a symbol with none built in has none
+    @Test
+    fun noLettersNoneForTheRest() {
+        assertNull(policy.popup("a"))
+        assertNull(policy.popup("ё"))
+        assertNull(policy.popup("《"))
     }
 }

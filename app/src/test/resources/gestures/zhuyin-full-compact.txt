@@ -464,7 +464,7 @@ comma said: ,
 comma pressed: [,]
 comma tap: [sendKey(key=,, states=536870912, code=51, up=false)] field |0,0
 comma swiping: [,]
-comma up: [] field |0,0
+comma up: [sendKey(key=,, states=536870912, code=51, up=false)] field |0,0
 comma down: [] field |0,0
 comma left: [] field |0,0
 comma right: [] field |0,0
@@ -486,7 +486,7 @@ period said: .
 period pressed: [.]
 period tap: [sendKey(key=., states=536870912, code=52, up=false)] field |0,0
 period swiping: [.]
-period up: [] field |0,0
+period up: [sendKey(key=., states=536870912, code=52, up=false)] field |0,0
 period down: [] field |0,0
 period left: [] field |0,0
 period right: [] field |0,0

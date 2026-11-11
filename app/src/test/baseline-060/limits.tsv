@@ -86,11 +86,11 @@ MaterialDark/pinyin-return_menu.png	0.270	5.3: popup-sp-and-radius
 MaterialDark/pinyin-split_land.png	0.524	key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
 MaterialDark/symbols-compact.png	1.780	key-spacing: rows closer at the compact height (060-key-spacing)
 MaterialDark/symbols-flat.png	0.158	
-MaterialDark/symbols-floating.png	0.355	5.3: floating-height-cap
+MaterialDark/symbols-floating.png	0.812	5.3: floating-height-cap; the panels' ⌫/space marks (060-keys-unify S5, the ⌫ icon smaller beside them)
 MaterialDark/symbols-land.png	0.000	
 MaterialDark/symbols-one_handed_left.png	0.152	
 MaterialDark/symbols-port.png	0.152	
-MaterialDark/symbols-split_land.png	0.000	
+MaterialDark/symbols-split_land.png	0.246	the panels' ⌫/space marks (060-keys-unify S5, the ⌫ icon smaller beside them)
 MaterialDark/zhuyin_full-compact.png	13.738	key-spacing: rows closer at the compact height (060-key-spacing)
 MaterialDark/zhuyin_full-flat.png	1.525	
 MaterialDark/zhuyin_full-floating.png	2.649	5.3: floating-height-cap; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
@@ -258,11 +258,11 @@ PixelLight/pinyin-return_menu.png	0.312	5.3: popup-sp-and-radius
 PixelLight/pinyin-split_land.png	0.540	key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
 PixelLight/symbols-compact.png	1.131	key-spacing: rows closer at the compact height (060-key-spacing)
 PixelLight/symbols-flat.png	0.163	
-PixelLight/symbols-floating.png	0.367	5.3: floating-height-cap
+PixelLight/symbols-floating.png	0.824	5.3: floating-height-cap; the panels' ⌫/space marks (060-keys-unify S5, the ⌫ icon smaller beside them)
 PixelLight/symbols-land.png	0.000	
 PixelLight/symbols-one_handed_left.png	0.159	
 PixelLight/symbols-port.png	0.159	
-PixelLight/symbols-split_land.png	0.000	
+PixelLight/symbols-split_land.png	0.248	the panels' ⌫/space marks (060-keys-unify S5, the ⌫ icon smaller beside them)
 PixelLight/zhuyin_full-compact.png	5.909	key-spacing: rows closer at the compact height (060-key-spacing)
 PixelLight/zhuyin_full-flat.png	1.581	
 PixelLight/zhuyin_full-floating.png	2.727	5.3: floating-height-cap; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)

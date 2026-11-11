@@ -45,10 +45,11 @@ key space kind=space role=space a11y="a11y_key_space"
   hit rect(378,0,648,702)
   anchor 513,351 up 0,-1
   actions long-press="space-long-press" send="sym:space" swipe-axis="both"
-  sound=space
+  sound=space shortcut="fn/space"
   normal
     shadow rect(385.88,18.38,640.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(385.88,18.38,640.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    icon cursor-move 603,23,632,52 #ff7a858a
   pressed
     +2 fill rect(385.88,18.38,640.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function a11y="。"
@@ -58,6 +59,7 @@ key period kind=function a11y="。"
   anchor 702,351 up 0,-1
   actions send="."
   text label="。"
+  shortcut="fn/period"
   normal
     shadow rect(655.88,18.38,748.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(655.88,18.38,748.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -70,11 +72,13 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   hit rect(756,0,918,702)
   anchor 837,351 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
-  sound=delete
+  sound=delete shortcut="fn/backspace"
   normal
     shadow rect(763.88,18.38,910.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(763.88,18.38,910.13,683.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 805.5,319.5,868.5,382.5 #ff7a858a
+    icon delete-sweep 873,23,902,52 #ff7a858a
+    icon restore 771,23,800,52 #ff7a858a
   pressed
     +2 fill rect(763.88,18.38,910.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
@@ -83,7 +87,7 @@ key enter kind=enter role=enter a11y="换行"
   hit rect(918,0,1080,702)
   anchor 999,351 up 0,-1
   actions send="sym:Return"
-  sound=return
+  sound=return shortcut="fn/return"
   menu "Emoji" icon=emoji do="picker:"
   normal
     shadow rect(925.88,18.38,1072.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

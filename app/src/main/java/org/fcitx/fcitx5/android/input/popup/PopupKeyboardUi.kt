@@ -4,8 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
-import org.fcitx.fcitx5.android.input.keyboard.toKeyAction
-import org.fcitx.fcitx5.android.input.keys.KeyOutput
 import android.content.Context
 import android.graphics.Rect
 import android.view.View
@@ -35,7 +33,7 @@ import kotlin.math.min
  * @param asIs every key committed as it is, never typed as a key ([keyAction])
  * @param inRow the key's own among those before [split] (one row): in focus first, the rest round it as
  * listed (PopupFocus.ownFirst); -1, the first, as the full keyboard's
- * @param outputs what each key types (060-keys-unify: the item's own, [asIs] not read); null, [keys] as [keyAction] says
+ * @param actions what each key types (060-keys-unify: the item's own, [asIs] not read); null, [keys] as [keyAction] says
  * @param onFocusMoved told, with the popup's view, each time another key comes into focus: a buzz,
  * as the finger is not over the key it picks ([PopupFocus])
  * @param scenes the engine's, the keys drawn as its scene (060-render-p2 S2), sized by its rules ([PopupKeys])
@@ -54,7 +52,7 @@ class PopupKeyboardUi(
     split: Int = keys.size,
     private val asIs: Boolean = false,
     inRow: Int = -1,
-    private val outputs: List<KeyOutput>? = null,
+    private val actions: List<KeyAction>? = null,
     private val onFocusMoved: (View) -> Unit = {},
     private val scenes: PopupScenes,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
@@ -221,7 +219,7 @@ class PopupKeyboardUi(
     }
 
     override fun onTrigger(): KeyAction? {
-        outputs?.let { return it.getOrNull(focusedIndex)?.toKeyAction() }
+        actions?.let { return it.getOrNull(focusedIndex) }
         val key = keys.getOrNull(focusedIndex) ?: return null
         return if (asIs) KeyAction.CommitAction(key) else keyAction(key)
     }

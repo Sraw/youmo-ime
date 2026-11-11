@@ -118,10 +118,10 @@ class ExpandedCandidateLayout(context: Context, theme: Theme, bar: BarLook = Sce
         // laid on the panel's colour and its divider, not a keyboard's fill
         override val sceneDrawsBase: Boolean get() = false
 
-        // Return, the pages that cannot turn `:disabled`; no marks (the column's keys reach no shortcut)
+        // Return, the pages that cannot turn `:disabled`; ⌫'s and Return's marks as every keyboard's (060-keys-unify D5)
         override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
             val texts = Texts(returnLabel = returnAppearance.label(context).toString(), returnIcon = SceneIcons.returnName(returnAppearance.icon))
-            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = texts, marks = SceneEnvs.NO_MARKS)
+            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = texts, marks = keyMarks(layout))
             val disabled = listOfNotNull(UP_KEY.takeIf { !upEnabled }, DOWN_KEY.takeIf { !downEnabled })
             return if (disabled.isEmpty()) env else env.copy(states = disabled.associateWith { setOf(KeyState.Disabled) })
         }

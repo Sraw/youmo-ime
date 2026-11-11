@@ -26,15 +26,6 @@ key comma kind=function role=comma a11y="，"
   actions preview="off" send=","
   text label="，"
   shortcut="fn/comma"
-  popup from=list
-    item "？"
-    item "！"
-    item "："
-    item "；"
-    item "、"
-    item "…"
-    item "“"
-    item "”"
   normal
     text "，" 972.75,230.19 system 400 52.5 #ff7a858a
   pressed
@@ -47,7 +38,6 @@ key period kind=function role=period a11y="。"
   actions preview="off" send="."
   text label="。"
   shortcut="fn/period"
-  popup from=none
   normal
     text "。" 972.75,370.69 system 400 52.5 #ff7a858a
   pressed

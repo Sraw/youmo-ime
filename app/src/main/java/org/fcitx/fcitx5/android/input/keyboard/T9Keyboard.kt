@@ -124,7 +124,7 @@ class T9Keyboard(
     /** 九键双拼's 1 types `;` while typing, shown beside its digit: only under a scheme that types it (微软's ing). */
     private val semicolon: Boolean,
 ) : BaseKeyboard(
-    context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE, shortcuts = true,
+    context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE,
 ), AutoCapsKeys {
 
     companion object {
@@ -820,8 +820,13 @@ class T9Keyboard(
 
     override val keysIm: String get() = imeName
 
-    // a getter, not a lazy: the scene may ask before this keyboard's fields past it are made
-    override val keysNineLetters: Map<Char, String> get() = ('2'..'9').associateWith { lettersOn(it, letters, english, shuangpin).lowercase() }
+    // a getter, not a lazy: the scene may ask before this keyboard's fields past it are made. Made once after
+    // (null till then), as the resolver's cache is asked on every swipe and compares it
+    override val keysNineLetters: Map<Char, String> get() = nineLettersMade ?: nineLetters()
+
+    private val nineLettersMade: Map<Char, String>? = nineLetters()
+
+    private fun nineLetters() = ('2'..'9').associateWith { lettersOn(it, letters, english, shuangpin).lowercase() }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         imeName = ime.uniqueName

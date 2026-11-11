@@ -3,7 +3,7 @@ lang long press: [] field hello world, again|18,18
 r1c1 said: ˉ
 r1c1 pressed: [ˉ]
 r1c1 tap: [sendKey(sym=17761372, states=536870912, code=0, up=false)] field hello world, again|18,18
-r1c1 swiping: [ˉ]
+r1c1 swiping: [˙]
 r1c1 up: [sendKey(sym=17761376, states=536870912, code=0, up=false)] field hello world, again|18,18
 r1c1 down: [sendKey(sym=17761372, states=536870912, code=0, up=false)] field hello world, again|18,18
 r1c1 left: [] field hello world, again|18,18
@@ -57,8 +57,8 @@ r2c1 said: ˊ
 r2c1 pressed: [ˊ]
 r2c1 tap: [sendKey(sym=17761373, states=536870912, code=0, up=false)] field hello wo|8,8
 r2c1 swiping: [ˊ]
-r2c1 up: [] field hello wo|8,8
-r2c1 down: [] field hello wo|8,8
+r2c1 up: [sendKey(sym=17761373, states=536870912, code=0, up=false)] field hello wo|8,8
+r2c1 down: [sendKey(sym=17761373, states=536870912, code=0, up=false)] field hello wo|8,8
 r2c1 left: [] field hello wo|8,8
 r2c1 right: [] field hello wo|8,8
 r2c1 nudged: [sendKey(sym=17761373, states=536870912, code=0, up=false)] field hello wo|8,8
@@ -101,8 +101,8 @@ r2c5 said: ?
 r2c5 pressed: [?]
 r2c5 tap: [sendKey(key=?, states=536870912, code=0, up=false)] field hello wo|8,8
 r2c5 swiping: [?]
-r2c5 up: [] field hello wo|8,8
-r2c5 down: [] field hello wo|8,8
+r2c5 up: [sendKey(key=?, states=536870912, code=0, up=false)] field hello wo|8,8
+r2c5 down: [sendKey(key=?, states=536870912, code=0, up=false)] field hello wo|8,8
 r2c5 left: [] field hello wo|8,8
 r2c5 right: [] field hello wo|8,8
 r2c5 nudged: [sendKey(key=?, states=536870912, code=0, up=false)] field hello wo|8,8
@@ -112,8 +112,8 @@ r3c1 said: ˇ
 r3c1 pressed: [ˇ]
 r3c1 tap: [sendKey(sym=17761374, states=536870912, code=0, up=false)] field hello wo|8,8
 r3c1 swiping: [ˇ]
-r3c1 up: [] field hello wo|8,8
-r3c1 down: [] field hello wo|8,8
+r3c1 up: [sendKey(sym=17761374, states=536870912, code=0, up=false)] field hello wo|8,8
+r3c1 down: [sendKey(sym=17761374, states=536870912, code=0, up=false)] field hello wo|8,8
 r3c1 left: [] field hello wo|8,8
 r3c1 right: [] field hello wo|8,8
 r3c1 nudged: [sendKey(sym=17761374, states=536870912, code=0, up=false)] field hello wo|8,8
@@ -156,8 +156,8 @@ r3c5 said: !
 r3c5 pressed: [!]
 r3c5 tap: [sendKey(key=!, states=536870912, code=0, up=false)] field hello wo|8,8
 r3c5 swiping: [!]
-r3c5 up: [] field hello wo|8,8
-r3c5 down: [] field hello wo|8,8
+r3c5 up: [sendKey(key=!, states=536870912, code=0, up=false)] field hello wo|8,8
+r3c5 down: [sendKey(key=!, states=536870912, code=0, up=false)] field hello wo|8,8
 r3c5 left: [] field hello wo|8,8
 r3c5 right: [] field hello wo|8,8
 r3c5 nudged: [sendKey(key=!, states=536870912, code=0, up=false)] field hello wo|8,8
@@ -167,8 +167,8 @@ r4c1 said: ˋ
 r4c1 pressed: [ˋ]
 r4c1 tap: [sendKey(sym=17761375, states=536870912, code=0, up=false)] field hello wo|8,8
 r4c1 swiping: [ˋ]
-r4c1 up: [] field hello wo|8,8
-r4c1 down: [] field hello wo|8,8
+r4c1 up: [sendKey(sym=17761375, states=536870912, code=0, up=false)] field hello wo|8,8
+r4c1 down: [sendKey(sym=17761375, states=536870912, code=0, up=false)] field hello wo|8,8
 r4c1 left: [] field hello wo|8,8
 r4c1 right: [] field hello wo|8,8
 r4c1 nudged: [sendKey(sym=17761375, states=536870912, code=0, up=false)] field hello wo|8,8
@@ -200,66 +200,66 @@ r4c4 said: ,
 r4c4 pressed: []
 r4c4 tap: [sendKey(sym=44, states=536870912, code=0, up=false)] field hello wo|8,8
 r4c4 swiping: []
-r4c4 up: [] field hello wo|8,8
-r4c4 down: [] field hello wo|8,8
+r4c4 up: [sendKey(sym=44, states=536870912, code=0, up=false)] field hello wo|8,8
+r4c4 down: [sendKey(sym=44, states=536870912, code=0, up=false)] field hello wo|8,8
 r4c4 left: [] field hello wo|8,8
 r4c4 right: [] field hello wo|8,8
 r4c4 nudged: [sendKey(sym=44, states=536870912, code=0, up=false)] field hello wo|8,8
-r4c4 long press: [；, 、, ：, ！, 。, ？]
-r4c4 long press: [] field hello wo。|9,9
+r4c4 long press: [~, (, ", ', ), ;, !, ., ?, :]
+r4c4 long press: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8
 r4c5 said: ~
 r4c5 pressed: [~]
-r4c5 tap: [sendKey(key=~, states=536870912, code=0, up=false)] field hello wo。|9,9
+r4c5 tap: [sendKey(key=~, states=536870912, code=0, up=false)] field hello wo|8,8
 r4c5 swiping: [~]
-r4c5 up: [] field hello wo。|9,9
-r4c5 down: [] field hello wo。|9,9
-r4c5 left: [] field hello wo。|9,9
-r4c5 right: [] field hello wo。|9,9
-r4c5 nudged: [sendKey(key=~, states=536870912, code=0, up=false)] field hello wo。|9,9
+r4c5 up: [sendKey(key=~, states=536870912, code=0, up=false)] field hello wo|8,8
+r4c5 down: [sendKey(key=~, states=536870912, code=0, up=false)] field hello wo|8,8
+r4c5 left: [] field hello wo|8,8
+r4c5 right: [] field hello wo|8,8
+r4c5 nudged: [sendKey(key=~, states=536870912, code=0, up=false)] field hello wo|8,8
 r4c5 long press: [~]
-r4c5 long press: [sendKey(key=~, states=536870912, code=0, up=false)] field hello wo。|9,9
+r4c5 long press: [sendKey(key=~, states=536870912, code=0, up=false)] field hello wo|8,8
 comma said: ,
 comma pressed: [,]
-comma tap: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo。|9,9
+comma tap: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo|8,8
 comma swiping: [,]
-comma up: [] field hello wo。|9,9
-comma down: [] field hello wo。|9,9
-comma left: [] field hello wo。|9,9
-comma right: [] field hello wo。|9,9
-comma nudged: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo。|9,9
+comma up: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo|8,8
+comma down: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo|8,8
+comma left: [] field hello wo|8,8
+comma right: [] field hello wo|8,8
+comma nudged: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo|8,8
 comma long press: [~, (, ", ', ), ;, !, ., ?, :]
-comma long press: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo。|9,9
+comma long press: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8
 space said: Space, Pinyin
 space pressed: []
-space tap: [sendKey(sym=32, states=536870912, code=0, up=false)] field hello wo。|9,9
+space tap: [sendKey(sym=32, states=536870912, code=0, up=false)] field hello wo|8,8
 space swiping: []
-space up: [] field hello wo。|9,9
-space down: [] field hello wo。|9,9
-space left: [sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false)] field hello wo。|9,9
-space right: [sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false)] field hello wo。|9,9
-space nudged: [sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false)] field hello wo。|9,9
+space up: [] field hello wo|8,8
+space down: [] field hello wo|8,8
+space left: [sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false), sendKey(sym=65361, states=536870912, code=0, up=false)] field hello wo|8,8
+space right: [sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false)] field hello wo|8,8
+space nudged: [sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false), sendKey(sym=65363, states=536870912, code=0, up=false)] field hello wo|8,8
 space long press: []
-space long press: [] field hello wo。|9,9
+space long press: [] field hello wo|8,8
 period said: .
 period pressed: [.]
-period tap: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo。|9,9
+period tap: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8
 period swiping: [.]
-period up: [] field hello wo。|9,9
-period down: [] field hello wo。|9,9
-period left: [] field hello wo。|9,9
-period right: [] field hello wo。|9,9
-period nudged: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo。|9,9
+period up: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8
+period down: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8
+period left: [] field hello wo|8,8
+period right: [] field hello wo|8,8
+period nudged: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8
 period long press: [&, $, _, %, ^, ;, !, ,, ?, :]
-period long press: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo。|9,9
+period long press: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo|8,8
 enter said: Done
 enter pressed: []
-enter tap: [sendKey(sym=65293, states=536870912, code=0, up=false)] field hello wo。|9,9
+enter tap: [sendKey(sym=65293, states=536870912, code=0, up=false)] field hello wo|8,8
 enter swiping: []
-enter up: [] field hello wo。|9,9
-enter down: [] field hello wo。|9,9
-enter left: [] field hello wo。|9,9
-enter right: [] field hello wo。|9,9
-enter nudged: [sendKey(sym=65293, states=536870912, code=0, up=false)] field hello wo。|9,9
+enter up: [] field hello wo|8,8
+enter down: [] field hello wo|8,8
+enter left: [] field hello wo|8,8
+enter right: [] field hello wo|8,8
+enter nudged: [sendKey(sym=65293, states=536870912, code=0, up=false)] field hello wo|8,8
 enter long press: []
-enter long press: [] field hello wo。|9,9
+enter long press: [] field hello wo|8,8
 backspace held: [sendKey(sym=65288, states=536870912, code=0, up=false)]

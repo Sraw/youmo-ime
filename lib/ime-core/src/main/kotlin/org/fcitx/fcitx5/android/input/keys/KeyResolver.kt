@@ -67,7 +67,8 @@ data class ResolvedKey(
 /**
  * Every key of a keyboard as its defaults ([KeyDefaults], by the [variant] and the layout's [nodes]) and the
  * user's [lists] and [slots] make it (060-keys-unify §3): one rule for every key on every keyboard. A key's
- * list is made once; what [KeyState] changes (capitals, the punctuation shown, roots) is laid on it as asked.
+ * list is made once; what [KeyState] changes (capitals, the punctuation shown, roots) is laid on it as asked,
+ * each key's kept for the last state asked. Main thread only: its caches are not guarded.
  */
 class KeyResolver(
     private val variant: KeyboardVariant,
@@ -80,6 +81,10 @@ class KeyResolver(
 
     // by the key, then Shift: the lists the user's are laid on are fixed while the keyboard shows
     private val made = HashMap<Pair<KeyId, Boolean>, Made?>()
+
+    // each key as resolved for [resolvedFor], the state last asked: made again only for another
+    private val resolved = HashMap<KeyId, ResolvedKey>()
+    private var resolvedFor: KeyState? = null
 
     private var marksFor: KeyState? = null
     private var marksMade: MarkSettings? = null
@@ -105,6 +110,14 @@ class KeyResolver(
     }
 
     fun resolve(id: KeyId, state: KeyState): ResolvedKey {
+        if (state != resolvedFor) {
+            resolved.clear()
+            resolvedFor = state
+        }
+        return resolved.getOrPut(id) { resolved(id, state) }
+    }
+
+    private fun resolved(id: KeyId, state: KeyState): ResolvedKey {
         val m = made.getOrPut(id to (state.caps && id.form == FULL)) { make(id, state.caps && id.form == FULL) }
         val roots = state.roots?.takeIf { id.form == FULL }?.let { r -> id.key.singleOrNull()?.let(r) }?.takeIf { it.isNotEmpty() }
         val popup = when {

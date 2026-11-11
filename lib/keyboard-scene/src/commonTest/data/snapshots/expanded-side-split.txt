@@ -32,11 +32,13 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   hit rect(1358.25,265,2340,397)
   anchor 1849.13,331 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
-  sound=delete
+  sound=delete shortcut="fn/backspace"
   normal
     shadow rect(1366.13,275.5,2332.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1366.13,275.5,2332.13,386.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 1817.63,299.5,1880.63,362.5 #ff7a858a
+    icon delete-sweep 2295,280,2324,309 #ff7a858a
+    icon restore 1374,280,1403,309 #ff7a858a
   pressed
     +2 fill rect(1366.13,275.5,2332.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
@@ -45,7 +47,7 @@ key enter kind=enter role=enter a11y="换行"
   hit rect(1358.25,397,2340,529)
   anchor 1849.13,463 up 0,-1
   actions send="sym:Return"
-  sound=return
+  sound=return shortcut="fn/return"
   menu "Emoji" icon=emoji do="picker:"
   normal
     shadow rect(1366.13,407.5,2332.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

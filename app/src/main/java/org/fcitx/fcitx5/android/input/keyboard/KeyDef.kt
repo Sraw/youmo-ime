@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.input.keys.KeyOutput
 import android.graphics.Typeface
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -180,11 +179,11 @@ open class KeyDef(
             }
 
             /**
-             * A named key's long press as the resolver has it now (060-keys-unify §1.3): each item typed as its
-             * [outputs]' says, shown as [labels]; those from [split] set apart, [inRow] under the finger first
+             * A named key's long press as the resolver has it now (060-keys-unify §1.3): each item typed as
+             * [actions] says (its KeyOutput's, the key's placeholders the keyboard's), shown as [labels]; those from [split] set apart, [inRow] under the finger first
              * as [Explicit]'s. Made as it opens ([BaseKeyboard.onPopupAction]); wired as [Named].
              */
-            class Resolved(val outputs: List<KeyOutput>, val labels: List<String>, val split: Int, val inRow: Int) : Keyboard()
+            class Resolved(val actions: List<KeyAction>, val labels: List<String>, val split: Int, val inRow: Int) : Keyboard()
 
             /** A named key's long press, the resolver's made as it opens: what [BaseKeyboard.wire] wires. */
             data class Named(val name: String) : Keyboard()

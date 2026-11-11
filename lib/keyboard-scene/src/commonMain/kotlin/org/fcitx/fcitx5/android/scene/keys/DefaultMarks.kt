@@ -106,6 +106,7 @@ object DefaultMarks {
                 letters = key.letters?.group,
                 themeFirst = a.actions["swipe-up"] ?: (a.alt as? Text.Literal)?.text,
                 place = if (key.letters != null) place++ else -1,
+                function = a.kind == "function",
             )
             val names = listOfNotNull(a.shortcut) + key.variants.mapNotNull { it.attrs.shortcut }
             for (name in names.distinct()) out += name to facts

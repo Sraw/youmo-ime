@@ -7,7 +7,8 @@ package org.fcitx.fcitx5.android.input.picker
 /**
  * The pinyin typed in the emoji panel's search, and where its keys go: the letters build it; a
  * backspace takes its last letter, or with none typed deletes in the field as elsewhere, but not
- * one held on from the query's letters, which would go on into the user's text.
+ * one held on from the query's letters, which would go on into the user's text. ⌫'s slots' 清空 and 恢复
+ * are the query's too ([clearAll], [restore]; 060-keys-unify J1): it is what the user is editing.
  */
 class EmojiSearchQuery {
 
@@ -26,8 +27,30 @@ class EmojiSearchQuery {
 
     val text: String get() = typed.toString()
 
+    // what the last clearAll took, for one restore
+    private var cleared: String? = null
+
+    /** The search opened or closed: nothing typed, nothing to restore. */
     fun clear() {
         typed.clear()
+        cleared = null
+    }
+
+    /** 清空: the query emptied, kept for [restore]; with nothing typed, nothing (the field is not the query). */
+    fun clearAll(): Outcome {
+        if (typed.isEmpty()) return Outcome.SWALLOWED
+        cleared = typed.toString()
+        typed.clear()
+        return Outcome.CHANGED
+    }
+
+    /** 恢复: the query the last [clearAll] took, once, in place of what is typed now; none, nothing. */
+    fun restore(): Outcome {
+        val back = cleared ?: return Outcome.SWALLOWED
+        cleared = null
+        typed.clear()
+        typed.append(back)
+        return Outcome.CHANGED
     }
 
     fun type(letters: String): Outcome {

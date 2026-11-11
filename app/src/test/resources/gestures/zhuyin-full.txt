@@ -464,8 +464,8 @@ comma said: ,
 comma pressed: [,]
 comma tap: [sendKey(key=,, states=536870912, code=51, up=false)] field hello w|7,7
 comma swiping: [,]
-comma up: [] field hello w|7,7
-comma down: [] field hello w|7,7
+comma up: [sendKey(key=,, states=536870912, code=51, up=false)] field hello w|7,7
+comma down: [sendKey(key=,, states=536870912, code=51, up=false)] field hello w|7,7
 comma left: [] field hello w|7,7
 comma right: [] field hello w|7,7
 comma nudged: [sendKey(key=,, states=536870912, code=51, up=false)] field hello w|7,7
@@ -486,8 +486,8 @@ period said: .
 period pressed: [.]
 period tap: [sendKey(key=., states=536870912, code=52, up=false)] field hello whello world, again|25,25
 period swiping: [.]
-period up: [] field hello whello world, again|25,25
-period down: [] field hello whello world, again|25,25
+period up: [sendKey(key=., states=536870912, code=52, up=false)] field hello whello world, again|25,25
+period down: [sendKey(key=., states=536870912, code=52, up=false)] field hello whello world, again|25,25
 period left: [] field hello whello world, again|25,25
 period right: [] field hello whello world, again|25,25
 period nudged: [sendKey(key=., states=536870912, code=52, up=false)] field hello whello world, again|25,25

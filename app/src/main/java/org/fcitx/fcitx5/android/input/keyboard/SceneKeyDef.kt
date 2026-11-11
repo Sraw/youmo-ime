@@ -37,6 +37,8 @@ class SceneKeyDef(
     val behavior: SceneBehavior,
     behaviors: Set<Behavior>,
     popup: Array<Popup>?,
+    /** What the layout's `action:<name>` sends on this key, the keyboard's own ([Table.action]): its long press's items' too. */
+    val placeholder: (String) -> KeyAction? = { null },
 ) : KeyDef(Appearance.Text("", 0f), behaviors, popup, name = behavior.id, shortcut = behavior.shortcut?.let(::viewName)) {
 
     override val swipesBothWays: Boolean get() = behavior.bothWays
@@ -100,7 +102,7 @@ class SceneKeyDef(
                 act(b.doubleTap)?.let { add(Behavior.DoubleTap(it)) }
             }
             val popups = popupsOf(b, node, table, ::act)
-            return SceneKeyDef(b, behaviors, popups.toTypedArray().takeIf { it.isNotEmpty() })
+            return SceneKeyDef(b, behaviors, popups.toTypedArray().takeIf { it.isNotEmpty() }) { name -> table.action(name, node) }
         }
 
         /**
@@ -121,7 +123,10 @@ class SceneKeyDef(
         private fun popupsOf(b: SceneBehavior, node: KeyNode, table: Table, act: (SceneAction?) -> KeyAction?): List<Popup> = buildList {
             b.bubble?.let {
                 val content = bubbleOf(b, node, table)!!
-                add(it.corner?.let { c -> Popup.AltPreview(content, c) } ?: Popup.Preview(content))
+                // a named key's swipe shows what the resolver swipes it to ([KeySwipes.preview] asks swipeText), whatever
+                // corner its layout wrote (060-keys-unify M6): the layout's corner only for a key of no name
+                val corner = it.corner ?: "".takeIf { node.shortcut != null }
+                add(corner?.let { c -> Popup.AltPreview(content, c) } ?: Popup.Preview(content))
             }
             when (val p = b.popup) {
                 is SceneBehavior.LongPopup.Preset -> add(Popup.Keyboard.Preset(p.label, p.transformPunctuation))

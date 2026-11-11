@@ -46,9 +46,9 @@ class EmojiSearchUi(context: Context, private val theme: Theme) : LinearLayout(c
 
     class Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, rows(context)) {
 
-        // 返回 in the app's words; no marks (no key of the search has a shortcut)
+        // 返回 in the app's words; ⌫'s marks as every keyboard's (060-keys-unify D5: its commands act on the query, PickerWindow)
         override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
-            SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = Texts(back = context.getString(R.string.picker_back)), marks = SceneEnvs.NO_MARKS)
+            SceneEnvs.of(this, look, theme.isDark, width, height, Input(), texts = Texts(back = context.getString(R.string.picker_back)), marks = keyMarks(layout))
 
         // laid on the search's own background (the keyboard's colour), as its views were
         override val sceneDrawsBase: Boolean get() = false

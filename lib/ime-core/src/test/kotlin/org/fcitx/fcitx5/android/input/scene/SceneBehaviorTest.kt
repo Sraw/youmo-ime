@@ -154,7 +154,8 @@ class SceneBehaviorTest {
 
     // 注音九键 (060-render-p2 S4d) as its views: a group types by the table, its bubble its face both ways, its
     // long press the app's (from="group", no letters=); the tones and ? ! ~ show their bubble though function
-    // keys (preview="on"), ? ! ~ offering their presets (SymbolKey's); the slot none though a letter key (preview="off")
+    // keys (preview="on"), ? ! ~ offering their presets (SymbolKey's); the slot none though a letter key (preview="off").
+    // Each named (060-keys-unify D2): ˉ's ˙ its long press's first, swiped as the resolver has it; the slot is ，'s (§5.2)
     @Test
     fun zhuyinNinesKeysBubbleAsTheirViews() {
         val k = keys("zhuyin-nine").mapValues { SceneBehavior.of(it.value) }
@@ -165,7 +166,8 @@ class SceneBehaviorTest {
         assertEquals("zy9/1", g.shortcut)
         val tone = k.getValue("r1c1")
         assertEquals(Bubble("ˉ", null), tone.bubble)
-        assertEquals(SceneAction.Placeholder("tone-5"), tone.swipe)
+        assertNull(tone.swipe)
+        assertEquals("zy9/tone-1", tone.shortcut)
         assertEquals(SceneBehavior.LongPopup.Listed(listOf("˙"), false), tone.popup)
         for ((id, mark) in listOf("r2c1" to "ˊ", "r3c1" to "ˇ", "r4c1" to "ˋ")) {
             assertEquals(Bubble(mark, null), k.getValue(id).bubble)
@@ -179,7 +181,8 @@ class SceneBehaviorTest {
         val slot = k.getValue("r4c4")
         assertNull(slot.bubble)
         assertEquals(SceneAction.Placeholder("zhuyin-slot"), slot.press)
-        assertEquals(SceneBehavior.LongPopup.Listed(listOf("。", "？", "！", "、", "：", "；"), true), slot.popup)
+        assertNull(slot.popup)
+        assertEquals("fn/comma", slot.shortcut)
         // preview= over the kind's either way; unwritten, the kind's
         assertNull(SceneBehavior.of(node("<key id=\"a\" label=\"A\" preview=\"off\" send=\"a\"/>")).bubble)
         assertEquals(Bubble("+", null), SceneBehavior.of(node("<key id=\"a\" kind=\"function\" label=\"+\" preview=\"on\" send=\"+\"/>")).bubble)
