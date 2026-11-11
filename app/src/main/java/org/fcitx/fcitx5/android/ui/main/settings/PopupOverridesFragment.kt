@@ -365,6 +365,13 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             with(content) { add(ctx.horizontalLayout {
                 gravity = if (page.leftAligned) Gravity.START else Gravity.CENTER_HORIZONTAL
                 keys.forEach { key ->
+                    // a function key in its place (注音九键's ，): greyed, a tap saying where it is changed
+                    if (page.elsewhere(key)) {
+                        add(KeyCaps.key(ctx, key.label, "", marked = false, dimmed = true).apply {
+                            setOnClickListener { v -> Snackbar.make(v, getString(R.string.shortcut_key_elsewhere, key.label), Snackbar.LENGTH_SHORT).show() }
+                        }, keyParams(ctx, weight = 1f))
+                        return@forEach
+                    }
                     val (name, slotKey, label) = pageKey(page, key)
                     val longPress = longPressOf(page, key, name)
                     // the engine's cap: a character key by its name, a function key by its own (its up and down)
@@ -426,7 +433,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // the scenes made off the main thread, the notes put in when they are (none for a page rebuilt since)
     private fun pageNotes(ctx: Context, page: KeyShortcutPages.Page, stored: SwipeSlots) {
         val function = page.form == KeyShortcuts.FUNCTION
-        val ways = page.rows.flatMap { if (function) it.take(1) else it }.flatMap { key ->
+        val ways = page.rows.flatMap { if (function) it.take(1) else it }.filterNot(page::elsewhere).flatMap { key ->
             val k = pageKey(page, key)
             listOf(true, false).filter { stored.isSet(k.slotKey, it) }.map { k to it }
         }

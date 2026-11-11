@@ -24,6 +24,8 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keys.First
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.KeyListsCache
+import org.fcitx.fcitx5.android.input.keys.KeyPopup
+import org.fcitx.fcitx5.android.input.keys.KeyState
 import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
@@ -611,7 +613,7 @@ class PopupOverridesFragmentTest {
             for (page in KeyShortcutPages.all) {
                 click(PopupOverridesFragment.pageTitle(page))
                 val keys = if (page == KeyShortcutPages.Function) KeyShortcutPages.FUNCTION_POPUPS.map { PopupOverridesFragment.FunctionLabels.getValue(it).let(st::s) to "fn/$it" }
-                else page.rows.flatten().map { (if (page == KeyShortcutPages.Full) it.label.lowercase() else it.label) to it.name }
+                else page.rows.flatten().filterNot(page::elsewhere).map { (if (page == KeyShortcutPages.Full) it.label.lowercase() else it.label) to it.name }
                 for ((label, name) in keys) {
                     val before = own(name)
                     // a function key's name may hold a comma (", key"): its caption read whole
@@ -703,11 +705,38 @@ class PopupOverridesFragmentTest {
         fun aGroupOfNoFirstOpenedWritesNothing() {
             open()
             click(R.string.shortcut_page_zy9)
-            val key = KeyShortcutPages.ZhuyinNine.rows.flatten().first { k ->
+            val key = KeyShortcutPages.ZhuyinNine.rows.flatten().filterNot(KeyShortcutPages.ZhuyinNine::elsewhere).first { k ->
                 KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(k.name))!!.let { it.defaultOf(KeyId.of(k.name))?.first == null && it.edit(KeyId.of(k.name)).row.isNotEmpty() }
             }
             dialogOf(key.label).ok()
             assertEquals(KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
+        }
+
+        // review 5: 注音九键's tone keys are on its tab; one edited there is that key's long press on the keyboard
+        @Test
+        fun aZhuyinToneEditedOnThePageIsTheKeyboardsLongPress() {
+            open()
+            click(R.string.shortcut_page_zy9)
+            val before = own("zy9/tone-1")
+            dialogOf("ˉ").apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("※")
+                ok()
+            }
+            assertEquals(before + "※", stored("zy9/tone-1")!!.symbols)
+            val key = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard("zy9/tone-1"))!!.resolve(KeyId("zy9/tone-1"), KeyState())
+            assertEquals("※", (key.popup as KeyPopup.Items).labels.last())
+        }
+
+        // the ， in its place is the function key's: greyed, a tap saying where it is changed and opening no editor
+        @Test
+        fun zhuyinNinesCommaSaysItIsChangedOnTheFunctionKeysTab() {
+            open()
+            click(R.string.shortcut_page_zy9)
+            val dialogs = ShadowDialog.getShownDialogs().size
+            keyCalled("，").performClick()
+            st.idle()
+            assertEquals(dialogs, ShadowDialog.getShownDialogs().size)
+            assertTrue(st.texts().toString(), st.s(R.string.shortcut_key_elsewhere, "，") in st.texts())
         }
 
         // review 4: a key turned off is said so, and stays off when only a slot is changed

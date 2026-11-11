@@ -1129,6 +1129,7 @@
     <string name="shortcut_page_zyfull">Zhuyin full</string>
     <string name="shortcut_page_number">Number pad</string>
     <string name="shortcut_page_function">Function keys</string>
+    <string name="shortcut_key_elsewhere">%s is a function key: change it on the Function keys tab</string>
     <string name="shortcut_text_too_long">At most %d characters</string>
     <string name="fn_key_space">Space</string>
     <string name="fn_key_backspace">Backspace</string>

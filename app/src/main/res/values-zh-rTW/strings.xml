@@ -1103,6 +1103,7 @@
     <string name="shortcut_page_zyfull">注音全鍵盤</string>
     <string name="shortcut_page_number">數字鍵盤</string>
     <string name="shortcut_page_function">功能鍵</string>
+    <string name="shortcut_key_elsewhere">在功能鍵頁改 %s</string>
     <string name="shortcut_text_too_long">最多 %d 個字</string>
     <string name="fn_key_space">空白</string>
     <string name="fn_key_backspace">退格</string>
