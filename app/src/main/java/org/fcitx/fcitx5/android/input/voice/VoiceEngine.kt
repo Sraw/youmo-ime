@@ -50,10 +50,13 @@ object VoiceEngine {
     const val WINDOW = 512
 
     /**
-     * Zeros after the last of the speech so the last chunk is decoded: a chunk (1.92 s) and a second
-     * more, as voice-eval's seg_app.py measured it.
+     * Zeros after the last of the speech so the last chunk is decoded: a chunk (1.92 s) and half a
+     * second more. Measured 2026-11-11 (voice-eval seg_app.py ENDPOINTS=1, six sets, 1448 clips): CER
+     * and the last character lost as with 2.92 s (6.96% vs 6.97%, 8.84% vs 8.91%), while a second
+     * chunk, ~600 ms of decoding on a Snapdragon 845, is run after ~19% of stops instead of ~45%;
+     * 2.05 s lost the last character more often (10.36%). The owner's choice.
      */
-    const val TAIL_PADDING = SAMPLE_RATE * 292 / 100
+    const val TAIL_PADDING = SAMPLE_RATE * 242 / 100
 
     private const val DIR = "voice"
     private const val KEEP_MS = 2 * 60 * 1000L
