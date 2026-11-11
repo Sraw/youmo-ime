@@ -185,4 +185,37 @@ class FastTypingTest {
         h.idle()
         assertEquals(h.sent().toString(), 3, h.sent().size)
     }
+
+    // ten keys 40 ms apart, a finger each, the next down before the last lifts, while the host takes
+    // 30–80 ms a key: every key reaches it, in the order typed
+    private fun slowHost(keyboard: ImKeyboard, ids: List<String>): List<String> {
+        val h = harness(keyboard)
+        h.api.keyDelay = { listOf(30L, 80L, 55L, 45L, 70L)[it % 5] }
+        val f = Fingers(h)
+        ids.forEachIndexed { n, id ->
+            f.down(n % 2, h.spot(h.keyNamed(id), if (n % 3 == 0) 0.25f else 0.75f))
+            h.after(20)
+            if (n > 0) f.up((n - 1) % 2)
+            h.after(20)
+        }
+        f.up((ids.size - 1) % 2)
+        h.after(1500)
+        h.idle()
+        return h.sent()
+    }
+
+    @Test
+    fun fourteenKeysTenFastKeysOnABusyHostAllArrive() {
+        // dui hui sui g: UI twice running, and other keys
+        val ids = listOf("r2c2", "r1c4", "r1c4", "r2c3", "r1c4", "r1c4", "r2c1", "r1c4", "r1c4", "r2c3")
+        val sent = slowHost(ImKeyboard.KEYS14, ids)
+        assertEquals(sent.toString(), ids.size, sent.size)
+    }
+
+    @Test
+    fun fullKeysTenFastKeysOnABusyHostAllArriveInOrder() {
+        val ids = "duihuisuig".map { it.toString() }
+        val sent = slowHost(ImKeyboard.FULL, ids)
+        assertEquals(sent.toString(), ids, sent.map { Regex("key=(.)").find(it)!!.groupValues[1] })
+    }
 }

@@ -215,21 +215,34 @@ class FakeHostApi : HostApi {
         return true
     }
 
+    /** How long each key takes the host, ms, by the key's turn: a busy engine (FastTypingTest). */
+    var keyDelay: (Int) -> Long = { 0L }
+    private var keysTaken = 0
+
+    private suspend fun slow() {
+        val ms = keyDelay(keysTaken++)
+        if (ms > 0) kotlinx.coroutines.delay(ms)
+    }
+
     override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int) {
+        slow()
         calls += "sendKey(key=$key, states=$states, code=$code, up=$up)"
     }
 
     override suspend fun sendKey(c: Char, states: UInt, code: Int, up: Boolean, timestamp: Int) {
+        slow()
         calls += "sendKey(char=$c, states=$states, code=$code, up=$up)"
     }
 
     override suspend fun sendKey(sym: Int, states: UInt, code: Int, up: Boolean, timestamp: Int) {
+        slow()
         calls += "sendKey(sym=$sym, states=$states, code=$code, up=$up)"
     }
 
     override suspend fun sendKey(
         sym: KeySym, states: KeyStates, code: Int, up: Boolean, timestamp: Int
     ) {
+        slow()
         calls += "sendKey(sym=${sym.sym}, states=${states.states}, code=$code, up=$up)"
     }
 
