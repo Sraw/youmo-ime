@@ -441,8 +441,9 @@ class T9UatTest {
         val dp = h.service.resources.displayMetrics.density
         slide(k, 0f, 10f, KeyboardHarness.Touch(k.width / 2f, k.height - 3 * dp))
         assertEquals("5jJ", h.field.text.toString())
-        slide(h.nineKey("9"), 25f)
-        assertEquals("5jJw", h.field.text.toString())
+        // 9 at the screen's right: last in its row (060-edge-popup), z a little left of it
+        slide(h.nineKey("9"), -25f)
+        assertEquals("5jJz", h.field.text.toString())
         // the full keyboard's cells are as small
         h.close()
         val q = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen()).start()

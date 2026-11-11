@@ -161,13 +161,14 @@ class GroupedKeyboardUatTest {
     @Uat("PY-89")
     fun theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove() {
         keys14().start()
-        // q and w long-press to their digit and capital alone on the full keyboard: nothing above
-        assertEquals(listOf("Q", "W", "1", "q", "w"), h.longPress(group("QW")))
+        // q and w long-press to their digit and capital alone on the full keyboard: nothing above. At
+        // the screen's left the corner is first, the rest in order inward (060-edge-popup)
+        assertEquals(listOf("1", "Q", "W", "q", "w"), h.longPress(group("QW")))
         // let go where it opened: the finger was on the corner
         assertEquals("1", h.field.text.toString())
         h.field.setText("")
         val asRow = h.longPress(group("AS"))
-        assertEquals(listOf("A", "S", "6", "a", "s"), asRow.takeLast(5))
+        assertEquals(listOf("6", "A", "S", "a", "s"), asRow.takeLast(5))
         val above = asRow.dropLast(5)
         assertTrue("$above", "@" in above && "*" in above && above.none { it.length == 1 && it[0].isLetterOrDigit() && it[0].code < 128 })
         h.field.setText("")
@@ -179,30 +180,27 @@ class GroupedKeyboardUatTest {
         assertTrue(h.api.calls.toString(), "reset()" in h.api.calls)
         assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("w"))
         assertTrue(sent().toString(), sent().isEmpty())
-        // L at the screen's right, under wider symbols (L 0 l, 4 above): its corner over the finger,
-        // the row moved right to the popup's end; it once started at the pushed-in popup's left,
-        // every key left of the finger. A move right of a key's step picks l
+        // L at the screen's right, under wider symbols (L l 0, 4 above, 060-edge-popup): its corner last,
+        // over the finger as far as the popup lets it; once in the middle, l right of it toward the
+        // edge the finger was at. A move left of a key's step picks l
         h.field.setText("")
         typing(InputMethodCatalog.PINYIN, "ni", "bu")
         val l = group("L")
         val f = h.finger(l, KeyboardHarness.Touch(l.bounds.width() / 2f, l.bounds.height() / 2f))
         h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
         val shown = h.popupChoices().associate { it.text to it.box }
-        val fingerX = l.bounds.exactCenterX().toInt()
-        assertTrue("$shown", shown["0"]!!.let { fingerX in it.left until it.right })
-        assertEquals("$shown", shown.values.maxOf { it.right }, shown["l"]!!.right)
+        assertEquals("$shown", shown.values.maxOf { it.right }, shown["0"]!!.right)
+        assertTrue("$shown", shown["l"]!!.right <= shown["0"]!!.left && shown["L"]!!.right <= shown["l"]!!.left)
         val step = shown["0"]!!.width() * PopupFocus.STEP
         // the popup's first move is where its focus starts from
         f.move(KeyboardHarness.Touch(l.bounds.width() / 2f, l.bounds.height() / 2f))
-        f.move(KeyboardHarness.Touch(l.bounds.width() / 2f + step, l.bounds.height() / 2f))
-        f.up(KeyboardHarness.Touch(l.bounds.width() / 2f + step, l.bounds.height() / 2f))
+        f.move(KeyboardHarness.Touch(l.bounds.width() / 2f - step, l.bounds.height() / 2f))
+        f.up(KeyboardHarness.Touch(l.bounds.width() / 2f - step, l.bounds.height() / 2f))
         assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("l"))
     }
 
-    // QW at the screen's left with loose keys (gap.h 5dp): Q W 1 q w, the 1 right of the finger, Q two
-    // shorter steps left with little room. The popup is placed by the key's face, the finger's x is
-    // from its cell: the face's inset (the gap) passed with the long press, or the room left was
-    // counted an inset too much and Q stayed out of reach at the screen's edge
+    // QW at the screen's left with loose keys (gap.h 5dp): 1 Q W q w (060-edge-popup), the 1 first,
+    // every letter right of it: the finger slides only inward, Q a step, w four
     @Test
     @Uat("PY-89")
     fun aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge() {
@@ -211,22 +209,24 @@ class GroupedKeyboardUatTest {
         typing(InputMethodCatalog.PINYIN, "ni", "bu")
         val qw = group("QW")
         val density = h.inputView.resources.displayMetrics.density
-        // the face 5dp in its cell across, as the long press passes it
-        assertEquals((5 * density).toInt().toFloat(), (qw.bounds.width() - qw.face.width()) / 2f, 1f)
-        // pressed left of its middle, 25dp from the screen's edge: less room than whole steps take
-        // to Q, by about the inset (with it counted as room the last step lands past the edge)
         val y = qw.bounds.height() / 2f
-        var x = (25 * density).toInt() - qw.bounds.left
-        val f = h.finger(qw, KeyboardHarness.Touch(x.toFloat(), y))
-        h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
-        assertTrue(h.popupChoices().first { it.text == "1" }.box.left > x + qw.bounds.left)
-        // a pixel at a time to the screen's left edge
-        while (x > -qw.bounds.left) {
-            x--
+        val x = (25 * density).toInt() - qw.bounds.left
+        // [steps] popup steps right, or to the screen's edge (null)
+        fun slide(steps: Int?): String {
+            h.field.setText("")
+            val f = h.finger(qw, KeyboardHarness.Touch(x.toFloat(), y))
+            h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+            val shown = h.popupChoices().associate { it.text to it.box }
+            assertEquals("$shown", shown.values.minOf { it.left }, shown["1"]!!.left)
+            val dx = steps?.let { it * shown["1"]!!.width() * PopupFocus.STEP + 2 } ?: (-x - qw.bounds.left).toFloat()
             f.move(KeyboardHarness.Touch(x.toFloat(), y))
+            f.move(KeyboardHarness.Touch(x + dx, y))
+            f.up(KeyboardHarness.Touch(x + dx, y))
+            return h.field.text.toString()
         }
-        f.up(KeyboardHarness.Touch(x.toFloat(), y))
-        assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("Q"))
+        assertTrue(h.field.text.toString(), slide(null).endsWith("1"))
+        assertTrue(h.field.text.toString(), slide(1).endsWith("Q"))
+        assertTrue(h.field.text.toString(), slide(4).endsWith("w"))
     }
 
     // a grouped keyboard with no 中/英 key ([probe] its letters' group): the globe asks the host for the

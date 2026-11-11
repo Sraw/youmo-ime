@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.popup
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.popup.PopupFocus.Companion.CANCELLED
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PopupFocusTest {
@@ -164,5 +165,46 @@ class PopupFocusTest {
         assertEquals(4, f.slide(300, 309))
         assertEquals(4, f.slide(309, 303))
         assertEquals(3, f.slide(303, 301))
+    }
+
+    // 060-edge-popup: a row in order whose own key the room puts at the screen's edge ends there
+
+    @Test
+    fun aRowInOrderThatFitsStaysInOrderRoundItsKey() {
+        // 九键's 5 mid-screen: D E F 5 d e f, 5 under the finger
+        assertEquals(listOf(0, 1, 2, 3, 4, 5, 6), PopupFocus.inOrderRow(7, 3, 7, 3).toList())
+        // in wider slots, the rest empty
+        assertEquals(listOf(-1, 0, 1, 2, -1), PopupFocus.inOrderRow(3, 1, 5, 2).toList())
+    }
+
+    @Test
+    fun atTheRightEdgeTheKeysOwnIsLastAndTheRestInOrderInward() {
+        // 十四键's L (L ? l, ? its own) at the right: L l ?
+        assertEquals(listOf(0, 2, 1), PopupFocus.inOrderRow(3, 1, 3, 2).toList())
+        // 九键's 3 at the right: D E F d e f 3
+        assertEquals(listOf(0, 1, 2, 4, 5, 6, 3), PopupFocus.inOrderRow(7, 3, 7, 6).toList())
+    }
+
+    @Test
+    fun atTheLeftEdgeTheKeysOwnIsFirstAndTheRestInOrderInward() {
+        // 十四键's AS (A S ~ a s) at the left: ~ A S a s
+        assertEquals(listOf(2, 0, 1, 3, 4), PopupFocus.inOrderRow(5, 2, 5, 0).toList())
+        // wanted a column in: still at the end, nothing left of it
+        assertEquals(listOf(2, 0, 1, 3, 4), PopupFocus.inOrderRow(5, 2, 5, 1).toList())
+    }
+
+    @Test
+    fun everyKeyOfTheRowIsInExactlyOneSlot() {
+        val cases = (1..7).flatMap { size -> (0 until size).flatMap { inRow -> (size..8).flatMap { columns -> (0 until columns).map { listOf(size, inRow, columns, it) } } } }
+        for (case in cases) {
+            val (size, inRow, columns) = case
+            val column = case[3]
+            val slots = PopupFocus.inOrderRow(size, inRow, columns, column)
+            val what = "$size $inRow $columns $column"
+            assertEquals(what, (0 until size).toList(), slots.filter { it >= 0 }.sorted())
+            val at = slots.indexOf(inRow)
+            // where it is not at [column], it is at the row's end by the edge, nothing past it
+            assertTrue(what, slots.withIndex().none { (c, k) -> k >= 0 && (c - at) * (at - column) > 0 })
+        }
     }
 }

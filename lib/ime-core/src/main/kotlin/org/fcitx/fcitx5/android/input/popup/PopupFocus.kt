@@ -115,6 +115,31 @@ class PopupFocus(
     companion object {
         const val CANCELLED = -1
 
+        /**
+         * A row kept in order ([size] keys, the one at [inRow] the key's own) laid in [columns] slots,
+         * its own key wanted at [column] (the one the room either side picks for any popup): each
+         * slot's key, -1 for an empty one; the key's own is in focus first wherever it lands. In order
+         * where that fits. Where the row would run past the screen's edge, the key's own goes to that
+         * end and the rest follow in order inward, as the full keyboard's popup at an edge has its own
+         * key at the end: from a key by the edge the finger only slides inward (060-edge-popup). In
+         * order, the key's own was in the middle and the keys past it lay toward the edge the finger
+         * was already at.
+         */
+        fun inOrderRow(size: Int, inRow: Int, columns: Int, column: Int): IntArray {
+            val slots = IntArray(columns) { -1 }
+            val last = (columns - size).coerceAtLeast(0)
+            val start = column - inRow
+            val others = (0 until size).filter { it != inRow }
+            val order = when {
+                start < 0 -> listOf(inRow) + others
+                start > last -> others + inRow
+                else -> (0 until size).toList()
+            }
+            val from = start.coerceIn(0, last)
+            order.forEachIndexed { i, key -> if (from + i < columns) slots[from + i] = key }
+            return slots
+        }
+
         /** How far past the middle between two keys, in keys, the finger goes before the next. */
         const val HYSTERESIS = 0.15f
 

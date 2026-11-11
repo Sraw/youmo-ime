@@ -32,7 +32,7 @@ import kotlin.math.min
  * past the last key
  * @param asIs every key committed as it is, never typed as a key ([keyAction])
  * @param inRow the keys before [split] in one row, in their order, the one at [inRow] in focus first,
- * the row moved whole to the column the room either side picks (KeyDef.Popup.Keyboard.Explicit.inRow); -1, the first under it and the others round it
+ * at the column the room either side picks, or at the row's end by an edge it would run past (PopupFocus.inOrderRow); -1, the first under it and the others round it
  * @param onFocusMoved told, with the popup's view, each time another key comes into focus: a buzz,
  * as the finger is not over the key it picks ([PopupFocus])
  * @param scenes the engine's, the keys drawn as its scene (060-render-p2 S2), sized by its rules ([PopupKeys])
@@ -75,8 +75,9 @@ class PopupKeyboardUi(
     private val focusRow: Int
     internal val focusColumn: Int
 
-    // the column the in-order row (inRow) starts at: moved whole so its key at inRow is in focus
-    private val rowStart: Int
+    // the in-order row's slots (PopupFocus.inOrderRow); null, no row in order
+    private val inOrderSlots: IntArray?
+
 
     // the scene's keys' size; null, the engine could not say ([unmade])
     private val sceneKeys: PopupKeys?
@@ -107,8 +108,10 @@ class PopupKeyboardUi(
         // by the room either side, as for any popup: inRow's own place left the row's start under a
         // key at the screen's right, the popup moved in and the finger right of every key but none
         val wanted = calcInitialFocusedColumn(columnCount, keyWidth, outerBounds, triggerBounds)
-        rowStart = if (inRow >= 0) (wanted - inRow).coerceIn(0, columnCount - groups[0].count()) else 0
-        focusColumn = if (inRow >= 0) rowStart + inRow else wanted
+        // a row in order with its own key at it, or at the row's end by the edge where it would run
+        // past it (PopupFocus.inOrderRow): from a key by the edge the finger only slides inward
+        inOrderSlots = if (inRow >= 0) PopupFocus.inOrderRow(groups[0].count(), inRow, columnCount, wanted) else null
+        focusColumn = inOrderSlots?.indexOf(inRow) ?: wanted
     }
 
     /**
@@ -163,10 +166,9 @@ class PopupKeyboardUi(
      * in which `0` indicates default focus
      */
     private val keyOrders = groups.flatMapIndexed { g, group ->
-        // the row in order as it is, from rowStart, the slots either side empty; the others round
-        // the column in focus
-        val ordered = g == 0 && inRow >= 0
-        val order = if (ordered) IntArray(columnCount) { (it - rowStart).takeIf { at -> at in 0 until group.count() } ?: -1 } else columnOrder
+        // the row in order, its own key in focus, ending at the edge where it would run past it; the
+        // others round the column in focus
+        val order = inOrderSlots?.takeIf { g == 0 } ?: columnOrder
         List(groupRows[g]) { r ->
             // a slot past its group's keys is empty: -1
             IntArray(columnCount) { col ->
