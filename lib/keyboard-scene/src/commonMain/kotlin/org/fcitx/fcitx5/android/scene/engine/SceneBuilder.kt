@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Icons
 import org.fcitx.fcitx5.android.scene.KeyEffect
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.KeyState
@@ -70,7 +71,7 @@ class SceneBuilder(
     // [values], a key's as the theme's cascade has them, with the app's 按键样式 laid on (KeyStyleOver.on)
     private fun over(values: Map<String, Value>): Map<String, Value> = over?.on(values, env.landscape, env.compact) ?: values
     private val paint = Paint(theme, env.density)
-    private val content = Content(env, measurer, icons)
+    private val content = Content(env, measurer, icons, themedSign = Icons.SHORT_TEXT in theme.icons)
     private val popups by lazy { PopupBuilder(theme, env, measurer, icons, cascade, paint) }
 
     /**

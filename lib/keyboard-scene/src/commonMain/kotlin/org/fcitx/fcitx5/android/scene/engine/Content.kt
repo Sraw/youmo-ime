@@ -91,7 +91,13 @@ class Looks(private val of: (Part) -> TextLook) {
  * the theme's; `key mark { hidden }` leaves the symbol out, `key shortcut { hidden }` a character key's
  * shortcut, `key hint { hidden }` a function key's swipe marks (drawn as shortcuts: `key shortcut` styles them).
  */
-class Content(private val env: Env, private val measurer: TextMeasurer, private val icons: IconSizes = IconSizes.MATERIAL) {
+// [themedSign]: the theme draws its own [Icons.SHORT_TEXT], whose ink is not known: its whole square kept apart
+class Content(
+    private val env: Env,
+    private val measurer: TextMeasurer,
+    private val icons: IconSizes = IconSizes.MATERIAL,
+    private val themedSign: Boolean = false,
+) {
     private val d = env.density
     private val textScale = KeyTextScale.of(env.compact, env.floating)
 
@@ -360,8 +366,8 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
                 val dp = if (compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
                 val icon = PlacedIcon(mark.name, slotBox(slot, dp * d, dp * d, content, h, v).let { if (snap) laidOut(it) else wholeSized(it) }, Part.Shortcut)
                 // the sign's two lines are a thin band of its square: that band its ink, so it fits where 「T」 did
-                // (under j's descender at 底部), where the square would not
-                if (mark == MarkContent.Text.SIGN) Drawn(emptyList(), listOf(icon), Icons.SHORT_TEXT_INK.of(icon.box)) else Drawn.of(icon)
+                // (under j's descender at 底部), where the square would not; a theme's own art may fill its square
+                if (mark == MarkContent.Text.SIGN && !themedSign) Drawn(emptyList(), listOf(icon), Icons.SHORT_TEXT_INK.of(icon.box)) else Drawn.of(icon)
             }
             is MarkContent.Text -> {
                 val text = mark.text

@@ -90,6 +90,33 @@ class SwipeTextsDrawnTest {
     }
 
     @Test
+    fun aThemesOwnSignKeepsItsWholeSquareApart() {
+        // compact, 底部: the built-in sign's two lines fit under j's descender; a theme's own short-text art, its ink
+        // not known, is kept apart as its whole square: clear of j's letter, or left out
+        val env = Forms.env("qwerty", Forms.all.getValue("compact").copy(density = NARROW))
+        val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = MarkSettings.PRESET + ("full/j:down" to MarkContent.Text("现在…", "现…")), user = setOf("full/j:down"))
+        fun j(theme: org.fcitx.fcitx5.android.scene.theme.Theme) = Forms.scene("qwerty", env.copy(marks = marks), theme).keys.first { it.shortcut == "full/j" }
+        fun ink(k: KeyNode) = k.ops(false).filterIsInstance<Op.Text>().first { it.text == "j" }.let { t ->
+            val m = FakeMeasurer.measure(t.text, t.font, t.weight, t.size, t.letterSpacing).ink
+            Box(t.x + m.left * t.scaleX, t.baseline + m.top, t.x + m.right * t.scaleX, t.baseline + m.bottom)
+        }
+        fun sign(k: KeyNode) = k.ops(false).filterIsInstance<Op.Icon>().firstOrNull { it.name == SIGN }?.box
+        val builtIn = j(Fixtures.materialLight)
+        val square = sign(builtIn)!!
+        assertTrue(square.top < ink(builtIn).bottom, "the built-in sign's square reaches into the letter's ink: $square")
+        val base = Fixtures.materialLight
+        val ownIcons: Map<String, String> = base.icons + mapOf(org.fcitx.fcitx5.android.scene.Icons.SHORT_TEXT to "short.png")
+        val themed = j(
+            org.fcitx.fcitx5.android.scene.theme.Theme(
+                base.name, base.dark, base.version, base.colors, base.styles, base.fonts, ownIcons, base.picture,
+                base.variants, base.baseColors, base.darkColors, base.meta, base.systemColors, base.soundFiles,
+            ),
+        )
+        val own = sign(themed)
+        assertTrue(own == null || own.top >= ink(themed).bottom || own.left >= ink(themed).right || own.right <= ink(themed).left, "a theme's sign over j: $own")
+    }
+
+    @Test
     fun aTextWithRoomIsNotDrawnShorter() {
         // 左上, the default: k has room for 「现在…」 as the app gives it
         val s = owners(KeyMarks.At.TopLeft)

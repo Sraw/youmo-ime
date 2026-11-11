@@ -29,7 +29,10 @@ class SceneIconsTest {
         for (d in paths) {
             var x = 0.0
             var y = 0.0
-            Regex("([MhvHz])([-\\d.,]*)").findAll(d).forEach { m ->
+            val commands = Regex("([MhvHz])([-\\d.,]*)").findAll(d).toList()
+            // a command it does not know (a curve, a relative move) would leave its ink out: the matches are the whole of d
+            assertEquals(d, commands.joinToString("") { it.value })
+            commands.forEach { m ->
                 val n = m.groupValues[2].split(',').filter { it.isNotEmpty() }.map { it.toDouble() }
                 when (m.groupValues[1]) {
                     "M" -> { x = n[0]; y = n[1] }
