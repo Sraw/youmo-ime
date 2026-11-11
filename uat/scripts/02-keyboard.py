@@ -234,3 +234,42 @@ case("KB-67", needs="jvm:KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOt
 
 
 case("KB-69", needs="jvm:KeyShortcutsHostTest.swipeSelectSelectsFromTheCursorAsTheFingerMovesSideways、KeyShortcutsHostTest.swipeSelectCommitsWhatIsTypedFirst、KeyShortcutsHostTest.swipeSelectStepsOverAnEmojiWhole、SwipeSelectionTest、SwipeStepsTest")(lambda d: None)
+
+
+@case("KB-70", visual=True)
+def kb70(d):
+    from uat import TESTBED
+    d.sh(f"am force-stop {TESTBED}")
+    d.testbed("types")
+    n = d.wait(lambda s: next((x for x in s.app() if x.rid == "multiline" and x.pkg == TESTBED), None), 15,
+               what="the testbed's 多行 field")
+    d.tap(n.c, 1.5)
+    d.page = None
+    d.host = None
+    d._keys = None
+    for i, w in enumerate(("aaa", "bbb", "ccc")):
+        d.type(w)
+        d.enter()          # the letters as typed
+        if i < 2:
+            d.enter()      # a new line
+    time.sleep(0.5)
+    st = d.testbed_state()["multiline"]
+    t = st["text"]
+    check(t == "aaa\nbbb\nccc", f"框里是 {t!r}")
+    line = lambda: t.count("\n", 0, d.testbed_state()["multiline"]["selStart"])
+    x, y = d.keys(refresh=True)["space"]
+    p = d.dpx()
+    seen = []
+    d.touch(("down", x, y), ("move", x - 8 * p, y), ("move", x - 16 * p, y), ("move", x - 25 * p, y), ("sleep", 0.3))
+    seen.append((d.testbed_state()["multiline"]["selStart"], line()))
+    d.touch(("move", x - 25 * p, y - 16 * p), ("move", x - 25 * p, y - 32 * p), ("sleep", 0.3))
+    seen.append((d.testbed_state()["multiline"]["selStart"], line()))
+    d.touch(("move", x - 25 * p, y - 48 * p), ("move", x - 25 * p, y - 62 * p), ("sleep", 0.3))
+    seen.append((d.testbed_state()["multiline"]["selStart"], line()))
+    d.shot("app", "横滑后上挪两行")
+    d.touch(("move", x - 25 * p, y - 20 * p), ("up", x - 25 * p, y - 20 * p), ("sleep", 0.3))
+    seen.append((d.testbed_state()["multiline"]["selStart"], line()))
+    lines = [s[1] for s in seen]
+    check(seen[0][0] < 11 and lines == [2, 1, 0, 1], f"光标 {seen}")
+    check(d.testbed_state()["multiline"]["text"] == t, "没有打出字")
+    return f"光标（位置, 行）{seen}"

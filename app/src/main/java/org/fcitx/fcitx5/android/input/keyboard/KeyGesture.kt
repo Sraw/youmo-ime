@@ -126,6 +126,13 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             recognizer.swipeThresholdY = value
         }
 
+    /** Vertical steps after a sideways one ([KeyGestureRecognizer.crossStepY]): the space's cursor up and down. */
+    var crossStepY
+        get() = recognizer.crossStepY
+        set(value) {
+            recognizer.crossStepY = value
+        }
+
     /** One axis a touch ([KeyGestureRecognizer.axisLock]): a key swiped sideways and up. */
     var axisLock
         get() = recognizer.axisLock
@@ -283,7 +290,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             key.showPressed(false)
         }
         if (!outcome.dispatchMove) return true
-        dispatchGestureEvent(GestureType.Move, x, y, outcome.countX, outcome.countY)
+        dispatchGestureEvent(GestureType.Move, x, y, outcome.countX, outcome.countY, countCrossY = outcome.countCrossY)
         return true
     }
 
@@ -293,11 +300,12 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         y: Float,
         countX: Int = 0,
         countY: Int = 0,
-        cancelled: Boolean = false
+        cancelled: Boolean = false,
+        countCrossY: Int = 0,
     ) {
         val event = Event(
             type, recognizer.gestureConsumed, x, y,
-            countX, countY, recognizer.swipeTotalX, recognizer.swipeTotalY, cancelled, recognizer.swipedY
+            countX, countY, recognizer.swipeTotalX, recognizer.swipeTotalY, cancelled, recognizer.swipedY, countCrossY
         )
         val consumed = key.onGesture(event) ?: return
         if (consumed) {

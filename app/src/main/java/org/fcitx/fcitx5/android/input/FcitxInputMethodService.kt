@@ -580,6 +580,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         FcitxKeyMapping.FcitxKey_Return -> handleReturnKey()
                         FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(EditorKeyPolicy.Direction.Left)
                         FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(EditorKeyPolicy.Direction.Right)
+                        // the space's slide up and down (SpaceCursor): a line, as the editor moves it
+                        FcitxKeyMapping.FcitxKey_Up -> { clearedText.edited(); sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_UP) }
+                        FcitxKeyMapping.FcitxKey_Down -> { clearedText.edited(); sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_DOWN) }
                         // a keyboard's own code handed back unhandled (no focused context): never text
                         else -> if (it.unicode > 0 && !KeyCodes.isInternal(it.unicode)) {
                             commitTyped(Character.toString(it.unicode))

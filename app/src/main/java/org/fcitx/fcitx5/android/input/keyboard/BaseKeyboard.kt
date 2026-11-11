@@ -165,6 +165,9 @@ abstract class BaseKeyboard(
      * ([KeyboardWindow]): a stroke drawn then filters its candidates (笔画筛选).
      */
     var imTyping = false
+
+    /** Set per field ([KeyboardWindow]): the space's slide moves the cursor up and down in one of more than one line. */
+    var inMultiLineField = false
     private val longPressDelay by prefs.keyboard.longPressDelay
 
     /** Set as a temporary mode (快速输入, Unicode) is on or off ([KeyboardWindow]): nothing is written on the keys in one. */
@@ -265,6 +268,9 @@ abstract class BaseKeyboard(
 
     // a rather large threshold effectively disables swipe of the direction
     private val disabledSwipeThreshold = dp(800f)
+
+    // a line of the space's cursor up or down: well over a sideways step, so a slide's drift moves no line
+    private val spaceLineStep = dp(28f)
 
     /**
      * Whether the comma's and the full stop's swipe to nothing is their tap, as a character key's (the
@@ -402,11 +408,12 @@ abstract class BaseKeyboard(
         g.swipeRepeatEnabled = true
         g.swipeThresholdX = selectionSwipeThreshold
         g.swipeThresholdY = disabledSwipeThreshold
+        g.crossStepY = spaceLineStep
         spaceSwipesCursor(key, spaceSwipeMoveCursor.getValue())
         key.gestureListener = { k, event ->
             when (event.type) {
                 GestureType.Move -> when (val count = event.countX) {
-                    0 -> false
+                    0 -> spaceLines(k, event.countCrossY)
                     else -> {
                         val sym =
                             if (count > 0) FcitxKeyMapping.FcitxKey_Right else FcitxKeyMapping.FcitxKey_Left
@@ -421,6 +428,17 @@ abstract class BaseKeyboard(
                 else -> false
             }
         }
+    }
+
+    // the space's slide up or down once it has moved the cursor sideways: a line a step (SpaceCursor)
+    private fun spaceLines(k: KeyHandle, steps: Int): Boolean {
+        val lines = SpaceCursor.vertical(steps, inMultiLineField, imTyping)
+        lines.forEach {
+            val sym = if (it == SpaceCursor.Line.Up) FcitxKeyMapping.FcitxKey_Up else FcitxKeyMapping.FcitxKey_Down
+            onAction(KeyAction.SymAction(KeySym(sym), KeyStates.Virtual))
+            if (hapticOnRepeat) InputFeedbacks.hapticFeedback(k.feedback)
+        }
+        return lines.isNotEmpty()
     }
 
     // backspace swiped sideways selects what it deletes as it lifts

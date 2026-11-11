@@ -35,6 +35,8 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx), KeyGesture.Key {
         val cancelled: Boolean = false,
         /** the vertical swipe reached a step at some point this touch, though [totalY] may be back at 0 */
         val swipedY: Boolean = false,
+        /** vertical steps after a sideways one ([KeyGestureRecognizer.crossStepY]), finger up negative */
+        val countCrossY: Int = 0,
     )
 
     fun interface OnGestureListener {

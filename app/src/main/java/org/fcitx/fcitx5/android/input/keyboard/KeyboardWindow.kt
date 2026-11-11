@@ -274,6 +274,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.inPasswordField = service.inPasswordField
             (it as? T9Keyboard)?.noSuggestions = noSuggestions
             it.address = address
+            it.inMultiLineField = multiLine
             it.imTyping = composing && !tempMode
             it.tempMode = tempMode
             // written on the letters (键盘手写): the current input method's own handwriting's
@@ -360,6 +361,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     // the field's, for the letters to show what an address is made of and no layout to glide there: told each layout as it attaches
     private var address = AddressKeys.NONE
+    private var multiLine = false
 
     // the field asks for no suggestions (CapabilityFlag.NoSpellCheck), where English spells no word on the nine keys
     private var noSuggestions = false
@@ -374,9 +376,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         currentKeyboard?.inPasswordField = service.inPasswordField
         val traits = info.toEditorTraits()
         address = AddressKeys.of(traits)
+        multiLine = traits.isMultiLine
         typingField = SceneTyping.field(traits, service.inPasswordField)
         typingChanged()
         currentKeyboard?.address = address
+        currentKeyboard?.inMultiLineField = multiLine
         // a number's, phone's or date's field its pad, any other the letters: leaving the one for
         // another, the input method's letters come back, the nine keys, the 14 keys as they were
         fieldPad.field = NumberPad.of(traits.number)

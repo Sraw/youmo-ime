@@ -373,6 +373,43 @@ class KeyboardUatTest {
         assertTrue(sent().size < left)
     }
 
+    @Test
+    @Uat("KB-70")
+    fun spaceSlidesUpAndDownAfterSideways() {
+        val up = "sym=${FcitxKeyMapping.FcitxKey_Up},"
+        val down = "sym=${FcitxKeyMapping.FcitxKey_Down},"
+        val h = harness().start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
+        val space = space(h)
+        // sideways first, then up two lines' worth and down one
+        val f = h.finger(space, h.at(space))
+        f.move(h.at(space, dx = -15f))
+        f.move(h.at(space, dx = -25f))
+        f.move(h.at(space, dx = -25f, dy = -30f))
+        f.move(h.at(space, dx = -25f, dy = -60f))
+        assertTrue(sent().toString(), sent().count { up in it } == 2)
+        f.move(h.at(space, dx = -25f, dy = -20f))
+        f.up(h.at(space, dx = -25f, dy = -20f))
+        assertTrue(sent().toString(), sent().count { down in it } == 1)
+        // up first is the space's swipe up: no line
+        h.api.calls.clear()
+        val g = h.finger(space, h.at(space))
+        g.move(h.at(space, dy = -60f))
+        g.move(h.at(space, dy = -70f))
+        g.up(h.at(space, dy = -70f))
+        assertTrue(sent().toString(), sent().none { up in it })
+    }
+
+    @Test
+    fun spaceSlidesNoLineInASingleLineField() {
+        val h = harness().start()
+        val space = space(h)
+        val f = h.finger(space, h.at(space))
+        f.move(h.at(space, dx = -25f))
+        f.move(h.at(space, dx = -25f, dy = -60f))
+        f.up(h.at(space, dx = -25f, dy = -60f))
+        assertTrue(sent().toString(), sent().none { "sym=${FcitxKeyMapping.FcitxKey_Up}," in it })
+    }
+
     private fun actions(h: KeyboardHarness): MutableList<Int> {
         val done = mutableListOf<Int>()
         h.field.setOnEditorActionListener { _, action, _ -> done += action; true }

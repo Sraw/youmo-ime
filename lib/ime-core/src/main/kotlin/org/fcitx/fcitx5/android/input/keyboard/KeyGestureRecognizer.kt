@@ -31,6 +31,8 @@ class KeyGestureRecognizer {
         /** Swipe steps crossed on each axis since the previous sample. */
         val countX: Int,
         val countY: Int,
+        /** Vertical steps of [crossStepY] once this touch has taken a sideways step; 0 without one. */
+        val countCrossY: Int = 0,
         /** Whether the caller should dispatch a Move gesture for this sample at all. */
         val dispatchMove: Boolean,
         /** Pending long-press / repeat timers that this sample invalidates. */
@@ -70,6 +72,13 @@ class KeyGestureRecognizer {
     var swipeThresholdX: Float = 24f
     var swipeThresholdY: Float = 24f
 
+    /**
+     * Once a touch has taken a sideways step, its vertical steps of this size ([MoveOutcome.countCrossY]),
+     * counted from where the finger was then: the space's cursor moved up and down after it moved
+     * sideways, so a touch going up first is still the key's swipe up. 0 counts none.
+     */
+    var crossStepY: Float = 0f
+
     /** How close two taps must be to count as a double tap. */
     var doubleTapTimeoutMs: Long = 0L
 
@@ -88,12 +97,13 @@ class KeyGestureRecognizer {
         val axisLock: Boolean,
         val swipeThresholdX: Float,
         val swipeThresholdY: Float,
+        val crossStepY: Float,
         val doubleTapTimeoutMs: Long,
     )
 
     private fun live() = Settings(
         longPressEnabled, repeatEnabled, swipeEnabled, swipeRepeatEnabled, doubleTapEnabled, axisLock,
-        swipeThresholdX, swipeThresholdY, doubleTapTimeoutMs,
+        swipeThresholdX, swipeThresholdY, crossStepY, doubleTapTimeoutMs,
     )
 
     /** Frozen at [onDown]; between touches the live configuration applies. */
@@ -117,6 +127,10 @@ class KeyGestureRecognizer {
     // one axis of a swipe each: where the finger last was, what is carried toward the next step, the steps so far
     private val swipeX = SwipeSteps()
     private val swipeY = SwipeSteps()
+
+    // [crossStepY]'s, started at the first sideways step
+    private val crossY = SwipeSteps()
+    private var crossing = false
 
     val swipeTotalX: Int get() = swipeX.total
 
@@ -219,6 +233,7 @@ class KeyGestureRecognizer {
         val held = axisPending(x, y)
         val countX = stepsX(x, held)
         val countY = stepsY(y, held)
+        val countCrossY = stepsCrossY(y, countX)
         if (countX != 0 || countY != 0) {
             if (settings.swipeRepeat) swipeRepeatTriggered = true
             if (settings.longPress && !longPressTriggered) cancelLongPress = true
@@ -228,6 +243,7 @@ class KeyGestureRecognizer {
             movedOutsideNow = movedOutsideNow,
             countX = countX,
             countY = countY,
+            countCrossY = countCrossY,
             dispatchMove = true,
             cancelLongPress = cancelLongPress,
             cancelRepeat = cancelRepeat,
@@ -260,6 +276,17 @@ class KeyGestureRecognizer {
         swipeY.last = y
         if (swipeY.total != 0) swipedY = true
         return steps
+    }
+
+    private fun stepsCrossY(y: Float, countX: Int): Int {
+        if (settings.crossStepY <= 0f) return 0
+        if (!crossing) {
+            if (countX == 0) return 0
+            crossing = true
+            crossY.start(y)
+            return 0
+        }
+        return crossY.step(y, settings.crossStepY)
     }
 
     /**
@@ -298,6 +325,8 @@ class KeyGestureRecognizer {
         touchMovedOutside = false
         swipedY = false
         lockedAxis = Axis.Undecided
+        crossing = false
+        crossY.reset()
         if (settings.swipe) {
             if (settings.swipeRepeat) swipeRepeatTriggered = false
             swipeX.reset()
