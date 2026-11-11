@@ -134,9 +134,9 @@ object KeyMarks {
     }
 
     /**
-     * A function key's: its [up] shortcut at [shortcutAt] ([onKeys], [symbolAt] where the symbols
-     * are), its [down] one in that slot mirrored, the up one always the upper of the two, each only where that way is on ([upOn], [downOn]);
-     * the down one alone at [shortcutAt]. 无 draws neither.
+     * A function key's: its [up] and [down] shortcuts in the slot of [shortcutAt] ([onKeys], [symbolAt]
+     * where the symbols are) and that slot mirrored, the up one the upper, each only where that way is
+     * on ([upOn], [downOn]); one alone in the slot itself. 无 draws neither.
      */
     fun <T : Any> placeFunction(
         up: T?, down: T?, upOn: Boolean, downOn: Boolean, symbolAt: At, shortcutAt: At, landscape: Boolean, compact: Boolean,

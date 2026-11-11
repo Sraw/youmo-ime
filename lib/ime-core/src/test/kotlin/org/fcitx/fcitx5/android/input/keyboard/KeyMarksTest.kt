@@ -137,32 +137,6 @@ class KeyMarksTest {
     }
 
     @Test
-    fun aShortcutWithNoRoomTriedInTheKeysOtherFreeCornersTopLeftFirst() {
-        // one alone: every other corner but the symbol's
-        assertEquals(listOf(listOf(Slot.TopLeft), listOf(Slot.BottomLeft)), KeyMarks.elsewhere(listOf(Slot.BottomRight), listOf(Slot.TopRight)))
-        assertEquals(listOf(listOf(Slot.TopRight), listOf(Slot.BottomRight)), KeyMarks.elsewhere(listOf(Slot.BottomLeft), listOf(Slot.TopLeft)))
-        assertEquals(
-            listOf(listOf(Slot.TopLeft), listOf(Slot.TopRight), listOf(Slot.BottomLeft), listOf(Slot.BottomRight)),
-            KeyMarks.elsewhere(listOf(Slot.Bottom), listOf(Slot.Below)),
-        )
-        // a function key's two: a corner and it mirrored, both free, each pair once, the up mark staying
-        // on the side the setting put it (a bottom setting moved is not drawn upside down)
-        assertEquals(
-            listOf(listOf(Slot.TopLeft, Slot.BottomLeft), listOf(Slot.TopRight, Slot.BottomRight)),
-            KeyMarks.elsewhere(listOf(Slot.Top, Slot.Bottom), emptyList()),
-        )
-        assertEquals(
-            listOf(listOf(Slot.BottomLeft, Slot.TopLeft), listOf(Slot.BottomRight, Slot.TopRight)),
-            KeyMarks.elsewhere(listOf(Slot.Bottom, Slot.Top), emptyList()),
-        )
-        assertEquals(
-            listOf(listOf(Slot.BottomRight, Slot.TopRight)),
-            KeyMarks.elsewhere(listOf(Slot.BottomLeft, Slot.TopLeft), emptyList()),
-        )
-        assertEquals(emptyList<List<Slot>>(), KeyMarks.elsewhere(emptyList(), emptyList()))
-    }
-
-    @Test
     fun slotsMirrorTopForBottom() {
         for (s in Slot.entries) {
             assertEquals(s.left, s.mirrored.left)

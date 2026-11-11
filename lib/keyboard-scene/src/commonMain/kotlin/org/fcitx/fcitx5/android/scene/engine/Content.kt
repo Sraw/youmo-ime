@@ -290,7 +290,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         }
     }
 
-    // a function key's as 0.5 drew them: the up one at the shortcuts' place, the down one there mirrored
+    // a function key's: the shortcuts' slot and its mirror, the up one the upper
     private fun functionSlots(ways: List<Way>): Map<Slot, Way> {
         val m = env.marks
         return KeyMarks.placeFunction(

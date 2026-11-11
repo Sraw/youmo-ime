@@ -54,7 +54,7 @@ object KeyMarkYield {
      * A mark's [ink] in its [slot], no smaller than [minScale] of it; [drop], how soon it is left out
      * where nothing else clears it (the higher the sooner; [DROP_SYMBOL] never); [elsewhere], the
      * slots it is tried in before that, in turn, with its ink there (a key's marks that have them, as
-     * many each, moved together: [KeyMarks.elsewhere]).
+     * many each, moved together).
      */
     data class Mark(
         val ink: Ink, val slot: Slot, val minScale: Float = 1f, val drop: Int = DROP_SHORTCUT,
