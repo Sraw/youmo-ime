@@ -164,6 +164,9 @@ class ThemeListFragment : Fragment() {
         }
         ThemeManager.prefs.lightModeTheme.setValue(light)
         ThemeManager.prefs.darkModeTheme.setValue(dark)
+        // the normal slot too: following turned off later shows this pick, not the one before (written as the
+        // slots are: the theme in use found anew by the system's mode)
+        ThemeManager.prefs.normalModeTheme.setValue(theme)
         updateSelectedThemes()
     }
 

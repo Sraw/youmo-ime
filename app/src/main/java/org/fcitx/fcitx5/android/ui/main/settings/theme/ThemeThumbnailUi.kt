@@ -145,10 +145,6 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
     }
 
     /**
-     * The 浅/深 of a built-in theme of two versions, [dark] the one shown, [switch] on a tap; none (null)
-     * for a theme of one.
-     */
-    /**
      * A theme of one version ([dark]'s): the chip says which it lacks (无深色/无浅色), nothing to tap; picked while
      * 跟随系统深色模式 is on, it is used in both modes (ThemeSlots).
      */

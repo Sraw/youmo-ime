@@ -622,7 +622,7 @@ object ThemeFilesManager {
                 if (there && packs.none { it.file == staged.name } && laterBuilds) {
                     errorRuntime(R.string.exception_theme_newer_kept)
                 }
-                if (!there && packs.distinctBy { it.file }.size >= ThemeAssetLimits.MAX_PACKS) {
+                if (!there && packs.filter { !it.builtin }.distinctBy { it.file }.size >= ThemeAssetLimits.MAX_PACKS) {
                     errorRuntime(R.string.exception_theme_packs, ThemeAssetLimits.MAX_PACKS.toString())
                 }
                 val refs = ThemePackFiles.refs(staged.name, staged.theme.variants) + staged.name

@@ -265,9 +265,10 @@ object ThemePackFiles {
      * ([sweepPacks], under its lock). Newest by its `theme.xml`'s time (the
      * import's), not the folder's: the check's stamp written in it changes that one.
      */
-    fun list(themes: File, builtins: List<Theme.Builtin>): List<Theme.Pack> {
+    fun list(themes: File, builtins: List<Theme.Builtin>, fresh: Boolean = true): List<Theme.Pack> {
         val root = folder(themes)
-        lastListed.clear()
+        // [fresh] false: a second folder listed after the themes' (the built-in packs), whose parses are kept
+        if (fresh) lastListed.clear()
         val dirs = root.listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") }) ?: return emptyList()
         // the app's boards read once a listing, and only for a pack not checked yet (its stamp)
         val builtIn = lazy { builtInBoards() }

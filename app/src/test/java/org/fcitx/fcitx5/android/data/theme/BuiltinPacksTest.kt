@@ -59,6 +59,13 @@ class BuiltinPacksTest {
     }
 
     @Test
+    fun unpackedWhereTheKeyboardReadsBeforeTheFirstUnlock() {
+        // device-protected storage: the credential-encrypted noBackupFilesDir is not there before the first unlock
+        val de = appContext.createDeviceProtectedStorageContext().noBackupFilesDir
+        assertEquals(de, BuiltinPacks.dir(appContext).parentFile)
+    }
+
+    @Test
     fun unpackedOnceAVersionAndNoneWhereOneFails() {
         val root = File(appContext.cacheDir, "bp-test").apply { deleteRecursively() }
         var opened = 0

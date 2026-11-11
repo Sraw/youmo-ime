@@ -163,7 +163,7 @@
     <string name="exception_theme_packs">There are already %1$s theme packs: delete one first</string>
     <string name="theme_pack_draw_failed">Theme %1$s failed to show last time: the default theme is used instead</string>
     <string name="theme_not_saved">The theme could not be saved: the phone\'s storage may be full</string>
-    <string name="follow_system_day_night_theme">Follow system day/night theme</string>
+    <string name="follow_system_day_night_theme">Follow system light/dark theme</string>
     <string name="follow_system_day_night_theme_summary">Override manual theme selection</string>
     <string name="light_mode_theme">Light mode theme</string>
     <string name="dark_mode_theme">Dark mode theme</string>
@@ -541,7 +541,7 @@
         <item quantity="other">%1$d words</item>
     </plurals>
     <string name="section_size">Size</string>
-    <string name="section_day_night">Day and night</string>
+    <string name="section_day_night">Light and dark</string>
     <string name="level_low">Low</string>
     <string name="level_standard">Standard</string>
     <string name="level_tall">Tall</string>

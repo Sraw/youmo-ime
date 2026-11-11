@@ -208,6 +208,8 @@ class SettingsMenuUatTest {
             assertEquals("amoled-black", prefs.lightModeTheme.getValue().name)
             assertEquals("amoled-black", prefs.darkModeTheme.getValue().name)
             assertEquals("amoled-black", ThemeManager.activeTheme.name)
+            // the normal slot too: following turned off shows the pick
+            assertEquals("amoled-black", prefs.normalModeTheme.getValue().name)
             assertTrue(keyboardIsDark())
         } finally {
             prefs.lightModeTheme.setValue(prefs.lightModeTheme.defaultValue)

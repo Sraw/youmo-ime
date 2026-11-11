@@ -42,14 +42,17 @@ object BuiltinPacks {
 
     private const val STAMP = ".unpacked"
 
-    /** Where they are unpacked: the folder whose `v4/` holds them, as the themes' does the user's. */
-    fun dir(context: Context) = File(context.noBackupFilesDir, DIR)
+    /**
+     * Where they are unpacked: the folder whose `v4/` holds them, as the themes' does the user's. Device-protected
+     * storage: before the first unlock after a reboot the keyboard draws them still (a slot moved off Nord, say).
+     */
+    fun dir(context: Context) = File(context.createDeviceProtectedStorageContext().noBackupFilesDir, DIR)
 
     /**
      * The packs unpacked into [root] from [open]'s zips (by [FILES]' ids), unless [root] has those of [version] already; whether they are
      * there. One that does not unpack (a full disk) leaves none: tried again at the next start, its themes not listed.
      */
-    fun unpack(root: File, version: String = BuildConfig.VERSION_NAME + BuildConfig.VERSION_CODE, open: (String) -> InputStream): Boolean {
+    fun unpack(root: File, version: String = "${BuildConfig.VERSION_NAME}/${BuildConfig.VERSION_CODE}", open: (String) -> InputStream): Boolean {
         val stamp = File(root, STAMP)
         if (stamp.isFile && runCatching { stamp.readText() }.getOrNull() == version) return true
         return try {
@@ -84,7 +87,7 @@ object BuiltinPacks {
     fun list(root: File, builtins: List<Theme.Builtin>, taken: Set<String> = emptySet()): List<Theme.Pack> {
         if (!File(root, STAMP).isFile) return emptyList()
         val order = File(root, ORDER).takeIf { it.isFile }?.readLines().orEmpty()
-        return ThemePackFiles.list(root, builtins).filter { it.file !in taken }.map { it.copy(builtin = true) }
+        return ThemePackFiles.list(root, builtins, fresh = false).filter { it.file !in taken }.map { it.copy(builtin = true) }
             .sortedBy { p -> order.indexOf(p.file).let { if (it < 0) Int.MAX_VALUE else it } }
     }
 
