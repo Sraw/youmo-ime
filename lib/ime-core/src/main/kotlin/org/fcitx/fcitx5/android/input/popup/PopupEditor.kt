@@ -9,9 +9,10 @@ package org.fcitx.fcitx5.android.input.popup
  * stored: it can only be chosen as the [first]), then its symbols, which can be moved, deleted and added to;
  * one item selected (or none, -1), and its [first], what a swipe's 长按首选 types (null: none). Each action
  * keeps the selection on the item it moved, or on the one that took the place of the one removed.
- * [defaultFirst] is the key's default first, what a deleted first falls back to while the list has it.
+ * [defaultFirst] is the key's default first, what a deleted first falls back to while the list has it; [off], a key
+ * whose long press the user turned off: its first edit turns it on with the default first (else the first symbol).
  */
-class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, private val defaultFirst: String? = null) {
+class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, private val defaultFirst: String? = null, private var off: Boolean = false) {
 
     private val list = symbols.filter { it !in row }.distinct().toMutableList()
 
@@ -62,10 +63,19 @@ class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, 
         selected = if (items.isEmpty()) -1 else minOf(selected, items.lastIndex)
     }
 
-    /** Adds the items of [text] (as [PopupOverrides.tokens] splits it) not there yet, at the end; to a list of none, the first of them first. */
+    /**
+     * Adds the items of [text] (as [PopupOverrides.tokens] splits it) not there yet, at the end; to a list of none, the
+     * first of them first; to a key turned [off] with no first, the default first (else the first symbol).
+     */
     fun add(text: String) {
         val wasEmpty = items.isEmpty()
+        val before = list.size
         PopupOverrides.tokens(text).distinct().filterTo(list) { it !in items }
-        if (wasEmpty) first = list.firstOrNull()
+        val added = list.size > before
+        when {
+            wasEmpty -> first = list.firstOrNull()
+            off && added && first == null -> first = defaultFirst?.takeIf { it in items } ?: list.firstOrNull()
+        }
+        if (added) off = false
     }
 }

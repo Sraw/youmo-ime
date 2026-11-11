@@ -827,6 +827,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     /** `key_lists` as stored, null where it is not (or is another type): read so, nothing written back. */
     fun storedKeyLists(): String? = runCatching { sharedPreferences.getString(KEY_LISTS, null) }.getOrNull()
 
+    /** `key_lists` [text] as stored, or removed where null (not stored yet: migrated at the next start, read from the old ones till then). */
+    fun setStoredKeyLists(text: String?) = sharedPreferences.edit { if (text == null) remove(KEY_LISTS) else putString(KEY_LISTS, text) }
+
     /**
      * An old long press ([POPUP_OVERRIDES], [KEY_POPUPS], [T9_SYMBOLS]) changed on its page (before 060-keys-unify S5
      * replaces those): stored, and `key_lists` removed in the same edit, so they are migrated again at the next start

@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
@@ -636,6 +637,39 @@ class PopupOverridesFragmentTest {
             return ShadowDialog.getLatestDialog() as AlertDialog
         }
 
+        // 上滑's 空 picked (the first of the two ways' 空)
+        private fun AlertDialog.emptyUp() {
+            KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().first { it.text.toString() == st.s(R.string.slot_empty) }.performClick()
+            st.idle()
+        }
+
+        // re-review 1: key_lists not stored yet (a 0.5 backup imported, migrated at the next start) is not stored by
+        // an undo either: the old long presses still read till then
+        @Test
+        fun anUndoLeavesKeyListsUnstoredAsItWas() {
+            open()
+            val p = AppPrefs.getInstance()
+            prefs.set(p.internal.popupOverrides, "q ?")
+            p.setStoredKeyLists(null)
+            assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.symbols?.lastOrNull())
+            dialogOf("q").apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+                ok()
+            }
+            click(R.string.undo)
+            assertNull(p.storedKeyLists())
+            assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.symbols?.lastOrNull())
+        }
+
+        // review 6: 九键's rows are the user's t9_letters
+        @Test
+        fun nineKeysRowsAreTheUsersLetters() {
+            prefs.set(AppPrefs.getInstance().keyboard.t9Letters, NineKeyLetters.STANDARD.withEdit('2', "abcq").serialize())
+            open()
+            val row = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard("t9/2"))!!.edit(KeyId.of("t9/2")).row
+            assertTrue(row.toString(), "q" in row || "Q" in row)
+        }
+
         // review 1: a symbol moved to the front keeps the first (q's 1 a symbol, its default's first: `*` would be the moved one)
         @Test
         fun movingSymbolsKeepsTheFirst() {
@@ -658,7 +692,7 @@ class PopupOverridesFragmentTest {
             open()
             click(R.string.shortcut_page_nine)
             dialogOf("1").apply {
-                KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().toList()[3].performClick()
+                emptyUp()
                 ok()
             }
             assertEquals(KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
@@ -685,7 +719,7 @@ class PopupOverridesFragmentTest {
             click(R.string.shortcut_page_nine)
             dialogOf("5").apply {
                 assertTrue(KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().any { it.isShown && it.text.toString() == st.s(R.string.long_press_off) })
-                KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().toList()[3].performClick()
+                emptyUp()
                 ok()
             }
             assertEquals(UserList.Off, stored("t9/5"))
@@ -701,7 +735,7 @@ class PopupOverridesFragmentTest {
             st.open(SettingsRoute.PopupOverrides)
             assertTrue(KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().any { it.text.toString() == st.s(R.string.long_press_newer) })
             dialogOf("q").apply {
-                KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().toList()[3].performClick()
+                emptyUp()
                 ok()
             }
             click(R.string.undo)

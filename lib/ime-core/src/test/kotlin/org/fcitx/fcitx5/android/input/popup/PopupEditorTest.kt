@@ -88,6 +88,20 @@ class PopupEditorTest {
         assertNull("no symbol left: none, not the row's 1", g.first)
     }
 
+    // re-review 2: a key turned off (its row, no first) edited on takes its default first, never `set !`
+    @Test
+    fun anOffKeyEditedOnTakesItsDefaultFirst() {
+        val e = PopupEditor(listOf("J", "K", "5"), emptyList(), null, defaultFirst = "5", off = true)
+        e.add("x")
+        assertEquals("5", e.first)
+        val f = PopupEditor(listOf("J", "K"), emptyList(), null, defaultFirst = null, off = true)
+        f.add("x")
+        assertEquals("no default first: the first symbol", "x", f.first)
+        val g = PopupEditor(listOf("J", "K", "5"), emptyList(), null, defaultFirst = "5")
+        g.add("x")
+        assertNull("a key on with none chosen keeps none", g.first)
+    }
+
     @Test
     fun addKeepsEachItemOnceAndNoneOfTheRow() {
         val e = editor()

@@ -111,7 +111,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     /** Every setting this page writes, as it was before the last change: what 撤销 puts back. */
     internal data class Snapshot(
-        val swipes: String, val lists: String,
+        // key_lists as stored: null where it is not yet (a 0.5 or beta backup imported, not migrated till the next start)
+        val swipes: String, val lists: String?,
         val up: Boolean, val down: Boolean, val upAt: KeyMarkPosition, val downAt: KeyMarkPosition,
     )
 
@@ -137,14 +138,14 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     private fun snapshot() = with(prefs) {
         Snapshot(
-            internal.keySwipes.getValue(), internal.keyLists.getValue(),
+            internal.keySwipes.getValue(), storedKeyLists(),
             keyboard.swipeUp.getValue(), keyboard.swipeDown.getValue(), keyboard.swipeUpPosition.getValue(), keyboard.swipeDownPosition.getValue(),
         )
     }
 
     private fun restore(s: Snapshot) = with(prefs) {
         internal.keySwipes.setValue(s.swipes)
-        internal.keyLists.setValue(s.lists)
+        setStoredKeyLists(s.lists)
         keyboard.swipeUp.setValue(s.up)
         keyboard.swipeDown.setValue(s.down)
         keyboard.swipeUpPosition.setValue(s.upAt)
@@ -664,7 +665,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         // a later version's key_lists (§4.3) is never written over: its long presses not edited here
         val start = longPress?.takeIf { !listsNewer }?.let { resolver?.edit(it.id) }
         val default = longPress?.let { resolver?.defaultOf(it.id) }
-        val editor = start?.let { PopupEditor(it.row, it.symbols, it.first, default?.first?.text) }
+        val editor = start?.let { PopupEditor(it.row, it.symbols, it.first, default?.first?.text, off = it.user?.off == true) }
         val field = EditText(ctx).apply {
             hint = getString(R.string.long_press_add_hint)
             inputType = InputType.TYPE_CLASS_TEXT
