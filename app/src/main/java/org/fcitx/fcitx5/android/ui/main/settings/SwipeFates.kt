@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.HandwritingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
@@ -46,6 +47,7 @@ import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.theme.Cascades
 import timber.log.Timber
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 
@@ -71,13 +73,25 @@ object SwipeFates {
         internal val measurer: TextMeasurer,
         // a table's every root on the letters: its letters' ways drawn nowhere (TextKeyboard.charShortcutMarks)
         internal val rootsShown: Boolean,
+        // the page's own cascades (the theme's looks worked out): only the page's thread works them out, not
+        // SceneThemes' kept ones the input view and the main thread work out at the same time
+        internal val cascades: Cascades,
+        internal val ways: Set<Boolean>,
     )
 
-    /** What a [Job]'s scene shows: each key's (by its shortcut name) ways' fates; null, no scene made. */
-    class Seen(val label: String, val landscape: Boolean, val fates: Map<String, Map<Boolean, MarkFate>>?)
+    /**
+     * What a [Job]'s scene shows: each key's (by its shortcut name) ways' fates; null, no scene made. [ways] the
+     * ways drawn at all (on, their place not 无): a way not among them has no fate to tell.
+     */
+    class Seen(
+        val label: String,
+        val landscape: Boolean,
+        val fates: Map<String, Map<Boolean, MarkFate>>?,
+        val ways: Set<Boolean> = setOf(true, false),
+    )
 
     /** A keyboard the user types on: its own class, made once, as told its input method. */
-    private class Shown(val label: String, val keyboard: BaseKeyboard, val codeRow: ImKeyboards.Layout, val rootsShown: Boolean)
+    private class Shown(val label: String, val keyboard: BaseKeyboard, val ime: InputMethodEntry?, val codeRow: ImKeyboards.Layout, val rootsShown: Boolean)
 
     /**
      * A settings page's keyboards: one a keyboard of [imes] (the input methods on), [tableLabels] each table's
@@ -90,21 +104,28 @@ object SwipeFates {
         // the page's thread's alone: a measurer keeps a Paint and what it measured
         private val measurer = measurer(theme, look)
 
-        private val shown: List<Shown> = shown(imes, tableLabels)
+        // the keyboards: they listen to the settings while held, so let go with the page ([release])
+        private var shown: List<Shown> = shown(imes, tableLabels)
+
+        // made on the main thread, used on the page's thread alone (one at a time: its executor's)
+        private var cascades: Cascades? = null
+
+        /** The keyboards let go: the page is gone. */
+        fun release() {
+            shown = emptyList()
+        }
 
         private fun shown(imes: List<InputMethodEntry>, tableLabels: Map<String, String?>): List<Shown> {
             val makers = keyboardMakers({ ctx }, { theme }) { HandwritingKeyboard(ctx, theme, deliver = { _, _ -> }) }
             val prefs = AppPrefs.getInstance().keyboard
             val scheme = EngineState.shuangpinScheme
             val on = imes.ifEmpty { listOf(null) }
+            // one keyboard a layout, told each input method's own as its scene is asked of ([jobs])
+            val keyboards = HashMap<String, BaseKeyboard>()
             val made = on.mapNotNull { ime ->
                 val layout = ImKeyboards.layoutOf(ime?.uniqueName ?: InputMethodCatalog.ENGLISH, prefs.imKeyboards(), scheme)
                 val name = ime?.let { lettersOf(it.uniqueName, prefs.imKeyboards(), scheme) } ?: nameOf(layout, scheme)
-                val keyboard = makers[name]?.invoke() ?: return@mapNotNull null
-                if (ime != null) keyboard.onInputMethodUpdate(ime)
-                // what the punctuation keys type as the host starts: English types its own
-                val english = ime?.uniqueName == InputMethodCatalog.ENGLISH
-                keyboard.onPunctuationUpdate(if (english) emptyMap() else PunctuationStartKeys.known.orEmpty())
+                val keyboard = keyboards[name] ?: makers[name]?.invoke()?.also { keyboards[name] = it } ?: return@mapNotNull null
                 val roots = ime != null && ime.uniqueName in InputMethodCatalog.TABLES &&
                     KeyLabels.of(tableLabels[ime.uniqueName].orEmpty()) == KeyLabels.ROOTS && !keyboardCompact()
                 Triple(ime, keyboard, layout) to roots
@@ -115,7 +136,7 @@ object SwipeFates {
                 val (ime, keyboard, layout) = m
                 val board = boardName(ctx, keyboard.themeBoard)
                 val label = if (boards[keyboard.themeBoard].orEmpty().size > 1 && ime != null) "$board（${InputMethodNames.of(ctx, ime)}）" else board
-                Shown(label, keyboard, layout, roots)
+                Shown(label, keyboard, ime, layout, roots)
             }
         }
 
@@ -124,21 +145,28 @@ object SwipeFates {
             val sceneTheme = SceneThemes.of(theme, look) ?: return emptyList<Job>().also { Timber.w("swipe fates: no scene theme of %s", theme.name) }
             val (upright, turned) = KeyboardArea.screens(ctx)
             val keyStyle = (theme as? Theme.Pack)?.let { ThemeManager.keyStyleShown.overPack }
+            val cascades = cascades?.takeIf { it.theme === sceneTheme } ?: Cascades(sceneTheme).also { cascades = it }
+            val spots = swipeSpots()
+            val on = swipeWays()
+            val ways = setOfNotNull(true.takeIf { on.up && spots.symbol != KeyMarks.At.None }, false.takeIf { on.down && spots.shortcut != KeyMarks.At.None })
             return shown.flatMap { s ->
+                s.ime?.let(s.keyboard::onInputMethodUpdate)
+                // what the punctuation keys type as the host starts: English types its own
+                val english = s.ime?.uniqueName == InputMethodCatalog.ENGLISH
+                s.keyboard.onPunctuationUpdate(if (english) emptyMap() else PunctuationStartKeys.known.orEmpty())
                 listOf(upright, turned).mapNotNull { screen ->
                     val size = size(screen, s.keyboard.themeBoard, s.codeRow)
                     val (layout, env) = s.keyboard.shownAs(look, size.width, size.height) ?: return@mapNotNull null
                     val names = SceneBoard.names(layout)
-                    val spots = swipeSpots()
                     val marks = SceneMarks.settings(
                         slots, swipeWays(), spots.symbol, spots.shortcut, !s.rootsShown, names,
                         SceneBoard.firsts(PopupOverridesCache.byName.current, names),
                     )
-                    val on = env.copy(
+                    val shownEnv = env.copy(
                         density = screen.density.toDouble(), landscape = screen.landscape, floating = size.floating,
                         split = size.split, marks = marks, typed = null, board = layout.id, keyStyle = keyStyle,
                     )
-                    Job(s.label, screen.landscape, sceneTheme, on, layout, measurer, s.rootsShown)
+                    Job(s.label, screen.landscape, sceneTheme, shownEnv, layout, measurer, s.rootsShown, cascades, ways)
                 }
             }
         }
@@ -146,17 +174,17 @@ object SwipeFates {
 
     /** [job]'s scene made: on the page's thread. */
     fun made(job: Job): Seen {
-        val built = SceneBuilder(job.theme, job.env, job.measurer, cascades = SceneThemes.cascades(job.theme)).build(job.layout.layout, job.layout.fragments)
+        val built = SceneBuilder(job.theme, job.env, job.measurer, cascades = job.cascades).build(job.layout.layout, job.layout.fragments)
         val scene = when (built) {
             is Parsed.Ok -> built.value
-            is Parsed.Failed -> return Seen(job.label, job.landscape, null).also { Timber.e("swipe fates: no scene of %s: %s", job.layout.id, built.problems) }
+            is Parsed.Failed -> return Seen(job.label, job.landscape, null, job.ways).also { Timber.e("swipe fates: no scene of %s: %s", job.layout.id, built.problems) }
         }
         val fates = scene.keys.filter { it.copy == 0 && it.shortcut != null }.associate { node ->
             // a table's letters show its roots: their ways drawn nowhere
             val letter = job.rootsShown && node.id.length == 1 && node.id[0] in 'a'..'z'
             node.shortcut!! to if (letter) mapOf(true to MarkFate.Dropped, false to MarkFate.Dropped) else node.fates
         }
-        return Seen(job.label, job.landscape, fates)
+        return Seen(job.label, job.landscape, fates, job.ways)
     }
 
     /** The size of the keys of a board ([board]: KeyNames') on [s], as InputView gives it; [floating] its text scale, [split] the letters halved. */
@@ -191,7 +219,8 @@ object SwipeFates {
      * keyboards differing, the one that draws it worst, by its name.
      */
     fun note(ctx: Context, seen: List<Seen>, shortcut: String, up: Boolean): String? {
-        if (seen.any { it.fates == null }) return null
+        // a scene not made: no claim; a way off or placed 无: drawn nowhere as the user chose, nothing to say
+        if (seen.any { it.fates == null || up !in it.ways }) return null
         val per = seen.groupBy { it.label }.mapNotNull { (label, both) ->
             fun fate(landscape: Boolean): MarkFate? = both.firstOrNull { it.landscape == landscape }?.fates?.get(shortcut)?.let {
                 // set and on, and drawn nowhere: no room even to say so
@@ -253,11 +282,7 @@ object SwipeFates {
         },
     )
 
-    /** The measurer a page's thread measures [theme]'s text with: its own, made here (the test's seam: [measurerFor]). */
+    /** The measurer a page's thread measures [theme]'s text with: its own, made here (the test's seam: [SceneBoard.measurerFor]). */
     private fun measurer(theme: Theme, look: ThemeLook): TextMeasurer =
-        measurerFor?.invoke() ?: AndroidTextMeasurer(SceneFonts.of(theme, look))
-
-    /** A test's measurer in place of the fonts' (a fixed width a character): null, the fonts'. */
-    @VisibleForTesting
-    var measurerFor: (() -> TextMeasurer)? = null
+        SceneBoard.measurerFor?.invoke() ?: AndroidTextMeasurer(SceneFonts.of(theme, look))
 }

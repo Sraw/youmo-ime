@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import timber.log.Timber
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -421,6 +422,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private val fatesThread = lazy { Executors.newSingleThreadExecutor() }
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    // the scenes being made: let go with the view
+    private var fatesRunning: Future<*>? = null
+
     private fun withFates(then: (SwipeFates.Page) -> Unit) {
         fatesPage?.let { return then(it) }
         fatesWaiting += then
@@ -442,6 +446,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 emptyList<InputMethodEntry>() to emptyMap()
             }
             val ctx = context ?: return@launch
+            // the view gone while fcitx answered: a page of keyboards for no one
+            if (view == null) return@launch
             val page = SwipeFates.Page(ctx, imes, labels)
             fatesPage = page
             fatesWaiting.toList().also { fatesWaiting.clear() }.forEach { it(page) }
@@ -451,10 +457,24 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // [slots]' scenes made on the notes' thread, [done] told on the main one unless [current] no longer
     private fun seen(slots: SwipeSlots, current: () -> Boolean, done: (List<SwipeFates.Seen>) -> Unit) = withFates { page ->
         val jobs = page.jobs(slots)
-        fatesThread.value.execute {
+        fatesRunning = fatesThread.value.submit {
             val seen = jobs.map(SwipeFates::made)
             mainHandler.post { if (current() && view != null) done(seen) }
         }
+    }
+
+    override fun onDestroyView() {
+        fatesRunning?.cancel(true)
+        fatesRunning = null
+        mainHandler.removeCallbacksAndMessages(null)
+        // the keyboards listen to the settings while held: made again for the next view
+        fatesPage?.release()
+        fatesPage = null
+        fatesAsked = false
+        fatesWaiting.clear()
+        // no page of the next view one of this one's: a note still on its way is of none
+        pagesMade++
+        super.onDestroyView()
     }
 
     override fun onDestroy() {

@@ -221,7 +221,7 @@ class PopupOverridesFragmentTest {
             prefs.set(k.keyboardHeightPercentLandscape, 34)
             prefs.set(org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.oneHanded, org.fcitx.fcitx5.android.input.keyboard.OneHanded.Right)
             prefs.set(slotsPref, SwipeSlots.Default.with("full/j", false, SwipeSlot.Text("现在怎么样了")).serialize())
-            SwipeFates.measurerFor = { org.fcitx.fcitx5.android.scene.engine.FixedMeasurer }
+            org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.measurerFor = { org.fcitx.fcitx5.android.scene.engine.FixedMeasurer }
             try {
                 open()
                 val note = st.s(R.string.swipe_fate_both, st.s(R.string.swipe_fate_part_sign), st.s(R.string.swipe_fate_part_shortened, "现…"))
@@ -250,7 +250,7 @@ class PopupOverridesFragmentTest {
                 section.note(null)
                 assertNull(section.noted)
             } finally {
-                SwipeFates.measurerFor = null
+                org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.measurerFor = null
             }
         }
 
