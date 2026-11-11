@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 import android.text.TextUtils
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -85,5 +86,10 @@ class ThemeNamesTest {
         } finally {
             RuntimeEnvironment.setFontScale(1f)
         }
+    }
+
+    @Test
+    fun everyBuiltInFileHasAName() {
+        assertEquals(BuiltinThemeFiles.FILES.map { it.first }.toSet(), ThemeNames.BUILTIN.keys)
     }
 }

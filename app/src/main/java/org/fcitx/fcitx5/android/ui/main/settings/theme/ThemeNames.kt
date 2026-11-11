@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
@@ -40,15 +41,32 @@ object ThemeNames {
     private fun number(theme: Theme, among: List<Theme>): Int =
         among.filter(::numbered).map { it.name }.distinct().sorted().indexOf(theme.name) + 1
 
-    private val BUILTIN = BuiltinThemeFiles.FILES.map { it.first }.zip(
-        listOf(R.string.theme_name_monet, R.string.theme_name_material, R.string.theme_name_pixel, R.string.theme_name_amoled_black),
-    ).toMap()
+    /** Each built-in file's name (BuiltinThemeFiles.FILES; a test holds every one to having one). */
+    @VisibleForTesting
+    internal val BUILTIN: Map<String, Int> = mapOf(
+        BuiltinThemeFiles.MONET to R.string.theme_name_monet,
+        BuiltinThemeFiles.MATERIAL to R.string.theme_name_material,
+        BuiltinThemeFiles.PIXEL to R.string.theme_name_pixel,
+        BuiltinThemeFiles.AMOLED_BLACK to R.string.theme_name_amoled_black,
+    )
 
     private val UUID = Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 
     /** The name row's height: a line of 12 sp and room above it, at least 24 dp, more as the font is set larger. */
-    fun rowHeight(ctx: Context): Int =
-        maxOf(ctx.dp(MIN_ROW_DP), kotlin.math.ceil(themeNameView(ctx).textSize * LINE).toInt() + ctx.dp(ROOM_DP))
+    fun rowHeight(ctx: Context): Int {
+        val scale = ctx.resources.configuration.fontScale
+        val density = ctx.resources.displayMetrics.density
+        rows?.takeIf { it.scale == scale && it.density == density }?.let { return it.px }
+        val px = maxOf(ctx.dp(MIN_ROW_DP), kotlin.math.ceil(themeNameView(ctx).textSize * LINE).toInt() + ctx.dp(ROOM_DP))
+        rows = Row(scale, density, px)
+        return px
+    }
+
+    // the last row worked out, by the font scale and density it was for: every card asks it
+    private class Row(val scale: Float, val density: Float, val px: Int)
+
+    @Volatile
+    private var rows: Row? = null
 
     // a line of Han characters, its size and the room above and below them
     private const val LINE = 1.4f
