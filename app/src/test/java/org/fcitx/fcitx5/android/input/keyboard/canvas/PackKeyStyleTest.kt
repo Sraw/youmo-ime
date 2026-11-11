@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
@@ -17,7 +18,6 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.look.Gap
-import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
 import org.fcitx.fcitx5.android.scene.theme.Selector
@@ -109,45 +109,23 @@ class PackKeyStyleTest {
         }
     }
 
-    // a pack of no key.space or key.enter style (天青, 奶油, 护眼·纸色, 霓虹赛博): 无边框 the space a bar, Return a circle all the same
+    // 无边框 on every pack, every form: every key alike (the space and Return too), no fill, border, shadow,
+    // inner shadow or cap (机械键帽's depth) unpressed
     @Test
-    fun withoutBordersEveryPacksSpaceIsABarAndReturnACircle() {
+    fun withoutBordersEveryPacksKeysAreFlat() {
         val flat = KeyStyleChoice(false, null, null, null)
         packs.forEach { (name, theme) ->
             forms.forEach { (form, env) ->
-                val s = scene(theme, flat, env)
-                val space = s.key("space")
-                val bar = (space.shape as Shape.Rect).box
-                assertTrue("$name $form space a bar: $bar in ${space.bounds}", near((bar.left - space.bounds.left) / density, 10.0))
-                val enter = s.key("enter").shape as Shape.Rect
-                assertEquals("$name $form Return", enter.box.width, enter.box.height, 0.01)
-                assertTrue("$name $form Return a circle: $enter", enter.radii.all { abs(it - enter.box.width / 2) < 0.01 })
-                // letters: no face, border, shadow or cap
-                s.key("a").faces.forEach { (states, ops) ->
-                    assertTrue("$name $form a $states $ops", ops.none { it is Op.Shadow || it is Op.InnerShadow || it is Op.Stroke })
+                scene(theme, flat, env).keys.forEach { n ->
+                    n.faces.forEach { (states, ops) ->
+                        assertTrue("$name $form ${n.id} $states $ops", ops.none { it is Op.Shadow || it is Op.InnerShadow || it is Op.Stroke || it is Op.NineSlice })
+                        assertTrue(
+                            "$name $form ${n.id} $states $ops",
+                            ops.filterIsInstance<Op.Fill>().none { it.color.alpha != 0 && KeyState.Pressed !in states },
+                        )
+                    }
                 }
             }
-        }
-    }
-
-    // 机械键帽: its cap (depth, inner shadow) and shadow gone flat
-    @Test
-    fun withoutBordersTheKeycapsHaveNoCap() {
-        val s = scene(packs.getValue("keycap"), KeyStyleChoice(false, null, null, null), portrait)
-        listOf("a", "shift", "backspace").forEach { k ->
-            s.key(k).faces.values.flatten().let { ops ->
-                assertTrue("$k $ops", ops.none { it is Op.Shadow || it is Op.InnerShadow || it is Op.Stroke })
-                assertTrue("$k one face at most (no cap under it): $ops", ops.filterIsInstance<Op.Fill>().count { it.color.alpha != 0 } <= 2)
-            }
-        }
-    }
-
-    // none blank: a key that must show what it is shows it, flat too
-    @Test
-    fun withoutBordersNoPackLeavesAKeyBlank() {
-        val flat = KeyStyleChoice(false, null, null, KeyStyleChoice.RADIUS_ROUND).overPack
-        packs.forEach { (name, theme) ->
-            assertEquals(name, emptyList<BlankKeys.Blank>(), BlankKeys.find(theme, listOf(BlankKeys.Board(qwerty)), limit = 10, keyStyle = flat))
         }
     }
 

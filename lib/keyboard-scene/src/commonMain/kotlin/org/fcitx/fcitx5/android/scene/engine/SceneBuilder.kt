@@ -67,31 +67,8 @@ class SceneBuilder(
     // the app's 按键样式 over a 4.0 theme's keys (KeyStyleOver), null where it changes nothing
     private val over = env.keyStyle?.takeUnless { it.none }
 
-    // each key's face as drawn here: one whose face carries what it shows kept as the theme drew it under 无边框
-    private val faces = HashMap<Pair<String, ExpandedKey>, Face?>()
-
-    private fun faceOf(board: String, key: ExpandedKey): Face? = faces.getOrPut(board to key) {
-        val face = key.attrs.face
-        if (over?.flat != true || face == Face.Keep || face == Face.None) return@getOrPut face
-        val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
-        val own = statesOf(key)
-        val wholes = listOf(own, own + KeyState.Pressed).map {
-            Selector.Target("key", board, key.key.id, key.attrs.role, classes, it.mapTo(HashSet()) { s -> s.xml })
-        }
-        val looks = wholes.map { KeyLook(unflat.of(it), theme) }
-        val parts = wholes.flatMap { w ->
-            listOfNotNull(Part.Label.takeIf { key.label != null }, Part.Icon.takeIf { key.icon != null })
-                .map { part -> TextLook(unflat.of(w.copy(part = part.xml)), theme) }
-        }
-        if (KeyStyleOver.keeps(looks, parts)) Face.Keep else face
-    }
-
     // [values], a key's as the theme's cascade has them, with the app's 按键样式 laid on (KeyStyleOver.on)
-    private fun over(values: Map<String, Value>, key: ExpandedKey, classes: Set<String>, face: Face?): Map<String, Value> {
-        val o = over ?: return values
-        val kind = listOf("space", "enter").firstOrNull { it == key.attrs.role || it in classes }
-        return o.on(values, kind, face == Face.Keep, env.landscape, env.compact)
-    }
+    private fun over(values: Map<String, Value>): Map<String, Value> = over?.on(values, env.landscape, env.compact) ?: values
     private val paint = Paint(theme, env.density)
     private val content = Content(env, measurer, icons)
     private val popups by lazy { PopupBuilder(theme, env, measurer, icons, cascade, paint) }
@@ -172,7 +149,7 @@ class SceneBuilder(
         // pass over the keys, so a trace tells the three apart
         val keyed = placed.mapNotNull { p -> (p.item as? ExpandedKey)?.let { p to it } }
         val styled = phases.section("cascade.of") { keyed.map { (_, k) -> styled(layout.id, k) } }
-        val shaped = phases.section("faces") { keyed.mapIndexed { i, (p, k) -> shaped(p, k, faceOf(layout.id, k), styled[i]) } }
+        val shaped = phases.section("faces") { keyed.mapIndexed { i, (p, k) -> shaped(p, k, styled[i]) } }
         val keys = phases.section("content") { keyed.mapIndexed { i, (p, k) -> prepare(p, k, styled[i], shaped[i], warnings) } }
         // the same keys with their edges where they fall, not on whole pixels: what the marks' yields are
         // worked out on (060-render-p2 S4e), so a pixel's rounding never turns a choice; drawn on the above
@@ -183,8 +160,7 @@ class SceneBuilder(
                 // a key with no marks has nothing to choose: as drawn
                 if (keys[i].content.marks.isEmpty()) return@mapIndexed keys[i].content
                 val cell = cells[i].cell
-                val face = faceOf(layout.id, k)
-                val g = Faces.of(cell, styled[i].looks.getValue(styled[i].states), face ?: Face.Default, k.attrs.margin ?: true, env.flat && face != Face.Keep, env.density)
+                val g = Faces.of(cell, styled[i].looks.getValue(styled[i].states), k.attrs.face ?: Face.Default, k.attrs.margin ?: true, env.flat && k.attrs.face != Face.Keep, env.density)
                 fitted(content.of(k, cell, g.content, Looks(styled[i].parts.getValue(styled[i].states)), g, snap = false))
             }
         }
@@ -296,24 +272,23 @@ class SceneBuilder(
     )
 
     // what a key's looks are worked out from: the same in the next scene, its looks kept by the cascade
-    private data class StyledFor(val board: String, val id: String, val role: String?, val classes: Set<String>, val states: Set<KeyState>, val face: Face?) :
+    private data class StyledFor(val board: String, val id: String, val role: String?, val classes: Set<String>, val states: Set<KeyState>) :
         Cascade.KeptKey<Styled>
 
     private fun styled(board: String, key: ExpandedKey): Styled {
-        val face = faceOf(board, key)
-        val c = cascadeFor(face)
+        val c = cascadeFor(key.attrs.face)
         val states = statesOf(key)
         val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
-        return c.kept(StyledFor(board, key.key.id, key.attrs.role, classes, states, face)) { styled(c, board, key, classes, states, face) }
+        return c.kept(StyledFor(board, key.key.id, key.attrs.role, classes, states)) { styled(c, board, key, classes, states) }
     }
 
-    private fun styled(c: Cascade, board: String, key: ExpandedKey, classes: Set<String>, states: Set<KeyState>, face: Face?): Styled {
+    private fun styled(c: Cascade, board: String, key: ExpandedKey, classes: Set<String>, states: Set<KeyState>): Styled {
         val looks = HashMap<Set<KeyState>, KeyLook>()
         val parts = HashMap<Set<KeyState>, (Part) -> TextLook>()
         for (s in listOf(states, states + KeyState.Pressed)) {
             // the key's target once a state, its parts the same but the part's name
             val whole = Selector.Target("key", board, key.key.id, key.attrs.role, classes, s.mapTo(HashSet()) { it.xml })
-            looks[s] = KeyLook(over(c.of(whole), key, classes, face), theme)
+            looks[s] = KeyLook(over(c.of(whole)), theme)
             // a part's look only when a text or an icon of it is placed or drawn
             val byPart = HashMap<Part, TextLook>()
             parts[s] = { part -> byPart.getOrPut(part) { TextLook(c.of(whole.copy(part = part.xml)), theme) } }
@@ -340,8 +315,7 @@ class SceneBuilder(
         val form = listOf<Any>(layout.id, env.landscape, env.compact, env.floating != null, env.split, env.isOneHanded)
         for (key in expanded.getOrPut(form) { expandedKeys(layout, fragments) }) {
             if (key.attrs.role !in roles) continue
-            val face = faceOf(layout.id, key)
-            val c = cascadeFor(face)
+            val c = cascadeFor(key.attrs.face)
             val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
             val own = statesOf(key)
             for (states in stateSets.map { own + it }.distinct().flatMap { listOf(it, it + KeyState.Pressed) }) {
@@ -350,7 +324,7 @@ class SceneBuilder(
                 fun hides(part: Part) = TextLook(c.of(whole.copy(part = part.xml)), theme).hidden
                 val shown = (key.label != null && !hides(Part.Label)) || (key.icon != null && !hides(Part.Icon))
                 val hidden = !shown && (key.label != null || key.icon != null)
-                if (hidden && KeyLook(over(c.of(whole), key, classes, face), theme).fill !is Fill.Image) out += key to states
+                if (hidden && KeyLook(over(c.of(whole)), theme).fill !is Fill.Image) out += key to states
             }
         }
         return out
@@ -388,8 +362,8 @@ class SceneBuilder(
     }
 
     // the key's face's layers in each state
-    private fun shaped(placed: Placed, key: ExpandedKey, drawn: Face?, styled: Styled): Map<Set<KeyState>, FaceGeometry> {
-        val face = drawn ?: Face.Default
+    private fun shaped(placed: Placed, key: ExpandedKey, styled: Styled): Map<Set<KeyState>, FaceGeometry> {
+        val face = key.attrs.face ?: Face.Default
         val flat = env.flat && face != Face.Keep
         val margin = key.attrs.margin ?: true
         return styled.looks.mapValues { (_, look) -> Faces.of(placed.cell, look, face, margin, flat, env.density) }

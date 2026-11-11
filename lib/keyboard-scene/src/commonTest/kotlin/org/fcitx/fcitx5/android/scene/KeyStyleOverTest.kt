@@ -11,7 +11,6 @@ import org.fcitx.fcitx5.android.scene.engine.KeyStyleOver
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.skin.SkinFixtures
-import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Value
@@ -106,64 +105,40 @@ class KeyStyleOverTest {
         }
     }
 
-    // a theme of no `key.space`, `key.enter` or `@flat` style (天青, 奶油…), with a cap and its shadows: 无边框 flat all the same
+    // a theme of no `key.space`, `key.enter` or `@flat` style (天青, 奶油…), with a cap and its shadows: 无边框 flat
+    // all the same, every key alike, the space and Return too
     @Test
-    fun withoutBordersEveryKeyIsFlatTheSpaceABarReturnACircle() {
+    fun withoutBordersEveryKeyIsFlat() {
         val t = theme("""<style select="key" depth="4dp" inner-shadow="0 1dp 0 #ffffff" shadow="0 2dp 2dp #40000000" border="1dp #000000"/>""")
         val flat = KeyStyleOver(flat = true)
         listOf(Fixtures.portrait, Fixtures.portrait.copy(landscape = true), Fixtures.compact, Fixtures.compact.copy(landscape = true)).forEach { env ->
-            val s = scene(t, flat, env)
-            listOf("a", "q", "shift", "backspace").forEach { id ->
-                val n = s.key(id)
+            scene(t, flat, env).keys.forEach { n ->
                 n.faces.forEach { (states, ops) ->
-                    assertTrue(ops.none { it is Op.Shadow || it is Op.InnerShadow || it is Op.Stroke }, "$id $states $ops")
-                    assertTrue(ops.filterIsInstance<Op.Fill>().none { it.color.alpha != 0 && KeyState.Pressed !in states }, "$id $states $ops")
+                    assertTrue(ops.none { it is Op.Shadow || it is Op.InnerShadow || it is Op.Stroke }, "${n.id} $states $ops")
+                    assertTrue(ops.filterIsInstance<Op.Fill>().none { it.color.alpha != 0 && KeyState.Pressed !in states }, "${n.id} $states $ops")
                 }
             }
-            val space = s.key("space")
-            val bar = face(space).box
-            assertTrue(near((bar.left - space.bounds.left) / d, 10.0), "space a bar: $bar in ${space.bounds}")
-            val enter = face(s.key("enter"))
-            assertEquals(enter.box.width, enter.box.height, 0.01)
-            assertTrue(enter.radii.all { abs(it - enter.box.width / 2) < 0.01 }, "Return a circle: $enter")
-            assertTrue(s.key("space").faces.values.flatten().any { it is Op.Fill && it.color.alpha != 0 }, "the bar is drawn")
         }
     }
 
     @Test
     fun withoutBordersNothingSinksOrHasDepth() {
         val over = KeyStyleOver(flat = true).on(
-            mapOf("press-sink" to Value.Number(2.0), "depth" to Value.Number(4.0)), null, kept = false, landscape = false, compact = false,
+            mapOf("press-sink" to Value.Number(2.0), "depth" to Value.Number(4.0)), landscape = false, compact = false,
         )
         assertEquals(Value.Number(0.0), over["press-sink"])
         assertEquals(Value.Number(0.0), over["depth"])
-        // a key kept as drawn: its own
-        val kept = KeyStyleOver(flat = true, radiusDp = 0.0).on(mapOf("depth" to Value.Number(4.0)), null, kept = true, landscape = false, compact = false)
-        assertEquals(Value.Number(4.0), kept["depth"])
     }
 
-    // a converted skin's keys whose picture carries the letter (its words hidden), pressed a picture too: never blank
+    // no exceptions: a converted skin's pictured keys lose their pictures too (what is set is what is drawn)
     @Test
-    fun withoutBordersAConvertedSkinsDrawnLettersKeepTheirFaces() {
+    fun withoutBordersAConvertedSkinsPicturesGoToo() {
         listOf(SkinFixtures.baidu(), SkinFixtures.sogou()).forEach { files ->
             val t = SkinFixtures.read(SkinFixtures.convert(files))
-            val flat = KeyStyleOver(flat = true)
-            assertEquals(emptyList(), BlankKeys.find(t, listOf(BlankKeys.Board(Fixtures.qwerty)), limit = 10, keyStyle = flat), t.name)
-            val own = scene(t, null)
-            val s = scene(t, flat)
-            s.keys.filter { k -> own.key(k.id).faces.values.flatten().any { it is Op.NineSlice } }.also { assertTrue(it.isNotEmpty(), t.name) }.forEach { k ->
-                assertTrue(k.faces.values.all { ops -> ops.any { it is Op.NineSlice } }, "${t.name} ${k.id}: ${k.faces}")
+            assertTrue(scene(t, null).keys.any { k -> k.faces.values.flatten().any { it is Op.NineSlice } }, t.name)
+            scene(t, KeyStyleOver(flat = true)).keys.forEach { k ->
+                assertTrue(k.faces.values.flatten().none { it is Op.NineSlice }, "${t.name} ${k.id}: ${k.faces}")
             }
         }
-    }
-
-    @Test
-    fun aFaceKeptByItsPictureOrItsHiddenWords() {
-        val image = ThemeReader.theme(base.replace("</theme>", "<style select=\"key:pressed\" fill=\"image(p.png, 1 1 1 1)\"/>\n</theme>")).ok()
-        val s = scene(image, KeyStyleOver(flat = true))
-        // pressed a picture: the key keeps the face it has as the theme drew it, not pressed too
-        assertEquals(scene(image, null).key("a").faces, s.key("a").faces)
-        val hidden = theme("""<style select="qwerty/q label" hidden="true"/>""")
-        assertEquals(scene(hidden, null).key("q").faces, scene(hidden, KeyStyleOver(flat = true)).key("q").faces)
     }
 }

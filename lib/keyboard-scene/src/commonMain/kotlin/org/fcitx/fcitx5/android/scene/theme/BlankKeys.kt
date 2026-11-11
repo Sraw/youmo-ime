@@ -8,7 +8,6 @@ import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.ExpandedKey
 import org.fcitx.fcitx5.android.scene.engine.FixedMeasurer
-import org.fcitx.fcitx5.android.scene.engine.KeyStyleOver
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
@@ -65,10 +64,8 @@ object BlankKeys {
      *
      * Stricter than the keyboard, not looser: a required key is tried in every state the styles name, even one its
      * role never enters (Return `:locked`), so a theme hiding it there alone is refused.
-     *
-     * [keyStyle]: as drawn under the app's 按键样式 too (无边框 its keys flat: none blank there either).
      */
-    fun find(theme: Theme, boards: List<Board>, limit: Int = 1, keyStyle: KeyStyleOver? = null): List<Blank> {
+    fun find(theme: Theme, boards: List<Board>, limit: Int = 1): List<Blank> {
         val deciding = theme.styles.filter { "fill" in it.values || "hidden" in it.values }
             .flatMap { it.selectors }.filter { it.widget == "key" }
         val sceneSets = unions(deciding.map { it.scenes }.toSet(), ::possible) ?: return listOf(TOO_MANY)
@@ -88,7 +85,7 @@ object BlankKeys {
             for (b in boards) {
                 // a board this scene set names not, or its scenes asked already
                 if ((named != null && named != b.layout.id) || !asked.add(b.layout.id to rest)) continue
-                val builder = SceneBuilder(theme, env(rest, b.layout.id, keyStyle), FixedMeasurer, cascades = cascades)
+                val builder = SceneBuilder(theme, env(rest, b.layout.id), FixedMeasurer, cascades = cascades)
                 for ((key, states) in builder.blanks(b.layout, b.fragments, REQUIRED_ROLES, stateSets, expanded)) {
                     out += Blank(b.layout.id, key.key.id, scenes, states)
                     if (out.size >= limit) return out
@@ -130,7 +127,7 @@ object BlankKeys {
 
     private const val KEYBOARD = "keyboard="
 
-    private fun env(scenes: Set<String>, board: String, keyStyle: KeyStyleOver?) = Env(
+    private fun env(scenes: Set<String>, board: String) = Env(
         width = WIDTH,
         height = HEIGHT,
         density = DENSITY,
@@ -140,8 +137,7 @@ object BlankKeys {
         split = "split" in scenes,
         oneHanded = if ("one-handed" in scenes) SplitKeyboard.Dock.LEFT else SplitKeyboard.Dock.FULL,
         dark = "dark" in scenes,
-        flat = "flat" in scenes || keyStyle?.flat == true,
-        keyStyle = keyStyle,
+        flat = "flat" in scenes,
         typed = scenes.filterTo(HashSet()) { it !in FORMS },
         board = board,
     )

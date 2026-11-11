@@ -1296,9 +1296,9 @@ colours, as `system()` colours are re-read on `onSystemPlatteChange`), not a loo
 settings reach it in the scene, not the theme: `SceneBoard` puts `KeyStyleChoice.overPack` on a pack's `Env.keyStyle`
 (null at 跟随主题, and for 有边框 alone), and `SceneBuilder` lays it (`KeyStyleOver.on`) on each real key's values
 after the cascade, so every selector shape, order and state (pressed too) is the pack's own; the theme maker passes
-none. 纵向 keeps the pack's bottom-minus-top; 无边框 drops face, border, shadows, depth and sink, the space a
-`spaceBar` bar and Return an `accentKey` circle, but a key whose face is an image (pressed too) or whose words or
-icon are hidden or transparent keeps its face as drawn (as `face="keep"`; `BlankKeys.find(keyStyle=)` checks it); the views drawn
+none. 纵向 keeps the pack's bottom-minus-top; 无边框 makes every key alike (the space and Return too, an image
+face too): no fill, border, shadows, depth or sink; no exceptions, the owner's call (2026-11-11), what is set is
+what is drawn (3.0 themes' flat look, `LookTheme`, is unchanged); the views drawn
 from a look (the theme page's preview, the thumbnail, the picture under the keys, key text font) read
 `Pack.look`: `LookDefaults` with its 24 colours, its picture, and the fonts its plain `key` and `candidate`
 styles name. Icons are checked and kept but not drawn yet (the engine draws its built-in icons by name).
