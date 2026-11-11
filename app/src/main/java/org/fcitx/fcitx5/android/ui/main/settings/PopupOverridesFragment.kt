@@ -586,13 +586,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         if (longPress is LongPress.ByName && longPress.own == null) R.string.long_press_unread else R.string.long_press_none
 
     // under a list set by name, each with its top margin in dp: an edited list is the user's from then on (the settings
-    // the keyboard's own comes from reach it no more); ， and 。 are one name on every keyboard (FUNCTION_POPUPS), handwriting's too
+    // the keyboard's own comes from reach it no more)
     private fun notes(ctx: Context, longPress: LongPress?): List<Pair<View, Int>> {
         if (longPress !is LongPress.ByName) return emptyList()
-        return listOfNotNull(
-            text(ctx, getString(R.string.long_press_by_name_snapshot), body = false) to 8,
-            (text(ctx, getString(R.string.long_press_every_keyboard), body = false) to 4).takeIf { longPress.name in KeyShortcutPages.FUNCTION_POPUPS },
-        )
+        return listOf(text(ctx, getString(R.string.long_press_by_name_snapshot), body = false) to 8)
     }
 
     // the list shown first: the label's (its preset under it), or the name's the user set, else what its keyboard pops up
