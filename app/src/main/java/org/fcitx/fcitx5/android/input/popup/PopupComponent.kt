@@ -335,7 +335,7 @@ class PopupComponent :
     private fun FrameLayout.LayoutParams.isAt(width: Int, height: Int, left: Int, top: Int) =
         this.width == width && this.height == height && leftMargin == left && topMargin == top
 
-    private fun showKeyboard(key: KeyRef, keyboard: KeyDef.Popup.Keyboard, bounds: Rect, faceInset: Int = 0) {
+    private fun showKeyboard(key: KeyRef, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
         var keys: Array<String>
         var labels: Array<String>
         val split: Int
@@ -378,7 +378,6 @@ class PopupComponent :
             inRow,
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
             scenes = scenes,
-            faceInset = faceInset,
         )
         if (keyboardUi.unmade) return
         showingEntryUi[key]?.let {
@@ -553,7 +552,7 @@ class PopupComponent :
                 is PopupAction.DismissAction -> dismissPopup(key)
                 is PopupAction.PreviewAction -> showPopup(key, content, bounds)
                 is PopupAction.PreviewUpdateAction -> updatePopup(key, content, words)
-                is PopupAction.ShowKeyboardAction -> showKeyboard(key, keyboard, bounds, faceInset)
+                is PopupAction.ShowKeyboardAction -> showKeyboard(key, keyboard, bounds)
                 is PopupAction.ShowMenuAction -> showMenu(key, menu, bounds)
                 is PopupAction.ShowEditMenuAction -> showEditMenu(key, bounds, password)
                 is PopupAction.TriggerAction -> outAction = triggerFocused(key)

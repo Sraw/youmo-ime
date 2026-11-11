@@ -180,9 +180,9 @@ class GroupedKeyboardUatTest {
         assertTrue(h.api.calls.toString(), "reset()" in h.api.calls)
         assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("w"))
         assertTrue(sent().toString(), sent().isEmpty())
-        // L at the screen's right, under wider symbols (L l 0, 4 above, 060-edge-popup): its corner last,
-        // over the finger as far as the popup lets it; once in the middle, l right of it toward the
-        // edge the finger was at. A move left of a key's step picks l
+        // L at the screen's right, under wider symbols (l L 0, 4 above, 060-edge-popup): its corner last,
+        // the rest inward as listed, as the full keyboard's; once in the middle, l right of it toward
+        // the edge the finger was at. A move left of a key's step picks L
         h.field.setText("")
         typing(InputMethodCatalog.PINYIN, "ni", "bu")
         val l = group("L")
@@ -190,13 +190,13 @@ class GroupedKeyboardUatTest {
         h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
         val shown = h.popupChoices().associate { it.text to it.box }
         assertEquals("$shown", shown.values.maxOf { it.right }, shown["0"]!!.right)
-        assertTrue("$shown", shown["l"]!!.right <= shown["0"]!!.left && shown["L"]!!.right <= shown["l"]!!.left)
+        assertTrue("$shown", shown["L"]!!.right <= shown["0"]!!.left && shown["l"]!!.right <= shown["L"]!!.left)
         val step = shown["0"]!!.width() * PopupFocus.STEP
         // the popup's first move is where its focus starts from
         f.move(KeyboardHarness.Touch(l.bounds.width() / 2f, l.bounds.height() / 2f))
         f.move(KeyboardHarness.Touch(l.bounds.width() / 2f - step, l.bounds.height() / 2f))
         f.up(KeyboardHarness.Touch(l.bounds.width() / 2f - step, l.bounds.height() / 2f))
-        assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("l"))
+        assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("L"))
     }
 
     // QW at the screen's left with loose keys (gap.h 5dp): 1 Q W q w (060-edge-popup), the 1 first,

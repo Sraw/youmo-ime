@@ -6,32 +6,32 @@ r1c1 long press: [] field hello world, again11|20,20
 r1c2 tap: [sendKey(sym=17761318, states=536870912, code=0, up=false)] field hello world, again11|20,20
 r1c2 up: [] field hello world, again112|21,21
 r1c2 down: [sendKey(sym=17761318, states=536870912, code=0, up=false)] field hello world, again112|21,21
-r1c2 long press: [2, W, E, w, e]
+r1c2 long press: [E, 2, W, w, e]
 r1c2 long press: [] field hello world, again1122|22,22
 r1c3 tap: [sendKey(sym=17761313, states=536870912, code=0, up=false)] field hello world, again1122|22,22
 r1c3 up: [] field hello world, again11223|23,23
 r1c3 down: [sendKey(sym=17761313, states=536870912, code=0, up=false)] field hello world, again11223|23,23
-r1c3 long press: [R, T, 3, r, t]
+r1c3 long press: [t, T, 3, R, r]
 r1c3 long press: [] field hello world, again112233|24,24
 r1c4 tap: [sendKey(sym=17761320, states=536870912, code=0, up=false)] field hello world, again112233|24,24
 r1c4 up: [] field hello world, again1122334|25,25
 r1c4 down: [] field hello world, again1122334Z|26,26
-r1c4 long press: [Y, 4, y]
+r1c4 long press: [y, 4, Y]
 r1c4 long press: [] field hello world, again1122334Z4|27,27
 r1c5 tap: [sendKey(sym=17761316, states=536870912, code=0, up=false)] field hello world, again1122334Z4|27,27
 r1c5 up: [] field hello world, again1122334Z45|28,28
 r1c5 down: [sendKey(sym=17761316, states=536870912, code=0, up=false)] field hello world, again1122334Z45|28,28
-r1c5 long press: [U, 5, u]
+r1c5 long press: [u, 5, U]
 r1c5 long press: [] field hello world, again1122334Z455|29,29
 r1c6 tap: [sendKey(sym=17761304, states=536870912, code=0, up=false)] field hello world, again1122334Z455|29,29
 r1c6 up: [] field hello world, again1122334Z4556|30,30
 r1c6 down: [sendKey(sym=17761304, states=536870912, code=0, up=false)] field hello world, again1122334Z4556|30,30
-r1c6 long press: [I, O, i, o, 6]
+r1c6 long press: [o, i, O, 6, I]
 r1c6 long press: [] field hello world, again1122334Z45566|31,31
 r1c7 tap: [sendKey(sym=17761311, states=536870912, code=0, up=false)] field hello world, again1122334Z45566|31,31
 r1c7 up: [] field hello world, again1122334Z455667|32,32
 r1c7 down: [sendKey(sym=17761311, states=536870912, code=0, up=false)] field hello world, again1122334Z455667|32,32
-r1c7 long press: [P, p, 7]
+r1c7 long press: [p, P, 7]
 r1c7 long press: [] field hello world, again1122334Z4556677|33,33
 r2c1 tap: [sendKey(sym=17761296, states=536870912, code=0, up=false)] field hello world, again1122334Z4556677|33,33
 r2c1 up: [] field hello world, again1122334Z45566778|34,34
@@ -41,27 +41,27 @@ r2c1 long press: [] field 8|1,1
 r2c2 tap: [sendKey(sym=17761314, states=536870912, code=0, up=false)] field 8|1,1
 r2c2 up: [] field 89|2,2
 r2c2 down: [sendKey(sym=17761314, states=536870912, code=0, up=false)] field 89|2,2
-r2c2 long press: [*, +, S, D, 9, s, d]
+r2c2 long press: [*, +, d, D, 9, S, s]
 r2c2 long press: [] field 899|3,3
 r2c3 tap: [sendKey(sym=17761301, states=536870912, code=0, up=false)] field 899|3,3
 r2c3 up: [] field 8990|4,4
 r2c3 down: [sendKey(sym=17761301, states=536870912, code=0, up=false)] field 8990|4,4
-r2c3 long press: [-, =, F, G, 0, f, g]
+r2c3 long press: [-, =, g, G, 0, F, f]
 r2c3 long press: [] field 89900|5,5
 r2c4 tap: [sendKey(sym=17761303, states=536870912, code=0, up=false)] field 89900|5,5
 r2c4 up: [] field 89900(|6,6
 r2c4 down: [sendKey(sym=17761303, states=536870912, code=0, up=false)] field 89900(|6,6
-r2c4 long press: [/, H, (, h]
+r2c4 long press: [/, h, (, H]
 r2c4 long press: [] field 89900((|7,7
 r2c5 tap: [sendKey(sym=17761305, states=536870912, code=0, up=false)] field 89900((|7,7
 r2c5 up: [] field 89900(()|8,8
 r2c5 down: [sendKey(sym=17761305, states=536870912, code=0, up=false)] field 89900(()|8,8
-r2c5 long press: [[, #, (, {, J, K, ), j, k]
+r2c5 long press: [[, #, (, {, k, K, ), J, j]
 r2c5 long press: [] field 89900(())|9,9
 r2c6 tap: [sendKey(sym=17761307, states=536870912, code=0, up=false)] field 89900(())|9,9
 r2c6 up: [] field 89900(())-|10,10
 r2c6 down: [sendKey(sym=17761307, states=536870912, code=0, up=false)] field 89900(())-|10,10
-r2c6 long press: [;, }, ], ), L, l, -]
+r2c6 long press: [;, }, ], ), l, L, -]
 r2c6 long press: [] field 89900(())--|11,11
 apostrophe tap: [] field 89900(())--'|12,12
 apostrophe up: [] field 89900(())--'|12,12
@@ -71,27 +71,27 @@ apostrophe long press: [] field 89900(())--''|13,13
 r3c1 tap: [sendKey(sym=17761321, states=536870912, code=0, up=false)] field 89900(())--''|13,13
 r3c1 up: [] field 89900(())--''~|14,14
 r3c1 down: [] field hello world, again1122334Z45566778|34,34
-r3c1 long press: [', `, Z, ~, z]
+r3c1 long press: [', `, z, ~, Z]
 r3c1 long press: [] field hello world, again1122334Z45566778~|35,35
 r3c2 tap: [sendKey(sym=17761319, states=536870912, code=0, up=false)] field hello world, again1122334Z45566778~|35,35
 r3c2 up: [] field hello world, again1122334Z45566778~!|36,36
 r3c2 down: [] field hello world, again1122334Z45566778~!|36,36
-r3c2 long press: [", :, ×, X, C, !, x, c]
+r3c2 long press: [", :, ×, c, C, !, X, x]
 r3c2 long press: [] field hello world, again1122334Z45566778~!!|37,37
 r3c3 tap: [sendKey(sym=17761317, states=536870912, code=0, up=false)] field hello world, again1122334Z45566778~!!|37,37
 r3c3 up: [] field hello world, again1122334Z45566778~!!@|38,38
 r3c3 down: [] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!|74,74
-r3c3 long press: [?, ¿, V, @, v]
+r3c3 long press: [?, ¿, v, @, V]
 r3c3 long press: [] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@|75,75
 r3c4 tap: [sendKey(sym=17761297, states=536870912, code=0, up=false)] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@|75,75
 r3c4 up: [] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@?|76,76
 r3c4 down: [sendKey(sym=17761297, states=536870912, code=0, up=false)] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@?|76,76
-r3c4 long press: [~, !, ¡, B, N, ?, b, n]
+r3c4 long press: [~, !, ¡, n, N, ?, B, b]
 r3c4 long press: [] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@??|77,77
 r3c5 tap: [sendKey(sym=17761308, states=536870912, code=0, up=false)] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@??|77,77
 r3c5 up: [] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@??:|78,78
 r3c5 down: [sendKey(sym=17761308, states=536870912, code=0, up=false)] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@??:|78,78
-r3c5 long press: [\, M, :, m]
+r3c5 long press: [\, m, :, M]
 r3c5 long press: [] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@??::|79,79
 backspace tap: [sendKey(sym=65288, states=536870912, code=0, up=false)] field hello world, again1122334Z45566778~!!@hello world, again1122334Z45566778~!@??::|79,79
 backspace up: [] field |0,0

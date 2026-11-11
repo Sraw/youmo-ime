@@ -525,8 +525,7 @@ abstract class BaseKeyboard(
                 key.onLongClick { k ->
                     val bounds = k.bounds ?: return@onLongClick false
                     longPopup.shown = true
-                    // the face's inset in its cell, the theme's: the finger's x is the cell's
-                    onPopupAction(PopupAction.ShowKeyboardAction(k.ref, popup, bounds, ((k.keyWidth - bounds.width()) / 2).coerceAtLeast(0)))
+                    onPopupAction(PopupAction.ShowKeyboardAction(k.ref, popup, bounds))
                     // do not consume this LongClick gesture
                     false
                 }

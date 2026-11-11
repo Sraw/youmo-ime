@@ -9,49 +9,49 @@ faces: [1=，。？！/1;, 2=ABC/2, 3=DEF/3, backspace=/null, 4=GHI/4, 5=JKL/5, 
 2 pressed: [ABC]
 2 tap: [sendKey(sym=16840948, states=536870912, code=0, up=false)] field ，，…
 2 down: [] field ，，…
-2 long press: [", @, !, A, B, C, 2, a, b, c]
+2 long press: [", @, !, c, a, B, 2, A, C, b]
 2 long press: [] field ，，…2
 3 said: DEF, 3
 3 pressed: [DEF]
 3 tap: [sendKey(sym=16840949, states=536870912, code=0, up=false)] field ，，…2
 3 down: [sendKey(sym=16840949, states=536870912, code=0, up=false)] field ，，…2
-3 long press: [-, +, D, E, F, d, e, f, 3]
+3 long press: [+, -, f, e, d, E, 3, D, F]
 3 long press: [] field ，，…23
 4 said: GHI, 4
 4 pressed: [GHI]
 4 tap: [sendKey(sym=16840950, states=536870912, code=0, up=false)] field ，，…23
 4 down: [sendKey(sym=16840950, states=536870912, code=0, up=false)] field ，，…23
-4 long press: [=, /, 4, G, H, I, g, h, i]
+4 long press: [=, /, g, H, 4, G, I, h, i]
 4 long press: [] field ，，…234
 5 said: JKL, 5
 5 pressed: [JKL]
 5 tap: [sendKey(sym=16840951, states=536870912, code=0, up=false)] field ，，…234
 5 down: [sendKey(sym=16840951, states=536870912, code=0, up=false)] field ，，…234
-5 long press: [), #, (, J, K, L, 5, j, k, l]
+5 long press: [), #, (, l, j, K, 5, J, L, k]
 5 long press: [] field ，，…2345
 6 said: MNO, 6
 6 pressed: [MNO]
 6 tap: [sendKey(sym=16840952, states=536870912, code=0, up=false)] field ，，…2345
 6 down: [sendKey(sym=16840952, states=536870912, code=0, up=false)] field ，，…2345
-6 long press: [~, \, M, N, O, m, n, o, 6]
+6 long press: [\, ~, o, n, m, N, 6, M, O]
 6 long press: [] field ，，…23456
 7 said: PQRS, 7
 7 pressed: [PQRS]
 7 tap: [sendKey(sym=16840953, states=536870912, code=0, up=false)] field ，，…23456
 7 down: [sendKey(sym=16840953, states=536870912, code=0, up=false)] field ，，…23456
-7 long press: [*, 7, P, Q, R, S, p, q, r, s]
+7 long press: [*, S, Q, 7, P, R, p, q, r, s]
 7 long press: [] field ，，…234567
 8 said: TUV, 8
 8 pressed: [TUV]
 8 tap: [sendKey(sym=16840954, states=536870912, code=0, up=false)] field ，，…234567
 8 down: [] field ，，…234567，，…
-8 long press: [?, T, U, V, 8, t, u, v]
+8 long press: [?, v, t, U, 8, T, V, u]
 8 long press: [] field ，，…234567，，…8
 9 said: WXYZ, 9
 9 pressed: [WXYZ]
 9 tap: [sendKey(sym=16840955, states=536870912, code=0, up=false)] field ，，…234567，，…8
 9 down: [] field 
-9 long press: [', :, W, X, Y, Z, w, x, y, z, 9]
+9 long press: [:, ', z, y, x, w, Z, X, 9, W, Y]
 9 long press: [] field 9
 0 tap: [sendKey(key=0, states=536870912, code=11, up=false)] field 9
 reset tap: [sendKey(sym=65307, states=536870912, code=0, up=false)] field 9

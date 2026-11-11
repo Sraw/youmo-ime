@@ -131,8 +131,8 @@ class T9UatTest {
     fun aLongPressedLetterGoesInAsItIs() {
         val h = harness().start()
         val five = h.nineKey("5")
-        // its letters and digit in a row, the finger starting on the digit
-        assertEquals(listOf("J", "K", "L", "5", "j", "k", "l"), h.popupOf(five).takeLast(7))
+        // its letters and digit in a row round the digit, as listed: right, left, right ... (060-edge-popup)
+        assertEquals(listOf("l", "j", "K", "5", "J", "L", "k"), h.popupOf(five).takeLast(7))
         h.longPressTo(five, "L")
         assertEquals("L", h.field.text.toString())
         assertEquals(emptyList<String>(), h.sent())
@@ -267,7 +267,7 @@ class T9UatTest {
         val two = h.nineKey("2")
         val popup = h.popupOf(two)
         // the symbols a row above the letters and digit
-        assertEquals(listOf("A", "B", "C", "2", "a", "b", "c"), popup.takeLast(7))
+        assertEquals(listOf("c", "a", "B", "2", "A", "C", "b"), popup.takeLast(7))
         assertTrue(popup.toString(), "@" in popup.dropLast(7) && "!" in popup.dropLast(7))
         // let go out of it: nothing
         assertEquals("", h.field.text.toString())
@@ -433,17 +433,18 @@ class T9UatTest {
             g.up(to)
         }
         slide(h.nineKey("5"), 25f)
-        assertEquals("5j", h.field.text.toString())
+        // round the digit as listed (060-edge-popup): J right of it, l at the row's left end
+        assertEquals("5J", h.field.text.toString())
         slide(h.nineKey("5"), -400f)
-        assertEquals("5jJ", h.field.text.toString())
+        assertEquals("5Jl", h.field.text.toString())
         // from 3 dp above its bottom edge, 10 dp down: just off the key, nothing
         val k = h.nineKey("5")
         val dp = h.service.resources.displayMetrics.density
         slide(k, 0f, 10f, KeyboardHarness.Touch(k.width / 2f, k.height - 3 * dp))
-        assertEquals("5jJ", h.field.text.toString())
-        // 9 at the screen's right: last in its row (060-edge-popup), z a little left of it
+        assertEquals("5Jl", h.field.text.toString())
+        // 9 by the screen's right (060-edge-popup): the row round it as the full keyboard's, X a little left
         slide(h.nineKey("9"), -25f)
-        assertEquals("5jJz", h.field.text.toString())
+        assertEquals("5JlX", h.field.text.toString())
         // the full keyboard's cells are as small
         h.close()
         val q = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen()).start()

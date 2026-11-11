@@ -242,10 +242,10 @@ def py89b(d):
     k = d.keys(refresh=True)
     p = d.dpx()
     width = int(d.sh("wm size").split()[-1].split("x")[0])
-    left = edge_hold(d, k["l"], -30 * p, "长按最右的 L：角标在最右，L l 往左")
+    left = edge_hold(d, k["l"], -30 * p, "长按最右的 L：l L 0，角标在最右")
     edge = edge_hold(d, k["l"], width - 1 - k["l"][0])
     as_ = edge_hold(d, k["as"], 30 * p, None)
-    check(left == "l", f"L 往左一挪打出 {left!r}")
+    check(left == "L", f"L 往左一挪打出 {left!r}")
     check(edge and edge.lower() != "l", f"L 往右到屏幕边打出 {edge!r}（应是角标）")
     check(as_ == "A", f"AS 往右一挪打出 {as_!r}")
     return f"L←{left} L→边{edge} AS→{as_}"

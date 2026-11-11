@@ -56,7 +56,6 @@ class PopupKeyboardUiTest {
     private fun popup(
         keys: Array<String>, trigger: Rect, outerBounds: Rect = outer, minKeyWidth: Int = keyWidth, split: Int = keys.size,
         asIs: Boolean = false, inRow: Int = -1, onFocusMoved: (View) -> Unit = {}, onDismiss: () -> Unit = {},
-        faceInset: Int = 0,
     ): PopupKeyboardUi {
         return PopupKeyboardUi(
             ctx = RuntimeEnvironment.getApplication(),
@@ -74,7 +73,6 @@ class PopupKeyboardUiTest {
             inRow = inRow,
             onFocusMoved = onFocusMoved,
             scenes = PopupScenes(View(context), TestThemes.PixelDark),
-            faceInset = faceInset,
         )
     }
 
@@ -140,17 +138,17 @@ class PopupKeyboardUiTest {
     }
 
     @Test
-    fun aRowInOrderIsDrawnSoTheKeyGivenUnderTheFinger() {
-        // 九键's 2: A B C 2 a b c in one row, the digit under the finger, its symbols above round it
+    fun aKeysOwnIsUnderTheFingerAndTheRestRoundItAsListed() {
+        // 九键's 2 (A B C 2 a b c, its own the 2) mid-screen: as the full keyboard lays its keys, 2 under
+        // the finger, the rest right, left, right ... as listed: c a B 2 A C b (用户 2026-11-10)
         val keys = arrayOf("A", "B", "C", "2", "a", "b", "c", "@", "!", "\"")
         val trigger = Rect(480, 500, 520, 550)
         val ui = popup(keys, trigger, split = 7, inRow = 3)
         val drawn = drawn(ui)
-        assertEquals((0 until 7).map { 0 to it }, keys.take(7).map { drawn[it] })
+        assertEquals(listOf("c", "a", "B", "2", "A", "C", "b"), (0 until 7).map { c -> drawn.entries.first { it.value == (0 to c) }.key })
         assertEquals(KeyAction.HostKeyAction("2"), ui.onTrigger())
         assertEquals(drawn["2"]!!.second, drawn["@"]!!.second)
         assertTrue(keys.drop(7).all { drawn[it]!!.first == 1 })
-        // the digit centred over the key, room enough either side
         assertEquals(trigger.left + (trigger.width() - ui.keyWidth) / 2, trigger.left + ui.focusedKeyLeft)
         // too many to fit across at full width: narrower, all in the one row still
         val narrow = popup(keys, trigger, outerBounds = Rect(0, 0, 7 * keyWidth / 2, 2000), split = 7, inRow = 3)
@@ -217,36 +215,27 @@ class PopupKeyboardUiTest {
     }
 
     @Test
-    fun aRowInOrderAtAnEdgeHasItsOwnKeyAtThatEnd() {
-        // 18 键's L (L - l under 5 symbols, the row shorter), 九键's 2 (longer than its symbols), 九键双拼's
-        // 5 and 9 (060-edge-popup): at an edge the key's own is at that end of the row, the rest in order
-        // inward, as the full keyboard's own key at an edge; mid-screen the row in order round it
+    fun atAnEdgeTheKeysOwnIsAtThatEndAndTheRestInward() {
+        // 18 键's L (L - l under 5 symbols), 九键's 2, 九键双拼's 5 and 9 (060-edge-popup): at an edge the
+        // key's own at that end, the rest inward as listed, as the full keyboard's own key at an edge
         val cases = listOf(
             arrayOf("L", "-", "l", "#0", "#1", "#2", "#3", "#4") to 1,
         ) + listOf(nine('2', false), nine('5', true), nine('9', true)).map { it.items to it.inRow }
         val right = Rect(960, 500, 1000, 550)
         val left = Rect(0, 500, 40, 550)
-        val centre = Rect(480, 500, 520, 550)
         for ((keys, inRow) in cases) {
             val split = 2 * inRow + 1
             val others = keys.take(split).filterIndexed { i, _ -> i != inRow }
-            for (trigger in listOf(right, left, centre)) {
+            for (trigger in listOf(right, left)) {
                 val ui = popup(keys, trigger, split = split, inRow = inRow)
                 val drawn = drawn(ui)
                 val what = "${keys[inRow]} at ${trigger.left}"
                 assertEquals(what, keys.size, drawn.size)
                 val row = drawn.filterValues { it.first == 0 }.entries.sortedBy { it.value.second }.map { it.key }
-                val expected = when (trigger) {
-                    right -> others + keys[inRow]
-                    left -> listOf(keys[inRow]) + others
-                    else -> keys.take(split)
-                }
-                assertEquals(what, expected, row)
-                // the key's own in focus at first, the first symbol above it
+                assertEquals(what, if (trigger == right) (others.reversed() + keys[inRow]) else (listOf(keys[inRow]) + others), row)
                 assertEquals(what, ui.focusColumn, drawn[keys[inRow]]!!.second)
                 assertEquals(what, KeyAction.HostKeyAction(keys[inRow]), ui.onTrigger())
                 assertEquals(what, ui.focusColumn, drawn[keys[split]]!!.second)
-                if (trigger == centre) assertEquals(what, trigger.left + (trigger.width() - ui.keyWidth) / 2, trigger.left + ui.focusedKeyLeft)
                 drawn.forEach { (label, cell) -> assertEquals(what, PopupKeyboardUi.keyAction(label), ui.select(cell.first, cell.second)) }
             }
         }
@@ -295,7 +284,7 @@ class PopupKeyboardUiTest {
     // edge, each key inward a step more, the edge itself still the digit
     private fun assertReachedInward(d: Char, shuangpin: Boolean, cell: Rect, toRight: Boolean, inset: Int, wide: Int) {
         val popup = nine(d, shuangpin)
-        val ui = { popup(popup.items, cell.face(inset), minKeyWidth = wide, split = popup.symbolsFrom, inRow = popup.inRow, faceInset = inset) }
+        val ui = { popup(popup.items, cell.face(inset), minKeyWidth = wide, split = popup.symbolsFrom, inRow = popup.inRow) }
         val what = "$d${if (shuangpin) " 双拼" else ""} at ${cell.left}, inset ${inset / density}"
         val inward = if (toRight) -1 else 1
         val step = ui().keyWidth * PopupFocus.STEP
@@ -311,8 +300,8 @@ class PopupKeyboardUiTest {
     }
 
     @Test
-    fun aPopupNotInOrderKeepsWholeStepsAtTheEdge() {
-        // the full keyboard's: no row in order, so no shorter steps by the edge (none given), the
+    fun aPopupKeepsWholeStepsAtTheEdge() {
+        // any popup (060-edge-popup: no shorter steps by the edge, none given), the
         // finger a key and a half from it, a key between; a step is a key
         val narrow = Rect(0, 0, 5 * keyWidth, 600)
         val cell = Rect(keyWidth, 500, 2 * keyWidth, 550)
@@ -333,8 +322,9 @@ class PopupKeyboardUiTest {
         val ui = { popup(popup.items, cell.face(), split = popup.symbolsFrom, inRow = popup.inRow) }
         // the next key past half a step and the slack (0.65 of a step), not before
         val next = (ui().keyWidth * PopupFocus.STEP * 0.65f).toInt() + 1
-        assertEquals(PopupKeyboardUi.keyAction(row[popup.inRow + 1]), ui().slideTo(cell, cell.centerX() + next))
-        assertEquals(PopupKeyboardUi.keyAction(row[popup.inRow - 1]), ui().slideTo(cell, cell.centerX() - next))
+        // 5's own first, then J right, K left (as listed, round it)
+        assertEquals(PopupKeyboardUi.keyAction(row[0]), ui().slideTo(cell, cell.centerX() + next))
+        assertEquals(PopupKeyboardUi.keyAction(row[1]), ui().slideTo(cell, cell.centerX() - next))
         assertEquals(PopupKeyboardUi.keyAction("5"), ui().slideTo(cell, cell.centerX() + next - 2))
         assertEquals(PopupKeyboardUi.keyAction("5"), ui().slideTo(cell, cell.centerX() - next + 2))
     }
@@ -501,20 +491,19 @@ class PopupKeyboardUiTest {
 
     @Test
     fun atAnEdgeTheDigitIsInFocusAndAStepPicksItsNeighbours() {
-        // 九键's 2 at the left: seven keys fit across only narrower, the row fills the screen with its
-        // digit first (060-edge-popup); the finger steps right from it, a key a step
+        // 九键's 2 at the left: seven keys fit across only narrower, the row fills the screen, B 2 A C a b c
+        // as the full keyboard's column order has it (060-edge-popup); a key a step either way
         val keys = arrayOf("A", "B", "C", "2", "a", "b", "c")
         val ui = popup(keys, Rect(0, 500, 40, 550), outerBounds = Rect(0, 0, 7 * keyWidth / 2, 2000), split = 7, inRow = 3)
         val step = ui.keyWidth * PopupFocus.STEP
         assertFalse(ui.changeFocus(25f, 20f))
         assertEquals(KeyAction.HostKeyAction("2"), ui.onTrigger())
-        // left to the screen's edge: nothing there, still 2
         ui.changeFocus(0f, 20f)
-        assertEquals(KeyAction.HostKeyAction("2"), ui.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("B"), ui.onTrigger())
         ui.changeFocus(25f + step + 2, 20f)
         assertEquals(KeyAction.HostKeyAction("A"), ui.onTrigger())
         ui.changeFocus(25f + 5 * step + 2, 20f)
-        assertEquals(KeyAction.HostKeyAction("b"), ui.onTrigger())
+        assertEquals(KeyAction.HostKeyAction("c"), ui.onTrigger())
     }
 
     @Test
