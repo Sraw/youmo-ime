@@ -216,7 +216,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 746 条（P0 130、P1 566、P2 50）：模拟器上跑 88 条（其中 45 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 658 条（JVM 586、发版时 23、真机或手工 36、语音 13）。
+现在共 750 条（P0 130、P1 570、P2 50）：模拟器上跑 90 条（其中 47 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 660 条（JVM 588、发版时 23、真机或手工 36、语音 13）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 
