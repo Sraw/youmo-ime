@@ -151,7 +151,7 @@ class VoiceHomophones internal constructor(
         suspend fun replace(text: String, lexicon: Lexicon): String {
             val spans = homophones.candidates(text)
             if (spans.isEmpty()) return text
-            val ask = spans.filter { it.key !in answered && pair(it) !in putIn }.distinctBy { it.key }
+            val ask = spans.filter { it.key !in answered }.distinctBy { it.key }
             if (ask.isNotEmpty() && !silent) {
                 val said = lexicon.allowed(ask)
                 if (said == null) silent = true else ask.forEachIndexed { i, span -> answered[span.key] = said.getOrElse(i) { false } }
@@ -160,8 +160,9 @@ class VoiceHomophones internal constructor(
             var until = 0
             for (span in spans) {
                 val from = span.at + span.start
-                // the engine's answer for this stretch where it is, never overturned; one put in this
-                // hold elsewhere only for a stretch it has not answered (the raw text's other runs)
+                // the engine's answer for this stretch where it is, asked of every place while it answers,
+                // never overturned; one put in this hold elsewhere only for a place it never answered
+                // (silent since), so what was typed does not turn back
                 val yes = answered[span.key] ?: (pair(span) in putIn)
                 if (from < until || !yes) continue
                 answered[span.key] = true

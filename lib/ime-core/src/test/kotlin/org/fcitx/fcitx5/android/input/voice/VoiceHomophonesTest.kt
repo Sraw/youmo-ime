@@ -168,6 +168,15 @@ class VoiceHomophonesTest {
     }
 
     @Test
+    fun `a new place of a stretch put in is asked, not put in unasked`() {
+        val hold = homophones(added("何芮"), added("徐婧")).hold()
+        assertEquals("何芮来了，", replaced(hold, "和瑞来了，"))
+        assertEquals("何芮来了，和瑞典", replaced(hold, "和瑞来了，和瑞典"))
+        assertEquals("找徐婧，", replaced(hold, "找徐静，"))
+        assertEquals("找徐婧，徐静雨来了", replaced(hold, "找徐静，徐静雨来了"))
+    }
+
+    @Test
     fun `several in one segment, overlapping ones the first, next to digits and letters`() {
         val h = homophones(added("徐婧"), added("何芮"), added("婧攻"))
         assertEquals("徐婧和何芮", replaced(h, "徐静和和瑞"))
