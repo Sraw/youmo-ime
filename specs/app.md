@@ -1355,9 +1355,12 @@ Skins of other input methods (`ThemeFilesManager.openSkin`, picked by `ThemeFile
 `.ssf`, `.flex`, `.yaml`/`.yml`, `.zip`): read whole into memory by `SkinZip.readSkin` (a lone YAML as itself, 1 MB at
 most; a ZIP holding one `.flex` and no `extension.json` as that `.flex`; a `.zip` that is no skin refused with
 `exception_theme_filename`, as a theme exported under the old name most likely is) and unpacked there by `SkinZip` (ime-core; central directory, else a local-header
-scan; `SkinLimits`: 64 MB file, 5000 entries, 32 MB an entry and 128 MB in all as they inflate, ratio 200 past 1 MB,
-no encrypted entries, a name with `..`, a leading `/` or a drive refused), converted by keyboard-scene's
-`SkinConverter` (`AndroidSkinCodec` decodes and writes PNG; an image past 12 M pixels not decoded), then its
+scan; `SkinLimits`: 16 MB file, 5000 entries, 16 MB an entry and 32 MB in all as they inflate, a zipped `.flex`'s
+counted with the ZIP's own, ratio 200 past 1 MB, no encrypted entries, a name with `..`, a leading `/` or a drive
+refused), converted by keyboard-scene's `SkinConverter` (`AndroidSkinCodec` decodes and writes PNG; an image past
+12 M pixels not decoded; `SkinFiles` keeps decoded images up to 12 M pixels in all, then lets them go; a keyboard
+picture shrunk before the bar is put on it, so a board is never past 4096 a side; an `OutOfMemoryError` or
+`StackOverflowError` all the same a refusal, as a backstop), then its
 `theme.xml` and files written under the converter's own names into the same `theme-import/<uuid>` and checked and
 offered by the same `pack()` as a pack's; `Opened.Pack.notes` (`SkinNote`) are listed in the confirmation as not
 carried over. `SkinError.Reason` maps to `exception_skin_*`. The theme keeps the skin's name and author (no suffix:
