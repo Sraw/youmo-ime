@@ -21,7 +21,7 @@ SETS = f'{HOME}/workspace/voice-eval/sets'
 CLIPS = f'{HOME}/workspace/youmo-ime/dev/uat-out/voice-clips'
 EN = os.environ.get('VOICE_QUIET_EN', f'{CLIPS}/en-short')
 MODELS = f'{HOME}/workspace/models/youmo-voice-060'
-TAIL = SR * 292 // 100
+TAIL = SR * 242 // 100
 LOUD, RISE, RANK, SKIP, FLOOR, SHORT = -50.0, 8.0, 3, 3, 10, 12
 
 

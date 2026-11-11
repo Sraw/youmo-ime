@@ -34,7 +34,7 @@ VADM = os.environ.get('VOICE_VAD', f'{HOME}/workspace/youmo-ime/.gradle/engine-d
 CLIPS = f'{HOME}/workspace/youmo-ime/dev/uat-out/voice-clips'
 EN = os.environ.get('VOICE_QUIET_EN', os.path.join(CLIPS, 'en-short'))
 SR, W = 16000, 512
-TAIL = SR * 292 // 100
+TAIL = SR * 242 // 100
 LOUD, RISE, SHORT = -50.0, 8.0, 12
 RULES = ['base', 'r1', 'a', 'b2', 'h2', 'h3', 'h4']
 # the app's hotwords (the pack's 78 thousand, score 1.5) and bpe vocabulary: they change what the room is heard as

@@ -60,7 +60,7 @@ open class SimpleThemeListAdapter(themes: List<Theme>, dark: Boolean = false) :
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         (holder.ui as ThemeThumbnailUi).apply {
             val theme = cards.shown[position]
-            setTheme(theme)
+            setTheme(theme, cards.shown)
             setChecked(checkedAt(position))
             setVersion(theme.takeIf { cards.other(it) != null }?.isDark) {
                 holder.bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION }?.let(::switchVersion)

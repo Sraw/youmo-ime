@@ -74,6 +74,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
         lightIndex += prependOffset(lightIndex)
         darkIndex += prependOffset(darkIndex)
         notifyItemInserted(OFFSET)
+        renumber(it)
     }
 
     // removedIndex is an entry's, index a position: those after it move up, its own is gone
@@ -94,11 +95,18 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
 
     private fun removeAt(index: Int) {
         if (index < 0) return
-        entries.removeAt(index)
+        val removed = entries.removeAt(index)
         notifyItemRemoved(index + OFFSET)
+        renumber(removed)
         activeIndex = indexAfterRemoval(index, activeIndex)
         lightIndex = indexAfterRemoval(index, lightIndex)
         darkIndex = indexAfterRemoval(index, darkIndex)
+    }
+
+    // [changed] a 我的主题 added or gone: the others' numbers (ThemeNames.shown) shown anew
+    private fun renumber(changed: Theme) {
+        if (!ThemeNames.numbered(changed)) return
+        entries.forEachIndexed { i, t -> if (t !== changed && ThemeNames.numbered(t)) notifyItemChanged(i + OFFSET) }
     }
 
     // the replaced entry goes first, and those it passes move down one
@@ -148,7 +156,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
             ADD_THEME -> holder.ui.root.setOnClickListener { onAddNewTheme() }
             THEME -> (holder.ui as ThemeThumbnailUi).apply {
                 val theme = entryAt(position)!!
-                setTheme(theme)
+                setTheme(theme, entries)
                 setChecked(stateAt(position))
                 setVersion(theme.takeIf { cards.other(it) != null }?.isDark) { switchVersion(holder.bindingAdapterPosition) }
                 if (cards.other(theme) == null) setOnly(theme.isDark)
