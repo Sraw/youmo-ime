@@ -657,8 +657,8 @@ zy9/5	zhuyin-nine	default	ㄎ ㄑ ㄟ |	-	-	-
 zy9/5	zhuyin-nine	zh	ㄎ ㄑ ㄟ |	-	-	-
 zy9/6	zhuyin-nine	default	ㄔ ㄘ ㄣ ㄧ |	-	-	-
 zy9/6	zhuyin-nine	zh	ㄔ ㄘ ㄣ ㄧ |	-	-	-
-zy9/question	zhuyin-nine	default	| ¿ ‽	¿	s:¿	-
-zy9/question	zhuyin-nine	zh	| ¿ ‽	¿	s:¿	-
+zy9/question	zhuyin-nine	default	| ¿ ‽	-	-	-
+zy9/question	zhuyin-nine	zh	| ¿ ‽	-	-	-
 zy9/tone-3	zhuyin-nine	default	-	-	-	-
 zy9/tone-3	zhuyin-nine	zh	-	-	-	-
 zy9/7	zhuyin-nine	default	ㄇ ㄋ ㄜ |	-	-	-
@@ -667,8 +667,8 @@ zy9/8	zhuyin-nine	default	ㄏ ㄒ ㄠ ㄡ |	-	-	-
 zy9/8	zhuyin-nine	zh	ㄏ ㄒ ㄠ ㄡ |	-	-	-
 zy9/9	zhuyin-nine	default	ㄕ ㄙ ㄤ ㄨ |	-	-	-
 zy9/9	zhuyin-nine	zh	ㄕ ㄙ ㄤ ㄨ |	-	-	-
-zy9/exclam	zhuyin-nine	default	| ¡	¡	s:¡	-
-zy9/exclam	zhuyin-nine	zh	| ¡	¡	s:¡	-
+zy9/exclam	zhuyin-nine	default	| ¡	-	-	-
+zy9/exclam	zhuyin-nine	zh	| ¡	-	-	-
 zy9/tone-4	zhuyin-nine	default	-	-	-	-
 zy9/tone-4	zhuyin-nine	zh	-	-	-	-
 zy9/10	zhuyin-nine	default	ㄈ ㄌ ㄝ |	-	-	-

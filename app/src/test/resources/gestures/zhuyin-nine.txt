@@ -3,7 +3,7 @@ lang long press: [] field hello world, again|18,18
 r1c1 said: ˉ
 r1c1 pressed: [ˉ]
 r1c1 tap: [sendKey(sym=17761372, states=536870912, code=0, up=false)] field hello world, again|18,18
-r1c1 swiping: [ˉ]
+r1c1 swiping: [˙]
 r1c1 up: [sendKey(sym=17761376, states=536870912, code=0, up=false)] field hello world, again|18,18
 r1c1 down: [sendKey(sym=17761372, states=536870912, code=0, up=false)] field hello world, again|18,18
 r1c1 left: [] field hello world, again|18,18
@@ -101,7 +101,7 @@ r2c5 said: ?
 r2c5 pressed: [?]
 r2c5 tap: [sendKey(key=?, states=536870912, code=0, up=false)] field hello wo|8,8
 r2c5 swiping: [?]
-r2c5 up: [sendKey(key=¿, states=536870912, code=0, up=false)] field hello wo|8,8
+r2c5 up: [sendKey(key=?, states=536870912, code=0, up=false)] field hello wo|8,8
 r2c5 down: [sendKey(key=?, states=536870912, code=0, up=false)] field hello wo|8,8
 r2c5 left: [] field hello wo|8,8
 r2c5 right: [] field hello wo|8,8
@@ -156,7 +156,7 @@ r3c5 said: !
 r3c5 pressed: [!]
 r3c5 tap: [sendKey(key=!, states=536870912, code=0, up=false)] field hello wo|8,8
 r3c5 swiping: [!]
-r3c5 up: [sendKey(key=¡, states=536870912, code=0, up=false)] field hello wo|8,8
+r3c5 up: [sendKey(key=!, states=536870912, code=0, up=false)] field hello wo|8,8
 r3c5 down: [sendKey(key=!, states=536870912, code=0, up=false)] field hello wo|8,8
 r3c5 left: [] field hello wo|8,8
 r3c5 right: [] field hello wo|8,8
@@ -200,8 +200,8 @@ r4c4 said: ,
 r4c4 pressed: []
 r4c4 tap: [sendKey(sym=44, states=536870912, code=0, up=false)] field hello wo|8,8
 r4c4 swiping: []
-r4c4 up: [] field hello wo|8,8
-r4c4 down: [] field hello wo|8,8
+r4c4 up: [sendKey(sym=44, states=536870912, code=0, up=false)] field hello wo|8,8
+r4c4 down: [sendKey(sym=44, states=536870912, code=0, up=false)] field hello wo|8,8
 r4c4 left: [] field hello wo|8,8
 r4c4 right: [] field hello wo|8,8
 r4c4 nudged: [sendKey(sym=44, states=536870912, code=0, up=false)] field hello wo|8,8
@@ -222,8 +222,8 @@ comma said: ,
 comma pressed: [,]
 comma tap: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo|8,8
 comma swiping: [,]
-comma up: [] field hello wo|8,8
-comma down: [] field hello wo|8,8
+comma up: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo|8,8
+comma down: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo|8,8
 comma left: [] field hello wo|8,8
 comma right: [] field hello wo|8,8
 comma nudged: [sendKey(key=,, states=536870912, code=51, up=false)] field hello wo|8,8
@@ -244,8 +244,8 @@ period said: .
 period pressed: [.]
 period tap: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8
 period swiping: [.]
-period up: [] field hello wo|8,8
-period down: [] field hello wo|8,8
+period up: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8
+period down: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8
 period left: [] field hello wo|8,8
 period right: [] field hello wo|8,8
 period nudged: [sendKey(key=., states=536870912, code=52, up=false)] field hello wo|8,8

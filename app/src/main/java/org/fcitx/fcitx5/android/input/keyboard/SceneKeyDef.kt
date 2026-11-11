@@ -123,7 +123,10 @@ class SceneKeyDef(
         private fun popupsOf(b: SceneBehavior, node: KeyNode, table: Table, act: (SceneAction?) -> KeyAction?): List<Popup> = buildList {
             b.bubble?.let {
                 val content = bubbleOf(b, node, table)!!
-                add(it.corner?.let { c -> Popup.AltPreview(content, c) } ?: Popup.Preview(content))
+                // a named key's swipe shows what the resolver swipes it to ([KeySwipes.preview] asks swipeText), whatever
+                // corner its layout wrote (060-keys-unify M6): the layout's corner only for a key of no name
+                val corner = it.corner ?: "".takeIf { node.shortcut != null }
+                add(corner?.let { c -> Popup.AltPreview(content, c) } ?: Popup.Preview(content))
             }
             when (val p = b.popup) {
                 is SceneBehavior.LongPopup.Preset -> add(Popup.Keyboard.Preset(p.label, p.transformPunctuation))

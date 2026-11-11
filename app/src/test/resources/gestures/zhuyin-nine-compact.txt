@@ -3,7 +3,7 @@ lang long press: [] field hello world, again|18,18
 r1c1 said: ˉ
 r1c1 pressed: [ˉ]
 r1c1 tap: [sendKey(sym=17761372, states=536870912, code=0, up=false)] field hello world, again|18,18
-r1c1 swiping: [ˉ]
+r1c1 swiping: [˙]
 r1c1 up: [sendKey(sym=17761376, states=536870912, code=0, up=false)] field hello world, again|18,18
 r1c1 down: [] field hello world, again|18,18
 r1c1 left: [] field hello world, again|18,18
@@ -101,7 +101,7 @@ r2c5 said: ?
 r2c5 pressed: [?]
 r2c5 tap: [sendKey(key=?, states=536870912, code=0, up=false)] field |0,0
 r2c5 swiping: [?]
-r2c5 up: [sendKey(key=¿, states=536870912, code=0, up=false)] field |0,0
+r2c5 up: [sendKey(key=?, states=536870912, code=0, up=false)] field |0,0
 r2c5 down: [] field |0,0
 r2c5 left: [] field |0,0
 r2c5 right: [] field |0,0
@@ -156,7 +156,7 @@ r3c5 said: !
 r3c5 pressed: [!]
 r3c5 tap: [sendKey(key=!, states=536870912, code=0, up=false)] field |0,0
 r3c5 swiping: [!]
-r3c5 up: [sendKey(key=¡, states=536870912, code=0, up=false)] field |0,0
+r3c5 up: [sendKey(key=!, states=536870912, code=0, up=false)] field |0,0
 r3c5 down: [] field |0,0
 r3c5 left: [] field |0,0
 r3c5 right: [] field |0,0
@@ -200,7 +200,7 @@ r4c4 said: ,
 r4c4 pressed: []
 r4c4 tap: [sendKey(sym=44, states=536870912, code=0, up=false)] field |0,0
 r4c4 swiping: []
-r4c4 up: [] field |0,0
+r4c4 up: [sendKey(sym=44, states=536870912, code=0, up=false)] field |0,0
 r4c4 down: [] field |0,0
 r4c4 left: [] field |0,0
 r4c4 right: [] field |0,0
@@ -222,7 +222,7 @@ comma said: ,
 comma pressed: [,]
 comma tap: [sendKey(key=,, states=536870912, code=51, up=false)] field |0,0
 comma swiping: [,]
-comma up: [] field |0,0
+comma up: [sendKey(key=,, states=536870912, code=51, up=false)] field |0,0
 comma down: [] field |0,0
 comma left: [] field |0,0
 comma right: [] field |0,0
@@ -244,7 +244,7 @@ period said: .
 period pressed: [.]
 period tap: [sendKey(key=., states=536870912, code=52, up=false)] field |0,0
 period swiping: [.]
-period up: [] field |0,0
+period up: [sendKey(key=., states=536870912, code=52, up=false)] field |0,0
 period down: [] field |0,0
 period left: [] field |0,0
 period right: [] field |0,0

@@ -95,6 +95,15 @@ class KeyDefaultsTest {
         assertNull(g.first)
     }
 
+    // 注音九键's ? and ! (function keys, no `<popup>`): their character's list, ¿ ‽ and ¡, but no first drawn or swiped to
+    @Test
+    fun aFunctionKeysCharacterListHasNoFirst() {
+        val q = KeyDefaults.of(KeyId("zy9/question"), KeyboardVariant(Form.ZhuyinNine), NodeFacts(text = "?", typing = true, function = true))!!
+        assertEquals(listOf("¿", "‽"), texts(q))
+        assertNull(q.first)
+        assertEquals("¿", KeyDefaults.of(KeyId("zy9/question"), KeyboardVariant(Form.ZhuyinNine), NodeFacts(text = "?", typing = true))!!.first?.text)
+    }
+
     @Test
     fun noneAndKeysThatDoNotTypeHaveNone() {
         assertNull(KeyDefaults.of(KeyId("zyfull/1"), KeyboardVariant(Form.ZhuyinFull), NodeFacts(text = "ㄅ", typing = true, popup = Popup("none", null, emptyList(), emptyMap()))))

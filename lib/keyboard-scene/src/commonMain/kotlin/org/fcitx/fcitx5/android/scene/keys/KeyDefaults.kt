@@ -10,7 +10,8 @@ import org.fcitx.fcitx5.android.scene.layout.Popup
  * What a layout's key tells its default long press (060-keys-unify): its tap's character ([text]) and [label],
  * whether it types ([typing]: a letter's kind with a label, a mark's role), its `<popup>`, a group's
  * [letters], the first a theme's layout wrote ([themeFirst]: its `swipe-up=`, else a literal `alt=`),
- * and a group key's [place] among the layout's groups (the built-in corners go by it).
+ * a group key's [place] among the layout's groups (the built-in corners go by it), and whether it is a
+ * [function] key's kind (no first of its character's: 注音九键's ? !).
  */
 data class NodeFacts(
     val text: String? = null,
@@ -21,6 +22,7 @@ data class NodeFacts(
     val letters: String? = null,
     val themeFirst: String? = null,
     val place: Int = -1,
+    val function: Boolean = false,
 )
 
 /**
@@ -89,13 +91,20 @@ object KeyDefaults {
         val letters = node.letters?.let { if (variant.form == KeyboardVariant.Form.Grouped18 && !variant.semicolon) it.replace(";", "") else it }
         if (letters != null && (p == null || p.from == "group")) return grouped(letters, node.themeFirst ?: corner(variant.form, node.place))
         return when (p?.from) {
-            null -> if (node.typing) node.text?.let { preset(it, caps) } else null
+            null -> typed(node, caps)
             "nine" -> id?.key?.singleOrNull()?.let { nine(it, variant) }
             "group" -> zhuyinGroup(node.label ?: node.text.orEmpty())
             "list" -> listed(p)
             "preset" -> (p.preset ?: node.text)?.let { preset(it, caps) }
             else -> null
         }
+    }
+
+    // no popup: a typing key's character's list; a function key's (注音九键's ? !) without a `<popup>` of its own has no
+    // first (060-keys-unify §3.2)
+    private fun typed(node: NodeFacts, caps: Boolean): DefaultList? {
+        val list = node.text?.takeIf { node.typing }?.let { preset(it, caps) } ?: return null
+        return if (node.function) DefaultList(list.row, list.symbols, null) else list
     }
 
     /** A function key's: ， and 。's lists, any other none (its long press an action, [FUNCTION_ACTIONS]). */

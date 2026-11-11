@@ -246,7 +246,7 @@ class PanelKeysUatTest {
     }
 
     @Test
-    @Uat("KB-79")
+    @Uat("KB-81")
     @Config(qualifiers = "w320dp-h568dp-port-xhdpi")
     fun aLayerOf32OnTheNarrowestOneHanded() {
         prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
@@ -254,7 +254,7 @@ class PanelKeysUatTest {
     }
 
     @Test
-    @Uat("KB-79")
+    @Uat("KB-81")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun aLayerOf32Landscape() {
         aLayerOf32()
