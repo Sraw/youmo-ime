@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.input.keys.KeyState
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.annotation.Keep
@@ -249,6 +248,7 @@ class ZhuyinKeyboard(
     private fun mapped(p: String) = punctuationMapping.getOrDefault(p, p)
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
+        super.onPunctuationUpdate(mapping)
         punctuationMapping = mapping
         canvas?.invalidateScene()
     }
@@ -314,8 +314,6 @@ class ZhuyinKeyboard(
     private var imeName = ""
 
     override val keysIm: String get() = imeName
-
-    override fun keyState(): KeyState = super.keyState().copy(punctuation = punctuationMapping)
 
     // no glide, no strokes: 键盘手写 alone, written over the symbol keys as the grouped keyboards' are. Their places
     // are where a stroke may start (with none, GlideInput's down finds no key and nothing is written); the char is unread

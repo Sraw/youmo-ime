@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.input.keys.KeyResolver
 import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import android.annotation.SuppressLint
 import android.content.Context
@@ -195,7 +197,6 @@ class TextKeyboard(
     // a table's roots in a letter's long press where the keys show them all (rootsOf), its letter in its corner where they show any
     override fun keyState(): KeysState = super.keyState().copy(
         caps = capsState != CapsState.None,
-        punctuation = punctuationMapping,
         roots = table?.takeIf { it.labels == KeyLabels.ROOTS }?.let { t -> rootsBy(t) },
         letterCorners = table?.labelled == true,
     )
@@ -228,6 +229,8 @@ class TextKeyboard(
     // what the keys show now, as the scene engine's environment: the screen's and the settings' as every
     // keyboard's (SceneEnvs), this one's state, Shift, texts and marks its own
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
+        // first: the layout the corners' resolver reads (alts)
+        val marks = keyMarks(layout)
         val state = TextBoardState(
             semicolonScheme = semicolonKey(imeName, EngineState.shuangpinScheme),
             table = imeName in InputMethodCatalog.TABLES,
@@ -257,7 +260,6 @@ class TextKeyboard(
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
-        val marks = keyMarks(layout)
         return SceneEnvs.of(
             this, look, theme.isDark, width, height,
             input = state.input(),
@@ -271,13 +273,7 @@ class TextKeyboard(
     // the letters' corners as last worked out, and what they were worked out from (cornerOf's inputs):
     // the canvas asks for a scene on every change the views show (a key typed), and these change only as
     // a setting or Shift does; the same map kept, the env compared with the last is equal at once
-    private data class AltsFor(
-        val shown: Boolean,
-        val labelled: Boolean,
-        val punctuation: Map<String, String>,
-        val overrides: PopupOverrides,
-        val caps: CapsState,
-    )
+    private data class AltsFor(val shown: Boolean, val resolver: KeyResolver?, val state: KeysState)
 
     private var altsMade: Pair<AltsFor, Map<String, String>>? = null
 
@@ -285,9 +281,14 @@ class TextKeyboard(
     // is not said (TalkBack) or given (its node's extras, the harness)
     private fun alts(): Map<String, String> {
         val shown = firstShown()
-        val now = AltsFor(shown, table?.labelled == true, punctuationMapping, PopupOverridesCache.user.current, capsState)
+        val now = AltsFor(shown, keyResolver(), keyState())
         altsMade?.takeIf { it.first == now }?.let { return it.second }
-        val made = if (shown) SceneLetters.alts { c -> letterDefs[c]?.let(::cornerOf) } else emptyMap()
+        // each letter's first as the resolver has it (060-keys-unify §3.4), a labelled table's letter itself
+        val made = if (shown && now.resolver != null) {
+            SceneLetters.alts { c -> if (now.state.letterCorners) c.toString() else now.resolver.resolve(KeyId("full/$c"), now.state).firstShown }
+        } else {
+            emptyMap()
+        }
         return made.also { altsMade = now to it }
     }
 
@@ -462,6 +463,7 @@ class TextKeyboard(
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
+        super.onPunctuationUpdate(mapping)
         punctuationMapping = mapping
         canvas?.invalidateScene()
     }
@@ -518,7 +520,7 @@ class TextKeyboard(
                             )
                         else action
                     }
-                    is KeyDef.Popup.Keyboard.Explicit -> action
+                    else -> action
                 }
             }
             else -> action

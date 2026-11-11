@@ -209,8 +209,9 @@ class SceneBoard(
          * are now (the user's lists, the swipes' slots): one resolver kept for each of the last few asked, so
          * keyboards switched between make none again.
          */
-        fun resolver(layout: SceneLayout, im: String): KeyResolver {
-            val of = ResolverFor(layout, KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme), KeyListsNow.current, SwipeSlotsCache.current)
+        fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null): KeyResolver {
+            val variant = KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters)
+            val of = ResolverFor(layout, variant, KeyListsNow.current, SwipeSlotsCache.current)
             return resolvers.getOrPut(of) {
                 KeyResolver(of.variant, of.lists, of.slots, DefaultMarks.nodes(layout.layout, layout.fragments))
             }.also { if (resolvers.size > KEPT_RESOLVERS) resolvers.remove(resolvers.keys.first()) }
@@ -220,8 +221,8 @@ class SceneBoard(
          * The marks' settings of [layout]'s keys for [im] in [state] (060-keys-unify §1.3: each key's first and
          * slots as the resolver has them), a character key's shortcut drawn where [charShortcuts].
          */
-        fun marks(layout: SceneLayout, charShortcuts: Boolean, im: String, state: KeyState): MarkSettings {
-            val marks = resolver(layout, im).marks(state)
+        fun marks(layout: SceneLayout, charShortcuts: Boolean, im: String, state: KeyState, nineLetters: Map<Char, String>? = null): MarkSettings {
+            val marks = resolver(layout, im, nineLetters).marks(state)
             return if (marks.charShortcuts == charShortcuts) marks else marks.copy(charShortcuts = charShortcuts)
         }
 

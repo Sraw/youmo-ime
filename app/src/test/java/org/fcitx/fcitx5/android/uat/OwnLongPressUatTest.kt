@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
+import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
@@ -62,22 +65,27 @@ class OwnLongPressUatTest {
         return KeyboardHarness(TestThemes.PixelLight, im, keyboards = chosen).start().also { made = it; it.relayout() }
     }
 
-    // each key named for a long press by name: its own as the editor starts it, against what holding it pops up
-    // (the order aside: the popup's is its places'); a corner the popup has not (九键's 1) is the editor's first only
+    // each key named for a long press by name: its list as the editor starts it (the keyboard's resolver, 060-keys-unify
+    // S5), against what holding it pops up (the order aside: the popup's is its places'); its corner the editor's first
     private fun checkEveryKey(h: KeyboardHarness) {
         val keys = h.keys().filterIsInstance<SceneShownKey>().filter { k -> k.node.shortcut?.let(KeyShortcutPages::longPressByName) == true && k.node.copy == 0 }
         assertTrue("no key named for a long press", keys.isNotEmpty())
+        val resolver = checkNotNull(h.board().keyResolver())
         for (k in keys) {
             val node = k.node
-            val own = OwnLongPress.of(SceneBehavior.of(node).popup, node)
+            val edit = resolver.edit(KeyId.of(node.shortcut!!))
             val shown = h.longPress(k)
             h.idle()
             val corner = GroupedKeyboard.cornerOf(node)
-            if (corner.isNotEmpty() && own.isNotEmpty()) assertEquals(node.shortcut, corner, own.first())
-            val popupOwn = if (own.isNotEmpty() && own.first() !in shown) own.drop(1) else own
-            assertEquals(node.shortcut, shown.sorted(), popupOwn.sorted())
+            if (corner.isNotEmpty() && edit.row.isNotEmpty()) assertEquals(node.shortcut, corner, edit.first)
+            assertEquals(node.shortcut, shown.sorted(), (edit.row + edit.symbols).sorted())
         }
     }
+
+    // the keyboard the harness shows now
+    private fun KeyboardHarness.board(): BaseKeyboard =
+        generateSequence(listOf(keyboard)) { views -> views.flatMap { v -> (v as? ViewGroup)?.let { g -> (0 until g.childCount).map(g::getChildAt) }.orEmpty() }.ifEmpty { null } }
+            .flatten().filterIsInstance<BaseKeyboard>().first { it.isShown }
 
     @Test
     @Uat("ST-100")

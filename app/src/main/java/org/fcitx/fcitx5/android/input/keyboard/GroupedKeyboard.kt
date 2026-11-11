@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.input.keys.KeyState
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.annotation.Keep
@@ -400,6 +399,7 @@ class GroupedKeyboard private constructor(
     // the corners as the full keyboard's and the comma and full stop as typed: ， and 。 in Chinese
     // (the address keys commit as they are, and say so)
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
+        super.onPunctuationUpdate(mapping)
         punctuationMapping = mapping
         canvas?.invalidateScene()
     }
@@ -446,8 +446,6 @@ class GroupedKeyboard private constructor(
     private var imeName = ""
 
     override val keysIm: String get() = imeName
-
-    override fun keyState(): KeyState = super.keyState().copy(punctuation = punctuationMapping)
 
     // 拼音键字母大小写 (made anew when it changes): the groups' faces and bubbles in capitals but where it says otherwise
     private val letterCase by AppPrefs.getInstance().keyboard.letterCase

@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Rect
@@ -390,9 +389,8 @@ class HandwritingKeyboard(
     // shows what they type ({punct:,}: 显示和输出一致, 060-render-p2 §5.3 S5b)
     private var punctuationMapping: Map<String, String> = emptyMap()
 
-    override fun keyState(): KeysState = super.keyState().copy(punctuation = punctuationMapping)
-
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
+        super.onPunctuationUpdate(mapping)
         punctuationMapping = mapping
         canvas?.invalidateScene()
     }

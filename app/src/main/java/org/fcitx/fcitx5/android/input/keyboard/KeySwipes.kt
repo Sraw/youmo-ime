@@ -93,7 +93,7 @@ internal class KeySwipes(
         val hasFirst = when (keyboard.swipeText(def)) {
             BaseKeyboard.SwipeChoice.BuiltIn -> builtIn
             BaseKeyboard.SwipeChoice.None -> false
-            is BaseKeyboard.SwipeChoice.Text -> true
+            is BaseKeyboard.SwipeChoice.Text, is BaseKeyboard.SwipeChoice.Output -> true
         }
         val slots = SwipeSlotsCache.current
         if (name == null) return KeySwipe.Key.unnamed(slots.orientation, hasFirst)
@@ -244,6 +244,7 @@ internal class KeySwipes(
                 // the long press's first: the key's own swipe, or the first of a long press the user set
                 when (val choice = keyboard.swipeText(def)) {
                     is BaseKeyboard.SwipeChoice.Text -> keyboard.onAction(PopupKeyboardUi.keyAction(choice.text), KeyActionListener.Source.Popup)
+                    is BaseKeyboard.SwipeChoice.Output -> choice.output.toKeyAction()?.let { keyboard.onAction(it, KeyActionListener.Source.Popup) }
                     else -> builtIn?.let { choice.typed(it) }?.let { (action, source) -> keyboard.onAction(action, source) }
                 }
                 // consumed when it types nothing too, or a swipe that stayed on the key would type it as a tap

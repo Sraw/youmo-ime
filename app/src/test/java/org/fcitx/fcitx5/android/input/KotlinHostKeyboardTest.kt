@@ -76,6 +76,7 @@ class KotlinHostKeyboardTest {
         keyboard.shuangpinKeyboard.let { it.setValue(it.defaultValue) }
         keyboard.t9Symbols.let { it.setValue(it.defaultValue) }
         AppPrefs.getInstance().internal.popupOverrides.let { it.setValue(it.defaultValue) }
+        AppPrefs.getInstance().internal.keyPopups.let { it.setValue(it.defaultValue) }
     }
 
     // the host answers on its thread, the bar is drawn on the main one: run both till [done]
@@ -116,7 +117,8 @@ class KotlinHostKeyboardTest {
     @Uat("ST-22")
     fun aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText() {
         keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14)
-        AppPrefs.getInstance().internal.popupOverrides.setValue("q ⒜")
+        // set on QW itself: q's own no longer reaches it (060-keys-unify L3)
+        AppPrefs.getInstance().internal.keyPopups.setValue("g14/qw ⒜")
         start(InputMethodCatalog.PINYIN)
         h.longPress(h.key("QW"), "⒜")
         typedAsText("⒜")

@@ -3,11 +3,11 @@ backspace tap: [sendKey(sym=65288, states=536870912, code=0, up=false)] field
 backspace long press: []
 backspace long press sent: repeats [sendKey(sym=65288, states=536870912, code=0, up=false)] field 
 comma tap: [sendKey(key=,, states=536870912, code=51, up=false)] field 
-comma long press: [”, “, …, 、, ；, ：, ！, ？]
-comma long press sent: [sendKey(key=？, states=536870912, code=0, up=false)] field 
+comma long press: [~, ), (, ', ", ;, :, !, ?, .]
+comma long press sent: [sendKey(key=., states=536870912, code=52, up=false)] field 
 period tap: [sendKey(key=., states=536870912, code=52, up=false)] field 
-period long press: []
-period long press sent: [sendKey(key=., states=536870912, code=52, up=false)] field 
+period long press: [&, ^, $, %, _, ;, :, !, ?, ,]
+period long press sent: [sendKey(key=,, states=536870912, code=51, up=false)] field 
 reading tap: [] field 
 symbols tap: [] field 
 numbers tap: [] field 

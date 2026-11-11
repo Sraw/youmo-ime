@@ -222,10 +222,10 @@ class SettingsPagesUatTest {
                 assertTrue(five.toString(), "#" in five)
                 val one = h.longPressed('1')
                 assertTrue(one.toString(), "，" in one && "。" in one && "…" !in one)
-                // nine keys English's 1: its own marks, half width, not the pinyin's
+                // nine keys English's 1: once changed, one list for every input method (060-keys-unify M3, KB-75)
                 h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
                 val english = h.longPressed('1')
-                assertTrue(english.toString(), english.containsAll(listOf(":", ";", "(", ")", "@")) && "，" !in english && "：" !in english)
+                assertTrue(english.toString(), "，" in english && "。" in english && ":" !in english)
             }
         } finally {
             symbols.setValue(symbols.defaultValue)

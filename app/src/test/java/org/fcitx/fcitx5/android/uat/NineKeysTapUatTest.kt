@@ -211,9 +211,9 @@ class NineKeysTapUatTest {
         assertEquals("0", h.sent().last())
         typing()
         h.longPressTo(h.nineKey("4"), "4")
-        // what is typed ended first (reset: the engine puts it in), then the digit as it is
-        assertTrue(h.api.calls.toString(), "reset()" in h.api.calls)
-        assertEquals("4", h.text)
+        // the keypad's 4 (060-keys-unify L7, D7): the engine picks the fourth word with it, nothing ended first
+        assertTrue(h.api.calls.toString(), "reset()" !in h.api.calls)
+        assertEquals(FcitxKeyMapping.FcitxKey_KP_4.toString(), h.sent().last())
     }
 
     private companion object {

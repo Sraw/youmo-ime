@@ -94,6 +94,8 @@ object OwnLongPress {
         is KeyDef.Popup.Keyboard.Explicit -> popup.items.toList().let { items ->
             if (popup.inRow < 0) items else listOf(items[popup.inRow]) + items.filterIndexed { i, _ -> i != popup.inRow }
         }
+        // the resolver's, which the keyboards make as they open (S6 drops this file)
+        is KeyDef.Popup.Keyboard.Resolved, is KeyDef.Popup.Keyboard.Named -> emptyList()
     }
 
     /**

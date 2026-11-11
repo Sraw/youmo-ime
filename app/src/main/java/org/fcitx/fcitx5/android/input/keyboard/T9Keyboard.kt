@@ -820,6 +820,9 @@ class T9Keyboard(
 
     override val keysIm: String get() = imeName
 
+    // a getter, not a lazy: the scene may ask before this keyboard's fields past it are made
+    override val keysNineLetters: Map<Char, String> get() = ('2'..'9').associateWith { lettersOn(it, letters, english, shuangpin).lowercase() }
+
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         imeName = ime.uniqueName
         showInputMethodName(ime)

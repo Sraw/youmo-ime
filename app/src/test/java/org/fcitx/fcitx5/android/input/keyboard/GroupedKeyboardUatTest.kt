@@ -163,9 +163,10 @@ class GroupedKeyboardUatTest {
         keys14().start()
         // q and w long-press to their digit and capital alone on the full keyboard: nothing above. At
         // the screen's left the corner is first, the rest in order inward (060-edge-popup)
+        h.api.calls.clear()
         assertEquals(listOf("1", "Q", "W", "q", "w"), h.longPress(group("QW")))
-        // let go where it opened: the finger was on the corner
-        assertEquals("1", h.field.text.toString())
+        // let go where it opened: the finger was on the corner, the keypad's 1 (060-keys-unify L7, D7)
+        assertTrue(sent().toString(), keypad(1) in sent().single())
         h.field.setText("")
         val asRow = h.longPress(group("AS"))
         assertEquals(listOf("6", "A", "S", "a", "s"), asRow.takeLast(5))
@@ -224,7 +225,10 @@ class GroupedKeyboardUatTest {
             f.up(KeyboardHarness.Touch(x + dx, y))
             return h.field.text.toString()
         }
-        assertTrue(h.field.text.toString(), slide(null).endsWith("1"))
+        h.api.calls.clear()
+        slide(null)
+        // the corner: the keypad's 1 (060-keys-unify L7), with which the engine picks the first candidate
+        assertTrue(sent().toString(), keypad(1) in sent().single())
         assertTrue(h.field.text.toString(), slide(1).endsWith("Q"))
         assertTrue(h.field.text.toString(), slide(4).endsWith("w"))
     }

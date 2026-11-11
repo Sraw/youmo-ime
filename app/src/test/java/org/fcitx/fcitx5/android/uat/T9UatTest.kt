@@ -199,17 +199,16 @@ class T9UatTest {
         typing(true, "ni")
         h.api.calls.clear()
         h.longPressTo(h.nineKey("2"), "2")
-        // what was typed ended first (the engine puts its first candidate in on reset), then the digit as it is
-        assertEquals(listOf("reset()"), h.api.calls.filter { it == "reset()" || it.startsWith("sendKey") || it.startsWith("select") })
-        // after the candidate the engine put in on reset (NineKeysHostUatTest.resetPutsTheFirstCandidateIn)
-        assertEquals("2", h.field.text.toString())
+        // the keypad's 2 (060-keys-unify L7, D7): with it the engine picks the second candidate, nothing ended first
+        assertEquals(listOf(FcitxKeyMapping.FcitxKey_KP_2), h.keypad())
+        assertEquals("", h.field.text.toString())
         // 1 swiped up while typing: the keypad's 1, with which the engine picks the first
         // candidate, no 1 (NineKeysHostUatTest.theNumberPadsDigitsAreTypedOrPick)
         typing(true, "xi")
         h.api.calls.clear()
         h.swipedUp(h.nineKey("1"))
         assertEquals(listOf(FcitxKeyMapping.FcitxKey_KP_1), h.keypad())
-        assertEquals("2", h.field.text.toString())
+        assertEquals("", h.field.text.toString())
     }
 
     // past the key's swipe threshold (36 dp) straight down, as a finger swipes
@@ -421,8 +420,10 @@ class T9UatTest {
         // far narrower than the nine keys' key
         assertTrue("cell $cell key ${five.width}", cell * 2 < five.width)
         h.captureBoard("T9UatTest/popup_5")
+        h.api.calls.clear()
         f.up(h.at(five))
-        assertEquals("5", h.field.text.toString())
+        // the keypad's 5 (L7): the engine types it, nothing being typed
+        assertEquals(listOf(FcitxKeyMapping.FcitxKey_KP_5), h.keypad())
         // a finger moved: about half a finger right, then far left
         fun slide(key: ShownKey, dx: Float, dy: Float = 0f, from: KeyboardHarness.Touch = h.at(key)) {
             val g = h.finger(key, from)
@@ -434,17 +435,17 @@ class T9UatTest {
         }
         slide(h.nineKey("5"), 25f)
         // round the digit as listed (060-edge-popup): J right of it, l at the row's left end
-        assertEquals("5J", h.field.text.toString())
+        assertEquals("J", h.field.text.toString())
         slide(h.nineKey("5"), -400f)
-        assertEquals("5Jl", h.field.text.toString())
+        assertEquals("Jl", h.field.text.toString())
         // from 3 dp above its bottom edge, 10 dp down: just off the key, nothing
         val k = h.nineKey("5")
         val dp = h.service.resources.displayMetrics.density
         slide(k, 0f, 10f, KeyboardHarness.Touch(k.width / 2f, k.height - 3 * dp))
-        assertEquals("5Jl", h.field.text.toString())
+        assertEquals("Jl", h.field.text.toString())
         // 9 by the screen's right (060-edge-popup): the row round it as the full keyboard's, X a little left
         slide(h.nineKey("9"), -25f)
-        assertEquals("5JlX", h.field.text.toString())
+        assertEquals("JlX", h.field.text.toString())
         // the full keyboard's cells are as small
         h.close()
         val q = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen()).start()

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import org.fcitx.fcitx5.android.input.keys.KeyOutput
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.SystemClock
@@ -341,6 +342,7 @@ class PopupComponent :
         val split: Int
         var asIs = false
         var inRow = -1
+        var outputs: List<KeyOutput>? = null
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
                 val preset = PopupOverridesCache.user.current.longPressOf(keyboard.label) ?: return
@@ -357,6 +359,15 @@ class PopupComponent :
                 keys = keyboard.items
                 labels = explicitLabels(keyboard) { if (punctuation.enabled) punctuation.transform(it) else it }
             }
+            is KeyDef.Popup.Keyboard.Resolved -> {
+                labels = keyboard.labels.toTypedArray()
+                keys = labels
+                split = keyboard.split
+                inRow = keyboard.inRow
+                outputs = keyboard.outputs
+            }
+            // made as it opens (BaseKeyboard.onPopupAction): none here is no list now
+            is KeyDef.Popup.Keyboard.Named -> return
         }
         // the keys float over the key on their own: the bubble under the one in focus, as one shape
         // with it, was as wide as the key pressed, and so were they
@@ -376,6 +387,7 @@ class PopupComponent :
             split,
             asIs,
             inRow,
+            outputs,
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
             scenes = scenes,
         )

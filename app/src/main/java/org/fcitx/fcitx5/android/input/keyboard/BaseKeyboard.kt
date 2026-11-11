@@ -4,6 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.input.keys.KeyResolver
+import org.fcitx.fcitx5.android.input.keys.KeyPopup
+import org.fcitx.fcitx5.android.input.keys.KeyOutput
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.input.keys.KeyState
 import android.content.Context
@@ -12,6 +16,7 @@ import android.view.MotionEvent
 import android.view.accessibility.AccessibilityManager
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
+import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -285,7 +290,7 @@ abstract class BaseKeyboard(
         override val inPasswordField get() = this@BaseKeyboard.inPasswordField
         override val charShortcutMarks get() = this@BaseKeyboard.charShortcutMarks
         override val punctuationSwipesTap get() = this@BaseKeyboard.punctuationSwipesTap
-        override fun swipeText(def: KeyDef) = this@BaseKeyboard.swipeText(def)
+        override fun swipeText(def: KeyDef) = resolvedSwipe(def) ?: this@BaseKeyboard.swipeText(def)
         override fun onAction(action: KeyAction, source: KeyActionListener.Source) = this@BaseKeyboard.onAction(action, source)
         override fun onPopupAction(action: PopupAction) = this@BaseKeyboard.onPopupAction(action)
         override fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float) = this@BaseKeyboard.onPopupChangeFocus(key, x, y)
@@ -323,11 +328,15 @@ abstract class BaseKeyboard(
         /** The first of the long press, typed as the long press types it. */
         data class Text(val text: String) : SwipeChoice
 
+        /** A named key's first, the resolver's: typed as the item says, [shown] in the preview. */
+        data class Output(val output: KeyOutput, val shown: String) : SwipeChoice
+
         /** What the swipe's Up types, and from where: null for [None]. */
         fun typed(builtIn: KeyAction): Pair<KeyAction, KeyActionListener.Source>? = when (this) {
             BuiltIn -> builtIn to KeyActionListener.Source.Keyboard
             None -> null
             is Text -> PopupKeyboardUi.keyAction(text) to KeyActionListener.Source.Popup
+            is Output -> output.toKeyAction()?.let { it to KeyActionListener.Source.Popup }
         }
 
         /** What the preview shows once the finger has swiped: nothing for [None], as nothing is typed. */
@@ -335,6 +344,7 @@ abstract class BaseKeyboard(
             BuiltIn -> alternative
             None -> ""
             is Text -> text
+            is Output -> shown
         }
 
         companion object {
@@ -389,15 +399,58 @@ abstract class BaseKeyboard(
         val longPopup = LongPopup()
         swipes.attach(key, def, longPopup)
         def.popup?.forEach { wirePopup(key, def, it, longPopup) }
-        // a long press set by name on a key that had none ([onPopupAction] shows it, as it does one in place of the key's)
-        val name = def.shortcut?.takeIf { shortcuts && KeyShortcutPages.longPressByName(it) }
+        // a named key's long press is the resolver's ([onPopupAction] makes it as it opens, 060-keys-unify): one
+        // with no long press of its own gets one where the resolver has a list for it now
+        val name = def.shortcut?.takeIf { shortcuts }
         if (name != null) {
             namesById[key.ref.id] = name
-            val user = userLongPress(name)
-            if (user != null && user.isNotEmpty() && def.popup.orEmpty().none { it is KeyDef.Popup.Keyboard }) {
-                wirePopup(key, def, KeyDef.Popup.Keyboard.Explicit(user), longPopup)
+            if (takesLongPress(def) && keyResolver()?.resolve(KeyId.of(name), keyState())?.popup != null) {
+                wirePopup(key, def, KeyDef.Popup.Keyboard.Named(name), longPopup)
             }
         }
+    }
+
+    // nothing of the key's own on its long press: no popup, no long press's action, no repeat (⌫)
+    private fun takesLongPress(def: KeyDef): Boolean =
+        def.popup.orEmpty().none { it is KeyDef.Popup.Keyboard || it is KeyDef.Popup.Menu } &&
+            def.behaviors.none { it is KeyDef.Behavior.LongPress || it is KeyDef.Behavior.Repeat }
+
+    /** The resolver of the layout the keys are drawn from now, for [keysIm]; null before a scene's made. */
+    @VisibleForTesting
+    internal fun keyResolver(): KeyResolver? = (keysLayout ?: sceneBoard?.layout)?.let { SceneBoard.resolver(it, keysIm, keysNineLetters) }
+
+    /** The nine keys' letters as this keyboard has them (a user's own): null for the language's. */
+    protected open val keysNineLetters: Map<Char, String>? get() = null
+
+    // the layout the scene was last made of ([keyMarks]): a theme's own where it has one
+    private var keysLayout: SceneLayout? = null
+
+    /**
+     * What swiping a named key to its first types, the resolver's (060-keys-unify §3.2): none where it has no
+     * first; null for a key with no name, or a function key with no first (its own swipe, as the layout has it).
+     */
+    private fun resolvedSwipe(def: KeyDef): SwipeChoice? {
+        val name = def.shortcut?.takeIf { shortcuts } ?: return null
+        val id = KeyId.of(name)
+        val r = keyResolver()?.resolve(id, keyState()) ?: return null
+        val first = r.first ?: return if (id.isFunction) null else SwipeChoice.None
+        val output = KeyOutput.of(first) ?: return SwipeChoice.None
+        return SwipeChoice.Output(output, r.firstShown ?: first.text)
+    }
+
+    /** [popup], the resolver's, as the popup shows it: its items typed as each says; null for none (roots are a keyboard's own). */
+    private fun resolvedPopup(popup: KeyPopup?): KeyDef.Popup.Keyboard.Resolved? {
+        val items = (popup as? KeyPopup.Items) ?: return null
+        val kept = items.items.indices.mapNotNull { i -> KeyOutput.of(items.items[i])?.let { Triple(i, it, items.labels[i]) } }
+        if (kept.isEmpty()) return null
+        val row = kept.count { it.first < items.inRow }
+        val focus = kept.indexOfFirst { it.first == items.focus }
+        return KeyDef.Popup.Keyboard.Resolved(
+            kept.map { it.second },
+            kept.map { it.third },
+            split = if (row == 0) kept.size else row,
+            inRow = if (row > 0 && focus in 0 until row) focus else -1,
+        )
     }
 
     // the space's sideways swipe moves the cursor, as the setting says ([spaceSwipesCursor])
@@ -753,14 +806,14 @@ abstract class BaseKeyboard(
 
     @CallSuper
     protected open fun onPopupAction(action: PopupAction) {
-        // last, after a keyboard's own (a group's long press made as it opens): the long press set by the key's name
+        // last, after a keyboard's own (a table's roots): a named key's long press is the resolver's as things are now,
+        // none where it has no list (turned off, or none built in)
         if (action is PopupAction.ShowKeyboardAction) {
-            val user = namesById[action.key.id]?.takeIf { KeyShortcuts.formOf(it) != KeyShortcutPreset.FULL }?.let(::userLongPress)
-            if (user != null) {
-                // turned off: no long press at all
-                if (user.isEmpty()) return
-                // in the shape of the key's own (its row, as it is where that is): the user's list looks as the original
-                popupActionListener?.onPopupAction(action.copy(keyboard = OwnLongPress.shaped(user, action.keyboard)))
+            val name = namesById[action.key.id]
+            val resolver = name?.let { keyResolver() }
+            if (name != null && resolver != null) {
+                val popup = resolvedPopup(resolver.resolve(KeyId.of(name), keyState()).popup) ?: return
+                popupActionListener?.onPopupAction(action.copy(keyboard = popup))
                 return
             }
         }
@@ -850,10 +903,13 @@ abstract class BaseKeyboard(
     protected open val keysIm: String get() = ""
 
     /** What the keys' lists depend on now (060-keys-unify §1.2): the swipe settings; Shift and punctuation a keyboard's own. */
-    protected open fun keyState(): KeyState = KeyState(ways = swipeWays(), spots = swipeSpots())
+    protected open fun keyState(): KeyState = KeyState(punctuation = keysPunctuation, ways = swipeWays(), spots = swipeSpots())
 
     /** The marks of [layout]'s keys as the resolver has them now. */
-    protected fun keyMarks(layout: SceneLayout): MarkSettings = SceneBoard.marks(layout, charShortcutMarks, keysIm, keyState())
+    protected fun keyMarks(layout: SceneLayout): MarkSettings {
+        keysLayout = layout
+        return SceneBoard.marks(layout, charShortcutMarks, keysIm, keyState(), keysNineLetters)
+    }
 
     /** The keys' swipe marks drawn again, as what [charShortcutMarks] or the corners read changed. */
     protected fun showSwipeMarks() {
@@ -864,8 +920,12 @@ abstract class BaseKeyboard(
         // do nothing by default
     }
 
+    // what the punctuation keys type now: a long press's items shown as typed (keyState)
+    private var keysPunctuation: Map<String, String> = emptyMap()
+
+    @CallSuper
     open fun onPunctuationUpdate(mapping: Map<String, String>) {
-        // do nothing by default
+        keysPunctuation = mapping
     }
 
     open fun onInputMethodUpdate(ime: InputMethodEntry) {

@@ -427,9 +427,10 @@ class HandwritingSceneGesturesTest {
     @Test
     fun aPickFromTheCommasLongPressTypesIt() = harness().use { h ->
         val choices = h.longPress(h.keyNamed("comma"))
-        assertTrue("$choices", "？" in choices)
+        // the comma's one list (060-keys-unify D1, L5), shown as the engine maps it: none here
+        assertTrue("$choices", "?" in choices)
         h.api.calls.clear()
-        h.longPress(h.keyNamed("comma"), pick = "？")
+        h.longPress(h.keyNamed("comma"), pick = "?")
         h.idle()
         val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
         // a choice of the popup reaches the engine, not the comma tapped. Which one: the popup's focus follows the
