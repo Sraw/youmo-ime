@@ -197,12 +197,33 @@ A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `N
 an appearance (text, image, width, variant) and behaviours (`Press`, `LongPress`, `Repeat`,
 `Swipe`, `DoubleTap`), each a `KeyAction` (`HostKeyAction`, `SymAction`, `CommitAction`,
 `LayoutSwitchAction`, `QuickPhraseAction`, `UnicodeAction`, `LangSwitchAction`,
-`SpaceLongPressAction` …). `CommonKeyActionListener` performs them. A key's long-press
-characters come from `PopupPreset` (built in) overridden by the user's `PopupOverrides` (the full
-keyboard's, by label, `popup_overrides`), the other keyboards' from the keyboard (`GroupedKeyboard`'s
-made as they open …) overridden by name (`key_popups`, `PopupOverridesCache.byName`: `BaseKeyboard`
-swaps a `ShowKeyboardAction`'s list for the user's, and wires one on a key that had none; the function keys' comma and period too, every keyboard's at once, `KeyShortcutPages.FUNCTION_POPUPS`; the settings' editor starts a key with none set from `OwnLongPress`, its board's node as the key cap drew it, resolved as the keyboards resolve it for the first of pinyin, 双拼, English whose keyboard the tab is, the key's corner first, and stores nothing while the list is that, an empty list where every one is deleted (off); a list set by name opens in the own's shape, `OwnLongPress.shaped`: its row with the first in the middle, as-is where the own is); the first
-of them (长按首选) is the small label in its corner. Every key has two slots, up and down
+`SpaceLongPressAction` …). `CommonKeyActionListener` performs them. A key's long press is one model for every keyboard (060-keys-unify, `dev/design/060-keys-unify-v2.md`). Every
+editable key has a `KeyId` (`full/q`, `t9/5`, `g18/we`, `zy9/3`, `zyfull//`, `num/0`, `fn/comma`; `KeyId.of`, called once
+by `LayoutReader` filling `KeyNode.shortcut`, is the only place a bare `comma` becomes `fn/comma`). The defaults live in
+keyboard-scene `keys/` (commonMain, so the theme maker's page draws the same marks: `DefaultMarks` when the env
+gives none): `KeyDefaults.of(id, KeyboardVariant, NodeFacts)` gives a `DefaultList` of a row (made per variant, never
+stored: the nine keys' and grouped keys' letters and digits, `;`) and a symbols layer, each an `Item` with a `Commit`
+(`AsKey` through the keyboard's own resolve as `Source.Popup`, `AsIs`, `Keypad(n)` the number pad's meaning, `Action`
+from a layout's `<item send=…>`), and a first; `FunctionKeyDefaults` the one comma and period list and the
+action long presses (符 quick phrase, 123 Unicode, 🌐 the picker, ⇧ caps lock, space), the same on every keyboard and panel;
+`SlotDefaults` the default slots. A theme layout's `swipe-up`/`alt` is that theme's default first (`NodeFacts.themeFirst`);
+the grouped keys read only the built-in symbols, never the full keyboard's user lists. The user's layer is ime-core
+`input/keys/`: `KeyLists` parses and writes `key_lists` (`@1` then `keyid\toff` or `keyid\tset\t<*|!|:item>\t…`, at most
+32 items of 16 code points, `KeyShortcuts.escape`d, bad lines skipped, a line equal to the default in every variant of
+the key dropped); it holds only symbols and the first, so a nine key's symbols are shared by pinyin, 双拼 and English
+while its row follows the input method. `KeyResolver(variant, lists, slots, layout).resolve(id, KeyState)` gives the
+popup, the first (what the up/down `TypeFirst`, the focus, the corner, the bubble's corner and TalkBack all read), the
+slots and marks, cached per variant and `KeyLists.version`, the state (Shift, a table's roots, the punctuation map,
+password, ways, places) mapped on top; an item's commit is the default item's of the same text, else the key's default
+symbols' (the nine key 1's are `AsIs`). `KeyOutput.of(item)` → `KeyOutputs.toKeyAction()` (app) is the one commit path
+for `PopupKeyboardUi` and `KeySwipes`. `KeyListsCache` (app) reads `key_lists`; `AppPrefs.dropRetired`'s
+`migrateKeyLists` (`KeyListsMigration`, pure) makes it once from 0.5/beta's `popup_overrides`, `key_popups` and
+`t9_symbols` when it has no `@1` head, leaving the old keys for a downgrade (into `RETIRED` at 0.7); `key_lists` is a
+plain `string` (not `hidden`, or a backup's import would reset it and the old keys come back) and is copied to device
+encrypted storage, where before the first unlock the cache migrates the old keys in memory. The settings' editor
+(按键字符和快捷键, every tab one slot page, the 九键 tab replacing 0.5's 按键长按) draws the current theme's layouts,
+starts a key from the resolver, shows the row greyed (it can only be made the first) and saves through
+`KeyLists.with`. The symbol picker's cells keep a built-in long press (`PickerLongPress`), outside the model. Every key has two slots, up and down
 (060-swipe-slots; `SwipeSlots` in ime-core, `KeyDef.shortcut` naming the key, `fn/<name>` a function
 key; stored in `key_swipes` as `@1\t<first-up|first-down>` then a line a slot over `SwipeSlotPreset`'s),
 each the long press's first, a command, a text or nothing; 上滑 and 下滑 (`swipe_up`, `swipe_down`)

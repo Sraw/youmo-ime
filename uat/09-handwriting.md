@@ -191,3 +191,9 @@
 - **操作**：什么都没打时，在 n 上点一下、抬手前往右拖约 0.4 个键；清空。点 w，马上在 o 上点一下、抬手前往右下拖半个多键（右 0.35、下 0.4 个键，不出键、不到角标滑动）；清空。打 ni、点空格上屏，马上（半秒内）在 h 上同样往右下拖；清空。停 1 秒以上，在键上分别写「一」「十」「人」（每个字写完停笔约 1 秒，看候选，再清空）。
 - **预期**：带拖的 n 打出 n，没有笔迹；w 和 o 都打出（wo），w 没被收回；空格后马上拖的那一下打出 h，不出笔迹、不写字（停一下再这样拖就是写字的一笔）。停一下以后「一」「十」「人」都写得出：候选里有这个字。
 - **JVM**：`KeyHandwritingUatTest.aTapDraggedUnderHalfAKeyTypesItsLetter`、`KeyHandwritingUatTest.theSecondLetterDraggedFarFromTheFirstIsTypedNotTakingItBack`、`KeyHandwritingUatTest.noWritingStartsRightAfterAKeyTypedOnlyHalfASecondOn`、`KeyInkGestureTest.aTapDraggedUnderHalfAKeyIsTheKeysAndStartsNoWriting`、`KeyInkGestureTest.charactersFirstStrokesStartTheWriting`（一 十 口 中 的 人 的第一笔，按 em 2 键高写的长度）、`KeyInkGestureTest.noWritingStartsRightAfterAKeyTypedNorIsATapThenAFirstDot`、`KeyInkGestureTest.aKeyAfterTheWritingIsNoTypingTillALetterIsTyped`、`KeyInkGestureTest.onlyAStrokeNearTheTapTakesItBack`（ime-core）。
+
+### HW-39 [P0] 手写的 ，。 与其它键盘相同
+- **前提**：手写键盘，中文标点。
+- **操作**：长按 ，；长按 。；在 ， 上横着划一下。
+- **预期**：， 弹出 KB-73 的列表；。 弹出与全键盘 。 相同的列表（`, ? ! : ; _ % $ ^ &`，按中文标点显示）；横划进书写板写字，不打标点。
+- **JVM**：app `HandwritingSceneGesturesTest.commaPeriodAsEverywhere`。
