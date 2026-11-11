@@ -725,6 +725,23 @@ class PopupOverridesFragmentTest {
             assertEquals(UserList.Off, stored("t9/5"))
         }
 
+        // an off key's character added and deleted again: still off
+        @Test
+        fun anOffKeyAddedToAndBackStaysOff() {
+            open()
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER + "\nt9/5\toff")
+            click(R.string.shortcut_page_nine)
+            dialogOf("5").apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(R.string.add) }.performClick()
+                st.idle()
+                tapItem("①")
+                button(R.string.delete)
+                ok()
+            }
+            assertEquals(UserList.Off, stored("t9/5"))
+        }
+
         // review 8: a later version's key_lists is read-only here: said so, never written over
         @Test
         fun aNewerVersionsListsAreNeverWritten() {

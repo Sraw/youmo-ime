@@ -102,6 +102,24 @@ class PopupEditorTest {
         assertNull("a key on with none chosen keeps none", g.first)
     }
 
+    // an off key's added character deleted again: off as it started, no first; a first chosen keeps it on
+    @Test
+    fun anOffKeyAddedToAndBackIsOffAgain() {
+        val e = PopupEditor(listOf("J", "K", "5"), emptyList(), null, defaultFirst = "5", off = true)
+        e.add("x")
+        e.tap(3)
+        e.delete()
+        assertNull(e.first)
+        assertEquals(emptyList<String>(), e.symbols)
+        val f = PopupEditor(listOf("J", "K", "5"), emptyList(), null, defaultFirst = "5", off = true)
+        f.add("x")
+        f.tap(1)
+        f.makeFirst()
+        f.tap(3)
+        f.delete()
+        assertEquals("K", f.first)
+    }
+
     @Test
     fun addKeepsEachItemOnceAndNoneOfTheRow() {
         val e = editor()

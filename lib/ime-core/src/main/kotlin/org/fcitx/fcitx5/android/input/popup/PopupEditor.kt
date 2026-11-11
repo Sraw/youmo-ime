@@ -16,6 +16,11 @@ class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, 
 
     private val list = symbols.filter { it !in row }.distinct().toMutableList()
 
+    // an off key's symbols as it started, and whether its first was taken only for being edited on (not chosen):
+    // its list back to those, it is off again
+    private val startSymbols = list.toList()
+    private var firstForOn = false
+
     val items: List<String> get() = row + list
 
     /** The symbols as they are now: what is stored. */
@@ -42,6 +47,7 @@ class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, 
 
     fun makeFirst() {
         if (selected in items.indices) first = items[selected]
+        firstForOn = false
     }
 
     fun moveLeft() = move(selected - 1)
@@ -60,6 +66,11 @@ class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, 
         if (!canDelete) return
         val gone = list.removeAt(selected - row.size)
         if (gone == first) first = defaultFirst?.takeIf { it in items } ?: list.firstOrNull()
+        if (firstForOn && list == startSymbols) {
+            first = null
+            off = true
+            firstForOn = false
+        }
         selected = if (items.isEmpty()) -1 else minOf(selected, items.lastIndex)
     }
 
@@ -74,7 +85,10 @@ class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, 
         val added = list.size > before
         when {
             wasEmpty -> first = list.firstOrNull()
-            off && added && first == null -> first = defaultFirst?.takeIf { it in items } ?: list.firstOrNull()
+            off && added && first == null -> {
+                first = defaultFirst?.takeIf { it in items } ?: list.firstOrNull()
+                firstForOn = true
+            }
         }
         if (added) off = false
     }
