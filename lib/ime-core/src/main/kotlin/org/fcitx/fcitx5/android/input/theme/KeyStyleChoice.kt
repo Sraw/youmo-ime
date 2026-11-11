@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.engine.KeyStyleOver
 import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.look.Keys
@@ -51,6 +52,18 @@ data class KeyStyleChoice(val blocks: Boolean?, val hGap: Spacing?, val vGap: Sp
             bar = if (blocks == false && keys.blocks && look.bar == BarBase.Transparent) BarBase.Color else look.bar,
         )
     }
+
+    /**
+     * These over a 4.0 pack's keys, laid on each key after the pack's cascade (the engine's Env.keyStyle); null
+     * when all follow the pack, which then draws as its file says. 有边框 is the pack's own faces (it is not flat).
+     */
+    val overPack: KeyStyleOver?
+        get() = KeyStyleOver(
+            across = hGap?.let { KeyStyleOver.Level(it.portrait, it.landscape) },
+            upDown = vGap?.let { KeyStyleOver.Level(it.portrait, it.landscape) },
+            radiusDp = radiusDp?.toDouble(),
+            flat = blocks == false,
+        ).takeUnless { it.none }
 
     companion object {
         val FOLLOW = KeyStyleChoice(null, null, null, null)
