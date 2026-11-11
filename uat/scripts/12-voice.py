@@ -348,6 +348,22 @@ def vo14(d):
     return f"框里「{t}」"
 
 
+# also on the JVM (VoiceHomophonesTest); this one, the real recognizer's 徐静 made the user's 徐婧
+@case("VO-38", base="B0-设置", mutates=True, needs=EV)
+def vo38(d):
+    script("13-words").add_word(d, "徐婧")
+    d.open_page("text")
+    out = []
+    for clip, want, wrong in (("xujing", "徐婧", "徐静"), ("xujing3", "许静", "徐婧"), ("gongshi", "公式", "攻势")):
+        d.clear()
+        shown, t = dictate(d, clip)
+        check(want in t and wrong not in t, f"说「{clip}」，框里「{t}」，要有「{want}」、没有「{wrong}」")
+        if clip == "xujing":
+            check(not any("徐静" in s for s in shown if "徐婧" not in s and "一下徐" in s), f"说的时候显示过「徐静」：{shown}")
+        out.append(t)
+    return "框里 " + " / ".join(f"「{t}」" for t in out)
+
+
 case("VO-15", needs="jvm:SettingsPagesUatTest.theVoiceModelsDataIsCredited")(lambda d: None)
 
 
