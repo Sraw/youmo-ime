@@ -342,6 +342,8 @@ def face_seams(d, label):
     whatever the key's width (退格 is one and a half letters wide). The face's colour is the line's middle, so a
     pressed (darker) face is judged alike; the panel's is the gap between g and h. A pixel off the face-panel line
     (a letter, an icon) is not a seam"""
+    # at standard height only: the walk stops at a gap of 4 px or more, and 紧凑's ~1 dp vertical gap would read
+    # as a seam of the next key
     k = d.keys(refresh=True)
     missing = [n for n in (label, "h", "g", "t") if n not in k]
     check(not missing, f"量键面拼缝要的键不在屏幕上：{missing}")
