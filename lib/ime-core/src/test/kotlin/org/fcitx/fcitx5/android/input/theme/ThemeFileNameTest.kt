@@ -21,6 +21,15 @@ class ThemeFileNameTest {
     }
 
     @Test
+    fun skinsByTheirExtensions() {
+        for (name in listOf("a.bds", "B.BDI", "x y.ssf")) assertTrue(name, ThemeFileName.isSkinFile(name))
+        for (name in listOf("a.theme", "a.ssf.zip", ".ssf", "ssf", "", null)) assertFalse(name.toString(), ThemeFileName.isSkinFile(name))
+        assertEquals("海风", ThemeFileName.base("海风.bds"))
+        assertEquals("a.b", ThemeFileName.base("dir/a.b.ssf"))
+        assertEquals(".ssf", ThemeFileName.base(".ssf"))
+    }
+
+    @Test
     fun anExportIsOfferedAsATheme() {
         assertEquals("夜.theme", ThemeFileName.of("夜"))
     }
