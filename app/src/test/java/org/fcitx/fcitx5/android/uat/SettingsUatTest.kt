@@ -46,6 +46,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeListAdapter
 import org.fcitx.fcitx5.android.until
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -67,6 +68,14 @@ class SettingsUatTest {
     private val api = FakeHostApi()
     private val st = SettingsHarness(api)
     private val activity get() = st.activity
+
+    // the packs as a user's phone has them, as the goldens were drawn (the theme preview's space has the
+    // microphone with the voice pack only): PackStore is a singleton the JVM keeps, so the shelf the test
+    // before in this fork left was drawn: one without the voice pack (use(voice = false)) loses the microphone
+    @Before
+    fun packs() {
+        TestShelves.use()
+    }
 
     @After
     fun close() = st.close()
