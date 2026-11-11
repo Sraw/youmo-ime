@@ -73,6 +73,11 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     // where down the key it came down, 0 its top and 1 its bottom: its cell's height, as [downAt]'s width
     private var downDown = Float.NaN
 
+    // each finger's own [downAt] and [downDown] by its id: typed fast, a second finger comes down on the
+    // same key (14 键's UI for "ui") before the first lifts, and the first's lift is its own place, not the
+    // second's (060-fast-typing)
+    private val downs = HashMap<Int, Pair<Float, Float>>(2)
+
     /**
      * Where across the key the touch that clicks it came down ([downAt]), for the click listener
      * alone: set as the finger lifts, before the touch's state is reset, cleared once the click
@@ -179,6 +184,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     }
 
     fun cancelGestures() {
+        downs.clear()
         key.showPressed(false)
         stopTimers()
         // unlike a normal lift, a cancel also forgets a pending double tap (and resets the rest)
@@ -199,7 +205,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         recognizer.doubleTapTimeoutMs = longPressDelay.toLong()
         when (action) {
             MotionEvent.ACTION_DOWN -> down(x, y, pointerId)
-            MotionEvent.ACTION_UP -> up(x, y, eventTime)
+            MotionEvent.ACTION_UP -> up(x, y, pointerId, eventTime)
             MotionEvent.ACTION_MOVE -> return move(x, y)
             MotionEvent.ACTION_CANCEL -> {
                 clickAt = Float.NaN
@@ -217,6 +223,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         touchPointer = pointerId
         downAt = across(x)
         downDown = downward(y)
+        downs[pointerId] = downAt to downDown
         clickAt = Float.NaN
         clickDown = Float.NaN
         key.hotspot(x, y)
@@ -252,7 +259,8 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         recognizer.onDown(x, y)
     }
 
-    private fun up(x: Float, y: Float, eventTime: Long) {
+    private fun up(x: Float, y: Float, pointerId: Int, eventTime: Long) {
+        val (at, atDown) = downs.remove(pointerId) ?: (downAt to downDown)
         key.showPressed(false)
         InputFeedbacks.hapticFeedback(key.feedback, longPress = true, keyUp = true)
         dispatchGestureEvent(GestureType.Up, x, y)
@@ -264,8 +272,8 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         // not on every Move, which a grouped key dispatches however little the finger moved: only
         // a swipe past the threshold, or off the key, is no tap. The total is signed, so one
         // swiped a step and back counts as a tap, as it clicks anyway
-        clickAt = tapPlace()
-        clickDown = tapPlace(downDown)
+        clickAt = tapPlace(at)
+        clickDown = tapPlace(atDown)
         resetState()
         if (outcome.performClick) {
             if (outcome.isDoubleTap) key.doubleTap() else key.click()
