@@ -105,7 +105,7 @@ class KeyListsMigrationTest {
     @Test
     fun theSamplesMigrate() {
         val versions = File("src/test/resources/keys-migration").listFiles(File::isDirectory)!!.sortedBy { it.name }
-        assertEquals(listOf("v0.5.2", "v0.6.0-beta1", "v0.6.0-beta2"), versions.map { it.name })
+        assertEquals(listOf("dev-after-beta2", "v0.5.2", "v0.6.0-beta1", "v0.6.0-beta2"), versions.map { it.name })
         for (dir in versions) {
             fun read(name: String) = File(dir, name).takeIf { it.isFile }?.readText()
             val m = migrated(read("popup_overrides"), read("key_popups"), read("t9_symbols"))

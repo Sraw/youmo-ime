@@ -93,9 +93,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * Every key's long press the user set, of every keyboard ([org.fcitx.fcitx5.android.input.keys.KeyLists],
          * `@1` first; 060-keys-unify §2): [popupOverrides], [keyPopups] and [Keyboard.t9Symbols] moved here once
          * ([dropRetired]), those kept as they were for a downgrade (§4.4). A plain setting, never `hidden`: a backup's
-         * would be reset after its import and the old ones migrated again (m2).
+         * would be reset after its import and the old ones migrated again (m2). 全部恢复默认 writes [KeyLists.HEADER], the
+         * default, never removes it: the old ones would come back at the next start. Whether to migrate is read from what
+         * is stored ([storedKeyLists]), never through this, which reads the default where nothing is.
          */
-        val keyLists = string(KEY_LISTS, "")
+        val keyLists = string(KEY_LISTS, KeyLists.HEADER)
 
         /**
          * The bar's buttons, their order and which show (ToolbarConfig.serialize; empty, as
@@ -779,6 +781,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 // every key's long press and swipe: a password may be typed with them before the first unlock
                 internal.keyLists,
                 internal.keySwipes,
+                // the old long presses too, while their keyboards read them (060-keys-unify S6 removes both)
+                internal.popupOverrides,
+                internal.keyPopups,
                 // the bar is there before the first unlock too
                 internal.toolbarButtons,
                 advanced.ignoreSystemCursor,
@@ -793,8 +798,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 clipboard
             ).forEach { category ->
                 category.managedPreferences.forEach {
-                    // 九键's symbols are in keyLists now, read before the first unlock from there alone
-                    if (it.value !== keyboard.t9Symbols) it.value.putValueTo(this@edit)
+                    it.value.putValueTo(this@edit)
                 }
             }
         }
@@ -819,6 +823,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         migrateKeyLists()
     }
 
+    /** `key_lists` as stored, null where it is not (or is another type): read so, nothing written back. */
+    fun storedKeyLists(): String? = runCatching { sharedPreferences.getString(KEY_LISTS, null) }.getOrNull()
+
+    /**
+     * The old long presses changed on their pages (before 060-keys-unify S5 replaces those): `key_lists` removed, so
+     * they are migrated again at the next start and read so till then ([org.fcitx.fcitx5.android.input.keys.KeyListsCache]).
+     */
+    fun forgetKeyLists() = sharedPreferences.edit { remove(KEY_LISTS) }
+
     /**
      * 0.5's and 0.6's betas' long presses ([Internal.popupOverrides], [Internal.keyPopups], [Keyboard.t9Symbols])
      * as [Internal.keyLists] (KeyListsMigration, 060-keys-unify §4.3): run while it is not of the format (never
@@ -828,7 +841,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val sp = sharedPreferences
         // stored as another type (a bad backup): read as unset, never a crash at every start
         fun storedString(key: String) = runCatching { sp.getString(key, null) }.getOrNull()
-        if (KeyLists.parse(storedString(KEY_LISTS)) != null) return
+        if (!KeyLists.needsMigration(storedKeyLists())) return
         val moved = KeyListsMigration.migrate(storedString(POPUP_OVERRIDES), storedString(KEY_POPUPS), storedString(T9_SYMBOLS))
         moved.lost.forEach { Timber.i("long press not kept: %s", it) }
         sp.edit { putString(KEY_LISTS, moved.text) }

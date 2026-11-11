@@ -8,7 +8,11 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.core.dirsUnder
+import org.fcitx.fcitx5.android.data.UserDataManager
+import org.fcitx.fcitx5.android.data.importedUserDataMarker
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.junit.Assert.assertEquals
@@ -20,7 +24,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * 060-keys-unify §4.3–4.5 and §6.4, the app's half: `key_lists` made once at a start from 0.5.2's and the betas'
@@ -38,11 +45,7 @@ class KeyListsUpgradeTest {
 
     private fun started(prefs: AppPrefs = AppPrefs(sp)) = prefs.apply { dropRetired() }
 
-    private fun cache(prefs: AppPrefs) = KeyListsCache {
-        KeyListsCache.Stored(prefs.internal.keyLists.getValue()) {
-            Triple(prefs.internal.popupOverrides.getValue(), prefs.internal.keyPopups.getValue(), prefs.keyboard.t9Symbols.getValue())
-        }
-    }
+    private fun cache(prefs: AppPrefs) = KeyListsCache { KeyListsCache.of(prefs) }
 
     // 0.5.2 (and beta1): 全键盘's by the letter and 九键's symbols
     private fun SharedPreferences.Editor.v052() {
@@ -56,7 +59,7 @@ class KeyListsUpgradeTest {
         putString(AppPrefs.KEY_POPUPS, "t9/2 2 A B C a b c # @\ncomma ！")
     }
 
-    private fun stored() = sp.getString(AppPrefs.KEY_LISTS, null)
+    private fun stored() = AppPrefs(sp).storedKeyLists()
 
     @Test
     fun aNewInstallHasTheEmptyLists() {
@@ -113,35 +116,76 @@ class KeyListsUpgradeTest {
     }
 
     @Test
-    fun aLaterFormatOrAWrongTypeIsMigratedNeverACrash() {
+    fun aWrongTypeIsMigratedNeverACrash() {
         sp.edit { putInt(AppPrefs.KEY_LISTS, 3); putInt(AppPrefs.POPUP_OVERRIDES, 1) }
         started()
         assertEquals("@1", stored())
-        sp.edit { putString(AppPrefs.KEY_LISTS, "@2\nfull/q\toff"); v052() }
+        // empty, or blanks: never of any version's
+        sp.edit { putString(AppPrefs.KEY_LISTS, " "); v052() }
         started()
-        assertTrue(KeyLists.parse(stored())!![KeyId("full/q")] != null)
+        assertEquals(UserList(false, listOf("!", "1", "Q")), KeyLists.parse(stored())!![KeyId("full/q")])
     }
 
-    // a 0.5.2 backup over a 0.6 install: the start after the import resets the hidden settings and then drops the
-    // retired ones, in FcitxApplication.onCreate's order. key_lists is the backup's (none): its old ones migrate (m2)
+    // a later version's, a downgrade from it: left as it is for that version, read as none set
+    @Test
+    fun aLaterFormatIsLeftAloneAndReadAsEmpty() {
+        sp.edit { putString(AppPrefs.KEY_LISTS, "@2\nfull/q\toff"); v052() }
+        val prefs = started()
+        assertEquals("@2\nfull/q\toff", stored())
+        assertEquals(KeyLists.Empty, cache(prefs).current)
+        // a byte order mark and blanks around ours are ours
+        sp.edit { putString(AppPrefs.KEY_LISTS, "\uFEFF @1\nfull/q\toff") }
+        started()
+        assertEquals(UserList.Off, cache(prefs).current[KeyId("full/q")])
+    }
+
+    // an old page (till S5 replaces it) changed the old ones: migrated again, read so before that start too
+    @Test
+    fun anOldPagesChangeIsMigratedAgain() {
+        sp.edit { v052() }
+        val prefs = started()
+        val c = cache(prefs)
+        assertEquals(UserList(false, listOf("!", "1", "Q")), c.current[KeyId("full/q")])
+        prefs.internal.popupOverrides.setValue("q ?")
+        prefs.forgetKeyLists()
+        assertEquals(listOf("?"), c.current[KeyId("full/q")]?.symbols)
+        started(prefs)
+        assertEquals(listOf("?"), KeyLists.parse(stored())!![KeyId("full/q")]?.symbols)
+    }
+
+    // a backup restored: 备份全部's zip (its metadata and the settings' file, read by the name the app's has), imported
+    // through UserDataManager over this install's, then the start after it, in FcitxApplication.onCreate's order: the
+    // hidden settings reset (the import's marker) and the retired dropped. 0.5.2's has no key_lists: its old ones migrate;
+    // 0.6's (a TAB and a newline in it) is kept through the reset (m2)
+    private fun imported(name: String, strings: Map<String, String>): AppPrefs {
+        val xml = strings.entries.joinToString("") { (k, v) -> "    <string name=\"$k\">$v</string>\n" }
+        val zip = ByteArrayOutputStream().also { bytes ->
+            ZipOutputStream(bytes).use { z ->
+                z.putNextEntry(ZipEntry("metadata.json"))
+                z.write("""{"packageName":"${BuildConfig.APPLICATION_ID}","versionCode":${BuildConfig.VERSION_CODE},"versionName":"1","exportTime":0}""".encodeToByteArray())
+                z.putNextEntry(ZipEntry("shared_prefs/$name.xml"))
+                z.write("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n$xml</map>\n".encodeToByteArray())
+            }
+        }.toByteArray()
+        // this install's directories, its settings where the app reads them
+        val dirs = dirsUnder(File(app.applicationInfo.dataDir))
+        UserDataManager.import(zip.inputStream(), dirs).getOrThrow()
+        val prefs = AppPrefs(app.getSharedPreferences(name, Context.MODE_PRIVATE))
+        FcitxApplication.resetHiddenSettings(prefs, directBoot = false) { importedUserDataMarker(app) }
+        return started(prefs)
+    }
+
     @Test
     @Config(application = FcitxApplication::class)
-    fun a052BackupImportedIsMigratedAtTheStartAfter() {
-        sp.edit { putString(AppPrefs.KEY_LISTS, "@1\nfull/w\toff") }
-        // the import replaced the whole file
-        sp.edit { clear(); v052() }
-        val marker = File.createTempFile("imported", null)
-        val prefs = AppPrefs(sp)
-        FcitxApplication.resetHiddenSettings(prefs, directBoot = false) { marker }
-        started(prefs)
-        val lists = KeyLists.parse(stored())!!
-        assertEquals(null, lists[KeyId("full/w")])
+    fun aBackupImportedIsMigratedAtTheStartAfterOr0_6sKept() {
+        val old = imported("key-lists-052", mapOf(AppPrefs.POPUP_OVERRIDES to "q ! 1 Q\nw", AppPrefs.T9_SYMBOLS to "1 . ,"))
+        val lists = KeyLists.parse(old.storedKeyLists())!!
         assertEquals(UserList(false, listOf("!", "1", "Q")), lists[KeyId("full/q")])
-        // and a 0.6 backup's own is kept through the reset after its import
-        sp.edit { putString(AppPrefs.KEY_LISTS, "@1\nfull/w\toff") }
-        FcitxApplication.resetHiddenSettings(prefs, directBoot = false) { File.createTempFile("imported", null) }
-        started(prefs)
-        assertEquals("@1\nfull/w\toff", stored())
+        assertEquals(UserList.Off, lists[KeyId("full/w")])
+        assertEquals(listOf(".", ","), lists[KeyId("t9/1")]?.symbols)
+        val new = imported("key-lists-060", mapOf(AppPrefs.KEY_LISTS to "@1\nfull/w\toff", AppPrefs.POPUP_OVERRIDES to "w 2"))
+        assertEquals("@1\nfull/w\toff", new.storedKeyLists())
+        assertEquals(UserList.Off, cache(new).current[KeyId("full/w")])
     }
 
     // before the first unlock after an upgrade: the device-protected copy is 0.5.2's, never migrated (dropRetired
@@ -165,18 +209,22 @@ class KeyListsUpgradeTest {
         assertTrue(c.version > v)
     }
 
-    // unlocked, the lists go to the device-protected copy; the old ones and 九键's symbols no longer do
+    // unlocked, the lists go to the device-protected copy, and the old ones while their keyboards read them (till S6);
+    // read there before the next unlock as the lists, whatever an older copy of the old ones says
     @Test
     @Config(application = FcitxApplication::class)
     fun theListsAreCopiedForBeforeTheFirstUnlock() {
         sp.edit { beta2() }
         val prefs = started()
         val de = PreferenceManager.getDefaultSharedPreferences(app.createDeviceProtectedStorageContext())
-        de.edit { clear() }
+        de.edit { clear(); putString(AppPrefs.POPUP_OVERRIDES, "q ?") }
+        val locked = AppPrefs(de)
+        assertEquals(listOf("?"), cache(locked).current[KeyId("full/q")]?.symbols)
         prefs.syncToDeviceEncryptedStorage()
         assertEquals(stored(), de.getString(AppPrefs.KEY_LISTS, null))
-        assertFalse(de.contains(AppPrefs.POPUP_OVERRIDES) || de.contains(AppPrefs.KEY_POPUPS) || de.contains(AppPrefs.T9_SYMBOLS))
-        // and read there before the next unlock, as the user's
-        assertEquals(KeyLists.parse(stored()), cache(AppPrefs(de)).current)
+        assertEquals(sp.getString(AppPrefs.POPUP_OVERRIDES, null), de.getString(AppPrefs.POPUP_OVERRIDES, null))
+        assertEquals(sp.getString(AppPrefs.T9_SYMBOLS, null), de.getString(AppPrefs.T9_SYMBOLS, null))
+        de.edit { putString(AppPrefs.POPUP_OVERRIDES, "q ?") }
+        assertEquals(KeyLists.parse(stored()), cache(locked).current)
     }
 }

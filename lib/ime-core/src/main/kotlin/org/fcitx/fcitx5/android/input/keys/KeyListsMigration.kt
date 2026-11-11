@@ -85,6 +85,11 @@ object KeyListsMigration {
             lists[id] = plain(items)
             return
         }
+        // beta2's editor stored the symbols alone: the row and the first were the keyboard's, nothing of them lost
+        if (items.none { it in row }) {
+            lists[id] = UserList(off = false, symbols = items)
+            return
+        }
         val default = defaultOf(id)
         val first = items.first()
         // the row the keyboard makes, not stored: a letter moved or taken out of it is lost (L4); the betas'
