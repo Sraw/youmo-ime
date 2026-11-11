@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.input.keys.KeyState
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.annotation.Keep
@@ -312,6 +313,10 @@ class ZhuyinKeyboard(
     // the input method shown, for whether 键盘手写 writes on the keys
     private var imeName = ""
 
+    override val keysIm: String get() = imeName
+
+    override fun keyState(): KeyState = super.keyState().copy(punctuation = punctuationMapping)
+
     // no glide, no strokes: 键盘手写 alone, written over the symbol keys as the grouped keyboards' are. Their places
     // are where a stroke may start (with none, GlideInput's down finds no key and nothing is written); the char is unread
     override val glide = glideInput(
@@ -351,7 +356,7 @@ class ZhuyinKeyboard(
             // the format as it is: the engine fills its place (getString with no arguments formats nothing)
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
-        return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
+        return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, texts = texts, marks = keyMarks(layout))
     }
 
     // last: the scene reads the state above (the keys drawn by the scene engine, 大千's and 注音九键's alike)

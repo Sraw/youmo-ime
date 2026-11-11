@@ -93,7 +93,7 @@ class NumberKeyboard(
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
         )
-        return SceneEnvs.of(this, look, theme.isDark, width, height, Input(pad = padOf(pad)), texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
+        return SceneEnvs.of(this, look, theme.isDark, width, height, Input(pad = padOf(pad)), texts = texts, marks = keyMarks(layout))
     }
 
     // last: the scene reads the pad (the keys drawn by the scene engine; number.xml's preview="off" popups="off")

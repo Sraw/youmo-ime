@@ -12,13 +12,14 @@ import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.KeySwipe
+import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.input.keyboard.KeyListsNow
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardVariants
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
-import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
-import org.fcitx.fcitx5.android.input.keyboard.swipeWays
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
-import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.KeyResolver
+import org.fcitx.fcitx5.android.input.keys.KeyState
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.KeyNode
@@ -30,7 +31,9 @@ import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.section
+import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import timber.log.Timber
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
@@ -124,15 +127,8 @@ class SceneBoard(
 
     private class Made(val theme: SceneTheme, val layout: SceneLayout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
 
-    // what the marks' settings are made from (the slots and long presses compared as the same instances: the caches')
-    private data class MarksFor(
-        val slots: SwipeSlots,
-        val ways: KeySwipe.Ways,
-        val spots: KeyMarks.Spots,
-        val charShortcuts: Boolean,
-        val names: Set<String>,
-        val popups: PopupOverrides,
-    )
+    // what a resolver is made from (the layout, lists and slots compared as the same instances: the caches')
+    private data class ResolverFor(val layout: SceneLayout, val variant: KeyboardVariant, val lists: KeyLists, val slots: SwipeSlots)
 
     companion object {
         // kept a process (main thread), as SceneThemes keeps the themes, for a keyboard made again (each
@@ -182,7 +178,8 @@ class SceneBoard(
         // a layout's shortcut names, and the marks' settings as last made from their inputs: kept for the
         // scene asked again, the same instances making the env equal to the last at once
         private var namesMade: Pair<SceneLayout, Set<String>>? = null
-        private var marksMade: Pair<MarksFor, MarkSettings>? = null
+        private val resolvers = LinkedHashMap<ResolverFor, KeyResolver>()
+        private const val KEPT_RESOLVERS = 4
 
         private fun measurer(of: Theme, look: ThemeLook): AndroidTextMeasurer =
             measurers.getOrPut(look to (of as? Theme.Pack)?.drawn?.fonts.orEmpty()) { AndroidTextMeasurer(SceneFonts.of(of, look)) }
@@ -208,15 +205,24 @@ class SceneBoard(
             ?: SceneMarks.names(layout.layout, layout.fragments.values).also { namesMade = layout to it }
 
         /**
-         * The marks' settings of [layout]'s keys as the settings are now (each key's two slots, 上滑 and
-         * 下滑 on, where each draws, the long presses set by a key's name), a character key's shortcut
-         * drawn where [charShortcuts].
+         * [layout]'s keys' lists, swipes and marks for the input method [im] (KeyboardVariants.of) as the settings
+         * are now (the user's lists, the swipes' slots): one resolver kept for each of the last few asked, so
+         * keyboards switched between make none again.
          */
-        fun marks(layout: SceneLayout, charShortcuts: Boolean): MarkSettings {
-            val of = MarksFor(SwipeSlotsCache.current, swipeWays(), swipeSpots(), charShortcuts, names(layout), PopupOverridesCache.byName.current)
-            return marksMade?.takeIf { it.first == of }?.second
-                ?: SceneMarks.settings(of.slots, of.ways, of.spots.symbol, of.spots.shortcut, of.charShortcuts, of.names, firsts(of.popups, of.names))
-                    .also { marksMade = of to it }
+        fun resolver(layout: SceneLayout, im: String): KeyResolver {
+            val of = ResolverFor(layout, KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme), KeyListsNow.current, SwipeSlotsCache.current)
+            return resolvers.getOrPut(of) {
+                KeyResolver(of.variant, of.lists, of.slots, DefaultMarks.nodes(layout.layout, layout.fragments))
+            }.also { if (resolvers.size > KEPT_RESOLVERS) resolvers.remove(resolvers.keys.first()) }
+        }
+
+        /**
+         * The marks' settings of [layout]'s keys for [im] in [state] (060-keys-unify §1.3: each key's first and
+         * slots as the resolver has them), a character key's shortcut drawn where [charShortcuts].
+         */
+        fun marks(layout: SceneLayout, charShortcuts: Boolean, im: String, state: KeyState): MarkSettings {
+            val marks = resolver(layout, im).marks(state)
+            return if (marks.charShortcuts == charShortcuts) marks else marks.copy(charShortcuts = charShortcuts)
         }
 
         /**

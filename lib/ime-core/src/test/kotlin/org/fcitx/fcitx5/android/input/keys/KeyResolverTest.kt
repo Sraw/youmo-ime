@@ -158,6 +158,38 @@ class KeyResolverTest {
     }
 
     @Test
+    fun theEditorStartsFromTheKeyAsItPopsUp() {
+        val nine = resolver("nine", Form.Nine)
+        val five = nine.edit(KeyId("t9/5"))
+        assertEquals(listOf("J", "K", "L", "5", "j", "k", "l"), five.row)
+        assertEquals("5", five.first)
+        assertNull(five.user)
+        val lists = KeyLists.of(mapOf(KeyId("full/q") to UserList(false, listOf("!", "Q"), First.None), KeyId("t9/5") to UserList.Off))
+        val q = resolver("qwerty", Form.Full, lists).edit(KeyId("full/q"))
+        assertEquals(KeyEdit(emptyList(), listOf("!", "Q"), null, UserList(false, listOf("!", "Q"), First.None)), q)
+        // off: the row as the keyboard makes it, nothing above
+        val off = resolver("nine", Form.Nine, lists).edit(KeyId("t9/5"))
+        assertEquals(KeyEdit(five.row, emptyList(), null, UserList.Off), off)
+    }
+
+    @Test
+    fun aKeysDefaultsOnEachVariant() {
+        val variants = listOf(KeyboardVariant(Form.Nine), KeyboardVariant(Form.Nine, KeyboardVariant.Language.English))
+        val (pinyin, english) = resolver("nine", Form.Nine).defaultsOn(KeyId("t9/1"), variants)
+        assertEquals("…", pinyin!!.symbols.first().text)
+        assertEquals(":", english!!.symbols.first().text)
+    }
+
+    @Test
+    fun aTablesLabelledLettersHaveThemselvesInTheirCorners() {
+        val r = resolver("qwerty", Form.Full)
+        val q = r.resolve(KeyId("full/q"), KeyState(letterCorners = true))
+        assertEquals(MarkContent.Symbol("q"), q.upMark)
+        // its long press as ever
+        assertEquals(r.resolve(KeyId("full/q"), KeyState()).popup, q.popup)
+    }
+
+    @Test
     fun theMarksAreMadeOnceAStateAndAreTheWebsByDefault() {
         val r = resolver("qwerty", Form.Full)
         val m = r.marks(KeyState())

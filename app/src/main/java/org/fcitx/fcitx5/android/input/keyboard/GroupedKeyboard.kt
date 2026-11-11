@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.input.keys.KeyState
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.annotation.Keep
@@ -444,6 +445,10 @@ class GroupedKeyboard private constructor(
     // the input method shown, for whether a stroke is drawn (笔画筛选)
     private var imeName = ""
 
+    override val keysIm: String get() = imeName
+
+    override fun keyState(): KeyState = super.keyState().copy(punctuation = punctuationMapping)
+
     // 拼音键字母大小写 (made anew when it changes): the groups' faces and bubbles in capitals but where it says otherwise
     private val letterCase by AppPrefs.getInstance().keyboard.letterCase
     private val upper: Boolean get() = LetterCaseRule.upper(letterCase.case, Shift.None, shiftless = true)
@@ -481,7 +486,7 @@ class GroupedKeyboard private constructor(
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
-        return SceneEnvs.of(this, look, theme.isDark, width, height, input = state.input(), texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
+        return SceneEnvs.of(this, look, theme.isDark, width, height, input = state.input(), texts = texts, marks = keyMarks(layout))
     }
 
     // a layout's own groups told the engine as this keyboard is shown, before any of its keys is tapped

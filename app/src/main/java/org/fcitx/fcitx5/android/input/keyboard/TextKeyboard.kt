@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
@@ -189,6 +190,22 @@ class TextKeyboard(
     // the input method last reported, for the `;` key again when the 双拼 scheme changed meanwhile
     private var imeName = ""
 
+    override val keysIm: String get() = imeName
+
+    // a table's roots in a letter's long press where the keys show them all (rootsOf), its letter in its corner where they show any
+    override fun keyState(): KeysState = super.keyState().copy(
+        caps = capsState != CapsState.None,
+        punctuation = punctuationMapping,
+        roots = table?.takeIf { it.labels == KeyLabels.ROOTS }?.let { t -> rootsBy(t) },
+        letterCorners = table?.labelled == true,
+    )
+
+    // one function a table, so the state, and so the marks made of it, compare equal while the table is the same
+    private var rootsMade: Pair<TableKeyboard, (Char) -> String?>? = null
+
+    private fun rootsBy(t: TableKeyboard): (Char) -> String? = rootsMade?.takeIf { it.first == t }?.second
+        ?: { c: Char -> t.rootsOf(c)?.joinToString(" ") }.also { rootsMade = t to it }
+
     // what the engine last said of a table input method's keyboard (EngineState.tableKeyboard), null
     // for another, or none said yet of the one shown: its letters' roots, its 拼 key, its code keys
     private var table: TableKeyboard? = null
@@ -240,7 +257,7 @@ class TextKeyboard(
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
-        val marks = SceneBoard.marks(layout, charShortcutMarks)
+        val marks = keyMarks(layout)
         return SceneEnvs.of(
             this, look, theme.isDark, width, height,
             input = state.input(),

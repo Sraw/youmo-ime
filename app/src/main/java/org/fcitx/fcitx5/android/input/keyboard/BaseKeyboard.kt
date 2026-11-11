@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.scene.engine.MarkSettings
+import org.fcitx.fcitx5.android.input.keys.KeyState
 import android.content.Context
 import android.graphics.Canvas
 import android.view.MotionEvent
@@ -632,7 +634,7 @@ abstract class BaseKeyboard(
      * was invalidated ([KeyboardCanvasView.invalidateScene], every change of what the keys show).
      */
     protected open fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
-        SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneBoard.marks(layout, charShortcutMarks))
+        SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = keyMarks(layout))
 
     /** Whether the canvas draws its board's fill under the keys ([KeyboardCanvasView.drawsBase]): a row or a column laid on its own background, not. */
     protected open val sceneDrawsBase: Boolean get() = true
@@ -843,6 +845,15 @@ abstract class BaseKeyboard(
 
     /** Whether the character keys draw their shortcuts' marks: not where their faces have no room ([TextKeyboard]'s roots). */
     protected open val charShortcutMarks: Boolean get() = true
+
+    /** The input method whose defaults the keys have (KeyboardVariants.of): the keyboard's own, "" for none. */
+    protected open val keysIm: String get() = ""
+
+    /** What the keys' lists depend on now (060-keys-unify §1.2): the swipe settings; Shift and punctuation a keyboard's own. */
+    protected open fun keyState(): KeyState = KeyState(ways = swipeWays(), spots = swipeSpots())
+
+    /** The marks of [layout]'s keys as the resolver has them now. */
+    protected fun keyMarks(layout: SceneLayout): MarkSettings = SceneBoard.marks(layout, charShortcutMarks, keysIm, keyState())
 
     /** The keys' swipe marks drawn again, as what [charShortcutMarks] or the corners read changed. */
     protected fun showSwipeMarks() {

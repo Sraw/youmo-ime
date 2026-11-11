@@ -818,6 +818,8 @@ class T9Keyboard(
     // the input method shown, for whether a stroke is drawn (笔画筛选)
     private var imeName = ""
 
+    override val keysIm: String get() = imeName
+
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         imeName = ime.uniqueName
         showInputMethodName(ime)
@@ -849,7 +851,7 @@ class T9Keyboard(
                 AutoCaps.Caps.LOCK -> Shift.Lock
             }
         }
-        return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, shift = caps, texts = texts, marks = SceneBoard.marks(layout, charShortcutMarks))
+        return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, shift = caps, texts = texts, marks = keyMarks(layout))
     }
 
     private val columnSlot = Rect()

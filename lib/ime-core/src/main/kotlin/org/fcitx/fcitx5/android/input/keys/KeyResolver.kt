@@ -29,6 +29,8 @@ data class KeyState(
     val roots: ((Char) -> String?)? = null,
     /** The punctuation the engine types now (`.` 。): an item typed as a key shown as it would be typed. */
     val punctuation: Map<String, String> = emptyMap(),
+    /** A table's keys labelled with its roots or their names: a letter's corner the letter (its long press as ever). */
+    val letterCorners: Boolean = false,
     val ways: KeySwipe.Ways = KeySwipe.Ways.Both,
     val spots: KeyMarks.Spots = KeyMarks.Spots(KeyMarks.At.SymbolDefault, KeyMarks.At.ShortcutDefault),
 )
@@ -40,6 +42,12 @@ sealed interface KeyPopup {
     /** A table's roots of the letter, shown alone. */
     data class Roots(val text: String) : KeyPopup
 }
+
+/**
+ * A key's list as the settings' editor starts it (060-keys-unify S5): its [row] (the keyboard's, never stored),
+ * its [symbols], its [first]'s text (null: none), and what the user set of it, null for none.
+ */
+data class KeyEdit(val row: List<String>, val symbols: List<String>, val first: String?, val user: UserList?)
 
 /**
  * A key as everything reads it: its long press ([popup], null with none), its [first] (what its swipe's
@@ -80,6 +88,22 @@ class KeyResolver(
     fun defaultOf(id: KeyId, caps: Boolean = false): DefaultList? =
         KeyDefaults.of(id, variant, facts[id] ?: NodeFacts(), caps = caps && id.form == FULL)
 
+    /**
+     * [id]'s defaults on each of [variants] (the editor's page's: 拼音, 双拼, English) with this layout's node of
+     * it: what KeyLists.with compares a list with.
+     */
+    fun defaultsOn(id: KeyId, variants: List<KeyboardVariant>): List<DefaultList?> =
+        variants.map { KeyDefaults.of(id, it, facts[id] ?: NodeFacts()) }
+
+    /** [id]'s list as the editor starts it: as the key pops up here with no Shift, the user's own where set. */
+    fun edit(id: KeyId): KeyEdit {
+        val user = lists[id]
+        val m = made.getOrPut(id to false) { make(id, false) }
+        if (m == null) return KeyEdit(defaultOf(id)?.row.orEmpty().map { it.text }, emptyList(), null, user)
+        val row = m.inRow.coerceAtLeast(0)
+        return KeyEdit(m.items.take(row).map { it.text }, m.items.drop(row).map { it.text }, m.first?.text, user)
+    }
+
     fun resolve(id: KeyId, state: KeyState): ResolvedKey {
         val m = made.getOrPut(id to (state.caps && id.form == FULL)) { make(id, state.caps && id.form == FULL) }
         val roots = state.roots?.takeIf { id.form == FULL }?.let { r -> id.key.singleOrNull()?.let(r) }?.takeIf { it.isNotEmpty() }
@@ -92,7 +116,8 @@ class KeyResolver(
         val shown = first?.let { DefaultMarks.shown(it, state.punctuation) }?.takeIf { it.isNotEmpty() }
         val swipe = KeySwipe.Key(SwipeSlots.typesAChar(id.name), slots.resolve(id.name, true), slots.resolve(id.name, false), hasFirst = first != null)
         // looking up roots, the corner is the letter the roots are of
-        val firstMark = (if (roots != null) id.key else shown)?.let(MarkContent::Symbol) ?: MarkContent.Empty
+        val letterCorner = roots != null || state.letterCorners && id.form == FULL && id.key.singleOrNull()?.isLetter() == true
+        val firstMark = (if (letterCorner) id.key else shown)?.let(MarkContent::Symbol) ?: MarkContent.Empty
         return ResolvedKey(id, popup, first, shown, swipe, mark(swipe.up, firstMark), mark(swipe.down, firstMark))
     }
 
