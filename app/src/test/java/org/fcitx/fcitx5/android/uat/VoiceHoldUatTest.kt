@@ -239,6 +239,27 @@ class VoiceHoldUatTest {
         assertEquals(-1 to -1, composing())
     }
 
+    /** Sent while holding (the app's button, or Enter with another finger), the field cleared, its input restarted or not: then afresh. */
+    @Test
+    @Uat("VO-29")
+    fun afterTheAppSentWhileHoldingWhatIsSaidNextStartsAfresh() {
+        allowMicrophone()
+        h.start(MULTI_LINE, fieldId = 7)
+        for (restarted in listOf(false, true)) {
+            val f = holdSpace()
+            voice.heard("今天天气")
+            h.advance(100)
+            h.field.text.clear()
+            if (restarted) h.restart()
+            h.advance(100)
+            voice.said += "很好。"
+            f.lift()
+            assertEquals("很好。", text())
+            h.field.text.clear()
+            h.advance(1000)
+        }
+    }
+
     /** Input restarted in the same field while the finger is down (a WebView, restartInput): what is said is kept (R20 F5794). */
     @Test
     @Uat("VO-12")

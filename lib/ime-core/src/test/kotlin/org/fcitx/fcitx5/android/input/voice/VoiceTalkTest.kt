@@ -79,13 +79,15 @@ class VoiceTalkTest {
         // the app sent the field's text, the composing 我们出去 with it
         talk.consumed()
         assertTrue(talk.typedAny)
-        assertEquals("" to "走走", talk.step("今天天气不错，我们出去走走", 7))
-        assertEquals("走走。", talk.rest("今天天气不错，我们出去走走。"))
+        // what is heard next is a new utterance (VoiceLive.restart), typed from its start
+        assertEquals("" to "走走", talk.step("走走", 0))
+        assertEquals("走走。", talk.rest("走走。"))
         // holding to talk: the same, all it composed taken
         val held = VoiceTalk(asItGoes = false)
         held.step("你好", 0)
         held.consumed()
-        assertNull(held.rest("你好"))
+        assertNull(held.rest(""))
+        assertNull(held.restNow())
     }
 
     @Test

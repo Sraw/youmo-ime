@@ -61,11 +61,15 @@ class VoiceTalk(private val asItGoes: Boolean) {
 
     /**
      * What composed was taken from the field by the app (a chat's text sent, the field cleared): all
-     * heard so far counts as typed, not typed again; the talk goes on after it.
+     * heard so far went with it, not typed again; what is heard next is a new utterance
+     * ([VoiceLive.restart]), typed from its start.
      */
     fun consumed() {
-        typed = last
         if (last.isNotEmpty()) typedAny = true
+        typed = ""
+        last = ""
+        lastRaw = false
+        halted = false
     }
 
     /**

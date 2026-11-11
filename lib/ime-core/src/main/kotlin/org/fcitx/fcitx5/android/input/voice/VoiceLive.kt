@@ -20,6 +20,36 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
     private var said = ""
     private var hearing = ""
 
+    // what of the segment being said went with the last utterance ([restart]): left out of it as it goes on
+    private var gone = ""
+
+    /** how many times the talk [restart]ed: what [Heard] tells, so one from before a restart is told apart */
+    var utterance = 0
+        private set
+
+    /**
+     * What was said so far was taken (the app sent it, cleared the field): what is said next is a
+     * new utterance, nothing of the last joined to it (no 「，」 before it) nor typed again. The
+     * segment being said goes on in the recognizer: what of it was heard is left out of it. To
+     * [to], as many restarts as were asked for.
+     */
+    fun restart(to: Int = utterance + 1) {
+        if (to <= utterance) return
+        utterance = to
+        said = ""
+        gone = hearing
+        hearing = ""
+    }
+
+    // [text] of the segment being said, what of it went with the last utterance left out
+    private fun fresh(text: String): String {
+        if (gone.isEmpty()) return text
+        var same = 0
+        val most = minOf(gone.length, text.length)
+        while (same < most && gone[same] == text[same]) same++
+        return text.substring(same).trimStart { it in MARKS || it.isWhitespace() }
+    }
+
     /** The segments closed and the one being said, as the recognizer wrote them, joined. */
     val raw: String
         get() = join(said, hearing)
@@ -29,15 +59,16 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
      * frozen part polished, the rest as heard); [text], it cleaned, as it shows; and [settled], how
      * many characters of [whole] stay as they are whatever is said next, so they can be typed as
      * the talk goes on (tap to talk, [VoiceTalk]). [fallback]: the polish failed on this step and
-     * [whole] is the raw text instead, not in step with what was polished before.
+     * [whole] is the raw text instead, not in step with what was polished before. [utterance]: the
+     * [VoiceLive.utterance] it is of.
      */
-    class Heard(val whole: String, val settled: Int, val fallback: Boolean = false) {
+    class Heard(val whole: String, val settled: Int, val fallback: Boolean = false, val utterance: Int = 0) {
         val text: String = VoiceText.clean(whole).orEmpty()
     }
 
     /** The segment being said is [raw] so far; what to show. */
     fun heard(raw: String): Heard {
-        hearing = raw.trim()
+        hearing = fresh(raw.trim())
         return shown()
     }
 
@@ -48,7 +79,9 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
      */
     fun closed(raw: String): Heard {
         hearing = ""
-        if (VoiceText.clean(raw) != null) said = join(said, raw.trim())
+        val text = fresh(raw.trim())
+        gone = ""
+        if (VoiceText.clean(text) != null) said = join(said, text)
         return shown()
     }
 
@@ -70,7 +103,7 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
         val shown = polish?.update(text)
         val whole = shown?.let { it.polished + it.rest } ?: text
         val fixed = polish?.frozenPrefix(VoicePolishTags.norm(stable).size) ?: stable
-        return Heard(whole, settled(whole, fixed))
+        return Heard(whole, settled(whole, fixed), utterance = utterance)
     }
 
     companion object {

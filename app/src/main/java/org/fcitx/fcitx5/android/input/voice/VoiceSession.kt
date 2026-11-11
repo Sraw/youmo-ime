@@ -69,6 +69,9 @@ class VoiceSession(
     private val asItGoes = asItGoes && composes
     private val talk = VoiceTalk(this.asItGoes)
 
+    // the utterances the app took ([taken]): what was heard before the last of them is not this one's
+    private var utterance = 0
+
     // something composing in the field now, ours: taken away if nothing is typed
     private var composing = false
 
@@ -97,7 +100,8 @@ class VoiceSession(
         }
 
         override fun heard(heard: VoiceLive.Heard) {
-            if (over) return
+            // heard before the app took what was said (the recognizer not told yet): gone with it
+            if (over || heard.utterance < utterance) return
             // the field composes the engine's text now (another finger typing): nothing typed as it is
             // said meanwhile, nor its text made voice's; the keyboard hidden: nothing composes
             val inField = composes && !direct && sameField && service.voiceOwnsComposing
@@ -133,12 +137,15 @@ class VoiceSession(
         }
     }
 
-    // what composed was taken from the field by others: the app took it ([consumed]), not typed
-    // again; else taken away, composed anew on the next heard
+    // what composed was taken from the field by others: the app took it (sent it, cleared the
+    // field), all heard so far with it, and what is said next is a new utterance, nothing of the
+    // last joined to it nor typed again; else taken away, composed anew on the next heard
     private fun taken(consumed: Boolean) {
         if (over) return
         composing = false
-        if (consumed) talk.consumed()
+        if (!consumed) return
+        talk.consumed()
+        listener?.restart(++utterance)
     }
 
     /** Stopped at [at] (uptime, ms: the lift's, the tap's): the tail after it counts from there, then the rest is typed. */
@@ -148,7 +155,9 @@ class VoiceSession(
         ui.recognizing()
         // the models not coming in, or a stretch not coming back: not waiting for good
         main.postDelayed({ endTypingWhatWasHeard(R.string.voice_hold_nothing) }, FINISH_MS)
-        listener?.finish(at) { said, raw ->
+        listener?.finish(at) { heard, raw ->
+            // all of it was said before the app took it: nothing of it left to type
+            val said = heard.takeIf { listener?.utterance?.let { it >= utterance } != false }
             val text = typed(talk.rest(said, raw))
             if (text != null) {
                 // it replaces what composes in the field: not taken away first, no flicker
@@ -271,6 +280,12 @@ class VoiceSession(
 
         /** why 语音整理 did not apply to this talk, if it did not: read once [finish] is done */
         val polishFailure: PolishFailure? get() = null
+
+        /** what was said so far taken by the app: what is said next is utterance [to] ([VoiceLive.restart]) */
+        fun restart(to: Int)
+
+        /** the utterance [finish]'s text is of ([VoiceLive.utterance]) */
+        val utterance: Int get() = 0
 
         /** the microphone closed now, what was heard still recognized */
         fun cut()

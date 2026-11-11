@@ -251,6 +251,51 @@ class VoiceTapUatTest : VoiceTapUat() {
         assertEquals(1, voice.closes)
     }
 
+    /** Sent, then talking on: what is said next starts afresh, no 「，」 before it, nothing sent typed again. */
+    @Test
+    @Uat("VO-29")
+    fun afterTheAppSentItWhatIsSaidNextStartsAfresh() {
+        allowMicrophone()
+        h.start(MULTI_LINE)
+        tapMic()
+        voice.heard("今天天气")
+        voice.heard("很好")
+        h.advance(100)
+        h.field.text.clear()
+        h.idle()
+        voice.heard("我们走吧")
+        h.advance(100)
+        assertEquals("我们走吧", text())
+        voice.said += "明天见"
+        tapMic()
+        assertEquals("我们走吧，明天见", text())
+        assertEquals(1, voice.closes)
+    }
+
+    /** Sent while a segment was still being said: what the polish later writes of it is not typed again. */
+    @Test
+    @Uat("VO-29")
+    fun afterTheAppSentMidSegmentWhatThePolishRewroteIsNotTypedAgain() {
+        allowMicrophone()
+        polishDroppingUmMarkingLe()
+        h.start(MULTI_LINE)
+        tapMic()
+        // its 了 not frozen yet: its 。 not there
+        voice.hearing("我到了吗")
+        h.advance(100)
+        assertEquals("我到了吗", text())
+        h.field.text.clear()
+        h.idle()
+        // the recognizer's segment goes on with what was sent in it
+        voice.hearing("我到了吗好的")
+        h.advance(100)
+        assertEquals("好的", text())
+        voice.said += "我到了吗好的"
+        tapMic()
+        assertEquals("好的", text())
+        assertEquals(1, voice.closes)
+    }
+
     /** The polish (always on): a tagger deleting 嗯, a 。 after 了 (as VoiceLiveTest's). */
     private fun polishDroppingUmMarkingLe() {
         val tags = VoicePolishTags(listOf("keep", "del"), listOf("", "，", "。"), listOf("none"))

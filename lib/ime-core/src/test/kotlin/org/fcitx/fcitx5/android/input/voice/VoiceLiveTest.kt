@@ -23,6 +23,34 @@ class VoiceLiveTest {
     }
 
     @Test
+    fun aRestartStartsANewUtteranceNothingJoinedToTheLast() {
+        val live = VoiceLive(VoicePolishStream(tags, tagger, freezeAfter = 2, window = 8))
+        live.closed("今天天气不错")
+        live.restart()
+        assertEquals(1, live.utterance)
+        // no 「，」 before it, nothing of the last in it
+        assertEquals("我们走吧", live.closed("我们走吧").whole)
+        assertEquals(1, live.closed("好").utterance)
+        assertEquals("我们走吧，好", live.raw)
+        // asked twice for the same: once
+        live.restart(1)
+        assertEquals("我们走吧，好", live.raw)
+    }
+
+    @Test
+    fun aRestartMidSegmentLeavesOutWhatOfItWasHeard() {
+        val live = VoiceLive(VoicePolishStream(tags, tagger, freezeAfter = 2, window = 8))
+        live.heard("我到了吗")
+        live.restart()
+        assertEquals("好的", live.heard("我到了吗，好的").whole)
+        live.closed("我到了吗好的")
+        assertEquals("好的", live.raw)
+        // the next segment as it comes
+        live.closed("再见")
+        assertEquals("好的，再见", live.raw)
+    }
+
+    @Test
     fun segmentsJoinedWithAPauseMarkWhereTheyHaveNone() {
         val live = VoiceLive()
         live.closed("今天天气不错")

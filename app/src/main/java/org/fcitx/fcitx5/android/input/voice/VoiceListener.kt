@@ -92,6 +92,19 @@ class VoiceListener(
     // of it decoded; true: the raw text, the polish having failed
     private val said = CompletableDeferred<Pair<String, Boolean>?>()
 
+    // the utterance asked for from the main thread ([restart]), the recognizer's VoiceLive brought to it
+    @Volatile
+    private var restartTo = 0
+
+    // the utterance [said] is of: set on the decoder before it completes
+    @Volatile
+    override var utterance = 0
+        private set
+
+    override fun restart(to: Int) {
+        restartTo = to
+    }
+
     // set on the decoder before [said] completes, read on the main thread once it has
     @Volatile
     override var polishFailure: VoiceSession.PolishFailure? = null
@@ -273,11 +286,13 @@ class VoiceListener(
         // its model not read in (logged as VoiceEngine read it): the raw text throughout
         if (models.polisher == null) polishFailure = VoiceSession.PolishFailure.LOAD
         // the polish failing: the raw text as it is after this step (read once the step has run), told as such
-        fun polished(step: () -> VoiceLive.Heard) =
+        fun polished(step: () -> VoiceLive.Heard) {
+            live.restart(restartTo)
             show(
                 orFallback<VoiceLive.Heard?>("voice polish", null) { step() }
-                    ?: VoiceLive.Heard(live.raw, 0, fallback = true).also { polishFailure = VoiceSession.PolishFailure.RUN }
+                    ?: VoiceLive.Heard(live.raw, 0, fallback = true, utterance = live.utterance).also { polishFailure = VoiceSession.PolishFailure.RUN }
             )
+        }
         val stream = try {
             VoiceEngine.stream(recognizer, words)
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
@@ -304,6 +319,8 @@ class VoiceListener(
             segment.finish(FloatArray(VoiceEngine.TAIL_PADDING))
             // numbers only, nothing said: the UAT's measure of the lift against the speech's end (uat/12 VO-23/24)
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
+            live.restart(restartTo)
+            utterance = live.utterance
             // the polish failing: the raw text, told as such (what was typed as it was said is polished)
             val polished = orFallback<String?>("voice polish", null) { live.finished() }
             // a live step's failure only showed raw text for a moment: the whole of it polished now

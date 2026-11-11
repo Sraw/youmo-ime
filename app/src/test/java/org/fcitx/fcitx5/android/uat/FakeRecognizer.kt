@@ -62,10 +62,22 @@ class FakeRecognizer : VoiceSession.Listening {
     /** the microphone's first sample not zero comes as it opens; false: only when [on] says so */
     var warm = true
 
+    private var restartTo = 0
+    override var utterance = 0
+
+    // as VoiceListener's: brought to the utterance asked for on the next step
+    override fun restart(to: Int) {
+        restartTo = to
+    }
+
+    private fun live() = live.also { it.restart(restartTo) }
+
     override fun load() = Unit
     override fun start() {
         opened++
         live = VoiceLive(polish?.invoke())
+        restartTo = 0
+        utterance = 0
         closed = false
         // from the capture thread, as VoiceListener's
         if (warm) Handler(Looper.getMainLooper()).post { on() }
@@ -78,10 +90,10 @@ class FakeRecognizer : VoiceSession.Listening {
     fun silent() = events.silent()
 
     /** a segment closed at an endpoint, the talk going on */
-    fun heard(raw: String) = events.heard(live.closed(raw))
+    fun heard(raw: String) = events.heard(live().closed(raw))
 
     /** the segment being said, so far */
-    fun hearing(raw: String) = events.heard(live.heard(raw))
+    fun hearing(raw: String) = events.heard(live().heard(raw))
 
     override fun finish(stoppedAt: Long, done: (said: String?, raw: Boolean) -> Unit) {
         finishes++
@@ -96,6 +108,7 @@ class FakeRecognizer : VoiceSession.Listening {
         said.clear()
         val done = waiting
         waiting = null
+        utterance = live().utterance
         if (!closed) done?.invoke(if (finishRaw) live.raw else live.finished(), finishRaw)
     }
 
