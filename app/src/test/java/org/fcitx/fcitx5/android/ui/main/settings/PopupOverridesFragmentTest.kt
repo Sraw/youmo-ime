@@ -26,7 +26,6 @@ import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.KeyListsCache
 import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.scene.keys.KeyId
-import org.fcitx.fcitx5.android.ui.main.settings.search.SettingsIndex
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
@@ -634,14 +633,6 @@ class PopupOverridesFragmentTest {
             d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
             assertEquals("½", KeyListsCache.user.current[KeyId("num/5")]!!.symbols.last())
-        }
-
-        // 九键's long press has one way in (ST-107): no 按键长按 page under 九键, the search's 按键长按 opens this page's 九键 tab
-        @Test
-        @Uat("ST-107")
-        fun nineKeyLongPressMerged() {
-            val found = SettingsIndex.build(st.activity).filter { it.title == st.s(R.string.t9_symbols) }
-            assertEquals(listOf(SettingsIndex.Target(SettingsRoute.PopupOverrides, KeyShortcutPages.Nine.form)), found.map { it.target })
         }
     }
 

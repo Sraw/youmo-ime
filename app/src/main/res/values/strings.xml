@@ -681,8 +681,6 @@
     <string name="t9_letters_field_hint">As on a phone: %s</string>
     <string name="t9_letters_editor_hint">Letters a to z, each once, in the order the key shows them and multi-tap goes through them</string>
     <string name="t9_letters_reset_all_message">Put every key back to its letters as on a phone?</string>
-    <string name="t9_symbols">Long-press symbols</string>
-    <string name="t9_symbols_summary">What a long press on a key offers besides its digit and letters</string>
     <string name="im_candidate_reading">Candidate readings</string>
     <string name="im_candidate_reading_summary">Each character\'s reading on the candidates, with its tone; the bar gets taller and the candidates wider</string>
     <string name="im_candidate_reading_off">Off</string>

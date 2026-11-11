@@ -663,8 +663,6 @@
     <string name="t9_letters_field_hint">默认：%s</string>
     <string name="t9_letters_editor_hint">填 a 到 z 的字母，每个一次；顺序就是键上显示和连按选字母的顺序</string>
     <string name="t9_letters_reset_all_message">把所有键恢复成默认的字母？</string>
-    <string name="t9_symbols">按键长按</string>
-    <string name="t9_symbols_summary">长按数字键时，除了数字和字母还能选的符号</string>
     <string name="im_candidate_reading">候选词注音</string>
     <string name="im_candidate_reading_summary">在候选词的每个字上标出读音和声调；候选栏会变高、候选词变宽</string>
     <string name="im_candidate_reading_off">关闭</string>

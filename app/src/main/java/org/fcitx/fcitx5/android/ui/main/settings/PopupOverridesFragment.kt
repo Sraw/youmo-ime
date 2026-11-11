@@ -54,7 +54,6 @@ import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.scene.keys.DefaultList
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyId
-import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -116,12 +115,6 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // the tab, 多选 and the keys chosen kept across a rotation (the fragment made again)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // a search result's page (九键's 按键长按, ST-107): its tab, named by its form
-        if (savedInstanceState == null) {
-            val entry = runCatching { androidx.navigation.fragment.NavHostFragment.findNavController(this).currentBackStackEntry }.getOrNull()
-            val form = entry?.takeIf(SearchHighlight::isWaiting)?.let { SearchHighlight.pointedAt(it).first }
-            page = pages.firstOrNull { it.form == form } ?: page
-        }
         savedInstanceState ?: return
         val form = savedInstanceState.getString(STATE_PAGE)
         page = pages.firstOrNull { it.form == form } ?: page
