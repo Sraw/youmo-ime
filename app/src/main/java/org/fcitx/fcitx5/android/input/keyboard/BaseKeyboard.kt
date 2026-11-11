@@ -329,14 +329,14 @@ abstract class BaseKeyboard(
         data class Text(val text: String) : SwipeChoice
 
         /** A named key's first, the resolver's: typed as the item says, [shown] in the preview. */
-        data class Output(val output: KeyOutput, val shown: String) : SwipeChoice
+        data class Output(val action: KeyAction, val shown: String) : SwipeChoice
 
         /** What the swipe's Up types, and from where: null for [None]. */
         fun typed(builtIn: KeyAction): Pair<KeyAction, KeyActionListener.Source>? = when (this) {
             BuiltIn -> builtIn to KeyActionListener.Source.Keyboard
             None -> null
             is Text -> PopupKeyboardUi.keyAction(text) to KeyActionListener.Source.Popup
-            is Output -> output.toKeyAction()?.let { it to KeyActionListener.Source.Popup }
+            is Output -> action to KeyActionListener.Source.Popup
         }
 
         /** What the preview shows once the finger has swiped: nothing for [None], as nothing is typed. */
@@ -376,6 +376,11 @@ abstract class BaseKeyboard(
     // the keys' names by their scene id: a long press opened is the user's where they set one by name
     private val namesById = HashMap<String, String>()
 
+    // each named key's `action:` placeholders, its long press's items' and first's (a scene key's, the keyboard's table)
+    private val placeholders = HashMap<String, (String) -> KeyAction?>()
+
+    private fun placeholderOf(def: KeyDef): (String) -> KeyAction? = (def as? SceneKeyDef)?.placeholder ?: { null }
+
     /**
      * What a tap sends for its key's [action]: the action itself, but where a keyboard adds where it fell,
      * [clickAt] across and [clickDown] down ([KeyGesture.clickAt], [KeyGesture.clickDown]).
@@ -404,6 +409,7 @@ abstract class BaseKeyboard(
         val name = def.shortcut?.takeIf { shortcuts }
         if (name != null) {
             namesById[key.ref.id] = name
+            placeholders[key.ref.id] = placeholderOf(def)
             if (takesLongPress(def) && keyResolver()?.resolve(KeyId.of(name), keyState())?.popup != null) {
                 wirePopup(key, def, KeyDef.Popup.Keyboard.Named(name), longPopup)
             }
@@ -434,14 +440,16 @@ abstract class BaseKeyboard(
         val id = KeyId.of(name)
         val r = keyResolver()?.resolve(id, keyState()) ?: return null
         val first = r.first ?: return if (id.isFunction) null else SwipeChoice.None
-        val output = KeyOutput.of(first) ?: return SwipeChoice.None
-        return SwipeChoice.Output(output, r.firstShown ?: first.text)
+        val action = KeyOutput.of(first)?.toKeyAction(placeholderOf(def)) ?: return SwipeChoice.None
+        return SwipeChoice.Output(action, r.firstShown ?: first.text)
     }
 
     /** [popup], the resolver's, as the popup shows it: its items typed as each says; null for none (roots are a keyboard's own). */
-    private fun resolvedPopup(popup: KeyPopup?): KeyDef.Popup.Keyboard.Resolved? {
+    private fun resolvedPopup(popup: KeyPopup?, placeholder: (String) -> KeyAction?): KeyDef.Popup.Keyboard.Resolved? {
         val items = (popup as? KeyPopup.Items) ?: return null
-        val kept = items.items.indices.mapNotNull { i -> KeyOutput.of(items.items[i])?.let { Triple(i, it, items.labels[i]) } }
+        val kept = items.items.indices.mapNotNull { i ->
+            KeyOutput.of(items.items[i])?.toKeyAction(placeholder)?.let { Triple(i, it, items.labels[i]) }
+        }
         if (kept.isEmpty()) return null
         val row = kept.count { it.first < items.inRow }
         val focus = kept.indexOfFirst { it.first == items.focus }
@@ -819,7 +827,7 @@ abstract class BaseKeyboard(
             val name = namesById[action.key.id]
             val resolver = name?.let { keyResolver() }
             if (name != null && resolver != null) {
-                val popup = resolvedPopup(resolver.resolve(KeyId.of(name), keyState()).popup) ?: return
+                val popup = resolvedPopup(resolver.resolve(KeyId.of(name), keyState()).popup, placeholders[action.key.id] ?: { null }) ?: return
                 popupActionListener?.onPopupAction(action.copy(keyboard = popup))
                 return
             }

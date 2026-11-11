@@ -244,7 +244,7 @@ internal class KeySwipes(
                 // the long press's first: the key's own swipe, or the first of a long press the user set
                 when (val choice = keyboard.swipeText(def)) {
                     is BaseKeyboard.SwipeChoice.Text -> keyboard.onAction(PopupKeyboardUi.keyAction(choice.text), KeyActionListener.Source.Popup)
-                    is BaseKeyboard.SwipeChoice.Output -> choice.output.toKeyAction()?.let { keyboard.onAction(it, KeyActionListener.Source.Popup) }
+                    is BaseKeyboard.SwipeChoice.Output -> keyboard.onAction(choice.action, KeyActionListener.Source.Popup)
                     else -> builtIn?.let { choice.typed(it) }?.let { (action, source) -> keyboard.onAction(action, source) }
                 }
                 // consumed when it types nothing too, or a swipe that stayed on the key would type it as a tap

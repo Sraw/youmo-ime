@@ -37,6 +37,8 @@ class SceneKeyDef(
     val behavior: SceneBehavior,
     behaviors: Set<Behavior>,
     popup: Array<Popup>?,
+    /** What the layout's `action:<name>` sends on this key, the keyboard's own ([Table.action]): its long press's items' too. */
+    val placeholder: (String) -> KeyAction? = { null },
 ) : KeyDef(Appearance.Text("", 0f), behaviors, popup, name = behavior.id, shortcut = behavior.shortcut?.let(::viewName)) {
 
     override val swipesBothWays: Boolean get() = behavior.bothWays
@@ -100,7 +102,7 @@ class SceneKeyDef(
                 act(b.doubleTap)?.let { add(Behavior.DoubleTap(it)) }
             }
             val popups = popupsOf(b, node, table, ::act)
-            return SceneKeyDef(b, behaviors, popups.toTypedArray().takeIf { it.isNotEmpty() })
+            return SceneKeyDef(b, behaviors, popups.toTypedArray().takeIf { it.isNotEmpty() }) { name -> table.action(name, node) }
         }
 
         /**

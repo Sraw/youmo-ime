@@ -74,6 +74,8 @@ class OwnLongPressUatTest {
         for (k in keys) {
             val node = k.node
             val edit = resolver.edit(KeyId.of(node.shortcut!!))
+            // one with none (注音九键's tones): nothing pops up, its bubble shown as it is held
+            if (edit.row.isEmpty() && edit.symbols.isEmpty()) continue
             val shown = h.longPress(k)
             h.idle()
             val corner = GroupedKeyboard.cornerOf(node)

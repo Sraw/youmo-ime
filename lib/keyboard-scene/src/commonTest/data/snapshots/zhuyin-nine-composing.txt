@@ -6,8 +6,9 @@ key r1c1 kind=function a11y="ˉ"
   shape rect(7.88,18.38,143.13,121.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,0,151,140)
   anchor 75.5,70 up 0,-1
-  actions preview="on" send="action:tone-1" swipe-up="action:tone-5"
+  actions preview="on" send="action:tone-1"
   text label="ˉ"
+  shortcut="zy9/tone-1"
   popup from=list
     item "˙" send="action:tone-5"
   normal
@@ -83,6 +84,7 @@ key r2c1 kind=function a11y="ˊ"
   anchor 75.5,210.5 up 0,-1
   actions preview="on" send="action:tone-2"
   text label="ˊ"
+  shortcut="zy9/tone-2"
   normal
     shadow rect(7.88,158.38,143.13,265.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,158.38,143.13,262.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -141,6 +143,7 @@ key r2c5 kind=function a11y="？"
   anchor 1004.5,210.5 up 0,-1
   actions preview="on" send="?"
   text label="？"
+  shortcut="zy9/question"
   normal
     shadow rect(936.88,158.38,1072.13,265.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(936.88,158.38,1072.13,262.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -154,6 +157,7 @@ key r3c1 kind=function a11y="ˇ"
   anchor 75.5,351 up 0,-1
   actions preview="on" send="action:tone-3"
   text label="ˇ"
+  shortcut="zy9/tone-3"
   normal
     shadow rect(7.88,299.38,143.13,405.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,299.38,143.13,402.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -212,6 +216,7 @@ key r3c5 kind=function a11y="！"
   anchor 1004.5,351 up 0,-1
   actions preview="on" send="!"
   text label="！"
+  shortcut="zy9/exclam"
   normal
     shadow rect(936.88,299.38,1072.13,405.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(936.88,299.38,1072.13,402.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -225,6 +230,7 @@ key r4c1 kind=function a11y="ˋ"
   anchor 75.5,491.5 up 0,-1
   actions preview="on" send="action:tone-4"
   text label="ˋ"
+  shortcut="zy9/tone-4"
   normal
     shadow rect(7.88,439.38,143.13,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,439.38,143.13,543.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -268,13 +274,7 @@ key r4c4 kind=letter a11y="分词"
   anchor 799.5,491.5 up 0,-1
   actions preview="off" send="action:zhuyin-slot"
   text label="分词"
-  popup from=list as-is="true"
-    item "。"
-    item "？"
-    item "！"
-    item "、"
-    item "："
-    item "；"
+  shortcut="fn/comma"
   normal
     shadow rect(677.88,439.38,921.13,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(677.88,439.38,921.13,543.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -288,6 +288,7 @@ key r4c5 kind=function a11y="～"
   anchor 1004.5,491.5 up 0,-1
   actions preview="on" send="~"
   text label="～"
+  shortcut="zy9/tilde"
   normal
     shadow rect(936.88,439.38,1072.13,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(936.88,439.38,1072.13,543.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4

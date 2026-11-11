@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
-import org.fcitx.fcitx5.android.input.keys.KeyOutput
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.SystemClock
@@ -342,7 +341,7 @@ class PopupComponent :
         val split: Int
         var asIs = false
         var inRow = -1
-        var outputs: List<KeyOutput>? = null
+        var actions: List<KeyAction>? = null
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
                 val preset = PopupOverridesCache.user.current.longPressOf(keyboard.label) ?: return
@@ -364,7 +363,7 @@ class PopupComponent :
                 keys = labels
                 split = keyboard.split
                 inRow = keyboard.inRow
-                outputs = keyboard.outputs
+                actions = keyboard.actions
             }
             // made as it opens (BaseKeyboard.onPopupAction): none here is no list now
             is KeyDef.Popup.Keyboard.Named -> return
@@ -387,7 +386,7 @@ class PopupComponent :
             split,
             asIs,
             inRow,
-            outputs,
+            actions,
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
             scenes = scenes,
         )

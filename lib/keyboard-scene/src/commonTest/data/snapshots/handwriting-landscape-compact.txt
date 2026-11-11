@@ -28,15 +28,6 @@ key comma kind=function role=comma a11y="，"
   actions preview="off" send=","
   text label="，"
   shortcut="fn/comma"
-  popup from=list
-    item "？"
-    item "！"
-    item "："
-    item "；"
-    item "、"
-    item "…"
-    item "“"
-    item "”"
   normal
     shadow rect(1996.88,83.5,2332.13,139.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1996.88,83.5,2332.13,136.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -51,7 +42,6 @@ key period kind=function role=period a11y="。"
   actions preview="off" send="."
   text label="。"
   shortcut="fn/period"
-  popup from=none
   normal
     shadow rect(1996.88,157.5,2332.13,212.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1996.88,157.5,2332.13,209.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
