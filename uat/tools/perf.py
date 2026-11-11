@@ -7,7 +7,9 @@ A and B are commits (built in a git worktree of their own under DIR) or source t
 are). Each is built as the benchmark type (specs/testing.md) with its text pack; then run alternately,
 A1 B1 B2 A2 A3 B3 ...: installed, the text pack imported through PackImportProvider (not gradle's
 connected task: it uninstalls the app, and the pack with it), KeyboardPerfBaselineTest run with
-`am instrument`, its `KeyboardPerf` lines kept. Without B, A is run `--pairs` times alone.
+`am instrument`, its `KeyboardPerf` lines kept. Without --only a run is two calls, every family but the
+motion ones, then `anim,picture`, the logs joined: all rows in one call pass JUnit's 30 min on the 6T
+(the memory and lower-face rows, which only that call has, are not measured). Without B, A is run `--pairs` times alone.
 
 Writes DIR/<run>.perf.log, DIR/rows.tsv (a line a row and run) and DIR/table.md: each row's mean ms,
 p90 ms, KiB a step and GCs a step, the runs' mean, B against A in percent; the frame, idle and anim
@@ -101,6 +103,8 @@ def apks(path):
     return app[0], test[0], pack
 
 
+# every family but the motion ones (the call without --only skips the memory and lower-face rows)
+FULL_ONLY = 'theme,shift,build,press,popup,rebuild,idle'
 FAILED = re.compile(r'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|shortMsg|INSTRUMENTATION_CODE: 0')
 
 
@@ -119,24 +123,34 @@ def run(tag, path, args, out):
     imported = open(f'{out}/{tag}.import.log', errors='ignore').read()
     if 'imported:text' not in imported and 'already:text' not in imported:
         raise RuntimeError(f'{tag}: the text pack was not imported, see {tag}.import.log')
-    extra = ['-e', 'perfRuns', str(args.runs)] + (['-e', 'perfOnly', args.only] if args.only else [])
+    # a run of every row passes JUnit's 30 min on the 6T: without --only, the rows go in two calls, logs joined
+    parts = [args.only] if args.only else [FULL_ONLY, 'anim,picture']
     if args.trace:
         # a non-debuggable app's own sections show only when atrace names it, and it is running anew
         adb('shell', 'am', 'force-stop', PKG)
         adb('shell', 'atrace', '--async_start', '-b', '32768', '-a', PKG, 'view', 'gfx', 'dalvik', 'sched', 'input')
     try:
-        adb('logcat', '-c')
-        adb('shell', 'am', 'instrument', '-w', '-e', 'class', TEST, *extra, f'{PKG}.test/androidx.test.runner.AndroidJUnitRunner',
-            out=f'{out}/{tag}.inst.log', check=False)
-        adb('logcat', '-d', '-s', 'KeyboardPerf:I', out=f'{out}/{tag}.perf.log')
+        inst, perf = [], []
+        for i, only in enumerate(parts):
+            adb('logcat', '-c')
+            adb('shell', 'am', 'instrument', '-w', '-e', 'class', TEST, '-e', 'perfRuns', str(args.runs), '-e', 'perfOnly',
+                only, f'{PKG}.test/androidx.test.runner.AndroidJUnitRunner', out=f'{out}/{tag}.inst{i}.log', check=False)
+            adb('logcat', '-d', '-s', 'KeyboardPerf:I', out=f'{out}/{tag}.perf{i}.log')
+            inst.append(open(f'{out}/{tag}.inst{i}.log', errors='ignore').read())
+            perf.append(open(f'{out}/{tag}.perf{i}.log', errors='ignore').read())
+            os.remove(f'{out}/{tag}.inst{i}.log')
+            os.remove(f'{out}/{tag}.perf{i}.log')
+            open(f'{out}/{tag}.inst.log', 'w').write(''.join(inst))
+            open(f'{out}/{tag}.perf.log', 'w').write(''.join(perf))
+            if FAILED.search(inst[-1]) or 'OK (' not in inst[-1]:
+                break
     finally:
         if args.trace:
             adb('shell', 'atrace', '--async_stop', out=f'{out}/{tag}.trace', check=False)
         # the anim rows' battery saver undone here too: a test killed midway leaves the phone "unplugged"
         adb('shell', 'cmd', 'power', 'set-mode', '0', check=False)
         adb('shell', 'dumpsys', 'battery', 'reset', check=False)
-    inst = open(f'{out}/{tag}.inst.log', errors='ignore').read()
-    if FAILED.search(inst) or 'OK (' not in inst:
+    if len(inst) < len(parts) or any(FAILED.search(x) or 'OK (' not in x for x in inst):
         raise RuntimeError(f'{tag}: the test failed, see {tag}.inst.log')
 
 
