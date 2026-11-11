@@ -44,8 +44,8 @@ class DefaultMarksTest {
         assertEquals(MarkContent.Symbol("1"), qwerty["full/q:up"])
         assertEquals(MarkContent.Icon("content-copy"), qwerty["full/c:down"])
         assertEquals(MarkContent.Empty, qwerty["full/q:down"])
-        assertEquals(MarkContent.Icon("cursor-move"), qwerty["space:up"])
-        assertEquals(MarkContent.Icon("delete-sweep"), qwerty["backspace:up"])
+        assertEquals(MarkContent.Icon("cursor-move"), qwerty["fn/space:up"])
+        assertEquals(MarkContent.Icon("delete-sweep"), qwerty["fn/backspace:up"])
         val nine = marks("nine")
         assertEquals(MarkContent.Symbol("2"), nine["t9/2:up"])
         assertEquals(MarkContent.Symbol("1"), nine["t9/1:up"])
@@ -69,5 +69,11 @@ class DefaultMarksTest {
         val marks = marks("k18")
         val env = EnvJson.read("""{"width": 1080, "height": 700, "density": 2.625, "marks": ${DefaultMarks.json(marks)}}""").ok()
         assertEquals(marks, env.marks.shortcuts)
+    }
+
+    @Test
+    fun aFunctionKeysBareNameIsReadAsItsOneName() {
+        val env = EnvJson.read("""{"width": 1080, "height": 700, "density": 2.625, "marks": {"shortcuts": {"space:up": {"icon": "x"}, "full/q:down": {}}}}""").ok()
+        assertEquals(mapOf("fn/space:up" to MarkContent.Icon("x"), "full/q:down" to MarkContent.Empty), env.marks.shortcuts)
     }
 }

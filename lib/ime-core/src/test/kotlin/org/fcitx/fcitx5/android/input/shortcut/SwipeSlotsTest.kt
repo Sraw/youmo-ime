@@ -132,9 +132,7 @@ class SwipeSlotsTest {
     }
 
     @Test
-    fun keyNamesFromLayouts() {
-        assertEquals("fn/space", SwipeSlots.keyOf("space"))
-        assertEquals("full/a", SwipeSlots.keyOf("full/a"))
+    fun functionKeysByName() {
         assertTrue(SwipeSlots.isFunction("fn/space"))
         assertFalse(SwipeSlots.isFunction("full/a"))
         assertEquals(KeyShortcut.Text("x"), Text("x").shortcut)

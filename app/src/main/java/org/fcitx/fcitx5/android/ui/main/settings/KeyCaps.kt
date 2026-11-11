@@ -34,6 +34,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.utils.styledColor
@@ -87,12 +88,13 @@ object KeyCaps {
             isClickable = false
             isFocusable = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            val function = shortcut != null && '/' !in shortcut.name
+            // the key's one name, as the layouts' (a function key's `fn/comma`)
+            val id = shortcut?.name?.let(KeyId::of)
             attrs = KeyAttrs(
                 label = SceneText.Literal(text),
                 alt = hint.takeIf { it.isNotEmpty() }?.let(SceneText::Literal),
-                kind = if (function) "function" else "letter",
-                shortcut = shortcut?.name,
+                kind = if (id?.isFunction == true) "function" else "letter",
+                shortcut = id?.name,
             )
             states = setOfNotNull(KeyState.Selected.takeIf { selected })
             // the label the keyboard's, shrunk as the cap is to its key, its marks where they are there (060-pending-decisions);
@@ -100,7 +102,7 @@ object KeyCaps {
             // with its marks, as a mark class is sized over them all (060-render-p2 S7a)
             keyboardKeyHeight = keyboardKeyHeight(ctx)
             board = shortcut?.let { if (it.layout != null) board(ctx, it.name, it.layout) else board(ctx, it.name) }
-            val names = board?.let { b -> SceneLayouts.of(ctx, b.layout)?.let(SceneBoard::names) } ?: listOfNotNull(shortcut?.name)
+            val names = board?.let { b -> SceneLayouts.of(ctx, b.layout)?.let(SceneBoard::names) } ?: listOfNotNull(id?.name)
             // each slot where its way's 图标位置 puts it on the keyboard, a key with no shortcut too
             val spots = swipeSpots()
             marks = SceneMarks.settings(
@@ -125,7 +127,7 @@ object KeyCaps {
         // overrides; none where the first's way draws nothing): without them no symbol is drawn, nor does one take a mark's room
         val alts = if (!firstShown()) emptyMap() else
             SceneLetters.alts { c -> c.toString().let { PopupOverridesCache.user.current.resolve(it, PopupPreset[it])?.firstOrNull() } }
-        return SceneKeyCell.Board(layout, shortcut, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code), alts,
+        return SceneKeyCell.Board(layout, KeyId.of(shortcut).name, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code), alts,
             AppPrefs.getInstance().keyboard.letterCase.getValue().case)
     }
 

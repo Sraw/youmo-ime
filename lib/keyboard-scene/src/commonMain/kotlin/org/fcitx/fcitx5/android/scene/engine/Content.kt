@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
@@ -257,7 +258,7 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
 
     private fun marks(key: ExpandedKey, cell: Box, content: Box, looks: Looks, hidden: Boolean, snap: Boolean): List<MarkDrawn> {
         val name = key.attrs.shortcut
-        val char = name == null || '/' in name
+        val char = name == null || !KeyId(name).isFunction
         // a function key's swipes (the space's cursor, ⌫'s sweep): a theme's `key hint { hidden }` leaves them out
         if (!char && looks.hint.hidden) return emptyList()
         val ways = ways(key, name, char, looks, hidden)

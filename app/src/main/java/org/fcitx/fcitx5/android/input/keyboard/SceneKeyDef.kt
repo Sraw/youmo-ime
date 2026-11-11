@@ -19,8 +19,13 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import timber.log.Timber
+
+// the old keys' name, a function key's bare (`comma`), as key_popups has it, until the keys are wired by
+// their one name (060-keys-unify S4b)
+private fun viewName(name: String): String = KeyId.of(name).let { if (it.isFunction) it.key else it.name }
 
 /**
  * A key of the scene as BaseKeyboard wires it, made from its layout's node (060-render-p2 U4 B):
@@ -32,7 +37,7 @@ class SceneKeyDef(
     val behavior: SceneBehavior,
     behaviors: Set<Behavior>,
     popup: Array<Popup>?,
-) : KeyDef(Appearance.Text("", 0f), behaviors, popup, name = behavior.id, shortcut = behavior.shortcut) {
+) : KeyDef(Appearance.Text("", 0f), behaviors, popup, name = behavior.id, shortcut = behavior.shortcut?.let(::viewName)) {
 
     override val swipesBothWays: Boolean get() = behavior.bothWays
 

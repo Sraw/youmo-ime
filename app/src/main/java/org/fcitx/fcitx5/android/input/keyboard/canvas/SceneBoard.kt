@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.section
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import timber.log.Timber
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
@@ -218,9 +219,14 @@ class SceneBoard(
                     .also { marksMade = of to it }
         }
 
-        /** The firsts of the long presses [popups] set by name of [names]' keys: null where one is turned off. */
-        fun firsts(popups: PopupOverrides, names: Collection<String>): Map<String, String?> =
-            names.filter { it in popups.labels }.associateWith { popups.resolve(it, null)?.firstOrNull() }
+        /**
+         * The firsts of the long presses [popups] set by name of [names]' keys (their one names; key_popups has a
+         * function key's bare, `comma`): null where one is turned off.
+         */
+        fun firsts(popups: PopupOverrides, names: Collection<String>): Map<String, String?> {
+            val labels = popups.labels.associateBy { KeyId.of(it).name }
+            return names.mapNotNull { n -> labels[n]?.let { n to popups.resolve(it, null)?.firstOrNull() } }.toMap()
+        }
 
         /** The scenes kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
         fun forgetScenes() = scenesKept.clear()

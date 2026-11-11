@@ -172,9 +172,6 @@ class SwipeSlots private constructor(
         /** A function key's name, as a layout's `shortcut="space"` is stored: `fn/space`. */
         fun functionKey(name: String) = "${KeyShortcuts.FUNCTION}/$name"
 
-        /** A key's name as stored from a layout's `shortcut=`: a character key's as it is, a function key's [functionKey]. */
-        fun keyOf(layoutName: String) = if ('/' in layoutName) layoutName else functionKey(layoutName)
-
         fun isFunction(key: String) = KeyShortcuts.formOf(key) == KeyShortcuts.FUNCTION
 
         /**

@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 
@@ -130,8 +131,14 @@ object EnvJson {
             upOn = m.bool("upOn", d.upOn),
             downOn = m.bool("downOn", d.downOn),
             firstUp = m.bool("firstUp", d.firstUp),
-            shortcuts = m.obj("shortcuts")?.let { s -> s.all { name, v -> name to mark(Members(v)) } } ?: d.shortcuts,
+            // a function key's bare name (`space:up`, before 060-keys-unify) read as its one name, `fn/space:up`
+            shortcuts = m.obj("shortcuts")?.let { s -> s.all { name, v -> markName(name) to mark(Members(v)) } } ?: d.shortcuts,
         ).also { m.done() }
+    }
+
+    private fun markName(name: String): String {
+        val way = name.lastIndexOf(':')
+        return if (way <= 0) name else KeyId.of(name.substring(0, way)).name + name.substring(way)
     }
 
     private fun mark(m: Members): MarkContent {

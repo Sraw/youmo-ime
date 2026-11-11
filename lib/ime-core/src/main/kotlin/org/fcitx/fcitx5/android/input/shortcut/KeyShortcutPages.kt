@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.shortcut
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 
 /**
  * The 按键字符和快捷键 page's tabs: each keyboard's character keys in its rows, as the keyboard
@@ -46,8 +47,11 @@ object KeyShortcutPages {
      */
     val FUNCTION_POPUPS = setOf("comma", "period")
 
-    /** Whether a key named [name] by its layout has a long press set by name: a character key's (`t9/2`), or one of [FUNCTION_POPUPS]. */
-    fun longPressByName(name: String): Boolean = '/' in name || name in FUNCTION_POPUPS
+    /**
+     * Whether a key named [name] has a long press set by name: a character key's (`t9/2`), or one of
+     * [FUNCTION_POPUPS], by its one name (`fn/comma`, a layout's) or the old keys' bare one (`comma`).
+     */
+    fun longPressByName(name: String): Boolean = KeyId.of(name).let { !it.isFunction || it.key in FUNCTION_POPUPS }
 
     val Full = Page(KeyShortcutPreset.FULL, FULL_ROWS.map { row -> row.map { Key(it.uppercase(), KeyShortcuts.charKey(KeyShortcutPreset.FULL, "$it")) } })
 

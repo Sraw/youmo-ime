@@ -78,7 +78,7 @@ class KeyCapsBoardTest {
                 h.start()
                 val keys = h.keys().filterIsInstance<SceneShownKey>().map { it.node }.filter { it.shortcut != null && it.copy == 0 }
                     // Return's icon the field's action (完成 here), the page's a plain field's
-                    .filter { it.shortcut != "return" }
+                    .filter { it.shortcut != "fn/return" }
                 assertTrue("$what: keys with shortcuts", keys.isNotEmpty())
                 var marked = 0
                 for (k in keys) {

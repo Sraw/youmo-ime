@@ -114,13 +114,13 @@ object SceneMarks {
         firsts: Map<String, String?> = emptyMap(),
     ): MarkSettings {
         val marks = HashMap<String, MarkContent>()
+        // the names as a layout reads them, one a key (`full/q`, `fn/space`): a slot stored by the same
         for (name in names) {
-            val key = SwipeSlots.keyOf(name)
             for (up in listOf(true, false)) {
                 val first = if (name in firsts) firsts[name]?.let(MarkContent::Symbol) ?: MarkContent.Empty else MarkContent.Corner
-                marks["$name:${if (up) "up" else "down"}"] = when (val slot = slots.resolve(key, up)) {
+                marks["$name:${if (up) "up" else "down"}"] = when (val slot = slots.resolve(name, up)) {
                     // a function key has no corner: its first is its long press's ([firsts]), or nothing
-                    SwipeSlot.First -> if (first == MarkContent.Corner && SwipeSlots.isFunction(key)) MarkContent.Empty else first
+                    SwipeSlot.First -> if (first == MarkContent.Corner && SwipeSlots.isFunction(name)) MarkContent.Empty else first
                     else -> content(slot.shortcut) ?: MarkContent.Empty
                 }
             }

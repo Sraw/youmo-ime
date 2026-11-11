@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.SlotDefaults
 import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
@@ -213,7 +215,7 @@ sealed interface MarkContent {
 /**
  * The marks' settings (rules B §7, 060-swipe-slots): every key has an up and a down way, each drawn
  * at its place ([upAt], [downAt]) where that way is on ([upOn], [downOn]), by [shortcuts]' names, the
- * layout's `shortcut=` and the way: `full/a:up`, `space:down`. A character key with no name there
+ * layout's `shortcut=` and the way: `full/a:up`, `fn/space:down`. A character key with no name there
  * draws its [MarkContent.Corner] the way [firstUp] says and nothing the other; a function key nothing.
  * [symbols] whether symbols are drawn at all, [charShortcuts] whether a character key's shortcuts are
  * (a table's roots take their room).
@@ -233,17 +235,16 @@ data class MarkSettings(
         name?.let { shortcuts["$it:${if (up) "up" else "down"}"] } ?: if (char && up == firstUp) MarkContent.Corner else MarkContent.Empty
 
     companion object {
-        /** KeyShortcutPreset's, down (the long press's first up): a select all, c copy, x cut, v paste, z undo, y redo; the space's edit menu, ⌫'s clear and restore. */
-        val PRESET: Map<String, MarkContent> = mapOf(
-            "full/a:down" to MarkContent.Icon("select-all"),
-            "full/c:down" to MarkContent.Icon("content-copy"),
-            "full/x:down" to MarkContent.Icon("content-cut"),
-            "full/v:down" to MarkContent.Icon("content-paste"),
-            "full/z:down" to MarkContent.Icon("undo"),
-            "full/y:down" to MarkContent.Icon("redo"),
-            "space:up" to MarkContent.Icon("cursor-move"),
-            "backspace:up" to MarkContent.Icon("delete-sweep"),
-            "backspace:down" to MarkContent.Icon("restore"),
-        )
+        /**
+         * [SlotDefaults]' commands of the full keyboard's letters and the function keys, the long press's first up:
+         * a select all, c copy, x cut, v paste, z undo, y redo down; the space's edit menu, ⌫'s clear and restore.
+         */
+        val PRESET: Map<String, MarkContent> = (('a'..'z').map { KeyId("full/$it") } + listOf("space", "backspace").map(KeyId::function))
+            .flatMap { id ->
+                listOf(true, false).mapNotNull { up ->
+                    (SlotDefaults.of(id, up, firstUp = true) as? SlotDefaults.Slot.Command)
+                        ?.let { "${id.name}:${if (up) "up" else "down"}" to MarkContent.Icon(SlotDefaults.icon(it.key)) }
+                }
+            }.toMap()
     }
 }

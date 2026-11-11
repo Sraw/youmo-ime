@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene.layout
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problems
 import org.fcitx.fcitx5.android.scene.SceneText
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.xml.Attributes
 import org.fcitx.fcitx5.android.scene.xml.Xml
@@ -298,7 +299,8 @@ object LayoutReader {
                 // the bubble as it is pressed, where its kind says otherwise: on a function key (注音九键's tones, ? ! ~), off a letter key (its slot)
                 a.oneOf("preview", ON_OFF)?.let { "preview" to it },
             ),
-        shortcut = a.matching("shortcut", SHORTCUT, "a shortcut name"),
+        // one name a key (060-keys-unify): a function key's `comma` is `fn/comma`, as the settings store it
+        shortcut = a.matching("shortcut", SHORTCUT, "a shortcut name")?.let { KeyId.of(it).name },
         mark = a.boolean("mark"),
         splitAfter = a.oneOf("split", listOf("after"))?.let { true },
     )

@@ -59,7 +59,7 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   hit rect(929,0,1080,140)
   anchor 1004.5,70 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
-  sound=delete shortcut="backspace"
+  sound=delete shortcut="fn/backspace"
   normal
     icon backspace 973,38.5,1036,101.5 #ff7a858a
     icon delete-sweep 1038.03,23.63,1067.03,52.63 #ff7a858a
@@ -261,7 +261,7 @@ key symbols kind=function role=symbols a11y="符"
   anchor 65,632 up 0,-1
   actions long-press="quickphrase" send="layout:Symbol"
   text label="符"
-  shortcut="symbols"
+  shortcut="fn/symbols"
   normal
     text "符" 42.95,647.75 system 700 42 #ff7a858a
   pressed
@@ -273,7 +273,7 @@ key numbers kind=function role=numbers a11y="123"
   anchor 194.5,632 up 0,-1
   actions long-press="unicode" send="layout:Number"
   text label="123"
-  shortcut="numbers"
+  shortcut="fn/numbers"
   normal
     text "123" 154.5,647.75 system 700 42 #ff7a858a
   pressed
@@ -285,7 +285,7 @@ key comma kind=function role=comma a11y="，"
   anchor 313,632 up 0,-1
   actions send=","
   text label="，"
-  shortcut="comma"
+  shortcut="fn/comma"
   normal
     text "，" 282.81,654.64 system 400 60.38 #ff7a858a
   pressed
@@ -297,7 +297,7 @@ key space kind=space role=space a11y="空格，注音"
   anchor 534.5,632 up 0,-1
   actions long-press="space-long-press" send="sym:space" swipe-axis="both"
   text label="注音"
-  sound=space shortcut="space"
+  sound=space shortcut="fn/space"
   normal
     fill rect(393.25,597.88,675.75,666.13 r=7.88,7.88,7.88,7.88) #ffc9ced1
     text "注音" 500,644.8 system 400 34.13 #ff37474f
@@ -311,7 +311,7 @@ key period kind=function role=period a11y="。"
   anchor 756,632 up 0,-1
   actions send="."
   text label="。"
-  shortcut="period"
+  shortcut="fn/period"
   normal
     text "。" 725.81,654.64 system 400 60.38 #ff7a858a
   pressed
@@ -322,7 +322,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   hit rect(810,562,918,702)
   anchor 864,632 up 0,-1
   actions long-press="ime-picker" send="lang"
-  shortcut="lang"
+  shortcut="fn/lang"
   normal
     icon language 832.5,600.5,895.5,663.5 #ff7a858a
   pressed
@@ -333,7 +333,7 @@ key enter kind=enter role=enter a11y="换行"
   hit rect(918,562,1080,702)
   anchor 999,632 up 0,-1
   actions send="sym:Return"
-  sound=return shortcut="return"
+  sound=return shortcut="fn/return"
   menu "Emoji" icon=emoji do="picker:"
   normal
     fill rect(953.06,586.06,1044.94,677.94 r=45.94,45.94,45.94,45.94) #ff5cb5ab

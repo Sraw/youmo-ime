@@ -85,8 +85,8 @@ class FacadeShotsTest {
             marks = MarkSettings(
                 upAt = KeyMarks.At.BottomLeft, downAt = KeyMarks.At.None, symbols = false, charShortcuts = false, upOn = false, downOn = false, firstUp = false,
                 shortcuts = mapOf(
-                    "copy:up" to MarkContent.Icon("copy"), "paste:down" to MarkContent.Text("粘\"贴\\"), "q:up" to MarkContent.Symbol("1"),
-                    "q:down" to MarkContent.Corner, "w:up" to MarkContent.Empty,
+                    "fn/copy:up" to MarkContent.Icon("copy"), "fn/paste:down" to MarkContent.Text("粘\"贴\\"), "full/q:up" to MarkContent.Symbol("1"),
+                    "full/q:down" to MarkContent.Corner, "full/w:up" to MarkContent.Empty,
                 ),
             ),
             states = mapOf("reading" to setOf(KeyState.On), "lock" to setOf(KeyState.Locked, KeyState.Disabled)),

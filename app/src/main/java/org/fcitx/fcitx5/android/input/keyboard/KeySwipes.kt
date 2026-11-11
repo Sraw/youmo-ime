@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import kotlin.math.abs
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 
 /** Whether a key's long press showed a popup in this touch: set by its popup's listener, read by its swipe. */
 internal class LongPopup {
@@ -96,7 +97,7 @@ internal class KeySwipes(
         }
         val slots = SwipeSlotsCache.current
         if (name == null) return KeySwipe.Key.unnamed(slots.orientation, hasFirst)
-        val key = SwipeSlots.keyOf(name)
+        val key = KeyId.of(name).name
         return KeySwipe.Key(tapsOnNothing(key), slots.resolve(key, up = true), slots.resolve(key, up = false), hasFirst)
     }
 
@@ -172,7 +173,7 @@ internal class KeySwipes(
     // the handwriting keyboard's ，。 beside the ink pad: a finger lifted more than half the key away
     // sideways was a stroke begun on it, which types nothing
     private fun wentSideways(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, held: Held): Boolean {
-        val name = def.shortcut?.takeIf { shortcuts }?.let(SwipeSlots::keyOf) ?: return false
+        val name = def.shortcut?.takeIf { shortcuts }?.let { KeyId.of(it).name } ?: return false
         if (!SwipeSlots.isFunction(name) || !tapsOnNothing(name)) return false
         val width = key.bounds?.width() ?: return false
         return abs(event.x - held.downX) * 2 > width

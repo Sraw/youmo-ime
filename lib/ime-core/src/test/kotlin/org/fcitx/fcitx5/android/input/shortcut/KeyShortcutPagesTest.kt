@@ -68,5 +68,9 @@ class KeyShortcutPagesTest {
         assertTrue(KeyShortcutPages.longPressByName("comma"))
         assertTrue(KeyShortcutPages.longPressByName("period"))
         assertFalse(KeyShortcutPages.longPressByName("space"))
+        // by the one name a layout gives them now
+        assertTrue(KeyShortcutPages.longPressByName("fn/comma"))
+        assertFalse(KeyShortcutPages.longPressByName("fn/space"))
+        assertFalse(KeyShortcutPages.longPressByName("fn/shift"))
     }
 }

@@ -203,7 +203,7 @@ key apostrophe kind=function role=apostrophe a11y="a11y_key_separator"
   anchor 81,292.5 up 0,-1
   actions send="'"
   text label="分词"
-  shortcut="separator"
+  shortcut="fn/separator"
   normal
     shadow rect(7.88,252.38,154.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,252.38,154.13,332.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -291,7 +291,7 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   hit rect(918,234,1080,351)
   anchor 999,292.5 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
-  sound=delete shortcut="backspace"
+  sound=delete shortcut="fn/backspace"
   normal
     shadow rect(925.88,252.38,1072.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(925.88,252.38,1072.13,332.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -307,7 +307,7 @@ key symbols kind=function role=symbols a11y="符"
   anchor 65,409.5 up 0,-1
   actions long-press="quickphrase" send="layout:Symbol"
   text label="符"
-  shortcut="symbols"
+  shortcut="fn/symbols"
   normal
     shadow rect(7.88,369.38,122.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,369.38,122.13,449.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -321,7 +321,7 @@ key numbers kind=function role=numbers a11y="123"
   anchor 194.5,409.5 up 0,-1
   actions long-press="unicode" send="layout:Number"
   text label="123"
-  shortcut="numbers"
+  shortcut="fn/numbers"
   normal
     shadow rect(137.88,369.38,251.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(137.88,369.38,251.13,449.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -335,7 +335,7 @@ key comma kind=function role=comma a11y="，"
   anchor 313,409.5 up 0,-1
   actions send=","
   text label="，"
-  shortcut="comma"
+  shortcut="fn/comma"
   normal
     shadow rect(266.88,369.38,359.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(266.88,369.38,359.13,449.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -349,7 +349,7 @@ key space kind=space role=space a11y="空格，拼音"
   anchor 534.5,409.5 up 0,-1
   actions long-press="space-long-press" send="sym:space" swipe-axis="both"
   text label="拼音"
-  sound=space shortcut="space"
+  sound=space shortcut="fn/space"
   normal
     shadow rect(374.88,369.38,694.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(374.88,369.38,694.13,449.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -364,7 +364,7 @@ key period kind=function role=period a11y="。"
   anchor 756,409.5 up 0,-1
   actions send="."
   text label="。"
-  shortcut="period"
+  shortcut="fn/period"
   normal
     shadow rect(709.88,369.38,802.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(709.88,369.38,802.13,449.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
@@ -377,7 +377,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   hit rect(810,351,918,468)
   anchor 864,409.5 up 0,-1
   actions long-press="ime-picker" send="lang"
-  shortcut="lang"
+  shortcut="fn/lang"
   normal
     shadow rect(817.88,369.38,910.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(817.88,369.38,910.13,449.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -390,7 +390,7 @@ key enter kind=enter role=enter a11y="换行"
   hit rect(918,351,1080,468)
   anchor 999,409.5 up 0,-1
   actions send="sym:Return"
-  sound=return shortcut="return"
+  sound=return shortcut="fn/return"
   menu "Emoji" icon=emoji do="picker:"
   normal
     shadow rect(925.88,369.38,1072.13,452.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
