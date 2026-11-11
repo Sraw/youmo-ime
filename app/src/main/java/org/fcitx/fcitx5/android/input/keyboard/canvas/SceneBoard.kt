@@ -13,11 +13,11 @@ import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.core.EngineState
-import org.fcitx.fcitx5.android.input.keyboard.KeyListsNow
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardVariants
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.KeyListsCache
 import org.fcitx.fcitx5.android.input.keys.KeyResolver
 import org.fcitx.fcitx5.android.input.keys.KeyState
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
@@ -211,7 +211,7 @@ class SceneBoard(
          */
         fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null): KeyResolver {
             val variant = KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters)
-            val of = ResolverFor(layout, variant, KeyListsNow.current, SwipeSlotsCache.current)
+            val of = ResolverFor(layout, variant, KeyListsCache.user.current, SwipeSlotsCache.current)
             return resolvers.getOrPut(of) {
                 KeyResolver(of.variant, of.lists, of.slots, DefaultMarks.nodes(layout.layout, layout.fragments))
             }.also { if (resolvers.size > KEPT_RESOLVERS) resolvers.remove(resolvers.keys.first()) }
