@@ -83,48 +83,97 @@ object KeyboardArea {
 
     /**
      * The screen the input method has on this display, upright (portrait) and turned, as InputView would see it (measured on
-     * the API 29, 33 and 36 emulators): from API 35 the display's whole (its maximum window, edge to edge, the bars drawn
-     * over); below, the display less the navigation bar (at the bottom upright, where it moves turned) and, from API 30,
+     * the API 29, 30, 33 and 36 emulators): from API 35 the display's whole (its maximum window, edge to edge, the bars
+     * drawn over); below, the display less the navigation bar (as held now, the one measured; turned, gestures' strip as
+     * tall, or the buttons' by the system's resources: at the bottom upright, where it moves turned) and, from API 30,
      * less the display cutout across its short side (a camera's notch: at the top upright, at a side turned). Not [ctx]'s
      * window: a settings page in a split screen tells of the keyboard as it is shown, full width.
      */
     fun screens(ctx: Context): Pair<Screen, Screen> {
         val density = ctx.resources.displayMetrics.density
-        val real = realSize(ctx)
-        val portrait = Point(minOf(real.x, real.y), maxOf(real.x, real.y))
-        val edgeToEdge = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
-        val cutout = if (edgeToEdge) 0 else cutoutAcross(ctx)
-        // a navigation bar at all: from API 30 as the display has it now (the resources' say so wrongly on an emulator);
-        // gestures' a strip at the bottom either way up, as tall as it is now (the system's resources are the buttons')
-        val shown = edgeToEdge || navBarShown(ctx)
-        val gestures = if (edgeToEdge || !shown) null else gestureBar(ctx)
+        val sdk = Build.VERSION.SDK_INT
+        if (sdk >= Build.VERSION_CODES.R) {
+            // one ask of the window manager: the display as held now, its bars and cutout
+            val m = ctx.windowManager.maximumWindowMetrics
+            val w = m.bounds.width()
+            val h = m.bounds.height()
+            if (sdk >= Build.VERSION_CODES.VANILLA_ICE_CREAM) return screensOf(w, h, density, NavBar.NONE, NavBar.NONE, 0, roundDp = true)
+            val n = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
+            val c = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.displayCutout())
+            val nowLandscape = w > h
+            // as held now, the bar measured: at the bottom, or at a side
+            val now = NavBar(n.bottom, n.left + n.right)
+            val mode = Settings.Secure.getInt(ctx.contentResolver, NAVIGATION_MODE, 0)
+            val other = otherBar(now, nowLandscape, density, mode) { NavBar.of(!nowLandscape, minOf(w, h), density) }
+            val cutout = if (nowLandscape) c.left + c.right else c.top + c.bottom
+            return screensOf(w, h, density, now, other, cutout, roundDp = true)
+        }
+        @Suppress("DEPRECATION")
+        val real = Point().also { ctx.windowManager.defaultDisplay.getRealSize(it) }
+        val res = Resources.getSystem()
+        val shown = res.getIdentifier("config_showNavigationBar", "bool", "android").takeIf { it != 0 }?.let(res::getBoolean) != false
+        val nowLandscape = real.x > real.y
+        fun bar(landscape: Boolean) = if (shown) NavBar.of(landscape, minOf(real.x, real.y), density) else NavBar.NONE
+        return screensOf(real.x, real.y, density, bar(nowLandscape), bar(!nowLandscape), 0, roundDp = false)
+    }
+
+    /**
+     * The screens upright and turned of a display [width]×[height] px as held now: [now] the navigation bar as held
+     * now, [other] turned; [cutout] the display cutout across its short side (top and bottom upright, the sides
+     * turned); [roundDp] the width in dp rounded, as the configuration has it from API 30 (truncated on 29).
+     */
+    @VisibleForTesting
+    internal fun screensOf(width: Int, height: Int, density: Float, now: NavBar, other: NavBar, cutout: Int, roundDp: Boolean): Pair<Screen, Screen> {
+        val nowLandscape = width > height
+        val shortSide = minOf(width, height)
+        val longSide = maxOf(width, height)
         fun screen(landscape: Boolean): Screen {
-            val w = if (landscape) portrait.y else portrait.x
-            val h = if (landscape) portrait.x else portrait.y
-            val bar = when {
-                edgeToEdge -> NavBar.NONE
-                gestures != null -> NavBar(gestures, 0)
-                else -> NavBar.of(landscape, portrait, density, shown)
-            }
-            val width = w - bar.side - (if (landscape) cutout else 0)
-            return Screen(width, h - bar.bottom - (if (landscape) 0 else cutout), (width / density).toInt(), density, landscape, h)
+            val w = if (landscape) longSide else shortSide
+            val h = if (landscape) shortSide else longSide
+            val bar = if (landscape == nowLandscape) now else other
+            val widthPx = w - bar.side - (if (landscape) cutout else 0)
+            val widthDp = if (roundDp) (widthPx / density + HALF).toInt() else (widthPx / density).toInt()
+            return Screen(widthPx, h - bar.bottom - (if (landscape) 0 else cutout), widthDp, density, landscape, h)
         }
         return screen(false) to screen(true)
     }
 
-    // the navigation bar the screen leaves out on API 29 (DisplayPolicy's of Android 10): at the bottom upright and,
-    // on a phone that has one that moves, at the side turned; none where the device shows none
-    private class NavBar(val bottom: Int, val side: Int) {
+    private const val HALF = 0.5f
+
+    /**
+     * The navigation bar turned, from [now] the one measured as held now ([nowLandscape]): none if none now. A bar
+     * at the bottom both ways up stays as tall turned: gesture navigation ([mode] 2), or a strip upright shorter than
+     * any buttons' bar (a ROM not saying mode 2), or a bar at the bottom while landscape (gestures, 3 buttons on a
+     * tablet or a display 600 dp or wider, a bar that does not move, the 12L taskbar). Each keeps its height turned
+     * (DisplayPolicy gives one bottom height for both, the taskbar is the same strip), so copying it is right.
+     * Else the buttons' bar by the system's resources, [buttons].
+     */
+    @VisibleForTesting
+    internal fun otherBar(now: NavBar, nowLandscape: Boolean, density: Float, mode: Int, buttons: () -> NavBar): NavBar {
+        if (now == NavBar.NONE) return NavBar.NONE
+        val bottomBothWays = mode == GESTURES ||
+            (nowLandscape && now.bottom > 0) ||
+            (!nowLandscape && now.bottom > 0 && now.bottom / density < STRIP_DP)
+        return if (bottomBothWays) NavBar(maxOf(now.bottom, now.side), 0) else buttons()
+    }
+
+    // a bar at the bottom upright shorter than this, dp, is a gesture strip (buttons' bars are 40 dp or more)
+    private const val STRIP_DP = 32
+
+    /** A navigation bar a screen leaves out, px: at the bottom, or at the sides. */
+    @VisibleForTesting
+    internal data class NavBar(val bottom: Int, val side: Int) {
         companion object {
             val NONE = NavBar(0, 0)
 
-            fun of(landscape: Boolean, portrait: Point, density: Float, shown: Boolean): NavBar {
+            // the buttons' bar by the system's resources (DisplayPolicy's): at the bottom upright and, on a phone
+            // whose bar moves, at the side turned
+            fun of(landscape: Boolean, shortSidePx: Int, density: Float): NavBar {
                 val res = Resources.getSystem()
                 fun bool(name: String) = res.getIdentifier(name, "bool", "android").takeIf { it != 0 }?.let(res::getBoolean)
                 fun dimen(name: String) = res.getIdentifier(name, "dimen", "android").takeIf { it != 0 }?.let(res::getDimensionPixelSize) ?: 0
-                if (!shown) return NONE
                 if (!landscape) return NavBar(dimen("navigation_bar_height"), 0)
-                val moves = bool("config_navBarCanMove") != false && portrait.x / density < TABLET_DP
+                val moves = bool("config_navBarCanMove") != false && shortSidePx / density < TABLET_DP
                 return if (moves) NavBar(0, dimen("navigation_bar_width")) else NavBar(dimen("navigation_bar_height_landscape"), 0)
             }
 
@@ -133,35 +182,10 @@ object KeyboardArea {
         }
     }
 
-    // the display cutout the input method's window leaves out below API 35, across the display's short side (top and
-    // bottom upright, the sides turned: the same whichever way it is held); none known on API 29
-    private fun cutoutAcross(ctx: Context): Int {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 0
-        val m = ctx.windowManager.maximumWindowMetrics
-        val c = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.displayCutout())
-        return if (m.bounds.width() > m.bounds.height()) c.left + c.right else c.top + c.bottom
-    }
-
-    // the gesture navigation's strip, px, where the system navigates by gestures (API 30+); null, by buttons
-    private fun gestureBar(ctx: Context): Int? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
-        if (Settings.Secure.getInt(ctx.contentResolver, NAVIGATION_MODE, 0) != GESTURES) return null
-        val n = ctx.windowManager.maximumWindowMetrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
-        return maxOf(n.bottom, n.left, n.right)
-    }
-
     // Settings.Secure.NAVIGATION_MODE, hidden: 0 three buttons, 1 two, 2 gestures
     private const val NAVIGATION_MODE = "navigation_mode"
-    private const val GESTURES = 2
-
-    private fun navBarShown(ctx: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            val res = Resources.getSystem()
-            return res.getIdentifier("config_showNavigationBar", "bool", "android").takeIf { it != 0 }?.let(res::getBoolean) != false
-        }
-        val n = ctx.windowManager.maximumWindowMetrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
-        return n.left + n.top + n.right + n.bottom > 0
-    }
+    @VisibleForTesting
+    internal const val GESTURES = 2
 
     private fun realSize(ctx: Context): Point = Point().also {
         @Suppress("DEPRECATION")

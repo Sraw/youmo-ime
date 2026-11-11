@@ -283,6 +283,13 @@ class PopupOverridesFragmentTest {
             assertNull(SwipeFates.note(ctx, both, "retype", true))
             // a scene not made: no claim
             assertNull(SwipeFates.note(ctx, both + SwipeFates.Seen("九键", true, null), "space", true))
+
+            // a shape code's roots filling the letter: said so, not 画不下; beside a keyboard drawing it, named
+            val dropped = mapOf("full/j" to mapOf(true to MarkFate.Dropped, false to MarkFate.Dropped))
+            fun rooted(label: String) = listOf(false, true).map { SwipeFates.Seen(label, it, dropped, roots = setOf("full/j")) }
+            assertEquals(st.s(R.string.swipe_fate_roots), SwipeFates.note(ctx, rooted("五笔"), "full/j", true))
+            val drawn = listOf(false, true).map { SwipeFates.Seen("全键盘", it, mapOf("full/j" to mapOf(true to MarkFate.AsSet))) }
+            assertEquals(st.s(R.string.swipe_fate_on, "五笔", st.s(R.string.swipe_fate_roots)), SwipeFates.note(ctx, drawn + rooted("五笔"), "full/j", true))
         }
 
         @Test
