@@ -758,15 +758,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private var lastLineKeyAt = 0L
+    private var lineKeysRushed = 0
 
     // none at the field's very start or end, where the key would move the focus away (SpaceCursor.sendable)
     private fun handleLineKey(line: SpaceCursor.Line) {
         val ic = currentInputConnection ?: return
         val now = SystemClock.uptimeMillis()
         // a slide's sample may send two lines at once: the editor applies keys later, so the second reads where the first was
-        val rushed = now - lastLineKeyAt < LINE_KEY_SETTLE_MS
+        if (now - lastLineKeyAt >= LINE_KEY_SETTLE_MS) lineKeysRushed = 0
+        val rushed = lineKeysRushed
         if (!SpaceCursor.sendable(line, ic.getTextBeforeCursor(LINE_REACH, 0), ic.getTextAfterCursor(LINE_REACH, 0), rushed)) return
         lastLineKeyAt = now
+        lineKeysRushed++
         clearedText.edited()
         sendDownUpKeyEvents(if (line == SpaceCursor.Line.Up) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN)
     }

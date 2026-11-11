@@ -32,9 +32,19 @@ class SpaceCursorTest {
 
     @Test
     fun aRushedLineOnlyWithANewlineThatWay() {
-        assertEquals(false, SpaceCursor.sendable(Line.Up, "aaa", "", rushed = true))
-        assertEquals(true, SpaceCursor.sendable(Line.Up, "a\nbb", "", rushed = true))
-        assertEquals(false, SpaceCursor.sendable(Line.Down, "a\nb", "cc", rushed = true))
-        assertEquals(true, SpaceCursor.sendable(Line.Down, "", "c\nd", rushed = true))
+        assertEquals(false, SpaceCursor.sendable(Line.Up, "aaa", "", rushed = 1))
+        assertEquals(true, SpaceCursor.sendable(Line.Up, "a\nb\nc", "", rushed = 1))
+        assertEquals(false, SpaceCursor.sendable(Line.Down, "a\nb", "cc", rushed = 1))
+        assertEquals(true, SpaceCursor.sendable(Line.Down, "", "c\nd\ne", rushed = 1))
+    }
+
+    @Test
+    fun aRushIsHeldToTheNewlinesThatWay() {
+        // "\nabc", the cursor at 1: the first Up goes to 0, the second reads the same stale text
+        assertEquals(true, SpaceCursor.sendable(Line.Up, "\n", "abc", rushed = 0))
+        assertEquals(false, SpaceCursor.sendable(Line.Up, "\n", "abc", rushed = 1))
+        // a flick of three lines over one newline: the first goes out, the rest held, as the reads are stale
+        val before = "aa\nbb"
+        assertEquals(listOf(true, false, false), (0..2).map { SpaceCursor.sendable(Line.Up, before, "", rushed = it) })
     }
 }
