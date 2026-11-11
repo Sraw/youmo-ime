@@ -1253,6 +1253,7 @@
     <string name="swipe_fate_shortened">画不下，键上显示为「%s」</string>
     <string name="swipe_fate_sign">画不下，键上显示为图标</string>
     <string name="swipe_fate_dropped">画不下，键上不显示（滑动照常有效）</string>
+    <string name="swipe_fate_roots">字根占了位置，键上不显示（滑动照常有效）</string>
     <string name="swipe_fate_both">竖屏%1$s，横屏%2$s</string>
     <string name="swipe_fate_part_as_set">照常显示</string>
     <string name="swipe_fate_part_shortened">显示为「%s」</string>
