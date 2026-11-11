@@ -42,7 +42,9 @@ object SkinZip {
         val entries = read(b)
         val flex = entries.keys.filter { it.endsWith(".flex", ignoreCase = true) }
         val own = entries.keys.any { it.substringAfterLast('/') == "extension.json" }
-        return if (flex.size == 1 && !own) read(entries.getValue(flex[0])) else entries
+        if (flex.size != 1 || own) return entries
+        // the inner one unpacked within what the outer's files left of the one budget: both are held at once
+        return read(entries.getValue(flex[0]), SkinLimits.MAX_TOTAL_BYTES - entries.values.sumOf { it.size.toLong() })
     }
 
     private fun bytes(input: InputStream): ByteArray {
@@ -57,18 +59,19 @@ object SkinZip {
         return out.toByteArray()
     }
 
-    /** [b]'s files by name (`/`-separated, no directories), the first of a name twice; at least one. */
-    fun read(b: ByteArray): Map<String, ByteArray> {
+    /** [b]'s files by name (`/`-separated, no directories), the first of a name twice; at least one; all within [budget] bytes. */
+    fun read(b: ByteArray, budget: Long = SkinLimits.MAX_TOTAL_BYTES): Map<String, ByteArray> {
         if (b.size > SkinLimits.MAX_ARCHIVE_BYTES) fail(Reason.TOO_BIG)
         if (b.size >= 4 && String(b, 0, 4, Charsets.ISO_8859_1) == "Skin") fail(Reason.SOGOU_ENCRYPTED)
         if (b.size < 4 || u32(b, 0) != LOCAL && u32(b, 0) != END) fail(Reason.NOT_ZIP)
-        val entries = central(b) ?: local(b)
+        val entries = central(b) ?: local(b, budget)
         val out = LinkedHashMap<String, ByteArray>()
         var total = 0L
         for (e in entries) {
             if (e.name.isEmpty() || e.name.endsWith("/")) continue
-            val bytes = unpack(b, e, SkinLimits.MAX_TOTAL_BYTES - total)
+            val bytes = e.inflated ?: unpack(b, e, budget - total)
             total += bytes.size
+            if (total > budget) fail(Reason.UNPACKED_TOO_BIG, e.name)
             out.getOrPut(e.name) { bytes }
         }
         // no file in it: nothing a skin is
@@ -76,15 +79,17 @@ object SkinZip {
         return out
     }
 
-    private class Entry(val name: String, val flags: Int, val method: Int, val data: Int, val packed: Int)
+    // [inflated]: a local scan's entry whose size comes after its data, inflated already to find where it ends
+    private class Entry(val name: String, val flags: Int, val method: Int, val data: Int, val packed: Int, val inflated: ByteArray? = null)
 
-    // the central directory's entries, or null where there is none to read (a local scan's turn)
+    // the central directory's entries, or null where there is none to read (a local scan's turn), one that says none
+    // too (a tool's that left it empty)
     private fun central(b: ByteArray): List<Entry>? {
         val end = (b.size - END_SIZE downTo maxOf(0, b.size - END_SIZE - MAX_COMMENT)).firstOrNull { u32(b, it) == END } ?: return null
         val count = u16(b, end + END_COUNT)
         val at = u32(b, end + END_OFFSET)
         if (count > SkinLimits.MAX_ENTRIES) fail(Reason.TOO_MANY_FILES)
-        if (at < 0 || at >= end) return null
+        if (count == 0 || at < 0 || at >= end) return null
         val out = ArrayList<Entry>()
         var p = at.toInt()
         repeat(count) {
@@ -109,8 +114,9 @@ object SkinZip {
     }
 
     // entries read one after another from the start: a ZIP whose directory is broken or missing
-    private fun local(b: ByteArray): List<Entry> {
+    private fun local(b: ByteArray, budget: Long): List<Entry> {
         val out = ArrayList<Entry>()
+        var held = 0L
         var p = 0
         while (p + LOC_SIZE <= b.size && u32(b, p) == LOCAL) {
             if (out.size >= SkinLimits.MAX_ENTRIES) fail(Reason.TOO_MANY_FILES)
@@ -121,38 +127,24 @@ object SkinZip {
             if (data > b.size) fail(Reason.NOT_ZIP)
             val name = name(b, p + LOC_SIZE, nameLen, flags)
             var packed = u32(b, p + LOC_PACKED)
+            var inflated: ByteArray? = null
             if (flags and DESCRIPTOR != 0) {
-                // sizes after the data: a deflated stream ends itself, a stored one cannot be found
+                // sizes after the data: a deflated stream ends itself, a stored one cannot be found; inflated once,
+                // here, its bytes kept
                 if (method != DEFLATED) fail(Reason.NOT_ZIP)
-                packed = deflatedLength(b, data)
+                if (flags and ENCRYPTED != 0) fail(Reason.ENCRYPTED, name)
+                val (bytes, used) = inflate(b, data, b.size - data, null, minOf(SkinLimits.MAX_ENTRY_BYTES, budget - held), name)
+                held += bytes.size
+                inflated = bytes
+                packed = used
             }
             if (packed < 0 || data + packed > b.size) fail(Reason.NOT_ZIP)
-            out += Entry(name, flags, method, data, packed.toInt())
+            out += Entry(name, flags, method, data, packed.toInt(), inflated)
             p = data + packed.toInt()
             if (flags and DESCRIPTOR != 0) p += if (p + 4 <= b.size && u32(b, p) == DESCRIPTOR_SIG) DESCRIPTOR_SIZE + 4 else DESCRIPTOR_SIZE
         }
         if (out.isEmpty()) fail(Reason.NOT_ZIP)
         return out
-    }
-
-    private fun deflatedLength(b: ByteArray, at: Int): Long {
-        val inf = Inflater(true)
-        try {
-            inf.setInput(b, at, b.size - at)
-            val sink = ByteArray(BUFFER)
-            var out = 0L
-            while (!inf.finished()) {
-                val n = inf.inflate(sink)
-                out += n
-                if (out > SkinLimits.MAX_ENTRY_BYTES) fail(Reason.UNPACKED_TOO_BIG)
-                if (n == 0 && (inf.needsInput() || inf.needsDictionary())) fail(Reason.NOT_ZIP)
-            }
-            return inf.bytesRead
-        } catch (e: DataFormatException) {
-            fail(Reason.NOT_ZIP, e.message.orEmpty(), e)
-        } finally {
-            inf.end()
-        }
     }
 
     private fun unpack(b: ByteArray, e: Entry, left: Long): ByteArray {
@@ -164,28 +156,33 @@ object SkinZip {
                 if (e.packed > left) fail(Reason.UNPACKED_TOO_BIG, e.name)
                 b.copyOfRange(e.data, e.data + e.packed)
             }
-            DEFLATED -> inflate(b, e, cap)
+            DEFLATED -> inflate(b, e.data, e.packed, e.packed.toLong(), cap, e.name).first
             else -> fail(Reason.ENCRYPTED, e.name)
         }
     }
 
-    private fun inflate(b: ByteArray, e: Entry, cap: Long): ByteArray {
+    // [len] bytes at [at] inflated within [cap]: the bytes and how many were read. [packed]: the entry's packed size,
+    // the ratio's base; none (a local scan's, size unknown), the bytes read so far, and the stream must end
+    private fun inflate(b: ByteArray, at: Int, len: Int, packed: Long?, cap: Long, name: String): Pair<ByteArray, Long> {
         val inf = Inflater(true)
         try {
-            inf.setInput(b, e.data, e.packed)
+            inf.setInput(b, at, len)
             val out = ByteArrayOutputStream()
             val buf = ByteArray(BUFFER)
             while (!inf.finished()) {
                 val n = inf.inflate(buf)
-                if (n == 0 && (inf.needsInput() || inf.needsDictionary())) break
+                if (n == 0 && (inf.needsInput() || inf.needsDictionary())) {
+                    if (packed == null) fail(Reason.NOT_ZIP, name)
+                    break
+                }
                 out.write(buf, 0, n)
                 val size = out.size().toLong()
-                if (size > cap) fail(Reason.UNPACKED_TOO_BIG, e.name)
-                if (size > SkinLimits.RATIO_FROM && size > e.packed.toLong() * SkinLimits.MAX_RATIO) fail(Reason.UNPACKED_TOO_BIG, e.name)
+                if (size > cap) fail(Reason.UNPACKED_TOO_BIG, name)
+                if (size > SkinLimits.RATIO_FROM && size > (packed ?: inf.bytesRead) * SkinLimits.MAX_RATIO) fail(Reason.UNPACKED_TOO_BIG, name)
             }
-            return out.toByteArray()
+            return out.toByteArray() to inf.bytesRead
         } catch (x: DataFormatException) {
-            fail(Reason.NOT_ZIP, e.name, x)
+            fail(Reason.NOT_ZIP, name, x)
         } finally {
             inf.end()
         }

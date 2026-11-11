@@ -93,6 +93,32 @@ class SkinZipTest {
     }
 
     @Test
+    fun anEmptyDirectoryIsReadEntryByEntry() {
+        // an end record that says no files (a tool's that left it so): the local headers read in turn
+        val b = zip("a.txt" to "hello".toByteArray(), "b.txt" to ByteArray(3000) { 2 })
+        val end = (b.size - 22 downTo 0).first { b[it] == 0x50.toByte() && b[it + 1] == 0x4b.toByte() && b[it + 2] == 5.toByte() && b[it + 3] == 6.toByte() }
+        // the files on this disk and in all
+        for (o in 8 until 12) b[end + o] = 0
+        val files = SkinZip.read(b)
+        assertEquals(setOf("a.txt", "b.txt"), files.keys)
+        assertArrayEquals(ByteArray(3000) { 2 }, files.getValue("b.txt"))
+    }
+
+    @Test
+    fun aZippedExtensionIsUnpackedWithinTheZipsBudget() {
+        // 24 MB unpacked in the .flex (within the budget alone), 12 MB in the ZIP's own files: past it together
+        val rnd = Random(3)
+        fun noise(n: Int) = ByteArray(n) { rnd.nextInt(4).toByte() }
+        val mb = 1024 * 1024
+        val flex = zip("extension.json" to "{}".toByteArray(), "stylesheets/a.bin" to noise(12 * mb), "stylesheets/b.bin" to noise(12 * mb))
+        assertEquals(3, SkinZip.readSkin(ByteArrayInputStream(zip("x.flex" to flex, stored = true)), "x.zip").size)
+        val both = zip("x.flex" to flex, "pad.bin" to noise(12 * mb - flex.size), stored = true)
+        assertTrue(both.size < SkinLimits.MAX_ARCHIVE_BYTES)
+        val e = assertThrows(SkinError::class.java) { SkinZip.readSkin(ByteArrayInputStream(both), "x.zip") }
+        assertEquals(Reason.UNPACKED_TOO_BIG, e.reason)
+    }
+
+    @Test
     fun namesOutOfTheSkinAreRefused() {
         for (name in listOf("../evil.ini", "a/../../b", "/etc/passwd", "C:/x", "a\\..\\..\\b", "a\u0001b")) {
             assertEquals(name, Reason.UNSAFE_NAME, reason(zip(name to byteArrayOf(1))))
