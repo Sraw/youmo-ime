@@ -1491,9 +1491,10 @@ the tap's presses, what is typed as it is said) are in ime-core's `input/voice/`
   n-best) decodes as the audio comes; no VAD cuts the segments (silero only says whether a short Latin segment was speech, **Quiet** below). Its endpoint rules (2.4 s of silence before
   anything, 1.2 s after something (set in `VoiceEngine.config()`; the Kotlin API's default is 1.4 s), 20 s at most) close a segment: `VoiceEngine.choose` picks its text among the
   n-best (`VoiceChoice`, the pinyin engine's model), and the stream is reset. The user's blocked words are in the
-  search graph (`createStream(hotwords, blocked)`), not searched again. After the microphone closes, 2.92 s of
-  zeros pad the tail (`TAIL_PADDING`: a chunk and its right context, else the last words wait for a chunk that
-  never comes) and the input is finished. Why endpoints and not the VAD: measured on six sets
+  search graph (`createStream(hotwords, blocked)`), not searched again. After the microphone closes, 2.42 s of
+  zeros pad the tail (`TAIL_PADDING`: a chunk and half a second, else the last words wait for a chunk that
+  never comes; 2.92 s before 2026-11-11, the same CER and last characters on 1448 clips, a second chunk decoded
+  after ~19% of stops instead of ~45%, the owner's choice) and the input is finished. Why endpoints and not the VAD: measured on six sets
   (`voice-eval/seg_app.py`, `ENDPOINTS=1`, 060-voice-tagger.md), endpoint segments are as good after the polish
   (written CER within ±0.5 points either way) and the segments do not wait on the VAD.
 - `VoiceLive` (ime-core) keeps the closed segments and the one being said: joined with nothing where neither has a
@@ -1563,6 +1564,14 @@ the tap's presses, what is typed as it is said) are in ime-core's `input/voice/`
 - The end mark: `VoiceEnd` (ime-core) by the field (`EditorTraits.sends`, `isMultiLine`, `isShortMessage`, a chat
   app's multi-line field) and 语音句末句号 (`keyboard.voiceEndMark`): a one-line field takes no end mark, a chat no
   「。」, anything else as said. Applied at the commit only; the composing text shows it as said.
+- The recognizer runs on 3 threads (one fewer than the cores on a phone of 3 or fewer): a 1.92 s chunk took 228 ms on 2, 182 on 3, 160 on 4 on a Snapdragon 845
+  (voice-eval `bench/stream_bench`), 3 leaving a big core to the UI. On the OnePlus 6T (2026-11-11, clip microphone, lifted at
+  the speech's end) the lift to the text took 1.1–1.7 s warm on 3 threads (1.2–1.8 s on 2): the 0.3 s tail, a
+  chunk's decoding ~600 ms (the encoder ~180 ms of it, the rest the beam search over the hotwords), a second chunk
+  as often as the padding asks; the polish ~30 ms, the homophones ~0; the first talk after the models were let go
+  ~1 s more (their load, overlapped with the capture). Debug line at the end, numbers only:
+  `voice timing:` (first text shown from the first sample not zero; from the stop: the microphone closed, the
+  backlog drained, the tail decoded, the polish, the homophones, what was said).
 - Debug line at the recognizer's end: `voice segments: speechStart=` (the first token's frame, from the opening)
   `segments=` (closed with something in them), for the UAT's lift offset (VO-23/24).
 

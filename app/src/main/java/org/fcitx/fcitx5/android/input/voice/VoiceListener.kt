@@ -143,6 +143,13 @@ class VoiceListener(
     // start()'s uptime: the debug log's time to the first sample not zero
     @Volatile
     private var startedAt = 0L
+    // debug: the first sample not zero, the first text shown and the microphone closed (uptime ms), for `voice timing:`
+    @Volatile
+    private var readyAt = 0L
+    @Volatile
+    private var shownAt = 0L
+    @Volatile
+    private var capturedAt = 0L
 
     private fun tell(event: Events.() -> Unit) {
         main.post { if (!closed) events.event() }
@@ -250,7 +257,10 @@ class VoiceListener(
         startedAt = SystemClock.uptimeMillis()
         // closed on completion, not in a finally: a launch cancelled before it ran never runs its
         // finally, and the decoder would wait on the microphone for good, the models with it
-        capture = scope.launch { record() }.also { it.invokeOnCompletion { audio.close() } }
+        capture = scope.launch { record() }.also { it.invokeOnCompletion {
+            capturedAt = SystemClock.uptimeMillis()
+            audio.close()
+        } }
     }
 
     /**
@@ -334,12 +344,21 @@ class VoiceListener(
                 closed = { text -> polished { live.closed(text) } },
                 quiet,
             )
+            var acceptMax = 0L
             for (samples in audio) {
                 if (closed) return
-                segment.accept(samples)
+                if (BuildConfig.DEBUG) {
+                    val t = SystemClock.uptimeMillis()
+                    segment.accept(samples)
+                    acceptMax = maxOf(acceptMax, SystemClock.uptimeMillis() - t)
+                } else {
+                    segment.accept(samples)
+                }
             }
             if (closed) return
+            val drained = SystemClock.uptimeMillis()
             segment.finish(FloatArray(VoiceEngine.TAIL_PADDING))
+            val tailDecoded = SystemClock.uptimeMillis()
             // numbers only, nothing said: the UAT's measure of the lift against the speech's end (uat/12 VO-23/24)
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
             restartIn(live)
@@ -353,7 +372,10 @@ class VoiceListener(
             } else if (polishFailure == VoiceSession.PolishFailure.RUN) {
                 polishFailure = null
             }
-            said.complete(if (polished != null) homophones.replace(polished, homophoneLexicon) to false else homophones.replace(live.raw, homophoneLexicon) to true)
+            val polishedAt = SystemClock.uptimeMillis()
+            val result = if (polished != null) homophones.replace(polished, homophoneLexicon) to false else homophones.replace(live.raw, homophoneLexicon) to true
+            if (BuildConfig.DEBUG) logTiming(drained, tailDecoded, polishedAt, acceptMax)
+            said.complete(result)
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
@@ -364,6 +386,20 @@ class VoiceListener(
             stream.release()
             said.cancel()
         }
+    }
+
+    // where the time after the stop goes, numbers only (debug builds; uptime ms)
+    private fun logTiming(drained: Long, tailDecoded: Long, polishedAt: Long, acceptMax: Long) {
+        val end = SystemClock.uptimeMillis()
+        // -1: not known (no lift or tap time, the capture not closed)
+        val stop = liftAt
+        val captured = capturedAt.takeIf { it > 0 }
+        Timber.d(
+            "voice timing: firstShownFromReadyMs=%d stopToClosedMs=%d closedToDrainedMs=%d tailDecodeMs=%d polishMs=%d homophonesMs=%d stopToSaidMs=%d acceptMaxMs=%d",
+            if (shownAt > 0 && readyAt > 0) shownAt - readyAt else -1, if (stop != null && captured != null) captured - stop else -1,
+            captured?.let { drained - it } ?: -1, tailDecoded - drained, polishedAt - tailDecoded, end - polishedAt,
+            stop?.let { end - it } ?: -1, acceptMax,
+        )
     }
 
     /** [stream] of [recognizer] as VoiceSegments drives it */
@@ -379,7 +415,10 @@ class VoiceListener(
         override fun firstTime(result: OnlineRecognizerResult) = result.timestamps.firstOrNull()
     }
 
-    private fun show(shown: VoiceLive.Heard) = tell { heard(shown) }
+    private fun show(shown: VoiceLive.Heard) {
+        if (BuildConfig.DEBUG && shownAt == 0L && shown.text.isNotEmpty()) shownAt = SystemClock.uptimeMillis()
+        tell { heard(shown) }
+    }
 
     private suspend fun record() {
         val record = open()
@@ -506,7 +545,10 @@ class VoiceListener(
                 if (onset) {
                     tell { ready() }
                     // the UAT's (VO-26): from start() to the first sample not zero
-                    if (BuildConfig.DEBUG) Timber.d("voice ready: fromStartMs=%d", SystemClock.uptimeMillis() - startedAt)
+                    if (BuildConfig.DEBUG) {
+                        readyAt = SystemClock.uptimeMillis()
+                        Timber.d("voice ready: fromStartMs=%d", readyAt - startedAt)
+                    }
                 }
                 val samples = buffer.copyOf(n)
                 // before all of it: the recognizer and the level hear the same
