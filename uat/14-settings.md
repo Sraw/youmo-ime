@@ -538,7 +538,7 @@
 
 ### ST-98 [P1] 按键字符和快捷键：预设、翻转上下滑
 - **前提**：B0-设置，**按键 → 按键字符和快捷键**。
-- **操作**：点顶上的 **翻转上下滑**；回测试页在 a 上向上滑、向下滑；回来点 **预设**，选「上滑长按首选，下滑快捷键」。
+- **操作**：点顶上的 **翻转上下滑**；回测试页在 a 上向上滑、向下滑；回来点 **预设**，选「上滑长按首选，下滑快捷键」，在问话里点 **确定**。
 - **预期**：翻转后 a 的两个图标还在原处（全选左上、`@` 右上：两个图标位置跟着槽一起换了），上滑全选、下滑打出 `@`；底部提示「已修改」带 **撤销**。选预设后回到默认（上滑 `@`，下滑全选，`@` 在右上）。
 - **JVM**：`PopupOverridesFragmentTest$Dialog.flippingAllSwapsTheWaysAndTheirPlaces`、`aPresetResetsEveryKeyAndCanBeTakenBack`、`SwipeSlotsUatTest.flippedTheSwipesSwapAndTheMarksStay`；设备上跑。
 

@@ -1020,6 +1020,8 @@ def st98(d):
     slots_page(d)
     d.tap_text("预设", scroll=False, after=1.0)
     d.tap_text("上滑长按首选，下滑快捷键", scroll=False, after=1.0)
+    # asked first: every key on every keyboard goes back
+    d.tap_text("确定", where="all", scroll=False, after=1.0)
     d.open_page("text")
     d.clear()
     a = d.keys(refresh=True)["a"]
