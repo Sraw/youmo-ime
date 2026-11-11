@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 
 /**
@@ -26,7 +25,3 @@ enum class KeyMarkPosition(override val stringRes: Int, val at: KeyMarks.At) : M
 }
 
 /** 标点位置 and 快捷键图标位置 as stored, apart ([KeyMarks.settled]): what every key and preview draws by. */
-internal fun markSpots(): KeyMarks.Spots {
-    val k = AppPrefs.getInstance().keyboard
-    return KeyMarks.settled(k.punctuationPosition.getValue().at, k.shortcutMarkPosition.getValue().at)
-}

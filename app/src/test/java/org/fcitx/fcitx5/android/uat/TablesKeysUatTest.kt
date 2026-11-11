@@ -161,12 +161,12 @@ class TablesKeysUatTest {
         h.capture("TablesKeysUatTest/wubi_names", h.inputView)
         h.told(wubi(KeyLabels.ROOTS))
         assertTrue(h.texts().toString(), "王龶戋\n五一" in h.texts())
-        // the roots fill the key: no shortcut drawn over them, its swipe up selecting all the same
+        // the roots fill the key: no shortcut drawn over them, its swipe down selecting all the same
         assertEquals(0, h.shortcutIcons("a"))
         h.capture("TablesKeysUatTest/wubi_roots", h.inputView)
         h.field.setText("你好")
         val a = letterKey(h, "a")
-        h.swipe(a, 0f, -a.height.toFloat())
+        h.swipe(a, 0f, a.height.toFloat())
         assertEquals(0 to 2, h.field.selectionStart to h.field.selectionEnd)
         // held: its roots, large, nothing typed
         val before = h.api.calls.size

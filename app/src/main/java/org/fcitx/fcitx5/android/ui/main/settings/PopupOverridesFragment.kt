@@ -14,6 +14,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import com.google.android.flexbox.FlexWrap
@@ -21,18 +22,20 @@ import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
-import com.google.android.material.R as MaterialR
+import com.google.android.material.snackbar.Snackbar
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.popup.PopupEditor
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
-import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
-import org.fcitx.fcitx5.android.ui.main.settings.KeyShortcutSection.Companion.withChosen
+import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
@@ -43,65 +46,195 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapContent
 import splitties.views.dsl.core.wrapInScrollView
+import com.google.android.material.R as MaterialR
 
 /**
- * Edits what a long press on a key offers, on a keyboard drawn as the user sees it: each key
- * with its first long-press character small where the keyboard shows it, a changed one outlined. The decisions
- * (replace, disable, carry over to Shift) live in [PopupOverrides]; this shows and writes them.
+ * 按键字符和快捷键 (060-swipe-slots): each keyboard's keys drawn as the user sees them, a tap editing a key's
+ * long press and its two slots (上滑 and 下滑: the long press's first, a command, a text, nothing). The full
+ * keyboard's long presses are by the key's label ([PopupOverrides] in `popup_overrides`), the other keyboards'
+ * by the key's name (`key_popups`); the slots are [SwipeSlots]. Above the keys: 预设, 翻转上下滑, 多选 (keys
+ * flipped, set to the first or nothing, put back, at once) and 撤销, which takes the last change back.
  */
 class PopupOverridesFragment : KeyCapsPageFragment() {
 
-    private val pref get() = AppPrefs.getInstance().internal.popupOverrides
+    private val prefs get() = AppPrefs.getInstance()
 
     private var overrides: PopupOverrides
-        get() = PopupOverrides.parse(pref.getValue())
-        set(value) = pref.setValue(value.serialize())
+        get() = PopupOverrides.parse(prefs.internal.popupOverrides.getValue())
+        set(value) = prefs.internal.popupOverrides.setValue(value.serialize())
 
-    private val shortcutsPref get() = AppPrefs.getInstance().internal.keyShortcuts
+    // the other keyboards' long presses, by the key's name
+    private var byName: PopupOverrides
+        get() = PopupOverrides.parse(prefs.internal.keyPopups.getValue())
+        set(value) = prefs.internal.keyPopups.setValue(value.serialize())
 
-    private var shortcuts: KeyShortcuts
-        get() = KeyShortcuts.parse(shortcutsPref.getValue())
-        set(value) = shortcutsPref.setValue(value.serialize())
+    private var slots: SwipeSlots
+        get() = prefs.internal.keySwipes.getValue().let { if (it.isEmpty()) SwipeSlots.Default else SwipeSlots.parse(it) }
+        set(value) = prefs.internal.keySwipes.setValue(value.serialize())
 
-    // the tab shown ([KeyShortcutPages.all]), kept as the page is rebuilt
+    // the tab shown ([pages]), kept as the page is rebuilt
     private var page = KeyShortcutPages.Full
 
-    private val layers get() = AppPrefs.getInstance().keyboard.swipeLayers.getValue()
+    // 多选: on, and the keys chosen (their slots' names), kept across tabs
+    private var selecting = false
+    private val selected = LinkedHashSet<String>()
+
+    /** Every setting this page writes, as it was before the last change: what 撤销 puts back. */
+    internal data class Snapshot(
+        val swipes: String, val popups: String, val keyPopups: String,
+        val up: Boolean, val down: Boolean, val upAt: KeyMarkPosition, val downAt: KeyMarkPosition,
+    )
+
+
+    private fun snapshot() = with(prefs) {
+        Snapshot(
+            internal.keySwipes.getValue(), internal.popupOverrides.getValue(), internal.keyPopups.getValue(),
+            keyboard.swipeUp.getValue(), keyboard.swipeDown.getValue(), keyboard.swipeUpPosition.getValue(), keyboard.swipeDownPosition.getValue(),
+        )
+    }
+
+    private fun restore(s: Snapshot) = with(prefs) {
+        internal.keySwipes.setValue(s.swipes)
+        internal.popupOverrides.setValue(s.popups)
+        internal.keyPopups.setValue(s.keyPopups)
+        keyboard.swipeUp.setValue(s.up)
+        keyboard.swipeDown.setValue(s.down)
+        keyboard.swipeUpPosition.setValue(s.upAt)
+        keyboard.swipeDownPosition.setValue(s.downAt)
+    }
+
+    // [block] done, what it changed kept for one 撤销 (a change that changed nothing keeps the one before)
+    private fun change(block: () -> Unit) {
+        val before = snapshot()
+        block()
+        if (snapshot() != before) {
+            undo = before
+            view?.let { v -> Snackbar.make(v, R.string.swipe_changed, Snackbar.LENGTH_LONG).setAction(R.string.undo) { undoLast() }.show() }
+        }
+        rebuild()
+    }
+
+    /** The last change taken back: one step, a second 撤销 has nothing to take. */
+    internal fun undoLast() {
+        val s = undo ?: return
+        undo = null
+        restore(s)
+        rebuild()
+    }
+
+    private val pages get() = KeyShortcutPages.all.filter { it !== KeyShortcutPages.Number }
 
     override fun rebuild() {
         val ctx = requireContext()
         content.apply {
             removeAllViews()
             add(tabs(ctx), lParams(matchParent))
-            // the long press's characters only on the full keyboard's tab; the others change the shortcut alone
-            val hint = if (page === KeyShortcutPages.Full) R.string.shortcut_hint else R.string.shortcut_hint_page
+            val hint = when {
+                page === KeyShortcutPages.Full -> R.string.swipe_slots_hint
+                page.form == KeyShortcuts.FUNCTION -> R.string.swipe_slots_hint_function
+                else -> R.string.swipe_slots_hint_page
+            }
             add(text(ctx, getString(hint), body = true), lParams(matchParent) { topMargin = ctx.dp(8) })
-            add(text(ctx, getString(R.string.shortcut_now, getString(layers.stringRes)), body = false), lParams(matchParent) { topMargin = ctx.dp(4) })
-            if (page === KeyShortcutPages.Full) fullPage(ctx) else shortcutPage(ctx, page)
-            add(ctx.horizontalLayout {
-                // a tab with no presets (注音九键, the numbers) has none to put back
-                if (page.hasPresets) add(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
-                    setText(R.string.shortcut_apply_presets)
-                    setOnClickListener { confirm(R.string.shortcut_apply_presets_message) { shortcuts = shortcuts.withPresets(page.form) } }
-                }, lParams { marginEnd = ctx.dp(8) })
-                add(MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
-                    setText(R.string.shortcut_clear_page)
-                    setOnClickListener { confirm(R.string.shortcut_clear_page_message) { shortcuts = shortcuts.cleared(page.names) } }
-                }, lParams())
-            }, lParams { topMargin = ctx.dp(12) })
+            add(if (selecting) selectionBar(ctx) else actionBar(ctx), lParams(matchParent) { topMargin = ctx.dp(8) })
+            if (page === KeyShortcutPages.Full) fullPage(ctx) else slotPage(ctx, page)
         }
     }
 
-    // a whole page's shortcuts replaced at a tap, there being no taking it back: asked first
-    private fun confirm(message: Int, change: () -> Unit) {
+    private fun button(ctx: Context, @StringRes title: Int, enabled: Boolean = true, onClick: () -> Unit) =
+        MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
+            setText(title)
+            isEnabled = enabled
+            setOnClickListener { onClick() }
+        }
+
+    private fun bar(ctx: Context, buttons: List<View>) = FlexboxLayout(ctx).apply {
+        flexWrap = FlexWrap.WRAP
+        buttons.forEach { add(it, FlexboxLayout.LayoutParams(wrapContent, wrapContent).apply { marginEnd = ctx.dp(8) }) }
+    }
+
+    private fun actionBar(ctx: Context) = bar(
+        ctx,
+        listOf(
+            button(ctx, R.string.swipe_presets) { choosePreset() },
+            button(ctx, R.string.swipe_flip_all) { change { flipAll() } },
+            button(ctx, R.string.swipe_multi_select) { selecting = true; rebuild() },
+            button(ctx, R.string.undo, enabled = undo != null) { undoLast() },
+        ),
+    )
+
+    private fun selectionBar(ctx: Context): View {
+        val any = selected.isNotEmpty()
+        val keys = selected.toList()
+        return ctx.verticalLayout {
+            add(text(ctx, if (any) getString(R.string.swipe_selected, keys.size) else getString(R.string.swipe_none_selected), body = true), lParams(matchParent))
+            add(bar(ctx, listOf(
+                button(ctx, R.string.select_all) { selected.addAll(slotKeys(page)); rebuild() },
+                button(ctx, R.string.swipe_flip, any) { change { slots = slots.flipped(keys) } },
+                button(ctx, R.string.swipe_set_first, any) { askWay(both = false) { up -> change { slots = slots.withAll(keys, up, SwipeSlot.First) } } },
+                button(ctx, R.string.swipe_set_empty, any) { askWay(both = true) { up -> change { slots = slots.withAll(keys, up, SwipeSlot.Empty) } } },
+                button(ctx, R.string.swipe_reset, any) { change { slots = slots.without(keys) } },
+                button(ctx, R.string.undo, enabled = undo != null) { undoLast() },
+                button(ctx, R.string.done) { selecting = false; selected.clear(); rebuild() },
+            )), lParams(matchParent))
+        }
+    }
+
+    // which way a batch sets: 上滑, 下滑, or (where [both]) the two; null for the two
+    private fun askWay(both: Boolean, then: (Boolean?) -> Unit) {
+        val ways = listOfNotNull(true, false, null.takeIf { both })
+        val names = listOfNotNull(getString(R.string.swipe_up), getString(R.string.swipe_down), getString(R.string.swipe_both_ways).takeIf { both })
         AlertDialog.Builder(requireContext())
-            .setMessage(message)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                change()
-                rebuild()
-            }
+            .setTitle(R.string.swipe_which_way)
+            .setItems(names.toTypedArray()) { _, i -> then(if (i < 2) ways[i] else null) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private fun choosePreset() {
+        val presets = listOf(SwipeOrientation.FirstUp, SwipeOrientation.FirstDown)
+        val names = listOf(R.string.swipe_preset_first_up, R.string.swipe_preset_first_down).map(::getString)
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.swipe_presets)
+            .setItems(names.toTypedArray()) { _, i -> change { applyPreset(presets[i]) } }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    // every key back to [orientation]'s presets; the first's mark kept where it was drawn, its way changed or not
+    private fun applyPreset(orientation: SwipeOrientation) {
+        val now = slots
+        slots = now.applied(orientation)
+        if (orientation != now.orientation) swapPositions()
+    }
+
+    // 翻转上下滑: every key's two slots swapped, and with them the two ways' switches and places, so the
+    // marks stay where they were and each swipe does what the other did
+    private fun flipAll() {
+        slots = slots.flippedAll(KeyShortcutPages.FUNCTION_KEYS.map(SwipeSlots::functionKey))
+        swapPositions()
+        with(prefs.keyboard) {
+            val up = swipeUp.getValue()
+            swipeUp.setValue(swipeDown.getValue())
+            swipeDown.setValue(up)
+        }
+    }
+
+    private fun swapPositions() = with(prefs.keyboard) {
+        val up = swipeUpPosition.getValue()
+        swipeUpPosition.setValue(swipeDownPosition.getValue())
+        swipeDownPosition.setValue(up)
+    }
+
+    // the slots' names of [page]'s keys, a function key once
+    private fun slotKeys(page: KeyShortcutPages.Page): List<String> =
+        if (page.form == KeyShortcuts.FUNCTION) page.rows.map { SwipeSlots.functionKey(it.first().label) } else page.names
+
+    // a tap on a key: chosen or not while 多选 is on, else its editor
+    private fun tapped(slotKey: String?, edit: () -> Unit) {
+        if (!selecting) return edit()
+        if (slotKey == null) return
+        if (!selected.remove(slotKey)) selected.add(slotKey)
+        rebuild()
     }
 
     private fun tabs(ctx: Context) = HorizontalScrollView(ctx).apply {
@@ -110,7 +243,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         add(ChipGroup(ctx).apply {
             isSingleLine = true
             isSingleSelection = true
-            KeyShortcutPages.all.forEach { p ->
+            pages.forEach { p ->
                 addView(Chip(ctx).apply {
                     isCheckable = true
                     setText(pageTitle(p))
@@ -121,12 +254,17 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             }
         }, lParams(wrapContent, wrapContent))
         // the page's tab in sight: the row is rebuilt with each page, scrolled back to its start, and
-        // eight tabs are wider than a phone (注音全键盘's was off the edge once 注音九键's came before it)
+        // the tabs are wider than a phone (注音全键盘's was off the edge once 注音九键's came before it)
         post { shown?.let { scrollTo((it.right - width).coerceAtLeast(0), 0) } }
     }
 
-    // a shortcut as a screen reader says it
-    private fun said(name: String): String? = KeyShortcutSection.shortLabel(requireContext(), shortcuts.resolve(name))
+    // a key's two slots as a screen reader says them: 上滑 then 下滑, a way with nothing left out
+    private fun said(slotKey: String): String? {
+        val s = slots
+        return listOf(true, false).mapNotNull { up ->
+            SwipeSlotSection.shortLabel(requireContext(), s.resolve(slotKey, up))?.let { getString(if (up) R.string.swipe_up else R.string.swipe_down) + " " + it }
+        }.joinToString("，").ifEmpty { null }
+    }
 
     private fun captionWidth(ctx: Context, page: KeyShortcutPages.Page): Int {
         val paint = KeyCaps.label(ctx, "", CAPTION_SP).paint
@@ -136,9 +274,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // a function key of ime-core's not named here yet shows as it is called there, not a crash
     private fun functionLabel(name: String) = FunctionLabels[name]?.let(::getString) ?: name
 
-    /** A tab other than the full keyboard's: its keys in their rows, a tap editing the shortcut alone. */
-    private fun shortcutPage(ctx: Context, page: KeyShortcutPages.Page) {
-        val stored = shortcuts
+    /** A tab other than the full keyboard's: its keys in their rows, a tap editing the key's slots and long press. */
+    private fun slotPage(ctx: Context, page: KeyShortcutPages.Page) {
+        val stored = slots
+        val names = byName
         val function = page.form == KeyShortcuts.FUNCTION
         val symbols = symbolsOf(page).iterator()
         // a function key's name beside its engine-drawn cap, on one line: as wide as the widest name on the page
@@ -148,13 +287,15 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             with(content) { add(ctx.horizontalLayout {
                 gravity = if (page.leftAligned) Gravity.START else Gravity.CENTER_HORIZONTAL
                 keys.forEach { key ->
-                    val names = if (function) row.map { it.name } else listOf(key.name)
+                    val fnName = key.label.takeIf { function }
+                    val slotKey = fnName?.let(SwipeSlots::functionKey) ?: key.name
+                    // the long press by the key's name: a character key's, and the function keys' with a list of characters
+                    val popupName = if (function) fnName?.takeIf { it in KeyShortcutPages.FUNCTION_POPUPS } else key.name
                     val label = if (function) functionLabel(key.label) else key.label
-                    val said = names.map { said(it) ?: "–" }.joinToString(" / ").takeIf { names.any { said(it) != null } }
                     val symbol = if (function) null else symbols.next()
                     // the engine's cap: a character key by its name, a function key by its own (its up and down)
-                    val shortcut = KeyCaps.Shortcut(if (function) key.name.substringAfter('/').substringBeforeLast('.') else key.name, stored)
-                    // the symbol the engine's cap draws where 标点位置 puts it (its alt), as the keyboard's key
+                    val shortcut = KeyCaps.Shortcut(fnName ?: key.name, stored)
+                    // the symbol the engine's cap draws where the first's way puts it (its alt), as the keyboard's key
                     val hint = (symbol as? KeyCaps.Mark.Text)?.text.orEmpty()
                     // the engine draws a function key's very face (space blank, the comma a ,): its name beside it, so
                     // the page says which key it is
@@ -166,8 +307,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                         maxLines = 1
                         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     }, lParams(captionWidth, ctx.dp(KeyHeight)))
-                    add(KeyCaps.key(ctx, label, hint, marked = names.any(stored::isSet), dimmed = false, said = said, shortcut = shortcut).apply {
-                        setOnClickListener { editShortcuts(label, names) }
+                    val marked = stored.isSet(slotKey) || popupName?.let { it in names.labels } == true
+                    add(KeyCaps.key(ctx, label, hint, marked = marked, dimmed = false, selected = slotKey in selected, said = said(slotKey), shortcut = shortcut).apply {
+                        setOnClickListener { tapped(slotKey) { edit(label, slotKey, popupName?.let(LongPress::ByName)) } }
                     }, params)
                 }
                 if (!function) weightSum = page.rows.maxOf { it.size }.toFloat()
@@ -176,8 +318,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     }
 
     // each key's symbol on [page] as its keyboard draws it, in the page's order: the 14 and 18 keys'
-    // corners (GroupedKeyboard); none on the number keys, a digit alone on each; the nine keys' and
-    // 注音's labelled by theirs, so not drawn again, its place kept from the shortcut
+    // corners (GroupedKeyboard); the nine keys' and 注音's labelled by theirs, so not drawn again
     private fun symbolsOf(page: KeyShortcutPages.Page): List<KeyCaps.Mark?> {
         val n = page.names.size
         return when (page.form) {
@@ -188,47 +329,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         }
     }
 
-    /** [names]' shortcuts (one, or a function key's up and down) edited, under [label]. */
-    private fun editShortcuts(label: String, names: List<String>) {
-        val ctx = requireContext()
-        val sections = names.map { section(ctx, it) }
-        val layout = ctx.verticalLayout {
-            val pad = ctx.dp(24)
-            setPadding(pad, ctx.dp(8), pad, 0)
-            sections.forEach { add(it.view, lParams(matchParent)) }
-        }
-        val current = shortcuts
-        val builder = AlertDialog.Builder(ctx)
-            .setTitle(label)
-            .setView(layout.wrapInScrollView())
-            .setPositiveButton(android.R.string.ok, null)
-            .setNegativeButton(android.R.string.cancel, null)
-        if (names.any(current::isSet)) {
-            builder.setNeutralButton(R.string.reset_this_key) { _, _ ->
-                shortcuts = names.fold(current) { s, n -> s.without(n) }
-                rebuild()
-            }
-        }
-        builder.show().onPositiveButtonClick onClick@{
-            val chosen = sections.map { it.chosen() ?: return@onClick false }
-            shortcuts = names.zip(chosen).fold(current) { s, (n, c) -> s.withChosen(n, c) }
-            rebuild()
-            true
-        }
-    }
-
-    // [name]'s section, titled by the way that reaches it now (a function key's name says its own)
-    private fun section(ctx: Context, name: String): KeyShortcutSection {
-        val layers = layers.layers
-        val (title, off) = if (KeyShortcuts.formOf(name) == KeyShortcuts.FUNCTION) {
-            val up = name.endsWith(".up")
-            getString(if (up) R.string.shortcut_section_up else R.string.shortcut_section_down) to
-                ((if (up) layers.up else layers.down) == SwipeLayers.Layer.Off)
-        } else {
-            val way = layers.wayOf(SwipeLayers.Layer.Shortcut)
-            getString(if (way == false) R.string.shortcut_section_down else R.string.shortcut_section_up) to (way == null)
-        }
-        return KeyShortcutSection(ctx, title, off, shortcuts.resolve(name))
+    // a way's section, titled by the way, said to be off where its switch is
+    private fun section(ctx: Context, slotKey: String, up: Boolean): SwipeSlotSection {
+        val on = if (up) prefs.keyboard.swipeUp.getValue() else prefs.keyboard.swipeDown.getValue()
+        return SwipeSlotSection(ctx, getString(if (up) R.string.swipe_up else R.string.swipe_down), !on, slots.resolve(slotKey, up))
     }
 
     private fun fullPage(ctx: Context) {
@@ -250,7 +354,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 current.labels.filter { it !in Letters }.forEach { add(key(ctx, it, current), otherParams(ctx)) }
                 add(KeyCaps.key(ctx, "+", "", marked = false, dimmed = false).apply {
                     contentDescription = getString(R.string.add_key)
-                    setOnClickListener { askLabel() }
+                    setOnClickListener { if (!selecting) askLabel() }
                 }, otherParams(ctx))
             }, lParams(matchParent))
 
@@ -266,8 +370,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         }
     }
 
-    // a letter's name in the shortcuts (full/a); the other keys have none of their own here
-    private fun shortcutName(label: String) = label.takeIf { it in Letters }?.let { KeyShortcuts.charKey(KeyShortcutPreset.FULL, it) }
+    // a letter's slots' name (full/a); the other keys have none of their own here
+    private fun slotName(label: String) = label.takeIf { it in Letters }?.let { KeyShortcuts.charKey(KeyShortcutPreset.FULL, it) }
 
     private fun key(ctx: Context, label: String, current: PopupOverrides): View {
         val shown = current.resolve(label, PopupPreset[label])?.toList().orEmpty()
@@ -277,11 +381,15 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             custom?.let { getString(R.string.edited_x, label) },
             getString(R.string.long_press_none).takeIf { shown.isEmpty() },
         ).joinToString(" ").ifEmpty { null }
-        val name = shortcutName(label)
-        val marked = custom != null || name?.let(shortcuts::isSet) == true
+        val name = slotName(label)
+        val stored = slots
+        val marked = custom != null || name?.let(stored::isSet) == true
         val symbol = shown.firstOrNull()
-        return KeyCaps.key(ctx, label, symbol.orEmpty(), marked = marked, dimmed = shown.isEmpty(), state = state, said = name?.let(::said), shortcut = name?.let { KeyCaps.Shortcut(it, shortcuts) }).apply {
-            setOnClickListener { edit(label) }
+        return KeyCaps.key(
+            ctx, label, symbol.orEmpty(), marked = marked, dimmed = shown.isEmpty(), selected = name != null && name in selected,
+            state = state, said = name?.let(::said), shortcut = name?.let { KeyCaps.Shortcut(it, stored) },
+        ).apply {
+            setOnClickListener { tapped(name) { edit(getString(R.string.long_press_of, label), name, LongPress.ByLabel(label)) } }
         }
     }
 
@@ -308,6 +416,12 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant))
     }
 
+    /** Whose long press a dialog edits: the full keyboard's by the key's label, the others' by the key's name. */
+    private sealed interface LongPress {
+        data class ByLabel(val label: String) : LongPress
+        data class ByName(val name: String) : LongPress
+    }
+
     /**
      * The characters drawn as the popup draws them, the first (what letting go gives) outlined.
      * A tap only selects one; what is done with it is up to the buttons below, apart from it: a
@@ -315,9 +429,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
      * Each view with its top margin in dp, in order: the characters, a line said when there are
      * none, the buttons, [field] with its add button.
      */
-    private fun chars(ctx: Context, editor: PopupEditor, field: EditText): List<Pair<View, Int>> {
+    private fun chars(ctx: Context, editor: PopupEditor, field: EditText, @StringRes emptyText: Int): List<Pair<View, Int>> {
         val keys = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
-        val empty = text(ctx, getString(R.string.long_press_none), body = true)
+        val empty = text(ctx, getString(emptyText), body = true)
         val actions = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
         lateinit var render: () -> Unit
         // each button with when it applies
@@ -363,51 +477,77 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         return listOf(keys to 12, empty to 0, actions to 4, addRow to 8)
     }
 
-    /** A key's long press edited ([chars]), and its shortcut where it has one ([section]). */
-    private fun edit(label: String) {
+    /**
+     * A key edited under [title]: its long press ([chars]) where [longPress] names one, its two slots
+     * ([section]) where [slotKey] does (a full keyboard's key of no letter has none).
+     */
+    private fun edit(title: String, slotKey: String?, longPress: LongPress?) {
         val ctx = requireContext()
-        val preset = PopupPreset[label]
-        val current = overrides
-        val editor = PopupEditor(current.resolve(label, preset)?.toList().orEmpty())
+        val editor = longPress?.let { PopupEditor(startOf(it)) }
         val field = EditText(ctx).apply {
             hint = getString(R.string.long_press_add_hint)
             inputType = InputType.TYPE_CLASS_TEXT
             imeOptions = EditorInfo.IME_ACTION_DONE
             isSingleLine = true
         }
-        val name = shortcutName(label)
-        val section = name?.let { section(ctx, it) }
+        val sections = slotKey?.let { k -> listOf(section(ctx, k, up = true), section(ctx, k, up = false)) }.orEmpty()
         val layout = ctx.verticalLayout {
             val pad = ctx.dp(24)
             setPadding(pad, ctx.dp(8), pad, 0)
-            add(text(ctx, getString(R.string.long_press_editor_hint), body = false), lParams(matchParent))
-            chars(ctx, editor, field).forEach { (view, top) -> add(view, lParams(matchParent) { topMargin = ctx.dp(top) }) }
-            section?.let { add(it.view, lParams(matchParent)) }
+            if (editor != null) {
+                add(text(ctx, getString(R.string.long_press_editor_hint), body = false), lParams(matchParent))
+                // by name, an empty list is the keyboard's own (the user's removed), not no long press
+                val empty = if (longPress is LongPress.ByName) R.string.long_press_by_name_hint else R.string.long_press_none
+                chars(ctx, editor, field, empty).forEach { (view, top) -> add(view, lParams(matchParent) { topMargin = ctx.dp(top) }) }
+            }
+            sections.forEach { add(it.view, lParams(matchParent)) }
         }
         val builder = AlertDialog.Builder(ctx)
-            .setTitle(getString(R.string.long_press_of, label))
+            .setTitle(title)
             .setView(layout.wrapInScrollView())
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
-        val stored = shortcuts
-        if (current[label] != null || name?.let(stored::isSet) == true) {
+        val stored = slots
+        if (longPress?.let(::isEdited) == true || slotKey?.let(stored::isSet) == true) {
             builder.setNeutralButton(R.string.reset_this_key) { _, _ ->
-                overrides = current.without(label)
-                name?.let { shortcuts = stored.without(it) }
-                rebuild()
+                change {
+                    longPress?.let { save(it, null) }
+                    slotKey?.let { slots = stored.without(listOf(it)) }
+                }
             }
         }
         builder.show().apply { setCanceledOnTouchOutside(false) }
             // a word left typed in the field counts as added; one holding a key code is said so, the dialog kept
             .onPositiveButtonClick onClick@{
-                if (rejected(field)) return@onClick false
-                val chosen = section?.let { it.chosen() ?: return@onClick false }
-                editor.add(field.text.toString())
-                overrides = current.withEdit(label, editor.items, preset)
-                if (name != null && chosen != null) shortcuts = stored.withChosen(name, chosen)
-                rebuild()
+                if (editor != null && rejected(field)) return@onClick false
+                val chosen = sections.map { it.chosen() ?: return@onClick false }
+                editor?.add(field.text.toString())
+                change {
+                    if (longPress != null) save(longPress, editor?.items.orEmpty())
+                    if (slotKey != null) slots = stored.with(slotKey, true, chosen[0]).with(slotKey, false, chosen[1])
+                }
                 true
             }
+    }
+
+    // the list shown first: the label's (its preset under it), or the name's the user set (none set: empty, the keyboard's own kept)
+    private fun startOf(longPress: LongPress): List<String> = when (longPress) {
+        is LongPress.ByLabel -> overrides.resolve(longPress.label, PopupPreset[longPress.label])?.toList().orEmpty()
+        is LongPress.ByName -> byName.resolve(longPress.name, null)?.toList().orEmpty()
+    }
+
+    private fun isEdited(longPress: LongPress): Boolean = when (longPress) {
+        is LongPress.ByLabel -> overrides[longPress.label] != null
+        is LongPress.ByName -> longPress.name in byName.labels
+    }
+
+    // [items] the long press now, null its default back
+    private fun save(longPress: LongPress, items: List<String>?) {
+        when (longPress) {
+            is LongPress.ByLabel -> overrides = items?.let { overrides.withEdit(longPress.label, it, PopupPreset[longPress.label]) }
+                ?: overrides.without(longPress.label)
+            is LongPress.ByName -> byName = items?.let { byName.withEdit(longPress.name, it, null) } ?: byName.without(longPress.name)
+        }
     }
 
     private fun askLabel() {
@@ -438,7 +578,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                     field.requestFocus()
                     return@onClick false
                 }
-                edit(label)
+                edit(getString(R.string.long_press_of, label), slotName(label), LongPress.ByLabel(label))
                 true
             }
     }
@@ -458,10 +598,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.reset_all)
             .setMessage(R.string.reset_all_long_press_message)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                overrides = PopupOverrides.Empty
-                rebuild()
-            }
+            .setPositiveButton(android.R.string.ok) { _, _ -> change { overrides = PopupOverrides.Empty } }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
@@ -469,10 +606,20 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private class Action(@StringRes val text: Int, val enabled: () -> Boolean, val run: () -> Unit)
 
     companion object {
+        // the one step back, kept past the page: the user leaves it to try the keys and comes back to take it back
+        private var undo: Snapshot? = null
+
+        @VisibleForTesting
+        internal fun forgetUndo() {
+            undo = null
+        }
+
         private val Rows = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
         private val Letters = ('a'..'z').map { it.toString() }.toSet()
         private const val KeyHeight = 52
         private const val OtherKeyWidth = 44
+
+        // the function keys whose long press is a list of characters, edited by name (the others' a menu, or none)
 
         internal fun pageTitle(page: KeyShortcutPages.Page) = when (page.form) {
             KeyShortcutPreset.FULL -> R.string.shortcut_page_full

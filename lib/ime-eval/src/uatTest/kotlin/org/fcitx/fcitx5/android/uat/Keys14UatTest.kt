@@ -195,7 +195,7 @@ class Keys14UatTest {
     @Uat("QU-09")
     fun unicodeOnTheFourteenKeysTakesTheCodeFromCornersAndHalves() = with(HostReplay(engines = UatEngines.fresh())) {
         unicode()
-        // 4E2D: UI swiped down (its corner 4, a keypad's), E the left half of ER, 2 ER swiped, D the left half of DF
+        // 4E2D: UI swiped up (its corner 4, a keypad's), E the left half of ER, 2 ER swiped, D the left half of DF
         key(KeySyms.KP_0 + 4)
         key(EngineReplay.symOf(Keyboard.tapKey(g14Code('e'), 0.25f)))
         key(KeySyms.KP_0 + 2)

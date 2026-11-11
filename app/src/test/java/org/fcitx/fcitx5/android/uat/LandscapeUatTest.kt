@@ -144,7 +144,7 @@ class LandscapeUatTest {
     @Uat("LS-05")
     fun swipeAndLongPressOnTheHalves() {
         h.start()
-        h.swipe(h.key("o"), 0f, h.key("o").height * 1.3f)
+        h.swipe(h.key("o"), 0f, -h.key("o").height * 1.3f)
         h.longPress(h.key("q"), "Q")
         // typed into the engine (pinyin takes them as keys); the engine's commit is its own
         val typed = sent()

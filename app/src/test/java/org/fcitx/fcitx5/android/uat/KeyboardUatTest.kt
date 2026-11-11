@@ -130,9 +130,9 @@ class KeyboardUatTest {
 
     @Test
     @Uat("KB-03")
-    fun swipingALetterDownTypesItsCorner() {
+    fun swipingALetterUpTypesItsCorner() {
         val h = harness().start()
-        h.swipe(h.key("w"), 0f, h.key("w").height * 1.3f)
+        h.swipe(h.key("w"), 0f, -h.key("w").height * 1.3f)
         assertEquals(sent().toString(), 1, sent().size)
         assertTrue(lastSent(), "key=2," in lastSent())
     }
@@ -454,7 +454,7 @@ class KeyboardUatTest {
             h.tap(h.key("o"))
             h.tap(h.key("k"))
             assertTrue(sent().toString(), "key=o," in sent()[0] && "key=k," in sent()[1])
-            h.swipe(h.key("q"), 0f, h.key("q").height * 1.3f)
+            h.swipe(h.key("q"), 0f, -h.key("q").height * 1.3f)
             assertTrue(lastSent(), "key=1," in lastSent())
             val shown = h.longPress(h.key("e"))
             assertTrue(shown.toString(), shown.size > 1)

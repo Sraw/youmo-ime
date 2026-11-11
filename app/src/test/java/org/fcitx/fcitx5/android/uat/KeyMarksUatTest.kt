@@ -65,12 +65,12 @@ class KeyMarksUatTest {
     private fun backspaceMarks() = (h.keyNamed("backspace") as SceneShownKey).markPlaces().shortcuts.joinToString(",")
 
     private fun at(position: KeyMarkPosition) {
-        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, position)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, position)
         h.idle()
     }
 
     private fun symbolsAt(position: KeyMarkPosition) {
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, position)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, position)
         h.idle()
     }
 
@@ -94,7 +94,7 @@ class KeyMarksUatTest {
         assertEquals("z BC TR", marksOf("z"))
         assertEquals("BC,TC", backspaceMarks())
         // 滑动 the other way moves nothing
-        prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
+        prefs.setLayers(SwipeLayersChoice.SymbolUpShortcutDown)
         h.idle()
         assertEquals("z BC TR", marksOf("z"))
         at(KeyMarkPosition.BottomRight)
@@ -151,7 +151,7 @@ class KeyMarksUatTest {
         assertEquals(first, marks())
         // the testers' second keyboard: swiped the other way and back
         for (choice in listOf(SwipeLayersChoice.SymbolUpShortcutDown, SwipeLayersChoice.ShortcutUpSymbolDown)) {
-            prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, choice)
+            prefs.setLayers(choice)
             h.idle()
             val changed = marks()
             fresh().start()
@@ -159,11 +159,12 @@ class KeyMarksUatTest {
             assertEquals(choice.name, first, marks())
         }
         // a shortcut changed and back
-        val shortcuts = AppPrefs.getInstance().internal.keyShortcuts
-        prefs.set(shortcuts, KeyShortcuts.Empty.with("full/s", KeyShortcut.Text("你好")).serialize())
+        val slots = AppPrefs.getInstance().internal.keySwipes
+        val was = slots.getValue()
+        prefs.setShortcuts(KeyShortcuts.Empty.with("full/s", KeyShortcut.Text("你好")))
         h.idle()
         assertEquals("s TL TR", marksOf("s"))
-        prefs.set(shortcuts, "")
+        prefs.set(slots, was)
         h.idle()
         assertEquals(first, marks())
         fresh().start()
@@ -175,7 +176,7 @@ class KeyMarksUatTest {
     @Test
     @Uat("KB-66")
     fun aLongPressTurnedOffPlacesTheMarksAsAKeyboardMadeWithIt() {
-        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+        prefs.setShortcuts(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")))
         h.start()
         val before = marksOf("q")
         prefs.set(AppPrefs.getInstance().internal.popupOverrides, "q")
@@ -194,8 +195,8 @@ class KeyMarksUatTest {
     fun eitherChangedTheKeyboardIsMadeAnew() {
         h.start()
         for ((pref, position) in listOf(
-            AppPrefs.getInstance().keyboard.punctuationPosition to KeyMarkPosition.BottomRight,
-            AppPrefs.getInstance().keyboard.shortcutMarkPosition to KeyMarkPosition.BottomLeft,
+            AppPrefs.getInstance().keyboard.swipeUpPosition to KeyMarkPosition.BottomRight,
+            AppPrefs.getInstance().keyboard.swipeDownPosition to KeyMarkPosition.BottomLeft,
         )) {
             val before = h.inputView
             prefs.set(pref, position)

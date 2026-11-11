@@ -13,15 +13,15 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.markSpots
+import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
-import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -51,8 +51,8 @@ class KeyMarkPositionSettingsTest {
     // what the dialogs pick put back after
     @Before
     fun defaults() {
-        prefs.set(keyboard.punctuationPosition, KeyMarkPosition.TopRight)
-        prefs.set(keyboard.shortcutMarkPosition, KeyMarkPosition.TopLeft)
+        prefs.set(keyboard.swipeUpPosition, KeyMarkPosition.TopRight)
+        prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.TopLeft)
     }
 
     private val keyboard get() = AppPrefs.getInstance().keyboard
@@ -73,67 +73,67 @@ class KeyMarkPositionSettingsTest {
     fun theTwoTogetherTheOthersPlaceGreyedOut() {
         st.open(SettingsRoute.Keys)
         val titles = st.titles()
-        val symbol = titles.indexOf(st.s(R.string.punctuation_position))
-        assertEquals("快捷键图标位置 right after 标点位置", symbol + 1, titles.indexOf(st.s(R.string.shortcut_mark_position)))
-        assertEquals(places, (st.pref(R.string.punctuation_position) as ListPreference).entries.map { it.toString() })
-        assertEquals(places, (st.pref(R.string.shortcut_mark_position) as ListPreference).entries.map { it.toString() })
+        val symbol = titles.indexOf(st.s(R.string.swipe_up_position))
+        assertEquals("下滑 and 下滑图标位置 right after 上滑图标位置", listOf(symbol + 1, symbol + 2), listOf(titles.indexOf(st.s(R.string.swipe_down)), titles.indexOf(st.s(R.string.swipe_down_position))))
+        assertEquals(places, (st.pref(R.string.swipe_up_position) as ListPreference).entries.map { it.toString() })
+        assertEquals(places, (st.pref(R.string.swipe_down_position) as ListPreference).entries.map { it.toString() })
         // the defaults: 右上, 左上
-        assertEquals("右上", st.pref(R.string.punctuation_position).summary)
-        assertEquals("左上", st.pref(R.string.shortcut_mark_position).summary)
+        assertEquals("右上", st.pref(R.string.swipe_up_position).summary)
+        assertEquals("左上", st.pref(R.string.swipe_down_position).summary)
 
-        val d = dialog(R.string.punctuation_position)
+        val d = dialog(R.string.swipe_up_position)
         val r = rows(d)
-        assertEquals("左上（快捷键图标在这里）" to false, r[2])
+        assertEquals("左上（下滑图标在这里）" to false, r[2])
         assertTrue(r.filterIndexed { i, _ -> i != 2 }.all { it.second })
         // the greyed one not picked, another is
         d.listView.performItemClick(null, 2, 2)
         st.idle()
-        assertEquals(KeyMarkPosition.TopRight, keyboard.punctuationPosition.getValue())
+        assertEquals(KeyMarkPosition.TopRight, keyboard.swipeUpPosition.getValue())
         d.listView.performItemClick(null, 3, 3)
         st.idle()
-        assertEquals(KeyMarkPosition.BottomLeft, keyboard.punctuationPosition.getValue())
+        assertEquals(KeyMarkPosition.BottomLeft, keyboard.swipeUpPosition.getValue())
         assertFalse(d.isShowing)
 
-        val s = dialog(R.string.shortcut_mark_position)
-        assertEquals("左下（标点在这里）" to false, rows(s)[3])
+        val s = dialog(R.string.swipe_down_position)
+        assertEquals("左下（上滑图标在这里）" to false, rows(s)[3])
         // the default 左上 free: 默认 offered
         assertTrue(s.getButton(DialogInterface.BUTTON_NEUTRAL).isShown)
         s.listView.performItemClick(null, 0, 0)
         st.idle()
-        assertEquals(KeyMarkPosition.TopRight, keyboard.shortcutMarkPosition.getValue())
+        assertEquals(KeyMarkPosition.TopRight, keyboard.swipeDownPosition.getValue())
     }
 
     @Test
     fun noneInBothAndNothingGreyedOut() {
-        prefs.set(keyboard.punctuationPosition, KeyMarkPosition.None)
+        prefs.set(keyboard.swipeUpPosition, KeyMarkPosition.None)
         st.open(SettingsRoute.Keys)
-        val d = dialog(R.string.shortcut_mark_position)
+        val d = dialog(R.string.swipe_down_position)
         assertTrue(rows(d).all { it.second })
         d.listView.performItemClick(null, 5, 5)
         st.idle()
-        assertEquals(KeyMarkPosition.None, keyboard.shortcutMarkPosition.getValue())
-        assertTrue(rows(dialog(R.string.punctuation_position)).all { it.second })
+        assertEquals(KeyMarkPosition.None, keyboard.swipeDownPosition.getValue())
+        assertTrue(rows(dialog(R.string.swipe_up_position)).all { it.second })
     }
 
     @Test
     fun theDefaultTakenNoDefaultButton() {
         // 快捷键图标位置 右上: 标点位置's default is where it is
-        prefs.set(keyboard.punctuationPosition, KeyMarkPosition.BottomRight)
-        prefs.set(keyboard.shortcutMarkPosition, KeyMarkPosition.TopRight)
+        prefs.set(keyboard.swipeUpPosition, KeyMarkPosition.BottomRight)
+        prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.TopRight)
         st.open(SettingsRoute.Keys)
-        val d = dialog(R.string.punctuation_position)
-        assertEquals("右上（快捷键图标在这里）" to false, rows(d)[0])
+        val d = dialog(R.string.swipe_up_position)
+        assertEquals("右上（下滑图标在这里）" to false, rows(d)[0])
         assertNull(d.getButton(DialogInterface.BUTTON_NEUTRAL)?.takeIf { it.isShown })
     }
 
     @Test
     fun onePlaceStoredInBothReadsAsTheSymbolMoved() {
-        prefs.set(keyboard.punctuationPosition, KeyMarkPosition.TopLeft)
-        prefs.set(keyboard.shortcutMarkPosition, KeyMarkPosition.TopLeft)
+        prefs.set(keyboard.swipeUpPosition, KeyMarkPosition.TopLeft)
+        prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.TopLeft)
         st.open(SettingsRoute.Keys)
-        assertEquals("左下", st.pref(R.string.punctuation_position).summary)
-        assertEquals("左上", st.pref(R.string.shortcut_mark_position).summary)
-        assertEquals("左下（标点在这里）" to false, rows(dialog(R.string.shortcut_mark_position))[3])
+        assertEquals("左下", st.pref(R.string.swipe_up_position).summary)
+        assertEquals("左上", st.pref(R.string.swipe_down_position).summary)
+        assertEquals("左下（上滑图标在这里）" to false, rows(dialog(R.string.swipe_down_position))[3])
     }
 
     // the two in one place (a backup restored, not yet stored apart at a start), then the other changed:
@@ -141,15 +141,15 @@ class KeyMarkPositionSettingsTest {
     @Test
     @Uat("KB-66")
     fun onePlaceStoredInBothThenTheOtherChangedTheSummaryIsTheKeyboards() {
-        prefs.set(keyboard.punctuationPosition, KeyMarkPosition.TopLeft)
-        prefs.set(keyboard.shortcutMarkPosition, KeyMarkPosition.TopLeft)
+        prefs.set(keyboard.swipeUpPosition, KeyMarkPosition.TopLeft)
+        prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.TopLeft)
         st.open(SettingsRoute.Keys)
-        assertEquals("左下", st.pref(R.string.punctuation_position).summary)
-        dialog(R.string.shortcut_mark_position).listView.performItemClick(null, 0, 0)
+        assertEquals("左下", st.pref(R.string.swipe_up_position).summary)
+        dialog(R.string.swipe_down_position).listView.performItemClick(null, 0, 0)
         st.idle()
-        assertEquals(KeyMarkPosition.TopRight, keyboard.shortcutMarkPosition.getValue())
-        assertEquals(KeyMarks.At.TopLeft, markSpots().symbol)
-        assertEquals("左上", st.pref(R.string.punctuation_position).summary)
-        assertEquals(KeyMarkPosition.TopLeft, keyboard.punctuationPosition.getValue())
+        assertEquals(KeyMarkPosition.TopRight, keyboard.swipeDownPosition.getValue())
+        assertEquals(KeyMarks.At.TopLeft, swipeSpots().symbol)
+        assertEquals("左上", st.pref(R.string.swipe_up_position).summary)
+        assertEquals(KeyMarkPosition.TopLeft, keyboard.swipeUpPosition.getValue())
     }
 }

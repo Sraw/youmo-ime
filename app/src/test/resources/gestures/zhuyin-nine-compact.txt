@@ -4,7 +4,7 @@ r1c1 said: ˉ
 r1c1 pressed: [ˉ]
 r1c1 tap: [sendKey(sym=17761372, states=536870912, code=0, up=false)] field hello world, again|18,18
 r1c1 swiping: [ˉ]
-r1c1 up: [sendKey(sym=17761372, states=536870912, code=0, up=false)] field hello world, again|18,18
+r1c1 up: [sendKey(sym=17761376, states=536870912, code=0, up=false)] field hello world, again|18,18
 r1c1 down: [] field hello world, again|18,18
 r1c1 left: [] field hello world, again|18,18
 r1c1 right: [] field hello world, again|18,18

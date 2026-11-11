@@ -361,6 +361,14 @@ class HandwritingSceneGesturesTest {
         assertEquals(listOf(app.getString(R.string.hw_reading_key_off, name), app.getString(R.string.hw_reading_key_on, name)), said)
     }
 
+    // the comma's long press set by name on 按键字符和快捷键's 功能键 page (060-swipe-slots): the handwriting one's
+    // too, the user's list in place of its own
+    @Test
+    fun theCommasLongPressSetByNameIsTheUsers() {
+        prefs.set(AppPrefs.getInstance().internal.keyPopups, "comma ① ②")
+        harness().use { h -> assertEquals(setOf("①", "②"), h.longPress(h.keyNamed("comma")).toSet()) }
+    }
+
     // 注 found by its view's name (button_reading): uat and TalkBack's tools look it up by it
     @Test
     fun readingKeyByItsViewsName() {

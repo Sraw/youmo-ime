@@ -312,10 +312,10 @@ class KeyboardCanvasViewTest {
             changed("the punctuation mapped") { board.onPunctuationUpdate(mapOf("é" to "ω")) }
             assertEquals(was.toString(), "ω", corner(was)[0])
             changed("a shortcut on q") {
-                prefs.set(internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+                prefs.setShortcuts(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")))
             }
-            changed("no swipe to shortcuts") { prefs.set(keyboard.swipeLayers, SwipeLayersChoice.SymbolDownOnly) }
-            changed("the symbol elsewhere") { prefs.set(keyboard.punctuationPosition, KeyMarkPosition.BottomLeft) }
+            changed("the first down, no swipe up") { prefs.setLayers(SwipeLayersChoice.SymbolDownOnly) }
+            changed("the symbol elsewhere") { prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.BottomLeft) }
             // the setting makes the input view anew (its other changes go with it): the corner's place is what
             // tells the marks' kept spots followed it, left of the letter and below it
             val letter = texts(was).single { it[0] == "q" }
@@ -594,7 +594,7 @@ class KeyboardCanvasViewTest {
         assertTrue(aBox.left - h.box(board).left > 4 * dp)
         val x = -2 * dp
         h.api.calls.clear()
-        h.touch(a, KeyboardHarness.Touch(x, a.height / 2f), KeyboardHarness.Touch(x, a.height / 2f + 30 * dp, 16), KeyboardHarness.Touch(x, a.height / 2f + 60 * dp, 16))
+        h.touch(a, KeyboardHarness.Touch(x, a.height / 2f), KeyboardHarness.Touch(x, a.height / 2f - 30 * dp, 16), KeyboardHarness.Touch(x, a.height / 2f - 60 * dp, 16))
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey(key=@,") })
         // held there: A's long press
         val f = h.finger(a, KeyboardHarness.Touch(x, a.height / 2f))

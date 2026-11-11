@@ -4,38 +4,45 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers.Layer
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 
 /**
- * What lifting the finger after a vertical swipe on a key does, by the 滑动 setting ([SwipeLayers]).
+ * What lifting the finger after a vertical swipe on a key does (060-swipe-slots): every key has an up
+ * slot and a down slot ([SwipeSlot]), and 上滑 and 下滑 each on or off ([Ways]).
  *
- * A character key (a letter, a digit of the nine keys, a group) has two layers: its corner symbol
- * and its shortcut. Swiped the way that is off, or to a layer it has nothing on (its long press
- * turned off, no shortcut set), it is a tap: the letter is typed here, not left to the key's own
- * tap, as a swipe that long has left the key, and a touch that left its key is no tap (ST-15).
- * With both ways off a swipe off the key is how a press is taken back, as it always was.
+ * A character key (a letter, a digit of the nine keys, a group, a zhuyin key): swiped a way that is
+ * off, or to a slot with nothing (empty, its long press's first where its long press is off), it is a
+ * tap: the letter is typed here, not left to the key's own tap, as a swipe that long has left the key,
+ * and a touch that left its key is no tap (ST-15). With both ways off a swipe off the key is how a
+ * press is taken back, as it always was.
  *
- * A function key (space, backspace, …) has no symbol: a way that is on reaches its shortcut that
- * way; a way off, or no shortcut, leaves the key as it always was.
+ * A function key (space, backspace, …): a way off, or a slot with nothing, leaves the key as it always was.
  *
  * Swiped past the threshold and back before the lift is cancelled, on every key.
  */
 object KeySwipe {
 
-    sealed interface Key {
-        /** A character key: whether it has a symbol to swipe to, and its shortcut. */
-        data class Char(val hasSymbol: Boolean, val shortcut: KeyShortcut) : Key
+    /**
+     * A key's two slots; [char] for a character key, [hasFirst] whether its long press has a first
+     * (what [SwipeSlot.First] types).
+     */
+    data class Key(val char: Boolean, val up: SwipeSlot, val down: SwipeSlot, val hasFirst: Boolean = true)
 
-        /** A function key: its shortcut up and down. */
-        data class Function(val up: KeyShortcut, val down: KeyShortcut) : Key
+    /** 上滑 and 下滑 on or off. */
+    data class Ways(val up: Boolean, val down: Boolean) {
+        val allOff: Boolean get() = !up && !down
+
+        companion object {
+            val Both = Ways(up = true, down = true)
+        }
     }
 
     sealed interface Outcome {
-        /** The corner symbol typed. */
+        /** The long press's first typed. */
         data object Symbol : Outcome
 
-        /** [shortcut] run: never [KeyShortcut.None]. */
+        /** [shortcut] run (a command, a text): never [KeyShortcut.None]. */
         data class Shortcut(val shortcut: KeyShortcut) : Outcome
 
         /** The key's own character, as a tap. */
@@ -63,30 +70,25 @@ object KeySwipe {
     @Suppress("LongParameterList")
     fun decide(
         key: Key,
-        layers: SwipeLayers,
+        ways: Ways,
         totalY: Int,
         swiped: Boolean,
         consumed: Boolean,
         cancelled: Boolean,
         password: Boolean,
     ): Outcome {
-        // 关 is 0.5.0's 禁用: no swipe on any key, a function key's tap kept as a character key's is
-        if (consumed || cancelled || layers.allOff) return Outcome.None
+        // both off is 0.5.0's 禁用: no swipe on any key, a function key's tap kept as a character key's is
+        if (consumed || cancelled || ways.allOff) return Outcome.None
         if (!swiped && totalY == 0) return Outcome.None
-        return when (key) {
-            is Key.Char -> when {
-                totalY == 0 -> Outcome.Cancel
-                else -> when (layers.layerOf(totalY)) {
-                    Layer.Off -> Outcome.Tap
-                    Layer.Symbol -> if (key.hasSymbol) Outcome.Symbol else Outcome.Tap
-                    Layer.Shortcut -> run(key.shortcut, password) ?: Outcome.Tap
-                }
-            }
-            is Key.Function -> when {
-                totalY == 0 -> Outcome.Cancel
-                layers.layerOf(totalY) == Layer.Off -> Outcome.None
-                else -> run(if (totalY < 0) key.up else key.down, password) ?: Outcome.None
-            }
+        if (totalY == 0) return Outcome.Cancel
+        val up = totalY < 0
+        // a slot with nothing: a character key's tap, a function key as it was
+        val nothing = if (key.char) Outcome.Tap else Outcome.None
+        if (!(if (up) ways.up else ways.down)) return nothing
+        return when (val slot = if (up) key.up else key.down) {
+            SwipeSlot.First -> if (key.hasFirst) Outcome.Symbol else nothing
+            SwipeSlot.Empty -> nothing
+            is SwipeSlot.Text, is SwipeSlot.Command -> run(slot.shortcut, password) ?: nothing
         }
     }
 
@@ -97,8 +99,8 @@ object KeySwipe {
     }
 
     /** What [key] previews having swiped [totalY] steps so far: what its lift would do. */
-    fun preview(key: Key, layers: SwipeLayers, totalY: Int, password: Boolean): Preview =
-        when (val outcome = decide(key, layers, totalY, swiped = true, consumed = false, cancelled = false, password)) {
+    fun preview(key: Key, ways: Ways, totalY: Int, password: Boolean): Preview =
+        when (val outcome = decide(key, ways, totalY, swiped = true, consumed = false, cancelled = false, password)) {
             Outcome.Symbol -> Preview.Symbol
             is Outcome.Shortcut -> Preview.Shortcut(outcome.shortcut)
             else -> Preview.Own

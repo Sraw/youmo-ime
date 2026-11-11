@@ -11,10 +11,12 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 
 /** Whether a key's long press showed a popup in this touch: set by its popup's listener, read by its swipe. */
 internal class LongPopup {
@@ -53,44 +55,52 @@ internal class KeySwipes(
     }
 
     private val prefs = AppPrefs.getInstance()
-    private val swipeLayersChoice by prefs.keyboard.swipeLayers
-    private val swipeLayers: SwipeLayers get() = swipeLayersChoice.layers
     private val hapticOnRepeat by prefs.keyboard.hapticOnRepeat
 
     /** The key whose touch 滑选 has: its bubble names 滑选 till the lift, wherever the finger drifts up or down. */
     private var selecting: KeyRef? = null
 
     @Keep
-    private val swipeLayersListener = ManagedPreference.OnChangeListener<SwipeLayersChoice> { _, _ -> showMarks() }
+    private val slotsListener = ManagedPreference.OnChangeListener<String> { _, _ -> showMarks() }
     @Keep
-    private val keyShortcutsListener = ManagedPreference.OnChangeListener<String> { _, _ -> showMarks() }
+    private val waysListener = ManagedPreference.OnChangeListener<Boolean> { _, _ -> showMarks() }
     @Keep
     private val markPositionListener = ManagedPreference.OnChangeListener<KeyMarkPosition> { _, _ -> showMarks() }
 
     init {
         if (shortcuts) {
-            prefs.keyboard.swipeLayers.registerOnChangeListener(swipeLayersListener)
-            prefs.internal.keyShortcuts.registerOnChangeListener(keyShortcutsListener)
-            prefs.keyboard.shortcutMarkPosition.registerOnChangeListener(markPositionListener)
-            prefs.keyboard.punctuationPosition.registerOnChangeListener(markPositionListener)
+            prefs.internal.keySwipes.registerOnChangeListener(slotsListener)
+            prefs.keyboard.swipeUp.registerOnChangeListener(waysListener)
+            prefs.keyboard.swipeDown.registerOnChangeListener(waysListener)
+            prefs.keyboard.swipeUpPosition.registerOnChangeListener(markPositionListener)
+            prefs.keyboard.swipeDownPosition.registerOnChangeListener(markPositionListener)
         }
     }
 
-    /** What the key of [def] swipes to as the settings are now ([KeySwipe.Key]). */
+    /**
+     * What the key of [def] swipes to as the settings are now ([KeySwipe.Key]): its two slots by its name;
+     * a key of no name (a panel's), its built-in swipe up alone.
+     */
     private fun swipeKey(def: KeyDef): KeySwipe.Key {
         val name = def.shortcut?.takeIf { shortcuts }
-        val stored = KeyShortcutsCache.current
-        return if (name == null || '/' in name) {
-            val symbol = def.behaviors.any { it is KeyDef.Behavior.Swipe } && keyboard.swipeText(def) != BaseKeyboard.SwipeChoice.None
-            KeySwipe.Key.Char(symbol, name?.let(stored::resolve) ?: KeyShortcut.None)
-        } else {
-            KeySwipe.Key.Function(stored.resolve(KeyShortcuts.functionKey(name, up = true)), stored.resolve(KeyShortcuts.functionKey(name, up = false)))
+        val builtIn = def.behaviors.any { it is KeyDef.Behavior.Swipe }
+        val hasFirst = when (keyboard.swipeText(def)) {
+            BaseKeyboard.SwipeChoice.BuiltIn -> builtIn
+            BaseKeyboard.SwipeChoice.None -> false
+            is BaseKeyboard.SwipeChoice.Text -> true
         }
+        if (name == null) return KeySwipe.Key(char = true, up = SwipeSlot.First, down = SwipeSlot.Empty, hasFirst = hasFirst)
+        val slots = SwipeSlotsCache.current
+        val key = SwipeSlots.keyOf(name)
+        return KeySwipe.Key(char = '/' in name, slots.resolve(key, up = true), slots.resolve(key, up = false), hasFirst)
     }
+
+    // 上滑 and 下滑 on or off; a panel's keys (no shortcuts) swipe up to their symbol as they always did
+    private val ways: KeySwipe.Ways get() = if (shortcuts) swipeWays() else KeySwipe.Ways.Both
 
     /** What the preview of [key] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
     fun preview(key: KeyHandle, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview, content: String = popup.content): PopupAction.PreviewUpdateAction =
-        when (val preview = if (selecting == key.ref) SWIPE_SELECT else KeySwipe.preview(swipeKey(def), swipeLayers, totalY, keyboard.inPasswordField)) {
+        when (val preview = if (selecting == key.ref) SWIPE_SELECT else KeySwipe.preview(swipeKey(def), ways, totalY, keyboard.inPasswordField)) {
             KeySwipe.Preview.Symbol -> PopupAction.PreviewUpdateAction(key.ref, keyboard.swipeText(def).preview(popup.alternative))
             is KeySwipe.Preview.Shortcut -> PopupAction.PreviewUpdateAction(key.ref, shortcutLabel(preview.shortcut), words = true)
             KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(key.ref, content)
@@ -181,7 +191,7 @@ internal class KeySwipes(
     // the threshold just passed ([attach]): a buzz where it reaches anything; whether it took the touch, [held]
     // by the edit menu opened, or by 滑选, its steps counted from here
     private fun swipeReached(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, held: Held): Boolean {
-        val preview = KeySwipe.preview(swipeKey(def), swipeLayers, event.totalY, keyboard.inPasswordField)
+        val preview = KeySwipe.preview(swipeKey(def), ways, event.totalY, keyboard.inPasswordField)
         if (preview == KeySwipe.Preview.Own) return false
         val editMenu = preview == KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.EditMenu))
         // the menu over a key the scene drawn last has not: nothing opens, so nothing felt
@@ -201,9 +211,13 @@ internal class KeySwipes(
     }
 
     private fun lifted(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, builtIn: KeyAction?, longPopup: Boolean): Boolean =
-        when (val outcome = KeySwipe.decide(swipeKey(def), swipeLayers, event.totalY, event.swipedY, event.consumed || longPopup, event.cancelled, keyboard.inPasswordField)) {
+        when (val outcome = KeySwipe.decide(swipeKey(def), ways, event.totalY, event.swipedY, event.consumed || longPopup, event.cancelled, keyboard.inPasswordField)) {
             KeySwipe.Outcome.Symbol -> {
-                builtIn?.let { keyboard.swipeText(def).typed(it) }?.let { (action, source) -> keyboard.onAction(action, source) }
+                // the long press's first: the key's own swipe, or the first of a long press the user set
+                when (val choice = keyboard.swipeText(def)) {
+                    is BaseKeyboard.SwipeChoice.Text -> keyboard.onAction(PopupKeyboardUi.keyAction(choice.text), KeyActionListener.Source.Popup)
+                    else -> builtIn?.let { choice.typed(it) }?.let { (action, source) -> keyboard.onAction(action, source) }
+                }
                 // consumed when it types nothing too, or a swipe that stayed on the key would type it as a tap
                 true
             }

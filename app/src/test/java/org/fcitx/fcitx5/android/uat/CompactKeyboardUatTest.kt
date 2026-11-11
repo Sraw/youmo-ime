@@ -91,7 +91,7 @@ class CompactKeyboardUatTest {
     @Test
     @Uat("ST-51")
     fun compactTextIsSmallerAndTheSymbolInItsCornerEvenAtBottom() {
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.Bottom)
         h.start()
         val size = h.key("q").size()
         val height = h.key("q").height
@@ -105,7 +105,7 @@ class CompactKeyboardUatTest {
         assertEquals("2", w.alt)
         assertTrue("底部 too: in its corner", w.inItsCorner())
         // the swipe types it all the same
-        h.swipe(w, 0f, w.height * 1.3f)
+        h.swipe(w, 0f, -w.height * 1.3f)
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") && "key=2," in it })
     }
 
@@ -114,7 +114,7 @@ class CompactKeyboardUatTest {
     @Test
     @Uat("ST-51")
     fun aBottomShortcutInTheFirstCornerFree() {
-        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, KeyMarkPosition.Bottom)
         compact()
         h.start()
         for (k in listOf("a", "z", "x", "c", "v")) {
@@ -122,7 +122,7 @@ class CompactKeyboardUatTest {
             assertEquals(k, listOf("TL"), h.key(k).marks().shortcuts)
         }
         fresh()
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.TopLeft)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.TopLeft)
         h.start()
         assertEquals(listOf("TR"), h.key("a").marks().shortcuts)
     }
@@ -130,7 +130,7 @@ class CompactKeyboardUatTest {
     @Test
     @Uat("ST-51")
     fun theShortcutIsDrawnTopLeftBesideTheSymbol() {
-        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+        prefs.setShortcuts(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")))
         h.start()
         assertTrue("standard: both", "你好" in h.texts())
         val icons = backspaceIcons()
@@ -148,7 +148,7 @@ class CompactKeyboardUatTest {
         // the backspace's 清除 (up) and 恢复 (down) both
         assertEquals(icons, backspaceIcons())
         // the shortcut still swipes
-        h.swipe(q, 0f, -q.height * 1.3f)
+        h.swipe(q, 0f, q.height * 1.3f)
         h.idle()
         assertEquals("你好", h.field.text.toString())
     }

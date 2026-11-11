@@ -10,6 +10,7 @@ import android.text.InputType
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import java.io.File
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -28,9 +29,10 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutRunner
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.uat.PrefsRule
-import org.fcitx.fcitx5.android.until as waitUntil
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -41,7 +43,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
+import org.fcitx.fcitx5.android.until as waitUntil
 
 /**
  * The swipes' shortcuts carried out (051-c §4): 清除 and 恢复 on backspace (up and down by default),
@@ -240,11 +242,11 @@ class KeyShortcutsHostTest {
 
     // 051-c §1.4: what is typed goes in first, then the shortcut runs
     @Test
-    fun vSwipedUpWhilePinyinIsTypedCommitsItThenPastes() {
+    fun vSwipedDownWhilePinyinIsTypedCommitsItThenPastes() {
         start()
         appContext.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(null, "X"))
         type("nihao")
-        swipe(h.key("v"), up = true)
+        swipe(h.key("v"), up = false)
         until("committed, then pasted") { h.field.text.endsWith("X") && preedit.isEmpty() }
         assertEquals("你好X", h.field.text.toString())
     }
@@ -253,10 +255,10 @@ class KeyShortcutsHostTest {
     // typed put in first
     @Test
     fun aShortcutOfQuickInputOpensItAfterWhatIsTyped() {
-        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.QuickInput)).serialize())
+        prefs.setShortcuts(KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.QuickInput)))
         start()
         type("nihao")
-        swipe(h.key("q"), up = true)
+        swipe(h.key("q"), up = false)
         until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
         assertEquals("", preedit)
     }
@@ -280,8 +282,9 @@ class KeyShortcutsHostTest {
         return finger
     }
 
+    // 滑选 in q's up slot (its long press's first by default)
     private fun swipeSelectOnQ() =
-        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.SwipeSelect)).serialize())
+        prefs.set(AppPrefs.getInstance().internal.keySwipes, SwipeSlots.Default.with("full/q", up = true, SwipeSlot.Command(KeyCommand.SwipeSelect)).serialize())
 
     private fun selected() = "${h.field.selectionStart}..${h.field.selectionEnd}"
 
@@ -459,10 +462,11 @@ class KeyShortcutsHostTest {
     // on space or backspace: their own sideways swipes (the cursor, the selection deleted) not run
     @Test
     fun swipeSelectOnSpaceOrBackspaceMovesNoCursorAndDeletesNothing() {
+        val select = SwipeSlot.Command(KeyCommand.SwipeSelect)
         prefs.set(
-            AppPrefs.getInstance().internal.keyShortcuts,
-            KeyShortcuts.Empty.with(KeyShortcuts.functionKey("space", up = true), KeyShortcut.Command(KeyCommand.SwipeSelect))
-                .with(KeyShortcuts.functionKey("backspace", up = true), KeyShortcut.Command(KeyCommand.SwipeSelect)).serialize(),
+            AppPrefs.getInstance().internal.keySwipes,
+            SwipeSlots.Default.with(SwipeSlots.functionKey("space"), up = true, select)
+                .with(SwipeSlots.functionKey("backspace"), up = true, select).serialize(),
         )
         start("hello world")
         synced()
@@ -509,10 +513,10 @@ class KeyShortcutsHostTest {
     // review L3: a copy changes nothing of the field, the cursor back where it was: the run goes on
     @Test
     fun aCopyBetweenBackspacesEndsNoRun() {
-        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)).serialize())
+        prefs.setShortcuts(KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)))
         start("你好世界")
         backspaces(1, leaving = "你好世")
-        swipe(h.key("c"), up = true)
+        swipe(h.key("c"), up = false)
         until("copied") { appContext.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text?.toString() == "你好世" }
         backspaces(1, leaving = "你好")
         assertEquals(2, h.field.selectionStart)
@@ -523,20 +527,17 @@ class KeyShortcutsHostTest {
     // 0.6.0 #4: a copy or cut with nothing selected in an empty field leaves the clipboard as it was
     @Test
     fun aCopyOrCutOfAnEmptyFieldKeepsTheClipboard() {
-        prefs.set(
-            AppPrefs.getInstance().internal.keyShortcuts,
-            KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)).with("full/x", KeyShortcut.Command(KeyCommand.Cut)).serialize(),
-        )
+        prefs.setShortcuts(KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)).with("full/x", KeyShortcut.Command(KeyCommand.Cut)))
         val clipboard = appContext.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(android.content.ClipData.newPlainText(null, "旧的"))
         start("")
         // each said (the empty field's branch run, not a swipe that never reached the command)
         fun said(): List<String> = org.robolectric.Shadows.shadowOf(appContext as android.app.Application).latestPopupWindow
             ?.contentView?.let { v -> KeyboardHarness.all(v).filterIsInstance<android.widget.TextView>().map { it.text.toString() }.toList() }.orEmpty()
-        swipe(h.key("c"), up = true)
+        swipe(h.key("c"), up = false)
         synced()
         assertTrue(said().toString(), appContext.getString(R.string.nothing_to_copy) in said())
-        swipe(h.key("x"), up = true)
+        swipe(h.key("x"), up = false)
         synced()
         assertTrue(said().toString(), appContext.getString(R.string.nothing_to_cut) in said())
         assertEquals("旧的", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
@@ -573,9 +574,9 @@ class KeyShortcutsHostTest {
     fun aRunIsNotPutBackAfterACutAndAPaste() {
         start("你好世界")
         backspaces(1, leaving = "你好世")
-        swipe(h.key("x"), up = true)
+        swipe(h.key("x"), up = false)
         until("cut") { h.field.text.isEmpty() }
-        swipe(h.key("v"), up = true)
+        swipe(h.key("v"), up = false)
         until("pasted") { h.field.text.toString() == "你好世" }
         swipe(backspace, up = false)
         synced()

@@ -49,7 +49,8 @@ class MarkJumpTest {
     }
 
     private fun shortcuts(at: KeyMarks.At) = MarkSettings(
-        shortcutAt = at,
+        upAt = if (at == KeyMarks.At.TopRight) KeyMarks.At.TopLeft else KeyMarks.At.TopRight,
+        downAt = at,
         shortcuts = MarkSettings.PRESET + mapOf("numbers:up" to MarkContent.Text("全选"), "numbers:down" to MarkContent.Icon("undo")),
     )
 

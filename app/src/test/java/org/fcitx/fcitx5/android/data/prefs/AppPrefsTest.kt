@@ -15,10 +15,16 @@ import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeMigration
+import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -222,7 +228,8 @@ class AppPrefsTest {
         }
     }
 
-    // 0.5's 划动输入标点符号及数字 becomes 滑动: the symbol the way it was, shortcuts the other way, off all off
+    // 0.5's 划动输入标点符号及数字 becomes 滑动, and that 0.6's slots: the symbol the way it was, shortcuts the other
+    // way, off all off
     @Test
     fun theOldSwipeSettingBecomesTheTwoWays() {
         // each row from an emptied store of its own: nothing one leaves is read by the next
@@ -230,8 +237,11 @@ class AppPrefsTest {
             why to {
                 sp.edit { clear(); stored() }
                 val prefs = AppPrefs(sp).apply { dropRetired() }
-                assertEquals(now, prefs.keyboard.swipeLayers.getValue())
+                val want = SwipeMigration.of(now.layers, upgraded = true, KeyShortcuts.Empty, KeyMarks.At.TopRight, KeyMarks.At.TopLeft)
+                assertEquals(want.slots.orientation, SwipeSlots.parse(prefs.internal.keySwipes.getValue()).orientation)
+                assertEquals(want.up to want.down, prefs.keyboard.swipeUp.getValue() to prefs.keyboard.swipeDown.getValue())
                 assertFalse("the old setting dropped", sp.contains("swipe_symbol_behavior"))
+                assertFalse("滑动 dropped too", sp.contains("swipe_layers"))
             }
         assertNamedRows(
             row("Down: the symbol down, shortcuts up", { putString("swipe_symbol_behavior", "Down") }, SwipeLayersChoice.ShortcutUpSymbolDown),
@@ -248,6 +258,56 @@ class AppPrefsTest {
         )
     }
 
+    // 0.5's 滑动, shortcuts and two places become 0.6's slots, ways and places, a swipe doing what it did, each
+    // mark where it was (060-swipe-slots); the old keys dropped
+    @Test
+    fun theOldSwipeSettingsBecomeTheSlots() {
+        sp.edit {
+            clear()
+            putInt("pid", 1)
+            putString("swipe_layers", SwipeLayersChoice.SymbolDownOnly.name)
+            putString("key_shortcuts", "full/q\ttext:你好\nfn/space.up\tnone")
+            putString("punctuation_position", KeyMarkPosition.BottomRight.name)
+            putString("shortcut_mark_position", KeyMarkPosition.TopLeft.name)
+        }
+        val prefs = AppPrefs(sp).apply { dropRetired() }
+        val slots = SwipeSlots.parse(prefs.internal.keySwipes.getValue())
+        assertEquals(SwipeOrientation.FirstDown, slots.orientation)
+        assertEquals("the shortcut the way the symbol is not", SwipeSlot.Text("你好"), slots.resolve("full/q", up = true))
+        assertEquals(SwipeSlot.First, slots.resolve("full/q", up = false))
+        assertEquals(SwipeSlot.Empty, slots.resolve("fn/space", up = true))
+        assertFalse(prefs.keyboard.swipeUp.getValue())
+        assertTrue(prefs.keyboard.swipeDown.getValue())
+        assertEquals("the symbol's place down, where it goes", KeyMarkPosition.BottomRight, prefs.keyboard.swipeDownPosition.getValue())
+        assertEquals(KeyMarkPosition.TopLeft, prefs.keyboard.swipeUpPosition.getValue())
+        for (old in listOf("swipe_layers", "key_shortcuts", "punctuation_position", "shortcut_mark_position")) assertFalse(old, sp.contains(old))
+        // read again: nothing more to do, nothing changed
+        val stored = sp.all
+        AppPrefs(sp).dropRetired()
+        assertEquals(stored, sp.all)
+    }
+
+    // a new install: the defaults (the first up, its shortcut down), none of 0.5's; an upgrade that never set
+    // 滑动 had 0.5's default (shortcuts up, the symbol down), and keeps it
+    @Test
+    fun aNewInstallHasTheNewDefaultsAnUpgradeItsOld() {
+        sp.edit { clear() }
+        val fresh = AppPrefs(sp).apply { dropRetired() }
+        assertEquals(SwipeSlots.Default, SwipeSlots.parse(fresh.internal.keySwipes.getValue()))
+        assertEquals(KeyMarkPosition.TopRight, fresh.keyboard.swipeUpPosition.getValue())
+        sp.edit { clear(); putInt("pid", 1) }
+        val upgraded = AppPrefs(sp).apply { dropRetired() }
+        assertEquals(SwipeOrientation.FirstDown, SwipeSlots.parse(upgraded.internal.keySwipes.getValue()).orientation)
+        assertEquals("the shortcut up, where its marks were", KeyMarkPosition.TopLeft, upgraded.keyboard.swipeUpPosition.getValue())
+        assertEquals(KeyMarkPosition.TopRight, upgraded.keyboard.swipeDownPosition.getValue())
+        // 0.6's set already (a 0.5 backup's keys merged in by hand): kept, the old ones dropped
+        sp.edit { clear(); putString("key_swipes", SwipeSlots.Default.with("full/a", true, SwipeSlot.Empty).serialize()); putString("swipe_layers", "Off") }
+        val kept = AppPrefs(sp).apply { dropRetired() }
+        assertEquals(SwipeSlot.Empty, SwipeSlots.parse(kept.internal.keySwipes.getValue()).resolve("full/a", true))
+        assertTrue(kept.keyboard.swipeUp.getValue())
+        assertFalse(sp.contains("swipe_layers"))
+    }
+
     // an import or a backup with the two in one place: the symbol stored where it reads, at the start after
     @Test
     @Uat("KB-66")
@@ -261,12 +321,15 @@ class AppPrefsTest {
             sp.edit { clear(); putString("punctuation_position", stored.name); putString("shortcut_mark_position", stored.name) }
             val prefs = AppPrefs(sp)
             prefs.dropRetired()
-            assertEquals(stored.name, now, prefs.keyboard.punctuationPosition.getValue())
-            assertEquals(stored.name, stored, prefs.keyboard.shortcutMarkPosition.getValue())
+            assertEquals(stored.name, now, prefs.keyboard.swipeUpPosition.getValue())
+            assertEquals(stored.name, stored, prefs.keyboard.swipeDownPosition.getValue())
         }
+        // 0.6's own two stored in one place: the up one moved off the down one's, as the page reads it
+        sp.edit { clear(); putString("key_swipes", ""); putString("swipe_up_position", "TopLeft"); putString("swipe_down_position", "TopLeft") }
+        AppPrefs(sp).apply { dropRetired() }.let { assertEquals(KeyMarkPosition.BottomLeft, it.keyboard.swipeUpPosition.getValue()) }
         // apart already: as stored
         sp.edit { clear(); putString("punctuation_position", "BottomLeft"); putString("shortcut_mark_position", "TopLeft") }
-        AppPrefs(sp).apply { dropRetired() }.let { assertEquals(KeyMarkPosition.BottomLeft, it.keyboard.punctuationPosition.getValue()) }
+        AppPrefs(sp).apply { dropRetired() }.let { assertEquals(KeyMarkPosition.BottomLeft, it.keyboard.swipeUpPosition.getValue()) }
     }
 
     // the old drawing's settings (the redraw's switch of 0.6's betas, vivo's touch routing, 扩大按键触摸区) and the

@@ -28,5 +28,8 @@ class PopupOverridesCache(private val text: () -> String) {
     companion object {
         // one copy for PopupComponent and TextKeyboard, so the long press and the swipe cannot drift apart
         val user = PopupOverridesCache { AppPrefs.getInstance().internal.popupOverrides.getValue() }
+
+        // the other keyboards' keys', by the key's name (`t9/2`): their long press and its first's swipe (060-swipe-slots)
+        val byName = PopupOverridesCache { AppPrefs.getInstance().internal.keyPopups.getValue() }
     }
 }

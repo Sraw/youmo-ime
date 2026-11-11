@@ -39,6 +39,8 @@ import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.keyboard.VoiceEndMark
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeMigration
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.vibrator
 import timber.log.Timber
@@ -60,7 +62,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          */
         val useHabits = bool("learning.use_habits", true)
         val verboseLog = bool("verbose_log", false)
-        val pid = int("pid", 0)
+        val pid = int(PID, 0)
         val editorInfoInspector = bool("editor_info_inspector", false)
 
         /** [org.fcitx.fcitx5.android.ui.main.AppLanguage]'s tag, read where appcompat cannot know it yet */
@@ -72,8 +74,18 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          */
         val popupOverrides = string("popup_overrides", "")
 
-        /** See [org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts] for the format: the keys' swipe shortcuts the user set. */
-        val keyShortcuts = string("key_shortcuts", "")
+        /**
+         * See [org.fcitx.fcitx5.android.input.shortcut.SwipeSlots] for the format: every key's 上滑 and 下滑
+         * the user set (060-swipe-slots); 0.5's `key_shortcuts` and 滑动 move here ([dropRetired]).
+         */
+        val keySwipes = string(KEY_SWIPES, "")
+
+        /**
+         * The long presses the user set of the keys of the keyboards other than 全键盘, by the key's name
+         * (`t9/2`, `g14/cv`): [org.fcitx.fcitx5.android.input.popup.PopupOverrides]' format with the name for
+         * the label. 全键盘's are [popupOverrides]', by the letter.
+         */
+        val keyPopups = string("key_popups", "")
 
         /**
          * The bar's buttons, their order and which show (ToolbarConfig.serialize; empty, as
@@ -168,35 +180,33 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         }
         /** 拼音键字母大小写: a Chinese input method's letter keys' faces ([LetterCaseChoice]); English's follow Shift whatever it is. */
         val letterCase = enumList(R.string.letter_case, "letter_case", LetterCaseChoice.Shift)
-        /** What a key's swipe up and down reach ([SwipeLayers]); the old 划动输入标点符号及数字 moves over ([dropRetired]). */
-        val swipeLayers = enumList(
-            R.string.swipe_layers,
-            SWIPE_LAYERS,
-            SwipeLayersChoice.ShortcutUpSymbolDown
-        )
+        /** 上滑 on every key (060-swipe-slots): off, a swipe up is a character key's tap, a function key as it was. */
+        val swipeUp = switch(R.string.swipe_up, SWIPE_UP, true)
         /**
-         * Where every key draws its symbol ([KeyMarkPosition]), whichever way swipes to it; never where
-         * [shortcutMarkPosition] is (greyed out there), but 无. Was the theme's, under the same key.
+         * Where every key draws what its swipe up reaches ([KeyMarkPosition]); never where
+         * [swipeDownPosition] is (greyed out there), but 无. 0.5's 标点位置 or 快捷键图标位置 move here.
          */
-        val punctuationPosition = enumList(
-            R.string.punctuation_position,
-            "punctuation_position",
+        val swipeUpPosition: ManagedPreference.PStringLike<KeyMarkPosition> = enumList(
+            R.string.swipe_up_position,
+            SWIPE_UP_POSITION,
             // small in the corner, as Sogou's: under the letter, it crowded the key
             KeyMarkPosition.TopRight,
             apart = ManagedPreferenceUi.Apart(
-                taken = { shortcutMarkPosition.getValue().takeIf { it != KeyMarkPosition.None } },
-                note = R.string.mark_at_taken_by_shortcut,
-                read = { settledSymbol(it, shortcutMarkPosition.getValue()) },
+                taken = { swipeDownPosition.getValue().takeIf { it != KeyMarkPosition.None } },
+                note = R.string.mark_at_taken_by_down,
+                read = { settledUp(it, swipeDownPosition.getValue()) },
             )
         )
-        /** Where every key draws its shortcut's mark ([KeyMarkPosition]), whichever way swipes to it; apart from [punctuationPosition]. */
-        val shortcutMarkPosition: ManagedPreference.PStringLike<KeyMarkPosition> = enumList(
-            R.string.shortcut_mark_position,
-            "shortcut_mark_position",
+        /** 下滑 on every key. */
+        val swipeDown = switch(R.string.swipe_down, SWIPE_DOWN, true)
+        /** Where every key draws what its swipe down reaches; apart from [swipeUpPosition]. */
+        val swipeDownPosition: ManagedPreference.PStringLike<KeyMarkPosition> = enumList(
+            R.string.swipe_down_position,
+            SWIPE_DOWN_POSITION,
             KeyMarkPosition.TopLeft,
             apart = ManagedPreferenceUi.Apart(
-                taken = { settledSymbol(punctuationPosition.getValue(), shortcutMarkPosition.getValue()).takeIf { it != KeyMarkPosition.None } },
-                note = R.string.mark_at_taken_by_symbol,
+                taken = { settledUp(swipeUpPosition.getValue(), swipeDownPosition.getValue()).takeIf { it != KeyMarkPosition.None } },
+                note = R.string.mark_at_taken_by_up,
             )
         )
         val longPressDelay = hidden(setByLevels = true) {
@@ -758,8 +768,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 internal.editorInfoInspector,
                 // the long-press and swipe characters: a password may be typed with them before the first unlock
                 internal.popupOverrides,
-                // a swipe's shortcut too
-                internal.keyShortcuts,
+                // a swipe's slots, and the other keyboards' long presses, too
+                internal.keySwipes,
+                internal.keyPopups,
                 // the bar is there before the first unlock too
                 internal.toolbarButtons,
                 advanced.ignoreSystemCursor,
@@ -793,20 +804,57 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val stale = RETIRED.filter(sharedPreferences::contains)
         if (stale.isNotEmpty()) sharedPreferences.edit { stale.forEach(::remove) }
         migrateSwipe()
+        migrateSwipeSlots()
         migrateKeyDrawing()
         settleMarkPositions()
     }
 
     /**
-     * 标点位置 stored in 快捷键图标位置's place, which the settings page never stores (an import, a
+     * 上滑图标位置 stored in 下滑图标位置's place, which the settings page never stores (an import, a
      * backup), stored as it reads ([KeyMarks.settled]). Read so only ([ManagedPreferenceUi.Apart.read]),
-     * it was not what the page's list held: 快捷键图标位置 moved away, the keyboard drew the symbol where
+     * it was not what the page's list held: 下滑图标位置 moved away, the keyboard drew the up mark where
      * it was stored and the page's summary said where it had read.
      */
     private fun settleMarkPositions() {
-        val symbol = keyboard.punctuationPosition.getValue()
-        val settled = settledSymbol(symbol, keyboard.shortcutMarkPosition.getValue())
-        if (settled != symbol) keyboard.punctuationPosition.setValue(settled)
+        val up = keyboard.swipeUpPosition.getValue()
+        val settled = settledUp(up, keyboard.swipeDownPosition.getValue())
+        if (settled != up) keyboard.swipeUpPosition.setValue(settled)
+    }
+
+    /**
+     * 0.5's 滑动 ([SWIPE_LAYERS]), the shortcuts set (`key_shortcuts`), 标点位置 and 快捷键图标位置 as
+     * 0.6's slots, 上滑 and 下滑 and their places ([SwipeMigration]): what a swipe did on every key it
+     * does after. Run while any of the old ones is stored (a 0.5 backup restored too) or the slots never
+     * were; the old ones removed. 滑动 never set: 0.5's default on an upgrade ([PID] stored: a start ran
+     * before), the new one on a new install.
+     */
+    private fun migrateSwipeSlots() {
+        val sp = sharedPreferences
+        if (OLD_SWIPE.none(sp::contains) && sp.contains(KEY_SWIPES)) return
+        // each read as unset where it is stored as another type (a bad backup): never a crash at every start
+        fun string(key: String) = runCatching { sp.getString(key, null) }.getOrNull()
+        fun at(key: String, default: KeyMarkPosition) =
+            string(key)?.let { v -> KeyMarkPosition.entries.firstOrNull { it.name == v } }?.at ?: default.at
+        val layers = string(SWIPE_LAYERS)?.let { v -> SwipeLayersChoice.entries.firstOrNull { it.name == v } }?.layers
+        val r = SwipeMigration.of(
+            layers,
+            upgraded = sp.contains(PID),
+            shortcuts = KeyShortcuts.parse(string(KEY_SHORTCUTS).orEmpty()),
+            symbolAt = at(PUNCTUATION_POSITION, KeyMarkPosition.TopRight),
+            shortcutAt = at(SHORTCUT_MARK_POSITION, KeyMarkPosition.TopLeft),
+        )
+        // a 0.6 setting already there (set, then a 0.5 backup's old ones merged in by hand) is the user's newer
+        val keep = sp.contains(KEY_SWIPES)
+        sp.edit {
+            if (!keep) {
+                putString(KEY_SWIPES, r.slots.serialize())
+                if (!r.up) putBoolean(SWIPE_UP, false)
+                if (!r.down) putBoolean(SWIPE_DOWN, false)
+                if (r.upAt != KeyMarks.At.TopRight) putString(SWIPE_UP_POSITION, KeyMarkPosition.of(r.upAt).name)
+                if (r.downAt != KeyMarks.At.TopLeft) putString(SWIPE_DOWN_POSITION, KeyMarkPosition.of(r.downAt).name)
+            }
+            OLD_SWIPE.forEach(::remove)
+        }
     }
 
     /**
@@ -884,6 +932,18 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         private const val SWIPE_SYMBOL_BEHAVIOR = "swipe_symbol_behavior"
         const val SWIPE_LAYERS = "swipe_layers"
 
+        // 0.6's swipe slots (060-swipe-slots), and the 0.5 settings they took the place of
+        const val KEY_SWIPES = "key_swipes"
+        const val SWIPE_UP = "swipe_up"
+        const val SWIPE_DOWN = "swipe_down"
+        const val SWIPE_UP_POSITION = "swipe_up_position"
+        const val SWIPE_DOWN_POSITION = "swipe_down_position"
+        private const val KEY_SHORTCUTS = "key_shortcuts"
+        private const val PUNCTUATION_POSITION = "punctuation_position"
+        private const val SHORTCUT_MARK_POSITION = "shortcut_mark_position"
+        private val OLD_SWIPE = listOf(SWIPE_LAYERS, KEY_SHORTCUTS, PUNCTUATION_POSITION, SHORTCUT_MARK_POSITION)
+        private const val PID = "pid"
+
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
         // 0.5's two switches, and 0.6's one list that took their place
         private const val GLIDE_TYPING = "glide_typing"
@@ -955,6 +1015,6 @@ enum class EnglishKeyboard(override val stringRes: Int, val keyboard: ImKeyboard
     }
 }
 
-// where the symbol's mark is drawn with the shortcut's at [shortcut]: moved off it if it is there (KeyMarks.settled)
-private fun settledSymbol(symbol: KeyMarkPosition, shortcut: KeyMarkPosition) =
-    KeyMarkPosition.of(KeyMarks.settled(symbol.at, shortcut.at).symbol)
+// where the up mark is drawn with the down one's at [down]: moved off it if it is there (KeyMarks.settled)
+private fun settledUp(up: KeyMarkPosition, down: KeyMarkPosition) =
+    KeyMarkPosition.of(KeyMarks.settled(up.at, down.at).symbol)

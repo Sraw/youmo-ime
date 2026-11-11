@@ -36,7 +36,7 @@ class StatusPanelHostUatTest {
     @Uat("TB-17")
     fun fullWidthOnTypesAFullWidthDigitButNotInEnglish() = with(HostReplay()) {
         toggle("fullwidth")
-        // the digit a swipe down on q sends
+        // the digit a swipe up on q sends
         type("1")
         expectText("１")
         ime(InputMethodCatalog.ENGLISH)

@@ -247,31 +247,68 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
     private fun measure(text: String, look: TextLook, weight: Int, size: Double): Measured = measure(measurer, text, look, weight, size)
 
     private fun marks(key: ExpandedKey, cell: Box, content: Box, looks: Looks, hidden: Boolean, snap: Boolean): List<MarkDrawn> {
-        val m = env.marks
         val name = key.attrs.shortcut
-        if (name == null || '/' in name) {
-            val symbol = key.alt?.takeIf { m.symbols && key.attrs.mark != false && !hidden && !looks.mark.hidden }
-            val shortcut = name?.let { m.shortcuts[it] }?.takeIf { m.charShortcuts && !looks.shortcut.hidden }
-            // KeyMarks.place's slots, by what each is: a symbol in the shortcut's slot takes it
-            val symbolSlot = symbol?.let { KeyMarks.symbolSlot(m.symbolAt, m.shortcutAt, env.landscape, env.compact) }
-            val shortcutSlot = shortcut?.let { KeyMarks.shortcutSlot(KeyMarks.onKeys(m.symbolAt, m.shortcutAt, env.landscape, env.compact).shortcut) }
-                ?.takeIf { it != symbolSlot }
-            return listOfNotNull(
-                shortcutSlot?.let { shortcutMark(shortcut, it, KeyMarkYield.DROP_SHORTCUT, cell, content, looks, snap) },
-                symbolSlot?.let { symbolMark(symbol, it, content, looks) },
-            )
-        }
+        val char = name == null || '/' in name
         // a function key's swipes (the space's cursor, ⌫'s sweep): a theme's `key hint { hidden }` leaves them out
-        if (looks.hint.hidden) return emptyList()
-        val up = m.shortcuts["$name:up"]
-        val down = m.shortcuts["$name:down"]
-        val placed = KeyMarks.placeFunction(up, down, m.upOn, m.downOn, m.symbolAt, m.shortcutAt, env.landscape, env.compact)
-        // up's first, down's second where both are (placeFunction's order)
-        return placed.at.entries.mapIndexed { i, (slot, mark) ->
-            val drop = if (i == 1) KeyMarkYield.DROP_DOWN_SHORTCUT else KeyMarkYield.DROP_SHORTCUT
-            shortcutMark(mark, slot, drop, cell, content, looks, snap)
+        if (!char && looks.hint.hidden) return emptyList()
+        val ways = ways(key, name, char, looks, hidden)
+        val slots = if (char) charSlots(ways) else functionSlots(ways)
+        // the shortcuts first, the up one before the down one, then the symbols (as 0.5 listed them)
+        var shortcuts = 0
+        return slots.entries.sortedWith(compareBy({ it.value.symbol != null }, { !it.value.up })).map { (slot, w) ->
+            if (w.symbol != null) {
+                symbolMark(w.symbol, slot, content, looks)
+            } else {
+                val drop = if (shortcuts++ == 0) KeyMarkYield.DROP_SHORTCUT else KeyMarkYield.DROP_DOWN_SHORTCUT
+                shortcutMark(w.shortcut!!, slot, drop, cell, content, looks, snap)
+            }
         }
     }
+
+    // each way that is on and draws something: a symbol's text, or a shortcut's mark
+    private fun ways(key: ExpandedKey, name: String?, char: Boolean, looks: Looks, hidden: Boolean): List<Way> {
+        val m = env.marks
+        val symbolsShown = m.symbols && !hidden && !looks.mark.hidden && (!char || key.attrs.mark != false)
+        val shortcutsShown = !char || (m.charShortcuts && !looks.shortcut.hidden)
+        return listOf(true, false).mapNotNull { up ->
+            if (!(if (up) m.upOn else m.downOn)) return@mapNotNull null
+            when (val c = m.of(name, char, up)) {
+                MarkContent.Corner -> key.alt?.takeIf { symbolsShown }?.let { Way(up, it, null) }
+                is MarkContent.Symbol -> c.text.takeIf { symbolsShown && it.isNotEmpty() }?.let { Way(up, it, null) }
+                is MarkContent.Icon, is MarkContent.Text -> c.takeIf { shortcutsShown }?.let { Way(up, null, it) }
+                MarkContent.Empty -> null
+            }
+        }
+    }
+
+    // a function key's as 0.5 drew them: the up one at the shortcuts' place, the down one there mirrored
+    private fun functionSlots(ways: List<Way>): Map<Slot, Way> {
+        val m = env.marks
+        return KeyMarks.placeFunction(
+            ways.firstOrNull { it.up }, ways.firstOrNull { !it.up }, true, true, m.symbolAt, m.shortcutAt, env.landscape, env.compact,
+        ).at
+    }
+
+    // KeyMarks' slots, by what each is (a symbol's or a shortcut's), the other way's place apart from it;
+    // two in one slot: a symbol's kept (as 0.5 kept the symbol), else the up one's
+    private fun charSlots(ways: List<Way>): Map<Slot, Way> {
+        val m = env.marks
+        val slots = LinkedHashMap<Slot, Way>()
+        for (w in ways.sortedBy { if (it.symbol != null) 0 else 1 }) {
+            val at = if (w.up) m.upAt else m.downAt
+            val other = if (w.up) m.downAt else m.upAt
+            val slot = if (w.symbol != null) {
+                KeyMarks.symbolSlot(at, other, env.landscape, env.compact)
+            } else {
+                KeyMarks.shortcutSlot(KeyMarks.onKeys(other, at, env.landscape, env.compact).shortcut)
+            }
+            if (slot != null && slot !in slots) slots[slot] = w
+        }
+        return slots
+    }
+
+    // a way's mark: a symbol's text, or a shortcut's
+    private class Way(val up: Boolean, val symbol: String?, val shortcut: MarkContent?)
 
     private fun symbolMark(text: String, slot: Slot, content: Box, looks: Looks): MarkDrawn {
         val sizeDp = SYMBOL_DP * textScale * looks.mark.scale
@@ -293,9 +330,10 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
                 val dp = if (compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP
                 Drawn.of(PlacedIcon(mark.name, slotBox(slot, dp * d, dp * d, content, h, v).let { if (snap) laidOut(it) else wholeSized(it) }, Part.Shortcut))
             }
-            is MarkContent.Text -> {
+            else -> {
+                val text = (mark as? MarkContent.Text)?.text.orEmpty()
                 val sizeDp = SHORTCUT_TEXT_DP * textScale
-                val m = measure(mark.text, looks.shortcut, looks.shortcut.weight, sizeDp * d).squeezed(SHORTCUT_TEXT_SHARE * cell.width)
+                val m = measure(text, looks.shortcut, looks.shortcut.weight, sizeDp * d).squeezed(SHORTCUT_TEXT_SHARE * cell.width)
                 m.inBox(slotBox(slot, m.box.width, m.box.height, content, h, v), Part.Shortcut)
             }
         }

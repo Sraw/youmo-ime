@@ -27,6 +27,7 @@ key comma kind=function role=comma a11y="，"
   anchor 2164.5,159 up 0,-1
   actions preview="off" send=","
   text label="，"
+  shortcut="comma"
   popup from=list
     item "？"
     item "！"
@@ -49,6 +50,7 @@ key period kind=function role=period a11y="。"
   anchor 2164.5,264.5 up 0,-1
   actions preview="off" send="."
   text label="。"
+  shortcut="period"
   popup from=none
   normal
     shadow rect(1996.88,222.5,2332.13,309.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

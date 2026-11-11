@@ -7,10 +7,13 @@ package org.fcitx.fcitx5.android.input.scene
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
+import org.fcitx.fcitx5.android.input.keyboard.KeySwipe
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.KeyMarkText
+import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
@@ -91,36 +94,44 @@ object SceneLetters {
         if (table?.labelled != true) emptyMap() else LETTERS.associate { c -> "root:$c" to table.label(c).orEmpty() }
 }
 
-/** The marks' settings ([MarkSettings]) from the app's: the swipe layers, where marks go, the user's shortcuts. */
+/** The marks' settings ([MarkSettings]) from the app's: each key's two swipe slots, 上滑 and 下滑, where each draws. */
 object SceneMarks {
 
     /**
-     * [names]' shortcuts (a layout's keys', [names]) as [shortcuts] has them; a character key's
-     * shortcut drawn where [charShortcuts] (a table's roots take its room) and a swipe reaches
-     * shortcuts, as KeySwipes.showMarks drew them.
+     * [names]' marks (a layout's keys', [names]) as [slots] has them, 上滑 and 下滑 on as [ways] are,
+     * drawn at [upAt] and [downAt]; a character key's shortcuts drawn where [charShortcuts] (a table's
+     * roots take their room). A long press's first is the key's corner, unless [firsts] has the key:
+     * the first of a long press the user set by the key's name (null: turned off), or a function key's.
      */
+    @Suppress("LongParameterList")
     fun settings(
-        shortcuts: KeyShortcuts,
-        layers: SwipeLayers,
-        spots: KeyMarks.Spots,
+        slots: SwipeSlots,
+        ways: KeySwipe.Ways,
+        upAt: KeyMarks.At,
+        downAt: KeyMarks.At,
         charShortcuts: Boolean,
         names: Collection<String>,
+        firsts: Map<String, String?> = emptyMap(),
     ): MarkSettings {
         val marks = HashMap<String, MarkContent>()
         for (name in names) {
-            if ('/' in name) {
-                content(shortcuts.resolve(name))?.let { marks[name] = it }
-            } else {
-                content(shortcuts.resolve(KeyShortcuts.functionKey(name, up = true)))?.let { marks["$name:up"] = it }
-                content(shortcuts.resolve(KeyShortcuts.functionKey(name, up = false)))?.let { marks["$name:down"] = it }
+            val key = SwipeSlots.keyOf(name)
+            for (up in listOf(true, false)) {
+                val first = if (name in firsts) firsts[name]?.let(MarkContent::Symbol) ?: MarkContent.Empty else MarkContent.Corner
+                marks["$name:${if (up) "up" else "down"}"] = when (val slot = slots.resolve(key, up)) {
+                    // a function key has no corner: its first is its long press's ([firsts]), or nothing
+                    SwipeSlot.First -> if (first == MarkContent.Corner && SwipeSlots.isFunction(key)) MarkContent.Empty else first
+                    else -> content(slot.shortcut) ?: MarkContent.Empty
+                }
             }
         }
         return MarkSettings(
-            symbolAt = at(spots.symbol),
-            shortcutAt = at(spots.shortcut),
-            charShortcuts = charShortcuts && layers.wayOf(SwipeLayers.Layer.Shortcut) != null,
-            upOn = layers.up != SwipeLayers.Layer.Off,
-            downOn = layers.down != SwipeLayers.Layer.Off,
+            upAt = at(upAt),
+            downAt = at(downAt),
+            charShortcuts = charShortcuts,
+            upOn = ways.up,
+            downOn = ways.down,
+            firstUp = slots.orientation == SwipeOrientation.FirstUp,
             shortcuts = marks,
         )
     }
@@ -134,7 +145,8 @@ object SceneMarks {
 
     fun content(s: KeyShortcut): MarkContent? = when (s) {
         is KeyShortcut.Command -> MarkContent.Icon(icon(s.command))
-        is KeyShortcut.Text -> MarkContent.Text(s.text)
+        // at most two characters as seen, the rest an ellipsis (要做 1): the bubble shows it whole
+        is KeyShortcut.Text -> MarkContent.Text(KeyMarkText.of(s.text))
         KeyShortcut.None -> null
     }
 

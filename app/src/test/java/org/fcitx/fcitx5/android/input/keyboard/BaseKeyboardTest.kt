@@ -139,21 +139,21 @@ class BaseKeyboardTest {
         }
     }
 
-    // 滑动 at its default (shortcuts up, symbols down): a's select all up, its symbol down, s with nothing up a tap
+    // the slots at their default (the long press's first up, shortcuts down): a's select all down, its first up, s with nothing down a tap
     @Test
     @Uat("KB-61")
-    fun aLettersSwipeUpIsItsShortcutAndDownItsSymbol() = told { t ->
-        t.drag("a", -0.8f)
+    fun aLettersSwipeDownIsItsShortcutAndUpItsFirst() = told { t ->
+        t.drag("a", 0.8f)
         assertEquals(listOf(KeyAction.ShortcutAction(KeyShortcut.Command(KeyCommand.SelectAll))), t.actions.filterIsInstance<KeyAction.ShortcutAction>())
         t.actions.clear()
-        t.drag("s", -0.8f)
-        assertEquals("nothing up there: a tap", listOf("s"), t.actions.filterIsInstance<KeyAction.HostKeyAction>().map { it.act })
+        t.drag("s", 0.8f)
+        assertEquals("nothing down there: a tap", listOf("s"), t.actions.filterIsInstance<KeyAction.HostKeyAction>().map { it.act })
         t.actions.clear()
-        t.drag("a", 0.8f)
-        assertTrue("its symbol, no shortcut: ${t.actions}", t.actions.isNotEmpty() && t.actions.none { it is KeyAction.ShortcutAction })
+        t.drag("a", -0.8f)
+        assertTrue("its first, no shortcut: ${t.actions}", t.actions.isNotEmpty() && t.actions.none { it is KeyAction.ShortcutAction })
         t.actions.clear()
         t.board.inPasswordField = true
-        t.drag("c", -0.8f)
+        t.drag("c", 0.8f)
         assertEquals("no copy of a password, nor a c", emptyList<KeyAction>(), t.actions.filter { it is KeyAction.ShortcutAction || it is KeyAction.HostKeyAction })
     }
 
@@ -176,9 +176,9 @@ class BaseKeyboardTest {
     @Test
     @Uat("KB-63")
     fun aKeysOwnTextShortcutIsWhatItsSwipeRuns() {
-        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+        prefs.setShortcuts(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")))
         told { t ->
-            t.drag("q", -2f)
+            t.drag("q", 2f)
             assertEquals(listOf(KeyAction.ShortcutAction(KeyShortcut.Text("你好"))), t.actions.filterIsInstance<KeyAction.ShortcutAction>())
         }
     }
@@ -186,7 +186,7 @@ class BaseKeyboardTest {
     // ST-15: a swipe the other way (up, the symbol being down) types the letter once, just past the threshold or far off
     @Test
     fun aSwipeTheOtherWayTypesTheLetterOnce() {
-        prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolDownOnly)
+        prefs.setLayers(SwipeLayersChoice.SymbolDownOnly)
         for ((what, rows) in listOf("just past the threshold" to -0.8f, "far off the key" to -2f)) {
             told { t ->
                 t.drag("q", rows)
@@ -198,7 +198,7 @@ class BaseKeyboardTest {
     // with swiping off, sliding off the key takes the press back, as before ST-15
     @Test
     fun withSwipingOffSlidingOffAKeyTypesNothing() {
-        prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.Off)
+        prefs.setLayers(SwipeLayersChoice.Off)
         told { t ->
             t.drag("q", -2f)
             assertEquals(emptyList<String>(), t.actions.filterIsInstance<KeyAction.HostKeyAction>().map { it.act })

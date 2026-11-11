@@ -60,7 +60,7 @@ class KeyShortcutsPageScreenshotTest {
     private fun open(vararg more: Pair<String, KeyShortcut>) {
         val p = AppPrefs.getInstance().internal
         val set = more.fold(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好"))) { s, (name, shortcut) -> s.with(name, shortcut) }
-        prefs.set(p.keyShortcuts, set.serialize())
+        prefs.setShortcuts(set)
         prefs.set(p.popupOverrides, PopupOverrides.Empty.with("b", emptyList()).serialize())
         st.activity
         st.open(SettingsRoute.PopupOverrides)
@@ -109,7 +109,6 @@ class KeyShortcutsPageScreenshotTest {
             R.string.shortcut_page_g14 to "keys14",
             R.string.shortcut_page_g18 to "keys18",
             R.string.shortcut_page_zyfull to "zhuyin_full",
-            R.string.shortcut_page_number to "number",
             R.string.shortcut_page_function to "function",
         )) {
             tab(title)
@@ -128,7 +127,7 @@ class KeyShortcutsPageScreenshotTest {
         var caps = 0
         for (title in listOf(
             R.string.shortcut_page_full, R.string.shortcut_page_nine, R.string.shortcut_page_g14, R.string.shortcut_page_g18,
-            R.string.shortcut_page_zyfull, R.string.shortcut_page_number, R.string.shortcut_page_function,
+            R.string.shortcut_page_zyfull, R.string.shortcut_page_function,
         )) {
             if (title != R.string.shortcut_page_full) tab(title)
             st.idle()
@@ -157,16 +156,12 @@ class KeyShortcutsPageScreenshotTest {
         capture("canvas_full_night")
     }
 
-    // the number keys draw no symbol (a digit alone): a shortcut there goes where one alone goes on
-    // the keyboard, under the digit with 标点位置 下方, never into the corner a symbol would have left
+    // 上滑图标位置 底部: the 14 keys' corners under their letters, as the keyboard draws them
     @Test
-    fun aNumberKeysShortcutIsPlacedAsTheKeyboardPlacesIt() {
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
-        open("num/5" to KeyShortcut.Command(KeyCommand.Copy))
-        tab(R.string.shortcut_page_number)
-        assertEquals(1, sceneIcons(key("5")))
-        capture("number_bottom")
-        // the 14 keys' corners drawn too, under their letters there
+    fun theFourteenKeysCornersAreDrawnUnderTheirLetters() {
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.Bottom)
+        open()
+        // the 14 keys' corners drawn too, under their letters there (the number pad has no page: 060-swipe-slots)
         tab(R.string.shortcut_page_g14)
         val qw = KeyboardHarness.all(key("QW")).filterIsInstance<SceneKeyCell>().single()
         assertTrue("${qw.width}x${qw.height} ${qw.keyNode?.ops(false)}", qw.keyNode?.ops(false).orEmpty().any { it is Op.Text && it.text == "1" })
@@ -187,17 +182,17 @@ class KeyShortcutsPageScreenshotTest {
     @Test
     fun theMarksWhereTheirSettingsSay() {
         for (at in KeyMarkPosition.entries.filter { it != KeyMarkPosition.TopLeft }) {
-            if (at == KeyMarkPosition.TopRight) prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.BottomRight)
-            prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, at)
+            if (at == KeyMarkPosition.TopRight) prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.BottomRight)
+            prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, at)
             open()
             assertEquals(if (at == KeyMarkPosition.None) 0 else 1, sceneIcons(key("a")))
             capture("full_${at.name}")
             tab(R.string.shortcut_page_function)
             capture("function_${at.name}")
-            prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.TopRight)
+            prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.TopRight)
         }
-        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.BottomRight)
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.TopLeft)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, KeyMarkPosition.BottomRight)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.TopLeft)
         open()
         capture("full_symbols_TopLeft")
     }
@@ -205,7 +200,7 @@ class KeyShortcutsPageScreenshotTest {
     // 标点位置 无: no symbols on the page, as on the keyboard; the shortcuts still there
     @Test
     fun noSymbolsWhereThePunctuationPositionIsNone() {
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.None)
         open()
         assertEquals(1, sceneIcons(key("a")))
         capture("full_symbols_None")

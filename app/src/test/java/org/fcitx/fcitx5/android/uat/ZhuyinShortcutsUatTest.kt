@@ -92,20 +92,20 @@ class ZhuyinShortcutsUatTest {
         val inFrom = symbols.associate { it.label to it.drawn(it.label)!!.centerX() - it.bounds.left }
         for (k in symbols) assertEquals(k.label, 1.0, (k as SceneShownKey).node.ops(false).filterIsInstance<Op.Text>().single { it.text == k.label }.scaleX, 0.0)
         h.captureBoard("ZhuyinShortcutsUatTest/dachen")
-        h.swipe(m, 0f, -m.height * 1.3f)
+        h.swipe(m, 0f, m.height * 1.3f)
         h.idle()
         assertEquals(0 to 7, h.field.selectionStart to h.field.selectionEnd)
-        // ㄋ has none: up types it, as a tap
+        // ㄋ has none: down types it, as a tap
         val n = h.key("ㄋ")
         val typed = h.sent().size
-        h.swipe(n, 0f, -n.height * 1.3f)
+        h.swipe(n, 0f, n.height * 1.3f)
         h.idle()
         assertEquals(h.api.calls.toString(), typed + 1, h.sent().size)
         assertTrue(h.sent().last(), h.sent().last().startsWith("sendKey(sym=${UNICODE + Keyboard.zhuyinKey('ㄋ')},"))
         assertEquals(0 to 7, h.field.selectionStart to h.field.selectionEnd)
         h.close()
         // none on 大千's letters' places, their presets too
-        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.cleared(('a'..'z').map { "zyfull/$it" }).serialize())
+        prefs.setShortcuts(KeyShortcuts.Empty.cleared(('a'..'z').map { "zyfull/$it" }))
         val bare = harness(ImKeyboard.ZHUYIN_FULL)
         assertEquals(0, bare.key("ㄇ").drawnIcons)
         val bareFrom = bare.keys().filter { k -> k.label in inFrom }
@@ -125,13 +125,14 @@ class ZhuyinShortcutsUatTest {
         assertEquals(16, bare.size)
         for (k in bare) assertEquals(k.id, 0 to listOf(k.label), k.drawnIcons to k.drawnTexts)
         h.close()
-        prefs.set(AppPrefs.getInstance().internal.keyShortcuts, KeyShortcuts.Empty.with("zy9/1", KeyShortcut.Text("你好")).serialize())
+        prefs.setShortcuts(KeyShortcuts.Empty.with("zy9/1", KeyShortcut.Text("你好")))
         h = harness(ImKeyboard.ZHUYIN_NINE)
         assertTrue(h.texts().toString(), "你好" in h.texts())
         assertEquals(listOf("ㄅㄉㄚ", "你好"), h.key("ㄅㄉㄚ").drawnTexts)
         h.captureBoard("ZhuyinShortcutsUatTest/nine_text")
+        // the shortcut's way: down, the long press's first up
         val group = h.key("ㄅㄉㄚ")
-        h.swipe(group, 0f, -group.height * 1.3f)
+        h.swipe(group, 0f, group.height * 1.3f)
         h.idle()
         assertEquals("你好", h.field.text.toString())
     }
@@ -148,9 +149,9 @@ class ZhuyinShortcutsUatTest {
         st.idle()
         val texts = st.texts()
         for (g in listOf("ㄅㄉㄚ", "ㄓㄗㄢㄦ", "ㄖㄥㄩ")) assertTrue("$g in $texts", g in texts)
-        // no presets to put back; the hint of changing a key's shortcut alone, not its long press
-        assertTrue(texts.toString(), st.s(R.string.shortcut_apply_presets) !in texts && st.s(R.string.shortcut_clear_page) in texts)
-        assertTrue(texts.toString(), st.s(R.string.shortcut_hint_page) in texts)
+        // the page's own actions, and the hint of a key's swipes and its long press by name
+        assertTrue(texts.toString(), st.s(R.string.swipe_presets) in texts && st.s(R.string.swipe_flip_all) in texts)
+        assertTrue(texts.toString(), st.s(R.string.swipe_slots_hint_page) in texts)
         st.capture("ZhuyinShortcutsUatTest/page_zy9")
     }
 }

@@ -76,20 +76,20 @@ class KeyCapsTest {
     @Test
     @Uat("ST-51")
     fun atBottomTheSymbolIsUnderTheLetterButInItsCornerWhenCompact() {
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.Bottom)
         assertEquals(At.Under, at(key()))
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
         // the shortcuts top left (the default): top right
         assertEquals(At.TopRight, at(key()))
         // the shortcuts top right: bottom right
-        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.TopRight)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, KeyMarkPosition.TopRight)
         assertEquals(At.BottomRight, at(key()))
         // 滑动 moves nothing
-        prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
+        prefs.setLayers(SwipeLayersChoice.SymbolUpShortcutDown)
         assertEquals(At.BottomRight, at(key()))
         // 无 is none whatever the height
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.None)
         assertEquals(At.None, at(key()))
     }
 
@@ -101,9 +101,9 @@ class KeyCapsTest {
             KeyMarkPosition.TopLeft to At.TopLeft,
             KeyMarkPosition.BottomLeft to At.BottomLeft,
         )
-        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, KeyMarkPosition.Bottom)
         for ((position, corner) in corners) {
-            prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, position)
+            prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, position)
             assertEquals("$position", corner, at(key()))
         }
     }

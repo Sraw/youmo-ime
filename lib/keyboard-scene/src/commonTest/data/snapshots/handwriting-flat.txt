@@ -25,6 +25,7 @@ key comma kind=function role=comma a11y="，"
   anchor 999,210.5 up 0,-1
   actions preview="off" send=","
   text label="，"
+  shortcut="comma"
   popup from=list
     item "？"
     item "！"
@@ -45,6 +46,7 @@ key period kind=function role=period a11y="。"
   anchor 999,351 up 0,-1
   actions preview="off" send="."
   text label="。"
+  shortcut="period"
   popup from=none
   normal
     text "。" 972.75,370.69 system 400 52.5 #ff7a858a

@@ -143,16 +143,16 @@ class GroupedKeyboardUatTest {
 
     @Test
     @Uat("PY-88")
-    fun aSwipeDownTypesTheCornerAndWhileTypingPicksThatCandidate() {
+    fun aSwipeUpTypesTheCornerAndWhileTypingPicksThatCandidate() {
         keys14().start()
-        h.swipe(group("QW"), 0f, group("QW").height * 1.3f)
-        h.swipe(group("BN"), 0f, group("BN").height * 1.3f)
+        h.swipe(group("QW"), 0f, -group("QW").height * 1.3f)
+        h.swipe(group("BN"), 0f, -group("BN").height * 1.3f)
         val idle = sent()
         assertEquals(idle.toString(), 2, idle.size)
         assertTrue(idle[0], keypad(1) in idle[0])
         assertTrue(idle[1], "key=@," in idle[1])
         typing(InputMethodCatalog.PINYIN, "ni", "bu")
-        h.swipe(group("ER"), 0f, group("ER").height * 1.3f)
+        h.swipe(group("ER"), 0f, -group("ER").height * 1.3f)
         // the keypad's 2: the engine takes it as the second candidate (KeyboardHalvesUatTest)
         assertTrue(sent().toString(), keypad(2) in sent().last() && sent().size == 3)
     }

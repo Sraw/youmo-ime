@@ -179,9 +179,9 @@ t long press: [sendKey(sym=17761439, states=536870912, code=0, up=false)] field 
 y said: ㄗ
 y pressed: [ㄗ]
 y tap: [sendKey(sym=17761442, states=536870912, code=0, up=false)] field hello world, again|18,18
-y swiping: [Redo]
-y up: [] field hello world, againZ|19,19
-y down: [sendKey(sym=17761442, states=536870912, code=0, up=false)] field hello world, againZ|19,19
+y swiping: [ㄗ]
+y up: [sendKey(sym=17761442, states=536870912, code=0, up=false)] field hello world, again|18,18
+y down: [] field hello world, againZ|19,19
 y left: [] field hello world, againZ|19,19
 y right: [] field hello world, againZ|19,19
 y nudged: [sendKey(sym=17761442, states=536870912, code=0, up=false)] field hello world, againZ|19,19
@@ -234,9 +234,9 @@ p long press: [sendKey(sym=17761454, states=536870912, code=0, up=false)] field 
 a said: ㄇ
 a pressed: [ㄇ]
 a tap: [sendKey(sym=17761426, states=536870912, code=0, up=false)] field hello world, againZ|19,19
-a swiping: [Select all]
-a up: [] field hello world, againZ|0,19
-a down: [sendKey(sym=17761426, states=536870912, code=0, up=false)] field hello world, againZ|0,19
+a swiping: [ㄇ]
+a up: [sendKey(sym=17761426, states=536870912, code=0, up=false)] field hello world, againZ|19,19
+a down: [] field hello world, againZ|0,19
 a left: [] field hello world, againZ|0,19
 a right: [] field hello world, againZ|0,19
 a nudged: [sendKey(sym=17761426, states=536870912, code=0, up=false)] field hello world, againZ|0,19
@@ -344,9 +344,9 @@ l long press: [sendKey(sym=17761451, states=536870912, code=0, up=false)] field 
 z said: ㄈ
 z pressed: [ㄈ]
 z tap: [sendKey(sym=17761427, states=536870912, code=0, up=false)] field hello world, againZ|0,19
-z swiping: [Undo]
-z up: [] field hello world, again|18,18
-z down: [sendKey(sym=17761427, states=536870912, code=0, up=false)] field hello world, again|18,18
+z swiping: [ㄈ]
+z up: [sendKey(sym=17761427, states=536870912, code=0, up=false)] field hello world, againZ|0,19
+z down: [] field hello world, again|18,18
 z left: [] field hello world, again|18,18
 z right: [] field hello world, again|18,18
 z nudged: [sendKey(sym=17761427, states=536870912, code=0, up=false)] field hello world, again|18,18
@@ -355,9 +355,9 @@ z long press: [sendKey(sym=17761427, states=536870912, code=0, up=false)] field 
 x said: ㄌ
 x pressed: [ㄌ]
 x tap: [sendKey(sym=17761431, states=536870912, code=0, up=false)] field hello world, again|18,18
-x swiping: [Cut]
-x up: [] field |0,0
-x down: [sendKey(sym=17761431, states=536870912, code=0, up=false)] field |0,0
+x swiping: [ㄌ]
+x up: [sendKey(sym=17761431, states=536870912, code=0, up=false)] field hello world, again|18,18
+x down: [] field |0,0
 x left: [] field |0,0
 x right: [] field |0,0
 x nudged: [sendKey(sym=17761431, states=536870912, code=0, up=false)] field |0,0
@@ -366,9 +366,9 @@ x long press: [sendKey(sym=17761431, states=536870912, code=0, up=false)] field 
 c said: ㄏ
 c pressed: [ㄏ]
 c tap: [sendKey(sym=17761434, states=536870912, code=0, up=false)] field |0,0
-c swiping: [Copy]
-c up: [] field |0,0
-c down: [sendKey(sym=17761434, states=536870912, code=0, up=false)] field |0,0
+c swiping: [ㄏ]
+c up: [sendKey(sym=17761434, states=536870912, code=0, up=false)] field |0,0
+c down: [] field |0,0
 c left: [] field |0,0
 c right: [] field |0,0
 c nudged: [sendKey(sym=17761434, states=536870912, code=0, up=false)] field |0,0
@@ -377,9 +377,9 @@ c long press: [sendKey(sym=17761434, states=536870912, code=0, up=false)] field 
 v said: ㄒ
 v pressed: [ㄒ]
 v tap: [sendKey(sym=17761437, states=536870912, code=0, up=false)] field |0,0
-v swiping: [Paste]
-v up: [] field hello world, again|18,18
-v down: [sendKey(sym=17761437, states=536870912, code=0, up=false)] field hello world, again|18,18
+v swiping: [ㄒ]
+v up: [sendKey(sym=17761437, states=536870912, code=0, up=false)] field |0,0
+v down: [] field hello world, again|18,18
 v left: [] field hello world, again|18,18
 v right: [] field hello world, again|18,18
 v nudged: [sendKey(sym=17761437, states=536870912, code=0, up=false)] field hello world, again|18,18

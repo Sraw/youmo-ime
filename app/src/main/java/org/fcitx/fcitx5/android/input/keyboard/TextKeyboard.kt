@@ -264,9 +264,10 @@ class TextKeyboard(
 
     private var altsMade: Pair<AltsFor, Map<String, String>>? = null
 
-    // none with 标点位置 无: a corner the scene does not draw is not said (TalkBack) or given (its node's extras, the harness)
+    // none where the long press's first's way draws nothing (its place 无, or off): a corner the scene does not draw
+    // is not said (TalkBack) or given (its node's extras, the harness)
     private fun alts(): Map<String, String> {
-        val shown = markSpots().symbol != KeyMarks.At.None
+        val shown = firstShown()
         val now = AltsFor(shown, table?.labelled == true, punctuationMapping, PopupOverridesCache.user.current, capsState)
         altsMade?.takeIf { it.first == now }?.let { return it.second }
         val made = if (shown) SceneLetters.alts { c -> letterDefs[c]?.let(::cornerOf) } else emptyMap()
@@ -535,8 +536,10 @@ class TextKeyboard(
     // a letter's swipe is the first of its long press, as built in (q: 1, then Q) and as the user
     // changed it: one thing, drawn in its corner too (drawn by the scene); none when the user
     // turned its long press off
-    override fun swipeText(def: KeyDef): SwipeChoice =
-        SwipeChoice.of(if (def is SceneKeyDef) swipeOverride(def.behavior.id) else (def.appearance as? KeyDef.Appearance.AltText)?.let(::swipeOverride))
+    override fun swipeText(def: KeyDef): SwipeChoice {
+        val letter = if (def is SceneKeyDef) swipeOverride(def.behavior.id) else (def.appearance as? KeyDef.Appearance.AltText)?.let(::swipeOverride)
+        return if (letter != null) SwipeChoice.of(letter) else super.swipeText(def)
+    }
 
     private fun swipeOverride(def: KeyDef.Appearance.AltText): String? = swipeOverride(def.displayText)
 

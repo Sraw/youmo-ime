@@ -224,6 +224,7 @@ class SettingsIndexTest {
         for (term in listOf("快捷键", "全选", "复制", "粘贴")) {
             assertTrue("$term: ${found(term)}", SettingsIndex.Target(SettingsRoute.PopupOverrides, null) in found(term))
         }
-        assertTrue(found("滑动").toString(), found("滑动").any { it.route == SettingsRoute.Keys && it.key == AppPrefs.SWIPE_LAYERS })
+        assertTrue(found("上滑").toString(), found("上滑").any { it.route == SettingsRoute.Keys && it.key == AppPrefs.SWIPE_UP })
+        assertTrue(found("下滑").toString(), found("下滑").any { it.route == SettingsRoute.Keys && it.key == AppPrefs.SWIPE_DOWN })
     }
 }

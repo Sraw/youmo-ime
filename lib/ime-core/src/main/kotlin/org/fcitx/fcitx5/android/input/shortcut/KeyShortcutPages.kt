@@ -40,6 +40,15 @@ object KeyShortcutPages {
     /** The function keys a shortcut goes on, by name, in the page's order. */
     val FUNCTION_KEYS = listOf("space", "backspace", "return", "shift", "comma", "period", "symbols", "numbers", "lang", "retype", "zero", "separator")
 
+    /**
+     * The function keys whose long press is a list of characters, set by name (060-swipe-slots), on every
+     * keyboard at once, the handwriting one's too; the others' long press is a menu or an action.
+     */
+    val FUNCTION_POPUPS = setOf("comma", "period")
+
+    /** Whether a key named [name] by its layout has a long press set by name: a character key's (`t9/2`), or one of [FUNCTION_POPUPS]. */
+    fun longPressByName(name: String): Boolean = '/' in name || name in FUNCTION_POPUPS
+
     val Full = Page(KeyShortcutPreset.FULL, FULL_ROWS.map { row -> row.map { Key(it.uppercase(), KeyShortcuts.charKey(KeyShortcutPreset.FULL, "$it")) } })
 
     val Nine = Page(

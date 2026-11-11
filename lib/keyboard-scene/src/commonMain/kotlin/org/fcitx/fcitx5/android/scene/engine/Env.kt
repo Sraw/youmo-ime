@@ -192,36 +192,64 @@ data class Texts(
     }
 }
 
-/** What a mark shows: a command's icon or a text (KeyShortcutLooks). */
+/**
+ * What a way of a key's swipe draws (060-swipe-slots, KeyShortcutLooks): a command's [Icon] or a [Text]
+ * (as shortcuts are drawn, at the shortcuts' size), [Corner] the key's own `alt` and [Symbol] a given
+ * one (as symbols are, a corner's), or [Empty], nothing.
+ */
 sealed interface MarkContent {
     data class Icon(val name: String) : MarkContent
     data class Text(val text: String) : MarkContent
+    data class Symbol(val text: String) : MarkContent
+    data object Corner : MarkContent
+    data object Empty : MarkContent
+
+    /** Drawn as a symbol (a corner's look), not as a shortcut. */
+    val symbol: Boolean get() = this is Symbol || this == Corner
 }
 
 /**
- * The marks' settings (rules B §7): where symbols and shortcuts go, whether a character key draws
- * its symbol ([symbols]: the swipe has one) and its shortcut ([charShortcuts]: 快捷键标记 and a
- * shortcut layer), whether a function key's up and down ones are drawn, and the shortcuts by
- * [shortcuts]' names: a character key's `full/a`, a function key's `space:up`, `backspace:down`.
+ * The marks' settings (rules B §7, 060-swipe-slots): every key has an up and a down way, each drawn
+ * at its place ([upAt], [downAt]) where that way is on ([upOn], [downOn]), by [shortcuts]' names, the
+ * layout's `shortcut=` and the way: `full/a:up`, `space:down`. A character key with no name there
+ * draws its [MarkContent.Corner] the way [firstUp] says and nothing the other; a function key nothing,
+ * its two drawn as 0.5 drew them ([shortcutAt]).
+ * [symbols] whether symbols are drawn at all, [charShortcuts] whether a character key's shortcuts are
+ * (a table's roots take their room).
  */
 data class MarkSettings(
-    val symbolAt: KeyMarks.At = KeyMarks.At.SymbolDefault,
-    val shortcutAt: KeyMarks.At = KeyMarks.At.ShortcutDefault,
+    val upAt: KeyMarks.At = KeyMarks.At.SymbolDefault,
+    val downAt: KeyMarks.At = KeyMarks.At.ShortcutDefault,
     val symbols: Boolean = true,
     val charShortcuts: Boolean = true,
     val upOn: Boolean = true,
     val downOn: Boolean = true,
+    val firstUp: Boolean = true,
     val shortcuts: Map<String, MarkContent> = PRESET,
 ) {
+    /** Where a symbol of a character key is drawn: the long press's first's way's place. */
+    val symbolAt: KeyMarks.At get() = if (firstUp) upAt else downAt
+
+    /**
+     * Where a shortcut of a character key is drawn, the other way's place; a function key's up one too,
+     * its down one there mirrored, as 0.5 drew them (KeyMarks.placeFunction): an up swipe's mark over a
+     * down one's whichever way the slots were flipped.
+     */
+    val shortcutAt: KeyMarks.At get() = if (firstUp) downAt else upAt
+
+    /** [name]'s way [up] by [shortcuts], else its default: a character key's corner the way [firstUp], else nothing. */
+    fun of(name: String?, char: Boolean, up: Boolean): MarkContent =
+        name?.let { shortcuts["$it:${if (up) "up" else "down"}"] } ?: if (char && up == firstUp) MarkContent.Corner else MarkContent.Empty
+
     companion object {
-        /** KeyShortcutPreset's: a select all, c copy, x cut, v paste, z undo, y redo; the space's edit menu, ⌫'s clear and restore. */
+        /** KeyShortcutPreset's, down (the long press's first up): a select all, c copy, x cut, v paste, z undo, y redo; the space's edit menu, ⌫'s clear and restore. */
         val PRESET: Map<String, MarkContent> = mapOf(
-            "full/a" to MarkContent.Icon("select-all"),
-            "full/c" to MarkContent.Icon("content-copy"),
-            "full/x" to MarkContent.Icon("content-cut"),
-            "full/v" to MarkContent.Icon("content-paste"),
-            "full/z" to MarkContent.Icon("undo"),
-            "full/y" to MarkContent.Icon("redo"),
+            "full/a:down" to MarkContent.Icon("select-all"),
+            "full/c:down" to MarkContent.Icon("content-copy"),
+            "full/x:down" to MarkContent.Icon("content-cut"),
+            "full/v:down" to MarkContent.Icon("content-paste"),
+            "full/z:down" to MarkContent.Icon("undo"),
+            "full/y:down" to MarkContent.Icon("redo"),
             "space:up" to MarkContent.Icon("cursor-move"),
             "backspace:up" to MarkContent.Icon("delete-sweep"),
             "backspace:down" to MarkContent.Icon("restore"),

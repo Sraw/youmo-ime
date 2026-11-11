@@ -12,34 +12,36 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.view.ViewCompat
-import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
-import org.fcitx.fcitx5.android.input.keyboard.markSpots
+import org.fcitx.fcitx5.android.input.keyboard.firstShown
+import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
+import org.fcitx.fcitx5.android.input.keyboard.swipeWays
 import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
-import org.fcitx.fcitx5.android.scene.layout.Text as SceneText
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import com.google.android.material.R as MaterialR
+import org.fcitx.fcitx5.android.scene.layout.Text as SceneText
 
 /**
  * Keys drawn as keys in the settings that edit what a key does (long press, Chinese punctuation),
@@ -61,11 +63,11 @@ object KeyCaps {
     }
 
     /**
-     * A key's shortcut, for the engine to draw its marks: a character key's [name] (`full/a`) or a function
-     * key's (`space`, its up and down), as [shortcuts] (the page's, being edited) has them; [layout] the board it is
+     * A key's swipes, for the engine to draw its marks: a character key's [name] (`full/a`) or a function
+     * key's (`space`, its up and down), as [slots] (the page's, being edited) has them; [layout] the board it is
      * drawn on, its form's ([board]) where null.
      */
-    class Shortcut(val name: String, val shortcuts: KeyShortcuts, val charShortcuts: Boolean = true, val layout: String? = null)
+    class Shortcut(val name: String, val slots: SwipeSlots, val charShortcuts: Boolean = true, val layout: String? = null)
 
     // the edited key outlined along the engine's face, in the keyboard theme's accent (as light or dark as the
     // face it is on, whatever the settings' own theme); dimmed (its long press off), its words faded alone, the
@@ -98,10 +100,11 @@ object KeyCaps {
             keyboardKeyHeight = keyboardKeyHeight(ctx)
             board = shortcut?.let { if (it.layout != null) board(ctx, it.name, it.layout) else board(ctx, it.name) }
             val names = board?.let { b -> SceneLayouts.of(ctx, b.layout)?.let(SceneBoard::names) } ?: listOfNotNull(shortcut?.name)
-            // the symbol where 标点位置 puts it on the keyboard, a key with no shortcut too
+            // each slot where its way's 图标位置 puts it on the keyboard, a key with no shortcut too
+            val spots = swipeSpots()
             marks = SceneMarks.settings(
-                shortcut?.shortcuts ?: KeyShortcuts.Empty, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(),
-                shortcut?.charShortcuts ?: true, names,
+                shortcut?.slots ?: SwipeSlotsCache.current, swipeWays(), spots.symbol, spots.shortcut,
+                shortcut?.charShortcuts ?: true, names, SceneBoard.firsts(PopupOverridesCache.byName.current, names),
             )
         }
 
@@ -118,8 +121,8 @@ object KeyCaps {
         val codeRow = CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT
         val code = CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats())
         // the letters' corners as the keyboard draws them (TextKeyboard.alts: the long presses' firsts, the user's
-        // overrides; none with 标点位置 无): without them no symbol is drawn, nor does one take a mark's room
-        val alts = if (markSpots().symbol == KeyMarks.At.None) emptyMap() else
+        // overrides; none where the first's way draws nothing): without them no symbol is drawn, nor does one take a mark's room
+        val alts = if (!firstShown()) emptyMap() else
             SceneLetters.alts { c -> c.toString().let { PopupOverridesCache.user.current.resolve(it, PopupPreset[it])?.firstOrNull() } }
         return SceneKeyCell.Board(layout, shortcut, KeyboardArea.keysWidth(ctx), KeyboardArea.keysHeight(ctx, code), alts,
             AppPrefs.getInstance().keyboard.letterCase.getValue().case)

@@ -118,15 +118,15 @@ class SettingsEffectUatTest {
 
     @Test
     @Uat("ST-13")
-    fun punctuationPositionNoneThenBottom() {
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
+    fun swipeUpPositionNoneThenBottom() {
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.None)
         h.start()
         assertNull(corner("w"))
         // the swipe types it all the same
-        h.swipe(h.key("w"), 0f, h.key("w").height * 1.3f)
+        h.swipe(h.key("w"), 0f, -h.key("w").height * 1.3f)
         assertTrue(sent().toString(), "key=2," in sent().last())
         fresh()
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.Bottom)
         h.start()
         val w = h.key("w")
         assertEquals("2", corner("w"))
@@ -146,7 +146,7 @@ class SettingsEffectUatTest {
     @Test
     @Uat("ST-15")
     fun swipeUpThenDisabled() {
-        prefs.set(keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
+        prefs.setLayers(SwipeLayersChoice.SymbolUpShortcutDown)
         h.start()
         val w = h.key("w")
         h.swipe(w, 0f, -w.height * 0.6f)
@@ -155,7 +155,7 @@ class SettingsEffectUatTest {
         h.swipe(w, 0f, w.height * 0.4f)
         assertTrue(sent().toString(), sent().size == 1 && "key=w," in sent().last())
         fresh()
-        prefs.set(keyboard.swipeLayers, SwipeLayersChoice.Off)
+        prefs.setLayers(SwipeLayersChoice.Off)
         h.start()
         for (dy in listOf(-1.3f, 1.3f)) {
             h.swipe(h.key("w"), 0f, h.key("w").height * dy)
@@ -236,7 +236,7 @@ class SettingsEffectUatTest {
         prefs.set(AppPrefs.getInstance().internal.popupOverrides, "q Q 1")
         h.start()
         assertEquals("Q", corner("q"))
-        h.swipe(h.key("q"), 0f, h.key("q").height * 1.3f)
+        h.swipe(h.key("q"), 0f, -h.key("q").height * 1.3f)
         assertTrue(sent().toString(), "key=Q," in sent().last())
     }
 

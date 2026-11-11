@@ -18,8 +18,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
@@ -30,33 +29,34 @@ import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapContent
 
 /**
- * One way's shortcut in a key's dialog (按键字符和快捷键): none, a command picked from a list, or a
- * text typed. [title] says the way, [off] that the setting turns that way off now.
+ * One way of a key (上滑 or 下滑) chosen (060-swipe-slots): the long press's first, a command, a text,
+ * or nothing. [off] says the way is switched off in the settings, its choice kept for when it is on.
  */
-class KeyShortcutSection(private val ctx: Context, title: String, off: Boolean, initial: KeyShortcut) {
+class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, initial: SwipeSlot) {
 
-    private var command = (initial as? KeyShortcut.Command)?.command ?: KeyCommand.SelectAll
+    private var command = (initial as? SwipeSlot.Command)?.command ?: KeyCommand.SelectAll
 
-    private val none = RadioButton(ctx).apply { setText(R.string.shortcut_none) }
+    private val first = RadioButton(ctx).apply { setText(R.string.slot_first) }
     private val commandButton = RadioButton(ctx)
     private val textButton = RadioButton(ctx).apply { setText(R.string.shortcut_text) }
-    private val radios = listOf(none, commandButton, textButton)
+    private val empty = RadioButton(ctx).apply { setText(R.string.slot_empty) }
+    private val radios = listOf(first, commandButton, textButton, empty)
 
     private val field = EditText(ctx).apply {
         inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
         filters = arrayOf(InputFilter.LengthFilter(KeyShortcut.MAX_TEXT))
-        setText((initial as? KeyShortcut.Text)?.text)
+        setText((initial as? SwipeSlot.Text)?.text)
         setOnFocusChangeListener { _, focused -> if (focused) pick(textButton) }
     }
 
     val view: LinearLayout = ctx.verticalLayout {
         add(TextView(ctx).apply {
-            text = if (off) title + ctx.getString(R.string.shortcut_section_off) else title
+            text = if (off) title + ctx.getString(R.string.slot_section_off) else title
             textSize = 14f
             setTextColor(ctx.styledColor(android.R.attr.colorPrimary))
             setPadding(0, ctx.dp(12), 0, ctx.dp(4))
         }, lParams(matchParent))
-        add(none, lParams(matchParent))
+        add(first, lParams(matchParent))
         add(ctx.horizontalLayout {
             gravity = Gravity.CENTER_VERTICAL
             add(commandButton, lParams(0, wrapContent) { weight = 1f })
@@ -67,6 +67,7 @@ class KeyShortcutSection(private val ctx: Context, title: String, off: Boolean, 
         }, lParams(matchParent))
         add(textButton, lParams(matchParent))
         add(field, lParams(matchParent) { marginStart = ctx.dp(32) })
+        add(empty, lParams(matchParent))
     }
 
     init {
@@ -74,9 +75,10 @@ class KeyShortcutSection(private val ctx: Context, title: String, off: Boolean, 
         showCommand()
         pick(
             when (initial) {
-                is KeyShortcut.Command -> commandButton
-                is KeyShortcut.Text -> textButton
-                KeyShortcut.None -> none
+                SwipeSlot.First -> first
+                is SwipeSlot.Command -> commandButton
+                is SwipeSlot.Text -> textButton
+                SwipeSlot.Empty -> empty
             },
         )
     }
@@ -102,23 +104,21 @@ class KeyShortcutSection(private val ctx: Context, title: String, off: Boolean, 
     }
 
     /** What is chosen; null when the text is chosen but empty, said on the field. */
-    fun chosen(): KeyShortcut? = when {
-        commandButton.isChecked -> KeyShortcut.Command(command)
-        textButton.isChecked -> field.text.toString().takeIf { it.isNotEmpty() }?.let(KeyShortcut::Text)
+    fun chosen(): SwipeSlot? = when {
+        first.isChecked -> SwipeSlot.First
+        commandButton.isChecked -> SwipeSlot.Command(command)
+        textButton.isChecked -> field.text.toString().takeIf { it.isNotEmpty() }?.let(SwipeSlot::Text)
             ?: null.also { field.error = ctx.getString(R.string.invalid_value) }
-        else -> KeyShortcut.None
+        else -> SwipeSlot.Empty
     }
 
     companion object {
-        /** [shortcuts] with [name] as [chosen]: a preset chosen is no edit of the user's. */
-        fun KeyShortcuts.withChosen(name: String, chosen: KeyShortcut): KeyShortcuts =
-            if (chosen == KeyShortcutPreset.of(name)) without(name) else with(name, chosen)
-
-        /** What a key's corner shows of [shortcut] on the page: a command's name, a text's start. */
-        fun shortLabel(ctx: Context, shortcut: KeyShortcut): String? = when (shortcut) {
-            is KeyShortcut.Command -> ctx.getString(KeyShortcutLooks.of(shortcut.command).label)
-            is KeyShortcut.Text -> shortcut.text
-            KeyShortcut.None -> null
+        /** What a slot is said as (a screen reader, the page): the first's words, a command's name, a text's start; none for nothing. */
+        fun shortLabel(ctx: Context, slot: SwipeSlot): String? = when (slot) {
+            SwipeSlot.First -> ctx.getString(R.string.slot_first)
+            is SwipeSlot.Command -> ctx.getString(KeyShortcutLooks.of(slot.command).label)
+            is SwipeSlot.Text -> slot.text
+            SwipeSlot.Empty -> null
         }
     }
 }

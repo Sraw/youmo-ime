@@ -44,30 +44,27 @@ class SwipePopupScreenshotTest {
     val prefs = PrefsRule()
 
     // q a long text, w 快速输入, e 恢复刚删除的: the longest words a bubble shows
-    private fun longShortcuts() = prefs.set(
-        AppPrefs.getInstance().internal.keyShortcuts,
-        KeyShortcuts.Empty
+    private fun longShortcuts() = prefs.setShortcuts(KeyShortcuts.Empty
             .with("full/q", KeyShortcut.Text("我的邮箱是 someone@example.com"))
             .with("full/w", KeyShortcut.Command(KeyCommand.QuickInput))
             .with("full/e", KeyShortcut.Command(KeyCommand.Restore))
-            .serialize(),
-    )
+            )
 
-    // [label]'s key swiped up past the threshold and held there, the bubble shown
+    // [label]'s key swiped down (its shortcut, by default) past the threshold and held there, the bubble shown
     private fun KeyboardHarness.held(label: String, name: String) {
         val key = key(label)
         val finger = finger(key, at(key))
-        for (i in 1..5) finger.move(at(key, dy = -10f * i, ms = 16))
+        for (i in 1..5) finger.move(at(key, dy = 10f * i, ms = 16))
         capture("SwipePopupScreenshotTest/$name", inputView)
         finger.up(at(key))
     }
 
-    // [label]'s key swiped down to its symbol and held: a character in the bubble, scaled as the keys' text
-    // (紧凑, floating). Held still, the long press would show its keys over it before the shot
+    // [label]'s key swiped up to its symbol (its long press's first) and held: a character in the bubble, scaled
+    // as the keys' text (紧凑, floating). Held still, the long press would show its keys over it before the shot
     private fun KeyboardHarness.symbolHeld(label: String, name: String) {
         val key = key(label)
         val finger = finger(key, at(key))
-        for (i in 1..5) finger.move(at(key, dy = 10f * i, ms = 16))
+        for (i in 1..5) finger.move(at(key, dy = -10f * i, ms = 16))
         capture("SwipePopupScreenshotTest/$name", inputView)
         finger.up(at(key))
     }
@@ -148,7 +145,7 @@ class SwipePopupScreenshotTest {
             fun bubble(label: String): String {
                 val key = h.key(label)
                 val finger = h.finger(key, h.at(key))
-                for (i in 1..5) finger.move(h.at(key, dy = -10f * i, ms = 16))
+                for (i in 1..5) finger.move(h.at(key, dy = 10f * i, ms = 16))
                 val shown = h.popupChoices().map { it.text }.filter { it.isNotEmpty() }
                 finger.up(h.at(key))
                 return shown.last()
@@ -264,10 +261,7 @@ class SwipePopupScreenshotTest {
     @Test
     @Config(qualifiers = "en-w393dp-h851dp-port-440dpi")
     fun english() {
-        prefs.set(
-            AppPrefs.getInstance().internal.keyShortcuts,
-            KeyShortcuts.Empty.with("full/w", KeyShortcut.Command(KeyCommand.TradSimp)).serialize(),
-        )
+        prefs.setShortcuts(KeyShortcuts.Empty.with("full/w", KeyShortcut.Command(KeyCommand.TradSimp)))
         KeyboardHarness(TestThemes.PixelLight).use { h ->
             h.start()
             h.held("w", "trad_simp_en")

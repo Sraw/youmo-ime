@@ -83,8 +83,11 @@ class FacadeShotsTest {
                 nineLetters = mapOf("2" to "abc"), other = mapOf("root:g" to "王\n一"), a11yGrouped = "%1\$s；%2\$s", a11ySpace = "空格 %1\$s",
             ),
             marks = MarkSettings(
-                symbolAt = KeyMarks.At.BottomLeft, shortcutAt = KeyMarks.At.None, symbols = false, charShortcuts = false, upOn = false, downOn = false,
-                shortcuts = mapOf("copy" to MarkContent.Icon("copy"), "paste" to MarkContent.Text("粘\"贴\\")),
+                upAt = KeyMarks.At.BottomLeft, downAt = KeyMarks.At.None, symbols = false, charShortcuts = false, upOn = false, downOn = false, firstUp = false,
+                shortcuts = mapOf(
+                    "copy:up" to MarkContent.Icon("copy"), "paste:down" to MarkContent.Text("粘\"贴\\"), "q:up" to MarkContent.Symbol("1"),
+                    "q:down" to MarkContent.Corner, "w:up" to MarkContent.Empty,
+                ),
             ),
             states = mapOf("reading" to setOf(KeyState.On), "lock" to setOf(KeyState.Locked, KeyState.Disabled)),
             board = "qwerty",
@@ -102,7 +105,7 @@ class FacadeShotsTest {
         assertTrue(EnvJson.read("{\"width\": 0, \"height\": 2, \"density\": 1}") is Parsed.Failed)
         assertTrue(EnvJson.read("{\"height\": 2, \"density\": 1}") is Parsed.Failed)
         assertTrue(EnvJson.read("[1]") is Parsed.Failed)
-        assertTrue(EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"marks\": {\"shortcuts\": {\"a\": {}}}}") is Parsed.Failed)
+        assertTrue(EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"marks\": {\"shortcuts\": {\"a:up\": {\"icon\": \"x\", \"text\": \"y\"}}}}") is Parsed.Failed)
         assertTrue(EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"states\": {\"a\": [\"pressed-ish\"]}}") is Parsed.Failed)
         assertTrue(EnvJson.read("{\"width\": \"1\", \"height\": 2, \"density\": 1}") is Parsed.Failed)
         assertTrue(EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"dark\": 1}") is Parsed.Failed)
@@ -185,9 +188,9 @@ object FacadeShots {
         val d = MarkSettings()
         fun at(name: String, v: Any, dv: Any) = name to (if (v == dv) null else str(EnvJson.AT.entries.first { it.value == v }.key))
         return obj(
-            at("symbolAt", m.symbolAt, d.symbolAt), at("shortcutAt", m.shortcutAt, d.shortcutAt),
+            at("upAt", m.upAt, d.upAt), at("downAt", m.downAt, d.downAt),
             "symbols" to bool(m.symbols, d.symbols), "charShortcuts" to bool(m.charShortcuts, d.charShortcuts),
-            "upOn" to bool(m.upOn, d.upOn), "downOn" to bool(m.downOn, d.downOn),
+            "upOn" to bool(m.upOn, d.upOn), "downOn" to bool(m.downOn, d.downOn), "firstUp" to bool(m.firstUp, d.firstUp),
             "shortcuts" to (
                 if (m.shortcuts == d.shortcuts) {
                     null
@@ -197,6 +200,9 @@ object FacadeShots {
                             k to when (v) {
                                 is MarkContent.Icon -> obj("icon" to str(v.name))
                                 is MarkContent.Text -> obj("text" to str(v.text))
+                                is MarkContent.Symbol -> obj("symbol" to str(v.text))
+                                MarkContent.Corner -> obj("corner" to "true")
+                                MarkContent.Empty -> obj()
                             }
                         },
                     )

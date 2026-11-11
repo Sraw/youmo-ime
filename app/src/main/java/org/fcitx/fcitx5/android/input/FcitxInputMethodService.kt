@@ -323,9 +323,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.keyboard.shuangpinKeyboard,
         prefs.keyboard.englishKeyboard,
         prefs.advanced.disableAnimation,
-        // every key's symbol laid out anew, those no swipe marks too; was a theme setting's
-        prefs.keyboard.punctuationPosition,
-        prefs.keyboard.shortcutMarkPosition,
+        // every key's marks laid out anew, those no swipe marks too; was a theme setting's
+        prefs.keyboard.swipeUpPosition,
+        prefs.keyboard.swipeDownPosition,
+        // the other keyboards' long presses, wired as their keys are made
+        prefs.internal.keyPopups,
         // the letters' faces (拼音键字母大小写): every keyboard made anew, its env read as it is now
         prefs.keyboard.letterCase,
     )

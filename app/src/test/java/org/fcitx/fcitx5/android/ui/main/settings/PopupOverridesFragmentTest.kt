@@ -17,9 +17,10 @@ import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
@@ -136,48 +137,143 @@ class PopupOverridesFragmentTest {
             assertEquals(before, pref.getValue())
         }
 
-        // a letter's dialog has its shortcut below its characters: a text typed there is what its swipe runs
-        @Test
-        fun aLettersShortcutIsSetInItsDialog() {
-            val pref = AppPrefs.getInstance().internal.keyShortcuts
-            // put back after, passed or failed: a later swipe test expects the presets (full/a = 全选)
-            prefs.set(pref, pref.getValue())
+        private val slotsPref get() = AppPrefs.getInstance().internal.keySwipes
+        private fun slots() = slotsPref.getValue().let { if (it.isEmpty()) SwipeSlots.Default else SwipeSlots.parse(it) }
+
+        private fun open() {
+            // put back after, passed or failed: a later swipe test expects the presets (full/a = 全选 down)
+            prefs.set(slotsPref, slotsPref.getValue())
+            prefs.set(AppPrefs.getInstance().internal.keyPopups, AppPrefs.getInstance().internal.keyPopups.getValue())
+            val k = AppPrefs.getInstance().keyboard
+            listOf(k.swipeUpPosition, k.swipeDownPosition).forEach { prefs.set(it, it.getValue()) }
+            listOf(k.swipeUp, k.swipeDown).forEach { prefs.set(it, it.getValue()) }
             st.activity
             st.open(SettingsRoute.PopupOverrides)
-            KeyboardHarness.all(st.activity.window.decorView)
-                .first { it.contentDescription?.toString()?.substringBefore(',') == "q" && it.hasOnClickListeners() }
-                .performClick()
+        }
+
+        private fun keyCalled(label: String) = KeyboardHarness.all(st.activity.window.decorView)
+            .first { it.contentDescription?.toString()?.substringBefore(',') == label && it.hasOnClickListeners() }
+
+        private fun click(title: Int) {
+            KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }.performClick()
+            st.idle()
+        }
+
+        // a list dialog's item picked: a preset, a way
+        private fun pick(index: Int) {
+            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            dialog.listView.performItemClick(null, index, 0)
+            st.idle()
+        }
+
+        // a letter's dialog has its two ways below its characters: a text typed for 下滑 is what its swipe down runs
+        @Test
+        @Uat("ST-95")
+        fun aLettersSlotsAreSetInItsDialog() {
+            open()
+            keyCalled("q").performClick()
             st.idle()
             val dialog = ShadowDialog.getLatestDialog() as AlertDialog
             val views = KeyboardHarness.all(dialog.window!!.decorView).toList()
-            // none, a command, a text
-            views.filterIsInstance<RadioButton>()[2].performClick()
+            // each way: the long press's first, a command, a text, nothing; 上滑 then 下滑
+            val radios = views.filterIsInstance<RadioButton>()
+            assertEquals(8, radios.size)
+            assertTrue("上滑 at its preset, the first", radios[0].isChecked)
+            radios[6].performClick()
             views.filterIsInstance<EditText>().last().setText("你好")
+            radios[3].performClick()
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
-            assertEquals(KeyShortcut.Text("你好"), KeyShortcuts.parse(pref.getValue()).resolve("full/q"))
+            assertEquals(SwipeSlot.Text("你好"), slots().resolve("full/q", up = false))
+            assertEquals(SwipeSlot.Empty, slots().resolve("full/q", up = true))
+            // 撤销: one step back
+            click(R.string.undo)
+            assertEquals(SwipeSlots.Default, slots())
         }
 
-        // a whole page's shortcuts cleared only once the user says so: cancelled, nothing changed
+        // 翻转上下滑: every key's two slots swapped, the places with them, and once more back
         @Test
-        fun aPageIsClearedOfItsShortcutsOnlyOnceConfirmed() {
-            val pref = AppPrefs.getInstance().internal.keyShortcuts
-            // put back after, passed or failed: a later swipe test expects the presets (full/a = 全选)
-            prefs.set(pref, pref.getValue())
+        @Uat("ST-96")
+        fun flippingAllSwapsTheWaysAndTheirPlaces() {
+            open()
+            val k = AppPrefs.getInstance().keyboard
+            val places = k.swipeUpPosition.getValue() to k.swipeDownPosition.getValue()
+            click(R.string.swipe_flip_all)
+            assertEquals(SwipeOrientation.FirstDown, slots().orientation)
+            assertEquals(SwipeSlot.Command(KeyCommand.SelectAll), slots().resolve("full/a", up = true))
+            assertEquals(places.second to places.first, k.swipeUpPosition.getValue() to k.swipeDownPosition.getValue())
+            click(R.string.swipe_flip_all)
+            assertEquals(SwipeSlots.Default, slots())
+            assertEquals(places, k.swipeUpPosition.getValue() to k.swipeDownPosition.getValue())
+        }
+
+        // a preset puts every key back, edits too; 撤销 brings them back
+        @Test
+        @Uat("ST-96")
+        fun aPresetResetsEveryKeyAndCanBeTakenBack() {
+            prefs.set(slotsPref, SwipeSlots.Default.with("full/q", false, SwipeSlot.Text("Q")).serialize())
             st.activity
             st.open(SettingsRoute.PopupOverrides)
-            fun clearPage(): AlertDialog {
-                KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>()
-                    .first { it.text.toString() == st.s(R.string.shortcut_clear_page) }.performClick()
-                st.idle()
-                return ShadowDialog.getLatestDialog() as AlertDialog
-            }
-            clearPage().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+            val edited = slots()
+            click(R.string.swipe_presets)
+            pick(1)
+            assertEquals(SwipeSlots.Default.applied(SwipeOrientation.FirstDown), slots())
+            click(R.string.undo)
+            assertEquals(edited, slots())
+        }
+
+        // the user leaves the page to try the keys: back on it, 撤销 still takes the change back
+        @Test
+        @Uat("ST-95")
+        fun theStepBackOutlivesThePage() {
+            open()
+            click(R.string.swipe_flip_all)
+            st.open(SettingsRoute.PopupOverrides)
+            click(R.string.undo)
+            assertEquals(SwipeSlots.Default, slots())
+        }
+
+        // 多选: keys tapped are chosen, not edited; the batch sets their slots alone
+        @Test
+        @Uat("ST-97")
+        fun selectedKeysAreSetAtOnce() {
+            open()
+            click(R.string.swipe_multi_select)
+            keyCalled("q").performClick()
             st.idle()
-            assertEquals(KeyShortcut.Command(KeyCommand.SelectAll), KeyShortcuts.parse(pref.getValue()).resolve("full/a"))
-            clearPage().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            keyCalled("w").performClick()
             st.idle()
-            assertEquals(KeyShortcut.None, KeyShortcuts.parse(pref.getValue()).resolve("full/a"))
+            assertTrue(st.texts().toString(), st.activity.getString(R.string.swipe_selected, 2) in st.texts())
+            click(R.string.swipe_set_empty)
+            pick(2)
+            for (key in listOf("full/q", "full/w")) for (up in listOf(true, false)) assertEquals(SwipeSlot.Empty, slots().resolve(key, up))
+            assertEquals("others as they were", SwipeSlot.First, slots().resolve("full/e", up = true))
+            click(R.string.swipe_flip)
+            assertEquals(SwipeSlot.Empty, slots().resolve("full/q", up = true))
+            click(R.string.swipe_set_first)
+            pick(1)
+            assertEquals(SwipeSlot.First, slots().resolve("full/w", up = false))
+            click(R.string.swipe_reset)
+            assertEquals(SwipeSlots.Default, slots())
+            click(R.string.done)
+            assertTrue(st.texts().toString(), st.s(R.string.swipe_multi_select) in st.texts())
+        }
+
+        // another keyboard's key: its long press set by its name, the keyboard's own kept until then
+        @Test
+        @Uat("ST-98")
+        fun anotherKeyboardsLongPressIsSetByName() {
+            open()
+            click(R.string.shortcut_page_g14)
+            keyCalled("QW").performClick()
+            st.idle()
+            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            val texts = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+            assertTrue(texts.toString(), st.s(R.string.long_press_by_name_hint) in texts)
+            KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<EditText>().first().setText("① ②")
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            st.idle()
+            assertEquals(listOf("①", "②"), PopupOverrides.parse(AppPrefs.getInstance().internal.keyPopups.getValue())["g14/qw"])
         }
     }
 

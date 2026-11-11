@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.shortcut
 
 import org.fcitx.fcitx5.android.Uat
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -58,5 +59,14 @@ class KeyShortcutPagesTest {
         assertEquals(listOf("fn/space.up", "fn/space.down"), space.map { it.name })
         assertTrue(KeyShortcutPages.all.all { page -> page.names.all { KeyShortcuts.formOf(it) == page.form } })
         assertEquals(KeyShortcutPages.all.size, KeyShortcutPages.all.map { it.form }.toSet().size)
+    }
+
+    // a character key's long press set by name, and the comma's and full stop's alone of the function keys
+    @Test
+    fun whichKeysHaveALongPressByName() {
+        assertTrue(KeyShortcutPages.longPressByName("t9/2"))
+        assertTrue(KeyShortcutPages.longPressByName("comma"))
+        assertTrue(KeyShortcutPages.longPressByName("period"))
+        assertFalse(KeyShortcutPages.longPressByName("space"))
     }
 }

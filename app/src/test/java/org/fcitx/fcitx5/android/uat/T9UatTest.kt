@@ -147,12 +147,12 @@ class T9UatTest {
 
     @Test
     @Uat("T9-10")
-    fun aDigitKeySwipedDownTypesItsDigit() {
+    fun aDigitKeySwipedUpTypesItsDigit() {
         val h = harness().start()
         val eight = h.nineKey("8")
-        // a key's height down. A 30 dp touch with no move between was once taken for a tap, and a tap of 8
+        // a key's height up. A 30 dp touch with no move between was once taken for a tap, and a tap of 8
         // then sent the digit too: this passed for the wrong reason
-        h.swipe(eight, 0f, eight.height.toFloat())
+        h.swipe(eight, 0f, -eight.height.toFloat())
         // the digit itself, as the number pad's 8 (the engine types it when nothing is composed),
         // not the key's code (Keyboard.pinyinNineKey)
         assertEquals(listOf("sendKey(sym=${FcitxKeyMapping.FcitxKey_KP_0 + 8}, states=536870912, code=0, up=false)"), h.sent())
@@ -203,25 +203,25 @@ class T9UatTest {
         assertEquals(listOf("reset()"), h.api.calls.filter { it == "reset()" || it.startsWith("sendKey") || it.startsWith("select") })
         // after the candidate the engine put in on reset (NineKeysHostUatTest.resetPutsTheFirstCandidateIn)
         assertEquals("2", h.field.text.toString())
-        // 1 swiped down while typing: the keypad's 1, with which the engine picks the first
+        // 1 swiped up while typing: the keypad's 1, with which the engine picks the first
         // candidate, no 1 (NineKeysHostUatTest.theNumberPadsDigitsAreTypedOrPick)
         typing(true, "xi")
         h.api.calls.clear()
-        h.swipedDown(h.nineKey("1"))
+        h.swipedUp(h.nineKey("1"))
         assertEquals(listOf(FcitxKeyMapping.FcitxKey_KP_1), h.keypad())
         assertEquals("2", h.field.text.toString())
     }
 
     // past the key's swipe threshold (36 dp) straight down, as a finger swipes
-    private fun KeyboardHarness.swipedDown(key: ShownKey) = touch(key, at(key), at(key, dy = 25f, ms = 30), at(key, dy = 50f, ms = 30))
+    private fun KeyboardHarness.swipedUp(key: ShownKey) = touch(key, at(key), at(key, dy = -25f, ms = 30), at(key, dy = -50f, ms = 30))
 
     @Test
     @Uat("T9-22")
-    fun aDigitSwipedDownWhileTypingPicksItsCandidate() {
+    fun aDigitSwipedUpWhileTypingPicksItsCandidate() {
         val h = harness().start()
         typing(true, "ni")
         h.api.calls.clear()
-        h.swipedDown(h.nineKey("2"))
+        h.swipedUp(h.nineKey("2"))
         // the keypad's 2, not the key's ABC: the engine picks the second candidate with it, as the
         // number pad's 2 (NineKeysHostUatTest.aSwipedDigitPicksItsCandidate); no digit in the field
         assertEquals(listOf(FcitxKeyMapping.FcitxKey_KP_2), h.keypad())
@@ -230,7 +230,7 @@ class T9UatTest {
         // address field types it as is, the URL keys' case), so nothing put in the field here
         typing(false)
         h.api.calls.clear()
-        h.swipedDown(h.nineKey("2"))
+        h.swipedUp(h.nineKey("2"))
         assertEquals(listOf(FcitxKeyMapping.FcitxKey_KP_2), h.keypad())
         assertEquals("", h.field.text.toString())
     }

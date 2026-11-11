@@ -10,10 +10,10 @@ import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
+import org.fcitx.fcitx5.android.input.keyboard.KeySwipe
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
@@ -142,36 +142,49 @@ class TextBoardSceneTest {
 
     @Test
     fun theMarksAsTheSettingsAre() {
-        val shortcuts = KeyShortcuts.Empty
-            .with("full/q", KeyShortcut.Text("hi"))
-            .with("full/a", KeyShortcut.None)
-            .with(KeyShortcuts.functionKey("space", up = false), KeyShortcut.Command(KeyCommand.Clipboard))
-        val names = SceneMarks.names(SceneData.qwerty)
+        val slots = SwipeSlots.Default
+            .with("full/q", up = false, SwipeSlot.Text("hello"))
+            .with("full/a", up = false, SwipeSlot.Empty)
+            .with("full/s", up = true, SwipeSlot.Command(KeyCommand.Paste))
+            .with("fn/space", up = false, SwipeSlot.Command(KeyCommand.Clipboard))
+            .with("fn/comma", up = true, SwipeSlot.First)
+            .with("fn/period", up = true, SwipeSlot.First)
+            .with("t9/2", up = true, SwipeSlot.First)
+        val names = SceneMarks.names(SceneData.qwerty) + setOf("t9/2", "t9/3", "period")
         assertTrue("full/q" in names && "space" in names && "return" in names)
-        val m = SceneMarks.settings(shortcuts, SwipeLayers.Default, KeyMarks.Spots(KeyMarks.At.BottomLeft, KeyMarks.At.Bottom), true, names)
-        assertEquals(MarkContent.Text("hi"), m.shortcuts["full/q"])
-        assertNull(m.shortcuts["full/a"])
-        assertEquals(MarkContent.Icon("content-copy"), m.shortcuts["full/c"])
+        val firsts = mapOf("comma" to "!", "t9/3" to null)
+        val m = SceneMarks.settings(slots, KeySwipe.Ways.Both, KeyMarks.At.BottomLeft, KeyMarks.At.Bottom, true, names, firsts)
+        assertEquals("two characters, then an ellipsis", MarkContent.Text("he…"), m.shortcuts["full/q:down"])
+        assertEquals(MarkContent.Corner, m.shortcuts["full/q:up"])
+        assertEquals(MarkContent.Empty, m.shortcuts["full/a:down"])
+        assertEquals(MarkContent.Icon("content-paste"), m.shortcuts["full/s:up"])
+        assertEquals(MarkContent.Icon("content-copy"), m.shortcuts["full/c:down"])
         assertEquals(MarkContent.Icon("cursor-move"), m.shortcuts["space:up"])
         assertEquals(MarkContent.Icon("clipboard"), m.shortcuts["space:down"])
         assertEquals(MarkContent.Icon("delete-sweep"), m.shortcuts["backspace:up"])
-        assertEquals(SceneKeyMarks.At.BottomLeft, m.symbolAt)
-        assertEquals(SceneKeyMarks.At.Bottom, m.shortcutAt)
-        assertTrue(m.charShortcuts && m.upOn && m.downOn)
+        assertEquals("a function key's first: its long press's", MarkContent.Symbol("!"), m.shortcuts["comma:up"])
+        assertEquals("none known: nothing", MarkContent.Empty, m.shortcuts["period:up"])
+        assertEquals("a long press turned off", MarkContent.Empty, m.shortcuts["t9/3:up"])
+        assertEquals(MarkContent.Corner, m.shortcuts["t9/2:up"])
+        assertEquals(SceneKeyMarks.At.BottomLeft, m.upAt)
+        assertEquals(SceneKeyMarks.At.Bottom, m.downAt)
+        assertTrue(m.charShortcuts && m.upOn && m.downOn && m.firstUp)
         // the built-in ones as the engine's own preset names them
-        val preset = SceneMarks.settings(KeyShortcuts.Empty, SwipeLayers.Default, KeyMarks.Spots(KeyMarks.At.TopRight, KeyMarks.At.TopLeft), true, names)
+        val preset = SceneMarks.settings(SwipeSlots.Default, KeySwipe.Ways.Both, KeyMarks.At.TopRight, KeyMarks.At.TopLeft, true, names)
         MarkSettings.PRESET.forEach { (k, v) -> assertEquals(k, v, preset.shortcuts[k]) }
+        val flipped = SceneMarks.settings(SwipeSlots.Default.flippedAll(listOf("fn/space")), KeySwipe.Ways.Both, KeyMarks.At.TopRight, KeyMarks.At.TopLeft, true, names)
+        assertFalse(flipped.firstUp)
+        assertEquals(MarkContent.Icon("select-all"), flipped.shortcuts["full/a:up"])
+        assertEquals(MarkContent.Icon("cursor-move"), flipped.shortcuts["space:down"])
     }
 
     @Test
-    fun noShortcutLayerNoCharacterShortcuts() {
-        val spots = KeyMarks.Spots(KeyMarks.At.TopRight, KeyMarks.At.TopLeft)
-        val off = SceneMarks.settings(KeyShortcuts.Empty, SwipeLayers(SwipeLayers.Layer.Symbol, SwipeLayers.Layer.Off), spots, true, setOf("full/a"))
-        assertFalse(off.charShortcuts)
+    fun theWaysOnAndTheRoomForShortcuts() {
+        val off = SceneMarks.settings(SwipeSlots.Default, KeySwipe.Ways(up = true, down = false), KeyMarks.At.TopRight, KeyMarks.At.TopLeft, true, setOf("full/a"))
         assertTrue(off.upOn)
         assertFalse(off.downOn)
         // a table's roots take the room
-        assertFalse(SceneMarks.settings(KeyShortcuts.Empty, SwipeLayers.Default, spots, false, setOf("full/a")).charShortcuts)
+        assertFalse(SceneMarks.settings(SwipeSlots.Default, KeySwipe.Ways.Both, KeyMarks.At.TopRight, KeyMarks.At.TopLeft, false, setOf("full/a")).charShortcuts)
     }
 
     @Test

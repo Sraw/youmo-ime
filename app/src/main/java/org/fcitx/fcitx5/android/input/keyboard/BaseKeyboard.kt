@@ -11,6 +11,7 @@ import android.view.accessibility.AccessibilityManager
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
 import androidx.constraintlayout.widget.ConstraintLayout
+import kotlin.math.absoluteValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,7 +50,11 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
+import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
+import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.pack.PackKind
@@ -67,7 +72,6 @@ import splitties.views.dsl.constraintlayout.leftOfParent
 import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
-import kotlin.math.absoluteValue
 
 abstract class BaseKeyboard(
     context: Context,
@@ -327,8 +331,24 @@ abstract class BaseKeyboard(
         }
     }
 
-    /** What swiping the key of [def] types where the user chose it ([TextKeyboard]): [SwipeChoice.BuiltIn] for what its key says. */
-    protected open fun swipeText(def: KeyDef): SwipeChoice = SwipeChoice.BuiltIn
+    /**
+     * What swiping the key of [def] to its long press's first types where the user chose it: the first of
+     * the long press set by the key's name (060-swipe-slots: the keyboards but 全键盘, whose [TextKeyboard]
+     * has them by the letter), else [SwipeChoice.BuiltIn] for what its key says.
+     */
+    protected open fun swipeText(def: KeyDef): SwipeChoice {
+        val name = def.shortcut?.takeIf { shortcuts && it in PopupOverridesCache.byName.current.labels } ?: return SwipeChoice.BuiltIn
+        return SwipeChoice.of(userLongPress(name)?.firstOrNull().orEmpty())
+    }
+
+    // the long press the user set by the key's [name] (`t9/2`), empty where they turned it off; null for none set
+    private fun userLongPress(name: String): Array<String>? {
+        val popups = PopupOverridesCache.byName.current
+        return if (name in popups.labels) popups.resolve(name, null) ?: emptyArray() else null
+    }
+
+    // the keys' names by their scene id: a long press opened is the user's where they set one by name
+    private val namesById = HashMap<String, String>()
 
     /**
      * What a tap sends for its key's [action]: the action itself, but where a keyboard adds where it fell,
@@ -353,6 +373,15 @@ abstract class BaseKeyboard(
         val longPopup = LongPopup()
         swipes.attach(key, def, longPopup)
         def.popup?.forEach { wirePopup(key, def, it, longPopup) }
+        // a long press set by name on a key that had none ([onPopupAction] shows it, as it does one in place of the key's)
+        val name = def.shortcut?.takeIf { shortcuts && KeyShortcutPages.longPressByName(it) }
+        if (name != null) {
+            namesById[key.ref.id] = name
+            val user = userLongPress(name)
+            if (user != null && user.isNotEmpty() && def.popup.orEmpty().none { it is KeyDef.Popup.Keyboard }) {
+                wirePopup(key, def, KeyDef.Popup.Keyboard.Explicit(user), longPopup)
+            }
+        }
     }
 
     // the space's sideways swipe moves the cursor, as the setting says ([spaceSwipesCursor])
@@ -696,6 +725,16 @@ abstract class BaseKeyboard(
 
     @CallSuper
     protected open fun onPopupAction(action: PopupAction) {
+        // last, after a keyboard's own (a group's long press made as it opens): the long press set by the key's name
+        if (action is PopupAction.ShowKeyboardAction) {
+            val user = namesById[action.key.id]?.takeIf { KeyShortcuts.formOf(it) != KeyShortcutPreset.FULL }?.let(::userLongPress)
+            if (user != null) {
+                // turned off: no long press at all
+                if (user.isEmpty()) return
+                popupActionListener?.onPopupAction(action.copy(keyboard = KeyDef.Popup.Keyboard.Explicit(user)))
+                return
+            }
+        }
         popupActionListener?.onPopupAction(action)
     }
 

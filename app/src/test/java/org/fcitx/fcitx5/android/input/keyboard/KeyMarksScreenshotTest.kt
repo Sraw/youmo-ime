@@ -55,8 +55,8 @@ class KeyMarksScreenshotTest {
         name: String, symbolAt: KeyMarkPosition, shortcutAt: KeyMarkPosition, board: Pair<InputMethodEntry, ImKeyboards.Chosen?>,
         table: TableKeyboard? = null,
     ) {
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, symbolAt)
-        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, shortcutAt)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, symbolAt)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, shortcutAt)
         KeyboardHarness(TestThemes.PixelLight, board.first, keyboards = board.second).use { h ->
             h.start()
             table?.let {

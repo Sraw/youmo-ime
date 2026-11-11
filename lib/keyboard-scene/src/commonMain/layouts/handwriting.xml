@@ -13,14 +13,14 @@
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
   </row>
   <row>
-    <key id="comma" role="comma" label="{punct:,}" preview="off" send=",">
+    <key id="comma" role="comma" label="{punct:,}" preview="off" send="," shortcut="comma">
       <popup from="list">
         <item text="？"/><item text="！"/><item text="："/><item text="；"/><item text="、"/><item text="…"/><item text="“"/><item text="”"/>
       </popup>
     </key>
   </row>
   <row>
-    <key id="period" role="period" label="{punct:.}" preview="off" send=".">
+    <key id="period" role="period" label="{punct:.}" preview="off" send="." shortcut="period">
       <popup from="none"/>
     </key>
   </row>

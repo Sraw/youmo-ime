@@ -278,7 +278,7 @@ class KeyMarksEverywhereUatTest {
         val rebuild = field.get(h.service) as ManagedPreference.OnChangeListener<Any>
         val keyboard = AppPrefs.getInstance().keyboard
         @Suppress("UNCHECKED_CAST")
-        listOf(keyboard.punctuationPosition, keyboard.shortcutMarkPosition)
+        listOf(keyboard.swipeUpPosition, keyboard.swipeDownPosition)
             .forEach { (it as ManagedPreference<Any>).unregisterOnChangeListener(rebuild) }
     }
 
@@ -286,8 +286,8 @@ class KeyMarksEverywhereUatTest {
         noRebuilds(h)
         var keys = 0
         for ((symbolAt, shortcutAt) in legal) {
-            prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, symbolAt)
-            prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, shortcutAt)
+            prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, symbolAt)
+            prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, shortcutAt)
             h.idle()
             // every scene made anew, as the keyboard made anew with these settings has it
             KeyboardHarness.all(h.inputView).filterIsInstance<KeyboardCanvasView>().forEach { it.invalidateScene() }

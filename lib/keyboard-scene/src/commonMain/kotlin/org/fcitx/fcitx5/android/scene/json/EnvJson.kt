@@ -24,9 +24,9 @@ import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
  * `{"width", "height", "density", "landscape", "compact", "floating": text scale or null, "split",
  * "oneHanded"/"dock": "left"|"right"|"full", "dark", "flat", "shift": "none"|"once"|"lock", "board",
  * "typed": [scene, …] or null, "states": {id or role: ["on", …]}, "input": {…Input's},
- * "texts": {…Texts', "letterCase": "lower"|"shift"|"upper"}, "marks": {…MarkSettings', "symbolAt" and
- * "shortcutAt": "top-right"|"bottom-right"|"top-left"|"bottom-left"|"bottom"|"none", "shortcuts":
- * {name: {"icon": name} or {"text": text}}}}`: the members are the classes' own names.
+ * "texts": {…Texts', "letterCase": "lower"|"shift"|"upper"}, "marks": {…MarkSettings', "upAt" and
+ * "downAt": "top-right"|"bottom-right"|"top-left"|"bottom-left"|"bottom"|"none", "shortcuts":
+ * {"name:up"|"name:down": {"icon": name} or {"text": text} or {"symbol": text} or {"corner": true} or {}}}}`: the members are the classes' own names.
  */
 object EnvJson {
     /** [source] read; its problems, each with its line, where it does not say an environment. */
@@ -123,12 +123,13 @@ object EnvJson {
     private fun marks(m: Members): MarkSettings {
         val d = MarkSettings()
         return MarkSettings(
-            symbolAt = m.choice("symbolAt", AT, d.symbolAt),
-            shortcutAt = m.choice("shortcutAt", AT, d.shortcutAt),
+            upAt = m.choice("upAt", AT, d.upAt),
+            downAt = m.choice("downAt", AT, d.downAt),
             symbols = m.bool("symbols", d.symbols),
             charShortcuts = m.bool("charShortcuts", d.charShortcuts),
             upOn = m.bool("upOn", d.upOn),
             downOn = m.bool("downOn", d.downOn),
+            firstUp = m.bool("firstUp", d.firstUp),
             shortcuts = m.obj("shortcuts")?.let { s -> s.all { name, v -> name to mark(Members(v)) } } ?: d.shortcuts,
         ).also { m.done() }
     }
@@ -136,11 +137,17 @@ object EnvJson {
     private fun mark(m: Members): MarkContent {
         val icon = m.nullableString("icon", null)
         val text = m.nullableString("text", null)
+        val symbol = m.nullableString("symbol", null)
+        val corner = m.bool("corner", false)
         m.done()
+        val given = listOfNotNull(icon, text, symbol, corner.takeIf { it })
         return when {
-            icon != null && text == null -> MarkContent.Icon(icon)
-            text != null && icon == null -> MarkContent.Text(text)
-            else -> throw EnvException(m.line, "a mark is {\"icon\": name} or {\"text\": text}")
+            given.size > 1 -> throw EnvException(m.line, "a mark is {\"icon\": name}, {\"text\": text}, {\"symbol\": text}, {\"corner\": true} or {}")
+            icon != null -> MarkContent.Icon(icon)
+            text != null -> MarkContent.Text(text)
+            symbol != null -> MarkContent.Symbol(symbol)
+            corner -> MarkContent.Corner
+            else -> MarkContent.Empty
         }
     }
 

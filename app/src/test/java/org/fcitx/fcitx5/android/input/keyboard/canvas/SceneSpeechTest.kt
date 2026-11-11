@@ -178,7 +178,7 @@ class SceneSpeechTest {
     // corners where they were, the same keys told them
     @Test
     fun aCornerNotDrawnNotTold() {
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.None)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.None)
         tell()
         assertTrue(compared.toString(), compared.none { it.alt != null || "1" in it.reads })
         harness().use { h ->
@@ -189,7 +189,7 @@ class SceneSpeechTest {
             assertEquals("q", q.contentDescription.toString())
         }
         compared.clear()
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.Bottom)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.Bottom)
         tell()
         assertTrue(compared.count { it.alt != null } >= 26)
     }

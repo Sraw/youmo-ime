@@ -18,8 +18,8 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
+import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Op
@@ -60,8 +60,7 @@ class KeyCapsBoardTest {
     }.sorted()
 
     private fun cap(shortcut: String, layout: String): SceneKeyCell {
-        val shortcuts = KeyShortcuts.parse(AppPrefs.getInstance().internal.keyShortcuts.getValue())
-        val f = KeyCaps.key(ctx, "", "", marked = false, dimmed = false, shortcut = KeyCaps.Shortcut(shortcut, shortcuts, layout = layout)) as FrameLayout
+        val f = KeyCaps.key(ctx, "", "", marked = false, dimmed = false, shortcut = KeyCaps.Shortcut(shortcut, SwipeSlotsCache.current, layout = layout)) as FrameLayout
         val cell = (0 until f.childCount).map(f::getChildAt).filterIsInstance<SceneKeyCell>().single()
         cell.measure(View.MeasureSpec.makeMeasureSpec(SIZE, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(SIZE, View.MeasureSpec.EXACTLY))
         cell.layout(0, 0, SIZE, SIZE)
@@ -70,9 +69,9 @@ class KeyCapsBoardTest {
 
     private fun check(what: String, layout: String, im: InputMethodEntry, keyboards: ImKeyboards.Chosen?) {
         // the shortcuts' marks top right, the symbols bottom right: both kinds drawn
-        prefs.set(AppPrefs.getInstance().keyboard.shortcutMarkPosition, KeyMarkPosition.TopRight)
-        prefs.set(AppPrefs.getInstance().keyboard.punctuationPosition, KeyMarkPosition.BottomRight)
-        prefs.set(AppPrefs.getInstance().keyboard.swipeLayers, SwipeLayersChoice.SymbolUpShortcutDown)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, KeyMarkPosition.TopRight)
+        prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.BottomRight)
+        prefs.setLayers(SwipeLayersChoice.SymbolUpShortcutDown)
         for (compact in listOf(false, true)) {
             if (compact) prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
             KeyboardHarness(keyboards = keyboards, im = im).use { h ->

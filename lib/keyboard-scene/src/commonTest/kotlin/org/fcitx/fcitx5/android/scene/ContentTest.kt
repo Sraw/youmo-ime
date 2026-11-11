@@ -467,16 +467,44 @@ class ContentTest {
         val s = Fixtures.scene(off)
         assertEquals(listOf("y"), texts(s, "y").map { it.text })
         assertEquals(listOf("backspace"), icons(s, "backspace").map { it.name })
-        val text = env.copy(marks = MarkSettings(shortcuts = mapOf("full/a" to MarkContent.Text("全选全选全选"))))
+        val text = env.copy(marks = MarkSettings(shortcuts = mapOf("full/a:down" to MarkContent.Text("全选全选全选"))))
         val a = texts(Fixtures.scene(text), "a").first { it.text == "全选全选全选" }
         assertTrue(a.scaleX < 1.0, "squeezed to 45% of the key")
         near(9 * d, a.size)
-        val bottom = env.copy(marks = MarkSettings(symbolAt = KeyMarks.At.Bottom))
+        val bottom = env.copy(marks = MarkSettings(upAt = KeyMarks.At.Bottom))
         val q = Fixtures.scene(bottom)
         val one = texts(q, "q").first { it.text == "1" }
         val label = texts(q, "q").first { it.text == "q" }
         assertTrue(one.baseline > label.baseline, "the symbol below the label")
         near(face(q, "q").bottom - 2 * d - 0.3 * Content.SYMBOL_DP * d, one.baseline, "2 dp up from the face's bottom")
+    }
+
+    @Test
+    fun eachWayDrawsItsSlotAtItsPlace() {
+        // 060-swipe-slots: the long press's first down (top right), a text up (top left); a symbol given, a way set to nothing
+        val marks = MarkSettings(
+            upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.TopRight, firstUp = false,
+            shortcuts = mapOf("full/q:up" to MarkContent.Text("你好…"), "full/w:up" to MarkContent.Symbol("!"), "full/w:down" to MarkContent.Empty),
+        )
+        val s = Fixtures.scene(env.copy(marks = marks))
+        val q = texts(s, "q")
+        val f = face(s, "q")
+        assertTrue(q.first { it.text == "1" }.x > f.centerX, "the corner down, at the top right")
+        assertTrue(q.first { it.text == "你好…" }.x < f.centerX, "the text up, at the top left")
+        val w = texts(s, "w").map { it.text }
+        assertEquals(listOf("!", "w").sorted(), w.sorted(), "a symbol given drawn, the corner set to nothing not")
+        assertTrue(texts(s, "w").first { it.text == "!" }.x < face(s, "w").centerX, "a symbol at its own way's place, the top left")
+        // a way off draws nothing
+        val upOff = Fixtures.scene(env.copy(marks = MarkSettings(upOn = false)))
+        assertTrue(texts(upOff, "q").none { it.text == "1" })
+        assertEquals("select-all", icons(upOff, "a").single().name)
+        val downOff = Fixtures.scene(env.copy(marks = MarkSettings(downOn = false)))
+        assertTrue(icons(downOff, "a").isEmpty())
+        assertTrue(icons(downOff, "backspace").none { it.name == "restore" })
+        // two on one key's ways, both shortcuts: each at its own place
+        val two = Fixtures.scene(env.copy(marks = MarkSettings(shortcuts = mapOf("full/a:up" to MarkContent.Icon("undo"), "full/a:down" to MarkContent.Icon("redo")))))
+        val a = icons(two, "a").associate { it.name to it.box }
+        assertTrue(a.getValue("undo").left > a.getValue("redo").left, "up at the top right, down at the top left")
     }
 
     @Test
@@ -499,7 +527,7 @@ class ContentTest {
     fun theLabelAboveASymbolBelowCentresToTheSymbolsExtent() {
         // M2: the symbol's TextView stood by the font's extent (1.05 of its size above the baseline), not its ink
         // no shortcuts: nothing meets, so the letters are their size
-        val s = Fixtures.scene(env.copy(marks = MarkSettings(symbolAt = KeyMarks.At.Bottom, charShortcuts = false)))
+        val s = Fixtures.scene(env.copy(marks = MarkSettings(upAt = KeyMarks.At.Bottom, charShortcuts = false)))
         val f = face(s, "q")
         val one = texts(s, "q").first { it.text == "1" }
         val symbolTop = one.baseline - 1.05 * one.size
@@ -632,7 +660,7 @@ class ContentTest {
             }
         }
         val d = 2.75
-        val marks = MarkSettings(symbolAt = KeyMarks.At.BottomLeft, shortcutAt = KeyMarks.At.Bottom)
+        val marks = MarkSettings(upAt = KeyMarks.At.BottomLeft, downAt = KeyMarks.At.Bottom)
         for (share in listOf(0.30, 0.32, 0.34, 0.36)) {
             val env = Forms.env("qwerty", Forms.compact.copy(compact = false, width = 393 * d, height = 851 * d * share, density = d, marks = marks))
             val key = SceneBuilder(Fixtures.materialLight, env, wide).build(Forms.layout("qwerty"), Forms.fragments).ok().keys.first { it.id == "a" }

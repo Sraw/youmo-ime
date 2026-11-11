@@ -8,17 +8,19 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.annotation.VisibleForTesting
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutsCache
-import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
-import org.fcitx.fcitx5.android.input.keyboard.markSpots
+import org.fcitx.fcitx5.android.input.keyboard.KeySwipe
+import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
+import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
+import org.fcitx.fcitx5.android.input.keyboard.swipeWays
+import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Scene
@@ -119,13 +121,14 @@ class SceneBoard(
 
     private class Made(val theme: SceneTheme, val layout: SceneLayout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
 
-    // what the marks' settings are made from (KeyShortcuts compared as the same instance: the cache's)
+    // what the marks' settings are made from (the slots and long presses compared as the same instances: the caches')
     private data class MarksFor(
-        val shortcuts: KeyShortcuts,
-        val layers: SwipeLayers,
+        val slots: SwipeSlots,
+        val ways: KeySwipe.Ways,
         val spots: KeyMarks.Spots,
         val charShortcuts: Boolean,
         val names: Set<String>,
+        val popups: PopupOverrides,
     )
 
     companion object {
@@ -202,14 +205,20 @@ class SceneBoard(
             ?: SceneMarks.names(layout.layout, layout.fragments.values).also { namesMade = layout to it }
 
         /**
-         * The marks' settings of [layout]'s keys as the settings are now (the user's shortcuts, the
-         * swipe layers, where marks go), a character key's shortcut drawn where [charShortcuts].
+         * The marks' settings of [layout]'s keys as the settings are now (each key's two slots, 上滑 and
+         * 下滑 on, where each draws, the long presses set by a key's name), a character key's shortcut
+         * drawn where [charShortcuts].
          */
         fun marks(layout: SceneLayout, charShortcuts: Boolean): MarkSettings {
-            val of = MarksFor(KeyShortcutsCache.current, AppPrefs.getInstance().keyboard.swipeLayers.getValue().layers, markSpots(), charShortcuts, names(layout))
+            val of = MarksFor(SwipeSlotsCache.current, swipeWays(), swipeSpots(), charShortcuts, names(layout), PopupOverridesCache.byName.current)
             return marksMade?.takeIf { it.first == of }?.second
-                ?: SceneMarks.settings(of.shortcuts, of.layers, of.spots, of.charShortcuts, of.names).also { marksMade = of to it }
+                ?: SceneMarks.settings(of.slots, of.ways, of.spots.symbol, of.spots.shortcut, of.charShortcuts, of.names, firsts(of.popups, of.names))
+                    .also { marksMade = of to it }
         }
+
+        /** The firsts of the long presses [popups] set by name of [names]' keys: null where one is turned off. */
+        fun firsts(popups: PopupOverrides, names: Collection<String>): Map<String, String?> =
+            names.filter { it in popups.labels }.associateWith { popups.resolve(it, null)?.firstOrNull() }
 
         /** The scenes kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
         fun forgetScenes() = scenesKept.clear()

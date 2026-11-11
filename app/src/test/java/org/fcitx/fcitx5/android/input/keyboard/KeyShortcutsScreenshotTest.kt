@@ -10,8 +10,9 @@ import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
+import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -34,12 +35,12 @@ import org.robolectric.annotation.GraphicsMode
 class KeyShortcutsScreenshotTest {
 
     private val prefs = AppPrefs.getInstance()
-    private val position = AppPrefs.getInstance().keyboard.punctuationPosition
+    private val position = AppPrefs.getInstance().keyboard.swipeUpPosition
 
     @After
     fun settingsAtTheirDefaults() {
-        prefs.internal.keyShortcuts.setValue("")
-        prefs.keyboard.swipeLayers.setValue(prefs.keyboard.swipeLayers.defaultValue)
+        prefs.internal.keySwipes.setValue(prefs.internal.keySwipes.defaultValue)
+        prefs.keyboard.swipeDownPosition.setValue(prefs.keyboard.swipeDownPosition.defaultValue)
         prefs.keyboard.pinyinKeyboard.setValue(prefs.keyboard.pinyinKeyboard.defaultValue)
         position.setValue(position.defaultValue)
     }
@@ -53,7 +54,7 @@ class KeyShortcutsScreenshotTest {
 
     @Test
     fun theDefaultMarksLightAndDark() {
-        prefs.internal.keyShortcuts.setValue(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")).serialize())
+        prefs.internal.keySwipes.setValue(SwipeSlots.Default.with("full/q", up = false, SwipeSlot.Text("你好")).serialize())
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
             // a's select all top left, its @ top right: the two settings' defaults
@@ -73,9 +74,10 @@ class KeyShortcutsScreenshotTest {
     }
 
     @Test
-    fun symbolsUpShortcutsDown() {
-        prefs.keyboard.swipeLayers.setValue(SwipeLayersChoice.SymbolUpShortcutDown)
-        shot("symbol_up")
+    fun theFirstDownDrawsItAtTheDownPlace() {
+        // the places are the ways' (上滑图标位置 top right, 下滑图标位置 top left): flipped, the symbol top left, the shortcut top right
+        prefs.internal.keySwipes.setValue(SwipeSlots.Default.applied(SwipeOrientation.FirstDown).serialize())
+        shot("first_down")
     }
 
     @Test

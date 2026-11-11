@@ -147,7 +147,7 @@ class TextSceneWiringTest {
         prefs.set(AppPrefs.getInstance().internal.popupOverrides, "q ⒜ 1")
         KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
             val q = h.keys().single { it.id == "q" }
-            h.swipe(q, 0f, q.bounds.height().toFloat())
+            h.swipe(q, 0f, -q.bounds.height().toFloat())
             h.idle()
             // FakeHostApi's sendKey of 1 (by char, key name or keysym): the built-in's 1 not typed
             assertTrue(h.api.calls.toString(), h.api.calls.any { "⒜" in it } && h.api.calls.none { it.startsWith("sendKey(char=1,") || it.startsWith("sendKey(key=1,") || it.startsWith("sendKey(sym=49,") })

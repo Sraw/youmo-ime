@@ -18,6 +18,9 @@ class KeyShortcuts private constructor(private val table: Map<String, KeyShortcu
 
     val isEmpty: Boolean get() = table.isEmpty()
 
+    /** The names the user set, in the order stored. */
+    val names: Set<String> get() = table.keys
+
     /** What [name] does: the user's, else its preset's. */
     fun resolve(name: String): KeyShortcut = table[name] ?: KeyShortcutPreset.of(name)
 
@@ -67,7 +70,7 @@ class KeyShortcuts private constructor(private val table: Map<String, KeyShortcu
             KeyShortcut.None -> NONE
         }
 
-        private fun escape(text: String) = buildString {
+        internal fun escape(text: String) = buildString {
             text.forEach {
                 when (it) {
                     '\\' -> append("\\\\")
@@ -81,7 +84,7 @@ class KeyShortcuts private constructor(private val table: Map<String, KeyShortcu
         }
 
         // a backslash before anything else, or at the end, is kept as it is
-        private fun unescape(text: String) = buildString {
+        internal fun unescape(text: String) = buildString {
             var i = 0
             while (i < text.length) {
                 val c = text[i]

@@ -153,10 +153,11 @@ class ZhuyinSceneGesturesTest {
     fun everyKeyGestures() {
         val scene = gestures(shown = setOf("q", "3", "7", "/", "comma", "period", "space", "enter"))
         GestureSnapshot.check("zhuyin-full", scene)
-        // what was compared is what the keys do: ㄆ's bubble its own, ㄇ's its shortcut's name as it is swiped (select all)
+        // what was compared is what the keys do: ㄆ's bubble its own; ㄇ swiped down its shortcut (select all, the
+        // way shortcuts are by default, 060-swipe-slots), up a tap (no long press's first of its own)
         assertTrue(scene.toString(), "q pressed: [ㄆ]" in scene && "q swiping: [ㄆ]" in scene)
-        assertTrue(scene.toString(), scene.any { it.startsWith("a swiping: [") && "ㄇ" !in it && it != "a swiping: []" })
-        assertTrue(scene.toString(), scene.any { it.startsWith("a up: []") && it.endsWith("|0,${TEXT.length + 1}") })
+        assertTrue(scene.toString(), "a swiping: [ㄇ]" in scene)
+        assertTrue(scene.toString(), scene.any { it.startsWith("a down: []") && it.endsWith("|0,${TEXT.length + 1}") })
     }
 
     // 注音九键 (060-render-p2 S4d): every group (its bubble its symbols, its shortcut's name as it is swiped; its
