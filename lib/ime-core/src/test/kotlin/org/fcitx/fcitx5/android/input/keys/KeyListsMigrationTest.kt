@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class KeyListsMigrationTest {
     private fun migrated(o: String? = null, named: String? = null, t9: String? = null) = KeyListsMigration.migrate(o, named, t9)
@@ -98,5 +99,24 @@ class KeyListsMigrationTest {
         val a = migrated("q ! 1\n, 。", "t9/2 2 A B C a b c #", "6 &")
         assertEquals(a, migrated("q ! 1\n, 。", "t9/2 2 A B C a b c #", "6 &"))
         assertEquals(a.text, KeyLists.parse(a.text)!!.serialize())
+    }
+
+    // 0.5.2's, beta1's and beta2's settings as stored (src/test/resources/keys-migration, its README) to the lists expected
+    @Test
+    fun theSamplesMigrate() {
+        val versions = File("src/test/resources/keys-migration").listFiles(File::isDirectory)!!.sortedBy { it.name }
+        assertEquals(listOf("v0.5.2", "v0.6.0-beta1", "v0.6.0-beta2"), versions.map { it.name })
+        for (dir in versions) {
+            fun read(name: String) = File(dir, name).takeIf { it.isFile }?.readText()
+            val m = migrated(read("popup_overrides"), read("key_popups"), read("t9_symbols"))
+            val lost = m.lost.joinToString("") { "$it\n" }
+            if (System.getenv("KEYS_MIGRATION_RECORD") != null) {
+                File(dir, "key_lists").writeText(m.text)
+                File(dir, "lost").writeText(lost)
+            }
+            assertEquals(dir.name, read("key_lists"), m.text)
+            assertEquals(dir.name, read("lost"), lost)
+            assertEquals(dir.name, m, migrated(read("popup_overrides"), read("key_popups"), read("t9_symbols")))
+        }
     }
 }
