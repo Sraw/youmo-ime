@@ -78,6 +78,13 @@ class VoiceLiveTest {
         other.closed("你好世界")
         other.restart(1, mid)
         assertEquals("世界", other.raw)
+        // the segment being said then closed as a sound only (nothing kept): the next one whole
+        val sound = polished()
+        val noise = sound.heard("嗯").upTo
+        sound.closed("嗯。")
+        sound.closed("嗯好的")
+        sound.restart(1, noise)
+        assertEquals("嗯好的", sound.raw)
         // none of the utterance shown: nothing left out
         val none = polished()
         none.closed("你好")
@@ -90,9 +97,14 @@ class VoiceLiveTest {
     fun theEndpointsChoiceWritingASentCharacterOtherwiseTypesItNotAgain() {
         val live = polished()
         live.restart(1, live.heard("我到了吗").upTo)
+        // its last character written otherwise: as likely a new word's, typed again rather than lost
         live.closed("我到了嘛好的")
-        assertEquals("好的", live.raw)
+        assertEquals("嘛好的", live.raw)
         assertEquals("好的", VoiceLive.cut("我到了吗", "我到了吗，好的"))
+        // the sent one's last character gone: the new word whole
+        assertEquals("好的", VoiceLive.cut("我到了吗", "我到了好的"))
+        // all of it written otherwise: nothing left out
+        assertEquals("你说好的", VoiceLive.cut("那个", "你说好的"))
         assertEquals("", VoiceLive.cut("我到了吗", "我到"))
         assertEquals("你好", VoiceLive.cut("", "你好"))
     }

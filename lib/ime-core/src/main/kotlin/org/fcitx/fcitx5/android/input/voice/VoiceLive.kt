@@ -28,6 +28,9 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
     // segments closed so far, so a [Mark] tells whether the one being said then has closed since
     private var closedCount = 0
 
+    // whether each closed segment went into [said] (one of a sound only does not), by its number
+    private val closedKept = mutableListOf<Boolean>()
+
     // what of the segment being said went with the last utterance ([restart]), as the recognizer
     // wrote it: left out of it as it goes on
     private var gone = ""
@@ -62,8 +65,9 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
         val base = upTo.said.trimEnd { it in MARKS }
         var rest = if (said.startsWith(base)) said.substring(base.length) else ""
         if (closedCount > upTo.closed) {
-            // the segment being said then has closed since: the start of what follows them
-            rest = cut(upTo.hearing, rest)
+            // the segment being said then has closed since: the start of what follows them, if it
+            // went into said at all (not a sound only, nor nothing)
+            if (closedKept[upTo.closed]) rest = cut(upTo.hearing, rest)
         } else {
             gone = upTo.hearingRaw
             hearing = fresh(hearingRaw)
@@ -108,7 +112,9 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
         val text = fresh(raw.trim())
         gone = ""
         closedCount++
-        if (VoiceText.clean(text) != null) said = join(said, text)
+        val kept = VoiceText.clean(text) != null
+        closedKept += kept
+        if (kept) said = join(said, text)
         return shown()
     }
 
@@ -190,19 +196,28 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
          */
         fun cut(prefix: String, text: String): String {
             if (prefix.isEmpty()) return text
-            // the edit distance from prefix to each start of text, a row at a time
-            var row = IntArray(text.length + 1) { it }
+            // the edit distance from prefix to each start of text, a row at a time; [last] the row
+            // before prefix's last character, to tell an end on a changed character
+            var last = IntArray(text.length + 1) { it }
+            var row = IntArray(text.length + 1)
             for (i in 1..prefix.length) {
-                val next = IntArray(text.length + 1)
-                next[0] = i
+                row[0] = i
                 for (j in 1..text.length) {
-                    val change = row[j - 1] + if (prefix[i - 1] == text[j - 1]) 0 else 1
-                    next[j] = minOf(change, row[j] + 1, next[j - 1] + 1)
+                    val change = last[j - 1] + if (prefix[i - 1] == text[j - 1]) 0 else 1
+                    row[j] = minOf(change, last[j] + 1, row[j - 1] + 1)
                 }
-                row = next
+                if (i < prefix.length) last = row.also { row = last }
             }
             var end = 0
-            for (j in 1..text.length) if (row[j] <= row[end]) end = j
+            for (j in 1..text.length) {
+                // as close and longer: not if it ends on a changed character (that may be a new
+                // word's, as likely as the sent one's written otherwise): a character typed twice
+                // is better than a new word lost
+                val changed = prefix.last() != text[j - 1] && row[j] == last[j - 1] + 1
+                if (row[j] < row[end] || (row[j] == row[end] && !changed)) end = j
+            }
+            // nothing much like what was sent (the recognizer wrote it all otherwise): all of it kept
+            if (row[end] * 2 > prefix.length) return text
             return text.substring(end).trimStart { it in MARKS || it.isWhitespace() }
         }
 
