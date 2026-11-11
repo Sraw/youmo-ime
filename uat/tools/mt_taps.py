@@ -81,6 +81,9 @@ def main():
     p.add_argument("-s", "--serial", required=True)
     p.add_argument("ops")
     a = p.parse_args()
+    # raw input events go to emulators only: never a phone (the owner's is 127.0.0.1:5599)
+    if not a.serial.startswith("emulator-") or adb(a.serial, "shell", "getprop", "ro.kernel.qemu").strip() != "1":
+        raise SystemExit(f"{a.serial}: not an emulator, refused")
     adb(a.serial, "shell", script(a.ops, touchscreen(a.serial), screen(a.serial)))
 
 

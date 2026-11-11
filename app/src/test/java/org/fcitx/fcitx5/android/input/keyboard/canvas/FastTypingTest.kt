@@ -9,6 +9,9 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.UNICODE
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
@@ -16,7 +19,6 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -46,6 +48,11 @@ class FastTypingTest {
             it.idle()
             it.api.calls.clear()
         }
+
+    // the keysym a 14-key tap of [letter]'s key at [at] across sends ([Keyboard.tapKey])
+    private fun tapSym(letter: Char, at: Float) = UNICODE + Keyboard.tapKey(NineKeyLetters.G14.key(letter), at)
+
+    private fun symOf(call: String) = Regex("sym=(\\d+)").find(call)!!.groupValues[1].toInt()
 
     private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
 
@@ -122,7 +129,8 @@ class FastTypingTest {
         h.idle()
         assertEquals(h.sent().toString(), 2, h.sent().size)
         // u where the first finger was, i where the second: each its own half
-        assertNotEquals(h.sent().toString(), h.sent()[0], h.sent()[1])
+        // u where the first finger came down (UI's left half), then i (its right): in that order
+        assertEquals(listOf(tapSym('u', 0.25f), tapSym('i', 0.75f)), h.sent().map(::symOf))
     }
 
     // the first finger drifts a little while the second is down on the same key
@@ -146,7 +154,8 @@ class FastTypingTest {
         f.up(1)
         h.idle()
         assertEquals(h.sent().toString(), 2, h.sent().size)
-        assertNotEquals(h.sent().toString(), h.sent()[0], h.sent()[1])
+        // u where the first finger came down (UI's left half), then i (its right): in that order
+        assertEquals(listOf(tapSym('u', 0.25f), tapSym('i', 0.75f)), h.sent().map(::symOf))
     }
 
     // the same key tapped twice quickly, one finger at a time: two letters, no double tap
@@ -164,7 +173,8 @@ class FastTypingTest {
         f.up(1)
         h.idle()
         assertEquals(h.sent().toString(), 2, h.sent().size)
-        assertNotEquals(h.sent().toString(), h.sent()[0], h.sent()[1])
+        // u where the first finger came down (UI's left half), then i (its right): in that order
+        assertEquals(listOf(tapSym('u', 0.25f), tapSym('i', 0.75f)), h.sent().map(::symOf))
     }
 
     // three fingers rolling over the 26 keys: a down, b down, a up, c down, b up, c up
