@@ -1231,4 +1231,8 @@
     <string name="swipe_none_selected">點鍵來選中。</string>
     <string name="swipe_changed">已修改</string>
     <string name="long_press_by_name_hint">沒改過時用鍵盤自帶的長按。在這裡新增字元就換成你的。</string>
+    <string name="swipe_preset_confirm">所有鍵盤的所有鍵都回到這個預設。之後可以還原。</string>
+    <string name="swipe_way_said">%1$s %2$s</string>
+    <string name="swipe_ways_said">%1$s，%2$s</string>
+    <string name="swipe_select_keys_only">這一頁只能選字母鍵；其他鍵盤的鍵在各自的分頁裡選。</string>
 </resources>

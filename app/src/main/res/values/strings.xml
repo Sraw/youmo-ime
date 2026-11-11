@@ -1257,4 +1257,8 @@
     <string name="swipe_none_selected">Tap keys to select them.</string>
     <string name="swipe_changed">Changed</string>
     <string name="long_press_by_name_hint">Unchanged, the key keeps the long press its keyboard gives it. Characters added here replace it.</string>
+    <string name="swipe_preset_confirm">Every key on every keyboard goes back to this preset. You can undo it afterwards.</string>
+    <string name="swipe_way_said">%1$s %2$s</string>
+    <string name="swipe_ways_said">%1$s, %2$s</string>
+    <string name="swipe_select_keys_only">Only the letter keys can be selected here; other keyboards\' keys on their tabs.</string>
 </resources>

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
+import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -13,6 +14,7 @@ import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
@@ -86,6 +88,26 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     )
 
 
+    /** A change: what was there [before], what it left [after] (another page's change since drops the step). */
+    internal data class Step(val before: Snapshot, val after: Snapshot)
+
+    // the tab, 多选 and the keys chosen kept across a rotation (the fragment made again)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        savedInstanceState ?: return
+        val form = savedInstanceState.getString(STATE_PAGE)
+        page = pages.firstOrNull { it.form == form } ?: page
+        selecting = savedInstanceState.getBoolean(STATE_SELECTING)
+        savedInstanceState.getStringArrayList(STATE_SELECTED)?.let(selected::addAll)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_PAGE, page.form)
+        outState.putBoolean(STATE_SELECTING, selecting)
+        outState.putStringArrayList(STATE_SELECTED, ArrayList(selected))
+    }
+
     private fun snapshot() = with(prefs) {
         Snapshot(
             internal.keySwipes.getValue(), internal.popupOverrides.getValue(), internal.keyPopups.getValue(),
@@ -107,8 +129,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private fun change(block: () -> Unit) {
         val before = snapshot()
         block()
-        if (snapshot() != before) {
-            undo = before
+        val after = snapshot()
+        if (after != before) {
+            undo = Step(before, after)
             view?.let { v -> Snackbar.make(v, R.string.swipe_changed, Snackbar.LENGTH_LONG).setAction(R.string.undo) { undoLast() }.show() }
         }
         rebuild()
@@ -116,9 +139,10 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     /** The last change taken back: one step, a second 撤销 has nothing to take. */
     internal fun undoLast() {
-        val s = undo ?: return
+        val step = undo ?: return
         undo = null
-        restore(s)
+        // changed since elsewhere (按键's switches and places): nothing put back over that
+        if (snapshot() == step.after) restore(step.before)
         rebuild()
     }
 
@@ -126,6 +150,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     override fun rebuild() {
         val ctx = requireContext()
+        // what the step would put back was changed since by another page (按键's 上滑, 下滑 and their places,
+        // the page left and come back to): taking it back would undo that too, unseen, so there is none
+        if (undo?.after?.let { it != snapshot() } == true) undo = null
         content.apply {
             removeAllViews()
             add(tabs(ctx), lParams(matchParent))
@@ -179,6 +206,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         }
     }
 
+    // a key 多选 cannot take (the full keyboard's others, +: no slots of their own), said so
+    private fun notSelectable() = Toast.makeText(requireContext(), R.string.swipe_select_keys_only, Toast.LENGTH_SHORT).show()
+
     // which way a batch sets: 上滑, 下滑, or (where [both]) the two; null for the two
     private fun askWay(both: Boolean, then: (Boolean?) -> Unit) {
         val ways = listOfNotNull(true, false, null.takeIf { both })
@@ -195,7 +225,17 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val names = listOf(R.string.swipe_preset_first_up, R.string.swipe_preset_first_down).map(::getString)
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.swipe_presets)
-            .setItems(names.toTypedArray()) { _, i -> change { applyPreset(presets[i]) } }
+            .setItems(names.toTypedArray()) { _, i -> confirmPreset(names[i]) { change { applyPreset(presets[i]) } } }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    // every key on every keyboard, asked first as 0.5 asked (撤销 takes it back all the same)
+    private fun confirmPreset(name: String, apply: () -> Unit) {
+        AlertDialog.Builder(requireContext())
+            .setTitle(name)
+            .setMessage(R.string.swipe_preset_confirm)
+            .setPositiveButton(android.R.string.ok) { _, _ -> apply() }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
@@ -232,7 +272,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // a tap on a key: chosen or not while 多选 is on, else its editor
     private fun tapped(slotKey: String?, edit: () -> Unit) {
         if (!selecting) return edit()
-        if (slotKey == null) return
+        if (slotKey == null) return notSelectable()
         if (!selected.remove(slotKey)) selected.add(slotKey)
         rebuild()
     }
@@ -261,9 +301,14 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // a key's two slots as a screen reader says them: 上滑 then 下滑, a way with nothing left out
     private fun said(slotKey: String): String? {
         val s = slots
-        return listOf(true, false).mapNotNull { up ->
-            SwipeSlotSection.shortLabel(requireContext(), s.resolve(slotKey, up))?.let { getString(if (up) R.string.swipe_up else R.string.swipe_down) + " " + it }
-        }.joinToString("，").ifEmpty { null }
+        val ways = listOf(true, false).mapNotNull { up ->
+            SwipeSlotSection.shortLabel(requireContext(), s.resolve(slotKey, up))?.let { getString(R.string.swipe_way_said, getString(if (up) R.string.swipe_up else R.string.swipe_down), it) }
+        }
+        return when (ways.size) {
+            0 -> null
+            1 -> ways[0]
+            else -> getString(R.string.swipe_ways_said, ways[0], ways[1])
+        }
     }
 
     private fun captionWidth(ctx: Context, page: KeyShortcutPages.Page): Int {
@@ -308,7 +353,8 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     }, lParams(captionWidth, ctx.dp(KeyHeight)))
                     val marked = stored.isSet(slotKey) || popupName?.let { it in names.labels } == true
-                    add(KeyCaps.key(ctx, label, hint, marked = marked, dimmed = false, selected = slotKey in selected, said = said(slotKey), shortcut = shortcut).apply {
+                    val state = getString(R.string.edited_x, label).takeIf { marked }
+                    add(KeyCaps.key(ctx, label, hint, marked = marked, dimmed = false, selected = slotKey in selected, state = state, said = said(slotKey), shortcut = shortcut).apply {
                         setOnClickListener { tapped(slotKey) { edit(label, slotKey, popupName?.let(LongPress::ByName)) } }
                     }, params)
                 }
@@ -354,7 +400,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
                 current.labels.filter { it !in Letters }.forEach { add(key(ctx, it, current), otherParams(ctx)) }
                 add(KeyCaps.key(ctx, "+", "", marked = false, dimmed = false).apply {
                     contentDescription = getString(R.string.add_key)
-                    setOnClickListener { if (!selecting) askLabel() }
+                    setOnClickListener { if (selecting) notSelectable() else askLabel() }
                 }, otherParams(ctx))
             }, lParams(matchParent))
 
@@ -607,7 +653,11 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
     companion object {
         // the one step back, kept past the page: the user leaves it to try the keys and comes back to take it back
-        private var undo: Snapshot? = null
+        private var undo: Step? = null
+
+        private const val STATE_PAGE = "page"
+        private const val STATE_SELECTING = "selecting"
+        private const val STATE_SELECTED = "selected"
 
         @VisibleForTesting
         internal fun forgetUndo() {

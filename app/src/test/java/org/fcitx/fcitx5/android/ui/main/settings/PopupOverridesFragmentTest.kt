@@ -7,9 +7,11 @@ package org.fcitx.fcitx5.android.ui.main.settings
 import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.RadioButton
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import com.google.android.material.chip.Chip
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -28,6 +30,7 @@ import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -180,17 +183,40 @@ class PopupOverridesFragmentTest {
             st.idle()
         }
 
+        // a key cap on the page: a frame with its click (the tabs are chips, the buttons buttons)
+        private fun firstCap() = KeyboardHarness.all(st.activity.window.decorView)
+            .first { it is FrameLayout && it !is Chip && it.hasOnClickListeners() && it.contentDescription != null }
+
         @Test
         fun aTappedKeyOpensItsDialogOnEveryTab() {
             open()
-            tap(keyCalled("q"))
-            assertTrue((ShadowDialog.getLatestDialog() as AlertDialog).isShowing)
-            ShadowDialog.getLatestDialog().dismiss()
+            val tabs = KeyShortcutPages.all.filter { it !== KeyShortcutPages.Number }
+            assertEquals(7, tabs.size)
+            for (page in tabs) {
+                click(PopupOverridesFragment.pageTitle(page))
+                val cap = firstCap()
+                tap(cap)
+                val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+                assertTrue("${page.form}: ${cap.contentDescription}", dialog.isShowing)
+                // its two ways, four choices each
+                assertEquals(page.form, 8, KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<RadioButton>().count())
+                dialog.dismiss()
+                st.idle()
+            }
+        }
+
+        // the tab, 多选 and the keys chosen kept as the page is made again (a rotation)
+        @Test
+        fun theTabAndTheChosenKeysOutliveARotation() {
+            open()
             click(R.string.shortcut_page_g14)
-            tap(keyCalled("QW"))
-            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
-            assertTrue(dialog.isShowing)
-            assertTrue(KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<RadioButton>().count() == 8)
+            click(R.string.swipe_multi_select)
+            keyCalled("QW").performClick()
+            st.idle()
+            st.recreate()
+            st.idle()
+            assertTrue(st.texts().toString(), st.s(R.string.swipe_selected, 1) in st.texts())
+            assertTrue("the 14 keys' tab", "QW" in st.texts())
         }
 
         // a letter's dialog has its two ways below its characters: a text typed for 下滑 is what its swipe down runs
@@ -244,6 +270,16 @@ class PopupOverridesFragmentTest {
             val edited = slots()
             click(R.string.swipe_presets)
             pick(1)
+            // asked first, as 0.5 asked: cancelled, nothing changed
+            val ask = ShadowDialog.getLatestDialog() as AlertDialog
+            assertTrue(ask.isShowing)
+            ask.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+            st.idle()
+            assertEquals(edited, slots())
+            click(R.string.swipe_presets)
+            pick(1)
+            (ShadowDialog.getLatestDialog() as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            st.idle()
             assertEquals(SwipeSlots.Default.applied(SwipeOrientation.FirstDown), slots())
             click(R.string.undo)
             assertEquals(edited, slots())
@@ -258,6 +294,23 @@ class PopupOverridesFragmentTest {
             st.open(SettingsRoute.PopupOverrides)
             click(R.string.undo)
             assertEquals(SwipeSlots.Default, slots())
+        }
+
+        // a change made elsewhere since (按键's 下滑 turned off) after a flip: 撤销 has nothing to take back, the switch
+        // never turned back on unseen
+        @Test
+        fun aStepChangedSinceElsewhereIsNoLongerTakenBack() {
+            open()
+            click(R.string.swipe_flip_all)
+            val flipped = slots()
+            AppPrefs.getInstance().keyboard.swipeDown.setValue(false)
+            st.open(SettingsRoute.PopupOverrides)
+            val undo = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(R.string.undo) }
+            assertFalse(undo.isEnabled)
+            undo.performClick()
+            st.idle()
+            assertFalse(AppPrefs.getInstance().keyboard.swipeDown.getValue())
+            assertEquals(flipped, slots())
         }
 
         // 多选: keys tapped are chosen, not edited; the batch sets their slots alone
