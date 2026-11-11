@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.daemon.HostDaemon.disconnect
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -48,7 +49,8 @@ object HostDaemon {
     private fun mkConnection(name: String) = object : HostConnection {
 
         private inline fun <T> ensureConnected(block: () -> T) =
-            if (lock.withLock { name in clients })
+            // read without lock: a restart holds it through a stop that does not time out (main-thread ANR)
+            if (name in clients)
                 block()
             else throw IllegalStateException("$name is disconnected")
 
@@ -78,7 +80,8 @@ object HostDaemon {
 
     private val lock = ReentrantLock()
 
-    private val clients = mutableMapOf<String, HostConnection>()
+    // concurrent for ensureConnected's lock-free read; compound updates stay under lock
+    private val clients: MutableMap<String, HostConnection> = ConcurrentHashMap()
 
     private val clientSeq = AtomicLong()
 
