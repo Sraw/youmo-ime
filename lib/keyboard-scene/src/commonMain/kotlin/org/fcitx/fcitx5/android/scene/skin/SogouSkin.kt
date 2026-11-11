@@ -156,8 +156,11 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             look.barColor = look.barColor ?: look.boardColor
         }
 
-        private fun barHeight(bar: SkinFill.Image?, width: Int, look: SkinLook) =
-            if (bar != null) maxOf(1, (bar.pixels.height.toDouble() * width / look.width).roundToInt()) else (width * BAR_RATIO).roundToInt()
+        // the bar's height to the keyboard's width: its picture's to the skin's, never past the width itself
+        private fun barRatio(bar: SkinFill.Image?, look: SkinLook) =
+            if (bar != null) (bar.pixels.height.toDouble() / look.width).coerceAtMost(1.0) else BAR_RATIO
+
+        private fun barHeight(bar: SkinFill.Image?, width: Int, look: SkinLook) = maxOf(1, (width * barRatio(bar, look)).roundToInt())
 
         private fun under(look: SkinLook, picture: SkinFill.Image, bar: SkinFill.Image?) {
             val board = Pixels(picture.pixels.width, picture.pixels.height).also { it.paste(picture.pixels, 0, 0) }
@@ -171,7 +174,7 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
         }
 
         private fun below(look: SkinLook, keyboard: SkinFill.Image, bar: SkinFill.Image?) {
-            val kb = keyboard.pixels.nine(keyboard.insets, keyboard.pixels.width, keyboard.pixels.height)
+            val kb = SkinPatch.fitted(keyboard.pixels.nine(keyboard.insets, keyboard.pixels.width, keyboard.pixels.height), barRatio(bar, look))
             val colour = kb.average(keepAlpha = false) ?: GREY
             val h = barHeight(bar, kb.width, look)
             val board = Pixels.filled(kb.width, h + kb.height, colour)

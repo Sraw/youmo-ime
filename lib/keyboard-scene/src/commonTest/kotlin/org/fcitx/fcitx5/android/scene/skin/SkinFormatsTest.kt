@@ -367,6 +367,69 @@ class SkinFormatsTest {
     }
 
     @Test
+    fun yamlLongChainsOfAnchorsAndTags() {
+        // a line of 300000 anchors or tags: no deeper a call for each, nor the line's rest copied for each
+        val n = 300_000
+        val block = SkinYaml.parse("a: " + "&x ".repeat(n) + "v\nb: *x\n") as Map<*, *>
+        assertEquals("v", block["a"])
+        assertEquals("v", block["b"])
+        assertEquals("v", (SkinYaml.parse("a: " + "!t ".repeat(n) + "v\n") as Map<*, *>)["a"])
+        assertEquals(listOf("v", "v"), (SkinYaml.parse("a: [" + "&x ".repeat(n) + "v, *x]\n") as Map<*, *>)["a"])
+        // a chain over the block under it
+        assertEquals(mapOf("k" to "v"), (SkinYaml.parse("a: " + "&x !t ".repeat(n) + "\n  k: v\n") as Map<*, *>)["a"])
+    }
+
+    @Test
+    fun boardsOfAnOddShapeAreShrunkBeforeTheyArePutTogether() {
+        // 100000×40: at its size, with the bar on top, a board of 100000×11540 (1.2 G pixels), past any memory
+        val look = SkinLook(1080)
+        SkinPatch.board(look, SkinFill.Image(Pixels.filled(100_000, 40, 0xFF3366CC.toInt()), null), SkinFill.Color(0xFFCC3333.toInt()))
+        val board = assertNotNull(look.board)
+        assertTrue(board.width <= SkinTheme.MAX_PICTURE_SIDE && board.height <= SkinTheme.MAX_PICTURE_SIDE, "${board.width}x${board.height}")
+        assertEquals(0xFFCC3333.toInt(), board[board.width / 2, 0])
+        assertEquals(0xFF3366CC.toInt(), board[board.width / 2, board.height - 1])
+        // Sogou's keyboard picture under its bar's
+        val files = sogouKeyboardPicture()
+        files["1080/status1/kb.png"] = img(Pixels.filled(100_000, 40, 0xFF3366CC.toInt()))
+        val sogou = convert(files).image(SkinTheme.BOARD)
+        assertEquals(0xFFCC3333.toInt(), sogou[sogou.width / 2, 0])
+        assertEquals(0xFF3366CC.toInt(), sogou[sogou.width / 2, sogou.height - 1])
+    }
+
+    @Test
+    fun decodedImagesAreKeptWithinABudget() {
+        var decoded = 0
+        // an image as tall as its file is long, 4096 across: no pixels made
+        val platform = object : SkinPlatform {
+            override fun image(bytes: ByteArray): SkinImage {
+                decoded++
+                return object : SkinImage {
+                    override val width = 4096
+                    override val height = bytes.size
+
+                    override fun pixels(x: Int, y: Int, w: Int, h: Int) = Pixels(1, 1)
+                }
+            }
+
+            override fun legacyText(bytes: ByteArray) = ""
+        }
+        // two of 8 M pixels are past the budget of 12 M; one of 8 M and one of 4 K are not
+        val tall = (SkinLimits.MAX_KEPT_PIXELS * 2 / 3 / 4096).toInt()
+        val f = SkinFiles(mapOf("a" to ByteArray(tall), "b" to ByteArray(tall), "c" to ByteArray(1)), platform)
+        f.image("a")
+        f.image("a")
+        assertEquals(1, decoded)
+        f.image("c")
+        f.image("a")
+        assertEquals(2, decoded)
+        f.image("b")
+        f.image("b")
+        assertEquals(3, decoded)
+        f.image("a")
+        assertEquals(4, decoded)
+    }
+
+    @Test
     fun json() {
         val j = SkinJson.parse("""{"a": [1, -2.5e3, true, false, null], "b": "\u4e2d\"\\\/\n", "c": {}, "d": [],}""") as Map<*, *>
         assertEquals(listOf("1", "-2.5e3", true, false, null), j["a"])

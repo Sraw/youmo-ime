@@ -115,24 +115,27 @@ object SkinYaml {
         }
 
         private fun value(text: String, ind: Int, depth: Int): Any? {
-            val t = text.trim()
-            return when {
-                t.startsWith("&") -> {
-                    val name = t.substring(1).substringBefore(' ')
-                    val rest = t.substring(1 + name.length).trim()
-                    val v = if (rest.isEmpty()) child(ind, depth) else value(rest, ind, depth)
-                    anchors[name] = v
-                    v
-                }
+            // the anchors (`&a`) and tags (`!t`) before it, stepped over in a loop: a line of thousands is no
+            // deeper a call, nor the line's rest copied for each
+            var p = 0
+            val names = ArrayList<String>()
+            while (true) {
+                while (p < text.length && text[p] == ' ') p++
+                if (p >= text.length || (text[p] != '&' && text[p] != '!')) break
+                val end = text.indexOf(' ', p).let { if (it < 0) text.length else it }
+                if (text[p] == '&') names += text.substring(p + 1, end)
+                p = end
+            }
+            val t = text.substring(p).trim()
+            val v = when {
+                t.isEmpty() && p > 0 -> child(ind, depth)
                 t.startsWith("*") -> anchors[t.substring(1).trim()]
-                t.startsWith("!") -> {
-                    val rest = t.substringAfter(' ', "").trim()
-                    if (rest.isEmpty()) child(ind, depth) else value(rest, ind, depth)
-                }
                 BLOCK.matches(t) -> block(ind, folded = t[0] == '>')
                 t.startsWith("{") || t.startsWith("[") -> Flow(flowText(t), anchors).value(depth)
                 else -> scalar(t)
             }
+            for (name in names) anchors[name] = v
+            return v
         }
 
         // a `|` or `>` block: the deeper lines' text, as they stand under the first one
@@ -193,10 +196,15 @@ object SkinYaml {
                     anchors[plain(key = false)]
                 }
                 '&' -> {
-                    p++
-                    val name = s.substring(p).takeWhile { it != ' ' && it != ',' && it != '}' && it != ']' }
-                    p += name.length
-                    value(depth).also { anchors[name] = it }
+                    // a run of anchors taken in a loop, as a block value's are
+                    val names = ArrayList<String>()
+                    while (p < s.length && s[p] == '&') {
+                        val from = ++p
+                        while (p < s.length && s[p] != ' ' && s[p] !in FLOW_ENDS) p++
+                        names += s.substring(from, p)
+                        ws()
+                    }
+                    value(depth).also { v -> names.forEach { anchors[it] = v } }
                 }
                 else -> plain(key = false).let(::typed)
             }

@@ -13,6 +13,7 @@ class SkinFiles(private val entries: Map<String, ByteArray>, private val platfor
     val names: Set<String> get() = entries.keys
 
     private val images = HashMap<String, SkinImage?>()
+    private var keptPixels = 0L
 
     /** Whether an image failed to decode or was past the limits (said to the user once). */
     var imageFailed = false
@@ -34,12 +35,23 @@ class SkinFiles(private val entries: Map<String, ByteArray>, private val platfor
 
     fun ini(name: String?): Ini = SkinText.ini(text(name))
 
-    /** [name] decoded, or null (not there, not an image, past the limits). */
+    /**
+     * [name] decoded, or null (not there, not an image, past the limits). Kept to be read again (an atlas, a key's
+     * tile at a time) within [SkinLimits.MAX_KEPT_PIXELS]: past it, those kept are let go, decoded again if asked for.
+     */
     fun image(name: String?): SkinImage? {
         if (name == null || name !in entries) return null
-        return images.getOrPut(name) {
-            platform.image(entries.getValue(name)).also { if (it == null) imageFailed = true }
+        if (name in images) return images[name]
+        val image = platform.image(entries.getValue(name))
+        if (image == null) imageFailed = true
+        val size = image?.let { it.width.toLong() * it.height } ?: 0L
+        if (keptPixels + size > SkinLimits.MAX_KEPT_PIXELS) {
+            images.clear()
+            keptPixels = 0
         }
+        images[name] = image
+        keptPixels += size
+        return image
     }
 
     /** All of [name]'s pixels, or null. */

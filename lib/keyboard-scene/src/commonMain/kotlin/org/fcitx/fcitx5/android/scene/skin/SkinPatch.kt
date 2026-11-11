@@ -49,7 +49,7 @@ object SkinPatch {
             look.barColor = barArgb ?: look.boardColor
             return
         }
-        val kb = board.pixels
+        val kb = fitted(board.pixels, BAR_RATIO)
         val colour = kb.average(keepAlpha = false) ?: GREY
         val h = (kb.width * BAR_RATIO).roundToInt().coerceAtLeast(1)
         val out = Pixels.filled(kb.width, h + kb.height, colour)
@@ -63,6 +63,18 @@ object SkinPatch {
         look.barHeight = h
         look.boardColor = colour
         look.barColor = out.crop(0, 0, kb.width, h)?.average(keepAlpha = false) ?: colour
+    }
+
+    /**
+     * [kb] shrunk where a board of it, a bar [barPerWidth] of its width on top, would be past
+     * [SkinTheme.MAX_PICTURE_SIDE] either way (the theme's board is cut to that side all the same): a picture of an odd
+     * shape (100000×120) is never put together at its size, which memory would not hold.
+     */
+    fun fitted(kb: Pixels, barPerWidth: Double): Pixels {
+        val side = SkinTheme.MAX_PICTURE_SIDE.toDouble()
+        val s = minOf(side / kb.width, side / (kb.height + kb.width * barPerWidth))
+        if (s >= 1) return kb
+        return kb.resized(maxOf(1, (kb.width * s).roundToInt()), maxOf(1, (kb.height * s).roundToInt()))
     }
 
     /** Whether two fills are the same: equal colours, or images of the same pixels. */

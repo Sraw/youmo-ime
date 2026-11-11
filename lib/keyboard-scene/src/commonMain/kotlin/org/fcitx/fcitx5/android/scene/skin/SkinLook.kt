@@ -155,12 +155,16 @@ class SkinError(val reason: Reason, val detail: String = "", cause: Throwable? =
     }
 }
 
-/** The bounds the converter holds a skin to: the file, its unpacked files, an image decoded. */
+/**
+ * The bounds the converter holds a skin to: the file, its unpacked files, an image decoded. All of it is in memory at
+ * once, in the input method's process: the file, its files (a FlorisBoard extension's in a ZIP counted with the ZIP's,
+ * one budget) and the images decoded. The largest of 23 real skins is 8.2 MB, 8.6 MB unpacked.
+ */
 object SkinLimits {
-    const val MAX_ARCHIVE_BYTES = 64L * 1024 * 1024
+    const val MAX_ARCHIVE_BYTES = 16L * 1024 * 1024
     const val MAX_ENTRIES = 5000
-    const val MAX_ENTRY_BYTES = 32L * 1024 * 1024
-    const val MAX_TOTAL_BYTES = 128L * 1024 * 1024
+    const val MAX_ENTRY_BYTES = 16L * 1024 * 1024
+    const val MAX_TOTAL_BYTES = 32L * 1024 * 1024
 
     /** Unpacked to packed, for a file past [RATIO_FROM] bytes: past it, a zip bomb. */
     const val MAX_RATIO = 200
@@ -168,6 +172,9 @@ object SkinLimits {
 
     /** An image's pixels, checked before decoding: a skin's largest atlas is 2215×2561 (5.7 M). */
     const val MAX_IMAGE_PIXELS = 12L * 1024 * 1024
+
+    /** Decoded images kept to be read again ([SkinFiles.image]): past it, those kept are let go first. */
+    const val MAX_KEPT_PIXELS = MAX_IMAGE_PIXELS
 
     /** A text file read (INI, CSS, TIL): past it, read as empty. */
     const val MAX_TEXT_BYTES = 1024 * 1024
