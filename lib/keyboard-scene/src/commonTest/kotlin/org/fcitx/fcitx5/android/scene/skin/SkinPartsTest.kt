@@ -146,7 +146,7 @@ class SkinPartsTest {
             Triple("other pixels", SkinFill.Image(px, null) to SkinFill.Image(Pixels.filled(4, 4, 0), null), false),
             Triple("two of none", null to null, true),
         )
-        for ((why, pair, same) in rows) assertEquals(same, SkinPatch.same(pair.first, pair.second), why)
+        assertRows(rows, { it.first }) { (why, pair, same) -> assertEquals(same, SkinPatch.same(pair.first, pair.second), why) }
     }
 
     @Test

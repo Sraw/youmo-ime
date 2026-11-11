@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.phrase
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord
@@ -233,6 +234,7 @@ class CommonWordsInSessionTest {
     // a replacement two words give, deleted from the keyboard, is taken off both: deleting it from the
     // word alone that listed it first left it offered by the other's initials
     @Test
+    @Uat("WD-44")
     fun aReplacementTwoWordsGiveDeletedFromTheKeyboardIsGoneFromBoth() {
         val saved = ArrayList<CommonWords>()
         val book = CommonWordBook(words("木字旁[mu'zi'pang]\t木\t米\n米字旁[mi'zi'pang]\t米\n")) { saved += it }

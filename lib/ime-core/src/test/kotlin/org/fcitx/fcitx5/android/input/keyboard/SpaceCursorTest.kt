@@ -84,6 +84,17 @@ class SpaceCursorTest {
                 assertEquals(0, rush.rushed(Line.Down, now = 1010))
                 assertEquals(true, SpaceCursor.sendable(Line.Down, null, "x\ny", rush.rushed(Line.Down, now = 1010)))
             },
+            // a fresh read taken for stale sent the cursor to the edge past the line the user went to
+            "rushed lines are surely unlanded only while the side reads as long as when the rush began" to {
+                val rush = SpaceCursor.LineRush()
+                rush.sent(Line.Up, now = 1000, read = 9)
+                rush.sent(Line.Up, now = 1010, read = 9)
+                assertEquals(true, rush.unmoved(Line.Up, now = 1020, read = 9))
+                assertEquals(false, rush.unmoved(Line.Up, now = 1020, read = 5))
+            },
+            "nothing rushed: nothing unlanded" to {
+                assertEquals(false, SpaceCursor.LineRush().unmoved(Line.Up, now = 1000, read = -1))
+            },
             "the rush ends once the editor had time to move" to {
                 val rush = SpaceCursor.LineRush()
                 rush.sent(Line.Down, now = 1000)

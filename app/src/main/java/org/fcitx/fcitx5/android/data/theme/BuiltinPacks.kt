@@ -44,7 +44,7 @@ object BuiltinPacks {
 
     private const val ORDER = ".order"
 
-    // "<root>|<version>" of each unpack that failed in this process, with when (System.nanoTime): not tried
+    // "<root>|<version>" of each unpack that failed in this process, with when ([unpack]'s now): not tried
     // again (and its folder deleted again) at every refresh of the themes, only [RETRY_NANOS] later, as a
     // full disk may have been cleared while the keyboard's process lives on
     private val failedHere = HashMap<String, Long>()
@@ -63,11 +63,16 @@ object BuiltinPacks {
      * start (not at each refresh of the themes), its themes not listed. A folder gone while the stamp is there is
      * unpacked again.
      */
-    fun unpack(root: File, version: String = "${BuildConfig.VERSION_NAME}/${BuildConfig.VERSION_CODE}", open: (String) -> InputStream): Boolean {
+    fun unpack(
+        root: File,
+        version: String = "${BuildConfig.VERSION_NAME}/${BuildConfig.VERSION_CODE}",
+        now: () -> Long = System::nanoTime,
+        open: (String) -> InputStream,
+    ): Boolean {
         val stamp = File(root, STAMP)
         if (stamp.isFile && runCatching { stamp.readText() }.getOrNull() == version && placed(root)) return true
         val attempt = "${root.path}|$version"
-        if (synchronized(failedHere) { failedHere[attempt]?.let { System.nanoTime() - it < RETRY_NANOS } == true }) return false
+        if (synchronized(failedHere) { failedHere[attempt]?.let { now() - it < RETRY_NANOS } == true }) return false
         return try {
             root.deleteRecursively()
             val v4 = ThemePackFiles.folder(root)
@@ -84,10 +89,10 @@ object BuiltinPacks {
             stamp.writeText(version)
             true
         } catch (e: IOException) {
-            failed(root, attempt, e)
+            failed(root, attempt, now(), e)
         } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
             // a zip whose theme.xml or an entry's name does not read: the build's bug, not a crash at every start
-            failed(root, attempt, e)
+            failed(root, attempt, now(), e)
         }
     }
 
@@ -113,9 +118,9 @@ object BuiltinPacks {
             .sortedBy { p -> order.indexOf(p.file).let { if (it < 0) Int.MAX_VALUE else it } }
     }
 
-    private fun failed(root: File, attempt: String, e: Throwable): Boolean {
+    private fun failed(root: File, attempt: String, at: Long, e: Throwable): Boolean {
         Timber.w(e, "Built-in theme packs not unpacked")
-        synchronized(failedHere) { failedHere[attempt] = System.nanoTime() }
+        synchronized(failedHere) { failedHere[attempt] = at }
         root.deleteRecursively()
         return false
     }

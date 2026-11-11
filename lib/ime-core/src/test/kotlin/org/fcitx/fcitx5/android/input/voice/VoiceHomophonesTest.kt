@@ -180,6 +180,18 @@ class VoiceHomophonesTest {
     }
 
     @Test
+    fun `a typed character is not put in by position into a text that changed before it`() {
+        val hold = homophones(added("何芮")).hold()
+        val no = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { false } }
+        val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { true } }
+        assertEquals("好，何芮", now { hold.replace(VoiceLive.Heard("好，和瑞", 3), yes) }.whole)
+        // the polish failing: the raw text has no comma and another 和 lands where 何 was typed: left as heard
+        assertEquals("好啊和平", now { hold.replace("好啊和平", no) })
+        // a text shorter than where 何 was typed: nothing put in, nothing out of range
+        assertEquals("好", now { hold.replace("好", no) })
+    }
+
+    @Test
     fun `a new utterance does not keep the last one's typed stretches`() {
         val hold = homophones(added("何芮")).hold()
         val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { true } }

@@ -202,7 +202,7 @@ class SkinFormatsTest {
             Triple("Sogou's TYPEFACE", { sogou() }, "default/font.ttf"),
             Triple("Trime's key_font", { trime() }, "fonts/k.ttf"),
         )
-        for ((why, skin, font) in rows) {
+        assertRows(rows, { it.first }) { (why, skin, font) ->
             assertContains(convert(skin()).themeXml, "<font ", message = "$why: within the limit")
             val files = skin()
             files[font] = ByteArray(SkinLimits.MAX_FONT_BYTES + 1)
@@ -488,6 +488,14 @@ class SkinFormatsTest {
         val again = f.pixels("a")
         assertEquals(3, decoded)
         assertFalse(a === again)
+        // the decoded image is not kept beside its whole pixels: two of 2/5 the budget each both stay (counted
+        // twice, the second pushed the first out)
+        val fifths = (SkinLimits.MAX_KEPT_PIXELS * 2 / 5 / 4096).toInt()
+        val g = SkinFiles(mapOf("a" to ByteArray(fifths), "b" to ByteArray(fifths)), platform)
+        val ga = g.pixels("a")
+        g.pixels("b")
+        assertTrue(ga === g.pixels("a"))
+        assertEquals(5, decoded)
     }
 
     @Test

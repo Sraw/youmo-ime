@@ -38,7 +38,8 @@ object SpaceCursor {
      * Whether a line [sendable] holds goes to the field's very start (end) instead: rushed lines bring the
      * cursor onto the first (last) line ([side], read before they landed, has no more newlines than
      * [rushed]), where the key would have gone to the start (end), and [side] was read [whole] so the
-     * start (end) is where it ends. Not at the very start (end) itself, nor with no lines rushed.
+     * start (end) is where it ends. Not at the very start (end) itself, nor with no lines rushed. Only
+     * for a read surely stale ([LineRush.unmoved]): read after the lines landed, the edge would skip lines.
      */
     fun toEdge(line: Line, before: CharSequence?, after: CharSequence?, rushed: Int, whole: Boolean): Boolean {
         val side = if (line == Line.Up) before else after
@@ -57,8 +58,19 @@ object SpaceCursor {
         /** The lines rushed before one to [line] at [now] (ms). */
         fun rushed(line: Line, now: Long): Int = if (line != last || now - lastAt >= settleMs) 0 else count
 
-        /** A line to [line] sent at [now]. */
-        fun sent(line: Line, now: Long) {
+        // the length of the side read when the rush began: a read of another length is one the editor moved since
+        private var readAt = -1
+
+        /**
+         * Whether a read of [read] chars of the side [line] goes to is surely stale: lines are rushed and
+         * the side reads as long as when the rush began, so none of them landed yet. A read that changed
+         * is the editor having moved some of them, how many unknown: not stale for sure.
+         */
+        fun unmoved(line: Line, now: Long, read: Int): Boolean = rushed(line, now) > 0 && read == readAt
+
+        /** A line to [line] sent at [now], [read] the length of the side it goes to read before it. */
+        fun sent(line: Line, now: Long, read: Int = -1) {
+            if (rushed(line, now) == 0) readAt = read
             count = rushed(line, now) + 1
             last = line
             lastAt = now

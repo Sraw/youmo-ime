@@ -70,9 +70,9 @@ class BuiltinPacksTest {
         val root = File(appContext.cacheDir, "bp-test").apply { deleteRecursively() }
         var opened = 0
         val open = { path: String -> opened++; BuiltinPacks.open(appContext, path) }
-        assertTrue(BuiltinPacks.unpack(root, "v1", open))
+        assertTrue(BuiltinPacks.unpack(root, "v1", open = open))
         assertEquals(BuiltinPacks.FILES.size, opened)
-        assertTrue(BuiltinPacks.unpack(root, "v1", open))
+        assertTrue(BuiltinPacks.unpack(root, "v1", open = open))
         assertEquals(BuiltinPacks.FILES.size, opened)
         assertEquals(BuiltinPacks.FILES.size, BuiltinPacks.list(root, ThemeManager.BuiltinThemes).distinctBy { it.file }.size)
         // a user's pack of the same name shown instead
@@ -99,15 +99,23 @@ class BuiltinPacksTest {
     }
 
     @Test
-    fun oneThatFailedIsNotTriedAgainUntilTheNextStart() {
-        // each refresh of the themes (each opening of the theme page) deleted and unpacked all of them again
+    fun oneThatFailedIsTriedAgainOnlyTenMinutesLater() {
+        // each refresh of the themes (each opening of the theme page) deleted and unpacked all of them again;
+        // and a full disk cleared while the process lives on must still get them unpacked
         val root = File(appContext.cacheDir, "bp-failed").apply { deleteRecursively() }
         var opened = 0
-        val failing = { id: String -> opened++; if (id == "cream") throw IOException("full") else BuiltinPacks.open(appContext, id) }
-        assertFalse(BuiltinPacks.unpack(root, "v1", failing))
+        var full = true
+        var clock = 0L
+        val failing = { id: String -> opened++; if (full && id == "cream") throw IOException("full") else BuiltinPacks.open(appContext, id) }
+        assertFalse(BuiltinPacks.unpack(root, "v1", { clock }, failing))
         val once = opened
-        assertFalse(BuiltinPacks.unpack(root, "v1", failing))
+        clock += 10L * 60 * 1_000_000_000 - 1
+        assertFalse(BuiltinPacks.unpack(root, "v1", { clock }, failing))
         assertEquals(once, opened)
+        full = false
+        clock += 1
+        assertTrue(BuiltinPacks.unpack(root, "v1", { clock }, failing))
+        assertEquals(BuiltinPacks.FILES.size, BuiltinPacks.names(root).size)
         root.deleteRecursively()
     }
 

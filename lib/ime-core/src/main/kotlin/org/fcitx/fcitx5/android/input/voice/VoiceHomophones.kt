@@ -152,10 +152,12 @@ class VoiceHomophones internal constructor(
         private val pinned = HashMap<Int, String>()
         private var pinnedOf = -1
 
-        // of those, each character typed already and changed, by where it is in that text: heard and
-        // put in ("和何"); put in again wherever that character is still heard there, whatever the
-        // rest of its stretch becomes (the recognizer rewriting the tail must not turn typed text back)
-        private val pinnedChars = HashMap<Int, String>()
+        // of those, each character typed already and changed, by where it is in that text: the text
+        // heard up to and with it, and the character put in; put in again while a text still starts
+        // with that heard stretch, whatever comes after it (the recognizer rewriting the tail must not
+        // turn typed text back), and never by position alone into a text that changed before it (the
+        // final text, the raw one without punctuation)
+        private val pinnedChars = HashMap<Int, Pair<String, Char>>()
 
         // stretches put in, as heard and as put in: "徐静\u0000徐婧"
         private val putIn = HashSet<String>()
@@ -194,7 +196,7 @@ class VoiceHomophones internal constructor(
                 if (from < settled) {
                     pinned[from] = pair(span)
                     for (k in from until minOf(settled, span.at + span.end)) {
-                        if (text[k] != out[k]) pinnedChars[k] = "${text[k]}${out[k]}"
+                        if (text[k] != out[k]) pinnedChars[k] = text.substring(0, k + 1) to out[k]
                     }
                 }
                 until = span.at + span.end
@@ -202,9 +204,9 @@ class VoiceHomophones internal constructor(
             return keepTyped(text, out)
         }
 
-        // [out] with each pinned character put in again where [text] still has it as heard
+        // [out] with each pinned character put in again where [text] still starts as heard when it was
         private fun keepTyped(text: String, out: CharArray): String {
-            for ((k, pair) in pinnedChars) if (k < text.length && text[k] == pair[0]) out[k] = pair[1]
+            for ((k, pin) in pinnedChars) if (text.startsWith(pin.first)) out[k] = pin.second
             return String(out)
         }
 

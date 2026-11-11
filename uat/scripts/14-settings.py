@@ -290,7 +290,7 @@ def push_file(d, local_path, filename):
 def baidu_skin(path, finder=False):
     """a Baidu skin made here (no third party's skin in the repository): a blue panel, letters on an orange
     face with a transparent margin (the gap between keys), named UAT 皮肤 by uat. [finder]: zipped as macOS
-    Finder zips a folder, with a __MACOSX/ copy of every file's ._ resource fork beside it"""
+    Finder zips a folder (all in one top folder), with a __MACOSX/ copy of every file's ._ resource fork beside it"""
     import io
     from PIL import Image, ImageDraw
 
@@ -316,12 +316,14 @@ def baidu_skin(path, finder=False):
         "port/cand1.cnd": "[CAND]\nFORE_STYLE=3\n",
         "port/py_26.ini": letters + "[KEY90]\nBACK_STYLE=2\nFORE_STYLE=3\nCENTER=F38\n",
     }
+    # Finder zips the folder itself: every file under one top folder, its ._ copy under __MACOSX/ the same way
+    top = "UAT skin/" if finder else ""
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in files.items():
-            z.writestr(name, data)
+            z.writestr(top + name, data)
             if finder:
-                head, _, base = name.rpartition("/")
-                z.writestr(f"__MACOSX/{head + '/' if head else ''}._{base}", b"\x00\x05\x16\x07" + bytes(80))
+                head, _, base = (top + name).rpartition("/")
+                z.writestr(f"__MACOSX/{head}/._{base}", b"\x00\x05\x16\x07" + bytes(80))
 
 
 def skin_colours(d):
@@ -399,6 +401,14 @@ def st101(d):
     d.tap(item.c, 1.5)
     d.open_page("text")
     d.shot("kb", "选用转换来的皮肤")
+    # held down for the shot: a pressed key darker though the skin has no pressed face (space by hand: held, it listens)
+    z = d.keys(refresh=True)["z"]
+    d.touch(("down", z[0], z[1]))
+    try:
+        d.shot("kb", "按住 z：变暗")
+    finally:
+        d.touch(("up", z[0], z[1]))
+    d.clear()
     o, b = skin_colours(d)
     check(o > 300 and b > 40, f"键盘不是皮肤的橙键蓝底（橙 {o} 蓝 {b} / 1800）")
     d.step("紧凑高度的键缝")
@@ -1193,7 +1203,23 @@ def st98(d):
     preset = d.field_text()
     check(preset == "@", f"预设后 a 上滑不是 @：「{preset}」")
     d.clear()
-    return f"翻转后 a 下滑「{flipped}」，预设后上滑「{preset}」"
+    d.step("离开页面后撤销")
+    slots_page(d)
+    d.tap_text("翻转上下滑", scroll=False, after=0.3)
+    # left while the snackbar shows: its 撤销 still puts the step back, no crash
+    d.back(after=0.5)
+    check(d.wait_text("撤销", timeout=3, where="all"), "离开页面后底部提示不见了，没有撤销可点")
+    d.tap_text("撤销", where="all", scroll=False, after=1.0)
+    d.open_page("text")
+    d.clear()
+    a = d.keys(refresh=True)["a"]
+    d.swipe(a, (a[0], a[1] - 130), 150, after=0.8)
+    undone = d.field_text()
+    check(undone == "@", f"离开页面后撤销，a 上滑不是 @：「{undone}」")
+    d.clear()
+    slots_page(d)
+    d.shot("full", "撤销后再打开：默认（@ 在右上）")
+    return f"翻转后 a 下滑「{flipped}」，预设后上滑「{preset}」，离开页面后撤销上滑「{undone}」"
 
 
 case("ST-99", needs="jvm:PopupOverridesFragmentTest$Dialog.selectedKeysAreSetAtOnce")(lambda d: None)

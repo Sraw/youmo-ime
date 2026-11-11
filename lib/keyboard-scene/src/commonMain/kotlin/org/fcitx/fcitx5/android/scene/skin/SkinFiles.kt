@@ -53,12 +53,16 @@ class SkinFiles(private val entries: Map<String, ByteArray>, private val platfor
         return image
     }
 
-    /** All of [name]'s pixels, or null: the same [Pixels] each time (read, never drawn into). */
+    /**
+     * All of [name]'s pixels, or null: the same [Pixels] each time (read, never drawn into). Only these are kept,
+     * not the decoded image too (unless [image] kept it already): the budget holds twice the pixels so.
+     */
     fun pixels(name: String?): Pixels? {
         if (name == null || name !in entries) return null
         if (name in whole) return whole[name]
-        val px = image(name)?.let { it.pixels(0, 0, it.width, it.height) }
-        keep(px?.let { it.width.toLong() * it.height } ?: 0L)
+        val image = if (name in images) images[name] else platform.image(entries.getValue(name)).also { if (it == null) imageFailed = true }
+        val px = image?.let { it.pixels(0, 0, it.width, it.height) }
+        keep(image?.let { it.width.toLong() * it.height } ?: 0L)
         whole[name] = px
         return px
     }

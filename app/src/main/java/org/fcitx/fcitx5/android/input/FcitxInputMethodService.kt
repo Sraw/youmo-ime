@@ -32,6 +32,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
 import android.widget.Toast
@@ -793,18 +794,24 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val rushed = lineRush.rushed(line, now)
         if (!SpaceCursor.sendable(line, before, after, rushed)) {
             val side = before ?: after
-            if (side != null && SpaceCursor.toEdge(line, before, after, rushed, whole = side.length < LINE_REACH)) {
-                // after the queued lines land: the field's start, or its end (the whole text's length)
-                val end = if (line == SpaceCursor.Line.Up) 0
-                else ic.getExtractedText(ExtractedTextRequest(), 0)?.text?.length ?: return
-                clearedText.edited()
-                ic.setSelection(end, end)
-            }
+            // the edge only while none of the rushed lines landed: read after them, it would skip lines
+            if (side != null && lineRush.unmoved(line, now, side.length) &&
+                SpaceCursor.toEdge(line, before, after, rushed, whole = side.length < LINE_REACH)
+            ) moveToFieldEdge(ic, line)
             return
         }
-        lineRush.sent(line, now)
+        lineRush.sent(line, now, read = (before ?: after)?.length ?: -1)
         clearedText.edited()
         sendDownUpKeyEvents(if (line == SpaceCursor.Line.Up) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN)
+    }
+
+    // after the queued lines land: the field's start, or its end (where the editor's text ends; a copy of the
+    // whole text over binder, once, at the edge alone)
+    private fun moveToFieldEdge(ic: InputConnection, line: SpaceCursor.Line) {
+        val end = if (line == SpaceCursor.Line.Up) 0
+        else ic.getExtractedText(ExtractedTextRequest(), 0)?.let { x -> x.text?.let { x.startOffset + it.length } } ?: return
+        clearedText.edited()
+        ic.setSelection(end, end)
     }
 
     private fun handleArrowKey(direction: EditorKeyPolicy.Direction) {
