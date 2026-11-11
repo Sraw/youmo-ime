@@ -105,6 +105,7 @@ class VoiceLiveTest {
         assertEquals("好的", VoiceLive.cut("我到了吗", "我到了好的"))
         // all of it written otherwise: nothing left out
         assertEquals("你说好的", VoiceLive.cut("那个", "你说好的"))
+        assertEquals("", VoiceLive.cut("我到了吗", "我"))
         assertEquals("", VoiceLive.cut("我到了吗", "我到"))
         assertEquals("你好", VoiceLive.cut("", "你好"))
     }

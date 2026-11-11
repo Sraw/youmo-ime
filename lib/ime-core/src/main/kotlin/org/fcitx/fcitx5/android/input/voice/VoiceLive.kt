@@ -196,6 +196,8 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
          */
         fun cut(prefix: String, text: String): String {
             if (prefix.isEmpty()) return text
+            // the recognizer took back some of what was sent and has nothing new: nothing to type
+            if (prefix.startsWith(text)) return ""
             // the edit distance from prefix to each start of text, a row at a time; [last] the row
             // before prefix's last character, to tell an end on a changed character
             var last = IntArray(text.length + 1) { it }
