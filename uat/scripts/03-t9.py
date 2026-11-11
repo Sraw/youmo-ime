@@ -162,13 +162,16 @@ def t960b(d):
     face = key.texts()[0]
     x, y = key.c
     d.touch(("down", x, y), ("sleep", 0.9), ("move", x, y))
-    d.shot("kb", f"长按最右一列的 {face}：{face[0]} 在最右，其余往左")
+    d.shot("kb", f"长按最右的组键 {face}：{face[0]} 在手指下，放不下时在靠边那头")
     shown = sorted((n for n in d.screen().nodes if n.text in set(face) and n.text and not n.clickable and n.b[3] <= kb.b[1] + (key.b[1] - kb.b[1])),
                    key=lambda n: n.c[0])
     d.touch(("up", x, y))
     time.sleep(0.5)
     row = [n.text for n in shown]
-    check(row and row[-1] == face[0], f"弹出一排 {row}，{face[0]} 应在最右")
+    first = next((n for n in shown if n.text == face[0]), None)
+    # as the full keyboard's: the first over the finger where the rest fit, else at the edge's end
+    check(first is not None and (first.b[0] <= x < first.b[2] or row[-1] == face[0]), f"弹出一排 {row}，{face[0]} 应在手指下或最右")
+    check(all(n.b[2] <= kb.b[2] for n in shown), "弹出的字超出屏幕")
     return f"{face}: {row}"
 
 
