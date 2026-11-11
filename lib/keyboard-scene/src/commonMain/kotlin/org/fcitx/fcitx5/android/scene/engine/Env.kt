@@ -231,9 +231,8 @@ data class MarkSettings(
     val symbolAt: KeyMarks.At get() = if (firstUp) upAt else downAt
 
     /**
-     * Where a shortcut of a character key is drawn, the other way's place; a function key's two in
-     * that slot and its mirror, the up one the upper (KeyMarks.placeFunction), whichever way the slots
-     * were flipped.
+     * Where a shortcut of a character key is drawn, the other way's place. A function key's
+     * marks are each at its own way's place instead (KeyMarks.placeFunction).
      */
     val shortcutAt: KeyMarks.At get() = if (firstUp) downAt else upAt
 

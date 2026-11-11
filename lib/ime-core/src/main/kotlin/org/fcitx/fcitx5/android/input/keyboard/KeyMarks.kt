@@ -21,8 +21,7 @@ package org.fcitx.fcitx5.android.input.keyboard
  * not. A shortcut that still has no room on its key is tried in the key's other free corners
  * ([elsewhere]) before it is left out.
  *
- * A function key has no symbol: its two shortcuts in the chosen slot and that slot mirrored
- * top for bottom, the up one's the upper ([placeFunction]); one alone in the chosen slot.
+ * A function key has no symbol: each way's shortcut at its own setting's place ([placeFunction]).
  */
 object KeyMarks {
 
@@ -130,25 +129,22 @@ object KeyMarks {
     }
 
     /**
-     * A function key's: its [up] and [down] shortcuts in the slot of [shortcutAt] ([onKeys], [symbolAt]
-     * where the symbols are) and that slot mirrored, the up one the upper, each only where that way is
-     * on ([upOn], [downOn]); one alone in the slot itself. 无 draws neither.
+     * A function key's: each way's mark at its own setting, [up] at [upAt] and [down] at [downAt], as a
+     * shortcut is ([onKeys]: on low keys a 底部 goes to the first corner of [LowOrder] the other way's is
+     * not), each only where that way is on ([upOn], [downOn]); 无 draws that one not. The settings page
+     * keeps the two apart; two in one slot all the same (a hand-edited import) put the down one in that
+     * slot mirrored, so neither covers the other.
      */
     fun <T : Any> placeFunction(
-        up: T?, down: T?, upOn: Boolean, downOn: Boolean, symbolAt: At, shortcutAt: At, landscape: Boolean, compact: Boolean,
+        up: T?, down: T?, upOn: Boolean, downOn: Boolean, upAt: At, downAt: At, landscape: Boolean, compact: Boolean,
     ): Placed<T> {
-        val slot = shortcutSlot(onKeys(symbolAt, shortcutAt, landscape, compact).shortcut) ?: return Placed()
+        val out = linkedMapOf<Slot, T>()
         val u = up?.takeIf { upOn }
         val d = down?.takeIf { downOn }
-        val out = linkedMapOf<Slot, T>()
-        if (u != null && d != null) {
-            // the pair at the chosen slot and its mirror, the up one over the down one
-            val (top, bottom) = if (slot.bottom) slot.mirrored to slot else slot to slot.mirrored
-            out[top] = u
-            out[bottom] = d
-        } else {
-            (u ?: d)?.let { out[slot] = it }
-        }
+        val upSlot = shortcutSlot(onKeys(downAt, upAt, landscape, compact).shortcut)
+        val downSlot = shortcutSlot(onKeys(upAt, downAt, landscape, compact).shortcut)
+        if (u != null && upSlot != null) out[upSlot] = u
+        if (d != null && downSlot != null) out[if (downSlot in out) downSlot.mirrored else downSlot] = d
         return Placed(out)
     }
 }

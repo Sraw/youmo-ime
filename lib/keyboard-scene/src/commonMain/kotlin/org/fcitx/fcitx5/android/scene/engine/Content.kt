@@ -290,11 +290,11 @@ class Content(private val env: Env, private val measurer: TextMeasurer, private 
         }
     }
 
-    // a function key's: the shortcuts' slot and its mirror, the up one the upper
+    // a function key's: each way's mark at its own setting's place
     private fun functionSlots(ways: List<Way>): Map<Slot, Way> {
         val m = env.marks
         return KeyMarks.placeFunction(
-            ways.firstOrNull { it.up }, ways.firstOrNull { !it.up }, true, true, m.symbolAt, m.shortcutAt, env.landscape, env.compact,
+            ways.firstOrNull { it.up }, ways.firstOrNull { !it.up }, true, true, m.upAt, m.downAt, env.landscape, env.compact,
         ).at
     }
 

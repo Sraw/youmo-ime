@@ -586,9 +586,9 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   normal
     shadow rect(739.88,439.38,853.12,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(739.88,439.38,853.12,543.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 776.18,460,839.18,523 #ff7a858a
-    icon delete-sweep 744.97,444.83,773.97,473.83 #ff7a858a
-    icon restore 744.97,509.1,773.97,538.1 #ff7a858a
+    icon backspace 766.2,474.31,826.8,534.9 #ff7a858a
+    icon delete-sweep 820.61,444.83,847.87,472.09 #ff7a858a
+    icon restore 744.97,444.83,772.24,472.09 #ff7a858a
   pressed
     +2 fill rect(739.88,439.38,853.12,543.63 r=10.5,10.5,10.5,10.5) #1f000000
 key symbols kind=function role=symbols a11y="符"
@@ -645,7 +645,7 @@ key space kind=space role=space a11y="空格，注音"
     shadow rect(300.88,580.38,552.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(300.88,580.38,552.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "注音" 392,644.8 system 400 34.13 #ff37474f
-    icon cursor-move 308,585,337,614 #ff7a858a
+    icon cursor-move 516.74,585,544,612.26 #ff7a858a
   pressed
     +2 fill rect(300.88,580.38,552.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function role=period a11y="。"
@@ -672,7 +672,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   normal
     shadow rect(653.88,580.38,724.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(653.88,580.38,724.13,683.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon language 657.5,600.5,720.5,663.5 #ff7a858a
+    icon language 658.7,601.7,719.3,662.3 #ff7a858a
   pressed
     +2 fill rect(653.88,580.38,724.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
@@ -686,6 +686,6 @@ key enter kind=enter role=enter a11y="换行"
   normal
     shadow rect(739.88,580.38,853.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(739.88,580.38,853.13,683.63 r=10.5,10.5,10.5,10.5) #ff5cb5ab
-    icon enter 765,600.5,828,663.5 #ffffffff
+    icon enter 766.2,601.7,826.8,662.3 #ffffffff
   pressed
     +2 fill rect(739.88,580.38,853.13,683.63 r=10.5,10.5,10.5,10.5) #1f000000

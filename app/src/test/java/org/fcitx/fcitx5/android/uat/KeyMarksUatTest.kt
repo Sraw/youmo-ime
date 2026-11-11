@@ -84,21 +84,22 @@ class KeyMarksUatTest {
         assertEquals("a TL TR", marksOf("a"))
         assertEquals("z TL TR", marksOf("z"))
         assertEquals("s - TR", marksOf("s"))
-        assertEquals("清除 up, 恢复 down", "TL,BL", backspaceMarks())
+        assertEquals("清除 at 上滑's place, 恢复 at 下滑's", "TR,TL", backspaceMarks())
         at(KeyMarkPosition.BottomLeft)
         assertEquals("a BL TR", marksOf("a"))
-        assertEquals("清除 up over 恢复 down", "TL,BL", backspaceMarks())
+        assertEquals("TR,BL", backspaceMarks())
         at(KeyMarkPosition.BottomRight)
         assertEquals("z BR TR", marksOf("z"))
         assertEquals("s - TR", marksOf("s"))
-        assertEquals("TR,BR", backspaceMarks())
+        assertEquals("the owner's: 清除 top right, 恢复 bottom right", "TR,BR", backspaceMarks())
         at(KeyMarkPosition.Bottom)
         assertEquals("z BC TR", marksOf("z"))
-        assertEquals("TC,BC", backspaceMarks())
+        assertEquals("TR,BC", backspaceMarks())
         at(KeyMarkPosition.BottomRight)
         symbolsAt(KeyMarkPosition.TopLeft)
         assertEquals("z BR TL", marksOf("z"))
         assertEquals("s - TL", marksOf("s"))
+        assertEquals("TL,BR", backspaceMarks())
         symbolsAt(KeyMarkPosition.BottomLeft)
         assertEquals("z BR BL", marksOf("z"))
         symbolsAt(KeyMarkPosition.Bottom)
@@ -106,6 +107,7 @@ class KeyMarksUatTest {
         // 无: that one not drawn, the swipe still there
         symbolsAt(KeyMarkPosition.None)
         assertEquals("z BR -", marksOf("z"))
+        assertEquals("清除 not drawn", "BR", backspaceMarks())
         at(KeyMarkPosition.None)
         assertEquals("z - -", marksOf("z"))
         assertEquals("", backspaceMarks())
@@ -167,8 +169,15 @@ class KeyMarksUatTest {
             val changed = marks()
             fresh().start()
             assertEquals(choice.name, changed, marks())
-            assertEquals(choice.name, first, marks())
+            // the letters' marks stay (the two places swapped with the ways); a function key's, whose swipes
+            // the flip leaves as they are, each go with its way's place: ⌫'s 清除 to 左上 and back
+            val function = setOf("Backspace", "Pinyin")
+            fun letters(m: List<String>) = m.filter { it.substringBefore(' ') !in function }
+            assertEquals(choice.name, letters(first), letters(marks()))
+            val flipped = choice == SwipeLayersChoice.ShortcutUpSymbolDown
+            assertEquals(choice.name, if (flipped) "TL,TR" else "TR,TL", backspaceMarks())
         }
+        val turned = marks()
         // a shortcut changed and back
         val slots = AppPrefs.getInstance().internal.keySwipes
         val was = slots.getValue()
@@ -177,9 +186,9 @@ class KeyMarksUatTest {
         assertEquals("s TL TR", marksOf("s"))
         prefs.set(slots, was)
         h.idle()
-        assertEquals(first, marks())
+        assertEquals(turned, marks())
         fresh().start()
-        assertEquals(first, marks())
+        assertEquals(turned, marks())
     }
 
     // a letter's long press turned off with the keyboard up: its corner emptied, its shortcut's mark

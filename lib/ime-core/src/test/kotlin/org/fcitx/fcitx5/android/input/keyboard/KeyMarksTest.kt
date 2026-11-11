@@ -108,32 +108,30 @@ class KeyMarksTest {
     }
 
     @Test
-    fun aFunctionKeysUpWhereChosenItsDownMirrored() {
-        val expected = mapOf(
-            At.TopLeft to (Slot.TopLeft to Slot.BottomLeft),
-            At.BottomLeft to (Slot.TopLeft to Slot.BottomLeft),
-            At.TopRight to (Slot.TopRight to Slot.BottomRight),
-            At.BottomRight to (Slot.TopRight to Slot.BottomRight),
-            At.Bottom to (Slot.Top to Slot.Bottom),
-        )
-        fun f(up: String?, down: String?, upOn: Boolean, downOn: Boolean, at: At, symbolAt: At = At.TopRight, low: Boolean = false) =
-            KeyMarks.placeFunction(up, down, upOn, downOn, symbolAt, at, low, false)
-        for ((at, slots) in expected) {
-            val (up, down) = slots
-            assertFalse("$at: the up swipe's mark over the down one's", up.bottom)
-            assertTrue("$at", down.bottom)
-            assertEquals(Placed.of(up to "清除", down to "恢复"), f("清除", "恢复", true, true, at, At.None))
-            val alone = at.corner ?: Slot.Bottom
-            assertEquals("the down one alone where chosen", Placed.of(alone to "恢复"), f("清除", "恢复", false, true, at, At.None))
-            assertEquals(Placed.of(alone to "清除"), f("清除", "恢复", true, false, at, At.None))
-            assertEquals(Placed.of(alone to "清除"), f("清除", null, true, true, at, At.None))
-            assertEquals(Placed<String>(), f(null, null, true, true, at, At.None))
+    fun aFunctionKeysMarksEachAtItsOwnWaysSetting() {
+        fun slot(at: At) = if (at == At.Bottom) Slot.Bottom else at.corner
+        for (upAt in At.entries) for (downAt in At.entries) {
+            if (upAt == downAt && upAt != At.None) continue // the settings page keeps them apart
+            val both = KeyMarks.placeFunction("清除", "恢复", true, true, upAt, downAt, false, false)
+            val want = listOfNotNull(slot(upAt)?.let { it to "清除" }, slot(downAt)?.let { it to "恢复" })
+            assertEquals("$upAt $downAt", Placed.of(*want.toTypedArray()), both)
+            assertEquals("$upAt $downAt: up off", Placed.of(*listOfNotNull(slot(downAt)?.let { it to "恢复" }).toTypedArray()),
+                KeyMarks.placeFunction("清除", "恢复", false, true, upAt, downAt, false, false))
+            assertEquals("$upAt $downAt: no down", Placed.of(*listOfNotNull(slot(upAt)?.let { it to "清除" }).toTypedArray()),
+                KeyMarks.placeFunction("清除", null, true, true, upAt, downAt, false, false))
+            // low keys: a 底部 to the first corner the other way's is not, the two never in one slot
+            for (landscape in listOf(true, false)) {
+                val low = KeyMarks.placeFunction("清除", "恢复", true, true, upAt, downAt, landscape, !landscape)
+                if (upAt != At.Bottom) assertEquals("$upAt $downAt low", slot(upAt), low.slotOf("清除"))
+                if (downAt != At.Bottom) assertEquals("$upAt $downAt low", slot(downAt), low.slotOf("恢复"))
+                if (upAt == At.Bottom) assertEquals(KeyMarks.LowOrder.first { it != downAt }.corner, low.slotOf("清除"))
+                if (downAt == At.Bottom) assertEquals(KeyMarks.LowOrder.first { it != upAt }.corner, low.slotOf("恢复"))
+            }
         }
-        assertEquals(Placed<String>(), f("清除", "恢复", true, true, At.None))
-        // 底部 on low keys: the first corner the symbol's is not, the down one mirrored
-        assertEquals(Placed.of(Slot.TopLeft to "清除", Slot.BottomLeft to "恢复"), f("清除", "恢复", true, true, At.Bottom, low = true))
-        assertEquals(Placed.of(Slot.TopRight to "清除", Slot.BottomRight to "恢复"), f("清除", "恢复", true, true, At.Bottom, At.TopLeft, low = true))
-        assertEquals(Placed.of(Slot.TopLeft to "清除", Slot.BottomLeft to "恢复"), KeyMarks.placeFunction("清除", "恢复", true, true, At.TopRight, At.Bottom, false, true))
+        // one place in both (a hand-edited import): both drawn all the same, apart
+        assertEquals(Placed.of(Slot.BottomRight to "清除", Slot.TopRight to "恢复"),
+            KeyMarks.placeFunction("清除", "恢复", true, true, At.BottomRight, At.BottomRight, false, false))
+        assertEquals(Placed<String>(), KeyMarks.placeFunction(null, null, true, true, At.TopRight, At.BottomRight, false, false))
     }
 
     @Test

@@ -85,23 +85,36 @@ class ContentTest {
     }
 
     @Test
-    fun aFunctionKeysUpSwipeMarkIsOverItsDownOnesWhereverTheyArePlaced() {
-        // beta2: 下滑图标位置 右下 drew ⌫'s 恢复 (down) top right and 清除 (up) bottom right
+    fun aFunctionKeysMarksEachWhereItsWaysSettingSays() {
+        // beta2: 上滑 右上, 下滑 右下 drew ⌫'s 恢复 (down) top right and 清除 (up) bottom right
         val places = KeyMarks.At.entries.filter { it != KeyMarks.At.None }
-        val both = mutableSetOf<KeyMarks.At>()
+        val seen = mutableSetOf<Pair<Boolean, KeyMarks.At>>()
         val combos = (places + KeyMarks.At.None).flatMap { up ->
             (places + KeyMarks.At.None).flatMap { down -> listOf(true, false).map { Triple(up, down, it) } }
         }.filter { it.first != it.second }
         for ((up, down, firstUp) in combos) {
             val s = Fixtures.scene(env.copy(marks = MarkSettings(upAt = up, downAt = down, firstUp = firstUp)))
+            val f = face(s, "backspace")
             val icons = icons(s, "backspace").associate { it.name to it.box }
-            val clear = icons["delete-sweep"]
-            val restore = icons["restore"]
-            if (clear == null || restore == null) continue
-            assertTrue(clear.bottom <= restore.top + 0.5, "$up $down $firstUp: up's 清除 $clear over down's 恢复 $restore")
-            both += if (firstUp) down else up
+            for ((name, at) in listOf("delete-sweep" to up, "restore" to down)) {
+                val box = icons[name]
+                assertEquals(at == KeyMarks.At.None, box == null, "$up $down $firstUp: $name drawn as set")
+                if (box == null) continue
+                val x = (box.left + box.right) / 2 - (f.left + f.right) / 2
+                val y = (box.top + box.bottom) / 2 - (f.top + f.bottom) / 2
+                val (wantX, wantBottom) = when (at) {
+                    KeyMarks.At.TopLeft -> -1 to false
+                    KeyMarks.At.TopRight -> 1 to false
+                    KeyMarks.At.BottomLeft -> -1 to true
+                    KeyMarks.At.BottomRight -> 1 to true
+                    else -> 0 to true
+                }
+                assertEquals(wantBottom, y > 0, "$up $down $firstUp: $name at $at, $box in $f")
+                assertTrue(if (wantX == 0) abs(x) < 1.0 else x * wantX > 0, "$up $down $firstUp: $name at $at, $box in $f")
+                seen += (name == "delete-sweep") to at
+            }
         }
-        assertEquals(places.toSet(), both, "both drawn at every shortcut place, the bottom ones too")
+        assertEquals(places.size * 2, seen.size, "each mark checked at every place")
     }
 
     @Test
@@ -116,8 +129,12 @@ class ContentTest {
         near(floor(11 * d + 0.5), redo.box.width)
         val backspace = icons(s, "backspace").map { it.name }
         assertEquals(listOf("backspace", "delete-sweep", "restore").sorted(), backspace.sorted())
-        val down = icons(s, "backspace").first { it.name == "restore" }
-        assertTrue(abs(face(s, "backspace").bottom - 2 * d - down.box.bottom) < 1.0, "down's at the bottom, within its pixel")
+        // each at its own way's place: up 右上, down 左上 by default
+        val bf = face(s, "backspace")
+        val up = icons(s, "backspace").first { it.name == "delete-sweep" }.box
+        val down = icons(s, "backspace").first { it.name == "restore" }.box
+        assertTrue(up.left > (bf.left + bf.right) / 2 && up.bottom < (bf.top + bf.bottom) / 2, "up's top right: $up")
+        assertTrue(down.right < (bf.left + bf.right) / 2 && down.bottom < (bf.top + bf.bottom) / 2, "down's top left: $down")
         assertEquals("cursor-move", icons(s, "space").single().name)
     }
 
@@ -128,7 +145,8 @@ class ContentTest {
         // icon of the board as much smaller (060-render-p2 S4e), no more than the marks' cap, both drawn one over
         // the other; at 20% (43.5 px) past the cap, the down one left out
         val d = 2.75
-        fun scene(h: Double) = Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = h, density = d)))
+        // the two one over the other (上滑 左上, 下滑 左下), as a function key's are where the settings say so
+        fun scene(h: Double) = Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = h, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft))))
         assertEquals(setOf("backspace", "delete-sweep"), icons(scene(407.0), "backspace").map { it.name }.toSet(), "at 20%")
         val s = scene(420.0)
         near(45.5, face(s, "backspace").height, "the face")
@@ -160,7 +178,7 @@ class ContentTest {
         }
         for ((theme, d, size) in grid) {
             val (wDp, hDp) = size
-            val e = Forms.env("zhuyin", Fixtures.compact.copy(width = wDp * d, height = hDp * d, density = d))
+            val e = Forms.env("zhuyin", Fixtures.compact.copy(width = wDp * d, height = hDp * d, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft)))
             val s = Forms.scene("zhuyin", e, theme)
             val key = s.keys.first { it.id == "backspace" }
             val f = (key.shape as Shape.Rect).box
@@ -329,7 +347,7 @@ class ContentTest {
         val glyph = key.ops(false).filterIsInstance<Op.Text>().maxOfOrNull { it.size }
         return when (op) {
             is Op.Text -> "${key.id} T ${op.text}" to (op.size * op.scaleX to (op.size == glyph && face < op.size))
-            is Op.Icon -> "${key.id} I ${op.name}" to (op.box.width to false)
+            is Op.Icon -> "${key.id} I ${op.name}" to (op.box.width to (face < op.box.height))
             else -> null
         }
     }
@@ -344,7 +362,11 @@ class ContentTest {
         // both bounds measured, not derived: a change to FIT_SLACK, the marks or the fonts re-measures them)
         val most = 0.042 / d
         if (tall && o - now > most * o) {
-            assertTrue(o - now <= 0.075 / d * o + 1e-6, "$id $o to $now, taller than its face, $at")
+            // icons taller than their faces, ⌫'s two marks side by side on top (上滑 右上, 下滑 左上):
+            // where the face no longer holds them beside it, the icons' class goes to its cap at once (compact
+            // qwerty, 1.5 px a dp, a 14 px face under a 36 px icon), never further
+            val cap = if (" I " in id) KeyMarkYield.MAX_CLASS_SHRINK else 0.075 / d
+            assertTrue(o - now <= cap * o + 1e-6, "$id $o to $now, taller than its face, $at")
             return
         }
         val slack = if (" I " in id) 1.0 + 1e-6 else 0.0
@@ -421,7 +443,7 @@ class ContentTest {
         fun theme(border: String) = ThemeReader.theme(
             testData("material-light.xml").replace("</theme>", "<style select=\"key\" radius=\"0dp\" border=\"$border\"/>\n</theme>"),
         ).ok()
-        fun scene(height: Double) = Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = height, density = d)), theme("1dp #ff112233"))
+        fun scene(height: Double) = Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = height, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft))), theme("1dp #ff112233"))
         assertEquals(setOf("backspace", "delete-sweep"), icons(scene(407.0), "backspace").map { it.name }.toSet(), "at 20%")
         for (height in listOf(420.0, 440.0)) {
             val s = scene(height)
@@ -440,7 +462,7 @@ class ContentTest {
         // size, no larger than theirs (060-render-p2 S4e)
         for (d in listOf(2.0, 2.625, 2.75, 3.5)) for (board in listOf("qwerty", "k14", "k18", "zhuyin-nine", "number", "symbols")) {
             val k = d / Forms.DENSITY
-            val e = Forms.env(board, Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d))
+            val e = Forms.env(board, Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft)))
             val s = Forms.scene(board, e)
             val at = "$board at $d"
             val icons = icons(s, "backspace").associate { it.name to it.box }

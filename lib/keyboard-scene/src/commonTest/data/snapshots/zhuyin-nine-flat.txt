@@ -62,8 +62,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
   sound=delete shortcut="backspace"
   normal
     icon backspace 973,38.5,1036,101.5 #ff7a858a
-    icon delete-sweep 941.78,23.63,970.78,52.63 #ff7a858a
-    icon restore 941.78,87.9,970.78,116.9 #ff7a858a
+    icon delete-sweep 1038.03,23.63,1067.03,52.63 #ff7a858a
+    icon restore 941.78,23.63,970.78,52.63 #ff7a858a
   pressed
     +0 fill rect(936.88,18.38,1072.13,121.63) #1f000000
 key r2c1 kind=function a11y="ˊ"
@@ -301,7 +301,7 @@ key space kind=space role=space a11y="空格，注音"
   normal
     fill rect(393.25,597.88,675.75,666.13 r=7.88,7.88,7.88,7.88) #ffc9ced1
     text "注音" 500,644.8 system 400 34.13 #ff37474f
-    icon cursor-move 382,585,411,614 #ff7a858a
+    icon cursor-move 657,585,686,614 #ff7a858a
   pressed
     +1 fill rect(393.25,597.88,675.75,666.13 r=7.88,7.88,7.88,7.88) #1f000000
 key period kind=function role=period a11y="。"
