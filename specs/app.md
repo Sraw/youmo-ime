@@ -1450,9 +1450,11 @@ the tap's presses, what is typed as it is said) are in ime-core's `input/voice/`
   never comes) and the input is finished. Why endpoints and not the VAD: measured on six sets
   (`voice-eval/seg_app.py`, `ENDPOINTS=1`, 060-voice-tagger.md), endpoint segments are as good after the polish
   (written CER within ±0.5 points either way) and the segments do not wait on the VAD.
-- `VoiceLive` (ime-core) keeps the closed segments and the one being said: joined with 「，」 where neither has a
-  mark, a space between English words, and a segment that starts with a mark (the recognizer's context
-  outliving the reset) ends the one before with it. 语音整理 is always on (no switch; `voice_polish` retired): its
+- `VoiceLive` (ime-core) keeps the closed segments and the one being said: joined with nothing where neither has a
+  mark (a mark at a pause is the tagger's, its after and num heads: the owner's decision 2026-11-10; the tagger's
+  training data, voice-eval `fusion_exp.py`'s `joined`, still has a 「，」 there, retraining is a later task), a
+  space between English words or numbers in digits, and a segment that starts with a mark (the recognizer's context
+  outliving the reset) ends the one before with it, not two marks in a row. 语音整理 is always on (no switch; `voice_polish` retired): its
   `VoicePolishStream` (K = 16, window 64) runs the polish tagger (`VoicePolisher`: ELECTRA-small int8 through
   `OrtModel.runLongs`, `voice/polish-tagger.ort` + `.json`; outputs op, after and num) on the text as it grows,
   freezing each character's three labels once 16 characters follow. Numbers are the tagger's alone: adjacent

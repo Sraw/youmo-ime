@@ -31,10 +31,10 @@ class VoiceLiveTest {
         // no 「，」 before it, nothing of the last in it
         assertEquals("我们走吧", live.closed("我们走吧").whole)
         assertEquals(1, live.closed("好").utterance)
-        assertEquals("我们走吧，好", live.raw)
+        assertEquals("我们走吧好", live.raw)
         // asked twice for the same: once
         live.restart(1)
-        assertEquals("我们走吧，好", live.raw)
+        assertEquals("我们走吧好", live.raw)
     }
 
     @Test
@@ -47,16 +47,26 @@ class VoiceLiveTest {
         assertEquals("好的", live.raw)
         // the next segment as it comes
         live.closed("再见")
-        assertEquals("好的，再见", live.raw)
+        assertEquals("好的再见", live.raw)
     }
 
     @Test
-    fun segmentsJoinedWithAPauseMarkWhereTheyHaveNone() {
+    fun segmentsJoinedWithNothingWhereTheyHaveNoMark() {
         val live = VoiceLive()
         live.closed("今天天气不错")
         live.closed("我们出去走走。")
-        assertEquals("今天天气不错，我们出去走走。", live.raw)
-        assertEquals("今天天气不错，我们出去走走。", live.finish())
+        // a mark at the pause is the tagger's (the owner's decision 2026-11-10): none without it
+        assertEquals("今天天气不错我们出去走走。", live.raw)
+        assertEquals("今天天气不错我们出去走走。", live.finish())
+    }
+
+    @Test
+    fun digitsAcrossAPauseStayOneNumberWhenTheTaggerSaysSo() {
+        // the tagger's number head marks every digit said: one number across the pause, no mark
+        val live = VoiceLive(VoicePolishStream(tags, tagger))
+        live.closed("一二三四五")
+        live.closed("六七")
+        assertEquals("1234567", live.finish())
     }
 
     @Test
@@ -79,14 +89,17 @@ class VoiceLiveTest {
         assertEquals("订了CEP的票，hello", live.heard("hello").text)
         assertEquals("订了CEP的票，hello world", live.heard("hello world").text)
         live.closed("hello world")
-        assertEquals("订了CEP的票，hello world，二零二六年", live.heard("二零二六年").text)
-        assertEquals("订了CEP的票，hello world，二零二六年", live.closed("二零二六年").text)
+        assertEquals("订了CEP的票，hello world二零二六年", live.heard("二零二六年").text)
+        assertEquals("订了CEP的票，hello world二零二六年", live.closed("二零二六年").text)
     }
 
     @Test
     fun englishWordsAcrossSegmentsKeepASpace() {
         assertEquals("hello world", VoiceLive.join("hello", "world"))
-        assertEquals("你好，world", VoiceLive.join("你好", "world"))
+        assertEquals("你好world", VoiceLive.join("你好", "world"))
+        // numbers in digits too: glued, 2026 and 11 would be one
+        assertEquals("2026 11", VoiceLive.join("2026", "11"))
+        assertEquals("你好世界", VoiceLive.join("你好", "世界"))
         assertEquals("hello。你好", VoiceLive.join("hello。", "你好"))
         assertEquals("你好", VoiceLive.join("", "你好"))
         assertEquals("你好", VoiceLive.join("你好", ""))

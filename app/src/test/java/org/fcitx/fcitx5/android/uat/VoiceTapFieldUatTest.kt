@@ -37,7 +37,7 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         h.start()
         val first = h.field
         tapMic()
-        voice.heard("你好")
+        voice.heard("你好，")
         h.advance(100)
         // another field tapped while it talks
         h.start()
@@ -59,10 +59,10 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         allowMicrophone()
         h.start(MULTI_LINE)
         tapMic()
-        voice.heard("今天天气")
-        voice.heard("很好")
+        voice.heard("今天天气，")
+        voice.heard("很好，")
         h.advance(100)
-        assertEquals("今天天气，很好", text())
+        assertEquals("今天天气，很好，", text())
         voice.held = true
         voice.said += "我们走吧"
         h.hide()
@@ -87,8 +87,8 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         h.start(MULTI_LINE)
         val first = h.field
         tapMic()
-        voice.heard("今天天气")
-        voice.heard("很好")
+        voice.heard("今天天气，")
+        voice.heard("很好，")
         h.advance(100)
         voice.held = true
         voice.said += "我们走吧"
@@ -98,13 +98,13 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         // another field before it is recognized: what was heard goes into the first as it is left
         h.start()
         h.advance(100)
-        assertEquals("今天天气，很好", first.text.toString())
+        assertEquals("今天天气，很好，", first.text.toString())
         assertEquals("", text())
         assertFalse(talking)
         // what was still to be heard does not come late, into either
         voice.release()
         h.advance(500)
-        assertEquals("今天天气，很好", first.text.toString())
+        assertEquals("今天天气，很好，", first.text.toString())
         assertEquals("", text())
         assertEquals(1, voice.closes)
     }
@@ -115,8 +115,8 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         allowMicrophone()
         h.start(MULTI_LINE)
         tapMic()
-        voice.heard("今天天气")
-        voice.heard("很好")
+        voice.heard("今天天气，")
+        voice.heard("很好，")
         h.advance(100)
         voice.held = true
         voice.said += "我们走吧"
@@ -142,7 +142,7 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         allowMicrophone()
         h.start(MULTI_LINE)
         tapMic()
-        voice.heard("今天天气")
+        voice.heard("今天天气，")
         voice.hearing("很好")
         h.advance(100)
         val mask = mask()!!
@@ -165,10 +165,10 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         allowMicrophone()
         h.start(MULTI_LINE, fieldId = 7)
         tapMic()
-        voice.heard("今天天气")
-        voice.heard("很好")
+        voice.heard("今天天气，")
+        voice.heard("很好，")
         h.advance(100)
-        assertEquals("今天天气，很好", text())
+        assertEquals("今天天气，很好，", text())
         // the app restarts input in it (a WebView's field, an app's restartInput): a new EditorInfo
         h.restart()
         h.advance(100)
@@ -190,8 +190,8 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         allowMicrophone()
         h.start(MULTI_LINE)
         tapMic()
-        voice.heard("今天天气")
-        voice.heard("很好")
+        voice.heard("今天天气，")
+        voice.heard("很好，")
         h.advance(100)
         voice.held = true
         voice.stuck = true
@@ -199,7 +199,7 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         // the recognizer never back, the tail cut no matter: 15 s and given up
         tapMic()
         h.advance(15_100)
-        assertEquals("今天天气，很好", text())
+        assertEquals("今天天气，很好，", text())
         assertEquals(-1 to -1, composing())
         assertTrue(shown().toString(), string(R.string.voice_tap_cut_short) in shown())
         assertFalse(talking)

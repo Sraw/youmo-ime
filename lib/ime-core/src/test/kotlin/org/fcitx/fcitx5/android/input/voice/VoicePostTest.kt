@@ -12,7 +12,7 @@ class VoicePostTest {
     @Test
     fun stretchesAreCleanedAndJoinedAsAHoldTypesThem() {
         val raw = listOf("嗯。", "订了 C E P 的票，", "hello", "world", "二零二六年")
-        assertEquals("订了CEP的票，hello world，二零二六年", VoicePost.text(raw.map { VoicePost.Stretch(it) }))
+        assertEquals("订了CEP的票，hello world二零二六年", VoicePost.text(raw.map { VoicePost.Stretch(it) }))
     }
 
     @Test

@@ -7,11 +7,13 @@ package org.fcitx.fcitx5.android.input.voice
 /**
  * What one talk shows and types as streaming recognition goes (060-voice-tagger.md §4.2, §5.1):
  * the segments the recognizer's endpoints closed, each its chosen text ([VoiceChoice]), then the
- * one being said, joined as the tagger was measured on (voice-eval `fusion_exp.py`'s `joined`: a
- * segment ending in no mark of its own gets a 「，」, except between two English words, which keep
- * a space), polished as it streams ([polish]: marks, numbers in digits; none if the tagger did not load,
+ * one being said, joined with nothing between them ([join]: a space between two English words or
+ * numbers, the recognizer's own marks kept), polished as it streams ([polish]: marks, numbers in digits; none if the tagger did not load,
  * the text then typed as recognised), then cleaned ([VoiceText.clean]: no spaces in Chinese). The field's end mark ([VoiceEnd]) is
  * the caller's. The rules come after the tagger: it was trained and measured on the recognizer's text.
+ * Where a pause has no mark is the tagger's to say (its after and number heads), not a rule's: the
+ * owner's decision 2026-11-10. Its training data (voice-eval `fusion_exp.py`'s `joined`) still puts
+ * a 「，」 there; training it on segments joined with nothing is a later task.
  *
  * Not thread-safe: one thread, the recognizer's, as the tagger runs in [heard] and [closed].
  */
@@ -139,7 +141,11 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
             return if (whole.regionMatches(0, fixed, 0, end)) end else 0
         }
 
-        /** [after] following [before], as the tagger's input had segments one after another. */
+        /**
+         * [after] following [before], one segment after another, with nothing between: a mark at a
+         * pause is the tagger's. Two English words or numbers keep a space, or they would be one
+         * word (「hello」「world」, 「2026」「11」).
+         */
         fun join(before: String, after: String): String = when {
             before.isEmpty() -> after
             after.isEmpty() -> before
@@ -148,7 +154,7 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
             after.first() in MARKS -> before.trimEnd { it in MARKS } + after
             before.last() in MARKS -> before + after
             before.last().isAsciiWord() && after.first().isAsciiWord() -> "$before $after"
-            else -> "$before，$after"
+            else -> before + after
         }
 
         private fun Char.isAsciiWord() = this < '\u0080' && isLetterOrDigit()

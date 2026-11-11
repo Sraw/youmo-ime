@@ -144,9 +144,9 @@ class VoiceHoldUatTest {
         h.emit(HostEvent.InputMethodChanged(english))
         h.advance(100)
         val f = holdSpace()
-        voice.heard("你好")
+        voice.heard("你好，")
         h.advance(100)
-        assertEquals(0 to 2, composing())
+        assertEquals(0 to 3, composing())
         voice.said += "世界。"
         f.lift()
         assertEquals("你好，世界。", text())
@@ -234,8 +234,8 @@ class VoiceHoldUatTest {
         assertEquals(0 to 4, composing())
         voice.said += "很好。"
         f.lift()
-        // the segments joined with a pause mark where they have none (VoiceLive)
-        assertEquals("今天天气，很好。", text())
+        // the segments joined with nothing where they have no mark: one there is the tagger's (VoiceLive)
+        assertEquals("今天天气很好。", text())
         assertEquals(-1 to -1, composing())
     }
 
@@ -247,7 +247,7 @@ class VoiceHoldUatTest {
         h.start(MULTI_LINE, fieldId = 7)
         for (restarted in listOf(false, true)) {
             val f = holdSpace()
-            voice.heard("今天天气")
+            voice.heard("今天天气，")
             h.advance(100)
             h.field.text.clear()
             if (restarted) h.restart()
@@ -267,7 +267,7 @@ class VoiceHoldUatTest {
         allowMicrophone()
         h.start(MULTI_LINE, fieldId = 7)
         val f = holdSpace()
-        voice.heard("今天天气")
+        voice.heard("今天天气，")
         h.advance(100)
         h.restart()
         h.advance(100)
@@ -283,14 +283,14 @@ class VoiceHoldUatTest {
         allowMicrophone()
         h.start(MULTI_LINE)
         val f = holdSpace()
-        voice.heard("今天天气")
+        voice.heard("今天天气，")
         h.advance(100)
         // the tail never recorded, and a cut not answered either: 15 s and given up
         voice.held = true
         voice.stuck = true
         f.lift()
         h.advance(15_100)
-        assertEquals("今天天气", text())
+        assertEquals("今天天气，", text())
         assertTrue(shown().toString(), string(R.string.voice_tap_cut_short) in shown())
     }
 
@@ -546,7 +546,7 @@ class VoiceHoldUatTest {
         h.start()
         val first = h.field
         val f = holdSpace()
-        voice.heard("你好")
+        voice.heard("你好，")
         h.advance(100)
         h.start()
         h.advance(500)
@@ -584,7 +584,7 @@ class VoiceHoldUatTest {
         allowMicrophone()
         h.start()
         val f = holdSpace()
-        voice.heard("你好")
+        voice.heard("你好，")
         h.advance(100)
         // as a device's: detaching the old view cancels the touch it held before anything under it
         // hears of the detach (ViewGroup.removeViewInternal: cancelTouchTarget, then detached). The
@@ -622,7 +622,7 @@ class VoiceHoldUatTest {
         allowMicrophone()
         h.start()
         val f = holdSpace()
-        voice.heard("你好")
+        voice.heard("你好，")
         h.advance(100)
         h.hide()
         h.advance(500)
@@ -659,7 +659,7 @@ class VoiceHoldUatTest {
         h.start()
         val first = h.field
         val f = holdSpace()
-        voice.heard("你好")
+        voice.heard("你好，")
         val up = h.keyboard.height / h.service.resources.displayMetrics.density * 0.4f
         f.move(h.at(space, dy = -up))
         h.start()
