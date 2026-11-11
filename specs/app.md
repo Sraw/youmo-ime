@@ -1557,6 +1557,10 @@ the tap's presses, what is typed as it is said) are in ime-core's `input/voice/`
 - The end mark: `VoiceEnd` (ime-core) by the field (`EditorTraits.sends`, `isMultiLine`, `isShortMessage`, a chat
   app's multi-line field) and 语音句末句号 (`keyboard.voiceEndMark`): a one-line field takes no end mark, a chat no
   「。」, anything else as said. Applied at the commit only; the composing text shows it as said.
+- The recognizer runs on 3 threads: a 1.92 s chunk took 228 ms on 2, 182 on 3, 160 on 4 on a Snapdragon 845
+  (voice-eval `bench/stream_bench`), 3 leaving a big core to the UI. Debug line at the end, numbers only:
+  `voice timing:` (first text shown from the first sample not zero; from the stop: the microphone closed, the
+  backlog drained, the tail decoded, the polish, the homophones, what was said).
 - Debug line at the recognizer's end: `voice segments: speechStart=` (the first token's frame, from the opening)
   `segments=` (closed with something in them), for the UAT's lift offset (VO-23/24).
 
