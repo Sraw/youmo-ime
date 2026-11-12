@@ -471,6 +471,35 @@ What holds the library to the app:
 - `node web/theme-maker/dev/serve.mjs` serves `dev/engine.html`, a preview of any board, theme,
   size and form drawn by the engine; development only, never published.
 
+## The keys' golden table (060-keys-unify)
+
+Every key's long press, first and marks on every keyboard is one reviewed table,
+`lib/ime-core/src/test/resources/keys-golden.tsv`: columns `keyid variant state items first up down`; in `items` a
+bare text is `AsKey`, a `=` suffix `AsIs`, `#N` `Keypad(N)`, `@action` an `Action`, the row and the symbols split by `|`.
+The variants are pinyin, 双拼 (自然码, 微软) and English × full, nine, 14, 18, a theme's own groups (the k17 example),
+both 注音, handwriting, a table, the number pad, the symbol picker, emoji, kaomoji, emoji search and the expanded
+candidates; the states default, Shift, a table's roots, full-width and half-width punctuation, password, url.
+
+- Made once: before the resolver, a throwaway export test on the old code wrote what each key did then,
+  `keys-before.tsv` (kept in `dev/`, not committed with its test); the resolver wrote `keys-golden.tsv`; the two were
+  diffed and every difference tied in the commit message to the design's D1–D9 / I1–I18. A later change to the
+  golden table says why in its commit message.
+- `KeyResolverGoldenTest` (ime-core) holds the resolver to it; app `KeysEverywhereUatTest` holds what the keyboards
+  really pop up and draw to it (not to the resolver, so it is not the resolver checked against itself).
+- `GeneratorParityTest` (app test sources) held the long-press generators moved into keyboard-scene `keys/` to the old
+  ones key by key while both existed; it went with the old code in S6.
+- The format and the migration: `KeyListsFormatTest` (every rule of the grammar), `KeyIdRoundTripTest` (every name the
+  built-in layouts and the k17 example give, and odd orphan names, through `serialize → parse`), `KeyListsWithTest`
+  (when a line is dropped), `KeyListsMigrationTest` (0.5.2, beta1, beta2 prefs in
+  `lib/ime-core/src/test/resources/keys-migration/`, twice the same), app `KeyListsUpgradeTest` (the
+  `uat/fixtures/upgrade/` backups imported, restarted, reset, and before the first unlock).
+- The web page and the app agree: keyboard-scene `DefaultMarksTest` compares `DefaultMarks.of` for every built-in
+  layout with `src/commonTest/data/default-marks/<layout>.json` on the JVM and in node (recorded with
+  `-Psnapshots.record=true`); app `DefaultMarksMatchAppTest` holds `KeyResolver.marks` with no user settings to the same json.
+- Lint: keyboard-scene `BuiltInLayoutLintTest` reads only the built-in `layouts/` (a theme's own layouts may keep the
+  old attributes): no `swipe-up`/`alt` on a character key, no `<popup>`/`long-press`/`swipe-up` on a function key, no
+  `mark="false"` but on the address keys, a `shortcut=` on every editable key that `KeyId.of` reads.
+
 ## Golden files from upstream fcitx
 
 The host is fcitx ported to Kotlin, and the native sources are not in the tree. What fcitx does is kept
