@@ -9,11 +9,15 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
+import org.fcitx.fcitx5.android.input.keys.First
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.shortcut.SwipeMigration
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.ui.main.settings.PopupOverridesFragment
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.rules.ExternalResource
@@ -43,8 +47,19 @@ class PrefsRule : ExternalResource() {
     fun <T : Any> set(pref: ManagedPreference<T>, value: T) {
         val was = pref.getValue()
         restore += { pref.setValue(was) }
-        // an old long press as its page stores it, `key_lists` removed with it (read migrated till S5's pages); put back after
-        if (pref.key in OLD_LONG_PRESS && value is String) AppPrefs.getInstance().setOldLongPress(pref.key, value) else pref.setValue(value)
+        pref.setValue(value)
+    }
+
+    /**
+     * A key's long press set as 按键字符和快捷键 sets it (`key_lists`, 060-keys-unify): by its name (`full/q`, `t9/2`,
+     * `fn/comma`; KeyId.of), its [symbols] above the built-in row, its [first] (the swipe's, the corner's) the default's
+     * unless given, or [off]; the other keys as they are. The store is put back after the test, key_lists with it.
+     */
+    fun setList(name: String, symbols: List<String> = emptyList(), first: String? = null, off: Boolean = false) {
+        val pref = AppPrefs.getInstance().internal.keyLists
+        val list = if (off) UserList.Off else UserList(off = false, symbols = symbols, first = first?.let(First::Literal) ?: First.Default)
+        // as stored, none left out as a default: a list turned off is kept where no default is told here
+        set(pref, KeyLists.of((KeyLists.parse(pref.getValue())?.lists.orEmpty()) + (KeyId.of(name) to list)).serialize())
     }
 
     /**
@@ -77,6 +92,9 @@ class PrefsRule : ExternalResource() {
         set(AppPrefs.getInstance().keyboard.swipeUp, up)
         set(AppPrefs.getInstance().keyboard.swipeDown, down)
     }
+
+    /** [key] stored as [value] as it is, of no setting this version declares (0.5's long presses): put back after the test. */
+    fun setStored(key: String, value: String) = store.edit().putString(key, value).commit()
 
     /** Something else a test changed that outlives it, put back with the prefs. */
     fun later(undo: () -> Unit) {
@@ -113,9 +131,5 @@ class PrefsRule : ExternalResource() {
             }
         }
         if (changed) e.commit()
-    }
-
-    private companion object {
-        val OLD_LONG_PRESS = setOf(AppPrefs.POPUP_OVERRIDES, AppPrefs.KEY_POPUPS, AppPrefs.T9_SYMBOLS)
     }
 }

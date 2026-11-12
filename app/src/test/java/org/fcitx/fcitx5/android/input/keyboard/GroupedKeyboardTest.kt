@@ -41,15 +41,7 @@ class GroupedKeyboardTest {
 
     private val context = RuntimeEnvironment.getApplication()
 
-    // what each letter's long press offers here: a symbol, a digit, a letter, and one corner
-    private val layout = GroupedKeyboard.layout(NineKeyLetters.G14) { letter ->
-        when (letter) {
-            "q" -> listOf("1", "Q", "%")
-            "w" -> listOf("2", "W", "%", "^")
-            "b" -> listOf("@", "&")
-            else -> emptyList()
-        }
-    }
+    private val layout = GroupedKeyboard.layout(NineKeyLetters.G14)
 
     private fun key(face: String) = layout.flatten().single { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == face }
 
@@ -58,7 +50,6 @@ class GroupedKeyboardTest {
     @After
     fun prefsAtTheirDefaults() {
         AppPrefs.getInstance().keyboard.showLangSwitchKey.let { it.setValue(it.defaultValue) }
-        AppPrefs.getInstance().internal.popupOverrides.let { it.setValue(it.defaultValue) }
     }
 
     @Test
@@ -100,21 +91,6 @@ class GroupedKeyboardTest {
         assertEquals(keypad(0), swipe("L"))
         assertEquals(KeyAction.HostKeyAction("@"), swipe("BN"))
         assertEquals(KeyAction.HostKeyAction("?"), swipe("M"))
-    }
-
-    @Test
-    fun theLongPressIsARowOfTheLettersAroundTheCornerWithSymbolsAbove() {
-        val qw = key("QW").popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().single()
-        // digits, letters and duplicates left out of the symbols
-        assertEquals(listOf("Q", "W", "1", "q", "w", "%", "^"), qw.items.toList())
-        assertEquals(5, qw.symbolsFrom)
-        assertEquals(2, qw.inRow)
-        // the corner already in the row is not offered again
-        val bn = key("BN").popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().single()
-        assertEquals(listOf("B", "N", "@", "b", "n", "&"), bn.items.toList())
-        val m = key("M").popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().single()
-        assertEquals(listOf("M", "?", "m"), m.items.toList())
-        assertEquals(1, m.inRow)
     }
 
     @Test
@@ -223,20 +199,6 @@ class GroupedKeyboardTest {
         // an address's keys commit as they are, and say so
         keyboard.address = AddressKeys.URL
         assertEquals(".", keyboard.shownKeyWithId(R.id.button_dot)!!.label)
-    }
-
-    @Test
-    fun theLongPressIsReadAsItOpensFromTheUsersKeys() {
-        val keyboard = GroupedKeyboard(context, TestThemes.PixelDark).laidOut()
-        val shown = ArrayList<PopupAction>()
-        keyboard.popupActionListener = PopupActionListener { shown += it }
-        val qw = keyboard.shownKey("QW")
-        // changed after the keyboard was made
-        AppPrefs.getInstance().internal.popupOverrides.setValue("q % ^\nw &")
-        val built = key("QW").popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().single()
-        keyboard.onPopupAction(PopupAction.ShowKeyboardAction(qw.ref(), built, Rect()))
-        val opened = (shown.single() as PopupAction.ShowKeyboardAction).keyboard as KeyDef.Popup.Keyboard.Explicit
-        assertEquals(listOf("Q", "W", "1", "q", "w", "%", "^", "&"), opened.items.toList())
     }
 
     private companion object {

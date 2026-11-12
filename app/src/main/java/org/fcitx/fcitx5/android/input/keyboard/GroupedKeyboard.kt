@@ -28,16 +28,14 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
-import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
 import org.fcitx.fcitx5.android.input.scene.KeyRef
-import org.fcitx.fcitx5.android.input.scene.SceneAction
-import org.fcitx.fcitx5.android.input.scene.SceneBehavior
 import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
@@ -89,7 +87,7 @@ class GroupedKeyboard private constructor(
     builtInSemicolon: Boolean,
     private val grouping: Grouping,
 ) : BaseKeyboard(
-    context, theme, layout(builtIn, builtInWire, builtInSemicolon, ::symbolsOf),
+    context, theme, layout(builtIn, builtInWire, builtInSemicolon),
     themeBoard = shapeOf(builtIn).board,
 ) {
 
@@ -158,13 +156,6 @@ class GroupedKeyboard private constructor(
             }
         }
 
-        // iFlytek's corners, a group each in order
-        internal val CORNERS = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "~", "!", "@", "?")
-
-        // the 18 keys' as the 14's: the digits from the top row on (8 9 0 on the second, a candidate
-        // each), marks after them; the 14 keys' four on the third row
-        internal val CORNERS18 = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "(", ")", "-", "~", "!", "@", "?", ":")
-
         private const val SIDE = 0.15f
 
         /**
@@ -174,9 +165,9 @@ class GroupedKeyboard private constructor(
         private class Shape(val rows: List<Int>, val widths: List<Float>, val corners: List<String>, val board: String, val preset: String)
 
         private fun shapeOf(letters: NineKeyLetters) = when (letters) {
-            NineKeyLetters.G14 -> Shape(listOf(5, 5, 4), listOf(0.2f, 0.2f, 0.175f), CORNERS, KeyNames.K14, KeyShortcutPreset.GROUPED14)
+            NineKeyLetters.G14 -> Shape(listOf(5, 5, 4), listOf(0.2f, 0.2f, 0.175f), KeyDefaults.CORNERS14, KeyNames.K14, KeyShortcutPreset.GROUPED14)
             // seven on top as wide as each other, six under them, five between the separator and backspace
-            NineKeyLetters.G18 -> Shape(listOf(7, 6, 5), listOf(1f / 7, 1f / 6, 0.14f), CORNERS18, KeyNames.K18, KeyShortcutPreset.GROUPED18)
+            NineKeyLetters.G18 -> Shape(listOf(7, 6, 5), listOf(1f / 7, 1f / 6, 0.14f), KeyDefaults.CORNERS18, KeyNames.K18, KeyShortcutPreset.GROUPED18)
             else -> error("no grouped keyboard of ${letters.tag()}")
         }
 
@@ -213,50 +204,16 @@ class GroupedKeyboard private constructor(
             }
         }
 
-        /**
-         * What the full keyboard's long press of [letter] offers besides letters and digits, as the
-         * user changed it: the long press's rows above a group's own.
-         */
-        internal fun symbolsOf(letter: String): List<String> =
-            PopupOverridesCache.user.current.longPressOf(letter).orEmpty().toList()
-
-        /** The corner a group key of [node] swipes (its keypad digit, its mark as typed: ~, not the ～ drawn). */
-        internal fun cornerOf(node: KeyNode): String =
-            node.actions["swipe-up"]?.let(SceneAction::of)?.let(SceneBehavior::typed).orEmpty()
-
-        /**
-         * [group]'s long press: Q W 1 q w, the [corner] under the finger; above, its letters'
-         * symbols ([symbolsOf]) but the corner and any letter or digit.
-         */
-        internal fun longPressOf(group: String, corner: String, symbolsOf: (String) -> List<String>): KeyDef.Popup.Keyboard.Explicit {
-            // ;'s capital is :, as Shift gives it: no second ; beside the lower one
-            val upper = group.map { if (it == ';') ":" else it.uppercase() }
-            val lower = group.map { it.toString() }
-            val symbols = group.flatMap { symbolsOf(it.toString()) }
-                .filter { s -> s != corner && s !in upper && s.none { it.isLetterOrDigit() } }
-                .distinct()
-            // a key of no corner (a layout's own that swipes nothing): Q W q w, its first lower case letter under the finger
-            val corners = if (corner.isEmpty()) emptyList() else listOf(corner)
-            return KeyDef.Popup.Keyboard.Explicit(
-                (upper + corners + lower + symbols).toTypedArray(),
-                symbolsFrom = corners.size + 2 * group.length,
-                inRow = group.length,
-            )
-        }
-
         // named by its place ([name], r1c1…): the same key whatever letters a scheme puts on it
         @Suppress("LongParameterList")
-        private fun groupKey(form: String, group: String, code: Char, corner: String, width: Float, symbolsOf: (String) -> List<String>, wire: (Char) -> Int, name: String): KeyDef {
+        private fun groupKey(form: String, group: String, code: Char, corner: String, width: Float, wire: (Char) -> Int, name: String): KeyDef {
             return KeyDef(
                 KeyDef.Appearance.AltText(displayText = group.uppercase(), altText = corner, textSize = 20f, percentWidth = width),
                 setOf(
                     KeyDef.Behavior.Press(code(code, wire)),
                     KeyDef.Behavior.Swipe(corner(corner)),
                 ),
-                arrayOf(
-                    KeyDef.Popup.AltPreview(group.uppercase(), corner),
-                    longPressOf(group, corner, symbolsOf),
-                ),
+                arrayOf(KeyDef.Popup.AltPreview(group.uppercase(), corner)),
                 name = name,
                 // its letters, a `;` of 18's L; left off or not
                 shortcut = KeyShortcuts.charKey(form, group.lowercase().replace(";", "")),
@@ -271,17 +228,17 @@ class GroupedKeyboard private constructor(
             letters.tag().split(',').map { if (semicolon) it else it.replace(";", "") }
 
         /**
-         * The keys: [letters]' groups in their rows, each with its corner and long press ([symbolsOf] a
-         * letter's symbols), sent as [wire] has them; a group's `;` left off but with [semicolon].
+         * The keys: [letters]' groups in their rows, each with its corner (their names, the images a theme
+         * gives them: the scene draws and wires the keys), sent as [wire] has them; a group's `;` left off but with [semicolon].
          */
-        internal fun layout(letters: NineKeyLetters, wire: (Char) -> Int = Char::code, semicolon: Boolean = true, symbolsOf: (String) -> List<String>): List<List<KeyDef>> {
+        internal fun layout(letters: NineKeyLetters, wire: (Char) -> Int = Char::code, semicolon: Boolean = true): List<List<KeyDef>> {
             val groups = groupsOf(letters, semicolon)
             val shape = shapeOf(letters)
             val first = shape.rows.runningFold(0, Int::plus)
             fun row(r: Int) = (first[r] until first[r + 1]).map {
                 groupKey(
                     shape.preset,
-                    groups[it], letters.codes[it], shape.corners[it], shape.widths[r], symbolsOf, wire, "r${r + 1}c${it - first[r] + 1}",
+                    groups[it], letters.codes[it], shape.corners[it], shape.widths[r], wire, "r${r + 1}c${it - first[r] + 1}",
                 )
             }
             return listOf(
@@ -372,24 +329,10 @@ class GroupedKeyboard private constructor(
         place.takeIf { it >= 0 }?.let(letters.codes::get)
     }
 
-    // the group and corner of the key [ref] whose long press is its letters' (no popup written, or from="group"):
-    // by its node's letters= and swipe; null for one whose layout wrote its own (060-render-p3 T9b)
-    private fun groupOf(ref: KeyRef): Pair<String, String>? =
-        canvas?.keyAt(ref.id, if (ref.copy) 1 else 0)?.takeIf { n -> n.popup.let { it == null || it.from == "group" } }?.let(::groupOfNode)
-
-    private fun groupOfNode(node: KeyNode): Pair<String, String>? = node.letters?.let { shown(it.group) to cornerOf(node) }
-
-    // a group's letters as its key shows them: pinyin's 18 keys' L without the `;` the engine reads it by
-    private fun shown(group: String) = if (semicolon) group else group.replace(";", "")
-
-    // a group key's (letters=) code and long press (060-render-v2 §15): the code of the engine's group its
-    // first letter is in, sent as [wire] has it (a tap's place added by [pressed]); its letters around its
-    // corner, made again as it opens ([onPopupAction])
+    // a group key's (letters=) code (060-render-v2 §15): the code of the engine's group its first letter is in,
+    // sent as [wire] has it (a tap's place added by [pressed]); its long press the resolver's, by its name
     override val sceneTable = object : SceneKeyDef.Table {
         override fun group(letters: String, node: KeyNode): KeyAction? = codeOf(letters, node.id)?.let { code(it, wire) }
-
-        override fun groupPopup(letters: String, node: KeyNode): KeyDef.Popup.Keyboard =
-            longPressOf(shown(letters), cornerOf(node), ::symbolsOf)
     }
 
     private var punctuationMapping: Map<String, String> = emptyMap()
@@ -403,16 +346,12 @@ class GroupedKeyboard private constructor(
         canvas?.invalidateScene()
     }
 
-    // the long press made as it opens, from the user's 「按键字符」 as they are now, as the full keyboard's Preset is;
-    // public for its test, which has no touch to open one
+    // the bubbles as the letters' case and the punctuation have them; public for its test, which has no touch to open one
     public override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = previewOf(cased(action.content), action.key, { it }, ::mapped))
             // a swipe's shortcut named (words) shows as the user named it: the case rule is the letters'
             is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(if (action.words) action.content else cased(action.content), action.key, { it }, ::mapped))
-            is PopupAction.ShowKeyboardAction -> groupOf(action.key)?.let { (group, corner) ->
-                action.copy(keyboard = longPressOf(group, corner, ::symbolsOf))
-            } ?: action
             else -> action
         }
         super.onPopupAction(shown)
@@ -471,6 +410,8 @@ class GroupedKeyboard private constructor(
             holdVoice = holdsToTalk,
         )
         val texts = Texts(
+            // the corners as said (Texts.alts by key name)
+            alts = keyReadings(layout),
             imeName = shownImeName.orEmpty(),
             letterCase = letterCase.case,
             comma = mapped(","),

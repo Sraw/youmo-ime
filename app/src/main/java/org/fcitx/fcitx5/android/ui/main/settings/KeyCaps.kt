@@ -26,14 +26,15 @@ import org.fcitx.fcitx5.android.input.keyboard.firstShown
 import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
 import org.fcitx.fcitx5.android.input.keyboard.swipeWays
 import org.fcitx.fcitx5.android.input.keys.KeyResolver
-import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.utils.styledColor
 import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
@@ -89,18 +90,25 @@ object KeyCaps {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             // the key's one name, as the layouts' (a function key's `fn/comma`)
             val id = shortcut?.name?.let(KeyId::of)
+            // a cap of no key's name with a hint (九键's letters' digits): the hint its first's mark, as a key's first is
+            // drawn (no layout's corner drawn any more, 060-keys-unify S6)
+            val cap = HINT_CAP.takeIf { id == null && hint.isNotEmpty() }
             attrs = KeyAttrs(
                 label = SceneText.Literal(text),
                 alt = hint.takeIf { it.isNotEmpty() }?.let(SceneText::Literal),
                 kind = if (id?.isFunction == true) "function" else "letter",
-                shortcut = id?.name,
+                shortcut = id?.name ?: cap,
             )
             states = setOfNotNull(KeyState.Selected.takeIf { selected })
             // the label the keyboard's, shrunk as the cap is to its key, its marks where they are there (060-pending-decisions);
             // a shortcut's key the keyboard's very key, made on its board at the keys' size, every key of the board
             // with its marks, as a mark class is sized over them all (060-render-p2 S7a)
             onBoard(ctx, shortcut, shortcut?.let { if (it.layout != null) board(ctx, it.name, it.layout) else board(ctx, it.name) })
+            if (cap != null) marks = marks.copy(shortcuts = marks.shortcuts + ("$cap:${if (marks.firstUp) "up" else "down"}" to MarkContent.Symbol(hint)))
         }
+
+    // the name a hinted cap's first is drawn by: no key's (KeyId's forms), a character key's
+    private const val HINT_CAP = "cap/hint"
 
     /**
      * [shortcut]'s key made on [board] (none: the key alone) at the keyboard's key height, its marks as the
@@ -146,10 +154,9 @@ object KeyCaps {
      */
     fun board(ctx: Context, shortcut: String, layout: String = defaultBoard(shortcut)): SceneKeyCell.Board {
         val size = SwipeFates.size(upright(ctx), layout, CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT)
-        // the letters' corners as the keyboard draws them (TextKeyboard.alts: the long presses' firsts, the user's
-        // overrides; none where the first's way draws nothing): without them no symbol is drawn, nor does one take a mark's room
-        val resolver = if (firstShown()) resolver(ctx, layout) else null
-        val alts = if (resolver == null) emptyMap() else SceneLetters.alts { c -> resolver.resolve(KeyId("full/$c"), keysState()).firstShown }
+        // the corners as the keyboard says them (BaseKeyboard.keyReadings: the long presses' firsts, the user's; none where the
+        // first's way draws nothing); the marks drawn are the resolver's (onBoard)
+        val alts = if (firstShown()) resolver(ctx, layout)?.readings(keysState()).orEmpty() else emptyMap()
         return SceneKeyCell.Board(layout, KeyId.of(shortcut).name, size.width, size.height, alts,
             AppPrefs.getInstance().keyboard.letterCase.getValue().case, size.floating, size.split)
     }

@@ -63,7 +63,7 @@ class ExpandTest {
     @Test
     fun bindings() {
         val texts = Texts(imeName = "拼音", comma = "，", period = "。", returnLabel = "发送", keepUppercase = false,
-            alts = mapOf("q" to "!"), punctuation = mapOf("?" to "？"), other = mapOf("zhuyin-group:1" to "ㄅ"))
+            alts = mapOf("full/q" to "!"), punctuation = mapOf("?" to "？"), other = mapOf("zhuyin-group:1" to "ㄅ"))
         val e = env.copy(texts = texts)
         assertEquals("q", Expand.text(Text.Binding("case", "q"), e))
         assertEquals("Q", Expand.text(Text.Binding("case", "q"), e.copy(shift = Shift.Once)))

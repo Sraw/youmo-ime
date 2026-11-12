@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene.engine
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problems
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Gap
@@ -124,7 +125,7 @@ object Expand {
 
     private fun key(key: Key, attrs: KeyAttrs, env: Env): ExpandedKey {
         val label = attrs.label?.let { text(it, env) }
-        val alt = attrs.alt?.let { text(it, env) }?.takeIf { it.isNotEmpty() }
+        val alt = reading(attrs, env)
         return ExpandedKey(
             key, attrs, label, alt,
             attrs.icon?.let { icon(it, env) },
@@ -132,6 +133,19 @@ object Expand {
             attrs.a11y?.let { text(it, env) } ?: spoken(attrs, key.letters != null, heard(attrs, label, env), alt, env.texts),
             attrs.alt?.let(::written),
         )
+    }
+
+    // the corner a screen reader says: a named key's long press's first as drawn, by its name ([Texts.alts], 060-keys-unify
+    // §3.4: the user's, not a theme's `alt=` they changed; none there, none said); a key of no name, or no readings
+    // given (the theme maker), its layout's `alt=`. A character key of `mark="false"` draws no symbol (Content.ways): none said
+    private fun reading(attrs: KeyAttrs, env: Env): String? {
+        val alts = env.texts.alts
+        val name = attrs.shortcut
+        if (alts != null && name != null) {
+            if (attrs.mark == false && !KeyId(name).isFunction) return null
+            return alts[name]?.takeIf { it.isNotEmpty() }
+        }
+        return attrs.alt?.let { text(it, env) }?.takeIf { it.isNotEmpty() }
     }
 
     // the label a screen reader is given: as following Shift shows it, whatever 拼音键字母大小写 draws (the key's
@@ -186,7 +200,9 @@ object Expand {
             "root" -> texts.other["root:$arg"]?.takeIf { it.isNotEmpty() } ?: cased(arg, env)
             // a 14/18 键 key's letters: capitals with no Shift to follow, unless the setting says otherwise
             "group" -> LetterCaseRule.shown(arg, LetterCaseRule.upper(texts.letterCase, env.shift, shiftless = true))
-            "alt" -> texts.alts?.get(arg).orEmpty()
+            // a full keyboard letter's first ([Texts.alts] by its name): no built-in layout binds it any more (060-keys-unify
+            // S6), a theme's own written before still reads
+            "alt" -> texts.alts?.get("full/$arg").orEmpty()
             // each character as punctuation maps it: 九键 1's run `,.?!` as it types
             "punct" -> arg.map { c -> c.toString().let { texts.punctuation[it] ?: it } }.joinToString("")
             "comma" -> texts.comma

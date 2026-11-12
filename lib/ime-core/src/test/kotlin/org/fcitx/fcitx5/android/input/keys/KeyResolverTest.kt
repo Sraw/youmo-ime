@@ -191,4 +191,26 @@ class KeyResolverTest {
         assertEquals(DefaultMarks.shortcuts(layout("qwerty"), fragments), m.shortcuts)
         assertFalse(r.marks(KeyState(roots = { null })).charShortcuts)
     }
+
+    // what a screen reader says of a key's corner: its first as drawn, only where a way draws it (060-keys-unify §3.4)
+    @Test
+    fun theReadingsAreTheFirstsTheWaysDraw() {
+        val r = resolver("qwerty", Form.Full)
+        val read = r.readings(zh)
+        assertSame(read, r.readings(zh))
+        assertEquals("1", read["full/q"])
+        assertEquals("@", read["full/a"])
+        // as Chinese punctuation shows it
+        assertEquals("～", r.readings(zh.copy(punctuation = zh.punctuation + ("~" to "～")))["full/n"])
+        // ， has a first, but no way draws it: nothing said
+        assertNull(read["fn/comma"])
+        assertNull(read["fn/space"])
+        // q's up a command: its first nowhere drawn, nothing said; set again to the first, said
+        val command = resolver("qwerty", Form.Full, slots = SwipeSlots.Default.with("full/q", up = true, SwipeSlot.Empty))
+        assertNull(command.readings(zh)["full/q"])
+        val down = resolver("qwerty", Form.Full, slots = SwipeSlots.Default.with("full/q", up = true, SwipeSlot.Empty).with("full/q", up = false, SwipeSlot.First))
+        assertEquals("1", down.readings(zh)["full/q"])
+        // the 14 keys' groups by their names
+        assertEquals("1", resolver("k14", Form.Grouped14).readings(KeyState())["g14/qw"])
+    }
 }

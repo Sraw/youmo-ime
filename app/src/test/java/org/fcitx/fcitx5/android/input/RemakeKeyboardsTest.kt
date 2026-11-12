@@ -14,7 +14,10 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.input.learning.UndoChip
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -148,16 +151,17 @@ class RemakeKeyboardsTest {
         }
     }
 
-    /** 九键's letters and symbols edited: the nine keys as a view made with them. */
+    /** 九键's letters and a key's long press edited: the nine keys as a view made with them (a key's long press is wired as it is made). */
     @Test
-    fun theNineKeysLettersAndSymbolsRemakeThem() {
+    fun theNineKeysLettersAndLongPressesRemakeThem() {
         val prefs = AppPrefs.getInstance().keyboard
+        val lists = AppPrefs.getInstance().internal.keyLists
         val nine = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)
         val letters = NineKeyLetters.of(listOf("abc", "def", "gi", "jkl", "mnoh", "pqrs", "tuv", "wxyz")).serialize()
         try {
             KeyboardHarness(keyboards = nine).use { h ->
                 h.start()
-                for ((pref, value) in listOf(prefs.t9Letters to letters, prefs.t9Symbols to "2 ⒉")) {
+                for ((pref, value) in listOf(prefs.t9Letters to letters, lists to KeyLists.of(mapOf(KeyId("t9/2") to UserList(off = false, symbols = listOf("⒉")))).serialize())) {
                     pref.setValue(value)
                     h.idle()
                     val expected = KeyboardHarness(keyboards = nine).use { it.start(); it.seen() }
@@ -166,7 +170,7 @@ class RemakeKeyboardsTest {
             }
         } finally {
             prefs.t9Letters.setValue("")
-            prefs.t9Symbols.setValue("")
+            lists.setValue(KeyLists.HEADER)
         }
     }
 

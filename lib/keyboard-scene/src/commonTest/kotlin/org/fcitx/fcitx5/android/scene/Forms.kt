@@ -7,9 +7,11 @@ package org.fcitx.fcitx5.android.scene
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.MenuCell
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
@@ -47,7 +49,7 @@ object Forms {
     /** The texts the app gives a pinyin keyboard in Chinese: Chinese punctuation, its name on the space, the screen reader's. */
     val texts = Texts(
         imeName = "拼音", comma = "，", period = "。", returnLabel = "换行", returnIcon = "enter",
-        alts = Fixtures.qwertyAlts,
+        alts = Fixtures.qwertyReadings,
         punctuation = mapOf(
             "," to "，", "." to "。", "?" to "？", "!" to "！", "~" to "～", ":" to "：", "(" to "（", ")" to "）",
         ),
@@ -115,11 +117,19 @@ object Forms {
 
     val materialDark: Theme by lazy { ThemeReader.theme(testData("material-dark.xml")).ok() }
 
-    /** [form] with what the app tells [board] by default: 注音 for the zhuyin boards, the full pad for number. */
-    fun env(board: String, form: Env): Env = when (board) {
-        "zhuyin", "zhuyin-nine" -> form.copy(input = form.input.copy(ime = "zhuyin"), texts = form.texts.copy(imeName = "注音"))
-        "number" -> form.copy(input = form.input.copy(pad = "full"))
-        else -> form
+    /**
+     * [form] with what the app tells [board] by default: 注音 for the zhuyin boards, the full pad for number; its keys' marks
+     * as built in (DefaultMarks, the app's on a new install) and their corners as said (Texts.alts: each first drawn up).
+     */
+    fun env(board: String, form: Env): Env {
+        val told = when (board) {
+            "zhuyin", "zhuyin-nine" -> form.copy(input = form.input.copy(ime = "zhuyin"), texts = form.texts.copy(imeName = "注音"))
+            "number" -> form.copy(input = form.input.copy(pad = "full"))
+            else -> form
+        }
+        val marks = DefaultMarks.shortcuts(layout(board), fragments, punctuation = told.texts.punctuation)
+        val readings = marks.entries.mapNotNull { (k, v) -> (v as? MarkContent.Symbol)?.takeIf { k.endsWith(":up") }?.let { k.removeSuffix(":up") to it.text } }.toMap()
+        return told.copy(marks = told.marks.copy(shortcuts = marks), texts = told.texts.copy(alts = readings))
     }
 
     fun scene(board: String, env: Env, theme: Theme = Fixtures.materialLight): Scene =

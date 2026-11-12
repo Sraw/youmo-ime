@@ -9,7 +9,7 @@ key 1 kind=letter a11y="，。？！，1"
   shape rect(180.88,18.38,402.13,157.63)
   hit rect(173,0,410,176)
   anchor 291.5,88 up 0,-1
-  actions preview="off" send="1" swipe-up="keypad:1"
+  actions preview="off" send="1"
   text label="，。？！" alt="1"
   shortcut="t9/1"
   popup from=nine
@@ -23,12 +23,13 @@ key 2 kind=letter a11y="ABC，2"
   shape rect(417.88,18.38,640.13,157.63)
   hit rect(410,0,648,176)
   anchor 529,88 up 0,-1
-  actions send="2" swipe-up="keypad:2"
+  actions send="2"
   text label="ABC" alt="2"
   shortcut="t9/2"
   popup from=nine
   normal
     text "ABC" 481.5,107.69 system 400 52.5 #ff37474f
+    icon content-copy 425,23,454,52 #ff7a858a
     text "2" 613.38,47.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(417.88,18.38,640.13,157.63) #1f000000
@@ -37,7 +38,7 @@ key 3 kind=letter a11y="DEF，3"
   shape rect(655.88,18.38,878.13,157.63)
   hit rect(648,0,886,176)
   anchor 767,88 up 0,-1
-  actions send="3" swipe-up="keypad:3"
+  actions send="3"
   text label="DEF" alt="3"
   shortcut="t9/3"
   popup from=nine
@@ -64,7 +65,7 @@ key 4 kind=letter a11y="GHI，4"
   shape rect(180.88,194.38,402.13,332.63)
   hit rect(173,176,410,351)
   anchor 291.5,263.5 up 0,-1
-  actions send="4" swipe-up="keypad:4"
+  actions send="4"
   text label="GHI" alt="4"
   shortcut="t9/4"
   popup from=nine
@@ -78,7 +79,7 @@ key 5 kind=letter a11y="JKL，5"
   shape rect(417.88,194.38,640.13,332.63)
   hit rect(410,176,648,351)
   anchor 529,263.5 up 0,-1
-  actions send="5" swipe-up="keypad:5"
+  actions send="5"
   text label="JKL" alt="5"
   shortcut="t9/5"
   popup from=nine
@@ -92,7 +93,7 @@ key 6 kind=letter a11y="MNO，6"
   shape rect(655.88,194.38,878.13,332.63)
   hit rect(648,176,886,351)
   anchor 767,263.5 up 0,-1
-  actions send="6" swipe-up="keypad:6"
+  actions send="6"
   text label="MNO" alt="6"
   shortcut="t9/6"
   popup from=nine
@@ -118,7 +119,7 @@ key 7 kind=letter a11y="PQRS，7"
   shape rect(180.88,369.38,402.13,508.63)
   hit rect(173,351,410,527)
   anchor 291.5,439 up 0,-1
-  actions send="7" swipe-up="keypad:7"
+  actions send="7"
   text label="PQRS" alt="7"
   shortcut="t9/7"
   popup from=nine
@@ -132,12 +133,13 @@ key 8 kind=letter a11y="TUV，8"
   shape rect(417.88,369.38,640.13,508.63)
   hit rect(410,351,648,527)
   anchor 529,439 up 0,-1
-  actions send="8" swipe-up="keypad:8"
+  actions send="8"
   text label="TUV" alt="8"
   shortcut="t9/8"
   popup from=nine
   normal
     text "TUV" 481.5,458.69 system 400 52.5 #ff37474f
+    icon content-paste 425,374,454,403 #ff7a858a
     text "8" 613.38,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(417.88,369.38,640.13,508.63) #1f000000
@@ -146,12 +148,13 @@ key 9 kind=letter a11y="WXYZ，9"
   shape rect(655.88,369.38,878.13,508.63)
   hit rect(648,351,886,527)
   anchor 767,439 up 0,-1
-  actions send="9" swipe-up="keypad:9"
+  actions send="9"
   text label="WXYZ" alt="9"
   shortcut="t9/9"
   popup from=nine
   normal
     text "WXYZ" 704,458.69 system 400 52.5 #ff37474f
+    icon undo 663,374,692,403 #ff7a858a
     text "9" 851.38,398.78 system 700 28 #ff7a858a
   pressed
     +0 fill rect(655.88,369.38,878.13,508.63) #1f000000
@@ -172,7 +175,7 @@ key symbols kind=function role=symbols a11y="符"
   shape rect(7.88,545.38,165.13,683.63)
   hit rect(0,527,173,702)
   anchor 86.5,614.5 up 0,-1
-  actions long-press="quickphrase" send="layout:Symbol"
+  actions send="layout:Symbol"
   text label="符"
   shortcut="fn/symbols"
   normal
@@ -184,7 +187,7 @@ key numbers kind=function role=numbers a11y="123"
   shape rect(180.88,545.38,316.13,683.63)
   hit rect(173,527,324,702)
   anchor 248.5,614.5 up 0,-1
-  actions long-press="unicode" send="layout:Number"
+  actions send="layout:Number"
   text label="123"
   shortcut="fn/numbers"
   normal
@@ -196,7 +199,7 @@ key space kind=space role=space a11y="空格，拼音"
   shape rect(350.25,569,751.75,660 r=7.88,7.88,7.88,7.88)
   hit rect(324,527,778,702)
   anchor 551,614.5 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   text label="拼音"
   sound=space shortcut="fn/space"
   normal
@@ -210,7 +213,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   shape rect(785.88,545.38,878.13,683.63)
   hit rect(778,527,886,702)
   anchor 832,614.5 up 0,-1
-  actions long-press="ime-picker" send="lang"
+  actions send="lang"
   shortcut="fn/lang"
   normal
     icon language 800.5,583,863.5,646 #ff7a858a

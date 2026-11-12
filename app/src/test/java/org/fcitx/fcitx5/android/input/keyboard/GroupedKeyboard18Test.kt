@@ -34,13 +34,7 @@ class GroupedKeyboard18Test {
 
     private val context = RuntimeEnvironment.getApplication()
 
-    private val layout = GroupedKeyboard.layout(NineKeyLetters.G18) { letter ->
-        when (letter) {
-            "l" -> listOf(")", "L")
-            ";" -> listOf(":")
-            else -> emptyList()
-        }
-    }
+    private val layout = GroupedKeyboard.layout(NineKeyLetters.G18)
 
     private fun key(face: String) = layout.flatten().single { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == face }
 
@@ -95,28 +89,14 @@ class GroupedKeyboard18Test {
         assertEquals(we, GroupedKeyboard.tapped(we, 0.1f, NineKeyLetters.G18, setOf("we")))
     }
 
-    @Test
-    fun theLongPressOfLSemicolonOffersBoth() {
-        val l = key("L;").popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().single()
-        assertEquals(listOf("L", ":", "-", "l", ";", ")"), l.items.toList())
-        assertEquals(2, l.inRow)
-    }
-
-    // pinyin's 18 keys have no ;: L alone on the key, its long press L 0 l and the symbols, no ; or :
+    // pinyin's 18 keys have no ;: L alone on the key (its long press the resolver's, g18/l: KeyDefaults)
     @Test
     @Uat("SP-28")
     fun pinyinsEighteenKeysShowLWithoutTheSemicolon() {
-        val pinyin = GroupedKeyboard.layout(NineKeyLetters.G18, semicolon = false) { letter ->
-            when (letter) {
-                "l" -> listOf(")", "L")
-                ";" -> listOf(":")
-                else -> emptyList()
-            }
-        }
+        val pinyin = GroupedKeyboard.layout(NineKeyLetters.G18, semicolon = false)
         val faces = pinyin.take(3).flatten().mapNotNull { (it.appearance as? KeyDef.Appearance.AltText)?.displayText }
         assertEquals(listOf("A", "SD", "FG", "H", "JK", "L"), faces.subList(7, 13))
         val l = pinyin.flatten().single { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == "L" }
-        assertEquals(listOf("L", "-", "l", ")"), l.popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().single().items.toList())
         // the code is the group's all the same, as the session reads it
         assertEquals(key("L;").behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action, l.behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action)
     }

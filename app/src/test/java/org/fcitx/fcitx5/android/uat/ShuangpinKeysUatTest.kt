@@ -129,7 +129,7 @@ class ShuangpinKeysUatTest {
         assertTrue(h.texts().toString(), "JKL" in h.texts() && "JKL;" !in h.texts())
         val five = h.longPress(h.nineKey("5"))
         assertFalse("$five", five.any { it == ";" || it == "；" || it == ":" || it == "：" })
-        // 微软's ; is 1's, marked 1; beside its digit: not under 小鹤 nor 自然码, drawn (the scene) or as the views had it
+        // 1's corner its first (Keypad 1) under every scheme: not under 小鹤 nor 自然码, drawn (the scene) or as the views had it
         for (scheme in listOf(ShuangpinScheme.XIAOHE, ShuangpinScheme.ZIRANMA)) {
             EngineState.shuangpinScheme = scheme
             h.start()
@@ -138,10 +138,11 @@ class ShuangpinKeysUatTest {
         val oldOne = T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true, semicolon = false).flatten()
             .firstNotNullOf { it.appearance as? KeyDef.Appearance.AltText }
         assertEquals("1", oldOne.altText)
-        // the scheme changed to 微软's, the input started again (as the engine's settings do): 1; at once
+        // 微软's, where 1 types ; as well: its first's still (060-keys-unify S6: a key's corner is its long press's first,
+        // by its name; the 1; the layout wrote is gone)
         EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
         h.start()
-        assertEquals("1;", h.nineKey("1").alt)
+        assertEquals("1", h.nineKey("1").alt)
     }
 
     @Test

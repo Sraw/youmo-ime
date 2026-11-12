@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keys
 
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeySwipe
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
@@ -56,7 +56,7 @@ data class KeyEdit(val row: List<String>, val symbols: List<String>, val first: 
 /**
  * A key as everything reads it: its long press ([popup], null with none), its [first] (what its swipe's
  * 长按首选 types, its corner shows, the long press opens on), [firstShown] as drawn, its two swipe slots
- * ([swipe]) and their marks.
+ * ([swipe]) and their marks; [corner] what its first's mark shows (a labelled table's letter itself), as a screen reader says it.
  */
 data class ResolvedKey(
     val id: KeyId,
@@ -66,6 +66,7 @@ data class ResolvedKey(
     val swipe: KeySwipe.Key,
     val upMark: MarkContent,
     val downMark: MarkContent,
+    val corner: String? = null,
 )
 
 /**
@@ -134,9 +135,29 @@ class KeyResolver(
         val swipe = KeySwipe.Key(SwipeSlots.typesAChar(id.name), slots.resolve(id.name, true), slots.resolve(id.name, false), hasFirst = first != null)
         // looking up roots, the corner is the letter the roots are of
         val letterCorner = roots != null || state.letterCorners && id.form == FULL && id.key.singleOrNull()?.isLetter() == true
-        val firstMark = (if (letterCorner) id.key else shown)?.let(MarkContent::Symbol) ?: MarkContent.Empty
-        return ResolvedKey(id, popup, first, shown, swipe, mark(swipe.up, firstMark), mark(swipe.down, firstMark))
+        val corner = if (letterCorner) id.key else shown
+        val firstMark = corner?.let(MarkContent::Symbol) ?: MarkContent.Empty
+        return ResolvedKey(id, popup, first, shown, swipe, mark(swipe.up, firstMark), mark(swipe.down, firstMark), corner)
     }
+
+    /**
+     * Every named key's [ResolvedKey.corner] by its name, as Texts.alts reads them (a screen reader's 「Q W，1」, 060-keys-unify
+     * §3.4): only where a way draws it (a slot its first's), as the corner a sighted user sees; a key with none left out.
+     * Made again only for another [state].
+     */
+    fun readings(state: KeyState): Map<String, String> {
+        if (state == readingsFor) readingsMade?.let { return it }
+        val made = nodes.mapNotNull { (name, _) ->
+            val r = resolve(KeyId.of(name), state)
+            r.corner?.takeIf { r.swipe.up == SwipeSlot.First || r.swipe.down == SwipeSlot.First }?.let { name to it }
+        }.toMap()
+        readingsFor = state
+        readingsMade = made
+        return made
+    }
+
+    private var readingsFor: KeyState? = null
+    private var readingsMade: Map<String, String>? = null
 
     /** The marks of every named key, as the scene draws them: made again only for another [state]. */
     fun marks(state: KeyState): MarkSettings {
@@ -152,8 +173,8 @@ class KeyResolver(
             if (slots.isSet(name, false)) user += "$name:down"
         }
         return MarkSettings(
-            upAt = SceneMarks.at(state.spots.symbol),
-            downAt = SceneMarks.at(state.spots.shortcut),
+            upAt = state.spots.symbol,
+            downAt = state.spots.shortcut,
             // a table's roots take a letter's room: its shortcut not drawn there
             charShortcuts = state.roots == null,
             upOn = state.ways.up,

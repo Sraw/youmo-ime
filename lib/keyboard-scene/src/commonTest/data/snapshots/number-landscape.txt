@@ -129,7 +129,7 @@ key space kind=function role=space a11y="a11y_key_space"
   shape rect(1996.88,142.5,2332.12,254.5 r=10.5,10.5,10.5,10.5)
   hit rect(1989,132,2340,265)
   anchor 2164.5,198.5 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   sound=space shortcut="fn/space"
   normal
     shadow rect(1996.88,142.5,2332.12,257.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
@@ -239,7 +239,7 @@ key symbols kind=letter role=symbols a11y="!?#"
   shape rect(592.88,407.5,889.13,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(585,397,897,529)
   anchor 741,463 up 0,-1
-  actions long-press="quickphrase" send="layout:Symbol"
+  actions send="layout:Symbol"
   text label="!?#"
   shortcut="fn/symbols"
   normal

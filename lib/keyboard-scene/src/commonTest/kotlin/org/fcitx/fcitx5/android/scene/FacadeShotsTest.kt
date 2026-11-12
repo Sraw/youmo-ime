@@ -79,14 +79,14 @@ class FacadeShotsTest {
             shift = Shift.Lock,
             texts = Texts(
                 imeName = "拼音", comma = "，", period = "。", returnLabel = "换行", returnIcon = "send", confirm = "OK", back = "Back",
-                keepUppercase = true, letterCase = LetterCase.Upper, alts = mapOf("q" to "1"), punctuation = mapOf("," to "，"),
+                keepUppercase = true, letterCase = LetterCase.Upper, alts = mapOf("full/q" to "1"), punctuation = mapOf("," to "，"),
                 nineLetters = mapOf("2" to "abc"), other = mapOf("root:g" to "王\n一"), a11yGrouped = "%1\$s；%2\$s", a11ySpace = "空格 %1\$s",
             ),
             marks = MarkSettings(
                 upAt = KeyMarks.At.BottomLeft, downAt = KeyMarks.At.None, symbols = false, charShortcuts = false, upOn = false, downOn = false, firstUp = false,
                 shortcuts = mapOf(
                     "fn/copy:up" to MarkContent.Icon("copy"), "fn/paste:down" to MarkContent.Text("粘\"贴\\"), "full/q:up" to MarkContent.Symbol("1"),
-                    "full/q:down" to MarkContent.Corner, "full/w:up" to MarkContent.Empty,
+                    "full/q:down" to MarkContent.Symbol("q"), "full/w:up" to MarkContent.Empty,
                 ),
             ),
             states = mapOf("reading" to setOf(KeyState.On), "lock" to setOf(KeyState.Locked, KeyState.Disabled)),
@@ -202,7 +202,6 @@ object FacadeShots {
                                 is MarkContent.Icon -> obj("icon" to str(v.name))
                                 is MarkContent.Text -> obj("text" to str(v.text))
                                 is MarkContent.Symbol -> obj("symbol" to str(v.text))
-                                MarkContent.Corner -> obj("corner" to "true")
                                 MarkContent.Empty -> obj()
                             }
                         },

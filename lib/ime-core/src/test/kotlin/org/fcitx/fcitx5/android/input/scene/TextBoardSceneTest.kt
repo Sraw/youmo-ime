@@ -9,14 +9,13 @@ import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeySwipe
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
-import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.Include
 import org.fcitx.fcitx5.android.scene.layout.Key
@@ -26,7 +25,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.fcitx.fcitx5.android.scene.rules.KeyMarks as SceneKeyMarks
 
 class TextBoardSceneTest {
 
@@ -114,12 +112,9 @@ class TextBoardSceneTest {
         // none shown: nothing for the binding, nor while the table shows the letters
         assertTrue(SceneLetters.roots(null).isEmpty())
         assertTrue(SceneLetters.roots(wubi.copy(labels = KeyLabels.NONE)).isEmpty())
-        val alts = SceneLetters.alts { c -> if (c == 'q') null else "$c!" }
-        assertEquals(25, alts.size)
-        assertEquals("a!", alts["a"])
         val state = TextBoardState(table = true, roots = true)
         assertTrue(state.input().roots)
-        val env = SceneData.portrait.copy(input = state.input(), texts = SceneData.portrait.texts.copy(alts = SceneLetters.alts { "$it" }, other = roots))
+        val env = SceneData.portrait.copy(input = state.input(), texts = SceneData.portrait.texts.copy(alts = ('a'..'z').associate { "full/$it" to "$it" }, other = roots))
         val g = (SceneBuilder(theme, env, SceneData.measurer).build(SceneData.qwerty, emptyMap()) as Parsed.Ok).value.keys.first { it.id == "g" }
         assertEquals(wubi.label('g'), g.label)
         assertEquals("g", g.alt)
@@ -155,7 +150,7 @@ class TextBoardSceneTest {
         val firsts = mapOf("fn/comma" to "!", "t9/3" to null)
         val m = SceneMarks.settings(slots, KeySwipe.Ways.Both, KeyMarks.At.BottomLeft, KeyMarks.At.Bottom, true, names, firsts)
         assertEquals("two characters, then an ellipsis", MarkContent.Text("he…", "h…"), m.shortcuts["full/q:down"])
-        assertEquals(MarkContent.Corner, m.shortcuts["full/q:up"])
+        assertEquals("no first known: nothing", MarkContent.Empty, m.shortcuts["full/q:up"])
         assertEquals(MarkContent.Empty, m.shortcuts["full/a:down"])
         assertEquals(MarkContent.Icon("content-paste"), m.shortcuts["full/s:up"])
         assertEquals(MarkContent.Icon("content-copy"), m.shortcuts["full/c:down"])
@@ -165,13 +160,14 @@ class TextBoardSceneTest {
         assertEquals("a function key's first: its long press's", MarkContent.Symbol("!"), m.shortcuts["fn/comma:up"])
         assertEquals("none known: nothing", MarkContent.Empty, m.shortcuts["fn/period:up"])
         assertEquals("a long press turned off", MarkContent.Empty, m.shortcuts["t9/3:up"])
-        assertEquals(MarkContent.Corner, m.shortcuts["t9/2:up"])
-        assertEquals(SceneKeyMarks.At.BottomLeft, m.upAt)
-        assertEquals(SceneKeyMarks.At.Bottom, m.downAt)
+        assertEquals(MarkContent.Empty, m.shortcuts["t9/2:up"])
+        assertEquals(KeyMarks.At.BottomLeft, m.upAt)
+        assertEquals(KeyMarks.At.Bottom, m.downAt)
         assertTrue(m.charShortcuts && m.upOn && m.downOn && m.firstUp)
-        // the built-in ones as the engine's own preset names them
+        // the built-in ones as SlotDefaults names them
         val preset = SceneMarks.settings(SwipeSlots.Default, KeySwipe.Ways.Both, KeyMarks.At.TopRight, KeyMarks.At.TopLeft, true, names)
-        MarkSettings.PRESET.forEach { (k, v) -> assertEquals(k, v, preset.shortcuts[k]) }
+        assertEquals(MarkContent.Icon("select-all"), preset.shortcuts["full/a:down"])
+        assertEquals(MarkContent.Icon("cursor-move"), preset.shortcuts["fn/space:up"])
         val flipped = SceneMarks.settings(SwipeSlots.Default.flippedAll(listOf("fn/space")), KeySwipe.Ways.Both, KeyMarks.At.TopRight, KeyMarks.At.TopLeft, true, names)
         assertFalse(flipped.firstUp)
         assertEquals(MarkContent.Icon("select-all"), flipped.shortcuts["full/a:up"])

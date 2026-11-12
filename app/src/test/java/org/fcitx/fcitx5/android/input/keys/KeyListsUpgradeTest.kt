@@ -139,14 +139,14 @@ class KeyListsUpgradeTest {
         assertEquals(UserList.Off, cache(prefs).current[KeyId("full/q")])
     }
 
-    // an old page (till S5 replaces it) changed the old ones: migrated again, read so before that start too
+    // key_lists gone with an old one changed (as 0.5's page left them): migrated again, read so before that start too
     @Test
-    fun anOldPagesChangeIsMigratedAgain() {
+    fun anOldOneChangedWithNoKeyListsIsMigratedAgain() {
         sp.edit { v052() }
         val prefs = started()
         val c = cache(prefs)
         assertEquals(UserList(false, listOf("!", "1", "Q")), c.current[KeyId("full/q")])
-        prefs.setOldLongPress(AppPrefs.POPUP_OVERRIDES, "q ?")
+        sp.edit { putString(AppPrefs.POPUP_OVERRIDES, "q ?"); remove(AppPrefs.KEY_LISTS) }
         assertEquals(null, prefs.storedKeyLists())
         assertEquals(listOf("?"), c.current[KeyId("full/q")]?.symbols)
         started(prefs)
@@ -209,8 +209,8 @@ class KeyListsUpgradeTest {
         assertTrue(c.version > v)
     }
 
-    // unlocked, the lists go to the device-protected copy, and the old ones while their keyboards read them (till S6);
-    // read there before the next unlock as the lists, whatever an older copy of the old ones says
+    // unlocked, the lists go to the device-protected copy, the old ones no longer (060-keys-unify S6: no keyboard reads
+    // them); read there before the next unlock as the lists, whatever an older copy of the old ones says
     @Test
     @Config(application = FcitxApplication::class)
     fun theListsAreCopiedForBeforeTheFirstUnlock() {
@@ -222,9 +222,22 @@ class KeyListsUpgradeTest {
         assertEquals(listOf("?"), cache(locked).current[KeyId("full/q")]?.symbols)
         prefs.syncToDeviceEncryptedStorage()
         assertEquals(stored(), de.getString(AppPrefs.KEY_LISTS, null))
-        assertEquals(sp.getString(AppPrefs.POPUP_OVERRIDES, null), de.getString(AppPrefs.POPUP_OVERRIDES, null))
-        assertEquals(sp.getString(AppPrefs.T9_SYMBOLS, null), de.getString(AppPrefs.T9_SYMBOLS, null))
-        de.edit { putString(AppPrefs.POPUP_OVERRIDES, "q ?") }
+        // the older copy there as it was, read no more
+        assertEquals("q ?", de.getString(AppPrefs.POPUP_OVERRIDES, null))
+        assertFalse(de.contains(AppPrefs.T9_SYMBOLS))
         assertEquals(KeyLists.parse(stored()), cache(locked).current)
+    }
+
+    // not migrated yet (an upgrade's first start before dropRetired, a 0.5 backup restored): no key_lists there either,
+    // the device-protected copy's own old ones migrated in memory there, never a `@1` that would hide them for good
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun noListsStoredNoneCopied() {
+        val prefs = AppPrefs(sp)
+        val de = PreferenceManager.getDefaultSharedPreferences(app.createDeviceProtectedStorageContext())
+        de.edit { clear(); putString(AppPrefs.KEY_LISTS, "@1\nfull/w\toff"); putString(AppPrefs.POPUP_OVERRIDES, "q ?") }
+        prefs.syncToDeviceEncryptedStorage()
+        assertFalse(de.contains(AppPrefs.KEY_LISTS))
+        assertEquals(listOf("?"), cache(AppPrefs(de)).current[KeyId("full/q")]?.symbols)
     }
 }

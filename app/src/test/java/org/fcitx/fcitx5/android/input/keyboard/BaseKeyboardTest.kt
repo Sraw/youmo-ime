@@ -65,19 +65,19 @@ class BaseKeyboardTest {
     }
 
     @Test
-    fun aSwipeTypesTheKeysOwnTheLongPresssFirstOrNothing() {
+    fun aSwipeTypesTheKeysOwnTheFirstOrNothing() {
         val own = KeyAction.HostKeyAction("1")
-        assertEquals(own to KeyActionListener.Source.Keyboard, SwipeChoice.of(null).typed(own))
-        assertNull("its long press turned off", SwipeChoice.of("").typed(own))
-        assertEquals(KeyAction.HostKeyAction("é") to KeyActionListener.Source.Popup, SwipeChoice.of("é").typed(own))
-        assertEquals(KeyAction.CommitAction("qu") to KeyActionListener.Source.Popup, SwipeChoice.of("qu").typed(own))
+        assertEquals(own to KeyActionListener.Source.Keyboard, SwipeChoice.BuiltIn.typed(own))
+        assertNull("its long press turned off", SwipeChoice.None.typed(own))
+        val first = KeyAction.CommitAction("qu")
+        assertEquals(first to KeyActionListener.Source.Popup, SwipeChoice.Output(first, "qu").typed(own))
     }
 
     @Test
     fun theSwipesPreviewIsWhatItTypes() {
-        assertEquals("1", SwipeChoice.of(null).preview("1"))
-        assertEquals("nothing, as nothing is typed", "", SwipeChoice.of("").preview("1"))
-        assertEquals("é", SwipeChoice.of("é").preview("1"))
+        assertEquals("1", SwipeChoice.BuiltIn.preview("1"))
+        assertEquals("nothing, as nothing is typed", "", SwipeChoice.None.preview("1"))
+        assertEquals("é", SwipeChoice.Output(KeyAction.HostKeyAction("é"), "é").preview("1"))
     }
 
     // PY-41: a space long press that does nothing (None) took the touch from a slow drag

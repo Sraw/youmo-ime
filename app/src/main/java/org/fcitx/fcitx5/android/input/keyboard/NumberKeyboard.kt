@@ -90,6 +90,8 @@ class NumberKeyboard(
     // (its keys beside the digits), Return's label and icon
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
         val texts = Texts(
+            // the corners as said (Texts.alts by key name)
+            alts = keyReadings(layout),
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
         )

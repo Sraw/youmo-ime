@@ -3,38 +3,38 @@
   26 键（qwerty）照现在的 TextKeyboard.Layout（TextKeyboard.kt:82-144）、KeyDefPreset 和 show*Key 的条件转写。
   App 画的就是这一份（app/build.gradle.kts 的 copySceneLayouts 拷进 raw），引擎的测试和快照读的也是这一份。
   拼音、双拼、英文、5 个码表共用这一块，差别都在 when= 里。宽度：字母键 = 1（原 percentWidth 0.1）。
-  不写的：每个字母的长按/上下滑字符（PopupPreset + 用户 PopupOverrides，按 label 自动取）、快捷键的内容（KeyShortcuts）。
-  26 键按节点接线（S5a）：字母键写 swipe-up（内置的上滑符号；用户改过的由 TextKeyboard.swipeText 换掉）：不写的话
-  SceneBehavior.cornerOf 见字母键有 shortcut、自己没有滑动，气泡角会显示字母自己（注音大千的规则），而不是上滑的符号。
+  不写的：每个字母的长按、上下滑和角标（不写 swipe-up/alt，BuiltInLayoutLintTest 管）：按键名（shortcut="full/q"）由
+  KeyDefaults 给默认、用户的 key_lists/key_swipes 盖上去（060-keys-unify）；角标是标记（MarkSettings.shortcuts，App 的由
+  KeyResolver.marks 给），读屏读的角标是 Texts.alts（按键名，长按首个如显示）。
   send 写小写字母：键码由 App 按大写取（SceneKeyDef.action，ScancodeMapping 只认大写）；大小写由 TextKeyboard 按 Shift 改。
   分体：行上 split="halves" 两半各五键（A §8，引擎按 SplitKeyboard 算宽），; 和 * 写 split="after" 接在右半后面。
-  角标 {alt:x}：App 给（Texts.alts）——长按首字（内置或用户改的，随 Shift），按标点映射显示；码表键上显示字根时是字母本身。
+  角标：长按首个（内置或用户改的，随 Shift），按标点映射显示；码表键上显示字根时是字母本身（KeyResolver）。
   码表显示字根/键名（when=roots）：字母键换成 {root:x}（Texts.other 的 root:x），多行时一行的高度放两行，宽了缩到键里。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="qwerty" name="26 键" family="letters" columns="10" arrange="rows" on-split="split">
   <defaults kind="letter" text-size="23"/>
   <row split="halves">
-    <key id="q" label="{case:q}" alt="{alt:q}" send="q" swipe-up="1" shortcut="full/q"><variant when="roots" label="{root:q}"/></key>
-    <key id="w" label="{case:w}" alt="{alt:w}" send="w" swipe-up="2" shortcut="full/w"><variant when="roots" label="{root:w}"/></key>
-    <key id="e" label="{case:e}" alt="{alt:e}" send="e" swipe-up="3" shortcut="full/e"><variant when="roots" label="{root:e}"/></key>
-    <key id="r" label="{case:r}" alt="{alt:r}" send="r" swipe-up="4" shortcut="full/r"><variant when="roots" label="{root:r}"/></key>
-    <key id="t" label="{case:t}" alt="{alt:t}" send="t" swipe-up="5" shortcut="full/t"><variant when="roots" label="{root:t}"/></key>
-    <key id="y" label="{case:y}" alt="{alt:y}" send="y" swipe-up="6" shortcut="full/y"><variant when="roots" label="{root:y}"/></key>
-    <key id="u" label="{case:u}" alt="{alt:u}" send="u" swipe-up="7" shortcut="full/u"><variant when="roots" label="{root:u}"/></key>
-    <key id="i" label="{case:i}" alt="{alt:i}" send="i" swipe-up="8" shortcut="full/i"><variant when="roots" label="{root:i}"/></key>
-    <key id="o" label="{case:o}" alt="{alt:o}" send="o" swipe-up="9" shortcut="full/o"><variant when="roots" label="{root:o}"/></key>
-    <key id="p" label="{case:p}" alt="{alt:p}" send="p" swipe-up="0" shortcut="full/p"><variant when="roots" label="{root:p}"/></key>
+    <key id="q" label="{case:q}" send="q" shortcut="full/q"><variant when="roots" label="{root:q}"/></key>
+    <key id="w" label="{case:w}" send="w" shortcut="full/w"><variant when="roots" label="{root:w}"/></key>
+    <key id="e" label="{case:e}" send="e" shortcut="full/e"><variant when="roots" label="{root:e}"/></key>
+    <key id="r" label="{case:r}" send="r" shortcut="full/r"><variant when="roots" label="{root:r}"/></key>
+    <key id="t" label="{case:t}" send="t" shortcut="full/t"><variant when="roots" label="{root:t}"/></key>
+    <key id="y" label="{case:y}" send="y" shortcut="full/y"><variant when="roots" label="{root:y}"/></key>
+    <key id="u" label="{case:u}" send="u" shortcut="full/u"><variant when="roots" label="{root:u}"/></key>
+    <key id="i" label="{case:i}" send="i" shortcut="full/i"><variant when="roots" label="{root:i}"/></key>
+    <key id="o" label="{case:o}" send="o" shortcut="full/o"><variant when="roots" label="{root:o}"/></key>
+    <key id="p" label="{case:p}" send="p" shortcut="full/p"><variant when="roots" label="{root:p}"/></key>
   </row>
   <row split="halves">
-    <key id="a" label="{case:a}" alt="{alt:a}" send="a" swipe-up="@" shortcut="full/a"><variant when="roots" label="{root:a}"/></key>
-    <key id="s" label="{case:s}" alt="{alt:s}" send="s" swipe-up="*" shortcut="full/s"><variant when="roots" label="{root:s}"/></key>
-    <key id="d" label="{case:d}" alt="{alt:d}" send="d" swipe-up="+" shortcut="full/d"><variant when="roots" label="{root:d}"/></key>
-    <key id="f" label="{case:f}" alt="{alt:f}" send="f" swipe-up="-" shortcut="full/f"><variant when="roots" label="{root:f}"/></key>
-    <key id="g" label="{case:g}" alt="{alt:g}" send="g" swipe-up="=" shortcut="full/g"><variant when="roots" label="{root:g}"/></key>
-    <key id="h" label="{case:h}" alt="{alt:h}" send="h" swipe-up="/" shortcut="full/h"><variant when="roots" label="{root:h}"/></key>
-    <key id="j" label="{case:j}" alt="{alt:j}" send="j" swipe-up="#" shortcut="full/j"><variant when="roots" label="{root:j}"/></key>
-    <key id="k" label="{case:k}" alt="{alt:k}" send="k" swipe-up="(" shortcut="full/k"><variant when="roots" label="{root:k}"/></key>
-    <key id="l" label="{case:l}" alt="{alt:l}" send="l" swipe-up=")" shortcut="full/l"><variant when="roots" label="{root:l}"/></key>
+    <key id="a" label="{case:a}" send="a" shortcut="full/a"><variant when="roots" label="{root:a}"/></key>
+    <key id="s" label="{case:s}" send="s" shortcut="full/s"><variant when="roots" label="{root:s}"/></key>
+    <key id="d" label="{case:d}" send="d" shortcut="full/d"><variant when="roots" label="{root:d}"/></key>
+    <key id="f" label="{case:f}" send="f" shortcut="full/f"><variant when="roots" label="{root:f}"/></key>
+    <key id="g" label="{case:g}" send="g" shortcut="full/g"><variant when="roots" label="{root:g}"/></key>
+    <key id="h" label="{case:h}" send="h" shortcut="full/h"><variant when="roots" label="{root:h}"/></key>
+    <key id="j" label="{case:j}" send="j" shortcut="full/j"><variant when="roots" label="{root:j}"/></key>
+    <key id="k" label="{case:k}" send="k" shortcut="full/k"><variant when="roots" label="{root:k}"/></key>
+    <key id="l" label="{case:l}" send="l" shortcut="full/l"><variant when="roots" label="{root:l}"/></key>
     <!-- 双拼方案会打 ; 且不分体（SemicolonKey.kt），或码表的额外码键在 ; 位（TableKeyboard.extraKey）：TextKeyboard.kt:324-329 -->
     <key id="semicolon" role="semicolon" label=";" send=";" mark="false" split="after"
          when="ime=shuangpin scheme-types=semicolon !split, table-extra=semicolon"/>
@@ -43,26 +43,26 @@
   <row split="halves">
     <!-- 码表时 ⇧ 让给「拼」键，开/关两态二选一（TextKeyboard.kt:300-306） -->
     <key id="shift" role="shift" kind="function" width="1.5" icon="{shift-icon}" a11y="a11y_key_shift" shortcut="shift"
-         send="caps" long-press="caps:lock" double-tap="caps:lock" when="!table"/>
+         send="caps" double-tap="caps:lock" when="!table"/>
     <key id="lookup" role="lookup" kind="function" width="1.5" label="拼" text-size="18" text-style="bold"
          send="code:U+F0104" when="table !looking-up"/>
     <key id="lookup-on" role="lookup-on" kind="enter" face="keep" width="1.5" label="拼" text-size="18" text-style="bold"
          send="code:U+F0104" when="table looking-up"/>
-    <key id="z" label="{case:z}" alt="{alt:z}" send="z" swipe-up="'" shortcut="full/z"><variant when="roots" label="{root:z}"/></key>
-    <key id="x" label="{case:x}" alt="{alt:x}" send="x" swipe-up=":" shortcut="full/x"><variant when="roots" label="{root:x}"/></key>
-    <key id="c" label="{case:c}" alt="{alt:c}" send="c" swipe-up="&quot;" shortcut="full/c"><variant when="roots" label="{root:c}"/></key>
-    <key id="v" label="{case:v}" alt="{alt:v}" send="v" swipe-up="?" shortcut="full/v"><variant when="roots" label="{root:v}"/></key>
-    <key id="b" label="{case:b}" alt="{alt:b}" send="b" swipe-up="!" shortcut="full/b"><variant when="roots" label="{root:b}"/></key>
-    <key id="n" label="{case:n}" alt="{alt:n}" send="n" swipe-up="~" shortcut="full/n"><variant when="roots" label="{root:n}"/></key>
-    <key id="m" label="{case:m}" alt="{alt:m}" send="m" swipe-up="\" shortcut="full/m"><variant when="roots" label="{root:m}"/></key>
+    <key id="z" label="{case:z}" send="z" shortcut="full/z"><variant when="roots" label="{root:z}"/></key>
+    <key id="x" label="{case:x}" send="x" shortcut="full/x"><variant when="roots" label="{root:x}"/></key>
+    <key id="c" label="{case:c}" send="c" shortcut="full/c"><variant when="roots" label="{root:c}"/></key>
+    <key id="v" label="{case:v}" send="v" shortcut="full/v"><variant when="roots" label="{root:v}"/></key>
+    <key id="b" label="{case:b}" send="b" shortcut="full/b"><variant when="roots" label="{root:b}"/></key>
+    <key id="n" label="{case:n}" send="n" shortcut="full/n"><variant when="roots" label="{root:n}"/></key>
+    <key id="m" label="{case:m}" send="m" shortcut="full/m"><variant when="roots" label="{root:m}"/></key>
     <key id="backspace" role="backspace" kind="function" width="1.5" icon="backspace" a11y="a11y_key_backspace"
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
   </row>
   <row>
     <key id="symbols" role="symbols" kind="function" width="1.2" label="符" text-size="16" text-style="bold"
-         send="layout:Symbol" long-press="quickphrase" shortcut="symbols"/>
+         send="layout:Symbol" shortcut="symbols"/>
     <key id="numbers" role="numbers" kind="function" width="1.2" label="123" text-size="16" text-style="bold"
-         send="layout:Number" long-press="unicode" shortcut="numbers"/>
+         send="layout:Number" shortcut="numbers"/>
     <!-- 地址框（AddressKeys.URL/EMAIL）里 , . 让给 / @ . .com（BaseKeyboard.kt:135-142） -->
     <key id="comma" role="comma" kind="function" label="{comma}" send="," shortcut="comma" when="!field=url|email"/>
     <key id="slash" role="slash" kind="function" label="/" send="commit:/" mark="false" when="field=url">
@@ -73,7 +73,7 @@
     </key>
     <!-- 占满剩下的宽：🌐 隐藏、地址键替换时空格自动变宽 -->
     <key id="space" role="space" kind="space" face="special" width="fill" label="{ime-name}" text-size="13"
-         badge="{hold-badge}" sound="space" send="sym:space" long-press="space-long-press" swipe-axis="both" shortcut="space"/>
+         badge="{hold-badge}" sound="space" send="sym:space" swipe-axis="both" shortcut="space"/>
     <key id="period" role="period" kind="function" label="{period}" send="." shortcut="period" when="!field=url|email"/>
     <!-- 原样上屏：经引擎 . 会变成 。 -->
     <key id="dot" role="dot" kind="function" label="." send="commit:." mark="false" when="field=url|email">
@@ -87,7 +87,7 @@
     </key>
     <!-- 字母键的底、功能键的字色（Variant.AltForeground） -->
     <key id="lang" role="lang" kind="letter" class="alt-text" icon="language" a11y="a11y_key_switch_language" shortcut="lang"
-         send="lang" long-press="ime-picker" when="lang-key"/>
+         send="lang" when="lang-key"/>
     <!-- 码表输入中 确定 替 ⏎（TextKeyboard.kt:309-313）；两者共用快捷键名 return -->
     <key id="enter" role="enter" kind="enter" face="special" width="1.5" icon="{return-icon}" a11y="{return}"
          sound="return" send="sym:Return" shortcut="return" when="!composing, !table">

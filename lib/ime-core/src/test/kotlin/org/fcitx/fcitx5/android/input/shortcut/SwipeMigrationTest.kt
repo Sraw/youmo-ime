@@ -4,7 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.shortcut
 
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.At
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks.At
 import org.fcitx.fcitx5.android.input.keyboard.KeySwipe
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers.Layer

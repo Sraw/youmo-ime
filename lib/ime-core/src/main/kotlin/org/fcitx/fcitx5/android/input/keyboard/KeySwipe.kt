@@ -33,7 +33,7 @@ object KeySwipe {
             /**
              * A key no layout names (a panel's, 注音九键's ˉ): no slot of its own to set, its long press's
              * first the way [orientation] puts every key's preset, nothing the other way; 翻转 flips it
-             * with them, and its corner is drawn there (MarkSettings.of).
+             * with them; no corner drawn (a mark is a named key's, 060-keys-unify S6).
              */
             fun unnamed(orientation: SwipeOrientation, hasFirst: Boolean): Key {
                 val firstUp = orientation == SwipeOrientation.FirstUp

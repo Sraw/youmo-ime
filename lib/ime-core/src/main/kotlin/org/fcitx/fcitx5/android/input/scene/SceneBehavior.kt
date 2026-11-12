@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.input.scene
 
 import org.fcitx.fcitx5.android.core.CoreLog
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 
@@ -135,7 +137,7 @@ data class SceneBehavior(
     val bothWays: Boolean,
     val shortcut: String?,
 ) {
-    /** The bubble over the key pressed: [content], and the [corner] a swipe types (AltPreview's: a letter's swiped to its shortcut alone, [content]) or null. */
+    /** The bubble over the key pressed: [content], and the [corner] a swipe types (AltPreview's: a named key's empty, its resolver's) or null. */
     data class Bubble(val content: String, val corner: String?)
 
     /** The keys a long press offers. */
@@ -178,12 +180,13 @@ data class SceneBehavior(
                 "off" -> false
                 else -> node.role in TYPING_ROLES || (node.kind == "letter" && !node.label.isNullOrEmpty())
             }
-            val bubble = if (!typing) null else content(node, press).let { Bubble(it, cornerOf(node, swipe, it)) }
+            val bubble = if (!typing) null else Bubble(content(node, press), cornerOf(node, swipe))
             return SceneBehavior(
                 id = node.id,
                 role = node.role,
                 press = press,
-                longPress = a["long-press"]?.let(SceneAction::of),
+                // a function key's action by its name, the same on every keyboard (060-keys-unify §5); a layout's own over it
+                longPress = (a["long-press"] ?: functionAction(node.shortcut))?.let(SceneAction::of),
                 repeat = a["repeat"] == "true",
                 swipe = swipe,
                 doubleTap = a["double-tap"]?.let(SceneAction::of),
@@ -197,11 +200,16 @@ data class SceneBehavior(
             )
         }
 
+        private fun functionAction(name: String?): String? =
+            name?.let(KeyId::of)?.takeIf { it.isFunction }?.let { KeyDefaults.FUNCTION_ACTIONS[it.key] }
+
         // what a swipe types; a letter key that swipes nothing of its own but has a shortcut, its own face, so the
         // bubble shows the shortcut as it is swiped to (大千's symbols' AltPreview(c, c), 060-render-p2 S4c)
-        private fun cornerOf(node: KeyNode, swipe: SceneAction?, content: String): String? = when {
+        // a named key's swipe is its name's (the keyboard's resolver says what it types and shows, KeySwipes): none here,
+        // the same whatever its face (Shift's capitals keep the key, SceneKeys)
+        private fun cornerOf(node: KeyNode, swipe: SceneAction?): String? = when {
             swipe != null -> typed(swipe)
-            node.kind == "letter" && node.shortcut != null -> content
+            node.shortcut != null -> ""
             else -> null
         }
 

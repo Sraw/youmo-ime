@@ -134,7 +134,7 @@ class SceneKeyDefTest {
         val canvas = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
         // ?: a function key with preview="on"
         val question = SceneBehavior.of(canvas.scene!!.keys.single { it.id == "r2c5" })
-        assertEquals(SceneBehavior.Bubble("?", null), question.bubble)
+        assertEquals(SceneBehavior.Bubble("?", ""), question.bubble)
         val off = Scene(1.0, 1.0, emptyList(), emptyList(), emptyList(), preview = false, popups = true)
         assertNull(SceneKeyDef.onBoard(question, off).bubble)
     }
@@ -148,28 +148,28 @@ class SceneKeyDefTest {
 
     // a group's tap and long press asked of the keyboard by its letters; none it has: nothing wired
     @Test
-    fun aGroupsTapAndLongPressAreTheKeyboards() {
+    fun aGroupsTapIsTheKeyboardsItsLongPressTheResolvers() {
         val qw = nodes().getValue("r1c1")
         val asked = mutableListOf<String>()
         val code = sym(UNICODE + 0xF8DA)
-        val long = KeyDef.Popup.Keyboard.Explicit(arrayOf("q", "w"))
         val table = object : SceneKeyDef.Table {
             override fun group(letters: String, node: KeyNode) = code.also { asked += "group $letters ${node.id}" }
-            override fun groupPopup(letters: String, node: KeyNode) = long.also { asked += "popup $letters ${node.id}" }
         }
         val def = SceneKeyDef.of(qw, table)
-        assertEquals(listOf("group qw r1c1", "popup qw r1c1"), asked)
+        assertEquals(listOf("group qw r1c1"), asked)
         assertEquals(code, def.behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action)
-        assertEquals(sym(FcitxKeyMapping.FcitxKey_KP_0 + 1), def.behaviors.filterIsInstance<KeyDef.Behavior.Swipe>().single().action)
-        assertTrue(long in def.popup.orEmpty())
+        // its swipe by its name too (KeySwipes asks the keyboard's resolver): the layout writes none (060-keys-unify S6)
+        assertTrue(def.behaviors.none { it is KeyDef.Behavior.Swipe })
+        // named (g14/qw): its long press the resolver's (KeyDefaults by its name), none made here
+        assertTrue(def.popup.orEmpty().none { it is KeyDef.Popup.Keyboard })
         val preview = def.popup.orEmpty().filterIsInstance<KeyDef.Popup.AltPreview>().single()
-        assertEquals("QW" to "1", preview.content to preview.alternative)
+        assertEquals("QW", preview.content)
         assertEquals("g14/qw", def.shortcut)
         // a keyboard with no groups: no tap, no long press, the rest as written
         val bare = SceneKeyDef.of(qw, object : SceneKeyDef.Table {})
         assertTrue(bare.behaviors.none { it is KeyDef.Behavior.Press })
         assertTrue(bare.popup.orEmpty().none { it is KeyDef.Popup.Keyboard })
-        assertNotNull(bare.behaviors.filterIsInstance<KeyDef.Behavior.Swipe>().singleOrNull())
+        assertTrue(bare.behaviors.none { it is KeyDef.Behavior.Swipe })
     }
 
     @Test

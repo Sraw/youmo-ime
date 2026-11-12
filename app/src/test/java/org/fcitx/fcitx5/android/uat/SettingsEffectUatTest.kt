@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -233,7 +234,7 @@ class SettingsEffectUatTest {
     @Uat("ST-21")
     fun aCharacterMadeFirstIsTheCornerAndTheSwipe() {
         // as 设为首选 stores it: Q first of q's
-        prefs.set(AppPrefs.getInstance().internal.popupOverrides, "q Q 1")
+        prefs.setList("full/q", listOf("Q", "1"), first = "Q")
         h.start()
         assertEquals("Q", corner("q"))
         h.swipe(h.key("q"), 0f, -h.key("q").height * 1.3f)
@@ -246,12 +247,12 @@ class SettingsEffectUatTest {
         h.start()
         val preset = h.longPress(h.key("a"))
         fresh()
-        prefs.set(AppPrefs.getInstance().internal.popupOverrides, "a " + (preset + listOf("α", "β", "⒜")).joinToString(" "))
+        prefs.setList("full/a", listOf("α", "β", "⒜"))
         h.start()
         val added = h.longPress(h.key("a"))
         assertTrue(added.toString(), "α" in added && "β" in added && "⒜" in added)
         fresh()
-        AppPrefs.getInstance().setOldLongPress(AppPrefs.POPUP_OVERRIDES, "")
+        AppPrefs.getInstance().internal.keyLists.setValue(KeyLists.HEADER)
         h.start()
         val back = h.longPress(h.key("a"))
         assertTrue(back.toString(), "α" !in back && "β" !in back)

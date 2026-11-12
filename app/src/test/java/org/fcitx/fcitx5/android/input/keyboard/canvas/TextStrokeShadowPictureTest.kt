@@ -16,6 +16,8 @@ import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.TextShadow
 import org.fcitx.fcitx5.android.scene.TextStroke
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.MarkContent
+import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
@@ -50,7 +52,9 @@ class TextStrokeShadowPictureTest {
     private val density = 2.625
     private val env = Env(
         1080.0, 720.0, density,
-        texts = Texts(imeName = "拼音", alts = "qwertyuiop".zip("1234567890").associate { (k, v) -> "$k" to "$v" }),
+        texts = Texts(imeName = "拼音"),
+        // the top row's digits as their corners
+        marks = MarkSettings(shortcuts = "qwertyuiop".zip("1234567890").associate { (k, v) -> "full/$k:up" to MarkContent.Symbol("$v") }),
     )
 
     // grey bands and rings: nothing of the text's red, white or blue in it

@@ -12,7 +12,7 @@ key 1 kind=letter a11y="ㄅ"
   normal
     shadow rect(7.87,10.5,92.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.87,10.5,92.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄅ" 27.69,61.73 system 400 44.63 #ff37474f
+    text "ㄅ" 28.94,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(7.87,10.5,92.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 2 kind=letter a11y="ㄉ"
@@ -26,7 +26,7 @@ key 2 kind=letter a11y="ㄉ"
   normal
     shadow rect(107.88,10.5,192.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(107.88,10.5,192.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄉ" 127.69,61.73 system 400 44.63 #ff37474f
+    text "ㄉ" 128.94,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(107.88,10.5,192.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 3 kind=letter a11y="ˇ"
@@ -40,7 +40,7 @@ key 3 kind=letter a11y="ˇ"
   normal
     shadow rect(207.88,10.5,293.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(207.88,10.5,293.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ˇ" 237.11,61.73 system 400 44.63 #ff37474f
+    text "ˇ" 237.86,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(207.88,10.5,293.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 4 kind=letter a11y="ˋ"
@@ -54,7 +54,7 @@ key 4 kind=letter a11y="ˋ"
   normal
     shadow rect(308.88,10.5,393.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(308.88,10.5,393.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ˋ" 337.61,61.73 system 400 44.63 #ff37474f
+    text "ˋ" 338.36,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(308.88,10.5,393.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 5 kind=letter a11y="ㄓ"
@@ -68,7 +68,7 @@ key 5 kind=letter a11y="ㄓ"
   normal
     shadow rect(408.88,10.5,493.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(408.88,10.5,493.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄓ" 428.69,61.73 system 400 44.63 #ff37474f
+    text "ㄓ" 429.94,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(408.88,10.5,493.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 6 kind=letter a11y="ˊ"
@@ -82,7 +82,7 @@ key 6 kind=letter a11y="ˊ"
   normal
     shadow rect(508.88,10.5,593.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(508.88,10.5,593.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ˊ" 537.61,61.73 system 400 44.63 #ff37474f
+    text "ˊ" 538.36,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(508.88,10.5,593.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 7 kind=letter a11y="˙"
@@ -96,7 +96,7 @@ key 7 kind=letter a11y="˙"
   normal
     shadow rect(608.88,10.5,694.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(608.88,10.5,694.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "˙" 638.11,61.73 system 400 44.63 #ff37474f
+    text "˙" 638.86,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(608.88,10.5,694.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 8 kind=letter a11y="ㄚ"
@@ -110,7 +110,7 @@ key 8 kind=letter a11y="ㄚ"
   normal
     shadow rect(709.88,10.5,794.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(709.88,10.5,794.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄚ" 729.69,61.73 system 400 44.63 #ff37474f
+    text "ㄚ" 730.94,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(709.88,10.5,794.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 9 kind=letter a11y="ㄞ"
@@ -124,7 +124,7 @@ key 9 kind=letter a11y="ㄞ"
   normal
     shadow rect(809.88,10.5,894.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(809.88,10.5,894.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄞ" 829.69,61.73 system 400 44.63 #ff37474f
+    text "ㄞ" 830.94,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(809.88,10.5,894.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key 0 kind=letter a11y="ㄢ"
@@ -138,7 +138,7 @@ key 0 kind=letter a11y="ㄢ"
   normal
     shadow rect(909.88,10.5,994.13,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(909.88,10.5,994.13,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄢ" 929.69,61.73 system 400 44.63 #ff37474f
+    text "ㄢ" 930.94,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(909.88,10.5,994.13,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key - kind=letter a11y="ㄦ"
@@ -152,7 +152,7 @@ key - kind=letter a11y="ㄦ"
   normal
     shadow rect(1009.88,10.5,1094.63,82.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1009.88,10.5,1094.63,79.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄦ" 1029.94,61.73 system 400 44.63 #ff37474f
+    text "ㄦ" 1031.19,61.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(1009.88,10.5,1094.63,79.5 r=10.5,10.5,10.5,10.5) #1f000000
 key q kind=letter a11y="ㄆ"
@@ -166,7 +166,7 @@ key q kind=letter a11y="ㄆ"
   normal
     shadow rect(7.88,100.5,102.13,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,100.5,102.13,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄆ" 32.69,151.73 system 400 44.63 #ff37474f
+    text "ㄆ" 33.94,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(7.88,100.5,102.13,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key w kind=letter a11y="ㄊ"
@@ -180,7 +180,7 @@ key w kind=letter a11y="ㄊ"
   normal
     shadow rect(117.88,100.5,213.13,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(117.88,100.5,213.13,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄊ" 143.19,151.73 system 400 44.63 #ff37474f
+    text "ㄊ" 144.44,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(117.88,100.5,213.13,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key e kind=letter a11y="ㄍ"
@@ -194,7 +194,7 @@ key e kind=letter a11y="ㄍ"
   normal
     shadow rect(228.88,100.5,323.13,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(228.88,100.5,323.13,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄍ" 253.69,151.73 system 400 44.63 #ff37474f
+    text "ㄍ" 254.94,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(228.88,100.5,323.13,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r kind=letter a11y="ㄐ"
@@ -208,7 +208,7 @@ key r kind=letter a11y="ㄐ"
   normal
     shadow rect(338.88,100.5,433.13,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(338.88,100.5,433.13,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄐ" 363.69,151.73 system 400 44.63 #ff37474f
+    text "ㄐ" 364.94,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(338.88,100.5,433.13,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key t kind=letter a11y="ㄔ"
@@ -222,7 +222,7 @@ key t kind=letter a11y="ㄔ"
   normal
     shadow rect(448.88,100.5,543.13,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(448.88,100.5,543.13,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄔ" 473.69,151.73 system 400 44.63 #ff37474f
+    text "ㄔ" 474.94,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(448.88,100.5,543.13,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key y kind=letter a11y="ㄗ"
@@ -236,7 +236,7 @@ key y kind=letter a11y="ㄗ"
   normal
     shadow rect(558.88,100.5,654.13,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(558.88,100.5,654.13,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄗ" 584.19,151.73 system 400 44.63 #ff37474f
+    text "ㄗ" 585.44,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(558.88,100.5,654.13,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key u kind=letter a11y="ㄧ"
@@ -250,7 +250,7 @@ key u kind=letter a11y="ㄧ"
   normal
     shadow rect(669.88,100.5,764.13,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(669.88,100.5,764.13,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄧ" 694.69,151.73 system 400 44.63 #ff37474f
+    text "ㄧ" 695.94,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(669.88,100.5,764.13,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key i kind=letter a11y="ㄛ"
@@ -264,7 +264,7 @@ key i kind=letter a11y="ㄛ"
   normal
     shadow rect(779.88,100.5,874.13,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(779.88,100.5,874.13,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄛ" 804.69,151.73 system 400 44.63 #ff37474f
+    text "ㄛ" 805.94,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(779.88,100.5,874.13,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key o kind=letter a11y="ㄟ"
@@ -278,7 +278,7 @@ key o kind=letter a11y="ㄟ"
   normal
     shadow rect(889.88,100.5,984.13,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(889.88,100.5,984.13,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄟ" 914.69,151.73 system 400 44.63 #ff37474f
+    text "ㄟ" 915.94,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(889.88,100.5,984.13,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key p kind=letter a11y="ㄣ"
@@ -292,7 +292,7 @@ key p kind=letter a11y="ㄣ"
   normal
     shadow rect(999.88,100.5,1094.63,172.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(999.88,100.5,1094.63,169.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄣ" 1024.94,151.73 system 400 44.63 #ff37474f
+    text "ㄣ" 1026.19,151.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(999.88,100.5,1094.63,169.5 r=10.5,10.5,10.5,10.5) #1f000000
 key a kind=letter a11y="ㄇ"
@@ -306,7 +306,7 @@ key a kind=letter a11y="ㄇ"
   normal
     shadow rect(7.88,190.5,102.13,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,190.5,102.13,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄇ" 32.69,241.23 system 400 44.63 #ff37474f
+    text "ㄇ" 33.94,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(7.88,190.5,102.13,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key s kind=letter a11y="ㄋ"
@@ -320,7 +320,7 @@ key s kind=letter a11y="ㄋ"
   normal
     shadow rect(117.88,190.5,213.13,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(117.88,190.5,213.13,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄋ" 143.19,241.23 system 400 44.63 #ff37474f
+    text "ㄋ" 144.44,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(117.88,190.5,213.13,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key d kind=letter a11y="ㄎ"
@@ -334,7 +334,7 @@ key d kind=letter a11y="ㄎ"
   normal
     shadow rect(228.88,190.5,323.13,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(228.88,190.5,323.13,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄎ" 253.69,241.23 system 400 44.63 #ff37474f
+    text "ㄎ" 254.94,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(228.88,190.5,323.13,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key f kind=letter a11y="ㄑ"
@@ -348,7 +348,7 @@ key f kind=letter a11y="ㄑ"
   normal
     shadow rect(338.88,190.5,433.13,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(338.88,190.5,433.13,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄑ" 363.69,241.23 system 400 44.63 #ff37474f
+    text "ㄑ" 364.94,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(338.88,190.5,433.13,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key g kind=letter a11y="ㄕ"
@@ -362,7 +362,7 @@ key g kind=letter a11y="ㄕ"
   normal
     shadow rect(448.88,190.5,543.13,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(448.88,190.5,543.13,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄕ" 473.69,241.23 system 400 44.63 #ff37474f
+    text "ㄕ" 474.94,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(448.88,190.5,543.13,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key h kind=letter a11y="ㄘ"
@@ -376,7 +376,7 @@ key h kind=letter a11y="ㄘ"
   normal
     shadow rect(558.88,190.5,654.13,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(558.88,190.5,654.13,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄘ" 584.19,241.23 system 400 44.63 #ff37474f
+    text "ㄘ" 585.44,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(558.88,190.5,654.13,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key j kind=letter a11y="ㄨ"
@@ -390,7 +390,7 @@ key j kind=letter a11y="ㄨ"
   normal
     shadow rect(669.88,190.5,764.13,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(669.88,190.5,764.13,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄨ" 694.69,241.23 system 400 44.63 #ff37474f
+    text "ㄨ" 695.94,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(669.88,190.5,764.13,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key k kind=letter a11y="ㄜ"
@@ -404,7 +404,7 @@ key k kind=letter a11y="ㄜ"
   normal
     shadow rect(779.88,190.5,874.13,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(779.88,190.5,874.13,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄜ" 804.69,241.23 system 400 44.63 #ff37474f
+    text "ㄜ" 805.94,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(779.88,190.5,874.13,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key l kind=letter a11y="ㄠ"
@@ -418,7 +418,7 @@ key l kind=letter a11y="ㄠ"
   normal
     shadow rect(889.88,190.5,984.13,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(889.88,190.5,984.13,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄠ" 914.69,241.23 system 400 44.63 #ff37474f
+    text "ㄠ" 915.94,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(889.88,190.5,984.13,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key ; kind=letter a11y="ㄤ"
@@ -432,7 +432,7 @@ key ; kind=letter a11y="ㄤ"
   normal
     shadow rect(999.88,190.5,1094.63,261.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(999.88,190.5,1094.63,258.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄤ" 1024.94,241.23 system 400 44.63 #ff37474f
+    text "ㄤ" 1026.19,241.23 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(999.88,190.5,1094.63,258.5 r=10.5,10.5,10.5,10.5) #1f000000
 key z kind=letter a11y="ㄈ"
@@ -446,7 +446,7 @@ key z kind=letter a11y="ㄈ"
   normal
     shadow rect(7.88,279.5,86.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,279.5,86.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄈ" 24.69,330.73 system 400 44.63 #ff37474f
+    text "ㄈ" 25.94,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(7.88,279.5,86.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key x kind=letter a11y="ㄌ"
@@ -460,7 +460,7 @@ key x kind=letter a11y="ㄌ"
   normal
     shadow rect(101.88,279.5,179.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(101.88,279.5,179.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄌ" 118.19,330.73 system 400 44.63 #ff37474f
+    text "ㄌ" 119.44,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(101.88,279.5,179.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key c kind=letter a11y="ㄏ"
@@ -474,7 +474,7 @@ key c kind=letter a11y="ㄏ"
   normal
     shadow rect(194.88,279.5,273.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(194.88,279.5,273.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄏ" 211.69,330.73 system 400 44.63 #ff37474f
+    text "ㄏ" 212.94,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(194.88,279.5,273.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key v kind=letter a11y="ㄒ"
@@ -488,7 +488,7 @@ key v kind=letter a11y="ㄒ"
   normal
     shadow rect(288.88,279.5,367.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(288.88,279.5,367.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄒ" 305.69,330.73 system 400 44.63 #ff37474f
+    text "ㄒ" 306.94,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(288.88,279.5,367.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key b kind=letter a11y="ㄖ"
@@ -502,7 +502,7 @@ key b kind=letter a11y="ㄖ"
   normal
     shadow rect(382.88,279.5,461.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(382.88,279.5,461.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄖ" 399.69,330.73 system 400 44.63 #ff37474f
+    text "ㄖ" 400.94,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(382.88,279.5,461.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key n kind=letter a11y="ㄙ"
@@ -516,7 +516,7 @@ key n kind=letter a11y="ㄙ"
   normal
     shadow rect(476.88,279.5,554.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(476.88,279.5,554.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄙ" 493.19,330.73 system 400 44.63 #ff37474f
+    text "ㄙ" 494.44,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(476.88,279.5,554.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key m kind=letter a11y="ㄩ"
@@ -530,7 +530,7 @@ key m kind=letter a11y="ㄩ"
   normal
     shadow rect(569.88,279.5,648.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(569.88,279.5,648.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄩ" 586.69,330.73 system 400 44.63 #ff37474f
+    text "ㄩ" 587.94,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(569.88,279.5,648.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key , kind=letter a11y="ㄝ"
@@ -544,7 +544,7 @@ key , kind=letter a11y="ㄝ"
   normal
     shadow rect(663.88,279.5,742.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(663.88,279.5,742.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄝ" 680.69,330.73 system 400 44.63 #ff37474f
+    text "ㄝ" 681.94,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(663.88,279.5,742.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key . kind=letter a11y="ㄡ"
@@ -558,7 +558,7 @@ key . kind=letter a11y="ㄡ"
   normal
     shadow rect(757.88,279.5,835.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(757.88,279.5,835.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄡ" 774.19,330.73 system 400 44.63 #ff37474f
+    text "ㄡ" 775.44,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(757.88,279.5,835.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key / kind=letter a11y="ㄥ"
@@ -572,7 +572,7 @@ key / kind=letter a11y="ㄥ"
   normal
     shadow rect(850.88,279.5,929.13,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(850.88,279.5,929.13,348.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "ㄥ" 867.69,330.73 system 400 44.63 #ff37474f
+    text "ㄥ" 868.94,330.73 system 400 42.12 #ff37474f
   pressed
     +2 fill rect(850.88,279.5,929.13,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"
@@ -586,8 +586,8 @@ key backspace kind=function role=backspace a11y="a11y_key_backspace"
     shadow rect(944.88,279.5,1094.63,351.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(944.88,279.5,1094.63,348.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
     icon backspace 988.25,282.5,1051.25,345.5 #ff7a858a
-    icon delete-sweep 1057,284,1086,313 #ff7a858a
-    icon restore 952,284,981,313 #ff7a858a
+    icon delete-sweep 1060.32,284,1086,309.68 #ff7a858a
+    icon restore 952,284,977.68,309.68 #ff7a858a
   pressed
     +2 fill rect(944.88,279.5,1094.63,348.5 r=10.5,10.5,10.5,10.5) #1f000000
 key symbols kind=function role=symbols a11y="符"
@@ -595,7 +595,7 @@ key symbols kind=function role=symbols a11y="符"
   shape rect(7.88,369.5,124.13,438.5 r=10.5,10.5,10.5,10.5)
   hit rect(0,359,132,449)
   anchor 66,404 up 0,-1
-  actions long-press="quickphrase" send="layout:Symbol"
+  actions send="layout:Symbol"
   text label="符"
   shortcut="fn/symbols"
   normal
@@ -609,7 +609,7 @@ key numbers kind=function role=numbers a11y="123"
   shape rect(139.88,369.5,257.13,438.5 r=10.5,10.5,10.5,10.5)
   hit rect(132,359,265,449)
   anchor 198.5,404 up 0,-1
-  actions long-press="unicode" send="layout:Number"
+  actions send="layout:Number"
   text label="123"
   shortcut="fn/numbers"
   normal
@@ -637,14 +637,14 @@ key space kind=space role=space a11y="空格，注音"
   shape rect(382.88,369.5,709.13,438.5 r=10.5,10.5,10.5,10.5)
   hit rect(375,359,717,449)
   anchor 546,404 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   text label="注音"
   sound=space shortcut="fn/space"
   normal
     shadow rect(382.88,369.5,709.13,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(382.88,369.5,709.13,438.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "注音" 516.5,414.88 system 400 29.01 #ff37474f
-    icon cursor-move 672,374,701,403 #ff7a858a
+    icon cursor-move 675.32,374,701,399.68 #ff7a858a
   pressed
     +2 fill rect(382.88,369.5,709.13,438.5 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function role=period a11y="。"
@@ -666,7 +666,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   shape rect(834.88,369.5,929.13,438.5 r=10.5,10.5,10.5,10.5)
   hit rect(827,359,937,449)
   anchor 882,404 up 0,-1
-  actions long-press="ime-picker" send="lang"
+  actions send="lang"
   shortcut="fn/lang"
   normal
     shadow rect(834.88,369.5,929.13,441.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

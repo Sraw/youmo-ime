@@ -79,10 +79,10 @@ class ThemePackLayoutsTest {
 
     private val nord by lazy { BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_nord) }
 
-    // the app's 26 keys named [name], q and w swiped up typing text of their own
+    // the app's 26 keys named [name], q and w swiped up typing text of their own (a theme's own swipes: the app's write none)
     private fun qwerty(name: String = "主题 26 键") = builtIn.text("qwerty")!!.replace("name=\"26 键\"", "name=\"$name\"")
-        .replace("send=\"q\" swipe-up=\"1\"", "send=\"q\" swipe-up=\"commit:qq\"")
-        .replace("send=\"w\" swipe-up=\"2\"", "send=\"w\" swipe-up=\"commit:ww\"")
+        .replace("send=\"q\"", "send=\"q\" swipe-up=\"commit:qq\"")
+        .replace("send=\"w\"", "send=\"w\" swipe-up=\"commit:ww\"")
 
     private fun zip(name: String, layouts: Map<String, String>) = ByteArrayOutputStream().also { bytes ->
         ZipOutputStream(bytes).use { zip ->
@@ -201,7 +201,7 @@ class ThemePackLayoutsTest {
     @Test
     fun theImportTellsTheKeyboardsUsedAndTheirCommitsEvenOnesWrittenAsReferences() {
         // e swiped up written c as a character reference: the reader decodes it, so it counts
-        val q = qwerty().replace("send=\"e\" swipe-up=\"3\"", "send=\"e\" swipe-up=\"&#99;ommit:ee\"")
+        val q = qwerty().replace("send=\"e\"", "send=\"e\" swipe-up=\"&#99;ommit:ee\"")
         val pack = opened("mine", mapOf("qwerty.xml" to q, "mine.xml" to "<keyboard/>", "k14.xml" to "<keyboard/>", "grouped-bottom.xml" to builtIn.text("grouped-bottom")!!))
         // the app's 26 keys have four (/ @ . .com), the pack two of its own and the referenced one
         val report = pack.staged.layoutReport

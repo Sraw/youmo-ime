@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.picker
 
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
-import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -29,7 +28,7 @@ class DefaultPickerPolicyTest {
     fun thePopupIsBuiltInAndCommittedAsShown() {
         val popup = policy.popup(",") as KeyDef.Popup.Keyboard.Explicit
         assertTrue(popup.asIs)
-        assertArrayEquals(PopupPreset[","], popup.items)
+        assertArrayEquals(arrayOf(".", "?", "!", ":", ";", "\"", "'", "(", ")", "~"), popup.items)
         assertArrayEquals(arrayOf("¢", "€", "£", "¥", "₹", "₽", "₺", "₩", "₱", "₿"), (policy.popup("$") as KeyDef.Popup.Keyboard.Explicit).items)
         assertTrue((policy.popup("1") as KeyDef.Popup.Keyboard.Explicit).items.isNotEmpty())
     }

@@ -721,7 +721,9 @@ class KeyboardHarness(
 
     /** The nine keys' key for [digit] (its small digit), or the column's punctuation key, whichever draws it. */
     // 微软's 九键双拼's 1 is marked 1; (its ; beside the digit)
-    fun nineKey(digit: String): ShownKey = keys().firstOrNull { it.alt == digit || it.alt == "$digit;" } ?: error("no key $digit in ${texts()}")
+    fun nineKey(digit: String): ShownKey = keys().firstOrNull { k -> (k as? SceneShownKey)?.node?.takeIf { it.copy == 0 }?.shortcut == "t9/$digit" }
+        // the old views' (no names): by the digit in its corner
+        ?: keys().firstOrNull { it.alt == digit || it.alt == "$digit;" } ?: error("no key $digit in ${texts()}")
 
     /**
      * Every text shown under [v] (visible ones only), depth first: a canvas's keys' labels, corners and

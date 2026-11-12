@@ -39,7 +39,7 @@ key space kind=space role=space a11y="a11y_key_space"
   shape rect(404.25,42,621.75,660 r=7.88,7.88,7.88,7.88)
   hit rect(378,0,648,702)
   anchor 513,351 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   sound=space shortcut="fn/space"
   normal
     fill rect(404.25,42,621.75,660 r=7.88,7.88,7.88,7.88) #ffc9ced1

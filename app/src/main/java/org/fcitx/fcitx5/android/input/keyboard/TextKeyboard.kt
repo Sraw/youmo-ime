@@ -39,9 +39,6 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
-import org.fcitx.fcitx5.android.input.popup.PopupOverrides
-import org.fcitx.fcitx5.android.input.popup.PopupOverridesCache
-import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneLetters
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
@@ -168,15 +165,6 @@ class TextKeyboard(
     private val letterCaseChoice by AppPrefs.getInstance().keyboard.letterCase
     private val letterCase: LetterCase get() = LetterCaseRule.forIme(letterCaseChoice.case, english = imeName == InputMethodNames.KEYBOARD)
 
-    // what the user made of the long press: a letter's first is its swipe and its corner too
-    private val popupOverridesPref = AppPrefs.getInstance().internal.popupOverrides
-
-    @Keep
-    private val popupOverridesListener = ManagedPreference.OnChangeListener<String> { _, _ ->
-        canvas?.invalidateScene()
-        // a swipe changed may type a table's code key no more, or now
-        showSemicolonKey()
-    }
 
     // the input method last reported, for the `;` key again when the 双拼 scheme changed meanwhile
     private var imeName = ""
@@ -241,8 +229,8 @@ class TextKeyboard(
             keepUppercase = keepLettersUppercase,
             letterCase = letterCase,
             punctuation = punctuationMapping,
-            // the corners and a table's roots
-            alts = alts(),
+            // the corners as said, and a table's roots
+            alts = keyReadings(layout),
             // a letter with no root left empty: the engine shows it as {case:x} would (Expand's root)
             other = SceneLetters.roots(table),
             // the formats as they are: the engine fills their places (getString with no arguments formats nothing)
@@ -259,28 +247,6 @@ class TextKeyboard(
         )
     }
 
-    // the letters' corners as last worked out, and what they were worked out from (cornerOf's inputs):
-    // the canvas asks for a scene on every change the views show (a key typed), and these change only as
-    // a setting or Shift does; the same map kept, the env compared with the last is equal at once
-    private data class AltsFor(val shown: Boolean, val resolver: KeyResolver?, val state: KeysState)
-
-    private var altsMade: Pair<AltsFor, Map<String, String>>? = null
-
-    // none where the long press's first's way draws nothing (its place 无, or off): a corner the scene does not draw
-    // is not said (TalkBack) or given (its node's extras, the harness)
-    private fun alts(): Map<String, String> {
-        val shown = firstShown()
-        val now = AltsFor(shown, keyResolver(), keyState())
-        altsMade?.takeIf { it.first == now }?.let { return it.second }
-        // each letter's first as the resolver has it (060-keys-unify §3.4), a labelled table's letter itself
-        val made = if (shown && now.resolver != null) {
-            SceneLetters.alts { c -> if (now.state.letterCorners) c.toString() else now.resolver.resolve(KeyId("full/$c"), now.state).firstShown }
-        } else {
-            emptyMap()
-        }
-        return made.also { altsMade = now to it }
-    }
-
     /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
     @VisibleForTesting
     val scenesMade: Int get() = sceneBoard?.scenesMade ?: 0
@@ -292,12 +258,6 @@ class TextKeyboard(
         canvas?.invalidateScene()
     }
 
-    // the letters' keys' definitions by their letters: their corners' (cornerOf)
-    private val letterDefs: Map<Char, KeyDef.Appearance.AltText> by lazy {
-        Layout.flatten().mapNotNull { (it.appearance as? KeyDef.Appearance.AltText)?.takeIf { a -> a.displayText.length == 1 && a.displayText[0] in 'A'..'Z' } }
-            .associateBy { it.displayText[0].lowercaseChar() }
-    }
-
     // a letter as its key shows it with no table's roots over it: Shift's case, kept upper case, or 拼音键字母大小写's
     private fun letterShown(letter: String) = LetterCaseRule.shown(letter, LetterCaseRule.upper(letterCase, shift(), keepUppercase = keepLettersUppercase))
 
@@ -305,14 +265,6 @@ class TextKeyboard(
         CapsState.None -> Shift.None
         CapsState.Once -> Shift.Once
         CapsState.Lock -> Shift.Lock
-    }
-
-    // a letter key's corner: its swipe (the long press's first, built in or the user's, as Shift has it) as
-    // the punctuation maps it; the letter itself while a table's roots are over it. The corners are kept
-    // by AltsFor: whatever new this reads goes into AltsFor too, or a change to it leaves the corners stale
-    private fun cornerOf(def: KeyDef.Appearance.AltText): String {
-        val letter = def.displayText.singleOrNull()?.takeIf { it.isLetter() }
-        return if (letter != null && table?.labelled == true) letter.lowercase() else transformPunctuation(swipeOverride(def) ?: def.altText)
     }
 
     override fun onAttachedToWindow() {
@@ -354,8 +306,13 @@ class TextKeyboard(
         canvas?.invalidateScene()
     }
 
-    // what the letters' swipes type, drawn in their corners
-    private fun cornerKeys(): Set<Char> = letterDefs.values.mapNotNullTo(HashSet()) { (swipeOverride(it) ?: it.altText).singleOrNull() }
+    // what the letters' swipes type, drawn in their corners: each letter's first as the resolver has it (as the
+    // keyboard is made: a list changed makes the keyboards anew)
+    private fun cornerKeys(): Set<Char> {
+        val resolver = keyResolver() ?: return emptySet()
+        val state = keyState()
+        return ('a'..'z').mapNotNullTo(HashSet()) { c -> resolver.resolve(KeyId("full/$c"), state).first?.text?.singleOrNull() }
+    }
 
     // glide typing (滑行输入) where the input method reads one; a stroke (笔画筛选) in pinyin's and 双拼's
     // the letters where the scene places them: each letter node of the scene by
@@ -388,13 +345,6 @@ class TextKeyboard(
         if (next == capsState) return
         capsState = next
         canvas?.invalidateScene()
-    }
-
-    private fun transformAlphabet(c: String): String {
-        return when (capsState) {
-            CapsState.None -> c.lowercase()
-            else -> c.uppercase()
-        }
     }
 
     private var punctuationMapping: Map<String, String> = mapOf()
@@ -500,17 +450,7 @@ class TextKeyboard(
                     super.onPopupAction(PopupAction.PreviewAction(action.key, roots, action.bounds))
                     return
                 }
-                when (action.keyboard) {
-                    is KeyDef.Popup.Keyboard.Preset -> {
-                        val label = action.keyboard.label
-                        if (label.length == 1 && label[0].isLetter())
-                            action.copy(
-                                keyboard = action.keyboard.copy(label = transformAlphabet(label))
-                            )
-                        else action
-                    }
-                    else -> action
-                }
+                action
             }
             else -> action
         }
@@ -531,47 +471,27 @@ class TextKeyboard(
                     else -> CapsState.None
                 }
             }
-        // Shift's icon, and a letter's corner, which is its swipe and follows Shift (swipeOverride)
+        // Shift's icon, and a letter's corner, which is its swipe and follows Shift (the resolver's, by KeyState.caps)
         canvas?.invalidateScene()
     }
 
-    // [keyboard]'s, a letter's long press, as a table's roots in a line, while the keys show them
+    // [keyboard]'s, a letter's long press (by its name, full/q), as a table's roots in a line, while the keys show them
     private fun rootsOf(keyboard: KeyDef.Popup.Keyboard): String? {
-        val letter = (keyboard as? KeyDef.Popup.Keyboard.Preset)?.label?.singleOrNull()?.lowercaseChar() ?: return null
+        val id = (keyboard as? KeyDef.Popup.Keyboard.Named)?.name?.let(KeyId::of)?.takeIf { it.form == "full" } ?: return null
+        val letter = id.key.singleOrNull()?.takeIf { it in 'a'..'z' } ?: return null
         return table?.rootsOf(letter)?.joinToString(" ")
     }
 
-    // a letter's swipe is the first of its long press, as built in (q: 1, then Q) and as the user
-    // changed it: one thing, drawn in its corner too (drawn by the scene); none when the user
-    // turned its long press off
-    override fun swipeText(def: KeyDef): SwipeChoice {
-        val letter = if (def is SceneKeyDef) swipeOverride(def.behavior.id) else (def.appearance as? KeyDef.Appearance.AltText)?.let(::swipeOverride)
-        return if (letter != null) SwipeChoice.of(letter) else super.swipeText(def)
-    }
-
-    private fun swipeOverride(def: KeyDef.Appearance.AltText): String? = swipeOverride(def.displayText)
-
-    // [key]'s, a letter's (Q or the scene's q)
-    private fun swipeOverride(key: String): String? {
-        val letter = key.takeIf { it.length == 1 && it[0].isLetter() }?.lowercase() ?: return null
-        // under Shift the long press shows the upper-case label's list (onPopupAction): so does the swipe
-        return PopupOverridesCache.user.current.swipeOf(letter, transformAlphabet(letter))
-    }
-
-    // last, after every field its scene reads (sceneEnv: altsMade, letterDefs, capsState, punctuationMapping)
+    // last, after every field its scene reads (sceneEnv: altsMade, capsState, punctuationMapping)
     init {
         // hidden until an input method says it types on it: shown, every one's A row had an 11th key
         // at a cold start, before fcitx reported the first
         showSemicolonKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
-        popupOverridesPref.registerOnChangeListener(popupOverridesListener)
         // the keys drawn by the scene engine, each wired as qwerty.xml's node says (U4 B)
         drawKeysWithScene(LAYOUT)
     }
 }
-
-/** What [label]'s long press offers: the user's list, else the built-in one; null where it is off. */
-internal fun PopupOverrides.longPressOf(label: String): Array<String>? = resolve(label, PopupPreset[label])
 
 // here, not in the companion: previewOf's JVM test would otherwise load TextKeyboard, a View; the
 // keys as the scene names them (qwerty.xml's ids); the 双拼 `;` is a key of the scheme, shown as it is too (; not ；)
@@ -589,13 +509,4 @@ internal fun previewOf(content: String, key: KeyRef, letter: (String) -> String,
     content.length != 1 || key.id in ADDRESS_NAMES -> content
     content[0].isLetter() -> letter(content)
     else -> punctuation(content)
-}
-
-/**
- * The first of [label]'s long press ([longPressOf]) as the user changed it, [label] being [letter] as
- * Shift shows it: null where the user changed neither (the built-in swipe), "" where that long press is off.
- */
-internal fun PopupOverrides.swipeOf(letter: String, label: String): String? {
-    if (this[letter] == null && this[label] == null) return null
-    return longPressOf(label)?.firstOrNull().orEmpty()
 }

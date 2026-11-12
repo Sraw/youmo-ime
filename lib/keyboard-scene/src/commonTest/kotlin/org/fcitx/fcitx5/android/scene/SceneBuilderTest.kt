@@ -150,7 +150,7 @@ class SceneBuilderTest {
         // the app's strings as given: the default ones English's
         val english = Forms.block.copy(texts = Texts(imeName = "English"))
         assertEquals("Space, English", keys("qwerty", english).getValue("space").a11y)
-        assertEquals("Q W, 1", keys("k14", english).getValue("r1c1").a11y)
+        assertEquals("Q W, 1", keys("k14", Forms.env("k14", english)).getValue("r1c1").a11y)
         // what is no group key reads as written, letters or not
         val plain = board(
             "symbols",
@@ -177,12 +177,23 @@ class SceneBuilderTest {
         val zx = k14.getValue("r3c1")
         assertEquals("Z X，～", zx.a11y, "the corner as shown, Chinese punctuation's")
         assertEquals("～", zx.alt)
-        assertEquals("{punct:~}", zx.altRaw)
+        assertNull(zx.altRaw, "no corner written: its name's first, as KeyDefaults has it")
+        // by its name, as the app reads them (Texts.alts): a named key's not there none, whatever its layout writes; a character
+        // key of mark="false" (no symbol drawn) none; a function key's its own
+        val told = Fixtures.portrait.copy(texts = Fixtures.portrait.texts.copy(alts = mapOf("full/a" to "@", "full/b" to "!", "full/c" to "#", "fn/x" to "⇥")))
+        val named = board(
+            "symbols",
+            "<row><key id=\"a\" label=\"a\" shortcut=\"full/a\"/><key id=\"b\" label=\"b\" mark=\"false\" shortcut=\"full/b\"/>" +
+                "<key id=\"d\" label=\"d\" alt=\"$\" shortcut=\"full/d\"/><key id=\"x\" kind=\"function\" label=\"x\" mark=\"false\" shortcut=\"x\"/></row>",
+        )
+        assertEquals(mapOf("a" to "@", "b" to null, "d" to null, "x" to "⇥"), Fixtures.scene(told, named).keys.associate { it.id to it.alt })
         val semicolon = Forms.env("k18", Forms.block).let { it.copy(input = it.input.copy(ime = "shuangpin", schemeTypes = setOf("semicolon"))) }
         assertEquals("L ;，-", Forms.scene("k18", semicolon).keys.single { it.label == "L;" }.a11y)
         val space = Forms.scene("symbols", Forms.env("symbols", Forms.block)).keys.single { it.role == "space" }
         assertEquals("a11y_key_space", space.a11y, "the panel's, as written")
-        assertEquals("space-long-press", space.actions["long-press"])
+        // its long press by its name, as every keyboard's space (KeyDefaults.FUNCTION_ACTIONS): none written
+        assertNull(space.actions["long-press"])
+        assertEquals("fn/space", space.shortcut)
         assertEquals("space", space.sound)
         assertNull(space.label?.takeIf { it.isNotBlank() }, "no input method's name on the panel's space")
     }

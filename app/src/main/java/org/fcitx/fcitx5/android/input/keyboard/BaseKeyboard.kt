@@ -52,7 +52,6 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
-import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
@@ -280,7 +279,8 @@ abstract class BaseKeyboard(
         override val inPasswordField get() = this@BaseKeyboard.inPasswordField
         override val charShortcutMarks get() = this@BaseKeyboard.charShortcutMarks
         override val strokesBeginOnKeys get() = this@BaseKeyboard.strokesBeginOnKeys
-        override fun swipeText(def: KeyDef) = def.shortcut?.let { resolving.swipe(it, placeholderOf(def)) } ?: this@BaseKeyboard.swipeText(def)
+        // a named key's the resolver's; a key of no name (a function key of no list too) its own swipe
+        override fun swipeText(def: KeyDef) = def.shortcut?.let { resolving.swipe(it, placeholderOf(def)) } ?: SwipeChoice.BuiltIn
         override fun onAction(action: KeyAction, source: KeyActionListener.Source) = this@BaseKeyboard.onAction(action, source)
         override fun onPopupAction(action: PopupAction) = this@BaseKeyboard.onPopupAction(action)
         override fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float) = this@BaseKeyboard.onPopupChangeFocus(key, x, y)
@@ -307,16 +307,13 @@ abstract class BaseKeyboard(
         spaceKeys.forEach { it.keyGesture.longPressFeedbackEnabled = takes }
     }
 
-    /** What swiping a key types: its own swipe, nothing, or what the user chose ([swipeText]). */
+    /** What swiping a key types: its own swipe, nothing, or its first, the resolver's ([KeyResolving.swipe]). */
     sealed interface SwipeChoice {
         /** The key's own [KeyDef.Behavior.Swipe], previewed as [KeyDef.Popup.AltPreview.alternative]. */
         data object BuiltIn : SwipeChoice
 
         /** Nothing: the user left the key nothing to swipe to (its long press is off). */
         data object None : SwipeChoice
-
-        /** The first of the long press, typed as the long press types it. */
-        data class Text(val text: String) : SwipeChoice
 
         /** A named key's first, the resolver's: typed as the item says, [shown] in the preview. */
         data class Output(val action: KeyAction, val shown: String) : SwipeChoice
@@ -325,7 +322,6 @@ abstract class BaseKeyboard(
         fun typed(builtIn: KeyAction): Pair<KeyAction, KeyActionListener.Source>? = when (this) {
             BuiltIn -> builtIn to KeyActionListener.Source.Keyboard
             None -> null
-            is Text -> PopupKeyboardUi.keyAction(text) to KeyActionListener.Source.Popup
             is Output -> action to KeyActionListener.Source.Popup
         }
 
@@ -333,25 +329,9 @@ abstract class BaseKeyboard(
         fun preview(alternative: String): String = when (this) {
             BuiltIn -> alternative
             None -> ""
-            is Text -> text
             is Output -> shown
         }
-
-        companion object {
-            /** What [TextKeyboard] found for a key (swipeOf): null for [BuiltIn], "" for [None]. */
-            fun of(text: String?): SwipeChoice = when {
-                text == null -> BuiltIn
-                text.isEmpty() -> None
-                else -> Text(text)
-            }
-        }
     }
-
-    /**
-     * What swiping the key of [def] to its long press's first types where the resolver has nothing of it (a key
-     * of no name, a function key of no list): [SwipeChoice.BuiltIn], what its key says ([TextKeyboard]: by the letter).
-     */
-    protected open fun swipeText(def: KeyDef): SwipeChoice = SwipeChoice.BuiltIn
 
     // the named keys as the resolver has them, the layout the keys are drawn from ([keyMarks]) its
     private val resolving = KeyResolving(object : KeyResolving.Board {
@@ -880,6 +860,13 @@ abstract class BaseKeyboard(
         keysLayout = layout
         return SceneBoard.marks(layout, charShortcutMarks, keysIm, keyState(), keysNineLetters)
     }
+
+    /**
+     * [layout]'s named keys' corners by name, as a screen reader says them (Texts.alts: 「Q W，1」, the user's first, 060-keys-unify
+     * §3.4); none where the long press's first is drawn nowhere ([firstShown]): a corner not drawn is not said.
+     */
+    protected fun keyReadings(layout: SceneLayout): Map<String, String> =
+        if (!firstShown()) emptyMap() else SceneBoard.resolver(layout, keysIm, keysNineLetters).readings(keyState())
 
     /** The keys' swipe marks drawn again, as what [charShortcutMarks] or the corners read changed. */
     protected fun showSwipeMarks() {

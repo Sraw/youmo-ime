@@ -5,8 +5,6 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.KeyState
-import org.fcitx.fcitx5.android.scene.keys.KeyId
-import org.fcitx.fcitx5.android.scene.keys.SlotDefaults
 import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
@@ -161,8 +159,9 @@ data class Input(
 
 /**
  * What the layout's bindings read (layout-1.xsd's `text`): the space's input method name, the comma
- * and full stop as punctuation maps them now, Return's label and icon, the letters' long press
- * firsts the user set ([alts]: none there, none drawn), [punctuation] the map, the rest by
+ * and full stop as punctuation maps them now, Return's label and icon, the named keys' long press
+ * firsts as drawn ([alts], by key name: `full/q`, `g14/qw`, `t9/2`; what a screen reader says of the
+ * corner, none there none said; null: none given, a key's `alt=` said), [punctuation] the map, the rest by
  * `name:arg` ([other]: `root:a`, `nine-letters:2`…).
  */
 data class Texts(
@@ -198,8 +197,9 @@ data class Texts(
 
 /**
  * What a way of a key's swipe draws (060-swipe-slots, KeyShortcutLooks): a command's [Icon] or a [Text]
- * (as shortcuts are drawn, at the shortcuts' size), [Corner] the key's own `alt` and [Symbol] a given
- * one (as symbols are, a corner's), or [Empty], nothing.
+ * (as shortcuts are drawn, at the shortcuts' size), a [Symbol] (as symbols are, a corner's: a long press's
+ * first, as the punctuation maps it), or [Empty], nothing. A key's `alt` is no mark: what it reaches is
+ * named in [MarkSettings.shortcuts] alone (060-keys-unify §3.4).
  */
 sealed interface MarkContent {
     data class Icon(val name: String) : MarkContent
@@ -217,18 +217,17 @@ sealed interface MarkContent {
         }
     }
     data class Symbol(val text: String) : MarkContent
-    data object Corner : MarkContent
     data object Empty : MarkContent
 
     /** Drawn as a symbol (a corner's look), not as a shortcut. */
-    val symbol: Boolean get() = this is Symbol || this == Corner
+    val symbol: Boolean get() = this is Symbol
 }
 
 /**
  * The marks' settings (rules B §7, 060-swipe-slots): every key has an up and a down way, each drawn
  * at its place ([upAt], [downAt]) where that way is on ([upOn], [downOn]), by [shortcuts]' names, the
- * layout's `shortcut=` and the way: `full/a:up`, `fn/space:down`. A character key with no name there
- * draws its [MarkContent.Corner] the way [firstUp] says and nothing the other; a function key nothing.
+ * layout's `shortcut=` and the way: `full/a:up`, `fn/space:down`; a key of no name there draws nothing
+ * (the app's are its resolver's, KeyResolver.marks; the theme maker's DefaultMarks').
  * [symbols] whether symbols are drawn at all, [charShortcuts] whether a character key's shortcuts are
  * (a table's roots take their room).
  */
@@ -240,28 +239,13 @@ data class MarkSettings(
     val upOn: Boolean = true,
     val downOn: Boolean = true,
     val firstUp: Boolean = true,
-    val shortcuts: Map<String, MarkContent> = PRESET,
+    val shortcuts: Map<String, MarkContent> = emptyMap(),
     /** The ways (`full/a:down`) the user set: their marks are kept over the built-in ones where two meet. */
     val user: Set<String> = emptySet(),
 ) {
     /** Whether [name]'s way [up] is one the user set. */
     fun isUser(name: String?, up: Boolean): Boolean = name != null && "$name:${if (up) "up" else "down"}" in user
 
-    /** [name]'s way [up] by [shortcuts], else its default: a character key's corner the way [firstUp], else nothing. */
-    fun of(name: String?, char: Boolean, up: Boolean): MarkContent =
-        name?.let { shortcuts["$it:${if (up) "up" else "down"}"] } ?: if (char && up == firstUp) MarkContent.Corner else MarkContent.Empty
-
-    companion object {
-        /**
-         * [SlotDefaults]' commands of the full keyboard's letters and the function keys, the long press's first up:
-         * a select all, c copy, x cut, v paste, z undo, y redo down; the space's edit menu, ⌫'s clear and restore.
-         */
-        val PRESET: Map<String, MarkContent> = (('a'..'z').map { KeyId("full/$it") } + listOf("space", "backspace").map(KeyId::function))
-            .flatMap { id ->
-                listOf(true, false).mapNotNull { up ->
-                    (SlotDefaults.of(id, up, firstUp = true) as? SlotDefaults.Slot.Command)
-                        ?.let { "${id.name}:${if (up) "up" else "down"}" to MarkContent.Icon(SlotDefaults.icon(it.key)) }
-                }
-            }.toMap()
-    }
+    /** [name]'s way [up] by [shortcuts]; nothing for a key of none. */
+    fun of(name: String?, up: Boolean): MarkContent = name?.let { shortcuts["$it:${if (up) "up" else "down"}"] } ?: MarkContent.Empty
 }

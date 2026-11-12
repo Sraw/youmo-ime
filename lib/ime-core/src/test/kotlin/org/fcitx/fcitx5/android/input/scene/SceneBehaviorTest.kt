@@ -115,14 +115,15 @@ class SceneBehaviorTest {
         val qw = SceneBehavior.of(keys("k14").getValue("r1c1"))
         // no send= written: its letters= are its tap (060-render-v2 §15)
         assertEquals(SceneAction.Group("qw"), qw.press)
-        assertEquals(SceneAction.Keypad(1), qw.swipe)
-        assertEquals(Bubble("QW", "1"), qw.bubble)
+        // its swipe by its name (KeyResolver, 060-keys-unify S6): none written, the bubble's corner the app's resolver's
+        assertNull(qw.swipe)
+        assertEquals(Bubble("QW", ""), qw.bubble)
         assertEquals(LongPopup.Letters("qw"), qw.popup)
         assertEquals("g14/qw", qw.shortcut)
         // the 18 keys' L is L; whatever its face: the group the engine reads
         val l = SceneBehavior.of(keys("k18").getValue("r2c6"))
         assertEquals(SceneAction.Group("l;"), l.press)
-        assertEquals(Bubble("L", "-"), l.bubble)
+        assertEquals(Bubble("L", ""), l.bubble)
         // a layout's own popup over the letters' (from="group" is theirs too)
         val listed = node("<key id=\"g\" label=\"AB\" letters=\"ab\"><popup from=\"list\"><item text=\"x\"/></popup></key>")
         assertEquals(LongPopup.Listed(listOf("x"), false), SceneBehavior.of(listed).popup)
@@ -133,23 +134,23 @@ class SceneBehaviorTest {
     }
 
     // 大千 (060-render-p2 S4c): a symbol's and a tone's tap the keyboard's table's, no long press, the
-    // bubble its face both ways (AltPreview(c, c)): swiped, the shortcut it reaches shows in its place
+    // bubble its face (AltPreview(c, ""), the corner a named key's resolver's): swiped, the shortcut it reaches shows in its place
     @Test
     fun dachensKeysTypeByTheTableAndTheirBubbleShowsTheShortcutSwipedTo() {
         val k = keys("zhuyin").mapValues { SceneBehavior.of(it.value) }
         val q = k.getValue("q")
         assertEquals(SceneAction.Placeholder("zhuyin"), q.press)
-        assertEquals(Bubble("ㄆ", "ㄆ"), q.bubble)
+        assertEquals(Bubble("ㄆ", ""), q.bubble)
         assertNull(q.popup)
         assertNull(q.swipe)
         assertEquals("zyfull/q", q.shortcut)
         assertEquals(mapOf("3" to "tone-3", "4" to "tone-4", "6" to "tone-2", "7" to "tone-5"), listOf("3", "4", "6", "7").associateWith { (k.getValue(it).press as SceneAction.Placeholder).name })
-        assertEquals(Bubble("ˇ", "ˇ"), k.getValue("3").bubble)
+        assertEquals(Bubble("ˇ", ""), k.getValue("3").bubble)
         // a letter of no shortcut its face alone; a swipe's own corner whatever its shortcut
         assertEquals(Bubble("A", null), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\"/>")).bubble)
         assertEquals(Bubble("A", "!"), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\" swipe-up=\"!\" shortcut=\"x/a\"/>")).bubble)
-        // the bottom row's comma (a function key's kind) as it was: no corner
-        assertEquals(Bubble(",", null), k.getValue("comma").bubble)
+        // the bottom row's comma (a function key's kind): named, its corner the resolver's too
+        assertEquals(Bubble(",", ""), k.getValue("comma").bubble)
     }
 
     // 注音九键 (060-render-p2 S4d) as its views: a group types by the table, its bubble its face both ways, its
@@ -161,20 +162,20 @@ class SceneBehaviorTest {
         val k = keys("zhuyin-nine").mapValues { SceneBehavior.of(it.value) }
         val g = k.getValue("r1c2")
         assertEquals(SceneAction.Placeholder("zhuyin"), g.press)
-        assertEquals(Bubble("ㄅㄉㄚ", "ㄅㄉㄚ"), g.bubble)
+        assertEquals(Bubble("ㄅㄉㄚ", ""), g.bubble)
         assertEquals(SceneBehavior.LongPopup.Composed("group"), g.popup)
         assertEquals("zy9/1", g.shortcut)
         val tone = k.getValue("r1c1")
-        assertEquals(Bubble("ˉ", null), tone.bubble)
+        assertEquals(Bubble("ˉ", ""), tone.bubble)
         assertNull(tone.swipe)
         assertEquals("zy9/tone-1", tone.shortcut)
         assertEquals(SceneBehavior.LongPopup.Listed(listOf("˙"), false), tone.popup)
         for ((id, mark) in listOf("r2c1" to "ˊ", "r3c1" to "ˇ", "r4c1" to "ˋ")) {
-            assertEquals(Bubble(mark, null), k.getValue(id).bubble)
+            assertEquals(Bubble(mark, ""), k.getValue(id).bubble)
             assertNull(k.getValue(id).popup)
         }
         for ((id, c) in listOf("r2c5" to "?", "r3c5" to "!", "r4c5" to "~")) {
-            assertEquals(Bubble(c, null), k.getValue(id).bubble)
+            assertEquals(Bubble(c, ""), k.getValue(id).bubble)
             assertEquals(SceneBehavior.LongPopup.Preset(c, true), k.getValue(id).popup)
             assertEquals(SceneAction.Key(c), k.getValue(id).press)
         }
@@ -218,7 +219,7 @@ class SceneBehaviorTest {
         assertNull("a function key shows no bubble", separator.bubble)
         assertNull(separator.popup)
         val comma = k.getValue("comma")
-        assertEquals(Bubble(",", null), comma.bubble)
+        assertEquals(Bubble(",", ""), comma.bubble)
         assertEquals(LongPopup.Preset(",", true), comma.popup)
         val space = k.getValue("space")
         assertTrue(space.bothWays)
@@ -237,6 +238,31 @@ class SceneBehaviorTest {
     }
 
     // the same node, the same behaviour: a scene made anew keeps the keys made for the last
+    // 060-keys-unify §5: a function key's action long press by its name alone, on every keyboard that has it (the
+    // number pad's space and !?# too, the layouts writing none)
+    @Test
+    fun aFunctionKeysLongPressIsItsNamesOnEveryKeyboard() {
+        val want = mapOf(
+            "fn/space" to SceneAction.Command("space-long-press"),
+            "fn/symbols" to SceneAction.Command("quickphrase"),
+            "fn/numbers" to SceneAction.Command("unicode"),
+            "fn/lang" to SceneAction.Command("ime-picker"),
+        )
+        val seen = HashSet<String>()
+        for (board in listOf("qwerty", "nine", "k14", "handwriting", "number")) {
+            for (node in keys(board).values.filter { it.shortcut in want }) {
+                assertEquals("$board ${node.shortcut}", want[node.shortcut], SceneBehavior.of(node).longPress)
+                seen += "$board ${node.shortcut}"
+            }
+        }
+        assertTrue(seen.toString(), "number fn/space" in seen && "number fn/symbols" in seen && "qwerty fn/lang" in seen)
+        // Shift's caps lock, on the keyboards that show it
+        val shift = keys("qwerty").getValue("shift")
+        assertEquals(SceneAction.of("caps:lock"), SceneBehavior.of(shift).longPress)
+        // a key of no such name: none
+        assertNull(SceneBehavior.of(keys("qwerty").getValue("backspace")).longPress)
+    }
+
     @Test
     fun aKeyThatDoesTheSameIsEqual() {
         val a = SceneBehavior.of(keys("k14").getValue("r2c1"))

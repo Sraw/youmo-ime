@@ -26,11 +26,10 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
-import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
@@ -71,28 +70,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val appLanguage = string("app_language", "")
 
         /**
-         * See [org.fcitx.fcitx5.android.input.popup.PopupOverrides] for the format. A letter's first
-         * is also what swiping it types, drawn in its corner.
-         */
-        val popupOverrides = string(POPUP_OVERRIDES, "")
-
-        /**
          * See [org.fcitx.fcitx5.android.input.shortcut.SwipeSlots] for the format: every key's 上滑 and 下滑
          * the user set (060-swipe-slots); 0.5's `key_shortcuts` and 滑动 move here ([dropRetired]).
          */
         val keySwipes = string(KEY_SWIPES, "")
 
         /**
-         * The long presses the user set of the keys of the keyboards other than 全键盘, by the key's name
-         * (`t9/2`, `g14/cv`): [org.fcitx.fcitx5.android.input.popup.PopupOverrides]' format with the name for
-         * the label. 全键盘's are [popupOverrides]', by the letter.
-         */
-        val keyPopups = string(KEY_POPUPS, "")
-
-        /**
          * Every key's long press the user set, of every keyboard ([org.fcitx.fcitx5.android.input.keys.KeyLists],
-         * `@1` first; 060-keys-unify §2): [popupOverrides], [keyPopups] and [Keyboard.t9Symbols] moved here once
-         * ([dropRetired]), those kept as they were for a downgrade (§4.4). A plain setting, never `hidden`: a backup's
+         * `@1` first; 060-keys-unify §2): 0.5's and the betas' [POPUP_OVERRIDES], [KEY_POPUPS] and [T9_SYMBOLS] moved here
+         * once ([dropRetired]), those kept as they were for a downgrade (§4.4), no longer settings of this version. A plain setting, never `hidden`: a backup's
          * would be reset after its import and the old ones migrated again (m2). 全部恢复默认 writes [KeyLists.HEADER], the
          * default, never removes it: the old ones would come back at the next start. Whether to migrate is read from what
          * is stored ([storedKeyLists]), never through this, which reads the default where nothing is.
@@ -310,13 +296,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 InputMethodCatalog.ENGLISH -> englishKeyboard.setValue(EnglishKeyboard.of(keyboard))
             }
         }
-
-        /**
-         * 0.5's and the betas' symbols of 九键's keys 1 to 9 ([NineKeySymbols.serialize], empty as by default): no
-         * page sets it now (060-keys-unify S5: 按键字符和快捷键's 九键 tab edits key_lists); read only by the
-         * migration to key_lists, gone in S6.
-         */
-        val t9Symbols = string(T9_SYMBOLS, "")
 
         /** Shown on the English page (InputMethodSettings), not here: English's alone. */
         val englishAutoCaps = bool(ENGLISH_AUTO_CAPS, true)
@@ -779,12 +758,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             listOf(
                 internal.verboseLog,
                 internal.editorInfoInspector,
-                // every key's long press and swipe: a password may be typed with them before the first unlock
-                internal.keyLists,
+                // every key's swipe: a password may be typed with it before the first unlock (its long press below)
                 internal.keySwipes,
-                // the old long presses too, while their keyboards read them (060-keys-unify S6 removes both)
-                internal.popupOverrides,
-                internal.keyPopups,
                 // the bar is there before the first unlock too
                 internal.toolbarButtons,
                 advanced.ignoreSystemCursor,
@@ -802,6 +777,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                     it.value.putValueTo(this@edit)
                 }
             }
+            // every key's long press as stored, none where none is (not yet migrated: migrated there from the old ones in
+            // memory, KeyListsCache), never the `@1` the setting reads then, which would hide the old ones there for good;
+            // the old ones themselves no longer copied (060-keys-unify S6): what is there from before stays till then
+            storedKeyLists()?.let { putString(KEY_LISTS, it) } ?: remove(KEY_LISTS)
         }
     }
 
@@ -830,21 +809,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     /** `key_lists` [text] as stored, or removed where null (not stored yet: migrated at the next start, read from the old ones till then). */
     fun setStoredKeyLists(text: String?) = sharedPreferences.edit { if (text == null) remove(KEY_LISTS) else putString(KEY_LISTS, text) }
 
-    /**
-     * An old long press ([POPUP_OVERRIDES], [KEY_POPUPS], [T9_SYMBOLS]) changed on its page (before 060-keys-unify S5
-     * replaces those): stored, and `key_lists` removed in the same edit, so they are migrated again at the next start
-     * and read so till then ([org.fcitx.fcitx5.android.input.keys.KeyListsCache]). Never one without the other.
-     */
-    fun setOldLongPress(key: String, text: String) = sharedPreferences.edit {
-        putString(key, text)
-        remove(KEY_LISTS)
-    }
-
     /** An old long press as stored, null where it is not (or is another type): read so, nothing written back. */
     fun storedOldLongPress(key: String): String? = runCatching { sharedPreferences.getString(key, null) }.getOrNull()
 
     /**
-     * 0.5's and 0.6's betas' long presses ([Internal.popupOverrides], [Internal.keyPopups], [Keyboard.t9Symbols])
+     * 0.5's and 0.6's betas' long presses ([POPUP_OVERRIDES], [KEY_POPUPS], [T9_SYMBOLS])
      * as [Internal.keyLists] (KeyListsMigration, 060-keys-unify §4.3): run while it is not of the format (never
      * stored, a 0.5 or beta backup restored), once. The old ones kept as they are, for a downgrade (§4.4).
      */

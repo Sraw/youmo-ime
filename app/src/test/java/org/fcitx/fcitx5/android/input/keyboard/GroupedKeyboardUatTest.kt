@@ -540,7 +540,7 @@ class GroupedKeyboardUatTest {
         val scheme = EngineState.shuangpinScheme
         EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
         prefs.later { EngineState.shuangpinScheme = scheme }
-        prefs.set(AppPrefs.getInstance().keyboard.t9Symbols, "2 ~")
+        prefs.setList("t9/2", listOf("~"))
         nineSp()
         chinesePunctuation(shuangpin, ";" to "；", ":" to "：", "~" to "～")
         h.relayout()

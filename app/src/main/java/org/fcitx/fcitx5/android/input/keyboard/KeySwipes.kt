@@ -11,7 +11,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.popup.PopupAction
-import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -103,7 +102,7 @@ internal class KeySwipes(
         val hasFirst = when (first) {
             BaseKeyboard.SwipeChoice.BuiltIn -> builtIn
             BaseKeyboard.SwipeChoice.None -> false
-            is BaseKeyboard.SwipeChoice.Text, is BaseKeyboard.SwipeChoice.Output -> true
+            is BaseKeyboard.SwipeChoice.Output -> true
         }
         val slots = SwipeSlotsCache.current
         if (name == null) return KeySwipe.Key.unnamed(slots.orientation, hasFirst)
@@ -254,7 +253,6 @@ internal class KeySwipes(
             KeySwipe.Outcome.Symbol -> {
                 // the long press's first: the key's own swipe, or the first of a long press the user set
                 when (val choice = reach(key.ref, def).first) {
-                    is BaseKeyboard.SwipeChoice.Text -> keyboard.onAction(PopupKeyboardUi.keyAction(choice.text), KeyActionListener.Source.Popup)
                     is BaseKeyboard.SwipeChoice.Output -> keyboard.onAction(choice.action, KeyActionListener.Source.Popup)
                     else -> builtIn?.let { choice.typed(it) }?.let { (action, source) -> keyboard.onAction(action, source) }
                 }

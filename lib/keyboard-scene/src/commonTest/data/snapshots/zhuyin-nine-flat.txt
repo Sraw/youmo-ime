@@ -260,7 +260,7 @@ key symbols kind=function role=symbols a11y="符"
   shape rect(7.88,580.38,122.13,683.63)
   hit rect(0,562,130,702)
   anchor 65,632 up 0,-1
-  actions long-press="quickphrase" send="layout:Symbol"
+  actions send="layout:Symbol"
   text label="符"
   shortcut="fn/symbols"
   normal
@@ -272,7 +272,7 @@ key numbers kind=function role=numbers a11y="123"
   shape rect(137.88,580.38,251.13,683.63)
   hit rect(130,562,259,702)
   anchor 194.5,632 up 0,-1
-  actions long-press="unicode" send="layout:Number"
+  actions send="layout:Number"
   text label="123"
   shortcut="fn/numbers"
   normal
@@ -296,7 +296,7 @@ key space kind=space role=space a11y="空格，注音"
   shape rect(393.25,597.88,675.75,666.13 r=7.88,7.88,7.88,7.88)
   hit rect(367,562,702,702)
   anchor 534.5,632 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   text label="注音"
   sound=space shortcut="fn/space"
   normal
@@ -322,7 +322,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   shape rect(817.88,580.38,910.13,683.63)
   hit rect(810,562,918,702)
   anchor 864,632 up 0,-1
-  actions long-press="ime-picker" send="lang"
+  actions send="lang"
   shortcut="fn/lang"
   normal
     icon language 832.5,600.5,895.5,663.5 #ff7a858a

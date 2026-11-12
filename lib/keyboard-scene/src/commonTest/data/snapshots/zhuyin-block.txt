@@ -237,6 +237,7 @@ key y kind=letter a11y="ㄗ"
     shadow rect(547.88,158.38,640.13,265.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(547.88,158.38,640.13,262.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "ㄗ" 567.75,230.19 system 400 52.5 #ff37474f
+    icon redo 555.75,162.41,584.75,191.41 #ff7a858a
   pressed
     +2 fill rect(547.88,158.38,640.13,262.63 r=10.5,10.5,10.5,10.5) #1f000000
 key u kind=letter a11y="ㄧ"
@@ -307,6 +308,7 @@ key a kind=letter a11y="ㄇ"
     shadow rect(7.88,299.38,100.13,405.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,299.38,100.13,402.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "ㄇ" 27.75,370.69 system 400 52.5 #ff37474f
+    icon select-all 15.75,302.81,44.75,331.81 #ff7a858a
   pressed
     +2 fill rect(7.88,299.38,100.13,402.63 r=10.5,10.5,10.5,10.5) #1f000000
 key s kind=letter a11y="ㄋ"
@@ -447,6 +449,7 @@ key z kind=letter a11y="ㄈ"
     shadow rect(7.88,439.38,84.13,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,439.38,84.13,543.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "ㄈ" 19.75,511.19 system 400 52.5 #ff37474f
+    icon undo 15.75,443.21,44.75,472.21 #ff7a858a
   pressed
     +2 fill rect(7.88,439.38,84.13,543.63 r=10.5,10.5,10.5,10.5) #1f000000
 key x kind=letter a11y="ㄌ"
@@ -461,6 +464,7 @@ key x kind=letter a11y="ㄌ"
     shadow rect(99.88,439.38,176.13,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(99.88,439.38,176.13,543.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "ㄌ" 111.75,511.19 system 400 52.5 #ff37474f
+    icon content-cut 107.55,443.21,136.55,472.21 #ff7a858a
   pressed
     +2 fill rect(99.88,439.38,176.13,543.63 r=10.5,10.5,10.5,10.5) #1f000000
 key c kind=letter a11y="ㄏ"
@@ -475,6 +479,7 @@ key c kind=letter a11y="ㄏ"
     shadow rect(191.88,439.38,267.13,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(191.88,439.38,267.13,543.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "ㄏ" 203.25,511.19 system 400 52.5 #ff37474f
+    icon content-copy 199.35,443.21,228.35,472.21 #ff7a858a
   pressed
     +2 fill rect(191.88,439.38,267.13,543.63 r=10.5,10.5,10.5,10.5) #1f000000
 key v kind=letter a11y="ㄒ"
@@ -489,6 +494,7 @@ key v kind=letter a11y="ㄒ"
     shadow rect(282.88,439.38,359.13,546.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(282.88,439.38,359.13,543.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "ㄒ" 294.75,511.19 system 400 52.5 #ff37474f
+    icon content-paste 291.15,443.21,320.15,472.21 #ff7a858a
   pressed
     +2 fill rect(282.88,439.38,359.13,543.63 r=10.5,10.5,10.5,10.5) #1f000000
 key b kind=letter a11y="ㄖ"
@@ -595,7 +601,7 @@ key symbols kind=function role=symbols a11y="符"
   shape rect(7.88,580.38,122.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,562,130,702)
   anchor 65,632 up 0,-1
-  actions long-press="quickphrase" send="layout:Symbol"
+  actions send="layout:Symbol"
   text label="符"
   shortcut="fn/symbols"
   normal
@@ -609,7 +615,7 @@ key numbers kind=function role=numbers a11y="123"
   shape rect(137.88,580.38,251.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(130,562,259,702)
   anchor 194.5,632 up 0,-1
-  actions long-press="unicode" send="layout:Number"
+  actions send="layout:Number"
   text label="123"
   shortcut="fn/numbers"
   normal
@@ -637,7 +643,7 @@ key space kind=space role=space a11y="空格，注音"
   shape rect(374.88,580.38,694.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(367,562,702,702)
   anchor 534.5,632 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   text label="注音"
   sound=space shortcut="fn/space"
   normal
@@ -666,7 +672,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   shape rect(817.88,580.38,910.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(810,562,918,702)
   anchor 864,632 up 0,-1
-  actions long-press="ime-picker" send="lang"
+  actions send="lang"
   shortcut="fn/lang"
   normal
     shadow rect(817.88,580.38,910.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

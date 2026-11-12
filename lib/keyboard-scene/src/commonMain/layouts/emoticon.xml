@@ -11,7 +11,7 @@
     <key id="comma" kind="function" width="10" label="{punct:,}" text-size="23" send="," shortcut="comma"/>
     <key id="emoji" kind="letter" class="alt-text" width="10" icon="emoji" a11y="a11y_key_emoji" send="picker:Emoji"/>
     <key id="space" role="space" kind="space" face="special" width="fill" text-size="13" a11y="a11y_key_space" badge="{hold-badge}" sound="space" send="sym:space"
-         long-press="space-long-press" swipe-axis="both" shortcut="space"/>
+         swipe-axis="both" shortcut="space"/>
     <key id="period" kind="function" width="10" label="{punct:.}" text-size="23" send="." shortcut="period"/>
     <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>

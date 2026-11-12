@@ -52,7 +52,7 @@ class BackspaceMarksTest {
             for (board in listOf("qwerty", "k14", "k18", "nine", "number", "symbols", "zhuyin", "handwriting", "zhuyin-nine")) {
                 val k = d / Forms.DENSITY
                 val e = Forms.env(board, Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d))
-                val s = Forms.scene(board, e.copy(marks = MarkSettings(upAt = KeyMarks.At.TopRight, downAt = down)))
+                val s = Forms.scene(board, e.copy(marks = e.marks.copy(upAt = KeyMarks.At.TopRight, downAt = down)))
                 assertEquals(setOf("backspace", "delete-sweep", "restore"), icons(s, "backspace").map { it.name }.toSet(), "$board at $d")
             }
         }

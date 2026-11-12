@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.scene
 
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeySwipe
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -21,7 +21,6 @@ import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.Row
-import org.fcitx.fcitx5.android.scene.rules.KeyMarks as SceneKeyMarks
 
 /**
  * What the 26 keys (TextKeyboard) show as the input is, as values: what qwerty.xml's `when=` asks of
@@ -76,15 +75,12 @@ data class TextBoardState(
 }
 
 /**
- * The letters' texts the 26 keys' bindings read ([org.fcitx.fcitx5.android.scene.engine.Texts]):
- * `{alt:x}` each letter's corner as the keyboard shows it ([corner]: null, none), `{root:x}` what a
- * table shows over it ([TableKeyboard.label]; the letter as [letter] shows it where the table has none).
+ * The letters' texts the 26 keys' bindings read ([org.fcitx.fcitx5.android.scene.engine.Texts]): `{root:x}` what a
+ * table shows over it ([TableKeyboard.label]; the letter itself where the table has none). The corners are the
+ * resolver's, by key name (KeyResolver.readings).
  */
 object SceneLetters {
     private val LETTERS = 'a'..'z'
-
-    fun alts(corner: (Char) -> String?): Map<String, String> =
-        LETTERS.mapNotNull { c -> corner(c)?.let { c.toString() to it } }.toMap()
 
     /**
      * `root:x`'s, for Texts.other: none where [table] shows no roots; "" for a letter with none, which the
@@ -100,8 +96,8 @@ object SceneMarks {
     /**
      * [names]' marks (a layout's keys', [names]) as [slots] has them, 上滑 and 下滑 on as [ways] are,
      * drawn at [upAt] and [downAt]; a character key's shortcuts drawn where [charShortcuts] (a table's
-     * roots take their room). A long press's first is the key's corner, unless [firsts] has the key:
-     * the first of a long press the user set by the key's name (null: turned off), or a function key's.
+     * roots take their room). A long press's first is [firsts]' by the key's name (null or none there: nothing
+     * drawn; the keyboards' marks are their resolver's, KeyResolver.marks, which knows every key's).
      */
     @Suppress("LongParameterList")
     fun settings(
@@ -119,17 +115,15 @@ object SceneMarks {
         for (name in names) {
             for (up in listOf(true, false)) {
                 if (slots.isSet(name, up)) user += "$name:${if (up) "up" else "down"}"
-                val first = if (name in firsts) firsts[name]?.let(MarkContent::Symbol) ?: MarkContent.Empty else MarkContent.Corner
                 marks["$name:${if (up) "up" else "down"}"] = when (val slot = slots.resolve(name, up)) {
-                    // a function key has no corner: its first is its long press's ([firsts]), or nothing
-                    SwipeSlot.First -> if (first == MarkContent.Corner && SwipeSlots.isFunction(name)) MarkContent.Empty else first
+                    SwipeSlot.First -> firsts[name]?.let(MarkContent::Symbol) ?: MarkContent.Empty
                     else -> content(slot.shortcut) ?: MarkContent.Empty
                 }
             }
         }
         return MarkSettings(
-            upAt = at(upAt),
-            downAt = at(downAt),
+            upAt = upAt,
+            downAt = downAt,
             charShortcuts = charShortcuts,
             upOn = ways.up,
             downOn = ways.down,
@@ -153,7 +147,7 @@ object SceneMarks {
         KeyShortcut.None -> null
     }
 
-    /** A command's icon as the scene names it ([MarkSettings.PRESET]'s names); the app draws each name's drawable. */
+    /** A command's icon as the scene names it (SlotDefaults.icon's names); the app draws each name's drawable. */
     fun icon(command: KeyCommand): String = when (command) {
         KeyCommand.SelectAll -> "select-all"
         KeyCommand.Copy -> "content-copy"
@@ -163,6 +157,4 @@ object SceneMarks {
         KeyCommand.EditMenu -> "cursor-move"
         else -> command.key.replace('_', '-')
     }
-
-    internal fun at(a: KeyMarks.At): SceneKeyMarks.At = SceneKeyMarks.At.valueOf(a.name)
 }

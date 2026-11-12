@@ -301,7 +301,7 @@ key symbols kind=function role=symbols a11y="符"
   shape rect(7.88,433.5,124.13,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(0,423,132,529)
   anchor 66,476 up 0,-1
-  actions long-press="quickphrase" send="layout:Symbol"
+  actions send="layout:Symbol"
   text label="符"
   shortcut="fn/symbols"
   normal
@@ -315,7 +315,7 @@ key numbers kind=function role=numbers a11y="123"
   shape rect(139.88,433.5,257.13,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(132,423,265,529)
   anchor 198.5,476 up 0,-1
-  actions long-press="unicode" send="layout:Number"
+  actions send="layout:Number"
   text label="123"
   shortcut="fn/numbers"
   normal
@@ -343,7 +343,7 @@ key space kind=space role=space a11y="空格，注音"
   shape rect(382.88,433.5,709.13,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(375,423,717,529)
   anchor 546,476 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   text label="注音"
   sound=space shortcut="fn/space"
   normal
@@ -372,7 +372,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   shape rect(834.88,433.5,929.13,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(827,423,937,529)
   anchor 882,476 up 0,-1
-  actions long-press="ime-picker" send="lang"
+  actions send="lang"
   shortcut="fn/lang"
   normal
     shadow rect(834.88,433.5,929.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

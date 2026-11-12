@@ -243,9 +243,9 @@ class GroupedKeyboardOwnGroupsTest {
     fun theLongPressIsItsLettersOrTheOneItsLayoutWrote() {
         val keyboard = grouped()
         val sentinel = KeyDef.Popup.Keyboard.Explicit(arrayOf("?"))
-        // no popup written: its letters, made as it opens; PQRS swipes no corner, so none among them
-        keyboard.onPopupAction(PopupAction.ShowKeyboardAction(keyboard.shownKey("PQRS").ref(), sentinel, Rect()))
-        val letters = (popups.single() as PopupAction.ShowKeyboardAction).keyboard as KeyDef.Popup.Keyboard.Explicit
+        // no popup written and no name: its letters' built-in list (KeyDefaults.grouped); PQRS swipes no corner, so none among them
+        keyboard.touch(keyboard.shownKey("PQRS"), 0.5f, 0.5f, heldMillis = 1_500)
+        val letters = popups.filterIsInstance<PopupAction.ShowKeyboardAction>().single().keyboard as KeyDef.Popup.Keyboard.Explicit
         assertEquals(listOf("P", "Q", "R", "S", "p", "q", "r", "s"), letters.items.take(8))
         assertEquals(8, letters.symbolsFrom)
         assertEquals(4, letters.inRow)

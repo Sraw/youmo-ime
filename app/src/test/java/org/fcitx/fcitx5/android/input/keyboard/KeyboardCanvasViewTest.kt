@@ -38,7 +38,6 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.under
-import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -295,9 +294,7 @@ class KeyboardCanvasViewTest {
         var cornerSize = ""
         fun corner(ops: List<String>) = texts(ops).single { it[3] == cornerSize }
         // é, not a symbol: under Shift the long press's list is upper-cased, É, which a corner kept from before Shift is not
-        val overrides = PopupOverrides.Empty.with("q", listOf("é", "1"))
         harness().use { h ->
-            val board = h.textKeyboard()
             var was = q(h)
             fun changed(what: String, change: () -> Unit) {
                 change()
@@ -305,11 +302,11 @@ class KeyboardCanvasViewTest {
                 assertTrue("$what: q drawn as before, $now", now != was)
                 was = now
             }
-            val internal = AppPrefs.getInstance().internal
             val keyboard = AppPrefs.getInstance().keyboard
-            changed("q's long press the user's") { prefs.set(internal.popupOverrides, overrides.serialize()) }
+            changed("q's long press the user's") { prefs.setList("full/q", listOf("é", "1"), first = "é") }
             cornerSize = texts(was).single { it[0] == "é" }[3]
-            changed("the punctuation mapped") { board.onPunctuationUpdate(mapOf("é" to "ω")) }
+            // the keyboard made anew by the change of the lists (FcitxInputMethodService.remakeKeyboardsPrefs): the one shown now
+            changed("the punctuation mapped") { h.textKeyboard().onPunctuationUpdate(mapOf("é" to "ω")) }
             assertEquals(was.toString(), "ω", corner(was)[0])
             changed("a shortcut on q") {
                 prefs.setShortcuts(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")))
@@ -325,7 +322,7 @@ class KeyboardCanvasViewTest {
             val before = corner(was)[0]
             h.tap(h.keyView("shift"))
             val shifted = corner(q(h))[0]
-            assertEquals(overrides.swipeOf("q", "Q"), shifted)
+            assertEquals("É", shifted)
             assertNotEquals(before, shifted)
         }
         // a table's roots over the letters and not: the corner the letter itself, then the swipe again
@@ -463,7 +460,7 @@ class KeyboardCanvasViewTest {
     // the user's own long press first on a letter: its corner, the preset's where the user set none
     @Test
     fun aCornerIsTheUsersLongPressFirst() {
-        prefs.set(AppPrefs.getInstance().internal.popupOverrides, "w %")
+        prefs.setList("full/w", listOf("%"), first = "%")
         harness().use { h ->
             val c = h.canvas()!!
             assertEquals("1", c.keyAt("q")?.alt)

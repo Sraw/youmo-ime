@@ -56,7 +56,7 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLook
  * Both are drawn by the scene ([layoutOf]: 大千's zhuyin.xml, 060-render-p2 S4c;
  * 注音九键's zhuyin-nine.xml, S4d) and wired from their layouts: what their keys send is the layouts'
  * `action:` placeholders, each this keyboard's ([placeholder]), a group's long press its symbols
- * ([groupPopup]), and what the slot and the bottom row show their state ([sceneEnv]), drawn again as it changes.
+ * (the resolver's, by their names), and what the slot and the bottom row show their state ([sceneEnv]), drawn again as it changes.
  */
 @SuppressLint("ViewConstructor")
 class ZhuyinKeyboard(
@@ -139,19 +139,9 @@ class ZhuyinKeyboard(
 
         private const val TONE = "tone-"
 
-        /**
-         * 注音九键's group's long press (its layout's `popup from="group"`): each zhuyin symbol the key
-         * shows, as its view's ([nineLayout]); null where it shows none. The built-in groups show their
-         * symbols alone; the filter is for a layout P3's themes may bring, whose group's label could
-         * carry something else (a space, a mark): never offered as a symbol the session has no code for.
-         */
-        internal fun groupPopup(label: String?): KeyDef.Popup.Keyboard? =
-            label?.filter { it in ZhuyinKeys.SYMBOLS }?.ifEmpty { null }?.map { it.toString() }?.let { KeyDef.Popup.Keyboard.Explicit(it.toTypedArray()) }
-
         /** The 分词 key's face while something is typed; else [PUNCTUATION]'s first, which it types. */
         internal const val SEPARATOR = "分词"
         internal const val PUNCTUATION = "，"
-        private val PUNCTUATION_MORE = arrayOf("。", "？", "！", "、", "：", "；")
 
         /**
          * The key in the grid after ㄖㄥㄩ's group: 分词 while [typing], else punctuation, as pinyin's nine keys' 1.
@@ -184,7 +174,7 @@ class ZhuyinKeyboard(
                 // preview naming it, as the nine keys' digits have
                 key(
                     symbols, 18f, GROUP, sym(Keyboard.zhuyinNineKey(g)),
-                    arrayOf(KeyDef.Popup.AltPreview(symbols, symbols), KeyDef.Popup.Keyboard.Explicit(symbols.map { it.toString() }.toTypedArray())),
+                    arrayOf(KeyDef.Popup.AltPreview(symbols, symbols)),
                     ZhuyinShortcutNames.nineKey("${g + 1}"),
                     name = "r${g / 3 + 1}c${g % 3 + 2}",
                 )
@@ -192,7 +182,6 @@ class ZhuyinKeyboard(
             val slot = KeyDef(
                 KeyDef.Appearance.Text(PUNCTUATION, 18f, percentWidth = GROUP),
                 setOf(KeyDef.Behavior.Press(slotAction(typing = false))),
-                arrayOf(KeyDef.Popup.Keyboard.Explicit(PUNCTUATION_MORE, asIs = true)),
                 name = "r${SLOT_ROW + 1}c${SLOT_COLUMN + 1}",
             )
             val keys = groups + slot
@@ -328,11 +317,9 @@ class ZhuyinKeyboard(
         canvas?.invalidateScene()
     }
 
-    // a symbol's or a tone's code (the layout's action:zhuyin, action:tone-N) by what its key shows; 注音九键's
-    // group's long press its symbols
+    // a symbol's or a tone's code (the layout's action:zhuyin, action:tone-N) by what its key shows
     override val sceneTable = object : SceneKeyDef.Table {
         override fun action(name: String, node: KeyNode): KeyAction? = placeholder(name, node.label, nine)
-        override fun popup(from: String, node: KeyNode): KeyDef.Popup.Keyboard? = if (nine && from == "group") groupPopup(node.label) else null
     }
 
     // what the bottom row shows now (grouped-bottom.xml's when= and bindings, as the grouped keyboards'): an
@@ -343,6 +330,8 @@ class ZhuyinKeyboard(
         // TextBoardState's composing is a table's alone (its 确定): the slot's said here (typing is the nine's alone)
         val input = state.input().copy(composing = typing)
         val texts = Texts(
+            // the corners as said (Texts.alts by key name)
+            alts = keyReadings(layout),
             imeName = shownImeName.orEmpty(),
             comma = mapped(","),
             period = mapped("."),

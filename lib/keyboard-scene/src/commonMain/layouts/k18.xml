@@ -1,58 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   18 键（GroupedKeyboard：GroupedPinyin18、Grouped18、Grouped18Plain，rules C §3），板 k18（拼音 18 和双拼 18 共用）。
-  第 1 行 7 组、第 2 行 6 组各占满（fill 平分），第 3 行 分词 15 + 五组各 14 + ⌫ 15。角标 1–0 ( ) - ~ ! @ ? :。
+  第 1 行 7 组、第 2 行 6 组各占满（fill 平分），第 3 行 分词 15 + 五组各 14 + ⌫ 15。角标 1–0 ( ) - ~ ! @ ? :（KeyDefaults.CORNERS18）。
   第 2 行最后一组在双拼方案打 ; 时是 L;（Grouped18），否则 L（拼音 18、Grouped18Plain），用 variant 写（读「L ;, -」）。
-  M 的角标 : 上滑发 :（过输入法，同现在的 HostKeyAction(":")）。其余同 14 键，但点按不按落点加权：各组键写 lean="off"
+  M 的首个 : 上滑发 :（过输入法，同现在的 HostKeyAction(":")）。其余同 14 键，但点按不按落点加权：各组键写 lean="off"
   （060-render-v2 §15「按落点加权」：拼音 18、双拼 18 现在都只发组码）。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="k18" name="18 键" family="grouped" columns="100">
   <defaults kind="letter" text-size="20" width="fill"/>
   <row>
-    <key id="r1c1" label="{group:q}" alt="1" letters="q" lean="off" swipe-up="keypad:1"
-         shortcut="g18/q"/>
-    <key id="r1c2" label="{group:we}" alt="2" letters="we" lean="off" swipe-up="keypad:2"
-         shortcut="g18/we"/>
-    <key id="r1c3" label="{group:rt}" alt="3" letters="rt" lean="off" swipe-up="keypad:3"
-         shortcut="g18/rt"/>
-    <key id="r1c4" label="{group:y}" alt="4" letters="y" lean="off" swipe-up="keypad:4"
-         shortcut="g18/y"/>
-    <key id="r1c5" label="{group:u}" alt="5" letters="u" lean="off" swipe-up="keypad:5"
-         shortcut="g18/u"/>
-    <key id="r1c6" label="{group:io}" alt="6" letters="io" lean="off" swipe-up="keypad:6"
-         shortcut="g18/io"/>
-    <key id="r1c7" label="{group:p}" alt="7" letters="p" lean="off" swipe-up="keypad:7"
-         shortcut="g18/p"/>
+    <key id="r1c1" label="{group:q}" letters="q" lean="off" shortcut="g18/q"/>
+    <key id="r1c2" label="{group:we}" letters="we" lean="off" shortcut="g18/we"/>
+    <key id="r1c3" label="{group:rt}" letters="rt" lean="off" shortcut="g18/rt"/>
+    <key id="r1c4" label="{group:y}" letters="y" lean="off" shortcut="g18/y"/>
+    <key id="r1c5" label="{group:u}" letters="u" lean="off" shortcut="g18/u"/>
+    <key id="r1c6" label="{group:io}" letters="io" lean="off" shortcut="g18/io"/>
+    <key id="r1c7" label="{group:p}" letters="p" lean="off" shortcut="g18/p"/>
   </row>
   <row>
-    <key id="r2c1" width="fill" label="{group:a}" alt="8" letters="a" lean="off" swipe-up="keypad:8"
-         shortcut="g18/a"/>
-    <key id="r2c2" width="fill" label="{group:sd}" alt="9" letters="sd" lean="off" swipe-up="keypad:9"
-         shortcut="g18/sd"/>
-    <key id="r2c3" width="fill" label="{group:fg}" alt="0" letters="fg" lean="off" swipe-up="keypad:0"
-         shortcut="g18/fg"/>
-    <key id="r2c4" width="fill" label="{group:h}" alt="{punct:(}" letters="h" lean="off" swipe-up="("
-         shortcut="g18/h"/>
-    <key id="r2c5" width="fill" label="{group:jk}" alt="{punct:)}" letters="jk" lean="off" swipe-up=")"
-         shortcut="g18/jk"/>
-    <key id="r2c6" width="fill" label="{group:l}" alt="{punct:-}" letters="l;" lean="off" swipe-up="-"
-         shortcut="g18/l">
+    <key id="r2c1" width="fill" label="{group:a}" letters="a" lean="off" shortcut="g18/a"/>
+    <key id="r2c2" width="fill" label="{group:sd}" letters="sd" lean="off" shortcut="g18/sd"/>
+    <key id="r2c3" width="fill" label="{group:fg}" letters="fg" lean="off" shortcut="g18/fg"/>
+    <key id="r2c4" width="fill" label="{group:h}" letters="h" lean="off" shortcut="g18/h"/>
+    <key id="r2c5" width="fill" label="{group:jk}" letters="jk" lean="off" shortcut="g18/jk"/>
+    <key id="r2c6" width="fill" label="{group:l}" letters="l;" lean="off" shortcut="g18/l">
       <variant when="ime=shuangpin scheme-types=semicolon" label="{group:l;}"/>
     </key>
   </row>
   <row>
     <key id="apostrophe" role="apostrophe" kind="function" width="15" label="分词" text-size="16" a11y="a11y_key_separator"
          send="'" shortcut="separator"/>
-    <key id="r3c1" width="14" label="{group:z}" alt="{punct:~}" letters="z" lean="off" swipe-up="~"
-         shortcut="g18/z"/>
-    <key id="r3c2" width="14" label="{group:xc}" alt="{punct:!}" letters="xc" lean="off" swipe-up="!"
-         shortcut="g18/xc"/>
-    <key id="r3c3" width="14" label="{group:v}" alt="{punct:@}" letters="v" lean="off" swipe-up="@"
-         shortcut="g18/v"/>
-    <key id="r3c4" width="14" label="{group:bn}" alt="{punct:?}" letters="bn" lean="off" swipe-up="?"
-         shortcut="g18/bn"/>
-    <key id="r3c5" width="14" label="{group:m}" alt="{punct::}" letters="m" lean="off" swipe-up=":"
-         shortcut="g18/m"/>
+    <key id="r3c1" width="14" label="{group:z}" letters="z" lean="off" shortcut="g18/z"/>
+    <key id="r3c2" width="14" label="{group:xc}" letters="xc" lean="off" shortcut="g18/xc"/>
+    <key id="r3c3" width="14" label="{group:v}" letters="v" lean="off" shortcut="g18/v"/>
+    <key id="r3c4" width="14" label="{group:bn}" letters="bn" lean="off" shortcut="g18/bn"/>
+    <key id="r3c5" width="14" label="{group:m}" letters="m" lean="off" shortcut="g18/m"/>
     <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
   </row>

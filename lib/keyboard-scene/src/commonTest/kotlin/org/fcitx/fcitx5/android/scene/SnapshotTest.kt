@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.theme.Cascades
@@ -68,8 +69,8 @@ object Shots {
         val block = Forms.block
         fun on(board: String, change: (Env) -> Env) = change(Forms.env(board, block))
         listOf(
-            Shot("qwerty-dark", "qwerty", block.copy(dark = true), ThemeSource.DARK),
-            Shot("qwerty-dark-flat", "qwerty", Forms.flat.copy(dark = true), ThemeSource.DARK),
+            Shot("qwerty-dark", "qwerty", on("qwerty") { it.copy(dark = true) }, ThemeSource.DARK),
+            Shot("qwerty-dark-flat", "qwerty", Forms.env("qwerty", Forms.flat).copy(dark = true), ThemeSource.DARK),
             Shot(
                 "qwerty-table-looking-up", "qwerty",
                 on("qwerty") { it.copy(input = it.input.copy(ime = "table", table = "wbx", composing = true, lookingUp = true)) },
@@ -82,10 +83,12 @@ object Shots {
                     it.copy(
                         input = it.input.copy(ime = "table", table = "wbx", roots = true),
                         texts = it.texts.copy(
-                            alts = Fixtures.qwertyAlts.mapValues { (k, _) -> k },
+                            alts = Fixtures.qwertyAlts.keys.associate { k -> "full/$k" to k },
                             other = Fixtures.qwertyAlts.keys.associate { k -> "root:$k" to k } +
                                 mapOf("root:g" to "王一\n五戋", "root:f" to "土士二干\n十寸雨", "root:q" to "金", "root:y" to "言文方"),
                         ),
+                        // the letter its corner (KeyResolver, looking up roots)
+                        marks = it.marks.copy(shortcuts = it.marks.shortcuts + Fixtures.qwertyAlts.keys.map { k -> "full/$k:up" to MarkContent.Symbol(k) }),
                     )
                 },
             ),

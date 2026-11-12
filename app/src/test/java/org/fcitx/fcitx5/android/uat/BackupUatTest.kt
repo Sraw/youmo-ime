@@ -439,7 +439,7 @@ class BackupUatTest {
         val escaped = odd.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
         File(old.sharedPrefs.apply { mkdirs() }, "${appContext.packageName}_preferences.xml").writeText(
             "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n" +
-                "    <string name=\"${internal.popupOverrides.key}\">$escaped</string>\n</map>\n",
+                "    <string name=\"${AppPrefs.POPUP_OVERRIDES}\">$escaped</string>\n</map>\n",
         )
         val phone = install("phone")
         UserDataManager.import(backup(old, learning).inputStream(), phone).getOrThrow()
@@ -447,7 +447,7 @@ class BackupUatTest {
             .parse(File(phone.sharedPrefs, "${appContext.packageName}_preferences.xml")).documentElement
             .getElementsByTagName("string").let { n -> (0 until n.length).map(n::item) }
             .associate { (it as org.w3c.dom.Element).getAttribute("name") to it.textContent }
-        assertEquals(odd, read[internal.popupOverrides.key])
+        assertEquals(odd, read[AppPrefs.POPUP_OVERRIDES])
     }
 
     // not a case: a settings file in the zip that will not parse does not fail the import; it lands as it was

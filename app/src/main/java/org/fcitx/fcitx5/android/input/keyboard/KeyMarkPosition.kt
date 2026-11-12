@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 
 /**
  * The choices of 上滑图标位置 and 下滑图标位置 ([KeyMarks.At]), one list in one order and wording for

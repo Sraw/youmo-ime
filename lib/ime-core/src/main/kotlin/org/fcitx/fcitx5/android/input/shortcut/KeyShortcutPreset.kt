@@ -4,11 +4,14 @@
  */
 package org.fcitx.fcitx5.android.input.shortcut
 
+import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.SlotDefaults
+
 /**
- * The shortcuts a key has before the user sets any: the full keyboard's letters as Ctrl's on a
- * computer (a select all, c copy, x cut, v paste, z undo, y redo); a key of several of those
- * letters (the nine keys' 2, the 14 keys' CV) takes the one used most ([PRIORITY]); the space's
- * up is the edit menu, the backspace's up clears the field and its down puts it back.
+ * The shortcuts a key has before the user sets any, as the scene's [SlotDefaults] has them (one table, 060-keys-unify):
+ * the full keyboard's letters as Ctrl's on a computer (a select all, c copy, x cut, v paste, z undo, y redo), a key of
+ * several (the nine keys' 2, the 14 keys' CV) the one used most; the space's up the edit menu, the backspace's up
+ * clears the field and its down puts it back.
  */
 object KeyShortcutPreset {
 
@@ -23,42 +26,19 @@ object KeyShortcutPreset {
     const val ZHUYIN_FULL = "zyfull"
     const val ZHUYIN_NINE = "zy9"
 
-    private val LETTERS = mapOf(
-        'a' to KeyCommand.SelectAll,
-        'c' to KeyCommand.Copy,
-        'x' to KeyCommand.Cut,
-        'v' to KeyCommand.Paste,
-        'z' to KeyCommand.Undo,
-        'y' to KeyCommand.Redo,
-    )
+    private const val UP = ".up"
+    private const val DOWN = ".down"
 
-    private val PRIORITY = listOf(KeyCommand.Paste, KeyCommand.Copy, KeyCommand.Undo, KeyCommand.SelectAll, KeyCommand.Cut, KeyCommand.Redo)
-
-    // the nine keys' digits' letters, as on a phone
-    private val NINE_LETTERS = mapOf('2' to "abc", '3' to "def", '4' to "ghi", '5' to "jkl", '6' to "mno", '7' to "pqrs", '8' to "tuv", '9' to "wxyz")
-
-    private val FUNCTION = mapOf(
-        KeyShortcuts.functionKey("space", up = true) to KeyCommand.EditMenu,
-        KeyShortcuts.functionKey("backspace", up = true) to KeyCommand.Clear,
-        KeyShortcuts.functionKey("backspace", up = false) to KeyCommand.Restore,
-    )
-
-    /** The most used of [letters]' commands, if any has one. */
-    fun ofLetters(letters: String): KeyCommand? {
-        val commands = letters.lowercase().mapNotNull { LETTERS[it] }
-        return PRIORITY.firstOrNull { it in commands }
-    }
-
+    /** [name]'s: a character key's (`full/a`), or a function key's one way (`fn/space.up`, [KeyShortcuts.functionKey]). */
     fun of(name: String): KeyShortcut {
-        val form = KeyShortcuts.formOf(name)
-        val key = name.substringAfter('/', "")
-        val command = when (form) {
-            KeyShortcuts.FUNCTION -> FUNCTION[name]
-            FULL, GROUPED14, GROUPED18, ZHUYIN_FULL -> ofLetters(key)
-            NINE -> key.singleOrNull()?.let(NINE_LETTERS::get)?.let(::ofLetters)
-            // 注音九键's keys are no letters, the number pad's digits none either
-            else -> null
-        }
-        return command?.let(KeyShortcut::Command) ?: KeyShortcut.None
+        val command = if (KeyShortcuts.formOf(name) == KeyShortcuts.FUNCTION) {
+            val up = name.endsWith(UP)
+            if (!up && !name.endsWith(DOWN)) null
+            else {
+                val key = KeyId(name.substringBeforeLast('.'))
+                (SlotDefaults.of(key, up, firstUp = true) as? SlotDefaults.Slot.Command)?.key
+            }
+        } else if ('/' in name) SlotDefaults.command(KeyId(name)) else null
+        return command?.let(KeyCommand::ofKey)?.let(KeyShortcut::Command) ?: KeyShortcut.None
     }
 }

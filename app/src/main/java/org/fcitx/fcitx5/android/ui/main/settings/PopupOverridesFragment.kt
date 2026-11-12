@@ -53,6 +53,7 @@ import org.fcitx.fcitx5.android.input.popup.PopupEditor
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.scene.keys.DefaultList
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
@@ -417,7 +418,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // a character key's long press, and the function keys' with a list of characters (， 。)
     private fun longPressOf(page: KeyShortcutPages.Page, key: KeyShortcutPages.Key, name: String): LongPress? = when {
         page.form != KeyShortcuts.FUNCTION -> LongPress(KeyId.of(name), KeyCaps.defaultBoard(name))
-        key.label in KeyShortcutPages.FUNCTION_POPUPS -> LongPress(KeyId.function(key.label), KeyCaps.defaultBoard(key.label))
+        KeyDefaults.function(key.label) != null -> LongPress(KeyId.function(key.label), KeyCaps.defaultBoard(key.label))
         else -> null
     }
 

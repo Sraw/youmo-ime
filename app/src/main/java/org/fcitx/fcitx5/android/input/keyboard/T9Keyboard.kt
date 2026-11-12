@@ -118,14 +118,12 @@ class T9Keyboard(
     theme: Theme,
     /** What each digit key types, as the user set it: the engine reads the digits by the same. */
     private val letters: NineKeyLetters = NineKeyLetters.STANDARD,
-    /** What each key's long press offers besides its digit and letters, as the user set it. */
-    symbols: NineKeySymbols = NineKeySymbols.STANDARD,
     private val english: Boolean = false,
     private val shuangpin: Boolean = false,
     /** 九键双拼's 1 types `;` while typing, shown beside its digit: only under a scheme that types it (微软's ing). */
     private val semicolon: Boolean,
 ) : BaseKeyboard(
-    context, theme, layout(letters, symbols, english, shuangpin, semicolon), themeBoard = KeyNames.NINE,
+    context, theme, layout(letters, english, shuangpin, semicolon), themeBoard = KeyNames.NINE,
 ), AutoCapsKeys {
 
     companion object {
@@ -172,9 +170,6 @@ class T9Keyboard(
 
         /** The column's for English: typed through it, which puts a word's space behind them. */
         private val ENGLISH_PUNCTUATION = listOf(",", ".", "?", "!", "'", "-", ":", ";", "@")
-
-        // 1's long press in English: the marks a word wants besides the column's and 1's own
-        internal val ENGLISH_ONE_SYMBOLS = listOf(":", ";", "\"", "(", ")", "@", "&", "/", "*", "~")
 
         // what 1 types while an English word is typed
         private const val APOSTROPHE = "'"
@@ -265,27 +260,6 @@ class T9Keyboard(
         /** A digit as a keypad's, as the number keyboard's: typed, or its candidate picked while typing (EngineEvent.KEYPAD). */
         private fun keypad(digit: Char) = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + (digit - '0')), KeyStates.Virtual)
 
-        /**
-         * Digit key [digit]'s long press (the views' and nine.xml's `popup from="nine"`): a row of its
-         * [letters]' capitals, the digit, its letters (A B C 2 a b c), the digit under the finger; its
-         * [symbols] in rows above.
-         */
-        internal fun ninePopup(digit: Char, letters: String, symbols: List<String>) = KeyDef.Popup.Keyboard.Explicit(
-            letters.map { it.uppercase() }.toTypedArray() + digit.toString() +
-                letters.lowercase().map { it.toString() } + symbols,
-            symbolsFrom = 1 + 2 * letters.length,
-            inRow = letters.length,
-        )
-
-        /**
-         * 1's long press: its symbols alone, none set apart: it has no letters; typed as they are, not
-         * through the engine, where . would be 。 English's its own, none of them full width. Null with none.
-         */
-        internal fun onePopup(english: Boolean, symbols: NineKeySymbols) =
-            (if (english) ENGLISH_ONE_SYMBOLS else symbols.symbols('1')).takeIf { it.isNotEmpty() }?.let {
-                KeyDef.Popup.Keyboard.Explicit(it.toTypedArray(), asIs = true)
-            }
-
         /** The letters on digit key [d] (2 to 9), as [layout] puts them. */
         internal fun lettersOn(d: Char, letters: NineKeyLetters, english: Boolean, shuangpin: Boolean) = when {
             shuangpin -> NineKeyLetters.NINE_SP.letters(NineKeyLetters.NINE_SP.codes[d - '2']).uppercase()
@@ -293,16 +267,13 @@ class T9Keyboard(
             else -> letters.letters(d).uppercase()
         }
 
-        private fun digitKey(digit: Char, letters: String, symbols: List<String>) = KeyDef(
+        private fun digitKey(digit: Char, letters: String) = KeyDef(
             KeyDef.Appearance.AltText(displayText = letters, altText = digit.toString(), textSize = 20f, percentWidth = DIGIT),
             setOf(
                 KeyDef.Behavior.Press(KeyAction.HostKeyAction(digit.toString())),
                 KeyDef.Behavior.Swipe(keypad(digit)),
             ),
-            arrayOf(
-                KeyDef.Popup.AltPreview(letters, digit.toString()),
-                ninePopup(digit, letters, symbols),
-            ),
+            arrayOf(KeyDef.Popup.AltPreview(letters, digit.toString())),
             name = digit.toString(),
             shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NINE, digit.toString()),
         )
@@ -438,19 +409,18 @@ class T9Keyboard(
          */
         internal fun layout(
             letters: NineKeyLetters,
-            symbols: NineKeySymbols = NineKeySymbols.STANDARD,
             english: Boolean = false,
             shuangpin: Boolean = false,
             semicolon: Boolean = true,
         ): List<List<KeyDef>> {
             fun on(d: Char) = lettersOn(d, letters, english, shuangpin)
-            return layoutOf(::on, symbols, english, oneAlt = if (shuangpin && semicolon) ONE_SEMICOLON else "1")
+            return layoutOf(::on, english, oneAlt = if (shuangpin && semicolon) ONE_SEMICOLON else "1")
         }
 
         /** 1's digit with 微软's `;` beside it: what 1 types while typing on its 九键双拼. */
         internal const val ONE_SEMICOLON = "1;"
 
-        private fun layoutOf(on: (Char) -> String, symbols: NineKeySymbols, english: Boolean, oneAlt: String): List<List<KeyDef>> = listOf(
+        private fun layoutOf(on: (Char) -> String, english: Boolean, oneAlt: String): List<List<KeyDef>> = listOf(
             listOf(
                 spacer(SIDE_KEY),
                 KeyDef(
@@ -459,20 +429,20 @@ class T9Keyboard(
                         KeyDef.Behavior.Press(KeyAction.HostKeyAction("1")),
                         KeyDef.Behavior.Swipe(keypad('1')),
                     ),
-                    onePopup(english, symbols)?.let { arrayOf(it) },
+                    null,
                     name = "1",
                     // a character key, as the digits are: its swipe types 1 as ever
                     shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NINE, "1"),
                 ),
-                digitKey('2', on('2'), symbols.symbols('2')),
-                digitKey('3', on('3'), symbols.symbols('3')),
+                digitKey('2', on('2')),
+                digitKey('3', on('3')),
                 BackspaceKey(RIGHT),
             ),
             listOf(
                 spacer(),
-                digitKey('4', on('4'), symbols.symbols('4')),
-                digitKey('5', on('5'), symbols.symbols('5')),
-                digitKey('6', on('6'), symbols.symbols('6')),
+                digitKey('4', on('4')),
+                digitKey('5', on('5')),
+                digitKey('6', on('6')),
                 if (english) {
                     CapsKey(RIGHT)
                 } else {
@@ -486,9 +456,9 @@ class T9Keyboard(
             ),
             listOf(
                 spacer(),
-                digitKey('7', on('7'), symbols.symbols('7')),
-                digitKey('8', on('8'), symbols.symbols('8')),
-                digitKey('9', on('9'), symbols.symbols('9')),
+                digitKey('7', on('7')),
+                digitKey('8', on('8')),
+                digitKey('9', on('9')),
                 KeyDef(
                     KeyDef.Appearance.Text("0", 20f, percentWidth = RIGHT, variant = KeyDef.Appearance.Variant.Alternative),
                     setOf(KeyDef.Behavior.Press(KeyAction.HostKeyAction("0"))),
@@ -517,16 +487,6 @@ class T9Keyboard(
     // each letter where the scene draws its digit's key (nine.xml's key N)
     private val sceneLetters: List<Pair<Char, KeyPlace>> = ('2'..'9').flatMap { d ->
         scenePlace(d.toString()).let { at -> letters.letters(d).map { it.lowercaseChar() to at } }
-    }
-
-    // a digit key's long press (nine.xml's `popup from="nine"`), as the views' (ninePopup, onePopup)
-    private val ninePopups: Map<String, KeyDef.Popup.Keyboard> by lazy {
-        ('2'..'9').associate { d -> "$d" to ninePopup(d, lettersOn(d, letters, english, shuangpin), symbols.symbols(d)) } +
-            listOfNotNull(onePopup(english, symbols)?.let { "1" to it })
-    }
-
-    override val sceneTable = object : SceneKeyDef.Table {
-        override fun popup(from: String, node: KeyNode): KeyDef.Popup.Keyboard? = if (from == "nine") ninePopups[node.id] else null
     }
 
     // glide typing (滑行输入) over the digit keys, read as full pinyin's letters, and a stroke drawn
@@ -852,6 +812,8 @@ class T9Keyboard(
         val base = state.input()
         val input = base.copy(ime = if (english) "english" else base.ime, composing = columnState.composing)
         val texts = Texts(
+            // the corners as said (Texts.alts by key name)
+            alts = keyReadings(layout),
             imeName = shownImeName.orEmpty(),
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),

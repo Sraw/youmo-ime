@@ -498,7 +498,7 @@ internal fun syllablesOwned(owns: Boolean, showsStrip: Boolean): Boolean = owns 
 internal fun keyboardMakers(contextOf: () -> Context, themeOf: () -> Theme, handwriting: () -> BaseKeyboard): Map<String, () -> BaseKeyboard> {
     fun nineKeys(english: Boolean): T9Keyboard {
         val keyboard = AppPrefs.getInstance().keyboard
-        return T9Keyboard(contextOf(), themeOf(), NineKeyLetters.parse(keyboard.t9Letters.getValue()), NineKeySymbols.parse(keyboard.t9Symbols.getValue()), english, semicolon = false)
+        return T9Keyboard(contextOf(), themeOf(), NineKeyLetters.parse(keyboard.t9Letters.getValue()), english = english, semicolon = false)
     }
     return mapOf(
         TextKeyboard.Name to { TextKeyboard(contextOf(), themeOf()) },
@@ -510,9 +510,9 @@ internal fun keyboardMakers(contextOf: () -> Context, themeOf: () -> Theme, hand
         GroupedKeyboard.Name18Plain to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, semicolon = false) },
         GroupedKeyboard.NamePinyin18 to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false, ownGroups = true) },
         GroupedKeyboard.NameShuangpin14 to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G14, Keyboard::shuangpin14Key) },
-        // the user's 按键字符 (its symbols) as 九键拼音 has them; its letters are 全拼's alone
-        T9Keyboard.ShuangpinName to { T9Keyboard(contextOf(), themeOf(), symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = true) },
-        T9Keyboard.ShuangpinPlainName to { T9Keyboard(contextOf(), themeOf(), symbols = NineKeySymbols.parse(AppPrefs.getInstance().keyboard.t9Symbols.getValue()), shuangpin = true, semicolon = false) },
+        // its letters are 全拼's alone
+        T9Keyboard.ShuangpinName to { T9Keyboard(contextOf(), themeOf(), shuangpin = true, semicolon = true) },
+        T9Keyboard.ShuangpinPlainName to { T9Keyboard(contextOf(), themeOf(), shuangpin = true, semicolon = false) },
         ZhuyinKeyboard.NameNine to { ZhuyinKeyboard(contextOf(), themeOf(), nine = true) },
         ZhuyinKeyboard.NameFull to { ZhuyinKeyboard(contextOf(), themeOf(), nine = false) },
         NumberKeyboard.Name to { NumberKeyboard(contextOf(), themeOf()) },

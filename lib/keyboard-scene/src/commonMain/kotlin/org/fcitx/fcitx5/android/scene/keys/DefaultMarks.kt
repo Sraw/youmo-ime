@@ -51,7 +51,6 @@ object DefaultMarks {
             is MarkContent.Icon -> "{\"icon\": ${quote(mark.name)}}"
             is MarkContent.Symbol -> "{\"symbol\": ${quote(mark.text)}}"
             is MarkContent.Text -> "{\"text\": ${quote(mark.text)}}"
-            MarkContent.Corner -> "{\"corner\": true}"
             MarkContent.Empty -> "{}"
         }
         "  ${quote(name)}: $value"

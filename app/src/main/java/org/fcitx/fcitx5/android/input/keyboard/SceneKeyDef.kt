@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import timber.log.Timber
@@ -57,19 +58,13 @@ class SceneKeyDef(
 
     /**
      * What a keyboard adds to the layout's words (060-render-p2 U4 B), each for the key of [KeyNode];
-     * null where it has none: its `action:` placeholders, a long press of its own (`popup from="nine"`),
-     * and a group key's (`letters=`, 060-render-v2 §15) code and long press, as the engine reads the
-     * keyboard's groups (SceneGroups).
+     * null where it has none: its `action:` placeholders, and a group key's (`letters=`, 060-render-v2 §15)
+     * code, as the engine reads the keyboard's groups (SceneGroups).
      */
     interface Table {
         fun action(name: String, node: KeyNode): KeyAction? = null
-        fun popup(from: String, node: KeyNode): Popup.Keyboard? = null
-
         /** A tap on the key of [letters]: its group's code (a tap's place added as it is pressed). */
         fun group(letters: String, node: KeyNode): KeyAction? = null
-
-        /** The long press of the key of [letters], made as it opens again (the user's keys as they are then). */
-        fun groupPopup(letters: String, node: KeyNode): Popup.Keyboard? = null
 
         /** What a hold of the key of [node] sends as it repeats, its press being [press]: the press again, but where the keyboard tells the two apart (the emoji search's ⌫). */
         fun repeat(press: KeyAction, node: KeyNode): KeyAction = press
@@ -116,6 +111,12 @@ class SceneKeyDef(
             else -> b.copy(bubble = b.bubble.takeIf { board.preview }, popup = b.popup.takeIf { board.popups })
         }
 
+        // KeyDefaults.grouped as the popup's keys: its row (Q W 1 q w), the symbols above, the first under the finger
+        private fun grouped(letters: String, corner: String?): Popup.Keyboard.Explicit {
+            val list = KeyDefaults.grouped(letters, corner)
+            return Popup.Keyboard.Explicit((list.row + list.symbols).map { it.text }.toTypedArray(), symbolsFrom = list.row.size, inRow = list.focus)
+        }
+
         /** What [b]'s bubble shows over the key of [node]: [table]'s, else its face's; null with no bubble. */
         fun bubbleOf(b: SceneBehavior, node: KeyNode, table: Table): String? = b.bubble?.let { table.bubble(node) ?: it.content }
 
@@ -123,18 +124,20 @@ class SceneKeyDef(
         private fun popupsOf(b: SceneBehavior, node: KeyNode, table: Table, act: (SceneAction?) -> KeyAction?): List<Popup> = buildList {
             b.bubble?.let {
                 val content = bubbleOf(b, node, table)!!
-                // a named key's swipe shows what the resolver swipes it to ([KeySwipes.preview] asks swipeText), whatever
-                // corner its layout wrote (060-keys-unify M6): the layout's corner only for a key of no name
-                val corner = it.corner ?: "".takeIf { node.shortcut != null }
-                add(corner?.let { c -> Popup.AltPreview(content, c) } ?: Popup.Preview(content))
+                // a named key's swipe shows what the resolver swipes it to ([KeySwipes.preview] asks swipeText): its corner
+                // empty (SceneBehavior.cornerOf, 060-keys-unify M6); the layout's corner only for a key of no name
+                add(it.corner?.let { c -> Popup.AltPreview(content, c) } ?: Popup.Preview(content))
             }
-            when (val p = b.popup) {
+            // a named key's long press is the resolver's, wired by its name (BaseKeyboard.wire, 060-keys-unify S6): the
+            // layout's popup only says which default list it has (KeyDefaults), the keyboard makes none of its own
+            if (node.shortcut == null) when (val p = b.popup) {
                 is SceneBehavior.LongPopup.Preset -> add(Popup.Keyboard.Preset(p.label, p.transformPunctuation))
                 is SceneBehavior.LongPopup.Listed -> add(Popup.Keyboard.Explicit(p.items.toTypedArray(), asIs = p.asIs))
-                is SceneBehavior.LongPopup.Composed -> table.popup(p.from, node)?.let(::add)
-                    ?: Timber.w("scene key %s: no long press from %s", b.id, p.from)
-                is SceneBehavior.LongPopup.Letters -> table.groupPopup(p.letters, node)?.let(::add)
-                    ?: Timber.w("scene key %s: no long press of %s", b.id, p.letters)
+                // a theme's own group of no name (a 17 keys' written without shortcut=): the built-in list of its letters,
+                // the corner it swipes first, none the user can change
+                is SceneBehavior.LongPopup.Letters -> add(grouped(p.letters, b.swipe?.let(SceneBehavior::typed)))
+                // made by a key's name alone (a nine key's, 注音九键's group): a key of none has no long press
+                is SceneBehavior.LongPopup.Composed -> Timber.w("scene key %s: a long press made by name on a key of none", b.id)
                 null -> {}
             }
             if (b.menu.isNotEmpty()) {

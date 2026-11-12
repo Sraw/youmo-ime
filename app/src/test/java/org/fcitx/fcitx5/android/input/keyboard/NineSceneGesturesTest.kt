@@ -128,8 +128,8 @@ class NineSceneGesturesTest {
         val scene = gestures(Variant(SHUANGPIN, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS), ShuangpinScheme.MICROSOFT))
         GestureSnapshot.check("nine-shuangpin-microsoft", scene)
         assertTrue(scene.first(), "5=JKL/5" in scene.first())
-        // 微软's ; on 1, beside its digit, as it is drawn
-        assertTrue(scene.first(), "/1;" in scene.first())
+        // 1's corner its first under 微软 too (060-keys-unify S6: the 1; the layout wrote is gone)
+        assertTrue(scene.first(), "1=,.?!/1," in scene.first())
     }
 
     @Test
@@ -248,9 +248,9 @@ class NineSceneGesturesTest {
     }
 
     // each key wired from nine.xml's node (U4 B) as the views' KeyDef has it, in each of the four: shortcut,
-    // both ways' swipe, what a tap, a hold, a swipe, a double tap and a long press do, its bubble, its long press's
-    // keys (`popup from="nine"`) and its menu, sound, space/backspace, enabled; 123's long press (unicode, every
-    // board's) the one exception
+    // both ways' swipe, what a tap, a hold, a swipe, a double tap and a long press do, its bubble and its menu (a
+    // named key's long press's keys are the resolver's, neither's: 060-keys-unify S6), sound, space/backspace,
+    // enabled; 123's long press (unicode, every board's) the one exception
     @Test
     fun eachKeyIsWiredAsItsViewWas() {
         val app = PlaceholderStrings(RuntimeEnvironment.getApplication())
@@ -298,27 +298,6 @@ class NineSceneGesturesTest {
         }
     }
 
-    // the digit keys' long press, written out here rather than read from T9Keyboard: the views' and the scene's
-    // (ninePopup / onePopup, nine.xml's `popup from="nine"`) alike
-    @Test
-    fun aDigitKeysLongPressIsItsCapitalsDigitLettersAndSymbols() {
-        val app = PlaceholderStrings(RuntimeEnvironment.getApplication())
-        fun KeyDef.Popup?.said() = (this as KeyDef.Popup.Keyboard.Explicit).let { "${it.items.toList()} ${it.symbolsFrom} ${it.inRow} ${it.asIs}" }
-        fun sceneOf(k: T9Keyboard, id: String): KeyDef.Popup.Keyboard.Explicit? {
-            val canvas = KeyboardHarness.all(k.laidOut()).filterIsInstance<KeyboardCanvasView>().single()
-            return k.sceneKey(canvas.keyAt(id)!!)!!.def.popup!!.filterIsInstance<KeyDef.Popup.Keyboard.Explicit>().singleOrNull()
-        }
-        val pinyin2 = "[A, B, C, 2, a, b, c, @, !, \"] 7 3 false"
-        val shuangpin5 = "[J, K, L, 5, j, k, l, #, (, )] 7 3 false"
-        val english1 = "[:, ;, \", (, ), @, &, /, *, ~] 10 -1 true"
-        assertEquals(pinyin2, T9Keyboard.ninePopup('2', "ABC", NineKeySymbols.STANDARD.symbols('2')).said())
-        assertEquals(shuangpin5, T9Keyboard.ninePopup('5', "JKL", NineKeySymbols.STANDARD.symbols('5')).said())
-        assertEquals(english1, T9Keyboard.onePopup(true, NineKeySymbols.STANDARD).said())
-        assertEquals(pinyin2, sceneOf(T9Keyboard(app, TestThemes.PixelLight, semicolon = false), "2").said())
-        assertEquals(shuangpin5, sceneOf(T9Keyboard(app, TestThemes.PixelLight, shuangpin = true, semicolon = true), "5").said())
-        assertEquals(english1, sceneOf(T9Keyboard(app, TestThemes.PixelLight, english = true, semicolon = false), "1").said())
-    }
-
     // a view's key by the scene's id: its name, else the function key it is
     private fun idOf(def: KeyDef) = when (def) {
         is BackspaceKey -> "backspace"
@@ -330,7 +309,8 @@ class NineSceneGesturesTest {
         else -> def.name ?: "?"
     }
 
-    private fun actions(def: KeyDef) = def.behaviors.map {
+    // a named key's swipe is its name's (KeySwipes asks the resolver, 060-keys-unify S6), neither the view's nor the node's: left out
+    private fun actions(def: KeyDef) = def.behaviors.filterNot { def.shortcut != null && it is KeyDef.Behavior.Swipe }.map {
         when (it) {
             is KeyDef.Behavior.Press -> "press ${it.action}"
             is KeyDef.Behavior.LongPress -> "long ${it.action}"
@@ -342,7 +322,8 @@ class NineSceneGesturesTest {
 
     private fun popups(def: KeyDef) = def.popup.orEmpty().map { p ->
         when (p) {
-            is KeyDef.Popup.AltPreview -> "bubble ${p.content} ${p.alternative}"
+            // a named key's swipe previewed as the resolver has it: the corner either has left out
+            is KeyDef.Popup.AltPreview -> if (def.shortcut != null) "bubble ${p.content}" else "bubble ${p.content} ${p.alternative}"
             is KeyDef.Popup.Preview -> "bubble ${p.content}"
             is KeyDef.Popup.Keyboard.Explicit -> "keys ${p.items.toList()} ${p.symbolsFrom} ${p.asIs} ${p.inRow}"
             is KeyDef.Popup.Keyboard.Preset -> "preset $p"

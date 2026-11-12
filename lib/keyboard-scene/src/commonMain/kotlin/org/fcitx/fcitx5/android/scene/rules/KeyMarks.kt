@@ -5,9 +5,8 @@
 package org.fcitx.fcitx5.android.scene.rules
 
 /**
- * Copied from ime-core's `input.keyboard.KeyMarks` for P1 (060-render-v2 §6), less its `elsewhere()`
- * (removed here in 060-render-p2 S4e; S8c merges the two, so they are not the same rules);
- * P2 moves ime-core and the app onto this one and deletes that.
+ * The one copy: ime-core's and the app's settings read this one (060-keys-unify S6 deleted ime-core's, whose
+ * `elsewhere()` the drawing had left in 060-render-p2 S4e).
  *
  * Where a key draws what its swipes reach, as slots of its face ([Slot]), from two settings with one
  * set of choices ([At]): 上滑图标位置 for the up way's mark, 下滑图标位置 for the down way's, whatever

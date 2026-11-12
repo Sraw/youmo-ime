@@ -496,7 +496,7 @@ class ZhuyinSceneGesturesTest {
     // the user's 按键字符 giving it ˊ and ㄅ; the comma's own ， as it is
     @Test
     fun aLongPressesSymbolOrToneIsSentAsItsCode() {
-        prefs.set(AppPrefs.getInstance().internal.popupOverrides, ", ˊ ㄅ ，")
+        prefs.setList("fn/comma", listOf("ˊ", "ㄅ", "，"))
         val sent = run {
             harness(InputType.TYPE_CLASS_TEXT).use { h ->
                 listOf("ˊ", "ㄅ", "，").map { pick ->

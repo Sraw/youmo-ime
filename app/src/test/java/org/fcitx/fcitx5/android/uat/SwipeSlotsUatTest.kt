@@ -148,7 +148,7 @@ class SwipeSlotsUatTest {
     @Test
     @Uat("ST-100")
     fun aGroupKeysLongPressSetByName() {
-        prefs.set(internal.keyPopups, "g14/qw ① ②")
+        prefs.setList("g14/qw", listOf("①", "②"), first = "①")
         val h = harness(ImKeyboard.KEYS14)
         val qw = h.key("QW")
         // above the group's own row, which is made for the input method, never set (060-keys-unify L4)

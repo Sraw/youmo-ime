@@ -37,7 +37,8 @@ import org.robolectric.annotation.GraphicsMode
  * The 26 keys drawn by the scene, wired from qwerty.xml's nodes (060-render-p2 U4 B), do what the
  * views' KeyDef (TextKeyboard.Layout) says, key by key, in each of its forms: pinyin, English, 双拼 with
  * `;`, a table's (五笔 with its roots and 拼, 仓颉 with its `*`), an address field's keys: shortcut, swipe axes,
- * actions, popups, sound, space/backspace and enabled (confirm's sound Return, as an exception). A letter's
+ * actions, popups (a named key's long press the resolver's, left out), sound, space/backspace and enabled (confirm's
+ * sound Return, as an exception). A letter's
  * press and long press are its letter in either case (TextKeyboard sends and shows them as Shift has
  * them); its bubble its letter too, whatever its face (a table's roots: TextKeyboard's Table.bubble).
  */
@@ -140,11 +141,10 @@ class TextSceneWiringTest {
         assertTrue(email.toString(), "at" in email)
     }
 
-    // the user's long press of q: its swipe types its first (TextKeyboard.swipeText reads the scene key's letter),
-    // not the layout's built-in 1
+    // the user's long press of q: its swipe types its first (the resolver's), not the layout's built-in 1
     @Test
     fun aLettersSwipeIsTheUsersFirst() {
-        prefs.set(AppPrefs.getInstance().internal.popupOverrides, "q ⒜ 1")
+        prefs.setList("full/q", listOf("⒜", "1"), first = "⒜")
         KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
             val q = h.keys().single { it.id == "q" }
             h.swipe(q, 0f, -q.bounds.height().toFloat())
@@ -260,8 +260,9 @@ class TextSceneWiringTest {
         }
     }
 
-    // a letter's in either case: TextKeyboard sends it as Shift has it
-    private fun actions(def: KeyDef, letter: Boolean) = def.behaviors.map {
+    // a letter's in either case: TextKeyboard sends it as Shift has it; a named key's swipe is its name's (KeySwipes asks
+    // the resolver, 060-keys-unify S6), neither the view's nor the node's: left out
+    private fun actions(def: KeyDef, letter: Boolean) = def.behaviors.filterNot { def.shortcut != null && it is KeyDef.Behavior.Swipe }.map {
         val a = when (it) {
             is KeyDef.Behavior.Press -> it.action
             is KeyDef.Behavior.LongPress -> it.action
@@ -272,11 +273,13 @@ class TextSceneWiringTest {
         "${it::class.simpleName} ${if (letter && a is KeyAction.HostKeyAction) a.copy(act = a.act.lowercase()) else a}"
     }.toSet()
 
-    private fun popups(def: KeyDef, letter: Boolean) = def.popup.orEmpty().map { p ->
+    // a named key's long press is the resolver's (KeyResolving.popup), neither the view's nor the node's: left out
+    private fun popups(def: KeyDef, letter: Boolean) = def.popup.orEmpty().filterNot { def.shortcut != null && it is KeyDef.Popup.Keyboard }.map { p ->
         when (p) {
             // a letter's bubble shows its letter as Shift has it (Table.bubble, transformAlphabet)
             // a named key's with no corner of the layout's (，): its corner the resolver's first as it is held, so a plain bubble
-            is KeyDef.Popup.AltPreview -> if (p.alternative.isEmpty()) "bubble ${p.content}" else "bubble ${if (letter) "letter" else p.content} ${p.alternative}"
+            // a named key's swipe the resolver's (its first, as KeySwipes previews it): the corner either has left out
+            is KeyDef.Popup.AltPreview -> if (p.alternative.isEmpty() || def.shortcut != null) "bubble ${if (letter) "letter" else p.content}" else "bubble ${if (letter) "letter" else p.content} ${p.alternative}"
             is KeyDef.Popup.Preview -> "bubble ${p.content}"
             is KeyDef.Popup.Keyboard.Explicit -> "keys ${p.items.toList()} ${p.symbolsFrom} ${p.asIs} ${p.inRow}"
             is KeyDef.Popup.Keyboard.Preset -> "preset ${if (letter) p.label.lowercase() else p.label} ${p.transformPunctuation}"

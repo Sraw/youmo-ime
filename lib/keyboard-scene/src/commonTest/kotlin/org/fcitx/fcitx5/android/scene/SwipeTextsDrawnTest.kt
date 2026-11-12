@@ -49,7 +49,7 @@ class SwipeTextsDrawnTest {
         val env = Forms.env("qwerty", Forms.all.getValue("block").copy(density = NARROW))
         val marks = MarkSettings(
             upAt = at.yielded, downAt = at,
-            shortcuts = MarkSettings.PRESET + keys.associate { "$it:down" to MarkContent.Text("现在…", "现…") },
+            shortcuts = Fixtures.presetMarks + keys.associate { "$it:down" to MarkContent.Text("现在…", "现…") },
             user = keys.map { "$it:down" }.toSet(),
         )
         return Forms.scene("qwerty", env.copy(marks = marks))
@@ -61,7 +61,7 @@ class SwipeTextsDrawnTest {
     // j's or k's down text as drawn: [text] (as the app gives it) and its [shorter], with 下滑 at [at]
     private fun rung(key: String, at: KeyMarks.At, text: String, shorter: String?, form: String = "block"): List<String> {
         val env = Forms.env("qwerty", Forms.all.getValue(form).copy(density = NARROW))
-        val marks = MarkSettings(upAt = at.yielded, downAt = at, shortcuts = MarkSettings.PRESET + ("$key:down" to MarkContent.Text(text, shorter)), user = setOf("$key:down"))
+        val marks = MarkSettings(upAt = at.yielded, downAt = at, shortcuts = Fixtures.presetMarks + ("$key:down" to MarkContent.Text(text, shorter)), user = setOf("$key:down"))
         val alts = Forms.scene("qwerty", env.copy(marks = marks)).keys.first { it.shortcut == key }.let { k -> k.alt }
         return texts(Forms.scene("qwerty", env.copy(marks = marks)), key).filter { it != alts }
     }
@@ -86,7 +86,7 @@ class SwipeTextsDrawnTest {
             val env = Forms.env(board, if (density == null) f else f.copy(density = density))
             val marks = MarkSettings(
                 upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom,
-                shortcuts = MarkSettings.PRESET + ("$key:down" to MarkContent.Text("现在…", "现…")), user = setOf("$key:down"),
+                shortcuts = Fixtures.presetMarks + ("$key:down" to MarkContent.Text("现在…", "现…")), user = setOf("$key:down"),
             )
             return Forms.scene(board, env.copy(marks = marks)).keys.first { it.shortcut == key }.fates
         }
@@ -97,7 +97,7 @@ class SwipeTextsDrawnTest {
         val both = Forms.env("qwerty", Forms.all.getValue("compact").copy(density = NARROW)).let { env ->
             val marks = MarkSettings(
                 upAt = KeyMarks.At.Bottom, downAt = KeyMarks.At.TopLeft,
-                shortcuts = MarkSettings.PRESET + ("full/j:up" to MarkContent.Text("现在…", "现…")) + ("full/j:down" to MarkContent.Icon("content-paste")),
+                shortcuts = Fixtures.presetMarks + ("full/j:up" to MarkContent.Text("现在…", "现…")) + ("full/j:down" to MarkContent.Icon("content-paste")),
                 user = setOf("full/j:up", "full/j:down"),
             )
             Forms.scene("qwerty", env.copy(marks = marks)).keys.first { it.shortcut == "full/j" }.fates
@@ -108,7 +108,7 @@ class SwipeTextsDrawnTest {
         // 大千 compact on a 360 dp phone: no room even for the sign on some key (NO_ROOM)
         val env = Forms.env("zhuyin", forms.getValue("compact@360dp"))
         val dropped = Forms.scene("zhuyin", env).keys.mapNotNull { it.shortcut }.filter { !KeyId(it).isFunction }.any { k ->
-            val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = MarkSettings.PRESET + ("$k:down" to MarkContent.Text("现在…", "现…")), user = setOf("$k:down"))
+            val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = Fixtures.presetMarks + ("$k:down" to MarkContent.Text("现在…", "现…")), user = setOf("$k:down"))
             Forms.scene("zhuyin", env.copy(marks = marks)).keys.first { it.shortcut == k }.fates[false] == MarkFate.Dropped
         }
         assertTrue(dropped, "some 大千 key leaves its set text out")
@@ -118,7 +118,7 @@ class SwipeTextsDrawnTest {
     fun theSignIsDrawnAsTheShortcutIconsAre() {
         // compact, 底部: j's sign at c's copy icon's size and colour, as every shortcut icon is
         val env = Forms.env("qwerty", Forms.all.getValue("compact").copy(density = NARROW))
-        val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = MarkSettings.PRESET + ("full/j:down" to MarkContent.Text("现在…", "现…")), user = setOf("full/j:down"))
+        val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = Fixtures.presetMarks + ("full/j:down" to MarkContent.Text("现在…", "现…")), user = setOf("full/j:down"))
         val s = Forms.scene("qwerty", env.copy(marks = marks))
         fun icon(key: String, name: String) = s.keys.first { it.shortcut == key }.ops(false).filterIsInstance<Op.Icon>().first { it.name == name }
         val sign = icon("full/j", SIGN)
@@ -132,7 +132,7 @@ class SwipeTextsDrawnTest {
         // compact, 底部: the built-in sign's two lines fit under j's descender; a theme's own short-text art, its ink
         // not known, is kept apart as its whole square: clear of j's letter, or left out
         val env = Forms.env("qwerty", Forms.all.getValue("compact").copy(density = NARROW))
-        val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = MarkSettings.PRESET + ("full/j:down" to MarkContent.Text("现在…", "现…")), user = setOf("full/j:down"))
+        val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = Fixtures.presetMarks + ("full/j:down" to MarkContent.Text("现在…", "现…")), user = setOf("full/j:down"))
         fun j(theme: org.fcitx.fcitx5.android.scene.theme.Theme) = Forms.scene("qwerty", env.copy(marks = marks), theme).keys.first { it.shortcut == "full/j" }
         fun ink(k: KeyNode) = k.ops(false).filterIsInstance<Op.Text>().first { it.text == "j" }.let { t ->
             val m = FakeMeasurer.measure(t.text, t.font, t.weight, t.size, t.letterSpacing).ink
@@ -196,7 +196,7 @@ class SwipeTextsDrawnTest {
             downAt = if (w.up) w.at.yielded else w.at,
             upOn = w.up || w.otherOn,
             downOn = !w.up || w.otherOn,
-            shortcuts = MarkSettings.PRESET + keys.associate { "$it:$way" to MarkContent.Text(shown, shorter) },
+            shortcuts = Fixtures.presetMarks + keys.associate { "$it:$way" to MarkContent.Text(shown, shorter) },
             user = keys.map { "$it:$way" }.toSet(),
         )
         return names(Forms.scene(board, env.copy(marks = marks))).all { (k, _) ->

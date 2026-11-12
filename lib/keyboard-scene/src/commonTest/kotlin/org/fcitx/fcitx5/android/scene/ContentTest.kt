@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.toInk
+import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
@@ -108,11 +109,11 @@ class ContentTest {
         val seen = mutableSetOf<Triple<String, Boolean, KeyMarks.At>>()
         val forms = listOf("tall" to Fixtures.portrait, "landscape" to Fixtures.landscape, "compact" to Fixtures.compact)
         val combos = (places + KeyMarks.At.None).flatMap { up -> (places + KeyMarks.At.None).map { up to it } }.filter { it.first != it.second }
-        val flippedPreset = MarkSettings.PRESET.mapKeys { (k, _) -> if (k.endsWith(":up")) k.dropLast(3) + ":down" else k.dropLast(5) + ":up" }
+        val flippedPreset = Fixtures.presetMarks.mapKeys { (k, _) -> if (k.endsWith(":up")) k.dropLast(3) + ":down" else k.dropLast(5) + ":up" }
         for ((form, base) in forms) for ((up, down) in combos) {
             val low = form != "tall"
             fun shown(at: KeyMarks.At, other: KeyMarks.At) = if (low && at == KeyMarks.At.Bottom) KeyMarks.LowOrder.first { it != other } else at
-            val s = Fixtures.scene(base.copy(marks = MarkSettings(upAt = up, downAt = down)))
+            val s = Fixtures.scene(base.copy(marks = MarkSettings(upAt = up, downAt = down, shortcuts = Fixtures.presetMarks)))
             val flipped = Fixtures.scene(base.copy(marks = MarkSettings(upAt = down, downAt = up, firstUp = false, shortcuts = flippedPreset)))
             val f = face(s, "backspace")
             val icons = icons(s, "backspace").associate { it.name to it.box }
@@ -293,7 +294,7 @@ class ContentTest {
         var against = 0
         var cappedSteps = 0
         while (h >= top * 0.55) {
-            val sc = Forms.scene(board, Forms.env(board, form.copy(width = form.width * k, height = h, density = d)))
+            val sc = Forms.scene(board, measuredMarks(board, Forms.env(board, form.copy(width = form.width * k, height = h, density = d))))
             val at = "at $d, ${form.width} ${if (form.compact) "compact " else ""}$board $h px"
             against += sc.keys.sumOf { iconsWithinArcs(it, at) }
             val sizes = sc.keys.flatMap { key -> key.ops(false).mapNotNull { op -> sized(key, op) } }.toMap()
@@ -315,9 +316,9 @@ class ContentTest {
         val e = e0.copy(
             input = e0.input.copy(ime = "table", table = "wbx", roots = true),
             texts = e0.texts.copy(
-                alts = Fixtures.qwertyAlts + ("h" to "WW"),
                 other = Fixtures.qwertyAlts.keys.associate { k -> "root:$k" to k } + mapOf("root:g" to "王一\n五戋"),
             ),
+            marks = e0.marks.copy(shortcuts = e0.marks.shortcuts + Fixtures.qwertyAlts.map { (k, v) -> "full/$k:up" to MarkContent.Symbol(v) } + ("full/h:up" to MarkContent.Symbol("WW"))),
         )
         val s = Forms.scene("qwerty", e)
         val g = texts(s, "g").last { it.text == Fixtures.qwertyAlts.getValue("g") }.size
@@ -369,6 +370,17 @@ class ContentTest {
             else -> null
         }
     }
+
+    // the marks the bounds below were measured with: the firsts as typed (`?`, not Chinese punctuation's wide `？`), the
+    // shortcut icons the full keyboard's letters', ⌫'s and the space's. The app's own (a 14/18 键 and 注音 key's icons, the
+    // wide corners) step further: small compact qwerty at 2 px a dp its letters 5% in a px, floating 注音 at 3.5 its ⌫ and
+    // space icons 1.1 px larger every 5 px shorter (060-keys-unify S6, measured; left to the render's own work)
+    private fun measuredMarks(board: String, e: Env): Env = e.copy(
+        marks = e.marks.copy(
+            shortcuts = DefaultMarks.shortcuts(Forms.layout(board), Forms.fragments)
+                .filter { (name, mark) -> mark !is MarkContent.Icon || name.startsWith("full/") || name.startsWith("fn/") },
+        ),
+    )
 
     // a px of keyboard, at [d] px a dp: at most 0.04 / d from [o] to [v] (2% at 2 px a dp: the less a px is
     // of a dp, the less it moves), or a px for an icon (whole px); a glyph taller than its face more, up to
@@ -429,7 +441,7 @@ class ContentTest {
         var turns = 0
         var h = 360.8
         while (h >= 298.8) {
-            val s = Forms.scene("qwerty", Forms.env("qwerty", Forms.floating.copy(width = Forms.floating.width * k, height = h, density = d)))
+            val s = Forms.scene("qwerty", measuredMarks("qwerty", Forms.env("qwerty", Forms.floating.copy(width = Forms.floating.width * k, height = h, density = d))))
             val f = face(s, "v")
             heights += f.height
             val x = texts(s, "v").first { it.text == "?" }.x - f.left
@@ -526,7 +538,7 @@ class ContentTest {
 
     @Test
     fun marksFollowTheSettings() {
-        val off = env.copy(marks = MarkSettings(symbols = false, charShortcuts = false, upOn = false, downOn = false))
+        val off = env.copy(marks = env.marks.copy(symbols = false, charShortcuts = false, upOn = false, downOn = false))
         val s = Fixtures.scene(off)
         assertEquals(listOf("y"), texts(s, "y").map { it.text })
         assertEquals(listOf("backspace"), icons(s, "backspace").map { it.name })
@@ -534,7 +546,7 @@ class ContentTest {
         val a = texts(Fixtures.scene(text), "a").first { it.text == "全选全选全选" }
         assertTrue(a.scaleX < 1.0, "squeezed to 45% of the key")
         near(9 * d, a.size)
-        val bottom = env.copy(marks = MarkSettings(upAt = KeyMarks.At.Bottom))
+        val bottom = env.copy(marks = env.marks.copy(upAt = KeyMarks.At.Bottom))
         val q = Fixtures.scene(bottom)
         val one = texts(q, "q").first { it.text == "1" }
         val label = texts(q, "q").first { it.text == "q" }
@@ -547,7 +559,8 @@ class ContentTest {
         // 060-swipe-slots: the long press's first down (top right), a text up (top left); a symbol given, a way set to nothing
         val marks = MarkSettings(
             upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.TopRight, firstUp = false,
-            shortcuts = mapOf("full/q:up" to MarkContent.Text("你好…"), "full/w:up" to MarkContent.Symbol("!"), "full/w:down" to MarkContent.Empty),
+            // q's first down, as KeyResolver puts it for 翻转上下滑
+            shortcuts = mapOf("full/q:up" to MarkContent.Text("你好…"), "full/q:down" to MarkContent.Symbol("1"), "full/w:up" to MarkContent.Symbol("!"), "full/w:down" to MarkContent.Empty),
         )
         val s = Fixtures.scene(env.copy(marks = marks))
         val q = texts(s, "q")
@@ -558,10 +571,10 @@ class ContentTest {
         assertEquals(listOf("!", "w").sorted(), w.sorted(), "a symbol given drawn, the corner set to nothing not")
         assertTrue(texts(s, "w").first { it.text == "!" }.x < face(s, "w").centerX, "a symbol at its own way's place, the top left")
         // a way off draws nothing
-        val upOff = Fixtures.scene(env.copy(marks = MarkSettings(upOn = false)))
+        val upOff = Fixtures.scene(env.copy(marks = env.marks.copy(upOn = false)))
         assertTrue(texts(upOff, "q").none { it.text == "1" })
         assertEquals("select-all", icons(upOff, "a").single().name)
-        val downOff = Fixtures.scene(env.copy(marks = MarkSettings(downOn = false)))
+        val downOff = Fixtures.scene(env.copy(marks = env.marks.copy(downOn = false)))
         assertTrue(icons(downOff, "a").isEmpty())
         assertTrue(icons(downOff, "backspace").none { it.name == "restore" })
         // two on one key's ways, both shortcuts: each at its own place
@@ -590,7 +603,7 @@ class ContentTest {
     fun theLabelAboveASymbolBelowCentresToTheSymbolsExtent() {
         // M2: the symbol's TextView stood by the font's extent (1.05 of its size above the baseline), not its ink
         // no shortcuts: nothing meets, so the letters are their size
-        val s = Fixtures.scene(env.copy(marks = MarkSettings(upAt = KeyMarks.At.Bottom, charShortcuts = false)))
+        val s = Fixtures.scene(env.copy(marks = env.marks.copy(upAt = KeyMarks.At.Bottom, charShortcuts = false)))
         val f = face(s, "q")
         val one = texts(s, "q").first { it.text == "1" }
         val symbolTop = one.baseline - 1.05 * one.size
@@ -677,9 +690,11 @@ class ContentTest {
         val roots = env.copy(
             input = env.input.copy(ime = "table", table = "wbx", roots = true),
             texts = env.texts.copy(
-                alts = Fixtures.qwertyAlts.mapValues { (k, _) -> k },
+                alts = Fixtures.qwertyAlts.keys.associate { k -> "full/$k" to k },
                 other = mapOf("root:q" to "金", "root:w" to "人亻八\n癶", "root:e" to "月彡乃用"),
             ),
+            // the letter its corner (KeyResolver, looking up roots)
+            marks = env.marks.copy(shortcuts = env.marks.shortcuts + Fixtures.qwertyAlts.keys.map { k -> "full/$k:up" to MarkContent.Symbol(k) }),
         )
         val s = Fixtures.scene(roots)
         val size = 23 * d

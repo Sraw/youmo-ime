@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.keys
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
-import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.scene.keys.DefaultList
 import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
@@ -45,14 +44,13 @@ object KeyListsMigration {
             val id = KeyId.of(label)
             fromName(id, byName[label].orEmpty(), lists, lost)
         }
-        val nine = NineKeySymbols.parse(t9Symbols.orEmpty())
-        for (d in '1'..'9') {
+        for ((d, symbols) in nineSymbols(t9Symbols.orEmpty())) {
             val id = KeyId("t9/$d")
             // a key set by its name had its symbols there: t9_symbols no longer counted for it (I17)
             if (id in named) continue
             // what the user set (the old defaults, 1's full width and as is, are none: its default now is the one list
             // through the punctuation)
-            if (!nine.isDefault(d)) lists[id] = UserList(off = false, symbols = nine.symbols(d))
+            lists[id] = UserList(off = false, symbols = symbols)
         }
         val kept = lists.filterNot { (id, list) -> same(list, defaultOf(id)) }
         return Migrated(KeyLists.of(kept).serialize(), lost)
@@ -145,4 +143,41 @@ object KeyListsMigration {
         default == null -> false
         else -> list.first == First.Default && list.symbols == default.symbols.map { it.text }
     }
+
+    /**
+     * 0.5's and the betas' `t9_symbols`: a line a key 1 to 9 set otherwise than its old default ([NINE_DEFAULTS]), its
+     * digit then its symbols apart by spaces; each kept as that version kept it (no digit or letter alone, no key code,
+     * each once, ten at most), a key set back to its old default none; a later line of a key wins.
+     */
+    private fun nineSymbols(text: String): Map<Char, List<String>> {
+        val edited = LinkedHashMap<Char, List<String>>()
+        for (line in text.lines()) {
+            val parts = line.split(' ').filter { it.isNotEmpty() }
+            val digit = parts.firstOrNull()?.singleOrNull()?.takeIf { it in '1'..'9' } ?: continue
+            val kept = parts.drop(1).filter(::nineAllowed).distinct().take(NINE_MAX)
+            if (kept == NINE_DEFAULTS[digit]) edited.remove(digit) else edited[digit] = kept
+        }
+        return edited
+    }
+
+    private fun nineAllowed(symbol: String): Boolean {
+        if (symbol.isEmpty() || symbol.any { it.isWhitespace() } || PopupOverrides.rejects(symbol)) return false
+        val c = symbol.singleOrNull() ?: return true
+        return c !in '0'..'9' && c.lowercaseChar() !in 'a'..'z'
+    }
+
+    private const val NINE_MAX = 10
+
+    // the old defaults of t9_symbols, a key set to them none set
+    private val NINE_DEFAULTS: Map<Char, List<String>> = mapOf(
+        '1' to listOf("…", "：", "；", "~", ".", "-", "@", "、", "“", "”"),
+        '2' to listOf("@", "!", "\""),
+        '3' to listOf("+", "-"),
+        '4' to listOf("=", "/"),
+        '5' to listOf("#", "(", ")"),
+        '6' to listOf("\\", "~"),
+        '7' to listOf("*"),
+        '8' to listOf("?"),
+        '9' to listOf(":", "'"),
+    )
 }

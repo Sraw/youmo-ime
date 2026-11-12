@@ -322,7 +322,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val remakeKeyboardsPrefs: Array<ManagedPreference<*>> = arrayOf(
         // drawn on 九键's keys, and in their long press
         prefs.keyboard.t9Letters,
-        prefs.keyboard.t9Symbols,
+        // every key's long press, wired as the keys are made (a key with none has no long press), and its first
+        // drawn and swiped to (a table's code key placed apart from them)
+        prefs.internal.keyLists,
         // each input method's keyboard (ImKeyboards), and the code row's height on it (KawaiiBarComponent.preeditHeight),
         // set anew as the input method is told again
         prefs.keyboard.pinyinKeyboard,
@@ -331,8 +333,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // every key's marks laid out anew, those no swipe marks too; was a theme setting's
         prefs.keyboard.swipeUpPosition,
         prefs.keyboard.swipeDownPosition,
-        // the other keyboards' long presses, wired as their keys are made
-        prefs.internal.keyPopups,
         // the letters' faces (拼音键字母大小写): every keyboard made anew, its env read as it is now
         prefs.keyboard.letterCase,
     )

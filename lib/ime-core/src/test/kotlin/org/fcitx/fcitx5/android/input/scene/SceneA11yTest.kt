@@ -43,7 +43,7 @@ class SceneA11yTest {
 
     @Test
     fun aLetterItsLabelItsCornerApartNoOldName() {
-        val q = scene(SceneData.portrait.copy(texts = SceneData.portrait.texts.copy(alts = mapOf("q" to "1")))).speech("q")
+        val q = scene(SceneData.portrait.copy(texts = SceneData.portrait.texts.copy(alts = mapOf("full/q" to "1")))).speech("q")
         assertEquals("q", q.text)
         // read with its corner, as the views' label and corner were read one after the other (the engine's a11y)
         assertEquals("q, 1", q.description)

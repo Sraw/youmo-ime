@@ -33,12 +33,12 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.keyTextScale
-import org.fcitx.fcitx5.android.input.keyboard.longPressOf
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.PopupMotion
 import org.fcitx.fcitx5.android.scene.engine.Popups
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.theme.Transition
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.utils.popIn
@@ -344,9 +344,10 @@ class PopupComponent :
         var focus = -1
         var actions: List<KeyAction>? = null
         when (keyboard) {
+            // a key of no name (a theme's): its character's built-in list, no setting reaches it (060-keys-unify S6)
             is KeyDef.Popup.Keyboard.Preset -> {
-                val preset = PopupOverridesCache.user.current.longPressOf(keyboard.label) ?: return
-                keys = preset
+                val preset = KeyDefaults.preset(keyboard.label) ?: return
+                keys = (preset.row + preset.symbols).map { it.text }.toTypedArray()
                 labels = if (keyboard.transformPunctuation && punctuation.enabled) {
                     Array(keys.size) { punctuation.transform(keys[it]) }
                 } else keys

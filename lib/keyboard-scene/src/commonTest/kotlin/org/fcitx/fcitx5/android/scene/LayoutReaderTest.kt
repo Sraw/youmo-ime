@@ -44,12 +44,17 @@ class LayoutReaderTest {
         assertEquals(listOf(RowSplit.Halves, RowSplit.Halves, RowSplit.Halves, RowSplit.Scale), rows.map { it.split })
         val q = rows[0].cells.first() as Key
         assertEquals(Text.Binding("case", "q"), q.attrs.label)
-        assertEquals(Text.Binding("alt", "q"), q.attrs.alt)
+        // its corner, swipe and long press by its name (060-keys-unify S6): none written
+        assertNull(q.attrs.alt)
         // a table's roots over the letter where it shows them
         assertEquals(Text.Binding("root", "q"), q.variants.single().attrs.label)
         assertEquals("q", q.attrs.actions["send"])
-        assertEquals("1", q.attrs.actions["swipe-up"])
+        assertNull(q.attrs.actions["swipe-up"])
         assertEquals("full/q", q.attrs.shortcut)
+        // a theme's own layout still writes them: its keys' defaults (C3)
+        val theirs = LayoutReader.layout(board("<row><key id=\"q\" label=\"q\" alt=\"{alt:q}\" swipe-up=\"1\" shortcut=\"q\"/></row>")).ok().parts.filterIsInstance<Row>().single().cells.single() as Key
+        assertEquals(Text.Binding("alt", "q"), theirs.attrs.alt)
+        assertEquals("1", theirs.attrs.actions["swipe-up"])
         val space = rows[3].cells.first { it.id == "space" } as Key
         assertEquals(Width.Fill, space.attrs.width)
         assertEquals(Face.Special, space.attrs.face)

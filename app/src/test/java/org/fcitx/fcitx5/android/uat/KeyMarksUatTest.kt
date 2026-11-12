@@ -200,7 +200,7 @@ class KeyMarksUatTest {
         prefs.setShortcuts(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好")))
         h.start()
         val before = marksOf("q")
-        prefs.set(AppPrefs.getInstance().internal.popupOverrides, "q")
+        prefs.setList("full/q", off = true)
         h.idle()
         val changed = marksOf("q")
         assertTrue(before, before != changed)

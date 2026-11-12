@@ -312,8 +312,7 @@ class Content(
         return listOf(true, false).mapNotNull { up ->
             if (!(if (up) m.upOn else m.downOn)) return@mapNotNull null
             val user = m.isUser(name, up)
-            when (val c = m.of(name, char, up)) {
-                MarkContent.Corner -> key.alt?.takeIf { symbolsShown }?.let { Way(up, it, null, user) }
+            when (val c = m.of(name, up)) {
                 is MarkContent.Symbol -> c.text.takeIf { symbolsShown && it.isNotEmpty() }?.let { Way(up, it, null, user) }
                 is MarkContent.Icon, is MarkContent.Text -> c.takeIf { shortcutsShown }?.let { Way(up, null, it, user) }
                 MarkContent.Empty -> null

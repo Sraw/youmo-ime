@@ -53,16 +53,6 @@ class ZhuyinKeyboardTest {
         assertEquals(listOf("？", "？"), shown.map { (it as? PopupAction.PreviewAction)?.content ?: (it as PopupAction.PreviewUpdateAction).content })
     }
 
-    // a group's long press: the zhuyin symbols on its face alone, nothing a layout P3's themes may bring
-    // could put there besides (a space, a mark), none where it shows none (060-render-p2 S4d L3)
-    @Test
-    fun aGroupsLongPressOffersItsZhuyinSymbolsAlone() {
-        val popup = ZhuyinKeyboard.groupPopup("ㄅ ㄉ!") as KeyDef.Popup.Keyboard.Explicit
-        assertEquals(listOf("ㄅ", "ㄉ"), popup.items.toList())
-        assertEquals(null, ZhuyinKeyboard.groupPopup("?!"))
-        assertEquals(null, ZhuyinKeyboard.groupPopup(null))
-    }
-
     @Test
     fun dachenHasEachSymbolAndToneWhereTaiwanPrintsIt() {
         val rows = ZhuyinKeyboard.fullLayout()

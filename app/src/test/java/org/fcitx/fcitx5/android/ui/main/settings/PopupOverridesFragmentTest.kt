@@ -610,7 +610,7 @@ class PopupOverridesFragmentTest {
             open()
             for (page in KeyShortcutPages.all) {
                 click(PopupOverridesFragment.pageTitle(page))
-                val keys = if (page == KeyShortcutPages.Function) KeyShortcutPages.FUNCTION_POPUPS.map { PopupOverridesFragment.FunctionLabels.getValue(it).let(st::s) to "fn/$it" }
+                val keys = if (page == KeyShortcutPages.Function) listOf("comma", "period").map { PopupOverridesFragment.FunctionLabels.getValue(it).let(st::s) to "fn/$it" }
                 else page.rows.flatten().filterNot(page::elsewhere).map { (if (page == KeyShortcutPages.Full) it.label.lowercase() else it.label) to it.name }
                 for ((label, name) in keys) {
                     val before = own(name)
@@ -649,7 +649,7 @@ class PopupOverridesFragmentTest {
         fun anUndoLeavesKeyListsUnstoredAsItWas() {
             open()
             val p = AppPrefs.getInstance()
-            prefs.set(p.internal.popupOverrides, "q ?")
+            prefs.setStored(AppPrefs.POPUP_OVERRIDES, "q ?")
             p.setStoredKeyLists(null)
             assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.symbols?.lastOrNull())
             dialogOf("q").apply {

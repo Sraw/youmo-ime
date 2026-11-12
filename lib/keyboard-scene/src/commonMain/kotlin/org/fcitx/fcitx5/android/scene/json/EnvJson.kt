@@ -145,18 +145,13 @@ object EnvJson {
         val icon = m.nullableString("icon", null)
         val text = m.nullableString("text", null)
         val symbol = m.nullableString("symbol", null)
-        // `"corner": false` is no mark of a kind: likely meant `{}`, said rather than drawn as nothing
-        val cornerGiven = m.has("corner")
-        val corner = m.bool("corner", false)
-        if (cornerGiven && !corner) throw EnvException(m.line, "\"corner\" is true or left out; no mark is {}")
         m.done()
-        val given = listOfNotNull(icon, text, symbol, corner.takeIf { it })
+        val given = listOfNotNull(icon, text, symbol)
         return when {
-            given.size > 1 -> throw EnvException(m.line, "a mark is {\"icon\": name}, {\"text\": text}, {\"symbol\": text}, {\"corner\": true} or {}")
+            given.size > 1 -> throw EnvException(m.line, "a mark is {\"icon\": name}, {\"text\": text}, {\"symbol\": text} or {}")
             icon != null -> MarkContent.Icon(icon)
             text != null -> MarkContent.Text(text)
             symbol != null -> MarkContent.Symbol(symbol)
-            corner -> MarkContent.Corner
             else -> MarkContent.Empty
         }
     }

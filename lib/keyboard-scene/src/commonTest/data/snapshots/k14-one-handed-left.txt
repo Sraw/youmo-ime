@@ -7,7 +7,6 @@ key r1c1 kind=letter a11y="Q W，1"
   shape rect(7.88,18.38,164.13,157.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,0,172,176)
   anchor 86,88 up 0,-1
-  actions swipe-up="keypad:1"
   text label="QW" alt="1"
   shortcut="g14/qw" letters="qw"
   normal
@@ -22,7 +21,6 @@ key r1c2 kind=letter a11y="E R，2"
   shape rect(179.88,18.38,336.13,157.63 r=10.5,10.5,10.5,10.5)
   hit rect(172,0,344,176)
   anchor 258,88 up 0,-1
-  actions swipe-up="keypad:2"
   text label="ER" alt="2"
   shortcut="g14/er" letters="er"
   normal
@@ -37,13 +35,13 @@ key r1c3 kind=letter a11y="T Y，3"
   shape rect(351.88,18.38,509.13,157.63 r=10.5,10.5,10.5,10.5)
   hit rect(344,0,517,176)
   anchor 430.5,88 up 0,-1
-  actions swipe-up="keypad:3"
   text label="TY" alt="3"
   shortcut="g14/ty" letters="ty"
   normal
     shadow rect(351.88,18.38,509.13,160.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(351.88,18.38,509.13,157.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "TY" 399,107.69 system 400 52.5 #ff37474f
+    icon redo 359,23,388,52 #ff7a858a
     text "3" 482.38,47.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(351.88,18.38,509.13,157.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -52,7 +50,6 @@ key r1c4 kind=letter a11y="U I，4"
   shape rect(524.88,18.38,681.13,157.63 r=10.5,10.5,10.5,10.5)
   hit rect(517,0,689,176)
   anchor 603,88 up 0,-1
-  actions swipe-up="keypad:4"
   text label="UI" alt="4"
   shortcut="g14/ui" letters="ui"
   normal
@@ -67,7 +64,6 @@ key r1c5 kind=letter a11y="O P，5"
   shape rect(696.88,18.38,853.13,157.63 r=10.5,10.5,10.5,10.5)
   hit rect(689,0,861,176)
   anchor 775,88 up 0,-1
-  actions swipe-up="keypad:5"
   text label="OP" alt="5"
   shortcut="g14/op" letters="op"
   normal
@@ -82,13 +78,13 @@ key r2c1 kind=letter a11y="A S，6"
   shape rect(7.88,194.38,164.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,176,172,351)
   anchor 86,263.5 up 0,-1
-  actions swipe-up="keypad:6"
   text label="AS" alt="6"
   shortcut="g14/as" letters="as"
   normal
     shadow rect(7.88,194.38,164.13,335.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,194.38,164.13,332.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "AS" 54.5,283.19 system 400 52.5 #ff37474f
+    icon select-all 15,199,44,228 #ff7a858a
     text "6" 137.38,223.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(7.88,194.38,164.13,332.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -97,7 +93,6 @@ key r2c2 kind=letter a11y="D F，7"
   shape rect(179.88,194.38,336.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(172,176,344,351)
   anchor 258,263.5 up 0,-1
-  actions swipe-up="keypad:7"
   text label="DF" alt="7"
   shortcut="g14/df" letters="df"
   normal
@@ -112,7 +107,6 @@ key r2c3 kind=letter a11y="G H，8"
   shape rect(351.88,194.38,509.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(344,176,517,351)
   anchor 430.5,263.5 up 0,-1
-  actions swipe-up="keypad:8"
   text label="GH" alt="8"
   shortcut="g14/gh" letters="gh"
   normal
@@ -127,7 +121,6 @@ key r2c4 kind=letter a11y="J K，9"
   shape rect(524.88,194.38,681.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(517,176,689,351)
   anchor 603,263.5 up 0,-1
-  actions swipe-up="keypad:9"
   text label="JK" alt="9"
   shortcut="g14/jk" letters="jk"
   normal
@@ -142,7 +135,6 @@ key r2c5 kind=letter a11y="L，0"
   shape rect(696.88,194.38,853.13,332.63 r=10.5,10.5,10.5,10.5)
   hit rect(689,176,861,351)
   anchor 775,263.5 up 0,-1
-  actions swipe-up="keypad:0"
   text label="L" alt="0"
   shortcut="g14/l" letters="l"
   normal
@@ -171,13 +163,13 @@ key r3c1 kind=letter a11y="Z X，～"
   shape rect(136.88,369.38,272.13,508.63 r=10.5,10.5,10.5,10.5)
   hit rect(129,351,280,527)
   anchor 204.5,439 up 0,-1
-  actions swipe-up="~"
-  text label="ZX" alt="～" alt-raw="{punct:~}"
+  text label="ZX" alt="～"
   shortcut="g14/zx" letters="zx"
   normal
     shadow rect(136.88,369.38,272.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(136.88,369.38,272.13,508.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "ZX" 173,458.69 system 400 52.5 #ff37474f
+    icon undo 144,374,173,403 #ff7a858a
     text "～" 233.62,398.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(136.88,369.38,272.13,508.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -186,13 +178,13 @@ key r3c2 kind=letter a11y="C V，！"
   shape rect(287.88,369.38,422.13,508.63 r=10.5,10.5,10.5,10.5)
   hit rect(280,351,430,527)
   anchor 355,439 up 0,-1
-  actions swipe-up="!"
-  text label="CV" alt="！" alt-raw="{punct:!}"
+  text label="CV" alt="！"
   shortcut="g14/cv" letters="cv"
   normal
     shadow rect(287.88,369.38,422.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(287.88,369.38,422.13,508.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
     text "CV" 323.5,458.69 system 400 52.5 #ff37474f
+    icon content-paste 295,374,324,403 #ff7a858a
     text "！" 383.62,398.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(287.88,369.38,422.13,508.63 r=10.5,10.5,10.5,10.5) #1f000000
@@ -201,8 +193,7 @@ key r3c3 kind=letter a11y="B N，@"
   shape rect(437.88,369.38,573.13,508.63 r=10.5,10.5,10.5,10.5)
   hit rect(430,351,581,527)
   anchor 505.5,439 up 0,-1
-  actions swipe-up="@"
-  text label="BN" alt="@" alt-raw="{punct:@}"
+  text label="BN" alt="@"
   shortcut="g14/bn" letters="bn"
   normal
     shadow rect(437.88,369.38,573.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
@@ -216,8 +207,7 @@ key r3c4 kind=letter a11y="M，？"
   shape rect(588.88,369.38,724.13,508.63 r=10.5,10.5,10.5,10.5)
   hit rect(581,351,732,527)
   anchor 656.5,439 up 0,-1
-  actions swipe-up="?"
-  text label="M" alt="？" alt-raw="{punct:?}"
+  text label="M" alt="？"
   shortcut="g14/m" letters="m"
   normal
     shadow rect(588.88,369.38,724.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
@@ -246,7 +236,7 @@ key symbols kind=function role=symbols a11y="符"
   shape rect(7.88,545.38,95.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,527,103,702)
   anchor 51.5,614.5 up 0,-1
-  actions long-press="quickphrase" send="layout:Symbol"
+  actions send="layout:Symbol"
   text label="符"
   shortcut="fn/symbols"
   normal
@@ -260,7 +250,7 @@ key numbers kind=function role=numbers a11y="123"
   shape rect(110.88,545.38,199.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(103,527,207,702)
   anchor 155,614.5 up 0,-1
-  actions long-press="unicode" send="layout:Number"
+  actions send="layout:Number"
   text label="123"
   shortcut="fn/numbers"
   normal
@@ -288,7 +278,7 @@ key space kind=space role=space a11y="空格，拼音"
   shape rect(300.88,545.38,552.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(293,527,560,702)
   anchor 426.5,614.5 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   text label="拼音"
   sound=space shortcut="fn/space"
   normal
@@ -317,7 +307,7 @@ key lang kind=letter role=lang a11y="a11y_key_switch_language"
   shape rect(653.88,545.38,724.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(646,527,732,702)
   anchor 689,614.5 up 0,-1
-  actions long-press="ime-picker" send="lang"
+  actions send="lang"
   shortcut="fn/lang"
   normal
     shadow rect(653.88,545.38,724.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

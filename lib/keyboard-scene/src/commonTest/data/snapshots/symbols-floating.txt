@@ -33,7 +33,7 @@ key numbers kind=letter role=numbers a11y="a11y_key_numbers"
   shape rect(220.88,465.38,299.13,577.63 r=10.5,10.5,10.5,10.5)
   hit rect(213,447,307,596)
   anchor 260,521.5 up 0,-1
-  actions long-press="unicode" send="layout:Number"
+  actions send="layout:Number"
   shortcut="fn/numbers"
   normal
     shadow rect(220.88,465.38,299.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
@@ -46,7 +46,7 @@ key space kind=space role=space a11y="a11y_key_space"
   shape rect(314.88,465.38,543.13,577.63 r=10.5,10.5,10.5,10.5)
   hit rect(307,447,551,596)
   anchor 429,521.5 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   sound=space shortcut="fn/space"
   normal
     shadow rect(314.88,465.38,543.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

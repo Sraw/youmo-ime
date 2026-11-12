@@ -45,7 +45,7 @@ key space kind=space role=space a11y="a11y_key_space"
   shape rect(826.88,10.5,1396.13,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(819,0,1404,529)
   anchor 1111.5,264.5 up 0,-1
-  actions long-press="space-long-press" send="sym:space" swipe-axis="both"
+  actions send="sym:space" swipe-axis="both"
   sound=space shortcut="fn/space"
   normal
     shadow rect(826.88,10.5,1396.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

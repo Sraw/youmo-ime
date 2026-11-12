@@ -11,7 +11,7 @@
     <key id="search" kind="function" width="10" icon="search" a11y="a11y_key_emoji_search" send="emoji-search:on"/>
     <key id="emoticon" kind="letter" class="alt-text" width="10" label=":-)" text-size="16" text-style="bold" send="picker:Emoticon"/>
     <key id="space" role="space" kind="space" face="special" width="fill" text-size="13" a11y="a11y_key_space" badge="{hold-badge}" sound="space" send="sym:space"
-         long-press="space-long-press" swipe-axis="both" shortcut="space"/>
+         swipe-axis="both" shortcut="space"/>
     <key id="period" kind="function" width="10" label="{punct:.}" text-size="23" send="." shortcut="period"/>
     <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
          sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>

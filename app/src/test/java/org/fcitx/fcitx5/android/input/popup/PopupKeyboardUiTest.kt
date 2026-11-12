@@ -13,7 +13,6 @@ import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
-import org.fcitx.fcitx5.android.input.keyboard.NineKeySymbols
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
@@ -261,11 +260,13 @@ class PopupKeyboardUiTest {
         }
     }
 
-    // 九键's (and 九键双拼's) own long press of [digit], as T9Keyboard makes it
-    private fun nine(digit: Char, shuangpin: Boolean): KeyDef.Popup.Keyboard.Explicit = T9Keyboard.ninePopup(
-        digit, T9Keyboard.lettersOn(digit, NineKeyLetters.STANDARD, english = false, shuangpin = shuangpin),
-        NineKeySymbols.STANDARD.symbols(digit),
-    )
+    // 九键's (and 九键双拼's) long press of [digit] as it is laid out: its capitals, its digit and its letters in a row
+    // about the digit, a few symbols above (the shape of the resolver's lists of t9/2 to t9/9)
+    private fun nine(digit: Char, shuangpin: Boolean): KeyDef.Popup.Keyboard.Explicit {
+        val letters = T9Keyboard.lettersOn(digit, NineKeyLetters.STANDARD, english = false, shuangpin = shuangpin)
+        val row = letters.map { it.uppercase() } + digit.toString() + letters.lowercase().map { it.toString() }
+        return KeyDef.Popup.Keyboard.Explicit((row + listOf("@", "!", "\"")).toTypedArray(), symbolsFrom = row.size, inRow = letters.length)
+    }
 
     private val density get() = context.resources.displayMetrics.density
 

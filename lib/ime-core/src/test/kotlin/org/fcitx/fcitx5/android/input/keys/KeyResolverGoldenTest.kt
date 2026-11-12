@@ -73,7 +73,6 @@ class KeyResolverGoldenTest {
         is MarkContent.Symbol -> "s:" + m.text
         is MarkContent.Icon -> "i:" + m.name
         is MarkContent.Text -> "t:" + m.text
-        MarkContent.Corner -> "corner"
         MarkContent.Empty -> "-"
     }
 

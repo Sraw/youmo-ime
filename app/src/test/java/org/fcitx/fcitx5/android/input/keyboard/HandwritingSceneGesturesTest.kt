@@ -369,7 +369,7 @@ class HandwritingSceneGesturesTest {
     @Test
     @Uat("ST-100")
     fun theCommasLongPressSetByNameIsTheUsers() {
-        prefs.set(AppPrefs.getInstance().internal.keyPopups, "comma ① ②")
+        prefs.setList("fn/comma", listOf("①", "②"))
         harness().use { h -> assertEquals(setOf("①", "②"), h.longPress(h.keyNamed("comma")).toSet()) }
     }
 

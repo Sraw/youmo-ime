@@ -15,7 +15,6 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardVariants
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
-import org.fcitx.fcitx5.android.input.popup.PopupOverrides
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.KeyListsCache
 import org.fcitx.fcitx5.android.input.keys.KeyResolver
@@ -241,15 +240,6 @@ class SceneBoard(
         fun marks(layout: SceneLayout, charShortcuts: Boolean, im: String, state: KeyState, nineLetters: Map<Char, String>? = null): MarkSettings {
             val marks = resolver(layout, im, nineLetters).marks(state)
             return if (marks.charShortcuts == charShortcuts) marks else marks.copy(charShortcuts = charShortcuts)
-        }
-
-        /**
-         * The firsts of the long presses [popups] set by name of [names]' keys (their one names; key_popups has a
-         * function key's bare, `comma`): null where one is turned off.
-         */
-        fun firsts(popups: PopupOverrides, names: Collection<String>): Map<String, String?> {
-            val labels = popups.labels.associateBy { KeyId.of(it).name }
-            return names.mapNotNull { n -> labels[n]?.let { n to popups.resolve(it, null)?.firstOrNull() } }.toMap()
         }
 
         /** The scenes kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */

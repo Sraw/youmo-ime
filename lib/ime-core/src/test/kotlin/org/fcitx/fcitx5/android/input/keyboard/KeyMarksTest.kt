@@ -4,10 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.At
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Placed
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Slot
-import org.fcitx.fcitx5.android.input.keyboard.KeyMarks.Spots
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks.At
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Placed
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Slot
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Spots
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals

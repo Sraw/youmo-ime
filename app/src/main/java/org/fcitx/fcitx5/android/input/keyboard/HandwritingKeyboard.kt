@@ -404,6 +404,8 @@ class HandwritingKeyboard(
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
         val input = Input(langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
         val texts = Texts(
+            // the corners as said (Texts.alts by key name)
+            alts = keyReadings(layout),
             imeName = shownImeName.orEmpty(),
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),

@@ -14,6 +14,9 @@ import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.keyboardOn
 import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.UserList
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -74,9 +77,11 @@ class KotlinHostKeyboardTest {
         if (::home.isInitialized) home.deleteRecursively()
         keyboard.pinyinKeyboard.let { it.setValue(it.defaultValue) }
         keyboard.shuangpinKeyboard.let { it.setValue(it.defaultValue) }
-        // the old long presses as their pages store them, `key_lists` with them (AppPrefs.setOldLongPress)
-        for (key in listOf(AppPrefs.T9_SYMBOLS, AppPrefs.POPUP_OVERRIDES, AppPrefs.KEY_POPUPS)) AppPrefs.getInstance().setOldLongPress(key, "")
+        AppPrefs.getInstance().internal.keyLists.setValue(KeyLists.HEADER)
     }
+
+    private fun setList(key: String, vararg symbols: String) =
+        AppPrefs.getInstance().internal.keyLists.setValue(KeyLists.of(mapOf(KeyId(key) to UserList(off = false, symbols = symbols.toList()))).serialize())
 
     // the host answers on its thread, the bar is drawn on the main one: run both till [done]
     private fun until(what: String, state: () -> String = { "" }, done: () -> Boolean) =
@@ -117,7 +122,7 @@ class KotlinHostKeyboardTest {
     fun aCircledLetterLongPressedOnTheFourteenKeysIsTypedAsText() {
         keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14)
         // set on QW itself: q's own no longer reaches it (060-keys-unify L3)
-        AppPrefs.getInstance().setOldLongPress(AppPrefs.KEY_POPUPS, "g14/qw ⒜")
+        setList("g14/qw", "⒜")
         start(InputMethodCatalog.PINYIN)
         h.longPress(h.key("QW"), "⒜")
         typedAsText("⒜")
@@ -127,7 +132,7 @@ class KotlinHostKeyboardTest {
     @Uat("ST-22")
     fun aParenthesisedDigitLongPressedOnShuangpinsNineKeysIsTypedAsText() {
         keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys)
-        AppPrefs.getInstance().setOldLongPress(AppPrefs.T9_SYMBOLS, "2 ⒉")
+        setList("t9/2", "⒉")
         start(InputMethodCatalog.SHUANGPIN)
         h.longPress(h.nineKey("2"), "⒉")
         typedAsText("⒉")
