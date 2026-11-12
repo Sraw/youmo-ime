@@ -48,7 +48,7 @@ rm -rf lib/fcitx5 lib/fcitx5-chinese-addons
 
 - libime 发布的词典和码表文本源，rime-stroke 的笔画表；
 - Unicode 的 `emoji-test.txt`、CLDR 的 `annotations/zh.xml`（表情），kfcd/chaizi 的 `chaizi-jt.txt`（拆字）；字卡的笔顺不下载，是仓库里的 `lexicon/stroke-order.tsv`；
-- 语音包的模型、词表和标点模型不下载，取自 `youmo.voiceModelDir` 指的本机目录；
+- 语音包的识别模型、词表和语音整理模型（`polish-tagger.ort`、`polish-tagger.json`）不下载，取自 `youmo.voiceModelDir` 指的本机目录；
 - 本仓库 release 里的数据，每类一个，版本写在 `build-logic` 里：
 
 | release | 内容 | 放进资源包的 |
@@ -88,6 +88,8 @@ signKeyPwd=...
 | `lib/ime-core` 的 `host/` | 输入法框架：按 Fcitx5 的代码用 Kotlin 重写（输入上下文、按键管线、标点、全角、简繁、快速输入、Unicode） |
 | `app` | Android 部分：界面、`InputMethodService`、设置，以及在一个线程上运行框架的 `KotlinHost` |
 | `lib/sherpa-onnx` | 语音识别运行库（sherpa-onnx 的源码，有本项目的改动） |
+| `lib/keyboard-scene` | 0.6.0 的键盘画法引擎（Kotlin 多平台，App 和网页主题制作页共用） |
+| `web/theme-maker` | 网页主题制作页；推到 `main` 且改了 `web/`、`lib/keyboard-scene/` 等时，`.github/workflows/pages.yml` 把它发布到 GitHub Pages（仓库 Pages 来源要设为 GitHub Actions） |
 | `lib/handwriting` | 手写识别的运行库（onnxruntime 和一个小 JNI）和句子模型的矩阵核心（`libyoumo-matrix`） |
 | `lib/ime-eval` | 评测：用测试集模拟打字，算首选正确率等指标 |
 | `lib/ime-dict-tool` | 从文本源构建引擎数据（只在构建时用，不进安装包） |
@@ -149,7 +151,7 @@ The build downloads its data and checks the SHA-256 of each file:
 
 - the dictionary and code table text sources published by libime, and rime-stroke's stroke table;
 - Unicode's `emoji-test.txt` and CLDR's `annotations/zh.xml` (emoji), kfcd/chaizi's `chaizi-jt.txt` (拆字); a character card's stroke orders are not downloaded but `lexicon/stroke-order.tsv` in the repository;
-- for the voice pack, X-ASR's original model archive (for its token list) and silero VAD;
+- for the voice pack, X-ASR's original model archive (for its token list) and silero VAD; the voice pack's recognizer model, its tokens and the polish tagger (`polish-tagger.ort`, `polish-tagger.json`) are not downloaded but taken from the local directory `youmo.voiceModelDir` names;
 - this repository's data releases, one of each kind, their versions pinned in `build-logic`:
 
 | Release | What | In the packs as |
@@ -189,6 +191,8 @@ A change to what users see or to a setting updates the [user's manual](docs/READ
 | `lib/ime-core`'s `host/` | The input method framework, ported from Fcitx5's code to Kotlin (input contexts, key pipeline, punctuation, full width, simplified/traditional, quick input, Unicode) |
 | `app` | The Android part: views, the `InputMethodService`, preferences, and `KotlinHost`, which runs the framework on one thread |
 | `lib/sherpa-onnx` | The speech recognition runtime (sherpa-onnx's source, with this project's changes) |
+| `lib/keyboard-scene` | 0.6.0's keyboard drawing engine (Kotlin Multiplatform, shared by the app and the web theme maker) |
+| `web/theme-maker` | The web theme maker; a push to `main` touching `web/`, `lib/keyboard-scene/` and the like publishes it to GitHub Pages through `.github/workflows/pages.yml` (the repository's Pages source set to GitHub Actions) |
 | `lib/handwriting` | The handwriting recognizers' runtime (onnxruntime and a small JNI) and the sentence models' matrix kernel (`libyoumo-matrix`) |
 | `lib/ime-eval` | Evaluation: types the test sets and measures top-1 accuracy and more |
 | `lib/ime-dict-tool` | Builds the engine data from text sources (build time only, not in the APK) |

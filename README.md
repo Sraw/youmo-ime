@@ -34,19 +34,20 @@
 ### 特色
 
 - **整句拼音**：全拼和双拼（小鹤、微软、自然码），键盘可选全键盘、18 键、两个字母一个键的 14 键或九键（按 `64426` 就是"你好"），也能用注音九键、大千注音全键盘打；简拼、半截输入，按到相邻键会自动纠正。
-- **笔画筛选**：打了拼音后在键盘上画一笔（横、竖、撇、点、折），只留第一个字这样起笔的候选，再画就按笔顺接着筛，不用翻页找字（默认关，和滑行输入二选一）。
+- **笔画筛选**：打了拼音后在键盘上画一笔（横、竖、撇、点、折），只留第一个字这样起笔的候选，再画就按笔顺接着筛，不用翻页找字（默认关，和滑行输入、键盘手写三选一）。
 - **自己训练的模型**：拼音和英文的 n-gram 模型从网页统计而来；两个小型句子模型参考前文，给整句重新排序。
 - **新词**：近几年的新词（显眼包、破防、红温……）逐个校对后收进词库，每次发版更新。
 - **手写**：一次写一个字，按整句理解，后写的字能改正前面认错的；长按单字看字卡（读音和例词、部首、笔顺）。候选上可以标出拼音或注音（默认关）。
+- **键盘手写**：没打字时直接在拼音、码表、注音的键盘上写汉字，不用换到手写输入法（默认关，和滑行输入、笔画筛选三选一）。
 - **码表**：五笔、仓颉、二笔、自然码、五笔拼音；重码按前文排，上屏后有联想。
 - **英文键盘**：自动纠错、补全、预测下一个词。
 - **滑行输入**：英文、拼音、九键、码表都能一笔划出一个词（默认关）。
 - **剪贴板、工具栏、输入框**：剪贴板条目能切成一块块，点选或横着滑选后拼起来上屏，历史可以不限条数；工具栏的按钮和顺序自己定；数字、电话框直接出数字键盘，网址、邮箱框给常用后缀和打过的邮箱。
-- **主题、滑动快捷键、编辑菜单**：导入、导出主题（主题文件 `.theme`，存着图片、颜色、按键的形状、字体）；每个键上滑、下滑可以设快捷键；空格上滑出全选、复制、粘贴、撤销，退格上滑清除、下滑恢复。
+- **主题、长按和滑动、编辑菜单**：在网页主题制作页做主题（渐变、动态背景、按键音、自己的图标），也能导入百度、搜狗、同文、FlorisBoard 的皮肤，带 12 个新内置主题；每个键的长按、上滑、下滑在一页里改，所有键盘通用；空格上滑出全选、复制、粘贴、撤销，退格上滑清除、下滑恢复，滑选能跨行选字。
 - **表情和小工具**：候选里给出对应的表情，表情面板按拼音搜索；快速输入存自己的常用语，什么都没打时点一下上屏；u 开头按部件拆字，算式后打 = 出结果，rq/sj/xq 出日期时间。
 - **横屏分体、单手、悬浮键盘，实体键盘**：横屏时字母键分成左右两半；键盘可以缩到一边单手打，或变成能拖动的小窗；接实体键盘时候选显示在光标旁。
-- **边打边学**：记住你选的词和顺序，常用的排到前面；上屏过几次的整段话，打出开头就接着给出剩下的；能导入搜狗等输入法的词库；长按候选可以删除、固定、屏蔽，做错了马上撤销；学到的东西自动备份，换手机能恢复。
-- **离线语音**（要导入语音包）：按住空格说话，可以中英混说，自动加标点；带口音的普通话也能识别。说完马上松手也不丢最后一个字，小声说也听得出。目前只支持普通话和英语，还不支持方言。
+- **边打边学**：记住你选的词和顺序，常用的排到前面；上屏过几次的整段话，打出开头就接着给出剩下的；能导入搜狗等输入法的词库；常用词能自己排到最前；长按候选可以删除、固定、屏蔽，做错了马上撤销；学到的东西自动备份，换手机能恢复。
+- **离线语音**（要导入语音包）：按住空格说话，或点麦克风说话，边说边出字，可以中英混说；自动去掉口头禅、加标点，数字按习惯写；带口音的普通话也能识别。说完马上松手也不丢最后一个字，小声说也听得出。目前只支持普通话和英语，还不支持方言。
 
 每项功能和设置的详细说明见[使用说明](docs/README.md)。
 
@@ -104,19 +105,20 @@ English, and offline voice input once the voice pack is imported. It asks for no
 ### Features
 
 - **Whole-sentence pinyin**: full pinyin and shuangpin (小鹤, 微软, 自然码) on the full keyboard, 18 keys, 14 keys of two letters each or nine keys (`64426` is 你好), or with zhuyin on nine keys or the full Dachen keyboard; abbreviations, half-typed syllables, slipped keys corrected.
-- **Stroke filter**: after the pinyin, draw a stroke on the keyboard (horizontal, vertical, left-falling, dot, turning) to keep only the candidates whose first character starts with it; more strokes narrow it down further, so no paging for a character (off by default, exclusive with glide typing).
+- **Stroke filter**: after the pinyin, draw a stroke on the keyboard (horizontal, vertical, left-falling, dot, turning) to keep only the candidates whose first character starts with it; more strokes narrow it down further, so no paging for a character (off by default; one of three with glide typing and keyboard handwriting).
 - **Models of its own**: pinyin and English n-gram models counted from web pages; two small sentence models reorder sentences by the text before.
 - **New words**: the last few years' words, curated one by one, updated with every release.
 - **Handwriting**: one character at a time, read as a sentence, so a later character puts an earlier misread right; long-press a character for its card (readings and words, radical, stroke order). Candidates can show their pinyin or zhuyin (off by default).
+- **Keyboard handwriting**: with nothing typed, write characters straight on the pinyin, table or zhuyin keyboard, no switch to handwriting (off by default; one of three with glide typing and the stroke filter).
 - **Code tables**: Wubi, Cangjie, Erbi, Ziranma, Wubi-Pinyin; candidates ordered by the text before, next-word suggestions.
 - **English keyboard**: autocorrection, completions, next-word predictions.
 - **Glide typing**: one stroke for a word in English, pinyin, nine keys and the code tables (off by default).
 - **Clipboard, toolbar, fields**: a clipboard entry cut into pieces, picked by taps or a sideways swipe and typed joined, with history of any length; the toolbar's buttons and their order your own; number and phone fields open a number pad, URL and email fields offer suffixes and the addresses you typed.
-- **Themes, swipe shortcuts, an edit menu**: themes imported and exported as `.theme` files (picture, colours, key shapes, font); a shortcut on any key's swipe up or down; swipe up on the space bar for select all, copy, paste and undo, up on backspace to clear, down to bring it back.
+- **Themes, long press and swipes, an edit menu**: themes made on the web theme maker (gradients, animated backgrounds, key sounds, your own icons), skins imported from Baidu, Sogou, Trime and FlorisBoard, 12 new built-in themes; each key's long press and swipes edited on one page for every keyboard; swipe up on the space bar for select all, copy, paste and undo, up on backspace to clear, down to bring it back; 滑选 selects across lines.
 - **Emoji and small tools**: emoji among the candidates, the emoji panel searched by pinyin; quick input keeps your own phrases, a tap types one when nothing is typed; characters typed by their parts (u…), sums worked out after =, the date and time from rq/sj/xq.
 - **Split, one-handed and floating keyboards, physical keyboards**: in landscape the letters split in two halves; the keyboard shrinks to one side or floats as a small window you drag; with a physical keyboard, candidates show by the cursor.
-- **Offline voice** (with the voice pack): hold the space bar to talk, Mandarin and English mixed, punctuation added; accented Mandarin understood too; letting go right after the last word keeps it, and quiet speech is heard. No dialects yet.
-- **Learns as you type**: your words and the order you pick them in, the common ones first; a passage typed whole a few times is offered on as you type its start; imported dictionaries (Sogou and others); long-press a candidate to delete, pin or block it, with an undo; what it learned is backed up on its own and can be restored on a new phone.
+- **Offline voice** (with the voice pack): hold the space bar or tap the microphone to talk, text appearing as you speak, Mandarin and English mixed; fillers dropped, punctuation added, numbers written as usual; accented Mandarin understood too; letting go right after the last word keeps it, and quiet speech is heard. No dialects yet.
+- **Learns as you type**: your words and the order you pick them in, the common ones first; a passage typed whole a few times is offered on as you type its start; imported dictionaries (Sogou and others); 常用词 put first by you; long-press a candidate to delete, pin or block it, with an undo; what it learned is backed up on its own and can be restored on a new phone.
 
 The [user's manual](docs/README.md) (in Chinese) covers every feature and setting.
 

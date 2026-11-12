@@ -8,6 +8,116 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
+## 0.6.0（YYYY-MM-DD）
+
+从 0.5.x 直接覆盖安装，设置、学到和添加的词都在；升级后**键盘会提示导入文字包**，导入后照常打字（要用语音的再导入语音包）。装过 0.6.0 测试版的也直接覆盖安装：设置、自己改的长按和滑动都带过来，导入过的资源包不用重新导入（只导入过测试版 1 语音包的，要重新导入语音包）。从正式版退回测试版 3 不支持改长按：退回后长按全按自带的、编辑器只读，再升级回来就照旧。
+
+Installing 0.6.0 over 0.5.x keeps settings and learned and added words; after the upgrade **the keyboard asks for the text pack**, then types as before (import the voice pack too for voice). A 0.6.0 test build (beta) is also simply installed over: settings and your own long-press and swipe lists carry over, and imported packs stay (only those who imported beta 1's voice pack must import the voice pack again). Going back from 0.6.0 to beta 3 does not support long-press edits: beta 3 then uses the built-in long presses with a read-only editor, and upgrading again brings yours back.
+
+### 主要变化
+
+- **资源包**：安装包里不再带词库和模型，拼音、英文、码表、句子模型、手写放在**文字包**（必须有），离线语音识别放在**语音包**（可选）。在 **设置 → 资源包 → 导入资源包** 选 `.youmopack` 文件（可以多选）；没导入文字包时键盘上会提示，点一下到这一页。资源包没有新版本时，升级只要下安装包；覆盖安装资源包还在，卸载会一起删掉。
+- **语音输入重做**：边说边识别，说着的内容以带下划线的待定文字出现在输入框里。**按住空格说话**（默认，松开上屏，上滑取消）；**点麦克风说话**（点工具栏的麦克风，不用一直按着，前面定下来的部分边说边上屏）。**语音整理** 总是开着：去掉"嗯""那个"等口头禅、重复和改口，加标点，数字按习惯写（二零零二年 → 2002年，十点十五 → 10:15）。**语音句末句号**（**按键 → 语音句末句号**）默认聊天框里不加句号。说出的词和你词库里的词同音时换成你的词。声音小时自动放大，安静时不凭空打出字；说完后最后几个字出来得更快。
+- **长按、上滑下滑、键角小字统一**：所有键盘（全键盘、14/18 键、九键、注音键盘、数字键盘、功能键、手写）的这些都在 **设置 → 按键 → 按键字符和快捷键** 一处改，一个键改一次，用到它的键盘都跟着变；原来 **九键 → 按键长按** 那一页并进来了，新加 **数字键盘** 页。每个键的长按列表最多 16 项，键自带的字母、数字也能移动、删除、设为首选；长按弹出时手指下就是首选。太长的长按首选、上滑下滑文字在键上画成前两个字加「…」，还放不下就画一个两条横线的图标。英文键盘的长按、滑动、键角和拼音一样。长按、键角、按下的气泡显示的都是中英文标点转换后真正打出的字符。从 0.5 升级时原来的设置自动搬过来，搬不过来或变了的见下面「长按和滑动统一后的变化」。
+- **每个键的上滑、下滑**：每个键各设一个上滑和一个下滑：长按首选、快捷键、一段文字或空。新快捷键 **滑选**：滑过以后左右挪一个字一个字地选中，再上下挪按屏幕行跨行选，和空格滑动移光标一样。符号、表情、颜文字面板和展开候选上的退格、空格、回车也能上滑下滑。
+- **键盘新画法**：键盘、候选栏、工具栏、编码行和各个面板都用新的引擎按主题画，改键盘设置只重画键，不再重建整个键盘。
+- **主题**：在网页 [主题制作页](https://sraw.github.io/youmo-ime/theme-maker/) 上做（App 里只导入、导出、删除），能做渐变、半透明键、动画 WebP 动态背景、按键状态过渡和按下动效、每类键各自的**按键音**、自己的 **SVG 图标** 和布局；导出的主题都是 4.0 格式，旧主题导出时转成 4.0，样子不变。**12 个新内置主题**：简蓝、橙风、素雅、清心、墨灰、液态玻璃、霓虹赛博、国风·天青（后三个带动态背景）、机械键帽（带按键音）、奶油、护眼·纸色、多巴胺。主题列表每张卡片下写主题名。
+- **导入别的输入法的皮肤**：**导入主题文件** 也收百度（`.bds`、`.bdi`）、搜狗手机版（`.ssf`，没加密的）的皮肤，同文（Trime）和 FlorisBoard 的主题，导入前先确认。
+- **在键上划**（**通用输入 → 在键上划**，默认关，三选一）：**滑行输入**、**笔画筛选**，以及新的 **键盘手写**：没打字时直接在拼音、码表、注音的键盘上写汉字，不用换到手写输入法。
+- **常用词**（**词库与短语 → 常用词**）有了自己的页面，能改、导入、导出，排在替换前面；替换项可以和原词一样（把原词排到最前）。
+- **按键音音量** 改成 0–100 的滑块，最左是「系统默认」，松手时按这个音量响一声。
+
+### 小改动
+
+- **快速输入** 的条目可以写备注、放进目录。
+- 空格横滑移过光标后再上下挪，光标走一行。
+- 左右和上下的键距分成两个设置；紧凑高度下行挨得更近、键更高。
+- 很长的内容分段送进输入框，不再被截断。
+- 键盘边上的键长按时，弹出的那排往里滑。
+- 工具栏右边多了 **麦克风**（没导入语音包时点了提示导入；密码框里没有）；空格长按默认是按住说话，导入了语音包时空格上有麦克风角标。
+- 长按候选 **屏蔽** 对英文、笔画查字、滑行、手写、表情和拆字的候选也管用：英文词屏蔽后不再补全、联想，也不再改成它；整句候选整句屏蔽。
+- 编辑长按列表的对话框显示在键盘上方，打了字直接点 **完成** 也会加进去；列表满了会说出来，不再悄悄丢掉。
+- 新设置 **拼音键字母大小写**：中文输入法键上的字母总是小写、跟随 Shift 或总是大写。
+- 九键 1：英文没打字时点 1 和拼音一样是 `, . ? !`；拼音的 1 关掉中文标点时打 `, . ? !`，键上也跟着变。
+- 功能键的上滑、下滑标记各画在自己的位置，设置里会说明哪个键上画不下；退格、空格的标记跟着上滑、下滑图标位置走。
+- 读屏和设置里 Shift 键叫「大小写」。
+- 主题画键盘出错时当场退回内置主题；下次启动发现上次没画完，也改用内置主题并提示。
+
+### 修复
+
+- **修复全新安装后学到的词不保存**（0.5.x 就有）：全新安装后存学习记录的目录没建出来，学到的词只在内存里，切到别的输入法后进程被系统回收，词就全没了。现在会建出目录、照常存盘；从 0.5.x 升级的，从升级后第一次打字起正常保存（之前丢的找不回）。
+- 打字很快时，手指抬起算在按下的位置，不会算到下一个键上。
+- 双拼 18 键、14 键不再把用 ü 键打的音「纠错」成别的。
+- 紧凑单手模式下全键盘有些键角小字（w 的 2、a 的 @）放不下就不画：现在都画得出来。
+- 键角圆的主题，左上角的小字不再伸出圆角；导入的皮肤键面上不再有 1 像素的细线。
+- 字比键宽、或字形超出键的位置时，缩小或挪回键里。
+
+### 长按和滑动统一后的变化
+
+从 0.5 升级时你原来的设置会自动搬过来，下面这些是搬不过来或者变了的：
+
+1. 全键盘页「其它键」里给 `, . ? ! ~` 以外的键设的长按不再生效，包括符号面板里符号的长按：符号面板的格子只用内置的长按。
+2. 单独给大写字母设的、和小写不一样的长按列表没有了；按 Shift 时显示小写列表的大写形式。
+3. 改全键盘的 q、w 不再影响 14 键、18 键 QW 的长按：要改就在 14 键、18 键页改。
+4. 一个键超过 16 项的长按，按列表顺序留前 16 项。
+5. 手写键盘的 ， 长按换成和其它键盘一样的列表（没有了 `、` `…`）；手写的 。 也有长按了。注音九键 ㄖㄥㄩ 右边那个键的长按换成和逗号一样的列表（没有了 `、`，可以在功能键页的 ， 里自己加）。
+6. 九键、14/18 键长按里点数字：正在打字时和数字键盘一样是选第几个候选，以前是直接打出数字。
+7. 逗号、句号的上滑下滑设成「长按首选」的，现在会画出首选、滑一下就打出它；滑向空着的方向等于点一下。
+8. 从 0.6.0 退回 0.5：在 0.6.0 里改的长按不会带回去；在旧版里又改了的，再升级也不会带过来（以 0.6.0 里的为准）。
+
+### Main changes
+
+- **Resource packs**: the APK no longer carries dictionaries and models. Pinyin, English, tables, sentence models and handwriting are in the **text pack** (required), offline voice in the **voice pack** (optional). Import `.youmopack` files in **设置 → 资源包 → 导入资源包** (several at once); without the text pack the keyboard says so, and a tap opens that page. When a release has no new pack, only the APK is needed; packs survive installing over and go with an uninstall.
+- **Voice input rebuilt**: recognized as you speak, shown in the field as underlined pending text. **Hold space to talk** (default; release to commit, swipe up to cancel) or **tap the microphone** (no holding; settled parts are committed as you go). **语音整理** is always on: drops fillers, repeats and restarts, adds punctuation, writes numbers as usual (二零零二年 → 2002年, 十点十五 → 10:15). **语音句末句号** (**按键 → 语音句末句号**) leaves the full stop off in chat fields by default. A word sounding like one in your dictionary becomes yours. Quiet voices are amplified, silence types nothing, and the last words arrive sooner.
+- **Long press, swipes and corner hints in one place**: for every keyboard (full, 14/18 keys, nine keys, zhuyin, number pad, function keys, handwriting) they are edited in **设置 → 按键 → 按键字符和快捷键**, once per key, and every keyboard using that key follows; the nine keys' **按键长按** page is merged in, and a **数字键盘** page is new. A key's long-press list holds at most 16 items; the key's own letters and digits move, delete and become first like any other; the popup opens with the first under the finger. A long first item, or a long swipe text, is drawn on the key as its first two characters and 「…」, or as an icon of two lines when even that does not fit. English's long press, swipes and hints are pinyin's. Long press, hints and the key bubble show what is really typed after the Chinese/English punctuation switch. Settings from 0.5 move over by themselves; what does not, or changes, is listed under "After long press and swipes were unified".
+- **A swipe up and a swipe down on every key**: each one the long-press first, a shortcut, a text or nothing. A new shortcut **滑选**: after the swipe, slide sideways to select character by character, then up or down to extend by screen lines, as space's cursor slide does. Backspace, space and enter on the symbol, emoji and kaomoji panels and the expanded candidates swipe too.
+- **New drawing**: the keyboard, candidate bar, toolbar, code row and panels are drawn by a new engine from the theme; a keyboard setting redraws the keys instead of rebuilding the keyboard.
+- **Themes**: made on the web [theme maker](https://sraw.github.io/youmo-ime/theme-maker/) (the app imports, exports and deletes): gradients, translucent keys, animated WebP backgrounds, key state transitions and press motion, **key sounds** per kind of key, your own **SVG icons** and layouts; themes export as format 4.0, older ones converted with the same look. **12 new built-in themes**: 简蓝, 橙风, 素雅, 清心, 墨灰, 液态玻璃, 霓虹赛博, 国风·天青 (the last three animated), 机械键帽 (with key sounds), 奶油, 护眼·纸色, 多巴胺. Each card in the theme list carries its name.
+- **Other keyboards' skins**: **导入主题文件** also takes Baidu (`.bds`, `.bdi`) and unencrypted Sogou mobile (`.ssf`) skins and Trime and FlorisBoard themes, after a confirmation.
+- **在键上划** (**通用输入 → 在键上划**, off by default, one of three): **滑行输入**, **笔画筛选**, and the new **键盘手写**: with nothing typed, write characters straight on the pinyin, table or zhuyin keyboard, no switch to handwriting.
+- **常用词** (**词库与短语 → 常用词**) has its own page to edit, import and export, ranked before replacements; a replacement may equal the word itself (to put it first).
+- **按键音音量** is a 0–100 slider whose far left is 「系统默认」; letting go plays a click at that volume.
+
+### Smaller changes
+
+- **快速输入** entries can carry a note and go into folders.
+- After space's sideways cursor slide, moving up or down moves the cursor a line.
+- Horizontal and vertical key gaps are two settings; at 紧凑 rows sit closer and keys are taller.
+- Very long text is sent to the field in parts, no longer cut off.
+- An edge key's long-press row slides inward.
+- A **microphone** on the toolbar's right (asks for the voice pack when missing; not in password fields); space's long press is hold-to-talk by default, with a microphone hint once the voice pack is in.
+- Long-press **屏蔽** works on English, stroke lookup, glide, handwriting, emoji and 拆字 candidates too: a blocked English word is no longer completed, predicted or corrected to; a sentence candidate is blocked whole.
+- The long-press list editor's dialog sits above the keyboard, and **完成** adds what you typed; a full list says so instead of dropping it.
+- New setting **拼音键字母大小写**: letters on Chinese keyboards always lower case, following Shift, or always upper case.
+- Nine keys' 1: with nothing typed in English it is `, . ? !` as in pinyin; pinyin's 1 with Chinese punctuation off types `, . ? !`, and the key shows it.
+- Function keys' up and down marks each sit at their own place, and settings say which key has no room; backspace's and space's marks follow the icon position settings.
+- Screen readers and settings call Shift 「大小写」.
+- A theme that fails to draw falls back to a built-in theme at once, and on the next start if the last drawing never finished, with a notice.
+
+### Fixes
+
+- **Words learned after a fresh install were not saved** (since 0.5.x): the learning folder was never created, so learned words lived only in memory and were lost when the system reclaimed the process after switching to another input method. The folder is created now; after upgrading from 0.5.x words are saved from the first key typed (those lost before cannot be recovered).
+- Fast typing: a lifted finger counts where it came down, not on the next key.
+- Shuangpin's 18 and 14 keys no longer "correct" syllables typed with the ü key.
+- In the compact one-handed mode some full-keyboard corner hints (w's 2, a's @) were left out for lack of room: all are drawn now.
+- Top-left hints stay inside rounded corners; imported skins lose a 1-pixel line on the key faces.
+- Text wider than its key, or outside it, is shrunk or moved back in.
+
+### After long press and swipes were unified
+
+Settings from 0.5 move over by themselves; these do not, or change:
+
+1. Long presses set on the full keyboard's 「其它键」 for keys other than `, . ? ! ~` no longer apply, nor do those of symbol-panel symbols: the panel uses the built-in ones.
+2. Separate capital-letter lists differing from the lowercase are gone; Shift shows the lowercase list in capitals.
+3. Changing the full keyboard's q and w no longer changes 14/18 keys' QW: edit those on the 14/18-key pages.
+4. A key's long press longer than 16 items keeps its first 16.
+5. Handwriting's ， long press is the same list as other keyboards' (no `、` `…`), and its 。 has a long press now. 注音九键's key right of ㄖㄥㄩ gets the comma's list (no `、`; add it under the function keys' ，).
+6. A digit picked from the nine keys' or 14/18 keys' long press while composing picks that candidate, as the number pad does; it used to type the digit.
+7. A comma or full stop swipe set to the long-press first is now drawn and types it; a swipe towards an empty way is a tap.
+8. Going back from 0.6.0 to 0.5 does not take long presses changed in 0.6.0; ones changed again in 0.5 are not brought back on the next upgrade (0.6.0's win).
+
+---
+
 ## 0.5.2（2026-11-04）
 
 0.5.1 同一天发出，替换成了 0.5.2：0.5.1 在 Android 10–12 上会崩溃（打出带读音的候选时输入法崩溃，例如读音纠正的 jiaose → 角色 jué sè；存过快速输入条目后打开 **快速输入** 管理页时应用崩溃）。装过 0.5.1 的直接覆盖安装 0.5.2。下面是相对 0.5.0 的变化。
