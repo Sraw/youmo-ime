@@ -82,7 +82,7 @@
 ### VO-12 [P1] 只上屏到开始说话时的输入框
 - **前提**：B0-语音。
 - **操作**：打开测试页的全部输入框（地址不带 `#`），在「普通文本」框长按空格说"你好"，不松手……说完前用另一只手点下面的「句子」框，再松开。
-- **预期**：「你好」不会出现在「句子」框里；松手前已经听到的「你好」上屏到「普通文本」框（和点麦克风说话一样，VO-30）。按住时先上滑到「松开手指，取消输入」再点别的框：两个框都没有。同一个框被应用 restartInput（测试台（uat/TESTBED.md，`./gradlew :testbed:installDebug` 装）的 `restart_target` 框按住空格说"你好"，另一只手点它的按钮（对它 `restartInput`）后再松开）：语音卡片不关，松开后「你好」上屏一次。按住说"你好"、听到后不松手，用返回键收起键盘（或转屏）：「你好」马上上屏到这个框一次，松手后不再上屏；先上滑到取消区再收起键盘：什么都不上屏。说完松手、还没上屏完就收起键盘：等识别完，整理后的后半段照常上屏一次（和点按说话一样）。
+- **预期**：「你好」不会出现在「句子」框里；松手前已经听到的「你好」上屏到「普通文本」框（和点麦克风说话一样，VO-30）。按住时先上滑到「松开手指，取消输入」再点别的框：两个框都没有。同一个框被应用 restartInput（测试台（uat/TESTBED.md，`./gradlew :testbed:installDebug`）的 `restart_target` 框按住空格说"你好"，另一只手点它的按钮（对它 `restartInput`）后再松开）：语音卡片不关，松开后「你好」上屏一次。按住说"你好"、听到后不松手，用返回键收起键盘（或转屏）：「你好」马上上屏到这个框一次，松手后不再上屏；先上滑到取消区再收起键盘：什么都不上屏。说完松手、还没上屏完就收起键盘：等识别完，整理后的后半段照常上屏一次（和点按说话一样）。
 - **JVM**：`VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt`（说完前、还没听到时换到另一个框，松开后两个框都没有「你好」（假识别器在 sherpa-onnx 处把识别结果交给真的 VoiceSession，其后整条链是 App 的；`:app:testDebugUnitTest`））；`VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesIntoTheFirst`（按住时已听到「你好」再换框：「你好」上屏到原来的框，新框没有）、`VoiceHoldUatTest.anotherFieldWhileInTheCancelZoneTypesNothing`（上滑到取消区再换框：都没有）、`VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid`（按住时同一个框 restartInput：接着听，松开后上屏一次）、`VoiceHoldUatTest.theViewsMadeAnewWhileHoldingTypeWhatWasHeardOnce`（按住时 View 重建（转屏、换主题）：听到的马上上屏一次，松手后不再上屏）、`VoiceHoldUatTest.theScreenTurnedWhileHoldingTypesWhatWasHeardOnce`（按住时转屏：同上）、`VoiceHoldUatTest.theKeyboardHiddenWhileHoldingTypesWhatWasHeardOnce`（按住时收起键盘：同上）、`VoiceHoldUatTest.theKeyboardHiddenAfterTheLiftStillTypesTheTail`（松手后马上收起：后半段整理后照常上屏）；设备上不跑。
 
 ### VO-13 [P1] 改掉空格长按行为

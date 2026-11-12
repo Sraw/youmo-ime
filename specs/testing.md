@@ -474,31 +474,38 @@ What holds the library to the app:
 ## The keys' golden table (060-keys-unify)
 
 Every key's long press, first and marks on every keyboard is one reviewed table,
-`lib/ime-core/src/test/resources/keys-golden.tsv`: columns `keyid variant state items first up down`; in `items` a
+`lib/ime-core/src/test/resources/keys-golden.tsv`: columns `keyid board state items first up down`; in `items` a
 bare text is `AsKey`, a `=` suffix `AsIs`, `#N` `Keypad(N)`, `@action` an `Action`, the row and the symbols split by `|`.
-The variants are pinyin, 双拼 (自然码, 微软) and English × full, nine, 14, 18, a theme's own groups (the k17 example),
-both 注音, handwriting, a table, the number pad, the symbol picker, emoji, kaomoji, emoji search and the expanded
-candidates; the states default, Shift, a table's roots, full-width and half-width punctuation, password, url.
+The boards (`board`, as `KeyResolverGoldenTest.boards` names them) are pinyin full, nine, 14, 18, 双拼 nine and 18 (微软),
+English full and nine, a theme's own groups (`theme-k18`: the k17-motion example's `layouts/k18.xml`), both 注音,
+handwriting, the number pad, the symbol picker, emoji, kaomoji, emoji search and the expanded candidates; the states
+`default`, `shift`, `zh` (Chinese punctuation) and `roots` (a table's roots).
 
 - Made once: before the resolver, a throwaway export test on the old code wrote what each key did then,
   `keys-before.tsv` (kept in `dev/`, not committed with its test); the resolver wrote `keys-golden.tsv`; the two were
   diffed and every difference tied in the commit message to the design's D1–D9 / I1–I18. A later change to the
   golden table says why in its commit message.
-- `KeyResolverGoldenTest` (ime-core) holds the resolver to it; app `KeysEverywhereUatTest` holds what the keyboards
-  really pop up and draw to it (not to the resolver, so it is not the resolver checked against itself).
+- `KeyResolverGoldenTest` (ime-core) holds the resolver to it; it is the only reader of the table. App
+  `KeysEverywhereUatTest` holds what the keyboards really pop up and draw to hand-written expectations, and
+  `DisplayIsTypedUatTest` the real popups to the resolver's result: neither reads the table.
 - `GeneratorParityTest` (app test sources) held the long-press generators moved into keyboard-scene `keys/` to the old
   ones key by key while both existed; it went with the old code in S6.
 - The format and the migration: `KeyListsFormatTest` (every rule of the grammar), `KeyIdRoundTripTest` (every name the
-  built-in layouts and the k17 example give, and odd orphan names, through `serialize → parse`), `KeyListsWithTest`
+  built-in layouts and the k17-motion example give, and odd orphan names, through `serialize → parse`), `KeyListsWithTest`
   (when a line is dropped), `KeyListsMigrationTest` (0.5.2, beta1, beta2 prefs in
-  `lib/ime-core/src/test/resources/keys-migration/`, twice the same), app `KeyListsUpgradeTest` (the
-  `uat/fixtures/upgrade/` backups imported, restarted, reset, and before the first unlock).
+  `lib/ime-core/src/test/resources/keys-migration/` to `@1`, twice the same; `upgrade`'s `@1` → `@2` cases), app `KeyListsUpgradeTest` (0.5.2, beta2 and
+  beta3 `@1` backups built in memory, `v052()`, `beta2()`, imported through `UserDataManager.import`, restarted, reset, and
+  before the first unlock; `uat/fixtures/upgrade/` holds only v0.3.x and v0.4.0 backups).
 - The web page and the app agree: keyboard-scene `DefaultMarksTest` compares `DefaultMarks.of` for every built-in
   layout with `src/commonTest/data/default-marks/<layout>.json` on the JVM and in node (recorded with
-  `-Psnapshots.record=true`); app `DefaultMarksMatchAppTest` holds `KeyResolver.marks` with no user settings to the same json.
+  `-Psnapshots.record=true`). The app has no test of its own holding `KeyResolver.marks` with no user settings to the same json: the resolver
+  and the page share keyboard-scene `keys/` (`KeyDefaults`, `SlotDefaults`), which is what keeps them alike.
 - Lint: keyboard-scene `BuiltInLayoutLintTest` reads only the built-in `layouts/` (a theme's own layouts may keep the
   old attributes): no `swipe-up`/`alt` on a character key, no `<popup>`/`long-press`/`swipe-up` on a function key, no
-  `mark="false"` but on the address keys, a `shortcut=` on every editable key that `KeyId.of` reads.
+  `mark="false"` but on the address keys, qwerty's `;` and `*` and 注音's two layouts (`zhuyin.xml`, `zhuyin-nine.xml`:
+  no room for a corner) (`markOffKept`), a `shortcut=` on every editable key that `KeyId.of` reads but the address keys,
+  `number-row.xml`, `emoji-search.xml`, the roles back/lock/reading/lookup, the keys search/emoji/emoticon/page-up/page-down,
+  the number pad's operator keys and qwerty's `;`/`*` (`unnamedKept`).
 
 ## Golden files from upstream fcitx
 

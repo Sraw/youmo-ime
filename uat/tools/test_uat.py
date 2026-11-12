@@ -111,6 +111,27 @@ class AttemptsTest(unittest.TestCase):
         saved = uat.read_json(os.path.join(uat.OUT, "m", "results.json"))
         self.assertEqual(("失败", "看图：错位"), (saved["A-1"][4][-1]["state"], saved["A-1"][4][-1]["seen"]))
 
+    def test_mark_prefixes_a_note_once(self):
+        os.makedirs(os.path.join(self.tmp.name, "runs"))
+        old_uat = uat.UAT
+        uat.UAT = self.tmp.name
+        try:
+            # a plain note gets the prefix; one that has it (a note copied from the picture check) not twice
+            for i, (note, seen) in enumerate((("错位", "x；看图：错位"), ("看图：错位", "x；看图：错位"))):
+                with self.subTest(note):
+                    name = f"m{i}"
+                    run = uat.Run(name, ["A-1"])
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        run.record(self.case("A-1"), "待看图", "x", "5556", 1)
+                    with open(os.path.join(self.tmp.name, "runs", f"{name}.md"), "w", encoding="utf-8") as f:
+                        f.write(f"# {name}\n\n- 跑法：x 共 1 条：待看图 1\n\n| 编号 | 结果 | 看到的 |\n")
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        uat.mark(name, "A-1", "通过", note)
+                    saved = uat.read_json(os.path.join(uat.OUT, name, "results.json"))
+                    self.assertEqual(seen, saved["A-1"][1])
+        finally:
+            uat.UAT = old_uat
+
     def test_a_short_old_result_keeps_its_fields_in_place(self):
         self.assertEqual({"at": "", "dev": "5557", "state": "阻塞", "seen": "超时", "secs": 0, "beside": []},
                          uat.attempts_of(["阻塞", "超时", "5557"])[0])

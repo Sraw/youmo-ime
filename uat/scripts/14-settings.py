@@ -1225,7 +1225,7 @@ def key_dialog(d, label):
     return d.wait(lambda s: s.find(text="设为首选"), 5, what=f"{label} 的对话框")
 
 
-def dialog_add(d, text):
+def dialog_add_digits(d, text):
     """添加 [text] (digits, typed on the keyboard's 123 page: adb's input text is a hardware keyboard's keys,
     which turn the soft keyboard into its small 实体键盘 bar) to the open key dialog's list"""
     s = d.screen()
@@ -1238,7 +1238,10 @@ def dialog_add(d, text):
         raise Blocked(f"键盘上没有 123：{sorted(k)[:20]}")
     d.tap(k["123"], 0.8)
     d.type(text)
-    d.tap(d.screen().find(text="添加").c, 0.6)
+    add = d.screen().find(text="添加")
+    if not add:
+        raise Blocked("对话框里没有「添加」")
+    d.tap(add.c, 0.6)
     d.sh("input keyevent 4")   # the keyboard down: 确定 under it
     time.sleep(0.8)
 
@@ -1282,7 +1285,16 @@ def dialog_text(d, way, pinyin, word):
         dialog_scroll(d)
     if not eds:
         raise Blocked(f"{way}的文字框不在屏上")
-    d.tap(min(eds, key=lambda n: n.b[1]).c, 0.8)
+    ed = min(eds, key=lambda n: n.b[1])
+    # at its right end, and what is in it backspaced first: the box opens with the text stored, and [word]
+    # replaces it
+    d.tap((ed.b[2] - 12, ed.c[1]), 0.8)
+    if ed.text:
+        bksp = d.keys(refresh=True).get("bksp")
+        if not bksp:
+            raise Blocked("键盘上没有退格")
+        for _ in range(len(ed.text) + 2):
+            d.tap(bksp, 0.15)
     d.type(pinyin)
     c = d.cands(want=word)
     if word not in c:
@@ -1400,7 +1412,7 @@ def st98(d):
 case("ST-99", needs="jvm:PopupOverridesFragmentTest$Dialog.selectedKeysAreSetAtOnce")(lambda d: None)
 
 
-case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress、PopupOverridesFragmentTest$Dialog.aListBackToTheOwnStoresNothingAndOneEmptiedKeepsItsRow、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
+case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress、PopupOverridesFragmentTest$Dialog.aListBackToTheEditorsDefaultStoresNothing、PopupOverridesFragmentTest$Row.anEmptiedListIsOffItsRowGoneToo、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
 
 
 
@@ -1412,6 +1424,12 @@ case("ST-108", needs="jvm:KeyListsUpgradeTest.v052sLongPressesMoveOverAndTheOldO
 
 
 case("ST-109", needs="jvm:PopupOverridesFragmentTest$Dialog.numberPage")(lambda d: None)
+
+
+case("ST-110", needs="release:要先在 0.6.0-beta3 上改九键 2 和 14 键 QW 的长按再覆盖安装；升级由 KeyListsMigrationTest、KeyListsUpgradeTest.aBeta3ListIsUpgradedAtTheStart 查")(lambda d: None)
+
+
+case("ST-111", needs="manual:松手的按键音和音量差要耳朵听；滑块、摘要和旧档位由 AppPrefsTest.theKeySoundVolumeIsASliderThatKeepsAnOlderLevel 查")(lambda d: None)
 
 
 @case("ST-107", base="B0-设置", mutates=True)
@@ -1462,7 +1480,7 @@ def st105(d):
     finally:
         d.rotate(0)
     check(not [n for n in THEME_NAMES if n not in land], f"横屏列表里少了：{[n for n in THEME_NAMES if n not in land]}")
-    return f"{len(names)} 个名字；横屏 {len(land)} 个"
+    return f"{len(names)} 个名字；横屏 {len(land)} 个；未跑（手工）：长名字导入、增删后的编号、TalkBack、最大字号"
 
 
 def pick_theme(d, name):
@@ -1515,7 +1533,8 @@ def st104(d):
     d.shot("kb", "多巴胺，无边框：上了色的那排字母键也没有键面")
     # no machine check: key_gaps reads a face's colour against what is between, and 天青's keys are pale over a
     # picture (it reads 2–8 dp where the shots show the same seams as Material's); the shots are compared by eye
-    return f"读到的键缝（上下, 左右 dp；天青背景是图，只作参考）：天青跟随 {own}，选档 {set_}，Material 同档 {material}，改回 {back}"
+    return (f"读到的键缝（上下, 左右 dp；天青背景是图，只作参考）：天青跟随 {own}，选档 {set_}，Material 同档 {material}，改回 {back}；"
+            "未跑（手工）：横屏、紧凑、霓虹赛博、机械键帽、导入的 .theme 包")
 
 
 @case("ST-106", base="B0-设置", mutates=True, visual=True)
@@ -1555,9 +1574,82 @@ def st106(d):
     dialog_text(d, "下滑", "hao", "好")
     time.sleep(1.5)
     dialog_scroll(d)
-    gone = [t for t in d.screen().texts("all") if "画不下" in t]
+    gone = [t for t in d.screen().texts("all") if "画不下" in t or "显示为" in t]
     dialog_ok(d)
     check(note, "下滑段下没有说键上画成什么")
-    check(page and note and page[0].split("：", 1)[-1] == note[0], f"页面键下面的说明 {page} 和对话框的 {note} 不同")
+    check(page and page[0].split("：", 1)[-1] == note[0], f"页面键下面的说明 {page} 和对话框的 {note} 不同")
     check(not gone, f"改成「好」后仍说 {gone}")
     return f"对话框「{note[0]}」；页面「{page[0] if page else ''}」；改成好后不说"
+
+
+@case("ST-112", base="B0-设置", mutates=True)
+def st112(d):
+    slots_tab(d, "全键盘")
+    key_dialog(d, "q")
+    s = d.screen()
+    e = next((n for n in s.app() if n.cls.endswith("EditText") and n.text in ("", "添加字符，空格分隔")), None)
+    if not e:
+        raise Blocked("对话框里没有添加字符的框")
+    d.tap(e.c, 0.8)
+    kb = d.need_keyboard()
+    s = d.screen()
+    ok = s.find(text="确定")
+    cancel = s.find(text="取消")
+    d.shot("full", "键盘弹出时对话框在键盘上面，确定、取消看得到")
+    check(ok and cancel, f"键盘弹出时对话框里找不到确定、取消：{s.texts()[-12:]}")
+    check(ok.b[3] <= kb.b[1] and cancel.b[3] <= kb.b[1], f"确定 {ok.b}、取消 {cancel.b} 被键盘（顶 {kb.b[1]}）挡住")
+    k = d.keys(refresh=True)
+    if "123" not in k:
+        raise Blocked(f"键盘上没有 123：{sorted(k)[:20]}")
+    d.tap(k["123"], 0.8)
+    d.type("7")
+    d.press("enter", after=1.0)
+    s = d.screen()
+    field = next((n for n in s.app() if n.cls.endswith("EditText") and n.text in ("", "添加字符，空格分隔")), None)
+    check(s.find(rid="keyboard_view", where="ime") is None, "点完成后键盘没收起")
+    check(s.find(text="设为首选") is not None, "点完成后对话框关了")
+    check(any(n.clickable and n.desc == "7" for n in s.app()), "点完成后列表里没有 7")
+    check(field is not None, f"点完成后添加框没清空：{[n.text for n in s.app() if n.cls.endswith('EditText')]}")
+    dialog_ok(d)
+    d.open_page("text")
+    d.clear()
+    shown = d.held(d.face("q", "Q"))
+    d.clear()
+    check("7" in shown, f"长按 q 弹出 {shown}，没有 7")
+    return f"确定在键盘上面；完成添加了 7 并收起键盘；长按 q 弹出 {shown[:12]}"
+
+
+case("ST-113", needs="jvm:KeyShortcutsPageScreenshotTest.zhuyinNinesCapsAreOneHeightARow、ZhuyinShortcutsUatTest.zhuyinNinesCommaSaysItIsChangedOnTheFunctionKeysTab")(lambda d: None)
+
+
+@case("ST-114", base="B0-设置", mutates=True)
+def st114(d):
+    from uat import grouped_keys
+    pinyin_keyboard(d, "14 键")
+    slots_tab(d, "14 键")
+    key_dialog(d, "QW")
+    for item in ("Q", "W", "1", "q", "w"):
+        dialog_pick(d, item)
+        # a delete leaves the next item selected: tapping it then unselects it, 删除 greyed
+        if not any(n.text == "删除" and n.enabled for n in d.screen().app()):
+            dialog_pick(d, item)
+        d.tap_text("删除", scroll=False, after=0.4)
+    d.shot("app", "QW 只剩符号")
+    dialog_ok(d)
+    d.open_page("text")
+    d.clear()
+    qw = d.keys(refresh=True)["qw"]
+    kb = d.need_keyboard()
+    on_keys = {t for n in kb.walk() if n.clickable for t in n.texts()}
+    d.touch(("down", *qw), ("sleep", 0.9))
+    shown = [n.text for n in d.screen().nodes if n.text and not n.clickable and n.text not in on_keys]
+    d.shot("full", "长按 QW 只弹符号，没有手指下那一行")
+    d.touch(("up", *qw))
+    time.sleep(0.5)
+    d.clear()
+    check(shown and not {"Q", "W", "1", "q", "w"} & set(shown), f"长按 QW 弹出 {shown}")
+    grouped_keys(d, "qw op")
+    c = d.cands()
+    check("我" in c[:5], f"打 wo 的候选 {c[:8]}，没有「我」")
+    return f"长按 QW 弹出 {shown[:10]}；wo 候选 {c[:5]}"
+

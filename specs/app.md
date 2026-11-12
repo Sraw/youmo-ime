@@ -204,25 +204,33 @@ keyboard-scene `keys/` (commonMain, so the theme maker's page draws the same mar
 gives none): `KeyDefaults.of(id, KeyboardVariant, NodeFacts)` gives a `DefaultList` of a row (made per variant, never
 stored: the nine keys' and grouped keys' letters and digits, `;`) and a symbols layer, each an `Item` with a `Commit`
 (`AsKey` through the keyboard's own resolve as `Source.Popup`, `AsIs`, `Keypad(n)` the number pad's meaning, `Action`
-from a layout's `<item send=…>`), and a first; `FunctionKeyDefaults` the one comma and period list and the
+from a layout's `<item send=…>`), and a first; `KeyDefaults.function` (`COMMA`, `PERIOD`) the one comma and period list and `KeyDefaults.FUNCTION_ACTIONS` the
 action long presses (符 quick phrase, 123 Unicode, 🌐 the picker, ⇧ caps lock, space), the same on every keyboard and panel;
 `SlotDefaults` the default slots. A theme layout's `swipe-up`/`alt` is that theme's default first (`NodeFacts.themeFirst`);
 the grouped keys read only the built-in symbols, never the full keyboard's user lists. The user's layer is ime-core
-`input/keys/`: `KeyLists` parses and writes `key_lists` (`@1` then `keyid\toff` or `keyid\tset\t<*|!|:item>\t…`, at most
-32 items of 16 code points, `KeyShortcuts.escape`d, bad lines skipped, a line equal to the default in every variant of
-the key dropped); it holds only symbols and the first, so a nine key's symbols are shared by pinyin, 双拼 and English
-while its row follows the input method. `KeyResolver(variant, lists, slots, layout).resolve(id, KeyState)` gives the
+`input/keys/`: `KeyLists` parses and writes `key_lists` (`@2` then `keyid\toff` or `keyid\tset\t<*|!|:item>\t…`, at most
+16 items of 16 code points (every built-in default fits, the longest 13; the popup ≤ 4 rows; the editor adds no 17th and says so), `KeyShortcuts.escape`d, bad lines skipped, a line equal to the editor's default dropped:
+its items and its first as resolved, `UserList.firstOf`, the one rule of a first: `*` the list's first item, `!` none,
+`:x` that item); it holds a key's whole list, its row's letters and digit as any item (060-row-unlock), one list by
+the key's name shared by every input method, so a key edited shows the same on pinyin, 双拼 and English; a key never
+edited shows its keyboard's default, its row by the input method. The one exception: 18 键's L skips `:` where the
+scheme types no `;` (`KeyResolver.make`, the condition `KeyDefaults` drops `;` by). The popup's row is the list's
+leading items of the default's row or single ASCII letters and digits (`inRow`, -1 for none); an emptied list is
+`off`. `KeyResolver(variant, lists, slots, layout).resolve(id, KeyState)` gives the
 popup, the first (what the up/down `TypeFirst`, the focus, the corner, the bubble's corner and TalkBack all read), the
 slots and marks, cached per variant and `KeyLists.version`, the state (Shift, a table's roots, the punctuation map,
 password, ways, places) mapped on top; an item's commit is the default item's of the same text, else the key's default
-symbols' (the nine key 1's are `AsIs`). `KeyOutput.of(item)` → `KeyOutputs.toKeyAction()` (app) is the one commit path
+symbols' (the nine key 1's are `AsKey` too, through the punctuation map as the comma's). `KeyOutput.of(item)` → `KeyOutputs.toKeyAction()` (app) is the one commit path
 for `PopupKeyboardUi` and `KeySwipes`. `KeyListsCache` (app) reads `key_lists`; `AppPrefs.dropRetired`'s
 `migrateKeyLists` (`KeyListsMigration`, pure) makes it once from 0.5/beta's `popup_overrides`, `key_popups` and
-`t9_symbols` when it has no `@1` head, leaving the old keys for a downgrade (into `RETIRED` at 0.7); `key_lists` is a
+`t9_symbols` when it is missing or has no `@n` head, then upgrades it, and beta3's `@1`, to `@2` (`KeyListsMigration.upgrade`:
+a row key's symbols put under its row as the editor shows it, by the user's 按键字母, the first 16 items kept in list order; its first as `@1` resolved it;
+`KeyLists.needsMigration`: a later version's `@3` is kept as it is, read as no lists, never migrated over), leaving the old keys for a downgrade (into `RETIRED` at 0.7); `key_lists` is a
 plain `string` (not `hidden`, or a backup's import would reset it and the old keys come back) and is copied to device
-encrypted storage, where before the first unlock the cache migrates the old keys in memory. The settings' editor
+encrypted storage, where before the first unlock the cache migrates the old keys (or upgrades `@1`) in memory. The settings' editor
 (按键字符和快捷键, every tab one slot page, the 九键 tab replacing 0.5's 按键长按) draws the current theme's layouts,
-starts a key from the resolver, shows the row greyed (it can only be made the first) and saves through
+starts a key from the resolver (`SceneBoard.resolver` with the variant given: `semicolon = true`, the user's 按键字母,
+so 18 键's L shows its `:`), every item moved, deleted and made the first alike, and saves the whole list through
 `KeyLists.with`. The symbol picker's cells keep a built-in long press (`PickerLongPress`), outside the model. Every key has two slots, up and down
 (060-swipe-slots; `SwipeSlots` in ime-core, `KeyDef.shortcut` naming the key, `fn/<name>` a function
 key; stored in `key_swipes` as `@1\t<first-up|first-down>` then a line a slot over `SwipeSlotPreset`'s),
@@ -236,7 +244,7 @@ space and backspace lock a touch to one axis (`KeyGestureRecognizer.axisLock`); 
 space slid sideways then moves a line a vertical step (`KeyGestureRecognizer.crossStepY`, `SpaceCursor`,
 060-space-2d): not while composing, and no Up at the field's very start nor Down at its end, so focus never
 leaves the field. `KeySwipes` (app)
-wires it on the typing keyboards (`shortcuts = true`), buzzes at the threshold, opens the edit menu
+wires it on every key with a name, by that name (`BaseKeyboard.wire`), buzzes at the threshold, opens the edit menu
 (`EditMenuLayout`, `PopupMenuUi.Fixed`) there: up where a notice its size goes (`EditMenuLayout.place`
 on `UndoChipPlacement`'s place, which `InputView` hands `PopupComponent.menuRoom`; over the bar where
 that is off the view), 粘贴 across from the key, not under the finger (the user, 0.5.1's test build),
@@ -252,7 +260,22 @@ tracked one while a selection predicted is not yet reported), and sets the selec
 Right of what is known to be in the field a step is tried alone, the steps after it kept till the
 editor reports it (`reportedSelection`, `selectionSettled`), as one past the end is ignored; one
 given up (the finger back off it) or still unreported at the lift is no longer predicted
-(`forgetSelection`), one reported by then kept for the next touch's anchor. The buzz is the listener's, where the selection moved. Any other key action
+(`forgetSelection`), one reported by then kept for the next touch's anchor. The buzz is the listener's, once a sample, where the selection moved.
+Slid up or down after its first sideways step, the free end moves a screen line a vertical step (the
+space's `CrossSteps` and `spaceLineStep`, gated by `SpaceCursor.vertical` as the space's): the editor
+moves it itself, `FcitxInputMethodService.extendLine` sending shift+DPAD (`sendShifted`) through the
+space's `sendLine` (its reads, `SpaceCursor.sendable`/`toEdge`, `LineRush`), the selection first set
+from the anchor (`EditingSession.selectFrom`) where the free end is the left one and no line is on its
+way. At the field's first or last line the selection goes from the anchor to the field's start or end
+(`moveToFieldEdge`). Each report not predicted (`unpredictedSelection`) is a line landed
+(`SwipeSelection.lineLanded`): the free end where the report has it, the anchor kept (a report of the
+selection as it is, the free end not moved, is not one; one not keeping the anchor stops the waiting),
+the field read anew around it past what was read; the sideways steps meanwhile wait and go on from
+there. None within 300 ms (`LINES_WAIT_MS`: an editor ignoring shift+arrow) and the steps go on from
+where the end was, the line not moved (no newline fallback), a later report still taken while the
+touch lasts and for 300 ms after it ends (lifted or cancelled: `linesAfterTouch`, then
+`SwipeSelection.linesForgotten`); from then on a report is the editor's own. Lifted, a
+selection a line left the other way round is set in order. Any other key action
 or another field (not the same one restarted, `sameField`) cancels it (a second finger); the lift (`EndSwipeSelectAction`) leaves the
 selection, the steps moved before it began still taken as it begins. A
 shortcut named in the key's bubble (`PopupAction.PreviewUpdateAction.words`) is fitted by
@@ -292,13 +315,13 @@ editor's report lags is cleared, not kept. A field kept from learning (`Password
 an app's own `restartInput` is another input, its clears forgotten. The
 marks on a key are placed by `KeyMarks` in slots of its face (`KeyMarks.Slot`: the corners, the edges' middles, under the
 label), on the keyboard and on 按键字符和快捷键's keys (`KeyCaps`) alike:
-two settings with one list of places (`KeyMarkPosition`, `KeyMarks.At`: 右上 右下 左上 左下 底部 无), 上滑图标位置 (`AppPrefs.keyboard.swipeUpPosition`, key `swipe_up_position`, top right) and 下滑图标位置 (`swipeDownPosition`, top left), each way's slot drawn at its own (`SceneMarks.settings`, keyboard-scene's `Content.charSlots`: a first as the corner symbol, a command an icon, a text its first two graphemes and 「…」, `KeyMarkText`; a way off draws nothing). A function key's two each at its own way's place too (`Content.functionSlots`, `KeyMarks.placeFunction`; two in one place, an unsettled import only, read as `KeyMarks.settled`: the up one yields). Till beta2 both were at the place of the way that is not the first's, the down one mirrored: a 下滑 右下 drew ⌫'s 恢复 top right and 清除 bottom right. 底部 is a shortcut's bottom edge middle, a symbol's under the letter; on landscape's and 紧凑's low keys (`KeyMarks.onKeys`) a way's 底部 is the first of 右上 右下 左上 左下 (`LowOrder`) the other way's place is not, whatever its mark (till beta2 the symbol's and the shortcut's went by different orders). A mark with no room in its slot is not moved to another corner (S4e): it is drawn smaller, else left out (above). The settings page never lets the two share a place but 无 (`ManagedPreferenceUi.Apart`: the other's place greyed out in `MyListPreferenceDialogFragment`, noted whose); two stored in one place (an import, a backup) are read apart by `KeyMarks.settled`, the symbol yielding top for bottom on its side, 底部 to top right (`swipeSpots()` is what every key and preview reads), and stored so at the next start (`AppPrefs.dropRetired` → `settleMarkPositions`; `Apart.read` reads them so on the page till then, and a list read again as the other changes: the summary is what the keyboard draws). Both are in the service's `remakeKeyboardsPrefs`: the keyboards (the bar's number row too) are made anew as either changes (`KeyMarksUatTest.eitherChangedTheKeyboardIsMadeAnew`). (0.5.1's testers saw the symbols pushed bottom right, then the shortcuts there after 滑动 changed ways: placement followed the swipe; `KeyMarksUatTest` holds the first open to what any setting change leaves, `KeyMarksTest` every combination.)
+two settings with one list of places (`KeyMarkPosition`, `KeyMarks.At`: 右上 右下 左上 左下 底部 无), 上滑图标位置 (`AppPrefs.keyboard.swipeUpPosition`, key `swipe_up_position`, top right) and 下滑图标位置 (`swipeDownPosition`, top left), each way's slot drawn at its own (`SceneMarks.settings`, keyboard-scene's `Content.charSlots`: a first as the corner symbol, a command an icon, a text its first two graphemes and 「…」, `KeyMarkText` (a first too: one rule, `SceneMarks.symbol`, the whole typed and said; a 0.5 backup's long presses drew whole over the next keys till R24); a way off draws nothing). A function key's two each at its own way's place too (`Content.functionSlots`, `KeyMarks.placeFunction`; two in one place, an unsettled import only, read as `KeyMarks.settled`: the up one yields). Till beta2 both were at the place of the way that is not the first's, the down one mirrored: a 下滑 右下 drew ⌫'s 恢复 top right and 清除 bottom right. 底部 is a shortcut's bottom edge middle, a symbol's under the letter; on landscape's and 紧凑's low keys (`KeyMarks.onKeys`) a way's 底部 is the first of 右上 右下 左上 左下 (`LowOrder`) the other way's place is not, whatever its mark (till beta2 the symbol's and the shortcut's went by different orders). A mark with no room in its slot is not moved to another corner (S4e): it is drawn smaller, else left out (above). The settings page never lets the two share a place but 无 (`ManagedPreferenceUi.Apart`: the other's place greyed out in `MyListPreferenceDialogFragment`, noted whose); two stored in one place (an import, a backup) are read apart by `KeyMarks.settled`, the up (上滑) way's mark yielding top for bottom on its side, 底部 to top right (`swipeSpots()` is what every key and preview reads), and stored so at the next start (`AppPrefs.dropRetired` → `settleMarkPositions`; `Apart.read` reads them so on the page till then, and a list read again as the other changes: the summary is what the keyboard draws). Both are in the service's `remakeKeyboardsPrefs`: the keyboards (the bar's number row too) are made anew as either changes (`KeyMarksUatTest.eitherChangedTheKeyboardIsMadeAnew`). (0.5.1's testers saw the symbols pushed bottom right, then the shortcuts there after 滑动 changed ways: placement followed the swipe; `KeyMarksUatTest` holds the first open to what any setting change leaves, `KeyMarksTest` every combination.)
 
 拼音键字母大小写 (`AppPrefs.keyboard.letterCase`, key `letter_case`, `LetterCaseChoice`: 总是小写 / 跟随 Shift / 总是大写, default 跟随 Shift) cases a Chinese input method's letter faces and press bubbles only; what is typed and Shift are untouched. The decision is keyboard-scene's pure `LetterCaseRule` (`forIme`: English always follows Shift, its case being what it types; `upper`: the setting, Shift's state, `shiftless` for 九键 and 14/18 键, which show capitals following Shift, and the hidden keep-uppercase). The keyboards pass it as `Texts.letterCase`; `Expand` reads it in `{case:x}`, `{nine-letters:N}` and `{group:qw}` (k14/k18's group faces); a key's screen reader text is the label as 跟随 Shift shows it, so it reads the same whichever is chosen. `TextKeyboard`/`GroupedKeyboard`/`T9Keyboard` case their bubbles by the same rule; `KeyCaps.board` (`SceneKeyCell.Board.letterCase`) and the 九键 letters page show it too. The hidden 键盘字母保持大写 (`keepLettersUppercase`, `keep_keyboard_letters_uppercase`) still holds under 跟随 Shift, 总是小写 over it; with it on, English's press bubble shows the capital its face shows while the letter typed still follows Shift. A table's letter with no root (`{root:x}` empty in `Texts.other`) falls back to `{case:x}`. In `remakeKeyboardsPrefs`. Held by `LetterCaseRuleTest`, `ExpandTest`, `LetterCaseScreenshotTest`.
 五笔's 全部字根 leaves the letters' shortcuts unmarked (`TextKeyboard.charShortcutMarks`: its roots start in the top left corner), shown as 键名 at 紧凑 though (`TableKeyboard.atHeight`, the setting kept); at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
 are made by `keyboardCompact()`) the symbol never under the letter, the shortcuts drawn as anywhere, smaller, and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
 makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`, as
-`floatingBuilt`); the theme page's preview does the same in `recalculateSize`. A key's glyph (label, icon) and its marks (shortcut icons and texts, a letter's symbol) keep apart only where their ink meets, worked out by the scene engine as it builds a key's content (`lib/keyboard-scene` `rules/KeyMarkYield`, run from `engine/Content`; 060-render-p2 S4e): one size for each class of glyph across a keyboard, no mark moved to another corner, a text that does not fit as the app gives it (two characters and 「…」) drawn a step down on that key alone, at its class's size, its key then asking nothing of the mark classes (`MarkContent.Text.ladder`: its first character and 「…」, then `Icons.SHORT_TEXT`, a two-line icon drawn as the shortcut icons are, its ink the two lines (`Icons.SHORT_TEXT_INK`), not its square: a text is here; `SceneBuilder.roomless`, `Member.shortened`; 0.6.0-beta2: the owner's 「现在怎么样了」 on j), a mark that cannot fit at its least size left out (a built-in one before one the user set, `MarkSettings.user` / `KeyMarkYield.Mark.user`; then the most expendable first: a function key's down shortcut, a shortcut; a symbol last); a mark is kept from the glyph by the gap less half a px (`FIT_SLACK`, L62/L65/L72: as L77's half px, too little to see), everywhere, so none jumps where it stops fitting. `KeyMarksEverywhereUatTest` measures every key of every keyboard (standard, 紧凑, floating, one-handed, landscape; every pair of places the settings allow) for nothing drawn over anything else and prints what was left out; the sweep leaves out none (it prints "left out (0)"; 060-pending-decisions S4e recorded 22 corner symbols with 紧凑, one-handed and the symbol at 左下, 右下 or 底部 before `FIT_SLACK` and later changes); at nominal height 大千 with 下滑 at 底部 leaves out preset shortcut icons (`KeyMarksScreenshotTest` zhuyin_full_TopRight_Bottom). The icon 8 dp at 紧凑. `KeyCaps`' caps are scenes and yield as every scene key does (below, S6). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
+`floatingBuilt`); the theme page's preview does the same in `recalculateSize`. A key's glyph (label, icon) and its marks (shortcut icons and texts, a letter's symbol) keep apart only where their ink meets, worked out by the scene engine as it builds a key's content (`lib/keyboard-scene` `rules/KeyMarkYield`, run from `engine/Content`; 060-render-p2 S4e): one size for each class of glyph across a keyboard, no mark moved to another corner, a text that does not fit as the app gives it (two characters and 「…」) drawn a step down on that key alone, at its class's size, its key then asking nothing of the mark classes (`MarkContent.Text.ladder`: its first character and 「…」, then `Icons.SHORT_TEXT`, a two-line icon drawn as the shortcut icons are, its ink the two lines (`Icons.SHORT_TEXT_INK`), not its square: a text is here; `SceneBuilder.roomless`, `Member.shortened`; 0.6.0-beta2: the owner's 「现在怎么样了」 on j), a mark that cannot fit at its least size left out (a mark wider than its key's face counts as not fitting: a long first the user set, a 0.5 backup's 「5%葡萄糖注射液100ml」, drawn over the next keys till R24; `KeyMarkYield.cornersIn`, `LongMarksStayOnTheirKeyTest`; a built-in one before one the user set, `MarkSettings.user` / `KeyMarkYield.Mark.user`; then the most expendable first: a function key's down shortcut, a shortcut; a symbol last); a mark is kept from the glyph by the gap less half a px (`FIT_SLACK`, L62/L65/L72: as L77's half px, too little to see), everywhere, so none jumps where it stops fitting. `KeyMarksEverywhereUatTest` measures every key of every keyboard (standard, 紧凑, floating, one-handed, landscape; every pair of places the settings allow) for nothing drawn over anything else and prints what was left out; the sweep leaves out no corner symbol (it prints "left out (0)"; 060-pending-decisions S4e recorded 22 corner symbols with 紧凑, one-handed and the symbol at 左下, 右下 or 底部 before `FIT_SLACK` and later changes); at nominal height 大千 with 下滑 at 底部 leaves out preset shortcut icons (`KeyMarksScreenshotTest` zhuyin_full_TopRight_Bottom). The icon 8 dp at 紧凑. `KeyCaps`' caps are scenes and yield as every scene key does (below, S6). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
 `zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutNames`; the tones and 注音九键's slot none, as 九键's 1). What each punctuation key types (。 or . by the punctuation mode) is the host's (`HostCore.startPunctuationKeys`), kept from the last run in `filesDir/punctuation-start-keys` (`PunctuationStartKeys`, written by the host as it changes, read on a thread of its own at the service's `onCreate`) so the keys show it before the host is up (060-render-p2 S7a); `PunctuationComponent.known` says whether it is known. None kept (a first install, the host not up yet): `KeyboardWindow` holds a punctuation key's tap back (not typed, its bubble not shown) and buzzes once. A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
 key (`lib/keyboard-scene` `engine/Popups`: `KEY_MIN_WIDTH_DP`, `KEY_HEIGHT_DP`, `LIFT_DP`; as wide as the key pressed, 九键's 7 filled the screen),
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
@@ -720,14 +743,13 @@ keysyms by name, `layout:`, `picker:` (alone, the page shown last), `commit:`, `
 `unicode`, `space-long-press`…; `action:<name>` the keyboard's `sceneTable`: 大千's `action:zhuyin` the
 code of the symbol the key shows and `action:tone-1`…`tone-5` a tone's (`ZhuyinKeyboard.placeholder`, which
 reads 注音九键's too: a group's code by the symbols it shows, its tones, `zhuyin-slot` the separator while typing and
-the comma key else; its groups write no `letters=` but `<popup from="group"/>`, their symbols the long press,
-`sceneTable.popup`); anything
+the comma key else; its groups write no `letters=` but `<popup from="group"/>`, their symbols the long press, made by the key's name `zy9/N` (`KeyDefaults.zhuyinGroup`, through the resolver)); anything
 else logged and doing nothing: `code:` a scalar value (U+10FFFF at most, no surrogate), `layout:` a name,
 `emoji-search:` on or off, the reader and `SceneAction.of` the same test; a `send=` that reads as nothing
 is no tap, not its group's code). A key that does the same in a scene made anew keeps its `SceneKey`.
 A group key writes its letters (`letters="qw"`, 060-render-v2 §15): its tap is its group's code (the
-keyboard's `sceneTable.group`, as `wire` sends it, its place added by `pressed`), its long press with no
-`popup` written (or `from="group"`) the letters' row the views' was (`sceneTable.groupPopup`). The
+keyboard's `sceneTable.group`, as `wire` sends it, its place added by `pressed`), its long press the resolver's by the key's name
+(`g14/…`, `g18/…`: `KeyDefaults.grouped`, Q W 1 q w, the letters' built-in symbols above); a theme's group of no name gets the same built-in list, none the user can change (`SceneKeyDef.grouped`). The
 app collects a layout's groups (`SceneGroups.of`, row by row, a fragment's where included) into a
 `NineKeyLetters` and takes it as the keyboard is made (`GroupedKeyboard.grouping`, `SceneGroups.taken`,
 060-render-p3 T9b): the keyboard's own groups (G14, G18) as always, their codes, `wire` and learning
@@ -745,8 +767,8 @@ the next word keeps its 前文. The field's composing text (handwriting's, Engli
 Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
 groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
 keyboards (`GroupedKeyboardOwnGroupsTest`, `KeyboardCustomTest`). The theme's board stays `k14`/`k18`.
-A group key's long press is made as it opens only where its layout wrote none (or `from="group"`); a key
-that swipes no corner gets its letters alone (`longPressOf`). `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
+A group key's long press is made as it opens (the resolver's, cached per variant and `KeyLists.version`); a key
+that swipes no corner gets its row with no first. `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
 where a tap leans and, P3, where the default label draws; the built-ins write their labels (`QW`, one
 word centred), so no label is drawn by the rows yet. Whether a tap leans (按落点加权) is the layout's:
 a group of two letters or more without `lean="off"` (`SceneGroups.leaning`, read whichever draws the
@@ -761,7 +783,9 @@ The number keyboard (S4b) is one layout, `number.xml`, for all seven pads: `Numb
 own `NumberKeyboard` drawing it. Its digits and `+ - * / , = .` are `sym:KP_…`: the `action:` table sends
 every `KP_` keysym with NumLock (`NumLockState`), as `NumPadKey` did (`keypad:`, a typing keyboard's
 corner digit, stays Virtual). The board's `preview="off" popups="off"` are applied to each key
-(`SceneKeyDef.onBoard`): no bubble, no long press's keyboard, but a menu written on a key pops up, so
+(`SceneKeyDef.onBoard`): no bubble, and a key of no name pops up no long press; a named key (`fn/…`, `num/N`)
+keeps the resolver's list, the user's data (`KeyResolving.opens` does not read the board: the emoji panel's ，。, the pad's
+space and digits); a menu written on a key pops up, so
 Return offers Emoji as on every other keyboard (the views swallowed it: rules C 疑问 8, fixed on the
 canvas alone, `NumberSceneGesturesTest`). A place a pad has no key for is a `<gap look>`: drawn
 `:disabled`, faded to `Popups.DISABLED_ALPHA` op by op as the blank key's view was as a whole, no touch,
@@ -902,14 +926,13 @@ keys' column, separator and multi-tap are in `T9Keyboard` with decisions in `Mul
 A nine key's long press shows one row, its letters in capitals, its digit, its letters (A B C 2 a
 b c, `Explicit.inRow` the digit's place: in that order, the digit under the finger, narrower keys
 when they don't fit; owner 2026-10-20), each committed as it is (`CommitAction`, after the first
-candidate), then in rows of their own above, no line between, its symbols (`NineKeySymbols` in ime-core, the pref `t9Symbols`, set in the 「九键」 section's
-按键长按, `NineKeySymbolsFragment`; separate from 按键字符, owner 2026-10-19): by default 2–9's are
-the full keyboard's corner characters of their letters (`PopupPresetTest` holds them to it), 1's
-the rest of 搜狗's column. `KeyDef.Popup.Keyboard.Explicit.symbolsFrom` sets 2–9's apart: shown
-as Chinese punctuation maps them and typed as keys to the engine, as the full keyboard's long
-press is (the first candidate, then the mark: quotes in turn, brackets paired; `'` while
-typing is the syllable separator, as there). 1's are
-`asIs`, committed as they are (`.` not `。`). A digit or a lone letter is never a symbol: the
+candidate), then in rows of their own above, no line between, its symbols (`KeyDefaults.nine`, `NINE_SYMBOLS`; the user's whole list in `key_lists` under `t9/N`, edited on 按键字符和快捷键's
+九键 tab, shared by pinyin, 双拼 and English): by default 2–9's are the full keyboard's corner characters of their
+letters, 1's the rest of 搜狗's column. `KeyDef.Popup.Keyboard.Explicit.symbolsFrom` sets them apart: shown
+as Chinese punctuation maps them and typed as keys to the engine (`Commit.AsKey`), as the full keyboard's long
+press is (the first candidate, then the mark: quotes in turn, brackets paired; `'` while typing is the syllable
+separator, as there); 1's too (owner decision: the nine keys' 1 and left column follow the punctuation mode, what
+shows is what is typed). A digit or a lone letter is never a symbol: the
 long press has those already. In an address field the column offers what addresses are made of
 (`AddressKeys.column`: `/` or `@`, `.`, `.com` …) in place of punctuation, pinyin's syllables still
 while typing, from the same `address` both boards take from `KeyboardWindow`; the bottom row is as
@@ -932,9 +955,9 @@ following pinyin's); each is in `recreateInputViewPrefs`. The router's IM stays 
 every pinyin keyboard. The ⋯ panel's 「键盘」 entry is `KeyboardPicker` (`show(anchor)`): the current
 input method's `choices`, the one in use ticked; a pick sets that input method's pref, so the view is
 rebuilt at once. No entry where there is no choice (the tables, handwriting). The settings pages
-show a section 「九键」 (`InputMethodSettings.NINE_KEYS`: 连按, 按键字母, 按键长按, one pref each, shared by
-pinyin's and English's nine keys; English's 九键英文打法 first in it; 双拼's holds 按键长按 alone, its
-letters the scheme's and no multi-tap) while 九键 is chosen, hidden and shown at once as 键盘 changes
+show a section 「九键」 (`InputMethodSettings.NINE_KEYS`: 连按, 按键字母, one pref each, shared by
+pinyin's and English's nine keys; English's 九键英文打法 first in it; 双拼 has no such section, its
+letters the scheme's and no multi-tap; every nine key's symbols are on 按键字符和快捷键's 九键 tab) while 九键 is chosen, hidden and shown at once as 键盘 changes
 (`Section.shown`, re-run by the page's refreshers; owner 2026-11-01: no row to a page of their own, none
 on 按键). A hardware keyboard types full pinyin / the full layout whatever is chosen.
 
@@ -1064,7 +1087,8 @@ Rules for settings, all decided:
   The level shown is the nearest to what the preferences hold, each key's distance over its levels'
   span (`LevelPick` in ime-core); the level itself is not stored, so adding one can show an old odd
   value as a neighbouring level, its numbers unchanged. 键盘高度's levels are `KeyboardHeightLevels`'
-  (ime-core), as the keyboard reads 紧凑 by the same numbers.
+  (ime-core), as the keyboard reads 紧凑 by the same numbers. The one exception is 按键音音量: a
+  0–100 slider (0 = 系统默认), its sound played as the finger lifts, the levels it replaced gone.
 - **跟随主题 of the keyboard's size** (060-render-p3 T5). 键盘高度, 两侧边距 and 底部边距 have 跟随主题 first
   (`levels(..., follow =)`: a `PBool` of `AppPrefs.Keyboard`, `keyboard_*_follow_theme`, default true,
   `hidden(setByLevels = true)`): picked, it is set and the ints are removed (their defaults); a level

@@ -10,6 +10,9 @@ WebView shell 要 API 34）。只用框架自带的 View，没有任何库。
 ./gradlew :testbed:installDebug          # 装到 ANDROID_SERIAL 那台；多台时先 export ANDROID_SERIAL=emulator-5556
 ```
 
+`uat.py` 用到测试台时，设备上没装（模拟器从不带它的只读快照起）就自己装 `testbed/build/outputs/apk/debug` 下最新的 APK，
+不用手装；改了测试台以后先 `./gradlew :testbed:assembleDebug` 重新构建（已经装了旧版的设备用上面的 `installDebug` 覆盖）。
+
 debug 和 release 两个包的包名相同、签名不同：交替安装前先 `adb uninstall org.fcitx.fcitx5.android.testbed`。
 
 模拟器的 clean 快照（`uat/tools/avd.sh`）里没有它：`uat.py up` 起的是只读快照，每次起来都要再装一次（几秒）。

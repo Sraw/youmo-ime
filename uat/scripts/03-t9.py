@@ -3,7 +3,7 @@
 
 import time
 
-from uat import case, check, first
+from uat import case, check, first, script
 
 
 def t9(d, digits, gap=0.35, after=0.6):
@@ -61,6 +61,9 @@ case("T9-18", needs="jvm:T9UatTest.theNumberPadsDigitsAreDigitsNotTheNineKeys、
 
 
 case("T9-19", needs="jvm:NineKeysTapUatTest.withMultiTapOnOnesPunctuationCyclesAndAQuickSecondDigitIsItsLetter、NineKeysUatTest.withMultiTapAQuickSecondPressIsTheLetterLearnedWordOrNot")(lambda d: None)
+
+
+case("T9-19b", needs="jvm:NineKeysTapUatTest.afterADigitWithHalfWidthOnOnesSecondTapReplacesTheCommaTyped")(lambda d: None)
 
 
 case("T9-24", needs="jvm:NineKeysTapUatTest.multiTapOffByDefaultOneIsACommaEachPress、NineKeysUatTest.twoQuickPressesAreTwoKeys")(lambda d: None)
@@ -241,4 +244,81 @@ def t960(d):
     return f"码行 {code}，音节条 {strip[:4]}，点 ㄇㄧ 后 {taken}；不打声调 {code2}，框里「{got}」；ㄓ 条 {zh[:6]}，{code3}"
 
 
+def held_cells(d, key):
+    """[key] (a centre) held: the popup's cells (texts shown outside the keyboard's own keys, with where
+    they are); let go where it went down, then nothing typed is left (cleared)"""
+    kb = d.need_keyboard()
+    on_keys = {t for n in kb.walk() if n.clickable for t in n.texts()}
+    d.touch(("down", *key), ("sleep", 0.9))
+    cells = [n for n in d.screen().nodes if n.text and not n.clickable and n.text not in on_keys]
+    d.shot("full", "长按 2：手指下一行是 A B C b c（A 在手指下），a 和符号在上面，没有 2")
+    d.touch(("up", *key))
+    time.sleep(0.5)
+    d.clear()
+    return cells
+
+
+def nine_two_row(cells, key, where):
+    """the popup of 2 after its 2 deleted and a moved to the end: A B C b c one row, A the nearest the
+    finger, a above them, no 2 anywhere"""
+    got = {n.text: n for n in cells}
+    row = [got.get(t) for t in ("A", "B", "C", "b", "c")]
+    check(all(row), f"{where}长按 2 的弹出没有 A B C b c 全部：{[n.text for n in cells][:20]}")
+    ys = [n.c[1] for n in row]
+    check(max(ys) - min(ys) < 10, f"{where}A B C b c 不在一行：{ys}")
+    check(min(row, key=lambda n: abs(n.c[0] - key[0])).text == "A", f"{where}手指下不是 A：{[(n.text, n.c[0]) for n in row]}，手指 x={key[0]}")
+    check("a" in got and got["a"].c[1] < min(ys), f"{where}a 不在那一行上面：{[(n.text, n.c) for n in cells][:20]}")
+    check("2" not in got, f"{where}删掉的 2 还在弹出里")
+
+
+@case("T9-62", base="B0-设置", mutates=True, visual=True)
+def t962(d):
+    from uat import add_im, choose, gear, pinyin_keyboard, shuangpin_keyboard
+    st = script("14-settings")
+    pinyin_keyboard(d, "九键")
+    add_im(d, "双拼")
+    gear(d, "双拼")
+    choose(d, "双拼方案", "微软")
+    shuangpin_keyboard(d, "九键")
+    st.slots_tab(d, "九键")
+    st.key_dialog(d, "2")
+    st.dialog_pick(d, "2")
+    d.tap_text("删除", scroll=False, after=0.4)
+    # the delete selected a, which took 2's place: to the end
+    for _ in range(10):
+        d.tap_text("右移", scroll=False, after=0.3)
+    d.shot("app", "九键 2：删了 2，a 挪到最后，带框的首选是 A")
+    d.tap_text("确定", where="all", scroll=False, after=1.0)
+    d.open_page("text")
+    d.switch_im("拼音")
+    d.clear()
+    two = d.face("ABC")
+    d.shot("kb", "拼音九键 2 的键角是 A")
+    check(two.alt == "A" or two.desc.endswith("A"), f"2 键的键角读作「{two.alt or two.desc}」，应是 A")
+    x, y = two.c
+    d.swipe((x, y), (x, y - 120), 150, after=0.6)
+    idle = d.field_text() or ""
+    check(idle == "A", f"没打字时上滑 2 打出「{idle}」，应是 A")
+    d.clear()
+    d.step("打字中上滑")
+    k = d.keys(refresh=True)
+    d.tap(k["6"], 0.3)
+    d.tap(k["4"], 0.3)
+    first_cand = (d.cands() or [""])[0]
+    d.swipe((x, y), (x, y - 120), 150, after=0.6)
+    typing = d.field_text() or ""
+    check(first_cand and typing == first_cand + "A", f"打 64 后上滑 2 打出「{typing}」，应是首选「{first_cand}」加 A")
+    d.clear()
+    d.step("长按 2")
+    nine_two_row(held_cells(d, (x, y)), (x, y), "拼音九键")
+    d.step("双拼九键长按 2")
+    d.switch_im("双拼")
+    two = d.face("ABC")
+    nine_two_row(held_cells(d, two.c), two.c, "双拼九键")
+    return f"没打字上滑「{idle}」，打字中上滑「{typing}」，两个九键的弹出一样"
+
+
 case("T9-61", needs="jvm:ZhuyinShortcutsUatTest.zhuyinNinesGroupsHaveNoneUntilOneIsSet、ZhuyinShortcutsUatTest.thePageHasZhuyinNinesTabBeforeDachens、ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts、KeyShortcutPagesTest.zhuyinNinesGroupsAreNamedByTheirPlaceThreeARow")(lambda d: None)
+
+
+case("T9-63", needs="jvm:SettingsPagesUatTest.anEditedNineKeysLongPressKeepsItsLettersWhenTheyChange")(lambda d: None)

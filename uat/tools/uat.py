@@ -1052,7 +1052,7 @@ class Device:
             if n.rid in names:
                 k[names[n.rid]] = n.c
                 continue
-            byd = {"退格": "bksp", "切换语言": "globe", "Shift": "shift"}
+            byd = {"退格": "bksp", "切换语言": "globe", "Shift": "shift", "大小写": "shift"}
             if n.desc in byd or n.desc.startswith("空格"):
                 k.setdefault(byd.get(n.desc, "space"), n.c)
                 continue
@@ -1068,6 +1068,24 @@ class Device:
             k.setdefault(key, c)
         self._keys = k
         return k
+
+    def held(self, key):
+        """[key] (a node of the keyboard) held: the texts shown the while, outside the keyboard's own keys; let
+        go where it went down (its first typed, if any)"""
+        kb = self.need_keyboard()
+        on_keys = {t for n in kb.walk() if n.clickable for t in n.texts()}
+        self.touch(("down", *key.c), ("sleep", 0.9))
+        shown = [n.text for n in self.screen().nodes if n.text and not n.clickable and n.text not in on_keys]
+        self.touch(("up", *key.c))
+        time.sleep(0.5)
+        return shown
+
+    def face(self, *texts):
+        """the keyboard's key whose face is one of [texts]"""
+        kb = self.need_keyboard()
+        n = next((n for n in kb.walk() if n.clickable and n.texts() and n.texts()[0] in texts), None)
+        check(n is not None, f"键盘上没有 {texts[0]}")
+        return n
 
     def need_keyboard(self, timeout=20):
         """our keyboard's view, waited for. Not up after a few seconds: another input method may have
@@ -1347,9 +1365,15 @@ class Device:
 
     # --- pages
     def testbed(self, page=""):
-        """the testbed app (:testbed, uat/TESTBED.md) at one page ("" its list), or Blocked when not installed"""
+        """the testbed app (:testbed, uat/TESTBED.md) at one page ("" its list): installed from its
+        built APK where missing (emulators start from a read-only snapshot without it), or Blocked"""
         if "package:" not in self.sh(f"pm path {TESTBED}"):
-            raise Blocked("没装输入测试台：./gradlew :testbed:installDebug")
+            dp = os.path.join(REPO, "testbed/build/outputs/apk/debug")
+            apks = sorted((os.path.join(dp, f) for f in (os.listdir(dp) if os.path.isdir(dp) else [])
+                           if f.endswith(".apk")), key=os.path.getmtime)
+            if not apks:
+                raise Blocked("没装输入测试台：./gradlew :testbed:assembleDebug")
+            self.adb("install", "-r", apks[-1], check=True, timeout=600)
         extra = f" --es page {shlex.quote(page)}" if page else ""
         self.sh(f"am start -W -n {TESTBED}/.MainActivity{extra}")
 
@@ -2554,7 +2578,7 @@ def mark(run_name, cid, state, note):
         sys.exit(f"{cid} not in {rj}")
     seen = res[cid][1]
     if note:
-        seen = (seen + "；" if seen else "") + "看图：" + note
+        seen = (seen + "；" if seen else "") + ("" if note.startswith("看图：") else "看图：") + note
     res[cid][0], res[cid][1] = state, seen
     if len(res[cid]) > 4 and res[cid][4]:   # the last attempt is this result: flakes reads it
         res[cid][4][-1]["state"], res[cid][4][-1]["seen"] = state, seen
@@ -3286,7 +3310,8 @@ def cmd_counts(a):
             if m:
                 cur = m.group(1)
                 priority[cur] = m.group(2)
-            elif cur and line.startswith("- **JVM**"):
+            elif cur and line.startswith("- **JVM**") and not line.split("：", 1)[-1].startswith("暂无"):
+                # 「暂无」 says there is no JVM test yet: not asserted on the JVM
                 jvm_line.add(cur)
     n, problems = tally({c.id: c.needs for c in CASES.values()}, priority, jvm_line)
     line = counts_line(n)

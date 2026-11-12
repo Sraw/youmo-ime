@@ -877,3 +877,6 @@ def wd42(d):
             d.adb("pull", f"{DOWNLOAD}/{new[0]}", local)
             text = open(local, encoding="utf-8").read()
         check(text.startswith("# youmo-common-words 1\n") and "木字旁[mu'zi'pang]\t木\n" in text, f"导出的 {new[0]}：{text[:160]!r}")
+
+
+case("WD-45", needs="jvm:CommonWordsTest.replacementsAreKeptOnceNineAtMostTheWordItselfToo、CommonWordsInSessionTest.theWordItselfAsAReplacementGoesFirst")(lambda d: None)

@@ -376,3 +376,9 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **操作**：打 mzp，长按候选「米」，选 **从常用词中删除**；清掉再打 mzp；到 **词库与短语 → 常用词** 看这两行。
 - **预期**：再打 mzp 时前面是「木」「糸」，没有「米」；页上是「木字旁 → 木」「米字旁 → 糸」。
 - **JVM**：ime-core `CommonWordsInSessionTest.aReplacementTwoWordsGiveDeletedFromTheKeyboardIsGoneFromBoth`（在键盘上删掉两个词都给的替换项，两个词上都去掉，再打不出）、`CommonWordsTest.aReplacementTwoWordsGiveIsTakenOffBoth`（数据层：删一次两个词上都去掉）；设备上不跑。
+
+### WD-45 [P1] 常用词：替换项可以是词本身
+- **前提**：B0-设置。
+- **操作**：**词库与短语 → 常用词**，点 **+**，词写「你好」，拼音留空，替换项写两行「你好」「您好」，保存。回「普通文本」框打 nihao，看候选栏，点空格。
+- **预期**：保存不报错，列表里有「你好 → 你好、您好」。打 nihao 时候选前两个是「你好」「您好」，「你好」只出现一次；点空格框里是「你好」。
+- **JVM**：ime-core `CommonWordsTest.replacementsAreKeptOnceNineAtMostTheWordItselfToo`（词本身算替换项，重复的只留一个，最多九个）、`CommonWordsInSessionTest.theWordItselfAsAReplacementGoesFirst`（你好 → 你好、您好：你好排第一、只出一次、上屏）；设备上不跑。

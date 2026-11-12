@@ -1,7 +1,7 @@
 """uat/02-keyboard.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import case, check, choose, has, home, script
+from uat import Blocked, case, check, choose, has, home, script
 
 
 @case("KB-01")
@@ -236,6 +236,90 @@ case("KB-67", needs="jvm:KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOt
 case("KB-69", needs="jvm:KeyShortcutsHostTest.swipeSelectSelectsFromTheCursorAsTheFingerMovesSideways、KeyShortcutsHostTest.swipeSelectCommitsWhatIsTypedFirst、KeyShortcutsHostTest.swipeSelectStepsOverAnEmojiWhole、SwipeSelectionTest、SwipeStepsTest")(lambda d: None)
 
 
+def testbed_field(d, rid):
+    """the testbed's types page, its field [rid] tapped: the keyboard up on it"""
+    from uat import TESTBED
+    d.sh(f"am force-stop {TESTBED}")
+    d.testbed("types")
+    n = d.wait(lambda s: next((x for x in s.app() if x.rid == rid and x.pkg == TESTBED), None), 15,
+               what=f"the testbed's {rid} field")
+    d.tap(n.c, 1.5)
+    d.page = None
+    d.host = None
+    d._keys = None
+
+
+@case("KB-85", mutates=True, visual=True)
+def kb85(d):
+    st = script("14-settings")
+    st.slots_tab(d, "全键盘")
+    st.key_dialog(d, "q")
+    st.dialog_way(d, "上滑", "命令")
+    if not d.screen().find(text="滑选", where="all"):
+        d.tap_text("换", scroll=False, after=0.8)
+    d.tap_text("滑选", where="all", scroll=False, after=0.6)
+    st.dialog_ok(d)
+    d.step("多行框折成几行")
+    testbed_field(d, "multiline")
+    # one paragraph, no newline: the field wraps it into screen lines (a chunk's enter commits its letters)
+    for _ in range(24):
+        d.type("abcdefghij")
+        d.enter()
+    time.sleep(0.5)
+    ml = lambda: d.testbed_state()["multiline"]
+    t = ml()["text"]
+    check(len(t) == 240 and "\n" not in t, f"框里是 {t!r}")
+    p = d.dpx()
+    # the cursor into the middle by the space slide (KB-70): sideways, then four screen lines up
+    x, y = d.keys(refresh=True)["space"]
+    d.touch(("down", x, y), ("move", x - 8 * p, y), ("move", x - 25 * p, y),
+            *[("move", x - 25 * p, y - dy * p) for dy in range(16, 65, 16)], ("up", x - 25 * p, y - 64 * p), ("sleep", 0.3))
+    c0 = ml()["selStart"]
+    if not 40 < c0 < 200:
+        raise Blocked(f"空格滑动没把光标放到中间：{c0}")
+    d.shot("app", "光标在中间一行")
+    d.step("滑选上下挪")
+    qx, qy = d.keys(refresh=True)["q"]
+    sel = lambda: (ml()["selStart"], ml()["selEnd"])
+    free = lambda a, b: a if b == anchor else b
+    d.touch(("down", qx, qy), ("move", qx, qy - 15 * p), ("move", qx, qy - 30 * p), ("sleep", 0.2),
+            ("move", qx - 10 * p, qy - 30 * p), ("sleep", 0.3))
+    s1 = sel()
+    check(s1 in ((c0 - 1, c0), (c0, c0 - 1)), f"往左挪一个字后选区 {s1}，起点 {c0}")
+    anchor = c0
+    for i in range(1, 4):
+        d.touch(("move", qx - 10 * p, qy - 30 * p - i * 28 * p), ("sleep", 0.3))
+    s2 = sel()
+    f2 = free(*s2)
+    d.shot("app", "滑选上挪三行：选区跨四行，起点不动")
+    # three screen lines: some 15 to 80 letters a line, never the paragraph's start (a logical line up)
+    check(anchor in s2 and 45 <= anchor - f2 <= 240 and f2 > 0, f"上挪三行后选区 {s2}，起点 {anchor}")
+    for i in range(2, -3, -1):
+        d.touch(("move", qx - 10 * p, qy - 30 * p - i * 28 * p), ("sleep", 0.3))
+    s3 = sel()
+    f3 = free(*s3)
+    check(anchor in s3 and 30 <= f3 - anchor <= 160, f"往下挪回五行后选区 {s3}，起点 {anchor}")
+    d.touch(("move", qx - 20 * p, qy - 30 * p + 2 * 28 * p), ("sleep", 0.3))
+    s4 = sel()
+    check(anchor in s4 and free(*s4) == f3 - 1, f"再往左挪一个字后选区 {s4}，之前 {s3}")
+    d.touch(("up", qx - 20 * p, qy - 30 * p + 2 * 28 * p), ("sleep", 0.5))
+    after = ml()
+    check(after["text"] == t and (after["selStart"], after["selEnd"]) == s4, f"松手后框里 {after['text'][:20]!r}…，选区 {(after['selStart'], after['selEnd'])}")
+    d.step("单行框")
+    testbed_field(d, "text")
+    d.type("hello")
+    d.enter()
+    time.sleep(0.3)
+    one = lambda: d.testbed_state()["text"]
+    qx, qy = d.keys(refresh=True)["q"]
+    d.touch(("down", qx, qy), ("move", qx, qy - 15 * p), ("move", qx, qy - 30 * p), ("sleep", 0.2),
+            ("move", qx - 10 * p, qy - 30 * p), ("sleep", 0.3), ("move", qx - 10 * p, qy - 30 * p - 50 * p), ("sleep", 0.3),
+            ("up", qx - 10 * p, qy - 30 * p - 50 * p), ("sleep", 0.3))
+    o = one()
+    check(o["text"] == "hello" and (o["selStart"], o["selEnd"]) == (4, 5), f"单行框：{o['text']!r} 选区 {(o['selStart'], o['selEnd'])}，应只选中 o")
+    return f"起点 {anchor}：上挪三行到 {f2}，下挪到 {f3}，左挪到 {free(*s4)}"
+
+
 def three_lines(d):
     """the testbed's 多行 field holding aaa, bbb, ccc on three lines, the cursor at the end"""
     from uat import TESTBED
@@ -335,30 +419,13 @@ case("KB-78", needs="jvm:KeysEverywhereUatTest.zhuyinNinesToneAndSlot、KeysEver
 case("KB-79", needs="jvm:KeysEverywhereUatTest.fourteenKeysQwFirstDrawnAndTyped")(lambda d: None)
 
 
-case("KB-82", needs="jvm:PanelKeysUatTest.aLayerOf32OnTheNarrowestOneHanded、PanelKeysUatTest.aLayerOf32Landscape")(lambda d: None)
+case("KB-82", needs="jvm:PanelKeysUatTest.aLayerOf16OnTheNarrowestOneHanded、PanelKeysUatTest.aLayerOf16Landscape、PopupEditorTest.addStopsAtSixteen")(lambda d: None)
 
 
 case("KB-83", needs="jvm:DisplayIsTypedUatTest.everyKeyShowsWhatItTypes、DisplayIsTypedUatTest.toggledWithTheKeyboardUp")(lambda d: None)
 
 
-def held(d, key):
-    """[key] (a node of the keyboard) held: the texts shown the while, outside the keyboard's own keys; let go
-    where it went down (its first typed, if any)"""
-    kb = d.need_keyboard()
-    on_keys = {t for n in kb.walk() if n.clickable for t in n.texts()}
-    d.touch(("down", *key.c), ("sleep", 0.9))
-    shown = [n.text for n in d.screen().nodes if n.text and not n.clickable and n.text not in on_keys]
-    d.touch(("up", *key.c))
-    time.sleep(0.5)
-    return shown
-
-
-def face(d, *texts):
-    """the keyboard's key whose face is one of [texts]"""
-    kb = d.need_keyboard()
-    n = next((n for n in kb.walk() if n.clickable and n.texts() and n.texts()[0] in texts), None)
-    check(n is not None, f"键盘上没有 {texts[0]}")
-    return n
+case("KB-84", needs="manual:18 键 L 的弹出在微软双拼和拼音下各看一次；规则由 KeyResolverTest.eighteenLsColonOnlyOnASchemeTypingSemicolon 查")(lambda d: None)
 
 
 @case("KB-80", base="B0-注音全键盘", mutates=True, visual=True)
@@ -366,21 +433,21 @@ def kb80(d):
     st = script("14-settings")
     d.open_page("text")
     d.clear()
-    b = face(d, "ㄅ")
-    before = held(d, b)
+    b = d.face("ㄅ")
+    before = d.held(b)
     check("1" not in before and b.desc in ("", "ㄅ"), f"改之前 ㄅ 长按弹出 {before}，读作「{b.desc}」")
     d.clear()
     st.slots_tab(d, "注音全键盘")
     st.key_dialog(d, "ㄅ")
-    st.dialog_add(d, "1")
+    st.dialog_add_digits(d, "1")
     st.dialog_way(d, "上滑", "长按首选")
     st.dialog_ok(d)
     d.open_page("text")
     d.clear()
-    b = face(d, "ㄅ")
+    b = d.face("ㄅ")
     d.shot("kb", "ㄅ 的键角画 1")
     corner = b.desc
-    after = held(d, b)
+    after = d.held(b)
     let_go = d.field_text()
     d.clear()
     d.swipe(b.c, (b.c[0], b.c[1] - 130), 150, after=0.8)
@@ -402,7 +469,7 @@ def kb81(d):
     st.dialog_ok(d)
     d.open_page("text")
     d.clear()
-    c = face(d, "，", ",")
+    c = d.face("，", ",")
     corner = c.desc
     # swiped first: the engine's “ ” alternation is its own state, which a clear does not reset (a hold let go
     # first would type “ and leave ” next)
@@ -472,3 +539,28 @@ def kb72(d):
     check(typed == "现在怎么样了", f"j 下滑打出「{typed}」")
     check(hello == "你好", f"a 下滑打出「{hello}」")
     return f"j 下滑「{typed}」，a 下滑「{hello}」"
+
+
+@case("KB-87", base="B0-设置", mutates=True, visual=True)
+def kb87(d):
+    st = script("14-settings")
+    long = "13895801474"
+    st.slots_tab(d, "全键盘")
+    st.key_dialog(d, "q")
+    st.dialog_add_digits(d, long)
+    st.dialog_pick(d, long)
+    d.tap_text("设为首选", scroll=False, after=0.4)
+    st.dialog_ok(d)
+    d.shot("app", "页面上 q 的键角画 13…")
+    d.open_page("text")
+    d.clear()
+    q = d.face("q", "Q")
+    d.shot("kb", "q 的键角画 13…，不伸出键外")
+    # the node gives the corner whole (as said and typed), not as drawn: 「13…」 is checked on the screenshot
+    corner = q.alt or q.desc
+    d.swipe(q.c, (q.c[0], q.c[1] - 130), 150, after=0.8)
+    up = d.field_text()
+    check(long in corner, f"q 的键角读作「{corner}」，应读整串 {long}")
+    check(up == long, f"上滑 q 打出「{up}」")
+    return f"键角「{corner}」，上滑「{up}」"
+
