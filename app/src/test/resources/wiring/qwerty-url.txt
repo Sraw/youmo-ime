@@ -3,8 +3,8 @@ b: shortcut=full/b bothWays=false actions=[Press HostKeyAction(act=b, code=48, s
 backspace: shortcut=backspace bothWays=true actions=[Press SymAction(sym=0xff08, states=KeyStates(states=536870912)), Repeat SymAction(sym=0xff08, states=KeyStates(states=536870912))] popups=[] sound=Delete space=false backspace=true enabled=true
 c: shortcut=full/c bothWays=false actions=[Press HostKeyAction(act=c, code=46, states=KeyStates(states=536870912))] popups=[bubble letter] sound=Standard space=false backspace=false enabled=true
 d: shortcut=full/d bothWays=false actions=[Press HostKeyAction(act=d, code=32, states=KeyStates(states=536870912))] popups=[bubble letter] sound=Standard space=false backspace=false enabled=true
-domain: shortcut=null bothWays=false actions=[Press CommitAction(text=.com, replacing=)] popups=[bubble .com, keys [.com, .cn, .net, .org] 4 true -1] sound=Standard space=false backspace=false enabled=true
-dot: shortcut=null bothWays=false actions=[Press CommitAction(text=., replacing=)] popups=[bubble .] sound=Standard space=false backspace=false enabled=true
+domain: shortcut=null bothWays=false actions=[Press CommitAction(text=.com, replacing=, punctuation=false)] popups=[bubble .com, keys [.com, .cn, .net, .org] 4 true -1] sound=Standard space=false backspace=false enabled=true
+dot: shortcut=null bothWays=false actions=[Press CommitAction(text=., replacing=, punctuation=false)] popups=[bubble .] sound=Standard space=false backspace=false enabled=true
 e: shortcut=full/e bothWays=false actions=[Press HostKeyAction(act=e, code=18, states=KeyStates(states=536870912))] popups=[bubble letter] sound=Standard space=false backspace=false enabled=true
 enter: shortcut=return bothWays=false actions=[Press SymAction(sym=0xff0d, states=KeyStates(states=536870912))] popups=[menu [Emoji ic_baseline_tag_faces_24 PickerSwitchAction(key=null)]] sound=Return space=false backspace=false enabled=true
 f: shortcut=full/f bothWays=false actions=[Press HostKeyAction(act=f, code=33, states=KeyStates(states=536870912))] popups=[bubble letter] sound=Standard space=false backspace=false enabled=true
@@ -24,7 +24,7 @@ q: shortcut=full/q bothWays=false actions=[Press HostKeyAction(act=q, code=16, s
 r: shortcut=full/r bothWays=false actions=[Press HostKeyAction(act=r, code=19, states=KeyStates(states=536870912))] popups=[bubble letter] sound=Standard space=false backspace=false enabled=true
 s: shortcut=full/s bothWays=false actions=[Press HostKeyAction(act=s, code=31, states=KeyStates(states=536870912))] popups=[bubble letter] sound=Standard space=false backspace=false enabled=true
 shift: shortcut=shift bothWays=false actions=[DoubleTap CapsAction(lock=true), LongPress CapsAction(lock=true), Press CapsAction(lock=false)] popups=[] sound=Standard space=false backspace=false enabled=true
-slash: shortcut=null bothWays=false actions=[Press CommitAction(text=/, replacing=)] popups=[bubble /] sound=Standard space=false backspace=false enabled=true
+slash: shortcut=null bothWays=false actions=[Press CommitAction(text=/, replacing=, punctuation=false)] popups=[bubble /] sound=Standard space=false backspace=false enabled=true
 space: shortcut=space bothWays=true actions=[LongPress SpaceLongPressAction(pointer=-1), Press SymAction(sym=0x0020, states=KeyStates(states=536870912))] popups=[] sound=SpaceBar space=true backspace=false enabled=true
 symbols: shortcut=symbols bothWays=false actions=[LongPress QuickPhraseAction, Press LayoutSwitchAction(act=Symbol)] popups=[] sound=Standard space=false backspace=false enabled=true
 t: shortcut=full/t bothWays=false actions=[Press HostKeyAction(act=t, code=20, states=KeyStates(states=536870912))] popups=[bubble letter] sound=Standard space=false backspace=false enabled=true

@@ -22,9 +22,6 @@ import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
-import org.fcitx.fcitx5.android.host.ChinesePunctuation
-import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton
@@ -240,14 +237,7 @@ class ThemeBaselineCompareTest {
     }
 
     // the record's 1 shows ，。？！ (the View's own): the scene's as the punctuation maps it (KB-76), Chinese's here
-    private fun chinesePunctuation(h: KeyboardHarness) {
-        val zh = ChinesePunctuation.map
-        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
-        h.api.statusAreaCached = active
-        h.api.punctuationCached = zh
-        h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, zh))
-        h.idle()
-    }
+    private fun chinesePunctuation(h: KeyboardHarness) = h.chinesePunctuation()
 
     private fun frame(h: KeyboardHarness): Bitmap {
         val v = h.inputView

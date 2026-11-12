@@ -71,7 +71,7 @@ class T9ShuangpinKeyboardTest {
     fun oneIsTheSeparatorWhileTypingElsePunctuation() {
         val tap = MultiTap(0)
         assertEquals(KeyAction.HostKeyAction("'"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = true, semicolon = false))
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = false, semicolon = false, marks = zh))
+        assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = false, semicolon = false, marks = zh))
     }
 
     // 微软's: 1 while typing is ;'s code, the engine reading it as ing or the separator; else punctuation as ever
@@ -80,7 +80,7 @@ class T9ShuangpinKeyboardTest {
         val tap = MultiTap(0)
         val one = KeyAction.HostKeyAction("1")
         assertEquals(code(NineKeyLetters.NINE_SP_SEMICOLON), T9Keyboard.resolveShuangpin(one, keys, tap, 0L, composing = true, semicolon = true))
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(one, keys, tap, 0L, composing = false, semicolon = true, marks = zh))
+        assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolveShuangpin(one, keys, tap, 0L, composing = false, semicolon = true, marks = zh))
     }
 
     @Test

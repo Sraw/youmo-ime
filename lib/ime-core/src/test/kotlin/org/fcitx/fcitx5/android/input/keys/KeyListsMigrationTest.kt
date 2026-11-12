@@ -120,8 +120,10 @@ class KeyListsMigrationTest {
             .resolve(one, KeyState()).popup as KeyPopup.Items
         assertEquals(listOf(".", ","), popup.items.map { it.text }.filter { it in setOf(".", ",") })
         assertTrue(popup.items.toString(), popup.items.filter { it.text in setOf(".", ",") }.all { it.commit == Commit.AsKey })
-        // beta2's by its name: kept as the user's (its editor stored a key only when saved), 0.5's default or not
-        assertEquals(UserList(false, old.split(' ')), lists(named = "t9/1 1 $old")[one])
+        // beta2's by its name as 0.5's default: none set, as t9_symbols' (its editor stored a key on OK, changed or not);
+        // another list kept as the user's
+        assertTrue(one !in lists(named = "t9/1 1 $old").lists)
+        assertEquals(UserList(false, listOf(".", ",")), lists(named = "t9/1 1 . ,")[one])
     }
 
     @Test

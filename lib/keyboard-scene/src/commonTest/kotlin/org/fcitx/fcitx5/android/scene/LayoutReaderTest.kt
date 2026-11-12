@@ -285,5 +285,11 @@ class LayoutReaderTest {
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\" rows=\"+2\"/></row>")).isNotEmpty())
         assertEquals(Text.Binding("punct", "，"), LayoutReader.text("{punct:，}"))
         assertNull(LayoutReader.text("{punct: }"))
+        // a run of marks a face's alone (九键 1's ,.?!); a corner and what is said one, as the betas' readers took it
+        assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"{punct:,.?!}\"/></row>")))
+        for (attr in listOf("alt", "a11y")) {
+            assertTrue(problems(board("<row><key id=\"a\" label=\"a\" $attr=\"{punct:,.}\"/></row>")).isNotEmpty(), attr)
+            assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"a\" $attr=\"{punct:,}\"/></row>")), attr)
+        }
     }
 }

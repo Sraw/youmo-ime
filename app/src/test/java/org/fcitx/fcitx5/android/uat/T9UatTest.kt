@@ -164,14 +164,15 @@ class T9UatTest {
     fun startOverClearsWhatIsTyped() {
         val h = harness().start()
         typing(true, "mi", "ni")
-        assertTrue(h.texts().toString(), "ni" in h.texts() && "，" !in h.texts())
+        // the column's punctuation as it types (none mapped here: , . ? !)
+        assertTrue(h.texts().toString(), "ni" in h.texts() && "…" !in h.texts())
         h.api.calls.clear()
         h.tap(h.key("重输"))
         // Escape: the engine drops what is typed
         assertEquals(listOf("sendKey(sym=${FcitxKeyMapping.FcitxKey_Escape}, states=536870912, code=0, up=false)"), h.api.calls)
         typing(false)
         assertEquals("", h.field.text.toString())
-        assertTrue(h.texts().toString(), "，" in h.texts() && "ni" !in h.texts())
+        assertTrue(h.texts().toString(), "…" in h.texts() && "ni" !in h.texts())
     }
 
     @Test

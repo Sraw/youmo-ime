@@ -5,6 +5,11 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.core.view.children
+import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
@@ -15,6 +20,9 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.host.ChinesePunctuation
+import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
@@ -108,6 +116,36 @@ class NineSceneGesturesTest {
         assertTrue(scene.joinToString("\n"), "5 pressed: [JKL]" in scene)
         assertTrue(scene.joinToString("\n"), scene.any { it.startsWith("5 long press: [") && "J" in it && "5" in it && "l" in it })
     }
+
+    // 1 and the column's punctuation as the punctuation maps them, shown as typed (用户 2026-11-11, 显示即所打): ，。？！ with
+    // Chinese punctuation on, , . ? ! with it off, toggled with the keyboard up
+    @Test
+    fun pinyinsOneAndColumnTypeAsThePunctuationMapsThem() {
+        val out = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
+            val out = mutableListOf<String>()
+            val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+            for ((mode, marks) in listOf("on" to ChinesePunctuation.map, "off" to emptyMap())) {
+                h.api.punctuationCached = marks
+                h.emit(HostEvent.StatusArea(if (marks.isEmpty()) emptyList() else active, KeyboardHarness.PINYIN, marks))
+                h.idle()
+                val column = column(h)
+                out += "$mode: 1=${h.nineKey("1").label} column=${column.map { it.text }}"
+                val before = h.field.text.length
+                h.after(BUBBLE_GONE_MS)
+                h.tap(h.nineKey("1"))
+                h.after(BUBBLE_GONE_MS)
+                h.tap(column.first())
+                h.tap(column[3])
+                out += "$mode typed: ${h.field.text.substring(before)}"
+            }
+            out
+        }
+        GestureSnapshot.check("nine-pinyin-punctuation", out)
+        assertEquals(listOf("on: 1=，。？！ column=[，, 。, ？, ！, …, 、, ：, ～, @]", "on typed: ，，！", "off: 1=,.?! column=[,, ., ?, !, …, 、, :, ~, @]", "off typed: ,,!"), out)
+    }
+
+    private fun column(h: KeyboardHarness): List<TextView> = KeyboardHarness.all(h.keyboard).filterIsInstance<ScrollView>().first { h.shown(it) }
+        .let { it.getChildAt(0) as ViewGroup }.children.filterIsInstance<TextView>().filter { it.isVisible }.toList()
 
     @Test
     fun pinyinsOneIsTheSeparatorWhileTyping() {

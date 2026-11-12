@@ -5,6 +5,11 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.text.InputType
+import android.view.ViewGroup
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.core.view.children
+import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -12,12 +17,15 @@ import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
+import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
@@ -59,7 +67,7 @@ class DisplayIsTypedUatTest {
 
     private val handwriting = InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false)
 
-    private val zh = mapOf("." to "。", "," to "，", "?" to "？", "!" to "！", ":" to "：", ";" to "；", "\"" to "“", "'" to "‘", "(" to "（", ")" to "）", "~" to "～", "^" to "……", "\\" to "、")
+    private val zh = ChinesePunctuation.map
 
     private val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
 
@@ -214,6 +222,8 @@ class DisplayIsTypedUatTest {
             val corner = key().node.shortcut != "t9/1"
             if (corner) assertTrue("${board.name}: ${key().drawnTexts}", mapped in key().drawnTexts)
             assertTrue(board.name, mapped in h.longPress(key()))
+            // 九键's 1 and its column as they type, through the punctuation: ，。？！ on
+            if (board.name == "nine") h.nineAsTyped("，。？！", "，")
             h.api.punctuationCached = emptyMap()
             h.emit(HostEvent.StatusArea(emptyList(), board.im, emptyMap()))
             h.idle()
@@ -221,6 +231,49 @@ class DisplayIsTypedUatTest {
             if (corner) assertTrue("${board.name}: ${key().drawnTexts}", first in key().drawnTexts && mapped !in key().drawnTexts)
             val held = h.longPress(key())
             assertTrue("${board.name}: $held", first in held && mapped !in held)
+            // and , . ? ! off
+            if (board.name == "nine") h.nineAsTyped(",.?!", ",")
         }
+    }
+
+    // 九键's 1 its [face], its column's first [first], each typing what it shows
+    private fun KeyboardHarness.nineAsTyped(face: String, first: String) {
+        assertEquals(face, nineKey("1").label)
+        val column = nineColumn()
+        assertEquals(face.map { it.toString() } + "…", column.take(5).map { it.text.toString() })
+        val before = field.text.toString()
+        after(BUBBLE_GONE_MS)
+        tap(nineKey("1"))
+        after(BUBBLE_GONE_MS)
+        tap(column.first())
+        assertEquals(before + first + first, field.text.toString())
+    }
+
+    private fun KeyboardHarness.nineColumn(): List<TextView> = KeyboardHarness.all(keyboard).filterIsInstance<ScrollView>().first { shown(it) }
+        .let { it.getChildAt(0) as ViewGroup }.children.filterIsInstance<TextView>().filter { it.isVisible }.toList()
+
+    // 九键's 1 and its column before the marks are known (a first install, the host not up): held back as the ，。 keys
+    // are, nothing typed that its face might not show; known, each types its mark
+    @Test
+    @Uat("KB-83")
+    fun ninesOneAndColumnAreHeldBackTillTheMarksAreKnown() {
+        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS, zh, InputType.TYPE_CLASS_TEXT)
+        // not known: the harness's host tells its marks as the view is made, so the component is set back by hand
+        val punctuation = h.inputView.javaClass.getDeclaredField("punctuation").apply { isAccessible = true }
+            .get(h.inputView) as PunctuationComponent
+        PunctuationStartKeys.forget(h.service)
+        PunctuationComponent::class.java.getDeclaredField("known").apply { isAccessible = true }.setBoolean(punctuation, false)
+        h.after(BUBBLE_GONE_MS)
+        h.tap(h.nineKey("1"))
+        h.after(BUBBLE_GONE_MS)
+        h.tap(h.nineColumn().first())
+        assertEquals(h.api.calls.toString(), "", h.field.text.toString())
+        punctuation.update(zh)
+        h.idle()
+        h.nineAsTyped("，。？！", "，")
+    }
+
+    private companion object {
+        const val BUBBLE_GONE_MS = 1000L
     }
 }

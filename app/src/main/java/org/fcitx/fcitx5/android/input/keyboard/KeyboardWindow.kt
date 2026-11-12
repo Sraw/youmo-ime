@@ -201,12 +201,14 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     // once, as no face could show what it would type (060-render-p2 S7a)
     private fun heldBack(action: KeyAction): Boolean {
         if (known()) return false
-        val c = when (action) {
-            is KeyAction.HostKeyAction -> action.act.singleOrNull()?.code
-            is KeyAction.SymAction -> action.sym.sym
-            else -> null
-        } ?: return false
-        if (!isAsciiMark(c)) return false
+        val mark = when (action) {
+            is KeyAction.HostKeyAction -> action.act.singleOrNull()?.code?.let(::isAsciiMark) == true
+            is KeyAction.SymAction -> isAsciiMark(action.sym.sym)
+            // 九键's 1 and its column: typed as the punctuation maps it, held back as the ，。 keys are
+            is KeyAction.CommitAction -> action.punctuation
+            else -> false
+        }
+        if (!mark) return false
         if (!heldBackFelt) {
             heldBackFelt = true
             InputFeedbacks.hapticFeedback(keyboardView)

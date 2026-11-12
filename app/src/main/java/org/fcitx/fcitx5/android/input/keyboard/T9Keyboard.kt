@@ -153,8 +153,11 @@ class T9Keyboard(
 
         private const val DIGIT = (1f - SIDE - RIGHT) / 3
 
-        /** Shown in the column while nothing is typed, committed as they are. */
-        private val PUNCTUATION = listOf("，", "。", "？", "！", "…", "、", "：", "~", "@")
+        /**
+         * Shown in the column while nothing is typed: each as punctuation maps it, shown as typed (用户 2026-11-11, 显示即所打):
+         * ，。？！ with Chinese punctuation on, , . ? ! with it off, as 1's.
+         */
+        private val PUNCTUATION = listOf(",", ".", "?", "!", "…", "、", ":", "~", "@")
 
         /**
          * What 1 types while nothing is typed: the first, pressed again soon the next in its place; each as punctuation
@@ -188,18 +191,29 @@ class T9Keyboard(
          * marks; in an address field ([address]) what addresses are made of ([AddressKeys.column]),
          * pinyin's syllables still while typing.
          */
-        internal fun labels(state: EngineState.T9State, english: Boolean = false, address: AddressKeys = AddressKeys.NONE): List<String> = when {
+        internal fun labels(
+            state: EngineState.T9State,
+            english: Boolean = false,
+            address: AddressKeys = AddressKeys.NONE,
+            marks: Map<String, String> = emptyMap(),
+        ): List<String> = when {
             !english && state.offersSyllables() -> state.syllables
             address != AddressKeys.NONE -> AddressKeys.column(address)
             english -> ENGLISH_PUNCTUATION
-            else -> PUNCTUATION
+            else -> PUNCTUATION.map { marks[it] ?: it }
         }
 
         /**
          * What picking item [i] of [state]'s column types: for [english], the mark through English, the
-         * word typed ended by it; an address's, committed as it is.
+         * word typed ended by it; an address's, committed as it is; punctuation as [marks] map it, as it is shown.
          */
-        internal fun pick(state: EngineState.T9State, i: Int, english: Boolean = false, address: AddressKeys = AddressKeys.NONE): KeyAction =
+        internal fun pick(
+            state: EngineState.T9State,
+            i: Int,
+            english: Boolean = false,
+            address: AddressKeys = AddressKeys.NONE,
+            marks: Map<String, String> = emptyMap(),
+        ): KeyAction =
             if (!english && state.offersSyllables()) {
                 // with the list's id: shown before a key typed since replaced it, the pick is dropped
                 KeyAction.SymAction(KeySym(UNICODE + Keyboard.syllableKey(i, state.id).code), KeyStates.Virtual)
@@ -208,7 +222,7 @@ class T9Keyboard(
             } else if (english) {
                 KeyAction.HostKeyAction(ENGLISH_PUNCTUATION[i])
             } else {
-                KeyAction.CommitAction(PUNCTUATION[i])
+                PUNCTUATION[i].let { KeyAction.CommitAction(marks[it] ?: it, punctuation = it.singleOrNull()?.code?.let(::isAsciiMark) == true) }
             }
 
         /**
@@ -373,13 +387,14 @@ class T9Keyboard(
         }
 
         // 1's [ONE], pressed again soon the next in place of the last, each as [marks] map it
-        private fun one(tap: MultiTap, time: Long, marks: Map<String, String>) = cycled(tap.press('1', ONE, time), ONE) { marked(it, marks) }
+        private fun one(tap: MultiTap, time: Long, marks: Map<String, String>) =
+            cycled(tap.press('1', ONE, time), ONE, punctuation = true) { marked(it, marks) }
 
         // the first of [run] committed for no [next], else [next] in place of the one before it
-        private fun cycled(next: Char?, run: String, text: (Char) -> String): KeyAction.CommitAction {
-            if (next == null) return KeyAction.CommitAction(text(run[0]))
+        private fun cycled(next: Char?, run: String, punctuation: Boolean = false, text: (Char) -> String): KeyAction.CommitAction {
+            if (next == null) return KeyAction.CommitAction(text(run[0]), punctuation = punctuation)
             val last = run[(run.indexOf(next) + run.length - 1) % run.length]
-            return KeyAction.CommitAction(text(next), replacing = text(last))
+            return KeyAction.CommitAction(text(next), replacing = text(last), punctuation = punctuation)
         }
 
         private fun cased(c: Char, upper: Boolean) = if (upper) c.uppercase() else c.toString()
@@ -474,6 +489,13 @@ class T9Keyboard(
                 ReturnKey(RIGHT),
             ),
         )
+    }
+
+    override fun onPunctuationUpdate(mapping: Map<String, String>) {
+        val changed = mapping != keysPunctuation
+        super.onPunctuationUpdate(mapping)
+        // the column's punctuation shows what it types, as the keys do
+        if (changed) show(columnState)
     }
 
     /** The field's address: what the column offers in place of punctuation ([AddressKeys.column]). */
@@ -639,7 +661,7 @@ class T9Keyboard(
         if (!state.composing && was) multiTap.reset()
         columnState = state
         typing = state.composing
-        val labels = labels(state, english, address)
+        val labels = labels(state, english, address, keysPunctuation)
         while (items.childCount < labels.size) items.addView(item(items.childCount))
         for (i in 0 until items.childCount) {
             val view = items.getChildAt(i) as TextView
@@ -665,7 +687,7 @@ class T9Keyboard(
         setOnClickListener {
             InputFeedbacks.hapticFeedback(this)
             InputFeedbacks.soundEffect(SoundKey.LETTER)
-            onAction(pick(columnState, i, english, address))
+            onAction(pick(columnState, i, english, address, keysPunctuation))
         }
     }
 

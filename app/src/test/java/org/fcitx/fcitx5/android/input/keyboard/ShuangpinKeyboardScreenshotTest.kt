@@ -58,8 +58,11 @@ class ShuangpinKeyboardScreenshotTest {
         setting.setValue(ShuangpinKeyboard.NineKeys)
         KeyboardHarness(TestThemes.PixelLight, shuangpin).use { h ->
             h.start()
+            // as a user sees it by default: Chinese punctuation on, 1 and the column ，。？！
+            h.chinesePunctuation(shuangpin)
+            h.relayout()
             val labels = h.texts()
-            for (l in listOf("ABC", "JKL", "WXYZ", "重输", "符", "123")) assertTrue("$l in $labels", l in labels)
+            for (l in listOf("ABC", "JKL", "WXYZ", "重输", "符", "123", "，")) assertTrue("$l in $labels", l in labels)
             assertFalse("no 中/英: $labels", "中/英" in labels)
             // 九键双拼's own row is tall; on the letters its column has the syllables, on 123 the row does
             val density = h.inputView.resources.displayMetrics.density

@@ -203,7 +203,11 @@ sealed interface Text {
         /** `{group:qw}`: a 14/18 键 key's one or two letters (`;` among them), cased as 拼音键字母大小写 says. */
         const val GROUP = "group"
 
-        /** `{punct:x}`: one to four characters but a space or a brace, each as punctuation maps it (`(`, `@`, `:` among the 18 keys' corners; 九键 1's `,.?!`). */
+        /**
+         * `{punct:x}`: a character but a space or a brace, as punctuation maps it (`(`, `@`, `:` among the 18 keys' corners);
+         * up to four, each mapped, in `label=` alone (九键 1's `,.?!`): `alt=` and `a11y=` take one (LayoutReader), and the
+         * 0.6.0 betas' readers took one anywhere, so a pack for them writes no run.
+         */
         const val PUNCT = "punct"
         val PLAIN = setOf("ime-name", "return", "confirm", "table-extra", "comma", "period", "back")
 

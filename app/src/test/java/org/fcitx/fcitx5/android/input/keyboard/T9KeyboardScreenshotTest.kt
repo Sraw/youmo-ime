@@ -36,7 +36,11 @@ class T9KeyboardScreenshotTest {
 
     private fun check(theme: Theme, name: String) = KeyboardHarness(theme, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).use { h ->
         h.start()
+        // as a user sees it by default: Chinese punctuation on, 1 and the column ，。？！
+        h.chinesePunctuation()
+        h.relayout()
         val labels = h.texts()
+        assertTrue(labels.toString(), "，。？！" in labels && "，" in labels)
         // left column's punctuation is the column; the keys: 1 to 9 with their letters, 重输, 0, 符, 123
         for (d in '1'..'9') assertTrue("$d in $labels", d.toString() in labels)
         for (l in listOf("ABC", "DEF", "WXYZ", "重输", "0", "符", "123")) assertTrue("$l in $labels", l in labels)

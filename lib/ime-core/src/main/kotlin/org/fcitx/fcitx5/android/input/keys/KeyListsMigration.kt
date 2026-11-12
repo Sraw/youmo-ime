@@ -91,7 +91,13 @@ object KeyListsMigration {
         val own = default?.row?.map { it.text }.orEmpty().filter { it != default?.first?.text }
         if (items.filter { it in own } != own) lost += "L4 ${id.name} ${items.joinToString(" ")}"
         val f = if (first == default?.first?.text) First.Default else First.Literal(first)
-        lists[id] = UserList(off = false, symbols = items.filterNot { it in row }, first = f)
+        val symbols = items.filterNot { it in row }
+        // beta2's 九键 key as 0.5's default: none set, as t9_symbols' (its editor stored a key on OK, changed or not)
+        if (id.form == "t9" && f == First.Default && symbols == NINE_DEFAULTS[id.key.singleOrNull()]) {
+            lists.remove(id)
+            return
+        }
+        lists[id] = UserList(off = false, symbols = symbols, first = f)
     }
 
     // a 0.5 list: the first item the first, as it was there

@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -121,14 +122,14 @@ class T9KeyboardTest {
         val tap = MultiTap(600)
         val keys = KeyActionListener.Source.Keyboard
         val one = KeyAction.HostKeyAction("1")
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolve(one, keys, tap, 0, composing = false, marks = ZH))
-        assertEquals(KeyAction.CommitAction("。", replacing = "，"), T9Keyboard.resolve(one, keys, tap, 100, composing = false, marks = ZH))
-        assertEquals(KeyAction.CommitAction("？", replacing = "。"), T9Keyboard.resolve(one, keys, tap, 200, composing = false, marks = ZH))
-        assertEquals(KeyAction.CommitAction("！", replacing = "？"), T9Keyboard.resolve(one, keys, tap, 300, composing = false, marks = ZH))
-        assertEquals(KeyAction.CommitAction("，", replacing = "！"), T9Keyboard.resolve(one, keys, tap, 400, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolve(one, keys, tap, 0, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction("。", replacing = "，", punctuation = true), T9Keyboard.resolve(one, keys, tap, 100, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction("？", replacing = "。", punctuation = true), T9Keyboard.resolve(one, keys, tap, 200, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction("！", replacing = "？", punctuation = true), T9Keyboard.resolve(one, keys, tap, 300, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction("，", replacing = "！", punctuation = true), T9Keyboard.resolve(one, keys, tap, 400, composing = false, marks = ZH))
         // after a pause, a ， of its own; Chinese punctuation off, , as it is
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolve(one, keys, tap, 2000, composing = false, marks = ZH))
-        assertEquals(KeyAction.CommitAction(","), T9Keyboard.resolve(one, keys, tap, 4000, composing = false))
+        assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolve(one, keys, tap, 2000, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction(",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 4000, composing = false))
         // while typing, the separator the engine reads
         assertEquals(one, T9Keyboard.resolve(one, keys, tap, 2100, composing = true))
     }
@@ -173,10 +174,16 @@ class T9KeyboardTest {
 
     @Test
     fun withNothingToOfferTheColumnCommitsPunctuation() {
+        val zh = ChinesePunctuation.map
         listOf(EngineState.T9State(), EngineState.T9State(composing = true)).forEach { state ->
-            assertEquals("，", T9Keyboard.labels(state).first())
-            assertEquals(KeyAction.CommitAction("，"), T9Keyboard.pick(state, 0))
-            assertEquals(KeyAction.CommitAction("@"), T9Keyboard.pick(state, T9Keyboard.labels(state).lastIndex))
+            // as the punctuation maps it, shown as typed: ，。？！ with Chinese punctuation on, , . ? ! with it off
+            assertEquals(listOf("，", "。", "？", "！", "…"), T9Keyboard.labels(state, marks = zh).take(5))
+            assertEquals(listOf(",", ".", "?", "!", "…"), T9Keyboard.labels(state).take(5))
+            assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.pick(state, 0, marks = zh))
+            assertEquals(KeyAction.CommitAction(",", punctuation = true), T9Keyboard.pick(state, 0))
+            // … and 、 no key's mark: as they are, not held back
+            assertEquals(KeyAction.CommitAction("…"), T9Keyboard.pick(state, 4, marks = zh))
+            assertEquals(KeyAction.CommitAction("@", punctuation = true), T9Keyboard.pick(state, T9Keyboard.labels(state).lastIndex))
         }
     }
 
@@ -306,7 +313,7 @@ class T9KeyboardTest {
         // the punctuation resets the engine, which tells of nothing typed again
         keyboard.show(EngineState.T9State())
         keyboard.key('1').click()
-        assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("。", replacing = "，")), sent)
+        assertEquals(listOf(KeyAction.CommitAction("，", punctuation = true), KeyAction.CommitAction("。", replacing = "，", punctuation = true)), sent)
     }
 
     // the ， now before the cursor may be the user's own
@@ -318,7 +325,7 @@ class T9KeyboardTest {
         keyboard.key('1').click()
         keyboard.cursorMoved()
         keyboard.key('1').click()
-        assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("，")), sent)
+        assertEquals(listOf(KeyAction.CommitAction("，", punctuation = true), KeyAction.CommitAction("，", punctuation = true)), sent)
     }
 
     // the app types it as its digit: nothing is typed in the engine, which tells nothing new
@@ -329,7 +336,7 @@ class T9KeyboardTest {
         val keyboard = keyboard(sent, letters = NineKeyLetters.of(listOf("abc", "")))
         keyboard.key('3').click()
         keyboard.key('1').click()
-        assertEquals(listOf(KeyAction.HostKeyAction("3"), KeyAction.CommitAction("，")), sent)
+        assertEquals(listOf(KeyAction.HostKeyAction("3"), KeyAction.CommitAction("，", punctuation = true)), sent)
     }
 
     @Test
@@ -358,7 +365,7 @@ class T9KeyboardTest {
         tap(keyboard.key('4'))
         val four = coded('4')
         // 1's punctuation too: two quick presses are two ，, the rest picked from the column
-        assertEquals(listOf(KeyAction.CommitAction("，"), KeyAction.CommitAction("，"), four, four), sent)
+        assertEquals(listOf(KeyAction.CommitAction("，", punctuation = true), KeyAction.CommitAction("，", punctuation = true), four, four), sent)
         assertEquals(listOf("GHI", "GHI"), previews.filterIsInstance<PopupAction.PreviewAction>().map { it.content })
     }
 
@@ -420,13 +427,13 @@ class T9KeyboardTest {
         fun press(time: Long, marks: Map<String, String> = emptyMap()) =
             T9Keyboard.resolveEnglish(one, KeyActionListener.Source.Keyboard, tap, time, composing = false, spells = true, upper = false, marks = marks)
         // 用户 2026-11-11: , . ? ! as pinyin's, no ' or - (the long presses have them)
-        assertEquals(KeyAction.CommitAction(","), press(0))
-        assertEquals(KeyAction.CommitAction(".", replacing = ","), press(100))
-        assertEquals(KeyAction.CommitAction("?", replacing = "."), press(200))
-        assertEquals(KeyAction.CommitAction("!", replacing = "?"), press(300))
-        assertEquals(KeyAction.CommitAction(",", replacing = "!"), press(400))
+        assertEquals(KeyAction.CommitAction(",", punctuation = true), press(0))
+        assertEquals(KeyAction.CommitAction(".", replacing = ",", punctuation = true), press(100))
+        assertEquals(KeyAction.CommitAction("?", replacing = ".", punctuation = true), press(200))
+        assertEquals(KeyAction.CommitAction("!", replacing = "?", punctuation = true), press(300))
+        assertEquals(KeyAction.CommitAction(",", replacing = "!", punctuation = true), press(400))
         // as the punctuation maps them, whatever the map
-        assertEquals(KeyAction.CommitAction("，"), press(2000, ZH))
+        assertEquals(KeyAction.CommitAction("，", punctuation = true), press(2000, ZH))
     }
 
     @Test

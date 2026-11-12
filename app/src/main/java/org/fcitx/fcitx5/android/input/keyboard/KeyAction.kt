@@ -23,8 +23,11 @@ sealed class KeyAction {
 
     data class SymAction(val sym: KeySym, val states: KeyStates = KeyStates.Virtual) : KeyAction()
 
-    /** [text] put in by the app, in place of [replacing] if that is what is before the cursor. */
-    data class CommitAction(val text: String, val replacing: String = "") : KeyAction()
+    /**
+     * [text] put in by the app, in place of [replacing] if that is what is before the cursor. [punctuation]: a mark as the
+     * punctuation maps it (九键's 1 and its column), held back as the punctuation keys are while that is not known.
+     */
+    data class CommitAction(val text: String, val replacing: String = "", val punctuation: Boolean = false) : KeyAction()
 
     data class CapsAction(val lock: Boolean) : KeyAction()
 

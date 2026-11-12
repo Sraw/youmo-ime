@@ -38,6 +38,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.WAIT_MS
 import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.host.ChinesePunctuation
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.core.FakeHostApi
@@ -717,6 +719,19 @@ class KeyboardHarness(
     private fun at(width: Int, height: Int, dx: Float, dy: Float, ms: Long): Touch {
         val dp = service.resources.displayMetrics.density
         return Touch(width / 2f + dx * dp, height / 2f + dy * dp, ms)
+    }
+
+    /**
+     * Chinese punctuation on for [im], as fcitx's punctuation addon tells it (cached too: a view made anew replays it): the
+     * keys shown as a user sees them by default (KB-76, ，。？！ on 九键's 1 and its column).
+     */
+    fun chinesePunctuation(im: InputMethodEntry = PINYIN) {
+        val zh = ChinesePunctuation.map
+        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+        api.statusAreaCached = active
+        api.punctuationCached = zh
+        emit(HostEvent.StatusArea(active, im, zh))
+        idle()
     }
 
     /** The nine keys' key for [digit] (its small digit), or the column's punctuation key, whichever draws it. */

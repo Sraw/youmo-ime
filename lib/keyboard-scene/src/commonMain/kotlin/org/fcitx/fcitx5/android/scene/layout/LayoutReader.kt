@@ -279,7 +279,7 @@ object LayoutReader {
     // the look and actions a key and <defaults> share (keyLook, keyActions)
     private fun look(a: Attributes): KeyAttrs = KeyAttrs(
         label = a.value("label", "text or one binding", ::text),
-        alt = a.value("alt", "text or one binding", ::text),
+        alt = a.value("alt", "text or one binding ({punct:} of one character)", ::oneMark),
         icon = a.value("icon", "an icon name or binding", ::icon),
         kind = a.oneOf("kind", KINDS),
         role = a.oneOf("role", KeyNames.ROLES),
@@ -289,7 +289,7 @@ object LayoutReader {
         bold = a.oneOf("text-style", listOf("normal", "bold"))?.let { it == "bold" },
         face = face(a),
         margin = a.boolean("margin"),
-        a11y = a.value("a11y", "text or one binding", ::text),
+        a11y = a.value("a11y", "text or one binding ({punct:} of one character)", ::oneMark),
         sound = a.oneOf("sound", listOf("standard", "space", "delete", "return")),
         badge = a.value("badge", "an icon name or binding", ::icon),
         actions = ACTIONS.mapNotNull { name -> a.value(name, "an action", ::action)?.let { name to it } }.toMap() +
@@ -310,6 +310,10 @@ object LayoutReader {
         '{' !in raw && '}' !in raw -> Text.Literal(raw)
         else -> binding(raw)?.takeIf { it.name !in Text.ICONS }
     }
+
+    // a corner or what a screen reader says: one mark of {punct:} (a run of them, 九键 1's `,.?!`, its face's alone; the
+    // betas' readers took one, 060-keys-unify review L3)
+    private fun oneMark(raw: String): Text? = text(raw)?.takeUnless { it is Text.Binding && it.name == Text.PUNCT && it.arg.orEmpty().length > 1 }
 
     private fun binding(raw: String): Text.Binding? {
         val m = BINDING.matchEntire(raw) ?: return null
