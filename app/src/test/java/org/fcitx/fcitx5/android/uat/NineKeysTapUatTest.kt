@@ -145,16 +145,32 @@ class NineKeysTapUatTest {
             val h = KeyboardHarness(host = fcitx, keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)).also { this.h = it }
             h.service.postFcitxJob { activate(1, "org.example.app") }
             h.start()
-            // the activation done on the host's thread and what it told back shown, before the first swipe
-            val active = AtomicBoolean()
-            h.service.postFcitxJob { active.set(true) }
-            until("the host's queue done", step = { h.idle() }) { active.get() }
-            h.idle()
+            // the host's thread done with what it was given and what it told back shown
+            fun hostDone() {
+                val done = AtomicBoolean()
+                h.service.postFcitxJob { done.set(true) }
+                until("the host's queue done", step = { h.idle() }) { done.get() }
+                h.idle()
+            }
+            // the activation, before the first swipe
+            hostDone()
             val three = h.nineKey("3")
             h.swipe(three, 0f, -three.bounds.height().toFloat())
             until("3 typed", step = { h.idle() }) { h.text == "3" }
+            hostDone()
+            // after the digit the marks are half width: 1 shows , first
+            assertEquals(',', h.nineKey("1").label.first())
             h.advance(PAUSE)
-            h.presses("11", QUICK)
+            h.tap(h.nineKey("1"))
+            until(", typed", step = { h.idle() }) { h.text == "3," }
+            // the engine's answer to the , in (it is no digit: full width again) before the second tap, as on a
+            // slow machine; the run still types half width (CI 43196090467: 3。)
+            hostDone()
+            // the race's order held: the full-width map is back (1 shows ， first) before the second tap
+            assertEquals('，', h.nineKey("1").label.first())
+            h.advance(QUICK)
+            h.tap(h.nineKey("1"))
+            h.advance(PAUSE)
             until("the second mark typed", step = { h.idle() }) { h.text.length >= 2 && h.text != "3," }
             assertEquals("3.", h.text)
         } finally {

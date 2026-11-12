@@ -30,12 +30,22 @@ class MultiTap(private val timeout: Long) {
     var typed: String = ""
 
     /**
+     * The punctuation's map the run's first press typed with, set by whoever commits it: the run's next presses
+     * type with it too, not with the map the engine tells after the first committed (半角 after a digit: the , typed
+     * is no digit, so its map back to full width would make 1's run , then 。). Empty as a run starts.
+     */
+    var marks: Map<String, String> = emptyMap()
+
+    /**
      * What pressing [key], whose letters are [letters], at [time] types: null for the key, any of
      * its letters; else the letter that takes the place of the last press.
      */
     fun press(key: Char, letters: String, time: Long): Char? {
         count = countAt(key, time)
-        if (count <= 1) typed = ""
+        if (count <= 1) {
+            typed = ""
+            marks = emptyMap()
+        }
         this.key = key
         at = time
         return letter(letters, count)
@@ -49,6 +59,7 @@ class MultiTap(private val timeout: Long) {
         key = NONE
         count = 0
         typed = ""
+        marks = emptyMap()
     }
 
     private fun countAt(key: Char, time: Long): Int =

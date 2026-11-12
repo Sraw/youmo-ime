@@ -117,16 +117,17 @@ class T9KeyboardTest {
         assertEquals(KeyAction.HostKeyAction("4"), T9Keyboard.resolve(KeyAction.HostKeyAction("4"), KeyActionListener.Source.Keyboard, tap, 20))
     }
 
-    // the marks changed between two taps of a run: the second takes back what the first committed, not the
-    // first mark mapped again (FB1 of R24; not seen end to end, where the marks stay 半角 through the run: T9-19b)
+    // the marks changed between two taps of a run (半角 after a digit; the engine tells the full-width map again once the
+    // first , is in, and on a slow device before the second tap): the whole run types with its first tap's map and
+    // takes back what the last tap committed (FB1 of R24, was 3,。; end to end T9-19b)
     @Test
-    fun oneAgainReplacesWhatTheLastTapCommittedThoughTheMarksChanged() {
+    fun oneAgainTypesWithTheRunsFirstMarksThoughTheyChanged() {
         val tap = MultiTap(600)
         val keys = KeyActionListener.Source.Keyboard
         val one = KeyAction.HostKeyAction("1")
-        assertEquals(KeyAction.CommitAction(",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 0, composing = false, marks = ZH - ","))
-        assertEquals(KeyAction.CommitAction("。", replacing = ",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 100, composing = false, marks = ZH))
-        // after a pause a run of its own: nothing of the last taken back
+        assertEquals(KeyAction.CommitAction(",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 0, composing = false, marks = emptyMap()))
+        assertEquals(KeyAction.CommitAction(".", replacing = ",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 100, composing = false, marks = ZH))
+        // after a pause a run of its own, with the marks as they are now: nothing of the last taken back
         assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolve(one, keys, tap, 2000, composing = false, marks = ZH))
         // another key between: the same
         T9Keyboard.resolve(KeyAction.HostKeyAction("4"), keys, tap, 2100)

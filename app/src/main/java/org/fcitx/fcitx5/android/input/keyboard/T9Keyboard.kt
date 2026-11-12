@@ -384,9 +384,14 @@ class T9Keyboard(
             return cycled(tap, next, keyLetters) { cased(it, if (next == null) upper else runUpper) }
         }
 
-        // 1's [ONE], pressed again soon the next in place of the last, each as [marks] map it
-        private fun one(tap: MultiTap, time: Long, marks: Map<String, String>) =
-            cycled(tap, tap.press('1', ONE, time), ONE, punctuation = true) { marked(it, marks) }
+        // 1's [ONE], pressed again soon the next in place of the last, each as [marks] mapped them at the run's
+        // first press ([MultiTap.marks])
+        private fun one(tap: MultiTap, time: Long, marks: Map<String, String>): KeyAction.CommitAction {
+            val next = tap.press('1', ONE, time)
+            if (next == null) tap.marks = marks
+            val run = tap.marks
+            return cycled(tap, next, ONE, punctuation = true) { marked(it, run) }
+        }
 
         // the first of [run] committed for no [next], else [next] in place of what the run's last
         // press committed ([MultiTap.typed]), not the letter before it mapped anew

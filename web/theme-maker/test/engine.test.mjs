@@ -68,11 +68,10 @@ test("a board's default marks are the app's (the JVM recorded them), its own lay
   const mapped = E.defaultMarks(own.layout, { '@': '＠' });
   assert.deepEqual(mapped.shortcuts['full/a:up'], { symbol: '＠' });
   assert.deepEqual(mapped.shortcuts['full/c:down'], { icon: 'content-copy' });
-  // nine's digits are keys, not marks typed: a map of them changes nothing; its 1's first is mapped
+  // nine's firsts are its digits, a keypad's (1's too, D7: DefaultMarksTest): keys, not marks typed, so no map changes them
   const nine = E.defaultMarks('nine', null);
-  const nineMapped = E.defaultMarks('nine', { '2': 'x', ',': '，' });
-  const changed = Object.keys(nine.shortcuts).filter((k) => JSON.stringify(nine.shortcuts[k]) !== JSON.stringify(nineMapped.shortcuts[k]));
-  assert.ok(changed.length > 0 && changed.every((k) => nineMapped.shortcuts[k].symbol === '，'), JSON.stringify(changed.map((k) => [k, nineMapped.shortcuts[k]])));
+  assert.deepEqual(nine.shortcuts['t9/1:up'], { symbol: '1' });
+  assert.deepEqual(E.defaultMarks('nine', { '1': 'x', '2': 'x', ',': '，' }), nine);
 });
 
 test("a scene's keys, slots and size as a page reads them", () => {

@@ -406,10 +406,14 @@ test("Chinese punctuation is the app's file's, each key's first (a new install's
 test("no marks given: the preview draws the board's defaults as a new install shows them; marks given are drawn whole", () => {
   const d = M.fromBuiltin(E, 'material');
   const env = M.envJson(M.ENV);
-  const drawnMarks = (r) => r.scene.json().keys.flatMap((k) => (k.marks || []).map((m) => m.text || m.icon)).filter(Boolean);
+  // the scene's drawing (its text: a key's normal state draws its content first, then its marks); scene.json() has no marks
+  const drawnMarks = (r) => r.scene.text().split('\nkey ').slice(1).flatMap((k) => {
+    const normal = k.split('\n  normal\n')[1].split(/\n  (?! )/)[0].split('\n').map((l) => /^    (?:text "(.*)"|icon (\S+)) /.exec(l)).filter(Boolean);
+    return normal.slice(1).map((m) => m[1] ?? m[2]);
+  });
   const nine = drawnMarks(M.check(E, d, 'nine', env, null));
-  // the app with Chinese punctuation on: nine's 1 shows its first as typed, not ,
-  assert.ok(!nine.includes(','), JSON.stringify(nine));
+  // the app with Chinese punctuation on: nine's 1 shows its first, the keypad digit 1 (no punctuation's)
+  assert.ok(nine.includes('1') && !nine.includes(','), JSON.stringify(nine));
   const qwerty = M.check(E, d, 'qwerty', env, null);
   assert.ok(drawnMarks(qwerty).length > 0, 'default marks drawn');
   assert.deepEqual(drawnMarks(M.check(E, d, 'qwerty', Object.assign({}, env, { marks: { shortcuts: {} } }), null)), [], 'marks given replace the defaults whole');
