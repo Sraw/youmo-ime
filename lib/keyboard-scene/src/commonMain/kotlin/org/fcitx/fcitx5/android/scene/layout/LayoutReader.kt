@@ -81,7 +81,34 @@ object LayoutReader {
             KeyNames.LETTERS.filter { it !in ids }.takeIf { it.isNotEmpty() }
                 ?.let { p.add(root.line, "a letters board lacks the keys ${it.joinToString(" ")}") }
         }
-        return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, parts, preview, popups) }
+        val named = composedNamed(family, parts)
+        return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, named, preview, popups) }
+    }
+
+    /**
+     * A nine key's and 注音九键's group's long press is made by its name alone (`<popup from="nine"/"group">`, KeyDefaults):
+     * one written with no `shortcut=` (a theme pack's of before 060-keys-unify) named as the app's are, a digit's `t9/<id>`,
+     * the groups `zy9/1`… in their order, so it has the long press, the corner and the swipe the user's list gives it
+     * (060-s6-review M3); a key named already kept as it is.
+     */
+    private fun composedNamed(family: String?, parts: List<Part>): List<Part> {
+        if (family != "nine" && family != "zhuyin-nine") return parts
+        var group = 0
+        fun name(k: Key): String? = when (k.popup?.from) {
+            "nine" -> k.id.takeIf { family == "nine" && it.length == 1 && it[0] in '1'..'9' }?.let { "t9/$it" }
+            "group" -> if (family == "zhuyin-nine" && k.letters == null) "zy9/${++group}" else null
+            else -> null
+        }
+        return parts.map { part ->
+            if (part !is Row) return@map part
+            val cells = part.cells.map { c ->
+                if (c !is Key) return@map c
+                val name = name(c)
+                if (name == null || c.attrs.shortcut != null) c
+                else Key(c.id, c.condition, c.attrs.copy(shortcut = name), c.popup, c.menu, c.line, c.variants, c.letters, c.lean)
+            }
+            Row(part.id, part.indent, part.endIndent, part.height, part.condition, part.split, part.defaults, cells, part.line)
+        }
     }
 
     private fun readFragment(root: XmlElement): Parsed<Fragment> {

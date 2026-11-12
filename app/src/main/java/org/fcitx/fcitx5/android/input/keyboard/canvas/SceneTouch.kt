@@ -103,7 +103,7 @@ class SceneKey(
     }
 
     /** Whether a long press does something of its own (a view's isLongClickable): a screen reader's long click offered. */
-    val longClickable: Boolean get() = longClick != null
+    val longClickable: Boolean get() = longClick != null && keyGesture.longPressNow()
     override fun doubleTap() {
         doubleTapAction?.invoke(this)
     }

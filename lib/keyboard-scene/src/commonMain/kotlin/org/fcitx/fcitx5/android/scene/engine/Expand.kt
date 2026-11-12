@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.scene.engine
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problems
-import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Gap
@@ -137,12 +136,11 @@ object Expand {
 
     // the corner a screen reader says: a named key's long press's first as drawn, by its name ([Texts.alts], 060-keys-unify
     // §3.4: the user's, not a theme's `alt=` they changed; none there, none said); a key of no name, or no readings
-    // given (the theme maker), its layout's `alt=`. A character key of `mark="false"` draws no symbol (Content.ways): none said
+    // given (the theme maker), its layout's `alt=`. A character key of `mark="false"`'s built-in first is no corner there (KeyResolver): none said
     private fun reading(attrs: KeyAttrs, env: Env): String? {
         val alts = env.texts.alts
         val name = attrs.shortcut
         if (alts != null && name != null) {
-            if (attrs.mark == false && !KeyId(name).isFunction) return null
             return alts[name]?.takeIf { it.isNotEmpty() }
         }
         return attrs.alt?.let { text(it, env) }?.takeIf { it.isNotEmpty() }

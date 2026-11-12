@@ -135,21 +135,23 @@ class KeyResolver(
         val swipe = KeySwipe.Key(SwipeSlots.typesAChar(id.name), slots.resolve(id.name, true), slots.resolve(id.name, false), hasFirst = first != null)
         // looking up roots, the corner is the letter the roots are of
         val letterCorner = roots != null || state.letterCorners && id.form == FULL && id.key.singleOrNull()?.isLetter() == true
-        val corner = if (letterCorner) id.key else shown
+        val corner = if (letterCorner) id.key else shown?.takeUnless { firstHidden(id, first) }
         val firstMark = corner?.let(MarkContent::Symbol) ?: MarkContent.Empty
         return ResolvedKey(id, popup, first, shown, swipe, mark(swipe.up, firstMark), mark(swipe.down, firstMark), corner)
     }
 
     /**
      * Every named key's [ResolvedKey.corner] by its name, as Texts.alts reads them (a screen reader's 「Q W，1」, 060-keys-unify
-     * §3.4): only where a way draws it (a slot its first's), as the corner a sighted user sees; a key with none left out.
-     * Made again only for another [state].
+     * §3.4): only where a way draws it (its slot the first's, the way on, its place not 无: as Content.ways and the
+     * marks' slots draw it), as the corner a sighted user sees; a key with none left out. Made again only for another [state].
      */
     fun readings(state: KeyState): Map<String, String> {
         if (state == readingsFor) readingsMade?.let { return it }
+        val up = state.ways.up && state.spots.symbol != KeyMarks.At.None
+        val down = state.ways.down && state.spots.shortcut != KeyMarks.At.None
         val made = nodes.mapNotNull { (name, _) ->
             val r = resolve(KeyId.of(name), state)
-            r.corner?.takeIf { r.swipe.up == SwipeSlot.First || r.swipe.down == SwipeSlot.First }?.let { name to it }
+            r.corner?.takeIf { up && r.swipe.up == SwipeSlot.First || down && r.swipe.down == SwipeSlot.First }?.let { name to it }
         }.toMap()
         readingsFor = state
         readingsMade = made
@@ -191,6 +193,14 @@ class KeyResolver(
     private fun mark(slot: SwipeSlot, first: MarkContent): MarkContent = when (slot) {
         SwipeSlot.First -> first
         else -> SceneMarks.content(slot.shortcut) ?: MarkContent.Empty
+    }
+
+    // a character key (any but fn/'s, as the scene has it: Content) of `mark="false"` (注音's) draws and says no first of its defaults', one the user set all the same
+    // (060-s6-review L4): set as the list's first, or the first of the symbols they wrote
+    private fun firstHidden(id: KeyId, first: Item): Boolean {
+        if (facts[id]?.markOff != true || id.isFunction) return false
+        val user = lists[id] ?: return true
+        return user.first !is First.Literal && first.text !in user.symbols
     }
 
     private class Made(val items: List<Item>, val inRow: Int, val first: Item?, val focus: Int, val own: Int)

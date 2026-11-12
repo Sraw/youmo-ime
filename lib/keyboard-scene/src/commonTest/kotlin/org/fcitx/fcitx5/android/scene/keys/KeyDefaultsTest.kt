@@ -109,6 +109,27 @@ class KeyDefaultsTest {
     }
 
     @Test
+    fun aThemesFirstIsItsSwipesTextAsItTypes() {
+        // a theme's `swipe-up=` as the scene reads it (060-s6-review M2): text typed as is, a key's, a code point's; an
+        // action no list has offers no first
+        assertEquals(Item("qq", Commit.AsIs), KeyDefaults.itemOf("commit:qq"))
+        assertEquals(Item("!"), KeyDefaults.itemOf("key:!"))
+        assertEquals(Item("\uD83D\uDE00"), KeyDefaults.itemOf("code:U+1F600"))
+        assertEquals(Item("、"), KeyDefaults.itemOf("code:U+3001"))
+        assertEquals(Item("", Commit.Action("sym:BackSpace")), KeyDefaults.itemOf("sym:BackSpace"))
+        val full = KeyboardVariant(Form.Full)
+        val qq = KeyDefaults.of(KeyId("full/q"), full, NodeFacts(text = "q", typing = true, themeFirst = "commit:qq"))!!
+        assertEquals(Item("qq", Commit.AsIs), qq.first)
+        assertEquals(listOf("qq", "1", "Q"), texts(qq))
+        // the list's own 1, not a second
+        val one = KeyDefaults.of(KeyId("full/q"), full, NodeFacts(text = "q", typing = true, themeFirst = "commit:1"))!!
+        assertEquals(listOf("1", "Q"), texts(one))
+        assertEquals(Item("1"), one.first)
+        val action = KeyDefaults.of(KeyId("full/q"), full, NodeFacts(text = "q", typing = true, themeFirst = "sym:BackSpace"))!!
+        assertEquals(listOf("1", "Q"), texts(action))
+    }
+
+    @Test
     fun aThemesFirstNotInTheListGoesFirstAmongTheSymbols() {
         val l = KeyDefaults.of(KeyId("full/q"), KeyboardVariant(Form.Full), NodeFacts(text = "q", typing = true, themeFirst = "!"))!!
         assertEquals(listOf("!", "1", "Q"), texts(l))

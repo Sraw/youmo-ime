@@ -249,7 +249,7 @@ class PopupKeyboardUiTest {
     @Test
     @Uat("T9-60b")
     fun aGroupOfNoKeysOwnHasItsFirstAtTheEdge() {
-        // 注音九键's group (ZhuyinKeyboard.groupPopup: no inRow, its symbols as shown): by the screen's
+        // 注音九键's group (KeyDefaults.zhuyinGroup: no inRow, its symbols as shown): by the screen's
         // edge the first, the one a lift types, at that end and the rest inward (060-edge-popup)
         val keys = arrayOf("ㄓ", "ㄔ", "ㄕ", "ㄖ")
         for ((trigger, toRight) in listOf(Rect(960, 500, 1000, 550) to true, Rect(0, 500, 40, 550) to false)) {

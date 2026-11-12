@@ -69,8 +69,18 @@ internal class KeyResolving(private val board: Board) {
         placeholders[ref] = placeholder
     }
 
-    /** Whether the key named [name] has a long press as things are now. */
-    fun hasPopup(name: String): Boolean = resolver()?.resolve(KeyId.of(name), board.state())?.popup != null
+    /**
+     * Whether the key of scene id [ref] has a long press as things are now: a list of anything it can type, or a
+     * table's roots (the keyboard's own to show); asked as it would fire, a key's long press wired whatever its list.
+     */
+    fun opens(ref: String): Boolean {
+        val name = namesById[ref] ?: return false
+        return when (val p = resolver()?.resolve(KeyId.of(name), board.state())?.popup) {
+            null -> false
+            is KeyPopup.Roots -> true
+            is KeyPopup.Items -> resolved(p, placeholders[ref] ?: { null }) != null
+        }
+    }
 
     /**
      * What swiping the key named [name] to its first types (060-keys-unify §3.2): none where it has no first; null

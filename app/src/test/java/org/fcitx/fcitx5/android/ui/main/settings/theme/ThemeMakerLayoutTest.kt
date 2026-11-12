@@ -189,6 +189,9 @@ class ThemeMakerLayoutTest {
         prefs.set(ThemeManager.prefs.floatingKeyboard, shot.mode == Mode.FLOATING)
         return KeyboardHarness(PROBE, keyboards = ImKeyboards.Chosen(pinyin = shot.board.keyboard), codeRow = CodeRowStyle.Floating).use { h ->
             h.start()
+            // the punctuation as pinyin types it on a new install (中文标点 on): ，。？！ on the nine keys' 1 and column, the
+            // corners and long presses as typed, the look the Roborazzi baselines have (060-keys-unify S6b)
+            h.chinesePunctuation()
             shot.board.from?.let { role -> h.tap(h.keys().first { it.id == role }) }
             when (shot.state) {
                 State.IDLE -> Unit

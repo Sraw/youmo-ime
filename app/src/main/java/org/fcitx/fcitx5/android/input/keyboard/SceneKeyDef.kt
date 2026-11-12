@@ -24,8 +24,8 @@ import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import timber.log.Timber
 
-// the old keys' name, a function key's bare (`comma`), as key_popups has it, until the keys are wired by
-// their one name (060-keys-unify S4b)
+// [KeyDef.shortcut]'s form: a function key's bare (`comma`), any other's whole (`full/q`), KeyId.of reading either
+// back as the one name
 private fun viewName(name: String): String = KeyId.of(name).let { if (it.isFunction) it.key else it.name }
 
 /**

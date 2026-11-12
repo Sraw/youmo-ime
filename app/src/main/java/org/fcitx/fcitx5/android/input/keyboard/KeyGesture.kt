@@ -102,6 +102,12 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     @Volatile
     var longPressFeedbackEnabled = true
 
+    /**
+     * Whether its long press does anything as things are now, asked as it would fire: where not, neither felt nor
+     * told, the touch a tap's still (a named key whose list is off or empty now, its long press wired whatever the list).
+     */
+    var longPressNow: () -> Boolean = { true }
+
     @Volatile
     private var repeatStarted = false
     var repeatEnabled
@@ -239,7 +245,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             longPressJob?.cancel()
             longPressJob = key.timers.launch {
                 delay(longPressDelay.toLong())
-                if (!recognizer.longPressMayFire()) return@launch
+                if (!recognizer.longPressMayFire() || !longPressNow()) return@launch
                 if (longPressFeedbackEnabled) {
                     InputFeedbacks.hapticFeedback(key.feedback, true)
                 }

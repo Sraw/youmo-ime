@@ -11,9 +11,13 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.input.keys.KeyOutput
+import org.fcitx.fcitx5.android.input.keys.KeyState
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.Row
@@ -156,6 +160,11 @@ class ThemePackLayoutsTest {
         inUse("mine", mapOf("qwerty.xml" to qwerty()))
         assertEquals("主题 26 键", name("qwerty"))
         assertEquals("commit:qq", keyQ("qwerty").attrs.actions["swipe-up"])
+        // the pack's q's first is its swipe's text as it types (KeyDefaults.itemOf: `commit:qq` is qq typed, no action's
+        // name drawn nor sent; 060-s6-review M2)
+        val q = SceneBoard.resolver(SceneLayouts.of(appContext, "qwerty")!!, "pinyin").resolve(KeyId("full/q"), KeyState())
+        assertEquals("qq", q.corner)
+        assertEquals(KeyOutput.Text("qq"), KeyOutput.of(q.first!!))
         // the others the app's
         assertSame(SceneLayouts.builtIn(appContext, "k14"), SceneLayouts.of(appContext, "k14"))
         assertEquals(

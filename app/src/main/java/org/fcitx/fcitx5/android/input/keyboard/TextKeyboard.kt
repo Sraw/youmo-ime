@@ -306,13 +306,26 @@ class TextKeyboard(
         canvas?.invalidateScene()
     }
 
-    // what the letters' swipes type, drawn in their corners: each letter's first as the resolver has it (as the
-    // keyboard is made: a list changed makes the keyboards anew)
+    // a letter's first changed may free the table's code key's place, or take it
+    override fun onKeyListsChanged() {
+        super.onKeyListsChanged()
+        showSemicolonKey()
+    }
+
+    // what the letters' swipes type, drawn in their corners: each letter's first as the resolver has it now
+    // (kept while the resolver and the state are the same: 26 keys resolved once, 060-s6-review L9)
     private fun cornerKeys(): Set<Char> {
         val resolver = keyResolver() ?: return emptySet()
         val state = keyState()
-        return ('a'..'z').mapNotNullTo(HashSet()) { c -> resolver.resolve(KeyId("full/$c"), state).first?.text?.singleOrNull() }
+        corners?.takeIf { it.resolver === resolver && it.state == state }?.let { return it.keys }
+        val keys = ('a'..'z').mapNotNullTo(HashSet()) { c -> resolver.resolve(KeyId("full/$c"), state).first?.text?.singleOrNull() }
+        corners = Corners(resolver, state, keys)
+        return keys
     }
+
+    private class Corners(val resolver: KeyResolver, val state: KeysState, val keys: Set<Char>)
+
+    private var corners: Corners? = null
 
     // glide typing (滑行输入) where the input method reads one; a stroke (笔画筛选) in pinyin's and 双拼's
     // the letters where the scene places them: each letter node of the scene by

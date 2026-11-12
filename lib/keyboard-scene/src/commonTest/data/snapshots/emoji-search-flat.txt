@@ -1,4 +1,4 @@
-scene 1080x702 no-popups
+scene 1080x702
 base
   fill rect(0,0,1080,702) #ffeceff1
 key q kind=letter a11y="q"
@@ -8,6 +8,7 @@ key q kind=letter a11y="q"
   anchor 54,117 up 0,-1
   actions send="q"
   text label="q"
+  popup from=none
   normal
     text "q" 35.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -19,6 +20,7 @@ key w kind=letter a11y="w"
   anchor 162,117 up 0,-1
   actions send="w"
   text label="w"
+  popup from=none
   normal
     text "w" 143.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -30,6 +32,7 @@ key e kind=letter a11y="e"
   anchor 270,117 up 0,-1
   actions send="e"
   text label="e"
+  popup from=none
   normal
     text "e" 251.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -41,6 +44,7 @@ key r kind=letter a11y="r"
   anchor 378,117 up 0,-1
   actions send="r"
   text label="r"
+  popup from=none
   normal
     text "r" 359.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -52,6 +56,7 @@ key t kind=letter a11y="t"
   anchor 486,117 up 0,-1
   actions send="t"
   text label="t"
+  popup from=none
   normal
     text "t" 467.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -63,6 +68,7 @@ key y kind=letter a11y="y"
   anchor 594,117 up 0,-1
   actions send="y"
   text label="y"
+  popup from=none
   normal
     text "y" 575.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -74,6 +80,7 @@ key u kind=letter a11y="u"
   anchor 702,117 up 0,-1
   actions send="u"
   text label="u"
+  popup from=none
   normal
     text "u" 683.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -85,6 +92,7 @@ key i kind=letter a11y="i"
   anchor 810,117 up 0,-1
   actions send="i"
   text label="i"
+  popup from=none
   normal
     text "i" 791.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -96,6 +104,7 @@ key o kind=letter a11y="o"
   anchor 918,117 up 0,-1
   actions send="o"
   text label="o"
+  popup from=none
   normal
     text "o" 899.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -107,6 +116,7 @@ key p kind=letter a11y="p"
   anchor 1026,117 up 0,-1
   actions send="p"
   text label="p"
+  popup from=none
   normal
     text "p" 1007.89,139.64 system 400 60.38 #ff37474f
   pressed
@@ -118,6 +128,7 @@ key a kind=letter a11y="a"
   anchor 108,351 up 0,-1
   actions send="a"
   text label="a"
+  popup from=none
   normal
     text "a" 89.89,373.64 system 400 60.38 #ff37474f
   pressed
@@ -129,6 +140,7 @@ key s kind=letter a11y="s"
   anchor 216,351 up 0,-1
   actions send="s"
   text label="s"
+  popup from=none
   normal
     text "s" 197.89,373.64 system 400 60.38 #ff37474f
   pressed
@@ -140,6 +152,7 @@ key d kind=letter a11y="d"
   anchor 324,351 up 0,-1
   actions send="d"
   text label="d"
+  popup from=none
   normal
     text "d" 305.89,373.64 system 400 60.38 #ff37474f
   pressed
@@ -151,6 +164,7 @@ key f kind=letter a11y="f"
   anchor 432,351 up 0,-1
   actions send="f"
   text label="f"
+  popup from=none
   normal
     text "f" 413.89,373.64 system 400 60.38 #ff37474f
   pressed
@@ -162,6 +176,7 @@ key g kind=letter a11y="g"
   anchor 540,351 up 0,-1
   actions send="g"
   text label="g"
+  popup from=none
   normal
     text "g" 521.89,373.64 system 400 60.38 #ff37474f
   pressed
@@ -173,6 +188,7 @@ key h kind=letter a11y="h"
   anchor 648,351 up 0,-1
   actions send="h"
   text label="h"
+  popup from=none
   normal
     text "h" 629.89,373.64 system 400 60.38 #ff37474f
   pressed
@@ -184,6 +200,7 @@ key j kind=letter a11y="j"
   anchor 756,351 up 0,-1
   actions send="j"
   text label="j"
+  popup from=none
   normal
     text "j" 737.89,373.64 system 400 60.38 #ff37474f
   pressed
@@ -195,6 +212,7 @@ key k kind=letter a11y="k"
   anchor 864,351 up 0,-1
   actions send="k"
   text label="k"
+  popup from=none
   normal
     text "k" 845.89,373.64 system 400 60.38 #ff37474f
   pressed
@@ -206,6 +224,7 @@ key l kind=letter a11y="l"
   anchor 972,351 up 0,-1
   actions send="l"
   text label="l"
+  popup from=none
   normal
     text "l" 953.89,373.64 system 400 60.38 #ff37474f
   pressed
@@ -228,6 +247,7 @@ key z kind=letter a11y="z"
   anchor 216,585 up 0,-1
   actions send="z"
   text label="z"
+  popup from=none
   normal
     text "z" 197.89,607.64 system 400 60.38 #ff37474f
   pressed
@@ -239,6 +259,7 @@ key x kind=letter a11y="x"
   anchor 324,585 up 0,-1
   actions send="x"
   text label="x"
+  popup from=none
   normal
     text "x" 305.89,607.64 system 400 60.38 #ff37474f
   pressed
@@ -250,6 +271,7 @@ key c kind=letter a11y="c"
   anchor 432,585 up 0,-1
   actions send="c"
   text label="c"
+  popup from=none
   normal
     text "c" 413.89,607.64 system 400 60.38 #ff37474f
   pressed
@@ -261,6 +283,7 @@ key v kind=letter a11y="v"
   anchor 540,585 up 0,-1
   actions send="v"
   text label="v"
+  popup from=none
   normal
     text "v" 521.89,607.64 system 400 60.38 #ff37474f
   pressed
@@ -272,6 +295,7 @@ key b kind=letter a11y="b"
   anchor 648,585 up 0,-1
   actions send="b"
   text label="b"
+  popup from=none
   normal
     text "b" 629.89,607.64 system 400 60.38 #ff37474f
   pressed
@@ -283,6 +307,7 @@ key n kind=letter a11y="n"
   anchor 756,585 up 0,-1
   actions send="n"
   text label="n"
+  popup from=none
   normal
     text "n" 737.89,607.64 system 400 60.38 #ff37474f
   pressed
@@ -294,6 +319,7 @@ key m kind=letter a11y="m"
   anchor 864,585 up 0,-1
   actions send="m"
   text label="m"
+  popup from=none
   normal
     text "m" 845.89,607.64 system 400 60.38 #ff37474f
   pressed

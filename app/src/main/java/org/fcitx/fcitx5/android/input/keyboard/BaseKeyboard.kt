@@ -131,6 +131,17 @@ abstract class BaseKeyboard(
         updateSpaceBadges(v)
     }
 
+    // the keys' lists (按键长按) changed, the editor's every save and undo: what a long press opens and a swipe types is
+    // asked as it happens, so only the corners are drawn again, no keyboard made anew (060-s6-review M1)
+    @Keep
+    private val keyListsListener = ManagedPreference.OnChangeListener<String> { _, _ -> onKeyListsChanged() }
+
+    /** The keys' lists changed: what is drawn of them (their firsts in the corners) drawn again. */
+    @CallSuper
+    protected open fun onKeyListsChanged() {
+        canvas?.invalidateScene()
+    }
+
     /** Set per field ([KeyboardWindow]): no hold to talk in a password (CommonKeyActionListener), so no badge. */
     var inPasswordField = false
         set(value) {
@@ -295,6 +306,7 @@ abstract class BaseKeyboard(
         spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
         updateSpaceBadges(spaceLongPress.getValue())
         spaceLongPress.registerOnChangeListener(spaceLongPressListener)
+        prefs.internal.keyLists.registerOnChangeListener(keyListsListener)
     }
 
     // holding the space to talk: a microphone on every keyboard's space says so, or no one would know
@@ -367,11 +379,13 @@ abstract class BaseKeyboard(
         swipes.attach(key, def, longPopup)
         def.popup?.forEach { wirePopup(key, def, it, longPopup) }
         // a named key's long press is the resolver's ([onPopupAction] makes it as it opens, 060-keys-unify): one
-        // with no long press of its own gets one where the resolver has a list for it now
+        // with no long press of its own always wired, firing only while the resolver has a list for it, so a list
+        // changed needs no keyboard made anew (060-s6-review M1), its corners drawn again only ([onKeyListsChanged])
         val name = def.shortcut
         if (name != null) {
             resolving.named(key.ref.id, name, placeholderOf(def))
-            if (takesLongPress(def) && resolving.hasPopup(name)) {
+            if (takesLongPress(def)) {
+                key.keyGesture.longPressNow = { resolving.opens(key.ref.id) }
                 wirePopup(key, def, KeyDef.Popup.Keyboard.Named(name), longPopup)
             }
         }
@@ -865,8 +879,11 @@ abstract class BaseKeyboard(
      * [layout]'s named keys' corners by name, as a screen reader says them (Texts.alts: 「Q W，1」, the user's first, 060-keys-unify
      * §3.4); none where the long press's first is drawn nowhere ([firstShown]): a corner not drawn is not said.
      */
-    protected fun keyReadings(layout: SceneLayout): Map<String, String> =
-        if (!firstShown()) emptyMap() else SceneBoard.resolver(layout, keysIm, keysNineLetters).readings(keyState())
+    protected fun keyReadings(layout: SceneLayout): Map<String, String> {
+        // the resolver the keys' long presses and swipes ask (KeyResolving's, kept while nothing it is made of changed)
+        keysLayout = layout
+        return if (!firstShown()) emptyMap() else resolving.resolver()?.readings(keyState()).orEmpty()
+    }
 
     /** The keys' swipe marks drawn again, as what [charShortcutMarks] or the corners read changed. */
     protected fun showSwipeMarks() {

@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Form
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -212,5 +213,38 @@ class KeyResolverTest {
         assertEquals("1", down.readings(zh)["full/q"])
         // the 14 keys' groups by their names
         assertEquals("1", resolver("k14", Form.Grouped14).readings(KeyState())["g14/qw"])
+    }
+
+    // a way turned off, or its place 无, draws no corner: none said (060-s6-review L1), each way apart
+    @Test
+    fun theReadingsLeaveOutAWayOffOrPlacedNowhere() {
+        val down = resolver("qwerty", Form.Full, slots = SwipeSlots.Default.with("full/q", up = true, SwipeSlot.Empty).with("full/q", up = false, SwipeSlot.First))
+        assertEquals("1", down.readings(zh)["full/q"])
+        assertNull(down.readings(zh.copy(ways = KeySwipe.Ways(up = true, down = false)))["full/q"])
+        assertNull(down.readings(zh.copy(spots = KeyMarks.Spots(KeyMarks.At.TopRight, KeyMarks.At.None)))["full/q"])
+        val r = resolver("qwerty", Form.Full)
+        assertNull(r.readings(zh.copy(ways = KeySwipe.Ways(up = false, down = true)))["full/w"])
+        assertNull(r.readings(zh.copy(spots = KeyMarks.Spots(KeyMarks.At.None, KeyMarks.At.Bottom)))["full/w"])
+        assertEquals("2", r.readings(zh.copy(ways = KeySwipe.Ways(up = true, down = false)))["full/w"])
+    }
+
+    // a character key of `mark="false"` (注音's): no first of the defaults' drawn or said, one the user set both
+    // (060-s6-review L4)
+    @Test
+    fun aMarkOffKeysFirstIsTheUsersAlone() {
+        val group = KeyId("zy9/1")
+        val r = resolver("zhuyin-nine", Form.ZhuyinNine)
+        assertNull(r.resolve(group, KeyState()).corner)
+        assertNull(r.readings(KeyState())["zy9/1"])
+        val own = resolver("zhuyin-nine", Form.ZhuyinNine, lists = KeyLists.Empty.with(group, UserList(false, listOf("!", "?")), listOf(null)))
+        // its symbols set, its first the defaults' (none for a group)
+        assertNull(own.resolve(group, KeyState()).corner)
+        val chosen = resolver("zhuyin-nine", Form.ZhuyinNine, lists = KeyLists.Empty.with(group, UserList(false, listOf("!", "?"), First.Literal("?")), listOf(null)))
+        assertEquals("?", chosen.resolve(group, KeyState()).corner)
+        assertEquals(MarkContent.Symbol("?"), chosen.resolve(group, KeyState()).upMark)
+        // ˉ's ˙ (its defaults' first, a named key not fn/'s: a character key's mark=) not drawn, as the scene never drew it
+        val tone = KeyId("zy9/tone-1")
+        assertEquals("˙", r.resolve(tone, KeyState()).first?.text)
+        assertEquals(MarkContent.Empty, r.resolve(tone, KeyState()).upMark)
     }
 }

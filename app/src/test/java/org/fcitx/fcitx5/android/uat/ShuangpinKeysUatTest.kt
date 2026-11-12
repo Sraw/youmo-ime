@@ -138,10 +138,14 @@ class ShuangpinKeysUatTest {
         val oldOne = T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true, semicolon = false).flatten()
             .firstNotNullOf { it.appearance as? KeyDef.Appearance.AltText }
         assertEquals("1", oldOne.altText)
-        // 微软's, where 1 types ; as well: its first's still (060-keys-unify S6: a key's corner is its long press's first,
-        // by its name; the 1; the layout wrote is gone)
+        // 微软's, where 1 types ; while typing: its corner its first's still (060-keys-unify S6: a key's corner is its long
+        // press's first, by its name), the ; on its face while typing, what the tap types then (060-s6-review L3)
         EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
         h.start()
+        assertEquals("1", h.nineKey("1").alt)
+        assertFalse(h.texts().toString(), "分词;" in h.texts())
+        h.typedWo()
+        assertTrue(h.texts().toString(), "分词;" in h.texts())
         assertEquals("1", h.nineKey("1").alt)
     }
 

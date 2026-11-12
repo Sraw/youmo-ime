@@ -54,9 +54,10 @@ class BuiltInLayoutLintTest {
     }
 
     @Test
-    fun aCharacterKeyWritesNoSwipeNorCorner() {
-        // its first is its long press's (KeyDefaults, the user's key_lists): the swipe types it, the corner draws it
-        val wrong = keys.filter { !it.function }.flatMap { k -> k.all.flatMap { a -> listOfNotNull("swipe-up".takeIf { it in a.actions }, "alt".takeIf { a.alt != null }) }.map { "${k.where}: $it" } }
+    fun noKeyWritesASwipeNorACorner() {
+        // a key's first is its long press's (KeyDefaults, the user's key_lists): the swipe types it, the corner draws it; a
+        // function key's marks are its slots' commands (SlotDefaults), which a corner written would sit on (060-s6-review L10)
+        val wrong = keys.flatMap { k -> k.all.flatMap { a -> listOfNotNull("swipe-up".takeIf { it in a.actions }, "alt".takeIf { a.alt != null }) }.map { "${k.where}: $it" } }
         assertEquals(emptyList(), wrong)
     }
 
@@ -100,7 +101,8 @@ class BuiltInLayoutLintTest {
         // the keys out of the keys' model, with the reason each is (060-keys-unify §5): a panel's own way about (back,
         // lock, search, the emoji and emoticon tabs, the candidates' pages), 手写's 注 (its long press a menu), a table's
         // 拼 lookup (one keyboard's, a table's own), the bar's number row (on the bar, no long press nor slots), the number
-        // pad's operators and marks (no list, §5), 表情搜索's letters (they spell a query, popups="off");
+        // pad's operators and marks (no list, §5; named with the editor's page for them, 0.6.1), 表情搜索's letters (they
+        // spell a query, `<popup from="none"/>`);
         // qwerty's ; and * (双拼's ing and a table's extra code keys, shown for one scheme or table): not named in 060-keys-unify,
         // a list and slots of their own wait on the editor's pages showing them
         fun unnamedKept(k: Written): Boolean = k.address ||

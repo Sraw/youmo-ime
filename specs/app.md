@@ -779,9 +779,11 @@ alone, and one whose ink stands out of it moved back in (060-render-rules B §8a
 
 What the scene is given, so it draws what the views would: qwerty.xml is
 `lib/keyboard-scene/src/commonMain/layouts/qwerty.xml`, the one file the app copies and the engine's
-tests read. A letter's corner is `{alt:x}`, the app's `Texts.alts` (`SceneLetters.alts` of
-`TextKeyboard.cornerOf`: the user's own long press first, else Shift's swipe override, else the
-swipe; through `transformPunctuation`; the letter itself under a table's labels); a table's roots or
+tests read. A named key's corner is its long press's first as the resolver has it (060-keys-unify §3.4,
+`KeyResolver`: the user's `key_lists` over `KeyDefaults`, shown as the punctuation maps it, the letter
+itself under a table's labels), drawn as the mark of the way its slot is the first's (`MarkSettings.shortcuts`,
+`BaseKeyboard.keyMarks`) and said from `Texts.alts` (`BaseKeyboard.keyReadings`, only where a way draws it);
+the layouts write no `alt=` of their own (BuiltInLayoutLintTest); a table's roots or
 names replace the letter through `when="roots"` and `{root:x}` (`SceneLetters.roots` of
 `TableKeyboard.label`), in two lines at 0.55 above three roots, as the views drew them. A table's 确定
 is `{confirm}`, the app's `key_confirm` (OK in English), as the view's text.

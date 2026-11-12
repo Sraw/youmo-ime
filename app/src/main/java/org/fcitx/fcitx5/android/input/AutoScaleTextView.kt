@@ -230,7 +230,7 @@ class AutoScaleTextView @JvmOverloads constructor(
     /**
      * Where its glyphs are drawn, in its own coordinates, into [out]: their ink, not the line's
      * height and advance the view is sized by (a key's label giving way to its corner's mark,
-     * KeyMarkYield). False for none: nothing to draw, or a styled text, its lines' ink unmeasured.
+     * the scene's rules.KeyMarkYield). False for none: nothing to draw, or a styled text, its lines' ink unmeasured.
      */
     fun inkBounds(out: RectF): Boolean {
         if (text.isEmpty()) return false

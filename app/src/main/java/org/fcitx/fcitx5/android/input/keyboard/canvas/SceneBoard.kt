@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.annotation.MainThread
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
@@ -222,8 +223,10 @@ class SceneBoard(
          * are now (the user's lists, the swipes' slots): one resolver kept for each of the last few asked, so
          * keyboards switched between make none again (the least recently asked dropped). A keyboard keeps its own
          * while nothing it is made of changed (KeyResolving), so this is asked as that changes, not on each touch.
-         * [slots] the settings' editor's, being edited.
+         * [slots] the settings' editor's, being edited. Main thread only, as the resolvers' caches are not guarded
+         * (KeyResolver): a scene made ahead on another thread asks for none.
          */
+        @MainThread
         fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null, slots: SwipeSlots = SwipeSlotsCache.current): KeyResolver {
             val variant = KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters)
             val lists = KeyListsCache.user.current

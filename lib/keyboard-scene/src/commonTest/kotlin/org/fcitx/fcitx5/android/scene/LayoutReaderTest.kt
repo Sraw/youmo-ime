@@ -292,4 +292,20 @@ class LayoutReaderTest {
             assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"a\" $attr=\"{punct:,}\"/></row>")), attr)
         }
     }
+
+    @Test
+    fun aComposedKeyWrittenWithNoNameIsNamedAsTheAppsAre() {
+        // a theme pack's nine keys and 注音九键 of before 060-keys-unify: no shortcut=, named by their place (060-s6-review M3)
+        fun names(family: String, rows: String) = LayoutReader.layout("<keyboard xmlns=\"$ns\" id=\"t\" name=\"t\" family=\"$family\" columns=\"10\">$rows</keyboard>")
+            .ok().parts.filterIsInstance<Row>().flatMap { r -> r.cells.filterIsInstance<Key>().map { it.attrs.shortcut } }
+        val nine = "<row><key id=\"1\" label=\"1\"><popup from=\"nine\"/></key><key id=\"2\" label=\"ABC\" shortcut=\"t9/9\"><popup from=\"nine\"/></key>" +
+            "<key id=\"x\" label=\"x\"><popup from=\"nine\"/></key><key id=\"3\" label=\"3\"/></row>"
+        assertEquals(listOf("t9/1", "t9/9", null, null), names("nine", nine))
+        // not the nine keys' family: as written
+        assertEquals(listOf(null, "t9/9", null, null), names("symbols", nine))
+        val groups = "<row><key id=\"a\" label=\"ㄅㄉㄚ\"><popup from=\"group\"/></key><key id=\"b\" label=\"ㄍ\" shortcut=\"zy9/7\"><popup from=\"group\"/></key>" +
+            "<key id=\"c\" label=\"ㄓ\"><popup from=\"group\"/></key></row>"
+        // counted in order, a named one too
+        assertEquals(listOf("zy9/1", "zy9/7", "zy9/3"), names("zhuyin-nine", groups))
+    }
 }

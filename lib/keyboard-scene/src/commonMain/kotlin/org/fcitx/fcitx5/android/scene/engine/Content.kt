@@ -279,7 +279,7 @@ class Content(
         val char = name == null || !KeyId(name).isFunction
         // a function key's swipes (the space's cursor, ⌫'s sweep): a theme's `key hint { hidden }` leaves them out
         if (!char && looks.hint.hidden) return emptyList()
-        val ways = ways(key, name, char, looks, hidden)
+        val ways = ways(name, char, looks, hidden)
         val slots = if (char) charSlots(ways) else functionSlots(ways)
         // the shortcuts first, the up one before the down one, then the symbols (as 0.5 listed them)
         var shortcuts = 0
@@ -305,9 +305,11 @@ class Content(
     }
 
     // each way that is on and draws something: a symbol's text, or a shortcut's mark
-    private fun ways(key: ExpandedKey, name: String?, char: Boolean, looks: Looks, hidden: Boolean): List<Way> {
+    private fun ways(name: String?, char: Boolean, looks: Looks, hidden: Boolean): List<Way> {
         val m = env.marks
-        val symbolsShown = m.symbols && !hidden && !looks.mark.hidden && (!char || key.attrs.mark != false)
+        // a character key's `mark="false"` is the key model's (KeyResolver, DefaultMarks): its built-in first is no mark
+        // there, a first the user set is one (060-s6-review L4)
+        val symbolsShown = m.symbols && !hidden && !looks.mark.hidden
         val shortcutsShown = !char || (m.charShortcuts && !looks.shortcut.hidden)
         return listOf(true, false).mapNotNull { up ->
             if (!(if (up) m.upOn else m.downOn)) return@mapNotNull null

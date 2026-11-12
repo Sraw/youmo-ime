@@ -87,7 +87,7 @@ object KeyListsMigration {
         val default = defaultOf(id)
         val first = items.first()
         // the row the keyboard makes, not stored: a letter moved or taken out of it is lost (L4); the betas'
-        // editor put the first in front of it (OwnLongPress.cornerFirst), which is no move
+        // editor put the key's corner first in front of it, which is no move
         val own = default?.row?.map { it.text }.orEmpty().filter { it != default?.first?.text }
         if (items.filter { it in own } != own) lost += "L4 ${id.name} ${items.joinToString(" ")}"
         val f = if (first == default?.first?.text) First.Default else First.Literal(first)

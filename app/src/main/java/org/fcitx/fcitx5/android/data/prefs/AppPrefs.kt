@@ -779,8 +779,16 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             }
             // every key's long press as stored, none where none is (not yet migrated: migrated there from the old ones in
             // memory, KeyListsCache), never the `@1` the setting reads then, which would hide the old ones there for good;
-            // the old ones themselves no longer copied (060-keys-unify S6): what is there from before stays till then
-            storedKeyLists()?.let { putString(KEY_LISTS, it) } ?: remove(KEY_LISTS)
+            // the old ones themselves no longer copied (060-keys-unify S6): what is there from before stays till then, and
+            // goes once they are (060-s6-review L5: no direct boot reads them past that). Not synced at a backup's import,
+            // whose settings file is copied over AppPrefs' (UserDataManager): migrated and synced at the start after
+            val lists = storedKeyLists()
+            if (lists == null) {
+                remove(KEY_LISTS)
+            } else {
+                putString(KEY_LISTS, lists)
+                listOf(POPUP_OVERRIDES, KEY_POPUPS, T9_SYMBOLS).forEach(::remove)
+            }
         }
     }
 

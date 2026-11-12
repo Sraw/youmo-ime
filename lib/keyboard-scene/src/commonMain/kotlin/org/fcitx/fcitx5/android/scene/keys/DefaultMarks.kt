@@ -30,7 +30,8 @@ object DefaultMarks {
         val marks = LinkedHashMap<String, MarkContent>()
         for ((name, facts) in nodes(layout, fragments)) {
             val id = KeyId.of(name)
-            val list = KeyDefaults.of(id, variant, facts)
+            // a key of `mark="false"` (a character's, not a function's) draws no first of its defaults'
+            val list = KeyDefaults.of(id, variant, facts)?.takeUnless { facts.markOff && !id.isFunction }
             for (up in listOf(true, false)) {
                 marks["$name:${if (up) "up" else "down"}"] = when (val slot = SlotDefaults.of(id, up, firstUp)) {
                     SlotDefaults.Slot.First -> list?.first?.takeIf { it.text.isNotEmpty() }?.let { MarkContent.Symbol(shown(it, punctuation)) } ?: MarkContent.Empty
@@ -106,6 +107,7 @@ object DefaultMarks {
                 themeFirst = a.actions["swipe-up"] ?: (a.alt as? Text.Literal)?.text,
                 place = if (key.letters != null) place++ else -1,
                 function = a.kind == "function",
+                markOff = a.mark == false,
             )
             val names = listOfNotNull(a.shortcut) + key.variants.mapNotNull { it.attrs.shortcut }
             for (name in names.distinct()) out += name to facts

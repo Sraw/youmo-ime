@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keys
 
+import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.keys.Commit
 import org.fcitx.fcitx5.android.scene.keys.KeyId
@@ -124,6 +125,55 @@ class KeyListsMigrationTest {
         // another list kept as the user's
         assertTrue(one !in lists(named = "t9/1 1 $old").lists)
         assertEquals(UserList(false, listOf(".", ",")), lists(named = "t9/1 1 . ,")[one])
+    }
+
+    // t9_symbols read as 0.5 read it (NineKeySymbols.parse, its cases ported here, 060-s6-review M4): a key's line its digit
+    // then its symbols apart by spaces, each kept as 0.5 kept it
+    private fun nine(t9: String, digit: Char) = lists(t9 = t9)[KeyId("t9/$digit")]?.symbols
+
+    @Test
+    fun nineDigitsLettersAndRepeatsAreNotKeptAndTenAtMost() {
+        assertEquals(listOf("!", "ab", "。"), nine("8 ! 2 a A ab ! 。", '8'))
+        assertEquals((1..10).map { "#$it" }, nine("2 " + (1..20).joinToString(" ") { "#$it" }, '2'))
+        // as stored: a digit and a letter among the symbols are its row's, never the user's
+        assertEquals(listOf("!"), nine("8 ! 8 u", '8'))
+        // what is left its old default (8's ?): none set
+        assertEquals(null, nine("8 ? 8 u", '8'))
+    }
+
+    @Test
+    fun nineAKeyboardsCodeIsNoSymbol() {
+        // 九键双拼's abc code is a key, never a symbol; the code of an earlier build is text now
+        assertEquals(listOf("@"), nine("2 ${nineSp("2")} @", '2'))
+        assertEquals(listOf("⒉"), nine("2 ⒉", '2'))
+    }
+
+    @Test
+    fun nineOnlyWhatIsRefusedLeavesTheKeyNoSymbols() {
+        // 0.5 read a line of nothing it keeps as the key set to none: its long press its row alone
+        assertEquals(emptyList<String>(), nine("7 a 1", '7'))
+        assertEquals(emptyList<String>(), nine("7", '7'))
+    }
+
+    @Test
+    fun nineASpaceInsideASymbolIsNoSeparatorAsStored() {
+        // the editor split what was typed at a full-width space too, so none was ever stored inside one: one there is refused
+        assertEquals(listOf("·"), nine("5 【\u3000】 ·", '5'))
+    }
+
+    @Test
+    fun nineReadBackAsWritten() {
+        assertEquals((1..10).map { "#$it" }, nine("2 7 z " + (1..12).joinToString(" ") { "#$it" }, '2'))
+        assertEquals(listOf("【", "】", "^_^"), nine("5 【 】 ^_^", '5'))
+        // set back to its defaults: none set
+        assertTrue(KeyId("t9/2") !in lists(t9 = "2 @ ! \"").lists)
+    }
+
+    @Test
+    fun nineALineNotAKeysIsLeftOut() {
+        val l = lists(t9 = "0 !\nx ?\n\n3 %\n12 #")
+        assertEquals(setOf(KeyId("t9/3")), l.lists.keys)
+        assertEquals(listOf("%"), l[KeyId("t9/3")]?.symbols)
     }
 
     @Test

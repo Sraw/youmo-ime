@@ -14,6 +14,8 @@
     <key id="1" label="{punct:,.?!}" text-size="16" preview="off" send="1" shortcut="t9/1">
       <!-- 1 键随输入中变（T9Keyboard.kt:672,683-687）：第一个成立的 variant 盖上去 -->
       <variant when="ime=english composing" label="'"/>
+      <!-- 微软双拼：输入中 1 打 ;（声母后是 ing，别处分词，T9Keyboard.resolveShuangpin），键面写出来（060-s6-review L3） -->
+      <variant when="scheme-types=semicolon composing" label="分词;"/>
       <variant when="composing" label="分词"/>
       <popup from="nine"/>
     </key>

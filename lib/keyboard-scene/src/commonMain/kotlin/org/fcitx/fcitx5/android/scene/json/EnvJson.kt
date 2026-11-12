@@ -27,7 +27,7 @@ import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
  * "typed": [scene, …] or null, "states": {id or role: ["on", …]}, "input": {…Input's},
  * "texts": {…Texts', "letterCase": "lower"|"shift"|"upper"}, "marks": {…MarkSettings', "upAt" and
  * "downAt": "top-right"|"bottom-right"|"top-left"|"bottom-left"|"bottom"|"none", "shortcuts":
- * {"name:up"|"name:down": {"icon": name} or {"text": text} or {"symbol": text} or {"corner": true} or {}}}}`: the members are the classes' own names.
+ * {"name:up"|"name:down": {"icon": name} or {"text": text} or {"symbol": text} or {}}}}`: the members are the classes' own names.
  */
 object EnvJson {
     /** [source] read; its problems, each with its line, where it does not say an environment. */

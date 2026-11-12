@@ -1,4 +1,4 @@
-scene 2340x529 board 1358.25,0,2340,529 no-popups
+scene 2340x529 board 1358.25,0,2340,529
 base
   fill rect(0,0,2340,529) #ffeceff1
 slot side-buttons 0,0,1358.25,529
@@ -9,6 +9,7 @@ key q kind=letter a11y="q"
   anchor 1407.13,88 up 0,-1
   actions send="q"
   text label="q"
+  popup from=none
   normal
     shadow rect(1366.13,10.5,1448.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1366.13,10.5,1448.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -22,6 +23,7 @@ key w kind=letter a11y="w"
   anchor 1505.5,88 up 0,-1
   actions send="w"
   text label="w"
+  popup from=none
   normal
     shadow rect(1463.88,10.5,1547.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1463.88,10.5,1547.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -35,6 +37,7 @@ key e kind=letter a11y="e"
   anchor 1604,88 up 0,-1
   actions send="e"
   text label="e"
+  popup from=none
   normal
     shadow rect(1562.88,10.5,1645.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1562.88,10.5,1645.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -48,6 +51,7 @@ key r kind=letter a11y="r"
   anchor 1702,88 up 0,-1
   actions send="r"
   text label="r"
+  popup from=none
   normal
     shadow rect(1660.88,10.5,1743.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1660.88,10.5,1743.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -61,6 +65,7 @@ key t kind=letter a11y="t"
   anchor 1800,88 up 0,-1
   actions send="t"
   text label="t"
+  popup from=none
   normal
     shadow rect(1758.88,10.5,1841.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1758.88,10.5,1841.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -74,6 +79,7 @@ key y kind=letter a11y="y"
   anchor 1898,88 up 0,-1
   actions send="y"
   text label="y"
+  popup from=none
   normal
     shadow rect(1856.88,10.5,1939.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1856.88,10.5,1939.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -87,6 +93,7 @@ key u kind=letter a11y="u"
   anchor 1996,88 up 0,-1
   actions send="u"
   text label="u"
+  popup from=none
   normal
     shadow rect(1954.88,10.5,2037.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1954.88,10.5,2037.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -100,6 +107,7 @@ key i kind=letter a11y="i"
   anchor 2094.5,88 up 0,-1
   actions send="i"
   text label="i"
+  popup from=none
   normal
     shadow rect(2052.88,10.5,2136.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2052.88,10.5,2136.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -113,6 +121,7 @@ key o kind=letter a11y="o"
   anchor 2193,88 up 0,-1
   actions send="o"
   text label="o"
+  popup from=none
   normal
     shadow rect(2151.88,10.5,2234.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2151.88,10.5,2234.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -126,6 +135,7 @@ key p kind=letter a11y="p"
   anchor 2291,88 up 0,-1
   actions send="p"
   text label="p"
+  popup from=none
   normal
     shadow rect(2249.88,10.5,2332.13,168.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2249.88,10.5,2332.13,165.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -139,6 +149,7 @@ key a kind=letter a11y="a"
   anchor 1456.5,264.5 up 0,-1
   actions send="a"
   text label="a"
+  popup from=none
   normal
     shadow rect(1414.88,186.5,1498.13,345.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1414.88,186.5,1498.13,342.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -152,6 +163,7 @@ key s kind=letter a11y="s"
   anchor 1555,264.5 up 0,-1
   actions send="s"
   text label="s"
+  popup from=none
   normal
     shadow rect(1513.88,186.5,1596.13,345.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1513.88,186.5,1596.13,342.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -165,6 +177,7 @@ key d kind=letter a11y="d"
   anchor 1653,264.5 up 0,-1
   actions send="d"
   text label="d"
+  popup from=none
   normal
     shadow rect(1611.88,186.5,1694.13,345.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1611.88,186.5,1694.13,342.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -178,6 +191,7 @@ key f kind=letter a11y="f"
   anchor 1751,264.5 up 0,-1
   actions send="f"
   text label="f"
+  popup from=none
   normal
     shadow rect(1709.88,186.5,1792.13,345.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1709.88,186.5,1792.13,342.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -191,6 +205,7 @@ key g kind=letter a11y="g"
   anchor 1849,264.5 up 0,-1
   actions send="g"
   text label="g"
+  popup from=none
   normal
     shadow rect(1807.88,186.5,1890.13,345.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1807.88,186.5,1890.13,342.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -204,6 +219,7 @@ key h kind=letter a11y="h"
   anchor 1947,264.5 up 0,-1
   actions send="h"
   text label="h"
+  popup from=none
   normal
     shadow rect(1905.88,186.5,1988.13,345.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1905.88,186.5,1988.13,342.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -217,6 +233,7 @@ key j kind=letter a11y="j"
   anchor 2045.5,264.5 up 0,-1
   actions send="j"
   text label="j"
+  popup from=none
   normal
     shadow rect(2003.88,186.5,2087.13,345.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2003.88,186.5,2087.13,342.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -230,6 +247,7 @@ key k kind=letter a11y="k"
   anchor 2144,264.5 up 0,-1
   actions send="k"
   text label="k"
+  popup from=none
   normal
     shadow rect(2102.88,186.5,2185.13,345.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2102.88,186.5,2185.13,342.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -243,6 +261,7 @@ key l kind=letter a11y="l"
   anchor 2242,264.5 up 0,-1
   actions send="l"
   text label="l"
+  popup from=none
   normal
     shadow rect(2200.88,186.5,2283.13,345.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2200.88,186.5,2283.13,342.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -269,6 +288,7 @@ key z kind=letter a11y="z"
   anchor 1555,441 up 0,-1
   actions send="z"
   text label="z"
+  popup from=none
   normal
     shadow rect(1513.88,363.5,1596.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1513.88,363.5,1596.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -282,6 +302,7 @@ key x kind=letter a11y="x"
   anchor 1653,441 up 0,-1
   actions send="x"
   text label="x"
+  popup from=none
   normal
     shadow rect(1611.88,363.5,1694.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1611.88,363.5,1694.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -295,6 +316,7 @@ key c kind=letter a11y="c"
   anchor 1751,441 up 0,-1
   actions send="c"
   text label="c"
+  popup from=none
   normal
     shadow rect(1709.88,363.5,1792.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1709.88,363.5,1792.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -308,6 +330,7 @@ key v kind=letter a11y="v"
   anchor 1849,441 up 0,-1
   actions send="v"
   text label="v"
+  popup from=none
   normal
     shadow rect(1807.88,363.5,1890.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1807.88,363.5,1890.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -321,6 +344,7 @@ key b kind=letter a11y="b"
   anchor 1947,441 up 0,-1
   actions send="b"
   text label="b"
+  popup from=none
   normal
     shadow rect(1905.88,363.5,1988.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1905.88,363.5,1988.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -334,6 +358,7 @@ key n kind=letter a11y="n"
   anchor 2045.5,441 up 0,-1
   actions send="n"
   text label="n"
+  popup from=none
   normal
     shadow rect(2003.88,363.5,2087.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2003.88,363.5,2087.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -347,6 +372,7 @@ key m kind=letter a11y="m"
   anchor 2144,441 up 0,-1
   actions send="m"
   text label="m"
+  popup from=none
   normal
     shadow rect(2102.88,363.5,2185.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2102.88,363.5,2185.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc

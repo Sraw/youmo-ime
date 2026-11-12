@@ -179,14 +179,15 @@ class SceneBuilderTest {
         assertEquals("～", zx.alt)
         assertNull(zx.altRaw, "no corner written: its name's first, as KeyDefaults has it")
         // by its name, as the app reads them (Texts.alts): a named key's not there none, whatever its layout writes; a character
-        // key of mark="false" (no symbol drawn) none; a function key's its own
+        // key of mark="false" as told too (the resolver leaves out the defaults' first there, one the user set said:
+        // 060-s6-review L4); a function key's its own
         val told = Fixtures.portrait.copy(texts = Fixtures.portrait.texts.copy(alts = mapOf("full/a" to "@", "full/b" to "!", "full/c" to "#", "fn/x" to "⇥")))
         val named = board(
             "symbols",
             "<row><key id=\"a\" label=\"a\" shortcut=\"full/a\"/><key id=\"b\" label=\"b\" mark=\"false\" shortcut=\"full/b\"/>" +
                 "<key id=\"d\" label=\"d\" alt=\"$\" shortcut=\"full/d\"/><key id=\"x\" kind=\"function\" label=\"x\" mark=\"false\" shortcut=\"x\"/></row>",
         )
-        assertEquals(mapOf("a" to "@", "b" to null, "d" to null, "x" to "⇥"), Fixtures.scene(told, named).keys.associate { it.id to it.alt })
+        assertEquals(mapOf("a" to "@", "b" to "!", "d" to null, "x" to "⇥"), Fixtures.scene(told, named).keys.associate { it.id to it.alt })
         val semicolon = Forms.env("k18", Forms.block).let { it.copy(input = it.input.copy(ime = "shuangpin", schemeTypes = setOf("semicolon"))) }
         assertEquals("L ;，-", Forms.scene("k18", semicolon).keys.single { it.label == "L;" }.a11y)
         val space = Forms.scene("symbols", Forms.env("symbols", Forms.block)).keys.single { it.role == "space" }

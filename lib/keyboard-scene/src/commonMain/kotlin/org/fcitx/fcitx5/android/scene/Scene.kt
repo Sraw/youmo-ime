@@ -70,8 +70,8 @@ enum class KeyState(val xml: String) {
  *
  * What the app needs to work it, so it never goes back to the layout: [label] and [alt] as shown (the
  * bindings read; null where there is none), [altRaw] the alt as written (`{punct:~}`; snapshots and tests only), its long
- * press's [popup] as written (null: PopupPreset's by its label and send; [Scene.popups] off: none at
- * all) and [menu], the [sound] it clicks with, the [shortcut] its swipes' symbols are kept under.
+ * press's [popup] as written (null: its character's built-in list, KeyDefaults, a named key's the user's over it;
+ * [Scene.popups] off: none at all) and [menu], the [sound] it clicks with, the [shortcut] its swipes' symbols are kept under.
  */
 class KeyNode(
     val id: String,

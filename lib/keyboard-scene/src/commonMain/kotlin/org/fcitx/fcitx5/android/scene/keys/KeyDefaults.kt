@@ -4,14 +4,16 @@
  */
 package org.fcitx.fcitx5.android.scene.keys
 
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.Popup
 
 /**
  * What a layout's key tells its default long press (060-keys-unify): its tap's character ([text]) and [label],
  * whether it types ([typing]: a letter's kind with a label, a mark's role), its `<popup>`, a group's
  * [letters], the first a theme's layout wrote ([themeFirst]: its `swipe-up=`, else a literal `alt=`),
- * a group key's [place] among the layout's groups (the built-in corners go by it), and whether it is a
- * [function] key's kind (no first of its character's: 注音九键's ? !).
+ * a group key's [place] among the layout's groups (the built-in corners go by it), whether it is a
+ * [function] key's kind (no first of its character's: 注音九键's ? !), and whether it draws no first of its
+ * defaults' ([markOff], `mark="false"`: 注音's keys; a first the user set drawn and said all the same, 060-s6-review L4).
  */
 data class NodeFacts(
     val text: String? = null,
@@ -23,6 +25,7 @@ data class NodeFacts(
     val themeFirst: String? = null,
     val place: Int = -1,
     val function: Boolean = false,
+    val markOff: Boolean = false,
 )
 
 /**
@@ -170,24 +173,49 @@ object KeyDefaults {
         else -> null
     }
 
-    /** A written first (`keypad:3`, `action:tone-5`, `~`) as an item. */
+    /**
+     * A written first (`keypad:3`, `action:tone-5`, `~`) as an item; a theme's `swipe-up=` read as the layout's actions are
+     * (SceneAction, 060-s6-review M2): `commit:qq` committed as it is, `key:`/`code:U+…` typed as a key, any other action
+     * (`sym:BackSpace`) the action, of no text to draw.
+     */
     fun itemOf(written: String): Item = when {
         written.startsWith("keypad:") && written.length == "keypad:".length + 1 ->
             written.last().let { Item(it.toString(), Commit.Keypad(it)) }
-        written.startsWith("action:") -> Item("", Commit.Action(written))
-        else -> Item(written.removePrefix("key:"))
+        written.startsWith("commit:") -> Item(written.removePrefix("commit:"), Commit.AsIs)
+        written.startsWith("key:") -> Item(written.removePrefix("key:"))
+        written.startsWith("code:") -> LayoutReader.codePoint(written)?.let { Item(text(it)) } ?: Item("", Commit.Action(written))
+        ACTION.matches(written) -> Item("", Commit.Action(written))
+        else -> Item(written)
     }
 
-    // a theme's first: the item it names (by its action, its keypad digit or its text), else put first among the symbols
+    // an action's word and its argument (`sym:BackSpace`, `action:tone-5`), as SceneAction reads one
+    private val ACTION = Regex("[a-z-]+:.+")
+
+    // a code point as text: a supplementary one as its two halves
+    private fun text(cp: Int): String {
+        if (cp < SUPPLEMENTARY) return cp.toChar().toString()
+        val v = cp - SUPPLEMENTARY
+        return charArrayOf((HIGH_SURROGATE + (v shr TEN_BITS)).toChar(), (LOW_SURROGATE + (v and LOW_MASK)).toChar()).concatToString()
+    }
+
+    private const val SUPPLEMENTARY = 0x10000
+    private const val HIGH_SURROGATE = 0xD800
+    private const val LOW_SURROGATE = 0xDC00
+    private const val TEN_BITS = 10
+    private const val LOW_MASK = 0x3FF
+
+    // a theme's first: the item it names (by its action, its keypad digit or its text, typed as a key or as is: `commit:1` is the list's 1), else put first among the symbols
     private fun DefaultList.withFirst(written: String): DefaultList {
         val want = itemOf(written)
-        val found = items.firstOrNull { it == want || (want.commit is Commit.Action && it.commit == want.commit) || (want.commit == Commit.AsKey && it.text == want.text) }
+        val found = items.firstOrNull { it == want || (want.commit is Commit.Action && it.commit == want.commit) || (textual(want) && it.text == want.text) }
         return when {
             found != null -> copy(first = found, focus = items.indexOf(found))
             want.text.isEmpty() -> this
             else -> copy(symbols = listOf(want) + symbols, first = want, focus = row.size)
         }
     }
+
+    private fun textual(i: Item): Boolean = i.commit == Commit.AsKey || i.commit == Commit.AsIs
 
     // a cased letter (every letter of a Latin key's presets has a case: ê, ß's SS, ı's I) or an ASCII digit: not
     // Char.isLetterOrDigit, whose Unicode tables would grow the theme maker's engine by tens of KB

@@ -639,8 +639,8 @@ fn/lang	zhuyin-full	default	-	-	-	-
 fn/lang	zhuyin-full	zh	-	-	-	-
 fn/return	zhuyin-full	default	-	-	-	-
 fn/return	zhuyin-full	zh	-	-	-	-
-zy9/tone-1	zhuyin-nine	default	| ˙@tone-5	˙@tone-5	s:˙	-
-zy9/tone-1	zhuyin-nine	zh	| ˙@tone-5	˙@tone-5	s:˙	-
+zy9/tone-1	zhuyin-nine	default	| ˙@tone-5	˙@tone-5	-	-
+zy9/tone-1	zhuyin-nine	zh	| ˙@tone-5	˙@tone-5	-	-
 zy9/1	zhuyin-nine	default	ㄅ ㄉ ㄚ |	-	-	-
 zy9/1	zhuyin-nine	zh	ㄅ ㄉ ㄚ |	-	-	-
 zy9/2	zhuyin-nine	default	ㄍ ㄐ ㄞ |	-	-	-

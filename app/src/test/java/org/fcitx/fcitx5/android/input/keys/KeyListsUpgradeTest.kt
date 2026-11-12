@@ -209,7 +209,7 @@ class KeyListsUpgradeTest {
         assertTrue(c.version > v)
     }
 
-    // unlocked, the lists go to the device-protected copy, the old ones no longer (060-keys-unify S6: no keyboard reads
+    // unlocked, the lists go to the device-protected copy, the old ones removed there (060-keys-unify S6: no keyboard reads
     // them); read there before the next unlock as the lists, whatever an older copy of the old ones says
     @Test
     @Config(application = FcitxApplication::class)
@@ -222,8 +222,8 @@ class KeyListsUpgradeTest {
         assertEquals(listOf("?"), cache(locked).current[KeyId("full/q")]?.symbols)
         prefs.syncToDeviceEncryptedStorage()
         assertEquals(stored(), de.getString(AppPrefs.KEY_LISTS, null))
-        // the older copy there as it was, read no more
-        assertEquals("q ?", de.getString(AppPrefs.POPUP_OVERRIDES, null))
+        // the older copy there gone with them, no direct boot reading it (060-s6-review L5)
+        assertFalse(de.contains(AppPrefs.POPUP_OVERRIDES))
         assertFalse(de.contains(AppPrefs.T9_SYMBOLS))
         assertEquals(KeyLists.parse(stored()), cache(locked).current)
     }
