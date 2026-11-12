@@ -291,11 +291,8 @@ object InputMethodSettings {
     }
     private val nineKeyLetters = Page(T9_LETTERS, R.string.t9_letters, R.string.t9_letters_summary, SettingsRoute.T9Letters)
 
-    // the long-press symbols: every nine keys', 九键双拼's too
-    private val nineKeySymbols = Page(T9_SYMBOLS, R.string.t9_symbols, R.string.t9_symbols_summary, SettingsRoute.T9Symbols)
-
     /** The nine keys' settings pinyin's and English's share: one pref each, whichever page sets it. */
-    val NINE_KEYS: List<Item> = listOf(multiTap, nineKeyLetters, nineKeySymbols)
+    val NINE_KEYS: List<Item> = listOf(multiTap, nineKeyLetters)
 
     // which are no use on pinyin's grouped keyboards
     private val pinyinKeys = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN)
@@ -347,8 +344,6 @@ object InputMethodSettings {
                 },
             )
         ),
-        // 九键双拼's letters and taps are its scheme's: of the nine keys' own, the long-press symbols alone
-        nineKeysSection(listOf(nineKeySymbols), AppPrefs.SHUANGPIN_KEYBOARD) { AppPrefs.getInstance().keyboard.shuangpinKeyboard.getValue() == ShuangpinKeyboard.NineKeys },
     )
 
     // each table's own, under its group of the addon's config; [keys] what its keys show of its roots, where it has them
@@ -462,7 +457,6 @@ object InputMethodSettings {
     const val T9_LETTERS = "t9_letters"
 
     /** 九键's page of its keys' long-press symbols: its key. */
-    const val T9_SYMBOLS = "t9_symbols"
 
     /** A table's 恢复码表顺序: its key. */
     const val RESET_TABLE_ORDER = "reset_table_order"

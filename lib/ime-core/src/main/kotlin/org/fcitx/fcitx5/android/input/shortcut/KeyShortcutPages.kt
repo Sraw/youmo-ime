@@ -22,7 +22,10 @@ object KeyShortcutPages {
      * shorter than the rest [leftAligned] as the keyboard has it or centred.
      */
     data class Page(val form: String, val rows: List<List<Key>>, val leftAligned: Boolean = false) {
-        val names: List<String> get() = rows.flatten().map { it.name }
+        val names: List<String> get() = rows.flatten().filterNot(::elsewhere).map { it.name }
+
+        /** Whether [key] is a function key drawn in its place on a keyboard's tab, edited on the function keys' (注音九键's ，). */
+        fun elsewhere(key: Key): Boolean = form != KeyShortcuts.FUNCTION && KeyId.of(key.name).isFunction
 
         /** Whether a key of it has a preset: 套用编辑快捷键 has none to put back otherwise (注音九键, the numbers). */
         val hasPresets: Boolean get() = names.any { KeyShortcutPreset.of(it) != KeyShortcut.None }
@@ -65,15 +68,21 @@ object KeyShortcutPages {
     val Grouped18 = grouped(KeyShortcutPreset.GROUPED18, NineKeyLetters.G18, intArrayOf(7, 6, 5))
 
     /**
-     * 注音九键's 11 groups, three a row as the keyboard has them, each named by its place (1 to 11):
-     * a group's symbols are no letters, and its tones' column and the 分词 key take no shortcut.
+     * 注音九键's keys where the keyboard has them: a tone's in the first column, the 11 groups three a row
+     * named by their place (1 to 11), ？ ！ ～ in the last; its ， in place is the function key's ([Page.elsewhere]).
      */
     val ZhuyinNine = Page(
         KeyShortcutPreset.ZHUYIN_NINE,
-        ZhuyinKeys.GROUP_SYMBOLS.mapIndexed { g, symbols -> Key(symbols, KeyShortcuts.charKey(KeyShortcutPreset.ZHUYIN_NINE, "${g + 1}")) }.chunked(3),
-        // ㄈㄌㄝ and ㄖㄥㄩ under the first two, the 分词 key in the third place
+        ZhuyinKeys.GROUP_SYMBOLS.mapIndexed { g, symbols -> Key(symbols, zy9("${g + 1}")) }.chunked(3).mapIndexed { r, groups ->
+            listOf(Key("ˉˊˇˋ"[r].toString(), zy9("tone-${r + 1}"))) + groups +
+                listOfNotNull(Key("，", "${KeyShortcuts.FUNCTION}/comma").takeIf { r == 3 }) +
+                listOfNotNull(listOf(null, "？" to "question", "！" to "exclam", "～" to "tilde")[r]?.let { (label, name) -> Key(label, zy9(name)) })
+        },
+        // the first row's backspace left off
         leftAligned = true,
     )
+
+    private fun zy9(key: String) = KeyShortcuts.charKey(KeyShortcutPreset.ZHUYIN_NINE, key)
 
     val ZhuyinFull = Page(
         KeyShortcutPreset.ZHUYIN_FULL,

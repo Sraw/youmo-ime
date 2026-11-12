@@ -37,10 +37,17 @@ class KeyShortcutPagesTest {
     @Uat("T9-61")
     fun zhuyinNinesGroupsAreNamedByTheirPlaceThreeARow() {
         val page = KeyShortcutPages.ZhuyinNine
-        assertEquals(listOf(3, 3, 3, 2), page.rows.map { it.size })
-        assertEquals((1..11).map { "zy9/$it" }, page.names)
-        assertEquals(listOf("ㄅㄉㄚ", "ㄍㄐㄞ", "ㄓㄗㄢㄦ"), page.rows.first().map { it.label })
-        assertEquals("ㄖㄥㄩ", page.rows.last().last().label)
+        // a tone first, then the groups, ？ ！ ～ last, the ， in place (the first row's backspace left off)
+        assertEquals(listOf(4, 5, 5, 5), page.rows.map { it.size })
+        assertEquals(
+            listOf("zy9/tone-1") + (1..3).map { "zy9/$it" } + listOf("zy9/tone-2") + (4..6).map { "zy9/$it" } + "zy9/question" +
+                "zy9/tone-3" + (7..9).map { "zy9/$it" } + "zy9/exclam" + "zy9/tone-4" + listOf("zy9/10", "zy9/11", "zy9/tilde"),
+            page.names,
+        )
+        assertEquals(listOf("ˉ", "ㄅㄉㄚ", "ㄍㄐㄞ", "ㄓㄗㄢㄦ"), page.rows.first().map { it.label })
+        assertEquals(listOf("ˋ", "ㄈㄌㄝ", "ㄖㄥㄩ", "，", "～"), page.rows.last().map { it.label })
+        // the ， is the function key's, edited on its tab
+        assertEquals(listOf("fn/comma"), page.rows.flatten().filter(page::elsewhere).map { it.name })
         // no preset: a group's symbols are no letters
         assertTrue(page.names.all { KeyShortcutPreset.of(it) == KeyShortcut.None })
         // its tab before 大千's

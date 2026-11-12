@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.view.View
+import android.widget.EditText
+import androidx.appcompat.app.AlertDialog
+import androidx.core.view.ViewCompat
 import com.google.android.material.chip.Chip
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -19,9 +22,13 @@ import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keys.KeyPopup
+import org.fcitx.fcitx5.android.input.keys.KeyState
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.ui.main.settings.KeyCaps
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -32,6 +39,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
 
 /**
  * The 注音 keyboards' swipe shortcuts (051-c 【待定 9】 A): 大千's keys take the full keyboard's six by
@@ -153,5 +161,43 @@ class ZhuyinShortcutsUatTest {
         assertTrue(texts.toString(), st.s(R.string.swipe_presets) in texts && st.s(R.string.swipe_flip_all) in texts)
         assertTrue(texts.toString(), st.s(R.string.swipe_slots_hint_page) in texts)
         st.capture("ZhuyinShortcutsUatTest/page_zy9")
+    }
+
+    // the 注音九键 tab's key labelled [label], opened (SettingsHarness on the page already)
+    private fun SettingsHarness.zy9Key(label: String): View {
+        KeyboardHarness.all(activity.window.decorView).filterIsInstance<Chip>().first { it.text.toString() == s(R.string.shortcut_page_zy9) }.performClick()
+        idle()
+        return KeyboardHarness.all(activity.window.decorView).first { it.contentDescription?.toString()?.substringBefore(',') == label && it.hasOnClickListeners() }
+    }
+
+    // review 5: 注音九键's tone keys are on its tab; one edited there is that key's long press on the keyboard
+    @Test
+    fun aZhuyinToneEditedOnThePageIsTheKeyboardsLongPress() {
+        val st = SettingsHarness().also { settings = it }
+        prefs.set(AppPrefs.getInstance().internal.keyLists, AppPrefs.getInstance().internal.keyLists.getValue())
+        st.open(SettingsRoute.PopupOverrides)
+        st.zy9Key("ˉ").performClick()
+        st.idle()
+        val d = ShadowDialog.getLatestDialog() as AlertDialog
+        KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().first().setText("※")
+        d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        st.idle()
+        val key = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard("zy9/tone-1"))!!.resolve(KeyId("zy9/tone-1"), KeyState())
+        assertEquals("※", (key.popup as KeyPopup.Items).labels.last())
+    }
+
+    // the ， in its place is the function key's: greyed, said so, a tap saying where it is changed and opening no editor
+    @Test
+    fun zhuyinNinesCommaSaysItIsChangedOnTheFunctionKeysTab() {
+        val st = SettingsHarness().also { settings = it }
+        st.open(SettingsRoute.PopupOverrides)
+        val comma = st.zy9Key("，")
+        assertEquals(st.s(R.string.shortcut_key_elsewhere, "，"), ViewCompat.getStateDescription(comma).toString())
+        assertTrue(st.texts().toString(), st.s(R.string.long_press_legend_elsewhere, "，") in st.texts())
+        val dialogs = ShadowDialog.getShownDialogs().size
+        comma.performClick()
+        st.idle()
+        assertEquals(dialogs, ShadowDialog.getShownDialogs().size)
+        assertTrue(st.texts().toString(), st.s(R.string.shortcut_key_elsewhere, "，") in st.texts())
     }
 }

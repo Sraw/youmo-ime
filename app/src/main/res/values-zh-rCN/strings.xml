@@ -366,11 +366,7 @@
     <string name="toolbar_reset">恢复默认</string>
     <string name="toolbar_trad_simp">简繁切换</string>
     <string name="reset_this_key">恢复此键默认</string>
-    <string name="long_press_editor_hint">带框的第一个是长按后直接松手得到的字符，也是滑动这个键输入的字符，也就是键上的小字。点一个字符选中它，再用下面的按钮调整。</string>
-    <string name="letters">字母</string>
-    <string name="other_keys">其他按键</string>
-    <string name="add_key">添加其他按键</string>
-    <string name="key_label_hint">按键标签，例如 .</string>
+    <string name="long_press_editor_hint">带框的是长按后直接松手得到的字符，也是滑动这个键输入的字符，也就是键上的小字。变淡的是键盘自带的（键上的字母、数字），只能设为首个，不能移动或删除。点一个字符选中它，再用下面的按钮调整。</string>
     <string name="reset_all_long_press_message">将所有按键的长按字符恢复为内置默认值？</string>
     <string name="reset_all">全部恢复默认</string>
     <string name="my_words">用户词库</string>
@@ -667,14 +663,6 @@
     <string name="t9_letters_field_hint">默认：%s</string>
     <string name="t9_letters_editor_hint">填 a 到 z 的字母，每个一次；顺序就是键上显示和连按选字母的顺序</string>
     <string name="t9_letters_reset_all_message">把所有键恢复成默认的字母？</string>
-    <string name="t9_symbols">按键长按</string>
-    <string name="t9_symbols_summary">长按数字键时，除了数字和字母还能选的符号</string>
-    <string name="t9_symbols_hint">点一个键，设置长按它时多出的符号，它们排在数字和字母上面，隔一条细线。开着中文标点时，2–9 的符号按中文标点打出（! 打出 ！），1 的符号原样打出。</string>
-    <string name="t9_symbols_of">%1$s 键的长按符号</string>
-    <string name="t9_symbols_field_hint">默认：%1$s</string>
-    <string name="t9_symbols_editor_hint">用空格分开，最多 %1$d 个。单个的数字和字母不能填：长按选它们是当按键用的（选候选、打拼音），打不出它们本身。清空就是这个键不加符号。</string>
-    <string name="t9_symbols_reset_all_message">把所有键的长按符号恢复成默认？</string>
-    <string name="t9_symbols_none_kept">填的都是单个的数字或字母，不能做符号，这个键没有改。</string>
     <string name="im_candidate_reading">候选词注音</string>
     <string name="im_candidate_reading_summary">在候选词的每个字上标出读音和声调；候选栏会变高、候选词变宽</string>
     <string name="im_candidate_reading_off">关闭</string>
@@ -798,9 +786,10 @@
     <string name="picker_symbols">符号</string>
     <string name="picker_flags">旗帜</string>
     <string name="long_press_legend">带框的键是改过的；变淡的键长按不弹出字符，滑向长按首选等于点这个键。</string>
+    <string name="long_press_legend_elsewhere">灰色的 %1$s 是功能键：长按照常可用，在功能键页改。</string>
     <string name="long_press_none">长按这个键不弹出字符。</string>
-    <string name="long_press_unread">读不到这个键的长按。</string>
-    <string name="long_press_by_name_snapshot">改过以后列表就是你的：之后改全键盘的按键字符或九键符号，这个键不再跟着变。</string>
+    <string name="long_press_off">这个键的长按已关。改动列表（添加字符或设为首选）就重新打开。</string>
+    <string name="long_press_newer">长按字符是新版本的应用设置的：原样保留，这里不能改。</string>
     <string name="long_press_add_hint">添加字符，空格分隔</string>
     <string name="punctuation_page_hint">打中文时，按左边的键打出右边的标点；一个键对应几个标点时可以选。点一项可修改或删除。</string>
     <string name="punctuation_pair">交替</string>
@@ -1115,6 +1104,7 @@
     <string name="shortcut_page_zyfull">注音全键盘</string>
     <string name="shortcut_page_number">数字键盘</string>
     <string name="shortcut_page_function">功能键</string>
+    <string name="shortcut_key_elsewhere">在功能键页改 %s</string>
     <string name="shortcut_text_too_long">最多 %d 个字</string>
     <string name="fn_key_space">空格</string>
     <string name="fn_key_backspace">退格</string>
@@ -1264,7 +1254,6 @@
     <string name="swipe_preset_confirm">所有键盘的所有键都回到这个预设。之后可以撤销。</string>
     <string name="swipe_way_said">%1$s %2$s</string>
     <string name="swipe_ways_said">%1$s，%2$s</string>
-    <string name="swipe_select_keys_only">这一页只能选字母键；其他键盘的键在各自的分页里选。</string>
     <string name="swipe_fate_shortened">画不下，键上显示为「%s」</string>
     <string name="swipe_fate_sign">画不下，键上显示为图标</string>
     <string name="swipe_fate_dropped">画不下，键上不显示（滑动照常有效）</string>

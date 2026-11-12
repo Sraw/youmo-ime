@@ -21,10 +21,15 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.keys.First
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.KeyListsCache
+import org.fcitx.fcitx5.android.input.keys.UserList
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
@@ -32,7 +37,6 @@ import org.fcitx.fcitx5.android.scene.MarkFate
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.junit.After
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -45,44 +49,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowDialog
 
-/**
- * What the long-press editor shows is what the popup shows. Putting the built-in list back on
- * "Q" while "q" was edited used to drop "Q"'s override, so the popup showed "q"'s edit upper-cased.
- */
+/** The long-press and swipe editor: what it starts from is what the keyboard pops up, what it stores is key_lists. */
 class PopupOverridesFragmentTest {
-
-    private val presetLower = arrayOf("1", "Q")
-    private val presetUpper = arrayOf("1", "q")
-
-    @Test
-    fun theBuiltInListPutBackOnAnUpperCaseKeyIsStoredWhenItsLowerCaseKeyIsEdited() {
-        val after = PopupOverrides.parse("q x y").withEdit("Q", presetUpper.toList(), presetUpper)
-        assertEquals(presetUpper.toList(), after["Q"])
-        assertArrayEquals(presetUpper, after.resolve("Q", presetUpper))
-    }
-
-    @Test
-    fun theBuiltInListPutBackIsNotAnEdit() {
-        val after = PopupOverrides.parse("q x y").withEdit("q", presetLower.toList(), presetLower)
-        assertEquals(PopupOverrides.Empty, after)
-    }
-
-    @Test
-    fun anUpperCaseKeySetToWhatItsLowerCaseEditGivesFollowsThatEdit() {
-        val after = PopupOverrides.parse("q x y\nQ m").withEdit("Q", listOf("X", "Y"), presetUpper)
-        assertNull(after["Q"])
-        assertArrayEquals(arrayOf("X", "Y"), after.resolve("Q", presetUpper))
-    }
-
-    // a label that named no key closed the add-key dialog with nothing said
-    @Test
-    fun aLabelForAnotherKeyIsOneWordOfTheStoredFormat() {
-        assertEquals(".", keyLabel(" . "))
-        assertNull(keyLabel(""))
-        assertNull(keyLabel("  \u3000"))
-        assertNull(keyLabel("a b"))
-        assertNull(keyLabel("a\u3000b"))
-    }
 
     // a 14-key code typed in the editor would be typed as that key: the editor says so instead of adding it
     @Test
@@ -127,7 +95,7 @@ class PopupOverridesFragmentTest {
         @Test
         @Uat("ST-22")
         fun aKeyCodeAloneIsRefusedAndTheDialogStays() {
-            val pref = AppPrefs.getInstance().internal.popupOverrides
+            val pref = AppPrefs.getInstance().internal.keyLists
             val before = pref.getValue()
             st.activity
             st.open(SettingsRoute.PopupOverrides)
@@ -152,7 +120,7 @@ class PopupOverridesFragmentTest {
         private fun open() {
             // put back after, passed or failed: a later swipe test expects the presets (full/a = 全选 down)
             prefs.set(slotsPref, slotsPref.getValue())
-            prefs.set(AppPrefs.getInstance().internal.keyPopups, AppPrefs.getInstance().internal.keyPopups.getValue())
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER)
             val k = AppPrefs.getInstance().keyboard
             listOf(k.swipeUpPosition, k.swipeDownPosition).forEach { prefs.set(it, it.getValue()) }
             listOf(k.swipeUp, k.swipeDown).forEach { prefs.set(it, it.getValue()) }
@@ -194,8 +162,9 @@ class PopupOverridesFragmentTest {
         @Test
         fun aTappedKeyOpensItsDialogOnEveryTab() {
             open()
-            val tabs = KeyShortcutPages.all.filter { it !== KeyShortcutPages.Number }
-            assertEquals(7, tabs.size)
+            // 数字 too (ST-109): every page one slotPage
+            val tabs = KeyShortcutPages.all
+            assertEquals(8, tabs.size)
             for (page in tabs) {
                 click(PopupOverridesFragment.pageTitle(page))
                 val cap = firstCap()
@@ -505,14 +474,16 @@ class PopupOverridesFragmentTest {
             assertFalse("the key has a long press: not said to have none", none.isVisible)
             d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
-            assertEquals("kept as it is, nothing stored", "", AppPrefs.getInstance().internal.keyPopups.getValue())
+            assertEquals("kept as it is, nothing stored", KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
             d = dialog()
             KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+            val before = own("g14/qw")
             d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
-            val stored = PopupOverrides.parse(AppPrefs.getInstance().internal.keyPopups.getValue())["g14/qw"]!!
-            assertEquals(listOf("1", "Q", "W", "q", "w"), stored.take(5))
-            assertEquals("①", stored.last())
+            // the row (1 q w) never stored: the symbols alone, ① after the keyboard's own
+            val stored = qwStored()!!
+            assertEquals(before + "①", stored.symbols)
+            assertEquals(First.Default, stored.first)
         }
 
         // the dialog titled by the key alone on every tab (it edits the slots too, not the long press only)
@@ -553,71 +524,96 @@ class PopupOverridesFragmentTest {
             st.idle()
         }
 
-        private fun qwStored() = PopupOverrides.parse(AppPrefs.getInstance().internal.keyPopups.getValue()).let { if ("g14/qw" in it.labels) it["g14/qw"].orEmpty() else null }
+        private fun stored(name: String): UserList? = KeyLists.parse(AppPrefs.getInstance().internal.keyLists.getValue())!![KeyId(name)]
+
+        private fun qwStored() = stored("g14/qw")
+
+        // a key's symbols as its page's keyboard has them with nothing set
+        private fun own(name: String): List<String> = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(name))!!.edit(KeyId.of(name)).symbols
 
         // moved and moved back, edited back to the keyboard's own, put back by 重置这个键: nothing stored;
-        // every one deleted: an empty list stored, the long press off (aListEmptiedTurnsTheLongPressOff)
+        // every symbol deleted: the row alone stored (the row can't be deleted)
         @Test
         @Uat("ST-100")
-        fun aListBackToTheOwnStoresNothingAndOneEmptiedStoresOff() {
+        fun aListBackToTheOwnStoresNothingAndOneEmptiedKeepsItsRow() {
             open()
-            click(R.string.shortcut_page_g14)
-            qwDialog().apply {
-                tapItem("q")
+            click(R.string.shortcut_page_nine)
+            // 九键 5's own symbols: # ( ), above its row J K L 5 j k l
+            val symbols = own("t9/5")
+            assertEquals(listOf("#", "(", ")"), symbols)
+            fun five(): AlertDialog {
+                keyCalled("5").performClick()
+                st.idle()
+                return ShadowDialog.getLatestDialog() as AlertDialog
+            }
+            five().apply {
+                tapItem("(")
                 button(R.string.long_press_move_left)
                 button(R.string.long_press_move_right)
                 ok()
             }
-            assertEquals("moved back", null, qwStored())
-            qwDialog().apply {
+            assertEquals("moved back", null, stored("t9/5"))
+            five().apply {
                 KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
                 ok()
             }
-            assertEquals("①", qwStored()!!.last())
-            qwDialog().apply {
+            assertEquals(symbols + "①", stored("t9/5")!!.symbols)
+            five().apply {
                 tapItem("①")
                 button(R.string.delete)
                 ok()
             }
-            assertEquals("edited back to the own", null, qwStored())
-            qwDialog().apply {
+            assertEquals("edited back to the own", null, stored("t9/5"))
+            five().apply {
                 KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
                 ok()
             }
-            qwDialog().apply {
+            five().apply {
                 getButton(AlertDialog.BUTTON_NEUTRAL).performClick()
                 st.idle()
             }
-            assertEquals("重置这个键", null, qwStored())
-            qwDialog().apply {
-                while (true) {
-                    val first = KeyboardHarness.all(window!!.decorView).firstOrNull { v ->
-                        v.hasOnClickListeners() && v.contentDescription?.toString()?.let { it.isNotEmpty() && ',' !in it } == true && v.parent?.javaClass?.simpleName == "FlexboxLayout"
-                    } ?: break
-                    first.performClick()
-                    st.idle()
-                    button(R.string.delete)
-                }
-                val none = KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().single { it.text.toString() == st.s(R.string.long_press_none) }
-                assertTrue(none.isVisible)
+            assertEquals("重置这个键", null, stored("t9/5"))
+            five().apply {
+                // a delete selects what took the place of the one deleted
+                tapItem(symbols.first())
+                repeat(symbols.size) { button(R.string.delete) }
                 ok()
             }
-            assertEquals("every one deleted: off", emptyList<String>(), qwStored())
+            assertEquals("every symbol deleted: the row kept", UserList(off = false, symbols = emptyList(), first = First.Default), stored("t9/5"))
         }
 
-        // every key of every tab but the full keyboard's starts from its keyboard's own long press (owner, 0.6.0
-        // beta2): the grouped and nine keys' their corner first (the cap's small character), 注音九键's its
-        // symbols, ， and 。 their preset; 注音大千's keys have none
+        // the row greyed (060-keys-unify S5): chosen as the first, never deleted or moved
+        @Test
+        fun aRowItemIsOnlyChosenAsTheFirst() {
+            open()
+            click(R.string.shortcut_page_g14)
+            qwDialog().apply {
+                tapItem("q")
+                fun enabled(text: Int) = KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(text) }.isEnabled
+                assertFalse(enabled(R.string.delete))
+                assertFalse(enabled(R.string.long_press_move_left))
+                assertFalse(enabled(R.string.long_press_move_right))
+                assertTrue(enabled(R.string.long_press_make_first))
+                button(R.string.long_press_make_first)
+                ok()
+            }
+            assertEquals(UserList(off = false, symbols = own("g14/qw"), first = First.Literal("q")), qwStored())
+            // the keyboards read it: its first is q now
+            assertEquals("q", KeyListsCache.user.current[KeyId("g14/qw")]!!.let { (it.first as First.Literal).text })
+        }
+
+        // every key of every tab starts from its keyboard's own long press (owner, 0.6.0 beta2): what is added goes after
+        // it, stored in key_lists by the key's one name; 注音大千's keys have none of their own
         @Test
         @Uat("ST-100")
         fun everyKeysEditorStartsFromItsKeyboardsOwnLongPress() {
             open()
-            val firsts = mapOf("g14/qw" to "1", "g18/q" to "1", "t9/1" to "1", "t9/2" to "2", "t9/9" to "9", "zy9/1" to "ㄅ")
-            for (page in KeyShortcutPages.all - KeyShortcutPages.Full - KeyShortcutPages.Number) {
+            for (page in KeyShortcutPages.all) {
                 click(PopupOverridesFragment.pageTitle(page))
-                val keys = if (page == KeyShortcutPages.Function) KeyShortcutPages.FUNCTION_POPUPS.map { PopupOverridesFragment.FunctionLabels.getValue(it).let(st::s) to it }
-                else page.rows.flatten().map { it.label to it.name }
+                val keys = if (page == KeyShortcutPages.Function) KeyShortcutPages.FUNCTION_POPUPS.map { PopupOverridesFragment.FunctionLabels.getValue(it).let(st::s) to "fn/$it" }
+                else page.rows.flatten().filterNot(page::elsewhere).map { (if (page == KeyShortcutPages.Full) it.label.lowercase() else it.label) to it.name }
                 for ((label, name) in keys) {
+                    val before = own(name)
                     // a function key's name may hold a comma (", key"): its caption read whole
                     (if (page == KeyShortcutPages.Function) KeyboardHarness.all(st.activity.window.decorView)
                         .first { it.contentDescription?.toString()?.startsWith(label) == true && it.hasOnClickListeners() } else keyCalled(label)).performClick()
@@ -626,12 +622,167 @@ class PopupOverridesFragmentTest {
                     KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().first().setText("※")
                     d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
                     st.idle()
-                    val own = PopupOverrides.parse(AppPrefs.getInstance().internal.keyPopups.getValue())[name]!!.dropLast(1)
-                    val none = page == KeyShortcutPages.ZhuyinFull
-                    assertEquals(name, none, own.isEmpty())
-                    firsts[name]?.let { assertEquals(name, it, own.first()) }
+                    assertEquals(name, before + "※", stored(name)!!.symbols)
+                    if (page == KeyShortcutPages.ZhuyinFull) assertEquals(name, emptyList<String>(), before)
                 }
             }
+        }
+
+        // the first the key resolves to, as the editor starts it
+        private fun firstOf(name: String): String? = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(name))!!.edit(KeyId.of(name)).first
+
+        private fun dialogOf(label: String): AlertDialog {
+            keyCalled(label).performClick()
+            st.idle()
+            return ShadowDialog.getLatestDialog() as AlertDialog
+        }
+
+        // 上滑's 空 picked (the first of the two ways' 空)
+        private fun AlertDialog.emptyUp() {
+            KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().first { it.text.toString() == st.s(R.string.slot_empty) }.performClick()
+            st.idle()
+        }
+
+        // re-review 1: key_lists not stored yet (a 0.5 backup imported, migrated at the next start) is not stored by
+        // an undo either: the old long presses still read till then
+        @Test
+        fun anUndoLeavesKeyListsUnstoredAsItWas() {
+            open()
+            val p = AppPrefs.getInstance()
+            prefs.set(p.internal.popupOverrides, "q ?")
+            p.setStoredKeyLists(null)
+            assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.symbols?.lastOrNull())
+            dialogOf("q").apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+                ok()
+            }
+            click(R.string.undo)
+            assertNull(p.storedKeyLists())
+            assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.symbols?.lastOrNull())
+        }
+
+        // review 6: 九键's rows are the user's t9_letters
+        @Test
+        fun nineKeysRowsAreTheUsersLetters() {
+            prefs.set(AppPrefs.getInstance().keyboard.t9Letters, NineKeyLetters.STANDARD.withEdit('2', "abcq").serialize())
+            open()
+            val row = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard("t9/2"))!!.edit(KeyId.of("t9/2")).row
+            assertTrue(row.toString(), "q" in row || "Q" in row)
+        }
+
+        // review 1: a symbol moved to the front keeps the first (q's 1 a symbol, its default's first: `*` would be the moved one)
+        @Test
+        fun movingSymbolsKeepsTheFirst() {
+            open()
+            val symbols = own("full/q")
+            val first = firstOf("full/q")
+            assertTrue(symbols.size >= 2 && first == symbols.first())
+            dialogOf("q").apply {
+                tapItem(symbols.last())
+                repeat(symbols.size - 1) { button(R.string.long_press_move_left) }
+                ok()
+            }
+            assertEquals(symbols.last(), stored("full/q")!!.symbols.first())
+            assertEquals("the first kept", first, firstOf("full/q"))
+        }
+
+        // review 2: a slot alone changed on 九键 1 (its default differs between pinyin and English) writes no list
+        @Test
+        fun aSlotAloneChangedWritesNoList() {
+            open()
+            click(R.string.shortcut_page_nine)
+            dialogOf("1").apply {
+                emptyUp()
+                ok()
+            }
+            assertEquals(KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
+        }
+
+        // review 3: a 注音九键 group with no default first, opened and OK'd, writes nothing (no `set !`)
+        @Test
+        fun aGroupOfNoFirstOpenedWritesNothing() {
+            open()
+            click(R.string.shortcut_page_zy9)
+            val key = KeyShortcutPages.ZhuyinNine.rows.flatten().filterNot(KeyShortcutPages.ZhuyinNine::elsewhere).first { k ->
+                KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(k.name))!!.let { it.defaultOf(KeyId.of(k.name))?.first == null && it.edit(KeyId.of(k.name)).row.isNotEmpty() }
+            }
+            dialogOf(key.label).ok()
+            assertEquals(KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
+        }
+
+        // review L2: 九键 1's editor starts from the keyboard's own list (KeyResolver.edit), not the views' old one
+        @Test
+        fun nineOnesEditorStartsFromTheStoredDefault() {
+            open()
+            click(R.string.shortcut_page_nine)
+            val d = dialogOf("1")
+            val items = listOf("^", ":", ";", "~", ".", "-", "@", "\\", "\"")
+            val said = KeyboardHarness.all(d.window!!.decorView).filter { it.hasOnClickListeners() }.mapNotNull { it.contentDescription?.toString() }.filter { it in items }.toList()
+            assertEquals(items, said)
+        }
+
+        // review 4: a key turned off is said so, and stays off when only a slot is changed
+        @Test
+        fun anOffKeyIsSaidSoAndKeptOff() {
+            open()
+            // 九键 5: a key with a row, which a save would have turned back on
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER + "\nt9/5\toff")
+            click(R.string.shortcut_page_nine)
+            dialogOf("5").apply {
+                assertTrue(KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().any { it.isShown && it.text.toString() == st.s(R.string.long_press_off) })
+                emptyUp()
+                ok()
+            }
+            assertEquals(UserList.Off, stored("t9/5"))
+        }
+
+        // an off key's character added and deleted again: still off
+        @Test
+        fun anOffKeyAddedToAndBackStaysOff() {
+            open()
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER + "\nt9/5\toff")
+            click(R.string.shortcut_page_nine)
+            dialogOf("5").apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(R.string.add) }.performClick()
+                st.idle()
+                tapItem("①")
+                button(R.string.delete)
+                ok()
+            }
+            assertEquals(UserList.Off, stored("t9/5"))
+        }
+
+        // review 8: a later version's key_lists is read-only here: said so, never written over
+        @Test
+        fun aNewerVersionsListsAreNeverWritten() {
+            val newer = "@2\nfull/q\tsomething"
+            prefs.set(AppPrefs.getInstance().internal.keyLists, newer)
+            open()
+            prefs.set(AppPrefs.getInstance().internal.keyLists, newer)
+            st.open(SettingsRoute.PopupOverrides)
+            assertTrue(KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().any { it.text.toString() == st.s(R.string.long_press_newer) })
+            dialogOf("q").apply {
+                emptyUp()
+                ok()
+            }
+            click(R.string.undo)
+            assertEquals(newer, AppPrefs.getInstance().internal.keyLists.getValue())
+        }
+
+        // 数字's keys edited like any other (ST-109): 5 given ½, the number keyboard's long press reads it
+        @Test
+        @Uat("ST-109")
+        fun numberPage() {
+            open()
+            click(R.string.shortcut_page_number)
+            keyCalled("5").performClick()
+            st.idle()
+            val d = ShadowDialog.getLatestDialog() as AlertDialog
+            KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().first().setText("½")
+            d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            st.idle()
+            assertEquals("½", KeyListsCache.user.current[KeyId("num/5")]!!.symbols.last())
         }
     }
 

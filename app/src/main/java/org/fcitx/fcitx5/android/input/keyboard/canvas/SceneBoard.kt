@@ -223,11 +223,12 @@ class SceneBoard(
          * are now (the user's lists, the swipes' slots): one resolver kept for each of the last few asked, so
          * keyboards switched between make none again (the least recently asked dropped). A keyboard keeps its own
          * while nothing it is made of changed (KeyResolving), so this is asked as that changes, not on each touch.
+         * [slots] the settings' editor's, being edited.
          */
-        fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null): KeyResolver {
+        fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null, slots: SwipeSlots = SwipeSlotsCache.current): KeyResolver {
             val variant = KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters)
             val lists = KeyListsCache.user.current
-            val of = ResolverFor(layout, variant, KeyListsCache.user.version, lists, SwipeSlotsCache.current)
+            val of = ResolverFor(layout, variant, KeyListsCache.user.version, lists, slots)
             return resolvers.getOrPut(of) {
                 KeyResolver(of.variant, of.lists, of.slots, DefaultMarks.nodes(layout.layout, layout.fragments))
             }

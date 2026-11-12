@@ -418,13 +418,13 @@ class SettingsUatTest {
     // the user's 11-01: the nine keys' own settings a section 「九键」 on the page of each input method whose
     // keyboard they are, there while the nine keys are chosen and at once (no row opening a page of their
     // own); none on 按键. One pref each, whichever page sets it. English's keyboard on its page, its 九键英文打法
-    // first in that section; 九键双拼's letters its scheme's, so its section has the long-press symbols alone
+    // first in that section; 九键双拼's letters its scheme's, so it has none
     @Test
     @Uat("ST-45")
     fun theNineKeysSettingsAreASectionOfEachKeyboardsPage() {
         val c = InputMethodCatalog
         val keyboard = AppPrefs.getInstance().keyboard
-        val nine = listOf(R.string.t9_multi_tap, R.string.t9_letters, R.string.t9_symbols).map(::s)
+        val nine = listOf(R.string.t9_multi_tap, R.string.t9_letters).map(::s)
         // the section's title and what is in it, as the page shows them (none: not there)
         fun section() = st.titles().let { t -> t.indexOf(s(R.string.keyboard_nine)).takeIf { it >= 0 }?.let { t.drop(it) } }
         fun choose(title: Int, value: String) = listed(title).let { if (it.callChangeListener(value)) it.value = value }
@@ -449,7 +449,7 @@ class SettingsUatTest {
             assertEquals(PinyinKeyboard.NineKeys, keyboard.pinyinKeyboard.getValue())
             val titles = st.titles()
             assertEquals(titles.indexOf(s(R.string.pinyin_keyboard)) + 1, titles.indexOf(s(R.string.keyboard_nine)))
-            assertEquals(listOf(s(R.string.keyboard_nine)) + nine, section()!!.take(4))
+            assertEquals(listOf(s(R.string.keyboard_nine)) + nine, section()!!.take(3))
             assertTrue(summary(R.string.t9_multi_tap).contains(s(R.string.t9_multi_tap_summary)))
             capture("pinyin_nine_keys")
             // set here, the one pref
@@ -475,17 +475,15 @@ class SettingsUatTest {
             assertTrue(st.titles().toString(), s(R.string.t9_english_typing) !in st.titles())
             choose(R.string.english_keyboard, EnglishKeyboard.NineKeys.name)
             idle()
-            assertEquals(listOf(R.string.keyboard_nine, R.string.t9_english_typing).map(::s) + nine, section()!!.take(5))
+            assertEquals(listOf(R.string.keyboard_nine, R.string.t9_english_typing).map(::s) + nine, section()!!.take(4))
             // what pinyin's page set
             assertEquals(s(T9MultiTap.entries.last().stringRes), listed(R.string.t9_multi_tap).entry.toString())
             capture("english_nine_keys")
-            // 双拼: its nine keys, the long-press symbols alone
+            // 双拼: its nine keys' letters and taps its scheme's, its long press on 按键字符和快捷键: no section
             im(c.SHUANGPIN)
-            assertEquals(null, section())
             choose(R.string.shuangpin_keyboard, ShuangpinKeyboard.NineKeys.name)
             idle()
-            assertEquals(listOf(R.string.keyboard_nine, R.string.t9_symbols).map(::s), section())
-            capture("shuangpin_nine_keys")
+            assertEquals(null, section())
         } finally {
             keyboard.pinyinKeyboard.setValue(keyboard.pinyinKeyboard.defaultValue)
             keyboard.shuangpinKeyboard.setValue(keyboard.shuangpinKeyboard.defaultValue)

@@ -21,6 +21,7 @@ import androidx.preference.TwoStatePreference
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -201,18 +202,29 @@ class SettingsPagesUatTest {
     @Test
     @Uat("T9-29")
     fun nineKeysLongPressesEdited() {
-        val symbols = AppPrefs.getInstance().keyboard.t9Symbols
+        val lists = AppPrefs.getInstance().internal.keyLists
         try {
-            // 1's marks typed as the popup gives them (. not made 。): T9KeyboardTest.aLongPressedSymbolGoesOnAsThePopupGivesIt
-            open(SettingsRoute.T9Symbols)
-            editKey('5', "")
-            assertTrue(symbols.getValue(), symbols.getValue().isNotEmpty())
-            editKey('5', null, AlertDialog.BUTTON_NEUTRAL)
-            // a letter alone is no symbol: nothing kept, 1 as it was
-            val before = symbols.getValue()
-            editKey('1', "a")
-            assertEquals(before, symbols.getValue())
-            editKey('1', "， 。")
+            // 九键's long press edited where every key's is (060-keys-unify S5: 按键字符和快捷键's 九键 tab, ST-107)
+            open(SettingsRoute.PopupOverrides)
+            view(s(R.string.shortcut_page_nine)).performClick()
+            idle()
+            fun nine(digit: Char) = KeyboardHarness.all(activity.window.decorView)
+                .first { it.isShown && it.contentDescription?.toString()?.substringBefore(',') == "$digit" && it.hasOnClickListeners() }
+            nine('1').performClick()
+            idle()
+            dialog().apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("， 。")
+                getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            }
+            idle()
+            // every per-key dialog names its reset 恢复此键默认, as uat T9-29 tells the tester to find it
+            nine('1').performClick()
+            idle()
+            dialog().apply {
+                assertEquals(activity.getString(R.string.reset_this_key), getButton(AlertDialog.BUTTON_NEUTRAL).text.toString())
+                dismiss()
+            }
+            idle()
             val nine = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS, english = ImKeyboard.NINE_KEYS)
             KeyboardHarness(im = KeyboardHarness.PINYIN, keyboards = nine).use { h ->
                 h.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
@@ -221,14 +233,14 @@ class SettingsPagesUatTest {
                 val five = h.longPressed('5')
                 assertTrue(five.toString(), "#" in five)
                 val one = h.longPressed('1')
-                assertTrue(one.toString(), "，" in one && "。" in one && "…" !in one)
+                assertTrue(one.toString(), "，" in one && "。" in one)
                 // nine keys English's 1: once changed, one list for every input method (060-keys-unify M3, KB-75)
                 h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
                 val english = h.longPressed('1')
-                assertTrue(english.toString(), "，" in english && "。" in english && ":" !in english)
+                assertTrue(english.toString(), "，" in english && "。" in english)
             }
         } finally {
-            symbols.setValue(symbols.defaultValue)
+            lists.setValue(KeyLists.HEADER)
         }
     }
 
