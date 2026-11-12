@@ -890,8 +890,9 @@ abstract class BaseKeyboard(
         // do nothing by default
     }
 
-    // what the punctuation keys type now: a long press's items shown as typed (keyState)
-    private var keysPunctuation: Map<String, String> = emptyMap()
+    // what the punctuation keys type now: a long press's items shown as typed (keyState), 九键 1's taps typed so
+    protected var keysPunctuation: Map<String, String> = emptyMap()
+        private set
 
     @CallSuper
     // the keys' long presses, corners and bubbles show what they type: as the punctuation maps it now, drawn again

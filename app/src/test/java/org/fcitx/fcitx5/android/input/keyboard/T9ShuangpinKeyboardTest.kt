@@ -47,7 +47,7 @@ class T9ShuangpinKeyboardTest {
     fun theDigitKeysShowTheStandardLettersAndOneMicrosoftsSemicolon() {
         fun alts(semicolon: Boolean) = T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true, semicolon = semicolon).flatten()
             .mapNotNull { it.appearance as? KeyDef.Appearance.AltText }
-        assertEquals(listOf("，。？！", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"), alts(true).map { it.displayText })
+        assertEquals(listOf(",.?!", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"), alts(true).map { it.displayText })
         // 1's ; beside its digit under 微软's alone
         assertEquals("1;", alts(true).first().altText)
         assertEquals("1", alts(false).first().altText)
@@ -64,11 +64,14 @@ class T9ShuangpinKeyboardTest {
         assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 20L, composing = true, semicolon = false))
     }
 
+    // Chinese punctuation on: 1's , as it maps it
+    private val zh = mapOf("," to "，")
+
     @Test
     fun oneIsTheSeparatorWhileTypingElsePunctuation() {
         val tap = MultiTap(0)
         assertEquals(KeyAction.HostKeyAction("'"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = true, semicolon = false))
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = false, semicolon = false))
+        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = false, semicolon = false, marks = zh))
     }
 
     // 微软's: 1 while typing is ;'s code, the engine reading it as ing or the separator; else punctuation as ever
@@ -77,7 +80,7 @@ class T9ShuangpinKeyboardTest {
         val tap = MultiTap(0)
         val one = KeyAction.HostKeyAction("1")
         assertEquals(code(NineKeyLetters.NINE_SP_SEMICOLON), T9Keyboard.resolveShuangpin(one, keys, tap, 0L, composing = true, semicolon = true))
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(one, keys, tap, 0L, composing = false, semicolon = true))
+        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolveShuangpin(one, keys, tap, 0L, composing = false, semicolon = true, marks = zh))
     }
 
     @Test

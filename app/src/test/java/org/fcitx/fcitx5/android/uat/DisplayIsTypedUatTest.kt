@@ -169,6 +169,29 @@ class DisplayIsTypedUatTest {
         }
     }
 
+    // what pops up is what the keyboard resolved: on each board, its first named key with a long press, held for real
+    @Test
+    @Uat("KB-83")
+    fun aHeldKeysPopupIsTheResolvers() {
+        var compared = 0
+        for (board in boards) {
+            val h = harness(board.im, board.chosen, zh, board.inputType)
+            board.open(h)
+            h.idle()
+            // the board laid over the rest (emoji search's covers the panel's bottom row, still shown under it)
+            val b = h.shownBoards().last()
+            val found = h.keys(b).asSequence().filterIsInstance<SceneShownKey>().filter { it.copy == 0 }.mapNotNull { k ->
+                val ref = b.sceneKey(k.node)?.ref?.id ?: return@mapNotNull null
+                b.resolvedKeys.popup(ref)?.keyboard?.labels?.takeIf { it.isNotEmpty() }?.let { k to it }
+            }.firstOrNull() ?: continue
+            val (k, labels) = found
+            assertEquals("${board.name} ${k.id}", labels.sorted(), h.longPress(k).sorted())
+            compared++
+        }
+        // the number pad, the symbol panel, the expanded candidates and emoji search's letters have none
+        assertTrue("$compared", compared >= boards.size - 4)
+    }
+
     // toggled with the keyboard up: the corner, the bubble and the long press as it now types
     @Test
     @Uat("KB-83")

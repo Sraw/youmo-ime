@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
@@ -83,7 +84,7 @@ class NineKeyLettersFragment : KeyCapsPageFragment() {
 
     private fun key(ctx: Context, digit: Char, current: NineKeyLetters): View {
         // 1 types punctuation, not letters: drawn as on the keyboard, not set here
-        if (digit == '1') return KeyCaps.key(ctx, T9Keyboard.ONE, "1", marked = false, dimmed = true).apply { isClickable = false }
+        if (digit == '1') return KeyCaps.key(ctx, T9Keyboard.oneLabel(PunctuationStartKeys.known.orEmpty()), "1", marked = false, dimmed = true).apply { isClickable = false }
         val shown = current.letters(digit)
         val edited = shown != NineKeyLetters.STANDARD.letters(digit)
         val state = getString(R.string.edited_x, digit.toString()).takeIf { edited }

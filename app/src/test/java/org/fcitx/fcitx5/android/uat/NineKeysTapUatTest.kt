@@ -14,7 +14,9 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
@@ -55,6 +57,16 @@ class NineKeysTapUatTest {
         it.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
         it.api.enabledIme = it.api.availableIme
     }.start(inputType)
+
+    // fcitx's Chinese punctuation on, as its addon tells it: 1 types ，。？！
+    private fun KeyboardHarness.chinese() = apply {
+        val zh = ChinesePunctuation.map
+        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+        api.statusAreaCached = active
+        api.punctuationCached = zh
+        emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, zh))
+        idle()
+    }
 
     @After
     fun close() {
@@ -98,7 +110,7 @@ class NineKeysTapUatTest {
     @Uat("T9-19")
     fun withMultiTapOnOnesPunctuationCyclesAndAQuickSecondDigitIsItsLetter() {
         prefs.set(AppPrefs.getInstance().keyboard.t9MultiTap, T9MultiTap.Medium)
-        val h = harness()
+        val h = harness().chinese()
         h.presses("11", QUICK)
         assertEquals("。", h.text)
         h.clear()
@@ -120,7 +132,7 @@ class NineKeysTapUatTest {
     @Uat("T9-24")
     fun multiTapOffByDefaultOneIsACommaEachPress() {
         assertEquals(T9MultiTap.Off, AppPrefs.getInstance().keyboard.t9MultiTap.getValue())
-        val h = harness()
+        val h = harness().chinese()
         h.presses("11", FAST)
         assertEquals("，，", h.text)
         h.clear()
@@ -133,8 +145,9 @@ class NineKeysTapUatTest {
     fun englishsOneWithNothingTypedCyclesItsMarks() {
         val h = harness()
         h.english()
+        // pinyin's , . ? ! (用户 2026-11-11), as English's punctuation (none mapped) types them
         h.presses("11", FAST)
-        assertEquals(",", h.text)
+        assertEquals(".", h.text)
         assertTrue(h.sent().toString(), h.sent().isEmpty())
     }
 

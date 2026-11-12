@@ -94,7 +94,10 @@ object Shots {
                 on("qwerty") { it.copy(input = it.input.copy(ime = "shuangpin", schemeTypes = setOf("semicolon"))) },
             ),
             Shot("qwerty-caps-lock", "qwerty", on("qwerty") { it.copy(shift = Shift.Lock) }),
-            Shot("nine-english-shifted", "nine", on("nine") { it.copy(input = it.input.copy(ime = "english"), shift = Shift.Once) }),
+            // English maps no punctuation (as the app has it): 1's face , . ? ! as it types
+            Shot("nine-english-shifted", "nine", on("nine") {
+                it.copy(input = it.input.copy(ime = "english"), shift = Shift.Once, texts = it.texts.copy(punctuation = emptyMap()))
+            }),
             Shot("nine-composing", "nine", on("nine") { it.copy(input = it.input.copy(composing = true)) }),
             Shot(
                 "k18-shuangpin-semicolon", "k18",

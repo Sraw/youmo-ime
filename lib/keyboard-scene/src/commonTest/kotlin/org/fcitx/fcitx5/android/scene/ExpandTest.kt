@@ -92,16 +92,17 @@ class ExpandTest {
     fun theFirstVariantThatHoldsIsLaidOver() {
         val l = LayoutReader.layout(
             "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
-                "<row><key id=\"one\" label=\"，。？！\" text-size=\"16\" alt=\"1\">" +
+                "<row><key id=\"one\" label=\"{punct:,.?!}\" text-size=\"16\" alt=\"1\">" +
                 "<variant when=\"composing ime=english\" label=\"'\"/><variant when=\"composing\" label=\"分词\"/>" +
-                "<variant when=\"ime=english\" label=\".,?!\"/></key></row></keyboard>",
+                "</key></row></keyboard>",
         ).ok()
         fun one(e: Env) = Expand.rows(l, emptyMap(), e).ok().single().items.single() as ExpandedKey
-        assertEquals("，。？！", one(env).label)
+        val zh = mapOf("," to "，", "." to "。", "?" to "？", "!" to "！")
+        assertEquals("，。？！", one(env.copy(texts = env.texts.copy(punctuation = zh))).label, "each as punctuation maps it")
+        assertEquals(",.?!", one(env).label, "none mapped: as written")
         assertEquals("分词", one(env.copy(input = Input(composing = true))).label)
         assertEquals(16.0, one(env.copy(input = Input(composing = true))).attrs.textSize, "the rest the key's")
         assertEquals("1", one(env.copy(input = Input(composing = true))).alt)
-        assertEquals(".,?!", one(env.copy(input = Input(ime = "english"))).label)
         assertEquals("'", one(env.copy(input = Input(ime = "english", composing = true))).label, "the first that holds")
     }
 

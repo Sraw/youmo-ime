@@ -1,55 +1,55 @@
-faces: [1=，。？！/1, 2=ABC/2, 3=DEF/3, backspace=/null, 4=GHI/4, 5=JKL/5, 6=MNO/6, reset=重输/null, 7=PQRS/7, 8=TUV/8, 9=WXYZ/9, 0=0/null, symbols=符/null, numbers=123/null, space=Shuangpin/null, lang=/null, enter=/null]
-1 said: ，。？！, 1
+faces: [1=,.?!/1, 2=ABC/2, 3=DEF/3, backspace=/null, 4=GHI/4, 5=JKL/5, 6=MNO/6, reset=重输/null, 7=PQRS/7, 8=TUV/8, 9=WXYZ/9, 0=0/null, symbols=符/null, numbers=123/null, space=Shuangpin/null, lang=/null, enter=/null]
+1 said: ,.?!, 1
 1 pressed: []
-1 tap: [] field ，
-1 down: [] field ，，
+1 tap: [] field ,
+1 down: [] field ,,
 1 long press: [\, -, @, ", ., ;, ^, :, ~, 1]
-1 long press: [sendKey(sym=65457, states=536870912, code=0, up=false)] field ，，
+1 long press: [sendKey(sym=65457, states=536870912, code=0, up=false)] field ,,
 2 said: ABC, 2
 2 pressed: [ABC]
-2 tap: [sendKey(sym=16840948, states=536870912, code=0, up=false)] field ，，
-2 down: [] field ，，
+2 tap: [sendKey(sym=16840948, states=536870912, code=0, up=false)] field ,,
+2 down: [] field ,,
 2 long press: [", @, !, c, a, B, 2, A, C, b]
-2 long press: [sendKey(sym=65458, states=536870912, code=0, up=false)] field ，，
+2 long press: [sendKey(sym=65458, states=536870912, code=0, up=false)] field ,,
 3 said: DEF, 3
 3 pressed: [DEF]
-3 tap: [sendKey(sym=16840949, states=536870912, code=0, up=false)] field ，，
-3 down: [sendKey(sym=16840949, states=536870912, code=0, up=false)] field ，，
+3 tap: [sendKey(sym=16840949, states=536870912, code=0, up=false)] field ,,
+3 down: [sendKey(sym=16840949, states=536870912, code=0, up=false)] field ,,
 3 long press: [+, -, f, e, d, E, 3, D, F]
-3 long press: [sendKey(sym=65459, states=536870912, code=0, up=false)] field ，，
+3 long press: [sendKey(sym=65459, states=536870912, code=0, up=false)] field ,,
 4 said: GHI, 4
 4 pressed: [GHI]
-4 tap: [sendKey(sym=16840950, states=536870912, code=0, up=false)] field ，，
-4 down: [sendKey(sym=16840950, states=536870912, code=0, up=false)] field ，，
+4 tap: [sendKey(sym=16840950, states=536870912, code=0, up=false)] field ,,
+4 down: [sendKey(sym=16840950, states=536870912, code=0, up=false)] field ,,
 4 long press: [=, /, g, H, 4, G, I, h, i]
-4 long press: [sendKey(sym=65460, states=536870912, code=0, up=false)] field ，，
+4 long press: [sendKey(sym=65460, states=536870912, code=0, up=false)] field ,,
 5 said: JKL, 5
 5 pressed: [JKL]
-5 tap: [sendKey(sym=16840951, states=536870912, code=0, up=false)] field ，，
-5 down: [sendKey(sym=16840951, states=536870912, code=0, up=false)] field ，，
+5 tap: [sendKey(sym=16840951, states=536870912, code=0, up=false)] field ,,
+5 down: [sendKey(sym=16840951, states=536870912, code=0, up=false)] field ,,
 5 long press: [), #, (, l, j, K, 5, J, L, k]
-5 long press: [sendKey(sym=65461, states=536870912, code=0, up=false)] field ，，
+5 long press: [sendKey(sym=65461, states=536870912, code=0, up=false)] field ,,
 6 said: MNO, 6
 6 pressed: [MNO]
-6 tap: [sendKey(sym=16840952, states=536870912, code=0, up=false)] field ，，
-6 down: [sendKey(sym=16840952, states=536870912, code=0, up=false)] field ，，
+6 tap: [sendKey(sym=16840952, states=536870912, code=0, up=false)] field ,,
+6 down: [sendKey(sym=16840952, states=536870912, code=0, up=false)] field ,,
 6 long press: [\, ~, o, n, m, N, 6, M, O]
-6 long press: [sendKey(sym=65462, states=536870912, code=0, up=false)] field ，，
+6 long press: [sendKey(sym=65462, states=536870912, code=0, up=false)] field ,,
 7 said: PQRS, 7
 7 pressed: [PQRS]
-7 tap: [sendKey(sym=16840953, states=536870912, code=0, up=false)] field ，，
-7 down: [sendKey(sym=16840953, states=536870912, code=0, up=false)] field ，，
+7 tap: [sendKey(sym=16840953, states=536870912, code=0, up=false)] field ,,
+7 down: [sendKey(sym=16840953, states=536870912, code=0, up=false)] field ,,
 7 long press: [*, S, Q, 7, P, R, p, q, r, s]
-7 long press: [sendKey(sym=65463, states=536870912, code=0, up=false)] field ，，
+7 long press: [sendKey(sym=65463, states=536870912, code=0, up=false)] field ,,
 8 said: TUV, 8
 8 pressed: [TUV]
-8 tap: [sendKey(sym=16840954, states=536870912, code=0, up=false)] field ，，
-8 down: [] field ，，，，
+8 tap: [sendKey(sym=16840954, states=536870912, code=0, up=false)] field ,,
+8 down: [] field ,,,,
 8 long press: [?, v, t, U, 8, T, V, u]
-8 long press: [sendKey(sym=65464, states=536870912, code=0, up=false)] field ，，，，
+8 long press: [sendKey(sym=65464, states=536870912, code=0, up=false)] field ,,,,
 9 said: WXYZ, 9
 9 pressed: [WXYZ]
-9 tap: [sendKey(sym=16840955, states=536870912, code=0, up=false)] field ，，，，
+9 tap: [sendKey(sym=16840955, states=536870912, code=0, up=false)] field ,,,,
 9 down: [] field 
 9 long press: [:, ', z, y, x, w, Z, X, 9, W, Y]
 9 long press: [sendKey(sym=65465, states=536870912, code=0, up=false)] field 

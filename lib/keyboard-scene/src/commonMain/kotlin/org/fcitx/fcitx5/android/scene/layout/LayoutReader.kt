@@ -365,7 +365,7 @@ object LayoutReader {
     private val SHORTCUT = Regex("([a-z0-9-]+/)?\\S{1,32}")
     private val BINDING = Regex("\\{([a-z-]+)(?::([^{}]*))?\\}")
     private val LETTER_ARG = Regex("[a-z;,./'?!~-]")
-    private val PUNCT_ARG = Regex("[^\\s{}]")
+    private val PUNCT_ARG = Regex("[^\\s{}]{1,4}")
     private val ON_OFF = listOf("on", "off")
     private val POPUP_FROM = listOf("preset", "list", "none", "nine", "group")
     private val NUMBER_ARG = Regex("[0-9]{1,2}")

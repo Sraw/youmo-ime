@@ -121,13 +121,14 @@ class T9KeyboardTest {
         val tap = MultiTap(600)
         val keys = KeyActionListener.Source.Keyboard
         val one = KeyAction.HostKeyAction("1")
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolve(one, keys, tap, 0, composing = false))
-        assertEquals(KeyAction.CommitAction("。", replacing = "，"), T9Keyboard.resolve(one, keys, tap, 100, composing = false))
-        assertEquals(KeyAction.CommitAction("？", replacing = "。"), T9Keyboard.resolve(one, keys, tap, 200, composing = false))
-        assertEquals(KeyAction.CommitAction("！", replacing = "？"), T9Keyboard.resolve(one, keys, tap, 300, composing = false))
-        assertEquals(KeyAction.CommitAction("，", replacing = "！"), T9Keyboard.resolve(one, keys, tap, 400, composing = false))
-        // after a pause, a ， of its own
-        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolve(one, keys, tap, 2000, composing = false))
+        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolve(one, keys, tap, 0, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction("。", replacing = "，"), T9Keyboard.resolve(one, keys, tap, 100, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction("？", replacing = "。"), T9Keyboard.resolve(one, keys, tap, 200, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction("！", replacing = "？"), T9Keyboard.resolve(one, keys, tap, 300, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction("，", replacing = "！"), T9Keyboard.resolve(one, keys, tap, 400, composing = false, marks = ZH))
+        // after a pause, a ， of its own; Chinese punctuation off, , as it is
+        assertEquals(KeyAction.CommitAction("，"), T9Keyboard.resolve(one, keys, tap, 2000, composing = false, marks = ZH))
+        assertEquals(KeyAction.CommitAction(","), T9Keyboard.resolve(one, keys, tap, 4000, composing = false))
         // while typing, the separator the engine reads
         assertEquals(one, T9Keyboard.resolve(one, keys, tap, 2100, composing = true))
     }
@@ -283,6 +284,8 @@ class T9KeyboardTest {
             setViewTreeLifecycleOwner(Owner())
             keyActionListener = KeyActionListener { action, _ -> sent += action }
             popupActionListener = PopupActionListener { previews += it }
+            // Chinese punctuation on: 1 types ，。？！
+            onPunctuationUpdate(ZH)
         }
     }
 
@@ -430,14 +433,19 @@ class T9KeyboardTest {
 
     @Test
     @Config(application = FcitxApplication::class)
-    fun englishOneWithNothingTypedIsItsMarksInTurn() {
+    fun englishOneWithNothingTypedIsPinyinsMarksInTurn() {
         val tap = MultiTap(600)
         val one = KeyAction.HostKeyAction("1")
-        fun press(time: Long) = T9Keyboard.resolveEnglish(one, KeyActionListener.Source.Keyboard, tap, time, composing = false, spells = true, upper = false)
-        assertEquals(KeyAction.CommitAction("."), press(0))
-        assertEquals(KeyAction.CommitAction(",", replacing = "."), press(100))
-        assertEquals(KeyAction.CommitAction("?", replacing = ","), press(200))
-        assertEquals(KeyAction.CommitAction("."), press(2000))
+        fun press(time: Long, marks: Map<String, String> = emptyMap()) =
+            T9Keyboard.resolveEnglish(one, KeyActionListener.Source.Keyboard, tap, time, composing = false, spells = true, upper = false, marks = marks)
+        // 用户 2026-11-11: , . ? ! as pinyin's, no ' or - (the long presses have them)
+        assertEquals(KeyAction.CommitAction(","), press(0))
+        assertEquals(KeyAction.CommitAction(".", replacing = ","), press(100))
+        assertEquals(KeyAction.CommitAction("?", replacing = "."), press(200))
+        assertEquals(KeyAction.CommitAction("!", replacing = "?"), press(300))
+        assertEquals(KeyAction.CommitAction(",", replacing = "!"), press(400))
+        // as the punctuation maps them, whatever the map
+        assertEquals(KeyAction.CommitAction("，"), press(2000, ZH))
     }
 
     @Test
@@ -574,5 +582,10 @@ class T9KeyboardTest {
         } finally {
             EngineState.syllablesState.value = EngineState.SyllableState()
         }
+    }
+
+    private companion object {
+        // Chinese punctuation's map of 1's marks
+        val ZH = mapOf("," to "，", "." to "。", "?" to "？", "!" to "！")
     }
 }

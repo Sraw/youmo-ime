@@ -10,10 +10,9 @@
   <defaults kind="letter" text-size="20" width="22"/>
   <row>
     <slot id="side" kind="nine-side" width="16" rows="3" look="function" face="keep"/>
-    <key id="1" label="，。？！" text-size="16" alt="1" preview="off" send="1" swipe-up="keypad:1" shortcut="t9/1">
+    <key id="1" label="{punct:,.?!}" text-size="16" alt="1" preview="off" send="1" swipe-up="keypad:1" shortcut="t9/1">
       <!-- 1 键随输入中变（T9Keyboard.kt:672,683-687）：第一个成立的 variant 盖上去 -->
       <variant when="ime=english composing" label="'"/>
-      <variant when="ime=english" label=".,?!"/>
       <variant when="scheme-types=semicolon composing" label="分词" alt="1;"/>
       <variant when="scheme-types=semicolon" alt="1;"/>
       <variant when="composing" label="分词"/>

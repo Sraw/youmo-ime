@@ -149,11 +149,12 @@ class ShuangpinKeysUatTest {
     fun theNineKeysOneIsPunctuationWithNothingTypedTheSeparatorWhileTyping() {
         val h = harness(ShuangpinKeyboard.NineKeys)
         h.tap(h.nineKey("1"))
-        assertEquals("，", h.field.text.toString())
+        // as the punctuation maps it: none here (KeysEverywhereUatTest has Chinese's ，)
+        assertEquals(",", h.field.text.toString())
         // while typing it is the separator, sent to the engine (ShuangpinUatTest has what it does there)
         h.typedWo()
         h.tap(h.nineKey("1"))
-        assertEquals("，", h.field.text.toString())
+        assertEquals(",", h.field.text.toString())
         assertTrue(h.api.calls.toString(), h.api.calls.last().startsWith("sendKey(key=', "))
     }
 }

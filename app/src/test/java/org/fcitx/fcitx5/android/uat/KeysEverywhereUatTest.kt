@@ -9,7 +9,9 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -17,6 +19,8 @@ import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
+import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.keyboard.ZhuyinKeyboard
 import org.fcitx.fcitx5.android.input.keys.First
 import org.fcitx.fcitx5.android.input.keys.KeyLists
@@ -77,7 +81,7 @@ class KeysEverywhereUatTest {
     }
 
     // ，'s list as Chinese punctuation shows it, its first (。) under the finger as it opens
-    private val zh = mapOf("." to "。", "," to "，", "?" to "？", "!" to "！", ":" to "：", ";" to "；", "\"" to "“", "'" to "‘", "(" to "（", ")" to "）", "~" to "～")
+    private val zh = ChinesePunctuation.map
 
     // held: the popup's items and the one focused as it opens (let go there: it is typed)
     private fun KeyboardHarness.held(key: ShownKey): Pair<List<String>, String?> {
@@ -183,6 +187,24 @@ class KeysEverywhereUatTest {
         assertTrue(h.sent().toString(), "key=Q," in h.sent().last())
     }
 
+    // narrow (one-handed): the popup's rows more, a first in the symbols above still focused as it opens and typed
+    @Test
+    @Uat("KB-75")
+    fun heldAndLetGoTypesTheFirstOnANarrowKeyboard() {
+        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Left)
+        val lists = mapOf(
+            KeyId("t9/1") to UserList(false, listOf("^", ":", ";", "~", ".", "-", "@", "\\", "\""), First.Literal("@")),
+            KeyId("t9/5") to UserList(false, listOf("#", "(", ")", "/", "%"), First.Literal("/")),
+        )
+        prefs.set(internal.keyLists, KeyLists.of(lists).serialize())
+        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)
+        for ((digit, first) in listOf("1" to "@", "5" to "/")) {
+            h.api.calls.clear()
+            assertEquals(digit, first, h.held(h.nineKey(digit)).second)
+            assertTrue(h.sent().toString(), "key=$first," in h.sent().last())
+        }
+    }
+
     @Test
     @Uat("KB-76")
     fun nineKeysOneThroughThePunctuationEverywhereAndSharedOnceEdited() {
@@ -203,6 +225,30 @@ class KeysEverywhereUatTest {
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("t9/1") to UserList(false, listOf(".", "@")))).serialize())
         h = harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS))
         assertEquals(listOf(".", "1", "@"), h.longPress(h.nineKey("1")).sorted())
+    }
+
+    @Test
+    @Uat("KB-76")
+    fun nineKeysOnesTapCyclesThePunctuationAsItMapsInBothLanguages() {
+        // 用户 2026-11-11: English's 1 as pinyin's (no ' or -: the long presses have them), each as the punctuation
+        // maps it, its face as it types
+        prefs.set(AppPrefs.getInstance().keyboard.t9MultiTap, T9MultiTap.Medium)
+        fun KeyboardHarness.cycle(): List<String> = List(5) {
+            tap(nineKey("1"))
+            // within 连按's time (中, 0.6 s): the next of the run
+            advance(150)
+            field.text.toString()
+        }
+        var h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS, punctuation = zh)
+        assertEquals("，。？！", h.nineKey("1").label)
+        assertEquals(listOf("，", "。", "？", "！", "，"), h.cycle())
+        // Chinese punctuation off: as they are, as English's
+        h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS, punctuation = emptyMap())
+        assertEquals(",.?!", h.nineKey("1").label)
+        assertEquals(listOf(",", ".", "?", "!", ","), h.cycle())
+        h = harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS))
+        assertEquals(",.?!", h.nineKey("1").label)
+        assertEquals(listOf(",", ".", "?", "!", ","), h.cycle())
     }
 
     @Test

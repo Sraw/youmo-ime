@@ -4,7 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.keys
 
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
+import org.fcitx.fcitx5.android.scene.keys.Commit
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -100,6 +103,25 @@ class KeyListsMigrationTest {
         assertEquals(listOf("&", "~"), l[KeyId("t9/6")]?.symbols)
         // 7's as built in
         assertTrue(KeyId("t9/7") !in l.lists)
+    }
+
+    // 九键 1 (用户 2026-11-11): its default now the one list through the punctuation; 0.5's default (full width, as is)
+    // is none of the user's, wherever it is stored
+    @Test
+    fun nineOneNoneButWhatTheUserSet() {
+        val one = KeyId("t9/1")
+        val old = "… ： ； ~ . - @ 、 “ ”"
+        assertTrue(one !in lists(t9 = "").lists)
+        assertTrue(one !in lists(t9 = "1 $old").lists)
+        val set = lists(t9 = "1 . ,")
+        assertEquals(UserList(false, listOf(".", ",")), set[one])
+        // and typed as the punctuation maps it, as every key's symbols
+        val popup = KeyResolver(KeyboardVariant(KeyboardVariant.Form.Nine), set, SwipeSlots.Default, emptyList())
+            .resolve(one, KeyState()).popup as KeyPopup.Items
+        assertEquals(listOf(".", ","), popup.items.map { it.text }.filter { it in setOf(".", ",") })
+        assertTrue(popup.items.toString(), popup.items.filter { it.text in setOf(".", ",") }.all { it.commit == Commit.AsKey })
+        // beta2's by its name: kept as the user's (its editor stored a key only when saved), 0.5's default or not
+        assertEquals(UserList(false, old.split(' ')), lists(named = "t9/1 1 $old")[one])
     }
 
     @Test

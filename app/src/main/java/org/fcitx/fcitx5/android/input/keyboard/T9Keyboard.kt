@@ -77,7 +77,8 @@ import splitties.views.dsl.core.add
  * Pinyin on nine keys (九键), laid out as 搜狗 does: a column on the left offering what the first
  * digits not yet taken may be (the engine's [EngineState.syllables] of 九键), or punctuation while
  * nothing is typed; 1 is the separator (分词) while something is typed, else punctuation
- * (，。？！, with 连按 on pressed again soon the next in place of the last, as a digit key's letters; its long
+ * (, . ? ! as punctuation maps them, ，。？！ with Chinese punctuation on, English's too; with 连按 on pressed again
+ * soon the next in place of the last, as a digit key's letters; its long
  * press more); backspace, start over (重输) and 0 on the right; symbols, numbers, space, the
  * language switch and return below. Swiping a digit key, 1 too, types the digit itself (picks its
  * candidate while typing, as the number keyboard's digits do).
@@ -157,20 +158,25 @@ class T9Keyboard(
         /** Shown in the column while nothing is typed, committed as they are. */
         private val PUNCTUATION = listOf("，", "。", "？", "！", "…", "、", "：", "~", "@")
 
-        /** What 1 types while nothing is typed: the first, pressed again soon the next in its place. */
-        internal const val ONE = "，。？！"
+        /**
+         * What 1 types while nothing is typed: the first, pressed again soon the next in its place; each as punctuation
+         * maps it ([marked]), as its face shows them (nine.xml's `{punct:,.?!}`): ，。？！ with Chinese punctuation on,
+         * , . ? ! in English or with it off (用户 2026-11-11: English's 1 as pinyin's, its ' and - on the long presses).
+         */
+        internal const val ONE = ",.?!"
+
+        /** [ONE] as [marks] (the punctuation's map now) type it, the first to the last. */
+        internal fun oneLabel(marks: Map<String, String>) = ONE.map { marked(it, marks) }.joinToString("")
+
+        private fun marked(c: Char, marks: Map<String, String>) = c.toString().let { marks[it] ?: it }
 
         /** The column's for English: typed through it, which puts a word's space behind them. */
         private val ENGLISH_PUNCTUATION = listOf(",", ".", "?", "!", "'", "-", ":", ";", "@")
 
-        /** What 1 types for English while nothing is typed, as [ONE]. */
-        internal const val ENGLISH_ONE = ".,?!'-"
-
         // 1's long press in English: the marks a word wants besides the column's and 1's own
         internal val ENGLISH_ONE_SYMBOLS = listOf(":", ";", "\"", "(", ")", "@", "&", "/", "*", "~")
 
-        // 1's label for English, and while a word is typed, what it then types
-        private const val ENGLISH_ONE_LABEL = ".,?!"
+        // what 1 types while an English word is typed
         private const val APOSTROPHE = "'"
 
         /** How soon English's 连按 takes a key pressed again as its next letter, 连按选字母 being off. */
@@ -224,11 +230,12 @@ class T9Keyboard(
             time: Long,
             composing: Boolean,
             semicolon: Boolean,
+            marks: Map<String, String> = emptyMap(),
         ): KeyAction {
             val key = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull()
             if (source == KeyActionListener.Source.Popup || key == null || key !in '1'..'9') return resolve(action, source, tap, time, composing)
             if (key == '1') {
-                if (!composing) return resolve(action, source, tap, time, composing = false)
+                if (!composing) return resolve(action, source, tap, time, composing = false, marks = marks)
                 tap.reset()
                 if (semicolon) return KeyAction.SymAction(KeySym(UNICODE + NineKeyLetters.NINE_SP_SEMICOLON.code), KeyStates.Virtual)
                 // the engine's 双拼 separates with ', a digit being no key of it
@@ -303,7 +310,7 @@ class T9Keyboard(
         /**
          * What [action] from [source] types: a digit key's press [MultiTap] reads at [time]
          * through [letters]; a letter or digit of its long press committed as it is; 1, while nothing is [composing],
-         * punctuation ([ONE]); anything else resets [tap] and types as it is: a symbol of 1 to 9's
+         * punctuation ([ONE] as [marks] map it); anything else resets [tap] and types as it is: a symbol of 1 to 9's
          * long press goes to the engine as the full keyboard's do (the first candidate, then the
          * mark Chinese punctuation maps it to, quotes in turn, brackets paired; 用户 2026-11-11: 1's too).
          */
@@ -314,14 +321,11 @@ class T9Keyboard(
             time: Long,
             composing: Boolean = false,
             letters: NineKeyLetters = NineKeyLetters.STANDARD,
+            marks: Map<String, String> = emptyMap(),
         ): KeyAction {
             val key = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull()
-            if (key == '1' && source != KeyActionListener.Source.Popup && !composing) {
-                // as a digit key's letters: pressed again soon, the next in place of the last
-                val next = tap.press(key, ONE, time) ?: return KeyAction.CommitAction(ONE.take(1))
-                val last = ONE[(ONE.indexOf(next) + ONE.length - 1) % ONE.length]
-                return KeyAction.CommitAction(next.toString(), replacing = last.toString())
-            }
+            // as a digit key's letters: pressed again soon, the next in place of the last
+            if (key == '1' && source != KeyActionListener.Source.Popup && !composing) return one(tap, time, marks)
             asIs(key, source)?.let {
                 tap.reset()
                 return chosen(it)
@@ -354,8 +358,7 @@ class T9Keyboard(
          * press is the key ([Keyboard.nineKey], a capital if [upper]); else a letter at a time,
          * committed, pressed again soon ([tap]) the next in place of the last, in the case
          * [runUpper] the run started in. A letter or digit of a long press is committed as it is (as
-         * [resolve] has it); 1 while [composing] is an apostrophe in the word, else
-         * English's marks ([ENGLISH_ONE]) as [ONE] is.
+         * [resolve] has it); 1 while [composing] is an apostrophe in the word, else [ONE] as [resolve] has it.
          */
         internal fun resolveEnglish(
             action: KeyAction,
@@ -367,14 +370,13 @@ class T9Keyboard(
             upper: Boolean,
             runUpper: Boolean = upper,
             letters: NineKeyLetters = NineKeyLetters.STANDARD,
+            marks: Map<String, String> = emptyMap(),
         ): KeyAction {
             val key = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull()
             if (key == '1' && source != KeyActionListener.Source.Popup) {
-                if (composing) {
-                    tap.reset()
-                    return KeyAction.HostKeyAction(APOSTROPHE)
-                }
-                return cycled(tap.press(key, ENGLISH_ONE, time), ENGLISH_ONE) { it.toString() }
+                if (!composing) return one(tap, time, marks)
+                tap.reset()
+                return KeyAction.HostKeyAction(APOSTROPHE)
             }
             asIs(key, source)?.let {
                 tap.reset()
@@ -398,6 +400,9 @@ class T9Keyboard(
             val next = tap.press(key, keyLetters, time)
             return cycled(next, keyLetters) { cased(it, if (next == null) upper else runUpper) }
         }
+
+        // 1's [ONE], pressed again soon the next in place of the last, each as [marks] map it
+        private fun one(tap: MultiTap, time: Long, marks: Map<String, String>) = cycled(tap.press('1', ONE, time), ONE) { marked(it, marks) }
 
         // the first of [run] committed for no [next], else [next] in place of the one before it
         private fun cycled(next: Char?, run: String, text: (Char) -> String): KeyAction.CommitAction {
@@ -449,7 +454,7 @@ class T9Keyboard(
             listOf(
                 spacer(SIDE_KEY),
                 KeyDef(
-                    KeyDef.Appearance.AltText(displayText = if (english) ENGLISH_ONE_LABEL else ONE, altText = oneAlt, textSize = 16f, percentWidth = DIGIT),
+                    KeyDef.Appearance.AltText(displayText = ONE, altText = oneAlt, textSize = 16f, percentWidth = DIGIT),
                     setOf(
                         KeyDef.Behavior.Press(KeyAction.HostKeyAction("1")),
                         KeyDef.Behavior.Swipe(keypad('1')),
@@ -710,7 +715,12 @@ class T9Keyboard(
         val time = pressed?.takeIf { it.digit == key }?.time ?: SystemClock.uptimeMillis()
         pressed = null
         if (english) return onEnglish(action, source, time)
-        val out = if (shuangpin) resolveShuangpin(action, source, multiTap, time, typing, semicolon) else resolve(action, source, multiTap, time, typing, letters)
+        val marks = keysPunctuation
+        val out = if (shuangpin) {
+            resolveShuangpin(action, source, multiTap, time, typing, semicolon, marks)
+        } else {
+            resolve(action, source, multiTap, time, typing, letters, marks)
+        }
         // a key the engine reads as typing: 1 right after it is the separator, though the engine
         // has not told of what is typed yet
         if (isTypingKey(out)) typing = true
@@ -733,7 +743,7 @@ class T9Keyboard(
             address = address != AddressKeys.NONE,
             noSuggestions = noSuggestions,
         )
-        val out = resolveEnglish(action, source, multiTap, time, typing, spells, shift.upper, runUpper, letters)
+        val out = resolveEnglish(action, source, multiTap, time, typing, spells, shift.upper, runUpper, letters, keysPunctuation)
         if (startsLetter(out)) {
             runUpper = shift.typed()
             canvas?.invalidateScene()
@@ -849,6 +859,8 @@ class T9Keyboard(
             nineLetters = ('2'..'9').associate { d -> d.toString() to lettersOn(d, letters, english, shuangpin).let { if (english && shift.upper) it.uppercase() else it } },
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
+            // 1's face ({punct:,.?!}) as it types
+            punctuation = keysPunctuation,
         )
         val caps = when {
             !english -> Shift.None

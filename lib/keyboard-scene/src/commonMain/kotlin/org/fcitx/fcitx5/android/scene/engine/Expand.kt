@@ -187,7 +187,8 @@ object Expand {
             // a 14/18 键 key's letters: capitals with no Shift to follow, unless the setting says otherwise
             "group" -> LetterCaseRule.shown(arg, LetterCaseRule.upper(texts.letterCase, env.shift, shiftless = true))
             "alt" -> texts.alts?.get(arg).orEmpty()
-            "punct" -> texts.punctuation[arg] ?: arg
+            // each character as punctuation maps it: 九键 1's run `,.?!` as it types
+            "punct" -> arg.map { c -> c.toString().let { texts.punctuation[it] ?: it } }.joinToString("")
             "comma" -> texts.comma
             "period" -> texts.period
             "ime-name" -> texts.imeName

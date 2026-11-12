@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -65,7 +66,7 @@ class PanelKeysUatTest {
 
     private val written = "你好"
 
-    private val zh = mapOf("." to "。", "," to "，", "?" to "？", "!" to "！", ":" to "：", ";" to "；", "\"" to "“", "'" to "‘", "(" to "（", ")" to "）", "~" to "～")
+    private val zh = ChinesePunctuation.map
 
     private fun harness(inputType: Int = InputType.TYPE_CLASS_TEXT): KeyboardHarness {
         made?.close()

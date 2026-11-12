@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keys
 
+import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.input.scene.SceneData
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.Parsed
@@ -51,7 +52,7 @@ class KeyResolverGoldenTest {
         Board("theme-k18", "../../web/theme-maker/examples/k17-motion/layouts/k18", KeyboardVariant(Form.Grouped18)),
     )
 
-    private val zh = mapOf("." to "。", "," to "，", "?" to "？", "!" to "！", ":" to "：", ";" to "；", "\"" to "“", "'" to "‘", "(" to "（", ")" to "）", "~" to "～")
+    private val zh = ChinesePunctuation.map
 
     private fun states(b: Board): List<Pair<String, KeyState>> = listOf("default" to KeyState(), "zh" to KeyState(punctuation = zh)) +
         if (b.variant.form == Form.Full) listOf("shift" to KeyState(caps = true), "roots" to KeyState(roots = { "R$it" })) else emptyList()

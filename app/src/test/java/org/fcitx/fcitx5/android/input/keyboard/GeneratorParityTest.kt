@@ -43,9 +43,6 @@ class GeneratorParityTest {
         }
     }
 
-    // 九键 1: none now, the old one's (as is, English's its own) no longer the defaults (用户 2026-11-11: one list,
-    // through the punctuation); its old view's goes in S6
-
     @Test
     fun theGroups() {
         val shapes = listOf(NineKeyLetters.G14 to GroupedKeyboard.CORNERS, NineKeyLetters.G18 to GroupedKeyboard.CORNERS18)

@@ -68,11 +68,11 @@ full/j	pinyin-full	zh	| # J	#	s:#	-
 full/j	pinyin-full	shift	| # j	#	s:#	-
 full/j	pinyin-full	roots	roots:Rj	#	s:j	-
 full/k	pinyin-full	default	| ( K [ {	(	s:(	-
-full/k	pinyin-full	zh	| （ K [ {	（	s:（	-
+full/k	pinyin-full	zh	| （ K 【 {	（	s:（	-
 full/k	pinyin-full	shift	| ( k [ {	(	s:(	-
 full/k	pinyin-full	roots	roots:Rk	(	s:k	-
 full/l	pinyin-full	default	| ) L ] } ł ;	)	s:)	-
-full/l	pinyin-full	zh	| ） L ] } ł ；	）	s:）	-
+full/l	pinyin-full	zh	| ） L 】 } ł ；	）	s:）	-
 full/l	pinyin-full	shift	| ) l ] } Ł	)	s:)	-
 full/l	pinyin-full	roots	roots:Rl	)	s:l	-
 fn/shift	pinyin-full	default	-	-	-	-
@@ -104,7 +104,7 @@ full/n	pinyin-full	zh	| ～ N ñ ń	～	s:～	-
 full/n	pinyin-full	shift	| ~ n Ñ Ń	~	s:~	-
 full/n	pinyin-full	roots	roots:Rn	~	s:n	-
 full/m	pinyin-full	default	| \ M	\	s:\	-
-full/m	pinyin-full	zh	| \ M	\	s:\	-
+full/m	pinyin-full	zh	| 、 M	、	s:、	-
 full/m	pinyin-full	shift	| \ m	\	s:\	-
 full/m	pinyin-full	roots	roots:Rm	\	s:m	-
 fn/backspace	pinyin-full	default	-	-	i:delete-sweep	i:restore
@@ -128,7 +128,7 @@ fn/space	pinyin-full	zh	-	-	i:cursor-move	-
 fn/space	pinyin-full	shift	-	-	i:cursor-move	-
 fn/space	pinyin-full	roots	-	-	i:cursor-move	-
 fn/period	pinyin-full	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	pinyin-full	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	pinyin-full	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/period	pinyin-full	shift	| , ? ! : ; _ % $ ^ &	,	-	-
 fn/period	pinyin-full	roots	| , ? ! : ; _ % $ ^ &	,	-	-
 fn/lang	pinyin-full	default	-	-	-	-
@@ -208,11 +208,11 @@ full/j	english-full	zh	| # J	#	s:#	-
 full/j	english-full	shift	| # j	#	s:#	-
 full/j	english-full	roots	roots:Rj	#	s:j	-
 full/k	english-full	default	| ( K [ {	(	s:(	-
-full/k	english-full	zh	| （ K [ {	（	s:（	-
+full/k	english-full	zh	| （ K 【 {	（	s:（	-
 full/k	english-full	shift	| ( k [ {	(	s:(	-
 full/k	english-full	roots	roots:Rk	(	s:k	-
 full/l	english-full	default	| ) L ] } ł ;	)	s:)	-
-full/l	english-full	zh	| ） L ] } ł ；	）	s:）	-
+full/l	english-full	zh	| ） L 】 } ł ；	）	s:）	-
 full/l	english-full	shift	| ) l ] } Ł	)	s:)	-
 full/l	english-full	roots	roots:Rl	)	s:l	-
 fn/shift	english-full	default	-	-	-	-
@@ -244,7 +244,7 @@ full/n	english-full	zh	| ～ N ñ ń	～	s:～	-
 full/n	english-full	shift	| ~ n Ñ Ń	~	s:~	-
 full/n	english-full	roots	roots:Rn	~	s:n	-
 full/m	english-full	default	| \ M	\	s:\	-
-full/m	english-full	zh	| \ M	\	s:\	-
+full/m	english-full	zh	| 、 M	、	s:、	-
 full/m	english-full	shift	| \ m	\	s:\	-
 full/m	english-full	roots	roots:Rm	\	s:m	-
 fn/backspace	english-full	default	-	-	i:delete-sweep	i:restore
@@ -268,7 +268,7 @@ fn/space	english-full	zh	-	-	i:cursor-move	-
 fn/space	english-full	shift	-	-	i:cursor-move	-
 fn/space	english-full	roots	-	-	i:cursor-move	-
 fn/period	english-full	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	english-full	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	english-full	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/period	english-full	shift	| , ? ! : ; _ % $ ^ &	,	-	-
 fn/period	english-full	roots	| , ? ! : ; _ % $ ^ &	,	-	-
 fn/lang	english-full	default	-	-	-	-
@@ -280,7 +280,7 @@ fn/return	english-full	zh	-	-	-	-
 fn/return	english-full	shift	-	-	-	-
 fn/return	english-full	roots	-	-	-	-
 t9/1	pinyin-nine	default	1# | ^ : ; ~ . - @ \ "	1#	s:1	-
-t9/1	pinyin-nine	zh	1# | ^ ： ； ～ 。 - @ \ “	1#	s:1	-
+t9/1	pinyin-nine	zh	1# | …… ： ； ～ 。 - @ 、 “	1#	s:1	-
 t9/2	pinyin-nine	default	A B C 2# a b c | @ ! "	2#	s:2	i:content-copy
 t9/2	pinyin-nine	zh	A B C 2# a b c | @ ！ “	2#	s:2	i:content-copy
 t9/3	pinyin-nine	default	D E F 3# d e f | + -	3#	s:3	-
@@ -292,7 +292,7 @@ t9/4	pinyin-nine	zh	G H I 4# g h i | = /	4#	s:4	-
 t9/5	pinyin-nine	default	J K L 5# j k l | # ( )	5#	s:5	-
 t9/5	pinyin-nine	zh	J K L 5# j k l | # （ ）	5#	s:5	-
 t9/6	pinyin-nine	default	M N O 6# m n o | \ ~	6#	s:6	-
-t9/6	pinyin-nine	zh	M N O 6# m n o | \ ～	6#	s:6	-
+t9/6	pinyin-nine	zh	M N O 6# m n o | 、 ～	6#	s:6	-
 fn/retype	pinyin-nine	default	-	-	-	-
 fn/retype	pinyin-nine	zh	-	-	-	-
 fn/shift	pinyin-nine	default	-	-	-	-
@@ -316,7 +316,7 @@ fn/lang	pinyin-nine	zh	-	-	-	-
 fn/return	pinyin-nine	default	-	-	-	-
 fn/return	pinyin-nine	zh	-	-	-	-
 t9/1	shuangpin-nine	default	1# | ^ : ; ~ . - @ \ "	1#	s:1	-
-t9/1	shuangpin-nine	zh	1# | ^ ： ； ～ 。 - @ \ “	1#	s:1	-
+t9/1	shuangpin-nine	zh	1# | …… ： ； ～ 。 - @ 、 “	1#	s:1	-
 t9/2	shuangpin-nine	default	A B C 2# a b c | @ ! "	2#	s:2	i:content-copy
 t9/2	shuangpin-nine	zh	A B C 2# a b c | @ ！ “	2#	s:2	i:content-copy
 t9/3	shuangpin-nine	default	D E F 3# d e f | + -	3#	s:3	-
@@ -328,7 +328,7 @@ t9/4	shuangpin-nine	zh	G H I 4# g h i | = /	4#	s:4	-
 t9/5	shuangpin-nine	default	J K L 5# j k l | # ( )	5#	s:5	-
 t9/5	shuangpin-nine	zh	J K L 5# j k l | # （ ）	5#	s:5	-
 t9/6	shuangpin-nine	default	M N O 6# m n o | \ ~	6#	s:6	-
-t9/6	shuangpin-nine	zh	M N O 6# m n o | \ ～	6#	s:6	-
+t9/6	shuangpin-nine	zh	M N O 6# m n o | 、 ～	6#	s:6	-
 fn/retype	shuangpin-nine	default	-	-	-	-
 fn/retype	shuangpin-nine	zh	-	-	-	-
 fn/shift	shuangpin-nine	default	-	-	-	-
@@ -352,7 +352,7 @@ fn/lang	shuangpin-nine	zh	-	-	-	-
 fn/return	shuangpin-nine	default	-	-	-	-
 fn/return	shuangpin-nine	zh	-	-	-	-
 t9/1	english-nine	default	1# | ^ : ; ~ . - @ \ "	1#	s:1	-
-t9/1	english-nine	zh	1# | ^ ： ； ～ 。 - @ \ “	1#	s:1	-
+t9/1	english-nine	zh	1# | …… ： ； ～ 。 - @ 、 “	1#	s:1	-
 t9/2	english-nine	default	A B C 2# a b c | @ ! "	2#	s:2	i:content-copy
 t9/2	english-nine	zh	A B C 2# a b c | @ ！ “	2#	s:2	i:content-copy
 t9/3	english-nine	default	D E F 3# d e f | + -	3#	s:3	-
@@ -364,7 +364,7 @@ t9/4	english-nine	zh	G H I 4# g h i | = /	4#	s:4	-
 t9/5	english-nine	default	J K L 5# j k l | # ( )	5#	s:5	-
 t9/5	english-nine	zh	J K L 5# j k l | # （ ）	5#	s:5	-
 t9/6	english-nine	default	M N O 6# m n o | \ ~	6#	s:6	-
-t9/6	english-nine	zh	M N O 6# m n o | \ ～	6#	s:6	-
+t9/6	english-nine	zh	M N O 6# m n o | 、 ～	6#	s:6	-
 fn/retype	english-nine	default	-	-	-	-
 fn/retype	english-nine	zh	-	-	-	-
 fn/shift	english-nine	default	-	-	-	-
@@ -404,9 +404,9 @@ g14/df	pinyin-14	zh	D F 7# d f | + -	7#	s:7	-
 g14/gh	pinyin-14	default	G H 8# g h | = /	8#	s:8	-
 g14/gh	pinyin-14	zh	G H 8# g h | = /	8#	s:8	-
 g14/jk	pinyin-14	default	J K 9# j k | # ( [ {	9#	s:9	-
-g14/jk	pinyin-14	zh	J K 9# j k | # （ [ {	9#	s:9	-
+g14/jk	pinyin-14	zh	J K 9# j k | # （ 【 {	9#	s:9	-
 g14/l	pinyin-14	default	L 0# l | ) ] } ;	0#	s:0	-
-g14/l	pinyin-14	zh	L 0# l | ） ] } ；	0#	s:0	-
+g14/l	pinyin-14	zh	L 0# l | ） 】 } ；	0#	s:0	-
 fn/separator	pinyin-14	default	-	-	-	-
 fn/separator	pinyin-14	zh	-	-	-	-
 g14/zx	pinyin-14	default	Z X ~ z x | ' ` : ×	~	s:~	i:undo
@@ -416,7 +416,7 @@ g14/cv	pinyin-14	zh	C V ！ c v | “ ？ ¿	！	s:！	i:content-paste
 g14/bn	pinyin-14	default	B N @ b n | ! ¡ ~	@	s:@	-
 g14/bn	pinyin-14	zh	B N @ b n | ！ ¡ ～	@	s:@	-
 g14/m	pinyin-14	default	M ? m | \	?	s:?	-
-g14/m	pinyin-14	zh	M ？ m | \	？	s:？	-
+g14/m	pinyin-14	zh	M ？ m | 、	？	s:？	-
 fn/backspace	pinyin-14	default	-	-	i:delete-sweep	i:restore
 fn/backspace	pinyin-14	zh	-	-	i:delete-sweep	i:restore
 fn/symbols	pinyin-14	default	-	-	-	-
@@ -428,7 +428,7 @@ fn/comma	pinyin-14	zh	| 。 ？ ！ ： ； “ ‘ （ ） ～	。	-	-
 fn/space	pinyin-14	default	-	-	i:cursor-move	-
 fn/space	pinyin-14	zh	-	-	i:cursor-move	-
 fn/period	pinyin-14	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	pinyin-14	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	pinyin-14	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/lang	pinyin-14	default	-	-	-	-
 fn/lang	pinyin-14	zh	-	-	-	-
 fn/return	pinyin-14	default	-	-	-	-
@@ -456,9 +456,9 @@ g18/fg	pinyin-18	zh	F G 0# f g | - =	0#	s:0	-
 g18/h	pinyin-18	default	H ( h | /	(	s:(	-
 g18/h	pinyin-18	zh	H （ h | /	（	s:（	-
 g18/jk	pinyin-18	default	J K ) j k | # ( [ {	)	s:)	-
-g18/jk	pinyin-18	zh	J K ） j k | # （ [ {	）	s:）	-
+g18/jk	pinyin-18	zh	J K ） j k | # （ 【 {	）	s:）	-
 g18/l	pinyin-18	default	L - l | ) ] } ;	-	s:-	-
-g18/l	pinyin-18	zh	L - l | ） ] } ；	-	s:-	-
+g18/l	pinyin-18	zh	L - l | ） 】 } ；	-	s:-	-
 fn/separator	pinyin-18	default	-	-	-	-
 fn/separator	pinyin-18	zh	-	-	-	-
 g18/z	pinyin-18	default	Z ~ z | ' `	~	s:~	i:undo
@@ -470,7 +470,7 @@ g18/v	pinyin-18	zh	V @ v | ？ ¿	@	s:@	i:content-paste
 g18/bn	pinyin-18	default	B N ? b n | ! ¡ ~	?	s:?	-
 g18/bn	pinyin-18	zh	B N ？ b n | ！ ¡ ～	？	s:？	-
 g18/m	pinyin-18	default	M : m | \	:	s::	-
-g18/m	pinyin-18	zh	M ： m | \	：	s:：	-
+g18/m	pinyin-18	zh	M ： m | 、	：	s:：	-
 fn/backspace	pinyin-18	default	-	-	i:delete-sweep	i:restore
 fn/backspace	pinyin-18	zh	-	-	i:delete-sweep	i:restore
 fn/symbols	pinyin-18	default	-	-	-	-
@@ -482,7 +482,7 @@ fn/comma	pinyin-18	zh	| 。 ？ ！ ： ； “ ‘ （ ） ～	。	-	-
 fn/space	pinyin-18	default	-	-	i:cursor-move	-
 fn/space	pinyin-18	zh	-	-	i:cursor-move	-
 fn/period	pinyin-18	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	pinyin-18	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	pinyin-18	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/lang	pinyin-18	default	-	-	-	-
 fn/lang	pinyin-18	zh	-	-	-	-
 fn/return	pinyin-18	default	-	-	-	-
@@ -510,9 +510,9 @@ g18/fg	shuangpin-18-ms	zh	F G 0# f g | - =	0#	s:0	-
 g18/h	shuangpin-18-ms	default	H ( h | /	(	s:(	-
 g18/h	shuangpin-18-ms	zh	H （ h | /	（	s:（	-
 g18/jk	shuangpin-18-ms	default	J K ) j k | # ( [ {	)	s:)	-
-g18/jk	shuangpin-18-ms	zh	J K ） j k | # （ [ {	）	s:）	-
+g18/jk	shuangpin-18-ms	zh	J K ） j k | # （ 【 {	）	s:）	-
 g18/l	shuangpin-18-ms	default	L : - l ; | ) ] }	-	s:-	-
-g18/l	shuangpin-18-ms	zh	L ： - l ； | ） ] }	-	s:-	-
+g18/l	shuangpin-18-ms	zh	L ： - l ； | ） 】 }	-	s:-	-
 fn/separator	shuangpin-18-ms	default	-	-	-	-
 fn/separator	shuangpin-18-ms	zh	-	-	-	-
 g18/z	shuangpin-18-ms	default	Z ~ z | ' `	~	s:~	i:undo
@@ -524,7 +524,7 @@ g18/v	shuangpin-18-ms	zh	V @ v | ？ ¿	@	s:@	i:content-paste
 g18/bn	shuangpin-18-ms	default	B N ? b n | ! ¡ ~	?	s:?	-
 g18/bn	shuangpin-18-ms	zh	B N ？ b n | ！ ¡ ～	？	s:？	-
 g18/m	shuangpin-18-ms	default	M : m | \	:	s::	-
-g18/m	shuangpin-18-ms	zh	M ： m | \	：	s:：	-
+g18/m	shuangpin-18-ms	zh	M ： m | 、	：	s:：	-
 fn/backspace	shuangpin-18-ms	default	-	-	i:delete-sweep	i:restore
 fn/backspace	shuangpin-18-ms	zh	-	-	i:delete-sweep	i:restore
 fn/symbols	shuangpin-18-ms	default	-	-	-	-
@@ -536,7 +536,7 @@ fn/comma	shuangpin-18-ms	zh	| 。 ？ ！ ： ； “ ‘ （ ） ～	。	-	-
 fn/space	shuangpin-18-ms	default	-	-	i:cursor-move	-
 fn/space	shuangpin-18-ms	zh	-	-	i:cursor-move	-
 fn/period	shuangpin-18-ms	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	shuangpin-18-ms	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	shuangpin-18-ms	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/lang	shuangpin-18-ms	default	-	-	-	-
 fn/lang	shuangpin-18-ms	zh	-	-	-	-
 fn/return	shuangpin-18-ms	default	-	-	-	-
@@ -634,7 +634,7 @@ fn/comma	zhuyin-full	zh	| 。 ？ ！ ： ； “ ‘ （ ） ～	。	-	-
 fn/space	zhuyin-full	default	-	-	i:cursor-move	-
 fn/space	zhuyin-full	zh	-	-	i:cursor-move	-
 fn/period	zhuyin-full	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	zhuyin-full	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	zhuyin-full	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/lang	zhuyin-full	default	-	-	-	-
 fn/lang	zhuyin-full	zh	-	-	-	-
 fn/return	zhuyin-full	default	-	-	-	-
@@ -686,7 +686,7 @@ fn/numbers	zhuyin-nine	zh	-	-	-	-
 fn/space	zhuyin-nine	default	-	-	i:cursor-move	-
 fn/space	zhuyin-nine	zh	-	-	i:cursor-move	-
 fn/period	zhuyin-nine	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	zhuyin-nine	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	zhuyin-nine	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/lang	zhuyin-nine	default	-	-	-	-
 fn/lang	zhuyin-nine	zh	-	-	-	-
 fn/return	zhuyin-nine	default	-	-	-	-
@@ -696,7 +696,7 @@ fn/backspace	handwriting	zh	-	-	i:delete-sweep	i:restore
 fn/comma	handwriting	default	| . ? ! : ; " ' ( ) ~	.	-	-
 fn/comma	handwriting	zh	| 。 ？ ！ ： ； “ ‘ （ ） ～	。	-	-
 fn/period	handwriting	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	handwriting	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	handwriting	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/symbols	handwriting	default	-	-	-	-
 fn/symbols	handwriting	zh	-	-	-	-
 fn/numbers	handwriting	default	-	-	-	-
@@ -746,7 +746,7 @@ fn/return	symbols	zh	-	-	-	-
 fn/space	emoji	default	-	-	i:cursor-move	-
 fn/space	emoji	zh	-	-	i:cursor-move	-
 fn/period	emoji	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	emoji	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	emoji	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/backspace	emoji	default	-	-	i:delete-sweep	i:restore
 fn/backspace	emoji	zh	-	-	i:delete-sweep	i:restore
 fn/return	emoji	default	-	-	-	-
@@ -756,7 +756,7 @@ fn/comma	emoticon	zh	| 。 ？ ！ ： ； “ ‘ （ ） ～	。	-	-
 fn/space	emoticon	default	-	-	i:cursor-move	-
 fn/space	emoticon	zh	-	-	i:cursor-move	-
 fn/period	emoticon	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	emoticon	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	emoticon	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/backspace	emoticon	default	-	-	i:delete-sweep	i:restore
 fn/backspace	emoticon	zh	-	-	i:delete-sweep	i:restore
 fn/return	emoticon	default	-	-	-	-
@@ -788,9 +788,9 @@ g18/sd	theme-k18	zh	S D 9# s d | * +	9#	s:9	-
 g18/fg	theme-k18	default	F G 0# f g | - =	0#	s:0	-
 g18/fg	theme-k18	zh	F G 0# f g | - =	0#	s:0	-
 g18/h	theme-k18	default	H J K ( h j k | / # [ {	(	s:(	-
-g18/h	theme-k18	zh	H J K （ h j k | / # [ {	（	s:（	-
+g18/h	theme-k18	zh	H J K （ h j k | / # 【 {	（	s:（	-
 g18/l	theme-k18	default	L - l | ) ] } ;	-	s:-	-
-g18/l	theme-k18	zh	L - l | ） ] } ；	-	s:-	-
+g18/l	theme-k18	zh	L - l | ） 】 } ；	-	s:-	-
 fn/separator	theme-k18	default	-	-	-	-
 fn/separator	theme-k18	zh	-	-	-	-
 g18/z	theme-k18	default	Z ~ z | ' `	~	s:~	i:undo
@@ -802,7 +802,7 @@ g18/v	theme-k18	zh	V @ v | ？ ¿	@	s:@	i:content-paste
 g18/bn	theme-k18	default	B N ? b n | ! ¡ ~	?	s:?	-
 g18/bn	theme-k18	zh	B N ？ b n | ！ ¡ ～	？	s:？	-
 g18/m	theme-k18	default	M : m | \	:	s::	-
-g18/m	theme-k18	zh	M ： m | \	：	s:：	-
+g18/m	theme-k18	zh	M ： m | 、	：	s:：	-
 fn/backspace	theme-k18	default	-	-	i:delete-sweep	i:restore
 fn/backspace	theme-k18	zh	-	-	i:delete-sweep	i:restore
 fn/symbols	theme-k18	default	-	-	-	-
@@ -814,7 +814,7 @@ fn/comma	theme-k18	zh	| 。 ？ ！ ： ； “ ‘ （ ） ～	。	-	-
 fn/space	theme-k18	default	-	-	i:cursor-move	-
 fn/space	theme-k18	zh	-	-	i:cursor-move	-
 fn/period	theme-k18	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	theme-k18	zh	| ， ？ ！ ： ； _ % $ ^ &	，	-	-
+fn/period	theme-k18	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
 fn/lang	theme-k18	default	-	-	-	-
 fn/lang	theme-k18	zh	-	-	-	-
 fn/return	theme-k18	default	-	-	-	-
