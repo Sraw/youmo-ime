@@ -1,0 +1,4 @@
+{"app": "0.6.0", "packs": [
+  {"pack": "text", "version": 1, "format": 1, "file": "youmo-text-v1.youmopack", "size": 311318870, "sha256": "a4179b79e51aa5a0192ed2cccff75a496439b6ec9b31136d0f3f25e988920c77", "contentSha256": "8bf36ceaa9166b8f278da33fdc116a57503c692c89e161e3ec85ff97924cc958", "changed": true},
+  {"pack": "voice", "version": 2, "format": 1, "file": "youmo-voice-v2.youmopack", "size": 184647313, "sha256": "2532fb906a2f8da902820c2506d11caf5ed55e680b44ed640eadf059ee4dafc0", "contentSha256": "d93b287b153dd0c5c3be2eed489c68c5c8ca13730ea1dfa848e276c8dee5effb", "changed": true}
+]}
