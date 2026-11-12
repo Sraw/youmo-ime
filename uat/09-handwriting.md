@@ -195,5 +195,5 @@
 ### HW-39 [P0] 手写的 ，。 与其它键盘相同
 - **前提**：手写键盘，中文标点。
 - **操作**：长按 ，；长按 。；在 ， 上横着划一下。
-- **预期**：， 弹出 KB-73 的列表；。 弹出与全键盘 。 相同的列表（`, ? ! : ; _ % $ ^ &`，按中文标点显示）；横划进书写板写字，不打标点。
-- **JVM**：app `HandwritingSceneGesturesTest.commaPeriodAsEverywhere`。
+- **预期**：， 弹出 KB-73 的列表；。 弹出与全键盘 。 相同的列表（`, ? ! : ; _ % $ ^ &`，按中文标点显示）；从它们横着划进书写板既不打标点，也不写字（上滑、下滑没设时滑一下等于点一下）。
+- **JVM**：app `KeysEverywhereUatTest.handwritingsCommaAndFullStopAreEveryKeyboards`、`HandwritingSceneGesturesTest.commaAndFullStopSwipedAreTappedAndAStrokeOffThemIsNothing`。

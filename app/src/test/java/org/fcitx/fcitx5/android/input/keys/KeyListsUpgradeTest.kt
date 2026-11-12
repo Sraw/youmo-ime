@@ -10,6 +10,7 @@ import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.dirsUnder
 import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.data.importedUserDataMarker
@@ -68,6 +69,7 @@ class KeyListsUpgradeTest {
     }
 
     @Test
+    @Uat("ST-108")
     fun v052sLongPressesMoveOverAndTheOldOnesStay() {
         sp.edit { v052() }
         val prefs = started()
@@ -82,6 +84,7 @@ class KeyListsUpgradeTest {
     }
 
     @Test
+    @Uat("ST-108")
     fun beta2sNamedListsMoveOverToo() {
         sp.edit { beta2() }
         started()
@@ -177,6 +180,7 @@ class KeyListsUpgradeTest {
 
     @Test
     @Config(application = FcitxApplication::class)
+    @Uat("ST-108")
     fun aBackupImportedIsMigratedAtTheStartAfterOr0_6sKept() {
         val old = imported("key-lists-052", mapOf(AppPrefs.POPUP_OVERRIDES to "q ! 1 Q\nw", AppPrefs.T9_SYMBOLS to "1 . ,"))
         val lists = KeyLists.parse(old.storedKeyLists())!!

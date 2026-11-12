@@ -376,6 +376,7 @@ class HandwritingSceneGesturesTest {
     // ，。 named (060-swipe-slots), so swiped: their two slots empty by default, a swipe up or down is a
     // tap; a stroke begun on one and drawn sideways into the pad types nothing, and writes nothing
     @Test
+    @Uat("HW-39")
     fun commaAndFullStopSwipedAreTappedAndAStrokeOffThemIsNothing() = harness().use { h ->
         fun sent() = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }.map { it.substringBefore(", states") }
             .also { h.api.calls.clear() }

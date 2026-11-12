@@ -124,3 +124,15 @@ def pan23(d):
     check(n is not None, f"颜文字里找不到 {long}")
     d.shot("kb", "颜文字长字")
     return f"框里「{t}」，表情和颜文字格子见图"
+
+
+case("PAN-25", needs="jvm:PanelKeysUatTest.slotsAndMarks")(lambda d: None)
+
+
+case("PAN-26", needs="jvm:PanelKeysUatTest.punctuationLongPress")(lambda d: None)
+
+
+case("PAN-27", needs="jvm:PanelKeysUatTest.aPasswordIsNotCopiedFromAPanel")(lambda d: None)
+
+
+case("PAN-28", needs="jvm:PanelKeysUatTest.actionLongPressesEverywhere、PanelKeysUatTest.numberPadsSpaceHeldAsTheLetters")(lambda d: None)

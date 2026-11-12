@@ -1197,6 +1197,101 @@ def page_key(d, label):
     return n
 
 
+def slots_tab(d, tab):
+    """the 按键字符和快捷键 page on its tab [tab] (全键盘 … 功能键): the row of tabs scrolls sideways"""
+    slots_page(d)
+    for _ in range(3):
+        s = d.screen()
+        n = next((n for n in s.app() if n.cls.endswith("RadioButton") and n.text == tab), None)
+        if n:
+            d.tap(n.c, 1.5)
+            return
+        row = [n for n in s.app() if n.cls.endswith("RadioButton")]
+        if not row:
+            raise Blocked("按键字符和快捷键页上没有分页")
+        y = row[0].c[1]
+        d.swipe((row[-1].c[0], y), (row[0].c[0], y), 300, after=0.8)
+    raise Blocked(f"按键字符和快捷键页上没有「{tab}」页")
+
+
+def key_dialog(d, label):
+    """a key of the page tapped (found by the first part of what a screen reader says of it): its dialog up"""
+    s = d.screen()
+    # by prefix, not page_key's split at commas: the comma key reads 「，键, .」
+    n = next((n for n in s.app() if n.clickable and (n.desc == label or n.desc.startswith(label + ","))), None)
+    if not n:
+        raise Blocked(f"页上没有 {label} 键：{[n.desc for n in s.app() if n.clickable and n.desc][:12]}")
+    d.tap(n.c, 0.5)
+    return d.wait(lambda s: s.find(text="设为首选"), 5, what=f"{label} 的对话框")
+
+
+def dialog_add(d, text):
+    """添加 [text] (digits, typed on the keyboard's 123 page: adb's input text is a hardware keyboard's keys,
+    which turn the soft keyboard into its small 实体键盘 bar) to the open key dialog's list"""
+    s = d.screen()
+    e = next((n for n in s.app() if n.cls.endswith("EditText") and n.text in ("", "添加字符，空格分隔")), None)
+    if not e:
+        raise Blocked("对话框里没有添加字符的框")
+    d.tap(e.c, 0.8)
+    k = d.keys(refresh=True)
+    if "123" not in k:
+        raise Blocked(f"键盘上没有 123：{sorted(k)[:20]}")
+    d.tap(k["123"], 0.8)
+    d.type(text)
+    d.tap(d.screen().find(text="添加").c, 0.6)
+    d.sh("input keyevent 4")   # the keyboard down: 确定 under it
+    time.sleep(0.8)
+
+
+def dialog_pick(d, item):
+    """an item of the open dialog's list selected (by what it reads out)"""
+    s = d.screen()
+    n = next((n for n in s.app() if n.clickable and n.desc == item), None)
+    if not n:
+        raise Blocked(f"对话框的列表里没有 {item}")
+    d.tap(n.c, 0.4)
+
+
+def dialog_way(d, way, option):
+    """上滑 or 下滑's [option] (长按首选, 文字, 空) in the open dialog, scrolled to where it is"""
+    for _ in range(3):
+        s = d.screen()
+        heads = sorted((n for n in s.app() if n.text in ("上滑", "下滑") and not n.clickable), key=lambda n: n.b[1])
+        head = next((n for n in heads if n.text == way), None)
+        if head:
+            nxt = next((n for n in heads if n.b[1] > head.b[1]), None)
+            opts = [n for n in s.app() if n.text.startswith(option) and n.b[1] > head.b[1] and (not nxt or n.b[1] < nxt.b[1])]
+            if opts:
+                d.tap(min(opts, key=lambda n: n.b[1]).c, 0.4)
+                return
+        ok = s.find(text="确定")
+        x = (ok.c[0] if ok else 540) - 300
+        d.swipe((x, 1500), (x, 900), 400, after=0.8)
+    raise Blocked(f"对话框里找不到{way}的「{option}」")
+
+
+def dialog_text(d, way, pinyin, word):
+    """上滑 or 下滑 set to the text [word], typed as [pinyin] and picked from the candidates"""
+    dialog_way(d, way, "文字")
+    s = d.screen()
+    picked = next((n for n in s.app() if n.text == "文字" and n.b[1] > 0), None)
+    eds = [n for n in s.app() if n.cls.endswith("EditText") and picked and n.b[1] > picked.b[1]]
+    if not eds:
+        raise Blocked(f"{way}的文字框不在屏上")
+    d.tap(min(eds, key=lambda n: n.b[1]).c, 0.8)
+    d.type(pinyin)
+    c = d.cands(want=word)
+    if word not in c:
+        raise Blocked(f"打 {pinyin} 候选里没有 {word}：{c[:5]}")
+    d.pick(word)
+    d.sh("input keyevent 4")
+    time.sleep(0.8)
+
+
+def dialog_ok(d):
+    d.tap(d.wait(lambda s: s.find(text="确定"), 5, what="确定").c, 1.5)
+
+
 @case("ST-97", base="B0-设置", mutates=True, visual=True)
 def st97(d):
     slots_page(d)
@@ -1292,9 +1387,164 @@ def st98(d):
 case("ST-99", needs="jvm:PopupOverridesFragmentTest$Dialog.selectedKeysAreSetAtOnce")(lambda d: None)
 
 
-case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress、PopupOverridesFragmentTest$Dialog.aListBackToTheOwnStoresNothingAndOneEmptiedStoresOff、OwnLongPressUatTest.everyKeysEditorStartIsWhatItsKeyboardPopsUp、OwnLongPressUatTest.aListEmptiedTurnsTheLongPressOff、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
+case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress、PopupOverridesFragmentTest$Dialog.aListBackToTheOwnStoresNothingAndOneEmptiedKeepsItsRow、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
 
 
 
 case("ST-103", needs="manual:逐个点新内置主题看键盘、动态背景、按键音，重启后解锁前看简蓝；列表与不能删由 BuiltinPacksTest 查")(lambda d: None)
 case("ST-102", needs="manual:要先装 0.6.0 测试版选 Nord/Deep Blue/Monokai 再覆盖安装；迁移由 ThemePrefsMigrationTest 查")(lambda d: None)
+
+
+case("ST-108", needs="jvm:KeyListsUpgradeTest.v052sLongPressesMoveOverAndTheOldOnesStay、KeyListsUpgradeTest.beta2sNamedListsMoveOverToo、KeyListsUpgradeTest.aBackupImportedIsMigratedAtTheStartAfterOr0_6sKept")(lambda d: None)
+
+
+case("ST-109", needs="jvm:PopupOverridesFragmentTest$Dialog.numberPage")(lambda d: None)
+
+
+@case("ST-107", base="B0-设置", mutates=True)
+def st107(d):
+    pinyin_keyboard(d, "九键")
+    rows = d.pref_rows()
+    titles = [t for t, _, _ in rows]
+    d.shot("full", "拼音的设置页：九键一栏只有连按选字母、按键字母")
+    check("连按选字母" in titles, f"拼音页没有连按选字母：{titles}")
+    held = [t for t, sm, _ in rows if "长按" in (t or "")]
+    check(not held, f"拼音页有改长按的入口：{held}")
+    slots_tab(d, "九键")
+    key_dialog(d, "5")
+    s = d.screen()
+    d.shot("full", "按键字符和快捷键的九键页：5 的对话框")
+    items = [n.desc for n in s.app() if n.clickable and n.desc and len(n.desc) <= 2]
+    check("#" in items, f"九键 5 的对话框里没有 #：{items}")
+    return f"拼音页 {len(titles)} 行无长按入口；九键页 5：{items[:10]}"
+
+
+THEME_NAMES = ("动态取色", "Material", "Pixel", "AMOLED 黑", "简蓝", "橙风", "素雅", "清心", "墨灰", "液态玻璃",
+               "霓虹赛博", "国风·天青", "机械键帽", "奶油", "护眼·纸色", "多巴胺")
+
+
+def theme_names(d, shots=None):
+    """the theme list's names top to bottom (the page scrolled through); a shot a screen with [shots]"""
+    seen = []
+    for i in range(14):
+        s = d.screen()
+        seen += [n.text for n in s.app() if n.text in THEME_NAMES + ("新增主题",) and n.text not in seen]
+        if shots:
+            d.shot("full", f"{shots} {i + 1}")
+        if not d.scroll(s):
+            break
+    return seen
+
+
+@case("ST-105", base="B0-设置", visual=True)
+def st105(d):
+    appearance_tab(d, "主题")
+    names = theme_names(d, "主题列表（竖屏）")
+    missing = [n for n in THEME_NAMES if n not in names]
+    check(not missing, f"列表里没有 {missing}：{names}")
+    d.rotate(1)
+    try:
+        appearance_tab(d, "主题")
+        land = theme_names(d, "主题列表（横屏）")
+    finally:
+        d.rotate(0)
+    check(not [n for n in THEME_NAMES if n not in land], f"横屏列表里少了：{[n for n in THEME_NAMES if n not in land]}")
+    return f"{len(names)} 个名字；横屏 {len(land)} 个"
+
+
+def pick_theme(d, name):
+    appearance_tab(d, "主题")
+    for _ in range(14):
+        s = d.screen()
+        n = s.find(text=name)
+        if n:
+            d.tap((n.c[0], n.b[1] - 120), 1.5)   # the card above its name
+            return
+        if not d.scroll(s):
+            break
+    raise Blocked(f"主题列表里没有 {name}")
+
+
+def key_style(d, title, option):
+    appearance_tab(d, "大小与样式")
+    choose(d, title, option)
+
+
+@case("ST-104", base="B0-设置", mutates=True, visual=True)
+def st104(d):
+    def gaps(note):
+        d.open_page("text")
+        v, h = key_gaps(d)
+        d.shot("kb", f"{note}：上下 {v:.0f} dp、左右 {h:.0f} dp")
+        return round(v), round(h)
+    pick_theme(d, "国风·天青")
+    own = gaps("天青，跟随主题")
+    key_style(d, "横向间距", "宽松")
+    key_style(d, "纵向间距", "紧凑")
+    set_ = gaps("天青，横向宽松、纵向紧凑")
+    key_style(d, "按键圆角", "直角")
+    d.open_page("text")
+    d.shot("kb", "天青，直角：所有键都是直角")
+    key_style(d, "按键圆角", "跟随主题")
+    key_style(d, "按键边框", "无边框")
+    d.open_page("text")
+    d.shot("kb", "天青，无边框：所有键（空格、回车在内）没有键面、描边、阴影")
+    key_style(d, "按键边框", "跟随主题")
+    pick_theme(d, "Material")
+    material = gaps("Material，横向宽松、纵向紧凑")
+    key_style(d, "横向间距", "跟随主题")
+    key_style(d, "纵向间距", "跟随主题")
+    pick_theme(d, "国风·天青")
+    back = gaps("天青，改回跟随主题")
+    pick_theme(d, "多巴胺")
+    key_style(d, "按键边框", "无边框")
+    d.open_page("text")
+    d.shot("kb", "多巴胺，无边框：上了色的那排字母键也没有键面")
+    check(abs(set_[0] - material[0]) <= 1 and abs(set_[1] - material[1]) <= 1,
+          f"选了档后天青的键缝 {set_} 和 Material 的 {material} 不同")
+    check(back == own, f"改回跟随主题后天青的键缝 {back}，原来 {own}")
+    check(own != set_, f"天青选档前后键缝都是 {own}")
+    return f"天青跟随 {own}，选档 {set_}，Material 同档 {material}，改回 {back}（上下, 左右 dp）"
+
+
+@case("ST-106", base="B0-设置", mutates=True, visual=True)
+def st106(d):
+    d.sh("wm density 480")
+    time.sleep(1.5)
+    home(d, "按键")
+    choose(d, "下滑图标位置", "底部")
+    appearance_tab(d, "大小与样式")
+    choose(d, "键盘高度", "紧凑")
+    d.open_page("text")
+    tb = script("05-toolbar")
+    tb.status_panel(d)
+    tb.ime(d, text="单手", contains=True, after=1.2)
+    slots_tab(d, "全键盘")
+    key_dialog(d, "j")
+    dialog_text(d, "下滑", "xianzaizenmeyangle", "现在怎么样了")
+    time.sleep(1.5)
+    s = d.screen()
+    note = [t for t in s.texts("all") if "画不下" in t or "显示为" in t]
+    d.shot("full", "j 的对话框：下滑段下说键上画成什么")
+    dialog_ok(d)
+    s = d.screen()
+    page = [t for t in s.texts("all") if t.startswith("j 下滑")]
+    d.shot("full", "页面键下面：j 下滑：……")
+    d.open_page("text")
+    d.shot("kb", "测试页 j 键上画的和说的一样")
+    d.rotate(1)
+    try:
+        d.open_page("text")
+        d.shot("kb", "横屏 j 键")
+    finally:
+        d.rotate(0)
+    slots_tab(d, "全键盘")
+    key_dialog(d, "j")
+    dialog_text(d, "下滑", "hao", "好")
+    time.sleep(1.5)
+    gone = [t for t in d.screen().texts("all") if "画不下" in t]
+    dialog_ok(d)
+    check(note, "下滑段下没有说键上画成什么")
+    check(page and note and page[0].split("：", 1)[-1] == note[0], f"页面键下面的说明 {page} 和对话框的 {note} 不同")
+    check(not gone, f"改成「好」后仍说 {gone}")
+    return f"对话框「{note[0]}」；页面「{page[0] if page else ''}」；改成好后不说"

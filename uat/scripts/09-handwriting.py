@@ -280,3 +280,6 @@ def hw38(d):
         d.clear()
         time.sleep(1.0)
     return f"n →「{p}」，w o →「{p2}」，空格后拖 h →「{f}」「{p3}」；" + "，".join(got)
+
+
+case("HW-39", needs="jvm:KeysEverywhereUatTest.handwritingsCommaAndFullStopAreEveryKeyboards、HandwritingSceneGesturesTest.commaAndFullStopSwipedAreTappedAndAStrokeOffThemIsNothing")(lambda d: None)

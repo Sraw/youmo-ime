@@ -1,7 +1,7 @@
 """uat/02-keyboard.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import case, check, choose, has, home
+from uat import case, check, choose, has, home, script
 
 
 @case("KB-01")
@@ -309,3 +309,166 @@ def kb71(d):
     d.shot("app", "快挪两行")
     check(two["focused"] and 0 < two["selStart"] <= first, f"快挪两行：{two['selStart']}（第一行是 1..{first}）")
     return f"上到 {top['selStart']}，下到 {end['selStart']}，焦点一直在多行框"
+
+
+# ---------------------------------------------------------------- 一个键一份长按（060-keys-unify）
+
+
+case("KB-73", needs="jvm:KeysEverywhereUatTest.commaIsOneKey")(lambda d: None)
+
+
+case("KB-74", needs="jvm:KeysEverywhereUatTest.commaEditedOnceEverywhere")(lambda d: None)
+
+
+case("KB-75", needs="jvm:KeysEverywhereUatTest.commaFirstDrawnAndTyped、KeysEverywhereUatTest.heldAndLetGoTypesTheFirst、KeysEverywhereUatTest.heldAndLetGoTypesTheFirstOnANarrowKeyboard")(lambda d: None)
+
+
+case("KB-76", needs="jvm:KeysEverywhereUatTest.nineKeysOneThroughThePunctuationEverywhereAndSharedOnceEdited、KeysEverywhereUatTest.nineKeysOnesTapCyclesThePunctuationAsItMapsInBothLanguages")(lambda d: None)
+
+
+case("KB-77", needs="jvm:KeysEverywhereUatTest.nineKeysFiveSymbolsSharedLettersByInputMethod")(lambda d: None)
+
+
+case("KB-78", needs="jvm:KeysEverywhereUatTest.zhuyinNinesToneAndSlot、KeysEverywhereUatTest.zhuyinNinesToneOff")(lambda d: None)
+
+
+case("KB-79", needs="jvm:KeysEverywhereUatTest.fourteenKeysQwFirstDrawnAndTyped")(lambda d: None)
+
+
+case("KB-82", needs="jvm:PanelKeysUatTest.aLayerOf32OnTheNarrowestOneHanded、PanelKeysUatTest.aLayerOf32Landscape")(lambda d: None)
+
+
+case("KB-83", needs="jvm:DisplayIsTypedUatTest.everyKeyShowsWhatItTypes、DisplayIsTypedUatTest.toggledWithTheKeyboardUp")(lambda d: None)
+
+
+def held(d, key):
+    """[key] (a node of the keyboard) held: the texts shown the while, outside the keyboard's own keys; let go
+    where it went down (its first typed, if any)"""
+    kb = d.need_keyboard()
+    on_keys = {t for n in kb.walk() if n.clickable for t in n.texts()}
+    d.touch(("down", *key.c), ("sleep", 0.9))
+    shown = [n.text for n in d.screen().nodes if n.text and not n.clickable and n.text not in on_keys]
+    d.touch(("up", *key.c))
+    time.sleep(0.5)
+    return shown
+
+
+def face(d, *texts):
+    """the keyboard's key whose face is one of [texts]"""
+    kb = d.need_keyboard()
+    n = next((n for n in kb.walk() if n.clickable and n.texts() and n.texts()[0] in texts), None)
+    check(n is not None, f"键盘上没有 {texts[0]}")
+    return n
+
+
+@case("KB-80", base="B0-注音全键盘", mutates=True, visual=True)
+def kb80(d):
+    st = script("14-settings")
+    d.open_page("text")
+    d.clear()
+    b = face(d, "ㄅ")
+    before = held(d, b)
+    check("1" not in before and b.desc in ("", "ㄅ"), f"改之前 ㄅ 长按弹出 {before}，读作「{b.desc}」")
+    d.clear()
+    st.slots_tab(d, "注音全键盘")
+    st.key_dialog(d, "ㄅ")
+    st.dialog_add(d, "1")
+    st.dialog_way(d, "上滑", "长按首选")
+    st.dialog_ok(d)
+    d.open_page("text")
+    d.clear()
+    b = face(d, "ㄅ")
+    d.shot("kb", "ㄅ 的键角画 1")
+    corner = b.desc
+    after = held(d, b)
+    let_go = d.field_text()
+    d.clear()
+    d.swipe(b.c, (b.c[0], b.c[1] - 130), 150, after=0.8)
+    up = d.field_text()
+    check("1" in after, f"改之后 ㄅ 长按弹出 {after}")
+    check(corner.endswith("1"), f"ㄅ 的键角读作「{corner}」")
+    check(let_go == "1" and up == "1", f"长按松手打出「{let_go}」，上滑打出「{up}」")
+    return f"改前长按无弹窗；改后弹出 1、键角 1，松手「{let_go}」，上滑「{up}」"
+
+
+@case("KB-81", mutates=True, visual=True)
+def kb81(d):
+    st = script("14-settings")
+    st.slots_tab(d, "功能键")
+    st.key_dialog(d, "，键")
+    st.dialog_pick(d, '"')
+    d.tap_text("设为首选", scroll=False, after=0.5)
+    st.dialog_way(d, "上滑", "长按首选")
+    st.dialog_ok(d)
+    d.open_page("text")
+    d.clear()
+    c = face(d, "，", ",")
+    corner = c.desc
+    # swiped first: the engine's “ ” alternation is its own state, which a clear does not reset (a hold let go
+    # first would type “ and leave ” next)
+    d.swipe(c.c, (c.c[0], c.c[1] - 130), 150, after=1.0)
+    one = d.field_text()
+    d.swipe(c.c, (c.c[0], c.c[1] - 130), 150, after=1.0)
+    two = d.field_text()
+    d.clear()
+    d.touch(("down", *c.c), ("sleep", 0.9))
+    d.shot("kb", "长按 ，：“ 带框；键角 “")
+    shown = [n.text for n in d.screen().nodes if n.text in ("“", '"')]
+    d.touch(("up", *c.c))
+    time.sleep(0.5)
+    d.clear()
+    check("“" in shown and '"' not in shown, f"长按弹窗里是 {shown}")
+    check(corner.endswith("“"), f"， 的键角读作「{corner}」")
+    # 成对符号 (KB-26) on by default: the first “ comes with its ”, the second (the engine's ”) steps over it
+    check(one == "“”" and two == "“”", f"上滑一次「{one}」，两次「{two}」")
+    return f"弹窗 {shown}、键角「{corner}」；上滑一次「{one}」，两次「{two}」"
+
+
+@case("KB-72", mutates=True, visual=True)
+def kb72(d):
+    st = script("14-settings")
+    tb = script("05-toolbar")
+    d.sh("wm density 480")
+    time.sleep(1.5)
+    for key in ("j", "k"):
+        st.slots_tab(d, "全键盘")
+        st.key_dialog(d, key)
+        st.dialog_text(d, "下滑", "xianzaizenmeyangle", "现在怎么样了")
+        st.dialog_ok(d)
+    d.open_page("text")
+    d.clear()
+    d.shot("kb", "下滑图标默认左上：j、k 画「现在…」「现…」或两条横线的图标，别的键不缩小")
+    j = d.keys(refresh=True)["j"]
+    d.swipe(j, (j[0], j[1] + 130), 150, after=0.8)
+    typed = d.field_text()
+    d.clear()
+    home(d, "按键")
+    choose(d, "下滑图标位置", "底部")
+    d.open_page("text")
+    d.shot("kb", "下滑图标在底部：j、k")
+    st.appearance_tab(d, "大小与样式")
+    choose(d, "键盘高度", "紧凑")
+    d.open_page("text")
+    d.shot("kb", "紧凑：j、k")
+    tb.status_panel(d)
+    tb.ime(d, text="单手", contains=True, after=1.2)
+    d.shot("kb", "紧凑、单手：j、k")
+    tb.status_panel(d)
+    tb.ime(d, text="单手", contains=True, after=1.2)
+    tb.floating(d)
+    d.shot("kb", "紧凑、悬浮：j、k")
+    st.slots_tab(d, "全键盘")
+    st.key_dialog(d, "a")
+    st.dialog_text(d, "下滑", "nihao", "你好")
+    st.dialog_ok(d)
+    home(d, "按键")
+    choose(d, "上滑图标位置", "左下")
+    d.open_page("text")
+    d.clear()
+    d.shot("kb", "a：上滑左下、下滑底部，碰上时省的是 @，你好照画")
+    a = d.keys(refresh=True)["a"]
+    d.swipe(a, (a[0], a[1] + 130), 150, after=0.8)
+    hello = d.field_text()
+    check(typed == "现在怎么样了", f"j 下滑打出「{typed}」")
+    check(hello == "你好", f"a 下滑打出「{hello}」")
+    return f"j 下滑「{typed}」，a 下滑「{hello}」"

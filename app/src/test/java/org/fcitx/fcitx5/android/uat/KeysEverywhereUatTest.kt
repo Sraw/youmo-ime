@@ -135,6 +135,20 @@ class KeysEverywhereUatTest {
         }
     }
 
+    // handwriting's ，。 the keys every keyboard has: ，'s list KB-73's ([commaIsOneKey] holds it there too), 。's the
+    // full keyboard's, each as Chinese punctuation shows it (a stroke off them into the pad: HandwritingSceneGesturesTest)
+    @Test
+    @Uat("HW-39")
+    fun handwritingsCommaAndFullStopAreEveryKeyboards() {
+        val period = listOf(",", "?", "!", ":", ";", "_", "%", "$", "^", "&").map { zh[it] ?: it }.sorted()
+        val full = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.FULL), zh)
+        val fullsPeriod = full.held(full.named("fn/period").single()).let { (items, focused) -> items.sorted() to focused }
+        assertEquals(period, fullsPeriod.first)
+        val h = harness(handwriting, punctuation = zh)
+        assertEquals(fullsPeriod, h.held(h.named("fn/period").single()).let { (items, focused) -> items.sorted() to focused })
+        assertEquals(comma.map(zh::getValue).sorted() to "。", h.held(h.named("fn/comma").single()).let { (items, focused) -> items.sorted() to focused })
+    }
+
     @Test
     @Uat("KB-74")
     fun commaEditedOnceEverywhere() {
