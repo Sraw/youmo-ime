@@ -110,6 +110,9 @@ class PunctuationMapUatTest {
             val half = if (on) "," else "，"
             // the A typed back to the field before the host told the keys what the comma now types: that told first
             synced()
+            // the host tells the map after the A's selection reached it, maybe only as the next press runs the
+            // looper (CI 43202860764, SDK 29: face ，, bubble ,): its face drawn anew first, then both checked
+            until("the comma's face told") { comma().label == half }
             assertEquals(what, twice(half), shown())
             until("the mark typed") { h.field.text.toString() == "，A$half" }
             // a Chinese word after it: the comma back to its mark
@@ -117,6 +120,7 @@ class PunctuationMapUatTest {
             runBlocking { fcitx.select(0) }
             until("the word typed") { h.field.text.endsWith("你好") }
             synced()
+            until("the comma's face told back") { comma().label == "，" }
             assertEquals(what, twice("，"), shown())
             until("the mark typed") { h.field.text.toString() == "，A${half}你好，" }
             h.close(); fcitx.stop()
