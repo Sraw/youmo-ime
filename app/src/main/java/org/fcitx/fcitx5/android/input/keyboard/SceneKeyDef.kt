@@ -5,14 +5,16 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
-import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
+import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
+import org.fcitx.fcitx5.android.input.keys.KeyOutput
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
+import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 import org.fcitx.fcitx5.android.input.scene.SceneAction
 import org.fcitx.fcitx5.android.input.scene.SceneBehavior
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
@@ -25,7 +27,8 @@ import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import timber.log.Timber
 
 // [KeyDef.shortcut]'s form: a function key's bare (`comma`), any other's whole (`full/q`), KeyId.of reading either
-// back as the one name
+// back as the one name. Kept bare because KeyDef.shortcut is the views' form too (TextKeyboard.layout & co., which
+// the wiring tests compare the scene's keys with); every reader of it asks KeyId.of, never compares the text
 private fun viewName(name: String): String = KeyId.of(name).let { if (it.isFunction) it.key else it.name }
 
 /**
@@ -111,10 +114,14 @@ class SceneKeyDef(
             else -> b.copy(bubble = b.bubble.takeIf { board.preview }, popup = b.popup.takeIf { board.popups })
         }
 
-        // KeyDefaults.grouped as the popup's keys: its row (Q W 1 q w), the symbols above, the first under the finger
-        private fun grouped(letters: String, corner: String?): Popup.Keyboard.Explicit {
+        // KeyDefaults.grouped as the popup's keys: its row (Q W 1 q w), the symbols above, the first under the finger;
+        // each typed as its item says, as a named key's (KeyResolving): a digit corner a keypad's, its candidate picked
+        // while typing (D7), [placeholder] the keyboard's `action:` (an item no build reads typed as a key)
+        private fun grouped(letters: String, corner: String?, placeholder: (String) -> KeyAction?): Popup.Keyboard.Explicit {
             val list = KeyDefaults.grouped(letters, corner)
-            return Popup.Keyboard.Explicit((list.row + list.symbols).map { it.text }.toTypedArray(), symbolsFrom = list.row.size, inRow = list.focus)
+            val items = list.row + list.symbols
+            val actions = items.map { KeyOutput.of(it)?.toKeyAction(placeholder) ?: PopupKeyboardUi.keyAction(it.text) }
+            return Popup.Keyboard.Explicit(items.map { it.text }.toTypedArray(), symbolsFrom = list.row.size, inRow = list.focus, actions = actions)
         }
 
         /** What [b]'s bubble shows over the key of [node]: [table]'s, else its face's; null with no bubble. */
@@ -135,7 +142,7 @@ class SceneKeyDef(
                 is SceneBehavior.LongPopup.Listed -> add(Popup.Keyboard.Explicit(p.items.toTypedArray(), asIs = p.asIs))
                 // a theme's own group of no name (a 17 keys' written without shortcut=): the built-in list of its letters,
                 // the corner it swipes first, none the user can change
-                is SceneBehavior.LongPopup.Letters -> add(grouped(p.letters, b.swipe?.let(SceneBehavior::typed)))
+                is SceneBehavior.LongPopup.Letters -> add(grouped(p.letters, b.swipe?.let(SceneBehavior::typed)) { name -> table.action(name, node) })
                 // made by a key's name alone (a nine key's, 注音九键's group): a key of none has no long press
                 is SceneBehavior.LongPopup.Composed -> Timber.w("scene key %s: a long press made by name on a key of none", b.id)
                 null -> {}

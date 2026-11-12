@@ -22,10 +22,8 @@ import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
-import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
@@ -69,8 +67,6 @@ class DisplayIsTypedUatTest {
 
     private val zh = ChinesePunctuation.map
 
-    private val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
-
     private fun harness(im: InputMethodEntry, chosen: ImKeyboards.Chosen?, punctuation: Map<String, String>, inputType: Int): KeyboardHarness {
         made?.close()
         return KeyboardHarness(TestThemes.PixelLight, im, keyboards = chosen).apply {
@@ -79,9 +75,7 @@ class DisplayIsTypedUatTest {
         }.start(inputType).also { h ->
             made = h
             // as fcitx's punctuation addon tells it, cached too: an input view made anew replays it
-            h.api.statusAreaCached = active
-            h.api.punctuationCached = punctuation
-            h.emit(HostEvent.StatusArea(active, im, punctuation))
+            h.chinesePunctuation(im, punctuation)
             h.relayout()
         }
     }
@@ -154,7 +148,7 @@ class DisplayIsTypedUatTest {
         // its corner, where its up is its first (a full keyboard's letter may show its letter instead)
         val id = KeyId.of(name)
         val letter = id.form == "full" && id.key.singleOrNull()?.isLetter() == true
-        if (!letter && SwipeSlots.Default.resolve(name, true) == SwipeSlot.First) {
+        if (!letter && SwipeSlots.parse(AppPrefs.getInstance().internal.keySwipes.getValue()).resolve(name, true) == SwipeSlot.First) {
             assertTrue("$at: corner ${k.drawnTexts}, typed $swiped", swiped in k.drawnTexts)
         }
         return checked + 1
@@ -259,10 +253,9 @@ class DisplayIsTypedUatTest {
     fun ninesOneAndColumnAreHeldBackTillTheMarksAreKnown() {
         val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS, zh, InputType.TYPE_CLASS_TEXT)
         // not known: the harness's host tells its marks as the view is made, so the component is set back by hand
-        val punctuation = h.inputView.javaClass.getDeclaredField("punctuation").apply { isAccessible = true }
-            .get(h.inputView) as PunctuationComponent
+        val punctuation = h.inputView.punctuation
         PunctuationStartKeys.forget(h.service)
-        PunctuationComponent::class.java.getDeclaredField("known").apply { isAccessible = true }.setBoolean(punctuation, false)
+        punctuation.forget()
         h.after(BUBBLE_GONE_MS)
         h.tap(h.nineKey("1"))
         h.after(BUBBLE_GONE_MS)

@@ -186,14 +186,16 @@ class ZhuyinShortcutsUatTest {
         assertEquals("※", (key.popup as KeyPopup.Items).labels.last())
     }
 
-    // the ， in its place is the function key's: greyed, said so, a tap saying where it is changed and opening no editor
+    // the ， in its place is the function key's: drawn as the keyboard's r4c4 and not faded (faded is a long press off), said so, a tap saying where it is changed and opening no editor
     @Test
+    @Uat("ST-113")
     fun zhuyinNinesCommaSaysItIsChangedOnTheFunctionKeysTab() {
         val st = SettingsHarness().also { settings = it }
         st.open(SettingsRoute.PopupOverrides)
         val comma = st.zy9Key("，")
         assertEquals(st.s(R.string.shortcut_key_elsewhere, "，"), ViewCompat.getStateDescription(comma).toString())
         assertTrue(st.texts().toString(), st.s(R.string.long_press_legend_elsewhere, "，") in st.texts())
+        assertEquals(1.0, KeyboardHarness.all(comma).filterIsInstance<org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell>().single().labelAlpha, 0.0)
         val dialogs = ShadowDialog.getShownDialogs().size
         comma.performClick()
         st.idle()

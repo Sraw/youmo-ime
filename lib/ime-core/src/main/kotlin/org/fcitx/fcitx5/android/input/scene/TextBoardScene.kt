@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.Row
+import org.fcitx.fcitx5.android.scene.keys.SlotDefaults
 
 /**
  * What the 26 keys (TextKeyboard) show as the input is, as values: what qwerty.xml's `when=` asks of
@@ -116,7 +117,7 @@ object SceneMarks {
             for (up in listOf(true, false)) {
                 if (slots.isSet(name, up)) user += "$name:${if (up) "up" else "down"}"
                 marks["$name:${if (up) "up" else "down"}"] = when (val slot = slots.resolve(name, up)) {
-                    SwipeSlot.First -> firsts[name]?.let(MarkContent::Symbol) ?: MarkContent.Empty
+                    SwipeSlot.First -> firsts[name]?.let(::symbol) ?: MarkContent.Empty
                     else -> content(slot.shortcut) ?: MarkContent.Empty
                 }
             }
@@ -140,6 +141,9 @@ object SceneMarks {
             .flatMap { k -> listOf(k.attrs.shortcut) + k.variants.map { it.attrs.shortcut } }
             .filterNotNull().toSet()
 
+    /** A long press's first as its corner draws it: as a swipe's text is (KeyMarkText, two characters as seen and 「…」), one rule for both; typed and said whole. */
+    fun symbol(first: String): MarkContent = MarkContent.Symbol(KeyMarkText.of(first))
+
     fun content(s: KeyShortcut): MarkContent? = when (s) {
         is KeyShortcut.Command -> MarkContent.Icon(icon(s.command))
         // at most two characters as seen, the rest an ellipsis (要做 1): the bubble shows it whole
@@ -148,13 +152,5 @@ object SceneMarks {
     }
 
     /** A command's icon as the scene names it (SlotDefaults.icon's names); the app draws each name's drawable. */
-    fun icon(command: KeyCommand): String = when (command) {
-        KeyCommand.SelectAll -> "select-all"
-        KeyCommand.Copy -> "content-copy"
-        KeyCommand.Cut -> "content-cut"
-        KeyCommand.Paste -> "content-paste"
-        KeyCommand.Clear -> "delete-sweep"
-        KeyCommand.EditMenu -> "cursor-move"
-        else -> command.key.replace('_', '-')
-    }
+    fun icon(command: KeyCommand): String = SlotDefaults.icon(command.key)
 }

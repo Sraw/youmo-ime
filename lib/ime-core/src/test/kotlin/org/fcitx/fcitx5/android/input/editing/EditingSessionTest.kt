@@ -484,6 +484,30 @@ class EditingSessionTest {
         },
     )
 
+    // 滑选's line: the selection set from its anchor, the other way round where the free end is the left
+    // one, as the editor extends its selection's end; predicted so, its report of that order taken
+    @Test
+    fun selectFromSetsTheAnchorFirst() = assertRows(
+        "the free end left of the anchor: set and predicted reversed" to {
+            val (s, e) = session("abcdef", cursor = 4)
+            s.selectFrom(4, 1)
+            assertTrue(s.selection.latest.rangeEquals(4, 1))
+            assertEquals("setSelection(4, 1)", e.calls.last())
+        },
+        "the report of it is the prediction, not a move of the editor's own" to {
+            val (s, _) = session("abcdef", cursor = 4)
+            s.selectFrom(4, 1)
+            assertEquals(EditingSession.CursorUpdate.None, s.onCursorUpdate(4, 1, -1, -1, ignoreSystemCursor = false))
+        },
+        "no editor, nothing predicted" to {
+            val (s, e) = session("abc", cursor = 1)
+            e.isAvailable = false
+            s.selectFrom(2, 0)
+            assertTrue(s.selection.latest.rangeEquals(1, 1))
+            assertTrue(e.calls.isEmpty())
+        },
+    )
+
     // region cancelSelection
 
     @Test
@@ -897,6 +921,7 @@ class EditingSessionTest {
             put("applySelectionOffset") { applySelectionOffset(0) }
             put("cancelSelection") { cancelSelection() }
             put("select") { select(1, 3) }
+            put("selectFrom") { selectFrom(3, 1) }
             put("deleteSurrounding") { deleteSurrounding(1, 0, inCodePoints = false) }
             put("replaceAround") { replaceAround(1, 0, "x") }
             put("backspace") { backspace(EditorTraits()) }

@@ -109,8 +109,8 @@ class CompactKeyboardUatTest {
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") && "key=2," in it })
     }
 
-    // too low for the bottom edge's middle: the first corner of top right, bottom right, top left, bottom left the symbols do
-    // not take, drawn, none left out (KeyMarks.onKeys)
+    // too low for the bottom edge's middle: the first corner of top right, bottom right, top left, bottom left the other way's corner does
+    // not take (4e3ebcfcc), drawn, none left out (KeyMarks.onKeys)
     @Test
     @Uat("ST-51")
     fun aBottomShortcutInTheFirstCornerFree() {

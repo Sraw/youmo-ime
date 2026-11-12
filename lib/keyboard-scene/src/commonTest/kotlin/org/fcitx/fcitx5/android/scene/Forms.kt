@@ -127,8 +127,11 @@ object Forms {
             "number" -> form.copy(input = form.input.copy(pad = "full"))
             else -> form
         }
-        val marks = DefaultMarks.shortcuts(layout(board), fragments, punctuation = told.texts.punctuation)
-        val readings = marks.entries.mapNotNull { (k, v) -> (v as? MarkContent.Symbol)?.takeIf { k.endsWith(":up") }?.let { k.removeSuffix(":up") to it.text } }.toMap()
+        // the first on the way told.marks puts it (the app's 首选 setting); the layout's own variant: no board here is 双拼's
+        val firstUp = told.marks.firstUp
+        val marks = DefaultMarks.shortcuts(layout(board), fragments, punctuation = told.texts.punctuation, firstUp = firstUp)
+        val way = if (firstUp) ":up" else ":down"
+        val readings = marks.entries.mapNotNull { (k, v) -> (v as? MarkContent.Symbol)?.takeIf { k.endsWith(way) }?.let { k.removeSuffix(way) to it.text } }.toMap()
         return told.copy(marks = told.marks.copy(shortcuts = marks), texts = told.texts.copy(alts = readings))
     }
 

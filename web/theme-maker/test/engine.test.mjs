@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { ENGINE } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -60,14 +60,19 @@ test('every snapshot is what the library builds of its ask (the JVM wrote them, 
 });
 
 test("a board's default marks are the app's (the JVM recorded them), its own layout's too, a key's first as the punctuation shows it", () => {
-  for (const f of readdirSync(join(data, 'default-marks'))) {
-    assert.deepEqual(E.defaultMarks(f.slice(0, -5), null), JSON.parse(read(data, 'default-marks', f)), f);
+  for (const f of readdirSync(join(data, 'default-marks')).filter((n) => n.endsWith('.json'))) {
+    assert.deepEqual(E.defaultMarks(basename(f, '.json'), null), JSON.parse(read(data, 'default-marks', f)), f);
   }
   const own = E.readLayout(read(scene, 'commonMain', 'layouts', 'qwerty.xml'), null);
   assert.ok(own.ok, JSON.stringify(own.problems));
   const mapped = E.defaultMarks(own.layout, { '@': '＠' });
   assert.deepEqual(mapped.shortcuts['full/a:up'], { symbol: '＠' });
   assert.deepEqual(mapped.shortcuts['full/c:down'], { icon: 'content-copy' });
+  // nine's digits are keys, not marks typed: a map of them changes nothing; its 1's first is mapped
+  const nine = E.defaultMarks('nine', null);
+  const nineMapped = E.defaultMarks('nine', { '2': 'x', ',': '，' });
+  const changed = Object.keys(nine.shortcuts).filter((k) => JSON.stringify(nine.shortcuts[k]) !== JSON.stringify(nineMapped.shortcuts[k]));
+  assert.ok(changed.length > 0 && changed.every((k) => nineMapped.shortcuts[k].symbol === '，'), JSON.stringify(changed.map((k) => [k, nineMapped.shortcuts[k]])));
 });
 
 test("a scene's keys, slots and size as a page reads them", () => {

@@ -478,7 +478,21 @@
   const FIELDS = ['text', 'password', 'url', 'number', 'email'];
   const IMES = ['pinyin', 'shuangpin', 'english', 'wubi', 'cangjie', 'handwriting'];
 
-  /** [e] (the page's choices) as the engine's EnvJson: the keyboard's width and height in px, the form's flags. */
+  /**
+   * Chinese punctuation as the app ships it (`punc.mb.zh_CN`), each key to its first, the one typed: what a new install
+   * has on for a Chinese input method, so the preview shows marks as the app does (，。？！ on nine's 1). The test
+   * holds it to the app's file.
+   */
+  const ZH_PUNCTUATION = {
+    '.': '。', ',': '，', '?': '？', '"': '“', ':': '：', ';': '；', "'": '‘', '<': '《', '>': '》', '\\': '、', '!': '！',
+    '#': '#', '$': '$', '%': '%', '^': '……', '_': '——', '(': '（', ')': '）', '[': '【', ']': '】', '{': '{', '}': '}',
+    '~': '～', '`': '`',
+  };
+
+  /**
+   * [e] (the page's choices) as the engine's EnvJson: the keyboard's width and height in px, the form's flags, and
+   * Chinese punctuation (ZH_PUNCTUATION) for any input method but English, as on a new install.
+   */
   function envJson(e) {
     const across = e.landscape ? Math.max(e.w, e.h) : Math.min(e.w, e.h);
     const out = {
@@ -495,12 +509,15 @@
     else if (e.form === 'left' || e.form === 'right') out.oneHanded = e.form;
     else if (e.form === 'split') out.split = true;
     else if (e.form === 'flat') out.flat = true;
+    if ((e.ime || 'pinyin') !== 'english') out.texts = { punctuation: ZH_PUNCTUATION };
     return out;
   }
 
   /**
    * What is wrong with [d] drawn on [board] in [env] (EnvJson): `[{level: "error"|"warning", line, message}]`,
-   * the theme's own, then the scene's; `theme` and `scene` where they were made.
+   * the theme's own, then the scene's; `theme` and `scene` where they were made. An [env] with `marks` is drawn with
+   * those whole (none of the defaults filled in for a member it leaves out); one without, with the board's default
+   * marks (defaultMarksOf).
    */
   function check(E, d, board, env, measurer) {
     try {
@@ -517,12 +534,32 @@
     add('warning', r.warnings);
     if (!r.ok) return { problems, theme: null, scene: null };
     const layout = layoutOf(E, d, board, (list) => add('warning', list));
-    // no marks of the page's: the app's on a new install (060-keys-unify C2, each key's first and shortcuts' icons)
-    const e = env.marks ? env : Object.assign({}, env, { marks: E.defaultMarks(layout, null) });
-    const s = E.buildScene(layout, r.theme, e, measurer || E.fixedMeasurer());
+    const marks = env.marks ? null : defaultMarksOf(E, layout, env);
+    const drawn = marks ? Object.assign({}, env, { marks }) : env;
+    const s = E.buildScene(layout, r.theme, drawn, measurer || E.fixedMeasurer());
     add('error', s.problems);
     add('warning', s.ok ? s.scene.json().warnings : s.warnings);
     return { problems, theme: r.theme, scene: s.ok ? s.scene : null };
+  }
+
+  /**
+   * The marks [layout] (an own layout or a built-in's id) has on a new install (060-keys-unify C2: each key's first,
+   * shortcuts' icons), each first shown as [env]'s punctuation maps it, as the app does. The layout family's (pinyin's
+   * 26 keys, ;-first 18 keys): the engine takes no input method, so 双拼 here shows pinyin's. Kept per layout and map
+   * (each edit checks again, the export check each board twice); an id the engine has no board of gets none, so
+   * buildScene says what is wrong with it.
+   */
+  const defaultMarksCache = new Map();
+  function defaultMarksOf(E, layout, env) {
+    const punctuation = (env.texts && env.texts.punctuation) || null;
+    let byMap = defaultMarksCache.get(layout);
+    if (!byMap) {
+      byMap = new Map();
+      if (defaultMarksCache.size > 64) defaultMarksCache.clear();
+      defaultMarksCache.set(layout, byMap);
+    }
+    if (!byMap.has(punctuation)) byMap.set(punctuation, typeof layout === 'string' && !E.layout(layout) ? null : E.defaultMarks(layout, punctuation));
+    return byMap.get(punctuation);
   }
 
   /**
@@ -648,7 +685,7 @@
   }
 
   root.YoumoMaker = {
-    THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES,
+    THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES, ZH_PUNCTUATION,
     doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

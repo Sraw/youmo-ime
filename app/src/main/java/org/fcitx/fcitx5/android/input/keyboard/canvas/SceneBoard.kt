@@ -185,7 +185,10 @@ class SceneBoard(
         // a layout's shortcut names, and the marks' settings as last made from their inputs: kept for the
         // scene asked again, the same instances making the env equal to the last at once
         private var namesMade: Pair<SceneLayout, Set<String>>? = null
-        private const val KEPT_RESOLVERS = 4
+        // one a layout the IME and the settings page ask: each keyboard, the number pad, the symbol, emoji and
+        // kaomoji panels, emoji search, the side column, and the settings page's key caps besides; one evicted is
+        // made again (every key resolved anew, its marks lost), so room for all of them, not the last few scenes'
+        private const val KEPT_RESOLVERS = 16
         private val resolvers = lruMap<ResolverFor, KeyResolver>(KEPT_RESOLVERS)
 
         /**
@@ -227,8 +230,12 @@ class SceneBoard(
          * (KeyResolver): a scene made ahead on another thread asks for none.
          */
         @MainThread
-        fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null, slots: SwipeSlots = SwipeSlotsCache.current): KeyResolver {
-            val variant = KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters)
+        fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null, slots: SwipeSlots = SwipeSlotsCache.current): KeyResolver =
+            resolver(layout, KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters), slots)
+
+        /** [layout]'s resolver for [variant] as given: the long press editor's (060-row-unlock §2: 18 键's L with its `:`), as [resolver]. */
+        @MainThread
+        fun resolver(layout: SceneLayout, variant: KeyboardVariant, slots: SwipeSlots = SwipeSlotsCache.current): KeyResolver {
             val lists = KeyListsCache.user.current
             val of = ResolverFor(layout, variant, KeyListsCache.user.version, lists, slots)
             return resolvers.getOrPut(of) {
@@ -240,10 +247,19 @@ class SceneBoard(
          * The marks' settings of [layout]'s keys for [im] in [state] (060-keys-unify §1.3: each key's first and
          * slots as the resolver has them), a character key's shortcut drawn where [charShortcuts].
          */
-        fun marks(layout: SceneLayout, charShortcuts: Boolean, im: String, state: KeyState, nineLetters: Map<Char, String>? = null): MarkSettings {
-            val marks = resolver(layout, im, nineLetters).marks(state)
-            return if (marks.charShortcuts == charShortcuts) marks else marks.copy(charShortcuts = charShortcuts)
+        fun marks(layout: SceneLayout, charShortcuts: Boolean, im: String, state: KeyState, nineLetters: Map<Char, String>? = null): MarkSettings =
+            marks(resolver(layout, im, nineLetters), charShortcuts, state)
+
+        /** [resolver]'s marks in [state], a character key's shortcut drawn where [charShortcuts]: a keyboard's own resolver's (KeyResolving). */
+        fun marks(resolver: KeyResolver, charShortcuts: Boolean, state: KeyState): MarkSettings {
+            val marks = resolver.marks(state)
+            if (marks.charShortcuts == charShortcuts) return marks
+            // the copy made of the same marks given again: the scene's env then equal to the last at once
+            marksCopied?.takeIf { it.first === marks }?.let { return it.second }
+            return marks.copy(charShortcuts = charShortcuts).also { marksCopied = marks to it }
         }
+
+        private var marksCopied: Pair<MarkSettings, MarkSettings>? = null
 
         /** The scenes kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
         fun forgetScenes() = scenesKept.clear()

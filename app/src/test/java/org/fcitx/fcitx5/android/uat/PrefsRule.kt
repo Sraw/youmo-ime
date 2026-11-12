@@ -52,12 +52,12 @@ class PrefsRule : ExternalResource() {
 
     /**
      * A key's long press set as 按键字符和快捷键 sets it (`key_lists`, 060-keys-unify): by its name (`full/q`, `t9/2`,
-     * `fn/comma`; KeyId.of), its [symbols] above the built-in row, its [first] (the swipe's, the corner's) the default's
+     * `fn/comma`; KeyId.of), its whole list [items] (a row's letters and digit too, 060-row-unlock), its [first] (the swipe's, the corner's) the default's
      * unless given, or [off]; the other keys as they are. The store is put back after the test, key_lists with it.
      */
-    fun setList(name: String, symbols: List<String> = emptyList(), first: String? = null, off: Boolean = false) {
+    fun setList(name: String, items: List<String> = emptyList(), first: String? = null, off: Boolean = false) {
         val pref = AppPrefs.getInstance().internal.keyLists
-        val list = if (off) UserList.Off else UserList(off = false, symbols = symbols, first = first?.let(First::Literal) ?: First.Default)
+        val list = if (off) UserList.Off else UserList(off = false, items = items, first = first?.let(First::Literal) ?: First.Default)
         // as stored, none left out as a default: a list turned off is kept where no default is told here
         set(pref, KeyLists.of((KeyLists.parse(pref.getValue())?.lists.orEmpty()) + (KeyId.of(name) to list)).serialize())
     }

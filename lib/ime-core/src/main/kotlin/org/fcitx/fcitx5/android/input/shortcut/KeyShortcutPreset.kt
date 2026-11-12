@@ -26,14 +26,11 @@ object KeyShortcutPreset {
     const val ZHUYIN_FULL = "zyfull"
     const val ZHUYIN_NINE = "zy9"
 
-    private const val UP = ".up"
-    private const val DOWN = ".down"
-
     /** [name]'s: a character key's (`full/a`), or a function key's one way (`fn/space.up`, [KeyShortcuts.functionKey]). */
     fun of(name: String): KeyShortcut {
         val command = if (KeyShortcuts.formOf(name) == KeyShortcuts.FUNCTION) {
-            val up = name.endsWith(UP)
-            if (!up && !name.endsWith(DOWN)) null
+            val up = name.endsWith(SwipeSlots.UP)
+            if (!up && !name.endsWith(SwipeSlots.DOWN)) null
             else {
                 val key = KeyId(name.substringBeforeLast('.'))
                 (SlotDefaults.of(key, up, firstUp = true) as? SlotDefaults.Slot.Command)?.key

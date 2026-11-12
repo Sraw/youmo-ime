@@ -7,8 +7,8 @@ package org.fcitx.fcitx5.android.input.picker
 import android.view.inputmethod.EditorInfo
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
-import androidx.transition.Transition
 import androidx.recyclerview.widget.RecyclerView
+import androidx.transition.Transition
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.isAsciiMark
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
@@ -103,6 +104,19 @@ class PickerWindow(
     override fun enterAnimation(lastWindow: InputWindow): Transition? = null
 
     override fun exitAnimation(nextWindow: InputWindow): Transition? = null
+
+    // the panel keyboard's bubbles: an ASCII mark's none while what it types is not known, as its tap is dropped
+    // then (and as the text keyboards' are, KeyboardWindow's): `,` shown would be `，` typed
+    private val heldBackPopups: PopupActionListener by lazy {
+        val shown = popup.listener
+        PopupActionListener { a ->
+            if (a is PopupAction.PreviewAction && a.content.singleOrNull()?.code?.let(::isAsciiMark) == true) {
+                if (!punctuation.known) punctuation.update(PunctuationStartKeys.known)
+                if (!punctuation.known) return@PopupActionListener
+            }
+            shown.onPopupAction(a)
+        }
+    }
 
     private val keyActionListener = KeyActionListener { it, source ->
         when (it) {
@@ -307,7 +321,7 @@ class PickerWindow(
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
             // its named keys' long presses, ，。's bubbles and the edit menu its space swipes to, as every keyboard's (060-keys-unify D5)
-            it.popupActionListener = popup.listener
+            it.popupActionListener = heldBackPopups
             it.inPasswordField = service.inPasswordField
         }
         pickerLayout.search?.keyboard?.keyActionListener = searchKeyActionListener

@@ -81,7 +81,7 @@ class KotlinHostKeyboardTest {
     }
 
     private fun setList(key: String, vararg symbols: String) =
-        AppPrefs.getInstance().internal.keyLists.setValue(KeyLists.of(mapOf(KeyId(key) to UserList(off = false, symbols = symbols.toList()))).serialize())
+        AppPrefs.getInstance().internal.keyLists.setValue(KeyLists.of(mapOf(KeyId(key) to UserList(off = false, items = symbols.toList()))).serialize())
 
     // the host answers on its thread, the bar is drawn on the main one: run both till [done]
     private fun until(what: String, state: () -> String = { "" }, done: () -> Boolean) =

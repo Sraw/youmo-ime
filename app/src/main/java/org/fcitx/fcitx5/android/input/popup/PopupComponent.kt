@@ -346,7 +346,7 @@ class PopupComponent :
         when (keyboard) {
             // a key of no name (a theme's): its character's built-in list, no setting reaches it (060-keys-unify S6)
             is KeyDef.Popup.Keyboard.Preset -> {
-                val preset = KeyDefaults.preset(keyboard.label) ?: return
+                val preset = KeyDefaults.preset(keyboard.label, keyboard.caps) ?: return
                 keys = (preset.row + preset.symbols).map { it.text }.toTypedArray()
                 labels = if (keyboard.transformPunctuation && punctuation.enabled) {
                     Array(keys.size) { punctuation.transform(keys[it]) }
@@ -358,6 +358,7 @@ class PopupComponent :
                 asIs = keyboard.asIs
                 inRow = keyboard.inRow
                 keys = keyboard.items
+                actions = keyboard.actions
                 labels = explicitLabels(keyboard) { if (punctuation.enabled) punctuation.transform(it) else it }
             }
             is KeyDef.Popup.Keyboard.Resolved -> {

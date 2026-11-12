@@ -435,6 +435,9 @@ object KeyMarkYield {
     // whether [i]'s corners are all within [edge]'s arcs, less its line
     private fun cornersIn(i: Ink, edge: Edge): Boolean {
         val f = edge.face
+        // within the face across: a mark wider than its key (a long first the user set) is over its neighbours; up and
+        // down a mark may stand in the insets (a 符 key's T), its keys' gap is not taken by it
+        if (i.left < f.left - 1e-9 || i.right > f.right + 1e-9) return false
         // the four corners in a plain loop, no list made: this runs in the boards' searches, many times a build
         for (n in edge.radii.indices) {
             val r = edge.radii[n]

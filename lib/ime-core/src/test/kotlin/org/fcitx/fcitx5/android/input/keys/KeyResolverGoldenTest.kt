@@ -26,16 +26,17 @@ import java.io.File
  * (060-keys-unify §6.1): its long press (the row, `|`, the symbols; `=` an as-is item, `#` a keypad's, `@`
  * an action's), its first and its two marks, in a few states. Written to build/keys-golden.tsv on every run;
  * a change to src/test/resources/keys-golden.tsv is reviewed line by line and its reason given in its commit.
+ * A board is here once per variant that makes a different key: English's boards are pinyin's (no English special
+ * case, the variant has no language), and 双拼's nine keys are pinyin's too (NINE_SP's letters on 2 to 9 are
+ * STANDARD_NINE's, its `;` on no digit, and `semicolon` reaches only the 18 keys' L), so neither has rows of its own;
+ * 双拼's 18 keys with `;` do (shuangpin-18-ms).
  */
 class KeyResolverGoldenTest {
     private class Board(val name: String, val file: String, val variant: KeyboardVariant)
 
     private val boards = listOf(
         Board("pinyin-full", "qwerty", KeyboardVariant(Form.Full)),
-        Board("english-full", "qwerty", KeyboardVariant(Form.Full)),
         Board("pinyin-nine", "nine", KeyboardVariant(Form.Nine)),
-        Board("shuangpin-nine", "nine", KeyboardVariant(Form.Nine)),
-        Board("english-nine", "nine", KeyboardVariant(Form.Nine)),
         Board("pinyin-14", "k14", KeyboardVariant(Form.Grouped14)),
         Board("pinyin-18", "k18", KeyboardVariant(Form.Grouped18)),
         Board("shuangpin-18-ms", "k18", KeyboardVariant(Form.Grouped18, semicolon = true)),
@@ -98,6 +99,7 @@ class KeyResolverGoldenTest {
         }
     }
 
+    // contract: keys-golden.tsv, every built-in key's default as the app shows it; a change there is a user-visible one
     @Test
     fun everyKeyIsAsTheGoldenTableHasIt() {
         val made = table()

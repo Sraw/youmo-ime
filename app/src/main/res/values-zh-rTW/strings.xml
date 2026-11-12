@@ -323,7 +323,7 @@
     <string name="emoji_skin_tone_type_5">🏾 中等深膚色 (Type-5)</string>
     <string name="emoji_skin_tone_type_6">🏿 深膚色 (Type-6)</string>
     <string name="hide_unsupported_emojis">隱藏不支援的表情</string>
-    <string name="a11y_key_shift">Shift</string>
+    <string name="a11y_key_shift">大小寫</string>
     <string name="a11y_state_shift_once">僅下一個字母大寫</string>
     <string name="a11y_state_caps_lock">大寫鎖定</string>
     <string name="a11y_key_backspace">退格</string>
@@ -366,7 +366,7 @@
     <string name="toolbar_reset">恢復預設</string>
     <string name="toolbar_trad_simp">簡繁切換</string>
     <string name="reset_this_key">恢復此鍵預設</string>
-    <string name="long_press_editor_hint">帶框的是長按後直接放開得到的字元，也是滑動這個鍵輸入的字元，也就是鍵上的小字。變淡的是鍵盤自帶的（鍵上的字母、數字），只能設為首個，不能移動或刪除。點一個字元選取它，再用下面的按鈕調整。</string>
+    <string name="long_press_editor_hint">帶框的是長按後直接放開得到的字元，也是滑動這個鍵輸入的字元，也就是鍵上的小字。鍵自己的字母、數字也和別的字元一樣能挪、刪、設為首個。18 鍵 L 上的 : 只在微軟雙拼的 18 鍵上出現。點一個字元選取它，再用下面的按鈕調整。</string>
     <string name="reset_all_long_press_message">將所有按鍵的長按字元還原為內建預設值？</string>
     <string name="reset_all">全部還原預設</string>
     <string name="my_words">使用者詞庫</string>
@@ -568,8 +568,6 @@
     <string name="vibration_strength">振動強度</string>
     <string name="level_light">輕</string>
     <string name="level_strong">強</string>
-    <string name="level_quiet">小</string>
-    <string name="level_loud">大</string>
     <string name="theme_and_size">外觀</string>
     <string name="configure_look">大小與樣式</string>
     <string name="export_user_data_summary">設定、學到和新增的詞、自訂短語、主題和剪貼簿紀錄（複製過的密碼也在內），存成一個檔案</string>
@@ -786,9 +784,10 @@
     <string name="picker_symbols">符號</string>
     <string name="picker_flags">旗幟</string>
     <string name="long_press_legend">帶框的鍵是改過的；變淡的鍵長按不彈出字元，滑向長按首選等於點這個鍵。</string>
-    <string name="long_press_legend_elsewhere">灰色的 %1$s 是功能鍵：長按照常可用，在功能鍵頁改。</string>
+    <string name="long_press_legend_elsewhere">這一頁的 %1$s 是功能鍵：長按照常可用，在功能鍵頁改。</string>
+    <string name="long_press_full">一個鍵最多 %1$d 個字元，多出的沒有加上。</string>
     <string name="long_press_none">長按這個鍵不彈出字元。</string>
-    <string name="long_press_off">這個鍵的長按已關。改動列表（新增字元或設為首選）就重新開啟。</string>
+    <string name="long_press_off">這個鍵的長按已關。新增字元就重新開啟。</string>
     <string name="long_press_newer">長按字元是新版本的應用程式設定的：原樣保留，這裡不能改。</string>
     <string name="long_press_add_hint">新增字元，空格分隔</string>
     <string name="punctuation_page_hint">打中文時，按左邊的鍵打出右邊的標點；一個鍵對應幾個標點時可以選。點一項可修改或刪除。</string>
@@ -962,7 +961,6 @@
     <string name="common_word_text">原詞</string>
     <string name="common_word_replacements">替換項，一行一個，按這個順序排在最前</string>
     <string name="common_word_no_replacement">至少填一個替換項</string>
-    <string name="common_word_same_as_word">替換項不能和原詞一樣</string>
     <string name="common_word_too_long">原詞最多 16 個字，替換項最多 32 個字</string>
     <string name="common_word_too_many">常用詞最多 2000 個</string>
     <string name="common_word_listed">這個詞已經在清單裡，點它編輯</string>
@@ -1109,7 +1107,7 @@
     <string name="fn_key_space">空白</string>
     <string name="fn_key_backspace">退格</string>
     <string name="fn_key_return">Enter</string>
-    <string name="fn_key_shift">Shift</string>
+    <string name="fn_key_shift">大小寫</string>
     <string name="fn_key_comma">，鍵</string>
     <string name="fn_key_period">。鍵</string>
     <string name="fn_key_symbols">符</string>

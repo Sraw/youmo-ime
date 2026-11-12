@@ -288,7 +288,8 @@ test('the environment is the engine\'s: every board and form builds, its size th
       }
     }
   }
-  assert.deepEqual(M.envJson(M.ENV), { width: 1080, height: Math.round(267 * 2.625), density: 2.625 });
+  assert.deepEqual(M.envJson(M.ENV), { width: 1080, height: Math.round(267 * 2.625), density: 2.625, texts: { punctuation: M.ZH_PUNCTUATION } });
+  assert.equal(M.envJson(Object.assign({}, M.ENV, { ime: 'english' })).texts, undefined, 'English: punctuation as written');
   assert.equal(M.envJson(Object.assign({}, M.ENV, { landscape: true })).width, 2340);
 });
 
@@ -391,6 +392,31 @@ test('each example opens, passes the check before a save with no error, and save
   assert.deepEqual(Object.keys(pic.files).sort(), ['picture-landscape.jpg', 'picture-portrait.jpg', 'picture.jpg']);
   assert.ok(/<style select="keyboard" fill="linear\(/.test(examples[0].xml));
   assert.ok(/transition="160ms ease-out"/.test(examples[2].xml) && /press-scale="92%"/.test(examples[2].xml));
+});
+
+test("Chinese punctuation is the app's file's, each key's first (a new install's)", () => {
+  const first = {};
+  for (const line of readFileSync(join(here, '..', '..', '..', 'app', 'src', 'main', 'host-assets', 'pkgdata', 'punctuation', 'punc.mb.zh_CN'), 'utf8').split('\n')) {
+    const t = line.trim().split(/\s+/);
+    if ((t.length === 2 || t.length === 3) && [...t[0]].length === 1 && !(t[0] in first)) first[t[0]] = t[1];
+  }
+  assert.deepEqual(M.ZH_PUNCTUATION, first);
+});
+
+test("no marks given: the preview draws the board's defaults as a new install shows them; marks given are drawn whole", () => {
+  const d = M.fromBuiltin(E, 'material');
+  const env = M.envJson(M.ENV);
+  const drawnMarks = (r) => r.scene.json().keys.flatMap((k) => (k.marks || []).map((m) => m.text || m.icon)).filter(Boolean);
+  const nine = drawnMarks(M.check(E, d, 'nine', env, null));
+  // the app with Chinese punctuation on: nine's 1 shows its first as typed, not ,
+  assert.ok(!nine.includes(','), JSON.stringify(nine));
+  const qwerty = M.check(E, d, 'qwerty', env, null);
+  assert.ok(drawnMarks(qwerty).length > 0, 'default marks drawn');
+  assert.deepEqual(drawnMarks(M.check(E, d, 'qwerty', Object.assign({}, env, { marks: { shortcuts: {} } }), null)), [], 'marks given replace the defaults whole');
+  // a board the engine has none of is the scene's problem, not a crash before it
+  const unknown = M.check(E, d, 'nope', env, null);
+  assert.ok(unknown.theme, JSON.stringify(unknown.problems));
+  assert.ok(!unknown.problems.some((p) => p.message.startsWith('引擎出错')), JSON.stringify(unknown.problems));
 });
 
 test("a pack's own layout of a board is the one the preview draws; one that does not read is a warning, the app's drawn", () => {

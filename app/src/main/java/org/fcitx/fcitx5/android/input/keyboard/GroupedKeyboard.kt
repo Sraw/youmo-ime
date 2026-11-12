@@ -21,25 +21,23 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
-import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyNode
-import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import timber.log.Timber
 
@@ -335,23 +333,17 @@ class GroupedKeyboard private constructor(
         override fun group(letters: String, node: KeyNode): KeyAction? = codeOf(letters, node.id)?.let { code(it, wire) }
     }
 
-    private var punctuationMapping: Map<String, String> = emptyMap()
-    private fun mapped(p: String) = punctuationMapping.getOrDefault(p, p)
-
-    // the corners as the full keyboard's and the comma and full stop as typed: ， and 。 in Chinese
-    // (the address keys commit as they are, and say so)
-    override fun onPunctuationUpdate(mapping: Map<String, String>) {
-        super.onPunctuationUpdate(mapping)
-        punctuationMapping = mapping
-        canvas?.invalidateScene()
-    }
+    // the corners as the full keyboard's and the comma and full stop as typed: ， and 。 in Chinese, as
+    // BaseKeyboard's keysPunctuation has them (the address keys commit as they are, and say so)
+    private fun mapped(p: String) = keysPunctuation.getOrDefault(p, p)
 
     // the bubbles as the letters' case and the punctuation have them; public for its test, which has no touch to open one
     public override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = previewOf(cased(action.content), action.key, { it }, ::mapped))
             // a swipe's shortcut named (words) shows as the user named it: the case rule is the letters'
-            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(if (action.words) action.content else cased(action.content), action.key, { it }, ::mapped))
+            is PopupAction.PreviewUpdateAction -> if (action.shown) action
+            else action.copy(content = previewOf(if (action.words) action.content else cased(action.content), action.key, { it }, ::mapped))
             else -> action
         }
         super.onPopupAction(shown)
@@ -419,7 +411,7 @@ class GroupedKeyboard private constructor(
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
             confirm = context.getString(R.string.key_confirm),
-            punctuation = punctuationMapping,
+            punctuation = keysPunctuation,
             // the formats as they are: the engine fills their places (getString with no arguments formats nothing)
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),

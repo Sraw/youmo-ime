@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.scene
 
-import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,7 +47,8 @@ class BackspaceMarksTest {
     fun aFloatingBoardsBackspaceDrawsBothWithTheDownOneBelow() {
         // docs/keyboard.md's advice: 下滑 at 右下, and every floating board draws both of ⌫'s marks (at 左下 恢复
         // meets ⌫'s icon on its left and is left out on most of them, so the docs name 右下 alone)
-        for (down in listOf(KeyMarks.At.BottomRight)) for (d in listOf(2.0, 2.625, 2.75, 3.5)) {
+        val down = KeyMarks.At.BottomRight
+        for (d in listOf(2.0, 2.625, 2.75, 3.5)) {
             for (board in listOf("qwerty", "k14", "k18", "nine", "number", "symbols", "zhuyin", "handwriting", "zhuyin-nine")) {
                 val k = d / Forms.DENSITY
                 val e = Forms.env(board, Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d))

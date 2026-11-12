@@ -7,10 +7,10 @@ package org.fcitx.fcitx5.android.ui.main.settings
 import android.content.Context
 import android.content.res.TypedArray
 import android.util.AttributeSet
+import android.widget.SeekBar
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.DialogPreference
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.utils.setOnChangeListener
 import splitties.dimensions.dp
 import splitties.resources.resolveThemeAttribute
 import splitties.views.dsl.core.add
@@ -53,6 +53,9 @@ class DialogSeekBarPreference @JvmOverloads constructor(
 
     var default: Int = 0
     var defaultLabel: String? = null
+
+    /** Called with the value where the user lets the slider go (按键音音量 plays a key's sound at it). */
+    var onRelease: ((Int) -> Unit)? = null
 
     init {
         context.theme.obtainStyledAttributes(attrs, R.styleable.DialogSeekBarPreference, 0, 0).run {
@@ -104,9 +107,15 @@ class DialogSeekBarPreference @JvmOverloads constructor(
         val seekBar = context.seekBar {
             max = progressForValue(this@DialogSeekBarPreference.max)
             progress = progressForValue(value)
-            setOnChangeListener {
-                textView.text = textForValue(valueForProgress(it))
-            }
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar) {
+                    onRelease?.invoke(valueForProgress(seekBar.progress))
+                }
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    textView.text = textForValue(valueForProgress(progress))
+                }
+            })
         }
         val dialogContent = context.verticalLayout {
             gravity = gravityHorizontalCenter

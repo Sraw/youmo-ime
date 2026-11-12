@@ -781,35 +781,76 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // a slide's sample may send two lines at once: the editor applies keys later, so the second reads where the first was
     private val lineRush = SpaceCursor.LineRush()
 
-    // none at the field's very start or end, where the key would move the focus away (SpaceCursor.sendable)
     private fun handleLineKey(line: SpaceCursor.Line) {
-        val ic = currentInputConnection ?: return
-        val now = SystemClock.uptimeMillis()
-        // only the side the line goes to is read: a binder call each, on the main thread
-        val before = if (line == SpaceCursor.Line.Up) ic.getTextBeforeCursor(LINE_REACH, 0) else null
-        val after = if (line == SpaceCursor.Line.Down) ic.getTextAfterCursor(LINE_REACH, 0) else null
-        val side = before ?: after
-        // only the rushed lines not landed yet: a read the editor already moved is not stale by those it applied
-        val rushed = lineRush.unlanded(line, now, side)
-        if (!SpaceCursor.sendable(line, before, after, rushed)) {
-            // the edge only while none of the rushed lines landed: read after them, it would skip lines
-            if (side != null && lineRush.unmoved(line, now, side.length) &&
-                SpaceCursor.toEdge(line, before, after, rushed, whole = side.length < LINE_REACH)
-            ) moveToFieldEdge(ic, line)
-            return
+        sendLine(line, null)
+    }
+
+    /**
+     * 滑选's free end [head] a line, its [anchor] kept: the editor moves it on screen as it does the
+     * space's cursor, with shift held (its selection's end, so set from [anchor] to [head] first where
+     * [head] is the left end, unless [anchored]: lines on their way already left it so). Whether a line
+     * went: its report is the free end's new place.
+     */
+    fun extendLine(line: SpaceCursor.Line, anchor: Int, head: Int, anchored: Boolean = false): Boolean {
+        currentInputConnection ?: return false
+        if (head < anchor && !anchored) editingSession.selectFrom(anchor, head)
+        return sendLine(line, CursorRange(anchor, head))
+    }
+
+    /** The editor's reports of a selection not predicted (a line landing): 滑选's, while its lines are on their way. */
+    var unpredictedSelection: ((CursorRange) -> Unit)? = null
+
+    // the space's cursor a line, or with [ends] (anchor, free end) 滑选's free end: none at the field's very
+    // start or end, where the key would move the focus away (SpaceCursor.sendable). What is read is the side
+    // of the cursor, or of a selection (its left end's before it, its right end's after it): a free end on the
+    // other side has the selection itself that way, a line surely there
+    private fun sendLine(line: SpaceCursor.Line, ends: CursorRange?): Boolean {
+        val ic = currentInputConnection ?: return false
+        val up = line == SpaceCursor.Line.Up
+        val facing = ends == null || (if (up) ends.end <= ends.start else ends.end >= ends.start)
+        if (facing) {
+            val now = SystemClock.uptimeMillis()
+            // only the side the line goes to is read: a binder call each, on the main thread
+            val before = if (up) ic.getTextBeforeCursor(LINE_REACH, 0) else null
+            val after = if (!up) ic.getTextAfterCursor(LINE_REACH, 0) else null
+            val side = before ?: after
+            // only the rushed lines not landed yet: a read the editor already moved is not stale by those it applied
+            val rushed = lineRush.unlanded(line, now, side)
+            if (!SpaceCursor.sendable(line, before, after, rushed)) {
+                // the edge only while none of the rushed lines landed: read after them, it would skip lines
+                return side != null && lineRush.unmoved(line, now, side.length) &&
+                    SpaceCursor.toEdge(line, before, after, rushed, whole = side.length < LINE_REACH) &&
+                    moveToFieldEdge(ic, line, ends?.start)
+            }
+            lineRush.sent(line, now, read = side?.length ?: -1, lines = side?.count { it == '\n' } ?: 0)
         }
-        lineRush.sent(line, now, read = side?.length ?: -1, lines = side?.count { it == '\n' } ?: 0)
         clearedText.edited()
-        sendDownUpKeyEvents(if (line == SpaceCursor.Line.Up) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN)
+        val code = if (up) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN
+        if (ends == null) sendDownUpKeyEvents(code) else sendShifted(ic, code)
+        return true
+    }
+
+    // [code] with shift held, as a hardware keyboard's shift+arrow: the editor extends its selection's end
+    private fun sendShifted(ic: InputConnection, code: Int) {
+        val t = SystemClock.uptimeMillis()
+        val meta = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        val flags = KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
+        fun key(action: Int, key: Int, state: Int) =
+            ic.sendKeyEvent(KeyEvent(t, t, action, key, 0, state, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, flags))
+        key(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, meta)
+        key(KeyEvent.ACTION_DOWN, code, meta)
+        key(KeyEvent.ACTION_UP, code, meta)
+        key(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 0)
     }
 
     // after the queued lines land: the field's start, or its end (where the editor's text ends; a copy of the
-    // whole text over binder, once, at the edge alone)
-    private fun moveToFieldEdge(ic: InputConnection, line: SpaceCursor.Line) {
+    // whole text over binder, once, at the edge alone); with [anchor], 滑选's selection from it to there
+    private fun moveToFieldEdge(ic: InputConnection, line: SpaceCursor.Line, anchor: Int? = null): Boolean {
         val end = if (line == SpaceCursor.Line.Up) 0
-        else ic.getExtractedText(ExtractedTextRequest(), 0)?.let { x -> x.text?.let { x.startOffset + it.length } } ?: return
+        else ic.getExtractedText(ExtractedTextRequest(), 0)?.let { x -> x.text?.let { x.startOffset + it.length } } ?: return false
         clearedText.edited()
-        ic.setSelection(end, end)
+        ic.setSelection(anchor ?: end, end)
+        return true
     }
 
     private fun handleArrowKey(direction: EditorKeyPolicy.Direction) {
@@ -1535,6 +1576,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         handleCursorUpdate(update)
         // a report not predicted, so not this service's own commit
         if (update != EditingSession.CursorUpdate.None) inputView?.cursorMoved()
+        if (update != EditingSession.CursorUpdate.None) unpredictedSelection?.invoke(CursorRange(newSelStart, newSelEnd))
         if (quoteReset && update == EditingSession.CursorUpdate.None) tellContextLater()
         inputView?.updateSelection(newSelStart, newSelEnd)
         wakeSettled()

@@ -14,6 +14,7 @@ import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.comparesScreenshots
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -118,6 +119,7 @@ class KeyShortcutsPageScreenshotTest {
             R.string.shortcut_page_g14 to "keys14",
             R.string.shortcut_page_g18 to "keys18",
             R.string.shortcut_page_zyfull to "zhuyin_full",
+            R.string.shortcut_page_zy9 to "zhuyin_nine",
             R.string.shortcut_page_number to "number",
             R.string.shortcut_page_function to "function",
         )) {
@@ -126,6 +128,23 @@ class KeyShortcutsPageScreenshotTest {
         }
         // the backspace's clear up and restore down, each its icon, beside its own (the keyboard's very key, S7a): no names cut short
         assertEquals(3, sceneIcons(key(st.s(R.string.fn_key_backspace))))
+    }
+
+    // 注音九键 mixes keys 14 and 24 wide in a row: each cell weighted by its key's width, every face of a row one
+    // height (the group keys were half-height chips), and the grey ， drawn as the board's r4c4, fitted as the rest
+    @Test
+    @Uat("ST-113")
+    fun zhuyinNinesCapsAreOneHeightARow() {
+        open()
+        tab(R.string.shortcut_page_zy9)
+        fatesDone()
+        val rows = KeyboardHarness.all(decor).filterIsInstance<SceneKeyCell>().groupBy { it.bounds.top }.values
+        assertTrue("${rows.size}", rows.size >= 4)
+        rows.forEach { row ->
+            val h = row.map { it.faceHeight }
+            // within rounding (the chips were about 0.58 of the rest)
+            assertTrue("faces $h", h.max() - h.min() <= 2.0)
+        }
     }
 
     // every cap on every tab the key asked for, found on its board (重输 and 0 on the nine keys', 分词 on 14 键's):

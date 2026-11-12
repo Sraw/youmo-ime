@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keys
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
@@ -14,36 +15,52 @@ import org.junit.Test
 class KeyListsWithTest {
     private val q = KeyId("full/q")
     private val one = KeyId("t9/1")
-    private val pinyinOne = KeyDefaults.nine('1', KeyboardVariant(KeyboardVariant.Form.Nine))
+    private val two = KeyId("t9/2")
+    private val nine = KeyboardVariant(KeyboardVariant.Form.Nine)
+    private val pinyinOne = KeyDefaults.nine('1', nine)
+    private val pinyinTwo = KeyDefaults.nine('2', nine)
 
+    // compared by the first resolved, not as stored: a key's default stores `:2` or `!`, never `*`
     @Test
     fun aListTheSameAsTheDefaultIsNotKept() {
-        val d = listOf(KeyDefaults.preset("q"))
-        assertNull(KeyLists.Empty.with(q, UserList(false, listOf("1", "Q")), d)[q])
-        assertEquals(UserList(false, listOf("Q", "1")), KeyLists.Empty.with(q, UserList(false, listOf("Q", "1")), d)[q])
-        // a first of its own is a setting, the list the same or not
-        assertEquals(First.None, KeyLists.Empty.with(q, UserList(false, listOf("1", "Q"), First.None), d)[q]?.first)
-        assertNull(KeyLists.Empty.with(q, UserList(false, listOf("1")), d).with(q, null, d)[q])
+        val d = KeyDefaults.preset("q")
+        val texts = pinyinTwo.items.map { it.text }
+        val group = KeyId("zy9/1")
+        val zhuyin = KeyDefaults.zhuyinGroup("ㄅㄉㄚ")!!
+        assertRows(
+            "q's default" to { assertNull(KeyLists.Empty.with(q, UserList(false, listOf("1", "Q")), d)[q]) },
+            "q's default reordered: kept" to {
+                assertEquals(UserList(false, listOf("Q", "1")), KeyLists.Empty.with(q, UserList(false, listOf("Q", "1")), d)[q])
+            },
+            "a first of its own is a setting, the list the same or not" to {
+                assertEquals(First.None, KeyLists.Empty.with(q, UserList(false, listOf("1", "Q"), First.None), d)[q]?.first)
+            },
+            "a change taken back" to { assertNull(KeyLists.Empty.with(q, UserList(false, listOf("1")), d).with(q, null, d)[q]) },
+            "九键 1's default, its first the list's" to {
+                assertNull(KeyLists.Empty.with(one, UserList(false, pinyinOne.items.map { it.text }), pinyinOne)[one])
+            },
+            "九键 2's default stored by hand, its first `:2`" to {
+                assertNull(KeyLists.Empty.with(two, UserList(false, texts, First.Literal("2")), pinyinTwo)[two])
+            },
+            "九键 2's list, its first item A another first: kept" to {
+                assertEquals(First.Default, KeyLists.Empty.with(two, UserList(false, texts), pinyinTwo)[two]?.first)
+            },
+            "注音九键's group, its first `!`" to {
+                assertNull(KeyLists.Empty.with(group, UserList(false, zhuyin.items.map { it.text }, First.None), zhuyin)[group])
+            },
+        )
     }
 
     @Test
-    fun nineOneHasOneDefaultSoItsOwnIsNoSetting() {
-        // English's 1 is pinyin's (用户 2026-11-11): set to it from either is no setting; anything else is one, shared (M3)
-        val defaults = listOf(pinyinOne, pinyinOne)
-        assertNull(KeyLists.Empty.with(one, UserList(false, pinyinOne.symbols.map { it.text }), defaults)[one])
-        assertEquals(listOf(".", "@"), KeyLists.Empty.with(one, UserList(false, listOf(".", "@")), defaults)[one]?.symbols)
-    }
-
-    @Test
-    fun noSymbolsAndNoRowIsOff() {
-        val d = listOf(KeyDefaults.preset("q"))
-        assertEquals(UserList.Off, KeyLists.Empty.with(q, UserList(false, emptyList()), d)[q])
-        // a row stays: the symbols emptied only
-        assertEquals(UserList(false, emptyList()), KeyLists.Empty.with(one, UserList(false, emptyList()), listOf(pinyinOne))[one])
+    fun noItemsIsOffOnEveryKey() {
+        assertEquals(UserList.Off, KeyLists.Empty.with(q, UserList(false, emptyList()), KeyDefaults.preset("q"))[q])
+        // a row's key emptied: off too, its row gone with it
+        assertEquals(UserList.Off, KeyLists.Empty.with(one, UserList(false, emptyList()), pinyinOne)[one])
+        assertEquals(UserList.Off, KeyLists.Empty.with(two, UserList(false, emptyList(), First.None), pinyinTwo)[two])
         // off where there is none anyway: nothing kept
         val z = KeyId("zyfull/1")
-        assertNull(KeyLists.Empty.with(z, UserList.Off, listOf(null))[z])
-        assertEquals(UserList.Off, KeyLists.Empty.with(q, UserList.Off, d)[q])
+        assertNull(KeyLists.Empty.with(z, UserList.Off, null)[z])
+        assertEquals(UserList.Off, KeyLists.Empty.with(q, UserList.Off, KeyDefaults.preset("q"))[q])
     }
 
     @Test

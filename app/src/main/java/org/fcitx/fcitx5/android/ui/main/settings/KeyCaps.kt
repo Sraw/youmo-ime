@@ -5,8 +5,11 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -14,7 +17,6 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
@@ -25,6 +27,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.firstShown
 import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
 import org.fcitx.fcitx5.android.input.keyboard.swipeWays
+import org.fcitx.fcitx5.android.input.keys.KeyListsCache
 import org.fcitx.fcitx5.android.input.keys.KeyResolver
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
@@ -32,17 +35,19 @@ import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
+import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.utils.styledColor
-import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import com.google.android.material.R as MaterialR
+import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import org.fcitx.fcitx5.android.scene.layout.Text as SceneText
 
 /**
@@ -123,7 +128,7 @@ object KeyCaps {
         // the marks as the keyboard's resolver has them (060-keys-unify §1.3): each key's first from key_lists, its
         // slots the page's being edited
         marks = if (layout != null) {
-            SceneBoard.resolver(layout, "", nineLetters(), slots).marks(keysState()).let { if (it.charShortcuts == charShortcuts) it else it.copy(charShortcuts = charShortcuts) }
+            SceneBoard.resolver(layout, NO_IM, nineLetters(), slots).marks(keysState()).let { if (it.charShortcuts == charShortcuts) it else it.copy(charShortcuts = charShortcuts) }
         } else {
             // a key alone (no board): its slots' marks, no first
             val spots = swipeSpots()
@@ -134,18 +139,41 @@ object KeyCaps {
     // the keys' state on a keyboard of no Shift and no punctuation: the swipe settings alone
     private fun keysState() = KeysState(ways = swipeWays(), spots = swipeSpots())
 
-    /** [layout]'s resolver as the editor reads a key's list of it ([KeyResolver.edit]): its keys' defaults and the user's lists. */
-    fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.of(ctx, layout)?.let { SceneBoard.resolver(it, "", nineLetters()) }
+    /**
+     * [layout]'s resolver as the editor reads a key's list of it ([KeyResolver.edit]): its keys' defaults and the user's
+     * lists, one list a key for every input method (060-row-unlock), shown with the user's 按键字母 and 18 键's L with
+     * its `:` (a scheme typing `;`'s: the item every keyboard but that one skips, §2).
+     */
+    fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.of(ctx, layout)?.let {
+        SceneBoard.resolver(it, KeyboardVariant(DefaultMarks.variantOf(it.layout).form, nineLetters(), semicolon = true))
+    }
 
     /** The nine keys' letters as the user set them (t9_letters), as 九键's keyboard has them: the editor's rows of 2 to 9. */
-    fun nineLetters(): Map<Char, String> = NineKeyLetters.parse(AppPrefs.getInstance().keyboard.t9Letters.getValue())
-        .let { l -> ('2'..'9').associateWith { l.letters(it).lowercase() } }
+    fun nineLetters(): Map<Char, String> = KeyListsCache.nineLettersOf(AppPrefs.getInstance().keyboard.t9Letters.getValue())
 
     /** A qwerty key's height on the keyboard as the height settings make it now, px (InputView's keys' area, [KeyboardArea]). */
     fun keyboardKeyHeight(ctx: Context): Int = SwipeFates.size(upright(ctx), KeyNames.QWERTY, ImKeyboards.Layout.TEXT).height / KEY_ROWS
 
     // the keyboard upright on this display, as the page's notes have it (SwipeFates), whatever way the page is turned
-    private fun upright(ctx: Context) = KeyboardArea.screens(ctx).first
+    private fun upright(ctx: Context) = thisTurn(UPRIGHT to Configuration(ctx.resources.configuration)) { KeyboardArea.screens(ctx).first }
+
+    /** The input method a settings cap's resolver is of: none, its layout's own defaults (KeyboardVariants' "" ). */
+    const val NO_IM = ""
+
+    private const val UPRIGHT = "upright"
+
+    // what one main-looper turn (a page rebuilt, a dialog's list drawn) works out once for all its caps, not per cap:
+    // the upright screen (KeyboardArea.screens asks the window manager, a binder call, and a secure setting) and each
+    // board's readings for the settings as they are; let go at the turn's end, before any setting can change
+    private var turn: HashMap<Any, Any?>? = null
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> thisTurn(key: Any, make: () -> T): T {
+        if (Looper.myLooper() != Looper.getMainLooper()) return make()
+        val cache = turn ?: HashMap<Any, Any?>().also { turn = it; mainHandler.post { turn = null } }
+        return if (key in cache) cache[key] as T else make().also { cache[key] = it }
+    }
 
     /**
      * The keyboard the key of [shortcut] (a shortcut page's name: `full/a`, `zyfull/1`, a function key's `space`) is on,
@@ -156,7 +184,15 @@ object KeyCaps {
         val size = SwipeFates.size(upright(ctx), layout, CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT)
         // the corners as the keyboard says them (BaseKeyboard.keyReadings: the long presses' firsts, the user's; none where the
         // first's way draws nothing); the marks drawn are the resolver's (onBoard)
-        val alts = if (firstShown()) resolver(ctx, layout)?.readings(keysState()).orEmpty() else emptyMap()
+        val alts = if (firstShown()) {
+            // keyed by all they are of: a setting changed within the turn (a test's) is no stale reading
+            val state = keysState()
+            thisTurn(listOf(layout, state, KeyListsCache.user.current, SwipeSlotsCache.current, nineLetters())) {
+                resolver(ctx, layout)?.readings(state).orEmpty()
+            }
+        } else {
+            emptyMap()
+        }
         return SceneKeyCell.Board(layout, KeyId.of(shortcut).name, size.width, size.height, alts,
             AppPrefs.getInstance().keyboard.letterCase.getValue().case, size.floating, size.split)
     }
@@ -168,6 +204,21 @@ object KeyCaps {
     fun defaultBoard(shortcut: String): String = KeyId.of(shortcut).let { id ->
         if (id.isFunction) FUNCTION_BOARDS[id.key] ?: KeyNames.QWERTY else BOARDS[id.form]?.first ?: KeyNames.QWERTY
     }
+
+    /**
+     * Every key's width on [layout] as the keyboard lays it out (its `fill` keys sharing what the row's others leave,
+     * its conditions weighed), by its shortcut's name, px at the keyboard's size: a settings page's cells weighted by
+     * these are shaped as the keys, so every cap, aspect-fitted into its cell (SceneKeyCell), comes out the
+     * keyboard's height (注音九键 mixes 14 and 24). Empty where the board could not be made.
+     */
+    fun widths(ctx: Context, layout: String, shortcut: String): Map<String, Double> =
+        SceneKeyCell(ctx, ThemeManager.activeTheme).run {
+            this.board = board(ctx, shortcut, layout)
+            // a scene is made for a cell of some size only; the board's own size is what lays the keys out
+            layout(0, 0, 1, 1)
+            // the first of a name, as a cap draws (SceneKeyCell.keyNode): 注音九键 has ， twice
+            scene?.keys.orEmpty().filter { it.copy == 0 && it.shortcut != null }.distinctBy { it.shortcut }.associate { it.shortcut!! to it.bounds.width }
+        }
 
     // a shortcut page's form: its board and the code row that board has
     private val BOARDS = mapOf(

@@ -4,50 +4,41 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
+import org.fcitx.fcitx5.android.input.keys.First
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.UserList
+
 /**
- * A key's long press as the settings edit it (060-keys-unify S5): its keyboard's [row] first, fixed (never
- * stored: it can only be chosen as the [first]), then its symbols, which can be moved, deleted and added to;
- * one item selected (or none, -1), and its [first], what a swipe's 长按首选 types (null: none). Each action
- * keeps the selection on the item it moved, or on the one that took the place of the one removed.
- * [defaultFirst] is the key's default first, what a deleted first falls back to while the list has it; [off], a key
- * whose long press the user turned off: its first edit turns it on with the default first (else the first symbol).
+ * A key's long press as the settings edit it (060-row-unlock §1): its whole list, every item (a key's own letters
+ * and digit too) moved, deleted and added to alike; one item selected (or none, -1), and its [first], what a
+ * swipe's 长按首选 types (null: none). Each action keeps the selection on the item it moved, or on the one that
+ * took the place of the one removed.
  */
-class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, private val defaultFirst: String? = null, private var off: Boolean = false) {
+class PopupEditor(items: List<String>, first: String?) {
 
-    private val list = symbols.filter { it !in row }.distinct().toMutableList()
+    private val list = items.distinct().toMutableList()
 
-    // an off key's symbols as it started, and whether its first was taken only for being edited on (not chosen):
-    // its list back to those, it is off again
-    private val startSymbols = list.toList()
-    private var firstForOn = false
+    /** The items as they are now: what is stored. */
+    val items: List<String> get() = list
 
-    val items: List<String> get() = row + list
-
-    /** The symbols as they are now: what is stored. */
-    val symbols: List<String> get() = list
-
-    var first: String? = first?.takeIf { it in items }
+    var first: String? = first?.takeIf { it in list }
         private set
 
     var selected = -1
         private set
 
-    /** Whether the item at [index] is of the row: greyed, only ever chosen as the first. */
-    fun isRow(index: Int) = index in row.indices
-
     /** Selects [index], or nothing if it was selected already. */
     fun tap(index: Int) {
-        selected = if (selected == index || index !in items.indices) -1 else index
+        selected = if (selected == index || index !in list.indices) -1 else index
     }
 
-    val canMakeFirst get() = selected in items.indices && items[selected] != first
-    val canMoveLeft get() = selected > row.size
-    val canMoveRight get() = selected >= row.size && selected < items.lastIndex
-    val canDelete get() = selected >= row.size && selected in items.indices
+    val canMakeFirst get() = selected in list.indices && list[selected] != first
+    val canMoveLeft get() = selected in 1..list.lastIndex
+    val canMoveRight get() = selected in 0 until list.lastIndex
+    val canDelete get() = selected in list.indices
 
     fun makeFirst() {
-        if (selected in items.indices) first = items[selected]
-        firstForOn = false
+        if (selected in list.indices) first = list[selected]
     }
 
     fun moveLeft() = move(selected - 1)
@@ -55,41 +46,30 @@ class PopupEditor(val row: List<String>, symbols: List<String>, first: String?, 
     fun moveRight() = move(selected + 1)
 
     private fun move(to: Int) {
-        if (!canDelete || to !in row.size..items.lastIndex) return
-        val from = selected - row.size
-        list.add(to - row.size, list.removeAt(from))
+        if (!canDelete || to !in list.indices) return
+        list.add(to, list.removeAt(selected))
         selected = to
     }
 
-    /** The selected symbol removed; the first, if it was, falls back to the default first where still there, else to the first symbol left (none with none). */
+    /** The selected item removed; the first, if it was, falls back to the list's first item now (none with none). */
     fun delete() {
         if (!canDelete) return
-        val gone = list.removeAt(selected - row.size)
-        if (gone == first) first = defaultFirst?.takeIf { it in items } ?: list.firstOrNull()
-        if (firstForOn && list == startSymbols) {
-            first = null
-            off = true
-            firstForOn = false
-        }
-        selected = if (items.isEmpty()) -1 else minOf(selected, items.lastIndex)
+        val gone = list.removeAt(selected)
+        if (gone == first) first = UserList.firstOf(First.Default, list)
+        // the next item: none left, nothing selected
+        selected = if (list.isEmpty()) -1 else minOf(selected, list.lastIndex)
     }
 
     /**
-     * Adds the items of [text] (as [PopupOverrides.tokens] splits it) not there yet, at the end; to a list of none, the
-     * first of them first; to a key turned [off] with no first, the default first (else the first symbol).
+     * Adds the items of [text] (as [PopupOverrides.tokens] splits it) not there yet, at the end, up to
+     * [KeyLists.MAX_ITEMS]; to a list of none, the first of them first. False when some did not fit.
      */
-    fun add(text: String) {
-        val wasEmpty = items.isEmpty()
-        val before = list.size
-        PopupOverrides.tokens(text).distinct().filterTo(list) { it !in items }
-        val added = list.size > before
-        when {
-            wasEmpty -> first = list.firstOrNull()
-            off && added && first == null -> {
-                first = defaultFirst?.takeIf { it in items } ?: list.firstOrNull()
-                firstForOn = true
-            }
-        }
-        if (added) off = false
+    fun add(text: String): Boolean {
+        val wasEmpty = list.isEmpty()
+        val new = PopupOverrides.tokens(text).distinct().filter { it !in list }
+        val room = (KeyLists.MAX_ITEMS - list.size).coerceAtLeast(0)
+        list += new.take(room)
+        if (wasEmpty) first = list.firstOrNull()
+        return new.size <= room
     }
 }

@@ -54,8 +54,11 @@ sealed class KeyAction {
     /** 滑选's touch lifted or taken away: the selection stays, the editor's as it reported it. */
     data object EndSwipeSelectAction : KeyAction()
 
-    /** 滑选's free end moved [steps] characters, negative to the left; [moved] run where the selection did move (the key's buzz). */
-    class SwipeSelectAction(val steps: Int, val moved: () -> Unit = {}) : KeyAction()
+    /**
+     * 滑选's free end moved [steps] characters, negative to the left, then [lines] up or down, the editor moving
+     * the free end a line on screen as the space's slide moves the cursor ([SpaceCursor]); [moved] run where the selection did move (the key's buzz).
+     */
+    class SwipeSelectAction(val steps: Int, val lines: List<SpaceCursor.Line> = emptyList(), val moved: () -> Unit = {}) : KeyAction()
 
     data class PickerSwitchAction(val key: PickerWindow.Key? = null) : KeyAction()
 

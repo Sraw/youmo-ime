@@ -552,6 +552,18 @@ class EditingSession(
         editor.setSelection(from, to)
     }
 
+    /**
+     * Selects from [anchor] to [head] in that order, [head] the end the editor moves with shift and an
+     * arrow (its selection's end): 滑选's free end before a line. As the editor reports it, the other
+     * way round where [head] is the left end.
+     */
+    fun selectFrom(anchor: Int, head: Int) {
+        checkThread()
+        if (!editor.isAvailable) return
+        selection.predict(anchor, head)
+        editor.setSelection(anchor, head)
+    }
+
     /** Collapses a selection to its end, leaving a plain cursor. */
     fun cancelSelection() {
         checkThread()

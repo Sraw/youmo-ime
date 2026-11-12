@@ -370,7 +370,7 @@
     <string name="toolbar_reset">Reset to default</string>
     <string name="toolbar_trad_simp">Simplified / Traditional</string>
     <string name="reset_this_key">Restore this key\'s default</string>
-    <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it, and the small character on the key. The faded ones are the keyboard\'s own (a key\'s letters, its digit): they can be made the first, not moved or deleted. Tap a character to select it, then use the buttons below.</string>
+    <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it, and the small character on the key. A key\'s own letters and digit are moved, deleted and made the first like any other character. The : on the 18 keys\' L shows only with Microsoft 双拼. Tap a character to select it, then use the buttons below.</string>
     <string name="reset_all_long_press_message">Restore every key to its built-in long-press characters?</string>
     <string name="reset_all">Reset all</string>
     <string name="my_words">User dictionary</string>
@@ -583,8 +583,6 @@
     <string name="vibration_strength">Vibration strength</string>
     <string name="level_light">Light</string>
     <string name="level_strong">Strong</string>
-    <string name="level_quiet">Quiet</string>
-    <string name="level_loud">Loud</string>
     <string name="theme_and_size">Look</string>
     <string name="configure_look">Size and style</string>
     <string name="export_user_data_summary">Settings, words learned and added, custom phrases, themes and the clipboard history (copied passwords too), in one file</string>
@@ -805,9 +803,10 @@
     <string name="picker_symbols">Symbols</string>
     <string name="picker_flags">Flags</string>
     <string name="long_press_legend">Outlined keys are changed; on a faded key a long press offers nothing, and a swipe to its first of long press is a tap.</string>
-    <string name="long_press_legend_elsewhere">A greyed %1$s is a function key: its long press works, and is changed on the Function keys tab.</string>
+    <string name="long_press_legend_elsewhere">The %1$s here is a function key: its long press works, and is changed on the Function keys tab.</string>
+    <string name="long_press_full">A key holds %1$d characters at most; the rest were not added.</string>
     <string name="long_press_none">Holding this key offers nothing.</string>
-    <string name="long_press_off">Holding this key offers nothing: its long press is turned off. Changing its list (adding a character or choosing a first) turns it on again.</string>
+    <string name="long_press_off">Holding this key offers nothing: its long press is turned off. Adding a character turns it on again.</string>
     <string name="long_press_newer">These long presses were set by a newer version of the app: they are kept as they are and cannot be edited here.</string>
     <string name="long_press_add_hint">Add, space between several</string>
     <string name="punctuation_page_hint">While typing Chinese, the key on the left types the punctuation on the right; a key with several offers a choice. Tap one to change or remove it.</string>
@@ -985,7 +984,6 @@
     <string name="common_word_text">Word</string>
     <string name="common_word_replacements">Replacements, one a line, offered in this order</string>
     <string name="common_word_no_replacement">Give at least one replacement</string>
-    <string name="common_word_same_as_word">A replacement cannot be the word itself</string>
     <string name="common_word_too_long">A word has at most 16 characters, a replacement 32</string>
     <string name="common_word_too_many">There are at most 2000 common words</string>
     <string name="common_word_listed">This word is listed already: tap it to edit</string>

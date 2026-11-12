@@ -48,10 +48,19 @@ sealed interface KeyPopup {
 }
 
 /**
- * A key's list as the settings' editor starts it (060-keys-unify S5): its [row] (the keyboard's, never stored),
- * its [symbols], its [first]'s text (null: none), and what the user set of it, null for none.
+ * A key's list as the settings' editor starts it (060-row-unlock §1): its [items] as the key pops up (its own
+ * letters and digit as any other item), its [first]'s text (null: none), and what the user set of it, null for none.
  */
-data class KeyEdit(val row: List<String>, val symbols: List<String>, val first: String?, val user: UserList?)
+data class KeyEdit(val items: List<String>, val first: String?, val user: UserList?) {
+    companion object {
+        /** The [First] an edited list stores for the editor's [first]: `*` for the list's first item, `!` for none, else the item. */
+        fun firstToStore(first: String?, items: List<String>): First = when (first) {
+            null -> First.None
+            UserList.firstOf(First.Default, items) -> First.Default
+            else -> First.Literal(first)
+        }
+    }
+}
 
 /**
  * A key as everything reads it: its long press ([popup], null with none), its [first] (what its swipe's
@@ -94,24 +103,17 @@ class KeyResolver(
     private var marksFor: KeyState? = null
     private var marksMade: MarkSettings? = null
 
+    private var readingsFor: KeyState? = null
+    private var readingsMade: Map<String, String>? = null
+
     /** The default list [id] has here, with no setting of the user's (the editor's start, `KeyLists.with`'s). */
     fun defaultOf(id: KeyId, caps: Boolean = false): DefaultList? =
         KeyDefaults.of(id, variant, facts[id] ?: NodeFacts(), caps = caps && id.form == FULL)
 
-    /**
-     * [id]'s defaults on each of [variants] (the editor's page's: 拼音, 双拼, English) with this layout's node of
-     * it: what KeyLists.with compares a list with.
-     */
-    fun defaultsOn(id: KeyId, variants: List<KeyboardVariant>): List<DefaultList?> =
-        variants.map { KeyDefaults.of(id, it, facts[id] ?: NodeFacts()) }
-
     /** [id]'s list as the editor starts it: as the key pops up here with no Shift, the user's own where set. */
     fun edit(id: KeyId): KeyEdit {
-        val user = lists[id]
         val m = made.getOrPut(id to false) { make(id, false) }
-        if (m == null) return KeyEdit(defaultOf(id)?.row.orEmpty().map { it.text }, emptyList(), null, user)
-        val row = m.inRow.coerceAtLeast(0)
-        return KeyEdit(m.items.take(row).map { it.text }, m.items.drop(row).map { it.text }, m.first?.text, user)
+        return KeyEdit(m?.items.orEmpty().map { it.text }, m?.first?.text, lists[id])
     }
 
     fun resolve(id: KeyId, state: KeyState): ResolvedKey {
@@ -130,13 +132,16 @@ class KeyResolver(
             m == null -> null
             else -> KeyPopup.Items(m.items, m.items.map { DefaultMarks.shown(it, state.punctuation) }, m.inRow, m.focus, m.own)
         }
-        val first = m?.first
+        // a first KeyOutput cannot make (a theme's `send=` of no action) is none, for the corner, the swipe's slot and
+        // the keyboard's swipe (KeyResolving.swipe) alike; one the app cannot map (an unknown sym or command, an
+        // `action:` with no placeholder) still shows a corner while the swipe types nothing
+        val first = m?.first?.takeIf { KeyOutput.of(it) != null }
         val shown = first?.let { DefaultMarks.shown(it, state.punctuation) }?.takeIf { it.isNotEmpty() }
         val swipe = KeySwipe.Key(SwipeSlots.typesAChar(id.name), slots.resolve(id.name, true), slots.resolve(id.name, false), hasFirst = first != null)
         // looking up roots, the corner is the letter the roots are of
         val letterCorner = roots != null || state.letterCorners && id.form == FULL && id.key.singleOrNull()?.isLetter() == true
-        val corner = if (letterCorner) id.key else shown?.takeUnless { firstHidden(id, first) }
-        val firstMark = corner?.let(MarkContent::Symbol) ?: MarkContent.Empty
+        val corner = if (letterCorner) id.key else shown?.takeUnless { firstHidden(id) }
+        val firstMark = corner?.let(SceneMarks::symbol) ?: MarkContent.Empty
         return ResolvedKey(id, popup, first, shown, swipe, mark(swipe.up, firstMark), mark(swipe.down, firstMark), corner)
     }
 
@@ -158,10 +163,11 @@ class KeyResolver(
         return made
     }
 
-    private var readingsFor: KeyState? = null
-    private var readingsMade: Map<String, String>? = null
-
-    /** The marks of every named key, as the scene draws them: made again only for another [state]. */
+    /**
+     * The marks of every named key, as the scene draws them: made again only for another [state].
+     * [MarkSettings.charShortcuts] here is only "no roots shown"; the keyboard's own rule (its labels the roots
+     * table's and roots on) is the caller's to lay over it, as SceneBoard, KeyCaps and SwipeFates do.
+     */
     fun marks(state: KeyState): MarkSettings {
         if (state == marksFor) marksMade?.let { return it }
         val marks = HashMap<String, MarkContent>()
@@ -195,56 +201,48 @@ class KeyResolver(
         else -> SceneMarks.content(slot.shortcut) ?: MarkContent.Empty
     }
 
-    // a character key (any but fn/'s, as the scene has it: Content) of `mark="false"` (注音's) draws and says no first of its defaults', one the user set all the same
-    // (060-s6-review L4): set as the list's first, or the first of the symbols they wrote
-    private fun firstHidden(id: KeyId, first: Item): Boolean {
-        if (facts[id]?.markOff != true || id.isFunction) return false
-        val user = lists[id] ?: return true
-        return user.first !is First.Literal && first.text !in user.symbols
-    }
+    // a character key (any but fn/'s, as the scene has it: Content) of `mark="false"` (注音's) draws and says no first of its
+    // defaults', any of a list the user set all the same (060-s6-review L4)
+    private fun firstHidden(id: KeyId): Boolean = facts[id]?.markOff == true && !id.isFunction && lists[id] == null
 
     private class Made(val items: List<Item>, val inRow: Int, val first: Item?, val focus: Int, val own: Int)
 
     private fun make(id: KeyId, caps: Boolean): Made? {
         val d = defaultOf(id, caps)
-        val user = lists[id]
-        if (user?.off == true) return null
+        val user = lists[id] ?: return d?.takeIf { it.items.isNotEmpty() }?.let(::madeOf)
+        if (user.off) return null
         val row = d?.row.orEmpty()
-        val symbols = if (user == null) d?.symbols.orEmpty() else symbolsOf(user, d, row, caps)
-        if (row.isEmpty() && symbols.isEmpty()) return null
-        val items = row + symbols
-        val first = when (val f = user?.first ?: First.Default) {
-            First.None -> null
-            is First.Literal -> items.firstOrNull { it.text == f.text } ?: defaultFirst(d, user, symbols, items)
-            First.Default -> defaultFirst(d, user, symbols, items)
-        }
-        val focus = first?.let(items::indexOf)?.takeIf { it >= 0 } ?: d?.focus?.takeIf { it < items.size } ?: 0
-        val own = if (row.isEmpty()) -1 else d?.focus?.takeIf { it < row.size } ?: (row.size / 2)
-        return Made(items, if (row.isEmpty()) -1 else row.size, first, focus, own)
-    }
-
-    // the user's symbols as items: each committed as the default's item of its text is, else as the default's symbols are (§3.1)
-    private fun symbolsOf(user: UserList, d: DefaultList?, row: List<Item>, caps: Boolean): List<Item> {
-        val texts = if (caps) user.symbols.map(::upper).distinct() else user.symbols
-        val rowTexts = row.map { it.text }.toSet()
+        // stored as typed lower case (a letter's): Shift's list has its capitals
+        val texts = (if (caps) user.items.map(::upper).distinct() else user.items).filterNot { skipped(id, it) }
         val commit = d?.symbols?.firstOrNull()?.commit?.takeIf { it == Commit.AsIs } ?: Commit.AsKey
-        return texts.filter { it !in rowTexts }.map { t -> d?.items?.firstOrNull { it.text == t } ?: Item(t, commit) }
+        // each committed as the default's item of its text is, else as the default's symbols are (§3.1)
+        val items = texts.map { t -> d?.items?.firstOrNull { it.text == t } ?: Item(t, commit) }
+        if (items.isEmpty()) return null
+        val firstText = UserList.firstOf(if (caps) user.first.upper() else user.first, texts)
+        val first = items.firstOrNull { it.text == firstText }
+        // the row: the leading items of the default's row, or a single ASCII letter or digit (a letter of another
+        // 按键字母 or scheme); none (-1), all as symbols (060-row-unlock §1.3)
+        val rowTexts = row.map { it.text }.toSet()
+        val inRow = if (row.isEmpty()) 0 else items.takeWhile { it.text in rowTexts || own(it.text) }.size
+        val focus = first?.let(items::indexOf)?.takeIf { it >= 0 } ?: 0
+        if (inRow == 0) return Made(items, -1, first, focus, -1)
+        return Made(items, inRow, first, focus, focus.takeIf { first != null && it < inRow } ?: (inRow / 2))
     }
 
-    /**
-     * The default's first where the list still has it: a row's (a digit, a corner) always; one the defaults put
-     * first among the symbols (a letter's, ，'s), the user's list's first then.
-     */
-    private fun defaultFirst(d: DefaultList?, user: UserList?, symbols: List<Item>, items: List<Item>): Item? {
-        val f = d?.first
-        return when {
-            d == null -> symbols.firstOrNull()
-            f == null -> null
-            f in d.row -> f.takeIf { it in items }
-            user == null -> f
-            else -> symbols.firstOrNull()
-        }
+    private fun madeOf(d: DefaultList): Made {
+        val own = if (d.row.isEmpty()) -1 else d.focus.takeIf { it < d.row.size } ?: (d.row.size / 2)
+        val focus = d.first?.let(d.items::indexOf)?.takeIf { it >= 0 } ?: d.focus.takeIf { it < d.items.size } ?: 0
+        return Made(d.items, if (d.row.isEmpty()) -1 else d.row.size, d.first, focus, own)
     }
+
+    // the one exception (060-row-unlock §2): the 18 keys' L group types `;` only where the scheme does (KeyDefaults'
+    // rule), and its capital `:` is shown only there
+    private fun skipped(id: KeyId, text: String): Boolean =
+        text == ":" && variant.form == KeyboardVariant.Form.Grouped18 && !variant.semicolon && facts[id]?.letters?.contains(';') == true
+
+    private fun own(text: String): Boolean = text.length == 1 && text[0].let { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' }
+
+    private fun First.upper(): First = if (this is First.Literal) First.Literal(upper(text)) else this
 
     // Shift shows a lower case list in capitals; "ß".uppercase() is "SS": such an item kept as typed
     private fun upper(item: String): String = item.uppercase().takeIf { it.length == item.length } ?: item

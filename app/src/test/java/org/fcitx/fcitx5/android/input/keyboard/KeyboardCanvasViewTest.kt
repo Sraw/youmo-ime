@@ -305,7 +305,7 @@ class KeyboardCanvasViewTest {
             val keyboard = AppPrefs.getInstance().keyboard
             changed("q's long press the user's") { prefs.setList("full/q", listOf("é", "1"), first = "é") }
             cornerSize = texts(was).single { it[0] == "é" }[3]
-            // the keyboard made anew by the change of the lists (FcitxInputMethodService.remakeKeyboardsPrefs): the one shown now
+            // the change of the lists only redraws (BaseKeyboard.onKeyListsChanged); the keyboard shown now, the same one
             changed("the punctuation mapped") { h.textKeyboard().onPunctuationUpdate(mapOf("é" to "ω")) }
             assertEquals(was.toString(), "ω", corner(was)[0])
             changed("a shortcut on q") {

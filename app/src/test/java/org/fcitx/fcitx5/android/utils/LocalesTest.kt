@@ -58,7 +58,10 @@ class LocalesTest {
         assertEquals(listOf("zh_CN", "zh", "en_US", "en"), of("zh-CN", "en-US", "zh-CN"))
     }
 
+    // below Android 13 the change reads the app's own pick through the app: without its own
+    // application this passed only when an earlier test had made one
     @Test
+    @Config(application = FcitxApplication::class)
     fun theLanguageIsTheBareLanguageOfTheFirstLocale() {
         change("zh-HK,en-US")
         assertEquals("zh_HK", Locales.languageWithCountry)

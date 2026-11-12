@@ -146,9 +146,11 @@ class SceneBehaviorTest {
         assertEquals("zyfull/q", q.shortcut)
         assertEquals(mapOf("3" to "tone-3", "4" to "tone-4", "6" to "tone-2", "7" to "tone-5"), listOf("3", "4", "6", "7").associateWith { (k.getValue(it).press as SceneAction.Placeholder).name })
         assertEquals(Bubble("ˇ", ""), k.getValue("3").bubble)
-        // a letter of no shortcut its face alone; a swipe's own corner whatever its shortcut
+        // a letter of no shortcut its face alone, or with its swipe-up='s corner; a named key's corner empty
+        // whatever its layout's swipe-up= (its resolver shows its swipe)
         assertEquals(Bubble("A", null), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\"/>")).bubble)
-        assertEquals(Bubble("A", "!"), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\" swipe-up=\"!\" shortcut=\"x/a\"/>")).bubble)
+        assertEquals(Bubble("A", "!"), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\" swipe-up=\"!\"/>")).bubble)
+        assertEquals(Bubble("A", ""), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\" swipe-up=\"!\" shortcut=\"x/a\"/>")).bubble)
         // the bottom row's comma (a function key's kind): named, its corner the resolver's too
         assertEquals(Bubble(",", ""), k.getValue("comma").bubble)
     }
@@ -237,7 +239,6 @@ class SceneBehaviorTest {
         assertEquals(Bubble(".com", null), url.getValue("domain").bubble)
     }
 
-    // the same node, the same behaviour: a scene made anew keeps the keys made for the last
     // 060-keys-unify §5: a function key's action long press by its name alone, on every keyboard that has it (the
     // number pad's space and !?# too, the layouts writing none)
     @Test
@@ -263,6 +264,21 @@ class SceneBehaviorTest {
         assertNull(SceneBehavior.of(keys("qwerty").getValue("backspace")).longPress)
     }
 
+    // contract: a theme's layout that writes long-press= or swipe-up= on a function key changes nothing: it acts by
+    // its name alone, as on every other keyboard (docs/theme-format.md, 060-keys-unify §5); an unnamed key keeps its own
+    @Test
+    fun aThemesLongPressAndSwipeOnAFunctionKeyAreIgnored() {
+        val space = SceneBehavior.of(node("<key id=\"space\" kind=\"function\" send=\"sym:space\" shortcut=\"space\" long-press=\"ime-picker\" swipe-up=\"!\"/>"))
+        assertEquals(SceneAction.Command("space-long-press"), space.longPress)
+        assertNull(space.swipe)
+        val backspace = SceneBehavior.of(node("<key id=\"bs\" kind=\"function\" send=\"sym:BackSpace\" shortcut=\"backspace\" long-press=\"quickphrase\"/>"))
+        assertNull(backspace.longPress)
+        val unnamed = SceneBehavior.of(node("<key id=\"q\" kind=\"function\" send=\"sym:Tab\" long-press=\"quickphrase\" swipe-up=\"!\"/>"))
+        assertEquals(SceneAction.Command("quickphrase"), unnamed.longPress)
+        assertEquals(SceneAction.of("!"), unnamed.swipe)
+    }
+
+    // the same node, the same behaviour: a scene made anew keeps the keys made for the last
     @Test
     fun aKeyThatDoesTheSameIsEqual() {
         val a = SceneBehavior.of(keys("k14").getValue("r2c1"))

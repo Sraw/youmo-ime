@@ -82,15 +82,7 @@ class PopupOverridesFragmentTest {
     // F4444: a code alone typed as a long-press character is refused in the dialog, which stays open
     @RunWith(RobolectricTestRunner::class)
     @Config(application = FcitxApplication::class)
-    class Dialog {
-
-        private val st = SettingsHarness()
-
-        @get:Rule
-        val prefs = PrefsRule()
-
-        @After
-        fun close() = st.close()
+    class Dialog : EditorDialog() {
 
         @Test
         @Uat("ST-22")
@@ -127,9 +119,6 @@ class PopupOverridesFragmentTest {
             st.activity
             st.open(SettingsRoute.PopupOverrides)
         }
-
-        private fun keyCalled(label: String) = KeyboardHarness.all(st.activity.window.decorView)
-            .first { it.contentDescription?.toString()?.substringBefore(',') == label && it.hasOnClickListeners() }
 
         private fun click(title: Int) {
             KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }.performClick()
@@ -211,8 +200,10 @@ class PopupOverridesFragmentTest {
                 org.robolectric.shadows.ShadowLooper.idleMainLooper(1, java.util.concurrent.TimeUnit.SECONDS)
                 awaitNotes { note !in shown() }
                 assertFalse(shown().toString(), note in shown())
-                // 上滑 left as the keyboard has it: no note of it
-                assertEquals(shown().toString(), 1, shown().count { it == st.s(R.string.swipe_fate_both, st.s(R.string.swipe_fate_part_dropped), st.s(R.string.swipe_fate_part_as_set)) || it.startsWith(st.s(R.string.swipe_fate_dropped).take(3)) || it.startsWith(st.s(R.string.swipe_fate_both, "", "").take(5)) })
+                // the one note left is 下滑's icon's: no room for it upright at 底部 on this low keyboard, as set turned;
+                // 上滑, left as the keyboard has it, none (any other note of either rung would be caught here too)
+                val iconNote = st.s(R.string.swipe_fate_both, st.s(R.string.swipe_fate_part_dropped), st.s(R.string.swipe_fate_part_as_set))
+                assertEquals(listOf(iconNote), shown().filter { it == iconNote || it.startsWith(st.s(R.string.swipe_fate_dropped).take(3)) || it.startsWith(st.s(R.string.swipe_fate_both, "", "").take(5)) })
                 // a note given is shown, none hidden
                 val section = SwipeSlotSection(st.activity, "", off = false, initial = SwipeSlot.Text("x"))
                 section.note("n")
@@ -238,16 +229,16 @@ class PopupOverridesFragmentTest {
         fun theNoteNamesTheKeyboardThatDrawsTheWayWorst() {
             val ctx = st.activity
             fun seen(label: String, up: MarkFate, turned: MarkFate) = listOf(
-                SwipeFates.Seen(label, false, mapOf("space" to mapOf(true to up))),
-                SwipeFates.Seen(label, true, mapOf("space" to mapOf(true to turned))),
+                SwipeFates.Seen(label, false, mapOf("fn/space" to mapOf(true to up))),
+                SwipeFates.Seen(label, true, mapOf("fn/space" to mapOf(true to turned))),
             )
             val both = seen("全键盘", MarkFate.AsSet, MarkFate.AsSet) + seen("九键", MarkFate.Sign, MarkFate.AsSet)
             val worst = SwipeFates.note(ctx, MarkFate.Sign, MarkFate.AsSet)!!
             assertEquals(st.s(R.string.swipe_fate_on, "九键", worst), SwipeFates.note(ctx, both, "space", true))
             // the same on both: no name
             assertEquals(worst, SwipeFates.note(ctx, seen("全键盘", MarkFate.Sign, MarkFate.AsSet) + seen("九键", MarkFate.Sign, MarkFate.AsSet), "space", true))
-            // set, and no fate in a scene: drawn nowhere
-            assertEquals(st.s(R.string.swipe_fate_dropped), SwipeFates.note(ctx, listOf(SwipeFates.Seen("全键盘", false, mapOf("space" to emptyMap())), SwipeFates.Seen("全键盘", true, mapOf("space" to emptyMap()))), "space", false))
+            // set, and no fate in a scene (set to 空, nothing to draw): no claim
+            assertNull(SwipeFates.note(ctx, listOf(SwipeFates.Seen("全键盘", false, mapOf("fn/space" to emptyMap())), SwipeFates.Seen("全键盘", true, mapOf("fn/space" to emptyMap()))), "space", false))
             // a key on no keyboard: nothing
             assertNull(SwipeFates.note(ctx, both, "retype", true))
             // a scene not made: no claim
@@ -480,10 +471,10 @@ class PopupOverridesFragmentTest {
             val before = own("g14/qw")
             d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
-            // the row (1 q w) never stored: the symbols alone, ① after the keyboard's own
+            // the whole list stored, ① after the keyboard's own; its first the corner 1, not the first item Q
             val stored = qwStored()!!
-            assertEquals(before + "①", stored.symbols)
-            assertEquals(First.Default, stored.first)
+            assertEquals(before + "①", stored.items)
+            assertEquals(First.Literal("1"), stored.first)
         }
 
         // the dialog titled by the key alone on every tab (it edits the slots too, not the long press only)
@@ -508,64 +499,48 @@ class PopupOverridesFragmentTest {
             return ShadowDialog.getLatestDialog() as AlertDialog
         }
 
-        // a character in the dialog's list tapped (selected), a button of the dialog's clicked
-        private fun AlertDialog.tapItem(item: String) {
-            KeyboardHarness.all(window!!.decorView).first { it.contentDescription?.toString() == item && it.hasOnClickListeners() }.performClick()
-            st.idle()
-        }
-
-        private fun AlertDialog.button(text: Int) {
-            KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(text) }.performClick()
-            st.idle()
-        }
-
-        private fun AlertDialog.ok() {
-            getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-            st.idle()
-        }
-
-        private fun stored(name: String): UserList? = KeyLists.parse(AppPrefs.getInstance().internal.keyLists.getValue())!![KeyId(name)]
-
         private fun qwStored() = stored("g14/qw")
 
-        // a key's symbols as its page's keyboard has them with nothing set
-        private fun own(name: String): List<String> = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(name))!!.edit(KeyId.of(name)).symbols
 
-        // moved and moved back, edited back to the keyboard's own, put back by 重置这个键: nothing stored;
-        // every symbol deleted: the row alone stored (the row can't be deleted)
+        private fun five(): AlertDialog {
+            keyCalled("5").performClick()
+            st.idle()
+            return ShadowDialog.getLatestDialog() as AlertDialog
+        }
+
+        private fun AlertDialog.typed(text: String) {
+            KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText(text)
+        }
+
+        // moved and moved back, edited back to the editor's default, put back by 重置这个键: nothing stored (060-row-unlock §1.1)
         @Test
         @Uat("ST-100")
-        fun aListBackToTheOwnStoresNothingAndOneEmptiedKeepsItsRow() {
+        fun aListBackToTheEditorsDefaultStoresNothing() {
             open()
             click(R.string.shortcut_page_nine)
-            // 九键 5's own symbols: # ( ), above its row J K L 5 j k l
-            val symbols = own("t9/5")
-            assertEquals(listOf("#", "(", ")"), symbols)
-            fun five(): AlertDialog {
-                keyCalled("5").performClick()
-                st.idle()
-                return ShadowDialog.getLatestDialog() as AlertDialog
-            }
+            // 九键 5's whole list: its row J K L 5 j k l, then # ( )
+            val items = own("t9/5")
+            assertEquals(listOf("J", "K", "L", "5", "j", "k", "l", "#", "(", ")"), items)
             five().apply {
-                tapItem("(")
+                tapItem("k")
                 button(R.string.long_press_move_left)
                 button(R.string.long_press_move_right)
                 ok()
             }
             assertEquals("moved back", null, stored("t9/5"))
             five().apply {
-                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+                typed("①")
                 ok()
             }
-            assertEquals(symbols + "①", stored("t9/5")!!.symbols)
+            assertEquals(items + "①", stored("t9/5")!!.items)
             five().apply {
                 tapItem("①")
                 button(R.string.delete)
                 ok()
             }
-            assertEquals("edited back to the own", null, stored("t9/5"))
+            assertEquals("edited back to the default", null, stored("t9/5"))
             five().apply {
-                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+                typed("①")
                 ok()
             }
             five().apply {
@@ -573,33 +548,6 @@ class PopupOverridesFragmentTest {
                 st.idle()
             }
             assertEquals("重置这个键", null, stored("t9/5"))
-            five().apply {
-                // a delete selects what took the place of the one deleted
-                tapItem(symbols.first())
-                repeat(symbols.size) { button(R.string.delete) }
-                ok()
-            }
-            assertEquals("every symbol deleted: the row kept", UserList(off = false, symbols = emptyList(), first = First.Default), stored("t9/5"))
-        }
-
-        // the row greyed (060-keys-unify S5): chosen as the first, never deleted or moved
-        @Test
-        fun aRowItemIsOnlyChosenAsTheFirst() {
-            open()
-            click(R.string.shortcut_page_g14)
-            qwDialog().apply {
-                tapItem("q")
-                fun enabled(text: Int) = KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(text) }.isEnabled
-                assertFalse(enabled(R.string.delete))
-                assertFalse(enabled(R.string.long_press_move_left))
-                assertFalse(enabled(R.string.long_press_move_right))
-                assertTrue(enabled(R.string.long_press_make_first))
-                button(R.string.long_press_make_first)
-                ok()
-            }
-            assertEquals(UserList(off = false, symbols = own("g14/qw"), first = First.Literal("q")), qwStored())
-            // the keyboards read it: its first is q now
-            assertEquals("q", KeyListsCache.user.current[KeyId("g14/qw")]!!.let { (it.first as First.Literal).text })
         }
 
         // every key of every tab starts from its keyboard's own long press (owner, 0.6.0 beta2): what is added goes after
@@ -622,19 +570,10 @@ class PopupOverridesFragmentTest {
                     KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().first().setText("※")
                     d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
                     st.idle()
-                    assertEquals(name, before + "※", stored(name)!!.symbols)
+                    assertEquals(name, before + "※", stored(name)!!.items)
                     if (page == KeyShortcutPages.ZhuyinFull) assertEquals(name, emptyList<String>(), before)
                 }
             }
-        }
-
-        // the first the key resolves to, as the editor starts it
-        private fun firstOf(name: String): String? = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(name))!!.edit(KeyId.of(name)).first
-
-        private fun dialogOf(label: String): AlertDialog {
-            keyCalled(label).performClick()
-            st.idle()
-            return ShadowDialog.getLatestDialog() as AlertDialog
         }
 
         // 上滑's 空 picked (the first of the two ways' 空)
@@ -651,14 +590,14 @@ class PopupOverridesFragmentTest {
             val p = AppPrefs.getInstance()
             prefs.setStored(AppPrefs.POPUP_OVERRIDES, "q ?")
             p.setStoredKeyLists(null)
-            assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.symbols?.lastOrNull())
+            assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.items?.lastOrNull())
             dialogOf("q").apply {
                 KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
                 ok()
             }
             click(R.string.undo)
             assertNull(p.storedKeyLists())
-            assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.symbols?.lastOrNull())
+            assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.items?.lastOrNull())
         }
 
         // review 6: 九键's rows are the user's t9_letters
@@ -666,7 +605,7 @@ class PopupOverridesFragmentTest {
         fun nineKeysRowsAreTheUsersLetters() {
             prefs.set(AppPrefs.getInstance().keyboard.t9Letters, NineKeyLetters.STANDARD.withEdit('2', "abcq").serialize())
             open()
-            val row = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard("t9/2"))!!.edit(KeyId.of("t9/2")).row
+            val row = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard("t9/2"))!!.edit(KeyId.of("t9/2")).items
             assertTrue(row.toString(), "q" in row || "Q" in row)
         }
 
@@ -682,7 +621,7 @@ class PopupOverridesFragmentTest {
                 repeat(symbols.size - 1) { button(R.string.long_press_move_left) }
                 ok()
             }
-            assertEquals(symbols.last(), stored("full/q")!!.symbols.first())
+            assertEquals(symbols.last(), stored("full/q")!!.items.first())
             assertEquals("the first kept", first, firstOf("full/q"))
         }
 
@@ -704,7 +643,7 @@ class PopupOverridesFragmentTest {
             open()
             click(R.string.shortcut_page_zy9)
             val key = KeyShortcutPages.ZhuyinNine.rows.flatten().filterNot(KeyShortcutPages.ZhuyinNine::elsewhere).first { k ->
-                KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(k.name))!!.let { it.defaultOf(KeyId.of(k.name))?.first == null && it.edit(KeyId.of(k.name)).row.isNotEmpty() }
+                KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(k.name))!!.let { it.defaultOf(KeyId.of(k.name))?.first == null && it.edit(KeyId.of(k.name)).items.isNotEmpty() }
             }
             dialogOf(key.label).ok()
             assertEquals(KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
@@ -756,7 +695,7 @@ class PopupOverridesFragmentTest {
         // review 8: a later version's key_lists is read-only here: said so, never written over
         @Test
         fun aNewerVersionsListsAreNeverWritten() {
-            val newer = "@2\nfull/q\tsomething"
+            val newer = "@3\nfull/q\tsomething"
             prefs.set(AppPrefs.getInstance().internal.keyLists, newer)
             open()
             prefs.set(AppPrefs.getInstance().internal.keyLists, newer)
@@ -782,7 +721,7 @@ class PopupOverridesFragmentTest {
             KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().first().setText("½")
             d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
-            assertEquals("½", KeyListsCache.user.current[KeyId("num/5")]!!.symbols.last())
+            assertEquals("½", KeyListsCache.user.current[KeyId("num/5")]!!.items.last())
         }
     }
 
@@ -792,5 +731,119 @@ class PopupOverridesFragmentTest {
     fun everyShortcutPageHasATitleAndEveryFunctionKeyAName() {
         KeyShortcutPages.all.forEach { PopupOverridesFragment.pageTitle(it) }
         assertEquals(emptyList<String>(), KeyShortcutPages.FUNCTION_KEYS.filter { it !in PopupOverridesFragment.FunctionLabels })
+    }
+    // the editor's list as one: the key's own letters and digit moved, deleted and made the first as any item (060-row-unlock)
+    @RunWith(RobolectricTestRunner::class)
+    @Config(application = FcitxApplication::class)
+    class Row : EditorDialog() {
+
+        private fun open(page: Int) {
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER)
+            st.activity
+            st.open(SettingsRoute.PopupOverrides)
+            KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(page) }.performClick()
+            st.idle()
+        }
+
+        // every item deleted, the row's too: off, as any key (060-row-unlock §1.1)
+        @Test
+        @Uat("ST-100")
+        fun anEmptiedListIsOffItsRowGoneToo() {
+            open(R.string.shortcut_page_nine)
+            val items = own("t9/5")
+            dialogOf("5").apply {
+                // a delete selects what took the place of the one deleted
+                tapItem(items.first())
+                repeat(items.size) { button(R.string.delete) }
+                ok()
+            }
+            assertEquals(UserList.Off, stored("t9/5"))
+        }
+
+        // 九键 2's digit deleted, its first is the list's first item now (A); a letter moved to the end: stored and opened again so
+        @Test
+        @Uat("T9-62")
+        fun aDigitDeletedAndALetterMovedAreKept() {
+            open(R.string.shortcut_page_nine)
+            val items = own("t9/2")
+            dialogOf("2").apply {
+                tapItem("2")
+                // the delete selects a, which took its place
+                button(R.string.delete)
+                repeat(items.size) { button(R.string.long_press_move_right) }
+                ok()
+            }
+            val want = items.filter { it != "2" && it != "a" } + "a"
+            assertEquals(UserList(off = false, items = want, first = First.Default), stored("t9/2"))
+            assertEquals("A", firstOf("t9/2"))
+            assertEquals(want, own("t9/2"))
+        }
+
+        // the row as any item (060-row-unlock): moved, deleted, made the first
+        @Test
+        fun aRowItemIsMovedDeletedAndMadeTheFirst() {
+            open(R.string.shortcut_page_g14)
+            dialogOf("QW").apply {
+                tapItem("q")
+                assertTrue(enabled(R.string.delete).isEnabled)
+                assertTrue(enabled(R.string.long_press_move_left).isEnabled)
+                assertTrue(enabled(R.string.long_press_move_right).isEnabled)
+                assertTrue(enabled(R.string.long_press_make_first).isEnabled)
+                button(R.string.long_press_make_first)
+                ok()
+            }
+            assertEquals(UserList(off = false, items = own("g14/qw"), first = First.Literal("q")), stored("g14/qw"))
+            // the keyboards read it: its first is q now
+            assertEquals("q", KeyListsCache.user.current[KeyId("g14/qw")]!!.let { (it.first as First.Literal).text })
+        }
+    }
+
+    // the editor's dialogs, for the nested classes below: the settings page, a key's dialog opened, its parts tapped
+    abstract class EditorDialog {
+
+        protected val st = SettingsHarness()
+
+        @get:Rule
+        val prefs = PrefsRule()
+
+        @After
+        fun close() = st.close()
+
+        protected fun keyCalled(label: String) = KeyboardHarness.all(st.activity.window.decorView)
+            .first { it.contentDescription?.toString()?.substringBefore(',') == label && it.hasOnClickListeners() }
+
+        protected fun dialogOf(label: String): AlertDialog {
+            keyCalled(label).performClick()
+            st.idle()
+            return ShadowDialog.getLatestDialog() as AlertDialog
+        }
+
+        // a character in the dialog's list tapped (selected), a button of the dialog's clicked
+        protected fun AlertDialog.tapItem(item: String) {
+            KeyboardHarness.all(window!!.decorView).first { it.contentDescription?.toString() == item && it.hasOnClickListeners() }.performClick()
+            st.idle()
+        }
+
+        protected fun AlertDialog.enabled(text: Int) = KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(text) }
+
+        protected fun AlertDialog.button(text: Int) {
+            enabled(text).performClick()
+            st.idle()
+        }
+
+        protected fun AlertDialog.ok() {
+            getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            st.idle()
+        }
+
+        protected fun stored(name: String): UserList? = KeyLists.parse(AppPrefs.getInstance().internal.keyLists.getValue())!![KeyId(name)]
+
+        protected fun edit(name: String) = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(name))!!.edit(KeyId.of(name))
+
+        // a key's list as its page's keyboard has it with nothing set, its own letters and digit too
+        protected fun own(name: String): List<String> = edit(name).items
+
+        // the first the key resolves to, as the editor starts it
+        protected fun firstOf(name: String): String? = edit(name).first
     }
 }

@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
+import kotlin.math.ceil
 
 /** A theme's name as the list shows it under its card (the owner, 0.6.0-beta2). */
 object ThemeNames {
@@ -57,7 +58,7 @@ object ThemeNames {
         val scale = ctx.resources.configuration.fontScale
         val density = ctx.resources.displayMetrics.density
         rows?.takeIf { it.scale == scale && it.density == density }?.let { return it.px }
-        val px = maxOf(ctx.dp(MIN_ROW_DP), kotlin.math.ceil(themeNameView(ctx).textSize * LINE).toInt() + ctx.dp(ROOM_DP))
+        val px = maxOf(ctx.dp(MIN_ROW_DP), ceil(themeNameView(ctx).textSize * LINE).toInt() + ctx.dp(ROOM_DP))
         rows = Row(scale, density, px)
         return px
     }

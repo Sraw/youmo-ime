@@ -107,8 +107,8 @@ sealed interface SceneAction {
  *
  * The bubble and the long press's keys follow the old keys' (KeyDefPreset): a key that types (a
  * letter's or a group's face, the comma, the full stop, an address's key) shows a bubble of what
- * it types, with its corner where it swipes one (a letter that swipes none but to its shortcut, its
- * face again: the bubble shows the shortcut swiped to); a function key (分词, 符, 123, ⌫) shows none. A
+ * it types, with its corner where it swipes one (a named key's corner empty: the keyboard's resolver
+ * shows its swipe); a function key (分词, 符, 123, ⌫) shows none. A
  * key's `preview="on|off"` says otherwise (注音九键's tones and ? ! ~ show theirs, its slot none); one on
  * the key overrides its `<defaults>`, but a board of `preview="off"` shows no bubble whatever its keys say
  * (the app's `SceneKeyDef.onBoard`). A key that types one character and names no long press offers its
@@ -165,28 +165,23 @@ data class SceneBehavior(
     val types: Boolean get() = bubble != null
 
     companion object {
-        /** The keys that type though their kind is a function key's (rules C §4, KeyDefPreset's SymbolKey and AddressKey). */
-        val TYPING_ROLES = setOf("comma", "period", "slash", "at", "dot", "domain", "semicolon", "star")
-
         fun of(node: KeyNode): SceneBehavior {
             val a = node.actions
             // a send= written is the tap, letters or not: one that reads as nothing is nothing (logged), not the group's code
             val send = a["send"]
             val press = if (send != null) SceneAction.of(send) else node.letters?.group?.let(SceneAction::Group)
-            val swipe = a["swipe-up"]?.let(SceneAction::of)
+            // a function key acts by its name alone, the same on every keyboard (060-keys-unify §5, docs/theme-format.md):
+            // a layout's long-press= or swipe-up= on it is ignored
+            val function = node.shortcut?.let(KeyId::of)?.isFunction == true
+            val swipe = if (function) null else a["swipe-up"]?.let(SceneAction::of)
             // preview= on a key over what its kind says (注音九键's tones and ? ! ~ show theirs, its slot none, as their views)
-            val typing = when (a["preview"]) {
-                "on" -> true
-                "off" -> false
-                else -> node.role in TYPING_ROLES || (node.kind == "letter" && !node.label.isNullOrEmpty())
-            }
+            val typing = KeyDefaults.typing(node.role, node.kind, node.label, a["preview"])
             val bubble = if (!typing) null else Bubble(content(node, press), cornerOf(node, swipe))
             return SceneBehavior(
                 id = node.id,
                 role = node.role,
                 press = press,
-                // a function key's action by its name, the same on every keyboard (060-keys-unify §5); a layout's own over it
-                longPress = (a["long-press"] ?: functionAction(node.shortcut))?.let(SceneAction::of),
+                longPress = (if (function) functionAction(node.shortcut) else a["long-press"])?.let(SceneAction::of),
                 repeat = a["repeat"] == "true",
                 swipe = swipe,
                 doubleTap = a["double-tap"]?.let(SceneAction::of),
@@ -203,13 +198,12 @@ data class SceneBehavior(
         private fun functionAction(name: String?): String? =
             name?.let(KeyId::of)?.takeIf { it.isFunction }?.let { KeyDefaults.FUNCTION_ACTIONS[it.key] }
 
-        // what a swipe types; a letter key that swipes nothing of its own but has a shortcut, its own face, so the
-        // bubble shows the shortcut as it is swiped to (大千's symbols' AltPreview(c, c), 060-render-p2 S4c)
-        // a named key's swipe is its name's (the keyboard's resolver says what it types and shows, KeySwipes): none here,
-        // the same whatever its face (Shift's capitals keep the key, SceneKeys)
+        // a named key's corner is empty whatever its layout's swipe-up= says: its swipe is its name's (the keyboard's
+        // resolver says what it types and shows, KeySwipes; Shift's capitals keep the key, SceneKeys); an unnamed
+        // key's, what its swipe-up= types
         private fun cornerOf(node: KeyNode, swipe: SceneAction?): String? = when {
-            swipe != null -> typed(swipe)
             node.shortcut != null -> ""
+            swipe != null -> typed(swipe)
             else -> null
         }
 

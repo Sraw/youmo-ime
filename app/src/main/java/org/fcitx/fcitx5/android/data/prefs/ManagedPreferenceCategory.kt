@@ -140,6 +140,8 @@ abstract class ManagedPreferenceCategory(
         @StringRes
         defaultLabel: Int? = null,
         special: ManagedPreferenceUi.EditTextInt.Special? = null,
+        // played as the slider is let go, with the value picked
+        preview: ((Int) -> Unit)? = null,
         enableUiOn: (() -> Boolean)? = null
     ): ManagedPreference.PInt {
         val pref = ManagedPreference.PInt(sharedPreferences, key, defaultValue)
@@ -150,7 +152,7 @@ abstract class ManagedPreferenceCategory(
             )
         else
             ManagedPreferenceUi.SeekBarInt(
-                title, key, defaultValue, min, max, unit, step, defaultLabel, enableUiOn
+                title, key, defaultValue, min, max, unit, step, defaultLabel, enableUiOn, preview
             )
         pref.register()
         ui.registerUi()

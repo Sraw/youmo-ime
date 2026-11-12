@@ -290,22 +290,25 @@ class SceneBuilder(
 
     // what a key's looks are worked out from: the same in the next scene, its looks kept by the cascade. [over]: the
     // key style laid on and the form it reads (landscape, compact), null without one, as the cascade is shared by
-    // every scene of the theme (a rotation, a setting changed, the settings' key cells)
+    // every scene of the theme (a rotation, a setting changed, the settings' key cells). The cascade keeps every one
+    // unbounded: the key styles and forms are a few fixed choices, so its keys are too (a free slider would need a bound)
     private data class StyledFor(
         val board: String,
         val id: String,
         val role: String?,
         val classes: Set<String>,
         val states: Set<KeyState>,
-        val over: Triple<KeyStyleOver, Boolean, Boolean>?,
-    ) :
-        Cascade.KeptKey<Styled>
+        val over: OverIn?,
+    ) : Cascade.KeptKey<Styled>
+
+    /** The key style laid on and the form it is read in. */
+    private data class OverIn(val style: KeyStyleOver, val landscape: Boolean, val compact: Boolean)
 
     private fun styled(board: String, key: ExpandedKey): Styled {
         val c = cascadeFor(key.attrs.face)
         val states = statesOf(key)
         val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
-        return c.kept(StyledFor(board, key.key.id, key.attrs.role, classes, states, over?.let { Triple(it, env.landscape, env.compact) })) { styled(c, board, key, classes, states) }
+        return c.kept(StyledFor(board, key.key.id, key.attrs.role, classes, states, over?.let { OverIn(it, env.landscape, env.compact) })) { styled(c, board, key, classes, states) }
     }
 
     private fun styled(c: Cascade, board: String, key: ExpandedKey, classes: Set<String>, states: Set<KeyState>): Styled {
@@ -583,7 +586,7 @@ class SceneBuilder(
             margin = k.key.attrs.margin ?: true,
             motion = motion(k.looks.getValue(k.states), k.looks.getValue(k.states + KeyState.Pressed), (normal.face ?: normal.pressed).bounds),
             // a way left out (no room even at its ladder's foot) said so, else how it was drawn
-            fates = k.content.marks.zip(s.marks).mapNotNull { (m, d) -> m.up?.let { up -> up to (if (d == null) MarkFate.Dropped else m.fate!!) } }.toMap(),
+            fates = k.content.marks.zip(s.marks).mapNotNull { (m, d) -> m.way?.let { w -> w.up to (if (d == null) MarkFate.Dropped else w.fate) } }.toMap(),
         )
     }
 

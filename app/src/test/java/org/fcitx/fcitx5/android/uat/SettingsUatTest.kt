@@ -420,13 +420,15 @@ class SettingsUatTest {
     // own); none on 按键. One pref each, whichever page sets it. English's keyboard on its page, its 九键英文打法
     // first in that section; 九键双拼's letters its scheme's, so it has none
     @Test
-    @Uat("ST-45")
+    @Uat("ST-45", "ST-107")
     fun theNineKeysSettingsAreASectionOfEachKeyboardsPage() {
         val c = InputMethodCatalog
         val keyboard = AppPrefs.getInstance().keyboard
         val nine = listOf(R.string.t9_multi_tap, R.string.t9_letters).map(::s)
-        // the section's title and what is in it, as the page shows them (none: not there)
-        fun section() = st.titles().let { t -> t.indexOf(s(R.string.keyboard_nine)).takeIf { it >= 0 }?.let { t.drop(it) } }
+        // the section's title and all that is in it, as the page shows them (none: not there); the whole of
+        // it, so a row come back (按键长按, ST-107) fails
+        fun section() = st.preferences().firstOrNull { it is PreferenceGroup && it.title.toString() == s(R.string.keyboard_nine) }
+            ?.let { g -> (g as PreferenceGroup).let { c -> listOf(c.title.toString()) + (0 until c.preferenceCount).map(c::getPreference).filter { it.isVisible }.map { it.title.toString() } } }
         fun choose(title: Int, value: String) = listed(title).let { if (it.callChangeListener(value)) it.value = value }
         try {
             keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Full)
@@ -449,7 +451,7 @@ class SettingsUatTest {
             assertEquals(PinyinKeyboard.NineKeys, keyboard.pinyinKeyboard.getValue())
             val titles = st.titles()
             assertEquals(titles.indexOf(s(R.string.pinyin_keyboard)) + 1, titles.indexOf(s(R.string.keyboard_nine)))
-            assertEquals(listOf(s(R.string.keyboard_nine)) + nine, section()!!.take(3))
+            assertEquals(listOf(s(R.string.keyboard_nine)) + nine, section())
             assertTrue(summary(R.string.t9_multi_tap).contains(s(R.string.t9_multi_tap_summary)))
             capture("pinyin_nine_keys")
             // set here, the one pref
@@ -475,7 +477,7 @@ class SettingsUatTest {
             assertTrue(st.titles().toString(), s(R.string.t9_english_typing) !in st.titles())
             choose(R.string.english_keyboard, EnglishKeyboard.NineKeys.name)
             idle()
-            assertEquals(listOf(R.string.keyboard_nine, R.string.t9_english_typing).map(::s) + nine, section()!!.take(4))
+            assertEquals(listOf(R.string.keyboard_nine, R.string.t9_english_typing).map(::s) + nine, section())
             // what pinyin's page set
             assertEquals(s(T9MultiTap.entries.last().stringRes), listed(R.string.t9_multi_tap).entry.toString())
             capture("english_nine_keys")

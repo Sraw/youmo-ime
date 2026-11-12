@@ -327,7 +327,7 @@
     <string name="keyboard_height_percent_base">键盘高度百分比</string>
     <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
     <string name="real_size">真实尺寸 (Display.getRealSize)</string>
-    <string name="a11y_key_shift">Shift</string>
+    <string name="a11y_key_shift">大小写</string>
     <string name="a11y_state_shift_once">仅下一个字母大写</string>
     <string name="a11y_state_caps_lock">大写锁定</string>
     <string name="a11y_key_backspace">退格</string>
@@ -366,7 +366,7 @@
     <string name="toolbar_reset">恢复默认</string>
     <string name="toolbar_trad_simp">简繁切换</string>
     <string name="reset_this_key">恢复此键默认</string>
-    <string name="long_press_editor_hint">带框的是长按后直接松手得到的字符，也是滑动这个键输入的字符，也就是键上的小字。变淡的是键盘自带的（键上的字母、数字），只能设为首个，不能移动或删除。点一个字符选中它，再用下面的按钮调整。</string>
+    <string name="long_press_editor_hint">带框的是长按后直接松手得到的字符，也是滑动这个键输入的字符，也就是键上的小字。键自己的字母、数字也和别的字符一样能挪、删、设为首个。18 键 L 上的 : 只在微软双拼的 18 键上出现。点一个字符选中它，再用下面的按钮调整。</string>
     <string name="reset_all_long_press_message">将所有按键的长按字符恢复为内置默认值？</string>
     <string name="reset_all">全部恢复默认</string>
     <string name="my_words">用户词库</string>
@@ -568,8 +568,6 @@
     <string name="vibration_strength">振动强度</string>
     <string name="level_light">轻</string>
     <string name="level_strong">强</string>
-    <string name="level_quiet">小</string>
-    <string name="level_loud">大</string>
     <string name="theme_and_size">外观</string>
     <string name="configure_look">大小与样式</string>
     <string name="export_user_data_summary">设置、学到和添加的词、自定义短语、主题和剪贴板记录（复制过的密码也在内），存成一个文件</string>
@@ -786,9 +784,10 @@
     <string name="picker_symbols">符号</string>
     <string name="picker_flags">旗帜</string>
     <string name="long_press_legend">带框的键是改过的；变淡的键长按不弹出字符，滑向长按首选等于点这个键。</string>
-    <string name="long_press_legend_elsewhere">灰色的 %1$s 是功能键：长按照常可用，在功能键页改。</string>
+    <string name="long_press_legend_elsewhere">这一页的 %1$s 是功能键：长按照常可用，在功能键页改。</string>
+    <string name="long_press_full">一个键最多 %1$d 个字符，多出的没有加上。</string>
     <string name="long_press_none">长按这个键不弹出字符。</string>
-    <string name="long_press_off">这个键的长按已关。改动列表（添加字符或设为首选）就重新打开。</string>
+    <string name="long_press_off">这个键的长按已关。添加字符就重新打开。</string>
     <string name="long_press_newer">长按字符是新版本的应用设置的：原样保留，这里不能改。</string>
     <string name="long_press_add_hint">添加字符，空格分隔</string>
     <string name="punctuation_page_hint">打中文时，按左边的键打出右边的标点；一个键对应几个标点时可以选。点一项可修改或删除。</string>
@@ -962,7 +961,6 @@
     <string name="common_word_text">原词</string>
     <string name="common_word_replacements">替换项，一行一个，按这个顺序排在最前</string>
     <string name="common_word_no_replacement">至少填一个替换项</string>
-    <string name="common_word_same_as_word">替换项不能和原词一样</string>
     <string name="common_word_too_long">原词最多 16 个字，替换项最多 32 个字</string>
     <string name="common_word_too_many">常用词最多 2000 个</string>
     <string name="common_word_listed">这个词已经在列表里，点它编辑</string>
@@ -1109,7 +1107,7 @@
     <string name="fn_key_space">空格</string>
     <string name="fn_key_backspace">退格</string>
     <string name="fn_key_return">回车</string>
-    <string name="fn_key_shift">Shift</string>
+    <string name="fn_key_shift">大小写</string>
     <string name="fn_key_comma">，键</string>
     <string name="fn_key_period">。键</string>
     <string name="fn_key_symbols">符</string>

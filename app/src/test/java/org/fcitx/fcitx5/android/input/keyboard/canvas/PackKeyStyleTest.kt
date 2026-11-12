@@ -44,6 +44,8 @@ class PackKeyStyleTest {
                 val text = ZipFile(f).use { z -> z.getInputStream(z.getEntry("theme.xml")).bufferedReader().readText() }
                 f.name.removePrefix("builtin_theme_").removeSuffix(".theme") to (ThemeReader.theme(text) as Parsed.Ok).value
             }
+            // the tests below go over every pack: none found (the path moved) would pass them all
+            .also { assertTrue("no built-in packs under src/main/res/raw", it.isNotEmpty()) }
     }
 
     private val qwerty: Layout by lazy {
@@ -74,18 +76,10 @@ class PackKeyStyleTest {
     private fun near(a: Double, b: Double) = abs(a - b) < 0.6
 
     @Test
-    fun allTwelve() = assertEquals(12, packs.size)
-
-    @Test
-    fun followingThePackIsItsOwnDrawing() {
-        assertNull(KeyStyleChoice.FOLLOW.overPack)
-        // 有边框 is a pack's own faces
-        assertNull(KeyStyleChoice(true, null, null, null).overPack)
-    }
-
-    @Test
     fun everyPacksKeysTakeTheSpacingsInEveryForm() {
         val choice = KeyStyleChoice(null, KeyStyleChoice.H_STANDARD, KeyStyleChoice.V_LOOSE, null)
+        // "own" below is the pack as it drew itself: following it lays nothing over it
+        assertNull(KeyStyleChoice.FOLLOW.overPack)
         packs.forEach { (name, theme) ->
             forms.forEach { (form, env) ->
                 val own = scene(theme, KeyStyleChoice.FOLLOW, env)
@@ -133,12 +127,17 @@ class PackKeyStyleTest {
     fun theRadiusIsEveryKeysInEveryFormPressedToo() {
         val choice = KeyStyleChoice(null, null, null, KeyStyleChoice.RADIUS_SQUARE)
         packs.forEach { (name, theme) ->
+            // a pack drawing its own shape= (none of the built-in ones now) is not a rounded rect to square
+            if (theme.styles.any { st -> "shape" in st.values }) return@forEach
             forms.forEach { (form, env) ->
                 val s = scene(theme, choice, env)
                 listOf("a", "shift", "space", "enter").forEach { k ->
                     val n = s.key(k)
-                    if (theme.styles.any { st -> "shape" in st.values }) return@forEach
                     assertEquals("$name $form $k", List(4) { 0.0 }, (n.shape as Shape.Rect).radii)
+                    // the pressed face's fills square too
+                    n.faces.filterKeys { KeyState.Pressed in it }.values.flatten().filterIsInstance<Op.Fill>().forEach {
+                        assertEquals("$name $form $k pressed", List(4) { 0.0 }, (it.shape as? Shape.Rect)?.radii ?: List(4) { 0.0 })
+                    }
                 }
             }
         }

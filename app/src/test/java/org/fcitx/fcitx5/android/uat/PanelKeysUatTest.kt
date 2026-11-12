@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
@@ -46,7 +45,7 @@ import org.robolectric.annotation.GraphicsMode
  * The panels' function keys as every keyboard's (060-keys-unify §6.2, D5, J1–J3): ⌫'s, the space's and Return's
  * slots and marks on the symbol panel, the emoji, the emoticons, the expanded candidates and the emoji search
  * (whose 清空 and 恢复 are its query's); their ，。 long presses; the action long presses the number pad and the
- * symbol panel's 123 gained; a password field's 清空 not run there either; a symbol layer of 32 shown whole.
+ * symbol panel's 123 gained; a password field's 清空 not run there either; a list of 16 shown whole.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -175,11 +174,7 @@ class PanelKeysUatTest {
         fun KeyboardHarness.held(name: String) = longPress(named(name)).sorted()
         // Chinese punctuation on: shown as it types (KB-83), so what is picked is what is typed
         fun chinese() = harness().also { h ->
-            val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
-            h.api.statusAreaCached = active
-            h.api.punctuationCached = zh
-            h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, zh))
-            h.idle()
+            h.chinesePunctuation(KeyboardHarness.PINYIN, zh)
         }
         var h = chinese()
         val comma = h.held("fn/comma")
@@ -260,10 +255,10 @@ class PanelKeysUatTest {
         assertEquals(letters, held(InputType.TYPE_CLASS_NUMBER))
     }
 
-    // J3: ，'s list at the most a layer holds (32), every item on the screen, the last picked: the finger slid
+    // J3: ，'s list at the most a key holds (16, KeyLists.MAX_ITEMS; four rows of five, no row of its own), every item on the screen, the last picked: the finger slid
     // from the item first under it, the popup's focus moving by PopupFocus.STEP, not by where its cells are
-    private fun aLayerOf32() {
-        val items = (0 until 32).map { "${'Ａ' + it % 26}${it / 26}" }
+    private fun aLayerOf16() {
+        val items = (0 until KeyLists.MAX_ITEMS).map { "${'Ａ' + it % 26}${it / 26}" }
         prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.of(mapOf(KeyId("fn/comma") to UserList(false, items))).serialize())
         val h = harness()
         val comma = h.named("fn/comma")
@@ -287,15 +282,15 @@ class PanelKeysUatTest {
     @Test
     @Uat("KB-82")
     @Config(qualifiers = "w320dp-h568dp-port-xhdpi")
-    fun aLayerOf32OnTheNarrowestOneHanded() {
+    fun aLayerOf16OnTheNarrowestOneHanded() {
         prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
-        aLayerOf32()
+        aLayerOf16()
     }
 
     @Test
     @Uat("KB-82")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
-    fun aLayerOf32Landscape() {
-        aLayerOf32()
+    fun aLayerOf16Landscape() {
+        aLayerOf16()
     }
 }

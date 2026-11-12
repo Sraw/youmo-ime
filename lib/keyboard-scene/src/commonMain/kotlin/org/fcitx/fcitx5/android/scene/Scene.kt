@@ -105,7 +105,11 @@ class KeyNode(
     val margin: Boolean = true,
     /** How it moves between its faces (060-render-p3 A1); null: it does not, each shown at once (every theme without motion). */
     val motion: Motion? = null,
-    /** Each way the user set that it draws a mark of (true: 上滑), how it is drawn: what the settings tell of it. */
+    /**
+     * Each way the user set that it places a mark of (true: 上滑), how it is drawn: what the settings tell of it.
+     * A way set that places none (set to 空, no first, its mark hidden by the theme, roots shown) has no entry: no
+     * claim; [MarkFate.Dropped] only for a mark placed and then left out for room.
+     */
     val fates: Map<Boolean, MarkFate> = emptyMap(),
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */

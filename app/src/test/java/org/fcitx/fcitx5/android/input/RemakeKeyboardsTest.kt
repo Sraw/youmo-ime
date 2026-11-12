@@ -151,9 +151,12 @@ class RemakeKeyboardsTest {
         }
     }
 
-    /** 九键's letters and a key's long press edited: the nine keys as a view made with them (a key's long press is wired as it is made). */
+    /**
+     * 九键's letters and a key's long press edited: the nine keys as a view made with them. The letters remake the
+     * keyboard; key_lists only redraw it (BaseKeyboard.onKeyListsChanged) and a long press reads the list as it is held.
+     */
     @Test
-    fun theNineKeysLettersAndLongPressesRemakeThem() {
+    fun theNineKeysLettersAndLongPressesShowAsAFreshOne() {
         val prefs = AppPrefs.getInstance().keyboard
         val lists = AppPrefs.getInstance().internal.keyLists
         val nine = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)
@@ -161,7 +164,7 @@ class RemakeKeyboardsTest {
         try {
             KeyboardHarness(keyboards = nine).use { h ->
                 h.start()
-                for ((pref, value) in listOf(prefs.t9Letters to letters, lists to KeyLists.of(mapOf(KeyId("t9/2") to UserList(off = false, symbols = listOf("⒉")))).serialize())) {
+                for ((pref, value) in listOf(prefs.t9Letters to letters, lists to KeyLists.of(mapOf(KeyId("t9/2") to UserList(off = false, items = listOf("⒉")))).serialize())) {
                     pref.setValue(value)
                     h.idle()
                     val expected = KeyboardHarness(keyboards = nine).use { it.start(); it.seen() }

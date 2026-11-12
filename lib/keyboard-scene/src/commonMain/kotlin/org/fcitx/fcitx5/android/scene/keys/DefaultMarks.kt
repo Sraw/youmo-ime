@@ -71,7 +71,11 @@ object DefaultMarks {
     fun shown(item: Item, punctuation: Map<String, String>): String =
         if (item.commit == Commit.AsKey) punctuation[item.text] ?: item.text else item.text
 
-    /** The variant a layout's family stands for, its default input method's. */
+    /**
+     * The variant a layout's family stands for, its default input method's. The 14 and 18 keys are told apart by the
+     * layout's id (`k18`): a theme pack replaces a keyboard only under that keyboard's id (PackLayouts.judge), so no
+     * pack's 18 keys reach here under another.
+     */
     fun variantOf(layout: Layout): KeyboardVariant = KeyboardVariant(
         when (layout.family) {
             "letters" -> KeyboardVariant.Form.Full

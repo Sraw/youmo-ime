@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.data.importedUserDataMarker
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -65,7 +66,7 @@ class KeyListsUpgradeTest {
     @Test
     fun aNewInstallHasTheEmptyLists() {
         started()
-        assertEquals("@1", stored())
+        assertEquals("@2", stored())
     }
 
     @Test
@@ -75,8 +76,9 @@ class KeyListsUpgradeTest {
         val prefs = started()
         val lists = KeyLists.parse(stored())!!
         assertEquals(UserList(false, listOf("!", "1", "Q")), lists[KeyId("full/q")])
-        assertEquals(listOf("。", "？"), lists[KeyId.function("comma")]?.symbols)
-        assertEquals(listOf(".", ","), lists[KeyId("t9/1")]?.symbols)
+        assertEquals(listOf("。", "？"), lists[KeyId.function("comma")]?.items)
+        // 九键 1's symbols under its row, its digit (060-row-unlock §5)
+        assertEquals(listOf("1", ".", ","), lists[KeyId("t9/1")]?.items)
         assertEquals(lists, cache(prefs).current)
         // kept as they were, for a downgrade (§4.4)
         assertEquals("q ! 1 Q\n, 。 ？", sp.getString(AppPrefs.POPUP_OVERRIDES, null))
@@ -89,9 +91,9 @@ class KeyListsUpgradeTest {
         sp.edit { beta2() }
         started()
         val lists = KeyLists.parse(stored())!!
-        assertEquals(listOf("#", "@"), lists[KeyId("t9/2")]?.symbols)
+        assertEquals(UserList(false, listOf("A", "B", "C", "2", "a", "b", "c", "#", "@"), First.Literal("2")), lists[KeyId("t9/2")])
         // the named one, the newer, over the character's
-        assertEquals(listOf("！"), lists[KeyId.function("comma")]?.symbols)
+        assertEquals(listOf("！"), lists[KeyId.function("comma")]?.items)
     }
 
     @Test
@@ -104,7 +106,7 @@ class KeyListsUpgradeTest {
         // 全部恢复默认 writes the empty lists: the old ones, still stored, never come back
         sp.edit { putString(AppPrefs.KEY_LISTS, KeyLists.HEADER) }
         started()
-        assertEquals("@1", stored())
+        assertEquals("@2", stored())
     }
 
     @Test
@@ -122,7 +124,7 @@ class KeyListsUpgradeTest {
     fun aWrongTypeIsMigratedNeverACrash() {
         sp.edit { putInt(AppPrefs.KEY_LISTS, 3); putInt(AppPrefs.POPUP_OVERRIDES, 1) }
         started()
-        assertEquals("@1", stored())
+        assertEquals("@2", stored())
         // empty, or blanks: never of any version's
         sp.edit { putString(AppPrefs.KEY_LISTS, " "); v052() }
         started()
@@ -132,9 +134,9 @@ class KeyListsUpgradeTest {
     // a later version's, a downgrade from it: left as it is for that version, read as none set
     @Test
     fun aLaterFormatIsLeftAloneAndReadAsEmpty() {
-        sp.edit { putString(AppPrefs.KEY_LISTS, "@2\nfull/q\toff"); v052() }
+        sp.edit { putString(AppPrefs.KEY_LISTS, "@3\nfull/q\toff"); v052() }
         val prefs = started()
-        assertEquals("@2\nfull/q\toff", stored())
+        assertEquals("@3\nfull/q\toff", stored())
         assertEquals(KeyLists.Empty, cache(prefs).current)
         // a byte order mark and blanks around ours are ours
         sp.edit { putString(AppPrefs.KEY_LISTS, "\uFEFF @1\nfull/q\toff") }
@@ -151,9 +153,9 @@ class KeyListsUpgradeTest {
         assertEquals(UserList(false, listOf("!", "1", "Q")), c.current[KeyId("full/q")])
         sp.edit { putString(AppPrefs.POPUP_OVERRIDES, "q ?"); remove(AppPrefs.KEY_LISTS) }
         assertEquals(null, prefs.storedKeyLists())
-        assertEquals(listOf("?"), c.current[KeyId("full/q")]?.symbols)
+        assertEquals(listOf("?"), c.current[KeyId("full/q")]?.items)
         started(prefs)
-        assertEquals(listOf("?"), KeyLists.parse(stored())!![KeyId("full/q")]?.symbols)
+        assertEquals(listOf("?"), KeyLists.parse(stored())!![KeyId("full/q")]?.items)
     }
 
     // a backup restored: 备份全部's zip (its metadata and the settings' file, read by the name the app's has), imported
@@ -186,10 +188,13 @@ class KeyListsUpgradeTest {
         val lists = KeyLists.parse(old.storedKeyLists())!!
         assertEquals(UserList(false, listOf("!", "1", "Q")), lists[KeyId("full/q")])
         assertEquals(UserList.Off, lists[KeyId("full/w")])
-        assertEquals(listOf(".", ","), lists[KeyId("t9/1")]?.symbols)
-        val new = imported("key-lists-060", mapOf(AppPrefs.KEY_LISTS to "@1\nfull/w\toff", AppPrefs.POPUP_OVERRIDES to "w 2"))
-        assertEquals("@1\nfull/w\toff", new.storedKeyLists())
+        assertEquals(listOf("1", ".", ","), lists[KeyId("t9/1")]?.items)
+        val new = imported("key-lists-060", mapOf(AppPrefs.KEY_LISTS to "@2\nfull/w\toff", AppPrefs.POPUP_OVERRIDES to "w 2"))
+        assertEquals("@2\nfull/w\toff", new.storedKeyLists())
         assertEquals(UserList.Off, cache(new).current[KeyId("full/w")])
+        // beta3's (`@1`): upgraded at the start after it, its rows by the backup's 按键字母
+        val beta3 = imported("key-lists-beta3", mapOf(AppPrefs.KEY_LISTS to "@1\nt9/2\tset\t*\t#", AppPrefs.T9_LETTERS to "abd,def,ghi,jkl,mno,pqrs,tuv,wxyz"))
+        assertEquals("@2\nt9/2\tset\t:2\tA\tB\tD\t2\ta\tb\td\t#", beta3.storedKeyLists())
     }
 
     // before the first unlock after an upgrade: the device-protected copy is 0.5.2's, never migrated (dropRetired
@@ -199,7 +204,8 @@ class KeyListsUpgradeTest {
         sp.edit { beta2() }
         val locked = AppPrefs(sp)
         val c = cache(locked)
-        val expected = KeyLists.parse(KeyListsMigration.migrate(sp.getString(AppPrefs.POPUP_OVERRIDES, null), sp.getString(AppPrefs.KEY_POPUPS, null), sp.getString(AppPrefs.T9_SYMBOLS, null)).text)!!
+        val migrated = KeyListsMigration.migrate(sp.getString(AppPrefs.POPUP_OVERRIDES, null), sp.getString(AppPrefs.KEY_POPUPS, null), sp.getString(AppPrefs.T9_SYMBOLS, null)).text
+        val expected = KeyLists.parse(KeyListsMigration.upgrade(migrated, KeyboardVariant.STANDARD_NINE))!!
         assertEquals(expected, c.current)
         assertFalse(sp.contains(AppPrefs.KEY_LISTS))
         // the same lists after the unlock's migration: the caches' readers see no change
@@ -223,17 +229,21 @@ class KeyListsUpgradeTest {
         val de = PreferenceManager.getDefaultSharedPreferences(app.createDeviceProtectedStorageContext())
         de.edit { clear(); putString(AppPrefs.POPUP_OVERRIDES, "q ?") }
         val locked = AppPrefs(de)
-        assertEquals(listOf("?"), cache(locked).current[KeyId("full/q")]?.symbols)
+        assertEquals(listOf("?"), cache(locked).current[KeyId("full/q")]?.items)
+        // the other two old ones there as well, each to be removed
+        de.edit { putString(AppPrefs.T9_SYMBOLS, "2 ⒉"); putString(AppPrefs.KEY_POPUPS, "t9/3 3 D E F d e f +") }
         prefs.syncToDeviceEncryptedStorage()
         assertEquals(stored(), de.getString(AppPrefs.KEY_LISTS, null))
         // the older copy there gone with them, no direct boot reading it (060-s6-review L5)
         assertFalse(de.contains(AppPrefs.POPUP_OVERRIDES))
         assertFalse(de.contains(AppPrefs.T9_SYMBOLS))
+        assertFalse(de.contains(AppPrefs.KEY_POPUPS))
         assertEquals(KeyLists.parse(stored()), cache(locked).current)
     }
 
     // not migrated yet (an upgrade's first start before dropRetired, a 0.5 backup restored): no key_lists there either,
-    // the device-protected copy's own old ones migrated in memory there, never a `@1` that would hide them for good
+    // the device-protected copy's own old ones migrated in memory there, never a `@1` that would hide them for good.
+    // This side has none of the old ones either: the copy's own kept, not removed
     @Test
     @Config(application = FcitxApplication::class)
     fun noListsStoredNoneCopied() {
@@ -242,6 +252,43 @@ class KeyListsUpgradeTest {
         de.edit { clear(); putString(AppPrefs.KEY_LISTS, "@1\nfull/w\toff"); putString(AppPrefs.POPUP_OVERRIDES, "q ?") }
         prefs.syncToDeviceEncryptedStorage()
         assertFalse(de.contains(AppPrefs.KEY_LISTS))
-        assertEquals(listOf("?"), cache(AppPrefs(de)).current[KeyId("full/q")]?.symbols)
+        assertEquals(listOf("?"), cache(AppPrefs(de)).current[KeyId("full/q")]?.items)
+    }
+
+    // key_lists not stored (a beta backup imported, or 撤销 putting that back) after a sync that dropped the old ones
+    // there: the old ones copied again, the direct boot never left with neither
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun noListsStoredTheOldOnesCopied() {
+        sp.edit { clear(); putString(AppPrefs.POPUP_OVERRIDES, "q ?") }
+        val prefs = AppPrefs(sp)
+        val de = PreferenceManager.getDefaultSharedPreferences(app.createDeviceProtectedStorageContext())
+        de.edit { clear(); putString(AppPrefs.KEY_LISTS, "@1\nfull/w\toff") }
+        prefs.syncToDeviceEncryptedStorage()
+        assertFalse(de.contains(AppPrefs.KEY_LISTS))
+        assertEquals("q ?", de.getString(AppPrefs.POPUP_OVERRIDES, null))
+        assertEquals(listOf("?"), cache(AppPrefs(de)).current[KeyId("full/q")]?.items)
+    }
+
+    // 060-row-unlock §5: beta3's `@1` upgraded once at a start, a row's key's symbols under its row and its first as
+    // beta3 showed it; read upgraded in memory before that (a direct boot), by the 按键字母 stored
+    @Test
+    @Uat("ST-110")
+    fun aBeta3ListIsUpgradedAtTheStart() {
+        val v1 = "@1\nt9/2\tset\t*\t#\ng14/qw\tset\t:①\t①"
+        sp.edit { putString(AppPrefs.KEY_LISTS, v1) }
+        val c = cache(AppPrefs(sp))
+        val two = UserList(false, listOf("A", "B", "C", "2", "a", "b", "c", "#"), First.Literal("2"))
+        val qw = UserList(false, listOf("Q", "W", "1", "q", "w", "①"), First.Literal("①"))
+        assertEquals(two, c.current[KeyId("t9/2")])
+        assertEquals(qw, c.current[KeyId("g14/qw")])
+        val v = c.version
+        started()
+        assertEquals(KeyLists.of(mapOf(KeyId("g14/qw") to qw, KeyId("t9/2") to two)).serialize(), stored())
+        assertEquals(v, c.version)
+        // the 按键字母 changed: the stored lists stay as they are
+        sp.edit { putString(AppPrefs.T9_LETTERS, "abd,def,ghi,jkl,mno,pqrs,tuv,wxyz") }
+        started()
+        assertEquals(two, KeyLists.parse(stored())!![KeyId("t9/2")])
     }
 }

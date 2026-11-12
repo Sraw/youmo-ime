@@ -203,7 +203,8 @@ class InputView(
     private val broadcaster = InputBroadcaster()
     @VisibleForTesting
     internal val popup = PopupComponent()
-    private val punctuation = PunctuationComponent()
+    @VisibleForTesting
+    internal val punctuation = PunctuationComponent()
     private val returnKeyDrawable = ReturnKeyDrawableComponent()
     private val preeditEmptyState = PreeditEmptyStateComponent()
     private val preedit = PreeditComponent(codeFloats)

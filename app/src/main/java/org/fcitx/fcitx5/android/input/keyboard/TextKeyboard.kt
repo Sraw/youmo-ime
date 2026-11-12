@@ -4,12 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.scene.keys.KeyId
-import org.fcitx.fcitx5.android.input.keys.KeyResolver
-import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.Configuration
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.CoroutineScope
@@ -26,17 +22,17 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
-import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keys.KeyResolver
+import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.scene.KeyRef
@@ -49,6 +45,7 @@ import org.fcitx.fcitx5.android.scene.engine.LetterCase
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 
@@ -165,7 +162,6 @@ class TextKeyboard(
     private val letterCaseChoice by AppPrefs.getInstance().keyboard.letterCase
     private val letterCase: LetterCase get() = LetterCaseRule.forIme(letterCaseChoice.case, english = imeName == InputMethodNames.KEYBOARD)
 
-
     // the input method last reported, for the `;` key again when the 双拼 scheme changed meanwhile
     private var imeName = ""
 
@@ -206,7 +202,6 @@ class TextKeyboard(
     // what the keys show now, as the scene engine's environment: the screen's and the settings' as every
     // keyboard's (SceneEnvs), this one's state, Shift, texts and marks its own
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
-        // first: the layout the corners' resolver reads (alts)
         val marks = keyMarks(layout)
         val state = TextBoardState(
             semicolonScheme = semicolonKey(imeName, EngineState.shuangpinScheme),
@@ -228,7 +223,7 @@ class TextKeyboard(
             confirm = context.getString(R.string.key_confirm),
             keepUppercase = keepLettersUppercase,
             letterCase = letterCase,
-            punctuation = punctuationMapping,
+            punctuation = keysPunctuation,
             // the corners as said, and a table's roots
             alts = keyReadings(layout),
             // a letter with no root left empty: the engine shows it as {case:x} would (Expand's root)
@@ -360,8 +355,7 @@ class TextKeyboard(
         canvas?.invalidateScene()
     }
 
-    private var punctuationMapping: Map<String, String> = mapOf()
-    private fun transformPunctuation(p: String) = punctuationMapping.getOrDefault(p, p)
+    private fun transformPunctuation(p: String) = keysPunctuation.getOrDefault(p, p)
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         var transformed = action
@@ -414,12 +408,6 @@ class TextKeyboard(
         canvas?.invalidateScene()
     }
 
-    override fun onPunctuationUpdate(mapping: Map<String, String>) {
-        super.onPunctuationUpdate(mapping)
-        punctuationMapping = mapping
-        canvas?.invalidateScene()
-    }
-
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(ime)
         imeName = ime.uniqueName
@@ -443,11 +431,16 @@ class TextKeyboard(
         override fun bubble(node: KeyNode) = node.id.takeIf { it.length == 1 && it[0] in 'a'..'z' }
     }
 
-    override fun onPopupAction(action: PopupAction) {
+    // public for its test, which has no theme's key of no name to hold
+    public override fun onPopupAction(action: PopupAction) {
         val newAction = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = transformPopupPreview(action.key, action.content))
             // the roots stay shown till the key is let go
-            is PopupAction.PreviewUpdateAction -> if (action.key == rootsShownOn) return else action.copy(content = transformPopupPreview(action.key, action.content))
+            is PopupAction.PreviewUpdateAction -> when {
+                action.key == rootsShownOn -> return
+                action.shown -> action
+                else -> action.copy(content = transformPopupPreview(action.key, action.content))
+            }
             is PopupAction.DismissAction -> action.also { if (it.key == rootsShownOn) rootsShownOn = null }
             // let go: the bubble goes whether or not a press shows one (no long press's keys to take it down)
             is PopupAction.TriggerAction -> if (action.key == rootsShownOn) {
@@ -463,7 +456,9 @@ class TextKeyboard(
                     super.onPopupAction(PopupAction.PreviewAction(action.key, roots, action.bounds))
                     return
                 }
-                action
+                // a key of no name's built-in list (a theme's letter written without shortcut=): in capitals as its face under Shift
+                val k = action.keyboard
+                if (k is KeyDef.Popup.Keyboard.Preset && capsState != CapsState.None) action.copy(keyboard = k.copy(caps = true)) else action
             }
             else -> action
         }
@@ -495,7 +490,7 @@ class TextKeyboard(
         return table?.rootsOf(letter)?.joinToString(" ")
     }
 
-    // last, after every field its scene reads (sceneEnv: altsMade, capsState, punctuationMapping)
+    // last, after every field its scene reads (sceneEnv: capsState)
     init {
         // hidden until an input method says it types on it: shown, every one's A row had an 11th key
         // at a cold start, before fcitx reported the first

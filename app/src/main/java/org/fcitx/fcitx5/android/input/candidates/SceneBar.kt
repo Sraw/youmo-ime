@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.candidates
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -110,7 +111,7 @@ object SceneBar {
      * (KawaiiBarComponent.heightDp): 100 for a theme setting none.
      */
     fun heightPercent(context: Context = appContext): Double =
-        heightPercent(context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
+        heightPercent(context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
 
     /** [heightPercent] on a screen [landscape] or not (KeyboardArea.Screen). */
     fun heightPercent(landscape: Boolean): Double {

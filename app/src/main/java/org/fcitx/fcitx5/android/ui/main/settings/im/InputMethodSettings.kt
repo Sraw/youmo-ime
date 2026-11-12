@@ -456,8 +456,6 @@ object InputMethodSettings {
     /** 九键's page of its keys' letters: its key. */
     const val T9_LETTERS = "t9_letters"
 
-    /** 九键's page of its keys' long-press symbols: its key. */
-
     /** A table's 恢复码表顺序: its key. */
     const val RESET_TABLE_ORDER = "reset_table_order"
 

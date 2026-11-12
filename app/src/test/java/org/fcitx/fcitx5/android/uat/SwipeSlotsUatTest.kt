@@ -148,10 +148,10 @@ class SwipeSlotsUatTest {
     @Test
     @Uat("ST-100")
     fun aGroupKeysLongPressSetByName() {
-        prefs.setList("g14/qw", listOf("①", "②"), first = "①")
+        prefs.setList("g14/qw", listOf("Q", "W", "1", "q", "w", "①", "②"), first = "①")
         val h = harness(ImKeyboard.KEYS14)
         val qw = h.key("QW")
-        // above the group's own row, which is made for the input method, never set (060-keys-unify L4)
+        // the whole list stored, the group's own row with it (060-row-unlock)
         val shown = h.longPress(qw)
         assertTrue(shown.toString(), shown.containsAll(listOf("①", "②", "Q", "w")))
         h.idle()

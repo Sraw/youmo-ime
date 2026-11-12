@@ -28,4 +28,16 @@ class SwipeStepsTest {
         assertEquals(0, s.total)
         assertEquals("nothing carried from before", 0, s.step(59f, 10f))
     }
+
+    @Test
+    fun crossStepsBeginAtTheFirstSidewaysStep() {
+        val c = CrossSteps()
+        assertEquals("no sideways step yet: none", 0, c.step(-100f, 0, 28f))
+        assertEquals("begins here", 0, c.step(-100f, 1, 28f))
+        assertEquals(-1, c.step(-130f, 0, 28f))
+        assertEquals(2, c.step(-70f, 0, 28f))
+        c.reset()
+        assertEquals("reset: waits for a sideways step again", 0, c.step(100f, 0, 28f))
+        assertEquals("no threshold: none", 0, CrossSteps().step(0f, 1, 0f))
+    }
 }

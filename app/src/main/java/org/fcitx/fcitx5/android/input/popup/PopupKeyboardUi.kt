@@ -68,7 +68,10 @@ class PopupKeyboardUi(
 
     // the keys before the split, then those from it (if any): each group's first index and size,
     // and how many rows it takes, from the bottom
-    private val groups: List<IntRange> = split.coerceIn(0, keys.size).let { at ->
+    // a row of the key's own alone (九键's 1: [1], then its symbols) is not a row by itself: it goes in
+    // with the rest, which then fill their rows (10 as 5×2, not 9 with a gap over a lone 1), still in focus
+    private val ownRow = inRow >= 0 && !(split == 1 && keys.size > 1)
+    private val groups: List<IntRange> = (if (ownRow || inRow < 0) split else keys.size).coerceIn(0, keys.size).let { at ->
         listOf(0 until at, at until keys.size).filter { !it.isEmpty() }.ifEmpty { listOf(keys.indices) }
     }
     private val groupRows: List<Int>
@@ -87,14 +90,19 @@ class PopupKeyboardUi(
         // as wide as the widest group wants: up to 5 a row, its rows as even as may be; the first
         // all in one row where it has a key's own ([inRow]). round() left fewer slots than entries for 13, 17,
         // 21 ... entries and hid the last ones
-        val evenly = groups.drop(if (inRow >= 0) 1 else 0).maxOfOrNull { group ->
+        val evenly = groups.drop(if (ownRow) 1 else 0).maxOfOrNull { group ->
             val count = group.count().toFloat()
             ceil(count / ceil(count / 5)).toInt()
         } ?: 0
         // with a key's own, the first group's one row; the rest no narrower than they would be (a key
         // of one letter or none would stack its symbols one a row)
-        columnCount = if (inRow >= 0) max(groups[0].count(), evenly) else evenly
-        groupRows = groups.map { ceil(it.count().toFloat() / columnCount).toInt() }
+        var columns = if (ownRow) max(groups[0].count(), evenly) else evenly
+        fun rowsOf(c: Int) = groups.map { ceil(it.count().toFloat() / c).toInt() }
+        // rows of five too tall for the room above the key (16 items in landscape: four rows): wider rows till they fit
+        val above = if (outerBounds.isEmpty) Int.MAX_VALUE else triggerBounds.top - outerBounds.top - lift
+        while (rowsOf(columns).sum() * keyHeight > above && columns < keys.size) columns++
+        columnCount = columns
+        groupRows = rowsOf(columnCount)
         rowCount = groupRows.sum()
 
         val room = outerBounds.takeUnless { it.isEmpty }?.width()?.toDouble()

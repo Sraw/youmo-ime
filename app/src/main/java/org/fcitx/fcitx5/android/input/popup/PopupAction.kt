@@ -26,6 +26,12 @@ sealed class PopupAction {
         val content: String,
         /** A swipe's shortcut named: words, smaller and kept narrow ([org.fcitx.fcitx5.android.input.popup.PreviewLabel]). */
         val words: Boolean = false,
+        /**
+         * A swipe's first as the resolver shows it ([org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard.SwipeChoice.Output]'s
+         * shown): already what the swipe types, so no keyboard puts its letters' case or punctuation over it (a q whose
+         * first is Q read q in the bubble and typed Q).
+         */
+        val shown: Boolean = false,
     ) : PopupAction()
 
     data class DismissAction(

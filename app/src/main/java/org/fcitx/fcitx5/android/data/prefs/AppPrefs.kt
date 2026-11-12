@@ -9,6 +9,7 @@ import androidx.annotation.Keep
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.InputFeedbacks.InputFeedbackMode
 import org.fcitx.fcitx5.android.data.InputFeedbacks.KeySoundSource
 import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_UNLIMITED
@@ -37,6 +38,7 @@ import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.keyboard.VoiceEndMark
 import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.KeyListsCache
 import org.fcitx.fcitx5.android.input.keys.KeyListsMigration
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
@@ -77,7 +79,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /**
          * Every key's long press the user set, of every keyboard ([org.fcitx.fcitx5.android.input.keys.KeyLists],
-         * `@1` first; 060-keys-unify §2): 0.5's and the betas' [POPUP_OVERRIDES], [KEY_POPUPS] and [T9_SYMBOLS] moved here
+         * `@2` first; 060-keys-unify §2, 060-row-unlock §1.2): 0.5's and the betas' [POPUP_OVERRIDES], [KEY_POPUPS] and [T9_SYMBOLS] moved here
          * once ([dropRetired]), those kept as they were for a downgrade (§4.4), no longer settings of this version. A plain setting, never `hidden`: a backup's
          * would be reset after its import and the old ones migrated again (m2). 全部恢复默认 writes [KeyLists.HEADER], the
          * default, never removes it: the old ones would come back at the next start. Whether to migrate is read from what
@@ -261,7 +263,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * What each of 九键's digit keys types ([NineKeyLetters.serialize], empty as on a phone):
          * set on its own page from the 九键 section of an input method's page, read by the keyboard and the engine alike.
          */
-        val t9Letters = string("t9_letters", "")
+        val t9Letters = string(T9_LETTERS, "")
 
         /**
          * Shown on the pinyin page and in ⋯'s 键盘: the on-screen keyboard pinyin is typed on, the
@@ -570,31 +572,18 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         ) {
             soundOnKeyPress.getValue() != InputFeedbackMode.Disabled
         }
-        val soundOnKeyPressVolume = hidden(setByLevels = true) {
-            int(
-                R.string.button_sound_volume,
-                "button_sound_volume",
-                0,
-                0,
-                100,
-                "%",
-                defaultLabel = R.string.system_default
-            ) {
-                soundOnKeyPress.getValue() != InputFeedbackMode.Disabled
-            }
-        }
-
-        init {
-            levels(
-                R.string.button_sound_volume, "button_sound_volume_level",
-                listOf(soundOnKeyPressVolume.key to soundOnKeyPressVolume.defaultValue),
-                listOf(
-                    Level(R.string.system_default, 0),
-                    Level(R.string.level_quiet, 20),
-                    Level(R.string.level_medium, 50),
-                    Level(R.string.level_loud, 90),
-                )
-            ) { soundOnKeyPress.getValue() != InputFeedbackMode.Disabled }
+        // a slider (owner, 2026-11-11): 0 the system's volume, shown 系统默认; a sound plays as it is let go
+        val soundOnKeyPressVolume = int(
+            R.string.button_sound_volume,
+            "button_sound_volume",
+            0,
+            0,
+            100,
+            "%",
+            defaultLabel = R.string.system_default,
+            preview = { InputFeedbacks.previewSound(it) }
+        ) {
+            soundOnKeyPress.getValue() != InputFeedbackMode.Disabled
         }
     }
 
@@ -777,14 +766,19 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                     it.value.putValueTo(this@edit)
                 }
             }
-            // every key's long press as stored, none where none is (not yet migrated: migrated there from the old ones in
-            // memory, KeyListsCache), never the `@1` the setting reads then, which would hide the old ones there for good;
-            // the old ones themselves no longer copied (060-keys-unify S6): what is there from before stays till then, and
-            // goes once they are (060-s6-review L5: no direct boot reads them past that). Not synced at a backup's import,
-            // whose settings file is copied over AppPrefs' (UserDataManager): migrated and synced at the start after
+            // every key's long press as stored, never the `@2` the setting reads where none is, which would hide the old
+            // ones there for good. None stored (a 0.5 or beta backup imported, or 撤销 putting that back, not migrated till
+            // the next start): the three old ones copied as they are, so a direct boot migrates them in memory
+            // (KeyListsCache) as this side does, never left with neither (an earlier sync dropped the old ones there).
+            // Stored: the old ones dropped there (060-s6-review L5: no direct boot reads them past that). Not synced at a
+            // backup's import, whose settings file is copied over AppPrefs' (UserDataManager): migrated and synced at the start after
             val lists = storedKeyLists()
             if (lists == null) {
                 remove(KEY_LISTS)
+                listOf(POPUP_OVERRIDES, KEY_POPUPS, T9_SYMBOLS).forEach { key ->
+                    // one this side has not: the copy's own kept (it is all a direct boot has)
+                    storedOldLongPress(key)?.let { putString(key, it) }
+                }
             } else {
                 putString(KEY_LISTS, lists)
                 listOf(POPUP_OVERRIDES, KEY_POPUPS, T9_SYMBOLS).forEach(::remove)
@@ -821,18 +815,25 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     fun storedOldLongPress(key: String): String? = runCatching { sharedPreferences.getString(key, null) }.getOrNull()
 
     /**
-     * 0.5's and 0.6's betas' long presses ([POPUP_OVERRIDES], [KEY_POPUPS], [T9_SYMBOLS])
-     * as [Internal.keyLists] (KeyListsMigration, 060-keys-unify §4.3): run while it is not of the format (never
-     * stored, a 0.5 or beta backup restored), once. The old ones kept as they are, for a downgrade (§4.4).
+     * 0.5's and 0.6's betas' long presses ([POPUP_OVERRIDES], [KEY_POPUPS], [T9_SYMBOLS]) as [Internal.keyLists]
+     * (KeyListsMigration, 060-keys-unify §4.3), and beta3's `@1` upgraded to `@2` (060-row-unlock §5, its rows by the
+     * user's 按键字母): run while it is neither (never stored, a 0.5, beta or `@1` backup restored), once; the old ones
+     * migrated to `@1` first. A later version's (`@3`) left as it is. The old ones kept as they are, for a downgrade (§4.4).
      */
     private fun migrateKeyLists() {
         val sp = sharedPreferences
         // stored as another type (a bad backup): read as unset, never a crash at every start
         fun storedString(key: String) = runCatching { sp.getString(key, null) }.getOrNull()
-        if (!KeyLists.needsMigration(storedKeyLists())) return
-        val moved = KeyListsMigration.migrate(storedString(POPUP_OVERRIDES), storedString(KEY_POPUPS), storedString(T9_SYMBOLS))
-        moved.lost.forEach { Timber.i("long press not kept: %s", it) }
-        sp.edit { putString(KEY_LISTS, moved.text) }
+        val stored = storedKeyLists()
+        if (!KeyLists.needsMigration(stored)) return
+        val v1 = if (KeyLists.isVersion1(stored)) {
+            stored.orEmpty()
+        } else {
+            val moved = KeyListsMigration.migrate(storedString(POPUP_OVERRIDES), storedString(KEY_POPUPS), storedString(T9_SYMBOLS))
+            moved.lost.forEach { Timber.i("long press not kept: %s", it) }
+            moved.text
+        }
+        sp.edit { putString(KEY_LISTS, KeyListsMigration.upgrade(v1, KeyListsCache.nineLettersOf(storedString(T9_LETTERS)))) }
     }
 
     /**
@@ -975,6 +976,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         const val POPUP_OVERRIDES = "popup_overrides"
         const val KEY_POPUPS = "key_popups"
         const val T9_SYMBOLS = "t9_symbols"
+
+        /** 九键's letters as the user set them (按键字母): what `@1`'s rows upgrade by. */
+        const val T9_LETTERS = "t9_letters"
 
         const val ENGLISH_AUTO_CAPS = "english_auto_caps"
         // 0.5's two switches, and 0.6's one list that took their place

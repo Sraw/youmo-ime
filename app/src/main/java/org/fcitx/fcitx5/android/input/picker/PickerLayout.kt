@@ -74,16 +74,6 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         private var locked = false
         private var returnAppearance = ReturnKeyAppearance.Enter
 
-        // , and . as punctuation maps them ({punct:,}), as they type: 显示和输出一致
-        private var punctuationMapping: Map<String, String> = emptyMap()
-
-        override fun onPunctuationUpdate(mapping: Map<String, String>) {
-            super.onPunctuationUpdate(mapping)
-            if (mapping == punctuationMapping) return
-            punctuationMapping = mapping
-            canvas?.invalidateScene()
-        }
-
         fun showLocked(locked: Boolean) {
             this.locked = locked
             canvas?.invalidateScene()
@@ -108,7 +98,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
                 returnLabel = returnAppearance.label(context).toString(),
                 returnIcon = SceneIcons.returnName(returnAppearance.icon),
                 back = context.getString(R.string.picker_back),
-                punctuation = punctuationMapping,
+                punctuation = keysPunctuation, // , and . as typed ({punct:,}: 显示和输出一致)
             )
             // its named keys' marks as every keyboard's (060-keys-unify D5): ⌫'s, the space's, Return's, the punctuation's
             val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(holdVoice = holdsToTalk), texts = texts, marks = keyMarks(layout))

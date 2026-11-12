@@ -277,7 +277,6 @@ class TextSceneWiringTest {
     private fun popups(def: KeyDef, letter: Boolean) = def.popup.orEmpty().filterNot { def.shortcut != null && it is KeyDef.Popup.Keyboard }.map { p ->
         when (p) {
             // a letter's bubble shows its letter as Shift has it (Table.bubble, transformAlphabet)
-            // a named key's with no corner of the layout's (，): its corner the resolver's first as it is held, so a plain bubble
             // a named key's swipe the resolver's (its first, as KeySwipes previews it): the corner either has left out
             is KeyDef.Popup.AltPreview -> if (p.alternative.isEmpty() || def.shortcut != null) "bubble ${if (letter) "letter" else p.content}" else "bubble ${if (letter) "letter" else p.content} ${p.alternative}"
             is KeyDef.Popup.Preview -> "bubble ${p.content}"

@@ -10,7 +10,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-// the expected lists are the app's before 060-keys-unify (dev/design/keys-before.tsv), not read from the generators
+// the expected lists are the app's before 060-keys-unify (dev/design/keys-before.tsv), not read from the generators,
+// except where the design changed them: nine-key 1's marks through the punctuation (nineOnesMarksGoThroughThePunctuation),
+// a zhuyin group's no first (aZhuyinGroupHasItsSymbolsAndNoFirst) and zy9/question's no first (aFunctionKeysCharacterListHasNoFirst)
 class KeyDefaultsTest {
     private val nine = KeyboardVariant(Form.Nine)
 
@@ -49,6 +51,13 @@ class KeyDefaultsTest {
         // no theme corner: the built-in one of its place
         val asGroup = KeyDefaults.of(KeyId("g14/as"), KeyboardVariant(Form.Grouped14), NodeFacts(letters = "as", place = 5))!!
         assertEquals(listOf("A", "S", "6", "a", "s", "@", "*"), texts(asGroup))
+        // a theme's swipe-up= that types nothing (an action, an empty commit:) is no first, as on any other key:
+        // the built-in corner of its place, never an empty cell between the capitals and the lower case
+        for (written in listOf("sym:BackSpace", "commit:")) {
+            val g = KeyDefaults.of(KeyId("g14/as"), KeyboardVariant(Form.Grouped14), NodeFacts(letters = "as", themeFirst = written, place = 5))!!
+            assertEquals(listOf("A", "S", "6", "a", "s", "@", "*"), texts(g), written)
+            assertEquals(Item("6", Commit.Keypad('6')), g.first, written)
+        }
         val zx = KeyDefaults.grouped("zx", "~")
         assertEquals(Item("~"), zx.first)
         assertEquals(listOf("Z", "X", "~", "z", "x"), zx.row.map { it.text })

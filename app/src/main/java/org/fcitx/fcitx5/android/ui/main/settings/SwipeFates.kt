@@ -23,7 +23,6 @@ import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.HandwritingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
-import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
@@ -44,7 +43,9 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import timber.log.Timber
 import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
@@ -94,6 +95,9 @@ object SwipeFates {
     /** A keyboard the user types on: its own class, made once, as told its input method. */
     private class Shown(val label: String, val keyboard: BaseKeyboard, val ime: InputMethodEntry?, val codeRow: ImKeyboards.Layout, val rootsShown: Boolean)
 
+    /** A keyboard made for an input method, before the page names it. */
+    private class Made(val ime: InputMethodEntry?, val keyboard: BaseKeyboard, val layout: ImKeyboards.Layout, val roots: Boolean)
+
     /**
      * A settings page's keyboards: one a keyboard of [imes] (the input methods on), [tableLabels] each table's
      * 按键显示 (its KeyLabels key); none on, the full keyboard. Made on the main thread, as the page opens.
@@ -130,15 +134,14 @@ object SwipeFates {
                 // the roots fill the full keyboard's letters alone (a table on the nine keys has none drawn)
                 val roots = layout == ImKeyboards.Layout.TEXT && ime != null && ime.uniqueName in InputMethodCatalog.TABLES &&
                     KeyLabels.of(tableLabels[ime.uniqueName].orEmpty()) == KeyLabels.ROOTS && !keyboardCompact()
-                Triple(ime, keyboard, layout) to roots
+                Made(ime, keyboard, layout, roots)
             }
             // a board named by its page's name; two input methods on one board, each by its own too
-            val boards = made.groupBy { it.first.second.themeBoard }
-            return made.map { (m, roots) ->
-                val (ime, keyboard, layout) = m
-                val board = boardName(ctx, keyboard.themeBoard)
-                val label = if (boards[keyboard.themeBoard].orEmpty().size > 1 && ime != null) "$board（${InputMethodNames.of(ctx, ime)}）" else board
-                Shown(label, keyboard, ime, layout, roots)
+            val boards = made.groupBy { it.keyboard.themeBoard }
+            return made.map { m ->
+                val board = boardName(ctx, m.keyboard.themeBoard)
+                val label = if (boards[m.keyboard.themeBoard].orEmpty().size > 1 && m.ime != null) "$board（${InputMethodNames.of(ctx, m.ime)}）" else board
+                Shown(label, m.keyboard, m.ime, m.layout, m.roots)
             }
         }
 
@@ -160,8 +163,9 @@ object SwipeFates {
                 listOf(upright, turned).mapNotNull { screen ->
                     val size = size(screen, s.keyboard.themeBoard, s.codeRow)
                     val (layout, env) = s.keyboard.shownAs(look, size.width, size.height) ?: return@mapNotNull null
-                    // the marks as the keyboard's resolver makes them (key_lists' firsts), the ways as [slots] has them
-                    val marks = SceneBoard.resolver(layout, s.ime?.uniqueName.orEmpty(), slots = slots)
+                    // the marks as the keyboard's resolver makes them (key_lists' firsts, the nine keys' letters as the user
+                    // set them, t9_letters), the ways as [slots] has them
+                    val marks = SceneBoard.resolver(layout, s.ime?.uniqueName.orEmpty(), KeyCaps.nineLetters(), slots)
                         .marks(KeysState(punctuation = punctuation, ways = on, spots = spots))
                         .let { if (it.charShortcuts == !s.rootsShown) it else it.copy(charShortcuts = !s.rootsShown) }
                     val shownEnv = env.copy(
@@ -182,8 +186,9 @@ object SwipeFates {
             is Parsed.Failed -> return Seen(job.label, job.landscape, null, job.ways).also { Timber.e("swipe fates: no scene of %s: %s", job.layout.id, built.problems) }
         }
         val keys = scene.keys.filter { it.copy == 0 && it.shortcut != null }
-        // a table's roots shown: its character keys' ways drawn nowhere, as the scene has it (a name with a board, `full/j`)
-        val roots = if (job.rootsShown) keys.mapNotNullTo(HashSet()) { it.shortcut?.takeIf { n -> '/' in n } } else emptySet()
+        // a table's roots shown: its character keys' ways drawn nowhere, as the scene has it (`full/j`); the function
+        // keys (`fn/space`) keep theirs
+        val roots = if (job.rootsShown) keys.mapNotNullTo(HashSet()) { it.shortcut?.takeUnless { n -> KeyId(n).isFunction } } else emptySet()
         val fates = keys.associate { node ->
             node.shortcut!! to if (node.shortcut in roots) mapOf(true to MarkFate.Dropped, false to MarkFate.Dropped) else node.fates
         }
@@ -217,21 +222,26 @@ object SwipeFates {
     }
 
     /**
-     * What the page says of way [up] of the key of [shortcut] (`full/j`, a function key's `space`), set, as [seen]:
+     * What the page says of way [up] of the key of [name] (`full/j`; a function key's `fn/space`, or the page's bare
+     * `space`, read as its one name [KeyId.of] as the scenes name it), set, as [seen]:
      * nothing where every keyboard that has the key draws it as set, or a scene was not made (no claim then); the
      * keyboards differing, the one that draws it worst, by its name.
      */
-    fun note(ctx: Context, seen: List<Seen>, shortcut: String, up: Boolean): String? {
+    fun note(ctx: Context, seen: List<Seen>, name: String, up: Boolean): String? {
+        val shortcut = KeyId.of(name).name
         // a scene not made: no claim; a way off or placed 无: drawn nowhere as the user chose, nothing to say
         if (seen.any { it.fates == null || up !in it.ways }) return null
         val per = seen.groupBy { it.label }.mapNotNull { (label, both) ->
+            val roots = both.any { shortcut in it.roots }
+            // no fate: the engine gave the way none (set to 空, no first to draw, its marks hidden by the theme): no
+            // claim, only a way actually dropped is 画不下; under the roots, which fill the key, it is theirs ([made]
+            // gives a rooted key's ways Dropped; a Seen made otherwise is held to the same)
             fun fate(landscape: Boolean): MarkFate? = both.firstOrNull { it.landscape == landscape }?.fates?.get(shortcut)?.let {
-                // set and on, and drawn nowhere: no room even to say so
-                it[up] ?: MarkFate.Dropped
+                it[up] ?: MarkFate.Dropped.takeIf { roots }
             }
             val upright = fate(false)
             val turned = fate(true)
-            if (upright == null && turned == null) null else Triple(label, upright to turned, both.any { shortcut in it.roots })
+            if (upright == null && turned == null) null else Triple(label, upright to turned, roots)
         }
         if (per.isEmpty()) return null
         val (label, worst, roots) = per.maxBy { (_, f) -> rank(f.first) * RANKS + rank(f.second) }

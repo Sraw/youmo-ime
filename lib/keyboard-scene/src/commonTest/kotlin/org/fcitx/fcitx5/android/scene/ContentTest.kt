@@ -27,6 +27,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+// small compact's keyboard width, px at Forms.DENSITY: 990 px at 2.75 px a dp
+private const val SMALL_COMPACT_WIDTH = 990.0 * 2.625 / 2.75
+
 // 060-render-v2 §6 step 5: labels, icons and marks where theme 3.0's views put them (rules B §5–§7)
 class ContentTest {
     private val env = Fixtures.portrait
@@ -223,7 +226,7 @@ class ContentTest {
     fun aCompactZhuyinBackspacesIconNeverFlickers() {
         // compact and small compact zhuyin, a px shorter at a time where ⌫'s icons crowd it: its sweep icon
         // never somewhere, then elsewhere, then back, both steps over 1.5 px (060-render-p2 S4e)
-        val small = Forms.compact.copy(width = 990.0 * 2.625 / 2.75, height = 407.0 * 2.625 / 2.75)
+        val small = Forms.compact.copy(width = SMALL_COMPACT_WIDTH, height = 407.0 * 2.625 / 2.75)
         for ((form, d, hi) in listOf(Triple(Forms.compact, 2.75, 324), Triple(small, 2.75, 324), Triple(Forms.compact, 3.5, 412), Triple(small, 3.5, 412))) {
             val k = d / Forms.DENSITY
             val at = (hi downTo hi - 12).map { h ->
@@ -281,7 +284,7 @@ class ContentTest {
         // the same for compact and small compact qwerty, k14 and k18; where a key's face is shorter than its
         // text (small compact k18 near 55%: 21 px of face, 36 px of text) the text gives a px for each px of
         // face: up to 3.75% a px there, only ever smaller (060-render-p2 S4e)
-        val small = Forms.compact.copy(width = 990.0 * 2.625 / 2.75, height = 407.0 * 2.625 / 2.75)
+        val small = Forms.compact.copy(width = SMALL_COMPACT_WIDTH, height = 407.0 * 2.625 / 2.75)
         for (d in listOf(1.5, 2.0, 2.75, 3.5)) for (form in listOf(Forms.compact, small)) for (board in listOf("qwerty", "k14", "k18")) sweepSmoothly(d, board, form)
     }
 
@@ -298,7 +301,8 @@ class ContentTest {
             val at = "at $d, ${form.width} ${if (form.compact) "compact " else ""}$board $h px"
             against += sc.keys.sumOf { iconsWithinArcs(it, at) }
             val sizes = sc.keys.flatMap { key -> key.ops(false).mapNotNull { op -> sized(key, op) } }.toMap()
-            val capped = last?.let { was -> sizes.count { (id, v) -> was[id]?.let { o -> smallStep(id, o.first, v, d, at) } == true } } ?: 0
+            val smallCompact = form.compact && form.width == SMALL_COMPACT_WIDTH
+            val capped = last?.let { was -> sizes.count { (id, v) -> was[id]?.let { o -> smallStep(id, o.first, v, d, smallCompact, at) } == true } } ?: 0
             if (capped > 0) cappedSteps++
             assertTrue(cappedSteps <= 2, "two capped steps of the icons at most $at")
             last = sizes
@@ -332,7 +336,7 @@ class ContentTest {
     fun aCompactZhuyinsIconsKeepWithinTheArcsHalfAPxAtATime() {
         // compact and small compact zhuyin and zhuyin nine at every density, from their height down to 55%
         // half a px at a time (between whole px of keyboard too): every icon within the arcs (060-render-p2 S4e)
-        val small = Forms.compact.copy(width = 990.0 * 2.625 / 2.75, height = 407.0 * 2.625 / 2.75)
+        val small = Forms.compact.copy(width = SMALL_COMPACT_WIDTH, height = 407.0 * 2.625 / 2.75)
         for (d in listOf(1.5, 2.0, 2.75, 3.5)) for (form in listOf(Forms.compact, small)) for (board in listOf("zhuyin", "zhuyin-nine")) halfPxWithinArcs(d, board, form)
     }
 
@@ -349,7 +353,7 @@ class ContentTest {
     fun aBackspacesIconKeepsWithinTheArcsBetweenWholePx() {
         // compact and small compact zhuyin where the rv4e sweep had ⌫'s and the space's icons out of the arcs
         // without onto's last within (between whole px of keyboard): within them (060-render-p2 S4e M1)
-        val small = Forms.compact.copy(width = 990.0 * 2.625 / 2.75, height = 407.0 * 2.625 / 2.75)
+        val small = Forms.compact.copy(width = SMALL_COMPACT_WIDTH, height = 407.0 * 2.625 / 2.75)
         for (form in listOf(Forms.compact, small)) for ((d, h) in listOf(3.5 to 409.2, 3.5 to 414.2, 2.75 to 322.8, 2.75 to 325.8, 2.75 to 326.8)) {
             val k = d / Forms.DENSITY
             for (board in listOf("zhuyin", "zhuyin-nine", "handwriting")) {
@@ -386,7 +390,7 @@ class ContentTest {
     // of a dp, the less it moves), or a px for an icon (whole px); a glyph taller than its face more, up to
     // 0.075 / d, only smaller (the face's px it gives, and its class's need fading in as its marks' does: small
     // compact k18 at 2 px a dp gives 3.6% at 196 px with FIT_SLACK, 2.8% without; growing, as any)
-    private fun smallStep(id: String, o: Double, v: Pair<Double, Boolean>, d: Double, at: String): Boolean {
+    private fun smallStep(id: String, o: Double, v: Pair<Double, Boolean>, d: Double, smallCompact: Boolean, at: String): Boolean {
         val (now, tall) = v
         // (0.042: small compact k18's '1' at 2 px a dp gives 2.06% at 187 px with FIT_SLACK, 1.9% at most without;
         // both bounds measured, not derived: a change to FIT_SLACK, the marks or the fonts re-measures them)
@@ -397,7 +401,7 @@ class ContentTest {
             // the face no longer holds them beside it and the icons' class goes to its cap in a step (measured: one
             // a sweep at 1.5 to 2.75 px a dp, two at 3.5; the caller allows two)
             val icon = " I " in id
-            if (icon) assertTrue(Regex(" 945(\\.0)? compact ") in at, "$id $o to $now, an icon taller than its face, $at")
+            if (icon) assertTrue(smallCompact, "$id $o to $now, an icon taller than its face, $at")
             assertTrue(o - now <= (if (icon) KeyMarkYield.MAX_CLASS_SHRINK else 0.075 / d) * o + 1e-6, "$id $o to $now, taller than its face, $at")
             return icon
         }

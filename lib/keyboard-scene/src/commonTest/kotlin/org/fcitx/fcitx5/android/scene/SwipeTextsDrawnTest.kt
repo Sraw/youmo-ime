@@ -6,10 +6,11 @@ package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
-import org.fcitx.fcitx5.android.scene.MarkFate
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
+import org.fcitx.fcitx5.android.scene.skin.assertRows
+import org.fcitx.fcitx5.android.scene.theme.Theme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -33,16 +34,15 @@ class SwipeTextsDrawnTest {
     private fun names(s: Scene) = s.keys.mapNotNull { k -> k.shortcut?.takeIf { !KeyId(it).isFunction }?.let { k to it } }
 
     @Test
-    fun aSetTextIsDrawnOnEveryKey() {
-        // the other way off: nothing but the key's own glyph in its way
-        assertEquals(NO_ROOM, missing(otherOn = false))
-    }
-
-    @Test
-    fun aSetTextBeatsTheBuiltInMarkItMeets() {
-        // the other way on and built in (the corner symbol, a preset icon): it is the one left out
-        assertEquals(NO_ROOM, missing(otherOn = true))
-    }
+    fun aSetTextIsDrawnOnEveryKey() = assertRows(
+        listOf(
+            // the other way off: nothing but the key's own glyph in its way
+            "aSetTextIsDrawnOnEveryKey" to false,
+            // the other way on and built in (the corner symbol, a preset icon): it is the one left out
+            "aSetTextBeatsTheBuiltInMarkItMeets" to true,
+        ),
+        { it.first },
+    ) { (_, otherOn) -> assertEquals(NO_ROOM, missing(otherOn)) }
 
     // j and k's down 「现在怎么样了」 (as the app gives it, 「现在…」, its shorter 「现…」) on a 360 dp phone's qwerty
     private fun owners(at: KeyMarks.At, keys: List<String> = listOf("full/j", "full/k")): Scene {
@@ -62,8 +62,9 @@ class SwipeTextsDrawnTest {
     private fun rung(key: String, at: KeyMarks.At, text: String, shorter: String?, form: String = "block"): List<String> {
         val env = Forms.env("qwerty", Forms.all.getValue(form).copy(density = NARROW))
         val marks = MarkSettings(upAt = at.yielded, downAt = at, shortcuts = Fixtures.presetMarks + ("$key:down" to MarkContent.Text(text, shorter)), user = setOf("$key:down"))
-        val alts = Forms.scene("qwerty", env.copy(marks = marks)).keys.first { it.shortcut == key }.let { k -> k.alt }
-        return texts(Forms.scene("qwerty", env.copy(marks = marks)), key).filter { it != alts }
+        val s = Forms.scene("qwerty", env.copy(marks = marks))
+        val alts = s.keys.first { it.shortcut == key }.alt
+        return texts(s, key).filter { it != alts }
     }
 
     @Test
@@ -133,7 +134,7 @@ class SwipeTextsDrawnTest {
         // not known, is kept apart as its whole square: clear of j's letter, or left out
         val env = Forms.env("qwerty", Forms.all.getValue("compact").copy(density = NARROW))
         val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = Fixtures.presetMarks + ("full/j:down" to MarkContent.Text("现在…", "现…")), user = setOf("full/j:down"))
-        fun j(theme: org.fcitx.fcitx5.android.scene.theme.Theme) = Forms.scene("qwerty", env.copy(marks = marks), theme).keys.first { it.shortcut == "full/j" }
+        fun j(theme: Theme) = Forms.scene("qwerty", env.copy(marks = marks), theme).keys.first { it.shortcut == "full/j" }
         fun ink(k: KeyNode) = k.ops(false).filterIsInstance<Op.Text>().first { it.text == "j" }.let { t ->
             val m = FakeMeasurer.measure(t.text, t.font, t.weight, t.size, t.letterSpacing).ink
             Box(t.x + m.left * t.scaleX, t.baseline + m.top, t.x + m.right * t.scaleX, t.baseline + m.bottom)
@@ -143,11 +144,14 @@ class SwipeTextsDrawnTest {
         val square = sign(builtIn)!!
         assertTrue(square.top < ink(builtIn).bottom, "the built-in sign's square reaches into the letter's ink: $square")
         val base = Fixtures.materialLight
-        val ownIcons: Map<String, String> = base.icons + mapOf(org.fcitx.fcitx5.android.scene.Icons.SHORT_TEXT to "short.png")
+        val ownIcons: Map<String, String> = base.icons + mapOf(Icons.SHORT_TEXT to "short.png")
+        // Theme is no data class: every field but the icons as the base's, by name
         val themed = j(
-            org.fcitx.fcitx5.android.scene.theme.Theme(
-                base.name, base.dark, base.version, base.colors, base.styles, base.fonts, ownIcons, base.picture,
-                base.variants, base.baseColors, base.darkColors, base.meta, base.systemColors, base.soundFiles,
+            Theme(
+                name = base.name, dark = base.dark, version = base.version, colors = base.colors, styles = base.styles,
+                fonts = base.fonts, icons = ownIcons, picture = base.picture, variants = base.variants,
+                baseColors = base.baseColors, darkColors = base.darkColors, meta = base.meta,
+                systemColors = base.systemColors, soundFiles = base.soundFiles,
             ),
         )
         val own = sign(themed)

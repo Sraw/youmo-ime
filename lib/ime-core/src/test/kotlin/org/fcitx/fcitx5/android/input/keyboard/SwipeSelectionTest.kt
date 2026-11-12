@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.shortcut.EditPlan
 import org.junit.Assert.assertEquals
@@ -274,5 +275,167 @@ class SwipeSelectionTest {
         assertNull(s.begin(old, CursorRange(5, 5), null))
         assertNull("the new touch's steps start at none", s.begin(now, CursorRange(5, 5), null))
         assertEquals("4..5", s.move(-1).text())
+    }
+
+    // 滑选 up and down: the editor moves the free end a line on screen (shift+Up/Down), its report taken back
+    @Test
+    fun aLineLandsWhereTheEditorReportsTheAnchorKept() {
+        val s = begun(before = "one two three")
+        assertEquals("10..13", s.move(-3).text())
+        assertEquals(true, s.lineable)
+        s.lineSent()
+        assertEquals(true, s.lining)
+        assertNull("steps meanwhile wait", s.move(-1))
+        // the editor's report: the anchor first, the end it moved before it
+        assertEquals("then go on from the reported end", "3..13", s.lineLanded(CursorRange(13, 4)).text())
+        assertEquals(13, s.anchorAt)
+        assertEquals("sideways from there", "2..13", s.move(-1).text())
+    }
+
+    @Test
+    fun aLinePastTheAnchorTurnsTheSelection() {
+        val s = begun(before = "ab", after = "cdefghij")
+        assertEquals("1..2", s.move(-1).text())
+        s.lineSent()
+        assertNull("nothing waiting: nothing to set, the editor has it", s.lineLanded(CursorRange(2, 7)))
+        assertEquals(7, s.headAt)
+        assertEquals("2..8", s.move(1).text())
+        assertEquals("back over the anchor", "1..2", s.move(-7).text())
+    }
+
+    @Test
+    fun rushedLinesWaitForTheirLastReport() {
+        val s = begun(before = "abcdefghij")
+        s.lineSent()
+        s.lineSent()
+        assertNull(s.move(1))
+        assertNull("the first landed", s.lineLanded(CursorRange(10, 6)))
+        assertEquals("the second: the step from there", "3..10", s.lineLanded(CursorRange(10, 2)).text())
+    }
+
+    // the editor moving the selection otherwise: the line no longer waited for, a report later not a line
+    @Test
+    fun aReportNotKeepingTheAnchorStopsWaiting() {
+        fun otherwise(givenUp: Boolean) = {
+            val s = begun(before = "abcdef")
+            s.lineSent()
+            if (givenUp) assertNull(s.linesUnreported()) else assertNull(s.move(-1))
+            assertNull("the editor moved the selection otherwise", s.lineLanded(CursorRange(1, 1)))
+            assertEquals(false, s.lining)
+            assertEquals(false, s.awaitingLines)
+            assertNull("not a line any more", s.lineLanded(CursorRange(6, 3)))
+            assertEquals(6, s.headAt)
+        }
+        assertRows(
+            "reported while the line is on time" to otherwise(givenUp = false),
+            "reported after the wait gave the line up" to otherwise(givenUp = true),
+        )
+    }
+
+    @Test
+    fun linesNeverReportedGiveTheStepsBack() {
+        val s = begun(before = "abcdef")
+        s.lineSent()
+        assertNull(s.move(-2))
+        assertEquals("an editor ignoring shift+Up: the steps taken from where the end was", "4..6", s.linesUnreported().text())
+        assertNull(s.linesUnreported())
+    }
+
+    // a line reported after the lift: set in order, the next touch keeping its anchor
+    @Test
+    fun aLineLandingAfterTheLiftIsKeptInOrder() {
+        fun lifted(givenUp: Boolean) = {
+            val s = begun(before = "abcdefgh")
+            s.lineSent()
+            if (givenUp) assertNull(s.linesUnreported())
+            assertNull(s.end())
+            assertEquals("the editor's, set in order", "3..8", s.lineLanded(CursorRange(8, 3)).text())
+            assertEquals(false, s.awaitingLines)
+            assertNull(s.begin(s.reached(), CursorRange(3, 8), EditPlan.Field("abc", "defgh", "")))
+            assertEquals("the next touch keeps the anchor", "2..8", s.move(-1).text())
+        }
+        assertRows(
+            "landing while still waited for" to lifted(givenUp = false),
+            "landing after the wait gave it up, late" to lifted(givenUp = true),
+        )
+    }
+
+    // the touch over a while: lines given up on no longer waited for, a report later the editor's own
+    @Test
+    fun lateLinesForgottenAreNoLongerWaitedFor() {
+        val s = begun(before = "abcdef")
+        s.lineSent()
+        assertNull(s.end())
+        assertEquals("lifted: the selection as it is, in order", "6..6", s.linesUnreported().text())
+        s.linesForgotten()
+        assertEquals(false, s.awaitingLines)
+        assertNull("not a line", s.lineLanded(CursorRange(6, 3)))
+        assertEquals(6, s.headAt)
+    }
+
+    @Test
+    fun noLineWhileAProbeWaitsOrBeforeItBegins() {
+        val s = SwipeSelection()
+        s.reached()
+        assertEquals("not begun", false, s.lineable)
+        val p = begun(before = "ab")
+        assertEquals("2..3", p.move(1, CursorRange(2, 2), settled = true).text())
+        assertEquals("a probe waiting", false, p.lineable)
+    }
+
+    // the steps moved while a line was on its way, the finger lifted before it landed: taken from where it landed
+    @Test
+    fun stepsWaitingForALineLandedAfterTheLiftAreTaken() {
+        val s = begun(before = "one two three")
+        assertEquals("12..13", s.move(-1).text())
+        s.lineSent()
+        assertNull(s.move(-2))
+        assertNull(s.end())
+        assertEquals("the line's end, two to the left, in order", "2..13", s.lineLanded(CursorRange(13, 4)).text())
+    }
+
+    // a line landing past what was read: the field read anew there, its characters graphemes again
+    @Test
+    fun aLineLandingPastTheReadReadsTheFieldThere() {
+        val family = "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"
+        val s = SwipeSelection()
+        val a = "a".repeat(SwipeSelection.READ)
+        assertNull(s.begin(s.reached(), CursorRange(1000, 1000), EditPlan.Field(a, "", a), at = 1000))
+        s.lineSent()
+        val head = 1000 - a.length - 100
+        var reads = 0
+        assertNull(
+            s.lineLanded(CursorRange(1000, head)) {
+                reads++
+                EditPlan.Field("x$family", "b".repeat(1000 - head), "") to head
+            },
+        )
+        assertEquals("read once, as it landed past the read", 1, reads)
+        assertEquals("the family a step", "${head - family.length}..1000", s.move(-1).text())
+    }
+
+    // an editor echoing the selection set for it in its own order, the free end not moved: not the line
+    @Test
+    fun anEchoOfTheSelectionIsNotALine() {
+        val s = begun(before = "abcdef")
+        assertEquals("4..6", s.move(-2).text())
+        s.lineSent()
+        assertNull("the echo", s.lineLanded(CursorRange(4, 6)))
+        assertEquals("still waiting for the line", true, s.lining)
+        assertNull(s.lineLanded(CursorRange(6, 1)))
+        assertEquals(1, s.headAt)
+    }
+
+    // a line reported after the wait gave it up: the free end where the editor has it, the steps after from there
+    @Test
+    fun aLineReportedLateIsStillWhereTheEndIs() {
+        val s = begun(before = "abcdefghij")
+        assertEquals("9..10", s.move(-1).text())
+        s.lineSent()
+        assertNull(s.linesUnreported())
+        assertEquals(true, s.awaitingLines)
+        assertNull("nothing to set: the editor has it", s.lineLanded(CursorRange(10, 4)))
+        assertEquals(false, s.awaitingLines)
+        assertEquals("on from the late line's end", "3..10", s.move(-1).text())
     }
 }

@@ -12,8 +12,6 @@ import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.ChinesePunctuation
-import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
@@ -70,12 +68,7 @@ class KeysEverywhereUatTest {
         }.start().also { h ->
             made = h
             // fcitx's Chinese punctuation on, as its addon tells it (cached too: an input view made anew replays it)
-            if (punctuation != null) {
-                val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
-                h.api.statusAreaCached = active
-                h.api.punctuationCached = punctuation
-                h.emit(HostEvent.StatusArea(active, im, punctuation))
-            }
+            if (punctuation != null) h.chinesePunctuation(im, punctuation)
             h.relayout()
         }
     }
@@ -127,11 +120,12 @@ class KeysEverywhereUatTest {
     @Test
     @Uat("KB-73")
     fun commaIsOneKey() {
-        for ((board, h) in everyComma(zh)) {
+        // Chinese punctuation on, then off: the one list as each shows it
+        for (punct in listOf(zh, emptyMap<String, String>())) for ((board, h) in everyComma(punct)) {
             val keys = h.named("fn/comma")
             assertEquals(board, if (board == ImKeyboard.ZHUYIN_NINE.name) 2 else 1, keys.size)
             // the same items and the first focused; their places on the screen go by where the key is, so not their order
-            for (k in keys) assertEquals("$board ${k.node.id}", comma.map(zh::getValue).sorted() to "。", h.held(k).let { (items, focused) -> items.sorted() to focused })
+            for (k in keys) assertEquals("$board ${k.node.id}", comma.map { punct[it] ?: it }.sorted() to (punct["."] ?: "."), h.held(k).let { (items, focused) -> items.sorted() to focused })
         }
     }
 
@@ -184,11 +178,11 @@ class KeysEverywhereUatTest {
         fun first(id: String, symbols: List<String>, first: String) =
             prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId(id) to UserList(false, symbols, First.Literal(first)))).serialize())
         // in the row
-        first("t9/5", listOf("#", "/"), "k")
+        first("t9/5", listOf("J", "K", "L", "5", "j", "k", "l", "#", "/"), "k")
         var h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)
         assertEquals("k", h.held(h.nineKey("5")).second)
         // a symbol above a row
-        first("t9/5", listOf("#", "/"), "/")
+        first("t9/5", listOf("J", "K", "L", "5", "j", "k", "l", "#", "/"), "/")
         h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)
         h.api.calls.clear()
         assertEquals("/", h.held(h.nineKey("5")).second)
@@ -201,14 +195,42 @@ class KeysEverywhereUatTest {
         assertTrue(h.sent().toString(), "key=Q," in h.sent().last())
     }
 
+    // a letter first swiped to: the bubble shows it as it types, not in the face's case (seen on a device: q's first Q
+    // read q in the bubble, typed Q; 14 键's capitals over a first q the other way round)
+    @Test
+    @Uat("KB-83")
+    fun aLetterFirstSwipedShowsAsItTypes() {
+        prefs.setWays(up = true, down = true)
+        fun swiped(h: KeyboardHarness, k: SceneShownKey): Pair<List<String>, String> {
+            h.api.calls.clear()
+            val finger = h.finger(k, h.at(k))
+            for (i in 1..5) finger.move(h.at(k, dy = -k.height * 0.3f * i, ms = 16))
+            val bubble = h.popupChoices().map { it.text }.filter { it.isNotEmpty() }
+            finger.up(h.at(k, dy = -k.height * 1.5f))
+            h.idle()
+            // a letter of a long press: sent as a key on the full keyboard, committed as it is on 14 键 (GroupedKeyboard.resolve)
+            return bubble to (h.sent().lastOrNull() ?: "committed ${h.field.text}")
+        }
+        prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("full/q") to UserList(false, listOf("1", "Q"), First.Literal("Q")))).serialize())
+        val full = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.FULL))
+        val (q, qSent) = swiped(full, full.named("full/q").single())
+        assertEquals(listOf("Q"), q)
+        assertTrue(qSent, "key=Q," in qSent)
+        prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("g14/qw") to UserList(false, listOf("q"), First.Literal("q")))).serialize())
+        val fourteen = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14))
+        val (qw, qwSent) = swiped(fourteen, fourteen.named("g14/qw").single())
+        assertEquals(listOf("q"), qw)
+        assertEquals("committed q", qwSent)
+    }
+
     // narrow (one-handed): the popup's rows more, a first in the symbols above still focused as it opens and typed
     @Test
     @Uat("KB-75")
     fun heldAndLetGoTypesTheFirstOnANarrowKeyboard() {
         prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Left)
         val lists = mapOf(
-            KeyId("t9/1") to UserList(false, listOf("^", ":", ";", "~", ".", "-", "@", "\\", "\""), First.Literal("@")),
-            KeyId("t9/5") to UserList(false, listOf("#", "(", ")", "/", "%"), First.Literal("/")),
+            KeyId("t9/1") to UserList(false, listOf("1", "^", ":", ";", "~", ".", "-", "@", "\\", "\""), First.Literal("@")),
+            KeyId("t9/5") to UserList(false, listOf("J", "K", "L", "5", "j", "k", "l", "#", "(", ")", "/", "%"), First.Literal("/")),
         )
         prefs.set(internal.keyLists, KeyLists.of(lists).serialize())
         val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)
@@ -235,8 +257,8 @@ class KeysEverywhereUatTest {
         h.api.calls.clear()
         h.longPressTo(h.nineKey("1"), "1", ".")
         assertTrue(h.sent().toString(), "key=.," in h.sent().last())
-        // changed once on pinyin's: English's the same (M3), its 1 kept
-        prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("t9/1") to UserList(false, listOf(".", "@")))).serialize())
+        // changed once on pinyin's: English's the same (M3), its 1 kept where the user kept it
+        prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("t9/1") to UserList(false, listOf("1", ".", "@")))).serialize())
         h = harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS))
         assertEquals(listOf(".", "1", "@"), h.longPress(h.nineKey("1")).sorted())
     }
@@ -268,7 +290,7 @@ class KeysEverywhereUatTest {
     @Test
     @Uat("KB-77")
     fun nineKeysFiveSymbolsSharedLettersByInputMethod() {
-        prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("t9/5") to UserList(false, listOf("#", "(", ")", "%")))).serialize())
+        prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("t9/5") to UserList(false, listOf("J", "K", "L", "5", "j", "k", "l", "#", "(", ")", "%")))).serialize())
         val pinyin = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS).let { it.longPress(it.nineKey("5")) }
         assertTrue(pinyin.toString(), pinyin.containsAll(listOf("J", "K", "L", "5", "j", "k", "l", "%")))
         // English's pinyin's: its capitals too

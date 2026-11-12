@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
@@ -258,6 +259,36 @@ class PopupKeyboardUiTest {
             assertEquals("$toRight", if (toRight) listOf("ㄖ", "ㄕ", "ㄔ", "ㄓ") else keys.toList(), row)
             assertEquals(KeyAction.HostKeyAction("ㄓ"), ui.onTrigger())
         }
+    }
+
+    @Test
+    @Uat("T9-29")
+    fun aKeysOwnAloneGoesInWithItsSymbolsNoSlotLeftEmpty() {
+        // a key's own alone in its row goes in with its symbols, as even as may be, its own in focus in the bottom row
+        val nineOne = arrayOf("1", "……", "：", "；", "～", "。", "-", "@", "、", "“")
+        val tenOwn = arrayOf("1") + Array(10) { "#$it" }
+        val middle = Rect(480, 500, 520, 550)
+        val left = Rect(0, 500, 40, 550)
+        val right = Rect(960, 500, 1000, 550)
+        fun check(keys: Array<String>, trigger: Rect, rows: Int, columns: Int) = {
+            val ui = popup(keys, trigger, split = 1, inRow = 0)
+            val drawn = drawn(ui)
+            assertEquals(rows, ui.rows())
+            assertEquals(keys.size, drawn.values.toSet().size)
+            assertTrue(drawn.values.all { (r, c) -> r in 0 until rows && c in 0 until columns })
+            assertEquals(0 to ui.focusColumn, drawn["1"])
+            assertEquals(KeyAction.HostKeyAction("1"), ui.onTrigger())
+        }
+        assertRows(
+            // 九键's 1 (KeyDefaults.nine: [1], then 9 marks): not a row of one under 5×2 with a gap, but 5×2
+            "九键 1, centred: 5×2, every slot a key" to check(nineOne, middle, 2, 5),
+            "九键 1 by the left edge: pushed in, still 5×2" to check(nineOne, left, 2, 5),
+            "九键 1 by the right edge: pushed in, still 5×2" to check(nineOne, right, 2, 5),
+            // a 1 the user left with its digit alone and ten symbols: 4 a row (3 rows), not ten of one
+            "digit and ten symbols, centred: 4 a row in 3 rows" to check(tenOwn, middle, 3, 4),
+            "digit and ten symbols by the left edge: the same 3 rows" to check(tenOwn, left, 3, 4),
+            "digit and ten symbols by the right edge: the same 3 rows" to check(tenOwn, right, 3, 4),
+        )
     }
 
     // 九键's (and 九键双拼's) long press of [digit] as it is laid out: its capitals, its digit and its letters in a row
@@ -578,16 +609,16 @@ class PopupKeyboardUiTest {
         assertEquals(a.top.toInt() + view.outset.top, box.top)
     }
 
+    // rows of five too tall for the room above the key (a list of 16 in landscape): wider rows till they fit, every
+    // key still drawn and none above the room
     @Test
-    fun aKeyOfNoLettersStillHasItsSymbolsFiveARow() {
-        // a 1 the user left with its digit alone: its ten symbols two rows of five, not ten of one
-        val keys = arrayOf("1") + Array(10) { "#$it" }
-        val ui = popup(keys, Rect(480, 500, 520, 550), split = 1, inRow = 0)
-        val drawn = drawn(ui)
-        assertEquals(3, ui.rows())
-        // centred, room either side: the digit in the middle column, under the first symbol
-        assertEquals(0 to 2, drawn["1"])
-        assertEquals(1 to 2, drawn["#0"])
-        assertEquals(KeyAction.HostKeyAction("1"), ui.onTrigger())
+    fun rowsTooTallForTheRoomAboveAreMadeWider() {
+        val keys = Array(16) { ('a' + it).toString() }
+        val trigger = Rect(480, 500, 520, 550)
+        // the room above the key: two rows (lift 10)
+        val ui = popup(keys, trigger, outerBounds = Rect(0, 500 - 10 - 2 * keyHeight, 1000, 600))
+        assertEquals(2, ui.rows())
+        assertEquals(keys.size, drawn(ui).values.toSet().size)
+        assertEquals(4, popup(keys, trigger).rows())
     }
 }

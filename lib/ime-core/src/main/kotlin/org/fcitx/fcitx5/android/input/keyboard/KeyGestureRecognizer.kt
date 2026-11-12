@@ -129,8 +129,7 @@ class KeyGestureRecognizer {
     private val swipeY = SwipeSteps()
 
     // [crossStepY]'s, started at the first sideways step
-    private val crossY = SwipeSteps()
-    private var crossing = false
+    private val crossY = CrossSteps()
 
     val swipeTotalX: Int get() = swipeX.total
 
@@ -278,16 +277,7 @@ class KeyGestureRecognizer {
         return steps
     }
 
-    private fun stepsCrossY(y: Float, countX: Int): Int {
-        if (settings.crossStepY <= 0f) return 0
-        if (!crossing) {
-            if (countX == 0) return 0
-            crossing = true
-            crossY.start(y)
-            return 0
-        }
-        return crossY.step(y, settings.crossStepY)
-    }
+    private fun stepsCrossY(y: Float, countX: Int): Int = crossY.step(y, countX, settings.crossStepY)
 
     /**
      * Decides what a finger lift means. Call before [resetForNextTouch]: the decision depends
@@ -325,7 +315,6 @@ class KeyGestureRecognizer {
         touchMovedOutside = false
         swipedY = false
         lockedAxis = Axis.Undecided
-        crossing = false
         crossY.reset()
         if (settings.swipe) {
             if (settings.swipeRepeat) swipeRepeatTriggered = false

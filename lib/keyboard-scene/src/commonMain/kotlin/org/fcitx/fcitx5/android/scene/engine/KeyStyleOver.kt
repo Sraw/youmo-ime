@@ -26,7 +26,9 @@ import org.fcitx.fcitx5.android.scene.theme.Value
  * - [radiusDp]: every key's corners.
  * - [flat] (无边框; the keys are then in `@flat` too, [Env.flat]): every key alike, no fill, border, shadow,
  *   inner shadow, depth or sink, whatever its face was (the owner: what is set is what is drawn, no exceptions;
- *   a skin whose picture carries its letters then shows none, as the user chose).
+ *   a skin whose picture carries its letters then shows none, as the user chose). A key of `face="keep"` (a 4.0
+ *   pack's 拼, 确定) is flattened too: it is a key. Slots are no keys and keep their face (九键's side column, the
+ *   handwriting pad): [flat] is laid on keys alone.
  */
 data class KeyStyleOver(
     val across: Level? = null,

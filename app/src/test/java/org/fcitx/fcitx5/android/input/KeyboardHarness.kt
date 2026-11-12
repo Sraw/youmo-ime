@@ -447,7 +447,8 @@ class KeyboardHarness(
     /** The clock run on by [ms], and what came due. */
     fun after(ms: Long) = idleFor(ms)
 
-    // as the looper's idleFor, the tasks due one at a time under the same limit as [idle]'s
+    // as the looper's idleFor, the tasks due one at a time under the same limit as [idle]'s; the field's
+    // selection changes told to the service at its end, as [idle] does
     private fun idleFor(ms: Long) {
         val looper = shadowOf(Looper.getMainLooper())
         val end = SystemClock.uptimeMillis() + ms
@@ -460,6 +461,7 @@ class KeyboardHarness(
         }
         // nothing due before the end left: the clock run on to it
         looper.idleFor(java.time.Duration.ofMillis(maxOf(0L, end - SystemClock.uptimeMillis())))
+        selectionDelivered()
     }
 
     /** A finger put on [v]'s middle, slid by [dx], [dy] px in a few steps, lifted. */
@@ -723,14 +725,14 @@ class KeyboardHarness(
 
     /**
      * Chinese punctuation on for [im], as fcitx's punctuation addon tells it (cached too: a view made anew replays it): the
-     * keys shown as a user sees them by default (KB-76, ，。？！ on 九键's 1 and its column).
+     * keys shown as a user sees them by default (KB-76, ，。？！ on 九键's 1 and its column). [marks] empty: punctuation
+     * off, no status entry, as the addon tells that.
      */
-    fun chinesePunctuation(im: InputMethodEntry = PINYIN) {
-        val zh = ChinesePunctuation.map
-        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
-        api.statusAreaCached = active
-        api.punctuationCached = zh
-        emit(HostEvent.StatusArea(active, im, zh))
+    fun chinesePunctuation(im: InputMethodEntry = PINYIN, marks: Map<String, String> = ChinesePunctuation.map) {
+        val status = if (marks.isEmpty()) emptyList() else listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+        api.statusAreaCached = status
+        api.punctuationCached = marks
+        emit(HostEvent.StatusArea(status, im, marks))
         idle()
     }
 

@@ -22,11 +22,20 @@ class MultiTap(private val timeout: Long) {
     private var at = 0L
 
     /**
+     * What the run's last press committed, set by whoever commits it: the next press of the run
+     * takes back this, not the last letter mapped anew (1's marks map differently once the first
+     * committed: 半角 after a digit, then the context reset). Empty when nothing of a run is committed: cleared
+     * as a run starts, so a run whose first press committed nothing takes nothing back.
+     */
+    var typed: String = ""
+
+    /**
      * What pressing [key], whose letters are [letters], at [time] types: null for the key, any of
      * its letters; else the letter that takes the place of the last press.
      */
     fun press(key: Char, letters: String, time: Long): Char? {
         count = countAt(key, time)
+        if (count <= 1) typed = ""
         this.key = key
         at = time
         return letter(letters, count)
@@ -39,6 +48,7 @@ class MultiTap(private val timeout: Long) {
     fun reset() {
         key = NONE
         count = 0
+        typed = ""
     }
 
     private fun countAt(key: Char, time: Long): Int =

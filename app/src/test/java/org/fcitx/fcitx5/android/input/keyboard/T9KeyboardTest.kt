@@ -117,6 +117,22 @@ class T9KeyboardTest {
         assertEquals(KeyAction.HostKeyAction("4"), T9Keyboard.resolve(KeyAction.HostKeyAction("4"), KeyActionListener.Source.Keyboard, tap, 20))
     }
 
+    // the marks changed between two taps of a run: the second takes back what the first committed, not the
+    // first mark mapped again (FB1 of R24; not seen end to end, where the marks stay 半角 through the run: T9-19b)
+    @Test
+    fun oneAgainReplacesWhatTheLastTapCommittedThoughTheMarksChanged() {
+        val tap = MultiTap(600)
+        val keys = KeyActionListener.Source.Keyboard
+        val one = KeyAction.HostKeyAction("1")
+        assertEquals(KeyAction.CommitAction(",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 0, composing = false, marks = ZH - ","))
+        assertEquals(KeyAction.CommitAction("。", replacing = ",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 100, composing = false, marks = ZH))
+        // after a pause a run of its own: nothing of the last taken back
+        assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolve(one, keys, tap, 2000, composing = false, marks = ZH))
+        // another key between: the same
+        T9Keyboard.resolve(KeyAction.HostKeyAction("4"), keys, tap, 2100)
+        assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolve(one, keys, tap, 2200, composing = false, marks = ZH))
+    }
+
     @Test
     fun oneWithNothingTypedIsPunctuationTheNextInPlaceOfTheLastIfPressedAgainSoon() {
         val tap = MultiTap(600)
@@ -134,8 +150,9 @@ class T9KeyboardTest {
         assertEquals(one, T9Keyboard.resolve(one, keys, tap, 2100, composing = true))
     }
 
-    // 2 to 9's to the engine, as the full keyboard's (the candidate, then the mark); 1's committed
-    // as they are already, not through the engine, where . would be 。
+    // a long-pressed symbol goes on as the popup gives it: 2 to 9's to the engine, as the full keyboard's (the
+    // candidate, then the mark); a user's literal item committed as it is. 1's defaults are stored as their source
+    // characters and typed as keys through the punctuation (KB-75), which the popup's own action carries
     @Test
     fun aLongPressedSymbolGoesOnAsThePopupGivesIt() {
         val tap = MultiTap(600)
@@ -287,6 +304,19 @@ class T9KeyboardTest {
         val sent = ArrayList<KeyAction>()
         val keyboard = keyboard(sent)
         keyboard.key('2').click()
+        keyboard.key('1').click()
+        assertEquals(listOf(coded('2'), coded('1')), sent)
+    }
+
+    // the punctuation's map told between a digit sent and the engine's answer: 1 still the separator, the
+    // column's labels redrawn only (the engine's last word, nothing typed, would make 1 punctuation)
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun aPunctuationUpdateBeforeTheEngineTellsKeepsOneTheSeparator() {
+        val sent = ArrayList<KeyAction>()
+        val keyboard = keyboard(sent)
+        keyboard.key('2').click()
+        keyboard.onPunctuationUpdate(emptyMap())
         keyboard.key('1').click()
         assertEquals(listOf(coded('2'), coded('1')), sent)
     }

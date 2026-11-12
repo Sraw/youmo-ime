@@ -287,6 +287,8 @@ class LayoutReaderTest {
         assertNull(LayoutReader.text("{punct: }"))
         // a run of marks a face's alone (九键 1's ,.?!); a corner and what is said one, as the betas' readers took it
         assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"{punct:,.?!}\"/></row>")))
+        // marks of the basic plane alone, so the JVM and the theme maker's JS count a run alike
+        assertTrue(problems(board("<row><key id=\"a\" label=\"{punct:\uD83D\uDE00}\"/></row>")).isNotEmpty())
         for (attr in listOf("alt", "a11y")) {
             assertTrue(problems(board("<row><key id=\"a\" label=\"a\" $attr=\"{punct:,.}\"/></row>")).isNotEmpty(), attr)
             assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"a\" $attr=\"{punct:,}\"/></row>")), attr)
@@ -307,5 +309,11 @@ class LayoutReaderTest {
             "<key id=\"c\" label=\"ㄓ\"><popup from=\"group\"/></key></row>"
         // counted in order, a named one too
         assertEquals(listOf("zy9/1", "zy9/7", "zy9/3"), names("zhuyin-nine", groups))
+        // a name another key wrote is not given twice (two keys would share one list): left unnamed, warned
+        val taken = "<row><key id=\"a\" label=\"ㄅㄉㄚ\" shortcut=\"zy9/2\"><popup from=\"group\"/></key><key id=\"b\" label=\"ㄍ\"><popup from=\"group\"/></key>" +
+            "<key id=\"c\" label=\"ㄓ\"><popup from=\"group\"/></key></row>"
+        assertEquals(listOf("zy9/2", null, "zy9/3"), names("zhuyin-nine", taken))
+        val twice = "<row><key id=\"2\" label=\"ABC\" shortcut=\"t9/9\"><popup from=\"nine\"/></key><key id=\"9\" label=\"WXYZ\"><popup from=\"nine\"/></key></row>"
+        assertEquals(listOf("t9/9", null), names("nine", twice))
     }
 }

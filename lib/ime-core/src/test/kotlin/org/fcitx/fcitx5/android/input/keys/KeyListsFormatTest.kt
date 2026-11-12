@@ -11,8 +11,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+// contract: key_lists' stored @2 format, which a backup, a later version and a downgrade read back
 class KeyListsFormatTest {
-    private fun parse(vararg lines: String) = KeyLists.parse((listOf("@1") + lines).joinToString("\n"))!!
+    private fun parse(vararg lines: String) = KeyLists.parse((listOf("@2") + lines).joinToString("\n"))!!
 
     @Test
     fun theThreeBodies() {
@@ -20,7 +21,8 @@ class KeyListsFormatTest {
         assertEquals(UserList(false, listOf("1", "!", "Q"), First.Default), l[KeyId("full/q")])
         assertEquals(UserList(false, listOf("…", "."), First.Literal(".")), l[KeyId("t9/1")])
         assertEquals(UserList.Off, l[KeyId("fn/comma")])
-        assertEquals(UserList(false, emptyList(), First.None), l[KeyId("full/w")])
+        // a set of no items is off, as KeyLists.with stores it (FB4 of R24)
+        assertEquals(UserList.Off, l[KeyId("full/w")])
     }
 
     @Test
@@ -28,8 +30,10 @@ class KeyListsFormatTest {
         assertNull(KeyLists.parse(null))
         assertNull(KeyLists.parse(""))
         assertNull(KeyLists.parse("q 1 Q"))
-        assertNull(KeyLists.parse("@2\nfull/q\toff"))
-        assertEquals(KeyLists.Empty, KeyLists.parse("@1"))
+        // @1's set held only the symbols above a row: upgraded, never read as @2's
+        assertNull(KeyLists.parse("@1\nfull/q\toff"))
+        assertNull(KeyLists.parse("@3\nfull/q\toff"))
+        assertEquals(KeyLists.Empty, KeyLists.parse("@2"))
     }
 
     @Test
@@ -42,9 +46,15 @@ class KeyListsFormatTest {
     fun itemsAreEscapedClippedAndCleaned() {
         val long = "一二三四五六七八九十一二三四五六七八"
         val l = parse("full/q\tset\t*\ta\\tb\t \t\t$long\ta\\tb\t\t.com")
-        assertEquals(listOf("a\tb", long.take(16), ".com"), l[KeyId("full/q")]!!.symbols)
-        val many = (1..40).joinToString("\t") { "s$it" }
-        assertEquals(32, parse("full/q\tset\t*\t$many")[KeyId("full/q")]!!.symbols.size)
+        assertEquals(listOf("a\tb", long.take(16), ".com"), l[KeyId("full/q")]!!.items)
+        val many = (1..60).joinToString("\t") { "s$it" }
+        assertEquals(16, parse("full/q\tset\t*\t$many")[KeyId("full/q")]!!.items.size)
+    }
+
+    // a row's letters and digit stored as any item, its digit first by name
+    @Test
+    fun aRowIsStoredAsAnyItems() {
+        assertEquals("@2\nt9/2\tset\t:2\tA\tB\tC\t2\ta\tb\tc\t@", KeyLists.of(mapOf(KeyId("t9/2") to UserList(false, listOf("A", "B", "C", "2", "a", "b", "c", "@"), First.Literal("2")))).serialize())
     }
 
     @Test
@@ -56,9 +66,9 @@ class KeyListsFormatTest {
     fun writtenInOrderOfTheNamesAndReadBack() {
         val l = parse("t9/2\tset\t*\t@", "full/q\tset\t:Q\t1\tQ\tx\\\\y", "fn/comma\toff")
         val text = l.serialize()
-        assertEquals("@1\nfn/comma\toff\nfull/q\tset\t:Q\t1\tQ\tx\\\\y\nt9/2\tset\t*\t@", text)
+        assertEquals("@2\nfn/comma\toff\nfull/q\tset\t:Q\t1\tQ\tx\\\\y\nt9/2\tset\t*\t@", text)
         assertEquals(l, KeyLists.parse(text))
-        assertEquals("@1", KeyLists.Empty.serialize())
+        assertEquals("@2", KeyLists.Empty.serialize())
     }
 
     @Test
@@ -71,9 +81,10 @@ class KeyListsFormatTest {
     // what an editor or a transfer adds around the header is not another format; only none of any version's migrates
     @Test
     fun theHeaderAroundBlanksAndAByteOrderMarkAndWhatMigrates() {
-        assertEquals(UserList.Off, KeyLists.parse("\uFEFF @1 \r\nfull/q\toff")!![KeyId("full/q")])
-        assertEquals(UserList.Off, KeyLists.parse("\n@1\nfull/q\toff")!![KeyId("full/q")])
-        for (old in listOf(null, "", "  ", "q ! 1", "t9/2 # @")) assertTrue("$old", KeyLists.needsMigration(old))
-        for (kept in listOf("@1", "\uFEFF@1\n", "@2\nfull/q\toff", "@")) assertFalse(kept, KeyLists.needsMigration(kept))
+        assertEquals(UserList.Off, KeyLists.parse("\uFEFF @2 \r\nfull/q\toff")!![KeyId("full/q")])
+        assertEquals(UserList.Off, KeyLists.parse("\n@2\nfull/q\toff")!![KeyId("full/q")])
+        // a bare or garbled `@` header is no version's: migrated, never kept read only as a later one's
+        for (old in listOf(null, "", "  ", "q ! 1", "t9/2 # @", "@", "@x\nfull/q\toff", "@1", "\uFEFF@1\n")) assertTrue("$old", KeyLists.needsMigration(old))
+        for (kept in listOf("@2", "\uFEFF@2\n", "@3\nfull/q\toff")) assertFalse(kept, KeyLists.needsMigration(kept))
     }
 }

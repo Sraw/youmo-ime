@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.broadcast
 
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.host.FullWidth
 import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.fcitx.fcitx5.android.input.keyboard.isAsciiMark
@@ -49,6 +50,12 @@ class PunctuationComponent :
      */
     var known = false
         private set
+
+    /** Back to not known, as a first install starts: the keys held back till the host tells its marks. */
+    @VisibleForTesting
+    internal fun forget() {
+        known = false
+    }
 
     fun transform(p: String) = mapping.getOrDefault(p, p)
 

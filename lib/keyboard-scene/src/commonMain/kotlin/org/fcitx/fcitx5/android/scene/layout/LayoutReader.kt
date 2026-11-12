@@ -81,7 +81,7 @@ object LayoutReader {
             KeyNames.LETTERS.filter { it !in ids }.takeIf { it.isNotEmpty() }
                 ?.let { p.add(root.line, "a letters board lacks the keys ${it.joinToString(" ")}") }
         }
-        val named = composedNamed(family, parts)
+        val named = composedNamed(family, parts, p)
         return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, named, preview, popups) }
     }
 
@@ -89,10 +89,12 @@ object LayoutReader {
      * A nine key's and 注音九键's group's long press is made by its name alone (`<popup from="nine"/"group">`, KeyDefaults):
      * one written with no `shortcut=` (a theme pack's of before 060-keys-unify) named as the app's are, a digit's `t9/<id>`,
      * the groups `zy9/1`… in their order, so it has the long press, the corner and the swipe the user's list gives it
-     * (060-s6-review M3); a key named already kept as it is.
+     * (060-s6-review M3); a key named already kept as it is. A name another key has written already is not given
+     * again (two keys of one name would share one list, slot and mark): the key is left unnamed, with a warning.
      */
-    private fun composedNamed(family: String?, parts: List<Part>): List<Part> {
+    private fun composedNamed(family: String?, parts: List<Part>, p: Problems): List<Part> {
         if (family != "nine" && family != "zhuyin-nine") return parts
+        val written = parts.filterIsInstance<Row>().flatMap { r -> r.cells.mapNotNull { (it as? Key)?.attrs?.shortcut } }.toSet()
         var group = 0
         fun name(k: Key): String? = when (k.popup?.from) {
             "nine" -> k.id.takeIf { family == "nine" && it.length == 1 && it[0] in '1'..'9' }?.let { "t9/$it" }
@@ -104,10 +106,13 @@ object LayoutReader {
             val cells = part.cells.map { c ->
                 if (c !is Key) return@map c
                 val name = name(c)
-                if (name == null || c.attrs.shortcut != null) c
-                else Key(c.id, c.condition, c.attrs.copy(shortcut = name), c.popup, c.menu, c.line, c.variants, c.letters, c.lean)
+                when {
+                    name == null || c.attrs.shortcut != null -> c
+                    name in written -> c.also { p.warn(c.line, "key ${c.id}: $name is another key's shortcut=, left unnamed") }
+                    else -> c.named(name)
+                }
             }
-            Row(part.id, part.indent, part.endIndent, part.height, part.condition, part.split, part.defaults, cells, part.line)
+            part.withCells(cells)
         }
     }
 
@@ -348,7 +353,8 @@ object LayoutReader {
         val arg = m.groupValues[2].takeIf { it.isNotEmpty() }
         val ok = when {
             arg == null -> name in Text.PLAIN || name in Text.ICONS
-            name == Text.PUNCT -> PUNCT_ARG.matches(arg)
+            // marks of the basic plane alone: 1 to 4 counted alike on the JVM (code points) and JS (UTF-16 units)
+            name == Text.PUNCT -> PUNCT_ARG.matches(arg) && arg.none { it.isSurrogate() }
             name == Text.GROUP -> GROUP_ARG.matches(arg)
             name in Text.WITH_LETTER -> LETTER_ARG.matches(arg)
             name in Text.WITH_NUMBER -> NUMBER_ARG.matches(arg)

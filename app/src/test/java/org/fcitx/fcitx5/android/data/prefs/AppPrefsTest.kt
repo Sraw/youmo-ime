@@ -10,6 +10,7 @@ import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows as assertNamedRows
+import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
@@ -370,5 +371,29 @@ class AppPrefsTest {
                 assertFalse(key, sp.contains(key))
             }
         }
+    }
+
+    // 按键音音量 a slider (owner, 2026-11-11): 0..100, 0 shown 系统默认, off with the sound, no levels; a 0.5's level kept
+    @Test
+    @Uat("ST-111")
+    fun theKeySoundVolumeIsASliderThatKeepsAnOlderLevel() {
+        val context = RuntimeEnvironment.getApplication()
+        sp.edit { putInt("button_sound_volume", 50); putString("button_sound_volume_level", "3") }
+        val prefs = AppPrefs(sp)
+        prefs.resetHiddenSettings(again = true)
+        assertEquals("the old level kept", 50, prefs.keyboard.soundOnKeyPressVolume.getValue())
+        val uis = prefs.keyboard.managedPreferencesUi
+        assertTrue(uis.filterIsInstance<ManagedPreferenceUi.Levels>().none { level -> level.keys.any { it.first == "button_sound_volume" } })
+        assertTrue(uis.none { it.key == "button_sound_volume_level" })
+        val slider = uis.filterIsInstance<ManagedPreferenceUi.SeekBarInt>().single { it.key == "button_sound_volume" }
+        assertEquals(0 to 100, slider.min to slider.max)
+        assertTrue("a sound plays as it is let go", slider.preview != null)
+        val ui = slider.createUi(context)
+        assertEquals(context.getString(org.fcitx.fcitx5.android.R.string.system_default), ui.defaultLabel)
+        assertEquals(0, ui.default)
+        prefs.keyboard.soundOnKeyPress.setValue(InputFeedbacks.InputFeedbackMode.Disabled)
+        assertFalse("off with the sound", slider.isEnabled())
+        prefs.keyboard.soundOnKeyPress.setValue(InputFeedbacks.InputFeedbackMode.Enabled)
+        assertTrue(slider.isEnabled())
     }
 }

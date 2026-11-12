@@ -39,15 +39,6 @@ class KeyboardVariantsTest {
     }
 
     @Test
-    fun theEditorsVariantsOfAForm() {
-        val nine = KeyboardVariants.all(Form.Nine, ShuangpinScheme.XIAOHE)
-        assertEquals(listOf(KeyboardVariant(Form.Nine), KeyboardVariant(Form.Nine, KeyboardVariants.SHUANGPIN_NINE)), nine)
-        assertEquals(listOf(KeyboardVariant(Form.Grouped14)), KeyboardVariants.all(Form.Grouped14, ShuangpinScheme.XIAOHE))
-        assertEquals(listOf(KeyboardVariant(Form.Grouped18), KeyboardVariant(Form.Grouped18, semicolon = true)), KeyboardVariants.all(Form.Grouped18, ShuangpinScheme.MICROSOFT))
-        assertEquals(listOf(KeyboardVariant(Form.Full)), KeyboardVariants.all(Form.Full, ShuangpinScheme.MICROSOFT))
-    }
-
-    @Test
     fun whatAnItemTypesAsTheAppsAction() {
         assertEquals(KeyAction.HostKeyAction("a"), KeyOutput.Press("a").toKeyAction())
         assertEquals(KeyAction.CommitAction("ing"), KeyOutput.Press("ing").toKeyAction())

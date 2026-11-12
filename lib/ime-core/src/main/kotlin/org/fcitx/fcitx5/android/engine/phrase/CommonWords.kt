@@ -53,7 +53,7 @@ class CommonWords private constructor(
     enum class Kind { WHOLE, FIRST_THREE, INITIALS }
 
     /** What is wrong with a line, or a word as the settings would save it. */
-    enum class Problem { NO_REPLACEMENT, SAME_AS_WORD, NO_PINYIN, BAD_PINYIN, TOO_LONG, TOO_MANY, BLANK_IN_REPLACEMENT, NEWER }
+    enum class Problem { NO_REPLACEMENT, NO_PINYIN, BAD_PINYIN, TOO_LONG, TOO_MANY, BLANK_IN_REPLACEMENT, NEWER }
 
     /** The [line]th line (1 based) of a file, [text], left out for [problem]. */
     class Skipped(val line: Int, val text: String, val problem: Problem)
@@ -263,21 +263,21 @@ class CommonWords private constructor(
          * them, before [clean]: none of them all blanks is no replacement.
          */
         fun problem(text: String, syllables: IntArray?, replacements: List<String>): Problem? {
-            val kept = clean(text, replacements)
+            val kept = clean(replacements)
             return when {
                 text.codePointCount(0, text.length) > MAX_WORD_CHARS -> Problem.TOO_LONG
                 replacements.any { it.codePointCount(0, it.length) > MAX_REPLACEMENT_CHARS } -> Problem.TOO_LONG
                 // a word, not a sentence: one with a blank is refused, not joined up behind the user's back
                 replacements.any { r -> r.trim().any(Char::isWhitespace) } -> Problem.BLANK_IN_REPLACEMENT
-                kept.isEmpty() -> if (replacements.any { it.trim() == text }) Problem.SAME_AS_WORD else Problem.NO_REPLACEMENT
+                kept.isEmpty() -> Problem.NO_REPLACEMENT
                 syllables == null -> Problem.NO_PINYIN
                 else -> null
             }
         }
 
-        /** [replacements] as kept: trimmed, none blank or the word itself, each once, [MAX_REPLACEMENTS] at most. */
-        fun clean(text: String, replacements: List<String>): List<String> =
-            replacements.map { it.trim() }.filter { it.isNotEmpty() && it != text }.distinct().take(MAX_REPLACEMENTS)
+        /** [replacements] as kept: trimmed, none blank, each once (the word itself may be one: it then goes at its place), [MAX_REPLACEMENTS] at most. */
+        fun clean(replacements: List<String>): List<String> =
+            replacements.map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(MAX_REPLACEMENTS)
 
         /** [pinyin] (`chong'qing`, `chong qing`, `chongqing`) as [text]'s syllables, as WordLists reads a user's; null where it does not read so. */
         fun syllables(text: String, pinyin: String): IntArray? = WordLists.entry(text, pinyin)?.syllables
@@ -311,7 +311,7 @@ class CommonWords private constructor(
                     continue
                 }
                 val before = words[l.word]
-                val replacements = clean(l.word, before?.replacements.orEmpty() + l.replacements)
+                val replacements = clean(before?.replacements.orEmpty() + l.replacements)
                 words[l.word] = Word(l.word, before?.syllables ?: syllables, replacements)
             }
             // a comment the user wrote is kept too, in its order among the lines skipped (all after the words read); the header is written anew

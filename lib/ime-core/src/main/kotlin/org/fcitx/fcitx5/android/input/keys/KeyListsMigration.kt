@@ -50,10 +50,11 @@ object KeyListsMigration {
             if (id in named) continue
             // what the user set (the old defaults, 1's full width and as is, are none: its default now is the one list
             // through the punctuation)
-            lists[id] = UserList(off = false, symbols = symbols)
+            lists[id] = UserList(off = false, items = symbols)
         }
         val kept = lists.filterNot { (id, list) -> same(list, defaultOf(id)) }
-        return Migrated(KeyLists.of(kept).serialize(), lost)
+        // `@1`'s: a key's symbols above its row, upgraded as any `@1` (upgrade)
+        return Migrated(KeyLists.HEADER_1 + KeyLists.of(kept).serialize().removePrefix(KeyLists.HEADER), lost)
     }
 
     private fun fromCharacters(o: PopupOverrides, named: Set<KeyId>, lists: MutableMap<KeyId, UserList>, lost: MutableList<String>) {
@@ -97,11 +98,11 @@ object KeyListsMigration {
             lists.remove(id)
             return
         }
-        lists[id] = UserList(off = false, symbols = symbols, first = f)
+        lists[id] = UserList(off = false, items = symbols, first = f)
     }
 
     // a 0.5 list: the first item the first, as it was there
-    private fun plain(items: List<String>): UserList = if (items.isEmpty()) UserList.Off else UserList(off = false, symbols = items)
+    private fun plain(items: List<String>): UserList = if (items.isEmpty()) UserList.Off else UserList(off = false, items = items)
 
     // the capitals Shift showed of a lower case list (PopupOverrides.shiftedOverride)
     private fun upper(items: List<String>): List<String> = items.map { s -> s.uppercase().takeIf { it.length == s.length } ?: s }.distinct()
@@ -129,25 +130,77 @@ object KeyListsMigration {
         "t9" -> id.key.singleOrNull()?.takeIf { it in '1'..'9' }?.let { KeyDefaults.nine(it, NINE) }
         "g14", "g18" -> KeyDefaults.grouped(id.key, cornerOf(id))
         "zy9" -> when (id.key) {
-            "question" -> KeyDefaults.preset("?")
-            "exclam" -> KeyDefaults.preset("!")
+            // function keys: their symbols, no first (KeyDefaults.typed)
+            "question" -> KeyDefaults.preset("?")?.let { DefaultList(it.row, it.symbols, null) }
+            "exclam" -> KeyDefaults.preset("!")?.let { DefaultList(it.row, it.symbols, null) }
             "tilde" -> KeyDefaults.preset("~")
             else -> id.key.toIntOrNull()?.let { ZhuyinKeys.GROUP_SYMBOLS.getOrNull(it - 1) }?.let(KeyDefaults::zhuyinGroup)
         }
         else -> null
     }
 
-    // a built-in group's corner, by its place among its keyboard's groups
+    // a built-in group's corner, by its place among its keyboard's groups; a group's `;` is not in its name (18 键's
+    // L is `l;`, named `g18/l`)
     private fun cornerOf(id: KeyId): String? {
         val (letters, form) = if (id.form == "g14") NineKeyLetters.G14 to KeyboardVariant.Form.Grouped14 else NineKeyLetters.G18 to KeyboardVariant.Form.Grouped18
-        val place = letters.codes.indexOfFirst { letters.letters(it) == id.key }
+        val place = letters.codes.indexOfFirst { letters.letters(it).replace(";", "") == id.key }
         return KeyDefaults.corner(form, place)
+    }
+
+    // a built-in group's letters, `;` too (as the editor shows 18 键's L, 微软双拼's): the key's name where none is found
+    private fun groupOf(id: KeyId): String {
+        val letters = if (id.form == "g14") NineKeyLetters.G14 else NineKeyLetters.G18
+        return letters.codes.map(letters::letters).firstOrNull { it.replace(";", "") == id.key } ?: id.key
+    }
+
+    /**
+     * `@1`'s [text] as `@2`'s (060-row-unlock §5), any other as it is (so it can run again and agree). A key's `set`
+     * of a built-in keyboard's row (九键's digits by the user's [nineLetters], the 14 and 18 keys' groups, 注音九键's)
+     * is its row as the editor shows it, then its symbols not in it; any other key's list as it was. Its first as
+     * `@1` resolved it against the built-in default (none where that has none), then written: none `!`, the new
+     * list's first item `*`, else the item.
+     */
+    fun upgrade(text: String, nineLetters: Map<Char, String>): String {
+        if (!KeyLists.isVersion1(text)) return text
+        val body = text.trimStart { it.isWhitespace() || it == '\uFEFF' }.substringAfter('\n', "")
+        val old = KeyLists.parse(KeyLists.HEADER + "\n" + body, emptyIsOff = false) ?: return text
+        val lists = old.lists.mapValues { (id, l) -> if (l.off) l else upgraded(id, l, nineLetters) }
+        return KeyLists.of(lists).serialize()
+    }
+
+    private fun upgraded(id: KeyId, l: UserList, nineLetters: Map<Char, String>): UserList {
+        val d = upgradeDefault(id, nineLetters)
+        val row = d?.row.orEmpty().map { it.text }
+        val symbols = l.items.filterNot { it in row }
+        val items = (row + symbols).take(KeyLists.MAX_ITEMS)
+        // @1's first: its default's where in its row (and the list), none where it has none, else the first symbol
+        val byDefault = when {
+            d == null -> symbols.firstOrNull()
+            d.first == null -> null
+            d.first?.text in row -> d.first?.text?.takeIf { it in items }
+            else -> symbols.firstOrNull()
+        }
+        val first = when (val f = l.first) {
+            First.None -> null
+            is First.Literal -> f.text.takeIf { it in items } ?: byDefault
+            First.Default -> byDefault
+        }
+        // a key of no row and no symbols: nothing to show, off as KeyLists.parse reads it
+        if (items.isEmpty()) return UserList.Off
+        return UserList(off = false, items = items, first = KeyEdit.firstToStore(first, items))
+    }
+
+    // the default a key upgrades against: the editor's for a row of a built-in keyboard, else 拼音's
+    private fun upgradeDefault(id: KeyId, nineLetters: Map<Char, String>): DefaultList? = when (id.form) {
+        "t9" -> id.key.singleOrNull()?.takeIf { it in '1'..'9' }?.let { KeyDefaults.nine(it, KeyboardVariant(KeyboardVariant.Form.Nine, nineLetters)) }
+        "g14", "g18" -> KeyDefaults.grouped(groupOf(id), cornerOf(id))
+        else -> defaultOf(id)
     }
 
     private fun same(list: UserList, default: DefaultList?): Boolean = when {
         list.off -> default == null
         default == null -> false
-        else -> list.first == First.Default && list.symbols == default.symbols.map { it.text }
+        else -> list.first == First.Default && list.items == default.symbols.map { it.text }
     }
 
     /**

@@ -28,7 +28,6 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
@@ -49,9 +48,10 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLook
  * its first tone, the session's. [nine]: 注音九键, the symbols in [ZhuyinKeys.GROUP_SYMBOLS]' 11 groups,
  * three a row, and on the left the tones ˉ ˊ ˇ ˋ a key each (˙ on ˉ's long press), as Taiwan's
  * 元書 has them: each ends the syllable and filters by its tone. The key after the last group is
- * 分词 while typing, punctuation else (pinyin's nine keys' 1). A group's long press each of its symbols. The bottom row is the grouped keyboards'.
+ * 分词 while typing, punctuation else (as pinyin's nine keys' 1, `t9/1`). A group's long press each of its symbols. The bottom row is the grouped keyboards'.
  * A symbol key's swipe reaches its shortcut ([ZhuyinShortcutNames]: 大千's by QWERTY place, the groups' by
- * their place); the tones (ˉ swipes to ˙) and the slot have none, as the nine keys' 1.
+ * their place); the tones are named `zy9/tone-1`…`zy9/tone-4` (ˉ's long press and swipe ˙), and the slot is
+ * `fn/comma`, the comma's: its long press, slots and marks the comma key's (zhuyin-nine.xml).
  *
  * Both are drawn by the scene ([layoutOf]: 大千's zhuyin.xml, 060-render-p2 S4c;
  * 注音九键's zhuyin-nine.xml, S4d) and wired from their layouts: what their keys send is the layouts'
@@ -232,21 +232,14 @@ class ZhuyinKeyboard(
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
     }
 
-    private var punctuationMapping: Map<String, String> = emptyMap()
-    private fun mapped(p: String) = punctuationMapping.getOrDefault(p, p)
-
-    override fun onPunctuationUpdate(mapping: Map<String, String>) {
-        super.onPunctuationUpdate(mapping)
-        punctuationMapping = mapping
-        canvas?.invalidateScene()
-    }
+    private fun mapped(p: String) = keysPunctuation.getOrDefault(p, p)
 
     // a bubble as its key shows it, what it types: ? ! ~ and the bottom row's comma and full stop as punctuation
     // maps them (060-render-p2 §5.3, the user's 「显示和输出一致」), as GroupedKeyboard's; public for its test
     public override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
-            is PopupAction.PreviewUpdateAction -> action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
+            is PopupAction.PreviewUpdateAction -> if (action.shown) action else action.copy(content = previewOf(action.content, action.key, { it }, ::mapped))
             else -> action
         }
         super.onPopupAction(shown)
@@ -338,7 +331,7 @@ class ZhuyinKeyboard(
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
             confirm = context.getString(R.string.key_confirm),
-            punctuation = punctuationMapping,
+            punctuation = keysPunctuation,
             // the format as it is: the engine fills its place (getString with no arguments formats nothing)
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )

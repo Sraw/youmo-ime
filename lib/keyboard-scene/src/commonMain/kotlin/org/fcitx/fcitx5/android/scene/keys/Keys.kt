@@ -38,7 +38,10 @@ sealed interface Commit {
     /** As the key's character would be: one code point through the keyboard (and the engine), more as text. */
     data object AsKey : Commit
 
-    /** As it is, past the engine (九键 1's marks: its `.` never 。). */
+    /**
+     * As it is, past the engine: a theme's `commit:` first, a `<popup as-is="true">` list's items (an
+     * address's .com .cn).
+     */
     data object AsIs : Commit
 
     /** A keypad's digit: the candidate of that number while typing, else the digit (D7). */
@@ -51,9 +54,10 @@ sealed interface Commit {
 data class Item(val text: String, val commit: Commit = Commit.AsKey)
 
 /**
- * A key's long press as built in: its [row], made for the keyboard's input method and never stored (a
- * nine key's letters and digit, a group's letters and corner), and its [symbols], what the user may
- * change; [first], what its swipe types and its corner shows, null with none; [focus] where the popup opens.
+ * A key's long press as built in: its [row], made for the keyboard's input method (a nine key's letters and
+ * digit, a group's letters and corner), and its [symbols] above it; the user's list, once set, is stored whole
+ * and replaces both (060-row-unlock). [first], what its swipe types and its corner shows, null with none; [focus]
+ * where the popup opens.
  */
 data class DefaultList(
     val row: List<Item>,

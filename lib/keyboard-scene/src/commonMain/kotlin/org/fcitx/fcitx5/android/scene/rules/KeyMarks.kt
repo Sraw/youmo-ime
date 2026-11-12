@@ -16,7 +16,8 @@ package org.fcitx.fcitx5.android.scene.rules
  * shortcut; a function key's two drew at one of them till 0.6.0-beta2.)
  *
  * The settings page keeps the two apart (the other's place greyed out); one place in both, as an
- * import or a backup can write, is read as [settled] says: the symbol yields. 无 draws nothing, the
+ * import or a backup can write, is read as [settled] says: on a character key the symbol yields, on a
+ * function key the up way's mark ([placeFunction]). 无 draws nothing, the
  * swipes still working.
  *
  * 底部 is under the letter for the symbol, the bottom edge's middle for the shortcut. Landscape's and
@@ -143,6 +144,8 @@ object KeyMarks {
         val u = up?.takeIf { upOn }
         val d = down?.takeIf { downOn }
         val (ua, da) = settled(upAt, downAt)
+        // each way placed as a shortcut is, the other way's place standing for the symbol's (onKeys' arguments by role,
+        // not by way): the up way's spot with the down way's as the other, and the down way's with the up's
         val upSlot = shortcutSlot(onKeys(da, ua, landscape, compact).shortcut)
         val downSlot = shortcutSlot(onKeys(ua, da, landscape, compact).shortcut)
         if (u != null && upSlot != null) out[upSlot] = u

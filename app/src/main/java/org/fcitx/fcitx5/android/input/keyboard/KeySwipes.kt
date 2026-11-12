@@ -15,8 +15,8 @@ import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
-import kotlin.math.abs
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import kotlin.math.abs
 
 /** Whether a key's long press showed a popup in this touch: set by its popup's listener, read by its swipe. */
 internal class LongPopup {
@@ -34,6 +34,8 @@ internal class KeySwipes(
     private val disabledThreshold: Float,
     /** 滑选's step sideways: the backspace's selection's, a character there as far as one it deletes. */
     private val selectThreshold: Float,
+    /** 滑选's step up or down once it has moved sideways: the space's line ([SpaceCursor]). */
+    private val lineStep: Float,
     private val keyboard: Keyboard,
 ) {
     /** What of [BaseKeyboard] a swipe reads and acts on. */
@@ -50,6 +52,9 @@ internal class KeySwipes(
         fun onPopupAction(action: PopupAction)
         fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float): Boolean
         fun onPopupTrigger(key: KeyRef, cancelled: Boolean): Boolean
+
+        /** The lines [steps] vertical steps move in the field as it is now, the space's slide's ([SpaceCursor.vertical]). */
+        fun lines(steps: Int): List<SpaceCursor.Line>
 
         /** The marks' settings changed with the keyboard up: a scene drawing the keys makes its marks again. */
         fun marksChanged()
@@ -78,7 +83,9 @@ internal class KeySwipes(
     }
 
     // what a key's swipe reaches, worked out once a touch: its preview is asked on every move (060-keys-unify
-    // review M6), and the settings it reads cannot change under a finger
+    // review M6), and the settings it reads cannot change under a finger. Shift can, from another finger: the
+    // swipe then types the case its touch began in, as its preview showed it (asking the keyboard's state on
+    // every move to follow it would cost the reads M6 took off the move)
     private class Reach(val def: KeyDef, val key: KeySwipe.Key, val first: BaseKeyboard.SwipeChoice)
 
     private val reaches = HashMap<KeyRef, Reach>()
@@ -116,7 +123,9 @@ internal class KeySwipes(
     /** What the preview of [key] of [def] shows, swiped [totalY]: its [popup]'s own content, or what the swipe reaches. */
     fun preview(key: KeyHandle, def: KeyDef, totalY: Int, popup: KeyDef.Popup.AltPreview, content: String = popup.content): PopupAction.PreviewUpdateAction =
         when (val preview = if (selecting == key.ref) SWIPE_SELECT else KeySwipe.preview(reach(key.ref, def).key, ways, totalY, keyboard.inPasswordField)) {
-            KeySwipe.Preview.Symbol -> PopupAction.PreviewUpdateAction(key.ref, reach(key.ref, def).first.preview(popup.alternative))
+            KeySwipe.Preview.Symbol -> reach(key.ref, def).first.let {
+                PopupAction.PreviewUpdateAction(key.ref, it.preview(popup.alternative), shown = it is BaseKeyboard.SwipeChoice.Output)
+            }
             is KeySwipe.Preview.Shortcut -> PopupAction.PreviewUpdateAction(key.ref, shortcutLabel(preview.shortcut), words = true)
             KeySwipe.Preview.Own -> PopupAction.PreviewUpdateAction(key.ref, content)
         }
@@ -175,6 +184,7 @@ internal class KeySwipes(
         var select = false
         var downX = 0f
         val steps = SwipeSteps()
+        val lines = CrossSteps()
     }
 
     // a key whose swipe to nothing is its tap: one that types a character, ，。 too, on every keyboard (060-keys-unify D3, §5.2)
@@ -196,7 +206,9 @@ internal class KeySwipes(
             return true
         }
         val n = held.steps.step(event.x, selectThreshold)
-        if (n != 0) keyboard.onAction(KeyAction.SwipeSelectAction(n) { if (hapticOnRepeat) InputFeedbacks.hapticFeedback(key.feedback) })
+        // up and down as the space's slide: once a sideways step was taken, so the swipe that reached 滑选 moves no line
+        val lines = keyboard.lines(held.lines.step(event.y, n, lineStep))
+        if (n != 0 || lines.isNotEmpty()) keyboard.onAction(KeyAction.SwipeSelectAction(n, lines) { if (hapticOnRepeat) InputFeedbacks.hapticFeedback(key.feedback) })
         return true
     }
 
@@ -231,6 +243,7 @@ internal class KeySwipes(
             held.select = true
             selecting = key.ref
             held.steps.start(event.x)
+            held.lines.reset()
             keyboard.onAction(KeyAction.BeginSwipeSelectAction)
             return true
         }
@@ -251,7 +264,7 @@ internal class KeySwipes(
     private fun ran(key: KeyHandle, def: KeyDef, outcome: KeySwipe.Outcome, builtIn: KeyAction?): Boolean =
         when (outcome) {
             KeySwipe.Outcome.Symbol -> {
-                // the long press's first: the key's own swipe, or the first of a long press the user set
+                // the long press's first: the key's own swipe, or the first of its long press as the resolver has it (built in or the user's)
                 when (val choice = reach(key.ref, def).first) {
                     is BaseKeyboard.SwipeChoice.Output -> keyboard.onAction(choice.action, KeyActionListener.Source.Popup)
                     else -> builtIn?.let { choice.typed(it) }?.let { (action, source) -> keyboard.onAction(action, source) }

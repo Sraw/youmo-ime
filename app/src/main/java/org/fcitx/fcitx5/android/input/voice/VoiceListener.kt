@@ -347,13 +347,9 @@ class VoiceListener(
             var acceptMax = 0L
             for (samples in audio) {
                 if (closed) return
-                if (BuildConfig.DEBUG) {
-                    val t = SystemClock.uptimeMillis()
-                    segment.accept(samples)
-                    acceptMax = maxOf(acceptMax, SystemClock.uptimeMillis() - t)
-                } else {
-                    segment.accept(samples)
-                }
+                val t = if (BuildConfig.DEBUG) SystemClock.uptimeMillis() else 0L
+                segment.accept(samples)
+                if (BuildConfig.DEBUG) acceptMax = maxOf(acceptMax, SystemClock.uptimeMillis() - t)
             }
             if (closed) return
             val drained = SystemClock.uptimeMillis()

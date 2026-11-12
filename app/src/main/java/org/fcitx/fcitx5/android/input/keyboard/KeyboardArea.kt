@@ -99,7 +99,9 @@ object KeyboardArea {
         val res = Resources.getSystem()
         val shown = res.getIdentifier("config_showNavigationBar", "bool", "android").takeIf { it != 0 }?.let(res::getBoolean) != false
         val nowLandscape = real.x > real.y
-        fun bar(landscape: Boolean) = if (shown) NavBar.of(landscape, minOf(real.x, real.y), density) else NavBar.NONE
+        // gestures (Q's navigation_mode 2, as R's otherBar reads it): the strip at the bottom held either way, never a side bar
+        val gestures = Settings.Secure.getInt(ctx.contentResolver, NAVIGATION_MODE, 0) == GESTURES
+        fun bar(landscape: Boolean) = if (shown) NavBar.of(landscape && !gestures, minOf(real.x, real.y), density) else NavBar.NONE
         return screensOf(real.x, real.y, density, bar(nowLandscape), bar(!nowLandscape), 0, roundDp = false)
     }
 

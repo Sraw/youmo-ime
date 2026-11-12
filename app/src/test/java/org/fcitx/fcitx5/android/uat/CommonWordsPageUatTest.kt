@@ -122,15 +122,15 @@ class CommonWordsPageUatTest {
             val d = dialog()
             val (text, pinyin, replacements) = KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().toList()
             text.setText("米字旁")
-            replacements.setText("米字旁")
+            replacements.setText("米")
             d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             until("pinyin filled") { pinyin.text.toString() == "mi zi pang" }
-            assertEquals(s(R.string.common_word_same_as_word), d.getButton(AlertDialog.BUTTON_POSITIVE).let { it.performClick(); idle(); replacements.error?.toString() })
-            replacements.setText("米\n糸")
+            // the word itself among them is taken as any replacement: typed, it goes in that place
+            replacements.setText("米\n米字旁\n糸")
             d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             idle()
-            until("listed with its keys") { "米字旁 → 米、糸\nmizipang · mzp" in shown() }
-            assertEquals(listOf("米字旁[mi'zi'pang] 米 糸"), commonWordsSaved())
+            until("listed with its keys") { "米字旁 → 米、米字旁、糸\nmizipang · mzp" in shown() }
+            assertEquals(listOf("米字旁[mi'zi'pang] 米 米字旁 糸"), commonWordsSaved())
             open(SettingsRoute.CommonWords)
             until("read") { shown().any { "米字旁" in it } }
             val file = Uri.parse("content://words.test/import.txt")
@@ -152,7 +152,7 @@ class CommonWordsPageUatTest {
             (page as CommonWordsFragment).exportWords(exportTo)
             until("exported") { exported.size() > 0 }
             assertEquals(
-                "# youmo-common-words 1\n米字旁[mi'zi'pang]\t米\t糸\n木字旁[mu'zi'pang]\t木\n中华人民共和国[zhong'hua'ren'min'gong'he'guo]\t中国\n",
+                "# youmo-common-words 1\n米字旁[mi'zi'pang]\t米\t米字旁\t糸\n木字旁[mu'zi'pang]\t木\n中华人民共和国[zhong'hua'ren'min'gong'he'guo]\t中国\n",
                 exported.toString(Charsets.UTF_8),
             )
             assertEquals(3, commonWordsSaved().size)

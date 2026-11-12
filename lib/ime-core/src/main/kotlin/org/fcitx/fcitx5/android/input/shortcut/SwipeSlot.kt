@@ -169,8 +169,9 @@ class SwipeSlots private constructor(
         private const val FIRST = "first"
         private const val NONE = "none"
         private const val TEXT = "text:"
-        private const val UP = ".up"
-        private const val DOWN = ".down"
+        /** A function key's way's suffix (`fn/space.up`): KeyShortcutPreset reads the same names. */
+        internal const val UP = ".up"
+        internal const val DOWN = ".down"
 
         /** A function key's name, as a layout's `shortcut="space"` is stored: `fn/space`. */
         fun functionKey(name: String) = "${KeyShortcuts.FUNCTION}/$name"

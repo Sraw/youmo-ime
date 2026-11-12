@@ -6,23 +6,30 @@ package org.fcitx.fcitx5.android.uat
 
 import android.text.InputType
 import android.widget.TextView
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.UNICODE
+import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
-import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.host.ModuleConfigs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
+import org.fcitx.fcitx5.android.until
+import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -32,6 +39,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * uat/03's presses in time on the nine keys: 连按 (a key pressed again soon), 1's punctuation, and
@@ -59,14 +68,7 @@ class NineKeysTapUatTest {
     }.start(inputType)
 
     // fcitx's Chinese punctuation on, as its addon tells it: 1 types ，。？！
-    private fun KeyboardHarness.chinese() = apply {
-        val zh = ChinesePunctuation.map
-        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
-        api.statusAreaCached = active
-        api.punctuationCached = zh
-        emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, zh))
-        idle()
-    }
+    private fun KeyboardHarness.chinese() = apply { chinesePunctuation() }
 
     @After
     fun close() {
@@ -126,6 +128,43 @@ class NineKeysTapUatTest {
         h.tap(h.keyWithId(R.id.button_backspace)!!)
         // Backspace is no digit: sent, the engine takes the letter off whole (NineKeysUatTest)
         assertEquals(nine("74") + listOf(letterAgain('h'), FcitxKeyMapping.FcitxKey_BackSpace.toString()), h.sent())
+    }
+
+    // fcitx's 「字母或数字后用半角标点」 on (punctuation.conf, no setting in the app): after a digit 1's run is
+    // half-width, its second tap taking back the , the first committed (the run replaces what was typed, not the
+    // previous mark mapped again)
+    @Test
+    @Uat("T9-19b")
+    fun afterADigitWithHalfWidthOnOnesSecondTapReplacesTheCommaTyped() {
+        prefs.set(AppPrefs.getInstance().keyboard.t9MultiTap, T9MultiTap.Medium)
+        val home = File(appContext.filesDir, "kotlin-host").apply { deleteRecursively() }
+        File(home, "config/" + ModuleConfigs.PUNCTUATION).apply { parentFile!!.mkdirs() }.writeText("HalfWidthPuncAfterLetterOrNumber=True\n")
+        val fcitx = startedHost(ScriptedEngine(home))
+        try {
+            runBlocking { fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "，", ""), PunctuationMapEntry(".", "。", ""))) }
+            val h = KeyboardHarness(host = fcitx, keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)).also { this.h = it }
+            h.service.postFcitxJob { activate(1, "org.example.app") }
+            h.start()
+            // the activation done on the host's thread and what it told back shown, before the first swipe
+            val active = AtomicBoolean()
+            h.service.postFcitxJob { active.set(true) }
+            until("the host's queue done", step = { h.idle() }) { active.get() }
+            h.idle()
+            val three = h.nineKey("3")
+            h.swipe(three, 0f, -three.bounds.height().toFloat())
+            until("3 typed", step = { h.idle() }) { h.text == "3" }
+            h.advance(PAUSE)
+            h.presses("11", QUICK)
+            until("the second mark typed", step = { h.idle() }) { h.text.length >= 2 && h.text != "3," }
+            assertEquals("3.", h.text)
+        } finally {
+            h?.close()
+            h = null
+            fcitx.stop()
+            home.deleteRecursively()
+            PunctuationManager.forget()
+            PunctuationStartKeys.forget(appContext)
+        }
     }
 
     @Test

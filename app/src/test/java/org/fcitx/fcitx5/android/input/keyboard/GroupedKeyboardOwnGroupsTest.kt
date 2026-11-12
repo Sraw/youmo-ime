@@ -12,6 +12,7 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
@@ -259,6 +260,20 @@ class GroupedKeyboardOwnGroupsTest {
         keyboard.touch(keyboard.shownKey("XYZ"), 0.5f, 0.5f, heldMillis = 1_500)
         val opened = popups.filterIsInstance<PopupAction.ShowKeyboardAction>().single().keyboard as KeyDef.Popup.Keyboard.Explicit
         assertEquals(listOf("xyz", "XYZ"), opened.items.toList())
+    }
+
+    // a group of no name with a digit corner: its long press's digit a keypad's (D7), as a named group's, its candidate
+    // picked while typing; the letters typed as keys
+    @Test
+    fun aGroupOfNoNamesDigitCornerIsAKeypadsInItsLongPress() {
+        k14Text = k17.replace("label=\"QW\" letters=\"qw\"/>", "label=\"QW\" letters=\"qw\" swipe-up=\"1\"/>")
+        val keyboard = grouped()
+        keyboard.touch(keyboard.shownKey("QW"), 0.5f, 0.5f, heldMillis = 1_500)
+        val opened = popups.filterIsInstance<PopupAction.ShowKeyboardAction>().single().keyboard as KeyDef.Popup.Keyboard.Explicit
+        assertEquals(listOf("Q", "W", "1", "q", "w"), opened.items.take(5))
+        val actions = opened.actions!!
+        assertEquals(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + 1), KeyStates.Virtual), actions[2])
+        assertEquals(KeyAction.HostKeyAction("q"), actions[3])
     }
 
     // 双拼's 14 keys type the built-in groups alone: the sample refused, logged, the app's 14 keys drawn and typed

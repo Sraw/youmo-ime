@@ -22,6 +22,11 @@ class PickerLongPressTest {
     fun aLetterHasNoneHere() {
         // the keys' lists are the scene's (PresetLists): no cell of the panel is a letter
         assertNull(PickerLongPress["e"])
+    }
+
+    @Test
+    fun aVariantHasNoneOfItsOwn() {
+        // € is offered in $'s list; held itself, nothing further
         assertNull(PickerLongPress["€"])
     }
 }

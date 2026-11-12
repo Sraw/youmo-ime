@@ -44,17 +44,4 @@ object KeyboardVariants {
     /** Whether [im] on a keyboard of [form] is 双拼's: 注音's and 手写's keyboards are theirs whatever types. */
     fun isShuangpin(form: Form, im: String): Boolean =
         form != Form.ZhuyinFull && form != Form.ZhuyinNine && form != Form.Handwriting && im.substringBefore('#') == InputMethodCatalog.SHUANGPIN
-
-    /**
-     * Every variant a key of a [form]'s page is shown under (the editor's: a list the same as the default on
-     * each of them is no setting, KeyLists.with): pinyin's, and 双拼's where its letters or `;` make it differ.
-     */
-    fun all(form: Form, scheme: ShuangpinScheme): List<KeyboardVariant> {
-        val semicolon = scheme.types(';')
-        return when (form) {
-            Form.Nine -> listOf(KeyboardVariant(form), KeyboardVariant(form, SHUANGPIN_NINE, semicolon))
-            Form.Grouped14, Form.Grouped18 -> listOf(KeyboardVariant(form), KeyboardVariant(form, semicolon = semicolon)).distinct()
-            else -> listOf(KeyboardVariant(form))
-        }
-    }
 }

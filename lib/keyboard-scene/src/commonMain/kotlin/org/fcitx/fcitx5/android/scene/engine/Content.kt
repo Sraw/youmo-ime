@@ -22,16 +22,20 @@ import kotlin.math.floor
 import kotlin.math.sqrt
 
 /**
- * A mark as placed before any yields ([KeyMarkYield.Mark] of it); [top] its box's (a text's by the
- * font's extent, as its TextView stood: the label under it centres to it).
+ * A mark as placed before any yields ([KeyMarkYield.Mark] of it): its [drawn] ink in [slot], [drop] its rank in
+ * leaving out, [top] its box's (a text's by the font's extent, as its TextView stood: the label under it centres to it);
+ * [way], the way the user set it is the mark of (null: a built-in one); [text], a text's ([MarkContent.Text]),
+ * which may step down where it has no room.
  */
-/** [user]: a way the user set; [text]: a text's ([MarkContent.Text]), which may step down where it has no room. */
 class MarkDrawn(
-    val drawn: Drawn, val slot: Slot, val drop: Int, val top: Double, val user: Boolean = false, val text: Boolean = false,
-    /** A way's: [up] the way, [fate] how it is drawn before any is left out (KeyNode.fates); null, a mark of no way the user set. */
-    val up: Boolean? = null,
-    val fate: MarkFate? = null,
-)
+    val drawn: Drawn, val slot: Slot, val drop: Int, val top: Double, val way: UserWay? = null, val text: Boolean = false,
+) {
+    /** A way the user set: kept over a built-in mark it meets. */
+    val user: Boolean get() = way != null
+}
+
+/** A way the user set: [up] (上滑) or not, and how it is drawn before any is left out ([fate], KeyNode.fates). */
+class UserWay(val up: Boolean, val fate: MarkFate)
 
 /**
  * The classes a keyboard's glyphs are one size in (060-render-p2 S4e, KeyMarkYield.group): [Main], what
@@ -97,8 +101,9 @@ class Looks(private val of: (Part) -> TextLook) {
  * `space-content` and `return-icon-<action>` give the space and Return a text, an icon or nothing of
  * the theme's; `key mark { hidden }` leaves the symbol out, `key shortcut { hidden }` a character key's
  * shortcut, `key hint { hidden }` a function key's swipe marks (drawn as shortcuts: `key shortcut` styles them).
+ *
+ * [themedSign]: the theme draws its own [Icons.SHORT_TEXT], whose ink is not known: its whole square kept apart.
  */
-// [themedSign]: the theme draws its own [Icons.SHORT_TEXT], whose ink is not known: its whole square kept apart
 class Content(
     private val env: Env,
     private val measurer: TextMeasurer,
@@ -276,7 +281,7 @@ class Content(
 
     private fun marks(key: ExpandedKey, cell: Box, content: Box, looks: Looks, hidden: Boolean, snap: Boolean, short: Map<Int, Int>): List<MarkDrawn> {
         val name = key.attrs.shortcut
-        val char = name == null || !KeyId(name).isFunction
+        val char = name == null || !KeyId.of(name).isFunction
         // a function key's swipes (the space's cursor, ⌫'s sweep): a theme's `key hint { hidden }` leaves them out
         if (!char && looks.hint.hidden) return emptyList()
         val ways = ways(name, char, looks, hidden)
@@ -300,7 +305,11 @@ class Content(
                 shortcutMark(shown, slot, drop, cell, content, looks, snap)
             }
             val text = w.shortcut is MarkContent.Text
-            if (w.user || text) MarkDrawn(m.drawn, m.slot, m.drop, m.top, user = w.user, text = text, up = w.up.takeIf { w.user }, fate = fate ?: MarkFate.AsSet.takeIf { w.user }) else m
+            when {
+                w.user -> MarkDrawn(m.drawn, m.slot, m.drop, m.top, way = UserWay(w.up, fate ?: MarkFate.AsSet), text = text)
+                text -> MarkDrawn(m.drawn, m.slot, m.drop, m.top, text = true)
+                else -> m
+            }
         }
     }
 

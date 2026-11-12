@@ -155,7 +155,8 @@ open class KeyDef(
         class AltPreview(content: String, val alternative: String) : Preview(content)
 
         sealed class Keyboard : Popup() {
-            data class Preset(val label: String, val transformPunctuation: Boolean = true) :
+            /** A key of no name's built-in list of [label] (KeyDefaults.preset); [caps]: Shift on, a letter's in capitals as its face. */
+            data class Preset(val label: String, val transformPunctuation: Boolean = true, val caps: Boolean = false) :
                 Keyboard()
 
             /**
@@ -165,16 +166,20 @@ open class KeyDef(
              * it is, never a key (none set apart then: nothing would map them). [inRow]: the items
              * before the symbols in one row, the one at [inRow] (the key's own) under the finger first
              * and the rest round it as listed, as the full keyboard's (060-edge-popup); -1, the first.
+             * [actions]: what each item types where its own differs from a key's (a theme's group's digit corner, a
+             * keypad's: KeyOutput.Keypad), one for each item; null, each as [asIs] says.
              */
             class Explicit(
                 val items: Array<String>,
                 val symbolsFrom: Int = items.size,
                 val asIs: Boolean = false,
                 val inRow: Int = -1,
+                val actions: List<KeyAction>? = null,
             ) : Keyboard() {
                 init {
                     require(!asIs || symbolsFrom >= items.size) { "symbols committed as they are are not mapped" }
                     require(inRow < minOf(symbolsFrom, items.size)) { "the key first under the finger is one of the row" }
+                    require(actions == null || actions.size == items.size) { "an action for each item" }
                 }
             }
 

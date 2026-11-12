@@ -46,3 +46,30 @@ class SwipeSteps {
         total = 0
     }
 }
+
+/**
+ * A finger's vertical steps once its touch has taken a sideways one, none before: the space's cursor
+ * lines ([KeyGestureRecognizer.crossStepY]) and 滑选's ([SwipeSelection.lineSent]), so a swipe's own drift
+ * up or down, or the one that reached 滑选, moves no line.
+ */
+class CrossSteps {
+    private val steps = SwipeSteps()
+    private var crossing = false
+
+    /** The vertical steps of [threshold] to [at], [sideways] the steps sideways this sample took. */
+    fun step(at: Float, sideways: Int, threshold: Float): Int {
+        if (threshold <= 0f) return 0
+        if (!crossing) {
+            if (sideways == 0) return 0
+            crossing = true
+            steps.start(at)
+            return 0
+        }
+        return steps.step(at, threshold)
+    }
+
+    fun reset() {
+        crossing = false
+        steps.reset()
+    }
+}

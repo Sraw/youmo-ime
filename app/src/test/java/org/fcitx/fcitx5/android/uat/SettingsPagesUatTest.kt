@@ -244,6 +244,45 @@ class SettingsPagesUatTest {
         }
     }
 
+    @Test
+    @Uat("T9-63")
+    fun anEditedNineKeysLongPressKeepsItsLettersWhenTheyChange() {
+        val lists = AppPrefs.getInstance().internal.keyLists
+        val letters = AppPrefs.getInstance().keyboard.t9Letters
+        try {
+            open(SettingsRoute.PopupOverrides)
+            view(s(R.string.shortcut_page_nine)).performClick()
+            idle()
+            KeyboardHarness.all(activity.window.decorView)
+                .first { it.isShown && it.contentDescription?.toString()?.substringBefore(',') == "7" && it.hasOnClickListeners() }
+                .performClick()
+            idle()
+            dialog().apply {
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
+                getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            }
+            idle()
+            open(SettingsRoute.T9Letters)
+            editKey('7', "prs")
+            editKey('8', "tu")
+            val nine = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS, english = ImKeyboard.NINE_KEYS)
+            KeyboardHarness(im = KeyboardHarness.PINYIN, keyboards = nine).use { h ->
+                h.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
+                h.api.enabledIme = h.api.availableIme
+                h.start()
+                // 7's long press was edited: a whole list kept, its q still there though 7's letters lost it
+                val seven = h.longPressed('7')
+                assertTrue(seven.toString(), "①" in seven && "q" in seven)
+                // 8's never was: it follows its letters, v gone
+                val eight = h.longPressed('8')
+                assertTrue(eight.toString(), "t" in eight && "v" !in eight && "V" !in eight)
+            }
+        } finally {
+            lists.setValue(KeyLists.HEADER)
+            letters.setValue(letters.defaultValue)
+        }
+    }
+
     /** The long press's popup of the nine keys' [digit] key, let go out of it (nothing typed). */
     private fun KeyboardHarness.longPressed(digit: Char, shown: KeyboardHarness.() -> Unit = {}): List<String> {
         val key = nineKey(digit.toString())

@@ -21,8 +21,6 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.host.ChinesePunctuation
-import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
@@ -123,11 +121,8 @@ class NineSceneGesturesTest {
     fun pinyinsOneAndColumnTypeAsThePunctuationMapsThem() {
         val out = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
             val out = mutableListOf<String>()
-            val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
             for ((mode, marks) in listOf("on" to ChinesePunctuation.map, "off" to emptyMap())) {
-                h.api.punctuationCached = marks
-                h.emit(HostEvent.StatusArea(if (marks.isEmpty()) emptyList() else active, KeyboardHarness.PINYIN, marks))
-                h.idle()
+                h.chinesePunctuation(KeyboardHarness.PINYIN, marks)
                 val column = column(h)
                 out += "$mode: 1=${h.nineKey("1").label} column=${column.map { it.text }}"
                 val before = h.field.text.length

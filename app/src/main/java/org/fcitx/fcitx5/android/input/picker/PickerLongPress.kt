@@ -30,9 +30,10 @@ object PickerLongPress {
         // Punctuation
         //
         "." to arrayOf(",", "?", "!", ":", ";", "_", "%", "$", "^", "&"),
-        // the bottom row's comma: its own long press was missing, so it offered only itself;
-        // ASCII, so a Chinese input method shows and commits them as its punctuation; the first ones
-        // sit nearest the finger, the full stop and the marks that end a sentence first
+        // the bottom row's comma: its own long press was missing, so it offered only itself; a panel's
+        // long press commits each as it shows it (asIs: not the punctuation's map, not the engine), so
+        // these ASCII marks type as ASCII; the first ones sit nearest the finger, the full stop and the
+        // marks that end a sentence first
         "," to arrayOf(".", "?", "!", ":", ";", "\"", "'", "(", ")", "~"),
         "-" to arrayOf("—", "–", "·"),
         "?" to arrayOf("¿", "‽"),

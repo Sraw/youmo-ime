@@ -204,7 +204,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                         return@onClick false
                     }
                 }
-                val word = CommonWords.Word(text, checkNotNull(syllables), CommonWords.clean(text, replacements))
+                val word = CommonWords.Word(text, checkNotNull(syllables), CommonWords.clean(replacements))
                 // one text, one word: edit the one listed
                 if (ui.entries.any { it.text == text && it.text != entry?.text }) {
                     textField.error = getString(R.string.common_word_listed)
@@ -232,7 +232,6 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
     private fun said(problem: Problem) = getString(
         when (problem) {
             Problem.NO_REPLACEMENT -> R.string.common_word_no_replacement
-            Problem.SAME_AS_WORD -> R.string.common_word_same_as_word
             Problem.NO_PINYIN -> R.string.word_pinyin_unknown
             Problem.BAD_PINYIN -> R.string.word_pinyin_invalid
             Problem.TOO_LONG -> R.string.common_word_too_long

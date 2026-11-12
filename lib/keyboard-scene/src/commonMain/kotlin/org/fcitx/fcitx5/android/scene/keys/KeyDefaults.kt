@@ -94,7 +94,7 @@ object KeyDefaults {
         val p = node.popup
         // the 18 keys' `;` on L only where the scheme types it (OwnLongPress.shown)
         val letters = node.letters?.let { if (variant.form == KeyboardVariant.Form.Grouped18 && !variant.semicolon) it.replace(";", "") else it }
-        if (letters != null && (p == null || p.from == "group")) return grouped(letters, node.themeFirst ?: corner(variant.form, node.place))
+        if (letters != null && (p == null || p.from == "group")) return grouped(letters, node.themeFirst?.takeIf { itemOf(it).text.isNotEmpty() } ?: corner(variant.form, node.place))
         return when (p?.from) {
             null -> typed(node, caps)
             "nine" -> id?.key?.singleOrNull()?.let { nine(it, variant) }

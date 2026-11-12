@@ -28,9 +28,10 @@ class DefaultPickerPolicyTest {
     fun thePopupIsBuiltInAndCommittedAsShown() {
         val popup = policy.popup(",") as KeyDef.Popup.Keyboard.Explicit
         assertTrue(popup.asIs)
-        assertArrayEquals(arrayOf(".", "?", "!", ":", ";", "\"", "'", "(", ")", "~"), popup.items)
-        assertArrayEquals(arrayOf("¢", "€", "£", "¥", "₹", "₽", "₺", "₩", "₱", "₿"), (policy.popup("$") as KeyDef.Popup.Keyboard.Explicit).items)
-        assertTrue((policy.popup("1") as KeyDef.Popup.Keyboard.Explicit).items.isNotEmpty())
+        // the lists' contents are PickerLongPressTest's: here only that the popup is that list
+        for (raw in listOf(",", "$", "1")) {
+            assertArrayEquals(raw, PickerLongPress[raw], (policy.popup(raw) as KeyDef.Popup.Keyboard.Explicit).items)
+        }
     }
 
     // a letter's list is a keyboard key's, not a cell's; a symbol with none built in has none

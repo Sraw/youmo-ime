@@ -286,6 +286,9 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
 
     private fun Argb.times(a: Double) = Argb((value and RGB) or ((alpha * a).roundToInt() shl ALPHA_SHIFT))
 
+    /** The face's height as drawn in the cell, px: a settings page's caps of one row the same (tests). */
+    internal val faceHeight: Double get() = keyNode?.bounds?.takeIf { it.hasSize }?.let { it.height * shrink } ?: height.toDouble()
+
     private val at = IntArray(2)
 
     /** Where the key's face is, in the window: what a popup over it aligns with (across its face, as [KeyboardCanvasView.popupBounds]). */

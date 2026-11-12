@@ -4,10 +4,14 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.SceneShownKey
+import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -82,5 +86,18 @@ class TextKeyboardCapsTest {
         assertEquals("QWERTYUIOPASDFGHJKLZXCVBNM", letters())
         shift()
         assertEquals("qwertyuiopasdfghjklzxcvbnm", letters())
+    }
+
+    // a key of no name (a theme's letter without shortcut=): its built-in list in capitals under Shift, as its face
+    @Test
+    fun aKeyOfNoNamesListFollowsShift() {
+        val shown = ArrayList<PopupAction>()
+        keyboard.popupActionListener = PopupActionListener { shown += it }
+        val ref = KeyRef.scene("nameless", 0)
+        keyboard.onPopupAction(PopupAction.ShowKeyboardAction(ref, KeyDef.Popup.Keyboard.Preset("q"), Rect()))
+        shift()
+        keyboard.onPopupAction(PopupAction.ShowKeyboardAction(ref, KeyDef.Popup.Keyboard.Preset("q"), Rect()))
+        val presets = shown.filterIsInstance<PopupAction.ShowKeyboardAction>().map { it.keyboard as KeyDef.Popup.Keyboard.Preset }
+        assertEquals(listOf(false, true), presets.map { it.caps })
     }
 }

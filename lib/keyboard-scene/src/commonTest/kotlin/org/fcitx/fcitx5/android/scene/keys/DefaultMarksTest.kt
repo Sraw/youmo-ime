@@ -22,6 +22,7 @@ class DefaultMarksTest {
 
     private fun marks(board: String) = DefaultMarks.shortcuts(Forms.layout(board), Forms.fragments)
 
+    // contract: data/default-marks/*.json, which the theme maker reads for its preview and export check
     @Test
     fun everyBoardsMarksAreAsRecorded() {
         val failed = boards.mapNotNull { board ->

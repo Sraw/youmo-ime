@@ -12,12 +12,13 @@ import java.io.File
  */
 object ChinesePunctuation {
     private const val PATH = "pkgdata/punctuation/punc.mb.zh_CN"
+    private val DIRS = listOf("src/main/host-assets", "../../app/src/main/host-assets", "app/src/main/host-assets")
 
     val map: Map<String, String> by lazy {
         // on ime-core's test classpath; :app's tests read the file from where the app ships it
         val bytes = ChinesePunctuation::class.java.getResourceAsStream("/$PATH")?.use { it.readBytes() }
-            ?: listOf("src/main/host-assets", "../../app/src/main/host-assets", "app/src/main/host-assets")
-                .map { File(it, PATH) }.first(File::isFile).readBytes()
+            ?: DIRS.map { File(it, PATH) }.firstOrNull(File::isFile)?.readBytes()
+            ?: error("no $PATH on the classpath nor under ${DIRS.joinToString()} (from ${File("").absolutePath})")
         PunctuationTable.parse(bytes).groupBy { it.key }.mapValues { (_, entries) -> entries.first().mapping }
     }
 }

@@ -47,7 +47,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
@@ -59,7 +58,6 @@ import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
-import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
@@ -383,18 +381,23 @@ class T9Keyboard(
                 return KeyAction.SymAction(KeySym(UNICODE + Keyboard.nineKey(key, upper)), KeyStates.Virtual)
             }
             val next = tap.press(key, keyLetters, time)
-            return cycled(next, keyLetters) { cased(it, if (next == null) upper else runUpper) }
+            return cycled(tap, next, keyLetters) { cased(it, if (next == null) upper else runUpper) }
         }
 
         // 1's [ONE], pressed again soon the next in place of the last, each as [marks] map it
         private fun one(tap: MultiTap, time: Long, marks: Map<String, String>) =
-            cycled(tap.press('1', ONE, time), ONE, punctuation = true) { marked(it, marks) }
+            cycled(tap, tap.press('1', ONE, time), ONE, punctuation = true) { marked(it, marks) }
 
-        // the first of [run] committed for no [next], else [next] in place of the one before it
-        private fun cycled(next: Char?, run: String, punctuation: Boolean = false, text: (Char) -> String): KeyAction.CommitAction {
-            if (next == null) return KeyAction.CommitAction(text(run[0]), punctuation = punctuation)
-            val last = run[(run.indexOf(next) + run.length - 1) % run.length]
-            return KeyAction.CommitAction(text(next), replacing = text(last), punctuation = punctuation)
+        // the first of [run] committed for no [next], else [next] in place of what the run's last
+        // press committed ([MultiTap.typed]), not the letter before it mapped anew
+        private fun cycled(tap: MultiTap, next: Char?, run: String, punctuation: Boolean = false, text: (Char) -> String): KeyAction.CommitAction {
+            val action = if (next == null) {
+                KeyAction.CommitAction(text(run[0]), punctuation = punctuation)
+            } else {
+                KeyAction.CommitAction(text(next), replacing = tap.typed, punctuation = punctuation)
+            }
+            tap.typed = action.text
+            return action
         }
 
         private fun cased(c: Char, upper: Boolean) = if (upper) c.uppercase() else c.toString()
@@ -494,8 +497,10 @@ class T9Keyboard(
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
         val changed = mapping != keysPunctuation
         super.onPunctuationUpdate(mapping)
-        // the column's punctuation shows what it types, as the keys do
-        if (changed) show(columnState)
+        // the column's punctuation shows what it types, as the keys do: its labels only, not show(), which would
+        // take the engine's last word for whether 1 is typing (a digit sent, not answered yet, made it so) and
+        // cancel a press on the column
+        if (changed) showLabels()
     }
 
     /** The field's address: what the column offers in place of punctuation ([AddressKeys.column]). */
@@ -661,16 +666,21 @@ class T9Keyboard(
         if (!state.composing && was) multiTap.reset()
         columnState = state
         typing = state.composing
-        val labels = labels(state, english, address, keysPunctuation)
+        showLabels()
+        column.scrollTo(0, 0)
+        // the keys drawn anew only when typing starts or ends
+        if (state.composing != was) canvas?.invalidateScene()
+    }
+
+    // the column's items as [columnState] and the punctuation have them now: their text only, a press on them kept
+    private fun showLabels() {
+        val labels = labels(columnState, english, address, keysPunctuation)
         while (items.childCount < labels.size) items.addView(item(items.childCount))
         for (i in 0 until items.childCount) {
             val view = items.getChildAt(i) as TextView
             view.isVisible = i < labels.size
             if (view.isVisible) view.text = labels[i]
         }
-        column.scrollTo(0, 0)
-        // the keys drawn anew only when typing starts or ends
-        if (state.composing != was) canvas?.invalidateScene()
     }
 
     // one line, in dp as the keys' text is: a syllable longer than the column (shuang, zhuang on a
@@ -812,7 +822,9 @@ class T9Keyboard(
     override val keysIm: String get() = imeName
 
     // a getter, not a lazy: the scene may ask before this keyboard's fields past it are made. Made once after
-    // (null till then), as the resolver's cache is asked on every swipe and compares it
+    // (null till then), as the resolver's cache is asked on every swipe and compares it: the null branch is
+    // taken only while BaseKeyboard's init runs, before this class's fields are assigned (a lazy's delegate
+    // field would be null there too)
     override val keysNineLetters: Map<Char, String> get() = nineLettersMade ?: nineLetters()
 
     private val nineLettersMade: Map<Char, String>? = nineLetters()

@@ -35,7 +35,7 @@ class MarkJumpTest {
     }
 
     private fun steady(what: String, board: String, at: (Double) -> Env, f: Double) {
-        val shots = (-STEPS..STEPS).map { i -> f + i * STEP }.map { it to marks(Forms.scene(board, Forms.env(board, at(it)))) }
+        val shots = (-STEPS..STEPS).map { i -> f + i * STEP }.map { it to marks(Forms.scene(board, told(board, at(it)))) }
         shots.zipWithNext { (fa, a), (fb, b) ->
             for ((key, ma) in a) {
                 val mb = b.getValue(key)
@@ -48,15 +48,21 @@ class MarkJumpTest {
         }
     }
 
+    // the board as [Forms.env] tells it, with the marks [e] sets by name over the built-in ones (Forms.env puts only those)
+    private fun told(board: String, e: Env): Env = Forms.env(board, e).let { it.copy(marks = it.marks.copy(shortcuts = it.marks.shortcuts + e.marks.shortcuts)) }
+
     private fun shortcuts(at: KeyMarks.At) = MarkSettings(
         upAt = if (at == KeyMarks.At.TopRight) KeyMarks.At.TopLeft else KeyMarks.At.TopRight,
         downAt = at,
-        shortcuts = Fixtures.presetMarks + mapOf("numbers:up" to MarkContent.Text("全选"), "numbers:down" to MarkContent.Icon("undo")),
+        shortcuts = Fixtures.presetMarks + mapOf("fn/numbers:up" to MarkContent.Text("全选"), "fn/numbers:down" to MarkContent.Icon("undo")),
     )
 
     @Test
     fun qwertyCompactAtAWidthsHair() {
         for (at in listOf(KeyMarks.At.TopRight, KeyMarks.At.TopLeft)) {
+            // 123's two marks, set by its name, are among what is held steady
+            val numbers = marks(Forms.scene("qwerty", told("qwerty", Forms.compact.copy(width = 1080.0, height = 468.0, marks = shortcuts(at))))).getValue("numbers").map { it.first }
+            assertTrue("text 全选" in numbers && "icon undo" in numbers, "$at: $numbers")
             steady("qwerty compact $at", "qwerty", { f -> Forms.compact.copy(width = 1080 * f, height = 468 * (0.8 + 0.2 * f), marks = shortcuts(at)) }, 0.8874)
         }
     }

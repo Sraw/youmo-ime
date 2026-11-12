@@ -131,14 +131,28 @@ object InputFeedbacks {
             val fromTheme = keySoundSource == KeySoundSource.FollowTheme
             ThemeSounds.sync(plays && fromTheme)
             if (!plays) return
-            val sounds = ThemeSounds.shared
-            when (val choice = KeySoundChoice.choose(key, sounds.given, sounds.loaded, fromTheme, soundOnKeyPressVolume, system)) {
-                is KeySoundChoice.Choice.Theme ->
-                    if (!sounds.play(choice.key, choice.volume)) playSystemClick(system, KeySoundChoice.systemVolume(soundOnKeyPressVolume))
-                is KeySoundChoice.Choice.System -> playSystemClick(choice.key, choice.volume)
-            }
+            play(key, system, fromTheme, soundOnKeyPressVolume)
         } finally {
             Trace.endSection()
+        }
+    }
+
+    /**
+     * A letter's sound at [volume] (按键音音量's 0..100, 0 the system's), as a press would play it: the
+     * slider let go, so the user hears what they picked. It plays whether or not the keys would.
+     */
+    fun previewSound(volume: Int) {
+        val fromTheme = keySoundSource == KeySoundSource.FollowTheme
+        ThemeSounds.sync(fromTheme)
+        play(SoundKey.LETTER, SoundKey.LETTER, fromTheme, volume)
+    }
+
+    private fun play(key: SoundKey, system: SoundKey, fromTheme: Boolean, volume: Int) {
+        val sounds = ThemeSounds.shared
+        when (val choice = KeySoundChoice.choose(key, sounds.given, sounds.loaded, fromTheme, volume, system)) {
+            is KeySoundChoice.Choice.Theme ->
+                if (!sounds.play(choice.key, choice.volume)) playSystemClick(system, KeySoundChoice.systemVolume(volume))
+            is KeySoundChoice.Choice.System -> playSystemClick(choice.key, choice.volume)
         }
     }
 

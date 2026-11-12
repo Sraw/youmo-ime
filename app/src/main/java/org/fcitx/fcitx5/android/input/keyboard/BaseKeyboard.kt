@@ -4,9 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.input.keys.KeyResolver
-import org.fcitx.fcitx5.android.scene.engine.MarkSettings
-import org.fcitx.fcitx5.android.input.keys.KeyState
 import android.content.Context
 import android.graphics.Canvas
 import android.view.MotionEvent
@@ -50,12 +47,11 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
+import org.fcitx.fcitx5.android.input.keys.KeyResolver
+import org.fcitx.fcitx5.android.input.keys.KeyState
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.scene.KeyRef
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.pack.PackKind
@@ -63,6 +59,7 @@ import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import splitties.dimensions.dp
@@ -286,7 +283,7 @@ abstract class BaseKeyboard(
      */
     protected open val strokesBeginOnKeys: Boolean get() = false
 
-    private val swipes = KeySwipes(this, inputSwipeThreshold, disabledSwipeThreshold, selectionSwipeThreshold, object : KeySwipes.Keyboard {
+    private val swipes = KeySwipes(this, inputSwipeThreshold, disabledSwipeThreshold, selectionSwipeThreshold, spaceLineStep, object : KeySwipes.Keyboard {
         override val inPasswordField get() = this@BaseKeyboard.inPasswordField
         override val charShortcutMarks get() = this@BaseKeyboard.charShortcutMarks
         override val strokesBeginOnKeys get() = this@BaseKeyboard.strokesBeginOnKeys
@@ -296,6 +293,7 @@ abstract class BaseKeyboard(
         override fun onPopupAction(action: PopupAction) = this@BaseKeyboard.onPopupAction(action)
         override fun onPopupChangeFocus(key: KeyRef, x: Float, y: Float) = this@BaseKeyboard.onPopupChangeFocus(key, x, y)
         override fun onPopupTrigger(key: KeyRef, cancelled: Boolean) = this@BaseKeyboard.onPopupTrigger(key, cancelled)
+        override fun lines(steps: Int) = this@BaseKeyboard.lines(steps)
         override fun marksChanged() {
             canvas?.invalidateScene()
         }
@@ -324,7 +322,7 @@ abstract class BaseKeyboard(
         /** The key's own [KeyDef.Behavior.Swipe], previewed as [KeyDef.Popup.AltPreview.alternative]. */
         data object BuiltIn : SwipeChoice
 
-        /** Nothing: the user left the key nothing to swipe to (its long press is off). */
+        /** Nothing: the key has no first to swipe to (its long press off, or its list with no first, built in or the user's). */
         data object None : SwipeChoice
 
         /** A named key's first, the resolver's: typed as the item says, [shown] in the preview. */
@@ -382,6 +380,7 @@ abstract class BaseKeyboard(
         // with no long press of its own always wired, firing only while the resolver has a list for it, so a list
         // changed needs no keyboard made anew (060-s6-review M1), its corners drawn again only ([onKeyListsChanged])
         val name = def.shortcut
+        if (name == null) resolving.unnamed(key.ref.id)
         if (name != null) {
             resolving.named(key.ref.id, name, placeholderOf(def))
             if (takesLongPress(def)) {
@@ -443,9 +442,12 @@ abstract class BaseKeyboard(
         }
     }
 
+    // the lines [steps] vertical steps move, the space's cursor or 滑选's free end: in this field as it is now
+    private fun lines(steps: Int) = SpaceCursor.vertical(steps, inMultiLineField, composing = imTyping || tempMode)
+
     // the space's slide up or down once it has moved the cursor sideways: a line a step (SpaceCursor)
     private fun spaceLines(k: KeyHandle, steps: Int): Boolean {
-        val lines = SpaceCursor.vertical(steps, inMultiLineField, composing = imTyping || tempMode)
+        val lines = lines(steps)
         lines.forEach {
             val sym = if (it == SpaceCursor.Line.Up) FcitxKeyMapping.FcitxKey_Up else FcitxKeyMapping.FcitxKey_Down
             onAction(KeyAction.SymAction(KeySym(sym), KeyStates.Virtual))
@@ -869,10 +871,15 @@ abstract class BaseKeyboard(
     /** What the keys' lists depend on now (060-keys-unify §1.2): the swipe settings; Shift and punctuation a keyboard's own. */
     protected open fun keyState(): KeyState = KeyState(punctuation = keysPunctuation, ways = swipeWays(), spots = swipeSpots())
 
-    /** The marks of [layout]'s keys as the resolver has them now. */
+    /**
+     * The marks of [layout]'s keys as the resolver has them now: the resolver the keys' long presses and swipes ask
+     * (KeyResolving's), of [layout], which from now on is the layout they read (each scene's env asks this, so the
+     * layout drawn is the one touched; [keyReadings] takes its layout as given and sets nothing).
+     */
     protected fun keyMarks(layout: SceneLayout): MarkSettings {
         keysLayout = layout
-        return SceneBoard.marks(layout, charShortcutMarks, keysIm, keyState(), keysNineLetters)
+        val resolver = resolving.resolver(layout) ?: return SceneBoard.marks(layout, charShortcutMarks, keysIm, keyState(), keysNineLetters)
+        return SceneBoard.marks(resolver, charShortcutMarks, keyState())
     }
 
     /**
@@ -880,9 +887,8 @@ abstract class BaseKeyboard(
      * §3.4); none where the long press's first is drawn nowhere ([firstShown]): a corner not drawn is not said.
      */
     protected fun keyReadings(layout: SceneLayout): Map<String, String> {
-        // the resolver the keys' long presses and swipes ask (KeyResolving's, kept while nothing it is made of changed)
-        keysLayout = layout
-        return if (!firstShown()) emptyMap() else resolving.resolver()?.readings(keyState()).orEmpty()
+        // the resolver the keys' long presses and swipes ask (KeyResolving's, kept while nothing it is made of changed), of [layout]
+        return if (!firstShown()) emptyMap() else resolving.resolver(layout)?.readings(keyState()).orEmpty()
     }
 
     /** The keys' swipe marks drawn again, as what [charShortcutMarks] or the corners read changed. */

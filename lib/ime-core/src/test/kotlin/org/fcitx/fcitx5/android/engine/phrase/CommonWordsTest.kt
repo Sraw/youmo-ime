@@ -53,7 +53,6 @@ class CommonWordsTest {
     fun badLinesAreSkippedSayingWhy() {
         val r = read(
             "米字旁[mi'zi'pang]\n" +
-                "米字旁[mi'zi'pang] 米字旁\n" +
                 "米字旁[mi'zi] 米\n" +
                 "米字旁[mi'zi'pxng] 米\n" +
                 "一二三四五六七八九十一二三四五六七[yi'er'san'si'wu'liu'qi'ba'jiu'shi'yi'er'san'si'wu'liu'qi] 数\n" +
@@ -61,16 +60,17 @@ class CommonWordsTest {
         )
         assertTrue(r.words.isEmpty)
         assertEquals(
-            listOf(Problem.NO_REPLACEMENT, Problem.SAME_AS_WORD, Problem.BAD_PINYIN, Problem.BAD_PINYIN, Problem.TOO_LONG, Problem.TOO_LONG),
+            listOf(Problem.NO_REPLACEMENT, Problem.BAD_PINYIN, Problem.BAD_PINYIN, Problem.TOO_LONG, Problem.TOO_LONG),
             r.skipped.map { it.problem },
         )
-        assertEquals("米字旁[mi'zi] 米", r.skipped[2].text)
+        assertEquals("米字旁[mi'zi] 米", r.skipped[1].text)
     }
 
     @Test
-    fun replacementsAreKeptOnceNineAtMostNoneTheWordItself() {
+    @Uat("WD-45")
+    fun replacementsAreKeptOnceNineAtMostTheWordItselfToo() {
         val r = read("米字旁[mi'zi'pang] 米 米字旁 糸 米 一 二 三 四 五 六 七 八 九\n")
-        assertEquals(listOf("米", "糸", "一", "二", "三", "四", "五", "六", "七"), r.words.words.single().replacements)
+        assertEquals(listOf("米", "米字旁", "糸", "一", "二", "三", "四", "五", "六"), r.words.words.single().replacements)
     }
 
     @Test
@@ -175,12 +175,12 @@ class CommonWordsTest {
         val s = CommonWords.syllables("米字旁", "mizipang")
         assertNull(CommonWords.problem("米字旁", s, listOf("米", " ")))
         assertEquals(Problem.NO_REPLACEMENT, CommonWords.problem("米字旁", s, listOf(" ")))
-        assertEquals(Problem.SAME_AS_WORD, CommonWords.problem("米字旁", s, listOf("米字旁")))
+        assertNull(CommonWords.problem("米字旁", s, listOf("米字旁")))
         assertEquals(Problem.NO_PINYIN, CommonWords.problem("米字旁", null, listOf("米")))
         assertNull(CommonWords.syllables("米字旁", "mi zi"))
         // a blank inside a replacement is refused: a word, not a sentence; around one, trimmed
         assertEquals(Problem.BLANK_IN_REPLACEMENT, CommonWords.problem("米字旁", s, listOf("米 糸")))
-        assertEquals(listOf("米"), CommonWords.clean("米字旁", listOf(" 米 ")))
+        assertEquals(listOf("米"), CommonWords.clean(listOf(" 米 ")))
     }
 
     @Test
@@ -231,13 +231,6 @@ class CommonWordsTest {
         val r = read("# youmo-common-words 1\n# my radicals\n米字旁 米\n中国[zhong'guo]\t华\n#後\n")
         assertEquals(listOf("# my radicals", "米字旁 米", "#後"), r.words.unread)
         assertEquals("# youmo-common-words 1\n中国[zhong'guo]\t华\n# my radicals\n米字旁 米\n#後\n", r.words.format())
-    }
-
-    @Test
-    fun theWordItselfAsTheOnlyReplacementIsSaidSoBlanksAroundIt() {
-        // the settings' field may keep a blank: it was told as no replacement at all
-        val s = CommonWords.syllables("米字旁", "mizipang")
-        assertEquals(Problem.SAME_AS_WORD, CommonWords.problem("米字旁", s, listOf(" 米字旁 ")))
     }
 
     @Test

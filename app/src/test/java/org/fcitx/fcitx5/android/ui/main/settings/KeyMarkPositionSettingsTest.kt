@@ -162,7 +162,7 @@ class KeyMarkPositionSettingsTest {
     // where the two settings put the marks, the keyboard floating, split or one-handed as upright (060-keys-unify
     // §6.2): z's 撤销 and its symbol; ⌫'s 清空 (上滑) and 恢复 (下滑), a mark left out where the key has no room for it
     // (floating's low keys: KeyMarksEverywhereUatTest's left out)
-    private fun placedIn(mode: String) {
+    private fun placedIn(mode: String, restoreFits: Boolean = true) {
         prefs.set(keyboard.swipeUpPosition, KeyMarkPosition.BottomLeft)
         prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.TopRight)
         KeyboardHarness().use { h ->
@@ -175,7 +175,8 @@ class KeyMarkPositionSettingsTest {
                 (if (it.centerY < face.centerY) "T" else "B") + (if (it.centerX < face.centerX) "L" else "R")
             }
             assertEquals(mode, "BL", corner("delete-sweep"))
-            assertTrue(mode, corner("restore").let { it == null || it == "TR" })
+            // 恢复 may be left out only where the keys are low (floating); docked one-handed or split it is there
+            if (restoreFits) assertEquals(mode, "TR", corner("restore")) else assertTrue(mode, corner("restore").let { it == null || it == "TR" })
         }
     }
 
@@ -183,7 +184,7 @@ class KeyMarkPositionSettingsTest {
     @Uat("KB-66")
     fun placedFloating() {
         prefs.set(ThemeManager.prefs.floatingKeyboard, true)
-        placedIn("悬浮")
+        placedIn("悬浮", restoreFits = false)
     }
 
     @Test

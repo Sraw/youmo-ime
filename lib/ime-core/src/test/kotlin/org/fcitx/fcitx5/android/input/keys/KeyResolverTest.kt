@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keys
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.KeySwipe
 import org.fcitx.fcitx5.android.input.scene.SceneData
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
@@ -14,9 +15,12 @@ import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.keys.Commit
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.Item
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Form
+import org.fcitx.fcitx5.android.scene.keys.NodeFacts
+import org.fcitx.fcitx5.android.scene.layout.Popup
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
@@ -34,7 +38,12 @@ class KeyResolverTest {
     private val fragments: Map<String, Fragment> by lazy { mapOf("grouped-bottom" to (LayoutReader.fragment(SceneData.read("grouped-bottom.xml")) as Parsed.Ok).value) }
 
     private fun resolver(board: String, form: Form, lists: KeyLists = KeyLists.Empty, slots: SwipeSlots = SwipeSlots.Default) =
-        KeyResolver(KeyboardVariant(form), lists, slots, DefaultMarks.nodes(layout(board), fragments))
+        resolver(board, KeyboardVariant(form), lists, slots)
+
+    private fun resolver(board: String, variant: KeyboardVariant, lists: KeyLists = KeyLists.Empty, slots: SwipeSlots = SwipeSlots.Default) =
+        KeyResolver(variant, lists, slots, DefaultMarks.nodes(layout(board), fragments))
+
+    private fun popup(r: ResolvedKey) = r.popup as KeyPopup.Items
 
     private val zh = KeyState(punctuation = mapOf("." to "。", "," to "，", "\"" to "“"))
 
@@ -58,6 +67,15 @@ class KeyResolverTest {
         assertEquals(listOf("!", "Q", "ß"), items(r.resolve(KeyId("full/q"), KeyState(caps = true)).popup))
         // the first the list's own first
         assertEquals(Item("!"), r.resolve(KeyId("full/q"), KeyState()).first)
+    }
+
+    // a first the user chose, stored lower case as typed, is still theirs under Shift: its capital
+    @Test
+    fun aChosenFirstShiftedIsItsCapital() {
+        val lists = KeyLists.of(mapOf(KeyId("full/e") to UserList(false, listOf("è", "é"), First.Literal("é"))))
+        val r = resolver("qwerty", Form.Full, lists)
+        assertEquals("é", r.resolve(KeyId("full/e"), KeyState()).first?.text)
+        assertEquals("É", r.resolve(KeyId("full/e"), KeyState(caps = true)).first?.text)
     }
 
     @Test
@@ -84,27 +102,90 @@ class KeyResolverTest {
         assertEquals(Commit.AsKey, p.items[5].commit)
         assertEquals(".", (r.resolve(KeyId("t9/1"), KeyState()).popup as KeyPopup.Items).labels[5])
         // the user's symbols the same, an added one as well
-        val lists = KeyLists.of(mapOf(KeyId("t9/1") to UserList(false, listOf(".", "§"), First.Literal("."))))
+        val lists = KeyLists.of(mapOf(KeyId("t9/1") to UserList(false, listOf("1", ".", "§"), First.Literal("."))))
         val set = resolver("nine", Form.Nine, lists).resolve(KeyId("t9/1"), zh)
         assertEquals(Item("."), set.first)
         assertEquals("。", set.firstShown)
         assertEquals(listOf(Commit.Keypad('1'), Commit.AsKey, Commit.AsKey), (set.popup as KeyPopup.Items).items.map { it.commit })
     }
 
+    private val two = KeyId("t9/2")
+
+    private fun nine(vararg items: String, first: First = First.Default, variant: KeyboardVariant = KeyboardVariant(Form.Nine)) =
+        resolver("nine", variant, KeyLists.of(mapOf(two to UserList(false, items.toList(), first)))).resolve(two, KeyState())
+
+    // the stored list is the whole list (060-row-unlock §1): its digit deleted, the first is its first item as the full keyboard's
     @Test
-    fun aRowStaysTheUsersSymbolsAboveIt() {
-        val lists = KeyLists.of(mapOf(KeyId("t9/5") to UserList(false, listOf("%", "j", "5"))))
-        val five = resolver("nine", Form.Nine, lists).resolve(KeyId("t9/5"), KeyState())
-        assertEquals(listOf("J", "K", "L", "5", "j", "k", "l", "%"), items(five.popup))
-        assertEquals(Item("5", Commit.Keypad('5')), five.first)
-        assertEquals(3, (five.popup as KeyPopup.Items).focus)
+    fun nineTwosDigitDeletedItsFirstIsA() {
+        val a = nine("A", "B", "C", "a", "b", "c", "@")
+        assertEquals(listOf("A", "B", "C", "a", "b", "c", "@"), items(a.popup))
+        assertEquals(Item("A"), a.first)
+        assertEquals("A", a.corner)
+        assertEquals(0, popup(a).focus)
+        assertEquals(6, popup(a).inRow)
+        val lists = KeyLists.of(mapOf(two to UserList(false, listOf("A", "B", "C", "a", "@"))))
+        assertEquals("A", resolver("nine", Form.Nine, lists).readings(KeyState())["t9/2"])
+        // emptied: off, nothing said
+        val off = resolver("nine", Form.Nine, KeyLists.Empty.with(two, UserList(false, emptyList()), KeyDefaults.nine('2', KeyboardVariant(Form.Nine))))
+        assertNull(off.resolve(two, KeyState()).popup)
+        assertNull(off.readings(KeyState())["t9/2"])
+    }
+
+    @Test
+    fun itsLettersDeletedTheDigitStaysAKeypads() {
+        val d = nine("2", "@", "!")
+        assertEquals(Item("2", Commit.Keypad('2')), d.first)
+        assertEquals(1, popup(d).inRow)
+        // the digit back: a keypad's again, the first where the user leaves it
+        val back = nine("A", "@", "2")
+        assertEquals(Commit.Keypad('2'), popup(back).items[2].commit)
+        assertEquals(Item("A"), back.first)
+    }
+
+    // the row: the leading items of the default's row or single ASCII letters and digits; -1 for none (§1.3)
+    @Test
+    fun theRowIsTheLeadingRowItems() {
+        val moved = nine("A", "B", "C", "2", "a", "b", "@", "c", first = First.Literal("2"))
+        assertEquals(6, popup(moved).inRow)
+        assertEquals(3, popup(moved).focus)
+        assertEquals(3, popup(moved).own)
+        val symbolFirst = nine("@", "A", "B", "C", "2", "a", "b", "c", first = First.Literal("2"))
+        assertEquals(-1, popup(symbolFirst).inRow)
+        assertEquals(4, popup(symbolFirst).focus)
+        // the first among the symbols: the row centres on its middle
+        val atSign = nine("A", "B", "C", "2", "a", "b", "c", "@", first = First.Literal("@"))
+        assertEquals(7, popup(atSign).inRow)
+        assertEquals(3, popup(atSign).own)
+        // a list of another 按键字母, shown on 双拼九键 (its letters NINE_SP's): one row all the same
+        val custom = nine("A", "B", "D", "2", "a", "b", "d", first = First.Literal("2"), variant = KeyboardVariant(Form.Nine, KeyboardVariant.STANDARD_NINE + ('2' to "abc;")))
+        assertEquals(7, popup(custom).inRow)
+    }
+
+    private val l = KeyId("g18/l")
+    private val lStored = UserList(false, listOf("L", ":", "-", "l", ";", ")", "]"), First.Literal("-"))
+
+    // the one exception (§2): 18 键's L shows `:` only where the scheme types `;`; `;` itself everywhere
+    @Test
+    fun eighteenLsColonOnlyOnASchemeTypingSemicolon() {
+        val lists = KeyLists.of(mapOf(l to lStored))
+        val pinyin = resolver("k18", KeyboardVariant(Form.Grouped18), lists).resolve(l, KeyState())
+        assertEquals(listOf("L", "-", "l", ";", ")", "]"), items(pinyin.popup))
+        val semi = popup(pinyin).items[3]
+        assertEquals(Item(";"), semi)
+        assertEquals(Item("-"), pinyin.first)
+        val microsoft = resolver("k18", KeyboardVariant(Form.Grouped18, semicolon = true), lists).resolve(l, KeyState())
+        assertEquals(listOf("L", ":", "-", "l", ";", ")", "]"), items(microsoft.popup))
+        // its first `:`, skipped: the first item shown
+        val colon = KeyLists.of(mapOf(l to lStored.copy(first = First.Literal(":"))))
+        assertEquals(Item("L"), resolver("k18", KeyboardVariant(Form.Grouped18), colon).resolve(l, KeyState()).first)
+        assertEquals(":", resolver("k18", KeyboardVariant(Form.Grouped18, semicolon = true), colon).resolve(l, KeyState()).first?.text)
     }
 
     @Test
     fun aGroupsCornerIsItsFirstTheUsersFirstWins() {
         val r = resolver("k14", Form.Grouped14)
         assertEquals(Item("1", Commit.Keypad('1')), r.resolve(KeyId("g14/qw"), KeyState()).first)
-        val lists = KeyLists.of(mapOf(KeyId("g14/qw") to UserList(false, listOf("+"), First.Literal("+"))))
+        val lists = KeyLists.of(mapOf(KeyId("g14/qw") to UserList(false, listOf("Q", "W", "1", "q", "w", "+"), First.Literal("+"))))
         val set = resolver("k14", Form.Grouped14, lists).resolve(KeyId("g14/qw"), KeyState())
         assertEquals(Item("+"), set.first)
         assertEquals(MarkContent.Symbol("+"), set.upMark)
@@ -112,16 +193,34 @@ class KeyResolverTest {
     }
 
     @Test
-    fun offOrNoneLeavesNoFirst() {
-        val lists = KeyLists.of(mapOf(KeyId("full/q") to UserList.Off, KeyId("full/w") to UserList(false, listOf("2"), First.None)))
-        val r = resolver("qwerty", Form.Full, lists)
-        val q = r.resolve(KeyId("full/q"), KeyState())
-        assertNull(q.popup)
-        assertNull(q.first)
-        assertFalse(q.swipe.hasFirst)
-        assertEquals(MarkContent.Empty, q.upMark)
-        assertNull(r.resolve(KeyId("full/w"), KeyState()).first)
-    }
+    fun noFirst() = assertRows(
+        // the user turned its long press off: nothing drawn, no swipe of its first
+        "off: no popup, no first, no mark" to {
+            val q = resolver("qwerty", Form.Full, KeyLists.of(mapOf(KeyId("full/q") to UserList.Off))).resolve(KeyId("full/q"), KeyState())
+            assertNull(q.popup)
+            assertNull(q.first)
+            assertFalse(q.swipe.hasFirst)
+            assertEquals(MarkContent.Empty, q.upMark)
+        },
+        // a list with its first set to none: items kept, none first
+        "a first set to none" to {
+            val lists = KeyLists.of(mapOf(KeyId("full/w") to UserList(false, listOf("2"), First.None)))
+            assertNull(resolver("qwerty", Form.Full, lists).resolve(KeyId("full/w"), KeyState()).first)
+        },
+        // a theme's `send=` of no action KeyOutput can make: the corner and the swipe's slot read the same none as
+        // the keyboard's swipe, so the corner never shows what the swipe does not type; the item stays in the popup
+        // (FB2 of R24, was aFirstNoBuildCanTypeIsNone)
+        "a first KeyOutput cannot make" to {
+            val node = NodeFacts(text = "q", popup = Popup("list", null, listOf("x" to "layout:", "y" to null), emptyMap()))
+            val q = KeyResolver(KeyboardVariant(Form.Full), KeyLists.Empty, SwipeSlots.Default, listOf("full/q" to node))
+                .resolve(KeyId("full/q"), KeyState())
+            assertEquals("x", (q.popup as KeyPopup.Items).items.first().text)
+            assertNull(q.first)
+            assertNull(q.corner)
+            assertFalse(q.swipe.hasFirst)
+            assertEquals(MarkContent.Empty, q.upMark)
+        },
+    )
 
     @Test
     fun aZhuyinKeyHasNoneUntilTheUserGivesIt() {
@@ -156,23 +255,14 @@ class KeyResolverTest {
     fun theEditorStartsFromTheKeyAsItPopsUp() {
         val nine = resolver("nine", Form.Nine)
         val five = nine.edit(KeyId("t9/5"))
-        assertEquals(listOf("J", "K", "L", "5", "j", "k", "l"), five.row)
+        assertEquals(listOf("J", "K", "L", "5", "j", "k", "l", "#", "(", ")"), five.items)
         assertEquals("5", five.first)
         assertNull(five.user)
         val lists = KeyLists.of(mapOf(KeyId("full/q") to UserList(false, listOf("!", "Q"), First.None), KeyId("t9/5") to UserList.Off))
         val q = resolver("qwerty", Form.Full, lists).edit(KeyId("full/q"))
-        assertEquals(KeyEdit(emptyList(), listOf("!", "Q"), null, UserList(false, listOf("!", "Q"), First.None)), q)
-        // off: the row as the keyboard makes it, nothing above
-        val off = resolver("nine", Form.Nine, lists).edit(KeyId("t9/5"))
-        assertEquals(KeyEdit(five.row, emptyList(), null, UserList.Off), off)
-    }
-
-    @Test
-    fun aKeysDefaultsOnEachVariant() {
-        val variants = listOf(KeyboardVariant(Form.Nine), KeyboardVariant(Form.Nine, KeyboardVariant.STANDARD_NINE + ('2' to "abc;")))
-        val (pinyin, shuangpin) = resolver("nine", Form.Nine).defaultsOn(KeyId("t9/2"), variants)
-        assertEquals(listOf("A", "B", "C", "2", "a", "b", "c"), pinyin!!.row.map { it.text })
-        assertEquals(listOf("A", "B", "C", ";", "2", "a", "b", "c", ";"), shuangpin!!.row.map { it.text })
+        assertEquals(KeyEdit(listOf("!", "Q"), null, UserList(false, listOf("!", "Q"), First.None)), q)
+        // off: nothing
+        assertEquals(KeyEdit(emptyList(), null, UserList.Off), resolver("nine", Form.Nine, lists).edit(KeyId("t9/5")))
     }
 
     @Test
@@ -188,6 +278,7 @@ class KeyResolverTest {
     fun theMarksAreMadeOnceAStateAndAreTheWebsByDefault() {
         val r = resolver("qwerty", Form.Full)
         val m = r.marks(KeyState())
+        // made once a state, a performance promise (every key's draw asks; KeyResolver's doc), not only equal
         assertSame(m, r.marks(KeyState()))
         assertEquals(DefaultMarks.shortcuts(layout("qwerty"), fragments), m.shortcuts)
         assertFalse(r.marks(KeyState(roots = { null })).charShortcuts)
@@ -198,6 +289,7 @@ class KeyResolverTest {
     fun theReadingsAreTheFirstsTheWaysDraw() {
         val r = resolver("qwerty", Form.Full)
         val read = r.readings(zh)
+        // made once a state, as marks() (a screen reader asks every key)
         assertSame(read, r.readings(zh))
         assertEquals("1", read["full/q"])
         assertEquals("@", read["full/a"])
@@ -236,15 +328,31 @@ class KeyResolverTest {
         val r = resolver("zhuyin-nine", Form.ZhuyinNine)
         assertNull(r.resolve(group, KeyState()).corner)
         assertNull(r.readings(KeyState())["zy9/1"])
-        val own = resolver("zhuyin-nine", Form.ZhuyinNine, lists = KeyLists.Empty.with(group, UserList(false, listOf("!", "?")), listOf(null)))
-        // its symbols set, its first the defaults' (none for a group)
+        val zhuyin = r.edit(group).items
+        val own = resolver("zhuyin-nine", Form.ZhuyinNine, lists = KeyLists.of(mapOf(group to UserList(false, zhuyin + "?", First.None))))
+        // a symbol added, no first set (none, as the group's default)
         assertNull(own.resolve(group, KeyState()).corner)
-        val chosen = resolver("zhuyin-nine", Form.ZhuyinNine, lists = KeyLists.Empty.with(group, UserList(false, listOf("!", "?"), First.Literal("?")), listOf(null)))
+        val chosen = resolver("zhuyin-nine", Form.ZhuyinNine, lists = KeyLists.of(mapOf(group to UserList(false, zhuyin + "?", First.Literal("?")))))
         assertEquals("?", chosen.resolve(group, KeyState()).corner)
         assertEquals(MarkContent.Symbol("?"), chosen.resolve(group, KeyState()).upMark)
         // ˉ's ˙ (its defaults' first, a named key not fn/'s: a character key's mark=) not drawn, as the scene never drew it
         val tone = KeyId("zy9/tone-1")
         assertEquals("˙", r.resolve(tone, KeyState()).first?.text)
         assertEquals(MarkContent.Empty, r.resolve(tone, KeyState()).upMark)
+    }
+
+    @Test
+    fun aLongFirstIsMarkedAsASetTextIs() {
+        // a 0.5 backup's long presses: the corner as a swipe's text is drawn (two characters as seen and 「…」), the
+        // first typed and said whole
+        val long = "5%葡萄糖注射液100ml"
+        val phone = "13895801474"
+        val lists = KeyLists.of(mapOf(KeyId("full/l") to UserList(false, listOf(long)), KeyId("full/q") to UserList(false, listOf(phone))))
+        val r = resolver("qwerty", Form.Full, lists)
+        val l = r.resolve(KeyId("full/l"), KeyState())
+        assertEquals(MarkContent.Symbol("5%…"), l.upMark)
+        assertEquals(long, l.first?.text)
+        assertEquals(long, l.corner)
+        assertEquals(MarkContent.Symbol("13…"), r.resolve(KeyId("full/q"), KeyState()).upMark)
     }
 }

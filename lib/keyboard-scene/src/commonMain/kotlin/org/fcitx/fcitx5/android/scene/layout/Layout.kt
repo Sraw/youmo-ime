@@ -49,7 +49,10 @@ class Row(
     val defaults: KeyAttrs,
     val cells: List<Cell>,
     val line: Int,
-) : Part
+) : Part {
+    /** This row as it is, of [cells]: every other field kept. */
+    fun withCells(cells: List<Cell>): Row = Row(id, indent, endIndent, height, condition, split, defaults, cells, line)
+}
 
 /** A width in key units (1 = a letter); [Fill] the row's room left, shared among its fills. */
 sealed interface Width {
@@ -86,6 +89,9 @@ class Key(
      * of two letters or more whose `lean=` is not off.
      */
     val leans: Boolean get() = letters != null && letters.group.length >= 2 && lean != false
+
+    /** This key as it is, of `shortcut=` [shortcut] (LayoutReader naming a pack's unnamed nine key): every field kept. */
+    fun named(shortcut: String): Key = Key(id, condition, attrs.copy(shortcut = shortcut), popup, menu, line, variants, letters, lean)
 }
 
 /**
@@ -204,7 +210,7 @@ sealed interface Text {
         const val GROUP = "group"
 
         /**
-         * `{punct:x}`: a character but a space or a brace, as punctuation maps it (`(`, `@`, `:` among the 18 keys' corners);
+         * `{punct:x}`: a character of the basic plane (no emoji) but a space or a brace, as punctuation maps it (`(`, `@`, `:` among the 18 keys' corners);
          * up to four, each mapped, in `label=` alone (九键 1's `,.?!`): `alt=` and `a11y=` take one (LayoutReader), and the
          * 0.6.0 betas' readers took one anywhere, so a pack for them writes no run.
          */

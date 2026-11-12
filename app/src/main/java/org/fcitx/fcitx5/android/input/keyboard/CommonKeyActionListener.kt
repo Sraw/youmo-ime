@@ -5,6 +5,8 @@
 
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.os.Handler
+import android.os.Looper
 import android.view.inputmethod.EditorInfo
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -110,7 +112,13 @@ class CommonKeyActionListener :
      */
     fun voiceTap() = VoiceFeature.tap(inputView) { listener.onKeyAction(CommitAction(it), KeyActionListener.Source.Keyboard) }
 
-    private fun select(range: CursorRange) = service.select(range.start, range.end)
+    private fun select(range: CursorRange) {
+        lineReversed = false
+        service.select(range.start, range.end)
+    }
+
+    // the editor's selection as a line of 滑选's left it, its free end the left one: from the anchor to it, not in order
+    private var lineReversed = false
 
     // the field 滑选 began in: a step in another (the field changed mid-touch) ends it. The same field
     // restarted (an app's restartInput, after a commit maybe) is the same: its EditorInfo alone is new
@@ -123,8 +131,51 @@ class CommonKeyActionListener :
     private fun endSwipeSelect(lifted: Boolean = false) {
         val reported = service.reportedSelection
         val settled = service.selectionSettled
-        val untaken = (if (lifted) swipeSelection.end(reported, settled) else swipeSelection.cancel(reported, settled)) ?: return
-        if (inSwipeSelectField()) service.forgetSelection(untaken)
+        val untaken = if (lifted) swipeSelection.end(reported, settled) else swipeSelection.cancel(reported, settled)
+        if (swipeSelection.awaitingLines) linesAfterTouch()
+        if (!inSwipeSelectField()) return
+        untaken?.let(service::forgetSelection)
+        // a line left the editor's selection the other way round (its free end the left one): in order, as any other is
+        // (a line past the anchor left it in order already)
+        val reversed = lineReversed && swipeSelection.headAt < swipeSelection.anchorAt
+        if (untaken == null && reversed && !swipeSelection.lining) select(CursorRange(swipeSelection.headAt, swipeSelection.anchorAt))
+    }
+
+    private val linesTimeout by lazy { Handler(Looper.getMainLooper()) }
+
+    // 滑选's lines on their way: each report of the editor's not predicted is one landing, the free end
+    // where it says; none a while on (an editor that ignores shift and an arrow), the steps waiting go on,
+    // a line the editor reports later still where the free end is. The editor's selection a line leaves
+    // goes from the anchor to the free end: the other way round where that is the left one
+    private fun awaitLines() {
+        service.unpredictedSelection = { reported ->
+            if (inSwipeSelectField()) {
+                val range = swipeSelection.lineLanded(reported) { service.readForSwipeSelect()?.let { it.field to it.at } }
+                if (range != null) select(range) else lineReversed = swipeSelection.headAt < swipeSelection.anchorAt
+            }
+            if (!swipeSelection.awaitingLines) linesDone()
+        }
+        linesTimeout.removeCallbacksAndMessages(null)
+        linesTimeout.postDelayed({
+            if (inSwipeSelectField()) swipeSelection.linesUnreported()?.let(::select)
+            if (!swipeSelection.awaitingLines) linesDone()
+        }, LINES_WAIT_MS)
+    }
+
+    // the touch over with lines not reported (an editor that ignores shift and an arrow never does): waited for
+    // a while more, then none: a report from then on the editor's own, not a line to set in order
+    private fun linesAfterTouch() {
+        linesTimeout.removeCallbacksAndMessages(null)
+        linesTimeout.postDelayed({
+            if (inSwipeSelectField()) swipeSelection.linesUnreported()?.let(::select)
+            swipeSelection.linesForgotten()
+            linesDone()
+        }, LINES_WAIT_MS)
+    }
+
+    private fun linesDone() {
+        service.unpredictedSelection = null
+        linesTimeout.removeCallbacksAndMessages(null)
     }
 
     // 滑选 begun once the editor reported what was committed first: below Android 12 the field's read
@@ -249,13 +300,26 @@ class CommonKeyActionListener :
                 is SwipeSelectAction -> if (!inSwipeSelectField()) {
                     endSwipeSelect()
                 } else {
-                    val range = swipeSelection.move(action.steps, service.reportedSelection, service.selectionSettled)
+                    val range = if (action.steps != 0) swipeSelection.move(action.steps, service.reportedSelection, service.selectionSettled) else null
                     // a step past the end the editor ignored, given up: no longer predicted, before what is set next
                     swipeSelection.untaken?.let(service::forgetSelection)
-                    range?.let {
-                        select(it)
-                        action.moved()
+                    range?.let(::select)
+                    // felt once a sample, sideways and lines together
+                    var moved = range != null
+                    // then the lines, as the space's slide moves the cursor: the editor moves the free end, the anchor kept
+                    action.lines.forEach { line ->
+                        if (!swipeSelection.lineable) return@forEach
+                        // set from the anchor to the free end where that is the left one, as the editor extends its selection's end
+                        // (lines already on their way left it so: set again from the free end not yet moved, it would undo them)
+                        val anchored = swipeSelection.lining
+                        if (swipeSelection.headAt < swipeSelection.anchorAt) lineReversed = true
+                        if (service.extendLine(line, swipeSelection.anchorAt, swipeSelection.headAt, anchored)) {
+                            swipeSelection.lineSent()
+                            awaitLines()
+                            moved = true
+                        }
                     }
+                    if (moved) action.moved()
                 }
                 is DeleteSelectionAction -> {
                     when (backspaceSwipe.onRelease(action.totalCnt)) {
@@ -400,3 +464,6 @@ private fun takenAsIs(key: String, address: Boolean, reads: (Int) -> Boolean): S
 
 // 滑选's begin waiting at most for the editor's report of what was committed first
 private const val SETTLE_MS = 200L
+
+// 滑选's lines waiting at most for the editor to report where it moved the free end: one that ignores them never does
+private const val LINES_WAIT_MS = 300L

@@ -76,6 +76,18 @@ class CommonWordsInSessionTest {
     }
 
     @Test
+    @Uat("WD-45")
+    fun theWordItselfAsAReplacementGoesFirst() {
+        // 你好 → 你好: typing nihao puts 你好 first, committed as any replacement
+        val s = session(CommonWordBook(words("你好[ni'hao] 你好 您好\n")))
+        val shown = s.type("nihao")
+        assertEquals(listOf("你好", "您好"), shown.take(2))
+        // and only there: the engine's own 你好 further down is the same word
+        assertEquals(1, shown.count { it == "你好" })
+        assertEquals("你好", s.apply(Action.Pick(0)).commit)
+    }
+
+    @Test
     fun aPartOfAKeyOrMoreTypesNothing() {
         val s = session(niHao)
         // each a key cut short or run on: no replacement of a key it is not

@@ -30,7 +30,6 @@ import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.handwriting.InkKeys
 import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
@@ -385,16 +384,6 @@ class HandwritingKeyboard(
         canvas?.invalidateScene()
     }
 
-    // ，and 。 as punctuation maps them: the views showed them full width whatever was typed; the scene
-    // shows what they type ({punct:,}: 显示和输出一致, 060-render-p2 §5.3 S5b)
-    private var punctuationMapping: Map<String, String> = emptyMap()
-
-    override fun onPunctuationUpdate(mapping: Map<String, String>) {
-        super.onPunctuationUpdate(mapping)
-        punctuationMapping = mapping
-        canvas?.invalidateScene()
-    }
-
     // what the scene's keys show as last told
     private var returnAppearance = ReturnKeyAppearance.Enter
     private var readingOn = false
@@ -409,7 +398,7 @@ class HandwritingKeyboard(
             imeName = shownImeName.orEmpty(),
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
-            punctuation = punctuationMapping,
+            punctuation = keysPunctuation, // ，and 。 as typed ({punct:,}: 显示和输出一致)
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
         )
         val env = SceneEnvs.of(this, look, theme.isDark, width, height, input, texts = texts, marks = keyMarks(layout))
