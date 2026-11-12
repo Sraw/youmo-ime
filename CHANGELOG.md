@@ -8,6 +8,18 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
+## 0.6.1（开发中）
+
+### 小改动
+
+- 学到的词没能存下来时（比如存储出了问题），键盘上提示一次，告诉你该怎么办；以前只记在内存里，什么都不说，输入法被系统停止后就全丢了。手机重启后、第一次解锁前学到的词不保存（解锁后照常），这时也提示一次。
+
+### Smaller changes
+
+- When learned words cannot be saved (a storage problem, say), the keyboard says so once, with what to do; before, they were kept in memory alone, nothing said, and lost once the system stopped the keyboard. Words learned after a restart and before the first unlock are not saved (they are again after it), and the keyboard says so once.
+
+---
+
 ## 0.6.0（2026-11-12）
 
 从 0.5.x 直接覆盖安装，设置、学到和添加的词都在；升级后**键盘会提示导入文字包**，导入后照常打字（要用语音的再导入语音包）。装过 0.6.0 测试版的也直接覆盖安装：设置、自己改的长按和滑动都带过来，导入过的资源包不用重新导入（只导入过测试版 1 语音包的，要重新导入语音包）。从正式版退回测试版 3 不支持改长按：退回后长按全按自带的、编辑器只读，再升级回来就照旧。
