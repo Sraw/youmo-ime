@@ -22,7 +22,7 @@ Installing 0.6.0 over 0.5.x keeps settings and learned and added words; after th
 - **每个键的上滑、下滑**：每个键各设一个上滑和一个下滑：长按首选、快捷键、一段文字或空。新快捷键 **滑选**：滑过以后左右挪一个字一个字地选中，再上下挪按屏幕行跨行选，和空格滑动移光标一样。符号、表情、颜文字面板和展开候选上的退格、空格、回车也能上滑下滑。
 - **键盘新画法**：键盘、候选栏、工具栏、编码行和各个面板都用新的引擎按主题画，改键盘设置只重画键，不再重建整个键盘。
 - **主题**：在网页 [主题制作页](https://sraw.github.io/youmo-ime/theme-maker/) 上做（App 里只导入、导出、删除），能做渐变、半透明键、动画 WebP 动态背景、按键状态过渡和按下动效、每类键各自的**按键音**、自己的 **SVG 图标** 和布局；导出的主题都是 4.0 格式，旧主题导出时转成 4.0，样子不变。**12 个新内置主题**：简蓝、橙风、素雅、清心、墨灰、液态玻璃、霓虹赛博、国风·天青（后三个带动态背景）、机械键帽（带按键音）、奶油、护眼·纸色、多巴胺。主题列表每张卡片下写主题名。
-- **导入别的输入法的皮肤**：**导入主题文件** 也收百度（`.bds`、`.bdi`）、搜狗手机版（`.ssf`，没加密的）的皮肤，同文（Trime）和 FlorisBoard 的主题，导入前先确认。
+- **导入别的输入法的皮肤（初步支持）**：**导入主题文件** 也收百度（`.bds`、`.bdi`）、搜狗手机版（`.ssf`，没加密的）的皮肤，同文（Trime）和 FlorisBoard 的主题，导入前先确认。现在还是初步支持，有的皮肤可能显示得不对或导入不了。
 - **在键上划**（**通用输入 → 在键上划**，默认关，三选一）：**滑行输入**、**笔画筛选**，以及新的 **键盘手写**：没打字时直接在拼音、码表、注音的键盘上写汉字，不用换到手写输入法。
 - **常用词**（**词库与短语 → 常用词**）有了自己的页面，能改、导入、导出，排在替换前面；替换项可以和原词一样（把原词排到最前）。
 - **按键音音量** 改成 0–100 的滑块，最左是「系统默认」，松手时按这个音量响一声。
@@ -34,7 +34,7 @@ Installing 0.6.0 over 0.5.x keeps settings and learned and added words; after th
 - 左右和上下的键距分成两个设置；紧凑高度下行挨得更近、键更高。
 - 很长的内容分段送进输入框，不再被截断。
 - 键盘边上的键长按时，弹出的那排往里滑。
-- 工具栏右边多了 **麦克风**（没导入语音包时点了提示导入；密码框里没有）；空格长按默认是按住说话，导入了语音包时空格上有麦克风角标。
+- 没导入语音包时，点工具栏的 **麦克风** 会提示导入（密码框里没有麦克风）；空格长按默认是按住说话，导入了语音包时空格上有麦克风角标。
 - 长按候选 **屏蔽** 对英文、笔画查字、滑行、手写、表情和拆字的候选也管用：英文词屏蔽后不再补全、联想，也不再改成它；整句候选整句屏蔽。
 - 编辑长按列表的对话框显示在键盘上方，打了字直接点 **完成** 也会加进去；列表满了会说出来，不再悄悄丢掉。
 - 新设置 **拼音键字母大小写**：中文输入法键上的字母总是小写、跟随 Shift 或总是大写。
@@ -73,7 +73,7 @@ Installing 0.6.0 over 0.5.x keeps settings and learned and added words; after th
 - **A swipe up and a swipe down on every key**: each one the long-press first, a shortcut, a text or nothing. A new shortcut **滑选**: after the swipe, slide sideways to select character by character, then up or down to extend by screen lines, as space's cursor slide does. Backspace, space and enter on the symbol, emoji and kaomoji panels and the expanded candidates swipe too.
 - **New drawing**: the keyboard, candidate bar, toolbar, code row and panels are drawn by a new engine from the theme; a keyboard setting redraws the keys instead of rebuilding the keyboard.
 - **Themes**: made on the web [theme maker](https://sraw.github.io/youmo-ime/theme-maker/) (the app imports, exports and deletes): gradients, translucent keys, animated WebP backgrounds, key state transitions and press motion, **key sounds** per kind of key, your own **SVG icons** and layouts; themes export as format 4.0, older ones converted with the same look. **12 new built-in themes**: 简蓝, 橙风, 素雅, 清心, 墨灰, 液态玻璃, 霓虹赛博, 国风·天青 (the last three animated), 机械键帽 (with key sounds), 奶油, 护眼·纸色, 多巴胺. Each card in the theme list carries its name.
-- **Other keyboards' skins**: **导入主题文件** also takes Baidu (`.bds`, `.bdi`) and unencrypted Sogou mobile (`.ssf`) skins and Trime and FlorisBoard themes, after a confirmation.
+- **Other keyboards' skins (early support)**: **导入主题文件** also takes Baidu (`.bds`, `.bdi`) and unencrypted Sogou mobile (`.ssf`) skins and Trime and FlorisBoard themes, after a confirmation. Support is early: some skins may look wrong or fail to import.
 - **在键上划** (**通用输入 → 在键上划**, off by default, one of three): **滑行输入**, **笔画筛选**, and the new **键盘手写**: with nothing typed, write characters straight on the pinyin, table or zhuyin keyboard, no switch to handwriting.
 - **常用词** (**词库与短语 → 常用词**) has its own page to edit, import and export, ranked before replacements; a replacement may equal the word itself (to put it first).
 - **按键音音量** is a 0–100 slider whose far left is 「系统默认」; letting go plays a click at that volume.
@@ -85,7 +85,7 @@ Installing 0.6.0 over 0.5.x keeps settings and learned and added words; after th
 - Horizontal and vertical key gaps are two settings; at 紧凑 rows sit closer and keys are taller.
 - Very long text is sent to the field in parts, no longer cut off.
 - An edge key's long-press row slides inward.
-- A **microphone** on the toolbar's right (asks for the voice pack when missing; not in password fields); space's long press is hold-to-talk by default, with a microphone hint once the voice pack is in.
+- Without the voice pack, the toolbar's **microphone** asks for it (no microphone in password fields); space's long press is hold-to-talk by default, with a microphone hint once the voice pack is in.
 - Long-press **屏蔽** works on English, stroke lookup, glide, handwriting, emoji and 拆字 candidates too: a blocked English word is no longer completed, predicted or corrected to; a sentence candidate is blocked whole.
 - The long-press list editor's dialog sits above the keyboard, and **完成** adds what you typed; a full list says so instead of dropping it.
 - New setting **拼音键字母大小写**: letters on Chinese keyboards always lower case, following Shift, or always upper case.
