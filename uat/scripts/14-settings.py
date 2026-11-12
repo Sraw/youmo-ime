@@ -993,13 +993,17 @@ def push_layouts_pack(d):
     def read(*p):
         with open(os.path.join(SCENE, *p), encoding="utf-8") as f:
             return f.read()
-    qwerty = read("layouts", "qwerty.xml").replace('name="26 键"', 'name="主题 26 键"') \
-        .replace('label="{case:q}" alt="{alt:q}" send="q"', 'label="{case:q}" alt="{alt:q}" send="commit:你好"')
-    k18 = read("layouts", "k18.xml").replace('name="18 键"', 'name="主题 18 键"')
+    def edit(text, old, new):
+        # a layout that changed under the script fails here, not as a wrong count in the dialog (q lost alt= once)
+        assert old in text, f"the app's layout no longer has {old!r}"
+        return text.replace(old, new, 1)
+    qwerty = edit(edit(read("layouts", "qwerty.xml"), 'name="26 键"', 'name="主题 26 键"'),
+                  'id="q" label="{case:q}" send="q"', 'id="q" label="{case:q}" send="commit:你好"')
+    k18 = edit(read("layouts", "k18.xml"), 'name="18 键"', 'name="主题 18 键"')
     layouts = {"qwerty.xml": qwerty, "k18.xml": k18, "k14.xml": "<keyboard/>"}
     p = os.path.join(tempfile.gettempdir(), f"uat-layouts-{d.port}.theme")
     with zipfile.ZipFile(p, "w") as z:
-        z.writestr("theme.xml", read("themes", "nord.xml").replace('name="nord"', 'name="uat-layouts"', 1))
+        z.writestr("theme.xml", edit(read("themes", "nord.xml"), 'name="nord"', 'name="uat-layouts"'))
         for n, t in layouts.items():
             z.writestr("layouts/" + n, t)
     push_download(d, p, "uat-layouts")
