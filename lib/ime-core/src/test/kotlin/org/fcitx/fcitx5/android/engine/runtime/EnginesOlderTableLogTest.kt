@@ -182,6 +182,23 @@ class EnginesOlderTableLogTest : EnginesFixture() {
         assertTrue(File(dir, Engines.TABLE_LOGS_READ).exists())
     }
 
+    // UAT PR-30: the first start after the upgrade has no text pack (every table's data throws), the record opened
+    // by a key all the same; the pack imported, the engine made anew (EngineBridge.close) reads the logs then
+    @Test
+    fun tablesWithoutTheirDataAreReadOnceTheyLoad() {
+        // 0.3.0's install: its table's log, no record yet
+        val dir = folder.newFolder("engine").also { File(FIXTURE, "engine/wubi.user").copyTo(File(it, "wubi.user")) }
+        val missing = { path: String -> if (path.startsWith(InputMethodCatalog.TABLE_DIR)) throw java.io.IOException("no text pack: $path") else load(path) }
+        Engines(missing, JvmFiles(dir), onError = { errors += it.toString() }, warmUps = { }, clock = clock).use { engines ->
+            engines.type(InputMethodCatalog.PINYIN, "ni")
+            engines.learnLog()
+        }
+        assertFalse(File(dir, Engines.TABLE_LOGS_READ).exists())
+        assertTrue(errors.any { "its table did not load" in it })
+        open(dir).use { assertEquals(listOf("好女"), it.wubi("vbvn")) }
+        assertTrue(File(dir, Engines.TABLE_LOGS_READ).exists())
+    }
+
     private companion object {
         const val FIXTURE = "src/test/resources/upgrade/v0.4.0-converted"
     }
