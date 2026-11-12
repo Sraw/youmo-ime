@@ -926,6 +926,11 @@ class Device:
     def visible(self, text, s, where="app", contains=False):
         """a node with this text whose centre is inside all its ancestors (not scrolled under a bar)"""
         pool = s.app() if where == "app" else s.ime() if where == "ime" else s.nodes
+        # an edge-to-edge page (API 35+) scrolls its rows under the system's navigation bar: a tap there is
+        # the bar's (seen: 按键圆角 at the page's foot, its dialog never opened)
+        # (the bar is systemui's, or the launcher's taskbar on API 36)
+        nav = [m.b[1] for m in s.nodes if m.pkg != PKG and m.rid in ("back", "home", "recent_apps")]
+        under = min(nav) if nav and where == "app" else None
         found = []
         for n in pool:
             if not (contains and (text in n.text or text in n.desc) or
@@ -938,7 +943,7 @@ class Device:
                 if a.cls in ("RecyclerView", "ListView", "ScrollView") and ok:
                     ok = a.b[1] + 20 <= y < a.b[3] - 20
                 a = a.parent
-            if ok:
+            if ok and (under is None or y < under):
                 found.append(n)
         # a category header and its row can carry the same title (词库与短语 → 用户词库): prefer the
         # one that is, or sits in, something clickable
