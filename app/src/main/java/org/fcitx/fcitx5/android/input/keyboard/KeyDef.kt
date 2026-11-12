@@ -183,7 +183,7 @@ open class KeyDef(
              * [actions] says (its KeyOutput's, the key's placeholders the keyboard's), shown as [labels]; those from [split] set apart, [inRow] under the finger first
              * as [Explicit]'s. Made as it opens ([BaseKeyboard.onPopupAction]); wired as [Named].
              */
-            class Resolved(val actions: List<KeyAction>, val labels: List<String>, val split: Int, val inRow: Int) : Keyboard()
+            class Resolved(val actions: List<KeyAction>, val labels: List<String>, val split: Int, val inRow: Int, val focus: Int = -1) : Keyboard()
 
             /** A named key's long press, the resolver's made as it opens: what [BaseKeyboard.wire] wires. */
             data class Named(val name: String) : Keyboard()

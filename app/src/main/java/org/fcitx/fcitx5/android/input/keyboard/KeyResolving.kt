@@ -108,11 +108,14 @@ internal class KeyResolving(private val board: Board) {
         if (kept.isEmpty()) return null
         val row = kept.count { it.first < items.inRow }
         val focus = kept.indexOfFirst { it.first == items.focus }
+        val own = kept.indexOfFirst { it.first == items.own }
         return KeyDef.Popup.Keyboard.Resolved(
             kept.map { it.second },
             kept.map { it.third },
             split = if (row == 0) kept.size else row,
-            inRow = if (row > 0 && focus in 0 until row) focus else -1,
+            // the row round the first where it is in it, else round its own middle, the first above it
+            inRow = if (row == 0) -1 else if (focus in 0 until row) focus else own.coerceIn(0, row - 1),
+            focus = focus,
         )
     }
 }

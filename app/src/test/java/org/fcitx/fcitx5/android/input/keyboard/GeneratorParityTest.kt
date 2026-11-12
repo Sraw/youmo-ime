@@ -9,7 +9,6 @@ import org.fcitx.fcitx5.android.input.popup.PopupPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
-import org.fcitx.fcitx5.android.scene.keys.Commit
 import org.fcitx.fcitx5.android.scene.keys.DefaultList
 import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
@@ -34,8 +33,8 @@ class GeneratorParityTest {
         val shuangpin = ('2'..'9').associateWith { NineKeyLetters.NINE_SP.letters(NineKeyLetters.NINE_SP.codes[it - '2']).lowercase() }
         val variants = listOf(
             KeyboardVariant(KeyboardVariant.Form.Nine) to (false to false),
-            KeyboardVariant(KeyboardVariant.Form.Nine, KeyboardVariant.Language.English) to (true to false),
-            KeyboardVariant(KeyboardVariant.Form.Nine, KeyboardVariant.Language.Shuangpin, shuangpin) to (false to true),
+            KeyboardVariant(KeyboardVariant.Form.Nine) to (true to false),
+            KeyboardVariant(KeyboardVariant.Form.Nine, shuangpin) to (false to true),
         )
         for ((variant, flags) in variants) for (d in '2'..'9') {
             val letters = T9Keyboard.lettersOn(d, NineKeyLetters.STANDARD, flags.first, flags.second)
@@ -44,16 +43,8 @@ class GeneratorParityTest {
         }
     }
 
-    @Test
-    fun theNineKeysOneKeepsItsSymbolsAsTheyAre() {
-        for (english in listOf(false, true)) {
-            val before = T9Keyboard.onePopup(english, NineKeySymbols.STANDARD)!!
-            val variant = KeyboardVariant(KeyboardVariant.Form.Nine, if (english) KeyboardVariant.Language.English else KeyboardVariant.Language.Pinyin)
-            val after = KeyDefaults.nine('1', variant)
-            assertEquals(before.items.toList(), after.symbols.map { it.text })
-            assertEquals(before.asIs, after.symbols.all { it.commit == Commit.AsIs })
-        }
-    }
+    // 九键 1: none now, the old one's (as is, English's its own) no longer the defaults (用户 2026-11-11: one list,
+    // through the punctuation); its old view's goes in S6
 
     @Test
     fun theGroups() {

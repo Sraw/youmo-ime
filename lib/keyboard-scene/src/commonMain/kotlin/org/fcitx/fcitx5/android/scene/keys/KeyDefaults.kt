@@ -32,9 +32,14 @@ data class NodeFacts(
  */
 object KeyDefaults {
 
-    /** 九键's symbols above a digit's letters, by digit; 1's typed as they are (D7: its digit a keypad's). */
+    /**
+     * 九键's symbols above a digit's letters, by digit, on every input method alike (用户 2026-11-11: 以拼音为准, no
+     * English of its own). Written as the punctuation maps them from, as ，'s are: shown and typed as Chinese
+     * punctuation has them (`^` ……, `\` 、, `"` “ ” in turn), as they are in English or with it off. 1's digit a
+     * keypad's (D7).
+     */
     val NINE_SYMBOLS: Map<Char, List<String>> = mapOf(
-        '1' to listOf("…", "：", "；", "~", ".", "-", "@", "、", "“", "”"),
+        '1' to listOf("^", ":", ";", "~", ".", "-", "@", "\\", "\""),
         '2' to listOf("@", "!", "\""),
         '3' to listOf("+", "-"),
         '4' to listOf("=", "/"),
@@ -44,9 +49,6 @@ object KeyDefaults {
         '8' to listOf("?"),
         '9' to listOf(":", "'"),
     )
-
-    /** English 九键's 1: the marks a word wants besides the column's, none full width. */
-    val ENGLISH_ONE_SYMBOLS = listOf(":", ";", "\"", "(", ")", "@", "&", "/", "*", "~")
 
     /** The 14 keys' corners, group by group (digits a keypad's, then marks); the 18's. */
     val CORNERS14 = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "~", "!", "@", "?")
@@ -122,15 +124,11 @@ object KeyDefaults {
 
     /**
      * Digit key [digit]'s on the nine keys: a row of its letters' capitals, the digit, its letters (A B C 2 a b c),
-     * the digit first, a keypad's; its symbols above. 1's: the digit, then its marks as they are.
+     * the digit first, a keypad's; its symbols above. 1's: the digit, then its marks.
      */
     fun nine(digit: Char, variant: KeyboardVariant): DefaultList {
         val keypad = Item(digit.toString(), Commit.Keypad(digit))
-        if (digit == '1') {
-            val english = variant.language == KeyboardVariant.Language.English
-            val marks = if (english) ENGLISH_ONE_SYMBOLS else NINE_SYMBOLS.getValue('1')
-            return DefaultList(listOf(keypad), marks.map { Item(it, Commit.AsIs) }, keypad)
-        }
+        if (digit == '1') return DefaultList(listOf(keypad), NINE_SYMBOLS.getValue('1').map(::Item), keypad)
         val letters = variant.nineLetters[digit].orEmpty()
         val row = letters.map { Item(it.uppercase()) } + keypad + letters.lowercase().map { Item(it.toString()) }
         return DefaultList(row, NINE_SYMBOLS[digit].orEmpty().map(::Item), keypad)

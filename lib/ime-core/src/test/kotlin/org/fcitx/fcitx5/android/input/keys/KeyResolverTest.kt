@@ -32,8 +32,8 @@ class KeyResolverTest {
 
     private val fragments: Map<String, Fragment> by lazy { mapOf("grouped-bottom" to (LayoutReader.fragment(SceneData.read("grouped-bottom.xml")) as Parsed.Ok).value) }
 
-    private fun resolver(board: String, form: Form, lists: KeyLists = KeyLists.Empty, slots: SwipeSlots = SwipeSlots.Default, language: KeyboardVariant.Language = KeyboardVariant.Language.Pinyin) =
-        KeyResolver(KeyboardVariant(form, language), lists, slots, DefaultMarks.nodes(layout(board), fragments))
+    private fun resolver(board: String, form: Form, lists: KeyLists = KeyLists.Empty, slots: SwipeSlots = SwipeSlots.Default) =
+        KeyResolver(KeyboardVariant(form), lists, slots, DefaultMarks.nodes(layout(board), fragments))
 
     private val zh = KeyState(punctuation = mapOf("." to "。", "," to "，", "\"" to "“"))
 
@@ -72,28 +72,22 @@ class KeyResolverTest {
     }
 
     @Test
-    fun nineOneIsAsIsItsDigitAKeypads() {
+    fun nineOneGoesThroughThePunctuationItsDigitAKeypads() {
         val r = resolver("nine", Form.Nine)
         val one = r.resolve(KeyId("t9/1"), zh)
         assertEquals(Item("1", Commit.Keypad('1')), one.first)
         val p = one.popup as KeyPopup.Items
         assertEquals(1, p.inRow)
-        // shown as typed, never the punctuation's
-        assertEquals(".", p.labels[5])
-        assertEquals(Commit.AsIs, p.items[5].commit)
-        // the user's symbols are as-is too, an added one as well
+        // shown as Chinese punctuation types it (用户 2026-11-11: 中英文标点还是要自动转换), as it is in English
+        assertEquals("。", p.labels[5])
+        assertEquals(Commit.AsKey, p.items[5].commit)
+        assertEquals(".", (r.resolve(KeyId("t9/1"), KeyState()).popup as KeyPopup.Items).labels[5])
+        // the user's symbols the same, an added one as well
         val lists = KeyLists.of(mapOf(KeyId("t9/1") to UserList(false, listOf(".", "§"), First.Literal("."))))
         val set = resolver("nine", Form.Nine, lists).resolve(KeyId("t9/1"), zh)
-        assertEquals(Item(".", Commit.AsIs), set.first)
-        assertEquals(listOf(Commit.Keypad('1'), Commit.AsIs, Commit.AsIs), (set.popup as KeyPopup.Items).items.map { it.commit })
-    }
-
-    @Test
-    fun englishNineOnesDefaultIsItsOwnTheUsersShared() {
-        val en = resolver("nine", Form.Nine, language = KeyboardVariant.Language.English)
-        assertEquals(":", items(en.resolve(KeyId("t9/1"), KeyState()).popup)[1])
-        val lists = KeyLists.of(mapOf(KeyId("t9/1") to UserList(false, listOf("@"))))
-        assertEquals(listOf("1", "@"), items(resolver("nine", Form.Nine, lists, language = KeyboardVariant.Language.English).resolve(KeyId("t9/1"), KeyState()).popup))
+        assertEquals(Item("."), set.first)
+        assertEquals("。", set.firstShown)
+        assertEquals(listOf(Commit.Keypad('1'), Commit.AsKey, Commit.AsKey), (set.popup as KeyPopup.Items).items.map { it.commit })
     }
 
     @Test
@@ -174,10 +168,10 @@ class KeyResolverTest {
 
     @Test
     fun aKeysDefaultsOnEachVariant() {
-        val variants = listOf(KeyboardVariant(Form.Nine), KeyboardVariant(Form.Nine, KeyboardVariant.Language.English))
-        val (pinyin, english) = resolver("nine", Form.Nine).defaultsOn(KeyId("t9/1"), variants)
-        assertEquals("…", pinyin!!.symbols.first().text)
-        assertEquals(":", english!!.symbols.first().text)
+        val variants = listOf(KeyboardVariant(Form.Nine), KeyboardVariant(Form.Nine, KeyboardVariant.STANDARD_NINE + ('2' to "abc;")))
+        val (pinyin, shuangpin) = resolver("nine", Form.Nine).defaultsOn(KeyId("t9/2"), variants)
+        assertEquals(listOf("A", "B", "C", "2", "a", "b", "c"), pinyin!!.row.map { it.text })
+        assertEquals(listOf("A", "B", "C", ";", "2", "a", "b", "c", ";"), shuangpin!!.row.map { it.text })
     }
 
     @Test

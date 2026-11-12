@@ -36,7 +36,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * One key the same on every keyboard (060-keys-unify §6.2, UAT KB-72–78): ，'s long press, its edit and its
+ * One key the same on every keyboard (060-keys-unify §6.2, UAT KB-73–79): ，'s long press, its edit and its
  * first; the nine keys' 1 and 5 by input method; 注音九键's ˉ and its slot r4c4, which is ，.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -121,7 +121,7 @@ class KeysEverywhereUatTest {
     private val comma = listOf(".", "?", "!", ":", ";", "\"", "'", "(", ")", "~")
 
     @Test
-    @Uat("KB-72")
+    @Uat("KB-73")
     fun commaIsOneKey() {
         for ((board, h) in everyComma(zh)) {
             val keys = h.named("fn/comma")
@@ -132,7 +132,7 @@ class KeysEverywhereUatTest {
     }
 
     @Test
-    @Uat("KB-73")
+    @Uat("KB-74")
     fun commaEditedOnceEverywhere() {
         val edited = comma - "~" + "…"
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("fn/comma") to UserList(false, edited))).serialize())
@@ -144,7 +144,7 @@ class KeysEverywhereUatTest {
     }
 
     @Test
-    @Uat("KB-74")
+    @Uat("KB-75")
     fun commaFirstDrawnAndTyped() {
         prefs.setWays(up = true, down = true)
         prefs.set(internal.keySwipes, SwipeSlots.Default.with("fn/comma", up = true, SwipeSlot.First).serialize())
@@ -158,15 +158,47 @@ class KeysEverywhereUatTest {
         }
     }
 
+    // held and let go where it opened: its first typed, focused as it opens wherever it is in the list (a first
+    // above the row opened on, not the row's middle)
     @Test
     @Uat("KB-75")
-    fun nineKeysOneAsIsEverywhereAndSharedOnceEdited() {
+    fun heldAndLetGoTypesTheFirst() {
+        fun first(id: String, symbols: List<String>, first: String) =
+            prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId(id) to UserList(false, symbols, First.Literal(first)))).serialize())
+        // in the row
+        first("t9/5", listOf("#", "/"), "k")
         var h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)
-        // as it is: a half-width . whatever the punctuation, not the engine's 。
-        h.longPressTo(h.nineKey("1"), "1", ".")
-        assertEquals(".", h.field.text.toString())
+        assertEquals("k", h.held(h.nineKey("5")).second)
+        // a symbol above a row
+        first("t9/5", listOf("#", "/"), "/")
+        h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)
+        h.api.calls.clear()
+        assertEquals("/", h.held(h.nineKey("5")).second)
+        assertTrue(h.sent().toString(), "key=/," in h.sent().last())
+        // a key of no row
+        first("full/q", listOf("1", "Q", "‰"), "Q")
+        h = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.FULL))
+        h.api.calls.clear()
+        assertEquals("Q", h.held(h.named("full/q").single()).second)
+        assertTrue(h.sent().toString(), "key=Q," in h.sent().last())
+    }
+
+    @Test
+    @Uat("KB-76")
+    fun nineKeysOneThroughThePunctuationEverywhereAndSharedOnceEdited() {
+        // Chinese punctuation on: shown as it types, 。, sent as the key . the engine maps (用户 2026-11-11)
+        var h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS, punctuation = zh)
+        val one = listOf("1", "^", ":", ";", "~", ".", "-", "@", "\\", "\"")
+        assertEquals(one.map { zh[it] ?: it }.sorted(), h.longPress(h.nineKey("1")).sorted())
+        h.api.calls.clear()
+        h.longPressTo(h.nineKey("1"), "1", "。")
+        assertTrue(h.sent().toString(), "key=.," in h.sent().last())
+        // English's the same list (no case of its own), as English types it
         h = harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS))
-        assertEquals((listOf("1") + ":;\"()@&/*~".map(Char::toString)).sorted(), h.longPress(h.nineKey("1")).sorted())
+        assertEquals(one.sorted(), h.longPress(h.nineKey("1")).sorted())
+        h.api.calls.clear()
+        h.longPressTo(h.nineKey("1"), "1", ".")
+        assertTrue(h.sent().toString(), "key=.," in h.sent().last())
         // changed once on pinyin's: English's the same (M3), its 1 kept
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("t9/1") to UserList(false, listOf(".", "@")))).serialize())
         h = harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS))
@@ -174,17 +206,18 @@ class KeysEverywhereUatTest {
     }
 
     @Test
-    @Uat("KB-76")
+    @Uat("KB-77")
     fun nineKeysFiveSymbolsSharedLettersByInputMethod() {
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("t9/5") to UserList(false, listOf("#", "(", ")", "%")))).serialize())
         val pinyin = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS).let { it.longPress(it.nineKey("5")) }
         assertTrue(pinyin.toString(), pinyin.containsAll(listOf("J", "K", "L", "5", "j", "k", "l", "%")))
+        // English's pinyin's: its capitals too
         val english = harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)).let { it.longPress(it.nineKey("5")) }
-        assertTrue(english.toString(), english.containsAll(listOf("j", "k", "l", "5", "%")))
+        assertEquals(pinyin.sorted(), english.sorted())
     }
 
     @Test
-    @Uat("KB-77")
+    @Uat("KB-78")
     fun zhuyinNinesToneAndSlot() {
         prefs.setWays(up = true, down = true)
         prefs.set(internal.keySwipes, SwipeSlots.Default.with("fn/comma", up = true, SwipeSlot.First).serialize())
@@ -222,7 +255,7 @@ class KeysEverywhereUatTest {
 
     // ˉ's list turned off: no popup, its up to nothing a tap (ˉ), as the resolver has it
     @Test
-    @Uat("KB-77")
+    @Uat("KB-78")
     fun zhuyinNinesToneOff() {
         prefs.setWays(up = true, down = true)
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("zy9/tone-1") to UserList.Off)).serialize())
@@ -239,7 +272,7 @@ class KeysEverywhereUatTest {
     }
 
     @Test
-    @Uat("KB-78")
+    @Uat("KB-79")
     fun fourteenKeysQwFirstDrawnAndTyped() {
         prefs.setWays(up = true, down = true)
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("g14/qw") to UserList(false, listOf("!"), First.Literal("!")))).serialize())

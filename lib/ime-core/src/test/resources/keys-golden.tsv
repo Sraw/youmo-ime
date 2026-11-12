@@ -279,8 +279,8 @@ fn/return	english-full	default	-	-	-	-
 fn/return	english-full	zh	-	-	-	-
 fn/return	english-full	shift	-	-	-	-
 fn/return	english-full	roots	-	-	-	-
-t9/1	pinyin-nine	default	1# | …= ：= ；= ~= .= -= @= 、= “= ”=	1#	s:1	-
-t9/1	pinyin-nine	zh	1# | …= ：= ；= ~= .= -= @= 、= “= ”=	1#	s:1	-
+t9/1	pinyin-nine	default	1# | ^ : ; ~ . - @ \ "	1#	s:1	-
+t9/1	pinyin-nine	zh	1# | ^ ： ； ～ 。 - @ \ “	1#	s:1	-
 t9/2	pinyin-nine	default	A B C 2# a b c | @ ! "	2#	s:2	i:content-copy
 t9/2	pinyin-nine	zh	A B C 2# a b c | @ ！ “	2#	s:2	i:content-copy
 t9/3	pinyin-nine	default	D E F 3# d e f | + -	3#	s:3	-
@@ -315,8 +315,8 @@ fn/lang	pinyin-nine	default	-	-	-	-
 fn/lang	pinyin-nine	zh	-	-	-	-
 fn/return	pinyin-nine	default	-	-	-	-
 fn/return	pinyin-nine	zh	-	-	-	-
-t9/1	shuangpin-nine	default	1# | …= ：= ；= ~= .= -= @= 、= “= ”=	1#	s:1	-
-t9/1	shuangpin-nine	zh	1# | …= ：= ；= ~= .= -= @= 、= “= ”=	1#	s:1	-
+t9/1	shuangpin-nine	default	1# | ^ : ; ~ . - @ \ "	1#	s:1	-
+t9/1	shuangpin-nine	zh	1# | ^ ： ； ～ 。 - @ \ “	1#	s:1	-
 t9/2	shuangpin-nine	default	A B C 2# a b c | @ ! "	2#	s:2	i:content-copy
 t9/2	shuangpin-nine	zh	A B C 2# a b c | @ ！ “	2#	s:2	i:content-copy
 t9/3	shuangpin-nine	default	D E F 3# d e f | + -	3#	s:3	-
@@ -351,8 +351,8 @@ fn/lang	shuangpin-nine	default	-	-	-	-
 fn/lang	shuangpin-nine	zh	-	-	-	-
 fn/return	shuangpin-nine	default	-	-	-	-
 fn/return	shuangpin-nine	zh	-	-	-	-
-t9/1	english-nine	default	1# | := ;= "= (= )= @= &= /= *= ~=	1#	s:1	-
-t9/1	english-nine	zh	1# | := ;= "= (= )= @= &= /= *= ~=	1#	s:1	-
+t9/1	english-nine	default	1# | ^ : ; ~ . - @ \ "	1#	s:1	-
+t9/1	english-nine	zh	1# | ^ ： ； ～ 。 - @ \ “	1#	s:1	-
 t9/2	english-nine	default	A B C 2# a b c | @ ! "	2#	s:2	i:content-copy
 t9/2	english-nine	zh	A B C 2# a b c | @ ！ “	2#	s:2	i:content-copy
 t9/3	english-nine	default	D E F 3# d e f | + -	3#	s:3	-

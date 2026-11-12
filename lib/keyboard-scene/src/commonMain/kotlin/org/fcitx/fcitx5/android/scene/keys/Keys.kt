@@ -65,18 +65,18 @@ data class DefaultList(
     val items: List<Item> get() = row + symbols
 }
 
-/** A keyboard as built: what its keys' rows are made for, fixed while it shows. */
+/**
+ * A keyboard as built: what its keys' rows are made for, fixed while it shows. No language: every input method's
+ * keys have the same lists (用户 2026-11-11: 以拼音为准, English no case of its own); only 双拼's letters differ.
+ */
 data class KeyboardVariant(
     val form: Form,
-    val language: Language = Language.Pinyin,
     /** A nine key's letters by its digit (2 to 9), as the input method puts them (双拼's NINE_SP). */
     val nineLetters: Map<Char, String> = STANDARD_NINE,
     /** 双拼 of a scheme typing `;` (微软's ing): the 18 keys' L group has it; else the group is L alone. */
     val semicolon: Boolean = false,
 ) {
     enum class Form { Full, Nine, Grouped14, Grouped18, ZhuyinFull, ZhuyinNine, Handwriting, Number, Panel }
-
-    enum class Language { Pinyin, Shuangpin, English, Zhuyin, Table, Handwriting }
 
     companion object {
         val STANDARD_NINE: Map<Char, String> = mapOf(

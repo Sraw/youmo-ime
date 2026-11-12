@@ -406,6 +406,10 @@ abstract class BaseKeyboard(
     @VisibleForTesting
     internal fun keyResolver(): KeyResolver? = resolving.resolver()
 
+    /** The named keys' long presses and swipes as they open now: what a test compares with what they type. */
+    @VisibleForTesting
+    internal val resolvedKeys: KeyResolving get() = resolving
+
     /** The nine keys' letters as this keyboard has them (a user's own): null for the language's. */
     protected open val keysNineLetters: Map<Char, String>? get() = null
 
@@ -890,8 +894,12 @@ abstract class BaseKeyboard(
     private var keysPunctuation: Map<String, String> = emptyMap()
 
     @CallSuper
+    // the keys' long presses, corners and bubbles show what they type: as the punctuation maps it now, drawn again
+    // as it changes (用户 2026-11-11: 选择时的也要一起变), every keyboard alike
     open fun onPunctuationUpdate(mapping: Map<String, String>) {
+        if (mapping == keysPunctuation) return
         keysPunctuation = mapping
+        canvas?.invalidateScene()
     }
 
     open fun onInputMethodUpdate(ime: InputMethodEntry) {

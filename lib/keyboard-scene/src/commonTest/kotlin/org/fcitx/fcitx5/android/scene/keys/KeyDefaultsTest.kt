@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.scene.keys
 
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Form
-import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Language
 import org.fcitx.fcitx5.android.scene.layout.Popup
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,18 +26,17 @@ class KeyDefaultsTest {
     }
 
     @Test
-    fun nineOnesMarksAreTypedAsTheyAre() {
+    fun nineOnesMarksGoThroughThePunctuation() {
         val one = KeyDefaults.nine('1', nine)
         assertEquals(Item("1", Commit.Keypad('1')), one.first)
-        assertEquals(listOf("…", "：", "；", "~", ".", "-", "@", "、", "“", "”"), one.symbols.map { it.text })
-        assertEquals(setOf<Commit>(Commit.AsIs), one.symbols.map { it.commit }.toSet())
-        val english = KeyDefaults.nine('1', KeyboardVariant(Form.Nine, Language.English))
-        assertEquals(listOf(":", ";", "\"", "(", ")", "@", "&", "/", "*", "~"), english.symbols.map { it.text })
+        // as the punctuation maps them from (… 、 “ as Chinese punctuation has them), typed as keys, as ，'s are
+        assertEquals(listOf("^", ":", ";", "~", ".", "-", "@", "\\", "\""), one.symbols.map { it.text })
+        assertEquals(setOf<Commit>(Commit.AsKey), one.symbols.map { it.commit }.toSet())
     }
 
     @Test
     fun shuangpinsNineLettersComeFromTheVariant() {
-        val sp = KeyboardVariant(Form.Nine, Language.Shuangpin, KeyboardVariant.STANDARD_NINE + ('7' to "pqrs;"))
+        val sp = KeyboardVariant(Form.Nine, KeyboardVariant.STANDARD_NINE + ('7' to "pqrs;"))
         assertEquals(listOf("P", "Q", "R", "S", ";", "7", "p", "q", "r", "s", ";"), KeyDefaults.nine('7', sp).row.map { it.text })
     }
 

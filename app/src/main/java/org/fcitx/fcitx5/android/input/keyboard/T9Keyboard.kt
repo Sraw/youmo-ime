@@ -90,7 +90,7 @@ import splitties.views.dsl.core.add
  * the engine puts in as that letter typed as itself and nothing else; its preview shows the letter.
  * Its long press offers a row of its letters in capitals, the digit and its letters (A B C 2 a b
  * c), the one chosen committed as it is after what is typed, and in rows above its symbols
- * ([NineKeySymbols]), typed as the full keyboard's long press types them (1's as they are).
+ * (the resolver's, KeyDefaults.NINE_SYMBOLS by default), typed as the full keyboard's long press types them, 1's too.
  *
  * A glide across the digit keys ([GlideInput], the setting on) is read as full pinyin's, each
  * key's letters on it: the engine types the reading's letters as themselves.
@@ -303,10 +303,9 @@ class T9Keyboard(
         /**
          * What [action] from [source] types: a digit key's press [MultiTap] reads at [time]
          * through [letters]; a letter or digit of its long press committed as it is; 1, while nothing is [composing],
-         * punctuation ([ONE]); anything else resets [tap] and types as it is: a symbol of 2 to 9's
+         * punctuation ([ONE]); anything else resets [tap] and types as it is: a symbol of 1 to 9's
          * long press goes to the engine as the full keyboard's do (the first candidate, then the
-         * mark Chinese punctuation maps it to, quotes in turn, brackets paired), 1's come
-         * committed as they are already.
+         * mark Chinese punctuation maps it to, quotes in turn, brackets paired; 用户 2026-11-11: 1's too).
          */
         internal fun resolve(
             action: KeyAction,

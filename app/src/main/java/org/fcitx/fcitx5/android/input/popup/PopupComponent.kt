@@ -341,6 +341,7 @@ class PopupComponent :
         val split: Int
         var asIs = false
         var inRow = -1
+        var focus = -1
         var actions: List<KeyAction>? = null
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
@@ -363,6 +364,7 @@ class PopupComponent :
                 keys = labels
                 split = keyboard.split
                 inRow = keyboard.inRow
+                focus = keyboard.focus
                 actions = keyboard.actions
             }
             // made as it opens (BaseKeyboard.onPopupAction): none here is no list now
@@ -387,6 +389,7 @@ class PopupComponent :
             asIs,
             inRow,
             actions,
+            opensOn = focus,
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
             scenes = scenes,
         )

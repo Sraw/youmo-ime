@@ -11,6 +11,7 @@ import android.graphics.Point
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowInsets
+import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
@@ -91,23 +92,8 @@ object KeyboardArea {
      */
     fun screens(ctx: Context): Pair<Screen, Screen> {
         val density = ctx.resources.displayMetrics.density
-        val sdk = Build.VERSION.SDK_INT
-        if (sdk >= Build.VERSION_CODES.R) {
-            // one ask of the window manager: the display as held now, its bars and cutout
-            val m = ctx.windowManager.maximumWindowMetrics
-            val w = m.bounds.width()
-            val h = m.bounds.height()
-            if (sdk >= Build.VERSION_CODES.VANILLA_ICE_CREAM) return screensOf(w, h, density, NavBar.NONE, NavBar.NONE, 0, roundDp = true)
-            val n = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
-            val c = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.displayCutout())
-            val nowLandscape = w > h
-            // as held now, the bar measured: at the bottom, or at a side
-            val now = NavBar(n.bottom, n.left + n.right)
-            val mode = Settings.Secure.getInt(ctx.contentResolver, NAVIGATION_MODE, 0)
-            val other = otherBar(now, nowLandscape, density, mode) { NavBar.of(!nowLandscape, minOf(w, h), density) }
-            val cutout = if (nowLandscape) c.left + c.right else c.top + c.bottom
-            return screensOf(w, h, density, now, other, cutout, roundDp = true)
-        }
+        // the check as is, not through a local: lint's NewApi reads no other (a release build's lintVital failed)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return measured(ctx, density)
         @Suppress("DEPRECATION")
         val real = Point().also { ctx.windowManager.defaultDisplay.getRealSize(it) }
         val res = Resources.getSystem()
@@ -115,6 +101,24 @@ object KeyboardArea {
         val nowLandscape = real.x > real.y
         fun bar(landscape: Boolean) = if (shown) NavBar.of(landscape, minOf(real.x, real.y), density) else NavBar.NONE
         return screensOf(real.x, real.y, density, bar(nowLandscape), bar(!nowLandscape), 0, roundDp = false)
+    }
+
+    // from API 30: one ask of the window manager, the display as held now, its bars and cutout
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun measured(ctx: Context, density: Float): Pair<Screen, Screen> {
+        val m = ctx.windowManager.maximumWindowMetrics
+        val w = m.bounds.width()
+        val h = m.bounds.height()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) return screensOf(w, h, density, NavBar.NONE, NavBar.NONE, 0, roundDp = true)
+        val n = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
+        val c = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.displayCutout())
+        val nowLandscape = w > h
+        // as held now, the bar measured: at the bottom, or at a side
+        val now = NavBar(n.bottom, n.left + n.right)
+        val mode = Settings.Secure.getInt(ctx.contentResolver, NAVIGATION_MODE, 0)
+        val other = otherBar(now, nowLandscape, density, mode) { NavBar.of(!nowLandscape, minOf(w, h), density) }
+        val cutout = if (nowLandscape) c.left + c.right else c.top + c.bottom
+        return screensOf(w, h, density, now, other, cutout, roundDp = true)
     }
 
     /**

@@ -50,8 +50,9 @@ object KeyListsMigration {
             val id = KeyId("t9/$d")
             // a key set by its name had its symbols there: t9_symbols no longer counted for it (I17)
             if (id in named) continue
-            val symbols = nine.symbols(d)
-            if (symbols != KeyDefaults.NINE_SYMBOLS[d].orEmpty()) lists[id] = UserList(off = false, symbols = symbols)
+            // what the user set (the old defaults, 1's full width and as is, are none: its default now is the one list
+            // through the punctuation)
+            if (!nine.isDefault(d)) lists[id] = UserList(off = false, symbols = nine.symbols(d))
         }
         val kept = lists.filterNot { (id, list) -> same(list, defaultOf(id)) }
         return Migrated(KeyLists.of(kept).serialize(), lost)

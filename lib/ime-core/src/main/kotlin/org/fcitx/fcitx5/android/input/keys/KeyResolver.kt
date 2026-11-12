@@ -35,9 +35,13 @@ data class KeyState(
     val spots: KeyMarks.Spots = KeyMarks.Spots(KeyMarks.At.SymbolDefault, KeyMarks.At.ShortcutDefault),
 )
 
-/** A key's long press as it opens: its [items], the first [inRow] of them the row, [focus] under the finger. */
+/**
+ * A key's long press as it opens: its [items], the first [inRow] of them the row, [focus] under the finger (the
+ * first, wherever it is: in the row, among the symbols), [own] the row's middle (its default's, the keypad digit
+ * or the corner; -1 with no row): where the row centres when the first is not in it.
+ */
 sealed interface KeyPopup {
-    data class Items(val items: List<Item>, val labels: List<String>, val inRow: Int, val focus: Int) : KeyPopup
+    data class Items(val items: List<Item>, val labels: List<String>, val inRow: Int, val focus: Int, val own: Int = -1) : KeyPopup
 
     /** A table's roots of the letter, shown alone. */
     data class Roots(val text: String) : KeyPopup
@@ -123,7 +127,7 @@ class KeyResolver(
         val popup = when {
             roots != null -> KeyPopup.Roots(roots)
             m == null -> null
-            else -> KeyPopup.Items(m.items, m.items.map { DefaultMarks.shown(it, state.punctuation) }, m.inRow, m.focus)
+            else -> KeyPopup.Items(m.items, m.items.map { DefaultMarks.shown(it, state.punctuation) }, m.inRow, m.focus, m.own)
         }
         val first = m?.first
         val shown = first?.let { DefaultMarks.shown(it, state.punctuation) }?.takeIf { it.isNotEmpty() }
@@ -168,7 +172,7 @@ class KeyResolver(
         else -> SceneMarks.content(slot.shortcut) ?: MarkContent.Empty
     }
 
-    private class Made(val items: List<Item>, val inRow: Int, val first: Item?, val focus: Int)
+    private class Made(val items: List<Item>, val inRow: Int, val first: Item?, val focus: Int, val own: Int)
 
     private fun make(id: KeyId, caps: Boolean): Made? {
         val d = defaultOf(id, caps)
@@ -184,7 +188,8 @@ class KeyResolver(
             First.Default -> defaultFirst(d, user, symbols, items)
         }
         val focus = first?.let(items::indexOf)?.takeIf { it >= 0 } ?: d?.focus?.takeIf { it < items.size } ?: 0
-        return Made(items, if (row.isEmpty()) -1 else row.size, first, focus)
+        val own = if (row.isEmpty()) -1 else d?.focus?.takeIf { it < row.size } ?: (row.size / 2)
+        return Made(items, if (row.isEmpty()) -1 else row.size, first, focus, own)
     }
 
     // the user's symbols as items: each committed as the default's item of its text is, else as the default's symbols are (§3.1)
