@@ -902,7 +902,7 @@
     <string name="theme_file_missing">你的某个主题缺了图片或字体文件（被删掉，或恢复的备份里没有），这个主题不再列出。重新导入它就能再用。</string>
     <string name="user_data_unreadable">部分你添加的内容（自定义短语、快速输入、标点表、主题）读取失败或无法就位。它们原样保留、不会被覆盖：这次暂时缺失或改用内置的。重启手机后再试。</string>
     <string name="user_data_not_settled">你添加的内容和设置这次无法就位，暂时不能修改、备份或恢复。重启手机后再试。</string>
-    <string name="learning_unkept">学到的词暂时无法保存：只记在内存里，输入法被关掉后就会丢失（以前存下的不受影响）。请确认手机存储空间够用，然后重启手机；仍然出现，请附上 开发者 → 实时日志 导出的日志报告问题。</string>
+    <string name="learning_unkept">学到的词暂时无法保存：只记在内存里，输入法被系统停止或手机重启后就会丢失（以前存下的不受影响）。请确认手机存储空间够用，然后重启手机；仍然出现，请附上 开发者 → 实时日志 导出的日志报告问题。</string>
     <string name="learning_unkept_locked">手机解锁前学到的词不会保存；解锁后照常保存。</string>
     <string name="split_keyboard">分体键盘</string>
     <string name="split_keyboard_auto">横屏且屏幕够宽时</string>

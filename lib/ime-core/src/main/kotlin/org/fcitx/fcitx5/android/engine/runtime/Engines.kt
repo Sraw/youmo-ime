@@ -120,7 +120,9 @@ class Engines(
     /**
      * Told once, at the first thing learned that did not reach the disk (no [userDir], the learning
      * record not opened, a write of it refused): what is learned from then on may live in memory
-     * alone, gone with the process, which the user is to be told ([LearnLog]).
+     * alone, gone with the process, which the user is to be told ([LearnLog]). Told once by each
+     * learning record opened (one more as the host is made anew, the record not opened put in memory):
+     * once a process is the app's to keep.
      */
     unkept: () -> Unit = {},
 ) : Closeable {

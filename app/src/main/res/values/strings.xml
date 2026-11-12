@@ -925,7 +925,7 @@
     <string name="theme_file_missing">A picture or font of one of your themes is gone (deleted, or not in a backup restored): that theme is not listed. Import it again to use it.</string>
     <string name="user_data_unreadable">Some of what you added (custom phrases, quick input, your punctuation table, themes) could not be read or put in place. It is left as it was and not saved over: for now it is missing or the built-in one is used. Restart the phone to try again.</string>
     <string name="user_data_not_settled">What you added and your settings could not be put in place this time, so they cannot be changed, backed up or restored now. Restart the phone to try again.</string>
-    <string name="learning_unkept">Words learned cannot be saved for now: they are kept in memory only and are lost once the keyboard is closed (what was saved before is not affected). Make sure the phone has free storage, then restart it; if this shows again, report it with the log from Developer → Real-time logs.</string>
+    <string name="learning_unkept">Words learned cannot be saved for now: they are kept in memory only and are lost once the system stops the keyboard or the phone restarts (what was saved before is not affected). Make sure the phone has free storage, then restart it; if this shows again, report it with the log from Developer → Real-time logs.</string>
     <string name="learning_unkept_locked">Words learned before the phone is unlocked are not saved; once it is unlocked, they are saved as usual.</string>
     <string name="split_keyboard">Split keyboard</string>
     <string name="split_keyboard_auto">On a wide screen held sideways</string>

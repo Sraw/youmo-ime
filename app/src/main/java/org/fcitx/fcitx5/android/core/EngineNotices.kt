@@ -68,21 +68,29 @@ object EngineNotices {
     // what toldUntilSeen has on its way and not yet seen
     private val telling: MutableSet<Int> = ConcurrentHashMap.newKeySet()
 
-    // what failedOnce said this process
-    private val toldOnce: MutableSet<Int> = ConcurrentHashMap.newKeySet()
+    // what failedOnce and toldOnce said this process
+    private val saidOnce: MutableSet<Int> = ConcurrentHashMap.newKeySet()
 
     /**
      * [failedUntilSeen], once a process: what several places may each find (the user's added files not
      * read, A4), told once till the process restarts.
      */
     fun failedOnce(@StringRes id: Int) {
-        if (toldOnce.add(id)) failedUntilSeen(id)
+        if (saidOnce.add(id)) failedUntilSeen(id)
+    }
+
+    /**
+     * [toldUntilSeen], once a process: news, no failure, what may be found again and again (learning
+     * before the first unlock, kept in memory alone as meant), told once till the process restarts.
+     */
+    fun toldOnce(@StringRes id: Int) {
+        if (saidOnce.add(id)) toldUntilSeen(id)
     }
 
     // a test's process outlives the run it stands for: what failedOnce said, and what a test with no
     // keyboard left waiting to be seen (else said with the next test's). On the main thread
     internal fun forgetToldOnce() {
-        toldOnce.clear()
+        saidOnce.clear()
         telling.clear()
         unseen.clear()
     }

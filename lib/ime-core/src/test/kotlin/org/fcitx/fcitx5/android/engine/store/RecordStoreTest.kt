@@ -106,17 +106,19 @@ class RecordStoreTest {
         assertEquals(mapOf("a" to 1), read())
     }
 
-    // an import's words in one write: the same bytes as one at a time, one that does not fit left out
+    // an import's words in one write: the same bytes as one at a time, one that does not fit left out,
+    // and so not all of them written (what LearnLog tells as learned not kept)
     @Test
     fun recordsAppendedAllAtOnceAreTheLogOneAtATimeWouldBe() {
         val errors = ArrayList<IOException>()
         val kept = HashMap<String, Int>()
         store(kept, errors).use { s ->
-            s.appendAll(listOf(added("a"), format.record(0) { writeUTF("x") }, added("b")))
+            assertFalse(s.appendAll(listOf(added("a"), format.record(0) { writeUTF("x") }, added("b"))))
+            assertTrue(s.appendAll(listOf(added("c"))))
         }
         assertEquals(1, errors.size)
-        assertArrayEquals(format.header() + added("a") + added("b"), file.readBytes())
-        assertEquals(mapOf("a" to 1, "b" to 1), read())
+        assertArrayEquals(format.header() + added("a") + added("b") + added("c"), file.readBytes())
+        assertEquals(mapOf("a" to 1, "b" to 1, "c" to 1), read())
     }
 
     @Test

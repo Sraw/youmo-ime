@@ -5,9 +5,7 @@
 package org.fcitx.fcitx5.android.core
 
 import android.text.TextPaint
-import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
-import androidx.core.os.UserManagerCompat
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -209,19 +207,20 @@ class EngineBridge {
     /**
      * What is learned not kept on the disk, whatever the cause (no [userDir], the record not opened,
      * a write of it refused): told once a process, on the keyboard. 0.5.2's fresh installs learned in
-     * memory alone for days and lost it all with the process, nothing said (061-userdict-loss). Before
-     * the first unlock that is as meant, the app restarting at it: said so; once unlocked (a phone
-     * that did not tell the app, say), as any other cause.
+     * memory alone for days and lost it all with the process, nothing said (061-userdict-loss).
      */
     private fun learningUnkept() {
         Timber.w("what is learned is not kept on the disk this run")
-        EngineNotices.failedOnce(unkeptNotice(FcitxApplication.getInstance().isDirectBootMode, UserManagerCompat.isUserUnlocked(appContext)))
+        sayUnkept(FcitxApplication.getInstance().isDirectBootMode)
     }
 
-    /** What [learningUnkept] says: the app in [directBoot] mode and the phone not yet [unlocked], that it is till then. */
-    @StringRes
-    internal fun unkeptNotice(directBoot: Boolean, unlocked: Boolean) =
-        if (directBoot && !unlocked) R.string.learning_unkept_locked else R.string.learning_unkept
+    /**
+     * In [directBoot] mode, as meant till the app restarts at the first unlock (unlocked already, in
+     * the moment before it exits, too): news that it is so. Otherwise a failure, what to do.
+     */
+    @VisibleForTesting
+    internal fun sayUnkept(directBoot: Boolean) =
+        if (directBoot) EngineNotices.toldOnce(R.string.learning_unkept_locked) else EngineNotices.failedOnce(R.string.learning_unkept)
 
     // credential-encrypted, unlike fcitx's home: what the user typed is not kept where it can be read
     // before the phone is first unlocked. Till then the engine learns in memory; the app restarts at unlock.

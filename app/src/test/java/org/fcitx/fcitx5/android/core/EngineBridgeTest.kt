@@ -8,7 +8,6 @@ import android.os.Looper
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
@@ -484,6 +483,24 @@ class EngineBridgeTest {
             }
         }
 
+        /**
+         * In direct boot mode (before the first unlock, or unlocked and the app not yet restarted) what is
+         * learned in memory alone is as meant: news, typed away, once a process; not the failure.
+         */
+        @Test
+        fun whatIsLearnedNotKeptBeforeTheUnlockIsNewsOnce() {
+            val said = sayer()
+            try {
+                bridge.sayUnkept(directBoot = true)
+                bridge.sayUnkept(directBoot = true)
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(listOf("${appContext.getString(R.string.learning_unkept_locked)} steady=false"), said)
+            } finally {
+                EngineNotices.sayer = null
+                EngineNotices.forgetToldOnce()
+            }
+        }
+
         // what is said on the keyboard, as said; with nothing told once yet
         private fun sayer(): MutableList<String> {
             EngineNotices.forgetToldOnce()
@@ -856,14 +873,6 @@ class EngineBridgeTest {
         assertFalse(bridge.shownAnew(LearningOp.Undo(1), "rime", done))
         assertTrue(bridge.shownAnew(LearningOp.Undo(1), InputMethodCatalog.ENGLISH, done))
     }
-
-    // what is learned not kept: before the first unlock, that it is till then; otherwise, what to do
-    @Test
-    fun whatIsLearnedNotKeptIsSaidAsThePhoneIs() = assertRows(
-        "before the first unlock: kept from the unlock on" to { assertEquals(R.string.learning_unkept_locked, bridge.unkeptNotice(directBoot = true, unlocked = false)) },
-        "unlocked, the app not told so: as any other cause" to { assertEquals(R.string.learning_unkept, bridge.unkeptNotice(directBoot = true, unlocked = true)) },
-        "any other cause" to { assertEquals(R.string.learning_unkept, bridge.unkeptNotice(directBoot = false, unlocked = true)) },
-    )
 
     @Test
     fun recentsAreClearedFromTheMinuteLearningWas() {
