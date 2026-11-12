@@ -188,6 +188,10 @@ gives the router the page size and English suggestions and the engines the rest 
 | Clipboard | Room database in `databases/` (`ClipboardManager`) | app |
 
 In direct-boot mode (before the first unlock) there is no `userDir`: the engine keeps what it
-learns in memory, and the app restarts into normal mode on unlock. A backup (`UserDataManager`)
+learns in memory, and the app restarts into normal mode on unlock. Whatever the cause of learning in
+memory (that, `files/engine` not made, `learn.log` not opened, a write of it refused), the first thing
+learned that does not reach the disk tells `Engines.unkept`, and the user is told once a process
+(`learning_unkept`, before the first unlock `learning_unkept_locked`; `EngineNotices.failedOnce`):
+0.5.2's fresh installs learned in memory alone for days, unseen, and lost it all with the process. A backup (`UserDataManager`)
 is one zip of `shared_prefs`, the clipboard database (without entries an app marked sensitive), the
 config, fcitx's data and the themes (as `external/config`, `external/data`, `external/theme` in the zip, where they always were), the rest of the external files dir and `files/engine/`: everything above but the read-only data.

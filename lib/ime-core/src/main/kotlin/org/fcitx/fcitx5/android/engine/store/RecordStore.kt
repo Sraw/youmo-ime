@@ -219,12 +219,13 @@ class RecordStore internal constructor(
 
     /**
      * Appends [records] as [append] does each, in one write: an import of many words is not a
-     * write per word (review R11 F3058). One that does not fit is left out and reported.
+     * write per word (review R11 F3058). One that does not fit is left out and reported. Whether
+     * all of them were written.
      */
-    fun appendAll(records: List<ByteArray>) {
-        val stream = out ?: return
+    fun appendAll(records: List<ByteArray>): Boolean {
+        val stream = out ?: return records.isEmpty()
         val kept = records.filter(::fits)
-        if (kept.isEmpty()) return
+        if (kept.isEmpty()) return records.isEmpty()
         val all = ByteArray(kept.sumOf { it.size })
         var at = 0
         kept.forEach { it.copyInto(all, at); at += it.size }
@@ -234,7 +235,7 @@ class RecordStore internal constructor(
         } catch (e: IOException) {
             onError(e)
             recover()
-            return
+            return false
         }
         val compacting = pending
         if (compacting != null) {
@@ -243,6 +244,7 @@ class RecordStore internal constructor(
         } else if (tooLong()) {
             compactDue()
         }
+        return kept.size == records.size
     }
 
     /** Compacts the log soon, as though it had grown long enough: one already being compacted is not compacted again. */

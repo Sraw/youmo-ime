@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import android.os.Looper
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.pack.PackStore
@@ -31,6 +33,7 @@ import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.host.EngineOptions
@@ -53,6 +56,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 import java.io.FileNotFoundException
@@ -428,6 +432,72 @@ class EngineBridgeTest {
                 dir.deleteRecursively()
             }
         }
+
+        /**
+         * As 0.5.2's fresh installs lost it (061-userdict-loss): words typed with no files/engine, the host
+         * made anew as after the process was killed, and the words are there; nothing said, all kept.
+         */
+        @Test
+        fun aFreshInstallsTypedWordsAreThereWhenTheHostIsMadeAnew() {
+            val dir = checkNotNull(bridge.userDir())
+            dir.deleteRecursively()
+            val said = sayer()
+            try {
+                typeEnglish("youmo")
+                bridge.close()
+                assertEquals(listOf("youmo"), LearnLog.replay(File(dir, LearnLog.FILE).readBytes()).enWords.keys.toList())
+                assertTrue(bridge.engines.englishWords().any { it.text == "youmo" && it.kind == UserWord.Kind.LEARNED })
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(emptyList<String>(), said)
+            } finally {
+                EngineNotices.sayer = null
+                bridge.close()
+                dir.deleteRecursively()
+            }
+        }
+
+        /**
+         * What is learned in memory alone, whatever the cause (here files/engine cannot be made, a file in
+         * its place), is said on the keyboard as a failure, what to do with it; once a process, not again
+         * with every word nor with the host made anew.
+         */
+        @Test
+        fun whatIsLearnedInMemoryAloneIsSaidOnTheKeyboardOnce() {
+            val dir = checkNotNull(bridge.userDir())
+            dir.deleteRecursively()
+            dir.writeText("")
+            val said = sayer()
+            try {
+                typeEnglish("youmo")
+                typeEnglish("youmo")
+                bridge.close()
+                typeEnglish("youmo")
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(listOf("${appContext.getString(R.string.learning_unkept)} steady=true"), said)
+                // learned for the run all the same
+                assertTrue(bridge.engines.englishWords().any { it.text == "youmo" })
+            } finally {
+                EngineNotices.sayer = null
+                EngineNotices.forgetToldOnce()
+                bridge.close()
+                dir.delete()
+            }
+        }
+
+        // what is said on the keyboard, as said; with nothing told once yet
+        private fun sayer(): MutableList<String> {
+            EngineNotices.forgetToldOnce()
+            val said = ArrayList<String>()
+            EngineNotices.sayer = EngineNotices.Sayer { message, steady -> said += "$message steady=$steady"; true }
+            return said
+        }
+
+        // [word] typed in English and committed with a space: learned
+        private fun typeEnglish(word: String) {
+            val engines = bridge.engines
+            word.forEach { engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.CHAR, it.code) }
+            assertEquals("$word ", engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.CHAR, ' '.code).commit)
+        }
         /** Taken, it says so: an Ink key goes out for what is shown. */
         @Test
         fun handwritingThatLoadsTakesTheInk() {
@@ -786,6 +856,14 @@ class EngineBridgeTest {
         assertFalse(bridge.shownAnew(LearningOp.Undo(1), "rime", done))
         assertTrue(bridge.shownAnew(LearningOp.Undo(1), InputMethodCatalog.ENGLISH, done))
     }
+
+    // what is learned not kept: before the first unlock, that it is till then; otherwise, what to do
+    @Test
+    fun whatIsLearnedNotKeptIsSaidAsThePhoneIs() = assertRows(
+        "before the first unlock: kept from the unlock on" to { assertEquals(R.string.learning_unkept_locked, bridge.unkeptNotice(directBoot = true, unlocked = false)) },
+        "unlocked, the app not told so: as any other cause" to { assertEquals(R.string.learning_unkept, bridge.unkeptNotice(directBoot = true, unlocked = true)) },
+        "any other cause" to { assertEquals(R.string.learning_unkept, bridge.unkeptNotice(directBoot = false, unlocked = true)) },
+    )
 
     @Test
     fun recentsAreClearedFromTheMinuteLearningWas() {

@@ -902,6 +902,8 @@
     <string name="theme_file_missing">你的某個主題缺了圖片或字型檔案（被刪掉，或還原的備份裡沒有），這個主題不再列出。重新匯入它就能再用。</string>
     <string name="user_data_unreadable">部分你新增的內容（自訂短語、快速輸入、標點表、主題）讀取失敗或無法就位。它們原樣保留、不會被覆蓋：這次暫時缺少或改用內建的。重新啟動手機後再試。</string>
     <string name="user_data_not_settled">你新增的內容和設定這次無法就位，暫時不能修改、備份或還原。重新啟動手機後再試。</string>
+    <string name="learning_unkept">學到的詞暫時無法儲存：只記在記憶體裡，輸入法被關掉後就會遺失（以前存下的不受影響）。請確認手機儲存空間足夠，然後重新啟動手機；仍然出現，請附上 開發人員 → 即時紀錄檔 匯出的紀錄檔回報問題。</string>
+    <string name="learning_unkept_locked">手機解鎖前學到的詞不會儲存；解鎖後照常儲存。</string>
     <string name="split_keyboard">分體鍵盤</string>
     <string name="split_keyboard_auto">橫屏且螢幕夠寬時</string>
     <string name="split_keyboard_always">總是</string>

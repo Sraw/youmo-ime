@@ -5,7 +5,9 @@
 package org.fcitx.fcitx5.android.core
 
 import android.text.TextPaint
+import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
+import androidx.core.os.UserManagerCompat
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -186,6 +188,7 @@ class EngineBridge {
             putAddresses = AddressStore::put,
             // logged rather than thrown, as EditingSession's: a debug build is also someone's daily keyboard
             offHostThread = if (BuildConfig.DEBUG) ({ Timber.e(IllegalStateException(it)) }) else null,
+            unkept = ::learningUnkept,
         ).also {
             it.useHabits = AppPrefs.getInstance().internal.useHabits.getValue()
             it.learning(null, BackupOp.SetAuto(AppPrefs.getInstance().internal.learningAutoBackup.getValue()))
@@ -202,6 +205,23 @@ class EngineBridge {
         Timber.w(e, "no traditional-to-simplified table: text read as it is")
         Simplifier.NONE
     }
+
+    /**
+     * What is learned not kept on the disk, whatever the cause (no [userDir], the record not opened,
+     * a write of it refused): told once a process, on the keyboard. 0.5.2's fresh installs learned in
+     * memory alone for days and lost it all with the process, nothing said (061-userdict-loss). Before
+     * the first unlock that is as meant, the app restarting at it: said so; once unlocked (a phone
+     * that did not tell the app, say), as any other cause.
+     */
+    private fun learningUnkept() {
+        Timber.w("what is learned is not kept on the disk this run")
+        EngineNotices.failedOnce(unkeptNotice(FcitxApplication.getInstance().isDirectBootMode, UserManagerCompat.isUserUnlocked(appContext)))
+    }
+
+    /** What [learningUnkept] says: the app in [directBoot] mode and the phone not yet [unlocked], that it is till then. */
+    @StringRes
+    internal fun unkeptNotice(directBoot: Boolean, unlocked: Boolean) =
+        if (directBoot && !unlocked) R.string.learning_unkept_locked else R.string.learning_unkept
 
     // credential-encrypted, unlike fcitx's home: what the user typed is not kept where it can be read
     // before the phone is first unlocked. Till then the engine learns in memory; the app restarts at unlock.

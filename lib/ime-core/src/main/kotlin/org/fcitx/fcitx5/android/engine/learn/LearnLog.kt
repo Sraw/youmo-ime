@@ -37,7 +37,10 @@ import java.util.concurrent.atomic.AtomicLong
  * replayed into [state] at [open], each commit and act of the user appended as one write and
  * applied as written. Folded in the [background] from the file's own bytes: what is older than
  * the cut ([LearnClock.cut]) becomes a snapshot, what is newer stays as it was written, for U-88
- * to take back. Without a [file] (no user directory, a test) it learns in memory alone.
+ * to take back. Without a [file] (no user directory, a test) it learns in memory alone. [unkept]
+ * is told once, at the first record applied that did not reach the disk (no file, one that did
+ * not open, a write refused): what is learned from then on may be gone with the process, which the
+ * user is to know (0.5.2's fresh installs learned in memory alone for days, unseen: 061-userdict-loss).
  */
 class LearnLog(
     private val file: LogFile?,
@@ -47,6 +50,7 @@ class LearnLog(
     private val compactAt: Long = RecordStore.DEFAULT_COMPACT_AT,
     // a seam for tests: folded only as it grows, not on each calendar day and start
     private val foldDaily: Boolean = true,
+    private val unkept: () -> Unit = {},
 ) : Closeable {
 
     var state = LearnState()
@@ -145,7 +149,7 @@ class LearnLog(
             return null
         }
         val newDay = newDay(commit.localDay)
-        store?.append(bytes)
+        tellIfUnkept(store?.append(bytes) == true)
         val befores = state.apply(commit)
         appended?.invoke(commit)
         changed()
@@ -293,7 +297,7 @@ class LearnLog(
             bytes += b
         }
         // one write for them all: a write per word took 100 000 words over a second on the fcitx thread (F3058, F3078)
-        store?.appendAll(bytes)
+        tellIfUnkept(bytes.isEmpty() || store?.appendAll(bytes) == true)
         for (record in kept) {
             // as a replay would: one failing is reported, the rest go on, and the listener is told (review-G NIT 2)
             applyOrKeep(state, record) { onError(IOException("a record not applied", it)) }
@@ -324,10 +328,20 @@ class LearnLog(
             return Put.TOO_LONG
         }
         val kept = store?.append(bytes) == true
+        tellIfUnkept(kept)
         state.apply(record)
         appended?.invoke(record)
         changed()
         return if (kept) Put.ON_DISK else Put.IN_MEMORY
+    }
+
+    private var toldUnkept = false
+
+    // a record about to be applied, [written] or not: the first not written told
+    private fun tellIfUnkept(written: Boolean) {
+        if (written || toldUnkept) return
+        toldUnkept = true
+        unkept()
     }
 
     /**

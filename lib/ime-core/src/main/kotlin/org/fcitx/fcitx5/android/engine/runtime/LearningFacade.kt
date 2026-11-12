@@ -62,6 +62,7 @@ internal class LearningFacade(
     private val first: (String) -> Int,
     addresses: () -> AddressData? = { null },
     putAddresses: (AddressData, merge: Boolean) -> Unit = { _, _ -> },
+    private val unkept: () -> Unit = {},
 ) {
     // the imported words (U-101): in the learning record, told to the user model
     val imports = ImportLayer(::learnLog, { lexicon.user() }, { lexicon.isBlockedWord(it) }, invalidate, learnClock)
@@ -81,7 +82,7 @@ internal class LearningFacade(
 
     /** The record, opened at its first use. */
     fun learnLog(): LearnLog = learnLog ?: run {
-        val log = LearnLog(userDir?.file(LearnLog.FILE), learnClock, onError = onError, background = compactions)
+        val log = LearnLog(userDir?.file(LearnLog.FILE), learnClock, onError = onError, background = compactions, unkept = unkept)
         learnLog = log
         // 0.4 stopped before it put an older build's learning in place (its mark left): told once, as none reads it
         // now; the mark left for a 0.4 put back
@@ -187,7 +188,7 @@ internal class LearningFacade(
     private fun notOpened(log: LearnLog, e: Exception) {
         onError(IOException("the learning record not opened", e))
         runCatching { log.close() }
-        learnLog = LearnLog(null, learnClock, onError = onError)
+        learnLog = LearnLog(null, learnClock, onError = onError, unkept = unkept)
     }
 
     // the learning backups (U-100, U-106; impl/streams/D-design.md): made every few typing days and when asked, listed, merged in when restored

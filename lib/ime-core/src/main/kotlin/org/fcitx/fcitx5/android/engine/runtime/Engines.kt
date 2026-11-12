@@ -117,6 +117,12 @@ class Engines(
      * given, this module's tests fail on one ([HostThread.ofTests]); the app gives its own.
      */
     private val offHostThread: ((String) -> Unit)? = HostThread.ofTests(),
+    /**
+     * Told once, at the first thing learned that did not reach the disk (no [userDir], the learning
+     * record not opened, a write of it refused): what is learned from then on may live in memory
+     * alone, gone with the process, which the user is to be told ([LearnLog]).
+     */
+    unkept: () -> Unit = {},
 ) : Closeable {
 
     private val hostThread = HostThread(offHostThread)
@@ -200,6 +206,7 @@ class Engines(
         first = { keyboards[pairs.shownSession(it)]?.first ?: 0 },
         addresses = addresses,
         putAddresses = putAddresses,
+        unkept = unkept,
     )
 
     private val words: LexiconFacade = LexiconFacade(lexicon, english, assets, tables, learner) { settings }
