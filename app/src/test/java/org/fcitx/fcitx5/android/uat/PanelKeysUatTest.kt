@@ -16,10 +16,12 @@ import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
+import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.input.picker.EmojiSearchUi
@@ -62,6 +64,8 @@ class PanelKeysUatTest {
     }
 
     private val written = "你好"
+
+    private val zh = mapOf("." to "。", "," to "，", "?" to "？", "!" to "！", ":" to "：", ";" to "；", "\"" to "“", "'" to "‘", "(" to "（", ")" to "）", "~" to "～")
 
     private fun harness(inputType: Int = InputType.TYPE_CLASS_TEXT): KeyboardHarness {
         made?.close()
@@ -168,20 +172,36 @@ class PanelKeysUatTest {
     fun punctuationLongPress() {
         // the same items; laid out from where the key is, so their order on the screen is not compared
         fun KeyboardHarness.held(name: String) = longPress(named(name)).sorted()
-        var h = harness()
+        // Chinese punctuation on: shown as it types (KB-83), so what is picked is what is typed
+        fun chinese() = harness().also { h ->
+            val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+            h.api.statusAreaCached = active
+            h.api.punctuationCached = zh
+            h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, zh))
+            h.idle()
+        }
+        var h = chinese()
         val comma = h.held("fn/comma")
         val period = h.held("fn/period")
-        assertTrue(comma.toString(), comma.size > 1)
-        h = harness()
+        assertTrue(comma.toString(), comma.size > 1 && "。" in comma)
+        h = chinese()
         h.emoticons()
         assertEquals(comma, h.held("fn/comma"))
         assertEquals(period, h.held("fn/period"))
-        h = harness()
+        h = chinese()
         h.emoji()
         assertEquals(period, h.held("fn/period"))
-        // as the letters' ，: picked, typed as the punctuation has it, not committed as the panel's own
-        h.longPress(h.named("fn/period"), period.last())
-        assertTrue(h.field.text.toString(), h.field.text.length > written.length)
+        // as the letters' ，: held and let go, its first typed as the punctuation has it and as it was shown
+        val key = h.named("fn/period")
+        val before = h.field.text.toString()
+        val f = h.finger(key, h.at(key))
+        h.advance(700)
+        f.move(h.at(key))
+        val focused = h.popupChoices().single { it.focused }.text
+        f.up(h.at(key))
+        h.idle()
+        assertEquals("，", focused)
+        assertEquals(before + focused, h.field.text.toString())
     }
 
     // a password field: a command that reads the field (复制, set on ⌫'s 上滑) not run from a panel either, as on
@@ -221,6 +241,24 @@ class PanelKeysUatTest {
         assertTrue(h.api.calls.toString(), "triggerUnicode()" in h.api.calls)
     }
 
+    // J2: the number pad's space held does what the letters' does
+    @Test
+    @Uat("PAN-28")
+    fun numberPadsSpaceHeldAsTheLetters() {
+        // a behaviour the fake host records (the default talks, with no voice pack here nothing)
+        prefs.set(AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior, SpaceLongPressBehavior.Enumerate)
+        fun held(inputType: Int): List<String> {
+            val h = harness(inputType)
+            h.api.calls.clear()
+            h.longPress(h.named("fn/space"))
+            h.idle()
+            return h.api.calls.toList()
+        }
+        val letters = held(InputType.TYPE_CLASS_TEXT)
+        assertTrue(letters.toString(), "enumerateIme(true)" in letters)
+        assertEquals(letters, held(InputType.TYPE_CLASS_NUMBER))
+    }
+
     // J3: ，'s list at the most a layer holds (32), every item on the screen, the last picked: the finger slid
     // from the item first under it, the popup's focus moving by PopupFocus.STEP, not by where its cells are
     private fun aLayerOf32() {
@@ -246,7 +284,7 @@ class PanelKeysUatTest {
     }
 
     @Test
-    @Uat("KB-81")
+    @Uat("KB-82")
     @Config(qualifiers = "w320dp-h568dp-port-xhdpi")
     fun aLayerOf32OnTheNarrowestOneHanded() {
         prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
@@ -254,7 +292,7 @@ class PanelKeysUatTest {
     }
 
     @Test
-    @Uat("KB-81")
+    @Uat("KB-82")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun aLayerOf32Landscape() {
         aLayerOf32()

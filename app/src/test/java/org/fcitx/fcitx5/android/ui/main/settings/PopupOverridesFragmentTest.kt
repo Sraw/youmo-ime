@@ -710,6 +710,17 @@ class PopupOverridesFragmentTest {
             assertEquals(KeyLists.HEADER, AppPrefs.getInstance().internal.keyLists.getValue())
         }
 
+        // review L2: 九键 1's editor starts from the keyboard's own list (KeyResolver.edit), not the views' old one
+        @Test
+        fun nineOnesEditorStartsFromTheStoredDefault() {
+            open()
+            click(R.string.shortcut_page_nine)
+            val d = dialogOf("1")
+            val items = listOf("^", ":", ";", "~", ".", "-", "@", "\\", "\"")
+            val said = KeyboardHarness.all(d.window!!.decorView).filter { it.hasOnClickListeners() }.mapNotNull { it.contentDescription?.toString() }.filter { it in items }.toList()
+            assertEquals(items, said)
+        }
+
         // review 4: a key turned off is said so, and stays off when only a slot is changed
         @Test
         fun anOffKeyIsSaidSoAndKeptOff() {

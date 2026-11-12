@@ -3,7 +3,7 @@ faces: [1=.,?!/1, 2=abc/2, 3=def/3, backspace=/null, 4=ghi/4, 5=jkl/5, 6=mno/6, 
 1 pressed: []
 1 tap: [] field .
 1 down: [] field ,
-1 long press: [~, /, @, &, *, ), ", :, ;, (, 1]
+1 long press: [\, -, @, ", ., ;, ^, :, ~, 1]
 1 long press: [sendKey(sym=65457, states=536870912, code=0, up=false)] field ,
 2 said: abc, 2
 2 pressed: [abc]

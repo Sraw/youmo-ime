@@ -34,6 +34,8 @@ import kotlin.math.min
  * @param inRow the key's own among those before [split] (one row): in focus first, the rest round it as
  * listed (PopupFocus.ownFirst); -1, the first, as the full keyboard's
  * @param actions what each key types (060-keys-unify: the item's own, [asIs] not read); null, [keys] as [keyAction] says
+ * @param opensOn the key in focus as the popup opens, wherever it is (a named key's first: in the row, among the
+ * symbols, on a key with no row), laid over the trigger as its group's own; -1: [inRow]'s, else the first
  * @param onFocusMoved told, with the popup's view, each time another key comes into focus: a buzz,
  * as the finger is not over the key it picks ([PopupFocus])
  * @param scenes the engine's, the keys drawn as its scene (060-render-p2 S2), sized by its rules ([PopupKeys])
@@ -53,6 +55,7 @@ class PopupKeyboardUi(
     private val asIs: Boolean = false,
     inRow: Int = -1,
     private val actions: List<KeyAction>? = null,
+    opensOn: Int = -1,
     private val onFocusMoved: (View) -> Unit = {},
     private val scenes: PopupScenes,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
@@ -156,9 +159,11 @@ class PopupKeyboardUi(
      * in which `0` indicates default focus
      */
     private val keyOrders = groups.flatMapIndexed { g, group ->
-        // every group round the column in focus, nearest first; the first's own key ([inRow]) first,
-        // the rest as listed (PopupFocus.ownFirst), as the full keyboard lays its keys
-        val priority = if (g == 0 && inRow >= 0) PopupFocus.ownFirst(group.count(), inRow) else null
+        // every group round the column in focus, nearest first; a group's own key first (the one it [opensOn] where it
+        // is in the group, else the row's [inRow]), the rest as listed (PopupFocus.ownFirst), as the full keyboard
+        // lays its keys
+        val own = if (opensOn in group) opensOn - group.first else if (g == 0) inRow else -1
+        val priority = if (own >= 0) PopupFocus.ownFirst(group.count(), own) else null
         List(groupRows[g]) { r ->
             // a slot past its group's keys is empty: -1
             IntArray(columnCount) { col ->
@@ -169,7 +174,10 @@ class PopupKeyboardUi(
         }
     }.toTypedArray()
 
-    private var focusedIndex = keyOrders[focusRow][focusColumn]
+    // the row it [opensOn]: that key's group's first, the key over the column in focus (keyOrders)
+    private val startRow = groups.indexOfFirst { opensOn in it }.takeIf { it >= 0 }?.let { g -> groupRows.take(g).sum() } ?: focusRow
+
+    private var focusedIndex = keyOrders[startRow][focusColumn]
 
     private val sceneView = sceneKeys?.let { made(it, focusedIndex) }?.let { first -> scenes.view(ctx).also { it.scene = first } }
 
@@ -196,7 +204,7 @@ class PopupKeyboardUi(
     // by how far the finger moves from where it was when the popup opened, not where it is
     private val focus = PopupFocus(
         rows = keyOrders.toList(),
-        startRow = focusRow,
+        startRow = startRow,
         startColumn = focusColumn,
         stepX = keyWidth * PopupFocus.STEP,
         stepY = keyHeight * PopupFocus.STEP,

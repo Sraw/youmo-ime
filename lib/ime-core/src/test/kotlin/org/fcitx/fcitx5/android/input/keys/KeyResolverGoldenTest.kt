@@ -14,7 +14,6 @@ import org.fcitx.fcitx5.android.scene.keys.Item
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Form
-import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Language
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.junit.Assert.assertTrue
@@ -32,16 +31,16 @@ class KeyResolverGoldenTest {
 
     private val boards = listOf(
         Board("pinyin-full", "qwerty", KeyboardVariant(Form.Full)),
-        Board("english-full", "qwerty", KeyboardVariant(Form.Full, Language.English)),
+        Board("english-full", "qwerty", KeyboardVariant(Form.Full)),
         Board("pinyin-nine", "nine", KeyboardVariant(Form.Nine)),
-        Board("shuangpin-nine", "nine", KeyboardVariant(Form.Nine, Language.Shuangpin)),
-        Board("english-nine", "nine", KeyboardVariant(Form.Nine, Language.English)),
+        Board("shuangpin-nine", "nine", KeyboardVariant(Form.Nine)),
+        Board("english-nine", "nine", KeyboardVariant(Form.Nine)),
         Board("pinyin-14", "k14", KeyboardVariant(Form.Grouped14)),
         Board("pinyin-18", "k18", KeyboardVariant(Form.Grouped18)),
-        Board("shuangpin-18-ms", "k18", KeyboardVariant(Form.Grouped18, Language.Shuangpin, semicolon = true)),
-        Board("zhuyin-full", "zhuyin", KeyboardVariant(Form.ZhuyinFull, Language.Zhuyin)),
-        Board("zhuyin-nine", "zhuyin-nine", KeyboardVariant(Form.ZhuyinNine, Language.Zhuyin)),
-        Board("handwriting", "handwriting", KeyboardVariant(Form.Handwriting, Language.Handwriting)),
+        Board("shuangpin-18-ms", "k18", KeyboardVariant(Form.Grouped18, semicolon = true)),
+        Board("zhuyin-full", "zhuyin", KeyboardVariant(Form.ZhuyinFull)),
+        Board("zhuyin-nine", "zhuyin-nine", KeyboardVariant(Form.ZhuyinNine)),
+        Board("handwriting", "handwriting", KeyboardVariant(Form.Handwriting)),
         Board("number", "number", KeyboardVariant(Form.Number)),
         Board("symbols", "symbols", KeyboardVariant(Form.Panel)),
         Board("emoji", "emoji", KeyboardVariant(Form.Panel)),

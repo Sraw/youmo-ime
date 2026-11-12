@@ -15,7 +15,6 @@ class KeyListsWithTest {
     private val q = KeyId("full/q")
     private val one = KeyId("t9/1")
     private val pinyinOne = KeyDefaults.nine('1', KeyboardVariant(KeyboardVariant.Form.Nine))
-    private val englishOne = KeyDefaults.nine('1', KeyboardVariant(KeyboardVariant.Form.Nine, KeyboardVariant.Language.English))
 
     @Test
     fun aListTheSameAsTheDefaultIsNotKept() {
@@ -28,12 +27,11 @@ class KeyListsWithTest {
     }
 
     @Test
-    fun nineOneDiffersByKeyboardSoIsKeptAsSet() {
-        val both = listOf(pinyinOne, englishOne)
-        val english = englishOne.symbols.map { it.text }
-        // set on English's to English's default: still a setting, which pinyin's 1 then shows (M3)
-        assertEquals(english, KeyLists.Empty.with(one, UserList(false, english), both)[one]?.symbols)
-        assertEquals(pinyinOne.symbols.map { it.text }, KeyLists.Empty.with(one, UserList(false, pinyinOne.symbols.map { it.text }), both)[one]?.symbols)
+    fun nineOneHasOneDefaultSoItsOwnIsNoSetting() {
+        // English's 1 is pinyin's (用户 2026-11-11): set to it from either is no setting; anything else is one, shared (M3)
+        val defaults = listOf(pinyinOne, pinyinOne)
+        assertNull(KeyLists.Empty.with(one, UserList(false, pinyinOne.symbols.map { it.text }), defaults)[one])
+        assertEquals(listOf(".", "@"), KeyLists.Empty.with(one, UserList(false, listOf(".", "@")), defaults)[one]?.symbols)
     }
 
     @Test

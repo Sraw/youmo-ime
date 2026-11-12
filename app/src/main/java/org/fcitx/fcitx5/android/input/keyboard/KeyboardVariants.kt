@@ -10,13 +10,12 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Form
-import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Language
 import org.fcitx.fcitx5.android.scene.layout.Layout
 
 /**
  * The one way a keyboard, and the settings' editor, says which defaults its keys have (060-keys-unify §1.3,
- * I12, I13): the form its layout's family is (a theme's own layout's too), the language its input method
- * types, the nine keys' letters, the 18 keys' `;`.
+ * I12, I13): the form its layout's family is (a theme's own layout's too), the nine keys' letters (双拼's its own), the
+ * 18 keys' `;`. The input method's language is none of it: every one's lists are pinyin's (用户 2026-11-11).
  */
 object KeyboardVariants {
 
@@ -34,45 +33,28 @@ object KeyboardVariants {
 
     /** A keyboard of [form] (its layout's family's) shown for [im]: [of]. */
     fun of(form: Form, im: String, scheme: ShuangpinScheme, nineLetters: Map<Char, String>? = null): KeyboardVariant {
-        val language = languageOf(form, im)
-        val shuangpin = language == Language.Shuangpin
+        val shuangpin = isShuangpin(form, im)
         return KeyboardVariant(
             form = form,
-            language = language,
             nineLetters = nineLetters ?: if (shuangpin) SHUANGPIN_NINE else KeyboardVariant.STANDARD_NINE,
             semicolon = shuangpin && scheme.types(';'),
         )
     }
 
-    /** The language of [im] on a keyboard of [form]: 注音's and 手写's keyboards are theirs whatever types. */
-    fun languageOf(form: Form, im: String): Language = when {
-        form == Form.ZhuyinFull || form == Form.ZhuyinNine -> Language.Zhuyin
-        form == Form.Handwriting -> Language.Handwriting
-        else -> when (im.substringBefore('#')) {
-            InputMethodCatalog.ENGLISH -> Language.English
-            InputMethodCatalog.SHUANGPIN -> Language.Shuangpin
-            in InputMethodCatalog.TABLES -> Language.Table
-            else -> Language.Pinyin
-        }
-    }
+    /** Whether [im] on a keyboard of [form] is 双拼's: 注音's and 手写's keyboards are theirs whatever types. */
+    fun isShuangpin(form: Form, im: String): Boolean =
+        form != Form.ZhuyinFull && form != Form.ZhuyinNine && form != Form.Handwriting && im.substringBefore('#') == InputMethodCatalog.SHUANGPIN
 
     /**
      * Every variant a key of a [form]'s page is shown under (the editor's: a list the same as the default on
-     * each of them is no setting, KeyLists.with): 拼音, 双拼 and English where they have the form.
+     * each of them is no setting, KeyLists.with): pinyin's, and 双拼's where its letters or `;` make it differ.
      */
     fun all(form: Form, scheme: ShuangpinScheme): List<KeyboardVariant> {
         val semicolon = scheme.types(';')
         return when (form) {
-            Form.Full -> listOf(Language.Pinyin, Language.Shuangpin, Language.English, Language.Table).map { KeyboardVariant(form, it, semicolon = it == Language.Shuangpin && semicolon) }
-            Form.Nine -> listOf(
-                KeyboardVariant(form),
-                KeyboardVariant(form, Language.Shuangpin, SHUANGPIN_NINE, semicolon),
-                KeyboardVariant(form, Language.English),
-            )
-            Form.Grouped14, Form.Grouped18 -> listOf(KeyboardVariant(form), KeyboardVariant(form, Language.Shuangpin, semicolon = semicolon))
-            Form.ZhuyinFull, Form.ZhuyinNine -> listOf(KeyboardVariant(form, Language.Zhuyin))
-            Form.Handwriting -> listOf(KeyboardVariant(form, Language.Handwriting))
-            Form.Number, Form.Panel -> listOf(KeyboardVariant(form))
+            Form.Nine -> listOf(KeyboardVariant(form), KeyboardVariant(form, SHUANGPIN_NINE, semicolon))
+            Form.Grouped14, Form.Grouped18 -> listOf(KeyboardVariant(form), KeyboardVariant(form, semicolon = semicolon)).distinct()
+            else -> listOf(KeyboardVariant(form))
         }
     }
 }
