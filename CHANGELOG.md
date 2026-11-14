@@ -41,6 +41,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 原来只给手写开的繁体，升级后带给顶替它的拼音；手写不在第一个时，手写的字跟着所在输入法的简繁。
 - 给书写板配了笔迹颜色的主题照样能导入，键上手写用它的笔迹颜色（和按键颜色对比不够时用按键文字的颜色）；书写板的其它样式、`@im=handwriting` 和手写布局不起作用，导入时提醒。
 - 和 0.6.0 不同：写好还没上屏的字显示在键盘上方的编码行里（和拼音一样），不再像 0.6.0 的手写输入法那样带下划线出现在输入框里（编码行选了 **输入框里（实验性）** 时照样在框里）；在输入框里点别处时，写好的字上屏到新的光标处。
+- **主题只管样子**：主题自带的键盘布局里写的长按列表、键角小字、上滑、下滑、双击和长按菜单不再起作用，这些都跟着键的名字，用输入法自带的同名键的，在 **按键 → 按键字符和快捷键** 里改；键的位置、样子、点了打什么照旧按主题的。导入这样的主题时提示一行「主题自带的布局里有 N 处……写法不起作用」，网页主题制作页在问题列表里列出行号。已经装着的主题也一样：主题写的默认首选不再生效，自己设过的不变。合并了键的 17 键这类布局，分组键的角标按键的名字取，不再因为前面少了一个键整体错一位。
 
 ### Main changes
 
@@ -76,6 +77,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Traditional characters turned on for handwriting alone go to pinyin where it takes handwriting's place; elsewhere what you write follows the input method you write in.
 - A theme that gave the handwriting pad an ink colour still imports, and the ink on the keys takes that colour (the key text's colour where it would not stand out); the pad's other styles, `@im=handwriting` and a handwriting layout do nothing, and the import says so.
 - Unlike 0.6.0: written characters not yet put in show in the code row above the keys (as pinyin does), no longer underlined in the text box as with 0.6.0's handwriting input method (still in the box where the code row is set to **In the text box (experimental)**); tapping elsewhere in the box puts them in at the new cursor.
+- **A theme sets only the look**: what a theme's own keyboard layouts write of a key's long press list, corner character, swipes up and down, double tap and long-press menu no longer takes effect; these follow the key's name, the app's own key of that name, and are changed in **Keys → Key characters and shortcuts**. Where keys are, how they look and what a tap types stay the theme's. Importing such a theme says so in one line (N settings in its layouts do nothing); the web theme maker lists the lines among its problems. Themes already installed are the same: a default first the theme wrote no longer holds, one you set yourself stays. In a layout that merges keys, such as the 17 keys, a group key's corner goes by its name and no longer shifts one along for the key gone before it.
 
 ---
 

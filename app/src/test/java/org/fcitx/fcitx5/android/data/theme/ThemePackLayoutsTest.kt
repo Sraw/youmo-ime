@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.theme
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
@@ -22,6 +23,7 @@ import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
+import org.fcitx.fcitx5.android.ui.main.settings.KeyCaps
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemePackDialogs
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
@@ -83,7 +85,8 @@ class ThemePackLayoutsTest {
 
     private val nord by lazy { BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_nord) }
 
-    // the app's 26 keys named [name], q and w swiped up typing text of their own (a theme's own swipes: the app's write none)
+    // the app's 26 keys named [name], q and w swiped up typing text of their own (a theme's own swipes: the app's write
+    // none; since 0.6.1 not taken, 主题只管外观)
     private fun qwerty(name: String = "主题 26 键") = builtIn.text("qwerty")!!.replace("name=\"26 键\"", "name=\"$name\"")
         .replace("send=\"q\"", "send=\"q\" swipe-up=\"commit:qq\"")
         .replace("send=\"w\"", "send=\"w\" swipe-up=\"commit:ww\"")
@@ -159,12 +162,12 @@ class ThemePackLayoutsTest {
     fun aPacksQwertyReplacesThe26Keys() {
         inUse("mine", mapOf("qwerty.xml" to qwerty()))
         assertEquals("主题 26 键", name("qwerty"))
-        assertEquals("commit:qq", keyQ("qwerty").attrs.actions["swipe-up"])
-        // the pack's q's first is its swipe's text as it types (KeyDefaults.itemOf: `commit:qq` is qq typed, no action's
-        // name drawn nor sent; 060-s6-review M2)
+        // its q's swipe written is not taken (主题只管外观, 061-custom-layout §19): q's first and corner the app's
+        assertNull(keyQ("qwerty").attrs.actions["swipe-up"])
         val q = SceneBoard.resolver(SceneLayouts.of(appContext, "qwerty")!!, "pinyin").resolve(KeyId("full/q"), KeyState())
-        assertEquals("qq", q.corner)
-        assertEquals(KeyOutput.Text("qq"), KeyOutput.of(q.first!!))
+        val app = SceneBoard.resolver(SceneLayouts.builtIn(appContext, "qwerty")!!, "pinyin").resolve(KeyId("full/q"), KeyState())
+        assertEquals(app.corner, q.corner)
+        assertEquals(KeyOutput.of(app.first!!), KeyOutput.of(q.first!!))
         // the others the app's
         assertSame(SceneLayouts.builtIn(appContext, "k14"), SceneLayouts.of(appContext, "k14"))
         assertEquals(
@@ -209,18 +212,59 @@ class ThemePackLayoutsTest {
 
     @Test
     fun theImportTellsTheKeyboardsUsedAndTheirCommitsEvenOnesWrittenAsReferences() {
-        // e swiped up written c as a character reference: the reader decodes it, so it counts
-        val q = qwerty().replace("send=\"e\"", "send=\"e\" swipe-up=\"&#99;ommit:ee\"")
+        // .com's tap written c as a character reference: the reader decodes it, so it counts; the swipes of q and w and
+        // e's (a reference too) are not taken, so not counted, and told as not taken instead
+        val q = qwerty().replace("send=\"e\"", "send=\"e\" swipe-up=\"&#99;ommit:ee\"").replace("send=\"commit:.com\"", "send=\"&#99;ommit:.com\"")
         val pack = opened("mine", mapOf("qwerty.xml" to q, "mine.xml" to "<keyboard/>", "k14.xml" to "<keyboard/>", "grouped-bottom.xml" to builtIn.text("grouped-bottom")!!))
-        // the app's 26 keys have four (/ @ . .com), the pack two of its own and the referenced one
+        // the app's 26 keys have four (/ @ . .com), the pack's own swipes none
         val report = pack.staged.layoutReport
-        assertEquals(7, report.commits)
+        assertEquals(4, report.commits)
+        assertEquals(3, report.ignored)
         assertEquals(listOf("qwerty"), report.used)
         // not the app's; does not read; a fragment no keyboard used includes
         assertEquals(setOf("mine", "k14", "grouped-bottom"), report.unused.map { it.first }.toSet())
         val text = ThemePackDialogs.confirmText(appContext, pack)
-        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts, "qwerty", 7)))
+        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts, "qwerty", 4)))
+        assertTrue(text, text.contains(appContext.resources.getQuantityString(R.plurals.theme_pack_layouts_ignored, 3, 3)))
+        // one: said as one (the English plural)
+        val one = opened("one", mapOf("qwerty.xml" to builtIn.text("qwerty")!!.replace("send=\"e\"", "send=\"e\" swipe-up=\"commit:ee\"")))
+        assertEquals(1, one.staged.layoutReport.ignored)
+        val said = ThemePackDialogs.confirmText(appContext, one)
+        assertTrue(said, said.contains("1 long-press, corner or swipe setting written in its layouts does nothing"))
         assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts_unused, report.unused.joinToString(", ") { it.first })))
+    }
+
+    // 主题只管外观 (061-custom-layout §19): a pack's 注音 (no board 0.6.1 moves) writing keys' corners and swipes, as
+    // installed packs of 0.6.0 may: the import tells what is not taken, the keyboard holds and swipes them as the app's,
+    // and a first the user set stays theirs
+    @Test
+    fun aPacksZhuyinKeysAreHeldAndSwipedAsTheAppsTheUsersFirstKept() {
+        val written = builtIn.text("zhuyin")!!
+            .replace("shortcut=\"zyfull/1\"", "shortcut=\"zyfull/1\" alt=\"!\" swipe-up=\"commit:ㄅㄅ\"")
+            .replace("shortcut=\"zyfull/2\"", "shortcut=\"zyfull/2\" alt=\"?\"")
+        val asApp = builtIn.text("zhuyin")!!
+        val report = opened("mine", mapOf("zhuyin.xml" to written)).staged.layoutReport
+        assertEquals(listOf("zhuyin"), report.used)
+        assertEquals(3, report.ignored)
+        // the commits counted as taken: the app's own, not the pack's swipe
+        val same = opened("same", mapOf("zhuyin.xml" to asApp)).staged.layoutReport
+        assertEquals(same.commits, report.commits)
+        assertEquals(0, same.ignored)
+
+        fun shown(id: String) = KeyCaps.resolver(appContext, "zhuyin")!!.resolve(KeyId(id), KeyState()).let { it.corner to it.first?.let(KeyOutput::of) }
+        val app = listOf("zyfull/1", "zyfull/2").associateWith(::shown)
+        val prefs = AppPrefs.getInstance()
+        try {
+            prefs.setStoredKeyLists("@2\nzyfull/2\tset\t:Y\tY\tZ")
+            inUse("held", mapOf("zhuyin.xml" to written))
+            assertNull(SceneLayouts.of(appContext, "zhuyin")!!.layout.parts.filterIsInstance<Row>().flatMap { it.cells }
+                .filterIsInstance<Key>().first { it.attrs.shortcut == "zyfull/1" }.attrs.actions["swipe-up"])
+            assertEquals(app.getValue("zyfull/1"), shown("zyfull/1"))
+            // the user's first: its corner
+            assertEquals("Y", shown("zyfull/2").first)
+        } finally {
+            prefs.setStoredKeyLists(null)
+        }
     }
 
     @Test

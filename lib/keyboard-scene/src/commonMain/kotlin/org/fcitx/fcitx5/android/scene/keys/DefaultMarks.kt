@@ -73,14 +73,14 @@ object DefaultMarks {
 
     /**
      * The variant a layout's family stands for, its default input method's. The 14 and 18 keys are told apart by the
-     * layout's id (`k18`): a theme pack replaces a keyboard only under that keyboard's id (PackLayouts.judge), so no
-     * pack's 18 keys reach here under another.
+     * app's keyboard the layout is of, [basedOn] (`k18`): a theme pack's is of its own id (PackLayouts.judge), a user's
+     * layout of the one it was made from (061-custom-layout §5.3), whatever its own id.
      */
-    fun variantOf(layout: Layout): KeyboardVariant = KeyboardVariant(
+    fun variantOf(layout: Layout, basedOn: String = layout.id): KeyboardVariant = KeyboardVariant(
         when (layout.family) {
             "letters" -> KeyboardVariant.Form.Full
             "nine" -> KeyboardVariant.Form.Nine
-            "grouped" -> if (layout.id == "k18") KeyboardVariant.Form.Grouped18 else KeyboardVariant.Form.Grouped14
+            "grouped" -> if (basedOn == "k18") KeyboardVariant.Form.Grouped18 else KeyboardVariant.Form.Grouped14
             "zhuyin" -> KeyboardVariant.Form.ZhuyinFull
             "zhuyin-nine" -> KeyboardVariant.Form.ZhuyinNine
             "number" -> KeyboardVariant.Form.Number
@@ -107,8 +107,9 @@ object DefaultMarks {
                 typing = KeyDefaults.typing(a.role, a.kind, (a.label as? Text.Literal)?.text ?: a.label?.let { "_" }, a.actions["preview"]),
                 popup = key.popup,
                 letters = key.letters?.group,
-                themeFirst = a.actions["swipe-up"] ?: (a.alt as? Text.Literal)?.text,
-                place = if (key.letters != null) place++ else -1,
+                layoutFirst = a.actions["swipe-up"] ?: (a.alt as? Text.Literal)?.text,
+                // KeyData's where it set one (a theme's or a user's layout: the app's key of its name's), else counted
+                place = if (key.letters != null) (place++).let { key.place ?: it } else -1,
                 function = a.kind == "function",
                 markOff = a.mark == false,
             )

@@ -716,3 +716,10 @@
 - **操作**：打开 **通用输入**，看 **表情候选** 和 **自带的日期时间** 的说明。
 - **预期**：两条说明末尾都写着「手写写的字没有」，下面没有「不适用：手写。」一行（手写不再是输入法）。
 - **JVM**：`InputMethodSettingsScreenTest.aSharedOptionSaysUnderItWhatItIsNoUseTo`；设备上不跑。
+
+### ST-133 [P1] 主题自带布局里写的长按、角标、滑动不起作用：注音的键跟内置的
+- **前提**：B0-注音全键盘；**外观 → 大小与样式** 的 **跟随系统深色模式** 关。一个主题包（Nord 改名 `uat-zhuyin-held`），带 `layouts/zhuyin.xml`：内置的注音全键盘，ㄅ（`shortcut="zyfull/1"`）上加了 `alt="!"` 和 `swipe-up="commit:ㄅㄅ"`（0.6.0 的包可以这样写）。
+- **操作**：先在测试页看 ㄅ 的键角、在 ㄅ 上向上滑；**外观 → 主题 → 新增主题 → 导入主题文件** 选这个包，看确认框，点 **导入**，点这个主题；回测试页看 ㄅ 的键角、在 ㄅ 上向上滑。
+- **预期**：确认框写「此主题包含自定义布局：zhuyin……」，另有一行「主题自带的布局里有 2 处长按、角标、滑动的写法不起作用：0.6.1 起主题只管样子，这些由 按键 → 按键字符和快捷键 管。」；能导入。换上后 ㄅ 的键角和上滑打出的跟换主题前一样（内置的），不画 `!`、不打 ㄅㄅ。
+- **JVM**：`ThemePackLayoutsTest.aPacksZhuyinKeysAreHeldAndSwipedAsTheAppsTheUsersFirstKept`（报告 3 处不起作用、`commit:` 只数换过之后的；键的上滑是内置的，键角和首选等于内置的，用户设过首选的键用用户的）、`ThemePackLayoutsTest.theImportTellsTheKeyboardsUsedAndTheirCommitsEvenOnesWrittenAsReferences`（确认框那一行）、keyboard-scene 的 `KeyDataTest`；设备上跑。
+

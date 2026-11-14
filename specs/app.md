@@ -231,7 +231,7 @@ stored: the nine keys' and grouped keys' letters and digits, `;`) and a symbols 
 (`AsKey` through the keyboard's own resolve as `Source.Popup`, `AsIs`, `Keypad(n)` the number pad's meaning, `Action`
 from a layout's `<item send=…>`), and a first; `KeyDefaults.function` (`COMMA`, `PERIOD`) the one comma and period list and `KeyDefaults.FUNCTION_ACTIONS` the
 action long presses (符 quick phrase, 123 Unicode, 🌐 the picker, ⇧ caps lock, space), the same on every keyboard and panel;
-`SlotDefaults` the default slots. A theme layout's `swipe-up`/`alt` is that theme's default first (`NodeFacts.themeFirst`);
+`SlotDefaults` the default slots. A layout's own `swipe-up`/`alt` is its default first (`NodeFacts.layoutFirst`): since 0.6.1 a theme pack's never reaches it (KeyData puts the app's key's of the name in its place), only a custom layout's on a name of its own; a group key's corner is the built-in table's at `NodeFacts.place`, the place of the app's key of its name (KeyData), none for a name of its own;
 the grouped keys read only the built-in symbols, never the full keyboard's user lists. The user's layer is ime-core
 `input/keys/`: `KeyLists` parses and writes `key_lists` (`@2` then `keyid\toff` or `keyid\tset\t<*|!|:item>\t…`, at most
 16 items of 16 code points (every built-in default fits, the longest 13; the popup ≤ 4 rows; the editor adds no 17th and says so), `KeyShortcuts.escape`d, bad lines skipped, a line equal to the editor's default dropped; a list with any item marked is
@@ -752,11 +752,18 @@ first, and where it has none or it does not read, one step back to the app's own
 `invalidate(key)` has a source's read again. The source is asked each time (`ThemePackLayouts.current`): while a
 theme 4.0 pack is in use, `ThemePackLayouts` (key `theme:<file>@<theme.xml's time>`, so a pack imported again is read
 again; a theme change makes the input view anew) reads its `layouts/<id>.xml`, only for an id the app has
-(`BuiltInLayouts.has`: a pack replaces keyboards, never adds one), and refuses (`LayoutSource.refuses`, logged once,
+(`PackLayouts.replaces`, commonMain, the theme maker's rule too: a pack replaces keyboards, never adds one), and refuses (`LayoutSource.refuses`, logged once,
 the app's drawn) one that is not as typable as the app's of that id (`ThemePackLayouts.judge`: its `id` and `family`,
 and every slot kind, function key of role backspace/enter/lang and digit key the app's has, its includes in place); a
 fragment it includes that the pack has not is the app's, a fragment of the pack's is read only by the pack's own
-keyboards. Block by block: a bad `k14.xml` falls back alone (`ThemePackLayoutsTest`). `SceneLayouts.of` drops what was
+keyboards. Block by block: a bad `k14.xml` falls back alone (`ThemePackLayoutsTest`). One taken is read as the app
+takes a theme's (主题只管外观, 061-custom-layout §19; `LayoutSource.keyData`, `KeyData.Mode.Pack`, applied in
+`SceneLayouts.load`): what its keys do held or swiped (`<popup>`, `<menu>`, `alt=`, `long-press`/`swipe-up`/`swipe-down`/
+`double-tap`, on keys, variants and defaults, and the keyboard's `popups=`) is the app's key's of the same name
+(`BuiltInKeyData`, generated from the layouts and held to them by `BuiltInKeyDataTest`; a key of no name the app's of its
+id on that board), a group key's corner place the app's key's of its name; what is written of them is not taken. Its
+place, look, tap, group letters, role, name, `repeat=` and `swipe-axis=` stay the pack's. The boards 0.6.1 moves to
+custom layouts (`KeyData.LISTED`) keep what they write on a name the app has not. `SceneLayouts.of` drops what was
 read of other sources once the source's key changes. The keyboard choices (the input method pages, ⋯'s 键盘) name
 the theme's layout a keyboard is drawn with (`KeyboardLabels`, `keyboard_themed`, `18 键（主题：17 键）`, the name cut
 at 24 characters; not where T9b draws the app's instead, 双拼 on own groups, which it does not log for them); ids stay as the theme format names the boards (`k14/r1c1`,
@@ -1488,10 +1495,11 @@ the packs listed) is replaced, as it could not be deleted otherwise. A new pack 
 key text under 3:1 on its keys in a version (`ThemePackCheck`'s contrast). The confirmation
 (`ThemePackDialogs`) shows the preview, author, version, license, the format, that it replaces a pack or a
 3.0 theme of the name, the keyboards it replaces as they would be drawn (`ThemePackLayouts.report`: read by the
-engine's reader and judged as above) with the count of their `commit:` actions (from the parsed layouts and the
-pack's fragments they include, each once: keys', variants', defaults', popup items' `send`, menu items' `do`; a
+engine's reader and judged as above) with the count of their `commit:` actions (as taken, KeyData's: a pack's own
+swipes are not; from the parsed layouts and the pack's fragments they include, each once: keys', variants', defaults', popup items' `send`, menu items' `do`; a
 character reference counts as what it reads as), the files never used (not an app id, unreadable, refused, a fragment
-no keyboard used includes), and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
+no keyboard used includes), how many held or swiped settings they write are not taken (`Report.ignored`,
+`theme_pack_layouts_ignored`, one line), and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
 
 Skins of other input methods (`ThemeFilesManager.openSkin`, picked by `ThemeFileName.isSkinFile`: `.bds`, `.bdi`,
 `.ssf`, `.flex`, `.yaml`/`.yml`, `.zip`): read whole into memory by `SkinZip.readSkin` (a lone YAML as itself, 1 MB at

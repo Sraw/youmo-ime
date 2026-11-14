@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.scene.json.EnvJson
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
+import org.fcitx.fcitx5.android.scene.layout.KeyData
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.LookTheme
@@ -139,8 +140,14 @@ object YoumoEngine {
         result(ThemeReader.theme(text(xml, "theme"), colors, optionalText(appVersion, "appVersion"), LookTheme.MAX_STYLES)) { "theme" to YoumoTheme(it) }
     }
 
-    /** [xml] (layout 1) read, its includes from [fragments] (`{id: xml}`, a theme pack's) or the built-in ones: `{ok, problems, warnings, layout}`. */
-    fun readLayout(xml: dynamic, fragments: dynamic): dynamic = checked {
+    /**
+     * [xml] (layout 1) read, its includes from [fragments] (`{id: xml}`, a theme pack's) or the built-in ones: `{ok, problems,
+     * warnings, layout, ignored}`. As a theme pack's file for the app's keyboard [board] (`"k18"`; none: as written), its
+     * keys' long press, corner and swipes the app's keys' of their names, as the app takes it (主题只管外观, KeyData), and
+     * `ignored` what it writes of them that is not taken: `[{file, line, what}]` (`what` the attribute or element, `alt`,
+     * `swipe-up`, `popup`…).
+     */
+    fun readLayout(xml: dynamic, fragments: dynamic, board: dynamic = null): dynamic = checked {
         val own = HashMap<String, Fragment>()
         val bad = ArrayList<Problem>()
         if (fragments != null) {
@@ -154,8 +161,15 @@ object YoumoEngine {
         if (bad.isNotEmpty()) return@checked failed(bad)
         val layout = LayoutReader.layout(text(xml, "layout"))
         if (layout !is Parsed.Ok) return@checked result(layout) { "layout" to null }
-        result(builtIns.includes(layout.value, own)) { "layout" to YoumoLayout(layout.value, it) }
+        val includes = builtIns.includes(layout.value, own)
+        val held = optionalText(board, "board")?.let { id -> includes.orNull()?.let { KeyData.of(id, layout.value, it, KeyData.Mode.Pack) } }
+        val answer = result(includes) { "layout" to (held?.let { h -> YoumoLayout(h.layout, h.fragments) } ?: YoumoLayout(layout.value, it)) }
+        answer.ignored = held?.ignored.orEmpty().map { obj("file" to it.file, "line" to it.line, "what" to it.what) }.toTypedArray()
+        answer
     }
+
+    /** Whether a theme pack's layout file [id] (`k18`, `grouped-bottom`) is read at all (PackLayouts.replaces): the app's and the page's one rule. */
+    fun replaces(id: String): Boolean = PackLayouts.replaces(id)
 
     /**
      * Where [theme] leaves Shift, Backspace, Space or Return blank (BlankKeys, the app's own import check): on the
@@ -167,11 +181,11 @@ object YoumoEngine {
         val files = HashMap<String, String>()
         if (layouts != null) for (name in keys(layouts, "layouts")) files[name.removeSuffix(".xml")] = text(layouts[name], "layout $name")
         // only the files the app reads: an id it has, within its size limit (PackLayouts.readable)
-        val own = PackLayouts.readable(files) { builtIns.layoutText(it) != null }
+        val own = PackLayouts.readable(files, PackLayouts::replaces)
         // the boards as the app draws them: a pack's only where the app takes it (PackLayouts.drawn), the app's
         // with the app's fragments
         val app = builtIns.layouts.mapNotNull { id ->
-            builtIns.layout(id)?.orNull()?.let { l -> builtIns.includes(l).orNull()?.let { BlankKeys.Board(l, it) } }
+            builtIns.layout(id)?.orNull()?.let { l -> builtIns.includes(l).orNull()?.let { BlankKeys.Board(l, it, id) } }
         }
         // too many to try: its code, "*", the page says what it means
         BlankKeys.find(theme.theme, PackLayouts.drawn(app, own) { builtIns.layoutText(it) }).map { if (it == BlankKeys.TOO_MANY) "*" else it.toString() }.toTypedArray()

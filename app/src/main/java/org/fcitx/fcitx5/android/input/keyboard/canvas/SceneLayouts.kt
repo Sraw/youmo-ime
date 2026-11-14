@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemePackLayouts
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Include
+import org.fcitx.fcitx5.android.scene.layout.KeyData
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import timber.log.Timber
@@ -36,6 +37,12 @@ interface LayoutSource {
      * is: a theme pack's held to what the app's of [id] must have to be typed on ([ThemePackLayouts.judge]).
      */
     fun refuses(id: String, layout: Layout, fragments: Map<String, Fragment>): String? = null
+
+    /**
+     * Whose a key's long press, corner and swipes are on a layout read from it ([KeyData]): null, as written (the app's
+     * own); a theme pack's, the app's key's of its name (主题只管外观, 061-custom-layout §19).
+     */
+    val keyData: KeyData.Mode? get() = null
 }
 
 /**
@@ -179,6 +186,7 @@ object SceneLayouts {
         source.refuses(id, layout, fragments)?.let { why ->
             return null.also { Timber.e("scene layout %s of %s not taken: %s", id, source.key, why) }
         }
-        return SceneLayout(id, layout, fragments)
+        val held = source.keyData?.let { KeyData.of(id, layout, fragments, it) } ?: return SceneLayout(id, layout, fragments)
+        return SceneLayout(id, held.layout, held.fragments)
     }
 }

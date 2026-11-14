@@ -10,7 +10,8 @@ import org.fcitx.fcitx5.android.scene.layout.Popup
 /**
  * What a layout's key tells its default long press (060-keys-unify): its tap's character ([text]) and [label],
  * whether it types ([typing]: a letter's kind with a label, a mark's role), its `<popup>`, a group's
- * [letters], the first a theme's layout wrote ([themeFirst]: its `swipe-up=`, else a literal `alt=`),
+ * [letters], the first its layout wrote ([layoutFirst]: its `swipe-up=`, else a literal `alt=`; a user's layout's key
+ * of a name of its own only, KeyData having put the app's key's in place of any other: 061-custom-layout §19),
  * a group key's [place] among the layout's groups (the built-in corners go by it), whether it is a
  * [function] key's kind (no first of its character's: 注音九键's ? !), and whether it draws no first of its
  * defaults' ([markOff], `mark="false"`: 注音's keys; a first the user set drawn and said all the same, 060-s6-review L4).
@@ -22,7 +23,7 @@ data class NodeFacts(
     val typing: Boolean = false,
     val popup: Popup? = null,
     val letters: String? = null,
-    val themeFirst: String? = null,
+    val layoutFirst: String? = null,
     val place: Int = -1,
     val function: Boolean = false,
     val markOff: Boolean = false,
@@ -86,7 +87,7 @@ object KeyDefaults {
     fun of(id: KeyId?, variant: KeyboardVariant, node: NodeFacts, caps: Boolean = false): DefaultList? {
         if (id != null && id.isFunction) return function(id.key)
         val made = made(id, variant, node, caps) ?: return null
-        return node.themeFirst?.let { made.withFirst(it) } ?: made
+        return node.layoutFirst?.let { made.withFirst(it) } ?: made
     }
 
     // by the node's popup: none, a nine digit's, a group's (of letters, else 注音's), a list, a preset; no popup, a typing key's preset
@@ -94,7 +95,7 @@ object KeyDefaults {
         val p = node.popup
         // the 18 keys' `;` on L only where the scheme types it (OwnLongPress.shown)
         val letters = node.letters?.let { if (variant.form == KeyboardVariant.Form.Grouped18 && !variant.semicolon) it.replace(";", "") else it }
-        if (letters != null && (p == null || p.from == "group")) return grouped(letters, node.themeFirst?.takeIf { itemOf(it).text.isNotEmpty() } ?: corner(variant.form, node.place))
+        if (letters != null && (p == null || p.from == "group")) return grouped(letters, node.layoutFirst?.takeIf { itemOf(it).text.isNotEmpty() } ?: corner(variant.form, node.place))
         return when (p?.from) {
             null -> typed(node, caps)
             "nine" -> id?.key?.singleOrNull()?.let { nine(it, variant) }
@@ -145,7 +146,7 @@ object KeyDefaults {
         // ;'s capital is :, as Shift gives it: no second ; beside the lower one
         val upper = group.map { if (it == ';') ":" else it.uppercase() }
         val lower = group.map { it.toString() }
-        // a digit corner is a keypad's (D7), whether built in or a theme's
+        // a digit corner is a keypad's (D7), whether built in or a layout's
         val first = corner?.takeIf { it.isNotEmpty() }?.let { c -> if (c.length == 1 && c[0] in '0'..'9') Item(c, Commit.Keypad(c[0])) else itemOf(c) }
         val symbols = group.flatMap { PresetLists.of(it.toString()).orEmpty() }
             .filter { s -> s != first?.text && s !in upper && s !in lower && s.none(::isLetterOrDigit) }
@@ -174,7 +175,7 @@ object KeyDefaults {
     }
 
     /**
-     * A written first (`keypad:3`, `action:tone-5`, `~`) as an item; a theme's `swipe-up=` read as the layout's actions are
+     * A written first (`keypad:3`, `action:tone-5`, `~`) as an item; a layout's `swipe-up=` read as its actions are
      * (SceneAction, 060-s6-review M2): `commit:qq` committed as it is, `key:`/`code:U+…` typed as a key, any other action
      * (`sym:BackSpace`) the action, of no text to draw.
      */
@@ -204,7 +205,7 @@ object KeyDefaults {
     private const val TEN_BITS = 10
     private const val LOW_MASK = 0x3FF
 
-    // a theme's first: the item it names (by its action, its keypad digit or its text, typed as a key or as is: `commit:1` is the list's 1), else put first among the symbols
+    // a layout's first: the item it names (by its action, its keypad digit or its text, typed as a key or as is: `commit:1` is the list's 1), else put first among the symbols
     private fun DefaultList.withFirst(written: String): DefaultList {
         val want = itemOf(written)
         val found = items.firstOrNull { it == want || (want.commit is Commit.Action && it.commit == want.commit) || (textual(want) && it.text == want.text) }

@@ -146,6 +146,10 @@
     <string name="sound_class_space">space</string>
     <string name="sound_class_enter">enter</string>
     <string name="sound_class_backspace">backspace</string>
+    <plurals name="theme_pack_layouts_ignored">
+        <item quantity="one">%1$d long-press, corner or swipe setting written in its layouts does nothing: from 0.6.1 a theme sets only how keys look; what a key gives held or swiped follows its name, under Keys → Key characters and shortcuts.</item>
+        <item quantity="other">%1$d long-press, corner or swipe settings written in its layouts do nothing: from 0.6.1 a theme sets only how keys look; what a key gives held or swiped follows its name, under Keys → Key characters and shortcuts.</item>
+    </plurals>
     <string name="theme_pack_layouts_unused">Layouts not used (unreadable, missing keys the keyboard needs, or not one of the app\'s keyboards): %1$s</string>
     <string name="keyboard_themed">%1$s (theme: %2$s)</string>
     <string name="theme_pack_warnings">Note:</string>

@@ -1751,3 +1751,53 @@ case("ST-122", needs="jvm:KotlinHostHandwritingTest.handwritingIsNoInputMethodTo
 case("ST-123", needs="jvm:HandwritingModeTest.theThemesInkOnlyWhereItStandsOutFromTheLetters、PanelThemeTest.theInkOverTheLetters")(lambda d: None)
 
 case("ST-124", needs="jvm:InputMethodSettingsScreenTest.aSharedOptionSaysUnderItWhatItIsNoUseTo")(lambda d: None)
+
+
+def push_zhuyin_held_pack(d):
+    """uat-zhuyin-held.theme in 下载: Nord as a pack of its own with the app's 注音全键盘, its ㄅ (zyfull/1) writing a
+    corner ! and a swipe up typing ㄅㄅ of its own, as a 0.6.0 pack could"""
+    def read(*p):
+        with open(os.path.join(SCENE, *p), encoding="utf-8") as f:
+            return f.read()
+    zhuyin = read("layouts", "zhuyin.xml")
+    assert 'shortcut="zyfull/1"' in zhuyin, "the app's 注音 no longer names ㄅ zyfull/1"
+    zhuyin = zhuyin.replace('shortcut="zyfull/1"', 'shortcut="zyfull/1" alt="!" swipe-up="commit:ㄅㄅ"', 1)
+    p = os.path.join(tempfile.gettempdir(), f"uat-zhuyin-held-{d.port}.theme")
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("theme.xml", read("themes", "nord.xml").replace('name="nord"', 'name="uat-zhuyin-held"', 1))
+        z.writestr("layouts/zhuyin.xml", zhuyin)
+    push_download(d, p, "uat-zhuyin-held")
+
+
+@case("ST-133", base="B0-注音全键盘", mutates=True, visual=True)
+def st133(d):
+    def bo():
+        d.open_page("text")
+        d.clear()
+        b = d.face("ㄅ")
+        corner = b.desc
+        d.swipe(b.c, (b.c[0], b.c[1] - 130), 150, after=0.8)
+        up = d.field_text()
+        d.clear()
+        return corner, up
+    before = bo()
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统深色模式", False)
+    push_zhuyin_held_pack(d)
+    d.step("导入")
+    import_theme(d, "uat-zhuyin-held", confirm=False)
+    for told in ("此主题包含自定义布局：zhuyin", "主题自带的布局里有 2 处长按、角标、滑动的写法不起作用"):
+        check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:10]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "导入后主题列表里没有它")
+    d.tap(item.c, 1.5)
+    d.step("看 ㄅ")
+    after = bo()
+    d.open_page("text")
+    d.face("ㄅ")
+    d.shot("kb", "主题自带注音全键盘：ㄅ 的键角是内置的，不是 !")
+    check(after[0] == before[0] and "!" not in after[0], f"ㄅ 的键角读作「{after[0]}」，内置的是「{before[0]}」")
+    check(after[1] == before[1] and "ㄅㄅ" not in after[1], f"ㄅ 上滑打出「{after[1]}」，内置的是「{before[1]}」")
+    return f"确认框提示 2 处不起作用；ㄅ 键角「{after[0]}」、上滑「{after[1]}」，和内置的一样"

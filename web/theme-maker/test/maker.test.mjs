@@ -433,6 +433,24 @@ test("a pack's own layout of a board is the one the preview draws; one that does
   assert.deepEqual(keys(bad), keys(M.doc(d.xml)));
 });
 
+test("a pack's layout writing a key's long press, corner or swipes: a warning a file with its lines, the app's drawn", () => {
+  const d = M.fromBuiltin(E, 'material');
+  const zhuyin = E.layoutSource('zhuyin');
+  const swiped = zhuyin.replace('shortcut="zyfull/1"', 'shortcut="zyfull/1" swipe-up="commit:ㄅㄅ" alt="!"').replace('shortcut="zyfull/2"', 'shortcut="zyfull/2" double-tap="commit:ㄉ"');
+  const lines = ['commit:ㄅㄅ', 'commit:ㄉ'].map((t) => swiped.split('\n').findIndex((l) => l.includes(t)) + 1);
+  const env = M.envJson(M.ENV);
+  const r = M.check(E, M.doc(d.xml, d.files, { 'zhuyin.xml': swiped }), 'zhuyin', env, null);
+  const notices = r.problems.filter((p) => p.level === 'warning' && /不起作用/.test(p.message));
+  assert.equal(notices.length, 1, JSON.stringify(r.problems));
+  assert.ok(notices[0].message.startsWith('layouts/zhuyin.xml：第 ' + lines.join('、') + ' 行的'), notices[0].message);
+  // drawn as the app's: its corners the app's
+  assert.equal(r.scene.text(), M.check(E, d, 'zhuyin', env, null).scene.text());
+  // the example 17 keys write its corners as the app draws them: no notice
+  const k17 = M.check(E, M.exampleDoc(examples[2]), 'k18', env, null);
+  assert.deepEqual(k17.problems.filter((p) => /不起作用/.test(p.message)), []);
+  assert.deepEqual(M.ignoredNotice([]), []);
+});
+
 test('the check before a save: an error of any board or version stops it, the app\'s refusals with them, each once', () => {
   const d = M.fromBuiltin(E, 'material');
   assert.deepEqual(M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV)), { errors: [], warnings: [] });

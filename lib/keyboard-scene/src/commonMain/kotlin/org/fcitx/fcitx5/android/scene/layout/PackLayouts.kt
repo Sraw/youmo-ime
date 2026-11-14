@@ -17,6 +17,17 @@ object PackLayouts {
     private val DIGIT = Regex("[0-9]")
     private const val BOM = "\uFEFF"
 
+    /** The app's fragments boards include (`<fragment>`): a pack's own of the id is read for its boards. */
+    val FRAGMENTS = setOf("grouped-bottom")
+
+    /**
+     * Whether a pack's layout file [id] (`k18`, `grouped-bottom`) is read at all: one of the app's boards it would stand
+     * for, or a fragment those include. One rule for the app's import and drawing (ThemePackLayouts.read), [readable]
+     * and the theme maker's page (061-custom-layout §11): a board the app has no more (手写, 061-handwriting-toolbar)
+     * leaves its pack's file unread and uncounted.
+     */
+    fun replaces(id: String): Boolean = id in BuiltInKeyData.BOARDS || id in FRAGMENTS
+
     /** The most bytes of a pack's layout file the app reads (ThemeAssetLimits.MAX_LAYOUT_BYTES): a bigger one is not read. */
     const val MAX_BYTES = 64L * 1024
 
@@ -58,7 +69,7 @@ object PackLayouts {
      * files the app reads ([readable]): one it does not would be asked here and not drawn there.
      */
     fun drawn(app: List<BlankKeys.Board>, own: Map<String, String>, appText: (String) -> String?): List<BlankKeys.Board> =
-        app.map { a -> own[a.layout.id]?.let { packBoard(a, it, own, appText) } ?: a }
+        app.map { a -> own[a.id]?.let { packBoard(a, it, own, appText) } ?: a }
 
     private fun packBoard(app: BlankKeys.Board, text: String, own: Map<String, String>, appText: (String) -> String?): BlankKeys.Board? {
         val layout = (LayoutReader.layout(text) as? Parsed.Ok)?.value ?: return null
@@ -67,7 +78,7 @@ object PackLayouts {
             val t = own[src] ?: appText(src) ?: return null
             fragments[src] = (LayoutReader.fragment(t) as? Parsed.Ok)?.value ?: return null
         }
-        return BlankKeys.Board(layout, fragments).takeIf { judge(app.layout.id, layout, fragments, app.layout, app.fragments) == null }
+        return BlankKeys.Board(layout, fragments, app.id).takeIf { judge(app.id, layout, fragments, app.layout, app.fragments) == null }
     }
 
     // every cell of [layout], its includes' rows in place

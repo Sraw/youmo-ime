@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Include
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
+import org.fcitx.fcitx5.android.scene.layout.KeyData
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.PackLayouts
@@ -38,8 +39,15 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
     override fun refuses(id: String, layout: Layout, fragments: Map<String, Fragment>): String? =
         judge(id, layout, fragments, SceneLayouts.builtIn(context, id))
 
-    /** What an import tells of a pack's layouts: the keyboards it replaces, the files it never uses with why, the `commit:` actions of those used. */
-    class Report(val used: List<String>, val unused: List<Pair<String, String>>, val commits: Int)
+    // 主题只管外观: what its keys do held or swiped the app's keys' of their names
+    override val keyData: KeyData.Mode get() = KeyData.Mode.Pack
+
+    /**
+     * What an import tells of a pack's layouts: the keyboards it replaces, the files it never uses with why, the `commit:`
+     * actions of those used (as they are taken: a long press's or a swipe's written in it is not), and how many of what
+     * they write a key does held or swiped is not taken ([ignored], KeyData: 061-custom-layout §19.4).
+     */
+    class Report(val used: List<String>, val unused: List<Pair<String, String>>, val commits: Int, val ignored: Int = 0)
 
     companion object {
         const val PREFIX = "theme:"
@@ -50,9 +58,9 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
         fun current(context: Context): LayoutSource =
             (ThemeManager.activeOrNull as? Theme.Pack)?.let { ThemePackLayouts(context, it) } ?: BuiltInLayouts(context)
 
-        /** The layout file [id] of the folder [dir], an id the app has only, within the limit, its byte-order mark gone. */
+        /** The layout file [id] of the folder [dir], an id a pack's file is read by only ([PackLayouts.replaces]), within the limit, its byte-order mark gone. */
         fun read(dir: File, id: String): String? {
-            if (!BuiltInLayouts.has(id)) return null
+            if (!PackLayouts.replaces(id)) return null
             val file = File(dir, "$id.xml")
             if (!file.isFile || file.length() > ThemeAssetLimits.MAX_LAYOUT_BYTES) return null
             return file.readText().removePrefix(BOM)
@@ -79,7 +87,7 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
         }
 
         private sealed interface Taken {
-            class Yes(val layout: Layout, val fragments: Map<String, Fragment>) : Taken
+            class Yes(val layout: Layout, val fragments: Map<String, Fragment>, val ignored: List<KeyData.Ignored>) : Taken
 
             /** Not a keyboard used: [why], null for a fragment (told unless a keyboard used includes it). */
             class Not(val why: String?) : Taken
@@ -87,8 +95,7 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
 
         // the pack's file [id] as it would be drawn ([report])
         private fun taken(dir: File, id: String, app: (String) -> SceneLayout?, appText: (String) -> String?): Taken {
-            val text = (if (BuiltInLayouts.has(id)) read(dir, id) else null)
-                ?: return Taken.Not(if (BuiltInLayouts.has(id)) "does not read" else "not a keyboard of the app")
+            val text = read(dir, id) ?: return Taken.Not(if (PackLayouts.replaces(id)) "does not read" else "not a keyboard of the app")
             val layout = (LayoutReader.layout(text) as? Parsed.Ok)?.value
                 ?: return Taken.Not("does not read".takeIf { LayoutReader.fragment(text) !is Parsed.Ok })
             val fragments = HashMap<String, Fragment>()
@@ -97,7 +104,9 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
                     ?: return Taken.Not("its fragment $src does not read")
                 fragments[src] = f
             }
-            return judge(id, layout, fragments, app(id))?.let { Taken.Not(it) } ?: Taken.Yes(layout, fragments)
+            judge(id, layout, fragments, app(id))?.let { return Taken.Not(it) }
+            // as it is drawn: what its keys do held or swiped the app's (SceneLayouts.load)
+            return KeyData.of(id, layout, fragments, KeyData.Mode.Pack).let { Taken.Yes(it.layout, it.fragments, it.ignored) }
         }
 
         /**
@@ -110,6 +119,8 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
             val unused = ArrayList<Pair<String, String>>()
             // the fragments of the keyboards used, each counted once (k14 and k18 share the bottom row)
             val included = HashMap<String, Fragment>()
+            // each thing not taken once, a fragment's though two keyboards include it
+            val ignored = HashSet<KeyData.Ignored>()
             var commits = 0
             val ids = files.map { it.removeSuffix(".xml") }
             for (id in ids) {
@@ -118,6 +129,7 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
                     is Taken.Yes -> {
                         used += id
                         commits += commits(r.layout, emptyMap())
+                        ignored += r.ignored
                         r.fragments.filterKeys { read(dir, it) != null }.forEach { (src, f) -> included[src] = f }
                     }
                 }
@@ -125,7 +137,7 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
             commits += included.values.sumOf { f -> commits(listOf(f.defaults), f.rows) }
             ids.filter { it !in used && it !in included && unused.none { u -> u.first == it } }
                 .forEach { unused += it to "a fragment no keyboard of the pack includes" }
-            return Report(used, unused, commits)
+            return Report(used, unused, commits, ignored.size)
         }
     }
 }

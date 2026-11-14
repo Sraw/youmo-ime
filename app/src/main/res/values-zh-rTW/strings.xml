@@ -146,6 +146,9 @@
     <string name="sound_class_space">空白</string>
     <string name="sound_class_enter">Enter</string>
     <string name="sound_class_backspace">退格</string>
+    <plurals name="theme_pack_layouts_ignored">
+        <item quantity="other">主題自帶的佈局裡有 %1$d 處長按、角標、滑動的寫法不起作用：0.6.1 起主題只管樣子，這些由 按鍵 → 按鍵字元和快捷鍵 管。</item>
+    </plurals>
     <string name="theme_pack_layouts_unused">不會使用的佈局（讀不出、缺鍵盤必需的鍵，或不是已有的鍵盤）：%1$s</string>
     <string name="keyboard_themed">%1$s（主題：%2$s）</string>
     <string name="theme_pack_warnings">注意：</string>

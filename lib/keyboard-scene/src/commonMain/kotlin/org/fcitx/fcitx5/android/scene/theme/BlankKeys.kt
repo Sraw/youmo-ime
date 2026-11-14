@@ -29,7 +29,8 @@ object BlankKeys {
     val REQUIRED_ROLES = setOf("shift", "backspace", "space", "enter")
 
     /** A board the theme may be shown on: the app's own, or a pack's (`layouts/`), with the fragments it includes. */
-    class Board(val layout: Layout, val fragments: Map<String, Fragment> = emptyMap())
+    /** A board, [id] the app's file's it is drawn as (`emoticon`, whose `<keyboard id>` is `emoji`). */
+    class Board(val layout: Layout, val fragments: Map<String, Fragment> = emptyMap(), val id: String = layout.id)
 
     /** A key left blank: on [board], its id [key], in [scenes], in [states]. */
     data class Blank(val board: String, val key: String, val scenes: Set<String>, val states: Set<KeyState>) {

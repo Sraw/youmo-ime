@@ -51,6 +51,7 @@ object ThemePackDialogs {
         if (pack.replaces) out += ctx.getString(R.string.theme_pack_replaces)
         val layouts = staged.layoutReport
         if (layouts.used.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts, layouts.used.joinToString(", "), layouts.commits)
+        if (layouts.ignored > 0) out += ctx.resources.getQuantityString(R.plurals.theme_pack_layouts_ignored, layouts.ignored, layouts.ignored)
         if (layouts.unused.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts_unused, layouts.unused.joinToString(", ") { it.first })
         val sounds = staged.theme.sounds.keys
         if (sounds.isNotEmpty()) {

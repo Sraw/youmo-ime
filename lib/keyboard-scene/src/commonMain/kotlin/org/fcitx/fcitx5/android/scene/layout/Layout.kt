@@ -19,7 +19,14 @@ class Layout(
     /** Its keys pop up a preview as they are pressed, and their long press's keyboard or menu (the number pad's do not: rules C §7). */
     val preview: Boolean = true,
     val popups: Boolean = true,
-)
+) {
+    /**
+     * This keyboard with [defaults], [parts] and [popups] in place of its own, everything else of it kept: the one place
+     * a layout is made again of another (KeyData), so a member added here is carried over by adding it here alone.
+     */
+    fun with(defaults: KeyAttrs, parts: List<Part>, popups: Boolean): Layout =
+        Layout(id, name, family, columns, onSplit, defaults, parts, preview, popups)
+}
 
 /** A row of a keyboard, or the rows of a fragment it includes. */
 sealed interface Part
@@ -83,6 +90,12 @@ class Key(
     val letters: Letters? = null,
     /** `lean=` as written: `off`, its tap sends the group's code alone, not where it fell (null: not written). */
     val lean: Boolean? = null,
+    /**
+     * Which of the app's groups' corners a group key takes (KeyDefaults.corner): set by [KeyData] on a theme's or a
+     * user's layout, the app's key of its name's place (-1: none), so a key merged or moved before it shifts no
+     * corner (061-custom-layout §9); null, its place among this layout's group keys (the app's own layouts).
+     */
+    val place: Int? = null,
 ) : Cell {
     /**
      * Whether a tap on it leans to the letter it fell nearest (060-render-v2 §15, 按落点加权): a group
@@ -91,7 +104,7 @@ class Key(
     val leans: Boolean get() = letters != null && letters.group.length >= 2 && lean != false
 
     /** This key as it is, of `shortcut=` [shortcut] (LayoutReader naming a pack's unnamed nine key): every field kept. */
-    fun named(shortcut: String): Key = Key(id, condition, attrs.copy(shortcut = shortcut), popup, menu, line, variants, letters, lean)
+    fun named(shortcut: String): Key = Key(id, condition, attrs.copy(shortcut = shortcut), popup, menu, line, variants, letters, lean, place)
 }
 
 /**

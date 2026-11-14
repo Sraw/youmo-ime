@@ -159,10 +159,10 @@
     for (const n of names) if (!n.endsWith('.xml') || !L.isPlainFileName(n)) bad('layouts/' + n + ' 不是 App 认得的布局文件名（<键盘>.xml）');
     if (names.length > lim.layouts) bad('自带的键盘布局 ' + names.length + ' 个，App 最多收 ' + lim.layouts + ' 个');
     for (const n of names) if (enc.encode(d.layouts[n]).length > lim.layoutBytes) bad('layouts/' + n + ' 超过 ' + lim.layoutBytes + ' 字节');
-    const boards = new Set(E.layouts());
     for (const n of names) {
       const id = n.replace(/\.xml$/, '');
-      if (!boards.has(id) && E.layoutSource(id) == null) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：App 没有这个键盘，不会用它' });
+      // the app's one rule of the files it reads (PackLayouts.replaces)
+      if (!E.replaces(id)) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：App 没有这个键盘，不会用它' });
     }
     // the app's ThemeAssetLimits.MAX_THEME_XML_BYTES
     const xmlBytes = enc.encode(d.xml).length;
@@ -568,24 +568,45 @@
   /**
    * The keyboard [board] is drawn with: the pack's own `layouts/<board>.xml` where it has one that reads (its includes
    * from the pack's other files there, else the app's), else the app's (its id). One that does not read is [warn]ed
-   * of, the app's drawn, as the app does (ThemePackLayouts: logged, its own drawn).
+   * of, the app's drawn, as the app does (ThemePackLayouts: logged, its own drawn). One taken is drawn as the app takes
+   * it: its keys' long press, corner and swipes the app's keys' of their names (主题只管外观), what it writes of them
+   * [warn]ed of, file by file, with the lines.
    */
   function layoutOf(E, d, board, warn) {
     const own = d.layouts[board + '.xml'];
     if (own == null) return board;
     const fragments = Object.create(null);
     // the pack's fragments the app reads: only under an id of its own (ThemePackLayouts.read)
-    for (const [n, t] of Object.entries(d.layouts)) if (n !== board + '.xml' && n.endsWith('.xml') && E.layoutSource(n.slice(0, -4)) != null) fragments[n.slice(0, -4)] = t;
-    const l = E.readLayout(own, fragments);
+    for (const [n, t] of Object.entries(d.layouts)) if (n !== board + '.xml' && n.endsWith('.xml') && E.replaces(n.slice(0, -4))) fragments[n.slice(0, -4)] = t;
+    const l = E.readLayout(own, fragments, board);
     if (!l.ok) {
       warn(l.problems.map((p) => ({ line: 0, message: 'layouts/' + board + '.xml' + (p.line ? ' 第 ' + p.line + ' 行' : '') + '：' + p.message + '（App 会用自己的这个键盘）' })));
       return board;
     }
     // as typable as the app's, else the app's drawn (ThemePackLayouts.judge, the same rule: PackLayouts)
     const why = E.refuses(board, l.layout);
-    if (why == null) return l.layout;
+    if (why == null) {
+      warn(ignoredNotice(l.ignored));
+      return l.layout;
+    }
     warn([{ line: 0, message: 'layouts/' + board + '.xml：App 不会用它（' + why + '），会用自己的这个键盘' }]);
     return board;
+  }
+
+  /**
+   * What a pack's layout writes of its keys held or swiped that the app does not take ([ignored], readLayout's), one
+   * warning a file: its lines, each once, in order.
+   */
+  function ignoredNotice(ignored) {
+    const lines = new Map();
+    for (const i of ignored || []) {
+      if (!lines.has(i.file)) lines.set(i.file, new Set());
+      if (i.line) lines.get(i.file).add(i.line);
+    }
+    return [...lines].map(([file, set]) => {
+      const at = set.size ? '第 ' + [...set].sort((a, b) => a - b).join('、') + ' 行的' : '';
+      return { line: 0, message: 'layouts/' + file + '.xml：' + at + '长按、角标、滑动写法不起作用（0.6.1 起主题只管样子，这些跟着键的名字，在 App 的 按键 → 按键字符和快捷键 里设）' };
+    });
   }
 
   /**
@@ -689,6 +710,6 @@
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES, ZH_PUNCTUATION,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, ignoredNotice, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

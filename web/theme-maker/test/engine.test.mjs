@@ -161,6 +161,19 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   assert.equal(missing.ok, false);
   assert.match(missing.problems[0].message, /nowhere/);
   assert.equal(E.readLayout(k14, { 'grouped-bottom': '<fragment' }).ok, false);
+  // as a theme pack's file of a board (主题只管外观, KeyData): a key's held and swiped the app's of its name, what is written
+  // of them and not taken told with its line; as written without the board
+  const zhuyin = read(dir, 'zhuyin.xml');
+  const swiped = zhuyin.replace('shortcut="zyfull/1"', 'shortcut="zyfull/1" swipe-up="commit:ㄅㄅ"');
+  const asPack = E.readLayout(swiped, null, 'zhuyin');
+  assert.ok(asPack.ok, JSON.stringify(asPack.problems));
+  const line = swiped.split('\n').findIndex((l) => l.includes('commit:ㄅㄅ')) + 1;
+  assert.deepEqual(asPack.ignored, [{ file: 'zhuyin', line, what: 'swipe-up' }]);
+  assert.equal(E.buildScene(asPack.layout, light, env, fixed).scene.text(), E.buildScene('zhuyin', light, env, fixed).scene.text());
+  assert.deepEqual(E.defaultMarks(asPack.layout, {}), E.defaultMarks('zhuyin', {}));
+  assert.deepEqual(E.readLayout(swiped, null).ignored, []);
+  assert.deepEqual(E.readLayout(zhuyin, null, 'zhuyin').ignored, [], 'written as the app has it: nothing');
+  assert.ok(E.replaces('grouped-bottom') && E.replaces('emoticon') && !E.replaces('mine'));
   assert.equal(E.buildScene('nope', light, env, fixed).ok, false);
   assert.equal(E.buildScene('qwerty', light, { width: 1080 }, fixed).ok, false, 'an environment without its height');
   assert.equal(E.buildScene('qwerty', light, '{"width": 1, "height": 1, "density": 1, "shift": "twice"}', fixed).ok, false);

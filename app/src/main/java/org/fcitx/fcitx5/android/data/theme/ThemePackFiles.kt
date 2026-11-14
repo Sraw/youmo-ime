@@ -476,7 +476,7 @@ object ThemePackFiles {
         val own = File(dir, LAYOUTS)
         // the pack's files the app would read (ThemePackLayouts.read: an id it has, within the limit)
         val texts = BuiltInLayouts.RAW.keys.mapNotNull { id -> ThemePackLayouts.read(own, id)?.let { id to it } }.toMap()
-        return PackLayouts.drawn(builtInLayouts.map { BlankKeys.Board(it.layout, it.fragments) }, texts) { BuiltInLayouts(appContext).text(it) }
+        return PackLayouts.drawn(builtInLayouts.map { BlankKeys.Board(it.layout, it.fragments, it.id) }, texts) { BuiltInLayouts(appContext).text(it) }
     }
 
     // the keyboards only: a fragment (grouped-bottom) read as a layout is refused, logged as broken
