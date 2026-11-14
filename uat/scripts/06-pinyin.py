@@ -520,6 +520,8 @@ def py121(d):
     for style in ("拼音", "注音符号"):
         if style == "注音符号":
             d.clear()
+            # the test page is in front: settings first, or goto finds no 通用输入 (R25 device pass)
+            d.open_settings()
             d.goto("通用输入")
             choose(d, "候选词注音", "注音符号")
             d.open_page("text")

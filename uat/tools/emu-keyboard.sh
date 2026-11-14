@@ -9,7 +9,7 @@
 # with no characters for an input method), which looked like bugs that a real keyboard does not have.
 #
 #   export ANDROID_SERIAL=emulator-5554
-#   uat/tools/emu-keyboard.sh up            # adb root, register "Test USB Keyboard"
+#   uat/tools/emu-keyboard.sh up            # adb root, register "Test USB Keyboard" (uinput; Android 10, which has none: hid)
 #   uat/tools/emu-keyboard.sh type ni hao   # letters, digits, spaces and ; ' , . /, key by key
 #   uat/tools/emu-keyboard.sh key SHIFT     # press and release keys in turn
 #   uat/tools/emu-keyboard.sh combo CTRL SPACE   # hold the first ones, press the last
@@ -31,6 +31,9 @@ declare -A C=(
   [RCTRL]=97 [RALT]=100 [HOME]=102 [UP]=103 [PGUP]=104 [LEFT]=105 [RIGHT]=106 [END]=107 [DOWN]=108
   [PGDN]=109 [PAGEUP]=104 [PAGEDOWN]=109 [DEL]=111 [META]=125
 )
+
+# a USB HID boot keyboard's report descriptor: a byte of modifiers (usages 224-231), one reserved, six keys (0-101)
+HID_BOOT_KEYBOARD=5,1,9,6,161,1,5,7,25,224,41,231,21,0,37,1,117,1,149,8,129,2,149,1,117,8,129,1,149,6,117,8,21,0,37,101,5,7,25,0,41,101,129,0,192
 
 device() {
   adb shell dumpsys input | grep -A3 'Test USB Keyboard' | grep -o '/dev/input/event[0-9]*' | head -1 || true
@@ -60,13 +63,27 @@ up)
   emulator || { echo "not an emulator: refusing" >&2; exit 1; }
   adb root >/dev/null; adb wait-for-device
   keys=$(seq -s, 1 255 | sed "s/,$//")   # BSD seq ends with the separator: invalid JSON
-  adb shell "echo '{\"id\":1,\"command\":\"register\",\"name\":\"Test USB Keyboard\",\"vid\":4660,\"pid\":22136,\"bus\":\"usb\",\"configuration\":[{\"type\":100,\"data\":[1]},{\"type\":101,\"data\":[$keys]}]}' > /data/local/tmp/kbfifo.log"
-  adb shell "nohup sh -c 'tail -n +1 -f /data/local/tmp/kbfifo.log | uinput -' >/data/local/tmp/uinput.out 2>&1 &"
-  sleep 2
-  device
+  # by the level, not by looking for the command: a failed adb call would read as "no uinput" and take hid's way on Android 11+
+  sdk=$(prop ro.build.version.sdk)
+  [[ "$sdk" =~ ^[0-9]+$ ]] || { echo "cannot read the device's API level (ro.build.version.sdk: '$sdk')" >&2; exit 1; }
+  if (( sdk >= 30 )); then
+    adb shell "echo '{\"id\":1,\"command\":\"register\",\"name\":\"Test USB Keyboard\",\"vid\":4660,\"pid\":22136,\"bus\":\"usb\",\"configuration\":[{\"type\":100,\"data\":[1]},{\"type\":101,\"data\":[$keys]}]}' > /data/local/tmp/kbfifo.log"
+    adb shell "nohup sh -c 'tail -n +1 -f /data/local/tmp/kbfifo.log | uinput -' >/data/local/tmp/uinput.out 2>&1 &"
+  else
+    # Android 10 (API 29) has no uinput command (it came with 11): the same keyboard through the system's
+    # hid command (uhid), a USB boot keyboard by its report descriptor (modifiers 224-231, keys 0-101).
+    # The kernel gives it an event node as it does uinput's, so type, key and combo are the same sendevent
+    adb shell "echo '{\"id\":1,\"command\":\"register\",\"name\":\"Test USB Keyboard\",\"vid\":4660,\"pid\":22136,\"descriptor\":[$HID_BOOT_KEYBOARD]}' > /data/local/tmp/kbfifo.log"
+    adb shell "nohup sh -c 'tail -n +1 -f /data/local/tmp/kbfifo.log | hid -' >/data/local/tmp/uinput.out 2>&1 &"
+  fi
+  # up to 5 s: said here, not by the first type's "no keyboard" (R25 device pass: up exited 0 on API 29)
+  for _ in 1 2 3 4 5 6 7 8 9 10; do DEV=$(device); [[ -n "$DEV" ]] && break; sleep 0.5; done
+  [[ -n "$DEV" ]] || { echo "no keyboard came up (API $sdk): $(adb shell 'cat /data/local/tmp/uinput.out' | tr -d '\r' | head -3)" >&2; exit 1; }
+  echo "$DEV"
   ;;
 down)
-  adb shell "pkill -x uinput; pkill -f 'kbfifo[.]log'; rm -f /data/local/tmp/kbfifo.log" || true
+  # hid is app_process under its class's name; it ends with its pipe as well
+  adb shell "pkill -x uinput; pkill -f 'commands[.]hid[.]Hid'; pkill -f 'kbfifo[.]log'; rm -f /data/local/tmp/kbfifo.log" || true
   ;;
 type|key|combo)
   DEV=$(device); [[ -n "$DEV" ]] || { echo "no keyboard: run up first" >&2; exit 1; }

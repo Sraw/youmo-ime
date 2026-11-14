@@ -198,6 +198,15 @@ class KeyboardHarness(
                 // with Ctrl, a shortcut (Ctrl+Z), as the view root hands it on
                 (event.isCtrlPressed && event.action == KeyEvent.ACTION_DOWN && target.onKeyShortcut(event.keyCode, event)) ||
                     target.dispatchKeyEvent(event)
+
+            override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence? = if (nothingBeforeGiven) null else super.getTextBeforeCursor(n, flags)
+
+            override fun getSurroundingText(beforeLength: Int, afterLength: Int, flags: Int): android.view.inputmethod.SurroundingText? =
+                if (nothingBeforeGiven || nothingAfterGiven) null else super.getSurroundingText(beforeLength, afterLength, flags)
+
+            override fun getTextAfterCursor(n: Int, flags: Int): CharSequence? = if (nothingAfterGiven) null else super.getTextAfterCursor(n, flags)
+
+            override fun takeSnapshot(): android.view.inputmethod.TextSnapshot? = if (nothingBeforeGiven || nothingAfterGiven) null else super.takeSnapshot()
         }
         this.info = info
         connection = ic
@@ -348,6 +357,15 @@ class KeyboardHarness(
     }
 
     private var delivered = intArrayOf(-1, -1, -1, -1)
+
+    /**
+     * The app gives nothing of what is before its cursor while set (getTextBeforeCursor, getSurroundingText and
+     * takeSnapshot null), what is after it as ever: the testbed's `null_before` field (uat/TESTBED.md).
+     */
+    var nothingBeforeGiven = false
+
+    /** The mirror: nothing of what is after the cursor given (getTextAfterCursor null, and the reads of both sides), what is before it as ever. */
+    var nothingAfterGiven = false
 
     /** The field's selection changes not told to the service while set: its tracked selection lagging, as an editor's report can. */
     var selectionLags = false

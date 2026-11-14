@@ -98,8 +98,20 @@ object EditPlan {
      * back from the editor's cursor as the report says, the start at most), nothing kept. A selection whose text the app gave
      * none of (or too long to) is deleted and not kept: with no text read it is no empty one, the
      * side before it never cleared in its place. Nothing of a [password] is kept.
+     * A side the app gave none of ([beforeGiven], [afterGiven] false; [field] has "" there) is no side read
+     * empty: nothing on it is cleared, the select-all that takes a whole field never used over it, and what
+     * is kept is kept as a short read's is ([Cleared.whole] false: text typed on that side cannot be told).
      */
-    fun clear(field: Field, start: Int, end: Int, limit: Int, password: Boolean): Clearing {
+    @Suppress("LongParameterList")
+    fun clear(
+        field: Field,
+        start: Int,
+        end: Int,
+        limit: Int,
+        password: Boolean,
+        beforeGiven: Boolean = true,
+        afterGiven: Boolean = true,
+    ): Clearing {
         val (before, selected, after) = field
         val from = minOf(start, end)
         return when {
@@ -123,8 +135,14 @@ object EditPlan {
                 listOf(Step.Delete(before.length, 0)),
                 Cleared(Field("", "", after), listOf(Step.Replace(before)), whole = from == before.length),
             )
-            // nothing before the cursor: all the field is after it
-            after.length >= limit -> Clearing(listOf(Step.ContextMenu(Menu.SelectAll), Step.Replace("")), null)
+            // nothing before the cursor: all the field is after it, taken whole. Only where that was read
+            // and the cursor is reported at the start: with text before it not given (or not reported yet)
+            // a select-all would take that too, never read and not to be put back; then what was read
+            // after the cursor alone goes, the rest left for another 清除
+            after.length >= limit -> Clearing(
+                if (beforeGiven && from == 0) listOf(Step.ContextMenu(Menu.SelectAll), Step.Replace("")) else listOf(Step.Delete(0, after.length)),
+                null,
+            )
             // a reported cursor past the start with nothing read before it is a short read too (an app that
             // gives no text before the cursor): the cursor put back where the report has it, the field matched
             // as the before side's short read is ([Cleared.whole] false), never sent to the field's start.
@@ -135,7 +153,13 @@ object EditPlan {
                 Cleared(Field("", "", ""), listOf(Step.Replace(after), Step.Select(from, from)), whole = from == 0, cursorBefore = true),
             )
             else -> Clearing(emptyList(), null)
-        }.let { if (password) it.copy(cleared = null) else it }
+        }.let {
+            when {
+                password -> it.copy(cleared = null)
+                beforeGiven && afterGiven -> it
+                else -> it.copy(cleared = it.cleared?.copy(whole = false))
+            }
+        }
     }
 
     /** [steps] carried out on [editor], the context menu's through [menu] (the editor has no such call). */

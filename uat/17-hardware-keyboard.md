@@ -12,6 +12,8 @@ uat/tools/emu-keyboard.sh key SHIFT          # 依次按下松开
 uat/tools/emu-keyboard.sh combo CTRL SPACE   # 按住前面的，按最后一个
 ```
 
+Android 10（API 29，youmo29）没有 `uinput` 命令，脚本在那里改用系统的 `hid` 命令插同一个键盘，用法一样；键盘没插上时 `up` 直接报错。
+
 不要用模拟器自带的键盘（qwerty2，它的 Shift 是粘滞的，也不给输入法字符），也不要在 redroid 这类和宿主机共用内核的容器里造键盘（见脚本开头）。
 
 前提里的 **B0-实体**：B0，再接上实体键盘（系统设置里"显示屏幕键盘"保持关闭，这是默认），点「普通文本」框，屏幕键盘弹出来。

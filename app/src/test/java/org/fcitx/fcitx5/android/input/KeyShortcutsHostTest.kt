@@ -239,6 +239,90 @@ class KeyShortcutsHostTest {
         assertEquals("", h.field.text.toString())
     }
 
+    // R25 device pass, KB-88: an app that gives nothing before its cursor (the testbed's null_before). The runner
+    // read no field at all where either side was not given, so the swipe did nothing and said nothing; what
+    // is after the cursor goes and comes back, the cursor where it was
+    @Test
+    @Uat("KB-88")
+    fun whereNothingBeforeTheCursorIsGivenWhatIsAfterItIsClearedAndPutBackAtTheCursor() {
+        start("abc def")
+        h.field.setSelection(3)
+        synced()
+        h.nothingBeforeGiven = true
+        swipe(backspace, up = true)
+        until("what is after the cursor cleared") { h.field.text.toString() == "abc" }
+        assertTrue(said().toString(), appContext.getString(R.string.field_cleared) in said())
+        swipe(backspace, up = false)
+        until("put back") { h.field.text.toString() == "abc def" }
+        assertEquals("3..3", selected())
+    }
+
+    // KB-88 review: what is typed cleared in such a field. Put back while nothing was typed since (the clear's own
+    // dropping of what was typed is no edit: nothing forgets the clear between the host's part and its keeping);
+    // not once a word was committed, which the field, giving nothing before its cursor, reads the same after
+    // (kept whole it was typed again after the word)
+    @Test
+    @Uat("KB-88")
+    fun whereNothingBeforeTheCursorIsGivenWhatIsTypedIsPutBackUnlessSomethingWasCommittedSince() {
+        start()
+        h.nothingBeforeGiven = true
+        type("nihao")
+        swipe(backspace, up = true)
+        until("nothing typed") { preedit.isEmpty() }
+        synced()
+        swipe(backspace, up = false)
+        until("typed again") { preedit == "nihao" }
+        assertEquals("", h.field.text.toString())
+
+        swipe(backspace, up = true)
+        until("nothing typed") { preedit.isEmpty() }
+        synced()
+        h.service.commitOverEngine("啊")
+        until("committed") { h.field.text.toString() == "啊" }
+        swipe(backspace, up = false)
+        synced()
+        assertEquals("", preedit)
+        assertEquals("啊", h.field.text.toString())
+        assertTrue(said().toString(), appContext.getString(R.string.nothing_to_restore) in said())
+    }
+
+    // the mirror: an app that gives nothing after its cursor. What is before it goes and comes back, what is after it untouched
+    @Test
+    @Uat("KB-88")
+    fun whereNothingAfterTheCursorIsGivenWhatIsBeforeItIsClearedAndPutBack() {
+        start("abc def")
+        h.field.setSelection(3)
+        synced()
+        h.nothingAfterGiven = true
+        swipe(backspace, up = true)
+        until("what is before the cursor cleared") { h.field.text.toString() == " def" }
+        swipe(backspace, up = false)
+        until("put back") { h.field.text.toString() == "abc def" }
+        assertEquals("3..3", selected())
+    }
+
+    // the same app with nothing after its cursor either gives "" there, not null: nothing read to clear, and
+    // the field is no empty one (review S2), so a copy takes it whole and never says there is nothing to copy
+    @Test
+    @Uat("KB-88")
+    fun whereNothingBeforeTheCursorIsGivenAFieldWithNothingAfterItIsNotTakenForAnEmptyOne() {
+        prefs.setShortcuts(KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)))
+        val clipboard = appContext.getSystemService(ClipboardManager::class.java)
+        clipboard.setPrimaryClip(ClipData.newPlainText(null, "旧的"))
+        start("abc")
+        h.nothingBeforeGiven = true
+        swipe(backspace, up = true)
+        synced()
+        assertEquals("abc", h.field.text.toString())
+        swipe(h.key("c"), up = false)
+        until("the field copied whole") { clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "abc" }
+        assertTrue(said().toString(), appContext.getString(R.string.nothing_to_copy) !in said())
+    }
+
+    // what the notice over the keyboard says now
+    private fun said(): List<String> = org.robolectric.Shadows.shadowOf(appContext as android.app.Application).latestPopupWindow
+        ?.contentView?.let { v -> KeyboardHarness.all(v).filterIsInstance<android.widget.TextView>().map { it.text.toString() }.toList() }.orEmpty()
+
     // review2: a field that asks for no learning keeps nothing of a clear, as a password does
     @Test
     fun aFieldKeptFromLearningIsClearedWithNothingToPutBack() {
@@ -557,8 +641,6 @@ class KeyShortcutsHostTest {
         clipboard.setPrimaryClip(android.content.ClipData.newPlainText(null, "旧的"))
         start("")
         // each said (the empty field's branch run, not a swipe that never reached the command)
-        fun said(): List<String> = org.robolectric.Shadows.shadowOf(appContext as android.app.Application).latestPopupWindow
-            ?.contentView?.let { v -> KeyboardHarness.all(v).filterIsInstance<android.widget.TextView>().map { it.text.toString() }.toList() }.orEmpty()
         swipe(h.key("c"), up = false)
         synced()
         assertTrue(said().toString(), appContext.getString(R.string.nothing_to_copy) in said())

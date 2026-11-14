@@ -288,7 +288,7 @@ uat/tools/uat.py jvm                             # 读 JUnit 结果，按编号�
 
 ## 实体键盘和语音
 
-实体键盘（17）的用例和别的用例一起跑：基线 `B0-实体` 用 `uat/tools/emu-keyboard.sh` 插上一个 uinput USB 键盘，
+实体键盘（17）的用例和别的用例一起跑：基线 `B0-实体` 用 `uat/tools/emu-keyboard.sh` 插上一个 uinput USB 键盘（Android 10 没有 `uinput` 命令，脚本改用 `hid` 命令，插的是同一个键盘），
 别的基线拔掉。语音（12）要导入语音包（运行器默认导入；`--no-voice` 只导文字包，语音用例单列为"在别处跑"）。
 语音片段（`uat/tools/voice-clips.py` 合成，在 `dev/uat-out/voice-clips/`，不进 git）由 debug 包的「片段麦克风」
 （`VoiceClipMic`）当作麦克风读到的声音（`Device.say`）：先 `content write` 写进 App 的 files，再

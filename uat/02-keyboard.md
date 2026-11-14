@@ -531,6 +531,6 @@
 
 ### KB-88 [P2] 光标前读不到的应用里退格上滑清除、下滑恢复
 - **前提**：B0；装了输入测试台（uat/TESTBED.md），打开它的 `behavior`（模拟应用行为）页，点 `null_before` 框（应用不给光标前的字：`getTextBeforeCursor` 这些都返回 null）。
-- **操作**：在框里打 `abc def`，把光标点到 `abc` 后面（`c` 和空格之间）；退格上滑；再退格下滑。
-- **预期**：上滑清掉光标后的 ` def`，框里剩 `abc`，提示"已清除"带撤销；下滑放回，框里是 `abc def`，光标仍在 `abc` 后（不跳到开头或末尾）。
-- **JVM**：ime-core `EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor`（光标前读不到时清除光标后的部分，放回后光标在原处）、`EditPlanTest.whatIsAfterACursorWhoseReportLaggedIsPutBackWithTheCursorWhereTheEditorHasIt`（R25 F7834：光标刚挪、报告还没跟上时，放回后的光标按输入框里的位置）（前一条也记在 KB-62）。这一条还没写进脚本，在模拟器上手工跑。
+- **操作**：切到英文，在框里打 `hello world`（不打 `abc` 这类不是单词的字母：英文按空格时会把它改成词库里的写法 `ABC`），把光标点到 `hello` 后面（`o` 和空格之间）；退格上滑；再退格下滑。
+- **预期**：上滑清掉光标后的 ` world`，框里剩 `hello`，提示"已清除"带撤销；下滑放回，框里是 `hello world`，光标仍在 `hello` 后（不跳到开头或末尾）。
+- **JVM**：`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenWhatIsAfterItIsClearedAndPutBackAtTheCursor`（真键盘、输入框的 `getTextBeforeCursor` 返回 null：上滑清掉光标后的、提示"已清除"，下滑放回、光标在原处）、`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenAFieldWithNothingAfterItIsNotTakenForAnEmptyOne`（光标后也没字时不清除，复制不当成空框）、`KeyShortcutsHostTest.whereNothingAfterTheCursorIsGivenWhatIsBeforeItIsClearedAndPutBack`（反过来，光标后读不到的应用：清掉光标前的、放回）、`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenWhatIsTypedIsPutBackUnlessSomethingWasCommittedSince`（清掉正在打的拼音能放回；之后上屏过字就不放回，提示"没有可恢复的内容"）；ime-core `EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor`（光标前读不到时清除光标后的部分，放回后光标在原处）、`EditPlanTest.aLongFieldAfterACursorWithTextBeforeItNotReadKeepsThatText`（光标后超过一万字时只删读到的那部分，不全选，光标前没读到的字留着）、`EditPlanTest.aClearWithASideNotGivenIsNotPutBackOnceSomethingIsTyped`（有一边读不到的清除，之后打过字就不放回）、`EditPlanTest.whatIsAfterACursorWhoseReportLaggedIsPutBackWithTheCursorWhereTheEditorHasIt`（R25 F7834：光标刚挪、报告还没跟上时，放回后的光标按输入框里的位置）（前一条也记在 KB-62）。这一条还没写进脚本，在模拟器上手工跑。

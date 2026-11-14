@@ -939,7 +939,9 @@ layout; the touch one comes back with the touch keyboard (`HardwareKeyboard.touc
 Testing one (`uat/tools/emu-keyboard.sh`, the cases in `uat/17-hardware-keyboard.md`): the emulator only, never a container device such as redroid (it shares the host kernel, and a uinput
 keyboard there is the host's too). The emulator's own `qwerty2` is an ALPHA keyboard (sticky Shift, `unicodeChar` 0
 in the IME): register a USB keyboard with `/system/bin/uinput` (JSON `register`, vid/pid unknown so it
-reads `Generic.kl`/`Generic.kcm`) and `sendevent` to its `/dev/input/eventN` as root.
+reads `Generic.kl`/`Generic.kcm`) and `sendevent` to its `/dev/input/eventN` as root. Android 10 has no
+`uinput` command: there the script registers the same keyboard with `/system/bin/hid` (uhid, a boot keyboard's
+report descriptor), whose event node takes the same `sendevent`; `up` fails if no keyboard appears.
 
 A number's, a phone's or a date's field opens a number pad of its own (`NumberPad.of(EditorTraits.number)`:
 the keys beside the digits blank (`BlankKey`, a `KeyDef`: no press, nothing for TalkBack; a `<gap look>` of number.xml, drawn faded as `:disabled`, no node) where the field takes none, a plain number
