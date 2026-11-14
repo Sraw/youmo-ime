@@ -135,7 +135,17 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    (a real N-best, not trigram-merged), and reuses the beams of the unchanged prefix so a key costs
    only its last syllables; the words collected from a position whose collecting read no edge where
    the graph changed (`SyllableGraph.sameUntil`) are kept too, which 双拼's 简拼 in the middle needs:
-   every key read alone made collecting from every position grow a key's time with the input.
+   every key read alone made collecting from every position grow a key's time with the input. Of a
+   position whose collecting did read there, the arcs ending before it are kept and only the steps
+   that crossed it are taken again (`collectOn`, from the steps `collectFrom` and it keep a
+   position: those onto where the graph changed or past it, at least the last key; not while a tone
+   is typed, a word's tones being asked of the whole path).
+   The first words keep their scores and order while the arcs from the start are the last decode's
+   and none reads to the end.
+   `PinyinDecoder.work` counts what a decode took (arcs; steps, which guard `collectOn`; words scored
+   in the search; first words scored anew, which guard the scores kept), the same on any
+   machine: `ShuangpinKeyWorkTest` (`:lib:ime-eval:uatTest`) holds a 小鹤 key on the app's data
+   under ceilings by it, and each key's reading to a decoder's made afresh.
 3. **Rank.** At `ModelLevel.MEDIUM` and up, `Reranker` adds the 4M sentence model's score of the
    decoder's best whole-input readings (after the text before the cursor) to the decoder's score;
    at `HIGH`, while the user pauses, the 25M model refines the top readings in time slices
@@ -1160,4 +1170,19 @@ were kept from key to key (`SyllableGraph.sameUntil`), p50/p95 17.7/25.8 ms whol
 initials, growing with the input; after, 5.5/8.0 and 7.6/9.8, as without 简拼 in the middle
 (the decoder before it, 7689e738f, 6.7–7.5/11.9–15.3 and 9.1–10.3/15.9–18.4 over two runs). On the host JVM
 (`ime-eval pinyin --scheme xiaohe`) keys 41–60 went 2.0/2.5 → 0.6/0.8 ms whole, 2.5/3.1 → 0.6/0.9
-initials; all candidates the same. The 6T is measured before 0.6.1 goes out (NEXT-PLAN).
+initials; all candidates the same.
+
+That emulator could not show what 简拼 in the middle costs: it runs on the Mac's cores, where the extra
+work of a key was about 0.6 ms of a 5–7 ms round trip, less than two runs of one build differ by. On the
+OnePlus 6T (the same runner and inputs, each build installed in turn, three rounds alternated, 2026-11-14)
+keys 41–60 took, p50/p95, 9.8/16.7 ms whole and 14.8/24.4 ms initials before 简拼 in the middle
+(3cbb9726b), 20.4/25.9 and 27.7/35.6 with it (191bc1ddf): every position a score of readings more, and the
+last positions collecting all of theirs again each key. With `collectOn`, the walk along a node's children,
+the beam comparing before it looks for a state's double, and the first words kept while no arc from the
+start changed and none reads to the end, 14.1/20.1 and 20.3/28.0 (keys 1–20:
+7.7 → 15.3 → 12.0 ms whole), all candidates the same on the 双拼 sets; on the host JVM, through
+`PinyinSession`, a key 0.70 → 0.41 ms whole and 0.91 → 0.54 initials, 0.07 and 0.15 with no key read
+alone. What is left is the reading itself: a 小鹤 key in whole syllables scores 6,400 words on 13,500 arcs
+where it scored 2,900 on 540 (`ShuangpinKeyWorkTest` prints them and holds them a quarter above:
+483 steps, 595 by initials; 114 and 127 first words scored anew), nearly all of them dropped by the model's score, which nothing cheaper
+bounds. So a slow phone is measured on the phone, and by counts where a time would not hold still.

@@ -311,6 +311,7 @@ class PinyinDecoderTest {
         var input = ""
         var prev2 = NO_WORD
         var prev = NO_WORD
+        var on = 0
         repeat(4000) { step ->
             val at = random.nextInt(input.length + 1)
             val piece = pieces[random.nextInt(pieces.size)]
@@ -328,7 +329,10 @@ class PinyinDecoderTest {
             val graph = segmenter.segment(input)
             val fresh = decoder(beam = 3).decode(graph, prev2, prev)
             assertEquals("step $step: $input", describe(fresh), describe(kept.decode(graph, prev2, prev)))
+            on += kept.collectedOn
         }
+        // going on from the last decode's steps was among what was compared
+        assertTrue("went on $on times", on > 400)
     }
 
     // 简拼 in the middle reads every 双拼 key alone too: the words collected from where nothing changed
@@ -351,6 +355,33 @@ class PinyinDecoderTest {
         buildsOnTheLast(segmenter, pieces, Random(13), steps = 1500, toneAllows = allows)
     }
 
+    // the nine keys with 简拼: a key is three or four letters, each a syllable begun, at every position
+    @Test
+    fun buildingOnTheLastDecodeChangesNothingOnTheNineKeys() {
+        // 64 ni, 426 hao, 62 ma, 924 zai, 5426 jian, 96 wo, 94664 zhong, 482 hua, and keys alone
+        val pieces = listOf("64", "426", "62", "924", "5426", "96", "94664", "482", "6", "4", "9", "5", "2", "7", "'")
+        buildsOnTheLast(T9Segmenter(abbreviations = true), pieces, Random(17), atLeast = 1)
+    }
+
+    // nothing of the dictionary starts the input, a word only imported does: the input is kept as typed
+    // beside it, also where the decoder goes on from a decode in which a word did start it
+    @Test
+    fun goingOnKeepsTheInputAsTypedWhereOnlyAnImportedWordStartsIt() {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        user.attachImports(ImportedWords().import("热" to "re"))
+        fun decoder() = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user)
+        val segmenter = PinyinSegmenter()
+        val kept = decoder()
+        var on = 0
+        // 人民 of renm is the one word from the start; renma has none, and 热 of re ends before the change
+        for (input in listOf("r", "re", "ren", "renm", "renma", "renmaz", "renmaza")) {
+            val graph = segmenter.segment(input)
+            assertEquals(input, describe(decoder().decode(graph)), describe(kept.decode(graph)))
+            on += kept.collectedOn
+        }
+        assertTrue("went on $on times", on > 0)
+    }
+
     /**
      * Types [pieces] at random with [segmenter] and checks, at each step, that a decoder building on
      * the last decode reads what one made afresh does: the sentences, the words and the arcs between
@@ -363,8 +394,10 @@ class PinyinDecoderTest {
         random: Random,
         steps: Int = 3000,
         toneAllows: ((Int, Int, Int) -> Boolean)? = null,
+        atLeast: Int = steps / 4,
     ) {
-        val user = UserModel(data.dictionary, data.vocabulary)
+        // the dictionaries the user merged among the tries walked
+        val user = mergedModel()
         user.attachImports(ImportedWords().import("妮好" to "ni hao", "中人" to "zhong ren"))
         val changes = listOf(
             { user.own(UserModel.Entry("你中", syl("ni", "zhong"))) },
@@ -384,6 +417,7 @@ class PinyinDecoderTest {
         }
         val kept = decoder()
         var input = ""
+        var on = 0
         repeat(steps) { step ->
             if (step % 97 == 96) {
                 changes[step / 97 % changes.size]()
@@ -401,7 +435,11 @@ class PinyinDecoderTest {
             }
             val graph = segmenter.segment(input)
             assertEquals("step $step: $input", read(decoder(), graph), read(kept, graph))
+            on += kept.collectedOn
         }
+        // going on from the last decode's steps (collectOn) was among what was compared, where it may be:
+        // not while tones are typed, a word's asked of the whole path to it
+        if (toneAllows == null) assertTrue("went on $on times", on >= atLeast) else assertEquals(0, on)
     }
 
     @Test
@@ -416,10 +454,15 @@ class PinyinDecoderTest {
         assertTrue("${d.collectedAnew}", d.collectedAnew <= 6)
         d.decode(segmenter.segment(input + "vs"))
         assertTrue("${d.collectedAnew}", d.collectedAnew <= 6)
+        val steps = d.work.steps
+        val scored = d.work.scored
         // and as many as before where it starts again
         d.reset()
         d.decode(segmenter.segment(input + "vs"))
         assertEquals(input.length + 2, d.collectedAnew)
+        // the work counted says the same: a key took a small part of the steps and the scoring of it all
+        assertTrue("$steps of ${d.work.steps} steps", steps * 10 <= d.work.steps)
+        assertTrue("$scored of ${d.work.scored} scored", scored * 10 <= d.work.scored)
     }
 
     @Test

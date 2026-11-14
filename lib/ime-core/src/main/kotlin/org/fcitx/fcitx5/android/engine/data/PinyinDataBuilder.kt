@@ -286,6 +286,14 @@ internal class IntList {
         a[size++] = v
     }
 
+    /** Adds [other]'s values from [from] up to [until], in one copy. */
+    fun addAll(other: IntList, from: Int, until: Int) {
+        val count = until - from
+        if (size + count > a.size) a = a.copyOf(maxOf(a.size * 2, size + count))
+        System.arraycopy(other.a, from, a, size, count)
+        size += count
+    }
+
     operator fun get(i: Int) = a[i]
 
     operator fun set(i: Int, v: Int) {
@@ -308,6 +316,14 @@ internal class FloatList {
     operator fun plusAssign(v: Float) {
         if (size == a.size) a = a.copyOf(size * 2)
         a[size++] = v
+    }
+
+    /** Adds [other]'s values from [from] up to [until], in one copy. */
+    fun addAll(other: FloatList, from: Int, until: Int) {
+        val count = until - from
+        if (size + count > a.size) a = a.copyOf(maxOf(a.size * 2, size + count))
+        System.arraycopy(other.a, from, a, size, count)
+        size += count
     }
 
     operator fun get(i: Int) = a[i]

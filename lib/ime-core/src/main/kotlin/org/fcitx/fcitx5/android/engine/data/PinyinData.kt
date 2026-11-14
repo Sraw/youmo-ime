@@ -216,6 +216,13 @@ class PinyinDictionary internal constructor(
     fun firstChild(node: Int): Int = childStart[node]
     fun childCount(node: Int): Int = childStart[node + 1] - childStart[node]
 
+    /** The first child from [next], before [end], whose syllable is not before [syllable], [end] for none: a node's children walked along syllables in their order. */
+    fun childFrom(next: Int, end: Int, syllable: Int): Int {
+        var at = next
+        while (at < end && syllables[at] < syllable) at++
+        return at
+    }
+
     /** @return the child of [node] reached by [syllable], or -1 */
     fun child(node: Int, syllable: Int): Int {
         val from = childStart[node]
@@ -234,6 +241,18 @@ class PinyinDictionary internal constructor(
 
     /** The log10 adjustment for this reading of [word]; 0 unless it is a polyphone's rarer reading */
     fun weight(node: Int, index: Int): Float = weightTable[weights.get(wordStart[node] + index).toInt() and 0xff]
+
+    /**
+     * Where [node]'s words start, for [wordAt] and [weightAt] of its first, second, ... from there:
+     * [word] and [weight] without looking the node's start up for each.
+     */
+    fun wordsOf(node: Int): Int = wordStart[node]
+
+    /** The word at [at], [wordsOf] a node plus an index below its [wordCount] (not checked, as [word]'s). */
+    fun wordAt(at: Int): Int = words[at]
+
+    /** [weight] of the word at [at], as [wordAt]'s. */
+    fun weightAt(at: Int): Float = weightTable[weights.get(at).toInt() and 0xff]
 }
 
 /**
