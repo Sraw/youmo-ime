@@ -160,6 +160,13 @@ class MainTest {
             arrayOf("pinyin", "d", "s", "r", "--typos", "maybe"),
             arrayOf("pinyin", "d", "s", "r", "--scheme", "t9", "--typos", "off"), // the nine keys read none
             arrayOf("ksc", "d", "s", "--typos", "off"), // not ksc's
+            arrayOf("pinyin", "d", "s", "r", "--scheme", "xiaohe", "--sp-abbrev", "maybe"),
+            // a penalty, as the others: not a bonus, nor endless
+            arrayOf("pinyin", "d", "s", "r", "--scheme", "xiaohe", "--sp-abbrev", "1"),
+            arrayOf("pinyin", "d", "s", "r", "--scheme", "xiaohe", "--sp-abbrev", "NaN"),
+            arrayOf("pinyin", "d", "s", "r", "--scheme", "xiaohe", "--sp-abbrev", "-Infinity"),
+            arrayOf("pinyin", "d", "s", "r", "--sp-abbrev", "off"), // 双拼's only: full pinyin reads 简拼 anyway
+            arrayOf("pinyin", "d", "s", "r", "--scheme", "xiaohe-18", "--sp-abbrev", "off"), // nor the grouped keys
             arrayOf("slips", "s", "o", "--scheme", "t9"), // 双拼's schemes only
             arrayOf("predict-learn", "d", "s", "--user-weight", "much"),
             // a weight, as --weight's: not negative, nor endless
@@ -451,6 +458,34 @@ class MainTest {
         assertEquals("张", first())
         assertEquals("张", first("--typos", "on"))
         assertNotEquals("张", first("--typos", "off"))
+    }
+
+    @Test
+    fun spAbbrevOffReadsAKeyAloneOnlyWhereItAndTheNextMakeNoSyllable() {
+        // 自然码 ufmuh: shen whole, then m, sh, h by their initials; mu and uh (shang) are pairs, so m
+        // and u alone are 简拼 in the middle: 什么时候 only with it read
+        val data = tmp.newFile("abbrev.data").apply {
+            writeBytes(
+                PinyinDataBuilder().layers(listOf(WordLayers.BASE)).unigram("<unk>", -7f, 0f).unigram("什么时候", -3f, 0f)
+                    .entry("什么时候", syl("shen", "me", "shi", "hou"))
+                    // read whole but for the h begun: shen mu, then he
+                    .unigram("神木", -4f, 0f).entry("神木", syl("shen", "mu")).unigram("和", -3f, 0f).entry("和", syl("he"))
+                    .build().toByteArray(),
+            )
+        }
+        val set = tmp.newFile("set.tsv").apply { writeText("ufmuh\t什么时候\tdaily\n") }
+        val result = File(tmp.root, "result.tsv")
+        fun candidates(vararg abbrev: String): List<String> {
+            assertEquals(0, exit("pinyin", data.path, set.path, result.path, "--scheme", "ziranma", *abbrev, "--threads", "1"))
+            return result.useLines { RunResultFormat.parse(it) }.single().candidates
+        }
+        candidates().let { assertTrue("$it", "什么时候" in it) }
+        candidates("--sp-abbrev", "-1").let { assertTrue("$it", "什么时候" in it) }
+        assertFalse("什么时候" in candidates("--sp-abbrev", "off"))
+        // the penalty reaches the decoder: free, 什么时候 goes before the reading in whole syllables; at -4 after it
+        val free = candidates("--sp-abbrev", "0")
+        val dear = candidates("--sp-abbrev", "-4")
+        assertTrue("$free $dear", free.indexOf("什么时候") in 0 until dear.indexOf("什么时候"))
     }
 
     @Test

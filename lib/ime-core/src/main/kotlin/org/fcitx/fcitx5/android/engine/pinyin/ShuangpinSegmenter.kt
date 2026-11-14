@@ -19,12 +19,24 @@ import java.util.TreeMap
  *   in libime (`hka` 好啊 in 微软);
  * - an upper-case letter for the Latin letter, as in full pinyin.
  *
- * A key is not read alone where it and the next make a syllable, as in libime by default: the
- * graph stays one path, and 简拼 in the middle would read every syllable a second way. The one
- * slip read with [typos] is ü typed with its own key after j, q, x, y (`jv` for ju), which libime
- * reads too; a slipped key otherwise lands on another syllable, not on a spelling to correct.
+ * Where a key and the next make a syllable, the key is read alone too, as the initial of every
+ * syllable typed starting with it ([Kind.INITIAL] flagged [SyllableMatches.ABBREV], which costs
+ * [org.fcitx.fcitx5.android.engine.lattice.Penalties.abbrev] on top of the initial's): 简拼 in the
+ * middle, as Rime's double_pinyin `abbrev`. So `ufmuh` in 自然码 is 什么时候, shen typed whole
+ * and the rest by initials though mu and shang are pairs, while `xm` still reads 先 first: the
+ * language model chooses. The pair alone was libime's reading; the abbreviation is priced so
+ * that input typed in whole syllables reads as it did
+ * (dev/design/061-shuangpin-abbrev-measure.md); [abbreviations] off is that old reading, for
+ * measuring against. The one slip read with [typos] is ü typed with its own key after j, q, x, y
+ * (`jv` for ju), which libime reads too; a slipped key otherwise lands on another syllable, not
+ * on a spelling to correct.
  */
-class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> = emptySet(), typos: Boolean = true) : Segmenter {
+class ShuangpinSegmenter(
+    private val scheme: ShuangpinScheme,
+    fuzzy: Set<Fuzzy> = emptySet(),
+    typos: Boolean = true,
+    private val abbreviations: Boolean = true,
+) : Segmenter {
 
     override val spellsFullPinyin: Boolean get() = false
 
@@ -34,6 +46,8 @@ class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> 
 
     private val pairs = arrayOfNulls<SyllableMatches>(KEYS * KEYS)
     private val leads = arrayOfNulls<SyllableMatches>(KEYS)
+    // leads flagged ABBREV: read where the key and the next make a syllable
+    private val abbrevs = arrayOfNulls<SyllableMatches>(KEYS)
     private val vowels = arrayOfNulls<SyllableMatches>(KEYS)
     private val latin = arrayOfNulls<SyllableMatches>(KEYS)
 
@@ -75,7 +89,10 @@ class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> 
             val lead = byLead.getOrPut(code[0]) { TreeMap() }
             syllables.forEach { (s, f) -> keepBest(lead, s, f or SyllableMatches.COMPLETION) }
         }
-        byLead.forEach { (key, syllables) -> leads[key.code] = toMatches(syllables) }
+        byLead.forEach { (key, syllables) ->
+            leads[key.code] = toMatches(syllables)
+            if (abbreviations) abbrevs[key.code] = toMatches(TreeMap(syllables.mapValues { it.value or SyllableMatches.ABBREV }))
+        }
         for (vowel in "aeo") {
             for (key in scheme.finalKeys(vowel.toString())) {
                 if (!scheme.typesInitial(key)) vowels[key.code] = single(Syllables.id(vowel.toString()))
@@ -89,8 +106,9 @@ class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> 
     // syllable's start it is the punctuation key, as in Microsoft Pinyin (`ni;` is 你；)
     override fun readsAfter(before: String, c: Char): Boolean {
         if (!scheme.types(c) || c in 'a'..'z' || scheme.typesInitial(c)) return true
-        // the graph walks only positions reached: an edge there ending on c is a syllable it ends
-        val graph = segment(before + c)
+        // the graph walks only positions reached: an edge there ending on c is a syllable it ends.
+        // Read in whole syllables: `lj;` is lan and `;`, not the l alone a 简拼 reads and `j;` (jing)
+        val graph = segment(before + c).withoutAbbreviations()
         return graph.end >= 2 && graph.edges(graph.end - 2).any { graph.to(it) == graph.end && graph.kind(it) == Kind.SYLLABLE }
     }
 
@@ -108,6 +126,7 @@ class ShuangpinSegmenter(private val scheme: ShuangpinScheme, fuzzy: Set<Fuzzy> 
         val pair = if (next < KEYS) pairs[key * KEYS + next] else null
         if (pair != null) {
             edges.add(at, 2, Kind.SYLLABLE, pair)
+            abbrevs[key]?.let { edges.add(at, 1, Kind.INITIAL, it) }
             return
         }
         leads[key]?.let { edges.add(at, 1, if (at + 1 == input.length) Kind.PARTIAL else Kind.INITIAL, it) }

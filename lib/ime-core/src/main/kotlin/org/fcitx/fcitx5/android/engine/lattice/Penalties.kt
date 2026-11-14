@@ -28,6 +28,16 @@ data class Penalties(
      * abbreviated readings mostly compete among themselves; a larger one prunes more.
      */
     val initial: Float = -1f,
+    /**
+     * On top of [initial], 双拼's key read as an initial alone where it and the next make a
+     * syllable (简拼 in the middle, [SyllableMatches.ABBREV][org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches.ABBREV]).
+     * Swept over 0, -1, -2 and -4 in 自然码, 小鹤 and 微软 (dev/design/061-shuangpin-abbrev-measure.md):
+     * -2 is the least that leaves input typed in whole syllables reading as before (2375 sentences,
+     * 1800 words, 500 characters, none changed; 0 lost 8 or 9 of chat's sentences, -1 two), and
+     * still puts a word typed with its first syllable whole and the rest by initials on the first
+     * page 96% of the time (47% without).
+     */
+    val abbrev: Float = -2f,
     /** A syllable still being typed at the end: `zho` for zhong. */
     val partial: Float = -1f,
     /**

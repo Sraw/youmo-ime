@@ -1,7 +1,7 @@
 """uat/07-shuangpin.md (B0-双拼). The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
 
-from uat import case
+from uat import case, check
 
 
 case("SP-01", needs="jvm:OtherInputMethodsUatTest.shuangpinZiranma")(lambda d: None)
@@ -29,6 +29,41 @@ case("SP-13b", needs="jvm:ShuangpinUatTest.aWordTypedTwiceInFullGoesThirdUnderAP
 
 
 case("SP-13c", needs="jvm:ShuangpinUatTest.aWordTypedTwiceInFullGoesThirdUnderAPartWithinItsKeyboard")(lambda d: None)
+
+
+@case("SP-30", base="B0-双拼", mutates="learn")
+def sp30(d):
+    d.type("ufmuh")
+    c = d.all_cands()
+    d.shot("kb", "自然码 ufmuh：候选栏或展开后的第一页有「什么时候」")
+    check("什么时候" in c, f"ufmuh 的候选栏和展开后的第一页都没有「什么时候」：{c[:14]}")
+    d.pick("什么时候")
+    t = d.field_text()
+    check(t == "什么时候", f"点「什么时候」后框里是「{t}」")
+    d.clear()
+    d.type("yivz")
+    c2 = d.all_cands()
+    d.shot("kb", "自然码 yivz：候选栏或展开后的第一页有「一直在」")
+    check("一直在" in c2, f"yivz 的候选栏和展开后的第一页都没有「一直在」：{c2[:14]}")
+    return f"框里是「{t}」；yivz 候选 {c2[:8]}"
+
+
+case("SP-31", needs="jvm:ShuangpinUatTest.twoKeysThatMakeASyllableStayThatSyllableFirst、ShuangpinUatTest.wholeSyllablesReadAsBeforeTheAbbreviations")(lambda d: None)
+
+
+case("SP-32", needs="jvm:ShuangpinUatTest.aWordTypedByItsInitialsOnly")(lambda d: None)
+
+
+case("SP-33", needs="jvm:ShuangpinUatTest.aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys")(lambda d: None)
+
+
+case("SP-34", needs="jvm:ShuangpinUatTest.aWordUsedInFullIsNotRaisedUnderAPairItsInitialsSpell")(lambda d: None)
+
+
+case("SP-35", needs="jvm:ShuangpinUatTest.aWordAddedByHandIsNotPutInUnderAPairItsInitialsSpell")(lambda d: None)
+
+
+case("SP-36", needs="jvm:ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 18 键 and 九键双拼 (B0-18键, B0-九键双拼)

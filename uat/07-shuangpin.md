@@ -62,6 +62,48 @@
 - **预期**：前五个里没有「奉化」。
 - **JVM**：`ShuangpinUatTest.aWordTypedTwiceInFullGoesThirdUnderAPartWithinItsKeyboard`（后半）（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
+### SP-30 [P1] 第一个字打全，后面的字只打声母
+- **前提**：B0-双拼（自然码）。
+- **操作**：点 u f m u h（自然码：shen = u f，然后 m、sh、h 各一个键），看候选栏和展开候选列表的第一页；点「什么时候」。删光，点 y i v z（yi，然后 zh、z），看候选。
+- **预期**：u f m u h 的候选栏或展开后的第一页有「什么时候」，点了框里是「什么时候」（m u、u h 连起来也是音节 mu、shang，每个键还能单独当声母，见 docs/pinyin.md「双拼」）；y i v z 的候选栏或展开后的第一页有「一直在」。
+- **JVM**：`ShuangpinUatTest.aWordTypedWithItsFirstSyllableWholeAndTheRestByInitials`（:lib:ime-eval:uatTest，真数据）；设备上留作冒烟（看胶水）。
+
+### SP-31 [P1] 两个键成音节的仍先按音节读，打全码的首选不变
+- **前提**：B0-双拼（自然码）。
+- **操作**：点 x m，看拼音行和第一个候选；删光，点 v g，看拼音行。
+- **预期**：x m 的拼音行是 `xian`，第一个候选是「先」；v g 的拼音行是 `zheng`。另在 JVM 上：聊天句子集（1946 句）用小鹤全码打，第一个候选和不读中间简拼时一样；每个音节的两个键（自然码、微软、小鹤，和 0.5 去掉的紫光、智能ABC、国标六种方案），第一个候选不变，第一页原有的候选被挤开的不超过 1%。
+- **JVM**：`ShuangpinUatTest.twoKeysThatMakeASyllableStayThatSyllableFirst`、`ShuangpinUatTest.wholeSyllablesReadAsBeforeTheAbbreviations`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+
+### SP-32 [P2] 全打声母
+- **前提**：B0-双拼（自然码）。
+- **操作**：点 u m u h（sh、m、sh、h），看候选（往后翻）。
+- **预期**：候选里有「什么时候」（多半不在第一页：m u、u h 先按音节读）。
+- **JVM**：`ShuangpinUatTest.aWordTypedByItsInitialsOnly`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+
+### SP-33 [P1] 只打声母选过的词，在这串键下学
+- **前提**：B0-双拼（自然码）。
+- **操作**：点 u f m u h，看第一个候选；点「什么时候」；再做一次；点 u f m u h，看第一个候选；删光，点 u m u h。
+- **预期**：第一次「什么时候」不是第一个；选过两次以后，u f m u h 下它第一；u m u h（另一串键）下它没有排到第一。
+- **JVM**：`ShuangpinUatTest.aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+
+### SP-34 [P1] 两个键成音节的码，学过的词不按单个声母提上来
+- **前提**：B0-双拼（自然码）。
+- **操作**：点 x m，记下候选第一页；删光，点 x w m m（xia mian），点「下面」；再做一次；删光，点 x m，看候选第一页；删光，点 x ' m（中间是分隔键）。
+- **预期**：x m 的第一页和第一次一样（「先」打头，「下面」没被提上来：x m 是音节 xian，按音节读，见 docs/pinyin.md「双拼」）；x ' m 下「下面」在前三。
+- **JVM**：`ShuangpinUatTest.aWordUsedInFullIsNotRaisedUnderAPairItsInitialsSpell`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+
+### SP-35 [P2] 两个键成音节的码，手动加的词不按单个声母放进来
+- **前提**：B0-双拼（自然码）。
+- **操作**：点 x m，记下候选第一页；删光，在用户词库里手动加「小明」（xiao ming）；点 x m，看候选第一页；删光，点 x c m y；删光，点 x ' m。
+- **预期**：x m 的第一页和加词之前一样；x c m y 第一个是「小明」；x ' m 的第一页有「小明」。
+- **JVM**：`ShuangpinUatTest.aWordAddedByHandIsNotPutInUnderAPairItsInitialsSpell`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+
+### SP-36 [P2] 两个键成音节的码下，在这串键上置顶、选过的按声母读的词照样排上来
+- **前提**：B0-双拼（自然码）。
+- **操作**：点 k y（kuai），在候选里找到「可以」（k、y 各按声母读），长按 → 固定到第一个；删光，再点 k y。另起（清掉学到的）：点 k y 选「可以」，删光再做一次；再点 k y。
+- **预期**：固定以后 k y 第一个是「可以」；选过两次以后「可以」比原来靠前，在第一页。在这串键上做的事按做的时候的读法算；别的拼法学到的词、手动加的词仍不按单个声母提上来（SP-34、SP-35）。
+- **JVM**：`ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+
 ## 18 键和九键双拼
 
 前提 **B0-18键** / **B0-九键双拼**：B0，在 **输入法** 里添加"双拼"，在 **输入法 → 双拼** 里把 **键盘** 选成「18 键」/「九键」，回测试页点「普通文本」框，换到双拼（README「基线状态」）。下面「点 WE」指点键面是 WE 的那个键；18 键是 `Q WE RT Y U IO P` / `A SD FG H JK L` / `Z XC V BN M`（微软是 L;）。

@@ -37,6 +37,9 @@ internal fun sessionTestData() = PinyinData.load(
             .unigram("西安", -4f, 0f)
             .unigram("先", -3f, 0f)
             .unigram("中", -3.5f, 0f)
+            // 双拼 微软's ; typed as ing (xing) and after a whole syllable (lan)
+            .unigram("星", -4f, 0f)
+            .unigram("蓝", -4f, 0f)
             // a word of the built-in phrases (PhraseBook.WORD_KEYS)
             .unigram("日期", -4f, 0f)
             .bigram("你", "好", -0.75f, 0f)
@@ -57,6 +60,8 @@ internal fun sessionTestData() = PinyinData.load(
             .entry("西安", syl("xi", "an"))
             .entry("先", syl("xian"))
             .entry("中", syl("zhong"))
+            .entry("星", syl("xing"))
+            .entry("蓝", syl("lan"))
             .build().toByteArray(),
     ),
 )

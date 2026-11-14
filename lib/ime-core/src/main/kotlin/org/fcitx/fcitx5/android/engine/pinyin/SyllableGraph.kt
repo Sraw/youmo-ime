@@ -95,6 +95,98 @@ class SyllableGraph internal constructor(
         return 0
     }
 
+    /**
+     * Whether [edge] is 双拼's key read alone where it and the next make a syllable ([SyllableMatches.ABBREV]).
+     * Its first match's flags stand for all: ShuangpinSegmenter flags every match of such an edge, fuzzy
+     * partners too, and those of no other.
+     */
+    fun isAbbreviation(edge: Int): Boolean = edgeMatches[edge].let { it.size > 0 && it.flags(0) and SyllableMatches.ABBREV != 0 }
+
+    /** Whether any edge [isAbbreviation]: only 双拼's graphs have one. */
+    val hasAbbreviations: Boolean by lazy(LazyThreadSafetyMode.NONE) { (0 until edgeCount).any(::isAbbreviation) }
+
+    /**
+     * This graph without [isAbbreviation]'s edges, nor what only they reach: the input read in
+     * whole syllables, a key alone an initial only where it and the next make none, as before 简拼
+     * in the middle. Itself where it has none (every way of typing but 双拼). Whether the input
+     * ends on a syllable, or `;` ends one, is asked of this: `lj;` in 微软 is 蓝 and ；, though `l`
+     * alone and `j;` (jing) read it too.
+     */
+    fun withoutAbbreviations(): SyllableGraph = whole
+
+    // made once a graph: asked of the same one on a key by the session and the ranking more than once
+    private val whole: SyllableGraph by lazy(LazyThreadSafetyMode.NONE) {
+        if (hasAbbreviations) dropAbbreviations() else this
+    }
+
+    private fun dropAbbreviations(): SyllableGraph {
+        val reached = BooleanArray(end + 1).also { it[start] = true }
+        val kept = ArrayList<Int>(edgeCount)
+        val first = IntArray(end + 2)
+        for (at in 0..end) {
+            first[at] = kept.size
+            if (!reached[at]) continue
+            for (e in edges(at)) {
+                if (isAbbreviation(e)) continue
+                kept += e
+                reached[edgeTo[e]] = true
+            }
+        }
+        first[end + 1] = kept.size
+        return SyllableGraph(
+            input, start, first, IntArray(kept.size) { edgeFrom[kept[it]] }, IntArray(kept.size) { edgeTo[kept[it]] },
+            Array(kept.size) { edgeKind[kept[it]] }, Array(kept.size) { edgeMatches[kept[it]] },
+            edgeAgainst?.let { a -> Array(kept.size) { a[kept[it]] } },
+        )
+    }
+
+    /**
+     * Whether the input from [from] to [to] reads as whole syllables, by [Kind.SYLLABLE] and
+     * [Kind.LETTER] edges that are no [isAbbreviation]: `xm` (xian) and `xwmm` (xia mian) in 自然码,
+     * not `ufmuh`, whose h is only begun. A code so read is the user's whole syllables: the words
+     * their habits raise under it are read so too, not by its keys as initials (HabitOrder).
+     */
+    fun readsWhole(from: Int, to: Int): Boolean {
+        if (from >= to) return false
+        val ok = BooleanArray(to + 1).also { it[from] = true }
+        for (at in from until to) {
+            if (!ok[at]) continue
+            for (e in edges(at)) {
+                if (asTyped(e) && edgeTo[e] <= to) ok[edgeTo[e]] = true
+            }
+        }
+        return ok[to]
+    }
+
+    // a whole syllable or a letter, as typed: not a key read alone where it and the next make a syllable
+    private fun asTyped(e: Int) = edgeKind[e].let { it == Kind.SYLLABLE || it == Kind.LETTER } && !isAbbreviation(e)
+
+    /**
+     * The first position whose edges, or the input up to it, differ from [other]'s; past both ends
+     * when the two are alike. What is read from before it, along edges that stay before it, reads
+     * the same in both: the decoder keeps those words from key to key (PinyinDecoder.buildLattice).
+     */
+    fun sameUntil(other: SyllableGraph): Int {
+        val ends = minOf(end, other.end)
+        var at = 0
+        while (at < ends && input[at] == other.input[at]) at++
+        for (p in 0..at) if (!sameEdges(p, other)) return p
+        return if (at == ends && end == other.end) end + 1 else at
+    }
+
+    private fun sameEdges(position: Int, other: SyllableGraph): Boolean {
+        val mine = edges(position)
+        val theirs = other.edges(position)
+        if (mine.last - mine.first != theirs.last - theirs.first) return false
+        for (i in 0..mine.last - mine.first) {
+            val a = mine.first + i
+            val b = theirs.first + i
+            if (edgeTo[a] != other.edgeTo[b] || edgeKind[a] != other.edgeKind[b] || !edgeMatches[a].sameAs(other.edgeMatches[b])) return false
+            if (!java.util.Arrays.equals(edgeAgainst?.get(a), other.edgeAgainst?.get(b))) return false
+        }
+        return true
+    }
+
     override fun toString(): String = (0 until edgeCount).joinToString("\n") { e ->
         "${from(e)}-${to(e)} ${kind(e)} ${text(e)}: ${matches(e)}"
     }

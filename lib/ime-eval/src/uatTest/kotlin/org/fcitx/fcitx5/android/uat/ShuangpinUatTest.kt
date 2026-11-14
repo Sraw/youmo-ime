@@ -8,12 +8,23 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.rerank.Reranker
+import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.eval.EvalSet
+import org.fcitx.fcitx5.android.eval.PinyinRun
+import org.fcitx.fcitx5.android.eval.ShuangpinSet
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /** uat/07-shuangpin.md: each case from B0-双拼 (自然码 unless the case sets another 方案). */
 class ShuangpinUatTest {
@@ -69,6 +80,146 @@ class ShuangpinUatTest {
             glide("nihao", GlideLayout.nineKeys())
             assertTrue("「$preedit」", preedit.isNotEmpty() && preedit.none(Char::isDigit))
             expectAmong("你好")
+        }
+    }
+
+    // 简拼 in the middle (docs/pinyin.md「双拼」): a key read alone where it and the next make a syllable
+    @Test
+    @Uat("SP-30")
+    fun aWordTypedWithItsFirstSyllableWholeAndTheRestByInitials() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        // 自然码 shen = uf, then m, sh, h: mu and uh (shang) are syllables, each key read alone too
+        type("ufmuh")
+        assertTrue("ufmuh: $page", "什么时候" in page)
+        backspace(5)
+        // zh's key alone: v and z make zhei
+        type("yivz")
+        assertTrue("yivz: $page", "一直在" in page)
+    }
+
+    @Test
+    @Uat("SP-31")
+    fun twoKeysThatMakeASyllableStayThatSyllableFirst() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        // 自然码 xm is xian: 先 first, the code row xian, as before 简拼 in the middle
+        type("xm")
+        expectPreedit("xian")
+        expectFirst("先")
+        backspace(2)
+        type("vg")
+        expectPreedit("zheng")
+    }
+
+    @Test
+    @Uat("SP-31")
+    fun wholeSyllablesReadAsBeforeTheAbbreviations() {
+        // pinyin-chat.tsv typed in 小鹤 whole, as `ime-eval pinyin --scheme xiaohe` against --sp-abbrev off:
+        // the decoder and the sentence model, the first candidates the same (none changed when measured)
+        val samples = ShuangpinSet.convert(File("data/pinyin-chat.tsv").useLines { EvalSet.parse(it) }, ShuangpinScheme.XIAOHE)
+        val model = SentenceModel.load(UatEngines.data(InputMethodCatalog.SENTENCE_MODEL), unpack = true)
+        fun run(abbreviations: Boolean) = PinyinRun(UatEngines.pinyinData, ShuangpinSegmenter(ShuangpinScheme.XIAOHE, abbreviations = abbreviations), reranker = { Reranker(model) })
+        val (off, on) = run(false) to run(true)
+        assertTrue("${samples.size}", samples.size > 1500)
+        val changed = samples.filter { s -> off.candidates(s.input, s.context).firstOrNull() != on.candidates(s.input, s.context).firstOrNull() }
+        assertEquals(emptyList<String>(), changed.map { it.input })
+        // each syllable's two keys alone, in each scheme (the three the app offers and three 0.5 dropped,
+        // as ShuangpinSegmenterTest keeps them): the first never changes, and what page 1 showed it
+        // still shows first, but for a few; words fill a page a rare syllable's few characters left short
+        for (scheme in ShuangpinSet.SCHEMES.values + DROPPED) {
+            fun twoKeys(abbreviations: Boolean) = PinyinRun(UatEngines.pinyinData, ShuangpinSegmenter(scheme, abbreviations = abbreviations), reranker = { Reranker(model) })
+            val (was0, now0) = twoKeys(false) to twoKeys(true)
+            val codes = (0 until Syllables.count).mapNotNull { scheme.encode(it) }.distinct()
+            val displaced = ArrayList<String>()
+            for (code in codes) {
+                val (was, now) = was0.candidates(code).take(EngineSettings.DEFAULT_PAGE_SIZE) to now0.candidates(code).take(EngineSettings.DEFAULT_PAGE_SIZE)
+                assertEquals("$scheme $code", was.firstOrNull(), now.firstOrNull())
+                if (now.take(was.size) != was) displaced += "$code $was $now"
+            }
+            assertTrue("$displaced of ${codes.size}", displaced.size * 100 <= codes.size)
+        }
+    }
+
+    @Test
+    @Uat("SP-32")
+    fun aWordTypedByItsInitialsOnly() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        // 自然码 sh m sh h: mu and uh are syllables, before them no way read 什么时候
+        type("umuh")
+        expectAmong("什么时候")
+    }
+
+    @Test
+    @Uat("SP-33")
+    fun aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        type("ufmuh")
+        assertTrue("$page", page.first() != "什么时候")
+        pick("什么时候")
+        type("ufmuh")
+        pick("什么时候")
+        type("ufmuh")
+        expectFirst("什么时候")
+        // learned under those keys: by initials only it stays where it was
+        type("umuh")
+        assertTrue("$page", page.first() != "什么时候")
+    }
+
+    // a code that reads as whole syllables ranks as before 简拼 in the middle (061-shuangpin-abbrev review M3)
+    @Test
+    @Uat("SP-34")
+    fun aWordUsedInFullIsNotRaisedUnderAPairItsInitialsSpell() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        // 自然码 xm is xian, xwmm xia mian: 下面 used there twice goes up under its initials apart, not under xm
+        type("xm")
+        val fresh = page
+        repeat(2) {
+            focus("")
+            type("xwmm")
+            pick("下面")
+        }
+        focus("")
+        type("xm")
+        assertEquals(fresh, page)
+        focus("")
+        type("x'm")
+        assertTrue("x'm: $page", "下面" in page.take(3))
+    }
+
+    @Test
+    @Uat("SP-35")
+    fun aWordAddedByHandIsNotPutInUnderAPairItsInitialsSpell() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        type("xm")
+        val fresh = page
+        focus("")
+        assertTrue(engines.addWord("小明", "xiao ming"))
+        type("xm")
+        assertEquals(fresh, page)
+        focus("")
+        type("xcmy")
+        expectFirst("小明")
+        focus("")
+        type("x'm")
+        expectOnFirstPage("小明")
+    }
+
+    @Test
+    @Uat("SP-36")
+    fun whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere() {
+        // 自然码 ky is kuai; 可以 by k and y alone, low on its list
+        val at = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+            type("ky")
+            val at = candidates.indexOf("可以")
+            assertTrue("ky: ${candidates.take(40)}", at > 0)
+            assertTrue(learn(LearningOp.Pin(at, "可以")) is LearningResult.Done)
+            focus("")
+            type("ky")
+            expectFirst("可以")
+            at
+        }
+        with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+            repeat(2) {
+                focus("")
+                type("ky")
+                pick("可以")
+            }
+            focus("")
+            type("ky")
+            assertTrue("ky: ${candidates.take(10)}", candidates.indexOf("可以") in 0 until minOf(at, EngineSettings.DEFAULT_PAGE_SIZE))
         }
     }
 
@@ -206,5 +357,24 @@ class ShuangpinUatTest {
 
     private companion object {
         const val SENTENCE = "我们今天去吃饭"
+
+        // 紫光, 智能ABC and 国标, which 0.5 dropped (SchemeMigration): libime's tables, as ShuangpinSegmenterTest has them
+        val DROPPED = listOf(
+            ShuangpinScheme(
+                "zh=u ch=a sh=i ai=p an=r ang=s ao=q ei=k en=w eng=t er=j ia=x ian=f iang=g iao=b ie=d in=y ing=; " +
+                    "iong=h iu=j ong=h ou=z ua=x uai=y uan=l uang=g ue=n ui=n un=m uo=o ve=n v=v",
+                "o",
+            ),
+            ShuangpinScheme(
+                "zh=a ch=e sh=v ai=l an=j ang=h ao=k ei=q en=f eng=g er=r ia=d ian=w iang=t iao=z ie=x in=c ing=y " +
+                    "iong=s iu=r ong=s ou=b ua=d uai=c uan=p uang=t ue=m ui=m un=n uo=o ve=m v=v",
+                "o",
+            ),
+            ShuangpinScheme(
+                "zh=v ch=i sh=u ai=k an=f ang=g ao=c ei=b en=r eng=h er=l ia=q ian=d iang=n iao=m ie=t in=l ing=j " +
+                    "iong=s iu=y ong=s ou=p ua=q uai=y uan=w uang=n ue=x ui=v un=z uo=o ve=x v=v",
+                "a",
+            ),
+        )
     }
 }

@@ -11,6 +11,9 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.Word
 import org.fcitx.fcitx5.android.engine.learn.Words
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -121,5 +124,19 @@ class RetypeTest {
         val m = Retype.matchKeyed(listOf(prediction), 0, listOf("山"), emptyList(), ::inCandidates).match
         assertEquals(0, m.typedAgain)
         assertTrue(m.rows.isEmpty())
+    }
+
+    // 双拼 keys deleted, then a word typed again: whole syllables take only what they read whole, as
+    // HabitOrder ranks them (061-shuangpin-abbrev review M3); keys not all pairs are read by initials too
+    @Test
+    fun shuangpinKeysThatReadWholeTakeNoWordTheirKeysAloneSpell() {
+        val ziranma = ShuangpinSegmenter(ShuangpinScheme.ZIRANMA)
+        fun units(vararg syllables: String) = Retype.Units(syllables.map { "字" }, syllables.map(Syllables::id).toIntArray(), emptyMap(), whole = true)
+        fun taken(keys: String, vararg syllables: String) = Retype.byReading(ziranma.segment(keys)).consume(units(*syllables), 0)
+        assertEquals(null, taken("xm", "xia", "mian")) // 下面 retyped after xm (先) deleted
+        assertEquals(1, taken("xm", "xian"))
+        assertEquals(2, taken("xwmm", "xia", "mian"))
+        assertEquals(4, taken("ufmuh", "shen", "me", "shi", "hou")) // 什么时候: h begun, m alone in the middle
+        assertEquals(2, taken("x'm", "xia", "mian"))
     }
 }

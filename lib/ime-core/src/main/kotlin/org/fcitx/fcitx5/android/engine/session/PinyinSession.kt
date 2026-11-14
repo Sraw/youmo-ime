@@ -873,7 +873,7 @@ class PinyinSession(
         // a sentence the user blocked whole as it reads (its words blocked one by one are the decoder's to leave out)
         // left out of what the habits put in too: a sentence used before would come back by them
         val sentenceBlocked = { c: Candidate -> c.words.size > 1 && user?.blocksSentence(c.text) { entries(c, decoded.graph) } == true }
-        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }.filterNot(sentenceBlocked), decoded.sentences, decoded.levels.map { l -> HabitOrder.Level(l.end, l.code, l.prev, l.injected.filterNot(sentenceBlocked), l.habitsHere) }, pageSize)
+        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }.filterNot(sentenceBlocked), decoded.sentences, decoded.levels.map { l -> HabitOrder.Level(l.end, l.code, l.prev, l.injected.filterNot(sentenceBlocked), l.habitsHere, l.recorded) }, pageSize)
         val read = ordered.list
         // a phrase of order k a place down where a pin leads: the pin stays first (U-83)
         val withPhrases = { list: List<Candidate> ->
@@ -1111,11 +1111,14 @@ internal fun recentTail(text: String): String {
  * Whether the input's longest last syllable is whole: zhong, not zho (whose o alone is a
  * syllable too, but not what is being typed), nor an initial. n, m, ng and r (嗯, 呣), and a,
  * o and e, are syllables as well as initials: at the end, likelier the start of a longer one.
+ * Read in whole syllables ([SyllableGraph.withoutAbbreviations]): 小鹤 `nih` ends on h begun, though n
+ * alone and `ih` (chang) read it too.
  */
 fun endsOnSyllable(graph: SyllableGraph): Boolean {
-    val last = (0 until graph.edgeCount).filter { graph.to(it) == graph.end }
-    val from = last.minOfOrNull { graph.from(it) } ?: return false
-    val longest = last.filter { graph.from(it) == from }.map { graph.kind(it) }
+    val whole = graph.withoutAbbreviations()
+    val last = (0 until whole.edgeCount).filter { whole.to(it) == whole.end }
+    val from = last.minOfOrNull { whole.from(it) } ?: return false
+    val longest = last.filter { whole.from(it) == from }.map { whole.kind(it) }
     return Kind.SYLLABLE in longest && Kind.INITIAL !in longest
 }
 

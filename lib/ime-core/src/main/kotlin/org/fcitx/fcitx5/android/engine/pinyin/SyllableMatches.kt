@@ -19,6 +19,10 @@ class SyllableMatches internal constructor(private val syllables: IntArray, priv
 
     fun flags(i: Int): Int = flags[i]
 
+    /** Whether [other] holds the same syllables with the same flags. */
+    internal fun sameAs(other: SyllableMatches): Boolean =
+        this === other || syllables.contentEquals(other.syllables) && flags.contentEquals(other.flags)
+
     /** These with [flag] on each. */
     internal fun with(flag: Int) = SyllableMatches(syllables, IntArray(size) { flags[it] or flag })
 
@@ -42,6 +46,9 @@ class SyllableMatches internal constructor(private val syllables: IntArray, priv
         /** A letter slipped onto the key next to it: `nihap` for nihao. */
         const val NEIGHBOUR = 8
 
+        /** 双拼's key read as an initial alone where it and the next make a syllable: 简拼 in the middle (ShuangpinSegmenter). */
+        const val ABBREV = 16
+
         internal val EMPTY = SyllableMatches(IntArray(0), IntArray(0))
 
         private fun describe(flags: Int) = buildString {
@@ -49,6 +56,7 @@ class SyllableMatches internal constructor(private val syllables: IntArray, priv
             if (flags and TYPO != 0) append('!')
             if (flags and COMPLETION != 0) append('…')
             if (flags and NEIGHBOUR != 0) append('?')
+            if (flags and ABBREV != 0) append('^')
         }
     }
 }

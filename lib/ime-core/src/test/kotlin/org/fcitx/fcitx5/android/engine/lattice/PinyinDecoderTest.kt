@@ -10,9 +10,14 @@ import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
@@ -324,6 +329,97 @@ class PinyinDecoderTest {
             val fresh = decoder(beam = 3).decode(graph, prev2, prev)
             assertEquals("step $step: $input", describe(fresh), describe(kept.decode(graph, prev2, prev)))
         }
+    }
+
+    // 简拼 in the middle reads every 双拼 key alone too: the words collected from where nothing changed
+    // are kept from key to key, and what the decoder reads is what it reads afresh, the user's words,
+    // those only imported and a key read alone each way among them
+    @Test
+    fun buildingOnTheLastDecodeChangesNothingIn双拼() {
+        // 自然码: ni hc(hao) ma zl(zai) jm(jian) wo vh(zhang) vs(zhong) hw(hua) rf(ren) mn(min), and keys alone
+        val pieces = listOf("ni", "hc", "ma", "zl", "jm", "wo", "vh", "vs", "hw", "rf", "mn", "n", "h", "z", "j", "v", "r", "m", "'", ";")
+        buildsOnTheLast(ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, abbreviations = true), pieces, Random(11))
+    }
+
+    // the tones typed after a syllable on the zhuyin keys weigh the words collected: kept with them
+    @Test
+    fun buildingOnTheLastDecodeChangesNothingInZhuyinWithTones() {
+        val allows = { cp: Int, syllable: Int, tone: Int -> (cp + syllable + tone) % 3 != 0 }
+        val segmenter = T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = allows)
+        // ni hao ma zai jian wo, symbol by symbol, and the five tones
+        val pieces = "ㄋㄧㄏㄠㄇㄚㄗㄞㄐㄢㄨㄛ".map { ZhuyinKeys.symbolCode(it).toString() } + (1..5).map { ZhuyinKeys.toneCode(it).toString() }
+        buildsOnTheLast(segmenter, pieces, Random(13), steps = 1500, toneAllows = allows)
+    }
+
+    /**
+     * Types [pieces] at random with [segmenter] and checks, at each step, that a decoder building on
+     * the last decode reads what one made afresh does: the sentences, the words and the arcs between
+     * every two positions, as whole syllables or not. Every so often the user's words change (owned,
+     * blocked, unblocked) and the decoder is [PinyinDecoder.reset], as the session does.
+     */
+    private fun buildsOnTheLast(
+        segmenter: Segmenter,
+        pieces: List<String>,
+        random: Random,
+        steps: Int = 3000,
+        toneAllows: ((Int, Int, Int) -> Boolean)? = null,
+    ) {
+        val user = UserModel(data.dictionary, data.vocabulary)
+        user.attachImports(ImportedWords().import("妮好" to "ni hao", "中人" to "zhong ren"))
+        val changes = listOf(
+            { user.own(UserModel.Entry("你中", syl("ni", "zhong"))) },
+            { user.block(UserModel.Entry("你好", syl("ni", "hao"))) },
+            { user.own(UserModel.Entry("好吗", syl("hao", "ma"))) },
+            { user.unblock(UserModel.Entry("你好", syl("ni", "hao"))) },
+            { user.block(UserModel.Entry("再", syl("zai"))) },
+            { user.own(UserModel.Entry("中人", syl("zhong", "ren"))) },
+        )
+        fun decoder() = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user, toneAllows = toneAllows)
+        fun read(d: PinyinDecoder, graph: SyllableGraph): List<Any?> {
+            val decoding = describe(d.decode(graph))
+            val between = (graph.start until graph.end).flatMap { a ->
+                (a + 1..graph.end).flatMap { b -> listOf(false, true).map { w -> d.arcsBetween(graph, a, b, w).map { "$a-$b $w ${it.text} ${it.score}" } } }
+            }
+            return decoding + between
+        }
+        val kept = decoder()
+        var input = ""
+        repeat(steps) { step ->
+            if (step % 97 == 96) {
+                changes[step / 97 % changes.size]()
+                kept.reset()
+            }
+            val at = random.nextInt(input.length + 1)
+            val piece = pieces[random.nextInt(pieces.size)]
+            when (random.nextInt(20)) {
+                in 0..11 -> input += piece
+                in 12..15 -> input = input.dropLast(1 + random.nextInt(2))
+                16 -> input = input.substring(0, at) + piece + input.substring(at)
+                17 -> input = input.substring(0, at) + piece[0] + input.substring(minOf(at + 1, input.length))
+                18 -> input = input.drop(1)
+                else -> input = ""
+            }
+            val graph = segmenter.segment(input)
+            assertEquals("step $step: $input", read(decoder(), graph), read(kept, graph))
+        }
+    }
+
+    @Test
+    fun aKeyAtTheEndCollectsWordsOnlyNearTheEnd() {
+        val segmenter = ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, abbreviations = true)
+        val d = decoder()
+        val input = "nihcmazljmwo".repeat(6)
+        d.decode(segmenter.segment(input))
+        assertEquals(input.length, d.collectedAnew)
+        // the words over the last key or two, and those as long as the dictionary's from before them
+        d.decode(segmenter.segment(input + "v"))
+        assertTrue("${d.collectedAnew}", d.collectedAnew <= 6)
+        d.decode(segmenter.segment(input + "vs"))
+        assertTrue("${d.collectedAnew}", d.collectedAnew <= 6)
+        // and as many as before where it starts again
+        d.reset()
+        d.decode(segmenter.segment(input + "vs"))
+        assertEquals(input.length + 2, d.collectedAnew)
     }
 
     @Test

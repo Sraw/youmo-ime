@@ -109,7 +109,16 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    carries every syllable that stretch may stand for, with `SyllableMatches` flags saying how it
    strays (fuzzy, typo, slipped onto a neighbouring key, initial only = 简拼, partial = still being
    typed, a Latin letter, raw). Unlike libime, every cut is kept and the language model chooses.
-   `PinyinSegmenter` (全拼), `ShuangpinSegmenter` (双拼, same graph), `T9Segmenter` (digits; with 连按
+   `PinyinSegmenter` (全拼), `ShuangpinSegmenter` (双拼, same graph; where a key and the next make a
+   syllable it reads the key alone too, an initial flagged `SyllableMatches.ABBREV`: 简拼 in the
+   middle, as Rime's `abbrev`, at `Penalties.abbrev` (−2) on top of the initial's −1, the least that
+   left input in whole syllables reading as before, dev/design/061-shuangpin-abbrev-measure.md;
+   `ime-eval pinyin --sp-abbrev off` reads without it; what asks how the user typed reads the
+   graph without them, `SyllableGraph.withoutAbbreviations`: whether the input ends on a syllable
+   (`endsOnSyllable`), whether `;` ends one (`readsAfter`), and a code `readsWhole` is the user's
+   whole syllables to `HabitOrder` and `Retype` too: under `xm` (xian) a word used under
+   other keys or added by hand that x'm spells does not come up, while what is pinned, first or used
+   under the code itself does (`Level.recorded`: 可以 under `ky`), review 061-shuangpin-abbrev M1–M3), `T9Segmenter` (digits; with 连按
    on, off by default, a key pressed again soon is its next letter and nothing else, `MultiTap`: the
    session puts it in as a letter typed as itself, upper case, in place of the digit, so `4 4` fast
    is `H`. The 2026-10-12 hybrid, read as keys too with a `Penalties.tapped`, went 2026-10-19: a
@@ -124,7 +133,9 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    its score, its layer's prior, the context of 联想 and the words 联想 offers after it, and the
    reading handwriting takes it at) plus the `Penalties` of how the input was read. It keeps whole sequences
    (a real N-best, not trigram-merged), and reuses the beams of the unchanged prefix so a key costs
-   only its last syllables.
+   only its last syllables; the words collected from a position whose collecting read no edge where
+   the graph changed (`SyllableGraph.sameUntil`) are kept too, which 双拼's 简拼 in the middle needs:
+   every key read alone made collecting from every position grow a key's time with the input.
 3. **Rank.** At `ModelLevel.MEDIUM` and up, `Reranker` adds the 4M sentence model's score of the
    decoder's best whole-input readings (after the text before the cursor) to the decoder's score;
    at `HIGH`, while the user pauses, the 25M model refines the top readings in time slices
@@ -535,6 +546,7 @@ setting either: it reads the codes.
   path, the ambiguity in each edge's syllables.
 - **Segmenter.** `GroupedShuangpinSegmenter(scheme, letters, fuzzy)`, built as
   `ShuangpinSegmenter` is (pairs, a key alone as PARTIAL/INITIAL, a/e/o alone, fuzzy), but reading no
+  简拼 in the middle (a key alone only where it and the next make no syllable) and no
   slip, not even ü typed with its own key: the grouped keyboards correct nothing (the user's 2026-11-03;
   纠错 says 不适用 for them and its value is ignored).
   It and `T9Segmenter` are `KeyedSegmenter`s: `letters`, `isKey`, `asTyped`, `initialsOf` (the
@@ -1129,3 +1141,12 @@ on purpose: only the settings rows of 生僻字屏蔽 ask, once per engine for t
 keyboard is up but for a field tapped in that second; moving the walk off the thread would need a
 second call from the page (the pack's part made on another thread, then the grid), for a cost paid
 once.
+
+双拼 with 简拼 in the middle, a key's round trip through `EngineEvalRunner` (lib/ime-eval/run-on-device.sh,
+`engine-shuangpin`, 小鹤) on the API 36 emulator of the Mac mini, 2026-11-14: 10 inputs each of 20, 40
+and 60 keys, in whole syllables and as a first syllable then initials, keys 41–60. Before the words
+were kept from key to key (`SyllableGraph.sameUntil`), p50/p95 17.7/25.8 ms whole and 21.7/29.8 ms
+initials, growing with the input; after, 5.5/8.0 and 7.6/9.8, as without 简拼 in the middle
+(the decoder before it, 7689e738f, 6.7–7.5/11.9–15.3 and 9.1–10.3/15.9–18.4 over two runs). On the host JVM
+(`ime-eval pinyin --scheme xiaohe`) keys 41–60 went 2.0/2.5 → 0.6/0.8 ms whole, 2.5/3.1 → 0.6/0.9
+initials; all candidates the same. The 6T is measured before 0.6.1 goes out (NEXT-PLAN).

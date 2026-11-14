@@ -42,7 +42,7 @@ class PinyinDecoder(
     private val beam: Int = DEFAULT_BEAM,
     /** Words taken per reading past the first word, most probable first; the first gets them all. */
     private val wordsPerReading: Int = DEFAULT_WORDS_PER_READING,
-    /** The user's own words, found along with the dictionary's; learning them needs a [reset]. */
+    /** The user's own words, found along with the dictionary's; any change to them (learned, added, blocked, imported) needs a [reset]. */
     private val user: UserWords? = null,
     /** Where lookAhead keeps its longer words, an entry per [dictionary] node, asked for when first needed: one array for decoders of the same dictionary and scores to share. */
     extensions: () -> Array<IntArray?> = { arrayOfNulls<IntArray>(dictionary.nodeCount) },
@@ -95,6 +95,15 @@ class PinyinDecoder(
     // what the beams hold now came from these, or from nothing if lastEnd is -1
     private var lastArcs = Lattice()
     private var lastEnd = -1
+    // the graph [arcs] were collected from, null till one is done and after a [reset]; and, as one is,
+    // the furthest position the collecting from a position read the edges of, and the furthest they went to
+    private var builtFrom: SyllableGraph? = null
+    private var reachRead = 0
+    private var reachTo = 0
+
+    /** How many positions the last decode collected words from anew, not kept from the one before: for tests. */
+    internal var collectedAnew = 0
+        private set
 
     // the words a pass over the arcs has taken, each once ([startWords], [arcsBetween], [rankedWords])
     private val seen = SeenWords()
@@ -124,6 +133,9 @@ class PinyinDecoder(
     private var pathTones = IntArray(PATH)
     private var pathLength = 0
     private var pathToned = 0
+    // of those, how many a 双拼 key read alone where it and the next make a syllable (SyllableMatches.ABBREV):
+    // the arcs over one are marked so, for what reads the input in whole syllables (startWords, arcsBetween)
+    private var pathAbbrev = 0
 
     private val contexts = LongArray(beam) // of the beam being extended, from scorer
     private val runs = LongArray(beam) // the scorer's trigrams of each of contexts, by their bits
@@ -162,9 +174,16 @@ class PinyinDecoder(
         return Decoding(sentences(graph, sentences), firstWords(graph, prev2, prev, words, firstKept, last))
     }
 
-    /** Forgets the last decode, so the next searches from scratch; needed when [scorer]'s scores change. */
+    /**
+     * Forgets the last decode, so the next searches and collects from scratch: needed when [scorer]'s
+     * scores change, and when [user]'s words do (one owned, added, blocked or imported). The words
+     * collected from key to key carry the user's words, their blocks and the imported ones as they
+     * were: a reset missed shows a word removed or blocked, or leaves out one just added, till the
+     * input starts again.
+     */
     fun reset() {
         lastEnd = -1
+        builtFrom = null
     }
 
     /**
@@ -176,26 +195,50 @@ class PinyinDecoder(
         return if (ranked) rankedWords(graph, words) else decode(graph, prev2, prev, words = words).words
     }
 
+    // whether the arc [a] is a word that ends at [to], not over a key read alone where [wholeSyllables]
+    private fun takes(a: Int, to: Int, wholeSyllables: Boolean): Boolean =
+        arcs.to[a] == to && arcs.word[a] != NO_WORD && !(wholeSyllables && arcs.flags[a] and ABBREVIATED != 0)
+
     private fun buildLattice(graph: SyllableGraph) {
         // collect's enter and leave pair up; a decode thrown out of half way leaves no path behind
         pathLength = 0
         pathToned = 0
+        pathAbbrev = 0
+        arcs.abbreviated = false
         val n = graph.end
+        // the arcs from a position whose collecting read only edges before where the graph changed
+        // are those of the last decode, found again: kept, so a key typed at the end of long input
+        // collects from its last syllables only (in 双拼 every key may be read alone, 简拼 in the
+        // middle, and collecting from every position grew a key's time with the input's length)
+        val was = builtFrom?.takeIf { it.start == graph.start }
+        builtFrom = null
+        val changed = was?.let { graph.sameUntil(it) } ?: -1
         arcs.clear(n)
+        collectedAnew = 0
         for (at in 0..n) {
             arcs.start[at] = arcs.size
             if (graph.edges(at).isEmpty()) continue
-            val limit = if (at == graph.start) Int.MAX_VALUE else wordsPerReading
-            collect(graph, at, dictionary.root, user?.root ?: -1, user?.mergedWords?.root ?: -1, 0f, false, limit)
-            // nothing in the dictionary starts here: keep what was typed, so every path goes on. Asked
-            // before the words only imported: no path goes on from those (review-G S2)
-            if (arcs.size == arcs.start[at]) {
-                for (e in graph.edges(at)) arcs.add(graph.to(e), NO_WORD, penalties.raw)
-            }
-            if (at == graph.start) user?.startWords?.let { collectStart(graph, at, it, it.root, 0f, false) }
-            arcs.sortByEnd(arcs.start[at], n)
+            if (was != null && lastArcs.readBefore(at, changed, changed == was.end, changed == n)) arcs.copy(lastArcs, at) else collectFrom(graph, at)
         }
         arcs.start[n + 1] = arcs.size
+        builtFrom = graph
+    }
+
+    // the arcs from [at], anew
+    private fun collectFrom(graph: SyllableGraph, at: Int) {
+        reachRead = at
+        reachTo = at
+        collectedAnew++
+        val limit = if (at == graph.start) Int.MAX_VALUE else wordsPerReading
+        collect(graph, at, dictionary.root, user?.root ?: -1, user?.mergedWords?.root ?: -1, 0f, false, limit)
+        // nothing in the dictionary starts here: keep what was typed, so every path goes on. Asked
+        // before the words only imported: no path goes on from those (review-G S2)
+        if (arcs.size == arcs.start[at]) {
+            for (e in graph.edges(at)) arcs.add(graph.to(e), NO_WORD, penalties.raw)
+        }
+        if (at == graph.start) user?.startWords?.let { collectStart(graph, at, it, it.root, 0f, false) }
+        arcs.sortByEnd(arcs.start[at], graph.end)
+        arcs.reached(at, reachRead, reachTo)
     }
 
     /**
@@ -207,6 +250,7 @@ class PinyinDecoder(
     private fun collect(graph: SyllableGraph, at: Int, node: Int, userNode: Int, mergedNode: Int, cost: Float, short: Boolean, limit: Int) {
         val merged = user?.mergedWords
         for (e in graph.edges(at)) {
+            read(graph, at, e)
             val kind = graph.kind(e)
             if (kind == Kind.RAW) continue
             val to = graph.to(e)
@@ -221,7 +265,7 @@ class PinyinDecoder(
                 if (child < 0 && userChild < 0 && mergedChild < 0) continue
                 val c = edgeCost + penalty(matches.flags(i)) + nasal(kind, matches.syllable(i)) + penalties.tap * graph.against(e, i)
                 var more = false
-                enter(matches.syllable(i), tone)
+                enter(matches.syllable(i), tone, matches.flags(i))
                 if (child >= 0) {
                     val words = minOf(dictionary.wordCount(child), limit)
                     addWords(to, child, words, c, edgeShort)
@@ -230,9 +274,15 @@ class PinyinDecoder(
                 }
                 if (addOthers(to, userChild, mergedChild, c, edgeShort, limit)) more = true
                 if (to < graph.end && more) collect(graph, to, child, userChild, mergedChild, c, edgeShort, limit)
-                leave(tone)
+                leave(tone, matches.flags(i))
             }
         }
+    }
+
+    // what collecting from a position has read of the graph: see Lattice.readBefore
+    private fun read(graph: SyllableGraph, at: Int, edge: Int) {
+        if (at > reachRead) reachRead = at
+        graph.to(edge).let { if (it > reachTo) reachTo = it }
     }
 
     // the user's words at [userNode] and the merged dictionaries' at [mergedNode] (-1 for none): whether longer ones go on
@@ -260,6 +310,7 @@ class PinyinDecoder(
     private fun collectStart(graph: SyllableGraph, at: Int, starts: StartWords, node: Int, cost: Float, short: Boolean) {
         val user = user ?: return
         for (e in graph.edges(at)) {
+            read(graph, at, e)
             val kind = graph.kind(e)
             if (kind == Kind.RAW) continue
             val to = graph.to(e)
@@ -269,11 +320,13 @@ class PinyinDecoder(
                 val child = starts.child(node, matches.syllable(i))
                 if (child < 0) continue
                 val c = cost + penalty(kind) + penalty(matches.flags(i)) + nasal(kind, matches.syllable(i)) + penalties.tap * graph.against(e, i)
+                abbreviated(matches.flags(i), 1)
                 for (w in 0 until starts.wordCount(child)) {
                     val word = starts.word(child, w)
                     if (user.startOnly(word) && !user.blocked(word, -1)) arcs.add(to, word, c + penalties.imported, short = edgeShort, startOnly = true)
                 }
                 if (to < graph.end && starts.childCount(child) > 0) collectStart(graph, to, starts, child, c, edgeShort)
+                abbreviated(matches.flags(i), -1)
             }
         }
     }
@@ -299,8 +352,8 @@ class PinyinDecoder(
     // the tone typed after [edge]'s syllable, 0 where none is asked of the words
     private fun toneOf(graph: SyllableGraph, edge: Int) = if (toneAllows == null) 0 else graph.tone(edge)
 
-    // [syllable] and its typed [tone] onto the path collect is on
-    private fun enter(syllable: Int, tone: Int) {
+    // [syllable] and its typed [tone] onto the path collect is on, its match's [flags] counted
+    private fun enter(syllable: Int, tone: Int, flags: Int) {
         if (pathLength == pathSyllables.size) {
             pathSyllables = pathSyllables.copyOf(2 * pathLength)
             pathTones = pathTones.copyOf(2 * pathLength)
@@ -309,11 +362,19 @@ class PinyinDecoder(
         pathTones[pathLength] = tone
         pathLength++
         if (tone > 0) pathToned++
+        abbreviated(flags, 1)
     }
 
-    private fun leave(tone: Int) {
+    private fun leave(tone: Int, flags: Int) {
         pathLength--
         if (tone > 0) pathToned--
+        abbreviated(flags, -1)
+    }
+
+    private fun abbreviated(flags: Int, by: Int) {
+        if (flags and SyllableMatches.ABBREV == 0) return
+        pathAbbrev += by
+        arcs.abbreviated = pathAbbrev > 0
     }
 
     // [Penalties.tone] where a tone typed on the path to [word] is one a character of it does not have
@@ -367,14 +428,16 @@ class PinyinDecoder(
      * The words of the last decode's arcs from the start of [graph] to [to] that [take] says, each
      * once, as candidates scored by their arcs' costs alone: those a list may lack that the user
      * has (impl/design-1b.md §1, injection). Every word from the start is an arc, with no limit.
+     * [wholeSyllables]: none over a 双拼 key read alone where it and the next make a syllable, for a code that
+     * [SyllableGraph.readsWhole] (HabitOrder).
      */
-    fun startWords(graph: SyllableGraph, to: Int, take: IntPredicate): List<Candidate> {
+    fun startWords(graph: SyllableGraph, to: Int, take: IntPredicate, wholeSyllables: Boolean = false): List<Candidate> {
         if (lastEnd != graph.end || lastStart != graph.start) return emptyList()
         val out = ArrayList<Candidate>()
         seen.clear()
         for (a in arcs.start[graph.start] until arcs.start[graph.start + 1]) {
             val word = arcs.word[a]
-            if (arcs.to[a] != to || word == NO_WORD) continue
+            if (!takes(a, to, wholeSyllables)) continue
             if (take.test(word) && seen.add(word)) out += Candidate(text(word), to, arcs.cost[a], intArrayOf(word), intArrayOf(to))
         }
         return out
@@ -391,15 +454,16 @@ class PinyinDecoder(
     /**
      * The words of the last decode's arcs of [graph] from [from] to [to], each once, as [startWords]
      * gives them: what a word added by hand is the only one of (impl/design-1c.md §1). Read off the
-     * lattice the decode built, no search.
+     * lattice the decode built, no search. [wholeSyllables] as for [startWords].
      */
-    fun arcsBetween(graph: SyllableGraph, from: Int, to: Int): List<Candidate> {
+    fun arcsBetween(graph: SyllableGraph, from: Int, to: Int, wholeSyllables: Boolean = false): List<Candidate> {
         if (from !in graph.start until graph.end || lastEnd != graph.end || lastStart != graph.start) return emptyList()
         val out = ArrayList<Candidate>()
         seen.clear()
         for (a in arcs.start[from] until arcs.start[from + 1]) {
             val word = arcs.word[a]
-            if (arcs.to[a] == to && word != NO_WORD && seen.add(word)) out += Candidate(text(word), to - from, arcs.cost[a], intArrayOf(word), intArrayOf(to))
+            if (!takes(a, to, wholeSyllables)) continue
+            if (seen.add(word)) out += Candidate(text(word), to - from, arcs.cost[a], intArrayOf(word), intArrayOf(to))
         }
         return out
     }
@@ -471,6 +535,7 @@ class PinyinDecoder(
         if (flags and SyllableMatches.FUZZY != 0) p += penalties.fuzzy
         if (flags and SyllableMatches.TYPO != 0) p += penalties.typo
         if (flags and SyllableMatches.NEIGHBOUR != 0) p += penalties.neighbour
+        if (flags and SyllableMatches.ABBREV != 0) p += penalties.abbrev
         return p
     }
 
@@ -699,8 +764,16 @@ class PinyinDecoder(
         val word = IntList() // NO_WORD for input kept as typed
         val scored = IntList() // the word the model scores: word, or a longer one it starts
         val cost = FloatList()
-        val flags = IntList() // SHORT for an arc over a syllable typed short (scored without the user's counts), START_ONLY for a start-only word
+        val flags = IntList() // SHORT for an arc over a syllable typed short (scored without the user's counts), START_ONLY for a start-only word,
+        // ABBREVIATED for one over a 双拼 key read alone where it and the next make a syllable
         val size get() = to.size
+
+        // per position, what collecting from it read: the furthest position it read the edges of, the furthest they went
+        private var reachRead = IntArray(0)
+        private var reachTo = IntArray(0)
+
+        /** Whether the arcs added are over a 简拼 in the middle: the decoder's path, as it collects. */
+        var abbreviated = false
 
         // for sorting
         private var ends = IntArray(0)
@@ -714,6 +787,8 @@ class PinyinDecoder(
             if (start.size < end + 2) {
                 start = IntArray(end + 2)
                 ends = IntArray(end + 2)
+                reachRead = IntArray(end + 2)
+                reachTo = IntArray(end + 2)
             }
             to.clear()
             word.clear()
@@ -764,7 +839,33 @@ class PinyinDecoder(
             this.word += word
             this.scored += scored
             this.cost += cost
-            this.flags += (if (short) SHORT else 0) or (if (startOnly) START_ONLY else 0)
+            this.flags += (if (short) SHORT else 0) or (if (startOnly) START_ONLY else 0) or (if (abbreviated) ABBREVIATED else 0)
+        }
+
+        fun reached(at: Int, read: Int, to: Int) {
+            reachRead[at] = read
+            reachTo[at] = to
+        }
+
+        /**
+         * Whether the arcs from [at] were collected reading only the edges before [changed], the first
+         * position where the graph they were collected from and the next differ: then the next has
+         * them all the same. An edge going to [changed] too, where it is the end of both graphs
+         * ([wasEnd], [isEnd]) or of neither: the end is where a syllable still being typed reads on.
+         */
+        fun readBefore(at: Int, changed: Int, wasEnd: Boolean, isEnd: Boolean): Boolean =
+            at < changed && reachRead[at] < changed && (reachTo[at] < changed || reachTo[at] == changed && wasEnd == isEnd)
+
+        /** Adds [other]'s arcs from [at], with what collecting them read. */
+        fun copy(other: Lattice, at: Int) {
+            for (a in other.start[at] until other.start[at + 1]) {
+                to += other.to[a]
+                word += other.word[a]
+                scored += other.scored[a]
+                cost += other.cost[a]
+                flags += other.flags[a]
+            }
+            reached(at, other.reachRead[at], other.reachTo[at])
         }
 
         fun same(arc: Int, other: Lattice, otherArc: Int) =
@@ -793,6 +894,7 @@ class PinyinDecoder(
         // the bits of Lattice.flags
         private const val SHORT = 1
         private const val START_ONLY = 2
+        private const val ABBREVIATED = 4
     }
 }
 

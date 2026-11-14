@@ -63,8 +63,8 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps",
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev",
     ) { args, _, _ ->
         val (dataPath, setPath, resultPath) = args.operands
         runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options))
@@ -465,8 +465,13 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         // only full pinyin reads slips: 双拼 and the nine keys read none
         valid("neighbours") { it in ON_OFF && (scheme == null || scheme == NO_LATIN) },
         valid("typos") { it in ON_OFF && readsTypos(scheme) },
+        // 双拼's 简拼 in the middle: off, the reading before it, or another extra penalty than the app's
+        valid("sp-abbrev") { readsAbbrev(it, scheme) },
     ).all { it }
 }
+
+/** Whether `--sp-abbrev` [spec] is off or a penalty (finite, not above 0), under a scheme of the full keyboard's 双拼 (the grouped ones read none). */
+private fun readsAbbrev(spec: String, scheme: String?) = (spec == "off" || spec.toFloatOrNull()?.let { it.isFinite() && it <= 0f } == true) && scheme in ShuangpinSet.SCHEMES
 
 /** Whether [scheme]'s segmenter reads common slips: full pinyin's and 双拼's; the grouped keyboards and zhuyin read none. */
 private fun readsTypos(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES
@@ -535,6 +540,10 @@ private class RunOptions(options: Map<String, String>) {
     val merged = options["merged"]
     val stale = "stale" in options
 
+    /** 双拼 reads a key as an initial alone in the middle too (ShuangpinSegmenter): unless off, at this extra penalty. */
+    val abbreviations = options["sp-abbrev"] != "off"
+    val abbrevPenalty = options["sp-abbrev"]?.toFloatOrNull() ?: Penalties().abbrev
+
     /** The 14 keys tapped by a simulated hand ([Taps]): the set, full pinyin, typed so. */
     val taps = options["taps"]?.let(Taps::parse)?.also {
         require(scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) == NineKeyLetters.G14) { "--taps types the 14 keys: a 14-key --scheme, not $scheme" }
@@ -553,7 +562,7 @@ private class RunOptions(options: Map<String, String>) {
         in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = data.tones::allows)
         in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme))
         in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy) }
-        else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy, typos)
+        else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy, typos, abbreviations = abbreviations)
     }
 }
 
@@ -614,7 +623,7 @@ private fun runPinyin(dataPath: String, setPath: String, resultPath: String, opt
         val results = dealt(selected, options.threads, {
             val data = loadData(dataPath)
             PinyinRun(
-                data, options.segmenter(data), penalties = Penalties(tap = options.taps?.let { -it.alpha } ?: Penalties().tap),
+                data, options.segmenter(data), penalties = Penalties(tap = options.taps?.let { -it.alpha } ?: Penalties().tap, abbrev = options.abbrevPenalty),
                 beam = options.beam, sentenceCount = options.sentences, layers = options.layers, pack = pack,
                 reranker = models.reranker, refiner = models.refiner,
                 merged = merged?.let { DictionaryFile.open(JvmFile(it), verify = false) }, mergedStale = options.stale,

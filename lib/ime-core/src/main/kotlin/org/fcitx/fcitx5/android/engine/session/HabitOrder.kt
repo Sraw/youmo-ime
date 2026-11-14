@@ -76,8 +76,11 @@ internal class HabitOrder(
         return text in addedOrder
     }
 
-    /** A level of the input: the candidates ending at [end] (from the pieces' end), ranked under [code] after [prev]; [injected], those put in. */
-    class Level(val end: Int, val code: Code, val prev: String, val injected: List<Candidate>, val habitsHere: Boolean)
+    /**
+     * A level of the input: the candidates ending at [end] (from the pieces' end), ranked under [code] after [prev]; [injected], those put in;
+     * [recorded], the texts pinned, first or used under the code itself, ranked there however the code reads them.
+     */
+    class Level(val end: Int, val code: Code, val prev: String, val injected: List<Candidate>, val habitsHere: Boolean, val recorded: Set<String>)
 
     /** [list] as shown, how those ranked were ([ranks]: the tier, the uses); [pinned], the pin in front, if one is. */
     class Ordered(val list: List<Candidate>, val ranks: Map<Candidate, HabitRanker.Ranked<Candidate>>) {
@@ -135,21 +138,32 @@ internal class HabitOrder(
         fun add(c: Candidate) {
             if (present.add(c.text)) injected += c
         }
-        for (w in listOfNotNull(pinned, firstHere) + used + spelled) if (w.text !in present) walk(graph, end, w)?.let(::add)
+        val whole = wholeSyllables(graph, graph.start, end)
+        // what the user did under this very code reads as they read it there, initials or not (ky: 可以
+        // pinned or picked there is raised); what other spellings raise, or their own and added words,
+        // only as the code reads whole (061-shuangpin-abbrev M3)
+        val recorded = listOfNotNull(pinned, firstHere) + used
+        walkIn(graph, end, recorded, false, present, ::add)
+        walkIn(graph, end, spelled, whole, present, ::add)
         // the user's own words and those added by hand the input reads here: theirs under every code; those imported, in their slot
         val user = user
         if (user != null && !habitsOnly) {
             // (a name added by hand, of the user's own trie, is [UserModel.chosen]; review-1b M1). One
             // pass over the start's arcs for both, each key (review-int-runtime N4)
             fun own(id: Int) = user.chosen(id) || isAddedId(id)
-            val starts = decoder.startWords(graph, end) { own(it) || user.startOnly(it) }
+            val starts = decoder.startWords(graph, end, { own(it) || user.startOnly(it) }, whole)
             starts.forEach { if (own(it.words[0])) add(it) }
             // a page of them by their order (D24), not each of the hundreds a short code reads (review-G S9): the rest as the decoder has them.
             // Each one's order asked once, not at each comparison (N4)
             starts.filter { !own(it.words[0]) && it.text !in present }.map { it to habits.importOrder(it.text) }.sortedBy { it.second }
                 .take(IMPORTS_PER_LEVEL).forEach { add(it.first) }
         }
-        return Level(end, code, prev, injected.map { Candidate(it.text, it.end, low, it.words, it.ends) }, habitsHere)
+        return Level(end, code, prev, injected.map { Candidate(it.text, it.end, low, it.words, it.ends) }, habitsHere, recorded.mapTo(HashSet()) { it.text })
+    }
+
+    // each of [words] not [present] that the input reads to [end], [whole] or not, to [add]
+    private fun walkIn(graph: SyllableGraph, end: Int, words: List<Words>, whole: Boolean, present: Set<String>, add: (Candidate) -> Unit) {
+        for (w in words) if (w.text !in present) walk(graph, end, w, whole = whole)?.let(add)
     }
 
     // those of the code's keyboard and first key whose counts across its spellings move them under it
@@ -177,10 +191,13 @@ internal class HabitOrder(
     /**
      * The words of [words], each as the model has it (never made one), along the syllables of
      * [graph] from its start to [end]; null if one is none, blocked, or the input does not read them so.
+     * [whole]: the code reads as whole syllables (`xm`, xian in 自然码), so not along a 双拼 key read alone
+     * where it and the next make a syllable: 下面 picked under `xwmm` is raised there, not over 先 under
+     * `xm` (061-shuangpin-abbrev review M3).
      */
-    private fun walk(graph: SyllableGraph, end: Int, words: Words, start: Int = graph.start): Candidate? {
+    private fun walk(graph: SyllableGraph, end: Int, words: Words, start: Int = graph.start, whole: Boolean = wholeSyllables(graph, start, end)): Candidate? {
         // a sentence pinned is one word of the record's, the model's words apart (review-1b S4)
-        sentence(words)?.let { return walk(graph, end, it, start) }
+        sentence(words)?.let { return walk(graph, end, it, start, whole) }
         val user = user
         val ids = IntArray(words.list.size)
         val syllables = ArrayList<IntArray>(words.list.size)
@@ -193,7 +210,7 @@ internal class HabitOrder(
             }
             if (id < 0 || user?.blockedAnyhow(id) == true) return null
             ids[i] = id
-            syllables += entry?.syllables ?: return startWord(graph, start, end, id, words)
+            syllables += entry?.syllables ?: return startWord(graph, start, end, id, words, whole)
         }
         val ends = IntArray(ids.size)
         fun go(word: Int, k: Int, at: Int): Boolean {
@@ -202,7 +219,7 @@ internal class HabitOrder(
                 return if (word == ids.size - 1) at == end else go(word + 1, 0, at)
             }
             for (e in graph.edges(at)) {
-                if (graph.kind(e) == Kind.RAW || graph.to(e) > end) continue
+                if (!passes(graph, e, end, whole)) continue
                 val m = graph.matches(e)
                 if ((0 until m.size).any { m.syllable(it) == syllables[word][k] } && go(word, k + 1, graph.to(e))) return true
             }
@@ -211,6 +228,10 @@ internal class HabitOrder(
         // its end the graph's place, as the decoder's candidates' and the levels' (F2814)
         return if (go(0, 0, start)) Candidate(words.text, end, 0f, ids, ends) else null
     }
+
+    // whether a word may go on over [e] in [walk]: no raw input, nothing past [end], no key read alone where the code reads [whole]
+    private fun passes(graph: SyllableGraph, e: Int, end: Int, whole: Boolean) =
+        graph.kind(e) != Kind.RAW && graph.to(e) <= end && !(whole && graph.isAbbreviation(e))
 
     /** [words], one word of several syllables the model has not, as the fewest of the model's words; null if it is no such or they are none. */
     private fun sentence(words: Words): Words? {
@@ -242,9 +263,12 @@ internal class HabitOrder(
         return (user?.known(entry) ?: data.wordIndex.find(w.text)) >= 0
     }
 
+    // whether the code from [start] to [end] reads as whole syllables, where 双拼 reads its keys alone too
+    private fun wholeSyllables(graph: SyllableGraph, start: Int, end: Int) = graph.hasAbbreviations && graph.readsWhole(start, end)
+
     // a word of one piece with no reading: the decoder's arc, if it reads all of it
-    private fun startWord(graph: SyllableGraph, start: Int, end: Int, id: Int, words: Words): Candidate? =
-        if (words.list.size == 1) decoder.arcsBetween(graph, start, end).firstOrNull { it.words[0] == id } else null
+    private fun startWord(graph: SyllableGraph, start: Int, end: Int, id: Int, words: Words, whole: Boolean): Candidate? =
+        if (words.list.size == 1) decoder.arcsBetween(graph, start, end, whole).firstOrNull { it.words[0] == id } else null
 
     // the codes kept of a kind by their keys, as [Habits.kept] lists them (the same list till the record changes)
     private var keptList: List<Habits.Kept>? = null
@@ -328,7 +352,7 @@ internal class HabitOrder(
         val items = ArrayList<Enforced.Item>()
         for (a in bounds) for (b in bounds.tailSet(a + 1)) {
             // keys glided are no keys of a word (1b N8)
-            val arcs = if (recorder.pressed.glided(from + a, from + b)) emptyList() else decoder.arcsBetween(graph, a, b)
+            val arcs = if (recorder.pressed.glided(from + a, from + b)) emptyList() else decoder.arcsBetween(graph, a, b, wholeSyllables(graph, a, b))
             val only = arcs.singleOrNull()?.takeIf { user.addedByHand(it.words[0]) || isAddedId(it.words[0]) } ?: continue
             items += Enforced.Item(a, b, only.words, only.ends, only.text, null, Enforced.Kind.ADDED)
         }
@@ -348,7 +372,10 @@ internal class HabitOrder(
         for ((k, level) in levels.withIndex()) {
             val at = if (k == 0) list.indexOfLast { it in sentences } + 1 else place(list, level.end, pageSize)
             list.addAll(at, level.injected)
-            val slots = list.indices.filter { list[it].end == level.end }
+            // a code read whole ranks no word only 简拼 in the middle reads (`xm`: 先, not 下面 used under
+            // xwmm, nor the user's own), but for what was pinned, first or used under the code itself (ky: 可以)
+            val whole = if (wholeSyllables(graph, graph.start, level.end)) graph.withoutAbbreviations() else null
+            val slots = list.indices.filter { list[it].end == level.end && ranksHere(list[it], level, whole) }
             val injected = level.injected.toHashSet()
             // whether a word reads the keys exactly is asked only where an imported word needs its slot
             val imports = slots.any { imported(list[it]) }
@@ -378,6 +405,21 @@ internal class HabitOrder(
             c, words, single = single, letters = letters || words.list.any { it.reading.isLatin() }, imported = imported, injected = injected,
             exact = imports && !imported && !letters && exact(graph, c),
         )
+    }
+
+    // whether [c] takes a slot of [level]: anything where the code is not read whole ([whole] null), else what reads along [whole] or was [Level.recorded] there
+    private fun ranksHere(c: Candidate, level: Level, whole: SyllableGraph?) = whole == null || c.text in level.recorded || readsAlong(whole, c)
+
+    // whether each word of [c] reads along [graph] from its start: on one without 简拼 in the middle, whether the code typed whole reads it
+    private fun readsAlong(graph: SyllableGraph, c: Candidate): Boolean {
+        var from = graph.start
+        for (i in c.words.indices) {
+            val word = c.words[i]
+            val own = user?.takeIf { word >= data.vocabulary.size }
+            if (word != NO_WORD && reading(graph, from, c.ends[i], word, data.dictionary, own) { _, _ -> "" } == null) return false
+            from = c.ends[i]
+        }
+        return true
     }
 
     // a word only imported (U-101): the decoder has it from the start alone, a candidate of one word
