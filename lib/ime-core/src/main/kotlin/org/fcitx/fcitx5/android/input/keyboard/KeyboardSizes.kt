@@ -30,10 +30,17 @@ data class KeyboardSizes(
     // the theme's where it is followed and gives one
     private fun themed(setting: Setting, theme: Twin?): Twin? = theme?.takeIf { setting.follow }
 
-    /** The keys' height asked for, px, out of [screen] px (KeyboardHeightCap cuts it after). */
-    fun heightPx(screen: Int, landscape: Boolean): Int =
-        themed(height, theme.height)?.let { (screen * it.of(landscape) / PERCENT).toInt() }
-            ?: (screen * (if (landscape) height.landscape else height.portrait) / PERCENT.toInt())
+    /**
+     * The keys' height asked for, px, out of [screen] px (KeyboardHeightCap cuts it after), on a screen [width] px
+     * wide. 横屏's percent is of the short side: a foldable's inner screen and a tablet upright are 横屏 (ScreenShape)
+     * and about as high as turned, not the landscape percent of their long side (061-wide-as-landscape §2.2): below API 35
+     * [screen] turned is the display less the navigation bar, so upright stands that bar's percent taller.
+     */
+    fun heightPx(screen: Int, width: Int, landscape: Boolean): Int {
+        val base = if (landscape) minOf(screen, width) else screen
+        return themed(height, theme.height)?.let { (base * it.of(landscape) / PERCENT).toInt() }
+            ?: (base * (if (landscape) height.landscape else height.portrait) / PERCENT.toInt())
+    }
 
     /** The padding each side, dp. */
     fun sidePaddingDp(landscape: Boolean): Double = dp(sidePadding, theme.sidePadding, landscape)

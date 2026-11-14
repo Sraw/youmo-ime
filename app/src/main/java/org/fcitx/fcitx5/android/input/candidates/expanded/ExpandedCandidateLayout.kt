@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.candidates.expanded
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.Configuration
 import android.view.Gravity
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
@@ -18,6 +17,7 @@ import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImageLayoutSwitchKey
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
 import org.fcitx.fcitx5.android.input.keyboard.SceneKeyDef
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
@@ -144,7 +144,7 @@ class ExpandedCandidateLayout(context: Context, theme: Theme, bar: BarLook = Sce
     init {
         id = R.id.expanded_candidate_view
 
-        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val landscape = KeyboardArea.landscape(context)
         val keys = ThemeManager.shownLook(theme).keys
         val inset = dp(if (landscape) keys.gap.vLand else keys.gap.v)
         // the theme's `candidates-panel` (T6a), else its panels' (the flat keys': the bar's colour, ThemeColors.panel);

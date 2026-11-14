@@ -6,7 +6,6 @@
 package org.fcitx.fcitx5.android.input
 
 import android.content.ClipData
-import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.SystemClock
 import android.util.SparseArray
@@ -61,6 +60,7 @@ import org.fcitx.fcitx5.android.input.candidates.CharCardView
 import org.fcitx.fcitx5.android.input.candidates.CompactLineView
 import org.fcitx.fcitx5.android.input.candidates.WordCardView
 import org.fcitx.fcitx5.android.input.candidates.tapsTo
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.learning.CandidateLearningMenu
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.popup.CardNav
@@ -350,7 +350,7 @@ abstract class BaseInputView(
             // they get it back, so what was typed is gone before the action reaches it. Not
             // focusable, the menu lets a touch outside it through as well: see [dispatchTouchEvent]
             val menu = ListPopupWindow(themedContext, null, android.R.attr.popupMenuStyle)
-            fun twoColumns() = nav.twoColumns(resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE, floatingKeyboard, pagedCandidates)
+            fun twoColumns() = nav.twoColumns(KeyboardArea.landscape(context), floatingKeyboard, pagedCandidates)
             // a card's menu its width whatever its lines (as wide as PopupMenu lets its menus grow; a card's two
             // columns, in landscape, wider); a title's or a reading line's no wider than they need
             fun width(): Int {
@@ -420,7 +420,7 @@ abstract class BaseInputView(
 
     // a card's menu in landscape: the card fills it and its lines are scrolled to, so the bar stays to say there are more
     private fun scrollbarShown(list: ListView?, card: Boolean) {
-        if (card && list != null && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) list.isScrollbarFadingEnabled = false
+        if (card && list != null && KeyboardArea.landscape(context)) list.isScrollbarFadingEnabled = false
     }
 
     /**

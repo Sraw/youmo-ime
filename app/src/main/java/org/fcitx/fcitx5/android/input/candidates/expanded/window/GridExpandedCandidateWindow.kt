@@ -5,23 +5,27 @@
 
 package org.fcitx.fcitx5.android.input.candidates.expanded.window
 
-import android.content.res.Configuration
+import android.content.Context
 import androidx.recyclerview.widget.GridLayoutManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 import org.fcitx.fcitx5.android.input.candidates.expanded.GridPagingCandidateViewAdapter
 import org.fcitx.fcitx5.android.input.candidates.expanded.SpanHelper
 import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.GridDecoration
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 
 class GridExpandedCandidateWindow :
     BaseExpandedCandidateWindow<GridExpandedCandidateWindow>() {
 
-    private val gridSpanCount by lazy {
-        AppPrefs.getInstance().keyboard.run {
-            if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
-                expandedCandidateGridSpanCount
-            else
+    private val gridSpanCount by lazy { spanCount(context) }
+
+    companion object {
+        /** The grid's columns: 横屏's setting where [context]'s window is 横屏 (KeyboardArea), a wide one upright too. */
+        fun spanCount(context: Context): Int = AppPrefs.getInstance().keyboard.run {
+            if (KeyboardArea.landscape(context))
                 expandedCandidateGridSpanCountLandscape
+            else
+                expandedCandidateGridSpanCount
         }.getValue()
     }
 

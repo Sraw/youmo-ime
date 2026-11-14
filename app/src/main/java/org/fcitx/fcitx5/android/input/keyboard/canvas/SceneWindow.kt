@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.content.Context
 import android.content.res.ColorStateList
-import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -15,6 +14,7 @@ import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.scene.theme.Argb
@@ -124,7 +124,7 @@ object SceneWindow {
     /** [dp] as the app's px of before (splitties' dp of a whole number: truncated). */
     fun px(context: Context, dp: Double): Float = (dp * context.resources.displayMetrics.density).toInt().toFloat()
 
-    private fun landscape(context: Context) = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    private fun landscape(context: Context) = KeyboardArea.landscape(context)
 
     private const val OPAQUE = 0xFF
 }

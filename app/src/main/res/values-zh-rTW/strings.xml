@@ -969,7 +969,7 @@
     <string name="learning_not_saving">學到的詞現在沒在儲存：只記在記憶體裡，輸入法被系統停止或手機重新啟動後就會遺失。清出一些儲存空間後會照常儲存；還不行就重新啟動手機。</string>
     <string name="user_lists_unkept">自訂短語或常用詞的改動沒能儲存：只記在記憶體裡，輸入法被系統停止或手機重新啟動後就會遺失（以前存下的不受影響）。清出一些儲存空間後，下次在鍵盤上再改同一樣（短語或常用詞）時會連這次的一起儲存；還不行就重新啟動手機，重新啟動後仍然出現，請附上 開發人員 → 即時紀錄檔 匯出的紀錄檔回報問題。</string>
     <string name="split_keyboard">分體鍵盤</string>
-    <string name="split_keyboard_auto">橫屏且螢幕夠寬時</string>
+    <string name="split_keyboard_auto">螢幕夠寬時</string>
     <string name="split_keyboard_always">總是</string>
     <string name="split_keyboard_off">關</string>
     <string name="split_dock">分體時其他面板</string>
@@ -1332,7 +1332,7 @@
     <string name="swipe_fate_sign">畫不下，鍵上顯示為圖示</string>
     <string name="swipe_fate_dropped">畫不下，鍵上不顯示（滑動照常有效）</string>
     <string name="swipe_fate_roots">字根佔了位置，鍵上不顯示（滑動照常有效）</string>
-    <string name="swipe_fate_both">直向%1$s，橫向%2$s</string>
+    <string name="swipe_fate_both">直拿%1$s，橫拿%2$s</string>
     <string name="swipe_fate_part_as_set">照常顯示</string>
     <string name="swipe_fate_part_shortened">顯示為「%s」</string>
     <string name="swipe_fate_part_sign">顯示為圖示</string>

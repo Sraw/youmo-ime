@@ -15,13 +15,18 @@ import org.junit.Test
 class SplitKeyboardTest {
 
     @Test
-    fun autoSplitsAWideScreenHeldSidewaysOnly() {
-        assertTrue(SplitKeyboard.splits(Mode.AUTO, landscape = true, widthDp = 800))
-        // a screen narrower on its side than a phone's is not split, nor a tablet upright
-        assertFalse(SplitKeyboard.splits(Mode.AUTO, landscape = true, widthDp = 560))
-        assertFalse(SplitKeyboard.splits(Mode.AUTO, landscape = false, widthDp = 800))
-        assertTrue(SplitKeyboard.splits(Mode.ALWAYS, landscape = false, widthDp = 360))
-        assertFalse(SplitKeyboard.splits(Mode.OFF, landscape = true, widthDp = 1280))
+    fun autoSplitsAWideScreenEitherWayUp() {
+        // a phone on its side, a foldable's inner screen and a tablet upright (横屏 all, ScreenShape)
+        assertTrue(SplitKeyboard.splits(Mode.AUTO, widthDp = 852))
+        assertTrue(SplitKeyboard.splits(Mode.AUTO, widthDp = 673))
+        assertTrue(SplitKeyboard.splits(Mode.AUTO, widthDp = 800))
+        assertTrue(SplitKeyboard.splits(Mode.AUTO, widthDp = 600))
+        // just narrower; a small phone on its side; a phone upright, a foldable's outer screen
+        assertFalse(SplitKeyboard.splits(Mode.AUTO, widthDp = 599))
+        assertFalse(SplitKeyboard.splits(Mode.AUTO, widthDp = 568))
+        assertFalse(SplitKeyboard.splits(Mode.AUTO, widthDp = 412))
+        assertTrue(SplitKeyboard.splits(Mode.ALWAYS, widthDp = 360))
+        assertFalse(SplitKeyboard.splits(Mode.OFF, widthDp = 1280))
     }
 
     @Test

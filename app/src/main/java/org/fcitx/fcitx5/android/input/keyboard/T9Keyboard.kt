@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.Configuration
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.StateListDrawable
@@ -586,7 +585,7 @@ class T9Keyboard(
         overScrollMode = OVER_SCROLL_NEVER
         // its face is the scene's slot's (nine.xml's `side`): the column draws only its items, which take the press
         val keys = ThemeManager.shownLook(theme).keys
-        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val landscape = KeyboardArea.landscape(context)
         val h = dp(if (landscape) keys.gap.hLand else keys.gap.h)
         val v = dp(if (landscape) keys.gap.vLand else keys.gap.v)
         setPadding(h, v, h, v)

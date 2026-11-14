@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea.NavBar
 import org.junit.Assert.assertEquals
@@ -52,6 +53,36 @@ class KeyboardScreensTest {
     private companion object {
         const val D = 2.625f
     }
+
+    // 横屏 of each, upright and turned (ScreenShape: turned, or 600 dp wide either way)
+    private fun shapes(w: Int, h: Int, density: Float = D, round: Boolean = true, nowDp: Int? = null) =
+        KeyboardArea.screensOf(w, h, density, NavBar.NONE, NavBar.NONE, 0, round, nowDp).let { (up, turned) ->
+            "${up.widthDp}/${up.landscape}" to "${turned.widthDp}/${turned.landscape}"
+        }
+
+    @Test
+    @Uat("LS-37")
+    fun eachScreenIsLandscapeAsWideAsItIs() = assertRows(
+        "aPhone" to { assertEquals("393/false" to "851/true", shapes(1080, 2340, density = 2.75f)) },
+        // a foldable unfolded, 673 × 841 dp: 横屏 both ways up, held either way now
+        "aFoldableUnfolded" to { assertEquals("673/true" to "841/true", shapes(1767, 2208)) },
+        "aFoldableUnfoldedTurnedNow" to { assertEquals("673/true" to "841/true", shapes(2208, 1767)) },
+        // its outer screen, a phone's
+        "aFoldableFolded" to { assertEquals("412/false" to "891/true", shapes(1082, 2340)) },
+        "aTablet" to { assertEquals("800/true" to "1280/true", shapes(1600, 2560, density = 2f)) },
+    )
+
+    @Test
+    fun theScreenHeldNowIsAsTheConfigurationSaysOnTheEdge() = assertRows(
+        // 1574 px at 2.625 is 599.6 dp: 599 truncated (API 29), the configuration's 600 for the one held now
+        "truncatedAlone" to { assertEquals("599/false" to "841/true", shapes(1574, 2208, round = false)) },
+        "theConfigurationsWidth" to { assertEquals("600/true" to "841/true", shapes(1574, 2208, round = false, nowDp = 600)) },
+        "roundedTheSame" to { assertEquals("599/false" to "841/true", shapes(1574, 2208, round = false, nowDp = 599)) },
+        // held turned now: the configuration's is the turned one's (842 of 841.1), the upright one's worked out
+        "notTheOneHeldNow" to { assertEquals("599/false" to "842/true", shapes(2208, 1574, round = false, nowDp = 842)) },
+        // an activity's half of a split screen is no rounding: the display's own width kept
+        "farOffIsNoRounding" to { assertEquals("599/false" to "841/true", shapes(1574, 2208, round = false, nowDp = 300)) },
+    )
 
     private val buttons = NavBar(0, 126)
     private fun other(now: NavBar, landscape: Boolean, mode: Int = 0) = KeyboardArea.otherBar(now, landscape, D, mode) { buttons }

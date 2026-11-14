@@ -142,6 +142,8 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         /** The keyboard floating at this text scale, or split, where the cap stands for it so (SwipeFates.size); null: as [SceneEnvs.of] has it. */
         val floating: Double? = null,
         val split: Boolean = false,
+        /** The keyboard upright as 横屏 or not (KeyboardArea.Screen.landscape): a foldable's inner screen and a tablet are. */
+        val landscape: Boolean = false,
     )
 
     var board: Board? = null
@@ -223,7 +225,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         val layout = SceneLayouts.of(context, b.layout) ?: return null
         val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(alts = b.alts, letterCase = b.letterCase), marks = marks)
             // the keyboard upright, the page turned or not (KeyCaps.board's size)
-            .copy(board = layout.id, keyStyle = overPack(), landscape = false)
+            .copy(board = layout.id, keyStyle = overPack(), landscape = b.landscape)
             .let { if (b.floating != null || b.split) it.copy(floating = b.floating ?: it.floating, split = b.split) else it }
         return when (val s = SceneBuilder(t, env, measurer, cascades = SceneThemes.cascades(t)).build(layout.layout, layout.fragments)) {
             is Parsed.Ok -> s.value.also { v -> if (v.keys.none { it.shortcut == b.shortcut }) Timber.e("key cell: no key of %s on %s", b.shortcut, b.layout) }

@@ -104,7 +104,7 @@
 - **JVM**：`LandscapeUatTest.dockGreyedWhenSplitIsOff`（分体键盘"关"时"分体时其他面板"不可用）；设备上不跑。
 
 ### LS-24 [P1] 竖屏时面板照旧铺满
-- **前提**：B0（竖屏，分体键盘为默认"横屏且屏幕够宽时"）。
+- **前提**：B0（竖屏，分体键盘为默认"屏幕够宽时"）。
 - **操作**：点 **123**；再点 **符**。
 - **预期**：都铺满宽度，没有箭头。
 - **JVM**：`LandscapeUatTest.portraitPanelsFull`（竖屏数字键盘、符号面板铺满、没有箭头）；设备上不跑。
@@ -158,3 +158,43 @@
 - **操作**：打 yinhang，长按「银行」，点读音行，点「行」；换悬浮键盘再做一遍。
 - **预期**：停靠时词卡左边是整词和字行，右边是上屏、复制；点开的字卡也是两列，「‹ 银行」在左列顶上。横屏展开后菜单项在卡下面，往下滑；菜单的滚动条一直显示（不淡出）。悬浮键盘上都是一列。
 - **JVM**：app `CandidateMenuUatTest.inLandscapeTheWordCardIsTwoColumnsWithLinesUnderIt`（图 `word_card_land`）、`CandidateMenuUatTest.onTheFloatingKeyboardTheWordCardIsOneColumn`；ime-core `CardNavTest`、`CharCardLayoutTest`；设备上不跑。
+
+## 宽屏算横屏（折叠屏、平板竖拿）
+
+屏幕宽 600 dp 以上，横拿竖拿都算横屏。没有折叠屏时，用 `adb shell wm size 1767x2208` 加 `wm density 420`（673×841 dp，展开竖拿）、`wm size 1082x2340`（412 dp 宽，外屏）模拟，测完 `wm size reset; wm density reset`；有折叠屏模拟器（`7.6in Foldable`、`pixel_fold`）时用 `adb emu fold` / `adb emu unfold`。
+
+### LS-33 [P1] 折叠屏展开竖拿按横屏排
+- **前提**：B0，展开竖拿（673×841 dp）；**键盘高度** 跟随主题（内置主题是标准）。
+- **操作**：回测试页点「普通文本」框，看键盘；转成横拿再看。
+- **预期**：竖拿时键盘按横屏排：字母分体，间距是横屏的；高度和横拿差不多一样（标准档约 330 dp，键区约屏幕短边的 49%；Android 15 以下竖拿高出导航条高度的约一半），不是竖屏的 30%（约 252 dp）。
+- **JVM**：`WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned`（673×841 dp 竖拿：横屏、高度为宽的 49%、主题 `@landscape`、自动分体、设置页的一对屏两个都是横屏）、`WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh`（841×673 dp 横拿：高度为高的 49%）、`WideScreenUatTest.theExpandedCandidatesTakeTheTurnedColumnsUpright`（展开候选的列数取横屏那个设置）；设备上看一次（`wm size 1767x2208` + `wm density 420`）。
+
+### LS-34 [P1] 折叠屏外屏、手机竖拿不变
+- **前提**：B0，外屏（412 dp 宽）或普通手机竖拿。
+- **操作**：回测试页点「普通文本」框，看键盘。
+- **预期**：和 0.6.0 一样：竖屏的高度（标准档屏高 30%）、间距，字母不分体。
+- **JVM**：`WideScreenUatTest.theOuterScreenIsAPhoneUprightAsBefore`（412×891 dp：不是横屏、屏高 30%、没有 `@landscape`、不分体）、`WideScreenUatTest.theOuterScreensExpandedCandidatesTakeTheUprightColumns`（展开候选的列数取竖屏那个设置）；设备上不跑。
+
+### LS-35 [P1] 打开键盘时折叠、展开马上重排
+- **前提**：折叠屏模拟器（或用 `wm size` 在 412 dp 宽和 673 dp 宽之间换），B0，外屏。
+- **操作**：点「普通文本」框，打 nihao 不选；展开；再折叠。
+- **预期**：展开后键盘马上按横屏排（分体、横屏的高度），折叠后回到竖屏的样子；打到一半的拼音照转屏的规则处理（清掉、不上屏），不卡、不留旧大小的键盘。
+- **设备**：需要折叠屏模拟器或手工换 `wm size`，没写成脚本。
+
+### LS-36 [P2] 平板竖拿算横屏，分体选「自动」时分体
+- **前提**：B0，平板竖拿（或模拟器竖屏 600 dp 以上，比如 `wm size 1600x2560` 加 `wm density 320`，800×1280 dp）；**分体键盘** 是默认的「屏幕够宽时」。
+- **操作**：点「普通文本」框，看键盘。
+- **预期**：字母分体；高度和平板横拿差不多一样（屏宽的 49%）。宽 599 dp 的竖屏不算横屏、不分体，600 dp 就算。
+- **JVM**：`WideScreenUatTest.aTabletUprightIsTurnedAndSplits`（800×1280 dp：横屏、分体、高度为 800 的 49%）、`WideScreenUatTest.justNarrowerIsUpright`（599 dp：竖屏、不分体，设置页的屏和键盘的一致）、`WideScreenUatTest.sixHundredWideIsTurned`（600 dp：横屏、分体）；设备上不跑。
+
+### LS-37 [P2] 设置页按这块屏的样子画
+- **前提**：折叠屏展开竖拿（673×841 dp）。
+- **操作**：打开 **按键 → 按键字符和快捷键**，看键帽和「画不下」的灰字；打开 **外观**，把设置和另一个应用分屏，看主题预览。
+- **预期**：键帽按横屏的键画（和展开时真键盘一样，上滑、下滑图标选「底部」的画在角上）；两种拿法画得不一样时灰字说「竖拿…，横拿…」。分屏时主题预览按整块屏的键盘画，不按设置页那半块窗口。
+- **JVM**：`WideScreenUatTest.theSettingsPreviewInHalfASplitScreenIsTheDisplays`（展开竖拿、设置页窗口只有 336 dp 宽时，预览里的键按显示屏画：横屏、分体，候选栏是横屏的高度，宽是显示屏的）；屏的一对由 `KeyboardScreensTest.eachScreenIsLandscapeAsWideAsItIs` 钉住。设备上用 `wm size` 看一次。
+
+### LS-38 [P2] 展开竖拿：键角和字卡和手机横拿一样
+- **前提**：B0，展开竖拿；**上滑图标位置** 选「底部」。
+- **操作**：看字母键；打 `unvzi`（拼音 u 拆字：女子），长按候选「好」看字卡。
+- **预期**：上滑的小字画在角上（右上），不画在字母下面；字卡分两栏（读音、例词在左，部首、拆字、笔顺在右），读音显示 3 行后可以滚动。
+- **JVM**：`WideScreenUatTest.theLowKeysMarksAndTheCardAsTurned`（673 dp 竖拿时场景是横屏，「底部」改到右上；字卡两栏、读音 3 行）；设备上不跑。

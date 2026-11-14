@@ -4,10 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
-import android.content.res.Configuration
 import android.view.View
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.inInputMethod
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.scene.engine.Env
@@ -80,7 +80,7 @@ object SceneEnvs {
         }
         return Env(
             width.toDouble(), height.toDouble(), view.resources.displayMetrics.density.toDouble(),
-            landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE,
+            landscape = KeyboardArea.landscape(context),
             compact = keyboardCompact(),
             floating = floating,
             split = split,

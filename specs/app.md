@@ -372,7 +372,22 @@ shown dark while `lookingUp`) in Shift's place, sending `Keyboard.LOOKUP`. While
 The keyboard area never passes 70% of the screen's height
 (`KeyboardHeightCap`), so 很高 in landscape leaves the field room.
 
-On a wide screen held sideways the letters split in two (`TextKeyboard.Split`, sized by
+横屏 (0.6.1, 061-wide-as-landscape) is one answer, keyboard-scene's `ScreenShape.landscape(turned, widthDp)`:
+held sideways, or `WIDE_DP` (600) wide or wider either way up (a foldable's inner screen, a tablet upright). Every
+portrait-or-landscape setting, the theme's `@landscape` and its landscape cut, the gaps' `vLand`/`hLand`, the bar's
+height, the expanded candidates' columns, the low keys' marks (`KeyMarks.onKeys`) and the card's two columns read
+it. It is worked out in `KeyboardArea` only: `screen(ctx)`/`landscape(ctx)` from the window's configuration (the
+input method's own in the keyboard), and `screensOf` for the display's pair upright and turned (the settings pages'
+caps and `SwipeFates`; on a foldable unfolded or a tablet both are 横屏), where the screen held now takes the
+configuration's `screenWidthDp` within a dp of the one worked out, so the two agree at 599.5. `displayScreen(ctx)`
+is the pair's one held now; `displayContext(ctx)` is a context of its configuration, in which the theme page's preview
+makes its keys and bar, so they are 横屏 and split as the keyboard is though the page's window is half a split screen
+or upright. A source scan (`LandscapeSourcesTest`) keeps `ORIENTATION_*` and a configuration's `orientation` to
+`KeyboardArea`, `ThemeFragment` (the page's own columns) and `DeviceInfo`. The height's percent of a 横屏 is of the screen's short side (`KeyboardSizes.heightPx`:
+the base or the width, the smaller), so a foldable upright is about as high as turned (below API 35 the turned height is the display's less the navigation bar, so upright stands some 49% of the bar taller). Nothing is kept by orientation: a
+fold or unfold remakes the input view as a turn does.
+
+On a screen `ScreenShape.WIDE_DP` wide or wider (auto) the letters split in two (`TextKeyboard.Split`, sized by
 `SplitKeyboard` in ime-core, the setting `ThemePrefs.splitKeyboard`: auto / always / off): Gboard's,
 five keys a half, G and V on both (`QWERT|YUIOP`, `ASDFG|GHJKL`, `⇧ZXCV|VBNM⌫`), each half a grid
 from the edge to the room between them; that room what ten letters 48 dp wide leave of the keyboard

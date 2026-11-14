@@ -347,7 +347,7 @@ class StrokeUatTest {
     }
 
     companion object {
-        // wide enough to split (SplitKeyboard.AUTO_MIN_WIDTH_DP)
+        // wide enough to split (ScreenShape.WIDE_DP)
         private const val LANDSCAPE = "w851dp-h393dp-land-440dpi"
     }
 }

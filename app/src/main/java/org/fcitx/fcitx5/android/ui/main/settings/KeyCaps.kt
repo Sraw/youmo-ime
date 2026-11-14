@@ -181,7 +181,8 @@ object KeyCaps {
      * paddings, the cap, one-handed, floating, split): [layout] the board, a function key's qwerty's unless given.
      */
     fun board(ctx: Context, shortcut: String, layout: String = defaultBoard(shortcut)): SceneKeyCell.Board {
-        val size = SwipeFates.size(upright(ctx), layout, CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT)
+        val screen = upright(ctx)
+        val size = SwipeFates.size(screen, layout, CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT)
         // the corners as the keyboard says them (BaseKeyboard.keyReadings: the long presses' firsts, the user's; none where the
         // first's way draws nothing); the marks drawn are the resolver's (onBoard)
         val alts = if (firstShown()) {
@@ -194,7 +195,7 @@ object KeyCaps {
             emptyMap()
         }
         return SceneKeyCell.Board(layout, KeyId.of(shortcut).name, size.width, size.height, alts,
-            AppPrefs.getInstance().keyboard.letterCase.getValue().case, size.floating, size.split)
+            AppPrefs.getInstance().keyboard.letterCase.getValue().case, size.floating, size.split, screen.landscape)
     }
 
     /**

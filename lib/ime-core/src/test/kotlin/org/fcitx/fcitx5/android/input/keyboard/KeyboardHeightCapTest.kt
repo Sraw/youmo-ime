@@ -42,9 +42,9 @@ class KeyboardHeightCapTest {
                 KeyboardSizes.Setting(true, 30, 49), KeyboardSizes.Setting(true, 0, 0), KeyboardSizes.Setting(true, 0, 0), false,
                 ThemeSizes(height = Twin(40.0, 60.0)),
             )
-            assertEquals(393 * 60 / 100, sizes.heightPx(393, landscape = true))
-            assertEquals(275 - 58 - 12, KeyboardHeightCap.keysHeight(sizes.heightPx(393, landscape = true), 393, 58, 12))
-            assertEquals(340, KeyboardHeightCap.keysHeight(sizes.heightPx(851, landscape = false), 851, 58, 12))
+            assertEquals(393 * 60 / 100, sizes.heightPx(393, 851, landscape = true))
+            assertEquals(275 - 58 - 12, KeyboardHeightCap.keysHeight(sizes.heightPx(393, 851, landscape = true), 393, 58, 12))
+            assertEquals(340, KeyboardHeightCap.keysHeight(sizes.heightPx(851, 393, landscape = false), 851, 58, 12))
         },
     )
 }

@@ -171,7 +171,8 @@ object SwipeFates {
                         density = screen.density.toDouble(), landscape = screen.landscape, floating = size.floating,
                         split = size.split, marks = marks, typed = null, board = layout.id, keyStyle = keyStyle,
                     )
-                    Job(s.label, screen.landscape, sceneTheme, shownEnv, layout, measurer, s.rootsShown, cascades, ways)
+                    // the turned one of the two, not 横屏: a foldable's inner screen is that both ways up
+                    Job(s.label, screen === turned, sceneTheme, shownEnv, layout, measurer, s.rootsShown, cascades, ways)
                 }
             }
         }

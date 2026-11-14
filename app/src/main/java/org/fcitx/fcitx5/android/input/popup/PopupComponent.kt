@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.popup
 
-import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
@@ -26,6 +25,7 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyMotionSwitch
@@ -76,7 +76,7 @@ class PopupComponent :
 
     private val keyBottomMargin by lazy {
         val gap = ThemeManager.shownLook(theme).keys.gap
-        context.dp(if (context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) gap.vLand else gap.v)
+        context.dp(if (KeyboardArea.landscape(context)) gap.vLand else gap.v)
     }
     private val hideThreshold = 100L
 

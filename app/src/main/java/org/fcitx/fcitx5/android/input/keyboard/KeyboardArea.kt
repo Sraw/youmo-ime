@@ -10,6 +10,7 @@ import android.content.res.Resources
 import android.graphics.Point
 import android.os.Build
 import android.provider.Settings
+import android.view.ContextThemeWrapper
 import android.view.WindowInsets
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
@@ -20,8 +21,10 @@ import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
+import org.fcitx.fcitx5.android.scene.rules.ScreenShape
 import org.fcitx.fcitx5.android.scene.theme.KeyboardSizes as ThemeSizes
 import org.fcitx.fcitx5.android.utils.windowManager
+import kotlin.math.abs
 
 /**
  * The docked keyboard's keys' area as the size settings and the theme make it ([KeyboardSizes]), px:
@@ -60,6 +63,8 @@ object KeyboardArea {
      * The screen the keyboard is laid out on, px: the input method window's, which is the display's whatever an
      * activity's window is (multi-window, split screen). [widthDp] the width as its configuration says it (the
      * split and floating widths read it); [realHeightPx] the display's whole height, 键盘高度's RealSize base.
+     * [landscape] is 横屏 as [ScreenShape] has it: held sideways, or as wide as a foldable's inner screen or a
+     * tablet upright, the one answer every portrait-or-landscape setting and the theme's `@landscape` read.
      */
     data class Screen(
         val widthPx: Int,
@@ -79,7 +84,15 @@ object KeyboardArea {
         val config = ctx.resources.configuration
         // the display's whole asked of the window manager only where 键盘高度 reads it (each measure pass asks)
         val real = if (AppPrefs.getInstance().advanced.keyboardHeightPercentBase.getValue() == KeyboardHeightPercentBase.RealSize) realSize(ctx).y else m.heightPixels
-        return Screen(m.widthPixels, m.heightPixels, config.screenWidthDp, m.density, config.orientation == Configuration.ORIENTATION_LANDSCAPE, real)
+        return Screen(m.widthPixels, m.heightPixels, config.screenWidthDp, m.density, landscape(ctx), real)
+    }
+
+    /**
+     * 横屏 as [ctx]'s window is ([ScreenShape]): the input method's own in the keyboard; everything there reads this
+     * (or [screen]'s), never the orientation itself, so a wide window upright is laid out as turned everywhere alike.
+     */
+    fun landscape(ctx: Context): Boolean = ctx.resources.configuration.let {
+        ScreenShape.landscape(it.orientation == Configuration.ORIENTATION_LANDSCAPE, it.screenWidthDp)
     }
 
     /**
@@ -90,10 +103,38 @@ object KeyboardArea {
      * less the display cutout across its short side (a camera's notch: at the top upright, at a side turned). Not [ctx]'s
      * window: a settings page in a split screen tells of the keyboard as it is shown, full width.
      */
-    fun screens(ctx: Context): Pair<Screen, Screen> {
+    fun screens(ctx: Context): Pair<Screen, Screen> = held(ctx).first
+
+    /**
+     * The screen of [screens] the display is held as now: what a settings page shows the keyboard on (the theme's
+     * preview), not its own window's, which in a split screen is half the display.
+     */
+    fun displayScreen(ctx: Context): Screen = held(ctx).let { (both, turned) -> if (turned) both.second else both.first }
+
+    /**
+     * [ctx] with the configuration of [displayScreen]: the display as held, not [ctx]'s window (half of it in a split
+     * screen, upright on a foldable unfolded where the display is 横屏). A settings page draws the keyboard in it, so
+     * the keys and the bar ([landscape], [screen]'s width, the split) are as the input method's window has them.
+     * Only its configuration's orientation and screenWidthDp/screenHeightDp, and the density, are the display's: its
+     * displayMetrics' widthPixels and heightPixels may still be [ctx]'s window's, so nothing made in it reads those.
+     */
+    fun displayContext(ctx: Context): Context {
+        val s = displayScreen(ctx)
+        val config = Configuration(ctx.resources.configuration).apply {
+            orientation = if (s.widthPx > s.heightPx) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
+            screenWidthDp = s.widthDp
+            screenHeightDp = (s.heightPx / s.density).toInt()
+        }
+        return ContextThemeWrapper(ctx, ctx.theme).apply { applyOverrideConfiguration(config) }
+    }
+
+    // the pair, and whether the display is held turned now
+    private fun held(ctx: Context): Pair<Pair<Screen, Screen>, Boolean> {
         val density = ctx.resources.displayMetrics.density
+        // the process's configuration, the display's: not an activity's own window's (split screen)
+        val nowWidthDp = ctx.applicationContext.resources.configuration.screenWidthDp
         // the check as is, not through a local: lint's NewApi reads no other (a release build's lintVital failed)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return measured(ctx, density)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return measured(ctx, density, nowWidthDp)
         @Suppress("DEPRECATION")
         val real = Point().also { ctx.windowManager.defaultDisplay.getRealSize(it) }
         val res = Resources.getSystem()
@@ -102,16 +143,18 @@ object KeyboardArea {
         // gestures (Q's navigation_mode 2, as R's otherBar reads it): the strip at the bottom held either way, never a side bar
         val gestures = Settings.Secure.getInt(ctx.contentResolver, NAVIGATION_MODE, 0) == GESTURES
         fun bar(landscape: Boolean) = if (shown) NavBar.of(landscape && !gestures, minOf(real.x, real.y), density) else NavBar.NONE
-        return screensOf(real.x, real.y, density, bar(nowLandscape), bar(!nowLandscape), 0, roundDp = false)
+        return screensOf(real.x, real.y, density, bar(nowLandscape), bar(!nowLandscape), 0, roundDp = false, nowWidthDp) to nowLandscape
     }
 
     // from API 30: one ask of the window manager, the display as held now, its bars and cutout
     @RequiresApi(Build.VERSION_CODES.R)
-    private fun measured(ctx: Context, density: Float): Pair<Screen, Screen> {
+    private fun measured(ctx: Context, density: Float, nowWidthDp: Int): Pair<Pair<Screen, Screen>, Boolean> {
         val m = ctx.windowManager.maximumWindowMetrics
         val w = m.bounds.width()
         val h = m.bounds.height()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) return screensOf(w, h, density, NavBar.NONE, NavBar.NONE, 0, roundDp = true)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            return screensOf(w, h, density, NavBar.NONE, NavBar.NONE, 0, roundDp = true, nowWidthDp) to (w > h)
+        }
         val n = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
         val c = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.displayCutout())
         val nowLandscape = w > h
@@ -120,16 +163,28 @@ object KeyboardArea {
         val mode = Settings.Secure.getInt(ctx.contentResolver, NAVIGATION_MODE, 0)
         val other = otherBar(now, nowLandscape, density, mode) { NavBar.of(!nowLandscape, minOf(w, h), density) }
         val cutout = if (nowLandscape) c.left + c.right else c.top + c.bottom
-        return screensOf(w, h, density, now, other, cutout, roundDp = true)
+        return screensOf(w, h, density, now, other, cutout, roundDp = true, nowWidthDp) to nowLandscape
     }
 
     /**
      * The screens upright and turned of a display [width]×[height] px as held now: [now] the navigation bar as held
      * now, [other] turned; [cutout] the display cutout across its short side (top and bottom upright, the sides
      * turned); [roundDp] the width in dp rounded, as the configuration has it from API 30 (truncated on 29).
+     * [nowWidthDp] the configuration's width as held now, taken for the screen held now where it is a rounding
+     * off what is worked out here: on [ScreenShape.WIDE_DP]'s edge (599.5) both say what [screen] says.
+     * Each screen 横屏 or not by [ScreenShape]: a foldable's inner screen and a tablet are turned both ways up.
      */
     @VisibleForTesting
-    internal fun screensOf(width: Int, height: Int, density: Float, now: NavBar, other: NavBar, cutout: Int, roundDp: Boolean): Pair<Screen, Screen> {
+    internal fun screensOf(
+        width: Int,
+        height: Int,
+        density: Float,
+        now: NavBar,
+        other: NavBar,
+        cutout: Int,
+        roundDp: Boolean,
+        nowWidthDp: Int? = null,
+    ): Pair<Screen, Screen> {
         val nowLandscape = width > height
         val shortSide = minOf(width, height)
         val longSide = maxOf(width, height)
@@ -138,8 +193,10 @@ object KeyboardArea {
             val h = if (landscape) shortSide else longSide
             val bar = if (landscape == nowLandscape) now else other
             val widthPx = w - bar.side - (if (landscape) cutout else 0)
-            val widthDp = if (roundDp) (widthPx / density + HALF).toInt() else (widthPx / density).toInt()
-            return Screen(widthPx, h - bar.bottom - (if (landscape) 0 else cutout), widthDp, density, landscape, h)
+            val worked = if (roundDp) (widthPx / density + HALF).toInt() else (widthPx / density).toInt()
+            val widthDp = nowWidthDp?.takeIf { landscape == nowLandscape && abs(it - worked) <= 1 } ?: worked
+            val shape = ScreenShape.landscape(landscape, widthDp)
+            return Screen(widthPx, h - bar.bottom - (if (landscape) 0 else cutout), widthDp, density, shape, h)
         }
         return screen(false) to screen(true)
     }
@@ -183,7 +240,8 @@ object KeyboardArea {
                 return if (moves) NavBar(0, dimen("navigation_bar_width")) else NavBar(dimen("navigation_bar_height_landscape"), 0)
             }
 
-            // a display this short side or wider keeps its bar at the bottom (DisplayPolicy: shortSizeDp < 600)
+            // a display this short side or wider keeps its bar at the bottom (DisplayPolicy: shortSizeDp < 600):
+            // the system's rule of the short side, not ScreenShape.WIDE_DP's of the width, though both are 600
             private const val TABLET_DP = 600
         }
     }
@@ -210,7 +268,7 @@ object KeyboardArea {
             KeyboardHeightPercentBase.DisplayMetrics -> s.heightPx
             KeyboardHeightPercentBase.RealSize -> s.realHeightPx
         }
-        return sizes().heightPx(base, s.landscape)
+        return sizes().heightPx(base, s.widthPx, s.landscape)
     }
 
     fun sidePadding(ctx: Context): Int = sidePadding(screen(ctx))
@@ -253,5 +311,5 @@ object KeyboardArea {
 
     /** Whether the letters are split on [s]: as the setting is, the screen as wide as it is; floating, never (TextKeyboard.splits). */
     fun splits(s: Screen, floating: Boolean = ThemeManager.prefs.floatingKeyboard.getValue()): Boolean =
-        !floating && SplitKeyboard.splits(ThemeManager.prefs.splitKeyboard.getValue().mode, s.landscape, s.widthDp)
+        !floating && SplitKeyboard.splits(ThemeManager.prefs.splitKeyboard.getValue().mode, s.widthDp)
 }

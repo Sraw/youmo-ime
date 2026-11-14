@@ -17,14 +17,13 @@ package org.fcitx.fcitx5.android.scene.rules
  */
 object SplitKeyboard {
 
-    /** The setting: split where the screen is wide, always, or never. */
-    enum class Mode { AUTO, ALWAYS, OFF }
-
     /**
-     * Narrowest screen [Mode.AUTO] splits on, in dp, and only held sideways: a phone on its side
-     * (some 700 to 930 dp), a tablet's landscape; not a tablet upright, typed on as a phone is.
+     * The setting: split where the screen is wide, always, or never. Wide is [ScreenShape.WIDE_DP] or wider,
+     * either way up: a phone on its side (some 700 to 930 dp), a tablet, a foldable's inner screen (673 dp
+     * upright); not a phone upright nor a foldable's outer screen. A tablet upright splits too since 0.6.1
+     * (the user, 2026-11-13: a wide screen is 横屏 every way, 061-wide-as-landscape).
      */
-    const val AUTO_MIN_WIDTH_DP = 600
+    enum class Mode { AUTO, ALWAYS, OFF }
 
     /** Keys a half has, each row: Gboard's five, G and V on both halves to make the rows so. */
     const val HALF_KEYS = 5
@@ -39,10 +38,10 @@ object SplitKeyboard {
     // a letter's width unsplit
     private const val LETTER = 0.1
 
-    fun splits(mode: Mode, landscape: Boolean, widthDp: Int): Boolean = when (mode) {
+    fun splits(mode: Mode, widthDp: Int): Boolean = when (mode) {
         Mode.ALWAYS -> true
         Mode.OFF -> false
-        Mode.AUTO -> landscape && widthDp >= AUTO_MIN_WIDTH_DP
+        Mode.AUTO -> widthDp >= ScreenShape.WIDE_DP
     }
 
     /**

@@ -121,3 +121,14 @@ case("LS-30", needs="jvm:LandscapeUatTest.theFourteenKeysAtTheSideWithTheirCodeR
 
 case("LS-31", needs="jvm:LandscapeUatTest.theEighteenKeysAtTheSideAsTheFourteen")(lambda d: None)
 case("LS-32", needs="jvm:CandidateMenuUatTest.inLandscapeTheWordCardIsTwoColumnsWithLinesUnderIt、CandidateMenuUatTest.onTheFloatingKeyboardTheWordCardIsOneColumn")(lambda d: None)
+
+
+# ---------------------------------------------------------------- a wide screen is landscape (061-wide-as-landscape)
+
+case("LS-33", needs="jvm:WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned、WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh、"
+     "WideScreenUatTest.theExpandedCandidatesTakeTheTurnedColumnsUpright")(lambda d: None)
+case("LS-34", needs="jvm:WideScreenUatTest.theOuterScreenIsAPhoneUprightAsBefore、WideScreenUatTest.theOuterScreensExpandedCandidatesTakeTheUprightColumns")(lambda d: None)
+case("LS-35", needs="manual:折叠屏模拟器上 adb emu fold/unfold（或 wm size 在 412 和 673 dp 宽之间换）时键盘马上重排；没写成脚本")(lambda d: None)
+case("LS-36", needs="jvm:WideScreenUatTest.aTabletUprightIsTurnedAndSplits、WideScreenUatTest.justNarrowerIsUpright、WideScreenUatTest.sixHundredWideIsTurned")(lambda d: None)
+case("LS-37", needs="jvm:WideScreenUatTest.theSettingsPreviewInHalfASplitScreenIsTheDisplays、KeyboardScreensTest.eachScreenIsLandscapeAsWideAsItIs")(lambda d: None)
+case("LS-38", needs="jvm:WideScreenUatTest.theLowKeysMarksAndTheCardAsTurned")(lambda d: None)

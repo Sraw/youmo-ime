@@ -9,6 +9,7 @@ import android.content.res.Configuration
 import android.graphics.Point
 import android.os.Build
 import org.fcitx.fcitx5.android.BuildConfig
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 
 // Adapted from https://gist.github.com/hendrawd/01f215fd332d84793e600e7f82fc154b
 object DeviceInfo {
@@ -42,6 +43,8 @@ object DeviceInfo {
                 }
             }"
         )
+        // 横屏 as the keyboard has it (a foldable's inner screen and a tablet are, held either way)
+        appendLine("Screen width: ${context.resources.configuration.screenWidthDp} dp, keyboard landscape: ${KeyboardArea.landscape(context)}")
         appendLine("--------- Package Info")
         val pkgInfo = context.packageManager.getPackageInfo(context.packageName, 0)
         appendLine("Package Name: ${pkgInfo.packageName}")

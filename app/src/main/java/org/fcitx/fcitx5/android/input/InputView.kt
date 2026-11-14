@@ -6,7 +6,6 @@
 package org.fcitx.fcitx5.android.input
 
 import android.annotation.SuppressLint
-import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
@@ -435,7 +434,7 @@ class InputView(
         val look = ThemeManager.shownLook(theme)
         customBackground.background = ThemePictureDrawable.board(look)
         val pictureHost = look.picture?.let {
-            PictureHost(look, customBackground, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+            PictureHost(look, customBackground, KeyboardArea.landscape(context))
         }
         // an animated one played where it fits the limits (A4): read and decoded off the main thread, the
         // still picture till then; stopped as the keyboard hides or the view goes

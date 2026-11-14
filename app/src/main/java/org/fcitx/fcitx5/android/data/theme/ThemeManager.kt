@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
@@ -295,7 +296,7 @@ object ThemeManager {
     // the theme's picture decoded ahead, off the main thread, as wide as the screen (the keyboard's, nearly)
     private fun prefetch() {
         val dm = appContext.resources.displayMetrics
-        val landscape = appContext.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val landscape = KeyboardArea.landscape(appContext)
         ThemeAssets.prefetch(shownLook(_activeTheme), landscape, dm.widthPixels, dm.density)
     }
 

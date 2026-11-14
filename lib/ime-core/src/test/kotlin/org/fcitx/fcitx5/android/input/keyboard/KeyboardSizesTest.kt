@@ -21,8 +21,8 @@ class KeyboardSizesTest {
     @Test
     fun aThemeWithoutASizeIsTheDefaultLevels() {
         // 851 px high upright, 393 on its side
-        assertEquals(851 * 30 / 100, following.heightPx(851, landscape = false))
-        assertEquals(393 * 49 / 100, following.heightPx(393, landscape = true))
+        assertEquals(851 * 30 / 100, following.heightPx(851, 393, landscape = false))
+        assertEquals(393 * 49 / 100, following.heightPx(393, 851, landscape = true))
         assertEquals(0.0, following.sidePaddingDp(false), 0.0)
         assertEquals(0.0, following.bottomPaddingDp(true), 0.0)
         assertFalse(following.compact)
@@ -31,13 +31,13 @@ class KeyboardSizesTest {
     @Test
     fun theThemeSetsAHeight() {
         val sizes = following.copy(theme = themed)
-        assertEquals((851 * 0.38).toInt(), sizes.heightPx(851, landscape = false))
-        assertEquals((393 * 0.52).toInt(), sizes.heightPx(393, landscape = true))
+        assertEquals((851 * 0.38).toInt(), sizes.heightPx(851, 393, landscape = false))
+        assertEquals((393 * 0.52).toInt(), sizes.heightPx(393, 851, landscape = true))
         assertEquals(8.0, sizes.sidePaddingDp(false), 0.0)
         assertEquals(48.0, sizes.sidePaddingDp(true), 0.0)
         assertEquals(2.5, sizes.bottomPaddingDp(true), 0.0)
         // the cap still comes last: 52% of a short landscape screen (204) and bars of 100 pass 70% (275), and the keys give way
-        val requested = sizes.heightPx(393, landscape = true)
+        val requested = sizes.heightPx(393, 851, landscape = true)
         // a screen of density 1, where the app's ctx.dp(bottom padding) is its dp
         val bottomPx = sizes.bottomPaddingDp(true).toInt()
         val keys = KeyboardHeightCap.keysHeight(requested, 393, 100, bottomPx)
@@ -46,16 +46,36 @@ class KeyboardSizesTest {
     }
 
     @Test
+    fun aWideScreenUprightIsAsHighAsTurned() {
+        // a foldable's inner screen, 673 × 841 dp upright, 横屏 both ways up: the short side's 49%, 329, either way
+        assertEquals(673 * 49 / 100, following.heightPx(841, 673, landscape = true))
+        assertEquals(following.heightPx(673, 841, landscape = true), following.heightPx(841, 673, landscape = true))
+        // a tablet upright, 800 × 1280: as high as on its side
+        assertEquals(following.heightPx(800, 1280, landscape = true), following.heightPx(1280, 800, landscape = true))
+        // the theme's height and a level picked alike
+        val sizes = following.copy(theme = themed)
+        assertEquals((673 * 0.52).toInt(), sizes.heightPx(841, 673, landscape = true))
+        assertEquals(673 * 34 / 100, KeyboardSizes(Setting(false, 20, 34), Setting(false, 0, 0), Setting(false, 0, 0), false).heightPx(841, 673, true))
+        // the screen's whole height as the base (RealSize): the short side all the same
+        assertEquals(673 * 49 / 100, following.heightPx(900, 673, landscape = true))
+        // a phone on its side and a tablet's landscape as before: their height is the short side already
+        assertEquals(393 * 49 / 100, following.heightPx(393, 851, landscape = true))
+        assertEquals(800 * 49 / 100, following.heightPx(800, 1280, landscape = true))
+        // upright, 竖屏: the height as before, whatever the width
+        assertEquals(851 * 30 / 100, following.heightPx(851, 393, landscape = false))
+    }
+
+    @Test
     fun aLevelPickedIsKeptOverTheTheme() {
         val sizes = KeyboardSizes(Setting(false, 20, 34), Setting(false, 24, 120), Setting(false, 0, 0), bottomFlush = true, theme = themed)
-        assertEquals(851 * 20 / 100, sizes.heightPx(851, false))
+        assertEquals(851 * 20 / 100, sizes.heightPx(851, 393, false))
         assertEquals(120.0, sizes.sidePaddingDp(true), 0.0)
         assertEquals(0.0, sizes.bottomPaddingDp(false), 0.0)
         assertTrue(sizes.compact)
         assertTrue(sizes.flush)
         // each setting on its own: the height followed, the paddings picked
         val mixed = sizes.copy(height = Setting(true, 30, 49))
-        assertEquals((851 * 0.38).toInt(), mixed.heightPx(851, false))
+        assertEquals((851 * 0.38).toInt(), mixed.heightPx(851, 393, false))
         assertEquals(24.0, mixed.sidePaddingDp(false), 0.0)
     }
 
