@@ -42,8 +42,8 @@ import org.fcitx.fcitx5.android.scene.theme.Theme
  * keyboard (one-handed or split at a side: rules D §2), expanded ([Expand]), placed ([Place]), each
  * key's look cascaded from the theme for its states and pressed, its face's layers placed ([Faces]),
  * its text and marks placed ([Content]) and kept apart ([KeyMarkYield]: the letters together, the
- * rest each on its own), all drawn as ops ([Paint]); a slot's or a blank place's face under it. The
- * same values give the same scene, on the phone, in a browser, in a test.
+ * rest each on its own), all drawn as ops ([Paint]); a slot's face under it, a gap nothing (the keyboard's
+ * fill shows). The same values give the same scene, on the phone, in a browser, in a test.
  */
 class SceneBuilder(
     private val theme: Theme,
@@ -186,19 +186,12 @@ class SceneBuilder(
         }
         val slots = placed.mapNotNull { p ->
             val s = (p.item as? ExpandedSlot)?.slot ?: return@mapNotNull null
-            val face = surface(layout.id, s.id, s.look, s.classes, s.face, p.cell, slot = true)
+            val face = surface(layout.id, s.id, s.look, s.classes, s.face, p.cell)
             if (s.kind == Pads.KIND) pad(layout.id, s, p.cell, face) else SlotNode(s.kind, s.id, p.cell, face)
-        }
-        // a key's place the board has no key for (the number pads'): a key that takes no press, `:disabled`
-        // and faded as theme 3.0's disabled blank view was (its whole view at android:disabledAlpha)
-        val blanks = placed.flatMap { p ->
-            val g = (p.item as? ExpandedGap)?.gap ?: return@flatMap emptyList()
-            surface(layout.id, g.id, g.look, g.classes, Face.Default, p.cell, slot = false, states = setOf(KeyState.Disabled.xml))
-                .map { popups.faded(it, Popups.DISABLED_ALPHA) }
         }
         val whole = Box(0.0, 0.0, env.width, env.height)
         val side = sideRoom(board, whole)?.let { SlotNode(SIDE_BUTTONS, null, it) }
-        return Parsed.Ok(Scene(env.width, env.height, base(whole) + gaps(placed) + blanks, nodes, slots + listOfNotNull(side), board, layout.preview, layout.popups, warnings.all))
+        return Parsed.Ok(Scene(env.width, env.height, base(whole) + gaps(placed), nodes, slots + listOfNotNull(side), board, layout.preview, layout.popups, warnings.all))
     }
 
     // the room between a split row's halves (`split-gap`, 060-render-p3 T7a): its fill and corners, each row's; none set, the keyboard's under it
@@ -238,22 +231,13 @@ class SceneBuilder(
         return listOfNotNull(paint.fill(Shape.Rect(box, Faces.radii(look.radius, box, env.density)), look.fill))
     }
 
-    // a key's face where a slot or a blank place is given a look: never pressed, `keep` block on flat keys too;
-    // a slot is not one of its board's every key (`handwriting/*`), but by its own name and look, as theme 3.0 drew the pad
-    private fun surface(
-        board: String,
-        id: String?,
-        look: String?,
-        classes: List<String>,
-        face: Face,
-        cell: Box,
-        slot: Boolean,
-        states: Set<String> = emptySet(),
-    ): List<Op> {
+    // a key's face where a slot is given a look: never pressed, `keep` block on flat keys too; a slot is not
+    // one of its board's every key (`handwriting/*`), but by its own name and look, as theme 3.0 drew the pad
+    private fun surface(board: String, id: String?, look: String?, classes: List<String>, face: Face, cell: Box): List<Op> {
         if (look == null || face == Face.None) return emptyList()
-        // a slot's or a blank place's face: the theme's alone, the key style is for the keys (the owner's settings name keys)
+        // a slot's face: the theme's alone, the key style is for the keys (the owner's settings name keys)
         val c = cascadeFor(face)
-        val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, states, slot = slot)), theme)
+        val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, emptySet(), slot = true)), theme)
         return paint.face(Faces.of(cell, l, face, true, env.flat && face != Face.Keep, env.density), l, false)
     }
 

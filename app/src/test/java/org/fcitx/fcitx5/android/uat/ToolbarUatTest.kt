@@ -399,7 +399,7 @@ class ToolbarUatTest {
         h.tap(h.key(s(R.string.picker_back)))
         h.tap(h.described(s(R.string.a11y_key_emoji)))
         assertEquals(kb, keyboardBox())
-        h.tap(h.key("ABC"))
+        h.tap(h.key(s(R.string.picker_back)))
         h.copied("公园")
         h.clipboard("公园")
         assertEquals(kb, keyboardBox())

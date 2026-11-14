@@ -4,9 +4,12 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.text.InputType
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Rect
+import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
@@ -63,7 +66,7 @@ class FieldPadUatTest {
         val keys = keys(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)
         assertTrue(keys.toString(), keys.containsAll(digits))
         assertTrue(keys.toString(), listOf("+", "-", "*", "/", ".", ",", "=").none { it in keys })
-        // the blank places: three left of the digits, one right of 3, three in the bottom row; each takes no
+        // the blank places: three left of the digits, one right of 9, three in the bottom row; each takes no
         // press, types nothing, has nothing for TalkBack (a blank view disabled and not read, the canvas's no node)
         val shown = h.keys()
         assertTrue(shown.toString(), shown.none { !it.enabled && (it.label.isNotEmpty() || it.description != null) })
@@ -72,14 +75,22 @@ class FieldPadUatTest {
         // middle one ends, the seven places of the seven blank keys
         val width = h.keyboard.width
         val blanks = stretches.flatMap { r ->
-            if (abs(r.width() - width * (BOTTOM_MIDDLE + BOTTOM_EDGE)) > 2) return@flatMap listOf(r)
+            if (abs(r.width() - width * (BOTTOM_MIDDLE + BOTTOM_RIGHT)) > 2) return@flatMap listOf(r)
             val middle = r.left + (width * BOTTOM_MIDDLE).roundToInt()
             listOf(Rect(r.left, r.top, middle, r.bottom), Rect(middle, r.top, r.right, r.bottom))
         }
         assertEquals(stretches.toString(), 7, blanks.size)
-        val wide = listOf(SIDE, SIDE, SIDE, SIDE, BOTTOM_EDGE, BOTTOM_MIDDLE, BOTTOM_EDGE)
+        val wide = listOf(LEFT, LEFT, LEFT, RIGHT, BOTTOM_LEFT, BOTTOM_MIDDLE, BOTTOM_RIGHT)
         val shares = blanks.map { it.width().toFloat() / width }.sorted()
         for ((want, got) in wide.sorted().zip(shares)) assertEquals("$blanks", want, got, 2f / width)
+        // drawn nothing (0.6.1, user 2026-11-13): each place's middle the keyboard's fill, as its corner is (a key's
+        // face is inset from its corner; 0.6.0 drew a faded one there)
+        val at = IntArray(2).also(h.keyboard::getLocationInWindow)
+        val board = Bitmap.createBitmap(h.keyboard.width, h.keyboard.height, Bitmap.Config.ARGB_8888).also { h.keyboard.draw(Canvas(it)) }
+        for (r in blanks) {
+            val ground = board.getPixel(r.left - at[0] + 1, r.top - at[1] + 1)
+            assertEquals("$r drawn on", Integer.toHexString(ground), Integer.toHexString(board.getPixel(r.centerX() - at[0], r.centerY() - at[1])))
+        }
         h.api.calls.clear()
         val before = h.field.text.toString()
         // each place tapped once: nothing sent, nothing typed
@@ -140,9 +151,9 @@ class FieldPadUatTest {
         assertTrue(h.texts().toString(), "/" in h.texts())
         h.start()
         assertTrue(h.texts().toString(), letters())
-        // within the field, ABC then 123 is its own pad again; a text field's 123 the whole one
+        // within the field, 返回 then 123 is its own pad again; a text field's 123 the whole one
         h.start(InputType.TYPE_CLASS_PHONE)
-        h.tap(h.key("ABC"))
+        h.tap(h.key(h.service.getString(R.string.picker_back)))
         assertTrue(h.texts().toString(), letters())
         h.tap(h.key("123"))
         assertTrue(h.texts().toString(), "#" in h.texts() && "=" !in h.texts())
@@ -155,9 +166,12 @@ class FieldPadUatTest {
         // a stretch this share of the width at least is a place, not the gap between two keys
         const val BLANK_AT_LEAST = 20
 
-        // NumberKeyboard's widths: the side column's, the bottom row's ends beside ABC and Return, its middle
-        const val SIDE = 0.15f
-        const val BOTTOM_EDGE = 0.1f
-        const val BOTTOM_MIDDLE = 0.13333f
+        // number.xml's widths, the nine keys' frame (0.6.1): the left column's, the right one's (right of 9), the
+        // bottom row's beside 返回, right of 0, and beside Return
+        const val LEFT = 0.16f
+        const val RIGHT = 0.18f
+        const val BOTTOM_LEFT = 0.08f
+        const val BOTTOM_MIDDLE = 0.12f
+        const val BOTTOM_RIGHT = 0.1f
     }
 }

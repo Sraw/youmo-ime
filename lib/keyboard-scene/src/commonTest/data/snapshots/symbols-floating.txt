@@ -16,29 +16,30 @@ key back kind=function role=back a11y="返回"
     text "返回" 21.5,534.89 system 700 35.7 #ff7a858a
   pressed
     +2 fill rect(7.88,465.38,110.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
-key lock kind=function role=lock a11y="a11y_key_panel_lock"
+key numbers kind=function role=numbers a11y="123"
   bounds 118,447,213,596
   shape rect(125.88,465.38,205.13,577.63 r=10.5,10.5,10.5,10.5)
   hit rect(118,447,213,596)
   anchor 165.5,521.5 up 0,-1
-  actions send="panel-lock"
+  actions send="layout:Number"
+  text label="123"
+  shortcut="fn/numbers"
   normal
     shadow rect(125.88,465.38,205.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(125.88,465.38,205.13,577.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon lock-open 134.95,490.95,196.05,552.05 #ff7a858a
+    text "123" 131.5,534.89 system 700 35.7 #ff7a858a
   pressed
     +2 fill rect(125.88,465.38,205.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
-key numbers kind=letter role=numbers a11y="a11y_key_numbers"
+key lock kind=function role=lock a11y="a11y_key_panel_lock"
   bounds 213,447,307,596
   shape rect(220.88,465.38,299.13,577.63 r=10.5,10.5,10.5,10.5)
   hit rect(213,447,307,596)
   anchor 260,521.5 up 0,-1
-  actions send="layout:Number"
-  shortcut="fn/numbers"
+  actions send="panel-lock"
   normal
     shadow rect(220.88,465.38,299.13,580.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(220.88,465.38,299.13,577.63 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon number-pad 229.45,490.95,290.55,552.05 #ff7a858a
+    fill rect(220.88,465.38,299.13,577.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon lock-open 229.45,490.95,290.55,552.05 #ff7a858a
   pressed
     +2 fill rect(220.88,465.38,299.13,577.63 r=10.5,10.5,10.5,10.5) #1f000000
 key space kind=space role=space a11y="a11y_key_space"

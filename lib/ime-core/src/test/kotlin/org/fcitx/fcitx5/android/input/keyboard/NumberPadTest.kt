@@ -12,7 +12,7 @@ import org.junit.Test
 
 class NumberPadTest {
 
-    private fun keys(pad: NumberPad) = (pad.left + pad.corner + pad.bottom).filter { it.isNotEmpty() }.toSet()
+    private fun keys(pad: NumberPad) = (pad.left + pad.besideNine + pad.bottom).filter { it.isNotEmpty() }.toSet()
 
     @Test
     fun eachFieldGetsThePadOfWhatItTakes() {

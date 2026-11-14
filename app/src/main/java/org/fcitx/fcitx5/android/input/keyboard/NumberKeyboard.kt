@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
@@ -26,7 +27,7 @@ class NumberKeyboard(
     context: Context,
     theme: Theme,
     private val pad: NumberPad = NumberPad.FULL,
-) : BaseKeyboard(context, theme, layout(pad), themeBoard = KeyNames.NUMBER) {
+) : BaseKeyboard(context, theme, layout(pad, context.getString(R.string.picker_back)), themeBoard = KeyNames.NUMBER) {
 
     companion object {
         const val Name = NumberPad.FULL_LAYOUT
@@ -40,11 +41,8 @@ class NumberKeyboard(
         /** [pad] as number.xml's `pad=` names it: `full`, `signed-decimal`… */
         internal fun padOf(pad: NumberPad): String = pad.name.lowercase().replace('_', '-')
 
-        // the keypad's own keys where it has them: no input method takes them for punctuation of its own (，for ,).
-        // Before Layout, which reads it as the companion is made
+        // the keypad's own keys where it has them: no input method takes them for punctuation of its own (，for ,)
         private val KEYPAD = mapOf("+" to 0xffab, "-" to 0xffad, "*" to 0xffaa, "/" to 0xffaf, "," to 0xffac, "=" to 0xffbd, "." to 0xffae)
-
-        val Layout: List<List<KeyDef>> = layout(NumberPad.FULL)
 
         private fun digit(d: Int, percentWidth: Float = 0f) = NumPadKey("$d", 0xffb0 + d, 30f, percentWidth, shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NUMBER, "$d"))
 
@@ -61,19 +59,19 @@ class NumberKeyboard(
             }
         }
 
-        /** [pad]'s keys: the digits as a phone's, [NumberPad]'s beside them. */
-        fun layout(pad: NumberPad): List<List<KeyDef>> = listOf(
-            listOf(side(pad.left[0], 0.15f), digit(1), digit(2), digit(3), side(pad.corner, 0.15f)),
-            listOf(side(pad.left[1], 0.15f), digit(4), digit(5), digit(6), MiniSpaceKey()),
-            listOf(side(pad.left[2], 0.15f), digit(7), digit(8), digit(9), BackspaceKey()),
+        /** [pad]'s keys: the digits as a phone's, [NumberPad]'s beside them; [back] the way back's label (返回). */
+        fun layout(pad: NumberPad, back: String): List<List<KeyDef>> = listOf(
+            listOf(side(pad.left[0], 0.16f), digit(1), digit(2), digit(3), BackspaceKey(0.18f)),
+            listOf(side(pad.left[1], 0.16f), digit(4), digit(5), digit(6), MiniSpaceKey()),
+            listOf(side(pad.left[2], 0.16f), digit(7), digit(8), digit(9), side(pad.besideNine, 0.18f)),
             listOf(
-                LayoutSwitchKey("ABC", TextKeyboard.Name),
-                side(pad.bottom[0], 0.1f),
-                LayoutSwitchKey("!?#", PickerWindow.Key.Symbol.name, 0.13333f, KeyDef.Appearance.Variant.AltForeground),
-                digit(0, 0.23334f),
-                side(pad.bottom[1], 0.13333f, KeyDef.Appearance.Variant.AltForeground),
+                LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, 0.16f),
+                LayoutSwitchKey(back, TextKeyboard.Name, 0.14f),
+                side(pad.bottom[0], 0.08f),
+                digit(0, 0.22f),
+                side(pad.bottom[1], 0.12f, KeyDef.Appearance.Variant.AltForeground),
                 side(pad.bottom[2], 0.1f),
-                ReturnKey()
+                ReturnKey(0.18f)
             )
         )
     }
@@ -94,6 +92,8 @@ class NumberKeyboard(
             alts = keyReadings(layout),
             returnLabel = returnAppearance.label(context).toString(),
             returnIcon = SceneIcons.returnName(returnAppearance.icon),
+            // the way back to the letters, 返回 as the symbol panel's (061-layout-survey Q2)
+            back = context.getString(R.string.picker_back),
         )
         return SceneEnvs.of(this, look, theme.isDark, width, height, Input(pad = padOf(pad)), texts = texts, marks = keyMarks(layout))
     }

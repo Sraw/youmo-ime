@@ -59,9 +59,14 @@ class KeyboardUatTest {
         val h = harness().start()
         h.tap(h.key("123"))
         val rows = h.texts()
-        assertEquals(listOf("+", "1", "2", "3", "/", "-", "4", "5", "6", "*", "7", "8", "9", "ABC", ",", "!?#", "0", "=", "."), rows)
-        // space, ⌫ and ↵ are image keys
-        space(h); h.describedKey("Backspace")
+        // the bottom row's first two places as the letters': 符, then the way back where 123 is (0.6.1, 061-layout-survey Q1-A)
+        val back = h.service.getString(R.string.picker_back)
+        assertEquals(listOf("+", "1", "2", "3", "-", "4", "5", "6", "*", "7", "8", "9", "/", "符", back, ",", "0", "=", "."), rows)
+        // space, ⌫ and ↵ are image keys; ⌫ at the top right, right of 3, as on the nine keys (0.6.1)
+        space(h)
+        val del = h.describedKey("Backspace").bounds
+        assertEquals("⌫ in the row of 3", h.key("3").bounds.top, del.top)
+        assertTrue("⌫ right of 3", del.left >= h.key("3").bounds.right)
         h.captureBoard("KeyboardUatTest/number_pad")
         h.tap(h.key("4"))
         h.tap(h.key("2"))
@@ -69,9 +74,24 @@ class KeyboardUatTest {
             listOf(FcitxKeyMapping.FcitxKey_KP_4, FcitxKeyMapping.FcitxKey_KP_2),
             h.api.calls.filter { it.startsWith("sendKey") }.map { Regex("sym=(\\d+)").find(it)!!.groupValues[1].toInt() },
         )
-        h.tap(h.key("ABC"))
+        h.tap(h.key(back))
         val letters = h.texts()
         assertTrue(letters.toString(), "q" in letters && "m" in letters && "123" in letters)
+    }
+
+    // 0.6.1 (user 2026-11-14, 061-layout-survey Q4-a): the symbol panel's row the letters' way round, 返回 where 符 was,
+    // 123 second as on the letter boards (its words, not an icon), the lock after them; its 123 opens the number pad
+    @Test
+    @Uat("KB-91")
+    fun theSymbolPanelsRowIsBackThen123ThenTheLock() {
+        val h = harness().start()
+        h.tap(h.key("符"))
+        val row = listOf("back", "numbers", "lock", "space", "backspace", "enter")
+        assertEquals(row, h.keys().filter { it.id in row }.sortedBy { it.bounds.left }.map { it.id })
+        assertEquals(h.service.getString(R.string.picker_back), h.keyNamed("back").label)
+        assertEquals("123", h.keyNamed("numbers").label)
+        h.tap(h.keyNamed("numbers"))
+        assertTrue(h.texts().toString(), "=" in h.texts())
     }
 
     @Test

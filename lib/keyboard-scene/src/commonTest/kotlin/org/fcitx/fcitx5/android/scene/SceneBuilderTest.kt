@@ -145,7 +145,7 @@ class SceneBuilderTest {
             assertEquals("空格，Rime", keys(board, named).getValue("space").a11y, "$board: a Latin name is not spelt")
         }
         assertEquals("ABC，2", keys("nine").getValue("2").a11y)
-        assertEquals("ABC", keys("number").getValue("back").a11y)
+        assertEquals("返回", keys("number").getValue("back").a11y, "the way back read as it says, 返回 since 0.6.1 (was ABC)")
         assertEquals("a，@", keys("qwerty").getValue("a").a11y)
         // the app's strings as given: the default ones English's
         val english = Forms.block.copy(texts = Texts(imeName = "English"))

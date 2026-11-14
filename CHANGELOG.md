@@ -18,6 +18,9 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### 小改动
 
 - **语音包 v3**：语音整理（去口头禅、加标点、写数字）换成重新训练的模型，只用可以商用的数据（AliMeeting 等，模型以 CC BY-SA 4.0 授权），标点更准、长段说话时段与段之间的标点更合适，几乎每句话末尾都加句末标点；中英混着说时略差一点；语音识别本身没变。这个版本的语音输入要语音包 v3：装着 0.6.0 语音包 v2 的，点麦克风会提示更新，在 **设置 → 资源包** 导入新的语音包 v3 后才能用语音输入（打字不受影响）。
+- **数字键盘和九键同一副格子**：从九键点 123，1–9、⌫（挪到右上角）、回车都在原位不动；底行左边两格和字母键盘一样是 **符**、**返回**（返回在 123 的位置），原来的 ABC、!?# 换成这两个。原来在右上角的 `/`（电话的数字键盘是 `-`）挪到 9 右边。数字密码、小数、带负号、日期时间这些框的数字键盘，用不上的位置不再画成空白键，直接空着，露出键盘底色（点了照旧没反应）。主题自带数字键盘、符号面板布局的，照主题写的位置。
+- **符号面板** 底行第二格是 **123**（字和灰底同字母键盘的 123），锁挪到第三格；读屏念「123」（以前念「数字键盘」）。
+- 数字键盘、表情、颜文字面板上回字母键盘的键都写 **返回**（以前写 ABC），和符号面板一样，读屏也念「返回」。
 - 学到的词没能存下来时（比如存储出了问题），键盘上提示一次，告诉你该怎么办；以前只记在内存里，什么都不说，输入法被系统停止后就全丢了。手机重启后、第一次解锁前学到的词不保存（解锁后照常），这时也提示一次。
 - 笔画筛选画的撇、横少被认成折：拐角两边要各是直的，弯成弧线的撇、末尾带个小钩的横按整体方向算。
 
@@ -32,6 +35,9 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### Smaller changes
 
 - **Voice pack v3**: voice polish (fillers dropped, punctuation, numbers) is a retrained model, trained only on data whose licences allow commercial use (AliMeeting and others; the model is licensed CC BY-SA 4.0): better punctuation, better marks where a long talk pauses, and nearly every sentence ends with a mark; slightly worse when Chinese and English are mixed; recognition itself is unchanged. Voice input in this version needs voice pack v3: with 0.6.0's voice pack v2, the microphone says to update it, and voice input works again once the new voice pack v3 is imported under **Settings → Resource packs** (typing is not affected).
+- **The number pads sit on the nine keys' frame**: tapping 123 on the nine keys leaves 1–9, ⌫ (now top right) and enter where they were; the bottom row starts as the letter boards' does, with **符** (symbols) and **返回** (back, where 123 was) in place of ABC and !?#. The `/` that was top right (the phone pad's `-`) is right of 9. On the pads of PIN, decimal, signed and date or time fields, a place without a key is no longer drawn as a blank key: it is left empty, the keyboard's background showing (tapping it does nothing, as before). A theme with its own number pad or symbol panel layout keeps its places.
+- The **symbol panel**'s bottom row has **123** second (its text and grey as the letter boards' 123), the lock third; a screen reader says 123 (it said Number pad).
+- The key back to the letters on the number pads and the emoji and emoticon panels says **返回** (Back), no longer ABC, as on the symbol panel; a screen reader says Back.
 - When learned words cannot be saved (a storage problem, say), the keyboard says so once, with what to do; before, they were kept in memory alone, nothing said, and lost once the system stopped the keyboard. Words learned after a restart and before the first unlock are not saved (they are again after it), and the keyboard says so once.
 - A 撇 or 横 drawn for the stroke filter is less often read as 折: a corner's two arms must each be straight, so a bowed 撇 or a 横 with a tick at its end is read by its overall direction.
 

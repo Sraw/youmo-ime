@@ -172,7 +172,7 @@ data class Texts(
     val returnIcon: String = "enter",
     /** The key a table's code is confirmed by, in Return's place (key_confirm: 确定, OK in English). */
     val confirm: String = "确定",
-    /** The symbol panel's way back to the keys (picker_back: 返回, Back in English). */
+    /** The way back of the number pad and the panels (picker_back: 返回, Back in English; 0.6.1, no longer ABC). */
     val back: String = "返回",
     val keepUppercase: Boolean = false,
     /** 拼音键字母大小写 as it holds for this input method (LetterCaseRule.forIme: English's always [LetterCase.Shift]). */

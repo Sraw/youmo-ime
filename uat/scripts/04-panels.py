@@ -114,7 +114,7 @@ def pan23(d):
         if n:
             break
         # from 70% to 30% of the panel's height, at its middle: the grid, above the picker's bottom row
-        # (a quarter of the panel: ABC，⌫); no screen size assumed
+        # (a quarter of the panel: 返回，⌫); no screen size assumed
         w = s.find(rid="input_window", where="ime")
         if not w:
             raise Blocked("颜文字面板不在")

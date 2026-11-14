@@ -60,7 +60,7 @@ class NumberKeyboardTest {
     }
 
     // each pad's keys wired from number.xml's nodes as their views were (U4 B): sound, the shortcut its swipes
-    // keep their symbols under, both ways' swipe, what a tap, a hold and a long press do (the space and !?#
+    // keep their symbols under, both ways' swipe, what a tap, a hold and a long press do (the space and 符
     // held as every keyboard's now); no bubble nor long
     // press's keys (preview="off" popups="off"), Return's Emoji menu alone (rules C 疑问 8)
     @Test
@@ -68,7 +68,7 @@ class NumberKeyboardTest {
         for (pad in NumberPad.entries) {
             val k = keyboard(pad)
             val scene = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single().scene!!
-            val old = NumberKeyboard.layout(pad).flatten().filter { it !is BlankKey }.associateBy { it.name ?: (it.appearance as KeyDef.Appearance.Text).displayText }
+            val old = NumberKeyboard.layout(pad, "返回").flatten().filter { it !is BlankKey }.associateBy { it.name ?: (it.appearance as KeyDef.Appearance.Text).displayText }
             assertEquals("$pad", old.keys, scene.keys.map { it.id }.toSet())
             for (node in scene.keys) {
                 val was = old.getValue(node.id)

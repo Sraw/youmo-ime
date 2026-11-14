@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.RecentlyUsed
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.picker.EmojiSearchUi
@@ -125,13 +126,35 @@ class PanelUatTest {
 
     private fun letters() = "q" in h.texts() && "m" in h.texts()
 
+    // the way back of the number pads and the panels: 返回 (Back here), no longer ABC (0.6.1, 061-layout-survey Q2)
+    private fun back() = h.service.getString(R.string.picker_back)
+
+    // KB-92: every way back says 返回, the pad a number or phone field opens with and the emoticons' too, as the symbol panel's
+    @Test
+    @Uat("KB-92")
+    fun everyWayBackSaysBack() = assertRows(
+        listOf<Pair<String, () -> Any>>(
+            "a number field's pad" to { h.start(InputType.TYPE_CLASS_NUMBER) },
+            "a phone field's pad" to { h.start(InputType.TYPE_CLASS_PHONE) },
+            "the 123 key's pad" to { h.start(); h.tap(h.key("123")) },
+            "the emoji panel" to { h.start(); h.tap(h.described(h.service.getString(R.string.a11y_key_emoji))) },
+            "the emoticon panel" to { h.start(); h.tap(h.described(h.service.getString(R.string.a11y_key_emoji))); h.tap(h.key(":-)")) },
+            "the symbol panel, which said it already" to { h.start(); h.tap(h.key("符")) },
+        ),
+        { (where, _) -> where },
+    ) { (_, open) ->
+        open()
+        assertEquals(back(), h.keyNamed("back").label)
+        assertFalse(h.texts().toString(), "ABC" in h.texts())
+    }
+
     @Test
     @Uat("PAN-02")
     fun numberAndPhoneFieldsOpenTheNumberPad() {
         for (type in listOf(InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_PHONE)) {
             h.start(type)
             val keys = h.texts()
-            assertTrue("$type: $keys", "5" in keys && "ABC" in keys && "q" !in keys)
+            assertTrue("$type: $keys", "5" in keys && back() in keys && "q" !in keys)
         }
     }
 
@@ -140,7 +163,7 @@ class PanelUatTest {
     fun numberPadSymbolsKeyOpensThePanel() {
         h.start()
         h.tap(h.key("123"))
-        h.tap(h.key("!?#"))
+        h.tap(h.key("符"))
         assertTrue(categories().toString(), "Common" in categories())
     }
 
@@ -176,9 +199,9 @@ class PanelUatTest {
     fun panelsNumbersKeyAndBack() {
         h.start()
         h.tap(h.key("符"))
-        h.tap(h.describedKey(h.service.getString(R.string.a11y_key_number_pad)))
-        assertTrue(h.texts().toString(), "!?#" in h.texts())
-        h.tap(h.key("ABC"))
+        h.tap(h.key("123"))
+        assertTrue(h.texts().toString(), "=" in h.texts())
+        h.tap(h.key(back()))
         h.tap(h.key("符"))
         h.tap(h.key(h.service.getString(R.string.picker_back)))
         assertTrue(h.texts().toString(), letters())
@@ -206,7 +229,7 @@ class PanelUatTest {
     fun emojiPanelBackToLetters() {
         h.start()
         h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
-        h.tap(h.key("ABC"))
+        h.tap(h.key(back()))
         assertTrue(h.texts().toString(), letters())
     }
 
@@ -227,7 +250,8 @@ class PanelUatTest {
         assertTrue(row().toString(), "👍" in row())
         h.tap(KeyboardHarness.all(search).filterIsInstance<TextView>().first { it.text.toString() == "👍" && it.hasOnClickListeners() })
         assertEquals("👍", h.field.text.toString())
-        h.tap(h.key(h.service.getString(R.string.picker_back)))
+        // the search's own 返回: the panel's, under the search, says 返回 too now (0.6.1)
+        h.tap(h.keys(search).first { it.label == back() })
         // the list again, 👍 first among the recent
         val tabs = KeyboardHarness.find<PickerLayout>(h.inputView)!!.tabsUi.root
         h.tap(tabs.getChildAt(0))
@@ -267,13 +291,13 @@ class PanelUatTest {
             return KeyboardHarness.cells(grid).filter { h.shown(it) }.map(KeyboardHarness::cellText).toList()
         }
         open(); nature(); h.tap(scrolledTo("🐱"))
-        h.tap(h.key("ABC"))
+        h.tap(h.key(back()))
         // another app's field
         h.start()
         open()
         assertFalse(recent().toString(), "🐱" in recent())
         nature(); h.tap(scrolledTo("🐱"))
-        h.tap(h.key("ABC"))
+        h.tap(h.key(back()))
         open()
         assertEquals("🐱", recent().first { it.isNotEmpty() })
     }

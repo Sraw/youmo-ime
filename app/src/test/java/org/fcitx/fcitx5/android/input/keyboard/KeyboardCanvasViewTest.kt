@@ -531,7 +531,7 @@ class KeyboardCanvasViewTest {
             val scene = h.canvas()!!.scene!!
             assertTrue(scene.base.any { it is Op.Picture })
             assertTrue(scene.under(drawsBase = true).none { it is Op.Picture })
-            // a blank place's picture face (the number pads'): a key's, not the board's, and stays
+            // a picture after it (a split row's middle filled by `split-gap`): not the board's, and stays
             val blank = Op.Picture(Shape.Rect(Box(0.0, 0.0, 40.0, 40.0)), 0.0, 90.0)
             val padded = Scene(scene.width, scene.height, scene.base + blank, scene.keys, scene.slots)
             assertEquals(listOf(blank), padded.under(drawsBase = true).filterIsInstance<Op.Picture>())

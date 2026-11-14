@@ -196,10 +196,10 @@ object LayoutReader {
 
     private fun gap(el: XmlElement, p: Problems): Gap {
         val a = Attributes(el, p)
-        val gap = Gap(
-            a.matching("id", IDENT, "a name"), width(a) ?: Width.Units(1.0), a.oneOf("look", KINDS), classes(a).orEmpty(),
-            condition(a), el.line,
-        )
+        val gap = Gap(a.matching("id", IDENT, "a name"), width(a) ?: Width.Units(1.0), condition(a), el.line)
+        // a 0.6.0 file's look (a blank key's face, drawn no more: Gap) still reads, a pack's layout kept as it was
+        a.oneOf("look", KINDS)
+        classes(a)
         a.done()
         noChildren(el, p)
         return gap

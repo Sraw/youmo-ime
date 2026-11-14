@@ -219,7 +219,7 @@ class LandscapeUatTest {
         val a = arrow()!!
         assertEquals(h.service.getString(R.string.split_dock_move_right), a.contentDescription)
         assertTrue(h.box(a).left >= b.right)
-        h.tap(h.key("ABC"))
+        h.tap(h.key(h.service.getString(R.string.picker_back)))
         // turned and back: a keyboard made anew
         h.close()
         harness = null
@@ -234,7 +234,7 @@ class LandscapeUatTest {
     fun lettersAgainFullAndSplit() {
         h.start()
         h.tap(h.key("123"))
-        h.tap(h.key("ABC"))
+        h.tap(h.key(h.service.getString(R.string.picker_back)))
         assertTrue(split())
         assertTrue("${bar()}", full(bar()))
         assertNull(arrow())
@@ -346,7 +346,7 @@ class LandscapeUatTest {
         h.tap(h.key("123"))
         assertTrue("${board()}", full(board()))
         assertNull(arrow())
-        h.tap(h.key("ABC"))
+        h.tap(h.key(h.service.getString(R.string.picker_back)))
         h.tap(h.key("符"))
         assertTrue("${board()}", full(board()))
         assertNull(arrow())
@@ -363,7 +363,7 @@ class LandscapeUatTest {
         h.tap(h.key("123"))
         assertTrue("${board()}", full(board()))
         assertNull(arrow())
-        h.tap(h.key("ABC"))
+        h.tap(h.key(h.service.getString(R.string.picker_back)))
         h.tap(h.key("符"))
         assertTrue("${board()}", full(board()))
         assertNull(arrow())

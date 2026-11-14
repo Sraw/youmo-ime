@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.picker.PickerLayout
@@ -47,14 +48,14 @@ class ThemeKeyNamesTest {
         ),
         "k14" to listOf(GroupedKeyboard.layout(NineKeyLetters.G14).flatten()),
         "k18" to listOf(GroupedKeyboard.layout(NineKeyLetters.G18).flatten()),
-        "number" to NumberPad.entries.map { NumberKeyboard.layout(it).flatten() },
+        "number" to NumberPad.entries.map { NumberKeyboard.layout(it, context.getString(R.string.picker_back)).flatten() },
         "handwriting" to listOf(HandwritingKeyboard.layout(context).flatten()),
         "zhuyin-nine" to listOf(ZhuyinKeyboard.nineLayout().flatten()),
         "zhuyin" to listOf(ZhuyinKeyboard.fullLayout().flatten(), ZhuyinKeyboard.fullLayout(compact = true).flatten()),
         "symbols" to listOf(PickerLayout.panelKeys(context, symbolPicker().switchKey)),
         "emoji" to listOf(
-            PickerLayout.listKeys(emojiPicker().switchKey, PickerWindow.SearchKey),
-            PickerLayout.listKeys(emoticonPicker().switchKey, null),
+            PickerLayout.listKeys(context.getString(R.string.picker_back), emojiPicker().switchKey, PickerWindow.SearchKey),
+            PickerLayout.listKeys(context.getString(R.string.picker_back), emoticonPicker().switchKey, null),
         ),
     )
 

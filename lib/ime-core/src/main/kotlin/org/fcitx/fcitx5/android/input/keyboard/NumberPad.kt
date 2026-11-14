@@ -15,10 +15,11 @@ import org.fcitx.fcitx5.android.input.editing.NumberKind
  * the digits stay where they are on every pad.
  *
  * @param left the column left of the digits, top to bottom
- * @param corner the key right of 3, above the space
+ * @param besideNine the key right of 9, below the space (⌫ right of 3 on every pad, as on the nine keys: 0.6.1;
+ *   before, this key was right of 3, the corner)
  * @param bottom the bottom row's: left of the symbols key, right of 0, and left of Return
  */
-enum class NumberPad(val left: List<String>, val corner: String, val bottom: List<String>) {
+enum class NumberPad(val left: List<String>, val besideNine: String, val bottom: List<String>) {
     FULL(listOf("+", "-", "*"), "/", listOf(",", "=", ".")),
 
     /** A PIN's: the digits alone. */

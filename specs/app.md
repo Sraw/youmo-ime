@@ -821,9 +821,19 @@ corner digit, stays Virtual). The board's `preview="off" popups="off"` are appli
 keeps the resolver's list, the user's data (`KeyResolving.opens` does not read the board: the emoji panel's ，。, the pad's
 space and digits); a menu written on a key pops up, so
 Return offers Emoji as on every other keyboard (the views swallowed it: rules C 疑问 8, fixed on the
-canvas alone, `NumberSceneGesturesTest`). A place a pad has no key for is a `<gap look>`: drawn
-`:disabled`, faded to `Popups.DISABLED_ALPHA` op by op as the blank key's view was as a whole, no touch,
-no node. The space is still `button_mini_space` to TalkBack (`KeyNames.BOARD_RESOURCES`, read by board).
+canvas alone, `NumberSceneGesturesTest`). ⌫ is right of 3 on every pad, as on the nine keys (0.6.1); the key a
+pad had there (`/`, the phone's `-`, `NumberPad.besideNine`) is right of 9. A place a pad has no key for is a `<gap>`:
+drawn nothing, the keyboard's fill showing (0.6.1, user 2026-11-13: 0.6.0 drew a faded key's face there, which
+the 按键样式's spacing left bigger than the keys), no touch, no node. A 0.6.0 layout's `<gap look=…>` still reads
+and is drawn nothing all the same, a theme pack's number.xml too (`NumberPadsTest`). The space is still `button_mini_space` to TalkBack (`KeyNames.BOARD_RESOURCES`, read by board).
+Since 0.6.1 (user 2026-11-14, dev/design/061-layout-survey.md Q1-A, Q3-1) the pads are on the nine keys' frame,
+columns 16 / 22 / 22 / 22 / 18, and the bottom row's first two places are the letter boards': `符` first (the
+nine keys' key: `kind="function"`, its look and words), then the way back where the letters have 123 (`返回`,
+`label="{back}"`, `Texts.back` = `picker_back`, as the panels'); `符 16 | 返回 14 | , 8 | 0 22 | = 12 | . 10 | ⏎ 18`,
+0 under 8. Going 123 from the nine keys moves none of 1–9, ⌫, Return, 符; 返回 sits on 123
+(`NumberPadsTest.everyPadSitsOnTheNineKeysFrame`). The symbol panel's row is the other way round (Q4-a):
+`返回 | 123 | 锁 | 空格 | ⌫ | ⏎`, its 123 the letters' (words, function face, no `a11y=`, read 123). The emoji's
+and emoticons' way back says `{back}` too (Q2; was ABC). A pack's own number.xml or symbols.xml keeps its own row.
 
 Any key in the `:disabled` state is faded the same way by the engine (`SceneBuilder.node`: every op of the face,
 words and marks at `Popups.DISABLED_ALPHA`), and `SceneTouch.Pointer` takes no press on it (no tap, no long press,
@@ -949,7 +959,7 @@ reads `Generic.kl`/`Generic.kcm`) and `sendevent` to its `/dev/input/eventN` as 
 report descriptor), whose event node takes the same `sendevent`; `up` fails if no keyboard appears.
 
 A number's, a phone's or a date's field opens a number pad of its own (`NumberPad.of(EditorTraits.number)`:
-the keys beside the digits blank (`BlankKey`, a `KeyDef`: no press, nothing for TalkBack; a `<gap look>` of number.xml, drawn faded as `:disabled`, no node) where the field takes none, a plain number
+the keys beside the digits blank (`BlankKey`, a `KeyDef`: no press, nothing for TalkBack; a `<gap>` of number.xml, drawn nothing, no node) where the field takes none, a plain number
 field's the whole pad, a PIN's the digits alone; `FieldPad` in `KeyboardWindow` maps the 123 key and
 `Unchanged` to that pad within the field; a pad is never remembered, so the next text field gets its letters).
 

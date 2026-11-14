@@ -2,17 +2,17 @@ scene 2340x529 board 1358.25,0,2340,529 no-popups
 base
   fill rect(0,0,2340,529) #ffeceff1
 slot side-buttons 0,0,1358.25,529
-key back kind=function role=back a11y="ABC"
+key back kind=function role=back a11y="返回"
   bounds 1358.25,0,1506,529
   shape rect(1366.13,10.5,1498.13,518.5 r=10.5,10.5,10.5,10.5)
   hit rect(1358.25,0,1506,529)
   anchor 1432.13,264.5 up 0,-1
   actions send="layout:Text"
-  text label="ABC"
+  text label="返回"
   normal
     shadow rect(1366.13,10.5,1498.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1366.13,10.5,1498.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "ABC" 1392.13,280.25 system 700 42 #ff7a858a
+    text "返回" 1387.63,280.25 system 700 42 #ff7a858a
   pressed
     +2 fill rect(1366.13,10.5,1498.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
 key comma kind=function a11y="，"

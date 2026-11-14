@@ -501,6 +501,8 @@ num/2	number	default	-	-	-	-
 num/2	number	zh	-	-	-	-
 num/3	number	default	-	-	-	-
 num/3	number	zh	-	-	-	-
+fn/backspace	number	default	-	-	i:delete-sweep	i:restore
+fn/backspace	number	zh	-	-	i:delete-sweep	i:restore
 num/4	number	default	-	-	-	-
 num/4	number	zh	-	-	-	-
 num/5	number	default	-	-	-	-
@@ -515,8 +517,6 @@ num/8	number	default	-	-	-	-
 num/8	number	zh	-	-	-	-
 num/9	number	default	-	-	-	-
 num/9	number	zh	-	-	-	-
-fn/backspace	number	default	-	-	i:delete-sweep	i:restore
-fn/backspace	number	zh	-	-	i:delete-sweep	i:restore
 fn/symbols	number	default	-	-	-	-
 fn/symbols	number	zh	-	-	-	-
 num/0	number	default	-	-	-	-

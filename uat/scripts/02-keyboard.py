@@ -567,3 +567,82 @@ def kb87(d):
 
 
 case("KB-88", needs="manual:输入测试台 null_before 框里退格上滑清除、下滑恢复，光标留在原处；还没写成脚本，在模拟器上手工跑")(lambda d: None)
+
+
+def board_keys(d):
+    """the canvas's keys on the screen by their scene id (Dumper's key=): {id: (bounds, text or description)}"""
+    out = {}
+    for n in d.screen().ime():
+        if n.key and n.key not in out:
+            out[n.key] = (n.b, n.text or n.desc)
+    return out
+
+
+def tap_key(d, id, after=0.6):
+    """a canvas key by its scene id"""
+    k = board_keys(d).get(id)
+    if not k:
+        raise Blocked(f"键盘上没有 {id}")
+    b = k[0]
+    d.tap(((b[0] + b[2]) // 2, (b[1] + b[3]) // 2), after)
+
+
+@case("KB-90", base="B0-九键", visual=True)
+def kb90(d):
+    ids = [str(i) for i in range(1, 10)] + ["backspace", "enter", "symbols", "numbers"]
+    nine = board_keys(d)
+    if any(i not in nine for i in ids):
+        raise Blocked(f"九键上缺 {[i for i in ids if i not in nine]}")
+    d.shot("kb", "九键")
+    tap_key(d, "numbers")
+    pad = board_keys(d)
+    d.shot("kb", "九键点 123 后的数字键盘")
+    pairs = [(i, i) for i in ids[:-1]] + [("back", "numbers")]
+    moved = [f"{p}{pad.get(p, (None,))[0]}≠{nine[t][0]}" for p, t in pairs if pad.get(p, (None,))[0] != nine[t][0]]
+    check(not moved, f"不在九键的位置：{moved}")
+    check(pad["symbols"][1] == "符" and pad["back"][1] == "返回", f"符、返回 写的是「{pad['symbols'][1]}」「{pad['back'][1]}」")
+    tap_key(d, "back")
+    again = board_keys(d)
+    check(all(again.get(i, (None,))[0] == nine[i][0] for i in ids), "返回 后九键的键挪了")
+    return "1–9、⌫、回车、符 原位，返回 在 123 的位置；返回 后九键不变"
+
+
+@case("KB-91", visual=True)
+def kb91(d):
+    tap_key(d, "symbols")
+    keys = board_keys(d)
+    row = ["back", "numbers", "lock", "space", "backspace", "enter"]
+    order = sorted((k for k in row if k in keys), key=lambda k: keys[k][0][0])
+    d.shot("kb", "符号面板")
+    check(order == row, f"底排 {order}")
+    check(keys["numbers"][1] == "123" and keys["back"][1] == "返回", f"返回、123 写的是「{keys['back'][1]}」「{keys['numbers'][1]}」")
+    tap_key(d, "numbers")
+    pad = board_keys(d)
+    check("=" in pad and "back" in pad, f"123 后不是数字键盘：{sorted(pad)[:8]}")
+    tap_key(d, "symbols")
+    check("lock" in board_keys(d), "数字键盘的 符 没打开符号面板")
+    tap_key(d, "back")
+    check("=" in board_keys(d), "符号面板的 返回 没回到数字键盘")
+    return "返回、123、锁…；123 进数字键盘，符 进面板，返回 回到数字键盘"
+
+
+@case("KB-92", page="tel", visual=True)
+def kb92(d):
+    pad = board_keys(d)
+    d.shot("kb", "电话框的数字键盘")
+    check(pad.get("back", (None, ""))[1] == "返回", f"电话框数字键盘的返回键写「{pad.get('back', (None, ''))[1]}」")
+    tap_key(d, "back")
+    letters = board_keys(d)
+    check("numbers" in letters and "back" not in letters, "返回 后不是字母键盘")
+    s = d.screen()
+    emoji = s.find(text="表情", where="ime") or s.find(desc="表情", where="ime")
+    if not emoji:
+        raise Blocked("工具栏上没有表情")
+    d.tap(emoji.c, 0.8)
+    said = {"表情": board_keys(d).get("back", (None, ""))[1]}
+    d.shot("kb", "表情面板")
+    tap_key(d, "emoticon")
+    said["颜文字"] = board_keys(d).get("back", (None, ""))[1]
+    d.shot("kb", "颜文字面板")
+    check(all(v == "返回" for v in said.values()), f"返回键写的是 {said}")
+    return "电话框数字键盘、表情、颜文字的返回键都写「返回」"

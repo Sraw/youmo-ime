@@ -375,7 +375,8 @@ class TextPickerSwitchKey(
 class MiniSpaceKey : KeyDef(
     Appearance.Image(
         src = R.drawable.ic_baseline_space_bar_24,
-        percentWidth = 0.15f,
+        // the number pads' right column, the nine keys' (0.6.1)
+        percentWidth = 0.18f,
         variant = Variant.Alternative,
         viewId = R.id.button_mini_space,
         contentDescription = R.string.a11y_key_space

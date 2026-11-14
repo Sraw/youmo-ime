@@ -1479,6 +1479,20 @@ class Device:
             (n for n in s.ime() if n.desc.startswith("空格")), None)
         return sp.desc if sp else ""
 
+    def to_letters(self, s=None):
+        """a number pad, a panel or the emoji search left up: its way back (the scene's id `back`, which
+        says 返回 since 0.6.1, no longer ABC) until the letters are, three at most (the symbol panel
+        over a number pad, the emoji search over its panel); the screen then"""
+        s = s or self.screen()
+        for _ in range(3):
+            back = next((n for n in s.ime() if n.key == "back"), None)
+            if not back or s.find(rid="button_lang", where="ime"):
+                break
+            self.tap(back.c, 0.6)
+            self._keys = None
+            s = self.screen()
+        return s
+
     def switch_im(self, label):
         """the globe key until the space key names this input method"""
         for _ in range(8):
@@ -1486,11 +1500,7 @@ class Device:
             if label == self.im_label().split("，", 1)[-1]:
                 self._keys = None
                 return
-            s = self.screen()
-            abc = s.find(text="ABC", where="ime")   # a number/symbol layout up: the letters first
-            if abc and not s.find(rid="button_lang", where="ime"):
-                self.tap(abc.c, 0.6)
-                self._keys = None
+            self.to_letters()   # a number pad or a panel up: the letters first
             self.press("globe", after=0.8)
             self._keys = None
         raise Blocked(f"地球键切不到「{label}」：{self.im_label()}")
@@ -1898,10 +1908,7 @@ def soft_reset(d, base, page):
     if getattr(d, "rot", 0) != want_rot:   # a case turned the screen
         d.rotate(want_rot)
         s = d.screen()
-    abc = s.find(text="ABC", where="ime")   # a case left a number/symbol layout up
-    if abc and not s.find(rid="button_lang", where="ime"):
-        d.tap(abc.c, 0.6)
-        d._keys = None
+    s = d.to_letters(s)   # a case left a number pad or a panel up
     fold = s.find(desc="隐藏工具栏", where="ime")   # a case left the toolbar open: the next starts closed
     if fold:
         d.tap(fold.c, 0.4)

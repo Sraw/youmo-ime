@@ -158,10 +158,12 @@ test('a colour laid over the picture is turned down to 30 % and given back after
   kept = L.seeThrough(theme, () => ['space', 'function'], kept);
   assert.deepEqual(kept, {});
   assert.equal(P.altKeyBackgroundColor, 0xff101010 | 0);
-  // the measured boards: the space a function key on the number board, numbers and symbols letters somewhere
+  // the measured boards: the space a function key on the number board; 符 and 123 a function key on every
+  // board since the number pads' 符 and the symbol panel's 123 are the letters' (0.6.1)
   const kindsOf = (role) => [...new Set(layout.views.flatMap((v) => v.items).filter((e) => e.t === 'key' && e.n && e.n.endsWith('/' + role)).map((e) => e.k))].sort();
   assert.deepEqual(kindsOf('space'), ['function', 'space']);
-  assert.ok(kindsOf('symbols').length > 1, kindsOf('symbols').join());
+  assert.deepEqual(kindsOf('symbols'), ['function']);
+  assert.deepEqual(kindsOf('numbers'), ['function']);
   // flat, the space lays its own colour: switching moves which colour is turned down
   P.keyBackgroundColor = 0xff464646 | 0;
   kept = {};

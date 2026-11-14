@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -125,6 +126,30 @@ class T9UatTest {
 
     // what the engine was sent: the digits and letters as fcitx key names
     private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") }.map { Regex("key=([^,]*)").find(it)?.groupValues?.get(1) ?: it }
+
+    // 0.6.1 (user 2026-11-14, dev/design/061-layout-survey.md Q1-A, Q3-1): the number pad is on the nine keys' frame, so
+    // 123 from them moves none of their keys; the way back is where 123 was, and takes the nine keys back as they were
+    @Test
+    @Uat("KB-90")
+    fun going123FromTheNineKeysMovesNoKey() {
+        val h = harness().start()
+        val nine = ((1..9).map { "$it" } + listOf("backspace", "enter", "symbols", "numbers")).associateWith { h.keyNamed(it).bounds }
+        h.tap(h.keyNamed("numbers"))
+        assertTrue(h.texts().toString(), "=" in h.texts())
+        assertRows(
+            (1..9).map { Triple("$it", "$it", "the digit where the nine keys' $it is") } + listOf(
+                Triple("backspace", "backspace", "⌫ at the top right on both"),
+                Triple("enter", "enter", "Return at the bottom right on both"),
+                Triple("symbols", "symbols", "符 first in the bottom row, as on every letter board"),
+                Triple("back", "numbers", "the way back where 123 was"),
+            ),
+            { (pad, _, why) -> "$pad: $why" },
+        ) { (pad, there, _) -> assertEquals(nine.getValue(there), h.keyNamed(pad).bounds) }
+        assertEquals("符", h.keyNamed("symbols").label)
+        assertEquals(h.service.getString(R.string.picker_back), h.keyNamed("back").label)
+        h.tap(h.keyNamed("back"))
+        assertEquals(nine, nine.keys.associateWith { h.keyNamed(it).bounds })
+    }
 
     @Test
     @Uat("T9-09")
@@ -250,7 +275,7 @@ class T9UatTest {
         // the keypad's 2 and 3, never the nine keys' ABC and DEF: the engine types them as they are
         // (NineKeysHostUatTest.theNumberPadsDigitsAreTypedOrPick)
         assertEquals(listOf(FcitxKeyMapping.FcitxKey_KP_2, FcitxKeyMapping.FcitxKey_KP_3), h.keypad())
-        h.tap(h.key("ABC"))
+        h.tap(h.key(h.service.getString(R.string.picker_back)))
         assertTrue(h.texts().toString(), "重输" in h.texts())
         typing(true, "ni")
         h.tap(h.key("123"))

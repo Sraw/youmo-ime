@@ -55,7 +55,7 @@ class KeyNamesTest {
 
     @Test
     fun everySignOfEveryPadIsNamed() {
-        val signs = NumberPad.entries.flatMap { it.left + it.corner + it.bottom }.filter { it.isNotEmpty() }
+        val signs = NumberPad.entries.flatMap { it.left + it.besideNine + it.bottom }.filter { it.isNotEmpty() }
         assertTrue(KeyNames.POSITIONS.getValue("number").containsAll(signs))
     }
 

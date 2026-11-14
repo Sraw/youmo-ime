@@ -129,7 +129,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
 
     // the symbols' board, or the emoji's (the emoticons' too)
     val embeddedKeyboard = Keyboard(
-        context, theme, if (panel) panelKeys(context, switchKey) else listKeys(switchKey, searchKey),
+        context, theme, if (panel) panelKeys(context, switchKey) else listKeys(context.getString(R.string.picker_back), switchKey, searchKey),
         if (panel) KeyNames.SYMBOLS else KeyNames.EMOJI,
         // the symbol panel's keys, the categories' and the grid's slots; the emoji's row, with its search or not
         // (the emoticons', S8a)
@@ -240,8 +240,8 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
         internal const val GRID_SLOT = "grid"
 
         // the emoji's search in place of the comma, which the letters have a step away
-        internal fun listKeys(switchKey: KeyDef, searchKey: KeyDef?) = listOf(
-            LayoutSwitchKey("ABC", TextKeyboard.Name),
+        internal fun listKeys(back: String, switchKey: KeyDef, searchKey: KeyDef?) = listOf(
+            LayoutSwitchKey(back, TextKeyboard.Name),
             searchKey ?: Keyboard.PunctuationKey(","),
             switchKey,
             SpaceKey(),
@@ -251,7 +251,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
             ReturnKey()
         )
 
-        /** Sogou's: 返回 where ABC was, the lock beside it; the punctuation is in the panel */
+        /** 返回 where 符 was, 123 where the letters have it, then the lock (0.6.1, symbols.xml); the punctuation is in the panel */
         internal fun panelKeys(context: Context, switchKey: KeyDef) = listOf(
             KeyDef(
                 KeyDef.Appearance.Text(
@@ -264,6 +264,7 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
                 setOf(KeyDef.Behavior.Press(KeyAction.PanelBackAction)),
                 name = "back",
             ),
+            switchKey,
             KeyDef(
                 KeyDef.Appearance.Image(
                     src = R.drawable.ic_baseline_lock_open_24,
@@ -275,7 +276,6 @@ class PickerLayout(context: Context, private val theme: Theme, switchKey: KeyDef
                 setOf(KeyDef.Behavior.Press(KeyAction.PanelLockAction)),
                 name = "lock",
             ),
-            switchKey,
             SpaceKey(),
             BackspaceKey(),
             ReturnKey()

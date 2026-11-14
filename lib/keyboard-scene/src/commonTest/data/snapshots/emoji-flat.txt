@@ -1,15 +1,15 @@
 scene 1080x702 no-popups
 base
   fill rect(0,0,1080,702) #ffeceff1
-key back kind=function role=back a11y="ABC"
+key back kind=function role=back a11y="返回"
   bounds 0,0,162,702
   shape rect(7.88,18.38,154.13,683.63)
   hit rect(0,0,162,702)
   anchor 81,351 up 0,-1
   actions send="layout:Text"
-  text label="ABC"
+  text label="返回"
   normal
-    text "ABC" 41,366.75 system 700 42 #ff7a858a
+    text "返回" 36.5,366.75 system 700 42 #ff7a858a
   pressed
     +0 fill rect(7.88,18.38,154.13,683.63) #1f000000
 key search kind=function a11y="a11y_key_emoji_search"

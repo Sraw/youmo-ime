@@ -534,3 +534,21 @@
 - **操作**：切到英文，在框里打 `hello world`（不打 `abc` 这类不是单词的字母：英文按空格时会把它改成词库里的写法 `ABC`），把光标点到 `hello` 后面（`o` 和空格之间）；退格上滑；再退格下滑。
 - **预期**：上滑清掉光标后的 ` world`，框里剩 `hello`，提示"已清除"带撤销；下滑放回，框里是 `hello world`，光标仍在 `hello` 后（不跳到开头或末尾）。
 - **JVM**：`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenWhatIsAfterItIsClearedAndPutBackAtTheCursor`（真键盘、输入框的 `getTextBeforeCursor` 返回 null：上滑清掉光标后的、提示"已清除"，下滑放回、光标在原处）、`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenAFieldWithNothingAfterItIsNotTakenForAnEmptyOne`（光标后也没字时不清除，复制不当成空框）、`KeyShortcutsHostTest.whereNothingAfterTheCursorIsGivenWhatIsBeforeItIsClearedAndPutBack`（反过来，光标后读不到的应用：清掉光标前的、放回）、`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenWhatIsTypedIsPutBackUnlessSomethingWasCommittedSince`（清掉正在打的拼音能放回；之后上屏过字就不放回，提示"没有可恢复的内容"）；ime-core `EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor`（光标前读不到时清除光标后的部分，放回后光标在原处）、`EditPlanTest.aLongFieldAfterACursorWithTextBeforeItNotReadKeepsThatText`（光标后超过一万字时只删读到的那部分，不全选，光标前没读到的字留着）、`EditPlanTest.aClearWithASideNotGivenIsNotPutBackOnceSomethingIsTyped`（有一边读不到的清除，之后打过字就不放回）、`EditPlanTest.whatIsAfterACursorWhoseReportLaggedIsPutBackWithTheCursorWhereTheEditorHasIt`（R25 F7834：光标刚挪、报告还没跟上时，放回后的光标按输入框里的位置）（前一条也记在 KB-62）。这一条还没写进脚本，在模拟器上手工跑。
+
+### KB-90 [P1] 九键点 123：数字键盘和九键是同一副格子，键都在原位
+- **前提**：B0-九键。
+- **操作**：记下九键上 1–9、⌫、回车、**符**、**123** 的位置；点 **123**；再点 **返回**。
+- **预期**：数字键盘上 1–9、⌫（右上角）、回车、**符**（底排第一格，灰底、字同九键）都和九键上同一个位置、同样大小；**返回** 正好在刚才 **123** 的位置（0.6.1，用户 2026-11-14，dev/design/061-layout-survey.md Q1-A、Q3-1）。点 **返回** 回到九键，各键位置不变。
+- **JVM**：`T9UatTest.going123FromTheNineKeysMovesNoKey`（九键的 1–9、⌫、回车、符 和数字键盘的同名键位置相同，返回在 123 的位置，键上写「符」和「返回」，返回后九键不变）；keyboard-scene `NumberPadsTest.everyPadSitsOnTheNineKeysFrame`（七种数字键盘 × 各种形态都和九键同格子，0 在 8 正下方；不在 `uat.py jvm` 的结果里）；设备上比较两块键盘的键位。
+
+### KB-91 [P1] 符号面板底排：返回、123、锁
+- **前提**：B0。
+- **操作**：点 **符**，看底排；点底排第二格的 **123**；在数字键盘上点 **符**；再点符号面板的 **返回**。
+- **预期**：符号面板底排从左到右是 **返回**、**123**、锁、空格、⌫、回车：**返回** 在字母键盘 **符** 的那一格，**123** 是第二格，写「123」、灰底，和字母键盘上的 **123** 一样（0.6.1，Q4-a）。点 **123** 打开数字键盘；数字键盘上点 **符** 又是符号面板，点 **返回** 回到数字键盘（回到来的那块键盘）。
+- **JVM**：`KeyboardUatTest.theSymbolPanelsRowIsBackThen123ThenTheLock`（底排次序、返回 和 123 的字、123 打开数字键盘）；keyboard-scene `NumberPadsTest.theSymbolPanelsBottomRowIsBackThen123ThenTheLock`（各种形态的次序，123 的字、键类和读屏同字母键盘；不在 `uat.py jvm` 的结果里）；设备上看底排、走一遍。
+
+### KB-92 [P1] 返回键都写「返回」
+- **前提**：B0，测试页的「电话」框（`tel`）。
+- **操作**：看弹出的数字键盘底排第二格；点它；点工具栏的表情，看面板底排第一格；点 `:-)` 进颜文字，再看底排第一格。
+- **预期**：电话框的数字键盘、表情面板、颜文字面板上回到字母键盘的键都写「返回」，不再写 ABC（和符号面板一样，0.6.1，Q2）；读屏也念「返回」。点电话框数字键盘的 **返回** 回到字母键盘。
+- **JVM**：`PanelUatTest.everyWayBackSaysBack`（数字框、电话框、123 进的数字键盘、表情、颜文字、符号面板的返回键都是 `picker_back`，没有 ABC）；keyboard-scene `NumberPadsTest.everyWayBackSays返回`、`SceneBuilderTest.keysAreReadAsTheyWere`（读屏念「返回」）；设备上看一遍。

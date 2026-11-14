@@ -61,7 +61,7 @@ class NumberSceneGesturesTest {
         KeyboardHarness.all(inputView).any { it is PopupSceneView && it.isShown }
 
     // what a finger does on each key of the pad of [inputType]: the keys that put another keyboard up
-    // (ABC, !?#) left to [theSwitchingKeysSwitch], as they would take the rest away
+    // (返回, 符) left to [theSwitchingKeysSwitch], as they would take the rest away
     private fun gestures(inputType: Int): List<String> = harness(inputType).use { h ->
         val ids = h.keys().mapNotNull { it.id }.filter { it !in SWITCHING }
         assertTrue(ids.toString(), ids.size >= MOST_KEYS_AT_LEAST)
@@ -71,7 +71,8 @@ class NumberSceneGesturesTest {
                 " field ${h.field.text}|${h.field.selectionStart},${h.field.selectionEnd}"
             h.api.calls.clear()
         }
-        for (id in ids) {
+        // ⌫ last (top right since 0.6.1): its swipe up clears the field the others' swipes act on
+        for (id in ids.sortedBy { it == "backspace" }) {
             val k = { h.keyNamed(id) }
             // no bubble as it is pressed (preview="off")
             h.press(k())
@@ -114,8 +115,8 @@ class NumberSceneGesturesTest {
         out
     }
 
-    // where the pad has no key, by the keys around: the column left of the digits, the corner right of
-    // 3, the bottom row's three; only those a key does not cover there (the full pad has none)
+    // where the pad has no key, by the keys around: the column left of the digits, the place right of
+    // 9 (⌫'s before 0.6.1), the bottom row's three; only those a key does not cover there (the full pad has none)
     private fun blanks(h: KeyboardHarness): List<Pair<String, android.graphics.Rect>> {
         val keys = h.keys()
         fun of(id: String) = h.keyNamed(id).bounds
@@ -124,10 +125,11 @@ class NumberSceneGesturesTest {
             "left 1" to of("1").let { b -> android.graphics.Rect(0, b.top, b.left, b.bottom) },
             "left 4" to of("4").let { b -> android.graphics.Rect(0, b.top, b.left, b.bottom) },
             "left 7" to of("7").let { b -> android.graphics.Rect(0, b.top, b.left, b.bottom) },
-            "right 3" to of("3").let { b -> android.graphics.Rect(b.right, b.top, of("space").right, b.bottom) },
-            "left !?#" to android.graphics.Rect(of("back").right, of("symbols").top, of("symbols").left, of("symbols").bottom),
-            "right 0" to of("0").let { b -> android.graphics.Rect(b.right, b.top, b.right + of("symbols").width(), b.bottom) },
-            "left enter" to of("enter").let { b -> android.graphics.Rect(b.left - of("back").width() * 2 / 3, b.top, b.left, b.bottom) },
+            "right 9" to of("9").let { b -> android.graphics.Rect(b.right, b.top, of("space").right, b.bottom) },
+            // the bottom row's places as wide as number.xml's (0.6.1: 符 16 返回 14 | 8 | 0 22 | 12 | 10 | ⏎ 18)
+            "left 0" to of("0").let { b -> android.graphics.Rect(of("back").right, b.top, b.left, b.bottom) },
+            "right 0" to of("0").let { b -> android.graphics.Rect(b.right, b.top, b.right + b.width() * 12 / 22, b.bottom) },
+            "left enter" to of("enter").let { b -> android.graphics.Rect(b.left - of("0").width() * 10 / 22, b.top, b.left, b.bottom) },
         )
         return places.filter { (_, r) -> r.width() > 0 && !covered(r.centerX(), r.centerY()) }
     }
@@ -142,14 +144,14 @@ class NumberSceneGesturesTest {
         GestureSnapshot.check("number-$pad", gestures(inputType))
     }
 
-    // ABC back to the letters, !?# the symbols' page, on every pad; neither types anything
+    // 返回 back to the letters, 符 the symbols' page, on every pad; neither types anything
     @Test
     fun theSwitchingKeysSwitch() = assertRows(FIELDS.entries, { (pad, _) -> "$pad" }) { (_, inputType) ->
         for (id in listOf("back", "symbols")) {
             harness(inputType).use { h ->
                 h.tap(h.keyNamed(id))
                 val picker = KeyboardHarness.find<PickerLayout>(h.inputView)?.isShown == true
-                if (id == "back") assertTrue("ABC: the letters", "q" in h.texts()) else assertTrue("!?#: the symbols' page", picker)
+                if (id == "back") assertTrue("返回: the letters", "q" in h.texts()) else assertTrue("符: the symbols' page", picker)
                 assertTrue("$id: ${h.api.calls}", h.api.calls.none { it.startsWith("sendKey") || it.startsWith("commit") })
             }
         }

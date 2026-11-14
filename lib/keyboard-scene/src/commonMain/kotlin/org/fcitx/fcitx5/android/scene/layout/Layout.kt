@@ -112,14 +112,12 @@ data class Letters(val rows: List<String>) {
 }
 
 /**
- * Room taking no touch (the old GapKey); with a [look], a key's face of that kind drawn there all the
- * same, a key that does nothing (the number pad's blank places: rules C §7, the old BlankKey).
+ * Room taking no touch and drawn nothing, the keyboard's fill showing (the old GapKey; the number pads'
+ * places without a key, rules C §7: 0.6.0 drew a faded key's face there, 0.6.1 nothing, user 2026-11-13).
  */
 class Gap(
     override val id: String?,
     val width: Width,
-    val look: String?,
-    val classes: List<String>,
     override val condition: Condition?,
     override val line: Int,
 ) : Cell

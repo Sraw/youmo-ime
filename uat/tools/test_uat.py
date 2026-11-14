@@ -176,6 +176,30 @@ class ScreenTest(unittest.TestCase):
         self.assertEqual(new["1"], clash["1"])
         self.assertEqual(new["q"], clash["q"])
 
+    def test_the_way_back_is_tapped_by_its_id_until_the_letters_are_up(self):
+        # what a case leaves up, as Dumper writes the canvas: its way back is the scene's id back
+        # (返回, ABC before 0.6.1), the letters have the globe; the nine keys' 2 says ABC and is no way back
+        def screen(*keys):
+            nodes = "".join(f'<node clickable="true" package="{uat.PKG}" text="{t}" key="{k}" resource-id="{r}" '
+                            f'bounds="[{i * 10},0][{i * 10 + 10},10]"/>' for i, (t, k, r) in enumerate(keys))
+            return uat.Screen(f'<hierarchy><window type="2">{nodes}</window></hierarchy>')
+        letters = screen(("ABC", "2", ""), ("", "language", f"{uat.PKG}:id/button_lang"))
+        pad = screen(("符", "symbols", ""), ("返回", "back", ""))
+        panel = screen(("返回", "back", ""), ("123", "numbers", ""))
+        stuck = screen(("返回", "back", ""))
+        for name, shown, taps in (("the letters: nothing tapped, not their ABC", [letters], 0),
+                                  ("a number pad", [pad, letters], 1),
+                                  ("the symbol panel over a number pad", [panel, pad, letters], 2),
+                                  ("a way back that does not go: three taps, then left", [stuck] * 4, 3)):
+            with self.subTest(name):
+                d = uat.Device("5556")
+                tapped, screens = [], iter(shown[1:])
+                d.tap = lambda xy, after=None: tapped.append(xy)
+                d.screen = lambda: next(screens)
+                last = d.to_letters(shown[0])
+                self.assertEqual(taps, len(tapped))
+                self.assertIs(shown[taps], last)
+
     def test_the_input_methods_touchable_region_is_read_from_dumpsys_input(self):
         # InputDispatcher's window line as redroid 14 printed it; the strip's band and the keyboard's
         # joined by |, an empty one as <empty>, the list ended by a comma
