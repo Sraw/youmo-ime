@@ -257,7 +257,7 @@ class KeyListsMigrationTest {
         val once = KeyListsMigration.upgrade("@1\nt9/2\tset\t*\t#\ng18/l\tset\t*\t)", standard)
         assertTrue(once.startsWith("@2"))
         assertEquals(once, KeyListsMigration.upgrade(once, standard))
-        assertEquals("@3\nx", KeyListsMigration.upgrade("@3\nx", standard))
+        assertEquals("@4\nx", KeyListsMigration.upgrade("@4\nx", standard))
     }
 
     // 0.5's settings migrated and upgraded at once: its 九键 symbols under their row, its first the digit as 0.5 had it

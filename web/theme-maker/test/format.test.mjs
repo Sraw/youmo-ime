@@ -651,8 +651,8 @@ test("the page made without --engine holds no engine; the page built holds the b
   const engine = blockOf(built(), 'youmo-engine');
   assert.equal(engine, engineText(), 'the page built has another engine');
   // no minifier without npm here, so not the plan's 600 KB: held just above what it is (1.285 MB with 060-keys-unify's
-  // default marks) so that it grows only on purpose; the history of each raise is in git
-  assert.ok(Buffer.byteLength(engine) <= 1_295_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
+  // default marks, 1.311 MB with 0.6.1's text variables) so that it grows only on purpose; the history of each raise is in git
+  assert.ok(Buffer.byteLength(engine) <= 1_315_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   // the global a page reads it by (build.gradle.kts: the library's link names it)
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
   // all else as without it: the engine's script and the CSP's hash of it the only difference

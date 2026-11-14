@@ -98,13 +98,16 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // [listsNewer] of the stored text it was read from: a page rebuilt or a key edited reads it several times
     private var newerOf: Pair<String, Boolean>? = null
 
-    /** A later version's key_lists (`@3`, §4.3, 060-row-unlock §5): read as none, never written over; the long presses read-only here. */
+    /** A later version's key_lists (`@4`, §4.3, 060-row-unlock §5): read as none, never written over; the long presses read-only here. */
     private val listsNewer: Boolean
         get() {
             val stored = prefs.internal.keyLists.getValue()
             newerOf?.takeIf { it.first == stored }?.let { return it.second }
             return (KeyLists.parse(stored) == null && !KeyLists.needsMigration(stored)).also { newerOf = stored to it }
         }
+
+    // the marks 不转中文标点 is for (PopupItemMarks.convertible); read once a page
+    private val punctuationKeys: Set<String> by lazy { PopupItemMarks.convertible(requireContext()) }
 
     // [slots] of the stored text it was parsed from: one instance while it is unchanged, so the keyboards' resolvers
     // made of it (SceneBoard's, kept by their slots) are made once, not at each rebuild
@@ -592,6 +595,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         val empty = text(ctx, getString(emptyText), body = true)
         val actions = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
         lateinit var render: () -> Unit
+        val marks = PopupItemMarks(ctx, editor, field, punctuationKeys) { render() }
         // each button with when it applies
         val buttons = listOf(
             Action(R.string.long_press_make_first, { editor.canMakeFirst }, editor::makeFirst),
@@ -606,20 +610,22 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             with(actions) { add(button, FlexboxLayout.LayoutParams(wrapContent, wrapContent).apply { marginEnd = ctx.dp(8) }) }
             button to action.enabled
         }
+        marks.addTo(actions)
         render = {
             keys.removeAllViews()
             editor.items.forEachIndexed { i, item ->
-                val key = KeyCaps.key(ctx, item, "", marked = item == editor.first, dimmed = false, selected = i == editor.selected)
+                val key = KeyCaps.key(ctx, item, "", marked = item == editor.first, dimmed = false, selected = i == editor.selected, tag = marks.tag(item))
                 key.setOnClickListener { editor.tap(i); render() }
                 keys.add(key, otherParams(ctx))
             }
             empty.isVisible = editor.items.isEmpty()
             buttons.forEach { (button, enabled) -> button.isEnabled = enabled() }
+            marks.render()
         }
         // false where the field holds a key code or what was typed did not all fit, said under the field
         fun addTyped(): Boolean {
             if (rejected(field)) return false
-            val fit = editor.add(field.text.toString())
+            val fit = editor.add(field.text.toString(), marks.adding, punctuationKeys)
             field.text = null
             if (!fit) {
                 field.error = getString(R.string.long_press_full, KeyLists.MAX_ITEMS)
@@ -646,7 +652,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             }, lParams())
         }
         render()
-        return listOf(keys to 12, empty to 0, actions to 4, addRow to 8)
+        return listOf(keys to 12, empty to 0, marks.selectedNow to 4, actions to 4, addRow to 8) + marks.underField()
     }
 
     /**
@@ -681,7 +687,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         // a later version's key_lists (§4.3) is never written over: its long presses not edited here
         val start = longPress?.takeIf { !listsNewer }?.let { resolver?.edit(it.id) }
         val default = longPress?.let { resolver?.defaultOf(it.id) }
-        val editor = start?.let { PopupEditor(it.items, it.first) }
+        val editor = start?.let { PopupEditor(it.items, it.first, it.user?.marks.orEmpty()) }
         val field = EditText(ctx).apply {
             hint = getString(R.string.long_press_add_hint)
             inputType = InputType.TYPE_CLASS_TEXT
@@ -756,13 +762,14 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     }
 
     /**
-     * [editor]'s list stored for [longPress]'s key: nothing touched while its items and first are as they started (a
+     * [editor]'s list stored for [longPress]'s key: nothing touched while its items, first and marks are as they started (a
      * slot alone edited; a key off kept off); none where it is the editor's [default] (KeyLists.with). Its first `*`
      * for the list's first item, `!` for none, else the item itself (KeyEdit.firstToStore).
      */
     private fun save(longPress: LongPress, editor: PopupEditor, start: KeyEdit, default: DefaultList?) {
-        if (editor.items == start.items && editor.first == start.first) return
-        lists = lists.with(longPress.id, UserList(off = false, items = editor.items, first = KeyEdit.firstToStore(editor.first, editor.items)), default)
+        if (editor.items == start.items && editor.first == start.first && editor.marks == start.user?.marks.orEmpty().filterKeys { it in start.items }) return
+        val list = UserList(off = false, items = editor.items, first = KeyEdit.firstToStore(editor.first, editor.items), marks = editor.marks.toMap())
+        lists = lists.with(longPress.id, list, default)
     }
 
     /**

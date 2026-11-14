@@ -22,6 +22,7 @@ import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.keys.SlotDefaults
+import java.util.Calendar
 
 /**
  * What the 26 keys (TextKeyboard) show as the input is, as values: what qwerty.xml's `when=` asks of
@@ -109,6 +110,7 @@ object SceneMarks {
         charShortcuts: Boolean,
         names: Collection<String>,
         firsts: Map<String, String?> = emptyMap(),
+        now: Calendar = Calendar.getInstance(),
     ): MarkSettings {
         val marks = HashMap<String, MarkContent>()
         val user = HashSet<String>()
@@ -118,7 +120,7 @@ object SceneMarks {
                 if (slots.isSet(name, up)) user += "$name:${if (up) "up" else "down"}"
                 marks["$name:${if (up) "up" else "down"}"] = when (val slot = slots.resolve(name, up)) {
                     SwipeSlot.First -> firsts[name]?.let(::symbol) ?: MarkContent.Empty
-                    else -> content(slot.shortcut) ?: MarkContent.Empty
+                    else -> content(slot.shortcut, now) ?: MarkContent.Empty
                 }
             }
         }
@@ -144,10 +146,11 @@ object SceneMarks {
     /** A long press's first as its corner draws it: as a swipe's text is (KeyMarkText, two characters as seen and 「…」), one rule for both; typed and said whole. */
     fun symbol(first: String): MarkContent = MarkContent.Symbol(KeyMarkText.of(first))
 
-    fun content(s: KeyShortcut): MarkContent? = when (s) {
+    /** [s] as its mark draws it, a text of variables filled in at [now] (none where that is nothing). */
+    fun content(s: KeyShortcut, now: Calendar): MarkContent? = when (s) {
         is KeyShortcut.Command -> MarkContent.Icon(icon(s.command))
         // at most two characters as seen, the rest an ellipsis (要做 1): the bubble shows it whole
-        is KeyShortcut.Text -> MarkContent.Text(KeyMarkText.of(s.text), KeyMarkText.shorter(s.text))
+        is KeyShortcut.Text -> s.typed(now).takeIf { it.isNotEmpty() }?.let { MarkContent.Text(KeyMarkText.of(it), KeyMarkText.shorter(it)) }
         KeyShortcut.None -> null
     }
 

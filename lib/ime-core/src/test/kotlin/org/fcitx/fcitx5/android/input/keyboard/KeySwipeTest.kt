@@ -26,6 +26,9 @@ class KeySwipeTest {
     private val space = Key(char = false, up = SwipeSlot.Command(KeyCommand.EditMenu), down = SwipeSlot.Empty)
     private val off = Ways(up = false, down = false)
 
+    // no slot here fills in variables: any time
+    private val anyTime = { java.util.Calendar.getInstance() }
+
     @Suppress("LongParameterList")
     private fun up(
         key: Key,
@@ -35,7 +38,7 @@ class KeySwipeTest {
         consumed: Boolean = false,
         cancelled: Boolean = false,
         password: Boolean = false,
-    ) = KeySwipe.decide(key, ways, totalY, swiped, consumed, cancelled, password)
+    ) = KeySwipe.decide(key, ways, totalY, swiped, consumed, cancelled, password, anyTime)
 
     @Test
     fun eachWayReachesItsSlot() {
@@ -60,7 +63,7 @@ class KeySwipeTest {
         val three = Key(char = true, up = SwipeSlot.of(pie), down = first)
         assertEquals(Outcome.Shortcut(pie), up(three, -1))
         assertEquals(Outcome.Shortcut(pie), up(three, -1, password = true))
-        assertEquals(Preview.Shortcut(pie), KeySwipe.preview(three, Ways.Both, -1, password = false))
+        assertEquals(Preview.Shortcut(pie), KeySwipe.preview(three, Ways.Both, -1, password = false, now = anyTime))
         assertEquals("the way off: a tap, as any slot's", Outcome.Tap, up(three, -1, Ways(up = false, down = true)))
     }
 
@@ -121,24 +124,24 @@ class KeySwipeTest {
     fun anUnnamedKeyFollowsTheOrientation() {
         val firstUp = Key.unnamed(SwipeOrientation.FirstUp, hasFirst = true)
         val firstDown = Key.unnamed(SwipeOrientation.FirstDown, hasFirst = true)
-        fun lift(key: Key, totalY: Int) = KeySwipe.decide(key, Ways.Both, totalY, swiped = true, consumed = false, cancelled = false, password = false)
+        fun lift(key: Key, totalY: Int) = KeySwipe.decide(key, Ways.Both, totalY, swiped = true, consumed = false, cancelled = false, password = false, now = anyTime)
         assertEquals(Outcome.Symbol, lift(firstUp, -1))
         assertEquals(Outcome.Tap, lift(firstUp, 1))
         assertEquals(Outcome.Symbol, lift(firstDown, 1))
         assertEquals(Outcome.Tap, lift(firstDown, -1))
         // its way off: a tap; both off: nothing of the swipe's
-        assertEquals(Outcome.Tap, KeySwipe.decide(firstDown, Ways(up = true, down = false), 1, swiped = true, consumed = false, cancelled = false, password = false))
-        assertEquals(Outcome.None, KeySwipe.decide(firstDown, Ways(up = false, down = false), 1, swiped = true, consumed = false, cancelled = false, password = false))
+        assertEquals(Outcome.Tap, KeySwipe.decide(firstDown, Ways(up = true, down = false), 1, swiped = true, consumed = false, cancelled = false, password = false, now = anyTime))
+        assertEquals(Outcome.None, KeySwipe.decide(firstDown, Ways(up = false, down = false), 1, swiped = true, consumed = false, cancelled = false, password = false, now = anyTime))
     }
 
     // the key's own preview where the lift does nothing as well: swiped back, or a password's copy
     // (lifted it cancels, as swiped and back does; the preview shows no shortcut that would not run)
     @Test
     fun thePreviewIsWhatTheLiftWouldDoTheKeysOwnWhereItDoesNothing() {
-        assertEquals(Preview.Shortcut(selectAll), KeySwipe.preview(a, Ways.Both, 1, password = false))
-        assertEquals(Preview.Symbol, KeySwipe.preview(a, Ways.Both, -1, password = false))
-        assertEquals(Preview.Own, KeySwipe.preview(s, Ways.Both, 1, password = false))
-        assertEquals(Preview.Own, KeySwipe.preview(a, Ways.Both, 0, password = false))
-        assertEquals(Preview.Own, KeySwipe.preview(Key(true, SwipeSlot.of(copy), first), Ways.Both, -1, password = true))
+        assertEquals(Preview.Shortcut(selectAll), KeySwipe.preview(a, Ways.Both, 1, password = false, now = anyTime))
+        assertEquals(Preview.Symbol, KeySwipe.preview(a, Ways.Both, -1, password = false, now = anyTime))
+        assertEquals(Preview.Own, KeySwipe.preview(s, Ways.Both, 1, password = false, now = anyTime))
+        assertEquals(Preview.Own, KeySwipe.preview(a, Ways.Both, 0, password = false, now = anyTime))
+        assertEquals(Preview.Own, KeySwipe.preview(Key(true, SwipeSlot.of(copy), first), Ways.Both, -1, password = true, now = anyTime))
     }
 }

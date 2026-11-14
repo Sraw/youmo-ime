@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.engine.phrase.TextVariables
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import java.util.Calendar
 
 /**
  * What lifting the finger after a vertical swipe on a key does (060-swipe-slots): every key has an up
@@ -83,7 +85,8 @@ object KeySwipe {
     /**
      * The lift of a touch on [key] that swiped [totalY] steps (down positive), having [swiped] past
      * the threshold at some point; [consumed] when a long press took the touch already, [cancelled]
-     * when the system took it; in a [password] field, where a command reading the field is not run.
+     * when the system took it; in a [password] field, where a command reading the field is not run. A text of
+     * variables that fills in nothing at [now] (all names not known) is a slot with nothing.
      */
     @Suppress("LongParameterList")
     fun decide(
@@ -94,6 +97,7 @@ object KeySwipe {
         consumed: Boolean,
         cancelled: Boolean,
         password: Boolean,
+        now: () -> Calendar,
     ): Outcome {
         // both off is 0.5.0's 禁用: no swipe on any key, a function key's tap kept as a character key's is
         if (consumed || cancelled || ways.allOff) return Outcome.None
@@ -106,7 +110,8 @@ object KeySwipe {
         return when (val slot = if (up) key.up else key.down) {
             SwipeSlot.First -> if (key.hasFirst) Outcome.Symbol else nothing
             SwipeSlot.Empty -> nothing
-            is SwipeSlot.Text, is SwipeSlot.Command -> run(slot.shortcut, password) ?: nothing
+            is SwipeSlot.Text -> if (slot.variables && TextVariables.expand(slot.text, now()).isEmpty()) nothing else run(slot.shortcut, password) ?: nothing
+            is SwipeSlot.Command -> run(slot.shortcut, password) ?: nothing
         }
     }
 
@@ -117,8 +122,8 @@ object KeySwipe {
     }
 
     /** What [key] previews having swiped [totalY] steps so far: what its lift would do. */
-    fun preview(key: Key, ways: Ways, totalY: Int, password: Boolean): Preview =
-        when (val outcome = decide(key, ways, totalY, swiped = true, consumed = false, cancelled = false, password)) {
+    fun preview(key: Key, ways: Ways, totalY: Int, password: Boolean, now: () -> Calendar): Preview =
+        when (val outcome = decide(key, ways, totalY, swiped = true, consumed = false, cancelled = false, password, now)) {
             Outcome.Symbol -> Preview.Symbol
             is Outcome.Shortcut -> Preview.Shortcut(outcome.shortcut)
             else -> Preview.Own

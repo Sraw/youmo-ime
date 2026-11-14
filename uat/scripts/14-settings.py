@@ -1735,3 +1735,10 @@ def st120(d):
     check(said, "笔画筛选时 3 的对话框里没有说打着拼音时滑不到")
     d.back(after=0.5)
     return f"命令里有 {len(strokes)} 种笔画；wang 上滑 3：「{before}」→「{typed}」；没打字上滑：「{empty}」；笔画筛选没打字上滑：「{filtered}」；对话框说明：{said}"
+
+
+case("ST-125", needs="jvm:PopupMarksEditorTest.aFieldOfVariablesIsOneItemOfThemPreviewedAndTold")(lambda d: None)
+
+case("ST-126", needs="manual:导出备份、恢复，覆盖装 0.6.0 再装回；JVM 见 DowngradeTo060Test")(lambda d: None)
+
+case("ST-127", needs="jvm:PopupMarksEditorTest.noChinesePunctuationIsForTheMarksATableConverts")(lambda d: None)

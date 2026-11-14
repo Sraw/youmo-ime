@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.input.keyboard.KeyClock
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardVariants
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
 import org.fcitx.fcitx5.android.input.keys.KeyLists
@@ -306,7 +307,7 @@ class SceneBoard(
             val lists = KeyListsCache.user.current
             val of = ResolverFor(layout, variant, KeyListsCache.user.version, lists, slots)
             return resolvers.getOrPut(of) {
-                KeyResolver(of.variant, of.lists, of.slots, DefaultMarks.nodes(layout.layout, layout.fragments))
+                KeyResolver(of.variant, of.lists, of.slots, DefaultMarks.nodes(layout.layout, layout.fragments), KeyClock)
             }
         }
 

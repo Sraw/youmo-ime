@@ -9,6 +9,7 @@ import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
@@ -55,11 +56,27 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
         doAfterTextChanged { pick(textButton) }
     }
 
+    // the text's variables filled in as it is typed (061-text-variables §2.4); what it types now, under it
+    private val help = TextVariableHelp(ctx, field)
+
+    private val variables = CheckBox(ctx).apply {
+        setText(R.string.text_variables_use)
+        isChecked = (initial as? SwipeSlot.Text)?.variables == true
+        setOnCheckedChangeListener { _, on ->
+            help.on = on
+            pick(textButton)
+        }
+    }
+
+    /** The variables help under the text: a test's. */
+    val variableHelp: TextVariableHelp get() = help
+
     /** Called when what is chosen may have changed (a way picked, a command, the text typed). */
     var onChange: (() -> Unit)? = null
 
     // how the keyboard draws what is chosen where that is not as set (SwipeFates.note): none, hidden
     private val noteView = TextView(ctx).apply {
+        id = R.id.swipe_slot_note
         textSize = 13f
         setTextColor(ctx.styledColor(android.R.attr.textColorSecondary))
         visibility = View.GONE
@@ -92,11 +109,14 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
         add(strokeView, lParams(matchParent) { marginStart = ctx.dp(32) })
         add(textButton, lParams(matchParent))
         add(field, lParams(matchParent) { marginStart = ctx.dp(32) })
+        add(variables, lParams(matchParent) { marginStart = ctx.dp(32) })
+        add(help.view, lParams(matchParent) { marginStart = ctx.dp(32) })
         add(empty, lParams(matchParent))
         add(noteView, lParams(matchParent) { marginStart = ctx.dp(32) })
     }
 
     init {
+        help.on = variables.isChecked
         radios.forEach { button -> button.setOnClickListener { pick(button) } }
         showCommand()
         pick(
@@ -128,9 +148,12 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
     fun peek(): SwipeSlot? = when {
         first.isChecked -> SwipeSlot.First
         commandButton.isChecked -> SwipeSlot.Command(command)
-        textButton.isChecked -> field.text.toString().takeIf { it.isNotEmpty() }?.let(SwipeSlot::Text)
+        textButton.isChecked -> text()
         else -> SwipeSlot.Empty
     }
+
+    // the text typed, with or without its variables (without where they would type it the same: stored as ever); none while empty
+    private fun text(): SwipeSlot.Text? = field.text.toString().takeIf { it.isNotEmpty() }?.let { SwipeSlot.Text.of(it, variables.isChecked) }
 
     private fun showCommand() {
         commandButton.text = ctx.getString(R.string.shortcut_command_is, ctx.getString(R.string.shortcut_command), ctx.getString(KeyShortcutLooks.of(command).label))
@@ -154,7 +177,7 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
     fun chosen(): SwipeSlot? = when {
         first.isChecked -> SwipeSlot.First
         commandButton.isChecked -> SwipeSlot.Command(command)
-        textButton.isChecked -> field.text.toString().takeIf { it.isNotEmpty() }?.let(SwipeSlot::Text)
+        textButton.isChecked -> text()
             ?: null.also { field.error = ctx.getString(R.string.invalid_value) }
         else -> SwipeSlot.Empty
     }

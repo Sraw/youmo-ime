@@ -323,14 +323,17 @@ abstract class BaseKeyboard(
         /** Nothing: the key has no first to swipe to (its long press off, or its list with no first, built in or the user's). */
         data object None : SwipeChoice
 
-        /** A named key's first, the resolver's: typed as the item says, [shown] in the preview. */
-        data class Output(val action: KeyAction, val shown: String) : SwipeChoice
+        /**
+         * A named key's first, the resolver's: typed as the item says, [shown] in the preview; one of variables
+         * typed as [fresh] makes it as the swipe lifts (061-text-variables §2.3).
+         */
+        data class Output(val action: KeyAction, val shown: String, val fresh: (() -> KeyAction)? = null) : SwipeChoice
 
         /** What the swipe's Up types, and from where: null for [None]. */
         fun typed(builtIn: KeyAction): Pair<KeyAction, KeyActionListener.Source>? = when (this) {
             BuiltIn -> builtIn to KeyActionListener.Source.Keyboard
             None -> null
-            is Output -> action to KeyActionListener.Source.Popup
+            is Output -> (fresh?.invoke() ?: action) to KeyActionListener.Source.Popup
         }
 
         /** What the preview shows once the finger has swiped: nothing for [None], as nothing is typed. */
@@ -810,7 +813,7 @@ abstract class BaseKeyboard(
         // ask popup keyboard whether there's a pending KeyAction
         onPopupAction(triggerAction)
         val action = triggerAction.outAction ?: return triggerAction.outConsumed
-        onAction(action, KeyActionListener.Source.Popup)
+        onAction(resolving.output(key.id, action), KeyActionListener.Source.Popup)
         onPopupAction(PopupAction.DismissAction(key))
         return true
     }
@@ -852,6 +855,7 @@ abstract class BaseKeyboard(
         SceneEnvs.watch(onTyping)
         typingChanged()
         showSwipeMarks()
+        catchUpMinute()
         keyInk?.let { ink ->
             inkScope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
                 s.launch { EngineState.handwritingEnded.collect(ink::ended) }
@@ -877,7 +881,23 @@ abstract class BaseKeyboard(
     protected open val keysIm: String get() = ""
 
     /** What the keys' lists depend on now (060-keys-unify §1.2): the swipe settings; Shift and punctuation a keyboard's own. */
-    protected open fun keyState(): KeyState = KeyState(punctuation = keysPunctuation, ways = swipeWays(), spots = swipeSpots())
+    protected open fun keyState(): KeyState =
+        KeyState(punctuation = keysPunctuation, ways = swipeWays(), spots = swipeSpots(), minute = minuteOfVariables())
+
+    // the user's lists or slots filling in variables: their values made anew each minute the keys are drawn or asked
+    // (061-text-variables §2.3); with none, one state for good
+    private fun minuteOfVariables(): Long = if (resolving.resolver()?.fillsIn == true) KeyClock.now() / MINUTE_MS else 0
+
+    // the minute the keys' marks were last drawn with ([keyMarks]), not one a long press or swipe asked for since
+    private var minuteDrawn = 0L
+
+    /**
+     * Shown again (a field started, the keyboard attached anew): keys drawn with variables' values of a minute gone
+     * (shown last yesterday, say) drawn again with this one's, not left as they were until something else redraws them.
+     */
+    fun catchUpMinute() {
+        if (minuteOfVariables() != minuteDrawn) canvas?.invalidateScene()
+    }
 
     /**
      * The marks of [layout]'s keys as the resolver has them now: the resolver the keys' long presses and swipes ask
@@ -886,8 +906,9 @@ abstract class BaseKeyboard(
      */
     protected fun keyMarks(layout: SceneLayout): MarkSettings {
         keysLayout = layout
-        val resolver = resolving.resolver(layout) ?: return SceneBoard.marks(layout, charShortcutMarks, keysIm, keyState(), keysNineLetters)
-        return SceneBoard.marks(resolver, charShortcutMarks, keyState())
+        val state = keyState().also { minuteDrawn = it.minute }
+        val resolver = resolving.resolver(layout) ?: return SceneBoard.marks(layout, charShortcutMarks, keysIm, state, keysNineLetters)
+        return SceneBoard.marks(resolver, charShortcutMarks, state)
     }
 
     /**
@@ -946,3 +967,5 @@ internal fun spaceLabel(name: String, subMode: InputMethodSubMode): String {
     val mode = subMode.label.ifEmpty { subMode.name }
     return if (mode.isEmpty()) name else "$name ($mode)"
 }
+
+private const val MINUTE_MS = 60_000L

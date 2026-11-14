@@ -134,9 +134,9 @@ class KeyListsUpgradeTest {
     // a later version's, a downgrade from it: left as it is for that version, read as none set
     @Test
     fun aLaterFormatIsLeftAloneAndReadAsEmpty() {
-        sp.edit { putString(AppPrefs.KEY_LISTS, "@3\nfull/q\toff"); v052() }
+        sp.edit { putString(AppPrefs.KEY_LISTS, "@4\nfull/q\toff"); v052() }
         val prefs = started()
-        assertEquals("@3\nfull/q\toff", stored())
+        assertEquals("@4\nfull/q\toff", stored())
         assertEquals(KeyLists.Empty, cache(prefs).current)
         // a byte order mark and blanks around ours are ours
         sp.edit { putString(AppPrefs.KEY_LISTS, "\uFEFF @1\nfull/q\toff") }

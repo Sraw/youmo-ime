@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.popup
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.input.keys.ItemMark
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -109,5 +110,96 @@ class PopupEditorTest {
     fun aFirstNotThereIsNone() {
         assertNull(PopupEditor(listOf("1", "a"), "z").first)
         assertEquals(listOf("1", "a"), PopupEditor(listOf("1", "a", "1"), null).items)
+    }
+
+    // 061-no-cn-punct §2.1: an English mark a Chinese table converts, the user's table's keys too
+    @Test
+    fun whatCanBeKeptAsIs() {
+        val keys = setOf(",", ".", "@")
+        assertTrue(PopupEditor.canKeepAsIs(",", keys))
+        for (no in listOf("a", "1", "，", "ab", "#")) assertFalse(no, PopupEditor.canKeepAsIs(no, keys))
+        // `@` in the user's table alone: still one
+        assertTrue(PopupEditor.canKeepAsIs("@", keys))
+        assertFalse(PopupEditor.canKeepAsIs("@", setOf(",")))
+    }
+
+    @Test
+    fun marksTurnedOnAndOffGoWithTheirItemAndNeverTogether() {
+        val keys = setOf(",", ".")
+        val e = PopupEditor(listOf("a", ",", "."), null)
+        e.tap(0)
+        assertFalse(e.canMark(ItemMark.AsIs, keys))
+        assertTrue(e.canMark(ItemMark.Variables, keys))
+        e.tap(1)
+        assertTrue(e.canMark(ItemMark.AsIs, keys))
+        e.toggle(ItemMark.AsIs)
+        assertEquals(ItemMark.AsIs, e.selectedMark)
+        // the other one greyed while it is on
+        assertFalse(e.canMark(ItemMark.Variables, keys))
+        e.toggle(ItemMark.Variables)
+        assertEquals(mapOf("," to ItemMark.AsIs), e.marks)
+        e.moveRight()
+        assertEquals(listOf("a", ".", ","), e.items)
+        assertEquals(ItemMark.AsIs, e.selectedMark)
+        e.toggle(ItemMark.AsIs)
+        assertNull(e.selectedMark)
+        e.toggle(ItemMark.Variables)
+        assertEquals(mapOf("," to ItemMark.Variables), e.marks)
+        e.delete()
+        assertEquals(emptyMap<String, ItemMark>(), e.marks)
+    }
+
+    @Test
+    fun theMarksAsStoredStartTheEditor() {
+        val e = PopupEditor(listOf("\$day", ","), null, mapOf("\$day" to ItemMark.Variables, "gone" to ItemMark.AsIs))
+        assertEquals(mapOf("\$day" to ItemMark.Variables), e.marks)
+    }
+
+    // 061-text-variables §2.5, S3: the field one item, blanks round it gone, a line break a space, 64 at most
+    @Test
+    fun anItemOfVariablesAdded() {
+        val e = PopupEditor(listOf("a"), "a")
+        assertTrue(e.add("  \$year 年\n\$month月 ", ItemMark.Variables))
+        assertEquals(listOf("a", "\$year 年 \$month月"), e.items)
+        assertEquals(mapOf("\$year 年 \$month月" to ItemMark.Variables), e.marks)
+        e.add("x".repeat(70), ItemMark.Variables)
+        assertEquals("x".repeat(64), e.items.last())
+        assertEquals(ItemMark.Variables, e.marks["x".repeat(64)])
+        // nothing but blanks: nothing added
+        assertTrue(e.add("  ", ItemMark.Variables))
+        assertEquals(3, e.items.size)
+    }
+
+    // 061-no-cn-punct Q3: the marks of them that can have it, the others added as ever
+    @Test
+    fun itemsAddedAsIs() {
+        val e = PopupEditor(emptyList(), null)
+        e.add(", a . ，", ItemMark.AsIs, setOf(",", "."))
+        assertEquals(listOf(",", "a", ".", "，"), e.items)
+        assertEquals(mapOf("," to ItemMark.AsIs, "." to ItemMark.AsIs), e.marks)
+    }
+
+    // turned off, an item of variables over 16 would be cut where stored and no longer be the first
+    @Test
+    fun aLongItemOfVariablesKeepsItsMark() {
+        val long = "\$year 年 \$month 月 \$day 日"
+        val e = PopupEditor(listOf("a", long, "\$day"), long, mapOf(long to ItemMark.Variables, "\$day" to ItemMark.Variables))
+        e.tap(1)
+        assertFalse(e.canMark(ItemMark.Variables, emptySet()))
+        assertFalse(e.canMark(ItemMark.AsIs, emptySet()))
+        // a short one can still have it turned off
+        e.tap(2)
+        assertTrue(e.canMark(ItemMark.Variables, emptySet()))
+    }
+
+    @Test
+    fun anItemThereAlreadyTakesTheMarkAdded() {
+        val e = PopupEditor(listOf("a", ",", "\$day"), null, mapOf("," to ItemMark.Variables))
+        assertTrue(e.add("\$day", ItemMark.Variables))
+        assertEquals(listOf("a", ",", "\$day"), e.items)
+        assertEquals(ItemMark.Variables, e.marks["\$day"])
+        // one with a mark keeps it
+        e.add(", .", ItemMark.AsIs, setOf(",", "."))
+        assertEquals(mapOf("," to ItemMark.Variables, "\$day" to ItemMark.Variables, "." to ItemMark.AsIs), e.marks)
     }
 }

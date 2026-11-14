@@ -675,3 +675,21 @@
 - **操作**：**按键 → 按键字符和快捷键 → 九键**，点 3（DEF），**上滑** 点 **命令** 旁的 **换**，选「笔画：撇」，确定；回测试页看 3 键；打 wang（9264），在 3 上向上滑；清空后什么都不打，在 3 上向上滑。再把 **在键上划** 改成「笔画筛选」，什么都不打，在 3 上向上滑；回到 **按键字符和快捷键 → 九键**，点 3 看上滑一段。
 - **预期**：命令列表里有「笔画：横」「笔画：竖」「笔画：撇」「笔画：点」「笔画：折」；3 键角上画着撇（丿）。打着 wang 时上滑：编码行多一个 `丿`，候选只剩第一个字起笔是撇的，和在键上画一撇一样；不打 3 的 DEF。什么都没打时上滑：什么都不打出来，也不打 DEF；选「笔画筛选」时也一样。选了「笔画筛选」后，3 的对话框里上滑的命令下面写着「在键上划选了笔画筛选时，打着拼音滑这个键按画出的形状算，不发这一笔」（在键上划是「关」时没有这一行；不是字母的键，比如九键的 1，也没有）：那时打着字在字母键上短划当成画笔画，见 KB-42，字母键上设成笔画的槽这时滑不到，这个键的上滑按画出的形状算，向上划不是笔画，什么也不发生。
 - **JVM**：`SwipeSlotsUatTest.aStrokeSlotSendsItsStroke`（键上画撇；九键和全键盘上滑发出撇的笔画键、不打键上的字母、不先上屏，打着拼音和没打字、「在键上划」关和笔画筛选没打字都一样；笔画筛选打着拼音时上滑 3 什么也不发，上滑九键的 1 照样发）、`PopupOverridesFragmentTest$Dialog.aStrokeSetWhileStrokesAreDrawnSaysItIsNotReachedWhileTyping`（只在笔画筛选、字母键上设的是笔画时说那一行，九键的 1 不说）、`aStrokePickedInTheDialogSaysItIsNotReachedWhileTyping`（从粘贴点「换」选撇后出现，改选无后消失）、`KeySwipeTest.aStrokeSlotIsRunAsItsCommand`、`SwipeSlotsTest.aStrokeIsStoredAsACommandInFormatOne`（存法不升版本，0.6.0 读到只把这一槽当默认）；引擎怎么筛候选、编码行的 `丿` 见 KB-42 的 uatTest；设备上跑。
+
+### ST-125 [P1] 按键字符和快捷键：「使用变量」、插入变量、预览、写错的名字
+- **前提**：B0-设置；**按键 → 按键字符和快捷键 → 全键盘**，点 q。
+- **操作**：勾输入框旁的 **使用变量**；点 **插入变量** 看列表；框里写 `$month月$day日`，看下面；改成 `$yaer年`，看下面；改回 `$month月$day日`，添加，确定；再点 q，点列表里这一项，看按钮排；在 **下滑** 选 **文字**，填 `${fullhour}:${minute}` 并勾它下面的 **使用变量**。
+- **预期**：勾上后框里的提示变成「整段算一项，比如 $month月$day日」，出现 **插入变量**；列表每行是变量名、说明和现在的值，选了在光标处插入 `${名字}`；框下实时写「现在打出：11月14日」；写错的名字下面红字「不认识 $yaer，会被去掉；要打出 $ 就写 $$」。整段（去掉首尾空白、换行变空格，最多 64 个字）存成一项，键帽下边写「变量」，读屏念「…，变量」。选中它时按钮排的 **使用变量** 开着（读屏念「使用变量，已开」），**不转中文标点** 置灰，上面一行写它现在打出的值。滑动文字槽勾上后同样有插入变量和预览。
+- **JVM**：`PopupMarksEditorTest.aFieldOfVariablesIsOneItemOfThemPreviewedAndTold`、`PopupMarksEditorTest.anItemOfVariablesIs64AtMostAndInsertedByName`、`PopupMarksEditorTest.aSwipesTextOfVariablesIsSetAndPreviewed`；ime-core `TextVariablesTest`、`PopupEditorTest`；设备上的一遍随 KB-93。
+
+### ST-126 [P2] 用了变量和「不转中文标点」的设置：备份恢复、降级到 0.6.0
+- **前提**：ST-125、KB-98 做过；装着 0.6.0 的 APK 备用。
+- **操作**：**导出备份**，清数据，**导入备份**，看 q 和，键；装 0.6.0（覆盖安装，数据留着），看长按和上下滑；不改任何设置，装回 0.6.1 再看；再装 0.6.0，在 **按键字符和快捷键** 里改任意一个滑槽，装回 0.6.1 再看。
+- **预期**：恢复后两项和它们的标记都在。0.6.0 里所有键的长按都回默认，不只带标记的那几个（带标记的列表存成 `@3`，它认不出，不坏、不改写），上下滑里带变量的槽回预设，其他槽照旧；装回 0.6.1 后都还在。**在 0.6.0 里改过任何滑槽后**，装回 0.6.1 带变量的那个槽是预设（0.6.0 整份重写时把它丢了；CHANGELOG 写明）。
+- **JVM**：ime-core `DowngradeTo060Test`（0.6.0 的读法读到 `@3` 和 `vtext:`：长按回默认、那个槽回预设、其他槽在）、`KeyListsFormatTest`；备份和降级在设备上手工做。
+
+### ST-127 [P1] 按键字符和快捷键：「不转中文标点」只对中文标点会转的英文标点
+- **前提**：B0-设置；**按键 → 按键字符和快捷键 → 全键盘**，点 q。
+- **操作**：勾输入框旁的 **不转中文标点**，看提示；再勾 **使用变量**，看前一个；勾回 **不转中文标点**，框里写 `, ab .`，添加，确定；再点 q，分别点 `ab` 和 `,`，看按钮排，点按钮排的 **不转中文标点**。
+- **预期**：输入框旁两个勾选框只能勾一个；勾 **不转中文标点** 时写「只对有中文写法的英文标点有效」；添加后 `,` 和 `.` 的键帽下边写「原样」，`ab` 不带。选 `ab` 时按钮排的 **不转中文标点** 置灰，选 `,` 时开着（读屏念「不转中文标点，已开」），点一下关掉（「已关」）。标点设置里自己加的英文标点（如 `@`）也能开。**功能键** 页只开这一项、不改列表时也存下。
+- **JVM**：`PopupMarksEditorTest.noChinesePunctuationIsForTheMarksATableConverts`、`PopupMarksEditorTest.aKeyOfTheUsersOwnTableCanBeKeptAsIs`、`PopupMarksEditorTest.aDefaultListMarkedAloneIsStored`；ime-core `PopupEditorTest`；设备上的一遍随 KB-98。

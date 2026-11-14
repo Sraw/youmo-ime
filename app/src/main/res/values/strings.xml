@@ -828,6 +828,43 @@
     <string name="long_press_off">Holding this key offers nothing: its long press is turned off. Adding a character turns it on again.</string>
     <string name="long_press_newer">These long presses were set by a newer version of the app: they are kept as they are and cannot be edited here.</string>
     <string name="long_press_add_hint">Add, space between several</string>
+    <string name="text_variables_use">Use variables</string>
+    <string name="text_as_is">Keep English punctuation</string>
+    <string name="text_as_is_hint">Only for English punctuation that has a Chinese form</string>
+    <string name="text_variables_insert">Insert a variable</string>
+    <string name="text_variables_now">Types now: %1$s</string>
+    <string name="text_variables_nothing">Types nothing now</string>
+    <string name="text_variables_dropped">%1$s is not known and is left out; write $$ to type $</string>
+    <string name="text_variables_kept">%1$s is typed as it is; write $$ to type $</string>
+    <string name="text_variables_item_hint">One item, e.g. $month/$day</string>
+    <string name="text_mark_variables">var</string>
+    <string name="text_mark_as_is">as is</string>
+    <string name="text_mark_on">on</string>
+    <string name="text_mark_off">off</string>
+    <string-array name="text_variable_descriptions">
+        <item>Year</item>
+        <item>Year, two digits</item>
+        <item>Month</item>
+        <item>Month, two digits</item>
+        <item>Day</item>
+        <item>Day, two digits</item>
+        <item>Weekday as a number, Sunday 0</item>
+        <item>Hour, 24-hour clock</item>
+        <item>Hour, 12-hour clock</item>
+        <item>AM or PM</item>
+        <item>AM or PM in Chinese</item>
+        <item>Minute</item>
+        <item>Second</item>
+        <item>Year in Chinese</item>
+        <item>Year in Chinese, two digits</item>
+        <item>Month in Chinese</item>
+        <item>Day in Chinese</item>
+        <item>Weekday in Chinese</item>
+        <item>Hour in Chinese, 24-hour clock</item>
+        <item>Hour in Chinese, 12-hour clock</item>
+        <item>Minute in Chinese</item>
+        <item>Second in Chinese</item>
+    </string-array>
     <string name="punctuation_page_hint">While typing Chinese, the key on the left types the punctuation on the right; a key with several offers a choice. Tap one to change or remove it.</string>
     <string name="punctuation_pair">in turn</string>
     <string name="punctuation_key">Key</string>

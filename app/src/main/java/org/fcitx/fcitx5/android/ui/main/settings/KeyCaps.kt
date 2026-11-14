@@ -45,6 +45,7 @@ import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.wrapContent
 import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import org.fcitx.fcitx5.android.scene.layout.Text as SceneText
@@ -257,20 +258,33 @@ object KeyCaps {
         state: String? = null,
         said: String? = null,
         shortcut: Shortcut? = null,
+        tag: String? = null,
     ): FrameLayout = KeyFrame(ctx).apply {
         isClickable = true
         isFocusable = true
         val ripple = ctx.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run {
             getDrawable(0).also { recycle() }
         }
-        contentDescription = listOfNotNull(text, hint, said).filter { it.isNotEmpty() }.joinToString(", ")
+        contentDescription = listOfNotNull(text, hint, said, tag).filter { it.isNotEmpty() }.joinToString(", ")
         ViewCompat.setStateDescription(this, state)
         isSelected = selected
         // drawn by the engine as the keyboard draws the key (060-render-p2 S6): its face in the keyboard's
         // theme, its symbol and shortcut's marks placed by the engine; edited, outlined along its face
         foreground = ripple
         add(sceneKey(ctx, text, hint, marked, dimmed, selected, shortcut), lParams(matchParent, matchParent))
+        // an item's mark (「变量」, 「原样」: 061-text-variables §2.5) in small words along the cap's foot
+        if (tag != null) {
+            add(TextView(ctx).apply {
+                this.text = tag
+                textSize = TAG_SP
+                setTextColor(ctx.styledColor(android.R.attr.textColorSecondary))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, lParams(wrapContent, wrapContent, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
+        }
     }
+
+    // the mark's words under an item's label
+    private const val TAG_SP = 9f
 
     // the engine's cell is a gesture view and takes every touch it gets, so a tap never reached this frame's
     // click on a device (Robolectric's performClick went straight to the frame): the frame keeps them all

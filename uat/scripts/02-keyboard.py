@@ -647,3 +647,124 @@ def kb92(d):
     d.shot("kb", "颜文字面板")
     check(all(v == "返回" for v in said.values()), f"返回键写的是 {said}")
     return "电话框数字键盘、表情、颜文字的返回键都写「返回」"
+
+
+def hold_pick(d, xy, text, shot=None):
+    """[xy] held: its long press's cell reading [text] picked, the popup's texts as they were. The focus follows the
+    finger's way from where the popup opened, a step each 0.6 of a cell (PopupFocus), not the cell under it: the
+    finger moved from the cell in focus by the cells between them, at that rate, and lifted"""
+    x, y = xy
+    d.touch(("down", x, y), ("sleep", 0.9), ("move", x, y))
+    s = d.screen()
+    if shot:
+        d.shot("full", shot)
+    cells = [n for n in s.nodes if n.text and not n.clickable and n.b[3] <= y]
+    texts = s.texts(where="all")
+    # the popup's own: the one in focus and the one reading [text] nearest it
+    focused = next((n for n in cells if n.selected), None)
+    cell = min((n for n in cells if n.text == text), default=None,
+               key=lambda n: (n.c[0] - (focused or n).c[0]) ** 2 + (n.c[1] - (focused or n).c[1]) ** 2)
+    if not cell or not focused:
+        d.touch(("up", x, y))
+        raise Blocked(f"长按弹出里没有「{text}」或没有选中的格：{texts[-16:]}")
+    w, h = focused.b[2] - focused.b[0], focused.b[3] - focused.b[1]
+    cols = round((cell.c[0] - focused.c[0]) / w)
+    rows = round((cell.c[1] - focused.c[1]) / h)
+    tx, ty = x + int(cols * 0.6 * w), y + int(rows * 0.6 * h)
+    d.touch(("move", (x + tx) // 2, (y + ty) // 2), ("move", tx, ty), ("sleep", 0.2), ("up", tx, ty))
+    time.sleep(0.5)
+    return texts
+
+
+def checked_box(d, text):
+    """the first check box reading [text] (the one by the field: the ways' come after it) ticked"""
+    s = d.screen()
+    box = min((n for n in s.app() if n.text == text and n.cls.endswith("CheckBox")), key=lambda n: n.b[1], default=None)
+    if not box:
+        raise Blocked(f"对话框里没有勾选框「{text}」")
+    d.tap(box.c, 0.5)
+
+
+def row_toggle(d, text):
+    """the button row's toggle reading [text] (not the check box by the field)"""
+    n = next((n for n in d.screen().app() if n.text == text and n.clickable and not n.cls.endswith("CheckBox")), None)
+    if not n:
+        raise Blocked(f"按钮排里没有「{text}」")
+    return n
+
+
+@case("KB-93", base="B0-设置", mutates=True, visual=True)
+def kb93(d):
+    st = script("14-settings")
+    st.slots_tab(d, "全键盘")
+    st.key_dialog(d, "q")
+    checked_box(d, "使用变量")
+    d.tap_text("插入变量", scroll=False, after=0.8)
+    d.tap_text("${weekday_cn}", contains=True, after=0.6)
+    s = d.screen()
+    now = next((n.text for n in s.app() if n.text.startswith("现在打出：")), None)
+    check(now, f"框下没有「现在打出：」：{s.texts()[-12:]}")
+    value = now.removeprefix("现在打出：")
+    d.tap_text("添加", scroll=False, after=0.6)
+    d.shot("app", "q 的对话框：加了一项「变量」")
+    marked = any(n.desc == f"{value}, 变量" or n.desc == "${weekday_cn}, 变量" for n in d.screen().app())
+    st.dialog_ok(d)
+    d.open_page("text")
+    d.clear()
+    q = d.face("q", "Q")
+    shown = hold_pick(d, q.c, value, shot=f"长按 q：弹出里是今天的「{value}」")
+    got = d.expect_field(value, msg="选了打出「{got}」，应打出 " + value)
+    check(marked, "对话框里那一项读屏没念「…，变量」")
+    check("${weekday_cn}" not in shown, "弹出里画着 ${weekday_cn}，不是它的值")
+    return f"预览「{now}」，弹出有「{value}」，选了打出「{got}」"
+
+
+case("KB-94", needs="jvm:TextVariablesUatTest.aSwipesTextOfVariablesTypesTheTimeItIsSwiped")(lambda d: None)
+
+case("KB-95", needs="jvm:TextVariablesUatTest.withoutTheMarkAsWrittenWithItAsFilledIn")(lambda d: None)
+
+case("KB-96", needs="manual:键盘开着等到下一分钟再选带变量的项，打出新时间；JVM 见 KeyResolverMarksTest.outputFillsInAgainAsPicked")(lambda d: None)
+
+case("KB-97", needs="jvm:TextVariablesUatTest.anItemOfVariablesFirstIsTypedBySwipingUp")(lambda d: None)
+
+
+def comma_as_is(d):
+    """，键's `.` marked 不转中文标点 on the settings page"""
+    st = script("14-settings")
+    st.slots_tab(d, "功能键")
+    st.key_dialog(d, "，键")
+    st.dialog_pick(d, ".")
+    t = row_toggle(d, "不转中文标点")
+    d.tap(t.c, 0.5)
+    n = row_toggle(d, "不转中文标点")
+    # its name the words, on or off its state (read 「不转中文标点，已开」)
+    said = f"{n.desc}，{'已开' if n.checked else '已关'}"
+    d.shot("app", "，键的对话框：`.` 开了不转中文标点，键帽下写「原样」")
+    st.dialog_ok(d)
+    return said
+
+
+@case("KB-98", base="B0-设置", mutates=True, visual=True)
+def kb98(d):
+    said = comma_as_is(d)
+    d.open_page("text")
+    d.clear()
+    comma = board_keys(d).get("comma")
+    if not comma:
+        raise Blocked(f"键盘上没有，键：{sorted(board_keys(d))[:20]}")
+    b = comma[0]
+    xy = ((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+    shown = hold_pick(d, xy, ".", shot="长按，键：`.` 画成 `.`，别的照旧是中文标点")
+    got = d.expect_field(".", msg="选 `.` 打出「{got}」，应是 `.`")
+    d.clear()
+    d.type("ni")
+    first = (d.cands() or [""])[0]
+    hold_pick(d, xy, ".")
+    then = d.expect_field(first + ".", msg=f"打着 ni 选 `.` 打出「{{got}}」，应是「{first}.」")
+    check(said == "不转中文标点，已开", f"按钮排的开关读作「{said}」")
+    return f"开关读作「{said}」；弹出 {[t for t in shown if t in ('.', '。', '，', '？', '！')]}；打出「{got}」，打着 ni「{then}」"
+
+
+case("KB-99", needs="jvm:AsIsPunctuationTypedTest.aMarkedFirstIsTypedBySwipingUp")(lambda d: None)
+
+case("KB-100", needs="jvm:AsIsPunctuationTypedTest.notMarkedItIsChinesePunctuationAsEver、AsIsPunctuationTypedTest.englishTypesTheSameMarkedOrNot")(lambda d: None)

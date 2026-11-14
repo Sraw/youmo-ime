@@ -809,6 +809,43 @@
     <string name="long_press_off">这个键的长按已关。添加字符就重新打开。</string>
     <string name="long_press_newer">长按字符是新版本的应用设置的：原样保留，这里不能改。</string>
     <string name="long_press_add_hint">添加字符，空格分隔</string>
+    <string name="text_variables_use">使用变量</string>
+    <string name="text_as_is">不转中文标点</string>
+    <string name="text_as_is_hint">只对有中文写法的英文标点有效</string>
+    <string name="text_variables_insert">插入变量</string>
+    <string name="text_variables_now">现在打出：%1$s</string>
+    <string name="text_variables_nothing">现在什么也打不出</string>
+    <string name="text_variables_dropped">不认识 %1$s，会被去掉；要打出 $ 就写 $$</string>
+    <string name="text_variables_kept">%1$s 会原样打出；要打出 $ 就写 $$</string>
+    <string name="text_variables_item_hint">整段算一项，比如 $month月$day日</string>
+    <string name="text_mark_variables">变量</string>
+    <string name="text_mark_as_is">原样</string>
+    <string name="text_mark_on">已开</string>
+    <string name="text_mark_off">已关</string>
+    <string-array name="text_variable_descriptions">
+        <item>年</item>
+        <item>两位年</item>
+        <item>月</item>
+        <item>两位月</item>
+        <item>日</item>
+        <item>两位日</item>
+        <item>星期（数字，周日是 0）</item>
+        <item>24 小时制的时</item>
+        <item>12 小时制的时</item>
+        <item>上午还是下午（AM/PM）</item>
+        <item>上午还是下午</item>
+        <item>分</item>
+        <item>秒</item>
+        <item>中文年</item>
+        <item>中文两位年</item>
+        <item>中文月</item>
+        <item>中文日</item>
+        <item>中文星期</item>
+        <item>中文时（24 小时制）</item>
+        <item>中文时（12 小时制）</item>
+        <item>中文分</item>
+        <item>中文秒</item>
+    </string-array>
     <string name="punctuation_page_hint">打中文时，按左边的键打出右边的标点；一个键对应几个标点时可以选。点一项可修改或删除。</string>
     <string name="punctuation_pair">交替</string>
     <string name="punctuation_key">按键</string>

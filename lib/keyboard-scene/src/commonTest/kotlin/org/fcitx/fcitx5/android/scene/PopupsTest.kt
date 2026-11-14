@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.scene.engine.PopupBuilder
 import org.fcitx.fcitx5.android.scene.engine.Popups
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.scene.engine.clusterEnds
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
@@ -242,9 +243,52 @@ class PopupsTest {
         // no room known: as wide as they want
         assertEquals(keys.width, b.popupKeys(labels, 3, null).ok().width)
         // too wide for the room: narrower, the text smaller alike
-        val narrow = b.popupKeys(labels, 3, 3 * 50.0).ok()
-        assertEquals(50.0, narrow.width)
-        assertEquals(size * 50 / keys.width, narrow.size, 1e-9)
+        val narrow = b.popupKeys(labels, 3, 3 * 100.0).ok()
+        assertEquals(100.0, narrow.width)
+        assertEquals(size * 100 / keys.width, narrow.size, 1e-9)
+        // never below the least size (what is wider still is cut as drawn)
+        assertEquals(px(Popups.MIN_WORDS_DP), b.popupKeys(labels, 3, 3 * 50.0).ok().size)
+    }
+
+    // 061-text-variables §2.3: a value filled in, 64 characters at most, shrunk to the least size, then cut, said whole
+    @Test
+    fun aLabelTooWideIsShrunkThenCutAndSaidWhole() {
+        val b = builder()
+        val long = "2026年11月14日 星期六 下午 03:05 " + "x".repeat(30)
+        val keys = b.popupKeys(listOf("a", long), 2, 2 * 60.0).ok()
+        assertEquals(60.0, keys.width)
+        assertEquals(px(Popups.MIN_WORDS_DP), keys.size)
+        val s = b.popup(listOf("a", long), listOf(listOf(0, 1)), keys, selected = -1).ok()
+        val cut = s.keys.single { it.label == long }
+        assertEquals(long, cut.a11y)
+        val text = cut.ops(false).filterIsInstance<Op.Text>().single()
+        assertTrue(text.text.endsWith("…"), text.text)
+        assertTrue(long.startsWith(text.text.removeSuffix("…")))
+        assertTrue(text.text.length < long.length)
+        // one that fits: whole
+        assertEquals("a", s.keys.single { it.label == "a" }.ops(false).filterIsInstance<Op.Text>().single().text)
+    }
+
+    // cut between characters as seen, never inside a flag, a family, an accent or a keycap
+    @Test
+    fun aLabelIsCutBetweenCharactersAsSeen() {
+        val family = "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"
+        val flag = "\uD83C\uDDE8\uD83C\uDDF3"
+        assertEquals(listOf(family.length, 2 * family.length), clusterEnds(family + family))
+        assertEquals(listOf(4, 8), clusterEnds(flag + flag))
+        assertEquals(listOf(2, 3), clusterEnds("e\u0301x"))
+        assertEquals(listOf(3, 5), clusterEnds("1\uFE0F\u20E3\uD83D\uDC4D"))
+        assertEquals(listOf(4, 5), clusterEnds("\uD83D\uDC4D\uD83C\uDFFDa"))
+        assertEquals(listOf(2, 3), clusterEnds("\r\na"))
+        assertEquals(emptyList(), clusterEnds(""))
+        val b = builder()
+        val long = family.repeat(40)
+        val keys = b.popupKeys(listOf("a", long), 2, 2 * 1000.0).ok()
+        val text = b.popup(listOf("a", long), listOf(listOf(0, 1)), keys, selected = -1).ok()
+            .keys.single { it.label == long }.ops(false).filterIsInstance<Op.Text>().single().text
+        val kept = text.removeSuffix("…")
+        assertTrue(kept.isNotEmpty() && kept.length < long.length, text)
+        assertEquals(0, kept.length % family.length, text)
     }
 
     @Test

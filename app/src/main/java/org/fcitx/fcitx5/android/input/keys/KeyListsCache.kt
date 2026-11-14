@@ -13,7 +13,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
  * what it is made); none of any version's ([KeyLists.needsMigration]: before the first unlock after an upgrade the
  * device-protected copy is still 0.5's or a beta's, and AppPrefs.dropRetired has not run on it; or an old page
  * changed the old ones since) as the old ones migrated and upgraded in memory (§4.3), never written back; a later
- * version's (`@3`) as [KeyLists.Empty]. Not thread-safe: its readers, the keyboards, run on the main thread.
+ * version's (`@4`) as [KeyLists.Empty]. Not thread-safe: its readers, the keyboards, run on the main thread.
  */
 class KeyListsCache(private val stored: () -> Stored) {
 

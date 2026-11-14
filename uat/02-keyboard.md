@@ -558,3 +558,51 @@
 - **操作**：看弹出的数字键盘底排第二格；点它；点工具栏的表情，看面板底排第一格；点 `:-)` 进颜文字，再看底排第一格。
 - **预期**：电话框的数字键盘、表情面板、颜文字面板上回到字母键盘的键都写「返回」，不再写 ABC（和符号面板一样，0.6.1，Q2）；读屏也念「返回」。点电话框数字键盘的 **返回** 回到字母键盘。
 - **JVM**：`PanelUatTest.everyWayBackSaysBack`（数字框、电话框、123 进的数字键盘、表情、颜文字、符号面板的返回键都是 `picker_back`，没有 ABC）；keyboard-scene `NumberPadsTest.everyWayBackSays返回`、`SceneBuilderTest.keysAreReadAsTheyWere`（读屏念「返回」）；设备上看一遍。
+
+### KB-93 [P1] 长按列表里「使用变量」的一项显示并打出今天的日期
+- **前提**：B0-设置；**按键 → 按键字符和快捷键 → 全键盘**，点 q，勾输入框旁的 **使用变量**，点 **插入变量**，选 `${weekday_cn}`（框里是 `${weekday_cn}`，下面写「现在打出：」和今天星期几），点 **添加**，确定。
+- **操作**：看页面上 q 键帽上的「变量」小标记；回测试页长按 q，看弹出；选那一项。
+- **预期**：键帽下边写「变量」，读屏念「…，变量」；弹出里那一项是今天的值（如「六」），不是 `${weekday_cn}`；选了打出今天的值（061-text-variables §2.3）。值太长时弹出里先缩小字号，到最小还放不下就截断加「…」，读屏念整段；键角是前两个字加「…」。
+- **JVM**：`TextVariablesUatTest.anItemOfVariablesShowsAndTypesToday`（`$month月$day日`：键角「前两个字…」，弹出今天的值，选了打出）、`TextVariablesUatTest.aLongValueIsCutInItsCellAndSaidWhole`（长的值截断加「…」、读屏念整段）；ime-core `KeyResolverMarksTest`、keyboard-scene `PopupsTest.aLabelTooWideIsShrunkThenCutAndSaidWhole`（不在 `uat.py jvm` 的结果里）；设备上走设置页和长按。
+
+### KB-94 [P1] 上下滑的文字槽「使用变量」：滑出那一刻的时间
+- **前提**：B0-设置；**按键 → 按键字符和快捷键 → 全键盘**，点 w，**下滑** 选 **文字**，填 `${fullhour}:${minute}`，勾它下面的 **使用变量**（下面写「现在打出：」和现在的时间），确定；**上下滑** 开着。
+- **操作**：回测试页看 w 的键角；在 w 上向下滑。
+- **预期**：键角和滑动气泡是现在的时间（如 `23:16`）；滑出打出 **滑的那一刻** 的时间。不勾 **使用变量** 时原样打出 `${fullhour}:${minute}`。
+- **JVM**：`TextVariablesUatTest.aSwipesTextOfVariablesTypesTheTimeItIsSwiped`、ime-core `SwipeSlotVariablesTest`（存法 `vtext:`、勾不勾两样、键角和气泡是现在的值、填出空的槽当作点按）；设备上手工滑一次。
+
+### KB-95 [P2] 不勾「使用变量」原样打出；带变量的项不变大写、不转中文标点
+- **前提**：B0；q 的长按列表里有不勾的 `$year` 和勾了 **使用变量** 的 `x$month.$day`；拼音、中文标点开着。
+- **操作**：长按 q 选 `$year`；清空；按 Shift，长按 Q，看弹出，选 `x…` 那一项。
+- **预期**：`$year` 原样打出；Shift 下 `$year` 变成 `$YEAR`，带变量的那项还是 `x11.14` 这样（小写 x，`.` 不转成 `。`），选了原样打出。
+- **JVM**：`TextVariablesUatTest.withoutTheMarkAsWrittenWithItAsFilledIn`；ime-core `KeyResolverMarksTest.anItemOfVariablesIsFilledInTypedAsItIsAndNotInCapitals`。
+
+### KB-96 [P2] 键盘开着过了一分钟再选：打出的是新时间
+- **前提**：KB-94 的 w，或长按列表里勾了 **使用变量** 的 `${minute}`。
+- **操作**：打开键盘，等到下一分钟，不收起键盘长按选它（或滑 w）。
+- **预期**：打出的是选的那一刻的分钟；键角在下一次画键盘时更新（再长按、换一下键盘都会更新）。
+- **JVM**：ime-core `KeyResolverMarksTest.outputFillsInAgainAsPicked`（选的时候按那一刻再填一次）、`KeyResolverMarksTest.aNewMinuteIsMadeAnewTheSameOneKept`（新的一分钟重做、同一分钟不重做）；设备上等一分钟手工看。
+
+### KB-97 [P2] 长按首选设到带变量的项：上滑打出填好的值
+- **前提**：q 的长按列表里有勾了 **使用变量** 的 `$month月$day日`，设为首选；**上下滑** 开着。
+- **操作**：在 q 上向上滑。
+- **预期**：打出今天的日期（如 `11月14日`），不是 `$month月$day日`。
+- **JVM**：`TextVariablesUatTest.anItemOfVariablesFirstIsTypedBySwipingUp`。
+
+### KB-98 [P1] 「不转中文标点」的 `.`：中文标点下长按打出 `.`
+- **前提**：B0-设置；**按键 → 按键字符和快捷键 → 功能键**，点 **，键**，选列表里的 `.`，点按钮排的 **不转中文标点**（读屏念「不转中文标点，已开」），确定。
+- **操作**：回测试页（拼音、中文标点开着），长按，键，看弹出；选 `.`。
+- **预期**：页面上 `.` 的键帽下边写「原样」；弹出里那一项画 `.`（别的项照旧画 `，` `？` 这些）；选了打出 `.`，不是 `。`（061-no-cn-punct）。
+- **JVM**：`AsIsPunctuationTypedTest.aMarkedDotIsTypedAsItIsUnderChinesePunctuation`（真引擎、中文标点表：弹出画 `.`，打出 `.`）；ime-core `KeyResolverMarksTest.anItemAsIsIsTypedAsItIs`；设备上走设置页和长按。
+
+### KB-99 [P1] 打着拼音时选「不转中文标点」的 `.`：先上屏候选再打 `.`
+- **前提**：KB-98 的 `.`。
+- **操作**：打 `ni`，长按，键选 `.`；清空；把 `.` 设为首选，打 `ni`，在，键上向上滑。
+- **预期**：两次都是先上屏第一个候选，再打出 `.`（如 `你.`）。
+- **JVM**：`AsIsPunctuationTypedTest.whilePinyinIsTypedTheCandidateGoesFirst`、`AsIsPunctuationTypedTest.aMarkedFirstIsTypedBySwipingUp`；设备上打一次长按的。
+
+### KB-100 [P2] 没开的项照旧转中文标点；英文下开不开一样
+- **前提**：KB-98 的 `.`；，键列表里的 `?` 没开。
+- **操作**：拼音下长按，键选 `?`；切到英文，打 `hello`，长按，键选 `.`；把 `.` 的 **不转中文标点** 关掉再做一次。
+- **预期**：拼音下 `?` 打出 `？`；英文下开不开都一样（刚打完一个词时也一样，比如句号后照旧自动加的空格），这个开关只在中文标点会转的时候起作用（061-no-cn-punct S4）。
+- **JVM**：`AsIsPunctuationTypedTest.notMarkedItIsChinesePunctuationAsEver`、`AsIsPunctuationTypedTest.englishTypesTheSameMarkedOrNot`（英文、刚打完 `hello` 和没打字两种，开不开打出的完全一样）；ime-core `KeyResolverMarksTest.anItemAsIsIsTheKeyWhereNothingIsConverted`。

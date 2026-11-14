@@ -31,7 +31,7 @@ class SwipeMigrationTest {
 
     private fun now(r: SwipeMigration.Result, key: String, up: Boolean, symbol: Boolean): String {
         val k = KeySwipe.Key(char = true, r.slots.resolve(key, true), r.slots.resolve(key, false), hasFirst = symbol)
-        return when (val o = KeySwipe.decide(k, KeySwipe.Ways(r.up, r.down), if (up) -1 else 1, true, false, false, false)) {
+        return when (val o = KeySwipe.decide(k, KeySwipe.Ways(r.up, r.down), if (up) -1 else 1, true, false, false, false, java.util.Calendar::getInstance)) {
             KeySwipe.Outcome.Symbol -> "S"
             KeySwipe.Outcome.Tap -> "T"
             KeySwipe.Outcome.None -> "N"

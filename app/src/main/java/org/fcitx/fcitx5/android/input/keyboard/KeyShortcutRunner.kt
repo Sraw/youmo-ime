@@ -46,7 +46,8 @@ class KeyShortcutRunner(
 
     fun run(shortcut: KeyShortcut) {
         when (shortcut) {
-            is KeyShortcut.Text -> service.commitOverEngine(shortcut.text)
+            // one of variables filled in as it is run (061-text-variables §2.4); filling in nothing, nothing typed
+            is KeyShortcut.Text -> shortcut.typed(KeyClock.calendar()).takeIf { it.isNotEmpty() }?.let { service.commitOverEngine(it) }
             is KeyShortcut.Command -> run(shortcut.command)
             KeyShortcut.None -> {}
         }

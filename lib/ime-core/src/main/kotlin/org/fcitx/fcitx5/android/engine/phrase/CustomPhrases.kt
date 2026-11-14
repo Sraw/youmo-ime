@@ -19,7 +19,7 @@ import java.util.TreeSet
  * A line is `key,order=value`: the value is offered as the [order]th candidate; a negative order
  * keeps it but turned off. A value in double quotes is unescaped; an empty value takes the lines
  * after it, up to the next phrase, as its text. A value starting with `#` is filled in when
- * offered: `$year`, `${month_cn}` and the like (see [VARIABLES]). Lines starting with `;` or `#`
+ * offered: `$year`, `${month_cn}` and the like (see [TextVariables]). Lines starting with `;` or `#`
  * outside a multi-line value are comments.
  */
 class CustomPhrases private constructor(private val phrases: Map<String, List<Phrase>>) {
@@ -259,105 +259,11 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
         }
 
         private fun Char.isAsciiLetter() = this in 'a'..'z' || this in 'A'..'Z'
-        private fun Char.isNameChar() = isAsciiLetter() || this in '0'..'9' || this == '_'
 
         /**
-         * [content] with each `$name` or `${name}` filled in from [VARIABLES] at [now]; one it
-         * does not know is left out, `$$` is a `$`. libime hands `${lua:...}` to its Lua addon;
-         * there is none here, so that is left out too.
+         * [content] with each `$name` or `${name}` filled in at [now] as [TextVariables.expand] fills it in: one it
+         * does not know left out, `$$` a `$`.
          */
-        fun evaluate(content: String, now: Calendar): String {
-            val out = StringBuilder()
-            var i = 0
-            while (i < content.length) {
-                val c = content[i]
-                if (c != '$' || i + 1 >= content.length) {
-                    out.append(c)
-                    i++
-                    continue
-                }
-                val next = content[i + 1]
-                when {
-                    next == '$' -> {
-                        out.append('$')
-                        i += 2
-                    }
-                    next == '{' -> {
-                        val end = content.indexOf('}', i + 2)
-                        // not closed: kept as written
-                        if (end < 0) return out.append(content, i, content.length).toString()
-                        out.append(variable(content.substring(i + 2, end), now))
-                        i = end + 1
-                    }
-                    next.isAsciiLetter() || next == '_' -> {
-                        var end = i + 2
-                        while (end < content.length && content[end].isNameChar()) end++
-                        out.append(variable(content.substring(i + 1, end), now))
-                        i = end
-                    }
-                    else -> {
-                        out.append('$').append(next)
-                        i += 2
-                    }
-                }
-            }
-            return out.toString()
-        }
-
-        private fun variable(name: String, now: Calendar): String = VARIABLES[name]?.invoke(now).orEmpty()
-
-        private fun Calendar.year() = get(Calendar.YEAR)
-        private fun Calendar.month() = get(Calendar.MONTH) + 1
-        private fun Calendar.day() = get(Calendar.DAY_OF_MONTH)
-        private fun Calendar.weekday() = get(Calendar.DAY_OF_WEEK) - 1 // 0 for Sunday
-        private fun Calendar.hour() = get(Calendar.HOUR_OF_DAY)
-        private fun Calendar.halfHour() = (hour() % 12).let { if (it == 0) 12 else it }
-
-        private fun twoDigits(n: Int) = if (n < 10) "0$n" else n.toString()
-
-        private const val DIGITS = "〇一二三四五六七八九"
-        private const val NUMBERS = "零一二三四五六七八九"
-        private const val WEEKDAYS = "日一二三四五六"
-
-        private fun chineseYear(digits: String) = digits.map { DIGITS[it - '0'] }.joinToString("")
-
-        /** 0 to 99 as said: 十一, 二十, and 零五 with [leadingZero]. */
-        internal fun chineseNumber(n: Int, leadingZero: Boolean): String {
-            if (n == 0) return "零"
-            val tens = n / 10
-            val ones = n % 10
-            val prefix = when (tens) {
-                0 -> if (leadingZero) "零" else ""
-                1 -> "十"
-                else -> "${NUMBERS[tens]}十"
-            }
-            return prefix + (if (ones == 0) "" else NUMBERS[ones].toString())
-        }
-
-        /** What a dynamic phrase can fill in, as fcitx5-chinese-addons names them. */
-        val VARIABLES: Map<String, (Calendar) -> String> = mapOf(
-            "year" to { c -> c.year().toString() },
-            "year_yy" to { c -> twoDigits(c.year() % 100) },
-            "month" to { c -> c.month().toString() },
-            "month_mm" to { c -> twoDigits(c.month()) },
-            "day" to { c -> c.day().toString() },
-            "day_dd" to { c -> twoDigits(c.day()) },
-            "weekday" to { c -> c.weekday().toString() },
-            "fullhour" to { c -> twoDigits(c.hour()) },
-            "halfhour" to { c -> twoDigits(c.halfHour()) },
-            "ampm" to { c -> if (c.hour() < 12) "AM" else "PM" },
-            "minute" to { c -> twoDigits(c.get(Calendar.MINUTE)) },
-            "second" to { c -> twoDigits(c.get(Calendar.SECOND)) },
-            "year_cn" to { c -> chineseYear(c.year().toString()) },
-            "year_yy_cn" to { c -> chineseYear(twoDigits(c.year() % 100)) },
-            "month_cn" to { c -> chineseNumber(c.month(), leadingZero = false) },
-            "day_cn" to { c -> chineseNumber(c.day(), leadingZero = false) },
-            "weekday_cn" to { c -> WEEKDAYS[c.weekday()].toString() },
-            "fullhour_cn" to { c -> chineseNumber(c.hour(), leadingZero = false) },
-            "halfhour_cn" to { c -> chineseNumber(c.halfHour(), leadingZero = false) },
-            "ampm_cn" to { c -> if (c.hour() < 12) "上午" else "下午" },
-            "minute_cn" to { c -> chineseNumber(c.get(Calendar.MINUTE), leadingZero = true) },
-            "second_cn" to { c -> chineseNumber(c.get(Calendar.SECOND), leadingZero = true) },
-        )
+        fun evaluate(content: String, now: Calendar): String = TextVariables.expand(content, now)
     }
 }

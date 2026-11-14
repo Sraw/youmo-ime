@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.input.keys.KeyPopup
 import org.fcitx.fcitx5.android.input.keys.KeyResolver
 import org.fcitx.fcitx5.android.input.keys.KeyState
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
+import org.fcitx.fcitx5.android.scene.keys.Item
 import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 
@@ -37,6 +38,10 @@ internal class KeyResolving(private val board: Board) {
 
     // each named key's `action:` placeholders, its long press's items' and first's (a scene key's, the keyboard's table)
     private val placeholders = HashMap<String, (String) -> KeyAction?>()
+
+    // the long press last opened of each key, by its scene id: each action of an item of variables, the item and the
+    // text it is filled in from, picking it typing them filled in again ([output], 061-text-variables M4)
+    private val filledIn = HashMap<String, Map<KeyAction, Pair<Item, String>>>()
 
     // what the resolver kept was made of (data class equals: the layout by instance, SceneLayout having no equals of its
     // own; the letters' map by its equals, the same instance at once; the lists by their version), nothing hashed. This
@@ -75,6 +80,7 @@ internal class KeyResolving(private val board: Board) {
     fun unnamed(ref: String) {
         namesById.remove(ref)
         placeholders.remove(ref)
+        filledIn.remove(ref)
     }
 
     /**
@@ -107,25 +113,42 @@ internal class KeyResolving(private val board: Board) {
             return if (id.isFunction && !listed) null else BaseKeyboard.SwipeChoice.None
         }
         val action = KeyOutput.of(first)?.toKeyAction(placeholder) ?: return BaseKeyboard.SwipeChoice.None
-        return BaseKeyboard.SwipeChoice.Output(action, r.firstShown ?: first.text)
+        // one of variables typed filled in as the swipe lifts, not as it began (061-text-variables §2.3)
+        val now = r.firstTemplate?.let { t -> { KeyAction.CommitAction(resolver.output(first, t)) } }
+        return BaseKeyboard.SwipeChoice.Output(action, r.firstShown ?: first.text, now)
+    }
+
+    /**
+     * What picking [action] from the long press of the key of scene id [ref] types: an item of variables filled in at
+     * this moment (061-text-variables §2.3, M4), by the item picked, never by its text (a plain 14 beside a `$day`
+     * drawn 14 before midnight types 14); any other as it is.
+     */
+    fun output(ref: String, action: KeyAction): KeyAction {
+        val (item, template) = filledIn[ref]?.get(action) ?: return action
+        val resolver = resolver() ?: return action
+        return KeyAction.CommitAction(resolver.output(item, template))
     }
 
     /** The long press of the key of scene id [ref] as it opens: the resolver's; null for a key of no name (its own). */
     fun popup(ref: String): Popup? {
         val name = namesById[ref] ?: return null
         val resolver = resolver() ?: return null
-        return Popup(resolved(resolver.resolve(KeyId.of(name), board.state()).popup, placeholders[ref] ?: { null }))
+        return Popup(resolved(ref, resolver.resolve(KeyId.of(name), board.state()).popup, placeholders[ref] ?: { null }))
     }
 
     /** A named key's long press: [keyboard] null where it has none (turned off, or none built in). */
     class Popup(val keyboard: KeyDef.Popup.Keyboard.Resolved?)
 
     /** [popup], the resolver's, as the popup shows it: its items typed as each says; null for none (roots are a keyboard's own). */
-    private fun resolved(popup: KeyPopup?, placeholder: (String) -> KeyAction?): KeyDef.Popup.Keyboard.Resolved? {
+    private fun resolved(ref: String, popup: KeyPopup?, placeholder: (String) -> KeyAction?): KeyDef.Popup.Keyboard.Resolved? {
+        filledIn.remove(ref)
         val items = (popup as? KeyPopup.Items) ?: return null
         val kept = items.items.indices.mapNotNull { i ->
             KeyOutput.of(items.items[i])?.toKeyAction(placeholder)?.let { Triple(i, it, items.labels[i]) }
         }
+        // the list's values are each once (KeyResolver), so each action is its item's alone
+        val templates = kept.mapNotNull { (i, action, _) -> items.templates.getOrNull(i)?.let { action to (items.items[i] to it) } }
+        if (templates.isNotEmpty()) filledIn[ref] = templates.toMap()
         if (kept.isEmpty()) return null
         val at = placesOf(kept.map { it.first }, items.inRow, items.focus, items.own)
         return KeyDef.Popup.Keyboard.Resolved(kept.map { it.second }, kept.map { it.third }, at.split, at.inRow, at.focus)

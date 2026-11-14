@@ -13,6 +13,9 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### 主要变化
 
 - **键的上滑、下滑能设成笔画**：**按键字符和快捷键** 里的命令多了 **笔画：横 / 竖 / 撇 / 点 / 折**（键上画 一丨丿丶乛），打着拼音时滑这个键就发出这一笔筛候选，和在键上画一笔一样（比如九键把 1 到 5 的上滑设成五种笔画）。不用选 **在键上划 → 笔画筛选** 也能用，快打时的短划就不会被当成笔画；没打字时滑了什么也不打。退回 0.6.0 时设了笔画的槽回到预设，别的槽照旧。
+- **长按和上下滑的文字能用日期时间变量**：**按键字符和快捷键** 里添加字符时勾输入框旁的 **使用变量**，整段（如 `$month月$day日`）算一项，和自定义短语同一张变量表（`$year`、`${minute}`，`$$` 打出 `$`）；长按弹出、键角显示今天的值，选了打出选的那一刻的值。上滑、下滑的文字也能勾。编辑处有 **插入变量** 列表、「现在打出：…」预览，写错的名字标红说会被去掉；这样的项键帽下写「变量」。不勾的照原样打出。
+- **长按里的标点能不转中文标点**：长按列表里的英文标点（比如逗号键的 `.`）开 **不转中文标点**（按钮排的开关，或添加时勾输入框旁的勾选框）后，中文标点下也照原样画、原样打出 `.`，打着拼音时先上屏候选；键帽下写「原样」。只对中文标点会转的英文标点（含标点设置里自己加的）有；英文输入法不受影响。
+- 退回 0.6.0：只要有一项长按带「变量」或「原样」，0.6.0 里**所有键**的长按都按自带的，不只是带标记的那几个（它认不出整份长按设置；不坏、不覆盖，升级回来都还在）；用了变量的上下滑文字槽在 0.6.0 里回到预设，别的槽照旧，**但在 0.6.0 里改过任何一个滑槽后，升级回来那个槽也是预设**。
 - 语音打错的词改对以后问一句要不要记住：把语音写错的词（「徐静」）整个删掉、用拼音或手写重打成读音一样的字（「徐婧」），键盘上方问「让语音记住『徐婧』？」，点 **记住** 才加进用户词库（读音按你打的拼音），下次语音就写对；不点就什么都不记，6 秒或接着打字就消失。只改一个字时第一次提示怎么让语音记住。用户词库页顶新开关 **改语音的字后问是否记住**（默认开）。语音打的字只在内存里跟着看，离开输入框就丢掉；密码框、不记录的框里不跟。
 - **编码行** 多了 **输入框里（实验性）**（设置 → 外观 → 大小与样式）：拼音带着下划线直接出现在输入框里，选了字才换成字，键盘上方不再有拼音条。应用这时能看到你正在打的拼音（搜索框会按拼音搜，按发送键发出去的就是拼音）；转屏、点另一个输入框、切到别的应用时，拼音可能留在原来的框里变成普通文字，要自己删掉。密码、数字、终端一类的框，和会改写你打的字、每打一个字就重开输入的应用，拼音仍在键盘上方。选它时先弹说明，点确定才改；默认仍是浮在键盘上方。
 - **生僻字屏蔽**（**词库与短语 → 生僻字屏蔽**，默认关）：不想在候选里看到的生僻字一次挡掉，所有中文输入法的候选、联想、整句、手写、笔画查字、拆字、滑行和语音结果里都不出现，含它的词也不出。按《通用规范汉字表》分四组：三级字、繁体字、其它表外字、扩展区；一级、二级常用字永远不挡。打开后默认只挡扩展区（扩展 B 及以后），常用的字词一个不少；每组可以整组挡，也可以在网格里一个个挡、放行（按住拖动连选，能撤销），能按拼音搜、粘贴一个字定位。你的词里有挡掉的字时不给出但不删，用户词库里标着「含屏蔽的字」，点一下就能放行。跟着「备份全部」走，恢复一份没有它的备份后回到关。
@@ -32,10 +35,14 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 上滑图标位置、下滑图标位置多了「顶部」：画在键的上边中间，字母不挪；横屏、紧凑时改画在角上：先挑上边的角（右上、左上），再挑下边的；一个顶部一个底部时顶部的在右上、底部的在右下。画在上、下边中间的文字只占两个角标记中间，放不下就缩短，不会和角上的小字连在一起。
 - 联想时候选栏最右边多了 ×：点了只收起这一次的联想，「联想下一个词」设置不变。
 - 繁体输出时，手写、拆字、笔画查字的字长按也有字卡了。
+- 长按弹出的项太长、窄屏上缩到最小字号也放不下时，末尾显示「…」，不再挤出格子；读屏照样念全文。
 
 ### Main changes
 
 - **A key's swipe up or down can be a stroke**: **Key characters and shortcuts** has the commands **Stroke: horizontal / vertical / left-falling / dot / turning** (drawn 一丨丿丶乛 on the key); swiped while pinyin is typed, the key sends that stroke to filter the candidates, as one drawn on the keys does (the nine keys' 1 to 5 set to the five strokes, say). It works without **Drawing on keys → Stroke filter**, so fast short swipes are no longer taken for strokes; with nothing typed the swipe types nothing. Going back to 0.6.0, a slot set to a stroke returns to its preset and the others stay.
+- **Long press items and swipe texts can fill in the date and time**: in **Key characters and shortcuts**, tick **Use variables** by the add box and the whole text (as `$month月$day日`) is one item, with the custom phrases' variables (`$year`, `${minute}`; `$$` types `$`); the long press and the key's corner show today's value and picking it types the value of that moment. A swipe's text can be ticked too. The editor has **Insert a variable**, a 「Types now: …」 preview, and names it does not know marked as dropped; such an item's cap says var. Unticked text is typed as written.
+- **A long press's punctuation can stay English**: turn on **Keep English punctuation** for an English mark of a long press list (the comma key's `.`, say), on the button row or by the add box, and it is drawn and typed as it is under Chinese punctuation, the candidate committed first while pinyin is typed; its cap says as is. Only for marks Chinese punctuation converts (your own punctuation table's too); English is unchanged.
+- Going back to 0.6.0: once any long press item is marked (variables or as is), **every key's** long press is the built-in one there, not only the marked ones (0.6.0 cannot read the whole list; unharmed, never written over, all back on upgrading); a swipe text of variables is its default there, the other slots kept, **but once any slot is changed in 0.6.0 that slot is its default after upgrading again**.
 - **Code row** has a third place, **In the text box (experimental)** (Settings → Look → Size and style): the pinyin goes straight into the text box, underlined, and turns into characters as you pick them; no pinyin strip over the keyboard. The app sees what you type meanwhile (a search box searches for the pinyin, its send button sends it); rotating the screen, tapping another text box or switching apps may leave it in the box as plain text, to delete yourself. Password, number and terminal fields, and apps that rewrite what you type or restart input at each letter, keep it over the keyboard. Picking it shows a note first and takes effect on OK; the default is still over the keyboard.
 
 ### Main changes
@@ -58,6 +65,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 上滑图标位置 and 下滑图标位置 have 「顶部」 (top): the top edge's middle, the letter where it was; on landscape and 紧凑 keys a corner, the top's first (top right, top left); one at 顶部 and one at 底部: top right and bottom right. A text at an edge's middle keeps between the corner marks, shortened where it does not fit, never running on into a corner's symbol.
 - With 联想 (next-word predictions) shown, the candidate bar has a × at its far right: it puts away these predictions alone, the setting unchanged.
 - With traditional output, a handwritten character (or one looked up by parts or strokes) has its card again on a long press.
+- A long press item too long for a narrow screen, even at the least text size, ends in 「…」 instead of running out of its cell; TalkBack still reads it whole.
 
 ---
 

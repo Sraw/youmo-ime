@@ -228,7 +228,12 @@ action long presses (符 quick phrase, 123 Unicode, 🌐 the picker, ⇧ caps lo
 `SlotDefaults` the default slots. A theme layout's `swipe-up`/`alt` is that theme's default first (`NodeFacts.themeFirst`);
 the grouped keys read only the built-in symbols, never the full keyboard's user lists. The user's layer is ime-core
 `input/keys/`: `KeyLists` parses and writes `key_lists` (`@2` then `keyid\toff` or `keyid\tset\t<*|!|:item>\t…`, at most
-16 items of 16 code points (every built-in default fits, the longest 13; the popup ≤ 4 rows; the editor adds no 17th and says so), `KeyShortcuts.escape`d, bad lines skipped, a line equal to the editor's default dropped:
+16 items of 16 code points (every built-in default fits, the longest 13; the popup ≤ 4 rows; the editor adds no 17th and says so), `KeyShortcuts.escape`d, bad lines skipped, a line equal to the editor's default dropped; a list with any item marked is
+written `@3` (061-text-variables §4.1), every item its marks' letters, `|` and the item (`v|$year年`, `|,`): `v`
+(`ItemMark.Variables`, 使用变量: a text of `TextVariables`, at most 64 code points, filled in as the key resolves and
+again as it is picked, `KeyResolver.output`), `r` (`ItemMark.AsIs`, 不转中文标点: committed as it is where the engine's
+punctuation converts its text, typed as the key elsewhere: English, punctuation off); 0.6.0 reads `@3` as a newer
+version's, its defaults, and never writes over it. Unmarked lists stay `@2`:
 its items and its first as resolved, `UserList.firstOf`, the one rule of a first: `*` the list's first item, `!` none,
 `:x` that item); it holds a key's whole list, its row's letters and digit as any item (060-row-unlock), one list by
 the key's name shared by every input method, so a key edited shows the same on pinyin, 双拼 and English; a key never

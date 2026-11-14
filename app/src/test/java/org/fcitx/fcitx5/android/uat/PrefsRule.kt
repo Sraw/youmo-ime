@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keys.First
+import org.fcitx.fcitx5.android.input.keys.ItemMark
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -55,11 +56,12 @@ class PrefsRule : ExternalResource() {
     /**
      * A key's long press set as 按键字符和快捷键 sets it (`key_lists`, 060-keys-unify): by its name (`full/q`, `t9/2`,
      * `fn/comma`; KeyId.of), its whole list [items] (a row's letters and digit too, 060-row-unlock), its [first] (the swipe's, the corner's) the default's
-     * unless given, or [off]; the other keys as they are. The store is put back after the test, key_lists with it.
+     * unless given, or [off], its items' [marks] (061-text-variables §3); the other keys as they are. The store is put
+     * back after the test, key_lists with it.
      */
-    fun setList(name: String, items: List<String> = emptyList(), first: String? = null, off: Boolean = false) {
+    fun setList(name: String, items: List<String> = emptyList(), first: String? = null, off: Boolean = false, marks: Map<String, ItemMark> = emptyMap()) {
         val pref = AppPrefs.getInstance().internal.keyLists
-        val list = if (off) UserList.Off else UserList(off = false, items = items, first = first?.let(First::Literal) ?: First.Default)
+        val list = if (off) UserList.Off else UserList(off = false, items = items, first = first?.let(First::Literal) ?: First.Default, marks = marks)
         // as stored, none left out as a default: a list turned off is kept where no default is told here
         set(pref, KeyLists.of((KeyLists.parse(pref.getValue())?.lists.orEmpty()) + (KeyId.of(name) to list)).serialize())
     }

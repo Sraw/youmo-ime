@@ -84,23 +84,6 @@ class CustomPhrasesTest {
         assertEquals(listOf(0 to "\$5 \$9 ! \${open"), phrases.lookup("d", now))
     }
 
-    @Test
-    fun everyVariableIsFilledIn() {
-        val morning = GregorianCalendar(2009, Calendar.JANUARY, 4, 0, 5, 0)
-        val expected = mapOf(
-            "year" to "2009", "year_yy" to "09", "month" to "1", "month_mm" to "01", "day" to "4", "day_dd" to "04",
-            "weekday" to "0", "fullhour" to "00", "halfhour" to "12", "ampm" to "AM", "minute" to "05", "second" to "00",
-            "year_cn" to "二〇〇九", "year_yy_cn" to "〇九", "month_cn" to "一", "day_cn" to "四", "weekday_cn" to "日",
-            "fullhour_cn" to "零", "halfhour_cn" to "十二", "ampm_cn" to "上午", "minute_cn" to "零五", "second_cn" to "零",
-        )
-        assertEquals(expected.keys, CustomPhrases.VARIABLES.keys)
-        for ((name, value) in expected) assertEquals(name, value, CustomPhrases.evaluate("\${$name}", morning))
-        assertEquals("二十", CustomPhrases.chineseNumber(20, leadingZero = false))
-        assertEquals("三十一", CustomPhrases.chineseNumber(31, leadingZero = true))
-        assertEquals("", CustomPhrases.evaluate("", morning))
-        assertEquals("a\$", CustomPhrases.evaluate("a\$", morning))
-    }
-
     // a candidate ending in … reads only part of the input; one made for a phrase, of its text, shown +
     private fun CustomPhrases.place(key: String, candidates: List<String>) =
         place(key, { now }, candidates, { it.removeSuffix("…").removePrefix("+") }, { !it.endsWith("…") }, { "+$it" })

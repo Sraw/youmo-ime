@@ -375,6 +375,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         (keyboards[T9Keyboard.EnglishName] as? T9Keyboard)?.noSuggestions = noSuggestions
         // the layout may stay as it is, so the one shown is told now
         currentKeyboard?.inPasswordField = service.inPasswordField
+        // shown again maybe a day later: its corners of variables of the minute now (061-text-variables §2.3)
+        currentKeyboard?.catchUpMinute()
         val traits = info.toEditorTraits()
         address = AddressKeys.of(traits)
         multiLine = traits.showsLines

@@ -518,7 +518,10 @@ handwriting, the number pad, the symbol picker, emoji, kaomoji, emoji search and
   ones key by key while both existed; it went with the old code in S6.
 - The format and the migration: `KeyListsFormatTest` (every rule of the grammar), `KeyIdRoundTripTest` (every name the
   built-in layouts and the k17-motion example give, and odd orphan names, through `serialize → parse`), `KeyListsWithTest`
-  (when a line is dropped), `KeyListsMigrationTest` (0.5.2, beta1, beta2 prefs in
+  (when a line is dropped; the `@3` marks), `DowngradeTo060Test` (0.6.0's own reading of `key_lists` and `key_swipes`,
+  frozen: a marked list its defaults never written over, a `vtext:` slot its default, the rest kept), `KeyResolverMarksTest`
+  (an item of variables filled in and filled in again as picked, an item as it is only where punctuation converts it),
+  `KeyListsMigrationTest` (0.5.2, beta1, beta2 prefs in
   `lib/ime-core/src/test/resources/keys-migration/` to `@1`, twice the same; `upgrade`'s `@1` → `@2` cases), app `KeyListsUpgradeTest` (0.5.2, beta2 and
   beta3 `@1` backups built in memory, `v052()`, `beta2()`, imported through `UserDataManager.import`, restarted, reset, and
   before the first unlock; `uat/fixtures/upgrade/` holds only v0.3.x and v0.4.0 backups).

@@ -820,7 +820,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
      * 0.5's and 0.6's betas' long presses ([POPUP_OVERRIDES], [KEY_POPUPS], [T9_SYMBOLS]) as [Internal.keyLists]
      * (KeyListsMigration, 060-keys-unify §4.3), and beta3's `@1` upgraded to `@2` (060-row-unlock §5, its rows by the
      * user's 按键字母): run while it is neither (never stored, a 0.5, beta or `@1` backup restored), once; the old ones
-     * migrated to `@1` first. A later version's (`@3`) left as it is. The old ones kept as they are, for a downgrade (§4.4).
+     * migrated to `@1` first. A later version's (`@4`) left as it is. The old ones kept as they are, for a downgrade (§4.4).
      */
     private fun migrateKeyLists() {
         val sp = sharedPreferences

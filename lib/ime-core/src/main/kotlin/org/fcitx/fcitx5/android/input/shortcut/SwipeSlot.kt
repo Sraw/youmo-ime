@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.shortcut
 
+import org.fcitx.fcitx5.android.engine.phrase.TextVariables
 import java.text.BreakIterator
 
 /**
@@ -15,10 +16,15 @@ sealed interface SwipeSlot {
     /** 长按首选: the first of the key's long press, as the user set it or built in (its corner); nothing where that is off. */
     data object First : SwipeSlot
 
-    /** A text committed as it is (a shortcut's [KeyShortcut.Text]). */
-    data class Text(val text: String) : SwipeSlot {
+    /** A text committed as it is (a shortcut's [KeyShortcut.Text]), its variables filled in where it has [variables]. */
+    data class Text(val text: String, val variables: Boolean = false) : SwipeSlot {
         init {
             require(text.isNotEmpty())
+        }
+
+        companion object {
+            /** [text] as the settings store it with 使用变量 [ticked]: of variables only where they type it differently. */
+            fun of(text: String, ticked: Boolean) = Text(text, ticked && TextVariables.fillsIn(text))
         }
     }
 
@@ -31,14 +37,14 @@ sealed interface SwipeSlot {
     /** What the slot runs as a shortcut; [KeyShortcut.None] for [First] and [Empty], which run none. */
     val shortcut: KeyShortcut
         get() = when (this) {
-            is Text -> KeyShortcut.Text(text)
+            is Text -> KeyShortcut.Text(text, variables)
             is Command -> KeyShortcut.Command(command)
             First, Empty -> KeyShortcut.None
         }
 
     companion object {
         fun of(shortcut: KeyShortcut): SwipeSlot = when (shortcut) {
-            is KeyShortcut.Text -> Text(shortcut.text)
+            is KeyShortcut.Text -> Text(shortcut.text, shortcut.variables)
             is KeyShortcut.Command -> Command(shortcut.command)
             KeyShortcut.None -> Empty
         }
@@ -80,7 +86,8 @@ object SwipeSlotPreset {
  *
  * Stored as text: a first line `@1`, a tab and the orientation's key (the format's version 1); then a
  * line per slot: the key's name, `.up` or `.down`, a tab, then the value: `first`, `none`, `text:` and
- * the text (escaped as [KeyShortcuts] escapes it), or a command's key. A slot with no line has its
+ * the text (escaped as [KeyShortcuts] escapes it), `vtext:` and one of variables (061-text-variables §4.2: 0.6.0
+ * skips the line, the slot its preset there), or a command's key. A slot with no line has its
  * preset; one set to its preset is stored as none ([with]). A line that does not parse is skipped
  * (a command no version has any more: the slot back to its preset), never a crash.
  */
@@ -97,6 +104,9 @@ class SwipeSlots private constructor(
 
     /** Whether the user set either of [key]'s slots: outlined on the settings page. */
     fun isSet(key: String): Boolean = wayName(key, true) in table || wayName(key, false) in table
+
+    /** Whether a slot set holds a text of variables: its marks then drawn anew each minute (KeyState.minute). */
+    val fillsIn: Boolean get() = table.values.any { it is SwipeSlot.Text && it.variables }
 
     /** The keys the user set a slot of. */
     val keys: Set<String> get() = table.keys.mapTo(LinkedHashSet()) { it.substringBeforeLast('.') }
@@ -169,6 +179,7 @@ class SwipeSlots private constructor(
         private const val FIRST = "first"
         private const val NONE = "none"
         private const val TEXT = "text:"
+        private const val VARIABLES_TEXT = "vtext:"
         /** A function key's way's suffix (`fn/space.up`): KeyShortcutPreset reads the same names. */
         internal const val UP = ".up"
         internal const val DOWN = ".down"
@@ -190,17 +201,20 @@ class SwipeSlots private constructor(
         private fun valueOf(slot: SwipeSlot): String = when (slot) {
             SwipeSlot.First -> FIRST
             SwipeSlot.Empty -> NONE
-            is SwipeSlot.Text -> TEXT + KeyShortcuts.escape(slot.text)
+            is SwipeSlot.Text -> (if (slot.variables) VARIABLES_TEXT else TEXT) + KeyShortcuts.escape(slot.text)
             is SwipeSlot.Command -> slot.command.key
         }
 
         private fun parseValue(value: String): SwipeSlot? = when {
             value == FIRST -> SwipeSlot.First
             value == NONE -> SwipeSlot.Empty
-            value.startsWith(TEXT) -> KeyShortcut.clip(KeyShortcuts.unescape(value.removePrefix(TEXT)), KeyShortcut.MAX_TEXT)
-                .takeIf { it.isNotEmpty() }?.let(SwipeSlot::Text)
+            value.startsWith(TEXT) -> text(value.removePrefix(TEXT), variables = false)
+            value.startsWith(VARIABLES_TEXT) -> text(value.removePrefix(VARIABLES_TEXT), variables = true)
             else -> KeyCommand.ofKey(value)?.let(SwipeSlot::Command)
         }
+
+        private fun text(stored: String, variables: Boolean): SwipeSlot? =
+            KeyShortcut.clip(KeyShortcuts.unescape(stored), KeyShortcut.MAX_TEXT).takeIf { it.isNotEmpty() }?.let { SwipeSlot.Text(it, variables) }
 
         /**
          * Never throws: the header missing or its orientation unknown is [SwipeOrientation.FirstUp]; a bad line

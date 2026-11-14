@@ -604,13 +604,15 @@ class KeyboardHarness(
     fun longPress(v: View, pick: String? = null): List<String> = longPress(box(v), pick)
 
     /** [longPress] on [k]. */
-    fun longPress(k: ShownKey, pick: String? = null): List<String> = longPress(k.bounds, pick)
+    fun longPress(k: ShownKey, pick: String? = null, meanwhile: () -> Unit = {}): List<String> = longPress(k.bounds, pick, meanwhile)
 
-    private fun longPress(b: Rect, pick: String?): List<String> {
+    // [meanwhile] run once the popup is up, before the finger moves
+    private fun longPress(b: Rect, pick: String?, meanwhile: () -> Unit = {}): List<String> {
         var x = b.exactCenterX()
         var y = b.exactCenterY()
         finger(MotionEvent.ACTION_DOWN, x, y)
         after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        meanwhile()
         val popup = popupChoices()
         val labels = popup.map { it.text }
         if (pick != null) {

@@ -204,7 +204,9 @@ class PopupOverridesFragmentTest {
                 // the one note left is 下滑's icon's: no room for it upright at 底部 on this low keyboard, as set turned;
                 // 上滑, left as the keyboard has it, none (any other note of either rung would be caught here too)
                 val iconNote = st.s(R.string.swipe_fate_both, st.s(R.string.swipe_fate_part_dropped), st.s(R.string.swipe_fate_part_as_set))
-                assertEquals(listOf(iconNote), shown().filter { it == iconNote || it.startsWith(st.s(R.string.swipe_fate_dropped).take(3)) || it.startsWith(st.s(R.string.swipe_fate_both, "", "").take(5)) })
+                val notes = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<TextView>()
+                    .filter { it.id == R.id.swipe_slot_note && it.visibility == View.VISIBLE }.map { it.text.toString() }.toList()
+                assertEquals(listOf(iconNote), notes)
                 // a note given is shown, none hidden
                 val section = SwipeSlotSection(st.activity, "", off = false, initial = SwipeSlot.Text("x"))
                 section.note("n")
@@ -754,7 +756,7 @@ class PopupOverridesFragmentTest {
         // review 8: a later version's key_lists is read-only here: said so, never written over
         @Test
         fun aNewerVersionsListsAreNeverWritten() {
-            val newer = "@3\nfull/q\tsomething"
+            val newer = "@4\nfull/q\tsomething"
             prefs.set(AppPrefs.getInstance().internal.keyLists, newer)
             open()
             prefs.set(AppPrefs.getInstance().internal.keyLists, newer)

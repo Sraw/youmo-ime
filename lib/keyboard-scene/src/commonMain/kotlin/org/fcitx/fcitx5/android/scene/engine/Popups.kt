@@ -215,8 +215,8 @@ internal class PopupBuilder(
      * A long press's [labels] [columns] across: each key as wide as the widest label and its padding
      * and no narrower than [minWidth], one text size for all ([Popups.KEY_TEXT_DP]); where so wide they
      * would not fit across [room] (null: no room known yet, the popups' place not laid out), narrower,
-     * all their labels smaller alike. Each label fitted by itself came out at as many sizes (`.com`
-     * smaller than `.cn`).
+     * all their labels smaller alike, never below [Popups.MIN_WORDS_DP] ([popup] cuts what is wider still).
+     * Each label fitted by itself came out at as many sizes (`.com` smaller than `.cn`).
      */
     fun popupKeys(labels: List<String>, columns: Int, room: Double?, minWidth: Double, height: Double): PopupKeys {
         val textLook = look("popup").second
@@ -226,13 +226,14 @@ internal class PopupBuilder(
         val wanted = maxOf(minWidth, fitting)
         val width = if (room == null || columns <= 0) wanted else min(wanted, floor(room / columns))
         // its padding too, so never below nothing however narrow
-        return PopupKeys(width, height, if (fitting > width) size * width / fitting else size)
+        return PopupKeys(width, height, if (fitting > width) maxOf(size * width / fitting, px(Popups.MIN_WORDS_DP)) else size)
     }
 
     /**
      * [labels] as [keys] in [rows], the bottom one first, each the index of a label in its column
      * (-1: an empty slot, its column kept so each key is drawn where the finger picks it); the label
-     * [selected] in focus.
+     * [selected] in focus. A label wider than its key at [keys]' size (a value filled in, 64 characters at
+     * most: 061-text-variables §2.3) drawn cut, ending in 「…」; said whole.
      */
     fun popup(labels: List<String>, rows: List<List<Int>>, keys: PopupKeys, selected: Int): Scene {
         val columns = rows.maxOfOrNull { it.size } ?: 0
@@ -247,7 +248,7 @@ internal class PopupBuilder(
                 val states = if (index == selected) setOf(KeyState.Selected) else emptySet()
                 val (cellLook, textLook) = cellLook(states)
                 val face = face(cell, cellLook)
-                val m = Content.measure(measurer, label, textLook, textLook.weight, keys.size)
+                val m = Content.measure(measurer, cut(label, keys.width - 2 * padding()) { Content.measure(measurer, it, textLook, textLook.weight, keys.size).m.advance }, textLook, textLook.weight, keys.size)
                 // the one in focus its face (`popup:selected`'s fill, radius, inner shadow, border), no shadow
                 val selected = if (KeyState.Selected in states) {
                     val g = geometry(face, cellLook, cell)
@@ -260,6 +261,17 @@ internal class PopupBuilder(
             }
         }
         return Scene(panel.width, panel.height, base, nodes, emptyList())
+    }
+
+    // [label] as it fits [room] measured by [width]: whole, or its most characters as seen (clusterEnds) that do with
+    // 「…」 after them
+    private fun cut(label: String, room: Double, width: (String) -> Double): String {
+        if (room <= 0 || width(label) <= room) return label
+        for (end in clusterEnds(label).asReversed().drop(1)) {
+            val shown = label.substring(0, end) + ELLIPSIS
+            if (width(shown) <= room) return shown
+        }
+        return ELLIPSIS
     }
 
     // a long press's key: `popup`'s fill and radius as they cascade, but its border, inner shadow and shape only a
@@ -378,9 +390,46 @@ internal class PopupBuilder(
         // a tail a third of its head's width at most
         const val TAIL_SHARE = 3.0
 
+        const val ELLIPSIS = "…"
+
         // what a long press's key takes only from a `:selected` style
         val CELL_OWN = setOf("border", "inner-shadow", "shape")
         const val RGB = 0x00FFFFFF
         const val ALPHA_SHIFT = 24
     }
 }
+
+/**
+ * Where each of [s]'s characters as seen ends, ascending, the last [s]'s length: grapheme clusters as Android's
+ * BreakIterator draws them, for what a long press's item holds (no java.text here, on JS): a combining or enclosing
+ * mark, a variation selector, a skin tone, a tag, a ZWJ and what it joins, and a CR's LF go with the one before; a
+ * flag's regional indicators two by two.
+ */
+internal fun clusterEnds(s: String): List<Int> {
+    val ends = ArrayList<Int>()
+    var i = 0
+    var prev = -1
+    var indicators = 0
+    while (i < s.length) {
+        val c = s[i]
+        val wide = c.isHighSurrogate() && i + 1 < s.length && s[i + 1].isLowSurrogate()
+        val cp = if (wide) 0x10000 + ((c.code - 0xD800) shl 10) + (s[i + 1].code - 0xDC00) else c.code
+        val indicator = cp in 0x1F1E6..0x1F1FF
+        val joins = ends.isNotEmpty() && (joinsBefore(prev, cp) || indicator && indicators % 2 == 1 || !wide && isMark(c))
+        indicators = if (indicator) indicators + 1 else 0
+        i += if (wide) 2 else 1
+        if (joins) ends[ends.lastIndex] = i else ends += i
+        prev = cp
+    }
+    return ends
+}
+
+// [cp] after [prev] in one character as seen, whatever came before them
+private fun joinsBefore(prev: Int, cp: Int): Boolean =
+    prev == ZWJ || cp == ZWJ || cp in 0xFE00..0xFE0F || cp in 0xE0100..0xE01EF || cp in 0x1F3FB..0x1F3FF ||
+        cp in 0xE0020..0xE007F || prev == '\r'.code && cp == '\n'.code
+
+private fun isMark(c: Char): Boolean =
+    c.category.let { it == CharCategory.NON_SPACING_MARK || it == CharCategory.ENCLOSING_MARK || it == CharCategory.COMBINING_SPACING_MARK }
+
+private const val ZWJ = 0x200D
