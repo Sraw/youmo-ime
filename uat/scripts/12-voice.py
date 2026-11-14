@@ -666,7 +666,7 @@ def vo28(d):
     return "发出「我们走吧」一次，聊天框已清空"
 
 
-case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing")(lambda d: None)
+case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing、PacksUatTest.aVoicePackOlderThanTheAppTakesAsksForTheNewOneAndVoiceStaysOff")(lambda d: None)
 case("VO-35", needs="jvm:VoiceEndTest.aChatLosesItsClosingMarkAQuestionKeepsItsOwn、VoiceEndTest.aLineLosesEveryEndMark、VoiceEndTest.elsewhereTheTextEndsAsSaidUnlessDropped、VoiceEndTest.aSearchAnAddressOrOneLineIsALine、VoicePolishTest.appliesAsPython")(lambda d: None)
 case("VO-36", needs="jvm:VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn、VoicePolishTest.nothingIsWrittenAfterAFullStop")(lambda d: None)
 case("VO-39", needs="jvm:VoiceFailureUatTest.eachFailureSaysItsOwnMessageAndWhatWasHeardIsTyped、"

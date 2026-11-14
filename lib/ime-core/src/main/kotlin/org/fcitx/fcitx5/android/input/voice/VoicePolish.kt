@@ -90,9 +90,11 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
      *
      * Two more that hold whatever the model (060-pending-decisions L574, the owner's, 2026-11-10; N-kd3b broke
      * both, and which edge sentences a retrain gets right varies run to run): a Chinese number's character
-     * ([NUMBER_CHARS]) is never deleted (「一点一点」 lost an 一), and [num] (if given) marks nothing inside an
-     * idiom of [IDIOMS] (「十全十美」 written 10全十美). A number character's replacement still applies: the rule
-     * is no deletion, and an op writing another word for it (二 as 两, a misheard 十 as 是) is the polish's.
+     * ([NUMBER_CHARS]) is never deleted (「一点一点」 lost an 一), nor an ASCII digit (a hotword's or English
+     * output's, 「iPhone15」: 0.6.1's tagger has no digit in its vocabulary, so it reads each as <unk>), and [num] (if
+     * given) marks nothing inside an idiom of [IDIOMS] (「十全十美」 written 10全十美). A number character's
+     * replacement still applies: the rule is no deletion, and an op writing another word for it (二 as 两, a
+     * misheard 十 as 是, 2个 as 两个) is the polish's.
      *
      * [op], [after] and [num] are changed in place. [lead] is the text just before [text] (a stream window's
      * start cuts an idiom): an idiom found across it unmarks its characters in [text] only.
@@ -101,7 +103,7 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
         for (i in text.indices) {
             if (text[i] < 0x80 && Character.isLetter(text[i])) op[i] = KEEP
             if (text[i] in STOPS) after[i] = 0
-            if (op[i] == DEL && text[i] in NUMBER_CHARS) op[i] = KEEP
+            if (op[i] == DEL && (text[i] in NUMBER_CHARS || text[i] in '0'.code..'9'.code)) op[i] = KEEP
         }
         if (num == null) return
         for (span in idioms(lead + text)) for (i in span) if (i >= lead.size) num[i - lead.size] = 0

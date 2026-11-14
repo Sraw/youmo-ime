@@ -1183,6 +1183,7 @@
     <string name="voice_no_microphone">無法使用麥克風</string>
     <string name="voice_recognition_failed">語音辨識出錯</string>
     <string name="voice_model_credit">語音辨識：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）與 silero VAD 執行</string>
+    <string name="voice_tagger_credit">語音整理（口頭禪、標點、數字）：本專案的模型，由 Chinese ELECTRA（哈工大訊飛聯合實驗室）以 AliMeeting 和 FineWeb-2 訓練</string>
     <string name="voice_hold_listening">正在聽…</string>
     <string name="voice_hold_preparing">準備中…</string>
     <string name="voice_hold_silent">麥克風沒有聲音</string>

@@ -294,9 +294,7 @@ class AssetPacksPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         val root = target.rootProject.layout.projectDirectory
         val keysDir = target.layout.projectDirectory.dir("pack-keys")
-        val props = Properties().apply { target.file("packs.properties").inputStream().use(::load) }
-        fun prop(name: String) = props.getProperty(name)?.trim()?.toIntOrNull()
-            ?: throw GradleException("app/packs.properties: no whole number $name")
+        fun prop(name: String) = packsProperty(target, name)
 
         val local = target.providers.fileContents(root.file("local.properties")).asText.map { text ->
             Properties().apply { load(text.reader()) }.getProperty(PROPERTY_KEY).orEmpty()

@@ -258,6 +258,25 @@ class VoicePolishTest {
     }
 
     @Test
+    fun aHotwordsDigitsAreNeverDeleted() {
+        // 0.6.1's tagger has no ASCII digit in its vocabulary (0.6.0's had 1–8): each reads as <unk>, and what it
+        // labels one is no reading of it; a hotword or English the recognizer writes with digits keeps them all
+        fun deletesDigits() = VoicePolishStream(tags, { t ->
+            VoicePolishStream.Labels(IntArray(t.size) { if (t[it] in '0'.code..'9'.code || t[it] == '嗯'.code) VoicePolishTags.DEL else 0 }, IntArray(t.size))
+        })
+        assertRows(
+            "a hotword's digits after its letters (the letters were already kept)" to { assertEquals("我想买一个iPhone15", deletesDigits().finish("嗯我想买一个iPhone15")) },
+            "digits between Chinese characters, every one of them" to { assertEquals("我住在3号楼2单元", deletesDigits().finish("我住在3号楼2单元")) },
+            "a run of digits and letters, the filler before it still dropped" to { assertEquals("在B站2233看到的", deletesDigits().finish("嗯在B站2233看到的")) },
+        )
+        // a digit's replacement still applies: only deleting it is undone (as a Chinese number's character)
+        val two = VoicePolishTags.norm("2个")
+        val twoOp = intArrayOf(tags.ops.indexOf("两"), 0)
+        tags.guarded(two, twoOp, IntArray(two.size))
+        assertEquals("两个", tags.apply(two, twoOp, IntArray(two.size)))
+    }
+
+    @Test
     fun anIdiomCutByAStreamWindowsStartIsStillNoNumber() {
         // a dictation longer than a window: the second step's window starts at 32, inside 十全十美 at 30..33,
         // and its tail tagged without its head was written 十全10美

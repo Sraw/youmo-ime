@@ -8,7 +8,9 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.gradle.api.GradleException
 import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.nio.file.Files
 
 class VoiceDataPluginTest {
@@ -25,39 +27,133 @@ class VoiceDataPluginTest {
         return byteArrayOf(0x0a, message.size.toByte()) + message
     }
 
+    private val localFiles = VoiceDataPlugin.MODEL_FILES + VoiceDataPlugin.ORT_FILES + VoiceDataPlugin.TAGGER_FILES
+
+    /** a local directory of every file the pack takes, each its name as its content (bpe.model a real SentencePiece model) */
+    private fun localDir(name: String = "local"): File {
+        val local = folder.newFolder(name)
+        for (file in localFiles) local.resolve(file).writeText(file)
+        local.resolve("bpe.model").writeBytes(sentencePieceModel("▁中", -1.5f))
+        return local
+    }
+
+    /** [local]'s files listed as `shasum -a 256` writes them, a comment first */
+    private fun listingOf(local: File, name: String = "voice-pack-v9.sha256"): File =
+        folder.root.resolve(name).apply {
+            writeText("# the pack's model files\n" + (localFiles + "bpe.model").joinToString("") { "${sha256Of(local.resolve(it))}  $it\n" })
+        }
+
+    private fun task(local: File?, listing: File, notices: File = noticeDir()): VoiceDataPlugin.CopyVoiceModels {
+        val project = ProjectBuilder.builder().withProjectDir(folder.newFolder()).build()
+        val task = project.tasks.register("copyVoiceModels", VoiceDataPlugin.CopyVoiceModels::class.java).get()
+        if (local != null) task.local.set(local)
+        task.expected.set(listing)
+        task.notices.set(notices)
+        task.hotwords.set(folder.newFile().apply { writeText("新 词\n") })
+        task.vad.set(folder.newFile().apply { writeText("vad") })
+        task.outputDir.set(folder.root.resolve("voice-assets"))
+        return task
+    }
+
+    /** the notices as app/voice-pack has them, and what else a directory gathers (Finder's, an editor's) */
+    private fun noticeDir(): File = folder.newFolder().apply {
+        resolve("README.txt").writeText("readme")
+        resolve("LICENSE-CC-BY-SA-4.0.txt").writeText("licence")
+        resolve(".DS_Store").writeText("finder")
+        resolve("README.txt~").writeText("backup")
+    }
+
     // the pinned release is the offline model, which the streaming recognizer cannot load
     // (sherpa-onnx ends the process), so the downloads alone build no APK until the streaming one is
     // released; the linking is held by the local directory's test below
     @Test
     fun withoutTheLocalDirectoryTheBuildSaysWhereTheModelsComeFrom() {
-        val project = ProjectBuilder.builder().withProjectDir(folder.newFolder("app")).build()
-        val task = project.tasks.register("copyVoiceModels", VoiceDataPlugin.CopyVoiceModels::class.java).get()
-        task.hotwords.set(folder.newFile("hotwords.txt").apply { writeText("新 词\n") })
-        task.vad.set(folder.newFile("silero_vad.onnx").apply { writeText("vad") })
-        task.outputDir.set(folder.root.resolve("voice-assets"))
+        val task = task(null, folder.newFile("voice-pack-v9.sha256"))
         val e = assertThrows(IllegalStateException::class.java) { task.copy() }
         assertTrue(e.message, e.message!!.contains(VoiceDataPlugin.LOCAL_PROPERTY))
     }
 
     @Test
     fun aLocalDirectoryStandsInForTheDownloadsWithThePolishTagger() {
-        val local = folder.newFolder("local")
-        for (name in VoiceDataPlugin.MODEL_FILES + VoiceDataPlugin.ORT_FILES + VoiceDataPlugin.TAGGER_FILES) local.resolve(name).writeText(name)
-        local.resolve("bpe.model").writeBytes(sentencePieceModel("▁中", -1.5f))
-        val project = ProjectBuilder.builder().withProjectDir(folder.newFolder("app")).build()
-        val task = project.tasks.register("copyVoiceModels", VoiceDataPlugin.CopyVoiceModels::class.java).get()
-        task.local.set(local)
-        task.hotwords.set(folder.newFile("hotwords.txt").apply { writeText("新 词\n") })
-        task.vad.set(folder.newFile("silero_vad.onnx").apply { writeText("vad") })
-        task.outputDir.set(folder.root.resolve("voice-assets"))
-        task.copy()
+        val local = localDir()
+        task(local, listingOf(local)).copy()
 
         val out = folder.root.resolve("voice-assets/voice")
-        for (name in VoiceDataPlugin.MODEL_FILES + VoiceDataPlugin.ORT_FILES + VoiceDataPlugin.TAGGER_FILES) {
+        for (name in localFiles) {
             assertTrue(name, Files.isSameFile(local.resolve(name).toPath(), out.resolve(name).toPath()))
         }
         assertEquals("▁中\t-1.5\n", out.resolve("bpe.vocab").readText())
         assertEquals("vad", out.resolve("silero_vad.onnx").readText())
+        // the polish tagger is CC BY-SA 4.0: the pack carries its notice and licence
+        assertEquals("readme", out.resolve("README.txt").readText())
+        assertEquals("licence", out.resolve("LICENSE-CC-BY-SA-4.0.txt").readText())
+        // and nothing else of the notices' directory: what goes in changes the signed pack's sum
+        assertTrue(!out.resolve(".DS_Store").exists() && !out.resolve("README.txt~").exists())
+    }
+
+    // the pack carries the tagger's notice and licence (CC BY-SA 4.0): without either, no pack
+    @Test
+    fun aNoticeMissingBuildsNoPack() {
+        for (name in VoiceDataPlugin.NOTICE_FILES) {
+            val local = localDir("local-$name")
+            val notices = noticeDir().apply { resolve(name).delete() }
+            val e = assertThrows(name, GradleException::class.java) { task(local, listingOf(local, "v-$name.sha256"), notices).copy() }
+            assertTrue(e.message, e.message!!.contains(name))
+        }
+    }
+
+    // shasum writes lower case, a listing written by hand may be upper: the same sums
+    @Test
+    fun aListingInUpperCaseIsTheSameSums() {
+        val local = localDir()
+        val listing = listingOf(local).apply {
+            writeText(readLines().joinToString("\n") { if (it.startsWith("#")) it else it.substringBefore("  ").uppercase() + "  " + it.substringAfter("  ") })
+        }
+        task(local, listing).copy()
+        assertTrue(folder.root.resolve("voice-assets/voice/polish-tagger.ort").isFile)
+    }
+
+    // youmo.voiceModelDir is a machine's own: pointed at another version's models (0.6.0's tagger
+    // after voice.version went to 3), the build fails rather than pack them under this version
+    @Test
+    fun aDirectoryNotTheListedVersionsBuildsNoPack() {
+        val rows = listOf<Pair<String, (File, File) -> Unit>>(
+            "another tagger (the 0.6.0 one under v3)" to { local, _ -> local.resolve("polish-tagger.ort").writeText("old") },
+            "a recognizer file changed" to { local, _ -> local.resolve("encoder.ort").writeText("other") },
+            "the bpe model the vocabulary is read from changed" to { local, _ -> local.resolve("bpe.model").writeText("other") },
+            "a file missing from the directory" to { local, _ -> local.resolve("polish-tagger.json").delete() },
+            "a file the pack takes missing from the listing" to { _, listing ->
+                listing.writeText(listing.readLines().filterNot { it.endsWith("tokens.txt") }.joinToString("\n"))
+            },
+            "a line of the listing without its file name" to { _, listing -> listing.appendText("0123abcd\n") },
+        )
+        val failed = rows.mapIndexedNotNull { i, (why, change) ->
+            val local = localDir("local$i")
+            val listing = listingOf(local, "voice-pack-v$i.sha256")
+            change(local, listing)
+            val e = runCatching { task(local, listing).copy() }.exceptionOrNull()
+            when {
+                e !is GradleException -> "$why: built ($e)"
+                VoiceDataPlugin.LOCAL_PROPERTY !in e.message!! && "does not list" !in e.message!! && "is not `<sha256>" !in e.message!! -> "$why: ${e.message}"
+                else -> null
+            }
+        }
+        assertTrue(failed.joinToString("\n"), failed.isEmpty())
+    }
+
+    // gradle/voice-pack-v<voice.version>.sha256 is what the build holds the directory to: the pack's
+    // version has one (a version raised without writing it fails every voice pack build)
+    @Test
+    fun theVoicePacksVersionHasItsListing() {
+        val root = File(System.getProperty("user.dir")).let { generateSequence(it) { d -> d.parentFile }.first { d -> d.resolve("app/packs.properties").isFile } }
+        val version = root.resolve("app/packs.properties").readLines().single { it.startsWith("voice.version=") }.substringAfter('=').trim().toInt()
+        val listed = root.resolve(VoiceDataPlugin.listing(version)).readLines().filter { it.isNotBlank() && !it.startsWith("#") }
+            .map { it.trim().split(Regex("\\s+"))[1] }.toSet()
+        assertEquals((localFiles + VoiceDataPlugin.BPE_MODEL).toSet(), listed)
+        val notices = root.resolve("app/${VoiceDataPlugin.NOTICE_DIR}")
+        assertTrue(notices.resolve("LICENSE-CC-BY-SA-4.0.txt").readText().startsWith("Attribution-ShareAlike 4.0 International"))
+        // the directory is the notices the pack takes, no more (one added there would not be packed)
+        assertEquals(VoiceDataPlugin.NOTICE_FILES.toSet(), notices.list()!!.toSet())
     }
 
     // youmo.voiceModelDir: ~/ taken as home (a home with a $ in it kept as it is), an absolute path kept

@@ -84,6 +84,11 @@ object VoiceFeature {
         Credit(context.getString(R.string.voice_model_credit), "Apache-2.0", "https://github.com/Gilgamesh-J/X-ASR"),
         // the encoder's fine-tuning kept its English with LibriSpeech, whose licence asks for the notice
         Credit("LibriSpeech", "CC-BY-4.0", "https://www.openslr.org/12/"),
+        // the polish tagger (0.6.1's, retrained on licence-clean data) is AliMeeting's derived work, so CC BY-SA
+        // as it is: the voice pack carries its README and the licence's text, linked here
+        Credit(context.getString(R.string.voice_tagger_credit), "CC-BY-SA-4.0", "https://github.com/Sraw/youmo-ime/blob/main/app/voice-pack/README.txt"),
+        Credit("AliMeeting (Alibaba Group; Yu et al., M2MeT, ICASSP 2022)", "CC-BY-SA-4.0", "https://www.openslr.org/119/"),
+        Credit("Chinese ELECTRA (hfl/chinese-electra-180g-small-ex-discriminator)", "Apache-2.0", "https://github.com/ymcui/Chinese-ELECTRA"),
         Credit("sherpa-onnx:1.13.8", "Apache-2.0", "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE"),
         // what sherpa-onnx is built with (lib/sherpa-onnx/README.md), in its library in the APK; its
         // onnxruntime is handwriting's too, credited on the page with it

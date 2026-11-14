@@ -429,14 +429,25 @@ class SettingsPagesUatTest {
         open(SettingsRoute.License)
         until("listed") { preferences((page as PreferenceFragmentCompat).preferenceScreen ?: return@until false).size > 3 }
         val prefs = preferences((page as PreferenceFragmentCompat).preferenceScreen)
-        val libri = prefs.firstOrNull { it.title == "LibriSpeech" }
         // credited in every build: the voice input is (its models the voice pack's)
-        assertNotNull(libri)
-        libri!!
-        assertEquals("CC-BY-4.0", libri.summary.toString())
-        libri.performClick()
-        idle()
-        assertEquals("https://www.openslr.org/12/", shadowOf(activity).nextStartedActivity.dataString)
+        fun credited(title: String, licence: String, url: String): () -> Unit = {
+            val pref = prefs.firstOrNull { it.title == title }
+            assertNotNull(title, pref)
+            assertEquals(title, licence, pref!!.summary.toString())
+            pref.performClick()
+            idle()
+            assertEquals(title, url, shadowOf(activity).nextStartedActivity.dataString)
+        }
+        assertRows(
+            "the encoder's fine-tuning kept its English with LibriSpeech, whose licence asks for the notice" to
+                credited("LibriSpeech", "CC-BY-4.0", "https://www.openslr.org/12/"),
+            "the polish tagger is AliMeeting's derived work: CC BY-SA, its README (in the pack too) linked" to
+                credited(s(R.string.voice_tagger_credit), "CC-BY-SA-4.0", "https://github.com/Sraw/youmo-ime/blob/main/app/voice-pack/README.txt"),
+            "AliMeeting, the tagger's real and seam data: CC BY-SA asks for the source's notice, its creator named" to
+                credited("AliMeeting (Alibaba Group; Yu et al., M2MeT, ICASSP 2022)", "CC-BY-SA-4.0", "https://www.openslr.org/119/"),
+            "the tagger was trained from Chinese ELECTRA small, Apache-2.0" to
+                credited("Chinese ELECTRA (hfl/chinese-electra-180g-small-ex-discriminator)", "Apache-2.0", "https://github.com/ymcui/Chinese-ELECTRA"),
+        )
     }
 
     private fun listedPage(what: LearningOp.Listed, items: List<ListedItem>) {

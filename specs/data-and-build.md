@@ -50,7 +50,7 @@ BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles 
 | `AndroidLib…`, `AndroidBase…` | library and shared Android defaults |
 | `EngineDataPlugin` | downloads (SHA-256 pinned) and compiles the engine's data into generated assets, stored uncompressed (see below) |
 | `AssetPacksPlugin` | the resource packs (below): `packTextPack`, `packVoicePack` (`packs` both), `releaseBundles`; the trusted public keys into `BuildConfig.PACK_KEYS` |
-| `VoiceDataPlugin` | the voice pack's files: the recognizer's models, the polish tagger (from `youmo.voiceModelDir`, which the voice pack's build needs for now: the pinned release is the offline model; the APK and the text pack build without it), hotword list |
+| `VoiceDataPlugin` | the voice pack's files: the recognizer's models, the polish tagger (from `youmo.voiceModelDir`, which the voice pack's build needs for now: the pinned release is the offline model; the APK and the text pack build without it; its files held to `gradle/voice-pack-v<voice.version>.sha256`, so a directory of another pack version fails the build rather than ship under this one), hotword list, `app/voice-pack/` (the pack's README and the polish tagger's licence, CC BY-SA 4.0) |
 | `HandwritingDataPlugin` | `:lib:handwriting` (onnxruntime, `pickFirst` with sherpa-onnx's identical copy) and the handwriting models (the text pack's) |
 | `BuildMetadataPlugin` | build time and git hash into `BuildConfig` (the data release names are `EngineDataPlugin`'s fields) |
 | `DetektConventionPlugin` | detekt on every Kotlin module, one config, a baseline per module |

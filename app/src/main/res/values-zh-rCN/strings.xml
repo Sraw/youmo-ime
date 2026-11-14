@@ -1183,6 +1183,7 @@
     <string name="voice_no_microphone">无法使用麦克风</string>
     <string name="voice_recognition_failed">语音识别出错</string>
     <string name="voice_model_credit">语音识别：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）与 silero VAD 运行</string>
+    <string name="voice_tagger_credit">语音整理（口头禅、标点、数字）：本项目的模型，由 Chinese ELECTRA（哈工大讯飞联合实验室）用 AliMeeting 和 FineWeb-2 训练</string>
     <string name="voice_hold_listening">正在听…</string>
     <string name="voice_hold_preparing">准备中…</string>
     <string name="voice_hold_silent">麦克风没有声音</string>

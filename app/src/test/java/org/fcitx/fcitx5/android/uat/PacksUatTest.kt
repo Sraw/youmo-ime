@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.uat
 import android.content.Intent
 import androidx.preference.PreferenceFragmentCompat
 import kotlinx.coroutines.runBlocking
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -176,6 +177,75 @@ class PacksUatTest {
             h.idle()
             assertEquals(listOf(h.service.getString(R.string.pack_voice_needed)), h.noticeTexts())
             assertTrue(openedPacks(opened()))
+        }
+    }
+
+    // 0.6.1 takes voice packs from v3 (0.6.0's v2 has the tagger trained on non-commercial data): a v2 kept
+    // from 0.6.0 stays installed but unused, the microphone says which version to import and opens the page,
+    // the space does nothing as without the pack, nothing reads its models, and importing v3 is the way back
+    @Test
+    @Uat("VO-34")
+    fun aVoicePackOlderThanTheAppTakesAsksForTheNewOneAndVoiceStaysOff() {
+        val dir = Files.createTempDirectory("packs").toFile()
+        // this build's requirements, as PackStore makes them
+        val app = TestShelves.requirements + (PackKind.VOICE to PackRequirement(BuildConfig.PACK_VOICE_FORMAT, BuildConfig.PACK_VOICE_MIN_VERSION))
+        // the v2 imported under 0.6.0, which took it; then this app's start
+        val old = PackShelf(dir, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
+        assertTrue(old.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
+        assertTrue(old.import(TestShelves.pack(PackKind.VOICE, version = 2, format = BuildConfig.PACK_VOICE_FORMAT).inputStream()) is ImportResult.Imported)
+        val shelf = PackShelf(dir, listOf(TestShelves.packs.publicKey), app).apply { load() }
+        try {
+            KeyboardHarness().use { h ->
+                h.start()
+                PackStore.useShelf(shelf)
+                h.idle()
+                assertRows(
+                    "this build takes the voice pack from v3: 0.6.0's v2 is too old" to {
+                        assertEquals(3, BuildConfig.PACK_VOICE_MIN_VERSION)
+                        assertTrue("${shelf.status(PackKind.VOICE)}", shelf.status(PackKind.VOICE) is PackStatus.NeedsUpdate)
+                    },
+                    "nothing reads the old pack's models: no directory is given for it" to { assertNull(PackStore.dir(PackKind.VOICE)) },
+                    "the keyboard still types: the text pack is ready" to { assertNull(gate(h)) },
+                    "the space held does nothing, as without the pack: no notice, no page" to {
+                        val space = h.keyNamed("space")
+                        val f = h.finger(space, h.at(space))
+                        h.advance(700)
+                        f.up(h.at(space))
+                        h.idle()
+                        assertEquals(emptyList<String>(), h.noticeTexts())
+                        assertNull(opened())
+                    },
+                    "the microphone says to import v3 and opens the packs page" to {
+                        val mic = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription == h.service.getString(R.string.voice_input) }
+                        h.tap(mic)
+                        h.idle()
+                        assertEquals(listOf(h.service.getString(R.string.pack_voice_needed_update, 3)), h.noticeTexts())
+                        assertTrue(openedPacks(opened()))
+                    },
+                    "the packs page says which version is needed and which is there" to {
+                        assertEquals(
+                            h.service.getString(R.string.pack_status_needs_update, 3, 2),
+                            PackImports.describe(h.service, shelf.status(PackKind.VOICE)),
+                        )
+                    },
+                    "the old v2 imported again is refused, saying v3 is needed; the one there stays" to {
+                        val again = shelf.import(TestShelves.pack(PackKind.VOICE, version = 2, format = BuildConfig.PACK_VOICE_FORMAT).inputStream())
+                        assertEquals(
+                            h.service.getString(R.string.pack_incompatible_old, "youmo-voice-v2.youmopack", h.service.getString(R.string.pack_voice), 2, 3),
+                            PackImports.describe(h.service, PackImports.Outcome("youmo-voice-v2.youmopack", again)),
+                        )
+                        assertTrue(shelf.status(PackKind.VOICE) is PackStatus.NeedsUpdate)
+                    },
+                    "importing v3 over it makes voice ready" to {
+                        assertTrue(shelf.import(TestShelves.pack(PackKind.VOICE, version = 3, format = BuildConfig.PACK_VOICE_FORMAT).inputStream()) is ImportResult.Imported)
+                        assertTrue(shelf.status(PackKind.VOICE) is PackStatus.Ready)
+                        assertNotNull(shelf.dir(PackKind.VOICE))
+                    },
+                )
+            }
+        } finally {
+            TestShelves.use()
+            dir.deleteRecursively()
         }
     }
 

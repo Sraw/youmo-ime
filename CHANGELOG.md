@@ -16,6 +16,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ### 小改动
 
+- **语音包 v3**：语音整理（去口头禅、加标点、写数字）换成重新训练的模型，只用可以商用的数据（AliMeeting 等，模型以 CC BY-SA 4.0 授权），标点更准、长段说话时段与段之间的标点更合适，几乎每句话末尾都加句末标点；中英混着说时略差一点；语音识别本身没变。这个版本的语音输入要语音包 v3：装着 0.6.0 语音包 v2 的，点麦克风会提示更新，在 **设置 → 资源包** 导入新的语音包 v3 后才能用语音输入（打字不受影响）。
 - 学到的词没能存下来时（比如存储出了问题），键盘上提示一次，告诉你该怎么办；以前只记在内存里，什么都不说，输入法被系统停止后就全丢了。手机重启后、第一次解锁前学到的词不保存（解锁后照常），这时也提示一次。
 - 笔画筛选画的撇、横少被认成折：拐角两边要各是直的，弯成弧线的撇、末尾带个小钩的横按整体方向算。
 
@@ -25,6 +26,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ### Smaller changes
 
+- **Voice pack v3**: voice polish (fillers dropped, punctuation, numbers) is a retrained model, trained only on data whose licences allow commercial use (AliMeeting and others; the model is licensed CC BY-SA 4.0): better punctuation, better marks where a long talk pauses, and nearly every sentence ends with a mark; slightly worse when Chinese and English are mixed; recognition itself is unchanged. Voice input in this version needs voice pack v3: with 0.6.0's voice pack v2, the microphone says to update it, and voice input works again once the new voice pack v3 is imported under **Settings → Resource packs** (typing is not affected).
 - When learned words cannot be saved (a storage problem, say), the keyboard says so once, with what to do; before, they were kept in memory alone, nothing said, and lost once the system stopped the keyboard. Words learned after a restart and before the first unlock are not saved (they are again after it), and the keyboard says so once.
 - A 撇 or 横 drawn for the stroke filter is less often read as 折: a corner's two arms must each be straight, so a bowed 撇 or a 横 with a tick at its end is read by its overall direction.
 
