@@ -287,30 +287,60 @@ class Content(
         val ways = ways(name, char, looks, hidden)
         val slots = if (char) charSlots(ways) else functionSlots(ways)
         // the shortcuts first, the up one before the down one, then the symbols (as 0.5 listed them)
-        var shortcuts = 0
-        return slots.entries.sortedWith(compareBy({ it.value.symbol != null }, { !it.value.up })).mapIndexed { i, (slot, w) ->
+        val sorted = slots.entries.sortedWith(compareBy({ it.value.symbol != null }, { !it.value.up })).map { it.key to it.value }
+        val firstShortcut = sorted.indexOfFirst { it.second.symbol == null }
+        fun drawn(i: Int, slot: Slot, w: Way, room: Double): MarkDrawn {
             var fate: MarkFate? = null
             val m = if (w.symbol != null) {
                 symbolMark(w.symbol, slot, content, looks)
             } else {
-                val drop = if (shortcuts++ == 0) KeyMarkYield.DROP_SHORTCUT else KeyMarkYield.DROP_DOWN_SHORTCUT
+                val drop = if (i == firstShortcut) KeyMarkYield.DROP_SHORTCUT else KeyMarkYield.DROP_DOWN_SHORTCUT
                 val s = w.shortcut!!
                 // a text its step down, the same whether laid out on whole pixels or not
-                val shown = if (s is MarkContent.Text) rung(s, short[i] ?: 0, looks) else s
-                if (w.user) fate = when {
-                    shown == MarkContent.Text.SIGN -> MarkFate.Sign
-                    s is MarkContent.Text && shown is MarkContent.Text && shown.text != s.text -> MarkFate.Shortened(shown.text)
-                    else -> MarkFate.AsSet
-                }
+                val shown = if (s is MarkContent.Text) stepped(s, short[i] ?: 0, room, cell, looks) else s
+                if (w.user) fate = fateOf(s, shown)
                 shortcutMark(shown, slot, drop, cell, content, looks, snap)
             }
             val text = w.shortcut is MarkContent.Text
-            when {
+            return when {
                 w.user -> MarkDrawn(m.drawn, m.slot, m.drop, m.top, way = UserWay(w.up, fate ?: MarkFate.AsSet), text = text)
                 text -> MarkDrawn(m.drawn, m.slot, m.drop, m.top, text = true)
                 else -> m
             }
         }
+        // the corners first: a centred text's room is between those on its edge, a gap from each (review 061-small S6:
+        // 「你好」 at 顶部 read on into 右上's 「1」 as 「你好1」), its steps down taken until it fits
+        val corners = sorted.mapIndexed { i, (slot, w) -> if (slot.centred) null else drawn(i, slot, w, Double.POSITIVE_INFINITY) }
+        return sorted.mapIndexed { i, (slot, w) -> corners[i] ?: drawn(i, slot, w, between(slot, corners.filterNotNull(), content)) }
+    }
+
+    // [s] [from] steps down its ladder, further while wider than [room]
+    private fun stepped(s: MarkContent.Text, from: Int, room: Double, cell: Box, looks: Looks): MarkContent {
+        var steps = from
+        while (steps < s.ladder.size && textWidth(rung(s, steps, looks), cell, looks) > room) steps++
+        return rung(s, steps, looks)
+    }
+
+    // how a way the user set as [s] is drawn as [shown]
+    private fun fateOf(s: MarkContent, shown: MarkContent): MarkFate = when {
+        shown == MarkContent.Text.SIGN -> MarkFate.Sign
+        s is MarkContent.Text && shown is MarkContent.Text && shown.text != s.text -> MarkFate.Shortened(shown.text)
+        else -> MarkFate.AsSet
+    }
+
+    // the width a mark centred in [slot] has between [corners] on its edge, [MIDDLE_GAP_DP] from each; any, none there
+    private fun between(slot: Slot, corners: List<MarkDrawn>, content: Box): Double {
+        val half = corners.filter { it.slot.bottom == slot.bottom }.minOfOrNull {
+            if (it.slot.left) content.centerX - it.drawn.ink.right else it.drawn.ink.left - content.centerX
+        } ?: return Double.POSITIVE_INFINITY
+        return 2 * (half - MIDDLE_GAP_DP * d)
+    }
+
+    // a shortcut's text as wide as [shortcutMark] lays it out; an icon (the sign) as narrow as any
+    private fun textWidth(mark: MarkContent, cell: Box, looks: Looks): Double = when (mark) {
+        is MarkContent.Text -> measure(mark.text, looks.shortcut, looks.shortcut.weight, SHORTCUT_TEXT_DP * textScale * d)
+            .squeezed(SHORTCUT_TEXT_SHARE * cell.width).box.width
+        else -> 0.0
     }
 
     // each way that is on and draws something: a symbol's text, or a shortcut's mark
@@ -477,6 +507,9 @@ class Content(
         const val SHORTCUT_ICON_COMPACT_DP = 8.0
         const val SHORTCUT_TEXT_DP = 9.0
         const val SHORTCUT_TEXT_SHARE = 0.45
+
+        /** A centred mark's least gap from a corner mark on its edge. */
+        const val MIDDLE_GAP_DP = 1.0
         const val SHORTCUT_SIDE_DP = 3.0
         const val SHORTCUT_SIDE_COMPACT_DP = 2.0
         const val SHORTCUT_EDGE_DP = 2.0

@@ -166,6 +166,12 @@
 - **预期**：联想消失，候选换成 h 的候选。
 - **JVM**：`PinyinUatTest.typingPutsTheWordsThatMayFollowAway`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
+### PY-134 [P1] 点 × 收起这一次的联想
+- **前提**：B0，打出「今天」，候选栏显示联想。
+- **操作**：看候选栏最右边；点 ×；再点 m i n g t i a n，空格。
+- **预期**：联想时最右边有 ×（⌄ 在它左边），打字时（有编码）没有 ×；点 × 后联想收起，栏上回到工具栏，什么都没上屏也没删；「联想下一个词」设置还开着，「明天」上屏后照常给出联想。
+- **JVM**：`BarUatTest.theCrossWithThePredictionsDropsThem`（联想时 × 在最右、⌄ 在它左边，点了只请宿主收起联想、不改设置，也不再把前文告诉引擎；没有联想、有编码时没有 ×）；宿主那一边见 ime-core `DropPredictionsTest`（联想时只收起联想，有编码时什么都不做）和 `DropPredictionsEnginesTest`（真会话上：英文纠错后点 ×，退格照样改回；英文自动加的空格照样让给逗号；拼音上屏的词照样是前文）。
+
 ## 长按候选
 
 ### PY-29 [P0] 屏蔽一个词

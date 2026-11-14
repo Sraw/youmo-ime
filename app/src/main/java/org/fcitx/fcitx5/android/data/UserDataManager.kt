@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.engine.store.RecordStore
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.utils.Const
+import org.fcitx.fcitx5.android.utils.ZipEnd
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.extract
@@ -285,16 +286,86 @@ object UserDataManager {
     fun import(src: InputStream) = import(src, appDirs)
 
     // stopped as it is unpacked once it would fill the disk (a zip bomb), not after; nor more than [maxEntries]
-    // entries, empty directories counted too: a zip of millions of them fills no disk but takes minutes and inodes
+    // entries, empty directories counted too: a zip of millions of them fills no disk but takes minutes and inodes.
+    // The zip is copied beside [tempDir] first, so that its end record says how many entries it has: too many
+    // refused at once, not after each is written (R25 PR-52a: 100 001 empty directories, half a minute of 加载中).
+    // Counted again as they are unpacked: what is unpacked is the entries themselves, which an end record may not
+    // tell truly. The copy only of a zip (its first bytes a zip's: a 20 GB video picked is refused before a byte is
+    // written), of [maxBytes] at most, and of half the room at most: what it unpacks to takes as much again, a
+    // stored entry's bytes (review 061-small S2). A zip with no end record to read is none of ours either (S4)
     @VisibleForTesting
-    internal fun extractWithinRoom(src: InputStream, tempDir: File, room: Long = tempDir.usableSpace, maxEntries: Int = MAX_BACKUP_ENTRIES): List<File> {
-        return ZipInputStream(src).use {
-            it.extract(tempDir) { count, size, total ->
-                if (count > maxEntries) errorRuntime(R.string.exception_user_data_too_many_entries)
-                if (total + size > room) errorRuntime(R.string.exception_user_data_no_room)
+    internal fun extractWithinRoom(
+        src: InputStream,
+        tempDir: File,
+        room: Long = tempDir.usableSpace,
+        maxEntries: Int = MAX_BACKUP_ENTRIES,
+        maxBytes: Long = MAX_BACKUP_BYTES,
+    ): List<File> {
+        val copy = File(tempDir.parentFile, "${tempDir.name}$COPY_SUFFIX")
+        try {
+            dropStaleCopies(tempDir.parentFile)
+            val copied = src.use { input ->
+                val head = ByteArray(ZIP_HEAD.size).let { it.copyOf(readUpTo(input, it)) }
+                if (!head.contentEquals(ZIP_HEAD) && !head.contentEquals(EMPTY_ZIP_HEAD)) errorRuntime(R.string.exception_user_data_not_a_backup)
+                copy.outputStream().use { out ->
+                    out.write(head)
+                    copyWithin(input, out, head.size.toLong(), maxBytes, room / 2)
+                }
             }
+            val entries = ZipEnd.entries(copy) ?: errorRuntime(R.string.exception_user_data_not_a_backup)
+            if (entries > maxEntries) errorRuntime(R.string.exception_user_data_too_many_entries)
+            return ZipInputStream(copy.inputStream()).use {
+                it.extract(tempDir) { count, size, total ->
+                    if (count > maxEntries) errorRuntime(R.string.exception_user_data_too_many_entries)
+                    if (copied + total + size > room) errorRuntime(R.string.exception_user_data_no_room)
+                }
+            }
+        } finally {
+            copy.delete()
         }
     }
+
+    // up to [into]'s size of [input]'s first bytes: how many there were
+    private fun readUpTo(input: InputStream, into: ByteArray): Int {
+        var n = 0
+        while (n < into.size) {
+            val read = input.read(into, n, into.size - n)
+            if (read < 0) break
+            n += read
+        }
+        return n
+    }
+
+    // [input] into [out] after [from] bytes already there, stopped on the chunk past [maxBytes] or [room], unwritten;
+    // how much there is in all
+    private fun copyWithin(input: InputStream, out: OutputStream, from: Long, maxBytes: Long, room: Long): Long {
+        var size = from
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val n = input.read(buffer)
+            if (n < 0) return size
+            size += n
+            if (size > maxBytes) errorRuntime(R.string.exception_user_data_too_big)
+            if (size > room) errorRuntime(R.string.exception_user_data_no_room)
+            out.write(buffer, 0, n)
+        }
+    }
+
+    // the copies of restores killed midway (the app's process ended, the copy's finally never ran): an hour
+    // old, no restore of the moment's; the restore's folder beside it the cache's to clear, as ever
+    private fun dropStaleCopies(dir: File?) {
+        val before = System.currentTimeMillis() - STALE_COPY_MS
+        dir?.listFiles { f -> f.isFile && f.name.endsWith(COPY_SUFFIX) && f.lastModified() < before }?.forEach { it.delete() }
+    }
+
+    // a zip's first entry's local header; an empty zip's end record, its whole
+    private val ZIP_HEAD = byteArrayOf(0x50, 0x4b, 0x03, 0x04)
+    private val EMPTY_ZIP_HEAD = byteArrayOf(0x50, 0x4b, 0x05, 0x06)
+    private const val COPY_SUFFIX = ".restore.zip"
+    private const val STALE_COPY_MS = 60 * 60 * 1000L
+
+    // a phone's whole backup is some megabytes; a file this big is none, whatever it is
+    private const val MAX_BACKUP_BYTES = 2L shl 30
 
     // a phone's whole backup is a few thousand files (the theme packs' images the most): ten times that and more is no backup
     private const val MAX_BACKUP_ENTRIES = 100_000

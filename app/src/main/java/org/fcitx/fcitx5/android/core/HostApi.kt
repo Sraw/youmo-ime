@@ -90,6 +90,9 @@ interface TypingApi {
     suspend fun isEmpty(): Boolean
     suspend fun reset()
 
+    /** 联想's predictions shown dropped (the bar's ×), the 联想 setting as it was; false where none show. */
+    suspend fun dropPredictions(): Boolean
+
     /** What is typed dropped, nothing committed (清除), with the [keyboard] of its input method; null with nothing typed. */
     suspend fun clearTyped(keyboard: (im: String) -> Any?): HostCore.Retyping?
 

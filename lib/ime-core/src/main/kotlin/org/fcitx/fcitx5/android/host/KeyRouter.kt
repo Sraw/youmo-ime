@@ -77,6 +77,18 @@ class KeyRouter(
     }
 
     /**
+     * 联想's × (0.6.1): the predictions shown put away, the 联想 setting as it was, what was committed still
+     * the context ([EngineEvent.DROP_PREDICTIONS]; Escape's reset lost English's own space and offered the
+     * word a correction replaced once the context was told again: review 061-small M1). Nothing where none
+     * show (a key typed since the × was tapped): false then.
+     */
+    fun dropPredictions(ic: InputContext, im: String): Boolean {
+        if (ic.panel.candidateList?.predicting != true) return false
+        send(ic, im, EngineEvent.DROP_PREDICTIONS)
+        return true
+    }
+
+    /**
      * `AndroidEngine::deactivate` (`:764-772`): switching to another input method keeps what was
      * typed, as libime's pinyin does ([switching]); losing focus drops it.
      */
@@ -514,6 +526,7 @@ class KeyRouter(
     internal inner class EngineCandidateList(private val ic: InputContext, private val im: String, s: Snapshot) : CandidateList {
         private var total = s.total
         private val actionable = s.actionable
+        override val predicting = s.predicting
 
         // what was typed, not a prediction (whose preedit is empty)
         private val composing = s.preedit.isNotEmpty()

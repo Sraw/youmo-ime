@@ -63,7 +63,7 @@ class KeyMarkPositionSettingsTest {
 
     private val keyboard get() = AppPrefs.getInstance().keyboard
 
-    private val places = listOf("右上", "右下", "左上", "左下", "底部", "无")
+    private val places = listOf("右上", "右下", "左上", "左下", "顶部", "底部", "无")
 
     // [title]'s dialog opened: its rows' texts, which can be picked
     private fun dialog(title: Int): AlertDialog {
@@ -115,7 +115,7 @@ class KeyMarkPositionSettingsTest {
         st.open(SettingsRoute.Keys)
         val d = dialog(R.string.swipe_down_position)
         assertTrue(rows(d).all { it.second })
-        d.listView.performItemClick(null, 5, 5)
+        d.listView.performItemClick(null, places.indexOf("无"), places.indexOf("无").toLong())
         st.idle()
         assertEquals(KeyMarkPosition.None, keyboard.swipeDownPosition.getValue())
         assertTrue(rows(dialog(R.string.swipe_up_position)).all { it.second })

@@ -261,6 +261,8 @@
     <string name="exception_user_data_metadata">找不到用户数据的元数据</string>
     <string name="exception_user_data_no_room">备份放不下：手机剩余空间不够</string>
     <string name="exception_user_data_too_many_entries">备份里的条目超过 10 万个，不是本应用的备份</string>
+    <string name="exception_user_data_not_a_backup">这个文件不是本应用的备份</string>
+    <string name="exception_user_data_too_big">文件超过 2 GB，不是本应用的备份</string>
     <string name="exception_user_data_package_name_mismatch">用户数据与当前应用不匹配</string>
     <string name="exception_user_data_too_old">这个备份来自 0.3.0 或更早的版本，这一版不再读取那时学到的内容。请先在 0.4.x 里恢复它、打几个字、停一下、重新备份，再在这里恢复新的备份</string>
     <string name="user_data_imported">已导入来自 %1$s 的用户数据，正在重启…</string>
@@ -300,6 +302,7 @@
     <string name="status_area">状态区域</string>
     <string name="expand_candidates_list">展开候选词列表</string>
     <string name="hide_candidates_list">隐藏候选词列表</string>
+    <string name="drop_predictions">收起联想</string>
     <string name="hide_keyboard">隐藏键盘</string>
     <string name="hide_toolbar">隐藏工具栏</string>
     <string name="expand_toolbar">展开工具栏</string>
@@ -778,7 +781,7 @@
     <string name="im_fuzzy_none">未开启</string>
     <string name="picker_recent">最近使用</string>
     <string name="picker_common">常用</string>
-    <string name="picker_ascii">数字与英文符号</string>
+    <string name="picker_ascii">英文符号</string>
     <string name="picker_brackets">括号</string>
     <string name="picker_arrows">箭头</string>
     <string name="picker_math">数学与希腊字母</string>
@@ -1078,6 +1081,7 @@
     <string name="mark_at_bottom_right">右下</string>
     <string name="mark_at_top_left">左上</string>
     <string name="mark_at_bottom_left">左下</string>
+    <string name="mark_at_top">顶部</string>
     <string name="mark_at_bottom">底部</string>
     <string name="mark_at_none">无</string>
     <string name="mark_at_taken">%1$s（%2$s）</string>

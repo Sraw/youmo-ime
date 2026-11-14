@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks.At
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Placed
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Slot
@@ -36,6 +37,51 @@ class KeyMarksTest {
         // either alone on a key where it would be
         assertEquals(Placed.of(Slot.BottomRight to "，"), KeyMarks.place("，", null, At.BottomRight, At.TopLeft, false))
         assertEquals(Placed.of(Slot.TopLeft to "全选"), KeyMarks.place(null, "全选", At.BottomRight, At.TopLeft, false))
+    }
+
+    // 顶部 (user 2026-11-13): the top edge's middle for either way's mark, the label where it is; on low keys,
+    // the first corner of TopOrder (as 底部 of LowOrder) the other's is not, a 顶部 and a 底部 each its own edge's right corner;
+    // one place in both, the symbol to the top right
+    @Test
+    fun theTopIsTheTopEdgesMiddleForEitherWay() {
+        assertRows(
+            "the symbol at 顶部" to { assertEquals(Placed.of(Slot.TopLeft to "全选", Slot.Top to "，"), place(At.Top, At.TopLeft)) },
+            "the shortcut at 顶部" to { assertEquals(Placed.of(Slot.Top to "全选", Slot.TopRight to "，"), place(At.TopRight, At.Top)) },
+            "the symbol at 顶部, the shortcut at 底部" to { assertEquals(Placed.of(Slot.Bottom to "全选", Slot.Top to "，"), place(At.Top, At.Bottom)) },
+            "the symbol at 底部, the shortcut at 顶部: the symbol under the letter" to {
+                assertEquals(Placed.of(Slot.Top to "全选", Slot.Below to "，"), place(At.Bottom, At.Top))
+            },
+            "both at 顶部 (an import): the symbol yields to the top right" to {
+                assertEquals(Placed.of(Slot.Top to "全选", Slot.TopRight to "，"), place(At.Top, At.Top))
+            },
+            "landscape: the symbol's 顶部 the first corner the shortcut's is not, the top's first: 左上, not 右下 (review 061-small N8)" to {
+                assertEquals(Placed.of(Slot.TopRight to "全选", Slot.TopLeft to "，"), place(At.Top, At.TopRight, landscape = true))
+            },
+            "a 底部 keeps its order: 右下 past a 右上" to {
+                assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomRight to "，"), place(At.Bottom, At.TopRight, landscape = true))
+            },
+            "a function key's lone 顶部 on a low key: 左上 past 右上" to {
+                assertEquals(Placed.of(Slot.TopLeft to "清除", Slot.TopRight to "恢复"),
+                    KeyMarks.placeFunction("清除", "恢复", true, true, At.Top, At.TopRight, true, false))
+            },
+            "compact: the shortcut's 顶部 the first corner the symbol's is not" to {
+                assertEquals(Placed.of(Slot.TopRight to "全选", Slot.TopLeft to "，"), place(At.TopLeft, At.Top, compact = true))
+            },
+            "a character key's 底部 symbol and 顶部 shortcut on a low key: each its own edge's right corner, as a function key's (review 061-small S5)" to {
+                assertEquals(Placed.of(Slot.TopRight to "全选", Slot.BottomRight to "，"), place(At.Bottom, At.Top, landscape = true))
+                assertEquals(Placed.of(Slot.BottomRight to "全选", Slot.TopRight to "，"), place(At.Top, At.Bottom, compact = true))
+            },
+            "a function key's way at 顶部" to {
+                assertEquals(Placed.of(Slot.Top to "清除", Slot.BottomLeft to "恢复"),
+                    KeyMarks.placeFunction("清除", "恢复", true, true, At.Top, At.BottomLeft, false, false))
+            },
+            "a function key's 顶部 and 底部 on a low key: each its own edge's right corner, not both 右上" to {
+                assertEquals(Placed.of(Slot.TopRight to "清除", Slot.BottomRight to "恢复"),
+                    KeyMarks.placeFunction("清除", "恢复", true, true, At.Top, At.Bottom, true, false))
+                assertEquals(Placed.of(Slot.BottomRight to "清除", Slot.TopRight to "恢复"),
+                    KeyMarks.placeFunction("清除", "恢复", true, true, At.Bottom, At.Top, false, true))
+            },
+        )
     }
 
     @Test
@@ -87,7 +133,7 @@ class KeyMarksTest {
             .flatMap { (symbolAt, shortcutAt) -> bools.flatMap { landscape -> bools.map { Case(symbolAt, shortcutAt, landscape, it, null, null) } } }
             .flatMap { c -> listOf("，", null).flatMap { symbol -> listOf("全选", null).map { c.copy(symbol = symbol, shortcut = it) } } }
         cases.forEach(::check)
-        assertEquals(6 * 6 * 2 * 2 * 2 * 2, cases.distinct().size)
+        assertEquals(7 * 7 * 2 * 2 * 2 * 2, cases.distinct().size)
     }
 
     private fun check(c: Case) {
@@ -95,7 +141,7 @@ class KeyMarksTest {
         val low = c.landscape || c.compact
         val shortcutSlot = KeyMarks.shortcutSlot(KeyMarks.onKeys(c.symbolAt, c.shortcutAt, c.landscape, c.compact).shortcut)
         if (!low) assertEquals("$c", KeyMarks.shortcutSlot(c.shortcutAt), shortcutSlot)
-        assertTrue("$c: no bottom edge on low keys", !low || shortcutSlot != Slot.Bottom)
+        assertTrue("$c: no edge's middle on low keys", !low || shortcutSlot != Slot.Bottom && shortcutSlot != Slot.Top)
         assertEquals("$c", if (c.shortcut != null) shortcutSlot else null, placed.slotOf("全选"))
         val s = placed.slotOf("，")
         val alone = KeyMarks.symbolSlot(c.symbolAt, c.shortcutAt, c.landscape, c.compact)
@@ -103,14 +149,27 @@ class KeyMarksTest {
         if (alone == null) return assertTrue("$c", c.symbolAt == At.None)
         assertNotEquals("$c", shortcutSlot, alone)
         assertTrue("$c", !(alone == Slot.Below && shortcutSlot == Slot.Bottom))
-        assertTrue("$c: under the letter only with room", alone != Slot.Below || !low)
+        assertTrue("$c: under the letter or the top's middle only with room", alone != Slot.Below && alone != Slot.Top || !low)
         // the legal ones (apart) where chosen
-        if (c.symbolAt != c.shortcutAt && c.symbolAt != At.Bottom) assertEquals("$c", c.symbolAt.corner, alone)
+        if (c.symbolAt != c.shortcutAt && !c.symbolAt.middle) assertEquals("$c", c.symbolAt.corner, alone)
+        if (c.symbolAt != c.shortcutAt && c.symbolAt == At.Top && !low) assertEquals("$c", Slot.Top, alone)
+    }
+
+    // a function key's way at [at] on a low key, the other's at [other]: a corner where set; a 底部 or 顶部 the first
+    // corner the other's setting is not, or, the other's an edge's middle too, its own edge's right corner
+    private fun lowSlot(at: At, other: At): Slot? = when {
+        !at.middle -> at.corner
+        other.middle -> if (at == At.Top) Slot.TopRight else Slot.BottomRight
+        else -> KeyMarks.lowOrder(at).first { it != other }.corner
     }
 
     @Test
     fun aFunctionKeysMarksEachAtItsOwnWaysSetting() {
-        fun slot(at: At) = if (at == At.Bottom) Slot.Bottom else at.corner
+        fun slot(at: At) = when (at) {
+            At.Top -> Slot.Top
+            At.Bottom -> Slot.Bottom
+            else -> at.corner
+        }
         for (upAt in At.entries) for (downAt in At.entries) {
             if (upAt == downAt && upAt != At.None) continue // the settings page keeps them apart
             val both = KeyMarks.placeFunction("清除", "恢复", true, true, upAt, downAt, false, false)
@@ -123,10 +182,9 @@ class KeyMarksTest {
             // low keys: a 底部 to the first corner the other way's is not, the two never in one slot
             for (landscape in listOf(true, false)) {
                 val low = KeyMarks.placeFunction("清除", "恢复", true, true, upAt, downAt, landscape, !landscape)
-                if (upAt != At.Bottom) assertEquals("$upAt $downAt low", slot(upAt), low.slotOf("清除"))
-                if (downAt != At.Bottom) assertEquals("$upAt $downAt low", slot(downAt), low.slotOf("恢复"))
-                if (upAt == At.Bottom) assertEquals(KeyMarks.LowOrder.first { it != downAt }.corner, low.slotOf("清除"))
-                if (downAt == At.Bottom) assertEquals(KeyMarks.LowOrder.first { it != upAt }.corner, low.slotOf("恢复"))
+                assertEquals("$upAt $downAt low", lowSlot(upAt, downAt), low.slotOf("清除"))
+                assertEquals("$upAt $downAt low", lowSlot(downAt, upAt), low.slotOf("恢复"))
+                assertNotEquals("$upAt $downAt low: two in one slot", low.slotOf("清除") ?: "a", low.slotOf("恢复") ?: "b")
             }
         }
         // both 底部 on a low key: settled first (上滑 to 右上), then 下滑's 底部 the first corner left, 右下

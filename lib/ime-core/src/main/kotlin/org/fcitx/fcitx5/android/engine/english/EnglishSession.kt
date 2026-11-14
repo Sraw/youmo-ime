@@ -199,10 +199,7 @@ class EnglishSession(
         if (r != null && (action == Action.Pick(0) || action == Action.Select(0))) return recall(r)
         // the word typed offered back goes with the offer: left on screen, a later pick would commit
         // it after the correction rather than in its place
-        if (r != null) {
-            candidates = emptyList()
-            pager.reset()
-        }
+        if (r != null) unoffer()
         val g = glided?.takeIf { input.isEmpty() && it.committed == last }
         // what goes on from the word glided: a pick, a backspace, a page; anything else leaves it
         if (!keepsGlided(action)) glided = null
@@ -223,8 +220,9 @@ class EnglishSession(
         }
     }
 
+    // 联想's × too: it puts the list away, the word glided still the backspace's to take back whole
     private fun keepsGlided(action: Action) = when (action) {
-        is Action.Pick, is Action.Select, is Action.Block, Action.Backspace, Action.NextPage, Action.PreviousPage -> true
+        is Action.Pick, is Action.Select, is Action.Block, Action.Backspace, Action.NextPage, Action.PreviousPage, Action.DropPredictions -> true
         else -> false
     }
 
@@ -237,7 +235,7 @@ class EnglishSession(
         Action.NextPage -> turn(pager.page + 1)
         Action.PreviousPage -> turn(pager.page - 1)
         // an arrow, a tab, enter: the word left as it is, maybe half typed, so not learned
-        Action.CommitRaw -> if (input.isEmpty()) snapshot(handled = false) else commit(typed(), space = false, learned = false).copy(handled = false)
+        Action.CommitRaw -> commitRaw()
         is Action.NineKey -> nineKey(action.digit, action.upper)
         // the nine keys' input is no text to move about in: a tap on it leaves it as it is
         is Action.Cursor -> cursor(action.at)
@@ -251,9 +249,16 @@ class EnglishSession(
         is Action.Forget -> forget(action.index)
         is Action.Unpin -> unpin(action.index)
         is Action.Block -> block(action.index)
+        // 联想's ×, sent only while predicting (nothing typed): the offer alone; [last] (its own space, which a mark
+        // takes the place of) and [corrected] stay
+        Action.DropPredictions -> { unoffer(); snapshot() }
         // nothing here refines, inks, pins or picks a syllable or letter: what is shown stays
         Action.Refine, is Action.Ink, is Action.Stroke, is Action.Pin, is Action.Syllable, is Action.Letter, Action.LookUp -> snapshot()
     }
+
+    private fun commitRaw() = if (input.isEmpty()) snapshot(handled = false) else commit(typed(), space = false, learned = false).copy(handled = false)
+
+    private fun unoffer() { candidates = emptyList(); pager.reset() }
 
     private fun cursor(at: Int): Snapshot {
         if (input.isEmpty() || nineKeyed()) return snapshot(handled = false)

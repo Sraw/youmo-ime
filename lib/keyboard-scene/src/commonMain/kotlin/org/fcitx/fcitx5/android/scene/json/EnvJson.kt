@@ -26,7 +26,7 @@ import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
  * "oneHanded"/"dock": "left"|"right"|"full", "dark", "flat", "shift": "none"|"once"|"lock", "board",
  * "typed": [scene, …] or null, "states": {id or role: ["on", …]}, "input": {…Input's},
  * "texts": {…Texts', "letterCase": "lower"|"shift"|"upper"}, "marks": {…MarkSettings', "upAt" and
- * "downAt": "top-right"|"bottom-right"|"top-left"|"bottom-left"|"bottom"|"none", "shortcuts":
+ * "downAt": "top-right"|"bottom-right"|"top-left"|"bottom-left"|"top"|"bottom"|"none", "shortcuts":
  * {"name:up"|"name:down": {"icon": name} or {"text": text} or {"symbol": text} or {}}}}`: the members are the classes' own names.
  */
 object EnvJson {
@@ -50,7 +50,7 @@ object EnvJson {
     /** [KeyMarks.At] by its JSON name. */
     val AT: Map<String, KeyMarks.At> = mapOf(
         "top-right" to KeyMarks.At.TopRight, "bottom-right" to KeyMarks.At.BottomRight, "top-left" to KeyMarks.At.TopLeft,
-        "bottom-left" to KeyMarks.At.BottomLeft, "bottom" to KeyMarks.At.Bottom, "none" to KeyMarks.At.None,
+        "bottom-left" to KeyMarks.At.BottomLeft, "top" to KeyMarks.At.Top, "bottom" to KeyMarks.At.Bottom, "none" to KeyMarks.At.None,
     )
 
     private fun env(m: Members): Env {

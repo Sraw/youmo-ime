@@ -435,6 +435,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     true
                 }
             }
+            dropPredictionsButton.setOnClickListener { service.dropPredictions() }
         }
     }
 
@@ -652,6 +653,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onCandidateUpdate(data: HostEvent.Candidates) {
+        candidateUi.dropPredictionsButton.visibility = if (data.predicting && data.candidates.isNotEmpty()) View.VISIBLE else View.GONE
         barStateMachine.push(CandidatesUpdated, CandidateEmpty to data.candidates.isEmpty())
     }
 

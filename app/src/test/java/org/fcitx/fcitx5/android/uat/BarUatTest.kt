@@ -11,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.ScriptedEngine
@@ -203,6 +204,55 @@ class BarUatTest {
         h.candidates()
         assertTrue(h.has(R.string.expand_toolbar))
         assertFalse(h.texts().toString(), "你" in h.texts())
+    }
+
+    // 联想's × (0.6.1): at the far right with 联想's words alone (the ⌄ before it), not with what is typed;
+    // tapped, the host asked to drop them, nothing else (the 联想 setting as it was)
+    @Test
+    @Uat("PY-134")
+    fun theCrossWithThePredictionsDropsThem() {
+        val h = harness().start()
+        fun predictions(vararg words: String) {
+            h.api.candidates = Array(words.size) { CandidateWord("", words[it], "") }
+            h.emit(HostEvent.Candidates(words.size, h.api.candidates.toList(), predicting = true))
+        }
+        val cross = h.service.getString(R.string.drop_predictions)
+        assertRows(
+            "联想's words: the × at the far right, the ⌄ before it" to {
+                // more than the bar holds: the ⌄ shown too
+                predictions(*Array(30) { "词$it" })
+                assertTrue(h.has(R.string.drop_predictions))
+                val x = h.described(cross)
+                val bar = x.rootView.width
+                val at = IntArray(2).also { x.getLocationInWindow(it) }
+                assertEquals("at the far right", bar, at[0] + x.width)
+                val expand = h.described(h.service.getString(R.string.expand_candidates_list))
+                val e = IntArray(2).also { expand.getLocationInWindow(it) }
+                assertTrue("the ⌄ before it", e[0] + expand.width <= at[0])
+                h.capture("BarUatTest/predictions")
+            },
+            "tapped: the host asked to drop them and nothing else (联想下一个词, an engine option, not set)" to {
+                h.api.calls.clear()
+                h.tap(h.described(cross))
+                assertEquals(listOf("dropPredictions()"), h.api.calls)
+            },
+            "dropped (the host's list still 联想's): the engine kept its context, none told again (review 061-small M1: " +
+                "a context told after it had English offer the word a correction replaced)" to {
+                h.api.candidatesCached = h.api.candidatesCached.copy(predicting = true)
+                h.api.calls.clear()
+                h.tap(h.described(cross))
+                h.idle()
+                assertEquals(listOf("dropPredictions()"), h.api.calls)
+            },
+            "the list emptied: no ×" to {
+                h.candidates()
+                assertFalse(h.has(R.string.drop_predictions))
+            },
+            "what is typed: no ×" to {
+                h.candidates("你", "呢")
+                assertFalse(h.has(R.string.drop_predictions))
+            },
+        )
     }
 
     @Test

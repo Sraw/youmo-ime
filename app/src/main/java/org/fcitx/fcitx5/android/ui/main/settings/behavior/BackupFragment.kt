@@ -74,8 +74,8 @@ class BackupFragment : PaddingPreferenceFragment() {
                                 // as they are replaced, so the import stops there (audit-061 app-rest-2)
                                 if (!HostDaemon.stopFcitx()) errorRuntime(R.string.exception_user_data_host_starting)
                                 ClipboardManager.closeDatabase()
-                                val inputStream = cr.openInputStreamOrThrow(uri)
-                                UserDataManager.import(inputStream).getOrThrow()
+                                // closed whatever fails, before the zip is read too (review 061-small N9)
+                                cr.openInputStreamOrThrow(uri).use { UserDataManager.import(it).getOrThrow() }
                             }
                             val exportTime = formatDateTime(metadata.exportTime)
                             ctx.toast(ctx.getString(R.string.user_data_imported, exportTime))

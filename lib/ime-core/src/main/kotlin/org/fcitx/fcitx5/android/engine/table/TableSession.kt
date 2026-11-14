@@ -303,7 +303,9 @@ class TableSession(
             snapshot(commit = text, handled = text.isNotEmpty())
         }
         Action.Refine -> refine()
-        is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp -> snapshot()
+        // the offer, if any, went in apply, as any action not its own ends it
+        is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp,
+        Action.DropPredictions -> snapshot()
         is Action.Cursor -> moveCursor(action.at)
         is Action.Step -> moveCursor(action.applyTo(cursor, input.length))
         Action.Reset, is Action.Context -> {

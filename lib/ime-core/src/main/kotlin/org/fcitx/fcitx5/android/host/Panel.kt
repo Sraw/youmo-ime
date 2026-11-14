@@ -55,6 +55,9 @@ interface CandidateList {
     /** The [index]th of all ([bulk] lists); else the page's. */
     fun candidateFromAll(index: Int): PanelCandidate? = candidate(index)
 
+    /** 联想's words with nothing typed ([org.fcitx.fcitx5.android.engine.runtime.Snapshot.predicting]): the bar's × drops them. */
+    val predicting: Boolean get() = false
+
     val pageable: Boolean get() = false
 
     /** `CandidateList::layoutHint`, what the paged window's orientation follows when automatic (Unicode's: vertical). */

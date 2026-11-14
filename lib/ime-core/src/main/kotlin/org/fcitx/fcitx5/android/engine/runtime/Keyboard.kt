@@ -73,6 +73,12 @@ object EngineEvent {
      * typing (review S1). Any session takes it as [CHAR].
      */
     const val HARD_CHAR = 17
+
+    /**
+     * The candidate bar's ×: 联想 put away ([Action.DropPredictions]), what was committed still the
+     * context; not handled where none is on show. Escape would reset the session (review 061-small M1).
+     */
+    const val DROP_PREDICTIONS = 18
 }
 
 /**
@@ -125,6 +131,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             EngineEvent.RESET -> session.apply(Action.Reset).copy(handled = false)
             EngineEvent.REFINE -> refine()
             EngineEvent.TYPED -> typed(arg)
+            EngineEvent.DROP_PREDICTIONS -> if (shown.predicting) session.apply(Action.DropPredictions) else again(handled = false)
             else -> passOn()
         }
         return shown

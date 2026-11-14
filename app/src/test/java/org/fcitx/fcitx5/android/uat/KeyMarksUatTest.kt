@@ -8,6 +8,7 @@ import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -111,6 +112,49 @@ class KeyMarksUatTest {
         at(KeyMarkPosition.None)
         assertEquals("z - -", marksOf("z"))
         assertEquals("", backspaceMarks())
+    }
+
+    // 顶部 (user 2026-11-13): the top edge's middle, a shortcut's and a symbol's alike, ⌫'s way there too; on a
+    // landscape keyboard, too low for it, the first corner the other's place is not
+    @Test
+    @Uat("KB-89")
+    fun theTopIsTheTopEdgesMiddle() {
+        h.start()
+        assertRows(
+            "下滑 at 顶部: the shortcut top centre, 恢复 too" to {
+                at(KeyMarkPosition.Top)
+                assertEquals("z TC TR", marksOf("z"))
+                assertEquals("TR,TC", backspaceMarks())
+            },
+            "上滑 at 顶部: the symbol over the letter, 清除 too" to {
+                at(KeyMarkPosition.BottomLeft)
+                symbolsAt(KeyMarkPosition.Top)
+                assertEquals("z BL TC", marksOf("z"))
+                assertEquals("TC,BL", backspaceMarks())
+            },
+            "上滑 at 顶部, 下滑 at 底部: one at each edge's middle" to {
+                at(KeyMarkPosition.Bottom)
+                assertEquals("z BC TC", marksOf("z"))
+                assertEquals("TC,BC", backspaceMarks())
+            },
+            "the same in landscape: the symbol top right, the shortcut bottom right" to {
+                RuntimeEnvironment.setQualifiers("+land")
+                h.turn()
+                assertEquals("z BR TR", marksOf("z"))
+                assertEquals("TR,BR", backspaceMarks())
+            },
+            "swapped in landscape (上滑 底部, 下滑 顶部): each its own edge's right corner, the shortcut top right and the symbol bottom right, as 退格's ways (review 061-small S5)" to {
+                symbolsAt(KeyMarkPosition.Bottom)
+                at(KeyMarkPosition.Top)
+                assertEquals("z TR BR", marksOf("z"))
+            },
+            "下滑 alone at 顶部 in landscape, 上滑 at 右上: the top's other corner, 左上 (review 061-small N8; 右下 before)" to {
+                symbolsAt(KeyMarkPosition.TopRight)
+                assertEquals("z TL TR", marksOf("z"))
+                // ⌫'s own icon moved down for them on its narrow key: read as a mark at the bottom too
+                assertTrue(backspaceMarks(), backspaceMarks().endsWith("TR,TL"))
+            },
+        )
     }
 
     // the default is the long press's first up: only turning it down (the two places swapped with it) shows the

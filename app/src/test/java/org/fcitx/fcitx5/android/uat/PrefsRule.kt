@@ -39,6 +39,8 @@ class PrefsRule : ExternalResource() {
     override fun before() {
         found = HashMap(store.all)
         set(AppPrefs.getInstance().internal.lastPickerType, PickerWindow.Key.Emoji.name)
+        // the symbol panel opens on the category picked last, which a test without this rule may have left
+        set(AppPrefs.getInstance().internal.symbolPanelCategory, "")
         // the floating keyboard's spot, which a drag's end writes: another test's drag moved the theme maker's
         // floating shots (ThemeMakerLayoutTest)
         AppPrefs.getInstance().internal.let { set(it.floatingKeyboardX, it.floatingKeyboardX.defaultValue); set(it.floatingKeyboardY, it.floatingKeyboardY.defaultValue) }

@@ -286,6 +286,11 @@ class FakeHostApi : HostApi {
         calls += "reset()"
     }
 
+    override suspend fun dropPredictions(): Boolean {
+        calls += "dropPredictions()"
+        return candidatesCached.predicting
+    }
+
     override suspend fun clearTyped(keyboard: (im: String) -> Any?): HostCore.Retyping? {
         calls += "clearTyped()"
         return null

@@ -167,6 +167,55 @@ class PanelUatTest {
         assertTrue(categories().toString(), "Common" in categories())
     }
 
+    // the category shown in bold on the side: the one the panel shows
+    private fun shownCategory(of: KeyboardHarness = h): String = KeyboardHarness.all(KeyboardHarness.find<PickerSideUi>(of.inputView)!!)
+        .filterIsInstance<TextView>().single { of.shown(it) && it.typeface?.isBold == true }.text.toString()
+
+    // user 2026-11-13: till a category is picked the panel opens on 最近 once a symbol was used, else on 常用;
+    // once one is, on the one shown last
+    @Test
+    @Uat("PAN-29")
+    fun thePanelOpensOnTheRecentlyUsedTillACategoryIsPicked() {
+        h.start()
+        h.tap(h.key("符"))
+        assertEquals("Common", shownCategory())
+        h.tap(scrolledTo("？"))
+        h.tap(h.key("符"))
+        assertEquals("nothing picked, a symbol used", "Recent", shownCategory())
+        h.tap(textView("Arrows"))
+        h.tap(scrolledTo("→"))
+        h.tap(h.key("符"))
+        assertEquals("picked, then reopened", "Arrows", shownCategory())
+    }
+
+    // user 2026-11-14: the pick kept across a restart (a keyboard made anew reads it), a reopen being none; one
+    // kept that is no longer a category (renamed, gone) as none picked
+    @Test
+    @Uat("PAN-29")
+    fun theCategoryPickedIsKeptForTheNextStart() {
+        val kept = AppPrefs.getInstance().internal.symbolPanelCategory
+        h.start()
+        h.tap(h.key("符"))
+        h.tap(scrolledTo("？"))
+        h.tap(h.key("符"))
+        assertEquals("opened on the recently used, not picked: nothing kept", "", kept.getValue())
+        h.tap(textView("Arrows"))
+        h.tap(scrolledTo("→"))
+        assertEquals("arrows", kept.getValue())
+        h.close()
+        KeyboardHarness().use { again ->
+            again.start()
+            again.tap(again.key("符"))
+            assertEquals("the next start: the one picked", "Arrows", shownCategory(again))
+        }
+        prefs.set(kept, "gone")
+        KeyboardHarness().use { again ->
+            again.start()
+            again.tap(again.key("符"))
+            assertEquals("kept, but no such category: as none picked, a symbol used", "Recent", shownCategory(again))
+        }
+    }
+
     @Test
     @Uat("PAN-05")
     fun lockedPanelStaysForSeveral() {

@@ -490,6 +490,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /**
+     * 联想's × (0.6.1): the predictions shown put away, the 联想 setting as it was; the engine keeps its
+     * context, nothing to tell again (review 061-small M1). Nothing where none showed by then (a key typed since the tap).
+     */
+    fun dropPredictions() {
+        postFcitxJob { dropPredictions() }
+    }
+
+    /**
      * The app bound and its field focused again in a fcitx started anew under them (a pack imported,
      * PackStore), as [onBindInput] and [onStartInput] did in the one before: the input context made
      * (activate), the field's capabilities, the focus that picks the input method (without them the

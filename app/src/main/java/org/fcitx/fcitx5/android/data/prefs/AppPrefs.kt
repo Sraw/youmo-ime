@@ -56,6 +56,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val lastPickerType = string("last_picker_type", PickerWindow.Key.Emoji.name)
         val symbolPanelLocked = bool("symbol_panel_locked", false)
 
+        /** The symbol panel's category picked last, by its [org.fcitx.fcitx5.android.input.picker.PickerData.Category.id] (`arrows`); empty, none yet (PAN-29). */
+        val symbolPanelCategory = string("symbol_panel_category", "")
+
         /** The 候选词注音 style last used but off (ReadingStyle's key; empty, none yet): what the handwriting pad's 注 turns on. */
         val lastCandidateReading = string("last_candidate_reading", "")
 

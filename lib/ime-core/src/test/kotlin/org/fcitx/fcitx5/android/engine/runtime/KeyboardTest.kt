@@ -124,6 +124,7 @@ class KeyboardTest {
                     input = ""
                     predicting = false
                 }
+                Action.DropPredictions -> predicting = false
                 Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, Action.Refine, is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, is Action.Cursor, is Action.Step, Action.LookUp -> {}
             }
             val shown = all()

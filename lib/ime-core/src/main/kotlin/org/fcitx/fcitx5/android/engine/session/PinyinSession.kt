@@ -259,6 +259,9 @@ class PinyinSession(
         Action.NextPage -> turn(pager.page + 1)
         Action.PreviousPage -> turn(pager.page - 1)
         Action.CommitRaw -> commitRaw()
+        // 联想's ×, sent only while predicting (Keyboard), nothing typed: the offer alone goes; recent, the record and
+        // what was learned of the commit stay for what is typed next
+        Action.DropPredictions -> { predictions.unoffer(); read(); snapshot() }
         Action.Reset -> {
             // the input method left, the field went, a panel or another input method writes: what is
             // in the field is no longer known till a context says (U-03; review-design-1c M1)
@@ -292,9 +295,7 @@ class PinyinSession(
      * Keys other than letters a key at a time too: whether 双拼's `;` is read depends on the keys before it.
      */
     fun typeAll(keys: String): Snapshot {
-        if (keys.isEmpty() || nineKeys != null || !keys.all { it in 'a'..'z' }) {
-            return keys.fold(snapshot()) { before, c -> apply(Action.Key(c)).let { it.copy(commit = before.commit + it.commit) } }
-        }
+        if (keys.isEmpty() || nineKeys != null || !keys.all { it in 'a'..'z' }) return keys.fold(snapshot()) { before, c -> apply(Action.Key(c)).let { it.copy(commit = before.commit + it.commit) } }
         unrefined = null
         insert(keys)
         read()

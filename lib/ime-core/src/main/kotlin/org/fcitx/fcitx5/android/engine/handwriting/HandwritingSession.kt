@@ -196,7 +196,8 @@ class HandwritingSession(
         if (!keepsOrder(action)) unrefined.drop()
         // what a Backspace deleted whole taken back, now that what came next is not a context saying otherwise (U-03)
         journal.before(action, learning)
-        return act(action)
+        // 联想's ×: the offer alone goes, what is written stays
+        return if (action == Action.DropPredictions && written.isEmpty()) unoffer() else act(action)
     }
 
     // what changes neither the sentences shown nor the page: an Ink (see apply), the cursor, which
@@ -232,7 +233,8 @@ class HandwritingSession(
         Action.Refine -> refine()
         is Action.Forget -> pressed(action.index, Offer.FORGET)
         is Action.Block -> pressed(action.index, Offer.BLOCK)
-        is Action.Glide, is Action.Stroke, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp -> snapshot()
+        is Action.Glide, is Action.Stroke, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp,
+        Action.DropPredictions -> snapshot()
     }
 
     override fun candidates(from: Int, count: Int): List<Choice> {

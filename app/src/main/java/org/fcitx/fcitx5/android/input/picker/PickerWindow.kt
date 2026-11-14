@@ -74,7 +74,10 @@ class PickerWindow(
 
     private var locked by AppPrefs.getInstance().internal.symbolPanelLocked
 
-    private val sidePanel by lazy { SymbolPanel(adapter.categories.size, FirstCategory) }
+    // the category picked last kept by its id, not its place or its label, which change between versions
+    private var pickedCategory by AppPrefs.getInstance().internal.symbolPanelCategory
+
+    private val sidePanel by lazy { SymbolPanel(adapter.categories.size, FirstCategory, categoryOf(adapter.categories, pickedCategory)) }
 
     private lateinit var pickerLayout: PickerLayout
 
@@ -283,9 +286,15 @@ class PickerWindow(
         pickerLayout.grid.gridLayoutManager.scrollToPositionWithOffset(adapter.startOf(category), 0)
     }
 
-    /** The panel's [category], alone beside the side, from its top. */
+    /** The panel's [category] picked on the side. */
     private fun select(category: Int) {
         sidePanel.select(category)
+        adapter.categories[category].id.takeIf { it.isNotEmpty() }?.let { pickedCategory = it }
+        showOnly(category)
+    }
+
+    /** The panel's [category], alone beside the side, from its top. */
+    private fun showOnly(category: Int) {
         adapter.only = category
         adapter.rebuild()
         pickerLayout.side?.activate(category)
@@ -309,7 +318,7 @@ class PickerWindow(
         if (panel) {
             sidePanel.open(adapter.recentEmpty)
             updateRecentTab()
-            select(sidePanel.selected)
+            showOnly(sidePanel.selected)
             pickerLayout.embeddedKeyboard.showLocked(locked)
         } else {
             search(false)
@@ -341,6 +350,10 @@ class PickerWindow(
 
         /** The category a picker of [count] opens on: no emoji (the app without their data), the recently used, the only one there is. */
         internal fun firstShown(count: Int) = minOf(FirstCategory, count - 1)
+
+        /** Where the category of [id] is among [categories]; null for none (an id no longer listed, none kept). */
+        internal fun categoryOf(categories: List<PickerData.Category>, id: String): Int? =
+            categories.indexOfFirst { it.id.isNotEmpty() && it.id == id }.takeIf { it >= 0 }
 
         internal val SearchKey = KeyDef(
             KeyDef.Appearance.Image(

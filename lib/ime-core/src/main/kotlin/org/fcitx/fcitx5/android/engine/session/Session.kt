@@ -313,6 +313,13 @@ sealed class Action {
     object Reset : Action()
 
     /**
+     * 联想 put away (the bar's ×), nothing else: what was committed stays the context, as do the
+     * session's own space and a correction's undo, which [Reset] would drop (review 061-small M1).
+     * Nothing to a session showing no predictions.
+     */
+    object DropPredictions : Action()
+
+    /**
      * Drops everything as [Reset] does, then takes [before], the text before the cursor, as what
      * the input to come follows: what the host read off the editor, where the engine committed
      * nothing yet (a field focused, the cursor put somewhere). [cleared]: [before] is what was

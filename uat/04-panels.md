@@ -26,6 +26,12 @@
 - **预期**：符号面板左边是分类：常用、中文、英文、括号、箭头、数学、序号、图形、全角（用过符号以后，最上面多一个"最近"）；点「《」后框里是「《」，面板关掉回到字母键盘。
 - **JVM**：`PanelUatTest.symbolPanelTypesAndCloses`（分类顺序、「《」上屏并回到键盘、用过后多「最近」；图）；设备上不跑。
 
+### PAN-29 [P1] 符号面板打开时的分类；英文一栏
+- **前提**：B0（没用过符号面板：清掉数据或新装）。
+- **操作**：点 **符**，看左边哪个分类亮着；在「常用」里点「？」。再点 **符**；点「箭头」，点「→」；再点 **符**。最后点「英文」，看格子。
+- **预期**：第一次打开亮的是「常用」；用过「？」后再打开亮的是「最近」（第一个是「？」）；点过「箭头」以后再打开就是「箭头」（记住上次看的）。再强行停止输入法（或重启手机）后点 **符**，仍是「箭头」。「英文」里没有 1–0 十个数字，第二行开头是英文的 `,` `.`。
+- **JVM**：`PanelUatTest.thePanelOpensOnTheRecentlyUsedTillACategoryIsPicked`（三次打开亮的分类）、`PickerDataTest.theEnglishTabHasNoDigitsButTheEnglishCommaAndFullStop`（英文一栏没有数字、有 `,` `.`）、`SymbolPanelTest.tillACategoryIsPickedItOpensOnTheRecentlyUsedOnceThereAreAny`、`PanelUatTest.theCategoryPickedIsKeptForTheNextStart`（点过的分类重新建键盘后还在；只是重新打开不算点过；记着的分类已没有时照没点过处理）、`SymbolPanelTest.aRememberedPickOpensAsAPickMadeInThisRun`、`PickerDataTest.everySymbolCategoryIsFoundAgainByItsId`（每个分类按自己的 id 记、按 id 找回原处）；设备上不跑。
+
 ### PAN-05 [P1] 锁住符号面板连续选几个
 - **前提**：B0，点 **符**。
 - **操作**：点下面的锁；点「→」「←」「↑」（在"箭头"分类）。

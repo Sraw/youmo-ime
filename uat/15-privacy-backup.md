@@ -261,14 +261,20 @@
 ### PR-52 [P1] 从备份恢复：改过名的备份能恢复，不是备份的文件、条目太多的被拒绝
 - **前提**：B0-设置，加词「澜境花园」，**备份与恢复 → 备份全部**。
 - **操作**：从备份恢复三种文件：这份备份改名成 `youmo_backup.bak`；一个不是备份的 zip（`other.zip`）；条目（文件和文件夹）超过 10 万个的 zip。
-- **预期**：`other.zip` 提示「找不到用户数据的元数据」，应用不重启，什么都没变；`youmo_backup.bak` 照常恢复（名字不以 `.zip` 结尾也行），「澜境花园」在；条目太多的提示「备份里的条目超过 10 万个，不是本应用的备份」，什么都不恢复。键盘一直没启动完时提示「键盘还在启动，没等到它启动完：什么都没有恢复。请稍后再试」，什么都不恢复（设备上造不出）。
-- **JVM**：`UserDataManagerTest.aBackupOfTooManyEntriesStopsAsItIsUnpacked`（11 个条目、上限 10 报错，10 个通过）、`UserDataManagerTest.aFileWithoutTheMetadataIsRefusedAndNothingChanges`（不是备份的拒绝、什么都没变）；名字不以 `.zip` 结尾的照常恢复：恢复只读选中文件的内容、不看名字，没有能因名字失败的 JVM 测试，选择器里选得到并恢复见 PR-52a（手工）；键盘还在启动：`HostRestartTest.aHostStuckStartingIsNotStoppedAndSaidSo` 只断言 `HostDaemon` 等不到启动完时不停、返回 false，恢复页由此提示的那一句没有测试（`BackupFragment` 直接调 `HostDaemon.stopFcitx()`，没有接缝）；设备上不跑。
+- **预期**：`other.zip` 提示「找不到用户数据的元数据」，应用不重启，什么都没变；`youmo_backup.bak` 照常恢复（名字不以 `.zip` 结尾也行），「澜境花园」在；条目太多的马上提示「备份里的条目超过 10 万个，不是本应用的备份」（先读 zip 末尾的目录记录数条目，不先解开），什么都不恢复。不是 zip 的文件（开头不是 zip 的头）马上提示「这个文件不是本应用的备份」，不先复制；zip 被截掉末尾、读不到目录记录的也这样提示；超过 2 GB 的提示「文件超过 2 GB，不是本应用的备份」；比剩余空间的一半还大的提示「备份放不进手机剩余的存储空间」。键盘一直没启动完时提示「键盘还在启动，没等到它启动完：什么都没有恢复。请稍后再试」，什么都不恢复（设备上造不出）。
+- **JVM**：`BackupEntriesTest.aFileIsCopiedOnlyIfAZipOfSizeAndRoomAndReadByItsEndRecord`（视频只读了开头 4 字节就拒绝、没复制；超过上限的、比剩余空间一半大的，复制时拒绝、什么都没解开；截掉末尾记录的、末尾记录说的条目放不进目录的，不是备份；65 536 个条目读 zip64 的记录；一小时前留下的副本删掉、刚建的留着）、`BackupEntriesTest.aFullFieldIsReadFromZip64OnlyWhereItsRecordIsThereAndHolds`（正好 65 535 个条目、没有 zip64 的照常读；字段全满却没有 zip64 定位记录、定位记录指到文件外或放不下、zip64 记录里的数读成负数的，都不是备份）、`BackupEntriesTest.aBackupOfTooManyEntriesIsRefusedBeforeAnyIsUnpacked`（11 个条目、上限 10：按 zip 末尾的目录记录拒绝，一个都没解开；目录只记了 1 个的照样在解开时拦下；10 个通过；zip 的临时副本都删掉）、`UserDataManagerTest.aBackupOfTooManyEntriesStopsAsItIsUnpacked`（11 个条目、上限 10 报错，10 个通过）、`UserDataManagerTest.aFileWithoutTheMetadataIsRefusedAndNothingChanges`（不是备份的拒绝、什么都没变）；名字不以 `.zip` 结尾的照常恢复：恢复只读选中文件的内容、不看名字，没有能因名字失败的 JVM 测试，选择器里选得到并恢复见 PR-52a（手工）；键盘还在启动：`HostRestartTest.aHostStuckStartingIsNotStoppedAndSaidSo` 只断言 `HostDaemon` 等不到启动完时不停、返回 false，恢复页由此提示的那一句没有测试（`BackupFragment` 直接调 `HostDaemon.stopFcitx()`，没有接缝）；设备上不跑。
 
 ### PR-52a [P1] 从备份恢复：系统文件选择器里选得到改过名的备份和任何文件
 - **前提**：B0-设置，加词「澜境花园」，**备份与恢复 → 备份全部** 存到"下载"；在"下载"里把它复制一份改名成 `youmo_backup.bak`；另放 `other.zip`（`fixtures` 里任何一个文件压成的 zip）和 `many.zip`（电脑上 `python3 -c "import zipfile;z=zipfile.ZipFile('many.zip','w');[z.writestr(f'd{i}/','') for i in range(100001)];z.close()"`，几 MB，`adb push` 到 `/sdcard/Download/`）；再放一张图片 `shot.png`（`adb shell screencap -p /sdcard/Download/shot.png`）。
 - **操作**：**备份与恢复 → 从备份恢复**，在系统文件选择器里先选 `other.zip`，看提示；再选 `many.zip`，看提示；再选 `shot.png`（误选了照片），看提示；再选 `youmo_backup.bak` 并确认。
-- **预期**：选择器里四个文件都列着、都能选（选择器不按文件类型过滤：`.bak` 不算 zip，图片也列着）；`other.zip` 和 `shot.png` 都提示「找不到用户数据的元数据」，`many.zip` 提示「备份里的条目超过 10 万个，不是本应用的备份」，这三次应用都不重启、什么都没变；`youmo_backup.bak` 照常恢复，应用重启，「澜境花园」在。
+- **预期**：选择器里四个文件都列着、都能选（选择器不按文件类型过滤：`.bak` 不算 zip，图片也列着）；`other.zip` 提示「找不到用户数据的元数据」，`shot.png` 马上提示「这个文件不是本应用的备份」，`many.zip` 马上（几秒内，不长时间显示「加载中」）提示「备份里的条目超过 10 万个，不是本应用的备份」，这三次应用都不重启、什么都没变；`youmo_backup.bak` 照常恢复，应用重启，「澜境花园」在。
 - 系统文件选择器是系统界面，在真机或模拟器上手工跑；拒绝和恢复本身见 PR-52 的 JVM 测试（`UserDataManagerTest.aFileWithoutTheMetadataIsRefusedAndNothingChanges` 的两行：不是备份的 zip、根本不是 zip 的文件）。
+
+### PR-52b [P2] 条目太多的 zip 马上被拒绝（设备）
+- **前提**：B0-设置；电脑上 `python3 -c "import zipfile;z=zipfile.ZipFile('many.zip','w');[z.writestr(f'd{i}/','') for i in range(100001)];z.close()"`，`adb push` 到 `/sdcard/Download/`。
+- **操作**：**备份与恢复 → 从备份恢复**，确认后在文件选择器里选 `many.zip`，计时到出提示。
+- **预期**：几秒内（脚本限 8 秒，含点下去后的 1 秒等待和读屏）提示「备份里的条目超过 10 万个，不是本应用的备份」，不长时间显示「加载中」；应用不重启，什么都没变。0.6.1 以前要先「加载中」约 31 秒（先解开十万个文件夹再拒绝）。
+- 拒绝本身见 PR-52 的 JVM 测试（`BackupEntriesTest.aBackupOfTooManyEntriesIsRefusedBeforeAnyIsUnpacked`）；这里在设备上看等多久。
 
 ### PR-53 [P1] 恢复备份后单手模式仍在记住的那一侧
 - **前提**：B0-设置；按 TB-20 把单手模式切到左侧再关掉。

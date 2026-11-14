@@ -88,7 +88,7 @@ class ContentTest {
         assertEquals(Fixtures.materialLight.colors["keyHint"], one.color)
     }
 
-    // [box] in [at]'s part of the face [f]: its side (the middle for 底部) and its half
+    // [box] in [at]'s part of the face [f]: its side (the middle for 底部 and 顶部) and its half
     private fun assertAt(at: KeyMarks.At, box: Box, f: Box, what: String) {
         val x = (box.left + box.right) / 2 - (f.left + f.right) / 2
         val y = (box.top + box.bottom) / 2 - (f.top + f.bottom) / 2
@@ -97,6 +97,7 @@ class ContentTest {
             KeyMarks.At.TopRight -> 1 to false
             KeyMarks.At.BottomLeft -> -1 to true
             KeyMarks.At.BottomRight -> 1 to true
+            KeyMarks.At.Top -> 0 to false
             else -> 0 to true
         }
         assertEquals(wantBottom, y > 0, "$what at $at, $box in $f")
@@ -106,7 +107,7 @@ class ContentTest {
     @Test
     fun aFunctionKeysMarksEachWhereItsWaysSettingSays() {
         // beta2: 上滑 右上, 下滑 右下 drew ⌫'s 恢复 (down) top right and 清除 (up) bottom right. Every 上滑 × 下滑, on
-        // tall keys and low ones (横屏, 紧凑: a 底部 the first of 右上 右下 左上 左下 the other way's is not), and
+        // tall keys and low ones (横屏, 紧凑: a 底部 the first of 右上 右下 左上 左下 the other way's is not, a 顶部 of 右上 左上 右下 左下), and
         // 翻转上下滑 (the two places, the long press's way and every key's two swipes swapped): the marks stay
         val places = KeyMarks.At.entries.filter { it != KeyMarks.At.None }
         val seen = mutableSetOf<Triple<String, Boolean, KeyMarks.At>>()
@@ -115,13 +116,20 @@ class ContentTest {
         val flippedPreset = Fixtures.presetMarks.mapKeys { (k, _) -> if (k.endsWith(":up")) k.dropLast(3) + ":down" else k.dropLast(5) + ":up" }
         for ((form, base) in forms) for ((up, down) in combos) {
             val low = form != "tall"
-            fun shown(at: KeyMarks.At, other: KeyMarks.At) = if (low && at == KeyMarks.At.Bottom) KeyMarks.LowOrder.first { it != other } else at
+            // each the first corner the other way's setting is not; a 顶部 and a 底部 each its own edge's right corner
+            fun shown(at: KeyMarks.At, other: KeyMarks.At) = when {
+                !low || !at.middle -> at
+                other.middle -> if (at == KeyMarks.At.Top) KeyMarks.At.TopRight else KeyMarks.At.BottomRight
+                else -> KeyMarks.lowOrder(at).first { it != other }
+            }
+            val upShown = shown(up, down)
+            val downShown = shown(down, up)
             val s = Fixtures.scene(base.copy(marks = MarkSettings(upAt = up, downAt = down, shortcuts = Fixtures.presetMarks)))
             val flipped = Fixtures.scene(base.copy(marks = MarkSettings(upAt = down, downAt = up, firstUp = false, shortcuts = flippedPreset)))
             val f = face(s, "backspace")
             val icons = icons(s, "backspace").associate { it.name to it.box }
             assertEquals(icons, icons(flipped, "backspace").associate { it.name to it.box }, "$form $up $down: 翻转 leaves them")
-            for ((name, at) in listOf("delete-sweep" to shown(up, down), "restore" to shown(down, up))) {
+            for ((name, at) in listOf("delete-sweep" to upShown, "restore" to downShown)) {
                 val box = icons[name]
                 if (at == KeyMarks.At.None) assertEquals(null, box, "$form $up $down: $name not drawn")
                 // drawn wherever set, on every form: no pair of places the yield drops one of on these keys

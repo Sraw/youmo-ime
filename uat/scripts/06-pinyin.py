@@ -66,6 +66,7 @@ case("PY-26", needs="jvm:PinyinUatTest.wordsThatMayFollowAfterACommit")(lambda d
 
 
 case("PY-27", needs="jvm:PinyinUatTest.typingPutsTheWordsThatMayFollowAway")(lambda d: None)
+case("PY-134", needs="jvm:BarUatTest.theCrossWithThePredictionsDropsThem")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 长按候选

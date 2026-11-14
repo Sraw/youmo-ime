@@ -754,19 +754,21 @@ class UserDataManagerTest {
             }
         }.toByteArray()
         // each row its own phone: a file wrongly put in by one is not found by the next (R25r3 F7938)
-        fun refused(phoneNamed: String, file: ByteArray) {
+        fun refused(phoneNamed: String, file: ByteArray, why: Int = R.string.exception_user_data_metadata) {
             val phone = install(phoneNamed)
             File(phone.sharedPrefs.apply { mkdirs() }, prefs).writeText("<map />")
             File(phone.engine.apply { mkdirs() }, "pinyin.log").writeText("learned")
             val e = UserDataManager.import(file.inputStream(), phone).exceptionOrNull()
-            assertEquals(appContext.getString(R.string.exception_user_data_metadata), e?.message)
+            assertEquals(appContext.getString(why), e?.message)
             assertEquals("<map />", File(phone.sharedPrefs, prefs).readText())
             assertEquals("learned", File(phone.engine, "pinyin.log").readText())
             assertEquals(listOf("pinyin.log"), phone.engine.list()!!.toList())
         }
         assertRows(
             "a zip that is no backup (no metadata.json), with files where a backup has them: none of them put in" to { refused("phone-given-another-zip", otherZip) },
-            "a file that is no zip at all (a photo picked by mistake): no entry read, refused the same" to { refused("phone-given-no-zip", "not a zip, nor a backup".encodeToByteArray()) },
+            "a file that is no zip at all (a photo picked by mistake): refused on its first bytes as no backup (review 061-small S2)" to {
+                refused("phone-given-no-zip", "not a zip, nor a backup".encodeToByteArray(), R.string.exception_user_data_not_a_backup)
+            },
         )
     }
 }

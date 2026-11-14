@@ -226,6 +226,7 @@ case("KB-65", needs="jvm:SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted
 
 
 case("KB-66", needs="jvm:KeyMarksUatTest.eachWhereItsSettingSays、KeyMarksUatTest.onePlaceStoredInBothTheSymbolYields、KeyMarkPositionSettingsTest.theTwoTogetherTheOthersPlaceGreyedOut、KeyMarksUatTest.theFirstOpenIsAsAfterAnySettingChanges、KeyMarksUatTest.aLongPressTurnedOffPlacesTheMarksAsAKeyboardMadeWithIt、KeyMarksScreenshotTest.everyPlaceOnTheKeyboards、KeyMarksTest、KeyMarkYieldTest")(lambda d: None)
+case("KB-89", needs="jvm:KeyMarksUatTest.theTopIsTheTopEdgesMiddle")(lambda d: None)
 
 
 case("KB-68", needs="jvm:LetterCaseScreenshotTest、LetterCaseRuleTest")(lambda d: None)

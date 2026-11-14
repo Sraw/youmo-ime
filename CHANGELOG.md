@@ -24,6 +24,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 数字键盘、表情、颜文字面板上回字母键盘的键都写 **返回**（以前写 ABC），和符号面板一样，读屏也念「返回」。
 - 学到的词没能存下来时（比如存储出了问题），键盘上提示一次，告诉你该怎么办；以前只记在内存里，什么都不说，输入法被系统停止后就全丢了。手机重启后、第一次解锁前学到的词不保存（解锁后照常），这时也提示一次。
 - 笔画筛选画的撇、横少被认成折：拐角两边要各是直的，弯成弧线的撇、末尾带个小钩的横按整体方向算。
+- 符号面板：还没在左边点过分类时，用过符号就打开在「最近」，没用过打开在「常用」；点过分类以后打开上次点的，重启后也记得。「英文」一栏去掉了开头的 1–0 十个数字，补上了英文的 `,` `.`，图标从「1?#」改成「!?#」。
+- 从备份恢复选了条目极多（超过 10 万个）的 zip 时马上提示不是本应用的备份；以前要先「加载中」半分钟左右。误选了照片、视频或残缺的 zip 也马上提示「这个文件不是本应用的备份」，不再先把整个文件复制一遍。
+- 上滑图标位置、下滑图标位置多了「顶部」：画在键的上边中间，字母不挪；横屏、紧凑时改画在角上：先挑上边的角（右上、左上），再挑下边的；一个顶部一个底部时顶部的在右上、底部的在右下。画在上、下边中间的文字只占两个角标记中间，放不下就缩短，不会和角上的小字连在一起。
+- 联想时候选栏最右边多了 ×：点了只收起这一次的联想，「联想下一个词」设置不变。
 
 ### Main changes
 
@@ -42,6 +46,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 - The key back to the letters on the number pads and the emoji and emoticon panels says **返回** (Back), no longer ABC, as on the symbol panel; a screen reader says Back.
 - When learned words cannot be saved (a storage problem, say), the keyboard says so once, with what to do; before, they were kept in memory alone, nothing said, and lost once the system stopped the keyboard. Words learned after a restart and before the first unlock are not saved (they are again after it), and the keyboard says so once.
 - A 撇 or 横 drawn for the stroke filter is less often read as 折: a corner's two arms must each be straight, so a bowed 撇 or a 横 with a tick at its end is read by its overall direction.
+- Symbol panel: till a category is picked on its side, it opens on 最近 (recent) once a symbol was used, else on 常用 (common); once one is, on the one picked last, kept across restarts. The 英文 (ASCII) tab no longer starts with the digits 1–0 and has the English `,` and `.` it lacked; its icon reads 「!?#」, not 「1?#」.
+- Restoring from a zip of far too many entries (over 100 000) says at once that it is no backup of this app; before, it showed 加载中 (loading) for about half a minute first. A photo, a video or a cut-short zip picked by mistake is likewise refused at once as no backup, without being copied first.
+- 上滑图标位置 and 下滑图标位置 have 「顶部」 (top): the top edge's middle, the letter where it was; on landscape and 紧凑 keys a corner, the top's first (top right, top left); one at 顶部 and one at 底部: top right and bottom right. A text at an edge's middle keeps between the corner marks, shortened where it does not fit, never running on into a corner's symbol.
+- With 联想 (next-word predictions) shown, the candidate bar has a × at its far right: it puts away these predictions alone, the setting unchanged.
 
 ---
 

@@ -87,11 +87,12 @@ def backup(d):
     return name, new, msgs
 
 
-def restore(d, fname, refused=None):
+def restore(d, fname, refused=None, took=None):
     """从备份恢复 → fname; returns (the confirmation's text, restarted), after the app came back.
     The caller checks restarted (F3725): a case may check the warning first (F3714).
     refused: text the import's error dialog must show (a backup this build refuses); returns (that
-    dialog's text, False) once it shows over our page, with our process still the same one"""
+    dialog's text, False) once it shows over our page, with our process still the same one.
+    took: a list the seconds from the file's tap to the refusal shown are added to"""
     d.hide_keyboard()
     home(d, "备份与恢复")
     d.tap_text("从备份恢复", after=1.2)
@@ -104,6 +105,16 @@ def restore(d, fname, refused=None):
     d.tap(b.c, 2.5)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"没出文件选择：{d.top_activity()}")
+    # a file pushed over adb (PR-52b's) is in 下载 but not in 近期的文件, where the picker may open: as
+    # import_packs_ui goes there
+    s = d.screen()
+    # 近期的文件 (Android 14+) or 最近 (Android 10's)
+    if not s.find(text=fname) and any(s.find(text=t, where="all") for t in ("近期的文件", "最近")):
+        # the drawer's ☰, by what it says to a screen reader (DocumentsUI's drawer_open); not found, where it is on
+        # this AVD (1080×2340, 440 dpi), as import_packs_ui has it
+        menu = next((n for n in s.nodes if n.desc in ("显示根目录", "Show roots")), None)
+        d.tap(menu.c if menu else (77, 148), 1.0)
+        d.tap_text("下载", scroll=False, after=2.0)
     for _ in range(4):
         n = d.screen().find(text=fname)
         if n:
@@ -112,12 +123,15 @@ def restore(d, fname, refused=None):
     else:
         raise Blocked(f"下载里没有 {fname}")
     pid = d.sh(f"pidof {PKG}").strip()
+    tapped = time.time()
     d.tap(n.c, 1.0)
     if refused:
         # the refusal itself, not a picker tapped on nothing or a crash: no restart alone proves neither
         try:
             msg = d.wait(lambda s: " ".join(n.text for n in s.nodes if n.rid == "message" and refused in (n.text or "")),
                          timeout=20, what=f"拒绝提示（{refused}）")
+            if took is not None:
+                took.append(time.time() - tapped)
         except Blocked:
             # a restart instead of the refusal is the build accepting the backup: a failure, not a block
             now = d.sh(f"pidof {PKG}").strip()
@@ -392,7 +406,29 @@ case("PR-49", needs="jvm:PrivacyUatTest.aBackupTakesAWholeSentenceUsedTwiceNotOn
 
 case("PR-50", needs="jvm:UserDataManagerTest.aBackupBiggerThanTheRoomLeftStopsAsItIsUnpacked")(lambda d: None)
 case("PR-51", needs="manual:要恢复备份造出同名的 3.0 主题和主题包两张卡，再分别删除")(lambda d: None)
-case("PR-52", needs="jvm:UserDataManagerTest.aBackupOfTooManyEntriesStopsAsItIsUnpacked、"
+case("PR-52", needs="jvm:BackupEntriesTest.aFileIsCopiedOnlyIfAZipOfSizeAndRoomAndReadByItsEndRecord、BackupEntriesTest.aFullFieldIsReadFromZip64OnlyWhereItsRecordIsThereAndHolds、BackupEntriesTest.aBackupOfTooManyEntriesIsRefusedBeforeAnyIsUnpacked、UserDataManagerTest.aBackupOfTooManyEntriesStopsAsItIsUnpacked、"
      "UserDataManagerTest.aFileWithoutTheMetadataIsRefusedAndNothingChanges")(lambda d: None)
+@case("PR-52b", base="B0-设置", mutates=True)
+def pr52b(d):
+    """a zip of 100 001 empty folders refused at once, by its central directory: not after each was
+    unpacked (R25: half a minute of 加载中 first)"""
+    d.step("把 many.zip 放进下载")
+    with tempfile.TemporaryDirectory() as tmp:
+        local = os.path.join(tmp, "many.zip")
+        with zipfile.ZipFile(local, "w") as z:
+            for i in range(100001):
+                z.writestr(f"d{i}/", "")
+        d.adb("push", local, f"{DOWNLOAD}/many.zip", check=True, timeout=120)
+    try:
+        d.step("从备份恢复选 many.zip")
+        took = []
+        msg, _ = restore(d, "many.zip", refused="条目超过 10 万个", took=took)
+        print(f"{d.serial}: PR-52b 拒绝用了 {took[0]:.1f} 秒（从点文件到提示，含一次 1 秒的等待和读屏）", flush=True)
+        # the tap's own second and the screen reads in it: the refusal itself well under that
+        check(took[0] < 8, f"点 many.zip 后 {took[0]:.1f} 秒才提示「{msg}」")
+    finally:
+        d.sh(f"rm -f {DOWNLOAD}/many.zip")
+
+
 case("PR-52a", needs="manual:系统文件选择器里选改过名的备份、不是备份的 zip、图片和条目太多的 zip；在真机或模拟器上手工跑")(lambda d: None)
 case("PR-53", needs="jvm:AppPrefsTest.theOneHandedSideRememberedIsNotResetByTheResetsOfHiddenSettings")(lambda d: None)

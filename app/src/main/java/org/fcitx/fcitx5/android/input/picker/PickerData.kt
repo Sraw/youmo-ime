@@ -16,20 +16,22 @@ object PickerData {
 
     /**
      * [name] heads the category's section in the list, [label] when it has none; [short] (or
-     * [name]) is what the symbol panel's narrow side lists it as
+     * [name]) is what the symbol panel's narrow side lists it as. [id]: the symbol panel's pick kept by it
+     * across restarts, never changed once released (a label changes, a resource's name is shrunk away)
      */
     data class Category(
         val label: String = "",
         val icon: Int = 0,
         @StringRes val name: Int = 0,
-        @StringRes val short: Int = 0
+        @StringRes val short: Int = 0,
+        val id: String = ""
     )
 
-    val RecentlyUsedCategory = Category("⟳", R.drawable.ic_baseline_access_time_24, R.string.picker_recent, R.string.picker_short_recent)
+    val RecentlyUsedCategory = Category("⟳", R.drawable.ic_baseline_access_time_24, R.string.picker_recent, R.string.picker_short_recent, id = "recent")
 
     val Symbol: List<Pair<Category, Array<String>>> = listOf(
         // what a Chinese text needs most, then the ASCII ones it borrows: the picker opens here
-        Category("，。", R.drawable.symbol_common, R.string.picker_common) to arrayOf(
+        Category("，。", R.drawable.symbol_common, R.string.picker_common, id = "common") to arrayOf(
             "，", "。", "？", "！", "、", "：", "；", "……", "——", "·",
             "“", "”", "‘", "’", "（", "）", "《", "》", "【", "】",
             "～", "@", "#", "%", "&", "*", "+", "-", "=", "/",
@@ -37,17 +39,17 @@ object PickerData {
             "_", "\\", "|", "<", ">", "[", "]", "{", "}", "^",
             "$", "¥", "€", "£", "°", "℃", "×", "÷", "√", "±"
         ),
-        Category("中", 0, R.string.picker_chinese, R.string.picker_short_chinese) to arrayOf(
+        Category("中", 0, R.string.picker_chinese, R.string.picker_short_chinese, id = "chinese") to arrayOf(
             "，", "。", "？", "！", "、", "：", "；", "……", "——", "·",
             "“", "”", "‘", "’", "（", "）", "《", "》", "〈", "〉",
             "【", "】", "「", "」", "『", "』", "〔", "〕", "〖", "〗",
             "～", "—", "－", "﹏", "＿", "￥", "＃", "％", "＆", "＊",
             "＠", "｜", "／", "＼", "々", "〃", "〇", "※", "§", "№"
         ),
-        Category("1?#", R.drawable.symbol_number_punctuation, R.string.picker_ascii, R.string.picker_short_ascii) to arrayOf(
-            "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+        // no digits (the keyboard's row and the number pad have them), but the English comma and full stop
+        Category("!?#", R.drawable.symbol_ascii, R.string.picker_ascii, R.string.picker_short_ascii, id = "ascii") to arrayOf(
             "!", "@", "#", "$", "%", "^", "&", "*", "(", ")",
-            "'", "\"", "=", "_", "`", ":", ";", "?",
+            ",", ".", "'", "\"", "=", "_", "`", ":", ";", "?",
             "~", "|", "+", "-", "\\", "/", "[", "]", "{", "}",
             "<", ">", "“", "”", "·", "‘", "’", "¡", "¿", "¥",
             "€", "£", "¢", "©", "®", "℗", "™", "℠",
@@ -55,7 +57,7 @@ object PickerData {
             "⁄", "‼", "⁇", "⁈", "⁉", "√", "π", "±", "×", "÷",
             "¶", "∆", "¤", "µ", "‹", "›", "«", "»"
         ),
-        Category("( )", R.drawable.symbol_bracket, R.string.picker_brackets) to arrayOf(
+        Category("( )", R.drawable.symbol_bracket, R.string.picker_brackets, id = "brackets") to arrayOf(
             "(", ")", "[", "]", "{", "}", "（", "）", "［", "］",
             "｛", "｝", "❨", "❩", "❲", "❳", "❴", "❵", "‘", "’",
             "“", "”", "❛", "❜", "❝", "❞", "<", ">",
@@ -63,7 +65,7 @@ object PickerData {
             "「", "」", "『", "』", "︵", "︶", "︷", "︸", "︹", "︺",
             "︻", "︼", "︽", "︾", "︿", "﹀", "﹁", "﹂",
         ),
-        Category("⇄", R.drawable.symbol_arrow, R.string.picker_arrows) to arrayOf(
+        Category("⇄", R.drawable.symbol_arrow, R.string.picker_arrows, id = "arrows") to arrayOf(
             "←", "↑", "→", "↓", "↔", "↕", "↖", "↗", "↘", "↙",
             "↚", "↛", "↜", "↝", "↞", "↟", "↠", "↡", "↢", "↣",
             "↤", "↥", "↦", "↧", "↨", "↩", "↪", "↫",
@@ -74,7 +76,7 @@ object PickerData {
             "⇒", "⇓", "⇔", "⇕", "⇖", "⇗", "⇘", "⇙", "⇚", "⇛",
             "⇜", "⇝", "⇞", "⇟", "⇠", "⇡", "⇢", "⇣"
         ),
-        Category("±", R.drawable.symbol_math, R.string.picker_math, R.string.picker_short_math) to arrayOf(
+        Category("±", R.drawable.symbol_math, R.string.picker_math, R.string.picker_short_math, id = "math") to arrayOf(
             "+", "-", "×", "÷", "±", "∓", "=", "≠", "∼", "≅",
             "<", ">", "≤", "≥", "√", "∛", "≈", "≡", "⁺", "⁻",
             "⊕", "⊗", "%", "‰", "∀", "∂", "∃", "∅",
@@ -88,7 +90,7 @@ object PickerData {
             "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π",
             "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω",
         ),
-        Category("①", R.drawable.symbol_ordinal, R.string.picker_ordinals) to arrayOf(
+        Category("①", R.drawable.symbol_ordinal, R.string.picker_ordinals, id = "ordinals") to arrayOf(
             "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩",
             "⑴", "⑵", "⑶", "⑷", "⑸", "⑹", "⑺", "⑻", "⑼", "⑽",
             "❶", "❷", "❸", "❹", "❺", "❻", "❼", "❽",
@@ -99,7 +101,7 @@ object PickerData {
             "ⅺ", "ⅻ", "ⅼ", "ⅽ", "ⅾ", "ⅿ", "¹", "²", "³", "⁴",
             "₁", "₂", "₃", "₄", "½", "⅓", "⅔", "㊣"
         ),
-        Category("◇", R.drawable.symbol_other, R.string.picker_shapes) to arrayOf(
+        Category("◇", R.drawable.symbol_other, R.string.picker_shapes, id = "shapes") to arrayOf(
             "⚫", "⚪", "●", "○", "■", "□", "⬛", "⬜", "★", "☆",
             "◆", "◇", "▲", "△", "▶", "▷", "▼", "▽", "◀", "◁",
             "◐", "◑", "♀", "♂", "♤", "♡", "♧", "♢",
@@ -113,7 +115,7 @@ object PickerData {
             "❏", "❐", "❑", "❒", "◈", "◉", "◊", "○", "◢", "◣",
             "◤", "◥", "❢", "❣", "❤", "❥", "❦", "❧"
         ),
-        Category("[全]", R.drawable.symbol_fullwidth, R.string.picker_fullwidth) to arrayOf(
+        Category("[全]", R.drawable.symbol_fullwidth, R.string.picker_fullwidth, id = "fullwidth") to arrayOf(
             "１", "２", "３", "４", "５", "６", "７", "８", "９", "０",
             "！", "＠", "＃", "＄", "％", "＾", "＆", "＊", "（", "）",
             "‘", "’", "＝", "＿", "｀", "：", "；", "？",

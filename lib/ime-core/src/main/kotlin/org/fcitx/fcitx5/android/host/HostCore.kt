@@ -307,6 +307,12 @@ class HostCore(
         true
     }
 
+    /** 联想's predictions put away (the bar's ×, [KeyRouter.dropPredictions]), the context kept; false where none show. */
+    fun dropPredictions(): Boolean = pipeline.batch {
+        val ic = contexts.active?.takeIf { it.hasFocus } ?: return@batch false
+        router.dropPredictions(ic, contexts.inputMethod(ic))
+    }
+
     /** What is typed dropped, nothing committed ([KeyRouter.clearTyped]): null with nothing typed. */
     fun clearTyped(keyboard: (im: String) -> Any? = { null }): Retyping? = pipeline.batch {
         // 联想's words with nothing typed are not what is typed
@@ -651,7 +657,7 @@ class HostCore(
             return
         }
         if (!list.bulk) {
-            emit(HostEvent.Candidates(list.size, (0 until list.size).mapNotNull { i -> list.candidate(i)?.let { entry(ic, "", it) } }))
+            emit(HostEvent.Candidates(list.size, (0 until list.size).mapNotNull { i -> list.candidate(i)?.let { entry(ic, "", it) } }, list.predicting))
             return
         }
         var total = list.totalSize
@@ -666,7 +672,7 @@ class HostCore(
             }
             out += entry(ic, "", word)
         }
-        emit(HostEvent.Candidates(total, out))
+        emit(HostEvent.Candidates(total, out, list.predicting))
     }
 
     // 候选词注音's readings go with the text as shown, kept while it has a code point for each (traditional

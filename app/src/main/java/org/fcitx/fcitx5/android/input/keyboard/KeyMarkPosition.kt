@@ -20,6 +20,7 @@ enum class KeyMarkPosition(override val stringRes: Int, val at: KeyMarks.At) : M
     BottomRight(R.string.mark_at_bottom_right, KeyMarks.At.BottomRight),
     TopLeft(R.string.mark_at_top_left, KeyMarks.At.TopLeft),
     BottomLeft(R.string.mark_at_bottom_left, KeyMarks.At.BottomLeft),
+    Top(R.string.mark_at_top, KeyMarks.At.Top),
     Bottom(R.string.mark_at_bottom, KeyMarks.At.Bottom),
     None(R.string.mark_at_none, KeyMarks.At.None);
 

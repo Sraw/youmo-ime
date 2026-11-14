@@ -41,8 +41,11 @@ sealed class HostEvent {
         }
     }
 
-    /** The bulk list's first 16 (`updateCandidatesBulk`, `androidfrontend.cpp:94-123`). */
-    data class Candidates(val total: Int, val candidates: List<CandidateEntry>) : HostEvent() {
+    /**
+     * The bulk list's first 16 (`updateCandidatesBulk`, `androidfrontend.cpp:94-123`); [predicting], 联想's words
+     * with nothing typed ([CandidateList.predicting]): the bar shows its × for them.
+     */
+    data class Candidates(val total: Int, val candidates: List<CandidateEntry>, val predicting: Boolean = false) : HostEvent() {
         companion object {
             val EMPTY = Candidates(0, emptyList())
         }

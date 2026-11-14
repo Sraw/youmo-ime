@@ -19,6 +19,9 @@ case("PAN-04", needs="jvm:PanelUatTest.symbolPanelTypesAndCloses")(lambda d: Non
 case("PAN-05", needs="jvm:PanelUatTest.lockedPanelStaysForSeveral")(lambda d: None)
 
 
+case("PAN-29", needs="jvm:PanelUatTest.thePanelOpensOnTheRecentlyUsedTillACategoryIsPicked、PanelUatTest.theCategoryPickedIsKeptForTheNextStart、PickerDataTest.everySymbolCategoryIsFoundAgainByItsId、PickerDataTest.theEnglishTabHasNoDigitsButTheEnglishCommaAndFullStop")(lambda d: None)
+
+
 case("PAN-07", needs="jvm:PanelUatTest.recentHasTheLastSymbolFirst")(lambda d: None)
 
 

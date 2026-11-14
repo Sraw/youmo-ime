@@ -261,6 +261,8 @@
     <string name="exception_user_data_metadata">Unable to find metadata of user data</string>
     <string name="exception_user_data_no_room">The backup does not fit in the phone\'s free storage</string>
     <string name="exception_user_data_too_many_entries">The backup has more than 100,000 entries: not a backup of this app</string>
+    <string name="exception_user_data_not_a_backup">This file is not a backup of this app</string>
+    <string name="exception_user_data_too_big">The file is over 2 GB: not a backup of this app</string>
     <string name="exception_user_data_package_name_mismatch">User data does not match current application</string>
     <string name="exception_user_data_too_old">This backup is from 0.3.0 or earlier, whose learning this version no longer reads. Restore it in 0.4.x, type a few characters and pause, back up again, then restore that here</string>
     <string name="user_data_imported">User data on %1$s has been imported, restarting…</string>
@@ -300,6 +302,7 @@
     <string name="status_area">Status area</string>
     <string name="expand_candidates_list">Expand candidates list</string>
     <string name="hide_candidates_list">Hide candidates list</string>
+    <string name="drop_predictions">Close predictions</string>
     <string name="hide_keyboard">Hide keyboard</string>
     <string name="hide_toolbar">Hide toolbar</string>
     <string name="expand_toolbar">Expand toolbar</string>
@@ -797,7 +800,7 @@
     <string name="im_fuzzy_none">Off</string>
     <string name="picker_recent">Recent</string>
     <string name="picker_common">Common</string>
-    <string name="picker_ascii">Digits &amp; ASCII</string>
+    <string name="picker_ascii">ASCII symbols</string>
     <string name="picker_brackets">Brackets</string>
     <string name="picker_arrows">Arrows</string>
     <string name="picker_math">Math &amp; Greek</string>
@@ -1104,6 +1107,7 @@
     <string name="mark_at_bottom_right">Bottom right</string>
     <string name="mark_at_top_left">Top left</string>
     <string name="mark_at_bottom_left">Bottom left</string>
+    <string name="mark_at_top">Top</string>
     <string name="mark_at_bottom">Bottom</string>
     <string name="mark_at_none">None</string>
     <string name="mark_at_taken">%1$s (%2$s)</string>
