@@ -214,6 +214,16 @@ class SettingsIndexTest {
         }
     }
 
+    // 061 生僻字屏蔽 (§6.1): the page drawn by hand found by its name and by 生僻字
+    @Test
+    @Config(qualifiers = "zh-rCN")
+    fun theRareCharactersPageIsFound() {
+        val search = SettingsSearch(SettingsIndex.build(RuntimeEnvironment.getApplication()))
+        for (term in listOf("生僻字屏蔽", "生僻字")) {
+            assertTrue(term, SettingsIndex.Target(SettingsRoute.RareChars, null) in search.find(term).map { it.target })
+        }
+    }
+
     // 051-c §1.8: the shortcuts and the swipe found by the words a user would type, in the app's language
     @Test
     @Config(qualifiers = "zh-rCN")

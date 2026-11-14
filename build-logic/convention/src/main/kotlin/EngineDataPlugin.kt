@@ -203,6 +203,10 @@ class EngineDataPlugin : Plugin<Project> {
             "engine-data/CJKRadicals-17.0.0.txt",
         )
         const val OPENCC_TASK = "compileOpenccData"
+        // each listed character's group for 生僻字屏蔽: Unihan.zip's kTGH (Unicode License v3) and OpenCC's
+        // TSCharacters.txt (Apache-2.0), already the app's (learn/): no new data. In the APK, not the text
+        // pack: the groups go with the app's version, a pack changed changes none of the user's choice
+        const val CHAR_LEVELS_TASK = "compileCharLevels"
 
         const val MODEL_TASK = "copySentenceModels"
         // a tag of its own, not "latest": what is downloaded is what was measured
@@ -325,6 +329,13 @@ class EngineDataPlugin : Plugin<Project> {
                 cover.set(target.tasks.named<ExtractTask>(HandwritingDataPlugin.EXTRACT_TASK).flatMap { it.outputDir.file("handwriting/chars.txt") })
             }
         }
+        val charLevels = target.tasks.register<CompileCharLevels>(CHAR_LEVELS_TASK) {
+            classpath.from(tool)
+            toolCode.set(fingerprint.flatMap { it.outputFile })
+            this.unihan.set(unihanZip.flatMap { it.outputFile })
+            traditional.set(target.layout.projectDirectory.file("src/main/assets/learn/TSCharacters.txt"))
+            outputDir.set(target.layout.buildDirectory.dir("generated/engine-charlevels"))
+        }
         // OpenCC 1.2.0's s2tw dictionaries, committed (lib/ime-dict-tool/opencc/README.md): frozen data
         val opencc = target.tasks.register<CompileOpenccData>(OPENCC_TASK) {
             classpath.from(tool)
@@ -370,6 +381,7 @@ class EngineDataPlugin : Plugin<Project> {
             variant.sources.assets?.addGeneratedSourceDirectory(emoji, CompileEmojiData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(chaizi, CompileChaiziData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(charInfo, CompileCharInfo::outputDir)
+            variant.sources.assets?.addGeneratedSourceDirectory(charLevels, CompileCharLevels::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(opencc, CompileOpenccData::outputDir)
         }
         // every directory of the engine's data (engine/… inside each, as the assets and the text pack have it), for
@@ -380,7 +392,7 @@ class EngineDataPlugin : Plugin<Project> {
         listOf(
             compile.flatMap { it.outputDir }, english.flatMap { it.outputDir }, emoji.flatMap { it.outputDir },
             chaizi.flatMap { it.outputDir }, charInfo.flatMap { it.outputDir }, compileTables.flatMap { it.outputDir },
-            copyModels.flatMap { it.outputDir }, opencc.flatMap { it.outputDir },
+            copyModels.flatMap { it.outputDir }, opencc.flatMap { it.outputDir }, charLevels.flatMap { it.outputDir },
         ).forEach { target.artifacts.add(DATA_CONFIGURATION, it) }
     }
 
@@ -642,6 +654,23 @@ class EngineDataPlugin : Plugin<Project> {
                     "--orders", orders.get().asFile.path, "--pinyin", pinyin.get().asFile.path,
                 ) + (cover.orNull?.let { c -> listOf("--cover", c.asFile.path) } ?: emptyList())
             }
+        }
+    }
+
+    /** `engine/charlevels.data`: ime-dict-tool's `charlevels`; a kTGH that is not the table's 8,105 ranked once each fails. */
+    @CacheableTask
+    abstract class CompileCharLevels : ToolDataTask() {
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val unihan: RegularFileProperty
+
+        @get:InputFile
+        @get:PathSensitive(PathSensitivity.NAME_ONLY)
+        abstract val traditional: RegularFileProperty
+
+        @TaskAction
+        fun compile() {
+            runTool("charlevels.data", "256m") { listOf("charlevels", "-o", it, "--unihan", unihan.get().asFile.path, traditional.get().asFile.path) }
         }
     }
 

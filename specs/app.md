@@ -1188,6 +1188,16 @@ Rules for settings, all decided:
 - **Direct boot.** Preferences the keyboard needs before the first unlock (in a password prompt)
   are copied to device-protected storage (`AppPrefs.syncToDeviceEncryptedStorage`); a new
   keyboard-facing category belongs in that list.
+- **生僻字屏蔽** (`RareCharsFragment`, 词库与短语's row after 常用词; `dev/design/061-rare-char-block.md`)
+  is neither store: its file `pinyin/rarechars.txt` (`RareCharsManager`, ime-core `RareChoice`) is read
+  by the engine at `reloadEngine`. The page copies the grid off the engine in one `HostApi.rareGrid`,
+  sorts it and drops what `Paint.hasGlyph` cannot draw off the main thread (`RareCharsViewModel`,
+  kept over a turn), keeps its edits in ime-core `RareEdits` (`DragRange` for the drag, `RareLayout`
+  for the rows), and saves them laid over the file as it then is at `onStop`, then reloads the
+  engine; no edit, no save. A later version's file, or one not read, makes the page read-only. The
+  user-word lists mark a word with a character held (`CharGate.heldIn`) and offer 「放行」 through
+  `RareCharsManager.allow`. JVM tests have no APK assets: `RareCharsManager.useLevels` takes
+  `TestCharLevels`.
 
 ### Adding a setting, the usual way
 
@@ -1546,6 +1556,9 @@ too, and the mark goes with the record into the stash, whose logs are then not r
 or with old logs but neither the record nor a backup, is refused before anything is copied
 (`exception_user_data_too_old`); one from before the renaming is not, having none of the engine's
 learning.
+The users' text files in `UserDataManager.FOLLOWED` (custom phrases, `commonwords.txt`,
+`rarechars.txt`, the quick phrases, punctuation) follow the backup: one the backup lacks is deleted from the
+phone, so a backup from before 0.6.1 (or made before 生僻字屏蔽 was ever turned on) leaves it off.
 
 ## Permissions and privacy
 

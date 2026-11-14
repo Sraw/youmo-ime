@@ -103,6 +103,20 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
   its maintenance.
 - Engine tests build small data in memory (`PinyinDataBuilder`, text tables) rather than loading the
   real model (`pinyin.data`); the evaluation is where the real data is judged.
+- 生僻字屏蔽's tests, what each covers (`./gradlew verify` runs the first two, not the third):
+  - `RareCharContractTest` (ime-core, small data): 全拼, 双拼, the nine keys, the pinyin glide,
+    strokes (`u`), parts (`u`), 五笔 typed and glided, predictions, handwriting, the user's own word;
+    hold → let through → hold on one `Engines`, with a gate made directly (so even 的 is held) and one
+    through the default choice, a character of the basic plane and one beyond it (a surrogate pair).
+    Not every `LISTED` method: the other tables, 注音 and the 14/18 keys go through the same session
+    code as 五笔 and 全拼. A new place a candidate comes from is added here.
+  - `HeldWordsTest` (ime-core): the gate by code point, the dictionary's words by id, the user's,
+    imported words and learned whole phrases (continuations) by text.
+  - `RareCharsUatTest` (ime-eval `uatTest`, the real data, minutes): every `LISTED` Chinese method
+    with every group held (注音, 双拼, the 14/18 keys, every table, handwriting), the real table's edges, 五笔's
+    auto-commit, 借手机.
+  The levels in tests are `TestCharLevels` (ime-core testFixtures); the app's JVM tests have no APK
+  assets and pass them to `RareCharsManager.useLevels`.
 - No `@Ignore`, `.only`, skipped or placeholder tests left behind.
 - Kover: 90% lines overall in ime-core, 60% per package. A new package needs its tests.
 

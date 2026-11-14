@@ -430,3 +430,52 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **操作**：照 VO-41 改出「徐婧」点 **记住**，打开 **用户词库 → 手动添加的词**；回去照样改一次，点 **记住** 后点 **撤销**，再看。
 - **预期**：点了以后手动添加的词里有「徐婧」（拼音 xu jing），和自己在这页加的一样，可以在这里删；撤销后不在，学到的词不动，学习记录里也不多一条「忘记」。
 - **JVM**：ime-core `EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销`、`VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap`；设备上手动添加的词那一半在 VO-41 的脚本里看。
+
+### WD-50 [P0] 生僻字屏蔽：打开后扩展区的字不再出现，别的表外字照常，关掉就回来
+<!-- 061-rare-char-block.md -->
+- **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 关着（这一行写「关」）。
+- **操作**：在「普通文本」框打 din，看候选栏；清空。到 **词库与短语 → 生僻字屏蔽** 打开开关（别的不动），返回，看 **词库与短语** 上这一行；回输入框再打 din、da。再到这一页把开关关掉，返回，打 din。
+- **预期**：第一次 din 的候选栏里有扩展区的字（码位 U+20000 以上：读 din 的字全在扩展区，模拟器上可能显示成方框，按码位核对）；打开后这一行写「已屏蔽 N 个字」，din 的候选栏里一个扩展区的字都没有（「顶」「的」之类照常），da 里「大」「打」照常；关掉后这一行写「关」，din 里扩展区的字又出来。翻完 da 的候选（「𤝰」U+24770 在很后面）由下面的 JVM 行查：打开后没有「𤝰」，「龘」「大」「打」照常，关掉后「𤝰」回来；借手机（**不用我的输入习惯**）时照样没有。
+- **JVM**：ime-eval `RareCharsUatTest.turnedOnExtensionBIsGoneTheRestStaysTurnedOffItIsBack`（:lib:ime-eval:uatTest，真数据：da 的全部候选）、ime-core `RareCharContractTest.theDefaultChoiceHoldsBackExtensionBAndTheOutOfTableAsChosen`（默认只挡扩展区）、`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（开关存下文件、让引擎重读、词库与短语那一行的副标题）；设备上跑 din。
+
+### WD-51 [P0] 生僻字屏蔽：默认只挡扩展区——诶、囧、龘、闫、裡 都还打得出
+- **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关（别的不动）。
+- **操作**：分别打 ei、jiong、da、yan、li，在候选里找「诶」「囧」「龘」「闫」「裡」。
+- **预期**：五个字都在（诶、囧、龘 是其它表外字，闫 是三级字，裡 是繁体字：默认都放行）。
+- **JVM**：ime-eval `RareCharsUatTest.byDefaultOnlyExtensionBIsHeld`（真数据，翻完候选）；设备上不跑。
+
+### WD-52 [P1] 生僻字屏蔽：勾上「其它表外字」后「龘」不出，单独放行「龘」又出；按住拖动连选、撤销
+- **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关。
+- **操作**：勾上组头「其它表外字（基本区和扩展 A）」的勾选框，看底部提示；返回，打 da 翻候选。再进这一页，搜 da，点「龘」那一格；返回，打 da。再进这一页，在「三级字」里长按一格，不抬手往后拖过几格、再往回拖一格，抬手；看这几格和底部提示，点 **撤销**。
+- **预期**：勾上后组头勾选框是勾上的，下面「已屏蔽」和组里的字数一样，底部提示「已屏蔽 N 个字」带 **撤销**；da 里没有「龘」，「大」照常。点「龘」后它不再变淡、没有斜线，组头勾选框变成部分勾选；da 里「龘」回来。拖动时从按住的那格到手指下那格都变成屏蔽（变淡加斜线），往回拖退出的那格恢复；抬手后底部提示「已屏蔽 N 个字」带 **撤销**，点了这几格都回到放行。
+- **JVM**：ime-eval `RareCharsUatTest.theOtherOutOfTableHeldThenOneLetThrough`（真数据）、`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（组的勾选框三态、点格、存下的文件）、`RareCharsPageUatTest.aDragHoldsBackARunAndOneUndoTakesItBack`（按住拖动、往回拖、撤销）、ime-core `RarePageTest.aDragSetsTheRangeToTheStartsOppositeAndLeavesTheRestAsTheyWere`；设备上不跑（拖动手势由 JVM 行查）。
+
+### WD-53 [P1] 生僻字屏蔽：含屏蔽字的词和联想也不出；五笔勾上「其它表外字」后打 adwe 直接上屏「期」（原来和「朞」重码），放行「朞」后又要选
+- **前提**：B0-设置；五笔的 **自动上屏** 开着（默认）。
+- **操作**：切到五笔打 adwe，看候选；**词库与短语 → 生僻字屏蔽** 打开开关、勾上「其它表外字」，返回，打 adwe；再进这一页搜 qi（或粘贴「朞」），点「朞」放行，返回，打 adwe。切到拼音打 dada，看候选；打 da 选「打」，看联想。
+- **预期**：开之前 adwe 有「期」「朞」两个，要选；勾上后打满四码直接上屏「期」；放行「朞」后又是两个、要选。dada 的候选里有含「哒」的词，没有含其它表外字、扩展区字的词；「打」后的联想里也没有。
+- **JVM**：ime-eval `RareCharsUatTest.wubiAutoCommitsTheOneLeftAndAgainChoosesOnceLetThrough`、`RareCharsUatTest.aWordWithAHeldCharacterIsNotOfferedNorPredicted`（真数据）、ime-core `RareCharContractTest.aGateMadeDirectlyHoldsBackEvenTheCommonest`（码表剩一个自动上屏、唯一的字被挡不上屏、同码的短语照常）；设备上不跑。
+
+### WD-54 [P1] 生僻字屏蔽：手写、笔画查字、拆字、滑行里都不出（先勾「其它表外字」；笔画表里没有扩展区的字，笔画查字用其它表外字）
+- **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关、勾上「其它表外字」。
+- **操作**：手写写一个「龘」；拼音里 `u` 笔画查字、`u` 拆字查一个其它表外字；在键上划 选 **滑行输入** 划 da。
+- **预期**：几处的候选里都没有其它表外字和扩展区的字，常用字照常。笔画表里没有扩展区的字（实测 0 个），所以笔画查字这一项用其它表外字查，不用扩展区的。
+- **JVM**：ime-eval `RareCharsUatTest.handwritingStrokesPartsAndGlideOfferNoneHeld`、`RareCharsUatTest.withEveryGroupHeldNoListedChineseInputMethodOffersOne`（每个列出的中文输入法，按键和滑行）、ime-core `RareCharContractTest.theHandwritingPadReadsAroundWhatIsHeld`；设备上不跑。
+
+### WD-55 [P1] 生僻字屏蔽：备份全部带着它，恢复后以备份为准；恢复一份没有它的备份后回到关；借手机时照样生效
+- **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关。
+- **操作**：**备份与恢复 → 备份全部**；把开关关掉；**从备份恢复** 选刚才那份；看这一行。再恢复一份做于打开以前的备份（或 0.6.0 的备份）；看这一行。打开开关，工具栏 ⋯ → **不用我的输入习惯**，打 din。
+- **预期**：恢复后这一行是「已屏蔽 N 个字」（以备份为准）；恢复没有它的备份后是「关」（手机上的文件被删）；恢复前的确认框写着没有生僻字屏蔽的备份恢复后它是关的。借手机时 din 里照样没有扩展区的字。
+- **JVM**：`UserDataManagerTest.theConfigDataAndThemesAreBackedUpWhereBackupsHaveThemAndRestoredIntoTheirOwnDirectories`（`pinyin/rarechars.txt` 进备份、恢复回原处）、`UserDataManagerTest.theUsersTextFilesFollowTheBackupItsCollectionsAndDotEntriesStay`（备份里没有它，手机上的被删）、ime-eval `RareCharsUatTest.turnedOnExtensionBIsGoneTheRestStaysTurnedOffItIsBack`（借手机时照样挡）；设备上不跑。
+
+### WD-56 [P1] 生僻字屏蔽：加一个含被屏蔽字的词，对话框当场提示；点「放行这个字」后打得出；用户词库里含屏蔽字的词标着「含屏蔽的字」
+- **前提**：B0-设置；在 **用户词库 → 手动添加的词** 里先加「龘龘」（拼音 da da）；**词库与短语 → 生僻字屏蔽** 打开开关、勾上「其它表外字」。
+- **操作**：打开 **用户词库 → 手动添加的词**，看「龘龘」那一行，点它；点 **放行 龘**；再看这一行，回测试页打 dada。点 **+**，词写「𤝰」……（或别的被挡的字），看输入框下面。
+- **预期**：「龘龘」那一行下面写「含屏蔽的字：龘」；点开的对话框里有 **放行 龘**；放行后这一句没了，dada 里有「龘龘」。加词对话框里写了被挡的字时，输入框下马上提示「"X" 是屏蔽的生僻字，加了也打不出」，旁边有 **放行这个字**；不放行也能保存。
+- **JVM**：`RareCharsPageUatTest.aUserWordWithACharacterHeldIsMarkedAndLetThrough`（列表的标记、放行后文件里多了这个字且标记消失、加词对话框的提示和按钮）、ime-core `RareChoiceTest.theCharactersHeldInAWord`、`HeldWordsTest.theUserModelAsksItsWordsAsTheDictionarysAndTheUsersByText`（用户的词含被挡的字不给出）；设备上不跑。
+
+### WD-57 [P2] 生僻字屏蔽：搜拼音、粘贴一个字定位、粘贴一级字显示「不能屏蔽」、恢复默认、设置搜索能搜到这一页
+- **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关。
+- **操作**：在页上的搜索框打 da（拼音键盘打了按回车上屏字母）；清空，粘贴「大」；清空，粘贴「龘」；清空。勾上「三级字」，右上角菜单 → **恢复默认**，确定。设置首页搜「生僻」。转一下屏。
+- **预期**：搜 da 列出读 da 的字（跨组，格子上的读音是 dá、dà……）；粘贴「大」写「大：常用字，不能屏蔽」，没有格子；粘贴「龘」只有「龘」一格；恢复默认先问「回到只屏蔽扩展区，并清空单独屏蔽和放行的字？」，确定后三级字的勾选框回到不勾、扩展区的回到勾上，底部有 **撤销**；设置搜索里有「生僻字屏蔽」，点了进这一页；转屏后改动和搜的字都还在。
+- **JVM**：`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（搜拼音、粘贴一级字、粘贴一个字定位）、`RareCharsPageUatTest.resetATurnAndALaterVersionsFile`（恢复默认、转屏）、`SettingsIndexTest.theRareCharactersPageIsFound`、ime-core `RarePageTest.aSearchFindsASpellingOrThePastedCharacter`；设备上跑搜 da 和恢复默认。

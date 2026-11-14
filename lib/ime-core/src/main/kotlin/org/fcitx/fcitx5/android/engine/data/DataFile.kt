@@ -167,6 +167,7 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
         const val KIND_ENGLISH = 3
         const val KIND_USER_DICTIONARY = 4
         const val KIND_CHAR_INFO = 5
+        const val KIND_CHAR_LEVELS = 6
 
         private val MAGIC = "FCITXIME".toByteArray(Charsets.US_ASCII)
         private const val HEADER_BYTES = 24

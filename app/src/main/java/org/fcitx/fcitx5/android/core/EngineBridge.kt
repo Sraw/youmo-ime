@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.pack.PackUnavailableException
 import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
+import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
@@ -373,6 +374,14 @@ class EngineBridge {
             wordsRead = false
             ""
         }
+        // 生僻字屏蔽's choice: one not read is off, never the default written over it (design §4.2, DECISIONS A4)
+        val rareChars = try {
+            File(dir, RareCharsManager.FILE.substringAfter('/')).takeIf { it.isFile }?.readText().orEmpty()
+        } catch (e: IOException) {
+            Timber.e(e, "rare characters: off this run")
+            unreadable()
+            ""
+        }
         val dictionaryDir = File(dir, "dictionaries")
         // where the data is not settled, nothing written: no libime file converted, no file compiled,
         // what is there read as it is (where that is, the next start may not read)
@@ -398,6 +407,7 @@ class EngineBridge {
             dictionaryPending = { MergedDictionary.pending(dictionaryDir) },
             commonWords = commonWords,
             saveCommonWords = WordsFile(wordsFile, commonWords, wordsRead && writable, saves = phraseSaves)::save,
+            rareChars = rareChars,
         )
     }
 

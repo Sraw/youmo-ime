@@ -18,6 +18,9 @@ class Chaizi private constructor(private val chars: Map<String, List<String>>) {
     /** The characters whose parts [letters] spells in full, the commonest first; none for most. */
     fun of(letters: String): List<String> = chars[letters].orEmpty()
 
+    /** Every character found by its parts, repeats as spelt more ways than one. */
+    fun all(): Sequence<String> = chars.values.asSequence().flatten()
+
     /** How many spellings have characters. */
     val size get() = chars.size
 

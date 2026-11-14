@@ -7,6 +7,7 @@ import re
 import statistics
 import tempfile
 import time
+import unicodedata
 
 from uat import Blocked, PKG, case, check, first, home, sym_char, in_picker
 
@@ -38,6 +39,8 @@ PIECES = {"蓝鲸花园": [("lanjinghuayuan", "蓝鲸花园")], "幽默": [("you
           "北京市海淀区": [("beijingshi", "北京市"), ("haidianqu", "海淀区")], "张三": [("zhangsan", "张三")],
           "上海市": [("shanghaishi", "上海市")], "年": [("nian", "年")], "月": [("yue", "月")],
           "日": [("ri", "日")], "鲸喵屿": [("jing", "鲸"), ("miao", "喵"), ("yu", "屿")],
+          # VO-54: 竫 (jìng, 三级字) as 静 reads
+          "徐竫": [("xu", "徐"), ("jing", "竫")],
           "你好": [("nihao", "你好")], "您好呀": [("ninhao", "您好"), ("ya", "呀")]}
 
 
@@ -925,3 +928,143 @@ case("WD-58", needs="jvm:VoiceAskUatTest.theSwitchOffAsksNothing、SettingsPages
 
 case("WD-59", needs="jvm:EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销、"
      "VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap")(lambda d: None)
+
+
+# ---------------------------------------------------------------- 生僻字屏蔽 (061-rare-char-block)
+
+RARE = "生僻字屏蔽"
+RARE_SWITCH = "屏蔽生僻字"   # Android 10 reads a switch with its state after: 「屏蔽生僻字 关闭」
+GROUPS = ("三级字", "繁体字", "其它表外字", "扩展区")
+NO_BOX = type("NoBox", (), {"desc": ""})()
+
+
+def ext(cands):
+    """the candidates with a character of 扩展区 (U+20000 and on): what the default holds back"""
+    return [c for c in cands if any(ord(ch) >= 0x20000 for ch in c)]
+
+
+def rare_page(d):
+    """词库与短语 → 生僻字屏蔽, once its grid is read (the switch shown)"""
+    d.hide_keyboard()
+    home(d, "词库与短语", RARE)
+    # the switch is there (disabled) while the grid is read: a group's head says it is read
+    return d.wait(lambda s: rare_box(s, GROUPS[0]) and next((n for n in s.app() if n.text.startswith(RARE_SWITCH)), None),
+                  timeout=30, step=0.3, what="生僻字屏蔽页读好")
+
+
+def rare_switch(d, on):
+    """the page's switch turned to on, the page left (its changes saved, the engine told)"""
+    sw = rare_page(d)
+    if sw.checked != on:
+        d.tap(sw.c, 0.8)
+        d.wait(lambda s: next((n for n in s.app() if n.text.startswith(RARE_SWITCH) and n.checked == on), None), timeout=8,
+               step=0.3, what=f"开关{'打开' if on else '关上'}")
+    d.back(1.0)
+    return rare_row(d)
+
+
+def rare_row(d):
+    """词库与短语's 生僻字屏蔽 row, as its summary reads once read (「关」, 「已屏蔽 N 个字」)"""
+    def said(s):
+        texts = [n.text for n in s.app() if n.text]
+        if RARE not in texts:
+            d.scroll(s)   # the row is near the page's end
+            return None
+        after = texts[texts.index(RARE) + 1:texts.index(RARE) + 2]
+        return after[0] if after and (after[0] == "关" or re.fullmatch(r"已屏蔽 [\d,]+ 个字", after[0])) else None
+    return d.wait(said, timeout=15, step=0.3, what="生僻字屏蔽那一行的副标题")
+
+
+def rare_note(s):
+    return next((n.text for n in s.app() if n.text and "改动在离开本页后生效" in n.text), "")
+
+
+def rare_box(s, group):
+    """a group head's box: its description, 「三级字，1,605 个，全部放行」"""
+    return next((n for n in s.app() if n.cls == "CheckBox" and n.desc.startswith(group + "，")), None)
+
+
+def toneless(reading):
+    return "".join(c for c in unicodedata.normalize("NFD", reading) if not unicodedata.combining(c)).replace("ü", "v")
+
+
+@case("WD-50", base="B0-设置", mutates=True)
+def wd50(d):
+    d.step("关着")
+    home(d, "词库与短语")
+    row = rare_row(d)
+    check(row == "关", f"词库与短语那一行：{row!r}")
+    before = page_cands(d, "din")
+    d.clear()
+    if not ext(before):
+        raise Blocked(f"din 的候选栏里本来就没有扩展区的字：{before[:10]}")
+    d.step("打开")
+    row = rare_switch(d, True)
+    check(row.startswith("已屏蔽 "), f"打开后那一行：{row!r}")
+    on = page_cands(d, "din")
+    d.clear()
+    check(on and not ext(on), f"打开后 din：{on[:10]}，扩展区的 {ext(on)}")
+    da = words(page_cands(d, "da"))
+    d.clear()
+    check("大" in da and "打" in da, f"打开后 da：{da[:10]}")
+    d.step("关掉")
+    check(rare_switch(d, False) == "关", "关掉后那一行不是「关」")
+    off = page_cands(d, "din")
+    d.clear()
+    check(ext(off), f"关掉后 din 里没有扩展区的字：{off[:10]}")
+    return f"关 {len(ext(before))} 个扩展区的；{row}：0 个；再关 {len(ext(off))} 个"
+
+
+case("WD-51", needs="jvm:RareCharsUatTest.byDefaultOnlyExtensionBIsHeld")(lambda d: None)
+case("WD-52", needs="jvm:RareCharsUatTest.theOtherOutOfTableHeldThenOneLetThrough、RareCharsPageUatTest.thePageHoldsBackAndLetsThrough、"
+     "RareCharsPageUatTest.aDragHoldsBackARunAndOneUndoTakesItBack、RarePageTest.aDragSetsTheRangeToTheStartsOppositeAndLeavesTheRestAsTheyWere")(lambda d: None)
+case("WD-53", needs="jvm:RareCharsUatTest.wubiAutoCommitsTheOneLeftAndAgainChoosesOnceLetThrough、RareCharsUatTest.aWordWithAHeldCharacterIsNotOfferedNorPredicted、"
+     "RareCharContractTest.aGateMadeDirectlyHoldsBackEvenTheCommonest")(lambda d: None)
+case("WD-54", needs="jvm:RareCharsUatTest.handwritingStrokesPartsAndGlideOfferNoneHeld、RareCharsUatTest.withEveryGroupHeldNoListedChineseInputMethodOffersOne、"
+     "RareCharContractTest.theHandwritingPadReadsAroundWhatIsHeld")(lambda d: None)
+case("WD-55", needs="jvm:UserDataManagerTest.theConfigDataAndThemesAreBackedUpWhereBackupsHaveThemAndRestoredIntoTheirOwnDirectories、"
+     "UserDataManagerTest.theUsersTextFilesFollowTheBackupItsCollectionsAndDotEntriesStay、RareCharsUatTest.turnedOnExtensionBIsGoneTheRestStaysTurnedOffItIsBack")(lambda d: None)
+case("WD-56", needs="jvm:RareCharsPageUatTest.aUserWordWithACharacterHeldIsMarkedAndLetThrough、RareChoiceTest.theCharactersHeldInAWord、"
+     "HeldWordsTest.theUserModelAsksItsWordsAsTheDictionarysAndTheUsersByText")(lambda d: None)
+
+
+@case("WD-57", base="B0-设置", mutates=True)
+def wd57(d):
+    rare_switch(d, True)
+    rare_page(d)
+    d.step("搜 da")
+    field = d.wait(lambda s: next((n for n in s.app() if n.cls == "EditText"), None), timeout=8, what="搜索框")
+    focus(d, field)
+    type_letters(d, "da")
+    d.hide_keyboard()
+
+    def cells(s):
+        got = [n.desc for n in s.app() if n.cls == "CheckBox" and "，" in n.desc and not n.desc.startswith(GROUPS)]
+        return got or None
+    found = d.wait(cells, timeout=10, step=0.3, what="搜到的格子")
+    readings = {c: [toneless(r) for r in c.split("，", 1)[1].split("、")] for c in found}
+    check(all("da" in r for r in readings.values()), f"搜 da 列出的：{found[:12]}")
+    d.step("恢复默认")
+    s = d.screen()
+    field = next((n for n in s.app() if n.cls == "EditText"), None)
+    focus(d, field)
+    d.press("bksp", 3, after=0.3)
+    d.hide_keyboard()
+    s = d.wait(lambda s: rare_box(s, "三级字") and s, timeout=8, step=0.3, what="三级字的组头")
+    first_note = rare_note(s)
+    d.tap(rare_box(s, "三级字").c, 0.8)
+    s = d.wait(lambda s: "全部屏蔽" in (rare_box(s, "三级字") or NO_BOX).desc and s, timeout=8, step=0.3, what="三级字整组屏蔽")
+    check(rare_note(s) != first_note, f"整组屏蔽后页顶没变：{rare_note(s)!r}")
+    more = d.screen().find(desc="更多选项", where="all")
+    if not more:
+        raise Blocked("生僻字屏蔽页没有 ⋮")
+    d.tap(more.c, 0.8)
+    d.tap_text("恢复默认", where="all", scroll=False, after=0.5)
+    said = "\n".join(messages(d.wait(lambda s: messages(s) and s, timeout=8, step=0.3, what="恢复默认的确认框")))
+    check("回到只屏蔽扩展区" in said, f"确认框：{said!r}")
+    ok(d)
+    s = d.wait(lambda s: "全部放行" in (rare_box(s, "三级字") or NO_BOX).desc and s, timeout=8, step=0.3, what="三级字回到放行")
+    check(rare_note(s) == first_note, f"恢复默认后页顶：{rare_note(s)!r}，原来 {first_note!r}")
+    check(any(n.text == "撤销" for n in s.app()), "恢复默认后底部没有「撤销」")
+    return f"搜 da {len(found)} 格；{first_note.split(' · ')[0]}"
+

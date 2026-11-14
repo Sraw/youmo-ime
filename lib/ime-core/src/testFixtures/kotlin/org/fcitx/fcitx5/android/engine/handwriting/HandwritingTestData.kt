@@ -73,10 +73,11 @@ fun handwritingDecoder(
     user: UserWords? = null,
     scorer: WordScorer = WordScorer.of(handwritingData.model),
     coarse: CoarseWords = CoarseWords.NONE,
+    held: (String) -> Boolean = { false },
 ): HandwritingDecoder {
     val d = handwritingData
     val readings = Predictor.charReadingsOf(d.dictionary, d.vocabulary)
-    return HandwritingDecoder(d.dictionary, d.vocabulary, d.wordIndex, scorer, { readings }, user, coarse)
+    return HandwritingDecoder(d.dictionary, d.vocabulary, d.wordIndex, scorer, { readings }, user, coarse, held)
 }
 
 /** A position's readings, best first, each [step] less likely than the one before. */

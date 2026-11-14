@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_DATABASE
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
 import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
+import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
@@ -569,9 +570,9 @@ object UserDataManager {
     private val STASHED = listOf(LearnLog.FILE, WordLists.ADDED, WordLists.BLOCKED, EnglishBlocks.FILE, Engines.TABLE_LOGS_READ)
 
     // in fcitx's data, beside the settings (punctuation.conf, androidengine.conf, ..., in the config's own
-    // directory): the custom phrases, the quick phrases (fcitx's PkgData data/quickphrase.d) and the
+    // directory): the custom phrases, 常用词 and 生僻字屏蔽's choice beside them, the quick phrases (fcitx's PkgData data/quickphrase.d) and the
     // punctuation maps (PkgData punctuation/punc.mb.*)
-    private val FOLLOWED = listOf("pinyin/customphrase", CommonWordsManager.FILE, "data/quickphrase.d", "punctuation")
+    private val FOLLOWED = listOf("pinyin/customphrase", CommonWordsManager.FILE, RareCharsManager.FILE, "data/quickphrase.d", "punctuation")
 
     // the directories of the engine's that are the phone's alone, neither exported nor imported
     private val OWN_DIRS = setOf(Backups.DIR, RestoreStash.DIR, RestoreStash.UNREADABLE)

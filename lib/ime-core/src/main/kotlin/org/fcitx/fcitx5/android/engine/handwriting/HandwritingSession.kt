@@ -391,12 +391,17 @@ class HandwritingSession(
         ranks = emptyList()
         rankedUnder = null
         val h = habits
-        if (!h.learns || written.isEmpty() || read.isEmpty()) return read
-        val code = Code(Kinds.HANDWRITING, KeyedRows.handwriting(written.last().reading.texts))
+        val last = readWritten().lastOrNull()
+        if (!h.learns || last == null || read.isEmpty()) return read
+        val code = Code(Kinds.HANDWRITING, KeyedRows.handwriting(last.reading.texts))
         ranks = HabitRanker.rank(read.map { HabitRanker.Item(it, Words.of(lastCharacter(it.text)), single = true) }, code, "", view(h))
         rankedUnder = code
         return ranks.map { it.value }
     }
+
+    // what was written that the decoder read: a position every reading of which is held back (生僻字屏蔽)
+    // is as if not written, no habit kept under its ink for another's character (review N4)
+    private fun readWritten(): List<Written> = decoder?.let { d -> written.filter { d.reads(it.reading) } } ?: written
 
     // characters, no word of the user's or imported a tier, nothing pinned
     private fun view(h: Habits) = h.rankView(pins = false, mine = false, imports = false)
@@ -436,11 +441,12 @@ class HandwritingSession(
         val chars = PhraseRules.codePoints(sentence.text)
         val first = sentences.firstOrNull()?.let { lastCharacter(it.text) }.orEmpty()
         // a character for each one written, as the decoder reads them; else the last alone
-        val each = chars.size == written.size
-        val from = if (each) 0 else written.size - 1
-        val picks = (from until written.size).map { i ->
-            val keys = KeyedRows.handwriting(written[i].reading.texts)
-            val last = i == written.size - 1
+        val inks = readWritten()
+        val each = chars.size == inks.size
+        val from = if (each) 0 else inks.size - 1
+        val picks = (from until inks.size).map { i ->
+            val keys = KeyedRows.handwriting(inks[i].reading.texts)
+            val last = i == inks.size - 1
             val text = if (last) lastCharacter(sentence.text) else chars[i]
             KeyedRows.Pick(keys, text, if (last && index > 0) Row.HOW_PICKED else Row.HOW_FIRST, if (last) first else text)
         }
@@ -457,7 +463,7 @@ class HandwritingSession(
         val commit = habits.record(rows + again?.match?.rows.orEmpty(), flags = predictions.learnFlags)
         retyped = again?.takeIf { it.skip > 0 && commit != null }?.let { Triple(deleted[it.match.typedAgain], it.skip, commit!!) }
         if (commit != null && each) {
-            inked += commit to written.map { it.reading.texts.toSet() }
+            inked += commit to inks.map { it.reading.texts.toSet() }
             while (inked.size > CommitJournal.KEPT) inked.removeAt(0)
         }
         journal.committed(sentence.text, commit, learning, again?.match)

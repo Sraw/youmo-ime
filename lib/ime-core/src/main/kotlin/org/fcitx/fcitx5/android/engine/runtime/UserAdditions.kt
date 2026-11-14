@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.phrase.PhraseBook
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.runtime.Engines.Additions
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
+import org.fcitx.fcitx5.android.engine.user.RareChoice
 import java.io.IOException
 
 /**
@@ -103,6 +104,11 @@ internal class UserAdditions(
         }
     }.also { commonWords = it }
 
+    private var rareChoice: RareChoice? = null
+
+    /** 生僻字屏蔽 as the user chose it ([RareChoice]), read once as the phrases are: the same object till [drop]. */
+    fun rareChoice(): RareChoice = rareChoice ?: RareChoice.parse(added()?.rareChars.orEmpty()).also { rareChoice = it }
+
     /** As a fresh install has them: the built-in phrases alone, the user's left out (U-93). */
     fun freshPhrases(): PhraseBook = PhraseBook(CustomPhrases.parse(""), CustomPhrases.BUILT_IN) {}
 
@@ -112,6 +118,7 @@ internal class UserAdditions(
         addedRead = false
         phrases = null
         commonWords = null
+        rareChoice = null
         return before
     }
 }

@@ -144,6 +144,22 @@ class HandwritingSessionTest {
         assertFalse(s.apply(Action.CommitRaw).handled)
     }
 
+    // 生僻字屏蔽 (review N4): a last position every reading of which is held back is as if not written
+    @Test
+    fun `no habit is kept under the ink of a character held back`() {
+        val learner = Learner(handwritingData)
+        val user = learner.model
+        val s = HandwritingSession(
+            handwritingDecoder(user, held = { it == "人" }), TextWords(handwritingData.model, handwritingData.wordIndex),
+            user = user, habits = learner.habits,
+        )
+        s.show(read("天", "话"))
+        val shown = s.show(read("人"))
+        assertEquals("话", s.apply(Action.Pick(shown.candidates.indexOf("话"))).commit)
+        val stats = learner.log.state.stats.keys.filter { it.code.kind == Kinds.HANDWRITING && it.code.keys.isNotEmpty() }
+        assertEquals(setOf(KeyedRows.handwriting(listOf("天", "话")) to "话"), stats.map { it.code.keys to it.text }.toSet())
+    }
+
     @Test
     fun `every sentence put in is learned by its words' text, after the word before it`() {
         val learner = Learner(handwritingData)

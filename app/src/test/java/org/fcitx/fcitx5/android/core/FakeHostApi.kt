@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
+import org.fcitx.fcitx5.android.engine.user.RareGrid
 import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
@@ -112,6 +113,14 @@ class FakeHostApi : HostApi {
     override suspend fun logProbs(texts: List<String>) = FloatArray(texts.size)
     override suspend fun voiceHomophones(words: List<UserWord>) = VoiceHomophones.NONE
     override suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = BooleanArray(spans.size)
+
+    /** What [rareHeld] answers: the texts with a character of these. */
+    var rareChars: Set<String> = emptySet()
+    override suspend fun rareHeld(texts: Collection<String>) = texts.filterTo(HashSet()) { t -> rareChars.any { it in t } }
+
+    /** What [rareGrid] answers. */
+    var rareGridAnswer: RareGrid? = null
+    override suspend fun rareGrid() = rareGridAnswer
 
     override suspend fun addUserWord(text: String, pinyin: String): Boolean {
         calls += "addUserWord($text, $pinyin)"

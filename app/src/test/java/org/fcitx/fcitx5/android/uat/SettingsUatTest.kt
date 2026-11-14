@@ -156,8 +156,9 @@ class SettingsUatTest {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         idle()
         assertTrue(api.calls.toString(), "addUserWord(幽默, you mo)" in api.calls)
-        val list = KeyboardHarness.all(activity.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
-        assertTrue(list.toString(), "幽默" in list && list.any { "you mo" in it })
+        // the list reloads after a hop off the main thread (生僻字屏蔽's file read): waited for
+        fun list() = KeyboardHarness.all(activity.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+        until("the word listed", state = ::list, step = ::idle) { list().let { l -> "幽默" in l && l.any { "you mo" in it } } }
     }
 
     @Test

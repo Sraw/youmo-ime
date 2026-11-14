@@ -33,6 +33,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.R as MaterialR
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputLayout
@@ -45,11 +47,13 @@ import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
+import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
-import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.LexiconView
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
+import org.fcitx.fcitx5.android.engine.user.CharGate
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
@@ -79,6 +83,7 @@ import splitties.views.gravityCenterVertical
 import splitties.views.imageDrawable
 import splitties.views.setPaddingDp
 import timber.log.Timber
+import java.io.IOException
 import kotlin.math.roundToInt
 
 /**
@@ -109,6 +114,9 @@ class UserWordListFragment : Fragment() {
     private var tableBlocks: TextView? = null
 
     private var all = emptyList<UserWord>()
+    // 生僻字屏蔽 (§5.4): what it holds back, for the rows and the add dialog to say; none for the lists not marked
+    private var rare = CharGate.NONE
+    private val marksRare get() = (source as? PinyinWords)?.kind?.let { it != UserWord.Kind.BLOCKED } == true
     // D8: a word's 「五笔：与 X 同码」 lines, for each table that cannot take it
     private var sameCode = emptyMap<String, String>()
     private var shown = emptyList<UserWord>()
@@ -259,6 +267,8 @@ class UserWordListFragment : Fragment() {
     private fun load() {
         lifecycleScope.launch {
             all = onFcitx("Reading user words failed") { source.words(this) }.getOrElse { return@launch }
+            // a file read and parsed: off the main thread (runOnReady runs on the caller's)
+            if (marksRare) rare = withContext(Dispatchers.IO) { RareCharsManager.gate() }
             // by word and reading: a learned word's count may have changed since it was picked
             val picked = selected.mapTo(HashSet()) { it.text to it.pinyin }
             selected.clear()
@@ -429,15 +439,18 @@ class UserWordListFragment : Fragment() {
 
     /** What can be done to [word]: edited where its list lets it be, corrected again (English's), taken off its list. */
     private fun act(word: UserWord) {
+        val held = rare.heldIn(word.text)
         val actions = buildList {
+            if (held.isNotEmpty()) add(if (held.size == 1) R.string.rare_allow_one else R.string.rare_allow_these)
             if (source.editable) add(R.string.edit)
             if (source == EnglishWords && word.neverCorrected) add(R.string.english_restore_correction)
             add(source.removeLabel)
         }
         AlertDialog.Builder(requireContext())
             .setTitle("${word.text}  ${word.pinyin}".trim())
-            .setItems(actions.map { getString(it) }.toTypedArray()) { _, which ->
+            .setItems(actions.map { if (it == R.string.rare_allow_one) getString(it, held.first()) else getString(it) }.toTypedArray()) { _, which ->
                 when (actions[which]) {
+                    R.string.rare_allow_one, R.string.rare_allow_these -> allowRare(held) { load() }
                     R.string.edit -> edit(R.string.edit, word) { text, pinyin ->
                         // added before the old is taken off: a word that does not read so leaves both be
                         addUserWord(text, pinyin).also { if (it) removeUserWords(listOf(word)) }
@@ -447,6 +460,24 @@ class UserWordListFragment : Fragment() {
                 }
             }
             .show()
+    }
+
+    /** Lets [chars] through (§5.4) and has the engine read it; [then], once it has. */
+    private fun allowRare(chars: List<String>, then: () -> Unit) {
+        val levels = RareCharsManager.levels ?: return
+        val ctx = requireContext().applicationContext
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) { RareCharsManager.allow(chars, levels) }
+            } catch (e: IOException) {
+                Timber.w(e, "rare characters: let through")
+                if (e is RareCharsManager.Newer) ctx.toast(R.string.rare_chars_newer) else ctx.toast(e)
+                return@launch
+            }
+            onFcitx("Reloading the engine failed") { reloadEngine() }
+            rare = withContext(Dispatchers.IO) { RareCharsManager.gate() }
+            then()
+        }
     }
 
     private fun addWord(@StringRes title: Int) = when (val list = source) {
@@ -509,9 +540,27 @@ class UserWordListFragment : Fragment() {
             textField.setText(it.text)
             pinyinField.setText(it.pinyin)
         }
+        // §5.4: a held character said at once, with a button to let it through; saving not stopped
+        val allow = MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply { visibility = View.GONE }
+        fun sayRare() {
+            val held = rare.heldIn(textField.str)
+            textLayout.helperText = held.takeIf { it.isNotEmpty() }?.let { getString(R.string.rare_add_hint, it.joinToString("、")) }
+            allow.visibility = if (held.isEmpty()) View.GONE else View.VISIBLE
+            allow.setText(if (held.size > 1) R.string.rare_allow_these else R.string.rare_allow_this)
+            // the list behind read again too: a word of it with the character no longer marked (review N9)
+            allow.setOnClickListener {
+                allowRare(held) {
+                    sayRare()
+                    load()
+                }
+            }
+        }
+        textField.doAfterTextChanged { sayRare() }
+        sayRare()
         val layout = ctx.verticalLayout {
             setPaddingDp(20, 10, 20, 0)
             add(textLayout, lParams(matchParent))
+            add(allow, lParams(wrapContent))
             add(pinyinLayout, lParams(matchParent))
         }
         AlertDialog.Builder(ctx)
@@ -592,7 +641,12 @@ class UserWordListFragment : Fragment() {
         override fun onBindViewHolder(holder: WordHolder, position: Int) {
             val word = shown[position]
             holder.text.text = word.text
-            holder.detail.text = source.detail(resources, word).let { said -> sameCode[word.text]?.let { "$said\n$it" } ?: said }
+            val held = rare.heldIn(word.text)
+            holder.detail.text = listOfNotNull(
+                source.detail(resources, word),
+                sameCode[word.text],
+                held.takeIf { it.isNotEmpty() }?.let { getString(R.string.rare_word_has, it.joinToString("、")) },
+            ).joinToString("\n")
             holder.check.visibility = if (selected.isEmpty()) View.GONE else View.VISIBLE
             holder.check.isChecked = word in selected
             holder.root.setOnClickListener { if (selected.isEmpty()) act(word) else toggle(word) }
@@ -633,7 +687,7 @@ internal sealed class WordSource(
 }
 
 /** One list of pinyin's user dictionary: the words learned come from typing alone, a blocked one is unblocked, not edited. */
-internal class PinyinWords(private val kind: UserWord.Kind) : WordSource(
+internal class PinyinWords(val kind: UserWord.Kind) : WordSource(
     title = UserWordsFragment.title(kind),
     searchHint = R.string.search_words_hint,
     addLabel = when (kind) {

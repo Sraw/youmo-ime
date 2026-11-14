@@ -11,6 +11,9 @@ import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.runtime.Engines.Additions
+import org.fcitx.fcitx5.android.engine.user.CharGate
+import org.fcitx.fcitx5.android.engine.user.HeldWords
+import org.fcitx.fcitx5.android.engine.user.RareChoice
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
@@ -27,7 +30,8 @@ import java.io.IOException
  * list it imports goes to the learning record as a batch of imported words ([imports], U-101). A
  * word forgotten here is forgotten in the tables too ([forgetInTables]) and in the learning record
  * ([forgotten]); a change the sessions must see drops them ([dropSessions]). Run on the fcitx
- * thread, as [Engines] is.
+ * thread, as [Engines] is. It holds 生僻字屏蔽 too ([held], [gate]): a setting, not a habit, so the
+ * fresh model of 「不用我的输入习惯」 holds the same back (DECISIONS R12).
  */
 internal class UserLexicon(
     private val userDir: UserFiles?,
@@ -78,7 +82,7 @@ internal class UserLexicon(
     // the dictionaries' words are the model's, listed, uncounted: scored below the model's unknown
     // word as their dictionary ranks them until the user owns them. The words added by hand are the
     // user's choice: scored as the model's word of their text from the start (UserModel.modelWord)
-    fun user(): UserModel = userModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, pinyinData.wordIndex, added.dictionary(), added.stale()).also { model ->
+    fun user(): UserModel = (userModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, pinyinData.wordIndex, added.dictionary(), added.stale()).also { model ->
         // kept while it is made, for what attach asks of it; not once a step failed, so the next
         // need makes it whole again rather than going on with half of it
         userModel = model
@@ -90,7 +94,59 @@ internal class UserLexicon(
             userModel = null
             throw e
         }
+    }).also { it.held = held() }
+
+    // 生僻字屏蔽's words held back, for the data and the choice they were made of: kept over the sessions'
+    // invalidate()s (each dropSessions makes them anew, often), made again only once either changed
+    private var heldWords = HeldWords.NONE
+    private var heldData: Any? = null
+    private var heldChoice: Any? = null
+
+    /**
+     * How many [HeldWords] were made since this lexicon was: once for the same data and choice. Read by
+     * the tests alone, as [SessionFactory.coarseMade].
+     */
+    internal var heldMade = 0
+
+    /**
+     * A gate of the tests' own in place of the user's choice: one that holds back 的, which no choice can
+     * (RareCharContractTest, design §8). Null, the choice's.
+     */
+    internal var gateOverride: CharGate? = null
+
+    /**
+     * The dictionary's words 生僻字屏蔽 holds back ([HeldWords]), as the user chose ([UserAdditions.rareChoice]);
+     * none while it is off. Made on the fcitx thread, at the first need after the choice or the data changed:
+     * a walk of every word's chars (time on a phone: specs/engine.md).
+     */
+    fun held(): HeldWords {
+        val choice: Any = gateOverride ?: added.rareChoice()
+        val data = pinyinData
+        // a CharGate (a test's) by identity, a RareChoice by value: read anew, the same choice is the same
+        if (data === heldData && choice == heldChoice) {
+            heldChoice = choice
+            return heldWords
+        }
+        val gate = when (choice) {
+            is CharGate -> choice
+            // the levels read only once on: a build without them is off, told once (EngineAssets.charLevels)
+            is RareChoice -> if (choice.on && !choice.newer) choice.gate(assets.charLevels) else CharGate.NONE
+            else -> CharGate.NONE
+        }
+        heldWords = if (gate.none) HeldWords.NONE else HeldWords.of(gate, data.vocabulary).also { heldMade++ }
+        heldData = data
+        heldChoice = choice
+        return heldWords
     }
+
+    /** The characters 生僻字屏蔽 holds back now: what a text is asked of where no word id is. */
+    fun gate(): CharGate = held().gate
+
+    /**
+     * A text blocked ([isBlocked]) or with a character held back ([gate]): what stroke lookup, 拆字
+     * and a glide's other readings leave out.
+     */
+    fun withheld(text: String): Boolean = isBlocked(text) || gate().holds(text)
 
     // in the user directory with the log, in memory without one
     private val lists by lazy(LazyThreadSafetyMode.NONE) { WordLists(userDir, onError) }
@@ -392,8 +448,8 @@ internal class UserLexicon(
      * their own words, counts or pairs, none added by hand. [attach] is not told: nothing of the
      * learning record is in it.
      */
-    fun freshUser(): UserModel = freshModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, pinyinData.wordIndex, added.dictionary(), added.stale()).also { model ->
+    fun freshUser(): UserModel = (freshModel ?: UserModel(pinyinData.dictionary, pinyinData.vocabulary, pinyinData.wordIndex, added.dictionary(), added.stale()).also { model ->
         freshModel = model
         lists.blockedWords.forEach { model.block(it) }
-    }
+    }).also { it.held = held() }
 }

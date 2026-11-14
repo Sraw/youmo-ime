@@ -46,9 +46,21 @@ object VoiceHotwords {
         val blocked: String,
         /** the user's words put in for what was heard read alike ([VoiceHomophones]) */
         val homophones: VoiceHomophones = VoiceHomophones.NONE,
+        /**
+         * the recognizer's characters 生僻字屏蔽 holds back (the engine's answer, [withHeld]): none of
+         * them completed in the search ([searchBlocked]), nor typed ([holds]). Not among [blockedWords],
+         * which are words standing alone in a text (VoiceBlocking), a character being in any (design §5.3)
+         */
+        val held: Set<String> = emptySet(),
     ) {
         /** the blocked words as written, not [HotwordSpelling.spelled] */
         val blockedWords: List<String> get() = blocked.split('/').filter { it.isNotEmpty() }.map { it.replace(" ", "") }
+
+        /** what the search is told never to complete: the blocked words, then each character [held], a token of its own */
+        val searchBlocked: String get() = (listOf(blocked).filter { it.isNotEmpty() } + held.sorted()).joinToString("/")
+
+        /** whether [text] has a character [held] */
+        fun holds(text: String): Boolean = held.isNotEmpty() && held.any { it in text }
 
         /**
          * As listened for with U-93's [habits]: off, none of the user's words (nor [homophones]), the blocked still
@@ -108,14 +120,26 @@ object VoiceHotwords {
     }
 
     /**
+     * [words] less those [held] names (生僻字屏蔽: a character held back in them), the blocked kept:
+     * what is listened for and what [VoiceHomophones] may put in for what was heard (design §5.3)
+     */
+    fun unheld(words: List<UserWord>, held: Set<String>): List<UserWord> =
+        if (held.isEmpty()) words else words.filter { it.kind == UserWord.Kind.BLOCKED || it.text !in held }
+
+    /**
      * The user's words for one stream: as hotwords, those they added first, then those they made
      * as they typed, most used first
      * ([org.fcitx.fcitx5.android.engine.runtime.Engines.userWords]' order): 我的词 alone (U-30, D29), no
      * word of another kind, nor one the user only typed once; blocked, those they blocked. With
      * U-93's 「用我的输入习惯」 off, [Words.withHabits] drops their hotwords, the blocked still blocked.
+     * Of [held], 生僻字屏蔽's answer for these words' texts and the recognizer's characters: a word of
+     * the user's with a character held back is no hotword (nor one for [VoiceHomophones], VoiceEngine);
+     * [Words.held], those of it among [chars], the recognizer's: a user's one-character word is in
+     * [held] too, and a character not a token of the recognizer's is none to tell its search (review S6).
      */
-    fun ofUser(words: List<UserWord>): Words {
-        fun spell(kinds: (UserWord.Kind) -> Boolean) = words.asSequence()
+    fun ofUser(words: List<UserWord>, held: Set<String> = emptySet(), chars: Collection<String> = emptyList()): Words {
+        val kept = unheld(words, held)
+        fun spell(kinds: (UserWord.Kind) -> Boolean) = kept.asSequence()
             .filter { kinds(it.kind) }
             .mapNotNull { word -> HotwordSpelling.spelled(word.text)?.let { it to word.kind } }
             // added and learned both: added, which comes first
@@ -126,6 +150,7 @@ object VoiceHotwords {
         return Words(
             hotwords = spell { it in MINE },
             blocked = spell { it == UserWord.Kind.BLOCKED },
+            held = chars.filterTo(HashSet()) { it in held },
         )
     }
 

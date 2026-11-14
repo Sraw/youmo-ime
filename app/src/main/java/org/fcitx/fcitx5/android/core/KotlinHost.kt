@@ -247,6 +247,8 @@ class KotlinHost(
     override suspend fun logProbs(texts: List<String>) = withContext(dispatcher) { bridge.engines.logProbs(texts) }
     override suspend fun voiceHomophones(words: List<UserWord>) = withContext(dispatcher) { bridge.engines.voiceHomophones(words) }
     override suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = withContext(dispatcher) { bridge.engines.voiceHomophonesAllowed(spans) }
+    override suspend fun rareHeld(texts: Collection<String>) = withContext(dispatcher) { bridge.engines.rareHeld(texts) }
+    override suspend fun rareGrid() = withContext(dispatcher) { bridge.engines.rareGrid() }
     override suspend fun addUserWord(text: String, pinyin: String) = withContext(dispatcher) { bridge.engines.addWord(text, pinyin) }
     override suspend fun voiceSaid(text: String, before: String?, hinted: Boolean) = withContext(dispatcher) { bridge.engines.voiceSaid(text, before, hinted) }
     override suspend fun voicePutIn(text: String) = withContext(dispatcher) { bridge.engines.voicePutIn(text) }

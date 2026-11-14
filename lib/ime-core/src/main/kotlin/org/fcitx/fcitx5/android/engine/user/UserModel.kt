@@ -237,8 +237,10 @@ class UserModel(
         importsChanged()
     }
 
-    /** The words imported changed: the tables code them again with the listed ([listings]). */
+    /** The words imported changed: the tables code them again with the listed ([listings]); what of them is held asked again. */
     fun importsChanged() {
+        // their places only grow today, but what a place holds is the imports' to say (review N5)
+        heldImports.clear()
         changes++
         listings++
         allChanged()
@@ -765,9 +767,61 @@ class UserModel(
     }
 
     override fun blocked(word: Int, node: Int) =
-        blockedAnyhow(word) && (word >= vocabulary.size || key(node, word) in blockedReadings)
+        isHeld(word) || blockedIds[word.toLong()] > 0f && (word >= vocabulary.size || key(node, word) in blockedReadings) ||
+            mergedStale && inStaleBase(word)
 
-    override fun blockedAnyhow(word: Int) = blockedIds[word.toLong()] > 0f || mergedStale && inStaleBase(word)
+    override fun blockedAnyhow(word: Int) = isHeld(word) || blockedIds[word.toLong()] > 0f || mergedStale && inStaleBase(word)
+
+    /**
+     * The words 生僻字屏蔽 holds back (RareChoice): of the dictionary's by [HeldWords]' bit, of the
+     * user's, a merged dictionary's and the imported by their text, each asked once. Set by
+     * [org.fcitx.fcitx5.android.engine.runtime.UserLexicon] as the choice or the data changes; a
+     * new one counts as a [changes], as a block does, so what was read of this model (a glide's) is read anew.
+     */
+    var held: HeldWords = HeldWords.NONE
+        set(value) {
+            if (value === field) return
+            field = value
+            heldUser.clear()
+            heldMerged.clear()
+            heldImports.clear()
+            changes++
+        }
+
+    // of the words past the dictionary's, by their place in their kind (word less its base: an id of
+    // the merged or imported is 2^27 or 2^28 on, a bitmap by id 16 or 32 MB): whether asked, and the answer
+    private val heldUser = HeldCache()
+    private val heldMerged = HeldCache()
+    private val heldImports = HeldCache()
+
+    private class HeldCache {
+        private val asked = java.util.BitSet()
+        private val held = java.util.BitSet()
+
+        fun of(place: Int, text: () -> String, gate: CharGate): Boolean {
+            if (!asked[place]) {
+                asked.set(place)
+                if (gate.holds(text())) held.set(place)
+            }
+            return held[place]
+        }
+
+        fun clear() {
+            asked.clear()
+            held.clear()
+        }
+    }
+
+    private fun isHeld(word: Int): Boolean {
+        val h = held
+        if (h === HeldWords.NONE || word < 0) return false
+        return when (kindOf(word)) {
+            Kind.BASE -> h.has(word)
+            Kind.USER -> heldUser.of(word - vocabulary.size, { text(word) }, h.gate)
+            Kind.MERGED -> heldMerged.of(word - mergedBase, { text(word) }, h.gate)
+            Kind.IMPORT -> heldImports.of(word - importBase, { text(word) }, h.gate)
+        }
+    }
 
     // a stale file's word the base has now: the base's alone, offered and blocked as that (review S7).
     // Looked up once a place, only while the recompile is owed
@@ -794,10 +848,12 @@ class UserModel(
 
     /**
      * What is left of the whole phrases [before] ends a start of (see [Continuations.find]): none
-     * turned off (NoPredict after "", U-73), none a blocked word is in, blocking being everywhere.
+     * turned off (NoPredict after "", U-73), none a blocked word is in, blocking being everywhere, nor a character held back ([held]).
      */
     fun continuationsAfter(before: String, starts: IntArray, last: String, limit: Int = Continuations.LIMIT): List<Continuations.Found> =
-        continuations.find(before, starts, last, limit) { whole -> !predictionsOff("", whole) && blockedEntries.none { it.text in whole } }
+        continuations.find(before, starts, last, limit) { whole ->
+            !predictionsOff("", whole) && blockedEntries.none { it.text in whole } && !held.gate.holds(whole)
+        }
 
     /** The words the user owns ([own]), not blocked, with how often each was typed lately. */
     fun ownWords(): List<Pair<Entry, Float>> = owned.mapNotNull { id -> entries[id]?.takeIf { it !in blockedEntries }?.let { it to counts[key(NO_WORD, id)] } }

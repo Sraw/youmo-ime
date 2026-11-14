@@ -157,7 +157,7 @@ internal class SessionFactory(
         val data = language.data
         val decoder = HandwritingDecoder(
             data.dictionary, data.vocabulary, data.wordIndex, language.scorer,
-            assets::charSyllables, language.user, language.coarse,
+            assets::charSyllables, language.user, language.coarse, held = lexicon.gate()::holds,
         )
         return HandwritingSession(
             decoder, TextWords(data.model, data.wordIndex), s.pageSize, language.user, language.predictor, reranker(), refiner(),
@@ -176,7 +176,7 @@ internal class SessionFactory(
                 val pinyin = pinyinSession(segmenter, spell = false, chaizi = chaizi())
                 val looked = ForgetsInTables(
                     StrokeLookup(
-                        pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::isBlocked, follow = pinyin::follow, retype = pinyin::typeAll,
+                        pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::withheld, follow = pinyin::follow, retype = pinyin::typeAll,
                         blockedUnder = { strokes -> learner.openHabits().blockedUnder(strokeCode(strokes)) },
                         blockUnder = { strokes, text -> learner.openHabits().blockUnder(strokeCode(strokes), text, on = true) },
                     ),
@@ -268,8 +268,9 @@ internal class SessionFactory(
             version = { language.user?.let { it to it.changes } to learner.learnLog().state.let { it.id to it.tableBlocksVersion } },
             // the words counted, scored anew a glide: their scores move with every word learned
             learned = { text -> language.user?.typed(text) == true },
-            // the table's own blocks, under a code, alone: a block in pinyin hides none of them (U-28 C12)
-            blocked = { code, text -> text in learner.openHabits().blockedUnder(Code(Kinds.table(im), code)) },
+            // the table's own blocks, under a code, alone: a block in pinyin hides none of them (U-28 C12); and
+            // 生僻字屏蔽's characters, held back everywhere
+            blocked = { code, text -> text in learner.openHabits().blockedUnder(Code(Kinds.table(im), code)) || language.held(text) },
         )
         // a glide after a code typed picks its first candidate: the next code is the glide's
         return GlideSession(
@@ -312,7 +313,7 @@ internal class SessionFactory(
 
     // what a glide's other readings leave out: the words blocked, and the coarse ones but those the
     // user added, as the decoders hold them back (CoarseWords); [blocked] as the session blocks
-    private fun glideHeldBack(blocked: (String) -> Boolean = lexicon::isBlocked): (String) -> Boolean {
+    private fun glideHeldBack(blocked: (String) -> Boolean = lexicon::withheld): (String) -> Boolean {
         val coarse = (CoarseWords.LIST - addedNow()).toHashSet()
         return { blocked(it) || it in coarse }
     }
@@ -340,6 +341,7 @@ internal class SessionFactory(
             simplify = { simplified.simplify(it) },
             // the record's own, not the habits a session is made with (U-93 keeps the blocks)
             blockedUnder = learner.openHabits()::blockedUnder,
+            held = lexicon.gate()::holds,
         )
     }
 
@@ -494,9 +496,9 @@ internal class SessionFactory(
         return { word -> book.builtInsOf(word, learnClock::calendar) }
     }
 
-    /** The characters by their parts' pinyin, as full pinyin offers them, but those blocked: none, the setting off. */
+    /** The characters by their parts' pinyin, as full pinyin offers them, but those blocked or held back: none, the setting off. */
     private fun chaizi(): PartsLookup = if (!settings().chaizi) PartsLookup { emptyList() } else object : PartsLookup {
-        override fun of(letters: String) = assets.chaiziOf(letters).filterNot { lexicon.isBlocked(it.first) }
+        override fun of(letters: String) = assets.chaiziOf(letters).filterNot { lexicon.withheld(it.first) }
 
         // a polyphone's reading as 候选词注音 draws it, blocked in that one
         override fun shownIn(text: String, before: String, hint: String?) = candidateReadings.oneOf(text, before, hint)?.let { Syllables.spelling(it.syllable) }

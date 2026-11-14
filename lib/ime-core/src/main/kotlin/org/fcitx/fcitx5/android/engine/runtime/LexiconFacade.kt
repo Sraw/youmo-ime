@@ -5,8 +5,12 @@
 package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.TABLES
+import org.fcitx.fcitx5.android.engine.user.DictionaryFile
+import org.fcitx.fcitx5.android.engine.user.RareGrid
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
+import java.lang.ref.WeakReference
 
 /**
  * The user's words as the settings show and change them, for [Engines]: pinyin's ([UserLexicon]:
@@ -72,6 +76,86 @@ internal class LexiconFacade(
     /** [EngineAssets.voiceHomophonesAllowed]. */
     fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = assets.voiceHomophonesAllowed(spans)
 
+    /** Which of [texts] have a character 生僻字屏蔽 holds back now ([UserLexicon.gate]): for voice, the user's words and the recognizer's characters. */
+    fun rareHeld(texts: Collection<String>): Set<String> {
+        val gate = lexicon.gate()
+        return if (gate.none) emptySet() else texts.filterTo(HashSet()) { gate.holds(it) }
+    }
+
+    // what the grid takes of the pack's data, which a new pack comes with new engines for: walked once
+    // (the page of the user's words asks at each showing, review S7)
+    private var pack: Pair<IntArray, Set<Int>>? = null
+
+    // the grid made, and of which of the user's words: their model and its counts, as the tables key
+    // theirs; the model held weakly, one replaced not kept for this
+    private var grid: RareGrid? = null
+    private var gridModel = WeakReference<UserModel>(null)
+    private var gridListings = 0
+    private var gridChanges = 0
+
+    // the merged dictionaries' characters beyond the basic plane, of the file they were walked in: a
+    // million words of a big one, walked again only with a new file (a new model), not as the user learns
+    private var mergedFile = WeakReference<DictionaryFile>(null)
+    private var mergedTyped: Set<Int> = emptySet()
+
+    /** How many times a merged dictionary was walked for the grid: for the tests. */
+    internal var mergedWalks = 0
+
+    /**
+     * 生僻字屏蔽's grid ([RareGrid.copy]): the characters the readings know, of 扩展 B on those the
+     * dictionary's words, the tables or the parts have, or the user's words (their dictionaries, those
+     * added or imported, those learned: each has a reading), and those the dictionary's one-character
+     * words and the strokes have with none; null without the levels (EngineAssets.charLevels). Made
+     * again only once the user's words changed.
+     */
+    fun rareGrid(): RareGrid? {
+        val levels = assets.charLevels ?: return null
+        val model = lexicon.user()
+        if (gridModel.get() === model && gridListings == model.listings && gridChanges == model.changes) grid?.let { return it }
+        val (single, packTyped) = pack ?: packChars().also { pack = it }
+        val typed = HashSet(packTyped)
+        // the dictionaries merged are not listed but as the user picks or blocks their words
+        typed += mergedTyped(model.dictionaryFile)
+        for (text in model.listedTexts() + model.ownTexts()) beyondBasic(text.length, text::get, typed)
+        return RareGrid.copy(levels, assets.pinyinData.charReadings, single.asSequence() + assets.strokes()?.codePoints().orEmpty(), typed::contains)
+            .also {
+                grid = it
+                gridModel = WeakReference(model)
+                gridListings = model.listings
+                gridChanges = model.changes
+            }
+    }
+
+    private fun mergedTyped(file: DictionaryFile?): Set<Int> {
+        if (file == null) return emptySet()
+        if (mergedFile.get() === file) return mergedTyped
+        mergedWalks++
+        val typed = HashSet<Int>()
+        for (place in 0 until file.size) file.text(place).let { beyondBasic(it.length, it::get, typed) }
+        mergedFile = WeakReference(file)
+        mergedTyped = typed
+        return typed
+    }
+
+    // the dictionary's one-character words; the characters beyond the basic plane its words, the tables and the parts have
+    private fun packChars(): Pair<IntArray, Set<Int>> {
+        val vocabulary = assets.pinyinData.vocabulary
+        val single = (0 until vocabulary.size).asSequence().mapNotNull { id ->
+            val n = vocabulary.length(id)
+            val c = vocabulary.char(id, 0)
+            when {
+                n == 1 -> c.code
+                n == 2 && Character.isHighSurrogate(c) && Character.isLowSurrogate(vocabulary.char(id, 1)) -> Character.toCodePoint(c, vocabulary.char(id, 1))
+                else -> null
+            }
+        }.toList().toIntArray()
+        val typed = HashSet<Int>()
+        for (id in 0 until vocabulary.size) beyondBasic(vocabulary.length(id), { vocabulary.char(id, it) }, typed)
+        tables.beyondBasic(typed)
+        for (c in assets.chaiziChars()) beyondBasic(c.length, c::get, typed)
+        return single to typed
+    }
+
     /** A character's readings as the dictionary has them, the likeliest first: `zhang/chang`; empty for none. */
     fun charReading(c: String): String = assets.charReading(c)
 
@@ -120,4 +204,19 @@ internal class LexiconFacade(
      */
     // the user's export is a backup (FXLB) since 4fa9c54f: this text form is kept for the word lists' round-trip tests
     fun exportWords(): List<String> = lexicon.exportWords()
+}
+
+/** Into [into], the code points past the basic plane of a text [length] UTF-16 units long, read a unit at a time by [char]. */
+internal inline fun beyondBasic(length: Int, char: (Int) -> Char, into: MutableSet<Int>) {
+    var i = 0
+    while (i < length - 1) {
+        val c = char(i)
+        if (Character.isHighSurrogate(c)) {
+            val low = char(i + 1)
+            if (Character.isLowSurrogate(low)) into += Character.toCodePoint(c, low)
+            i += 2
+        } else {
+            i++
+        }
+    }
 }

@@ -93,6 +93,9 @@ object UatEngines {
     /** The common words file, as the app keeps it (an export's text): read by the engine on [Engines.reload]. */
     var commonWords: String = ""
 
+    /** 生僻字屏蔽's file, as the app keeps it (`pinyin/rarechars.txt`'s text): read by the engine on [Engines.reload]. */
+    var rareChars: String = ""
+
     // what a case's user dir errors were: a case fails on one, as the app would log and go on
     private val errors = ArrayList<IOException>()
 
@@ -133,6 +136,7 @@ object UatEngines {
                 indexes = indexes?.let(::JvmFiles),
                 commonWords = commonWords,
                 saveCommonWords = { commonWords = it.format() },
+                rareChars = rareChars,
             )
         },
         // on the caller's thread: what a case sees does not depend on a warm-up's timing
@@ -160,6 +164,7 @@ object UatEngines {
         Clock.reset()
         phrases = ""
         commonWords = ""
+        rareChars = ""
         dictionary = { null }
         indexes = null
         val left = synchronized(errors) { errors.toList().also { errors.clear() } }

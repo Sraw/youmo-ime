@@ -38,6 +38,9 @@ class HandwritingDecoder(
     private val readings: () -> Map<Int, IntArray>,
     private val user: UserWords? = null,
     private val coarse: CoarseWords = CoarseWords.NONE,
+    // 生僻字屏蔽, by text: a character the ink read with no word id is held back too, and apart from what the
+    // user blocked, whose position keeps the ink's best where every reading is blocked (design §5.1)
+    private val held: (String) -> Boolean = { false },
     private val inkWeight: Double = INK_WEIGHT,
     private val alternatives: Int = ALTERNATIVES,
     private val beam: Int = BEAM,
@@ -98,11 +101,16 @@ class HandwritingDecoder(
     }
 
     fun decode(positions: List<InkReading>, prev2: Int = NO_WORD, prev: Int = NO_WORD): Decoding {
-        val n = positions.size
+        // a position every reading of which is held back is as if not written: the rest read as a sentence
+        // still (none of its readings would leave the beams after it empty). The same objects kept, so a
+        // stroke goes on from the beams before it ([standing])
+        val read = positions.filter(::reads)
+        val n = read.size
         if (n == 0) return Decoding(emptyList())
         val beams = arrayOfNulls<List<State>>(n + 1)
-        val from = keep(positions, prev2, prev, beams)
-        val ending = arcs(positions)
+        val from = keep(read, prev2, prev, beams)
+        keptTo = from
+        val ending = arcs(read)
         for (end in from + 1..n) {
             val next = ArrayList<State>()
             for (arc in ending[end]) {
@@ -113,7 +121,7 @@ class HandwritingDecoder(
             beams[end] = if (end == n) next else distinct(next)
         }
         searchedBeams = beams
-        beamsOf = positions.toList()
+        beamsOf = read.toList()
         beamsPrev2 = prev2
         beamsPrev = prev
         val ends = HashSet<String>()
@@ -126,6 +134,13 @@ class HandwritingDecoder(
         }
         return Decoding(endings.map(::sentenceOf), best.values.map(::sentenceOf))
     }
+
+    /** Whether [position] reads as anything: not every reading of it held back (生僻字屏蔽). */
+    fun reads(position: InkReading): Boolean = position.texts.any { !held(it) }
+
+    /** The last position whose beams the last [decode] went on from (-1: searched all anew): for the tests. */
+    internal var keptTo = -1
+        private set
 
     // the beams last searched, of the positions they read, after the words they went on from
     private var searchedBeams: Array<List<State>?> = emptyArray()
@@ -234,9 +249,11 @@ class HandwritingDecoder(
         val p = positions[start]
         val map = readings()
         val ids = IntArray(p.texts.size) { index.find(p.texts[it]) }
-        // a character the user blocked, in any reading, is left out as a word is (see word); the
-        // ink's best stays where every reading is, or nothing would read the position to put it in
-        val open = p.texts.indices.filter { !blocked(ids[it]) }.ifEmpty { p.texts.indices.take(1) }
+        // a character held back is never read (decode left out a position of none else); one the user
+        // blocked, in any reading, is left out as a word is (see word), the ink's best of the rest
+        // staying where every reading is, or nothing would read the position to put it in
+        val shown = p.texts.indices.filter { !held(p.texts[it]) }
+        val open = shown.filter { !blocked(ids[it]) }.ifEmpty { shown.take(1) }
         for (i in open) arcs += Arc(start, start + 1, ids[i], p.texts[i], inkWeight * p.scores[i], alone(p.texts[i], ids[i], map))
         searched = positions
         searchStart = start
@@ -245,9 +262,11 @@ class HandwritingDecoder(
         // but where every reading is, the ink's best alone, as above (review M2): once a position, not a path through it (review R2 L6)
         shut = Array(minOf(positions.size - start, MAX_WORD)) { k ->
             val texts = positions[start + k].texts
+            val heldAt = BooleanArray(texts.size) { held(texts[it]) }
             // the start's ids found above
-            val blockedAt = BooleanArray(texts.size) { blocked(if (k == 0) ids[it] else index.find(texts[it])) }
-            if (blockedAt.all { it }) BooleanArray(texts.size) { it != 0 } else blockedAt
+            val blockedAt = BooleanArray(texts.size) { heldAt[it] || blocked(if (k == 0) ids[it] else index.find(texts[it])) }
+            val best = heldAt.indexOfFirst { !it }
+            if (blockedAt.all { it }) BooleanArray(texts.size) { it != best } else blockedAt
         }
         foundTexts.clear()
         extend(start, dictionary.root, user?.root ?: -1, user?.mergedWords?.root ?: -1, StringBuilder(), 0.0)

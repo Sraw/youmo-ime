@@ -106,6 +106,10 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object CommonWords : SettingsRoute()
 
+    /** 生僻字屏蔽 (dev/design/061-rare-char-block.md §6). */
+    @Serializable
+    data object RareChars : SettingsRoute()
+
     /**
      * 快速输入's page; [edit]: its editor open at once on [key], [content], [note] and [folder], an
      * entry the user has when [existing] (else a new one filled in so), as the keyboard opens it.
@@ -253,6 +257,9 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<CommonWordsFragment, CommonWords> {
                 label = ctx.getString(R.string.common_words)
+            }
+            fragment<RareCharsFragment, RareChars> {
+                label = ctx.getString(R.string.rare_chars)
             }
         }
     }

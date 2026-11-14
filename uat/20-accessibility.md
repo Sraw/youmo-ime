@@ -74,6 +74,13 @@
 - **预期**：不出笔迹、不写字，读屏照常读摸到的键。
 - **JVM**：`KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores`（触摸浏览开着时不写）；设备上不跑。
 
+### AX-17 [P1] 生僻字屏蔽的网格
+<!-- 061-rare-char-block.md §6.4 -->
+- **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关；打开 TalkBack。
+- **操作**：摸组头的勾选框和几个格子；在一个格子上双击；摸右边的字母条。
+- **预期**：共同的预期；勾选框读组名、字数和「全部屏蔽 / 部分屏蔽 / 全部放行」；格子读成复选框：字和它的读音（多音字读出全部读音，如「荅，dā、dá」），屏蔽的读「已选中」；双击切换后读出的状态跟着变。
+- **JVM**：`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（格子的 `AccessibilityNodeInfo` 是可勾选的 CheckBox、屏蔽时已勾选，读的是字和全部读音；组头勾选框的描述）；TalkBack 本身在设备上手工看。
+
 ## 长按候选
 
 ### AX-12 [P1] 长按候选弹出的菜单逐项读

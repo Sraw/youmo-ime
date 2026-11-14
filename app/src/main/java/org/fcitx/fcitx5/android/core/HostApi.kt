@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
+import org.fcitx.fcitx5.android.engine.user.RareGrid
 import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
@@ -239,6 +240,12 @@ interface LexiconApi {
 
     /** Whether each of [spans] may become its word: see [Engines.voiceHomophonesAllowed]. */
     suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray
+
+    /** Those of [texts] with a character 生僻字屏蔽 holds back: see [Engines.rareHeld]. */
+    suspend fun rareHeld(texts: Collection<String>): Set<String>
+
+    /** 生僻字屏蔽's grid, copied off the data: see [Engines.rareGrid]. */
+    suspend fun rareGrid(): RareGrid?
 
     /** How the dictionary reads [text], for the user to check: see [Engines.pinyinOf]. */
     suspend fun pinyinOf(text: String): String?

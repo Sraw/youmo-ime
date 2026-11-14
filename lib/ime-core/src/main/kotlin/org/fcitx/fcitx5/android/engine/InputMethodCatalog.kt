@@ -178,6 +178,9 @@ object InputMethodCatalog {
 
     /** Each character's radical, strokes and parts (CharInfo), for its card; read if the app has it. */
     const val CHAR_INFO_DATA = "engine/charinfo.data"
+
+    /** Each listed character's group for 生僻字屏蔽 (CharLevels), in the APK: without it the blocking is off. */
+    const val CHAR_LEVELS_DATA = "engine/charlevels.data"
     /** Read if the app has one; without it the engine types by the decoder alone. */
     const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
     /** Six times the work of [SENTENCE_MODEL], and right more often: see [PinyinSession]'s refiner. */

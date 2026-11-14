@@ -35,6 +35,7 @@ import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.pack.PackKind
 import timber.log.Timber
 import java.io.File
+import java.io.IOException
 
 /**
  * The streaming recognizer (X-ASR's 1920 ms streaming transducer, its encoder fine-tuned for
@@ -161,18 +162,20 @@ object VoiceEngine {
      * second or more.
      */
     fun stream(recognizer: OnlineRecognizer, words: VoiceHotwords.Words): OnlineStream = when {
-        words.blocked.isNotEmpty() -> recognizer.createStream(words.hotwords, words.blocked)
+        // the blocked words and 生僻字屏蔽's characters (design 061-rare-char-block §5.3)
+        words.searchBlocked.isNotEmpty() -> recognizer.createStream(words.hotwords, words.searchBlocked)
         words.hotwords.isNotEmpty() -> recognizer.createStream(words.hotwords)
         else -> recognizer.createStream()
     }
 
     /**
      * A segment's text, the recognizer's [result] at its endpoint: of its hypotheses, the one
-     * [VoiceChoice] chooses with [language]; the blocked words were blocked in the search already.
+     * [VoiceChoice] chooses with [language], one with no character 生僻字屏蔽 holds first; the blocked
+     * words were blocked in the search already.
      */
     suspend fun choose(result: OnlineRecognizerResult, words: VoiceHotwords.Words, language: VoiceChoice.Language): String {
         val heard = VoiceChoice.Heard(result.nbest.toList(), result.nbestScores, result.text)
-        return VoiceChoice.choose(heard, words.blockedWords, language) { heard }
+        return VoiceChoice.choose(heard, words.blockedWords, language, held = words::holds) { heard }
     }
 
     /**
@@ -188,8 +191,13 @@ object VoiceEngine {
             reading.async {
                 // the homophones made of the same words, at once: their words are the hotwords'
                 // their failing costs the homophones only, never the hotwords
+                val chars = recognizerChars()
                 val words = fcitx.runOnReady {
-                    userWords().let { w ->
+                    userWords().let { all ->
+                        // 生僻字屏蔽: a word of the user's with a character held back neither listened for nor put
+                        // in for what was heard; the recognizer's characters held never completed (design §5.3)
+                        val held = rareHeld(all.map { it.text } + chars)
+                        val w = VoiceHotwords.unheld(all, held)
                         val homophones = try {
                             voiceHomophones(w)
                         } catch (e: CancellationException) {
@@ -198,7 +206,7 @@ object VoiceEngine {
                             Timber.w(e, "voice homophones not made")
                             VoiceHomophones.NONE
                         }
-                        VoiceHotwords.ofUser(w).copy(homophones = homophones)
+                        VoiceHotwords.ofUser(w, held, chars).copy(homophones = homophones)
                     }
                 }
                 remembered.read(ticket, words)
@@ -206,6 +214,24 @@ object VoiceEngine {
         }
         // how many, not which: they are the user's
         return inTimeOrLast(read, remembered, USER_WORDS_MS).withHabits(habits).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
+    }
+
+    // the recognizer's Chinese characters, each a token of its own (tokens.txt: a token and its id a
+    // line), read once from the voice pack: what 生僻字屏蔽 may have to keep the search from; none without the pack
+    // (again for a pack put in since: a file of another time)
+    @Volatile private var tokenChars: Pair<Long, List<String>>? = null
+
+    private fun recognizerChars(): List<String> = try {
+        val file = File(path("tokens.txt"))
+        val stamp = file.lastModified()
+        tokenChars?.takeIf { it.first == stamp }?.second ?: file.useLines { lines ->
+            lines.map { it.substringBefore(' ') }
+                .filter { it.codePointCount(0, it.length) == 1 && Character.UnicodeScript.of(it.codePointAt(0)) == Character.UnicodeScript.HAN }
+                .toList()
+        }.also { tokenChars = stamp to it }
+    } catch (e: IOException) {
+        Timber.w(e, "voice tokens not read: no character held back from the search")
+        emptyList()
     }
 
     // the engine still starting or busy: voice input with the words last read, not a wait

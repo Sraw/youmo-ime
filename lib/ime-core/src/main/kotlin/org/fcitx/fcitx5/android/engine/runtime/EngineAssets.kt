@@ -6,12 +6,14 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAIZI_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAR_INFO_DATA
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAR_LEVELS_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.EMOJI_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.REFINING_MODEL
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SENTENCE_MODEL
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.STROKE_DATA
+import org.fcitx.fcitx5.android.engine.data.CharLevels
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.NgramModel
@@ -331,6 +333,15 @@ internal class EngineAssets(
         }
     }
 
+    /**
+     * Each listed character's group for 生僻字屏蔽 (APK's); null, told once, if it cannot be read: the
+     * blocking is then off, not guessed by ranges alone, which would hold back the table's 三级字 and
+     * traditional characters beyond the basic block (design §3.1).
+     */
+    val charLevels: CharLevels? by lazy(LazyThreadSafetyMode.NONE) {
+        readOr(null, "cannot read $CHAR_LEVELS_DATA: 生僻字屏蔽 off") { CharLevels.load(blobs.load(CHAR_LEVELS_DATA), verify = false) }
+    }
+
     // what [read] reads, or [fallback] with [onError] told [message] when the file cannot be opened (not in
     // the pack: FileNotFoundException), read (IOException) or makes no sense (DataFormatException,
     // IllegalArgumentException): the one rule for every optional file here (0.6.1 audit engine-13)
@@ -353,6 +364,9 @@ internal class EngineAssets(
     /** The characters whose parts [letters] spells (Chaizi), each with its reading, but those the phone cannot draw. */
     fun chaiziOf(letters: String): List<Pair<String, String>> =
         chaizi.of(letters).filter { drawn.getOrPut(it) { textShows(it) } }.map { it to charReading(it) }
+
+    /** Every character found by its parts ([Chaizi.all]), shown or not: what 生僻字屏蔽's grid asks can be typed. */
+    fun chaiziChars(): Sequence<String> = chaizi.all()
 
     // null till asked for; an app without the data has no lookup
     private var strokeTable: Strokes? = null

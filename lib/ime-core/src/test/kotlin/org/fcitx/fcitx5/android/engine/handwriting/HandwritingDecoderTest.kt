@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.handwriting
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
@@ -319,6 +320,38 @@ class HandwritingDecoderTest {
         val blocking = handwritingDecoder(OneWord(blocked = data.wordIndex.find("话"), alsoBlocked = data.wordIndex.find("天")))
         val d = blocking.decode(listOf(read("淡", step = 0.3), read("天", "话")))
         assertTrue(d.sentences.toString(), d.sentences.none { "话" in it })
+    }
+
+    // 生僻字屏蔽 (dev/design/061-rare-char-block.md §5.1): held back by text, a reading with no word id too
+    @Test
+    fun `a character held back is never read, nor put in as all the ink reads`() {
+        val held = setOf("𤝰", "人")
+        val holding = handwritingDecoder(held = { t -> held.any { it in t } })
+        val gao = read("高")
+        val ren = read("人", "𤝰")
+        assertRows(
+            "a reading with no word id (𤝰) held: the other" to { assertEquals(listOf("山"), holding.decode(listOf(read("𤝰", "山"))).sentences) },
+            "one position, every reading held: nothing, not the ink's best as a block leaves" to {
+                assertEquals(emptyList<String>(), holding.decode(listOf(read("人", "𤝰"))).sentences)
+            },
+            "three positions, the middle's all held: the two either side read as one sentence" to {
+                assertEquals("高山", holding.decode(listOf(gao, ren, read("山"))).text)
+            },
+            "held, as blocked, in no word either" to {
+                assertTrue(holding.decode(listOf(gao, read("人", "山"))).sentences.none { "人" in it })
+            },
+            "a stroke more goes on from the beams before, the positions held left out as they were" to {
+                val d = handwritingDecoder(held = { t -> held.any { it in t } })
+                d.decode(listOf(gao, ren))
+                val shan = read("山")
+                assertEquals("高山", d.decode(listOf(gao, ren, shan)).text)
+                assertTrue("kept to ${d.keptTo}", d.keptTo >= 0)
+            },
+            "what the user blocked keeps its fallback: the ink's best of the rest" to {
+                val both = handwritingDecoder(OneWord(blocked = data.wordIndex.find("山")), held = { it == "人" })
+                assertEquals(listOf("山"), both.decode(listOf(read("人", "山"))).sentences)
+            },
+        )
     }
 
     @Test

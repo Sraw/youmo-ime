@@ -24,6 +24,7 @@ import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 import java.util.zip.CRC32
+import java.util.zip.DataFormatException
 
 /**
  * The table input methods of [Engines], each loaded at first need and kept, with what the user
@@ -95,7 +96,8 @@ internal class TableRegistry(
         override fun longer(prefix: String, byLength: Boolean) =
             mergedNow()?.let { (index, file) -> index.longer(prefix, byLength, file) }.orEmpty()
         override fun leadsAnywhere(prefix: String) = coded().any { it.leadsAnywhere(prefix) } || mergedNow()?.first?.leadsAnywhere(prefix) == true
-        override fun blocked(text: String) = lexicon.isBlockedWord(text)
+        // the gate outside isBlockedWord, which asks two characters at least: a character held back is held alone too
+        override fun blocked(text: String) = lexicon.isBlockedWord(text) || lexicon.gate().holds(text)
         override fun blockable(text: String) = text.codePointCount(0, text.length) >= 2 && assets.pinyinOf(text) != null
         override fun forget(text: String) = lexicon.forgetEverywhere(text)
         // as pinyin offers to forget: what the record has, or a word added by hand (PY-33)
@@ -279,6 +281,32 @@ internal class TableRegistry(
         val data = blobs.load("$TABLE_DIR/${TABLES.getValue(im).file}")
         val dictionary = TableDictionary(CodeTable.load(data.duplicate(), verify = false))
         Table(dictionary, SavedPhrases(dictionary, im, state, ::drop), data)
+    }
+
+    /**
+     * Into [into], the characters past the basic plane of every one of [TABLES]' entries, each table
+     * read for this and let go (not loaded for typing); one that cannot be read told and passed over.
+     */
+    fun beyondBasic(into: MutableSet<Int>) {
+        for (method in TABLES.values) {
+            val table = readAlone(method.file) ?: continue
+            for (i in 0 until table.size) beyondBasic(table.textLength(i), { table.textChar(i, it) }, into)
+        }
+    }
+
+    // the table of [file] read on its own; null, told, if it cannot be (as EngineAssets.readOr)
+    private fun readAlone(file: String): CodeTable? {
+        val failed = try {
+            return CodeTable.load(blobs.load("$TABLE_DIR/$file"), verify = false)
+        } catch (e: IOException) {
+            e
+        } catch (e: DataFormatException) {
+            e
+        } catch (e: IllegalArgumentException) {
+            e
+        }
+        onError(IOException("cannot read $file: its characters not in 生僻字屏蔽's grid", failed))
+        return null
     }
 
     /** After the engines were closed: each table loads again. */

@@ -102,6 +102,28 @@ class VoiceChoiceTest {
         assertEquals("开放了", choose(heard, blocked, language))
     }
 
+    // 生僻字屏蔽 (dev/design/061-rare-char-block.md §5.3): a hypothesis with a character held back passed over
+    @Test
+    fun aHypothesisWithACharacterHeldBackIsPassedOver() {
+        val held = { t: String -> "𤝰" in t }
+        assertRows(
+            "nothing blocked: the first without it" to {
+                assertEquals("大大", now { VoiceChoice.choose(heard("大𤝰", "大大"), emptyList(), FakeLanguage(), held) { error("searched again") } })
+            },
+            "each with it: the first, something typed all the same" to {
+                assertEquals("大𤝰", now { VoiceChoice.choose(heard("大𤝰", "𤝰"), emptyList(), FakeLanguage(), held) { error("searched again") } })
+            },
+            "a word blocked too: the first with neither" to {
+                val got = now { VoiceChoice.choose(heard("开饭𤝰", "开饭了", "开放了"), blocked, FakeLanguage(words), held) { error("searched again") } }
+                assertEquals("开放了", got)
+            },
+            "searched again: its best with it passed over for its next" to {
+                val again = VoiceChoice.Heard(listOf("开放𤝰", "开放啦"), FloatArray(0), "开放𤝰")
+                assertEquals("开放啦", now { VoiceChoice.choose(heard("开饭了"), blocked, FakeLanguage(words), held) { again } })
+            },
+        )
+    }
+
     private fun heard(vararg nbest: String) = VoiceChoice.Heard(nbest.toList(), FloatArray(0), nbest.first())
 
     private fun choose(

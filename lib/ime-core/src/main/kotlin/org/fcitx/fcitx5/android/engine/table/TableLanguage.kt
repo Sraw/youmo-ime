@@ -49,6 +49,11 @@ class TableLanguage(
      */
     val blockedUnder: (Code) -> Set<String> = habits::blockedUnder,
     /**
+     * Whether a text has a character 生僻字屏蔽 holds back (UserLexicon.gate): never offered, under
+     * any code, nor counted among the 重码 a code commits alone ([TableSession] D8).
+     */
+    val held: (String) -> Boolean = { false },
+    /**
      * Traditional text to simplified ([Simplifier]): a traditional table's words are learned for 联想
      * as the predictor reads them, simplified (PLAN §2.1); its codes keep the table's own.
      */

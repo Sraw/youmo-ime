@@ -270,6 +270,12 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         phrases.addPreference(R.string.common_words, R.string.common_words_summary) {
             navigateWithAnim(SettingsRoute.CommonWords)
         }
+        rareRow = Preference(ctx).apply {
+            setTitle(R.string.rare_chars)
+            summary = rareSummary
+            isIconSpaceReserved = false
+            setOnPreferenceClickListener { navigateWithAnim(SettingsRoute.RareChars); true }
+        }.also(phrases::addPreference)
         phrases.addPreference(R.string.quick_phrases, R.string.quick_phrases_summary) {
             navigateWithAnim(SettingsRoute.QuickPhrase())
         }
@@ -737,6 +743,20 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
                     }
                 }
                 .show()
+        }
+    }
+
+    // 生僻字屏蔽's row: 「关」 or 「已屏蔽 N 个字」 (§6.1), counted over the grid the engine copies
+    private var rareRow: Preference? = null
+    private var rareSummary: String? = null
+
+    override fun onStart() {
+        super.onStart()
+        val fcitx = viewModel.fcitx
+        lifecycleScope.launch {
+            val said = rareSummary(requireContext()) { fcitx.runOnReady { rareGrid() } } ?: return@launch
+            rareSummary = said
+            rareRow?.summary = said
         }
     }
 

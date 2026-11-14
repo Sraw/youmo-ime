@@ -490,6 +490,28 @@ case("VO-52", needs="jvm:VoiceEditsTest.asked once in a window, again in the nex
      "EnginesVoiceEditsTest.undone, what typing the word learned stays (review S3)")(lambda d: None)
 
 
+@case("VO-54", base="B0-设置", mutates=True, needs=EV)
+def vo54(d):
+    words = script("13-words")
+    words.add_word(d, "徐竫")
+    d.open_page("text")
+    d.clear()
+    _, before = dictate(d, "xujing")
+    check("徐竫" in before, f"屏蔽前框里「{before}」，要有你的「徐竫」")
+    d.clear()
+    words.rare_switch(d, True)
+    words.rare_page(d)
+    s = d.wait(lambda s: words.rare_box(s, "三级字") and s, timeout=8, step=0.3, what="三级字的组头")
+    d.tap(words.rare_box(s, "三级字").c, 0.8)
+    d.wait(lambda s: "全部屏蔽" in (words.rare_box(s, "三级字") or words.NO_BOX).desc, timeout=8, step=0.3, what="三级字整组屏蔽")
+    d.back(1.0)
+    d.open_page("text")
+    d.clear()
+    _, after = dictate(d, "xujing")
+    check("竫" not in after and after, f"屏蔽三级字后框里「{after}」")
+    return f"屏蔽前「{before}」，后「{after}」"
+
+
 case("VO-15", needs="jvm:SettingsPagesUatTest.theVoiceModelsDataIsCredited")(lambda d: None)
 
 

@@ -45,7 +45,9 @@ import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
+import org.fcitx.fcitx5.android.engine.user.CharGate
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
+import org.fcitx.fcitx5.android.engine.user.RareGrid
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
@@ -179,6 +181,8 @@ class Engines(
         /** The common words' file as read ([CommonWords.format]), and where the keyboard's deleting one goes, as [savePhrases]. */
         val commonWords: String = "",
         val saveCommonWords: (CommonWords) -> Unit = {},
+        /** 生僻字屏蔽's file as read ([org.fcitx.fcitx5.android.engine.user.RareChoice.format]); empty for none, off. */
+        val rareChars: String = "",
     )
 
     private val assets = EngineAssets(blobs, onError, kernel, emojiShows, textShows)
@@ -284,6 +288,25 @@ class Engines(
 
     /** [LexiconFacade.voiceHomophones]. */
     fun voiceHomophones(words: List<UserWord>): VoiceHomophones = checked { this.words.voiceHomophones(words) }
+
+    /** The tests' own gate in place of the user's choice of 生僻字屏蔽 ([UserLexicon.gateOverride]); read at the next [reload]. */
+    internal var rareGate: CharGate?
+        get() = lexicon.gateOverride
+        set(value) {
+            lexicon.gateOverride = value
+        }
+
+    /** How many times the words held back were found ([UserLexicon.heldMade]): for the tests. */
+    internal val rareHeldMade: Int get() = lexicon.heldMade
+
+    /** How many times 生僻字屏蔽's grid walked a merged dictionary ([LexiconFacade.mergedWalks]): for the tests. */
+    internal val rareMergedWalks: Int get() = words.mergedWalks
+
+    /** [LexiconFacade.rareHeld]. */
+    fun rareHeld(texts: Collection<String>): Set<String> = checked { words.rareHeld(texts) }
+
+    /** [LexiconFacade.rareGrid]. */
+    fun rareGrid(): RareGrid? = checked { words.rareGrid() }
 
     /** [LexiconFacade.voiceHomophonesAllowed]. */
     fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray = checked { words.voiceHomophonesAllowed(spans) }

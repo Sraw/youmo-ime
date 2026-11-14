@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.dicttool
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.data.CharLevels
+import org.fcitx.fcitx5.android.engine.data.CharLevelsBuilder
 import org.fcitx.fcitx5.android.engine.data.CodeTableReader
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
@@ -137,6 +139,18 @@ private val COMMANDS = listOf(
         """,
         inputs = 0..0,
     ) { options, out -> charInfo(options, out) },
+    Command(
+        "charlevels -o <out> --unihan <Unihan.zip> <TSCharacters.txt>",
+        """
+            each listed character's group for 生僻字屏蔽:
+            the 通用规范汉字表's three levels (Unihan's
+            kTGH; not its 8,105 characters ranked 1 to
+            8,105 once each fails), and the traditional
+            characters OpenCC's TSCharacters.txt makes
+            one of them
+        """,
+        inputs = 1..1,
+    ) { options, out -> charLevels(options, out) },
     Command(
         "hotwords -o <out> <pack.words>",
         """
@@ -1094,6 +1108,22 @@ private fun charInfo(options: Options, out: Appendable) {
     out.appendLine("wrote $output: ${output.length()} bytes")
 }
 
+private fun charLevels(options: Options, out: Appendable) {
+    val builder = CharLevelsBuilder()
+    ZipFile(options.unihan!!).use { zip ->
+        val entry = zip.getEntry(UNIHAN_OTHER) ?: throw FileNotFoundException("${options.unihan}: no $UNIHAN_OTHER")
+        zip.getInputStream(entry).bufferedReader().useLines { builder.tgh(it, UNIHAN_OTHER) }
+    }
+    File(options.inputs.single()).useLines { builder.traditional(it) }
+    val bytes = ByteArrayOutputStream().also { builder.build().writeTo(it) }.toByteArray()
+    val levels = CharLevels.load(ByteBuffer.wrap(bytes))
+    val counts = (0 until levels.size).groupingBy { levels.levelAt(it) }.eachCount()
+    out.appendLine("charlevels: " + CharLevels.Level.entries.mapNotNull { l -> counts[l]?.let { "$l $it" } }.joinToString(", "))
+    val output = File(options.output!!)
+    output.writeBytes(bytes)
+    out.appendLine("wrote $output: ${output.length()} bytes")
+}
+
 // of the characters in [cover], the shares that have each part of the record: below its floor fails
 private fun checkCover(cover: String, options: Options, info: CharInfo, out: Appendable) {
     val readings = PinyinData.load(map(options.pinyin!!)).charReadings
@@ -1121,6 +1151,7 @@ private fun checkCover(cover: String, options: Options, info: CharInfo, out: App
 
 // Unihan.zip's file of kRSUnicode and kTotalStrokes
 private const val UNIHAN_RS = "Unihan_IRGSources.txt"
+private const val UNIHAN_OTHER = "Unihan_OtherMappings.txt"
 
 // of the characters handwriting knows, at least this share must be taken apart (about 98% are), and have
 // the mainland's stroke order (about 95% have: lexicon/stroke-order.tsv's are the simplified ones; a traditional one

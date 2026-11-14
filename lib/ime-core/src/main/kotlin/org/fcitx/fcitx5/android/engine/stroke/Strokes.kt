@@ -44,6 +44,12 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
 
     private fun charAt(i: Int) = table.textChar(byChar[i], 0)
 
+    /** Each entry's character as a code point (repeats as the table has them): what 生僻字屏蔽 counts (RareGrid). */
+    fun codePoints(): Sequence<Int> = (0 until table.size).asSequence().map { e ->
+        val c = table.textChar(e, 0)
+        if (Character.isHighSurrogate(c)) Character.toCodePoint(c, table.textChar(e, 1)) else c.code
+    }
+
     // where [c]'s entries start in [byChar], or where they would
     private fun firstOf(c: Char): Int {
         var lo = 0

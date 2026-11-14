@@ -54,7 +54,7 @@ open class EnginesFixture {
         .build(mapOf(Misreadings.META_PREFIX + "角色" to Misreadings.meta(Misreadings("角色", "jué sè", listOf("jiao'se")))))
         .toByteArray()
 
-    private val wubi = CodeTable.Builder()
+    protected var wubiData: ByteArray = CodeTable.Builder()
         .header("键码", "abcdefghijklmnopqrstuvwxy")
         .header("码长", "4")
         .rule("e2", "p11+p12+p21+p22")
@@ -97,6 +97,9 @@ open class EnginesFixture {
     // none: a test of the characters' cards puts its own
     protected var charInfo: ByteArray? = null
 
+    // none: 生僻字屏蔽's tests put TestCharLevels' (an app without them has the feature off)
+    protected var charLevels: ByteArray? = null
+
     protected val loaded = ArrayList<String>()
 
     // Engines' warm-ups run as they are handed over, on the test's thread: what they load is in
@@ -117,7 +120,7 @@ open class EnginesFixture {
         loaded += path
         val bytes = when (path) {
             InputMethodCatalog.PINYIN_DATA -> pinyin
-            "${InputMethodCatalog.TABLE_DIR}/wbx.data" -> wubi
+            "${InputMethodCatalog.TABLE_DIR}/wbx.data" -> wubiData
             InputMethodCatalog.SENTENCE_MODEL -> model
             InputMethodCatalog.REFINING_MODEL -> refining
             InputMethodCatalog.STROKE_DATA -> strokes
@@ -125,6 +128,7 @@ open class EnginesFixture {
             InputMethodCatalog.EMOJI_DATA -> emoji
             InputMethodCatalog.CHAIZI_DATA -> chaizi
             InputMethodCatalog.CHAR_INFO_DATA -> charInfo
+            InputMethodCatalog.CHAR_LEVELS_DATA -> charLevels
             else -> throw IllegalArgumentException(path)
         }
         // as the app's assets do of a file it has not got

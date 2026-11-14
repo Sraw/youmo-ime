@@ -35,6 +35,8 @@ class EngineBackedHostApi(
     override suspend fun userWordCounts() = engines.userWordCounts()
     override suspend fun sameCodes(texts: List<String>, ims: List<String>) = engines.sameCodes(texts, ims)
     override suspend fun pinyinOf(text: String) = engines.pinyinOf(text)
+    override suspend fun rareHeld(texts: Collection<String>) = engines.rareHeld(texts)
+    override suspend fun rareGrid() = engines.rareGrid()
     override suspend fun pinyinsOf(texts: List<String>) = engines.pinyinsOf(texts)
     override suspend fun charCard(index: Int, text: String, paged: Boolean) = engines.charCard(im, index, text, paged)
     override suspend fun wordBoundaries(texts: List<String>) = engines.wordBoundaries(texts)

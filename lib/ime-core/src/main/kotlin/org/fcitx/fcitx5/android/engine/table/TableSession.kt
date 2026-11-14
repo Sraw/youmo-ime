@@ -748,7 +748,11 @@ class TableSession(
         val entries = if (spelt.isEmpty()) coded else coded + spelt
         val here = keyed(code)
         val blockedHere = language?.blockedUnder?.invoke(here).orEmpty()
-        val alone = spelt.isEmpty() && alone(coded, blockedHere)
+        // what the code shows not: blocked under it, or with a character 生僻字屏蔽 holds back. The lone one left
+        // of 重码 so commits itself, and a code whose one entry is held back commits none (design §5.1)
+        val held = language?.held
+        val hidden: (String) -> Boolean = if (held == null) blockedHere::contains else { t -> t in blockedHere || held(t) }
+        val alone = spelt.isEmpty() && alone(coded, hidden)
         // saved phrases are found by their plain code; the matching key is for the table's
         val savedHere = if (alone) emptyList() else saved.saved(code).map { (c, text) -> Item(c, text) }
         val others = if (alone) emptyList() else shared.words(code).filterNot { (c, text) -> saved.isSaved(c, text) }.map { (c, text) -> Item(c, text) }
@@ -777,7 +781,7 @@ class TableSession(
         val order = tail.order.prefix(if (options.sortByCodeLength) maxOf(reach, tail.order.indexOfFirst { !found.spelt(it) } + 1) else Int.MAX_VALUE)
         ownFirst(order, found::spelt)
         val pinned = habits.pinned(here)?.text
-        val blocked = { item: Item -> item.text in blockedHere || (!item.inTable && shared.blocked(item.text)) }
+        val blocked = { item: Item -> hidden(item.text) || (!item.inTable && shared.blocked(item.text)) }
         // a code that commits itself is typed blind: no phrase stops it (D8), nor under a wildcard, which is no key
         val custom = if (alone) emptyList() else phrasesUnder(code)
         // the table's own first, before 调频's models and the habits ranked it: picked over another shown first, a use of it (F2739)
@@ -790,18 +794,18 @@ class TableSession(
             Ranking(blocked, emojiOf, phrasesOf, own, custom) { if (read.hasNext()) tail.item(read.next()) else null }
         }
         if (reach == 0) return made(order)
-        return weighed(code, order, reach, { k -> kind(code, found, order[k]) }, blockedHere, made)
+        return weighed(code, order, reach, { k -> kind(code, found, order[k]) }, hidden, made)
     }
 
     /**
-     * Whether the table's entries [coded] are one text, not [blocked], whose code commits itself
-     * (D8): a row the table has twice is one text, a blocked one none. Done at the second text.
+     * Whether the table's entries [coded] are one text, not [hidden], whose code commits itself
+     * (D8): a row the table has twice is one text, a hidden one none. Done at the second text.
      */
-    private fun alone(coded: IntArray, blocked: Set<String>): Boolean {
+    private fun alone(coded: IntArray, hidden: (String) -> Boolean): Boolean {
         var text: String? = null
         for (e in coded) {
             val t = table.text(e)
-            if (t in blocked || t == text) continue
+            if (t == text || hidden(t)) continue
             if (text != null || !commitsWhole(table.code(e))) return false
             text = t
         }
@@ -858,14 +862,14 @@ class TableSession(
     /**
      * [made] with the 重码 of [code] in [order] placed ([kind] of each of its first [reach] positions,
      * past which there are none: a table entry, or [OTHER]): the table's by the word and sentence
-     * models, one blocked under the code ([blockedHere]) left where it is (it is not shown). In the
+     * models, one not shown ([hidden]: blocked under the code, or held back) left where it is. In the
      * table's order where it does not order by use (调频), or a wildcard was typed.
      */
-    private fun weighed(code: String, order: IntArray, reach: Int, kind: (Int) -> Int, blockedHere: Set<String>, made: (IntArray) -> Ranking): Ranking {
+    private fun weighed(code: String, order: IntArray, reach: Int, kind: (Int) -> Int, hidden: (String) -> Boolean, made: (IntArray) -> Ranking): Ranking {
         val language = language?.takeIf { options.orderByUse } ?: return made(order)
         if (options.matchingKey != null && code.contains(options.matchingKey)) return made(order)
         val kinds = IntArray(reach, kind)
-        val rankable = kinds.indices.filter { kinds[it] >= 0 && table.text(kinds[it]) !in blockedHere }
+        val rankable = kinds.indices.filter { kinds[it] >= 0 && !hidden(table.text(kinds[it])) }
         if (rankable.size < 2) return made(order)
         val (prev2, prev) = TextWords.previous(language.words.lastTwo(predictions.before))
         val texts = rankable.map { table.text(kinds[it]) }

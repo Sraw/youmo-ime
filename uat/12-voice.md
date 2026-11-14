@@ -347,3 +347,10 @@
 - **操作**：按住空格说「今天天气」，还在说时（待定文字在框里）点 n i；说完。
 - **预期**：拼音在键盘上方的小条里，不写进框里；说完上屏后框里是说的话，没有多出拼音字母。
 - **JVM**：`CodeInFieldTest`「voice composing in the field: the strip」（打拼音时框里有别的待定文字就走小条）；`CodeInFieldUatTest.voiceTypedOverTheCodeTakesItAwayAndTheCodeFloatsOn`（框里是拼音时语音上屏：拼音拿走、浮到小条）；设备上手工看。
+
+### VO-54 [P1] 生僻字屏蔽：语音结果里没有挡掉的字，含挡掉的字的你的词不替换
+<!-- 061-rare-char-block.md §5.3：默认（只挡扩展区）下语音不受影响，要自己造条件 -->
+- **前提**：B0-设置（导入了语音包）；在 **用户词库 → 手动添加的词** 里加「徐竫」（xu jing；竫 读 jìng，是三级字，和「静」同音）。
+- **操作**：回测试页，按住空格说"麻烦你去找一下徐婧"（VO-38 的片段），松开；删光。**词库与短语 → 生僻字屏蔽** 打开开关，勾上「三级字」，返回；再说一遍。
+- **预期**：第一次框里是「麻烦你去找一下徐竫」（同音换成你的词，同 VO-38）；屏蔽三级字以后是「徐静」（或别的说法），没有「竫」：含挡掉的字的词不当热词，也不当同音替换的目标。识别结果本身含挡掉的字时换成识别器的下一个说法（几个说法都有它时照识别器写的给），这一项片段里造不出，只由下面的 JVM 行查。
+- **JVM**：ime-core `VoiceChoiceTest.aHypothesisWithACharacterHeldBackIsPassedOver`（先挑不含挡掉的字的说法，都含时取第一个）、`VoiceHotwordsTest.aWordWithACharacterHeldBackIsNoHotwordAndTheCharactersAreNeverCompleted`（含挡掉的字的词不当热词、不给同音替换，挡掉的字里识别器有的告诉识别器不补全）、`RareCharContractTest.voiceAsksWhichOfItsTextsAreHeld`（引擎答哪些文本含挡掉的字）；模拟器上（导入了语音包）跑同音替换这一半。

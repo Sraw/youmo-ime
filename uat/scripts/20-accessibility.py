@@ -160,6 +160,7 @@ def ax12(d):
 case("AX-13", needs="jvm:KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores")(lambda d: None)
 
 
+case("AX-17", needs="jvm:RareCharsPageUatTest.thePageHoldsBackAndLetsThrough")(lambda d: None)
 case("AX-14", needs="jvm:ShiftKeyNameTest.theShiftKeyIsNamedOnItsCapAndToAScreenReader")(lambda d: None)
 
 
