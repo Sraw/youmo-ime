@@ -12,6 +12,8 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TableLayout
@@ -29,8 +31,9 @@ import kotlin.math.min
  * the character large on the left, each reading on its right (pinyin, zhuyin, up to two words), the
  * readings scrolled past [CharCardLayout.readingRows]; then the radical, strokes, parts and stroke order,
  * under them or, [twoColumns], beside them; [buttons] (上屏, 复制) last, under them all or, [twoColumns],
- * in the right column. What the card does not know it leaves out. TalkBack reads it as one sentence
- * ([CharCard.spoken]), the buttons each on its own.
+ * in the right column; [back] (the way back to the word card it was opened from) over it all, or over the
+ * left column. What the card does not know it leaves out; a reading the word read it in ([CharCard.Row.inWord])
+ * in [accent]. TalkBack reads it as one sentence ([CharCard.spoken]), the way back and the buttons each on its own.
  */
 @SuppressLint("ViewConstructor")
 class CharCardView(
@@ -41,6 +44,7 @@ class CharCardView(
     twoColumns: Boolean,
     accent: Int,
     buttons: View? = null,
+    back: View? = null,
 ) : LinearLayout(context) {
 
     private val secondary = context.styledColorOrDefault(android.R.attr.textColorSecondary, Color.GRAY)
@@ -55,8 +59,9 @@ class CharCardView(
     private val readings = TableLayout(context).apply {
         card.readings.forEach { r ->
             addView(TableRow(context).apply {
-                addView(text(r.pinyin), cell())
-                addView(text(r.zhuyin), cell())
+                val color = if (r.inWord) accent else null
+                addView(text(r.pinyin, color = color), cell())
+                addView(text(r.zhuyin, color = color), cell())
                 addView(text(r.examples.joinToString(" "), color = secondary), cell())
             })
         }
@@ -68,7 +73,7 @@ class CharCardView(
     }
 
     /** The readings' scroller, as high as [CharCardLayout.readingRows] of them. */
-    val readingsScroll: ScrollView = Capped(context, CharCardLayout.readingRows(twoColumns)).apply {
+    val readingsScroll: ScrollView = CappedScroll(context, CharCardLayout.readingRows(twoColumns)).apply {
         isVerticalScrollBarEnabled = true
         addView(readings)
     }
@@ -100,7 +105,12 @@ class CharCardView(
         if (info.childCount == 0) info.visibility = GONE
         if (twoColumns) {
             // the readings as wide as they are, the rest what is left: the radical and the rest, the buttons under them
-            addView(top, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            val left = if (back == null) top else LinearLayout(context).apply {
+                orientation = VERTICAL
+                addView(back, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                addView(top, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            }
+            addView(left, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             val side = LinearLayout(context).apply {
                 orientation = VERTICAL
                 addView(info, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -108,41 +118,17 @@ class CharCardView(
             }
             addView(side, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(CELL_GAP * 2) })
         } else {
+            back?.let { addView(it, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)) }
             addView(top, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             addView(info, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(ROW_GAP * 2) })
             buttons?.let { addView(it, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(ROW_GAP * 2) }) }
         }
         // one sentence for TalkBack, not a stop at each line
-        val strokeNames = context.resources.getStringArray(R.array.char_card_stroke_names)
-        contentDescription = card.spoken(
-            CharCard.Words(
-                context.getString(R.string.char_card_readings) + " ", context.getString(R.string.char_card_radical) + " ",
-                context.getString(R.string.char_card_parts) + " ", context.getString(R.string.char_card_order) + " ", "、", "，",
-                { context.getString(R.string.char_card_strokes, it) },
-            ) { strokeNames[it.ordinal] },
-        )
+        contentDescription = card.spoken(cardWords(context))
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        isFocusable = true
         top.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         info.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-    }
-
-    // a scroller no higher than its first [rows] rows (and half the next, to show there are more); in the
-    // menu's ListView, which would take a vertical drag past the touch slop though it cannot scroll, the
-    // drag kept here while there is more to scroll to (review 051-hw-reading M1)
-    private class Capped(context: Context, private val rows: Int) : ScrollView(context) {
-        override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-            if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
-                parent?.requestDisallowInterceptTouchEvent(canScrollVertically(1) || canScrollVertically(-1))
-            }
-            return super.dispatchTouchEvent(ev)
-        }
-
-        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-            val table = getChildAt(0) as? ViewGroup ?: return
-            if (table.childCount <= rows) return
-            val row = table.getChildAt(0).let { it.measuredHeight + (it.layoutParams as MarginLayoutParams).bottomMargin }
-            setMeasuredDimension(measuredWidth, min(measuredHeight, row * rows + row / 2))
-        }
     }
 
     private companion object {
@@ -151,5 +137,51 @@ class CharCardView(
         const val CELL_GAP = 12
         const val ROW_GAP = 2
         const val SPACE = "　"
+    }
+}
+
+/**
+ * A scroller no higher than its first [rows] rows (and half the next, to show there are more): a card's readings,
+ * a word card's characters. In the menu's ListView, which would take a vertical drag past the touch slop though it
+ * cannot scroll, the drag is kept here while there is more to scroll to (review 051-hw-reading M1).
+ */
+internal class CappedScroll(context: Context, private val rows: Int) : ScrollView(context) {
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            parent?.requestDisallowInterceptTouchEvent(canScrollVertically(1) || canScrollVertically(-1))
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        val table = getChildAt(0) as? ViewGroup ?: return
+        if (table.childCount <= rows) return
+        val row = table.getChildAt(0).let { it.measuredHeight + (it.layoutParams as MarginLayoutParams).bottomMargin }
+        setMeasuredDimension(measuredWidth, min(measuredHeight, row * rows + row / 2))
+    }
+}
+
+/** The labels a card's sentence for TalkBack reads, in the app's language ([CharCard.spoken], WordCard.spoken). */
+internal fun cardWords(context: Context): CharCard.Words {
+    val strokeNames = context.resources.getStringArray(R.array.char_card_stroke_names)
+    return CharCard.Words(
+        context.getString(R.string.char_card_readings) + " ", context.getString(R.string.char_card_radical) + " ",
+        context.getString(R.string.char_card_parts) + " ", context.getString(R.string.char_card_order) + " ", "、", "，",
+        { context.getString(R.string.char_card_strokes, it) },
+    ) { strokeNames[it.ordinal] }
+}
+
+/**
+ * TalkBack's name for what a tap on this view does ([label]: 展开词卡), and, [button], that it is one: a card's row
+ * in the menu's first line, which the list marks disabled, is a view tapped on its own (061-word-card.md §3.5).
+ */
+internal fun View.tapsTo(label: CharSequence, button: Boolean = true) {
+    accessibilityDelegate = object : View.AccessibilityDelegate() {
+        override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+            super.onInitializeAccessibilityNodeInfo(host, info)
+            if (button) info.className = Button::class.java.name
+            info.addAction(AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, label))
+        }
     }
 }

@@ -11,6 +11,8 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.reading.CandidateCard
+import org.fcitx.fcitx5.android.engine.reading.CardReading
 import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
@@ -254,10 +256,14 @@ interface LexiconApi {
     suspend fun pinyinsOf(texts: List<String>): Map<String, String?>
 
     /**
-     * The card of candidate [index] (of the page shown if [paged]) of the input method shown, if it still shows [text]: a handwritten
-     * character's or one looked up (see [Engines.charCard]); null for any other.
+     * What the menu of candidate [index] (of the page shown if [paged]) of the input method shown heads with, if it
+     * still shows [text]: a character looked up its card, any other with a Han character in it its reading line and
+     * card (see [Engines.card]); null for any other, or an input method not the engine's.
      */
-    suspend fun charCard(index: Int, text: String, paged: Boolean): CharCard?
+    suspend fun candidateCard(index: Int, text: String, paged: Boolean): CandidateCard?
+
+    /** The card of [char], [reading] first: a word card's character tapped (see [Engines.charCardOf]). */
+    suspend fun charCardOf(char: String, reading: CardReading?): CharCard?
 
     /** Adds [text] read as [pinyin]; false if it does not read so. */
     suspend fun addUserWord(text: String, pinyin: String): Boolean

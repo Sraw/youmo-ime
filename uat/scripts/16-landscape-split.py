@@ -122,3 +122,4 @@ case("LS-30", needs="jvm:LandscapeUatTest.theFourteenKeysAtTheSideWithTheirCodeR
 
 
 case("LS-31", needs="jvm:LandscapeUatTest.theEighteenKeysAtTheSideAsTheFourteen")(lambda d: None)
+case("LS-32", needs="jvm:CandidateMenuUatTest.inLandscapeTheWordCardIsTwoColumnsWithLinesUnderIt、CandidateMenuUatTest.onTheFloatingKeyboardTheWordCardIsOneColumn")(lambda d: None)

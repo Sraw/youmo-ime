@@ -197,3 +197,9 @@
 - **操作**：长按 ，；长按 。；在 ， 上横着划一下。
 - **预期**：， 弹出 KB-73 的列表；。 弹出与全键盘 。 相同的列表（`, ? ! : ; _ % $ ^ &`，按中文标点显示）；从它们横着划进书写板既不打标点，也不写字（上滑、下滑没设时滑一下等于点一下）。
 - **JVM**：app `KeysEverywhereUatTest.handwritingsCommaAndFullStopAreEveryKeyboards`、`HandwritingSceneGesturesTest.commaAndFullStopSwipedAreTappedAndAStrokeOffThemIsNothing`。
+
+### HW-40 [P1] 手写的字照旧直接是完整字卡；手写之后的联想词是读音行
+- **前提**：B0，手写。
+- **操作**：写「行」，长按候选「行」；点上屏后长按一个联想词。
+- **预期**：手写的字长按第一行直接是完整字卡（和以前一样）；联想词长按第一行是读音行，点开是词卡。
+- **JVM**：app `HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu`（图不变）；ime-core `EnginesHandwritingReadingsTest`（写的字 Looked，联想词 Word）；设备上不跑。

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -15,6 +16,8 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.reading.CandidateCard
+import org.fcitx.fcitx5.android.engine.reading.CardReading
 import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
@@ -101,10 +104,23 @@ class FakeHostApi : HostApi {
 
     override suspend fun pinyinsOf(texts: List<String>): Map<String, String?> = texts.associateWith { readings[it] }
 
-    /** What [charCard] answers, by the candidate's text: no data to make one of, so none unless set here. */
-    val charCards = mutableMapOf<String, CharCard>()
+    /** What [candidateCard] answers, by the candidate's text: no data to make one of, so none unless set here. */
+    val candidateCards = mutableMapOf<String, CandidateCard>()
 
-    override suspend fun charCard(index: Int, text: String, paged: Boolean): CharCard? = charCards[text]
+    override suspend fun candidateCard(index: Int, text: String, paged: Boolean): CandidateCard? = candidateCards[text]
+
+    /** What [charCardOf] answers, by the character, and what it was asked. */
+    val charCards = mutableMapOf<String, CharCard>()
+    val charCardsAsked = mutableListOf<Pair<String, CardReading?>>()
+
+    /** Held till completed, if set: [charCardOf]'s answer late. */
+    var charCardGate: CompletableDeferred<Unit>? = null
+
+    override suspend fun charCardOf(char: String, reading: CardReading?): CharCard? {
+        charCardsAsked += char to reading
+        charCardGate?.await()
+        return charCards[char]
+    }
 
     // no model: each char a word of its own
     override suspend fun wordBoundaries(texts: List<String>) = texts.associateWith { IntArray(it.length + 1) { i -> i } }

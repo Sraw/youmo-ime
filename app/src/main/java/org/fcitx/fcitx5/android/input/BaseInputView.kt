@@ -16,11 +16,13 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.ArrayAdapter
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ListAdapter
 import android.widget.ListPopupWindow
+import android.widget.ListView
 import android.widget.TextView
 import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -49,12 +51,19 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.reading.CandidateCard
 import org.fcitx.fcitx5.android.engine.reading.CharCard
+import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.engine.reading.WordCard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.input.candidates.CharCardView
+import org.fcitx.fcitx5.android.input.candidates.CompactLineView
+import org.fcitx.fcitx5.android.input.candidates.WordCardView
+import org.fcitx.fcitx5.android.input.candidates.tapsTo
 import org.fcitx.fcitx5.android.input.learning.CandidateLearningMenu
 import org.fcitx.fcitx5.android.input.learning.UndoChip
+import org.fcitx.fcitx5.android.input.popup.CardNav
 import org.fcitx.fcitx5.android.input.popup.CharCardLayout
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.clipboardManager
@@ -275,21 +284,22 @@ abstract class BaseInputView(
     }
 
     /**
-     * The long press's lines for the candidate [text] at [idx], and its character card: quick input's
-     * own lines for one of its entries (numbered over the whole list, not a page's: a paged list's, the
-     * floating and physical keyboards', has none of them, as the host has no page offset for it); else the engine's
-     * menu, worded by the app (U-82), with a handwritten character's card, or one looked up's (the
-     * engine's alone), in the same trip; else, for an input method not the engine's, what the addon
+     * The long press's lines for the candidate [text] at [idx], and what heads them: quick input's own lines
+     * for one of its entries, no card (numbered over the whole list, not a page's: a paged list's, the floating and physical
+     * keyboards', has none of them, as the host has no page offset for it); else the engine's menu, worded by the
+     * app (U-82), with the candidate's card ([CandidateCard]: its reading line, a character looked up its card;
+     * the engine's alone) in the same trip; else, for an input method not the engine's, what the addon
      * offers, as it words it: not the addon's words where the engine's list changed under the press
      * (review-E-ui N8).
      */
-    private suspend fun candidateMenu(idx: Int, text: String): Pair<List<CandidateLearningMenu.Line>, CharCard?> {
+    private suspend fun candidateMenu(idx: Int, text: String): Pair<List<CandidateLearningMenu.Line>, CandidateCard?> {
         val im = fcitx.runImmediately { inputMethodEntryCached }.uniqueName
         val engines = EngineBridge.isEngines(im)
         val phrase = if (pagedCandidates) null else fcitx.runOnReady { quickPhraseAt(idx) }
         if (phrase != null) return quickPhraseLines(idx, text, phrase) to null
         val op = learningMenu.menuOf(idx, text, pagedCandidates)
-        val (learned, card) = fcitx.runOnReady { learning(op) to if (engines) charCard(idx, text, pagedCandidates) else null }
+        val (learned, card) = fcitx.runOnReady { learning(op) to if (engines) candidateCard(idx, text, pagedCandidates) else null }
+        // a field that learns nothing has no lines: the card alone (the user, 2026-11-14, Q4)
         val lines = learningMenu.linesOf(learned, idx, text, pagedCandidates) ?: if (engines) emptyList() else {
             fcitx.runOnReady { getCandidateActions(idx) }.map { action ->
                 CandidateLearningMenu.Line(action.text) {
@@ -318,38 +328,62 @@ abstract class BaseInputView(
                     }
                 }
             }
-            // as wide as PopupMenu lets its menus grow
-            // (a card's two columns let it grow wider in landscape; a title's menu keeps PopupMenu's own limit)
-            val widest = CharCardLayout.width(resources.displayMetrics.widthPixels, dp(320), card != null && twoColumns())
-            // the card (上屏 and 复制 in it), then the lines; else the title, then the lines
-            val head = listOfNotNull(cardRow(card, accent, { candidateActionMenu?.dismiss() }) { fcitx.launchOnReady { it.select(idx, text) } })
+            // where the head is: its reading line, a card opened from it (CardNav); its view in [head], the menu's first row
+            val nav = CardNav(card)
+            val head = if (card == null) null else FrameLayout(themedContext)
             // a line picked may show others in its place (a block's confirmation, the reason): the same popup
             var shown = lines
-            // the first line's row: after the card, else after the title
-            val firstLine = head.size.coerceAtLeast(1)
+            // the first line's row: after the head, the title or the card
+            val firstLine = 1
             val adapter = object : ArrayAdapter<CharSequence>(themedContext, android.R.layout.simple_list_item_1, ArrayList()) {
                 override fun areAllItemsEnabled() = false
                 override fun isEnabled(position: Int) = position >= firstLine && shown[position - firstLine].enabled
-                override fun getViewTypeCount() = 1 + head.size
-                override fun getItemViewType(position: Int) = if (position < head.size) position + 1 else 0
+                override fun getViewTypeCount() = 2
+                override fun getItemViewType(position: Int) = if (position == 0 && head != null) 1 else 0
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
-                    head.getOrNull(position) ?: super.getView(position, convertView, parent)
+                    if (position == 0 && head != null) head else super.getView(position, convertView, parent)
             }
-            if (head.isEmpty()) adapter.add(title) else head.forEach { _ -> adapter.add(text) }
+            adapter.add(if (head == null) title else text)
             adapter.addAll(shown.map { it.label })
             // not a PopupMenu: that one takes the window focus from the editor, and some (the
             // launcher's search) finish composing when they lose it and start the input anew when
             // they get it back, so what was typed is gone before the action reaches it. Not
             // focusable, the menu lets a touch outside it through as well: see [dispatchTouchEvent]
             val menu = ListPopupWindow(themedContext, null, android.R.attr.popupMenuStyle)
-            // the card's menu its width whatever its lines; a title's no wider than they need
-            fun width() = if (head.isEmpty()) min(adapter.widest(FrameLayout(themedContext)), widest) else widest
+            fun twoColumns() = nav.twoColumns(resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE, floatingKeyboard, pagedCandidates)
+            // a card's menu its width whatever its lines (as wide as PopupMenu lets its menus grow; a card's two
+            // columns, in landscape, wider); a title's or a reading line's no wider than they need
+            fun width(): Int {
+                val widest = CharCardLayout.width(resources.displayMetrics.widthPixels, dp(320), twoColumns())
+                return if (nav.expanded) widest else min(adapter.widest(FrameLayout(themedContext)), widest)
+            }
+            // the head as [nav] has it now, TalkBack's focus moved to its first node once laid out after a step
+            var charOfWord: CharCard? = null
+            fun showHead() {
+                head ?: return
+                val built = headView(card ?: return, nav, text, accent, charOfWord, twoColumns(), idx, menu, step = {
+                    showHead()
+                    menu.setContentWidth(width())
+                    adapter.notifyDataSetChanged()
+                    menu.show()
+                    scrollbarShown(menu.listView, card = true)
+                    menu.listView?.rootView?.let { decor -> decor.doOnPreDraw { growFrom(decor, view) } }
+                }, pickChar = { row, c ->
+                    charOfWord = c
+                    nav.pick(row)
+                })
+                head.removeAllViews()
+                head.addView(built.first, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                built.second?.let { target -> head.doOnPreDraw { focusForTalkBack(target) } }
+            }
+            showHead()
             candidateActionMenu = menu.apply {
                 isModal = false
                 anchorView = view
                 setAdapter(adapter)
                 setContentWidth(width())
                 setOnItemClickListener { _, _, position, _ ->
+                    if (position < firstLine) return@setOnItemClickListener
                     val next = shown[position - firstLine].pick()
                     if (next == null) {
                         dismiss()
@@ -357,7 +391,7 @@ abstract class BaseInputView(
                     }
                     shown = next
                     adapter.clear()
-                    if (head.isEmpty()) adapter.add(title) else head.forEach { _ -> adapter.add(text) }
+                    adapter.add(if (head == null) title else text)
                     adapter.addAll(next.map { it.label })
                     setContentWidth(width())
                     show()
@@ -369,9 +403,103 @@ abstract class BaseInputView(
                 // not the platform's drop-down animation: grown out of the candidate pressed (Motion)
                 animationStyle = 0
                 show()
+                scrollbarShown(listView, card = head != null)
                 listView?.rootView?.let { decor -> decor.doOnPreDraw { growFrom(decor, view) } }
             }
         }
+    }
+
+    /** The view TalkBack's focus was last moved to in a candidate's card, for tests: the move itself only works with TalkBack on. */
+    @VisibleForTesting
+    internal var cardFocused: View? = null
+
+    private fun focusForTalkBack(target: View) {
+        cardFocused = target
+        target.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+    }
+
+    // a card's menu in landscape: the card fills it and its lines are scrolled to, so the bar stays to say there are more
+    private fun scrollbarShown(list: ListView?, card: Boolean) {
+        if (card && list != null && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) list.isScrollbarFadingEnabled = false
+    }
+
+    /**
+     * The menu's head for [card] where [nav] is: its reading line, the character's card or the word's (上屏 as the
+     * candidate tapped, 复制 the candidate), a character of the word's ([charOfWord]: 复制 it alone, the way back
+     * over it), each tap a [step] after [nav] moved; with the view TalkBack's focus goes to, null before any step.
+     * A word's character tapped asks the engine for its card ([HostApi.charCardOf]), then [pickChar] it if [menu]
+     * is still the one up.
+     */
+    private fun headView(
+        card: CandidateCard,
+        nav: CardNav,
+        text: String,
+        accent: Int,
+        charOfWord: CharCard?,
+        twoColumns: Boolean,
+        idx: Int,
+        menu: ListPopupWindow,
+        step: () -> Unit,
+        pickChar: (Int, CharCard) -> Unit,
+    ): Pair<View, View?> {
+        val textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, ThemeManager.prefs.candidateTextSize.getValue().toFloat(), resources.displayMetrics)
+        val close: () -> Unit = { candidateActionMenu?.dismiss() }
+        val commit = { fcitx.launchOnReady { it.select(idx, text) } }
+        val focus = nav.focusTarget
+        return when (nav.head) {
+            CardNav.Head.TITLE -> error("no card")
+            CardNav.Head.LINE -> CompactLineView(themedContext, text, (card as CandidateCard.Line).line, accent, wraps = true) to null
+            CardNav.Head.COMPACT -> {
+                val line = when (card) {
+                    is CandidateCard.Char -> card.line
+                    is CandidateCard.Word -> card.line
+                    else -> ""
+                }
+                val label = context.getString(if (card is CandidateCard.Word) R.string.card_open_word else R.string.card_open_char)
+                CompactLineView(themedContext, text, line, accent, wraps = false, openLabel = label) { if (nav.open()) step() } to null
+            }
+            CardNav.Head.LOOKED, CardNav.Head.CHAR -> {
+                val c = if (card is CandidateCard.Looked) card.card else (card as CandidateCard.Char).card
+                CharCardView(themedContext, c, textSize, twoColumns, accent, cardButtons(accent, close, commit, text)).let { it to it.takeIf { focus == CardNav.Focus.CARD } }
+            }
+            CardNav.Head.WORD -> {
+                val word = (card as CandidateCard.Word).card
+                val pick = { row: Int ->
+                    val r = word.rows[row]
+                    service.lifecycleScope.launch {
+                        val c = fcitx.runOnReady { charCardOf(r.text, r.reading) } ?: return@launch
+                        // closed meanwhile (another candidate's menu maybe up), or another row's card shown already
+                        if (candidateActionMenu !== menu || nav.head != CardNav.Head.WORD) return@launch
+                        pickChar(row, c)
+                        step()
+                    }
+                    Unit
+                }
+                WordCardView(themedContext, word, textSize, twoColumns, accent, cardButtons(accent, close, commit, text), pick).let { it to it.head.takeIf { focus == CardNav.Focus.WORD } }
+            }
+            CardNav.Head.WORD_CHAR -> {
+                val word = (card as CandidateCard.Word).card
+                val c = checkNotNull(charOfWord)
+                val back = backView(word, accent) { if (nav.back()) step() }
+                CharCardView(themedContext, c, textSize, twoColumns, accent, cardButtons(accent, close, null, c.text), back).let { it to back.takeIf { focus == CardNav.Focus.BACK } }
+            }
+        }
+    }
+
+    // a word's character's card: the way back to the word's, ‹ 银行 yín háng
+    private fun backView(word: WordCard, accent: Int, back: () -> Unit) = TextView(themedContext).apply {
+        text = buildSpannedString {
+            append(BACK)
+            color(accent) { append(word.text) }
+            append(SPACE + word.line(ReadingStyle.PINYIN))
+        }
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_TEXT_SP)
+        gravity = Gravity.CENTER_VERTICAL
+        minHeight = dp(CharCardLayout.MIN_ROW_DP)
+        background = context.styledDrawable(android.R.attr.selectableItemBackground)
+        contentDescription = context.getString(R.string.card_back, word.text)
+        setOnClickListener { back() }
+        tapsTo(context.getString(R.string.card_back, word.text))
     }
 
     // 上屏 and 复制 for any; 编辑 and 删除 for the user's own, a deletion undone from the same menu
@@ -496,32 +624,25 @@ abstract class BaseInputView(
     /** Whether the keyboard floats: a character's card is then in one column, as upright (CharCardLayout). */
     protected open val floatingKeyboard: Boolean get() = false
 
-    private fun twoColumns() =
-        CharCardLayout.twoColumns(resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE, floatingKeyboard)
-
     /**
-     * The menu's first row for [card]: the card, with 上屏 ([commit], as the candidate tapped) and 复制 (the
-     * character alone to the clipboard, nothing typed changed) in it, each closing the menu ([close]); none for no card.
+     * A card's buttons: 上屏 ([commit], as the candidate tapped; none for a word's character, Q2) and 复制 ([copied]
+     * alone to the clipboard, nothing typed changed; 复制「行」 for a word's character), each closing the menu ([close]).
      */
-    private fun cardRow(card: CharCard?, accent: Int, close: () -> Unit, commit: () -> Unit): View? {
-        card ?: return null
-        val textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, ThemeManager.prefs.candidateTextSize.getValue().toFloat(), resources.displayMetrics)
-        val buttons = LinearLayout(themedContext).apply {
-            fun button(label: Int, act: () -> Unit) = TextView(themedContext).apply {
-                text = context.getString(label)
-                gravity = Gravity.CENTER
-                minHeight = dp(BUTTON_HEIGHT)
-                setTextColor(accent)
-                background = context.styledDrawable(android.R.attr.selectableItemBackground)
-                setOnClickListener {
-                    act()
-                    close()
-                }
+    private fun cardButtons(accent: Int, close: () -> Unit, commit: (() -> Unit)?, copied: String): View = LinearLayout(themedContext).apply {
+        fun button(label: String, act: () -> Unit) = TextView(themedContext).apply {
+            text = label
+            gravity = Gravity.CENTER
+            minHeight = dp(BUTTON_HEIGHT)
+            setTextColor(accent)
+            background = context.styledDrawable(android.R.attr.selectableItemBackground)
+            setOnClickListener {
+                act()
+                close()
             }
-            addView(button(R.string.quick_phrase_commit, commit), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(button(R.string.quick_phrase_copy) { copy(card.text) }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        return CharCardView(themedContext, card, textSize, twoColumns(), accent, buttons)
+        commit?.let { addView(button(context.getString(R.string.quick_phrase_commit), it), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)) }
+        val copy = if (commit == null) context.getString(R.string.card_copy_char, copied) else context.getString(R.string.quick_phrase_copy)
+        addView(button(copy) { copy(copied) }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
     }
 
     // [text] alone to the clipboard (a card's character, a quick input entry's content): nothing committed, what is typed stays
@@ -615,6 +736,9 @@ abstract class BaseInputView(
 
     private companion object {
         // 上屏 and 复制's height, as a menu line's
-        const val BUTTON_HEIGHT = 48
+        const val BUTTON_HEIGHT = CharCardLayout.MIN_ROW_DP
+        private const val CARD_TEXT_SP = 16f
+        private const val BACK = "‹ "
+        private const val SPACE = "　"
     }
 }

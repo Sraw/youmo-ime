@@ -636,3 +636,4 @@ def hk45(d):
 
 
 case("HK-46", needs="manual:编码行在输入框里时实体键盘的悬浮候选窗没有拼音那一行：接 emu-keyboard.sh 的实体键盘手工看")(lambda d: None)
+case("HK-47", needs="jvm:HardwareKeyUatTest.theFloatingWindowsCardsAreOneColumn")(lambda d: None)

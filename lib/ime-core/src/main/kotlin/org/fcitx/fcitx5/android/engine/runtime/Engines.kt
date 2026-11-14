@@ -9,6 +9,8 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS_OWN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.TABLES
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ZHUYIN
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ZHUYIN_NINE
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.glides
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
@@ -34,9 +36,12 @@ import org.fcitx.fcitx5.android.engine.platform.LogFile
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmThreads
+import org.fcitx.fcitx5.android.engine.reading.CandidateCard
 import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
+import org.fcitx.fcitx5.android.engine.reading.CardReading
 import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.engine.reading.WordCard
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
@@ -560,10 +565,22 @@ class Engines(
      */
     private fun readingAndHint(im: String, session: Session?, index: Int, text: String, hint: String): Pair<List<String>, String> {
         val style = settings.candidateReading
-        val above = if (im in pairs) hintAbove(im, index, text, hint, if (style == ReadingStyle.OFF) ReadingStyle.PINYIN else style) else emptyList()
+        val above = above(im, index, text, hint, if (style == ReadingStyle.OFF) ReadingStyle.PINYIN else style)
         if (above.isNotEmpty()) return above to ""
         return (if (session == null) emptyList() else read(im, session, index, text, style)) to hint
     }
+
+    /**
+     * The candidate [text] at [index] of [session]'s, [hint] its hint, read in [style] (not [ReadingStyle.OFF]) as
+     * [readingAndHint] reads it while 候选词注音 is on: the same two steps, so a held candidate's card ([card]) and the
+     * bar never read a character apart (a misreading's true reading, 角色 jué sè, by its hint; any other as typed).
+     */
+    private fun readingsOf(im: String, session: Session, index: Int, text: String, hint: String, style: ReadingStyle): List<String> =
+        above(im, index, text, hint, style).ifEmpty { read(im, session, index, text, style) }
+
+    // a pinyin's or 双拼's hint that is a reading, drawn above the candidate (readingAndHint)
+    private fun above(im: String, index: Int, text: String, hint: String, style: ReadingStyle): List<String> =
+        if (im in pairs) hintAbove(im, index, text, hint, style) else emptyList()
 
     // the candidate at [index] of [session]'s as 候选词注音 writes it: handwriting's last character with all its readings
     private fun read(im: String, session: Session, index: Int, text: String, style: ReadingStyle): List<String> {
@@ -572,18 +589,79 @@ class Engines(
     }
 
     /**
-     * The card of the [index]th of [im]'s candidates ([paged], of the page shown: the paged window's), [text]:
-     * a character looked up (handwriting's, by its parts or strokes: [Session.lookedUp]); null for any
-     * other, or if [text] is no longer there.
+     * What the menu of the [index]th of [im]'s candidates ([paged], of the page shown: the paged window's) heads
+     * with ([CandidateCard]), [text] the candidate as the app shows it ([shown] converts the engine's so: 繁體's
+     * 銀行 of 银行, as [learning]'s menu checks it); null if it is no longer there or has no Han character in it.
+     * A character looked up (handwriting's, by its parts or strokes: [Session.lookedUp]) has its card; any other
+     * its reading as [readingsOf] reads it, of the engine's text, the characters the shown text's where they are
+     * as many. More than [WordCard.MAX_CHARS] Han characters, its reading alone, nothing looked up.
+     * Measured 2026-11-14 on the API 36 emulator, the Mac under other builds (load 40+), 50 runs a held candidate,
+     * the median: a character 0.1–0.8 ms, a word of 2 or 8 characters 0.2–0.9 ms, a sentence of 9 (its line
+     * alone) 0.2–0.4 ms, a prediction 0.2 ms, the slowest of 50 mostly under 3 ms but single runs of 15–145 ms
+     * (the host's load: short words too); a custom phrase of 200 characters, read by its text, 2.2–3.9 ms, a tenth
+     * of the runs 38 ms or more. [charCardOf], a word's row tapped: 0.05 ms (061-word-card-impl-report.md).
      */
-    fun charCard(im: String, index: Int, text: String, paged: Boolean = false): CharCard? = checked {
-        val shown = pairs.shownSession(im)
-        val session = sessions[shown] ?: return@checked null
-        val at = index + if (paged) keyboards[shown]?.first ?: 0 else 0
+    fun card(im: String, index: Int, text: String, paged: Boolean = false, shown: (String) -> String = { it }): CandidateCard? = checked {
+        val id = pairs.shownSession(im)
+        val session = sessions[id] ?: return@checked null
+        val at = index + if (paged) keyboards[id]?.first ?: 0 else 0
+        val c = session.candidates(at, 1).firstOrNull() ?: return@checked null
+        if (c.text != text && shown(c.text) != text) return@checked null
         // the text first: what lookedUp reads is what candidates read up to
-        if (session.candidates(at, 1).firstOrNull()?.text != text) return@checked null
-        val before = session.lookedUp(at) ?: return@checked null
-        CharCard.of(text, before, candidateReadings, assets.pinyinData.charReadings, assets.charInfo, assets.strokes())
+        session.lookedUp(at)?.let { before -> CharCard.of(text, before, candidateReadings, assets.pinyinData.charReadings, assets.charInfo, assets::strokes) }
+            ?.let { return@checked CandidateCard.Looked(it) }
+        val han = WordCard.hanCount(c.text)
+        if (han == 0) return@checked null
+        // the shown characters where each is one of the engine's (国 國), else the engine's throughout
+        val chars = if (text.codePointCount(0, text.length) == c.text.codePointCount(0, c.text.length)) text else c.text
+        val style = lineStyle(id)
+        if (han > WordCard.MAX_CHARS) return@checked CandidateCard.Line(text, longLine(im, session, at, c, chars, style))
+        val pinyin = readingsOf(im, session, at, c.text, c.hint, ReadingStyle.PINYIN)
+        val zhuyin = readingsOf(im, session, at, c.text, c.hint, ReadingStyle.ZHUYIN)
+        val word = WordCard.of(chars, pinyin, zhuyin, assets.charInfo)
+        val line = word.line(style)
+        if (han > 1 || chars.codePointCount(0, chars.length) > 1) return@checked CandidateCard.Word(line, word)
+        val row = word.rows.single()
+        val card = charCardOf(chars, row.reading) ?: return@checked null
+        CandidateCard.Char(candidateReadings.lineOf(c.text, if (style == ReadingStyle.ZHUYIN) row.zhuyin else row.pinyin, style), card)
+    }
+
+    /**
+     * A long candidate's line ([CandidateCard.Line]): read as the bar reads it; past [WordCard.LINE_CHARS] Han
+     * characters (a custom phrase of a paragraph) its first whole words up to so many alone, then …: what is
+     * read is what costs (the 200 of one, 2–4 ms, a tenth of the runs 38 ms or more, read whole). The two steps
+     * of [readingsOf] still: a hint that is a reading (all Han, a syllable each: cheap) is the bar's, so its first
+     * so many; else the cut part read by the session's words, as the bar reads those.
+     */
+    private fun longLine(im: String, session: Session, at: Int, c: Choice, chars: String, style: ReadingStyle): String {
+        if (WordCard.hanCount(c.text) <= WordCard.LINE_CHARS) return WordCard.line(chars, readingsOf(im, session, at, c.text, c.hint, style))
+        // the words the session read it as, those wholly in; none (a first word longer than that alone) or none
+        // known, so many characters, read by their text
+        val words = session.readingOf(at)?.takeIf { w -> w.joinToString("") { it.text } == c.text }
+        val kept = words?.let { w ->
+            var han = 0
+            w.takeWhile { han += WordCard.hanCount(it.text); han <= WordCard.LINE_CHARS }.takeIf { it.isNotEmpty() }
+        }
+        val cut = kept?.joinToString("") { it.text } ?: WordCard.firstHan(c.text, WordCard.LINE_CHARS)
+        val count = cut.codePointCount(0, cut.length)
+        val shown = chars.substring(0, chars.offsetByCodePoints(0, count))
+        // a hint's readings are one a code point of an all-Han text: the cut part's the first so many
+        val readings = above(im, at, c.text, c.hint, style).take(count).ifEmpty { candidateReadings.of(cut, style, kept) }
+        return WordCard.line(shown, readings) + " " + CandidateReadings.MORE
+    }
+
+    /**
+     * The card of [char], one Han character, [reading] the one first ([CharCard.of]): a word card's row tapped.
+     * Of the data alone, not the session: the same whatever the candidates are now.
+     */
+    fun charCardOf(char: String, reading: CardReading?): CharCard? = checked {
+        CharCard.of(char, "", candidateReadings, assets.pinyinData.charReadings, assets.charInfo, assets::strokes, first = reading)
+    }
+
+    // the compact line's style: 候选词注音's; off, zhuyin on the zhuyin keyboards (the user, 2026-11-14, Q6), else pinyin
+    private fun lineStyle(session: String): ReadingStyle = when (settings.candidateReading) {
+        ReadingStyle.OFF -> if (session == ZHUYIN || session == ZHUYIN_NINE) ReadingStyle.ZHUYIN else ReadingStyle.PINYIN
+        else -> settings.candidateReading
     }
 
     // a character's several readings hinted are drawn as the one it has after what was put before it (Session.lookedUp)

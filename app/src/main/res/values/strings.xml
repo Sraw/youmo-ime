@@ -705,6 +705,11 @@
     <string name="char_card_strokes">%1$d strokes</string>
     <string name="char_card_parts">Parts</string>
     <string name="char_card_order">Stroke order</string>
+    <string name="card_open_word">Open word card</string>
+    <string name="card_open_char">Open character card</string>
+    <string name="card_see_char">See character card</string>
+    <string name="card_back">Back to %1$s</string>
+    <string name="card_copy_char">Copy “%1$s”</string>
     <!-- each stroke's shape as TalkBack reads a card's stroke order, in StrokeShape's order -->
     <string-array name="char_card_stroke_names">
         <item>horizontal</item>

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.uat
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
+import org.fcitx.fcitx5.android.engine.reading.CandidateCard
 import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
 import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
@@ -157,7 +158,7 @@ class HandwritingEngineUatTest {
         write(*written)
         val i = candidates.indexOf(written[0])
         check(i >= 0) { "${written[0]} not among $candidates" }
-        checkNotNull(engines.charCard(InputMethodCatalog.HANDWRITING, i, written[0]))
+        checkNotNull((engines.card(InputMethodCatalog.HANDWRITING, i, written[0]) as? CandidateCard.Looked)?.card)
     }
 
     // a reading's words a dictionary's, not the model's others: 荣和, 去呢, 弦数 are two words run together (the user, 2026-11-02)

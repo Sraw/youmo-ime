@@ -199,3 +199,8 @@
 - **预期**：18 键的键面只写 L，九键的 5 键只写 JKL、1 键角标只写 `1`，都不写 `;`；长按一行里没有 `;` 和 `:`（九键 2–9 键自己设的符号照旧）。把方案改成"微软"，不收起键盘，18 键马上变成 L;；九键 1 键角标仍是 `1`（角标是长按首选），打字时 1 键的键面变成「分词;」（这时点它打 `;`），没打字时键面照旧（5 键仍是 JKL）。
 - **JVM**：`ShuangpinKeysUatTest.theEighteenKeysUnderASchemeWithoutTheSemicolonShowLAlone`（小鹤键面是 L，没有 `;`）、`ShuangpinKeysUatTest.theNineKeysUnderASchemeWithoutTheSemicolonShowJklAlone`（5 键是 JKL，长按没有 `;` `:`；小鹤、自然码 1 键角标是 `1`，新画法和旧 View 都查；换成微软角标仍是 `1`，打字时键面是「分词;」）、`KeyboardWindowTest`（小鹤、自然码的 18 键和九键是没有分号的那个，微软是带分号的）、`GroupedKeyboard18Test.pinyinsEighteenKeysShowLWithoutTheSemicolon`（不带分号时长按没有 `;` `:`，码不变）；设备上不跑。
 
+### SP-29 [P1] 双拼打的词读音和全拼一样（按词，不按双拼的键）
+- **前提**：B0，双拼（自然码）。
+- **操作**：打 ynhh，长按「银行」。
+- **预期**：读音行是「银行　yín háng」，和全拼打的一样。
+- **JVM**：ime-core `EnginesWordCardTest`（双拼 ynhh）；设备上不跑。

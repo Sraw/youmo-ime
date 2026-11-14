@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.reading.CardReading
 import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 
@@ -38,7 +39,8 @@ class EngineBackedHostApi(
     override suspend fun rareHeld(texts: Collection<String>) = engines.rareHeld(texts)
     override suspend fun rareGrid() = engines.rareGrid()
     override suspend fun pinyinsOf(texts: List<String>) = engines.pinyinsOf(texts)
-    override suspend fun charCard(index: Int, text: String, paged: Boolean) = engines.charCard(im, index, text, paged)
+    override suspend fun candidateCard(index: Int, text: String, paged: Boolean) = engines.card(im, index, text, paged)
+    override suspend fun charCardOf(char: String, reading: CardReading?) = engines.charCardOf(char, reading)
     override suspend fun wordBoundaries(texts: List<String>) = engines.wordBoundaries(texts)
     override suspend fun logProbs(texts: List<String>) = engines.logProbs(texts)
     override suspend fun voiceHomophones(words: List<UserWord>) = engines.voiceHomophones(words)

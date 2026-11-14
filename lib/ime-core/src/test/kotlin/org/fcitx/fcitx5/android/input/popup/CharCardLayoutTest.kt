@@ -19,6 +19,16 @@ class CharCardLayoutTest {
         assertFalse(CharCardLayout.twoColumns(landscape = false, floating = true))
         assertEquals(3, CharCardLayout.readingRows(true))
         assertEquals(4, CharCardLayout.readingRows(false))
+        // a word's characters as many
+        assertEquals(2, CharCardLayout.wordRows(true))
+        assertEquals(4, CharCardLayout.wordRows(false))
+    }
+
+    // the physical keyboard's window, by the cursor: one column whatever the screen
+    @Test
+    fun oneColumnInThePagedWindow() {
+        assertFalse(CharCardLayout.twoColumns(landscape = true, floating = false, paged = true))
+        assertTrue(CharCardLayout.twoColumns(landscape = true, floating = false, paged = false))
     }
 
     @Test

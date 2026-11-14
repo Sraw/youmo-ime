@@ -432,3 +432,4 @@ def pr52b(d):
 
 case("PR-52a", needs="manual:系统文件选择器里选改过名的备份、不是备份的 zip、图片和条目太多的 zip；在真机或模拟器上手工跑")(lambda d: None)
 case("PR-53", needs="jvm:AppPrefsTest.theOneHandedSideRememberedIsNotResetByTheResetsOfHiddenSettings")(lambda d: None)
+case("PR-54", needs="jvm:CandidateMenuUatTest.aFieldThatLearnsNothingHasTheCardAndNoLines")(lambda d: None)

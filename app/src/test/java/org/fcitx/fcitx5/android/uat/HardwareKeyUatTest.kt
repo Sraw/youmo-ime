@@ -10,6 +10,8 @@ import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -26,9 +28,14 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.learn.control.WordKind
+import org.fcitx.fcitx5.android.engine.reading.CandidateCard
+import org.fcitx.fcitx5.android.engine.reading.CharCard
+import org.fcitx.fcitx5.android.engine.reading.WordCard
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.CandidatesView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.candidates.CharCardView
+import org.fcitx.fcitx5.android.input.candidates.WordCardView
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
 import org.fcitx.fcitx5.android.input.keyboard.HandwritingKeyboard
@@ -508,6 +515,34 @@ class HardwareKeyUatTest {
         assertNotNull(keyboard)
         // split: G and V on both halves
         assertEquals(2, h.texts().count { it == "g" })
+    }
+
+    // the floating candidates window's cards: one column, in landscape too (061-word-card.md §3.5)
+    @Test
+    @Uat("HK-47")
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi-keysexposed-qwerty")
+    fun theFloatingWindowsCardsAreOneColumn() {
+        val h = harness().start()
+        h.api.learned = ::learned
+        val yinhang = WordCard(
+            "银行", listOf("yín", "háng"), listOf("ㄧㄣˊ", "ㄏㄤˊ"),
+            listOf(WordCard.Row("银", "yín", "ㄧㄣˊ", "钅", 11, null), WordCard.Row("行", "háng", "ㄏㄤˊ", "行", 6, WordCard.readingOf("háng", "ㄏㄤˊ"))),
+        )
+        h.api.candidateCards["银行"] = CandidateCard.Word("yín háng", yinhang)
+        h.api.charCards["行"] = CharCard("行", listOf(CharCard.Row("háng", "ㄏㄤˊ", listOf("银行"), inWord = true)), "行", 6, null, null)
+        h.type("y")
+        h.emit(HostEvent.Paged(listOf(CandidateWord("", "银行", ""), CandidateWord("", "因为", "")), 0, false, false))
+        val word = KeyboardHarness.all(h.candidatesView).filterIsInstance<TextView>().first { it.isShown && it.text.toString() == "银行" }
+        generateSequence(word as View) { it.parent as? View }.first { it.isLongClickable }.performLongClick()
+        h.idle()
+        val menu = checkNotNull(h.candidatesView.candidateActionMenu)
+        fun head() = (menu.listView!!.adapter.getView(0, null, menu.listView!!) as FrameLayout).getChildAt(0)
+        check(head().performClick())
+        h.idle()
+        assertEquals(LinearLayout.VERTICAL, (head() as WordCardView).orientation)
+        check((head() as WordCardView).rows[1].performClick())
+        h.idle()
+        assertEquals(LinearLayout.VERTICAL, (head() as CharCardView).orientation)
     }
 
     // the engine's menu for 点了: one the user chose, 忘掉学到的 offered; the forget taken back with 3

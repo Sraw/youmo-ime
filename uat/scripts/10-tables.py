@@ -195,3 +195,4 @@ def tbl52(d):
     d.clear()
     check("你" not in again, f"屏蔽后 z n i 还有「你」：{again[:6]}")
     return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}（设置里恢复由 JVM 管）"
+case("TBL-53", needs="jvm:EnginesWordCardTest、WordCardUatTest.theExamplesReadAsTheDesignHasThem")(lambda d: None)

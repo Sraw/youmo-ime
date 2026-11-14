@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
 import org.fcitx.fcitx5.android.engine.phrase.CharInfoTest
+import org.fcitx.fcitx5.android.engine.reading.CandidateCard
 import org.fcitx.fcitx5.android.engine.reading.ReadingData
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -100,10 +101,11 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         // not what is there now, or no such candidate
         assertNull(e.charCard(HANDWRITING, 0, "江"))
         assertNull(e.charCard(HANDWRITING, 5, "行"))
-        // what may follow: no card
+        // what may follow: no card at once, its reading line (a word card's or a character's behind it)
         e.onEvent(HANDWRITING, EngineEvent.PICK, 0)
         val followed = e.candidates(HANDWRITING, 0, 1).single().text
         assertNull(e.charCard(HANDWRITING, 0, followed))
+        assertTrue(e.card(HANDWRITING, 0, followed).toString(), e.card(HANDWRITING, 0, followed).let { it is CandidateCard.Char || it is CandidateCard.Word })
         // pinyin's: by its parts or strokes, not as typed
         val p = engines(ReadingStyle.OFF)
         val parts = p.type(PINYIN, "ushuigong")
@@ -113,7 +115,9 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         assertNotNull(byStrokes.toString(), q.charCard(PINYIN, byStrokes.candidates.indexOf("行"), "行"))
         val r = engines(ReadingStyle.OFF)
         val typed = r.type(PINYIN, "xing")
+        // as typed: its reading line, the card behind it
         assertNull(r.charCard(PINYIN, typed.candidates.indexOf("行"), "行"))
+        assertTrue(r.card(PINYIN, typed.candidates.indexOf("行"), "行") is CandidateCard.Char)
         assertNull(engines(ReadingStyle.OFF).charCard(HANDWRITING, 0, "行"))
     }
 
@@ -130,12 +134,34 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
     }
 
     @Test
+    @Uat("PY-131")
+    fun traditionalOutputsWrittenCharacterHasItsCardAsShown() {
+        val e = engines(ReadingStyle.OFF)
+        e.write(0, "银")
+        val shown: (String) -> String = { it.replace('银', '銀') }
+        assertNull(e.card(HANDWRITING, 0, "銀"))
+        val card = e.card(HANDWRITING, 0, "銀", shown = shown) as CandidateCard.Looked
+        assertEquals("銀", card.card.text)
+    }
+
+    @Test
+    fun aWrittenLetterHasNoCard() {
+        val e = engines(ReadingStyle.PINYIN)
+        e.write(0, "a")
+        assertNull(e.card(HANDWRITING, 0, "a"))
+    }
+
+    @Test
     fun noCardFileNoRadical() {
         charInfo = null
         val e = engines(ReadingStyle.OFF)
         e.write(0, "江")
         assertEquals(CharCardFields(null, 6), e.charCard(HANDWRITING, 0, "江")?.let { CharCardFields(it.radical, it.strokes) })
     }
+
+    // the card shown at once, of a character looked up
+    private fun Engines.charCard(im: String, index: Int, text: String, paged: Boolean = false) =
+        (card(im, index, text, paged) as? CandidateCard.Looked)?.card
 
     private data class CharCardFields(val radical: String?, val strokes: Int?)
 }

@@ -157,3 +157,9 @@
 - **操作**：看键盘；点 BN IO 看编码行和音节条。
 - **预期**：横屏分体时 18 键和 14 键一样整块靠一边，三行齐全，编码行和音节条跟着它；点 BN IO 后音节条里有 ni。
 - **JVM**：`LandscapeUatTest.theEighteenKeysAtTheSideAsTheFourteen`（18 键靠一边、三行齐全，编码行和音节条跟着，音节条有 ni，金图 keys18_side）；设备上不跑。
+
+### LS-32 [P1] 横屏：词卡左右两列，从词卡点开的字卡也是两列；悬浮键盘一列
+- **前提**：B0-横屏，「普通文本」框。
+- **操作**：打 yinhang，长按「银行」，点读音行，点「行」；换悬浮键盘再做一遍。
+- **预期**：停靠时词卡左边是整词和字行，右边是上屏、复制；点开的字卡也是两列，「‹ 银行」在左列顶上。横屏展开后菜单项在卡下面，往下滑；菜单的滚动条一直显示（不淡出）。悬浮键盘上都是一列。
+- **JVM**：app `CandidateMenuUatTest.inLandscapeTheWordCardIsTwoColumnsWithLinesUnderIt`（图 `word_card_land`）、`CandidateMenuUatTest.onTheFloatingKeyboardTheWordCardIsOneColumn`；ime-core `CardNavTest`、`CharCardLayoutTest`；设备上不跑。

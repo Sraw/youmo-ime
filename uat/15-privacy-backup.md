@@ -281,3 +281,9 @@
 - **操作**：**备份与恢复 → 备份全部**，再 **从备份恢复** 这一份；应用重启后回测试页，点工具栏 **⋯ → 单手模式**。
 - **预期**：键盘缩到左侧（恢复后的重置不把记住的一侧改回右侧）。
 - **JVM**：`AppPrefsTest.theOneHandedSideRememberedIsNotResetByTheResetsOfHiddenSettings`（第一次启动和导入备份后两次重置隐藏设置，记住的左侧都不变）；设备上不跑。
+
+### PR-54 [P1] 无痕框里长按候选：只有读音行和卡，没有菜单项，不学
+- **前提**：B0，测试页无痕框（不学习）。
+- **操作**：打 yinhang，长按「银行」，点读音行，点「行」；清空，再打 yinhang。
+- **预期**：只有读音行，点开词卡、字卡照常，没有屏蔽、固定首位等菜单项；之后打 yinhang「银行」的位置不变（没学）。
+- **JVM**：app `CandidateMenuUatTest.aFieldThatLearnsNothingHasTheCardAndNoLines`；设备上不跑。

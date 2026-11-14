@@ -120,6 +120,18 @@ class CandidateReadings(
     }
 
     /**
+     * [text], one character a candidate reads [first] (as [of] or [ofHint] write it in [style]), as a held
+     * candidate's compact line writes it: [first], then its other readings in [ordered]'s order, [MAX_SHOWN] in all
+     * apart by [LINE_SEPARATOR], [MORE] after them if it has more (háng / xíng…); empty where [first] is (a tone not
+     * known, in zhuyin: R25), the line then as empty as the bar above it.
+     */
+    fun lineOf(text: String, first: String, style: ReadingStyle): String {
+        if (first.isEmpty() || text.isEmpty()) return ""
+        val rest = ordered(text.codePointAt(0)).map { written(it.syllable, it.tone, style) }.filter { it.isNotEmpty() && it != first }.distinct()
+        return (listOf(first) + rest.take(MAX_SHOWN - 1)).joinToString(LINE_SEPARATOR) + if (rest.size > MAX_SHOWN - 1) MORE.toString() else ""
+    }
+
+    /**
      * A pinyin hint of [text] (a misreading's true "jué sè", a part's or a stroke lookup's "hao") as one reading
      * a character, written as [style] has it (pinyin while 候选词注音 is off): the hint's own tones where it has
      * them, else its syllables with the tones they have in [text], toneless where none is known (in zhuyin
@@ -222,6 +234,9 @@ class CandidateReadings(
     companion object {
         /** Between a character's readings, as [allOf] writes them (xíng/háng) and a hint of them reads (EngineAssets.charReading). */
         const val SEPARATOR = '/'
+
+        /** Between a character's readings on a held candidate's compact line ([lineOf]): háng / xíng…. */
+        const val LINE_SEPARATOR = " / "
 
         /** After them, when the character has more than are shown: hé/hè…. */
         const val MORE = '…'

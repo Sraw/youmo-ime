@@ -322,3 +322,4 @@ case("T9-61", needs="jvm:ZhuyinShortcutsUatTest.zhuyinNinesGroupsHaveNoneUntilOn
 
 
 case("T9-63", needs="jvm:SettingsPagesUatTest.anEditedNineKeysLongPressKeepsItsLettersWhenTheyChange")(lambda d: None)
+case("T9-64", needs="jvm:EnginesWordCardTest")(lambda d: None)

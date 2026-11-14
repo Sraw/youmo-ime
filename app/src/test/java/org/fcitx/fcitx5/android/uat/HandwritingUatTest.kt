@@ -12,6 +12,7 @@ import android.text.InputType
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.BaseInputConnection
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ListPopupWindow
 import android.widget.TextView
@@ -32,6 +33,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
 import org.fcitx.fcitx5.android.engine.learn.control.WordKind
+import org.fcitx.fcitx5.android.engine.reading.CandidateCard
 import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
@@ -317,14 +319,15 @@ class HandwritingUatTest {
         return h.inputView.candidateActionMenu!!
     }
 
-    private fun ListPopupWindow.row(i: Int): View = listView!!.adapter.getView(i, null, listView!!)
+    // the menu's row [i]; the head's card, not the box it is shown in
+    private fun ListPopupWindow.row(i: Int): View = listView!!.adapter.getView(i, null, listView!!).let { if (it is FrameLayout) it.getChildAt(0) else it }
 
     // in Chinese, as the user reviews the image
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
     @Test
     @Uat("HW-29")
     fun aHeldCharactersCardThenItsButtonsAndTheMenu() {
-        h.api.charCards["行"] = hang
+        h.api.candidateCards["行"] = CandidateCard.Looked(hang)
         h.start()
         written("银行")
         val menu = held("行")
@@ -349,7 +352,7 @@ class HandwritingUatTest {
         h.relayout()
         h.capture("HandwritingUatTest/char_card_port", menu.listView!!.rootView)
         // a candidate with no card: the title as before
-        h.api.charCards.clear()
+        h.api.candidateCards.clear()
         menu.dismiss()
         val plain = held("衍")
         assertEquals("衍", plain.listView!!.adapter.getItem(0).toString())
@@ -359,7 +362,7 @@ class HandwritingUatTest {
     @Test
     @Uat("HW-30")
     fun copyPutsTheCharacterAloneOnTheClipboardAndCommitIsATap() {
-        h.api.charCards["行"] = hang
+        h.api.candidateCards["行"] = CandidateCard.Looked(hang)
         h.start()
         written("银行")
         var menu = held("行")
@@ -384,7 +387,7 @@ class HandwritingUatTest {
     @Uat("HW-29")
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun theCardInLandscapeIsTwoColumns() {
-        h.api.charCards["行"] = hang
+        h.api.candidateCards["行"] = CandidateCard.Looked(hang)
         h.start()
         written("银行")
         val card = held("行").row(0) as CharCardView
@@ -412,7 +415,7 @@ class HandwritingUatTest {
             prefs.set(floatingKeyboardX, floatingKeyboardX.defaultValue)
             prefs.set(floatingKeyboardY, floatingKeyboardY.defaultValue)
         }
-        h.api.charCards["行"] = hang
+        h.api.candidateCards["行"] = CandidateCard.Looked(hang)
         h.start()
         written("银行")
         val menu = held("行")
@@ -426,8 +429,8 @@ class HandwritingUatTest {
     @Uat("HW-29")
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
     fun aCardLeavesOutWhatIsNotKnownAndScrollsItsReadings() {
-        h.api.charCards["乾"] = CharCard("乾", listOf(CharCard.Row("gān", "ㄍㄢ", listOf("乾坤")), CharCard.Row("qián", "ㄑㄧㄢˊ", listOf("乾隆"))), "乙", 11, null, null)
-        h.api.charCards["和"] = CharCard(
+        h.api.candidateCards["乾"] = CandidateCard.Looked(CharCard("乾", listOf(CharCard.Row("gān", "ㄍㄢ", listOf("乾坤")), CharCard.Row("qián", "ㄑㄧㄢˊ", listOf("乾隆"))), "乙", 11, null, null))
+        h.api.candidateCards["和"] = CandidateCard.Looked(CharCard(
             "和",
             listOf(
                 CharCard.Row("hé", "ㄏㄜˊ", listOf("和平", "和谐")), CharCard.Row("hè", "ㄏㄜˋ", listOf("附和")),
@@ -436,7 +439,7 @@ class HandwritingUatTest {
                 CharCard.Row("huo", "˙ㄏㄨㄛ", emptyList()),
             ),
             "口", 8, listOf(CharCard.Part("禾", "hé"), CharCard.Part("口", "kǒu")), StrokeShape.parse("P H S P D S HZ H"),
-        )
+        ))
         h.start()
         h.emit(HostEvent.ClientPreedit(FormattedText(arrayOf("乾"), intArrayOf(0), 1)))
         h.api.candidates = arrayOf(CandidateWord("", "乾", ""), CandidateWord("", "和", ""))

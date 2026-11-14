@@ -165,3 +165,4 @@ case("AX-14", needs="jvm:ShiftKeyNameTest.theShiftKeyIsNamedOnItsCapAndToAScreen
 
 
 case("AX-15", needs="manual:TalkBack 读框里的拼音（设计页 M16）：手工听")(lambda d: None)
+case("AX-16", needs="manual:TalkBack 摸读音行、字行、返回行、上屏和复制，展开后焦点落在哪（JVM：CandidateMenuUatTest.talkBackReadsTheLineTheRowsAndTheWayBackAndIsTakenToWhatOpened 只断言节点和焦点调用）")(lambda d: None)

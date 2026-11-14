@@ -390,7 +390,9 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   so what is composing is read again, and the app makes its views anew with `ViewRebuild.READING`, which
   does not end the composition. Handwriting's 注 key (`ReadingToggle`: off ↔ the last style used)
   sets the same option.
-  A character's card (`CharCard.of`, `Engines.charCard(im, index, text)`): for a candidate the session
+  A held candidate's card (`Engines.card(im, index, text, paged, shown)`, a `CandidateCard`; the text checked
+  against the candidate as the learning menu checks it, a traditional shown 銀行 taken for the engine's 银行
+  and its characters shown): `Looked`, a character's full card at once for a candidate the session
   says was looked up (`Session.lookedUp`: handwriting's characters, full pinyin's `u` parts and stroke
   lookup, not what was typed nor what may follow; `paged`, the index from the page shown), its readings
   in `ordered(card = true)`'s order with up to two words each (`CharReadings`: a dictionary's words only,
@@ -402,8 +404,17 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   for a character without, the stroke table's (`Strokes`) of Unihan's count, else its first (the table's orders
   sorted, not rime-stroke's own order; the five kinds only, a 折 `StrokeShape.ZHE`), the strokes counted as the
   order shown is (Unihan's count may be Taiwan's glyph's: 范 9 beside the mainland's 8); what is
-  not known is null. The app shows it above the held candidate's menu (`CharCardView`, laid out by
-  `CharCardLayout`).
+  not known is null. Any other candidate with a Han character in it: a compact line of its reading and,
+  a tap away, `Char` (one character: `CandidateReadings.lineOf`, háng / xíng…, and its card) or `Word`
+  (two to `WordCard.MAX_CHARS` = 8 Han characters: `WordCard`, the word in pinyin and zhuyin, a row each
+  Han character with its radical and strokes); more than 8, `Line`, the reading alone. The readings are the
+  bar's: `Engines.readingsOf` takes the same two steps as `readingAndHint`, sharing its `above` (a hint
+  that is a reading, drawn above it) and `read` (else the text as the session typed it), in both styles whatever 候选词注音 is; the line in its style (off: zhuyin on the zhuyin
+  keyboards, else pinyin). A word's row reads `CardReading` (syllable and tone, null tone where none is
+  known); `Engines.charCardOf(char, reading)`, stateless, makes that character's card with the reading first
+  (`CharCard.of(first = …)`, `Row.inWord`; prepended when the dictionary's list has no such reading).
+  Emoji, English, quick input's entries: none. The app shows it as the held candidate's menu head
+  (`CardNav`, `CompactLineView`, `WordCardView`, `CharCardView`, laid out by `CharCardLayout`).
 - **Strokes.** `u` with nothing typed starts `StrokeLookup` (`h s p n z` = 横竖撇捺折); any other
   letter turns it back into pinyin (`usb`, or `uan` as a slip for `yan`), typed at the strokes'
   cursor, which they keep as pinyin keeps its own.

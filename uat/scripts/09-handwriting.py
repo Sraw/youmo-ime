@@ -283,3 +283,4 @@ def hw38(d):
 
 
 case("HW-39", needs="jvm:KeysEverywhereUatTest.handwritingsCommaAndFullStopAreEveryKeyboards、HandwritingSceneGesturesTest.commaAndFullStopSwipedAreTappedAndAStrokeOffThemIsNothing")(lambda d: None)
+case("HW-40", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu、EnginesHandwritingReadingsTest")(lambda d: None)

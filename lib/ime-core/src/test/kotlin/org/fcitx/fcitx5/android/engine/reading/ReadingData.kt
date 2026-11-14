@@ -126,8 +126,8 @@ object ReadingData {
             // the model's alone, yet what puts 长's zhǎng before cháng
             Triple("长大", "zhang da", -2f),
         ).forEach { (w, r, p) -> b.unigram(w, p, 0f).entry(w, syl(*r.split(' ').toTypedArray())) }
-        // a word the model has after 行 and 银行: something offered once either is put in
-        b.bigram("行", "江", -1f, 0f).bigram("银行", "江", -1f, 0f)
+        // a word the model has after 行 and 银行: something offered once either is put in; and a polyphone after 江
+        b.bigram("行", "江", -1f, 0f).bigram("银行", "江", -1f, 0f).bigram("江", "行", -1f, 0f)
         // a rarer reading of the word, by the dictionary's weight: no example of it
         b.entry("了", syl("liao"), -3f).entry("能", syl("nai"), -5f)
         b.entry("行", syl("hang"), -1f).entry("行", syl("heng"), -3f).entry("银行", syl("yin", "xing"), -2f)

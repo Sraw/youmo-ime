@@ -605,3 +605,47 @@ def py122(d):
 
 
 case("PY-123", needs="jvm:CodeInFieldUatTest.aSelectionMadeInTheCodeLeavesItAsTextAndTheEngineReset")(lambda d: None)
+case("PY-125", needs="jvm:EnginesWordCardTest、CharCardTest.theReadingACandidateHasItInFirst、WordCardUatTest.theExamplesReadAsTheDesignHasThem")(lambda d: None)
+case("PY-126", needs="jvm:CandidateMenuUatTest.aHeldCharacterOpensToItsFullCard、EnginesWordCardTest")(lambda d: None)
+case("PY-127", needs="jvm:EnginesWordCardTest、WordCardUatTest.theCardReadsAsTheBarOnTheChatWordsAndTheMisreadings")(lambda d: None)
+case("PY-128", needs="jvm:WordCardTest、EnginesWordCardTest、CandidateMenuUatTest.noReadingLineWhereTheEngineHasNoCard")(lambda d: None)
+case("PY-129", needs="jvm:EnginesWordCardTest.aPredictionHasItsLineAsTheBarReadsIt、CandidateMenuUatTest.aPredictionHasItsReadingLineOverItsLines")(lambda d: None)
+case("PY-130", needs="jvm:EnginesWordCardTest、WordCardUatTest.theExamplesReadAsTheDesignHasThem")(lambda d: None)
+case("PY-131", needs="jvm:EnginesWordCardTest.traditionalOutputHasItsCardItsCharactersAsShown、EnginesHandwritingReadingsTest.traditionalOutputsWrittenCharacterHasItsCardAsShown")(lambda d: None)
+case("PY-132", needs="jvm:CandidateMenuUatTest.withTheCodeInTheFieldTheCardLeavesItAsItIs")(lambda d: None)
+case("PY-133", needs="jvm:CandidateMenuUatTest.aLongCandidateHasItsReadingAloneWrapped、EnginesWordCardTest、CardNavTest")(lambda d: None)
+
+
+@case("PY-124", base="B0", visual=True)
+def py124(d):
+    """the reading line over the menu, the word card it opens, a character's card and the way back
+    (061-word-card.md); the views' children are hidden from accessibility, so each step is found by
+    its description, as TalkBack reads it"""
+    d.open_page("text")
+    d.type("yinhang")
+    menu = d.long_pick("银行")
+    d.shot("full", "长按「银行」：最上面一行是读音")
+    s = d.screen()
+    line = s.find(desc="银行，yín háng", where="all")
+    check(line is not None, f"没有读音行：{[t for t in menu if len(t) < 16][:12]}")
+    check(all(x in menu for x in ("屏蔽", "固定首位")), f"菜单项变了：{[t for t in menu if len(t) < 16][:12]}")
+    d.tap(line.c, after=0.8)
+    s = d.screen()
+    d.shot("full", "点读音行：词卡")
+    check(s.find(desc="银行，读音 yín háng", where="all") is not None, "点开后没有词卡")
+    row = next((n for n in s.nodes if n.desc.startswith("行，háng")), None)
+    check(row is not None, f"词卡里没有「行」那一行：{[n.desc for n in s.nodes if n.desc][:12]}")
+    d.tap(row.c, after=0.8)
+    s = d.screen()
+    d.shot("full", "点「行」：字卡，返回行，只有复制")
+    back = s.find(desc="返回 银行", where="all")
+    check(back is not None, "字卡上没有返回行")
+    texts = s.texts(where="all")
+    check("复制「行」" in texts and "上屏" not in texts, f"字卡的按钮：{[t for t in texts if len(t) < 8][:12]}")
+    d.tap(back.c, after=0.8)
+    s = d.screen()
+    check(s.find(desc="银行，读音 yín háng", where="all") is not None, "返回后不是词卡")
+    d.tap_text("上屏", where="all", scroll=False, after=0.8)
+    field = d.field_text()
+    check(field == "银行", f"上屏后框里「{field}」")
+    return "读音行、词卡、字卡、返回、上屏"

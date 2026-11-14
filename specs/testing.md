@@ -198,6 +198,9 @@ with the default reading (neighbouring keys on, both models). `release-report.sh
 used for a data release: against a baseline, no gate set may lose significantly more samples than it
 wins (McNemar, Bonferroni-corrected), learning must bring back what was typed, and the candidate readings (候选词注音) must read
 `data/readings/chat.tsv` right at `ReadingsRun.GATE` (98%; `readings --gate`).
+A held candidate's card reads it as the bar does: `EnginesWordCardTest` (each keyboard's way to 银行, on the
+fixture) and `WordCardUatTest` (`:lib:ime-eval:uatTest`: the first 100 of `pinyin-chat.tsv` and every
+`misreadings.tsv` word, both styles) hold the card's readings to `Snapshot.readings`, a code point at a time.
 
 `run-on-device.sh` runs a set through the APK's own engine on a device, for checking that the app
 decodes as the tool does.

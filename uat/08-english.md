@@ -121,3 +121,9 @@
 - **操作**：九键按 8 4 3，长按候选「the」选 **屏蔽**；清空再按 8 4 3。全键盘划 h-e-l-o（上屏「hello 」），长按候选里的「help」选 **屏蔽**，再点剩下的另一个词；再划一次，长按第一个候选「hello」。
 - **预期**：843 的「the」能屏蔽，之后 843 不再给「the」；「help」从候选里消失，其余还在，点的词替换掉「hello 」；滑行已上屏的那个词（第一个候选）长按没有 **屏蔽**。
 - **JVM**：`EnglishBlockOffersTest`；设备上不跑。
+
+### EN-29 [P2] 英文候选长按：没有读音行，菜单和以前一样
+- **前提**：B0，英文。
+- **操作**：打 hello，长按「hello」。
+- **预期**：第一行是「hello」本身，没有读音、没有 ›；菜单项和以前一样。
+- **JVM**：ime-core `EnginesWordCardTest`（英文没有卡）；app `CandidateMenuUatTest.noReadingLineWhereTheEngineHasNoCard`；设备上不跑。

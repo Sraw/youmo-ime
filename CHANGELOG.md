@@ -17,6 +17,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - **编码行** 多了 **输入框里（实验性）**（设置 → 外观 → 大小与样式）：拼音带着下划线直接出现在输入框里，选了字才换成字，键盘上方不再有拼音条。应用这时能看到你正在打的拼音（搜索框会按拼音搜，按发送键发出去的就是拼音）；转屏、点另一个输入框、切到别的应用时，拼音可能留在原来的框里变成普通文字，要自己删掉。密码、数字、终端一类的框，和会改写你打的字、每打一个字就重开输入的应用，拼音仍在键盘上方。选它时先弹说明，点确定才改；默认仍是浮在键盘上方。
 - **生僻字屏蔽**（**词库与短语 → 生僻字屏蔽**，默认关）：不想在候选里看到的生僻字一次挡掉，所有中文输入法的候选、联想、整句、手写、笔画查字、拆字、滑行和语音结果里都不出现，含它的词也不出。按《通用规范汉字表》分四组：三级字、繁体字、其它表外字、扩展区；一级、二级常用字永远不挡。打开后默认只挡扩展区（扩展 B 及以后），常用的字词一个不少；每组可以整组挡，也可以在网格里一个个挡、放行（按住拖动连选，能撤销），能按拼音搜、粘贴一个字定位。你的词里有挡掉的字时不给出但不删，用户词库里标着「含屏蔽的字」，点一下就能放行。跟着「备份全部」走，恢复一份没有它的备份后回到关。
 - **双拼中间、后面的字可以只打声母**：第一个字打全、后面只打声母也能出词，比如自然码 `ufmuh` 出「什么时候」、`yivz` 出「一直在」；以前两个键能拼成音节时只按音节读。拆开读的一般排在按音节读的后面，打全码时第一个候选不变；两个键成音节的（`xm`），别的打法学过的词、手动加的词不会按单个声母提到前面，在这串键上固定、选过的照样排上来。全打声母（`umuh`）也能出，但常在后几页。18 键、14 键和九键双拼不变。
+- **长按任何中文候选，菜单最上面一行是它的读音**，点开看字卡或词卡（8 个字以内；更长的只显示读音）：词卡有整个词的拼音和注音、每个字的读音、部首和笔画，点一个字看它的完整字卡（多音字在这个词里的读音排第一）。以前只有手写、拆字和笔画查字的字有字卡。在不学习的输入框（无痕模式等）里长按只出读音和卡，没有菜单项。
 
 ### 小改动
 
@@ -30,6 +31,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 从备份恢复选了条目极多（超过 10 万个）的 zip 时马上提示不是本应用的备份；以前要先「加载中」半分钟左右。误选了照片、视频或残缺的 zip 也马上提示「这个文件不是本应用的备份」，不再先把整个文件复制一遍。
 - 上滑图标位置、下滑图标位置多了「顶部」：画在键的上边中间，字母不挪；横屏、紧凑时改画在角上：先挑上边的角（右上、左上），再挑下边的；一个顶部一个底部时顶部的在右上、底部的在右下。画在上、下边中间的文字只占两个角标记中间，放不下就缩短，不会和角上的小字连在一起。
 - 联想时候选栏最右边多了 ×：点了只收起这一次的联想，「联想下一个词」设置不变。
+- 繁体输出时，手写、拆字、笔画查字的字长按也有字卡了。
 
 ### Main changes
 
@@ -41,6 +43,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - After you correct a word voice got wrong, the keyboard asks whether voice should remember it: delete the word (徐静) whole and type it again in pinyin or handwriting as one that reads the same (徐婧), and it asks “Have voice remember 徐婧?”; only **Remember** adds it to your words, so voice writes it right next time. Not tapped, nothing is kept, and it goes in 6 s or once you type on. One character changed, it says once how to have the word remembered. A new switch on top of the user dictionary page, **Ask after fixing voice's words** (on). What voice typed is followed in memory only, dropped once you leave the field; password and no-learning fields are not followed.
 - **Rare characters** (**Words and phrases → Rare characters**, off by default): hold back the rare characters you never want among the candidates, in one go; they then never show in any Chinese input method's candidates, predictions, sentences, handwriting, stroke and parts look-up, glide typing or voice results, nor does any word with one. Four groups by the Table of General Standard Chinese Characters: level 3, traditional, other unlisted, and the extensions; levels 1 and 2 are never held back. Turned on, only the extensions (B and later) are held back at first, every common character and word still there; each group can be held back whole, or a character at a time in the grid (drag to set many, with undo), searched by pinyin or found by pasting it. Your words with a character held back are not offered but kept, marked 「含屏蔽的字」 in the user's words, let through with a tap. It goes with "Back up all"; restoring a backup without it turns it off.
 - **双拼 takes initials in the middle**: type the first syllable whole and the rest by their initials, as 自然码 `ufmuh` for 什么时候 or `yivz` for 一直在; before, two keys that made a syllable were read only as that syllable. Keys read apart usually come after the syllable they make, and input in whole syllables keeps its first candidate; where two keys make a syllable (`xm`), words learned from other spellings or added by hand are not raised by their initials, while what is pinned or picked under those very keys is. Initials only (`umuh`) work too, often further down. The 18, 14 and nine keys are unchanged.
+- **Hold any Chinese candidate: the menu's first line is its reading**; tap it for the character's card or, for a word of up to eight characters, a word card (longer candidates show the reading only): the whole word in pinyin and zhuyin, each character's reading, radical and strokes, and each character's full card a tap away (a polyphone's reading in this word first). Before, only handwritten characters and those looked up by parts or strokes had cards. In a field that learns nothing (an incognito tab and the like) the hold shows the reading and the cards alone, no menu items.
 
 ### Smaller changes
 
@@ -54,6 +57,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Restoring from a zip of far too many entries (over 100 000) says at once that it is no backup of this app; before, it showed 加载中 (loading) for about half a minute first. A photo, a video or a cut-short zip picked by mistake is likewise refused at once as no backup, without being copied first.
 - 上滑图标位置 and 下滑图标位置 have 「顶部」 (top): the top edge's middle, the letter where it was; on landscape and 紧凑 keys a corner, the top's first (top right, top left); one at 顶部 and one at 底部: top right and bottom right. A text at an edge's middle keeps between the corner marks, shortened where it does not fit, never running on into a corner's symbol.
 - With 联想 (next-word predictions) shown, the candidate bar has a × at its far right: it puts away these predictions alone, the setting unchanged.
+- With traditional output, a handwritten character (or one looked up by parts or strokes) has its card again on a long press.
 
 ---
 

@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.reading.CardReading
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -240,7 +241,11 @@ class KotlinHost(
     override suspend fun sameCodes(texts: List<String>, ims: List<String>) = withContext(dispatcher) { bridge.engines.sameCodes(texts, ims) }
     override suspend fun pinyinOf(text: String) = withContext(dispatcher) { bridge.engines.pinyinOf(text) }
     override suspend fun pinyinsOf(texts: List<String>) = withContext(dispatcher) { bridge.engines.pinyinsOf(texts) }
-    override suspend fun charCard(index: Int, text: String, paged: Boolean) = onHost { inputMethodEntryCached.uniqueName.takeIf(EngineBridge::isEngines)?.let { bridge.engines.charCard(it, index, text, paged) } }
+    // 繁體: the candidate as shown, converted; the engine checks it against its own so (as learning's menu)
+    override suspend fun candidateCard(index: Int, text: String, paged: Boolean) =
+        onHost { inputMethodEntryCached.uniqueName.takeIf(EngineBridge::isEngines)?.let { bridge.engines.card(it, index, text, paged, ::shownText) } }
+
+    override suspend fun charCardOf(char: String, reading: CardReading?) = onHost { bridge.engines.charCardOf(char, reading) }
     override suspend fun wordBoundaries(texts: List<String>) = withContext(dispatcher) {
         aTextAtATime(texts) { bridge.engines.wordBoundaries(it) }
     }

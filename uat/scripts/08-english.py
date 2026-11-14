@@ -118,3 +118,4 @@ def en27(d):
 
 
 case("EN-28", needs="jvm:EnglishBlockOffersTest")(lambda d: None)
+case("EN-29", needs="jvm:EnginesWordCardTest、CandidateMenuUatTest.noReadingLineWhereTheEngineHasNoCard")(lambda d: None)

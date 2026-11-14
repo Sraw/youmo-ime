@@ -4,10 +4,13 @@
  */
 package org.fcitx.fcitx5.android.engine.reading
 
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.phrase.CharInfo
 import org.fcitx.fcitx5.android.engine.phrase.CharInfoTest
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.junit.Assert.assertEquals
@@ -21,8 +24,8 @@ class CharCardTest {
     private val readings = CandidateReadings(data, data.tones) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
     private val strokes = Strokes(CodeTable.load(ByteBuffer.wrap(Strokes.read("...\n行\tppshhz\n江\tnnhhsh\n".reader().buffered(), "stroke").build().toByteArray()))) { 0f }
 
-    private fun card(text: String, before: String = "", info: CharInfo = CharInfoTest.info, strokes: Strokes? = this.strokes) =
-        CharCard.of(text, before, readings, data.charReadings, info, strokes)
+    private fun card(text: String, before: String = "", info: CharInfo = CharInfoTest.info, strokes: Strokes? = this.strokes, first: CardReading? = null) =
+        CharCard.of(text, before, readings, data.charReadings, info, { strokes }, first)
 
     @Test
     fun everyReadingWithItsWordsAndTheCharactersMakeUp() {
@@ -44,6 +47,17 @@ class CharCardTest {
         assertEquals("丿丿丨一一亅", card.orderShown())
         assertEquals(StrokeShape.parse("P P S H H SG"), card.strokeOrder)
         assertEquals("丿丿丨一一乛", card("行", info = CharInfo.EMPTY)!!.orderShown())
+    }
+
+    @Test
+    fun theStrokeTableIsReadOnlyForACharacterWithoutItsOrder() {
+        var asked = 0
+        val counted = { asked++; strokes }
+        // charinfo.data has 行's order: the table (a pack's file, read on first use) not asked for
+        CharCard.of("行", "", readings, data.charReadings, CharInfoTest.info, counted)
+        assertEquals(0, asked)
+        CharCard.of("行", "", readings, data.charReadings, CharInfo.EMPTY, counted)
+        assertEquals(1, asked)
     }
 
     @Test
@@ -92,7 +106,7 @@ class CharCardTest {
     fun theDictionariesNeutralToneLastAndATraditionalCharactersWordsItsSimplifiedOnes() {
         assertEquals(listOf("tóu", "tou"), card("头")!!.readings.map { it.pinyin })
         val traditional = CandidateReadings(data, data.tones, { it.replace('還', '还') }) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
-        val huan = CharCard.of("還", "", traditional, data.charReadings, CharInfoTest.info, strokes)!!
+        val huan = CharCard.of("還", "", traditional, data.charReadings, CharInfoTest.info, { strokes })!!
         assertEquals(listOf("hái", "huán"), huan.readings.map { it.pinyin })
         assertEquals(listOf("还是"), huan.readings.first().examples)
     }
@@ -114,5 +128,28 @@ class CharCardTest {
         // a stroke known by its kind only: the kind's name
         assertEquals("行，读音 xíng、háng、héng、hàng，6 画，笔顺 撇、撇、竖、横、横、折", card("行", info = CharInfo.EMPTY)!!.spoken(words))
         assertEquals("江，读音 jiāng", card("江", info = CharInfo.EMPTY, strokes = null)!!.spoken(words))
+    }
+
+    // opened from a word's row, or a held character: the reading it has there first, so the two never read it apart
+    @Test
+    @Uat("PY-125")
+    fun theReadingACandidateHasItInFirst() {
+        fun first(syllable: String, tone: Int?) = card("行", first = CardReading(Syllables.id(syllable), tone))!!.readings
+        assertRows(
+            "of its syllable and tone: that row first, marked, its words kept" to {
+                val r = first("hang", 2)
+                assertEquals(listOf("háng", "xíng", "héng", "hàng"), r.map { it.pinyin })
+                assertEquals(CharCard.Row("háng", "ㄏㄤˊ", listOf("银行"), inWord = true), r.first())
+                assertEquals(listOf(true, false, false, false), r.map { it.inWord })
+            },
+            "its syllable in another tone (a word's exception): a row of it put first, no words" to {
+                val r = first("xing", 4)
+                assertEquals(CharCard.Row("xìng", "ㄒㄧㄥˋ", emptyList(), inWord = true), r.first())
+                assertEquals(listOf("xíng", "háng", "héng", "hàng"), r.drop(1).map { it.pinyin })
+            },
+            "a syllable the card lacks: the same" to { assertEquals(listOf("jiāng", "xíng"), first("jiang", 1).take(2).map { it.pinyin }) },
+            "a tone not known: toneless, no zhuyin" to { assertEquals(CharCard.Row("chun", "", emptyList(), inWord = true), first("chun", null).first()) },
+            "none: the card as it is" to { assertEquals(card("行")!!.readings, card("行", first = null)!!.readings) },
+        )
     }
 }

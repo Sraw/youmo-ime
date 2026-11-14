@@ -319,3 +319,9 @@ Android 10（API 29，youmo29）没有 `uinput` 命令，脚本在那里改用�
 - **操作**：按 n i h a o，看框和光标旁的悬浮候选窗；按空格。
 - **预期**：拼音带下划线在框里，悬浮候选窗里只有候选，没有拼音那一行；空格后框里是「你好」。
 - **JVM**：`HardwareKeyUatTest.theCodeInTheFieldIsNotInTheFloatingWindowToo`（对照：编码行在键盘上方时悬浮窗里有拼音）；设备上接实体键盘手工看。
+
+### HK-47 [P1] 实体键盘候选窗长按：读音行、词卡、字卡都一列，横屏也是
+- **前提**：B0，接实体键盘，「普通文本」框。
+- **操作**：按 y i n h a n g，长按悬浮候选窗里的「银行」，点读音行，点「行」；横屏再做一遍。
+- **预期**：候选窗的菜单最上面是读音行，词卡、字卡都是一列，横屏也是。
+- **JVM**：app `HardwareKeyUatTest.theFloatingWindowsCardsAreOneColumn`；ime-core `CardNavTest`（分页候选窗一列）；设备上不跑。

@@ -112,3 +112,4 @@ case("SP-27", needs="jvm:KotlinHostSchemeTest.aNewInstallsShuangpinIsXiaohe")(la
 
 
 case("SP-28", needs="jvm:ShuangpinKeysUatTest.theEighteenKeysUnderASchemeWithoutTheSemicolonShowLAlone、ShuangpinKeysUatTest.theNineKeysUnderASchemeWithoutTheSemicolonShowJklAlone、KeyboardWindowTest、GroupedKeyboard18Test.pinyinsEighteenKeysShowLWithoutTheSemicolon")(lambda d: None)
+case("SP-29", needs="jvm:EnginesWordCardTest")(lambda d: None)

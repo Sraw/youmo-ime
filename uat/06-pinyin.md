@@ -619,3 +619,63 @@
 - **操作**：在框里双击编码（或长按后拖选）。
 - **预期**：「ni hao」留在框里成为普通文字（没有下划线）并被选中，候选栏清空；接着打字替换的是选中的这段，和选中任何文字时一样。
 - **JVM**：`CodeInFieldUatTest.aSelectionMadeInTheCodeLeavesItAsTextAndTheEngineReset`。
+
+### PY-124 [P0] 长按拼音打出的词：最上面一行是读音，点开是词卡，菜单项照旧
+- **前提**：B0，「普通文本」框。
+- **操作**：打 yinhang，长按候选「银行」；点最上面一行；点「行」那一行；点「‹ 银行」；点 **上屏**。
+- **预期**：菜单第一行是「银行　yín háng　›」，下面 **屏蔽**、**固定首位**、**为什么排在这** 和以前一样多、一样的顺序；点开后是词卡：大字「银行」、yín háng、ㄧㄣˊ ㄏㄤˊ，银、行各一行（读音、注音、部首、笔画、›），下面 **上屏**、**复制**；点「行」是行的字卡，háng 在第一行（强调色），最上面「‹ 银行　yín háng」，下面只有 **复制「行」**；返回后又是词卡；点上屏，框里是「银行」。
+- **JVM**：app `CandidateMenuUatTest.aHeldWordShowsItsReadingThenItsCardAndEachCharacters`（图 `reading_line`、`word_card_port`、`char_of_word`）、`CandidateMenuUatTest.copyFromAWordCardAndFromItsCharacter`、`CandidateMenuUatTest.theSameFromTheExpandedGrid`（展开的候选网格）；ime-core `EnginesWordCardTest`（全拼、简拼、双拼、九键、14/18 键、滑行、注音键盘各打一次「银行」，卡上读音和候选栏一样）；`:lib:ime-eval:uatTest` 的 `WordCardUatTest`（真数据：银行的读音和部首；聊天词前 100 个和全部常读错的词，卡上读音 == 候选栏读音，拼音、注音两种）；设备上照跑。
+
+### PY-125 [P1] 多音字由词定读音：行业的行读 háng，行走的行读 xíng；字卡里那个读音排第一
+- **前提**：B0，「普通文本」框。
+- **操作**：打 hangye，长按「行业」，点读音行，点「行」；清空，打 xingzou，长按「行走」，点读音行，点「行」。
+- **预期**：行业 读音行是 háng yè，行的字卡第一行是 háng；行走 读音行是 xíng zǒu，行的字卡第一行是 xíng（强调色）；两个字卡别的读音照旧都在。
+- **JVM**：ime-core `EnginesWordCardTest`（多音字一行）、`CharCardTest.theReadingACandidateHasItInFirst`；`WordCardUatTest.theExamplesReadAsTheDesignHasThem`（真数据：行业、行走）；设备上不跑。
+
+### PY-126 [P1] 长按单字：读音行「行　háng / xíng…」，点开是完整字卡，上屏、复制都在
+- **前提**：B0，「普通文本」框。
+- **操作**：打 hang，长按候选「行」；点最上面一行。
+- **预期**：第一行是「行　háng / xíng…」（打的读音在前）；点开是和手写一样的完整字卡（读音、例词、部首、笔画、拆字、笔顺），háng 在第一行，下面 **上屏**、**复制**，再下面菜单项照旧。
+- **JVM**：app `CandidateMenuUatTest.aHeldCharacterOpensToItsFullCard`；ime-core `EnginesWordCardTest`（Char 的读音行）；设备上不跑。
+
+### PY-127 [P1] 错音打的词：jiaose 出的「角色」读音行是 jué sè，和候选栏标的一样
+- **前提**：B0，「普通文本」框；**候选词注音** 关。
+- **操作**：打 jiaose，长按「角色」。
+- **预期**：读音行是「角色　jué sè」（真读音，不是打的 jiao se），和候选栏上方的提示一样。
+- **JVM**：ime-core `EnginesWordCardTest`；`WordCardUatTest.theExamplesReadAsTheDesignHasThem`、`WordCardUatTest.theCardReadsAsTheBarOnTheChatWordsAndTheMisreadings`（全部常读错的词）；设备上不跑。
+
+### PY-128 [P1] 混着字母、数字的候选只给汉字成行；表情候选和英文没有读音行
+- **前提**：B0，「普通文本」框。
+- **操作**：打 kalaok，长按「卡拉OK」；打 haha，长按表情候选；长按英文候选（打 hello，长按「hello」）。
+- **预期**：卡拉OK 的读音行是 kǎ lā OK，词卡只有卡、拉两行；表情、英文候选长按第一行是候选本身（没有读音、没有 ›），菜单项和以前一样。
+- **JVM**：ime-core `WordCardTest`（字母、数字原样，不成行）、`EnginesWordCardTest`（英文、表情没有卡）；app `CandidateMenuUatTest.noReadingLineWhereTheEngineHasNoCard`（快速输入的条目也没有）；设备上不跑。
+
+### PY-129 [P1] 联想词长按也有读音行，不再联想、屏蔽照旧在下面
+- **前提**：B0，「普通文本」框；**联想下一个词** 开。
+- **操作**：打 nihao，点空格上屏，长按联想里的一个词。
+- **预期**：第一行是这个词的读音行，点开是词卡；下面 **不再联想**、**屏蔽** 照旧。
+- **JVM**：ime-core `EnginesWordCardTest.aPredictionHasItsLineAsTheBarReadsIt`（联想词的卡）、app `CandidateMenuUatTest.aPredictionHasItsReadingLineOverItsLines`（读音行在不再联想、屏蔽上面）；设备上不跑。
+
+### PY-130 [P2] 查不到声调的字：拼音样式写 chun（不带调），注音样式留空，字卡第一行是 chun
+- **前提**：B0，「普通文本」框。
+- **操作**：打 chun，展开候选找到「䏝」，长按它；点读音行。
+- **预期**：读音行是「䏝　chun / …」（不带调）；字卡第一行是 chun；注音键盘上读音行不写注音。
+- **JVM**：ime-core `EnginesWordCardTest`、`WordCardTest.readingOf`；`WordCardUatTest.theExamplesReadAsTheDesignHasThem`（真数据）；设备上不跑。
+
+### PY-131 [P1] 繁體输出下长按「銀行」也出词卡，字是銀、行，读音 yín háng；手写的字也有字卡了
+- **前提**：B0，「普通文本」框；简繁切换到繁体。
+- **操作**：打 yinhang，长按「銀行」，点读音行；切到手写，写一个字，长按它。
+- **预期**：读音行「銀行　yín háng」，词卡里是銀、行两行，部首按繁体字（銀 金）；手写的字长按直接是字卡（以前繁体输出时没有）。
+- **JVM**：ime-core `EnginesWordCardTest.traditionalOutputHasItsCardItsCharactersAsShown`（繁体显示的 銀行）、`EnginesHandwritingReadingsTest.traditionalOutputsWrittenCharacterHasItsCardAsShown`（繁体输出下手写的字）；设备上不跑。
+
+### PY-132 [P1] 编码写进输入框时长按看词卡、复制，框里的拼音不动、不被留下
+- **前提**：B-IF，「普通文本」框。
+- **操作**：打 yinhang，长按「银行」，点读音行，点「行」，点 **复制「行」**。
+- **预期**：框里一直是带下划线的「yinhang」，长按、展开、点字、复制都不变；剪贴板里是「行」；接着点候选照常上屏，不留拼音。
+- **JVM**：app `CandidateMenuUatTest.withTheCodeInTheFieldTheCardLeavesItAsItIs`；设备上不跑。
+
+### PY-133 [P1] 超过 8 个字的候选只有读音行：读音折行，没有 ›，点了不展开，菜单项照旧；8 个字以内照常有词卡
+- **前提**：B0，「普通文本」框。
+- **操作**：打一整句（比如 womenjintianxiawuquyinhangbanshi），长按整句候选；点第一行。
+- **预期**：第一行是整句，下面是它的读音，折行，最多 4 行；没有 ›，点了不变；读屏读成文字，不是按钮；菜单项照旧。8 个字以内的候选照常有词卡。
+- **JVM**：app `CandidateMenuUatTest.aLongCandidateHasItsReadingAloneWrapped`（图 `long_line`）；ime-core `EnginesWordCardTest`（9 个字是 Line，8 个字是 Word）、`CardNavTest`；设备上不跑。
