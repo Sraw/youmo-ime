@@ -33,13 +33,14 @@ any change to behaviour or settings.
 
 | What | Command |
 |---|---|
+| Everything CI checks, one list for CI and local runs (`verifyCore`, `verifyApp`, `verifyApp29`; not the APK nor `:lib:ime-eval:uatTest`) | `./gradlew verify` |
 | Core logic tests + API-level check + coverage floors | `./gradlew :lib:ime-core:check` |
 | Drawing engine (060 redraw) tests on JVM and JS, API-level check, coverage floors; snapshots anew: `:lib:keyboard-scene:jvmTest -Psnapshots.record=true` | `./gradlew :lib:keyboard-scene:check` |
 | App JVM tests (Robolectric where needed) | `./gradlew :app:testDebugUnitTest` |
 | The same at SDK 29 (Android 10, minSdk: must keep working; specs/testing.md) | `./gradlew :app:testDebugUnitTestAt29` |
 | Engine UAT replay (uat/ cases through Engines with the app's data; not in check, minutes the first time) | `./gradlew :lib:ime-eval:uatTest` |
 | The two resource packs (signed with `youmo.packKey` of local.properties if set, else the committed test key, which only debug and benchmark builds trust; the voice pack needs `youmo.voiceModelDir`, absolute or `~/`, in ~/.gradle/gradle.properties: without it `:app:packTextPack`, the text pack alone) | `./gradlew :app:packs` → `app/build/packs/` |
-| A release's downloads: the APK with the text pack (文字版), with both (语音版), and which packs changed (`-PbuildABI=arm64-v8a`, the release key) | `./gradlew :app:releaseBundles` |
+| A release's downloads: the APK with the text pack (文字版), with both (语音版), and which packs changed (the release key) | `./gradlew :app:releaseBundles` |
 | Import the built packs into a debug build on an emulator (`--no-voice`: the text pack only; installs the debug APK first; a phone imports in Settings → 资源包) | `uat/tools/uat.py packs --port <port>` |
 | Static analysis (syntax rules only; type resolution doesn't work here) | `./gradlew detekt` |
 | Accept current findings after a deliberate batch (run alone, not with `detekt`; `:<module>:detektBaseline` for one module, bare `detektBaseline` rewrites every module) | `./gradlew :<module>:detektBaseline` |
@@ -53,7 +54,7 @@ any change to behaviour or settings.
 | English typing measured: committed as meant, wrongly corrected, slips fixed, words offered before a key | `ime-eval english <english.data> lib/ime-eval/data/english.txt [--misses <out.tsv>]` |
 | English glide typing measured on simulated paths: first, first three, time a word | `ime-eval english-glide <english.data> lib/ime-eval/data/english.txt [--wobble 0.3] [--misses <out.tsv>]` |
 | Pinyin glide typing measured the same way, a dictionary word at a time (`--word nihao`: one clean path's readings; 双拼, the nine keys, a table's codes instead) | `ime-eval pinyin-glide <pinyin.data> lib/ime-eval/data/pinyin-chat.tsv [--shuangpin Ziranma \| --keys nine \| --table <wbx.data>] [--misses <out.tsv>]` |
-| Voice post-processing measured on recorded stretches (voice-eval's `seg_app.py <set>`, `ENDPOINTS=1` for the app's endpoint segments: the recognizer and rerank, each segment's n-best and time; no recognizer runs here): CER, written CER, marks P/R/F1, ends | `ime-eval voice-post <seg-<set>.jsonl>... [--source app\|top] [--misses <out.tsv>] [--texts <out.tsv>]` |
+| Voice post-processing measured on recorded stretches (voice-eval's `seg_app.py <set>`, `ENDPOINTS=1` for the app's endpoint segments: the recognizer and rerank, each segment's n-best and time; no recognizer runs here): CER, written CER, marks P/R/F1, ends | `ime-eval voice-post <seg-<set>.jsonl>... [--source app\|top\|tagged] [--tagger <polish-tagger.json>] [--guard on\|off] [--misses <out.tsv>] [--texts <out.tsv>]` |
 
 Unit tests need no NDK or CMake (the repo has no submodules). Instrumented tests (`HostTest`, `SoftKeyboardTest`)
 need an APK build and an emulator; CI runs them weekly / on PRs labelled `emulator`.

@@ -23,7 +23,7 @@ import java.io.File
  * writes first (the backups' ORIGIN) or a record's fields shows here. The script is one calendar
  * day on [VirtualHostClock], so no fold or backup runs in the background; the install id is fixed.
  *
- * A difference that is meant (a new record, a behaviour bumped in EngineBehaviour) is recorded
+ * A difference that is meant (a new record, a changed behaviour) is recorded
  * again with `GOLDEN_RECORD=1` in the environment: the file under src/test/resources is rewritten.
  *
  * contract: the record's bytes as 2184786dc wrote them, which mutation cannot see.

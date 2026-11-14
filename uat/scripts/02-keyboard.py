@@ -134,7 +134,8 @@ def kb31(d):
 case("KB-32", needs="jvm:KeyboardUatTest.glideIsOffByDefault")(lambda d: None)
 
 
-case("KB-33", needs="jvm:HostCasesUatTest.aGlideGoesInWithItsSpaceItsWordChangedOrErasedWholeAMarkTakesTheSpace、KeyboardFieldsUatTest.aGlideDrawsTheFingersTrail")(lambda d: None)
+case("KB-33", needs="jvm:HostCasesUatTest.aGlideGoesInWithItsSpaceItsWordChangedOrErasedWholeAMarkTakesTheSpace、KeyboardFieldsUatTest.aGlideDrawsTheFingersTrail、"
+     "TextSceneWiringTest.aGlideReadsEachLetterWhereTheKeySendingItIsWhateverItsId")(lambda d: None)
 
 
 case("KB-35", needs="jvm:KeyboardUatTest.tapsShortSwipesAndHoldsAreNoGlide")(lambda d: None)
@@ -212,7 +213,7 @@ case("KB-60", needs="jvm:HostCoreContractTest.an app unbound clears the panel it
 case("KB-61", needs="jvm:BaseKeyboardTest.aLettersSwipeDownIsItsShortcutAndUpItsFirst")(lambda d: None)
 
 
-case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore、EditPlanTest、EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor、EditPlanTest.aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor、EditPlanTest.aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor、HostCoreEnginesTest.what is typed is cleared without a commit and typed again、HostCoreEnginesTest.what is typed after a syllable taken off the nine keys' bar is never typed again、EnginesTest.aSyllableTakenOffTheBarIsAPick、SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels")(lambda d: None)
+case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore、EditPlanTest、EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor、EditPlanTest.aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor、EditPlanTest.aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor、EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor、KeyShortcutsHostTest.aClearMadeBeforeTheCursorsReportIsInIsPutBackWithTheCursorWhereItIsReportedThen、HostCoreEnginesTest.what is typed is cleared without a commit and typed again、HostCoreEnginesTest.what is typed after a syllable taken off the nine keys' bar is never typed again、EnginesTest.aSyllableTakenOffTheBarIsAPick、SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels")(lambda d: None)
 
 
 case("KB-63", needs="jvm:BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns")(lambda d: None)
@@ -564,3 +565,5 @@ def kb87(d):
     check(up == long, f"上滑 q 打出「{up}」")
     return f"键角「{corner}」，上滑「{up}」"
 
+
+case("KB-88", needs="manual:输入测试台 null_before 框里退格上滑清除、下滑恢复，光标留在原处；还没写成脚本，在模拟器上手工跑")(lambda d: None)

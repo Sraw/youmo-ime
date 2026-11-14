@@ -374,11 +374,13 @@ internal class UserLexicon(
         }
     }
 
-    /** U-86 「全部清空」: no word added by hand nor blocked any more; the model made anew at next need. */
+    /**
+     * U-86 「全部清空」: no word added by hand nor blocked any more, nor a line of their files this build does
+     * not read (R25 F7821); the model made anew at next need.
+     */
     fun clearLists() {
-        lists.removeAll(lists.addedWords)
-        lists.unblockAll(lists.blockedWords)
-        englishBlocks.unblock(englishBlocks.blocked)
+        lists.clear()
+        englishBlocks.clear()
         blockedTexts = null
         dropUser()
         dropSessions()

@@ -729,7 +729,7 @@ class KeyboardHarness(
      * off, no status entry, as the addon tells that.
      */
     fun chinesePunctuation(im: InputMethodEntry = PINYIN, marks: Map<String, String> = ChinesePunctuation.map) {
-        val status = if (marks.isEmpty()) emptyList() else listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+        val status = if (marks.isEmpty()) emptyList() else listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", "", true))
         api.statusAreaCached = status
         api.punctuationCached = marks
         emit(HostEvent.StatusArea(status, im, marks))

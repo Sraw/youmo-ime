@@ -665,7 +665,7 @@ class ToolbarUatTest {
         expand()
         // no 简繁 till the input method offers it; the ⋯ there, fixed
         assertEquals(listOf(R.string.learning_habits_off, R.string.one_handed, R.string.status_area, R.string.a11y_key_emoji, R.string.hide_keyboard).map(::s), barButtons())
-        val chttrans = listOf(StatusEntry(7, "chttrans", "fcitx-chttrans-inactive", ""))
+        val chttrans = listOf(StatusEntry(7, "chttrans", "fcitx-chttrans-inactive", "", false))
         h.api.statusAreaCached = chttrans
         h.emit(HostEvent.StatusArea(chttrans, KeyboardHarness.PINYIN))
         h.relayout()
@@ -675,7 +675,7 @@ class ToolbarUatTest {
         h.tap(h.described(s(R.string.status_simplified)))
         h.idle()
         assertTrue(h.api.calls.toString(), "activateAction(7)" in h.api.calls)
-        val traditional = listOf(StatusEntry(7, "chttrans", "fcitx-chttrans-active", ""))
+        val traditional = listOf(StatusEntry(7, "chttrans", "fcitx-chttrans-active", "", true))
         h.emit(HostEvent.StatusArea(traditional, KeyboardHarness.PINYIN))
         assertTrue(lit(R.string.status_traditional))
         // the panel's one-handed toggle, the same, lit while on; off from elsewhere, unlit

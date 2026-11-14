@@ -255,3 +255,16 @@
 - **预期**：第一次框里是「麻烦你去找一下徐婧」（没加时是「徐静」；说的时候显示的也已是「徐婧」）；第二次仍是「许静来了」（声调不同不换）；第三次是「这个公式」（常用词不换成你的「攻势」）。
 - **JVM**：`VoiceHomophonesTest`（读音带声调逐字相同、学到的词打过 3 次以上、自己的词和常用词不换、更长的词里不换（`lib/ime-core` 的确定链））；模拟器上（导入了语音包）也跑一遍。
 
+### VO-39 [P1] 语音出错时的提示
+<!-- R25 voice-3/voice-5：识别出错不再报成模型或麦克风的问题 -->
+- **前提**：无（JVM；真机上造不出这三种错）。
+- **操作**：按住空格说话，分别遇到：语音模型载入失败（还没听到什么）；说了「今天天气」后麦克风出错；说了「今天天气」后识别出错。每次出错后再松开手指。
+- **预期**：卡片上分别提示「语音模型载入失败」「无法使用麦克风」「语音识别出错」，「松开上屏」的提示收起；框里是出错前已经听到的（第一种是空的，后两种是「今天天气」），松开后不再上屏一遍。松开手指以后（收尾时）麦克风才出错的，不算出错：不提示，麦克风照常关掉，听到的照常上屏。
+- **JVM**：`VoiceFailureUatTest.eachFailureSaysItsOwnMessageAndWhatWasHeardIsTyped`（一张表三行，即上面三种错：假识别器 `FakeRecognizer.fail` 报出错，其后是真的 VoiceSession 和卡片）、`VoiceListenerMicrophoneTest.aReadThrowingIsTheMicrophonesFailure`（真的 VoiceListener，读麦克风时抛异常报的是「无法使用麦克风」，不是「语音识别出错」）、`VoiceListenerMicrophoneTest.aReadThrowingOnceLiftedIsNoFailure`（松开手指以后读麦克风才抛异常：不报失败，麦克风停下），都在 `:app:testDebugUnitTest`；设备上不跑。
+
+### VO-40 [P1] 模型还在载入时结束说话，麦克风随即关掉
+<!-- R25r2 F7829 (voice-7)：载入模型时关掉，麦克风一直开着 -->
+- **前提**：B0-语音，Android 12 起的设备（状态栏有麦克风使用指示；更早的系统看不到，记为阻塞）：root 过的真机，或 API 31 起的模拟器（`adb root`，多数手机没有 root）；以 root 杀掉输入法进程（同 LC-11 的做法，不要用强行停止），让语音模型不在内存里。
+- **操作**：点「普通文本」框，按住空格，还没出现「正在听…」（模型还在载入）就上滑松开取消；看状态栏右上角的麦克风指示。再杀一次进程，按住空格，还没出现「正在听…」就用另一只手指点系统的主屏幕键（或从底边上滑回桌面）；再看指示。
+- **预期**：两次都在几秒内麦克风指示消失（下拉通知栏也不再说本应用在用麦克风），不一直亮着；回到测试页再按住空格照常能说。
+- **JVM**：`VoiceListenerMicrophoneTest.closedWhileTheModelsLoadTheMicrophoneIsStopped`（真的 VoiceListener，读麦克风卡住不返回时关掉它，`AudioRecord` 在 `close()` 里就停下，不等读返回；`:app:testDebugUnitTest`）；系统的麦克风指示在设备上手工看（`needs="manual:…"`，发版时排进手工那一批）。

@@ -386,7 +386,13 @@ class UserWordListFragment : Fragment() {
                         app.toast(e)
                         return@launch
                     }
-                    if (undone == LearningResult.Unavailable) app.toast(R.string.learning_undo_gone)
+                    // as the chip's undo says it (BaseInputView.learningUndo): a removal the record could not take back
+                    // is said, not the words just left out (R25r8 F8053)
+                    when (undone) {
+                        LearningResult.Unavailable -> app.toast(R.string.learning_undo_gone)
+                        LearningResult.Failed -> app.toast(R.string.learning_undo_failed)
+                        else -> {}
+                    }
                     if (isAdded) load()
                 }
             }

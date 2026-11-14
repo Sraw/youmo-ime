@@ -76,5 +76,12 @@ internal class TempModeRig(
     val aux get() = panel.auxUp.toString()
     val page get() = panel.candidates?.let { l -> (0 until l.size).map { l.candidate(it).text } }.orEmpty()
 
+    /** The candidate at [globalIndex] of the shown list tapped, as the panel's list picks it; false for none. */
+    fun tap(globalIndex: Int): Boolean {
+        val c = panel.candidates?.candidates?.getOrNull(globalIndex) ?: return false
+        c.select?.invoke(ic)
+        return true
+    }
+
     fun commits() = log.filter { it.startsWith("commit ") }.map { it.removePrefix("commit ") }
 }

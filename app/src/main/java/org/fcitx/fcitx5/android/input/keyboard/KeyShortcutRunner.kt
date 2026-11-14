@@ -126,7 +126,7 @@ class KeyShortcutRunner(
         val field = service.startedField
         val back = field?.let { read()?.let { now -> cleared.take(field, now, typing()) } } ?: return service.say(R.string.nothing_to_restore)
         val typed = back.typed as? HostCore.Retyping
-        if (typed == null) return apply(back.restore)
+        if (typed == null) return apply(back.restoreAt(service.currentInputSelection.let { minOf(it.start, it.end) }))
         // the input method changed since, its keyboard, or the field: said, the clear gone all
         // the same (review S4)
         val keyboard = keyboardOf(typed.im)

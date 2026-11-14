@@ -72,67 +72,33 @@ interface CandidateList {
 }
 
 /**
- * fcitx's `CommonCandidateList` (`fcitx/candidatelist.cpp:465-700`): a fixed list of words, paged
- * by [pageSize] (5 by default), bulk and pageable, labels empty unless given, a global cursor.
- * What punctuation's marks are offered in (`androidengine.cpp:534-541`); quick phrase and Unicode
- * may use it too.
+ * A [TempCandidateList] as the panel's list (fcitx's `CommonCandidateList`, `fcitx/candidatelist.cpp:465-700`:
+ * bulk, pageable, labelled): a pick is the candidate's own select. The temp modes' lists and
+ * punctuation's marks (`androidengine.cpp:534-541`) are shown through it, one pager for both.
  */
-open class CommonCandidateList(words: List<PanelCandidate> = emptyList()) : CandidateList {
-    private val words = words.toMutableList()
-    private var labels: List<String> = emptyList()
-    private var page = 0
-
-    var pageSize: Int = DEFAULT_PAGE_SIZE
-        set(value) {
-            require(value >= 1) { "invalid page size" }
-            field = value
-            page = 0
+internal open class TempModeCandidates(private val list: TempCandidateList) : CandidateList {
+    private inner class Word(val candidate: TempCandidate) : PanelCandidate {
+        override val text get() = candidate.text
+        override val comment get() = candidate.comment
+        override val asIs get() = candidate.asIs
+        override fun select(ic: InputContext) {
+            candidate.select?.invoke(ic)
         }
-
-    /** The cursor among all of them, -1 for none. */
-    var globalCursorIndex: Int = -1
-        set(value) {
-            require(value < words.size) { "invalid index" }
-            field = if (value < 0) -1 else value
-        }
-
-    fun append(word: PanelCandidate) {
-        words += word
     }
 
-    fun setLabels(labels: List<String>) {
-        this.labels = labels
-    }
-
-    override val size: Int get() = (words.size - page * pageSize).coerceIn(0, pageSize)
-
-    override fun label(index: Int): String = if (index in 0 until size) labels.getOrElse(index) { "" } else ""
-
-    override fun candidate(index: Int): PanelCandidate? = if (index in 0 until size) words[page * pageSize + index] else null
-
-    override val cursorIndex: Int
-        get() = if (globalCursorIndex >= 0 && globalCursorIndex / pageSize == page) globalCursorIndex % pageSize else -1
-
+    override val size get() = list.size
+    override fun label(index: Int) = if (index in 0 until list.size) list.label(index) else ""
+    override fun candidate(index: Int): PanelCandidate? = if (index in 0 until list.size) Word(list.candidate(index)) else null
+    override val cursorIndex get() = list.cursorIndex
     override val bulk get() = true
-    override val totalSize get() = words.size
-    override fun candidateFromAll(index: Int): PanelCandidate? = words.getOrNull(index)
-
+    override val totalSize get() = list.totalSize
+    override fun candidateFromAll(index: Int): PanelCandidate? = list.candidates.getOrNull(index)?.let(::Word)
     override val pageable get() = true
-    override val hasPrev get() = page > 0
-    override val hasNext get() = page + 1 < (words.size + pageSize - 1) / pageSize
-
-    override fun prev() {
-        if (hasPrev) page--
-    }
-
-    override fun next() {
-        if (hasNext) page++
-    }
-
-    companion object {
-        /** `CommonCandidateListPrivate::pageSize_`, and fcitx's `DefaultPageSize` kept as a constant (design §1.4). */
-        const val DEFAULT_PAGE_SIZE = 5
-    }
+    override val hasPrev get() = list.hasPrev
+    override val hasNext get() = list.hasNext
+    override fun prev() = list.prev()
+    override fun next() = list.next()
+    override val layoutHint get() = list.layoutHint
 }
 
 /**

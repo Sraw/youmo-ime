@@ -168,16 +168,8 @@ static OnlineRecognizerConfig GetConfig(JNIEnv *env, jobject config, bool *ok) {
   // youmo: no LM or CTC FST decoder here (lib/sherpa-onnx/README.md); the
   // Kotlin config has neither
 
-  fid = env->GetFieldID(cls, "hr",
-                        "Lcom/k2fsa/sherpa/onnx/HomophoneReplacerConfig;");
-  jobject hr_config = env->GetObjectField(config, fid);
-  jclass hr_config_cls = env->GetObjectClass(hr_config);
-
-  SHERPA_ONNX_JNI_READ_STRING(ans.hr.lexicon, lexicon, hr_config_cls,
-                              hr_config);
-
-  SHERPA_ONNX_JNI_READ_STRING(ans.hr.rule_fsts, ruleFsts, hr_config_cls,
-                              hr_config);
+  // youmo: nor the homophone replacer (upstream's `hr`): the app puts in the
+  // user's words itself (VoiceHomophones); the Kotlin config has no `hr`
 
   *ok = true;
   return ans;

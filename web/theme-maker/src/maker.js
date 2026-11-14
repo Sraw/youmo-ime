@@ -5,10 +5,10 @@
 (function (root) {
   'use strict';
 
-  // the comments of [xml] blanked (same length), so what is looked for is never found inside one
-  const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => ' '.repeat(c.length));
-  const unescape = (v) => v.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-  const escape = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // the XML text helpers are youmo-form's, one set for both (R25 web-8): the page and the tests load it first
+  const F = root.YoumoForm;
+  if (!F) throw new Error('youmo-maker needs youmo-form loaded first');
+  const { uncommented, unescape, escape } = F;
   // a file named by an attribute: either quote, spaces around '=' (as XML has it and the app reads it)
   const srcOf = (tag, attr) => new RegExp('<(' + tag + ')\\b[^>]*?\\b(' + attr + ')\\s*=\\s*(?:"([^"]+)"|\'([^\']+)\')', 'g');
   const fileOf = (m) => unescape(m[3] ?? m[4]);
@@ -28,22 +28,24 @@
 
   /** The <theme>'s name= of [xml], null for none. */
   function themeName(xml) {
-    const m = /<theme\b(?:[^>"']|"[^"]*"|'[^']*')*?\sname\s*=\s*("([^"]*)"|'([^']*)')/.exec(uncommented(xml));
-    return m ? unescape(m[2] ?? m[3]) : null;
+    const t = F.elements(xml, 'theme')[0];
+    const a = t && t.attrs.find((x) => x[0] === 'name');
+    return a ? a[1] : null;
   }
 
   /** [xml] with its <theme>'s name= [name] (one put in where it has none). */
   function withName(xml, name) {
-    const t = /<theme\b(?:[^>"']|"[^"]*"|'[^']*')*?\/?>/.exec(uncommented(xml));
+    const t = F.elements(xml, 'theme')[0];
     if (!t) return xml;
-    const tag = xml.slice(t.index, t.index + t[0].length);
+    const tag = t.tag;
     // its attributes one by one, so a ' name=' inside another's quoted value is never the one changed
     let at = null;
     for (const a of tag.matchAll(/(\s)([^\s=/>]+)\s*=\s*("[^"]*"|'[^']*')/g)) if (a[2] === 'name') { at = a; break; }
     const named = at
       ? tag.slice(0, at.index) + at[1] + 'name="' + escape(name) + '"' + tag.slice(at.index + at[0].length)
-      : tag.replace(/^<theme\b/, '<theme name="' + escape(name) + '"');
-    return xml.slice(0, t.index) + named + xml.slice(t.index + t[0].length);
+      // a function, not a string: a `$&` or `$'` in the name is the name's, never a replacement pattern
+      : tag.replace(/^<theme\b/, (open) => open + ' name="' + escape(name) + '"');
+    return xml.slice(0, t.start) + named + xml.slice(t.start + tag.length);
   }
 
   /** A new document of the app's theme [id] (engine's themeSource), named apart from it so an import adds a theme. */
@@ -92,8 +94,9 @@
     if (!read.ok) return read.problems.map((p) => ({ level: 'error', line: p.line || 0, message: p.message }));
     const name = read.theme.name;
     if (name == null || !L.isPlainFileName(name) || name.startsWith('.') || /#(light|dark)$/.test(name)) bad('主题名 "' + name + '" 不能做文件名');
-    // the app refuses a pack named as a built-in theme (ThemeFilesManager.packClash): the names the page is given
-    else if ((format.builtinNames || []).includes(name)) bad('主题名 "' + name + '" 是 App 内置主题的名字，App 不会收；换一个名字');
+    // the app refuses a pack named as a built-in theme or pack (ThemeFilesManager.packClash): the names the page is
+    // given, looked up as ThemePackFiles.builtinClash does, by the name and, for two versions, each version's ref
+    else if ([name, ...(read.theme.variants.length > 1 ? read.theme.variants.map((v) => name + '#' + v) : [])].some((n) => (format.builtinNames || []).includes(n))) bad('主题名 "' + name + '" 是 App 内置主题的名字，App 不会收；换一个名字');
     const xml = uncommented(d.xml);
     const named = new Set();
     for (const m of xml.matchAll(srcOf('picture|cut|font|icon|sound', 'src|file'))) named.add(fileOf(m) + '|' + m[1]);
@@ -592,10 +595,10 @@
    */
   function iconsOf(E, base, d, cache) {
     const out = Object.assign({}, base);
-    const attr = (tag, n) => { const m = new RegExp('\\s' + n + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')').exec(tag); return m ? unescape(m[1] ?? m[2]) : null; };
-    for (const m of uncommented(d.xml).matchAll(/<icon\b(?:[^>"']|"[^"]*"|'[^']*')*>/g)) {
-      const name = attr(m[0], 'name');
-      const bytes = d.files[attr(m[0], 'src')];
+    for (const e of F.elements(d.xml, 'icon')) {
+      const a = Object.fromEntries(e.attrs);
+      const name = a.name;
+      const bytes = d.files[a.src];
       if (!name || !bytes) continue;
       if (!cache.has(bytes)) {
         let r = null;

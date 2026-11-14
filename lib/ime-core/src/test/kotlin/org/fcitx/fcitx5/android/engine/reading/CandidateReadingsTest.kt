@@ -29,6 +29,9 @@ class CandidateReadingsTest {
                 .unigram("银", -3f, 0f).entry("银", syl("yin"))
                 .unigram("你", -2f, 0f).entry("你", syl("ni"))
                 .entry("𠀀", syl("he"))
+                // 䏝 as libime's dictionary has it, chun first; Unihan knows it as zhuān alone
+                .entry("䏝", syl("chun")).entry("䏝", syl("zhuan"))
+                .charTone('䏝'.code, Syllables.id("zhuan"), 1)
                 .unigram("说话", -2f, 0f).entry("说话", syl("shuo", "hua"))
                 .unigram("我们", -2f, 0f).entry("我们", syl("wo", "men"))
                 .entry("说", syl("shuo")).entry("话", syl("hua")).entry("我", syl("wo")).entry("们", syl("men"))
@@ -80,11 +83,48 @@ class CandidateReadingsTest {
     }
 
     @Test
-    fun whatIsNoHanCharacterOrHasNoKnownToneIsLeftEmpty() {
+    fun whatIsNoHanCharacterOrHasNoSyllableIsLeftEmpty() {
         assertEquals(listOf("nǐ", "", ""), readings.of("你A😀", ReadingStyle.PINYIN))
         assertEquals(emptyList<String>(), readings.of("hello", ReadingStyle.PINYIN))
-        // a character of the dictionary only, with no tone known
-        assertEquals(emptyList<String>(), readings.of("𠀀", ReadingStyle.PINYIN))
+        // a character the dictionary has not got: no syllable to write
+        assertEquals(emptyList<String>(), readings.of("䄝", ReadingStyle.PINYIN))
+        assertEquals(listOf("nǐ", ""), readings.of("你䄝", ReadingStyle.PINYIN))
+    }
+
+    // a character whose tone is not known, its syllable known (the typed one, or the dictionary's): in pinyin
+    // that syllable toneless, a neighbour of known tone toned as ever (the user, 2026-11-14)
+    @Test
+    @Uat("PY-121")
+    fun aCharacterOfNoKnownToneIsItsSyllableTonelessInPinyin() = assertRows(
+        "by its text, the dictionary's syllable" to { assertEquals(listOf("he"), readings.of("𠀀", ReadingStyle.PINYIN)) },
+        "as typed" to { assertEquals(listOf("chun"), readings.of("𠀀", ReadingStyle.PINYIN, listOf(WordReading("𠀀", -1, syl("chun"))))) },
+        "in a word, beside one of known tone" to {
+            assertEquals(listOf("nǐ", "he"), readings.of("你𠀀", ReadingStyle.PINYIN, listOf(WordReading("你𠀀", -1, syl("ni", "he")))))
+        },
+        // typed chun, read chun, though the dictionary has a toned zhuān too: the session's reading wins
+        "typed in its untoned syllable" to { assertEquals(listOf("chun"), readings.of("䏝", ReadingStyle.PINYIN, listOf(WordReading("䏝", -1, syl("chun"))))) },
+    )
+
+    // in zhuyin a toneless syllable reads as the first tone (ㄏㄜ is hē): nothing rather than that
+    @Test
+    @Uat("PY-121")
+    fun aCharacterOfNoKnownToneIsLeftEmptyInZhuyin() = assertRows(
+        "alone" to { assertEquals(emptyList<String>(), readings.of("𠀀", ReadingStyle.ZHUYIN)) },
+        "as typed" to { assertEquals(emptyList<String>(), readings.of("𠀀", ReadingStyle.ZHUYIN, listOf(WordReading("𠀀", -1, syl("chun"))))) },
+        "in a word, beside one of known tone" to {
+            assertEquals(listOf("ㄋㄧˇ", ""), readings.of("你𠀀", ReadingStyle.ZHUYIN, listOf(WordReading("你𠀀", -1, syl("ni", "he")))))
+        },
+    )
+
+    // read by its text (a table's, handwriting's), a character of several dictionary syllables takes one of
+    // known tone first: 䏝 zhuān, not the toneless chun the dictionary lists before it
+    @Test
+    @Uat("PY-121")
+    fun aCharacterReadByItsTextTakesASyllableOfKnownToneFirst() {
+        // the dictionary's first is chun, so taking the first would read it so
+        assertEquals(Syllables.id("chun"), Predictor.charReadingsOf(data.dictionary, data.vocabulary).getValue('䏝'.code).first())
+        assertEquals(listOf("zhuān"), readings.of("䏝", ReadingStyle.PINYIN))
+        assertEquals(listOf("ㄓㄨㄢ"), readings.of("䏝", ReadingStyle.ZHUYIN))
     }
 
     @Test
@@ -95,7 +135,7 @@ class CandidateReadingsTest {
     }
 
     @Test
-    @Uat("PY-111")
+    @Uat("PY-111", "PY-121")
     fun aHintIsOneReadingACharacterWithItsTones() {
         // a misreading's, toned already
         assertEquals(listOf("jué", "sè"), readings.ofHint("角色", "jué sè"))
@@ -108,7 +148,11 @@ class CandidateReadingsTest {
         // in zhuyin: the hint's tones, or the character's
         assertEquals(listOf("ㄅㄛ", "ㄖㄜˇ"), readings.ofHint("般若", "bō rě", ReadingStyle.ZHUYIN))
         assertEquals(listOf("ㄒㄧㄥˊ"), readings.ofHint("行", "xing", ReadingStyle.ZHUYIN))
-        assertEquals(listOf("ㄏㄜ"), readings.ofHint("𠀀", "he", ReadingStyle.ZHUYIN))
+        // R25 F7970: no tone known, in zhuyin: not written (toneless it would read as the first tone), as a
+        // candidate's own reading is not; the characters beside it keep theirs
+        assertEquals(listOf(""), readings.ofHint("𠀀", "he", ReadingStyle.ZHUYIN))
+        assertEquals(listOf("ㄒㄧㄥˊ", ""), readings.ofHint("行𠀀", "xing he", ReadingStyle.ZHUYIN))
+        assertEquals(listOf("xíng", "he"), readings.ofHint("行𠀀", "xing he"))
     }
 
     // the readings of 了, 能, 行 and their words as Unihan and the dictionaries have them
@@ -117,7 +161,7 @@ class CandidateReadingsTest {
     // a polyphone's several readings hinted (a part's or a stroke lookup's "le/liao"): one, toned, the one it has
     // after what was put before it, else its commonest (A5, the user, 2026-11-06)
     @Test
-    @Uat("PY-111", "PY-118")
+    @Uat("PY-111", "PY-118", "PY-121")
     fun aHintOfACharactersSeveralReadingsIsTheOneItHasThere() = assertRows(
         "了 alone: le" to { assertEquals(listOf("le"), polyphones.ofHint("了", "le/liao")) },
         "了 after 好 (好了): le" to { assertEquals(listOf("le"), polyphones.ofHint("了", "le/liao", before = "好")) },
@@ -127,6 +171,9 @@ class CandidateReadingsTest {
         "行 after 进 (进行): xíng" to { assertEquals(listOf("xíng"), polyphones.ofHint("行", "hang/xing", before = "进")) },
         "in zhuyin" to { assertEquals(listOf("ㄏㄤˊ"), polyphones.ofHint("行", "xing/hang", ReadingStyle.ZHUYIN, before = "银")) },
         "no reading known: the hint's first" to { assertEquals(listOf("he"), polyphones.ofHint("𠀀", "he/huo")) },
+        "no reading known, in zhuyin: not written, toneless it would read as the first tone (R25 F7970)" to {
+            assertEquals(listOf(""), polyphones.ofHint("𠀀", "he/huo", ReadingStyle.ZHUYIN))
+        },
         // the hint lists at most three: one it does not list is neither drawn nor blocked (oneOf, PartsLookup.shownIn)
         "行 after 银, the hint without hang: of those it lists" to { assertEquals(listOf("xíng"), polyphones.ofHint("行", "xing/heng", before = "银")) },
         // a character the data has, hinted none of its readings: the hint's first, as one it has none of

@@ -11,6 +11,7 @@ import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
@@ -43,21 +44,29 @@ import org.robolectric.annotation.GraphicsMode
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class CandidateMenuUatTest {
 
-    private val h = KeyboardHarness()
+    // a var for the tables whose rows each want a keyboard of their own (anUndoThatFailedSaysWhatToDo)
+    private var h = KeyboardHarness()
 
     @After
     fun close() = h.close()
 
     private val ops = mutableListOf<LearningOp>()
 
-    private fun engine(menu: LearningResult.Menu, report: String = "") {
+    // [undone]: what the chip's 撤销 answers; [saving]: what LearningOp.Saving answers
+    private fun engine(
+        menu: LearningResult.Menu,
+        report: String = "",
+        undone: LearningResult = LearningResult.Done(),
+        saving: LearningResult = LearningResult.Saving(true),
+    ) {
         h.api.learned = { op ->
             ops += op
             val inner = (op as? LearningOp.OnPage)?.op ?: op
             when (inner) {
                 is LearningOp.Menu -> menu
                 is LearningOp.Report -> LearningResult.Text(report)
-                is LearningOp.Undo -> LearningResult.Done()
+                is LearningOp.Undo -> undone
+                LearningOp.Saving -> saving
                 else -> LearningResult.Done(TOKEN)
             }
         }
@@ -137,6 +146,43 @@ class CandidateMenuUatTest {
         engine(LearningResult.Menu("试", WordKind.DICTIONARY, listOf(MenuItem.DELETE, MenuItem.BLOCK, MenuItem.PIN, MenuItem.WHY), null, BlockScope.EVERYWHERE))
         longPress("试")
         assertEquals(listOf("试", s(R.string.learning_forget), s(R.string.learning_block), s(R.string.learning_pin), s(R.string.learning_why)), lines())
+    }
+
+    // F8038: an undo the record could not take is said on the chip, neither "try again" nor a restart: the act is no
+    // longer undoable once its undo failed (R25r7). Whether the record saves is not asked (R25r8 F8057): the one
+    // sentence whatever it answers, so the failed row's record is one that stopped, where the restart would be said
+    // were it asked; an act no longer undoable says so
+    @Test
+    @Uat("WD-46")
+    fun anUndoThatFailedSaysWhatToDo() {
+        // each row on a keyboard of its own: the chip an earlier row left is the latest popup otherwise; the chip's
+        // words and the ops its undo asked
+        fun saidAfterUndo(undone: LearningResult): Pair<List<String>, List<LearningOp>> {
+            h.close()
+            h = KeyboardHarness()
+            h.start()
+            candidates("是", "时", "事")
+            engine(dictionary, undone = undone, saving = LearningResult.Saving(false, rewrites = false))
+            longPress("是")
+            pick(s(R.string.learning_block))
+            pick(s(R.string.learning_block_confirm))
+            ops.clear()
+            undo()
+            return chip().orEmpty() to ops.toList()
+        }
+        assertRows(
+            "failed: not undone, neither a retry nor a restart promised, the record not asked whether it saves" to {
+                val (said, asked) = saidAfterUndo(LearningResult.Failed)
+                assertTrue(said.toString(), s(R.string.learning_undo_failed) in said)
+                // the chip says it with no 撤销 of its own: the act is not undone again (R25r9 F8071)
+                assertFalse(said.toString(), s(R.string.learning_undo) in said)
+                assertTrue(asked.toString(), asked.any { it is LearningOp.Undo } && LearningOp.Saving !in asked)
+            },
+            "no longer undoable" to {
+                val (said, _) = saidAfterUndo(LearningResult.Unavailable)
+                assertTrue(said.toString(), s(R.string.learning_undo_gone) in said)
+            },
+        )
     }
 
     @Test

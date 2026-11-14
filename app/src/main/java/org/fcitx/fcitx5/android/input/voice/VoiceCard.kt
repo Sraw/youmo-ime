@@ -12,13 +12,56 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.annotation.StringRes
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.theme.Theme
 import splitties.dimensions.dp
 
 /**
  * The parts of the card the two talks show alike (VoiceHoldOverlay, held; VoiceTapOverlay,
- * tapped): the bars on their pill, and the card's going. Made in one place so they stay alike.
+ * tapped): its three lines, the bars on their pill, and the card's going. Made in one place so they
+ * stay alike: the held card's going once kept its hint under a failure's message (voice-10).
  */
 internal object VoiceCard {
+
+    /** what is heard, as it is said */
+    fun heard(ctx: Context, theme: Theme) = TextView(ctx).apply {
+        textSize = 18f
+        gravity = Gravity.CENTER or Gravity.BOTTOM
+        VoiceStyle.heard(this)
+        setTextColor(theme.keyTextColor)
+    }
+
+    /** the status line: 正在听 once the microphone is really on (ready), not as the talk starts */
+    fun status(ctx: Context, theme: Theme) = TextView(ctx).apply {
+        textSize = 15f
+        gravity = Gravity.CENTER
+        setTextColor(theme.keyTextColor)
+        setText(R.string.voice_hold_preparing)
+    }
+
+    /** the line under it: how to end the talk */
+    fun hint(ctx: Context, theme: Theme, @StringRes text: Int) = TextView(ctx).apply {
+        textSize = 12f
+        gravity = Gravity.CENTER
+        setTextColor(theme.altKeyTextColor)
+        setText(text)
+    }
+
+    /**
+     * The talk over: [card] still shown a moment (the message, the fade) but no longer taking
+     * touches, so the keys under it get the next press (VO-16); [message] in [status], the hint no
+     * longer true under it, taken away.
+     */
+    fun ended(card: View, status: TextView, hint: TextView, main: Handler, @StringRes message: Int?) {
+        card.isClickable = false
+        message?.let {
+            status.setText(it)
+            hint.visibility = View.INVISIBLE
+        }
+        fadeOut(card, main, message)
+    }
 
     /** the bars, in [color] (the theme's voice look's microphone colour) */
     fun wave(ctx: Context, color: Int) = VoiceWaveView(ctx).apply {

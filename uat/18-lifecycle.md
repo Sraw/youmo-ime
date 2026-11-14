@@ -105,3 +105,9 @@
 - **预期**：「中」照原样上屏留在框里，下划线没了；再写的是新的一个字，不接在「中」的笔画上（docs/other-input-methods.md）。
 - **JVM**：`StuckBarUatTest.aThemeChangedMidHandwritingCommitsIt`；设备上不跑（同 LC-15）。
 
+### LC-20 [P2] 键盘一直没启动完时重启实例或换界面语言：提示可能没重启成
+<!-- R25r2 F7883 -->
+- **前提**：B0-设置，键盘的实例一直停在启动中（设备上很难造出：要它启动时卡住 10 秒以上，比如很慢的机器刚开机时；造不出记为阻塞）。
+- **操作**：**⋮ → 开发者**，点 **重启 Fcitx 实例**，确定，等提示；再在 **界面语言** 里换一种语言，等提示。
+- **预期**：两处都提示「键盘还在启动，可能没有重启成。请稍后再试」，不说「完成」（说「可能」：等不到启动完时没有重启，或者已经重启了、新的实例还在启动，两种都是这一句）；换语言时界面照常换成新的语言（输入法和设置页的名字等键盘下次启动才换）；稍后键盘启动完，再点 **重启 Fcitx 实例** 照常提示完成（LC-10）。
+- **JVM**：`HostRestartTest.aHostStuckStartingIsWaitedForNoLongerThanTheWaitAndSaidNotUp`（`HostDaemon` 等不到启动完时不重启、返回 false）；两处由此提示的那一句没有测试（`DeveloperFragment` 和 `AppLanguage` 直接调 `HostDaemon.restartFcitx()`，没有接缝，Robolectric 下它总是返回 true），在设备上手工跑。

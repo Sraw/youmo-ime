@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.WordLayers
@@ -191,6 +192,12 @@ class MainTest {
             // the models read the sentences at one ink weight
             arrayOf("handwriting", "d", "r", "--rerank", "m", "--weights", "1,2"),
             arrayOf("voice-post", "s", "--source", "best"),
+            // the tagger's json and --source tagged go together: labels without a table, or a table nothing reads
+            arrayOf("voice-post", "s", "--source", "tagged"),
+            arrayOf("voice-post", "s", "--source", "app", "--tagger", "t.json"),
+            arrayOf("voice-post", "s", "--source", "tagged", "--tagger", "t.json", "--guard", "maybe"),
+            // the guards are the tagger's labels': with any other source --guard would change nothing and say so nowhere
+            arrayOf("voice-post", "s", "--source", "app", "--guard", "off"),
             arrayOf(),
         )
         for (args in usageErrors) assertEquals(args.joinToString(" "), 2, exit(*args))
@@ -208,6 +215,68 @@ class MainTest {
             val line = lines.single { it.startsWith("${command.name} ") }
             assertEquals(command.name, command.options, Regex("--([a-z-]+)").findAll(line).map { it.groupValues[1] }.toSet())
         }
+    }
+
+    @Test
+    fun voicePostPassesTheGuardSwitchToTheTaggedReplay() {
+        val tagger = tmp.newFile("polish-tagger.json").apply { writeText("""{"ops": ["keep", "del"], "after": [""], "num": ["none"]}""") }
+        val set = tmp.newFile("seg-g.jsonl").apply {
+            writeText(
+                """{"wav": "1.wav", "ref": "好", "stretches": [{"nbest": ["好"], "app": "好"}], """ +
+                    """"tagged": {"text": "好", "op": [0], "after": [0], "num": [0]}}""" + "\n",
+            )
+        }
+        fun line(vararg guard: String): String {
+            val out = StringBuilder()
+            assertEquals(0, runCli(arrayOf("voice-post", set.path, "--source", "tagged", "--tagger", tagger.path, *guard), out, StringBuilder()))
+            return out.lines().first { it.startsWith("tagged:") }.split(' ')[1]
+        }
+        assertEquals("guard=true", line())
+        assertEquals("guard=false", line("--guard", "off"))
+    }
+
+    @Test
+    fun voicePostWithAFileReadWrongFailsNamingItNotWithAStackTrace() {
+        val goodTagger = """{"ops": ["keep", "del"], "after": [""], "num": ["none"]}"""
+        val goodLine = """{"wav": "1.wav", "ref": "好", "stretches": [{"nbest": ["好"], "app": "好"}]}"""
+        // exit 1 and what it says on err: a stack trace would leave runCli by throwing
+        fun failure(set: String, lines: String, tagger: String = "polish-tagger-$set.json", taggerText: String = goodTagger): String {
+            val t = tmp.newFile(tagger).apply { writeText(taggerText) }
+            val s = tmp.newFile(set).apply { writeText(lines) }
+            val err = StringBuilder()
+            val exit = runCli(arrayOf("voice-post", s.path, "--source", "tagged", "--tagger", t.path), StringBuilder(), err)
+            assertEquals(err.toString(), 1, exit)
+            return err.toString()
+        }
+        assertRows(
+            "labels shorter than the tagged text: VoicePostRun.read refuses it, which ended the whole run uncaught" to {
+                val err = failure(
+                    "seg-short.jsonl",
+                    """{"wav": "short.wav", "ref": "好的", "stretches": [{"nbest": ["好的"], "app": "好的"}], """ +
+                        """"tagged": {"text": "好的", "op": [0], "after": [0, 0], "num": [0, 0]}}""" + "\n",
+                )
+                assertTrue(err, err.startsWith("voice-post: seg-short.jsonl: short.wav:"))
+            },
+            "a line not json: kotlinx's message alone does not say where, so the file and the line are added" to {
+                val err = failure("seg-cut.jsonl", goodLine + "\n" + """{"wav": "2.wav", "ref": """ + "\n")
+                assertTrue(err, err.startsWith("voice-post: seg-cut.jsonl:2: "))
+            },
+            "a line missing a key a record needs: named the same way" to {
+                val err = failure("seg-nowav.jsonl", """{"ref": "好", "stretches": []}""" + "\n")
+                assertTrue(err, err.startsWith("voice-post: seg-nowav.jsonl:1: "))
+            },
+            "a tagger file VoicePolishTags refuses (ops not starting keep, del): its check's message, naming the file" to {
+                val err = failure(
+                    "seg-4.jsonl", goodLine + "\n",
+                    tagger = "bad-ops.json", taggerText = """{"ops": ["del", "keep"], "after": [""], "num": ["none"]}""",
+                )
+                assertTrue(err, err.startsWith("voice-post: bad-ops.json: ops start keep, del"))
+            },
+            "a tagger file not json" to {
+                val err = failure("seg-5.jsonl", goodLine + "\n", tagger = "cut.json", taggerText = """{"ops": [""")
+                assertTrue(err, err.startsWith("voice-post: cut.json: "))
+            },
+        )
     }
 
     @Test

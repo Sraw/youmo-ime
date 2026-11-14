@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.data.replaceDirectory
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
@@ -35,6 +36,8 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.store.RecordStore
+import org.fcitx.fcitx5.android.engine.store.Unsaved
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
@@ -127,14 +130,18 @@ class EngineBridgeTest {
     }
 
     @Test
+    @Uat("WD-48")
     fun aKeyboardChangeNotSavedIsSavedWithTheNext() {
         val file = phraseFile()
-        val saves = EngineBridge.PhraseFile(file, file.readText(), true) { it.run() }
+        // a save that fails is told, as what is learned and not kept is (0.6.1 audit decode-2)
+        var told = 0
+        val saves = EngineBridge.PhraseFile(file, file.readText(), true, unsaved = { told++ }) { it.run() }
         val pinned = CustomPhrases.parse(file.readText()).pinned("yx", "信箱")
         // where the new file is written first: the save fails
         val blocker = File(file.path + ".new").apply { mkdir() }
         saves.save(pinned)
         assertEquals(listOf(phone, email), CustomPhraseManager.load(file))
+        assertEquals(1, told)
         // taken away here, not by the failed save: the next save then depends on the base alone
         blocker.delete()
         saves.save(pinned.without("dh", "电话"))
@@ -158,6 +165,42 @@ class EngineBridgeTest {
         val unsettled = bridge.additions(folder.root, writable = false)
         assertThrows(IOException::class.java) { unsettled.saveCommonWords(CommonWords.EMPTY) }
         assertEquals(2, CommonWordsManager.load(file).words.size)
+    }
+
+    // 0.6.1 audit decode-2: a keyboard's delete of a common word that is not saved is told, not only logged
+    @Test
+    fun aCommonWordsSaveThatFailsIsTold() {
+        // a directory where the file is: neither read nor replaced
+        val file = folder.newFolder("commonwords.txt")
+        var told = 0
+        val saves = EngineBridge.WordsFile(file, "", true, unsaved = { told++ }) { it.run() }
+        saves.save(CommonWords.parse("米字旁[mi'zi'pang] 米\n").words)
+        assertEquals(1, told)
+    }
+
+    // R25r4 F7969, as the phrases' above: a keyboard's delete of a common word not saved is saved with the next, the
+    // base taken as saved only once it is. Taken as saved at the failure, the next save would read 米字旁's 米 alone as
+    // a word it left alone and keep the file's 米 糸: the first delete undone. (The next deleting 米字旁's 米 too would
+    // not tell: a word gone from both is gone either way, CommonWords.merged)
+    @Test
+    @Uat("WD-48")
+    fun aCommonWordsChangeNotSavedIsSavedWithTheNext() {
+        val file = File(folder.root, "commonwords.txt")
+        CommonWordsManager.write(CommonWords.parse("米字旁[mi'zi'pang] 米 糸\n中华人民共和国[zhong'hua'ren'min'gong'he'guo] 中国\n").words, file)
+        val before = CommonWordsManager.load(file).words.map { it.toString() }
+        var told = 0
+        val saves = EngineBridge.WordsFile(file, file.readText(), true, unsaved = { told++ }) { it.run() }
+        val read = CommonWords.parse(file.readText()).words
+        // where the new file is written first (CommonWordsManager.write): the save fails
+        val blocker = File(file.path + ".new").apply { mkdir() }
+        saves.save(read.without("米字旁", "糸"))
+        assertEquals(before, CommonWordsManager.load(file).words.map { it.toString() })
+        assertEquals(1, told)
+        // taken away here, not by the failed save: the next save then depends on the base alone
+        blocker.delete()
+        saves.save(read.without("米字旁", "糸").without("中华人民共和国", "中国"))
+        assertEquals(listOf("米字旁[mi'zi'pang] 米"), CommonWordsManager.load(file).words.map { it.toString() })
+        assertEquals(1, told)
     }
 
     @Test
@@ -498,6 +541,95 @@ class EngineBridgeTest {
             } finally {
                 EngineNotices.sayer = null
                 EngineNotices.forgetToldOnce()
+            }
+        }
+
+        /**
+         * R25r2 F7839: what the engine tells of the user's data ([EngineBridge.userDataFailed], its onError) is said on
+         * the keyboard, each in its own words: the two `if`s and their strings were in no test.
+         */
+        @Test
+        @Uat("WD-47", "WD-48")
+        fun whatTheEngineCouldNotReadOrWriteIsSaidInItsOwnWords() {
+            fun saidOf(e: IOException): List<String> {
+                val said = sayer()
+                bridge.userDataFailed(e)
+                // the same again: once a process
+                bridge.userDataFailed(e)
+                shadowOf(Looper.getMainLooper()).idle()
+                return said.toList()
+            }
+            try {
+                class Row(val why: String, val failure: IOException, val said: Int)
+                assertRows(
+                    listOf(
+                        Row("the record did not read and was kept aside (decode-1): what read is used, said so", RecordStore.KeptAside("kept"), R.string.learning_kept_aside),
+                        Row("a word added or blocked by hand not written (decode-2): in memory alone, as what is learned and not kept", Unsaved("not written"), R.string.learning_unkept),
+                    ),
+                    { it.why },
+                ) { row -> assertEquals(listOf("${appContext.getString(row.said)} steady=true"), saidOf(row.failure)) }
+                // any other failure is logged, nothing said
+                assertEquals(emptyList<String>(), saidOf(IOException("a file not closed")))
+            } finally {
+                EngineNotices.sayer = null
+                EngineNotices.forgetToldOnce()
+            }
+        }
+
+        /** As the engine finds it: a learning record that is no record is kept aside whole, and that is said, once. */
+        @Test
+        @Uat("WD-47")
+        fun aLearningRecordThatDoesNotReadIsSaidKeptAside() {
+            val dir = checkNotNull(bridge.userDir())
+            dir.deleteRecursively()
+            dir.mkdirs()
+            // no header of the record's: not a log this reads
+            File(dir, LearnLog.FILE).writeText("x".repeat(64))
+            val said = sayer()
+            try {
+                typeEnglish("youmo")
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(listOf("${appContext.getString(R.string.learning_kept_aside)} steady=true"), said)
+                // learned over it all the same, the file as it was beside it
+                assertTrue(bridge.engines.englishWords().any { it.text == "youmo" })
+                assertTrue(dir.list().orEmpty().toList().toString(), dir.list().orEmpty().any { RecordStore.isAside(LearnLog.FILE, it) })
+            } finally {
+                EngineNotices.sayer = null
+                EngineNotices.forgetToldOnce()
+                bridge.close()
+                dir.deleteRecursively()
+            }
+        }
+
+        /**
+         * R25r2 F7855/F7881: a keyboard's change to the phrases or the common words that is not saved is said by the
+         * files' own wiring (no `unsaved` given: [EngineBridge]'s), once a process, in words of its own: it was said
+         * as 学到的词暂时无法保存, which is not what failed, and spent that notice's once.
+         */
+        @Test
+        @Uat("WD-48")
+        fun aPhraseOrCommonWordNotSavedIsSaidOnceInItsOwnWordsNotAsLearning() {
+            val dir = File(appContext.cacheDir, "unsaved").apply { deleteRecursively(); mkdirs() }
+            val said = sayer()
+            try {
+                // a directory where the file is: neither read nor replaced
+                val words = EngineBridge.WordsFile(File(dir, "commonwords.txt").apply { mkdir() }, "", true) { it.run() }
+                words.save(CommonWords.parse("米字旁[mi'zi'pang] 米\n").words)
+                words.save(CommonWords.parse("米字旁[mi'zi'pang] 糸\n").words)
+                val file = File(dir, "customphrase").also { CustomPhraseManager.save(listOf(PinyinCustomPhrase("dh", 1, "电话")), it) }
+                // where the new file is written first: the save fails
+                File(file.path + ".new").mkdir()
+                EngineBridge.PhraseFile(file, file.readText(), true) { it.run() }.save(CustomPhrases.parse(file.readText()).pinned("dh", "店话"))
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(listOf("${appContext.getString(R.string.user_lists_unkept)} steady=true"), said)
+                // the learning's own failure after it is still said
+                bridge.sayUnkept(directBoot = false)
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(appContext.getString(R.string.learning_unkept) + " steady=true", said.last())
+            } finally {
+                EngineNotices.sayer = null
+                EngineNotices.forgetToldOnce()
+                dir.deleteRecursively()
             }
         }
 
@@ -878,5 +1010,14 @@ class EngineBridgeTest {
     fun recentsAreClearedFromTheMinuteLearningWas() {
         assertEquals(0L, bridge.recentsSince(LearningResult.ALL))
         assertEquals(30_000_000L * 60_000L, bridge.recentsSince(30_000_000))
+    }
+
+    // audit-061 app-rest-13: the engine's input methods are those the catalog lists, not any name that looks like one
+    @Test
+    fun theEnginesInputMethodsAreTheListedOnes() {
+        assertTrue(InputMethodCatalog.LISTED.all { EngineBridge.isEngines(it.name) })
+        assertFalse(EngineBridge.isEngines("engine-unknown"))
+        assertFalse(EngineBridge.isEngines("keyboard-de"))
+        assertFalse(EngineBridge.isEngines(""))
     }
 }

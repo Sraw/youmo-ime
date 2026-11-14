@@ -79,6 +79,9 @@ object DictionaryFormat {
          * another encoding read as GBK (Big5's pairs all decode so), or another romanisation
          */
         MISMATCH,
+
+        /** the file larger than an import takes of its type, or than the memory converting it needs (the app's to say: not analysed) */
+        TOO_LARGE,
     }
 
     sealed class Analysis

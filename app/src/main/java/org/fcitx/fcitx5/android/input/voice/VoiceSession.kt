@@ -126,6 +126,7 @@ class VoiceSession(
             when (why) {
                 VoiceListener.Failure.NoModel -> R.string.voice_no_model
                 VoiceListener.Failure.NoMicrophone -> R.string.voice_no_microphone
+                VoiceListener.Failure.Recognition -> R.string.voice_recognition_failed
             }
         )
     }

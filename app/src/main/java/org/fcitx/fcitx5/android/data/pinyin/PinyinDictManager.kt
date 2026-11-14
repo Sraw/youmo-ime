@@ -129,14 +129,15 @@ object PinyinDictManager {
         var done = false
         try {
             // the copy a tenth of the way, as [size] (the provider's, 0 for none known) says
-            stream.use { input -> raw.outputStream().use { copy(input, it, size) { share -> progress(COPY_SHARE * share) } } }
+            stream.use { input -> raw.outputStream().use { copy(input, it, size, maxImported(type)) { share -> progress(COPY_SHARE * share) } } }
             val text = if (type == null || type == PinyinDictionary.Type.Text) {
                 raw
             } else {
                 val dictionary = PinyinDictionary.new(raw) ?: errorArg(R.string.exception_dict_filename, name)
                 File.createTempFile("import", ".${PinyinDictionary.Type.Text.ext}", appContext.cacheDir).also {
                     it.delete()
-                    dictionary.toTextDictionary(it)
+                    made = it
+                    convert(dictionary, it)
                 }
             }
             made = text
@@ -161,14 +162,15 @@ object PinyinDictManager {
         }
     }
 
-    private fun copy(input: InputStream, out: OutputStream, size: Long, progress: (Float) -> Unit) {
+    private fun copy(input: InputStream, out: OutputStream, size: Long, max: Long = Long.MAX_VALUE, progress: (Float) -> Unit) {
         val buffer = ByteArray(COPY_BUFFER)
         var copied = 0L
         while (true) {
             val n = input.read(buffer)
             if (n < 0) return
-            out.write(buffer, 0, n)
             copied += n
+            if (copied > max) refuse(DictionaryFormat.Reason.TOO_LARGE)
+            out.write(buffer, 0, n)
             if (size > 0) progress(minOf(1f, copied.toFloat() / size))
         }
     }
@@ -305,6 +307,7 @@ object PinyinDictManager {
         DictionaryFormat.Reason.TOO_MANY -> R.string.dict_refused_too_many
         DictionaryFormat.Reason.NO_PINYIN -> R.string.dict_refused_no_pinyin
         DictionaryFormat.Reason.MISMATCH -> R.string.dict_refused_mismatch
+        DictionaryFormat.Reason.TOO_LARGE -> R.string.dict_refused_too_large
     }
 
     /**
@@ -325,9 +328,32 @@ object PinyinDictManager {
             stream.close()
             return runCatching { errorArg(R.string.exception_dict_filename, name) }
         }
+        // named as the settings page names it (dictionaryName): none for a hidden name, refused unread too
+        val dictionary = dictionaryName(fileName) ?: run {
+            stream.close()
+            return runCatching { errorArg(R.string.exception_dict_filename, name) }
+        }
         // a stream that fails as it is copied throws, as it did before the analysis
-        return prepare(stream, fileName).use { importPrepared(it, PinyinDictionary.nameOf(fileName)) }
+        return prepare(stream, fileName).use { importPrepared(it, dictionary) }
     }
+
+    /**
+     * What a file named [fileName] is kept as in the base dictionaries: Rime's `luna_pinyin.dict.yaml` as `luna_pinyin`,
+     * any other without its extension. It may name no file of the base ([dictionaryName]).
+     */
+    fun keptName(fileName: String): String =
+        if (isRimeDictionary(fileName)) fileName.dropLast(RIME_DICTIONARY.length) else PinyinDictionary.nameOf(fileName)
+
+    /**
+     * [keptName], where it can name a file of the base: none for `.dict.yaml` alone (empty), nor for a hidden one
+     * (`.txt`'s, the list would show it untitled). The one rule of the settings page's import and [importFromInputStream].
+     */
+    fun dictionaryName(fileName: String): String? = keptName(fileName).takeIf { it.isNotEmpty() && !it.startsWith(".") }
+
+    /** Whether [fileName] is a Rime dictionary's (`*.dict.yaml`), read as a word list. */
+    fun isRimeDictionary(fileName: String) = fileName.lowercase().endsWith(RIME_DICTIONARY)
+
+    private const val RIME_DICTIONARY = ".dict.yaml"
 
     /**
      * [block] run on the words of [stream], a dictionary of any [PinyinDictionary.Type] called
@@ -345,6 +371,30 @@ object PinyinDictManager {
         }
     }
 
+    /**
+     * The most of a file of [type] copied into the cache to import (0.6.1 audit import-edit-2): a .scel is
+     * read whole, as the user dictionary's import caps it; a .dict is read whole and decompressed (Zstd's
+     * cap is 128 MiB out); text is streamed, capped for the cache alone. Past it, refused as TOO_LARGE
+     * before anything is read: a file picked by mistake must not take down the keyboard in this process.
+     */
+    internal fun maxImported(type: PinyinDictionary.Type?): Long = when (type) {
+        PinyinDictionary.Type.Sougou -> MAX_SCEL
+        PinyinDictionary.Type.LibIME -> MAX_LIBIME
+        else -> MAX_TEXT
+    }
+
+    // a binary dictionary written to [dest] as text; one too large for the heap refused, as the old dictionaries'
+    // migration does (ImportedDictionaries), rather than the OutOfMemoryError ending the process with the keyboard
+    private fun convert(dictionary: PinyinDictionary, dest: File) {
+        try {
+            dictionary.toTextDictionary(dest)
+        } catch (e: OutOfMemoryError) {
+            Timber.w(e, "%s: too large to convert", dictionary.file.name)
+            dest.delete()
+            refuse(DictionaryFormat.Reason.TOO_LARGE)
+        }
+    }
+
     /** [input], a dictionary called [name], as text in a file of the cache, the caller's to delete. */
     private fun textOf(input: InputStream, name: String): File {
         // the name a provider gives is no path to trust: only its extension, which tells the type
@@ -352,10 +402,11 @@ object PinyinDictManager {
         val text = File.createTempFile("import", ".${PinyinDictionary.Type.Text.ext}", appContext.cacheDir)
         var made = false
         try {
-            raw.outputStream().use { input.copyTo(it) }
+            val type = PinyinDictionary.Type.fromFileName(withLowercaseExtension(name))
+            raw.outputStream().use { copy(input, it, 0, maxImported(type)) {} }
             val dictionary = PinyinDictionary.new(raw) ?: errorArg(R.string.exception_dict_filename, name)
             text.delete()
-            dictionary.toTextDictionary(text)
+            convert(dictionary, text)
             made = true
             return text
         } finally {
@@ -393,7 +444,8 @@ object PinyinDictManager {
     /** A .scel file as the text dictionary the import keeps: scel2org5's output, read in Kotlin (ImportFiles.Scel). */
     @Throws(IOException::class)
     fun sougouDictConv(src: File, dest: File) {
-        // streamed: a cell dictionary of a million words built whole in a String is tens of MB in the keyboard's own process
+        // the text streamed out: a cell dictionary of a million words built whole in a String is tens of MB in the keyboard's
+        // own process. The file itself is read whole, at most MAX_SCEL (maxImported)
         try {
             dest.bufferedWriter().use { ImportFiles.Scel.writeTextDictionary(src.readBytes(), it) }
         } catch (e: IOException) {
@@ -407,6 +459,15 @@ object PinyinDictManager {
     internal const val EXPORT_PEEK = 64 shl 10
 
     private const val COPY_BUFFER = 1 shl 16
+
+    /** As the user dictionary's import of a .scel caps it (PinyinDictionaryFragment). */
+    internal const val MAX_SCEL = 32L shl 20
+
+    // libime's own are tens of MB (zhwiki's 0.6 of it keys); read whole, decompressed, then streamed out as text
+    private const val MAX_LIBIME = 64L shl 20
+
+    // streamed throughout, but copied into the cache first
+    private const val MAX_TEXT = 512L shl 20
 
     private const val COUNT_TRIES = 3
 

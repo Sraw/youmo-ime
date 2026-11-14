@@ -30,12 +30,14 @@ import org.fcitx.fcitx5.android.scene.engine.KeyStyleOver
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
+import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import timber.log.Timber
+import kotlin.math.roundToInt
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 
 /**
@@ -45,7 +47,8 @@ import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
  * show now as the engine's environment ([env]: SceneEnvs.of with its own Input, texts and marks),
  * and asks for a new scene ([KeyboardCanvasView.invalidateScene]) whenever any of that changes.
  * BaseKeyboard.drawKeysWithScene puts one over a keyboard. A [layout] that did not read (null) draws
- * nothing: no scene, no key (SceneLayouts logged it).
+ * nothing: no scene, no key (SceneLayouts logged it). A theme pack's layout the engine refuses in some
+ * environment draws the app's own of the same id there ([ownLayout]).
  */
 class SceneBoard(
     private val context: Context,
@@ -102,14 +105,34 @@ class SceneBoard(
         val layout = layout ?: return null
         val sceneTheme = SceneTrace.section("theme") { SceneThemes.of(of, look) } ?: return null
         val measurer = measurer(of, look)
-        return scene(layout, sceneTheme, look, measurerFor?.invoke() ?: measurer, width, height, (of as? Theme.Pack)?.let { ThemeManager.keyStyleShown.overPack })?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key), PackIcons.of(of)) }
+        val keyStyle = (of as? Theme.Pack)?.let { ThemeManager.keyStyleShown.overPack }
+        val using = measurerFor?.invoke() ?: measurer
+        val env = envOf(look, layout, width, height, keyStyle)
+        // made as it is asked: with nothing refused (every theme but a pack whose layout was), none is
+        val refused by lazy(LazyThreadSafetyMode.NONE) { RefusedIn(layout, env) }
+        // refused here before: not made again to be refused again each time what the keys show changes (R25r2 F7833).
+        // The app's own asks its env after the pack's, so the keyboard reads the layout drawn (BaseKeyboard.keyMarks)
+        val scene = (if (layoutsRefused.isNotEmpty() && refusedBefore(refused)) null else scene(layout, sceneTheme, using, env))
+            ?: ownLayout(layout)?.let { own ->
+                scene(own, sceneTheme, using, envOf(look, own, width, height, keyStyle))?.also { refusedHere(refused) }
+            }
+        return scene?.let { KeyboardCanvasView.Drawn(it, look, measurer.fonts, (of as? Theme.Pack)?.let(PackDrawGuard::key), PackIcons.of(of)) }
     }
 
-    // the scene of [sceneTheme] ([look]'s): the last kept for the same values, or made; null, the engine refused it
+    // a theme pack's layout the engine refused here (a row too wide in this form, a `when=` leaving a row empty: what
+    // reading it cannot see) draws the app's own of its id, as one that does not read does (SceneLayouts.of), logged;
+    // the scene's env asks the keyboard of that layout, so the keys touched are the ones drawn (BaseKeyboard.keyMarks).
+    // Null where [layout] is the app's already: nothing else to draw
+    private fun ownLayout(layout: SceneLayout): SceneLayout? =
+        SceneLayouts.builtIn(context, layout.id)?.takeIf { it !== layout }
+
+    // what the keys of [layout] show now as the engine's environment, the board's id its theme's @keyboard= (060-render-p3 T5)
     // [keyStyle]: the key style settings over a pack's own keys (a look's has them in it)
-    private fun scene(layout: SceneLayout, sceneTheme: SceneTheme, look: ThemeLook, measurer: TextMeasurer, width: Int, height: Int, keyStyle: KeyStyleOver?): Scene? {
-        // the board's id its theme's @keyboard= (060-render-p3 T5)
-        val env = SceneTrace.section("env") { env(look, layout, width, height).copy(board = layout.id, keyStyle = keyStyle) }
+    private fun envOf(look: ThemeLook, layout: SceneLayout, width: Int, height: Int, keyStyle: KeyStyleOver?): Env =
+        SceneTrace.section("env") { env(look, layout, width, height).copy(board = layout.id, keyStyle = keyStyle) }
+
+    // the scene of [sceneTheme] in [env] ([layout]'s): the last kept for the same values, or made; null, the engine refused it
+    private fun scene(layout: SceneLayout, sceneTheme: SceneTheme, measurer: TextMeasurer, env: Env): Scene? {
         // the same values make the same scene: one asked again for nothing that shows (the first key typed,
         // the word committed: Return's look unchanged) is the last one, not made again in the frame
         scenesKept.lastOrNull { it.theme === sceneTheme && it.layout === layout && it.measurer === measurer && it.env == env }?.let { return it.scene }
@@ -126,6 +149,20 @@ class SceneBoard(
     }
 
     private class Made(val theme: SceneTheme, val layout: SceneLayout, val measurer: TextMeasurer, val env: Env, val scene: Scene)
+
+    // a layout as read (the same instance, SceneLayouts': one a pack and id) in what of an env its rows and their
+    // places are made from: the size, the form, the field, the input method, typing, Shift, all a `when=` asks
+    // (Env.facts). Not what the keys show besides (the texts, the marks, the keys' states: no row comes or goes by
+    // them), so a refusal is remembered through every key typed (R25r2 F7833), and not for a field or a state it
+    // did not happen in (R25r3 F7922: by the size alone, a layout refused in one field drew the app's own in all)
+    @VisibleForTesting
+    internal class RefusedIn(val layout: SceneLayout, env: Env) {
+        val placing: Env = env.copy(texts = NO_TEXTS, marks = NO_MARKS, states = emptyMap())
+
+        override fun equals(other: Any?): Boolean = other is RefusedIn && layout === other.layout && placing == other.placing
+
+        override fun hashCode(): Int = System.identityHashCode(layout) * 31 + placing.hashCode()
+    }
 
     // what a resolver is made from: the layout, lists and slots compared as the same instances (the caches'), the
     // lists' version too, and hashed so (none of their contents hashed each time a resolver is asked for)
@@ -159,6 +196,36 @@ class SceneBoard(
         // refusing their scene though the theme converted: one keyboard's refused, another's not (the engine
         // makes a scene a layout at a time). The popups and cells follow the one shown ([drawnTheme])
         private val keysRefused = LinkedHashSet<Triple<String, ThemeLook, String>>()
+
+        private val NO_TEXTS = Texts()
+        private val NO_MARKS = MarkSettings()
+
+        // the theme packs' layouts (as read: one a pack and id, read anew as the pack changes) the engine refused in
+        // an environment ([RefusedIn]), the app's own making a scene there: its own drawn from then on, the pack's
+        // not made again each time
+        // what the keys show changes (most keys typed), and logged once while remembered. Whatever the
+        // theme: one whose every scene is refused has the app's own refused too, and is not remembered
+        // R25r4 F7976: one an environment (each field, Shift's state, typing or not …), so more than a theme's looks:
+        // the last KEPT_REFUSED used kept, one asked again moved last, so the states in use are never let go of and
+        // made, refused and logged again
+        @VisibleForTesting
+        internal const val KEPT_REFUSED = 64
+        private val layoutsRefused = LinkedHashSet<RefusedIn>()
+
+        // whether [at] is remembered refused, kept as the last used if so
+        private fun refusedBefore(at: RefusedIn): Boolean = layoutsRefused.remove(at).also { if (it) layoutsRefused.add(at) }
+
+        @VisibleForTesting
+        internal fun refusedHere(at: RefusedIn) {
+            if (!layoutsRefused.add(at)) return
+            if (layoutsRefused.size > KEPT_REFUSED) layoutsRefused.remove(layoutsRefused.first())
+            // the size in whole pixels, as a screen's is said (Env's are Double)
+            Timber.w("keyboard canvas: the pack's layout %s refused at %d×%d; the app's own drawn", at.layout.id, at.placing.width.roundToInt(), at.placing.height.roundToInt())
+        }
+
+        /** The refusals remembered, the least recently used first ([KEPT_REFUSED] of them at most). */
+        @VisibleForTesting
+        internal val refusals: Collection<RefusedIn> get() = layoutsRefused.toList()
 
         // the board whose keys were drawn last: the keyboard on screen, whose keys' popups show
         private var shownBoard: String? = null
@@ -261,12 +328,19 @@ class SceneBoard(
 
         private var marksCopied: Pair<MarkSettings, MarkSettings>? = null
 
-        /** The scenes kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
-        fun forgetScenes() = scenesKept.clear()
+        /**
+         * The scenes kept let go, the next asked made anew as things are: a measure of what making one costs
+         * (KeyboardPerfBaselineTest). The packs' layouts remembered refused too ([layoutsRefused]): which layout is
+         * drawn is asked of the engine again, a test's keyboard not drawing by what another test's was refused.
+         */
+        fun forgetScenes() {
+            scenesKept.clear()
+            layoutsRefused.clear()
+        }
 
         /** The scenes and the looks' measurers let go: a theme's file written over under the same path ([SceneThemes.forgetAll]). */
         fun forgetLooks() {
-            scenesKept.clear()
+            forgetScenes()
             measurers.clear()
             // a theme written again may make its keys' scene now: its popups and cells its own until the keys say
             keysRefused.clear()

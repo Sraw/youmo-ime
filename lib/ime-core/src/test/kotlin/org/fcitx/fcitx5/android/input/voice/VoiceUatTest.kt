@@ -24,7 +24,7 @@ class VoiceUatTest {
 
     private val lan = UserWord("澜境花园", "lan jing hua yuan", Kind.ADDED)
 
-    private fun listened(vararg words: UserWord, habits: Boolean = true) = VoiceHotwords.ofUser(words.toList(), habits).hotwords.split('/').filter { it.isNotEmpty() }
+    private fun listened(vararg words: UserWord, habits: Boolean = true) = VoiceHotwords.ofUser(words.toList()).withHabits(habits).hotwords.split('/').filter { it.isNotEmpty() }
 
     @Test
     @Uat("VO-14")

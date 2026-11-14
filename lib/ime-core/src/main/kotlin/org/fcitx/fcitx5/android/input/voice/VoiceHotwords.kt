@@ -8,14 +8,14 @@ import org.fcitx.fcitx5.android.engine.runtime.UserWord
 
 /**
  * Words the recognizer is told to listen for (sherpa-onnx's hotwords, a bonus on each of their
- * tokens as the beam search goes): the new-word pack's, put in the assets by VoiceDataPlugin by
- * [spelled] too, and the user's own. On the voice evaluation's new words, those in the list went
+ * tokens as the beam search goes): the new-word pack's, in the voice pack by VoiceDataPlugin, spelled by
+ * [HotwordSpelling.spelled] too, and the user's own. On the voice evaluation's new words, those in the list went
  * from 89 to some 104 of 138 heard, the rest of the speech much as it was; a larger bonus
  * hears more of them and mishears more of everything else.
  *
  * A word the user blocked is not written, the pack's or not, as a word: [VoiceBlocking] picks a
  * hypothesis without it, else our sherpa-onnx's beam search (lib/sherpa-onnx) is told not to let
- * one complete it. Only those [spelled]: two to twelve Chinese characters, [MAX_USER] of them;
+ * one complete it. Only those [HotwordSpelling.spelled]: two to twelve Chinese characters, [MAX_USER] of them;
  * and only once the engine has told the listener the user's words (VoiceEngine.userHotwords
  * waits so long).
  * Each stream with the user's words holds a graph of the pack's too, some 37 MB.
@@ -40,17 +40,14 @@ object VoiceHotwords {
     // a few thousand add little to the pack's 78 thousand
     const val MAX_USER = 3000
 
-    /** [HotwordSpelling.spelled], which the dict tool spells the pack's words by. */
-    fun spelled(word: String): String? = HotwordSpelling.spelled(word)
-
-    /** What a stream is told of the user's words: each list's words [spelled], apart by `/`. */
+    /** What a stream is told of the user's words: each list's words [HotwordSpelling.spelled], apart by `/`. */
     data class Words(
         val hotwords: String,
         val blocked: String,
         /** the user's words put in for what was heard read alike ([VoiceHomophones]) */
         val homophones: VoiceHomophones = VoiceHomophones.NONE,
     ) {
-        /** the blocked words as written, not [spelled] */
+        /** the blocked words as written, not [HotwordSpelling.spelled] */
         val blockedWords: List<String> get() = blocked.split('/').filter { it.isNotEmpty() }.map { it.replace(" ", "") }
 
         /**
@@ -79,10 +76,6 @@ object VoiceHotwords {
         private var lastFrom = 0L
 
         private var underWay: Any? = null
-
-        /** A read about to start: its ticket for [read], later reads' larger. */
-        @Synchronized
-        fun start(): Long = ++started
 
         /**
          * The read under way while [running] says it still runs, else one [launch]ed now with its
@@ -119,19 +112,19 @@ object VoiceHotwords {
      * as they typed, most used first
      * ([org.fcitx.fcitx5.android.engine.runtime.Engines.userWords]' order): 我的词 alone (U-30, D29), no
      * word of another kind, nor one the user only typed once; blocked, those they blocked. With
-     * [habits] off (U-93's 「用我的输入习惯」) no hotword of theirs, the blocked still blocked.
+     * U-93's 「用我的输入习惯」 off, [Words.withHabits] drops their hotwords, the blocked still blocked.
      */
-    fun ofUser(words: List<UserWord>, habits: Boolean = true): Words {
+    fun ofUser(words: List<UserWord>): Words {
         fun spell(kinds: (UserWord.Kind) -> Boolean) = words.asSequence()
             .filter { kinds(it.kind) }
-            .mapNotNull { word -> spelled(word.text)?.let { it to word.kind } }
+            .mapNotNull { word -> HotwordSpelling.spelled(word.text)?.let { it to word.kind } }
             // added and learned both: added, which comes first
             .distinctBy { it.first }
             .take(MAX_USER)
             // sherpa-onnx's own bonus for one hotword, after its tokens; learned ones get [SCORE]
             .joinToString("/") { (spelling, kind) -> if (kind == UserWord.Kind.ADDED) "$spelling :$ADDED_SCORE" else spelling }
         return Words(
-            hotwords = if (habits) spell { it in MINE } else "",
+            hotwords = spell { it in MINE },
             blocked = spell { it == UserWord.Kind.BLOCKED },
         )
     }

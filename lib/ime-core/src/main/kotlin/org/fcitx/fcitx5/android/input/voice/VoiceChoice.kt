@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.input.voice
 
 /**
- * What of a stretch the recognizer heard is typed (VoiceEngine.recognize): the best of its
+ * What of a stretch the recognizer heard is typed (VoiceEngine.choose): the best of its
  * hypotheses by the pinyin engine's model too ([VoiceRerank]); of them, that first, the first with
  * none of the words the user blocked standing as a word in it, below it none with them at all
  * ([VoiceBlocking]); if each has one,

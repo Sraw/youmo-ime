@@ -56,7 +56,7 @@ class PhrasesOnEveryKeyboardTest(private val name: String, private val keyboard:
         val book = PhraseBook(CustomPhrases.parse("$KEY,2=$PHRASE\n")) { saved += it }
         val log = LearnLog(null).apply { open() }
         val written = ArrayList<LearnRecord>()
-        log.appended = { written += it }
+        log.appended = { r, _ -> written += r }
         val session = keyboard.make(book, log)
         keyboard.type(session, KEY)
         val shown = session.candidates(0, 20).map { it.text }

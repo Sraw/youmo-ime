@@ -39,7 +39,6 @@ import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
-import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
@@ -243,15 +242,6 @@ object KeyCaps {
         gravity = Gravity.CENTER
         typeface = Typeface.MONOSPACE
         setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurface))
-    }
-
-    /** What a key draws beside its label, as the keyboard draws its swipes' marks ([KeyMarks]). */
-    sealed interface Mark {
-        /** A character: the corner symbol, or a text shortcut's whole, shrunk sideways to fit as on the key. */
-        data class Text(val text: String) : Mark
-
-        /** The key's symbol where the page labels the key by it (九键's digits): not drawn, its corner kept from the shortcut. */
-        data object Unshown : Mark
     }
 
     /**

@@ -70,6 +70,8 @@ One process. Inside it:
   engine's own background saves.
 - **`engine-phrases`** (`EngineBridge`): one thread saving the custom phrases file and the common
   words file (`WordsFile`, a replacement deleted from the keyboard), one save at a time, in order.
+  One not saved is said once a process (`user_lists_unkept`, `EngineNotices.failedOnce`), in its own words:
+  not `learning_unkept` (below), whose once would be spent on it and which says something else failed.
 - **`record-compaction`** (`Engines`' `background`, `JvmThreads.each` unless a test gives its own): a daemon thread for each
   compaction of a user log (`RecordStore`), at most every few thousand records, and each backup's write. The host thread, which learns, reads the
   counts; this thread writes and syncs them to a new file, which the next append on the host

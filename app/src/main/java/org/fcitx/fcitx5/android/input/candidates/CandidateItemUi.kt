@@ -82,11 +82,13 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
         val fg = look.color.value
         val altFg = look.commentColor.value
         val label = label(index)
-        // pinyin above the words: the text centred below it, in the bar made taller for it (CandidateBarHeight)
-        // or, the setting off, a hint's reading above them in the bar's own height, where plain words stand
-        val hint = EngineState.candidateReading.value == ReadingStyle.OFF
-        val above = !hint && ReadingSpan.above(candidate.readings)
-        text.setPadding(0, if (above) (text.textSize * CandidateBarHeight.READING_LINE).roundToInt() else 0, 0, 0)
+        // pinyin above the words: the text centred below it, in the bar made taller for it (CandidateBarHeight),
+        // a candidate of no reading (an emoji, a word in English) too, so it stands on its neighbours' baseline
+        // (the user, 2026-11-14); zhuyin beside them and, the setting off, a hint's reading above them in the
+        // bar's own height take no room above, where plain words stand
+        val style = EngineState.candidateReading.value
+        val hint = style == ReadingStyle.OFF
+        text.setPadding(0, if (style == ReadingStyle.PINYIN) (text.textSize * CandidateBarHeight.READING_LINE).roundToInt() else 0, 0, 0)
         text.text = buildSpannedString {
             if (label.isNotEmpty()) color(look.labelColor.value) { append(label) }
             color(fg) {

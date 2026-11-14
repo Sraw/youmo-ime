@@ -19,21 +19,15 @@ class NativeAppConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         target.pluginManager.apply(target.libs.plugins.android.application.get().pluginId)
 
-        // split apks should be disabled when building bundle
-        // https://issuetracker.google.com/issues/402800800
-        val isBuildingBundle = target.rootProject.gradle.startParameter.taskNames.any {
-            it.startsWith("${target.path}:bundle")
-        }
         target.extensions.configure<ApplicationExtension> {
             ndkVersion = target.ndkVersion
-            if (!isBuildingBundle) {
-                splits.abi {
-                    isEnable = true
-                    isUniversalApk = false
-                    reset()
-                    (target.buildAbiOverride?.split(",") ?: Versions.supportedABIs).forEach {
-                        include(it)
-                    }
+            // one APK an ABI; no app bundle is made (it would need the splits off)
+            splits.abi {
+                isEnable = true
+                isUniversalApk = false
+                reset()
+                Versions.buildABIs(target.buildAbiOverride).forEach {
+                    include(it)
                 }
             }
             packaging {

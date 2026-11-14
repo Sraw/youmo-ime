@@ -7,9 +7,12 @@ package org.fcitx.fcitx5.android.eval
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.eval.VoicePostRun.Mark
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 
 class VoicePostRunTest {
 
@@ -80,7 +83,7 @@ class VoicePostRunTest {
                 """{"start": 2.0, "end": 2.6, "nbest": ["世界"], "scores": [0], "app": "世界。"}]}""" + "\n",
         )
         val clips = VoicePostRun.read(file, "app")
-        assertEquals(500L, clips.single().stretches.first().startMs)
+        assertEquals(listOf("你好，", "世界。"), clips.single().stretches.map { it.raw })
         val out = StringBuilder()
         VoicePostRun.run(listOf(file.path), "app", null, out)
         val row = out.lines()[1].split('\t')
@@ -148,4 +151,82 @@ class VoicePostRunTest {
         VoicePostRun.score("我去", "我去", s)
         assertEquals("-", VoicePostRun.row("x", s).split('\t')[8])
     }
+
+    // --source tagged: the tagger's labels (voice-eval's) through the app's own polish and guards (voice-4)
+    @Test
+    fun taggedLabelsArePolishedAsTheAppPolishes() {
+        val tagger = tmp.newFile("polish-tagger.json")
+        tagger.writeText("""{"ops": ["keep", "del"], "after": ["", "，", "。"], "num": ["none"]}""")
+        val file = tmp.newFile("seg-t.jsonl")
+        // 嗯 deleted, 。 after 好; 三 deleted too, which the guard keeps (a number's character is never deleted)
+        file.writeText(
+            """{"wav": "1.wav", "ref": "今天三个人很好。", "stretches": [{"start": 0, "end": 1, "nbest": ["嗯今天三个人很好"], "scores": [0], "app": "嗯今天三个人很好"}], """ +
+                """"tagged": {"text": "嗯今天三个人很好", "op": [1, 0, 0, 1, 0, 0, 0, 0], "after": [0, 0, 0, 0, 0, 0, 0, 2], "num": [0, 0, 0, 0, 0, 0, 0, 0]}}""" + "\n",
+        )
+        val tags = VoicePostRun.tags(tagger)
+        fun texts(guard: Boolean): Pair<String, String> {
+            val texts = tmp.newFile()
+            val out = StringBuilder()
+            VoicePostRun.run(listOf(file.path), "tagged", null, out, texts.path, VoicePostRun.Polish(tags, guard))
+            return texts.readLines()[1].split('\t')[3] to out.lines().first { it.startsWith("tagged:") }
+        }
+        assertEquals("今天三个人很好。" to "tagged: guard=true untagged=0 unfound=0 long=0", texts(true))
+        assertEquals("今天个人很好。" to "tagged: guard=false untagged=0 unfound=0 long=0", texts(false))
+    }
+
+    // what says whether a tagged run's scores can be trusted: windows found where the stream is, and
+    // the clips that could not be replayed as the app's counted, not scored wrong without a word
+    @Test
+    fun taggedWindowsAreFoundAlongTheClipAndTheOnesNotReplayedCounted() {
+        val tagger = tmp.newFile("polish-tagger.json")
+        tagger.writeText("""{"ops": ["keep", "del"], "after": ["", "，", "。"], "num": ["none"]}""")
+        // 80 characters none of which repeats, so a window is found in one place only: two stretches, and
+        // windows [0, 40) then [16, 80) (WINDOW 64), the one deleted (75) only in the second
+        val han = (0 until 80).map { Char(0x5000 + it) }.joinToString("")
+        fun labels(f: (Int) -> Int) = (0 until 80).joinToString(", ", "[", "]") { "${f(it)}" }
+        val file = tmp.newFile("seg-w.jsonl")
+        file.writeText(
+            """{"wav": "long.wav", "ref": "x", "stretches": [{"app": "${han.take(40)}"}, {"app": "${han.drop(40)}"}], """ +
+                """"tagged": {"text": "$han", "op": ${labels { if (it == 75) 1 else 0 }}, "after": ${labels { if (it == 79) 2 else 0 }}, """ +
+                """"num": ${labels { 0 }}}}""" + "\n" +
+                // voice-eval tagged another text than the app's: every window not found, the text as heard
+                """{"wav": "other.wav", "ref": "x", "stretches": [{"app": "我去了"}], """ +
+                """"tagged": {"text": "我来了", "op": [1, 0, 0], "after": [0, 0, 2], "num": [0, 0, 0]}}""" + "\n" +
+                // no labels: as the app's with the tagger failing to load, the text unpolished
+                """{"wav": "none.wav", "ref": "x", "stretches": [{"app": "嗯我去了"}]}""" + "\n",
+        )
+        val texts = tmp.newFile()
+        val out = StringBuilder()
+        VoicePostRun.run(listOf(file.path), "tagged", null, out, texts.path, VoicePostRun.Polish(VoicePostRun.tags(tagger)))
+        assertEquals(
+            listOf(han.removeRange(75, 76) + "。", "我去了", "嗯我去了"),
+            texts.readLines().drop(1).map { it.split('\t')[3] },
+        )
+        // other.wav: its window asked about as the text grew and at the end, neither found
+        assertEquals("tagged: guard=true untagged=1 unfound=2 long=1", out.lines().first { it.startsWith("tagged:") })
+    }
+
+    @Test
+    fun taggedLabelsNotACharacterEachAreRefusedNamingTheClip() {
+        val file = tmp.newFile("seg-b.jsonl")
+        file.writeText(
+            """{"wav": "short.wav", "ref": "x", "stretches": [{"app": "我去了"}], """ +
+                """"tagged": {"text": "我去了", "op": [0, 0], "after": [0, 0, 0], "num": [0, 0, 0]}}""" + "\n",
+        )
+        val e = assertThrows(VoicePostRun.BadInput::class.java) { VoicePostRun.read(file, "tagged") }
+        assertTrue(e.message!!, e.message!!.contains("short.wav"))
+    }
+
+    // R25r5 F8020: a file not there (a path mistyped) ended the run with a stack trace, not a failed run naming it
+    @Test
+    fun aFileNotThereIsRefusedNamingIt() = assertRows(
+        "a set's clips: read outside the parsing, an IOException not caught" to {
+            val e = assertThrows(VoicePostRun.BadInput::class.java) { VoicePostRun.read(File(tmp.root, "seg-gone.jsonl"), "app") }
+            assertTrue(e.message!!, e.message!!.startsWith("seg-gone.jsonl: "))
+        },
+        "a tagger's json: read inside the parsing, which caught no IOException" to {
+            val e = assertThrows(VoicePostRun.BadInput::class.java) { VoicePostRun.tags(File(tmp.root, "gone-tagger.json")) }
+            assertTrue(e.message!!, e.message!!.startsWith("gone-tagger.json: "))
+        },
+    )
 }

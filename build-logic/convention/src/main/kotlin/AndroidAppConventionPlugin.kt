@@ -27,7 +27,6 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.withType
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.w3c.dom.Element
 import javax.xml.parsers.DocumentBuilderFactory
 
@@ -82,7 +81,6 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
                 resources {
                     excludes += setOf(
                         "/META-INF/*.version",
-                        "/META-INF/*.kotlin_module",  // cannot be excluded actually
                         "/META-INF/androidx/**",
                         "/DebugProbesKt.bin",
                         "/kotlin-tooling-metadata.json"
@@ -91,32 +89,16 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
             }
         }
 
-        // remove META-INF/com/android/build/gradle/app-metadata.properties
+        // remove META-INF/com/android/build/gradle/app-metadata.properties: through Gradle's internals, so a
+        // Gradle or AGP that changed them fails the build here instead of shipping the file unnoticed
         target.tasks.withType<PackageApplication> {
-            val valueField =
-                AbstractProperty::class.java.declaredFields.find { it.name == "value" } ?: run {
-                    println("class AbstractProperty field value not found, something could have gone wrong")
-                    return@withType
-                }
+            val valueField = checkNotNull(AbstractProperty::class.java.declaredFields.find { it.name == "value" }) {
+                "AbstractProperty has no field `value` (a Gradle upgrade?): app-metadata.properties would go into the APK"
+            }
             valueField.isAccessible = true
             doFirst {
                 valueField.set(appMetadata, Providers.notDefined<RegularFile>())
                 allInputFilesWithNameOnlyPathSensitivity.removeAll { true }
-            }
-        }
-
-        // try to remove <pkg_name>-<version_name>.kotlin_module, but it does not work ¯\_(ツ)_/¯
-        target.tasks.withType<KotlinCompile> {
-            doLast f@{
-                val ktClass = outputs.files.files.filter { it.path.contains("kotlin-classes") }
-                if (ktClass.isEmpty()) return@f
-                val metaInf = ktClass.first().resolve("META-INF")
-                if (!metaInf.exists() || !metaInf.isDirectory) return@f
-                metaInf.listFiles()?.forEach {
-                    if (it.name.endsWith(".kotlin_module")) {
-                        it.delete()
-                    }
-                }
             }
         }
 

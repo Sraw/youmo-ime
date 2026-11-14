@@ -919,12 +919,13 @@ private sealed class Shelf(val saved: String) {
 
 /** What [QuickPhraseFragment]'s import says of [r]: every skipped line counted, those with a bad key too, and the keyless added. */
 internal fun quickPhraseImportToast(ctx: Context, r: QuickPhraseManager.Imported): String {
-    val said = skippedToast(ctx, r)
+    val skipped = skippedToast(ctx, r)
+    val said = if (r.overLimit == 0) skipped else ctx.getString(R.string.import_over_limit, skipped, r.overLimit, QuickPhraseManager.MAX_ENTRIES)
     return if (r.keyless == 0) said else ctx.getString(R.string.quick_phrase_import_keyless, said, r.keyless)
 }
 
 private fun skippedToast(ctx: Context, r: QuickPhraseManager.Imported): String {
-    if (r.added + r.duplicates + r.tooLong == 0) {
+    if (r.added + r.duplicates + r.tooLong + r.overLimit == 0) {
         // not a .mb file (a picture picked, say): said so, not "0 imported", though a line or
         // two with a bad key are still said
         return if (r.badKey == 0) ctx.getString(R.string.quick_phrase_import_none)

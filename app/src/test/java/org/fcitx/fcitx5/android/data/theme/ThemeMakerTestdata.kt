@@ -35,31 +35,24 @@ object ThemeMakerTestdata {
     /** The file [name] as it is in the repo: for the app's own tests to read what the page reads. */
     fun file(name: String) = File(dir, name)
 
-    // the pages themselves: the maker (web/theme-maker/index.html) and the one before 0.6.0 (classic/index.html)
-    private val pages = File(dir.parentFile.parentFile, "index.html").let { listOf(it, File(it.parentFile, "classic/index.html")) }
+    // the generated blocks, a file each (web/theme-maker/generated/<id>.json), which tools/assemble.mjs puts into the pages
+    private val generated = File(dir.parentFile.parentFile, "generated")
 
     /**
-     * Each page's block `<script type="application/json" id="[id]">` holds [text] between a newline at each
-     * end, compared as text; written into the pages with `-PupdateThemeMaker`, the rest of each page left as
-     * it is. A page carries only the blocks it reads (tools/assemble.mjs), so a block is in one page or both,
-     * never in none. The generated data: the format and the built-in themes (ThemeMakerFormatTest), the
-     * measured layouts and icons (ThemeMakerLayoutTest), the engine's icons (EnginePaintTest).
+     * The generated block [id] (web/theme-maker/generated/[id].json) holds [text] and a newline at its end, compared
+     * as text; written with `-PupdateThemeMaker`. tools/assemble.mjs puts each into the pages that read it, as their
+     * `<script type="application/json" id="[id]">`. The generated data: the format and the built-in themes
+     * (ThemeMakerFormatTest), the measured layouts and icons (ThemeMakerLayoutTest), the engine's icons (EnginePaintTest).
      */
     fun block(id: String, text: String) {
-        val open = "<script type=\"application/json\" id=\"$id\">"
-        val holding = pages.filter { it.readText().contains(open) }
-        assertTrue("no page has block $id", holding.isNotEmpty())
-        for (page in holding) {
-            val html = page.readText()
-            val from = html.indexOf(open) + open.length
-            val end = html.indexOf("</script>", from)
-            assertTrue("$page: block $id is not closed", end >= 0)
-            val now = "\n" + text + "\n"
-            if (update) {
-                page.writeText(html.substring(0, from) + now + html.substring(end))
-                continue
-            }
-            assertEquals("$page: block $id is not what the app makes now: run the test with -PupdateThemeMaker", now, html.substring(from, end))
+        val file = File(generated, "$id.json")
+        val now = text + "\n"
+        if (update) {
+            generated.mkdirs()
+            file.writeText(now)
+            return
         }
+        assertTrue("$file is missing: run the test with -PupdateThemeMaker", file.exists())
+        assertEquals("$file is not what the app makes now: run the test with -PupdateThemeMaker", now, file.readText())
     }
 }

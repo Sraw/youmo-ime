@@ -254,7 +254,6 @@ class KotlinHost(
     override suspend fun forgetEnglishWords(texts: List<String>) = withContext(dispatcher) { bridge.engines.forgetEnglishWords(texts) }
     override suspend fun importUserWords(lines: Sequence<String>, fileName: String) = withContext(dispatcher) { bridge.engines.importWords(lines, fileName) }
     override suspend fun importBatches() = withContext(dispatcher) { bridge.engines.importBatches() }
-    override suspend fun importedWords(batch: Int?) = withContext(dispatcher) { bridge.engines.importedWords(batch) }
     override suspend fun dropImport(batch: Int) = withContext(dispatcher) { bridge.engines.dropImport(batch) }
     override suspend fun restoreImport(batch: Int) = withContext(dispatcher) { bridge.engines.restoreImport(batch) }
     override suspend fun tableKeys(im: String) = withContext(dispatcher) { bridge.tableKeys(im) }

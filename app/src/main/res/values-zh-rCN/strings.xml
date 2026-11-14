@@ -66,7 +66,6 @@
     <string name="github_repo">GitHub 仓库</string>
     <string name="expanded_candidate_grid_span_count">表格样式展开候选词列数</string>
     <string name="no_config_options">目前没有可用的配置选项</string>
-    <string name="unimplemented_type">⛔ 未实现类型</string>
     <string name="select">选择</string>
     <string name="text_editing">文本编辑</string>
     <string name="instruction_enable_clipboard_listening">要启用剪贴板管理，请在设置中开启“记录剪贴板历史”。</string>
@@ -85,7 +84,6 @@
     <string name="reset">重置</string>
     <string name="input_method_options">输入法设置</string>
     <string name="theme">主题</string>
-    <string name="configure">配置</string>
     <string name="navbar_background">导航栏背景</string>
     <string name="navbar_bkg_none">无背景</string>
     <string name="navbar_bkg_color_only">跟随键盘背景色</string>
@@ -259,9 +257,10 @@
     <string name="reset_keyboard_on_focus_change">焦点改变时切换回键盘</string>
     <string name="export_user_data">备份全部</string>
     <string name="import_user_data">从备份恢复</string>
-    <string name="exception_user_data_filename">文件 %1$s 的拓展名不是幽默输入法备份</string>
+    <string name="exception_user_data_host_starting">键盘还在启动，没等到它启动完：什么都没有恢复。请稍后再试</string>
     <string name="exception_user_data_metadata">找不到用户数据的元数据</string>
     <string name="exception_user_data_no_room">备份放不下：手机剩余空间不够</string>
+    <string name="exception_user_data_too_many_entries">备份里的条目超过 10 万个，不是本应用的备份</string>
     <string name="exception_user_data_package_name_mismatch">用户数据与当前应用不匹配</string>
     <string name="exception_user_data_too_old">这个备份来自 0.3.0 或更早的版本，这一版不再读取那时学到的内容。请先在 0.4.x 里恢复它、打几个字、停一下、重新备份，再在这里恢复新的备份</string>
     <string name="user_data_imported">已导入来自 %1$s 的用户数据，正在重启…</string>
@@ -294,6 +293,7 @@
     <string name="candidates_window_padding">候选窗口边距</string>
     <string name="restart_fcitx_instance">重启 Fcitx 实例</string>
     <string name="restart_fcitx_instance_confirm">Fcitx 实例将被销毁并重新初始化。继续吗？</string>
+    <string name="restart_fcitx_still_starting">键盘还在启动，可能没有重启成。请稍后再试</string>
     <string name="user_data">备份与恢复</string>
     <string name="haptic_on_repeat">重复按键时的振动反馈</string>
     <string name="redo">重做</string>
@@ -405,6 +405,7 @@
     <string name="learning_done_delete_phrase">已从自定义词组中删除「%1$s」</string>
     <string name="learning_done_no_predict">不再联想「%1$s」</string>
     <string name="learning_undo_gone">已经撤销不了了</string>
+    <string name="learning_undo_failed">没撤销成：学到的词现在存不下</string>
     <string name="learning_habits_off">不用我的输入习惯</string>
     <string name="learning_habits_on">恢复我的输入习惯</string>
     <string name="learning_clear_recent">清掉最近</string>
@@ -416,6 +417,7 @@
     <string name="learning_cleared">已清掉</string>
     <string name="learning_not_done">候选已经变了，没做</string>
     <string name="learning_clear_failed">没清掉，再试一次</string>
+    <string name="learning_clear_failed_not_saving">没清掉：学到的词现在存不下，重启键盘后再清</string>
     <string name="learning_clear_recent_title">清掉%1$s学到的？</string>
     <string name="learning_no_predict_entry">不再联想的搭配：%1$d 个 ›</string>
     <string name="my_words_table_blocked">码表里按码屏蔽的</string>
@@ -527,6 +529,7 @@
     <string name="learning_restore_confirm_undated">把这份备份（%1$s）和手机上学到的合并？次数取两边较大的；固定、屏蔽、首选冲突时以手机上的为准。恢复前会先另存一份现在的，后悔了可以退回。</string>
     <string name="learning_backup_delete_confirm">删除 %1$s 的备份（%2$s）？删了不能找回。</string>
     <string name="learning_try_again">没做成，再试一次</string>
+    <string name="learning_try_again_not_saving">没做成：学到的词现在存不下，重启键盘后再试</string>
     <string name="learning_reverted">已退回恢复前</string>
     <string name="learning_backup_this_install">这次安装存的</string>
     <string name="learning_backup_elsewhere">别处来的</string>
@@ -827,6 +830,7 @@
     <string name="dict_refused_too_many">词太多，超过输入法能放下的</string>
     <string name="dict_refused_no_pinyin">有些行没有拼音；没有拼音的词只能并入用户词库</string>
     <string name="dict_refused_mismatch">字和读音大多对不上（读音不是普通话拼音，或者文件编码不对）</string>
+    <string name="dict_refused_too_large">文件太大，导入不了这么大的这类文件</string>
     <string name="dict_too_large_for_user">这个词库太大，请并入基础词库</string>
     <string name="dict_user_imports_full">用户词库里导入的词已近上限，放不下这些词；请并入基础词库，或先删掉以前导入的词</string>
     <string name="dict_detected_rime">Rime 词库</string>
@@ -902,8 +906,11 @@
     <string name="theme_file_missing">你的某个主题缺了图片或字体文件（被删掉，或恢复的备份里没有），这个主题不再列出。重新导入它就能再用。</string>
     <string name="user_data_unreadable">部分你添加的内容（自定义短语、快速输入、标点表、主题）读取失败或无法就位。它们原样保留、不会被覆盖：这次暂时缺失或改用内置的。重启手机后再试。</string>
     <string name="user_data_not_settled">你添加的内容和设置这次无法就位，暂时不能修改、备份或恢复。重启手机后再试。</string>
-    <string name="learning_unkept">学到的词暂时无法保存：只记在内存里，输入法被系统停止或手机重启后就会丢失（以前存下的不受影响）。请确认手机存储空间够用，然后重启手机；仍然出现，请附上 开发者 → 实时日志 导出的日志报告问题。</string>
+    <string name="learning_unkept">学到的词暂时无法保存：只记在内存里，输入法被系统停止或手机重启后就会丢失（以前存下的不受影响）。清出一些存储空间后会照常保存；还不行就重启手机，重启后仍然出现，请附上 开发者 → 实时日志 导出的日志报告问题。</string>
     <string name="learning_unkept_locked">手机解锁前学到的词不会保存；解锁后照常保存。</string>
+    <string name="learning_kept_aside">学习记录有读不出来的内容：原文件已另存一份，读得出的部分照常使用，其余学到的词这次用不上了。想找回以前学到的词，可以在 学习备份 里恢复。</string>
+    <string name="learning_not_saving">学到的词现在没在保存：只记在内存里，输入法被系统停止或手机重启后就会丢失。清出一些存储空间后会照常保存；还不行就重启手机。</string>
+    <string name="user_lists_unkept">自定义短语或常用词的改动没能保存：只记在内存里，输入法被系统停止或手机重启后就会丢失（以前存下的不受影响）。清出一些存储空间后，下次在键盘上再改同一样（短语或常用词）时会连这次的一起保存；还不行就重启手机，重启后仍然出现，请附上 开发者 → 实时日志 导出的日志报告问题。</string>
     <string name="split_keyboard">分体键盘</string>
     <string name="split_keyboard_auto">横屏且屏幕够宽时</string>
     <string name="split_keyboard_always">总是</string>
@@ -1105,7 +1112,6 @@
     <string name="shortcut_page_number">数字键盘</string>
     <string name="shortcut_page_function">功能键</string>
     <string name="shortcut_key_elsewhere">在功能键页改 %s</string>
-    <string name="shortcut_text_too_long">最多 %d 个字</string>
     <string name="fn_key_space">空格</string>
     <string name="fn_key_backspace">退格</string>
     <string name="fn_key_return">回车</string>
@@ -1118,8 +1124,6 @@
     <string name="fn_key_retype">重输（九键）</string>
     <string name="fn_key_zero">0（九键）</string>
     <string name="fn_key_separator">分词（14/18 键）</string>
-    <string name="fn_key_up">上滑</string>
-    <string name="fn_key_down">下滑</string>
     <string name="quick_phrases">快速输入</string>
     <string name="quick_phrases_summary">长按「符」，打关键词的开头挑一段存好的文字；什么都不打时列出全部</string>
     <string name="quick_phrases_page_hint">长按「符」进来，打关键词的开头挑一段存好的文字；什么都不打时列出全部，像翻笔记本。打拼音时顺手出的缩写，用「自定义短语」。</string>
@@ -1161,6 +1165,7 @@
     <string name="quick_phrase_saved">已保存</string>
     <string name="quick_phrase_import_done_too_long">导入 %1$d 条，跳过 %2$d 条重复、%3$d 条超过 %4$d 字</string>
     <string name="quick_phrase_import_bad_key">%1$s；另跳过 %2$d 条没有关键词或关键词、注释太长的（关键词最多 %3$d 个字符，注释最多 %4$d 个字）</string>
+    <string name="import_over_limit">%1$s；另有 %2$d 条没导入：导入最多加到 %3$d 条</string>
     <string name="quick_phrase_discard_confirm">放弃这次的修改？</string>
     <string name="quick_phrase_discard">放弃</string>
     <string name="quick_phrase_keep_editing">继续编辑</string>
@@ -1171,6 +1176,7 @@
     <string name="clipboard_save_quick_phrase">存为快速输入</string>
     <string name="voice_no_model">语音模型载入失败</string>
     <string name="voice_no_microphone">无法使用麦克风</string>
+    <string name="voice_recognition_failed">语音识别出错</string>
     <string name="voice_model_credit">语音识别：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）与 silero VAD 运行</string>
     <string name="voice_hold_listening">正在听…</string>
     <string name="voice_hold_preparing">准备中…</string>

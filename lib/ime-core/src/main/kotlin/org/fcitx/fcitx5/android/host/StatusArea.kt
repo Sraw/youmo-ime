@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.host
 
 /**
  * A toggle a module puts in the status area, fcitx's `Action` (`fcitx/action.h`): what the keyboard's
- * status panel shows ([icon], [shortText]) and what a tap does ([activate]). [name] is the one the
+ * status panel shows ([icon], [shortText]), whether it is on ([active]) and what a tap does ([activate]). [name] is the one the
  * app matches on for its own label (`StatusAreaEntry.label`), as fcitx's text is in fcitx's language.
  */
 abstract class StatusAction(val name: String) {
@@ -18,6 +18,9 @@ abstract class StatusAction(val name: String) {
 
     abstract fun icon(ic: InputContext): String
     abstract fun shortText(ic: InputContext): String
+
+    /** Whether the toggle is on in [ic]: said apart, not read off [icon]'s name (R25 core-input-6). */
+    abstract fun active(ic: InputContext): Boolean
     abstract fun activate(ic: InputContext)
 
     /** `Action::update`: the status area of [ic] shows this action anew. */
@@ -27,7 +30,7 @@ abstract class StatusAction(val name: String) {
 }
 
 /** One action as the status panel shows it on a context, the app's `Action` DTO's fields. */
-data class StatusEntry(val id: Int, val name: String, val icon: String, val shortText: String)
+data class StatusEntry(val id: Int, val name: String, val icon: String, val shortText: String, val active: Boolean)
 
 /**
  * The status area: the actions each context's input method shows (`fcitx/statusarea.cpp`). The
@@ -60,7 +63,7 @@ class StatusArea(private val onChanged: (InputContext) -> Unit = {}) {
     fun contains(ic: InputContext, action: StatusAction): Boolean = action in ic.propertyFor(actions)
 
     fun entries(ic: InputContext): List<StatusEntry> =
-        ic.propertyFor(actions).map { StatusEntry(it.id, it.name, it.icon(ic), it.shortText(ic)) }
+        ic.propertyFor(actions).map { StatusEntry(it.id, it.name, it.icon(ic), it.shortText(ic), it.active(ic)) }
 
     /** A tap on the entry [id] (`native-lib.cpp:344-350`): any registered action, as fcitx looks it up by id. */
     fun activate(ic: InputContext, id: Int) {

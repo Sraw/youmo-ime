@@ -21,43 +21,43 @@ dependencies {
 gradlePlugin {
     plugins {
         register("androidAppConvention") {
-            id = "org.fcitx.fcitx5.android.app-convention"
+            id = "youmo.app-convention"
             implementationClass = "AndroidAppConventionPlugin"
         }
         register("androidLibConvention") {
-            id = "org.fcitx.fcitx5.android.lib-convention"
+            id = "youmo.lib-convention"
             implementationClass = "AndroidLibConventionPlugin"
         }
         register("buildMetadata") {
-            id = "org.fcitx.fcitx5.android.build-metadata"
+            id = "youmo.build-metadata"
             implementationClass = "BuildMetadataPlugin"
         }
         register("detektConvention") {
-            id = "org.fcitx.fcitx5.android.detekt"
+            id = "youmo.detekt"
             implementationClass = "DetektConventionPlugin"
         }
         register("voiceData") {
-            id = "org.fcitx.fcitx5.android.voice-data"
+            id = "youmo.voice-data"
             implementationClass = "VoiceDataPlugin"
         }
         register("handwritingData") {
-            id = "org.fcitx.fcitx5.android.handwriting-data"
+            id = "youmo.handwriting-data"
             implementationClass = "HandwritingDataPlugin"
         }
         register("engineData") {
-            id = "org.fcitx.fcitx5.android.engine-data"
+            id = "youmo.engine-data"
             implementationClass = "EngineDataPlugin"
         }
         register("unitTestResources") {
-            id = "org.fcitx.fcitx5.android.unit-test-resources"
+            id = "youmo.unit-test-resources"
             implementationClass = "UnitTestResourcesPlugin"
         }
         register("assetPacks") {
-            id = "org.fcitx.fcitx5.android.asset-packs"
+            id = "youmo.asset-packs"
             implementationClass = "AssetPacksPlugin"
         }
         register("nativeAppConvention") {
-            id = "org.fcitx.fcitx5.android.native-app-convention"
+            id = "youmo.native-app-convention"
             implementationClass = "NativeAppConventionPlugin"
         }
     }

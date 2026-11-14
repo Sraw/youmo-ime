@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executor
 import java.util.concurrent.FutureTask
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Keeps what the user taught an input method in [file], a log of [format]: [open] replays it into
@@ -31,13 +32,15 @@ import java.util.concurrent.RejectedExecutionException
  *
  * A log cut short loses its last record, which is cut from the file so appends go on from a
  * record's end. A file of another format or version is kept aside as `<name>.unreadable` rather
- * than overwritten, and learning starts afresh. A log that stops reading anywhere but in a last
- * record cut short, as a torn append leaves it, is damaged: it is kept aside whole as well, and
- * goes on from what read.
+ * than overwritten, and learning starts afresh. A record garbled (its CRC failing) with whole
+ * records after it is dropped and the rest read on (user's decision B2); a log that stops reading
+ * anywhere else but in a last record cut short, as a torn append leaves it, is damaged and goes on
+ * from what read. Either way the log is first kept aside whole, and [onError] hears a [KeptAside].
  *
  * Writing never fails the learning that asked for it: text the user picked must reach the app
  * whatever the disk does. A failed write is reported to [onError] and cut back off the file, so
- * later appends do not land behind torn bytes; learning goes on in memory regardless.
+ * later appends do not land behind torn bytes; learning goes on in memory regardless, and [writing]
+ * is false until an append is written again, or the log whole.
  */
 class RecordStore internal constructor(
     private val file: LogFile,
@@ -74,22 +77,14 @@ class RecordStore internal constructor(
 
     private var out: OutputStream? = null
 
-    /**
-     * A seam for a test (EnginesRecordFaultTest): the next write to the open log throws, as a full
-     * disk would, and the store recovers as from one. Not the stream itself, which nothing else in
-     * the module is to swap or drop (F3233).
-     */
-    internal fun refuseNextWrite() {
-        val real = out ?: return
-        out = object : OutputStream() {
-            override fun write(b: Int) = throw IOException("refused")
-            override fun write(b: ByteArray, off: Int, len: Int) = throw IOException("refused")
-            override fun close() = real.close()
-        }
-    }
     // out is null before open and once a failed write stopped the appends: only the first is not open
     private var opened = false
     private var closed = false
+    // the last append failed: the cut-back and the open after it tell nothing of the next write (a full
+    // disk allows both), so only an append written whole clears it, or the log written whole since (a
+    // rewrite, a compaction: R25 F7953, or 「没在保存」 stayed after a clear that rewrote the file till a word was next learned,
+    // for good with learning off)
+    private var refused = false
     // the end of the last record known written whole
     private var end = 0L
     // the counts alone may outgrow compactAt: then compact again only once the log doubles
@@ -101,8 +96,17 @@ class RecordStore internal constructor(
      * A compaction being written by [background], as long as its task returns (-1: nothing to
      * compact), and the records appended to the log since.
      */
-    private class Pending(val task: FutureTask<Long>) {
+    private class Pending(val task: FutureTask<Long>, private val countsWritten: AtomicBoolean) {
         val since = ArrayList<ByteArray>()
+        // an append failed once its counts were written: they tell nothing of the disk now. Not one that failed
+        // before they were (the task run by finish, say, no thread having started it): those counts the disk took
+        // after the refusal (R25 F7982). Written, not the task done: it syncs after its last byte, and a refusal
+        // meanwhile had 「没在保存」 gone one write early, no byte written since (R25 F8008)
+        var refusedSince = false
+
+        fun refused() {
+            if (countsWritten.get()) refusedSince = true
+        }
     }
 
     /**
@@ -125,12 +129,17 @@ class RecordStore internal constructor(
                 format.hasHeader(bytes) -> {
                     var unread = 0
                     var cause: Exception? = null
-                    val end = format.read(bytes, skipped = {
-                        unread++
-                        cause = cause ?: it
-                    }) { type, input -> if (type != EMPTIED) replay(type, input) }
+                    val garbled = ArrayList<IntRange>()
+                    val end = format.read(
+                        bytes,
+                        skipped = {
+                            unread++
+                            cause = cause ?: it
+                        },
+                        garbled = { from, to -> garbled += from until to },
+                    ) { type, input -> if (type != EMPTIED) replay(type, input) }
                     if (unread > 0) onError(IOException("$file: $unread unreadable records skipped", cause))
-                    if (end < bytes.size) cut(bytes, end)
+                    if (garbled.isNotEmpty()) dropGarbled(bytes, end, garbled) else if (end < bytes.size) cut(bytes, end)
                 }
                 // killed before the header was all written: nothing to keep
                 format.header().copyOf(bytes.size).contentEquals(bytes) -> file.write(format.header())
@@ -160,10 +169,32 @@ class RecordStore internal constructor(
             val aside = aside()
             // on disk before the log is cut: else a power cut could lose both
             writeSynced(aside) { it.write(bytes) }
-            onError(IOException("$file damaged at byte $end: kept whole as ${aside.name}"))
+            onError(KeptAside("$file damaged at byte $end: kept whole as ${aside.name}"))
         }
         file.truncate(end.toLong())
         if (damaged && end <= RecordFormat.HEADER_SIZE) file.append().use { it.write(format.record(EMPTIED) {}) }
+    }
+
+    /**
+     * Rewrites the log without the [garbled] records [open] read past, and without what follows
+     * [end], once it is kept whole aside: the other readers of the log (a fold, a rewrite) then
+     * find no record they would stop at, and the next open neither drops nor keeps aside again.
+     */
+    private fun dropGarbled(bytes: ByteArray, end: Int, garbled: List<IntRange>) {
+        val aside = aside()
+        writeSynced(aside) { it.write(bytes) }
+        val tail = if (end < bytes.size && !tornAppend(bytes, end)) ", and stops reading at byte $end" else ""
+        onError(KeptAside("$file: ${garbled.size} garbled records skipped$tail: kept whole as ${aside.name}"))
+        replaceFile(file, file.beside(COMPACTING)) { next ->
+            next.create().use { stream ->
+                var at = 0
+                for (range in garbled) {
+                    stream.write(bytes, at, range.first - at)
+                    at = range.last + 1
+                }
+                stream.write(bytes, at, end - at)
+            }
+        }
     }
 
     /** Whether the records stop at [end] as a torn append leaves them: in a last record whose length, or the bytes it says, run past the end. */
@@ -178,7 +209,7 @@ class RecordStore internal constructor(
     private fun moveAside() {
         val aside = aside()
         if (!file.renameTo(aside)) throw IOException("cannot move $file aside")
-        onError(IOException("$file is not a log this reads: kept as ${aside.name}"))
+        onError(KeptAside("$file is not a log this reads: kept as ${aside.name}"))
     }
 
     // never over an earlier file kept aside: that may be a newer version's log, still wanted
@@ -188,6 +219,24 @@ class RecordStore internal constructor(
         while (aside.taken()) aside = file.beside(UNREADABLE + "." + n++)
         return aside
     }
+
+    /**
+     * Whether appends reach the disk: opened, not closed, and the last one written. After a write that
+     * failed it is false, though the file was cut back and opened again (a full disk allows both, and
+     * refuses the next write as it did this one: R25 F7819), until a later append is written, or the log
+     * whole (a rewrite, a compaction) and opened again; and for good, till the next start, once the file
+     * could not be cut back or opened.
+     */
+    val writing: Boolean get() = out != null && !refused
+
+    /**
+     * Whether a [rewrite] is still tried: false once the log stopped taking writes (one failed, and the file
+     * could not be cut back or opened again), till the next start. True while a full disk refuses the appends
+     * ([writing] false, the log open): a rewrite goes through there once there is room, with no restart, which
+     * is what a caller tells the user apart by (R25 F8037). Asks nothing of the disk, so a compaction being
+     * written that [checkRewrites] would fail to put in place is not known yet.
+     */
+    val takesRewrites: Boolean get() = out != null
 
     private fun tooLong() = end > maxOf(compactAt, 2 * compacted)
 
@@ -202,7 +251,10 @@ class RecordStore internal constructor(
         try {
             stream.write(record)
             end += record.size
+            refused = false
         } catch (e: IOException) {
+            refused = true
+            pending?.refused()
             onError(e)
             recover()
             return false
@@ -232,7 +284,10 @@ class RecordStore internal constructor(
         try {
             stream.write(all)
             end += all.size
+            refused = false
         } catch (e: IOException) {
+            refused = true
+            pending?.refused()
             onError(e)
             recover()
             return false
@@ -296,7 +351,8 @@ class RecordStore internal constructor(
         // one being written in the background goes first: both would write the same file
         pending?.let { finish(it) }
         if (fold != null) {
-            finish(Pending(foldTask(fold)).also { it.task.run() })
+            val written = AtomicBoolean()
+            finish(Pending(foldTask(fold, written), written).also { it.task.run() })
             return
         }
         try {
@@ -316,37 +372,68 @@ class RecordStore internal constructor(
      * leaves the log as it was. A compaction being written is put in place first, so the bytes read
      * are the log as it is, and none is renamed over the rewrite after: this thread alone renames.
      *
-     * @return the bytes written, null if nothing was (false, not open, or a header alone: [onError])
-     * @throws IOException if the disk failed: the log as it was
+     * A rewrite that keeps no record (a header alone: 清掉最近 of a log that holds that time alone, R25
+     * F8000) is written as a log emptied, as a compaction to no counts is: declined, the log kept what
+     * the user was told is cleared.
+     *
+     * A log that stopped taking writes (one failed, and the file could not be cut back or opened again) is not
+     * rewritten, and that is a failure, not nothing to write: read as "nothing of that time in the log", a 清掉最近
+     * was told cleared with the time's records still in the file (R25 F8018).
+     *
+     * @return the bytes written, null if nothing was (false, or not so much as a header: [onError])
+     * @throws IOException if the disk failed, or the log takes no writes: the log as it was
      */
     @Throws(IOException::class)
     fun rewrite(transform: (ByteArray, OutputStream) -> Boolean): ByteArray? {
-        check(opened && !closed) { "not open" }
-        if (out == null) return null
-        pending?.let { finish(it) }
-        if (out == null) return null
+        checkRewrites()
         val written = ByteArrayOutputStream()
         if (!transform(file.read(), written)) return null
-        // a header alone is a log a start seeds again (as a first one): never written for one emptied
-        if (written.size() <= RecordFormat.HEADER_SIZE) {
-            onError(IOException("a rewrite to a header alone declined"))
+        if (written.size() < RecordFormat.HEADER_SIZE) {
+            onError(IOException("a rewrite to less than a header declined"))
             return null
         }
+        // a header alone is a log a start seeds again (as a first one): one emptied is marked so, as by [countsTo]
+        if (written.size() == RecordFormat.HEADER_SIZE) written.write(format.record(EMPTIED) {})
         // a failure the caller's to tell (a clear that did not clear): the file as it was, still open
         replaceFile(file, file.beside(COMPACTING)) { it.write(written.toByteArray()) }
         reopen(compactedTo = file.length())
         return written.toByteArray()
     }
 
-    /** Folds the log's first [end] bytes into the next file, written and synced: its length, or -1 for nothing to fold. */
-    private fun foldTask(fold: Fold): FutureTask<Long> {
+    /**
+     * What [rewrite] checks before it reads the log, for a caller with something to undo first that a rewrite
+     * sure to fail must leave (a clear's backups, deleted before its rewrite: R25 F8021): a compaction being
+     * written is put in place, as [rewrite] does.
+     *
+     * @throws IOException if the log takes no writes: [rewrite] would throw the same
+     */
+    @Throws(IOException::class)
+    fun checkRewrites() {
+        check(opened && !closed) { "not open" }
+        if (out == null) throw stopped()
+        pending?.let { finish(it) }
+        // putting the compaction in place may have failed to open the log again
+        if (out == null) throw stopped()
+    }
+
+    private fun stopped() = IOException("$file takes no writes (a write failed, or it did not open again): not rewritten")
+
+    /**
+     * Folds the log's first [end] bytes into the next file, written and synced: its length, or -1 for nothing to fold.
+     * [written] is set once its last byte is written, before the sync ([Pending.refused]).
+     */
+    private fun foldTask(fold: Fold, written: AtomicBoolean): FutureTask<Long> {
         val length = end
         val next = file.beside(COMPACTING)
         return FutureTask(
             Callable {
                 val log = file.read(length.toInt())
                 var folded = false
-                writeSynced(next) { folded = fold.fold(log, it) }
+                writeSynced(next) {
+                    folded = fold.fold(log, it)
+                    // nothing folded, nothing written
+                    if (folded) written.set(true)
+                }
                 if (folded) {
                     next.length()
                 } else {
@@ -362,15 +449,25 @@ class RecordStore internal constructor(
      * [finish] puts them in place.
      */
     private fun compactInBackground(executor: Executor) {
+        // set by the task, on the executor's thread, once its last byte is written; read by this one at a refusal
+        val written = AtomicBoolean()
         val task = if (fold != null) {
-            foldTask(fold)
+            foldTask(fold, written)
         } else {
             // as long as the log, which open read whole, so seldom grown; handed on as it is, not copied
             val bytes = ByteArrayOutputStream(end.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()).also { countsTo(it, seeding = false) }
             val next = file.beside(COMPACTING)
-            FutureTask(Callable { writeSynced(next) { bytes.writeTo(it) }.let { bytes.size().toLong() } })
+            FutureTask(
+                Callable {
+                    writeSynced(next) {
+                        bytes.writeTo(it)
+                        written.set(true)
+                    }
+                    bytes.size().toLong()
+                },
+            )
         }
-        val compacting = Pending(task)
+        val compacting = Pending(task, written)
         pending = compacting
         try {
             executor.execute(compacting.task)
@@ -401,7 +498,8 @@ class RecordStore internal constructor(
             compacted = end
             return
         }
-        reopen(compactedTo = size)
+        // written after the last refusal: the counts (their last byte after it), or what was appended since behind them just now
+        reopen(compactedTo = size, wrote = !compacting.refusedSince || compacting.since.isNotEmpty())
     }
 
     /** Appends to the [size] bytes of counts [compacting] wrote in [next] what was appended to the log since, and syncs it. */
@@ -439,8 +537,11 @@ class RecordStore internal constructor(
         }
     }
 
-    /** Appends from the end of the log just renamed over the old one, of which [compactedTo] bytes are counts. */
-    private fun reopen(compactedTo: Long) {
+    /**
+     * Appends from the end of the log just renamed over the old one, of which [compactedTo] bytes are counts.
+     * [wrote]: the disk took bytes of it after the last append it refused, so, opened, it is [writing] again.
+     */
+    private fun reopen(compactedTo: Long, wrote: Boolean = true) {
         // the old stream writes to the file renamed over, now unlinked
         try {
             out?.close()
@@ -450,7 +551,7 @@ class RecordStore internal constructor(
         end = file.length()
         compacted = compactedTo
         out = try {
-            openAppend(file)
+            openAppend(file).also { if (wrote) refused = false }
         } catch (e: IOException) {
             onError(e)
             null
@@ -505,9 +606,25 @@ class RecordStore internal constructor(
         out = null
     }
 
+    /**
+     * What [onError] hears when the log, or part of it, could not be read and was kept aside whole
+     * ([isAside]): learning goes on from what read, which the user is to be told (0.6.1 audit decode-1).
+     */
+    class KeptAside(message: String) : IOException(message)
+
     companion object {
         const val DEFAULT_COMPACT_AT = 1L shl 20
         const val UNREADABLE = ".unreadable"
+
+        /**
+         * Whether [name] is a copy of the log named [log] kept aside ([KeptAside]): `<log>.unreadable`,
+         * then `.unreadable.1`, `.2`... The one rule for the app and the clears, which name it nowhere else.
+         */
+        fun isAside(log: String, name: String): Boolean {
+            if (!name.startsWith(log + UNREADABLE)) return false
+            val rest = name.substring(log.length + UNREADABLE.length)
+            return rest.isEmpty() || (rest.length > 1 && rest[0] == '.' && rest.drop(1).all { it in '0'..'9' })
+        }
         private const val COMPACTING = ".compacting"
         // of no fields, and a type no format's records have: they count from 1, and skip types they do not know
         private const val EMPTIED: Byte = 0

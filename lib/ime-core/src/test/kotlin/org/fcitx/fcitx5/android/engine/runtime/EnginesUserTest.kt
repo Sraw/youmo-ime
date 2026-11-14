@@ -54,7 +54,7 @@ class EnginesUserTest : EnginesFixture() {
             assertEquals("", VoiceHotwords.ofUser(engines.userWords()).hotwords)
             pickedApart()
             assertEquals("拟 好", VoiceHotwords.ofUser(engines.userWords()).hotwords)
-            assertEquals("", VoiceHotwords.ofUser(engines.userWords(), habits = false).hotwords)
+            assertEquals("", VoiceHotwords.ofUser(engines.userWords()).withHabits(false).hotwords)
         }
     }
 

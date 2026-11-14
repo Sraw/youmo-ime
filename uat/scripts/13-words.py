@@ -384,6 +384,7 @@ case("WD-14z", needs="jvm:LexiconUatTest.aScelFileIntoTheUserDictionaryIsImporte
 
 
 case("WD-14z2", needs="jvm:BaseDictionaryUpgradeUatTest.aScelFileIntoTheBaseIsConvertedAndMerged")(lambda d: None)
+case("WD-14z3", needs="jvm:PinyinDictManagerTest.aBinaryDictionaryPastItsCapIsRefusedAsItIsCopied")(lambda d: None)
 
 
 def title_of(s):
@@ -781,13 +782,17 @@ def wd37(d):
 
 # ---------------------------------------------------------------- R11: 清空学到的 / 全部清空
 
-case("WD-25", needs="jvm:LexiconUatTest.clearingTheLearnedKeepsYourWordsUnlessAll")(lambda d: None)
+case("WD-25", needs="jvm:LexiconUatTest.clearingTheLearnedKeepsYourWordsUnlessAll、WordListsTest.aClearEmptiesTheListsAndTheLinesThatDoNotRead、"
+     "EnginesLearningTest.aClearOfEverythingEmptiesTheWordListsOfTheLinesThisBuildDoesNotRead、WordListsTest.aClearDeletesAListThatDidNotRead")(lambda d: None)
 
 
 case("WD-30", needs="jvm:SettingsPagesUatTest.searchDeleteSeveralAndTakeThemBack")(lambda d: None)
 
 
 case("WD-38", needs="jvm:DictionaryFormatTest.aFewWordsAloneInAGbkFileWithPinyinRefuseNothing")(lambda d: None)
+
+
+case("WD-37a", needs="jvm:SettingsPagesUatTest.anImportFillsTheCustomPhrasesToTheirLimitAndSaysTheRest")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 常用词 (060-common-words)
@@ -880,3 +885,36 @@ def wd42(d):
 
 
 case("WD-45", needs="jvm:CommonWordsTest.replacementsAreKeptOnceNineAtMostTheWordItselfToo、CommonWordsInSessionTest.theWordItselfAsAReplacementGoesFirst")(lambda d: None)
+case("WD-46", needs="jvm:StatusAreaNotSavingTest.thePanelSaysLearningIsNotSavedOnlyWhileItIsNot、"
+     "StatusAreaNotSavingTest.thePanelAsksOnlyWhetherLearningSavesNotTheOverview、"
+     "UserWordsNotSavingTest.thePageSaysLearningIsNotSavedOnlyWhileItIsNot、"
+     "EnginesRecordFaultTest.aRecordThatStoppedTakingWritesIsNotSaving、"
+     "LearnLogTest.aRecordWhoseFileDidNotOpenTakesNoRewrite、"
+     "EnginesRecordFaultTest.aRecordWhoseWritesKeepFailingIsNotSavingUntilOneIsWritten、"
+     "RecordStoreTest.aStoreWhoseWritesKeepFailingIsNotWritingUntilOneIsWritten、"
+     "RecordStoreTest.aStoreAWriteWasRefusedIsWritingAgainOnceTheLogIsWrittenWhole、"
+     "EnginesRecordFaultTest.aRecordAWriteWasRefusedIsSavingAgainOnceAClearRewroteIt、"
+     "RecordStoreTest.aCompactionPutInPlaceAfterAWriteRefusedIsWritingOnlyIfWrittenSince、"
+     "LearningControlTest.aClearOfASpanTheDiskRefusedTakesItFromMemoryToo、LearningControlTest.aClearOfARecordThatStoppedTakingWritesFailsWithNothingCleared、EnginesRecordFaultTest.aClearOfARecordThatStoppedTakingWritesSaysItFailed、RecordStoreTest.aRewriteOfALogNotOpenedAgainBehindItsCompactionThrowsAndWritesNothing、LearningClearedTest.aFailedClearSaysToRestartOnlyWhenTheRecordTakesNoRewrite、"
+     "LearningControlTest.aForgetTheFileNeverTookIsTakenBackInMemoryAndOneItHoldsFailsWithItsRewrite、"
+     "LearningControlTest.anActTheFileRefusedIsTakenBackOnlyWhereNothingElseIsUnwritten、LearningControlTest.aForgetTakenBackFailsWhereTheFileDoesNotReadOrIsStillFull、"
+     "EnginesRecordFaultTest.aForgetTheDiskRefusedIsTakenBackInMemory、"
+     "EnginesRecordFaultTest.aForgetOnDiskWhoseRewriteFailsSaysItFailed、"
+     "BackupControlTest.aRecordThatStoppedTakingWritesIsNeitherRestoredToNorRevertedAndAStashWaits、"
+     "LearningClearedTest.aBackupActThatFailedSaysToRestartOnlyIfItRewritesTheRecord、"
+     "CandidateMenuUatTest.anUndoThatFailedSaysWhatToDo、"
+     "SettingsPagesUatTest.anUndoOfARemovalNotTakenBackSaysWhy、"
+     "UnwrittenLearningControlTest.aForgetOnARecordThatDidNotOpenIsNoLongerTakenBack、"
+     "UnwrittenLearningControlTest.aPinOrANoPredictIsTakenBackByItsOppositeWhateverIsUnwritten、"
+     "UnwrittenLearningControlTest.whatIsUnwrittenIsCountedARecordAndAnewOnceTheStateIsTheFiles、"
+     "EnginesRecordFaultTest.aDeleteRefusedAfterTheOneAlikeTakesItBackOnlyWhereNothingElseIsUnwritten")(lambda d: None)
+case("WD-47", needs="jvm:RecordStoreTest.recordsGarbledMidLogAreDroppedAndTheRestReadOn、"
+     "RecordStoreTest.aLogThatIsNotOneThisReadsIsKeptAsideAndSaidSo、"
+     "EnginesLearningTest.aClearTakesTheCopiesOfTheRecordKeptAside、"
+     "EngineBridgeTest$Made.aLearningRecordThatDoesNotReadIsSaidKeptAside、EngineBridgeTest$Made.whatTheEngineCouldNotReadOrWriteIsSaidInItsOwnWords")(lambda d: None)
+case("WD-48", needs="jvm:WordListsTest.aListThatCannotBeWrittenIsKeptInMemory、"
+     "EnglishBlocksTest.aBlockThatCannotBeKeptIsBlockedInMemoryAndToldAsUnsaved、"
+     "EngineBridgeTest$Made.whatTheEngineCouldNotReadOrWriteIsSaidInItsOwnWords、"
+     "EngineBridgeTest$Made.aPhraseOrCommonWordNotSavedIsSaidOnceInItsOwnWordsNotAsLearning、"
+     "EngineBridgeTest.aKeyboardChangeNotSavedIsSavedWithTheNext、EngineBridgeTest.aCommonWordsChangeNotSavedIsSavedWithTheNext")(lambda d: None)
+case("WD-49", needs="manual:「打开方式」是系统文件应用的界面（从设备存储的 Download 打开）；在真机或模拟器上手工跑")(lambda d: None)

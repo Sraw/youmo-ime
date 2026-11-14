@@ -502,3 +502,69 @@ def py116(d):
 
 case("PY-117", needs="jvm:WordListsTest.aBlockedLatinWordReadsBackAsItsLetters、EnginesUserWordsTest.aLatinWordBlockedInPinyinStaysBlockedAfterARestartTillRestored")(lambda d: None)
 case("PY-119", needs="jvm:FastTypingTest.fourteenKeysTwoFingersOnOneKeyTypeEachItsHalf")(lambda d: None)
+case("PY-120", needs="jvm:EnginesStrokeLookupChainTest.withoutAKeyPassedOnWhatWasCommittedIsTheContext、"
+     "EnginesStrokeLookupChainTest.enterPassedOnToTheAppDropsWhatWasCommittedBefore")(lambda d: None)
+
+
+@case("PY-121", base="B0-设置", mutates=True, visual=True)
+def py121(d):
+    """the readings are drawn, not in the bar's accessibility: the machine finds the rare characters of
+    chun in the expanded list, the shots show their toneless chun (none in zhuyin) and each row's
+    characters on one line; and the floating window's emoji and word in English beside candidates read
+    (its JVM test lays out a Han character alone, R25r5 F8001)"""
+    rare = ("䏝", "䏰", "䄝")
+    d.goto("通用输入")
+    choose(d, "候选词注音", "拼音")
+    d.open_page("text")
+    found = []
+    for style in ("拼音", "注音符号"):
+        if style == "注音符号":
+            d.clear()
+            d.goto("通用输入")
+            choose(d, "候选词注音", "注音符号")
+            d.open_page("text")
+        d.type("chun")
+        d.cands()
+        b = d.screen().find(desc="展开候选词列表", where="ime")
+        if not b:
+            raise Blocked("chun 的候选栏没有「展开候选词列表」")
+        d.tap(b.c, 0.6)
+        found = []
+        for _ in range(15):
+            s = d.screen()
+            grid = s.find(rid="expanded_candidate_view", where="ime")
+            texts = [n.text.split(" ", 1)[0] for n in (grid.walk() if grid else []) if n.cls == "TextView" and n.text]
+            found = [c for c in rare if c in texts]
+            if found:
+                break
+            nxt = s.find(desc="更多候选词", where="ime")
+            if not nxt or not nxt.enabled:
+                break
+            d.tap(nxt.c, 0.5)
+        check(found, f"{style}：chun 的展开候选里没翻到 {'、'.join(rare)}")
+        d.shot("kb", f"{style}：{'、'.join(found)} " + ("上方是不带声调的 chun，别的字带调" if style == "拼音" else "不标注音")
+               + "；每一行的字底边在一条线上")
+        if style == "拼音":
+            d.clear()
+            d.type("haha")
+            d.cands()
+            d.shot("kb", "拼音：表情这种没注音的候选和有注音的字底边对齐")
+            d.clear()
+            # the window by the cursor, on the emulator's USB keyboard (the next case's baseline unplugs it
+            # if this one stops before the down); a shot of the top half, where the test page's field is
+            d.kb("up")
+            try:
+                time.sleep(3)
+                for keys, what in (("haha", "表情"), ("iphone", "「iPhone」这种英文")):
+                    d.kb("type", keys)
+                    time.sleep(1)
+                    d.shot("top", f"拼音、悬浮候选窗：{what}和有注音的候选一样高、底边对齐")
+                    d.kb("key", "ESC")
+                    time.sleep(0.5)
+            finally:
+                d.kb("down")
+                time.sleep(3)
+    return f"翻到 {'、'.join(found)}，读音和对齐看图"
+
+
+case("PY-121a", needs="manual:youmo29（API 29）上测试页打不开（WebView shell 要 API 34+）：在输入测试台 types 页的 text 框接 emu-keyboard.sh 的实体键盘手工跑，看悬浮候选窗的图")(lambda d: None)

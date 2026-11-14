@@ -31,7 +31,6 @@ import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.extract
 import org.fcitx.fcitx5.android.utils.isPlainFileName
-import org.fcitx.fcitx5.android.utils.withTempDir
 import timber.log.Timber
 import java.io.File
 import java.io.FileFilter
@@ -449,55 +448,13 @@ object ThemeFilesManager {
     }
 
     /**
-     * [theme] as a theme 3.0 zip (its files, then its json), as the app exported before 0.6.0 and the theme
-     * maker's page still makes and reads: the zips the page's tests read are written by it (ThemeMakerRulesTest).
+     * A 3.0 theme imported: [created] new (not one of its name replaced), [migrated] from an older format;
+     * [renamedFrom] its name in the file where that was taken, saved under [theme]'s ([importJson]).
      */
-    @VisibleForTesting
-    internal fun exportJson(theme: Theme.Custom, dest: OutputStream) =
-        runCatching {
-            ownFiles(theme, dest)
-            ZipOutputStream(dest.buffered()).use { zipStream ->
-                // the files it names, by name: we don't export their internal paths
-                theme.look.files().forEach { path ->
-                    zipStream.putNextEntry(ZipEntry(File(path).name))
-                    File(path).inputStream().use { it.copyTo(zipStream) }
-                }
-                val tweakedTheme = theme.withFileNames()
-                zipStream.putNextEntry(ZipEntry("${tweakedTheme.name}.json"))
-                zipStream.write(
-                    Json.encodeToString(CustomThemeSerializer, tweakedTheme)
-                        .encodeToByteArray()
-                )
-                // done
-                zipStream.closeEntry()
-            }
-        }
-
-    /** A theme imported: [created] new (not one of its name replaced), [migrated] from an older format. */
-    /** A 3.0 theme imported: [renamedFrom] its name in the file where that was taken, saved under [theme]'s ([importJson]). */
     data class Imported(val created: Boolean, val theme: Theme.Custom, val migrated: Boolean, val renamedFrom: String? = null)
 
     /**
-     * Imports the theme zip [src]. [themes] are the themes there are, taken where they are changed (the
-     * main thread) before this runs on another: it reads them, not the list being changed.
-     */
-    fun importTheme(src: InputStream, themes: List<Theme> = ThemeManager.getAllThemes()): Result<Imported> =
-        runCatching {
-            if (!writable) notSettled()
-            ZipInputStream(src).use { zipStream ->
-                withTempDir { tempDir ->
-                    // counted as it is unpacked: refused at the first entry past a limit, a zip bomb too
-                    // a theme's files are at the zip's top, as it is exported; what is in a folder is counted, not taken
-                    val extracted = zipStream.extract(tempDir, flat = true) { count, size, total ->
-                        ThemeAssetLimits.entry(count, size, total)?.let(::refused)
-                    }
-                    importJson(extracted, themes)
-                }
-            }
-        }
-
-    /**
-     * What a theme zip held ([openTheme]): a 3.0 theme, imported as [importTheme] does; or a 4.0 pack, checked
+     * What a theme zip held ([openTheme]): a 3.0 theme, imported at once ([importJson]); or a 4.0 pack, checked
      * whole and not yet taken, for the user to see ([ThemePackFiles.Staged]) and take ([Pack.commit]) or not
      * ([Pack.discard]).
      */
@@ -591,7 +548,8 @@ object ThemeFilesManager {
     private const val STALE_UNPACKED_MS = 60 * 60 * 1000L
 
     /**
-     * Opens the theme zip [src] ([themes] as [importTheme]'s): one with a `theme.xml` at its top is a theme 4.0
+     * Opens the theme zip [src] ([themes]: the themes there are, taken where they are changed (the
+     * main thread) before this runs on another, so that it reads them, not the list being changed): one with a `theme.xml` at its top is a theme 4.0
      * pack (060-render-p3 T8a), unpacked (its top and `layouts/`, counted and held to the limits as it is),
      * checked whole ([ThemePackFiles.check]) and kept unpacked for [Opened.Pack.commit]; any other a 3.0 theme
      * (or older), imported at once as before.
@@ -726,7 +684,7 @@ object ThemeFilesManager {
         if (staged.name in ThemeManager.BuiltinPackNames) errorRuntime(R.string.exception_theme_name_clash)
     }
 
-    // the theme 3.0 json among [extracted] (an older one's too) imported with its files ([importTheme])
+    // the theme 3.0 json among [extracted] (an older one's too) imported with its files ([openTheme])
     private fun importJson(extracted: List<File>, themes: List<Theme>): Imported {
         // not a Mac's "._<name>" beside it (its attributes, some zippers put at the top)
         val jsonFile = extracted.find { it.isFile && it.extension == "json" && !it.name.startsWith("._") }

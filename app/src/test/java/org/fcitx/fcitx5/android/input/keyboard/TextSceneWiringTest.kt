@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.core.EngineState
@@ -18,7 +19,10 @@ import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.LayoutSource
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -257,6 +261,61 @@ class TextSceneWiringTest {
                 val y = at.second + (g.bounds.exactCenterY() - first.exactCenterY()) / unitY
                 assertEquals("g at ${g.bounds}", 0f, layout.distance('g', x, y), 0.02f)
             }
+        }
+    }
+
+    // R25r3 F7963: the letters were found by their keys' ids (a single a–z). A letters board has a key of each of
+    // those ids, or it does not read (LayoutReader), but nothing holds the key of id q to sending q (PackLayouts.judge
+    // asks for none): with an id that is not what the key sends, the glide read another letter than a tap types.
+    // Here the app's 26 keys with every letter's id another letter's (a's z, b's y, …), and P's key sending q as Q's
+    // does: the glide is read, each letter where the key sending it is drawn, and q on Q's key alone, the first of
+    // the two in the layout's order
+    @Test
+    @Uat("KB-33")
+    fun aGlideReadsEachLetterWhereTheKeySendingItIsWhateverItsId() {
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
+        val sourceWas = SceneLayouts.source
+        SceneLayouts.source = { ctx ->
+            val app = BuiltInLayouts(ctx)
+            object : LayoutSource {
+                override val key = "qwerty-ids-not-letters"
+
+                override fun text(id: String) = if (id != "qwerty") app.text(id) else app.text(id)!!
+                    .replace(Regex("<key id=\"([a-z])\" ")) { "<key id=\"${'a' + ('z' - it.groupValues[1].single())}\" " }
+                    .replace("send=\"p\"", "send=\"q\"")
+            }
+        }
+        try {
+            KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
+                // the source's layout is the one drawn: Q's key is named j, and no letter's key by its letter
+                assertEquals("j", h.key("q").id)
+                assertTrue(h.keys().map { it.label to it.id }.toString(), h.keys().none { k -> k.id?.singleOrNull()?.let { it in 'a'..'z' } == true && k.id == k.label })
+                val keys = "qzm".map { h.key("$it") }
+                val first = keys.first().bounds
+                h.drag(keys.first(), first.exactCenterX(), first.exactCenterY(), steps = 0, lift = false)
+                for (k in keys.drop(1)) h.move(k.bounds.exactCenterX(), k.bounds.exactCenterY())
+                h.move(keys.last().bounds.exactCenterX(), keys.last().bounds.exactCenterY(), steps = 1, lift = true)
+                val layout = h.api.glides.single().layout
+                val q = layout.centre('q')
+                for ((i, c) in "zm".withIndex()) {
+                    val k = keys[i + 1].bounds
+                    val read = layout.centre(c)
+                    assertEquals("$c x", (k.exactCenterX() - first.exactCenterX()) / first.width(), read.first - q.first, 0.02f)
+                }
+                // P's key types q too: no p in the layout, and q is not there, nine keys from Q's
+                assertTrue("p read", 'p' !in layout)
+                val p = h.key("p").bounds
+                val across = (p.exactCenterX() - first.exactCenterX()) / first.width()
+                assertEquals("q's nearest key from P's", across, layout.distance('q', q.first + across, q.second), 0.02f)
+                // R25r4 F7971: the bubble too is the letter the key sends, not its id (Q's key is named j); a press as a
+                // tap's, glide typing off
+                prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Off)
+                h.press(h.key("q"))
+                assertEquals(listOf("q"), h.popupChoices().map { it.text.lowercase() })
+                h.release()
+            }
+        } finally {
+            SceneLayouts.source = sourceWas
         }
     }
 

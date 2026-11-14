@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <stdexcept>
+#include <string>
 #include <utility>
 #if __OHOS__
 #include "hilog/log.h"
@@ -51,11 +53,18 @@
   } while (0)
 #endif
 
-#define SHERPA_ONNX_EXIT(code) \
-  do {                         \
-    fflush(stdout);            \
-    fflush(stderr);            \
-    _Exit(code);               \
+// youmo: thrown, not _Exit: a voice pack's model that does not load (a
+// metadata key missing, tokens.txt not the model's) ended the keyboard's
+// process with nothing said. The JNI entry points' SafeJNI turns it into a
+// Java RuntimeException, which voice input tells as the model failing to
+// load; a host tool's main ends on it uncaught, as it ended before
+#define SHERPA_ONNX_EXIT(code)                                              \
+  do {                                                                      \
+    fflush(stdout);                                                         \
+    fflush(stderr);                                                         \
+    throw std::runtime_error(std::string("sherpa-onnx: error ") +           \
+                             std::to_string(code) + " at " + __FILE__ + ":" + \
+                             std::to_string(__LINE__));                     \
   } while (0)
 
 // Read an integer

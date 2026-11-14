@@ -5,7 +5,6 @@
 
 import org.gradle.api.GradleException
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -62,18 +61,51 @@ class AssetPacksBundleTest {
         assertEquals(mapOf("text" to false, "voice" to true), changed)
     }
 
+    // a refused release leaves nothing that looks releasable: every check before the first file is written
     @Test
-    fun aTestKeyPackOrAChangeUnderTheSameVersionWritesNothing() {
+    fun aRefusedReleaseWritesNothing() {
+        fun write(apkFile: File = apk(), text: AssetPacksPlugin.Listing = listing("text"), voice: AssetPacksPlugin.Listing = listing("voice"), version: String = "0.6.0",
+                  before: Map<String, AssetPacksPlugin.Listing> = emptyMap(), profileable: Boolean = false): (File) -> Unit =
+            { out -> AssetPacksPlugin.writeBundles(apkFile, text, voice, version, before, out, profileable) }
+        val unsigned = folder.root.resolve("app-arm64-v8a-release-unsigned.apk").apply { writeText("apk") }
+        // each row's own refusal (its exception and a word of its message): one refused by an earlier check,
+        // or for a reason of the fixture's (a file missing), would pass a table that took any refusal
+        val stateException = IllegalStateException::class.java
+        val gradleException = GradleException::class.java
+        val rows = listOf(
+            Triple("a pack signed with the test key: a phone with the release build refuses it", stateException to "test key",
+                write(text = listing("text", releaseKey = false))),
+            Triple("a pack's content changed under the last release's version: phones that have it would not take the new one",
+                gradleException to "content changed",
+                write(text = listing("text", content = "new"), before = mapOf("text" to listing("text", content = "old")))),
+            Triple("a pack's version below the last release's: a phone with the newer one refuses the lower", gradleException to "is below",
+                write(voice = listing("voice", version = 1), before = mapOf("voice" to listing("voice", version = 2, content = "old")))),
+            // build-03: the APK must be the release's own
+            Triple("the APK unsigned (AGP's *-unsigned.apk: no release key set)", gradleException to "is not signed", write(apkFile = unsigned)),
+            Triple("a profileable APK: a test build's", gradleException to "profileable", write(profileable = true)),
+            Triple("built past the tag", gradleException to "not a release's tag", write(version = "0.6.0-5-gabc1234")),
+            Triple("built off any tag", gradleException to "not a release's tag", write(version = "0.6.0-untagged")),
+            Triple("built past a pre-release's tag", gradleException to "not a release's tag", write(version = "0.6.0-beta1-3-gabc1234")),
+        )
+        val wrong = rows.mapIndexedNotNull { i, (why, refusal, release) ->
+            val (kind, word) = refusal
+            val out = folder.root.resolve("out-$i")
+            val thrown = runCatching { release(out) }.exceptionOrNull()
+            when {
+                thrown == null -> "$why: not refused"
+                thrown::class.java != kind || word !in thrown.message.orEmpty() -> "$why: $thrown"
+                out.exists() -> "$why: wrote ${out.list()?.toList()}"
+                else -> null
+            }
+        }
+        assertEquals(emptyList<String>(), wrong)
+    }
+
+    @Test
+    fun aPreReleaseAtItsTagIsShipped() {
         val out = folder.root.resolve("out")
-        assertThrows(IllegalStateException::class.java) {
-            AssetPacksPlugin.writeBundles(apk(), listing("text", releaseKey = false), listing("voice"), "0.6.0", emptyMap(), out)
-        }
-        assertFalse(out.exists())
-        val before = mapOf("text" to listing("text", content = "old"))
-        assertThrows(GradleException::class.java) {
-            AssetPacksPlugin.writeBundles(apk(), listing("text", content = "new"), listing("voice"), "0.6.0", before, out)
-        }
-        assertFalse(out.exists())
+        AssetPacksPlugin.writeBundles(apk(), listing("text"), listing("voice"), "0.6.1-beta1", emptyMap(), out)
+        assertTrue(out.resolve("youmo-0.6.1-beta1.apk").isFile)
     }
 
     @Test

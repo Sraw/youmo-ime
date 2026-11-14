@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.ListedItem
@@ -21,14 +20,5 @@ class UserWordsClearTest {
         // the engine not there: what was counted
         assertEquals(1, blockedThatReturn(mapOf(UserWord.Kind.BLOCKED to 1), LearningResult.Unavailable))
         assertEquals(0, blockedThatReturn(emptyMap(), null))
-    }
-
-    // F3231: 清掉学到的 tells cleared, a disk that failed, or not now (anything else: locked, no engine)
-    @Test
-    fun clearingTellsWhatHappened() {
-        assertEquals(R.string.learning_cleared, clearedMessage(LearningResult.Cleared(0)))
-        assertEquals(R.string.learning_clear_failed, clearedMessage(LearningResult.Failed))
-        assertEquals(R.string.learning_not_now, clearedMessage(LearningResult.Unavailable))
-        assertEquals(R.string.learning_not_now, clearedMessage(null))
     }
 }

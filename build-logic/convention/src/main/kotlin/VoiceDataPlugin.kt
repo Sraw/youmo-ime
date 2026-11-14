@@ -87,12 +87,11 @@ class VoiceDataPlugin : Plugin<Project> {
          * A directory of the 0.6.0 models instead of the downloads, until they are published
          * (dev/design/060-voice-tagger.md §5.1): the streaming transducer's [ORT_FILES], its
          * [MODEL_FILES] and [BPE_MODEL], and the polish tagger's [TAGGER_FILES]. A machine's own,
-         * in ~/.gradle/gradle.properties.
+         * in ~/.gradle/gradle.properties. What the released voice pack v2 had of it: gradle/voice-pack-v2.sha256
+         * (`shasum -a 256 -c` in the directory).
          */
         const val LOCAL_PROPERTY = "youmo.voiceModelDir"
 
-        /** [value] trimmed, a leading `~/` taken as [home] (as it is, a `$` in it no group reference) */
-        fun homed(value: String, home: String): String = value.trim().replaceFirst(Regex("^~(?=/)"), Regex.escapeReplacement(home))
         internal val TAGGER_FILES = listOf("polish-tagger.ort", "polish-tagger.json")
 
         // whether a stretch heard is speech at all (VoiceQuiet): not where it ends, as before 0.6.0

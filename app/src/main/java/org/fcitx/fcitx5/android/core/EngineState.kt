@@ -23,12 +23,6 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyInkGesture
 object EngineState {
 
     /**
-     * What the nine-key keyboard shows beside its keys: whether anything is typed, what its first
-     * digits not yet taken may be, and which list that is (see Snapshot.syllables, syllablesId).
-     */
-    data class T9State(val composing: Boolean = false, val syllables: List<String> = emptyList(), val id: Int = 0)
-
-    /**
      * The syllables offered, as the last event of input method [im] left them: whether anything is
      * typed, what its first keys not yet taken may be, which list that is. Each reader takes its
      * own input method's alone (the nine keys' column pinyin's or 双拼's, the code row's pinyin's), so

@@ -11,8 +11,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
+import org.fcitx.fcitx5.android.input.voice.VoicePolishTags
 import org.fcitx.fcitx5.android.input.voice.VoicePost
 import java.io.File
+import java.io.IOException
 import java.util.Locale
 
 /**
@@ -85,7 +88,16 @@ internal object VoicePostRun {
         /** clips of a set with written references that have none (written_refs.py could not make one): left out */
         var unwritten = 0
 
+        /**
+         * `--source tagged`: clips voice-eval gave no labels, windows of the app's stream not found in its labelled text,
+         * and clips labelled longer than the app's window ([Replay]: their labels saw more than the app's model would)
+         */
+        var untagged = 0
+        var unfound = 0
+        var long = 0
+
         fun add(o: Score) {
+            untagged += o.untagged; unfound += o.unfound; long += o.long
             clips += o.clips; stretches += o.stretches; refWords += o.refWords; wordErrors += o.wordErrors
             refWritten += o.refWritten; writtenErrors += o.writtenErrors
             for (k in tp.indices) { tp[k] += o.tp[k]; fp[k] += o.fp[k]; fn[k] += o.fn[k] }
@@ -169,33 +181,127 @@ internal object VoicePostRun {
      * recognizer's first). The reference is the written one where written_refs.py made it (marks in, fillers and stammers out:
      * what should be typed), else the set's own ([written] false).
      */
-    class Clip(val wav: String, val ref: String, val written: Boolean, val stretches: List<VoicePost.Stretch>)
+    class Clip(val wav: String, val ref: String, val written: Boolean, val stretches: List<VoicePost.Stretch>, val tagged: Tagged? = null)
 
-    fun read(file: File, source: String): List<Clip> = file.readLines().filter { it.isNotBlank() }.map { line ->
+    /**
+     * What the polish tagger made of a clip, run by voice-eval on the text the app's tagger sees (the
+     * stretches' `app` texts joined, normed: VoicePolishStream's), for `--source tagged`: [text]'s code
+     * points and a label each, indices into the tagger json's `ops`, `after` and `num`. The clip's
+     * `"tagged": {"text": …, "op": […], "after": […], "num": […]}`.
+     */
+    class Tagged(val text: IntArray, val labels: VoicePolishStream.Labels)
+
+    /**
+     * [tagged]'s labels for each window the app's stream asks about, found in its text from where the
+     * last one was; one not found (the texts differ) all kept, counted in [misses].
+     *
+     * The labels are the whole clip's, tagged once by voice-eval, not the app's: on the phone the model
+     * sees only the window it is asked about ([VoicePolishStream.WINDOW] characters at most, nothing after
+     * its end) and a character's labels are kept once [VoicePolishStream.FREEZE_AFTER] follow it. So a label
+     * here may have seen more context than the app's would; clips longer than a window, where that is
+     * largest, are counted in the run's `tagged:` line (`long`). A window whose text also comes earlier
+     * from where the last one was (a stammer of a whole window, 对对对…) takes the first one's labels:
+     * nothing counts that.
+     */
+    class Replay(private val tagged: Tagged) : VoicePolishStream.Tagger {
+        var misses = 0
+            private set
+        private var from = 0
+
+        override fun labels(text: IntArray): VoicePolishStream.Labels {
+            val at = find(text, from) ?: find(text, 0)
+            if (at == null) {
+                misses++
+                return VoicePolishStream.Labels(IntArray(text.size), IntArray(text.size))
+            }
+            from = at
+            val l = tagged.labels
+            return VoicePolishStream.Labels(l.op.copyOfRange(at, at + text.size), l.after.copyOfRange(at, at + text.size), l.num.copyOfRange(at, at + text.size))
+        }
+
+        private fun find(text: IntArray, start: Int): Int? = (start..tagged.text.size - text.size).firstOrNull { i ->
+            text.indices.all { tagged.text[i + it] == text[it] }
+        }
+    }
+
+    /**
+     * A file of the run's input that cannot be read as one: said as a failed run (`voice-post: <message>`, exit 1),
+     * not a stack trace. Only [read] and [tags] throw it, so an IllegalArgumentException anywhere else is the
+     * tool's own and still ends the run loudly.
+     */
+    class BadInput(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+    // what a json not of the shape asked for throws: not json or a json shape the accessors refuse (both
+    // IllegalArgumentException, kotlinx's SerializationException among them; a label not a number too), a key missing;
+    // and a file not there or not readable (a path mistyped, the likeliest wrong input: R25r5 F8020)
+    private inline fun <T> parsing(where: String, block: () -> T): T = try {
+        block()
+    } catch (e: IOException) {
+        throw BadInput("$where: ${e.message}", e)
+    } catch (e: IllegalArgumentException) {
+        throw BadInput("$where: ${e.message}", e)
+    } catch (e: NoSuchElementException) {
+        throw BadInput("$where: ${e.message}", e)
+    }
+
+    /**
+     * The tag tables of a polish tagger's json (the voice pack's `polish-tagger.json`), as VoicePolisher reads them;
+     * a file VoicePolishTags refuses (as the app's tagger would fail to load) is [BadInput].
+     */
+    fun tags(file: File): VoicePolishTags = parsing(file.name) {
+        val o = Json.parseToJsonElement(file.readText()).jsonObject
+        fun strings(key: String) = o.getValue(key).jsonArray.map { it.jsonPrimitive.content }
+        VoicePolishTags(strings("ops"), strings("after"), strings("num"))
+    }
+
+    /** [file]'s clips; a line that is not one ([BadInput]) is named by the file and its line number. */
+    fun read(file: File, source: String): List<Clip> = parsing(file.name) { file.readLines() }.withIndex().filter { it.value.isNotBlank() }.map { (i, line) ->
+        parsing("${file.name}:${i + 1}") { clip(file, line, source) }
+    }
+
+    private fun clip(file: File, line: String, source: String): Clip {
         val o = Json.parseToJsonElement(line).jsonObject
         // `"written": null` is no written reference, not the text "null"
         val written = (o["written"] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content
-        Clip(
+        return Clip(
             o.getValue("wav").jsonPrimitive.content,
             written ?: o.getValue("ref").jsonPrimitive.content,
             written != null,
             o.getValue("stretches").jsonArray.map { s ->
                 val st = s.jsonObject
-                VoicePost.Stretch(text(st, source), (st.seconds("start") * 1000).toLong(), (st.seconds("end") * 1000).toLong())
+                VoicePost.Stretch(text(st, source))
+            },
+            (o["tagged"] as? JsonObject)?.let { t ->
+                fun ints(key: String) = t.getValue(key).jsonArray.map { it.jsonPrimitive.content.toInt() }.toIntArray()
+                val text = t.getValue("text").jsonPrimitive.content.codePoints().toArray()
+                val labels = VoicePolishStream.Labels(ints("op"), ints("after"), ints("num"))
+                // a label a character, or Replay would fail halfway through the run on a slice past the end
+                if (labels.op.size != text.size || labels.after.size != text.size || labels.num.size != text.size) {
+                    throw BadInput(
+                        "${file.name}: ${o.getValue("wav").jsonPrimitive.content}: tagged has ${text.size} characters and " +
+                            "${labels.op.size}/${labels.after.size}/${labels.num.size} op/after/num labels",
+                    )
+                }
+                Tagged(text, labels)
             },
         )
     }
 
+    // `tagged`: the rerank's text, as `app`, polished with the tagger's labels
     private fun text(st: JsonObject, source: String) = when (source) {
         "top" -> st.getValue("nbest").jsonArray.firstOrNull()?.jsonPrimitive?.content.orEmpty()
         else -> st.getValue("app").jsonPrimitive.content
     }
 
-    private fun JsonObject.seconds(key: String) = getValue(key).jsonPrimitive.content.toDouble()
 
     /**
      * Scores each file of [paths] and all together; [misses], a TSV of the clips whose written text is not the reference's;
      * [texts], one of every clip scored (what a layer after these, voice-eval's, starts from).
+     * [polish]: with `--source tagged`, the tagger's tables and whether its labels are [VoicePolishTags.guarded]
+     * as the app's are: the whole of the app's post-processing but the homophones (the engine's), so a
+     * retrained tagger is scored much as the user gets it, and each guard is measured by turning them off.
+     * Not quite: the labels are the whole clip's, not the app's windows' ([Replay]); the `tagged:` line
+     * after the table counts the clips longer than a window.
      */
     fun run(
         paths: List<String>,
@@ -203,14 +309,17 @@ internal object VoicePostRun {
         misses: String?,
         out: Appendable,
         texts: String? = null,
+        polish: Polish? = null,
     ): Int {
         misses?.let { File(it).bufferedWriter() }.use { m ->
-            texts?.let { File(it).bufferedWriter() }.use { t -> run(paths, source, m, t, out) }
+            texts?.let { File(it).bufferedWriter() }.use { t -> run(paths, source, m, t, out, polish) }
         }
         return 0
     }
 
-    private fun run(paths: List<String>, source: String, missed: Appendable?, texts: Appendable?, out: Appendable) {
+    class Polish(val tags: VoicePolishTags, val guard: Boolean = true)
+
+    private fun run(paths: List<String>, source: String, missed: Appendable?, texts: Appendable?, out: Appendable, polish: Polish?) {
         val all = Score()
         missed?.appendLine("set\twav\tref\thyp")
         texts?.appendLine("set\twav\tref\thyp")
@@ -224,7 +333,12 @@ internal object VoicePostRun {
             val scored = if (clips.any { it.written }) clips.filter { it.written } else clips
             score.unwritten = clips.size - scored.size
             for (clip in scored) {
-                val hyp = VoicePost.text(clip.stretches)
+                val replay = polish?.let { p -> clip.tagged?.let(::Replay)?.let { it to VoicePolishStream(p.tags, it, guard = p.guard) } }
+                // a clip voice-eval did not tag: as the app's with the tagger failing, and counted
+                if (polish != null && replay == null) score.untagged++
+                if (polish != null && (clip.tagged?.text?.size ?: 0) > VoicePolishStream.WINDOW) score.long++
+                val hyp = VoicePost.text(clip.stretches, replay?.second)
+                replay?.first?.let { score.unfound += it.misses }
                 score.stretches += clip.stretches.size
                 val before = score.writtenErrors
                 score(clip.ref, hyp, score)
@@ -236,6 +350,8 @@ internal object VoicePostRun {
             all.add(score)
         }
         if (paths.size > 1) out.appendLine(row("all", all))
+        // after the table, not a column of it: the table's columns are what voice-eval reads
+        if (polish != null) out.appendLine("tagged: guard=${polish.guard} untagged=${all.untagged} unfound=${all.unfound} long=${all.long}")
     }
 
     private val WHITE = Regex("[\t\r\n]")

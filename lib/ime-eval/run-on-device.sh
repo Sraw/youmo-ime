@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Runs an evaluation set through the engine the debug APK ships (the own engine, since libime
-# left the app) on a connected device or emulator, via EngineEvalRunner, and pulls the result, ready for
+# left the app) on a connected emulator, via EngineEvalRunner, and pulls the result, ready for
 #   ./gradlew :lib:ime-eval:run --args="score data/<set>.tsv <result.tsv> [baseline/<...>.tsv]"
-# Needs an APK build with the NDK (it installs the debug APK); INSTALL=0 runs on the APKs installed by a
-# run before, for several sets in a row.
+# Needs an emulator (uat.py up; uat.py packs installs the debug APK and imports the text pack); INSTALL=0 runs
+# on the APKs installed by a run before, for several sets in a row.
 #   lib/ime-eval/run-on-device.sh [set=pinyin] [ime=engine-pinyin] [out-dir=build/eval]
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,42 +14,33 @@ PKG=${FCITX_PKG:-io.github.sraw.youmo.debug}
 OUT=${3:-$HERE/build/eval}
 
 cd "$REPO"
-if [ "${INSTALL:-1}" != 0 ]; then
-    ./gradlew :app:installDebug :app:installDebugAndroidTest :app:packTextPack --offline -q
-    # the engine's data is the text pack's, imported as uat.py's `packs` does (debug builds trust its test key)
-    uri=content://$PKG.uat.packs
-    state=$(adb shell content call --uri "$uri" --method state | tr -d '\r')
-    for f in "$REPO"/app/build/packs/youmo-text-v*.youmopack; do
-        n=$(basename "$f")
-        v=${n#youmo-text-v}; v=${v%.youmopack}
-        # the same pack already there: not written again (hundreds of MB). The same version is not enough:
-        # a rebuild keeps text.version, so the file's SHA-256 last pushed to this device is kept on the host.
-        # It assumes this script is the device's only importer: a serial used again by another AVD, or a pack
-        # of the same version imported otherwise (uat.py packs from another worktree), wants the mark deleted
-        sha=$(shasum -a 256 "$f" | cut -d' ' -f1)
-        mark="$HERE/build/eval/pushed-$(adb get-serialno | tr -d '\r')-$n.sha256"
-        case "$state" in
-            *"text=v$v"[!0-9]*|*"text=v$v") [ "$(cat "$mark" 2>/dev/null)" != "$sha" ] || continue ;;
-        esac
-        adb shell content write --uri "$uri/$n" < "$f"
-        adb shell content call --uri "$uri" --method import --arg "$n" | grep -Eq 'result=(imported|already)' || { echo "the text pack was not imported: $n" >&2; exit 1; }
-        mkdir -p "$(dirname "$mark")" && echo "$sha" > "$mark"
-    done
-fi
 # the runner starts its own engine in the app's process; if fcitx were the active keyboard, its
 # service would hold a second engine there, on the same data files. So another enabled keyboard
-# takes over for the run, and the user's is put back after it
+# takes over for the run, and the user's is put back after it: the one before the install, which
+# makes this one the keyboard (uat.py packs: ime set)
 keyboard() { adb shell settings get secure default_input_method | tr -d '\r'; }
 KEYBOARD=$(keyboard)
-if [[ $KEYBOARD == "$PKG/"* ]]; then
-    restore() {
-        local status=$?
+restore() {
+    local status=$?
+    # none chosen before (a new emulator answers "null"): nothing to put back. Else set before the install,
+    # which makes this one the keyboard first: an install or an import that fails after it put back too
+    if [[ -n $KEYBOARD && $KEYBOARD != null && $(keyboard) != "$KEYBOARD" ]]; then
         adb shell ime set "$KEYBOARD" >/dev/null 2>&1 || true
         # by what is set, not by adb's status: adb shell passes on no exit status before Android 7.0
         [[ $(keyboard) == "$KEYBOARD" ]] || echo "the keyboard was not put back: adb shell ime set $KEYBOARD" >&2
-        exit "$status"
-    }
-    trap restore EXIT
+    fi
+    exit "$status"
+}
+trap restore EXIT
+if [ "${INSTALL:-1}" != 0 ]; then
+    ./gradlew :app:assembleDebug :app:installDebugAndroidTest :app:packTextPack --offline -q
+    # the APK and the text pack as a UAT run has them: uat.py installs the debug APK and imports the pack,
+    # skipping one already there (the same version and the same file); one importer, one rule for "there"
+    serial=$(adb get-serialno | tr -d '\r')
+    [[ $serial == emulator-* ]] || { echo "$serial: uat.py packs takes an emulator; on a phone import the text pack in Settings" >&2; exit 1; }
+    python3 "$REPO/uat/tools/uat.py" packs --port "${serial#emulator-}" --no-voice
+fi
+if [[ $(keyboard) == "$PKG/"* ]]; then
     OTHER=$(adb shell ime list -s | tr -d '\r' | grep -v -m 1 "^$PKG/" || true)
     [ -z "$OTHER" ] || adb shell ime set "$OTHER" >/dev/null 2>&1 || true
     if [[ $(keyboard) == "$PKG/"* ]]; then

@@ -140,12 +140,18 @@
 - **预期**：拼音里有「量子文化村」（基础词库是设置，不是习惯），jingyuan 里没有手动加的「鲸园」；五笔 j b y s 的候选里有「量子计算机」「量子文化村」。
 - **JVM**：`PrivacyUatTest.notUsingHabitsTheBaseDictionaryStillTypes`（:lib:ime-eval:uatTest，真数据）（合并文件里的量子文化村照样打得出，手动加的鲸园没有，五笔 jbys 有量子计算机、量子文化村）；设备上不跑。
 
+### PR-17b [P2] 不用我的输入习惯：码表里「日期」带出自带的日期，不看自己的短语
+- **前提**：B0-设置；添加五笔；在 **词库与短语 → 自定义短语** 里加 `rq` → 我的日期（这时码表里「日期」后面不再带自带的日期）。
+- **操作**：切到五笔，点 j j a d；点 **⋯ → 不用我的输入习惯**，再点 j j a d；最后 **恢复我的输入习惯**。
+- **预期**：用自己的习惯时 jjad 只有「日期」，后面没有自带的日期；不用习惯时第一个仍是「日期」，后面有今天的日期（如 `2026-11-13`），和刚装好一样，不看自己的短语。
+- **JVM**：ime-core `EnginesBorrowedPhrasesTest.aSwitchOfTheHabitsOrThePhrasesReadAnewChangesTheBookThatDecides`（用习惯时 jjad 只有日期，不用习惯时日期后面有自带的日期；同一个引擎上照用例的步骤：用、不用、再用习惯，删掉自己的短语重读后自带的日期回来）；设备上不跑。
+
 ### PR-21 [P1] 清掉最近一段时间
 <!-- learning: U-88 -->
 - **前提**：B0，按 PY-54 在「他」后面连着选两次「点了」；在表情面板里点「😀」；然后打 s h i，长按第五个候选（记作 C）选 **固定首位**。
-- **操作**：点 **⋯ → 清掉最近**，选 **最近 1 小时**，读确认框，确认；回到框里，接着打「他」，点 d l；点 ⌫，点 s h i；打开表情面板。
-- **预期**：确认框写明清掉以后不能"退回恢复前"；确认后键盘上方提示「已清掉」；「他 dl」第一个是「带来」，「点了」也不在第二（这段时间的选择都忘了）；shi 第一个仍是 C（主动做的固定不撤）；表情面板的"最近使用"里没有「😀」。
-- **JVM**：`PrivacyUatTest.clearingTheLastHourForgetsItsPicksNotThePins`（:lib:ime-eval:uatTest，真数据）（清掉最近 1 小时后他 dl 第一是带来、点了不在第二，shi 第一仍 C。表情最近使用的清除由 RecentlyUsedTest，确认框文字是界面）；设备上不跑。
+- **操作**：点 **⋯ → 清掉最近**，选 **最近 1 小时**，读确认框，确认；回到框里，接着打「他」，点 d l；点 ⌫，点 s h i；打开表情面板。再从 B0 起一遍（刚重置，学习记录里只有接下来打的字）：按 PY-54 在「他」后面连着选两次「点了」，不固定、不屏蔽，同样清掉最近 1 小时；接着打「他」，点 d l；强行停止输入法，再打「他」，点 d l。
+- **预期**：确认框写明清掉以后不能"退回恢复前"；确认后键盘上方提示「已清掉」；「他 dl」第一个是「带来」，「点了」也不在第二（这段时间的选择都忘了）；shi 第一个仍是 C（主动做的固定不撤）；表情面板的"最近使用"里没有「😀」。第二遍（记录里只有这段时间的字）同样清掉：「他 dl」第一个是「带来」，提示「已清掉」；强行停止后再打仍是「带来」（文件里也没了，不是只从内存里拿掉）。
+- **JVM**：`PrivacyUatTest.clearingTheLastHourForgetsItsPicksNotThePins`（:lib:ime-eval:uatTest，真数据）（清掉最近 1 小时后他 dl 第一是带来、点了不在第二，shi 第一仍 C。表情最近使用的清除由 RecentlyUsedTest，确认框文字是界面）、ime-core `LearningControlTest.aClearOfAllTheRecordHoldsEmptiesIt`（记录里只有清掉的这段时：清掉后内存里没有，重读文件也没有，之后接着记、重读得到）；设备上不跑。
 
 ## 备份与恢复（学到的）
 
@@ -251,3 +257,21 @@
 - **操作**：**备份与恢复 → 备份全部**；在 **外观 → 主题** 里导出 `X` 再导入导出的文件（4.0 包 `X` 替换了 3.0 的 `X`）；从刚才的备份恢复（这时 3.0 的 `X` 和包 `X` 并存，两张卡）；长按 3.0 的那张卡 **删除**，确定，看主题列表并点剩下那张。再从备份恢复一次，这回长按包的那张卡删除。
 - **预期**：每次只删选的那张卡，另一张还在，点它键盘照常换成它（背景图正常），没有退回默认主题或丢图。
 - 真机或模拟器上手工跑（要恢复备份造出两张同名卡），不在自动跑里。
+
+### PR-52 [P1] 从备份恢复：改过名的备份能恢复，不是备份的文件、条目太多的被拒绝
+- **前提**：B0-设置，加词「澜境花园」，**备份与恢复 → 备份全部**。
+- **操作**：从备份恢复三种文件：这份备份改名成 `youmo_backup.bak`；一个不是备份的 zip（`other.zip`）；条目（文件和文件夹）超过 10 万个的 zip。
+- **预期**：`other.zip` 提示「找不到用户数据的元数据」，应用不重启，什么都没变；`youmo_backup.bak` 照常恢复（名字不以 `.zip` 结尾也行），「澜境花园」在；条目太多的提示「备份里的条目超过 10 万个，不是本应用的备份」，什么都不恢复。键盘一直没启动完时提示「键盘还在启动，没等到它启动完：什么都没有恢复。请稍后再试」，什么都不恢复（设备上造不出）。
+- **JVM**：`UserDataManagerTest.aBackupOfTooManyEntriesStopsAsItIsUnpacked`（11 个条目、上限 10 报错，10 个通过）、`UserDataManagerTest.aFileWithoutTheMetadataIsRefusedAndNothingChanges`（不是备份的拒绝、什么都没变）；名字不以 `.zip` 结尾的照常恢复：恢复只读选中文件的内容、不看名字，没有能因名字失败的 JVM 测试，选择器里选得到并恢复见 PR-52a（手工）；键盘还在启动：`HostRestartTest.aHostStuckStartingIsNotStoppedAndSaidSo` 只断言 `HostDaemon` 等不到启动完时不停、返回 false，恢复页由此提示的那一句没有测试（`BackupFragment` 直接调 `HostDaemon.stopFcitx()`，没有接缝）；设备上不跑。
+
+### PR-52a [P1] 从备份恢复：系统文件选择器里选得到改过名的备份和任何文件
+- **前提**：B0-设置，加词「澜境花园」，**备份与恢复 → 备份全部** 存到"下载"；在"下载"里把它复制一份改名成 `youmo_backup.bak`；另放 `other.zip`（`fixtures` 里任何一个文件压成的 zip）和 `many.zip`（电脑上 `python3 -c "import zipfile;z=zipfile.ZipFile('many.zip','w');[z.writestr(f'd{i}/','') for i in range(100001)];z.close()"`，几 MB，`adb push` 到 `/sdcard/Download/`）；再放一张图片 `shot.png`（`adb shell screencap -p /sdcard/Download/shot.png`）。
+- **操作**：**备份与恢复 → 从备份恢复**，在系统文件选择器里先选 `other.zip`，看提示；再选 `many.zip`，看提示；再选 `shot.png`（误选了照片），看提示；再选 `youmo_backup.bak` 并确认。
+- **预期**：选择器里四个文件都列着、都能选（选择器不按文件类型过滤：`.bak` 不算 zip，图片也列着）；`other.zip` 和 `shot.png` 都提示「找不到用户数据的元数据」，`many.zip` 提示「备份里的条目超过 10 万个，不是本应用的备份」，这三次应用都不重启、什么都没变；`youmo_backup.bak` 照常恢复，应用重启，「澜境花园」在。
+- 系统文件选择器是系统界面，在真机或模拟器上手工跑；拒绝和恢复本身见 PR-52 的 JVM 测试（`UserDataManagerTest.aFileWithoutTheMetadataIsRefusedAndNothingChanges` 的两行：不是备份的 zip、根本不是 zip 的文件）。
+
+### PR-53 [P1] 恢复备份后单手模式仍在记住的那一侧
+- **前提**：B0-设置；按 TB-20 把单手模式切到左侧再关掉。
+- **操作**：**备份与恢复 → 备份全部**，再 **从备份恢复** 这一份；应用重启后回测试页，点工具栏 **⋯ → 单手模式**。
+- **预期**：键盘缩到左侧（恢复后的重置不把记住的一侧改回右侧）。
+- **JVM**：`AppPrefsTest.theOneHandedSideRememberedIsNotResetByTheResetsOfHiddenSettings`（第一次启动和导入备份后两次重置隐藏设置，记住的左侧都不变）；设备上不跑。

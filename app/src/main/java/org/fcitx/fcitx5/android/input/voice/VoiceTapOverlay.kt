@@ -14,7 +14,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.BaseInputView
 import org.fcitx.fcitx5.android.input.InputView
@@ -74,30 +73,15 @@ class VoiceTapOverlay(
 
     private val session: VoiceSession = VoiceSession(service, inputView.fcitx, ui, asItGoes = true, commit)
 
-    private val heard = TextView(ctx).apply {
-        textSize = 18f
-        gravity = Gravity.CENTER or Gravity.BOTTOM
-        VoiceStyle.heard(this)
-        setTextColor(theme.keyTextColor)
+    private val heard = VoiceCard.heard(ctx, theme).apply {
         // INVISIBLE, not GONE: its share of the height kept, the pill stays in the middle
         // what is said shows in the field as it is said; here only where the field cannot show it
         visibility = if (session.composes) View.INVISIBLE else View.VISIBLE
     }
     private val wave = VoiceCard.wave(ctx, look.micColor.value)
     private val pill = VoiceCard.pill(ctx, wave, look.micFill.value)
-    private val status = TextView(ctx).apply {
-        textSize = 15f
-        gravity = Gravity.CENTER
-        setTextColor(theme.keyTextColor)
-        // 正在听 once the microphone is really on (ready), not as it is tapped
-        setText(R.string.voice_hold_preparing)
-    }
-    private val hint = TextView(ctx).apply {
-        textSize = 12f
-        gravity = Gravity.CENTER
-        setTextColor(theme.altKeyTextColor)
-        setText(R.string.voice_tap_hint)
-    }
+    private val status = VoiceCard.status(ctx, theme)
+    private val hint = VoiceCard.hint(ctx, theme, R.string.voice_tap_hint)
 
     private val glass = VoiceStyle.glass(ctx, look)
 
@@ -200,14 +184,8 @@ class VoiceTapOverlay(
         if (inputView.hold === this) inputView.hold = null
         if (gone) return
         gone = true
-        // still shown a moment (the message, the fade), the keys under it not yet back: a press
-        // goes through to them rather than stopping a talk that is over
-        card.isClickable = false
-        message?.let {
-            status.setText(it)
-            hint.visibility = View.INVISIBLE
-        }
-        VoiceCard.fadeOut(card, main, message)
+        // a press goes through to the keys under it rather than stopping a talk that is over
+        VoiceCard.ended(card, status, hint, main, message)
     }
 
 }

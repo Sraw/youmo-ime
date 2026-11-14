@@ -24,6 +24,7 @@ class FullWidth(private val statusArea: StatusArea, private val commit: (InputCo
     val action: StatusAction = object : StatusAction("fullwidth") {
         override fun icon(ic: InputContext) = if (enabled) "fcitx-fullwidth-active" else "fcitx-fullwidth-inactive"
         override fun shortText(ic: InputContext) = if (enabled) "Full width Character" else "Half width Character"
+        override fun active(ic: InputContext) = enabled
         override fun activate(ic: InputContext) = setEnabled(!enabled, ic)
     }.also(statusArea::register)
 

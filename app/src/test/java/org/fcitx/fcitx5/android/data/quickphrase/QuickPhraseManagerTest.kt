@@ -76,6 +76,23 @@ class QuickPhraseManagerTest {
         assertEquals(QuickPhraseManager.Imported(0, 0, 0, badKey = 1), QuickPhraseManager.import(badKey.toByteArray(), dir = dir))
     }
 
+    @Test
+    fun anImportFillsTheListToItsLimitAndCountsTheRest() {
+        val max = QuickPhraseManager.MAX_ENTRIES
+        val file = QuickPhraseFiles.formatMine((1..max + 3).map { QuickPhraseEntry("k$it", "c$it") })
+        assertEquals(QuickPhraseManager.Imported(max, 0, 0, overLimit = 3), QuickPhraseManager.import(file.toByteArray(), dir = dir))
+        assertEquals(max, QuickPhraseManager.load(dir).size)
+        // the file's first ones kept
+        assertTrue(QuickPhraseManager.load(dir).any { it.key == "k1" })
+        assertFalse(QuickPhraseManager.load(dir).any { it.key == "k${max + 1}" })
+        // full: none added, the new ones counted, the ones there still duplicates
+        val more = QuickPhraseFiles.formatMine(listOf(gh, QuickPhraseEntry("k1", "c1")))
+        assertEquals(QuickPhraseManager.Imported(0, 1, 0, overLimit = 1), QuickPhraseManager.import(more.toByteArray(), dir = dir))
+        // the limit is the import's alone: one added by hand past it is kept (QU-15, R25r3 F7932)
+        assertEquals(QuickPhraseManager.Put.Saved, QuickPhraseManager.put(null, QuickPhraseEntry("byhand", "h"), dir = dir))
+        assertEquals(max + 1, QuickPhraseManager.load(dir).size)
+    }
+
     // review L11: a key in another case is found by the same keys, so it is the same entry
     @Test
     fun aKeyInAnotherCaseIsADuplicateButAnEntrysOwnCaseMayChange() {

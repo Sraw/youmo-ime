@@ -167,13 +167,13 @@ class KeyboardUatTest {
         }
         runBlocking { h.api.setPunctuationMap("zh_CN", entries) }
         PunctuationManager.forget()
-        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", "", true))
         h.api.statusAreaCached = active
         h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, entries.groupBy { it.key }.mapValues { it.value.first().mapping }))
         assertEquals("、", corner(h, "m"))
         assertEquals("？", corner(h, "v"))
         // English: the addon off for it
-        val inactive = listOf(StatusEntry(1, "punctuation", "fcitx-punc-inactive", ""))
+        val inactive = listOf(StatusEntry(1, "punctuation", "fcitx-punc-inactive", "", false))
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
         h.emit(HostEvent.StatusArea(inactive, KeyboardHarness.ENGLISH, emptyMap()))
         assertEquals("\\", corner(h, "m"))

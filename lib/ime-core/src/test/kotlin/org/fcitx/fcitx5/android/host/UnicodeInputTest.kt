@@ -261,9 +261,9 @@ class UnicodeInputTest {
     fun theKeyboardButtonAndTaps() {
         assertTrue(rig.unicode.trigger(rig.ic))
         rig.type("snowman")
-        assertTrue(rig.unicode.selectCandidate(rig.ic, 2))
+        assertTrue(rig.tap(2))
         assertEquals(listOf("⛇"), rig.commits())
-        assertFalse(rig.unicode.selectCandidate(rig.ic, 0))
+        assertFalse(rig.tap(0))
     }
 
     @Test

@@ -306,13 +306,15 @@ is not measured yet: before taking a case that fails then passes for an app bug,
 `uat.py flakes` over a few two-emulator runs (and `UAT_SLOW=1`), and record the counts here.
 Details in `uat/README.md`.
 
-Release gates 2, 3 and 5 of the host replacement (0.4.0) (in-place upgrade from the `uat/fixtures/upgrade`
-releases, backups both ways with them, start/latency/memory side by side) are one command each,
-`uat/gates/gates.py upgrade|backups|perf`, on a redroid of their own (not ported to the emulator yet:
-they, `uat/parity/parity.py prepare|run`, `uat/parity/record.sh` and `uat/fixtures/upgrade/make.py` exit
-saying so; parity.py's other commands need no device); results in `uat/runs/`
-(`uat/gates/README.md`). A `.debug` build is upgraded by putting the fixture's files into its own
-directories and gets backups retargeted to its id; the release APK is upgraded with `install -r`.
+Release gates 2 and 3 of the host replacement (0.4.0) (in-place upgrade from the `uat/fixtures/upgrade`
+releases, backups both ways with them) are one command each, `uat/gates/gates.py upgrade|backups`, run
+before every release from 0.6.1 (DECISIONS.md B14), each on uat.py's emulator of its own (`--port`,
+default 5560, up from the clean snapshot and down after); the new build gets the text pack after the
+fixture's files are in place. Results in `uat/runs/` (`uat/gates/README.md`). A `.debug` build is
+upgraded by putting the fixture's files into its own directories and gets backups retargeted to its id;
+the release APK is upgraded with `install -r`. Gate 5 (start, latency, memory side by side) is gone:
+`uat/tools/perf.py` measures that. `uat/fixtures/upgrade/make.py` still exits (made for redroid): the
+fixtures are the ones it made on 0.3.x/0.4.0.
 
 ## The testbed app (`:testbed`)
 
@@ -369,7 +371,8 @@ and both `from-app` theme files, and builds `from-web.theme` from `theme.json` (
 export of it imports the same; and the pages' generated blocks (`youmo-format`: the
 file's version, every type's fields from `ThemeFileJson`'s descriptors, the limits, the defaults;
 `youmo-presets`: the eleven built-in palettes) are what the app has, through
-`ThemeMakerTestdata.block`, which `-PupdateThemeMaker` lets write them. `youmo-layout` and
+`ThemeMakerTestdata.block`, which `-PupdateThemeMaker` lets write them, each to
+`web/theme-maker/generated/<id>.json` (in git; the pages read them from there). `youmo-layout` and
 `youmo-icons` are `ThemeMakerLayoutTest`'s the same way, and the page's test holds them to what the
 preview reads (format 1: views of items, every key name one `KeyNames` knows, every colour a palette
 field, every icon there). The test task takes `web/theme-maker` as an
@@ -381,14 +384,15 @@ Two pages (060-render-p3 M1): `index.html`, the maker (`src/`: `page.html` with 
 held to the engine by `test/form.test.mjs`, `ui.js`: the page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
 `page.html`, `style.css`, `ui.js`), and `examples/` (`examples.json` and a folder of each example, put in the
 maker's `youmo-examples` block); both run `src/lib.js` (everything the tests hold to the app's
-3.0 rules and zip). Edit them, then `node web/theme-maker/tools/assemble.mjs`, which writes both: the
-sources put in, each page's generated blocks kept from that page as it is (each carries only the ones
-its `page.html` has a slot for: the maker `youmo-format`, `youmo-engine-icons` and `youmo-examples`, classic
-`youmo-format`, `youmo-presets`, `youmo-layout`, `youmo-icons` and no engine; `ThemeMakerTestdata.block`
-writes a block into every page that has it), and the Content-Security-Policy's `script-src` set to each script's SHA-256 (six on the maker,
-two on classic; nothing else runs, a script not hashed is refused, an edit by hand breaks them).
-The page's test fails when either page is not what assemble makes of its sources and the fonts, and
-when the CSP's hashes are not its scripts'. Commit `src/` and both pages together.
+3.0 rules and zip). Neither page is in git (R25 B12): `node web/theme-maker/tools/assemble.mjs` makes
+both from their sources (`web/theme-maker/.gitignore` keeps them out): the sources put in, each page's
+generated blocks read from `generated/<id>.json` (each carries only the ones its `page.html` has a slot
+for: the maker `youmo-format`, `youmo-engine-icons` and `youmo-examples` (from `examples/`), classic
+`youmo-format`, `youmo-presets`, `youmo-layout`, `youmo-icons` and no engine), and the
+Content-Security-Policy's `script-src` set to each script's SHA-256 (six on the maker, two on classic;
+nothing else runs, a script not hashed is refused). The page's test assembles both in memory and fails
+when a generated block is missing or the CSP's hashes are not its scripts'. Commit `src/` and
+`generated/`; CI, the tests and `dev/serve.mjs` assemble the pages.
 `test/maker.test.mjs` (node, needs the built engine; CI runs it with the other two): a document
 saved opens the same (theme.xml first, files, `layouts/` kept as they are), 3.0 and 2.1 files open
 as 4.0 through the engine's `convert30`, undo and redo (at most 100 back), the draft kept and given
@@ -403,7 +407,7 @@ not know, comments and spacing kept), the engine reads every result, and the cas
 (`YoumoEngine.sources`, `Cascade.sources`) names the style each value comes from; the forms write numbers within the engine's bounds (`YoumoEngine.limits`), and an icon the app would refuse (a PNG, an SVG past `SvgSubset`, which the engine's `readIcon` runs) is named and blocks the save. `from-maker.theme` and `from-maker-picture.theme` (the panels' save: a real PNG cut for each orientation, see-through keys, a gradient, an SVG icon) are
 its saves, which `ThemePackImportTest` imports. `test/names-and-files.test.mjs` (the same): names and files as theme.xml has them: a name with XML's special characters, values with `>`, which files are still named, the effect images the app checks (≤ 256 px a side, size limit, .png/.webp only), theme.xml's size limit, the draft's files written once. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
-`fonts/`, `examples/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
+`fonts/`, `examples/`, `generated/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
 
 ### The engine in the page (060-render-p3 W1)
 
@@ -417,16 +421,14 @@ property (`sources`: the line of the winning style, `Cascade.sources` laid over 
 the maker's cascade check)).
 `./gradlew :lib:keyboard-scene:youmoEngine` writes `build/youmo-engine/youmo-engine.js` (UMD, global
 `youmo-engine`; indents and the source map's line dropped, `<!--` and `</` escaped). The engine is not
-in git: the `index.html` committed has `NO_ENGINE` (a comment) in its `youmo-engine` script, so a
-change to the engine's code (any `commonMain` change of the scene's) never has to make the page again
-and no gate has to catch a stale one. `node web/theme-maker/tools/assemble.mjs --engine [out]` writes
+in git: the page assembled without `--engine` has `NO_ENGINE` (a comment) in its `youmo-engine` script. `node web/theme-maker/tools/assemble.mjs --engine [out]` writes
 the page with the build's engine in that script and the CSP's hash of it (`out`: `build/index.html`,
 not in git); the Pages workflow publishes that, and `dev/serve.mjs` serves it at `/page.html`. The
 four subset fonts (`fonts/`, `tools/subset-fonts.py`: Roboto and Noto Sans CJK SC from Robolectric's
 runtime, cut to what a keyboard shows, 160 KB) are in git, in a `youmo-fonts` style as data URLs: they
 depend on no engine code, as `youmo-engine-icons` depends on the app's drawables only. The page's test
-holds `index.html` to `NO_ENGINE`, and the page assembled with the build's engine (in memory) to the
-build, to 1.2 MB, to its scripts and their hashes, and to `index.html` but for that script; CI builds
+holds the page assembled without it to `NO_ENGINE`, and the page assembled with the build's engine (in
+memory) to the build, to 1.2 MB, to its scripts and their hashes, and to the other but for that script; CI builds
 the engine and assembles the page before the node tests, in the unit test job and the Pages workflow.
 A page that uses the engine needs it put in: opened straight from the repository, `index.html` has none.
 
@@ -467,7 +469,8 @@ What holds the library to the app:
   `CHROMIUM=`) draws six groups of shots in Chromium through `dev/engine.html` and compares them
   with `app/build/w1-pixel/`: under 2% of pixels off by more than 48, under 0.2% in 5x5 areas off by
   more than 16 (the plain board against the app's with q pressed must fail it, and does).
-- `node web/theme-maker/test/panels-smoke.mjs` (local, the same Chromium) drives the maker's 字和图标 tab by mouse and by touch: a field edited, then the next field typed into or a box tapped, both kept (a value edit updates the controls in place, never draws the tab anew); after undo with a field focused every field shows the document; a colour row after undoing a rename edits the colour it names, and the crop shows a picture replaced by one of its size (a row of another name, a box of another data-key is put in whole). After 用这个裁切 replaces its box the focus stays in the tab; the tabs 栏, 弹出, 面板和窗口, 尺寸, 动效 and 信息 each draw, an 信息 edit keeps the next field focused, 试一下 plays, and the environment's typing bar grows the preview.
+- `node web/theme-maker/test/panels-smoke.mjs` (CI's unit test job on every push and PR, with the runner's
+  Chrome, DECISIONS.md B13; locally the same Chromium as pixel-smoke) drives the maker's 字和图标 tab by mouse and by touch: a field edited, then the next field typed into or a box tapped, both kept (a value edit updates the controls in place, never draws the tab anew); after undo with a field focused every field shows the document; a colour row after undoing a rename edits the colour it names, and the crop shows a picture replaced by one of its size (a row of another name, a box of another data-key is put in whole). After 用这个裁切 replaces its box the focus stays in the tab; the tabs 栏, 弹出, 面板和窗口, 尺寸, 动效 and 信息 each draw, an 信息 edit keeps the next field focused, 试一下 plays, and the environment's typing bar grows the preview.
 - `node web/theme-maker/dev/serve.mjs` serves `dev/engine.html`, a preview of any board, theme,
   size and form drawn by the engine; development only, never published.
 
@@ -533,68 +536,16 @@ regenerate without a checkout of fcitx:
   (`ImportFiles.Scel.textDictionary`); `ScelGoldenTest` holds it to these byte for byte, the two broken files
   failing as `IOException`.
 
-## Parity of the two hosts (`uat/parity`)
+## Parity of the two hosts (history)
 
-The native fcitx host and the Kotlin one were run on the same key sequences and compared
-(fcitx-replacement §7.2) while both built. Only the Kotlin host builds now: the native side is a debug
-APK built at the tag `native-last`, or a recorded native run (`dev/parity-runs/r3`). Dev tooling only:
-nothing here is in an APK.
-
-- **Sequence files** (JSON lines): a header with the engine (below), the data releases
-  `EngineDataPlugin` names, the input methods enabled in order and the hash of the sequences; then one
-  sequence a line (start input method and field, steps: `type`, `space`, `enter`, `bksp`, `pick`,
-  `pickText`, `hw`, `ime`, `field`, `app`, `pause`, `toggle`, `quick`, `unicode`). `ime-eval parity-generate --seed --count` writes
-  random ones (`SequenceGenerator`); `uat/parity/parity.py uat-export` takes the uat scripts' key
-  sequences, sealed with `ime-eval parity-seal`. The header's engine (`Provenance`) is
-  `ENGINE_BEHAVIOUR` (`EngineBehaviour.VERSION` in ime-core) and a digest of the data and settings in the
-  tree (`Provenance.CONFIG_DIRS`: `app/src/main/host-assets`, `app/src/main/assets`, `lexicon` (only the files EngineDataPlugin reads),
-  `lib/ime-dict-tool/opencc`); the data releases beside it. Not the source tree: a comment or a rename would make
-  every recording stale, and the native host's (r3, recorded at `native-last`) can never be made again.
-  A JVM comparison against a recording of another engine still runs, its report headed "engine changed
-  since this recording: differences may be intended", exit 3 (0 a pass, 1 differences); `parity-check`
-  says so and passes. Outputs whose headers name other sequences, input methods or engine than the
-  sequence file (two device runs from different builds' files) are refused. A JVM replay's output also
-  names the engine it ran on (`engine-run`); `parity-compare --jvm` holds that to the recording, not the
-  checkout that compares. `parity-rehead` gives old files this checkout's fingerprint, the first one kept
-  as `engine-was` however often it runs.
-- **When to bump `ENGINE_BEHAVIOUR`**: any change that can change what a key sequence shows or writes:
-  ranking, decoding, segmentation, learning, refine scheduling, the host's key handling, settings
-  defaults. Not for comments, renames, refactors, tests or tooling. The review checks it: a behaviour
-  change with no bump makes the next JVM-vs-recording comparison count it as the host's.
-- **Device**: `parity.py` with uat.py's `Device`. The field is a test editor app outside the input
-  method (`uat/parity/editor`, built with the SDK's tools, installed as `io.github.sraw.parity.a` and
-  `.b` for two uids) that logs every `InputConnection` edit with the field after it; password fields
-  are logged masked. Keys are tapped where the Dumper reads them; hardware keys are `input keyevent`
-  (no uinput on redroid). Each sequence starts from a root snapshot of the app's data
-  (`prepare`), restored with `chown -R` to the current uid and `restorecon -R`; the builds are swapped
-  with `adb install -r -d`. The driver's input methods are those of the builds around `native-last`
-  (`ADDED`: 九键拼音 and 五笔, `engine-t9` in the profile): it compares those builds only. Since 0.5 the
-  nine keys are pinyin's keyboard, not an input method, and the device run is not ported to it; the
-  JVM replay below is what checks the host now.
-- **JVM**: `:lib:ime-eval:parityReplay` runs a file on `HostReplay` (about a second a sequence; `k/n`
-  shards). What the service does around the host is modelled too: the host's texts in the devices'
-  zh-CN, read from the app's `values-zh-rCN` (`ResourceHostStrings`); a tap on the bar picks the
-  candidate as shown (繁 with 简繁 on); an input method change tells the session the field
-  (`FieldPolicy.inputMethodChanged`); fields are named as the service names them for its memory of
-  what was written (`ContextMemory.field`: the editor's package and the kind of field); another app's
-  bar stays shown until the host updates it or the language key shows the overlay of a new input
-  method's name, and a hardware Return shows the floating window over it until the screen's keyboard
-  is used again. So is the driver's way around the keyboard: a single-line field's Enter (its editor
-  action) puts the keyboard away, and the next tap the driver needs brings it back with a tap on the
-  field that puts the cursor at the end, as after a hardware Return; a status toggle under next-word
-  suggestions puts the keyboard away and back first (`uat.py` `expand_toolbar`). A Backspace key event
-  from the screen tells the engine nothing (its cursor report is predicted, `EditingSession.backspace`);
-  a hardware one, or Enter and the arrows, does. The 符 and 123 keys
-  resolve what is typed and reset fcitx before quick input or Unicode, as `commitAndReset`. Keys typed in one step
-  are 200 ms apart on the replay's clock (`HostReplay.TAP_MILLIS`) and on the device (`parity.py`
-  `KEY_GAP`, Tapper's sleep between taps): the refine after each key runs out before the next on both, so
-  the tool makes no timing difference of its own. Keep the two equal.
-- **Comparison**: `ime-eval parity-compare` — device against device every step and call identical;
-  `--jvm` against a device allows one swap of neighbouring candidates whose sentence-model score
-  difference is under ε, listed apart, the rest of that sequence uncompared. A step read busy (the
-  recorder's idle wait ran out) is device timing, an allowed difference (DECISIONS.md 2026-10-25): it
-  is skipped and the next step's state compared, its calls held to the calls since the last idle step;
-  a busy last step's difference is listed apart as `TIMING` and does not fail, when both outputs ran the
-  whole sequence and an idle step before it was compared (busy throughout, or stopped short, still fails).
-  `uat/parity/record.sh` does a whole round: this checkout's APK, then `--native-apk <native-last APK>`
-  to run the native side too or `--native-out <native.jsonl>` to compare with a recorded one.
+While the native fcitx host and the Kotlin one both built (fcitx-replacement §7.2), a device tool
+(`uat/parity`: a test editor app, a recorder, `ime-eval parity-*` to generate, seal and compare key
+sequences, with the engine's fingerprint `ENGINE_BEHAVIOUR` in each file's header) ran the same
+sequences on both and compared what the user saw, call by call. The native host is gone (the tag
+`native-last`), its recording can never be made again, and the device side was made for redroid; it
+was deleted in 0.6.1 (the user decided on 2026-11-13 not to keep a device tool no device can run; git history before that has it). What is left is the JVM side's
+model of a device run: `ParityReplay` (`lib/ime-eval/src/uatTest`, with `Step`, `Sequence`, `State`
+and `Output` of `eval/parity/ParityFile.kt`, given the input methods as a list) runs a sequence on `HostReplay` as the driver did
+(the editor apps' uids and fields, the bar kept over another app, the keyboard put away by a single-line
+field's Enter, keys 200 ms apart on the replay's clock, `HostReplay.TAP_MILLIS`), and
+`HostReplayUatTest` holds the host to what the devices showed.

@@ -9,7 +9,7 @@
  * Framework Views and no library: nothing new for verification-metadata, a build in seconds.
  */
 plugins {
-    id("org.fcitx.fcitx5.android.app-convention")
+    id("youmo.app-convention")
 }
 
 android {

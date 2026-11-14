@@ -76,17 +76,17 @@ class EnginesOlderTableLogTest : EnginesFixture() {
     @Test
     fun aReadWhoseWriteIsRefusedIsDoneAgainAtTheNextOpen() {
         val dir = installed()
-        lateinit var engines: Engines
         var armed = true
+        val disk = RefusingDisk()
         val refusing = { path: String ->
             if (armed && path == "${InputMethodCatalog.TABLE_DIR}/wbx.data") {
                 armed = false
-                checkNotNull(engines.learnLog().store).refuseNextWrite()
+                disk.refuseNextWrite()
             }
             load(path)
         }
         // no warm-ups: the table loads first for the read, the record already open
-        engines = Engines(refusing, JvmFiles(dir), onError = { errors += it.toString() }, warmUps = { }, clock = clock)
+        val engines = Engines(refusing, JvmFiles(dir), onError = { errors += it.toString() }, warmUps = { }, clock = clock, openAppend = disk::open)
         engines.use { it.type(InputMethodCatalog.PINYIN, "ni") }
         assertFalse(armed)
         assertFalse(File(dir, Engines.TABLE_LOGS_READ).exists())

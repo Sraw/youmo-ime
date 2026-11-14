@@ -22,13 +22,11 @@ on:
       - opened
       - reopened
       - synchronize
-    paths-ignore:
-      - "**.md"
+  # no paths-ignore of "**.md": tests read Markdown too (ThemeFormatDocTest docs/theme-format.md, `uat.py counts`
+  # uat/), and a commit of documents alone runs fast from the build cache
   push:
     branches:
       - main
-    paths-ignore:
-      - "**.md"
   workflow_dispatch:
 
 permissions:
@@ -59,6 +57,7 @@ jobs:
         with:
           npm: "true"
 
+      # verifyCore (the root build.gradle.kts; dev/review's verify.sh runs the same list):
       # :lib:ime-core is a plain JVM module: no Android SDK, no resource merging, seconds to
       # run. `check` = tests, the Android API level guard (animal-sniffer, which Android lint cannot
       # provide for a JVM module) and the coverage floors (Kover). :lib:ime-dict-tool, the host tool
@@ -74,9 +73,11 @@ jobs:
       # scene snapshots compared on both, the API level guard and the coverage floors on the JVM.
       # `youmoEngine`: the engine as the theme maker page has it (060-render-p3 W1; not in git: the
       # page's tests below put it in the page, as pages.yml does, and hold it to the snapshots).
+      # detekt: findings already present are frozen in config/detekt/baseline-*.xml; it fails on new ones
+      # only. Syntax rules only: type resolution does not work on this toolchain (see detekt.yml).
       # --continue: the coverage report is wanted most when a check has failed
-      - name: Run core logic, drawing engine, dict tool and evaluation tests, API level check and coverage floors
-        run: ./gradlew --build-cache --continue :lib:ime-core:check :lib:ime-core:koverHtmlReport :lib:keyboard-scene:check :lib:keyboard-scene:youmoEngine :lib:ime-dict-tool:test :lib:ime-dict-tool:koverHtmlReport :lib:ime-eval:test :lib:ime-eval:compileUatTestKotlin :build-logic:convention:test
+      - name: Run core logic, drawing engine, dict tool and evaluation tests, API level check, coverage floors and detekt
+        run: ./gradlew --build-cache --continue verifyCore :lib:ime-core:koverHtmlReport :lib:ime-dict-tool:koverHtmlReport
 
       # the C++ tests of our sherpa-onnx changes (context graph, hotword and blocked-phrase encoding):
       # the runner's g++, with googletest and simple-sentencepiece downloaded SHA-256 checked; no NDK,
@@ -91,11 +92,10 @@ jobs:
         working-directory: uat/tools
         run: python3 -m unittest test_uat
 
-      # the parity driver's log splitting, uat export and dry run (fcitx-replacement §7.2), no device
-      - name: Run parity tool tests
+      # the cases against their scripts and uat/README.md's count (uat.py counts): reads files only
+      - name: Check the UAT cases' counts
         if: success() || failure()
-        working-directory: uat/parity
-        run: python3 -m unittest test_parity
+        run: python3 uat/tools/uat.py counts
 
       # the release gates' scripts (uat/gates): backup retargeting, the INI reading of their checks
       - name: Run gate tool tests
@@ -108,7 +108,8 @@ jobs:
         if: success() || failure()
         run: python3 -m unittest discover -s lexicon/tools
 
-      # chat.py's readings of the words a chat line means otherwise, which the chat, dialog and mixed sets are typed by
+      # chat.py's readings of the words a chat line means otherwise, which the chat, dialog and mixed sets are typed by;
+      # run-on-device.sh's keyboard put back (a fake adb)
       - name: Run eval tool tests
         if: success() || failure()
         run: python3 -m unittest discover -s lib/ime-eval/tools
@@ -133,11 +134,12 @@ jobs:
         run: |
           node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs web/theme-maker/test/names-and-files.test.mjs
 
-      # Findings already present are frozen in config/detekt/baseline-*.xml; this fails on new ones
-      # only. Syntax rules only: type resolution does not work on this toolchain (see detekt.yml).
-      - name: Static analysis (detekt)
+      # the maker's tabs driven in a real browser (B13: every run and before a release): the runner's Chrome, without
+      # its sandbox where CI is set (Ubuntu 24.04's AppArmor keeps it from user namespaces); its exit 2 (no browser
+      # came up) fails the step as 1 does
+      - name: Run the theme maker's panels smoke test
         if: success() || failure()
-        run: ./gradlew --build-cache detekt
+        run: node web/theme-maker/test/panels-smoke.mjs "$(command -v google-chrome || command -v chromium)"
 
       - name: Annotate test failures
         if: failure()
@@ -185,15 +187,17 @@ jobs:
         uses: ./.github/actions/setup-build
         with:
           cmake: "true"
+          downloads: restore
           robolectric: robolectric-35
 
       # debug only (one APK since 0.6.0, voice input in it). The screenshot tests compare against app/src/test/screenshots
       # (roborazzi.test.verify in gradle.properties); goldens are recorded on JDK 21 locally.
-      # One ABI: a build of all four links resources once per split, and the unit tests need one.
-      - name: Run app unit tests
+      # One ABI, the runner's. verifyApp (root build.gradle.kts): the tests, lint, and the instrumented
+      # tests' sources compiled (otherwise only the weekly emulator job compiles them)
+      - name: Run app unit tests, lint and the instrumented tests' compile
         env:
           BUILD_ABI: x86_64
-        run: ./gradlew --build-cache -PskipExhaustive :app:testDebugUnitTest :app:koverLogDebug
+        run: ./gradlew --build-cache --continue -PskipExhaustive verifyApp :app:koverLogDebug
 
       - name: Upload heap dumps
         if: failure()
@@ -226,6 +230,7 @@ jobs:
           path: |
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
+            app/build/reports/lint-results-debug.*
           retention-days: 14
 
   # Android 10 (minSdk 29) must keep working: every app Robolectric test again at SDK 29, a task of
@@ -246,13 +251,14 @@ jobs:
         uses: ./.github/actions/setup-build
         with:
           cmake: "true"
+          downloads: restore
           robolectric: robolectric-29
 
       # debug, as above; one ABI
       - name: Run app unit tests at SDK 29
         env:
           BUILD_ABI: x86_64
-        run: ./gradlew --build-cache -PskipExhaustive :app:testDebugUnitTestAt29
+        run: ./gradlew --build-cache -PskipExhaustive verifyApp29
 
       - name: Upload heap dumps
         if: failure()

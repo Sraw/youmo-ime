@@ -504,6 +504,15 @@ sherpa-onnx/jni/speech-denoiser.h
 sherpa-onnx/jni/spoken-language-identification.cc
 sherpa-onnx/jni/wave-writer.cc
 
+# 0.6.1 (voice-8): the offline recognizer's JNI and Kotlin API and the wave reader's; the app only
+# streams. Its csrc stays for host-eval.sh's sherpa-onnx-offline, which the JNI library no longer links:
+sherpa-onnx/jni/offline-recognizer.cc
+sherpa-onnx/jni/offline-stream.cc
+sherpa-onnx/jni/wave-reader.cc
+sherpa-onnx/kotlin-api/HomophoneReplacerConfig.kt
+sherpa-onnx/kotlin-api/OfflineRecognizer.kt
+sherpa-onnx/kotlin-api/OfflineStream.kt
+sherpa-onnx/kotlin-api/WaveReader.kt
 # Layer C: the build options whose sources are gone (TTS, speaker diarization, NPUs, WASM, Python,
 # C API, websocket, PortAudio, ALSA, tests) and their dependency files; the CMakeLists.txt edits are our commits:
 cmake/__init__.py

@@ -1,0 +1,288 @@
+{
+    "version": "3.0",
+    "migrates": [
+        "2.1"
+    ],
+    "older": [
+        "2.0",
+        "1.0"
+    ],
+    "types": {
+        "ThemeFile": {
+            "name": "string",
+            "isDark": "boolean",
+            "palette": "Palette",
+            "picture": "Picture?",
+            "base": "Base",
+            "bar": "Bar",
+            "keys": "Keys",
+            "text": "Text"
+        },
+        "Palette": {
+            "backgroundColor": "int",
+            "barColor": "int",
+            "keyboardColor": "int",
+            "keyBackgroundColor": "int",
+            "keyTextColor": "int",
+            "candidateTextColor": "int",
+            "candidateLabelColor": "int",
+            "candidateCommentColor": "int",
+            "altKeyBackgroundColor": "int",
+            "altKeyTextColor": "int",
+            "accentKeyBackgroundColor": "int",
+            "accentKeyTextColor": "int",
+            "keyPressHighlightColor": "int",
+            "keyShadowColor": "int",
+            "popupBackgroundColor": "int",
+            "popupTextColor": "int",
+            "spaceBarColor": "int",
+            "dividerColor": "int",
+            "clipboardEntryColor": "int",
+            "genericActiveBackgroundColor": "int",
+            "genericActiveForegroundColor": "int",
+            "keyBorderColor": "int",
+            "keyHintColor": "int",
+            "toolbarIconColor": "int"
+        },
+        "Picture": {
+            "src": "string",
+            "portrait": "Crop",
+            "landscape": "Crop?",
+            "brightness": "int",
+            "blurDp": "int"
+        },
+        "Crop": {
+            "file": "string",
+            "cropRect": "Box?",
+            "rotation": "int"
+        },
+        "Box": {
+            "bottom": "int",
+            "left": "int",
+            "right": "int",
+            "top": "int"
+        },
+        "Base": {
+            "@sealed": {
+                "color": {},
+                "picture": {}
+            }
+        },
+        "Bar": {
+            "@sealed": {
+                "color": {},
+                "picture": {
+                    "blurDp": "int",
+                    "brightness": "int"
+                },
+                "transparent": {}
+            }
+        },
+        "Keys": {
+            "blocks": "boolean",
+            "radiusDp": "int",
+            "borderDp": "int",
+            "shadowDp": "int",
+            "gap": "Gap",
+            "press": "Press",
+            "letter": "Kind",
+            "function": "Kind",
+            "space": "Kind",
+            "enter": "Kind",
+            "overrides": "{Override}"
+        },
+        "Gap": {
+            "h": "int",
+            "v": "int",
+            "hLand": "int",
+            "vLand": "int"
+        },
+        "Press": {
+            "@enum": [
+                "tint",
+                "ripple"
+            ]
+        },
+        "Kind": {
+            "fill": "Fill",
+            "pressed": "Pressed"
+        },
+        "Fill": {
+            "@sealed": {
+                "color": {},
+                "image": {
+                    "file": "string",
+                    "insets": "[int]",
+                    "pxPerDp": "int"
+                },
+                "picture": {
+                    "blurDp": "int",
+                    "brightness": "int"
+                }
+            }
+        },
+        "Pressed": {
+            "@sealed": {
+                "color": {
+                    "argb": "int"
+                },
+                "darken": {},
+                "image": {
+                    "file": "string",
+                    "insets": "[int]",
+                    "pxPerDp": "int"
+                }
+            }
+        },
+        "Override": {
+            "fill": "Fill?",
+            "pressed": "Pressed?",
+            "label": "Label"
+        },
+        "Label": {
+            "@enum": [
+                "show",
+                "hide"
+            ]
+        },
+        "Text": {
+            "keyFont": "string?",
+            "candidateFont": "string?",
+            "keyWeight": "int",
+            "candidateWeight": "int",
+            "keyScale": "int"
+        }
+    },
+    "limits": {
+        "radiusDp": 24,
+        "borderDp": 3,
+        "shadowDp": 3,
+        "gapDp": 24,
+        "blurDp": 25,
+        "pxPerDp": 8,
+        "weights": [
+            300,
+            400,
+            700
+        ],
+        "keyScale": [
+            85,
+            130
+        ],
+        "entries": 300,
+        "fileBytes": 33554432,
+        "totalBytes": 67108864,
+        "pictureSide": 4096,
+        "keyImageSide": 1024,
+        "keyImageBytes": 2097152,
+        "iconBytes": 65536,
+        "overrides": 400,
+        "layouts": 16,
+        "layoutBytes": 65536,
+        "boardImageBytes": 12582912,
+        "animatedBytes": 4194304,
+        "animatedSide": 720,
+        "animatedFrames": 300,
+        "animatedFrameMs": 50,
+        "effectImageSide": 256,
+        "effectImageBytes": 131072,
+        "themeXmlBytes": 1048576
+    },
+    "builtinNames": [
+        "MonetLight",
+        "monet#light",
+        "monet",
+        "MonetDark",
+        "monet#dark",
+        "MaterialLight",
+        "material#light",
+        "material",
+        "MaterialDark",
+        "material#dark",
+        "PixelLight",
+        "pixel#light",
+        "pixel",
+        "PixelDark",
+        "pixel#dark",
+        "NordLight",
+        "nord#light",
+        "nord",
+        "NordDark",
+        "nord#dark",
+        "DeepBlue",
+        "deep-blue",
+        "Monokai",
+        "monokai",
+        "AMOLEDBlack",
+        "amoled-black",
+        "deep-blue#dark",
+        "monokai#dark",
+        "国风·天青",
+        "墨灰",
+        "多巴胺",
+        "奶油",
+        "护眼·纸色",
+        "机械键帽",
+        "橙风",
+        "液态玻璃",
+        "清心",
+        "简蓝",
+        "素雅",
+        "霓虹赛博"
+    ],
+    "defaults": {
+        "keys": {
+            "blocks": true,
+            "radiusDp": 4,
+            "borderDp": 0,
+            "shadowDp": 1,
+            "gap": {
+                "h": 3,
+                "v": 7,
+                "hLand": 3,
+                "vLand": 4
+            },
+            "press": "tint",
+            "letter": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "function": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "space": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "enter": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "overrides": {}
+        },
+        "text": {
+            "keyFont": null,
+            "candidateFont": null,
+            "keyWeight": 400,
+            "candidateWeight": 400,
+            "keyScale": 100
+        }
+    }
+}

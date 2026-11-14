@@ -179,31 +179,31 @@ class VoiceEngineTest {
         }
     }
 
-    /** [samples] as the listener hears them, a window at a time: each segment's result, closed at an endpoint or at the end */
+    /**
+     * [samples] as the listener hears them, a window at a time, through the listener's own loop
+     * ([VoiceSegments], as VoiceListener drives it): each segment's result, closed at an endpoint or
+     * at the end. A loop of its own here left VoiceSegments on the real recognizer untested (voice-12).
+     */
     private fun segments(recognizer: OnlineRecognizer, stream: OnlineStream, samples: FloatArray): List<OnlineRecognizerResult> {
         val out = mutableListOf<OnlineRecognizerResult>()
-        fun keep() = recognizer.getResult(stream).takeIf { it.text.isNotBlank() }?.let { out += it }
-        fun decode() {
-            while (recognizer.isReady(stream)) {
-                recognizer.decode(stream)
-                if (recognizer.isEndpoint(stream)) {
-                    keep()
-                    recognizer.reset(stream)
-                }
-            }
-        }
         try {
-            var i = 0
-            while (i < samples.size) {
-                val end = minOf(i + VoiceEngine.WINDOW, samples.size)
-                stream.acceptWaveform(samples.copyOfRange(i, end), VoiceEngine.SAMPLE_RATE)
-                decode()
-                i = end
+            val segment = VoiceSegments(
+                VoiceListener.Recognition(recognizer, stream),
+                VoiceEngine.SAMPLE_RATE,
+                choose = { result -> result.text.also { out += result } },
+                live = {},
+                closed = {},
+                VoiceQuiet(),
+            )
+            runBlocking {
+                var i = 0
+                while (i < samples.size) {
+                    val end = minOf(i + VoiceEngine.WINDOW, samples.size)
+                    segment.accept(samples.copyOfRange(i, end))
+                    i = end
+                }
+                segment.finish(FloatArray(VoiceEngine.TAIL_PADDING))
             }
-            stream.acceptWaveform(FloatArray(VoiceEngine.TAIL_PADDING), VoiceEngine.SAMPLE_RATE)
-            stream.inputFinished()
-            decode()
-            keep()
         } finally {
             stream.release()
         }

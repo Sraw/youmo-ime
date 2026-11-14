@@ -16,7 +16,7 @@ import org.fcitx.fcitx5.android.input.UnicodePunctuation
  * it reads as the recognizer's best. A text model would rather drop an English word it lacks
  * than keep it (accident happen → 时间); what was said in English is the recognizer's.
  *
- * Measured on ~/voice-eval (rerank.py, rr_ng.py: 1155 utterances, our sherpa-onnx's n-best with
+ * Measured on ~/workspace/voice-eval (rerank.py, rr_ng.py: 1155 utterances, our sherpa-onnx's n-best with
  * the app's hotwords, the weight by two-fold cross-validation), mixed error rate with a beam of
  * 16 (VoiceEngine's), as heard → ranked: new words 10.94% → 9.04% (328 of 405 written, from
  * 308), aishell 3.99 → 3.74, fleurs 4.81 → 4.55, ascend (Chinese and English mixed) 9.29 → 9.29;

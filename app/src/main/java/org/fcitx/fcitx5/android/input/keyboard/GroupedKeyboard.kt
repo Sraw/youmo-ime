@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
@@ -78,15 +79,15 @@ class GroupedKeyboard private constructor(
     context: Context,
     theme: Theme,
     // the built-in keyboard this one is (G14, G18): its layout's id, its theme board, its keys' names
-    builtIn: NineKeyLetters,
+    private val builtInLetters: NineKeyLetters,
     // named apart from the properties below, which an initializer would otherwise not see (review L4: the
     // 18 keys' wire reached a layout's own codes through sceneTable)
-    builtInWire: (Char) -> Int,
-    builtInSemicolon: Boolean,
+    private val builtInWire: (Char) -> Int,
+    private val builtInSemicolon: Boolean,
     private val grouping: Grouping,
 ) : BaseKeyboard(
-    context, theme, layout(builtIn, builtInWire, builtInSemicolon),
-    themeBoard = shapeOf(builtIn).board,
+    context, theme, layout(builtInLetters, builtInWire, builtInSemicolon),
+    themeBoard = shapeOf(builtInLetters).board,
 ) {
 
     constructor(
@@ -99,17 +100,24 @@ class GroupedKeyboard private constructor(
         ownGroups: Boolean = false,
     ) : this(context, theme, letters, wire, semicolon, grouping(context, letters, ownGroups))
 
+    // whether [layout] is the one of the layout's own groups: not the app's own of its id, drawn where the engine
+    // refused the pack's (SceneBoard.ownLayout), whose keys are the built-in groups' and are typed as such
+    private fun ownOn(layout: SceneLayout?): Boolean = grouping.own != null && layout === grouping.layout
+
+    // the keys drawn are the layout's own groups'
+    private val ownDrawn: Boolean get() = ownOn(drawnLayout)
+
     // what the engine reads this keyboard's codes and record by: the built-in groups', or the layout's own
-    private val letters: NineKeyLetters = grouping.letters
+    private val letters: NineKeyLetters get() = if (ownDrawn) grouping.letters else builtInLetters
 
     // a layout's own groups' codes go as they are (NineKeyLetters.CUSTOM_BLOCK); the built-in ones' as [wire] has them
-    private val wire: (Char) -> Int = if (grouping.own != null) Char::code else builtInWire
+    private val wire: (Char) -> Int get() = if (ownDrawn) Char::code else builtInWire
 
     // a layout's own groups shown as written, a `;` among them too
-    private val semicolon: Boolean = builtInSemicolon || grouping.own != null
+    private fun semicolonOn(layout: SceneLayout?): Boolean = builtInSemicolon || ownOn(layout)
 
-    // the groups in the engine's order: a layout's own key's code is its group's place among them
-    private val groups: List<String> = letters.tag().split(',')
+    // the layout's own groups in the engine's order: a layout's own key's code is its group's place among them
+    private val groups: List<String> = grouping.letters.tag().split(',')
 
     // a layout's own groups' keys, in the same order: the place of a key whose letters another key has too (review L3)
     private val ownIds: List<String> = grouping.layout?.takeIf { grouping.own != null }?.let { SceneGroups.ids(it.layout, it.fragments) }.orEmpty()
@@ -320,7 +328,7 @@ class GroupedKeyboard private constructor(
     // the code of the key [id] of [group]'s letters: the built-in keyboard's of its first letter (as always), a
     // layout's own its key's place among the engine's groups (a letter may be on more than one key of its own,
     // the same letters too); a key not found by its id (one of a when=, its id another's too), its group's first place
-    private fun codeOf(group: String, id: String): Char? = if (grouping.own == null) {
+    private fun codeOf(group: String, id: String): Char? = if (!ownDrawn) {
         letters.key(group[0])
     } else {
         val place = ownIds.indexOf(id).takeIf { it >= 0 && groups.getOrNull(it) == group } ?: groups.indexOf(group)
@@ -359,10 +367,14 @@ class GroupedKeyboard private constructor(
 
     // the groups whose taps lean (按落点加权): the layout's lean=, whichever draws the keys, its groups the
     // keyboard's (060-render-v2 §15); a layout of other groups, or none read: as built in (SceneGroups.leaningOf)
-    private val leaning: Set<String> by lazy {
-        val layout = sceneBoard?.layout ?: grouping.layout
-        SceneGroups.leaningOf(letters, layout?.layout, layout?.fragments.orEmpty())
+    private val leaning: Set<String> get() {
+        val layout = drawnLayout ?: grouping.layout
+        leaningKept?.takeIf { it.first === layout }?.let { return it.second }
+        return SceneGroups.leaningOf(letters, layout?.layout, layout?.fragments.orEmpty()).also { leaningKept = layout to it }
     }
+
+    // [leaning] of the layout last drawn: the app's own in place of a pack's refused one has its own
+    private var leaningKept: Pair<SceneLayout?, Set<String>>? = null
 
     // Return as last shown: its icon on the scene's key too
     private var returnAppearance = ReturnKeyAppearance.Enter
@@ -396,7 +408,7 @@ class GroupedKeyboard private constructor(
     // key, the space's microphone; the corners, the comma and the full stop as punctuation maps them
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
         val state = TextBoardState(
-            semicolonScheme = groupsOf(letters, semicolon).any { ';' in it },
+            semicolonScheme = groupsOf(if (ownOn(layout)) grouping.letters else builtInLetters, semicolonOn(layout)).any { ';' in it },
             address = address,
             langKey = showLangSwitchKey.getValue(),
             holdVoice = holdsToTalk,
@@ -423,10 +435,32 @@ class GroupedKeyboard private constructor(
     // (KeyboardWindow attaches a keyboard as it makes it): a keyboard kept while another's own groups were
     // shown tells its own again (EngineState.ownKeys). Not as it is made: one made and never shown (a
     // preview) would change the groups the keyboard shown is read by. A built-in grouping leaves it as it is, on
-    // purpose (sticky): only a layout of its own sends the codes those groups read, so the stale ones read nothing
+    // purpose (sticky): only a layout of its own sends the codes those groups read, so the stale ones read nothing.
+    // Nor where the engine refused the layout and the app's own of its id is drawn (SceneBoard.ownLayout): its keys
+    // send the built-in groups' codes, and the pack's groups told would be read by nothing typed here
     override fun onAttach() {
         super.onAttach()
-        grouping.own?.let { EngineState.ownKeys = it }
+        attached = true
+        tellOwnKeys()
+    }
+
+    // shown (onAttach) and not taken off since: a scene made then (onSceneBuilt) may tell the groups anew
+    private var attached = false
+
+    override fun onDetach() {
+        attached = false
+        super.onDetach()
+    }
+
+    // the pack's groups told as it was shown, then its layout refused as the scene was made: taken back
+    private fun tellOwnKeys() {
+        val own = grouping.own ?: return
+        if (ownDrawn) EngineState.ownKeys = own else if (EngineState.ownKeys === own) EngineState.ownKeys = null
+    }
+
+    override fun onSceneBuilt(scene: Scene?) {
+        super.onSceneBuilt(scene)
+        if (attached) tellOwnKeys()
     }
 
     // last: the scene reads the state above (the keys drawn by the scene engine, each as its layout says)

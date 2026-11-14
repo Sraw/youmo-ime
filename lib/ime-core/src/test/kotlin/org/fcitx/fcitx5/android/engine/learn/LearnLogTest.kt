@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.learn
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Unknown
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
@@ -599,5 +600,30 @@ class LearnLogTest {
         assertEquals(mapOf("汪小明" to "wang xiao ming"), changes.removed)
         assertEquals(mapOf("点了" to "dian le"), changes.formed)
         assertTrue(changes.recount)
+    }
+
+    // R25 F8064: a record whose file did not open learns in memory, and no rewrite of it is written till a start
+    // opens it. It said it took rewrites, so a restore that failed there was told to try again, at every try
+    @Uat("WD-46")
+    @Test
+    fun aRecordWhoseFileDidNotOpenTakesNoRewrite() {
+        val copied: (ByteArray, java.io.OutputStream) -> Boolean = { bytes, out -> out.write(bytes); true }
+        val notOpened = LearnLog(MemoryFiles().file(LearnLog.FILE), openAppend = { throw IOException("not opened") }).also { it.open() }
+        assertFalse(notOpened.onDisk)
+        assertFalse(notOpened.rewrite(copied))
+        assertFalse("none is written: said so", notOpened.takesRewrites)
+        // in memory (no user directory yet) the state is rewritten there
+        val inMemory = LearnLog(null).also { it.open() }
+        assertTrue(inMemory.rewrite(copied))
+        assertTrue(inMemory.takesRewrites)
+        // and a file open takes them
+        val opened = LearnLog(MemoryFiles().file(LearnLog.FILE)).also { it.open() }
+        opened.use { open ->
+            assertTrue(open.rewrite(copied))
+            assertTrue(open.takesRewrites)
+        }
+        // closed, as one that did not open: nothing is written till it is opened again (R25 F8075)
+        assertFalse(opened.takesRewrites)
+        assertFalse(opened.rewrite(copied))
     }
 }

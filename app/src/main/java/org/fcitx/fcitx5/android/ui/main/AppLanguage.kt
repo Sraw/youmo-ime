@@ -8,11 +8,16 @@ import android.content.Context
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.utils.toast
 import java.util.Locale
 
 /**
@@ -84,6 +89,15 @@ object AppLanguage {
         // fcitx names its input methods and config pages in the language it starts in;
         // one not running starts in this one anyway
         Locales.onLocalesPicked(appContext)
-        if (HostDaemon.getFirstConnectionOrNull() != null) HostDaemon.restartFcitx()
+        // a host still starting is waited for (else it keeps the old language's names): off the main thread
+        if (HostDaemon.getFirstConnectionOrNull() != null) {
+            FcitxApplication.getInstance().coroutineScope.launch(Dispatchers.IO) {
+                // one that stayed starting keeps the old language's names till it next starts; restarted and starting still, it
+                // takes the new one, which the wait does not tell from the other: said either way (R25r2 F7883)
+                if (!HostDaemon.restartFcitx()) {
+                    withContext(Dispatchers.Main) { appContext.toast(R.string.restart_fcitx_still_starting) }
+                }
+            }
+        }
     }
 }

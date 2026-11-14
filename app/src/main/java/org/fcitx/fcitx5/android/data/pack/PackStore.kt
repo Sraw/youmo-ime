@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.pack.Refusal
 import org.fcitx.fcitx5.android.pack.VerifyDue
 import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.utils.causes
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -194,7 +195,7 @@ object PackStore {
      * (restartIfRunning waits for the host it would be stopping). True if found damaged.
      */
     fun verifyAfterFailure(kind: PackKind, e: Throwable): Boolean {
-        if (generateSequence(e) { it.cause }.take(MAX_CAUSES).any { it is PackUnavailableException }) return false
+        if (e.causes().any { it is PackUnavailableException }) return false
         val gen = shelf.dir(kind) ?: return false
         val verifiedAt = shelf.verifiedAt(kind)
         val now = System.currentTimeMillis()
@@ -340,6 +341,5 @@ object PackStore {
     private const val BUFFER = 1 shl 16
     private const val VERIFY_AFTER_MS = 30_000L
     private const val CHARGING_POLL_MS = 15L * 60 * 1000
-    private const val MAX_CAUSES = 8
     private const val RECENTLY_MS = 10L * 60 * 1000
 }

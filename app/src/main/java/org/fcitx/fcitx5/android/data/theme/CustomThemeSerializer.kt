@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
-import arrow.core.compose
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -54,7 +53,7 @@ object CustomThemeSerializer : JsonTransformingSerializer<Theme.Custom>(ThemeFil
     private fun applyStrategy(oldVersion: String, obj: JsonObject) =
         strategies
             .takeWhile { it.version != oldVersion }
-            .foldRight(EmptyTransform) { it, acc -> it.transformation compose acc }
+            .foldRight(EmptyTransform) { it, acc -> { obj -> it.transformation(acc(obj)) } }
             .invoke(obj)
 
     data class MigrationStrategy(

@@ -345,7 +345,7 @@ abstract class BaseKeyboard(
 
     // the named keys as the resolver has them, the layout the keys are drawn from ([keyMarks]) its
     private val resolving = KeyResolving(object : KeyResolving.Board {
-        override val layout get() = keysLayout ?: sceneBoard?.layout
+        override val layout get() = drawnLayout
         override val im get() = keysIm
         override val nineLetters get() = keysNineLetters
         override fun state() = keyState()
@@ -408,6 +408,12 @@ abstract class BaseKeyboard(
 
     // the layout the scene was last made of ([keyMarks]): a theme's own where it has one
     private var keysLayout: SceneLayout? = null
+
+    /**
+     * The layout the keys are drawn from now: the last scene's ([keyMarks]), the board's asked for before one is made. Not
+     * [SceneBoard.layout] where the engine refused a theme pack's layout and the app's own of its id is drawn instead.
+     */
+    protected val drawnLayout: SceneLayout? get() = keysLayout ?: sceneBoard?.layout
 
     // the space's sideways swipe moves the cursor, as the setting says ([spaceSwipesCursor])
     private fun wireSpace(key: KeyHandle) {
@@ -608,11 +614,15 @@ abstract class BaseKeyboard(
         private set
 
     // the scene's keys ([drawKeysWithScene]) and what a touch on the canvas finds
-    private val sceneKeys = SceneKeys(this) { key, def -> wire(key, def) }
+    private val sceneKeys = SceneKeys(this, { keysLayout }) { key, def -> wire(key, def) }
 
     /** The board the scene engine draws this keyboard's keys from ([drawKeysWithScene], 060-render-p2 S4). */
     protected var sceneBoard: SceneBoard? = null
         private set
+
+    /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
+    @VisibleForTesting
+    val scenesMade: Int get() = sceneBoard?.scenesMade ?: 0
 
     /**
      * The keys drawn by the scene of the app's layout [layoutName] ([BuiltInLayouts]). A layout that
@@ -655,7 +665,7 @@ abstract class BaseKeyboard(
      * ([sceneEnv]): a settings page's scene of the keyboard (SwipeFates); null, no layout read.
      */
     internal fun shownAs(look: ThemeLook, width: Int, height: Int): Pair<SceneLayout, Env>? =
-        sceneBoard?.layout?.let { it to sceneEnv(look, it, width, height) }
+        drawnLayout?.let { it to sceneEnv(look, it, width, height) }
 
     /** Whether the canvas draws its board's fill under the keys ([KeyboardCanvasView.drawsBase]): a row or a column laid on its own background, not. */
     protected open val sceneDrawsBase: Boolean get() = true

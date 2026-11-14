@@ -50,6 +50,7 @@ import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import java.io.Closeable
 import java.io.IOException
+import java.io.OutputStream
 import java.util.concurrent.Executor
 
 /**
@@ -125,6 +126,13 @@ class Engines(
      * once a process is the app's to keep.
      */
     unkept: () -> Unit = {},
+    /**
+     * A seam for tests: how the learning record is opened for appends. A test's refuses a
+     * write, as a full disk would (EnginesRecordFaultTest, EnginesOlderTableLogTest); the app gives none.
+     * A constructor's argument handed down to the record's store, as its `openAppend`, in place of the
+     * setters on the store the tests used to reach for (0.6.1 audit engine-12).
+     */
+    openAppend: (LogFile) -> OutputStream = LogFile::append,
 ) : Closeable {
 
     private val hostThread = HostThread(offHostThread)
@@ -209,6 +217,7 @@ class Engines(
         addresses = addresses,
         putAddresses = putAddresses,
         unkept = unkept,
+        openAppend = openAppend,
     )
 
     private val words: LexiconFacade = LexiconFacade(lexicon, english, assets, tables, learner) { settings }

@@ -572,7 +572,7 @@ case("ST-15", needs="jvm:SettingsEffectUatTest.swipeUpThenDisabled、KeySwipeTes
 case("ST-16", needs="jvm:SettingsEffectUatTest.aLongerLongPressDelay")(lambda d: None)
 
 
-case("ST-17", needs="jvm:SettingsEffectUatTest.holdingTheSpaceGoesToTheNextInputMethod")(lambda d: None)
+case("ST-17", needs="jvm:SettingsEffectUatTest.holdingTheSpaceGoesToTheNextInputMethod、SpaceLongPressNextImTest")(lambda d: None)
 
 
 case("ST-18", needs="jvm:SettingsEffectUatTest.spaceSwipeOffLeavesTheCursor")(lambda d: None)
@@ -1657,3 +1657,12 @@ def st114(d):
     check("我" in c[:5], f"打 wo 的候选 {c[:8]}，没有「我」")
     return f"长按 QW 弹出 {shown[:10]}；wo 候选 {c[:5]}"
 
+
+case("ST-115", needs="jvm:PackLayoutRefusedTest.aLayoutTheEngineRefusesDrawsTheAppsOwnOfItsId、"
+     "PackLayoutRefusedTest.theAppsOwnLayoutDrawnInsteadIsTypedAsTheBuiltInGroups、"
+     "PackLayoutRefusedTest.aLayoutRefusedIsNotMadeAgainAsWhatTheKeysShowChanges、"
+     "PackLayoutRefusedTest.aRefusalInUseIsKeptThroughManyOthersAndLoggedOnce、"
+     "PackLayoutRefusedTest.aLayoutRefusedInOneStateIsDrawnInAnotherAtTheSameSize、"
+     "PackLayoutRefusedTest.theKeysTypedOnBeforeTheLayoutDrawnChangedSendTheDrawnLayoutsCodes、"
+     "PackLayoutRefusedTest.aZhuyinKeyWhoseFaceChangedSendsTheSymbolItShows")(lambda d: None)
+case("ST-116", needs="manual:主题制作网页；在电脑浏览器上手工跑（只有深色版的主题从背景图取色、勾「这个主题有浅色版」）")(lambda d: None)

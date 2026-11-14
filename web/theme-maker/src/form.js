@@ -9,7 +9,6 @@
   const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '));
   const unescape = (v) => v.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
   const escape = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const lineAt = (xml, i) => xml.slice(0, i).split('\n').length;
   const ATTR = /([\w:-]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
 
   /** [tag]'s attributes in order: `[[name, value]]`, values unescaped. */
@@ -25,20 +24,34 @@
     // a '>' inside a quoted value does not end the tag
     const re = new RegExp('<' + name + '\\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*?(\\/>|>)', 'g');
     const out = [];
+    // each element's line counted on from the last one's, up to it and no further (R25 web-7: from the start each
+    // time was a theme's length per element, seconds for a theme of thousands of styles; a look for the next line
+    // break was the rest of the theme per element where there is none, a theme written on one line)
+    let line = 1;
+    let counted = 0;
     for (const m of plain.matchAll(re)) {
+      for (let i = counted; i < m.index; i++) if (xml.charCodeAt(i) === 10) line++;
+      counted = m.index;
       let end = m.index + m[0].length;
       if (m[1] === '>') {
         const close = plain.indexOf('</' + name + '>', end);
         end = close < 0 ? end : close + name.length + 3;
       }
-      out.push({ start: m.index, end, line: lineAt(xml, m.index), tag: xml.slice(m.index, m.index + m[0].length), attrs: attrsOf(xml.slice(m.index, m.index + m[0].length)) });
+      out.push({ start: m.index, end, line, tag: xml.slice(m.index, m.index + m[0].length), attrs: attrsOf(xml.slice(m.index, m.index + m[0].length)) });
     }
     return out;
   }
 
-  /** The theme's styles in order: `[{start, end, line, select, attrs: [[name, value]]}]` (attrs without select). */
+  // the last text styles() read and what it found: a tab's drawing asks a dozen values of the same text (R25 web-7)
+  let stylesOf = { xml: null, list: [] };
+
+  /** The theme's styles in order: `[{start, end, line, select, attrs: [[name, value]]}]` (attrs without select). A new array each call, its items shared: not to be changed. */
   function styles(xml) {
-    return elements(xml, 'style').map((e) => ({ ...e, select: (e.attrs.find((a) => a[0] === 'select') || [])[1] ?? null, attrs: e.attrs.filter((a) => a[0] !== 'select') }));
+    if (stylesOf.xml !== xml) {
+      const list = elements(xml, 'style').map((e) => Object.freeze({ ...e, select: (e.attrs.find((a) => a[0] === 'select') || [])[1] ?? null, attrs: e.attrs.filter((a) => a[0] !== 'select') }));
+      stylesOf = { xml, list };
+    }
+    return stylesOf.list.slice();
   }
 
   // [xml] with [start, end) replaced by [text]; a removal takes its line's indent and its line break with it
@@ -101,13 +114,13 @@
 
   /** [xml] with [text] (an element) put in where [kind]'s go: after the last of it or of a kind before it, else first in <theme>. */
   function insert(xml, kind, text) {
-    const plain = uncommented(xml);
     let at = -1;
     for (const k of ORDER.slice(0, ORDER.indexOf(kind) + 1)) for (const e of elements(xml, k)) at = Math.max(at, e.end);
     if (at < 0) {
-      const open = /<theme\b[^>]*>/.exec(plain);
+      // the <theme> tag as elements() finds it: a '>' in a quoted value does not end it (R25 web-8)
+      const open = elements(xml, 'theme')[0];
       if (!open) throw new Error('no <theme>');
-      at = open.index + open[0].length;
+      at = open.start + open.tag.length;
     }
     return xml.slice(0, at) + '\n  ' + text + xml.slice(at);
   }
@@ -150,13 +163,18 @@
     ['其它', ['divider', 'clipboardEntry']],
   ];
 
-  // the <colors> of [variant] ('light': the one without variant=)
+  // the version the <colors> without variant= is: a theme's only one (a dark-only theme's are its dark colours,
+  // R25 web-4), else the light one
+  const bareVariant = (xml) => { const vs = variants(xml); return vs.length === 1 ? vs[0] : 'light'; };
+
+  // the <colors> of [variant] (see bareVariant for the one without variant=)
   function colorsBlock(xml, variant) {
-    return elements(xml, 'colors').find((e) => ((e.attrs.find((a) => a[0] === 'variant') || [])[1] || 'light') === variant) || null;
+    const bare = bareVariant(xml);
+    return elements(xml, 'colors').find((e) => ((e.attrs.find((a) => a[0] === 'variant') || [])[1] || bare) === variant) || null;
   }
 
   /** [variant]'s colours as written: `{name: value}` (the text: `#…`, `@name`, `darker(@key, 8%)`…). */
-  function colors(xml, variant = 'light') {
+  function colors(xml, variant = bareVariant(xml)) {
     const b = colorsBlock(xml, variant);
     const out = {};
     if (!b) return out;
@@ -168,7 +186,7 @@
   }
 
   /** [xml] with colour [name] of [variant] [value] (null: taken out); a <colors> made where there is none. */
-  function setColor(xml, name, value, variant = 'light') {
+  function setColor(xml, name, value, variant = bareVariant(xml)) {
     let b = colorsBlock(xml, variant);
     // a <colors …/> with nothing in it: an open and a close, so a colour has where to go
     if (b && /\/>$/.test(b.tag)) {
@@ -178,7 +196,7 @@
     }
     if (!b) {
       if (value == null) return xml;
-      xml = insert(xml, 'colors', variant === 'light' ? '<colors>\n  </colors>' : '<colors variant="' + variant + '">\n  </colors>');
+      xml = insert(xml, 'colors', variant === bareVariant(xml) ? '<colors>\n  </colors>' : '<colors variant="' + variant + '">\n  </colors>');
       b = colorsBlock(xml, variant);
     }
     const inside = elements(xml.slice(0, b.end), 'color').filter((e) => e.start > b.start);
@@ -201,17 +219,24 @@
 
   /**
    * [xml] with a dark version or without: on, variants="light dark" and a <colors variant="dark"> as a copy of the
-   * light colours where it has none; off, variants="light" and the dark colours gone.
+   * light colours where it has none; a dark-only theme's colours, now the light version's too, copied whichever
+   * way its block is written (without variant=, or variant="dark", which leaves no light block: a light version
+   * of the defaults). Off, variants="light" and the dark colours gone. A dark-only theme is never turned off:
+   * that would make its dark colours a light version's (R25 web-4), so it is [xml] as it is.
    */
   function withDark(xml, on) {
     const t = elements(xml, 'theme')[0];
     if (!t) throw new Error('no <theme>');
+    const darkOnly = variants(xml).join() === 'dark';
+    if (!on && darkOnly) return xml;
     xml = splice(xml, t.start, t.start + t.tag.length, withAttr(t.tag, 'variants', on ? 'light dark' : 'light'));
     const dark = colorsBlock(xml, 'dark');
     if (on && !dark) {
       const light = colors(xml, 'light');
       xml = insert(xml, 'colors', '<colors variant="dark">\n  </colors>');
       for (const [n, v] of Object.entries(light)) xml = setColor(xml, n, v, 'dark');
+    } else if (on && darkOnly && !colorsBlock(xml, 'light')) {
+      for (const [n, v] of Object.entries(colors(xml, 'dark'))) xml = setColor(xml, n, v, 'light');
     } else if (!on && dark) xml = splice(xml, dark.start, dark.end, '');
     return xml;
   }
@@ -529,7 +554,7 @@
   }
 
   root.YoumoForm = {
-    uncommented, styles, elements, valueOf, setProp, setProps, insert, sameSelect, sceneInsets, LIMITS, clamp,
+    uncommented, unescape, escape, attrsOf, styles, elements, valueOf, setProp, setProps, insert, sameSelect, sceneInsets, LIMITS, clamp,
     COLOR_GROUPS, colors, setColor, variants, withDark, hexOf, parseHex,
     picture, setPicture, cropRect, isNamed, sounds, setSound, removeSound,
     fillText, parseFill, shadowText, parseShadow, borderText, parseBorder, parseInset, insetText, parseRadius, radiusText,

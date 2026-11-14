@@ -8,7 +8,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ScrollView
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
@@ -138,7 +137,7 @@ class T9ColumnFitTest {
         RuntimeEnvironment.setFontScale(scale)
         val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
         val longest = listOf("shuang", "zhuang", "chuang", "shuan")
-        keyboard.show(EngineState.T9State(composing = true, syllables = longest, id = 1))
+        keyboard.show(T9State(composing = true, syllables = longest, id = 1))
         val density = keyboard.resources.displayMetrics.density
         // the narrowest the nine keys are laid out: a 240dp-wide keyboard (one-handed on a small phone)
         val w = (NARROWEST_DP * density).toInt()

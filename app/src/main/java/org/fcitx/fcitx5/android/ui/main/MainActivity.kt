@@ -5,7 +5,10 @@
 package org.fcitx.fcitx5.android.ui.main
 
 import android.annotation.SuppressLint
+import android.content.ContentResolver
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
@@ -32,6 +35,7 @@ import org.fcitx.fcitx5.android.utils.parcelable
 import org.fcitx.fcitx5.android.utils.startActivity
 import splitties.views.topPadding
 import timber.log.Timber
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
@@ -98,7 +102,7 @@ class MainActivity : AppCompatActivity() {
     private fun processIntent(intent: Intent?) {
         val action = intent?.action ?: return
         when (action) {
-            Intent.ACTION_VIEW -> intent.data?.let {
+            Intent.ACTION_VIEW -> intent.data?.takeIf { importable(this, it) }?.let {
                 AlertDialog.Builder(this)
                     .setTitle(R.string.pinyin_dict)
                     .setMessage(R.string.whether_import_dict)
@@ -145,6 +149,25 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_SETTINGS_ROUTE = "${BuildConfig.APPLICATION_ID}.EXTRA_SETTINGS_ROUTE"
+
+        /**
+         * Whether a file another app asks us to open ([Intent.ACTION_VIEW]) may be read: a `content://` one (its
+         * provider gives what the sender may share), or a `file://` one (old file managers still send them) outside
+         * this app's own directories. Read with the app's rights, a path into them would take its private files,
+         * the learning backup kept before a restore say, for a dictionary to import.
+         */
+        internal fun importable(ctx: Context, uri: Uri): Boolean = when (uri.scheme) {
+            ContentResolver.SCHEME_CONTENT -> true
+            ContentResolver.SCHEME_FILE -> {
+                val path = uri.path?.let { runCatching { File(it).canonicalFile }.getOrNull() }
+                val own = listOfNotNull(
+                    ctx.dataDir, ctx.createDeviceProtectedStorageContext().dataDir,
+                    ctx.getExternalFilesDir(null)?.parentFile, ctx.externalCacheDir?.parentFile,
+                ).map { it.canonicalFile }
+                path != null && own.none { path.startsWith(it) }
+            }
+            else -> false
+        }.also { if (!it) Timber.w("Not opened: ${uri.scheme} ${uri.path}") }
     }
 
 }

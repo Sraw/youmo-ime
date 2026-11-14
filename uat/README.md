@@ -95,12 +95,14 @@
 `./gradlew :app:packs` 打在 `app/build/packs/`）每台设备只导入一次：
 
 ```sh
-uat/tools/uat.py packs --port 5554    # 装 debug 包并导入两个包（已是这一版的跳过）；--no-voice 只导文字包
+uat/tools/uat.py packs --port 5554    # 装 debug 包并导入两个包（版本相同、文件也和上次导入的相同才跳过）；--no-voice 只导文字包
 ```
 
 它走 debug 包里只认 shell 的导入口（`PackImportProvider`，`content://<包名>.uat.packs`）：`content write` 把包写进 App 的缓存，
 `content call --method import` 交给和「资源包」页同一个 `PackStore.import`（签名、每个文件的 SHA-256、格式号都照查），
 `--method state` 查每个包的状态。debug 包信任仓库里的测试密钥和正式密钥。
+开发时重做的包版本号不变（`packs.properties` 只在发版时升），所以运行器每导入一个包就在设备上记下它的文件 SHA-256
+（`/data/local/tmp/youmo-uat-packs/<包>.sha256`），版本相同但文件变了也会重导。标记里还记着这次导入在 App 里的代号（`files/packs/<包>/current`），在「资源包」页手动导入过别的文件，代号就变了，下次运行也会重导，不用手动删标记。
 
 重置时不能用 `pm clear`：它连资源包一起删，每条用例再导一次要多好几秒。debug 包可以 `run-as`，运行器就先停掉输入法、
 `am force-stop`、收回录音权限、删掉外部存储里 App 的目录，再用 App 自己的身份删掉数据目录里除 `files/packs` 以外的一切（设置、词、剪贴板、主题），
@@ -176,7 +178,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 | 类 | 在哪 | 写法 | 例子 |
 |---|---|---|---|
-| 引擎 | ime-core 单测（小数据、毫秒级）或 `:lib:ime-eval:uatTest`（真数据：EngineReplay 只有引擎，HostReplay 加 Kotlin 宿主的标点、简繁、快速输入、面板、虚拟时钟，ParityReplay 对设备录的序列） | `needs="jvm:<测试类>.<方法>"`，`.md` 加 **JVM** 行 | 整句、学习排序、标点、快速输入、九键连按 |
+| 引擎 | ime-core 单测（小数据、毫秒级）或 `:lib:ime-eval:uatTest`（真数据：EngineReplay 只有引擎，HostReplay 加 Kotlin 宿主的标点、简繁、快速输入、面板、虚拟时钟） | `needs="jvm:<测试类>.<方法>"`，`.md` 加 **JVM** 行 | 整句、学习排序、标点、快速输入、九键连按 |
 | 界面 | `:app:testDebugUnitTest` 的 Robolectric + Roborazzi（`uat/*UatTest`、`KeyboardHarness`、`*KeyboardScreenshotTest`） | 同上 | 键盘样子、状态面板、设置页、词库页、横屏/分体 |
 | 只能在设备上 | 模拟器 | 不写 `needs=` | 真窗口和 insets、系统界面（向导、输入法选择框、导航栏、TalkBack）、麦克风、真实体键盘、安装/升级/降级、杀进程、转屏和切应用、锁屏、内存和堆 |
 | 冒烟 | 模拟器，另有 JVM 断言 | 不写 `needs=`，`.md` 有 **JVM** 行并写"设备上留作冒烟" | 每区一条胶水最重的 |
@@ -211,12 +213,12 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | `voice:…` | 导入了语音包的 debug 包（默认就是；`--no-voice` 时、发布包上在别处跑：发布包没有片段麦克风） | 12 语音 |
 | `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v、QU-20、ST-82、ST-85、ST-110 |
 | `release,scripted:…` | 发版时用发布包脚本跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
-| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24、ST-68、ST-69、ST-70、ST-73、ST-74、TB-53、VO-37、ST-75、ST-76、ST-77、ST-78、ST-79、ST-80、ST-81、TB-46a、PR-51、ST-83、ST-84、ST-86、ST-87、ST-88、ST-89、ST-91、ST-92、ST-93、ST-94、ST-102、ST-103、KB-84、ST-111 |
+| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24、ST-68、ST-69、ST-70、ST-73、ST-74、TB-53、VO-37、ST-75、ST-76、ST-77、ST-78、ST-79、ST-80、ST-81、TB-46a、PR-51、ST-83、ST-84、ST-86、ST-87、ST-88、ST-89、ST-91、ST-92、ST-93、ST-94、ST-102、ST-103、KB-84、ST-111、WD-49、PR-52a、ST-116、KB-88、LC-20、VO-40、PY-121a |
 | `jvm:<测试>` | JVM 上的测试（`:app:testDebugUnitTest`、`:app:testDebugUnitTestAt29` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 797 条（P0 138、P1 602、P2 57）：模拟器上跑 107 条（其中 61 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 690 条（JVM 612、发版时 24、真机或手工 40、语音 14）。
+现在共 816 条（P0 138、P1 615、P2 63）：模拟器上跑 108 条（其中 62 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 708 条（JVM 623、发版时 24、真机或手工 47、语音 14）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 

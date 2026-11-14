@@ -45,6 +45,7 @@ class Chttrans(
     val action: StatusAction = object : StatusAction("chttrans") {
         override fun icon(ic: InputContext) = if (isTraditional(ic)) "fcitx-chttrans-active" else "fcitx-chttrans-inactive"
         override fun shortText(ic: InputContext) = if (isTraditional(ic)) "Traditional Chinese" else "Simplified Chinese"
+        override fun active(ic: InputContext) = isTraditional(ic)
         override fun activate(ic: InputContext) = toggle(ic)
     }.also(statusArea::register)
 

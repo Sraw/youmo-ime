@@ -92,6 +92,12 @@ sealed class LearningOp {
     /** How much there is to keep or lose: the counts U-86's confirmation and the lexicon page show ([LearningResult.Overview]). */
     data object Overview : LearningOp()
 
+    /**
+     * Whether what is learned is saving to the disk now (LearnLog.saving; [LearningResult.Saving]): nothing
+     * counted, for the ⋯ panel, which asks each time it opens (R25 F7897).
+     */
+    data object Saving : LearningOp()
+
     /** A list of the lexicon page ([LearningResult.Listed]): the pins, the predictions turned off, a table's blocks under a code. */
     data class ListItems(val what: Listed) : LearningOp()
 
@@ -130,14 +136,34 @@ sealed class LearningResult {
 
     data class Text(val text: String) : LearningResult()
 
-    /** Asked, and it could have been, but the disk failed: nothing done (a clear that did not clear says so). */
+    /** Asked, and it could have been, but the disk failed: nothing done (a clear that did not clear says so, and a forget not taken back). */
     data object Failed : LearningResult()
 
     /** What was learned since [fromMinute] (epoch minutes; [ALL] for everything) is gone. */
     data class Cleared(val fromMinute: Int) : LearningResult()
 
-    /** How many of each the user has: their own words, the words added by hand, pinned, blocked, predictions turned off; and whether habits are used (U-93). */
-    data class Overview(val mine: Int, val added: Int, val pinned: Int, val blocked: Int, val noPredict: Int, val habits: Boolean) : LearningResult()
+    /**
+     * How many of each the user has: their own words, the words added by hand, pinned, blocked, predictions turned off;
+     * whether habits are used (U-93); and whether what is learned is saving to the disk now (LearnLog.saving).
+     */
+    data class Overview(
+        val mine: Int,
+        val added: Int,
+        val pinned: Int,
+        val blocked: Int,
+        val noPredict: Int,
+        val habits: Boolean,
+        val saving: Boolean = true,
+    ) : LearningResult()
+
+    /**
+     * [LearningOp.Saving]'s answer: [saving] as [Overview.saving]. [rewrites] false: the record takes no rewrite
+     * (a clear, a restore, a forget taken back) till the process starts anew, its file not open again after a
+     * write that failed, or not opened at all this run (LearnLog.takesRewrites); true otherwise, a full disk too,
+     * where one goes through once there is room. So what failed while not saving is told to restart only where
+     * that helps (R25 F8037).
+     */
+    data class Saving(val saving: Boolean, val rewrites: Boolean = true) : LearningResult()
 
     data class Listed(val items: List<ListedItem>) : LearningResult()
 

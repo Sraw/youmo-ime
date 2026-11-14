@@ -27,6 +27,13 @@ object Versions {
     val supportedABIs = abiIds.keys
     const val fallbackABI = "arm64-v8a"
 
+    // what is built without -PbuildABI: the released one alone. The emulator tasks (CI's x86_64, the
+    // Mac's arm64) pass theirs; the 32-bit ones are still built when named
+    val defaultABIs = setOf(fallbackABI)
+
+    /** The ABIs a build makes: [override] (-PbuildABI / BUILD_ABI, comma-separated) if given, else [defaultABIs]. */
+    fun buildABIs(override: String?): Collection<String> = override?.split(",") ?: defaultABIs
+
     fun calculateVersionCode(abi: String = fallbackABI): Int {
         val abiId = abiIds[abi] ?: 0
         return baseVersionCode * 10 + abiId
@@ -61,6 +68,9 @@ object Versions {
         }
         return versionName
     }
+
+    /** Whether [versionName] is a release's or a pre-release's, built at its tag (what releaseBundles ships). */
+    fun isTaggedName(versionName: String) = RELEASE_NAME.matches(versionName) || PRE_RELEASE_NAME.matches(versionName)
 
     // a release's name at its tag: 0.1.0, not 0.1.0-5-gabc1234 past it nor 0.1.0-untagged
     private val RELEASE_NAME = Regex("\\d+(\\.\\d+)*")

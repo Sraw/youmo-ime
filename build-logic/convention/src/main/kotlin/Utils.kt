@@ -24,5 +24,8 @@ fun Project.epn(env: String, prop: String) =
     System.getenv(env)?.takeIf { it.isNotBlank() }
         ?: runCatching { property(prop)!!.toString() }.getOrNull()
 
+/** [value] trimmed, a leading `~/` taken as [home] (as it is, a `$` in it no group reference): a machine setting's path */
+internal fun homed(value: String, home: String): String = value.trim().replaceFirst(Regex("^~(?=/)"), Regex.escapeReplacement(home))
+
 fun String.capitalized(): String =
     if (get(0).isUpperCase()) this else replaceFirstChar { get(0).uppercaseChar() }

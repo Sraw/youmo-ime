@@ -1,0 +1,10 @@
+# The voice pack v2's (0.6.0's) model files as youmo.voiceModelDir had them (youmo-voice-060-O, 2026-11-10;
+# checked against the released youmo-voice-v2.youmopack's manifest, 2026-11-13). The directory is not backed up
+# (DECISIONS B17): these name what was shipped until the 0.6.1 voice-models-* release pins it.
+f87a38025a5fdd1e4e9591f6a44bb81295097ce0b80df6f4ab9f44e52c64ca5f  bpe.model
+c6bcf62f7acf626d4b03e15c10454ca71469bf527075578f1b564fecff42f7a2  decoder.ort
+dbaa239be8e9920b86cecbf149c69545bfc282ec72313914c4d2dfa2c340f3d7  encoder.ort
+e6034d67718c415fe0ca9b4dfe1958da187f4fa3d69e671d36e61f76748bcc32  joiner.ort
+219b3ba9185a75981e6f79a11c945216688ef4b0f8e0d2fea20a65ec488c96b1  polish-tagger.json
+403324ed08b6c3cdcc0c964287d7b034bcebcc1aab87538e2d02144e36fb795a  polish-tagger.ort
+b818a60878b9aae978cbb8ad594acbd403d76d1af2e31ef4197c84e2dbdba27c  tokens.txt

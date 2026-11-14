@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.host
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -47,11 +48,13 @@ class TempModeTapsTest {
 
     @Test
     fun aRejectedCodeLeavesQuickInputUntouched() {
-        // code review N5: a key quick input does not take (a syllable tapped in the strip) typed nothing, yet Return no longer committed alt
-        rig.quickPhrase.trigger(rig.ic, str = "S", alt = "ALT", key = Key('k'.code))
+        // code review N5: a key quick input does not take (a syllable tapped in the strip) types nothing and leaves the mode on
+        rig.quickPhrase.trigger(rig.ic)
+        rig.type("a")
         send(Keyboard.SYLLABLES.first.code)
+        assertTrue(rig.quickPhrase.isActive(rig.ic))
         rig.press(KeySyms.RETURN)
-        assertEquals(listOf("ALT"), rig.commits())
+        assertEquals(listOf("a"), rig.commits())
     }
 
     @Test

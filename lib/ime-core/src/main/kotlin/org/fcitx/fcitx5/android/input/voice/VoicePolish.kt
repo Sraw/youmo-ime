@@ -117,13 +117,13 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
         private const val ASCII = 0x80
 
         // norm's full width marks, and what English writes for each
-        private val WIDE_MARKS = "，？！：；".codePoints().toArray()
-        private const val ASCII_MARKS = ",?!:;"
-        private val STOPS = ".。？！".codePoints().toArray()
+        private val WIDE_MARKS = VoiceMarks.WIDE.codePoints().toArray()
+        private const val ASCII_MARKS = VoiceMarks.ASCII
+        private val STOPS = VoiceMarks.STOPS.codePoints().toArray()
 
         // marks end a number though the tagger put them in one (numeval.py render); each of VoiceLive.ENDS
         // among them (VoicePolishTest checks), so what is typed as it is said is never cut inside a number
-        internal val NUMBER_BREAKS = setOf("，", "。", "？", "！", "、", "…", "：", "；", ",", "?", "!", ";")
+        internal val NUMBER_BREAKS = VoiceMarks.NUMBER_BREAKS
 
         /** the characters a Chinese number is said with, 点 among them (三点五): never deleted ([guarded]) */
         val NUMBER_CHARS = "一二两三四五六七八九十百千万亿零〇幺点".codePoints().toArray().toSet()
@@ -131,10 +131,10 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
         /**
          * Idioms and fixed words said with number characters that are no number (「十全十美」, not 10全十美):
          * nothing in them is marked a number ([guarded]). A list here, not the pinyin dictionary: that is
-         * the native engine's, which the voice path (and voice-eval's numeval.py, which checks the same) has
-         * no reach to, and these are a closed set; four characters and more, so a real number beside one
-         * (「三个一心一意的人」) is not taken for it. Nothing ties this list to numeval.py's: a change here
-         * goes there by hand. Each once (VoicePolishTest checks).
+         * the native engine's, which the voice path has no reach to, and these are a closed set; four
+         * characters and more, so a real number beside one (「三个一心一意的人」) is not taken for it.
+         * voice-eval has no copy of it: `ime-eval voice-post --source tagged` scores the tagger's labels
+         * through this code, with `--guard off` to measure what the guards are worth. Each once (VoicePolishTest checks).
          */
         val IDIOMS: List<String> = """
             十全十美 一心一意 七上八下 三心二意 一五一十 四面八方 五颜六色 乱七八糟 一模一样 万无一失 一干二净
@@ -161,7 +161,7 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
             return found
         }
 
-        private val PAUSE_BEFORE_MARK = Regex("[，、；：]+(?=[。？！…，])")
+        private val PAUSE_BEFORE_MARK = Regex("[${VoiceMarks.PAUSE_BEFORE}]+(?=[。？！…，])")
 
         // a mark English wrote after an English letter (a number still pending in [run] is what it follows, not
         // [out]'s last) as English writes it (「Yes, I know?」): norm made it full width
@@ -279,7 +279,7 @@ class VoicePolishStream(
     private val tagger: Tagger,
     private val freezeAfter: Int = FREEZE_AFTER,
     private val window: Int = WINDOW,
-    /** the labels [VoicePolishTags.guarded]; false only for voice-eval's goldens, which have none */
+    /** the labels [VoicePolishTags.guarded]; false only for voice-eval's goldens, which have none, and `ime-eval voice-post --guard off` */
     private val guard: Boolean = true,
 ) {
     /** The op, after and number labels of [text] (code points), a character each; the model run. */

@@ -40,7 +40,7 @@ class DeletionRunTest {
     }
 
     private fun FakeEditor.restore(kept: ClearedText, typing: Boolean = false, gives: Int = 10_000): Boolean =
-        kept.take(f, field(gives, gives), typing)?.also { EditPlan.apply(it.restore, this) {} } != null
+        kept.take(f, field(gives, gives), typing)?.also { EditPlan.apply(it.restoreAt(minOf(selectionStart, selectionEnd)), this) {} } != null
 
     @Test
     @Uat("KB-64")

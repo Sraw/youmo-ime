@@ -583,3 +583,22 @@
 - **操作**：打 h a n g，看「行」上方；清空，在 **通用输入** 的 **在键上划** 里选 **笔画筛选**，打 h a n g 再在键盘上画一撇（「行」的第一笔），「行」留在候选里，看「行」上方；清空，把 **候选词注音** 换成「注音」，再打 h a n g。
 - **预期**：三次「行」上方都是 háng（注音是 ㄏㄤˊ），从不是 xíng（ㄒㄧㄥˊ）。
 - **JVM**：`EnginesReadingsTest.eachCandidateIsReadAsTyped`、`EnginesReadingsTest.aCharacterOfTwoReadingsIsReadAsTypedThroughFullPinyinsWrappers`（全拼和笔画查字、笔画筛选这些包着它的都按所打读音）、`StrokeFilterTest.readingsAndLookupsOfAKeptCandidateAreOfItsOwnPlace`；设备上不跑。
+
+### PY-120 [P1] 多行框里回车换行后，不接着前面的字联想
+- **前提**：B0，点「句子」框（多行、空着，回车换行，框不清空；「普通文本」是单行框，回车不换行）。
+- **操作**：点 h a o，点空格；点回车；点 n i 看候选。
+- **预期**：框里是「好」加换行；ni 的候选和在空框开头打 ni 一样，不按「好」接下去排（回车交给 App 后，前面上屏的字不再当上文）。聊天框发出去以后仍接着前面的字，见 PY-11。
+- **JVM**：ime-core `EnginesStrokeLookupChainTest.withoutAKeyPassedOnWhatWasCommittedIsTheContext`（不按回车时「好」是上文，ni 先出「拟」）、`EnginesStrokeLookupChainTest.enterPassedOnToTheAppDropsWhatWasCommittedBefore`（回车交给 App 后上文丢掉，ni 先出「你」）；设备上不跑。
+
+### PY-121 [P1] 候选词注音：查不到声调的生僻字标不带调的读音，没读音的候选和别的对齐
+- **前提**：B0-设置；在 **通用输入** 里把 **候选词注音** 选「拼音」，回测试页（脚本从这里开始，自己选）。
+- **操作**：打 chun，点 ⌄ 展开候选，往后翻到有 䏝、䏰、䄝 的那页，截图；清空，打 haha，看候选栏里的表情和汉字候选。清空，接上实体键盘（脚本用模拟器的 USB 键盘），按 h a h a，看光标旁悬浮候选窗里的表情和汉字候选，截图；按 Esc，按 i p h o n e，看悬浮候选窗里的「iPhone」和别的候选，截图；按 Esc，拔掉实体键盘。（悬浮候选窗这两步在 Android 10 的 youmo29 上另跑一次，见 PY-121a：测试页在那里打不开。）把 **候选词注音** 换成「注音符号」，再打 chun 翻到同一页。
+- **预期**：拼音下 䏝、䏰、䄝 上方是不带声调的 chun（它们的声调查不到：词典把它们收在 chun 下，声调表里没有这个读音），别的字照旧带声调（春 chūn、纯 chún）；每一行里所有字的底边在一条线上，没有哪个格子的字比旁边高；表情这种没读音的候选也和有读音的候选底边对齐。注音符号下这几个字不标（不带调的注音会被读成一声），字仍和旁边对齐；拆字、笔画查字出的这类字，注音符号下读音提示同样不标。悬浮候选窗（实体键盘）里没读音的候选（表情、「iPhone」这种英文）和有读音的一样高、底边对齐：看图（JVM 上悬浮候选窗只断言没读音的汉字「好」和有读音的「你」，表情、英文只在设备的图上看）。用户 2026-11-14 定。
+- **JVM**：ime-core `CandidateReadingsTest.aCharacterOfNoKnownToneIsItsSyllableTonelessInPinyin`（所打音节或词典音节，不带调）、`CandidateReadingsTest.aCharacterOfNoKnownToneIsLeftEmptyInZhuyin`、`CandidateReadingsTest.aCharacterReadByItsTextTakesASyllableOfKnownToneFirst`（码表、手写按字查读音时先取有声调的：䏝 zhuān）、`CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones`、`CandidateReadingsTest.aHintOfACharactersSeveralReadingsIsTheOneItHasThere`（拆字、笔画查字的提示：查不到声调的字注音符号下不标）；app `CandidateReadingsUatTest.aCandidateOfNoReadingStandsOnItsNeighboursBaseline`（候选栏，拼音和注音；图 `unread_pinyin_port`）、`ReadingBaselineTest.aGridCellOfNoReadingStandsOnItsNeighboursBaseline`（展开候选）、`ReadingBaselineTest.aFloatingCandidateOfNoReadingIsAsTallAndOnTheSameBaseline`（悬浮候选窗：只排没读音的汉字「好」和有读音的「你」，SDK 29 和 35 各跑一次，只守住算法：Robolectric 的字体没有不同高度的回退字体，撤掉修复也照过，Android 10–12 上的实际效果看 youmo29 上的截图，见 PY-121a；表情、英文不在里面，看设备的图）；真数据里的读音见 `:lib:ime-eval:uatTest` 的 `PinyinReadingUatTest.aCharacterOfNoKnownToneReadsToneless`（打 chun：拼音 䏝 是 chun、春 是 chūn；注音 䏝 不标、春 是 ㄔㄨㄣ）；读音本身已在 JVM 上用真数据断言，设备上照跑只看对齐（截图：每行的字底边在一条线上，没读音的候选和旁边的一样高；悬浮候选窗里的表情和英文只有这里看）。
+
+### PY-121a [P1] 候选词注音：Android 10 上悬浮候选窗里没读音的候选和别的对齐（输入测试台，手工）
+- **前提**：youmo29 模拟器（Android 10，API 29），B0-设置，手工做到（运行器做 B0 时要打开测试页，这台上打不开）：系统语言简体中文、竖屏、不接实体键盘；`uat/tools/uat.py packs --port <youmo29 的端口> --no-voice`（装 debug 包、设为当前键盘、导入文字包）；装过、用过的再按 uat/README.md「重置」那三条 adb 命令重置（不要 `pm clear`，它连资源包一起删）；打开幽默输入法应用，停在设置首页。再装好输入测试台（`ANDROID_SERIAL=<youmo29> ./gradlew :testbed:installDebug`，uat/TESTBED.md）；在 **通用输入** 里把 **候选词注音** 选「拼音」。PY-121 的测试页要 API 34+，在这台上打不开，所以这一遍用测试台、手工做。
+- **操作**：打开测试台 `types` 页（`adb shell am start -n org.fcitx.fcitx5.android.testbed/.MainActivity --es page types`），点 `text` 框；接上实体键盘（`ANDROID_SERIAL=<youmo29> uat/tools/emu-keyboard.sh up`），按 h a h a（`emu-keyboard.sh type haha`），看光标旁悬浮候选窗里的表情和汉字候选，截图；按 Esc（`emu-keyboard.sh key ESC`），按 i p h o n e，看悬浮候选窗里的「iPhone」和别的候选，截图；按 Esc，拔掉实体键盘（`emu-keyboard.sh down`）。
+- **预期**：同 PY-121 的悬浮候选窗部分：没读音的候选（表情、「iPhone」这种英文）和有读音的一样高、底边对齐。Android 13 以下表情由它自己的回退字体排，有读音的字的行按汉字的行排，这两张图是这件事在 Android 10–12 上唯一的证据（JVM 上 Robolectric 没有不同高度的回退字体）。
+- **JVM**：`ReadingBaselineTest.aFloatingCandidateOfNoReadingIsAsTallAndOnTheSameBaseline`（SDK 29 和 35 各跑一次，只守住算法，见 PY-121）；设备上看图，手工跑。
+

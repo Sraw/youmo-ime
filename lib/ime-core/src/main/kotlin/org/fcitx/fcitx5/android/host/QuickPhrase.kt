@@ -67,7 +67,7 @@ class QuickPhrase(
     private val addLabel: String = "+ Add",
     /** After [auxLabel] with nothing typed and none of the user's entries. */
     private val emptyHint: String = "type a key, or tap + Add for your own",
-) : PanelTempMode {
+) : TempMode {
 
     constructor(host: TempModeHost, table: QuickPhraseTable, auxLabel: String = "Quick Phrase: ") :
         this(host, fixed(QuickPhraseBook(table)), auxLabel)
@@ -78,12 +78,7 @@ class QuickPhrase(
     private class State {
         var active = false
         var typed = false
-        var text = ""
         var hint = ""
-        var prefix = ""
-        var str = ""
-        var alt = ""
-        var key = Key(TempKeys.NONE)
         val buffer = TempInputBuffer(MAX_SIZE)
 
         // what each character of buffer may be in a key, in step with it: edited through the methods below
@@ -131,26 +126,14 @@ class QuickPhrase(
     }
 
     /**
-     * `QuickPhraseTempMode::trigger` (`:289-304`): active with an empty buffer. [text] follows the aux
-     * label until something is typed; [prefix] goes before the buffer in the preedit and the commit;
-     * [str] is committed by [key] while nothing is typed, [alt] by Return.
+     * `QuickPhraseTempMode::trigger` (`:289-304`): active with an empty buffer. fcitx's text, prefix,
+     * str, alt and key arguments are left out: only pinyin's quick phrase hand-off passes them, and
+     * the keyboard's button and the trigger keys never do.
      */
-    fun trigger(
-        ic: InputContext,
-        text: String = "",
-        prefix: String = "",
-        str: String = "",
-        alt: String = "",
-        key: Key = Key(TempKeys.NONE),
-    ) {
+    fun trigger(ic: InputContext) {
         val s = ic.propertyFor(state)
         s.typed = false
         s.active = true
-        s.text = text
-        s.prefix = prefix
-        s.str = str
-        s.alt = alt
-        s.key = key
         s.buffer.clear()
         s.keys.clear()
         updateUI(ic)
@@ -215,12 +198,7 @@ class QuickPhrase(
                 return true
             }
             KeySyms.RETURN, KeySyms.KP_ENTER -> {
-                val untouched = !s.typed && s.buffer.isEmpty()
-                if (untouched && s.str.isNotEmpty() && s.alt.isNotEmpty()) {
-                    host.commit(ic, s.alt)
-                } else if (s.buffer.size + s.prefix.toByteArray().size != 0) {
-                    host.commit(ic, s.prefix + s.buffer.userInput)
-                }
+                if (!s.buffer.isEmpty()) host.commit(ic, s.buffer.userInput)
                 reset(ic)
                 return true
             }
@@ -255,17 +233,11 @@ class QuickPhrase(
                 return true
             }
         }
-        val untouched = !s.typed && s.buffer.isEmpty()
-        if (untouched && s.str.isNotEmpty() && TempKeys.check(key, s.key)) {
-            host.commit(ic, s.str)
-            reset(ic)
-            return true
-        }
         val chr = KeySyms.toUnicode(key.sym)
         if (chr == 0) {
             s.buffer.type("")
         } else {
-            // a keyboard's own code that is no key's types nothing and leaves the mode untouched (Enter still commits s.alt)
+            // a keyboard's own code that is no key's types nothing and leaves the mode untouched
             val typed = QuickPhraseKeys.of(chr, hooks.nineKeys) ?: return true
             s.type(typed.shown, typed.can)
         }
@@ -276,11 +248,11 @@ class QuickPhrase(
 
     /**
      * `invokeAction` (`:331-343`): a tap in the preedit moves the buffer's cursor there; any other
-     * action, a tap in the prefix, or a context without client preedit leaves the mode.
+     * action, or a context without client preedit, leaves the mode.
      */
     override fun invokeAction(ic: InputContext, e: InvokeActionEvent): Boolean {
         val s = ic.propertyFor(state)
-        val cursor = e.cursor - s.prefix.codePointCount(0, s.prefix.length)
+        val cursor = e.cursor
         if (cursor < 0 || e.action != InvokeActionEvent.Action.LeftClick ||
             !ic.has(Capability.PREEDIT)
         ) {
@@ -297,23 +269,11 @@ class QuickPhrase(
         val s = ic.propertyFor(state)
         s.active = false
         s.typed = false
-        s.text = ""
         s.buffer.clear()
         s.keys.clear()
         s.found = emptyList()
-        s.prefix = ""
-        s.str = ""
-        s.alt = ""
-        s.key = Key(TempKeys.NONE)
         s.list = null
         host.showPanel(ic, TempPanel.EMPTY)
-    }
-
-    override fun selectCandidate(ic: InputContext, globalIndex: Int): Boolean {
-        val list = ic.propertyFor(state).list ?: return false
-        val c = list.candidates.getOrNull(globalIndex) ?: return false
-        c.select?.invoke(ic)
-        return true
     }
 
     /** `updateUI` (`:345-428`); [kept], the list it replaces, has its page and lit candidate kept where they still are. */
@@ -338,9 +298,8 @@ class QuickPhrase(
                 if (kept != null) keep(it, kept)
             }
         }
-        // a trigger's own text (none of the app's) has the line to itself
         val noneYet = withMine && book.mine.isEmpty()
-        s.hint = if (empty && noneYet && s.text.isEmpty()) emptyHint else ""
+        s.hint = if (empty && noneYet) emptyHint else ""
         show(ic)
     }
 
@@ -381,13 +340,13 @@ class QuickPhrase(
         // capabilityFlags(), the preedit flag masked as setEnablePreedit left it (inputcontext.cpp:69-75)
         val client = ic.has(Capability.PREEDIT)
         val format = if (client) TextFormatFlag.Underline.flag else TextFormatFlag.NoFlag.flag
-        val segments = listOf(s.prefix, s.buffer.userInput).filter { it.isNotEmpty() }
+        val segments = listOf(s.buffer.userInput).filter { it.isNotEmpty() }
         val preedit = FormattedText(
             segments.toTypedArray(),
             IntArray(segments.size) { format },
-            s.prefix.length + s.buffer.cursorInString,
+            s.buffer.cursorInString,
         )
-        val aux = TempKeys.text(if (s.typed) auxLabel else auxLabel + s.text + s.hint)
+        val aux = TempKeys.text(if (s.typed) auxLabel else auxLabel + s.hint)
         host.showPanel(
             ic,
             if (client) {

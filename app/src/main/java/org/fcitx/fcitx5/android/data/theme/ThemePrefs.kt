@@ -142,8 +142,16 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     }
 
     // the side 单手模式 was last at, which turning it on from the status area goes back to: a
-    // left-handed user would otherwise move it across every time
-    val oneHandedSide = hidden { enumList(R.string.one_handed, "one_handed_side", OneHanded.Right) }
+    // left-handed user would otherwise move it across every time. The app's state (ThemeManager writes
+    // it), not a setting: no UI, and not `hidden`, which an import of a backup resets (audit-061 app-rest-1)
+    val oneHandedSide = ManagedPreference.PStringLike(
+        sharedPreferences,
+        "one_handed_side",
+        OneHanded.Right,
+        object : ManagedPreference.StringLikeCodec<OneHanded> {
+            override fun decode(raw: String): OneHanded? = OneHanded.entries.firstOrNull { it.name == raw && it != OneHanded.Off }
+        },
+    ).apply { register() }
 
     // the keyboard over the app, smaller, dragged anywhere (FloatingKeyboard); also from the status
     // area. The view is made anew for it: the letters do not split floating

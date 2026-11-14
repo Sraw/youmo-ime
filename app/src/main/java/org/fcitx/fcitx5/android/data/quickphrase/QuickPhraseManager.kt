@@ -187,9 +187,16 @@ object QuickPhraseManager {
     /**
      * What an [import] did: [added] entries ([keyless] of them with a key Chinese from its start, now
      * their note), and the lines skipped as already there, too long, or with a key or note that cannot
-     * be one ([badKey], [QuickPhraseFiles.validKey]).
+     * be one ([badKey], [QuickPhraseFiles.validKey]); [overLimit] good ones not added, the list at [MAX_ENTRIES].
      */
-    data class Imported(val added: Int, val duplicates: Int, val tooLong: Int, val badKey: Int = 0, val keyless: Int = 0)
+    data class Imported(val added: Int, val duplicates: Int, val tooLong: Int, val badKey: Int = 0, val keyless: Int = 0, val overLimit: Int = 0)
+
+    /**
+     * The most entries an import fills the user's list to: each use and each change reads and writes the whole
+     * file ([markUsed], [put]), which a file of a million short lines (8 MB, the most a picked file is read) would make
+     * seconds a tap.
+     */
+    const val MAX_ENTRIES = 5000
 
     /**
      * The entries of a `.mb` file's [bytes] added after the user's ([QuickPhraseFiles.merge]), into
@@ -204,8 +211,13 @@ object QuickPhraseManager {
         val mine = all.entries
         val file = QuickPhraseFiles.parse(bytes)
         val merged = QuickPhraseFiles.merge(mine, file.entries, all.folders, file.folders)
-        if (merged.entries.size != mine.size || merged.folders != all.folders) write(target, merged.entries, readUsed(target), merged.folders)
-        return Imported(merged.entries.size - mine.size, merged.duplicates, merged.tooLong, merged.badKey, merged.keyless)
+        // the file's first ones up to the limit; a list already past it (one of before) kept whole, nothing added
+        val entries = merged.entries.take(maxOf(MAX_ENTRIES, mine.size))
+        val added = entries.subList(mine.size, entries.size)
+        if (entries.size != mine.size || merged.folders != all.folders) write(target, entries, readUsed(target), merged.folders)
+        return Imported(
+            added.size, merged.duplicates, merged.tooLong, merged.badKey, added.count { it.keyless }, merged.entries.size - entries.size,
+        )
     }
 
     /**

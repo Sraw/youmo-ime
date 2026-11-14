@@ -240,10 +240,10 @@ class NineSceneGesturesTest {
     @Test
     fun typingAloneRedrawsOne() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         val t9 = KeyboardHarness.all(h.keyboard).filterIsInstance<T9Keyboard>().single()
-        t9.show(EngineState.T9State(composing = true, syllables = listOf("a")))
+        t9.show(T9State(composing = true, syllables = listOf("a")))
         h.idle()
         assertEquals("分词", h.nineKey("1").label)
-        t9.show(EngineState.T9State())
+        t9.show(T9State())
         h.idle()
         assertTrue(h.nineKey("1").label, h.nineKey("1").label != "分词")
     }

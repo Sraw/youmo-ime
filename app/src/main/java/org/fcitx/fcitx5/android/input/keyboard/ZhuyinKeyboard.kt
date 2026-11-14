@@ -139,6 +139,9 @@ class ZhuyinKeyboard(
 
         private const val TONE = "tone-"
 
+        // a key's action written as the layout writes it: the symbol its face shows ([placeholder]'s `zhuyin`)
+        private const val ZHUYIN_ACTION = "action:zhuyin"
+
         /** The 分词 key's face while something is typed; else [PUNCTUATION]'s first, which it types. */
         internal const val SEPARATOR = "分词"
         internal const val PUNCTUATION = "，"
@@ -313,6 +316,10 @@ class ZhuyinKeyboard(
     // a symbol's or a tone's code (the layout's action:zhuyin, action:tone-N) by what its key shows
     override val sceneTable = object : SceneKeyDef.Table {
         override fun action(name: String, node: KeyNode): KeyAction? = placeholder(name, node.label, nine)
+
+        // R25r3 F7962: action:zhuyin's code is made from the face as the key is made; a key kept through a face changed
+        // (a pack's `<variant>`, its layout refused and the app's own drawn) went on sending the last face's symbol
+        override fun reads(node: KeyNode): Any? = node.label.takeIf { ZHUYIN_ACTION in node.actions.values }
     }
 
     // what the bottom row shows now (grouped-bottom.xml's when= and bindings, as the grouped keyboards'): an

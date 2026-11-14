@@ -163,7 +163,7 @@ class ThemePackListingTest : ThemePackFixture() {
         val dark = opened(sample()).commit().getOrThrow()[1]
         File(packs, "mine/theme.xml").writeText("<theme")
         assertEquals("pixel", dark.scene.name)
-        assertEquals(ThemeManager.builtin("pixel#dark").palette(), dark.look.palette)
+        assertEquals(ThemeManager.builtin("pixel#dark").palette, dark.look.palette)
     }
 
     @Test

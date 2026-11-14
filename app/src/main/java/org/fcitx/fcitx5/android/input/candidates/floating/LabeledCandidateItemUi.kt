@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.candidates.floating
 
 import android.content.Context
 import android.graphics.Typeface
+import android.text.Spanned
 import android.util.TypedValue
 import android.widget.TextView
 import androidx.core.text.buildSpannedString
@@ -47,6 +48,9 @@ class LabeledCandidateItemUi(
         val top = paddingTop + if (includeFontPadding) -fm.top else -fm.ascent
         if (need > top) setPadding(paddingLeft, paddingTop + ceil(need - top).toInt(), paddingRight, paddingBottom)
     }
+
+    // the padding above set once made; a candidate of no pinyin gets the reading's line on top of it (update)
+    private val plainTop = root.paddingTop
 
     private val floor get() = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, CandidateBarHeight.HINT_FLOOR_SP, ctx.resources.displayMetrics)
 
@@ -94,6 +98,11 @@ class LabeledCandidateItemUi(
                 }
             }
         }
+        // with pinyin on, a candidate of none (an emoji, a word in English) as tall as one read and on the same
+        // baseline, as in the bar (the user, 2026-11-14): the room ReadingSpan.getSize puts above a line of pinyin
+        val read = (root.text as? Spanned)?.getSpans(0, root.text.length, ReadingSpan::class.java)?.isNotEmpty() == true
+        val room = if (EngineState.candidateReading.value == ReadingStyle.PINYIN && !read) ceil(root.paint.textSize * CandidateBarHeight.READING_LINE).toInt() else 0
+        root.setPadding(root.paddingLeft, plainTop + room, root.paddingRight, root.paddingBottom)
         // a theme's dot is not read out, only the candidate (fcitx's own label is, as ever)
         root.contentDescription = if (bar.labelStyle == BarLook.LabelStyle.Dot) root.text.subSequence(label.length, root.text.length) else null
     }

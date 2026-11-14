@@ -82,7 +82,7 @@ class ThemePackImportTest : ThemePackFixture() {
         assertEquals(File(folder, "p.webp").path, dark.look.picture!!.portrait.file)
         assertEquals(80, dark.look.picture!!.brightness)
         assertEquals(listOf(File(folder, "enter.png").path), ThemePackFiles.images(dark.drawn).map { it.file })
-        assertEquals(TestThemes.NordDark.palette(), dark.look.palette)
+        assertEquals(TestThemes.NordDark.palette, dark.look.palette)
         assertEquals(TestThemes.NordLight.keyTextColor, versions[0].keyTextColor)
         // listed and found by the settings' names, its versions one card
         ThemeManager.refreshThemes()
@@ -104,7 +104,7 @@ class ThemePackImportTest : ThemePackFixture() {
         assertEquals(emptyList<String>(), pack.staged.warnings)
         val versions = pack.commit().getOrThrow()
         assertEquals(listOf("nord-mine#light", "nord-mine#dark"), versions.map { it.name })
-        assertEquals(TestThemes.NordDark.palette(), versions[1].look.palette)
+        assertEquals(TestThemes.NordDark.palette, versions[1].look.palette)
     }
 
     // and its save of a picture: a real PNG, decoded as the app does

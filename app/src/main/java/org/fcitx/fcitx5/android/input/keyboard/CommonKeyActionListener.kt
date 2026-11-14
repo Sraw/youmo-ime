@@ -90,6 +90,16 @@ class CommonKeyActionListener :
     // the next input method: each on its own keyboard, the nine keys' English one of English's (I1)
     private suspend fun HostApi.nextInputMethod() = enumerateIme()
 
+    // the language key's and the space's long press alike (audit-061 app-input-8): with one input method
+    // there is no next, so the prompt to add one rather than nothing happening
+    private suspend fun HostApi.nextInputMethodOrPrompt() {
+        if (enabledIme().size < 2) {
+            service.lifecycleScope.launch { service.showDialog(AddMoreInputMethodsPrompt.build(context)) }
+        } else {
+            nextInputMethod()
+        }
+    }
+
     /**
      * What is typed put in first ([FcitxInputMethodService.commitAndReset]), then [then]: whether
      * the field is an address's read now, as the key is pressed, not on fcitx's thread.
@@ -252,17 +262,7 @@ class CommonKeyActionListener :
                 is UnicodeAction -> afterPendingInput { triggerUnicode() }
                 is LangSwitchAction -> {
                     when (langSwitchKeyBehavior) {
-                        LangSwitchBehavior.Enumerate -> {
-                            service.postFcitxJob {
-                                if (enabledIme().size < 2) {
-                                    service.lifecycleScope.launch {
-                                        service.showDialog(AddMoreInputMethodsPrompt.build(context))
-                                    }
-                                } else {
-                                    nextInputMethod()
-                                }
-                            }
-                        }
+                        LangSwitchBehavior.Enumerate -> service.postFcitxJob { nextInputMethodOrPrompt() }
                         LangSwitchBehavior.ToggleActivate -> {
                             service.postFcitxJob {
                                 toggleIme()
@@ -346,9 +346,7 @@ class CommonKeyActionListener :
                 is SpaceLongPressAction -> {
                     when (val behavior = spaceKeyLongPressBehavior) {
                         SpaceLongPressBehavior.None -> {}
-                        SpaceLongPressBehavior.Enumerate -> service.postFcitxJob {
-                            nextInputMethod()
-                        }
+                        SpaceLongPressBehavior.Enumerate -> service.postFcitxJob { nextInputMethodOrPrompt() }
                         SpaceLongPressBehavior.ToggleActivate -> service.postFcitxJob {
                             toggleIme()
                         }

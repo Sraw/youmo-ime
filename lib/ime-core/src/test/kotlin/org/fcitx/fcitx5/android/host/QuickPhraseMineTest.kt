@@ -87,7 +87,7 @@ class QuickPhraseMineTest {
         r.type("#wz")
         assertEquals(listOf("www.baidu.com", "www.sina.com.cn"), r.page)
         assertEquals(listOf("百度", "新浪"), notes())
-        r.quickPhrase.selectCandidate(r.ic, 1)
+        r.tap(1)
         assertEquals(listOf("www.sina.com.cn"), r.commits())
         // its use kept with its note, so the right one of the two goes first
         assertEquals(listOf(sina to 100L), hooks.used)
@@ -118,7 +118,7 @@ class QuickPhraseMineTest {
     @Test
     fun tappingMineCommitsItWholeAsItIsAndPutsItFirst() {
         open()
-        rig.quickPhrase.selectCandidate(rig.ic, 1)
+        rig.tap(1)
         assertEquals(listOf(addr.content), rig.commits())
         assertEquals(listOf(addr.content), rig.asIs)
         assertEquals(listOf(addr to 100L), hooks.used)
@@ -137,7 +137,7 @@ class QuickPhraseMineTest {
     fun inAPasswordFieldMineCommitsButItsUseIsNotKept() {
         rig.ic.capabilities = Capability.PASSWORD
         open()
-        rig.quickPhrase.selectCandidate(rig.ic, 1)
+        rig.tap(1)
         assertEquals(listOf(addr.content), rig.commits())
         assertTrue(hooks.used.isEmpty())
         assertEquals(listOf(gh, addr), book.mine)
@@ -167,7 +167,7 @@ class QuickPhraseMineTest {
     @Test
     fun addLeavesAndAsksTheApp() {
         open()
-        rig.quickPhrase.selectCandidate(rig.ic, 2)
+        rig.tap(2)
         assertEquals(1, hooks.added)
         assertFalse(rig.quickPhrase.isActive(rig.ic))
         assertEquals(emptyList<String>(), rig.commits())

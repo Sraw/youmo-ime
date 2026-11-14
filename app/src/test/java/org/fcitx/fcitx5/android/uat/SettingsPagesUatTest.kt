@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.ShuangpinNames
@@ -81,7 +82,8 @@ class SettingsPagesUatTest {
     fun phone() = phoneStorage()
 
     private val api = FakeHostApi()
-    private val st = SettingsHarness(api)
+    // made anew by a test whose rows each want a settings app of their own
+    private var st = SettingsHarness(api)
     private val activity get() = st.activity
 
     @After
@@ -332,11 +334,7 @@ class SettingsPagesUatTest {
         idle()
         clickable(view("幽默")).performClick()
         idle()
-        val menu = shadowOf(activity).optionsMenu
-        val delete = (0 until menu.size()).map { menu.getItem(it) }.first { it.title.toString() == s(R.string.delete_selected) }
-        delete.javaClass.getMethod("invoke").invoke(delete)
-        idle()
-        val confirm = dialog()
+        val confirm = deleteSelected()
         val message = KeyboardHarness.all(confirm.window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
         assertTrue(message.toString(), activity.resources.getQuantityString(R.plurals.confirm_delete_words, 2, 2) in message)
         confirm.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
@@ -346,6 +344,51 @@ class SettingsPagesUatTest {
         view(s(R.string.learning_undo)).performClick()
         until("back") { "澜境花园" in shown() && "幽默" in shown() }
         assertTrue(api.calls.toString(), "learning(Undo(token=9))" in api.calls)
+    }
+
+    // the toolbar's 删除所选 on the words selected: its confirmation
+    private fun deleteSelected(): AlertDialog {
+        val menu = shadowOf(activity).optionsMenu
+        val delete = (0 until menu.size()).map { menu.getItem(it) }.first { it.title.toString() == s(R.string.delete_selected) }
+        delete.javaClass.getMethod("invoke").invoke(delete)
+        idle()
+        return dialog()
+    }
+
+    // R25r8 F8053: a removal the record could not take back says so, as the chip's undo does, not the words just
+    // left out with nothing said; one no longer to be taken back says that (R25r9 F8076)
+    @Test
+    @Uat("WD-46")
+    fun anUndoOfARemovalNotTakenBackSaysWhy() {
+        // each row on a settings app of its own: the page and the snackbar an earlier row left otherwise
+        fun undoSays(undone: LearningResult, saidId: Int) {
+            st.close()
+            st = SettingsHarness(api)
+            api.calls.clear()
+            words(UserWord("幽默", "you mo", UserWord.Kind.ADDED))
+            api.learned = { op ->
+                when (op) {
+                    is LearningOp.RemoveWords -> { api.userWords.removeAll(op.words.toSet()); LearningResult.Done(9) }
+                    is LearningOp.Undo -> undone
+                    else -> LearningResult.Done()
+                }
+            }
+            open(SettingsRoute.UserWordList(UserWord.Kind.ADDED.name))
+            until("listed") { "幽默" in shown() }
+            clickable(view("幽默")).performLongClick()
+            idle()
+            deleteSelected().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            until("said") { activity.resources.getQuantityString(R.plurals.learning_removed, 1, 1) in shown() }
+            view(s(R.string.learning_undo)).performClick()
+            val said = s(saidId)
+            // the rows' toasts differ: an earlier row's is not taken for this one's
+            until("not undone, said: $said") { ShadowToast.getTextOfLatestToast() == said }
+            assertTrue(api.calls.toString(), "learning(Undo(token=9))" in api.calls)
+        }
+        assertRows(
+            "failed: not undone, said so" to { undoSays(LearningResult.Failed, R.string.learning_undo_failed) },
+            "no longer to be taken back: said so" to { undoSays(LearningResult.Unavailable, R.string.learning_undo_gone) },
+        )
     }
 
     @Test
@@ -643,6 +686,35 @@ class SettingsPagesUatTest {
         } finally {
             read.countDown()
             PinyinCustomPhraseFragment.load = load
+            CustomPhraseManager.save(emptyList())
+        }
+    }
+
+    // audit-061 import-edit-3 (PinyinCustomPhraseFragment.MAX_PHRASES): a file of hundreds of thousands of phrases was
+    // imported whole, the list read and written whole at each change after; an import fills it to the limit and says
+    // how many were left out (adding by hand is not limited, WD-37a)
+    @Test
+    @Uat("WD-37a")
+    fun anImportFillsTheCustomPhrasesToTheirLimitAndSaysTheRest() {
+        val max = PinyinCustomPhraseFragment.MAX_PHRASES
+        // a key of letters alone (one with a digit is not a phrase's line, and the page would read none)
+        CustomPhraseManager.save((1 until max).map { PinyinCustomPhrase("k", 1, "词$it") })
+        try {
+            open(SettingsRoute.PinyinCustomPhrase)
+            idle()
+            val file = Uri.parse("content://phrases.test/many.txt")
+            shadowOf(activity.contentResolver).registerInputStream(file, ByteArrayInputStream("aa,1=甲\nbb,1=乙\ncc,1=丙\n".toByteArray()))
+            (page as PinyinCustomPhraseFragment).importPhrases(file)
+            val said = s(R.string.import_over_limit, s(R.string.import_phrases_done, 1), 2, max)
+            until("said") { ShadowToast.getTextOfLatestToast() == said }
+            // the limit is the import's alone: one more added through + past it is kept (WD-37a, R25r3 F7932)
+            KeyboardHarness.all(activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
+            idle()
+            phraseDialog("zz", "1", "乙乙")
+            val saved = phrasesSaved()
+            assertEquals(max + 1, saved.size)
+            assertTrue("zz,1=乙乙" in saved)
+        } finally {
             CustomPhraseManager.save(emptyList())
         }
     }

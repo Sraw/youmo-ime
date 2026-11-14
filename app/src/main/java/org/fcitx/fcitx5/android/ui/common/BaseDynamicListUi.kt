@@ -21,7 +21,6 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.ItemTouchHelper
-import arrow.core.identity
 import com.google.android.material.behavior.HideViewOnScrollBehavior
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
@@ -102,11 +101,6 @@ abstract class BaseDynamicListUi<T>(
          * Do nothing
          */
         class Custom<T> : Mode<T>()
-
-        @Suppress("FunctionName")
-        companion object {
-            fun FreeAddString() = FreeAdd("", ::identity)
-        }
     }
 
     /**

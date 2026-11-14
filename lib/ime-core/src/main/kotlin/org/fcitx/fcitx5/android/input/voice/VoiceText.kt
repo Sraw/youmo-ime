@@ -9,7 +9,7 @@ object VoiceText {
 
     // a cough or a breath taken for speech comes back as one of these
     private const val FILLERS = "嗯呃额啊唔哦噢欸诶呀"
-    private const val PAUSES = "。，、！？.,!?…\\s"
+    private const val PAUSES = VoiceMarks.PAUSES
     private val FILLER = Regex("^[$FILLERS$PAUSES]+$")
 
     // a cough or throat clearing comes back as 咳咳咳… or 哼哼哼 (voice-eval's noise set: 9 of 159

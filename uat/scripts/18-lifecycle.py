@@ -234,3 +234,6 @@ case("LC-18", needs="jvm:StuckBarUatTest.floatingAndDockedMidPinyinKeepIt")(lamb
 
 
 case("LC-19", needs="jvm:StuckBarUatTest.aThemeChangedMidHandwritingCommitsIt")(lambda d: None)
+
+
+case("LC-20", needs="manual:键盘实例一直停在启动中设备上难造出；开发者页重启实例、换界面语言时的提示在设备上手工看")(lambda d: None)

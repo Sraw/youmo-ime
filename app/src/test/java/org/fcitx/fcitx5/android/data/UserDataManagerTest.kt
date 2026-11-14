@@ -300,9 +300,12 @@ class UserDataManagerTest {
         File(phone.engine, EnglishBlocks.FILE).writeText("the phone's")
         File(phone.engine, "${Backups.DIR}/auto-1.fxlb").writeText("the phone's")
         File(phone.engine, "wubi.user").writeText("the phone's")
+        // engine-07: the record's copies kept aside, by any number, the phone's as the record is
+        File(phone.engine, "${LearnLog.FILE}.unreadable.1").writeText("the phone's")
         val backup = zip(
             BuildConfig.APPLICATION_ID,
             RestoreStash.BACKUP to "the backup's learning",
+            "engine/${LearnLog.FILE}.unreadable.1" to "the backup's",
             "engine/${OLD_MARKER}" to "the backup's",
             "engine/${WordLists.ADDED}" to "the backup's",
             "engine/${EnglishBlocks.FILE}" to "the backup's English",
@@ -310,7 +313,7 @@ class UserDataManagerTest {
         )
         UserDataManager.import(backup, phone).getOrThrow()
         // review-DE-design D-M3: every old log the phone's, a changed one reading to the record as words removed
-        for (name in listOf(LearnLog.FILE, OLD_MARKER, WordLists.ADDED, EnglishBlocks.FILE, "${Backups.DIR}/auto-1.fxlb", "wubi.user")) {
+        for (name in listOf(LearnLog.FILE, OLD_MARKER, WordLists.ADDED, EnglishBlocks.FILE, "${Backups.DIR}/auto-1.fxlb", "wubi.user", "${LearnLog.FILE}.unreadable.1")) {
             assertEquals(name, "the phone's", File(phone.engine, name).readText())
         }
         val stash = stashes(phone).single()
@@ -642,12 +645,18 @@ class UserDataManagerTest {
         File(phone.engine, Engines.TABLE_LOGS_READ).writeText("")
         File(phone.engine, WordLists.ADDED).writeText("words")
         File(phone.engine, "${Backups.DIR}/auto-1.fxlb").writeText("backup")
+        File(phone.engine, "${LearnLog.FILE}.unreadable").writeText("kept aside")
+        File(phone.engine, "${LearnLog.FILE}.unreadable.2").writeText("kept aside")
         val names = ByteArrayOutputStream().also { UserDataManager.export(it, 0L, phone, "learning".toByteArray()).getOrThrow() }.let { bytes ->
             ZipInputStream(bytes.toByteArray().inputStream()).use { zip -> generateSequence { zip.nextEntry }.map { it.name }.toList() }
         }
         assertTrue(RestoreStash.BACKUP in names)
         assertTrue("engine/${WordLists.ADDED}" in names)
-        val gone = listOf(LearnLog.FILE, OLD_PINYIN, OLD_TABLE, "$OLD_TABLE.told", Engines.TABLE_LOGS_READ, "${Backups.DIR}/auto-1.fxlb").map { "engine/$it" }
+        val gone = listOf(
+            LearnLog.FILE, OLD_PINYIN, OLD_TABLE, "$OLD_TABLE.told", Engines.TABLE_LOGS_READ, "${Backups.DIR}/auto-1.fxlb",
+            // engine-07: every copy kept aside, not the first alone
+            "${LearnLog.FILE}.unreadable", "${LearnLog.FILE}.unreadable.2",
+        ).map { "engine/$it" }
         for (name in gone) assertFalse(name, name in names)
     }
 
@@ -714,5 +723,50 @@ class UserDataManagerTest {
         // the same with room enough: unpacked
         val roomy = folder.newFolder("roomy")
         assertEquals(listOf("big"), UserDataManager.extractWithinRoom(zip.inputStream(), roomy, room = 2L shl 20).map { it.name })
+    }
+
+    // audit-061 import-edit-3: a zip of more entries than a backup has (empty directories, which fill no disk) is
+    // stopped as it is unpacked, told so; as many as the cap is unpacked
+    @Test
+    @Uat("PR-52")
+    fun aBackupOfTooManyEntriesStopsAsItIsUnpacked() {
+        fun dirs(n: Int) = ByteArrayOutputStream().also { out ->
+            ZipOutputStream(out).use { z -> repeat(n) { z.putNextEntry(ZipEntry("d$it/")); z.closeEntry() } }
+        }.toByteArray()
+        val e = runCatching { UserDataManager.extractWithinRoom(dirs(11).inputStream(), folder.newFolder("many"), maxEntries = 10) }.exceptionOrNull()
+        assertEquals(appContext.getString(R.string.exception_user_data_too_many_entries), e?.message)
+        UserDataManager.extractWithinRoom(dirs(10).inputStream(), folder.newFolder("enough"), maxEntries = 10)
+    }
+
+    // R25r2 F7854/F7920: the restore's picker offers every file (a backup renamed, or named by its provider, is not a
+    // zip to it), so what keeps a file that is no backup off the phone is this check of what is in it, before
+    // anything is copied in. That the picker offers them is the system's picker's to show (uat PR-52a, by hand): the
+    // import is given a stream and never sees a name, so no test of it here can fail for one (R25r3 F7927)
+    @Test
+    @Uat("PR-52")
+    fun aFileWithoutTheMetadataIsRefusedAndNothingChanges() {
+        val otherZip = ByteArrayOutputStream().also { bytes ->
+            ZipOutputStream(bytes).use { zip ->
+                zip.putNextEntry(ZipEntry("external/data/pinyin/customphrase"))
+                zip.write("dh,1=电话".encodeToByteArray())
+                zip.putNextEntry(ZipEntry("engine/pinyin.log"))
+                zip.write("another's".encodeToByteArray())
+            }
+        }.toByteArray()
+        // each row its own phone: a file wrongly put in by one is not found by the next (R25r3 F7938)
+        fun refused(phoneNamed: String, file: ByteArray) {
+            val phone = install(phoneNamed)
+            File(phone.sharedPrefs.apply { mkdirs() }, prefs).writeText("<map />")
+            File(phone.engine.apply { mkdirs() }, "pinyin.log").writeText("learned")
+            val e = UserDataManager.import(file.inputStream(), phone).exceptionOrNull()
+            assertEquals(appContext.getString(R.string.exception_user_data_metadata), e?.message)
+            assertEquals("<map />", File(phone.sharedPrefs, prefs).readText())
+            assertEquals("learned", File(phone.engine, "pinyin.log").readText())
+            assertEquals(listOf("pinyin.log"), phone.engine.list()!!.toList())
+        }
+        assertRows(
+            "a zip that is no backup (no metadata.json), with files where a backup has them: none of them put in" to { refused("phone-given-another-zip", otherZip) },
+            "a file that is no zip at all (a photo picked by mistake): no entry read, refused the same" to { refused("phone-given-no-zip", "not a zip, nor a backup".encodeToByteArray()) },
+        )
     }
 }

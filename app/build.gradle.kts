@@ -3,14 +3,14 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 plugins {
-    id("org.fcitx.fcitx5.android.app-convention")
-    id("org.fcitx.fcitx5.android.native-app-convention")
-    id("org.fcitx.fcitx5.android.build-metadata")
-    id("org.fcitx.fcitx5.android.engine-data")
-    id("org.fcitx.fcitx5.android.voice-data")
-    id("org.fcitx.fcitx5.android.handwriting-data")
-    id("org.fcitx.fcitx5.android.asset-packs")
-    id("org.fcitx.fcitx5.android.unit-test-resources")
+    id("youmo.app-convention")
+    id("youmo.native-app-convention")
+    id("youmo.build-metadata")
+    id("youmo.engine-data")
+    id("youmo.voice-data")
+    id("youmo.handwriting-data")
+    id("youmo.asset-packs")
+    id("youmo.unit-test-resources")
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -156,30 +156,6 @@ android {
         // Chinese and English only, library translations too; zh-HK/zh-MO still resolve to
         // values-zh-rTW through Android's Hant script matching
         localeFilters += listOf("en") + Versions.translations.map { it.replace("_", "-r") }
-        // what the native host's CMake install left in src/main/assets (usr/: fcitx's data and
-        // catalogs) and its data descriptor (descriptor.json), in checkouts that built it:
-        // ignored files, never deleted
-        // a non-empty list replaces aapt's default one rather than adding to it, so that is
-        // repeated first (dot files, `_` dirs, backups~, VCS and OS litter)
-        @Suppress("UnstableApiUsage")
-        ignoreAssetsPatterns += listOf(
-            "!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*", "!CVS", "!thumbs.db",
-            "!picasa.ini", "!*~",
-        ) + listOf("<dir>usr", "descriptor.json")
-    }
-
-    // the native fcitx host's libraries, no longer built: copy-fcitx5-modules and CMake copied
-    // them into AGP's obj dirs, which keep .so files from older builds
-    packaging {
-        jniLibs {
-            excludes += listOf(
-                "libspell", "libimselector",
-                "libFcitx5Core", "libFcitx5Utils", "libFcitx5Config", "libnative-lib",
-                "libandroidengine", "libandroidfrontend", "libandroidnotification",
-                "libchttrans", "libclipboard", "libfullwidth", "libpunctuation", "libquickphrase",
-                "libunicode", "libscel2org5",
-            ).map { "**/$it.so" }
-        }
     }
 
     testOptions {
@@ -218,6 +194,12 @@ android {
         kotlin.srcDir("src/debug/java")
         manifest.srcFile("src/debug/AndroidManifest.xml")
     }
+}
+
+// 0.3.x's native host installed fcitx's data (usr/) and its descriptor into src/main/assets; they are
+// untracked, so an old checkout still has them and they would be packed. Stop rather than filter.
+listOf("src/main/assets/usr", "src/main/assets/descriptor.json").map(::file).filter { it.exists() }.let { left ->
+    check(left.isEmpty()) { "0.3.x leftovers would go into the APK, delete them: ${left.joinToString()}" }
 }
 
 // TablesSettingsUatTest runs the real engine on build/generated's pinyin and table blobs. Nothing
@@ -333,8 +315,6 @@ dependencies {
     implementation(libs.androidx.startup)
     implementation(libs.androidx.viewpager2)
     implementation(libs.material)
-    implementation(libs.arrow.core)
-    implementation(libs.arrow.functions)
     implementation(libs.flexbox)
     implementation(libs.dependency)
     implementation(libs.timber)

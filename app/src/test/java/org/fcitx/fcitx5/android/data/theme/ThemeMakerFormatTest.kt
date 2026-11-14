@@ -49,7 +49,7 @@ import java.util.zip.ZipInputStream
 /**
  * contract: the theme file format and the page's generated blocks, which mutation cannot see.
  * The theme maker page and the app read and write the same theme files: the page's generated blocks
- * of web/theme-maker/index.html (`youmo-format`: the file's version, fields and limits; `youmo-presets`:
+ * in web/theme-maker/generated/ (`youmo-format`: the file's version, fields and limits; `youmo-presets`:
  * the built-in themes) are what this app has, and what the page exports (testdata/from-web.theme, which
  * its own test holds byte for byte) imports as testdata/theme.json. Changed here, the page's test
  * (`node --test web/theme-maker/test/format.test.mjs`) fails till it follows.
@@ -158,8 +158,12 @@ class ThemeMakerFormatTest {
             put("older", JsonArray(CustomThemeSerializer.knownVersions.filter { it != current && it != "2.1" }.map(::JsonPrimitive)))
             put("types", types())
             put("limits", limits())
-            // the names a pack may not take (ThemePackFiles.builtinClash): each built-in version's 0.5 name, ref and file
-            put("builtinNames", JsonArray(TestThemes.builtins.flatMap { (old, t) -> listOf(old, t.name, t.file) }.distinct().map(::JsonPrimitive)))
+            // the names a pack may not take, both of ThemeFilesManager.packClash's rules: ThemePackFiles.builtinClash's
+            // (each built-in version's 0.5 name, ref and file; every name a setting is moved from) and the built-in
+            // packs' (ThemeManager.BuiltinPackNames); the page checks the pack's name and, for two versions, name#light/#dark
+            val clash = TestThemes.builtins.flatMap { (old, t) -> listOf(old, t.name, t.file) } +
+                BuiltinThemeFiles.LEGACY.keys + BuiltinThemeFiles.RETIRED.keys + ThemeManager.BuiltinPackNames.sorted()
+            put("builtinNames", JsonArray(clash.distinct().map(::JsonPrimitive)))
             put("defaults", buildJsonObject {
                 put("keys", pretty.encodeToJsonElement(KeysJson.of(LookDefaults.KEYS)))
                 put("text", pretty.encodeToJsonElement(TextJson.of(LookDefaults.TEXT)))

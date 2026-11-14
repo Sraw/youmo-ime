@@ -153,8 +153,7 @@ class HostEnglishTest {
         val pinyin = fcitx.statusArea().map { it.name }
         Assert.assertTrue("$pinyin", pinyin.containsAll(toggles))
         val fullWidth = fcitx.statusArea().first { it.name == "fullwidth" }
-        // its action is not checkable: the icon says whether it is on
-        val wasOn = fullWidth.icon == "fcitx-fullwidth-active"
+        val wasOn = fullWidth.active
         if (!wasOn) fcitx.activateAction(fullWidth.id)
         try {
             fcitx.activateIme(InputMethodNames.KEYBOARD)

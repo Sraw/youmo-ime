@@ -195,9 +195,9 @@ class QuickPhraseTest {
     fun tappingAListedCandidate() {
         trigger()
         rig.type("ab")
-        assertTrue(rig.quickPhrase.selectCandidate(rig.ic, 11))
+        assertTrue(rig.tap(11))
         assertEquals(listOf("v9"), rig.commits())
-        assertFalse(rig.quickPhrase.selectCandidate(rig.ic, 0))
+        assertFalse(rig.tap(0))
     }
 
     @Test
@@ -227,20 +227,17 @@ class QuickPhraseTest {
     }
 
     @Test
-    fun triggerWithTextPrefixStrAndAlt() {
-        // :289-304; :175-180 alt on Return; :246-251 str on its key; aux text until typed
-        rig.quickPhrase.trigger(rig.ic, text = "hint", str = "S", alt = "ALT", key = Key('k'.code))
-        assertEquals("Quick Phrase: hint", rig.aux)
+    fun returnCommitsWhatIsTypedAndNothingWhenNothingIs() {
+        // :175-180 with no prefix or alt (the trigger passes none here)
+        trigger()
         rig.press(KeySyms.RETURN)
-        rig.quickPhrase.trigger(rig.ic, str = "S", alt = "ALT", key = Key('k'.code))
-        rig.press('k'.code)
-        rig.quickPhrase.trigger(rig.ic, text = "hint", prefix = "P")
+        assertFalse(rig.quickPhrase.isActive(rig.ic))
+        trigger()
         rig.type("x")
-        assertEquals("Quick Phrase: ", rig.aux)
-        assertEquals("Px", rig.preedit)
-        assertEquals(2, rig.panel.preedit.cursor)
+        assertEquals("x", rig.preedit)
+        assertEquals(1, rig.panel.preedit.cursor)
         rig.press(KeySyms.RETURN)
-        assertEquals(listOf("ALT", "S", "Px"), rig.commits())
+        assertEquals(listOf("x"), rig.commits())
     }
 
     @Test

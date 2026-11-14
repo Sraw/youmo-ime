@@ -20,6 +20,7 @@ on:
       - lib/handwriting/build.gradle.kts
       # its caches' paths are part of what finds them: a change to them needs caches saved anew
       - .github/workflows/engine_downloads.yml
+      - .github/actions/setup-build/action.yml
   schedule:
     - cron: "41 4 * * 1,4"
   workflow_dispatch:
@@ -40,53 +41,24 @@ jobs:
           fetch-depth: 0
           submodules: false
 
-      # as pull_request.yml's; only looked up, and saved at the end where it was missing. The
-      # scheduled run restores it, a read for certain to GitHub's 7 days, which a lookup may not be
-      - name: Cache engine data downloads
-        id: cache
-        uses: actions/cache@v6
+      # the caches as every workflow has them (.github/actions/setup-build); only looked up, and saved at
+      # the end where missing. The scheduled run restores them, a read for certain to GitHub's 7 days,
+      # which a lookup may not be
+      - name: Set up the build
+        id: setup
+        uses: ./.github/actions/setup-build
         with:
-          path: |
-            .gradle/engine-downloads
-            !.gradle/engine-downloads/voice
-            !.gradle/engine-downloads/handwriting
-            !.gradle/engine-downloads/onnxruntime-android-*.zip
-          key: engine-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/EngineDataPlugin.kt') }}
+          downloads: save
+          handwriting: "true"
           lookup-only: ${{ github.event_name != 'schedule' }}
-
-      # as pull_request.yml's, looked up and saved as the engine cache is
-      - name: Cache handwriting downloads
-        id: handwriting
-        uses: actions/cache@v6
-        with:
-          path: |
-            .gradle/engine-downloads/handwriting
-            .gradle/engine-downloads/onnxruntime-android-*.zip
-          key: handwriting-downloads-${{ hashFiles('build-logic/convention/src/main/kotlin/HandwritingDataPlugin.kt', 'lib/handwriting/build.gradle.kts') }}
-          lookup-only: ${{ github.event_name != 'schedule' }}
-
-      - name: Setup Java
-        if: steps.cache.outputs.cache-hit != 'true' || steps.handwriting.outputs.cache-hit != 'true'
-        uses: actions/setup-java@v5
-        with:
-          distribution: "temurin"
-          java-version: "21"
-
-      - name: Setup Android environment
-        if: steps.cache.outputs.cache-hit != 'true' || steps.handwriting.outputs.cache-hit != 'true'
-        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
-
-      - name: Setup Gradle
-        if: steps.cache.outputs.cache-hit != 'true' || steps.handwriting.outputs.cache-hit != 'true'
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       # EngineDataPlugin's downloads, each checked against its SHA-256: downloadEngineData depends on
       # every one it registers, so one it adds is fetched and cached too
       - name: Download engine data
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.setup.outputs.downloads-hit != 'true'
         run: ./gradlew :app:downloadEngineData
 
       # the handwriting release's archive and the onnxruntime archive, SHA-256 checked as those are
       - name: Download handwriting data
-        if: steps.handwriting.outputs.cache-hit != 'true'
+        if: steps.setup.outputs.handwriting-hit != 'true'
         run: ./gradlew :app:downloadHandwritingModels :lib:handwriting:downloadOnnxruntime

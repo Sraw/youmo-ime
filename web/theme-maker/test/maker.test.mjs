@@ -10,14 +10,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { blockOf, ENGINE } from '../tools/assemble.mjs';
+import { ENGINE, examplesJson, generated } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = join(here, '..', 'src');
 const testdata = join(here, 'testdata');
 vm.runInThisContext(readFileSync(join(src, 'lib.js'), 'utf8'), { filename: 'lib.js' });
-vm.runInThisContext(readFileSync(join(src, 'maker.js'), 'utf8'), { filename: 'maker.js' });
 vm.runInThisContext(readFileSync(join(src, 'form.js'), 'utf8'), { filename: 'form.js' });
+vm.runInThisContext(readFileSync(join(src, 'maker.js'), 'utf8'), { filename: 'maker.js' });
 globalThis.YoumoPanels = [];
 for (const f of readdirSync(join(src, 'panels')).sort()) vm.runInThisContext(readFileSync(join(src, 'panels', f), 'utf8'), { filename: f });
 const F = globalThis.YoumoForm;
@@ -28,7 +28,7 @@ const L = globalThis.YoumoLib;
 const M = globalThis.YoumoMaker;
 globalThis.Path2D = class { constructor(d) { this.d = d; } };
 const E = createRequire(import.meta.url)(ENGINE).YoumoEngine;
-const FORMAT = JSON.parse(blockOf(readFileSync(join(here, '..', 'index.html'), 'utf8'), 'youmo-format'));
+const FORMAT = JSON.parse(generated('youmo-format'));
 const bytes = (name) => new Uint8Array(readFileSync(join(testdata, name)));
 const enc = (t) => new TextEncoder().encode(t);
 
@@ -376,7 +376,7 @@ test('a 3.0 theme the app exports with every override it allows opens, and stays
 });
 
 // 060-render-p3 M4: the examples the page starts from, as assemble.mjs puts them in
-const examples = JSON.parse(blockOf(readFileSync(join(here, '..', 'index.html'), 'utf8'), 'youmo-examples'));
+const examples = JSON.parse(examplesJson());
 
 test('each example opens, passes the check before a save with no error, and saves to a pack that opens the same', async () => {
   assert.deepEqual(examples.map((e) => e.id), ['gradient', 'picture', 'k17-motion']);

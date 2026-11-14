@@ -86,6 +86,7 @@ internal class LearningOps(
         is LearningOp.ClearRecent -> clearRecent(op)
         is LearningOp.ClearLearned -> clearLearned(op)
         LearningOp.Overview -> overview()
+        LearningOp.Saving -> saving()
         is LearningOp.ListItems -> LearningResult.Listed(listed(op.what))
         is LearningOp.RemoveItems -> {
             remove(op.items)
@@ -100,8 +101,13 @@ internal class LearningOps(
         is LearningOp.RestoreCorrection -> LearningResult.Done().also { restoreCorrection(op.texts) }
     }
 
+    // whether learning is written now, and whether the record takes a rewrite at all till the process starts anew (F8037)
+    private fun saving(): LearningResult = log().let { LearningResult.Saving(it.saving, it.takesRewrites) }
+
     // U-88, U-86: the backups that hold what goes forgotten before the rewrite, a fresh one after
-    // (C25); failed, a fresh one all the same, as those were gone already (review-E-engine S1)
+    // (C25); failed in the rewrite, a fresh one all the same, as those were gone already (review-E-engine S1).
+    // Failed before it (a record that stopped taking writes: R25 F8021) they were left, and the fresh one is
+    // asked for all the same, to no harm: nothing was cleared for it to bring back
     // what the tables learn is in the record (stream C), their order kept but by 全部清空, as their
     // per-code blocks; the phrases an older build saved for them, the record's too, go with 全部清空
     private fun clearRecent(op: LearningOp.ClearRecent): LearningResult = cleared {
@@ -157,16 +163,26 @@ internal class LearningOps(
     // a session reads the record as it is now when told to show anew: not made again, what is typed
     // or written kept (DE-S4, review-int S1); one that cannot (Session.rereads false: the strokes'
     // lookup) is (review-E-engine S5)
+    // Failed, not Unavailable, where the record could not be written without the act: the app says that apart
+    // from an act no longer the last (R25 F8038)
     private fun undo(im: String?, token: Long): LearningResult {
-        if (!control.undo(token)) return LearningResult.Unavailable
+        when (control.takeBack(token)) {
+            LearningControl.TakenBack.DONE -> Unit
+            LearningControl.TakenBack.GONE -> return LearningResult.Unavailable
+            LearningControl.TakenBack.FAILED -> return LearningResult.Failed
+        }
         if (im != null && session(im)?.rereads == false) dropSessions()
         return LearningResult.Done()
     }
 
     // [act] made undoable: its token, or null where the host made no act of it (the list it was
-    // asked of gone by then; review-E-engine S4)
     // asked of gone by then; review-E-engine S4). Not done but [wrote] something (another candidate
-    // shown alike acted on, the pressed one then refused): that taken back at once (review R4 M1)
+    // shown alike acted on, the pressed one then refused): that taken back at once (review R4 M1).
+    // Where that is not done (GONE or FAILED: see LearningControl.TakenBack; e.g. storage full and something else
+    // learned in memory alone, R25 F8066) the words alike stay deleted, and the user is told it was not done (a
+    // block's take-back writes its opposite or is undone in its own list, and is done). Kept so (R25 F8079): they
+    // are the text the user asked to delete, and to take them back there would drop the rest learned since the
+    // disk filled
     private fun acted(inverse: () -> Unit = {}, wrote: () -> Boolean = { false }, act: () -> Boolean): Long? {
         var did = false
         val token = control.undoable(inverse) { did = act() }
@@ -358,6 +374,7 @@ internal class LearningOps(
             blocked = counts[UserWord.Kind.BLOCKED] ?: 0,
             noPredict = state.noPredict.size,
             habits = habits(),
+            saving = log().saving,
         )
     }
 

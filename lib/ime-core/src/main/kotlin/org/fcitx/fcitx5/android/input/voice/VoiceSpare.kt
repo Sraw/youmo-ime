@@ -68,8 +68,6 @@ class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
     /** the one made ahead, now no one else's; null if none */
     fun take(): T? = spare.getAndSet(null)
 
-    val ready get() = spare.get() != null
-
     /** [clear]s so far: read before what decides an [offer]'s `wanted`, and given to it */
     val clears: Int get() = cleared.get()
 

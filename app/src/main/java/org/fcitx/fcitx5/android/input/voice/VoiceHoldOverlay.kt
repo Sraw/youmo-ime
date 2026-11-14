@@ -16,7 +16,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
-import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.BaseInputView
 import org.fcitx.fcitx5.android.input.InputView
@@ -52,12 +51,7 @@ class VoiceHoldOverlay(
     private var colorAnimator: ValueAnimator? = null
     private var currentColor = talkColor
 
-    private val heard = TextView(ctx).apply {
-        textSize = 18f
-        gravity = Gravity.CENTER or Gravity.BOTTOM
-        VoiceStyle.heard(this)
-        setTextColor(theme.keyTextColor)
-    }
+    private val heard = VoiceCard.heard(ctx, theme)
     private val wave = VoiceCard.wave(ctx, look.micColor.value)
 
     // the bars on a pill of their own, as a bubble the voice is in
@@ -73,20 +67,9 @@ class VoiceHoldOverlay(
     // the 正在听 cue felt this hold (the card is made anew for each)
     private var cued = false
 
-    private val status = TextView(ctx).apply {
-        textSize = 15f
-        gravity = Gravity.CENTER
-        setTextColor(theme.keyTextColor)
-        // 正在听 once the microphone is really on (ready), not as the finger goes down
-        setText(R.string.voice_hold_preparing)
-    }
+    private val status = VoiceCard.status(ctx, theme)
 
-    private val hint = TextView(ctx).apply {
-        textSize = 12f
-        gravity = Gravity.CENTER
-        setTextColor(theme.altKeyTextColor)
-        setText(R.string.voice_hold_hint)
-    }
+    private val hint = VoiceCard.hint(ctx, theme, R.string.voice_hold_hint)
     private val card = LinearLayout(ctx).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
@@ -228,11 +211,9 @@ class VoiceHoldOverlay(
         if (inputView.hold === this) inputView.hold = null
         if (gone) return
         gone = true
-        // still shown a moment (the message, the fade), but no longer the held finger's: clickable,
-        // it took the next press on the space under it and the long press never fired (VO-16)
-        card.isClickable = false
-        message?.let { status.setText(it) }
-        VoiceCard.fadeOut(card, main, message)
+        // no longer the held finger's: clickable, it took the next press on the space under it and
+        // the long press never fired (VO-16)
+        VoiceCard.ended(card, status, hint, main, message)
     }
 
     companion object {

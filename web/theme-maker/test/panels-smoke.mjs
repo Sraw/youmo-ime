@@ -1,7 +1,8 @@
 // The editing's tabs in a real browser (060-render-p3 M2): a field's edit commits on leaving it, and what the user
 // does next is kept: the characters typed into the next field, the box clicked right after. A tab drawn anew under
-// the user (every change did that) took the field just entered away and the click with it. Local only, not CI: it
-// needs a Chromium (no jsdom here: no npm). Run: node web/theme-maker/test/panels-smoke.mjs [chromium]
+// the user (every change did that) took the field just entered away and the click with it. CI runs it on every push
+// and PR (unit_test.yml, with the runner's Chrome; R25 B13); it needs a Chromium (no jsdom here: no npm).
+// Run: node web/theme-maker/test/panels-smoke.mjs [chromium]
 // (default: Playwright's headless shell, as pixel-smoke.mjs finds it; CHROMIUM=<path> too). Exit 0 all kept, 1 not, 2 not run.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
@@ -14,7 +15,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function browser(shell) {
   const dir = mkdtempSync(join(tmpdir(), 'panels-smoke-'));
-  const proc = spawn(shell, ['--headless', '--disable-gpu', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
+  // CI only: GitHub's Ubuntu 24.04 runners keep unprivileged user namespaces from Chrome's sandbox (AppArmor), and
+  // the page is this checkout's own; a local run keeps the sandbox
+  const sandbox = process.env.CI ? ['--no-sandbox'] : [];
+  const proc = spawn(shell, ['--headless', '--disable-gpu', ...sandbox, '--remote-debugging-port=0', '--user-data-dir=' + dir, '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
   const file = join(dir, 'DevToolsActivePort');
   let ws;
   try {
@@ -88,9 +92,14 @@ async function main() {
   const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) failed++; };
   try {
     await b.send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/page.html' });
-    for (let i = 0; i < 100 && !(await js(`!!document.querySelector('#builtins button')`)); i++) await wait(100);
-    await js(`document.fonts.ready.then(() => 1)`);
-    await js(`(document.getElementById('new-panel').open || document.getElementById('new-panel').showModal(), document.querySelector('#builtins button').click())`);
+    // the page's start is done once it opens 新建 itself (its fonts loaded, no draft found, the first document set):
+    // a theme picked before that (the buttons are there from the first moment) had 新建 opened over it a moment
+    // later on a loaded machine, and the click meant for 大小 landed on the panel
+    // (?.: the navigation may not have put the page in yet)
+    const started = () => js(`!!document.getElementById('new-panel')?.open`);
+    for (let i = 0; i < 300 && !(await started()); i++) await wait(100);
+    if (!(await started())) throw new Error('the page did not start (新建 not opened in 30 s)');
+    await js(`document.querySelector('#builtins button').click()`);
     await js(`document.querySelector('#tabs [data-tab=text]').click()`);
     await wait(300);
 

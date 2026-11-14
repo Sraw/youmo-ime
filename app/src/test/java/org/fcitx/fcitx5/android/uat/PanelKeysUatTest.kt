@@ -245,6 +245,8 @@ class PanelKeysUatTest {
         prefs.set(AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior, SpaceLongPressBehavior.Enumerate)
         fun held(inputType: Int): List<String> {
             val h = harness(inputType)
+            // two to go between: with one, the prompt to add more (SpaceLongPressNextImTest)
+            h.api.enabledIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
             h.api.calls.clear()
             h.longPress(h.named("fn/space"))
             h.idle()

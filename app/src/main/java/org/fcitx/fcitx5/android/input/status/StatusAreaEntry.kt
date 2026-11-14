@@ -65,8 +65,7 @@ sealed class StatusAreaEntry(
         }
 
         fun fromEntry(context: Context, it: StatusEntry): Host {
-            val active = it.icon.endsWith("-active")
-            return Host(it, label(context, it.name, active) ?: it.shortText, drawableFromIconName(it.icon), active)
+            return Host(it, label(context, it.name, it.active) ?: it.shortText, drawableFromIconName(it.icon), it.active)
         }
 
         // fcitx names its actions in its own language, not the app's (InputMethodNames)

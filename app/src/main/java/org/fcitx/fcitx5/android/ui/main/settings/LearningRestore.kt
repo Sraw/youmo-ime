@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.BackupResult
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
+import org.fcitx.fcitx5.android.input.learning.failedMessage
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.utils.formatDateTime
 import org.fcitx.fcitx5.android.utils.toast
@@ -64,9 +65,9 @@ internal class LearningRestore(
      * Said on [ctx] that [result] failed, [op] logged with the engine's reason: that reason is an
      * exception's text, not for the user. A file that does not read is told apart in [from].
      */
-    private fun failed(ctx: Context, op: BackupOp, result: BackupResult?) {
+    private suspend fun failed(ctx: Context, op: BackupOp, result: BackupResult?) {
         Timber.w("learning %s failed: %s", op.javaClass.simpleName, result?.error)
-        ctx.toast(if (result == null) R.string.learning_not_now else R.string.learning_try_again)
+        ctx.toast(if (result == null) R.string.learning_not_now else fcitx().runOnReady { failedMessage(op) })
     }
 
     /** [op] done, said if it failed. */

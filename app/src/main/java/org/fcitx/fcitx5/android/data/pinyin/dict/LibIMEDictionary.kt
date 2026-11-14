@@ -23,9 +23,8 @@ class LibIMEDictionary(file: File) : PinyinDictionary() {
 
     override fun toTextDictionary(dest: File): TextDictionary {
         ensureTxt(dest)
-        dest.bufferedWriter().use { out ->
-            LibimeFiles.pinyinDictionary(file.readBytes()).forEach { out.write(it); out.write('\n'.code) }
-        }
+        // written as read: no list of the whole dictionary's lines (engine-08)
+        dest.bufferedWriter().use { LibimeFiles.writePinyinDictionary(file.readBytes(), it) }
         return TextDictionary(dest)
     }
 }

@@ -86,6 +86,9 @@ class EngineDataPlugin : Plugin<Project> {
 
     companion object {
         const val COMPILE_TASK = "compileEngineData"
+
+        /** The app's consumable configuration of the engine data's directories (`project(":app", DATA_CONFIGURATION)`). */
+        const val DATA_CONFIGURATION = "engineData"
         const val DOWNLOADS_TASK = "downloadEngineData"
         private const val BASE_URL = "https://download.fcitx-im.org/data/"
         private const val RELEASES_URL = "https://github.com/Sraw/youmo-ime/releases/download/"
@@ -177,8 +180,7 @@ class EngineDataPlugin : Plugin<Project> {
         )
 
         const val CHAIZI_TASK = "compileChaiziData"
-        private const val HANDWRITING_PLUGIN = "org.fcitx.fcitx5.android.handwriting-data"
-        private const val HANDWRITING_TASK = "extractHandwritingModels"
+        private const val HANDWRITING_PLUGIN = "youmo.handwriting-data"
         // characters by their parts, the open 汉语拆字字典 (CC BY 3.0), at a commit of its
         private const val CHAIZI_COMMIT = "e177ab54ce4edf255315a60593ffecbd8167e96b"
         private val CHAIZI = Download(
@@ -283,7 +285,7 @@ class EngineDataPlugin : Plugin<Project> {
             dictionaries.from(lexicon.file("latin.words"))
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-assets"))
         }
-        target.tasks.register<CompileEnglishData>(ENGLISH_TASK) {
+        val english = target.tasks.register<CompileEnglishData>(ENGLISH_TASK) {
             classpath.from(tool)
             toolCode.set(fingerprint.flatMap { it.outputFile })
             this.lm.set(englishLm.flatMap { it.outputDir.file(ENGLISH_FILE) })
@@ -320,7 +322,7 @@ class EngineDataPlugin : Plugin<Project> {
         // the characters handwriting knows, each of which must have a card: HandwritingDataPlugin's, applied after this
         target.pluginManager.withPlugin(HANDWRITING_PLUGIN) {
             charInfo.configure {
-                cover.set(target.tasks.named<ExtractTask>(HANDWRITING_TASK).flatMap { it.outputDir.file("handwriting/chars.txt") })
+                cover.set(target.tasks.named<ExtractTask>(HandwritingDataPlugin.EXTRACT_TASK).flatMap { it.outputDir.file("handwriting/chars.txt") })
             }
         }
         // OpenCC 1.2.0's s2tw dictionaries, committed (lib/ime-dict-tool/opencc/README.md): frozen data
@@ -332,7 +334,7 @@ class EngineDataPlugin : Plugin<Project> {
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-opencc"))
         }
         val tableRuns = target.gradle.sharedServices.registerIfAbsent("engineTableRuns", TableRuns::class.java)
-        target.tasks.register<CompileTables>(TABLES_TASK) {
+        val compileTables = target.tasks.register<CompileTables>(TABLES_TASK) {
             classpath.from(tool)
             toolCode.set(fingerprint.flatMap { it.outputFile })
             tables.from(TABLE.files.map { name -> table.flatMap { it.outputDir.file(name) } })
@@ -346,7 +348,7 @@ class EngineDataPlugin : Plugin<Project> {
         val models = MODELS.entries.mapIndexed { i, (name, sha) ->
             registerDownload(target, "downloadSentenceModel$i", Download(MODEL_URL + name, sha, "sentence-models/$name"), downloadsDir)
         }
-        target.tasks.register<CopyModels>(MODEL_TASK) {
+        val copyModels = target.tasks.register<CopyModels>(MODEL_TASK) {
             files.from(models.map { task -> task.flatMap { it.outputFile } })
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-models"))
         }
@@ -370,6 +372,16 @@ class EngineDataPlugin : Plugin<Project> {
             variant.sources.assets?.addGeneratedSourceDirectory(charInfo, CompileCharInfo::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(opencc, CompileOpenccData::outputDir)
         }
+        // every directory of the engine's data (engine/… inside each, as the assets and the text pack have it), for
+        // :lib:ime-eval's replay: it depends on this instead of a copy of the task names and their directories.
+        // The assets above and the text pack's tasks (AssetPacksPlugin.SOURCES) together: a data task added to either
+        // goes here too, or uatTest (not in CI) misses it
+        target.configurations.consumable(DATA_CONFIGURATION)
+        listOf(
+            compile.flatMap { it.outputDir }, english.flatMap { it.outputDir }, emoji.flatMap { it.outputDir },
+            chaizi.flatMap { it.outputDir }, charInfo.flatMap { it.outputDir }, compileTables.flatMap { it.outputDir },
+            copyModels.flatMap { it.outputDir }, opencc.flatMap { it.outputDir },
+        ).forEach { target.artifacts.add(DATA_CONFIGURATION, it) }
     }
 
     private fun stem(source: Source) = source.name.substringBefore('-').substringBefore('.')
@@ -428,7 +440,7 @@ class EngineDataPlugin : Plugin<Project> {
             dependsOn(classpath)
         }
 
-        @get:InputFiles
+        @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val lm: RegularFileProperty
 
@@ -519,7 +531,7 @@ class EngineDataPlugin : Plugin<Project> {
     /** English's words and model as `engine/english.data`, compiled from the arpa of the release. */
     @CacheableTask
     abstract class CompileEnglishData : ToolDataTask() {
-        @get:InputFiles
+        @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val lm: RegularFileProperty
 

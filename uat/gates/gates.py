@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Release gates 2, 3 and 5 of dev/design/fcitx-replacement.md §8 on a redroid of their own.
+"""Release gates 2 and 3 of dev/design/fcitx-replacement.md §8 on an emulator of their own (uat.py's AVD).
 
   gates.py upgrade <new.apk> [--old DIR]        gate 2: v0.3.0/0.3.1/0.3.2/0.4.0 upgraded in place
   gates.py backups <new.apk> --old DIR          gate 3: new backup → each old build; old backups → new
-  gates.py perf <label>=<apk> [<label>=<apk>…]   gate 5: start, key latency, memory, side by side
 
-DIR holds the released text APKs (`gh release download v0.3.x -p '*text-arm64*'`). Options:
---port (5566), --container (youmo-gates), --cpus (0-5), --keep (leave the container up).
+DIR holds the released text APKs (`gh release download v0.3.x -p '*text-arm64*'`; those versions had
+one). Options: --port (5560: emulator-5560, clear of a UAT run's 5554/5556; `uat.py --devices auto`
+can reach it, and a gate does not take an emulator it did not start), --keep (leave it up, still the
+gates': the next gate starts it again, unless a uat.py run took it since).
+Gate 5 (start, key latency, memory) is gone: uat/tools/perf.py measures that (DECISIONS.md B14).
 
 The new build is the release tree's release APK at the release; before that, a .debug APK:
 it cannot be installed over a released one (other id and key), so gate 2
@@ -22,7 +24,6 @@ import glob
 import json
 import os
 import re
-import statistics
 import subprocess
 import sys
 import time
@@ -35,6 +36,17 @@ import uat  # noqa: E402
 
 RELEASED = "io.github.sraw.youmo"
 VERSIONS = ("v0.3.0", "v0.3.1", "v0.3.2", "v0.4.0")
+# on the device a gate brought up: up() kills only such an emulator of the AVD left up on its port;
+# a uat.py run on that device drops it (uat.run_on), so a gate after --keep refuses it then
+GATE_MARK = uat.GATE_MARK
+
+
+def released_before_pack_page(version):
+    """a released build before 0.6.0: no 资源包 page (no pack imported before its first start) and its data where
+    0.3/0.4 kept it: phase.py's --old, for gate 3's imports into it and its checks alike"""
+    return tuple(int(n) for n in version.lstrip("v").split(".")) < (0, 6, 0)
+
+
 # old builds whose backups this build refuses (exception_user_data_too_old: 0.3.0's learning is not read)
 REFUSED = ("v0.3.0",)
 FIXTURES = os.path.join(UAT_DIR, "fixtures", "upgrade")
@@ -63,7 +75,7 @@ def build_of(pkg):
 class Gate:
     def __init__(self, a, name, new_apk):
         self.a = a
-        self.serial = f"127.0.0.1:{a.port}"
+        self.serial = f"emulator-{a.port}"
         stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.dir = os.path.join(UAT_DIR, "runs", "gates", f"{stamp}-{name}")
         os.makedirs(self.dir, exist_ok=True)
@@ -72,37 +84,25 @@ class Gate:
         self.new = new_apk
         self.new_pkg, self.new_ver = badging(new_apk) if new_apk else (None, None)
 
-    # --- the device
+    # --- the device: uat.py's emulator from its read-only snapshot, so each gate starts on a clean device
     def up(self):
-        c = self.a.container
-        subprocess.run(["adb", "disconnect", self.serial], capture_output=True)
-        subprocess.run(["docker", "rm", "-f", c], capture_output=True)
-        subprocess.run(["docker", "run", "-d", "--name", c, "--privileged", "--memory", "2048m",
-                        "--cpuset-cpus", self.a.cpus, "-p", f"{self.serial}:5555", uat.IMAGE,
-                        "androidboot.redroid_width=1080", "androidboot.redroid_height=2340",
-                        "androidboot.redroid_dpi=440", "androidboot.redroid_gpu_mode=host"],
-                       check=True, capture_output=True)
-        self.wait_boot()
-        subprocess.run(["docker", "exec", c, "sh", "-c",
-                        "setprop persist.sys.locale zh-CN; setprop sys.boot_completed 0; stop; start"])
-        time.sleep(3)
-        self.wait_boot()
-        time.sleep(3)
-
-    def wait_boot(self):
-        for _ in range(240):
-            subprocess.run(["adb", "connect", self.serial], capture_output=True)
-            r = subprocess.run(["adb", "-s", self.serial, "shell", "getprop sys.boot_completed; pm path android"],
-                               capture_output=True, text=True)
-            if r.stdout.startswith("1") and "package:" in r.stdout:
-                return
-            time.sleep(1)
-        sys.exit("redroid did not boot")
+        # uat.up keeps one already up as it is: one left by --keep or a gate that stopped before down() would
+        # bring its packages, pack marks and Download's zips into this gate. Started again from the snapshot;
+        # only a gate's (marked when it came up): this AVD on the port without the mark is a uat.py run's
+        # (--devices auto reaches 5560 too), killed under it
+        d = uat.Device(self.a.port)
+        if uat.avd_name(d) == uat.AVD:
+            if d.sh(f"cat {GATE_MARK} 2>/dev/null").strip() != "gate":
+                sys.exit(f"{self.serial} is up and not a gate's (a uat.py run's?): another --port, "
+                         f"or `uat/tools/uat.py down --port {self.a.port}` once it is not in use")
+            uat.down(self.a.port)
+        uat.up(self.a.port)
+        # the snapshot is started read-only: the mark is this emulator's only, gone when it is killed
+        uat.Device(self.a.port).sh(f"echo gate > {GATE_MARK}")
 
     def down(self):
         if not self.a.keep:
-            subprocess.run(["adb", "disconnect", self.serial], capture_output=True)
-            subprocess.run(["docker", "rm", "-f", self.a.container], capture_output=True)
+            uat.down(self.a.port)
 
     def uninstall(self, *pkgs):
         for p in pkgs:
@@ -110,8 +110,7 @@ class Gate:
 
     def phase(self, pkg, *args):
         """phase.py as the build of pkg; (ok, its last line)"""
-        env = dict(os.environ, UAT_BUILD=build_of(pkg),
-                   UAT_CONTAINERS=f"{self.a.port}:{self.a.container}")
+        env = dict(os.environ, UAT_BUILD=build_of(pkg))
         t0 = time.time()
         r = subprocess.run([sys.executable, os.path.join(HERE, "phase.py"), str(self.a.port), *args],
                            capture_output=True, text=True, env=env)
@@ -237,10 +236,11 @@ def cmd_backups(a):
             g.uninstall(RELEASED)
             z = retarget(new_zip, os.path.join(g.dir, f"new-for-{v}.zip"), RELEASED)
             ok, last = g.phase(RELEASED, "install", old_apk(a, v))
+            old = released_before_pack_page(v)
             if ok:
-                ok, last = g.phase(RELEASED, "import", z)
+                ok, last = g.phase(RELEASED, "import", z, *(["--old"] if old else []))
             if ok:
-                g.checked(f"new → {v}", RELEASED, old=True)
+                g.checked(f"new → {v}", RELEASED, old=old)
             else:
                 g.blocked(f"new → {v}", last)
         g.uninstall(RELEASED)
@@ -270,84 +270,11 @@ def cmd_backups(a):
                                                           " Debug build: zips retargeted between the two ids."))
 
 
-def cmd_perf(a):
-    g = Gate(a, "perf", None)
-    results = {}
-    try:
-        g.up()
-        # two rounds, A B A B, the second kept: the first build measured after the boot was slower in
-        # every round-one run (the device still settling), whichever build it was
-        for rnd, spec in [(r, s) for r in (1, 2) for s in a.apks]:
-            label, _, apk = spec.partition("=")
-            pkg, ver = badging(apk)
-            print(f"round {rnd} {label}: {pkg} {ver}", flush=True)
-            g.uninstall(RELEASED, RELEASED + ".debug")
-            out = os.path.join(g.dir, f"{label}-round{rnd}.json")
-            ok, last = g.phase(pkg, "install", apk)
-            if ok:
-                ok, last = g.phase(pkg, "perf", out, str(a.runs))
-            results[label] = (ver, json.load(open(out)) if ok and os.path.exists(out) else None, last)
-    finally:
-        g.down()
-    date = datetime.date.today().isoformat()
-    path = os.path.join(UAT_DIR, "runs", f"{date}-gate-perf-{'-'.join(r.split('=')[0] for r in a.apks)}.md")
-    lines = ["# Gate 5: start, key latency, memory", "",
-             f"Items: `{os.path.relpath(g.dir, UAT_DIR)}/`. redroid x86_64, cpus {a.cpus}, 2 GB. Cold start: "
-             "from `am force-stop` (the field focused, tapped again), until the keyboard shows, the space key "
-             "names the input method, and `ni` tapped then has a candidate (medians of "
-             f"{a.runs}). Key: `input tap` to the composing row or the bar changing, 8 words twice, through "
-             "adb and the UI dumper (its read cost is in every number, the same for both). Memory: dumpsys "
-             "meminfo after a GC, 6 samples 1.5 s apart, the first dropped (it reads high). Builds measured "
-             "A B A B on one device, the second round reported.", "",
-             "| build | version | cold start ms: keyboard / host up / candidate | key ms p50 / p90 | PSS MB | Native heap MB | Java heap MB |",
-             "|---|---|---|---|---|---|---|"]
-    complete = bool(results)
-    for label, (ver, r, last) in results.items():
-        if not r:
-            lines.append(f"| {label} | {ver} | blocked: {last} | | | | |")
-            complete = False
-            continue
-        cold = r["cold_start_ms"]
-        cols = perf_cols(r)
-        complete = complete and None not in cols
-        cols = ["n/a" if c is None else c for c in cols]
-        host = (f" (Kotlin host's own: {median_of(cold, 'host_log')})"
-                if any(c.get("host_log") for c in cold) else "")
-        lines.append(f"| {label} | {ver} | {cols[0]} / {cols[1]} / {cols[2]}{host} | {cols[3]} / {cols[4]} | "
-                     f"{cols[5]} | {cols[6]} | {cols[7]} |")
-    with open(path, "w") as f:
-        f.write("\n".join(lines) + "\n")
-    print(path)
-    return complete
-
-
-def perf_cols(r):
-    """a build's row: cold start keyboard / ready / candidate, key p50 / p90, PSS / native / Java MB.
-    A column with no reading (every run timed out, meminfo unread) is None, shown n/a and failing the
-    gate: a 0 there would read as a measurement"""
-    cold, mem = r["cold_start_ms"], r["mem_kb"][1:]   # the first meminfo sample reads high
-    k = sorted(r["key_ms"])
-    return [median_of(cold, "keyboard"), median_of(cold, "ready"), median_of(cold, "candidate"),
-            statistics.median(k) if k else None, k[int(len(k) * 0.9)] if k else None,
-            *(median_of(mem, key, 1024) for key in ("pss_total", "native_heap", "java_heap"))]
-
-
-def median_of(rows, key, scale=None):
-    """the median of rows' readings of key, those that have one; None when none has"""
-    got = [r[key] for r in rows if r.get(key)]
-    if not got:
-        return None
-    m = statistics.median(got)
-    return round(m / scale, 1) if scale else m
-
-
 def main():
-    sys.exit("gates.py: still made for redroid (Docker on Linux); not ported to the emulator yet (uat/README.md)")
     p = argparse.ArgumentParser()
-    p.add_argument("--port", default="5566")
-    p.add_argument("--container", default="youmo-gates")
-    p.add_argument("--cpus", default="0-5")
-    p.add_argument("--keep", action="store_true")
+    p.add_argument("--port", default="5560", type=uat.emu_port)
+    p.add_argument("--keep", action="store_true",
+                   help="leave the emulator up, still the gates': the next gate restarts it, unless a uat.py run took it")
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("upgrade")
     s.add_argument("new")
@@ -355,11 +282,8 @@ def main():
     s = sub.add_parser("backups")
     s.add_argument("new")
     s.add_argument("--old", required=True)
-    s = sub.add_parser("perf")
-    s.add_argument("apks", nargs="+")
-    s.add_argument("--runs", type=int, default=5)
     a = p.parse_args()
-    ok = {"upgrade": cmd_upgrade, "backups": cmd_backups, "perf": cmd_perf}[a.cmd](a)
+    ok = {"upgrade": cmd_upgrade, "backups": cmd_backups}[a.cmd](a)
     sys.exit(0 if ok else 1)
 
 

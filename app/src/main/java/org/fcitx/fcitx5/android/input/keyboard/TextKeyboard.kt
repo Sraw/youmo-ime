@@ -67,6 +67,11 @@ class TextKeyboard(
         // the layout its keys are drawn from (lib/keyboard-scene's qwerty.xml)
         private const val LAYOUT = "qwerty"
 
+        // the letter the key of [node] types: its send=, one of a–z as the layouts write a letter's (lower case); null for any other key.
+        // Not `code:U+0071` (R25r4 F7998): that is a code typed as it is (SceneKeyDef.action, a SymAction), not a letter Shift
+        // cases (onAction's HostKeyAction), so no letter key to a glide, a stroke, writing on the keys or the bubble either
+        private fun letterSent(node: KeyNode): Char? = node.actions["send"]?.singleOrNull()?.takeIf { it in 'a'..'z' }
+
         /** Whether the letters are split here: as the setting is, the screen as wide as it is now; floating, never. */
         fun splits(context: Context): Boolean = KeyboardArea.splits(KeyboardArea.screen(context))
 
@@ -242,10 +247,6 @@ class TextKeyboard(
         )
     }
 
-    /** The scenes the engine made for this keyboard: a test's count of what was not kept. */
-    @VisibleForTesting
-    val scenesMade: Int get() = sceneBoard?.scenesMade ?: 0
-
     /** The scenes kept let go, the next asked made anew as things are: a measure of what making one costs (KeyboardPerfBaselineTest). */
     @VisibleForTesting
     fun forgetScene() {
@@ -325,9 +326,17 @@ class TextKeyboard(
     // glide typing (滑行输入) where the input method reads one; a stroke (笔画筛选) in pinyin's and 双拼's
     // the letters where the scene places them: each letter node of the scene by
     // its (id, copy), a split row's second G its copy 1
-    private fun sceneLetters(): List<Pair<Char, KeyPlace>> = canvas?.shownKeys.orEmpty()
-        .filter { it.id.length == 1 && it.id[0] in 'a'..'z' }
-        .map { it.id[0] to scenePlace(it.id, it.copy == 1) }
+    // R25r3 F7963: a letter's key is the one that sends it (send="q"), whatever its id: a theme pack's layout has a key
+    // of each id a–z (LayoutReader) but need not have it send that letter (PackLayouts.judge asks for none), and by
+    // the id a glide, a stroke and writing on the keys read another letter than the key types. Two keys sending one
+    // letter: the first in the layout's order is the letter's (both its copies, split), the other none's
+    private fun sceneLetters(): List<Pair<Char, KeyPlace>> {
+        val keyOf = HashMap<Char, String>()
+        return canvas?.shownKeys.orEmpty().mapNotNull { node ->
+            val letter = letterSent(node) ?: return@mapNotNull null
+            if (keyOf.getOrPut(letter) { node.id } != node.id) null else letter to scenePlace(node.id, node.copy == 1)
+        }
+    }
 
     override val glide = glideInput(letters = { sceneLetters() }, enabled = { glides }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }, writes = { InputMethodCatalog.writesOnKeys(imeName) }) { path, layout ->
         onAction(KeyAction.GlideAction(Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
@@ -428,7 +437,7 @@ class TextKeyboard(
     override val sceneTable: SceneKeyDef.Table get() = LetterBubbles
 
     private object LetterBubbles : SceneKeyDef.Table {
-        override fun bubble(node: KeyNode) = node.id.takeIf { it.length == 1 && it[0] in 'a'..'z' }
+        override fun bubble(node: KeyNode) = letterSent(node)?.toString()
     }
 
     // public for its test, which has no theme's key of no name to hold

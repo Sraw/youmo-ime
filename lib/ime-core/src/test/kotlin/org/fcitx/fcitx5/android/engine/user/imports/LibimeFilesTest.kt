@@ -27,6 +27,14 @@ class LibimeFilesTest {
         assertEquals(listOf("骁骎 xiao'qin 0.0", "琮璟 cong'jing 0.0"), LibimeFiles.pinyinDictionary(resource("extra.dict")))
     }
 
+    // engine-08: what the import writes, line by line as read, is the same lines
+    @Test
+    fun aDictionaryWrittenAsItIsRead() {
+        val out = StringBuilder()
+        LibimeFiles.writePinyinDictionary(resource("extra.dict"), out)
+        assertEquals(LibimeFiles.pinyinDictionary(resource("extra.dict")).joinToString("") { "$it\n" }, out.toString())
+    }
+
     @Test
     fun anEmptyUserDictionary() {
         assertEquals(emptyList<String>(), LibimeFiles.pinyinDictionary(resource("user.dict")))

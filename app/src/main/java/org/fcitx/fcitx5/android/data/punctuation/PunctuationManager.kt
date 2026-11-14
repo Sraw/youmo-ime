@@ -53,9 +53,4 @@ object PunctuationManager {
         start()
         forget()
     }
-
-    const val ENTRIES = "Entries"
-    const val KEY = "Key"
-    const val MAPPING = "Mapping"
-    const val ALT_MAPPING = "AltMapping"
 }

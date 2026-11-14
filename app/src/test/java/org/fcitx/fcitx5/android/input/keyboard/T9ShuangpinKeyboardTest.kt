@@ -110,7 +110,7 @@ class T9ShuangpinKeyboardTest {
             // pinyin's answer is another input method's here: not taken
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, composing = true, syllables = listOf("bu", "nu"), id = 2)
             looper.idle()
-            assertEquals(T9Keyboard.labels(EngineState.T9State()), column())
+            assertEquals(T9Keyboard.labels(T9State()), column())
         } finally {
             EngineState.syllablesState.value = EngineState.SyllableState()
         }

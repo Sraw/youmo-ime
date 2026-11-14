@@ -39,6 +39,8 @@ import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.store.RecordStore
+import org.fcitx.fcitx5.android.engine.store.Unsaved
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.EngineHost
 import org.fcitx.fcitx5.android.input.address.AddressStore
@@ -47,6 +49,7 @@ import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.utils.causes
 import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 import java.io.File
@@ -167,7 +170,7 @@ class EngineBridge {
         get() = made ?: Engines(
             blobs = ::asset,
             userDir = userDir()?.let(::restored)?.let(::JvmFiles),
-            onError = { Timber.w(it, "engine user data") },
+            onError = ::userDataFailed,
             additions = { data().let { additions(pinyinDir(it), it.writable) } },
             kernel = NativeMatrixKernel.loaded,
             emojiShows = EmojiModifier.validator(),
@@ -194,14 +197,27 @@ class EngineBridge {
         }
 
     // OpenCC's character tables, as the app ships them: the app's traditional text read simplified by
-    // learning. Read from the APK's assets, never from the data directory DataManager syncs: no
-    // copy there to go stale or missing
+    // learning. Read from the APK's assets, never from a copy on disk: none there to go stale or
+    // missing
     private fun simplifier(): Simplifier = try {
         val assets = appContext.assets
         Simplifier.read(assets.open(TRADITIONAL_TABLE).use { it.readBytes() }, assets.open(SIMPLIFIED_TABLE).use { it.readBytes() })
     } catch (e: IOException) {
         Timber.w(e, "no traditional-to-simplified table: text read as it is")
         Simplifier.NONE
+    }
+
+    /**
+     * What the engine could not read or write of the user's data ([Engines]' onError): logged, and what the user
+     * is to know of it said on the keyboard.
+     */
+    @VisibleForTesting
+    internal fun userDataFailed(e: IOException) {
+        Timber.w(e, "engine user data")
+        // the learning record, or part of it, did not read and was kept aside: from what read, or empty (decode-1)
+        if (e is RecordStore.KeptAside) EngineNotices.failedOnce(R.string.learning_kept_aside)
+        // a word added or blocked by hand not written: in memory alone, as what is learned and not kept (decode-2)
+        if (e is Unsaved) learningUnkept()
     }
 
     /**
@@ -268,7 +284,7 @@ class EngineBridge {
         Timber.e("%s cannot load (%s): not called again till the engine is reloaded", im, e.javaClass.name)
         // said on the keyboard (§3: not a toast, which Android 13 drops); a pack missing is told as such,
         // one damaged since it was last read through too (read through now, on this thread: review M-2)
-        val pack = generateSequence(e) { it.cause }.take(MAX_CAUSES).filterIsInstance<PackUnavailableException>().firstOrNull()
+        val pack = e.causes().filterIsInstance<PackUnavailableException>().firstOrNull()
         EngineNotices.failed(
             when {
                 pack != null -> R.string.pack_text_needed_short
@@ -311,13 +327,7 @@ class EngineBridge {
         // an asset or table that cannot be opened or is none; not memory run out mapping one,
         // FileChannel.map's IOException "Map failed", even as a cause
         private fun cannotLoad(e: Throwable) =
-            (e is IOException || e is DataFormatException) && chain(e).none { it is VirtualMachineError }
-
-        // [e] and its causes, each once: initCause refuses only a throwable itself, so a chain may loop back
-        private fun chain(e: Throwable): Sequence<Throwable> {
-            val seen = HashSet<Throwable>()
-            return generateSequence(e) { it.cause }.takeWhile(seen::add)
-        }
+            (e is IOException || e is DataFormatException) && e.causes().none { it is VirtualMachineError }
     }
 
     /**
@@ -372,7 +382,7 @@ class EngineBridge {
             !writable -> "where fcitx's data is, is not settled"
             else -> null
         }
-        val save = PhraseFile(phraseFile, phrases, refused == null, refused.orEmpty(), phraseSaves)::save
+        val save = PhraseFile(phraseFile, phrases, refused == null, refused.orEmpty(), saves = phraseSaves)::save
         // the compiled file, never the texts (0.3.1 read them whole here and ran the heap out at
         // every focus): one not made yet, or stale, is compiled off this thread, the engine reloaded then
         val seen = MergedDictionary.current(dictionaryDir, compiles = writable)
@@ -387,7 +397,7 @@ class EngineBridge {
             dictionaryStale = seen.stale,
             dictionaryPending = { MergedDictionary.pending(dictionaryDir) },
             commonWords = commonWords,
-            saveCommonWords = WordsFile(wordsFile, commonWords, wordsRead && writable, phraseSaves)::save,
+            saveCommonWords = WordsFile(wordsFile, commonWords, wordsRead && writable, saves = phraseSaves)::save,
         )
     }
 
@@ -396,7 +406,14 @@ class EngineBridge {
      * one ([Engines.Additions.saveCommonWords]), on [saves], as [PhraseFile] saves the phrases; not
      * where the file was not read or the data is not settled ([writable] false).
      */
-    internal class WordsFile(private val file: File, private val text: String, private val writable: Boolean, private val saves: Executor) {
+    internal class WordsFile(
+        private val file: File,
+        private val text: String,
+        private val writable: Boolean,
+        // a save that failed: the user's change lives in memory alone, which they are told (0.6.1 audit decode-2)
+        private val unsaved: () -> Unit = ::toldUnsaved,
+        private val saves: Executor,
+    ) {
         private var base: CommonWords? = null
 
         fun save(words: CommonWords) {
@@ -408,6 +425,7 @@ class EngineBridge {
                     base = words
                 } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                     Timber.w(e, "common words")
+                    unsaved()
                 }
             }
         }
@@ -430,6 +448,8 @@ class EngineBridge {
         private val text: String,
         private val read: Boolean,
         private val refused: String = "custom phrases were not read",
+        // as WordsFile's
+        private val unsaved: () -> Unit = ::toldUnsaved,
         private val saves: Executor,
     ) {
         private var base: CustomPhrases? = null
@@ -445,6 +465,7 @@ class EngineBridge {
                 } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                     // on that thread, it would end the process: kept in memory, as the engine does
                     Timber.w(e, "custom phrases")
+                    unsaved()
                 }
             }
         }
@@ -558,7 +579,7 @@ class EngineBridge {
         is LearningOp.Undo, is LearningOp.UseHabits, is LearningOp.ClearRecent, is LearningOp.ClearLearned,
         is LearningOp.NoPredict, is LearningOp.RemoveItems, is LearningOp.RemoveWords -> true
         is LearningOp.Menu, is LearningOp.Delete, is LearningOp.Block, is LearningOp.Pin, is LearningOp.Unpin,
-        is LearningOp.Report, LearningOp.Overview, is LearningOp.ListItems, is LearningOp.RestoreCorrection,
+        is LearningOp.Report, LearningOp.Overview, LearningOp.Saving, is LearningOp.ListItems, is LearningOp.RestoreCorrection,
         is LearningOp.ResetTableOrder -> false
         // a restore or 退回恢复前 changes what was learned; the rest only read or keep files
         is BackupOp.Restore, is BackupOp.RestoreKept, BackupOp.Revert -> true
@@ -649,6 +670,12 @@ class EngineBridge {
     fun tableKeys(im: String): Set<Char> = made?.tableKeys(im).orEmpty()
 
     companion object {
+        // what the user changed on the keyboard (a common word deleted, a phrase pinned or deleted) not saved: said
+        // as what is learned and not kept is, in words of its own (WordsFile, PhraseFile). Not learning_unkept: that
+        // says the words learned are not saved, which is not so here, and its once a process would be spent on
+        // this, the learning's own failure then never said (R25r2 F7881)
+        private fun toldUnsaved() = EngineNotices.failedOnce(R.string.user_lists_unkept)
+
         /**
          * Saves [phrases], the engine's, as what it changed since [base] (those it read or last saved)
          * applied to [file] as it is now: the editor may have saved since, its reload of the engine
@@ -658,13 +685,9 @@ class EngineBridge {
             CustomPhraseManager.saveKeysOver(CustomPhraseManager.items(base), CustomPhraseManager.items(phrases), file)
         }
 
-        /** Whether [im] is one of the engine's input methods, whose long press the app words (U-82). */
-        fun isEngines(im: String) = im.startsWith(ENGINE) || im == InputMethodCatalog.ENGLISH
+        /** Whether [im] is one of the engine's input methods (those the host lists), whose long press the app words (U-82). */
+        fun isEngines(im: String) = InputMethodCatalog.listed(im) != null
 
-        // the host's input methods (the native androidengine's), but English, which is keyboard-us's
-        private const val ENGINE = "engine-"
-        // a chain of causes looked down this far for a pack missing (initCause may loop one back)
-        private const val MAX_CAUSES = 16
         private const val MS_PER_MINUTE = 60_000L
         private const val IDLE_SECONDS = 30L
         private const val LIBIME_DICTIONARY = "user.dict"

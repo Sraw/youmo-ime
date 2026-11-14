@@ -1,17 +1,24 @@
-# Release gates 2, 3, 5
+# Release gates 2, 3
 
 `dev/design/fcitx-replacement.md` §8: run on the release tree before the draft release; also
-runnable on any debug build (this tree, or one built at the tag `native-last` for the native host) to find problems early.
-Each brings up its own fresh redroid (`--container`, `--port`, `--cpus`; default `youmo-gates`,
-5566, 0-5) and removes it after (`--keep` leaves it). Build the APKs before: no build while it is up.
+runnable on any debug build to find problems early; run both before every release (DECISIONS.md B14).
+Each brings up uat.py's emulator (the AVD `youmo` from its read-only snapshot: a clean device every
+time; `uat/tools/avd.sh` makes it) on `--port` (default 5560, clear of a UAT run's 5554/5556, but `uat.py --devices auto` can reach it) and
+kills it after (`--keep` leaves it up to look at; the next run kills a gate's emulator found on the port and starts
+it again from the snapshot; one of this AVD a gate did not start, a UAT run's, stops the gate instead, and so does a
+kept one a `uat.py run --devices <port>` has taken since: the run drops the gate's mark).
+The new build is arm64 (the emulator's ABI); the text pack (`./gradlew :app:packTextPack`) is imported
+before the new build's checks, after the fixture's files are in place (the import starts the app, whose
+first start moves them); a released build in gate 3 before 0.6.0 has no pack to import (no 资源包 page,
+`gates.released_before_pack_page`), one from 0.6.0 on gets it as the new build does. Build the APK and pack before.
 
 | Gate | Command | What |
 |---|---|---|
 | 2 | `python3 uat/gates/gates.py upgrade <new.apk> [--old <dir>]` | each `uat/fixtures/upgrade/v0.3.x` upgraded to the new build, then 14 checks (15 with a `de.tar`) |
 | 3 | `python3 uat/gates/gates.py backups <new.apk> --old <dir>` | the new build's 备份全部 restored into v0.3.0/0.3.1/0.3.2; each fixture's `backup.zip` restored into the new build |
-| 5 | `python3 uat/gates/gates.py perf <label>=<apk>…` | cold start (keyboard, host up, first candidate), per-key latency, PSS/Native/Java heap, side by side |
 
-`<dir>`: the released text APKs, `gh release download v0.3.x -p '*text-arm64*'` for each.
+`<dir>`: the released text APKs, `gh release download v0.3.x -p '*text-arm64*'` for each (0.3.x and
+0.4.0 shipped a text and a voice APK; 0.6.0 on ships one). Gate 5 (start, latency, memory) is gone: `uat/tools/perf.py`.
 
 The checks (`phase.py check`), the same after every upgrade and restore: the fixtures' settings
 (括号成对 关, 键盘高度 高, 性能档位 中档 in the file and on the settings page), the input method list
@@ -29,11 +36,6 @@ A release APK (`io.github.sraw.youmo`) is installed over the old release (`insta
 get it. A `.debug` APK cannot be (other id and key): gate 2 installs it and puts the fixture's files
 into its directories before its first start, and gate 3 retargets each backup to the other id
 (`metadata.json` and the preferences file's name, which the import checks).
-
-Gate 5 on redroid x86_64: a release APK is arm64 only and runs translated there, so compare like
-with like (two x86_64 debug builds of the same tree, or two arm64 release builds); every latency
-includes adb's and the dumper's round trip, the same for each build. A column with no reading
-(every run timed out, meminfo unread) shows n/a and fails the gate.
 
 Results: `uat/runs/<date>-gate-<name>-<apk>.md`, every item in `uat/runs/gates/<stamp>-<name>/`.
 `python3 -m unittest test_gates` (here) tests the device-free parts.

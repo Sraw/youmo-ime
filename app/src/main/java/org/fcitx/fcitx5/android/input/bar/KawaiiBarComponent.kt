@@ -612,7 +612,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     context.getString(if (panelActions.habitsOn) R.string.learning_habits_off else R.string.learning_habits_on)
             }
             ToolbarButton.TradSimp -> {
-                val traditional = tradSimpEntry()?.icon?.endsWith("-active") == true
+                val traditional = tradSimpEntry()?.active == true
                 view.setOn(traditional)
                 view.setIcon(if (traditional) R.drawable.ic_fcitx_status_chttrans_trad else R.drawable.ic_fcitx_status_chttrans_simp)
                 view.contentDescription = context.getString(if (traditional) R.string.status_traditional else R.string.status_simplified)

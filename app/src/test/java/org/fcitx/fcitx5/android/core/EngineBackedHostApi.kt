@@ -48,7 +48,6 @@ class EngineBackedHostApi(
     override suspend fun forgetEnglishWords(texts: List<String>) = engines.forgetEnglishWords(texts)
     override suspend fun importUserWords(lines: Sequence<String>, fileName: String) = engines.importWords(lines, fileName)
     override suspend fun importBatches() = engines.importBatches()
-    override suspend fun importedWords(batch: Int?) = engines.importedWords(batch)
     override suspend fun dropImport(batch: Int) = engines.dropImport(batch)
     override suspend fun restoreImport(batch: Int) = engines.restoreImport(batch)
     override suspend fun tableKeys(im: String) = engines.tableKeys(im)

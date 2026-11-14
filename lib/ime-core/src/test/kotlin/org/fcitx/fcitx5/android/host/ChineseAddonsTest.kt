@@ -106,8 +106,8 @@ class ChineseAddonsTest {
         assertEquals("another context has its own state", "“" to "", punctuation.pushPunctuationV2(other, '"'.code))
         pipeline.reset(ic)
         assertEquals("“" to "", punctuation.pushPunctuationV2(ic, '"'.code))
-        assertEquals("each key its own turn", "‘", punctuation.pushPunctuation(ic, '\''.code))
-        assertEquals("’", punctuation.pushPunctuation(ic, '\''.code))
+        assertEquals("each key its own turn", "‘" to "", punctuation.pushPunctuationV2(ic, '\''.code))
+        assertEquals("’" to "", punctuation.pushPunctuationV2(ic, '\''.code))
     }
 
     @Test
@@ -115,33 +115,26 @@ class ChineseAddonsTest {
         punctuation.setConfig(punctuation.config.copy(typePairedTogether = true))
         assertEquals("“" to "”", punctuation.pushPunctuationV2(ic, '"'.code))
         assertEquals("“" to "”", punctuation.pushPunctuationV2(ic, '"'.code))
-        assertEquals("V1 still alternates", "“", punctuation.pushPunctuation(ic, '"'.code))
-        assertTrue(state().lastPuncStack.isNotEmpty())
+        assertTrue(state().lastPuncStack.isEmpty())
     }
 
     @Test
     fun `reset clears every part of the state (ca punctuation cpp 287-302)`() {
         punctuation.pushPunctuationV2(ic, '"'.code)
         state().lastIsEngOrDigit = 'a'.code
-        state().notConverted = '.'.code
         pipeline.reset(ic)
         assertEquals(0, state().lastIsEngOrDigit)
-        assertEquals(0, state().notConverted)
         assertTrue(state().lastPuncStack.isEmpty())
     }
 
     @Test
-    fun `half width after a letter or digit, and cancelLast gives the mark (ca punctuation cpp 444-448, 504-516)`() {
+    fun `half width after a letter or digit (ca punctuation cpp 444-448)`() {
         punctuation.setConfig(punctuation.config.copy(halfWidthAfterLatinOrNumber = true))
         pipeline.commit(ic, "abc")
         assertEquals('c'.code, state().lastIsEngOrDigit)
         assertEquals("" to "", punctuation.pushPunctuationV2(ic, '.'.code))
-        assertEquals('.'.code, state().notConverted)
+        assertEquals("" to "", punctuation.pushPunctuationV2(ic, ','.code))
         assertEquals("only . and , stay", "？" to "", punctuation.pushPunctuationV2(ic, '?'.code))
-        assertEquals("the push cleared it", "", punctuation.cancelLast(ic))
-        punctuation.pushPunctuationV2(ic, ','.code)
-        assertEquals("，", punctuation.cancelLast(ic))
-        assertEquals("once", "", punctuation.cancelLast(ic))
         pipeline.commit(ic, "中")
         assertEquals("。" to "", punctuation.pushPunctuationV2(ic, '.'.code))
     }
@@ -235,7 +228,6 @@ class ChineseAddonsTest {
         assertEquals("" to "", punctuation.pushPunctuationV2(ic, '.'.code))
         assertEquals("" to "", punctuation.getPunctuation('.'.code))
         assertEquals(emptyList<String>(), punctuation.getPunctuationCandidates('['.code))
-        assertEquals("", punctuation.cancelLast(ic))
         assertEquals(listOf(PunctuationConfig(enabled = false, halfWidthAfterLatinOrNumber = false)), saved)
     }
 
@@ -356,7 +348,7 @@ class ChineseAddonsTest {
         assertEquals(listOf("status", "panel"), log)
         assertTrue(chttrans.isTraditional(ic))
         assertEquals(
-            StatusEntry(chttrans.action.id, "chttrans", "fcitx-chttrans-active", "Traditional Chinese"),
+            StatusEntry(chttrans.action.id, "chttrans", "fcitx-chttrans-active", "Traditional Chinese", true),
             statusArea.entries(ic).first(),
         )
         press('F'.code, KeyStates.CTRL or KeyStates.SHIFT or KeyStates.CAPS_LOCK)
@@ -410,6 +402,8 @@ class ChineseAddonsTest {
             listOf("fcitx-chttrans-inactive", "fcitx-punc-active", "fcitx-fullwidth-inactive"),
             statusArea.entries(ic).map { it.icon },
         )
+        // what the app colours each switch and words its label by (StatusAreaEntryUi): on is active, each its own
+        assertEquals(listOf(false, true, false), statusArea.entries(ic).map { it.active })
         assertEquals(listOf(1, 2, 3).toSet(), listOf(chttrans.action.id, punctuation.action.id, fullWidth.action.id).toSet())
         log.clear()
         statusArea.activate(ic, fullWidth.action.id)
@@ -422,6 +416,7 @@ class ChineseAddonsTest {
             listOf("Traditional Chinese", "Half width punctuation", "Full width Character"),
             statusArea.entries(ic).map { it.shortText },
         )
+        assertEquals(listOf(true, false, true), statusArea.entries(ic).map { it.active })
         assertTrue("a tap never tips", tips.isEmpty())
         statusArea.activate(ic, 99)
         // a switch clears the list (fcitx/instance.cpp:2491): the modules leave that context alone

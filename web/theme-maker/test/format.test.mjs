@@ -2,7 +2,7 @@
 // the drawing rules case by case (rules.json), the theme file both ways (theme.json, the zips), and
 // the page's export byte for byte (from-web.theme, which the app's ThemeMakerFormatTest imports).
 // Run: node --test web/theme-maker/test/format.test.mjs   (a file: Node 24 takes no folder here; UPDATE=1
-// writes from-web.theme again). The page is made of src/ by tools/assemble.mjs; index.html must be what it makes.
+// writes from-web.theme again). The page is made of src/ and generated/ by tools/assemble.mjs, here in memory (neither page is in git).
 // contract: the page's library against the app's testdata/ (rules.json, theme.json, the zips) and the
 // generated blocks, which mutation of either side cannot see.
 import { test } from 'node:test';
@@ -14,18 +14,19 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
-import { assemble, blockOf, CLASSIC, CLASSIC_SRC, ENGINE, engineText, fontFaces, FONTS, NO_ENGINE } from '../tools/assemble.mjs';
+import { assemble, blockOf, CLASSIC_SRC, ENGINE, engineText, fontFaces, FONTS, GENERATED, generated, NO_ENGINE } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const data = join(here, 'testdata');
-const html = readFileSync(join(here, '..', 'index.html'), 'utf8');
-// the page as the site has it (pages.yml): index.html with the build's engine put in; made when a test asks, so
+// the page as assemble.mjs makes it without the engine (R25 B12: not in git, made here)
+const html = assemble();
+// the page as the site has it (pages.yml): the page with the build's engine put in; made when a test asks, so
 // that only those tests fail where the engine is not built (./gradlew :lib:keyboard-scene:youmoEngine)
 let builtPage = null;
-const built = () => (builtPage ??= assemble(undefined, html, ENGINE));
+const built = () => (builtPage ??= assemble(undefined, ENGINE));
 
 // the classic page (060-render-p3 M1) carries the blocks only it reads: the presets, the layout, the icons
-const classicHtml = readFileSync(CLASSIC, 'utf8');
+const classicHtml = assemble(CLASSIC_SRC);
 function block(id, page = html) {
   const text = blockOf(page, id);
   assert.ok(text != null, 'no block ' + id + ' in the page');
@@ -631,15 +632,19 @@ test('each page carries only the generated blocks it reads, and classic no engin
   assert.equal(blockOf(html, 'youmo-format'), blockOf(classicHtml, 'youmo-format'), 'the app writes the format into both');
 });
 
-test('index.html is what tools/assemble.mjs makes of src/ (src/ changed, the page not made again: fails)', () => {
-  assert.ok(assemble() === html, 'index.html is not src/ assembled: node web/theme-maker/tools/assemble.mjs');
+// what a page carries is generated/<id>.json by construction (assemble); what can go wrong is an id the app's tests
+// write that no page reads any more (or a file gone), which nothing else would show
+test('each generated block the app writes has its file and a page that reads it', () => {
   // the maker before 0.6.0, kept at classic/ (060-render-p3 §5.1): its own src/classic/, the library and blocks shared
-  assert.ok(assemble(CLASSIC_SRC) === readFileSync(CLASSIC, 'utf8'), 'classic/index.html is not src/classic/ assembled');
+  for (const id of GENERATED) {
+    assert.ok(generated(id).length > 0, id);
+    assert.ok([html, classicHtml].some((page) => blockOf(page, id) !== null), id + ': no page reads it');
+  }
 });
 
 // 060-render-p3 W1: the engine is not in git (a change to its code would have to make the page again); the
-// page built is the build's engine as it is, within its budget, the rest index.html's; the fonts are fonts/
-test("index.html holds no engine; the page built holds the build's, and no bigger than its budget", () => {
+// page built is the build's engine as it is, within its budget, the rest the page without it; the fonts are fonts/
+test("the page made without --engine holds no engine; the page built holds the build's, and no bigger than its budget", () => {
   assert.equal(blockOf(html, 'youmo-engine'), NO_ENGINE);
   const engine = blockOf(built(), 'youmo-engine');
   assert.equal(engine, engineText(), 'the page built has another engine');
@@ -648,7 +653,7 @@ test("index.html holds no engine; the page built holds the build's, and no bigge
   assert.ok(Buffer.byteLength(engine) <= 1_295_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   // the global a page reads it by (build.gradle.kts: the library's link names it)
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
-  // all else as index.html: the engine's script and the CSP's hash of it the only difference
+  // all else as without it: the engine's script and the CSP's hash of it the only difference
   const rest = (page) => page.replace(/<script id="youmo-engine">[\s\S]*?<\/script>/, '').replace(/script-src [^;]*;/, '');
   assert.equal(rest(built()), rest(html));
 });
@@ -685,10 +690,13 @@ test('assemble.mjs refuses a page it cannot make, and puts in text that looks li
     for (const f of ['style.css', 'maker.js', 'form.js', 'ui.js']) copyFileSync(join(src, f), join(dir, f));
     cpSync(join(src, 'panels'), join(dir, 'panels'), { recursive: true });
     const page = readFileSync(join(src, 'page.html'), 'utf8');
-    const made = (p, old = html) => { writeFileSync(join(dir, 'page.html'), p); return assemble(dir, old); };
+    const made = (p, gen = undefined) => { writeFileSync(join(dir, 'page.html'), p); return assemble(dir, null, undefined, undefined, gen); };
     assert.throws(() => made(page.replace('{{ui}}', '')), /no \{\{ui\}\}/, 'a slot missing');
     assert.throws(() => made(page.replace('{{css}}', '{{css}}{{css}}')), /2 \{\{css\}\}/, 'a slot twice');
-    assert.throws(() => made(page, html.replace('id="youmo-engine-icons"', 'id="youmo-other"')), /no youmo-engine-icons block/, 'a generated block missing');
+    const gen = join(dir, 'generated');
+    cpSync(join(here, '..', 'generated'), gen, { recursive: true });
+    rmSync(join(gen, 'youmo-engine-icons.json'));
+    assert.throws(() => made(page, gen), /no youmo-engine-icons block/, 'a generated block missing');
     assert.throws(() => made(page.replace(/<script id="youmo-ui">/, '<script>')), /a script not hashed/, 'a script not hashed');
     // a slot's name inside what is put in is text, not a slot
     writeFileSync(join(dir, 'style.css'), '/* {{lib}} $& */');
@@ -726,9 +734,9 @@ test('an image is decoded only within what it may be: the source a photo, a cut 
   assert.ok(!L.decodable(L.imageSize(huge.files[theme.picture.src]), L.decodeCaps(format, L.fileRole(huge.theme, huge.theme.picture.src))));
 });
 
-test('each page runs only its own scripts, by their hashes, as git keeps it and as built', () => {
+test('each page runs only its own scripts, by their hashes, without the engine and as built', () => {
   const classic = classicHtml;
-  for (const [what, page, count] of [['index.html', html, 6], ['the page built', built(), 6], ['classic', classic, 2], ['classic built', assemble(CLASSIC_SRC, classic, ENGINE), 2]]) {
+  for (const [what, page, count] of [['the page', html, 6], ['the page built', built(), 6], ['classic', classic, 2], ['classic built', assemble(CLASSIC_SRC, ENGINE), 2]]) {
     const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(page);
     assert.ok(m, 'no CSP meta in ' + what);
     const csp = m[1];

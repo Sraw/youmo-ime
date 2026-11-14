@@ -12,13 +12,10 @@ endif()
 
 set(sources
   common.cc
-  offline-recognizer.cc
-  offline-stream.cc
   online-recognizer.cc
   online-stream.cc
   version.cc
   voice-activity-detector.cc
-  wave-reader.cc
 )
 
 add_library(sherpa-onnx-jni SHARED ${sources})

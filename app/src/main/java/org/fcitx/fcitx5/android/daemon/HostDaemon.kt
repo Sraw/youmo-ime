@@ -23,19 +23,20 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 /**
- * Manage the singleton instance of [Fcitx]
+ * Owns the one host of the process, a [KotlinHost] (ime-core's host run on its own thread), behind [HostInstance].
  *
- * To use fcitx, client should call [connect] to obtain a [HostConnection],
- * and call [disconnect] on client destroyed. Client should not leak the instance of [HostApi],
- * and must use [HostConnection] to access fcitx functionalities.
+ * To use the host, a client calls [connect] to obtain a [HostConnection] and [disconnect] when it is destroyed. A
+ * client should not keep the [HostApi] it is handed, and reaches the host only through its [HostConnection].
  *
- * The instance of [Fcitx] always exists,but whether the dispatcher runs and callback works depend on clients, i.e.
- * if no clients are connected, [Fcitx.stop] will be called.
+ * The [KotlinHost] always exists; whether it runs depends on the clients: the first [connect] starts it, and it is
+ * stopped once none is connected. [stopFcitx] and [restartFcitx] (a backup restored, the language changed) wait for a
+ * host still starting before they stop it, so they may block for seconds: call them off the main thread.
  *
  * Functions are thread-safe in this class.
  */
@@ -174,9 +175,7 @@ object HostDaemon {
      */
     @VisibleForTesting
     internal fun restartOnceStarted(state: StateFlow<HostLifecycle.State>, waitMs: Long, restart: () -> Boolean): Boolean {
-        fun started() = runBlocking {
-            withTimeoutOrNull(waitMs) { state.first { it != HostLifecycle.State.STARTING } }
-        } != null
+        fun started() = pastStarting(state, waitMs)
         if (!started()) {
             Timber.w("fcitx still starting after %d ms: not restarted", waitMs)
             return false
@@ -188,14 +187,58 @@ object HostDaemon {
         return true
     }
 
+    /**
+     * [stop] once [state] is past STARTING (waited for at most [waitMs] in all, outside the lock): true; false, still
+     * starting then (a warning logged), not stopped. KotlinHost.stop skips a host not READY, so one stopped while
+     * starting would go on reading and writing the files an import is replacing (audit-061 app-rest-2).
+     * [stop] looks again under its lock and says whether it stopped: false, the host was started anew between the
+     * wait and the lock (a pack's import or a language change restarting it), waited for again (R25r2 F7862).
+     */
+    @VisibleForTesting
+    internal fun stopOnceStarted(state: StateFlow<HostLifecycle.State>, waitMs: Long, stop: () -> Boolean): Boolean {
+        val until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMs)
+        while (true) {
+            val left = TimeUnit.NANOSECONDS.toMillis(until - System.nanoTime())
+            if (left <= 0 || !pastStarting(state, left)) {
+                Timber.w("fcitx still starting after %d ms: not stopped", waitMs)
+                return false
+            }
+            if (stop()) return true
+        }
+    }
+
+    /**
+     * [stop] unless the host is [now] starting: what [stopOnceStarted]'s stop does under the lock, the state read there.
+     * False, not stopped: started anew since the wait (KotlinHost.stop would skip it and the import go on over a
+     * running host), to be waited for again (R25r2 F7862).
+     */
+    @VisibleForTesting
+    internal fun stopUnlessStarting(now: HostLifecycle.State, stop: () -> Unit): Boolean {
+        if (now == HostLifecycle.State.STARTING) return false
+        stop()
+        return true
+    }
+
+    private fun pastStarting(state: StateFlow<HostLifecycle.State>, waitMs: Long): Boolean = runBlocking {
+        withTimeoutOrNull(waitMs) { state.first { it != HostLifecycle.State.STARTING } }
+    } != null
+
     private const val RESTART_WAIT_MS = 10_000L
 
     /**
-     * Restart fcitx instance while keep the clients connected
+     * Restart fcitx instance while keep the clients connected: a host still starting waited for first
+     * ([restartOnceStarted]; stopped while starting, the stop and the start were both skipped, the old
+     * one kept: a language changed not taken). False if it stayed starting. Blocks: not on the main thread.
      */
-    fun restartFcitx() = lock.withLock {
-        realFcitx.stop()
-        start()
+    fun restartFcitx(): Boolean {
+        if (testConnection != null) return true
+        return restartOnceStarted(realFcitx.lifecycle.stateFlow, RESTART_WAIT_MS) {
+            lock.withLock {
+                realFcitx.stop()
+                start()
+                true
+            }
+        }
     }
 
     /**
@@ -203,11 +246,21 @@ object HostDaemon {
      * Should only be used before importing user configuration files,
      * then the App must be restarted as soon as possible.
      *
-     * This method blocks until fully stopped.
+     * A host still starting is waited for first ([stopOnceStarted]); false if it stayed starting, not
+     * stopped: the import must not go on. Blocks until fully stopped: not on the main thread.
      */
-    fun stopFcitx() {
-        realFcitx.stop()
+    fun stopFcitx(): Boolean {
+        if (testConnection != null) return true
+        return stopOnceStartedUnderLock(realFcitx.lifecycle.stateFlow, RESTART_WAIT_MS) { realFcitx.stop() }
     }
+
+    /**
+     * [stopFcitx]'s body, the host's [state] and its [stop] passed in so a test runs it whole, not a copy (R25r5
+     * F8010): [stopOnceStarted], each stop looking again under the lock ([stopUnlessStarting], the state read there).
+     */
+    @VisibleForTesting
+    internal fun stopOnceStartedUnderLock(state: StateFlow<HostLifecycle.State>, waitMs: Long, stop: () -> Unit): Boolean =
+        stopOnceStarted(state, waitMs) { lock.withLock { stopUnlessStarting(state.value, stop) } }
 
     /**
      * Start fcitx instance.

@@ -4,11 +4,13 @@
  */
 package org.fcitx.fcitx5.android.engine.stroke
 
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.HandedBack
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Pager
 import org.fcitx.fcitx5.android.engine.session.Session
@@ -139,6 +141,22 @@ class StrokeLookup(
     override val rereads get() = !looking && pinyin.rereads
 
     override fun fieldFlags(flags: Int) = pinyin.fieldFlags(flags)
+
+    // the members below are pinyin's to keep: not forwarded, Session's empty defaults dropped full pinyin's
+    // passedOn, and what was typed before Enter stayed its context (audit-061 engine-01)
+    override fun passedOn() {
+        if (looking) end()
+        idle = true
+        pinyin.passedOn()
+    }
+
+    override val lastCommit: Commit? get() = pinyin.lastCommit
+
+    override fun typed(text: String) = pinyin.typed(text)
+
+    // a lookup's keys as typed (the default's CommitRaw); else pinyin's, which may have picked words in pieces,
+    // and has nothing typed after: the key starts a lookup again, as after any other way its input ends
+    override fun handBack(): HandedBack = if (looking) super.handBack() else pinyin.handBack().also { idle = true }
 
     private fun type(c: Char): Snapshot = when {
         c in Strokes.KEYS -> lookUp { input.insert(cursor++, c) }

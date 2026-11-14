@@ -39,7 +39,7 @@ class UnicodeInput(
     // Android's nice 10 (THREAD_PRIORITY_BACKGROUND), not MIN's 19: a key typed meanwhile waits on
     // this build, which at 19 gets next to no CPU while the app and keyboard draw
     private val background: (() -> Unit) -> Unit = { Thread(it, "host-unicode").apply { priority = Thread.NORM_PRIORITY - 1 }.start() },
-) : PanelTempMode {
+) : TempMode {
 
     private enum class Mode { Off, Search, Direct }
 
@@ -177,12 +177,6 @@ class UnicodeInput(
 
     /** No invoke action of its own: fcitx's default takes it and does nothing (`fcitx/tempmode.cpp:26-29`). */
     override fun invokeAction(ic: InputContext, e: InvokeActionEvent) = true
-
-    override fun selectCandidate(ic: InputContext, globalIndex: Int): Boolean {
-        val c = ic.propertyFor(state).list?.candidates?.getOrNull(globalIndex) ?: return false
-        c.select?.invoke(ic)
-        return true
-    }
 
     /** `updateUI` (`:298-417`): rebuilds the list. */
     private fun updateUI(ic: InputContext, trigger: Boolean = false) {

@@ -46,14 +46,17 @@ class KeyRouter(
     internal val refiner = Refiner(clock)
 
     // English where it suggests nothing: the last key was a glide the session took, its word held;
-    // cleared by any other key, a reset (the cursor moved, focus lost) and activate (`androidengine.h:302-304`)
+    // cleared by any other key, a reset (the cursor moved, focus lost) and activate (`androidengine.h:302-304`).
+    // The router's, not per context: keys reach only the focused context and a focus change always resets
+    // (focusOut, then activate), and the sessions it pairs with are per input method (Engines), not per context
     private var glidedAsIs = false
 
     // input methods whose session has answered: one that never did has nothing to drop (`native-lib.cpp:728`)
     private val answered = HashSet<String>()
 
     // what was typed since nothing was, to type it again when 清除 is taken back; null once a part of it
-    // was committed, or a candidate chosen or acted on (what those keys typed then hung on the list shown)
+    // was committed, or a candidate chosen or acted on (what those keys typed then hung on the list shown).
+    // The router's, as glidedAsIs is and for the same reason: one focused context at a time, reset between
     private var typed: MutableList<Typed>? = ArrayList()
 
     // failures by call, input method, event and class, their trace at the first, a count at the 2nd, 4th, 8th…
@@ -442,15 +445,15 @@ class KeyRouter(
         // pushes again as it goes in
         val turns = pair && after.isEmpty()
         if (turns) punctuation.push(ic, unicode)
-        val list = PunctuationCandidateList()
-        list.pageSize = options.pageSize
-        list.append(PunctuationWord(text, after, text + after == typed, if (turns) unicode else 0))
+        val words = ArrayList<TempCandidate>()
+        words += punctuationWord(text, after, text + after == typed, if (turns) unicode else 0)
         // that entry is the whole first card: the marks list a pair's two halves apart
-        for (i in (if (pair) 2 else 1) until marks.size) list.append(PunctuationWord(marks[i], "", marks[i] == typed))
-        list.globalCursorIndex = 0
+        for (i in (if (pair) 2 else 1) until marks.size) words += punctuationWord(marks[i], "", marks[i] == typed)
+        val list = TempCandidateList(words, options.pageSize, emptyList())
+        list.setGlobalCursorIndex(0)
         ic.panel.reset()
         showPreedit(ic, text + after)
-        ic.panel.candidateList = list
+        ic.panel.candidateList = PunctuationCandidateList(list)
         services.updatePreedit(ic)
         services.updatePanel(ic)
         return true
@@ -467,26 +470,19 @@ class KeyRouter(
     }
 
     // a punctuation key's marks on the panel, till one goes in (`:310-311`)
-    private class PunctuationCandidateList : CommonCandidateList()
+    private class PunctuationCandidateList(list: TempCandidateList) : TempModeCandidates(list)
 
-    /** One of the marks a punctuation key with several offers (`:282-308`): picked, it goes in as the key types it. */
-    private inner class PunctuationWord(
-        private val mark: String,
-        private val after: String,
-        half: Boolean,
-        // the key pushed again as it goes in, on the first entry of a pair typed a half at a time; else 0
-        private val key: Int = 0,
-    ) : PanelCandidate {
-        override val text = mark + after
-        override val comment = if (half) strings.half else ""
-
-        override fun select(ic: InputContext) {
+    /**
+     * One of the marks a punctuation key with several offers (`:282-308`): picked, it goes in as the key
+     * types it. [key]: pushed again as it goes in, on the first entry of a pair typed a half at a time; else 0.
+     */
+    private fun punctuationWord(mark: String, after: String, half: Boolean, key: Int = 0) =
+        TempCandidate(mark + after, if (half) strings.half else "") { ic ->
             if (key != 0) punctuation?.push(ic, key)
             commitPunctuation(ic, mark, after)
             // last: the list that holds this word goes with the panel
             clearPanel(ic)
         }
-    }
 
     /** A session's candidate: picking it sends its index among all of them (`EngineCandidateWord`, `:39-56`). */
     internal inner class EngineWord(

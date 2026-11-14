@@ -56,11 +56,21 @@ class CancelledElsewhereTest {
     fun aHotwordsReadCancelledElsewhereIsTheLastRead() = runBlocking {
         val remembered = VoiceHotwords.Remembered()
         val last = Words("你好", "")
-        remembered.read(remembered.start(), last)
+        remembered.read(remembered.shared<Long>({ false }) { it }, last)
         val reading = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val read = reading.async<Words> { awaitCancellation() }
         val got = async { inTimeOrLast(read, remembered, 10_000) }
         reading.cancel()
         assertEquals(last, got.await())
+    }
+
+    // the read failing (the engine's reading threw): the words last read, as for a late read, not none (voice-6)
+    @Test
+    fun aHotwordsReadThatFailedIsTheLastRead() = runBlocking {
+        val remembered = VoiceHotwords.Remembered()
+        val last = Words("你好", "坏词")
+        remembered.read(remembered.shared<Long>({ false }) { it }, last)
+        val read = CompletableDeferred<Words>().apply { completeExceptionally(IllegalStateException("engine")) }
+        assertEquals(last, inTimeOrLast(read, remembered, 10_000))
     }
 }

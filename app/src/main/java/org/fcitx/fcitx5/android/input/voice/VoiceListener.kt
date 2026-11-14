@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -50,7 +51,12 @@ class VoiceListener(
     private val language: VoiceChoice.Language,
 ) : VoiceSession.Listening {
 
-    enum class Failure { NoModel, NoMicrophone }
+    /**
+     * Why the talk ended: the models not loading, the microphone failing, or recognizing failing with
+     * the models in (natively, or memory running out for a graph of hotwords), which was told as the
+     * models' (voice-5) and an uncaught failure as the microphone's (app-input-21).
+     */
+    enum class Failure { NoModel, NoMicrophone, Recognition }
 
     interface Events {
         fun loaded()
@@ -68,10 +74,11 @@ class VoiceListener(
         fun level(level: Float)
     }
 
-    // a native error is the session's to show, not the keyboard's to crash on
+    // a native error is the session's to show, not the keyboard's to crash on; the microphone's
+    // ([record]) and the models' failures are told where they happen, so what reaches here is neither for certain
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e ->
         Timber.w(e, "voice")
-        tell { failed(Failure.NoMicrophone) }
+        tell { failed(Failure.Recognition) }
     })
 
     // the recognizer's thread: the stream, the hotwords and VoiceLive are its alone. One for every
@@ -130,6 +137,10 @@ class VoiceListener(
     private var acquired = false
     private var decoding: Job? = null
     private var capture: Job? = null
+    // the microphone open, from the capture thread: [close] stops it so a read blocked in the HAL
+    // returns (VoiceCaptureEnd), not left recording after the talk ended
+    @Volatile
+    private var recording: AudioRecord? = null
     // read off the main thread too, as the models load and on the recognizer's
     @Volatile
     private var closed = false
@@ -172,7 +183,7 @@ class VoiceListener(
         scope.launch {
             // asked for while the models load, not after: the engine may be busy a while
             // an Error of it caught in here: thrown out of the async it would cancel this launch and reach the
-            // scope's handler (told as the microphone's failure) whichever message came first
+            // scope's handler (told as recognizing's failure) whichever message came first
             val user = async { caught { userHotwords() } }
             val loaded = try {
                 VoiceEngine.acquire()
@@ -199,7 +210,7 @@ class VoiceListener(
             }.getOrElse { e ->
                 // an Error past the acquire (userHotwords falls back on exceptions only): the models
                 // let go, not held for good, and the decoder not left waiting for them; told as the
-                // models' failure, not the microphone's (the scope's handler)
+                // models' failure, not recognizing's (the scope's handler)
                 Timber.w(e, "voice hotwords")
                 ready.cancel()
                 main.post { VoiceEngine.release() }
@@ -289,6 +300,17 @@ class VoiceListener(
         if (closed) return
         closed = true
         cut()
+        // from here, not only on the capture thread: its own stop comes after a read that may not return.
+        // Before the models are in too (the first talk, or the first after they were let go): the
+        // microphone is open from the press, and was left recording when closed then (voice-7, R25r2 F7829)
+        recording?.let {
+            try {
+                it.stop()
+            } catch (e: IllegalStateException) {
+                // released or stopped on the capture thread meanwhile
+                Timber.w(e, "voice record stop on close")
+            }
+        }
         // still loading: once in, they are let go there
         if (!acquired) return
         acquired = false
@@ -296,6 +318,8 @@ class VoiceListener(
         scope.launch {
             last?.join()
             main.post { VoiceEngine.release() }
+            // nothing of this listener's is left to run: a coroutine still waiting (finish's on [said]) ends here
+            scope.cancel()
         }
     }
 
@@ -311,33 +335,30 @@ class VoiceListener(
             said.cancel(e)
             return
         }
-        val recognizer = models.recognizer
-        val live = VoiceLive(models.polisher?.stream())
-        // its model not read in (logged as VoiceEngine read it): the raw text throughout
-        if (models.polisher == null) polishFailure = VoiceSession.PolishFailure.LOAD
-        // the user's words put in for what reads as them, after the polish, as it shows and as it is
-        // typed alike (060-voice-userdict.md): what shows is what is typed, no word changing at the end
-        val homophones = words.homophones.hold()
-        val homophoneLexicon = VoiceHomophones.Lexicon { safeLanguage.homophonesAllowed(it) }
-        // the polish failing: the raw text as it is after this step (read once the step has run), told as such
-        suspend fun polished(step: () -> VoiceLive.Heard) {
-            restartIn(live)
-            val heard = orFallback<VoiceLive.Heard?>("voice polish", null) { step() }
-                ?: VoiceLive.Heard(live.raw, 0, fallback = true, utterance = live.utterance, upTo = live.mark()).also { polishFailure = VoiceSession.PolishFailure.RUN }
-            show(homophones.replace(heard, homophoneLexicon))
-        }
-        val stream = try {
-            VoiceEngine.stream(recognizer, words)
-        } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-            // memory running out for the graph of hotwords too: the models, not the microphone
-            Timber.w(e, "voice stream")
-            tell { failed(Failure.NoModel) }
-            said.cancel()
-            return
-        }
+        // all of it in the try: a throw before the stream (the polish's stream, the homophones) left
+        // [said] neither completed nor cancelled, and [finish] waiting on it for good (voice-5)
+        var stream: OnlineStream? = null
         try {
+            val recognizer = models.recognizer
+            val live = VoiceLive(models.polisher?.stream())
+            // its model not read in (logged as VoiceEngine read it): the raw text throughout
+            if (models.polisher == null) polishFailure = VoiceSession.PolishFailure.LOAD
+            // the user's words put in for what reads as them, after the polish, as it shows and as it is
+            // typed alike (060-voice-userdict.md): what shows is what is typed, no word changing at the end
+            val homophones = words.homophones.hold()
+            val homophoneLexicon = VoiceHomophones.Lexicon { safeLanguage.homophonesAllowed(it) }
+            // the polish failing: the raw text as it is after this step (read once the step has run), told as such
+            suspend fun polished(step: () -> VoiceLive.Heard) {
+                restartIn(live)
+                val heard = orFallback<VoiceLive.Heard?>("voice polish", null) { step() }
+                    ?: VoiceLive.Heard(live.raw, 0, fallback = true, utterance = live.utterance, upTo = live.mark()).also { polishFailure = VoiceSession.PolishFailure.RUN }
+                show(homophones.replace(heard, homophoneLexicon))
+            }
+            // memory running out for the graph of hotwords too: recognizing's failure, the models being in
+            val made = VoiceEngine.stream(recognizer, words)
+            stream = made
             val segment = VoiceSegments(
-                Recognition(recognizer, stream),
+                Recognition(recognizer, made),
                 VoiceEngine.SAMPLE_RATE,
                 choose = { result -> orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) } },
                 live = { heard -> polished { live.heard(heard) } },
@@ -375,11 +396,11 @@ class VoiceListener(
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-            // the recognizer or the polish failing natively: the models', not the microphone's
+            // the recognizer or the polish failing natively, with the models in: not the models' loading
             Timber.w(e, "voice decode")
-            tell { failed(Failure.NoModel) }
+            tell { failed(Failure.Recognition) }
         } finally {
-            stream.release()
+            stream?.release()
             said.cancel()
         }
     }
@@ -398,8 +419,8 @@ class VoiceListener(
         )
     }
 
-    /** [stream] of [recognizer] as VoiceSegments drives it */
-    private class Recognition(private val recognizer: OnlineRecognizer, private val stream: OnlineStream) : VoiceRecognition<OnlineRecognizerResult> {
+    /** [stream] of [recognizer] as VoiceSegments drives it; VoiceEngineTest's too, so it drives the real loop */
+    internal class Recognition(private val recognizer: OnlineRecognizer, private val stream: OnlineStream) : VoiceRecognition<OnlineRecognizerResult> {
         override fun accept(samples: FloatArray) = stream.acceptWaveform(samples, VoiceEngine.SAMPLE_RATE)
         override fun inputFinished() = stream.inputFinished()
         override fun isReady() = recognizer.isReady(stream)
@@ -416,12 +437,27 @@ class VoiceListener(
         tell { heard(shown) }
     }
 
+    // the microphone failing as it starts or is read (startRecording refused, a read throwing) is the
+    // microphone's failure, said so, not recognizing's (the scope's handler; R25r2 F7872); as a read's
+    // error is, not once lifted: what was said is in, typed as at the tail's end
     private suspend fun record() {
+        try {
+            captureAudio()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            Timber.w(e, "voice microphone")
+            if (liftAt == null) tell { failed(Failure.NoMicrophone) }
+        }
+    }
+
+    private suspend fun captureAudio() {
         val record = open()
         if (record == null) {
             tell { failed(Failure.NoMicrophone) }
             return
         }
+        recording = record
         val opening = Opening(record.bufferSizeInFrames)
         // whether a window is speech (VoiceQuiet), on the gained samples: silero did not fire at the
         // -50 to -60 dBFS of soft speech before the gain (specs/app.md). Taken once the microphone is
@@ -437,6 +473,7 @@ class VoiceListener(
                     // what was read is in already: a stop failing is no microphone failure to end the talk on
                     Timber.w(e, "voice record stop")
                 } finally {
+                    recording = null
                     record.release()
                     // numbers only, nothing said: the UAT's check of the tail's timing and the level (uat/12 VO-23/24)
                     if (BuildConfig.DEBUG) opening.log()
@@ -517,6 +554,9 @@ class VoiceListener(
         // the device UAT's clips in place of what the microphone hears (VoiceClipMic); none in a release
         val clips = if (BuildConfig.DEBUG) VoiceClipMic.feed() else null
         var windows = 0
+        // the detector while it works: one failing on a window is done without from there, as an opening with none
+        // (all kept), logged; not thrown on to be told as the microphone's failure (record's catch; R25r3 F7942)
+        var detector = vad
         try {
             while (currentCoroutineContext().isActive) {
                 val n = clips?.read(buffer) ?: read(record, buffer, shorts)
@@ -549,7 +589,17 @@ class VoiceListener(
                 val samples = buffer.copyOf(n)
                 // before all of it: the recognizer and the level hear the same
                 opening.gain.apply(samples)
-                quiet.window(buffer, n, vad?.let { speech(it, samples, opening) })
+                val speech = detector?.let {
+                    @Suppress("TooGenericExceptionCaught")
+                    try {
+                        speech(it, samples, opening)
+                    } catch (e: Exception) {
+                        Timber.w(e, "voice vad")
+                        detector = null
+                        null
+                    }
+                }
+                quiet.window(buffer, n, speech)
                 audio.trySend(samples)
                 if (++windows % LEVEL_EVERY == 0) {
                     val level = rms(samples)

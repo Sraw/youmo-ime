@@ -28,7 +28,10 @@ import org.fcitx.fcitx5.android.engine.learn.control.BackupResult
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
+import org.fcitx.fcitx5.android.ui.main.settings.openInputStreamOrThrow
+import org.fcitx.fcitx5.android.ui.main.settings.openOutputStreamOrThrow
 import org.fcitx.fcitx5.android.utils.AppUtil
+import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.formatDateTime
 import org.fcitx.fcitx5.android.utils.importErrorDialog
 import org.fcitx.fcitx5.android.utils.iso8601UTCDateTime
@@ -59,20 +62,19 @@ class BackupFragment : PaddingPreferenceFragment() {
                 val ctx = requireContext()
                 val cr = ctx.contentResolver
                 lifecycleScope.withLoadingDialog(ctx) {
-                    val name = cr.queryFileName(uri) ?: return@withLoadingDialog
-                    if (!name.endsWith(".zip")) {
-                        ctx.importErrorDialog(R.string.exception_user_data_filename, name)
-                        return@withLoadingDialog
-                    }
+                    // no check of the file's name: a provider may name it otherwise or not at all (the picker's
+                    // GetContent), and what is not a backup is refused by its contents (no metadata.json)
                     // outlives the page, which a rotation cancels: once the engine's files are
                     // replaced the app must exit, else fcitx comes back writing to the old ones
                     val failed = FcitxApplication.getInstance().coroutineScope.async(Dispatchers.Main.immediate) {
                         try {
-                            // stop fcitx before overwriting files
-                            HostDaemon.stopFcitx()
                             val metadata = withContext(Dispatchers.IO) {
+                                // stop fcitx before overwriting files: off the main thread, as a host still
+                                // starting is waited for; one that stays starting would read and write them
+                                // as they are replaced, so the import stops there (audit-061 app-rest-2)
+                                if (!HostDaemon.stopFcitx()) errorRuntime(R.string.exception_user_data_host_starting)
                                 ClipboardManager.closeDatabase()
-                                val inputStream = cr.openInputStream(uri)!!
+                                val inputStream = cr.openInputStreamOrThrow(uri)
                                 UserDataManager.import(inputStream).getOrThrow()
                             }
                             val exportTime = formatDateTime(metadata.exportTime)
@@ -105,7 +107,7 @@ class BackupFragment : PaddingPreferenceFragment() {
                             (learning(BackupOp.Copy) as? BackupResult)?.bytes
                         }
                         withContext(Dispatchers.IO) {
-                            val outputStream = ctx.contentResolver.openOutputStream(uri)!!
+                            val outputStream = ctx.contentResolver.openOutputStreamOrThrow(uri)
                             UserDataManager.export(outputStream, exportTimestamp, learning).getOrThrow()
                         }
                         // said, as a restore is: the picker closes on its own and nothing else shows it worked
@@ -139,7 +141,10 @@ class BackupFragment : PaddingPreferenceFragment() {
                     .setTitle(R.string.import_user_data)
                     .setMessage(R.string.confirm_import_user_data)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
-                        importLauncher.launch("application/zip")
+                        // every file: the picker shows by type, and a backup renamed (.bak) or named by where it was
+                        // kept is no application/zip to it, greyed out; what is no backup is refused by its contents
+                        // (R25r2 F7854)
+                        importLauncher.launch("*/*")
                     }
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()

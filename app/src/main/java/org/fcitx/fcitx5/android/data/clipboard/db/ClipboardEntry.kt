@@ -43,7 +43,8 @@ data class ClipboardEntry(
             transformer: ((String) -> String)? = null
         ): ClipboardEntry? {
             val desc = clipData.description
-            // TODO: handle multiple items (when does this happen?)
+            // the first item only, deliberately: a clip of several (files copied in a file manager, a few apps'
+            // multi-part copies) is kept as what a paste of plain text gives first, its type the first's
             val item = clipData.getItemAt(0) ?: return null
             val str = item.text?.toString() ?: return null
             val sensitive = desc.extras?.getBoolean(IS_SENSITIVE) ?: false

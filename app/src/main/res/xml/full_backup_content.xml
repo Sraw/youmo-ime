@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- DataManager.dataDir's assets, in device-protected storage (device_root), synced again on the next start;
+<!-- The 0.3.x native host's data in device-protected storage (device_root: usr/, descriptor.json, README.md),
+     removed at the first start after an upgrade (FcitxApplication.deleteNativeData);
      the resource packs (device_file packs/), far over the backup's 25 MB. Read on Android 11 and earlier
      only, where allowBackup="false" turns backup and phone-to-phone transfer off anyway: from such a phone
      the packs never move, the new phone imports them again -->

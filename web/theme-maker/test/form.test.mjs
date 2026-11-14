@@ -96,6 +96,87 @@ test('colours: changed, added, taken out, a dark version made of the light one a
   assert.equal(F.parseHex('@key'), null);
 });
 
+// R25 web-7: a theme of the app's 4100 styles (a 3.0 theme of 400 keys of their own, converted) is edited without a wait
+// the time limit is far above the few ms it takes, so a loaded CI runner does not fail it; quadratic took seconds
+test('a theme of 4100 styles: a change and the 按键 tab\'s dozen-odd values of it within a second, each style on its line', () => {
+  const many = Array.from({ length: 4100 }, (_, i) => '  <style select="qwerty/k' + i + '" fill="#ff' + String(i % 10).repeat(6) + '"/>').join('\n');
+  const xml = BASE.replace('</theme>', '<!-- a\ncomment -->\n' + many + '\n</theme>');
+  const at = F.styles(xml);
+  const first = xml.split('\n').findIndex((l) => l.includes('qwerty/k0"')) + 1;
+  assert.equal(at.find((s) => s.select === 'qwerty/k0').line, first);
+  assert.equal(at.find((s) => s.select === 'qwerty/k4099').line, first + 4099);
+  const props = ['fill', 'radius', 'border', 'shadow', 'drop-shadow', 'depth', 'depth-color', 'inset', 'shape', 'press', 'overlay', 'color', 'font', 'size'];
+  const t0 = performance.now();
+  const changed = F.setProp(xml, 'qwerty/k17', 'radius', '4dp');
+  for (const p of props) F.valueOf(changed, 'qwerty/k17', p);
+  const ms = performance.now() - t0;
+  assert.equal(F.valueOf(changed, 'qwerty/k17', 'radius'), '4dp');
+  assert.ok(ms < 1000, ms + ' ms');
+  // what styles() hands out is the caller's to sort or reverse: the next call is as before
+  F.styles(changed).reverse();
+  assert.equal(F.styles(changed)[0].select, at[0].select);
+});
+
+// the same written on one line (a minified theme.xml), where elements() counts no line break up to each element:
+// the line numbers right where there is no break to count. Not timed: the loop before F7898 was right here too, only
+// slow, and a clock limit on a whole minified theme is the kind that fails a loaded CI runner (F7909)
+test('a theme of 4100 styles on one line: all of them found, all on line 1', () => {
+  const many = Array.from({ length: 4100 }, (_, i) => '<style select="qwerty/k' + i + '" fill="#ff' + String(i % 10).repeat(6) + '"/>').join('');
+  const xml = BASE.replace(/\n\s*/g, ' ').replace('</theme>', many + '</theme>');
+  const at = F.styles(xml);
+  assert.equal(at.length, 4100 + F.styles(BASE).length);
+  assert.deepEqual([...new Set(at.map((s) => s.line))], [1]);
+});
+
+// R25 web-4: a dark-only theme's <colors> without variant= are its dark colours (AMOLED, Deep Blue, Monokai start so)
+test('a dark-only theme: its colours shown and set in its one block, its switch adds a light version, never drops the dark', () => {
+  const dark = F.setColor(E.themeSource('amoled-black'), 'key', '#ff222222');
+  assert.deepEqual(F.variants(dark), ['dark']);
+  assert.equal(F.elements(dark, 'colors').length, 1);
+  const own = F.colors(dark, 'dark');
+  assert.equal(own.key, '#ff222222', 'the dark colours are the block without variant=');
+  assert.equal(Object.keys(own).length, 24);
+  assert.deepEqual(F.colors(dark), own, 'its only version by default (the 背景 panel asks so)');
+  const doc = { xml: dark, files: {}, layouts: {} };
+  for (const shown of [true, false]) {
+    const set = P.colors.ops.set(doc, 'key', '#ff112233', shown).xml;
+    assert.equal(F.elements(set, 'colors').length, 1, 'no second <colors> block, the preview ' + (shown ? 'dark' : 'light'));
+    assert.equal(read(set).theme.info(true).colors.key, '#ff112233');
+  }
+  assert.equal(P.colors.ops.dark(doc, false).xml, dark, 'the dark version is never dropped: it stays a dark theme');
+  const both = P.colors.ops.dark(doc, true).xml;
+  assert.deepEqual(F.variants(both), ['light', 'dark']);
+  assert.deepEqual(F.colors(both, 'dark'), own);
+  assert.deepEqual(F.colors(both, 'light'), own, 'the light version starts as its colours');
+  const r = read(both);
+  assert.equal(r.theme.info(true).colors.key, '#ff222222');
+  assert.equal(r.theme.info(false).colors.key, '#ff222222');
+  // 从背景图取色 on it: its one block is the dark version the app reads, so worked out for dark whatever the picture
+  // or the preview (a light picture once wrote a light palette there)
+  const bright = Array.from({ length: 20 }, () => [235, 235, 235]);
+  const ops = P.colors.ops;
+  assert.notEqual(ops.fromPicture(bright, true).key, ops.fromPicture(bright, false).key, 'the row tells the two apart');
+  for (const shown of [null, false, true]) {
+    const picked = ops.fromPictureAll(doc, bright, shown).xml;
+    assert.equal(F.colors(picked, 'dark').key, ops.fromPicture(bright, true).key, 'preview ' + shown);
+  }
+});
+
+// a dark-only theme written with <colors variant="dark"> (by hand: the built-in ones have no variant=): its light
+// version starts as its colours too, not the defaults of a light block it never had
+test('a dark-only theme whose block says variant="dark" gets a light version of its colours', () => {
+  const x = E.themeSource('amoled-black').replace(/<colors>/, '<colors variant="dark">');
+  assert.deepEqual(F.variants(x), ['dark']);
+  const own = F.colors(x, 'dark');
+  assert.equal(Object.keys(own).length, 24);
+  const both = F.withDark(x, true);
+  assert.deepEqual(F.variants(both), ['light', 'dark']);
+  assert.deepEqual(F.colors(both, 'dark'), own);
+  assert.deepEqual(F.colors(both, 'light'), own);
+  const r = read(both);
+  assert.equal(r.theme.info(false).colors.key, r.theme.info(true).colors.key);
+});
+
 test('the 配色 panel writes a colour of the version shown, the dark switch writes the dark version', () => {
   const doc = { xml: nord, files: {}, layouts: {} };
   const out = P.colors.ops.set(doc, 'keyText', '#ff0000', true);

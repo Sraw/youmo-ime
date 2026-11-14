@@ -250,14 +250,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             ManagedPreference.PStringLike(sharedPreferences, key, defaultValue, codec).apply { register() }
 
         /** Shown in the 九键 section of pinyin's and English's pages (InputMethodSettings), while the nine keys are their keyboard. */
-        val t9MultiTap = stringLike(T9_MULTI_TAP, object : ManagedPreference.StringLikeCodec<T9MultiTap> {
-            override fun decode(raw: String) = T9MultiTap.entries.firstOrNull { it.name == raw }
-        }, T9MultiTap.Off)
+        val t9MultiTap = stringLike(T9_MULTI_TAP, ManagedPreference.enumCodec<T9MultiTap>(), T9MultiTap.Off)
 
         /** Shown in the 九键 section of English's page: how the nine keys type English. */
-        val t9EnglishTyping = stringLike(T9_ENGLISH_TYPING, object : ManagedPreference.StringLikeCodec<T9EnglishTyping> {
-            override fun decode(raw: String) = T9EnglishTyping.entries.firstOrNull { it.name == raw }
-        }, T9EnglishTyping.Predictive)
+        val t9EnglishTyping = stringLike(T9_ENGLISH_TYPING, ManagedPreference.enumCodec<T9EnglishTyping>(), T9EnglishTyping.Predictive)
 
         /**
          * What each of 九键's digit keys types ([NineKeyLetters.serialize], empty as on a phone):
@@ -269,23 +265,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * Shown on the pinyin page and in ⋯'s 键盘: the on-screen keyboard pinyin is typed on, the
          * nine keys 0.4's 九键拼音 (NineKeysMerge). A hardware keyboard types 全拼 still.
          */
-        val pinyinKeyboard = stringLike(PINYIN_KEYBOARD, object : ManagedPreference.StringLikeCodec<PinyinKeyboard> {
-            override fun decode(raw: String) = PinyinKeyboard.entries.firstOrNull { it.name == raw }
-        }, PinyinKeyboard.Full)
+        val pinyinKeyboard = stringLike(PINYIN_KEYBOARD, ManagedPreference.enumCodec<PinyinKeyboard>(), PinyinKeyboard.Full)
 
         /**
          * Shown on the 双拼 page and in ⋯'s 键盘: the on-screen keyboard 双拼 is typed on; the 14 keys
          * not under 微软 (ImKeyboards.choices): chosen before 微软 is, they give way to the 18 keys,
          * which are then stored (EngineBridge.configure). A hardware keyboard types the full one still.
          */
-        val shuangpinKeyboard = stringLike(SHUANGPIN_KEYBOARD, object : ManagedPreference.StringLikeCodec<ShuangpinKeyboard> {
-            override fun decode(raw: String) = ShuangpinKeyboard.entries.firstOrNull { it.name == raw }
-        }, ShuangpinKeyboard.Full)
+        val shuangpinKeyboard = stringLike(SHUANGPIN_KEYBOARD, ManagedPreference.enumCodec<ShuangpinKeyboard>(), ShuangpinKeyboard.Full)
 
         /** Shown on the English page and in ⋯'s 键盘: the 26 keys for everyone, upgrades too (I1 Q3), or the nine keys. */
-        val englishKeyboard = stringLike(ENGLISH_KEYBOARD, object : ManagedPreference.StringLikeCodec<EnglishKeyboard> {
-            override fun decode(raw: String) = EnglishKeyboard.entries.firstOrNull { it.name == raw }
-        }, EnglishKeyboard.Full)
+        val englishKeyboard = stringLike(ENGLISH_KEYBOARD, ManagedPreference.enumCodec<EnglishKeyboard>(), EnglishKeyboard.Full)
 
         /** Each input method's keyboard as set, for ImKeyboards to decide the layout from. */
         fun imKeyboards() = ImKeyboards.Chosen(pinyinKeyboard.getValue().keyboard, shuangpinKeyboard.getValue().keyboard, englishKeyboard.getValue().keyboard)
@@ -309,9 +299,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * pinyin is typed that filters its candidates (笔画筛选, InputMethodCatalog.filtersByStrokes),
          * or nothing. Off till chosen: a fast tap may glide. 0.5's two switches move over ([dropRetired]).
          */
-        val keyDrawing = stringLike(KEY_DRAWING, object : ManagedPreference.StringLikeCodec<KeyDrawing> {
-            override fun decode(raw: String) = KeyDrawing.entries.firstOrNull { it.name == raw }
-        }, KeyDrawing.Off)
+        val keyDrawing = stringLike(KEY_DRAWING, ManagedPreference.enumCodec<KeyDrawing>(), KeyDrawing.Off)
 
         /** Shown on the shared page too: every input method types a bracket or a quote. */
         val autoPairs = bool(AUTO_PAIRS, true)
@@ -328,9 +316,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val rememberAddresses = bool("address_remember", true)
 
         /** Shown on the handwriting page (InputMethodSettings): how long the pen stays up before a character is done. */
-        val handwritingPause = stringLike(HANDWRITING_PAUSE, object : ManagedPreference.StringLikeCodec<HandwritingPause> {
-            override fun decode(raw: String) = HandwritingPause.entries.firstOrNull { it.name == raw }
-        }, HandwritingPause.Medium)
+        val handwritingPause = stringLike(HANDWRITING_PAUSE, ManagedPreference.enumCodec<HandwritingPause>(), HandwritingPause.Medium)
         val showLangSwitchKey =
             switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
         val langSwitchKeyBehavior = hidden {

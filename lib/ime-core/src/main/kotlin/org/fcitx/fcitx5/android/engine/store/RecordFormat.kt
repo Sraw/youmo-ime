@@ -16,7 +16,7 @@ import java.util.zip.CRC32
  * A log of records, each appended as it happens: a header of [magic] and [version], then records
  * of a length, a type and its fields, and a CRC32 of type and fields. A record cut short (the app
  * killed while writing) or garbled fails its length or CRC; reading stops there, and what came
- * before stands.
+ * before stands (a log's reader may read past a garbled one: [read]).
  */
 class RecordFormat(magic: String, val version: Int) {
     private val magic = magic.toByteArray(Charsets.US_ASCII).also { require(it.size == MAGIC_SIZE) { "magic of four letters" } }
@@ -46,12 +46,27 @@ class RecordFormat(magic: String, val version: Int) {
      * [replay] (a count below zero), is skipped, and [skipped] hears why: its CRC held, so that
      * is a writer's bug rather than damage.
      *
+     * Given [garbled], a record whose CRC alone fails, of a length a record may have, with a whole
+     * record after it (some run of such records then one whole), is read past rather than read to:
+     * [garbled] hears where each starts and ends. One damaged byte mid-log must not lose all after
+     * it (user's decision B2, 0.6.1 audit engine-07). Without it (a backup, written whole and never
+     * merged in part) reading stops there.
+     *
      * @return the length of the records read whole: past it the log was cut short
      */
-    fun read(bytes: ByteArray, skipped: (Exception) -> Unit = {}, replay: (Byte, DataInputStream) -> Unit): Int {
+    fun read(
+        bytes: ByteArray,
+        skipped: (Exception) -> Unit = {},
+        garbled: ((start: Int, end: Int) -> Unit)? = null,
+        replay: (Byte, DataInputStream) -> Unit,
+    ): Int {
         require(hasHeader(bytes)) { "not a log of ${String(magic, Charsets.US_ASCII)} $version" }
         var at = HEADER_SIZE
         var length = wholeRecord(bytes, at)
+        while (length < 0 && garbled != null) {
+            at = pastGarbled(bytes, at, garbled) ?: break
+            length = wholeRecord(bytes, at)
+        }
         while (length > 0) {
             val input = DataInputStream(ByteArrayInputStream(bytes, at + 4, length))
             try {
@@ -65,8 +80,34 @@ class RecordFormat(magic: String, val version: Int) {
             }
             at += 4 + length + 4
             length = wholeRecord(bytes, at)
+            while (length < 0 && garbled != null) {
+                at = pastGarbled(bytes, at, garbled) ?: break
+                length = wholeRecord(bytes, at)
+            }
         }
         return at
+    }
+
+    /**
+     * Where the whole record after the garbled ones from [at] starts, each told to [garbled]; null
+     * if they are not followed by one: cut short or garbage, where reading stops.
+     */
+    private fun pastGarbled(bytes: ByteArray, at: Int, garbled: (Int, Int) -> Unit): Int? {
+        val ends = ArrayList<Int>()
+        var next = at
+        do {
+            if (bytes.size - next < 4) return null
+            val length = ByteBuffer.wrap(bytes).getInt(next)
+            if (length !in 1..MAX_RECORD || bytes.size - next - 4 < length + 4) return null
+            next += 4 + length + 4
+            ends += next
+        } while (wholeRecord(bytes, next) < 0)
+        var start = at
+        for (end in ends) {
+            garbled(start, end)
+            start = end
+        }
+        return next
     }
 
     /**

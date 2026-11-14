@@ -216,7 +216,11 @@ object QuickPhraseFiles {
 
     private const val NBSP = ' '
 
-    /** What a folder cannot be named: the page's shelves of entries in none, of all, and of those with no key. */
+    /**
+     * What a folder cannot be named: the page's shelves of entries in none, of all, and of those with no key,
+     * in every language the app has (`quick_phrase_unfiled`, `quick_phrase_all`, `quick_phrase_keyless_shelf`
+     * of its strings), not only the one shown: a file goes to a phone in another language as it is.
+     */
     val RESERVED_FOLDERS = setOf("全部", "未分类", "未分類", "All", "No folder", "待补关键词", "待補關鍵詞", "Need a key")
 
     /** Whether [name] is one of [RESERVED_FOLDERS], case aside (`all` too). */

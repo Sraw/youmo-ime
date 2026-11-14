@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.learn.Han
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.write
+import org.fcitx.fcitx5.android.engine.store.Unsaved
 import org.fcitx.fcitx5.android.engine.store.replaceFile
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.imports.WordText
@@ -29,6 +30,9 @@ import java.nio.charset.CodingErrorAction
 class WordLists(private val dir: UserFiles?, private val onError: (IOException) -> Unit = {}) {
     // the lists whose file did not read: what is in memory is not all of them, so not written over them
     private val unread = HashSet<String>()
+    // each list's lines this build does not read (a later build's, say), written back as they were: not lost
+    // to the next change (0.6.1 audit decode-9), as the learning record keeps a record it does not know
+    private val unknown = HashMap<String, List<String>>()
     private val added = read(ADDED)
     // an emoji blocked in its word's reading has as many syllables as that word, not as its code points (blockedEntry)
     private val blocked = read(BLOCKED) { line -> splitValues(line).takeIf { it.size == 2 || it.size == 3 && it[2].toFloatOrNull() != null }?.let { blockedEntry(it[0], it[1]) } }
@@ -68,6 +72,28 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
 
     fun unblockAll(entries: Collection<Entry>): List<Entry> = change(BLOCKED, blocked, entries) { blocked.remove(it) }
 
+    /**
+     * U-86 「全部清空」: both lists emptied, the lines this build does not read with them. Those are kept
+     * through a change so that it loses nothing (decode-9); a clear of everything means gone, or a later
+     * build's block would be back with that build (R25 F7821). A list whose file did not read is deleted
+     * unread, for the same: left, its words were back at the next start that reads it, the user told all
+     * was cleared (R25 F7961); one that cannot be deleted is told as not kept.
+     */
+    fun clear() {
+        for ((name, list) in listOf(ADDED to added, BLOCKED to blocked)) {
+            if (name in unread) {
+                // what was added since is in memory alone
+                list.clear()
+                val file = dir?.file(name)
+                if (file != null && file.taken() && !file.delete()) onError(Unsaved("$file did not read: not cleared")) else unread -= name
+            } else if (list.isNotEmpty() || name in unknown) {
+                list.clear()
+                unknown.remove(name)
+                write(name, list)
+            }
+        }
+    }
+
     private inline fun change(name: String, list: Set<Entry>, entries: Collection<Entry>, op: (Entry) -> Boolean) =
         entries.filter(op).also { if (it.isNotEmpty()) write(name, list) }
 
@@ -81,7 +107,10 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
         val file = dir?.file(name) ?: return LinkedHashSet()
         return try {
             if (!file.taken()) LinkedHashSet() else file.input().bufferedReader().useLines { lines ->
-                lines.mapNotNull(entry).toCollection(LinkedHashSet())
+                val kept = ArrayList<String>()
+                val entries = lines.mapNotNullTo(LinkedHashSet()) { line -> entry(line).also { if (it == null && line.isNotBlank()) kept += line } }
+                if (kept.isNotEmpty()) unknown[name] = kept
+                entries
             }
         } catch (e: IOException) {
             onError(e)
@@ -94,18 +123,19 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
         val dir = dir ?: return
         val file = dir.file(name)
         if (name in unread) {
-            onError(IOException("$file did not read: not written over"))
+            onError(Unsaved("$file did not read: not written over"))
             return
         }
         try {
             dir.mkdirs()
             // a whole list or the one before it, never half of one, nor an empty one after a power cut
             replaceFile(file, dir.file("$name.new")) { temp ->
-                temp.write(entries.joinToString("") { "${escapeValue(it.text)} ${it.apostrophed()}\n" }.toByteArray())
+                val lines = entries.map { "${escapeValue(it.text)} ${it.apostrophed()}" } + unknown[name].orEmpty()
+                temp.write(lines.joinToString("") { "$it\n" }.toByteArray())
             }
         } catch (e: IOException) {
             // kept in memory: what the user sees stays as they asked, till the next start
-            onError(e)
+            onError(Unsaved("$file not written", e))
         }
     }
 

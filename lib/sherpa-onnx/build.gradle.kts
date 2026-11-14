@@ -11,7 +11,7 @@
  * since 0.6.0; its models are the voice pack's).
  */
 plugins {
-    id("org.fcitx.fcitx5.android.lib-convention")
+    id("youmo.lib-convention")
 }
 
 android {
@@ -20,7 +20,7 @@ android {
 
     defaultConfig {
         ndk {
-            abiFilters += project.buildAbiOverride?.split(",") ?: Versions.supportedABIs
+            abiFilters += project.buildAbiOverride?.split(",") ?: Versions.defaultABIs
         }
         @Suppress("UnstableApiUsage")
         externalNativeBuild {

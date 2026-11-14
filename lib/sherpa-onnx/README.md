@@ -19,8 +19,10 @@ upstream's AAR, so that it is ours to change.
 
 ## What we changed
 
-Each change is made to both recognizers, the offline (`OfflineRecognizer`) and the streaming one
-(`OnlineRecognizer`, 0.6.0's), unless it says otherwise.
+The app uses only the streaming recognizer (`OnlineRecognizer`, 0.6.0's). The offline one is kept in
+`csrc/` only for `host-eval.sh`'s `sherpa-onnx-offline` (voice-eval); its JNI and Kotlin API, and the
+wave reader's, are gone (0.6.1, "What we removed"), so the JNI library does not link it. A change
+need only be made to the streaming recognizer; the changes below that predate 0.6.1 are in both.
 
 - **Blocked phrases:** `CreateStream(hotwords, blocked)` (Kotlin `createStream(hotwords, blocked)`):
   a transducer's modified beam search does not let a hypothesis complete any of them
@@ -54,6 +56,12 @@ Each change is made to both recognizers, the offline (`OfflineRecognizer`) and t
   cannot be mapped throws, and `OnlineRecognizer_newFromFile` (under `SafeJNI`) hands Java a
   `RuntimeException`, which voice input catches (it says it cannot load), where `SHERPA_ONNX_EXIT`
   ended the keyboard's process.
+- **Errors throw:** `SHERPA_ONNX_EXIT` (`csrc/macros.h`) throws `std::runtime_error` rather than
+  calling `_Exit`, so every other check on the load path (a metadata key missing, a `tokens.txt` line
+  that is not `token id`, silero's checks) is a `RuntimeException` too: the JNI entry points that
+  make a model (`OnlineRecognizer_newFromFile`, `Vad_newFromFile`) and those that run one are under
+  `SafeJNI`. A host tool's `main` ends on it uncaught, as it ended before. In a `noexcept` function
+  it would still end the process (`std::terminate`), as `_Exit` did.
 
 Each change is marked `youmo` in the source, except the deletions under "What we removed". Their C++ unit tests run on this machine with
 `lib/sherpa-onnx/host-test.sh`; the app's `VoiceEngineTest` covers them through the JNI.

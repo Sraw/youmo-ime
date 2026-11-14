@@ -169,15 +169,15 @@
 
 ### ST-56 [P2] 主题制作网页：和内置主题同名的不让保存
 - **不在 0.5.x 跑**：主题制作网页 0.6.0 起提供（0.5.x 的 App 和用户文档不链到它）；只在电脑浏览器上手工跑。
-- **前提**：电脑浏览器打开 `web/theme-maker/index.html`，从一个内置主题新建（新建出来的名字是 `<内置主题>-mine`，不和内置主题同名）。
-- **操作**：打开 **信息** 页，看 **名称** 旁的说明；把名称改成 `MaterialDark`，点 **文件 › 保存 .theme**；再把名称改成 `MaterialDark-mine`，再保存。
-- **预期**：名称旁写「也是文件名；和 App 内置主题同名的 App 不收；和自己导入过的同名会覆盖它」；名为 `MaterialDark` 时「问题」里有错误「主题名 "MaterialDark" 是 App 内置主题的名字，App 不会收；换一个名字」，不能保存、不下载文件；改名后照常保存下载 `MaterialDark-mine.theme`。
-- **JVM**：没有；保存前的检查由 `web/theme-maker/test/names-and-files.test.mjs`（`node --test`）查，这一条在电脑浏览器上手工跑。
+- **前提**：电脑浏览器打开 `web/theme-maker/build/index.html`（`./gradlew :lib:keyboard-scene:youmoEngine` 后跑 `node web/theme-maker/tools/assemble.mjs --engine` 组装出来，或用 Pages 站点上的制作页），从一个内置主题新建（新建出来的名字是 `<内置主题>-mine`，不和内置主题同名）。
+- **操作**：打开 **信息** 页，看 **名称** 旁的说明；把名称改成 `MaterialDark`，点 **文件 › 保存 .theme**；再改成 `奶油`（App 内置的主题包），再保存；再把名称改成 `MaterialDark-mine`，再保存。最后从有深浅两版的内置主题（如 Material）新建一个，名称改成 `奶油`，保存。
+- **预期**：名称旁写「也是文件名；和 App 内置主题同名的 App 不收；和自己导入过的同名会覆盖它」；名为 `MaterialDark` 时「问题」里有错误「主题名 "MaterialDark" 是 App 内置主题的名字，App 不会收；换一个名字」，不能保存、不下载文件；名为 `奶油` 时（单版和两版的都一样）同样报错、不下载；改名成 `MaterialDark-mine` 后照常保存下载 `MaterialDark-mine.theme`。
+- **JVM**：没有；保存前的检查由 `web/theme-maker/test/names-and-files.test.mjs`（`node --test`）查，页面拿到的内置名字（含内置主题包的名字）和 App 的一致由 `ThemeMakerFormatTest.thePagesFormatIsTheApps` 查，这一条在电脑浏览器上手工跑。
 
 ### ST-76 [P2] 主题制作网页：特效图片太大、theme.xml 太大不让保存
 - **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
 - **前提**：一个从制作页保存的 `.theme`，解开后在 `theme.xml` 里让一个按键特效的图片指向放进包里的一张 300×300 的 PNG，重新打包（`theme.xml` 在 zip 顶层）；再做一个 `theme.xml` 超过 1 MB 的（例如加一大段注释）。
-- **操作**：电脑浏览器打开 `web/theme-maker/index.html`，打开第一个文件，点 **文件 › 保存 .theme**；再打开第二个，保存。
+- **操作**：电脑浏览器打开 `web/theme-maker/build/index.html`（`./gradlew :lib:keyboard-scene:youmoEngine` 后跑 `node web/theme-maker/tools/assemble.mjs --engine` 组装出来，或用 Pages 站点上的制作页），打开第一个文件，点 **文件 › 保存 .theme**；再打开第二个，保存。
 - **预期**：第一个「问题」里有错误「<图片名> 太大：300×300，特效图片最多 256」，第二个有「theme.xml 有 <字节数> 字节，App 最多收 <上限> 字节」；都不能保存、不下载文件（App 导入也会拒收它们）。
 - **JVM**：没有；规则由 `web/theme-maker/test/names-and-files.test.mjs`（`node --test`）查，这一条在电脑浏览器上手工跑。
 
@@ -215,9 +215,9 @@
 
 ### ST-17 [P1] 空格长按切输入法
 - **前提**：B0-设置，**空格键长按行为** 选"轮换输入法"。
-- **操作**：回测试页长按空格。
-- **预期**：切到英文（空格键上的名字变了）。
-- **JVM**：`SettingsEffectUatTest.holdingTheSpaceGoesToTheNextInputMethod`（轮换输入法时长按空格让引擎换到下一个输入法）；设备上不跑。
+- **操作**：回测试页长按空格。再到 **输入法** 里只留英文一个，回测试页长按空格。
+- **预期**：切到英文（空格键上的名字变了）。只启用了一个输入法时不切换，弹出「您想添加更多输入法吗？」，和点语言键一样。
+- **JVM**：`SettingsEffectUatTest.holdingTheSpaceGoesToTheNextInputMethod`（轮换输入法时长按空格让引擎换到下一个输入法）、`SpaceLongPressNextImTest.holdingTheSpaceWithOneInputMethodAsksToAddMore`（只启用英文时长按空格弹出添加输入法的对话框，不调 `enumerateIme`）；设备上不跑。
 
 ### ST-18 [P1] 关掉空格滑动移光标
 - **前提**：B0-设置，关掉 **划动空格键以移动光标**；点「长文本」框，光标在末尾。
@@ -377,15 +377,15 @@
 ### ST-80 [P2] 主题制作网页：viewBox 原点不在 0 的 SVG 图标画在键中间
 - **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
 - **前提**：一个 SVG 图标，`viewBox="0 -960 960 960"`（Material Symbols 的写法）。
-- **操作**：电脑浏览器打开 `web/theme-maker/index.html`，给一个按键用这个图标，看预览；保存 `.theme` 导入 App 并选用，看同一个键。
+- **操作**：电脑浏览器打开 `web/theme-maker/build/index.html`（`./gradlew :lib:keyboard-scene:youmoEngine` 后跑 `node web/theme-maker/tools/assemble.mjs --engine` 组装出来，或用 Pages 站点上的制作页），给一个按键用这个图标，看预览；保存 `.theme` 导入 App 并选用，看同一个键。
 - **预期**：预览里图标画在键的中间，不偏上一整个键；和导入 App 后看到的一样。
 - **JVM**：没有；画法由 lib/keyboard-scene 的 `CanvasPainterTest.anIconsViewBoxOriginIsMovedToTheCorner`（jsTest）查，这一条在电脑浏览器上手工跑。
 
 ### ST-81 [P2] 主题制作网页：关掉再打开恢复草稿；两个标签页交替改，重开恢复最后改的那个（图不串）
 - **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
-- **前提**：电脑浏览器（Chrome 或 Firefox）从本机服务器打开制作页（`web/theme-maker` 里 `python3 -m http.server`，开 `http://localhost:8000/index.html`；各标签页的草稿写入在这里一次一个），没有旧草稿（有就在询问里点 **丢弃草稿**）。
+- **前提**：电脑浏览器（Chrome 或 Firefox）从本机服务器打开制作页（`web/theme-maker` 里 `python3 -m http.server`，开 `http://localhost:8000/build/index.html`，页面先照上面组装好；各标签页的草稿写入在这里一次一个），没有旧草稿（有就在询问里点 **丢弃草稿**）。
 - **操作**：在「信息」里把名称改成 `tab1`，改一个颜色，换一张背景图，关掉标签页再打开，询问「上次的草稿…还在，恢复吗？」点 **恢复**；再开第二个标签页，询问里也点 **恢复**，在「信息」里把名称改成 `tab2`，换另一张图；回第一个标签页，在「信息」里把名称改成 `tab1b`；关掉两个标签页再打开，看询问里的主题名，点 **恢复**。
-- **预期**：第一次重开恢复的是 `tab1`、改后的颜色和那张图；最后重开的询问和恢复的都是 `tab1b`，背景图是第一个标签页的那张，不是第二个标签页的图，也不是空白。再用文件直接打开（`file://…/index.html`，浏览器可能不给锁，草稿照常写）把同样的步骤走一遍，结果相同。
+- **预期**：第一次重开恢复的是 `tab1`、改后的颜色和那张图；最后重开的询问和恢复的都是 `tab1b`，背景图是第一个标签页的那张，不是第二个标签页的图，也不是空白。再用文件直接打开（`file://…/build/index.html`，浏览器可能不给锁，草稿照常写）把同样的步骤走一遍，结果相同。
 - **JVM**：没有；存取规则由 web/theme-maker 的 `names-and-files.test.mjs`（草稿按 id 分记录、两个标签页交错写、写到一半中断、旧版草稿）查，这一条在电脑浏览器上手工跑。
 
 ### ST-86 [P1] 主题带按键音：导入时提示，各类键放各自的声音
@@ -426,7 +426,7 @@
 
 ### ST-92 [P2] 主题制作网页：换的图标画在预览上；按键音标签选文件、试听、提示
 - **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
-- **前提**：电脑浏览器（Chrome，另用 Safari 看一遍 Ogg）打开 `web/theme-maker/index.html`，从 Nord 开始；`uat/fixtures/theme-sounds-icons/` 里的文件。
+- **前提**：电脑浏览器（Chrome，另用 Safari 看一遍 Ogg）打开 `web/theme-maker/build/index.html`（`./gradlew :lib:keyboard-scene:youmoEngine` 后跑 `node web/theme-maker/tools/assemble.mjs --engine` 组装出来，或用 Pages 站点上的制作页），从 Nord 开始；`uat/fixtures/theme-sounds-icons/` 里的文件。
 - **操作**：**字和图标 → 换图标** 给 backspace 选 `backspace.svg`、enter 选 `enter.svg`、shift 选 `shift.svg`，看预览；再给 backspace 选 `bad/no-fill.svg`。**按键音** 标签里五行分别选 `letter.wav`、`function.wav`、`space.ogg`、`enter.ogg`、`backspace.mp3`，逐个点 **试听**；再给字母键选 `bad/big.wav`、`bad/deep.wav`、`bad/junk-tail.mp3`；把 **源码** 里一个 `<sound>` 的文件名改成包里没有的，点保存；改回来，点 **去掉** 去掉全部五个，看源码。
 - **预期**：预览里退格、回车、Shift 换成选的 SVG：退格在键中间，宽的回车等比居中，Shift 下面的一横是橙色；`no-fill.svg` 放不进去并说原因。五个声音都放得进去，每行显示格式、时长、声道、采样率和大小（如「…，44100 Hz，12 KB」），试听都响（Safari 放不了 Ogg 时提示「这个浏览器放不了，App 里能放」）；选了 MP3 不弹提示，那一行下面出现灰字说明开头约 25 ms 空白、建议 WAV 或 Ogg。三个坏文件放不进去，各给出原因（提示以文件名开头）；缺文件时保存被拦下。全部去掉后源码里没有 `<sounds>`，包里也没有这些文件。
 - **JVM**：没有；规则由 web/theme-maker 的 `form.test.mjs`、`maker.test.mjs`、`engine.test.mjs`、`panels-smoke.mjs` 查，这一条在电脑浏览器上手工跑。
@@ -639,3 +639,15 @@
 - **预期**：长按只弹符号（没有手指下那一行，也没有 Q W 1 q w）；点 QW 仍打这一组：wo 出「我」。
 - **JVM**：`PopupOverridesFragmentTest$Row.anEmptiedListIsOffItsRowGoneToo`（删光后没有那一行）；点按设备上跑。
 
+### ST-115 [P1] 主题包的布局读得出、摆不下：画 App 自带的那个键盘，照常打字
+- **前提**：B0-设置；**输入法 → 拼音** 的 **键盘** 选「14 键」。导入一个主题包，`layouts/k14.xml` 读得出、键也齐，但有一行的键宽加起来超过 100（比如自带 14 键里键最多的那一行，每个键的宽都改成 30）。
+- **操作**：在主题列表里点这个主题；回测试页看键盘，点 b n 所在的键（打 ni）看候选。
+- **预期**：键盘不是空白：画的是 App 自带的 14 键（不是包里那个），点按照自带的分组打，ni 出「你」一类候选，和内置主题一样。
+- **JVM**：`PackLayoutRefusedTest.aLayoutTheEngineRefusesDrawsTheAppsOwnOfItsId`（引擎摆放时拒绝的布局换成自带的同名布局画出来）、`PackLayoutRefusedTest.theAppsOwnLayoutDrawnInsteadIsTypedAsTheBuiltInGroups`（换上的自带 14 键按内置分组打字，被拒布局的分组不告诉引擎）、`PackLayoutRefusedTest.aLayoutRefusedIsNotMadeAgainAsWhatTheKeysShowChanges`（拒过的布局按布局和摆放它的环境记住：尺寸、输入框、输入法、Shift 这些，键上显示的东西变了也不再摆一次、不再记日志）、`PackLayoutRefusedTest.aRefusalInUseIsKeptThroughManyOthersAndLoggedOnce`（拒过的按最近用到的留 64 条，别的环境再多，在用的那个也不被挤掉：不再摆一次、不再记日志）、`PackLayoutRefusedTest.aLayoutRefusedInOneStateIsDrawnInAnotherAtTheSameSize`（在一种状态下拒过，同样尺寸的另一种状态照样画包里的布局）、`PackLayoutRefusedTest.theKeysTypedOnBeforeTheLayoutDrawnChangedSendTheDrawnLayoutsCodes`（打过字以后换成自带的布局画，或反过来，每个键都发画出来的那个布局的码，不留着上一个布局的）、`PackLayoutRefusedTest.aZhuyinKeyWhoseFaceChangedSendsTheSymbolItShows`（同一个根因在注音键上：包里的 `<variant>` 改了键面的注音键，发出的是键上显示的那个符号，不是上一个键面的）；导入时就读不出的布局见 ST-72；设备上不跑。
+
+### ST-116 [P2] 主题制作网页：只有深色版的主题勾「这个主题有浅色版」
+- **不在 0.5.x 跑**：只在电脑浏览器上手工跑。
+- **前提**：电脑浏览器打开 `web/theme-maker/build/index.html`（做法同 ST-56）；一张浅色图片（大半是白的就行）。只有深色版的主题从网页的内置主题新建：App 里长按内置主题没有反应、导不出来（ST-35）。
+- **操作**：**文件 › 新建…**，在「从内置主题开始」里点 **Monokai**（只有深色版，App 里叫「墨灰」）；进 **背景**，**选图片…** 选那张浅色图片；进 **配色**，看开关的名字；顶栏切到浅色，点 **从背景图取色**，看预览里按键和字的颜色；顶栏切到深色，再点一次，再看；然后勾上 **这个主题有浅色版**；顶栏切到浅色，改一个颜色；**文件 › 保存 .theme**；把保存的文件导入 App（**外观 → 主题 → 新增主题 → 导入主题文件**），系统深浅色各看一次。
+- **预期**：开关写的是「这个主题有浅色版」（不是「这个主题有深色版」）；两次 **从背景图取色** 写的都是深色配色（深色的键、浅色的字），不因顶栏在浅色、图片是浅色就写成浅色配色（只有深色版的主题，那一份颜色就是 App 深色时用的）；勾上后页面不报错，浅色版先用和深色版同样的颜色（开关这时照常写「这个主题有深色版」并勾着），改的那一个只改浅色版；保存的 `theme.xml` 里有深浅两版；App 收下它，系统浅色时用浅色版（改过的那个颜色），深色时是从背景图取的深色配色。
+- **JVM**：没有；深浅两版的读写和只有深色版时从背景图取色写深色配色由 web/theme-maker 的 `form.test.mjs`（`F.withDark`、`a dark-only theme: its colours shown and set in its one block, its switch adds a light version, never drops the dark`）查，开关的样子和按钮在页面上的效果没有自动测试，这一条在电脑浏览器上手工跑。

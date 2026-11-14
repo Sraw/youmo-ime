@@ -1,6 +1,6 @@
 // The maker's names and files as theme.xml has them: a theme's name with XML's special characters, a value with
 // '>' in it, which files are still named, the effect images the app checks, the draft's files written once.
-// contract: the page's youmo-format block (index.html) and the app's ThemeAssetLimits / built-in names it is held to.
+// contract: the page's youmo-format block (generated/youmo-format.json) and the app's ThemeAssetLimits / built-in names it is held to.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { blockOf, ENGINE } from '../tools/assemble.mjs';
+import { ENGINE, generated } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = join(here, '..', 'src');
@@ -21,7 +21,7 @@ const M = globalThis.YoumoMaker;
 const P = Object.fromEntries(globalThis.YoumoPanels.map((p) => [p.id, p]));
 globalThis.Path2D = class { constructor(d) { this.d = d; } };
 const E = createRequire(import.meta.url)(ENGINE).YoumoEngine;
-const FORMAT = JSON.parse(blockOf(readFileSync(join(here, '..', 'index.html'), 'utf8'), 'youmo-format'));
+const FORMAT = JSON.parse(generated('youmo-format'));
 
 function pngHeader(w, h, length = 33) {
   const b = new Uint8Array(length);
@@ -53,6 +53,20 @@ test('a theme name with &, < and quotes is written escaped and read back as type
   const inside = M.withName('<theme xmlns="https://youmo-ime/theme/4" author="x name=y" name="old" version="4.0"></theme>', 'new');
   assert.ok(inside.includes('author="x name=y"'), inside);
   assert.equal(M.themeName(inside), 'new');
+});
+
+// R25 web-8: the two places that wrote into the <theme> tag by a regex of their own
+test('an element put first in <theme> goes after its tag, past a ">" in a quoted name; a name with $ patterns is put in as it is', () => {
+  const xml = '<theme xmlns="https://youmo-ime/theme/4" name="a>b" variants="light" version="4.0">\n  <colors>\n  </colors>\n</theme>\n';
+  const out = F.setMeta(xml, 'author', 'me');
+  assert.ok(out.startsWith('<theme xmlns="https://youmo-ime/theme/4" name="a>b" variants="light" version="4.0">\n  <meta author="me"/>'), out);
+  assert.equal(M.themeName(out), 'a>b');
+  const odd = "A$&B$'C$$D$`E";
+  const named = M.withName('<theme xmlns="https://youmo-ime/theme/4" variants="light" version="4.0"></theme>', odd);
+  assert.equal(M.themeName(named), odd, named);
+  assert.equal((named.match(/<theme\b/g) || []).length, 1, named);
+  // the maker's helpers are the form's: one set
+  assert.equal(M.themeName('<theme name="x&amp;y"/>'), 'x&y');
 });
 
 test('a value with ">" in it is written escaped, and an element is not cut at a ">" inside quotes', () => {
@@ -104,11 +118,20 @@ test('save refuses what the app refuses: an effect image, a theme.xml past its s
     [M.doc(withEffect('ripple-image(effect-a.png, 100%, 300ms)'), { 'effect-a.png': pngHeader(1000, 1000) }), /effect-a/, true, 'within a key image\'s 1024 px but past an effect\'s: the effect\'s limit'],
     [M.doc(big), /theme\.xml/, true, 'a theme.xml past the app\'s 1 MB in bytes (UTF-8), within the engine\'s characters'],
     [M.doc(M.withName(base, 'MaterialLight')), /内置/, true, 'named as a built-in theme: the app would take it for its own'],
+    // R25 web-1: the built-in packs' names (ThemeManager.BuiltinPackNames), the second of the app's two rules
+    [M.doc(M.withName(base, '简蓝')), /内置/, true, 'named as a built-in pack (the docs: export 简蓝, edit it here)'],
+    [M.doc(M.withName(base, '液态玻璃')), /内置/, true, 'another built-in pack'],
+    [M.doc(M.withName(base, '简蓝-mine')), /内置/, false, 'a name of the user\'s own'],
   ];
   for (const [d, what, bad, why] of rows) {
     const out = M.saveProblems(E, L, FORMAT, d);
     assert.equal(out.some((p) => p.level === 'error' && what.test(p.message)), bad, why + ': ' + JSON.stringify(out).slice(0, 300));
   }
+  // the app looks a two-version pack up by name#light / name#dark too (ThemePackFiles.builtinClash): so does the page
+  assert.equal(base.match(/variants="([^"]*)"/)[1], 'light dark');
+  const refOnly = { ...FORMAT, builtinNames: ['x#dark'] };
+  assert.ok(M.saveProblems(E, L, refOnly, M.doc(M.withName(base, 'x'))).some((p) => /内置/.test(p.message)), 'a version\'s ref clashing');
+  assert.ok(!M.saveProblems(E, L, refOnly, M.doc(M.withName(base, 'y'))).some((p) => /内置/.test(p.message)), 'another name');
   // an effect's image is not a key image the preview decodes
   const d = M.doc(withEffect('ripple-image(effect-a.png, 100%, 300ms)'), { 'effect-a.png': pngHeader(64, 64) });
   assert.deepEqual(M.decodableImages(L, FORMAT, d), []);

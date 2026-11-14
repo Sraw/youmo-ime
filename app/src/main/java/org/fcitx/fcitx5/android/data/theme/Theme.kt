@@ -4,10 +4,13 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import android.os.Parcel
 import android.os.Parcelable
 import kotlinx.parcelize.IgnoredOnParcel
+import kotlinx.parcelize.Parceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.TypeParceler
+import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.scene.look.Palette
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
@@ -19,36 +22,30 @@ sealed class Theme : Parcelable {
     abstract val name: String
     abstract val isDark: Boolean
 
-    abstract val backgroundColor: Int
-    abstract val barColor: Int
-    abstract val keyboardColor: Int
+    /** Its colours: a custom theme's [look]'s, a built-in one's version's colour table, a pack's what its file says. */
+    abstract val palette: Palette
 
-    abstract val keyBackgroundColor: Int
-    abstract val keyTextColor: Int
-
-    //  Color of candidate text
-    abstract val candidateTextColor: Int
-    abstract val candidateLabelColor: Int
-    abstract val candidateCommentColor: Int
-
-    abstract val altKeyBackgroundColor: Int
-    abstract val altKeyTextColor: Int
-
-    abstract val accentKeyBackgroundColor: Int
-    abstract val accentKeyTextColor: Int
-
-    abstract val keyPressHighlightColor: Int
-    abstract val keyShadowColor: Int
-
-    abstract val popupBackgroundColor: Int
-    abstract val popupTextColor: Int
-
-    abstract val spaceBarColor: Int
-    abstract val dividerColor: Int
-    abstract val clipboardEntryColor: Int
-
-    abstract val genericActiveBackgroundColor: Int
-    abstract val genericActiveForegroundColor: Int
+    val backgroundColor: Int get() = palette.backgroundColor
+    val barColor: Int get() = palette.barColor
+    val keyboardColor: Int get() = palette.keyboardColor
+    val keyBackgroundColor: Int get() = palette.keyBackgroundColor
+    val keyTextColor: Int get() = palette.keyTextColor
+    val candidateTextColor: Int get() = palette.candidateTextColor
+    val candidateLabelColor: Int get() = palette.candidateLabelColor
+    val candidateCommentColor: Int get() = palette.candidateCommentColor
+    val altKeyBackgroundColor: Int get() = palette.altKeyBackgroundColor
+    val altKeyTextColor: Int get() = palette.altKeyTextColor
+    val accentKeyBackgroundColor: Int get() = palette.accentKeyBackgroundColor
+    val accentKeyTextColor: Int get() = palette.accentKeyTextColor
+    val keyPressHighlightColor: Int get() = palette.keyPressHighlightColor
+    val keyShadowColor: Int get() = palette.keyShadowColor
+    val popupBackgroundColor: Int get() = palette.popupBackgroundColor
+    val popupTextColor: Int get() = palette.popupTextColor
+    val spaceBarColor: Int get() = palette.spaceBarColor
+    val dividerColor: Int get() = palette.dividerColor
+    val clipboardEntryColor: Int get() = palette.clipboardEntryColor
+    val genericActiveBackgroundColor: Int get() = palette.genericActiveBackgroundColor
+    val genericActiveForegroundColor: Int get() = palette.genericActiveForegroundColor
 
     /**
      * All the theme draws with: a custom theme's own, a built-in one's its colours with [LookDefaults]; a pack's
@@ -77,27 +74,7 @@ sealed class Theme : Parcelable {
         override val isDark: Boolean,
         override val look: ThemeLook,
     ) : Theme() {
-        override val backgroundColor get() = look.palette.backgroundColor
-        override val barColor get() = look.palette.barColor
-        override val keyboardColor get() = look.palette.keyboardColor
-        override val keyBackgroundColor get() = look.palette.keyBackgroundColor
-        override val keyTextColor get() = look.palette.keyTextColor
-        override val candidateTextColor get() = look.palette.candidateTextColor
-        override val candidateLabelColor get() = look.palette.candidateLabelColor
-        override val candidateCommentColor get() = look.palette.candidateCommentColor
-        override val altKeyBackgroundColor get() = look.palette.altKeyBackgroundColor
-        override val altKeyTextColor get() = look.palette.altKeyTextColor
-        override val accentKeyBackgroundColor get() = look.palette.accentKeyBackgroundColor
-        override val accentKeyTextColor get() = look.palette.accentKeyTextColor
-        override val keyPressHighlightColor get() = look.palette.keyPressHighlightColor
-        override val keyShadowColor get() = look.palette.keyShadowColor
-        override val popupBackgroundColor get() = look.palette.popupBackgroundColor
-        override val popupTextColor get() = look.palette.popupTextColor
-        override val spaceBarColor get() = look.palette.spaceBarColor
-        override val dividerColor get() = look.palette.dividerColor
-        override val clipboardEntryColor get() = look.palette.clipboardEntryColor
-        override val genericActiveBackgroundColor get() = look.palette.genericActiveBackgroundColor
-        override val genericActiveForegroundColor get() = look.palette.genericActiveForegroundColor
+        override val palette: Palette get() = look.palette
     }
 
     /**
@@ -108,50 +85,19 @@ sealed class Theme : Parcelable {
      * the system's, read again when they change; its keys may keep the key style of before 3.0 (ThemeLookMigration).
      */
     @Parcelize
+    @TypeParceler<Palette, PaletteParceler>
     data class Builtin(
         override val name: String,
         override val isDark: Boolean,
         /** Its file's theme: the versions of one file are one card in the list. */
         override val file: String,
         val followsSystem: Boolean,
-        override val backgroundColor: Int,
-        override val barColor: Int,
-        override val keyboardColor: Int,
-        override val keyBackgroundColor: Int,
-        override val keyTextColor: Int,
-        override val candidateTextColor: Int,
-        override val candidateLabelColor: Int,
-        override val candidateCommentColor: Int,
-        override val altKeyBackgroundColor: Int,
-        override val altKeyTextColor: Int,
-        override val accentKeyBackgroundColor: Int,
-        override val accentKeyTextColor: Int,
-        override val keyPressHighlightColor: Int,
-        override val keyShadowColor: Int,
-        override val popupBackgroundColor: Int,
-        override val popupTextColor: Int,
-        override val spaceBarColor: Int,
-        override val dividerColor: Int,
-        override val clipboardEntryColor: Int,
-        override val genericActiveBackgroundColor: Int,
-        override val genericActiveForegroundColor: Int,
-        val keyBorderColor: Int,
-        val keyHintColor: Int,
-        val toolbarIconColor: Int,
+        override val palette: Palette,
     ) : Theme(), Versioned {
-
-        /** Its colours as [ThemeLook] holds them. */
-        fun palette() = Palette(
-            backgroundColor, barColor, keyboardColor, keyBackgroundColor, keyTextColor, candidateTextColor,
-            candidateLabelColor, candidateCommentColor, altKeyBackgroundColor, altKeyTextColor,
-            accentKeyBackgroundColor, accentKeyTextColor, keyPressHighlightColor, keyShadowColor,
-            popupBackgroundColor, popupTextColor, spaceBarColor, dividerColor, clipboardEntryColor,
-            genericActiveBackgroundColor, genericActiveForegroundColor, keyBorderColor, keyHintColor, toolbarIconColor,
-        )
 
         @IgnoredOnParcel
         override val look: ThemeLook by lazy {
-            LookDefaults.look(palette()).let { if (followsSystem) ThemeLookMigration.monetLook?.applyTo(it) ?: it else it }
+            LookDefaults.look(palette).let { if (followsSystem) ThemeLookMigration.monetLook?.applyTo(it) ?: it else it }
         }
 
         /** Monet's look as it is now, fixed, as a theme of the user's: exported, it no longer follows the wallpaper. */
@@ -169,10 +115,12 @@ sealed class Theme : Parcelable {
                 fun c(n: String) = theme.colors.getValue(n).value
                 return Builtin(
                     name, theme.dark, theme.name, followsSystem,
-                    c("background"), c("bar"), c("keyboard"), c("key"), c("keyText"), c("candidateText"), c("candidateLabel"),
-                    c("candidateComment"), c("altKey"), c("altKeyText"), c("accentKey"), c("accentKeyText"), c("keyPressHighlight"),
-                    c("keyShadow"), c("popupBackground"), c("popupText"), c("spaceBar"), c("divider"), c("clipboardEntry"),
-                    c("genericActiveBackground"), c("genericActiveForeground"), c("keyBorder"), c("keyHint"), c("toolbarIcon"),
+                    Palette(
+                        c("background"), c("bar"), c("keyboard"), c("key"), c("keyText"), c("candidateText"), c("candidateLabel"),
+                        c("candidateComment"), c("altKey"), c("altKeyText"), c("accentKey"), c("accentKeyText"), c("keyPressHighlight"),
+                        c("keyShadow"), c("popupBackground"), c("popupText"), c("spaceBar"), c("divider"), c("clipboardEntry"),
+                        c("genericActiveBackground"), c("genericActiveForeground"), c("keyBorder"), c("keyHint"), c("toolbarIcon"),
+                    ),
                 )
             }
         }
@@ -207,34 +155,19 @@ sealed class Theme : Parcelable {
         val drawn: SceneTheme by lazy { ThemePackFiles.drawn(scene, dir) }
 
         @IgnoredOnParcel
-        private val palette: Palette by lazy { ThemePackFiles.palette(scene) }
+        override val palette: Palette by lazy { ThemePackFiles.palette(scene) }
 
         @IgnoredOnParcel
         override val look: ThemeLook by lazy { ThemePackFiles.look(scene, palette, dir) }
 
         /** The file of it a theme 4 names [name] (by its name in the pack's folder). */
         fun path(name: String): String = File(dir, name).path
-
-        override val backgroundColor get() = palette.backgroundColor
-        override val barColor get() = palette.barColor
-        override val keyboardColor get() = palette.keyboardColor
-        override val keyBackgroundColor get() = palette.keyBackgroundColor
-        override val keyTextColor get() = palette.keyTextColor
-        override val candidateTextColor get() = palette.candidateTextColor
-        override val candidateLabelColor get() = palette.candidateLabelColor
-        override val candidateCommentColor get() = palette.candidateCommentColor
-        override val altKeyBackgroundColor get() = palette.altKeyBackgroundColor
-        override val altKeyTextColor get() = palette.altKeyTextColor
-        override val accentKeyBackgroundColor get() = palette.accentKeyBackgroundColor
-        override val accentKeyTextColor get() = palette.accentKeyTextColor
-        override val keyPressHighlightColor get() = palette.keyPressHighlightColor
-        override val keyShadowColor get() = palette.keyShadowColor
-        override val popupBackgroundColor get() = palette.popupBackgroundColor
-        override val popupTextColor get() = palette.popupTextColor
-        override val spaceBarColor get() = palette.spaceBarColor
-        override val dividerColor get() = palette.dividerColor
-        override val clipboardEntryColor get() = palette.clipboardEntryColor
-        override val genericActiveBackgroundColor get() = palette.genericActiveBackgroundColor
-        override val genericActiveForegroundColor get() = palette.genericActiveForegroundColor
     }
+}
+
+/** A built-in theme's [Palette] in a parcel, by name ([PaletteJson]) as a theme file holds it. */
+internal object PaletteParceler : Parceler<Palette> {
+    override fun create(parcel: Parcel): Palette = Json.decodeFromString(PaletteJson.serializer(), parcel.readString()!!).toPalette()
+
+    override fun Palette.write(parcel: Parcel, flags: Int) = parcel.writeString(Json.encodeToString(PaletteJson.serializer(), PaletteJson.of(this)))
 }

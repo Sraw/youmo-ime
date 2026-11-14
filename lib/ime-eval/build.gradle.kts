@@ -52,31 +52,24 @@ val uatTestSources = sourceSets.create("uatTest") {
 configurations["uatTestImplementation"].extendsFrom(configurations.implementation.get())
 configurations["uatTestRuntimeOnly"].extendsFrom(configurations.runtimeOnly.get())
 
-// the app's engine data, as its assets have them: each task with its output directory (engine/ inside),
-// one pair a line so a task cannot be added without its directory
-val appDataOutputs = listOf(
-    "compileEngineData" to "engine-assets",
-    "compileEnglishData" to "engine-english",
-    "compileEmojiData" to "engine-emoji",
-    "compileChaiziData" to "engine-chaizi",
-    "compileCharInfo" to "engine-charinfo",
-    "compileEngineTables" to "engine-tables",
-    "copySentenceModels" to "engine-models",
-    "compileOpenccData" to "engine-opencc",
-)
-val appDataTasks = appDataOutputs.map { it.first }
-val appDataDirs = appDataOutputs.map { rootProject.layout.projectDirectory.dir("app/build/generated/${it.second}") }
+// the app's engine data, as its assets have them: the directories EngineDataPlugin's tasks make (engine/ inside),
+// which it publishes as :app's engineData configuration; depending on it builds them
+val appData = configurations.resolvable("appEngineData")
+val appDataScope = configurations.dependencyScope("appEngineDataScope")
+appData.configure { extendsFrom(appDataScope.get()) }
+dependencies { add(appDataScope.name, project(mapOf("path" to ":app", "configuration" to "engineData"))) }
 
 // what a run over the app's data reads: the data, the punctuation table, pkgdata, strings, the
-// fixtures; uatTest's and parityReplay's
+// fixtures; uatTest's
 fun <T> T.appData() where T : Task, T : JavaForkOptions {
-    dependsOn(appDataTasks.map { ":app:$it" })
-    appDataDirs.forEach { inputs.dir(it).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("data-${it.asFile.name}") }
+    val data = appData.get()
+    inputs.files(data).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("data")
     // the punctuation table the app ships, for the host replay's punctuation module
     val punctuation = rootProject.layout.projectDirectory.file("app/src/main/host-assets/pkgdata/punctuation/punc.mb.zh_CN")
     inputs.file(punctuation).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("punctuation")
     systemProperty("uat.punctuation", punctuation.asFile.absolutePath)
-    systemProperty("uat.assets", appDataDirs.joinToString(File.pathSeparator) { it.asFile.absolutePath })
+    // read when the task runs: the directories are the tasks' outputs, known once the configuration resolves
+    jvmArgumentProviders.add(CommandLineArgumentProvider { listOf("-Duat.assets=" + data.files.joinToString(File.pathSeparator) { it.absolutePath }) })
     // fcitx's own data the app ships (quick phrases, charselectdata), the Kotlin host's pkgdata: the host
     // replay's quick input and Unicode read them
     val pkgdata = rootProject.layout.projectDirectory.dir("app/src/main/host-assets/pkgdata")
@@ -108,20 +101,9 @@ tasks.test {
     systemProperty("youmo.engines.hostThreadStrict", "true")
 }
 
-// a parity sequence file (fcitx-replacement §7.2, uat/parity) on the Kotlin host with the app's data:
-//   ./gradlew :lib:ime-eval:parityReplay --args="<sequences.jsonl> <out.jsonl> [<first n> | <k>/<n> | all] [<device output.jsonl>: its ids only]"
-// paths relative to this module, as `run`'s
-tasks.register<JavaExec>("parityReplay") {
-    description = "A parity sequence file replayed on the Kotlin host and the real engines."
-    classpath = uatTestSources.runtimeClasspath
-    mainClass.set("org.fcitx.fcitx5.android.uat.ParityReplay")
-    workingDir = projectDir
-    appData()
-}
-
 dependencies {
     implementation(project(":lib:ime-core"))
-    // the parity files (sequences, outputs): JSON lines the device tools (uat/parity) read and write too
+    // voice-post reads voice-eval's JSON lines and the polish tagger's json (VoicePostRun)
     implementation(libs.kotlinx.serialization.json)
     "uatTestImplementation"(libs.junit)
     // @Uat, which uat.py jvm reads

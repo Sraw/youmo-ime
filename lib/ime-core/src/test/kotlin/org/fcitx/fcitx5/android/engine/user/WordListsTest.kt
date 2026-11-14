@@ -5,11 +5,14 @@
 package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.LogFile
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
 import org.fcitx.fcitx5.android.engine.platform.write
+import org.fcitx.fcitx5.android.engine.store.Unsaved
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.entry
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.inTrie
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.model
@@ -23,6 +26,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.nio.file.Files
 
 class WordListsTest {
@@ -106,6 +110,7 @@ class WordListsTest {
         assertFalse(m.blockedAnyhow(m.id(entry("你", "ni"))))
     }
 
+    @Uat("WD-48")
     @Test
     fun aListThatCannotBeWrittenIsKeptInMemory() {
         val errors = ArrayList<IOException>()
@@ -114,8 +119,83 @@ class WordListsTest {
         val lists = WordLists(root.dir("lists"), errors::add)
         assertTrue(lists.add(entry("你好", "ni", "hao")))
         assertEquals(listOf(entry("你好", "ni", "hao")), lists.addedWords)
-        assertEquals(1, errors.size)
+        // decode-2: told as not kept, which the app says on the keyboard, not only logged
+        assertTrue(errors.single() is Unsaved)
     }
+
+    // decode-9: a line this build does not read (a later build's, say) is written back as it was, not lost to the next change
+    @Test
+    fun aLineThatDoesNotReadIsKeptThroughAChange() {
+        val dir = MemoryFiles()
+        dir.file(WordLists.BLOCKED).write("拟 ni\n你好 ni'hao 1.5 later\n".toByteArray())
+        val lists = WordLists(dir)
+        assertEquals(listOf(entry("拟", "ni")), lists.blockedWords)
+        assertTrue(lists.block(entry("好", "hao")))
+        assertEquals("拟 ni\n好 hao\n你好 ni'hao 1.5 later\n", dir.file(WordLists.BLOCKED).read().decodeToString())
+        assertEquals(listOf(entry("拟", "ni"), entry("好", "hao")), WordLists(dir).blockedWords)
+    }
+
+    // R25 F7821: 全部清空 is no ordinary change: the lines this build does not read go too, or a later build's
+    // block is back with that build; a list of such lines alone is emptied as well
+    @Test
+    @Uat("WD-25")
+    fun aClearEmptiesTheListsAndTheLinesThatDoNotRead() {
+        val dir = MemoryFiles()
+        dir.file(WordLists.ADDED).write("你好 ni'hao\n幽默 you'mo 2 later\n".toByteArray())
+        dir.file(WordLists.BLOCKED).write("你好 ni'hao 1.5 later\n".toByteArray())
+        val lists = WordLists(dir)
+        assertEquals(listOf(entry("你好", "ni", "hao")), lists.addedWords)
+        assertEquals(emptyList<UserModel.Entry>(), lists.blockedWords)
+        lists.clear()
+        assertEquals(emptyList<UserModel.Entry>(), lists.addedWords)
+        assertEquals(mapOf(WordLists.ADDED to "", WordLists.BLOCKED to ""), dir.all.mapValues { it.value.decodeToString() })
+        // gone for good: the next change does not write them back
+        assertTrue(lists.block(entry("拟", "ni")))
+        assertEquals("拟 ni\n", dir.file(WordLists.BLOCKED).read().decodeToString())
+    }
+
+    // R25 F7961: 全部清空 is as just installed (F7821): a list whose file did not read was skipped, its file left
+    // to bring its words back at a start that reads it, the user told all was cleared
+    @Test
+    @Uat("WD-25")
+    fun aClearDeletesAListThatDidNotRead() = assertRows(
+        "its file reads again later: deleted unread, so not back at the next start, and the list is written again" to {
+            val files = MemoryFiles()
+            files.file(WordLists.ADDED).write("你好 ni'hao\n".toByteArray())
+            var failing = true
+            // a disk whose reads fail for a while (EIO)
+            val dir = object : UserFiles by files {
+                override fun file(name: String): LogFile = files.file(name).let { f ->
+                    if (!failing) f else object : LogFile by f {
+                        override fun input(): InputStream = throw IOException("EIO")
+                    }
+                }
+            }
+            val errors = ArrayList<IOException>()
+            val lists = WordLists(dir, errors::add)
+            assertEquals(1, errors.size)
+            failing = false
+            lists.clear()
+            assertFalse(files.file(WordLists.ADDED).taken())
+            assertEquals(emptyList<UserModel.Entry>(), WordLists(files).addedWords)
+            assertTrue(lists.add(entry("拟", "ni")))
+            assertEquals("拟 ni\n", files.file(WordLists.ADDED).read().decodeToString())
+            assertEquals(1, errors.size)
+        },
+        "it cannot be deleted (a directory with something in it): told as not kept, and still not written over" to {
+            val files = MemoryFiles()
+            files.dir(WordLists.ADDED).dir("x").mkdirs()
+            val errors = ArrayList<IOException>()
+            val lists = WordLists(files, errors::add)
+            assertEquals(1, errors.size)
+            lists.clear()
+            assertEquals(2, errors.size)
+            assertTrue(errors.last() is Unsaved)
+            assertTrue(lists.add(entry("拟", "ni")))
+            assertEquals(3, errors.size)
+            assertTrue(files.dir(WordLists.ADDED).dir("x").exists())
+        },
+    )
 
     @Test
     fun aListThatDidNotReadIsNotWrittenOver() {

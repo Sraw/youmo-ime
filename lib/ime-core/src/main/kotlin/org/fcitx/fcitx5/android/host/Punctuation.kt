@@ -44,7 +44,6 @@ class Punctuation(
     class State {
         val lastPuncStack = HashMap<Int, String>()
         var lastIsEngOrDigit = 0
-        var notConverted = 0
     }
 
     private val stateProperty = IcProperty { State() }
@@ -65,6 +64,7 @@ class Punctuation(
     val action: StatusAction = object : StatusAction("punctuation") {
         override fun icon(ic: InputContext) = if (enabled) "fcitx-punc-active" else "fcitx-punc-inactive"
         override fun shortText(ic: InputContext) = if (enabled) "Full width punctuation" else "Half width punctuation"
+        override fun active(ic: InputContext) = enabled
         override fun activate(ic: InputContext) = setEnabled(!enabled, ic)
     }.also(statusArea::register)
 
@@ -157,7 +157,6 @@ class Punctuation(
         override fun onReset(ic: InputContext) {
             val s = state(ic)
             s.lastIsEngOrDigit = 0
-            s.notConverted = 0
             s.lastPuncStack.clear()
             tell(ic)
         }
@@ -196,43 +195,19 @@ class Punctuation(
     fun getPunctuationCandidates(unicode: Int): List<String> = if (enabled) profile.punctuations(unicode) else emptyList()
 
     /**
-     * `pushPunctuation` (`:438-468`): the mark [unicode] types on [ic], a pair's halves in turn. After
-     * a letter or digit, `.` and `,` stay as typed when the option says so (empty, remembered for [cancelLast]).
+     * `pushPunctuationV2` (`:469-502`): the mark [unicode] types on [ic], a pair's halves in turn, or both
+     * at once when "type paired together" is on. After a letter or digit, `.` and `,` stay as typed when
+     * the option says so (empty). fcitx's V1 `pushPunctuation` and `cancelLast` (`:438-468, 504-516`)
+     * are left out: nothing here calls them.
      */
-    fun pushPunctuation(ic: InputContext, unicode: Int): String {
-        val (text, after) = push(ic, unicode, paired = false) ?: return ""
-        check(after.isEmpty())
-        return text
-    }
-
-    /** `pushPunctuationV2` (`:469-502`): as [pushPunctuation], but both halves at once when "type paired together" is on. */
-    fun pushPunctuationV2(ic: InputContext, unicode: Int): Pair<String, String> =
-        push(ic, unicode, config.typePairedTogether) ?: EMPTY_PAIR
-
-    private fun push(ic: InputContext, unicode: Int, paired: Boolean): Pair<String, String>? {
-        if (!enabled) return null
+    fun pushPunctuationV2(ic: InputContext, unicode: Int): Pair<String, String> {
+        if (!enabled || typesAsItself(ic, unicode)) return EMPTY_PAIR
         val state = state(ic)
-        if (typesAsItself(ic, unicode)) {
-            state.notConverted = unicode
-            return null
-        }
         val result = getPunctuation(unicode)
-        state.notConverted = 0
-        if (result.second.isEmpty()) return result.first to ""
-        if (paired) return result
+        if (result.second.isEmpty() || config.typePairedTogether) return result.first to result.second
         if (state.lastPuncStack.remove(unicode) != null) return result.second to ""
         state.lastPuncStack[unicode] = result.first
         return result.first to ""
-    }
-
-    /** `cancelLast` (`:504-516`): the mark a `.` or `,` left as typed would have been; empty otherwise. */
-    fun cancelLast(ic: InputContext): String {
-        if (!enabled) return ""
-        val state = state(ic)
-        if (!dontConvertWhenEn(state.notConverted)) return ""
-        val result = getPunctuation(state.notConverted)
-        state.notConverted = 0
-        return result.first
     }
 
     companion object {

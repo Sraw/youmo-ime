@@ -184,6 +184,8 @@ class SettingsEffectUatTest {
     fun holdingTheSpaceGoesToTheNextInputMethod() {
         prefs.set(keyboard.spaceKeyLongPressBehavior, SpaceLongPressBehavior.Enumerate)
         h.start()
+        // two to go between: with one, the prompt to add more (SpaceLongPressNextImTest)
+        h.api.enabledIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
         h.press(space())
         h.after(1000)
         h.release()

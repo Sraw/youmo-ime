@@ -34,7 +34,6 @@ import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
-import java.io.FileNotFoundException
 import java.io.IOException
 
 /**
@@ -140,19 +139,9 @@ internal class EngineAssets(
         fun get(): SentenceModel? {
             if (tried) return model
             tried = true
-            model = try {
+            // a pack without it, or one that does not read: pinyin reads by the decoder alone, as before models were added
+            model = readOr(null, "cannot read $path: pinyin reads by the decoder alone") {
                 SentenceModel.load(blobs.load(path), unpack, kernel ?: MatrixKernel.JVM)
-            } catch (e: FileNotFoundException) {
-                // a build without them (EngineDataPlugin fetches them): pinyin reads by the decoder alone
-                onError(IOException("cannot open $path: pinyin reads by the decoder alone", e))
-                null
-            } catch (e: IOException) {
-                onError(e)
-                null
-            } catch (e: IllegalArgumentException) {
-                // pinyin reads as well without it as before it was added
-                onError(IOException("cannot read $path", e))
-                null
             }
             return model
         }
@@ -311,11 +300,8 @@ internal class EngineAssets(
 
     // the words emoji stand for; none if the app has not got them
     private val emoji: EmojiData by lazy {
-        try {
+        readOr(EmojiData.EMPTY, "cannot read $EMOJI_DATA: no emoji candidates") {
             EmojiData.read(Charsets.UTF_8.decode(blobs.load(EMOJI_DATA)))
-        } catch (e: IOException) {
-            onError(IOException("cannot read $EMOJI_DATA: no emoji candidates", e))
-            EmojiData.EMPTY
         }
     }
 
@@ -327,11 +313,8 @@ internal class EngineAssets(
 
     // characters by their parts' pinyin; none if the app has not got them
     private val chaizi: Chaizi by lazy {
-        try {
+        readOr(Chaizi.EMPTY, "cannot read $CHAIZI_DATA: no characters by their parts") {
             Chaizi.read(Charsets.UTF_8.decode(blobs.load(CHAIZI_DATA)))
-        } catch (e: IOException) {
-            onError(IOException("cannot read $CHAIZI_DATA: no characters by their parts", e))
-            Chaizi.EMPTY
         }
     }
 
@@ -342,13 +325,18 @@ internal class EngineAssets(
         }
     }
 
-    // what [read] reads, or [fallback] with [onError] told [message] when the file cannot be opened or read
+    // what [read] reads, or [fallback] with [onError] told [message] when the file cannot be opened (not in
+    // the pack: FileNotFoundException), read (IOException) or makes no sense (DataFormatException,
+    // IllegalArgumentException): the one rule for every optional file here (0.6.1 audit engine-13)
     private inline fun <T> readOr(fallback: T, message: String, read: () -> T): T = try {
         read()
     } catch (e: IOException) {
         onError(IOException(message, e))
         fallback
     } catch (e: DataFormatException) {
+        onError(IOException(message, e))
+        fallback
+    } catch (e: IllegalArgumentException) {
         onError(IOException(message, e))
         fallback
     }
@@ -367,22 +355,13 @@ internal class EngineAssets(
     fun strokes(): Strokes? {
         if (!strokesTried) {
             strokesTried = true
-            strokeTable = try {
+            strokeTable = readOr(null, "cannot read $STROKE_DATA: no lookup by strokes") {
                 val words = pinyinData.wordIndex
                 val model = pinyinData.model
                 Strokes(CodeTable.load(blobs.load(STROKE_DATA), verify = false)) { c ->
                     val id = words.find(c)
                     if (id < 0) Float.NEGATIVE_INFINITY else model.score(id)
                 }
-            } catch (e: FileNotFoundException) {
-                onError(IOException("cannot open $STROKE_DATA: no lookup by strokes", e))
-                null
-            } catch (e: IOException) {
-                onError(e)
-                null
-            } catch (e: DataFormatException) {
-                onError(IOException(e))
-                null
             }
         }
         return strokeTable

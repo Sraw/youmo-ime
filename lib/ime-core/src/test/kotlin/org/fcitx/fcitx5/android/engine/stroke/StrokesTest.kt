@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
+import org.fcitx.fcitx5.android.engine.session.HandedBack
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
@@ -270,6 +271,46 @@ class StrokesTest {
         // nor from letters committed as typed
         "zai".forEach { l.apply(Action.Key(it)) }
         assertEquals("", contexts.last())
+    }
+
+    // engine-01 (R25 F7850): a key passed on to the app is pinyin's to drop its context by, a lookup on or
+    // not; the lookup ends with it, none of its keys typed into the pinyin
+    @Test
+    fun aKeyPassedOnReachesThePinyinAndEndsALookup() {
+        var passed = 0
+        val real = Pinyin()
+        val pinyin = object : Session by real {
+            override fun passedOn() {
+                passed++
+            }
+        }
+        val l = StrokeLookup(pinyin, { strokes() })
+        l.passedOn()
+        assertEquals(1, passed)
+        "uh".forEach { l.apply(Action.Key(it)) }
+        l.passedOn()
+        assertEquals(2, passed)
+        assertEquals(emptyList<Action>(), real.actions)
+        // over: u starts another, not a key ending the one that was on (uhu typed into the pinyin)
+        assertEquals("u", l.apply(Action.Key('u')).preedit)
+        assertEquals("u一", l.apply(Action.Key('h')).preedit)
+    }
+
+    // engine-01 (R25 F7850, F7877): handed back mid-lookup, its keys as typed; otherwise as the pinyin hands
+    // back, a piece picked put in and the keys after it back, not all of it as keys (Session's default).
+    // Nothing is typed in the pinyin after, so u starts a lookup, as after any other end of its input
+    @Test
+    fun handedBackALookupIsItsKeysAndThePinyinIsAsThePinyinHandsBack() {
+        val pinyin = PinyinSession(sessionTestData(), PinyinSegmenter())
+        val l = StrokeLookup(pinyin, { strokes("...\n再\th\n") }, follow = pinyin::follow)
+        "uh".forEach { l.apply(Action.Key(it)) }
+        assertEquals(HandedBack("", null, "uh"), l.handBack())
+        "nihao".forEach { l.apply(Action.Key(it)) }
+        l.apply(Action.Pick(l.candidates(0, 20).indexOfFirst { it.text == "你" }))
+        val back = l.handBack()
+        assertEquals("你" to "hao", back.picked to back.keys)
+        "uh".forEach { l.apply(Action.Key(it)) }
+        assertEquals(listOf(Choice("再")), l.candidates(0, 1))
     }
 
     @Test

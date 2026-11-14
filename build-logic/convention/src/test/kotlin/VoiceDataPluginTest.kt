@@ -63,8 +63,8 @@ class VoiceDataPluginTest {
     // youmo.voiceModelDir: ~/ taken as home (a home with a $ in it kept as it is), an absolute path kept
     @Test
     fun theModelDirsTildeIsHome() {
-        assertEquals("/home/a/x", VoiceDataPlugin.homed(" ~/x ", "/home/a"))
-        assertEquals("/home/\$a/x", VoiceDataPlugin.homed("~/x", "/home/\$a"))
-        assertEquals("/abs/x", VoiceDataPlugin.homed("/abs/x", "/home/a"))
+        assertEquals("/home/a/x", homed(" ~/x ", "/home/a"))
+        assertEquals("/home/\$a/x", homed("~/x", "/home/\$a"))
+        assertEquals("/abs/x", homed("/abs/x", "/home/a"))
     }
 }

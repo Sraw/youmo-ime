@@ -1,8 +1,4 @@
 # Module :app
-# Installed data
-/app/src/main/assets/usr/
-# Generated asset descriptor
-/app/src/main/assets/descriptor.json
 
 # Intellij
 .idea/

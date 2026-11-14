@@ -647,6 +647,11 @@ class EditingSession(
             val measured = unitsBeforeCursor(1, overhang = 0)
             if (measured == null) direct = false else directUnits = measured
         }
+        // a selection goes the one way a selection is deleted (R25 core-input-10)
+        if (direct && lastSelection.isNotEmpty()) {
+            deleteSelection()
+            return true
+        }
         // With no editor the key event the caller falls back to goes nowhere either, so there
         // is no move to predict.
         if (editor.isAvailable) {
@@ -660,11 +665,7 @@ class EditingSession(
             }
         }
         if (!direct) return false
-        if (lastSelection.isEmpty()) {
-            editor.deleteSurroundingText(1, 0, inCodePoints = true)
-        } else {
-            editor.commitText("", 0)
-        }
+        editor.deleteSurroundingText(1, 0, inCodePoints = true)
         return true
     }
 

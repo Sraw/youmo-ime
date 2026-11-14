@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows as assertNamedRows
 import org.fcitx.fcitx5.android.data.InputFeedbacks
@@ -75,7 +76,7 @@ class AppPrefsTest {
         val prefs = AppPrefs(sp)
         val categories = listOf(prefs.keyboard, prefs.candidates, prefs.clipboard, prefs.symbols, prefs.advanced)
         // AppPrefs' keys alone: ThemeManager.prefs is registered with the application's AppPrefs, not this one.
-        // ThemePrefsTest and aCategoryRegisteredAfterTheResetIsResetAsItRegisters check that its reset keeps what its levels set
+        // ThemePrefsTest checks that its reset keeps what its levels set
         val own = categories.flatMapTo(HashSet()) { it.managedPreferences.keys }
         // what every level sets, one off its default: the keyboard's size on the theme page, the long press, the vibration, the sound
         val levels = (categories + ThemeManager.prefs)
@@ -103,24 +104,55 @@ class AppPrefsTest {
         assertFalse("shown", prefs.keyboard.popupOnKeyPress.getValue())
     }
 
-    // ThemeManager registers ThemePrefs after the reset at the start: what it hides goes back then
+    // a category of the test's own, registered late as ThemePrefs is: a setting without a UI, one a level still sets, one shown
+    private class Late(sp: SharedPreferences) : ManagedPreferenceCategory(R.string.virtual_keyboard, sp) {
+        val unseen = hidden { switch(R.string.ignore_sys_cursor, "late_unseen", false) }
+        val setByALevel = hidden(setByLevels = true) { switch(R.string.hide_key_config, "late_set_by_a_level", false) }
+        val shown = switch(R.string.inline_suggestions, "late_shown", false)
+    }
+
+    // ThemeManager registers ThemePrefs after the reset at the start: what it hides goes back then, what a level sets
+    // is kept (ThemePrefs' own: ThemePrefsTest). R25r2 F7895: on settings declared here, not on navbar_background,
+    // ThemePrefs' last hidden setting (hidden at SDK 29 alone, and B9 deletes the settings without a UI); the
+    // mechanism stays for whatever is hidden next. R25r3 F7937: the test of the same on navbar_background is gone
     @Test
     @Config(application = FcitxApplication::class)
-    fun aCategoryRegisteredAfterTheResetIsResetAsItRegisters() {
-        sp.edit {
-            putString("one_handed_side", "Left")
-            putInt("keyboard_side_padding", 9)
+    fun aCategoryOfTheTestsOwnRegisteredAfterTheResetIsResetAsItRegisters() {
+        fun stored() = sp.edit {
+            putBoolean("late_unseen", true)
+            putBoolean("late_set_by_a_level", true)
+            putBoolean("late_shown", true)
         }
+        stored()
+        val prefs = AppPrefs(sp)
+        prefs.resetHiddenSettings()
+        val late = prefs.registerProvider(::Late)
+        assertFalse("without a UI: back to its default", late.unseen.getValue())
+        assertTrue("a level sets it: kept", late.setByALevel.getValue())
+        assertTrue("shown: the user's", late.shown.getValue())
+        // a later start, the reset done before it: nothing registered then is reset
+        stored()
+        val later = AppPrefs(sp)
+        later.resetHiddenSettings()
+        assertTrue(later.registerProvider(::Late).unseen.getValue())
+    }
+
+    // audit-061 app-rest-1: the side 单手模式 was last at is the app's state, not a hidden setting: neither the
+    // first start's reset nor the one after a backup's import puts it back to the right
+    @Test
+    @Config(application = FcitxApplication::class)
+    @Uat("PR-53")
+    fun theOneHandedSideRememberedIsNotResetByTheResetsOfHiddenSettings() {
+        sp.edit { putString("one_handed_side", "Left") }
         val prefs = AppPrefs(sp)
         prefs.resetHiddenSettings()
         val theme = prefs.registerProvider(::ThemePrefs)
+        assertEquals(OneHanded.Left, theme.oneHandedSide.getValue())
+        prefs.resetHiddenSettings(again = true)
+        assertEquals(OneHanded.Left, theme.oneHandedSide.getValue())
+        // Off is no side: read as the default
+        sp.edit { putString("one_handed_side", "Off") }
         assertEquals(OneHanded.Right, theme.oneHandedSide.getValue())
-        assertEquals("a level sets it", 9, sp.getInt("keyboard_side_padding", -1))
-        // a later start, the reset done before it: nothing registered then is reset
-        sp.edit { putString("one_handed_side", "Left") }
-        val later = AppPrefs(sp)
-        later.resetHiddenSettings()
-        assertEquals(OneHanded.Left, later.registerProvider(::ThemePrefs).oneHandedSide.getValue())
     }
 
     // 0.5's two switches 滑行输入 (glide_typing, 0.4's key too) and 笔画筛选 (stroke_filter) as the one list

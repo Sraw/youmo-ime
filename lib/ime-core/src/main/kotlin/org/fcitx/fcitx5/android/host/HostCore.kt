@@ -687,35 +687,6 @@ class HostCore(
     // the text sent for [word]: filtered, one put in as it is ([PanelCandidate.asIs]) as it is
     private fun shown(ic: InputContext, word: PanelCandidate) = if (word.asIs) word.text else filterOutput(ic, word.text)
 
-    /**
-     * A temp mode's [TempCandidateList] as the panel's list (fcitx's `CommonCandidateList`: bulk,
-     * pageable, labelled): a pick is the mode's candidate's own select.
-     */
-    private class TempModeCandidates(private val list: TempCandidateList) : CandidateList {
-        private inner class Word(val candidate: TempCandidate) : PanelCandidate {
-            override val text get() = candidate.text
-            override val comment get() = candidate.comment
-            override val asIs get() = candidate.asIs
-            override fun select(ic: InputContext) {
-                candidate.select?.invoke(ic)
-            }
-        }
-
-        override val size get() = list.size
-        override fun label(index: Int) = if (index in 0 until list.size) list.label(index) else ""
-        override fun candidate(index: Int): PanelCandidate? = if (index in 0 until list.size) Word(list.candidate(index)) else null
-        override val cursorIndex get() = list.cursorIndex
-        override val bulk get() = true
-        override val totalSize get() = list.totalSize
-        override fun candidateFromAll(index: Int): PanelCandidate? = list.candidates.getOrNull(index)?.let(::Word)
-        override val pageable get() = true
-        override val hasPrev get() = list.hasPrev
-        override val hasNext get() = list.hasNext
-        override fun prev() = list.prev()
-        override fun next() = list.next()
-        override val layoutHint get() = list.layoutHint
-    }
-
     companion object {
         /** The overlay's time (`instance.cpp:526`). */
         const val INFO_MILLIS = 1000L

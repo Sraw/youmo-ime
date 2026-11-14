@@ -4,13 +4,9 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.putJsonArray
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.KeySyms
 import org.fcitx.fcitx5.android.host.Refiner
-import org.fcitx.fcitx5.android.eval.parity.Header
 import org.fcitx.fcitx5.android.eval.parity.Sequence
 import org.fcitx.fcitx5.android.eval.parity.Step
 import org.junit.Assert.assertEquals
@@ -285,8 +281,8 @@ class HostReplayUatTest {
 
     @Test
     fun anotherAppsBarIsCoveredOnASwitchOrAHardwareReturn() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN); add(InputMethodCatalog.ENGLISH) } })
-        fun last(vararg steps: Step) = ParityReplay.run(header, Sequence("s", InputMethodCatalog.PINYIN, "text", steps.toList())).states.last()
+        val ims = listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH)
+        fun last(vararg steps: Step) = ParityReplay.run(ims, Sequence("s", InputMethodCatalog.PINYIN, "text", steps.toList())).states.last()
         val typed = Step("type", "nihao")
         // what the other app showed, until the host updates it
         assertEquals("ni hao", last(typed, Step("app")).preedit)
@@ -315,9 +311,9 @@ class HostReplayUatTest {
 
     @Test
     fun aMalformedStepStopsOnlyItsSequence() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN) } })
+        val ims = listOf(InputMethodCatalog.PINYIN)
         // a hardware key the replay has no name for: F4127's catch, not the shard's run
-        val out = ParityReplay.run(header, Sequence("s", InputMethodCatalog.PINYIN, "text", listOf(Step("type", "nihao"), Step("hw", "NoSuchKey"))))
+        val out = ParityReplay.run(ims, Sequence("s", InputMethodCatalog.PINYIN, "text", listOf(Step("type", "nihao"), Step("hw", "NoSuchKey"))))
         assertTrue("not stopped", out.error != null)
         // the steps before it kept
         assertEquals(listOf("ni hao"), out.states.map { it.preedit })
@@ -325,8 +321,8 @@ class HostReplayUatTest {
 
     @Test
     fun aToggleUnderSuggestionsGoesByTheKeyboardPutAway() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN) } })
-        val states = ParityReplay.run(header, Sequence("s", InputMethodCatalog.PINYIN, "text", listOf(Step("type", "zaiwen"), Step("space"), Step("toggle", "fullwidth")))).states
+        val ims = listOf(InputMethodCatalog.PINYIN)
+        val states = ParityReplay.run(ims, Sequence("s", InputMethodCatalog.PINYIN, "text", listOf(Step("type", "zaiwen"), Step("space"), Step("toggle", "fullwidth")))).states
         assertTrue("suggestions after the commit", states[1].cands.isNotEmpty())
         // uat.py's expand_toolbar: Back and a tap on the field, which the suggestions do not outlast
         assertEquals(emptyList<String>(), states[2].cands)
@@ -334,9 +330,9 @@ class HostReplayUatTest {
 
     @Test
     fun aSingleLineFieldsEnterPutsTheKeyboardAwayAndATapBringsItBackAtTheEnd() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN); add(InputMethodCatalog.ENGLISH) } })
+        val ims = listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH)
         val steps = listOf(Step("type", "test"), Step("enter"), Step("hw", "Left"), Step("type", "x"))
-        val states = ParityReplay.run(header, Sequence("s", InputMethodCatalog.ENGLISH, "url", steps)).states
+        val states = ParityReplay.run(ims, Sequence("s", InputMethodCatalog.ENGLISH, "url", steps)).states
         // the arrow moves the cursor in the field with no keyboard; the letter's tap on the field puts it at the end first
         assertEquals(3 to 3, states[2].sel)
         assertEquals("testx", states[3].text)
@@ -344,9 +340,9 @@ class HostReplayUatTest {
 
     @Test
     fun theKeyboardBackFromUnderTheFloatingWindowIsTappedForAtTheFieldsEnd() {
-        val header = Header(buildJsonObject { putJsonArray("ims") { add(InputMethodCatalog.PINYIN); add(InputMethodCatalog.ENGLISH) } })
+        val ims = listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH)
         val steps = listOf(Step("type", "test"), Step("space"), Step("hw", "Left"), Step("hw", "Return"), Step("type", "x"))
-        val states = ParityReplay.run(header, Sequence("s", InputMethodCatalog.ENGLISH, "text", steps)).states
+        val states = ParityReplay.run(ims, Sequence("s", InputMethodCatalog.ENGLISH, "text", steps)).states
         // the Return typed where the arrow left the cursor, before the space
         assertEquals("test\n ", states[3].text)
         // the letter after the field's end, where the tap put the cursor

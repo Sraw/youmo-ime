@@ -46,4 +46,16 @@ class VersionsTest {
             assertThrows(name, IllegalArgumentException::class.java) { Versions.versionCodeOf(name) }
         }
     }
+
+    // what the app's splits and lib/handwriting's abiFilters are given (B15: the released ABI alone by default)
+    @Test
+    fun theBuildMakesTheReleasedAbiAloneUnlessToldOthers() {
+        val rows = listOf(
+            Triple("no -PbuildABI: arm64 alone, the ABI released", null, listOf("arm64-v8a")),
+            Triple("CI's emulator job: the x86_64 named, not arm64 besides", "x86_64", listOf("x86_64")),
+            Triple("32-bit still built when named, with others", "armeabi-v7a,arm64-v8a", listOf("armeabi-v7a", "arm64-v8a")),
+        )
+        val wrong = rows.filter { (_, override, abis) -> Versions.buildABIs(override).toList() != abis }.map { it.first }
+        assertEquals(emptyList<String>(), wrong)
+    }
 }

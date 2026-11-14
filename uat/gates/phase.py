@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One device step of a release gate, for one package: gates.py (upgrade, backups, perf) runs
+"""One device step of a release gate, for one package: gates.py (upgrade, backups) runs
 each step as its own process, with UAT_BUILD naming the package (release: the
 released id, debug: .debug), since uat.py fixes the package at import.
 
@@ -16,13 +16,10 @@ Steps:
                                build writes chttrans.conf and androidengine.conf itself
   backup <out.zip>             备份全部, the zip pulled
   import <zip>                 the zip pushed to Download, 从备份恢复
-  perf <out.json> [runs]       cold start to first candidate, per-key latency, memory (PSS etc.)
 """
 import json
 import os
 import re
-import statistics
-import subprocess
 import sys
 import tarfile
 import tempfile
@@ -54,7 +51,6 @@ UNREAD_LEARNING = ("v0.3.0",)
 
 def device(port):
     d = Device(port)
-    subprocess.run(["adb", "connect", d.serial], capture_output=True)
     d.start_dumper()
     return d
 
@@ -234,14 +230,19 @@ def to_pinyin(d):
     return label
 
 
-def first_start(d):
+def first_start(d, packs=True):
+    """packs: the text pack imported first, as a user of 0.6.0 on must (no dictionaries in the APK). Only after
+    restore-files: the import starts the app, whose first start moves the fixture's files. A released v0.3.x/0.4.0
+    build (check --old, import --old) has its data inside and no 资源包 page to import on"""
+    if packs:
+        uat.import_packs(d, voice=False)
     ensure_ime(d)
     d.open_settings()
 
 
 def check(d, out, version=None, old=False):
     def run():
-        first_start(d)
+        first_start(d, packs=not old)
         typed = typed_checks(d, version)
         # the settings page closed before the files are read (the host writes each change at once)
         d.sh("input keyevent KEYCODE_HOME")
@@ -305,10 +306,11 @@ def pushed(d, zip_path):
     return name
 
 
-def import_(d, zip_path):
+def import_(d, zip_path, old=False):
+    """old: a released v0.3.x/0.4.0 build is installed (gate 3's new → vX), which has no pack to import"""
     s15 = script("15-privacy-backup")
     name = pushed(d, zip_path)
-    first_start(d)
+    first_start(d, packs=not old)
     warn, restarted = s15.restore(d, name)
     # restore() only reports a missing restart; a gate that restored without one must fail (F4089)
     # uat.check, not check: this file's own check (the gate step) shadows the import (F4160)
@@ -330,106 +332,10 @@ def import_refused(d, zip_path):
     return f"refused {name}"
 
 
-# --- gate 5
-
-def meminfo(d):
-    pid = d.sh(f"pidof {PKG}").strip()
-    if pid:
-        d.root(f"kill -10 {pid}")   # SIGUSR1: ART collects first (13-words.py java_heap)
-        time.sleep(1.5)
-    out = d.sh(f"dumpsys meminfo {PKG}")
-    got = {}
-    for key, pat in (("pss_total", r"TOTAL PSS:\s+(\d+)"), ("native_heap", r"Native Heap:\s+(\d+)"),
-                     ("java_heap", r"Java Heap:\s+(\d+)")):
-        m = re.search(pat, out)
-        got[key] = int(m.group(1)) if m else None
-    return got
-
-
-def bar(d):
-    """what a key changes: the composing row and the candidates"""
-    s = d.screen()
-    return d.preedit(s), tuple(d.candidates(s))
-
-
-def perf(d, out, runs=5):
-    words = ["nihao", "women", "zhongguo", "jintian", "tianqi", "henhao", "shijian", "pengyou"]
-
-    def run():
-        ensure_ime(d)
-        to_pinyin(d)
-        ime_ready(d)
-        f = d.field()
-        fx, fy = f.c
-        # cold: the app's process stopped, the focused field tapped; then the keyboard drawn, the host
-        # up (the space key names the input method, not （不可用）), and the bar's first candidate for ni
-        cold = []
-        for _ in range(runs):
-            # timed from the stop: the system binds the keyboard again at once, and a release build
-            # is up before a pause after the stop would end
-            d.sh("logcat -c")
-            t0 = time.time()
-            d.sh(f"am force-stop {PKG}")
-            ensure_ime(d)   # a stopped keyboard may have been swapped for the system's
-            d.sh(f"input tap {fx} {fy}")
-            t_kb = t_ready = t_cand = None
-            while time.time() - t0 < 60:
-                label = d.im_label()
-                if not label and time.time() - t0 > 5:   # the tap went before the window was back
-                    d.sh(f"input tap {fx} {fy}")
-                if label and t_kb is None:
-                    t_kb = time.time() - t0
-                if label and "不可用" not in label:
-                    t_ready = time.time() - t0
-                    break
-            keys = d.keys(refresh=True)
-            for ch in "ni":
-                d.sh(f"input tap {keys[ch][0]} {keys[ch][1]}")
-            while time.time() - t0 < 60:
-                if d.candidates():
-                    t_cand = time.time() - t0
-                    break
-            run_ = {k: round(v * 1000) if v else None for k, v in
-                    (("keyboard", t_kb), ("ready", t_ready), ("candidate", t_cand))}
-            m = re.search(r"Kotlin host ready in (\d+) ms", d.sh("logcat -d"))   # KotlinHost.startup's own
-            run_["host_log"] = int(m.group(1)) if m else None
-            cold.append(run_)
-            d.bksp(3)
-        # warm: each key timed from the tap to the composing row or the bar changing
-        keys = d.keys(refresh=True)
-        lat = []
-        for w in words * 2:
-            before = bar(d)
-            for ch in w:
-                x, y = keys[ch]
-                t0 = time.time()
-                d.sh(f"input tap {x} {y}")
-                while time.time() - t0 < 5:
-                    now = bar(d)
-                    if now != before:
-                        break
-                lat.append(round((time.time() - t0) * 1000))
-                before = now
-            d.space()
-            time.sleep(0.3)
-        time.sleep(5)
-        mem = [meminfo(d) for _ in range(6)]
-        return {"cold_start_ms": cold, "key_ms": lat, "mem_kb": mem}
-    res = with_page(d, run)
-    with open(out, "w") as f:
-        json.dump(res, f, indent=1)
-    cand = [c["candidate"] for c in res["cold_start_ms"] if c["candidate"]]
-    pss = [m["pss_total"] for m in res["mem_kb"][1:] if m["pss_total"]]
-    return (f"cold median {statistics.median(cand) if cand else None} ms, key median "
-            f"{statistics.median(res['key_ms'])} ms, PSS median {statistics.median(pss) if pss else None} KB")
-
-
 def main():
-    sys.exit("phase.py: still made for redroid (Docker on Linux); not ported to the emulator yet (uat/README.md)")
     port, step, *args = sys.argv[1:]
     if step == "install":
         d = Device(port)
-        subprocess.run(["adb", "connect", d.serial], capture_output=True)
         r = d.adb("install", *(["-r"] if "-r" in args[1:] else []), args[0], timeout=900)
         if "Success" not in r:
             raise Blocked(f"install: {r.strip()[-200:]}")
@@ -440,8 +346,7 @@ def main():
         r = {"restore-files": lambda: restore_files(d, args[0]), "check": lambda: check(d, args[0], next((a for a in args[1:] if a != "--old"), None),
                                                                       "--old" in args),
              "rewrite": lambda: rewrite(d), "backup": lambda: backup(d, args[0]),
-             "import": lambda: import_(d, args[0]), "import-refused": lambda: import_refused(d, args[0]),
-             "perf": lambda: perf(d, args[0], int(args[1]) if len(args) > 1 else 5)}[step]()
+             "import": lambda: import_(d, args[0], "--old" in args[1:]), "import-refused": lambda: import_refused(d, args[0])}[step]()
         print(f"{step}: {r}")
     finally:
         d.stop_dumper()

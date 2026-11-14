@@ -216,7 +216,7 @@ object UserDataManager {
                 writeFileTree(dirs.engine, "engine", zipStream) { f ->
                     val path = f.relativeTo(dirs.engine).path
                     f.name.endsWith(".compacting") || path.substringBefore(File.separatorChar) in OWN_DIRS ||
-                        (learning != null && path in LEARNED_FROM) || ((learning != null || oldLogsRead) && isOldLog(path))
+                        (learning != null && (path in LEARNED_FROM || isKeptAside(path))) || ((learning != null || oldLogsRead) && isOldLog(path))
                 }
             }
             learning?.let {
@@ -284,13 +284,20 @@ object UserDataManager {
 
     fun import(src: InputStream) = import(src, appDirs)
 
-    // stopped as it is unpacked once it would fill the disk (a zip bomb), not after
+    // stopped as it is unpacked once it would fill the disk (a zip bomb), not after; nor more than [maxEntries]
+    // entries, empty directories counted too: a zip of millions of them fills no disk but takes minutes and inodes
     @VisibleForTesting
-    internal fun extractWithinRoom(src: InputStream, tempDir: File, room: Long = tempDir.usableSpace): List<File> {
+    internal fun extractWithinRoom(src: InputStream, tempDir: File, room: Long = tempDir.usableSpace, maxEntries: Int = MAX_BACKUP_ENTRIES): List<File> {
         return ZipInputStream(src).use {
-            it.extract(tempDir) { _, size, total -> if (total + size > room) errorRuntime(R.string.exception_user_data_no_room) }
+            it.extract(tempDir) { count, size, total ->
+                if (count > maxEntries) errorRuntime(R.string.exception_user_data_too_many_entries)
+                if (total + size > room) errorRuntime(R.string.exception_user_data_no_room)
+            }
         }
     }
+
+    // a phone's whole backup is a few thousand files (the theme packs' images the most): ten times that and more is no backup
+    private const val MAX_BACKUP_ENTRIES = 100_000
 
     internal fun import(src: InputStream, dirs: Dirs) = runCatching {
         if (!dirs.settled) errorRuntime(R.string.user_data_not_settled)
@@ -359,7 +366,8 @@ object UserDataManager {
             // the settings are the backup's (PR-10): a config file it has not was at its defaults when it was
             // made, fcitx writing only what is set, so the phone's is dropped, not left over the backup's
             pruneAbsent(File(tempDir, "external-${ConfigHome.CONFIG.old}"), File(tempDir, "external-${ConfigHome.DATA.old}"), dirs)
-            // keep importing recently_used for backwords compatibility
+            // keep importing recently_used for backwards compatibility: an upstream Fcitx5 backup's recent symbols are
+            // still taken (DECISIONS B3)
             copyDir(File(tempDir, "recently_used"), dirs.recentlyUsed)
             // last: an import failing after it would start fcitx again on the logs it replaced
             val learning = File(tempDir, RestoreStash.BACKUP).takeIf { it.isFile }
@@ -432,7 +440,7 @@ object UserDataManager {
                 .forEach {
                     val path = it.toRelativeString(engine)
                     val target = File(staged, path)
-                    val phonesOwn = path in PHONES || path.substringBefore(File.separatorChar) in OWN_DIRS || isOldLog(path)
+                    val phonesOwn = path in PHONES || isKeptAside(path) || path.substringBefore(File.separatorChar) in OWN_DIRS || isOldLog(path)
                     if (it.isDirectory) target.mkdirs() else if (phonesOwn || !target.exists()) it.copyTo(target, overwrite = true)
                 }
         }
@@ -450,6 +458,7 @@ object UserDataManager {
         val stashed = STASHED + staged.list().orEmpty().filter(::isOldLog)
         for (name in stashed) File(staged, name).takeIf { it.isFile }?.let { it.copyTo(File(stash, name)); it.delete() }
         PHONES.forEach { File(staged, it).deleteRecursively() }
+        staged.list().orEmpty().filter(::isKeptAside).forEach { File(staged, it).deleteRecursively() }
         if (stash.list().isNullOrEmpty()) stash.parentFile?.let { if (stash.delete()) it.delete() }
     }
 
@@ -474,9 +483,13 @@ object UserDataManager {
     private const val OLD_PINS_MOVED = "learn.pins-moved"
     private const val OLD_PINYIN = "pinyin.user"
 
+    // the learning record's copies kept aside, at the engine directory's top: .unreadable, .unreadable.1... (the
+    // engine's rule: 0.6.1 audit engine-07). The phone's learning, as PHONES; with the learning given, as LEARNED_FROM
+    private fun isKeptAside(path: String) = File.separatorChar !in path && RecordStore.isAside(LearnLog.FILE, path)
+
     // the files of the phone's learning: kept over a backup's, as the backup's learning is merged into them
     private val PHONES = setOf(
-        LearnLog.FILE, LearnLog.FILE + RecordStore.UNREADABLE, OLD_MARKER, "$OLD_MARKER.new",
+        LearnLog.FILE, OLD_MARKER, "$OLD_MARKER.new",
         OLD_PINS_MOVED, WordLists.ADDED, WordLists.BLOCKED, EnglishBlocks.FILE, OLD_PINYIN, Engines.TABLE_LOGS_READ,
     )
 
@@ -493,7 +506,7 @@ object UserDataManager {
     private val OWN_DIRS = setOf(Backups.DIR, RestoreStash.DIR, RestoreStash.UNREADABLE)
 
     // what the learning a zip carries as a backup is made of, with the old logs (isOldLog): not exported beside it
-    private val LEARNED_FROM = setOf(LearnLog.FILE, LearnLog.FILE + RecordStore.UNREADABLE, OLD_MARKER, OLD_PINS_MOVED, Engines.TABLE_LOGS_READ)
+    private val LEARNED_FROM = setOf(LearnLog.FILE, OLD_MARKER, OLD_PINS_MOVED, Engines.TABLE_LOGS_READ)
 }
 
 /**

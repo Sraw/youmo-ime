@@ -25,7 +25,10 @@ class WordReading(val text: String, val word: Int, val syllables: IntArray)
 
 /**
  * The reading of each character of a candidate, written out ([ToneMark]) as [style] has it: one string
- * a code point, empty for a code point that is no Han character or whose tone is not known.
+ * a code point, empty for a code point that is no Han character or has no syllable. A character whose
+ * tone is not known (a rare one the dictionary reads a way Unihan does not: 䏝 chun) is its syllable
+ * toneless in pinyin, and empty in zhuyin, where a toneless syllable reads as the first tone (the
+ * user, 2026-11-14): every reading written here, a hint's too ([ofHint]), goes by that ([written]).
  *
  * A candidate whose session knows how its words were read (pinyin's: 银行 typed yinhang) goes by
  * that; any other (a table's, handwriting's, a prediction's) by its text: the longest words of the
@@ -55,7 +58,10 @@ class CandidateReadings(
             while (at < w.text.length) {
                 val cp = w.text.codePointAt(at)
                 val tone = tones?.get(i)?.toInt() ?: ToneMark.NONE
-                out += if (tones == null || !Character.isIdeographic(cp) || tone == ToneMark.NONE) "" else written(w.syllables[i], tone, style)
+                out += when {
+                    tones == null || !Character.isIdeographic(cp) || w.syllables[i] == UNREAD -> ""
+                    else -> written(w.syllables[i], tone, style)
+                }
                 at += Character.charCount(cp)
                 i++
             }
@@ -116,8 +122,9 @@ class CandidateReadings(
     /**
      * A pinyin hint of [text] (a misreading's true "jué sè", a part's or a stroke lookup's "hao") as one reading
      * a character, written as [style] has it (pinyin while 候选词注音 is off): the hint's own tones where it has
-     * them, else its syllables with the tones they have in [text], toneless where none is known; empty if [text]
-     * is not all Han or [hint] is no syllable a character (an emoji's name stays a hint).
+     * them, else its syllables with the tones they have in [text], toneless where none is known (in zhuyin
+     * such a character has an empty reading, as in [of], and the hint is not left beside it: R25 F7970); empty
+     * if [text] is not all Han or [hint] is no syllable a character (an emoji's name stays a hint).
      *
      * A hint of one character's several readings ("le/liao", a polyphone a part or a stroke lookup found)
      * is drawn as one reading too, as any candidate's is (A5, the user, 2026-11-06): the one [ordered]
@@ -135,7 +142,7 @@ class CandidateReadings(
         // zhuyin: each syllable's symbols, in the hint's tone or the character's
         val known = if (toned) null else table.tones(text, ids)
         val tones = IntArray(ids.size) { if (toned) ToneMark.parse(parts[it])?.second ?: ToneMark.NONE else known?.get(it)?.toInt() ?: ToneMark.NONE }
-        return ids.mapIndexed { i, id -> Zhuyin.of(id)?.let { ToneMark.zhuyin(it, tones[i]) }.orEmpty() }
+        return ids.mapIndexed { i, id -> written(id, tones[i], style) }
     }
 
     /**
@@ -154,7 +161,8 @@ class CandidateReadings(
 
     // one character's [several] readings hinted as one, written as [style] has it: [oneOf] of them; the
     // hint's first where the data has none of them; nothing where [style] cannot write the one chosen,
-    // as it is blocked in that one (PartsLookup.shownIn) and another drawn would say otherwise
+    // as it is blocked in that one (PartsLookup.shownIn) and another drawn would say otherwise (a [Reading]
+    // has a tone always; the hint's first, read by [ofHint], may have none)
     private fun oneWritten(text: String, several: List<String>, style: ReadingStyle, before: String): List<String> {
         if (text.codePointCount(0, text.length) != 1 || several.any { p -> p.isEmpty() || !p.all(Char::isLetter) }) return emptyList()
         val one = oneOf(text, before, several.joinToString(SEPARATOR.toString())) ?: return ofHint(text, several.first(), style)
@@ -172,8 +180,9 @@ class CandidateReadings(
     private fun erhua(w: WordReading): Boolean =
         w.text.length > 1 && w.text.last() == '儿' && w.syllables.last().let { it == ER || it == R } && w.text !in CHILD
 
+    // the one place a reading is written: in zhuyin none for a tone not known, which would read as the first
     private fun written(syllable: Int, tone: Int, style: ReadingStyle): String = when (style) {
-        ReadingStyle.ZHUYIN -> Zhuyin.of(syllable)?.let { ToneMark.zhuyin(it, tone) }.orEmpty()
+        ReadingStyle.ZHUYIN -> if (tone == ToneMark.NONE) "" else Zhuyin.of(syllable)?.let { ToneMark.zhuyin(it, tone) }.orEmpty()
         else -> ToneMark.pinyin(Syllables.spelling(syllable), tone)
     }
 
@@ -196,9 +205,13 @@ class CandidateReadings(
             }
             val one = found ?: run {
                 val cp = text.codePointAt(at)
-                // a character only the dictionary has (rare ones have a reading or two); with none, a
-                // syllable no character has a tone for, so it is left unmarked
-                WordReading(text.substring(at, at + Character.charCount(cp)), -1, intArrayOf(charReadings[cp]?.firstOrNull() ?: UNREAD))
+                val c = text.substring(at, at + Character.charCount(cp))
+                // a character only the dictionary has (rare ones have a reading or two): the first of them
+                // with a tone known (䏝 zhuān, not its toneless chun), else the first; with none, a syllable
+                // no character has, so it is left unmarked
+                val all = charReadings[cp]
+                val toned = all?.firstOrNull { s -> table.tones(c, intArrayOf(s))?.let { it[0].toInt() != ToneMark.NONE } == true }
+                WordReading(c, -1, intArrayOf(toned ?: all?.firstOrNull() ?: UNREAD))
             }
             out += one
             at += one.text.length
@@ -230,7 +243,7 @@ class CandidateReadings(
             "新生儿", "早产儿", "混血儿", "低能儿", "娇儿", "妻儿", "生儿",
         )
 
-        // a syllable no character has a tone for: the Latin letter A, which no Han character reads as
+        // a syllable no character has: the Latin letter A, which no Han character reads as
         private val UNREAD = Syllables.id("A")
     }
 }

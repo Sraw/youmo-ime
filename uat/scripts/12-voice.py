@@ -669,3 +669,8 @@ def vo28(d):
 case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing")(lambda d: None)
 case("VO-35", needs="jvm:VoiceEndTest.aChatLosesItsClosingMarkAQuestionKeepsItsOwn、VoiceEndTest.aLineLosesEveryEndMark、VoiceEndTest.elsewhereTheTextEndsAsSaidUnlessDropped、VoiceEndTest.aSearchAnAddressOrOneLineIsALine、VoicePolishTest.appliesAsPython")(lambda d: None)
 case("VO-36", needs="jvm:VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn、VoicePolishTest.nothingIsWrittenAfterAFullStop")(lambda d: None)
+case("VO-39", needs="jvm:VoiceFailureUatTest.eachFailureSaysItsOwnMessageAndWhatWasHeardIsTyped、"
+     "VoiceListenerMicrophoneTest.aReadThrowingIsTheMicrophonesFailure、"
+     "VoiceListenerMicrophoneTest.aReadThrowingOnceLiftedIsNoFailure")(lambda d: None)
+case("VO-40", needs="manual:系统的麦克风使用指示要在 Android 12 起的设备上看（root 杀进程：root 过的真机或 API 31 起的模拟器）；"
+     "关麦克风本身由 JVM 的 VoiceListenerMicrophoneTest.closedWhileTheModelsLoadTheMicrophoneIsStopped 断言")(lambda d: None)

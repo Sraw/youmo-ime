@@ -4,13 +4,19 @@
  */
 package org.fcitx.fcitx5.android.engine.english
 
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.platform.UserFiles
+import org.fcitx.fcitx5.android.engine.platform.write
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.store.Unsaved
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
 /** English's blocked words (EnglishBlocks): what a block reaches, in a session and kept. */
 class EnglishBlocksTest {
@@ -22,6 +28,78 @@ class EnglishBlocksTest {
     private fun EnglishSession.commit(word: String): String {
         type(word)
         return apply(Action.Key(' ')).commit
+    }
+
+    // decode-9: a line not taken for a word is written back as it was, not lost to the next block
+    @Test
+    fun aLineThatDoesNotReadIsKeptThroughABlock() {
+        val dir = MemoryFiles()
+        dir.file(EnglishBlocks.FILE).write("the\n!later form\n".toByteArray())
+        val blocks = EnglishBlocks(dir)
+        assertEquals(listOf("the"), blocks.blocked)
+        blocks.block(listOf("US"))
+        assertEquals("the\nUS\n!later form\n", dir.file(EnglishBlocks.FILE).read().decodeToString())
+    }
+
+    // R25 F7821: 全部清空 takes the lines not taken for a word too; a file of such lines alone as well
+    @Test
+    fun aClearEmptiesTheWordsAndTheLinesThatDoNotRead() = assertRows(
+        listOf("words and a line not read" to "the\n!later form\n", "lines not read alone" to "!later form\n"),
+        { it.first },
+    ) { (_, text) ->
+        val dir = MemoryFiles()
+        dir.file(EnglishBlocks.FILE).write(text.toByteArray())
+        val blocks = EnglishBlocks(dir)
+        blocks.clear()
+        assertEquals(emptyList<String>(), blocks.blocked)
+        assertEquals("", dir.file(EnglishBlocks.FILE).read().decodeToString())
+        blocks.block(listOf("US"))
+        assertEquals("US\n", dir.file(EnglishBlocks.FILE).read().decodeToString())
+    }
+
+    // R25 F7961: 全部清空 deletes a list that did not read, as WordLists': skipped, its file was left to come back
+    @Test
+    fun aClearDeletesAListThatDidNotRead() = assertRows(
+        listOf<Triple<String, (MemoryFiles) -> Unit, Boolean>>(
+            Triple("what stands there can be deleted: gone, and the list is written again", { it.dir(EnglishBlocks.FILE).mkdirs() }, true),
+            Triple("it cannot be (a directory with something in it): told as not kept, still not written over", { it.dir(EnglishBlocks.FILE).dir("x").mkdirs() }, false),
+        ),
+        { it.first },
+    ) { (why, there, deleted) ->
+        val dir = MemoryFiles().also(there)
+        val errors = ArrayList<IOException>()
+        val blocks = EnglishBlocks(dir, errors::add)
+        assertEquals(why, 1, errors.size)
+        blocks.clear()
+        assertEquals(why, if (deleted) 1 else 2, errors.size)
+        assertEquals(listOf("US"), blocks.block(listOf("US")))
+        if (deleted) {
+            assertEquals(why, "US\n", dir.file(EnglishBlocks.FILE).read().decodeToString())
+            assertEquals(why, 1, errors.size)
+        } else {
+            assertTrue(why, errors.drop(1).all { it is Unsaved } && errors.size == 3)
+            assertTrue(why, dir.dir(EnglishBlocks.FILE).dir("x").exists())
+        }
+    }
+
+    // decode-2 (R25 F7848): a block that cannot be written, or made over a file that did not read, is told as
+    // not kept (Unsaved, what the keyboard says), not as any I/O error (only logged); blocked for the run all the same
+    @Uat("WD-48")
+    @Test
+    fun aBlockThatCannotBeKeptIsBlockedInMemoryAndToldAsUnsaved() = assertRows(
+        listOf<Pair<String, (MemoryFiles) -> UserFiles>>(
+            "the list cannot be written: a file where its directory should be" to { root -> root.file("lists").createNew(); root.dir("lists") },
+            "the list did not read: a directory where it should be" to { root -> root.dir(EnglishBlocks.FILE).mkdirs(); root },
+        ),
+        { it.first },
+    ) { (why, dir) ->
+        val errors = ArrayList<IOException>()
+        val blocks = EnglishBlocks(dir(MemoryFiles()), errors::add)
+        val read = errors.size
+        assertEquals(listOf("the"), blocks.block(listOf("the")))
+        assertTrue(blocks.has("The"))
+        assertEquals(why, 1, errors.size - read)
+        assertTrue("$why: ${errors.last()}", errors.last() is Unsaved)
     }
 
     // review L1: a word blocked in lower case is blocked in any case; one with a capital as written alone

@@ -115,6 +115,30 @@ class LearningControlUndoTest {
         assertEquals(1, replayed().uses("指导"))
     }
 
+    // R25 F8004: the only act of a new record, one with no opposite, is taken back by a rewrite to no record at
+    // all. The store declined that (a header alone) till R25 F8000, and the 撤销 did nothing; now the record is
+    // written as one emptied, and goes on behind that mark
+    @Test
+    fun theOnlyActOfANewRecordIsTakenBackAndTheRecordGoesOnBehindTheMark() {
+        val log = open()
+        val control = control(log)
+        val header = file().length()
+        val token = control.undoable { log.addEnglish("youmo", on = true) }
+        assertEquals(setOf("youmo"), log.state.enWords.keys)
+        assertTrue(control.undo(token))
+        assertTrue(log.state.isEmpty())
+        assertTrue(replayed().isEmpty())
+        // the mark of a log emptied, not a header alone, which a start would take for a new log
+        assertTrue(file().length() > header)
+        assertEquals(emptyList<IOException>(), errors)
+        log.guide()
+        log.close()
+        val again = open()
+        assertEquals(1, again.state.uses("指导"))
+        assertTrue(again.state.enWords.isEmpty())
+        assertEquals(emptyList<IOException>(), errors)
+    }
+
     @Test
     fun anActIsNotTakenBackOnceTheLogWasRewritten() {
         val log = open()

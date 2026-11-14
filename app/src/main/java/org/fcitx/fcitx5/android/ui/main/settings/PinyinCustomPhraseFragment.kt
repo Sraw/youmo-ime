@@ -305,8 +305,12 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
                 val phrases = withContext(Dispatchers.Default) {
                     CustomPhraseManager.items(CustomPhrases.parse(WordLists.decode(bytes))).filter { have.add(it.serialize()) }
                 }
-                ui.addItems(phrases)
-                ctx.toast(getString(R.string.import_phrases_done, phrases.size))
+                // up to the limit: the whole list is written at each save and read by the engine at each start
+                val kept = phrases.take((MAX_PHRASES - ui.entries.size).coerceAtLeast(0))
+                ui.addItems(kept)
+                val done = getString(R.string.import_phrases_done, kept.size)
+                val over = phrases.size - kept.size
+                ctx.toast(if (over == 0) done else getString(R.string.import_over_limit, done, over, MAX_PHRASES))
             }
         }
     }
@@ -398,6 +402,9 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         // the file's read; a test holds it to see the page while it waits
         @VisibleForTesting
         internal var load: () -> List<PinyinCustomPhrase> = { CustomPhraseManager.load() }
+
+        /** The most phrases an import fills the list to (a file of 8 MB holds hundreds of thousands). */
+        const val MAX_PHRASES = 5000
     }
 
 }

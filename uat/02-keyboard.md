@@ -195,7 +195,7 @@
 - **前提**：B0-英文，在 **通用输入** 的 **在键上划** 里选 **滑行输入**。
 - **操作**：点 o k；手指按在 h 上，不抬手依次划过 e、l、o，在 o 上抬起；接着划 w-o-r-l-d；点候选栏里另一个词（例如第二个）；再划一次 h-e-l-l-o，点 ⌫；再划一次 h-e-l-l-o，打一个逗号 `,`。
 - **预期**：划的时候键盘上画出手指走过的线；第一次抬手后框里是「ok hello 」（ok 像按了空格那样先上屏），候选栏是它可能的其他词；划 world 后是「ok hello world 」（中间只有一个空格）；点候选后刚上屏的 world 换成那个词；再划出 hello 后点一下 ⌫，整个 hello 连同空格删掉，前面那个词还在；最后划 hello 再打逗号，结尾是「hello, 」（空格移到逗号后面）。
-- **JVM**：`HostCasesUatTest.aGlideGoesInWithItsSpaceItsWordChangedOrErasedWholeAMarkTakesTheSpace`（上屏、换词、退格、标点）+ `KeyboardFieldsUatTest.aGlideDrawsTheFingersTrail`（轨迹截图）；设备上不跑。
+- **JVM**：`HostCasesUatTest.aGlideGoesInWithItsSpaceItsWordChangedOrErasedWholeAMarkTakesTheSpace`（上屏、换词、退格、标点）+ `KeyboardFieldsUatTest.aGlideDrawsTheFingersTrail`（轨迹截图）+ `TextSceneWiringTest.aGlideReadsEachLetterWhereTheKeySendingItIsWhateverItsId`（字母键按键发的字母认，不看 id：主题包布局的 id 不是字母照样滑行、每个字母读在发它的键上；两个键发同一个字母只认布局里靠前的那个；按下时的气泡也是键发的那个字母，不是它的 id。拼音下测，认键各输入法共用）；设备上不跑。
 
 ### KB-35 [P1] 快速点击、上下短划和长按不算滑行
 - **前提**：滑行开，切到英文。
@@ -358,7 +358,7 @@
 - **前提**：B0，上滑、下滑是默认，输入框里有字。
 - **操作**：空格上滑不松手，左挪一格松开；框里写 `one two three`，选中 `two` 退格上滑；光标放在 `one` 后再上滑两次；退格下滑三次；打拼音 `nihao` 时退格上滑，再下滑。换到 B0-九键，打 6 4，点音节栏上第一个音节，退格上滑清除，再退格下滑。开着 TalkBack（做法同 MN-13）时空格上滑，手指在编辑菜单的格子上移动。
 - **预期**：空格上滑出一排五格（全选、剪切、复制、粘贴、撤销），在键盘上方（"已复制"这类提示出现的地方，手指挡不住），粘贴对着空格；和菜单重叠的提示先收起，按键出错的提示（「词库没装上」这类）和菜单开着时新来的提示藏到菜单后、菜单收起后出现；候选栏上的提示不受影响；左挪一格松开是复制。悬浮键盘、横屏时也在键盘上方。第一次上滑删掉 `two`，接着删掉光标前的 `one`，再删掉光标后的部分，框空了；每次提示"已清除"带撤销。下滑三次按倒序放回，最后 `two` 又是选中的。打拼音时上滑只清掉拼音串，什么都不上屏；下滑拼音串回来，候选照旧。清除后打了字再下滑，提示"没有可恢复的内容"。九键在音节栏选了音节后清除的，下滑也提示"没有可恢复的内容"，拼音不回来（14、18 键的音节栏一样）。TalkBack 按格子上的字读（全选、剪切、复制、粘贴、撤销），不读 select_all 这类内部名字。
-- **JVM**：`BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore`（弹出编辑菜单；退格上下滑发出清除、恢复）；菜单在键盘上方、提示收起、左挪一格松开复制见 `SwipePopupScreenshotTest.theEditMenuIsAboveTheKeyboardAndPicksAsBefore`，出错提示藏起再回来见 `SwipePopupScreenshotTest.aFailureIsHiddenUnderTheEditMenuAndBackAsItGoes`、`UndoChipTest.theEditMenuPutsAwayWhatWasDoneAndHidesAFailureTillItGoes`、ime-core `NoticeStateTest.theEditMenuPutsAwayOrHides`，摆放规则见 ime-core `EditPlanTest.theEditMenuGoesWhereTheNoticesGo`，竖屏、紧凑、悬浮、横屏的样子见 `SwipePopupScreenshotTest` 的 `edit_menu_*` 金样；清除和恢复对输入框做什么、倒序放回、改动后不放回见 ime-core `EditPlanTest`；只给出部分光标前文本的应用里清除只删那部分、撤销放回光标处、在光标前打了字就不放回见 `EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor`、`aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor`、`aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor`；拼音串清掉不上屏、放回同样的拼音见 `HostCoreEnginesTest`（`what is typed is cleared without a commit and typed again`），音节栏选过音节后清除的不放回见 `HostCoreEnginesTest`（`what is typed after a syllable taken off the nine keys' bar is never typed again`）、ime-core `EnginesTest.aSyllableTakenOffTheBarIsAPick`；TalkBack 读格子的字见 `SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels`；设备上的冒烟见报告。
+- **JVM**：`BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore`（弹出编辑菜单；退格上下滑发出清除、恢复）；菜单在键盘上方、提示收起、左挪一格松开复制见 `SwipePopupScreenshotTest.theEditMenuIsAboveTheKeyboardAndPicksAsBefore`，出错提示藏起再回来见 `SwipePopupScreenshotTest.aFailureIsHiddenUnderTheEditMenuAndBackAsItGoes`、`UndoChipTest.theEditMenuPutsAwayWhatWasDoneAndHidesAFailureTillItGoes`、ime-core `NoticeStateTest.theEditMenuPutsAwayOrHides`，摆放规则见 ime-core `EditPlanTest.theEditMenuGoesWhereTheNoticesGo`，竖屏、紧凑、悬浮、横屏的样子见 `SwipePopupScreenshotTest` 的 `edit_menu_*` 金样；清除和恢复对输入框做什么、倒序放回、改动后不放回见 ime-core `EditPlanTest`；只给出部分光标前文本的应用里清除只删那部分、撤销放回光标处、在光标前打了字就不放回见 `EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor`、`aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor`、`aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor`；光标前什么都不给的应用里清除光标后的部分、撤销后放回，光标回到原处而不是开头见 `EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor`，设备上在输入测试台的 `null_before` 框里手工看见 KB-88；光标刚挪、输入框的报告还没到就清除的，放回后光标在输入框那时报告的位置（不是清除时滞后的那个）见 `KeyShortcutsHostTest.aClearMadeBeforeTheCursorsReportIsInIsPutBackWithTheCursorWhereItIsReportedThen`；拼音串清掉不上屏、放回同样的拼音见 `HostCoreEnginesTest`（`what is typed is cleared without a commit and typed again`），音节栏选过音节后清除的不放回见 `HostCoreEnginesTest`（`what is typed after a syllable taken off the nine keys' bar is never typed again`）、ime-core `EnginesTest.aSyllableTakenOffTheBarIsAPick`；TalkBack 读格子的字见 `SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels`；设备上的冒烟见报告。
 
 ### KB-63 [P2] 自己设的文字快捷键
 - **前提**：B0，**按键字符和快捷键** 里把 Q 的下滑设成文字「你好」。
@@ -528,3 +528,9 @@
 - **操作**：看页面上的 q；回测试页看 q 的键角，上滑 q。
 - **预期**：页面上和键盘上 q 的键角都画「13…」，在自己的键面里，不伸到旁边的键上；上滑 q 打出整串 `13895801474`。
 - **JVM**：ime-core `KeyResolverTest.aLongFirstIsMarkedAsASetTextIs`（键角按设的文字的规则截成前两个字加「…」，`5%葡萄糖注射液100ml` 画「5%…」，首选和读屏仍是整串）；画出来比键面宽的角标不画由 keyboard-scene `LongMarksStayOnTheirKeyTest` 查（不在 `uat.py jvm` 的结果里）；设备上看键角、打出整串。
+
+### KB-88 [P2] 光标前读不到的应用里退格上滑清除、下滑恢复
+- **前提**：B0；装了输入测试台（uat/TESTBED.md），打开它的 `behavior`（模拟应用行为）页，点 `null_before` 框（应用不给光标前的字：`getTextBeforeCursor` 这些都返回 null）。
+- **操作**：在框里打 `abc def`，把光标点到 `abc` 后面（`c` 和空格之间）；退格上滑；再退格下滑。
+- **预期**：上滑清掉光标后的 ` def`，框里剩 `abc`，提示"已清除"带撤销；下滑放回，框里是 `abc def`，光标仍在 `abc` 后（不跳到开头或末尾）。
+- **JVM**：ime-core `EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor`（光标前读不到时清除光标后的部分，放回后光标在原处）、`EditPlanTest.whatIsAfterACursorWhoseReportLaggedIsPutBackWithTheCursorWhereTheEditorHasIt`（R25 F7834：光标刚挪、报告还没跟上时，放回后的光标按输入框里的位置）（前一条也记在 KB-62）。这一条还没写进脚本，在模拟器上手工跑。

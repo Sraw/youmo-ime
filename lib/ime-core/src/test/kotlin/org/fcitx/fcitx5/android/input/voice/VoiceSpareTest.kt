@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.voice
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,7 +22,7 @@ class VoiceSpareTest {
         var told: Throwable? = null
         assertFalse(spare.tryBuild({ throw UnsatisfiedLinkError("no sherpa") }) { told = it })
         assertTrue(told is UnsatisfiedLinkError)
-        assertFalse(spare.ready)
+        assertNull(spare.take())
         // and the next build is not blocked by the failed one
         assertTrue(spare.tryBuild({ "vad" }) { told = it })
         assertEquals("vad", spare.take())
@@ -70,7 +71,7 @@ class VoiceSpareTest {
         spare.offer("c")
         spare.clear()
         assertEquals(listOf("b", "c"), released)
-        assertFalse(spare.ready)
+        assertNull(spare.take())
     }
 
     // a clear while a build is under way releases what the build made, rather than keep it as the
@@ -80,7 +81,7 @@ class VoiceSpareTest {
         val released = mutableListOf<String>()
         val spare = VoiceSpare<String> { released += it }
         assertFalse(spare.build { spare.clear(); "a" })
-        assertFalse(spare.ready)
+        assertNull(spare.take())
         assertEquals(listOf("a"), released)
     }
 
@@ -92,7 +93,7 @@ class VoiceSpareTest {
         val spare = VoiceSpare<String> { released += it }
         spare.afterOffer = { spare.clear() }
         spare.build { "a" }
-        assertFalse(spare.ready)
+        assertNull(spare.take())
         assertEquals(listOf("a"), released)
     }
 
@@ -104,7 +105,7 @@ class VoiceSpareTest {
         val before = spare.clears
         spare.clear()
         assertFalse(spare.offer("a", wanted = true, clearsBefore = before))
-        assertFalse(spare.ready)
+        assertNull(spare.take())
         assertEquals(listOf("a"), released)
         assertTrue(spare.offer("b", wanted = true, clearsBefore = spare.clears))
         assertEquals(listOf("a"), released)

@@ -7,14 +7,17 @@ package org.fcitx.fcitx5.android.input.candidates
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.os.Build
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.style.ReplacementSpan
 import org.fcitx.fcitx5.android.engine.reading.CandidateReadings.Companion.MORE
 import org.fcitx.fcitx5.android.engine.reading.CandidateReadings.Companion.SEPARATOR
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
+import org.fcitx.fcitx5.android.input.keyboard.canvas.lruMap
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -72,11 +75,11 @@ class ReadingSpan(
         if (fm != null) {
             // the text's own fonts (a Han character's fallback is taller than the paint's): a line of it plain
             // and one of it read are then the same height
-            // (that overload is API 33; below it, NoSuchMethodError: the paint's own metrics instead)
+            // (that overload is API 33; below it, NoSuchMethodError: a Han character's line as laid out, hanLine)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 paint.getFontMetricsInt(text, start, end - start, start, end - start, false, fm)
             } else {
-                paint.getFontMetricsInt(fm)
+                hanLine(paint, fm)
             }
             // room above for the pinyin where the view lays out by lines (the floating window's)
             if (!zhuyin && !hint) {
@@ -169,6 +172,37 @@ class ReadingSpan(
 
         fun isZhuyin(reading: String): Boolean = reading.any { it in 'ㄅ'..'ㄯ' }
 
+        // R25r4 F7990, below API 33: the paint's own metrics are its font's, shorter than the Han fallback a plain line
+        // of the floating window is laid out by (a TextView's fallback line spacing), so a candidate read and one not
+        // stood on two baselines there. A Han character's line as a layout makes it instead: one a typeface and size,
+        // kept (a layout each character asked would cost each candidate drawn a layout). A character read is Han.
+        // Accepted, below API 33 alone (R25r5 F8016): the paint's locale list, which picks the CJK fallback, is not in
+        // the key, and a character in another fallback (Ext B …) is not measured, its
+        // line maybe a little off 中's
+        private const val HAN_SAMPLE = "中"
+        private const val KEPT_LINES = 4
+        private val hanLines = lruMap<Pair<Typeface?, Float>, Paint.FontMetricsInt>(KEPT_LINES)
+
+        private fun hanLine(paint: Paint, fm: Paint.FontMetricsInt) {
+            val line = hanLines.getOrPut(paint.typeface to paint.textSize) {
+                val p = TextPaint(paint)
+                val layout = StaticLayout.Builder.obtain(HAN_SAMPLE, 0, HAN_SAMPLE.length, p, max(ceil(p.measureText(HAN_SAMPLE)).toInt(), 1))
+                    .setIncludePad(true).setUseLineSpacingFromFallbacks(true).build()
+                // the padding included, a line's ascent is its top and its descent its bottom; the padding the difference
+                Paint.FontMetricsInt().apply {
+                    top = layout.getLineAscent(0)
+                    ascent = top - layout.topPadding
+                    bottom = layout.getLineDescent(0)
+                    descent = bottom - layout.bottomPadding
+                }
+            }
+            fm.top = line.top
+            fm.ascent = line.ascent
+            fm.descent = line.descent
+            fm.bottom = line.bottom
+            fm.leading = 0
+        }
+
         /**
          * [text] with a [ReadingSpan] on each code point [readings] has one for (one per code point; empty for none);
          * hints' readings with [hintSize] above 0, [hintRoom] as the span has them; [floor] the smallest several
@@ -199,8 +233,5 @@ class ReadingSpan(
             val room = baseline - paint.textSize * CandidateBarHeight.HAN_TOP - HINT_GAP
             return CandidateBarHeight.hintSize(paint.textSize, room, (fm.descent - fm.ascent) / paint.textSize, floor)
         }
-
-        /** Whether [readings] are pinyin above the characters, which the candidate's view makes room for. */
-        fun above(readings: List<String>): Boolean = readings.any { it.isNotEmpty() } && readings.none(::isZhuyin)
     }
 }

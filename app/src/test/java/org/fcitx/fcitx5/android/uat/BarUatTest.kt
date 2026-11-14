@@ -127,12 +127,12 @@ class BarUatTest {
         tap(generateSequence(t) { it.parent as? View }.first { it.hasOnClickListeners() })
     }
 
-    // the host's toggle [name] on, as it now stands: its icon -active, but punctuation's is -active
-    // while Chinese punctuation is on, so its "on" (English punctuation) is the icon without it.
+    // the host's toggle [name] on, as it now stands: its entry active, but punctuation's is active
+    // while Chinese punctuation is on, so its "on" (English punctuation) is the entry not active.
     // Read on the test's thread, the host answering on its own (the cache is empty till its first event)
     private fun on(name: String) =
         fcitx!!.statusAreaCached.ifEmpty { runBlocking { fcitx!!.statusArea() } }
-            .first { it.name == name }.icon.endsWith("-active") != (name == "punctuation")
+            .first { it.name == name }.active != (name == "punctuation")
 
     private fun KeyboardHarness.toggled(name: String, from: Int, to: Int) {
         statusPanel()

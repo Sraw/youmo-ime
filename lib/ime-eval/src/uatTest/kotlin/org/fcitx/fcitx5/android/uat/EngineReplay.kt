@@ -199,10 +199,18 @@ class EngineReplay(
     }
 
     /**
-     * The field emptied by the app, as a chat's box once a message is sent: the engine told as the
-     * service tells it ([FieldPolicy.told]), what was written there remembered ([ContextMemory]).
+     * The field emptied by the app, as a chat's box once a message is sent: the user's Enter first,
+     * which the engine sees as on the phone (a session drops its context on it) and the app takes as
+     * send, no line break; then the engine told as the service tells it ([FieldPolicy.told]), what was
+     * written there remembered ([ContextMemory]).
      */
     fun sent() {
+        sending = true
+        try {
+            enter()
+        } finally {
+            sending = false
+        }
         val now = memoryClock++
         // the field as it is now: a sensitive one's text neither remembered nor told (focusAnother focuses
         // the memory on the field, on none for a sensitive one); never a password's, which requirePlain sends to HostReplay
@@ -213,6 +221,9 @@ class EngineReplay(
         val told = checkNotNull(policy.told(now, { "" }, { "" }))
         engines.context(im, told.before, learning = !field.sensitive, cleared = told.cleared, after = told.after, said = told.said)
     }
+
+    // an Enter the app takes as send ([sent]): no line break typed
+    private var sending = false
 
     private val memory = ContextMemory()
     private val policy = FieldPolicy(memory)
@@ -413,7 +424,7 @@ class EngineReplay(
         val unicode = KeySyms.toUnicode(sym)
         when {
             sym == BACKSPACE -> if (before.isNotEmpty()) before.setLength(before.offsetByCodePoints(before.length, -1)) else return
-            sym == RETURN || sym == KP_ENTER -> before.append('\n')
+            sym == RETURN || sym == KP_ENTER -> if (sending) return else before.append('\n')
             unicode >= SPACE && unicode != DELETE -> before.appendCodePoint(unicode)
             else -> return
         }

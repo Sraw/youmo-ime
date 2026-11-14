@@ -485,9 +485,14 @@ internal class SessionFactory(
     /** The emoji a word stands for, as the Chinese input methods offer them: none, the setting off. */
     private fun emoji(): (String) -> List<String> = if (settings().emoji) assets::emojiOf else { _ -> emptyList() }
 
-    /** The built-in phrases' texts a word stands for, as the tables offer them, at learning's time: none, the setting off. */
-    private fun wordPhrases(): (String) -> List<String> =
-        if (settings().builtInPhrases) { word -> lexicon.added.phrases().builtInsOf(word, learnClock::calendar) } else { _ -> emptyList() }
+    /** The built-in phrases' texts a word stands for, as the tables offer them, at learning's time: none, the setting off; the user's edits to them left out while habits are off, as [phraseBook] (U-93). */
+    private fun wordPhrases(): (String) -> List<String> {
+        if (!settings().builtInPhrases) return { _ -> emptyList() }
+        // the session's book, as the one it was made with (habits switched, or the phrases read anew, drop the
+        // sessions): chosen at its first word, not made anew for every candidate while habits are off
+        val book by lazy(LazyThreadSafetyMode.NONE) { phraseBook() }
+        return { word -> book.builtInsOf(word, learnClock::calendar) }
+    }
 
     /** The characters by their parts' pinyin, as full pinyin offers them, but those blocked: none, the setting off. */
     private fun chaizi(): PartsLookup = if (!settings().chaizi) PartsLookup { emptyList() } else object : PartsLookup {

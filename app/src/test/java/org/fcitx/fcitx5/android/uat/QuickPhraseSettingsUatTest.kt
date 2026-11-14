@@ -561,6 +561,10 @@ class QuickPhraseSettingsUatTest {
                 "keyless ones added said last", QuickPhraseManager.Imported(3, 0, 0, keyless = 2),
                 said(R.string.quick_phrase_import_keyless, said(R.string.quick_phrase_import_done, 3, 0), 2),
             ),
+            Triple(
+                "past the list's limit: the rest said, not 'not a .mb file' when none went in", QuickPhraseManager.Imported(0, 0, 0, overLimit = 5),
+                said(R.string.import_over_limit, said(R.string.quick_phrase_import_done, 0, 0), 5, QuickPhraseManager.MAX_ENTRIES),
+            ),
         )
         assertRows(rows, { it.first }) { (_, r, expected) -> assertEquals(expected, quickPhraseImportToast(app, r)) }
     }

@@ -28,9 +28,19 @@ object LibimeFiles {
      *
      * @throws DataFormatException for a file that is not what it should be
      */
-    fun pinyinDictionary(data: ByteArray): List<String> {
+    fun pinyinDictionary(data: ByteArray): List<String> = ArrayList<String>().also { lines -> forEachPinyinLine(data) { lines += it } }
+
+    /**
+     * [pinyinDictionary]'s lines written to [out] as they are read, each ended by a newline: an import
+     * holds no list of a whole dictionary's strings beside its bytes (0.6.1 audit engine-08; zhwiki's is
+     * 64.5 MiB decompressed, and the import is to fit a 256 MB heap).
+     *
+     * @throws DataFormatException for a file that is not what it should be
+     */
+    fun writePinyinDictionary(data: ByteArray, out: Appendable) = forEachPinyinLine(data) { out.append(it).append('\n') }
+
+    private fun forEachPinyinLine(data: ByteArray, line: (String) -> Unit) {
         val trie = LibimeTrie.read(body(data, PINYIN_MAGIC, "pinyin dictionary", compressedFrom = 2))
-        val out = ArrayList<String>()
         trie.forEach { key, length, value ->
             var sep = 0
             while (sep < length && key[sep] != PINYIN_SEPARATOR) sep++
@@ -39,9 +49,8 @@ object LibimeFiles {
             val cost = Float.fromBits(value)
             if (cost.isNaN() || cost.isInfinite()) return@forEach
             val text = String(key, sep + 1, length - sep - 1, Charsets.UTF_8)
-            out += "${escapeValue(text)} $reading $cost"
+            line("${escapeValue(text)} $reading $cost")
         }
-        return out
     }
 
     private fun spell(bytes: ByteArray, from: Int, to: Int): String? {

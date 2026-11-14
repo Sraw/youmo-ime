@@ -115,15 +115,15 @@ the panel again through `updatePanel`.
   the host activates an input method it calls `setInputMethodActions(ic, …)`: `chttrans, punctuation,
   fullwidth` for a Chinese one, none otherwise (`instance.cpp:2491` clears, `androidengine.cpp:500-509`
   adds). A module acts on a context only while its action is in that list. `entries(ic)` is what the
-  panel shows (`StatusEntry`: id, name, icon, shortText; the app labels the three by `name`), `activate(ic, id)` a tap.
+  panel shows (`StatusEntry`: id, name, icon, shortText, active (each `StatusAction.active`, whether the toggle is on); the app labels the three by `name`), `activate(ic, id)` a tap.
 - **Tips** (`Tip`): Ctrl+. gives `PunctuationEnabled/Disabled` ("标点: 已启用全角标点。" / "标点: 全角标点已禁用。"),
   Ctrl+Shift+F `TraditionalEnabled` / `SimplifiedEnabled` ("切换到繁体中文: 已启用繁体中文。" / "切换到简体中文: 已启用简体中文。"):
   the app makes the text, "summary: body" as `androidnotification.cpp:84`. A tap in the status area tips nothing.
 - **`Punctuation`**: `PunctuationProfile.load(system, user)`: a user file replaces the built-in table
   wholesale; `parse` keeps fcitx's line rules, `fromEntries` the edit page's, `format` its save format.
-  Per-context state (`lastIsEngOrDigit`, `notConverted`, the pair stack) clears on reset; the key router
-  calls `pushPunctuationV2`, `cancelLast`, `getPunctuation(Candidates)` as `androidengine` calls
-  `IPunctuation`. `PunctuationConfig` is `punctuation.conf`; `save` is told of every change.
+  Per-context state (`lastIsEngOrDigit`, the pair stack) clears on reset; the key router
+  calls `pushPunctuationV2`, `getPunctuation`, `getPunctuationCandidates` as `androidengine` calls
+  `IPunctuation` (fcitx's V1 `pushPunctuation` and `cancelLast` have no caller here and are not ported). `PunctuationConfig` is `punctuation.conf`; `save` is told of every change.
   Rebuilding the state from surrounding text is not ported (unreachable today).
 - **`FullWidth`**: off at start, not saved, no hotkey; a press with no modifier of U+0020–U+007E commits
   its full-width form and is accepted, not filtered; the commit filter converts above space only.
@@ -162,7 +162,7 @@ the candidates once at the end of the event, for the active context only.
 |---|---|---|
 | `KeyRouter` | `androidengine.cpp` `keyEvent`/`send`/`show`/`activate`/`deactivate`/`reset`/`invokeActionImpl` | the pipeline's `KeyEngine`; a session that throws: panel cleared, session reset unless it never answered, one whose reset fails not reset again (`native-lib.cpp:722-745`) |
 | `KeyRouter.EngineCandidateList` | `EngineCandidateList` (`:75-239`) | page from the snapshot, the rest a chunk of 32 at a time, those before the page once; long press asked, then checked again on the same candidate |
-| `CommonCandidateList` | fcitx's | punctuation's marks; temp modes may use it |
+| `TempCandidateList` (`TempModeCandidates` on the panel) | fcitx's `CommonCandidateList` | the temp modes' lists and punctuation's marks |
 | `Panel` | `InputPanel` | per context (`InputContext.panel`); `reset` clears the overlay too; `empty` ignores it |
 | `Refiner` | `refine_` (`:26-28,706-721`) | 30 ms after a key, a slice at once after a slice; any event cancels it, a long-press menu holds it |
 | `Profile` | `InputMethodManager` load/save | fcitx's INI rules, through `IniFile`; defaults written as `# Key=`; other groups kept |
@@ -189,12 +189,12 @@ in a table) are filled in at `learnClock.calendar()`, so nothing in a replay rea
 
 ## Temp modes: quick input and Unicode
 
-Both are `PanelTempMode`s registered in this order in `TempModeManager` (fcitx loads quickphrase
+Both are `TempMode`s registered in this order in `TempModeManager` (fcitx loads quickphrase
 before unicode). They talk to the host through `TempModeHost`: `commit` goes through the pipeline's
 commit filters, `showPanel(ic, TempPanel)` hands over the mode's whole panel (preedit or client
 preedit, aux, `TempCandidateList`), `TempPanel.EMPTY` when the mode leaves — fcitx resets the input
 panel then, and the engine's panel only comes back with the engine's next event. A tapped candidate
-is `selectCandidate(ic, globalIndex)`. Paging constants (5 a page, Up/Down, Tab/Shift+Tab) are
+goes through the host's panel list (`HostCore`'s `TempModeCandidates`), which runs the candidate's `select`. Paging constants (5 a page, Up/Down, Tab/Shift+Tab) are
 `TempKeys`' (design §1.4); the lists' labels are fcitx's `keyToLabel` ("1. ", "A-1. ").
 
 - `QuickPhrase` (`modules/quickphrase/quickphrasetempmode.cpp`): Super+grave / Super+semicolon or

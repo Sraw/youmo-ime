@@ -277,9 +277,6 @@ interface LexiconApi {
     /** The lists imported, oldest first: see [Engines.importBatches]. */
     suspend fun importBatches(): List<ImportLayer.Batch>
 
-    /** The words only imported, of [batch] if given: see [Engines.importedWords]. */
-    suspend fun importedWords(batch: Int?): List<ImportLayer.Word>
-
     /** Undoes the list imported as [batch]: see [Engines.dropImport]. */
     suspend fun dropImport(batch: Int): Int?
 

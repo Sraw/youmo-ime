@@ -63,7 +63,7 @@ class T9KeyboardTest {
 
     @Test
     fun whileTypingTheColumnOffersTheSyllablesOfItsList() {
-        val state = EngineState.T9State(composing = true, syllables = listOf("ni", "mi", "o"), id = 3)
+        val state = T9State(composing = true, syllables = listOf("ni", "mi", "o"), id = 3)
         assertEquals(listOf("ni", "mi", "o"), T9Keyboard.labels(state))
         // fcitx's key for a Unicode character: 0x01000000 plus its code point
         assertEquals(
@@ -193,7 +193,7 @@ class T9KeyboardTest {
     @Test
     fun withNothingToOfferTheColumnCommitsPunctuation() {
         val zh = ChinesePunctuation.map
-        listOf(EngineState.T9State(), EngineState.T9State(composing = true)).forEach { state ->
+        listOf(T9State(), T9State(composing = true)).forEach { state ->
             // as the punctuation maps it, shown as typed: ，。？！ with Chinese punctuation on, , . ? ! with it off
             assertEquals(listOf("，", "。", "？", "！", "…"), T9Keyboard.labels(state, marks = zh).take(5))
             assertEquals(listOf(",", ".", "?", "!", "…"), T9Keyboard.labels(state).take(5))
@@ -246,11 +246,11 @@ class T9KeyboardTest {
         val looper = shadowOf(Looper.getMainLooper())
         looper.idleFor(1, TimeUnit.SECONDS)
         assertTrue(keyboard.isAttachedToWindow)
-        val twelve = EngineState.T9State(composing = true, syllables = List(12) { "ni" }, id = 1)
+        val twelve = T9State(composing = true, syllables = List(12) { "ni" }, id = 1)
         keyboard.show(twelve)
         // punctuation has no item 10: picked from the list shown when it ran, the click threw
         tap(keyboard.columnItem(10))
-        keyboard.show(EngineState.T9State())
+        keyboard.show(T9State())
         looper.idle()
         // nor did the user see the syllables of a list that came after their release
         tap(keyboard.columnItem(0))
@@ -328,9 +328,9 @@ class T9KeyboardTest {
         val sent = ArrayList<KeyAction>()
         val keyboard = keyboard(sent)
         keyboard.key('4').click()
-        keyboard.show(EngineState.T9State(composing = true, syllables = listOf("g", "h", "i"), id = 1))
+        keyboard.show(T9State(composing = true, syllables = listOf("g", "h", "i"), id = 1))
         // a candidate picked on the bar: nothing typed
-        keyboard.show(EngineState.T9State())
+        keyboard.show(T9State())
         keyboard.key('4').click()
         assertEquals(listOf(coded('4'), coded('4')), sent)
     }
@@ -342,7 +342,7 @@ class T9KeyboardTest {
         val keyboard = keyboard(sent)
         keyboard.key('1').click()
         // the punctuation resets the engine, which tells of nothing typed again
-        keyboard.show(EngineState.T9State())
+        keyboard.show(T9State())
         keyboard.key('1').click()
         assertEquals(listOf(KeyAction.CommitAction("，", punctuation = true), KeyAction.CommitAction("。", replacing = "，", punctuation = true)), sent)
     }
@@ -490,8 +490,8 @@ class T9KeyboardTest {
         assertTrue(english[1].any { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == "ghi" })
         assertTrue(english[1].any { it is CapsKey })
         assertFalse(english.flatten().any { (it.appearance as? KeyDef.Appearance.Text)?.displayText == "重输" })
-        assertEquals(listOf(",", ".", "?", "!", "'"), T9Keyboard.labels(EngineState.T9State(composing = true), english = true).take(5))
-        assertEquals(KeyAction.HostKeyAction(","), T9Keyboard.pick(EngineState.T9State(composing = true), 0, english = true))
+        assertEquals(listOf(",", ".", "?", "!", "'"), T9Keyboard.labels(T9State(composing = true), english = true).take(5))
+        assertEquals(KeyAction.HostKeyAction(","), T9Keyboard.pick(T9State(composing = true), 0, english = true))
     }
 
     @Test
@@ -543,13 +543,13 @@ class T9KeyboardTest {
             pickFirst()
             assertEquals(KeyAction.CommitAction("@"), sent.last())
             keyboard.address = AddressKeys.NONE
-            assertEquals(T9Keyboard.labels(EngineState.T9State(), english), column())
+            assertEquals(T9Keyboard.labels(T9State(), english), column())
         }
         // pinyin typed in an address field: its syllables still
-        val typing = EngineState.T9State(composing = true, syllables = listOf("ni", "mi"))
+        val typing = T9State(composing = true, syllables = listOf("ni", "mi"))
         assertEquals(listOf("ni", "mi"), T9Keyboard.labels(typing, address = AddressKeys.URL))
-        assertEquals(KeyAction.CommitAction(".com"), T9Keyboard.pick(EngineState.T9State(), 2, address = AddressKeys.URL))
-        assertEquals(KeyAction.CommitAction(".com"), T9Keyboard.pick(EngineState.T9State(composing = true), 2, english = true, address = AddressKeys.URL))
+        assertEquals(KeyAction.CommitAction(".com"), T9Keyboard.pick(T9State(), 2, address = AddressKeys.URL))
+        assertEquals(KeyAction.CommitAction(".com"), T9Keyboard.pick(T9State(composing = true), 2, english = true, address = AddressKeys.URL))
     }
 
     // no 中/英 on either since I1 (English's keyboard is its own setting); the globe, in an address field too
@@ -583,7 +583,7 @@ class T9KeyboardTest {
         try {
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("bu", "nu"), id = 1)
             looper.idle()
-            assertEquals(T9Keyboard.labels(EngineState.T9State()), column())
+            assertEquals(T9Keyboard.labels(T9State()), column())
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, composing = true, syllables = listOf("ni", "mi"), id = 2)
             looper.idle()
             assertEquals(listOf("ni", "mi"), column())
@@ -593,7 +593,7 @@ class T9KeyboardTest {
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("bu"), id = 3)
             activity.setContentView(keyboard)
             looper.idle()
-            assertEquals(T9Keyboard.labels(EngineState.T9State()), column())
+            assertEquals(T9Keyboard.labels(T9State()), column())
         } finally {
             EngineState.syllablesState.value = EngineState.SyllableState()
         }

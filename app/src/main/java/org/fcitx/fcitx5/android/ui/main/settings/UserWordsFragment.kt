@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.input.learning.clearAndTell
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
@@ -67,6 +68,9 @@ class UserWordsFragment : PaddingPreferenceFragment() {
 
     private lateinit var exportLauncher: ActivityResultLauncher<String>
 
+    // what is learned not reaching the disk now (LearnLog.saving): said at the top for as long as it lasts (decode-4)
+    private lateinit var notSaving: Preference
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { it?.let(::export) }
@@ -76,6 +80,13 @@ class UserWordsFragment : PaddingPreferenceFragment() {
         val ctx = requireContext()
         val screen = preferenceManager.createPreferenceScreen(ctx)
         preferenceScreen = screen
+        notSaving = Preference(ctx).apply {
+            isIconSpaceReserved = false
+            isSelectable = false
+            isVisible = false
+            setSummary(R.string.learning_not_saving)
+        }
+        screen.addPreference(notSaving)
         // not kept by this screen: the app's preference is, which ⋯ sets too
         habits = SwitchPreferenceCompat(ctx).apply {
             isPersistent = false
@@ -164,6 +175,7 @@ class UserWordsFragment : PaddingPreferenceFragment() {
             val counts = viewModel.fcitx.runOnReady { userWordCounts() }
             lists.forEach { (kind, pref) -> pref.summary = count(counts[kind] ?: 0) }
             val overview = viewModel.fcitx.runOnReady { learning(LearningOp.Overview) } as? LearningResult.Overview ?: return@launch
+            notSaving.isVisible = !overview.saving
             listed[LearningOp.Listed.PINS]?.summary = count(overview.pinned)
             listed[LearningOp.Listed.NO_PREDICT]?.summary = count(overview.noPredict)
         }
@@ -206,10 +218,9 @@ class UserWordsFragment : PaddingPreferenceFragment() {
     private fun clear(all: Boolean) {
         val ctx = requireContext()
         lifecycleScope.withLoadingDialog(ctx) {
-            val cleared = viewModel.fcitx.runOnReady { learning(LearningOp.ClearLearned(all)) }
             // works locked too (the record in memory then): what fails is the disk (review-E-ui S6)
-            // not on disk (locked since boot) is not now, as ⋯'s 清掉最近 says it (StatusAreaWindow)
-            ctx.toast(clearedMessage(cleared))
+            // not on disk (locked since boot) is not now, as ⋯'s 清掉最近 says it (PanelActions)
+            ctx.toast(viewModel.fcitx.runOnReady { clearAndTell(LearningOp.ClearLearned(all)) })
             refreshCounts()
         }
     }
@@ -236,11 +247,3 @@ internal fun blockedThatReturn(counts: Map<UserWord.Kind, Int>, tableBlocks: Lea
 @StringRes
 internal fun clearMessage(all: Boolean): Int =
     if (all) R.string.learning_clear_all_message else R.string.learning_clear_learned_message
-
-/** What 清掉学到的 tells: works locked too (the record in memory then), what fails is the disk; anything else is not now. */
-@StringRes
-internal fun clearedMessage(cleared: LearningResult?): Int = when (cleared) {
-    is LearningResult.Cleared -> R.string.learning_cleared
-    LearningResult.Failed -> R.string.learning_clear_failed
-    else -> R.string.learning_not_now
-}

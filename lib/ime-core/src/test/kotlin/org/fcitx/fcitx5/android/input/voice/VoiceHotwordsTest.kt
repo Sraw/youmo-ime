@@ -12,22 +12,25 @@ import org.junit.Test
 
 class VoiceHotwordsTest {
 
+    // a read's ticket, as VoiceEngine gets one: [VoiceHotwords.Remembered.shared] launching it
+    private fun VoiceHotwords.Remembered.ticket(): Long = shared<Long>({ false }) { it }
+
     @Test
     fun spelledACharacterAToken() {
-        assertEquals("佛 系", VoiceHotwords.spelled("佛系"))
-        assertEquals("幽 默 输 入 法", VoiceHotwords.spelled("幽默输入法"))
+        assertEquals("佛 系", HotwordSpelling.spelled("佛系"))
+        assertEquals("幽 默 输 入 法", HotwordSpelling.spelled("幽默输入法"))
     }
 
     @Test
     fun onlyChineseOfTwoCharactersAndMore() {
-        assertNull(VoiceHotwords.spelled("佛"))
-        assertNull(VoiceHotwords.spelled(""))
-        assertNull(VoiceHotwords.spelled("YYDS"))
-        assertNull(VoiceHotwords.spelled("A股"))
-        assertNull(VoiceHotwords.spelled("你好！"))
-        assertNull(VoiceHotwords.spelled("一二三四五六七八九十一二三"))
+        assertNull(HotwordSpelling.spelled("佛"))
+        assertNull(HotwordSpelling.spelled(""))
+        assertNull(HotwordSpelling.spelled("YYDS"))
+        assertNull(HotwordSpelling.spelled("A股"))
+        assertNull(HotwordSpelling.spelled("你好！"))
+        assertNull(HotwordSpelling.spelled("一二三四五六七八九十一二三"))
         // 𠮶仔: a character beyond the BMP
-        assertNull(VoiceHotwords.spelled("\uD842\uDFB6仔"))
+        assertNull(HotwordSpelling.spelled("\uD842\uDFB6仔"))
     }
 
     @Test
@@ -43,9 +46,8 @@ class VoiceHotwordsTest {
         )
         assertEquals(VoiceHotwords.Words("幽 默 :5.0/佛 系", "尬 聊/内 卷"), VoiceHotwords.ofUser(words))
         assertEquals(VoiceHotwords.Words.NONE, VoiceHotwords.ofUser(emptyList()))
-        // U-93 off: nothing of theirs listened for, the blocked never heard all the same
-        assertEquals(VoiceHotwords.Words("", "尬 聊/内 卷"), VoiceHotwords.ofUser(words, habits = false))
-        // words read with the switch on, handed to a listener once it is off: theirs dropped all the same
+        // U-93 off: nothing of theirs listened for, the blocked never heard all the same; so too for words
+        // read with the switch on and handed to a listener once it is off
         assertEquals(VoiceHotwords.Words("", "尬 聊/内 卷"), VoiceHotwords.ofUser(words).withHabits(false))
         assertEquals(VoiceHotwords.ofUser(words), VoiceHotwords.ofUser(words).withHabits(true))
     }
@@ -61,9 +63,9 @@ class VoiceHotwordsTest {
         // VO-10/VO-14 (F2458, F2467): an engine too busy to answer in time leaves the words last read in use, never none
         val remembered = VoiceHotwords.Remembered()
         val first = VoiceHotwords.Words("澜 境", "天 气")
-        assertEquals(first, remembered.inTime(remembered.read(remembered.start(), first)))
+        assertEquals(first, remembered.inTime(remembered.read(remembered.ticket(), first)))
         // the next read comes late: this listener has the first words
-        val late = remembered.start()
+        val late = remembered.ticket()
         assertEquals(first, remembered.inTime(null))
         val added = VoiceHotwords.Words("澜 境 花 园", "天 气")
         remembered.read(late, added)
@@ -74,8 +76,8 @@ class VoiceHotwordsTest {
     @Test
     fun aReadStartedEarlierButDoneLaterDoesNotReplaceANewerOne() {
         val remembered = VoiceHotwords.Remembered()
-        val older = remembered.start()
-        val newer = remembered.start()
+        val older = remembered.ticket()
+        val newer = remembered.ticket()
         val fresh = VoiceHotwords.Words("花 园", "")
         remembered.read(newer, fresh)
         remembered.read(older, VoiceHotwords.Words.NONE)

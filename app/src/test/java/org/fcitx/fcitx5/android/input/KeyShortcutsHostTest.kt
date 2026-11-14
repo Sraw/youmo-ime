@@ -120,6 +120,31 @@ class KeyShortcutsHostTest {
         assertEquals(4, h.field.selectionStart)
     }
 
+    // R25r3 F7921 (R25 F7834, the app's side): the cursor put at the field's start and 清除 swiped before the editor's
+    // report of it is in (the service has it after 界 still); the clear taken back leaves the cursor where the editor
+    // reports it then, before the text, not where the lagging report had it as the clear was made (after it). The
+    // runner passing the plan's own steps (EditPlan.Cleared.restore) left it at 4
+    @Test
+    @Uat("KB-62")
+    fun aClearMadeBeforeTheCursorsReportIsInIsPutBackWithTheCursorWhereItIsReportedThen() {
+        start("你好世界")
+        synced()
+        h.selectionLags = true
+        h.field.setSelection(0)
+        assertEquals("4..4", tracked())
+        swipe(backspace, up = true)
+        until("the field cleared") { h.field.text.isEmpty() }
+        // the report in
+        h.selectionLags = false
+        synced()
+        assertEquals("0..0", tracked())
+        swipe(backspace, up = false)
+        until("put back") { h.field.text.toString() == "你好世界" }
+        synced()
+        assertEquals(0, h.field.selectionStart)
+        assertEquals(0, h.field.selectionEnd)
+    }
+
     @Test
     fun pinyinClearedIsDroppedUncommittedAndTypedAgain() {
         start()

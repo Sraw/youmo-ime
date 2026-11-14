@@ -9,7 +9,8 @@ import java.text.Normalizer
 /**
  * A syllable with its tone, written out: pinyin with a tone mark (hǎo, lǜ) or zhuyin with its tone
  * sign (ㄏㄠˇ). Tones are numbered 1–4, [NEUTRAL] for the neutral tone (轻声); [NONE] means not known,
- * and callers leave such a character unmarked rather than guess.
+ * written as the syllable alone: callers write it toneless or leave it out rather than guess a tone
+ * (CandidateReadings: pinyin toneless, zhuyin left out, as there it would read as the first tone).
  */
 object ToneMark {
 

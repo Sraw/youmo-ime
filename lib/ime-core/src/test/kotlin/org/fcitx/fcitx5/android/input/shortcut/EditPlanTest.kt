@@ -101,7 +101,7 @@ class EditPlanTest {
     }
 
     private fun FakeEditor.restore(kept: ClearedText, typing: Boolean = false): Boolean =
-        kept.take(f, field(), typing)?.also { run(it.restore) } != null
+        kept.take(f, field(), typing)?.also { run(it.restoreAt(minOf(selectionStart, selectionEnd))) } != null
 
     @Test
     fun aClearTakesTheSelectionThenWhatIsBeforeTheCursorThenWhatIsAfter() {
@@ -158,6 +158,60 @@ class EditPlanTest {
         assertTrue(editor.restore(kept))
         assertEquals("hello", editor.text)
         assertEquals(0, editor.selectionStart)
+    }
+
+    // import-edit-5: an app that reads nothing before the cursor, the cursor reported past the start
+    @Uat("KB-62")
+    @Test
+    fun nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor() {
+        val kept = ClearedText()
+        val editor = FakeEditor("abc def", cursor = 3)
+        val clearing = EditPlan.clear(EditPlan.Field("", "", " def"), 3, 3, 1000, password = false)
+        assertEquals(listOf(EditPlan.Step.Delete(0, 4)), clearing.steps)
+        editor.run(clearing.steps)
+        assertEquals("abc", editor.text)
+        assertFalse("what is before the cursor never read", clearing.cleared!!.whole)
+        kept.remember(f, clearing.cleared)
+        assertTrue(editor.restore(kept))
+        assertEquals("abc def", editor.text)
+        assertEquals(3, editor.selectionStart)
+        assertEquals(3, editor.selectionEnd)
+    }
+
+    // R25 F7834: the cursor just put at the field's start, the report still where it was as 清除 is pressed.
+    // The field reads as the app above's does (nothing before a reported cursor past the start), so the
+    // clear cannot tell them apart; the report as the clear is taken back does: settled by then, at the
+    // start here and where it was there
+    @Test
+    fun whatIsAfterACursorWhoseReportLaggedIsPutBackWithTheCursorWhereTheEditorHasIt() = assertRows(
+        listOf(
+            Triple("the report lagged: the editor's cursor at the start", FakeEditor("abc def", cursor = 0), 0),
+            Triple("the app gives nothing before its cursor", FakeEditor("abc def", cursor = 3), 3),
+        ),
+        { it.first },
+    ) { (_, editor, cursor) ->
+        val after = editor.textAfterCursor(1000).toString()
+        val clearing = EditPlan.clear(EditPlan.Field("", "", after), 3, 3, 1000, password = false)
+        editor.run(clearing.steps)
+        assertEquals(cursor, editor.selectionStart)
+        // the editor's report, settled, as the app has it when the clear is taken back
+        editor.run(clearing.cleared!!.restoreAt(editor.selectionStart))
+        assertEquals("abc def", editor.text)
+        assertEquals(cursor, editor.selectionStart)
+        assertEquals(cursor, editor.selectionEnd)
+    }
+
+    // only a cursor left before the text put back goes by the later report: a selection's ends, and a
+    // report not known, stay as planned
+    @Test
+    fun theReportAsAClearIsTakenBackMovesOnlyACursorLeftBeforeTheText() {
+        val after = EditPlan.clear(EditPlan.Field("", "", "def"), 3, 3, 1000, password = false).cleared!!
+        assertEquals(after.restore, after.restoreAt(-1))
+        assertEquals(listOf(EditPlan.Step.Replace("def"), EditPlan.Step.Select(0, 0)), after.restoreAt(0))
+        val selection = EditPlan.clear(EditPlan.Field("ab", "cd", "ef"), 2, 4, 1000, password = false).cleared!!
+        assertEquals(selection.restore, selection.restoreAt(0))
+        val before = EditPlan.clear(EditPlan.Field("ab", "", "ef"), 2, 2, 1000, password = false).cleared!!
+        assertEquals(before.restore, before.restoreAt(0))
     }
 
     @Test

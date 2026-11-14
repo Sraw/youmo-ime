@@ -12,7 +12,8 @@ on:
       - opened
       - reopened
       - synchronize
-    paths:
+    # an anchor: push names the same paths (GitHub Actions reads YAML anchors)
+    paths: &paths
       - "app/src/main/java/org/fcitx/fcitx5/android/input/**"
       - "app/src/main/java/org/fcitx/fcitx5/android/data/theme/**"
       - "app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt"
@@ -33,25 +34,7 @@ on:
   push:
     branches:
       - main
-    # the same as pull_request's
-    paths:
-      - "app/src/main/java/org/fcitx/fcitx5/android/input/**"
-      - "app/src/main/java/org/fcitx/fcitx5/android/data/theme/**"
-      - "app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt"
-      - "app/src/main/res/**"
-      - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/input/**"
-      - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/table/**"
-      - "lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/engine/InputMethodCatalog.kt"
-      # the yield rules (scene.rules.KeyMarks) and the scene layout the test checks
-      - "lib/keyboard-scene/src/commonMain/**"
-      - "lib/keyboard-scene/build.gradle.kts"
-      - "app/src/test/java/org/fcitx/fcitx5/android/uat/KeyMarksEverywhereUatTest.kt"
-      - "app/src/test/java/org/fcitx/fcitx5/android/input/KeyboardHarness.kt"
-      - "app/src/test/resources/robolectric.properties"
-      - "app/build.gradle.kts"
-      - "gradle/libs.versions.toml"
-      - ".github/actions/setup-build/**"
-      - ".github/workflows/key_marks.yml"
+    paths: *paths
   schedule:
     - cron: "37 3 * * 2"
   workflow_dispatch:
@@ -90,6 +73,7 @@ jobs:
         uses: ./.github/actions/setup-build
         with:
           cmake: "true"
+          downloads: restore
           robolectric: robolectric-${{ matrix.sdk }}-keymarks
 
       - name: Run KeyMarksEverywhereUatTest

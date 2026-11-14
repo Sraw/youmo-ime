@@ -93,6 +93,9 @@ class FakeRecognizer : VoiceSession.Listening {
     /** 2 s of zeroes */
     fun silent() = events.silent()
 
+    /** the listener failing ([VoiceListener.Failure]): the models, the microphone, or recognizing */
+    fun fail(why: VoiceListener.Failure) = events.failed(why)
+
     /** a segment closed at an endpoint, the talk going on */
     fun heard(raw: String) = events.heard(live().closed(raw))
 

@@ -960,12 +960,73 @@ class ClearAndPacksTest(unittest.TestCase):
         dev.assert_not_called()
 
     def test_a_pack_already_at_the_builds_version_is_not_copied_again(self):
-        d = self.device(lambda cmd: "Result: Bundle[{text=v2}]")
+        sha = uat.file_sha256(__file__)
+        d = self.device(lambda cmd: f"{sha} g1-1\n" if cmd.startswith("cat ")
+                        else "g1-1\n" if cmd.startswith("run-as ") else "Result: Bundle[{text=v2}]")
         with mock.patch.object(uat, "BUILD", "debug"), \
                 mock.patch.object(uat, "pack_files", return_value={"text": (__file__, 2)}), \
                 mock.patch.object(uat.subprocess, "run") as run:
             uat.import_packs(d, voice=False)
         run.assert_not_called()
+
+    def test_a_pack_imported_by_hand_since_the_mark_is_imported_again(self):
+        # the app reports the build's version and the mark names the build's file, but another file of that
+        # version was imported in Settings since (a new generation); kept, the run would test that other pack
+        sha = uat.file_sha256(__file__)
+        rows = ((f"{sha} g1-1", "g2-1", "imported by hand after the runner's import: another generation"),
+                (sha, "g2-1", "a mark of the runner before generations were marked, a hand import after it"))
+        for mark, generation, why in rows:
+            with self.subTest(why):
+                d = self.device(lambda cmd: mark + "\n" if cmd.startswith("cat ")
+                                else generation + "\n" if cmd.startswith("run-as ")
+                                else "Result: Bundle[{result=imported:text:v2}]" if "--method import" in cmd
+                                else "Result: Bundle[{text=v2}]")
+                ok = SimpleNamespace(returncode=0, stdout="", stderr="")
+                with mock.patch.object(uat, "BUILD", "debug"), \
+                        mock.patch.object(uat, "pack_files", return_value={"text": (__file__, 2)}), \
+                        mock.patch.object(uat.subprocess, "run", return_value=ok) as run:
+                    uat.import_packs(d, voice=False)
+                run.assert_called_once()
+
+    def test_a_generation_not_readable_after_an_import_is_said(self):
+        # the mark is then "<sha> ", which never matches: each run copies the pack over adb again, said once a run
+        d = self.device(lambda cmd: "" if cmd.startswith(("cat ", "run-as "))
+                        else "Result: Bundle[{result=imported:text:v2}]" if "--method import" in cmd
+                        else "Result: Bundle[{text=v2}]")
+        ok = SimpleNamespace(returncode=0, stdout="", stderr="")
+        out = io.StringIO()
+        with mock.patch.object(uat, "BUILD", "debug"), \
+                mock.patch.object(uat, "pack_files", return_value={"text": (__file__, 2)}), \
+                mock.patch.object(uat.subprocess, "run", return_value=ok), contextlib.redirect_stdout(out):
+            uat.import_packs(d, voice=False)
+        self.assertIn("text pack's generation not readable", out.getvalue())
+
+    def test_a_run_takes_a_gates_emulator_dropping_its_mark(self):
+        # gates.py --keep leaves 5560 up and marked; a run on it (--devices 5560) makes it the run's, so a later
+        # gate refuses it instead of killing it under the run
+        d = self.device(lambda cmd: "1\n" if cmd.startswith("getprop") else "")
+        stop = RuntimeError("past the devices")
+        with mock.patch.object(uat, "BUILD", "debug"), mock.patch.object(uat, "Device", return_value=d), \
+                mock.patch.object(uat, "ours"), mock.patch.object(uat, "need_root"), mock.patch.object(uat, "install"), \
+                mock.patch.object(uat, "version", side_effect=stop), mock.patch.object(uat, "HTTP_PORT", 8000):
+            d.adb = lambda *a, **k: None
+            with self.assertRaises(RuntimeError):
+                uat.run_on(SimpleNamespace(no_voice=True), [], ["5560"])
+        self.assertIn(f"rm -f {uat.GATE_MARK}", d.calls)
+
+    def test_a_pack_rebuilt_at_the_same_version_is_imported_and_marked(self):
+        # the build's pack has another file than the one last imported: same version, new content
+        d = self.device(lambda cmd: "0" * 64 + " g1-1\n" if cmd.startswith("cat ")
+                        else "g3-1\n" if cmd.startswith("run-as ")
+                        else "Result: Bundle[{result=imported:text:v2}]" if "--method import" in cmd
+                        else "Result: Bundle[{text=v2}]")
+        ok = SimpleNamespace(returncode=0, stdout="", stderr="")
+        with mock.patch.object(uat, "BUILD", "debug"), \
+                mock.patch.object(uat, "pack_files", return_value={"text": (__file__, 2)}), \
+                mock.patch.object(uat.subprocess, "run", return_value=ok) as run:
+            uat.import_packs(d, voice=False)
+        run.assert_called_once()
+        self.assertTrue(any(f"{uat.file_sha256(__file__)} g3-1" in c and "text.sha256" in c for c in d.calls))
 
 
 class PlugTest(unittest.TestCase):

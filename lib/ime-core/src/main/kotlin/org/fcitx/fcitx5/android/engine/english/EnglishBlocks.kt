@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.english
 
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.write
+import org.fcitx.fcitx5.android.engine.store.Unsaved
 import org.fcitx.fcitx5.android.engine.store.replaceFile
 import java.io.IOException
 
@@ -19,6 +20,8 @@ import java.io.IOException
 class EnglishBlocks(private val dir: UserFiles?, private val onError: (IOException) -> Unit = {}) {
     // a file that did not read is not written over: what is in memory is not all of it
     private var unread = false
+    // lines this build does not take for a word (a later build's, say), written back as they were (decode-9)
+    private val unknown = ArrayList<String>()
     private val words: LinkedHashSet<String> = read()
 
     /** The words blocked, as written when blocked. */
@@ -42,13 +45,31 @@ class EnglishBlocks(private val dir: UserFiles?, private val onError: (IOExcepti
     fun unblock(texts: Collection<String>): List<String> =
         texts.filter { words.remove(it) }.also { if (it.isNotEmpty()) write() }
 
+    /**
+     * U-86 「全部清空」: no word blocked, and the lines not taken for a word gone with them; a file that did
+     * not read deleted unread (R25 F7961), as [WordLists.clear][org.fcitx.fcitx5.android.engine.user.WordLists.clear].
+     */
+    fun clear() {
+        if (unread) {
+            words.clear()
+            unknown.clear()
+            val file = dir?.file(FILE)
+            if (file != null && file.taken() && !file.delete()) onError(Unsaved("$file did not read: not cleared")) else unread = false
+            return
+        }
+        if (words.isEmpty() && unknown.isEmpty()) return
+        words.clear()
+        unknown.clear()
+        write()
+    }
+
     private fun read(): LinkedHashSet<String> {
         val out = LinkedHashSet<String>()
         val file = dir?.file(FILE) ?: return out
         try {
             if (file.taken()) {
                 file.input().bufferedReader().useLines { lines ->
-                    lines.map(String::trim).filter(EnglishText::isWord).forEach { out.add(it) }
+                    lines.map(String::trim).filter(String::isNotEmpty).forEach { if (EnglishText.isWord(it)) out.add(it) else unknown += it }
                 }
             }
         } catch (e: IOException) {
@@ -62,17 +83,18 @@ class EnglishBlocks(private val dir: UserFiles?, private val onError: (IOExcepti
         val dir = dir ?: return
         val file = dir.file(FILE)
         if (unread) {
-            onError(IOException("$file did not read: not written over"))
+            onError(Unsaved("$file did not read: not written over"))
             return
         }
         try {
             dir.mkdirs()
             // the whole list or the one before it, never half of one
             replaceFile(file, dir.file("$FILE.new")) { temp ->
-                temp.write(words.joinToString("") { "$it\n" }.toByteArray())
+                temp.write((words + unknown).joinToString("") { "$it\n" }.toByteArray())
             }
         } catch (e: IOException) {
-            onError(e)
+            // kept in memory till the next start, as WordLists'
+            onError(Unsaved("$file not written", e))
         }
     }
 

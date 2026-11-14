@@ -84,7 +84,10 @@ class AssetPacksPlugin : Plugin<Project> {
             "voice" to listOf("voice/"),
         )
 
-        /** The tasks whose outputs (each a directory of asset paths) make each pack. */
+        /**
+         * The tasks whose outputs (each a directory of asset paths) make each pack. An engine data task added to the
+         * text pack goes into EngineDataPlugin's DATA_CONFIGURATION too, which :lib:ime-eval's replay reads.
+         */
         private val SOURCES = mapOf(
             "text" to listOf(
                 EngineDataPlugin.COMPILE_TASK, EngineDataPlugin.ENGLISH_TASK, EngineDataPlugin.MODEL_TASK,
@@ -137,8 +140,6 @@ class AssetPacksPlugin : Plugin<Project> {
 
         fun keyName(raw: ByteArray) = hex(MessageDigest.getInstance("SHA-256").digest(raw)).take(16)
 
-        fun hex(bytes: ByteArray) = bytes.joinToString("") { "%02x".format(it.toInt() and 0xff) }
-
         fun stored(zip: ZipOutputStream, name: String, size: Long, crc: Long, write: (ZipOutputStream) -> Unit) {
             val entry = ZipEntry(name)
             entry.method = ZipEntry.STORED
@@ -180,6 +181,9 @@ class AssetPacksPlugin : Plugin<Project> {
          */
         fun changed(old: Listing?, now: Listing): Boolean {
             if (old == null) return true
+            if (now.version < old.version) {
+                throw GradleException("the ${now.id} pack's version ${now.version} is below the last release's ${old.version}: app/packs.properties")
+            }
             if (old.contentSha256 != now.contentSha256 && old.version == now.version) {
                 throw GradleException("the ${now.id} pack's content changed but its version is still ${now.version}: raise ${now.id}.version in app/packs.properties")
             }
@@ -239,7 +243,7 @@ class AssetPacksPlugin : Plugin<Project> {
 
         /** The signing key's path as set: `~/` is [home], a relative path [root]'s (not the Gradle daemon's directory); empty stays empty */
         fun resolveKeyPath(value: String, root: File, home: String): String {
-            val path = value.trim().replaceFirst(Regex("^~(?=/)"), Regex.escapeReplacement(home))
+            val path = homed(value, home)
             return if (path.isEmpty() || File(path).isAbsolute) path else root.resolve(path).path
         }
 
@@ -254,8 +258,13 @@ class AssetPacksPlugin : Plugin<Project> {
          * bundle (APK + text pack) and the voice bundle (APK + both), each pack, and
          * `release-packs.json` (read back by [Listing.readAll] as the next release's [before]).
          * Every check before anything is written: a failed run leaves nothing that looks releasable.
+         * The APK: signed (AGP names one without a key `*-unsigned.apk`), not [profileable] (a test build's),
+         * built at a release's or pre-release's tag ([version] not `0.6.0-5-gabc1234` nor `0.6.0-untagged`).
          */
-        fun writeBundles(apk: File, text: Listing, voice: Listing, version: String, before: Map<String, Listing>, out: File) {
+        fun writeBundles(apk: File, text: Listing, voice: Listing, version: String, before: Map<String, Listing>, out: File, profileable: Boolean = false) {
+            if (apk.name.endsWith("-unsigned.apk")) throw GradleException("${apk.name} is not signed: set the release key (SIGN_KEY_FILE or SIGN_KEY_BASE64, BUILDING.md)")
+            if (profileable) throw GradleException("buildProfileable is set: a release APK is never profileable (unset BUILD_PROFILEABLE / -PbuildProfileable)")
+            if (!Versions.isTaggedName(version)) throw GradleException("version $version is not a release's tag: build at the release's tag (git tag v<version>)")
             val packs = listOf(text, voice)
             packs.forEach { check(it.releaseKey) { "the ${it.id} pack is signed with the test key: a release ships the release key's" } }
             val changed = packs.map { changed(before[it.id], it) }
@@ -354,6 +363,7 @@ class AssetPacksPlugin : Plugin<Project> {
                     voicePack.set(packs.getValue("voice").flatMap { it.outputDir })
                     dependsOn(packs.values)
                     versionName.set(variant.outputs.first().versionName)
+                    profileable.set(target.buildProfileable)
                     val released = target.layout.projectDirectory.file(RELEASED)
                     previous.set(
                         target.providers.gradleProperty("previousPacks").map { root.file(it) }
@@ -489,6 +499,9 @@ class AssetPacksPlugin : Plugin<Project> {
         @get:Input
         abstract val versionName: Property<String>
 
+        @get:Input
+        abstract val profileable: Property<Boolean>
+
         @get:Optional
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NONE)
@@ -513,7 +526,7 @@ class AssetPacksPlugin : Plugin<Project> {
             val packs = listOf("text" to textPack, "voice" to voicePack).map { (id, dir) ->
                 Listing.read(dir.get().asFile.listFiles().orEmpty().single { it.name.startsWith("youmo-$id-") && it.name.endsWith(".json") })
             }
-            writeBundles(apk, packs[0], packs[1], versionName.get(), before, outputDir.get().asFile)
+            writeBundles(apk, packs[0], packs[1], versionName.get(), before, outputDir.get().asFile, profileable.get())
             logger.lifecycle(
                 packs.joinToString("\n") { p ->
                     val old = before[p.id]

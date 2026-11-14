@@ -42,7 +42,6 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.LearningUse
 import org.fcitx.fcitx5.android.engine.user.WordPack
-import org.fcitx.fcitx5.android.eval.parity.PARITY_COMMANDS
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import java.io.File
 import java.io.RandomAccessFile
@@ -193,13 +192,42 @@ internal val COMMANDS = listOf(
         sentences(dataPath, setPath, outPath, RunOptions(args.options))
     },
     // the voice post-processing on voice-eval's recorded stretches (seg_app.py), no recognizer: dev/design/060-voice-post.md §5
-    Command("voice-post", "<seg-set.jsonl>... [--source app|top] [--misses <out.tsv>] [--texts <out.tsv>]", 1..Int.MAX_VALUE, "source", "misses", "texts") { args, out, err ->
+    // --source tagged: the rerank's text through the polish tagger's labels as voice-eval exported them (VoicePostRun.Tagged),
+    // the app's whole post-processing; --guard off scores them unguarded
+    Command(
+        "voice-post",
+        "<seg-set.jsonl>... [--source app|top|tagged] [--tagger <polish-tagger.json>] [--guard on|off] [--misses <out.tsv>] [--texts <out.tsv>]",
+        1..Int.MAX_VALUE, "source", "tagger", "guard", "misses", "texts",
+    ) { args, out, err ->
         val source = args.options["source"] ?: "app"
-        if (source !in setOf("app", "top")) {
-            err.appendLine("voice-post: --source app or top, not $source")
+        if (source !in setOf("app", "top", "tagged")) {
+            err.appendLine("voice-post: --source app, top or tagged, not $source")
             return@Command null
         }
-        VoicePostRun.run(args.operands, source, args.options["misses"], out, args.options["texts"])
+        val tagger = args.options["tagger"]
+        if ((source == "tagged") != (tagger != null)) {
+            err.appendLine("voice-post: --tagger goes with --source tagged, and only with it")
+            return@Command null
+        }
+        val guard = args.options["guard"] ?: "on"
+        if (guard !in setOf("on", "off")) {
+            err.appendLine("voice-post: --guard on or off, not $guard")
+            return@Command null
+        }
+        // the guards are the tagger's labels': without them it would run as given and say nothing
+        if (args.options["guard"] != null && tagger == null) {
+            err.appendLine("voice-post: --guard goes with --source tagged, and only with it")
+            return@Command null
+        }
+        try {
+            val polish = tagger?.let { VoicePostRun.Polish(VoicePostRun.tags(File(it)), guard == "on") }
+            VoicePostRun.run(args.operands, source, args.options["misses"], out, args.options["texts"], polish)
+        } catch (e: VoicePostRun.BadInput) {
+            // a tagger file or a record read wrong, named by VoicePostRun: said as a failed run, not a stack trace;
+            // anything else thrown is the tool's own and fails loudly
+            err.appendLine("voice-post: ${e.message}")
+            1
+        }
     },
     Command("lm", "<model.safetensors> <context> <text>...", 3..Int.MAX_VALUE) { args, out, _ ->
         val (modelPath, context) = args.operands
@@ -320,7 +348,7 @@ internal val COMMANDS = listOf(
             0
         }
     },
-) + PARITY_COMMANDS
+)
 
 val USAGE = "usage: " + COMMANDS.joinToString("\n       ") { "${it.name} ${it.usage}" } + """
 schemes: ${(ShuangpinSet.SCHEMES.keys + ShuangpinSet.GROUPED.keys + T9Set.SCHEMES + ZhuyinSet.SCHEMES.keys + NO_LATIN).joinToString(" ")}

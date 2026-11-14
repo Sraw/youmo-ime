@@ -5,12 +5,16 @@
 package org.fcitx.fcitx5.android.input.status
 
 import android.view.View
+import androidx.core.view.isVisible
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
@@ -38,8 +42,13 @@ import splitties.views.backgroundColor
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.horizontalLayout
 import splitties.views.dsl.core.lParams
+import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.textView
+import splitties.views.dsl.core.verticalLayout
+import splitties.views.dsl.core.wrapContent
 import splitties.views.dsl.recyclerview.recyclerView
 import splitties.views.recyclerview.gridLayoutManager
+import timber.log.Timber
 
 class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     InputBroadcastReceiver {
@@ -103,11 +112,29 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
         }
     }
 
+    // learning stopped reaching the disk (a write refused, the record not opened again): said on
+    // top of the panel while it lasts, as on top of 用户词库 (R25 decode-1)
+    private val notSaving by lazy {
+        context.textView {
+            setText(R.string.learning_not_saving)
+            textSize = 12f
+            setTextColor(theme.keyTextColor)
+            setPadding(dp(12), dp(8), dp(12), 0)
+            isVisible = false
+        }
+    }
+
     val view by lazy {
-        context.recyclerView {
+        context.verticalLayout {
             ThemeColors.panel(ThemeManager.shownLook(theme).palette, ThemeManager.shownLook(theme).keys)?.let { backgroundColor = it }
-            layoutManager = gridLayoutManager(4)
-            adapter = this@StatusAreaWindow.adapter
+            add(notSaving, lParams(matchParent, wrapContent))
+            add(
+                context.recyclerView {
+                    layoutManager = gridLayoutManager(4)
+                    adapter = this@StatusAreaWindow.adapter
+                },
+                lParams(matchParent, matchParent),
+            )
         }
     }
 
@@ -186,7 +213,14 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     override fun onAttached() {
         fcitx.launchOnReady {
             val data = it.statusArea()
+            // only whether it saves, not the overview (the record's state and every list of the user's words
+            // counted, on the fcitx thread, before the panel showed anything: R25r2 F7897); asked each time the
+            // panel opens. One that fails leaves the notice off, the panel shown
+            val saving = runCatching { (it.learning(LearningOp.Saving) as? LearningResult.Saving)?.saving }
+                .onFailure { e -> if (e is CancellationException) throw e else Timber.w(e, "status panel: whether learning saves not read") }
+                .getOrNull() ?: true
             imeScope.launch {
+                notSaving.isVisible = !saving
                 onStatusAreaUpdate(data)
             }
         }

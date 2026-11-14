@@ -9,6 +9,7 @@ import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -17,6 +18,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.junit.After
@@ -139,6 +141,45 @@ class CandidateReadingsUatTest {
         for (style in listOf(ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) for (sp in listOf(20, 28)) {
             shown(style, sp, "handwriting_${style.key.lowercase()}_${sp}sp_land", handwriting = true)
         }
+    }
+
+    // PY-121: a candidate of no reading (a rare character whose tone is not known, in zhuyin; an emoji) on the
+    // same baseline as its neighbours read (the user, 2026-11-14): with pinyin, it once stood centred in the
+    // taller bar, half the reading's line above them
+    @Test
+    @Uat("PY-121")
+    fun aCandidateOfNoReadingStandsOnItsNeighboursBaseline() {
+        val words = listOf("你", "纯", "䏝", "😀")
+        // R25r4 F7973: a row a style, each its own style and harness (closed as the row ends), so a pinyin row failing
+        // does not hide zhuyin's
+        fun onOneBaseline(style: ReadingStyle, read: List<List<String>>, capture: String?) {
+            EngineState.candidateReadingState.value = style
+            try {
+                KeyboardHarness().start().use { h ->
+                    h.api.candidates = Array(words.size) { CandidateWord("", words[it], "", readings = read[it]) }
+                    h.emit(HostEvent.Candidates(words.size, h.api.candidates.toList()))
+                    h.relayout()
+                    val bar = h.inputView.findViewById<View>(R.id.candidate_view)
+                    val cells = KeyboardHarness.all(bar).filterIsInstance<AutoScaleTextView>().filter { h.shown(it) }.toList()
+                    val baselines = words.map { w ->
+                        val v = cells.single { it.text.toString().endsWith(w) }
+                        h.box(v).top + v.baseline
+                    }
+                    assertEquals("$style: ${words.zip(baselines)}", 1, baselines.toSet().size)
+                    capture?.let { h.capture(it) }
+                }
+            } finally {
+                EngineState.candidateReadingState.value = ReadingStyle.OFF
+            }
+        }
+        assertRows(
+            "pinyin: 䏝 read by its toneless syllable, the emoji's reading line above it left empty, all on one baseline" to {
+                onOneBaseline(ReadingStyle.PINYIN, listOf(listOf("nǐ"), listOf("chún"), listOf("chun"), emptyList()), "CandidateReadingsUatTest/unread_pinyin_port")
+            },
+            "zhuyin: 䏝 of no tone given no reading, the readings beside the characters, no room above any" to {
+                onOneBaseline(ReadingStyle.ZHUYIN, listOf(listOf("ㄋㄧˇ"), listOf("ㄔㄨㄣˊ"), emptyList(), emptyList()), null)
+            },
+        )
     }
 
     @Test

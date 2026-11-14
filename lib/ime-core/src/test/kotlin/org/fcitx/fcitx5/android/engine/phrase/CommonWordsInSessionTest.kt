@@ -42,7 +42,7 @@ class CommonWordsInSessionTest {
     private fun words(text: String) = CommonWords.parse(text).words
 
     private val log = LearnLog(null).apply { open() }
-    private val written = ArrayList<LearnRecord>().also { w -> log.appended = { w += it } }
+    private val written = ArrayList<LearnRecord>().also { w -> log.appended = { r, _ -> w += r } }
 
     private fun session(
         book: CommonWordBook,

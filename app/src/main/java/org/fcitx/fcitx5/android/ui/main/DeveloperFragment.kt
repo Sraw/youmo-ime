@@ -106,8 +106,10 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                     .setNegativeButton(android.R.string.cancel, null)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         lifecycleScope.launch {
-                            HostDaemon.restartFcitx()
-                            context.toast(R.string.done)
+                            // waits for a host still starting: off the main thread
+                            val restarted = withContext(Dispatchers.IO) { HostDaemon.restartFcitx() }
+                            // one that stayed starting was not restarted, or was and the new one is starting still: not said done (R25r2 F7883)
+                            context.toast(if (restarted) R.string.done else R.string.restart_fcitx_still_starting)
                         }
                     }
                     .show()

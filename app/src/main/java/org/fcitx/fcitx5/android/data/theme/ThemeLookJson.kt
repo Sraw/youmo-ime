@@ -167,7 +167,7 @@ internal data class PaletteJson(
     }
 }
 
-// as 2.1's crop rectangle was written (RectSerializer): its fields by name, in this order
+// as 2.1's crop rectangle was written (by a RectSerializer since removed): its fields by name, in this order
 @Serializable
 internal data class BoxJson(val bottom: Int, val left: Int, val right: Int, val top: Int) {
     fun toBox() = Box(left, top, right, bottom)

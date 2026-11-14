@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.LogFile
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.session.Session
+import org.fcitx.fcitx5.android.engine.store.RecordStore
 import org.fcitx.fcitx5.android.engine.table.OlderTableLog
 import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.UserModel
@@ -63,6 +64,7 @@ internal class LearningFacade(
     addresses: () -> AddressData? = { null },
     putAddresses: (AddressData, merge: Boolean) -> Unit = { _, _ -> },
     private val unkept: () -> Unit = {},
+    private val openAppend: (LogFile) -> OutputStream = LogFile::append,
 ) {
     // the imported words (U-101): in the learning record, told to the user model
     val imports = ImportLayer(::learnLog, { lexicon.user() }, { lexicon.isBlockedWord(it) }, invalidate, learnClock)
@@ -82,7 +84,7 @@ internal class LearningFacade(
 
     /** The record, opened at its first use. */
     fun learnLog(): LearnLog = learnLog ?: run {
-        val log = LearnLog(userDir?.file(LearnLog.FILE), learnClock, onError = onError, background = compactions, unkept = unkept)
+        val log = LearnLog(userDir?.file(LearnLog.FILE), learnClock, onError = onError, background = compactions, unkept = unkept, openAppend = openAppend)
         learnLog = log
         // 0.4 stopped before it put an older build's learning in place (its mark left): told once, as none reads it
         // now; the mark left for a 0.4 put back
@@ -106,9 +108,6 @@ internal class LearningFacade(
         keepOlderTablePhrases(opened)
         opened
     }
-
-    /** The record if it is open: none opened to answer. */
-    val openLog: LearnLog? get() = learnLog
 
     /**
      * Once, at the first open of a build past 0.4 (its mark beside the record then): the phrases 0.4's
@@ -218,7 +217,9 @@ internal class LearningFacade(
 
     // the learning record rewritten whole by [transform] (LearnLog.rewrite), the sessions made anew on it. A record
     // that did not open learns in memory, where a rewrite does not last: an error then, so a restore says so and a
-    // settings zip's stash is kept for the next start (what is written is on disk, or it was not written)
+    // settings zip's stash is kept for the next start (what is written is on disk, or it was not written).
+    // The file is compared with what [transform] wrote: a transform that writes a header alone would not match
+    // (the store marks such a log emptied behind it, R25 F8000), but a restore and a revert always write HEAD (BackupControl)
     private fun rewriteLearning(transform: (ByteArray, OutputStream) -> Boolean): Boolean {
         var wrote: ByteArray? = null
         val done = learnLog().rewrite { log, out ->
@@ -254,7 +255,7 @@ internal class LearningFacade(
     fun predictionOff(prev: String, next: String) = learnLog?.state?.noPredict?.contains(prev to next) == true
 
     // the user's acts on what was learned (impl/streams/E-design.md): the older builds' logs go with what is cleared
-    private val control = LearningControl(::learnLog, learnClock, legacy = ::retired, onError = onError)
+    private val control = LearningControl(::learnLog, learnClock, legacy = ::retired, copies = { userDir?.let(::keptAside).orEmpty() }, onError = onError)
 
     // what a clear deletes of the older builds' files: the tables' logs with a clear of everything, or once read
     // into the record (TABLE_LOGS_READ), not before: their phrases are the user's still (F2 review B2)
@@ -263,6 +264,14 @@ internal class LearningFacade(
         val tableLogs = if (all || dir.file(Engines.TABLE_LOGS_READ).taken()) TABLES.keys.map { OlderTableLog.file(dir, it) } else emptyList()
         return LearningControl.retired(dir, tableLogs) + legacyFiles
     }
+
+    // the record's copies kept aside whole (RecordStore.KeptAside): a clear, of everything or of any time, means
+    // gone, and a copy cannot lose a time alone (user's decision decode-3; apart from the older builds' files,
+    // which only a clear of today or more takes: R25 F7925). Listed, by the name a clear sets
+    // aside renames from, so that one a clear killed half-way left is found again (LearningControl.resumeDrop)
+    private fun keptAside(dir: UserFiles): List<LogFile> =
+        dir.files().map { it.removeSuffix(LearningControl.CLEARED) }.distinct()
+            .filter { RecordStore.isAside(LearnLog.FILE, it) }.map(dir::file)
 
     private val ops by lazy(LazyThreadSafetyMode.NONE) {
         LearningOps(

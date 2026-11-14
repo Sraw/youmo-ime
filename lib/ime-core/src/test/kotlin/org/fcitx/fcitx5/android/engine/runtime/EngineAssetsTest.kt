@@ -300,6 +300,17 @@ class EngineAssetsTest : EnginesFixture() {
         assertEquals(expected, refined)
     }
 
+    // engine-13: an optional file that does not make sense (IllegalArgumentException, as a sentence model's has it)
+    // falls back as one not in the pack does, the stroke lookup's too: told once, none, never thrown
+    @Test
+    fun anOptionalFileThatDoesNotReadFallsBackOneWay() {
+        val errors = ArrayList<IOException>()
+        val bad = EngineAssets({ if (it == InputMethodCatalog.STROKE_DATA) throw IllegalArgumentException("garbled") else load(it) }, { errors += it }, null)
+        assertNull(bad.strokes())
+        assertNull(bad.strokes())
+        assertEquals(1, errors.size)
+    }
+
     private companion object {
         const val MAX_SLICES = 10_000
         const val PICKS = 20

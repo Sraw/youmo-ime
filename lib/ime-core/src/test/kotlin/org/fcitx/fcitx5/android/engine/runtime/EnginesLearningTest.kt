@@ -4,7 +4,10 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
@@ -26,6 +29,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.write
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -413,6 +417,70 @@ class EnginesLearningTest : EnginesFixture() {
             assertTrue(engines.op(LearningOp.ClearRecent(LearningOp.Span.TODAY)) is LearningResult.Cleared)
         }
         assertFalse(log.exists())
+    }
+
+    // user's decision decode-3: the copies of the record kept aside go with a clear of everything and with one of a time
+    // (a copy cannot lose a time alone); nothing else named alike. An older build's file (the second of a row: whether
+    // it is left) goes only with a clear of today or more, as before
+    @Uat("WD-47")
+    @Test
+    fun aClearTakesTheCopiesOfTheRecordKeptAside() = assertRows(
+        listOf(
+            Triple("全部清空: the record and all beside it", LearningOp.ClearLearned(true), false),
+            // R25 F7923: WD-47's own step, 清空学到的 without 全部清空
+            Triple("清空学到的, 全部清空 not ticked: the copies are of what was learned", LearningOp.ClearLearned(false), false),
+            Triple("a clear of today: a copy cannot lose a time alone, so the whole copy", LearningOp.ClearRecent(LearningOp.Span.TODAY), false),
+            // R25 F7925: the shorter spans left the copies, against WD-47 and what the settings say
+            Triple("a clear of 10 minutes: the copies as today's, the older builds' files left", LearningOp.ClearRecent(LearningOp.Span.TEN_MINUTES), true),
+            Triple("a clear of an hour: the copies as today's, the older builds' files left", LearningOp.ClearRecent(LearningOp.Span.HOUR), true),
+        ),
+        { it.first },
+    ) { (why, op, olderLeft) ->
+        val files = MemoryFiles()
+        val copies = listOf("learn.log.unreadable", "learn.log.unreadable.1").map { files.file(it).apply { write("x".toByteArray()) } }
+        val other = files.file("learn.log.unreadable.x").apply { write("x".toByteArray()) }
+        val older = files.file("pinyin.user").apply { write("x".toByteArray()) }
+        Engines(::load, files, warmUps = inPlace).use { engines ->
+            engines.learnNi()
+            assertTrue(engines.op(op) is LearningResult.Cleared)
+        }
+        copies.forEach { assertFalse("$it", it.exists()) }
+        assertTrue(other.exists())
+        assertEquals(why, olderLeft, older.exists())
+    }
+
+    // decode-3 (R25 F7860): a clear killed between setting a copy aside (renamed `.cleared`) and deleting it is
+    // finished as the record next opens: the copy is found by the name it was renamed from, though no file
+    // of that name is listed any more
+    @Test
+    fun aCopyKeptAsideThatAKilledClearLeftRenamedIsGoneAtTheNextStart() {
+        val left = listOf("learn.log.unreadable.cleared", "learn.log.unreadable.1.cleared").map { root.file(it).apply { write("x".toByteArray()) } }
+        // not a copy's name: not this clear's to take
+        val other = root.file("learn.log.unreadable.x.cleared").apply { write("x".toByteArray()) }
+        // R25 F7925: the copies alone set aside may be a clear of 10 minutes', which takes no older build's file
+        val older = root.file("pinyin.user").apply { write("x".toByteArray()) }
+        engines().use { it.learnNi() }
+        left.forEach { assertFalse("$it", it.exists()) }
+        assertTrue(other.exists())
+        assertTrue(older.exists())
+    }
+
+    // R25 F7821: 全部清空 is as just installed: the lines of the word lists this build does not read (a later
+    // build's, kept through ordinary changes: decode-9) go too, or that build would block the word again
+    @Test
+    @Uat("WD-25")
+    fun aClearOfEverythingEmptiesTheWordListsOfTheLinesThisBuildDoesNotRead() {
+        val lists = mapOf(
+            WordLists.ADDED to "拟好 ni'hao\n幽默 you'mo 2 later\n",
+            WordLists.BLOCKED to "你好 ni'hao 1.5 later\n",
+            EnglishBlocks.FILE to "the\n!later form\n",
+        )
+        lists.forEach { (name, text) -> root.file(name).write(text.toByteArray()) }
+        engines().use { engines ->
+            engines.learnNi()
+            assertTrue(engines.op(LearningOp.ClearLearned(true)) is LearningResult.Cleared)
+        }
+        assertEquals(lists.mapValues { "" }, lists.mapValues { root.file(it.key).read().decodeToString() })
     }
 
     @Test

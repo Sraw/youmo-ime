@@ -110,7 +110,7 @@ class GroupedKeyboardUatTest {
 
     // fcitx's Chinese punctuation, as its addon has it on
     private fun chinesePunctuation(im: InputMethodEntry, vararg marks: Pair<String, String>) {
-        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+        val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", "", true))
         // cached as the real host caches what it sent: an input view made anew replays these
         h.api.statusAreaCached = active
         h.api.punctuationCached = marks.toMap()

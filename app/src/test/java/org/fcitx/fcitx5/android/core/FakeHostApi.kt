@@ -156,8 +156,6 @@ class FakeHostApi : HostApi {
 
     override suspend fun importBatches(): List<ImportLayer.Batch> = importBatches.toList()
 
-    override suspend fun importedWords(batch: Int?): List<ImportLayer.Word> = emptyList()
-
     // the batch's words left, taken out of [importBatches]; null for none such
     override suspend fun dropImport(batch: Int): Int? {
         calls += "dropImport($batch)"

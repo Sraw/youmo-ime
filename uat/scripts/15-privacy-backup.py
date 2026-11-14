@@ -318,9 +318,10 @@ case("PR-17", needs="jvm:WordsUatTest.notUsingMyHabitsAsFreshlyInstalledButForWh
 
 
 case("PR-17a", needs="jvm:PrivacyUatTest.notUsingHabitsTheBaseDictionaryStillTypes")(lambda d: None)
+case("PR-17b", needs="jvm:EnginesBorrowedPhrasesTest.aSwitchOfTheHabitsOrThePhrasesReadAnewChangesTheBookThatDecides")(lambda d: None)
 
 
-case("PR-21", needs="jvm:PrivacyUatTest.clearingTheLastHourForgetsItsPicksNotThePins")(lambda d: None)
+case("PR-21", needs="jvm:PrivacyUatTest.clearingTheLastHourForgetsItsPicksNotThePins、LearningControlTest.aClearOfAllTheRecordHoldsEmptiesIt")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 自动备份
@@ -391,3 +392,7 @@ case("PR-49", needs="jvm:PrivacyUatTest.aBackupTakesAWholeSentenceUsedTwiceNotOn
 
 case("PR-50", needs="jvm:UserDataManagerTest.aBackupBiggerThanTheRoomLeftStopsAsItIsUnpacked")(lambda d: None)
 case("PR-51", needs="manual:要恢复备份造出同名的 3.0 主题和主题包两张卡，再分别删除")(lambda d: None)
+case("PR-52", needs="jvm:UserDataManagerTest.aBackupOfTooManyEntriesStopsAsItIsUnpacked、"
+     "UserDataManagerTest.aFileWithoutTheMetadataIsRefusedAndNothingChanges")(lambda d: None)
+case("PR-52a", needs="manual:系统文件选择器里选改过名的备份、不是备份的 zip、图片和条目太多的 zip；在真机或模拟器上手工跑")(lambda d: None)
+case("PR-53", needs="jvm:AppPrefsTest.theOneHandedSideRememberedIsNotResetByTheResetsOfHiddenSettings")(lambda d: None)

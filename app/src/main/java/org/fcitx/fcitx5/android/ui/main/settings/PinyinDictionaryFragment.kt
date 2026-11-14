@@ -391,6 +391,9 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
                 // a provider's error comes back through the binder as any kind (a SecurityException for
                 // a file the picker gave that it will not open after all): shown, as import() does
                 ctx.importErrorDialog(e)
+            } catch (@Suppress("SwallowedException") e: OutOfMemoryError) {
+                // a file read whole (a .scel, a .dict converted) larger than the heap takes: told so, not the process lost
+                ctx.importErrorDialog(R.string.dict_refused_too_large)
             }
         }
     }
@@ -576,6 +579,9 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
                 throw e
             } catch (e: Exception) {
                 ctx.importErrorDialog(e)
+            } catch (@Suppress("SwallowedException") e: OutOfMemoryError) {
+                // the user dictionary's .scel or word list read whole, larger than the heap takes: told so, not the process lost
+                ctx.importErrorDialog(R.string.dict_refused_too_large)
             } finally {
                 // the page gone, too: about twice the file in the cache otherwise (review S3)
                 withContext(NonCancellable + Dispatchers.IO) { prepared.close() }
@@ -791,9 +797,7 @@ internal fun startsInUser(incoming: Incoming) = incoming.userExport || !offersBa
 internal fun offersBase(incoming: Incoming) = mergesIntoBase(incoming.fileName) && incoming.namedForBase
 
 /** Whether a file named [fileName] is Rime's dictionary (`*.dict.yaml`): text the base takes, its header skipped. */
-internal fun isRimeDictionary(fileName: String) = fileName.lowercase().endsWith(RIME_DICTIONARY)
-
-private const val RIME_DICTIONARY = ".dict.yaml"
+internal fun isRimeDictionary(fileName: String) = PinyinDictManager.isRimeDictionary(fileName)
 
 /** Whether the base dictionary takes a file named [fileName]: a dictionary's type, or Rime's. */
 internal fun mergesIntoBase(fileName: String) =
@@ -814,7 +818,7 @@ internal suspend fun importWordsFrom(
     // a few MB at most); a .dict is converted as the base's are, to UTF-8 text read a line at a time
     when (PinyinDictionary.Type.fromFileName(withLowercaseExtension(fileName))) {
         PinyinDictionary.Type.Sougou -> {
-            val lines = withContext(Dispatchers.IO) { scelLines(open().use { it.readImported(MAX_SCEL) }) }
+            val lines = withContext(Dispatchers.IO) { scelLines(open().use { it.readImported(PinyinDictManager.MAX_SCEL.toInt()) }) }
             import(lines.asSequence())
         }
         PinyinDictionary.Type.LibIME -> withContext(Dispatchers.IO) { PinyinDictManager.readWords(open(), fileName, import) }
@@ -823,9 +827,6 @@ internal suspend fun importWordsFrom(
             import(lines)
         }
     }
-
-// a .scel read at most: Sogou's biggest cell dictionaries are some 10 MB
-private const val MAX_SCEL = 32 shl 20
 
 /** The words of a .scel file, [bytes], as lines of a word list: `词 pin'yin 12`. */
 internal fun scelLines(bytes: ByteArray): List<String> = ArrayList<String>().also { out -> ImportFiles.Scel.read(bytes) { out += it.line() } }
@@ -876,10 +877,10 @@ internal fun incoming(fileName: String, head: ByteArray?) = Incoming(
  */
 internal class Incoming(val fileName: String, val userExport: Boolean = false, val backup: Boolean = false) {
     /** what it is kept as: Rime's `luna_pinyin.dict.yaml` as luna_pinyin */
-    val name = if (isRimeDictionary(fileName)) fileName.dropLast(RIME_DICTIONARY.length) else PinyinDictionary.nameOf(fileName)
+    val name = PinyinDictManager.keptName(fileName)
 
-    /** Whether [name] can name a file of the base: `.dict.yaml` alone names none, a hidden `.txt` the list shows untitled. */
-    val namedForBase get() = name.isNotEmpty() && !name.startsWith(".")
+    /** Whether [name] can name a file of the base (PinyinDictManager.dictionaryName). */
+    val namedForBase get() = PinyinDictManager.dictionaryName(fileName) != null
 
     /** Named as a backup, and not one (cut short, or damaged): never offered as words, read as text it is noise. */
     val brokenBackup get() = !backup && withLowercaseExtension(fileName).endsWith(LearnBackup.EXTENSION)

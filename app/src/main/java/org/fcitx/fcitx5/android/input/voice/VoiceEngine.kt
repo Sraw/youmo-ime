@@ -55,6 +55,8 @@ object VoiceEngine {
      * and the last character lost as with 2.92 s (6.96% vs 6.97%, 8.84% vs 8.91%), while a second
      * chunk, ~600 ms of decoding on a Snapdragon 845, is run after ~19% of stops instead of ~45%;
      * 2.05 s lost the last character more often (10.36%). The owner's choice.
+     * Changing this requires raising voice.minVersion (app/packs.properties): it holds only for the
+     * pack's encoder chunk, and an older pack would still be Ready (voice-1, decided 2026-11-13).
      */
     const val TAIL_PADDING = SAMPLE_RATE * 242 / 100
 
@@ -74,7 +76,9 @@ object VoiceEngine {
 
     /**
      * The recognizer's calls, every listener's, one at a time: a talk's tail still decoding and the
-     * next talk's stream made on the same recognizer (which keeps its last graph of hotwords) do not overlap.
+     * next talk's stream made on the same recognizer (which keeps its last graph of hotwords) never run
+     * at once. Only that: a listener's decode suspends (awaiting audio, the engine's answers), and
+     * another's may run in between, interleaved on this one thread.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     val decoder: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
@@ -319,12 +323,25 @@ internal fun modelsOutdated(users: Int, loadedDir: File?, loaded: Boolean, dir: 
     users == 0 && loaded && loadedDir != dir
 
 /**
- * [read]'s words in [ms], or [remembered]'s last read where it took longer or was
- * cancelled from elsewhere (its scope ending); the caller cancelled stays cancelled ([cancelledElsewhereAs])
+ * [read]'s words in [ms], or [remembered]'s last read where it took longer, failed or was
+ * cancelled from elsewhere (its scope ending); the caller cancelled stays cancelled ([cancelledElsewhereAs]).
+ * A failed read falls back as a late one does: before, it reached the listener's fallback of no
+ * words, so a word the user blocked was typed (voice-6).
  */
 @VisibleForTesting
 internal suspend fun inTimeOrLast(read: Deferred<VoiceHotwords.Words>, remembered: VoiceHotwords.Remembered, ms: Long): VoiceHotwords.Words {
-    val inTime = withTimeoutOrNull(ms) { cancelledElsewhereAs(null) { read.await() } }
+    val inTime = withTimeoutOrNull(ms) {
+        cancelledElsewhereAs(null) {
+            try {
+                read.await()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                Timber.w(e, "voice hotwords: the read failed")
+                null
+            }
+        }
+    }
     // a timeout was silent: the user's words were dropped and nothing said so
     if (inTime == null) Timber.w("voice hotwords: no answer in %d ms or the read cancelled, the last read used", ms)
     return remembered.inTime(inTime)

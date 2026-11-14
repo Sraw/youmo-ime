@@ -35,6 +35,21 @@ bar's width changes. The ⋯ panel's own actions live in `PanelActions`, called 
 `StatusAreaWindow` and the bar's buttons alike. A new panel entry that should be a button too is a
 `ToolbarButton`, its `ToolbarButtonLooks`, its action in `PanelActions`, and an `on(…)` line in
 `KawaiiBarComponent`.
+The panel (`StatusAreaWindow`) is a notice line above the grid: as it attaches it asks the host for
+`statusArea()` and `learning(LearningOp.Saving)` on the fcitx thread (that flag alone, not the whole `Overview` with every
+list counted), and shows `learning_not_saving` (the 用户词库 page's sentence) while `LearningResult.Saving.saving` is
+false (`StatusAreaNotSavingTest`). `LearningOp.Saving` has a second reader, `input/learning/LearningCleared.kt`: a
+learning act that failed (`clearAndTell` for 清掉最近 and 清空学到的; `failedMessage` for a backup's restore and its
+revert) asks it then, and tells `learning_clear_failed_not_saving` / `learning_try_again_not_saving`
+(restart the keyboard, then again) only while `LearningResult.Saving.rewrites` is false: the record takes no rewrite
+till the process starts anew, a write having failed and the record not opened again. Storage full (not saving, the
+record still open) and no answer tell the plain `learning_clear_failed` / `learning_try_again`: space freed, the same
+act works with no restart. A backup op that does not rewrite the record (a copy, made in memory) always tells
+`learning_try_again` (`LearningClearedTest`). The undo chip's failed undo (`BaseInputView.learningUndo`, `Failed`: the act on disk, the rewrite
+dropping it failed; an act never written is taken back in memory, its undo `Done`, when nothing else is unwritten,
+else `Unavailable`, `learning_undo_gone`) says `learning_undo_failed`, the chip
+then with no 撤销, no retry nor restart told (`CandidateMenuUatTest.anUndoThatFailedSaysWhatToDo`). Whether a toggle entry is on is the
+host's `StatusEntry.active` (each `StatusAction.active`, worked out as its icon is), never read from the icon name's suffix.
 Where `IdleUiPolicy` shows nothing (`IdleUi.emptyBar`), an email's or a
 URL's field gets its address suggestions (`input/address/AddressStrip`, the choice ime-core's `AddressSuggestions`:
 the field, the text around the cursor, the two lists, the counts in; the text to put in, what it replaces, the cursor out).
@@ -364,7 +379,7 @@ the window attached (`InputBroadcastReceiver.onWindowAttached`, its `DockFollowe
 (`KeyboardWindow.onLayoutShown`).
 
 One-handed (`ThemePrefs.oneHanded`: off / right / left, read live the same way; the status area's
-单手模式 turns it on at the side last used, hidden `ThemePrefs.oneHandedSide`, right at first, or off): while the letters do not split, every board, the letters
+单手模式 turns it on at the side last used, `ThemePrefs.oneHandedSide`, right at first, or off; that side is internal state with no UI, not a hidden setting, so neither the first reset nor importing a backup sets it back): while the letters do not split, every board, the letters
 too, goes to that side, 80% of the width, a phone's 420 dp at most (`SplitKeyboard.placement`, which
 decides both). The room beside it has the arrow, which then sets `oneHanded` rather than
 `splitDock`, and a button back to the whole width. These side buttons, split's and one-handed's, are
@@ -657,7 +672,9 @@ backspace's swipes, its press, long press, repeat, double tap, swipes (`KeySwipe
 `SceneKey` made of its node's `SceneKeyDef` (`drawKeysWithScene`), so a key does what its view did
 before S8a. Its press is shown by the canvas (`showPressed(KeyRef)`), a popup over it placed
 at its face across and its cell down in the window (`popupBounds`), as a view's `bounds` were; glide
-typing reads its cell (`KeyPlace`) (`SceneTouchTest`). Without a scene nothing is drawn and no key
+typing reads its cell (`KeyPlace`) (`SceneTouchTest`), a letter's key the one that sends it (`send=`), whatever its id
+(a pack's layout names its keys as it likes), the first in the layout's order where two send one (`TextKeyboard.sceneLetters`,
+R25r3 F7963). Without a scene nothing is drawn and no key
 takes a touch (logged). TalkBack reads the canvas's `ExploreByTouchHelper`: a virtual node a key, all it says the scene's (ime-core's
 `SceneA11y.of`): its text the label, its description the scene's `a11y` (an `a11y_*` name the app's
 string; a letter "q, 1", label then corner), Shift's state (`a11y_state_shift_*`), the old view's
@@ -729,7 +746,10 @@ at 24 characters; not where T9b draws the app's instead, 双拼 on own groups, w
 `invalidateScene()` on every change of what the keys show (punctuation, address keys, the language key,
 Return, the input method; a keyboard kept while another was shown is told the punctuation as it is now
 when `KeyboardWindow.attachLayout` attaches it again, `PunctuationComponent.mapping`). What a key does: a keyboard moved wires each scene key from its node (U4 B; the keys and the touch that
-finds them are `SceneKeys`, a node's key kept while it does the same): ime-core's `SceneBehavior.of`
+finds them are `SceneKeys`, a node's key kept while it does the same and the layout drawn is the one it was made for:
+another layout instance drawn (a pack's refused and the app's own in its place, or back) keeps none, a group's code being
+its layout's (R25r3 F7962); a node whose table reads more of it than what it does keeps its key only while that is the
+same, `SceneKeyDef.Table.reads`: 注音's `action:zhuyin`, typed as its face): ime-core's `SceneBehavior.of`
 reads press, long press, repeat, swipe, double tap, bubble, long-press popup, menu, sound and axes from
 the layout (the bubble's corner what a swipe types, or, on a letter key with a shortcut and no swipe of its
 own, its own face, so the bubble names the shortcut as it is swiped to: 大千's symbols' `AltPreview(c, c)`; a key's
@@ -767,6 +787,15 @@ the next word keeps its 前文. The field's composing text (handwriting's, Engli
 Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
 groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
 keyboards (`GroupedKeyboardOwnGroupsTest`, `KeyboardCustomTest`). The theme's board stays `k14`/`k18`.
+A pack layout refused so is drawn as the app's own (`SceneBoard.ownLayout`) and typed as it: the built-in groups'
+letters, codes, `wire` and leaning (`GroupedKeyboard` by the layout drawn, `BaseKeyboard.drawnLayout`, the settings
+preview's `shownAs` too); the pack's groups are not told the engine (`onAttach` only where the pack's own is drawn;
+a fallback found after attaching takes back what it told, `ownKeys` null; `PackLayoutRefusedTest`).
+The refusal is remembered per layout (one pack's and id) and what of the env its rows are placed by: the size, the form,
+the field, the input method, Shift, all a `when=` asks, not the texts, marks or keys' states (`SceneBoard.RefusedIn`,
+in `layoutsRefused`, the last 64 used kept (one asked again moved last); a refusal in one field or state is not one in another, R25r3 F7922), cleared
+with the scenes (`SceneBoard.forgetScenes`), and logged once: as what the keys show changes (most keys typed) only the app's own is made, the pack's not made to be
+refused again.
 A group key's long press is made as it opens (the resolver's, cached per variant and `KeyLists.version`); a key
 that swipes no corner gets its row with no first. `letters` keep their rows (`"pq rs"` 2 × 2, a space a row):
 where a tap leans and, P3, where the default label draws; the built-ins write their labels (`QW`, one
@@ -1300,9 +1329,9 @@ copies the references as they are now. Before the first unlock nothing is moved,
 there that is a reference now (`monokai`, in a copy synced before the theme was moved) reads as the
 built-in theme until the unlock.
 
-Import (`ThemeFilesManager.importTheme`) takes the json and every file it names, by file name only
+Import (`ThemeFilesManager.openTheme`, its 3.0 branch `importJson`) takes the json and every file it names, by file name only
 (never a path, never a `.json`, never `.saving`); it checks all before copying any, so a refusal leaves nothing.
-Only the zip's top-level files are taken (`extract(flat = true)`): an entry in a folder (a Mac's `__MACOSX/`)
+Only the zip's top-level files are taken (`extract(keep = ThemePackFiles::unpacked)`: also `layouts/`, which a 3.0 theme does not read, and no dot-file): an entry in a folder (a Mac's `__MACOSX/`)
 is counted and its bytes metered, never written. Limits (`ThemeAssetLimits`, the numbers in the messages
 read from it), counted as the zip is unpacked (a zip bomb stops at the first entry past one; a directory
 is an entry): 300 entries, 32 MB a file, 64 MB in all; a picture's cuts 4096 px a side (the source photo
@@ -1326,7 +1355,7 @@ over by then keeps the new bytes: only a rename in one directory can fail there)
 again while listing that fails (a full disk) is logged and drawn migrated all the same, saved at the
 next start; `ThemeManager.saveTheme` tells the user (`theme_not_saved`, no path) and returns false. Export (a 3.0 theme's, now as 4.0: below)
 takes only files of the theme dir (a planted json's other paths are refused before anything is written); 3.0's own zip
-(`exportJson`, each named file once, then the json) stays for the web theme maker's fixtures only; delete removes
+(`exportJson`, each named file once, then the json) is a test helper now (app test sources), for the web theme maker's fixtures only; delete removes
 the json and every named file that is in the theme dir. Listing skips a theme with a file missing, and
 one that does not read (told once, `user_data_unreadable`), leaving its file as it is.
 
@@ -1377,7 +1406,7 @@ naming that pack's versions are reset to their defaults (`ThemePrefs.dropThemeRe
 a pack in use anew) only when `ThemeMonet.systemColors` differ from the ones they took.
 
 Import (`ThemeFilesManager.openTheme`): a zip with a top-level `theme.xml` is a pack, else it is 3.0
-(`importTheme`, as above). A pack is unpacked under `cacheDir/theme-import/<uuid>` (swept at the process's
+(`importJson`, as above; the tests of 3.0 imports call it through `openTheme`, as the theme page does). A pack is unpacked under `cacheDir/theme-import/<uuid>` (swept at the process's
 first open): its top-level files and `layouts/` only (`ZipStream.extract(keep = ...)`), the rest counted and
 metered as above; a folder but `layouts/` or `__MACOSX/`, or one in `layouts/`, is refused, and a zip whose
 `theme.xml` is only in a folder says it must be at the top (`exception_theme_xml_top`). It is checked whole before the user is
@@ -1470,8 +1499,8 @@ learning (the zip's learning backup, or its record, or an older build's logs to 
 lists, `words.en.blocked` with them: `RestoreStash.read` reads it into the blocked words, no reading to
 them, as a backup's bytes carry them) is moved into a directory of its own under `RestoreStash.DIR`, and the engine merges it as it
 next starts (beside any stash not merged yet). An emoji blocked in its word's reading (👍🏻 hao) is a
-line of `words.blocked` like any, its syllables not one per code point (`WordLists.blockedEntry`). A `learn.log.unreadable*` (a later build's log kept
-aside) stays. An export with the learning as a backup leaves out the files it is made of and the old
+line of `words.blocked` like any, its syllables not one per code point (`WordLists.blockedEntry`). Every `learn.log.unreadable[.N]` (`RecordStore.isAside`: a later build's log, or a garbled one, kept
+aside) is the phone's own: importing a backup does not overwrite it, an export with the learning leaves it out of the zip, and 全部清空 and clearing a time span both delete it. An export with the learning as a backup leaves out the files it is made of and the old
 logs (`*.user`, `*.user.told`) and `learn.table-logs-read`, the phone's own as the record is; with
 that mark (the old logs read into the record) an export without the learning leaves the old logs out
 too, and the mark goes with the record into the stash, whose logs are then not read again. A zip of this app from before 0.3.1 (its metadata's `versionCode`),
@@ -1540,10 +1569,16 @@ the tap's presses, what is typed as it is said) are in ime-core's `input/voice/`
   n-best (`VoiceChoice`, the pinyin engine's model), and the stream is reset. The user's blocked words are in the
   search graph (`createStream(hotwords, blocked)`), not searched again. After the microphone closes, 2.42 s of
   zeros pad the tail (`TAIL_PADDING`: a chunk and half a second, else the last words wait for a chunk that
-  never comes; 2.92 s before 2026-11-11, the same CER and last characters on 1448 clips, a second chunk decoded
+  never comes; changing it must raise `voice.minVersion`, as the pack's tuning is measured with it; 2.92 s before 2026-11-11, the same CER and last characters on 1448 clips, a second chunk decoded
   after ~19% of stops instead of ~45%, the owner's choice) and the input is finished. Why endpoints and not the VAD: measured on six sets
   (`voice-eval/seg_app.py`, `ENDPOINTS=1`, 060-voice-tagger.md), endpoint segments are as good after the polish
   (written CER within ±0.5 points either way) and the segments do not wait on the VAD.
+  Off the phone, `ime-eval voice-post` replays such recorded stretches (CLAUDE.md): `--source app` or `top` takes
+  the recognizer's text as `seg_app.py` wrote it, `--source tagged` (with `--tagger`, voice-eval's tagger export) runs
+  the app's whole post-processing through `VoiceLive` and the polish stream, all but the homophone swap (no user words there).
+  Its labels are the whole clip's, tagged once by voice-eval, not the app's: on the phone the tagger sees only the
+  window it is asked about (`VoicePolishStream.WINDOW`, 64 characters, nothing after it), so a clip longer than a window
+  is scored with labels that saw more context than the app's would. The run's `tagged:` line counts those clips (`long=`).
 - `VoiceLive` (ime-core) keeps the closed segments and the one being said: joined with nothing where neither has a
   mark (a mark at a pause is the tagger's, its after and num heads: the owner's decision 2026-11-10; the tagger's
   training data, voice-eval `fusion_exp.py`'s `joined`, still has a 「，」 there, retraining is a later task), a
@@ -1635,7 +1670,7 @@ the tap's presses, what is typed as it is said) are in ime-core's `input/voice/`
   per-window step, so its order (the lift seen before the window is counted) is tested in ime-core.
   Why: lifting 300 ms before the speech ends lost the last character 57.7% of the time, at the end
   10.7%; with the tail, lifting 300 ms early lost it 10.7% of the time, as lifting at the end did
-  (`~/voice-eval/tailquiet`, table 1 of `dev/design/voice-tail-and-quiet.md`). Lifting in the cancel
+  (`~/workspace/voice-eval/tailquiet`, table 1 of `dev/design/voice-tail-and-quiet.md`). Lifting in the cancel
   zone, `drop()` and `inputEnded()` close at once, as before. Tapped, the stop (the microphone, the mask, a
   press off the mask, the keyboard hidden, the quiet minute) is `finish(now)`: the same tail from the tap.
   A new press after the lift (`ACTION_DOWN`/`POINTER_DOWN` anywhere on the input view for the space

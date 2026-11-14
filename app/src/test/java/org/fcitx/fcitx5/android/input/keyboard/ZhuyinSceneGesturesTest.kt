@@ -309,7 +309,7 @@ class ZhuyinSceneGesturesTest {
                 assertEquals(",", h.keyNamed("comma").label)
                 h.tap(h.key("123"))
                 h.idle()
-                val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", ""))
+                val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", "", true))
                 h.emit(HostEvent.StatusArea(active, KeyboardHarness.PINYIN, mapOf("," to "，")))
                 h.idle()
                 h.tap(h.key("ABC"))

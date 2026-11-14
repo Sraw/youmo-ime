@@ -11,6 +11,7 @@ import androidx.preference.ListPreference
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.fcitx.fcitx5.android.ui.main.settings.placeholder
@@ -57,17 +58,28 @@ class ManagedPreferenceCategoryTest {
         if (callChangeListener(value)) this.value = value
     }
 
+    // a stored value this build's list has no entry for (a backup's, another build's) reads and shows as the default,
+    // and is not written over: a build that has it reads it again
     @Test
-    fun aValueTheListDoesNotOfferReadsAndShowsAsTheDefault() {
-        // a value the list does not offer, carried over by a backup or another build
-        sp.edit { putString("behavior", SpaceLongPressBehavior.Voice.name) }
-        val sample = Sample(sp)
-        assertEquals(SpaceLongPressBehavior.None, sample.behavior.getValue())
-        val list = shown(sample)
-        assertEquals(SpaceLongPressBehavior.None.name, list.value)
-        assertEquals(placeholder(R.string.space_behavior_none), list.entry.toString())
-        // shown, not written over: a build that offers it again reads Voice
-        assertEquals(SpaceLongPressBehavior.Voice.name, sp.getString("behavior", null))
+    fun aValueTheListDoesNotOfferReadsAndShowsAsTheDefaultAndIsKept() {
+        class Row(val why: String, val stored: String)
+        assertRows(
+            listOf(
+                Row("the enum's value, which the list does not offer (0.5.x's text build and Voice)", SpaceLongPressBehavior.Voice.name),
+                // audit-061 app-rest-12: enumValueOf threw IllegalArgumentException on it, the settings read failing
+                Row("no name of the enum's at all (a later build's value, an older version installed back)", "SomethingLater"),
+            ),
+            { it.why },
+        ) { row ->
+            sp.edit { putString("behavior", row.stored) }
+            val sample = Sample(sp)
+            assertEquals(SpaceLongPressBehavior.None, sample.behavior.getValue())
+            val list = shown(sample)
+            assertEquals(SpaceLongPressBehavior.None.name, list.value)
+            assertEquals(placeholder(R.string.space_behavior_none), list.entry.toString())
+            // shown, not written over
+            assertEquals(row.stored, sp.getString("behavior", null))
+        }
     }
 
     @Test

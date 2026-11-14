@@ -141,11 +141,10 @@ class VoiceLive(private val polish: VoicePolishStream? = null) {
     }
 
     companion object {
-        private const val MARKS = "，。？！、；：,.?!;:…"
+        private const val MARKS = VoiceMarks.JOINING
 
-        // the marks a talk is typed up to as it goes: not 「.」 (3.5, e.g.), 「：」 (what follows
-        // belongs to it) nor 「…」
-        internal const val ENDS = "。？！；，、?!;,"
+        // the marks a talk is typed up to as it goes ([VoiceMarks.LIVE_ENDS])
+        internal const val ENDS = VoiceMarks.LIVE_ENDS
 
         /**
          * How much of [fixed] (text that stays) may be typed now: up to its last mark with a

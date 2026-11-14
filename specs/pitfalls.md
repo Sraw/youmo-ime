@@ -36,12 +36,12 @@ take a clean detekt as proof of type-level correctness.
 
 A checkout that built 0.3.x still holds native fcitx's `cmake --install` output in
 `app/src/main/assets/usr` (and `descriptor.json`) and its `.so` files in AGP's `obj/` dirs: nothing
-deletes them. The app build ignores them instead, so they never ship again from such a checkout:
-`androidResources.ignoreAssetsPatterns` (`<dir>usr`, `descriptor.json`; the list repeats aapt's default patterns first, since a non-empty list replaces them rather than adding to them) and the old libraries in
-`packaging.jniLibs.excludes` (`app/build.gradle.kts`). Check a release APK with `unzip -l` (no
-`libFcitx5*`, `libnative-lib`, `libpunctuation`, no `assets/usr/`). The same holds for any native
-library dropped from `lib/handwriting` or `lib/sherpa-onnx` later: exclude it through
-`packaging.jniLibs.excludes`.
+deletes them. The app build stops on the first two (`app/build.gradle.kts`: "0.3.x leftovers would go
+into the APK, delete them"): delete them and build again; they are no longer in `.gitignore`, so
+`git status` shows them too. The old libraries stay excluded through `packaging.jniLibs.excludes`
+(`app/build.gradle.kts`). Check a release APK with `unzip -l` (no `libFcitx5*`, `libnative-lib`,
+`libpunctuation`, no `assets/usr/`). The same holds for any native library dropped from
+`lib/handwriting` or `lib/sherpa-onnx` later: exclude it through `packaging.jniLibs.excludes`.
 
 On the phone, 0.3.x's data sync left fcitx's files in device-protected storage (`usr/`, `learn/`,
 `README.md`, listed in `descriptor.json`; 7.4 MB from 0.3.2). `FcitxApplication.deleteNativeData` removes exactly

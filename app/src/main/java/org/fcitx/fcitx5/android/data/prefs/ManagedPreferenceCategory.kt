@@ -120,9 +120,11 @@ abstract class ManagedPreferenceCategory(
         apart: ManagedPreferenceUi.Apart<T>? = null,
         noinline enableUiOn: (() -> Boolean)? = null
     ): ManagedPreference.PStringLike<T> where T : Enum<T>, T : ManagedPreferenceEnum {
+        val names = ManagedPreference.enumCodec<T>()
         val codec = object : ManagedPreference.StringLikeCodec<T> {
-            // one the list does not offer (a value of another build's, a backup's) reads as the default
-            override fun decode(raw: String): T? = enumValueOf<T>(raw).takeIf { it in entryValues }
+            // one the list does not offer, or not a name of T's (a value of another build's, a backup's): read as
+            // the default, left stored
+            override fun decode(raw: String): T? = names.decode(raw)?.takeIf { it in entryValues }
         }
         val entryLabels = entryValues.map { it.stringRes }
         return list(title, key, defaultValue, codec, entryValues, entryLabels, apart, enableUiOn)

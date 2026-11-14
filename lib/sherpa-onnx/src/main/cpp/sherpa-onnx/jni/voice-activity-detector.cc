@@ -103,9 +103,12 @@ JNIEXPORT jlong JNICALL Java_com_k2fsa_sherpa_onnx_Vad_newFromFile(
     return 0;
   }
 
-  auto model = new sherpa_onnx::VoiceActivityDetector(config);
-
-  return (jlong)model;
+  // youmo: the model's loading throws (SHERPA_ONNX_EXIT): a Java
+  // RuntimeException, caught by voice input, not the process ended
+  return SafeJNI(
+      env, "Vad_newFromFile",
+      [&]() -> jlong { return (jlong) new sherpa_onnx::VoiceActivityDetector(config); },
+      (jlong)0);
 }
 
 SHERPA_ONNX_EXTERN_C

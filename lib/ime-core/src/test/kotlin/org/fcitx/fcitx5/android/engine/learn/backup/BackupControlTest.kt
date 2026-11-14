@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.engine.learn.backup
 
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.FakeClock
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
@@ -18,6 +20,8 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.corrected
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.write
+import org.fcitx.fcitx5.android.engine.runtime.RefusingDisk
+import org.fcitx.fcitx5.android.engine.runtime.StashIntake
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -31,7 +35,9 @@ class BackupControlTest {
     private val root = MemoryFiles()
 
     private val clock = FakeClock()
-    private val log by lazy { LearnLog(root.file(LearnLog.FILE), clock).apply { open() } }
+    // the record's disk, which takes every write till a test has it refuse
+    private val disk = RefusingDisk()
+    private val log by lazy { LearnLog(root.file(LearnLog.FILE), clock, openAppend = disk::open).apply { open() } }
     private val added = LinkedHashSet<ListedWord>()
     private val blocked = LinkedHashSet<ListedWord>()
     private val imported = ArrayList<String>()
@@ -340,6 +346,103 @@ class BackupControlTest {
         control.backups.dropBeforeRestore()
         assertFalse(control.run(BackupOp.Restore(backupOf(3L, "泥"))).ok)
         assertNull(control.backups.beforeRestore())
+    }
+
+    /**
+     * A record with a restore written (a copy for 退回恢复前 to go back to) and a word learned after it; [stopped],
+     * that word's write was refused and the file not opened again, so the record takes no more writes this run.
+     * Each row of the test below has its own.
+     */
+    private class Restored(stopped: Boolean, restored: ByteArray) : AutoCloseable {
+        val root = MemoryFiles()
+        val clock = FakeClock()
+        private val disk = RefusingDisk()
+        val log = LearnLog(root.file(LearnLog.FILE), clock, openAppend = disk::open).apply { open() }
+        private val added = LinkedHashSet<ListedWord>()
+        private val blocked = LinkedHashSet<ListedWord>()
+        val control = BackupControl(
+            Backups(root.dir(Backups.DIR), 1L), clock, "test",
+            state = { log.state },
+            lists = { added.toList() to blocked.toList() },
+            rewrite = { t -> log.rewrite(t) },
+            addLists = { a, b ->
+                added += a
+                blocked += b
+            },
+            removeLists = { a, b ->
+                added -= a.toSet()
+                blocked -= b.toSet()
+            },
+            importLines = {},
+        )
+        val told = ArrayList<IOException>()
+        private val copy: ByteArray
+        private val file: ByteArray
+        private val learned: String
+
+        init {
+            log.record(listOf(corrected("ni", "你", "ni")))
+            assertTrue(control.run(BackupOp.Restore(restored)).ok)
+            copy = checkNotNull(control.backups.beforeRestore())
+            if (stopped) {
+                disk.refuseOpens = true
+                disk.refuseNextWrite()
+            }
+            log.record(listOf(corrected("ni", "尼", "ni")))
+            // the condition itself, not the words the store logs of it (R25 F8044)
+            assertEquals(!stopped, log.saving)
+            assertEquals(!stopped, log.takesRewrites)
+            file = root.file(LearnLog.FILE).read()
+            learned = log.state.dump()
+            clock.minutes(5)
+        }
+
+        // a settings zip's stash of [backup], taken as the engine does at its start (LearningFacade): whether merged, and gone
+        fun stashTaken(backup: ByteArray): Boolean {
+            val stash = root.dir(RestoreStash.DIR).dir("${clock.now()}").apply { mkdirs() }
+            stash.file(RestoreStash.BACKUP).write(backup)
+            StashIntake(root, told::add, read = { RestoreStash.read(it) }, merge = { b, time -> control.restore(b, since = time) }).takeAll()
+            return !stash.file(RestoreStash.BACKUP).exists()
+        }
+
+        // nothing merged nor gone back to: the copy before the last restore, the file, the state and the lists as they were
+        fun assertAsItWas(why: String) {
+            assertTrue("$why: the copy before the last restore kept", copy.contentEquals(control.backups.beforeRestore()))
+            assertTrue("$why: the file", file.contentEquals(root.file(LearnLog.FILE).read()))
+            assertEquals("$why: the state", learned, log.state.dump())
+            assertTrue("$why: the lists", added.isEmpty() && blocked.isEmpty())
+        }
+
+        override fun close() = log.close()
+    }
+
+    // R25 F8027: a record that stopped taking writes (one failed, the file not opened again) is not rewritten, and
+    // since R25 F8018 its rewrite throws where it said "not written". A restore and 退回恢复前 fail as they did (the
+    // result not ok; what the app then says is LearningRestore's failedMessage, the restart text there:
+    // LearningClearedTest), the copy before kept, and a settings zip's stash is left for the next start, told once.
+    // Each row does the same on a record that takes writes first, where it is done: the record stopped is what refuses it
+    @Uat("WD-46")
+    @Test
+    fun aRecordThatStoppedTakingWritesIsNeitherRestoredToNorRevertedAndAStashWaits() {
+        val earlier = backupOf(2L, "拟")
+        val backup = backupOf(3L, "泥")
+        assertRows(
+            listOf<Pair<String, (Restored) -> Boolean>>(
+                "a backup restored" to { it.control.run(BackupOp.Restore(backup)).ok },
+                "退回恢复前" to { it.control.run(BackupOp.Revert).ok },
+                // told is the stash intake's alone to fill: asked of this row only (R25 F8060)
+                "a settings zip's stash: told once, left where it is" to { r ->
+                    r.stashTaken(backup).also { taken -> if (!taken) assertEquals("told once", 1, r.told.size) }
+                },
+            ),
+            { it.first },
+        ) { (why, act) ->
+            Restored(stopped = false, earlier).use { assertTrue("$why, of a record that takes writes: done", act(it)) }
+            Restored(stopped = true, earlier).use {
+                assertFalse(why, act(it))
+                it.assertAsItWas(why)
+            }
+        }
     }
 
     // a stash taken again: the copy an earlier try made is kept, unless the phone learned since (that try's rewrite failed)

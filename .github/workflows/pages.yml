@@ -1,8 +1,9 @@
 name: Pages
 
 # The theme maker (web/theme-maker/index.html, one file that needs nothing else) on GitHub Pages:
-# web/ without the tests, at https://<owner>.github.io/<repo>/theme-maker/, its index.html the one
-# the repository keeps with the engine put in (lib/keyboard-scene's build: tools/assemble.mjs --engine).
+# web/ without the tests, at https://<owner>.github.io/<repo>/theme-maker/, its index.html and
+# classic/index.html assembled here from src/ and generated/ with the engine put in (lib/keyboard-scene's
+# build: tools/assemble.mjs --engine; the assembled pages are not in git, R25 B12).
 # Published only when its own test passes, so a page that reads or writes theme files unlike the app
 # never goes up.
 # Needs the repository's Pages source set to "GitHub Actions" (Settings › Pages).
@@ -58,13 +59,14 @@ jobs:
       - name: Run theme maker tests
         run: node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs web/theme-maker/test/names-and-files.test.mjs
 
-      # the site: web/ as it is, the page's tests, sources, tools, fonts and examples (in index.html), dev pages and
-      # build left out (index.html is all it needs), its index.html the page with its engine; the maker before 0.6.0
+      # the site: web/ as it is, the page's tests, sources, tools, fonts, examples and generated blocks (all in
+      # index.html), dev pages and build left out (index.html is all it needs), its index.html the page with its
+      # engine; the maker before 0.6.0
       # beside it at classic/ (060-render-p3 §5.1, kept till 0.6.x ends)
       - name: Pack the site
         run: |
           mkdir _site
-          tar -C web --exclude='./*/test' --exclude='./*/src' --exclude='./*/tools' --exclude='./*/fonts' --exclude='./*/examples' --exclude='./*/dev' --exclude='./*/build' -cf - . | tar -C _site -xf -
+          tar -C web --exclude='./*/test' --exclude='./*/src' --exclude='./*/tools' --exclude='./*/fonts' --exclude='./*/examples' --exclude='./*/dev' --exclude='./*/build' --exclude='./*/generated' -cf - . | tar -C _site -xf -
           node web/theme-maker/tools/assemble.mjs --engine _site/theme-maker/index.html
           grep -q "globalThis\['youmo-engine'\] = factory(" _site/theme-maker/index.html
           test ! -e _site/theme-maker/build
@@ -74,6 +76,7 @@ jobs:
           test ! -e _site/theme-maker/fonts
           test ! -e _site/theme-maker/dev
           test ! -e _site/theme-maker/examples
+          test ! -e _site/theme-maker/generated
           grep -q 'id="youmo-examples"' _site/theme-maker/index.html
           grep -q 'id="youmo-presets"' _site/theme-maker/classic/index.html
 

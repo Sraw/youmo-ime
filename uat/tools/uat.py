@@ -29,6 +29,7 @@ Output is kept short on purpose (counts and paths): an agent reading it re-reads
 """
 import argparse
 import datetime
+import hashlib
 import importlib.util
 import io
 import json
@@ -2866,9 +2867,33 @@ def stop(d, msg):
     sys.exit(msg)
 
 
+# what was last imported, a pack's file SHA-256 each and the generation the app installed it as (<id>.sha256:
+# "<sha> <generation>"): a pack rebuilt during development keeps its version (packs.properties is raised for a
+# release), so the version the app reports cannot tell it from the old one. Only import_packs writes them; a pack
+# imported another way (Settings → 资源包 by hand) is a new generation (PackShelf names each import anew), so the
+# mark no longer matches and the build's pack is imported again
+PACK_MARKS = "/data/local/tmp/youmo-uat-packs"
+# an emulator a release gate brought up (gates.py, which kills only one with it); a run that takes the device drops it
+GATE_MARK = "/data/local/tmp/youmo-gate"
+
+
+def pack_generation(d, pid):
+    """the generation a pack is installed as (PackShelf's `<id>/current`), read as the app (a debug build)"""
+    return d.sh(f"run-as {PKG} cat /data/user_de/0/{PKG}/files/packs/{pid}/current 2>/dev/null").strip()
+
+
+def file_sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
 def import_packs(d, voice=True):
-    """the packs a run needs imported, once a device: those there at the build's version are kept
-    (an import of the same pack again is a no-op the app tells apart, but costs a copy over adb)"""
+    """the packs a run needs imported, once a device: those there at the build's version, of the same
+    file as last imported and still the generation that import made, are kept (an import of the same
+    pack again is a no-op the app tells apart, but costs a copy over adb)"""
     try:
         files = pack_files(voice)
     except SystemExit as e:
@@ -2878,7 +2903,8 @@ def import_packs(d, voice=True):
         return
     state = packs_state(d)
     for pid, (path, ver) in files.items():
-        if state.get(pid) == f"v{ver}":
+        sha, mark = file_sha256(path), f"{PACK_MARKS}/{pid}.sha256"
+        if state.get(pid) == f"v{ver}" and d.sh(f"cat {mark} 2>/dev/null").strip() == f"{sha} {pack_generation(d, pid)}":
             continue
         name = os.path.basename(path)
         with open(path, "rb") as src:
@@ -2889,7 +2915,12 @@ def import_packs(d, voice=True):
         out = d.sh(f"content call --uri {PACK_URI} --method import --arg {name}")
         if not re.search(r"result=(imported|already):", out):
             stop(d, f"{d.serial}: {name} not imported: {out.strip()[:200]}")
+        generation = pack_generation(d, pid)
+        d.sh(f"mkdir -p {PACK_MARKS} && echo {sha} {shlex.quote(generation)} > {mark}")
         print(f"{d.serial}: {name} imported", flush=True)
+        if not generation:
+            # the mark then never matches: the copy over adb the mark saves would come back each run unseen
+            print(f"{d.serial}: {pid} pack's generation not readable (run-as {PKG}): imported again each run", flush=True)
 
 
 def import_packs_ui(d, files=None):
@@ -3063,6 +3094,8 @@ def run_on(a, cases, ports):
         if d.sh("getprop sys.boot_completed").strip() != "1":
             sys.exit(f"{d.serial} is not up (uat.py up --port {p})")
         ours(d)
+        # this run's now: a gate left up with --keep (gates.py) would find its mark later and kill it under the run
+        d.sh(f"rm -f {GATE_MARK}")
         need_root(d)   # one started by hand
         # the voice pack only where it is used (a release run has no voice cases); a release run's
         # packs come with each reset's pm clear (clear_keeping_packs), so not here as well

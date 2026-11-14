@@ -18,13 +18,13 @@ import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
-import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardPicker
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.learning.clearAndTell
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
 
@@ -127,15 +127,9 @@ class PanelActions(
             .setMessage(R.string.learning_clear_recent_message)
             .setPositiveButton(R.string.learning_clear) { _, _ ->
                 scope.launch {
-                    val cleared = fcitx.runOnReady { learning(LearningOp.ClearRecent(span)) }
-                    // not on disk (the phone locked since it started) is not now; a disk that failed, again (review-E-ui S6)
-                    service.say(
-                        when (cleared) {
-                            is LearningResult.Cleared -> R.string.learning_cleared
-                            LearningResult.Failed -> R.string.learning_clear_failed
-                            else -> R.string.learning_not_now
-                        }
-                    )
+                    // not on disk (the phone locked since it started) is not now; a disk that failed, again, or a
+                    // restart first while learning is not saving (review-E-ui S6, F8022)
+                    service.say(fcitx.runOnReady { clearAndTell(LearningOp.ClearRecent(span)) })
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)

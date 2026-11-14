@@ -6,6 +6,7 @@
 #include "sherpa-onnx/csrc/utils.h"
 
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -15,6 +16,13 @@
 namespace sherpa_onnx {
 
 static const char kTokens[] = "<blk> 0\n开 1\n饭 2\n";
+
+// a tokens.txt line not `token id` (a pack's tokens not the model's): thrown,
+// not the process ended (SHERPA_ONNX_EXIT, voice-2), so voice input can say so
+TEST(SymbolTable, AMalformedLineThrows) {
+  EXPECT_THROW(SymbolTable(std::string("<blk> 0\n开 1 extra\n"), false),
+               std::runtime_error);
+}
 
 // 龘 is not in the table: shortened to 开, its line would boost another word
 TEST(EncodeHotwords, ALineWithAMissingTokenIsLeftOutWhole) {

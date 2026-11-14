@@ -51,6 +51,8 @@ class LearnLog(
     // a seam for tests: folded only as it grows, not on each calendar day and start
     private val foldDaily: Boolean = true,
     private val unkept: () -> Unit = {},
+    // a seam for tests: a disk that refuses a write ([RecordStore]'s)
+    private val openAppend: (LogFile) -> OutputStream = LogFile::append,
 ) : Closeable {
 
     var state = LearnState()
@@ -64,8 +66,12 @@ class LearnLog(
      */
     var listener: ((LearnState.Changes) -> Unit)? = null
 
-    /** Hears each record appended from now on, as written: what an act wrote, for it to be taken back (LearningControl). */
-    var appended: ((LearnRecord) -> Unit)? = null
+    /**
+     * Hears each record appended from now on, as written: what an act wrote, for it to be taken back
+     * (LearningControl). `kept` false: the file did not take it (a write refused, no file open), and it is in
+     * the state alone, where taking it back needs no rewrite (R25 F8050).
+     */
+    var appended: ((record: LearnRecord, kept: Boolean) -> Unit)? = null
 
     internal var store: RecordStore? = null
         private set
@@ -105,7 +111,7 @@ class LearnLog(
         val reader = LearnRecords.Reader()
         var inTail = true
         var oldestTail = Int.MAX_VALUE
-        val store = RecordStore(file, LearnRecords.FORMAT, compactAt, onError, background, fold = { log, to -> fold(log, LearnClock.cut(clock), to) })
+        val store = RecordStore(file, LearnRecords.FORMAT, compactAt, onError, openAppend, background, fold = { log, to -> fold(log, LearnClock.cut(clock), to) })
         try {
             store.open(
                 replay = { type, input ->
@@ -149,9 +155,10 @@ class LearnLog(
             return null
         }
         val newDay = newDay(commit.localDay)
-        tellIfUnkept(store?.append(bytes) == true)
+        val kept = store?.append(bytes) == true
+        tellIfUnkept(kept)
         val befores = state.apply(commit)
-        appended?.invoke(commit)
+        appended?.invoke(commit, kept)
         changed()
         remember(commit.seq, commit, befores, newDay)
         return commit
@@ -297,12 +304,13 @@ class LearnLog(
             bytes += b
         }
         // one write for them all: a write per word took 100 000 words over a second on the fcitx thread (F3058, F3078)
-        tellIfUnkept(bytes.isEmpty() || store?.appendAll(bytes) == true)
+        val written = bytes.isEmpty() || store?.appendAll(bytes) == true
+        tellIfUnkept(written, kept.size)
         for (record in kept) {
             // as a replay would: one failing is reported, the rest go on, and the listener is told (review-G NIT 2)
             applyOrKeep(state, record) { onError(IOException("a record not applied", it)) }
             // an act's records as written: the last act before them is no longer one to take back (LearningControl)
-            appended?.invoke(record)
+            appended?.invoke(record, written)
         }
         changed()
     }
@@ -330,15 +338,24 @@ class LearnLog(
         val kept = store?.append(bytes) == true
         tellIfUnkept(kept)
         state.apply(record)
-        appended?.invoke(record)
+        appended?.invoke(record, kept)
         changed()
         return if (kept) Put.ON_DISK else Put.IN_MEMORY
     }
 
     private var toldUnkept = false
 
-    // a record about to be applied, [written] or not: the first not written told
-    private fun tellIfUnkept(written: Boolean) {
+    /**
+     * How many records the open store did not take and are in the state alone, since it was last what the file
+     * says. Counted, for an act taken back in memory to know its own are all of them ([dropUnwritten] drops
+     * every one: R25 F8066).
+     */
+    internal var unwritten = 0
+        private set
+
+    // [records] about to be applied, [written] or not: the first not written told
+    private fun tellIfUnkept(written: Boolean, records: Int = 1) {
+        if (!written && store != null) unwritten += records
         if (written || toldUnkept) return
         toldUnkept = true
         unkept()
@@ -351,10 +368,22 @@ class LearnLog(
      * taken back. False if nothing was written: a file that did not open (learned in memory this
      * run), or [transform] said so; with no file at all, the state's own snapshot is rewritten.
      *
-     * @throws IOException if the disk failed: the log and the state as they were
+     * @throws IOException if the disk failed, or the file stopped taking writes after one that failed
+     * ([RecordStore.rewrite]: not "nothing written", or a clear is told done with its records still in the file,
+     * R25 F8018): the log and the state as they were
      */
     @Throws(IOException::class)
     fun rewrite(transform: (ByteArray, OutputStream) -> Boolean): Boolean = rewrite(endUndo = true, transform)
+
+    /**
+     * Throws as [rewrite] would of a file that stopped taking writes, before anything is read or written
+     * ([RecordStore.checkRewrites]): for a clear, which deletes the backups before its rewrite (R25 F8021).
+     * Nothing for a log in memory, or one that did not open.
+     */
+    @Throws(IOException::class)
+    fun checkRewrites() {
+        store?.checkRewrites()
+    }
 
     // [endUndo] false: a rewrite the user did not make (the conversion landing) leaves an import's 撤销 (F3209)
     private fun rewrite(endUndo: Boolean, transform: (ByteArray, OutputStream) -> Boolean): Boolean {
@@ -365,17 +394,59 @@ class LearnLog(
         bytes ?: return false
         // written: what was read of it before is no longer there, whatever reading it again throws (review-int-records N5)
         rewritten()
+        read(bytes, endUndo)
+        return true
+    }
+
+    /**
+     * The state made what the file says, where records the disk refused are in the state alone: a clear
+     * that found nothing of its span in the file would leave what was typed then offered till the process
+     * ends, though told cleared (R25 F7999). With it goes whatever else was not written, of any time, as
+     * with a rewrite, whose state is the file's too: none of it would outlast the process. So is an act taken
+     * back none of whose records the file took (R25 F8050), but only where its records are all that is not
+     * written ([unwritten]), so that nothing else goes with it (LearningControl.takeBack: R25 F8066). Whether
+     * there was any; then no commit before it may be taken back.
+     *
+     * @throws IOException if the file did not read: the state as it was
+     */
+    @Throws(IOException::class)
+    fun dropUnwritten(): Boolean {
+        val file = file?.takeIf { store != null && unwritten > 0 } ?: return false
+        val bytes = file.read()
+        rewritten()
+        read(bytes, endUndo = true)
+        return true
+    }
+
+    // the state made what the log [bytes] replay to, the listener told what that changed of the user's words
+    private fun read(bytes: ByteArray, endUndo: Boolean) {
         val was = state
         // what replaying it changed is no change of the user's: [Changes.between] says that (review-int-records S1)
         state = replay(bytes).also { it.takeChanges() }
         // the words imported where they were: a model over them, and a session typing, go on (review-G M1)
         state.keepImportsOf(was, endUndo)
+        unwritten = 0
         listener?.invoke(LearnState.Changes.between(was, state))
-        return true
     }
 
     /** Whether what is written lasts: a file, opened. Without, what was typed has no times kept to clear a span of (U-88). */
     val onDisk: Boolean get() = store != null
+
+    /**
+     * Whether what is learned now reaches the disk: [onDisk], and its writes not stopped by one that failed
+     * and could not be cut back. False, what is learned lives in memory till the process ends, which the
+     * word list and the status panel say for as long as it lasts (user's decision decode-4).
+     */
+    val saving: Boolean get() = store?.writing == true
+
+    /**
+     * False once the file stopped taking writes for this run ([RecordStore.takesRewrites]): [checkRewrites]
+     * and [rewrite] throw from then on, and only a new start opens it again. False too of a file that did not
+     * open (or is closed): [rewrite] writes nothing there, at every try, till a start opens it (R25 F8064: said
+     * true, a restore that failed there was told to try again). True otherwise, as while a full disk refuses
+     * the appends ([saving] false), and for a log in memory, which is rewritten there (R25 F8037).
+     */
+    val takesRewrites: Boolean get() = store?.takesRewrites ?: (file == null)
 
     // learned in memory (no user directory yet): the log the state would fold to, rewritten as one on disk would be
     private fun inMemory(transform: (ByteArray, OutputStream) -> Boolean): ByteArray? {

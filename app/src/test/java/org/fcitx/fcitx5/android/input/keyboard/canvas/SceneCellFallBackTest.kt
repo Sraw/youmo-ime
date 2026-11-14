@@ -12,8 +12,6 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardCanvasViewTest
 import org.fcitx.fcitx5.android.scene.Op
-import org.fcitx.fcitx5.android.scene.Parsed
-import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Part
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
@@ -50,12 +48,14 @@ class SceneCellFallBackTest {
 
     private val context = RuntimeEnvironment.getApplication()
     private val realSource = SceneThemes.source
+    private val realFallback = SceneLayouts.fallback
     private val builtIn = ThemeManager.builtin("pixel#light")
 
     @After
     fun tearDown() {
         SceneThemes.source = realSource
         SceneThemes.forgetAll()
+        SceneLayouts.fallback = realFallback
         SceneBoard.shown(null)
     }
 
@@ -103,13 +103,23 @@ class SceneCellFallBackTest {
     @Test
     fun aKeyboardsKeysRefusedThePopupsAndCellsFollowTheOneShown() {
         val t = custom()
+        // the refused one the app's own (SceneLayouts.builtIn): a pack's refused draws the app's of its id instead
+        // (SceneBoard.ownLayout, PackLayoutRefusedTest); the app's refused, the built-in theme draws
+        SceneLayouts.fallback = { ctx ->
+            val app = BuiltInLayouts(ctx)
+            object : LayoutSource {
+                override val key = "refused-qwerty"
+
+                override fun text(id: String) = if (id == "qwerty") TOO_WIDE.replace("ID", id) else app.text(id)
+            }
+        }
         fun board(id: String, refused: Boolean = false): SceneBoard {
-            val layout = if (refused) SceneLayout(id, LayoutReader.layout(TOO_WIDE.replace("ID", id)).let { it as? Parsed.Ok ?: error((it as Parsed.Failed).problems.toString()) }.value, emptyMap()) else SceneLayouts.of(context, id)!!
+            val layout = if (refused) SceneLayouts.builtIn(context, id)!! else SceneLayouts.of(context, id)!!
             return SceneBoard(context, t, layout) { look, _, w, h -> SceneEnvs.of(View(context), look, false, w, h, Input()) }
         }
         fun preview(id: String, refused: Boolean = true): SceneBoard {
             val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
-            val layout = if (refused) SceneLayout(id, LayoutReader.layout(TOO_WIDE.replace("ID", id)).let { it as? Parsed.Ok ?: error((it as Parsed.Failed).problems.toString()) }.value, emptyMap()) else SceneLayouts.of(activity, id)!!
+            val layout = if (refused) SceneLayouts.builtIn(activity, id)!! else SceneLayouts.of(activity, id)!!
             return SceneBoard(activity, t, layout) { look, _, w, h -> SceneEnvs.of(View(activity), look, false, w, h, Input()) }
         }
         fun draw(b: SceneBoard) = b.view(BoardImages.NONE, key = { null }).apply { layout(0, 0, 1080, 700) }.scene

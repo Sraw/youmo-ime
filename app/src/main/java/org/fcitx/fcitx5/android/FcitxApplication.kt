@@ -19,7 +19,9 @@ import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import com.google.android.material.color.DynamicColors
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -48,6 +50,19 @@ class FcitxApplication : Application() {
 
     val coroutineScope = MainScope() + CoroutineName("FcitxApplication")
 
+    // [block] on an IO thread, the broadcast held open (goAsync) until it is done: a receiver's onReceive runs on the main
+    // thread, where waiting for the host (HostDaemon.stopFcitx/restartFcitx) could block it into an ANR
+    private fun BroadcastReceiver.offMain(block: () -> Unit) {
+        val pending = goAsync()
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                block()
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
     private val shutdownReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != Intent.ACTION_SHUTDOWN) return
@@ -63,11 +78,14 @@ class FcitxApplication : Application() {
             if (intent.action != Intent.ACTION_USER_UNLOCKED) return
             if (!isDirectBootMode) return
             Timber.d("Device unlocked, app will exit now and restart to normal mode")
-            HostDaemon.getFirstConnectionOrNull()?.also {
-                // try to shutdown fcitx gracefully
-                HostDaemon.stopFcitx()
+            // off the main thread: stopFcitx waits (up to seconds) for a host still starting to be up first
+            offMain {
+                HostDaemon.getFirstConnectionOrNull()?.also {
+                    // try to shutdown fcitx gracefully
+                    HostDaemon.stopFcitx()
+                }
+                AppUtil.exit()
             }
-            AppUtil.exit()
         }
     }
 
@@ -76,7 +94,8 @@ class FcitxApplication : Application() {
             if (intent.action != ACTION_RESTART_FCITX_INSTANCE) return
             if (HostDaemon.getFirstConnectionOrNull() != null) {
                 Timber.i("Received broadcast '${intent.action}', try to restart fcitx instance ...")
-                HostDaemon.restartFcitx()
+                // off the main thread: restartFcitx waits (up to seconds) for a host still starting to be up first
+                offMain { HostDaemon.restartFcitx() }
             } else {
                 Timber.i("Received broadcast '${intent.action}', but there's no fcitx instance")
             }

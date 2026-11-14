@@ -23,6 +23,16 @@ abstract class ManagedPreference<T : Any>(
         fun decode(raw: String): T?
     }
 
+    companion object {
+        /**
+         * [T] stored by its name; a name it does not have (another build's value, a backup's) reads as null, so the
+         * default, and is left stored: [readOrReset] would write the default over it, lost to a build that has it.
+         */
+        inline fun <reified T : Enum<T>> enumCodec(): StringLikeCodec<T> = object : StringLikeCodec<T> {
+            override fun decode(raw: String): T? = enumValues<T>().firstOrNull { it.name == raw }
+        }
+    }
+
     fun interface OnChangeListener<in T : Any> {
         fun onChange(key: String, value: T)
     }

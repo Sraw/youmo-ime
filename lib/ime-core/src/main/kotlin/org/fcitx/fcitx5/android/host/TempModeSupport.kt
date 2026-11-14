@@ -25,12 +25,6 @@ interface TempModeHost {
     fun showPanel(ic: InputContext, panel: TempPanel)
 }
 
-/** A temp mode with a panel of its own: the candidate bar and code row while it is active. */
-interface PanelTempMode : TempMode {
-    /** The candidate at [globalIndex] of the whole list tapped (`candidateFromAll(idx).select`). */
-    fun selectCandidate(ic: InputContext, globalIndex: Int): Boolean
-}
-
 /**
  * fcitx's input panel as a temp mode fills it: [preedit] (shown in the code row) or [clientPreedit]
  * (in the editor, when the context has [Capability.PREEDIT]), [auxUp], and the candidate list.
@@ -60,7 +54,7 @@ class TempCandidate(val text: String, comment: () -> String, internal val select
 }
 
 /**
- * The part of fcitx's `CommonCandidateList` (`fcitx/candidatelist.cpp:365-800`) the temp modes use:
+ * The part of fcitx's `CommonCandidateList` (`fcitx/candidatelist.cpp:365-800`) the temp modes and punctuation's marks use:
  * pages of [pageSize], a global cursor, paging that resets the cursor to the page's first
  * ([resetCursorAfterPaging], `CursorPositionAfterPaging::ResetToFirst`) or leaves it, and cursor
  * moves that run over the whole list and wrap (no placeholders, `cursorIncludeUnselected` and
@@ -260,7 +254,7 @@ internal object TempKeys {
     val NEXT_CANDIDATE = Key(KeySyms.TAB)
 
     /** fcitx's `DefaultPageSize` (`globalconfig.cpp`), a constant here (design §1.4). */
-    const val PAGE_SIZE = CommonCandidateList.DEFAULT_PAGE_SIZE
+    const val PAGE_SIZE = 5
 
     /** `Key::isModifier` (`key.cpp:460-467`), [Key.isModifier]'s one set. */
     fun isModifier(key: Key) = key.isModifier

@@ -57,10 +57,9 @@ object VoiceEnd {
         else -> Field.OTHER
     }
 
-    // a full stop and what the recognizer leaves at a stretch's end that closes nothing (a comma);
-    // not a colon, which says something follows ("如下："), nor a question's or an exclamation's, which were meant
-    private const val CLOSING = "。.，,、；;"
-    private const val ALL = "$CLOSING：:？?！!…"
+    // [VoiceMarks.CLOSING]: a full stop and a comma left at a stretch's end, not a colon, a question's or an exclamation's
+    private const val CLOSING = VoiceMarks.CLOSING
+    private const val ALL = VoiceMarks.ENDING
 
     /** [text] ended for a [field] as [mode] has it. */
     fun apply(text: String, field: Field, mode: Mode): String = when {

@@ -235,8 +235,11 @@ abstract class BaseInputView(
         service.lifecycleScope.launch {
             when (fcitx.runOnReady { learning(LearningOp.Undo(token)) }) {
                 LearningResult.Unavailable -> chip(context.getString(R.string.learning_undo_gone), LearningResult.NO_UNDO)
-                // a disk that failed: said, as 清掉最近 says it, not the chip just gone
-                LearningResult.Failed -> chip(context.getString(R.string.learning_try_again), LearningResult.NO_UNDO)
+                // the act on disk and the rewrite dropping it failed (or the file did not read): said, not the chip just
+                // gone. No "try again": the token is dropped, the act no longer undoable; nor a restart, which keeps an
+                // act on disk and gives no undo of it, and forgets one held in memory only, with the rest learned there
+                // (R25r9 F8074, R25r10 F8084)
+                LearningResult.Failed -> chip(context.getString(R.string.learning_undo_failed), LearningResult.NO_UNDO)
                 else -> {}
             }
         }

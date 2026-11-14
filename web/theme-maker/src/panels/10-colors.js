@@ -5,8 +5,8 @@
   const panels = root.YoumoPanels;
   const F = root.YoumoForm;
 
-  // the version a colour is written to: the dark one where the theme has it and the preview shows it
-  const version = (xml, dark) => (dark && F.variants(xml).includes('dark') ? 'dark' : 'light');
+  // the version a colour is written to: a theme's only one (a dark-only theme's dark one, R25 web-4), else the one the preview shows
+  const version = (xml, dark) => { const vs = F.variants(xml); return vs.length === 1 ? vs[0] : dark ? 'dark' : 'light'; };
 
   const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   // WCAG's contrast of two colours' relative luminance (sRGB made linear)
@@ -64,11 +64,15 @@
       for (const [n, v] of Object.entries(colors)) xml = F.setColor(xml, n, v, version(xml, dark));
       return panels.next(d, xml);
     },
-    /** [d] with fromPicture's colours of [samples] in each version it has, each worked out for its own (light, dark; a theme of one version: [dark], null as the picture is). */
+    /**
+     * [d] with fromPicture's colours of [samples] in each version it has, each worked out for its own (light, dark).
+     * A theme of one version: a dark-only one's for dark (R25 web-4: its one block is what the app reads for dark),
+     * a light one's as [dark] says (null: as the picture is).
+     */
     fromPictureAll: (d, samples, dark = null) => {
       let xml = d.xml;
       const vs = F.variants(xml);
-      for (const v of vs) for (const [n, c] of Object.entries(fromPicture(samples, vs.length > 1 ? v === 'dark' : dark))) xml = F.setColor(xml, n, c, v);
+      for (const v of vs) for (const [n, c] of Object.entries(fromPicture(samples, vs.length > 1 || v === 'dark' ? v === 'dark' : dark))) xml = F.setColor(xml, n, c, v);
       return panels.next(d, xml);
     },
     fromPicture, contrast,
@@ -79,11 +83,13 @@
     const d = api.doc();
     const which = version(d.xml, api.env().dark);
     const own = F.colors(d.xml, which);
-    const hasDark = F.variants(d.xml).includes('dark');
-    const darkBox = h('input', { type: 'checkbox', checked: hasDark, on: { change: () => api.apply((x) => ops.dark(x, darkBox.checked)) } });
+    const vs = F.variants(d.xml);
+    // a dark-only theme offers a light version (both then of its colours), never to drop its dark one (R25 web-4)
+    const darkOnly = vs.join() === 'dark';
+    const box = h('input', { type: 'checkbox', checked: darkOnly ? false : vs.includes('dark'), on: { change: () => api.apply((x) => ops.dark(x, darkOnly || box.checked)) } });
     el.append(
-      h('p', { className: 'muted' }, '写的是' + (which === 'dark' ? '深色' : '浅色') + '版的颜色' + (hasDark ? '（顶栏切浅/深）' : '') + '。可以用取色器，也可以写表达式：@key、darker(@key, 8%)、system(primary, #6750a4)。'),
-      row('这个主题有深色版', darkBox),
+      h('p', { className: 'muted' }, '写的是' + (which === 'dark' ? '深色' : '浅色') + '版的颜色' + (vs.length > 1 ? '（顶栏切浅/深）' : '') + '。可以用取色器，也可以写表达式：@key、darker(@key, 8%)、system(primary, #6750a4)。'),
+      row(darkOnly ? '这个主题有浅色版' : '这个主题有深色版', box),
     );
     const pictureButton = h('button', { type: 'button', textContent: '从背景图取色', disabled: !F.picture(d.xml), on: { click: async () => {
       const samples = await api.pictureSamples();

@@ -182,7 +182,7 @@ class T9Keyboard(
         private const val SHOWN = 4
 
         // nothing typed, or nothing of it left to take: the column offers punctuation
-        private fun EngineState.T9State.offersSyllables() = composing && syllables.isNotEmpty()
+        private fun T9State.offersSyllables() = composing && syllables.isNotEmpty()
 
         /**
          * The column's items for [state]: its syllables while typing, else punctuation; [english]'s
@@ -190,7 +190,7 @@ class T9Keyboard(
          * pinyin's syllables still while typing.
          */
         internal fun labels(
-            state: EngineState.T9State,
+            state: T9State,
             english: Boolean = false,
             address: AddressKeys = AddressKeys.NONE,
             marks: Map<String, String> = emptyMap(),
@@ -206,7 +206,7 @@ class T9Keyboard(
          * word typed ended by it; an address's, committed as it is; punctuation as [marks] map it, as it is shown.
          */
         internal fun pick(
-            state: EngineState.T9State,
+            state: T9State,
             i: Int,
             english: Boolean = false,
             address: AddressKeys = AddressKeys.NONE,
@@ -592,7 +592,7 @@ class T9Keyboard(
     private var itemHeight = 0
 
     /** What the column shows, read by its items when picked. */
-    private var columnState = EngineState.T9State()
+    private var columnState = T9State()
 
     // something typed, as the engine last told, or a key sent since that types
     private var typing = false
@@ -615,7 +615,7 @@ class T9Keyboard(
         add(column, lParams(0, 0))
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
         multiTapPref.registerOnChangeListener(multiTapListener)
-        show(EngineState.T9State())
+        show(T9State())
     }
 
     private var scope: CoroutineScope? = null
@@ -627,13 +627,13 @@ class T9Keyboard(
         super.onAttachedToWindow()
         scope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
             if (english) {
-                s.launch { EngineState.englishTyping.collectLatest { show(EngineState.T9State(composing = it)) } }
+                s.launch { EngineState.englishTyping.collectLatest { show(T9State(composing = it)) } }
             } else {
                 s.launch {
                     // another input method answering: nothing typed on the nine keys (not "no news", as a
                     // filter had it: a switch's last answer, another's, would leave the column's syllables shown)
                     EngineState.syllables
-                        .map { if (it.im == ownIm) EngineState.T9State(it.composing, it.syllables, it.id) else EngineState.T9State() }
+                        .map { if (it.im == ownIm) T9State(it.composing, it.syllables, it.id) else T9State() }
                         .collectLatest(::show)
                 }
             }
@@ -656,7 +656,7 @@ class T9Keyboard(
     }
 
     /** The column for [state]: its syllables while typing, else punctuation; its items kept, made only when more are needed. */
-    internal fun show(state: EngineState.T9State) {
+    internal fun show(state: T9State) {
         // a press on the list replaced is cancelled, as removing its items did: its pick would take what now sits there
         MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_CANCEL, 0f, 0f, 0).also {
             items.dispatchTouchEvent(it)

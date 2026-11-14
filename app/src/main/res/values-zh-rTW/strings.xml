@@ -66,7 +66,6 @@
     <string name="github_repo">GitHub 倉庫</string>
     <string name="expanded_candidate_grid_span_count">表格樣式展開候選詞列數</string>
     <string name="no_config_options">目前沒有可用的設定選項</string>
-    <string name="unimplemented_type">⛔ 未實作類型</string>
     <string name="select">選取</string>
     <string name="text_editing">文字編輯</string>
     <string name="instruction_enable_clipboard_listening">要使用剪貼簿管理，請在設定中啟用監聽剪貼簿</string>
@@ -85,7 +84,6 @@
     <string name="reset">重設</string>
     <string name="input_method_options">輸入法設定</string>
     <string name="theme">主題</string>
-    <string name="configure">配置</string>
     <string name="navbar_background">導航列背景</string>
     <string name="navbar_bkg_none">無背景</string>
     <string name="navbar_bkg_color_only">與鍵盤背景色相符</string>
@@ -259,9 +257,10 @@
     <string name="reset_keyboard_on_focus_change">焦點改變時切換回鍵盤</string>
     <string name="export_user_data">備份全部</string>
     <string name="import_user_data">從備份還原</string>
-    <string name="exception_user_data_filename">%1$s 的副檔名並不是幽默輸入法備份</string>
+    <string name="exception_user_data_host_starting">鍵盤還在啟動，沒等到它啟動完：什麼都沒有還原。請稍後再試</string>
     <string name="exception_user_data_metadata">無法找到使用者資料的中繼資料</string>
     <string name="exception_user_data_no_room">備份放不下：手機剩餘空間不夠</string>
+    <string name="exception_user_data_too_many_entries">備份裡的條目超過 10 萬個，不是本應用程式的備份</string>
     <string name="exception_user_data_package_name_mismatch">使用者資料與目前應用程式不符合</string>
     <string name="exception_user_data_too_old">這個備份來自 0.3.0 或更早的版本，這一版不再讀取那時學到的內容。請先在 0.4.x 裡還原它、打幾個字、停一下、重新備份，再在這裡還原新的備份</string>
     <string name="user_data_imported">已匯入來自 %1$s 的使用者資料，正在重新啟動</string>
@@ -294,6 +293,7 @@
     <string name="candidates_window_padding">候選視窗邊距</string>
     <string name="restart_fcitx_instance">重新啟動 Fcitx 實例</string>
     <string name="restart_fcitx_instance_confirm">Fcitx 實例將被銷燬並重新初始化。繼續嗎？</string>
+    <string name="restart_fcitx_still_starting">鍵盤還在啟動，可能沒有重新啟動成。請稍後再試</string>
     <string name="haptic_on_repeat">重複按鍵時的觸覺回饋</string>
     <string name="redo">重做</string>
     <string name="status_area">狀態區</string>
@@ -405,6 +405,7 @@
     <string name="learning_done_delete_phrase">已從自訂詞組中刪除「%1$s」</string>
     <string name="learning_done_no_predict">不再聯想「%1$s」</string>
     <string name="learning_undo_gone">已經復原不了了</string>
+    <string name="learning_undo_failed">沒撤銷成：學到的詞現在存不下</string>
     <string name="learning_habits_off">不用我的輸入習慣</string>
     <string name="learning_habits_on">恢復我的輸入習慣</string>
     <string name="learning_clear_recent">清掉最近</string>
@@ -416,6 +417,7 @@
     <string name="learning_cleared">已清掉</string>
     <string name="learning_not_done">候選已經變了，沒做</string>
     <string name="learning_clear_failed">沒清掉，再試一次</string>
+    <string name="learning_clear_failed_not_saving">沒清掉：學到的詞現在存不下，重新啟動鍵盤後再清</string>
     <string name="learning_clear_recent_title">清掉%1$s學到的？</string>
     <string name="learning_no_predict_entry">不再聯想的搭配：%1$d 個 ›</string>
     <string name="my_words_table_blocked">碼表裡按碼封鎖的</string>
@@ -527,6 +529,7 @@
     <string name="learning_restore_confirm_undated">把這份備份（%1$s）和手機上學到的合併？次數取兩邊較大的；固定、封鎖、首選衝突時以手機上的為準。還原前會先另存一份現在的，後悔了可以退回。</string>
     <string name="learning_backup_delete_confirm">刪除 %1$s 的備份（%2$s）？刪了不能找回。</string>
     <string name="learning_try_again">沒做成，再試一次</string>
+    <string name="learning_try_again_not_saving">沒做成：學到的詞現在存不下，重新啟動鍵盤後再試</string>
     <string name="learning_reverted">已退回還原前</string>
     <string name="learning_backup_this_install">這次安裝存的</string>
     <string name="learning_backup_elsewhere">別處來的</string>
@@ -827,6 +830,7 @@
     <string name="dict_refused_too_many">詞太多，超過輸入法能放下的</string>
     <string name="dict_refused_no_pinyin">有些行沒有拼音；沒有拼音的詞只能併入使用者詞庫</string>
     <string name="dict_refused_mismatch">字和讀音大多對不上（讀音不是普通話拼音，或者檔案編碼不對）</string>
+    <string name="dict_refused_too_large">檔案太大，匯入不了這麼大的這類檔案</string>
     <string name="dict_too_large_for_user">這個詞庫太大，請併入基礎詞庫</string>
     <string name="dict_user_imports_full">使用者詞庫裡匯入的詞已近上限，放不下這些詞；請併入基礎詞庫，或先刪掉以前匯入的詞</string>
     <string name="dict_detected_rime">Rime 詞庫</string>
@@ -902,8 +906,11 @@
     <string name="theme_file_missing">你的某個主題缺了圖片或字型檔案（被刪掉，或還原的備份裡沒有），這個主題不再列出。重新匯入它就能再用。</string>
     <string name="user_data_unreadable">部分你新增的內容（自訂短語、快速輸入、標點表、主題）讀取失敗或無法就位。它們原樣保留、不會被覆蓋：這次暫時缺少或改用內建的。重新啟動手機後再試。</string>
     <string name="user_data_not_settled">你新增的內容和設定這次無法就位，暫時不能修改、備份或還原。重新啟動手機後再試。</string>
-    <string name="learning_unkept">學到的詞暫時無法儲存：只記在記憶體裡，輸入法被系統停止或手機重新啟動後就會遺失（以前存下的不受影響）。請確認手機儲存空間足夠，然後重新啟動手機；仍然出現，請附上 開發人員 → 即時紀錄檔 匯出的紀錄檔回報問題。</string>
+    <string name="learning_unkept">學到的詞暫時無法儲存：只記在記憶體裡，輸入法被系統停止或手機重新啟動後就會遺失（以前存下的不受影響）。清出一些儲存空間後會照常儲存；還不行就重新啟動手機，重新啟動後仍然出現，請附上 開發人員 → 即時紀錄檔 匯出的紀錄檔回報問題。</string>
     <string name="learning_unkept_locked">手機解鎖前學到的詞不會儲存；解鎖後照常儲存。</string>
+    <string name="learning_kept_aside">學習記錄有讀不出來的內容：原檔案已另存一份，讀得出的部分照常使用，其餘學到的詞這次用不上了。想找回以前學到的詞，可以在 學習備份 裡還原。</string>
+    <string name="learning_not_saving">學到的詞現在沒在儲存：只記在記憶體裡，輸入法被系統停止或手機重新啟動後就會遺失。清出一些儲存空間後會照常儲存；還不行就重新啟動手機。</string>
+    <string name="user_lists_unkept">自訂短語或常用詞的改動沒能儲存：只記在記憶體裡，輸入法被系統停止或手機重新啟動後就會遺失（以前存下的不受影響）。清出一些儲存空間後，下次在鍵盤上再改同一樣（短語或常用詞）時會連這次的一起儲存；還不行就重新啟動手機，重新啟動後仍然出現，請附上 開發人員 → 即時紀錄檔 匯出的紀錄檔回報問題。</string>
     <string name="split_keyboard">分體鍵盤</string>
     <string name="split_keyboard_auto">橫屏且螢幕夠寬時</string>
     <string name="split_keyboard_always">總是</string>
@@ -1105,7 +1112,6 @@
     <string name="shortcut_page_number">數字鍵盤</string>
     <string name="shortcut_page_function">功能鍵</string>
     <string name="shortcut_key_elsewhere">在功能鍵頁改 %s</string>
-    <string name="shortcut_text_too_long">最多 %d 個字</string>
     <string name="fn_key_space">空白</string>
     <string name="fn_key_backspace">退格</string>
     <string name="fn_key_return">Enter</string>
@@ -1118,8 +1124,6 @@
     <string name="fn_key_retype">重輸（九鍵）</string>
     <string name="fn_key_zero">0（九鍵）</string>
     <string name="fn_key_separator">分詞（14/18 鍵）</string>
-    <string name="fn_key_up">上滑</string>
-    <string name="fn_key_down">下滑</string>
     <string name="quick_phrases">快速輸入</string>
     <string name="quick_phrases_summary">長按「符」，打關鍵詞的開頭挑一段存好的文字；什麼都不打時列出全部</string>
     <string name="quick_phrases_page_hint">長按「符」進來，打關鍵詞的開頭挑一段存好的文字；什麼都不打時列出全部，像翻筆記本。打拼音時順手出的縮寫，用「自訂短語」。</string>
@@ -1161,6 +1165,7 @@
     <string name="quick_phrase_saved">已儲存</string>
     <string name="quick_phrase_import_done_too_long">匯入 %1$d 條，略過 %2$d 條重複、%3$d 條超過 %4$d 字</string>
     <string name="quick_phrase_import_bad_key">%1$s；另略過 %2$d 條沒有關鍵詞或關鍵詞、註釋太長的（關鍵詞最多 %3$d 個字元，註釋最多 %4$d 個字）</string>
+    <string name="import_over_limit">%1$s；另有 %2$d 條沒匯入：匯入最多加到 %3$d 條</string>
     <string name="quick_phrase_discard_confirm">放棄這次的修改？</string>
     <string name="quick_phrase_discard">放棄</string>
     <string name="quick_phrase_keep_editing">繼續編輯</string>
@@ -1171,6 +1176,7 @@
     <string name="clipboard_save_quick_phrase">存為快速輸入</string>
     <string name="voice_no_model">語音模型載入失敗</string>
     <string name="voice_no_microphone">無法使用麥克風</string>
+    <string name="voice_recognition_failed">語音辨識出錯</string>
     <string name="voice_model_credit">語音辨識：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）與 silero VAD 執行</string>
     <string name="voice_hold_listening">正在聽…</string>
     <string name="voice_hold_preparing">準備中…</string>

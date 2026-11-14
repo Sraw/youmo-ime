@@ -571,7 +571,7 @@
   }
 
   /**
-   * A theme zip opened as the app imports one (ThemeFilesManager.importTheme): refused past
+   * A theme zip opened as the app imports one (ThemeFilesManager.openTheme): refused past
    * ThemeAssetLimits by what the zip says before anything is unpacked (every entry counted, a folder's
    * too), each entry unpacked no bigger than it says; the json at its top (one; a Mac's `._` passed
    * over), every file it names found at the top by its last part (File(name).name; of two entries of a

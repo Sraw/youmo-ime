@@ -12,7 +12,7 @@ import com.android.build.gradle.tasks.ExternalNativeBuildJsonTask
  * (pickFirst in the app). Its ORT-format models are mapped from their pack file, not read onto the heap.
  */
 plugins {
-    id("org.fcitx.fcitx5.android.lib-convention")
+    id("youmo.lib-convention")
 }
 
 val ortVersion = "1.30.0"
@@ -53,7 +53,7 @@ android {
         // the version the app's licences page names (LicensesFragment): the pin itself, not a copy of it
         buildConfigField("String", "ORT_VERSION", "\"$ortVersion\"")
         ndk {
-            abiFilters += project.buildAbiOverride?.split(",") ?: Versions.supportedABIs
+            abiFilters += Versions.buildABIs(project.buildAbiOverride)
         }
         @Suppress("UnstableApiUsage")
         externalNativeBuild {

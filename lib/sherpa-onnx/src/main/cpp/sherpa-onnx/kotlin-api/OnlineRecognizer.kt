@@ -35,7 +35,6 @@ data class OnlineModelConfig(
 data class OnlineRecognizerConfig(
     var featConfig: FeatureConfig = FeatureConfig(),
     var modelConfig: OnlineModelConfig = OnlineModelConfig(),
-    var hr: HomophoneReplacerConfig = HomophoneReplacerConfig(),
     var endpointConfig: EndpointConfig = EndpointConfig(),
     var enableEndpoint: Boolean = true,
     var decodingMethod: String = "greedy_search",
