@@ -1,0 +1,10 @@
+<!-- 竖, as 笔画筛选 shows it (丨): a swipe slot's stroke (KeyCommand.Stroke*) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M10.75,3.5h2.5v17h-2.5Z" />
+</vector>

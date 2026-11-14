@@ -6,12 +6,18 @@ package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
@@ -77,6 +83,52 @@ class SwipeSlotsUatTest {
         h.swipe(q, 0f, -q.height * 1.3f)
         h.idle()
         assertTrue(h.sent().toString(), "key=q," in h.sent().last())
+    }
+
+    // a stroke set on a key's swipe (issue #4), the nine keys' 3 or 1 or the full keyboard's q: its icon drawn on the key;
+    // swiped up, the engine's stroke key sent and never the key's letters, nothing committed first (it filters what
+    // is typed), with 在键上划 off and with nothing typed under 笔画筛选 (the engine does nothing with it then:
+    // StrokeFilterTest); under 笔画筛选 with pinyin typed the swipe on a letter key is a stroke drawn (KB-42), up none;
+    // 九键's 1 starts no stroke (GlideTouch.down), so its slot's sent then too
+    @Test
+    @Uat("ST-120")
+    fun aStrokeSlotSendsItsStroke() {
+        val pie = "sym=${UNICODE + Keyboard.strokeKey('p')},"
+        class Row(val why: String, val keyboard: ImKeyboard, val drawing: KeyDrawing, val typed: String, val sent: List<Boolean>, val nine: String = "3")
+        assertRows(
+            listOf(
+                Row("nine keys, 在键上划 off, pinyin typed: the slot's stroke, to filter by", ImKeyboard.NINE_KEYS, KeyDrawing.Off, "wang", listOf(true)),
+                Row("nine keys, 在键上划 off, nothing typed: the stroke key still, never DEF (the engine drops it)", ImKeyboard.NINE_KEYS, KeyDrawing.Off, "", listOf(true)),
+                Row("nine keys, 笔画筛选, nothing typed: no stroke drawn then, so the slot's", ImKeyboard.NINE_KEYS, KeyDrawing.StrokeFilter, "", listOf(true)),
+                Row("nine keys, 笔画筛选, pinyin typed: a stroke drawn, up none; the slot not reached", ImKeyboard.NINE_KEYS, KeyDrawing.StrokeFilter, "wang", listOf()),
+                Row("nine keys' 1, 笔画筛选, pinyin typed: no stroke starts on it, the slot's sent", ImKeyboard.NINE_KEYS, KeyDrawing.StrokeFilter, "wang", listOf(true), nine = "1"),
+                Row("full keyboard, 在键上划 off, pinyin typed: the same key, any keyboard", ImKeyboard.FULL, KeyDrawing.Off, "wo", listOf(true)),
+            ),
+            { it.why },
+        ) { row ->
+            val full = row.keyboard == ImKeyboard.FULL
+            prefs.set(internal.keySwipes, SwipeSlots.Default.with(if (full) "full/q" else "t9/${row.nine}", up = true, SwipeSlot.Command(KeyCommand.StrokePie)).serialize())
+            prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, row.drawing)
+            val h = harness(row.keyboard)
+            try {
+                val key = (if (full) h.key("q") else h.nineKey(row.nine)) as SceneShownKey
+                val icons = key.node.ops(false).filterIsInstance<org.fcitx.fcitx5.android.scene.Op.Icon>().map { it.name }
+                assertTrue("$icons", "stroke-p" in icons)
+                if (row.typed.isNotEmpty()) {
+                    h.api.inputPanelCached = HostEvent.InputPanel(FormattedText(arrayOf(row.typed), intArrayOf(0), row.typed.length), FormattedText.Empty, FormattedText.Empty)
+                    h.emit(h.api.inputPanelCached)
+                }
+                h.api.calls.clear()
+                h.swipe(key, 0f, -key.height * 1.3f)
+                h.idle()
+                assertEquals("${h.sent()}", row.sent, h.sent().map { pie in it })
+                // what is typed is filtered, not committed or dropped first, and nothing reaches the field
+                assertEquals(emptyList<String>(), h.api.calls.filter { it.startsWith("select(") || it == "reset()" || it == "clearTyped()" })
+                assertEquals("", h.field.text.toString())
+            } finally {
+                close()
+            }
+        }
     }
 
     @Test

@@ -207,7 +207,7 @@ class CommonKeyActionListener :
     }
 
     val listener: KeyActionListener by lazy {
-        KeyActionListener { action, _ ->
+        KeyActionListener { action, source ->
             // another key acting (a second finger) ends a 滑选 under way: its steps no longer select
             if (action !is BeginSwipeSelectAction && action !is SwipeSelectAction) endSwipeSelect(lifted = action is EndSwipeSelectAction)
             when (action) {
@@ -239,7 +239,7 @@ class CommonKeyActionListener :
                     }
                 }
                 // the field's own commands after what is typed is in, on the main thread where its editor is
-                is ShortcutAction -> when ((action.shortcut as? KeyShortcut.Command)?.command) {
+                is ShortcutAction -> when (val command = (action.shortcut as? KeyShortcut.Command)?.command) {
                     // 清除 drops what is typed, committing nothing; 恢复 leaves it be. The field's then, as
                     // input may move on to another before the host answers
                     KeyCommand.Clear -> {
@@ -254,8 +254,13 @@ class CommonKeyActionListener :
                     KeyCommand.QuickInput -> afterPendingInput { triggerQuickPhrase() }
                     // only a swipe's, which selects as it moves (BeginSwipeSelectAction): a tap's is nothing
                     KeyCommand.SwipeSelect -> {}
-                    else -> afterPendingInput {
-                        ContextCompat.getMainExecutor(context).execute { shortcutRunner.run(action.shortcut) }
+                    // a stroke set on a key's swipe (KeyCommand.stroke): the engine's key, as one drawn on the keys
+                    // is (BaseKeyboard's glide), whatever 在键上划 is; the engine has it do nothing with nothing typed
+                    else -> when (val stroke = command?.stroke) {
+                        null -> afterPendingInput {
+                            ContextCompat.getMainExecutor(context).execute { shortcutRunner.run(action.shortcut) }
+                        }
+                        else -> listener.onKeyAction(SymAction.stroke(stroke), source)
                     }
                 }
                 is QuickPhraseAction -> afterPendingInput { triggerQuickPhrase() }

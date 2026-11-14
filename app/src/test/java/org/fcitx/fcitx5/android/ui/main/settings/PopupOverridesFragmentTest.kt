@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.KeyListsCache
 import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
@@ -303,6 +304,64 @@ class PopupOverridesFragmentTest {
             click(R.string.undo)
             assertEquals(SwipeSlots.Default, slots())
         }
+
+        // a stroke set on a letter key while 在键上划 is 笔画筛选: the way says it is not reached while pinyin is typed,
+        // a short swipe then a stroke drawn (issue #4); not with the setting off, nor for another command or a text,
+        // nor on a key no stroke starts on (九键's 1: there the stroke is sent)
+        @Test
+        @Uat("ST-120")
+        fun aStrokeSetWhileStrokesAreDrawnSaysItIsNotReachedWhileTyping() {
+            val drawing = AppPrefs.getInstance().keyboard.keyDrawing
+            val pie = SwipeSlot.Command(KeyCommand.StrokePie)
+            class Row(val why: String, val drawn: KeyDrawing, val tab: Int, val slotKey: String, val label: String, val slot: SwipeSlot, val says: Boolean)
+            org.fcitx.fcitx5.android.engine.assertRows(
+                listOf(
+                    Row("笔画筛选, a stroke on q: said", KeyDrawing.StrokeFilter, R.string.shortcut_page_full, "full/q", "q", pie, true),
+                    Row("笔画筛选, a stroke on 九键's 3, a letter key: said", KeyDrawing.StrokeFilter, R.string.shortcut_page_nine, "t9/3", "3", pie, true),
+                    Row("笔画筛选, a stroke on 九键's 1: no stroke starts there, the slot's sent, nothing to say", KeyDrawing.StrokeFilter, R.string.shortcut_page_nine, "t9/1", "1", pie, false),
+                    Row("在键上划 off, a stroke: always reached, nothing to say", KeyDrawing.Off, R.string.shortcut_page_full, "full/q", "q", pie, false),
+                    Row("笔画筛选, another command: not a stroke", KeyDrawing.StrokeFilter, R.string.shortcut_page_full, "full/q", "q", SwipeSlot.Command(KeyCommand.Paste), false),
+                    Row("笔画筛选, a text", KeyDrawing.StrokeFilter, R.string.shortcut_page_full, "full/q", "q", SwipeSlot.Text("x"), false),
+                ),
+                { it.why },
+            ) { row ->
+                prefs.set(drawing, row.drawn)
+                prefs.set(slotsPref, SwipeSlots.Default.with(row.slotKey, true, row.slot).serialize())
+                st.activity
+                st.open(SettingsRoute.PopupOverrides)
+                click(row.tab)
+                val dialog = dialogOf(row.label)
+                val said = strokeNoted(dialog)
+                dialog.dismiss()
+                st.idle()
+                assertEquals(row.says, said)
+            }
+        }
+
+        // chosen in the dialog: from 粘贴, a stroke picked through 「换」 says it, 「无」 picked after takes it away
+        @Test
+        @Uat("ST-120")
+        fun aStrokePickedInTheDialogSaysItIsNotReachedWhileTyping() {
+            prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.StrokeFilter)
+            prefs.set(slotsPref, SwipeSlots.Default.with("full/q", true, SwipeSlot.Command(KeyCommand.Paste)).serialize())
+            st.activity
+            st.open(SettingsRoute.PopupOverrides)
+            val dialog = dialogOf("q")
+            assertFalse("粘贴: not a stroke", strokeNoted(dialog))
+            // 上滑's 「换」, the first; the command list, 笔画：撇 in it
+            KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(R.string.shortcut_change) }.performClick()
+            st.idle()
+            pick(KeyCommand.entries.indexOf(KeyCommand.StrokePie))
+            assertTrue("笔画：撇 picked", strokeNoted(dialog))
+            KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<RadioButton>().first { it.text == st.s(R.string.slot_empty) }.performClick()
+            st.idle()
+            assertFalse("无 picked", strokeNoted(dialog))
+            dialog.dismiss()
+            st.idle()
+        }
+
+        private fun strokeNoted(dialog: AlertDialog) = KeyboardHarness.all(dialog.window!!.decorView).filterIsInstance<TextView>()
+            .any { it.visibility == View.VISIBLE && it.text.toString() == st.s(R.string.slot_stroke_drawn) }
 
         // the bug: the dialog focusing a way's text field by itself (a key with no long press to edit has it
         // first) chose 文字 for it, so a command kept there became an empty text on 确定. Only typing chooses it

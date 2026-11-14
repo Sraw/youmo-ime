@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.Include
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.Row
+import org.fcitx.fcitx5.android.scene.Icons
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -191,5 +192,8 @@ class TextBoardSceneTest {
         assertEquals(names.size, names.toSet().size)
         assertEquals("hide-keyboard", SceneMarks.icon(KeyCommand.HideKeyboard))
         assertEquals("undo", SceneMarks.icon(KeyCommand.Undo))
+        assertEquals("stroke-p", SceneMarks.icon(KeyCommand.StrokePie))
+        // each one a theme may name, which the app draws (its SceneIcons test)
+        assertEquals(Icons.COMMANDS.toSet(), names.toSet())
     }
 }

@@ -33,8 +33,10 @@ import splitties.views.dsl.core.wrapContent
 /**
  * One way of a key (上滑 or 下滑) chosen (060-swipe-slots): the long press's first, a command, a text,
  * or nothing. [off] says the way is switched off in the settings, its choice kept for when it is on.
+ * [strokesDrawn]: 在键上划 is 笔画筛选 and the key one a stroke drawn starts on, where a short swipe while pinyin
+ * is typed is a stroke drawn, so a stroke set here is not reached then (BaseKeyboard's glide): said under a stroke chosen.
  */
-class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, initial: SwipeSlot) {
+class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, initial: SwipeSlot, private val strokesDrawn: Boolean = false) {
 
     private var command = (initial as? SwipeSlot.Command)?.command ?: KeyCommand.SelectAll
 
@@ -63,6 +65,14 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
         visibility = View.GONE
     }
 
+    // a stroke chosen while strokes are drawn on the keys: not reached while pinyin is typed (issue #4)
+    private val strokeView = TextView(ctx).apply {
+        textSize = 13f
+        setTextColor(ctx.styledColor(android.R.attr.textColorSecondary))
+        setText(R.string.slot_stroke_drawn)
+        visibility = View.GONE
+    }
+
     val view: LinearLayout = ctx.verticalLayout {
         add(TextView(ctx).apply {
             text = if (off) title + ctx.getString(R.string.slot_section_off) else title
@@ -79,6 +89,7 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
                 setOnClickListener { chooseCommand() }
             }, lParams())
         }, lParams(matchParent))
+        add(strokeView, lParams(matchParent) { marginStart = ctx.dp(32) })
         add(textButton, lParams(matchParent))
         add(field, lParams(matchParent) { marginStart = ctx.dp(32) })
         add(empty, lParams(matchParent))
@@ -100,6 +111,7 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
 
     private fun pick(button: RadioButton) {
         radios.forEach { it.isChecked = it === button }
+        strokeView.visibility = if (strokesDrawn && commandButton.isChecked && command.stroke != null) View.VISIBLE else View.GONE
         onChange?.invoke()
     }
 

@@ -24,7 +24,6 @@ import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.InputMethodSubMode
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
-import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -36,7 +35,6 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
-import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
@@ -209,7 +207,7 @@ abstract class BaseKeyboard(
      * Glide typing over [letters], taken where [enabled] says and 滑行输入 is on, in a field where
      * words are typed: not a password's or an address's. Where 笔画筛选 is chosen instead (one setting,
      * [KeyDrawing]), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
-     * one: sent as the engine's stroke key (Keyboard.strokeKey), the shape StrokeShape's; one it
+     * one: sent as the engine's stroke key (KeyAction.SymAction.stroke), the shape StrokeShape's; one it
      * reads as none is dropped.
      *
      * Made also: the keyboard's 键盘手写 ([keyInk], the input method's [writes]); a keyboard that never calls
@@ -235,7 +233,7 @@ abstract class BaseKeyboard(
             longPressMillis = { longPressDelay.toLong() },
             down = down,
             strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
-            stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction(KeySym(UNICODE + Keyboard.strokeKey(it)), KeyStates.Virtual)) } },
+            stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction.stroke(it)) } },
             ink = ink,
             // 键盘手写: an input method written in [writes] says, in a field where words are typed, not in a
             // temporary mode; not while TalkBack explores by touch, the finger feeling for keys, not writing

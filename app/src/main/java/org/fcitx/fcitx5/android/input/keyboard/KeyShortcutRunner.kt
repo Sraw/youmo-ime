@@ -90,6 +90,8 @@ class KeyShortcutRunner(
             KeyCommand.TradSimp -> tradSimp()
             KeyCommand.ChooseKeyboard -> chooseKeyboard()
             KeyCommand.HideKeyboard -> service.requestHideSelf(0)
+            // the engine's keys, sent by the listener as a stroke drawn is (CommonKeyActionListener): nothing here
+            KeyCommand.StrokeHeng, KeyCommand.StrokeShu, KeyCommand.StrokePie, KeyCommand.StrokeDian, KeyCommand.StrokeZhe -> {}
         }
     }
 

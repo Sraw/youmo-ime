@@ -10,13 +10,23 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ## 0.6.1（开发中）
 
+### 主要变化
+
+- **键的上滑、下滑能设成笔画**：**按键字符和快捷键** 里的命令多了 **笔画：横 / 竖 / 撇 / 点 / 折**（键上画 一丨丿丶乛），打着拼音时滑这个键就发出这一笔筛候选，和在键上画一笔一样（比如九键把 1 到 5 的上滑设成五种笔画）。不用选 **在键上划 → 笔画筛选** 也能用，快打时的短划就不会被当成笔画；没打字时滑了什么也不打。退回 0.6.0 时设了笔画的槽回到预设，别的槽照旧。
+
 ### 小改动
 
 - 学到的词没能存下来时（比如存储出了问题），键盘上提示一次，告诉你该怎么办；以前只记在内存里，什么都不说，输入法被系统停止后就全丢了。手机重启后、第一次解锁前学到的词不保存（解锁后照常），这时也提示一次。
+- 笔画筛选画的撇、横少被认成折：拐角两边要各是直的，弯成弧线的撇、末尾带个小钩的横按整体方向算。
+
+### Main changes
+
+- **A key's swipe up or down can be a stroke**: **Key characters and shortcuts** has the commands **Stroke: horizontal / vertical / left-falling / dot / turning** (drawn 一丨丿丶乛 on the key); swiped while pinyin is typed, the key sends that stroke to filter the candidates, as one drawn on the keys does (the nine keys' 1 to 5 set to the five strokes, say). It works without **Drawing on keys → Stroke filter**, so fast short swipes are no longer taken for strokes; with nothing typed the swipe types nothing. Going back to 0.6.0, a slot set to a stroke returns to its preset and the others stay.
 
 ### Smaller changes
 
 - When learned words cannot be saved (a storage problem, say), the keyboard says so once, with what to do; before, they were kept in memory alone, nothing said, and lost once the system stopped the keyboard. Words learned after a restart and before the first unlock are not saved (they are again after it), and the keyboard says so once.
+- A 撇 or 横 drawn for the stroke filter is less often read as 折: a corner's two arms must each be straight, so a bowed 撇 or a 横 with a tick at its end is read by its overall direction.
 
 ---
 

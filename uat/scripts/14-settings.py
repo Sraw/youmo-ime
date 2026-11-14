@@ -1666,3 +1666,63 @@ case("ST-115", needs="jvm:PackLayoutRefusedTest.aLayoutTheEngineRefusesDrawsTheA
      "PackLayoutRefusedTest.theKeysTypedOnBeforeTheLayoutDrawnChangedSendTheDrawnLayoutsCodes、"
      "PackLayoutRefusedTest.aZhuyinKeyWhoseFaceChangedSendsTheSymbolItShows")(lambda d: None)
 case("ST-116", needs="manual:主题制作网页；在电脑浏览器上手工跑（只有深色版的主题从背景图取色、勾「这个主题有浅色版」）")(lambda d: None)
+
+
+@case("ST-120", base="B0-设置", mutates=True, visual=True)
+def st120(d):
+    pinyin_keyboard(d, "九键")
+    slots_tab(d, "九键")
+    key_dialog(d, "3")
+    dialog_way(d, "上滑", "命令")
+    # its 换 (the first under 上滑's head) opens the commands' own list, a dialog over the key's
+    s = d.screen()
+    head = next((n for n in s.app() if n.text == "上滑" and not n.clickable), None)
+    change = sorted((n for n in s.app() if n.text == "换" and head and n.b[1] > head.b[1]), key=lambda n: n.b[1])
+    if not change:
+        raise Blocked(f"上滑一段里没有「换」：{s.texts()[-16:]}")
+    d.tap(change[0].c, 0.8)
+    # the five strokes at the list's end
+    for _ in range(4):
+        if any(n.text == "笔画：撇" for n in d.screen().app()):
+            break
+        dialog_scroll(d)
+    s = d.wait(lambda s: s if any(n.text == "笔画：撇" for n in s.app()) else None, 5, what="命令列表里的笔画")
+    strokes = [t for t in ("笔画：横", "笔画：竖", "笔画：撇", "笔画：点", "笔画：折") if any(n.text == t for n in s.app())]
+    d.shot("app", "命令列表：五种笔画")
+    check(len(strokes) == 5, f"命令列表里的笔画只有 {strokes}")
+    d.tap_text("笔画：撇", scroll=False, after=0.6)
+    dialog_ok(d)
+    d.open_page("text")
+    d.clear()
+    d.shot("kb", "九键 3 键角上画着撇")
+    k = d.keys(refresh=True)
+    three = k["3"]
+    d.taps([k[c] for c in "9264"], gap=0.35, after=0.6)
+    before = d.preedit()
+    d.swipe(three, (three[0], three[1] - 130), 150, after=0.8)
+    typed = d.preedit()
+    d.shot("kb", "打着 wang 上滑 3：编码行多一个丿")
+    check("丿" in typed and "丿" not in before, f"打着拼音上滑 3，编码行由「{before}」变成「{typed}」，没多一个丿")
+    check("d" not in typed.replace(before, ""), f"上滑 3 打了 DEF：「{typed}」")
+    d.clear()
+    d.swipe(three, (three[0], three[1] - 130), 150, after=0.8)
+    empty = d.preedit() + d.field_text()
+    check(empty == "", f"什么都没打时上滑 3，打出了「{empty}」")
+    d.step("在键上划选笔画筛选")
+    home(d, "通用输入")
+    choose(d, "在键上划", "笔画筛选")
+    d.open_page("text")
+    d.clear()
+    three = d.keys(refresh=True)["3"]
+    d.swipe(three, (three[0], three[1] - 130), 150, after=0.8)
+    filtered = d.preedit() + d.field_text()
+    check(filtered == "", f"笔画筛选、什么都没打时上滑 3，打出了「{filtered}」")
+    # the dialog says the stroke is not reached while typing now
+    slots_tab(d, "九键")
+    key_dialog(d, "3")
+    note = "在键上划选了笔画筛选时，打着拼音滑这个键按画出的形状算，不发这一笔"
+    said = any(n.text == note for n in d.screen().app())
+    d.shot("app", "笔画筛选时 3 的对话框：上滑的命令下面说打字时滑不到")
+    check(said, "笔画筛选时 3 的对话框里没有说打着拼音时滑不到")
+    d.back(after=0.5)
+    return f"命令里有 {len(strokes)} 种笔画；wang 上滑 3：「{before}」→「{typed}」；没打字上滑：「{empty}」；笔画筛选没打字上滑：「{filtered}」；对话框说明：{said}"

@@ -52,6 +52,18 @@ class KeySwipeTest {
         assertEquals(Outcome.Shortcut(KeyShortcut.Text("你好")), up(q, -1))
     }
 
+    // a stroke (issue #4) runs as a command, never the key's tap whatever is typed (the engine does nothing
+    // with it then), in a password too: it reads nothing of the field
+    @Test
+    fun aStrokeSlotIsRunAsItsCommand() {
+        val pie = KeyShortcut.Command(KeyCommand.StrokePie)
+        val three = Key(char = true, up = SwipeSlot.of(pie), down = first)
+        assertEquals(Outcome.Shortcut(pie), up(three, -1))
+        assertEquals(Outcome.Shortcut(pie), up(three, -1, password = true))
+        assertEquals(Preview.Shortcut(pie), KeySwipe.preview(three, Ways.Both, -1, password = false))
+        assertEquals("the way off: a tap, as any slot's", Outcome.Tap, up(three, -1, Ways(up = false, down = true)))
+    }
+
     @Test
     fun anEmptySlotOrAWayOffIsATap() {
         assertEquals("no shortcut", Outcome.Tap, up(s, 1))

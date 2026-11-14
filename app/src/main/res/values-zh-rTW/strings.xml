@@ -1095,6 +1095,11 @@
     <string name="shortcut_trad_simp">切簡繁</string>
     <string name="shortcut_choose_keyboard">切鍵盤</string>
     <string name="shortcut_hide_keyboard">收起鍵盤</string>
+    <string name="shortcut_stroke_h">筆畫：橫</string>
+    <string name="shortcut_stroke_s">筆畫：豎</string>
+    <string name="shortcut_stroke_p">筆畫：撇</string>
+    <string name="shortcut_stroke_n">筆畫：點</string>
+    <string name="shortcut_stroke_z">筆畫：折</string>
     <string name="field_cleared">已清除</string>
     <string name="nothing_to_restore">沒有可恢復的內容</string>
     <string name="nothing_to_copy">沒有內容可以複製</string>
@@ -1240,6 +1245,7 @@
     <string name="slot_first">長按首選</string>
     <string name="slot_empty">空</string>
     <string name="slot_section_off">（現在關著，在鍵盤設定裡打開）</string>
+    <string name="slot_stroke_drawn">在鍵上劃選了筆畫篩選時，打著拼音滑這個鍵按畫出的形狀算，不發這一筆</string>
     <string name="swipe_slots_hint">點一個鍵，改它長按彈出的字元，和上滑、下滑做什麼。</string>
     <string name="swipe_slots_hint_page">點一個鍵，改它上滑、下滑做什麼，和長按彈出的字元。</string>
     <string name="swipe_slots_hint_function">點一個鍵，改它上滑、下滑做什麼。</string>

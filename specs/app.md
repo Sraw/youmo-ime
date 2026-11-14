@@ -555,8 +555,13 @@ the two old keys dropped. The page's row is an `AppChoice` whose summary is the 
 a glide (`STROKE`, 0.3 of a key any way, keys counted as wide and tall, before the long press): a
 竖 from the bottom row or a short 点 must be one before the key's swipe (36dp) is, so while pinyin
 is typed a key's swipe is a stroke; on the lift the path, in key widths both ways, is read by `StrokeShape` (ime-core) and
-sent as the engine's stroke key, `KeyAction.SymAction` of `Keyboard.strokeKey`; a shape it reads
-as none (up, up to the left) is dropped. A stroke may also start between a split keyboard's halves
+sent as the engine's stroke key, `KeyAction.SymAction.stroke` (`Keyboard.strokeKey`); a shape it reads
+as none (up, up to the left) is dropped. `StrokeShape` reads a 折 only where the turn's two arms are
+each straight or bent themselves (issue #4: a bowed 撇, a 横 with a tick, were 折; `StrokeShapeRatesTest`).
+A key's swipe slot may be a stroke instead (`KeyCommand.Stroke*`, `KeyCommand.stroke`; 0.6.1, issue #4):
+`CommonKeyActionListener` sends it as the same key whatever `KeyDrawing` is, the engine's `StrokeFilter`
+doing nothing with nothing typed; the stroke is the one set, never one chosen from the candidates.
+Stored as a command key in format 1 (0.6.0 skips the line, that slot back to its preset). A stroke may also start between a split keyboard's halves
 (`SplitGap`, ime-core: in a row of letters, room between two of them at least half a key wide, found
 from where the letters are, so only the 26 keys split have it), passed to `GlideTouch.down` as
 `inGap`, and `GlideInput` keeps that down though no key takes it (else its moves would go nowhere);

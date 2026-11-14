@@ -1095,6 +1095,11 @@
     <string name="shortcut_trad_simp">切简繁</string>
     <string name="shortcut_choose_keyboard">切键盘</string>
     <string name="shortcut_hide_keyboard">收起键盘</string>
+    <string name="shortcut_stroke_h">笔画：横</string>
+    <string name="shortcut_stroke_s">笔画：竖</string>
+    <string name="shortcut_stroke_p">笔画：撇</string>
+    <string name="shortcut_stroke_n">笔画：点</string>
+    <string name="shortcut_stroke_z">笔画：折</string>
     <string name="field_cleared">已清除</string>
     <string name="nothing_to_restore">没有可恢复的内容</string>
     <string name="nothing_to_copy">没有内容可以复制</string>
@@ -1240,6 +1245,7 @@
     <string name="slot_first">长按首选</string>
     <string name="slot_empty">空</string>
     <string name="slot_section_off">（现在关着，在键盘设置里打开）</string>
+    <string name="slot_stroke_drawn">在键上划选了笔画筛选时，打着拼音滑这个键按画出的形状算，不发这一笔</string>
     <string name="swipe_slots_hint">点一个键，改它长按弹出的字符，和上滑、下滑做什么。</string>
     <string name="swipe_slots_hint_page">点一个键，改它上滑、下滑做什么，和长按弹出的字符。</string>
     <string name="swipe_slots_hint_function">点一个键，改它上滑、下滑做什么。</string>

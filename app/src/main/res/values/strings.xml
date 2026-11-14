@@ -1121,6 +1121,11 @@
     <string name="shortcut_trad_simp">Traditional / Simplified</string>
     <string name="shortcut_choose_keyboard">Choose keyboard</string>
     <string name="shortcut_hide_keyboard">Hide keyboard</string>
+    <string name="shortcut_stroke_h">Stroke: horizontal</string>
+    <string name="shortcut_stroke_s">Stroke: vertical</string>
+    <string name="shortcut_stroke_p">Stroke: left-falling</string>
+    <string name="shortcut_stroke_n">Stroke: dot</string>
+    <string name="shortcut_stroke_z">Stroke: turning</string>
     <string name="field_cleared">Cleared</string>
     <string name="nothing_to_restore">Nothing to restore</string>
     <string name="nothing_to_copy">Nothing to copy</string>
@@ -1266,6 +1271,7 @@
     <string name="slot_first">First of long press</string>
     <string name="slot_empty">Nothing</string>
     <string name="slot_section_off">" (off now: turn it on in the keyboard settings)"</string>
+    <string name="slot_stroke_drawn">"While Drawing on keys is Stroke filter, a short swipe while pinyin is typed is read as the stroke drawn, not this one"</string>
     <string name="swipe_slots_hint">Tap a key to change its long press characters and what swiping it up and down does.</string>
     <string name="swipe_slots_hint_page">Tap a key to change what swiping it up and down does, and its long press characters.</string>
     <string name="swipe_slots_hint_function">Tap a key to change what swiping it up and down does.</string>

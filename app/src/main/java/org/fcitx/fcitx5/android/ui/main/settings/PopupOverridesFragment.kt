@@ -39,6 +39,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.TableSettings
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keys.KeyEdit
 import org.fcitx.fcitx5.android.input.keys.KeyLists
@@ -545,8 +546,15 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     // a way's section, titled by the way, said to be off where its switch is
     private fun section(ctx: Context, slotKey: String, up: Boolean): SwipeSlotSection {
         val on = if (up) prefs.keyboard.swipeUp.getValue() else prefs.keyboard.swipeDown.getValue()
-        return SwipeSlotSection(ctx, getString(if (up) R.string.swipe_up else R.string.swipe_down), !on, slots.resolve(slotKey, up))
+        val strokesDrawn = prefs.keyboard.keyDrawing.getValue() == KeyDrawing.StrokeFilter && startsStroke(slotKey)
+        return SwipeSlotSection(ctx, getString(if (up) R.string.swipe_up else R.string.swipe_down), !on, slots.resolve(slotKey, up), strokesDrawn)
     }
+
+    // a key a stroke drawn starts on (GlideTouch.down: a letter key): the full keyboard's, 九键's 2 to 9, the
+    // grouped keyboards'; not 九键's 1, 注音's (they draw none), the numbers' nor a function key
+    private fun startsStroke(slotKey: String): Boolean =
+        listOf(KeyShortcutPages.Full, KeyShortcutPages.Grouped14, KeyShortcutPages.Grouped18).any { slotKey in it.names } ||
+            slotKey in KeyShortcutPages.Nine.names && slotKey != KeyShortcuts.charKey(KeyShortcutPreset.NINE, "1")
 
     private fun LinearLayout.keyParams(ctx: Context, weight: Float) = lParams(0, ctx.dp(KeyHeight)) {
         this.weight = weight

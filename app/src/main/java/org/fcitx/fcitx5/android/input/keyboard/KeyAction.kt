@@ -8,8 +8,10 @@ import android.view.MotionEvent
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 
@@ -21,7 +23,12 @@ sealed class KeyAction {
         val states: KeyStates = KeyStates.Virtual
     ) : KeyAction()
 
-    data class SymAction(val sym: KeySym, val states: KeyStates = KeyStates.Virtual) : KeyAction()
+    data class SymAction(val sym: KeySym, val states: KeyStates = KeyStates.Virtual) : KeyAction() {
+        companion object {
+            /** The engine's key for [stroke], one of 横竖撇点折 as Strokes.KEYS has them (笔画筛选: drawn on the keys, or a swipe slot's). */
+            fun stroke(stroke: Char) = SymAction(KeySym(UNICODE + Keyboard.strokeKey(stroke)), KeyStates.Virtual)
+        }
+    }
 
     /**
      * [text] put in by the app, in place of [replacing] if that is what is before the cursor. [punctuation]: a mark as the

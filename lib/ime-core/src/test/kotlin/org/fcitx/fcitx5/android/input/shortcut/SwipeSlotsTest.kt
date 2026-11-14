@@ -168,6 +168,21 @@ class SwipeSlotsTest {
         )) assertEquals(text, shorter, KeyMarkText.shorter(text))
     }
 
+    // the strokes (0.6.1, issue #4) are commands as the others, in format 1 still: an app before them (0.6.0)
+    // reads the line as a command it has not, that one slot back to its preset and the rest kept, as
+    // parseSkipsWhatItCannotRead has it; a format 2 would have lost every slot there
+    @Test
+    fun aStrokeIsStoredAsACommandInFormatOne() {
+        val s = SwipeSlots.Default.with("t9/3", up = true, Command(KeyCommand.StrokePie)).with("t9/2", up = false, Command(KeyCommand.StrokeHeng))
+        val text = s.serialize()
+        assertEquals("@1\tfirst-up\nt9/3.up\tstroke_p\nt9/2.down\tstroke_h", text)
+        assertEquals(s, SwipeSlots.parse(text))
+        // as 0.6.0 reads it: a command key it does not know is skipped, the other line kept
+        val before = SwipeSlots.parse(text.replace("stroke_p", "no-such-command"))
+        assertEquals(First, before.resolve("t9/3", up = true))
+        assertEquals(Command(KeyCommand.StrokeHeng), before.resolve("t9/2", up = false))
+    }
+
     // a newer version's slots (a backup of it, a downgrade): its lines are not read, the presets stand
     @Test
     fun anotherVersionsSlotsAreThePresets() {

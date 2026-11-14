@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.shortcut
 
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -136,6 +137,16 @@ class KeyShortcutsTest {
         KeyCommand.entries.forEach { assertEquals(it, KeyCommand.ofKey(it.key)) }
         assertNull(KeyCommand.ofKey("nothing"))
         assertEquals(setOf(KeyCommand.Copy, KeyCommand.Cut), KeyCommand.entries.filter { it.readsField }.toSet())
+    }
+
+    // each stroke's command is the engine's stroke of its name, in the strokes' order, and only those are strokes
+    @Test
+    fun theStrokesAreTheEnginesFive() {
+        val strokes = KeyCommand.entries.filter { it.stroke != null }
+        assertEquals(Strokes.KEYS, strokes.map { it.stroke }.joinToString(""))
+        assertEquals(strokes, KeyCommand.entries.filter { it.group == KeyCommand.Group.Stroke })
+        assertEquals(listOf("stroke_h", "stroke_s", "stroke_p", "stroke_n", "stroke_z"), strokes.map { it.key })
+        assertTrue(strokes.none { it.readsField })
     }
 
     // the empty set and one parsed from nothing are equal, so their hashes must be too
