@@ -1047,6 +1047,24 @@ height. Docked the service's touchable insets become a region, the keyboard's ba
 floating, the strip is added to the keyboard's region. The undo chip keeps off it
 (`UndoChipPlacement` `stripTop` / `strip`). The physical keyboard's `CandidatesView` is unaffected.
 
+`InField` (输入框里, 实验性, 0.6.1; dev/design/061-code-in-field.md) keeps the floating layout
+(`KawaiiBarComponent.codeRowFloats()` is `!= Embedded`, the same heights) and writes the session's code
+(`InputPanel.code`) into the field as composing text: `FcitxInputMethodService.placeCode` asks
+`CodeInField` (ime-core) where each code goes, decided as it starts and kept till it ends (field to
+strip only), and `EditingSession.writeCode` writes it (`FieldCode`: a probe read before the first
+letter, a read at its first report, read before each write an editor has not reported, four unreported
+writes and it is out). The field takes it unless it is raw keys (TYPE_NULL), a password or a number's
+(`CodeInField.takes`). Even then a code goes on the strip when it starts over a selection or with no
+known cursor, or while voice's text is composing; and one with a private-use character in it (a
+keyboard's own glyph, not text) floats from there on. A field that let it down
+(rewritten, unread, input restarted by the app) floats it for the rest of its input (`CodeInField.fallBack`,
+kept across restarts). Then the strip draws none of the code (`service.forStrip`), only the syllables
+and hints, and the physical keyboard's `CandidatesView` none either; the address strip stays empty.
+Every place that ended the engine's preedit in the field goes by `EditingSession.kind`
+(`leaveComposition`): English's word finished as text, voice's taken away, the code taken away proven
+ours or let go of. The engine's context reads leave the code out (`beforeCode`/`afterCode`). The
+setting asks first (`ManagedPreferenceUi.Confirm`, the list's OK/Cancel note).
+
 Pinyin's 18 keys (`Keys18`) are the grouped keyboard over `G18`, sending `Keyboard.pinyin18Key(code)`
 (L; is just L on pinyin); 双拼's 18 keys (`shuangpinKeyboard == Keys18`) the same keyboard with 双拼's
 codes, and 双拼's 14 keys (`Keys14`) the 14 keys' groups sending `Keyboard.shuangpin14Key(code)`; each

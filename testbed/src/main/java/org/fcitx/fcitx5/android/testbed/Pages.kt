@@ -131,6 +131,7 @@ object Pages {
         field("pw_visible", "可见密码", TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
         field("no_learning", "不要个性化学习（NO_PERSONALIZED_LEARNING）", ime = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING)
         field("no_extract", "横屏不进全屏提取（NO_EXTRACT_UI）", ime = EditorInfo.IME_FLAG_NO_EXTRACT_UI)
+        field("auto_correct", "自动更正（AUTO_CORRECT）", TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
     }
 
     private fun PageBuilder.imeOptions() {
@@ -257,6 +258,12 @@ object Pages {
         label("两个框共用一个 View id（shared）")
         field("shared_a", "共用 id 的第一个", idName = "shared")
         field("shared_b", "共用 id 的第二个", idName = "shared")
+        label("每次变化都 setText(同样的文字) 的框；不设 id 的两个框")
+        field("settext_echo", "每次变化 setText(同样的文字)，光标放回末尾") {
+            addTextChangedListener(afterChange { s -> val t = s.toString(); setText(t); setSelection(t.length) })
+        }
+        field("no_id_a", "不设 id 的第一个", idName = "shared") { id = View.NO_ID }
+        field("no_id_b", "不设 id 的第二个", idName = "shared") { id = View.NO_ID }
     }
 
     private fun PageBuilder.containers() {

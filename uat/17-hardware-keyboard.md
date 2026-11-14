@@ -313,3 +313,9 @@ Android 10（API 29，youmo29）没有 `uinput` 命令，脚本在那里改用�
 - **操作**：点工具栏的「显示屏幕键盘」，在屏幕 18 键上点 BN IO，按实体键盘的 2；清空，再点「显示屏幕键盘」（按了实体键屏幕键盘会收起），点 BN IO，按实体键盘的 d、`;`。
 - **预期**：第一次 2 选第 2 个候选上屏；第二次 BN IO 按编码行的读音留下（字母，没有私用区字符），d ; 按全键盘微软双拼读成 ding（小窗里有「定」之类）。Esc 和空格的路由见 HK-44 和 JVM。
 - **JVM**：`EnginesShuangpinKeysTest.aSemicolonTheSchemeTypesIsFullShuangpins`、`KeyboardPairTest.twoKeyedSessionsTurnByTheCodeAndAKeyFullTypesIsFulls`、`KeyRouterCodesTest.aHardwareMarkReachesShuangpinAsAHardwareChar`。
+
+### HK-46 [P1] 编码行在输入框里：实体键盘打的拼音也在框里
+- **前提**：B-IF，接上实体键盘（`uat/tools/emu-keyboard.sh up`），点「普通文本」框。
+- **操作**：按 n i h a o，看框和光标旁的悬浮候选窗；按空格。
+- **预期**：拼音带下划线在框里，悬浮候选窗里只有候选，没有拼音那一行；空格后框里是「你好」。
+- **JVM**：`HardwareKeyUatTest.theCodeInTheFieldIsNotInTheFloatingWindowToo`（对照：编码行在键盘上方时悬浮窗里有拼音）；设备上接实体键盘手工看。

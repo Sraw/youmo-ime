@@ -633,3 +633,6 @@ def hk45(d):
     check(f2 and f2.isascii() and f2.isalpha() and not has_keyboard_code(f2), f"按 d 后框里「{f2}」")
     check(c2 and ("定" in c2[:5] or "顶" in c2[:5]), f"d ; 的小窗「{p}」候选 {c2[:5]}")
     return f"「{f1}」；「{f2}」+ d; {c2[:3]}"
+
+
+case("HK-46", needs="manual:编码行在输入框里时实体键盘的悬浮候选窗没有拼音那一行：接 emu-keyboard.sh 的实体键盘手工看")(lambda d: None)

@@ -87,6 +87,9 @@
 
 **B0-设置**：B0 的第 1–3 步，然后打开"幽默输入法"应用，停在设置首页。
 
+**B-IF（编码行在输入框里）**：B0，然后在 **外观 → 大小与样式** 里把 **编码行** 选成「输入框里（实验性）」，在弹出的说明上点 **确定**，回测试页点「普通文本」框。
+LC-01/03/04 的「不留字母」是 B0 下的；B-IF 下由 LC-21 起的几条代替（dev/design/061-code-in-field.md §9）。
+
 前提里写"B0，另外……"的，先到 B0，再做"另外"的部分。
 
 ### 重置
@@ -213,12 +216,12 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | `voice:…` | 导入了语音包的 debug 包（默认就是；`--no-voice` 时、发布包上在别处跑：发布包没有片段麦克风） | 12 语音 |
 | `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v、QU-20、ST-82、ST-85、ST-110 |
 | `release,scripted:…` | 发版时用发布包脚本跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
-| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24、ST-68、ST-69、ST-70、ST-73、ST-74、TB-53、VO-37、ST-75、ST-76、ST-77、ST-78、ST-79、ST-80、ST-81、TB-46a、PR-51、ST-83、ST-84、ST-86、ST-87、ST-88、ST-89、ST-91、ST-92、ST-93、ST-94、ST-102、ST-103、KB-84、ST-111、WD-49、PR-52a、ST-116、KB-88、LC-20、VO-40、PY-121a |
+| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24、ST-68、ST-69、ST-70、ST-73、ST-74、TB-53、VO-37、ST-75、ST-76、ST-77、ST-78、ST-79、ST-80、ST-81、TB-46a、PR-51、ST-83、ST-84、ST-86、ST-87、ST-88、ST-89、ST-91、ST-92、ST-93、ST-94、ST-102、ST-103、KB-84、ST-111、WD-49、PR-52a、ST-116、KB-88、LC-20、VO-40、PY-121a、LC-33 |
 | `jvm:<测试>` | JVM 上的测试（`:app:testDebugUnitTest`、`:app:testDebugUnitTestAt29` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 835 条（P0 139、P1 630、P2 66）：模拟器上跑 112 条（其中 66 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 723 条（JVM 635、发版时 24、真机或手工 47、语音 17）。
+现在共 856 条（P0 141、P1 646、P2 69）：模拟器上跑 125 条（其中 79 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 731 条（JVM 638、发版时 24、真机或手工 52、语音 17）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 

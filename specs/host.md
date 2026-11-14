@@ -163,7 +163,7 @@ the candidates once at the end of the event, for the active context only.
 | `KeyRouter` | `androidengine.cpp` `keyEvent`/`send`/`show`/`activate`/`deactivate`/`reset`/`invokeActionImpl` | the pipeline's `KeyEngine`; a session that throws: panel cleared, session reset unless it never answered, one whose reset fails not reset again (`native-lib.cpp:722-745`) |
 | `KeyRouter.EngineCandidateList` | `EngineCandidateList` (`:75-239`) | page from the snapshot, the rest a chunk of 32 at a time, those before the page once; long press asked, then checked again on the same candidate |
 | `TempCandidateList` (`TempModeCandidates` on the panel) | fcitx's `CommonCandidateList` | the temp modes' lists and punctuation's marks |
-| `Panel` | `InputPanel` | per context (`InputContext.panel`); `reset` clears the overlay too; `empty` ignores it |
+| `Panel` | `InputPanel` | per context (`InputContext.panel`); `reset` clears the overlay too; `empty` ignores it; `code`: the preedit shown is the session's code (`KeyRouter.show`), not a temp mode's nor punctuation's marks, sent as `InputPanel.code` (what 编码行 输入框里 may write into the field) |
 | `Refiner` | `refine_` (`:26-28,706-721`) | 30 ms after a key, a slice at once after a slice; any event cancels it, a long-press menu holds it |
 | `Profile` | `InputMethodManager` load/save | fcitx's INI rules, through `IniFile`; defaults written as `# Key=`; other groups kept |
 | `HostClock` | the event loop's timers | `VirtualHostClock` (testFixtures) is also the `LearnClock`, so a replay learns the same |

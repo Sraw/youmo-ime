@@ -166,6 +166,32 @@ class HostCoreContractTest {
     }
 
     @Test
+    fun `the session's code is flagged as the code the app may write into the field, nothing else is`() {
+        // 061-code-in-field §4.2: only KeyRouter.show's preedit; a temp mode's and the punctuation marks' are
+        // covered where those are (ChineseModulesHostTest, KeyRouterPunctuationTest)
+        val core = core()
+        core.open()
+        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "ni hao", candidates = listOf("你好")) else snap() }
+        val log = core.log()
+        core.press('n')
+        val code = log.filterIsInstance<HostEvent.InputPanel>().last()
+        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(commit = "你好") else snap() }
+        core.press('1')
+        val cleared = log.filterIsInstance<HostEvent.InputPanel>().last()
+        core.setCurrentInputMethod(ImGroup.KEYBOARD_US)
+        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "he", candidates = listOf("hello")) else snap() }
+        log.clear()
+        core.press('h')
+        assertRows(
+            "pinyin's code on the panel is the code" to { assertTrue(code.code); assertEquals("ni hao", code.preedit.toString()) },
+            "nothing left to type: no code" to { assertFalse(cleared.code) },
+            "English's word is the app's preedit, never the code" to {
+                assertTrue(log.filterIsInstance<HostEvent.InputPanel>().none { it.code })
+            },
+        )
+    }
+
+    @Test
     fun `an untaken key is handed back, release too`() {
         // af:385-393
         val core = core()

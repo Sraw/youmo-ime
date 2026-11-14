@@ -87,6 +87,9 @@ class AddressStrip(private val ctx: Context, private val theme: Theme, private v
     // [read], what start read already
     private fun refresh(start: Int, end: Int, read: Around?) {
         val f = field ?: return
+        // the code in the field (编码行 输入框里) is not an address: nothing read, offered nor seen while it
+        // is there; the candidates have the bar meanwhile (061-code-in-field §6.5)
+        if (service.codeInFieldNow) return show(emptyList())
         val around = read ?: Around.read(service.currentInputConnection, start == end && start >= 0)
         if (learns) service.addressLearning.seen(around?.whole, read = around != null)
         // a selection: nothing to put beside it. One the app gave no position of (-1, -1) shows as the text selected

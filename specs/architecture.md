@@ -152,6 +152,9 @@ never reaches the app's text, so nothing has to be taken out of it afterwards. T
 keep the cursor in sight, and a tap on it puts the cursor there (`HostApi.moveCursor`, the
 engine's `EngineEvent.CURSOR` with the place in the preedit), for a key missed in the middle of a
 long code to be typed or deleted there; arrows and the swipe on space move it too (`Action.Step`).
+编码行 输入框里 (实验性) is the user's choice to have the code in the field anyway, as the app's
+composing text, under the rule that nothing the keyboard cannot prove it wrote is deleted (`EditingSession.Kind.CODE`,
+`FieldCode`, `CodeInField`; [app.md](app.md) and [pitfalls.md](pitfalls.md#composing-text-in-the-app-outlives-the-keyboard)).
 
 ## The engine host
 

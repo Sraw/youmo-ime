@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.input.cursor.CursorRange
+
 /**
  * The slice of `android.view.inputmethod.InputConnection` that editing logic actually needs.
  *
@@ -62,4 +64,11 @@ interface InputEditor {
 
     /** Groups the calls in [block] so the editor sees one atomic change. */
     fun batchEdit(block: () -> Unit)
+
+    /**
+     * The composing region as the editor has it now, read at once (Android 13's `takeSnapshot`), not as its
+     * last report said: start and end -1 when there is none; null when the editor cannot tell (before
+     * Android 13, or no snapshot given).
+     */
+    fun composingRegion(): CursorRange? = null
 }

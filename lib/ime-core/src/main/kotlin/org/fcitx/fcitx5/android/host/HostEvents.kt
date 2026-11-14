@@ -30,6 +30,11 @@ sealed class HostEvent {
         val auxDown: FormattedText,
         /** Quick input's panel ([TempPanel.quickPhrase]). */
         val quickPhrase: Boolean = false,
+        /**
+         * [preedit] is the session's code as the code row shows it ([Panel.code]): what 编码行 输入框里
+         * may write into the field. Not a temp mode's nor a punctuation key's marks on offer.
+         */
+        val code: Boolean = false,
     ) : HostEvent() {
         companion object {
             val EMPTY = InputPanel(FormattedText.Empty, FormattedText.Empty, FormattedText.Empty)

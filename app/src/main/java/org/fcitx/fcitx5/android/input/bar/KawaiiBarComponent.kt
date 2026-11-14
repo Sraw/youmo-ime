@@ -767,8 +767,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         /** Whether [im]'s keyboard shows the code row's syllables ([CodeRowHeight.showsStrip]). */
         fun showsStrip(im: String?): Boolean = CodeRowHeight.showsStrip(codeLayout(im))
 
-        /** Whether the code row floats over the app (编码行), a preference read: the input view is made anew as it changes. */
-        fun codeRowFloats(): Boolean = ThemeManager.prefs.codeRow.getValue() == CodeRowStyle.Floating
+        /**
+         * Whether the code row is out of the keyboard (编码行 浮在键盘上方, or 输入框里 with the strip for what
+         * stays out of the field), a preference read: the input view is made anew as it changes.
+         */
+        fun codeRowFloats(): Boolean = ThemeManager.prefs.codeRow.getValue() != CodeRowStyle.Embedded
 
         private fun codeLayout(im: String?) =
             ImKeyboards.layoutOf(im.orEmpty(), AppPrefs.getInstance().keyboard.imKeyboards(), EngineState.shuangpinScheme)

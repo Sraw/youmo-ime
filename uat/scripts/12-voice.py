@@ -798,3 +798,6 @@ case("VO-39", needs="jvm:VoiceFailureUatTest.eachFailureSaysItsOwnMessageAndWhat
      "VoiceListenerMicrophoneTest.aReadThrowingOnceLiftedIsNoFailure")(lambda d: None)
 case("VO-40", needs="manual:系统的麦克风使用指示要在 Android 12 起的设备上看（root 杀进程：root 过的真机或 API 31 起的模拟器）；"
      "关麦克风本身由 JVM 的 VoiceListenerMicrophoneTest.closedWhileTheModelsLoadTheMicrophoneIsStopped 断言")(lambda d: None)
+
+
+case("VO-53", needs="manual:语音待定文字在框里时打拼音：说话和点键要同时，手工看")(lambda d: None)

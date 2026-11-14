@@ -196,6 +196,52 @@ class SettingsUatTest {
         }
     }
 
+    @Test
+    @Uat("ST-117")
+    fun theCodeRowsThreePlacesTheFieldOnlyOnceItsNoteIsAgreedTo() {
+        val was = ThemeManager.prefs.codeRow.getValue()
+        try {
+            ThemeManager.prefs.codeRow.setValue(CodeRowStyle.Floating)
+            activity
+            open(SettingsRoute.Theme)
+            st.tab(1)
+            val row = listed(R.string.code_row_style)
+            val entries = row.entries.map { it.toString() }
+            // 输入框里 picked: its note first, the setting unchanged till OK
+            row.callChangeListener(CodeRowStyle.InField.name)
+            idle()
+            val note = ShadowDialog.getLatestDialog() as AlertDialog
+            val noteText = KeyboardHarness.all(note.window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+            val beforeOk = ThemeManager.prefs.codeRow.getValue()
+            note.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+            idle()
+            val cancelled = ThemeManager.prefs.codeRow.getValue() to row.value
+            row.callChangeListener(CodeRowStyle.InField.name)
+            idle()
+            (ShadowDialog.getLatestDialog() as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            idle()
+            val agreed = ThemeManager.prefs.codeRow.getValue() to row.value
+            // another back: no note
+            val dialogs = ShadowDialog.getShownDialogs().size
+            if (row.callChangeListener(CodeRowStyle.Embedded.name)) row.value = CodeRowStyle.Embedded.name
+            idle()
+            org.fcitx.fcitx5.android.assertRows(
+                "three places, in the keyboard, over it, in the field" to {
+                    assertEquals(listOf(R.string.code_row_embedded, R.string.code_row_floating, R.string.code_row_in_field).map(::s), entries)
+                },
+                "the note says what the field gets" to { assertTrue(noteText.toString(), s(R.string.code_row_in_field_note) in noteText) },
+                "not set while the note is up" to { assertEquals(CodeRowStyle.Floating, beforeOk) },
+                "cancelled: as it was" to { assertEquals(CodeRowStyle.Floating to CodeRowStyle.Floating.name, cancelled) },
+                "OK: in the field" to { assertEquals(CodeRowStyle.InField to CodeRowStyle.InField.name, agreed) },
+                "the others set at once, no note" to {
+                    assertEquals(CodeRowStyle.Embedded, ThemeManager.prefs.codeRow.getValue()); assertEquals(dialogs, ShadowDialog.getShownDialogs().size)
+                },
+            )
+        } finally {
+            ThemeManager.prefs.codeRow.setValue(was)
+        }
+    }
+
     // the options KotlinHost keeps: each page's save loaded into them as setImOptions does, every page then reading them again
     private val options = EngineOptions()
 

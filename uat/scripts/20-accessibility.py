@@ -161,3 +161,6 @@ case("AX-13", needs="jvm:KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorE
 
 
 case("AX-14", needs="jvm:ShiftKeyNameTest.theShiftKeyIsNamedOnItsCapAndToAScreenReader")(lambda d: None)
+
+
+case("AX-15", needs="manual:TalkBack 读框里的拼音（设计页 M16）：手工听")(lambda d: None)

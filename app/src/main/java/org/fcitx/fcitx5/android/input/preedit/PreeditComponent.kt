@@ -50,14 +50,33 @@ class PreeditComponent(private val floats: Boolean = false) : TypedComponent<Pre
             }
             // a syllable taken goes as 九键's column's does, through the keys' listener
             syllables.onPick = { commonKeyActionListener.listener.onKeyAction(it, KeyActionListener.Source.Keyboard) }
+            syllables.onShownChanged = { onShown?.invoke() }
         }
     }
 
     // the code on the row, as a tap on it found it
     private var shown = ""
 
+    // the panel last shown, drawn again as the code moves into the field or out of it
+    private var last: HostEvent.InputPanel? = null
+
+    /**
+     * Told once the row is drawn and as its syllables come or go: InputView's floating strip is there
+     * while either is (with the code in the app's field, 编码行 输入框里, the syllables alone may be).
+     */
+    var onShown: (() -> Unit)? = null
+
     override fun onInputPanelUpdate(data: HostEvent.InputPanel) {
-        shown = data.preedit.toString()
-        ui.update(data)
+        last = data
+        // the code in the app's field (编码行 输入框里) is not drawn here too: aux and the syllables are
+        val drawn = service.forStrip(data)
+        shown = drawn.preedit.toString()
+        ui.update(drawn)
+        onShown?.invoke()
+    }
+
+    /** The code moved into the field or out of it (FcitxInputMethodService.codeInFieldNow): the row drawn anew. */
+    fun codePlaceChanged() {
+        last?.let(::onInputPanelUpdate)
     }
 }

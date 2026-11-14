@@ -386,6 +386,8 @@ class KeyRouter(
         if (s.commit.isNotEmpty()) services.commit(ic, s.commit)
         panel.reset()
         if (s.preedit.isNotEmpty()) showPreedit(ic, s.preedit, s.cursor)
+        // the session's code on the panel (not in the app's field as its preedit): the app may write it there
+        ic.panel.code = ic.panel.preedit.isNotEmpty()
         // a table's pinyin lookup, said before what is typed: no code of the table's
         if (s.lookingUp) panel.auxUp = TempKeys.text(LOOKING_UP)
         if (s.candidates.isNotEmpty()) panel.candidateList = EngineCandidateList(ic, im, s)

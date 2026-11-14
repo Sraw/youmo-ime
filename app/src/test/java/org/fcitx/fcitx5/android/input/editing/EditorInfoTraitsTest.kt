@@ -82,6 +82,19 @@ class EditorInfoTraitsTest {
         assertFalse(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }.isEmail)
     }
 
+    @Test
+    fun aPasswordHiddenOrShownIsAPasswordNotAFieldThatOnlyAsksNotToBeLearnedFrom() {
+        // the code stays out of a password's field (编码行 输入框里, 061-code-in-field §6.1), a shown one too
+        assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }.isPassword)
+        assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD }.isPassword)
+        assertTrue(info { inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD }.isPassword)
+        assertFalse(info {
+            inputType = InputType.TYPE_CLASS_TEXT
+            imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+        }.isPassword)
+        assertFalse(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }.isPassword)
+    }
+
     /** A password, or a field that asks not to be learned from: what an arrow must not read. */
     @Test
     fun aPasswordOrAFieldNotToLearnFromIsSensitive() {

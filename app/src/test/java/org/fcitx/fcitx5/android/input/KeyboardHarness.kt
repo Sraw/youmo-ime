@@ -168,13 +168,15 @@ class KeyboardHarness(
     /**
      * Focus a field of this [inputType], as the app's field gaining focus would; [packageName] the
      * app's, [fieldId] its view's (one field told from another by them, as ContextMemory.field does),
-     * [prefill] what the app put in it before it was focused.
+     * [prefill] what the app put in it before it was focused. [terminal]: the field tells TYPE_NULL yet its
+     * connection takes text, as Termux's view (a BaseInputConnection over its own buffer) does.
      */
     fun start(
         inputType: Int = InputType.TYPE_CLASS_TEXT,
         imeOptions: Int = 0,
         packageName: String = "org.example.app",
         fieldId: Int = 0,
+        terminal: Boolean = false,
         prefill: (EditText) -> Unit = {},
     ): KeyboardHarness {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().also { activities += it }.get()
@@ -187,27 +189,57 @@ class KeyboardHarness(
             it.requestFocus()
         }
         delivered = intArrayOf(field.selectionStart, field.selectionEnd, -1, -1)
+        deliveredText = field.text.toString()
         val info = EditorInfo().also {
             it.packageName = packageName
             it.fieldId = fieldId
         }
         val target = field
+        val made = ++connectionsMade
         // a key the keyboard sends (←, Home, Ctrl+Z) the system hands to the focused view: Robolectric's does not
         val ic = object : android.view.inputmethod.InputConnectionWrapper(field.onCreateInputConnection(info), true) {
+            // closed (closeConnection): every call dropped, as the system's connection to a gone view drops it
+            private val open get() = made > closedThrough
+
             override fun sendKeyEvent(event: KeyEvent): Boolean =
                 // with Ctrl, a shortcut (Ctrl+Z), as the view root hands it on
-                (event.isCtrlPressed && event.action == KeyEvent.ACTION_DOWN && target.onKeyShortcut(event.keyCode, event)) ||
-                    target.dispatchKeyEvent(event)
+                open && ((event.isCtrlPressed && event.action == KeyEvent.ACTION_DOWN && target.onKeyShortcut(event.keyCode, event)) ||
+                    target.dispatchKeyEvent(event))
 
-            override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence? = if (nothingBeforeGiven) null else super.getTextBeforeCursor(n, flags)
+            override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence? =
+                if (nothingBeforeGiven || !open) null else super.getTextBeforeCursor(n, flags)
 
             override fun getSurroundingText(beforeLength: Int, afterLength: Int, flags: Int): android.view.inputmethod.SurroundingText? =
-                if (nothingBeforeGiven || nothingAfterGiven) null else super.getSurroundingText(beforeLength, afterLength, flags)
+                if (nothingBeforeGiven || nothingAfterGiven || !open) null else super.getSurroundingText(beforeLength, afterLength, flags)
 
-            override fun getTextAfterCursor(n: Int, flags: Int): CharSequence? = if (nothingAfterGiven) null else super.getTextAfterCursor(n, flags)
+            override fun getTextAfterCursor(n: Int, flags: Int): CharSequence? =
+                if (nothingAfterGiven || !open) null else super.getTextAfterCursor(n, flags)
 
-            override fun takeSnapshot(): android.view.inputmethod.TextSnapshot? = if (nothingBeforeGiven || nothingAfterGiven) null else super.takeSnapshot()
+            override fun takeSnapshot(): android.view.inputmethod.TextSnapshot? =
+                if (nothingBeforeGiven || nothingAfterGiven || !open) null else super.takeSnapshot()
+
+            override fun beginBatchEdit() = open && super.beginBatchEdit()
+
+            override fun endBatchEdit() = open && super.endBatchEdit()
+
+            override fun commitText(text: CharSequence?, newCursorPosition: Int) = open && super.commitText(text, newCursorPosition)
+
+            override fun setComposingText(text: CharSequence?, newCursorPosition: Int) = open && super.setComposingText(text, newCursorPosition)
+
+            override fun setComposingRegion(start: Int, end: Int) = open && super.setComposingRegion(start, end)
+
+            override fun finishComposingText() = open && super.finishComposingText()
+
+            override fun deleteSurroundingText(beforeLength: Int, afterLength: Int) = open && super.deleteSurroundingText(beforeLength, afterLength)
+
+            override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int) =
+                open && super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+
+            override fun setSelection(start: Int, end: Int) = open && super.setSelection(start, end)
+
+            override fun performEditorAction(editorAction: Int) = open && super.performEditorAction(editorAction)
         }
+        if (terminal) info.inputType = InputType.TYPE_NULL
         this.info = info
         connection = ic
         doStartInput(ic, info, restarting = false)
@@ -217,6 +249,33 @@ class KeyboardHarness(
         idle()
         relayout()
         return this
+    }
+
+    /**
+     * The app closes the field's connection (its view gone, another focused) before the service is told
+     * of it: every call on it dropped from now, till the next [start].
+     */
+    fun closeConnection() {
+        closedThrough = connectionsMade
+    }
+
+    private var connectionsMade = 0
+    private var closedThrough = 0
+
+    /**
+     * The app's screen made anew (a configuration it handles by recreating, a theme change): the old
+     * field's connection closed first, then a new field, its id and kind the old one's, starting input
+     * with the old one's text and selection as its saved state brings them (no composing span).
+     */
+    fun recreate() {
+        val text = field.text.toString()
+        val (start, end) = field.selectionStart to field.selectionEnd
+        val type = field.inputType
+        closeConnection()
+        start(inputType = type, packageName = info.packageName, fieldId = info.fieldId) {
+            it.setText(text)
+            it.setSelection(start, end)
+        }
     }
 
     /** The app restarting input in the same field, now of [inputType] (a WebView's field told anew). */
@@ -370,6 +429,15 @@ class KeyboardHarness(
     /** The field's selection changes not told to the service while set: its tracked selection lagging, as an editor's report can. */
     var selectionLags = false
 
+    /**
+     * As a device's EditText: a change of the composing span alone, the text and selection as they were
+     * (an app's clearComposingText), not told to the service; told with the next change that is. Off,
+     * every change is told, as Robolectric's field gives the harness no other way to tell them apart.
+     */
+    var spanAloneUnreported = false
+
+    private var deliveredText = ""
+
     // what the system's input method manager does as the field's selection or composing text
     // changes: Robolectric's tells the service nothing, whose tracking of the cursor would lag
     private fun selectionDelivered() {
@@ -381,6 +449,10 @@ class KeyboardHarness(
             android.view.inputmethod.BaseInputConnection.getComposingSpanEnd(text),
         )
         if (now.contentEquals(delivered)) return
+        val textNow = text.toString()
+        val spanAlone = now[0] == delivered[0] && now[1] == delivered[1] && textNow == deliveredText
+        if (spanAloneUnreported && spanAlone) return
+        deliveredText = textNow
         val was = delivered
         delivered = now
         service.onUpdateSelection(was[0], was[1], now[0], now[1], now[2], now[3])

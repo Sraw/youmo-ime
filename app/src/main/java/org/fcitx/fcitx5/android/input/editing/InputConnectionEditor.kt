@@ -4,7 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import android.view.inputmethod.InputConnection
+import org.fcitx.fcitx5.android.input.cursor.CursorRange
 
 /**
  * Binds [InputEditor] to the real editor.
@@ -66,5 +69,17 @@ class InputConnectionEditor(private val connection: () -> InputConnection?) : In
         } finally {
             ic.endBatchEdit()
         }
+    }
+
+    // takeSnapshot is Android 13's: not there to call before (a NoSuchMethodError on Android 10)
+    override fun composingRegion(): CursorRange? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Snapshots.composingRegion(connection()) else null
+
+    // TextSnapshot named in a class of its own: one an older verifier resolves while checking this class
+    // (Android 10 has no TextSnapshot) would fail it at load, before any version check runs
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private object Snapshots {
+        fun composingRegion(ic: InputConnection?): CursorRange? =
+            ic?.takeSnapshot()?.let { CursorRange(it.compositionStart, it.compositionEnd) }
     }
 }

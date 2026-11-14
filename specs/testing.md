@@ -64,7 +64,13 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
   (`*SceneGesturesTest`, `SceneTouchTest`, `SceneSpeechTest`).
 - New logic gets a test in the same change, in ime-core where the logic is.
 - Prefer fakes over mockk. `FakeEditor` (ime-core `testFixtures`) stands in for an
-  `InputConnection` and is held to the real `BaseInputConnection` by a contract test.
+  `InputConnection` and is held to the real `BaseInputConnection` by a contract test. Its app-side
+  actions (`appSetsText`, `appReplace`, `appDropSpan`, `appSelect`: an app's own edits, a `TextWatcher`'s,
+  a selection) are held there too (`InputEditorContractTest.appEdits`); its `rewriter` (an `InputFilter`
+  upper-casing or cutting the whole text) and `isAvailable = false` (a connection the framework closed
+  after the app finished the text) are the fake's alone: a closed connection's dropped calls are the
+  framework's wrapper, not `BaseInputConnection`'s, and were measured on devices (061-code-in-field M2, M3).
+  `CodeInFieldPropertyTest` drives them at random against the code in the field.
   `FakeHostApi` (app test sources) cannot be held to the real engine (JNI), so keep it dumb:
   store config, record calls, simulate no input.
 - The engine's user files: `MemoryFiles` (ime-core testFixtures), a `UserFiles` in memory that

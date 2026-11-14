@@ -570,3 +570,37 @@ def py121(d):
 
 
 case("PY-121a", needs="manual:youmo29（API 29）上测试页打不开（WebView shell 要 API 34+）：在输入测试台 types 页的 text 框接 emu-keyboard.sh 的实体键盘手工跑，看悬浮候选窗的图")(lambda d: None)
+
+
+@case("PY-122", mutates=True)
+def py122(d):
+    lc = script("18-lifecycle")
+    lc.testbed_in_field(d, "types", "text")
+    d.type("nihao")
+    d.cands()
+    f = next(x for x in d.screen().app() if x.rid == "text" and x.pkg == lc.TESTBED)
+    # inside 「ni hao」: taps from the field's left edge on till the field's cursor is in the code, not at its ends
+    at = None
+    for i in range(1, 30):
+        d.tap((f.b[0] + i * int(6 * d.dpx()), (f.b[1] + f.b[3]) // 2), 0.6)
+        st = lc.tb(d, "text")
+        if 0 < st.get("selStart", 0) < 6:
+            at = st["selStart"]
+            break
+    if at is None:
+        raise Blocked("点不到编码里面")
+    st = lc.tb(d, "text")
+    d.type("a")
+    d.cands()
+    st1 = lc.tb(d, "text")
+    d.space()
+    time.sleep(0.6)
+    t2 = lc.tb(d, "text").get("text")
+    check(st.get("text") == "ni hao" and (st.get("compStart"), st.get("compEnd")) == (0, 6), f"点进编码后框「{st.get('text')}」composing {st.get('compStart')}–{st.get('compEnd')}")
+    t1 = st1.get("text") or ""
+    check(t1.replace(" ", "") == ("nihao"[:sum(c != " " for c in "ni hao"[:at])] + "a" + "nihao"[sum(c != " " for c in "ni hao"[:at]):]), f"在第 {at} 位点 a 后框「{t1}」")
+    check(t2 and not any(c.isascii() and c.isalpha() for c in t2), f"空格后框里「{t2}」")
+    return f"光标点到第 {at} 位，「{t1}」→「{t2}」"
+
+
+case("PY-123", needs="jvm:CodeInFieldUatTest.aSelectionMadeInTheCodeLeavesItAsTextAndTheEngineReset")(lambda d: None)

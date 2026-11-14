@@ -4,11 +4,14 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import android.os.Build
 import android.text.Selection
 import android.text.SpannableStringBuilder
 import android.view.View
 import android.view.inputmethod.BaseInputConnection
 import org.fcitx.fcitx5.android.core.FormattedText
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -242,6 +245,33 @@ open class EditingSessionOverRealEditorTest {
             }
         }
         assertTrue(failures.take(5).joinToString("\n"), failures.isEmpty())
+    }
+
+    @Test
+    fun `the editor's composing region is asked of Android 13's snapshot, never before it`() {
+        val editable = SpannableStringBuilder("ABni").also { Selection.setSelection(it, 4) }
+        var snapshots = 0
+        val connection = object : BaseInputConnection(View(RuntimeEnvironment.getApplication()), true) {
+            override fun getEditable() = editable
+
+            // counted at every SDK: below 33 the framework has no such method, a call would be a NoSuchMethodError
+            override fun takeSnapshot(): android.view.inputmethod.TextSnapshot? = super.takeSnapshot().also { snapshots++ }
+        }
+        connection.setComposingRegion(2, 4)
+        val editor = InputConnectionEditor { connection }
+        val spanned = editor.composingRegion()
+        connection.finishComposingText()
+        val none = editor.composingRegion()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            assertEquals(2 to 4, spanned?.let { it.start to it.end })
+            assertEquals(-1 to -1, none?.let { it.start to it.end })
+            assertEquals(2, snapshots)
+        } else {
+            // cannot tell: the code's write goes on as it would (LC-30's one letter at most)
+            assertNull(spanned)
+            assertNull(none)
+            assertEquals(0, snapshots)
+        }
     }
 
     /** The same at the app's minSdk. */

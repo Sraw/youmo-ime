@@ -341,3 +341,9 @@
 - **操作**：照 VO-41 改出「徐婧」不点；再说一次照样改；点 **记住** 再点 **撤销**；之后用拼音再打几次「徐婧」。
 - **预期**：第二次照样问；撤销以后，打「徐婧」学到的和从没点过记住时一样（学到的词、次数都一样）。
 - **JVM**：ime-core `VoiceEditsTest.asked once in a window, again in the next (Q6)`、`EnginesVoiceEditsTest.undone, what typing the word learned stays (review S3)`；设备上不跑。
+
+### VO-53 [P2] 编码行在输入框里：语音的待定文字在框里时打拼音
+- **前提**：B-IF，B0-语音的语音包。
+- **操作**：按住空格说「今天天气」，还在说时（待定文字在框里）点 n i；说完。
+- **预期**：拼音在键盘上方的小条里，不写进框里；说完上屏后框里是说的话，没有多出拼音字母。
+- **JVM**：`CodeInFieldTest`「voice composing in the field: the strip」（打拼音时框里有别的待定文字就走小条）；`CodeInFieldUatTest.voiceTypedOverTheCodeTakesItAwayAndTheCodeFloatsOn`（框里是拼音时语音上屏：拼音拿走、浮到小条）；设备上手工看。

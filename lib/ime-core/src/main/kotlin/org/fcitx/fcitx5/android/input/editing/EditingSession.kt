@@ -47,13 +47,44 @@ class EditingSession(
     var composingText: FormattedText = FormattedText.Empty
         private set
 
+    /** What the composing text in the field is, and so how it leaves ([leaveComposition]). */
+    enum class Kind {
+        /** The engine's own preedit in the app (English's word, handwriting's): finished in place as text. */
+        TEXT,
+
+        /** Voice's, as it is heard ([provisional]). */
+        PROVISIONAL,
+
+        /**
+         * The session's code as the code row shows it (`ni hao`, 编码行 输入框里, [writeCode]): taken away
+         * when proven still ours, else let go as text; never kept for the engine to commit
+         * (dev/design/061-code-in-field.md §4.3).
+         */
+        CODE,
+    }
+
+    /** The composing text's [Kind]; [Kind.TEXT] with nothing composed. */
+    var kind = Kind.TEXT
+        private set
+
     /**
      * The composing text is not the engine's but stands in for text still to come (voice's, as it
      * is heard): replaced by the commit, never finished in place first, and taken away, not kept,
      * when the cursor leaves it. Finished in place, it stayed as text and the commit typed it again.
      */
-    var provisional = false
-        private set
+    val provisional: Boolean get() = kind == Kind.PROVISIONAL
+
+    /** Whether the session's code is in the field now ([Kind.CODE]). */
+    val codeInField: Boolean get() = kind == Kind.CODE && composing.isNotEmpty()
+
+    // the code's checks, reads and leaving (FieldCode)
+    private val code = FieldCode(this, editor)
+
+    /** [FieldCode.fellBack]: told when the code can no longer be in this field, and floats. */
+    var codeFellBack by code::fellBack
+
+    /** [FieldCode.inlineCompletion]: a URL's or an email's field, its completion after the code the app's. */
+    var inlineCompletion by code::inlineCompletion
 
     /** How a [provisional] composition left the field ([provisionalTaken]). */
     enum class Taken {
@@ -162,6 +193,7 @@ class EditingSession(
     ): CursorUpdate {
         val updateIndex = ++cursorUpdateIndex
         pairs.cursorReported()
+        if (codeInField) return code.reconcile(selStart, selEnd, composingStart, composingEnd, ignoreSystemCursor, updateIndex)
         if (selection.consume(selStart, selEnd)) {
             // Only when the prediction matched: an InputFilter can also change the text, and
             // then the old range may no longer be the composition.
@@ -213,6 +245,75 @@ class EditingSession(
         editor.finishComposingText()
         return CursorUpdate.FocusOutIn
     }
+
+    /**
+     * Where a commit lands now: the cursor, or the start of the code in the field, which it replaces.
+     * Null over voice's or English's composing text, which a commit may or may not replace.
+     */
+    val commitStart: Int?
+        get() = when {
+            composing.isEmpty() -> selection.latest.start
+            codeInField -> composing.start
+            else -> null
+        }
+
+    /**
+     * Writes the session's code [text] into the field as its composing text ([Kind.CODE]), or
+     * empties it. False when it is not written, and the code floats instead: something else
+     * composes here, a selection would be replaced, the field cannot be read, or the code written
+     * before is not as written and was let go of (§6.3; [codeFellBack] is told then).
+     */
+    fun writeCode(text: FormattedText, render: (FormattedText) -> CharSequence = { it.toString() }): Boolean {
+        checkThread()
+        if (!editor.isAvailable) return false
+        if (text.isEmpty()) {
+            // the code emptied (its last letter deleted, cleared): taken away as leaving takes it,
+            // proven ours, never by an empty write, which replaces whatever the editor holds then
+            if (codeInField) code.leave(fallBack = false)
+            return true
+        }
+        if (!code.mayWrite()) return false
+        write(text, Kind.CODE, render)
+        code.wrote()
+        return true
+    }
+
+    /**
+     * Ends what is composed as leaving the field ends it, by its [kind]: English's word finished
+     * in place as text ([finishComposition]), voice's taken away (the talk types it), the code taken
+     * away when proven still ours, else let go of as text (§0, §4.3). [fallBack]: the engine keeps
+     * its code, which floats from now on ([codeFellBack]), as before voice's commit.
+     */
+    fun leaveComposition(fallBack: Boolean = false) {
+        checkThread()
+        when (kind) {
+            Kind.TEXT -> finishComposition()
+            Kind.PROVISIONAL -> updateComposingText(FormattedText.Empty)
+            Kind.CODE -> code.leave(fallBack)
+        }
+    }
+
+    /**
+     * Input restarted over the code ([Kind.CODE]; nothing done otherwise). [again], the input
+     * method's own restart (the screen turned, the same EditorInfo): the field is the same, the code
+     * taken away when proven ours. Any other restart may be another field under the same view (a web
+     * page's, Compose's, Flutter's): the code there proves nothing, so it is let go of, never read,
+     * and the field's code floats for the rest of this input (§6.4).
+     */
+    fun codeRestarted(again: Boolean) {
+        checkThread()
+        if (kind == Kind.CODE) code.restarted(again)
+    }
+
+    /**
+     * What a read of the field's text before the cursor ([before]) would be without the code in it:
+     * the engine's context (前文) is what was there before the code, never the code itself
+     * (§7.9). Unchanged with no code in the field, or with a cursor outside it.
+     */
+    fun beforeCode(before: CharSequence?): CharSequence? = code.before(before)
+
+    /** [beforeCode] for a read after the cursor ([after]): the code's part after the cursor dropped. */
+    fun afterCode(after: CharSequence?): CharSequence? = code.after(after)
 
     /**
      * Input restarted over a [provisional] composition, which the restart's focus out would leave as
@@ -320,7 +421,12 @@ class EditingSession(
     ) {
         checkThread()
         if (!editor.isAvailable) return
-        this.provisional = provisional && text.length > 0
+        write(text, if (provisional) Kind.PROVISIONAL else Kind.TEXT, render)
+    }
+
+    // [text] as the composing text of [kind] (TEXT with nothing composed); see updateComposingText
+    private fun write(text: FormattedText, kind: Kind, render: (FormattedText) -> CharSequence) {
+        this.kind = if (text.length > 0) kind else Kind.TEXT
         val lastSelection = selection.latest
         // Nothing to change, nothing sent: an empty batch is still two calls on the editor. The
         // context left behind on an app switch sends its empty preedit as the next app binds, and
@@ -368,7 +474,7 @@ class EditingSession(
         checkThread()
         composing.clear()
         composingText = FormattedText.Empty
-        provisional = false
+        kind = Kind.TEXT
     }
 
     /**
@@ -634,8 +740,9 @@ class EditingSession(
         checkThread()
         // Backspace only gets here when fcitx passed it on, which it does not while it has a
         // preedit; a composing region left in the editor is stale, so it is finished (kept as
-        // typed) and the deletion works on plain text, predictably.
-        finishComposition()
+        // typed) and the deletion works on plain text, predictably. The code, if one is there, is
+        // taken away when proven ours, else let go of (§4.3); voice's text is finished as before
+        if (kind == Kind.CODE) code.leave(fallBack = false) else finishComposition()
         val lastSelection = selection.latest
         var direct = editor.isAvailable && traits.acceptsDeleteSurrounding &&
             !traits.isRawKeyInput && (lastSelection.isNotEmpty() || lastSelection.start > 0)
@@ -706,5 +813,6 @@ class EditingSession(
     }
 }
 
-/** How far from the cursor a provisional composition is read back (characters, one IPC read). */
-private const val MAX_STILL_THERE_READ = 4096
+/** How far from the cursor a provisional composition or the code is read back (characters, one IPC read). */
+internal const val MAX_STILL_THERE_READ = 4096
+

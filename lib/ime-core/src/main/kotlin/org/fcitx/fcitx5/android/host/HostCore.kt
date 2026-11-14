@@ -626,7 +626,7 @@ class HostCore(
             if (p.empty) {
                 emit(HostEvent.InputPanel(FormattedText.Empty, text(p.overlayMessage), FormattedText.Empty))
             } else {
-                emit(HostEvent.InputPanel(pipeline.filterOutput(ic, p.preedit), pipeline.filterOutput(ic, p.auxUp), pipeline.filterOutput(ic, p.auxDown), p.quickPhrase))
+                emit(HostEvent.InputPanel(pipeline.filterOutput(ic, p.preedit), pipeline.filterOutput(ic, p.auxUp), pipeline.filterOutput(ic, p.auxDown), p.quickPhrase, p.code && p.preedit.isNotEmpty()))
             }
             sendCandidates(ic)
         }

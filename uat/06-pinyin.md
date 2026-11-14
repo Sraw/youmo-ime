@@ -602,3 +602,14 @@
 - **预期**：同 PY-121 的悬浮候选窗部分：没读音的候选（表情、「iPhone」这种英文）和有读音的一样高、底边对齐。Android 13 以下表情由它自己的回退字体排，有读音的字的行按汉字的行排，这两张图是这件事在 Android 10–12 上唯一的证据（JVM 上 Robolectric 没有不同高度的回退字体）。
 - **JVM**：`ReadingBaselineTest.aFloatingCandidateOfNoReadingIsAsTallAndOnTheSameBaseline`（SDK 29 和 35 各跑一次，只守住算法，见 PY-121）；设备上看图，手工跑。
 
+### PY-122 [P1] 编码行在输入框里：点框里的编码移光标
+- **前提**：B-IF，输入测试台 `types` 页的 `text` 框，点 n i h a o。
+- **操作**：点框里「ni hao」中间（不是两头）；点 a；点空格。
+- **预期**：点了之后框里还是带下划线的「ni hao」，光标停在点的地方；点 a 后 a 插在光标处（点在 n 后面就是「nai hao」），候选跟着变；空格后框里是选定的字，没有留下字母。
+- **JVM**：`CodeInFieldUatTest.aTapInsideTheCodeMovesTheEnginesCursor`（点进编码，引擎的光标跟着移）；设备上照跑。
+
+### PY-123 [P1] 编码行在输入框里：在编码里选字，编码留下成为文字
+- **前提**：B-IF，在「普通文本」框点 n i h a o。
+- **操作**：在框里双击编码（或长按后拖选）。
+- **预期**：「ni hao」留在框里成为普通文字（没有下划线）并被选中，候选栏清空；接着打字替换的是选中的这段，和选中任何文字时一样。
+- **JVM**：`CodeInFieldUatTest.aSelectionMadeInTheCodeLeavesItAsTextAndTheEngineReset`。

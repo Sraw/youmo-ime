@@ -21,6 +21,8 @@ data class EditorTraits(
     val isUri: Boolean = false,
     /** An email address field. */
     val isEmail: Boolean = false,
+    /** A password's, its characters hidden or shown (a shown one is only sensitive to fcitx). */
+    val isPassword: Boolean = false,
     /** A number, phone or date field. */
     val isNumber: Boolean = false,
     /** What kind of number a number, phone or date field says it takes; null for any other field. */

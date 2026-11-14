@@ -54,6 +54,7 @@ fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
         isRawKeyInput = type == InputType.TYPE_NULL,
         isUri = type == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_URI,
         isEmail = type == InputType.TYPE_CLASS_TEXT && variation in EMAIL_VARIATIONS,
+        isPassword = CapabilityFlags.isPassword(this),
         isNumber = type == InputType.TYPE_CLASS_NUMBER || type == InputType.TYPE_CLASS_PHONE || type == InputType.TYPE_CLASS_DATETIME,
         number = numberKind(type, variation, inputType and InputType.TYPE_MASK_FLAGS),
         isSearch = action == EditorInfo.IME_ACTION_SEARCH,

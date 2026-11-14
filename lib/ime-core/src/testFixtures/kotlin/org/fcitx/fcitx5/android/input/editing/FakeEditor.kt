@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.input.cursor.CursorRange
+
 /**
  * A text buffer that behaves like an editor, for testing [EditingSession].
  *
@@ -45,6 +47,16 @@ class FakeEditor(
 
     private val buffer = StringBuilder(initial)
 
+    // who put each character of [buffer] there: [APP] or [KEYBOARD]
+    private val owner = StringBuilder(APP.toString().repeat(initial.length))
+
+    /**
+     * Who put each character of [text] there, one per character: [APP] (the initial text, the app's
+     * edits) or [KEYBOARD] (what the input method's calls put in). Characters alike are told apart by
+     * it: a test asserts that the keyboard deleted none of the app's, whatever they are.
+     */
+    val owners: String get() = owner.toString()
+
     /** Selection anchor and focus, as set; `start > end` is possible, as in `Selection`. */
     var selectionStart = cursor
         private set
@@ -84,9 +96,86 @@ class FakeEditor(
     fun appSetsText(text: String) {
         buffer.setLength(0)
         buffer.append(text)
+        owner.setLength(0)
+        owner.append(APP.toString().repeat(text.length))
         selectionStart = text.length
         selectionEnd = text.length
         clearComposing()
+    }
+
+    /**
+     * The app's own edit of [from, to) to [text] (a `TextWatcher`'s, a formatter's), as an `Editable`'s
+     * `replace` moves its spans (held to it by InputEditorContractTest.appEdits): the composing span,
+     * exclusive at both ends, takes in nothing inserted at either end; its start inside the range goes
+     * to the new text's end, its end inside it to the new text's start, and a span left empty goes. The
+     * selection inside the range lands in proportion in the new text (`SpannableStringBuilder`'s
+     * adjustment). Not recorded in [calls].
+     */
+    fun appReplace(from: Int, to: Int, text: String) {
+        val length = text.length
+        buffer.replace(from, to, text)
+        owner.replace(from, to, APP.toString().repeat(length))
+        fun moved(p: Int) = if (p in from + 1..<to) from + (p - from) * length / (to - from) else shift(p, from, to, length)
+        selectionStart = moved(selectionStart)
+        selectionEnd = moved(selectionEnd)
+        if (!hasComposing) return
+        val a = when {
+            composingStart < from -> composingStart
+            composingStart <= to -> from + length
+            else -> composingStart - (to - from) + length
+        }
+        val b = when {
+            composingEnd <= from -> composingEnd
+            composingEnd < to -> from
+            else -> composingEnd - (to - from) + length
+        }
+        if (a < b) {
+            composingStart = a
+            composingEnd = b
+        } else {
+            clearComposing()
+        }
+    }
+
+    /** The app's: the composing span dropped, the text kept (`finishComposingText` of its own, an `InputFilter` that drops spans). */
+    fun appDropSpan() = clearComposing()
+
+    /** The app's: [start]..[end] selected (a double tap, a drag, a select-all), as [reportSelection]. */
+    fun appSelect(start: Int, end: Int = start) = reportSelection(start, end)
+
+    /**
+     * The app's rewrite of what the keyboard puts in (an `InputFilter`: upper-cased, cut to a length),
+     * applied to the whole text after each [commitText] and [setComposingText]; null for none. The
+     * selection and the composing span are kept, cut to the new length (a span left empty goes).
+     */
+    var rewriter: ((String) -> String)? = null
+
+    /**
+     * Whether the editor gives its composing region at once ([composingRegion], Android 13's
+     * `takeSnapshot`); false: it cannot tell, as before Android 13.
+     */
+    var snapshots = false
+
+    override fun composingRegion(): CursorRange? {
+        if (!snapshots) return null
+        calls += "composingRegion()"
+        return CursorRange(composingStart, composingEnd)
+    }
+
+    private fun rewrite() {
+        val r = rewriter ?: return
+        val new = r(buffer.toString())
+        buffer.setLength(0)
+        buffer.append(new)
+        // what is left keeps its owner; anything longer is the app's
+        owner.setLength(minOf(owner.length, new.length))
+        while (owner.length < new.length) owner.append(APP)
+        selectionStart = selectionStart.coerceAtMost(new.length)
+        selectionEnd = selectionEnd.coerceAtMost(new.length)
+        if (hasComposing) {
+            composingEnd = composingEnd.coerceAtMost(new.length)
+            if (composingStart >= composingEnd) clearComposing()
+        }
     }
 
     /**
@@ -118,6 +207,7 @@ class FakeEditor(
             .coerceIn(0, buffer.length)
         var cursor = shift(c, a, b, text.length)
         buffer.replace(a, b, text)
+        owner.replace(a, b, KEYBOARD.toString().repeat(text.length))
         if (reselectsZeroAfterInsert && newCursorPosition == 0 && a == b) cursor = c
         selectionStart = cursor
         selectionEnd = cursor
@@ -137,6 +227,7 @@ class FakeEditor(
         calls += "commitText($text, $newCursorPosition)"
         if (!isAvailable || commitFails(text)) return false
         replaceText(text, newCursorPosition, composing = false)
+        rewrite()
         return true
     }
 
@@ -145,6 +236,7 @@ class FakeEditor(
         calls += "setComposingText($text, $newCursorPosition)"
         if (!isAvailable) return
         replaceText(text.toString(), newCursorPosition, composing = true)
+        rewrite()
     }
 
     /** Test shorthand for the common `newCursorPosition = 1`. */
@@ -226,6 +318,8 @@ class FakeEditor(
         }
         buffer.delete(b, end)
         buffer.delete(start, a)
+        owner.delete(b, end)
+        owner.delete(start, a)
         val removed = a - start
         fun move(p: Int) = if (p >= a) p - removed else p
         selectionStart = move(selectionStart)
@@ -284,5 +378,13 @@ class FakeEditor(
     fun reportSelection(start: Int, end: Int = start) {
         selectionStart = start
         selectionEnd = end
+    }
+
+    companion object {
+        /** [owners]: a character the app put there (the initial text too). */
+        const val APP = 'a'
+
+        /** [owners]: a character the input method's calls put there. */
+        const val KEYBOARD = 'k'
     }
 }

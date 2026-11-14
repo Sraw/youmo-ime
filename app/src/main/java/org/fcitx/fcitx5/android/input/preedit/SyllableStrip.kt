@@ -56,6 +56,12 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
     /** Where a tap's key goes: the keyboard's listener (PreeditComponent). */
     var onPick: ((KeyAction) -> Unit)? = null
 
+    /**
+     * Told as the row comes or goes: the floating strip is there for it alone while the code is in
+     * the app's field (编码行 输入框里, PreeditComponent.onShown).
+     */
+    var onShownChanged: (() -> Unit)? = null
+
     /** What a tap gives before its key: as 九键's column, the listener giving none of its own. */
     internal var feedback: (View) -> Unit = {
         InputFeedbacks.hapticFeedback(it)
@@ -121,7 +127,9 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
             it.recycle()
         }
         items.cancelPendingInputEvents()
+        val was = isVisible
         isVisible = labels.isNotEmpty()
+        if (was != isVisible) onShownChanged?.invoke()
         while (items.childCount < labels.size) items.addView(item(items.childCount))
         for (i in 0 until items.childCount) {
             val view = items.getChildAt(i) as TextView

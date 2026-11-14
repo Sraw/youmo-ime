@@ -14,6 +14,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 - **键的上滑、下滑能设成笔画**：**按键字符和快捷键** 里的命令多了 **笔画：横 / 竖 / 撇 / 点 / 折**（键上画 一丨丿丶乛），打着拼音时滑这个键就发出这一笔筛候选，和在键上画一笔一样（比如九键把 1 到 5 的上滑设成五种笔画）。不用选 **在键上划 → 笔画筛选** 也能用，快打时的短划就不会被当成笔画；没打字时滑了什么也不打。退回 0.6.0 时设了笔画的槽回到预设，别的槽照旧。
 - 语音打错的词改对以后问一句要不要记住：把语音写错的词（「徐静」）整个删掉、用拼音或手写重打成读音一样的字（「徐婧」），键盘上方问「让语音记住『徐婧』？」，点 **记住** 才加进用户词库（读音按你打的拼音），下次语音就写对；不点就什么都不记，6 秒或接着打字就消失。只改一个字时第一次提示怎么让语音记住。用户词库页顶新开关 **改语音的字后问是否记住**（默认开）。语音打的字只在内存里跟着看，离开输入框就丢掉；密码框、不记录的框里不跟。
+- **编码行** 多了 **输入框里（实验性）**（设置 → 外观 → 大小与样式）：拼音带着下划线直接出现在输入框里，选了字才换成字，键盘上方不再有拼音条。应用这时能看到你正在打的拼音（搜索框会按拼音搜，按发送键发出去的就是拼音）；转屏、点另一个输入框、切到别的应用时，拼音可能留在原来的框里变成普通文字，要自己删掉。密码、数字、终端一类的框，和会改写你打的字、每打一个字就重开输入的应用，拼音仍在键盘上方。选它时先弹说明，点确定才改；默认仍是浮在键盘上方。
 
 ### 小改动
 
@@ -27,6 +28,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### Main changes
 
 - **A key's swipe up or down can be a stroke**: **Key characters and shortcuts** has the commands **Stroke: horizontal / vertical / left-falling / dot / turning** (drawn 一丨丿丶乛 on the key); swiped while pinyin is typed, the key sends that stroke to filter the candidates, as one drawn on the keys does (the nine keys' 1 to 5 set to the five strokes, say). It works without **Drawing on keys → Stroke filter**, so fast short swipes are no longer taken for strokes; with nothing typed the swipe types nothing. Going back to 0.6.0, a slot set to a stroke returns to its preset and the others stay.
+- **Code row** has a third place, **In the text box (experimental)** (Settings → Look → Size and style): the pinyin goes straight into the text box, underlined, and turns into characters as you pick them; no pinyin strip over the keyboard. The app sees what you type meanwhile (a search box searches for the pinyin, its send button sends it); rotating the screen, tapping another text box or switching apps may leave it in the box as plain text, to delete yourself. Password, number and terminal fields, and apps that rewrite what you type or restart input at each letter, keep it over the keyboard. Picking it shows a note first and takes effect on OK; the default is still over the keyboard.
 
 ### Main changes
 

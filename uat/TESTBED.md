@@ -72,6 +72,7 @@ adb shell am start -n org.fcitx.fcitx5.android.testbed/.MainActivity --es page b
 | `pw_text` `pw_number` `pw_web` `pw_visible` | 四种密码 |
 | `no_learning` | IME_FLAG_NO_PERSONALIZED_LEARNING |
 | `no_extract` | IME_FLAG_NO_EXTRACT_UI |
+| `auto_correct` | TYPE_TEXT_FLAG_AUTO_CORRECT |
 
 ### `ime` imeOptions 和焦点
 
@@ -104,6 +105,8 @@ adb shell am start -n org.fcitx.fcitx5.android.testbed/.MainActivity --es page b
 | `null_before` | 光标前读不到：`getTextBeforeCursor`、API 31 的 `getSurroundingText`、API 33 的 `takeSnapshot` 都返回 null，EditorInfo 里也不带初始周围文字（API 30 起框架会把它放进 EditorInfo） |
 | `terminal` | 像 Termux 的自绘 View：`onCheckIsTextEditor`，TYPE_NULL + NO_FULLSCREEN，`BaseInputConnection`；点一下弹键盘；按下/抬起都记 key 事件，收到的字放在状态的 `text` 里 |
 | `shared`（`shared_a` `shared_b`） | 两个框共用一个 View id；状态里按名字分开。转屏后系统按 id 恢复，两个框会恢复成同一段文字 |
+| `settext_echo` | TextWatcher 里每次变化都 `setText(同样的文字)` 并把光标放回末尾 |
+| `no_id_a` `no_id_b` | 不设 View id（`NO_ID`）的两个框，按 contentDescription 找 |
 | `dialog_field` | 按钮打开的 AlertDialog 里的框（对话框关掉后它不再出现在状态里） |
 | `sheet_field` | 按钮打开的底部弹出层（贴底的 Dialog）里的框 |
 | `landscape_extract` | 不带 noExtractUi：先转横屏再点，测全屏提取模式 |

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- the fields' resource ids (PageBuilder.idOf): stable names for uat.py -->
 <resources>
+    <item name="auto_correct" type="id" />
     <item name="bottom" type="id" />
     <item name="cap_chars" type="id" />
     <item name="cap_sentences" type="id" />
@@ -49,6 +50,7 @@
     <item name="pw_visible" type="id" />
     <item name="pw_web" type="id" />
     <item name="restart_target" type="id" />
+    <item name="settext_echo" type="id" />
     <item name="shared" type="id" />
     <item name="sheet_field" type="id" />
     <item name="short_message" type="id" />

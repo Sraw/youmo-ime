@@ -71,6 +71,10 @@ class KeyRouterPunctuationTest {
         assertTrue(core.sendKey(Key('.'.code)))
         assertTrue(commits().isEmpty())
         assertEquals(listOf("。", "．"), log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text })
+        // the marks above them are not a code the app may write into the field (061-code-in-field §4.2)
+        val panel = log.filterIsInstance<HostEvent.InputPanel>().last()
+        assertEquals("。", panel.preedit.toString())
+        assertFalse(panel.code)
         core.sendKey(Key(','.code))
         assertEquals(listOf("。", "，"), commits())
     }

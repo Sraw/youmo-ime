@@ -44,6 +44,12 @@ open class InputEditorContractTest {
         /** Where a random sequence records what the editor returned along the way. */
         var returned: MutableList<String>
         fun outcome(returned: List<String>): Outcome
+
+        /** The app's own edit of [from, to) to [text], not the keyboard's ([FakeEditor.appReplace]). */
+        fun appReplace(from: Int, to: Int, text: String)
+
+        /** The app's: the composing span dropped, the text kept ([FakeEditor.appDropSpan]). */
+        fun appDropSpan()
     }
 
     private class Fake(text: String, selStart: Int, selEnd: Int) : Subject {
@@ -58,6 +64,10 @@ open class InputEditorContractTest {
             fake.composingStart to fake.composingEnd,
             returned,
         )
+
+        override fun appReplace(from: Int, to: Int, text: String) = fake.appReplace(from, to, text)
+
+        override fun appDropSpan() = fake.appDropSpan()
     }
 
     private class Real(text: String, selStart: Int, selEnd: Int) : Subject {
@@ -78,6 +88,12 @@ open class InputEditorContractTest {
                 BaseInputConnection.getComposingSpanEnd(editable),
             returned,
         )
+
+        override fun appReplace(from: Int, to: Int, text: String) {
+            editable.replace(from, to, text)
+        }
+
+        override fun appDropSpan() = BaseInputConnection.removeComposingSpans(editable)
     }
 
     private class Scenario(
@@ -285,6 +301,23 @@ open class InputEditorContractTest {
      * Random sequences of every operation, text with surrogate pairs and the odd lone surrogate,
      * positions in and out of range. Seeded, so a failure names a reproducible sequence.
      */
+    // the app's edits around the keyboard's composing text (061-code-in-field §8): where its span goes
+    @Test
+    fun appEdits() = run(
+        listOf(
+            Scenario("inserted at the span's start: not in it", "ab", 2) { editor.setComposingText("ni", 1); appReplace(2, 2, "X") },
+            Scenario("inserted at its end: not in it", "ab", 2) { editor.setComposingText("ni", 1); appReplace(4, 4, "X") },
+            Scenario("inserted inside: in it", "ab", 2) { editor.setComposingText("ni", 1); appReplace(3, 3, "X") },
+            Scenario("before it: moved", "ab", 2) { editor.setComposingText("ni", 1); appReplace(0, 1, "XYZ") },
+            Scenario("a letter of it replaced", "ab", 2) { editor.setComposingText("nih", 1); appReplace(3, 4, "X") },
+            Scenario("over its end", "abcd", 2) { editor.setComposingText("ni", 1); appReplace(3, 5, "X") },
+            Scenario("over its start", "abcd", 2) { editor.setComposingText("ni", 1); appReplace(1, 3, "X") },
+            Scenario("all of it deleted: gone", "ab", 2) { editor.setComposingText("ni", 1); appReplace(2, 4, "") },
+            Scenario("the span dropped, the text kept", "ab", 2) { editor.setComposingText("ni", 1); appDropSpan() },
+            Scenario("the whole text set", "ab", 2) { editor.setComposingText("ni", 1); appReplace(0, 4, "XY") },
+        ),
+    )
+
     @Test
     fun randomSequences() {
         val random = kotlin.random.Random(20260923)

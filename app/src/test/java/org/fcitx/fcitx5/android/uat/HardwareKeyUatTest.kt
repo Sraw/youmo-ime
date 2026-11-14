@@ -14,8 +14,10 @@ import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -33,6 +35,7 @@ import org.fcitx.fcitx5.android.input.keyboard.HandwritingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -67,8 +70,9 @@ class HardwareKeyUatTest {
         vararg enabled: InputMethodEntry = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH),
         im: InputMethodEntry = enabled.first(),
         keyboards: ImKeyboards.Chosen? = null,
+        codeRow: CodeRowStyle = CodeRowStyle.Embedded,
     ) =
-        KeyboardHarness(im = im, keyboards = keyboards).also {
+        KeyboardHarness(im = im, keyboards = keyboards, codeRow = codeRow).also {
             h = it
             it.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, handwriting)
             it.api.enabledIme = arrayOf(*enabled)
@@ -160,6 +164,44 @@ class HardwareKeyUatTest {
     }
 
     private inline fun <reified T : View> KeyboardHarness.showing(): Boolean = KeyboardHarness.all(inputView).any { it is T && shown(it) }
+
+    /**
+     * The floating candidates window's text of [code] typed on the hardware keyboard with the code row
+     * [style]: the panel the engine shows for it, as [CodeInFieldUatTest] sends it.
+     */
+    private fun floatingWindowTyping(style: CodeRowStyle, code: String): Pair<String, List<String>> {
+        val h = harness(codeRow = style).start()
+        // a key from the hardware keyboard: the touch keyboard away, the candidates by the cursor
+        h.type(code.take(1))
+        val panel = HostEvent.InputPanel(FormattedText(arrayOf(code), intArrayOf(0), code.length), FormattedText.Empty, FormattedText.Empty, code = true)
+        h.api.inputPanelCached = panel
+        h.emit(panel)
+        h.emit(HostEvent.Paged(listOf(CandidateWord("", "你好", "")), 0, false, true))
+        val shown = KeyboardHarness.all(h.candidatesView).filter { it.isShown }.filterIsInstance<TextView>()
+            .map { it.text.toString() }.filter { it.isNotEmpty() }.toList()
+        val field = h.field.text.toString()
+        h.close()
+        this.h = null
+        return field to shown
+    }
+
+    @Test
+    @Uat("HK-46")
+    fun theCodeInTheFieldIsNotInTheFloatingWindowToo() {
+        val inField = floatingWindowTyping(CodeRowStyle.InField, "nihao")
+        val above = floatingWindowTyping(CodeRowStyle.Embedded, "nihao")
+        assertRows(
+            "in the field: the code there, the window the candidates alone" to {
+                assertEquals("nihao", inField.first)
+                assertFalse(inField.second.toString(), inField.second.any { "nihao" in it })
+                assertTrue(inField.second.toString(), "你好" in inField.second)
+            },
+            "on the keyboard: the window draws the code over its candidates, the field none" to {
+                assertEquals("", above.first)
+                assertTrue(above.second.toString(), above.second.any { "nihao" in it })
+            },
+        )
+    }
 
     @Test
     @Uat("HK-30")

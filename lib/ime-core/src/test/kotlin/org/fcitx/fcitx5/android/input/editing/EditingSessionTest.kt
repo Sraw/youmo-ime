@@ -928,6 +928,9 @@ class EditingSessionTest {
             put("onCursorUpdate") { onCursorUpdate(3, 3, -1, -1, ignoreSystemCursor = false) }
             put("updateComposingText") { updateComposingText(formatted("ni")) }
             put("provisionalRestarted") { provisionalRestarted(sameField = true, 3, 3) }
+            put("writeCode") { writeCode(formatted("ni")) }
+            put("leaveComposition") { leaveComposition() }
+            put("codeRestarted") { codeRestarted(again = true) }
         }
         val pairCalls = buildMap<String, AutoPairs.() -> Unit> {
             put("type") { type("(") }
@@ -938,8 +941,9 @@ class EditingSessionTest {
             put("deletedBefore") { deletedBefore(cursor = 3, units = 1) }
         }
         // a new public method must be added above, with a call, or to queries if it changes nothing; this names one in neither
-        // the listener told of a provisional composition taken: set once by its owner, the editor untouched
-        val queries = setOf("setProvisionalTaken")
+        // the listeners and the field's kind, set once by their owner; the context reads that leave the
+        // code out: the editor untouched
+        val queries = setOf("setProvisionalTaken", "setCodeFellBack", "setInlineCompletion", "beforeCode", "afterCode")
         val pairQueries = emptySet<String>()
         assertEquals("EditingSession methods not listed", emptyList<String>(), unlisted(EditingSession::class.java, calls.keys + queries))
         assertEquals("AutoPairs methods not listed", emptyList<String>(), unlisted(AutoPairs::class.java, pairCalls.keys + pairQueries))

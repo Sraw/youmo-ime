@@ -75,6 +75,54 @@ into the app as composing text; pinyin and a table's code show above the candida
 ([architecture.md](architecture.md#a-key-from-the-finger-to-the-editor)). An input method whose preedit is a code must
 not be added to `composesText`.
 
+编码行 输入框里 (实验性, 0.6.1) writes the code into the field all the same, as the user's choice, under
+one rule (dev/design/061-code-in-field.md §0): nothing the keyboard cannot prove it wrote is deleted or
+replaced. A code in the field (`EditingSession.Kind.CODE`, `FieldCode`) ends one of two ways only: taken
+away once read back character for character where it was written, else let go of as text
+(`finishComposingText`). The read and the delete are both around the editor's own cursor
+(`deleteSurroundingText` after the span is finished, or `setComposingText("")` on the span the editor
+itself reports), never at the session's offsets, which run behind the editor's when reports come late
+(`CodeInFieldPropertyTest` found an app's letter deleted that way). The lengths read and deleted are
+still the session's: they hold only while the editor's cursor is the one the session thinks, so a code
+is judged by a report only once the session has no write of its own still unreported (a report behind
+the latest write judges nothing), and a write an editor has not yet reported reads the field first.
+A read back proves the text, not its writer: an app that deletes part of the code and leaves its own
+text there alike, cursor and all, has it taken away with the code (the property test leaves this out).
+A read back alike does not prove the span is still there: an app that ends the composing text as the
+field changes (a search box's `clearComposingText()`, posted) and whose report has not come by the
+next key makes the next `setComposingText` an insert at the cursor, a copy of the code beside the letters
+it left. Before a write whose last report is not in, `FieldCode.mayWrite` asks the editor's region at once
+(`InputEditor.composingRegion`, Android 13's `takeSnapshot`; never called below 33, where it does not
+exist) and floats the code when it is gone. That covers a write the editor has not reported yet only:
+an `EditText` sends no `onUpdateSelection` at all when the app's `clearComposingText()` removes the span
+(measured on the API 36 emulator, `finish_composing_async`), so with the last write reported the next goes
+in unasked and a copy of the code as last written is left beside it, which floats from the next report
+(LC-30): one letter where the app clears at every change (`nni`), the whole code typed before a pause
+where it clears only after one (a debounce: `ABnihniha`).
+`takeSnapshot` is only as good as the editor's own: an app's `InputConnection` written by hand (not over
+`BaseInputConnection` and an `Editable`) may answer `null` (the interface's default, which is read as
+"cannot say", the write goes ahead) or a snapshot whose composition is always -1 though it keeps one. The
+second reads as the span gone: the code is taken away, proven ours, and floats the first time a key comes
+before the last write's report, though nothing was wrong. Nothing is lost, but such a field falls back to the
+strip on a fast typist; there is no way to tell it from an app that did end the span.
+An app's own change whose report comes while a write of ours is still unreported matches no write the
+session predicted, so it takes `FieldCode.reconcile`'s unpredicted path (the code released as text, the
+engine told `CursorUpdate.FocusOutIn`) rather than being judged as a late report of our write: a code
+being typed can be left in the field as text. Not verified on real Chrome.
+The reads are synchronous, and a WebView answers them only when its renderer is free. Measured on the
+API 36 emulator (2026-11-14, a debug build timing `placeCode` on the main thread; 16 letters by `input
+keyevent`, four times): in a web field whose `input` handler takes 40 ms of JavaScript, the code in the
+field spent a median 23 ms (p90 42) of the main thread per key, and a key reached the field a median
+65 ms after it was pressed at a typist's pace (420 ms in a burst, keys queued behind the renderer); the
+code on the strip, 0.05 ms and 6 ms (31 ms in a burst). In a plain web field: 0.5 ms and 17 ms against
+0.05 ms and 7 ms. Most of it is the renderer's own time, which the field's own echo of each letter needs
+anyway, but the strip never waits on it. Left as it is (061-code-in-field: the setting is experimental, and
+the strip is the default). Asking the
+snapshot before every write would close that, at one synchronous call per key.
+A restart that is not the input method's own (`again`) may be another field under the same view, so
+the code is let go of there unread. And `setComposingText("")` with no span left replaces the
+selection: never send it to take away a code the editor no longer marks.
+
 ### `EditorInfo` decides a lot
 
 Password, URL, email, search, no-suggestions and no-personalized-learning flags change what the

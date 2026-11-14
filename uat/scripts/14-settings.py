@@ -1668,6 +1668,12 @@ case("ST-115", needs="jvm:PackLayoutRefusedTest.aLayoutTheEngineRefusesDrawsTheA
 case("ST-116", needs="manual:主题制作网页；在电脑浏览器上手工跑（只有深色版的主题从背景图取色、勾「这个主题有浅色版」）")(lambda d: None)
 
 
+case("ST-117", needs="jvm:SettingsUatTest.theCodeRowsThreePlacesTheFieldOnlyOnceItsNoteIsAgreedTo")(lambda d: None)
+
+
+case("ST-118", needs="jvm:FloatingCodeStripUatTest.withTheCodeInTheFieldTheStripShowsTheSyllablesAlone、FloatingCodeStripUatTest.theKeyboardIsAsHighOnEveryKeyboardAndLowerThanEmbedded")(lambda d: None)
+
+
 case("ST-119", needs="jvm:DeveloperUatTest.voiceCorrectionsAskedAndRememberedAreCounted")(lambda d: None)
 
 

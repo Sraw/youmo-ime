@@ -111,3 +111,89 @@
 - **操作**：**⋮ → 开发者**，点 **重启 Fcitx 实例**，确定，等提示；再在 **界面语言** 里换一种语言，等提示。
 - **预期**：两处都提示「键盘还在启动，可能没有重启成。请稍后再试」，不说「完成」（说「可能」：等不到启动完时没有重启，或者已经重启了、新的实例还在启动，两种都是这一句）；换语言时界面照常换成新的语言（输入法和设置页的名字等键盘下次启动才换）；稍后键盘启动完，再点 **重启 Fcitx 实例** 照常提示完成（LC-10）。
 - **JVM**：`HostRestartTest.aHostStuckStartingIsWaitedForNoLongerThanTheWaitAndSaidNotUp`（`HostDaemon` 等不到启动完时不重启、返回 false）；两处由此提示的那一句没有测试（`DeveloperFragment` 和 `AppLanguage` 直接调 `HostDaemon.restartFcitx()`，没有接缝，Robolectric 下它总是返回 true），在设备上手工跑。
+
+## 编码行在输入框里（B-IF）
+
+总规矩：输入法证明不了是自己写的字一个都不删；证明不了就留在框里成为普通文字。
+
+### LC-21 [P0] 输入框里打拼音：选字、收键盘都不留编码
+- **前提**：B-IF。
+- **操作**：在「普通文本」框点 n i h a o，看框和键盘上方；点空格；再点 n i，收起键盘。
+- **预期**：打字时框里是带下划线的「ni hao」，键盘上方没有拼音条；空格后框里是「你好」；收起键盘后框里还是「你好」，没有留下「ni」。
+- **JVM**：`CodeInFieldUatTest.theCodeIsTheFieldsComposingTextTillAWordIsChosenAndGoesAsTheKeyboardDoes`；设备上照跑。
+
+### LC-22 [P0] 选中文字后打拼音，选中的文字不丢
+- **前提**：B-IF，输入测试台 `ime` 页的 `preselected` 框（「前面选中的后面」，预先选中「选中」）。
+- **操作**：点 n i，看框和键盘上方；退格上滑清除；再点 n i，点框里别的位置；收起键盘。
+- **预期**：打字时框里的字和选区都没变，拼音在键盘上方的小条里；清除后选区还在；点别处后、收起键盘后框里还是「前面选中的后面」。
+- **JVM**：`CodeInFieldUatTest.aSelectionAsTheCodeStartsKeepsTheCodeOnTheStripAndTheSelectionWhole`；设备上照跑。
+
+### LC-23 [P1] 输入框里打拼音时点另一个框（已知会留下）
+- **前提**：B-IF，测试页打开全部的框（`fields.html`），在「普通文本」框点 n i。
+- **操作**：点「句子」框，点 h a o 空格。
+- **预期**：「句子」框里是「好」；「普通文本」框里可能留下「ni」成为普通文字（应用在输入法知道之前就把它定成了文字，输入法不删），框里别的字一个不少。
+- **JVM**：`CodeInFieldUatTest.aConnectionTheAppClosesFirstIsSentNothingAndTheNextFieldTakesItsOwnCode`（应用先关掉连接、输入法才收到结束输入：旧框留下「ni」，什么都不发给它；新框的编码照常）。
+
+### LC-24 [P1] 输入框里打拼音时转屏
+- **前提**：B-IF，在「普通文本」框点 n i h a o。
+- **操作**：转成横屏，键盘收起了就点框；点 h a o 空格；转回竖屏。
+- **预期**：框里最后是「好」或者「ni hao好」（输入法自己重启输入时证明后拿走；应用重建了框就留下），不会少字、不会多出别的字母；转屏后打字正常。
+- **JVM**：`CodeInFieldUatTest.theScreenTurnedTakesTheCodeAwayProvenOurs`（输入法自己的重启：拿走）；`CodeInFieldUatTest.aScreenTheAppMakesAnewHasTheCodeLeftAsTextInTheNewField`（应用重建界面，先关旧连接，新框带着旧文字开始输入：「ni」留下，之后的拼音接着进新框）。
+
+### LC-25 [P1] 输入框里打拼音时切走再回来、切换输入法
+- **前提**：B-IF，在「普通文本」框点 n i。
+- **操作**：按"最近任务"切到设置再切回来，点框；点 n i，再用输入法选择器换到别的输入法再换回来。
+- **预期**：框里没有多出别的字；拼音如果留下，是「ni」原样成为普通文字；回来后打字正常。
+
+### LC-26 [P1] 应用自己重启输入的框：留下这一次的编码，之后在小条里
+- **前提**：B-IF，输入测试台 `behavior` 页的 `settext_echo` 框。
+- **操作**：点 n，看框；再点 n i h a o，点空格。
+- **预期**：第一个 n 留在框里成为普通文字（应用重启了输入，输入法不删；重启照旧清掉引擎里这一次的编码，键盘上没有它）；再打的拼音在键盘上方的小条里，框里不再出现拼音；空格后框里是「n你好」，别的字一个不少。
+- **JVM**：`CodeInFieldUatTest.anAppsOwnRestartLeavesTheCodeAsTextAndFloatsItFromThen`；设备上照跑。
+
+### LC-27 [P1] 会改写文字的框：改过的那段留下，之后在小条里
+- **前提**：B-IF，输入测试台 `behavior` 页的 `upper` 框。
+- **操作**：点 n i h a o，点空格。
+- **预期**：框里先出现「N」（应用改成了大写，输入法不删），之后的拼音在键盘上方的小条里；空格后框里是「N你好」。
+- **JVM**：`CodeInFieldUatTest.anAppThatRewritesTheCodeHasItLeftAndFloatsTheRest`；设备上照跑。
+
+### LC-28 [P1] 读不到光标前文字的框：拼音一直在小条里
+- **前提**：B-IF，输入测试台 `behavior` 页的 `null_before` 框。
+- **操作**：点 n i h a o，看框；点空格。
+- **预期**：框里始终没有拼音，拼音在键盘上方的小条里；空格后框里是「你好」。
+- **JVM**：`CodeInFieldUatTest.aFieldThatWillNotBeReadNeverHasTheCode`；设备上照跑。
+
+### LC-29 [P1] 限长的框：放得下的字母留下，之后在小条里
+- **前提**：B-IF，输入测试台 `ime` 页的 `max10` 框（最多 10 个字）。
+- **操作**：点 n i h a o z h o n g g u o，看框和键盘上方。
+- **预期**：框里是应用收下的前 10 个字符「ni hao zho」（编码照显示的样子写进框，音节间有空格；应用截掉了后面的，输入法不删，成为普通文字）；拼音「ni hao zhong guo」整个在键盘上方的小条里，接着打完、选字和「浮在键盘上方」时一样。
+- **JVM**：`CodeInFieldUatTest.aFieldThatCutsTheCodeShortKeepsWhatItTookAndFloatsTheRest`；设备上照跑。
+
+### LC-30 [P1] 应用清掉 composing 的框：拼音拿走，在小条里
+- **前提**：B-IF，输入测试台 `behavior` 页的 `finish_composing` 框，再换 `finish_composing_async` 框。
+- **操作**：各点 n i h a o（快打），看框和键盘上方；点空格。
+- **预期**：打字时框里最多闪一下第一个字母，拼音在键盘上方的小条里；空格后框里是「你好」。`finish_composing_async` 框里最多多留一个字母（如「nni」，之后拼音在小条里，空格后「nni你好」），框里原有的字一个不少。留下的是上一次写进去的整段编码的一份：这个框每次改动都清，所以是一个字母；停顿后才清的应用（防抖）会留下停顿前打的整段（如「ABnihniha」）。应用异步去掉 composing 时 `EditText` 不报告，输入法只在上一次写入还没报告时（Android 13 起）读编辑器的 composing 区来发现（API 36 模拟器实测）。
+- **JVM**：`CodeInFieldUatTest.aFieldThatClearsTheComposingTextHasTheCodeTakenAwayAndFloated`（应用清除时有报告的三种：同步清、post 清、清得比下一键晚，都不留字母；清除不报告，像设备上的 `EditText`（harness 的 `spanAloneUnreported`）：留下「nni」，和设备一致；以及报告没赶上下一键：SDK 36 读 composing 区不留、SDK 29 留一个）；设备上照跑（API 36 模拟器）。
+
+### LC-31 [P1] 终端（TYPE_NULL）：拼音一直在小条里
+- **前提**：B-IF，输入测试台 `behavior` 页的 `terminal` 框。
+- **操作**：点 n i h a o，看框和键盘上方；点空格。
+- **预期**：框里始终没有拼音，拼音在键盘上方的小条里；空格后框里是「你好」。
+- **JVM**：`CodeInFieldUatTest.aTerminalNeverHasTheCode`；设备上照跑。
+
+### LC-32 [P1] 不设 id 的两个框之间换框
+- **前提**：B-IF，输入测试台 `behavior` 页的 `no_id_a` 框。
+- **操作**：点 n i；点 `no_id_b` 框，点 h a o 空格。
+- **预期**：`no_id_b` 里是「好」；`no_id_a` 里没有多出别的字，拼音如果留下是「ni」原样成为普通文字（同 LC-23）。
+- **JVM**：`CodeInFieldUatTest.anotherFieldTappedLeavesTheFirstWholeAndTheNextTakesItsOwnCode`（输入法先知道换了框：拿走）；设备上照跑。
+
+### LC-33 [P2] 网页里会改写文字的框
+- **前提**：B-IF，输入测试台 `webview` 页的 `w_rewrite` 框（JS 在 input 事件里转大写）。
+- **操作**：点 n i h a o，点空格。
+- **预期**：同 LC-27：被改成大写的那段留下，之后拼音在键盘上方的小条里；最后框里是留下的大写字母加「你好」，别的字一个不少。
+
+### LC-34 [P1] 发送后 setText("") 的聊天框：发出去后拼音照样进框
+- **前提**：B-IF，输入测试台 `behavior` 页的 `chat_settext` 框（发送后 `setText("")`，框架自己让输入法重来：Android 10 直接重启，30 起延后，34 起 `invalidateInput`）。
+- **操作**：点 n i h a o、空格，点回车（发送）；再点 n i，看框和键盘上方；点空格。
+- **预期**：发送前框里是「你好」，发送后框是空的；再打的「ni」带着下划线在框里，键盘上方没有小条；空格后框里是「你」，没有上一次的字母留下。
+- **JVM**：没有。这条看的是各版本框架自己让输入法重来的方式，harness 只有一种 `restart()`；发送时框里已经没有编码，编码在框里时应用重启输入见 LC-26。设备上跑（API 36 模拟器；Android 10 用 youmo29）。

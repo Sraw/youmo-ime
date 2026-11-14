@@ -207,6 +207,7 @@ class ChineseModulesHostTest {
         val list = log.filterIsInstance<HostEvent.Candidates>().last()
         assertEquals(listOf("北京市", "海淀区"), list.candidates.map { it.text })
         assertEquals("dz", log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
+        assertFalse("quick input's code is not written into the field", log.filterIsInstance<HostEvent.InputPanel>().last().code)
         log.clear()
         assertTrue(core.select(1, "海淀区"))
         assertEquals(HostEvent.Commit("海淀区", -1), log.filterIsInstance<HostEvent.Commit>().single())

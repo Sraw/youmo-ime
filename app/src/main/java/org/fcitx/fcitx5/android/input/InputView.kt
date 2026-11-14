@@ -528,6 +528,7 @@ class InputView(
             bottomOfParent()
         })
         floatingController.setUp(keyboardView)
+        if (codeFloats) preedit.onShown = ::showCodeStrip
         codeStrip = if (!codeFloats) null else FloatingCodeStrip(context, theme, preedit.ui.root).also {
             // under the key previews, as the embedded row is
             add(it, lParams(wrapContent, dp(KawaiiBarComponent.stripHeight(fcitx.runImmediately { inputMethodEntryCached }.uniqueName))) {
@@ -827,15 +828,6 @@ class InputView(
             is HostEvent.InputPanel -> {
                 preeditEmptyState.updatePreeditEmptyState(preedit = it.preedit)
                 broadcaster.onInputPanelUpdate(it)
-                // floating, there only while there is a code: from the first key till it goes up or is cleared
-                codeStrip?.let { strip ->
-                    if (preedit.ui.visible != (strip.visibility != GONE)) {
-                        strip.isVisible = preedit.ui.visible
-                        // at once, not on the next frame: the touchable region of this one is worked out first
-                        placeCodeStrip()
-                        if (!strip.isVisible) undoStripMoved()
-                    }
-                }
             }
             is HostEvent.InputMethodChanged -> {
                 updateCodeRow(it.im)
@@ -856,6 +848,19 @@ class InputView(
             else -> {}
         }
     }
+
+    // floating, there only while there is something on it: from the first key till the code goes up or is
+    // cleared; with the code in the field (编码行 输入框里), while aux or the syllables are there
+    private fun showCodeStrip() {
+        val strip = codeStrip?.takeIf { (it.visibility == GONE) == (preedit.ui.visible || preedit.ui.syllables.isVisible) } ?: return
+        strip.isVisible = strip.visibility == GONE
+        // at once, not on the next frame: the touchable region of this one is worked out first
+        placeCodeStrip()
+        if (!strip.isVisible) undoStripMoved()
+    }
+
+    /** The code moved into the app's field or out of it (FcitxInputMethodService.codeInFieldNow): the strip drawn anew. */
+    fun codePlaceChanged() = preedit.codePlaceChanged()
 
     // the code row tall or thin for input method [im]; the keys keep their height (the cap aside)
     private fun updateCodeRow(im: String) {

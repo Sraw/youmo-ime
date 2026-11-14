@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.annotation.StringRes
+import androidx.appcompat.app.AlertDialog
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
@@ -152,7 +153,8 @@ abstract class ManagedPreferenceUi<T : Preference>(
         @StringRes
         val entryLabels: List<Int>,
         enableUiOn: (() -> Boolean)? = null,
-        val apart: Apart<T>? = null
+        val apart: Apart<T>? = null,
+        val confirm: Confirm<T>? = null,
     ) : ManagedPreferenceUi<ListPreference>(key, enableUiOn) {
         override fun createUi(context: Context): ListPreference = object : ListPreference(context), TakenEntry {
             // a stored value the list does not offer shows as what it reads as: the default; one apart
@@ -188,8 +190,19 @@ abstract class ManagedPreferenceUi<T : Preference>(
                 super.onDetached()
             }
 
-            // the user's pick of that default: setValue sees no change, and persistString would see it stored
+            // the user's pick of that default: setValue sees no change, and persistString would see it stored.
+            // A pick [confirm] asks about first: set once the dialog's OK is pressed, not before
             override fun callChangeListener(newValue: Any?): Boolean {
+                val ask = confirm?.takeIf { newValue != value && newValue == codec.encode(it.value) }
+                if (ask != null && newValue is String) {
+                    AlertDialog.Builder(context)
+                        .setTitle(ask.title)
+                        .setMessage(ask.message)
+                        .setPositiveButton(android.R.string.ok) { _, _ -> if (super.callChangeListener(newValue)) value = newValue }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                    return false
+                }
                 if (!super.callChangeListener(newValue)) return false
                 if (newValue == value && newValue is String) sharedPreferences?.edit { putString(key, newValue) }
                 return true
@@ -214,6 +227,9 @@ abstract class ManagedPreferenceUi<T : Preference>(
      * list's pick is read again as the other changes.
      */
     class Apart<T>(val taken: () -> T?, @StringRes val note: Int, val read: (T) -> T = { it })
+
+    /** A list's [value], what it means said first ([title], [message]): picked only once that dialog's OK is pressed. */
+    class Confirm<T>(val value: T, @StringRes val title: Int, @StringRes val message: Int)
 
     /** A list preference whose dialog greys out [takenIndex] (-1 for none), noted [takenNote]. */
     interface TakenEntry {

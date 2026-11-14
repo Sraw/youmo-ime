@@ -117,6 +117,12 @@ class Panel {
     /** A quick input's panel ([TempPanel.quickPhrase]). */
     var quickPhrase: Boolean = false
 
+    /**
+     * [preedit] is an input method's session code (`KeyRouter.show`), not a temp mode's text nor a
+     * punctuation key's marks: the app may write it into the field (编码行 输入框里, 061-code-in-field).
+     */
+    var code: Boolean = false
+
     /** `InputPanel::reset` (`inputpanel.cpp:121-132`): everything, the overlay too. */
     fun reset() {
         preedit = FormattedText.Empty
@@ -126,6 +132,7 @@ class Panel {
         candidateList = null
         overlayMessage = ""
         quickPhrase = false
+        code = false
     }
 
     /**

@@ -652,6 +652,18 @@
 - **预期**：开关写的是「这个主题有浅色版」（不是「这个主题有深色版」）；两次 **从背景图取色** 写的都是深色配色（深色的键、浅色的字），不因顶栏在浅色、图片是浅色就写成浅色配色（只有深色版的主题，那一份颜色就是 App 深色时用的）；勾上后页面不报错，浅色版先用和深色版同样的颜色（开关这时照常写「这个主题有深色版」并勾着），改的那一个只改浅色版；保存的 `theme.xml` 里有深浅两版；App 收下它，系统浅色时用浅色版（改过的那个颜色），深色时是从背景图取的深色配色。
 - **JVM**：没有；深浅两版的读写和只有深色版时从背景图取色写深色配色由 web/theme-maker 的 `form.test.mjs`（`F.withDark`、`a dark-only theme: its colours shown and set in its one block, its switch adds a light version, never drops the dark`）查，开关的样子和按钮在页面上的效果没有自动测试，这一条在电脑浏览器上手工跑。
 
+### ST-117 [P1] 编码行的三个选项；选「输入框里」先看说明
+- **前提**：B0-设置。
+- **操作**：**外观 → 大小与样式**，点 **编码行**；看选项；选「输入框里（实验性）」，在说明上点 **取消**；再选它，点 **确定**；再改回「浮在键盘上方」。
+- **预期**：三个选项依次是「嵌在键盘里」「浮在键盘上方」「输入框里（实验性）」；选「输入框里」先弹说明（拼音进框、应用看得到、转屏换框可能留下、哪些框仍在键盘上方），取消后还是「浮在键盘上方」，确定后才是「输入框里（实验性）」；改回别的选项不弹说明。
+- **JVM**：`SettingsUatTest.theCodeRowsThreePlacesTheFieldOnlyOnceItsNoteIsAgreedTo`；设备上不跑。
+
+### ST-118 [P1] 编码行在输入框里：键盘和浮在上方时一样高，14 键的小条只有音节
+- **前提**：B-IF，**键盘** 选「14 键」。
+- **操作**：点 n i，看键盘上方和框。
+- **预期**：键盘的高度和「浮在键盘上方」时一样；拼音在框里，键盘上方的小条只有音节（ni、mi 一类），没有拼音。
+- **JVM**：`FloatingCodeStripUatTest.withTheCodeInTheFieldTheStripShowsTheSyllablesAlone`、`FloatingCodeStripUatTest.theKeyboardIsAsHighOnEveryKeyboardAndLowerThanEmbedded`；设备上不跑。
+
 ### ST-119 [P2] 开发者页：语音改字问过几次、记住几次
 - **前提**：B0-设置，打开过开发者选项。
 - **操作**：照 VO-41 问一次、点 **记住**；打开 **开发者**。

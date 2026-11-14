@@ -184,8 +184,12 @@ class CandidatesView(
         }
     }
 
+    /** The code moved into the app's field or out of it (FcitxInputMethodService.codeInFieldNow): drawn anew. */
+    fun codePlaceChanged() = updateUi()
+
     private fun updateUi() {
-        preeditUi.update(inputPanel)
+        // the code in the field (编码行 输入框里, the hardware keyboard's too): the window draws none of it
+        preeditUi.update(service.forStrip(inputPanel))
         preeditUi.root.visibility = if (preeditUi.visible) VISIBLE else GONE
         candidatesUi.update(paged, orientation)
         updateVisibility()

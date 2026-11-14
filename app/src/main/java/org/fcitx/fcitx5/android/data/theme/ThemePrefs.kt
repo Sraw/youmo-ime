@@ -117,8 +117,12 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     // the code being typed over the app, outside the keyboard (FloatingCodeStrip), or in it above the
     // candidates as up to 0.5.0; the keyboard is lower floating, the keys keeping their height. For
-    // everyone, upgrades too (the user, 2026-11-01). The view is made anew for it
-    val codeRow = enumList(R.string.code_row_style, "code_row_style", CodeRowStyle.Floating)
+    // everyone, upgrades too (the user, 2026-11-01). The view is made anew for it. 输入框里 (实验性,
+    // 0.6.1): the code in the app's field, what it means said before it is picked (061-code-in-field §4.1)
+    val codeRow = enumList(
+        R.string.code_row_style, "code_row_style", CodeRowStyle.Floating,
+        confirm = ManagedPreferenceUi.Confirm(CodeRowStyle.InField, R.string.code_row_in_field, R.string.code_row_in_field_note),
+    )
 
     // the on-screen bar's words, its 联想 and the expanded grid; the bar grows with it, the keys
     // keep their height (CandidateBarHeight). The floating window has its own candidates_window_font_size

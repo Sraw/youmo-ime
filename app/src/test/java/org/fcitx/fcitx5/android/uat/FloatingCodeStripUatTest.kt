@@ -104,7 +104,8 @@ class FloatingCodeStripUatTest {
     }
 
     private fun typing(code: String, im: String = InputMethodCatalog.PINYIN, vararg syllables: String) {
-        val panel = HostEvent.InputPanel(FormattedText(arrayOf(code), intArrayOf(0), code.length), FormattedText.Empty, FormattedText.Empty)
+        // the session's code, as the engine flags it (InputPanel.code)
+        val panel = HostEvent.InputPanel(FormattedText(arrayOf(code), intArrayOf(0), code.length), FormattedText.Empty, FormattedText.Empty, code = true)
         h.api.inputPanelCached = panel
         h.emit(panel)
         if (syllables.isNotEmpty()) EngineState.syllablesState.value = EngineState.SyllableState(im, composing = true, syllables = syllables.toList(), id = 1)
@@ -207,6 +208,22 @@ class FloatingCodeStripUatTest {
         assertEquals(full.second, embedded.second)
         assertEquals(CodeRowHeight.THIN_DP.toFloat(), (embedded.first - full.first) / dp, 1f)
         assertEquals(CodeRowHeight.STRIP_DP.toFloat(), (embedded14.first - fourteen.first) / dp, 1f)
+        // 输入框里 (061-code-in-field §4.5): the row not in the keyboard either, as high as floating
+        assertEquals(full, heights(CodeRowStyle.InField, ImKeyboards.Chosen()))
+        assertEquals(fourteen, heights(CodeRowStyle.InField, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14)))
+    }
+
+    @Test
+    @Uat("ST-118")
+    fun withTheCodeInTheFieldTheStripShowsTheSyllablesAlone() {
+        open(ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14), style = CodeRowStyle.InField)
+        typing("ni", InputMethodCatalog.PINYIN, "ni", "mi")
+        assertTrue("the syllables shown", shownStrip())
+        assertEquals("ni", h.field.text.toString())
+        val code = KeyboardHarness.all(h.inputView.findViewById<HorizontalScrollView>(R.id.code_row_text)).filterIsInstance<TextView>()
+            .filter { h.shown(it) }.joinToString("") { it.text }
+        assertEquals("none of the code on it", "", code)
+        assertEquals(listOf("ni", "mi"), syllableItems().map { it.text.toString() })
     }
 
     private fun syllables(): SyllableStrip = h.inputView.findViewById(R.id.code_row_syllables)
