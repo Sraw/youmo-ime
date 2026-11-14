@@ -120,9 +120,9 @@ class SettingsUatTest {
         activity
         open(SettingsRoute.UserWords)
         val words = preferences((page as PreferenceFragmentCompat).preferenceScreen)
-        // the two switches on top, both on
+        // the three switches on top, all on
         val switches = words.filterIsInstance<TwoStatePreference>()
-        assertEquals(listOf(s(R.string.learning_use_habits), s(R.string.learning_auto_backup)), switches.map { it.title.toString() })
+        assertEquals(listOf(s(R.string.learning_use_habits), s(R.string.learning_auto_backup), s(R.string.learning_voice_ask)), switches.map { it.title.toString() })
         assertTrue(switches.all { it.isChecked })
         val titles = words.map { it.title.toString() }
         for (t in listOf(R.string.learning_clear_learned, R.string.learning_backups, R.string.english_words, R.string.export_words)) {

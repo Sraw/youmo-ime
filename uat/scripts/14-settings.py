@@ -1668,6 +1668,9 @@ case("ST-115", needs="jvm:PackLayoutRefusedTest.aLayoutTheEngineRefusesDrawsTheA
 case("ST-116", needs="manual:主题制作网页；在电脑浏览器上手工跑（只有深色版的主题从背景图取色、勾「这个主题有浅色版」）")(lambda d: None)
 
 
+case("ST-119", needs="jvm:DeveloperUatTest.voiceCorrectionsAskedAndRememberedAreCounted")(lambda d: None)
+
+
 @case("ST-120", base="B0-设置", mutates=True, visual=True)
 def st120(d):
     pinyin_keyboard(d, "九键")

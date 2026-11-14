@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 
 /**
@@ -250,6 +251,24 @@ interface LexiconApi {
 
     /** Adds [text] read as [pinyin]; false if it does not read so. */
     suspend fun addUserWord(text: String, pinyin: String): Boolean
+
+    /** Voice's text put in, [before] the cursor read after, [hinted] the once-only hint shown: see [Engines.voiceSaid]. */
+    suspend fun voiceSaid(text: String, before: String?, hinted: Boolean)
+
+    /** What the app put in the field, while voice's text is followed: see [Engines.voicePutIn]. */
+    suspend fun voicePutIn(text: String): VoiceEdits.Reply
+
+    /** The field read as the prompt is to show: see [Engines.voiceConfirm]. */
+    suspend fun voiceConfirm(before: String?, after: String?): VoiceEdits.Ask?
+
+    /** Voice's text followed no more: see [Engines.voiceEditsEnd]. */
+    suspend fun voiceEditsEnd()
+
+    /** The prompt's 「记住」: see [Engines.voiceRemember]. */
+    suspend fun voiceRemember(ask: VoiceEdits.Ask): Boolean
+
+    /** Its 撤销: see [Engines.voiceForget]. */
+    suspend fun voiceForget(word: String)
 
     /** Blocks [text] read as [pinyin], never offered again; false if it does not read so. */
     suspend fun blockUserWord(text: String, pinyin: String): Boolean

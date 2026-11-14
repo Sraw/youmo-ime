@@ -33,8 +33,9 @@ sealed class KeyAction {
     /**
      * [text] put in by the app, in place of [replacing] if that is what is before the cursor. [punctuation]: a mark as the
      * punctuation maps it (九键's 1 and its column), held back as the punctuation keys are while that is not known.
+     * [voice]: a talk's text (语音先问再记 follows it).
      */
-    data class CommitAction(val text: String, val replacing: String = "", val punctuation: Boolean = false) : KeyAction()
+    data class CommitAction(val text: String, val replacing: String = "", val punctuation: Boolean = false, val voice: Boolean = false) : KeyAction()
 
     data class CapsAction(val lock: Boolean) : KeyAction()
 

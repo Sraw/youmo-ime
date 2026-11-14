@@ -114,7 +114,9 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
+import org.fcitx.fcitx5.android.input.voice.VoiceAsk
 import org.fcitx.fcitx5.android.input.voice.VoiceCommit
+import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.scene.engine.section
@@ -767,6 +769,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         // paired or stepped over: either way the cursor is after [text]
         contextMemory.committed(text, now = SystemClock.elapsedRealtime())
+        voicePut(text)
     }
 
     private fun handleReturnKey() {
@@ -884,12 +887,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val at = if (cursor == text.length) -1 else cursor
         editingSession.replaceAround(before, after, text, at)
         contextMemory.committed(text, at, SystemClock.elapsedRealtime())
+        voicePut(text)
     }
 
     fun commitText(text: String, cursor: Int = -1) {
         // a long paste cut short: only what went in ends the field's text
         val landed = editingSession.commitText(text, cursor)
         contextMemory.committed(landed, if (landed.length == text.length) cursor else -1, SystemClock.elapsedRealtime())
+        voicePut(landed)
         if (cursor == -1 && (landed.endsWith('=') || landed.endsWith('＝'))) offerCalculation()
     }
 
@@ -918,17 +923,117 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * and nothing else since ([PostedCommit.takeBack]). Not reported yet when [text] goes in,
      * [replacing] stays: 1 pressed again before the editor reported the first types both, ，。.
      * Posted, it waits for fcitx (starting, or reloading for the nine keys' letters): by then
-     * another field may have the focus, or none, and nothing goes in ([PostedCommit]).
+     * another field may have the focus, or none, and nothing goes in ([PostedCommit]). [voice]:
+     * a talk's text, gathered for 语音先问再记 ([VoiceAsk]).
      */
-    fun commitOverEngine(text: String, replacing: String = ""): Job {
+    fun commitOverEngine(text: String, replacing: String = "", voice: Boolean = false): Job {
         val address = inAddressField
         val asked = PostedCommit(startedWith, replacing, text)
+        if (voice) voiceAsk.posting()
         return postFcitxJob {
-            if (!stillIn(asked, text)) return@postFcitxJob
+            if (!stillIn(asked, text)) {
+                if (voice) lifecycleScope.launch { voiceAsk.landed(inField = false) }
+                return@postFcitxJob
+            }
             commitAndReset(address)
             lifecycleScope.launch {
-                if (!stillIn(asked, text)) return@launch
-                lastPosted.putIn(asked, postedField, selection)
+                if (!stillIn(asked, text)) {
+                    if (voice) voiceAsk.landed(inField = false)
+                    return@launch
+                }
+                if (!voice) return@launch lastPosted.putIn(asked, postedField, selection)
+                voiceAsk.voice { lastPosted.putIn(asked, postedField, selection) }
+                voiceAsk.landed(inField = true)?.let(::tellVoiceSaid)
+            }
+        }
+    }
+
+    // 语音先问再记: a talk's text, gathered as it went in, and what else went in while the engine follows it
+    private val voiceAsk = VoiceAsk()
+
+    /** A talk began ([VoiceSession.begin]): what it puts in is gathered. */
+    fun voiceTalkBegan() = voiceAsk.began()
+
+    /** The talk is over ([VoiceSession]'s end): its text to the engine once all of it is in. */
+    fun voiceTalkEnded() {
+        voiceAsk.ended()?.let(::tellVoiceSaid)
+    }
+
+    // a talk's [text], all in: the engine follows it as the user changes it, where it is to ask (the switch
+    // on, a field that learns), read before the cursor now that it is in (review R6); elsewhere it is not
+    // given voice's text at all, what it followed of another talk ended (review S6)
+    private fun tellVoiceSaid(text: String) {
+        val prefs = AppPrefs.getInstance().internal
+        val asks = prefs.voiceAskRemember.getValue() && !fieldPolicy.sensitive
+        voiceAsk.told(asks)
+        if (!asks) {
+            postFcitxJob { voiceEditsEnd() }
+            return
+        }
+        val before = currentInputConnection?.getTextBeforeCursor(ContextChars, 0)?.toString()
+        // the hint shown once: the engine not looking for it again (review S7)
+        val hinted = prefs.voiceAskHintShown.getValue()
+        postFcitxJob { voiceSaid(text, before, hinted) }
+    }
+
+    // [text] went in, not voice's: reported while the engine follows voice's text; typed while a talk goes on, the
+    // following ended (VO-47: the talk's text told once it is over, what it is changed in then not asked about)
+    private fun voicePut(text: String) {
+        when (voiceAsk.putIn(text)) {
+            VoiceAsk.Put.REPORT -> reportVoicePut(text)
+            VoiceAsk.Put.END -> postFcitxJob { voiceEditsEnd() }
+            VoiceAsk.Put.NONE -> Unit
+        }
+    }
+
+    // [text] went in while the engine follows voice's text: told, and what its edit asks shown once the field
+    // reads as the engine has it (review M6); the window shut, nothing more reported
+    private fun reportVoicePut(text: String) {
+        val window = voiceAsk.current
+        postFcitxJob {
+            val reply = voicePutIn(text)
+            val ask = reply.ask
+            // the window open, nothing asked: nothing for the main thread (review N15)
+            if (reply.open && ask == null) return@postFcitxJob
+            val read = withContext(Dispatchers.Main) {
+                if (!reply.open) voiceAsk.shut(window)
+                val ic = currentInputConnection
+                if (ask == null || ic == null) null
+                else ic.getTextBeforeCursor(ContextChars, 0)?.toString() to ic.getTextAfterCursor(ContextChars, 0)?.toString()
+            } ?: return@postFcitxJob
+            val confirmed = voiceConfirm(read.first, read.second) ?: return@postFcitxJob
+            withContext(Dispatchers.Main) { askVoiceWord(confirmed) }
+        }
+    }
+
+    // 「让语音记住『徐婧』？」 with 记住; or, once, how to have a word remembered (Q3)
+    private fun askVoiceWord(ask: VoiceEdits.Ask) {
+        val prefs = AppPrefs.getInstance().internal
+        if (!prefs.voiceAskRemember.getValue()) return
+        if (ask.hint) {
+            if (prefs.voiceAskHintShown.getValue()) return
+            prefs.voiceAskHintShown.setValue(true)
+            say(R.string.voice_ask_hint)
+            return
+        }
+        prefs.voiceAskShown.setValue(prefs.voiceAskShown.getValue() + 1)
+        say(getString(R.string.voice_ask_remember, ask.word), UndoChip.Undo({ rememberVoiceWord(ask) }, action = R.string.voice_ask_remember_action))
+    }
+
+    // 记住 tapped: added by hand, said so with 撤销 (taking it off the added words, nothing forgotten). The
+    // word added drops the engine's sessions: the bar's 联想 of the old one reset away, not left to tap (review 16)
+    private fun rememberVoiceWord(ask: VoiceEdits.Ask) {
+        postFcitxJob {
+            val added = voiceRemember(ask)
+            if (added) reset()
+            withContext(Dispatchers.Main) {
+                if (!added) return@withContext say(R.string.voice_ask_failed)
+                val taken = AppPrefs.getInstance().internal.voiceAskTaken
+                taken.setValue(taken.getValue() + 1)
+                say(getString(R.string.voice_ask_remembered, ask.word), UndoChip.Undo({
+                    taken.setValue(maxOf(0, taken.getValue() - 1))
+                    postFcitxJob { voiceForget(ask.word) }
+                }))
             }
         }
     }
@@ -1796,7 +1901,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      */
     fun commitVoice(text: String) {
         if (editingSession.composing.isNotEmpty() && !editingSession.provisional) finishComposing()
-        commitText(text)
+        voiceAsk.voice { commitText(text) }
     }
 
     /**
@@ -1909,6 +2014,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         contextReads.forget()
         fieldPolicy.finish()
         dropSettleWaiters()
+        // voice's text in the field left no longer followed
+        voiceAsk.reset()
+        postFcitxJob { voiceEditsEnd() }
     }
 
     override fun onUnbindInput() {

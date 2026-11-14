@@ -66,6 +66,10 @@ class UserWordsFragment : PaddingPreferenceFragment() {
 
     private lateinit var backups: SwitchPreferenceCompat
 
+    private val voiceAsk = AppPrefs.getInstance().internal.voiceAskRemember
+
+    private lateinit var voiceAsks: SwitchPreferenceCompat
+
     private lateinit var exportLauncher: ActivityResultLauncher<String>
 
     // what is learned not reaching the disk now (LearnLog.saving): said at the top for as long as it lasts (decode-4)
@@ -115,6 +119,18 @@ class UserWordsFragment : PaddingPreferenceFragment() {
             }
         }
         screen.addPreference(backups)
+        // 语音先问再记 (Q4): read by the keyboard as a talk's text goes in, nothing to tell the engine
+        voiceAsks = SwitchPreferenceCompat(ctx).apply {
+            isPersistent = false
+            isIconSpaceReserved = false
+            setTitle(R.string.learning_voice_ask)
+            setSummary(R.string.learning_voice_ask_summary)
+            setOnPreferenceChangeListener { _, value ->
+                voiceAsk.setValue(value as Boolean)
+                true
+            }
+        }
+        screen.addPreference(voiceAsks)
         val words = category(R.string.words_section_manage)
         fun addListed(what: LearningOp.Listed) {
             listed[what] = Preference(ctx).apply {
@@ -166,6 +182,7 @@ class UserWordsFragment : PaddingPreferenceFragment() {
         // turned off or on in ⋯ meanwhile
         habits.isChecked = useHabits.getValue()
         backups.isChecked = autoBackup.getValue()
+        voiceAsks.isChecked = voiceAsk.getValue()
         // back from a list: counted again
         refreshCounts()
     }

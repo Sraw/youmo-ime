@@ -60,6 +60,7 @@ import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.host.QuickPhraseHooks
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -247,6 +248,12 @@ class KotlinHost(
     override suspend fun voiceHomophones(words: List<UserWord>) = withContext(dispatcher) { bridge.engines.voiceHomophones(words) }
     override suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = withContext(dispatcher) { bridge.engines.voiceHomophonesAllowed(spans) }
     override suspend fun addUserWord(text: String, pinyin: String) = withContext(dispatcher) { bridge.engines.addWord(text, pinyin) }
+    override suspend fun voiceSaid(text: String, before: String?, hinted: Boolean) = withContext(dispatcher) { bridge.engines.voiceSaid(text, before, hinted) }
+    override suspend fun voicePutIn(text: String) = withContext(dispatcher) { bridge.engines.voicePutIn(text) }
+    override suspend fun voiceConfirm(before: String?, after: String?) = withContext(dispatcher) { bridge.engines.voiceConfirm(before, after) }
+    override suspend fun voiceEditsEnd() = withContext(dispatcher) { bridge.engines.voiceEditsEnd() }
+    override suspend fun voiceRemember(ask: VoiceEdits.Ask) = withContext(dispatcher) { bridge.engines.voiceRemember(ask) }
+    override suspend fun voiceForget(word: String) = withContext(dispatcher) { bridge.engines.voiceForget(word) }
     override suspend fun blockUserWord(text: String, pinyin: String) = withContext(dispatcher) { bridge.engines.blockWord(text, pinyin) }
     override suspend fun removeUserWords(words: List<UserWord>) = withContext(dispatcher) { bridge.engines.removeWords(words) }
     override suspend fun englishWords() = withContext(dispatcher) { bridge.engines.englishWords() }

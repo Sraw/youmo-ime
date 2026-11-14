@@ -765,7 +765,7 @@ class VoiceHoldUatTest {
         say("汪小明")
         assertEquals("汪小明", text())
         // put in the field over the engine (commitOverEngine: its input reset, the text the app's):
-        // no word chosen, added or learned from it
-        assertEquals(listOf("reset()"), h.api.calls)
+        // no word chosen, added or learned from it; only told the engine to follow (语音先问再记, VO-41)
+        assertEquals(listOf("reset()", "voiceSaid(汪小明, 汪小明, false)"), h.api.calls)
     }
 }

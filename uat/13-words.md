@@ -418,3 +418,15 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **操作**：在系统「文件」应用里从设备存储进 `Download`（侧栏里以手机型号或「内部存储」命名的那一项，没有时在 ⋮ 里点 **显示内部存储**；不要从侧栏的「下载」进：那里给应用的地址是 `…/document/msf:NN`，不带文件名，打开方式里没有本应用），长按 `dict-words.txt` → 打开方式 → 幽默输入法；看对话框，点确定，按 WD-11 选"基础词库"导入。
 - **预期**：弹出「您想导入这个词库吗？」，确定后进词库页导入，和在词库页里选文件一样；列表里多出 `dict-words`。
 - **JVM**：`MainActivityTest.aFileIntoTheAppsOwnDirectoriesIsNotOpenedFromOutside`（`content://`、下载里的文件能打开，应用自己目录里的不打开）；打开方式只认地址以 `.dict`、`.scel`、`.txt`、`.fxlb` 结尾的文件（`AndroidManifest.xml` 的 VIEW 过滤器），Rime 的 `.dict.yaml` 不在其中，在词库页里导入（WD-14e）；「打开方式」是系统界面，在真机或模拟器上手工跑。
+
+### WD-58 [P1] 用户词库页顶「改语音的字后问是否记住」
+- **前提**：B0-语音。
+- **操作**：打开 **用户词库**，看页顶第三个开关；关掉，回测试页照 VO-41 改一次；再打开。
+- **预期**：开关默认开，说明写着只有点「记住」才加词；关掉后不问、不加词、开发者页的计数不变；再打开照常问。
+- **JVM**：`VoiceAskUatTest.theSwitchOffAsksNothing`（关掉时不把语音的字交给引擎跟着看、不提示、不计数）、`SettingsUatTest.pagesFromTopToBottom`、`SettingsPagesUatTest.theUsersWordsListsCountsAndDays`（页顶三个开关）；设备上不跑。
+
+### WD-59 [P1] 点「记住」加的词在手动添加的词里，撤销后不在
+- **前提**：B0-语音。
+- **操作**：照 VO-41 改出「徐婧」点 **记住**，打开 **用户词库 → 手动添加的词**；回去照样改一次，点 **记住** 后点 **撤销**，再看。
+- **预期**：点了以后手动添加的词里有「徐婧」（拼音 xu jing），和自己在这页加的一样，可以在这里删；撤销后不在，学到的词不动，学习记录里也不多一条「忘记」。
+- **JVM**：ime-core `EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销`、`VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap`；设备上手动添加的词那一半在 VO-41 的脚本里看。

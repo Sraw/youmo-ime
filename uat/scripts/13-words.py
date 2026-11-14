@@ -918,3 +918,10 @@ case("WD-48", needs="jvm:WordListsTest.aListThatCannotBeWrittenIsKeptInMemory、
      "EngineBridgeTest$Made.aPhraseOrCommonWordNotSavedIsSaidOnceInItsOwnWordsNotAsLearning、"
      "EngineBridgeTest.aKeyboardChangeNotSavedIsSavedWithTheNext、EngineBridgeTest.aCommonWordsChangeNotSavedIsSavedWithTheNext")(lambda d: None)
 case("WD-49", needs="manual:「打开方式」是系统文件应用的界面（从设备存储的 Download 打开）；在真机或模拟器上手工跑")(lambda d: None)
+
+
+case("WD-58", needs="jvm:VoiceAskUatTest.theSwitchOffAsksNothing、SettingsPagesUatTest.theUsersWordsListsCountsAndDays")(lambda d: None)
+
+
+case("WD-59", needs="jvm:EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销、"
+     "VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap")(lambda d: None)

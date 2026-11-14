@@ -13,6 +13,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### 主要变化
 
 - **键的上滑、下滑能设成笔画**：**按键字符和快捷键** 里的命令多了 **笔画：横 / 竖 / 撇 / 点 / 折**（键上画 一丨丿丶乛），打着拼音时滑这个键就发出这一笔筛候选，和在键上画一笔一样（比如九键把 1 到 5 的上滑设成五种笔画）。不用选 **在键上划 → 笔画筛选** 也能用，快打时的短划就不会被当成笔画；没打字时滑了什么也不打。退回 0.6.0 时设了笔画的槽回到预设，别的槽照旧。
+- 语音打错的词改对以后问一句要不要记住：把语音写错的词（「徐静」）整个删掉、用拼音或手写重打成读音一样的字（「徐婧」），键盘上方问「让语音记住『徐婧』？」，点 **记住** 才加进用户词库（读音按你打的拼音），下次语音就写对；不点就什么都不记，6 秒或接着打字就消失。只改一个字时第一次提示怎么让语音记住。用户词库页顶新开关 **改语音的字后问是否记住**（默认开）。语音打的字只在内存里跟着看，离开输入框就丢掉；密码框、不记录的框里不跟。
 
 ### 小改动
 
@@ -23,6 +24,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### Main changes
 
 - **A key's swipe up or down can be a stroke**: **Key characters and shortcuts** has the commands **Stroke: horizontal / vertical / left-falling / dot / turning** (drawn 一丨丿丶乛 on the key); swiped while pinyin is typed, the key sends that stroke to filter the candidates, as one drawn on the keys does (the nine keys' 1 to 5 set to the five strokes, say). It works without **Drawing on keys → Stroke filter**, so fast short swipes are no longer taken for strokes; with nothing typed the swipe types nothing. Going back to 0.6.0, a slot set to a stroke returns to its preset and the others stay.
+
+### Main changes
+
+- After you correct a word voice got wrong, the keyboard asks whether voice should remember it: delete the word (徐静) whole and type it again in pinyin or handwriting as one that reads the same (徐婧), and it asks “Have voice remember 徐婧?”; only **Remember** adds it to your words, so voice writes it right next time. Not tapped, nothing is kept, and it goes in 6 s or once you type on. One character changed, it says once how to have the word remembered. A new switch on top of the user dictionary page, **Ask after fixing voice's words** (on). What voice typed is followed in memory only, dropped once you leave the field; password and no-learning fields are not followed.
 
 ### Smaller changes
 

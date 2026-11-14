@@ -1550,6 +1550,25 @@ readiness changes, for the badge. A value the user set is left as it is. Voice d
 normalisation, reranking hypotheses with the pinyin model, blocked words, hotwords, the hold's and
 the tap's presses, what is typed as it is said) are in ime-core's `input/voice/` and tested there.
 
+### Voice: asked, then remembered
+
+`input/voice/VoiceAsk` (main thread) gathers a talk's text as `commitVoice` and the CommitAction voice
+posts (`voice = true`, `commitOverEngine`) put it in, and hands it over once the talk is over
+(`VoiceSession` → `voiceTalkBegan`/`voiceTalkEnded`) and the last of it in: `HostApi.voiceSaid` with the
+text before the cursor read then (review R6) and `hinted` (`voiceAskHintShown`: the engine stops looking
+for the hint, review S7), where it asks: the switch on (`AppPrefs.internal.voiceAskRemember`, 用户词库页顶)
+and the field not sensitive (`fieldPolicy.sensitive`: a password, no personalized learning); elsewhere
+`voiceEditsEnd` alone, voice's text never handed over (review S6). A talk beginning leaves the window of
+the last as it is, so one that puts nothing in (not heard, no permission, a failure) stops nothing; what
+is typed while one lasts is not reported and ends the window (`VoiceAsk.Put.END` → `voiceEditsEnd`), the
+talk's own text handed over once it is over (VO-47). What else goes in (`commitText`,
+`commitTyped`, `putAround`) is reported (`voicePutIn`) while a window is open, the main thread asked only
+where the window shut or an ask came (review N15); an ask is confirmed against the field read again (`voiceConfirm`, review M6) and said as a notice
+with 记住 (`UndoChip.Undo`'s `action`), 6 s, typing puts it away (Q1). 记住 → `voiceRemember`, then
+「语音记住了」 with 撤销 (`voiceForget`). The hint (Q3) is said once (`voiceAskHintShown`). The developer
+page counts asked and remembered (`voiceAskShown`, `voiceAskTaken`; 撤销 takes one off). `onFinishInput`
+resets it and ends the engine's window.
+
 ### Voice: the start
 
 - 正在听 only once the microphone is really on: `VoiceOnset` (ime-core) reports the first sample not zero,

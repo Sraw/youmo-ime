@@ -537,6 +537,14 @@
     <string name="learning_backups_summary">Restore one, or save a copy where you can see it</string>
     <string name="learning_auto_backup">Back up automatically</string>
     <string name="learning_auto_backup_summary">Every 7 typing days, the newest 2 kept, in the keyboard\'s own folder: no other app can read them, and uninstalling the keyboard deletes them</string>
+    <string name="learning_voice_ask">Ask after fixing voice\'s words</string>
+    <string name="learning_voice_ask_summary">A word voice got wrong, deleted whole and typed again in pinyin or handwriting as one that reads the same, tones and all: asked once whether voice should remember it. Only “Remember” adds it to your words</string>
+    <string name="voice_ask_remember">Have voice remember “%1$s”?</string>
+    <string name="voice_ask_remember_action">Remember</string>
+    <string name="voice_ask_remembered">Voice will remember “%1$s”</string>
+    <string name="voice_ask_failed">Could not add it to the user dictionary</string>
+    <string name="voice_ask_hint">For voice to remember it, delete the whole word and type it again</string>
+    <string name="voice_ask_counts">Voice corrections: asked %1$d times, remembered %2$d</string>
     <string name="learning_restore">Restore from a backup</string>
     <string name="learning_restore_summary">A backup or a word list exported from this keyboard, merged with what this phone has</string>
     <string name="learning_restore_confirm">Merge the backup of %1$s (%2$s) with what this phone has learned? Each count takes the larger of the two; where pins, blocks and first choices differ, this phone\'s stay. What is here now is saved first, to go back to.</string>

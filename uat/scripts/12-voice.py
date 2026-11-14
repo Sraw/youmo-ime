@@ -366,6 +366,130 @@ def vo38(d):
     return "框里 " + " / ".join(f"「{t}」" for t in out)
 
 
+# 徐静 of a talk of xujing deleted to the end (the sentence's mark with it) and 徐婧 typed again in pinyin: asked
+# 「让语音记住『徐婧』？」; the talk's text
+def retyped_asks(d, between=None):
+    d.clear()
+    _, t = dictate(d, "xujing")
+    check("徐静" in t, f"说「麻烦你去找一下徐婧」，框里「{t}」，没有「徐静」可改")
+    if between:
+        between(d)
+    d.bksp(len(t) - t.index("徐静"))
+    d.type("xujing")
+    try:
+        d.pick("徐婧")
+    except Fail:
+        d.pick("徐")
+        d.pick("婧")
+    ask = "让语音记住『徐婧』？"
+    check(d.wait_text(ask, timeout=5, where="all"), f"重打「徐婧」后没问「{ask}」，框里「{d.field_text()}」")
+    return t
+
+
+# also on the JVM (VoiceAskUatTest, EnginesVoiceEditsTest); this one, the glue: a real talk's text told to the
+# engine, a real pinyin commit reported, the notice's 记住 adding the word, the bar's 联想 of the session it
+# drops cleared (review item 16)
+@case("VO-41", base="B0-语音", mutates=True, needs=EV)
+def vo41(d):
+    d.open_page("text")
+    t = retyped_asks(d)
+    d.tap_text("记住", where="all", scroll=False, after=1.0)
+    check(d.wait_text("语音记住了『徐婧』", timeout=3, where="all"), "点记住后没说「语音记住了『徐婧』」")
+    bar = d.candidates()
+    check(not bar, f"点记住后候选栏还留着旧的联想 {bar}")
+    script("13-words").user_lexicon(d, "手动添加的词")
+    check(d.wait_text("徐婧", timeout=5), "手动添加的词里没有「徐婧」")
+    return f"说出「{t}」，删到句末重打「徐婧」后问了，点记住加进手动添加的词，候选栏清空"
+
+
+CHROME = "com.android.chrome"
+
+
+# VO-50's web field in Chrome where the emulator has it (its first-run pages skipped by its command line, a debug
+# app's), else the test page's WebView browser as VO-41 runs it; WeChat and 备忘录 are the phone's
+@case("VO-50", base="B0-语音", mutates=True, needs=EV)
+def vo50(d):
+    # the test page first: served and reversed to the device (ensure_fixtures), the keyboard up
+    d.open_page("text")
+    if "package:" not in d.sh(f"pm path {CHROME}"):
+        where = "这台没有 Chrome：测试页的 WebView 浏览器"
+    else:
+        d.sh(f"am set-debug-app --persistent {CHROME}")
+        d.sh("echo 'chrome --disable-fre --no-default-browser-check --no-first-run' > /data/local/tmp/chrome-command-line")
+        d.sh(f"am force-stop {CHROME}")
+        d.reload_n += 1
+        d.sh(f"am start -a android.intent.action.VIEW -d 'http://127.0.0.1:8000/fields.html?r={d.reload_n}#text' -p {CHROME}")
+
+        # its offer of notifications (a dialog over the page, the first run's) turned down
+        def ready(s):
+            no = next((n for n in s.app() if n.pkg == CHROME and n.rid == "negative_button"), None)
+            if no:
+                d.tap(no.c, 1.0)
+                return None
+            return next((n for n in s.app() if "EditText" in n.cls and n.pkg == CHROME
+                         and n.rid not in ("url_bar", "search_box_text")), None)
+        d.tap(d.wait(ready, 30, what="Chrome's page").c, 1.0)
+        where = "Chrome"
+    t = retyped_asks(d)
+    return f"{where}：说出「{t}」，重打「徐婧」后问了（微信、备忘录要在 6T 上跑，待做）"
+
+
+case("VO-42", needs="jvm:VoiceAskUatTest.notTappedNothingIsAdded、"
+     "VoiceEditsTest.asked once in a window, again in the next (Q6)")(lambda d: None)
+
+
+case("VO-43", needs="jvm:VoiceEditsTest.what is not asked about、VoiceEditsTest.the word to ask about、"
+     "VoiceEditsTest.typed by what is no word typed, the window ends (Q5)、"
+     "EnginesVoiceEditsTest.nothing is followed where nothing would be learned")(lambda d: None)
+
+
+case("VO-44", needs="jvm:EnginesVoiceEditsTest.asked again at the place, the first word added gives way (review M4)、"
+     "EnginesVoiceEditsTest.a word that does not add leaves the first be (review S8)、"
+     "VoiceEditsTest.asked again at the same place, the word it adds takes the first's place (review M4)")(lambda d: None)
+
+
+case("VO-45", needs="jvm:EnginesVoiceEditsTest.a word written again on the pad is asked about, read as the characters are")(lambda d: None)
+
+
+case("VO-46", needs="jvm:VoiceAskUatTest.aFieldThatLearnsNothingIsNotFollowed、"
+     "EnginesVoiceEditsTest.nothing is followed where nothing would be learned")(lambda d: None)
+
+
+def nothing_said(d):
+    """the space held 2 s with nothing said, let go: nothing goes in"""
+    before = d.field_text() or ""
+    x, y = hold_space(d)
+    time.sleep(2)
+    d.touch(("up", x, y))
+    t = settle(d)
+    check(t == before, f"按住空格什么都没说，框里从「{before}」变成「{t}」")
+
+
+# also on the JVM (VoiceAskUatTest: typing while a talk lasts, a talk that puts nothing in); this one, a real
+# talk that hears nothing between voice's text and its edit
+@case("VO-47", base="B0-语音", mutates=True, needs=EV)
+def vo47(d):
+    d.open_page("text")
+    t = retyped_asks(d, between=nothing_said)
+    return f"说出「{t}」，再按住空格什么都没说（没上屏），之后删到句末重打「徐婧」照样问"
+
+
+case("VO-48", needs="jvm:VoiceEditsTest.what is not asked about")(lambda d: None)
+
+
+case("VO-49", needs="jvm:VoiceEditsTest.edits made other ways than Backspace at the end、"
+     "VoiceEditsTest.the window ends where what happened is not sure、VoiceEditsTest.an emoji's Backspace is not counted")(lambda d: None)
+
+
+case("VO-51", needs="jvm:VoiceAskUatTest.howToHaveAWordRememberedIsSaidOnce、"
+     "VoiceEditsTest.one character typed again is told once how to have it remembered (Q3)、"
+     "EnginesVoiceEditsTest.the once-only hint is not looked for once said")(lambda d: None)
+
+
+case("VO-52", needs="jvm:VoiceEditsTest.asked once in a window, again in the next (Q6)、"
+     "EnginesVoiceEditsTest.undone, what typing the word learned stays (review S3)")(lambda d: None)
+
+
 case("VO-15", needs="jvm:SettingsPagesUatTest.theVoiceModelsDataIsCredited")(lambda d: None)
 
 

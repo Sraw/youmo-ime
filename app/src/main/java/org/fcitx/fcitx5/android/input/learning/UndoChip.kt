@@ -23,6 +23,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.PopupWindow
+import androidx.annotation.StringRes
 import androidx.core.view.ViewCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -62,9 +63,9 @@ class UndoChip(
     /**
      * What 撤销 takes back, and [lapsed] what follows when the chip goes without it: timed out,
      * tapped away, another notice in its place, the keyboard gone. One of the two is called, once,
-     * on the main thread.
+     * on the main thread. [action], the button's words: 撤销, or what [undo] does (语音先问再记's 记住).
      */
-    class Undo(val undo: () -> Unit, val lapsed: () -> Unit = {})
+    class Undo(val undo: () -> Unit, val lapsed: () -> Unit = {}, @StringRes val action: Int = R.string.learning_undo)
 
     private var window: PopupWindow? = null
 
@@ -402,7 +403,7 @@ class UndoChip(
 
     // a text button in the accent colour, a rounded ripple as it is pressed: no block of colour (§4)
     private fun undoButton(undo: Undo) = anchor.context.textView {
-        setText(R.string.learning_undo)
+        setText(undo.action)
         setTextColor(undoColour(theme))
         typeface = Typeface.DEFAULT_BOLD
         textSize = 14f

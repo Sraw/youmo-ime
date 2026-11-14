@@ -120,7 +120,7 @@ class CommonKeyActionListener :
      * Tap to talk, started or stopped: the bar's microphone or a key's shortcut. What is said goes
      * in as the emoji's does (a pinyin being typed committed first, not overwritten).
      */
-    fun voiceTap() = VoiceFeature.tap(inputView) { listener.onKeyAction(CommitAction(it), KeyActionListener.Source.Keyboard) }
+    fun voiceTap() = VoiceFeature.tap(inputView) { listener.onKeyAction(CommitAction(it, voice = true), KeyActionListener.Source.Keyboard) }
 
     private fun select(range: CursorRange) {
         lineReversed = false
@@ -229,7 +229,7 @@ class CommonKeyActionListener :
                         sendKey(action.sym, action.states)
                     }
                 }
-                is CommitAction -> service.commitOverEngine(action.text, action.replacing)
+                is CommitAction -> service.commitOverEngine(action.text, action.replacing, voice = action.voice)
                 // the engine sends the key that commits its word, carrying the glide, itself (HostApi.offerGlide)
                 is GlideAction -> {
                     val n = EngineState.keySent()
@@ -359,7 +359,7 @@ class CommonKeyActionListener :
                         // hold to talk: the keyboard stays, the key's finger followed till it lifts
                         SpaceLongPressBehavior.Voice -> if (behavior.talks(PackStore.ready(PackKind.VOICE), service.inPasswordField)) {
                             VoiceFeature.hold(inputView, action.pointer) { text ->
-                                listener.onKeyAction(KeyAction.CommitAction(text), KeyActionListener.Source.Keyboard)
+                                listener.onKeyAction(KeyAction.CommitAction(text, voice = true), KeyActionListener.Source.Keyboard)
                             }
                         }
                     }

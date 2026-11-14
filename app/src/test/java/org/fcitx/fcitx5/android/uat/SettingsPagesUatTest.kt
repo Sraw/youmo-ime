@@ -392,7 +392,7 @@ class SettingsPagesUatTest {
     }
 
     @Test
-    @Uat("WD-21")
+    @Uat("WD-21", "WD-58")
     fun theUsersWordsListsCountsAndDays() {
         val today = (System.currentTimeMillis() / 86_400_000L).toInt()
         words(
@@ -403,7 +403,7 @@ class SettingsPagesUatTest {
         open(SettingsRoute.UserWords)
         val prefs = preferences((page as PreferenceFragmentCompat).preferenceScreen)
         assertEquals(
-            listOf(s(R.string.learning_use_habits), s(R.string.learning_auto_backup)),
+            listOf(s(R.string.learning_use_habits), s(R.string.learning_auto_backup), s(R.string.learning_voice_ask)),
             prefs.filterIsInstance<TwoStatePreference>().map { it.title.toString() },
         )
         val titles = prefs.map { it.title.toString() }

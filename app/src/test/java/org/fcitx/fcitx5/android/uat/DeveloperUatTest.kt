@@ -24,7 +24,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** 开发者 (uat/14 ST-29): its page, and the editor info inspector it turns on in the keyboard's ⋯. */
+/** 开发者 (uat/14 ST-29, ST-119): its page, the editor info inspector it turns on in the keyboard's ⋯, 语音先问再记's counts. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -53,6 +53,20 @@ class DeveloperUatTest {
             // saved under the inspector's key in the default preferences, which AppPrefs reads
             val saved = PreferenceManager.getDefaultSharedPreferences(st.activity).getBoolean(inspector.key, false)
             assertTrue("switch ${switch.isChecked}", switch.isChecked && saved)
+        }
+    }
+
+    @Test
+    @Uat("ST-119")
+    fun voiceCorrectionsAskedAndRememberedAreCounted() {
+        val internal = AppPrefs.getInstance().internal
+        prefs.set(internal.voiceAskShown, 3)
+        prefs.set(internal.voiceAskTaken, 1)
+        SettingsHarness().use { st ->
+            st.activity
+            st.open(SettingsRoute.Developer)
+            // a line to read, not a button
+            assertTrue(!st.pref(st.activity.getString(R.string.voice_ask_counts, 3, 1)).isSelectable)
         }
     }
 

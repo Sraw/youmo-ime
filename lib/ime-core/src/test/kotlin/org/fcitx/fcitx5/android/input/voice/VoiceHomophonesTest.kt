@@ -112,6 +112,27 @@ class VoiceHomophonesTest {
     }
 
     @Test
+    fun `a word added to the words read is what reading them all again with it would be`() {
+        val ws = listOf(added("何芮"), learned("徐靖", 9f), learned("公式", 1f))
+        val texts = listOf("徐静", "找一下徐静，和瑞", "徐靖来了", "徐婧来了", "公式", "许静")
+        // as Engines' settings read it: none for a character its pinyin has no reading of
+        val unread = listOf(intArrayOf(reading(xu, 2)), intArrayOf())
+        fun same(why: String, base: List<UserWord>, readsAs: List<IntArray>? = null) = why to {
+            val w = added("徐婧")
+            val read = { u: UserWord -> if (readsAs != null && u === w) readsAs else readings(u) }
+            val whole = VoiceHomophones.of(base + w, read) { chars[it] }
+            val quick = VoiceHomophones.of(base, read) { chars[it] }.withAdded(w.text, read(w))
+            assertEquals(why, texts.map { replaced(whole, it) }, texts.map { replaced(quick, it) })
+        }
+        assertRows(
+            same("a new word: after those added, before the learned", ws),
+            same("a learned word added: moved to the added, ahead of 徐靖", ws + learned("徐婧", 5f)),
+            same("a word without a reading for each character: one of theirs, never put in", ws, unread),
+            same("the same, learned before: no longer put in for its learning", ws + learned("徐婧", 5f), unread),
+        )
+    }
+
+    @Test
     fun `no single characters, nor blocked words, take part`() {
         assertSame(VoiceHomophones.NONE, homophones(added("婧"), UserWord("徐婧", "", BLOCKED)))
         assertTrue(VoiceHomophones.NONE.candidates("徐静").isEmpty())

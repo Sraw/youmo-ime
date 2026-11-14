@@ -141,6 +141,19 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val learningAutoBackup = bool("learning.auto_backup", true)
 
         /**
+         * 语音先问再记's switch, the lexicon page's third (061-voice-learn-from-edits.md, Q4): a word of
+         * voice's deleted and typed again, read the same, asked about (「让语音记住『徐婧』？」).
+         */
+        val voiceAskRemember = bool("learning.voice_ask_remember", true)
+
+        /** How often it was asked, and the word remembered (an undo taking one back): the developer page's line. */
+        val voiceAskShown = int("learning.voice_ask_shown", 0)
+        val voiceAskTaken = int("learning.voice_ask_taken", 0)
+
+        /** 「把整个词删掉重打，语音才能记住」 said, once (Q3). */
+        val voiceAskHintShown = bool("learning.voice_ask_hint_shown", false)
+
+        /**
          * What the address suggestions learned ([org.fcitx.fcitx5.android.input.address.AddressBook]'s two
          * strings): how often each suffix ended an address, and the email addresses remembered. In the
          * backup with the rest of this file; never in the device-protected copy (AddressStrip learns nothing before the first unlock).

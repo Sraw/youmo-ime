@@ -523,6 +523,14 @@
     <string name="learning_backups_summary">從備份還原，或另存一份</string>
     <string name="learning_auto_backup">自動備份</string>
     <string name="learning_auto_backup_summary">每 7 個打字日存一份，只留最近 2 份；存在輸入法自己的目錄，別的 App 拿不到，解除安裝輸入法就沒了</string>
+    <string name="learning_voice_ask">改語音的字後問是否記住</string>
+    <string name="learning_voice_ask_summary">語音打錯的詞整個刪掉、用拼音或手寫重打成讀音（連聲調）一樣的字後，問一次要不要讓語音記住；點「記住」才加進使用者詞庫</string>
+    <string name="voice_ask_remember">讓語音記住『%1$s』？</string>
+    <string name="voice_ask_remember_action">記住</string>
+    <string name="voice_ask_remembered">語音記住了『%1$s』</string>
+    <string name="voice_ask_failed">沒能加入使用者詞庫</string>
+    <string name="voice_ask_hint">把整個詞刪掉重打，語音才能記住</string>
+    <string name="voice_ask_counts">語音改字：問過 %1$d 次，記住 %2$d 次</string>
     <string name="learning_restore">從備份還原</string>
     <string name="learning_restore_summary">本輸入法的備份或匯出的詞表，和手機上現有的合併</string>
     <string name="learning_restore_confirm">把 %1$s 的備份（%2$s）和手機上學到的合併？次數取兩邊較大的；固定、封鎖、首選衝突時以手機上的為準。還原前會先另存一份現在的，後悔了可以退回。</string>

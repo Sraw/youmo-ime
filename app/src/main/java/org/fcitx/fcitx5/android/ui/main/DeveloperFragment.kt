@@ -12,6 +12,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.Preference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -129,6 +130,14 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
             }
+            // 语音先问再记's counts, for the owner to see whether it asks too often (061-voice-learn-from-edits.md §6)
+            addPreference(Preference(context).apply {
+                val internal = AppPrefs.getInstance().internal
+                title = getString(R.string.voice_ask_counts, internal.voiceAskShown.getValue(), internal.voiceAskTaken.getValue())
+                isSelectable = false
+                isIconSpaceReserved = false
+                isSingleLineTitle = false
+            })
             addPreference(R.string.capture_heap_dump) {
                 val fileName = "${context.packageName}_${iso8601UTCDateTime()}.hprof"
                 val file = context.cacheDir.resolve(fileName)

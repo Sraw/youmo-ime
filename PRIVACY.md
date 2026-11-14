@@ -18,6 +18,7 @@
 - 拼音解码、两个句子模型都在手机上运行。
 - 你输入的内容、学到的词和词频、剪贴板记录、设置，都只存在手机上这个应用自己的目录里。
 - 为了按前文给出更准的候选，引擎会读输入框里光标前的文字，和你打的字一样只在手机上处理。密码框等敏感输入框不读。
+- 改语音打错的词时问要不要记住：语音打进来的字只在内存里跟着，看你怎么改，离开输入框就丢掉，不存盘；点「记住」才把那个词存进用户词库。密码框等敏感输入框里不跟。问过几次、记住过几次这两个数只存在手机上，跟着「备份全部」走。
 - 只有你主动导出时（"高级"里的备份全部，用户词库、自定义短语和主题的导出，日志和堆内存转储），这些数据才会写成文件，存到你选的位置。
 - 例外是 Android 12 及以上系统自带的换机迁移（新旧手机直连）：系统会把设置、学到和添加的词、自定义短语、导入的词库和主题一起搬到新手机，剪贴板记录不会。应用不使用云端备份。
 - 卸载应用会删除它的全部数据。
@@ -42,6 +43,7 @@ Also:
 - Pinyin decoding and both sentence models run on the phone.
 - What you type, the words and frequencies it learns, the clipboard history and the settings stay in the app's own directories on the phone.
 - To suggest better candidates from what comes before, the engine reads the text before the cursor in the input field. Like what you type, it is handled on the phone only, and it is not read from password or other sensitive fields.
+- When you correct a word voice got wrong, the app asks whether voice should remember it: what voice typed is followed in memory only, to see how you change it, dropped once you leave the field and never saved; only tapping “Remember” saves that word to your user dictionary. Password and other sensitive fields are not followed. How often it asked and how often you tapped “Remember”, two counts, stay on the phone and go with “Back up everything”.
 - Your data is written to a file only when you export it yourself (a full backup in Advanced, your word list, custom phrases or a theme, the log or a heap dump), to a place you choose.
 - The exception is the phone-to-phone transfer of Android 12 and later: the system moves the settings, the words learned and added, custom phrases, imported dictionaries and themes to the new phone, but not the clipboard history. The app uses no cloud backup.
 - Uninstalling the app deletes all of its data.

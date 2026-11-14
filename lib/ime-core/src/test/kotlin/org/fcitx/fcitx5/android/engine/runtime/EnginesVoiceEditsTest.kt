@@ -1,0 +1,315 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
+package org.fcitx.fcitx5.android.engine.runtime
+
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
+import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.ReadingSource
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.input.voice.VoiceEdits
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** 语音先问再记 through Engines: its commits and Backspaces followed, the word asked about added and taken off. */
+class EnginesVoiceEditsTest : EnginesFixture() {
+
+    init {
+        pinyin = PinyinDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram("我", -2f, 0f).entry("我", syl("wo"))
+            .unigram("找", -3f, 0f).entry("找", syl("zhao"))
+            .unigram("徐", -4f, 0f).entry("徐", syl("xu"))
+            .unigram("婧", -4f, 0f).entry("婧", syl("jing"))
+            .unigram("靖", -4.5f, 0f).entry("靖", syl("jing"))
+            // 单, read dan, and shan as a surname: what is added is read as typed (review S2)
+            .unigram("单", -4f, 0f).entry("单", syl("dan")).entry("单", syl("shan"))
+            .apply {
+                for ((c, s, t) in listOf(
+                    Triple('我', "wo", 3), Triple('找', "zhao", 3), Triple('徐', "xu", 2), Triple('许', "xu", 3),
+                    Triple('静', "jing", 4), Triple('婧', "jing", 4), Triple('靖', "jing", 4), Triple('单', "dan", 1), Triple('单', "shan", 4),
+                )) {
+                    charTone(c.code, Syllables.id(s), t)
+                    charReading(ReadingSource.MANDARIN, c.code, Syllables.id(s), t)
+                }
+            }
+            .build()
+            .toByteArray()
+    }
+
+    // voice's [said] in an empty field, its last two deleted with Backspace, [keys] typed in pinyin and [word] picked:
+    // what is asked
+    private fun Engines.retyped(
+        said: String = "我找徐静",
+        learning: Boolean = true,
+        keys: String = "xujing",
+        word: String = "徐婧",
+        hinted: Boolean = false,
+        n: Int = 2,
+    ): VoiceEdits.Ask? {
+        voiceSaid(said, said, hinted)
+        repeat(n) { assertFalse("the app's to delete", onEvent(PINYIN, EngineEvent.BACKSPACE, 0).handled) }
+        return typedAgain(said.dropLast(n), keys, word, learning)
+    }
+
+    // [keys] typed in pinyin after [kept], [word] picked a candidate at a time: what is asked
+    private fun Engines.typedAgain(kept: String, keys: String, word: String, learning: Boolean = true): VoiceEdits.Ask? {
+        type(PINYIN, keys)
+        // a part picked commits nothing till the whole is
+        var picked = ""
+        var commit = ""
+        while (commit.isEmpty()) {
+            val rest = word.substring(picked.length)
+            val shown = candidates(PINYIN, 0, 50).map { it.text }
+            val k = shown.indexOf(rest).takeIf { it >= 0 } ?: shown.indexOfFirst { it.isNotEmpty() && rest.startsWith(it) }
+            assertTrue("$rest among $shown", k >= 0)
+            picked += shown[k]
+            commit = onEvent(PINYIN, EngineEvent.PICK, k, learning).commit
+        }
+        assertEquals(word, commit)
+        return voicePutIn(commit).ask?.let { voiceConfirm(kept + commit, "") }
+    }
+
+    // the handwriting pad's reading of [piece] offered with its key (EnginesHandwritingTest)
+    private fun Engines.write(piece: Int, text: String) = onEvent(
+        HANDWRITING, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(piece, InkReading(listOf(text), DoubleArray(1))),
+    )
+
+    private fun added(e: Engines) = e.userWords(UserWord.Kind.ADDED).map { it.text }
+
+    @Test
+    @Uat("VO-41", "WD-59")
+    fun `a word typed again is asked about, added on 记住 and taken off on its 撤销`() {
+        val dir = MemoryFiles()
+        Engines(::load, dir, warmUps = inPlace).use { e ->
+            e.context(PINYIN, "", said = true)
+            val ask = e.retyped()
+            assertRows(
+                "asked, read as typed: voice's rules with it added would put it in" to {
+                    assertEquals("徐婧", ask?.word)
+                    assertEquals("xu jing", ask?.pinyin)
+                },
+                "记住: added by hand" to {
+                    assertNotNull(ask)
+                    assertTrue(e.voiceRemember(ask!!))
+                    assertEquals(listOf("徐婧"), added(e))
+                },
+                "撤销: off the added words, nothing forgotten in the learning record (review R1)" to {
+                    e.voiceForget("徐婧")
+                    assertEquals(emptyList<String>(), added(e))
+                    assertFalse(records(dir).any { it is LearnRecord.Forget && it.text == "徐婧" })
+                },
+            )
+        }
+    }
+
+    @Test
+    @Uat("VO-41")
+    fun `a word is added read as its syllables were typed (review S2)`() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            e.context(PINYIN, "", said = true)
+            val ask = e.retyped("我找单静", keys = "shanjing", word = "单婧")
+            assertRows(
+                "单 typed shan: asked, read shan jing (its readings, dan and shan, leave it open)" to {
+                    assertEquals("单婧", ask?.word)
+                    assertEquals("shan jing", ask?.pinyin)
+                },
+                "added so" to {
+                    assertTrue(e.voiceRemember(ask!!))
+                    assertEquals(listOf("shan jing"), e.userWords(UserWord.Kind.ADDED).map { it.pinyin })
+                },
+            )
+        }
+    }
+
+    @Test
+    @Uat("VO-44")
+    fun `asked again at the place, the first word added gives way (review M4)`() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            e.context(PINYIN, "", said = true)
+            val first = e.retyped()!!
+            assertTrue(e.voiceRemember(first))
+            // the word deleted again and another of the same reading typed: voice judged without the first, ranked first
+            repeat(2) { e.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
+            val second = e.typedAgain("我找", "xujing", "徐靖")
+            assertRows(
+                "asked as replacing the first" to {
+                    assertEquals("徐靖", second?.word)
+                    assertEquals("徐婧", second?.replaces)
+                },
+                "记住: the second added" to { assertTrue(e.voiceRemember(second!!)) },
+                "the first taken off" to { assertEquals(listOf("徐靖"), added(e)) },
+            )
+        }
+    }
+
+    // 许静, read xu3 jing4, has no part in 徐静 (xu2): voice's words not empty, what is asked judged on them with it added
+    private fun Engines.addedUnrelated() = assertTrue(addWord("许静", "xu jing"))
+
+    @Test
+    @Uat("VO-41")
+    fun `with an unrelated word added before, a word typed again is asked about the same`() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            e.addedUnrelated()
+            e.context(PINYIN, "", said = true)
+            val ask = e.retyped()
+            assertRows(
+                "asked, read as typed" to {
+                    assertEquals("徐婧", ask?.word)
+                    assertEquals("xu jing", ask?.pinyin)
+                },
+                "记住: added after it" to {
+                    assertTrue(e.voiceRemember(ask!!))
+                    assertEquals(listOf("许静", "徐婧"), added(e))
+                },
+            )
+        }
+    }
+
+    @Test
+    @Uat("VO-44")
+    fun `with an unrelated word added before, asked again at the place, the first word added gives way`() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            e.addedUnrelated()
+            e.context(PINYIN, "", said = true)
+            assertTrue(e.voiceRemember(e.retyped()!!))
+            repeat(2) { e.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
+            val second = e.typedAgain("我找", "xujing", "徐靖")
+            assertRows(
+                "asked as replacing the first" to {
+                    assertEquals("徐靖", second?.word)
+                    assertEquals("徐婧", second?.replaces)
+                },
+                "记住: the second in the first's stead, the unrelated one kept" to {
+                    assertTrue(e.voiceRemember(second!!))
+                    assertEquals(listOf("许静", "徐靖"), added(e))
+                },
+            )
+        }
+    }
+
+    @Test
+    @Uat("VO-44")
+    fun `a word that does not add leaves the first be (review S8)`() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            e.context(PINYIN, "", said = true)
+            assertTrue(e.voiceRemember(e.retyped()!!))
+            // read as nothing spells: not added
+            val bad = VoiceEdits.Ask("徐靖", "xu", "徐静", replaces = "徐婧", hint = false, cells = emptySet())
+            assertRows(
+                "not added" to { assertFalse(e.voiceRemember(bad)) },
+                "the first still added" to { assertEquals(listOf("徐婧"), added(e)) },
+            )
+        }
+    }
+
+    @Test
+    @Uat("VO-45")
+    fun `a word written again on the pad is asked about, read as the characters are`() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            e.context(HANDWRITING, "", said = true)
+            e.voiceSaid("我找徐静", "我找徐静", hinted = false)
+            repeat(2) { assertFalse("the app's to delete", e.onEvent(HANDWRITING, EngineEvent.BACKSPACE, 0).handled) }
+            e.write(0, "徐")
+            e.write(1, "婧")
+            val commit = e.onEvent(HANDWRITING, EngineEvent.CHAR, ' '.code).commit
+            val ask = e.voicePutIn(commit).ask?.let { e.voiceConfirm("我找$commit", "") }
+            assertRows(
+                "written as 徐婧" to { assertEquals("徐婧", commit) },
+                "asked, read by the characters' readings as voice's (no syllables typed)" to {
+                    assertEquals("徐婧", ask?.word)
+                    assertEquals("xu jing", ask?.pinyin)
+                },
+            )
+        }
+    }
+
+    @Test
+    @Uat("VO-51")
+    fun `the once-only hint is not looked for once said`() = assertRows(
+        "one character typed again where a word would be asked: the hint" to {
+            Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+                e.context(PINYIN, "", said = true)
+                assertEquals(true, e.retyped(n = 1, keys = "jing", word = "婧")?.hint)
+            }
+        },
+        "the app saying it was shown: nothing" to {
+            Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+                e.context(PINYIN, "", said = true)
+                assertNull(e.retyped(n = 1, keys = "jing", word = "婧", hinted = true))
+            }
+        },
+    )
+
+    @Test
+    @Uat("VO-52")
+    fun `undone, what typing the word learned stays (review S3)`() {
+        // the word retyped, then typed [more] times: what the user's words learned say of it
+        fun learned(undone: Boolean, more: Int) = Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            e.context(PINYIN, "", said = true)
+            val ask = e.retyped()!!
+            if (undone) {
+                assertTrue(e.voiceRemember(ask))
+                e.voiceForget(ask.word)
+            }
+            repeat(more) {
+                e.onEvent(PINYIN, EngineEvent.RESET, 0)
+                e.type(PINYIN, "xujing")
+                assertEquals("徐婧", e.onEvent(PINYIN, EngineEvent.PICK, 0).commit)
+            }
+            e.userWords(UserWord.Kind.LEARNED).map { "${it.text}:${it.count}" }
+        }
+        assertRows(*(0..3).map { n -> "typed $n more: learned as never 记住'd" to { assertEquals(learned(false, n), learned(true, n)) } }.toTypedArray())
+    }
+
+    @Test
+    @Uat("VO-46", "VO-43")
+    fun `nothing is followed where nothing would be learned`() = assertRows(
+        "the habits not used (U-93)" to {
+            Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+                e.useHabits = false
+                assertNull(e.retyped())
+            }
+        },
+        "the habits turned off while followed (review S4)" to {
+            Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+                e.voiceSaid("我找徐静", "我找徐静", hinted = false)
+                repeat(2) { e.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
+                e.useHabits = false
+                assertNull(e.typedAgain("我找", "xujing", "徐婧"))
+            }
+        },
+        "a commit not learned from" to {
+            Engines(::load, MemoryFiles(), warmUps = inPlace).use { e -> assertNull(e.retyped(learning = false)) }
+        },
+        "a context of a field cleared" to {
+            Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+                e.voiceSaid("我找徐静", "我找徐静", hinted = false)
+                e.context(PINYIN, "我找徐静", cleared = true)
+                assertFalse(e.voicePutIn("徐婧").open)
+            }
+        },
+        "input finished" to {
+            Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+                e.voiceSaid("我找徐静", "我找徐静", hinted = false)
+                e.voiceEditsEnd()
+                assertFalse(e.voicePutIn("徐婧").open)
+            }
+        },
+        "a tone not the same, by the data's readings (Q2)" to {
+            Engines(::load, MemoryFiles(), warmUps = inPlace).use { e -> assertNull(e.retyped("我找许静")) }
+        },
+    )
+}

@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -116,6 +117,33 @@ class FakeHostApi : HostApi {
         calls += "addUserWord($text, $pinyin)"
         userWords += UserWord(text, pinyin, UserWord.Kind.ADDED)
         return true
+    }
+
+    // voice's text not followed: no engine to follow it (EngineBackedHostApi has); the calls recorded
+    override suspend fun voiceSaid(text: String, before: String?, hinted: Boolean) {
+        calls += "voiceSaid($text, $before, $hinted)"
+    }
+
+    /** What the next report of a put-in asks ([voicePutIn]), confirmed as it is ([voiceConfirm]): none unless set here. */
+    var voiceAsk: VoiceEdits.Ask? = null
+
+    override suspend fun voicePutIn(text: String): VoiceEdits.Reply {
+        calls += "voicePutIn($text)"
+        return VoiceEdits.Reply(true, voiceAsk)
+    }
+
+    override suspend fun voiceConfirm(before: String?, after: String?): VoiceEdits.Ask? {
+        calls += "voiceConfirm($before, $after)"
+        return voiceAsk.also { voiceAsk = null }
+    }
+    override suspend fun voiceEditsEnd() {
+        calls += "voiceEditsEnd()"
+    }
+
+    override suspend fun voiceRemember(ask: VoiceEdits.Ask) = addUserWord(ask.word, ask.pinyin)
+    override suspend fun voiceForget(word: String) {
+        calls += "voiceForget($word)"
+        userWords.removeAll { it.text == word && it.kind == UserWord.Kind.ADDED }
     }
 
     override suspend fun blockUserWord(text: String, pinyin: String): Boolean {

@@ -268,3 +268,76 @@
 - **操作**：点「普通文本」框，按住空格，还没出现「正在听…」（模型还在载入）就上滑松开取消；看状态栏右上角的麦克风指示。再杀一次进程，按住空格，还没出现「正在听…」就用另一只手指点系统的主屏幕键（或从底边上滑回桌面）；再看指示。
 - **预期**：两次都在几秒内麦克风指示消失（下拉通知栏也不再说本应用在用麦克风），不一直亮着；回到测试页再按住空格照常能说。
 - **JVM**：`VoiceListenerMicrophoneTest.closedWhileTheModelsLoadTheMicrophoneIsStopped`（真的 VoiceListener，读麦克风卡住不返回时关掉它，`AudioRecord` 在 `close()` 里就停下，不等读返回；`:app:testDebugUnitTest`）；系统的麦克风指示在设备上手工看（`needs="manual:…"`，发版时排进手工那一批）。
+
+### VO-41 [P1] 改对语音的词后问要不要记住，点「记住」才加
+<!-- learning: 061-voice-learn-from-edits.md 第 3 版；用户 2026-11-14 答 Q1–Q6（DECISIONS.md） -->
+- **前提**：B0-语音；用户词库里没有「徐婧」。
+- **操作**：在「普通文本」框按住空格说"麻烦你去找一下徐婧"，松开（框里是「…徐静」，见 VO-38）。按 ⌫ 删掉句末标点和「徐静」，用拼音打 x u j i n g，选「徐婧」（一个字一个字选也行）。看键盘上方；点 **记住**；再点 **撤销**。再点一次 **记住** 后打开 **用户词库 → 手动添加的词**。
+- **预期**：重打以后键盘上方问「让语音记住『徐婧』？」，带 **记住** 按钮；点了提示变成「语音记住了『徐婧』」带 **撤销**，候选栏清空（不留重打前的联想），手动添加的词里有「徐婧」（拼音 xu jing）；点 **撤销** 又拿掉（学到的不动，不算删过）；再记住后再说"麻烦你去找一下徐婧"直接是「徐婧」。
+- **JVM**：`VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap`（整段说完、全部进框后才把这段字和光标前的字交给引擎；之后上屏的报给引擎，弹提示前读框；提示、**记住**、加词后复位清掉候选栏、撤销、开发者页的两个计数）、ime-core `EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销`（真的 Engines：⌫ 两次、拼音重打，问「徐婧 / xu jing」；记住进手动添加的词；撤销不在学习记录里写「忘掉」）、`VoiceEditsTest.a word deleted and typed again, read the same, is asked about`；模拟器上（导入了语音包）留作冒烟：真的语音片段、真拼音、真提示。
+
+### VO-42 [P1] 不点就什么都不记，下次再这样改还问
+- **前提**：B0-语音。
+- **操作**：照 VO-41 改出「徐婧」，问的时候不点，接着打一个字；再照样改一次，等 6 秒。
+- **预期**：提示随打字消失；6 秒后也自己消失；都没有加词。同一次说的里面只问一次，下次说、再这样改还会问。
+- **JVM**：`VoiceAskUatTest.notTappedNothingIsAdded`（打字收起、6 秒收起、不加词）、ime-core `VoiceEditsTest.asked once in a window, again in the next (Q6)`；设备上不跑。
+
+### VO-43 [P1] 这些改法不问
+- **前提**：B0-语音。
+- **操作**：语音打出「徐静」后分别：重打成「许静」（声调不同）、「徐婧婧」（字数不同）、词库里的常见词（「公式」改「攻势」）；用码表（五笔）、联想、粘贴打进去；打进标点或数字；只删不打。
+- **预期**：都不问。只问点了以后语音真会换的词：读音（连声调）逐字一样、两个字以上、加了以后语音真会把听到的那段换成它（常见词不换，见 VO-38）。打进来的不是汉字（标点、数字）就不再跟着看。
+- **JVM**：ime-core `VoiceEditsTest.what is not asked about`（声调不同、字数不同、听到的就是你的词、只删不打、打的不是汉字……一张表）、`VoiceEditsTest.the word to ask about`（问的词和拼音按每个字共有的带调读音）、`VoiceEditsTest.typed by what is no word typed, the window ends (Q5)`（码表、联想、粘贴打的不算，窗口结束）、`EnginesVoiceEditsTest.nothing is followed where nothing would be learned`（真数据的声调不同不问）；设备上不跑。
+
+### VO-44 [P2] 同一处改两次：点了记住换掉上一次加的
+- **前提**：B0-语音。
+- **操作**：照 VO-41 改成「徐婧」点 **记住**，再把「徐婧」删掉重打成「徐靖」，点 **记住**。
+- **预期**：第二次照样问（判断时不算上一次加的「徐婧」）；手动添加的词里只有「徐靖」，上一次加的「徐婧」拿掉（本来就有的词不动）；第二个词加不上时，第一个留着。
+- **JVM**：ime-core `EnginesVoiceEditsTest.asked again at the place, the first word added gives way (review M4)`（真的 Engines：记住、删掉重打「徐靖」、问且换掉「徐婧」）、`EnginesVoiceEditsTest.a word that does not add leaves the first be (review S8)`、`VoiceEditsTest.asked again at the same place, the word it adds takes the first's place (review M4)`；设备上不跑。
+
+### VO-45 [P1] 切到手写改字也问
+- **前提**：B0-语音。
+- **操作**：照 VO-41 说话，删掉「徐静」，切到手写输入法写「徐」「婧」上屏。
+- **预期**：照样问「让语音记住『徐婧』？」；拼音按两个字和语音听到的共有的读音（xu jing）。
+- **JVM**：ime-core `EnginesVoiceEditsTest.a word written again on the pad is asked about, read as the characters are`（真的 Engines、手写输入法）；设备上不跑。
+
+### VO-46 [P1] 不记录的框里、不用我的输入习惯时不问
+- **前提**：B0-语音。
+- **操作**：在要求不记录的框（`IME_FLAG_NO_PERSONALIZED_LEARNING`，测试 App 里的「不记录」框）照 VO-41 改；再在 **⋯ → 不用我的输入习惯** 时照样改；再在改到一半（删掉了「徐静」）时切到不用我的输入习惯，打「徐婧」。
+- **预期**：都不问；不记录的框里语音打的字也不交给引擎。
+- **JVM**：`VoiceAskUatTest.aFieldThatLearnsNothingIsNotFollowed`（不交给引擎，只告诉它结束）、ime-core `EnginesVoiceEditsTest.nothing is followed where nothing would be learned`（不用输入习惯、改到一半关掉输入习惯、这次不学、框被清空、离开输入框）；设备上不跑。
+
+### VO-47 [P1] 点麦克风说话也问；说话中途改不问；没出字的一段不挡
+- **前提**：B0-语音。
+- **操作**：点麦克风说「我找徐静」，点停；照 VO-41 改。再点麦克风说话，说的时候用拼音打字，再点停。另说一段「我找徐静」，再按住空格什么都不说（或没听清）松开，然后照 VO-41 改。
+- **预期**：说完以后改照样问；说话中途打了字，上一段就不再跟着、也不报给引擎，这一段说完以后才交给引擎；中途没打字，上一段照样跟着。一段没上屏任何字的说话（没听清、没权限、识别出错）不影响上一段：之后改照样问。
+- **JVM**：`VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap`（点麦克风说的）、`VoiceAskUatTest.whatGoesInWhileTalkingIsNotReported`、`VoiceAskUatTest.aTalkThatPutsNothingInLeavesTheLastFollowed`；ime-core `VoiceEditsTest.a gap filled and not reported, voice going on after it, the next change is asked about`。设备上跑「按住空格没说话之后照样问」。
+
+### VO-48 [P1] 屏蔽过的词、已经手动加过的词不问
+- **前提**：B0-语音。
+- **操作**：先手动加「徐婧」，照 VO-41 改；再拿掉它、屏蔽「婧」，照样改。
+- **预期**：都不问。
+- **JVM**：ime-core `VoiceEditsTest.what is not asked about`（「已手动加」「含屏蔽的字」两行）；设备上不跑。
+
+### VO-49 [P2] 别的改法：在中间改、选中改、移开光标、表情、不报告选区的框
+- **前提**：B0-语音。
+- **操作**：语音打出「我找徐静了」后，把光标移到「徐静」后面删掉重打「徐婧」；或选中「徐静」直接打「徐婧」；或在中间打字后把光标移到别处再回来；删一个表情；在不报告选区的框里点到中间改字。
+- **预期**：看得准是删掉「徐静」重打成「徐婧」的（光标在那一段后面删、选中替换）照样问；弄不清删的是哪一段、光标去了别处、框没报告光标在哪，就不再跟着，不问（宁可不问，不问错）。
+- **JVM**：ime-core `VoiceEditsTest.edits made other ways than Backspace at the end`（中间删掉重打照样问）、`VoiceEditsTest.the window ends where what happened is not sure`（框不报告选区：读到的上下文对不上就不问）、`VoiceEditsTest.the anchor not read as voice's text waits for a context (review R6)`、`VoiceEditsTest.an emoji's Backspace is not counted`、`VoiceEditsTest.only the last characters are kept`、`VoiceEditsTest.what the host read is cut at its length`；设备上不跑。
+
+### VO-50 [P0] 别的应用里也问：Chrome（模拟器）；微信、备忘录（真机）
+- **前提**：B0-语音；模拟器装了 Chrome（没有就用系统的 WebView Browser Tester）。
+- **操作**：在网页输入框里照 VO-41 说话、删掉「徐静」、重打「徐婧」。
+- **预期**：问「让语音记住『徐婧』？」（读光标前的字的时机对不对只有在别的应用里看得出）。微信、备忘录要在 6T 上各跑一遍，三处都出提示才发版。
+- **设备**：`uat/scripts/12-voice.py` 的 `vo50`（模拟器上的浏览器）；6T 上的微信、备忘录待做。
+
+### VO-51 [P1] 只改一个字不问，第一次说一句怎么让语音记住
+- **前提**：B0-语音；这台手机上还没出过这句提示。
+- **操作**：语音打出「徐静」后只删「静」、打「婧」。以后再这样只改一个字。把「她」改成「他」。
+- **预期**：第一次键盘上方说「把整个词删掉重打，语音才能记住」（没有按钮，不算问过）；以后不再说，引擎也不再找；「她」改「他」不说。
+- **JVM**：`VoiceAskUatTest.howToHaveAWordRememberedIsSaidOnce`、ime-core `VoiceEditsTest.one character typed again is told once how to have it remembered (Q3)`、`EnginesVoiceEditsTest.the once-only hint is not looked for once said`；设备上不跑。
+
+### VO-52 [P1] 没点的下次还问；记住再撤销，打字学到的还在
+- **前提**：B0-语音。
+- **操作**：照 VO-41 改出「徐婧」不点；再说一次照样改；点 **记住** 再点 **撤销**；之后用拼音再打几次「徐婧」。
+- **预期**：第二次照样问；撤销以后，打「徐婧」学到的和从没点过记住时一样（学到的词、次数都一样）。
+- **JVM**：ime-core `VoiceEditsTest.asked once in a window, again in the next (Q6)`、`EnginesVoiceEditsTest.undone, what typing the word learned stays (review S3)`；设备上不跑。

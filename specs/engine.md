@@ -61,6 +61,34 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   one with a common word in it or across its edge, nor inside a longer dictionary word. Built with the
   hotwords (`Engines.voiceHomophones`), each candidate checked once a hold
   (`Engines.voiceHomophonesAllowed`); shown as it streams too, same length, so settled text holds.
+- **Asked, then remembered** (0.6.1, dev/design/061-voice-learn-from-edits.md): `VoiceEdits` (ime-core
+  `input/voice/`, pure; `engine/runtime/VoiceEditsGlue` binds it to `Engines`) follows the text of one talk,
+  told whole by `Engines.voiceSaid(text, before, hinted)` once it is in, with the field's text before the
+  cursor then; only where the app asks (its switch on, a field that learns), else it calls `voiceEditsEnd`
+  and the engine never sees voice's text (review S6). A window, one per talk: Backspaces the app takes
+  (`EngineEvent.BACKSPACE` not handled) and commits of pinyin, 双拼, 九键 and handwriting not picked from
+  联想 (r13 U-30; tables, English, 联想, paste, and any commit with a character not Chinese, a mark or a
+  digit, end it, Q5) are followed by cells, a pinyin commit with the syllables typed for it
+  (`CommitRecorder`'s record, `VoiceEditsGlue.readingOf`; review S2); what goes in otherwise is reported by
+  the app (`voicePutIn`), and the context (`Engines.context`) ends it where what happened is not sure (the
+  field cleared, the cursor elsewhere, text before not as expected). A selection of the window is a gap
+  that what is typed next replaces, as Backspaces make one. A stretch of 2+ characters deleted whole and
+  typed again, the same length, each character sharing a toned reading with the one heard
+  (`EngineAssets.voiceReadings`; Q2), is asked about once a window (Q6) only if voice's own homophones, the
+  word added as the settings add it (one this window added at the place left out, review M4), would put
+  it in (`Words.takes`; so a common word, a word already added or blocked is not); a sentence's mark
+  deleted with it, the stretch is judged once its Chinese is typed again (review S5). A word asked about
+  is not asked again that window: one typed at the place after it is, but the first typed back again is
+  not (Q6). A syllable typed that none of the character's readings in the tables has asks nothing (voice
+  could not hear what would be added as typed). One character typed
+  again is asked about where a learned word of the user's covers it (§3 (a)); else it says once how to
+  have it remembered (`Ask.hint`, Q3; `hinted`, the app's word that it was said, stops the looking, S7).
+  The user's words are read and voice's table built once an edit (S7). `voiceConfirm(before, after)` reads
+  the field again before the notice. `voiceRemember` adds it by hand (`LexiconFacade.addWord`), then takes
+  off one this window added at the place (review M4/S8, `UserLexicon.unAdd`); `voiceForget` (its 撤销) takes
+  it off the added words only, nothing forgotten in the learning record (review R1), typed again learned as
+  if never added (S3). Nothing is followed while U-93 is off (turning it off ends the window, S4), a commit
+  is not learned from, or input finished (`voiceEditsEnd`). Memory only, the last 256 characters.
 
 ## Pinyin, from keys to candidates
 

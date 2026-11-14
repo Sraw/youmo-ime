@@ -32,6 +32,8 @@ class VoiceHomophones internal constructor(
     private val own: Set<String>,
     // a character's readings ([reading]), all of them, null for none; looked up as heard, not kept
     private val chars: (Char) -> IntArray?,
+    // how many of [words] are added by hand: first
+    private val added: Int = 0,
 ) {
     /** A user's word, the readings each of its characters may have ([reading]). */
     class Word(val text: String, val readings: List<IntArray>)
@@ -127,6 +129,17 @@ class VoiceHomophones internal constructor(
             }
         }
         return false
+    }
+
+    /**
+     * These with [text] read [readings] (as [of]'s are) added by hand after the others added: as [of] the
+     * user's words and it would be, the rest not read again (VoiceEdits asks it once a word asked about).
+     */
+    internal fun withAdded(text: String, readings: List<IntArray>): VoiceHomophones {
+        // added already: as it is; learned: added now, its place among them
+        if (words.indexOfFirst { it.text == text } in 0 until added) return this
+        val all = words.filterTo(ArrayList()) { it.text != text }.apply { add(added, Word(text, readings)) }
+        return VoiceHomophones(all, own + text, chars, added + 1)
     }
 
     /** One hold's replacing ([hold]): made for each listener, on its decoder's thread alone. */
@@ -227,7 +240,7 @@ class VoiceHomophones internal constructor(
 
     companion object {
         /** none of the user's words: nothing replaced */
-        val NONE = VoiceHomophones(emptyList(), emptySet()) { null }
+        val NONE = VoiceHomophones(emptyList(), emptySet(), { null })
 
         /** a learned word takes part once typed more than this many times (the owner's 2026-11-10) */
         const val LEARNED_MIN = 3f
@@ -259,7 +272,8 @@ class VoiceHomophones internal constructor(
                 .mapNotNull { w -> readingsOf(w)?.takeIf { r -> r.size == w.text.length && r.all { it.isNotEmpty() } }?.let { Word(w.text, it) } }
                 .toList()
             if (taking.isEmpty()) return NONE
-            return VoiceHomophones(taking, mine.mapTo(HashSet()) { it.text }, charReadings)
+            val added = mine.filter { it.kind == UserWord.Kind.ADDED }.mapTo(HashSet()) { it.text }
+            return VoiceHomophones(taking, mine.mapTo(HashSet()) { it.text }, charReadings, taking.count { it.text in added })
         }
 
         /**

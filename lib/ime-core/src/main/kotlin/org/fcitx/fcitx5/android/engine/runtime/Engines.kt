@@ -47,6 +47,7 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.WordLists
+import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import java.io.Closeable
 import java.io.IOException
@@ -222,6 +223,11 @@ class Engines(
 
     private val words: LexiconFacade = LexiconFacade(lexicon, english, assets, tables, learner) { settings }
 
+    // 语音先问再记: what voice put in the field, followed as the user changes it; on Engines, not a
+    // session, as a word added drops the sessions (061-voice-learn-from-edits.md, review R8)
+    private val simplified by lazy(LazyThreadSafetyMode.NONE) { simplifier() }
+    private val voiceEdits = VoiceEditsGlue(words, lexicon, assets) { simplified.simplify(it) }
+
     /**
      * Does [op] (PLAN §2.8) in [im], the input method in use; [act] has the host send a long
      * press's event for the candidate at an index, as it always did, so it shows the list left
@@ -248,6 +254,8 @@ class Engines(
         set(value) {
             hostThread.check()
             learner.useHabits = value
+            // voice's text not followed while off, nor what was before (review S4)
+            if (!value) voiceEdits.edits.clear()
         }
 
     /** [LexiconFacade.userWords]. */
@@ -456,10 +464,49 @@ class Engines(
             val shown = pairs[im]?.showing ?: keyboard(im).showing
             return annotated(im, shown.copy(commit = "", deleteBefore = 0, handled = true, refines = false, picked = false))
         }
+        // 联想 on show: a pick of it is no word typed (VoiceEdits); the session's record of its last
+        // commit, a new one of which says how what this commits was typed
+        val predicting = (pairs[im]?.showing ?: keyboards[im]?.showing)?.predicting == true
+        // looked for only while voice's text is followed: nothing else reads it
+        val following = voiceEdits.edits.open
+        val shownBefore = if (following) pairs.shownSession(im) else null
+        val recordBefore = shownBefore?.let { sessions[it]?.lastCommit }
         val s = pairs[im]?.onEvent(event, arg, learning, payload)
             ?: keyboard(im).onEvent(if (event == EngineEvent.HARD_CHAR) EngineEvent.CHAR else event, arg, learning, payload)
+        // the session that typed it, shown before the event or after it: a new record of its last commit says
+        // how. One shown only after has no record before to compare, so one left from an earlier commit of it
+        // may be read; readingOf takes that only where it spells what went in (the same word, typed so then)
+        val reading = if (s.commit.isEmpty() || !following) null else
+            VoiceEditsGlue.readingOf(s.commit, listOf(shownBefore, pairs.shownSession(im)).firstNotNullOfOrNull { id -> sessions[id]?.lastCommit?.takeIf { it !== recordBefore } })
+        voiceEdits.answered(im, event, s, predicting, learning, reading)
         return annotated(im, s)
     }
+
+    /**
+     * Voice's [text], one talk's, in the field, [before] the cursor read once it was in (null: not
+     * read): followed as the user changes it ([VoiceEdits.said]) where the user's habits are used; else
+     * nothing is followed. Told only where the app asks (its switch on, a field that learns: review S6;
+     * else [voiceEditsEnd]); [hinted]: the once-only hint said already, not looked for (review S7).
+     */
+    fun voiceSaid(text: String, before: String?, hinted: Boolean) = checked {
+        voiceEdits.edits.hinted = hinted
+        if (learner.useHabits) voiceEdits.edits.said(text, before) else voiceEdits.edits.clear()
+    }
+
+    /** The app put [text] in the field: [VoiceEdits.putIn]. */
+    fun voicePutIn(text: String): VoiceEdits.Reply = checked { voiceEdits.edits.putIn(text) }
+
+    /** The field read as the prompt is to show: [VoiceEdits.confirm]. */
+    fun voiceConfirm(before: String?, after: String?): VoiceEdits.Ask? = checked { voiceEdits.edits.confirm(before, after) }
+
+    /** Nothing of voice's text followed any more: another field, input finished. */
+    fun voiceEditsEnd() = checked { voiceEdits.edits.clear() }
+
+    /** 「记住」 tapped: [ask]'s word added by hand; false if it does not read so (nothing added). */
+    fun voiceRemember(ask: VoiceEdits.Ask): Boolean = checked { voiceEdits.remember(ask) }
+
+    /** Its 撤销: [word] taken off the added words, nothing forgotten (UserLexicon.unAdd). */
+    fun voiceForget(word: String) = checked { voiceEdits.forget(word) }
 
     // 候选词注音 of the reading for each candidate shown: the factory's, whose pinyin blocks a polyphone by its parts in the one shown
     private val candidateReadings get() = factory.candidateReadings
@@ -558,6 +605,7 @@ class Engines(
         said: Boolean = false,
     ): Boolean {
         hostThread.check()
+        voiceEdits.context(before, learning, cleared, after, selected, said)
         return field.context(im, before, learning, cleared, learnFlags, started, after, selected, said)
     }
 

@@ -255,23 +255,29 @@ internal class EngineAssets(
         val data = pinyinData
         return VoiceHomophones.of(
             words,
-            readingsOf = { w ->
-                val syllables = w.pinyin.split(' ', '\'').filter { it.isNotEmpty() }.map(Syllables::id).toIntArray()
-                if (syllables.size != w.text.length || syllables.any { it < 0 }) null else {
-                    val tones = data.tones.tones(w.text, syllables, textWords.id(w.text).takeIf { it != NgramModel.NO_WORD } ?: -1)
-                    syllables.indices.map { k ->
-                        val tone = tones?.get(k)?.toInt() ?: ToneMark.NONE
-                        if (tone != ToneMark.NONE) intArrayOf(VoiceHomophones.reading(syllables[k], tone))
-                        else data.charReadings.of(w.text[k].code).filter { it.syllable == syllables[k] }.map { VoiceHomophones.reading(it.syllable, it.tone) }.toIntArray()
-                    }
-                }
-            },
+            readingsOf = ::voiceWordReadings,
             // looked up in the mapped table as heard (its reads stateless, any thread's), not copied to the heap
-            charReadings = { c ->
-                val of = data.charReadings.of(c.code)
-                if (of.isEmpty()) null else IntArray(of.size) { VoiceHomophones.reading(of[it].syllable, of[it].tone) }
-            },
+            charReadings = ::voiceReadings,
         )
+    }
+
+    /** [w]'s readings, a character's each ([VoiceHomophones.reading], its tone where known), as voice reads the user's words; null if its pinyin does not spell it. */
+    fun voiceWordReadings(w: UserWord): List<IntArray>? {
+        val data = pinyinData
+        val syllables = w.pinyin.split(' ', '\'').filter { it.isNotEmpty() }.map(Syllables::id).toIntArray()
+        if (syllables.size != w.text.length || syllables.any { it < 0 }) return null
+        val tones = data.tones.tones(w.text, syllables, textWords.id(w.text).takeIf { it != NgramModel.NO_WORD } ?: -1)
+        return syllables.indices.map { k ->
+            val tone = tones?.get(k)?.toInt() ?: ToneMark.NONE
+            if (tone != ToneMark.NONE) intArrayOf(VoiceHomophones.reading(syllables[k], tone))
+            else data.charReadings.of(w.text[k].code).filter { it.syllable == syllables[k] }.map { VoiceHomophones.reading(it.syllable, it.tone) }.toIntArray()
+        }
+    }
+
+    /** [c]'s readings, all of them, as [VoiceHomophones.reading] packs them; null for none. */
+    fun voiceReadings(c: Char): IntArray? {
+        val of = pinyinData.charReadings.of(c.code)
+        return if (of.isEmpty()) null else IntArray(of.size) { VoiceHomophones.reading(of[it].syllable, of[it].tone) }
     }
 
     /** [VoiceHomophones.allowed] of each of [spans], by the dictionary's words and the model's counts. */

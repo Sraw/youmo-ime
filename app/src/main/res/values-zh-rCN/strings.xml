@@ -523,6 +523,14 @@
     <string name="learning_backups_summary">从备份恢复，或另存一份</string>
     <string name="learning_auto_backup">自动备份</string>
     <string name="learning_auto_backup_summary">每 7 个打字日存一份，只留最近 2 份；存在输入法自己的目录，别的 App 拿不到，卸载输入法就没了</string>
+    <string name="learning_voice_ask">改语音的字后问是否记住</string>
+    <string name="learning_voice_ask_summary">语音打错的词整个删掉、用拼音或手写重打成读音（连声调）一样的字后，问一次要不要让语音记住；点「记住」才加进用户词库</string>
+    <string name="voice_ask_remember">让语音记住『%1$s』？</string>
+    <string name="voice_ask_remember_action">记住</string>
+    <string name="voice_ask_remembered">语音记住了『%1$s』</string>
+    <string name="voice_ask_failed">没能加入用户词库</string>
+    <string name="voice_ask_hint">把整个词删掉重打，语音才能记住</string>
+    <string name="voice_ask_counts">语音改字：问过 %1$d 次，记住 %2$d 次</string>
     <string name="learning_restore">从备份恢复</string>
     <string name="learning_restore_summary">本输入法的备份或导出的词表，和手机上现有的合并</string>
     <string name="learning_restore_confirm">把 %1$s 的备份（%2$s）和手机上学到的合并？次数取两边较大的；固定、屏蔽、首选冲突时以手机上的为准。恢复前会先另存一份现在的，后悔了可以退回。</string>

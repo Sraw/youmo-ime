@@ -134,6 +134,7 @@ class VoiceSession(
     /** The microphone opens now, the models load meanwhile. */
     fun begin() {
         service.watchVoice(::taken)
+        service.voiceTalkBegan()
         listener = (listening?.invoke(events) ?: VoiceListener(
             events,
             hotwords = { VoiceEngine.userHotwords(fcitx, habits = AppPrefs.getInstance().internal.useHabits.getValue()) },
@@ -270,6 +271,8 @@ class VoiceSession(
         over = true
         main.removeCallbacksAndMessages(null)
         service.watchVoice(null)
+        // its text, all in (or once it is), followed for 语音先问再记
+        service.voiceTalkEnded()
         // dropped, nothing heard, given up: what composed goes, in the field it composed in only
         if (composing && sameField) service.composeVoice("")
         composing = false
