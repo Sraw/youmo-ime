@@ -316,6 +316,10 @@ class ToolbarUatTest {
         h.clipboard("散步")
         assertEquals(s(R.string.delete_all_except_pinned), deleteAll())
         h.waitFor("the notice") { h.notice() != null }
+        // the list drops 散步 after the notice says so (the database's change, then the page Paging loads anew): else 散步,
+        // still listed, passes "back" below at once, before the undo is in, and the next 全部删除 is asked of a
+        // database still without 散步 (only 公园 left to delete, then 散步 coming back: SDK 29, full runs)
+        h.waitFor("散步 gone") { h.entry("散步") == null }
         assertTrue(h.noticeTexts().toString(), h.service.resources.getString(R.string.num_items_deleted, 1) in h.noticeTexts())
         val undo = KeyboardHarness.all(h.notice()!!.contentView).filterIsInstance<TextView>().last { it.text.toString() == s(R.string.undo) }
         assertTrue(undo.performClick())

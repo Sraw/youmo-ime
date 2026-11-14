@@ -147,8 +147,10 @@ class MotionNoticeUatTest {
         h.copied("公园")
         h.clipboard("公园")
         deleteByMenu("公园")
-        // marked on Room's thread, then said
+        // marked on Room's thread, then said; the list drops it after (Paging's load anew): else "back" below passes on
+        // the list as it was, the undo not yet in, and the close's clearing may run before it and leave 公园 to the next
         h.waitFor("the notice") { h.notice() != null }
+        h.waitFor("公园 gone") { h.entry("公园") == null }
         val said = h.noticeTexts()
         assertTrue(said.toString(), s(R.string.undo) in said && h.service.resources.getString(R.string.num_items_deleted, 1) in said)
         // over the keys, where every notice is, not a bar at the bottom
@@ -191,6 +193,7 @@ class MotionNoticeUatTest {
         deleteByMenu("公园")
         h.waitFor("2 deleted") { h.service.resources.getString(R.string.num_items_deleted, 2) in h.noticeTexts() }
         assertTrue(h.noticeTexts().toString(), h.service.resources.getString(R.string.num_items_deleted, 2) in h.noticeTexts())
+        h.waitFor("both gone") { h.entry("公园") == null && h.entry("散步") == null }
         undo()
         h.waitFor("both back") { h.entry("公园") != null && h.entry("散步") != null }
     }

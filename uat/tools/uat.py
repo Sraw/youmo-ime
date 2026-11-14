@@ -1964,9 +1964,9 @@ def choose(d, title, option):
         pool = [n for n in box.walk()] if box and box.rid == "select_dialog_listview" else s.app()
         return next((n for n in pool if n.text == option), None) or \
             next((n for n in pool if n.text.startswith(option) and n.text != title and n.rid != "summary"), None)
-    try:   # the dialog up, then the option in it
-        d.wait(dialog, 3, step=0.15)
-        n = d.wait(opt, 2, step=0.15)
+    try:   # the dialog up, then the option in it (bounds only: ended as soon as it shows; a loaded machine took over 3 s)
+        d.wait(dialog, 10, step=0.15)
+        n = d.wait(opt, 5, step=0.15)
     except Blocked:
         raise Blocked(f"「{title}」里没有「{option}」：{d.screen().texts()[:12]}")
     d.tap(n.c, 0.3 if not SLOW else 1.0)

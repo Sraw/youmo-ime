@@ -7,16 +7,23 @@ package org.fcitx.fcitx5.android.uat
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.ui.main.AppLanguage
+import org.fcitx.fcitx5.android.until
+import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowToast
 
 /**
  * 界面语言 (uat/14 ST-25), the keyboard's half: on a Chinese phone, English picked for the app, the
@@ -46,6 +53,23 @@ class AppLanguageUatTest {
         KeyboardHarness().use { h ->
             h.start()
             assertTrue(h.texts().toString(), h.described("Emoji") != null)
+        }
+    }
+
+    // 界面语言 changed while the keyboard's host stayed starting (uat/18 LC-20): said it may not have restarted
+    @Test
+    @Uat("LC-20")
+    fun aLanguageChangedWhileTheHostStaysStartingSaysItMayNotHaveRestarted() {
+        HostDaemon.testRestarted = false
+        try {
+            SettingsHarness().use { st ->
+                st.activity
+                AppLanguage.set("en")
+                until("said", { ShadowToast.getTextOfLatestToast() }) { st.idle(); ShadowToast.getTextOfLatestToast() != null }
+                assertEquals(appContext.getString(R.string.restart_fcitx_still_starting), ShadowToast.getTextOfLatestToast())
+            }
+        } finally {
+            HostDaemon.testRestarted = true
         }
     }
 }

@@ -236,7 +236,7 @@ case("LC-18", needs="jvm:StuckBarUatTest.floatingAndDockedMidPinyinKeepIt")(lamb
 case("LC-19", needs="jvm:StuckBarUatTest.aThemeChangedMidHandwritingCommitsIt")(lambda d: None)
 
 
-case("LC-20", needs="manual:键盘实例一直停在启动中设备上难造出；开发者页重启实例、换界面语言时的提示在设备上手工看")(lambda d: None)
+case("LC-20", needs="jvm:DeveloperUatTest.aRestartGivenUpOnAHostStillStartingSaysItMayNotHaveRestarted,DeveloperUatTest.restartedTheInstanceSaysDone,AppLanguageUatTest.aLanguageChangedWhileTheHostStaysStartingSaysItMayNotHaveRestarted")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 编码行在输入框里（B-IF）
@@ -364,15 +364,21 @@ def lc24(d):
     d.type("nihao")
     d.cands()
     d.rotate(1)
-    if not keyboard_up(d):
+    # the keyboard laid out anew after the turn: looked for a few seconds, not once (gone for a moment, the field
+    # tapped would be under it, not in the dump: 页面上没有第 1 个框)
+    try:
+        d.wait(lambda s: s.find(rid="keyboard_view", where="ime"), 4, step=0.3, what="the keyboard back")
+    except Blocked:
         tap_field(d)
     d.type("hao")
     d.cands()
     d.space()
-    # read as LC-01 reads after a rotation (the focused field, else the page's first), polled: the
-    # rebuilt page's field is not always the focused one by the time the space is in
+    # read back in portrait: in landscape the keyboard leaves the page a strip about 40 px tall, the field under the
+    # keyboard unless the page happened to scroll it into that strip, and a field not shown is not in the dump
+    # (None, half the runs). The focused field, else the page's first, polled: a rebuilt page's field may not be focused
+    d.rotate(0)
     want = ("好", "ni hao好")
-    end = time.time() + 3
+    end = time.time() + 5
     while True:
         s = d.screen()
         f = fields(d, s)
@@ -381,7 +387,6 @@ def lc24(d):
         if t in want or time.time() > end:
             break
         time.sleep(0.3)
-    d.rotate(0)
     check(t in want, f"最后框里「{t}」，页上第一个框「{f0}」")
     return f"最后「{t}」"
 

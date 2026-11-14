@@ -110,8 +110,7 @@ class PunctuationMapUatTest {
             val half = if (on) "," else "，"
             // the A typed back to the field before the host told the keys what the comma now types: that told first
             synced()
-            // the host tells the map after the A's selection reached it, maybe only as the next press runs the
-            // looper (CI 43202860764, SDK 29: face ，, bubble ,): its face drawn anew first, then both checked
+            // the host tells the map after the A's selection reached it: its face drawn anew first, then both checked
             until("the comma's face told") { comma().label == half }
             assertEquals(what, twice(half), shown())
             until("the mark typed") { h.field.text.toString() == "，A$half" }
@@ -252,14 +251,17 @@ class PunctuationMapUatTest {
         press("、")
     }
 
-    // the key's face and the bubble it shows pressed
+    // the key's face and the bubble it shows pressed, both read while it is held, before the release types (a key's
+    // label is looked up in the scene each time; the mark typed on release may already have made the host tell the
+    // next one, after a half-width , the full-width ， again: face ，, bubble , on SDK 29 and 35, CI 43202860764)
     private fun faceAndBubble(key: () -> org.fcitx.fcitx5.android.input.ShownKey): List<String> {
         h.after(BUBBLE_GONE_MS)
         val k = key()
         h.press(k)
+        val face = k.label
         val bubble = h.popupChoices().map { it.text }.single()
         h.release()
-        return listOf(k.label, bubble)
+        return listOf(face, bubble)
     }
 
     private companion object {

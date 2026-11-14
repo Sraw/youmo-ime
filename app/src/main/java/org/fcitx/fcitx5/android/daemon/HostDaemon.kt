@@ -105,6 +105,13 @@ object HostDaemon {
     var testConnection: ((String) -> HostConnection)? = null
 
     /**
+     * Test seam: what [restartFcitx] says under [testConnection] (a fake engine has no start to wait for): false
+     * stands for a host that stayed starting, so the pages' "may not have restarted" is tested (LC-20).
+     */
+    @VisibleForTesting
+    var testRestarted = true
+
+    /**
      * Create a connection
      */
     fun connect(name: String): HostConnection = lock.withLock {
@@ -231,7 +238,7 @@ object HostDaemon {
      * one kept: a language changed not taken). False if it stayed starting. Blocks: not on the main thread.
      */
     fun restartFcitx(): Boolean {
-        if (testConnection != null) return true
+        if (testConnection != null) return testRestarted
         return restartOnceStarted(realFcitx.lifecycle.stateFlow, RESTART_WAIT_MS) {
             lock.withLock {
                 realFcitx.stop()
@@ -275,4 +282,7 @@ object HostDaemon {
      * a settings page), without starting it as [connect] would
      */
     fun getFirstConnectionOrNull() = lock.withLock { clients.firstNotNullOfOrNull { it.value } }
+
+    /** Whether fcitx runs for some client: a test's fake engine stands for one ([testConnection]). */
+    fun hasClient(): Boolean = lock.withLock { testConnection != null || clients.isNotEmpty() }
 }
