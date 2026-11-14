@@ -13,7 +13,9 @@ import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
+import java.lang.management.ManagementFactory
 import kotlin.random.Random
 
 /** The merged dictionaries' file (DictionaryFile) typed through the engines: picked, and the time a key takes. */
@@ -69,45 +71,52 @@ class EnginesMergedTest : EnginesFixture() {
         }
     }
 
-    // review S6: a key's time with a file of 300,000 words over every syllable, against none: the
-    // walkers' merged trie adds arcs, never a pass over the file. Its arcs make a key about 3.5 times
-    // as long here (0.5 against 1.7 ms); a pass over the file would be tens of ms. Generous bounds and
-    // the best of a few batches: a slow CI machine, under the coverage agent, with GC in between
+    // review S6: the walkers' merged trie adds arcs, never a pass over the file: a key takes as long
+    // with a file whose words are a hundred times as many, the added ones under syllables the keys
+    // never reach. Timed as the thread's CPU, the two files' batches taken in turns and their medians
+    // compared: a busy machine (verify beside other builds, load 60) and the JIT's warming moved a
+    // wall-clock bound against no file at all (0.03 ms a key warm, 6 ms with the file under load)
     @Test
-    fun aKeyTakesAboutAsLongWithAFileOfManyWordsAsWithout() {
+    fun aKeyTakesAsLongWithAHundredTimesTheWordsElsewhereInTheFile() {
         val random = Random(7)
-        val syllables = (0 until Syllables.count).map(Syllables::spelling).filter { it.isNotEmpty() }
-        val lines = List(WORDS) {
+        fun lines(count: Int, syllables: List<String>) = List(count) {
             val n = 1 + random.nextInt(4)
             val text = String(CharArray(n) { (0x4E00 + random.nextInt(20_000)).toChar() })
             "$text ${List(n) { syllables[random.nextInt(syllables.size)] }.joinToString("'")} ${random.nextInt(1, 1000)}"
         }
-        val big = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { lines.asSequence() })
-        fun perKey(additions: Engines.Additions?): Double {
-            Engines(::load, MemoryFiles(), { throw it }, additions = { additions }).use { engines ->
-                // warmed: the first key opens everything
-                engines.type(InputMethodCatalog.PINYIN, "ni")
-                engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
-                val keys = "nihaoshijiezhongguoren"
-                return (1..BATCHES).minOf {
-                    val start = System.nanoTime()
-                    repeat(ROUNDS) {
-                        engines.type(InputMethodCatalog.PINYIN, keys)
-                        engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
-                    }
-                    (System.nanoTime() - start) / 1e6 / (ROUNDS * keys.length)
-                }
+        val all = (0 until Syllables.count).map(Syllables::spelling).filter { it.isNotEmpty() }
+        val near = lines(NEAR, all)
+        // initials none of KEYS' letters starts, nor a key next to one reads (fuzzy, slips): checked below, the candidates the same
+        val elsewhere = lines(ELSEWHERE, all.filter { it[0] in "bpfdtkqxcw" })
+        fun additions(lines: List<String>) = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { lines.asSequence() })
+        val small = Engines(::load, MemoryFiles(), { throw it }, additions = { additions(near) }, warmUps = { it.run() })
+        val big = Engines(::load, MemoryFiles(), { throw it }, additions = { additions(near + elsewhere) }, warmUps = { it.run() })
+        val cpu = ManagementFactory.getThreadMXBean()
+        assumeTrue("the thread's CPU time", cpu.isCurrentThreadCpuTimeSupported)
+        fun Engines.typed(): List<List<String>> = KEYS.map { onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, it.code).candidates }
+            .also { onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0) }
+        fun Engines.perKey(): Double {
+            val start = cpu.currentThreadCpuTime
+            repeat(ROUNDS) { typed() }
+            return (cpu.currentThreadCpuTime - start) / 1e6 / (ROUNDS * KEYS.length)
+        }
+        small.use {
+            big.use {
+                assertEquals(small.typed(), big.typed())
+                val times = List(BATCHES) { b -> if (b % 2 == 0) small.perKey() to big.perKey() else big.perKey().let { small.perKey() to it } }
+                val without = times.map { it.first }.sorted()[BATCHES / 2]
+                val with = times.map { it.second }.sorted()[BATCHES / 2]
+                println("per key: %.3f ms with %d words, %.3f ms with %d more elsewhere".format(without, NEAR, with, ELSEWHERE))
+                assertTrue("$with ms a key against $without", with < without * 3)
             }
         }
-        val without = perKey(null)
-        val with = perKey(big)
-        println("per key: ${"%.3f".format(without)} ms without, ${"%.3f".format(with)} ms with $WORDS merged words")
-        assertTrue("$with ms a key against $without", with < without * 6 + 5)
     }
 
     private companion object {
-        const val WORDS = 300_000
+        const val KEYS = "nihaoshijiezhongguoren"
+        const val NEAR = 3_000
+        const val ELSEWHERE = 297_000
         const val ROUNDS = 5
-        const val BATCHES = 3
+        const val BATCHES = 9
     }
 }

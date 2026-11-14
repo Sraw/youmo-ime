@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_DATABASE
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
 import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
+import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -251,6 +252,25 @@ object UserDataManager {
         ThemePackFiles.dropStamps(themes)
     }
 
+    // [from], the backup's directory of [name] (one of [Dirs.moved]), laid over the phone's [dir]
+    private fun layOver(name: String, from: File, dir: File) {
+        dir.mkdirs()
+        if (name == ConfigHome.THEME.old) dropRestoredPacks(from, dir)
+        // the data's pinyin dictionaries written under the sources lock, as by every other writer of
+        // them: a conversion on the compile thread commits after the copy, and finds a text it read
+        // half copied changed. Without it, one listed as the copy made it, not yet written to, was
+        // committed empty and deleted under the copy's write, its words gone. Nothing waits on the
+        // compile thread in here (ImportedDictionaries' rule)
+        if (name == ConfigHome.DATA.old) synchronized(ImportedDictionaries) { copyMoved(from, dir) } else copyMoved(from, dir)
+    }
+
+    /**
+     * How the backup's config, data and themes are laid over the phone's: [copyDir]. A test's stand-in
+     * stops in the middle of a file, as a copy stopped by the system would, for what runs meanwhile.
+     */
+    @VisibleForTesting
+    internal var copyMoved: (source: File, target: File) -> Unit = { source, target -> copyDir(source, target) }
+
     private fun copyDir(source: File, target: File) {
         val exists = source.exists()
         val isDir = source.isDirectory
@@ -428,11 +448,7 @@ object UserDataManager {
             val external = File(tempDir, "external")
             for ((name, dir) in dirs.moved) {
                 val from = File(tempDir, "external-$name")
-                if (File(external, name).renameTo(from)) {
-                    dir.mkdirs()
-                    if (name == ConfigHome.THEME.old) dropRestoredPacks(from, dir)
-                    copyDir(from, dir)
-                }
+                if (File(external, name).renameTo(from)) layOver(name, from, dir)
             }
             if (external.isDirectory) copyDir(external, dirs.external)
             // the settings are the backup's (PR-10): a config file it has not was at its defaults when it was

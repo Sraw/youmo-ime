@@ -329,7 +329,10 @@ class PinyinDictManagerTest {
             empty()
             val mine = PinyinDictManager.importFromInputStream("幽默 you'mo\n".byteInputStream(), "mine.txt").getOrThrow()
             assertTrue(row.why, PinyinDictManager.turn(mine, false))
-            if (!row.compiledFirst) MergedDictionary.refreshNow(dir)
+            // the compile the turn queued, done before an older build's text is put there: one it converted
+            // as it was written (made, not yet written to) was committed empty and deleted under the write,
+            // its words gone. An older build is never running beside this one's compile
+            MergedDictionary.refreshNow(dir)
             File(dir, "big.txt").writeText("搭子 da'zi 0.0\n妮 ni 0.0\n你 ni 0.0\n")
             if (row.compiledFirst) MergedDictionary.refreshNow(dir)
             assertEquals(row.why, row.compiledFirst, File(dir, MergedDictionary.FILE).exists())

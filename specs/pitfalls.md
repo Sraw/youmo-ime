@@ -203,6 +203,13 @@ foreground app. What the keyboard says goes in its notice instead, `FcitxInputMe
   while holding the sources lock (`ImportedDictionaries`' monitor): the compile thread takes it to
   commit a conversion and to sweep, so the wait deadlocks. Commit a source in a short locked block,
   leave it, then compile; gzip and deflate run outside the lock into a `.tmp`.
+- A dictionary's source files (`.txt`, `.txt.gz`, on or off) are made, renamed and deleted under the
+  sources lock, a restore's copy of them too (`UserDataManager.layOver`); `merged.ymd`, the
+  `.merged.*` records, the compile's work files and the `.tmp`s written before a commit are not (the
+  bullet above: a wait on the compile there deadlocks). A conversion that lists an older build's text
+  as a copy made it, not yet written to, finds its length and time unchanged at the commit, commits it
+  empty and deletes it under the write, its words gone; under the lock the commit waits for the copy
+  and sees it changed.
 - Never turn or delete a dictionary by the `File` a page listed: a conversion may have replaced
   `x.txt` by `x.txt.gz` since. Resolve the name under the lock.
 - After an upgrade from 0.3.1/0.3.2 imported words are missing until the conversion and compile end
