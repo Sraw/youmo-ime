@@ -107,6 +107,69 @@ abstract class ManagedPreferenceUi<T : Preference>(
         }
     }
 
+    /**
+     * A choice of [labels] itself stored nowhere: shown as [current] reads it, and [pick] writing what it stands
+     * for, as many keys as that takes, in one edit (KeyboardStyles: a shape's style and what is under it). The
+     * one shown picked again by the user is written too: a default only shown (横屏键盘样式 by the width) is then
+     * stored; as the page opens it is not (a style not set stays so). Shown anew as any of [watched] changes
+     * elsewhere (the keyboard's toggles while the page is open).
+     */
+    class Choice(
+        @StringRes
+        val title: Int,
+        key: String,
+        private val labels: List<Int>,
+        private val current: (Context) -> Int,
+        private val pick: (Context, Int) -> Unit,
+        private val watched: List<ManagedPreference<String>> = emptyList(),
+        enableUiOn: (() -> Boolean)? = null,
+    ) : ManagedPreferenceUi<ListPreference>(key, enableUiOn) {
+
+        override fun createUi(context: Context) = object : ListPreference(context) {
+            override fun getPersistedString(defaultReturnValue: String?) = current(context).toString()
+
+            override fun persistString(value: String?) = persist(value, again = false)
+
+            // the one shown as the page opens (onSetInitialValue) is not written; the user's pick of it is
+            private fun persist(value: String?, again: Boolean): Boolean {
+                val index = value?.toIntOrNull()?.takeIf { it in labels.indices } ?: return false
+                if (again || index != current(context)) pick(context, index)
+                return true
+            }
+
+            // setValue sees no change in the one shown: picked all the same
+            override fun callChangeListener(newValue: Any?): Boolean {
+                if (!super.callChangeListener(newValue)) return false
+                if (newValue == value) persist(newValue as? String, again = true)
+                return true
+            }
+
+            // kept here: the preferences hold their listeners weakly
+            private val shownAnew = ManagedPreference.OnChangeListener<String> { _, _ -> value = current(context).toString() }
+
+            override fun onAttached() {
+                super.onAttached()
+                watched.forEach { it.registerOnChangeListener(shownAnew) }
+            }
+
+            override fun onDetached() {
+                watched.forEach { it.unregisterOnChangeListener(shownAnew) }
+                super.onDetached()
+            }
+        }.apply {
+            key = this@Choice.key
+            isIconSpaceReserved = false
+            isSingleLineTitle = false
+            entryValues = labels.indices.map { it.toString() }.toTypedArray()
+            entries = labels.map { context.getString(it) }.toTypedArray()
+            summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+            // stored nowhere: without a default the list would not read the one shown at all
+            setDefaultValue("0")
+            setTitle(this@Choice.title)
+            setDialogTitle(this@Choice.title)
+        }
+    }
+
     /** A line of text, nothing to set: where a setting has gone. */
     class Note(
         @StringRes

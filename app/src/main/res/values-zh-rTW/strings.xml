@@ -975,10 +975,12 @@
     <string name="learning_kept_aside">學習記錄有讀不出來的內容：原檔案已另存一份，讀得出的部分照常使用，其餘學到的詞這次用不上了。想找回以前學到的詞，可以在 學習備份 裡還原。</string>
     <string name="learning_not_saving">學到的詞現在沒在儲存：只記在記憶體裡，輸入法被系統停止或手機重新啟動後就會遺失。清出一些儲存空間後會照常儲存；還不行就重新啟動手機。</string>
     <string name="user_lists_unkept">自訂短語或常用詞的改動沒能儲存：只記在記憶體裡，輸入法被系統停止或手機重新啟動後就會遺失（以前存下的不受影響）。清出一些儲存空間後，下次在鍵盤上再改同一樣（短語或常用詞）時會連這次的一起儲存；還不行就重新啟動手機，重新啟動後仍然出現，請附上 開發人員 → 即時紀錄檔 匯出的紀錄檔回報問題。</string>
-    <string name="split_keyboard">分體鍵盤</string>
-    <string name="split_keyboard_auto">螢幕夠寬時</string>
-    <string name="split_keyboard_always">總是</string>
-    <string name="split_keyboard_off">關</string>
+    <string name="keyboard_style_portrait">直向鍵盤樣式</string>
+    <string name="keyboard_style_landscape">橫向鍵盤樣式</string>
+    <string name="keyboard_style_normal">普通</string>
+    <string name="keyboard_style_split">分體</string>
+    <string name="keyboard_style_floating">懸浮</string>
+    <string name="keyboard_style_one_handed">單手</string>
     <string name="split_dock">分體時其他面板</string>
     <string name="split_dock_right">靠右</string>
     <string name="split_dock_left">靠左</string>
@@ -986,8 +988,7 @@
     <string name="split_dock_move_left">移到左邊</string>
     <string name="split_dock_move_right">移到右邊</string>
     <string name="one_handed">單手模式</string>
-    <string name="one_handed_off">關</string>
-    <string name="one_handed_exit">恢復全寬</string>
+    <string name="one_handed_exit">退出單手模式</string>
     <string name="floating_keyboard">懸浮鍵盤</string>
     <string name="floating_keyboard_dock">鍵盤放回底部</string>
     <string name="code_row_style">編碼行</string>

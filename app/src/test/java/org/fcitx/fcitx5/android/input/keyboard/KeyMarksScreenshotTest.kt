@@ -96,7 +96,7 @@ class KeyMarksScreenshotTest {
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         shoot("full_compact_one_handed", KeyMarkPosition.TopRight, KeyMarkPosition.BottomRight, boards[0].second)
         val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
         try {
@@ -107,8 +107,8 @@ class KeyMarksScreenshotTest {
         }
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 30)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 49)
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Off)
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyleDefault()
+        prefs.setStyle(KeyboardStyle.FLOATING)
         shoot("zhuyin_full_floating", KeyMarkPosition.TopRight, KeyMarkPosition.Bottom, boards[2].second)
     }
 }

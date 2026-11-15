@@ -27,7 +27,6 @@ import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.NavigationBarManager
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.scene.look.LookTheme
@@ -45,6 +44,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.math.roundToInt
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 
 /**
  * 060-render-p3 T7a in the app: floating, one-handed and split, the window round the keys is the
@@ -122,7 +122,7 @@ class WindowThemeTest {
     @Test
     fun floatingTheFrameAndTheHandleAreTheThemes() {
         everything()
-        prefs.set(theme.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         KeyboardHarness().use { h ->
             started(h)
             val card = card(h)
@@ -153,7 +153,7 @@ class WindowThemeTest {
     @Test
     fun oneHandedTheSideButtonsAndTheNavigationBarAreTheThemes() {
         everything()
-        prefs.set(theme.oneHanded, OneHanded.Left)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Left)
         prefs.set(theme.alwaysShowHandle, true)
         KeyboardHarness().use { h ->
             started(h)
@@ -172,7 +172,7 @@ class WindowThemeTest {
     @Test
     fun colourOnlyTheBarsColourAndItsButtonsTheThemes() {
         everything()
-        prefs.set(theme.oneHanded, OneHanded.Left)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Left)
         prefs.set(theme.navbarBackground, NavbarBackground.ColorOnly)
         KeyboardHarness().use { h ->
             started(h)
@@ -199,7 +199,7 @@ class WindowThemeTest {
     @Test
     fun splitTheSideButtonsAndTheGapAreTheThemes() {
         everything()
-        prefs.set(theme.splitKeyboard, SplitKeyboardMode.Always)
+        prefs.setStyle(KeyboardStyle.SPLIT)
         RuntimeEnvironment.setQualifiers(LANDSCAPE)
         KeyboardHarness().use { h ->
             started(h)
@@ -223,7 +223,7 @@ class WindowThemeTest {
 
     @Test
     fun aThemeOfNoneIsTheAppsLookOfBefore() {
-        prefs.set(theme.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         prefs.set(theme.floatingHandle, FloatingHandleSide.Top)
         val t = TestThemes.PixelLight
         KeyboardHarness(t).use { h ->
@@ -246,8 +246,8 @@ class WindowThemeTest {
             started(h)
             assertEquals(null, handle(h).background)
         }
-        prefs.set(theme.floatingKeyboard, false)
-        prefs.set(theme.oneHanded, OneHanded.Left)
+        prefs.setStyleDefault()
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Left)
         KeyboardHarness(t).use { h ->
             started(h)
             for (b in sideButtons(h).filter { h.shown(it) }) {
@@ -263,7 +263,7 @@ class WindowThemeTest {
     @Test
     fun aLookThatMadeNoThemeIsTheAppsLookOfBefore() {
         SceneThemes.source = { _, _, _ -> "<theme/>" }
-        prefs.set(theme.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         prefs.set(theme.floatingHandle, FloatingHandleSide.Top)
         val t = TestThemes.PixelLight
         KeyboardHarness(t).use { h ->

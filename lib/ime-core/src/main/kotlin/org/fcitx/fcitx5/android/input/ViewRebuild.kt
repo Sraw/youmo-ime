@@ -24,11 +24,12 @@ enum class ViewRebuild(
     SETTING(endsComposition = true),
 
     /**
-     * The handle dragged between floating and docked (or the status area's toggle): the same
-     * keyboard moved, not a setting changed (user, 2026-10-31). What is typed stays, and the new
-     * views show it.
+     * The shape's 键盘样式 changed so the views are made anew (floating or split into or out of, from the
+     * keyboard's toggles, the handle dragged, or the settings page): the same keyboard laid out another
+     * way, not a setting changed (user, 2026-10-31 for the handle; 2026-11-14 for every style change,
+     * 061-wide-keyboard-style §3.5). What is typed stays, and the new views show it.
      */
-    FLOATING(endsComposition = false),
+    STYLE(endsComposition = false),
 
     /**
      * 候选词注音 changed (the handwriting pad's 注, or its row in the settings): the bar's height alone, the

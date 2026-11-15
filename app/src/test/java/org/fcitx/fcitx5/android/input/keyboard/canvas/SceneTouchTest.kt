@@ -18,8 +18,8 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.scene.KeyNode
@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.uat.PrefsRule
+import org.fcitx.fcitx5.android.uat.TestStyles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -226,8 +227,8 @@ class SceneTouchTest {
 
     @Test
     fun aSplitRowsTwoGsEachTypeOnce() {
-        ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Always)
-        prefs.later { ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Auto) }
+        TestStyles.set(KeyboardStyle.SPLIT)
+        prefs.later { TestStyles.clear() }
         val typed = gesture { h ->
             val gs = h.views("g")
             assertEquals(2, gs.size)
@@ -263,8 +264,8 @@ class SceneTouchTest {
     // each copy, each read from its own copy's cell, not from where the other finger came down
     @Test
     fun aKeysTwoCopiesEachReadFromItsOwnCell() {
-        ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Always)
-        prefs.later { ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Auto) }
+        TestStyles.set(KeyboardStyle.SPLIT)
+        prefs.later { TestStyles.clear() }
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
             val kb = h.textKeyboard()
             val c = checkNotNull(h.canvas())

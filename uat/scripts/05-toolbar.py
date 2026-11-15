@@ -190,7 +190,7 @@ def kbox(d, s=None):
     return kb.b if kb else None
 
 
-case("TB-20", needs="jvm:ToolbarUatTest.oneHandedToASideAcrossAndBack")(lambda d: None)
+case("TB-20", needs="jvm:ToolbarUatTest.oneHandedToASideAcrossAndBack、KeyboardStyleUatTest.normalAndOneHandedSlideTheSameView")(lambda d: None)
 
 
 case("TB-21", needs="jvm:ToolbarUatTest.oneHandedPanelsAsNarrow")(lambda d: None)
@@ -293,6 +293,9 @@ def tb23(d):
         f = next((n for n in s.app() if n.cls == "EditText" and n.rid != "url_field"), None)
         if f:
             d.tap(f.c, 1.2)
+    # 横屏键盘样式 is its own: not set, docked turned; floating there too, at the spot kept
+    if not d.screen().find(desc="键盘放回底部", where="ime"):
+        floating(d)
     b3 = kbox(d)
     d.shot("full", "横屏")
     d.rotate(0)
@@ -309,6 +312,9 @@ def tb23(d):
 
 
 case("TB-24", needs="jvm:FloatingUatTest.theDockButtonPutsItBack")(lambda d: None)
+
+
+case("TB-65", needs="jvm:KeyboardStyleUatTest.theBarsOneHandedWhereSplitNotWhereFloating、KeyboardStyleUatTest.fromTheBarTheFocusIsOnTheNewViewsOneHandedButton")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 计算结果

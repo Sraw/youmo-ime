@@ -33,6 +33,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 
 /** UAT cases of the floating keyboard in uat/05: docking, the zone, the handle, its corners and notices. */
 @RunWith(RobolectricTestRunner::class)
@@ -53,7 +55,8 @@ class FloatingUatTest {
         }
     }
 
-    private val floating get() = ThemeManager.prefs.floatingKeyboard
+    // 悬浮 as the shape the test is in has it
+    private val floating get() = KeyboardStyles.floating(h.service)
     private val screenW get() = h.service.resources.displayMetrics.widthPixels
     private val screenH get() = h.service.resources.displayMetrics.heightPixels
     private val dp get() = h.service.resources.displayMetrics.density
@@ -71,13 +74,13 @@ class FloatingUatTest {
     @Test
     @Uat("TB-24")
     fun theDockButtonPutsItBack() {
-        prefs.set(floating, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         assertTrue(floatingNow())
         h.tap(h.described(h.service.getString(R.string.floating_keyboard_dock)))
         h.after(1000)
         h.relayout()
-        assertFalse(floating.getValue())
+        assertFalse(floating)
         assertFalse("${keys()}", floatingNow())
     }
 
@@ -87,7 +90,7 @@ class FloatingUatTest {
     @Test
     @Uat("TB-23")
     fun leftInACornerItIsThereNextTimeAndAfterARotation() {
-        prefs.set(floating, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         h.drag(grip(), 0f, 0f)
         h.after(1000)
@@ -132,7 +135,7 @@ class FloatingUatTest {
     @Test
     @Uat("TB-32")
     fun squareKeysASquareFloatingKeyboard() {
-        prefs.set(floating, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         assertTrue("rounded by default", cornerRadius(h) > 0f)
         // the background drawn behind the keys as round (R20 F6557)
@@ -153,23 +156,23 @@ class FloatingUatTest {
     @Test
     @Uat("TB-34")
     fun theDockingZoneShownAndDroppedIn() {
-        prefs.set(floating, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         h.drag(grip(), screenW / 2f, screenH / 2f)
         h.drag(grip(), screenW / 2f, screenH.toFloat(), lift = false)
         assertTrue("the mark at the bottom", dockMark() != null)
         assertTrue("above the bottom ${keys()}", h.box(grip()).bottom <= screenH)
         h.move(screenW / 2f, screenH - 150 * dp, lift = true)
-        assertTrue(floating.getValue())
+        assertTrue(floating)
         // up left, then into the zone and let go there
         h.drag(grip(), 0f, 0f)
         val at = keys()
         h.drag(grip(), screenW / 2f, screenH.toFloat())
         h.after(1000)
         h.relayout()
-        assertFalse(floating.getValue())
+        assertFalse(floating)
         assertFalse(floatingNow())
-        floating.setValue(true)
+        TestStyles.set(KeyboardStyle.FLOATING)
         h.start()
         h.after(1000)
         h.relayout()
@@ -180,7 +183,7 @@ class FloatingUatTest {
     @Test
     @Uat("TB-36")
     fun aSecondFingerInTheZoneKeepsItFloating() {
-        prefs.set(floating, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         h.drag(grip(), 0f, 0f)
         h.drag(grip(), screenW / 2f, screenH.toFloat(), lift = false)
@@ -188,7 +191,7 @@ class FloatingUatTest {
         h.secondFingerThenLift(screenW / 4f, screenH / 3f)
         h.after(1000)
         h.relayout()
-        assertTrue(floating.getValue())
+        assertTrue(floating)
         assertTrue(floatingNow())
         assertTrue("left at the lowest, not back up left: ${keys()}", keys().top > screenH / 2)
     }
@@ -196,7 +199,7 @@ class FloatingUatTest {
     @Test
     @Uat("TB-35")
     fun theHandleOnTop() {
-        prefs.set(floating, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         prefs.set(ThemeManager.prefs.floatingHandle, FloatingHandleSide.Top)
         h.start()
         val g = h.box(grip())
@@ -214,9 +217,9 @@ class FloatingUatTest {
             KeyboardHarness.keysOf(st.activity.window.decorView).first { it.label == "q" }.textSize("q")!!
         }
         h.close()
-        prefs.set(floating, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         val on = size()
-        floating.setValue(false)
+        TestStyles.clear()
         assertEquals(on, size(), 0.01f)
     }
 
@@ -238,7 +241,7 @@ class FloatingUatTest {
     @Test
     @Uat("TB-39")
     fun atTheTopTheUndoIsBelowAndTappable() {
-        prefs.set(floating, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         undoAtTheTop()
         assertNotEquals(0, keys().height())
@@ -248,7 +251,7 @@ class FloatingUatTest {
     @Uat("TB-39")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun landscapeAsTallAsTheScreenTheUndoStillShown() {
-        prefs.set(floating, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         h.drag(grip(), screenW / 2f, 0f)
         var undone = false

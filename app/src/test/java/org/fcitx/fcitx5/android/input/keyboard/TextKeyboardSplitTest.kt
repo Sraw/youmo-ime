@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.uat.TestStyles
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -27,13 +28,13 @@ class TextKeyboardSplitTest {
         .joinToString("") { it.label }.lowercase()
 
     @After
-    fun auto() = ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Auto)
+    fun auto() = TestStyles.clear()
 
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
     fun aPhoneOnItsSideHasTheMiddleKeysOnBothHalves() {
         assertEquals("qwertyuiopasdfgghjklzxcvvbnm", letters())
-        ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Off)
+        TestStyles.set(KeyboardStyle.NORMAL)
         assertEquals("qwertyuiopasdfghjklzxcvbnm", letters())
     }
 
@@ -41,7 +42,7 @@ class TextKeyboardSplitTest {
     @Config(qualifiers = "w360dp-h800dp-port")
     fun uprightItIsOneUnlessAlwaysSplit() {
         assertEquals("qwertyuiopasdfghjklzxcvbnm", letters())
-        ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Always)
+        TestStyles.set(KeyboardStyle.SPLIT)
         assertEquals("qwertyuiopasdfgghjklzxcvvbnm", letters())
     }
 }

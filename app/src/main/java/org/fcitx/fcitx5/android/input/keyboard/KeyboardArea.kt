@@ -439,13 +439,12 @@ object KeyboardArea {
     fun keysWidth(s: Screen): Int = s.widthPx - 2 * sidePadding(s)
 
     /** The keyboard's width, dp: the screen's less its side padding (InputView's), or floating its own (TextKeyboard.widthDp). */
-    fun widthDp(s: Screen, floating: Boolean = ThemeManager.prefs.floatingKeyboard.getValue()): Int {
+    fun widthDp(s: Screen, floating: Boolean = KeyboardStyles.of(s).floating): Int {
         if (floating) return FloatingKeyboard.widthDp(s.widthDp)
         // the theme's where the setting follows it (sidePadding): a fraction of a dp cut, as there
         return (s.widthDp - 2 * sizes().sidePaddingDp(s.landscape)).toInt()
     }
 
-    /** Whether the letters are split on [s]: as the setting is, the screen as wide as it is; floating, never (TextKeyboard.splits). */
-    fun splits(s: Screen, floating: Boolean = ThemeManager.prefs.floatingKeyboard.getValue()): Boolean =
-        !floating && SplitKeyboard.splits(ThemeManager.prefs.splitKeyboard.getValue().mode, s.widthDp)
+    /** Whether the letters are split on [s]: its shape's 键盘样式 is 分体, set or its default by the width (TextKeyboard.splits). */
+    fun splits(s: Screen): Boolean = KeyboardStyles.of(s).splits
 }

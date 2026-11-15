@@ -12,8 +12,8 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
@@ -102,19 +102,19 @@ class SwipeFatesParityUatTest {
 
     @Test
     fun oneHanded() {
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         parity()
     }
 
     @Test
     fun floating() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         parity()
     }
 
     @Test
     fun splitLandscape() {
-        prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
+        prefs.setStyle(KeyboardStyle.SPLIT)
         parity(landscape = true)
     }
 

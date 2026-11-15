@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.bar.ToolbarButton
 import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.ui.common.DynamicListAdapter
 import org.fcitx.fcitx5.android.ui.main.ClipboardEditActivity
@@ -366,7 +367,7 @@ class ToolbarUatTest {
     @Test
     @Uat("TB-20")
     fun oneHandedToASideAcrossAndBack() {
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Off)
+        prefs.setStyleDefault()
         val width = h.service.resources.displayMetrics.widthPixels
         h.start()
         expand()
@@ -395,7 +396,7 @@ class ToolbarUatTest {
     @Test
     @Uat("TB-21")
     fun oneHandedPanelsAsNarrow() {
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         h.start()
         val kb = keyboardBox()
         h.tap(h.key("符"))
@@ -663,7 +664,7 @@ class ToolbarUatTest {
     @Uat("TB-43")
     fun thePanelsTogglesOnTheBar() {
         prefs.set(toolbarButtons, "habits,one_handed,trad_simp,|,emoji,hide")
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Off)
+        prefs.setStyleDefault()
         prefs.set(AppPrefs.getInstance().internal.useHabits, true)
         h.start()
         expand()
@@ -685,9 +686,9 @@ class ToolbarUatTest {
         // the panel's one-handed toggle, the same, lit while on; off from elsewhere, unlit
         assertFalse(lit(R.string.one_handed))
         h.tap(h.described(s(R.string.one_handed)))
-        assertTrue(ThemeManager.prefs.oneHanded.getValue() != OneHanded.Off)
+        assertEquals(KeyboardStyle.ONE_HANDED, TestStyles.stored(landscape = false))
         assertTrue(lit(R.string.one_handed))
-        ThemeManager.prefs.oneHanded.setValue(OneHanded.Off)
+        TestStyles.clear()
         h.idle()
         assertFalse(lit(R.string.one_handed))
         // habits off: lit, and named for turning them back on
@@ -700,7 +701,7 @@ class ToolbarUatTest {
     @Uat("TB-43")
     fun thePanelsOthersOnTheBar() {
         prefs.set(toolbarButtons, "theme,input_method_settings,clear_recent,|,floating,one_handed,hide")
-        prefs.set(ThemeManager.prefs.floatingKeyboard, false)
+        prefs.setStyleDefault()
         h.start()
         expand()
         h.tap(h.described(s(R.string.theme)))
@@ -716,7 +717,7 @@ class ToolbarUatTest {
         assertTrue(shadowOf(spans).isShowing)
         // the input view made anew for it: the spans gone with the old one
         h.tap(h.described(s(R.string.floating_keyboard)))
-        assertTrue(ThemeManager.prefs.floatingKeyboard.getValue())
+        assertEquals(KeyboardStyle.FLOATING, TestStyles.stored(landscape = false))
         h.after(500)
         assertFalse(shadowOf(spans).isShowing)
     }
@@ -726,7 +727,7 @@ class ToolbarUatTest {
     fun floatingTheBarFitsAndHasNoOneHanded() {
         // more at the right than a floating bar holds: the rest on the toolbar, the menu key and ⋯ reachable
         prefs.set(toolbarButtons, "undo,|,emoji,voice,hide,theme,floating,one_handed,habits,clear_recent,input_method_settings,redo")
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         h.relayout()
         val menu = h.box(h.described(s(R.string.expand_toolbar)))

@@ -85,6 +85,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.bar.ToolbarButton
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -109,6 +110,9 @@ import org.fcitx.fcitx5.android.input.editing.WatchedEditor
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyleState
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.SpaceCursor
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSelection
@@ -535,6 +539,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun replaceInputView(theme: Theme, start: Boolean = false): InputView = SceneTrace.section("replaceInputView") {
         compactBuilt = keyboardCompact()
+        // every view made, a turn's too: the style a change is told from by the shape it was made on
+        screenBuilt = KeyboardArea.screen(this).also { styleBuilt = KeyboardStyles.of(it) }
         readingBuilt = EngineState.candidateReading.value
         val newInputView = SceneTrace.section("new InputView") { InputView(this, fcitx, theme) }
         // no text pack (or not one this app reads): the keyboard cannot type, and says so over all of it
@@ -647,8 +653,35 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (field) tellContext()
     }
 
-    // what the views were last made for, to tell the handle's move from a theme's change
-    private var floatingBuilt = ThemeManager.prefs.floatingKeyboard.getValue()
+    /**
+     * The screen the input view was last made on (replaceInputView; its FloatingController's, read at the same
+     * time), whose shape's style the keyboard's toggles write, and that style as it was then.
+     */
+    internal var screenBuilt: KeyboardArea.Screen? = null
+        private set
+    private var styleBuilt: KeyboardStyleState? = null
+
+    /** The bar's button TalkBack's focus goes back to in the view made anew for a style (§3.6), set by its toggle. */
+    internal var focusAfterStyleRebuild: ToolbarButton? = null
+
+    /**
+     * A shape's style changed (061-wide-keyboard-style §3.5): the other shape's, nothing; floating or split into or
+     * out of, the views made anew keeping what is typed, from wherever (the keyboard's toggles, the handle, the
+     * settings page); 普通 and 单手, InputView slides the board itself.
+     */
+    @Keep
+    private val keyboardStyleListener = ManagedPreference.OnChangeListener<String> { key, _ ->
+        val landscape = screenBuilt?.landscape ?: return@OnChangeListener
+        val built = styleBuilt ?: return@OnChangeListener
+        if (key != KeyboardStyles.styleKey(landscape).key) return@OnChangeListener
+        val screen = KeyboardArea.screen(this)
+        if (screen.landscape != landscape) return@OnChangeListener
+        val now = KeyboardStyles.of(screen)
+        if (now.floating == built.floating && now.splits == built.splits) return@OnChangeListener
+        rebuilding(ViewRebuild.STYLE)
+        replaceInputViews(ThemeManager.activeTheme, start = true)
+        focusAfterStyleRebuild?.let { inputView?.kawaiiBar?.focusForTalkBack(it) }
+    }
 
     @Keep
     private val recreateInputViewListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
@@ -692,9 +725,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Keep
     private val onThemeChangeListener = ThemeManager.OnThemeChangeListener {
-        val floating = ThemeManager.prefs.floatingKeyboard.getValue()
-        rebuilding(if (floating != floatingBuilt) ViewRebuild.FLOATING else ViewRebuild.SETTING)
-        floatingBuilt = floating
+        rebuilding(ViewRebuild.SETTING)
         replaceInputViews(it, start = true)
     }
 
@@ -771,6 +802,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.candidates.registerOnChangeListener(recreateCandidatesViewListener)
         keyboardHeightPrefs.forEach { it.registerOnChangeListener(keyboardHeightListener) }
         ThemeManager.addOnChangedListener(onThemeChangeListener)
+        ThemeManager.prefs.keyboardStylePortrait.registerOnChangeListener(keyboardStyleListener)
+        ThemeManager.prefs.keyboardStyleLandscape.registerOnChangeListener(keyboardStyleListener)
         // a fcitx not ready yet syncs them itself once it is, in the app's language as here
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             fcitx.runIfReady {
@@ -2313,6 +2346,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
         keyboardHeightPrefs.forEach { it.unregisterOnChangeListener(keyboardHeightListener) }
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
+        ThemeManager.prefs.keyboardStylePortrait.unregisterOnChangeListener(keyboardStyleListener)
+        ThemeManager.prefs.keyboardStyleLandscape.unregisterOnChangeListener(keyboardStyleListener)
         InputFeedbacks.releaseSounds()
         // the last field learned from as the service goes (another keyboard picked, the system stopping it): not at a hide or
         // a bar made anew, the same field maybe to come back to. A process killed outright still loses it

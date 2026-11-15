@@ -20,6 +20,8 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingSwitch.Bounds
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.motion.Motion
 import org.fcitx.fcitx5.android.scene.engine.WindowLooks
@@ -44,8 +46,17 @@ class FloatingController(
     private val context = root.context
     private val prefs = ThemeManager.prefs
 
-    /** Floating: read once, the view made anew as it changes (ThemeManager), the letters splitting or not. */
-    val floating = prefs.floatingKeyboard.getValue()
+    /**
+     * The screen the view is made on: its shape's 键盘样式 is what this writes, whenever it does (the view taken
+     * out after a turn docks the shape it floated on, not the one turned to).
+     */
+    val screenBuilt = KeyboardArea.screen(context)
+
+    /** Floating: read once, the view made anew as it changes (the service, ViewRebuild.STYLE), the letters splitting or not. */
+    val floating = KeyboardStyles.of(screenBuilt).floating
+
+    /** The letters split as made (TextKeyboard.Split), read with [floating]. */
+    val splitsBuilt = KeyboardStyles.of(screenBuilt).splits
 
     private val side = prefs.floatingHandle.getValue()
     val handleAtBottom = side == FloatingHandleSide.Bottom
@@ -140,7 +151,7 @@ class FloatingController(
     fun detached() {
         if (!floating && keyboard.isShown && keyboard.isLaidOut) root.parent?.let { DockedBounds.leave(it, keyboard.bounds()) }
         // made anew under its slide down (a turn, a theme): docked all the same, once this is done with
-        if (switch.slideOver()) Handler(Looper.getMainLooper()).post { prefs.floatingKeyboard.setValue(false) }
+        if (switch.slideOver()) Handler(Looper.getMainLooper()).post { KeyboardStyles.floatingOff(screenBuilt) }
     }
 
     /** Hidden, or its field left. */
@@ -169,7 +180,7 @@ class FloatingController(
         InputFeedbacks.hapticFeedback(keyboard, longPress = true)
         val at = IntArray(2).also { root.getLocationOnScreen(it) }
         val from = keyboard.bounds()
-        prefs.floatingKeyboard.setValue(true)
+        KeyboardStyles.floatingOn(screenBuilt)
         val next = { find(frame.getChildAt(0)) }
         next()?.grab(rawX - at[0], rawY - at[1], from, ended = touch == null)
         if (touch != null) FloatingHandoff(frame, touch, rawX, rawY) { next()?.carried }.start()
@@ -205,7 +216,7 @@ class FloatingController(
     private fun dock() {
         val ms = Motion.Long.enter(motionSettings())
         when (switch.dock(animates = ms > 0L && keyboard.isLaidOut)) {
-            FloatingSwitch.Dock.Now -> prefs.floatingKeyboard.setValue(false)
+            FloatingSwitch.Dock.Now -> KeyboardStyles.floatingOff(screenBuilt)
             FloatingSwitch.Dock.Sliding -> Unit
             // laid out at the bottom in the middle, moved from there by translation (FloatingPlacer)
             FloatingSwitch.Dock.Slide -> keyboard.animate().translationX(0f).translationY(0f).scaleX(1f).scaleY(1f)
@@ -219,7 +230,7 @@ class FloatingController(
     }
 
     private fun slid() {
-        if (switch.slideOver()) prefs.floatingKeyboard.setValue(false)
+        if (switch.slideOver()) KeyboardStyles.floatingOff(screenBuilt)
     }
 
     private fun showDockMark(shown: Boolean) {

@@ -244,7 +244,7 @@ class TextSceneWiringTest {
     @Config(qualifiers = "w800dp-h360dp-land")
     fun aSplitGlideReadsBothCopiesOfG() {
         prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
-        prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
+        prefs.setStyle(KeyboardStyle.SPLIT)
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
             val q = h.keys().single { it.id == "q" }
             val gs = h.keys().filter { it.id == "g" }

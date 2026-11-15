@@ -72,7 +72,7 @@ class TextKeyboard(
         // cases (onAction's HostKeyAction), so no letter key to a glide, a stroke, writing on the keys or the bubble either
         private fun letterSent(node: KeyNode): Char? = node.actions["send"]?.singleOrNull()?.takeIf { it in 'a'..'z' }
 
-        /** Whether the letters are split here: as the setting is, the screen as wide as it is now; floating, never. */
+        /** Whether the letters are split here: the 键盘样式 of the shape the screen is now ([KeyboardStyles]). */
         fun splits(context: Context): Boolean = KeyboardArea.splits(KeyboardArea.screen(context))
 
         /** The keyboard's width, dp: the screen's less its side padding (InputView's), or floating its own. */

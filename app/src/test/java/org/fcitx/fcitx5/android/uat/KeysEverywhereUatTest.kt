@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.input.keyboard.ZhuyinKeyboard
@@ -209,7 +210,7 @@ class KeysEverywhereUatTest {
     @Test
     @Uat("KB-75")
     fun heldAndLetGoTypesTheFirstOnANarrowKeyboard() {
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Left)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Left)
         val lists = mapOf(
             KeyId("t9/1") to UserList(false, listOf("1", "^", ":", ";", "~", ".", "-", "@", "\\", "\""), First.Literal("@")),
             KeyId("t9/5") to UserList(false, listOf("J", "K", "L", "5", "j", "k", "l", "#", "(", ")", "/", "%"), First.Literal("/")),

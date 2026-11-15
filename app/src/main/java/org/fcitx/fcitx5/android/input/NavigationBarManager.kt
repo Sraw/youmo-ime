@@ -13,6 +13,7 @@ import androidx.core.view.WindowCompat
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.scene.look.BoardBase
@@ -54,7 +55,7 @@ class NavigationBarManager {
 
     private fun evaluateWithVirtualKeyboard(window: Window) {
         // floating, the app is under the bar, not the keyboard: the system's, as with None
-        val background = if (ThemeManager.prefs.floatingKeyboard.getValue()) NavbarBackground.None else navbarBackground
+        val background = if (KeyboardStyles.floating(window.context)) NavbarBackground.None else navbarBackground
         when (background) {
             NavbarBackground.None -> {
                 shouldUpdateNavbarForeground = false
@@ -107,7 +108,7 @@ class NavigationBarManager {
         val theme = ThemeManager.activeTheme
         // the theme's (`navbar { color }`, 060-render-p3 T7a); null, follow: the colour under the keys. The
         // floating keyboard's is the app's under it; the hardware keyboard's (its candidates alone) the theme's
-        val floating = virtual && ThemeManager.prefs.floatingKeyboard.getValue()
+        val floating = virtual && KeyboardStyles.floating(window.context)
         val set = if (floating) null else SceneWindow.navbar(theme, SceneWindow.scenes(window.context, theme, placement = if (virtual) placement else emptySet()))
         if (shouldUpdateNavbarForeground) {
             WindowCompat.getInsetsController(window, window.decorView)

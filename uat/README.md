@@ -26,7 +26,7 @@
 | [13-words.md](13-words.md) | 词库页、用户词库、屏蔽词、导入导出、导入词库、导入的词、清空学到的、自定义短语、常用词 |
 | [14-settings.md](14-settings.md) | 设置首页、通用输入、外观、按键、声音与振动、剪贴板与表情、实体键盘、界面语言、开发者、关于 |
 | [15-privacy-backup.md](15-privacy-backup.md) | 隐私与权限、密码框和无痕、不用我的输入习惯、清掉最近、备份与恢复（含学到的合并、退回、自动备份） |
-| [16-landscape-split.md](16-landscape-split.md) | 横屏、分体键盘、分体时其他面板靠边 |
+| [16-landscape-split.md](16-landscape-split.md) | 横屏、分体键盘、分体时其他面板靠边，竖屏、横屏键盘样式 |
 | [17-hardware-keyboard.md](17-hardware-keyboard.md) | 实体键盘 |
 | [18-lifecycle.md](18-lifecycle.md) | 转屏、切换应用、换输入框、引擎重启这些时刻 |
 | [19-motion-notices.md](19-motion-notices.md) | 提示条（位置、替换、配色）、始终显示悬浮条、候选字号 |
@@ -223,7 +223,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 950 条（P0 144、P1 712、P2 94）：模拟器上跑 134 条（其中 87 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 816 条（JVM 716、发版时 24、真机或手工 57、语音 19）。
+现在共 963 条（P0 144、P1 720、P2 99）：模拟器上跑 134 条（其中 87 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 829 条（JVM 726、发版时 24、真机或手工 60、语音 19）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 

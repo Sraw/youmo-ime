@@ -61,6 +61,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.math.roundToInt
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 
 /**
  * contract: data files the theme maker page reads (youmo-layout.json, youmo-icons.json and its blocks).
@@ -185,8 +186,11 @@ class ThemeMakerLayoutTest {
     private fun measure(shot: Shot, icons: MutableSet<String>): String {
         val q = shot.phone.qualifiers.let { if (shot.landscape) it.replace("-port-", "-land-").swapSides() else it }
         RuntimeEnvironment.setQualifiers(q)
-        prefs.set(ThemeManager.prefs.oneHanded, if (shot.mode == Mode.ONE_HANDED) OneHanded.Right else OneHanded.Off)
-        prefs.set(ThemeManager.prefs.floatingKeyboard, shot.mode == Mode.FLOATING)
+        when (shot.mode) {
+            Mode.ONE_HANDED -> prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
+            Mode.FLOATING -> prefs.setStyle(KeyboardStyle.FLOATING)
+            else -> prefs.setStyleDefault()
+        }
         return KeyboardHarness(PROBE, keyboards = ImKeyboards.Chosen(pinyin = shot.board.keyboard), codeRow = CodeRowStyle.Floating).use { h ->
             h.start()
             // the punctuation as pinyin types it on a new install (中文标点 on): ，。？！ on the nine keys' 1 and column, the

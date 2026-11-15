@@ -15,7 +15,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
-import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
@@ -53,6 +52,12 @@ object ThemeManager {
         ThemeLookMigration.monetLook = it.monetLook()
         // before the keyboard's size is read
         it.migrateSizeFollow()
+        // before a keyboard asks how it is shown
+        it.migrateKeyboardStyle()
+    }
+
+    private val keyboardStyleKeys = with(prefs) {
+        setOf(keyboardStylePortrait.key, keyboardStyleLandscape.key, keyboardStyleUnderPortrait.key, keyboardStyleUnderLandscape.key)
     }
 
     // the built-in packs' names ([BuiltinPacks], unpacked here first): a 3.0 theme of the user's named as one (a file
@@ -486,10 +491,9 @@ object ThemeManager {
         when (key) {
             in prefs.dayNightModePrefNames -> activeTheme = evaluateActiveTheme()
             // InputView moves the board itself: made anew, the symbols shown would go back to the letters.
-            // The side one-handed mode is put at, from wherever (status area, arrows, settings page), is
-            // where the status area's toggle opens it again; remembered, it changes nothing shown
-            prefs.oneHanded.key -> OneHanded.sideToRemember(prefs.oneHanded.getValue())?.let(prefs.oneHandedSide::setValue)
-            prefs.splitDock.key, prefs.oneHandedSide.key -> Unit
+            // A style the service makes the views anew for where it floats or splits otherwise, keeping what is
+            // typed (ViewRebuild.STYLE), and InputView slides it between 普通 and 单手; the other shape's, nothing
+            prefs.splitDock.key, prefs.oneHandedSide.key, in keyboardStyleKeys -> Unit
             in keyStyleKeys -> {
                 keyStyle = prefs.keyStyleChoice()
                 fireChange()
@@ -558,6 +562,8 @@ object ThemeManager {
             else remove(ThemeLookMigration.MONET_KEY)
             // the sizes' 跟随主题 moved (no managed preference): before the first unlock not moved again
             putBoolean(ThemePrefs.SIZES_FOLLOW_MIGRATED, prefs.sizeFollowMigrated)
+            // the styles moved (no managed preference): not again from the old keys before the first unlock
+            putBoolean(ThemePrefs.KEYBOARD_STYLE_MIGRATED, prefs.keyboardStyleMigrated)
         }
     }
 

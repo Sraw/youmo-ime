@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.voice.VoiceSession
 import org.fcitx.fcitx5.android.input.voice.VoicePermissionActivity
@@ -173,8 +174,8 @@ class VoiceHoldUatTest {
     @Uat("VO-02")
     fun floatingTheCardGoesWithTheKeyboard() {
         allowMicrophone()
-        ThemeManager.prefs.floatingKeyboard.setValue(true)
-        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        TestStyles.set(KeyboardStyle.FLOATING)
+        restore += { TestStyles.clear() }
         h.start()
         // dragged and made smaller
         h.keyboard.translationX = 40f
@@ -201,8 +202,8 @@ class VoiceHoldUatTest {
     @Uat("VO-03")
     fun onAScaledKeyboardTheCancelDistanceIsTheKeyboardAsSeen() {
         allowMicrophone()
-        ThemeManager.prefs.floatingKeyboard.setValue(true)
-        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        TestStyles.set(KeyboardStyle.FLOATING)
+        restore += { TestStyles.clear() }
         h.start()
         h.keyboard.scaleX = 0.8f
         h.keyboard.scaleY = 0.8f
@@ -564,8 +565,8 @@ class VoiceHoldUatTest {
     @Test
     @Uat("VO-12")
     fun theViewsMadeAnewWhileHoldingTypeWhatWasHeardOnce() = heardWhileTheViewsAreMadeAnew {
-        ThemeManager.prefs.floatingKeyboard.setValue(true)
-        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        TestStyles.set(KeyboardStyle.FLOATING)
+        restore += { TestStyles.clear() }
     }
 
     // the screen turned with the finger still down (super makes the views anew): the same, by

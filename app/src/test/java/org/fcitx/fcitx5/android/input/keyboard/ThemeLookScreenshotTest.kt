@@ -26,6 +26,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import org.fcitx.fcitx5.android.uat.TestStyles
 
 /**
  * Theme file 3.0 drawn (§4.2 of dev/design/051-d3-theme-maker.md): five sample themes, light and
@@ -143,10 +144,10 @@ class ThemeLookScreenshotTest {
     @Uat("ST-52")
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
     fun oneHandedAndFloatingShowTheirOwnPartOfThePicture() {
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         everyTheme("one_handed") { s, dark, b -> s.name == "glass" && !dark && b.name == "full" }
-        ThemeManager.prefs.oneHanded.setValue(OneHanded.Off)
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        TestStyles.clear()
+        prefs.setStyle(KeyboardStyle.FLOATING)
         everyTheme("floating") { s, dark, b -> s.name == "glass" && !dark && b.name == "full" }
     }
 
@@ -154,7 +155,7 @@ class ThemeLookScreenshotTest {
     @Uat("ST-52")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun splitTurned() {
-        prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
+        prefs.setStyle(KeyboardStyle.SPLIT)
         everyTheme("split_land") { s, dark, b -> (s.name == "glass" || s.name == "cutout") && !dark && b.name == "full" }
     }
 }

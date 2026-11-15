@@ -92,9 +92,9 @@ English's word committed, what is written over the keys put in; user, 2026-10-27
 14 keys reaches the full keyboard's session and no code row is left over an empty bar; then it tells
 the engine its context again, as the field stays and no input restarts to. `onConfigurationChanged`
 ends it the same way, so of dark mode's two (it and the theme's rebuild, in either order) the last
-tell follows the last end. Floating and docked (`FLOATING`, told from a theme change by the
-`floatingKeyboard` value the views were made for), the system's `onCreateInputView` and a language
-picked anew keep it.
+tell follows the last end. A 键盘样式 changed so the views are made anew (`STYLE`: floating or split into or
+out of, from wherever; the service's own listener on the two style keys, against the shape and style the views
+were made for), the system's `onCreateInputView` and a language picked anew keep it.
 
 A setting only the keys read (`remakeKeyboardsPrefs`: each input method's keyboard, 九键's letters and
 symbols, the marks' places, the long presses, the letters' case) does not make the view anew: `InputView.remakeKeyboards` ends what was typed the same way, drops
@@ -399,8 +399,25 @@ or upright. A source scan (`LandscapeSourcesTest`) keeps `ORIENTATION_*` and a c
 or a tablet is as high upright as turned. Nothing is kept by orientation: a
 fold or unfold remakes the input view as a turn does.
 
-On a screen `ScreenShape.WIDE_DP` wide or wider (auto) the letters split in two (`TextKeyboard.Split`, sized by
-`SplitKeyboard` in ime-core, the setting `ThemePrefs.splitKeyboard`: auto / always / off): Gboard's,
+**键盘样式** (061-wide-keyboard-style). Each shape (竖屏, 横屏 as `KeyboardArea.landscape` says: a foldable
+unfolded and a tablet are 横屏 either way up) has its own style, 普通 / 分体 / 悬浮 / 单手 (`KeyboardStyle`, ime-core),
+and what is under it (`KeyboardStyleUnder`: what turning floating or one-handed off goes back to, so 横屏 split,
+floated and docked again is split). `KeyboardStyleState` holds the pair, any of the 16 stored read as one of the 8
+that mean something; a shape with no style stored is its default by its width (`KeyboardStyleState.default`:
+横屏 `ScreenShape.WIDE_DP` wide or wider splits, as 0.6.0's 屏幕够宽时; else 普通). Stored as four keys,
+`keyboard_style_{portrait,landscape}` and their `_under` (`ThemePrefs.StyleKey`: "" is not stored, so a style not
+set stays so in the copy before the first unlock and is the default by the width there). `KeyboardStyles` (app)
+is the one way in: read by a screen; written by the settings page's two lists (`ManagedPreferenceUi.Choice`, a
+list stored nowhere, both keys in one edit) and the keyboard's toggles, which write the shape the view was made
+on (`FloatingController.screenBuilt`), not the one there is when they write (a view taken out after a turn).
+The service makes the views anew (`ViewRebuild.STYLE`) only where floating or split changes; 普通 ↔ 单手 InputView
+slides; `ThemeManager` makes nothing anew for them, and the theme's preview remakes its keys itself. 0.6.0's
+分体键盘, 单手模式 and 悬浮键盘 move once (`ThemePrefs.migrateKeyboardStyle`, the table
+`KeyboardStyleMigration.from060`, the mark `keyboard_style_migrated` copied before the first unlock too; none of
+the three stored, nothing written); their keys stay, for a backup of 0.6.1 brought back into 0.6.0.
+
+Where the style is 分体 the letters split in two (`TextKeyboard.Split`, sized by
+`SplitKeyboard` in ime-core): Gboard's,
 five keys a half, G and V on both (`QWERT|YUIOP`, `ASDFG|GHJKL`, `⇧ZXCV|VBNM⌫`), each half a grid
 from the edge to the room between them; that room what ten letters 48 dp wide leave of the keyboard
 (the screen less its side padding), 12–40% of it; the space spans it, the rest of the bottom row as
@@ -420,11 +437,11 @@ the window attached (`InputBroadcastReceiver.onWindowAttached`, its `DockFollowe
 `InputWindowManager.currentWindow`) and the keyboard window's layout
 (`KeyboardWindow.onLayoutShown`).
 
-One-handed (`ThemePrefs.oneHanded`: off / right / left, read live the same way; the status area's
-单手模式 turns it on at the side last used, `ThemePrefs.oneHandedSide`, right at first, or off; that side is internal state with no UI, not a hidden setting, so neither the first reset nor importing a backup sets it back): while the letters do not split, every board, the letters
+One-handed (the style 单手, read live the same way; the status area's
+单手模式 turns it on at the side last used, `ThemePrefs.oneHandedSide`, right at first, or off; that side is internal state with no UI, not a hidden setting, so neither the first reset nor importing a backup sets it back): every board, the letters
 too, goes to that side, 80% of the width, a phone's 420 dp at most (`SplitKeyboard.placement`, which
-decides both). The room beside it has the arrow, which then sets `oneHanded` rather than
-`splitDock`, and a button back to the whole width. These side buttons, split's and one-handed's, are
+decides both). The room beside it has the arrow, which then sets `oneHandedSide` rather than
+`splitDock`, and a button back to both hands (退出单手模式: 普通 or split, as under it). These side buttons, split's and one-handed's, are
 drawn as the theme's `side-button` says (060-render-p3 T7a, `SceneWindow.sideButton`; none set: the
 function keys' text colour on nothing, a round ripple of the pressed colour, as before; the ripple
 `side-button:pressed`'s overlay over `side-button`'s), dressed once a placement (`InputView.dressSideButtons`);
@@ -506,7 +523,7 @@ every level). `none`, or 0 wide, none. The floating code strip's colour and the 
 page's preview bar (its base and height, of the theme shown) are the theme's `bar` too. A candidate's
 `size` stays unread: 候选字号 is the user's setting, and the bar's height the theme's.
 
-Floating (`ThemePrefs.floatingKeyboard`, the status area's 悬浮键盘; the input view is made anew for
+Floating (the style 悬浮, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
 much shorter (85% at least), with `FloatingHandle` at the bottom (24 dp: a short bar and the dock button;
 `ThemePrefs.floatingHandle` puts it on top, the view made anew). The dock button is 56×24 dp, a
@@ -546,8 +563,8 @@ the strip counts with the bars there and the app's 120 dp wins (the owner, 2026-
 down to the rows' 36 dp each (the user, 2026-11-14). All of this is
 `floating/FloatingController` (the handle, the placer, the dock mark, the switches), the input view
 only placing its views and passing its insets, attach and detach on. The grip held for the system's
-long-press time (`GripPress` in ime-core) buzzes and sets `floatingKeyboard`: ThemeManager makes the
-view anew at once, `setInputView` takes the old one out of the service's input area (the framework
+long-press time (`GripPress` in ime-core) buzzes and turns floating on for the shape the view was made on: the service makes the
+view anew at once (`ViewRebuild.STYLE`), `setInputView` takes the old one out of the service's input area (the framework
 cancels its touch) and the rest of that touch reaches the input area itself, unheld and unsplit.
 `FloatingHandoff`, its touch listener till the finger lifts, passes it to the new view's controller
 (`carried`), following only the grip's finger in that touch (`HandoffTouch` in ime-core: its pointer

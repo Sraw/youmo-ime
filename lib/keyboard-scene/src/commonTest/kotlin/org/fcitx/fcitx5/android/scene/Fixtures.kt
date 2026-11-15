@@ -61,7 +61,7 @@ object Fixtures {
     /** The same, the keyboard compact (text 0.9), 576 px: not the height setting's lowest (that is [Forms.compact]'s). */
     val compact: Env by lazy { portrait.copy(height = 576.0, compact = true) }
 
-    /** A phone on its side, 914 dp: split (SplitKeyboard.Mode.AUTO splits from 600 dp). */
+    /** A phone on its side, 914 dp: split (横屏 split by default from 600 dp, KeyboardStyleState.default). */
     val landscape: Env by lazy { portrait.copy(width = 2400.0, height = 528.0, landscape = true, split = true) }
 
     /** Floating, 300 dp wide, its text 0.85. */

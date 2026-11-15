@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.KeyTextScale
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -177,7 +178,7 @@ class CompactKeyboardUatTest {
         h.start()
         val size = h.key("q").size()
         fresh()
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         compact()
         h.start()
         val screen = h.service.resources.configuration.screenWidthDp
@@ -203,7 +204,7 @@ class CompactKeyboardUatTest {
         val letter = lettersStayClearOfTheirSymbols().first().size()
         val symbol = h.key("a").let { it.textSize(it.alt!!)!! }
         fresh()
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         h.start()
         val lower = lettersStayClearOfTheirSymbols()
         assertTrue(lower.joinToString { "${it.label} ${it.size()} ${it.textSize(it.alt!!)}" }, lower.all { it.size() == letter && it.textSize(it.alt!!) == symbol })
@@ -213,11 +214,11 @@ class CompactKeyboardUatTest {
         // the standard height: the letters the two-handed keyboard's size too
         fresh()
         level(38, 60)
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Off)
+        prefs.setStyleDefault()
         h.start()
         val standard = lettersStayClearOfTheirSymbols().first().size()
         fresh()
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         h.start()
         assertEquals(standard, lettersStayClearOfTheirSymbols().first().size(), 0.01f)
     }

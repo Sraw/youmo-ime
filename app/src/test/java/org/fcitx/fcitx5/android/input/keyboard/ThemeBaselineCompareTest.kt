@@ -46,6 +46,8 @@ import java.nio.file.StandardOpenOption
 import java.util.Locale
 import javax.imageio.ImageIO
 import kotlin.math.abs
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
+import org.fcitx.fcitx5.android.uat.TestStyles
 
 /**
  * The scene engine's drawing held to the old drawing's record, `src/test/baseline-060` (P2's S0, the
@@ -176,6 +178,12 @@ class ThemeBaselineCompareTest {
         return { setValue(was) }
     }
 
+    // 键盘样式 on both shapes, none stored again after
+    private fun style(style: KeyboardStyle): () -> Unit {
+        TestStyles.set(style)
+        return { TestStyles.clear() }
+    }
+
     private val theme get() = ThemeManager.prefs
 
     // 横屏 as high as 0.6.0's (49% of the screen), not 0.6.1's rows of dp: the drawing compared, not the height
@@ -187,15 +195,15 @@ class ThemeBaselineCompareTest {
     private val upright = Form("port")
 
     private val forms = listOf(
-        Form("land", LANDSCAPE) { listOf(theme.splitKeyboard.during(SplitKeyboardMode.Off), heightAs060()) },
+        Form("land", LANDSCAPE) { listOf(style(KeyboardStyle.NORMAL), heightAs060()) },
         Form("compact") {
             val compact = KeyboardHeightLevels.ALL[KeyboardHeightLevels.COMPACT]
             val keyboard = AppPrefs.getInstance().keyboard
             listOf(keyboard.keyboardHeightPercent.during(compact.portrait), keyboard.keyboardHeightPercentLandscape.during(compact.landscapeLevel))
         },
-        Form("floating") { listOf(theme.floatingKeyboard.during(true)) },
-        Form("one_handed_left") { listOf(theme.oneHanded.during(OneHanded.Left)) },
-        Form("split_land", LANDSCAPE) { listOf(theme.splitKeyboard.during(SplitKeyboardMode.Always), heightAs060()) },
+        Form("floating") { listOf(style(KeyboardStyle.FLOATING)) },
+        Form("one_handed_left") { listOf(theme.oneHandedSide.during(OneHanded.Left), style(KeyboardStyle.ONE_HANDED)) },
+        Form("split_land", LANDSCAPE) { listOf(style(KeyboardStyle.SPLIT), heightAs060()) },
         Form("flat") { listOf(theme.keyBorderChoice.during(ThemePrefs.KeyBorderChoice.Off)) },
     )
 

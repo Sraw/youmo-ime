@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -94,7 +95,7 @@ class MotionNoticeUatTest {
     @Test
     @Uat("MN-03")
     fun floatingAtTheTopTheNoticeGoesBelow() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         val handle = grip()!!
         h.drag(handle, h.box(handle).exactCenterX(), 0f)
@@ -113,7 +114,7 @@ class MotionNoticeUatTest {
     @Uat("MN-03")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun floatingAtTheLeftTheNoticeGoesRight() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         val handle = grip()!!
         h.drag(handle, 0f, h.box(handle).exactCenterY())
@@ -250,7 +251,7 @@ class MotionNoticeUatTest {
         h.after(500)
         h.relayout()
         assertFalse("${keys()}", floating())
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.after(500)
         h.relayout()
         val again = keys()
@@ -261,7 +262,7 @@ class MotionNoticeUatTest {
     @Uat("MN-12")
     fun oneHandedTheHandleAsWideAsTheKeyboard() {
         prefs.set(ThemeManager.prefs.alwaysShowHandle, true)
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         h.start()
         val kb = keys()
         val g = h.box(grip()!!)

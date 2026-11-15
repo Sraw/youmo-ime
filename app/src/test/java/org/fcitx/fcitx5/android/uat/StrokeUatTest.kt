@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
@@ -424,10 +425,10 @@ class StrokeUatTest {
     @Uat("KB-42")
     fun noOtherLayoutHasAGap() {
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
-        class Board(val name: String, val board: PinyinKeyboard, val kind: Class<*>, val oneHanded: OneHanded = OneHanded.Off)
+        class Board(val name: String, val board: PinyinKeyboard, val kind: Class<*>, val oneHanded: Boolean = false)
         val boards = listOf(
             Board("26 keys", PinyinKeyboard.Full, TextKeyboard::class.java),
-            Board("26 keys one-handed", PinyinKeyboard.Full, TextKeyboard::class.java, OneHanded.Right),
+            Board("26 keys one-handed", PinyinKeyboard.Full, TextKeyboard::class.java, oneHanded = true),
             Board("14 keys", PinyinKeyboard.Keys14, GroupedKeyboard::class.java),
             Board("18 keys", PinyinKeyboard.Keys18, GroupedKeyboard::class.java),
             Board("nine keys", PinyinKeyboard.NineKeys, T9Keyboard::class.java),
@@ -436,12 +437,12 @@ class StrokeUatTest {
         )
         for (b in boards) {
             prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, b.board)
-            prefs.set(ThemeManager.prefs.oneHanded, b.oneHanded)
+            if (b.oneHanded) prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right) else prefs.setStyleDefault()
             harness(KeyboardHarness.PINYIN)
             val kb = board()
             assertTrue("${b.name}: ${kb.javaClass}", b.kind.isInstance(kb))
             // one-handed: the keyboard narrower than the screen, its letters as one block at a side
-            if (b.oneHanded != OneHanded.Off) assertTrue("${kb.width} of ${kb.rootView.width}", kb.width < kb.rootView.width * 0.9)
+            if (b.oneHanded) assertTrue("${kb.width} of ${kb.rootView.width}", kb.width < kb.rootView.width * 0.9)
             val found = grid(kb).filter { (x, y) -> kb.glideForTest?.inGap(x, y) == true }
             assertEquals(b.name, emptyList<Pair<Float, Float>>(), found)
             close()

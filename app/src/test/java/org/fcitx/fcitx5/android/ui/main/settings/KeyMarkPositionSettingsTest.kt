@@ -15,9 +15,9 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.swipeSpots
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.uat.PrefsRule
@@ -183,21 +183,21 @@ class KeyMarkPositionSettingsTest {
     @Test
     @Uat("KB-66")
     fun placedFloating() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         placedIn("悬浮", restoreFits = false)
     }
 
     @Test
     @Uat("KB-66")
     fun placedSplit() {
-        prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
+        prefs.setStyle(KeyboardStyle.SPLIT)
         placedIn("分开")
     }
 
     @Test
     @Uat("KB-66")
     fun placedOneHanded() {
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         placedIn("单手")
     }
 }

@@ -10,6 +10,7 @@ import android.util.Size
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestion
 import android.view.inputmethod.InlineSuggestionsResponse
@@ -18,6 +19,7 @@ import android.widget.ViewAnimator
 import android.widget.inline.InlineContentView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
+import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -385,7 +387,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     ToolbarButton.TradSimp -> { _ -> tradSimpEntry()?.let(panelActions::activate) }
                     ToolbarButton.Floating -> { _ -> panelActions.toggleFloating() }
                     // the keyboard resized where it is (InputView), not taken back to its letters
-                    ToolbarButton.OneHanded -> { _ -> panelActions.toggleOneHanded(reattach = false) }
+                    ToolbarButton.OneHanded -> { _ -> panelActions.toggleOneHanded(fromBar = true) }
                     ToolbarButton.Habits -> { _ -> panelActions.toggleHabits() }
                     ToolbarButton.ClearRecent -> { v -> panelActions.clearRecent(v) }
                     ToolbarButton.Theme -> { _ -> panelActions.themes() }
@@ -522,6 +524,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         view.currentView === idleUi.root && idleUi.onScreen(button) && it.isShown
     }
 
+    /** The button TalkBack's focus was last moved to ([focusForTalkBack]), for tests: the move itself only works with TalkBack on. */
+    @VisibleForTesting
+    internal var talkBackFocused: View? = null
+
+    /** TalkBack's focus on [button] once the bar is laid out, where it is shown (the view made anew for a style, §3.6). */
+    fun focusForTalkBack(button: ToolbarButton) {
+        view.post {
+            val b = shownButton(button) ?: return@post
+            talkBackFocused = b
+            b.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+        }
+    }
+
     override val view by lazy {
         // its colour is InputView's barBackground's, under the row above it too
         ViewAnimator(context).apply {
@@ -550,7 +565,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         clipboardSuggestion.registerOnChangeListener(onClipboardSuggestionUpdateListener)
         clipboardItemTimeout.registerOnChangeListener(onClipboardTimeoutUpdateListener)
         toolbarButtons.registerOnChangeListener(onToolbarButtonsUpdateListener)
-        ThemeManager.prefs.oneHanded.registerOnChangeListener(onToggleUpdateListener)
+        // lit as the shape's style is: 普通 and 单手 slid, not made anew
+        ThemeManager.prefs.keyboardStylePortrait.registerOnChangeListener(onToggleUpdateListener)
+        ThemeManager.prefs.keyboardStyleLandscape.registerOnChangeListener(onToggleUpdateListener)
         prefs.internal.useHabits.registerOnChangeListener(onToggleUpdateListener)
         handwritingOpen.registerOnChangeListener(onHandwritingUpdateListener)
         statusEntries = fcitx.runImmediately { statusAreaCached }

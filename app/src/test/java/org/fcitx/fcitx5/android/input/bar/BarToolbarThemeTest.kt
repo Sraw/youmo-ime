@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.preedit.PreeditUi
@@ -77,9 +78,12 @@ class BarToolbarThemeTest {
     private fun dp(v: Int) = (v * ctx.resources.displayMetrics.density).toInt()
 
     // the bar's and the keys' heights, px, the keyboard shown
-    private fun heights(floating: Boolean, oneHanded: OneHanded = OneHanded.Off): Pair<Int, Int> {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, floating)
-        prefs.set(ThemeManager.prefs.oneHanded, oneHanded)
+    private fun heights(floating: Boolean, oneHanded: Boolean = false): Pair<Int, Int> {
+        when {
+            floating -> prefs.setStyle(KeyboardStyle.FLOATING)
+            oneHanded -> prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
+            else -> prefs.setStyleDefault()
+        }
         return KeyboardHarness().use { h ->
             h.start()
             h.after(1000)
@@ -125,7 +129,7 @@ class BarToolbarThemeTest {
         assertEquals(dp(40), floatingBar)
         assertEquals(floatingKeys, floatingTallKeys)
         // one-handed: the same bar over the narrower keys
-        val (oneHandedTall, oneHandedKeys) = heights(floating = false, oneHanded = OneHanded.Right)
+        val (oneHandedTall, oneHandedKeys) = heights(floating = false, oneHanded = true)
         assertEquals(dp(48), oneHandedTall)
         assertEquals(keys, oneHandedKeys)
         // the least: a shorter bar, the keys as they were

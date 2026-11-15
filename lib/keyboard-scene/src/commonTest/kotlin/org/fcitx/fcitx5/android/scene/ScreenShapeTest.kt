@@ -5,10 +5,7 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.rules.ScreenShape
-import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
-import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard.Mode
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -31,17 +28,5 @@ class ScreenShapeTest {
         // foldables' outer screens and phones upright
         assertFalse(ScreenShape.landscape(turned = false, widthDp = 344))
         assertFalse(ScreenShape.landscape(turned = false, widthDp = 412))
-    }
-
-    @Test
-    fun autoSplitsFromTheSameWidth() {
-        // this copy of the split as ime-core's: one width for 横屏 and AUTO's split
-        assertEquals(600, ScreenShape.WIDE_DP)
-        assertTrue(SplitKeyboard.splits(Mode.AUTO, widthDp = 673))
-        assertTrue(SplitKeyboard.splits(Mode.AUTO, widthDp = 852))
-        assertFalse(SplitKeyboard.splits(Mode.AUTO, widthDp = 599))
-        assertFalse(SplitKeyboard.splits(Mode.AUTO, widthDp = 568))
-        assertTrue(SplitKeyboard.splits(Mode.ALWAYS, widthDp = 360))
-        assertFalse(SplitKeyboard.splits(Mode.OFF, widthDp = 1280))
     }
 }

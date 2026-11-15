@@ -38,6 +38,7 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.candidates.CharCardView
 import org.fcitx.fcitx5.android.input.candidates.CompactLineView
 import org.fcitx.fcitx5.android.input.candidates.WordCardView
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.popup.CharCardLayout
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.junit.After
@@ -616,7 +617,7 @@ class CandidateMenuUatTest {
     @Uat("LS-32")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun onTheFloatingKeyboardTheWordCardIsOneColumn() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         AppPrefs.getInstance().internal.run {
             prefs.set(floatingKeyboardX, floatingKeyboardX.defaultValue)
             prefs.set(floatingKeyboardY, floatingKeyboardY.defaultValue)

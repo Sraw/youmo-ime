@@ -70,9 +70,9 @@ class WideScreenUatTest {
         // turned's rows, a large screen's (its short side 673 dp): 4 × 56 dp, as high as turned (the next test), not 30% of 841
         assertTrue(s.large)
         assertEquals(s.dp(4 * 56.0), KeyboardArea.requestedHeight(ctx))
-        // the theme's `@landscape` and the gaps' turned ones, the split on its default (自动)
+        // the theme's `@landscape` and the gaps' turned ones, split as 横屏键盘样式 is when not set (by the width)
         assertTrue("landscape" in scenes())
-        assertTrue(KeyboardArea.splits(s, floating = false))
+        assertTrue(KeyboardArea.splits(s))
         // the display's pair as the settings pages draw it: 横屏 both ways up, the one held now as the keyboard's
         val (upright, turned) = KeyboardArea.screens(ctx)
         assertTrue(upright.landscape && turned.landscape)
@@ -99,7 +99,7 @@ class WideScreenUatTest {
         assertFalse(s.landscape)
         assertEquals(ctx.resources.displayMetrics.heightPixels * 30 / 100, KeyboardArea.requestedHeight(ctx))
         assertFalse("landscape" in scenes())
-        assertFalse(KeyboardArea.splits(s, floating = false))
+        assertFalse(KeyboardArea.splits(s))
         assertFalse(KeyboardArea.screens(ctx).first.landscape)
     }
 
@@ -110,7 +110,7 @@ class WideScreenUatTest {
         noThemeSizes()
         val s = KeyboardArea.screen(ctx)
         assertTrue(s.landscape)
-        assertTrue(KeyboardArea.splits(s, floating = false))
+        assertTrue(KeyboardArea.splits(s))
         // as high as on its side, 4 × 56 dp at 1x, not 30% of 1280
         assertEquals(4 * 56, KeyboardArea.requestedHeight(ctx))
     }
@@ -121,7 +121,7 @@ class WideScreenUatTest {
     fun justNarrowerIsUpright() {
         val s = KeyboardArea.screen(ctx)
         assertFalse(s.landscape)
-        assertFalse(KeyboardArea.splits(s, floating = false))
+        assertFalse(KeyboardArea.splits(s))
         // the settings pages' screen held now says the same as the keyboard's
         assertEquals(s.widthDp to false, KeyboardArea.displayScreen(ctx).let { it.widthDp to it.landscape })
     }
@@ -132,7 +132,7 @@ class WideScreenUatTest {
     fun sixHundredWideIsTurned() {
         val s = KeyboardArea.screen(ctx)
         assertTrue(s.landscape)
-        assertTrue(KeyboardArea.splits(s, floating = false))
+        assertTrue(KeyboardArea.splits(s))
         assertEquals(s.widthDp to true, KeyboardArea.displayScreen(ctx).let { it.widthDp to it.landscape })
     }
 

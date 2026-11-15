@@ -68,6 +68,12 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         recalculateSize()
     }
 
+    // the letters split or not as the held shape's 键盘样式 is (TextKeyboard.Split), picked on this page or on the
+    // keyboard: no theme's change any more (ThemeManager), so made anew here
+    private val styleChangeListener = ManagedPreference.OnChangeListener<String> { _, _ ->
+        makeKeyboard()
+    }
+
     private val bkg = imageView {
         scaleType = ImageView.ScaleType.CENTER_CROP
     }
@@ -114,6 +120,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             ThemeManager.prefs.codeRow.registerOnChangeListener(sizeChangeListener)
             // the bar's height follows the candidate text size (KawaiiBarComponent.heightDp)
             ThemeManager.prefs.candidateTextSize.registerOnChangeListener(sizeChangeListener)
+            ThemeManager.prefs.keyboardStylePortrait.registerOnChangeListener(styleChangeListener)
+            ThemeManager.prefs.keyboardStyleLandscape.registerOnChangeListener(styleChangeListener)
         }
 
         override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -129,6 +137,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             ThemeManager.prefs.alwaysShowHandle.unregisterOnChangeListener(sizeChangeListener)
             ThemeManager.prefs.codeRow.unregisterOnChangeListener(sizeChangeListener)
             ThemeManager.prefs.candidateTextSize.unregisterOnChangeListener(sizeChangeListener)
+            ThemeManager.prefs.keyboardStylePortrait.unregisterOnChangeListener(styleChangeListener)
+            ThemeManager.prefs.keyboardStyleLandscape.unregisterOnChangeListener(styleChangeListener)
             super.onDetachedFromWindow()
         }
     }

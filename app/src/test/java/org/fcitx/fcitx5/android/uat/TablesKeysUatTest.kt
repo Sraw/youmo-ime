@@ -21,7 +21,7 @@ import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -229,7 +229,7 @@ class TablesKeysUatTest {
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
     fun theSplitHalvesHaveTheKeyAfterLToo() {
-        ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Always)
+        TestStyles.set(KeyboardStyle.SPLIT)
         try {
             val erbi = TableKeyboard(InputMethodCatalog.ERBI, setOf(';', '\'', ',', '.', '/', '*'), false, KeyLabels.NONE, null)
             val h = harness(InputMethodCatalog.ERBI, "二笔", erbi)
@@ -248,7 +248,7 @@ class TablesKeysUatTest {
             assertNotNull(h.keyWithId(R.id.button_star))
             assertNull(h.keyWithId(R.id.button_semicolon))
         } finally {
-            ThemeManager.prefs.splitKeyboard.setValue(SplitKeyboardMode.Auto)
+            TestStyles.clear()
         }
     }
 

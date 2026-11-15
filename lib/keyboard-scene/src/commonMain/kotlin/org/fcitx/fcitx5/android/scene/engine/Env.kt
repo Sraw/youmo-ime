@@ -29,7 +29,7 @@ data class Env(
     val compact: Boolean = false,
     /** Floating: the keys' text scale there (FloatingKeyboard.textScale); null docked, or a settings preview. */
     val floating: Double? = null,
-    /** The letters split (SplitKeyboard.splits, never floating); the other boards then go to [dock]'s side. */
+    /** The letters split (键盘样式 分体, never floating); the other boards then go to [dock]'s side. */
     val split: Boolean = false,
     /** 单手: the side the board goes to ([SplitKeyboard.Dock.FULL]: off). */
     val oneHanded: SplitKeyboard.Dock = SplitKeyboard.Dock.FULL,

@@ -98,6 +98,10 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
   CI's instrumented tests run at API 29 and 35.
 - A class reading `AppPrefs` in its initialiser needs `AppPrefs.init(sharedPreferences)` in the test
   (a relaxed mock is enough); the error message says so.
+- 键盘样式 in an app test: `PrefsRule.setStyle(style, landscape = null /* both */, side)` and
+  `setStyleDefault()` (each shape's default by its width), or `TestStyles` (uat/) outside the rule, which
+  writes what is under before the style, as the service and the input view are told of the style. Put
+  back with the store after the test.
 - Test the behaviour a user would notice, named so ("a coarse word the user typed is not lowered"),
   with the case that bit as the example. A test that only restates the implementation is not worth
   its maintenance.

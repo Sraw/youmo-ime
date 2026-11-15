@@ -1804,3 +1804,6 @@ def st133(d):
     check(after[0] == before[0] and "!" not in after[0], f"ㄅ 的键角读作「{after[0]}」，内置的是「{before[0]}」")
     check(after[1] == before[1] and "ㄅㄅ" not in after[1], f"ㄅ 上滑打出「{after[1]}」，内置的是「{before[1]}」")
     return f"确认框提示 2 处不起作用；ㄅ 键角「{after[0]}」、上滑「{after[1]}」，和内置的一样"
+
+
+case("ST-140", needs="jvm:KeyboardStyleSettingsUatTest.theTwoStylesInPlaceOfTheThree、KeyboardStyleSettingsUatTest.notSetShowsTheTurnedScreensOwn、KeyboardStyleSettingsUatTest.aStyleChangedFromTheKeyboardShowsAtOnce")(lambda d: None)

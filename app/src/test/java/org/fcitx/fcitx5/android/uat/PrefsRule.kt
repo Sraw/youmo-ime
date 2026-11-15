@@ -7,7 +7,10 @@ package org.fcitx.fcitx5.android.uat
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
+import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
 import org.fcitx.fcitx5.android.input.keys.First
 import org.fcitx.fcitx5.android.input.keys.ItemMark
@@ -96,6 +99,18 @@ class PrefsRule : ExternalResource() {
         set(AppPrefs.getInstance().keyboard.swipeUp, up)
         set(AppPrefs.getInstance().keyboard.swipeDown, down)
     }
+
+    /**
+     * 键盘样式 [style] on both shapes, or on the one [landscape] says (TestStyles); [side] where 单手 is at. Put back
+     * with the store after the test.
+     */
+    fun setStyle(style: KeyboardStyle, landscape: Boolean? = null, side: OneHanded? = null) {
+        side?.let { set(ThemeManager.prefs.oneHandedSide, it) }
+        TestStyles.set(style, landscape)
+    }
+
+    /** No style stored: each shape's default by its width (竖屏 普通; 横屏 split from 600 dp). */
+    fun setStyleDefault() = TestStyles.clear()
 
     /** [key] stored as [value] as it is, of no setting this version declares (0.5's long presses): put back after the test. */
     fun setStored(key: String, value: String) = store.edit().putString(key, value).commit()

@@ -110,7 +110,7 @@ class SwipePopupScreenshotTest {
 
     @Test
     fun floatingOnTheCanvas() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         shoot("floating")
     }
 

@@ -253,10 +253,10 @@ class NineSceneGesturesTest {
     @Test
     fun aGlideIsReadWhereTheSceneDrawsTheKeys() {
         assertGlidesOnTheScene("docked")
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         assertGlidesOnTheScene("floating")
-        prefs.set(ThemeManager.prefs.floatingKeyboard, false)
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyleDefault()
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         assertGlidesOnTheScene("one-handed")
     }
 

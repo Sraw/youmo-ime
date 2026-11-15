@@ -35,6 +35,7 @@ import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.KeyTextScale
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -112,6 +113,13 @@ class KeyMarksEverywhereUatTest {
             pref.setValue(value)
         }
 
+        // 键盘样式 on both shapes, and the side where 单手; none stored again after
+        fun setStyle(style: KeyboardStyle, side: OneHanded? = null) {
+            side?.let { set(ThemeManager.prefs.oneHandedSide, it) }
+            TestStyles.set(style)
+            undo += { TestStyles.clear() }
+        }
+
         fun undo() {
             undo.asReversed().forEach { it() }
             undo.clear()
@@ -123,9 +131,9 @@ class KeyMarksEverywhereUatTest {
     private val upright = listOf(
         Mode("标准") {},
         Mode("紧凑") { compact(it) },
-        Mode("悬浮") { it.set(ThemeManager.prefs.floatingKeyboard, true) },
-        Mode("单手") { it.set(ThemeManager.prefs.oneHanded, OneHanded.Right) },
-        Mode("紧凑单手") { p -> compact(p); p.set(ThemeManager.prefs.oneHanded, OneHanded.Right) },
+        Mode("悬浮") { it.setStyle(KeyboardStyle.FLOATING) },
+        Mode("单手") { it.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right) },
+        Mode("紧凑单手") { p -> compact(p); p.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right) },
     )
 
     private val turned = listOf(

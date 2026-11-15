@@ -4,18 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
-
-/** The 单手模式 setting: the whole keyboard at a side while the letters do not split ([SplitKeyboard.placement]). */
-enum class OneHanded(override val stringRes: Int, val dock: SplitKeyboard.Dock) : ManagedPreferenceEnum {
-    Off(R.string.one_handed_off, SplitKeyboard.Dock.FULL),
-    Right(R.string.split_dock_right, SplitKeyboard.Dock.RIGHT),
-    Left(R.string.split_dock_left, SplitKeyboard.Dock.LEFT),
-    ;
-
-    companion object {
-        /** The side to keep for the status area's toggle: any side put, from wherever; [Off] keeps the last one. */
-        fun sideToRemember(value: OneHanded): OneHanded? = value.takeIf { it != Off }
-    }
+/**
+ * The side 单手 puts the whole keyboard at ([SplitKeyboard.placement]), remembered (`one_handed_side`) for both
+ * shapes. Named as 0.6.0's 单手模式 stored it (`one_handed`, Off as well), which KeyboardStyleMigration reads.
+ */
+enum class OneHanded(val dock: SplitKeyboard.Dock) {
+    Right(SplitKeyboard.Dock.RIGHT),
+    Left(SplitKeyboard.Dock.LEFT),
 }

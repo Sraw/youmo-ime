@@ -20,11 +20,14 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightLevels
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyleMigration
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
+import org.fcitx.fcitx5.android.utils.appContext
 
 class ThemePrefs(sharedPreferences: SharedPreferences) :
     ManagedPreferenceCategory(R.string.theme, sharedPreferences) {
@@ -115,6 +118,57 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         }
     }
 
+    /** [migrateKeyboardStyle] done: copied with the managed preferences. */
+    val keyboardStyleMigrated: Boolean get() = runCatching { sharedPreferences.getBoolean(KEYBOARD_STYLE_MIGRATED, false) }.getOrDefault(false)
+
+    /**
+     * Once: 0.6.0's 分体键盘, 单手模式 and 悬浮键盘 as each shape's style, as it showed there
+     * (KeyboardStyleMigration.from060); [KEYBOARD_STYLE_MIGRATED] marks it done. The old keys stay, for a backup of
+     * this version brought back into 0.6.0, which reads them (§6.2). A backup of 0.6.0 brought back has no mark:
+     * moved at the start after it (the restore restarts the process). A shape's style stored already is kept (a
+     * damaged file); an old value unreadable is its default. Done before the first unlock too, on the copy there
+     * (ThemeManager.syncToDeviceEncryptedStorage): 0.6.0's copy has the old keys only.
+     */
+    fun migrateKeyboardStyle() {
+        if (keyboardStyleMigrated) return
+        fun string(key: String) = runCatching { sharedPreferences.getString(key, null) }.getOrNull()
+        val split = when (string(SPLIT_KEYBOARD_060)) {
+            "Always" -> KeyboardStyleMigration.Split060.ALWAYS
+            "Off" -> KeyboardStyleMigration.Split060.OFF
+            else -> KeyboardStyleMigration.Split060.AUTO
+        }
+        val side = OneHanded.entries.firstOrNull { it.name == string(ONE_HANDED_060) }
+        val floating = runCatching { sharedPreferences.getBoolean(FLOATING_KEYBOARD_060, false) }.getOrDefault(false)
+        val migrated = KeyboardStyleMigration.from060(split, oneHanded = side != null, floating)
+        // none of the three stored (a new install, 0.6.0's defaults): the defaults, none written
+        val any = listOf(SPLIT_KEYBOARD_060, ONE_HANDED_060, FLOATING_KEYBOARD_060).any(sharedPreferences::contains)
+        sharedPreferences.edit {
+            fun put(style: StyleKey, under: StyleKey, stored: KeyboardStyleMigration.Stored) {
+                if (!any || sharedPreferences.contains(style.key) || sharedPreferences.contains(under.key)) return
+                stored.style?.let { putString(style.key, it.name) }
+                stored.under?.let { putString(under.key, it.name) }
+            }
+            put(keyboardStylePortrait, keyboardStyleUnderPortrait, migrated.portrait)
+            put(keyboardStyleLandscape, keyboardStyleUnderLandscape, migrated.landscape)
+            // 0.6.0 kept it as it changed; one of before that may not have
+            side?.let { putString(oneHandedSide.key, it.name) }
+            putBoolean(KEYBOARD_STYLE_MIGRATED, true)
+        }
+    }
+
+    /** A style's or an under's name ([KeyboardStyles]), "" where none is stored: copied as it is, or as not there. */
+    class StyleKey(sharedPreferences: SharedPreferences, key: String) : ManagedPreference<String>(sharedPreferences, key, "") {
+        override fun setValue(value: String) = sharedPreferences.edit { if (value.isEmpty()) remove(key) else putString(key, value) }
+
+        override fun getValue(): String = runCatching { sharedPreferences.getString(key, null) }.getOrNull().orEmpty()
+
+        // a style not stored stays so in the copy before the first unlock: its default is by the width there
+        override fun putValueTo(editor: SharedPreferences.Editor) {
+            val value = getValue()
+            if (value.isEmpty()) editor.remove(key) else editor.putString(key, value)
+        }
+    }
+
     // the code being typed over the app, outside the keyboard (FloatingCodeStrip), or in it above the
     // candidates as up to 0.5.0; the keyboard is lower floating, the keys keeping their height. For
     // everyone, upgrades too (the user, 2026-11-01). The view is made anew for it. 输入框里 (实验性,
@@ -131,35 +185,49 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         CandidateBarHeight.DEFAULT_TEXT_SP, 14, 28, "sp"
     )
 
-    // the letters in two halves, for the thumbs, on a phone on its side (TextKeyboard.splits)
-    val splitKeyboard = enumList(R.string.split_keyboard, "split_keyboard", SplitKeyboardMode.Auto)
+    /**
+     * 竖屏键盘样式 and 横屏键盘样式 (061-wide-keyboard-style): each shape's KeyboardStyle and what is under it, by
+     * name; a style not stored is the shape's default by its width (KeyboardStyleState.default), so none is
+     * written but by the user, the keyboard's toggles and [migrateKeyboardStyle]. Read and written through
+     * KeyboardStyles alone, the two of a shape in one edit; the view is made anew or slid by the service and
+     * InputView, not by the theme (ThemeManager).
+     */
+    val keyboardStylePortrait = StyleKey(sharedPreferences, "keyboard_style_portrait").apply { register() }
+    val keyboardStyleLandscape = StyleKey(sharedPreferences, "keyboard_style_landscape").apply { register() }
+    val keyboardStyleUnderPortrait = StyleKey(sharedPreferences, "keyboard_style_portrait_under").apply { register() }
+    val keyboardStyleUnderLandscape = StyleKey(sharedPreferences, "keyboard_style_landscape_under").apply { register() }
 
-    // the other boards at a side while it splits; read by the input view as it changes, not made anew
+    init {
+        ManagedPreferenceUi.Choice(
+            R.string.keyboard_style_portrait, "keyboard_style_portrait_list", KeyboardStyles.LABELS,
+            current = { KeyboardStyles.shown(it, landscape = false).ordinal },
+            pick = { ctx, i -> KeyboardStyles.set(ctx, landscape = false, KeyboardStyle.entries[i]) },
+            watched = listOf(keyboardStylePortrait, keyboardStyleUnderPortrait),
+        ).registerUi()
+        ManagedPreferenceUi.Choice(
+            R.string.keyboard_style_landscape, "keyboard_style_landscape_list", KeyboardStyles.LABELS,
+            current = { KeyboardStyles.shown(it, landscape = true).ordinal },
+            pick = { ctx, i -> KeyboardStyles.set(ctx, landscape = true, KeyboardStyle.entries[i]) },
+            watched = listOf(keyboardStyleLandscape, keyboardStyleUnderLandscape),
+        ).registerUi()
+    }
+
+    // the other boards at a side while it splits; read by the input view as it changes, not made anew. Of use
+    // where a shape splits, or goes back to split from one-handed or floating
     val splitDock = enumList(R.string.split_dock, "split_dock", SplitDock.Right) {
-        splitKeyboard.getValue() != SplitKeyboardMode.Off
+        KeyboardStyles.splitDockOffered(appContext)
     }
 
-    // the whole keyboard at a side for one thumb while it does not split; also from the status area,
-    // and read by the input view as it changes, as the dock is; floating, it does nothing
-    val oneHanded = enumList(R.string.one_handed, "one_handed", OneHanded.Off) {
-        !floatingKeyboard.getValue()
-    }
-
-    // the side 单手模式 was last at, which turning it on from the status area goes back to: a
-    // left-handed user would otherwise move it across every time. The app's state (ThemeManager writes
-    // it), not a setting: no UI, and not `hidden`, which an import of a backup resets (audit-061 app-rest-1)
+    // the side 单手 was last at, which turning it on goes back to (from the status area, the toolbar, the
+    // settings page): a left-handed user would otherwise move it across every time; the arrows beside it
+    // write it, read by the input view as it changes. The app's state, not a setting: no UI, and not
+    // `hidden`, which an import of a backup resets (audit-061 app-rest-1)
     val oneHandedSide = ManagedPreference.PStringLike(
         sharedPreferences,
         "one_handed_side",
         OneHanded.Right,
-        object : ManagedPreference.StringLikeCodec<OneHanded> {
-            override fun decode(raw: String): OneHanded? = OneHanded.entries.firstOrNull { it.name == raw && it != OneHanded.Off }
-        },
+        ManagedPreference.enumCodec<OneHanded>(),
     ).apply { register() }
-
-    // the keyboard over the app, smaller, dragged anywhere (FloatingKeyboard); also from the status
-    // area. The view is made anew for it: the letters do not split floating
-    val floatingKeyboard = switch(R.string.floating_keyboard, "floating_keyboard", false)
 
     // where its drag handle is: made anew for it too. Set also while it does not float, for the next time
     val floatingHandle = enumList(R.string.floating_handle, "floating_handle", FloatingHandleSide.Bottom)
@@ -380,6 +448,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     companion object {
         /** [migrateSizeFollow] done. */
         const val SIZES_FOLLOW_MIGRATED = "keyboard_sizes_follow_migrated"
+
+        /** [migrateKeyboardStyle] done. */
+        const val KEYBOARD_STYLE_MIGRATED = "keyboard_style_migrated"
+
+        /** 0.6.0's three, read by [migrateKeyboardStyle] alone; kept for 0.6.0 (§6.2). */
+        const val SPLIT_KEYBOARD_060 = "split_keyboard"
+        const val ONE_HANDED_060 = "one_handed"
+        const val FLOATING_KEYBOARD_060 = "floating_keyboard"
 
         /** 0.5.2's one 按键间距, which [migrateKeySpacing] moves into the two. */
         const val KEY_SPACING_052 = "key_spacing_choice"

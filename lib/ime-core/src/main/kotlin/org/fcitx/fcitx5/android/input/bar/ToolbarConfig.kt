@@ -28,7 +28,7 @@ enum class ToolbarButton(val key: String) {
     TradSimp("trad_simp"),
     Floating("floating"),
 
-    /** Not where the keyboard floats or its letters split, as in the panel */
+    /** Not where the keyboard floats, as in the panel; split, it goes one-handed over the split (061-wide-keyboard-style §3.3) */
     OneHanded("one_handed"),
     Habits("habits"),
     ClearRecent("clear_recent"),
@@ -97,7 +97,7 @@ data class ToolbarConfig(val items: List<Item>) {
         val voice: Boolean,
         /** the input method has chttrans's 简繁 */
         val tradSimp: Boolean,
-        /** not floating, the letters not split */
+        /** not floating */
         val oneHanded: Boolean,
         /** the input method has keyboards to choose from */
         val keyboards: Boolean,

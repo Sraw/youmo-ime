@@ -33,6 +33,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 
 /**
  * The code row and the candidates while pinyin is half typed and the keyboard is made anew or put
@@ -67,7 +68,7 @@ class StuckBarUatTest {
         if (::fcitx.isInitialized) fcitx.stop()
         if (::home.isInitialized) home.deleteRecursively()
         keyboard.pinyinKeyboard.let { it.setValue(it.defaultValue) }
-        ThemeManager.prefs.floatingKeyboard.let { it.setValue(it.defaultValue) }
+        TestStyles.clear()
         ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
     }
 
@@ -179,7 +180,7 @@ class StuckBarUatTest {
         engine.events.clear()
         for (floating in listOf(true, false)) {
             // the handle dragged off the bottom, then back: the keyboard made anew, nothing typed ended
-            ThemeManager.prefs.floatingKeyboard.setValue(floating)
+            if (floating) TestStyles.set(KeyboardStyle.FLOATING) else TestStyles.clear()
             h.idle()
             h.relayout()
             until("ni kept ${if (floating) "floating" else "docked"}", ::state) { shown("ni") != null && shown("你好") != null }

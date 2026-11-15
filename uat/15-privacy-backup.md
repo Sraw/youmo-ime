@@ -312,6 +312,18 @@
 - **预期**：上屏「門」；拼音打 men 也出繁体（拼音顶替了手写的第一位，也接过它的繁体，用户定 Q12）。手写不在第一个时它的繁体没了，提示里说一句「现在写的字跟着所在输入法的简繁」。
 - **JVM**：`KotlinHostHandwritingTest.zeroSixsTraditionalHandwritingIsPinyinsWhereItTookItsPlace`（拼音顶替时繁体给拼音；不在第一个时去掉并在提示里说）、`HandwritingRetireTest.traditionalHandwritingGoesToPinyinWhereItTookHandwritingsPlace`（ime-core）；设备上不跑。
 
+### PR-59 [P1] 从 0.6.0 升级：分体、单手、悬浮换成两种键盘样式，样子不变
+- **前提**：0.6.0 装着，依次用这四组设置各升级一次（或做 0.6.0 的「备份全部」再在 0.6.1 恢复）：① 分体键盘关、单手模式靠右；② 分体键盘总是；③ 悬浮键盘开；④ 分体键盘屏幕够宽时、单手模式开。
+- **操作**：装 0.6.1 覆盖升级（或恢复），竖拿、横拿各点一次框；打开 **外观 → 大小与样式** 看两项。
+- **预期**：竖拿横拿都和 0.6.0 一样：① 竖屏单手靠右、横屏单手；② 两边都分体；③ 两边都悬浮，拖回底部是原来的（不分体 / 宽屏横屏分体）；④ 竖屏单手，宽 ≥ 600 dp 的横屏仍分体（0.6.0 分体时不单手），宽不到 600 dp 的横屏是普通（唯一的例外，0.6.0 在这里是单手）。设置页两项显示的就是看到的样子。单手的那一侧照旧。
+- **JVM**：`KeyboardStyleTest.from060EachShapeAsItShowed`、`KeyboardStyleTest.from060FloatingOverWhatShowedDocked`（ime-core：换算表）、`KeyboardStyleMigrationAppTest.onTheWideScreenTheLandscapeOneIsNotWritten`（④：横屏不写，按屏宽定）、`KeyboardStyleMigrationAppTest.alwaysSplitFloatingIsFloatingOverSplitBothWays`、`KeyboardStyleMigrationAppTest.onlyOnceAndAStyleStoredIsKept`（只换一次，旧的三项留着）；真的升级发版时手工看一次。
+
+### PR-60 [P2] 0.6.1 的备份恢复到 0.6.0，再升回来
+- **前提**：0.6.0 升到 0.6.1 前分体键盘关；0.6.1 里把横屏键盘样式改成悬浮，做「备份全部」。
+- **操作**：装回 0.6.0 恢复这份备份，看键盘和设置；在 0.6.0 里把悬浮键盘打开；再装 0.6.1 覆盖升级。
+- **预期**：0.6.0 不崩，照升级前的设置（不分体、不悬浮；0.6.1 的样式它不认）；升回 0.6.1 后用的是降级前 0.6.1 的样式（横屏悬浮、竖屏普通），0.6.0 里打开的悬浮不再换算过来。
+- **设备**：手工（要 0.6.0 的包）；只换一次由 `KeyboardStyleMigrationAppTest.onlyOnceAndAStyleStoredIsKept` 钉住。
+
 ### PR-61 [P1] 从 0.6.0 升级：横屏高度
 - **前提**：0.6.0 装着，**键盘高度** 选"高"，开过悬浮键盘并在横屏把它拖到中间；做一份「备份全部」。装 0.6.1 覆盖升级。
 - **操作**：看设置里的键盘高度；横屏点「普通文本」框；开悬浮键盘看；恢复刚才的备份再看；再装回 0.6.0。

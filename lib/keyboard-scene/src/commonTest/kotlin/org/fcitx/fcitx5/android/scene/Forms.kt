@@ -30,7 +30,7 @@ import org.fcitx.fcitx5.android.scene.theme.ThemeReader
  * 70% of the width, kept to 300–420 dp, so 300 dp; 85% of the upright height, on its side of 0.6.0's 49%
  * of the short side; its text 0.85 (FloatingKeyboard). One-handed: 80% of the width, 328 dp
  * (SplitKeyboard.placement); split on its side, the letters across the whole width, the other boards
- * docked right at 42% (the default split_dock; Mode.AUTO splits from 600 dp).
+ * docked right at 42% (the default split_dock; 横屏 splits by default from 600 dp).
  */
 object Forms {
     const val DENSITY = 2.625
@@ -73,7 +73,7 @@ object Forms {
     /** On its side, not split (split_mode off). */
     val landscape = base.copy(width = SCREEN_LONG, height = (ROWS * SIDEWAYS_ROW_DP * DENSITY).toInt().toDouble(), landscape = true)
 
-    /** On its side, split (Mode.AUTO at 891 dp). */
+    /** On its side, split (横屏 by default at 891 dp). */
     val split = landscape.copy(split = true)
 
     val floating = base.copy(

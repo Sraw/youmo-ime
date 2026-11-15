@@ -440,4 +440,6 @@ case("PR-56", needs="jvm:AppPrefsTest.zeroSixsKeyHandwritingIsOffWithTheToolbars
 case("PR-57", needs="manual:要 0.6.0 做的「备份全部」（列表里有手写、学过「澜」），恢复后看列表、手写开关和「澜」的排序")(lambda d: None)
 case("PR-58", needs="jvm:KotlinHostHandwritingTest.zeroSixsTraditionalHandwritingIsPinyinsWhereItTookItsPlace、"
                "HandwritingRetireTest.traditionalHandwritingGoesToPinyinWhereItTookHandwritingsPlace")(lambda d: None)
+case("PR-59", needs="jvm:KeyboardStyleTest.from060EachShapeAsItShowed、KeyboardStyleTest.from060FloatingOverWhatShowedDocked、KeyboardStyleMigrationAppTest.onTheWideScreenTheLandscapeOneIsNotWritten、KeyboardStyleMigrationAppTest.alwaysSplitFloatingIsFloatingOverSplitBothWays、KeyboardStyleMigrationAppTest.onlyOnceAndAStyleStoredIsKept")(lambda d: None)
+case("PR-60", needs="manual:要 0.6.0 的包：0.6.1 的备份恢复到 0.6.0 不崩、照升级前的设置；在 0.6.0 改了再升回来用降级前 0.6.1 的样式")(lambda d: None)
 case("PR-61", needs="jvm:KeyboardSizesTest.floatingKeepsThePercentOf060、KeyboardAreaTest.aPhoneTurnedAsksForFourRowsOf48")(lambda d: None)

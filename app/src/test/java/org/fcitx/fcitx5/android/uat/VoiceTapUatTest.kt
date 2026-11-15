@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.voice.VoiceFeature
 import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
 import org.fcitx.fcitx5.android.input.voice.VoicePolishTags
@@ -420,8 +421,8 @@ class VoiceTapUatTest : VoiceTapUat() {
         assertEquals(0 to 5, composing())
         // a theme's rebuild (floating on) while the tail still composes: it is not finished in the
         // field as text, then typed again by the talk the old view's end stops
-        ThemeManager.prefs.floatingKeyboard.setValue(true)
-        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        TestStyles.set(KeyboardStyle.FLOATING)
+        restore += { TestStyles.clear() }
         h.idle()
         h.relayout()
         h.advance(1000)
@@ -432,8 +433,8 @@ class VoiceTapUatTest : VoiceTapUat() {
     @Uat("VO-04")
     fun floatingTheMaskGoesWithTheKeyboard() {
         allowMicrophone()
-        ThemeManager.prefs.floatingKeyboard.setValue(true)
-        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        TestStyles.set(KeyboardStyle.FLOATING)
+        restore += { TestStyles.clear() }
         h.start()
         // dragged and made smaller
         h.keyboard.translationX = 40f
@@ -462,8 +463,8 @@ class VoiceTapUatTest : VoiceTapUat() {
     @Uat("VO-04")
     fun floatingDraggingItsHandleTalksOn() {
         allowMicrophone()
-        ThemeManager.prefs.floatingKeyboard.setValue(true)
-        restore += { ThemeManager.prefs.floatingKeyboard.setValue(false) }
+        TestStyles.set(KeyboardStyle.FLOATING)
+        restore += { TestStyles.clear() }
         // the drag below keeps where it ended, and the preferences are one for every test of the JVM
         // (OneDefaultPreferencesShadow): put back, or a later test measures the floating keyboard there
         AppPrefs.getInstance().internal.run {

@@ -5,9 +5,9 @@
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.view.View
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.inInputMethod
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.scene.engine.Env
@@ -72,7 +72,7 @@ object SceneEnvs {
     ): Env {
         val context = view.context
         val config = view.resources.configuration
-        val floating = if (ThemeManager.prefs.floatingKeyboard.getValue() && context.inInputMethod()) {
+        val floating = if (context.inInputMethod() && KeyboardStyles.floating(context)) {
             val screen = config.screenWidthDp
             FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen).toDouble()
         } else {

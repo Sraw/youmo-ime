@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.content.Context
 import android.content.ContextWrapper
 import android.inputmethodservice.InputMethodService
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 
 /**
@@ -25,7 +24,7 @@ internal fun keyboardCompact(): Boolean = KeyboardArea.sizes().compact
 internal fun keyTextScale(context: Context): Float {
     // a keyboard drawn elsewhere (the theme's preview in the settings) is not the floating one, but
     // is 紧凑 as the real one is, so the preview shows what the level does
-    val floating = if (ThemeManager.prefs.floatingKeyboard.getValue() && context.inInputMethod()) {
+    val floating = if (context.inInputMethod() && KeyboardStyles.floating(context)) {
         val screen = context.resources.configuration.screenWidthDp
         FloatingKeyboard.textScale(FloatingKeyboard.widthDp(screen), screen)
     } else {

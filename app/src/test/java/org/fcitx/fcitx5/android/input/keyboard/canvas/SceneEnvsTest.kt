@@ -8,9 +8,11 @@ import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
+import org.fcitx.fcitx5.android.uat.TestStyles
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -30,7 +32,7 @@ class SceneEnvsTest {
     private val view get() = View(RuntimeEnvironment.getApplication())
 
     @After
-    fun floatingBack() = ThemeManager.prefs.floatingKeyboard.setValue(ThemeManager.prefs.floatingKeyboard.defaultValue)
+    fun floatingBack() = TestStyles.clear()
 
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
@@ -52,7 +54,7 @@ class SceneEnvsTest {
     // a settings page's preview is no floating keyboard: its text not scaled as one
     @Test
     fun floatingOnlyInTheInputMethod() {
-        ThemeManager.prefs.floatingKeyboard.setValue(true)
+        TestStyles.set(KeyboardStyle.FLOATING)
         val env = SceneEnvs.of(view, TestThemes.PixelDark.look, dark = false, width = 1000, height = 700, input = Input())
         assertNull(env.floating)
         assertFalse(env.landscape)

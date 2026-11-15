@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.engine.table.TableKeyboard
 import org.fcitx.fcitx5.android.engine.table.TableRoots
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.uat.PrefsRule
+import org.fcitx.fcitx5.android.uat.TestStyles
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -129,12 +130,12 @@ class CompactKeyboardScreenshotTest {
     @Uat("ST-51")
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
     fun floatingOneHandedAndDark() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         shootFull("floating_port", shift = true)
-        ThemeManager.prefs.floatingKeyboard.setValue(false)
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        TestStyles.clear()
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         shootFull("one_handed_port", shift = true)
-        ThemeManager.prefs.oneHanded.setValue(OneHanded.Off)
+        TestStyles.clear()
         shootFull("dark_port", TestThemes.PixelDark)
     }
 
@@ -142,7 +143,7 @@ class CompactKeyboardScreenshotTest {
     @Uat("ST-51")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun splitTurned() {
-        prefs.set(ThemeManager.prefs.splitKeyboard, SplitKeyboardMode.Always)
+        prefs.setStyle(KeyboardStyle.SPLIT)
         shootFull("split_land")
     }
 

@@ -179,7 +179,8 @@ class PopupOverridesFragmentTest {
             prefs.set(k.swipeDownPosition, KeyMarkPosition.Bottom)
             prefs.set(k.keyboardHeightPercent, 20)
             prefs.set(k.keyboardHeightPercentLandscape, 34)
-            prefs.set(org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.oneHanded, org.fcitx.fcitx5.android.input.keyboard.OneHanded.Right)
+            prefs.setStyleDefault()
+            prefs.setStyle(org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle.ONE_HANDED, landscape = false, side = org.fcitx.fcitx5.android.input.keyboard.OneHanded.Right)
             prefs.set(slotsPref, SwipeSlots.Default.with("full/j", false, SwipeSlot.Text("现在怎么样了")).serialize())
             org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.measurerFor = { org.fcitx.fcitx5.android.scene.engine.FixedMeasurer }
             try {

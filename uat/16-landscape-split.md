@@ -30,15 +30,15 @@
 
 ### LS-09 [P1] 改设置马上生效
 - **前提**：B0-横屏，键盘是分体的。
-- **操作**：展开工具栏点 **…** → **主题**（进到外观），**大小与样式 → 分体键盘** 选"关"，返回测试页点「普通文本」框。
+- **操作**：展开工具栏点 **…** → **主题**（进到外观），**大小与样式 → 横屏键盘样式** 选"普通"，返回测试页点「普通文本」框。
 - **预期**：键盘不再分体，不用重启应用。
-- **JVM**：`LandscapeUatTest.splitOffTakesAtOnce`（分体键盘改"关"后回到框里不再分体，G 只有一个）；设备上不跑。
+- **JVM**：`LandscapeUatTest.splitOffTakesAtOnce`（横屏键盘样式改"普通"后回到框里不再分体，G 只有一个）；设备上不跑。
 
 ### LS-10 [P1] 设置页的预览跟着分体
 - **前提**：B0-设置，设备横屏。
 - **操作**：打开 **外观**，看上面的键盘预览；再进 **大小与样式** 看预览。
-- **预期**：预览是分体的，样子和测试页里横屏的键盘一样（键的宽窄比例一致，不是挤在一起的细长键）；把"分体键盘"改成"关"后预览马上变成不分体。
-- **JVM**：`LandscapeUatTest.thePreviewSplitsToo`（横屏外观页的预览分体（两个 g）、改"关"马上不分体；图）；设备上不跑。
+- **预期**：预览是分体的，样子和测试页里横屏的键盘一样（键的宽窄比例一致，不是挤在一起的细长键）；把"横屏键盘样式"改成"普通"后预览马上变成不分体。
+- **JVM**：`LandscapeUatTest.thePreviewSplitsToo`（横屏外观页的预览分体（两个 g）、改"普通"马上不分体；图）；设备上不跑。
 
 ### LS-13 [P1] 网址框的分体键盘底排
 - **前提**：B0-横屏，点「网址」框。
@@ -97,23 +97,23 @@
 - **预期**：数字键盘铺满整个宽度，没有箭头。
 - **JVM**：`LandscapeUatTest.fullWidthTakesTheWholeWidth`（"铺满"时数字键盘铺满、没有箭头）；设备上不跑。
 
-### LS-23 [P1] 分体为"关"时"分体时其他面板"不可用
-- **前提**：B0-设置，**分体键盘** 选"关"。
+### LS-23 [P1] 两种样式都是普通时"分体时其他面板"不可用
+- **前提**：B0-设置，**竖屏键盘样式**、**横屏键盘样式** 都选"普通"。
 - **操作**：看 **分体时其他面板**。
 - **预期**：这一项是灰的，点不了。
-- **JVM**：`LandscapeUatTest.dockGreyedWhenSplitIsOff`（分体键盘"关"时"分体时其他面板"不可用）；设备上不跑。
+- **JVM**：`LandscapeUatTest.dockGreyedWhenSplitIsOff`（两种样式都普通时"分体时其他面板"不可用）；设备上不跑。
 
 ### LS-24 [P1] 竖屏时面板照旧铺满
-- **前提**：B0（竖屏，分体键盘为默认"屏幕够宽时"）。
+- **前提**：B0（竖屏，竖屏键盘样式为默认的普通）。
 - **操作**：点 **123**；再点 **符**。
 - **预期**：都铺满宽度，没有箭头。
 - **JVM**：`LandscapeUatTest.portraitPanelsFull`（竖屏数字键盘、符号面板铺满、没有箭头）；设备上不跑。
 
-### LS-24a [P1] 竖屏选"总是"时面板铺满
-- **前提**：B0-设置，**分体键盘** 选"总是"，**分体时其他面板** 为"靠右"；竖屏手机回测试页点「普通文本」框。
+### LS-24a [P1] 竖屏键盘样式选分体时面板铺满
+- **前提**：B0-设置，**竖屏键盘样式** 选"分体"，**分体时其他面板** 为"靠右"；竖屏手机回测试页点「普通文本」框。
 - **操作**：点 **123**；再点 **符**。
 - **预期**：字母键盘分体，但数字键盘和符号面板都铺满宽度，没有箭头。
-- **JVM**：`LandscapeUatTest.portraitAlwaysSplitPanelsFull`（竖屏"总是"时字母分体，数字键盘、符号面板铺满、没有箭头）；设备上不跑。
+- **JVM**：`LandscapeUatTest.portraitAlwaysSplitPanelsFull`（竖屏键盘样式分体时字母分体，数字键盘、符号面板铺满、没有箭头）；设备上不跑。
 
 ### LS-25 [P1] 靠边时数字框直接出靠边的数字键盘
 - **前提**：B0-横屏。
@@ -181,8 +181,8 @@
 - **预期**：展开后键盘马上按横屏排（分体、横屏的高度），折叠后回到竖屏的样子；打到一半的拼音照转屏的规则处理（清掉、不上屏），不卡、不留旧大小的键盘。
 - **设备**：需要折叠屏模拟器或手工换 `wm size`，没写成脚本。
 
-### LS-36 [P2] 平板竖拿算横屏，分体选「自动」时分体
-- **前提**：B0，平板竖拿（或模拟器竖屏 600 dp 以上，比如 `wm size 1600x2560` 加 `wm density 320`，800×1280 dp）；**分体键盘** 是默认的「屏幕够宽时」。
+### LS-36 [P2] 平板竖拿算横屏，横屏键盘样式没设过时分体
+- **前提**：B0，平板竖拿（或模拟器竖屏 600 dp 以上，比如 `wm size 1600x2560` 加 `wm density 320`，800×1280 dp）；**横屏键盘样式** 没设过（屏宽 ≥ 600 dp 时分体）。
 - **操作**：点「普通文本」框，看键盘。
 - **预期**：字母分体；高度和平板横拿一样（标准档键区 4 × 56 dp）。宽 599 dp 的竖屏不算横屏、不分体，600 dp 就算。
 - **JVM**：`WideScreenUatTest.aTabletUprightIsTurnedAndSplits`（800×1280 dp：横屏、分体、键区 4 × 56 dp）、`WideScreenUatTest.justNarrowerIsUpright`（599 dp：竖屏、不分体，设置页的屏和键盘的一致）、`WideScreenUatTest.sixHundredWideIsTurned`（600 dp：横屏、分体）；设备上不跑。
@@ -198,6 +198,56 @@
 - **操作**：看字母键；打 `unvzi`（拼音 u 拆字：女子），长按候选「好」看字卡。
 - **预期**：上滑的小字画在角上（右上），不画在字母下面；字卡分两栏（读音、例词在左，部首、拆字、笔顺在右），读音显示 3 行后可以滚动。
 - **JVM**：`WideScreenUatTest.theLowKeysMarksAndTheCardAsTurned`（673 dp 竖拿时场景是横屏，「底部」改到右上；字卡两栏、读音 3 行）；设备上不跑。
+
+## 竖屏、横屏键盘样式
+
+### LS-39 [P1] 默认：竖屏普通、横屏分体
+- **前提**：B0（竖屏、横屏键盘样式都没设过），手机横屏宽 ≥ 600 dp。
+- **操作**：竖拿点「普通文本」框看键盘；转到横屏再看；再转回竖屏。
+- **预期**：竖拿是普通的整块键盘；横拿分体（G 两边都有）；转回竖屏又是整块。和 0.6.0 默认的样子一样。
+- **JVM**：`KeyboardStyleUatTest.notSetTurnedSplits`（没设过、851 dp 宽横屏：分体）、`KeyboardStyleUatTest.notSetUprightIsWhole`（竖屏：整块铺满）；设备上不跑。
+
+### LS-40 [P1] 横屏悬浮、竖屏停靠，各记各的
+- **前提**：B0-设置，**竖屏键盘样式** 选"普通"，**横屏键盘样式** 选"悬浮"。
+- **操作**：竖拿点「普通文本」框；转到横屏；再转回竖屏；重开手机后再横拿一次。
+- **预期**：竖拿停在底部、铺满；横过来是悬浮键盘（用横屏那份大小、位置），不分体；竖回来又停在底部。重开后照旧。在竖屏把竖屏样式改成单手、悬浮，横屏那边的键盘不重建、照旧分体。
+- **JVM**：`KeyboardStyleUatTest.turnedFloatingUprightDockedEachItsOwn`（横屏悬浮、不分体）、`KeyboardStyleUatTest.uprightDockedWhereTurnedFloats`（竖屏铺满）、`KeyboardStyleUatTest.theOtherShapesStyleMakesNothingAnew`（改另一个方向的样式，键盘不重建）；重开手机设备上不跑（样式存在设置里，和别的设置一样）。
+
+### LS-41 [P1] 横屏单手：靠一边，换边，退出回到分体
+- **前提**：B0-设置，**横屏键盘样式** 先选"分体"，再选"单手"。
+- **操作**：横拿点「普通文本」框；点旁边空白里的箭头；再点斜箭头；转到竖屏看。
+- **预期**：横拿时整个键盘约 420 dp 宽靠一边（第一次靠右），不分体；箭头换到另一边；斜箭头读「退出单手模式」，点了回到分体；竖屏照旧是普通的整块。
+- **JVM**：`KeyboardStyleUatTest.turnedOneHandedAtTheSideRememberedAndBackToSplit`（横屏单手靠记住的左边、不分体，点「退出单手模式」重建后分体，横屏样式存成分体）；设备上不跑。
+
+### LS-42 [P1] 键盘上切换只改当时那个方向
+- **前提**：B0-横屏（横屏样式没设过、分体）。
+- **操作**：在「普通文本」打 ni 不选，展开工具栏点 **⋯ → 悬浮键盘**；打开 **设置 → 外观 → 大小与样式** 看两项；回来把悬浮键盘拖回底部；再开悬浮，去系统设置强行停止输入法，回来点框，拖回底部。
+- **预期**：变成悬浮时 ni 和候选还在；设置页「横屏键盘样式」是悬浮，「竖屏键盘样式」还是普通；拖回底部回到分体；强行停止后再拖回底部，也回到分体。
+- **JVM**：`KeyboardStyleUatTest.floatingFromThePanelIsTheTurnedOnesAndDocksBackToSplit`（⋯ 里点悬浮只写横屏、竖屏没动，打的拼音不结束，拖回底部是分体）、`KeyboardStyleUatTest.afterATurnTheTurnedShapeIsTheOneWrittenAndMadeAnewOnce`（竖屏开、转到横屏后点悬浮写的是横屏，只重建一次）、`KeyboardStyleUatTest.turnedBeforeTheViewIsMadeAnewThePanelWritesTheBuiltShape`（屏已转、视图还没重建时 ⋯ 里点单手，写的是建视图时的竖屏）；强行停止设备上手工（底下那层和样式存在同一处，`KeyboardStyleMigrationAppTest`、`KeyboardStylesTest.theKeyboardsToggleWritesItsShapeOnlyBothKeys` 读写都断言了）。
+
+### LS-43 [P2] 横屏分体时也能单手，打拼音时切换不丢
+- **前提**：B0-横屏（分体）。
+- **操作**：打 ni 不选；展开工具栏点 **⋯ → 单手模式**；再点一次。
+- **预期**：变成单手（约 420 dp 靠一边，不分体），ni 和候选都还在；再点回到分体，ni 还在；竖屏样式不变。
+- **JVM**：`KeyboardStyleUatTest.splitToOneHandedAndBackKeepsWhatIsTyped`（分体 → 单手 → 分体，各重建一次，没有 `focusOutIn`/`reset`，只写横屏）；设备上不跑。
+
+### LS-44 [P2] 折叠屏、平板：内屏两个方向都用横屏键盘样式
+- **前提**：折叠屏模拟器或 `wm size` 换成 673×841 dp；**竖屏键盘样式** 选"普通"，**横屏键盘样式** 选"悬浮"。
+- **操作**：展开竖拿、展开横拿各点一次框；折叠（或换回 412 dp 宽）再点。
+- **预期**：展开时两个方向都是悬浮；折起来（外屏）是普通。
+- **设备**：需要折叠屏模拟器或手工换 `wm size`，没写成脚本；展开竖拿读横屏那项由 `KeyboardStylesTest.aWideScreenUprightReadsTheLandscapeOne` 钉住。
+
+### LS-45 [P2] 悬浮键盘正滑回底部时转屏
+- **前提**：B0，竖屏开着悬浮键盘（竖屏样式悬浮），横屏样式悬浮。
+- **操作**：按住拖动条拖回底部，松手后立刻转屏；转回来。
+- **预期**：横过来仍是悬浮（横屏那项不变）；竖回来是停在底部的普通（拖回底部改的是竖屏那项）。不崩、不留两块键盘。
+- **JVM**：`KeyboardStyleUatTest.slidingDownAsTheScreenTurnsDocksTheShapeItWasMadeOn`（点放回底部、滑下时转屏：竖屏存成普通，横屏仍悬浮）、`KeyboardStylesTest.aViewMadeOnTheOtherShapeWritesThatOne`；设备上不跑。
+
+### LS-46 [P2] 宽不到 600 dp 的横屏没设过时不分体
+- **前提**：模拟器 `wm size 1280x720` 加 `wm density 360`（横屏约 569×320 dp），或 Android 14 以下带三个按钮侧边导航栏的手机横拿；横屏样式没设过。
+- **操作**：横拿点框；打开 **设置 → 外观 → 大小与样式** 看 **横屏键盘样式**；选"分体"，回来再点框。
+- **预期**：没设过时是普通的整块键盘；设置页显示"普通"；选了分体后分体。
+- **JVM**：`KeyboardStylesTest.notSetTurnedUnder600IsNormal`（592 dp 宽横屏没设过：普通）、`KeyboardStylesTest.notSetTurnedFrom600Splits`（640 dp：分体，设置页照实际显示，什么都不存）；设备上不跑。
 
 ## 横屏高度（按每行高度，给应用留底线）
 
@@ -217,8 +267,8 @@
 
 ### LS-49 [P1] 折叠屏展开、平板：四个方向一样高
 - **前提**：折叠屏展开（`wm size 1767x2208` + `wm density 420`）、平板（`wm size 1600x2560` + `wm density 320`），B0，标准档。
-- **操作**：横拿、竖拿各点一次「普通文本」框；把 **分体键盘** 改成关、开 **单手模式** 再看；测完 `wm size reset; wm density reset`。
-- **预期**：标准档键盘约 312 dp（含导航条），每行约 56 dp，四种方向一样高；关掉分体、开单手时也一样高。
+- **操作**：横拿、竖拿各点一次「普通文本」框；**横屏键盘样式** 选普通，再选单手，各看一次；测完 `wm size reset; wm density reset`。
+- **预期**：标准档键盘约 312 dp（含导航条），每行约 56 dp，四种方向一样高；选普通、单手时也一样高。
 - **JVM**：`WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned`、`WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh`、`WideScreenUatTest.aTabletUprightIsTurnedAndSplits`、`KeyboardAreaTest.aTabletAShortSideOver600IsLargeWhicheverWayHeld`（601×962 dp 平板减掉导航条后仍是大屏）；设备上的数是 2026-11-14 在模拟器上量的（API 29/33/34/36，见 061-landscape-height-impl-report），不在每次 UAT 里跑。
 
 ### LS-50 [P2] 小手机横屏：每行最矮 36 dp

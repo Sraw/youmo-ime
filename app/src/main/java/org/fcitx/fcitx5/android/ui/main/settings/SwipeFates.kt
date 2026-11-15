@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
@@ -207,7 +208,9 @@ object SwipeFates {
     @VisibleForTesting
     internal fun size(s: KeyboardArea.Screen, board: String?, codeRow: ImKeyboards.Layout, rows: Double = KeyboardHeightCap.DEFAULT_ROWS): Size {
         val prefs = ThemeManager.prefs
-        if (prefs.floatingKeyboard.getValue()) {
+        // each screen by its own shape's 键盘样式: upright floating, turned split (061-wide-keyboard-style)
+        val style = KeyboardStyles.of(s)
+        if (style.floating) {
             val widthDp = FloatingKeyboard.widthDp(s.widthDp)
             val height = FloatingKeyboard.height(KeyboardArea.floatingBase(s), widthDp, s.widthDp)
             return Size(s.dp(widthDp.toDouble()), height, FloatingKeyboard.textScale(widthDp, s.widthDp).toDouble(), false)
@@ -215,9 +218,9 @@ object SwipeFates {
         val handle = if (prefs.alwaysShowHandle.getValue()) s.dp(FloatingHandle.HEIGHT_DP.toDouble()) else 0
         val height = KeyboardArea.keysHeight(s, CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats()), handle, rows = rows)
         val letters = board == KeyNames.QWERTY
-        val splitting = KeyboardArea.splits(s, floating = false)
+        val splitting = style.splits
         val widthDp = KeyboardArea.widthDp(s, floating = false)
-        val placed = SplitKeyboard.placement(prefs.oneHanded.getValue().dock, prefs.splitDock.getValue().dock, splitting, letters, widthDp)
+        val placed = SplitKeyboard.placement(KeyboardStyles.oneHandedDock(s), prefs.splitDock.getValue().dock, splitting, letters, widthDp)
         return when {
             placed != null -> Size(s.dp(placed.widthDp.toDouble()), height, null, false)
             else -> Size(KeyboardArea.keysWidth(s), height, null, splitting && letters)

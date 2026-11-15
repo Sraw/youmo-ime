@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.preedit.FloatingCodeStrip
@@ -254,7 +255,7 @@ class FloatingCodeStripUatTest {
     @Test
     @Uat("ST-50")
     fun oneHandedTheStripIsAtTheBoardsLeft() {
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         open()
         typing("ni hao")
         val bar = h.box(h.bar)
@@ -267,7 +268,7 @@ class FloatingCodeStripUatTest {
     @Test
     @Uat("ST-50")
     fun floatingTheStripIsOutsideTheKeyboardAndUnderItAtTheTop() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         open()
         typing("ni hao")
         val keyboard = h.box(h.keyboard)

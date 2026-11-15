@@ -68,6 +68,7 @@ import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 
 /**
  * UAT cases of handwriting (uat/09) on the whole keyboard over a fake engine: the toolbar's 手写 on, strokes
@@ -331,14 +332,14 @@ class HandwritingUatTest {
     @Test
     @Uat("AX-18")
     fun theCandidateBarsButtonOnTheOneHandedKeyboard() {
-        prefs.set(ThemeManager.prefs.oneHanded, OneHanded.Right)
+        prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         candidateBarsButton()
     }
 
     @Test
     @Uat("AX-18")
     fun theCandidateBarsButtonOnTheFloatingKeyboard() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         AppPrefs.getInstance().internal.run {
             prefs.set(floatingKeyboardX, floatingKeyboardX.defaultValue)
             prefs.set(floatingKeyboardY, floatingKeyboardY.defaultValue)
@@ -614,7 +615,7 @@ class HandwritingUatTest {
     @Uat("HW-29")
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun theCardOnTheFloatingKeyboardIsOneColumn() {
-        prefs.set(ThemeManager.prefs.floatingKeyboard, true)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         // at its default place whatever an earlier test left: higher up, the card has more room
         AppPrefs.getInstance().internal.run {
             prefs.set(floatingKeyboardX, floatingKeyboardX.defaultValue)

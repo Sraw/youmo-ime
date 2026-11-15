@@ -999,10 +999,12 @@
     <string name="learning_kept_aside">The learning record could not be read in full: the file was kept aside as a copy, what could be read is used as usual, and the rest of the words learned are not used this time. To get earlier learned words back, restore one in Learning backups.</string>
     <string name="learning_not_saving">Words learned are not being saved now: they are kept in memory only and are lost once the system stops the keyboard or the phone restarts. Free some storage on the phone and they are saved as usual again; if they still are not, restart the phone.</string>
     <string name="user_lists_unkept">A change to your custom phrases or common words could not be saved: it is kept in memory only and is lost once the system stops the keyboard or the phone restarts (what was saved before is not affected). Free some storage on the phone and it is saved with your next change of the same kind (a phrase or a common word) on the keyboard; if it still is not, restart the phone, and if this shows again after that, report it with the log from Developer → Real-time logs.</string>
-    <string name="split_keyboard">Split keyboard</string>
-    <string name="split_keyboard_auto">On a wide screen</string>
-    <string name="split_keyboard_always">Always</string>
-    <string name="split_keyboard_off">Off</string>
+    <string name="keyboard_style_portrait">Portrait keyboard style</string>
+    <string name="keyboard_style_landscape">Landscape keyboard style</string>
+    <string name="keyboard_style_normal">Normal</string>
+    <string name="keyboard_style_split">Split</string>
+    <string name="keyboard_style_floating">Floating</string>
+    <string name="keyboard_style_one_handed">One-handed</string>
     <string name="split_dock">Other panels when split</string>
     <string name="split_dock_right">Right side</string>
     <string name="split_dock_left">Left side</string>
@@ -1010,8 +1012,7 @@
     <string name="split_dock_move_left">Move to the left</string>
     <string name="split_dock_move_right">Move to the right</string>
     <string name="one_handed">One-handed mode</string>
-    <string name="one_handed_off">Off</string>
-    <string name="one_handed_exit">Full width</string>
+    <string name="one_handed_exit">Exit one-handed mode</string>
     <string name="floating_keyboard">Floating keyboard</string>
     <string name="floating_keyboard_dock">Dock the keyboard</string>
     <string name="code_row_style">Code row</string>
