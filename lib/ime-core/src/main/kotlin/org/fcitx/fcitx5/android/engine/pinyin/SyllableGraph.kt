@@ -127,6 +127,20 @@ class SyllableGraph internal constructor(
     val hasOtherReadings: Boolean by lazy(LazyThreadSafetyMode.NONE) { hasAbbreviations || edgeSlips != null }
 
     /**
+     * Whether an edge from [from] up to [to] (not from [to]) [readsOtherwise]: where none does, every
+     * path from [from] to [to] reads the keys as typed, and [withoutOtherReadings] has those paths if it
+     * reaches [from].
+     */
+    fun readsOtherwiseWithin(from: Int, to: Int): Boolean = hasOtherReadings && otherwiseBefore.let { it[to] > it[from] }
+
+    // how many edges [readsOtherwise] from the positions before each: made once a graph, where it has any
+    private val otherwiseBefore: IntArray by lazy(LazyThreadSafetyMode.NONE) {
+        IntArray(end + 1).also { n ->
+            for (at in 0 until end) n[at + 1] = n[at] + edges(at).count(::readsOtherwise)
+        }
+    }
+
+    /**
      * This graph without the edges that [readsOtherwise], nor what only they reach: the input read
      * in whole syllables as typed, a key alone an initial only where it and the next make none, as
      * before 简拼 in the middle, and no key read as the key next to it. Itself where it has none.

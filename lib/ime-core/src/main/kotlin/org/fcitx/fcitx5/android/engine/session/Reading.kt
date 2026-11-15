@@ -15,7 +15,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches
  * [slips], each key read as the key next to it, its place in the graph to the key meant (learned so, 061-neighbour-correction §8.2);
  * [otherwise], whether its path has an edge that [reads otherwise][SyllableGraph.readsOtherwise] than typed (简拼, a slip):
  * the very test [SyllableGraph.withoutOtherReadings] drops edges by, as HabitOrder.readsAlong takes a path with none for
- * one that graph keeps; a change to either is a change to both.
+ * one that graph keeps, and [SyllableGraph.readsOtherwiseWithin] counts to let it skip a word; a change to one is a
+ * change to all three.
  */
 internal class Reading(
     val shown: List<String>, val ends: List<Int>, val syllables: IntArray, val exact: Boolean = true, val slips: Map<Int, Char> = emptyMap(),

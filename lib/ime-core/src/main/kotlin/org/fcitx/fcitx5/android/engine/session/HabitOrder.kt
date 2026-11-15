@@ -417,10 +417,16 @@ internal class HabitOrder(
 
     /**
      * Whether each word of [c] reads along [whole] ([graph] without 简拼 in the middle nor slips, nor what only they
-     * reach) from its start: whether the code typed whole reads it. A word [graph] reads over no edge read otherwise,
-     * from a place the words before reached along [whole], reads along [whole] so, and one [graph] does not read does
-     * not; only the others are walked on [whole]. Past text kept as typed ([NO_WORD], an arc over any edge, a slip's
-     * too) the place may be one only a slip reaches, so the next word is walked. Internal for the test that holds it
+     * reach) from its start: whether the code typed whole reads it. A word from a place the words before reached
+     * along [whole] over keys no edge reads otherwise ([SyllableGraph.readsOtherwiseWithin]) reads along it as
+     * [graph] reads it, so is not read at all: the decoder read it there, and where nothing reads otherwise
+     * ([whole] null) every candidate takes its slot unread. So each word of [c] must be one [graph] reads at its place,
+     * as the decoder's candidates and those walked on [graph] are: one it does not, over such keys, is taken to read
+     * along (HabitOrderReadsAlongTest.aWordOverKeysNothingReadsOtherwiseIsTakenToReadThereUnread). Most words of a long input are such, and reading
+     * them all, every candidate's, each key, was most of what the nine keys' slips cost (061-nine-perf-impl-report).
+     * Of the others, a word [graph] reads over no edge read otherwise reads along [whole] so, and one [graph] does
+     * not read does not; only the rest are walked on [whole]. Past text kept as typed ([NO_WORD], an arc over any
+     * edge, a slip's too) the place may be one only a slip reaches, so the next word is walked. Internal for the test that holds it
      * to the walk of every word (HabitOrderReadsAlongTest).
      */
     internal fun readsAlong(graph: SyllableGraph, whole: SyllableGraph, c: Candidate, readings: Readings): Boolean {
@@ -432,7 +438,8 @@ internal class HabitOrder(
             val to = c.ends[i]
             if (word == NO_WORD) {
                 sure = false
-            } else {
+            } else if (!sure || graph.readsOtherwiseWithin(from, to)) {
+                // read only where it may not read along [whole]: past text kept as typed, or over an edge read otherwise
                 val r = readings.reading(from, to, word) { spelt(graph, from, to, word) } ?: return false
                 val walked = r.otherwise || !sure
                 if (walked && !readings.along(from, to, word) { reading(whole, from, to, word, data.dictionary, ownOf(word)) { _, _ -> "" } != null }) return false
@@ -486,6 +493,9 @@ internal class HabitOrder(
     internal class Readings {
         private val along = HashMap<Long, Boolean>()
         private val readings = HashMap<Long, Reading?>()
+
+        /** How many words were read on an order's graph: for the test that holds [readsAlong] to the words it need read. */
+        internal val read: Int get() = readings.size
 
         fun along(from: Int, to: Int, word: Int, read: () -> Boolean): Boolean = along.getOrPut(key(from, to, word), read)
 

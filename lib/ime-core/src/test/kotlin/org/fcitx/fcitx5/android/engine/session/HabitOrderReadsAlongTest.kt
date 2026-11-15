@@ -92,7 +92,10 @@ class HabitOrderReadsAlongTest {
         return out
     }
 
-    private class Counts(var candidates: Int = 0, var read: Int = 0, var pastKept: Int = 0, var graphs: Int = 0, var onlyWalked: Int = 0)
+    private class Counts(
+        var candidates: Int = 0, var read: Int = 0, var pastKept: Int = 0, var graphs: Int = 0, var onlyWalked: Int = 0,
+        val slipped: MutableMap<String, Int> = HashMap(),
+    )
 
     private fun check(what: String, segmenter: Segmenter, keys: String, touches: Array<Touch?>, counts: Counts) {
         val graph = segmenter.segment(keys, null, touches)
@@ -100,6 +103,7 @@ class HabitOrderReadsAlongTest {
         // one for every candidate, as an order has: a word's place read for one is what the next finds
         val readings = HabitOrder.Readings()
         if (graph.hasOtherReadings) counts.graphs++
+        if ((0 until graph.edgeCount).any(graph::isSlip)) counts.slipped.merge(what, 1, Int::plus)
         for (c in candidates(graph)) {
             val expected = walked(whole, c)
             assertEquals("$what $keys ${c.words.toList()} ${c.ends.toList()}", expected, order.readsAlong(graph, whole, c, readings))
@@ -140,9 +144,60 @@ class HabitOrderReadsAlongTest {
         }
         // enough of each kind to hold: graphs with slips or 简拼, candidates that read, and ones read past text kept as typed
         assertTrue("${counts.graphs} graphs read otherwise", counts.graphs > 500)
+        // of them, ones with a slip of each kind: 简拼 in 双拼 alone would fill the count above
+        for (kind in listOf("全拼", "九键", "双拼")) assertTrue("${counts.slipped[kind]} $kind graphs with a slip", (counts.slipped[kind] ?: 0) > 150)
         assertTrue("${counts.read} of ${counts.candidates} read", counts.read > 5000 && counts.read < counts.candidates)
         assertTrue("${counts.pastKept} read past text kept as typed", counts.pastKept > 200)
         // and ones that read only if the word after text kept as typed is not walked again
         assertTrue("${counts.onlyWalked} told apart by the walk past text kept as typed", counts.onlyWalked > 500)
+    }
+
+    // a word over keys nothing reads otherwise is not read: on a long input most are, and reading every one of
+    // every candidate took most of what the nine keys' slips cost a key (061-nine-perf-impl-report)
+    @Test
+    fun onlyTheWordsOverKeysReadOtherwiseAreRead() {
+        // 我们在家里 and 99, its second 9 tapped at its top, toward 6: wo (T9-68)
+        val keys = "womenzaijiali".map { NineKeyLetters.STANDARD.key(it) }.joinToString("") + "99"
+        val touches = Array<Touch?>(keys.length) { TouchBoxes.tap(TouchBoxes.NINE, keys[it]) }
+        touches[keys.length - 1] = TouchBoxes.tap(TouchBoxes.NINE, '9', dy = -0.42f)
+        val graph = T9Segmenter(abbreviations = false, neighbours = true).segment(keys, null, touches)
+        assertTrue("a slip read", graph.hasOtherReadings)
+        val whole = graph.withoutOtherReadings()
+        val readings = HabitOrder.Readings()
+        val words = HashSet<Triple<Int, Int, Int>>()
+        val over = HashSet<Triple<Int, Int, Int>>()
+        for (c in decoder.decode(graph).sentences) {
+            assertEquals(c.text, walked(whole, c), order.readsAlong(graph, whole, c, readings))
+            var from = graph.start
+            for (i in c.words.indices) {
+                val word = Triple(from, c.ends[i], c.words[i])
+                words += word
+                if (graph.readsOtherwiseWithin(from, c.ends[i])) over += word
+                from = c.ends[i]
+            }
+        }
+        assertTrue("${over.size} of ${words.size} words over the slip", over.isNotEmpty() && over.size < words.size)
+        assertTrue("${readings.read} read, ${over.size} over the slip", readings.read <= over.size)
+    }
+
+    // the skip takes each word for one the graph reads at its place, as every candidate an order ranks is (the decoder's,
+    // or one walked on the graph there): a word it does not read, over keys nothing reads otherwise, is taken to read
+    // along unread. Before, it was read and the candidate turned away. No such candidate comes from the session
+    @Test
+    fun aWordOverKeysNothingReadsOtherwiseIsTakenToReadThereUnread() {
+        // 你 (64) and 99, its second 9 tapped toward 6: a slip at the end only
+        val keys = "6499"
+        val touches = Array<Touch?>(keys.length) { TouchBoxes.tap(TouchBoxes.NINE, keys[it]) }
+        touches[keys.length - 1] = TouchBoxes.tap(TouchBoxes.NINE, '9', dy = -0.42f)
+        val graph = T9Segmenter(abbreviations = false, neighbours = true).segment(keys, null, touches)
+        assertTrue("a slip read", graph.hasOtherReadings && graph.readsOtherwiseWithin(2, 4) && !graph.readsOtherwiseWithin(0, 2))
+        val whole = graph.withoutOtherReadings()
+        val ta = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == "他" }
+        // 他 (82) over 64
+        val c = Candidate("他", 2, 0f, intArrayOf(ta), intArrayOf(2))
+        assertEquals("walked, it does not read", false, walked(whole, c))
+        val readings = HabitOrder.Readings()
+        assertEquals("taken to read, unread", true, order.readsAlong(graph, whole, c, readings))
+        assertEquals(0, readings.read)
     }
 }

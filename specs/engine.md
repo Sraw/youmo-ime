@@ -1242,4 +1242,9 @@ cost was not the decoder: a touch gives nearly every graph a slip, so `HabitOrde
 code read whole once a candidate, a key (`readsAlong`), and `words` read each candidate's words again
 (host, through `PinyinSession`: `reading` 63k → 212k calls, 1.5M → 3.4M steps). Each word at its place is
 now read once an order (`Readings`), and walked on the code read whole only where its reading goes over an
-edge read otherwise (`Reading.otherwise`): 107k calls, 1.7M steps with touches.
+edge read otherwise (`Reading.otherwise`): 107k calls, 1.7M steps with touches. A word over keys no edge reads
+otherwise (`SyllableGraph.readsOtherwiseWithin`), from a place reached along the code read whole, is not read at
+all: the decoder read it there, as every candidate takes its slot unread where no edge reads otherwise. On the
+nine keys' 60-key samples that leaves a word in ten read (host: 35.6k of 39.7k words skipped), and on the
+emulator the nine keys went from +0.49 to +0.17 ms over 946a4ab04 at keys 41–60, the candidates the same at
+every key (061-nine-perf-impl-report).
