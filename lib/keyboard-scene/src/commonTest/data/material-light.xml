@@ -67,8 +67,8 @@
   <!-- 弹出层：圆角跟键（PopupComponent.kt:88-89） -->
   <style select="preview, popup" fill="@popupBackground" color="@popupText" radius="4dp" shadow="0 2dp 2dp #33000000"/>
   <style select="popup:selected" fill="@genericActiveBackground" color="@genericActiveForeground"/>
-  <style select="menu" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText" radius="50%"/>
-  <style select="menu:selected" overlay="@keyPressHighlight"/>
+  <style select="menu" fill="@popupBackground" color="@popupText" icon-color="@popupText" radius="50%"/>
+  <style select="menu:selected" fill="@accentKey" color="@accentKeyText" icon-color="@accentKeyText"/>
 
   <!-- 悬浮：圆角 = 键圆角 + min(横缝, 竖缝) = 4 + 3（FloatingKeyboard.cornerDp）；外框、把手不写，用引擎的默认（WindowLooks） -->
   <style select="@floating keyboard" radius="7dp"/>

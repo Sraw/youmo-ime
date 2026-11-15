@@ -243,6 +243,9 @@ case("KB-61", needs="jvm:BaseKeyboardTest.aLettersSwipeDownIsItsShortcutAndUpIts
 case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore、EditPlanTest、EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor、EditPlanTest.aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor、EditPlanTest.aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor、EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor、KeyShortcutsHostTest.aClearMadeBeforeTheCursorsReportIsInIsPutBackWithTheCursorWhereItIsReportedThen、HostCoreEnginesTest.what is typed is cleared without a commit and typed again、HostCoreEnginesTest.what is typed after a syllable taken off the nine keys' bar is never typed again、EnginesTest.aSyllableTakenOffTheBarIsAPick、SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels")(lambda d: None)
 
 
+case("KB-105", needs="jvm:BuiltinThemeEquivalenceTest.theMenusCellInFocusStandsOutInEveryBuiltInTheme、PopupsTest.aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded、LookThemeTextTest、SwipePopupScreenshotTest")(lambda d: None)
+
+
 case("KB-63", needs="jvm:BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns")(lambda d: None)
 
 

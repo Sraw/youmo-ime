@@ -318,7 +318,7 @@ class PopupsTest {
     }
 
     @Test
-    fun aMenusCellInFocusIsLargerAndTintedOneDisabledFaded() {
+    fun aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded() {
         val cells = listOf(MenuCell("全选", "select-all"), MenuCell("剪切", "cut"), MenuCell("复制", "copy"))
         val s = builder().menu(cells, listOf(0, 1, 2), selected = 1, disabled = setOf(2)).ok()
         val cell = px(Popups.MENU_CELL_DP)
@@ -331,17 +331,19 @@ class PopupsTest {
         // round: the theme's 50%
         val face = assertIs<Shape.Rect>(all.shape)
         assertEquals(face.box.width / 2, face.radii[0], 1e-9)
-        assertEquals(listOf(color("accentKey"), color("keyPressHighlight")), cut.ops(false).filterIsInstance<Op.Fill>().map { it.color })
-        assertEquals(1, all.ops(false).filterIsInstance<Op.Fill>().size)
+        // the others the long press's colours, the one in focus Return's (0.6.1)
+        assertEquals(listOf(color("accentKey")), cut.ops(false).filterIsInstance<Op.Fill>().map { it.color })
+        assertEquals(color("accentKeyText"), cut.ops(false).filterIsInstance<Op.Icon>().single().tint)
+        assertEquals(listOf(color("popupBackground")), all.ops(false).filterIsInstance<Op.Fill>().map { it.color })
         // an icon at its own size in the middle, the theme's colour
         val icon = all.ops(false).filterIsInstance<Op.Icon>().single()
         assertEquals("select-all", icon.name)
         assertEquals(Box(cell / 2 - 12 * d, cell / 2 - 12 * d, cell / 2 + 12 * d, cell / 2 + 12 * d), icon.box)
-        assertEquals(color("accentKeyText"), icon.tint)
+        assertEquals(color("popupText"), icon.tint)
         // disabled: 30% of itself
         assertEquals(setOf(KeyState.Disabled), copy.states)
         val faded = copy.ops(false).filterIsInstance<Op.Fill>().single().color
-        assertEquals(Argb(color("accentKey").value and 0xFFFFFF or (77 shl 24)), faded)
+        assertEquals(Argb(color("popupBackground").value and 0xFFFFFF or (77 shl 24)), faded)
         assertEquals("全选", all.a11y)
     }
 

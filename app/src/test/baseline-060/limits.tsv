@@ -9,10 +9,10 @@ AMOLEDBlack/k18-port.png	0.143
 AMOLEDBlack/nine-port.png	0.208	5.3: nine-syllables-sp
 AMOLEDBlack/number-port.png	9.819	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 AMOLEDBlack/pinyin-bubble_q.png	0.285	5.3: popup-sp-and-radius
-AMOLEDBlack/pinyin-edit_menu.png	0.253	5.3: popup-sp-and-radius
+AMOLEDBlack/pinyin-edit_menu.png	2.970	061: the menu's cells the popup's colours, the one in focus Return's
 AMOLEDBlack/pinyin-long_press_e.png	0.594	5.3: popup-sp-and-radius
 AMOLEDBlack/pinyin-port.png	0.287	
-AMOLEDBlack/pinyin-return_menu.png	0.289	5.3: popup-sp-and-radius
+AMOLEDBlack/pinyin-return_menu.png	0.967	061: the menu's cells the popup's colours, the one in focus Return's
 AMOLEDBlack/symbols-port.png	2.012	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 AMOLEDBlack/zhuyin_full-port.png	1.584	
 AMOLEDBlack/zhuyin_nine-port.png	0.147	5.3: zhuyin-nine-shown-not-typed
@@ -22,10 +22,10 @@ DeepBlue/k18-port.png	0.141
 DeepBlue/nine-port.png	0.205	5.3: nine-syllables-sp
 DeepBlue/number-port.png	7.814	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 DeepBlue/pinyin-bubble_q.png	0.321	5.3: popup-sp-and-radius
-DeepBlue/pinyin-edit_menu.png	0.250	5.3: popup-sp-and-radius
+DeepBlue/pinyin-edit_menu.png	2.932	061: the menu's cells the popup's colours, the one in focus Return's
 DeepBlue/pinyin-long_press_e.png	0.759	5.3: popup-sp-and-radius
 DeepBlue/pinyin-port.png	0.283	
-DeepBlue/pinyin-return_menu.png	0.283	5.3: popup-sp-and-radius
+DeepBlue/pinyin-return_menu.png	0.999	061: the menu's cells the popup's colours, the one in focus Return's
 DeepBlue/symbols-port.png	0.578	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 DeepBlue/zhuyin_full-port.png	1.545	
 DeepBlue/zhuyin_nine-port.png	0.146	5.3: zhuyin-nine-shown-not-typed
@@ -66,14 +66,14 @@ MaterialDark/number-port.png	7.294	0.6.1: number pads on the nine keys' frame, �
 MaterialDark/number-split_land.png	3.579	key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller); 0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 MaterialDark/pinyin-bubble_q.png	0.267	5.3: popup-sp-and-radius
 MaterialDark/pinyin-compact.png	9.581	key-spacing: rows closer at the compact height (060-key-spacing)
-MaterialDark/pinyin-edit_menu.png	0.238	5.3: popup-sp-and-radius
+MaterialDark/pinyin-edit_menu.png	2.919	061: the menu's cells the popup's colours, the one in focus Return's
 MaterialDark/pinyin-flat.png	0.280	
 MaterialDark/pinyin-floating.png	1.529	5.3: floating-height-cap; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
 MaterialDark/pinyin-land.png	0.091	
 MaterialDark/pinyin-long_press_e.png	0.577	5.3: popup-sp-and-radius
 MaterialDark/pinyin-one_handed_left.png	0.337	
 MaterialDark/pinyin-port.png	0.270	
-MaterialDark/pinyin-return_menu.png	0.270	5.3: popup-sp-and-radius
+MaterialDark/pinyin-return_menu.png	0.962	061: the menu's cells the popup's colours, the one in focus Return's
 MaterialDark/pinyin-split_land.png	0.524	key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
 MaterialDark/symbols-compact.png	1.780	key-spacing: rows closer at the compact height (060-key-spacing)
 MaterialDark/symbols-flat.png	0.572	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
@@ -102,10 +102,10 @@ MaterialLight/k18-port.png	0.125
 MaterialLight/nine-port.png	0.188	5.3: nine-syllables-sp
 MaterialLight/number-port.png	5.906	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 MaterialLight/pinyin-bubble_q.png	0.320	5.3: popup-sp-and-radius
-MaterialLight/pinyin-edit_menu.png	0.237	5.3: popup-sp-and-radius
+MaterialLight/pinyin-edit_menu.png	2.766	061: the menu's cells the popup's colours, the one in focus Return's
 MaterialLight/pinyin-long_press_e.png	0.755	5.3: popup-sp-and-radius
 MaterialLight/pinyin-port.png	0.269	
-MaterialLight/pinyin-return_menu.png	0.303	5.3: popup-sp-and-radius
+MaterialLight/pinyin-return_menu.png	0.400	061: the menu's cells the popup's colours, the one in focus Return's
 MaterialLight/symbols-port.png	1.994	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 MaterialLight/zhuyin_full-port.png	1.542	
 MaterialLight/zhuyin_nine-port.png	0.139	5.3: zhuyin-nine-shown-not-typed
@@ -115,10 +115,10 @@ MonetDark/k18-port.png	0.097
 MonetDark/nine-port.png	0.140	5.3: nine-syllables-sp
 MonetDark/number-port.png	11.973	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 MonetDark/pinyin-bubble_q.png	0.238	5.3: popup-sp-and-radius
-MonetDark/pinyin-edit_menu.png	0.222	5.3: popup-sp-and-radius
+MonetDark/pinyin-edit_menu.png	2.752	061: the menu's cells the popup's colours, the one in focus Return's
 MonetDark/pinyin-long_press_e.png	0.556	5.3: popup-sp-and-radius
 MonetDark/pinyin-port.png	0.238	
-MonetDark/pinyin-return_menu.png	0.277	5.3: popup-sp-and-radius
+MonetDark/pinyin-return_menu.png	0.373	061: the menu's cells the popup's colours, the one in focus Return's
 MonetDark/symbols-port.png	2.026	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 MonetDark/zhuyin_full-port.png	1.569	
 MonetDark/zhuyin_nine-port.png	0.119	5.3: zhuyin-nine-shown-not-typed
@@ -128,10 +128,10 @@ MonetLight/k18-port.png	0.091
 MonetLight/nine-port.png	0.135	5.3: nine-syllables-sp
 MonetLight/number-port.png	8.105	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 MonetLight/pinyin-bubble_q.png	0.297	5.3: popup-sp-and-radius
-MonetLight/pinyin-edit_menu.png	0.216	5.3: popup-sp-and-radius
+MonetLight/pinyin-edit_menu.png	2.745	061: the menu's cells the popup's colours, the one in focus Return's
 MonetLight/pinyin-long_press_e.png	0.780	5.3: popup-sp-and-radius
 MonetLight/pinyin-port.png	0.241	
-MonetLight/pinyin-return_menu.png	0.278	5.3: popup-sp-and-radius
+MonetLight/pinyin-return_menu.png	0.374	061: the menu's cells the popup's colours, the one in focus Return's
 MonetLight/symbols-port.png	2.024	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 MonetLight/zhuyin_full-port.png	1.596	
 MonetLight/zhuyin_nine-port.png	0.119	5.3: zhuyin-nine-shown-not-typed
@@ -141,10 +141,10 @@ Monokai/k18-port.png	0.109
 Monokai/nine-port.png	0.169	5.3: nine-syllables-sp
 Monokai/number-port.png	3.377	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 Monokai/pinyin-bubble_q.png	0.241	5.3: popup-sp-and-radius
-Monokai/pinyin-edit_menu.png	0.225	5.3: popup-sp-and-radius
+Monokai/pinyin-edit_menu.png	2.947	061: the menu's cells the popup's colours, the one in focus Return's
 Monokai/pinyin-long_press_e.png	0.559	5.3: popup-sp-and-radius
 Monokai/pinyin-port.png	0.244	
-Monokai/pinyin-return_menu.png	0.244	5.3: popup-sp-and-radius
+Monokai/pinyin-return_menu.png	0.934	061: the menu's cells the popup's colours, the one in focus Return's
 Monokai/symbols-port.png	0.535	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 Monokai/zhuyin_full-port.png	1.462	
 Monokai/zhuyin_nine-port.png	0.129	5.3: zhuyin-nine-shown-not-typed
@@ -154,10 +154,10 @@ NordDark/k18-port.png	0.147
 NordDark/nine-port.png	0.214	5.3: nine-syllables-sp
 NordDark/number-port.png	7.677	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 NordDark/pinyin-bubble_q.png	0.282	5.3: popup-sp-and-radius
-NordDark/pinyin-edit_menu.png	0.249	5.3: popup-sp-and-radius
+NordDark/pinyin-edit_menu.png	2.783	061: the menu's cells the popup's colours, the one in focus Return's
 NordDark/pinyin-long_press_e.png	0.578	5.3: popup-sp-and-radius
 NordDark/pinyin-port.png	0.284	
-NordDark/pinyin-return_menu.png	0.319	5.3: popup-sp-and-radius
+NordDark/pinyin-return_menu.png	0.416	061: the menu's cells the popup's colours, the one in focus Return's
 NordDark/symbols-port.png	0.581	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 NordDark/zhuyin_full-port.png	1.510	
 NordDark/zhuyin_nine-port.png	0.151	5.3: zhuyin-nine-shown-not-typed
@@ -167,10 +167,10 @@ NordLight/k18-port.png	0.144
 NordLight/nine-port.png	0.214	5.3: nine-syllables-sp
 NordLight/number-port.png	3.669	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 NordLight/pinyin-bubble_q.png	0.338	5.3: popup-sp-and-radius
-NordLight/pinyin-edit_menu.png	0.255	5.3: popup-sp-and-radius
+NordLight/pinyin-edit_menu.png	2.786	061: the menu's cells the popup's colours, the one in focus Return's
 NordLight/pinyin-long_press_e.png	0.795	5.3: popup-sp-and-radius
 NordLight/pinyin-port.png	0.288	
-NordLight/pinyin-return_menu.png	0.322	5.3: popup-sp-and-radius
+NordLight/pinyin-return_menu.png	0.419	061: the menu's cells the popup's colours, the one in focus Return's
 NordLight/symbols-port.png	0.579	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 NordLight/zhuyin_full-port.png	1.544	
 NordLight/zhuyin_nine-port.png	0.151	5.3: zhuyin-nine-shown-not-typed
@@ -180,10 +180,10 @@ PixelDark/k18-port.png	0.135
 PixelDark/nine-port.png	0.198	5.3: nine-syllables-sp
 PixelDark/number-port.png	7.300	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 PixelDark/pinyin-bubble_q.png	0.273	5.3: popup-sp-and-radius
-PixelDark/pinyin-edit_menu.png	0.242	5.3: popup-sp-and-radius
+PixelDark/pinyin-edit_menu.png	2.984	061: the menu's cells the popup's colours, the one in focus Return's
 PixelDark/pinyin-long_press_e.png	0.582	5.3: popup-sp-and-radius
 PixelDark/pinyin-port.png	0.276	
-PixelDark/pinyin-return_menu.png	0.276	5.3: popup-sp-and-radius
+PixelDark/pinyin-return_menu.png	0.972	061: the menu's cells the popup's colours, the one in focus Return's
 PixelDark/symbols-port.png	0.569	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 PixelDark/zhuyin_full-port.png	1.536	
 PixelDark/zhuyin_nine-port.png	0.144	5.3: zhuyin-nine-shown-not-typed
@@ -224,14 +224,14 @@ PixelLight/number-port.png	5.916	0.6.1: number pads on the nine keys' frame, ⌫
 PixelLight/number-split_land.png	2.950	key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller); 0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 PixelLight/pinyin-bubble_q.png	0.330	5.3: popup-sp-and-radius
 PixelLight/pinyin-compact.png	4.155	key-spacing: rows closer at the compact height (060-key-spacing)
-PixelLight/pinyin-edit_menu.png	0.246	5.3: popup-sp-and-radius
+PixelLight/pinyin-edit_menu.png	3.310	061: the menu's cells the popup's colours, the one in focus Return's
 PixelLight/pinyin-flat.png	0.287	
 PixelLight/pinyin-floating.png	1.589	5.3: floating-height-cap; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
 PixelLight/pinyin-land.png	0.098	
 PixelLight/pinyin-long_press_e.png	0.796	5.3: popup-sp-and-radius
 PixelLight/pinyin-one_handed_left.png	0.356	
 PixelLight/pinyin-port.png	0.279	
-PixelLight/pinyin-return_menu.png	0.312	5.3: popup-sp-and-radius
+PixelLight/pinyin-return_menu.png	1.007	061: the menu's cells the popup's colours, the one in focus Return's
 PixelLight/pinyin-split_land.png	0.540	key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
 PixelLight/symbols-compact.png	2.603	key-spacing: rows closer at the compact height (060-key-spacing); 0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 PixelLight/symbols-flat.png	0.577	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
@@ -260,10 +260,10 @@ TransparentDark/k18-port.png	0.147
 TransparentDark/nine-port.png	0.215	5.3: nine-syllables-sp
 TransparentDark/number-port.png	9.919	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 TransparentDark/pinyin-bubble_q.png	0.278	5.3: popup-sp-and-radius
-TransparentDark/pinyin-edit_menu.png	0.308	5.3: popup-sp-and-radius
+TransparentDark/pinyin-edit_menu.png	3.059	061: the menu's cells the popup's colours, the one in focus Return's
 TransparentDark/pinyin-long_press_e.png	0.635	5.3: popup-sp-and-radius
 TransparentDark/pinyin-port.png	0.280	
-TransparentDark/pinyin-return_menu.png	0.314	5.3: popup-sp-and-radius
+TransparentDark/pinyin-return_menu.png	1.009	061: the menu's cells the popup's colours, the one in focus Return's
 TransparentDark/symbols-port.png	2.055	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 TransparentDark/zhuyin_full-port.png	1.492	
 TransparentDark/zhuyin_nine-port.png	0.152	5.3: zhuyin-nine-shown-not-typed
@@ -273,10 +273,10 @@ TransparentLight/k18-port.png	0.146
 TransparentLight/nine-port.png	0.218	5.3: nine-syllables-sp
 TransparentLight/number-port.png	3.474	0.6.1: number pads on the nine keys' frame, ⌫ top right, 符/返回 bottom left (061-layout-survey Q1-A, Q3-1)
 TransparentLight/pinyin-bubble_q.png	0.355	5.3: popup-sp-and-radius
-TransparentLight/pinyin-edit_menu.png	0.267	5.3: popup-sp-and-radius
+TransparentLight/pinyin-edit_menu.png	3.331	061: the menu's cells the popup's colours, the one in focus Return's
 TransparentLight/pinyin-long_press_e.png	0.817	5.3: popup-sp-and-radius
 TransparentLight/pinyin-port.png	0.300	
-TransparentLight/pinyin-return_menu.png	0.337	5.3: popup-sp-and-radius
+TransparentLight/pinyin-return_menu.png	1.031	061: the menu's cells the popup's colours, the one in focus Return's
 TransparentLight/symbols-port.png	0.590	0.6.1: the symbol panel's 123 second as text, the lock third (061-layout-survey Q4-a)
 TransparentLight/zhuyin_full-port.png	1.619	
 TransparentLight/zhuyin_nine-port.png	0.154	5.3: zhuyin-nine-shown-not-typed

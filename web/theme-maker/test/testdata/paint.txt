@@ -2221,19 +2221,17 @@ text "g" 28.8,72.2 w=400 s=52.5 sx=1.00 ls=0.00 #ff37474f
 text "e" 117.8,72.2 w=400 s=52.5 sx=1.00 ls=0.00 #ff37474f
 text "f" 206.8,72.2 w=400 s=52.5 sx=1.00 ls=0.00 #ff37474f
 == popup-menu-icons-block popup-menu-icons-block pressed=-
-fill 20.0,20.0,106.0,106.0 #ff5cb5ab
-icon select-all 32.0,32.0,95.0,95.0 #ffffffff
-fill 146.0,20.0,232.0,106.0 #ff5cb5ab
+fill 20.0,20.0,106.0,106.0 #ffd9dbdd
+icon select-all 32.0,32.0,95.0,95.0 #ff37474f
+fill 146.0,20.0,232.0,106.0 #ffd9dbdd
 fill 270.0,18.0,360.0,108.0 #ff5cb5ab
-fill 270.0,18.0,360.0,108.0 #1f000000
-fill 398.0,20.0,484.0,106.0 #ff5cb5ab
-fill 524.0,20.0,610.0,106.0 #4d5cb5ab
-icon undo 536.0,32.0,599.0,95.0 #4dffffff
+fill 398.0,20.0,484.0,106.0 #ffd9dbdd
+fill 524.0,20.0,610.0,106.0 #4dd9dbdd
+icon undo 536.0,32.0,599.0,95.0 #4d37474f
 == popup-menu-words-flat popup-menu-words-flat pressed=-
-fill 5.0,20.0,215.0,106.0 #ff5cb5ab
-text "拼音" 73.0,76.8 w=400 s=36.8 sx=1.00 ls=0.00 #ffffffff
+fill 5.0,20.0,215.0,106.0 #ffd9dbdd
+text "拼音" 73.0,76.8 w=400 s=36.8 sx=1.00 ls=0.00 #ff37474f
 fill 225.0,18.0,435.0,108.0 #ff5cb5ab
-fill 225.0,18.0,435.0,108.0 #1f000000
 text "关" 311.6,76.8 w=400 s=36.8 sx=1.00 ls=0.00 #ffffffff
-fill 445.0,20.0,655.0,106.0 #ff5cb5ab
-text "注音符号" 476.5,76.8 w=400 s=36.8 sx=1.00 ls=0.00 #ffffffff
+fill 445.0,20.0,655.0,106.0 #ffd9dbdd
+text "注音符号" 476.5,76.8 w=400 s=36.8 sx=1.00 ls=0.00 #ff37474f

@@ -192,9 +192,10 @@ object LookTheme {
         val popupShadow = Shadow(0.0, POPUP_SHADOW_DP, POPUP_SHADOW_DP, ColorExpr.Literal(Argb(POPUP_SHADOW)))
         s.add(listOf(of("preview"), of("popup")), "fill" to solid(ref("popupBackground")), "color" to color("popupText"), "radius" to radius(keys.radiusDp), "shadow" to Value.OfShadow(popupShadow))
         s.add(of("popup", state = "selected"), "fill" to solid(ref("genericActiveBackground")), "color" to color("genericActiveForeground"))
-        s.add(of("menu"), "fill" to solid(ACCENT_KEY), "color" to color("accentKeyText"), "icon-color" to color("accentKeyText"), "radius" to Value.OfRadius(Radius(List(CORNERS) { 0.0 }, half = true)))
-        // theme 3.0's cell in focus: the key's pressed colour over its own
-        s.add(of("menu", state = "selected"), "overlay" to color("keyPressHighlight"))
+        // the menu's cells as a long press's (the popup's colours), the one in focus Return's: theme 3.0's were all
+        // Return's, the one in focus its pressed colour over it, too like the others to tell (0.6.1)
+        s.add(of("menu"), "fill" to solid(ref("popupBackground")), "color" to color("popupText"), "icon-color" to color("popupText"), "radius" to Value.OfRadius(Radius(List(CORNERS) { 0.0 }, half = true)))
+        s.add(of("menu", state = "selected"), "fill" to solid(ACCENT_KEY), "color" to color("accentKeyText"), "icon-color" to color("accentKeyText"))
         // no rounder than a radius is read (keys of 24 dp and a gap made no theme, and no keyboard was drawn); the
         // frame round it is the app's outline, of no such limit (WindowLooks.cornerDp), so its corners are the same.
         // The handle the engine's default (WindowLooks.handleColor), as the window's frame
