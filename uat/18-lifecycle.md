@@ -132,8 +132,8 @@
 ### LC-24 [P1] 输入框里打拼音时转屏
 - **前提**：B-IF，在「普通文本」框点 n i h a o。
 - **操作**：转成横屏，键盘收起了就点框；点 h a o 空格；转回竖屏。
-- **预期**：框里最后是「好」或者「ni hao好」（输入法自己重启输入时证明后拿走；应用重建了框就留下），不会少字、不会多出别的字母；转屏后打字正常。
-- **JVM**：`CodeInFieldUatTest.theScreenTurnedTakesTheCodeAwayProvenOurs`（输入法自己的重启：拿走）；`CodeInFieldUatTest.aScreenTheAppMakesAnewHasTheCodeLeftAsTextInTheNewField`（应用重建界面，先关旧连接，新框带着旧文字开始输入：「ni」留下，之后的拼音接着进新框）。
+- **预期**：框里最后是「好」或者「ni hao好」（输入法自己重启输入时证明后拿走；应用重建了框就留下），不会少字、不会多出别的字母；转屏后打字正常。转屏时网页丢了焦点的那几次（键盘几乎盖满网页，API 36 模拟器上 5 次里约 3 次）：空格后框里没有「好」，键盘上方那一行写着「没写进去：好，点一下输入框」；点一下框、再点这一行，「好」进框，这一行消失（LC-36）。
+- **JVM**：`CodeInFieldUatTest.theScreenTurnedTakesTheCodeAwayProvenOurs`（输入法自己的重启：拿走）；`CodeInFieldUatTest.aScreenTheAppMakesAnewHasTheCodeLeftAsTextInTheNewField`（应用重建界面，先关旧连接，新框带着旧文字开始输入：「ni」留下，之后的拼音接着进新框）；`CommitKeptUatTest.theCodeInTheFieldWhenTheFieldDropsItsWritesAfterATurnIsKeptAndWrittenByATapOnItsLine`（转屏后框收了写入却不照办：编码改到小条，上屏的字留在键盘上，点那一行写进去）。
 
 ### LC-25 [P1] 输入框里打拼音时切走再回来、切换输入法
 - **前提**：B-IF，在「普通文本」框点 n i。
@@ -198,3 +198,9 @@
 - **操作**：转屏（或换一个主题）；再写「人」。
 - **预期**：「中」上屏留在框里（键盘重建时写好的上屏，DECISIONS A2）；回来后手写还开着，写的「人」是新的一个字。
 - **JVM**：`HostCasesUatTest.aCharacterNotCommittedIsPutInWhenTheKeyboardGoes`（键盘走时写好的上屏）、`KeyHandwritingUatTest.theKeyboardHiddenAndShownAgainStillWrites`（键盘重建后还写得上）；设备上不跑。
+
+### LC-36 [P1] 输入框收了字却没写进去：字留在键盘上，点一下写进去
+- **前提**：B0-文本框；一个收下输入法的写入却不照办的框（网页的框在它的 WebView 丢了焦点、键盘还开着时就是这样：转屏时键盘几乎盖满网页，见 LC-24；设备上要靠转屏碰，造不出记为阻塞）。编码行三种样式都一样。
+- **操作**：点 n i 空格，再点 h a o 空格，看键盘上方；点一下框，再点键盘上方那一行。
+- **预期**：框里没有字时，候选上方的编码行写着「没写进去：你好，点一下输入框」（两次上屏的字按顺序都留着；很长的只显示末尾 24 个字，前面是「…」），读屏念出这一句；框恢复后点这一行，「你好」写在光标处，只写一次，这一行消失；框还没恢复时点它，字照旧留着；刚又上屏了别的字、还在等回报时点它，等那次判完再写，按打字的顺序。留着的字在这几种情况下不再留：接着打别的字并且写进去了、换到另一个输入框、键盘收起。转屏、应用在同一个框里重新开始输入（点了网页的框）时还留着。照常收字的框，不管光标回报得多晚，都不出现这一行（上屏后马上删掉、发送清空、应用清空并重新开始输入也不出现）；密码框、应用要求不记录的框、没有类型的框（终端）不检查，也不显示。
+- **JVM**：`CommitKeptUatTest.withTheCodeOnTheStripOrInTheBarWhatADeafFieldDroppedIsKeptTheSame`（浮动、嵌在键盘里两种编码行：两个词都留着，点那一行写进去）；`CommitKeptUatTest.aFieldThatTakesTheTextIsNeverSaidToHaveDroppedItHoweverLateItReports`（马上回报、回报晚于等待、编码在框里且回报晚：都不出现）；`CommitKeptUatTest.whatIsKeptGoesWithTheKeyboardAnotherFieldOrSomethingElseTypedAndStaysThroughATurnAndARestart`（各种放掉和留着的情况、密码框）；`CommitKeptUatTest.aCommitMadeJustBeforeTheWaitForAnEarlierOneIsUpWaitsItsOwnTime`（前一次的定时器不判后一次，换了框也一样）；`CommitKeptUatTest.aCommitFollowedByADeletionASendOrInputStartedAnewIsNotSaidToBeLostInAFieldThatReportsLate`（回报晚的框里上屏后删掉、发送、清空重开：不出现）；`CommitKeptUatTest.theKeptLineTappedWhileAnotherCommitWaitsWritesBothInTheOrderTyped`（等待中点那一行：按顺序写进去）；`CommitKeptUatTest.theKeptLineTappedWhileACommitWaitsThatThenReportsIsStillWritten`（等待中点了，那次上屏照常回报：留着的照样写进去）；`CommitKeptUatTest.theKeptLineAskedForIsWrittenWhenTheWaitEndsHoweverItEnds`（读回来写进去了、按了退格、post 前又上屏了一次、输入已结束：都写，按打字顺序，不写进已结束的连接）；`CommitKeptUatTest.theKeptLineGoesBeforeAuxBelowWhichKeepsItsFormatting`；ime-core 的 `CommitCheckTest`（判定本身：改写文字的框、读不到的框、一排同样的字、打到一半的英文词）。设备上的那一种见 LC-24。

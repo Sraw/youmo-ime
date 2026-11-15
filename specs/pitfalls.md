@@ -123,6 +123,66 @@ A restart that is not the input method's own (`again`) may be another field unde
 the code is let go of there unread. And `setComposingText("")` with no span left replaces the
 selection: never send it to take away a code the editor no longer marks.
 
+### A field that takes a commit and drops it
+
+A WebView whose Android view lost the focus while the keyboard stayed up takes every write of the
+connection and does nothing with it: `commitText` and `setComposingText` return true, no selection is
+reported, reads answer with the text as it was, and the input method is told nothing (the client's
+`mServedView` is still that view, the connection active, no `onStartInput`). Chromium's renderer drops
+IME events for a widget without focus. Measured on the API 36 emulator (WebView 133, 2026-11-14,
+`dumpsys activity top`): turning the screen with the keyboard up in webview_shell, where landscape
+leaves the page 42 px under a 771 px keyboard, the WebView had no focus after 4 turns of 22 with nothing
+typed, 3 of 5 in UAT LC-24, and never in 15 turns under Gboard (which leaves it 141 px); the three
+turns that lost it each had a passing inset of the keyboard's first (window 2340x944, content top 173,
+then 2340x1014 and 243). The view's height is thought to pass through nothing, at which Android clears
+a view's focus and, in touch mode, gives it back to nobody (`View.sizeChange`; inferred, not seen in
+the host). The focus stays lost after turning back; a tap on the page brings it back, with no new input
+started.
+
+So every commit is checked (`CommitCheck`, `EditingSession.commitText`): the text before the cursor is
+read before it (32 units), and it has landed when the editor reports the cursor where the commit was
+to leave it. With no such report
+800 ms after that commit (`CommitCheck.WAIT_MS`; the service's `judgeCommit` timer, set again for the
+time left, `waitLeft`, where it was set for an earlier commit that reported or a field since left: an
+editor whose reads lag a frame has not shown a commit just made) the text before the cursor is read
+again: the same, and not already ending in what was committed, nothing went in. The text is then kept
+(`CommitCheck.kept`, commits typed on into the same field added in order), the session's cursor put
+back to the last one reported, and the code row says it (`FcitxInputMethodService.keptLine`, the
+panel's line below, first, aux after it as formatted: 「没写进去：…，点一下输入框」, its last 24 units
+where long, announced by the view that shows it). A tap on that line, that part of it alone, commits it
+again (`writeKept`, the session's commit alone: the first try was already told to the journal and the
+context), and it is kept again if that does not go in either; tapped while a later commit waits, it is
+written once that wait ends (`CommitCheck.toWrite`, posted after whatever ended it, and only while input
+is started: a finished connection drops it; or at once, before a commit made ahead of the post, not
+before an address suggestion's replacement, whose units around the cursor were counted without it), and
+that commit landing does not let it go meanwhile (written at once, it would join the commit waiting and be judged
+after it, out of the order typed). It is let go when a
+later commit lands (a report, or read back in), when input starts in a field that says it is another
+(package, id, type, name or hint: a WebView's fields say nothing apart, and the screen turned or the
+page tapped is the same field) and when the keyboard is put away (`onFinishInputView`).
+
+What keeps it off fields that are only odd: the commit's own report ends the wait; a read that differs is
+landed (an app that upper-cases, cuts short, or reports late: its reads are in order with its writes);
+a read not given judges nothing. Not checked at all: a password or a field not to be learned from
+(never read), a field of no type, and an editor that has not said where its cursor is (a terminal's or
+a game's `BaseInputConnection` with no `Editable` reads back empty before and after a commit it did
+take). Left as they are: an editor of a type and a cursor that empties itself at each commit would get
+the line at every word (none known); a field that refuses the text and reports nothing (full to its
+length, digits only) gets it too, which is true, and the tap does not help; a commit that is a row of
+what already ends the field (哈 after 哈哈哈) cannot be told and is taken as landed; a cursor report
+that is not the commit's while it waits (the field tapped within the 800 ms) leaves the cursor where no
+read can tell, and that one commit is not judged (what was kept before stays; the next commit reads and
+waits on its own). So too anything else done to the field while a commit waits (`CommitCheck.moved`): the session's deletions and cursor moves,
+the service's key events (Backspace, Enter, arrows, lines, shortcuts, a physical key replayed), the
+editor's action, a context-menu action, and input started anew in the same field (the app's
+restartInput, its text set maybe): a commit then deleted, sent or cleared away reads back as before it
+in an editor that reports late. Enter or send, a paste and a physical key replayed end the wait so as
+Backspace does, and a kept text asked for is written after their effect. As any start of input in the same field ends the wait so, a commit
+within 800 ms before the app's `restartInput`, or before a WebView's restart as the screen turns, is
+not judged: dropped there, it is lost as before. The cost is one synchronous read before each commit, a key's character
+committed included (`ForwardedKeys.Action.CommitChar`, a virtual key's unicode), none for a commit made
+while another waits, and none after it where the editor reports in time.
+
 ### `EditorInfo` decides a lot
 
 Password, URL, email, search, no-suggestions and no-personalized-learning flags change what the

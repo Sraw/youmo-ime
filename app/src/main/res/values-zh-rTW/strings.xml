@@ -988,6 +988,7 @@
     <string name="code_row_embedded">嵌在鍵盤裡</string>
     <string name="code_row_in_field">輸入框裡（實驗性）</string>
     <string name="code_row_in_field_note">拼音帶著底線直接出現在輸入框裡，選了字才換成字。這時應用能看到你正在打的拼音：搜尋框會按拼音搜，按了應用的傳送鍵送出去的就是拼音。轉螢幕、點另一個輸入框、切到別的應用時，拼音可能留在原來的框裡變成普通文字（比如「ni hao」「你hao」），要自己刪掉，輸入法不會替你刪。密碼、數字、終端一類的框，和會改寫你打的字的應用，拼音仍顯示在鍵盤上方。</string>
+    <string name="commit_kept">沒寫進去：%1$s，點一下輸入框</string>
     <string name="floating_handle">懸浮鍵盤拖動條</string>
     <string name="floating_handle_bottom">下面</string>
     <string name="floating_handle_top">上面</string>

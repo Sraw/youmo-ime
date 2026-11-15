@@ -931,6 +931,7 @@ class EditingSessionTest {
             put("writeCode") { writeCode(formatted("ni")) }
             put("leaveComposition") { leaveComposition() }
             put("codeRestarted") { codeRestarted(again = true) }
+            put("judgeCommit") { judgeCommit() }
         }
         val pairCalls = buildMap<String, AutoPairs.() -> Unit> {
             put("type") { type("(") }

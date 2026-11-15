@@ -40,6 +40,14 @@ class FakeEditor(
     override var isAvailable: Boolean = true
 
     /**
+     * Reads answer, writes are dropped: a WebView that lost its view's focus while the keyboard stayed up
+     * (the screen turned, its view no height for a moment). The connection is the served one still, every
+     * write is taken (`commitText` true) and does nothing, no selection is reported, and a read gives the
+     * text as it was. Each call is still recorded in [calls].
+     */
+    var dropsWrites: Boolean = false
+
+    /**
      * How much text before the cursor this editor is willing to reveal; null models an editor
      * that reveals none (`getTextBeforeCursor` returning null). Real editors cap it too.
      */
@@ -226,6 +234,7 @@ class FakeEditor(
     override fun commitText(text: String, newCursorPosition: Int): Boolean {
         calls += "commitText($text, $newCursorPosition)"
         if (!isAvailable || commitFails(text)) return false
+        if (dropsWrites) return true
         replaceText(text, newCursorPosition, composing = false)
         rewrite()
         return true
@@ -234,7 +243,7 @@ class FakeEditor(
     /** Styling spans are not modelled: only the characters of [text] land in the buffer. */
     override fun setComposingText(text: CharSequence, newCursorPosition: Int) {
         calls += "setComposingText($text, $newCursorPosition)"
-        if (!isAvailable) return
+        if (!isAvailable || dropsWrites) return
         replaceText(text.toString(), newCursorPosition, composing = true)
         rewrite()
     }
@@ -245,7 +254,7 @@ class FakeEditor(
     /** Out-of-range positions are ignored, not clamped, as `BaseInputConnection` does. */
     override fun setSelection(start: Int, end: Int) {
         calls += "setSelection($start, $end)"
-        if (!isAvailable) return
+        if (!isAvailable || dropsWrites) return
         val length = buffer.length
         if (start !in 0..length || end !in 0..length) return
         selectionStart = start
@@ -254,14 +263,14 @@ class FakeEditor(
 
     override fun finishComposingText() {
         calls += "finishComposingText()"
-        if (!isAvailable) return
+        if (!isAvailable || dropsWrites) return
         clearComposing()
     }
 
     /** Clamped into the text and ordered; an empty region means no composing region. */
     override fun setComposingRegion(start: Int, end: Int) {
         calls += "setComposingRegion($start, $end)"
-        if (!isAvailable) return
+        if (!isAvailable || dropsWrites) return
         val length = buffer.length
         val a = minOf(start, end).coerceIn(0, length)
         val b = maxOf(start, end).coerceIn(0, length)
@@ -298,7 +307,7 @@ class FakeEditor(
      */
     override fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean) {
         calls += "deleteSurroundingText($before, $after, inCodePoints=$inCodePoints)"
-        if (!isAvailable) return
+        if (!isAvailable || dropsWrites) return
         var a = minOf(selectionStart, selectionEnd)
         var b = maxOf(selectionStart, selectionEnd)
         if (hasComposing) {

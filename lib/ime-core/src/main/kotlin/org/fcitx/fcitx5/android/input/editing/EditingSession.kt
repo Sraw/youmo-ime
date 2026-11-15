@@ -80,6 +80,22 @@ class EditingSession(
     // the code's checks, reads and leaving (FieldCode)
     private val code = FieldCode(this, editor)
 
+    /**
+     * Whether each commit went into the field, and what did not ([CommitCheck]): told of every
+     * [commitText], every cursor report, and every other change made here to the field or its cursor
+     * (a deletion, a selection set: [CommitCheck.moved]); the service times the wait and calls [judgeCommit].
+     */
+    val commits = CommitCheck(editor)
+
+    /**
+     * The wait for a commit's report is up ([CommitCheck.judge]): where nothing went in, the cursor
+     * predicted past it never came, and is the one the editor reported last.
+     */
+    fun judgeCommit() {
+        checkThread()
+        if (commits.judge()) selection.resetTo(selection.current.start, selection.current.end)
+    }
+
     /** [FieldCode.fellBack]: told when the code can no longer be in this field, and floats. */
     var codeFellBack by code::fellBack
 
@@ -193,6 +209,9 @@ class EditingSession(
     ): CursorUpdate {
         val updateIndex = ++cursorUpdateIndex
         pairs.cursorReported()
+        // the cursor where the last write was to leave it: that write is in. Any other report (the field
+        // tapped, the app's own change) says nothing of it, and puts the cursor where no read can tell
+        if (!selection.settled && selection.latest.rangeEquals(selStart, selEnd)) commits.reported() else commits.moved()
         if (codeInField) return code.reconcile(selStart, selEnd, composingStart, composingEnd, ignoreSystemCursor, updateIndex)
         if (selection.consume(selStart, selEnd)) {
             // Only when the prediction matched: an InputFilter can also change the text, and
@@ -521,6 +540,9 @@ class EditingSession(
         // finish the composition as-is and only move the cursor if it is not already there, or on
         // its way there: a pending move (the preedit cursor's, say) is where the caret will be.
         // Re-committing identical text would make the editor redraw and can drop spans.
+        // checked only where the editor has said where its cursor is: one of no text of its own (a
+        // terminal's, a game's) says nothing, and reads back empty whether it took the text or not
+        val before = if (selection.latest.start >= 0) commits.before(text) else null
         if (composing.isNotEmpty() && composingText.toString() == text) {
             val c = if (cursor == -1) text.length else cursor
             val target = composing.start + c
@@ -532,13 +554,14 @@ class EditingSession(
                 }
                 editor.finishComposingText()
             }
+            commits.committed(text, before)
             return text
         }
         val start = if (composing.isEmpty()) selection.latest.start else composing.start
         resetComposingState()
         val pieces = CommitPieces.split(text, commitPiece)
         if (pieces.size > 1) {
-            return text.substring(0, commitPieces(start, pieces, cursor))
+            return text.substring(0, commitPieces(start, pieces, cursor)).also { commits.committed(it, before) }
         } else if (cursor == -1) {
             selection.predict(start + text.length)
             editor.commitText(text, 1)
@@ -550,6 +573,7 @@ class EditingSession(
                 editor.setSelection(target, target)
             }
         }
+        commits.committed(text, before)
         return text
     }
 
@@ -607,6 +631,7 @@ class EditingSession(
         if (!editor.isAvailable) return
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
+        commits.moved()
         // what the pairs were laid out in is not there to the same length
         pairs.forget()
         selection.predict(lastSelection.start)
@@ -640,6 +665,7 @@ class EditingSession(
         val start = max(lastSelection.start + offsetStart, 0)
         val end = max(lastSelection.end + offsetEnd, 0)
         if (start > end) return
+        commits.moved()
         selection.predict(start, end)
         editor.setSelection(start, end)
     }
@@ -654,6 +680,7 @@ class EditingSession(
         if (!editor.isAvailable) return
         val from = max(start, 0)
         val to = max(end, from)
+        commits.moved()
         selection.predict(from, to)
         editor.setSelection(from, to)
     }
@@ -666,6 +693,7 @@ class EditingSession(
     fun selectFrom(anchor: Int, head: Int) {
         checkThread()
         if (!editor.isAvailable) return
+        commits.moved()
         selection.predict(anchor, head)
         editor.setSelection(anchor, head)
     }
@@ -677,6 +705,7 @@ class EditingSession(
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
         val end = lastSelection.end
+        commits.moved()
         selection.predict(end)
         editor.setSelection(end, end)
     }
@@ -697,6 +726,7 @@ class EditingSession(
     fun deleteSurrounding(before: Int, after: Int, inCodePoints: Boolean) {
         checkThread()
         if (!editor.isAvailable) return
+        commits.moved()
         // after the cursor, or around what is composed, a closing one put in may go too
         if (after > 0 || composing.isNotEmpty()) pairs.forget()
         val overhangBefore = composingOverhang()
@@ -743,6 +773,8 @@ class EditingSession(
         // typed) and the deletion works on plain text, predictably. The code, if one is there, is
         // taken away when proven ours, else let go of (§4.3); voice's text is finished as before
         if (kind == Kind.CODE) code.leave(fallBack = false) else finishComposition()
+        // a deletion, here or the caller's key event: what a commit waiting did can no longer be read back
+        commits.moved()
         val lastSelection = selection.latest
         var direct = editor.isAvailable && traits.acceptsDeleteSurrounding &&
             !traits.isRawKeyInput && (lastSelection.isNotEmpty() || lastSelection.start > 0)

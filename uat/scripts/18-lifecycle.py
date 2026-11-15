@@ -245,6 +245,16 @@ def in_field(d, page="text"):
     home(d, "外观")
     d.tap_text("大小与样式", scroll=False, after=1.0)
     choose(d, "编码行", "输入框里")
+
+    # the note's 确定 shows a moment after the option is tapped: choose, looking once, missed it on a loaded
+    # machine, and the case went on with the code on the strip (LC-24 passed so, nothing of it tested)
+    def chosen(s):
+        ok = s.find(text="确定")
+        if ok:
+            d.tap(ok.c, 0.3)
+            return None
+        return next((n for n in s.app() if n.rid == "summary" and n.text.startswith("输入框里")), None)
+    d.wait(chosen, 10, step=0.3, what="编码行 是 输入框里")
     if page is not None:   # "": the page of every field
         d.open_page(page)
 
@@ -363,9 +373,9 @@ def lc24(d):
     d.cands()
     d.rotate(1)
     # the keyboard laid out anew after the turn: looked for a few seconds, not once (gone for a moment, the field
-    # tapped would be under it, not in the dump: 页面上没有第 1 个框)
+    # tapped would be under it, not in the dump: 页面上没有第 1 个框; its view started 7 s after the turn on a loaded machine)
     try:
-        d.wait(lambda s: s.find(rid="keyboard_view", where="ime"), 4, step=0.3, what="the keyboard back")
+        d.wait(lambda s: s.find(rid="keyboard_view", where="ime"), 12, step=0.3, what="the keyboard back")
     except Blocked:
         tap_field(d)
     d.type("hao")
@@ -375,6 +385,20 @@ def lc24(d):
     # keyboard unless the page happened to scroll it into that strip, and a field not shown is not in the dump
     # (None, half the runs). The focused field, else the page's first, polled: a rebuilt page's field may not be focused
     d.rotate(0)
+    # the web view may have lost its focus as the screen turned (its height nothing for a moment, the keyboard
+    # over most of the page): it takes the writes and drops them. The keyboard then says so above the candidates,
+    # and after a tap on the field a tap on that line writes the text (about 3 runs in 5 on the API 36 emulator)
+    kept = None
+    try:
+        kept = d.wait(lambda s: s.find(contains="没写进去", where="ime"), 2.5, step=0.3, what="没写进去")
+    except Blocked:
+        pass
+    if kept:
+        check("好" in kept.text, f"键盘上留着的是「{kept.text}」")
+        tap_field(d)
+        time.sleep(1.0)
+        line = d.wait(lambda s: s.find(contains="没写进去", where="ime"), 5, step=0.3, what="点了框以后那一行还在")
+        d.tap(line.c, 1.0)
     want = ("好", "ni hao好")
     end = time.time() + 5
     while True:
@@ -386,7 +410,12 @@ def lc24(d):
             break
         time.sleep(0.3)
     check(t in want, f"最后框里「{t}」，页上第一个框「{f0}」")
-    return f"最后「{t}」"
+    gone = not d.screen().find(contains="没写进去", where="ime")
+    check(gone, "写进去以后那一行还在")
+    return f"最后「{t}」" + ("（框丢了焦点，留在键盘上，点那一行写进去的）" if kept else "")
+
+
+case("LC-36", needs="jvm:CommitKeptUatTest.withTheCodeOnTheStripOrInTheBarWhatADeafFieldDroppedIsKeptTheSame,CommitKeptUatTest.aFieldThatTakesTheTextIsNeverSaidToHaveDroppedItHoweverLateItReports,CommitKeptUatTest.whatIsKeptGoesWithTheKeyboardAnotherFieldOrSomethingElseTypedAndStaysThroughATurnAndARestart")(lambda d: None)
 
 
 case("LC-25", needs="manual:切到别的应用再回来、用输入法选择器换输入法：留下与否随系统，设备上手工看（设计页 M3、M6）")(lambda d: None)

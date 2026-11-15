@@ -98,6 +98,7 @@ import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.editing.ArrowKeys
 import org.fcitx.fcitx5.android.input.editing.CodeInField
 import org.fcitx.fcitx5.android.input.editing.CodePoints
+import org.fcitx.fcitx5.android.input.editing.CommitCheck
 import org.fcitx.fcitx5.android.input.editing.ContextMemory
 import org.fcitx.fcitx5.android.input.editing.EditingSession
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
@@ -287,9 +288,122 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      */
     val codeInFieldNow: Boolean get() = editingSession.codeInField
 
-    /** [panel] as the code row draws it: its code gone while that is in the field ([codeInFieldNow]). */
-    fun forStrip(panel: HostEvent.InputPanel): HostEvent.InputPanel =
-        if (panel.code && codeInFieldNow) panel.copy(preedit = FormattedText.Empty) else panel
+    /**
+     * [panel] as the code row draws it: its code gone while that is in the field ([codeInFieldNow]),
+     * and what a field took and dropped ([keptLine]) said after it.
+     */
+    fun forStrip(panel: HostEvent.InputPanel): HostEvent.InputPanel {
+        val drawn = if (panel.code && codeInFieldNow) panel.copy(preedit = FormattedText.Empty) else panel
+        val line = keptLine ?: return drawn
+        // first, for the row to tell a tap on it (CodeRowUi.notice); aux below after it as it was formatted
+        val aux = drawn.auxDown
+        if (aux.isEmpty()) return drawn.copy(auxDown = FormattedText(arrayOf(line), intArrayOf(0), -1))
+        val head = "$line  "
+        val cursor = if (aux.cursor < 0) -1 else head.length + aux.cursor
+        return drawn.copy(auxDown = FormattedText(arrayOf(head) + aux.strings, intArrayOf(0) + aux.flags, cursor))
+    }
+
+    /**
+     * What was committed and did not go into the field ([CommitCheck.kept]; a WebView whose view lost
+     * the focus as the screen turned takes every write and drops it), as the code row says it: kept
+     * till the user writes it with a tap on that line ([writeKept]), types something else that goes
+     * in, or leaves the field or the keyboard. Null with nothing kept. Its end alone where it is long.
+     */
+    val keptLine: String?
+        get() {
+            val kept = keptShown.ifEmpty { return null }
+            var from = maxOf(0, kept.length - KEPT_SHOWN)
+            if (from > 0 && Character.isLowSurrogate(kept[from])) from++
+            return getString(R.string.commit_kept, if (from > 0) "…" + kept.substring(from) else kept)
+        }
+
+    // CommitCheck.kept as the views last drew it (main thread)
+    private var keptShown = ""
+
+    // the timer for the commit waiting is set: one at a time, set again for the time a later commit has left
+    private var judging = false
+
+    private val judgeCommit = Runnable {
+        judging = false
+        val commits = editingSession.commits
+        // set for a commit before the one waiting now (that one reported, another field's forgotten): not this one's time yet
+        if (commits.waitLeft() == 0L) editingSession.judgeCommit()
+        commitsChanged()
+    }
+
+    private val writeAsked = Runnable {
+        val commits = editingSession.commits
+        if (commits.toWrite && !commits.isWaiting) writeKept()
+    }
+
+    /**
+     * A commit about to be made while the kept text, asked for, waits for its post ([writeAsked]): written
+     * first, synchronously, so that it goes in before what is typed now (after it, the order would be
+     * reversed, and that commit landing would not let it go).
+     */
+    private fun keptFirst() {
+        val commits = editingSession.commits
+        if (!commits.toWrite || commits.isWaiting) return
+        mainHandler.removeCallbacks(writeAsked)
+        writeKept()
+    }
+
+    // a commit waits for its report, or what is kept changed (CommitCheck.changed)
+    private fun commitsChanged() {
+        val commits = editingSession.commits
+        // the kept line tapped while a commit waited, and that wait over (reported, judged, or the field acted on):
+        // written once the session is done with what ended it (a cursor report, a deletion), not in the middle of it
+        if (commits.toWrite && !commits.isWaiting) {
+            mainHandler.removeCallbacks(writeAsked)
+            mainHandler.post(writeAsked)
+        }
+        if (commits.isWaiting && !judging) {
+            judging = true
+            mainHandler.postDelayed(judgeCommit, commits.waitLeft())
+        }
+        if (commits.kept == keptShown) return
+        keptShown = commits.kept
+        inputView?.codePlaceChanged()
+        candidatesView?.codePlaceChanged()
+        keptLine?.let(::announce)
+    }
+
+    /**
+     * Said aloud as the kept line appears, by the view that shows it: the row is no focus a screen reader
+     * follows. `announceForAccessibility` is deprecated from API 36 for describing the UI (a live region),
+     * which would speak the row's every code as it is typed.
+     */
+    @Suppress("DEPRECATION")
+    private fun announce(line: String) {
+        listOfNotNull(inputView, candidatesView).firstOrNull { it.isAttachedToWindow && it.isShown }?.announceForAccessibility(line)
+    }
+
+    /**
+     * The line of what did not go in was tapped: written where the cursor is now, unless something composes
+     * there. While a later commit waits for its report it is written once that one is judged: written now, it
+     * would join the one waiting and be kept after it, out of the order typed.
+     */
+    fun writeKept() {
+        val commits = editingSession.commits
+        // only while input is started: between onFinishInput and the next start the connection is a finished
+        // one, which takes the text and drops it. An ask is kept: the next start in the same field tells it
+        // again (moved), another field or the keyboard put away forgets it
+        if (startedWith == null) return
+        if (editingSession.composing.isNotEmpty()) {
+            // something composes by the time a wait ends: not written over it; the line stays, to tap again
+            commits.toWrite = false
+            return
+        }
+        if (commits.isWaiting) {
+            commits.toWrite = true
+            return
+        }
+        val text = commits.take()
+        // the session's commit alone: the first try was already told as typed (the journal, the context)
+        if (text.isNotEmpty()) editingSession.commitText(text)
+    }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // the views told where the code is now, once it moved
     private fun syncCodePlace() {
@@ -331,6 +445,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // Set on the main thread, read on fcitx's too (commitOverEngine)
     @Volatile
     private var startedWith: EditorInfo? = null
+
+    // the field input last started in, kept through onFinishInput: what CommitCheck keeps is that field's
+    private var commitsField: EditorInfo? = null
+
+    // what a field dropped is kept for that field: one that says it is another (its app, id, type,
+    // name or hint) is not offered it. A WebView's fields tell nothing apart, and a tap on the one
+    // that lost the focus starts input anew, so there it stays
+    private fun commitsStartIn(attribute: EditorInfo, sensitive: Boolean) {
+        // the same field started anew (the app's restartInput, its text set maybe): a commit waiting is not
+        // judged by what a read there finds, and what was kept before stays
+        if (commitsField?.voiceField() != attribute.voiceField()) editingSession.commits.forget() else editingSession.commits.moved()
+        commitsField = attribute
+        // not read in a password or a field that asks not to be learned from, nor one of no type (no text of its own)
+        editingSession.commits.on = !sensitive && !CapabilityFlags.isPassword(attribute) && !attribute.isTypeNull()
+    }
 
     /** The input started last, null between fields: the token a clear is kept under ([ClearedText]). */
     val startedField: EditorInfo? get() = startedWith
@@ -589,6 +718,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             codeInField.fallBack()
             syncCodePlace()
         }
+        editingSession.commits.changed = ::commitsChanged
+        // the clock the handler's delays are in
+        editingSession.commits.clock = SystemClock::uptimeMillis
         EngineNotices.sayer = engineSayer
         pickedLocalesChanged()
         // the punctuation keys the last run started with, read off this thread before the keyboard is made
@@ -679,7 +811,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     // KeyEvent from physical keyboard (or input method engine forwardKey)
                     clearedText.edited()
                     // replay the original event if we still have it
-                    if (keyEventRelay.replay(it.timestamp)) return@event
+                    if (keyEventRelay.replay(it.timestamp)) {
+                        editingSession.commits.moved()
+                        return@event
+                    }
                     // no original event to replay: simulate one
                     when (val action = ForwardedKeys.decide(it.keySym.keyCode, it.up, it.unicode)) {
                         is ForwardedKeys.Action.SendKey -> {
@@ -812,6 +947,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      */
     fun performContextMenuAction(id: Int) {
         fieldEditor.changing()
+        editingSession.commits.moved()
         if ((id == android.R.id.cut || id == android.R.id.paste) && selection.latest.isNotEmpty()) contextMemory.cut()
         currentInputConnection?.performContextMenuAction(id)
     }
@@ -824,6 +960,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /** What the user typed, a key or the engine's commit: a bracket or quote may go in paired. */
     private fun commitTyped(text: String, cursor: Int = -1) {
+        // before the pairs read where it starts
+        keptFirst()
         if (cursor != -1 || !pairing || !editingSession.pairs.type(text)) {
             // fcitx's punctuation may put a pair in itself, the cursor between
             val start = editingSession.commitStart
@@ -838,6 +976,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun handleReturnKey() {
         clearedText.edited()
+        // the editor's action (a chat's send, its field cleared) or a key: a commit waiting is not read back after it
+        editingSession.commits.moved()
         when (val action = EditorKeyPolicy.onReturn(currentInputEditorInfo.toEditorTraits(packageName))) {
             EditorKeyPolicy.ReturnAction.SendEnter -> sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
             is EditorKeyPolicy.ReturnAction.PerformEditorAction ->
@@ -899,6 +1039,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     // [code] with shift held, as a hardware keyboard's shift+arrow: the editor extends its selection's end
     private fun sendShifted(ic: InputConnection, code: Int) {
+        editingSession.commits.moved()
         val t = SystemClock.uptimeMillis()
         val meta = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
         val flags = KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
@@ -916,12 +1057,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val end = if (line == SpaceCursor.Line.Up) 0
         else ic.getExtractedText(ExtractedTextRequest(), 0)?.let { x -> x.text?.let { x.startOffset + it.length } } ?: return false
         clearedText.edited()
+        editingSession.commits.moved()
         ic.setSelection(anchor ?: end, end)
         return true
     }
 
     private fun handleArrowKey(direction: EditorKeyPolicy.Direction) {
         clearedText.edited()
+        editingSession.commits.moved()
         val keyCode = when (direction) {
             EditorKeyPolicy.Direction.Left -> KeyEvent.KEYCODE_DPAD_LEFT
             EditorKeyPolicy.Direction.Right -> KeyEvent.KEYCODE_DPAD_RIGHT
@@ -948,6 +1091,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      */
     fun putAround(before: Int, after: Int, text: String, cursor: Int) {
         if (editingSession.composing.isNotEmpty()) return
+        // no keptFirst: the units around the cursor to replace were counted without the kept text; it is
+        // written after the replacement, as its wait ends (writeAsked)
         val at = if (cursor == text.length) -1 else cursor
         editingSession.replaceAround(before, after, text, at)
         contextMemory.committed(text, at, SystemClock.elapsedRealtime())
@@ -955,6 +1100,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun commitText(text: String, cursor: Int = -1) {
+        keptFirst()
         // a long paste cut short: only what went in ends the field's text
         val landed = editingSession.commitText(text, cursor)
         contextMemory.committed(landed, if (landed.length == text.length) cursor else -1, SystemClock.elapsedRealtime())
@@ -1165,8 +1311,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         reset()
     }
 
+    /**
+     * A key the field acts on as it likes (Backspace, Enter, an arrow, a line): what a commit waiting for its
+     * report did can no longer be read back ([CommitCheck.moved]). So too [sendDownKeyEvent], [sendShifted],
+     * the editor's action and the cursor set here past the session.
+     */
+    override fun sendDownUpKeyEvents(keyEventCode: Int) {
+        editingSession.commits.moved()
+        super.sendDownUpKeyEvents(keyEventCode)
+    }
+
     private fun sendDownKeyEvent(eventTime: Long, keyEventCode: Int, metaState: Int = 0) {
         clearedText.edited()
+        editingSession.commits.moved()
         currentInputConnection?.sendKeyEvent(
             KeyEvent(
                 eventTime,
@@ -1633,6 +1790,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // restarted, the same field: what it had of the floating window stays its
         if (restarting && cursorField === startedWith) cursorField = attribute
         startedWith = attribute
+        commitsStartIn(attribute, sensitive)
         // another field's clears are never put back here, nor kept once it is left; the screen turned is the same input
         if (!again) clearedText.forget()
         // what commitOverEngine put in last, a paste into a password maybe, is not kept: the reset above
@@ -2076,6 +2234,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
+        // the keyboard put away: what a field dropped is no longer offered
+        editingSession.commits.forget()
         decorLocationUpdated = false
         inputViewStarted = false
         inputDeviceMgr.onFinishInputView()
@@ -2141,6 +2301,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onDestroy() {
         if (EngineNotices.sayer === engineSayer) EngineNotices.sayer = null
+        mainHandler.removeCallbacks(judgeCommit)
+        mainHandler.removeCallbacks(writeAsked)
         getSystemService(InputManager::class.java).unregisterInputDeviceListener(inputDeviceListener)
         recreateInputViewPrefs.forEach {
             it.unregisterOnChangeListener(recreateInputViewListener)
@@ -2184,6 +2346,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Suppress("ConstPropertyName")
     companion object {
+        // code units of a kept text the code row shows, its end
+        private const val KEPT_SHOWN = 24
         /** How far before or after the cursor a line key looks for a newline. */
         private const val LINE_REACH = 256
 

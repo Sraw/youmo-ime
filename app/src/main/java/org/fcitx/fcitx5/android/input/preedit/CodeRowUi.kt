@@ -36,6 +36,18 @@ class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView
     /** Where in the preedit a tap on the row puts the cursor, in code points (HostApi.moveCursor). */
     var onTap: ((Int) -> Unit)? = null
 
+    /**
+     * The row's line below starts with a notice to tap, [notice] units of it (set before [update]; 0 for
+     * none: what a field dropped, kept): a tap on it is [onNotice]'s, a screen reader's click on the row too.
+     * The rest of the line below is aux as ever, no tap's.
+     */
+    var onNotice: (() -> Unit)? = null
+    var notice = 0
+
+    // where the line below starts in the row's one line, as lines() made it and as drawn (the cursor's | before it)
+    private var belowAt = 0
+    private var belowShown = 0
+
     private val row = HorizontalScrollView(ctx).apply {
         id = R.id.code_row_text
         isHorizontalScrollBarEnabled = false
@@ -62,25 +74,38 @@ class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView
 
     init {
         val taps = GestureDetector(ctx, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent) = preeditShown.isNotEmpty()
+            override fun onDown(e: MotionEvent) = preeditShown.isNotEmpty() || notice > 0
 
             override fun onSingleTapUp(e: MotionEvent): Boolean {
                 val layout = upView.layout ?: return false
                 val offset = layout.getOffsetForHorizontal(0, e.x - upView.totalPaddingLeft)
+                // an offset is the character edge nearest the tap: the notice's from before its first to after its last
+                // (past the end of the row's text is its end: the notice's where it ends the row)
+                if (notice > 0 && offset in belowShown..belowShown + notice) {
+                    onNotice?.invoke()
+                    return true
+                }
+                if (preeditShown.isEmpty()) return false
                 onTap?.invoke(CodeRow.tapAt(offset, cursorShown, auxShown, preeditShown))
                 return true
             }
         })
         upView.setOnTouchListener { _, e -> taps.onTouchEvent(e) }
+        // touches are the detector's; this is a screen reader's double tap, while the notice is there
+        upView.setOnClickListener { if (notice > 0) onNotice?.invoke() }
+        upView.isClickable = false
     }
 
     override fun lines(above: SpannedString, below: SpannedString): Pair<CharSequence, CharSequence> {
-        val line = if (below.isEmpty()) above else buildSpannedString { append(above); append("  "); append(below) }
+        val line = if (below.isEmpty()) above else buildSpannedString { append(above); append(GAP); append(below) }
+        belowAt = above.length + GAP.length
         return line to ""
     }
 
     override fun update(inputPanel: HostEvent.InputPanel) {
         super.update(inputPanel)
+        upView.isClickable = notice > 0
+        belowShown = belowAt + if (cursorShown in 0..belowAt) 1 else 0
         auxShown = inputPanel.auxUp.length
         preeditShown = inputPanel.preedit.toString()
         // once laid out with the new text; one waiting at a time, while the window draws nothing
@@ -105,5 +130,8 @@ class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView
 
     companion object {
         private const val REVEAL_MARGIN = 32
+
+        // between the line above and the line below
+        private const val GAP = "  "
     }
 }

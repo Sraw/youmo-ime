@@ -1012,6 +1012,7 @@
     <string name="code_row_embedded">In the keyboard</string>
     <string name="code_row_in_field">In the text box (experimental)</string>
     <string name="code_row_in_field_note">The pinyin goes straight into the text box, underlined, and turns into characters as you pick them. The app sees it as you type: a search box searches for it, and the app\'s send button sends it. When you rotate the screen, tap another text box or switch apps, it may stay in the box as plain text (such as \"ni hao\" or \"你hao\"); delete it yourself, the keyboard will not. Password, number and terminal fields, and apps that rewrite what you type, keep it above the keyboard.</string>
+    <string name="commit_kept">Not typed in: %1$s. Tap the text box</string>
     <string name="floating_handle">Floating keyboard handle</string>
     <string name="floating_handle_bottom">Bottom</string>
     <string name="floating_handle_top">Top</string>

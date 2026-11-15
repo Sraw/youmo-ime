@@ -49,6 +49,8 @@ class PreeditComponent(private val floats: Boolean = false) : TypedComponent<Pre
                 service.postFcitxJob { if (inputPanelCached.preedit.toString() == tapped) moveCursor(at) }
             }
             // a syllable taken goes as 九键's column's does, through the keys' listener
+            // the line of what a field dropped (FcitxInputMethodService.keptLine): a tap writes it
+            onNotice = { service.writeKept() }
             syllables.onPick = { commonKeyActionListener.listener.onKeyAction(it, KeyActionListener.Source.Keyboard) }
             syllables.onShownChanged = { onShown?.invoke() }
         }
@@ -71,12 +73,14 @@ class PreeditComponent(private val floats: Boolean = false) : TypedComponent<Pre
         // the code in the app's field (编码行 输入框里) is not drawn here too: aux and the syllables are
         val drawn = service.forStrip(data)
         shown = drawn.preedit.toString()
+        ui.notice = service.keptLine?.length ?: 0
         ui.update(drawn)
         onShown?.invoke()
     }
 
     /** The code moved into the field or out of it (FcitxInputMethodService.codeInFieldNow): the row drawn anew. */
     fun codePlaceChanged() {
-        last?.let(::onInputPanelUpdate)
+        // with no panel yet (nothing typed since the view was made) the kept line alone may be to draw
+        (last ?: HostEvent.InputPanel.EMPTY.takeIf { service.keptLine != null })?.let(::onInputPanelUpdate)
     }
 }

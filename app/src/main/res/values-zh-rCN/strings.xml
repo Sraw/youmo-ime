@@ -988,6 +988,7 @@
     <string name="code_row_embedded">嵌在键盘里</string>
     <string name="code_row_in_field">输入框里（实验性）</string>
     <string name="code_row_in_field_note">拼音带着下划线直接出现在输入框里，选了字才换成字。这时应用能看到你正在打的拼音：搜索框会按拼音搜，按了应用的发送键发出去的就是拼音。转屏、点另一个输入框、切到别的应用时，拼音可能留在原来的框里变成普通文字（比如「ni hao」「你hao」），要自己删掉，输入法不会替你删。密码、数字、终端一类的框，和会改写你打的字的应用，拼音仍显示在键盘上方。</string>
+    <string name="commit_kept">没写进去：%1$s，点一下输入框</string>
     <string name="floating_handle">悬浮键盘拖动条</string>
     <string name="floating_handle_bottom">下面</string>
     <string name="floating_handle_top">上面</string>

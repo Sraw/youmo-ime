@@ -222,20 +222,20 @@ class KeyboardHarness(
 
             override fun endBatchEdit() = open && super.endBatchEdit()
 
-            override fun commitText(text: CharSequence?, newCursorPosition: Int) = open && super.commitText(text, newCursorPosition)
+            override fun commitText(text: CharSequence?, newCursorPosition: Int) = open && (writesDropped || super.commitText(text, newCursorPosition))
 
-            override fun setComposingText(text: CharSequence?, newCursorPosition: Int) = open && super.setComposingText(text, newCursorPosition)
+            override fun setComposingText(text: CharSequence?, newCursorPosition: Int) = open && (writesDropped || super.setComposingText(text, newCursorPosition))
 
-            override fun setComposingRegion(start: Int, end: Int) = open && super.setComposingRegion(start, end)
+            override fun setComposingRegion(start: Int, end: Int) = open && (writesDropped || super.setComposingRegion(start, end))
 
-            override fun finishComposingText() = open && super.finishComposingText()
+            override fun finishComposingText() = open && (writesDropped || super.finishComposingText())
 
-            override fun deleteSurroundingText(beforeLength: Int, afterLength: Int) = open && super.deleteSurroundingText(beforeLength, afterLength)
+            override fun deleteSurroundingText(beforeLength: Int, afterLength: Int) = open && (writesDropped || super.deleteSurroundingText(beforeLength, afterLength))
 
             override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int) =
-                open && super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+                open && (writesDropped || super.deleteSurroundingTextInCodePoints(beforeLength, afterLength))
 
-            override fun setSelection(start: Int, end: Int) = open && super.setSelection(start, end)
+            override fun setSelection(start: Int, end: Int) = open && (writesDropped || super.setSelection(start, end))
 
             override fun performEditorAction(editorAction: Int) = open && super.performEditorAction(editorAction)
         }
@@ -425,6 +425,12 @@ class KeyboardHarness(
 
     /** The mirror: nothing of what is after the cursor given (getTextAfterCursor null, and the reads of both sides), what is before it as ever. */
     var nothingAfterGiven = false
+
+    /**
+     * The field takes every write and does nothing with it while set, reads answered as ever: a WebView whose
+     * view lost the focus with the keyboard up (the screen turned, LC-24). Nothing changes, so nothing is reported.
+     */
+    var writesDropped = false
 
     /** The field's selection changes not told to the service while set: its tracked selection lagging, as an editor's report can. */
     var selectionLags = false

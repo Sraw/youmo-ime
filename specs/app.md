@@ -1069,6 +1069,11 @@ height. Docked the service's touchable insets become a region, the keyboard's ba
 floating, the strip is added to the keyboard's region. The undo chip keeps off it
 (`UndoChipPlacement` `stripTop` / `strip`). The physical keyboard's `CandidatesView` is unaffected.
 
+The row also says what a field took and never wrote (`FcitxInputMethodService.keptLine`, put after the
+panel's line below by `forStrip`; [pitfalls.md](pitfalls.md#a-field-that-takes-a-commit-and-drops-it)):
+`CodeRowUi.notice` (its length) makes a tap on that part of the line, and a screen reader's click on
+the row, `writeKept`. The physical keyboard's `CandidatesView` shows the line and takes no tap.
+
 `InField` (输入框里, 实验性, 0.6.1; dev/design/061-code-in-field.md) keeps the floating layout
 (`KawaiiBarComponent.codeRowFloats()` is `!= Embedded`, the same heights) and writes the session's code
 (`InputPanel.code`) into the field as composing text: `FcitxInputMethodService.placeCode` asks
