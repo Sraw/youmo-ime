@@ -419,6 +419,54 @@ class KeyHandwritingUatTest {
         assertEquals(emptyList<String>(), keysSent())
     }
 
+    // the thumb holding space lifted in the middle of a stroke, the pen lifted last: the stroke is one, and neither
+    // the space nor a letter is typed
+    @Uat("HW-53")
+    @Test
+    fun theThumbLiftedMidStrokeLeavesTheStrokeAlone() {
+        harness()
+        h.api.calls.clear()
+        val t = h.box(h.key("t"))
+        val space = h.box(h.keyNamed("space"))
+        val pad = board().keyInkForTest!!.pad
+        val downAt = SystemClock.uptimeMillis()
+        val thumb = Triple(0, space.exactCenterX(), space.exactCenterY())
+        fun pen(i: Int) = Triple(1, t.exactCenterX(), t.exactCenterY() + i * t.height() / 6f)
+        fingers(MotionEvent.ACTION_DOWN, 0, downAt, thumb)
+        fingers(MotionEvent.ACTION_POINTER_DOWN, 1, downAt, thumb, pen(0))
+        for (i in 1..3) fingers(MotionEvent.ACTION_MOVE, 0, downAt, thumb, pen(i))
+        fingers(MotionEvent.ACTION_POINTER_UP, 0, downAt, thumb, pen(3))
+        for (i in 4..6) fingers(MotionEvent.ACTION_MOVE, 0, downAt, pen(i))
+        fingers(MotionEvent.ACTION_UP, 0, downAt, pen(6))
+        h.idle()
+        assertEquals(1, pad.finished.size)
+        assertEquals(emptyList<String>(), keysSent())
+    }
+
+    // another finger down on the letters while a stroke is written, and up again: not heard, the stroke one
+    @Uat("HW-53")
+    @Test
+    fun aFingerDownAndUpWhileWritingIsNotHeard() {
+        harness()
+        h.api.calls.clear()
+        val t = h.box(h.key("t"))
+        val g = h.box(h.key("g"))
+        val pad = board().keyInkForTest!!.pad
+        val downAt = SystemClock.uptimeMillis()
+        fun pen(i: Int) = Triple(0, t.exactCenterX(), t.exactCenterY() + i * t.height() / 6f)
+        val other = Triple(2, g.exactCenterX(), g.exactCenterY())
+        fingers(MotionEvent.ACTION_DOWN, 0, downAt, pen(0))
+        for (i in 1..2) fingers(MotionEvent.ACTION_MOVE, 0, downAt, pen(i))
+        fingers(MotionEvent.ACTION_POINTER_DOWN, 1, downAt, pen(2), other)
+        fingers(MotionEvent.ACTION_MOVE, 0, downAt, pen(3), other)
+        fingers(MotionEvent.ACTION_POINTER_UP, 1, downAt, pen(3), other)
+        for (i in 4..6) fingers(MotionEvent.ACTION_MOVE, 0, downAt, pen(i))
+        fingers(MotionEvent.ACTION_UP, 0, downAt, pen(6))
+        h.idle()
+        assertEquals(1, pad.finished.size)
+        assertEquals(emptyList<String>(), keysSent())
+    }
+
     // ⌫ taking a stroke back times the pause again (KeyInk.undo): what is left is not finished before the one taken
     // back can be written again
     @Uat("HW-06")

@@ -252,5 +252,5 @@
 ### HW-53 [P2] 拇指搁在键盘上，另一根手指照样写
 - **前提**：B0-手写。
 - **操作**：① 写字的手指在 t 上落下开始写「十」的第一笔，拇指随后按到 m 上不抬，写完两笔，停笔。② 拇指先按住空格不抬，另一根手指写「十」的两笔，停笔。
-- **预期**：两次都是两笔都写上、候选里有「十」；拇指那里没有笔迹，不打出 m、也不打空格；拇指抬起不算一笔。（拇指先搁在字母区上时，那一下本身就是一笔，另一根手指不算：和 0.6.0 的书写板一样。）
-- **JVM**：`KeyHandwritingUatTest.aFingerRestingThroughSeveralStrokesIsNoInk`、`KeyHandwritingUatTest.aThumbHoldingSpaceLetsTheLettersBeWrittenOn`、`GlideTouchTest.handwritingWithAThumbRestingEachDownOnTheLettersWritesAgain`（ime-core）；设备上不跑（模拟器打不出多指）。
+- **预期**：两次都是两笔都写上、候选里有「十」；拇指那里没有笔迹，不打出 m、也不打空格；拇指抬起不算一笔，写到一半拇指先抬起也一样；写着一笔时又一根手指落下再抬起，不算一笔。（拇指先搁在字母区上时，那一下本身就是一笔，另一根手指不算：和 0.6.0 的书写板一样。按住 ⌫ 到开始连删后再写，已删的不恢复。）
+- **JVM**：`KeyHandwritingUatTest.aFingerRestingThroughSeveralStrokesIsNoInk`、`KeyHandwritingUatTest.aThumbHoldingSpaceLetsTheLettersBeWrittenOn`、`KeyHandwritingUatTest.theThumbLiftedMidStrokeLeavesTheStrokeAlone`、`KeyHandwritingUatTest.aFingerDownAndUpWhileWritingIsNotHeard`、`GlideTouchTest.handwritingWithAThumbRestingEachDownOnTheLettersWritesAgain`（ime-core）；设备上不跑（模拟器打不出多指）。

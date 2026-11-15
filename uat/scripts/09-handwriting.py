@@ -254,4 +254,5 @@ case("HW-51", needs="jvm:EnginesHandwritingReadingsTest.aWrittenCharacterShowsIt
 case("HW-52", needs="jvm:KeyHandwritingUatTest.aStrokeStartsInTheSplitGap")(lambda d: None)
 
 case("HW-53", needs="jvm:KeyHandwritingUatTest.aFingerRestingThroughSeveralStrokesIsNoInk、KeyHandwritingUatTest.aThumbHoldingSpaceLetsTheLettersBeWrittenOn、"
+              "KeyHandwritingUatTest.theThumbLiftedMidStrokeLeavesTheStrokeAlone、KeyHandwritingUatTest.aFingerDownAndUpWhileWritingIsNotHeard、"
               "GlideTouchTest.handwritingWithAThumbRestingEachDownOnTheLettersWritesAgain")(lambda d: None)
