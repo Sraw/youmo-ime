@@ -341,7 +341,7 @@ class PinyinDecoderTest {
     @Test
     fun buildingOnTheLastDecodeChangesNothingIn双拼() {
         // 自然码: ni hc(hao) ma zl(zai) jm(jian) wo vh(zhang) vs(zhong) hw(hua) rf(ren) mn(min), and keys alone
-        val pieces = listOf("ni", "hc", "ma", "zl", "jm", "wo", "vh", "vs", "hw", "rf", "mn", "n", "h", "z", "j", "v", "r", "m", "'", ";")
+        val pieces = listOf("ni", "hc", "ma", "zl", "jm", "wo", "vh", "vs", "hw", "rf", "mn", "re", "n", "h", "z", "j", "v", "r", "m", "'", ";")
         buildsOnTheLast(ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, abbreviations = true), pieces, Random(11))
     }
 
@@ -355,31 +355,20 @@ class PinyinDecoderTest {
         buildsOnTheLast(segmenter, pieces, Random(13), steps = 1500, toneAllows = allows)
     }
 
+    // letters: a syllable is read more than one way (re n, ren), so a word only imported (热 of re) ends
+    // before the key that takes the dictionary's one word from the start (人民 of renm, none of renma)
+    @Test
+    fun buildingOnTheLastDecodeChangesNothingInLetters() {
+        // few pieces, so that ren, m, a come one after another from the start
+        buildsOnTheLast(PinyinSegmenter(), listOf("ren", "m", "a", "re", "n", "i"), Random(19), steps = 6000, atLeast = 411) // a quarter of the 1645 it goes on
+    }
+
     // the nine keys with 简拼: a key is three or four letters, each a syllable begun, at every position
     @Test
     fun buildingOnTheLastDecodeChangesNothingOnTheNineKeys() {
-        // 64 ni, 426 hao, 62 ma, 924 zai, 5426 jian, 96 wo, 94664 zhong, 482 hua, and keys alone
-        val pieces = listOf("64", "426", "62", "924", "5426", "96", "94664", "482", "6", "4", "9", "5", "2", "7", "'")
-        buildsOnTheLast(T9Segmenter(abbreviations = true), pieces, Random(17), atLeast = 1)
-    }
-
-    // nothing of the dictionary starts the input, a word only imported does: the input is kept as typed
-    // beside it, also where the decoder goes on from a decode in which a word did start it
-    @Test
-    fun goingOnKeepsTheInputAsTypedWhereOnlyAnImportedWordStartsIt() {
-        val user = UserModel(data.dictionary, data.vocabulary)
-        user.attachImports(ImportedWords().import("热" to "re"))
-        fun decoder() = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user)
-        val segmenter = PinyinSegmenter()
-        val kept = decoder()
-        var on = 0
-        // 人民 of renm is the one word from the start; renma has none, and 热 of re ends before the change
-        for (input in listOf("r", "re", "ren", "renm", "renma", "renmaz", "renmaza")) {
-            val graph = segmenter.segment(input)
-            assertEquals(input, describe(decoder().decode(graph)), describe(kept.decode(graph)))
-            on += kept.collectedOn
-        }
-        assertTrue("went on $on times", on > 0)
+        // 64 ni, 426 hao, 62 ma, 924 zai, 5426 jian, 96 wo, 94664 zhong, 482 hua, 736 ren, 6466 min and a key, 73 re, and keys alone
+        val pieces = listOf("64", "426", "62", "924", "5426", "96", "94664", "482", "736", "6466", "73", "6", "4", "9", "5", "2", "7", "'")
+        buildsOnTheLast(T9Segmenter(abbreviations = true), pieces, Random(17), atLeast = 168) // a quarter of the 672 it goes on
     }
 
     /**
@@ -398,7 +387,7 @@ class PinyinDecoderTest {
     ) {
         // the dictionaries the user merged among the tries walked
         val user = mergedModel()
-        user.attachImports(ImportedWords().import("妮好" to "ni hao", "中人" to "zhong ren"))
+        user.attachImports(ImportedWords().import("妮好" to "ni hao", "中人" to "zhong ren", "热" to "re", "仁" to "ren"))
         val changes = listOf(
             { user.own(UserModel.Entry("你中", syl("ni", "zhong"))) },
             { user.block(UserModel.Entry("你好", syl("ni", "hao"))) },
@@ -406,10 +395,14 @@ class PinyinDecoderTest {
             { user.unblock(UserModel.Entry("你好", syl("ni", "hao"))) },
             { user.block(UserModel.Entry("再", syl("zai"))) },
             { user.own(UserModel.Entry("中人", syl("zhong", "ren"))) },
+            // 热 and 仁, only imported, are then all that starts re and ren: the input is kept as typed beside them
+            { user.block(UserModel.Entry("人民", syl("ren", "min"))) },
+            { user.unblock(UserModel.Entry("人民", syl("ren", "min"))) },
         )
         fun decoder() = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user, toneAllows = toneAllows)
+        var typed = false // whether the last read's sentences keep some of the input as typed
         fun read(d: PinyinDecoder, graph: SyllableGraph): List<Any?> {
-            val decoding = describe(d.decode(graph))
+            val decoding = describe(d.decode(graph).also { r -> typed = r.sentences.any { s -> s.text.any { it in 'a'..'z' || it in '0'..'9' } } })
             val between = (graph.start until graph.end).flatMap { a ->
                 (a + 1..graph.end).flatMap { b -> listOf(false, true).map { w -> d.arcsBetween(graph, a, b, w).map { "$a-$b $w ${it.text} ${it.score}" } } }
             }
@@ -418,6 +411,7 @@ class PinyinDecoderTest {
         val kept = decoder()
         var input = ""
         var on = 0
+        var onTyped = 0
         repeat(steps) { step ->
             if (step % 97 == 96) {
                 changes[step / 97 % changes.size]()
@@ -436,10 +430,12 @@ class PinyinDecoderTest {
             val graph = segmenter.segment(input)
             assertEquals("step $step: $input", read(decoder(), graph), read(kept, graph))
             on += kept.collectedOn
+            if (kept.collectedOn > 0 && typed) onTyped++
         }
         // going on from the last decode's steps (collectOn) was among what was compared, where it may be:
-        // not while tones are typed, a word's asked of the whole path to it
-        if (toneAllows == null) assertTrue("went on $on times", on >= atLeast) else assertEquals(0, on)
+        // not while tones are typed, a word's asked of the whole path to it. And going on where input is
+        // kept as typed, which a start-only word kept from the last decode once hid
+        if (toneAllows == null) assertTrue("went on $on times, $onTyped with input kept as typed", on >= atLeast && onTyped > 0) else assertEquals(0, on)
     }
 
     @Test

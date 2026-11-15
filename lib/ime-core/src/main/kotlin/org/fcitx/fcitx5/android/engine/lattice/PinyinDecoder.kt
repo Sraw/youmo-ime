@@ -183,6 +183,10 @@ class PinyinDecoder(
     ): Decoding {
         if (graph.start == graph.end) {
             reset()
+            // nothing was done: [work] is not the last decode's
+            steps = 0
+            scored = 0
+            firstAnew = 0
             return Decoding(emptyList(), emptyList())
         }
         // what the last decode left is built on only in the same context: see search and firstWords
@@ -298,7 +302,11 @@ class PinyinDecoder(
      * position whose edges differ: its arcs ending before [changed], which only edges before it made,
      * and those of its steps onto [changed] or past it taken again, each the walk on from there.
      * The steps are in the order collecting took them and each is taken as collecting takes it, so
-     * the arcs come out as [collectFrom]'s would, in their order (the tests compare the two).
+     * the arcs come out as [collectFrom]'s would, in their order (the tests compare the two). But
+     * for one order, which nothing reads: where the input is kept as typed ([finish]) beside a
+     * start-only word kept from the last decode, that word comes before the arcs as typed ending
+     * where it does, after them in [collectFrom]'s; the next decode's Lattice.same then finds the
+     * arcs another's and its first words are scored again.
      */
     private fun collectOn(graph: SyllableGraph, at: Int, changed: Int) {
         check(toneAllows == null) { "a word's tones are asked of the whole path to it" }
