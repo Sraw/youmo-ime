@@ -47,6 +47,11 @@ class PackIconDrawable(private val outline: PackIcons.Outline, private val tint:
         raster?.let { canvas.drawBitmap(it, null, bounds, paint) }
     }
 
+    // its raster's size: an ImageView's wrap_content (a bar's or a panel's icon) as a vector's 24 dp would be
+    override fun getIntrinsicWidth(): Int = pixelWidth
+
+    override fun getIntrinsicHeight(): Int = pixelHeight
+
     override fun setAlpha(alpha: Int) {
         paint.alpha = alpha
     }

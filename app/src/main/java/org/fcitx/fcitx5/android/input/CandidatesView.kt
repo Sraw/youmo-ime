@@ -6,8 +6,6 @@
 package org.fcitx.fcitx5.android.input
 
 import android.annotation.SuppressLint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.view.MotionEvent
@@ -27,10 +25,13 @@ import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
+import org.fcitx.fcitx5.android.input.bar.BarIcons
 import org.fcitx.fcitx5.android.input.candidates.floating.PagedCandidatesUi
 import org.fcitx.fcitx5.android.input.floating.FloatingButtonPlacement
 import org.fcitx.fcitx5.android.input.floating.FloatingButtonPlacement.Area
 import org.fcitx.fcitx5.android.input.floating.FloatingButtonPlacement.Spot
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.preedit.PreeditUi
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import splitties.dimensions.dp
@@ -46,7 +47,6 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.withTheme
 import splitties.views.dsl.core.wrapContent
-import splitties.views.imageResource
 import splitties.views.padding
 import kotlin.math.roundToInt
 
@@ -154,13 +154,17 @@ class CandidatesView(
     // the touch keyboard back, as Gboard's floating button has it: an app that tells no input method
     // of a tap in its field (Chrome) leaves no other way to it but the system's settings
     private val keyboardButton = imageView {
-        imageResource = R.drawable.ic_baseline_keyboard_24
-        colorFilter = PorterDuffColorFilter(theme.altKeyTextColor, PorterDuff.Mode.SRC_IN)
+        showTouchKeyboardIcon(this)
         background = borderlessRippleDrawable(theme.keyPressHighlightColor)
         scaleType = ImageView.ScaleType.CENTER
         contentDescription = context.getString(R.string.show_touch_keyboard)
         setOnClickListener { service.showTouchKeyboard() }
         setOnTouchListener(::onButtonTouch)
+    }
+
+    // its icon a theme's `touch-keyboard` too (061-toolbar-icons)
+    private fun showTouchKeyboardIcon(v: ImageView) {
+        BarIconDrawables.show(v, PackIcons.of(theme), BarIcons.TOUCH_KEYBOARD, theme.altKeyTextColor, v.dp(TOUCH_KEYBOARD_ICON_DP)) { showTouchKeyboardIcon(v) }
     }
 
     override fun onStartHandleFcitxEvent() {
@@ -502,5 +506,8 @@ class CandidatesView(
     private companion object {
         // the cursor at rest this long: the lone button's touch window moved to it
         const val RECEIVER_SETTLE_MS = 150L
+
+        // the keyboard button's icon: a vector's own
+        const val TOUCH_KEYBOARD_ICON_DP = 24
     }
 }

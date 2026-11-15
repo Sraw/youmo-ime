@@ -465,6 +465,32 @@ test("the library's painter draws what the app's ScenePainter draws, line for li
   assert.deepEqual(wrong, []);
 });
 
+// 061-toolbar-icons: the page's bar sample draws an icon as the app's bar does, by the painter's own op
+test('paintIcon draws a name of the icons given in its box and tint, turned about its middle; one not given draws nothing', () => {
+  const ctx = new RecordingContext();
+  assert.ok(E.paintIcon(ctx, { icons }, 'undo', 10, 4, 20, '#ff112233', 0).ok);
+  assert.deepEqual(ctx.written().filter((l) => l.startsWith('icon')), ['icon undo 10.0,4.0,30.0,24.0 #ff112233']);
+  const turned = new RecordingContext();
+  assert.ok(E.paintIcon(turned, { icons }, 'toolbar-expand', 0, 0, 20, '#ff000000', -90).ok);
+  assert.deepEqual(turned.written().filter((l) => l.startsWith('icon')), ['icon toolbar-expand 0.0,0.0,20.0,20.0 #ff000000']);
+  const none = new RecordingContext();
+  assert.ok(E.paintIcon(none, { icons: {} }, 'undo', 0, 0, 20, '#ff000000', 0).ok);
+  assert.ok(!none.written().some((l) => l.startsWith('icon')));
+  assert.equal(E.paintIcon(none, { icons }, 'undo', 0, 0, 20, 'red', 0).ok, false, 'a tint not #aarrggbb');
+  assert.equal(E.paintIcon({}, { icons }, 'undo', 0, 0, 20, '#ff000000', 0).ok, false, 'not a context');
+});
+
+// the icon page's groups: every name the engine draws in one at least, the bar's own fallback only where it differs
+test("the bar's icons block groups every icon the app draws, and the menu key's ⌄ turned", () => {
+  const bar = JSON.parse(read(testdata, 'bar-icons.json'));
+  const all = new Set(Object.values(bar.groups).flat());
+  assert.deepEqual([...all].sort(), Object.keys(icons).sort());
+  assert.deepEqual(Object.keys(bar.groups), ['return', 'keys', 'commands', 'bar', 'panel']);
+  assert.ok(bar.groups.bar.includes('undo') && bar.groups.commands.includes('undo'), 'one name, one meaning: undo in both');
+  assert.deepEqual(Object.keys(bar.toolbarFallback).sort(), ['choose-keyboard', 'hide-keyboard']);
+  assert.deepEqual(bar.turned, { 'toolbar-expand': -90, 'toolbar-collapse': 90 });
+});
+
 test('a page with no icon or image for an op draws what it can: a nine-slice its fallback colour, nothing for the rest', () => {
   // theme 3.0's space key an image over its key's colour (look-3.0.xml): that colour where the page has no image
   const t = E.readTheme(read(data, 'facade', 'look-3.0.xml'), null, null);

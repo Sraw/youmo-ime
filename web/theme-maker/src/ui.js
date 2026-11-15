@@ -12,9 +12,14 @@
   const FORMAT = json('youmo-format');
   const EXAMPLES = json('youmo-examples');
   const ICONS = json('youmo-engine-icons');
+  // the icon page's groups, the bar's own image of a name whose key's differs, the menu key's ⌄ turned (061-toolbar-icons)
+  const BAR_ICONS = json('youmo-bar-icons');
   // the theme's own icons as the engine reads them, by their files' bytes (M.iconsOf)
   const iconCache = new WeakMap();
   const iconsNow = () => M.iconsOf(E, ICONS, history.current, iconCache);
+  // the bar's: the app's there (hide-keyboard's ▾) under the theme's own
+  const BAR_BASE = Object.assign({}, ICONS, BAR_ICONS.toolbarFallback);
+  const barIconsNow = () => M.iconsOf(E, BAR_BASE, history.current, iconCache);
   const $ = (id) => document.getElementById(id);
 
   const THEME_LABEL = { material: 'Material', pixel: 'Pixel', nord: 'Nord', 'deep-blue': 'Deep Blue', monokai: 'Monokai', 'amoled-black': 'AMOLED', monet: '系统取色' };
@@ -382,14 +387,17 @@
     ctx.translate(0, bar.pre);
     if (env.bar === 'typing') E.paint(bar.scene, ctx, state);
     else {
-      // idle: the bar's base and five toolbar buttons (a circle, or the toolbar's radius), the second one on
+      // idle: the bar's base and five toolbar buttons (a circle, or the toolbar's radius), the third (the clipboard) on;
+      // each its icon as the app draws it, the theme's or the app's (the menu key's ⌄ turned where it is the app's)
       const h = bar.scene.height;
       if (lk.bar) { ctx.fillStyle = css(lk.bar); ctx.fillRect(0, 0, bar.scene.width, h); }
       const size = Math.min(h - 8 * dp, 36 * dp);
       const step = bar.scene.width / 6;
+      const icons = barIconsNow();
+      const names = ['toolbar-expand', 'undo', 'clipboard', 'emoji', 'voice'];
       for (let i = 0; i < 5; i++) {
         const cx = step * (i + 0.5) + step / 2;
-        const on = i === 1;
+        const on = i === 2;
         const fill = on ? lk.toolbar.onFill : lk.toolbar.fill;
         const r = lk.toolbar.radiusDp == null ? size / 2 : Math.min(size / 2, lk.toolbar.radiusDp * dp);
         if (fill) {
@@ -398,10 +406,10 @@
           ctx.roundRect(cx - size / 2, (h - size) / 2, size, size, r);
           ctx.fill();
         }
-        ctx.fillStyle = css(on ? lk.toolbar.onIcon : lk.toolbar.icon);
-        ctx.beginPath();
-        ctx.arc(cx, h / 2, size / 5, 0, Math.PI * 2);
-        ctx.fill();
+        const name = names[i];
+        const icon = 20 * dp;
+        const turned = icons[name] === BAR_BASE[name] ? BAR_ICONS.turned[name] || 0 : 0;
+        E.paintIcon(ctx, { icons }, name, cx - icon / 2, (h - icon) / 2, icon, on ? lk.toolbar.onIcon : lk.toolbar.icon, turned);
       }
     }
     ctx.restore();
@@ -855,7 +863,9 @@
     limits: () => FORMAT.limits,
     goToLine,
     bitmap: (name) => assets.cuts[name] || null,
-    iconNames: () => Object.keys(ICONS).sort(),
+    iconGroups: () => BAR_ICONS.groups,
+    // a name whose app's image on the bar is not the key's: a theme's icon of it makes the two alike
+    barOwnImage: (name) => name in BAR_ICONS.toolbarFallback,
     choosePicture,
     cutPicture: (src, rect) => cutOf(history.current.files[src], rect),
     async pickFile(accept) {

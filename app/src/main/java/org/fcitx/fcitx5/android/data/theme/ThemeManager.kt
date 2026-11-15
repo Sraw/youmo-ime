@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import android.content.res.Configuration
+import android.os.Looper
 import android.widget.Toast
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
@@ -14,7 +15,9 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
@@ -302,7 +305,24 @@ object ThemeManager {
     private fun prefetch() {
         val dm = appContext.resources.displayMetrics
         val landscape = KeyboardArea.landscape(appContext)
-        ThemeAssets.prefetch(shownLook(_activeTheme), landscape, dm.widthPixels, dm.density)
+        val look = shownLook(_activeTheme)
+        // the bar's icons of the theme's own read ahead too (061-toolbar-icons §2.4): the bar is made with the input
+        // view, and a button whose icon the theme writes draws none till it is read. Queued before the picture and its
+        // blurs (the decode thread is one: behind them they were hundreds of ms late); asked on the main thread, where
+        // they are kept
+        val icons = PackIcons.of(_activeTheme)
+        val picture = Runnable { ThemeAssets.prefetch(look, landscape, dm.widthPixels, dm.density) }
+        when {
+            icons === PackIcons.EMPTY -> picture.run()
+            Looper.myLooper() == Looper.getMainLooper() -> {
+                BarIconDrawables.readAhead(icons)
+                picture.run()
+            }
+            else -> ThemeAssets.poster(Runnable {
+                BarIconDrawables.readAhead(icons)
+                picture.run()
+            })
+        }
     }
 
     // the last look shown and what it was made of: the same object while neither changes, as what is

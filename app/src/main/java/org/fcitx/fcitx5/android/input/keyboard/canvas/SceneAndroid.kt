@@ -13,10 +13,13 @@ import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
+import org.fcitx.fcitx5.android.input.bar.BarIcons
+import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.scene.SceneMarks
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Icons
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.Phases
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
@@ -143,7 +146,11 @@ object SceneIcons {
         "arrow-upward" to R.drawable.ic_baseline_arrow_upward_24,
         "arrow-downward" to R.drawable.ic_baseline_arrow_downward_24,
         "short-text" to R.drawable.ic_baseline_short_text_24,
-    ) + KeyCommand.entries.associate { SceneMarks.icon(it) to KeyShortcutLooks.of(it).icon }
+    ) + KeyCommand.entries.associate { SceneMarks.icon(it) to KeyShortcutLooks.of(it).icon } +
+        // the bar's and the panels' own (a key may name them too), their images there; a name shared with a key's
+        // or a command's is drawn on a key as the key's (hide-keyboard's ⌄ keyboard, not the bar's ▾)
+        (BarIcons.BAR + BarIcons.PANELS).filter { it.name !in Icons.KEYS && it.name !in Icons.COMMANDS }
+            .associate { it.name to ToolbarButtonLooks.drawable(it.fallback) }
 
     // the drawables named by id ([nameOf]): only these read back, so a name no menu gave (a theme's
     // icon="drawable:123") is no resource looked up that may not exist

@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.host.StatusEntry
+import org.fcitx.fcitx5.android.input.bar.BarIcons
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
@@ -69,17 +70,14 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
         arrayOf(
             StatusAreaEntry.Android(
                 context.getString(R.string.theme),
-                R.drawable.ic_baseline_palette_24,
                 ThemeList
             ),
             StatusAreaEntry.Android(
                 context.getString(R.string.input_method_options),
-                R.drawable.ic_baseline_language_24,
                 InputMethod
             ),
             StatusAreaEntry.Android(
                 context.getString(R.string.virtual_keyboard),
-                R.drawable.ic_baseline_keyboard_24,
                 Keyboard
             )
         )
@@ -144,14 +142,13 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
         val oneHanded = if (!actions.oneHandedOffered) emptyArray() else arrayOf(
             StatusAreaEntry.Android(
                 context.getString(R.string.one_handed),
-                R.drawable.ic_baseline_pan_tool_24,
                 OneHandedToggle,
                 active = actions.oneHanded
             )
         )
         // where the input method on has keyboards to choose from (I1 Q1)
         val keyboards = if (!actions.keyboardsOffered) emptyArray() else arrayOf(
-            StatusAreaEntry.Android(context.getString(R.string.status_keyboard), R.drawable.ic_baseline_dialpad_24, KeyboardChoice)
+            StatusAreaEntry.Android(context.getString(R.string.status_keyboard), KeyboardChoice)
         )
         adapter.entries = arrayOf(
             *staticEntries,
@@ -159,20 +156,17 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
             *oneHanded,
             StatusAreaEntry.Android(
                 context.getString(R.string.floating_keyboard),
-                R.drawable.ic_baseline_open_with_24,
                 FloatingToggle,
                 active = floating
             ),
             // off, shown lit: the keyboard is not as the user left it
             StatusAreaEntry.Android(
                 context.getString(if (actions.habitsOn) R.string.learning_habits_off else R.string.learning_habits_on),
-                R.drawable.ic_view_private,
                 HabitsToggle,
                 active = !actions.habitsOn
             ),
             StatusAreaEntry.Android(
                 context.getString(R.string.learning_clear_recent),
-                R.drawable.ic_baseline_delete_sweep_24,
                 ClearRecent
             ),
             *Array(entries.size) { StatusAreaEntry.fromEntry(context, entries[it]) }
@@ -190,7 +184,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     }
 
     private val settingsButton by lazy {
-        ToolButton(context, R.drawable.ic_baseline_settings_24, theme).apply {
+        ToolButton(context, BarIcons.APP_SETTINGS, theme).apply {
             contentDescription = context.getString(R.string.open_input_method_settings)
             fixIconSize(context.dp(KawaiiBarComponent.ICON_DP))
             setOnClickListener { AppUtil.launchMain(context) }

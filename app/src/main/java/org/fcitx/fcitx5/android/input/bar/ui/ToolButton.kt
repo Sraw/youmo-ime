@@ -19,8 +19,12 @@ import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
+import org.fcitx.fcitx5.android.input.bar.BarIcons
+import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.scene.engine.ToolbarLook
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
@@ -53,10 +57,29 @@ class ToolButton(context: Context) : CustomGestureView(context) {
     /** The theme's toolbar button (060-render-p3 T6b): its fill and shape, its icon's colour, pressed and on. */
     private var toolbar: ToolbarLook? = null
 
-    constructor(context: Context, @DrawableRes icon: Int, theme: Theme, look: ToolbarLook = SceneBar.of(context, theme).toolbar) : this(context) {
-        toolbar = look
-        image.imageTintList = ColorStateList.valueOf(look.icon.value)
+    // the theme's icons ([setIcon] of a name) and the one shown by its name, null: an image of the app's alone
+    private var icons = PackIcons.EMPTY
+    private var shown: BarIcons.Icon? = null
+
+    // the icon's side ([fixIconSize]), 0: a vector's own, 24 dp
+    private var iconPx = 0
+
+    /** A button of the bar's or a panel's whose [icon] a theme may replace (061-toolbar-icons). */
+    constructor(context: Context, icon: BarIcons.Icon, theme: Theme, look: ToolbarLook = SceneBar.of(context, theme).toolbar) : this(context) {
+        dress(theme, look)
         setIcon(icon)
+    }
+
+    /** A button whose icon is the app's whatever the theme (the title bar's back, the editor info's). */
+    constructor(context: Context, @DrawableRes icon: Int, theme: Theme, look: ToolbarLook = SceneBar.of(context, theme).toolbar) : this(context) {
+        dress(theme, look)
+        setIcon(icon)
+    }
+
+    private fun dress(theme: Theme, look: ToolbarLook) {
+        toolbar = look
+        icons = PackIcons.of(theme)
+        image.imageTintList = ColorStateList.valueOf(look.icon.value)
         background = background(look, on = false)
         add(image, lParams(wrapContent, wrapContent, gravityCenter))
     }
@@ -73,6 +96,14 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         val look = toolbar ?: return
         setIconTint((if (on) look.onIcon else look.icon).value)
         if (look.fill != look.onFill) background = background(look, on)
+    }
+
+    /** [setOn] with the icon of that state ([icon]): drawn once, in the state's colour. */
+    fun setOn(on: Boolean, icon: BarIcons.Icon) {
+        shown = icon
+        setOn(on)
+        // the app's: set by its resource, the tint list already the state's
+        if (!themed) drawIcon()
     }
 
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
@@ -111,6 +142,12 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         }
     }
 
+    var iconAlpha: Float
+        get() = image.alpha
+        set(value) {
+            image.alpha = value
+        }
+
     fun iconAnimate(): ViewPropertyAnimator = image.animate()
 
     /** The icon [px] square whatever the button's size: a button made narrower keeps it as it was. */
@@ -120,6 +157,8 @@ class ToolButton(context: Context) : CustomGestureView(context) {
             width = px
             height = px
         }
+        iconPx = px
+        if (themed) drawIcon()
     }
 
     /** The icon's colour: lit (a toggle on) or not */
@@ -128,10 +167,46 @@ class ToolButton(context: Context) : CustomGestureView(context) {
 
     fun setIconTint(@ColorInt color: Int) {
         image.imageTintList = ColorStateList.valueOf(color)
+        // a theme's icon is drawn in its colour (a tint list is nothing to it): drawn again in this one
+        if (themed) drawIcon()
     }
 
     fun setIcon(@DrawableRes icon: Int) {
+        shown = null
+        drawn = null
         image.imageResource = icon
+    }
+
+    /** [icon]: the theme's of its name where it has one (nothing till it is read), else the app's ([BarIconDrawables]). */
+    fun setIcon(icon: BarIcons.Icon) {
+        shown = icon
+        drawIcon()
+    }
+
+    /** Whether the icon shown is the theme's by its name (or will be, once read). */
+    val themed: Boolean get() = shown?.let { BarIconDrawables.themed(icons, it) } == true
+
+    /** The icon as drawn now; null where the theme's is not read yet. */
+    @get:VisibleForTesting
+    internal val iconDrawable: Drawable? get() = image.drawable
+
+    // what the theme's icon drawn now was drawn of (name, colour, side): the same again is not rastered anew
+    private var drawn: Triple<BarIcons.Icon, Int, Int>? = null
+
+    private fun drawIcon() {
+        val icon = shown ?: return
+        if (!BarIconDrawables.themed(icons, icon)) {
+            // the app's, in the tint list as ever
+            drawn = null
+            image.imageResource = ToolbarButtonLooks.drawable(icon.fallback)
+            return
+        }
+        val px = iconPx.takeIf { it > 0 } ?: dp(DEFAULT_ICON_DP)
+        val now = Triple(icon, iconTint, px)
+        if (now == drawn && image.drawable != null) return
+        val d = BarIconDrawables.of(context, icons, icon, iconTint, px) { if (shown === icon) drawIcon() }
+        drawn = now.takeIf { d != null }
+        image.setImageDrawable(d)
     }
 
     // the ripple's spread is animation too: off with 移除动画 as with 禁用动画
@@ -139,5 +214,10 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         circlePressHighlightDrawable(color)
     } else {
         borderlessRippleDrawable(color, dp(20))
+    }
+
+    private companion object {
+        // the app's vectors' side
+        const val DEFAULT_ICON_DP = 24
     }
 }

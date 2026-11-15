@@ -717,6 +717,36 @@
 - **预期**：输入框旁两个勾选框只能勾一个；勾 **不转中文标点** 时写「只对有中文写法的英文标点有效」；添加后 `,` 和 `.` 的键帽下边写「原样」，`ab` 不带。选 `ab` 时按钮排的 **不转中文标点** 置灰，选 `,` 时开着（读屏念「不转中文标点，已开」），点一下关掉（「已关」）。标点设置里自己加的英文标点（如 `@`）也能开。**功能键** 页只开这一项、不改列表时也存下。
 - **JVM**：`PopupMarksEditorTest.noChinesePunctuationIsForTheMarksATableConverts`、`PopupMarksEditorTest.aKeyOfTheUsersOwnTableCanBeKeptAsIs`、`PopupMarksEditorTest.aDefaultListMarkedAloneIsStored`；ime-core `PopupEditorTest`；设备上的一遍随 KB-98。
 
+### ST-128 [P1] 主题换栏上的图标：菜单键两态、撤销、剪贴板、表情；换回内置主题恢复自带
+- **前提**：B0-设置；**外观 → 大小与样式** 的 **跟随系统深色模式** 关。一个主题包（Nord 改名 `uat-bar-icons`），带 `<icon>`：`toolbar-expand`、`toolbar-collapse`、`undo`、`more`、`emoji`、`clipboard`（各是一个实心方块的 SVG）。
+- **操作**：导入并点这个主题，回测试页看工具栏收着时的菜单键；点开工具栏看撤销、重做、⋯、表情；复制一段字，看候选栏上的剪贴板建议条；再换回内置的 Nord 看一遍。
+- **预期**：菜单键收着、展开都是方块（主题写了的），撤销、⋯、表情、剪贴板建议条的图标是方块，没写的重做是自带的图；换回内置主题后全是自带的图。
+- **JVM**：`BarIconsThemeTest.aThemesBarIconsAreDrawnTheOnesItDoesNotWriteTheApps`（写了的画主题的、没写的画自带的、剪贴板条）、`BarIconsThemeTest.aBuiltInThemeDrawsTheAppsAgain`；ime-core `BarIconsTest.everyToolbarButtonAndTheMenuKeyHaveANameAThemeMayWrite`（每个按钮都有名字）；设备上不跑。
+
+### ST-129 [P1] 主题换 `undo`：工具栏的撤销和键上的撤销快捷键一起换
+- **前提**：B0-设置，跟随系统深色模式关；一个只带 `<icon name="undo">` 的主题包（0.6.0 做的、换过 `undo` 的主题也是这样）；**按键字符和快捷键** 里 z 的上滑设成 **撤销**。
+- **操作**：导入并点这个主题，看 z 键角的撤销图标；点开工具栏看撤销按钮。
+- **预期**：两处是同一张主题的图（一个名字一个意思）；升级到 0.6.1 后 0.6.0 的这种主题，工具栏的撤销也换成主题的图（CHANGELOG 写明）。
+- **JVM**：`BarIconsThemeTest.aThemesUndoIsTheToolbarsAndTheShortcutsAlike`；ime-core `BarIconsTest.aNameIsOneThingDone`（和快捷键同名的正好是做同一件事的 10 个）；设备上不跑。
+
+### ST-130 [P2] 只换菜单键的一态；没换 `hide-keyboard` 时栏上和键上的收起图标各是各的
+- **前提**：B0-设置，跟随系统深色模式关；一个只带 `<icon name="toolbar-expand">` 的主题包；一个只带 `undo` 的主题包。
+- **操作**：点第一个主题，看菜单键；点开工具栏，看菜单键；再收起。点第二个主题，点开、收起工具栏看菜单键；看工具栏的收起键盘按钮和键盘上收起键盘的快捷键图标。
+- **预期**：第一个主题：收着时是主题的图、不转；展开时是自带的 ⌄（朝左，从右往左排的语言朝右），两态之间淡入淡出，不转（「禁用动画」开着时直接换）。第二个主题：菜单键像以前一样转着变。没换 `hide-keyboard` 时工具栏上是 ▾、键上是带 ⌄ 的键盘，换了以后两处都是主题的图。
+- **JVM**：`BarIconsThemeTest.aThemeOfOneMenuStateDrawsThatOneTheOtherTheAppsTurnedNeitherTurned`、`BarIconsThemeTest.noMenuIconOfTheThemesTurnsTheAppsAsEver`、`BarIconsThemeTest.hideKeyboardsImagesAreEachPlacesOwnTillAThemeWritesIt`；设备上不跑。
+
+### ST-131 [P2] 主题制作网页：图标按画在哪里分组，候选栏预览画出工具栏图标
+- **前提**：电脑浏览器打开主题制作网页，从内置主题开始。
+- **操作**：点 **字和图标**，往下看「换图标」；给 `undo` 换一个 SVG，看候选栏预览。
+- **预期**：图标分「回车键、键、快捷键的命令、栏、状态面板和编辑面板」几组；`undo` 在「快捷键的命令」和「栏」里各一行，各注明「也在」另一组；`hide-keyboard`、`choose-keyboard` 注明栏上自带的图和键上的不同。候选栏预览的工具栏按钮画真图标（菜单键自带的 ⌄ 朝右），换了 `undo` 后第二个按钮是新图，剪贴板按钮用开着的图标颜色。
+- **JVM**：`web/theme-maker/test/panels-smoke.mjs`（分组、两处的 undo、hide-keyboard 的注明）、`engine.test.mjs` 的 paintIcon 和 bar-icons 两条；`EnginePaintTest.theBarsIconsAreThePages` 生成分组；在电脑浏览器上手工看预览。
+
+### ST-132 [P1] 主题换状态面板和编辑面板的图标；设置页还是自带的
+- **前提**：B0-设置，跟随系统深色模式关；一个主题包带 `theme`、`trad-simp-off`、`punctuation`、`keyboard-settings`、`app-settings`、`clipboard`、`backspace`、`floating-dock`、`one-handed-exit`、`touch-keyboard`、`candidates-prev` 的 `<icon>`。
+- **操作**：点这个主题；点开工具栏点 ⋯ 看各格和右上角的齿轮；点中文标点让它关掉再看；点开编辑面板看剪贴板和退格、方向键；打开符号面板看底排的 123、表情面板；开悬浮键盘看条上回到底部的按钮；开单手模式看旁边空白里的按钮；接实体键盘打字看浮动候选窗的键盘按钮和翻页箭头；进设置页看图标。
+- **预期**：主题、简体、中文标点（开着时）、虚拟键盘的格子和齿轮是主题的图；中文标点关掉后是自带的（`punctuation-off` 没写），其它没写的格子也是自带的；编辑面板的剪贴板、退格是主题的，方向键是自带的；123、表情跟着键上的 `number-pad`、`emoji`；悬浮键盘回到底部的按钮是主题的；单手模式旁边退出单手的按钮是主题的，左右挪的箭头是自带的；浮动候选窗的键盘按钮和往前翻的箭头是主题的，往后翻的是自带的；设置页里全是自带的。别的输入法自带的开关（比如 unikey 的）不换。
+- **JVM**：`BarIconsThemeTest.theStatusPanelsCellsAndGearAreTheThemes`、`BarIconsThemeTest.thePanelsButtonsDoingACommandsJobAreTheThemes`、`BarIconsThemeTest.everyCellHasAName`、`BarIconsThemeTest.theButtonsBesideTheKeysAreTheThemes`、`BarIconsThemeTest.theFloatingCandidateWindowsKeyboardButtonIsTheThemes`；ime-core `BarIconsTest.theEnginesTogglesHaveANamePerState`；设备上不跑。
+
 ### ST-121 [P1] 通用输入：在键上划三项，下面是「手写」小节
 - **前提**：B0-设置。
 - **操作**：打开 **通用输入**，点开 **在键上划**；往下看「手写」小节，把 **停笔多久算写完一个字** 改成"很短（0.3 秒）"，回测试页打开手写写「人」。

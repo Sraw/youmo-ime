@@ -6,16 +6,16 @@
 package org.fcitx.fcitx5.android.input.candidates.floating
 
 import android.content.Context
-import android.content.res.ColorStateList
 import android.widget.ImageView
-import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
+import org.fcitx.fcitx5.android.input.bar.BarIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.utils.styledFloat
 import splitties.dimensions.dp
-import splitties.resources.drawable
 import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
@@ -24,26 +24,30 @@ import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.imageView
-import splitties.views.imageDrawable
 
 class PaginationUi(override val ctx: Context, val theme: Theme) : Ui {
 
-    private fun createIcon(@DrawableRes icon: Int, @StringRes description: Int) = imageView {
-        imageTintList = ColorStateList.valueOf(theme.keyTextColor)
-        imageDrawable = drawable(icon)
+    // a theme's `candidates-prev`, `candidates-next` too (061-toolbar-icons): drawn as the app's is, a square as high as the
+    // arrow's room cropped to its width
+    private fun createIcon(icon: BarIcons.Icon, @StringRes description: Int) = imageView {
         scaleType = ImageView.ScaleType.CENTER_CROP
         isClickable = true
         contentDescription = ctx.getString(description)
+        show(this, icon)
     }
 
-    val prevIcon = createIcon(R.drawable.ic_baseline_arrow_prev_24, R.string.a11y_candidates_prev_page)
-    val nextIcon = createIcon(R.drawable.ic_baseline_arrow_next_24, R.string.a11y_candidates_next_page)
+    private fun show(v: ImageView, icon: BarIcons.Icon) {
+        BarIconDrawables.show(v, PackIcons.of(theme), icon, theme.keyTextColor, v.dp(ARROW_HEIGHT_DP)) { show(v, icon) }
+    }
+
+    val prevIcon = createIcon(BarIcons.CANDIDATES_PREV, R.string.a11y_candidates_prev_page)
+    val nextIcon = createIcon(BarIcons.CANDIDATES_NEXT, R.string.a11y_candidates_next_page)
 
     private val disabledAlpha = styledFloat(android.R.attr.disabledAlpha)
 
     override val root = constraintLayout {
-        val w = dp(10)
-        val h = dp(20)
+        val w = dp(ARROW_WIDTH_DP)
+        val h = dp(ARROW_HEIGHT_DP)
         add(nextIcon, lParams(w, h) {
             centerVertically()
             endOfParent()
@@ -57,5 +61,10 @@ class PaginationUi(override val ctx: Context, val theme: Theme) : Ui {
     fun update(data: HostEvent.Paged) {
         prevIcon.alpha = if (data.hasPrev) 1f else disabledAlpha
         nextIcon.alpha = if (data.hasNext) 1f else disabledAlpha
+    }
+
+    private companion object {
+        const val ARROW_WIDTH_DP = 10
+        const val ARROW_HEIGHT_DP = 20
     }
 }

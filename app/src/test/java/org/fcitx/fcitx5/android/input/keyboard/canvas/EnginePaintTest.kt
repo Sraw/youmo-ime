@@ -24,7 +24,10 @@ import org.fcitx.fcitx5.android.SCREENSHOT_SDK
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeMakerTestdata
+import org.fcitx.fcitx5.android.input.bar.BarIcons
+import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
 import org.fcitx.fcitx5.android.scene.Box
+import org.fcitx.fcitx5.android.scene.Icons
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.FixedMeasurer
@@ -34,6 +37,7 @@ import org.fcitx.fcitx5.android.scene.getOr
 import org.fcitx.fcitx5.android.scene.json.EnvJson
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.ui.main.settings.theme.VectorIconJson
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -97,6 +101,28 @@ class EnginePaintTest {
         }.joinToString(",\n", "{\n", "\n}")
         ThemeMakerTestdata.check("engine-icons.json", "$json\n")
         ThemeMakerTestdata.block("youmo-engine-icons", json)
+    }
+
+    // the icon page's groups by where a name is drawn (a name in each it is drawn in), the bar's own image of a name whose
+    // key's differs (hide-keyboard's ▾, not the key's keyboard), the menu key's ⌄ turned: `youmo-bar-icons` (061-toolbar-icons §2.6)
+    @Test
+    fun theBarsIconsAreThePages() {
+        fun list(names: List<String>) = names.distinct().joinToString(",", "[", "]") { "\"$it\"" }
+        val groups = linkedMapOf(
+            "return" to Icons.RETURN, "keys" to Icons.KEYS + Icons.SHORT_TEXT, "commands" to Icons.COMMANDS,
+            "bar" to BarIcons.BAR.map { it.name }, "panel" to BarIcons.PANELS.map { it.name },
+        )
+        assertEquals(Icons.ALL, groups.values.flatten().toSet())
+        val own = (BarIcons.BAR + BarIcons.PANELS).distinct().filter { ToolbarButtonLooks.drawable(it.fallback) != SceneIcons.of(it.name) }
+        assertEquals(setOf("hide-keyboard", "choose-keyboard"), own.map { it.name }.toSet())
+        val fallback = own.sortedBy { it.name }.joinToString(",\n", "{\n", "\n}") { i ->
+            "\"${i.name}\":" + VectorIconJson.of(context.resources.getResourceEntryName(ToolbarButtonLooks.drawable(i.fallback)))
+        }
+        val json = "{\n\"groups\":" + groups.entries.joinToString(",\n", "{\n", "\n}") { (k, v) -> "\"$k\":" + list(v) } +
+            ",\n\"toolbarFallback\":" + fallback +
+            ",\n\"turned\":{\"${BarIcons.TOOLBAR_EXPAND.name}\":-90,\"${BarIcons.TOOLBAR_COLLAPSE.name}\":90}\n}"
+        ThemeMakerTestdata.check("bar-icons.json", "$json\n")
+        ThemeMakerTestdata.block("youmo-bar-icons", json)
     }
 
     // ------------------------------------------------------------------ the shots

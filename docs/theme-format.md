@@ -146,20 +146,26 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 `<font name src>` 定义一个字体，最多 4 个，样式里用 `font="名字"` 引用；`system` 是系统字体，不用定义。
 `<icon name src>` 定义一个图标，最多 200 个，名字是小写字母、数字和 `-`，文件只能是 SVG（限制见文末）。
 
-- **替换自带图标**：名字和输入法自带的图标相同时，键盘上凡是画这个图标的地方都换成主题的：键上的图标、角标、Shift 的三种状态、回车随动作变的图标、按键气泡、长按弹出和键盘里画的菜单弹出层。工具栏、剪贴板和编辑这些面板、系统样式的长按菜单不换。每个状态、每种动作是一个名字，只换写了的那个：`shift` 只换没按下时的 Shift，单次和锁定是 `shift-once`、`shift-locked`；`enter` 只换换行时的回车。自带图标的名字：
+- **替换自带图标**：名字和输入法自带的图标相同时，键盘里凡是画这个图标的地方都换成主题的：键上的图标、角标、Shift 的三种状态、回车随动作变的图标、按键气泡、长按弹出和键盘里画的菜单弹出层，还有候选栏、工具栏、剪贴板条、悬浮键盘的条、单手模式旁边空白里的按钮、接实体键盘时的浮动候选窗、状态面板（工具栏的 ⋯）和编辑面板里的按钮。只有设置页面、系统样式的长按菜单不换。**一个名字一个意思**：做同一件事的地方用同一个名字，换一次处处都换，比如 `undo` 既是快捷键的撤销、也是工具栏的撤销，`clipboard` 是快捷键的、工具栏的、剪贴板条和编辑面板的剪贴板。每个状态、每种动作是一个名字，只换写了的那个：`shift` 只换没按下时的 Shift，单次和锁定是 `shift-once`、`shift-locked`；`enter` 只换换行时的回车；工具栏收着时的菜单键是 `toolbar-expand`，展开时是 `toolbar-collapse`。没写的名字各处画自己自带的图，所以同一个名字在不同地方自带的图可以不一样（`hide-keyboard` 在栏上是 ▾，在键上是带 ⌄ 的键盘；`choose-keyboard` 在栏上是九个点，在键上是键盘），主题写了就是同一张。自带图标的名字：
 
   | 用在 | 名字 |
   |---|---|
   | 回车（随输入框要的动作） | `enter`（换行）、`go`、`search`、`send`、`next`、`done`、`previous` |
   | 键 | `backspace`、`language`、`space`、`shift`、`shift-once`、`shift-locked`、`number-pad`、`lock`、`lock-open`、`emoji`、`voice`、`arrow-upward`、`arrow-downward`；自己设的下滑文字放不下时画的 `short-text`（两条横线；自带的只按两条线让开字母，主题换成自己的图时按整个方块让开，放不下就不画） |
-  | 快捷键的命令 | `select-all`、`content-copy`、`content-cut`、`content-paste`、`undo`、`redo`、`delete-sweep`、`restore`、`field-start`、`field-end`、`cursor-move`、`clipboard`、`quick-input`、`emoji`、`voice`、`trad-simp`、`choose-keyboard`、`hide-keyboard`、`swipe-select`；笔画横竖撇点折是 `stroke-h`、`stroke-s`、`stroke-p`、`stroke-n`、`stroke-z` |
+  | 快捷键的命令（工具栏、面板里做同一件事的按钮也是这个名字） | `select-all`、`content-copy`、`content-cut`、`content-paste`、`undo`、`redo`、`delete-sweep`、`restore`、`field-start`、`field-end`、`cursor-move`、`clipboard`、`quick-input`、`emoji`、`voice`、`trad-simp`（繁体开着）、`choose-keyboard`、`hide-keyboard`、`swipe-select`；笔画横竖撇点折是 `stroke-h`、`stroke-s`、`stroke-p`、`stroke-n`、`stroke-z` |
+  | 栏（候选栏、工具栏、剪贴板条、悬浮键盘的条，和键盘旁边的按钮） | 菜单键 `toolbar-expand`（收着）、`toolbar-collapse`（展开）；工具栏的 `trad-simp-off`（简体）、`more`、`floating`、`one-handed`、`habits-off`、`clear-recent`、`theme`、`input-method-settings`、`handwriting`；候选栏的 `candidates-expand`、`candidates-collapse`、`predictions-close`；悬浮键盘回到底部的 `floating-dock`；单手模式旁边退出单手的 `one-handed-exit`；接实体键盘时浮动候选窗的 `touch-keyboard`（显示触屏键盘）和翻页的 `candidates-prev`、`candidates-next`（只露出中间 10dp 宽，和自带的箭头一样） |
+  | 状态面板 | `keyboard-settings`（虚拟键盘）、`app-settings`（右上角的齿轮）；输入法的开关各两个状态：`punctuation`、`punctuation-off`（中文标点）、`full-width`、`full-width-off`（全角）、`prediction`、`prediction-off`（联想） |
+
+  菜单键：主题两个都没写时，自带的 ⌄ 像以前一样转着变；写了其中一个，就不转，两个状态之间淡入淡出（150 ms，「禁用动画」开着时直接换），没写的那个状态画自带的 ⌄（收着时朝右，展开时朝左；从右往左排的语言反过来）。图标画在各处自带图标的位置和大小上，着色用那里的颜色：工具栏按钮开着时用 `toolbar:selected` 的 `icon-color`。没有意义名字的不换：状态面板里别的输入法自带的开关（比如 unikey 的）、编辑面板的方向键和单手、分体时旁边空白里左右挪键盘的箭头（指方向，不是一件事的图标）、标题栏的返回、剪贴板的全部删除。栏和状态面板的名字在键上也能用（主题自带布局的 `icon=`、`icon(名字)`），没换时画的是它在栏上自带的图。
+- 用了栏和状态面板这些新名字的主题，0.6.0 也能导入，但不认识这些名字：导入时警告「不会画」，栏上照旧画自带的图。
+- 0.6.0 的主题如果换了 `undo`、`redo`、`clipboard`、`emoji`、`voice`、`cursor-move`、`quick-input`、`hide-keyboard`、`choose-keyboard`、`trad-simp`，升级后工具栏上做同一件事的按钮也换成主题的图。
 - **新名字**：不是自带的名字，可以在 `icon(名字)`（`space-content`、`return-icon-*`）和主题自带布局的 `icon=` 里用。一个 `<icon>` 既不是自带的名字、又没被任何 `icon()` 用到时给警告「不会画」（只被主题布局用到的也会收到这条警告）。
 - **颜色**：路径没写 `fill`（自己的或从 `<g>`、`<svg>` 继承的）或写 `currentColor` 时，用部件的 `icon-color` 着色——注意浏览器里没写 fill 是黑色，这里不是。写了 `#颜色` 的路径保留这个颜色。SVG 的颜色按 CSS 的写法读：`#rgb`、`#rgba`、`#rrggbb`、`#rrggbbaa`，**透明度在最后**，和主题里 `#aarrggbb` 的写法相反。`icon-color` 的透明度乘到所有路径上；`icon-color` 是 `transparent` 时整个图标不画。
 - **透明度**：`opacity`、`fill-opacity` 乘到每条路径上。`<g opacity>` 是分别乘到组里的每条路径，重叠的地方会比浏览器里看到的深（浏览器先合成整个组再变透明）；网页预览和键盘上画的一样。
-- **大小和位置**：图标总是画在自带图标的位置和大小上（24dp 见方），不跟 SVG 的 `width`、`height` 走。`viewBox`（没有就用 `width`/`height`，再没有就是 24×24）按比例缩放、居中放进去，不会拉伸（即 SVG 的 `xMidYMid meet`）。
+- **大小和位置**：图标总是画在自带图标的位置和大小上（键上 24dp 见方，栏和面板上是那里自带图标的大小），不跟 SVG 的 `width`、`height` 走。`viewBox`（没有就用 `width`/`height`，再没有就是 24×24）按比例缩放、居中放进去，不会拉伸（即 SVG 的 `xMidYMid meet`）。
 - **必须画得出东西**：至少一条路径真的会画：`fill` 不是 `none`、透明度不是 0、不只有 `M`（移动）。否则导入时报「nothing to draw」。面积为零的路径（比如 `M0 0L1 0Z`）不检查，算作会画。
 - 路径支持 SVG 的全部命令（`M L H V C S Q T A Z` 和小写的相对写法），包括弧和连写的弧标志（`a1 1 0 011 1`）。
-- 导入后文件坏了、超过 64 KB 或不见了：画同名的自带图标（没有自带的就不画）。
+- 导入后文件坏了、超过 64 KB 或不见了：画那个地方自带的图标（没有自带的就不画）。栏和面板上，键盘刚打开时主题的图标还没读完的先空着，读完再画，不会先闪一下自带的图；主题没写的名字马上画自带的。键上不一样：没读完时先画自带的，读完换成主题的。
 
 ### `<style>`
 

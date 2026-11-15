@@ -121,10 +121,23 @@
 
     el.append(h('h3', { textContent: '换图标（SVG，按名字）' }));
     el.append(h('p', { className: 'muted', textContent: 'App 只收只有填充路径的 SVG：<svg>、<g>、<path> 和 fill 一类的属性，没有 transform、style、描边、渐变；不能用的会在这里说，也存不了。' }));
+    el.append(h('p', { className: 'muted', textContent: '一个名字一个意思：同一个名字在键上、栏上、面板里都换成这一张。“栏”是候选栏、工具栏、剪贴板条和悬浮键盘的条；“状态面板”是工具栏 ⋯ 打开的那一页。' }));
     const own = ops.icons(d.xml);
-    for (const name of api.iconNames()) {
+    // by where each is drawn (the app's BarIcons and the scene's Icons: youmo-bar-icons); a name in two groups is one icon
+    const GROUPS = [['return', '回车键'], ['keys', '键'], ['commands', '快捷键的命令'], ['bar', '栏'], ['panel', '状态面板和编辑面板']];
+    const groups = api.iconGroups();
+    for (const [g, label] of GROUPS) {
+      el.append(h('h4', { textContent: label }));
+      for (const name of groups[g]) {
+        const also = GROUPS.filter(([o]) => o !== g && groups[o].includes(name)).map(([, l]) => l);
+        const notes = [also.length ? '也在' + also.join('、') : null, api.barOwnImage(name) ? '栏上 App 自带的图和键上的不同，换了就是同一张' : null].filter(Boolean);
+        el.append(iconRow(name, notes));
+      }
+    }
+
+    function iconRow(name, notes) {
       const problems = own[name] && d.files[own[name]] ? iconProblems(api.engine, d.files[own[name]], api.limits().iconBytes) : [];
-      el.append(row(name, h('span', { className: problems.length ? 'bad' : 'muted', textContent: own[name] ? own[name] + (problems.length ? '：' + problems[0] : '') : 'App 自带' }),
+      return row(name, h('span', { className: problems.length ? 'bad' : 'muted', textContent: (own[name] ? own[name] + (problems.length ? '：' + problems[0] : '') : 'App 自带') + (notes.length ? '（' + notes.join('；') + '）' : '') }),
         h('button', { type: 'button', textContent: '换…', on: { click: async () => {
           const f = await api.pickFile('image/svg+xml,.svg');
           if (!f) return;
@@ -133,7 +146,7 @@
           if (wrong.length) api.toast(f.name + ' 用不了：' + wrong[0]);
           else api.apply((x) => ops.setIcon(x, name, bytes));
         } } }),
-        own[name] ? h('button', { type: 'button', textContent: '用 App 的', on: { click: () => api.apply((x) => ops.setIcon(x, name, null)) } }) : null));
+        own[name] ? h('button', { type: 'button', textContent: '用 App 的', on: { click: () => api.apply((x) => ops.setIcon(x, name, null)) } }) : null);
     }
   }
 

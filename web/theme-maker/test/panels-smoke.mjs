@@ -103,6 +103,14 @@ async function main() {
     await js(`document.querySelector('#tabs [data-tab=text]').click()`);
     await wait(300);
 
+    // 061-toolbar-icons: the icons by where they are drawn, a name in two places noted in each
+    const groups = JSON.parse(await js(`JSON.stringify([...document.querySelectorAll('#edit .tab:not([hidden]) h4')].map((e) => e.textContent))`));
+    check(['回车键', '键', '快捷键的命令', '栏', '状态面板和编辑面板'].every((g) => groups.includes(g)), 'the icons grouped: ' + groups.join(' '));
+    const undo = JSON.parse(await js(`JSON.stringify([...document.querySelectorAll('#edit .tab:not([hidden]) label.row')].filter((r) => r.querySelector('.what').textContent === 'undo').map((r) => r.textContent))`));
+    check(undo.length === 2 && undo.every((t) => t.includes('也在')), 'undo in the commands and the bar, each noting the other: ' + undo.join(' | '));
+    const hide = await js(`[...document.querySelectorAll('#edit .tab:not([hidden]) label.row')].find((r) => r.querySelector('.what').textContent === 'hide-keyboard').textContent`);
+    check(hide.includes('栏上 App 自带的图和键上的不同'), 'hide-keyboard notes its bar image differs: ' + hide);
+
     // typed into 大小, then into 字距 (clicked): both kept, the second's characters not wiped
     await click('大小');
     await type('120');

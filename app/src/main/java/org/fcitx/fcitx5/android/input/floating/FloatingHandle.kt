@@ -6,8 +6,7 @@ package org.fcitx.fcitx5.android.input.floating
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.MotionEvent
@@ -15,8 +14,13 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.ImageView
+import androidx.annotation.ColorInt
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
+import org.fcitx.fcitx5.android.input.bar.BarIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
@@ -80,11 +84,10 @@ class FloatingHandle(
     // floating, the button that docks the keyboard again
     private val dock = (mode as? Mode.Floating)?.let { floating ->
         ImageView(context).apply {
-            setImageResource(R.drawable.ic_baseline_open_in_full_24)
             background = borderlessRippleDrawable(theme.keyPressHighlightColor)
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             contentDescription = context.getString(R.string.floating_keyboard_dock)
-            setPadding(dp(3), dp(3), dp(3), dp(3))
+            setPadding(dp(DOCK_PADDING_DP), dp(DOCK_PADDING_DP), dp(DOCK_PADDING_DP), dp(DOCK_PADDING_DP))
             setOnClickListener { floating.onDock() }
         }
     }
@@ -127,8 +130,20 @@ class FloatingHandle(
             width = SceneWindow.px(context, look.widthDp).toInt()
             height = SceneWindow.px(context, look.heightDp).toInt()
         }
-        dock?.colorFilter = PorterDuffColorFilter(look.iconColor.value, PorterDuff.Mode.SRC_IN)
+        drawDock(look.iconColor.value)
     }
+
+    // the dock button's icon, a theme's `floating-dock` too (061-toolbar-icons), in the handle's icon colour
+    private fun drawDock(@ColorInt color: Int) {
+        val d = dock ?: return
+        BarIconDrawables.show(d, PackIcons.of(theme), BarIcons.FLOATING_DOCK, color, dp(HEIGHT_DP - 2 * DOCK_PADDING_DP)) {
+            if (dressed?.iconColor?.value == color) drawDock(color)
+        }
+    }
+
+    /** The dock button's icon as drawn now (null: none, or the theme's not read yet). */
+    @get:VisibleForTesting
+    internal val dockDrawable: Drawable? get() = dock?.drawable
 
     // raw (screen) places: the handle moves with the keyboard under the finger
     @SuppressLint("ClickableViewAccessibility")
@@ -189,5 +204,6 @@ class FloatingHandle(
         // button is wider for it, the strip having nothing else beside the bar
         const val HEIGHT_DP = 24
         const val DOCK_WIDTH_DP = 56
+        private const val DOCK_PADDING_DP = 3
     }
 }

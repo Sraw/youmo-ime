@@ -345,3 +345,9 @@
 - **操作**：回测试页看工具栏；点 › 展开。
 - **预期**：放不下的常驻按钮按顺序挪进展开的工具栏，排在 ⋯ 前面；手写在展开里照样能点开、关。
 - **JVM**：`ToolbarConfigTest.pinnedOnesWithNoRoomGoOntoTheToolbarInOrderBeforeTheMoreButton`（ime-core）；设备上不跑。
+
+### TB-64 [P2] 主题图标的按钮开着时用「开着」的图标颜色；简繁两态各自的图；冷启动不先闪自带的图
+- **前提**：B0-设置，跟随系统深色模式关；一个主题包带 `one-handed`、`trad-simp-off`、`undo` 的 `<icon>`，和 `<style select="toolbar:selected" icon-color="…"/>`；工具栏里放上简繁。
+- **操作**：点这个主题，点开工具栏点单手，看单手按钮；点简繁换成繁体再换回；收起键盘，在设置里 **停止输入法** 后重新打开测试页的输入框，看工具栏打开那一刻。
+- **预期**：单手开着时主题的图用 `toolbar:selected` 的图标颜色，关掉回到平常的颜色；简体时是主题的 `trad-simp-off`，繁体时是自带的（`trad-simp` 没写）。重开键盘时主题写了的图标不会先画一下自带的再换成主题的（读完前空着），没写的马上画自带的。
+- **JVM**：`BarIconsThemeTest.aToggleOnDrawsItsIconInTheSelectedColour`（像素）、`BarIconsThemeTest.tradSimpsTwoStatesAreTwoNames`、`BarIconsThemeTest.aThemesIconNotReadYetIsNothingTillItIsNeverTheAppsFirst`（读完前空着、预读）；设备上不跑。

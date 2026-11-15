@@ -460,3 +460,6 @@ case("TB-55", needs="jvm:ToolbarConfigTest.handwritingIsPinnedByDefaultAndLeftOu
 case("TB-56", needs="jvm:BarToolbarThemeTest.theToolbarAndTheCodeAreTheThemes")(lambda d: None)
 
 case("TB-57", needs="jvm:ToolbarConfigTest.pinnedOnesWithNoRoomGoOntoTheToolbarInOrderBeforeTheMoreButton")(lambda d: None)
+
+case("TB-64", needs="jvm:BarIconsThemeTest.aToggleOnDrawsItsIconInTheSelectedColour、BarIconsThemeTest.tradSimpsTwoStatesAreTwoNames、"
+               "BarIconsThemeTest.aThemesIconNotReadYetIsNothingTillItIsNeverTheAppsFirst")(lambda d: None)

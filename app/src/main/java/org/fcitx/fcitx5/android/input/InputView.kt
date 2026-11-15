@@ -45,10 +45,13 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
+import org.fcitx.fcitx5.android.input.bar.BarIcons
 import org.fcitx.fcitx5.android.input.bar.Calculation
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarStateMachine
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton
+import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
@@ -77,6 +80,7 @@ import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.picker.PickerData
@@ -120,6 +124,14 @@ import timber.log.Timber
 
 // a button in the room beside a board at a side, square
 private const val SIDE_BUTTON_DP = SplitKeyboard.ONE_HANDED_MIN_FREE_DP
+
+// the side buttons' icon: a vector's own
+private const val SIDE_ICON_DP = 24
+
+// one-handed's way back to the whole width in the side buttons' colour: a theme's `one-handed-exit` where it has one,
+// [again] once its file is read
+private fun showFullWidthIcon(b: ImageView, theme: Theme, tint: Int, again: () -> Unit) =
+    BarIconDrawables.show(b, PackIcons.of(theme), BarIcons.ONE_HANDED_EXIT, tint, b.dp(SIDE_ICON_DP), again)
 
 @SuppressLint("ViewConstructor")
 class InputView(
@@ -175,8 +187,9 @@ class InputView(
     private val moveRight = moveButton(SplitKeyboard.Dock.RIGHT, R.drawable.ic_baseline_arrow_forward_24, R.string.split_dock_move_right)
 
     // one-handed, the other button there: both hands again, at either side; 普通 opens out from the side, split is
-    // made anew (the service), the letters halved as the view is made
-    private fun fullWidthButton() = sideButton(R.drawable.ic_baseline_open_in_full_24, R.string.one_handed_exit) {
+    // made anew (the service), the letters halved as the view is made; its icon a theme's `one-handed-exit` too
+    // (dressSideButtons)
+    private fun fullWidthButton() = sideButton(ToolbarButtonLooks.drawable(BarIcons.ONE_HANDED_EXIT.fallback), R.string.one_handed_exit) {
         KeyboardStyles.oneHandedOff(floatingController.screenBuilt)
     }
 
@@ -681,8 +694,10 @@ class InputView(
         if (scenes == sideButtonsDressed) return
         sideButtonsDressed = scenes
         val look = SceneWindow.sideButton(theme, scenes)
+        for (b in listOf(moveLeft, moveRight)) b.colorFilter = PorterDuffColorFilter(look.iconColor.value, PorterDuff.Mode.SRC_IN)
+        // read late: dressed again (in the scenes then)
+        for (b in listOf(fullWidthLeft, fullWidthRight)) showFullWidthIcon(b, theme, look.iconColor.value) { sideButtonsDressed = null; dressSideButtons() }
         for (b in listOf(moveLeft, moveRight, fullWidthLeft, fullWidthRight)) {
-            b.colorFilter = PorterDuffColorFilter(look.iconColor.value, PorterDuff.Mode.SRC_IN)
             b.background = SceneWindow.sideButtonBackground(context, look, dp(SIDE_BUTTON_DP))
         }
     }

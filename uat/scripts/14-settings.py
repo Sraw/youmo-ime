@@ -1746,6 +1746,18 @@ case("ST-126", needs="manual:导出备份、恢复，覆盖装 0.6.0 再装回�
 
 case("ST-127", needs="jvm:PopupMarksEditorTest.noChinesePunctuationIsForTheMarksATableConverts")(lambda d: None)
 
+case("ST-128", needs="jvm:BarIconsThemeTest.aThemesBarIconsAreDrawnTheOnesItDoesNotWriteTheApps、BarIconsThemeTest.aBuiltInThemeDrawsTheAppsAgain")(lambda d: None)
+
+case("ST-129", needs="jvm:BarIconsThemeTest.aThemesUndoIsTheToolbarsAndTheShortcutsAlike")(lambda d: None)
+
+case("ST-130", needs="jvm:BarIconsThemeTest.aThemeOfOneMenuStateDrawsThatOneTheOtherTheAppsTurnedNeitherTurned、"
+               "BarIconsThemeTest.noMenuIconOfTheThemesTurnsTheAppsAsEver、BarIconsThemeTest.hideKeyboardsImagesAreEachPlacesOwnTillAThemeWritesIt")(lambda d: None)
+
+case("ST-131", needs="manual:主题制作网页；在电脑浏览器上手工看候选栏预览（分组由 panels-smoke.mjs 查）")(lambda d: None)
+
+case("ST-132", needs="jvm:BarIconsThemeTest.theStatusPanelsCellsAndGearAreTheThemes、BarIconsThemeTest.thePanelsButtonsDoingACommandsJobAreTheThemes、"
+               "BarIconsThemeTest.theButtonsBesideTheKeysAreTheThemes、BarIconsThemeTest.theFloatingCandidateWindowsKeyboardButtonIsTheThemes")(lambda d: None)
+
 case("ST-121", needs="jvm:SettingsUatTest.keyDrawingIsOneListOfItsChoices、InputMethodSettingsScreenTest.keyDrawingIsOneChoiceSummarizedByItself、"
                "InputMethodSettingsScreenTest.thePauseOnTheSharedPageIsTheAppsPreference、HandwritingUatTest.aShortAndALongPause")(lambda d: None)
 

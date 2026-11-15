@@ -8,7 +8,9 @@
 // engine's packages.
 @file:OptIn(ExperimentalJsExport::class)
 
+import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problem
 import org.fcitx.fcitx5.android.scene.Scene
@@ -476,6 +478,24 @@ object YoumoEngine {
     }
 
     /**
+     * The icon [name] of [state]'s `icons` drawn on [ctx] as the app's bar draws one (061-toolbar-icons §2.6): [size] px
+     * square at [x], [y], in [tint] (`#aarrggbb`, the toolbar's icon-color) where its paths have no colour, turned
+     * [rotation] degrees about its middle (the app's ⌄ of the menu key). The painter's own op, so it is drawn as a key's
+     * icon is. `{ok, problems}`; an icon [state] has none of draws nothing.
+     */
+    fun paintIcon(ctx: dynamic, state: dynamic, name: dynamic, x: dynamic, y: dynamic, size: dynamic, tint: dynamic, rotation: dynamic): dynamic = checked {
+        if (ctx == null || jsTypeOf(ctx.fill) != "function") throw NotOfType("ctx: not a 2D context")
+        if (ctx.canvas == null || ctx.canvas == undefined) throw NotOfType("ctx: a context with no canvas")
+        val color = text(tint, "tint").takeIf { HEX_ARGB.matches(it) } ?: throw NotOfType("tint: not #aarrggbb")
+        val left = number(x, "x")
+        val top = number(y, "y")
+        val side = number(size, "size")
+        val op = Op.Icon(text(name, "name"), Box(left, top, left + side, top + side), Argb(color.substring(1).toLong(HEX).toInt()), number(rotation, "rotation"))
+        CanvasPainter(ctx, assets(state, families(member(state, "fonts"))), 1.0, left + side, top + side).draw(listOf(op))
+        obj("ok" to true, "problems" to emptyArray<dynamic>(), "warnings" to emptyArray<dynamic>())
+    }
+
+    /**
      * A theme file 3.0 ([json], the app's export and the old maker's) as theme 4, as the app converts it:
      * `{ok, problems, xml, name, dark, files: [[path in the 3.0 file, name in the 4.0]]}`.
      */
@@ -532,6 +552,8 @@ object YoumoEngine {
 
     // the bar's sample as the app's of the default 候选字号 (SceneBar): 40dp high, 18sp text, 9dp each side, 32dp at least
     private const val BAR_DP = 40.0
+    private const val HEX = 16
+    private val HEX_ARGB = Regex("#[0-9a-fA-F]{8}")
     private const val BAR_TEXT_SP = 18.0
     private const val BAR_PADDING_DP = 9.0
     private const val BAR_MIN_DP = 32.0

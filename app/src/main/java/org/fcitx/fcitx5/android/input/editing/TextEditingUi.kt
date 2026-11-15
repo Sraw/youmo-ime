@@ -10,6 +10,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.BarIcons
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
@@ -87,7 +88,8 @@ class TextEditingUi(
 
     val pasteButton = textButton(android.R.string.paste, altStyle = true)
 
-    val backspaceButton = iconButton(R.drawable.ic_baseline_backspace_24, altStyle = true).apply {
+    val backspaceButton = TextEditingButton(ctx, theme, ripple, border, radius, altStyle = true, fill).apply {
+        setIcon(BarIcons.BACKSPACE)
         soundEffect = SoundKey.BACKSPACE
         systemSound = SoundKey.BACKSPACE
         contentDescription = ctx.getString(R.string.backspace)
@@ -194,7 +196,7 @@ class TextEditingUi(
         }
     }
 
-    val clipboardButton = ToolButton(ctx, R.drawable.ic_clipboard, theme).apply {
+    val clipboardButton = ToolButton(ctx, BarIcons.CLIPBOARD, theme).apply {
         contentDescription = ctx.getString(R.string.clipboard)
         fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }

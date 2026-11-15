@@ -37,7 +37,7 @@ offered, the input method with keyboards to pick from: `KeyboardPicker` through 
 the right's overflow before it) and which at the right; `IdleUi.arrange` places them, again as the
 bar's width changes. The ⋯ panel's own actions live in `PanelActions`, called by
 `StatusAreaWindow` and the bar's buttons alike. A new panel entry that should be a button too is a
-`ToolbarButton`, its `ToolbarButtonLooks`, its action in `PanelActions`, and an `on(…)` line in
+`ToolbarButton`, its `ToolbarButtonLooks`, its icon in `BarIcons.of` (a name a theme may replace; `Icons.TOOLBAR` if new), its action in `PanelActions`, and an `on(…)` line in
 `KawaiiBarComponent`.
 The toolbar's 手写 (061-handwriting-toolbar) is such a button, pinned by default (`ToolbarConfig.DEFAULT`: 表情, 手写,
 语音, 收起; `withHandwritingPinned` for a bar arranged before, `AppPrefs.pinHandwriting`), offered where
@@ -700,6 +700,19 @@ scale applied) in the tint, a path's own colour kept and faded by the tint's alp
 (uniform, centred) as the web's `CanvasPainter.icon` places it. Why not on the main thread (060-theme-sounds-icons §2.4):
 on youmo29 (API 29 emulator, a dex of keyboard-scene run with `app_process`) 15 worst-case icons (64 KB of arcs, 20 000
 numbers, 11 400 cubics each) read and made Paths in 786 ms the first time, 220 ms warm, against a frame's 16 ms.
+Outside the scene (061-toolbar-icons) the same icons are drawn by `BarIcons` (ime-core `input/bar/`), the one table of
+the bar's, the candidate bar's, the clipboard strip's, the floating strip's, the status panel's and the editing panel's
+icons: each a `BarIcons.Icon(name, fallback)`, a name among `Icons.ALL` (`Icons.TOOLBAR`, `Icons.PANEL` for those of their
+own; a button doing a shortcut command's job has the command's name) and the place's own image (`Fallback`, the drawable of
+`ToolbarButtonLooks.drawable`), which may differ from the key's of the name (`hide-keyboard`, `choose-keyboard`).
+`BarIconDrawables.of` gives the theme's `PackIconDrawable` in the place's tint and size, the fallback where the theme has
+none (or the file is broken), and null while the file is being read: a bar is not drawn the app's icon and then the
+theme's (the view rebinds when it is in). `ThemeManager.prefetch` reads ahead every `BarIcons.BAR` name of the theme picked, queued on the one decode thread before the picture and its blurs (behind them the bar waited hundreds of ms). An `ImageView` that is no `ToolButton` (one-handed's side buttons, the floating candidate window's keyboard button and page arrows, the floating strip's dock) is drawn by `BarIconDrawables.show`: the app's resource under a colour filter, or the theme's drawable with none.
+`ToolButton(context, icon, theme)` holds the icon and redraws it for `setOn` (the toolbar's `toolbar:selected`
+icon-color) and a size change. The menu key turns the app's ⌄ only while the theme has neither `toolbar-expand` nor
+`toolbar-collapse`; else it crossfades (`Motion.Long`, halves out and in) and draws a state the theme lacks unturned or
+turned as before. The engine's toggles in the status panel are named by fcitx's icon (`BarIcons.engine`, chinese-addons'
+four, on and off each a name); others (unikey's) keep the app's image.
 The theme's styles matched to a key (`Cascade.of`) are kept by target, a key no selector names
 as one with no key (the 26 letters share theirs), with what it inherits; `Cascades` keeps a theme's
 cascade by the scenes it names (`flat` and not; what is typed only where the theme names it, so a

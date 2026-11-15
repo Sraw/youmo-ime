@@ -12,9 +12,13 @@ import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
 import androidx.annotation.DrawableRes
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
+import org.fcitx.fcitx5.android.input.bar.BarIcons
+import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
-import org.fcitx.fcitx5.android.input.keyboard.shadowedKeyBackgroundDrawable
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.keyboard.insetRadiusDrawable
+import org.fcitx.fcitx5.android.input.keyboard.shadowedKeyBackgroundDrawable
 import org.fcitx.fcitx5.android.utils.borderDrawable
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import org.fcitx.fcitx5.android.utils.rippleDrawable
@@ -96,9 +100,29 @@ class TextEditingButton(
     }
 
     fun setIcon(@DrawableRes icon: Int) {
+        shown = null
         imageView.imageResource = icon
+        showImage()
+    }
+
+    // the icon of a name shown ([setIcon]): a read finished for one shown before is not drawn over this one
+    private var shown: BarIcons.Icon? = null
+
+    /**
+     * [icon], a button doing a command's job (061-toolbar-icons §2.8): a theme's of its name in the icon's colour
+     * where it has one (nothing till it is read), else the app's.
+     */
+    fun setIcon(icon: BarIcons.Icon) {
+        val icons = PackIcons.of(theme)
+        if (!BarIconDrawables.themed(icons, icon)) return setIcon(ToolbarButtonLooks.drawable(icon.fallback))
+        shown = icon
+        imageView.setImageDrawable(BarIconDrawables.of(context, icons, icon, theme.altKeyTextColor, dp(ICON_DP)) { if (shown === icon) setIcon(icon) })
+        showImage()
+    }
+
+    private fun showImage() {
         removeView(textView)
-        add(imageView, lParams(wrapContent, wrapContent, gravityCenter))
+        if (imageView.parent == null) add(imageView, lParams(wrapContent, wrapContent, gravityCenter))
     }
 
     fun enableActivatedState() {
@@ -157,5 +181,10 @@ class TextEditingButton(
                 )
             }
         }
+    }
+
+    private companion object {
+        // the app's vectors' side
+        const val ICON_DP = 24
     }
 }

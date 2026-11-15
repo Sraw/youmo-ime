@@ -71,15 +71,15 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
-import org.fcitx.fcitx5.android.input.keyboard.HandwritingMode
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
+import org.fcitx.fcitx5.android.input.keyboard.HandwritingMode
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
-import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.status.PanelActions
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
@@ -295,7 +295,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     angle = if (angle in -45f..45f) {
                         angle.coerceIn(-10f, 10f)
                     } else abs(angle).coerceIn(90f - 10f, 90f + 10f) * dir
-                    v.iconRotation = angle
+                    // the app's ▾ points where the swipe goes; a theme's icon is no arrow to turn (061-toolbar-icons)
+                    if (!v.themed) v.iconRotation = angle
                 }
                 CustomGestureView.GestureType.Up -> {
                     val handled = !e.cancelled && when (angle) {
@@ -304,7 +305,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                             true
                         }
                         !in -45f..45f if distance > v.swipeThresholdX -> {
-                            v.iconRotation = 90f * dir
+                            if (!v.themed) v.iconRotation = 90f * dir
                             numberRowMode = IdleUiPolicy.NumberRowMode.ForceShow
                             evalIdleUiState(fromUser = true)
                             true
@@ -489,7 +490,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 }
             )
         }
-        candidateUi.expandButton.setIcon(R.drawable.ic_baseline_expand_more_24)
+        candidateUi.expandButton.setIcon(BarIcons.CANDIDATES_EXPAND)
         candidateUi.expandButton.contentDescription = context.getString(R.string.expand_candidates_list)
     }
 
@@ -498,7 +499,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         candidateUi.expandButton.setOnClickListener {
             windowManager.attachWindow(KeyboardWindow)
         }
-        candidateUi.expandButton.setIcon(R.drawable.ic_baseline_expand_less_24)
+        candidateUi.expandButton.setIcon(BarIcons.CANDIDATES_COLLAPSE)
         candidateUi.expandButton.contentDescription = context.getString(R.string.hide_candidates_list)
     }
 
@@ -665,8 +666,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
             ToolbarButton.TradSimp -> {
                 val traditional = tradSimpEntry()?.active == true
-                view.setOn(traditional)
-                view.setIcon(if (traditional) R.drawable.ic_fcitx_status_chttrans_trad else R.drawable.ic_fcitx_status_chttrans_simp)
+                view.setOn(traditional, BarIcons.tradSimp(traditional))
                 view.contentDescription = context.getString(if (traditional) R.string.status_traditional else R.string.status_simplified)
             }
             else -> {}

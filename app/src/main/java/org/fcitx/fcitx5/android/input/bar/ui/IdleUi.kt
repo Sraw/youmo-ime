@@ -15,12 +15,14 @@ import android.view.ViewGroup
 import android.view.animation.AlphaAnimation
 import android.view.animation.AnimationSet
 import android.view.animation.TranslateAnimation
-import android.widget.LinearLayout
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
+import org.fcitx.fcitx5.android.input.bar.BarIcons
 import org.fcitx.fcitx5.android.input.bar.IdleUiPolicy.Display
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton
@@ -35,6 +37,7 @@ import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.motion.Motion
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.utils.interpolator
@@ -74,17 +77,28 @@ class IdleUi(
         if (ctx.resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_LTR) 1f else -1f
     }
 
-    private val menuButtonRotation
-        get() = when {
-            currentState == Display.Toolbar -> 90f * translateDirection
-            else -> -90f * translateDirection
-        }
+    private val packIcons = PackIcons.of(theme)
+
+    // the app's menu key is one ⌄ turned to say the state; a theme's icon of either state (061-toolbar-icons Q3) has
+    // each state drawn as its own, none turned, the one it does not write the app's ⌄ turned as ever
+    private val menuTurns = BarIcons.menuStates.none { BarIconDrawables.themed(packIcons, it) }
+
+    private val menuOpen get() = currentState == Display.Toolbar
+
+    private fun menuRotation(open: Boolean): Float = when {
+        BarIconDrawables.themed(packIcons, BarIcons.menu(open)) -> 0f
+        open -> 90f * translateDirection
+        else -> -90f * translateDirection
+    }
 
     // the theme's toolbar button, worked out once for the bar's every button (T6b)
     private val toolbar = SceneBar.of(ctx, theme).toolbar
 
-    val menuButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme, toolbar).apply {
-        iconRotation = menuButtonRotation
+    // the state the menu key's icon is drawn for
+    private var menuDrawnOpen = menuOpen
+
+    val menuButton = ToolButton(ctx, BarIcons.menu(menuOpen), theme, toolbar).apply {
+        iconRotation = menuRotation(menuOpen)
         fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
 
@@ -334,8 +348,10 @@ class IdleUi(
         }
     }
 
-    private fun updateMenuButtonRotation(instant: Boolean = false) {
-        val targetRotation = menuButtonRotation
+    private fun updateMenuButtonIcon(instant: Boolean = false) {
+        val open = menuOpen
+        if (!menuTurns) return crossfadeMenuButton(open, instant)
+        val targetRotation = menuRotation(open)
         menuButton.apply {
             if (targetRotation == iconRotation) return
             iconAnimate().cancel()
@@ -344,6 +360,29 @@ class IdleUi(
                 iconAnimate().setDuration(ms).setInterpolator(Motion.Curve.Move.interpolator).rotation(targetRotation)
             } else {
                 iconRotation = targetRotation
+            }
+        }
+    }
+
+    // a theme's menu key: the state's own icon faded in for the other's, Motion.Long (150 ms) in all, at once with 禁用动画
+    private fun crossfadeMenuButton(open: Boolean, instant: Boolean) {
+        if (open == menuDrawnOpen) return
+        menuDrawnOpen = open
+        menuButton.apply {
+            iconAnimate().cancel()
+            val show = {
+                setIcon(BarIcons.menu(open))
+                iconRotation = menuRotation(open)
+            }
+            val ms = if (instant) 0L else Motion.Long.enter(motionSettings())
+            if (ms > 0L) {
+                iconAnimate().setDuration(ms / 2).alpha(0f).withEndAction {
+                    show()
+                    iconAnimate().setDuration(ms / 2).alpha(1f)
+                }
+            } else {
+                show()
+                iconAlpha = 1f
             }
         }
     }
@@ -422,7 +461,7 @@ class IdleUi(
         currentState = state
         layOutWork()
         updateMenuButtonContentDescription()
-        updateMenuButtonRotation(instant = !fromUser)
+        updateMenuButtonIcon(instant = !fromUser)
     }
 
     companion object {

@@ -2,9 +2,9 @@
 // from src/ (page.html with style.css, lib.js, maker.js, form.js, src/panels/*.js and ui.js put in) and classic/index.html (the maker
 // before 0.6.0, kept till 0.6.x ends) from src/classic/ (its page.html, style.css and ui.js, src/lib.js shared),
 // the CSP's script hashes worked out, and the generated blocks (youmo-format,
-// youmo-presets, youmo-layout, youmo-icons, youmo-engine-icons: the app's tests write them, never by
+// youmo-presets, youmo-layout, youmo-icons, youmo-engine-icons, youmo-bar-icons: the app's tests write them, never by
 // hand) read from generated/<id>.json, each page carrying only the blocks its page.html has a slot for
-// (the maker: youmo-format, youmo-engine-icons; classic: the four it reads), the page's fonts (fonts/,
+// (the maker: youmo-format, youmo-engine-icons, youmo-bar-icons; classic: the four it reads), the page's fonts (fonts/,
 // tools/subset-fonts.py) put in.
 // Neither page is in git (R25 B12): only their sources and the generated files are, so a change to src/ is
 // committed once. CI (pages.yml, unit_test.yml), the tests (in memory) and dev/serve.mjs make them.
@@ -19,7 +19,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-export const GENERATED = ['youmo-format', 'youmo-presets', 'youmo-layout', 'youmo-icons', 'youmo-engine-icons'];
+export const GENERATED = ['youmo-format', 'youmo-presets', 'youmo-layout', 'youmo-icons', 'youmo-engine-icons', 'youmo-bar-icons'];
 
 /** Where the app's tests write the generated blocks, each as <id>.json (ThemeMakerTestdata.block). */
 export const GENERATED_DIR = join(root, 'generated');

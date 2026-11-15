@@ -5,13 +5,16 @@
 package org.fcitx.fcitx5.android.input.bar.ui.idle
 
 import android.content.Context
+import android.graphics.drawable.Drawable
 import android.text.TextUtils
-import org.fcitx.fcitx5.android.R
+import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
+import org.fcitx.fcitx5.android.input.bar.BarIcons
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.utils.rippleDrawable
 import splitties.dimensions.dp
-import splitties.resources.drawable
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.centerInParent
@@ -33,11 +36,20 @@ import splitties.views.imageDrawable
 
 class ClipboardSuggestionUi(override val ctx: Context, private val theme: Theme) : Ui {
 
-    private val icon = imageView {
-        imageDrawable = drawable(R.drawable.ic_clipboard)!!.apply {
-            setTint(theme.altKeyTextColor)
-        }
+    // the toolbar's clipboard's icon (a theme's `clipboard` too: 061-toolbar-icons), in the strip's own colour
+    private val icon = imageView()
+
+    private fun drawIcon() {
+        icon.imageDrawable = BarIconDrawables.of(ctx, PackIcons.of(theme), BarIcons.CLIPBOARD, theme.altKeyTextColor, ctx.dp(ICON_DP)) { drawIcon() }
     }
+
+    init {
+        drawIcon()
+    }
+
+    /** The icon as drawn now; null where the theme's is not read yet. */
+    @get:VisibleForTesting
+    internal val iconDrawable: Drawable? get() = icon.drawable
 
     val text = textView {
         isSingleLine = true
@@ -48,7 +60,7 @@ class ClipboardSuggestionUi(override val ctx: Context, private val theme: Theme)
 
     private val layout = constraintLayout {
         val spacing = dp(4)
-        add(icon, lParams(dp(20), dp(20)) {
+        add(icon, lParams(dp(ICON_DP), dp(ICON_DP)) {
             startOfParent(spacing)
             before(text)
             centerVertically()
@@ -70,5 +82,9 @@ class ClipboardSuggestionUi(override val ctx: Context, private val theme: Theme)
             centerInParent()
             verticalMargin = dp(4)
         })
+    }
+
+    private companion object {
+        const val ICON_DP = 20
     }
 }
