@@ -128,7 +128,10 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
                 // The tracked selection lagging (collapsed though text is selected): said all the
                 // same, the selection left as the editor has it, its end not known here
                 val collapseAt = cursorAfterCopy(range.start, range.end)
-                if (collapseAt != null) ic.setSelection(collapseAt, collapseAt)
+                if (collapseAt != null) {
+                    ic.setSelection(collapseAt, collapseAt)
+                    service.changedPastSession()
+                }
                 if (copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_copied)
                 updateSelection(hasSelection, false)
             }

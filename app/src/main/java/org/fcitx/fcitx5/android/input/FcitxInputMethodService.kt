@@ -845,7 +845,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     clearedText.edited()
                     // replay the original event if we still have it
                     if (keyEventRelay.replay(it.timestamp)) {
-                        editingSession.commits.moved()
+                        // fcitx hands back the up of every key it took (the space that chose a word too):
+                        // moved there ended that commit's wait and forgot what it left, so on a hardware
+                        // keyboard every commit read before it and none was judged. An up that does change
+                        // the field is caught by its cursor report or by input started anew; a rewrite of
+                        // the same length at the same cursor is not, as for any app's own edit
+                        if (!it.up) editingSession.commits.moved()
                         return@event
                     }
                     // no original event to replay: simulate one
@@ -973,6 +978,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         contextMemory.backspace(deleting.start, deleting.end)
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
     }
+
+    /**
+     * The field changed past the session (a shortcut's edits, the text-editing panel's cursor set): a commit
+     * waiting can no longer be read back, nor is the text before the cursor known ([CommitCheck.moved]).
+     */
+    fun changedPastSession() = editingSession.commits.moved()
 
     /**
      * The text-editing panel's menu action, done by the editor: a selection a cut or a paste

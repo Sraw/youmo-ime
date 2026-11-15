@@ -307,4 +307,93 @@ class CommitCheckTest {
             "forgotten with the field" to { assertFalse(asked { s.commits.forget() }.s.commits.toWrite) },
         )
     }
+
+    @Test
+    fun `after a commit that landed the next is not read before, and one dropped then is still kept`() {
+        val r = Rig("说：")
+        r.s.commitText("你")
+        r.report()
+        r.e.dropsWrites = true
+        r.s.commitText("好")
+        val readsBefore = r.reads()
+        r.s.judgeCommit()
+        assertRows(
+            "one read, before the first commit: the second's text before the cursor known" to { assertEquals(1, readsBefore) },
+            "dropped, no report, the text before the cursor as the first left it: kept" to { assertEquals("好", r.kept) },
+            "the field as the first left it" to { assertEquals("说：你", r.e.text) },
+        )
+    }
+
+    @Test
+    fun `read before a commit again where the field may not be as the last commit left it`() {
+        fun readsForSecond(between: Rig.() -> Unit, second: Rig.() -> Unit = { s.commitText("好") }) =
+            Rig("说：").run {
+                s.commitText("你")
+                report()
+                between()
+                val at = reads()
+                second()
+                reads() - at
+            }
+        assertRows(
+            "nothing between: not read" to { assertEquals(0, readsForSecond({})) },
+            "the cursor put elsewhere by the user" to { assertEquals(1, readsForSecond({ e.setSelection(1, 1); report() })) },
+            "a deletion" to { assertEquals(1, readsForSecond({ s.deleteSurrounding(1, 0, inCodePoints = false); report() })) },
+            "a code composing in the field, the commit replacing it" to {
+                assertEquals(1, readsForSecond({ code("hao"); report() }))
+            },
+            "the last commit not a plain insertion (the cursor left inside it)" to {
+                assertEquals(1, Rig("说：").run { s.commitText("（）", 1); report(); val at = reads(); s.commitText("好"); reads() - at })
+            },
+            "another field" to { assertEquals(1, readsForSecond({ s.commits.forget() })) },
+            "the cursor away and back where the last commit left it" to {
+                assertEquals(1, readsForSecond({ e.setSelection(1, 1); report(); e.setSelection(3, 3); report() }))
+            },
+            "the app's rewrite in place, of the same length, reported at the same cursor" to {
+                assertEquals(1, readsForSecond({ e.appReplace(0, 1, "讲"); report() }))
+            },
+            "a commit judged and kept between" to {
+                assertEquals(1, readsForSecond({ e.dropsWrites = true; s.commitText("好"); s.judgeCommit(); e.dropsWrites = false }))
+            },
+            "checking turned off and on again" to { assertEquals(1, readsForSecond({ s.commits.on = false; s.commits.on = true })) },
+        )
+    }
+
+    @Test
+    fun `the known text before the cursor is what a read there would give`() {
+        // [text] before the cursor; a commit that lands, then one the field drops: kept, and the reads made
+        fun keptAfterLanded(text: String, limit: Int = Int.MAX_VALUE) = Rig(text).run {
+            e.revealLimit = limit
+            s.commitText("你")
+            report()
+            e.dropsWrites = true
+            s.commitText("好")
+            val reads = reads()
+            s.judgeCommit()
+            kept to reads
+        }
+        // two commits before one report, then one more that lands and one dropped
+        val merged = Rig("说：").run {
+            s.commitText("你")
+            s.commitText("好")
+            report()
+            s.commitText("吗")
+            report()
+            e.dropsWrites = true
+            s.commitText("呢")
+            val reads = reads()
+            s.judgeCommit()
+            kept to reads
+        }
+        assertRows(
+            "40 units before the cursor: the last 32 known" to { assertEquals("好" to 1, keptAfterLanded("a".repeat(40))) },
+            "a pair cut at the 32nd unit back, as a read cuts it" to {
+                assertEquals("好" to 1, keptAfterLanded("x😀" + "a".repeat(30)))
+            },
+            "commits judged together: known after them all" to { assertEquals("呢" to 1, merged) },
+            "an editor that gives less before the cursor than asked: read each time, still kept" to {
+                assertEquals("好" to 2, keptAfterLanded("a".repeat(40), limit = 10))
+            },
+        )
+    }
 }

@@ -173,15 +173,32 @@ what already ends the field (哈 after 哈哈哈) cannot be told and is taken as
 that is not the commit's while it waits (the field tapped within the 800 ms) leaves the cursor where no
 read can tell, and that one commit is not judged (what was kept before stays; the next commit reads and
 waits on its own). So too anything else done to the field while a commit waits (`CommitCheck.moved`): the session's deletions and cursor moves,
-the service's key events (Backspace, Enter, arrows, lines, shortcuts, a physical key replayed), the
+the service's key events (Backspace, Enter, arrows, lines, shortcuts, a physical key's press replayed), the
 editor's action, a context-menu action, and input started anew in the same field (the app's
 restartInput, its text set maybe): a commit then deleted, sent or cleared away reads back as before it
-in an editor that reports late. Enter or send, a paste and a physical key replayed end the wait so as
+in an editor that reports late. Enter or send, a paste and a physical key's press replayed end the wait so as
 Backspace does, and a kept text asked for is written after their effect. As any start of input in the same field ends the wait so, a commit
 within 800 ms before the app's `restartInput`, or before a WebView's restart as the screen turns, is
-not judged: dropped there, it is lost as before. The cost is one synchronous read before each commit, a key's character
-committed included (`ForwardedKeys.Action.CommitChar`, a virtual key's unicode), none for a commit made
-while another waits, and none after it where the editor reports in time.
+not judged: dropped there, it is lost as before. The read before a commit is a synchronous binder
+round trip that waits for the app's main thread (on the OnePlus 6T, in a page busy 12 ms of every 16,
+7 ms at the median and 14 ms at p90 per commit, against 0.35 ms without it). So it is not made where
+the text before the cursor is known: a commit that landed where it was to leave the cursor (reported)
+leaves what was read before it and what it committed, and the next commit at that cursor, nothing
+composing in the field, takes that instead (`CommitCheck.before`). Anything done to the field in
+between (`moved`), another field (`forget`), a commit that is not a plain insertion at the cursor
+(the cursor left inside it, a long text in pieces, a composition replaced) read again, and so does an
+editor that gives less before the cursor than asked. An app's rewrite in place of the same length that
+it does not report (a space made a no-break one, 「,」 made 「，」) leaves what is known stale till the
+next `moved`: a commit dropped meanwhile reads back other than that and is not kept, as before this
+check; dropped text is kept again once the next read is made. Typing on, a
+read is made at the first commit after the field is started, tapped, deleted in or composed in; none
+for a commit made while another waits, and none after it where the editor reports in time. A key the
+engine hands back and the service replays to the app (a hardware key's digit, `KeyEventRelay`) is no
+commit and is not checked: its press ends the wait as any key the service sends to the app does. Its release, which the engine
+hands back for every key it took (the space that chose the word too), ends nothing: when it did,
+every commit typed on a hardware keyboard lost its wait and read before it. A release that does
+change the field is caught by its cursor report or by input started anew; a rewrite of the same
+length at the same cursor is not, as for any edit of the app's own.
 
 ### `EditorInfo` decides a lot
 

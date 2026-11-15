@@ -207,7 +207,7 @@ class KeyboardHarness(
                     target.dispatchKeyEvent(event))
 
             override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence? =
-                if (nothingBeforeGiven || !open) null else super.getTextBeforeCursor(n, flags)
+                if (nothingBeforeGiven || !open) null else super.getTextBeforeCursor(n, flags).also { beforeReads += n }
 
             override fun getSurroundingText(beforeLength: Int, afterLength: Int, flags: Int): android.view.inputmethod.SurroundingText? =
                 if (nothingBeforeGiven || nothingAfterGiven || !open) null else super.getSurroundingText(beforeLength, afterLength, flags)
@@ -422,6 +422,9 @@ class KeyboardHarness(
      * takeSnapshot null), what is after it as ever: the testbed's `null_before` field (uat/TESTBED.md).
      */
     var nothingBeforeGiven = false
+
+    /** The length each read of the text before the field's cursor asked for, in order (CommitCheck's is [CommitCheck.READ]). */
+    val beforeReads = mutableListOf<Int>()
 
     /** The mirror: nothing of what is after the cursor given (getTextAfterCursor null, and the reads of both sides), what is before it as ever. */
     var nothingAfterGiven = false

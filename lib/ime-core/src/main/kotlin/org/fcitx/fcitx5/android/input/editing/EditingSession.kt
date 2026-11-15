@@ -542,7 +542,9 @@ class EditingSession(
         // Re-committing identical text would make the editor redraw and can drop spans.
         // checked only where the editor has said where its cursor is: one of no text of its own (a
         // terminal's, a game's) says nothing, and reads back empty whether it took the text or not
-        val before = if (selection.latest.start >= 0) commits.before(text) else null
+        // not read where the last commit left the text before the cursor known (CommitCheck.before)
+        val plain = composing.isEmpty()
+        val before = if (selection.latest.start >= 0) commits.before(text, selection.latest.start, plain) else null
         if (composing.isNotEmpty() && composingText.toString() == text) {
             val c = if (cursor == -1) text.length else cursor
             val target = composing.start + c
@@ -565,6 +567,8 @@ class EditingSession(
         } else if (cursor == -1) {
             selection.predict(start + text.length)
             editor.commitText(text, 1)
+            commits.committed(text, before, if (plain) start + text.length else -1)
+            return text
         } else {
             val target = start + cursor
             selection.predict(target)

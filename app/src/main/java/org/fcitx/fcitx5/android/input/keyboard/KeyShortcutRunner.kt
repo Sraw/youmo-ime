@@ -174,7 +174,11 @@ class KeyShortcutRunner(
         ctrl = fieldEdgeCtrl(service.currentInputEditorInfo?.toEditorTraits()?.isRawKeyInput == true),
     )
 
-    private fun apply(steps: List<EditPlan.Step>) = EditPlan.apply(steps, editor, ::menu)
+    // done past the session: a commit waiting can no longer be read back (CommitCheck.moved)
+    private fun apply(steps: List<EditPlan.Step>) {
+        if (steps.isNotEmpty()) service.changedPastSession()
+        EditPlan.apply(steps, editor, ::menu)
+    }
 
     private fun menu(action: EditPlan.Menu) = service.performContextMenuAction(
         when (action) {

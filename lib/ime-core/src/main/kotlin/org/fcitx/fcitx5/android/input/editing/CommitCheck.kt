@@ -24,6 +24,13 @@ import org.fcitx.fcitx5.android.core.CoreLog
  * a game: `BaseInputConnection` with no `Editable`) reads back empty before and after and would look
  * the same. A field that refuses the text (full to its length, digits only) and reports nothing is
  * said not to have taken it, which is so.
+ *
+ * The read before a commit is a binder round trip that waits for the app's main thread (7 ms at the
+ * median on a phone, a page busy with its own script; dev/design/061-lc24-commit-read.md). So it is
+ * not made where the text before the cursor is known: a commit that landed where it was to leave the
+ * cursor ([reported]) leaves what was read before it and what it committed ([known]), and the next
+ * commit made at that cursor, with nothing composing, takes that instead. Anything else done to the
+ * field ([moved], [forget]) and a commit that is not a plain insertion at the cursor forget it.
  */
 class CommitCheck(private val editor: InputEditor) {
 
@@ -31,7 +38,10 @@ class CommitCheck(private val editor: InputEditor) {
     var on = false
         set(value) {
             field = value
-            if (!value) ended()
+            if (!value) {
+                known = null
+                ended()
+            }
         }
 
     /**
@@ -60,9 +70,15 @@ class CommitCheck(private val editor: InputEditor) {
 
     // commits no report has come after: the text before the cursor read before the first, when ([clock]),
     // and what they committed since
-    private class Waiting(val before: String, var text: String, val since: Long)
+    // and the cursor they were to leave, where the text before it is then known ([known]); -1 where not
+    private class Waiting(val before: String, var text: String, val since: Long, var at: Int)
 
     private var waiting: Waiting? = null
+
+    // the text before the cursor at [at], as the last commit that landed there left it; null where unknown
+    private class Known(val at: Int, val text: String)
+
+    private var known: Known? = null
 
     /** Whether a commit waits for the editor's report: the service calls [judge] once its wait is up. */
     val isWaiting: Boolean get() = waiting != null
@@ -75,24 +91,32 @@ class CommitCheck(private val editor: InputEditor) {
      */
     fun waitLeft(): Long = waiting?.let { (it.since + WAIT_MS - clock()).coerceAtLeast(0) } ?: 0
 
-    /** The text before the cursor, read before a commit of [text] for [committed]; null where not checked. */
-    fun before(text: String): CharSequence? {
+    /**
+     * The text before the cursor before a commit of [text], for [committed]; null where not checked.
+     * Not read where it is known: the cursor at [at], where the last commit that landed left it, and
+     * nothing composing in the field ([plain]).
+     */
+    fun before(text: String, at: Int = -1, plain: Boolean = false): CharSequence? {
         if (!on || text.isEmpty() || waiting != null) return null
+        known?.let { if (plain && it.at == at) return it.text }
         return editor.textBeforeCursor(READ)
     }
 
     /**
-     * [text] was committed, [before] read before it ([before]'s answer). A commit while another
-     * waits is judged with it, from the first one's read.
+     * [text] was committed, [before] read before it ([before]'s answer), to leave the cursor at [at]
+     * after it: a plain insertion at the cursor, nothing composing replaced; -1 for any other. A
+     * commit while another waits is judged with it, from the first one's read.
      */
-    fun committed(text: String, before: CharSequence?) {
+    fun committed(text: String, before: CharSequence?, at: Int = -1) {
         if (!on || text.isEmpty()) return
         waiting?.let {
             it.text += text
+            it.at = if (it.at >= 0) at else -1
             return
         }
+        known = null
         // an editor that would not say what is before the cursor is not one to judge
-        waiting = Waiting(before?.toString() ?: return, text, clock())
+        waiting = Waiting(before?.toString() ?: return, text, clock(), at)
         changed?.invoke()
     }
 
@@ -101,7 +125,11 @@ class CommitCheck(private val editor: InputEditor) {
      * in, and what was kept before is no longer asked for, the user having typed on.
      */
     fun reported() {
-        if (waiting == null) return
+        val landed = waiting ?: return
+        // an editor that gives less before the cursor than asked (a cap of its own) reads back shorter than
+        // that would be, and a commit dropped would not read the same: not known there, read
+        val whole = landed.before.length >= minOf(READ, landed.at - landed.text.length)
+        known = if (landed.at >= 0 && whole) Known(landed.at, (landed.before + landed.text).takeLast(READ)) else null
         if (!toWrite) kept = ""
         ended()
     }
@@ -114,7 +142,10 @@ class CommitCheck(private val editor: InputEditor) {
      * and the next commit waits on its own, read before it and timed from it. The service is told again
      * of a write asked for and not done yet ([toWrite]: input was not started when its post ran).
      */
-    fun moved() = ended()
+    fun moved() {
+        known = null
+        ended()
+    }
 
     // nothing waits any more: what the user asked to be written is written now (the service, told)
     private fun ended() {
@@ -126,6 +157,7 @@ class CommitCheck(private val editor: InputEditor) {
     fun judge(): Boolean {
         val asked = waiting ?: return false
         waiting = null
+        known = null
         val now = editor.textBeforeCursor(READ)?.toString()
         // the same text before the cursor, and not what was committed already there (a word finished
         // in place, 哈 after a row of 哈): nothing went in
@@ -149,6 +181,7 @@ class CommitCheck(private val editor: InputEditor) {
     /** Another field, or the keyboard put away: nothing waits and nothing is kept. */
     fun forget() {
         waiting = null
+        known = null
         toWrite = false
         kept = ""
     }

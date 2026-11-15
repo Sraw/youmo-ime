@@ -49,6 +49,9 @@ class FakeHostApi : HostApi {
      */
     val calls: MutableList<String> = CopyOnWriteArrayList()
 
+    /** The timestamp each hardware key sent carried, in order: what fcitx hands back with a key it did not take. */
+    val keyTimestamps: MutableList<Int> = CopyOnWriteArrayList()
+
     val events = MutableSharedFlow<HostEvent>(extraBufferCapacity = 64)
     override val eventFlow: SharedFlow<HostEvent> get() = events
 
@@ -304,6 +307,7 @@ class FakeHostApi : HostApi {
         slow()
         calls += "sendKey(sym=${sym.sym}, states=${states.states}, code=$code, up=$up)"
         if (touch != null) touches += "sym=${sym.sym}" to touch
+        keyTimestamps += timestamp
     }
 
     override suspend fun select(idx: Int, text: String?): Boolean {
