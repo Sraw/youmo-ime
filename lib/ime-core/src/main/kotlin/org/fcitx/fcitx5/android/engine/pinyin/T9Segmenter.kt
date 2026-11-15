@@ -46,6 +46,12 @@ import java.util.TreeMap
  * the spelling actually typed for it (a fuzzy partner's, üe's ue), kept beside the index as the
  * group's first or second letter of each key.
  *
+ * With [neighbours] (pinyin's keys alone), a syllable some of the keys spell with one key slipped
+ * from a key around it is read too, as likely as where it was tapped says ([SlipCost];
+ * 061-neighbour-correction §4.3, §4.4): whole syllables only, legal (costing more) where the keys
+ * as typed spell one. On a keyboard that weighs a key's letters by where it was tapped, the key
+ * slipped to has its letters weighed by where the tap lies on it, the slipped key's own not at all.
+ *
  * The keys may spell syllables in zhuyin's symbols instead ([KeySpelling], 注音九键 and 大千 of
  * [ZhuyinKeys]): every syllable indexed by its symbols' keys, a symbol typed as itself its code, a
  * tone after a syllable a separator (the decoder weighs it: [SyllableGraph.tone]).
@@ -55,6 +61,10 @@ class T9Segmenter(
     private val abbreviations: Boolean = true,
     override val letters: NineKeyLetters = NineKeyLetters.STANDARD,
     override val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? = null,
+    neighbours: Boolean = false,
+    // the nine keys' digits read the slips over -3 alone: on a phone (6T) those over -4 cost 2.7 ms a key at the
+    // 41st to 60th key, over the 1.5 the design allows, and found 1 point more (061-neighbour-correction §7.2, N3)
+    private val slipCost: SlipCost = if (letters.isGrouped) SlipCost() else SlipCost(floor = -3f),
 ) : KeyedSegmenter {
 
     // the tables below made once for the settings that shape them, shared by the sessions made anew
@@ -69,6 +79,7 @@ class T9Segmenter(
     private val wholeLetters = tables.wholeLetters
     private val startLetters = tables.startLetters
     private val initialLetters = tables.initialLetters
+    private val slips = neighbours && spelling == KeySpelling.Pinyin
 
     /**
      * How many times two spellings of a syllable kept for the same keys and flags had different
@@ -178,11 +189,124 @@ class T9Segmenter(
 
     override fun segment(input: String): SyllableGraph = segment(input, null)
 
-    override fun segment(input: String, taps: FloatArray?): SyllableGraph {
+    override fun segment(input: String, taps: FloatArray?): SyllableGraph = segment(input, taps, null)
+
+    override fun segment(input: String, taps: FloatArray?, touches: Array<Touch?>?): SyllableGraph {
         val placed = taps?.takeIf { letters.isGrouped && it.any { at -> !at.isNaN() } }
+        val touched = touches?.takeIf { slips }?.let { passing(input, it) }
         return GraphEdges.build(input) { at, edges ->
-            if (input[at] in 'a'..'z') chosen(input, at, edges) else walk(input, at, edges, placed)
+            if (input[at] in 'a'..'z') {
+                chosen(input, at, edges)
+            } else {
+                walk(input, at, edges, placed)
+                if (touched != null) slipped(input, at, edges, placed, touched)
+            }
         }
+    }
+
+    /**
+     * Adds, for each run of keys from [at], the whole syllables it spells with one key read as a
+     * key around it where it was tapped, those it spells as typed left out, each at its cheapest
+     * slip. Not a letter typed as itself (one chosen off a long press).
+     */
+    private fun slipped(input: String, at: Int, edges: GraphEdges, taps: FloatArray?, passing: Array<List<Passing>?>) {
+        var length = 0
+        var any = false
+        while (at + length < input.length && isKey(input[at + length]) && length < MAX_SYLLABLE) {
+            if (passing[at + length] != null) any = true
+            length++
+            if (any) slippedRun(input, at, length, edges, taps, passing)
+        }
+    }
+
+    /**
+     * Each key's [Passing]: the keys around its tap a slip may read it as, past [SlipCost.floor] as
+     * an illegal one (a legal one costs more); null where none, and in all where no key has one, so
+     * keys tapped on target do none of [slippedRun]'s work.
+     */
+    private fun passing(input: String, touches: Array<Touch?>): Array<List<Passing>?>? {
+        var out: Array<List<Passing>?>? = null
+        for (i in input.indices) {
+            val touch = touches.getOrNull(i)?.takeIf { letters.isCode(input[i]) } ?: continue
+            var here: ArrayList<Passing>? = null
+            for (near in touch.near) {
+                val cost = if (readsAs(input[i], near.char)) slipCost.of(touch, near, legal = false) else Float.NaN
+                if (!cost.isNaN()) here = (here ?: ArrayList()).apply { add(Passing(touch, near, cost)) }
+            }
+            if (here != null) (out ?: arrayOfNulls<List<Passing>>(input.length).also { out = it })[i] = here
+        }
+        return out
+    }
+
+    // whether the key [typed] may be read as [d], a key around it: another with letters
+    private fun readsAs(typed: Char, d: Char) = d != typed && letters.isCode(d) && letters.letters(d).isNotEmpty()
+
+    // a key around a tap a slip may read it as: the tap, the key, what it costs read so where the keys typed spell nothing
+    private class Passing(val touch: Touch, val near: Near, val cost: Float)
+
+    // [slipped] for the run of [length] keys from [at]
+    private fun slippedRun(input: String, at: Int, length: Int, edges: GraphEdges, taps: FloatArray?, passing: Array<List<Passing>?>) {
+        val typed = input.substring(at, at + length)
+        val keys = keysOf(typed)
+        val full = whole[keys]?.let { fitting(it, typed) }
+        // made at the first slip read
+        var best: TreeMap<Int, Slip>? = null
+        for (j in 0 until length) passing[at + j]?.forEach { best = slipOnto(typed, keys, j, it, full, best) }
+        val found = best
+        if (found == null || found.isEmpty()) return
+        val builder = Slips.Builder()
+        found.values.forEach { builder.add(it.cost, it.at, it.meant) }
+        val m = SyllableMatches(found.keys.toIntArray(), found.values.map { it.flags }.toIntArray())
+        edges.add(at, length, Kind.SYLLABLE, m, taps?.let { slipAgainst(m, found.values.toList(), typed, at, it) }, builder.build())
+    }
+
+    // [best] (made if none and one is read) with the syllables [typed] spells with its [j]th key read as [p]'s, those [full] has left out
+    private fun slipOnto(typed: String, keys: String, j: Int, p: Passing, full: SyllableMatches?, best: TreeMap<Int, Slip>?): TreeMap<Int, Slip>? {
+        val d = p.near.char
+        val cost = if (full != null) slipCost.legal(p.cost) else p.cost
+        if (cost.isNaN()) return best
+        val m = whole[replaced(keys, j, d)]?.let { fitting(it, replaced(typed, j, d)) } ?: return best
+        val out = best ?: TreeMap()
+        for (i in 0 until m.size) {
+            val syllable = m.syllable(i)
+            if (full != null && full.indexOf(syllable) >= 0) continue
+            val old = out[syllable]
+            if (old == null || cost > old.cost) out[syllable] = Slip(cost, j, d, m.flags(i) or SyllableMatches.NEIGHBOUR, p.touch, p.near)
+        }
+        return out
+    }
+
+    // a syllable's cheapest slip so far: its cost, which key of the run, the key meant, its match's flags, where and by what
+    private class Slip(val cost: Float, val at: Int, val meant: Char, val flags: Int, val touch: Touch, val near: Near)
+
+    /**
+     * [against] for the slips of [m], [found] each match's: the key slipped to weighed by where the
+     * tap lies on it ([Touch] put onto [Near]: its edge nearest the key hit), in the dimensions the
+     * keyboard's own places have (the 14 keys' across alone, a layout's own across and down); a
+     * keyboard whose taps have no place (the 18 keys) weighs none.
+     */
+    private fun slipAgainst(m: SyllableMatches, found: List<Slip>, typed: String, at: Int, taps: FloatArray): FloatArray? {
+        var any = false
+        val out = FloatArray(m.size) { i ->
+            val slip = found[i]
+            val keys = replaced(keysOf(typed), slip.at, slip.meant)
+            val all = whole[keys]
+            val choices = wholeLetters[keys]
+            if (all == null || choices == null) return@FloatArray 0f
+            val choice = choices[all.indexOf(m.syllable(i))]
+            var sum = 0f
+            for (k in typed.indices) {
+                val tap = taps.getOrElse(at + k) { Float.NaN }
+                val code = if (k == slip.at) slip.meant else typed[k]
+                // an 18-key key has no place (Keyboard.placesTaps: its tap is NaN), so its letters are never weighed, as in against
+                if (tap.isNaN() || !letters.isCode(code) || letters.letters(code).length < 2) continue
+                val place = if (k == slip.at) placeOn(slip.touch, slip.near, tap) else tap
+                sum += letters.against(code, (choice shr (LETTER_BITS * k)) and LETTER_MASK, place)
+            }
+            if (sum > 0f) any = true
+            sum
+        }
+        return out.takeIf { any }
     }
 
     /** The syllable, or initial, chosen at [at]: its letters up to the separator. */
@@ -253,6 +377,13 @@ class T9Segmenter(
             sum
         }
         return out.takeIf { any }
+    }
+
+    // [s] with its [k]th character [c]
+    private fun replaced(s: String, k: Int, c: Char) = buildString(s.length) {
+        append(s, 0, k)
+        append(c)
+        append(s, k + 1, s.length)
     }
 
     // a letter typed as itself as any key typing it: every way to type a syllable is indexed
@@ -334,6 +465,19 @@ class T9Segmenter(
 
     companion object {
         private const val MAX_SYLLABLE = 6
+
+        /**
+         * Where [touch] lies on the key [near] around the one it hit, as [NineKeyLetters.place] has a
+         * tap ([own], the hit key's place, says in which dimensions): clamped onto it, so on its edge
+         * nearest the key hit (061-neighbour-correction §4.4).
+         */
+        internal fun placeOn(touch: Touch, near: Near, own: Float): Float {
+            val x = ((touch.dx - near.nx) / near.nw + HALF).coerceIn(0f, 1f)
+            if (NineKeyLetters.placeY(own).isNaN()) return x
+            return NineKeyLetters.place(x, ((touch.dy - near.ny) / near.nh + HALF).coerceIn(0f, 1f))
+        }
+
+        private const val HALF = 0.5f
 
         private val TABLES = SettingsMemo<Pair<Set<Fuzzy>, NineKeyLetters>, Tables>(SpellingIndex.MEMO) { (fuzzy, letters) -> Tables(fuzzy, letters) }
 

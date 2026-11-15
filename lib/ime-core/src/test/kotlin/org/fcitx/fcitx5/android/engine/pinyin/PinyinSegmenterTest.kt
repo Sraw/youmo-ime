@@ -221,8 +221,11 @@ class PinyinSegmenterTest {
         assertEquals("ai? ei? qi? si? wo? wu?", matchesOf(slips, "wi").toString())
         // what spells a syllable as typed is that syllable, not a slip for another
         assertEquals("ni", matchesOf(slips, "ni").toString())
-        // a vowel slipped away is read where the input has one elsewhere
-        val yang = slips.segment("zenmeyqng")
+        // a vowel slipped away, the keys left consonants alone, is read only where tapped near it:
+        // with no place, keys that read as 简拼 are read as typed (061-neighbour-correction §4.5)
+        assertFalse(slips.segment("zenmeyqng").let { g -> (0 until g.edgeCount).any { g.text(it) == "yqng" } })
+        val q = TouchBoxes.tap(TouchBoxes.QWERTY, 'q', dx = 0.3f, dy = 0.4f)
+        val yang = slips.segment("zenmeyqng", null, TouchBoxes.touchesAt(9, 6, q))
         assertEquals(NEIGHBOUR, yang.flags(yang.edge("yqng", Kind.SYLLABLE), "yang"))
         // but input of consonants alone is 简拼: xhn is no slip for xun there
         assertFalse(slips.segment("wxhn").let { g -> (0 until g.edgeCount).any { g.text(it) == "xhn" } })

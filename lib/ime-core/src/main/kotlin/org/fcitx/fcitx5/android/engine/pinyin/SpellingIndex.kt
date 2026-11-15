@@ -11,8 +11,10 @@ import java.util.TreeMap
  * A character trie over everything a user may type for one syllable: the standard spellings,
  * their [Fuzzy] variants and, with [typos], common slips. Walking it along the input finds
  * every syllable a piece of input can be, without allocating. With [neighbours], a standard
- * spelling with one letter slipped onto a key next to it ([KeyNeighbours]) reads as the syllable
- * too, where the slip spells nothing else: `hap` for hao, but not `gao` for hao.
+ * spelling with any one letter in place of one of its own is kept as a slip of the syllable
+ * ([slip]): `hap` for hao, `gao` for hao too. Which of them is read, the key typed being next to
+ * the one meant and where it was tapped, is the segmenter's to say (061-neighbour-correction §4.1):
+ * the index knows no keyboard.
  *
  * Each node knows the syllables its own key spells ([matches]) and, for input that stops part-way
  * through a syllable, those typing on from it reaches ([extensions]).
@@ -54,9 +56,10 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean, neighbours: Bool
     fun initial(node: Int): SyllableMatches? = initials[node]
 
     /**
-     * Syllables this node's key spells with one letter slipped onto a neighbouring key, flagged
-     * [SyllableMatches.NEIGHBOUR]; null if none. Only where the key spells nothing itself, and
-     * never as a completion: a slip is read only once it is typed in full.
+     * Syllables this node's key spells with one letter in place of another, flagged
+     * [SyllableMatches.NEIGHBOUR]; null if none. A syllable the key spells itself is among them
+     * where another of its spellings is one letter off (lve and lue): the segmenter leaves those
+     * out. Never a completion: a slip is read only once it is typed in full.
      */
     fun slip(node: Int): SyllableMatches? = slips[node]
 
@@ -69,12 +72,8 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean, neighbours: Bool
     init {
         val root = Node()
         val byInitial = HashMap<String, TreeMap<Int, Int>>()
-        val spelt = HashSet<String>()
         fun node(key: String) = key.fold(root) { n, c -> n.children.getOrPut(c) { Node() } }
-        fun add(key: String, syllable: Int, flags: Int) {
-            keepBest(node(key).matches, syllable, flags)
-            spelt += key
-        }
+        fun add(key: String, syllable: Int, flags: Int) = keepBest(node(key).matches, syllable, flags)
         for (id in 0 until Syllables.count) {
             val spelling = Syllables.spelling(id)
             val parts = split(spelling)
@@ -96,7 +95,7 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean, neighbours: Bool
                 }
             }
         }
-        if (neighbours) addSlips(spelt) { key, id -> keepBest(node(key).slips, id, SyllableMatches.NEIGHBOUR) }
+        if (neighbours) addSlips { key, id -> keepBest(node(key).slips, id, SyllableMatches.NEIGHBOUR) }
 
         // breadth-first, so each node's children are consecutive
         val order = arrayListOf(root)
@@ -152,22 +151,20 @@ internal class SpellingIndex(fuzzy: Set<Fuzzy>, typos: Boolean, neighbours: Bool
 
         const val MEMO = 4
 
-        /** Each standard spelling with one letter slipped, as [add] is to keep it, unless [spelt] already. */
-        fun addSlips(spelt: Set<String>, add: (String, Int) -> Unit) {
+        /** Each standard spelling with one letter in place of one of its own, as [add] is to keep it. */
+        fun addSlips(add: (String, Int) -> Unit) {
             for (id in 0 until Syllables.count) {
                 val (init, fin) = split(Syllables.spelling(id)) ?: continue
-                for ((f, _) in finals(fin, emptyList())) {
-                    slips(init + f).filter { it !in spelt }.forEach { add(it, id) }
-                }
+                for ((f, _) in finals(fin, emptyList())) slips(init + f).forEach { add(it, id) }
             }
         }
 
-        /** [spelling] with each of its letters in turn slipped onto each key next to it. */
+        /** [spelling] with each of its letters in turn in place of every other letter. */
         fun slips(spelling: String): List<String> = if (spelling.length < 2) {
             emptyList()
         } else {
             spelling.indices.flatMap { at ->
-                KeyNeighbours.of(spelling[at]).map { spelling.substring(0, at) + it + spelling.substring(at + 1) }
+                ('a'..'z').filter { it != spelling[at] }.map { spelling.substring(0, at) + it + spelling.substring(at + 1) }
             }
         }
 

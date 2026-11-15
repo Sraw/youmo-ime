@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
@@ -88,7 +89,7 @@ class GroupedKeyboard private constructor(
 ) : BaseKeyboard(
     context, theme, layout(builtInLetters, builtInWire, builtInSemicolon),
     themeBoard = shapeOf(builtInLetters).board,
-) {
+), TypingKeys {
 
     constructor(
         context: Context,
@@ -198,7 +199,7 @@ class GroupedKeyboard private constructor(
             val own = c.code in NineKeyLetters.CUSTOM_BLOCK
             if (own && down.isNaN()) return action
             val sent = if (own) Keyboard.tapKey(c, at, down) else Keyboard.tapKey(c, at)
-            return KeyAction.SymAction(KeySym(UNICODE + sent), KeyStates.Virtual)
+            return action.copy(sym = KeySym(UNICODE + sent), states = KeyStates.Virtual)
         }
 
         // a digit as a keypad's, as 九键's swipe sends it: typed, or its candidate picked while typing
@@ -323,6 +324,11 @@ class GroupedKeyboard private constructor(
         enabled = { false },
         filters = { InputMethodCatalog.filtersByStrokes(imeName) },
     ) { _, _ -> }
+
+    // each group key, as its code goes out (061-neighbour-correction); 双拼's engine reads no place
+    override fun typingKeys(): List<Pair<Char, KeyRef>> = canvas?.shownKeys.orEmpty().mapNotNull { k ->
+        k.letters?.let { l -> codeOf(l.group, k.id)?.let { wire(it).toChar() to KeyRef(k.id, k.copy == 1) } }
+    }
 
     // the code of the key [id] of [group]'s letters: the built-in keyboard's of its first letter (as always), a
     // layout's own its key's place among the engine's groups (a letter may be on more than one key of its own,

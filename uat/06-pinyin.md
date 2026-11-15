@@ -109,6 +109,35 @@
 - **预期**：zhagn 的候选第一页有「张」「章」；zhon 的有「中」；jv 的有「句」；nihso 的有「你好」。
 - **JVM**：`PinyinUatTest.pinyinTypedWrongStillGivesTheWord`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
+### PY-137 [P0] 按偏的键按落点读：点在边上纠，点在正中不改
+- **前提**：B0。
+- **操作**：在「普通文本」框点 n i h，再点 `s` 键靠左边缘（离 `a` 近的那一侧，键宽的五分之一处），再点 o，看候选和编码行，删光；点 s h i，三个键都点在正中，看候选。
+- **预期**：第一次首选是「你好」，编码行是 `ni hao`（纠正后的拼写）；第二次首选是「是」之类 shi 的字，候选里没有把 `s` 读成 `a` 的词。
+- **JVM**：`NeighbourSlipTest.fullPinyinReadsAKeyAsTheOneItWasTappedTowards`、`aLegalSlipIsReadOnlyNearTheKeyMeant`，`PinyinSessionSlipTest.aWordReadThroughASlipIsLearnedUnderTheKeyMeant`（编码行 `ni hao`），`NeighbourTouchTest.theHostHandsTheTouchToTheEngineWithTheKey`（键盘把落点交给引擎）；设备上照跑（落点要真的点出来）。
+
+### PY-138 [P1] 一串声母点在正中，不读成按偏
+- **前提**：B0。
+- **操作**：每个键都点在正中，点 n i k w l（你看完了：首字全码，后面声母）。
+- **预期**：首选和关掉 **纠正错拼和按偏的键** 时一样（「你看完了」）；候选里没有把 `kw` 读成 `ke` 这类按偏读法。
+- **JVM**：`NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle`、ime-eval `TouchSimTest.cleanTapsReadFirstWhatNoPlaceReads`（点在正中时首选和不带落点一样）；设备上不跑。
+
+### PY-139 [P1] 实体键盘全拼：拼不成的照旧纠，一串声母不纠
+- **前提**：B0，接上实体键盘（模拟器上用电脑键盘）。
+- **操作**：在实体键盘上打 nihso，看候选，删光；打 nikwl，看候选。
+- **预期**：nihso 首选「你好」（没有落点，按 0.6.0 的规则：拼不成才纠）；nikwl 首选「你看完了」，不出 `kw` 读成 `ke` 的读法。
+- **JVM**：`PinyinSessionSlipTest.withNoPlaceAWordReadThroughASlipIsLearnedUnderTheKeyMeantToo`、`NeighbourSlipTest.withNoPlaceALegalSlipIsNotRead`、`PinyinUatTest.pinyinTypedWrongStillGivesTheWord`（:lib:ime-eval:uatTest）；设备上不跑。
+
+### PY-140 [P1] 按偏选出的词按纠正后的键学
+- **前提**：B0。
+- **操作**：点 t a m a，其中 `t` 点在靠 `y` 的那一边（键宽的三分之一左右，还在 `t` 上）；在候选里先选「呀」再选「吗」上屏；照样再来一遍。然后用同样靠 `y` 的点法再点 t a m a，看候选；删光后点 y a（都在正中），看候选。
+- **预期**：第二次靠 `y` 点 t a m a 时，单字里「他」仍在「呀」前面（「呀」没有因为选过而提到「他」前面：选的时候记在纠正后的 y a 下，不记在实际按的 t a 下）；点 y a 时「呀」比没选过时靠前。
+- **JVM**：`PinyinSessionSlipTest.aLegalSlipPickedIsLearnedUnderTheKeysMeantNotThoseTyped`、`aLegalSlipPickedRaisesNothingUnderTheKeysTyped`；设备上不跑。
+
+### PY-143 [P1] 全拼：照真坐标点在键边上，按偏的键读出；点在正中不读
+- **前提**：B0。
+- **操作**：在「普通文本」框点 t a m a，其中 `t` 点在键宽 85% 处（靠 `y` 那边，还在 `t` 上），看候选，删光；四个键都点在正中再打一遍，看候选。
+- **预期**：第一次候选栏或展开后的第一页里有「亚麻」「鸭毛」这类 ya ma 的词（`t` 读成 `y`）；第二次没有。
+
 ### PY-18 [P1] 常读错的词按错的读音打，候选上方标出正确读音
 - **前提**：B0。
 - **操作**：点 j i a o s e；清空，点 x x x u e z（简拼加半个字）。
@@ -510,6 +539,18 @@
 - **预期**：编码行读 dui，首选是「对」；两次按 UI 各算一个字母，第一下按它自己的落点（左半边 u），不按第二个手指的。
 - **注**：0.6.0 beta1 里第一个手指抬起时用的是第二个手指的落点，两下都偏向 i（060-fast-typing）。`adb shell input` 不能两指叠按，设备上手动。
 - **JVM**：`FastTypingTest.fourteenKeysTwoFingersOnOneKeyTypeEachItsHalf`（两下各发一个码，落点各是各的）；不同键叠按、三指滚按、同键快点两下见同一个类。
+
+### PY-141 [P1] 14 键：点在键边上读成旁边的键
+- **前提**：B0；**输入法 → 拼音** 的「键盘」选「14 键」。
+- **操作**：点 `bn` 键靠右边缘（靠 `m`），再点 `e`、`bn`（想打 men），看候选；删光，三个键都点在正中再打一遍。
+- **预期**：第一次候选里有「们」；第二次候选里没有把 `bn` 读成 `m` 的读法。
+- **JVM**：`NeighbourSlipTest.theFourteenKeysReadAKeyAsTheOneNextToItAndWeighItsLetters`、`PinyinSessionSlipTest.onTheFourteenKeysTheKeyMeantIsLearnedAsItsCode`、`GroupedKeyboardTapTest.aTapCarriesWhereItFellAndTheKeysAroundIt`（键盘交出落点和旁边的键）；设备上不跑。
+
+### PY-142 [P1] 18 键：点在键边上读成旁边的键
+- **前提**：B0；**输入法 → 拼音** 的「键盘」选「18 键」。
+- **操作**：同 PY-141（18 键上 `bn` 右边是 `m`）；再点 `sd` 键靠右边缘（靠 `fg`）打一个音节的开头，看候选。
+- **预期**：同 PY-141；`sd` 那一次候选里有 `f`/`g` 开头的音节的字。18 键的落点不加按字母的左右权重（用户定）。
+- **JVM**：`NeighbourSlipTest.theEighteenKeysReadAKeyAsTheOneNextToIt`（18 键三种键宽）、`aTapIsPutOntoTheKeyMeantAtItsEdgeNearestTheKeyHit`；设备上不跑。
 
 ## 笔画筛选
 

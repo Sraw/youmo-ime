@@ -384,7 +384,7 @@ class PinyinDecoder(
         if (to >= crossFrom) crossings.add(at, e - graph.edges(at).first, i, node, userNode, mergedNode, cost, short, path.abbreviated)
         val edgeShort = short || isShort(kind)
         val tone = toneOf(graph, e)
-        val c = cost + penalties.ofKind(kind) + penalties.ofMatch(matches.flags(i)) + nasal(kind, syllable) + penalties.tap * graph.against(e, i)
+        val c = cost + penalties.ofKind(kind) + penalties.ofMatch(matches.flags(i)) + nasal(kind, syllable) + penalties.tap * graph.against(e, i) + graph.slipCost(e, i)
         var more = false
         enter(syllable, tone, matches.flags(i))
         if (child >= 0) {
@@ -438,7 +438,7 @@ class PinyinDecoder(
             for (i in 0 until matches.size) {
                 val child = starts.child(node, matches.syllable(i))
                 if (child < 0) continue
-                val c = cost + penalties.ofKind(kind) + penalties.ofMatch(matches.flags(i)) + nasal(kind, matches.syllable(i)) + penalties.tap * graph.against(e, i)
+                val c = cost + penalties.ofKind(kind) + penalties.ofMatch(matches.flags(i)) + nasal(kind, matches.syllable(i)) + penalties.tap * graph.against(e, i) + graph.slipCost(e, i)
                 abbreviated(matches.flags(i), 1)
                 for (w in 0 until starts.wordCount(child)) {
                     val word = starts.word(child, w)
@@ -797,7 +797,8 @@ class PinyinDecoder(
     /**
      * The path [collect] is on: its syllables and the tones typed after them (0 none), [length] of them
      * and [toned] with a tone, and how many of them a 双拼 key read alone where it and the next make a
-     * syllable ([SyllableMatches.ABBREV]).
+     * syllable ([SyllableMatches.ABBREV]) or a key read as the key next to it ([SyllableMatches.NEIGHBOUR]):
+     * neither is the input as typed in whole syllables.
      */
     private class Path {
         var syllables = IntArray(PATH)
@@ -831,7 +832,7 @@ class PinyinDecoder(
         }
 
         fun count(flags: Int, by: Int) {
-            if (flags and SyllableMatches.ABBREV != 0) abbreviated += by
+            if (flags and (SyllableMatches.ABBREV or SyllableMatches.NEIGHBOUR) != 0) abbreviated += by
         }
 
         /** [penalty] where a tone typed on the path is one a character of the word of [chars] chars, [charAt] each, does not have by [allows]. */
@@ -869,7 +870,7 @@ class PinyinDecoder(
         val scored = IntList() // the word the model scores: word, or a longer one it starts
         val cost = FloatList()
         val flags = IntList() // SHORT for an arc over a syllable typed short (scored without the user's counts), START_ONLY for a start-only word,
-        // ABBREVIATED for one over a 双拼 key read alone where it and the next make a syllable
+        // ABBREVIATED for one over a 双拼 key read alone where it and the next make a syllable, or over a key read as the key next to it
         val size get() = to.size
 
         // per position, what collecting from it read: the furthest position it read the edges of, the furthest they went

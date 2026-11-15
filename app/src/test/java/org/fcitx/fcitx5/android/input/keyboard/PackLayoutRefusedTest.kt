@@ -104,7 +104,8 @@ class PackLayoutRefusedTest {
         setViewTreeLifecycleOwner(object : LifecycleOwner {
             override val lifecycle = LifecycleRegistry(this)
         })
-        keyActionListener = KeyActionListener { action, _ -> sent += action }
+        // the codes alone: where each fell (061-neighbour-correction) is GroupedKeyboardTapTest's
+        keyActionListener = KeyActionListener { action, _ -> sent += (action as? KeyAction.SymAction)?.copy(touch = null) ?: action }
         laidOut()
     }
 

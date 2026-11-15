@@ -293,18 +293,18 @@ class ShuangpinSegmenterTest {
     }
 
     @Test
-    fun withoutAbbreviationsIsTheGraphTypedInWholeSyllables() {
+    fun withoutOtherReadingsIsTheGraphTypedInWholeSyllables() {
         val ziranma = ShuangpinSegmenter(ZIRANMA)
         val off = ShuangpinSegmenter(ZIRANMA, abbreviations = false)
         for (typed in listOf("xm", "ufmuh", "umuh", "xwmm", "x'm", "yivz")) {
-            assertEquals(typed, off.segment(typed).edgeSet(), ziranma.segment(typed).withoutAbbreviations().edgeSet())
+            assertEquals(typed, off.segment(typed).edgeSet(), ziranma.segment(typed).withoutOtherReadings().edgeSet())
         }
         assertTrue(ziranma.segment("xm").hasAbbreviations)
-        assertFalse(ziranma.segment("xm").withoutAbbreviations().hasAbbreviations)
+        assertFalse(ziranma.segment("xm").withoutOtherReadings().hasAbbreviations)
         // none to take off: the graph itself
         val full = PinyinSegmenter().segment("xian")
         assertFalse(full.hasAbbreviations)
-        assertSame(full, full.withoutAbbreviations())
+        assertSame(full, full.withoutOtherReadings())
     }
 
     @Test

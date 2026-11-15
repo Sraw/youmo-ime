@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.reading.WordReading
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 
 /**
  * An input method engine as its host sees it: actions in, what to show and commit out. The host
@@ -177,8 +178,11 @@ sealed class Action {
      * its key a grouped keyboard's code was tapped ([Keyboard.tapKey][org.fcitx.fcitx5.android.engine.runtime.Keyboard.tapKey]):
      * the 14 keys' across alone, 0 the left edge and 1 the right; a layout's own keyboard's across
      * and down packed as one ([NineKeyLetters.place][org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.place]); NaN for none.
+     * [touch]: where on its key it was tapped and the keys around it, for reading it as one of
+     * those where it spells nothing or less likely ([Touch], 061-neighbour-correction); null for
+     * none (a hardware key, TalkBack, a key typed by a glide or sent by the app).
      */
-    data class Key(val char: Char, val glided: Boolean = false, val at: Float = Float.NaN) : Action()
+    data class Key(val char: Char, val glided: Boolean = false, val at: Float = Float.NaN, val touch: Touch? = null) : Action()
 
     object Backspace : Action()
 

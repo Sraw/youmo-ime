@@ -204,9 +204,11 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
     private fun char(codePoint: Int, payload: Action? = null): Snapshot {
         hostChar(codePoint, payload)?.let { return it }
         // whatever the session: one sent the wrong way reads as its code would, never as U+FFFD ending the input
+        // where the key was tapped and the keys around it, as the host's key carries it (061-neighbour-correction)
+        val touch = (payload as? Action.Key)?.touch
         if (codePoint in TAPS || codePoint in PLACES) {
             val (code, at) = untapped(codePoint)
-            return session.apply(Action.Key(code, at = at))
+            return session.apply(Action.Key(code, at = at, touch = touch))
         }
         keyedChar(codePoint)?.let { return keyed(codePoint, it, payload) }
         if (codePoint in NINE_DIGITS) {
@@ -228,7 +230,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             // a pick of the bar as it was shown: sent again its list's id is gone, so never a key to type again
             return session.apply(Action.Syllable(n % Action.Syllable.MAX, n / Action.Syllable.MAX)).copy(picked = true)
         }
-        if (session.reads(c) || english) return session.apply(Action.Key(c))
+        if (session.reads(c) || english) return session.apply(Action.Key(c, touch = touch))
         // on the nine keys a digit is a key: one not read (0) ends the input, as punctuation does
         val digit = c.digitToIntOrNull()?.takeUnless { nineKeys }
         return when {

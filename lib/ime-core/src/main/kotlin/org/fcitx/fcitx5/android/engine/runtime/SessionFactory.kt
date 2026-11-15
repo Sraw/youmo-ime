@@ -186,16 +186,16 @@ internal class SessionFactory(
             // else is read, as on the nine keys. Top-1, both models on, the same samples (one exact reading each, so
             // no 简拼 among them; 2026-10-25): full pinyin / 14 keys / nine keys 97.0 / 94.6 / 88.8% on pinyin.tsv's
             // 429, 73.4 / 61.3 / 53.6% on chat's held-out 983. g14 and g14-strict alike there; strict is faster
-            PINYIN_KEYS -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = NineKeyLetters.G14), spell = true))
+            PINYIN_KEYS -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = NineKeyLetters.G14, neighbours = s.typos), spell = true))
             // the 18 keys: 双拼's groups (I1 Q4: G18 first, measured; another grouping if it falls short), ; no
             // letter of pinyin's; as the 14 keys otherwise, learned under qk:<G18's tag>
-            PINYIN_KEYS18 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = NineKeyLetters.G18), spell = true))
+            PINYIN_KEYS18 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = NineKeyLetters.G18, neighbours = s.typos), spell = true))
             // a layout's own groups (a theme's 17 keys, 060-render-p3 T9b): as the 14 keys, learned under qk:<their tag>;
             // its keyboard the one in use, its codes read by it (typedLetter). None told (Engines swallows their codes
             // then): G14's, which reads none of them
             PINYIN_KEYS_OWN -> {
                 val own = s.ownKeyboard?.also(NineKeyLetters::inUse) ?: NineKeyLetters.G14
-                ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = own), spell = true))
+                ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = own, neighbours = s.typos), spell = true))
             }
             // pinyin in zhuyin (design 051 §3.3): the nine keys' way with symbols for letters, a tone a separator
             // the decoder weighs; learned under zy:nine and zy:dachen, apart from pinyin's keyboards
@@ -211,7 +211,7 @@ internal class SessionFactory(
             // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
             // glided as full pinyin, over the digits' keys: each letter typed as itself, as one chosen from a key's long press
             T9 -> {
-                val pinyin = pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys), spell = true)
+                val pinyin = pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys, neighbours = s.typos), spell = true)
                 GlideSession(
                     ForgetsInTables(pinyin),
                     syllableBoundary,
@@ -226,7 +226,7 @@ internal class SessionFactory(
             SHUANGPIN_KEYS18, SHUANGPIN_KEYS14, SHUANGPIN_NINE -> ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy), spell = true, kind = Kinds.shuangpin(s.shuangpin)))
             SHUANGPIN -> {
                 val spelling = PinyinGlide.Spelling.shuangpin(s.scheme)
-                val pinyin = pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin))
+                val pinyin = pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos, neighbours = s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin))
                 GlideSession(
                     ForgetsInTables(pinyin),
                     syllableBoundary,

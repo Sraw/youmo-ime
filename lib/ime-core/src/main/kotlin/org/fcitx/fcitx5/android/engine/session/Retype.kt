@@ -126,17 +126,17 @@ internal object Retype {
     /**
      * Pinyin's matcher: [graph], the deleted commit's keys read as syllables, a syllable an edge,
      * taking the units' syllables from its start to its end. Keys that read as whole syllables are
-     * not read by 简拼 in the middle (`xm` takes 先, not 下面), as HabitOrder ranks them
-     * (061-shuangpin-abbrev review M3).
+     * not read by 简拼 in the middle (`xm` takes 先, not 下面), nor as slipped keys (`ta` takes 他, not
+     * 呀), as HabitOrder ranks them (061-shuangpin-abbrev review M3; 061-neighbour-correction §8.2).
      */
     fun byReading(graph: SyllableGraph): Matcher {
-        val whole = graph.hasAbbreviations && graph.readsWhole(graph.start, graph.end)
+        val whole = graph.hasOtherReadings && graph.readsWhole(graph.start, graph.end)
         return Matcher { units, from ->
             fun go(place: Int, k: Int): Int? {
                 if (place == graph.end) return (k - from).takeIf { it > 0 }
                 if (k == units.syllables.size) return null
                 for (e in graph.edges(place)) {
-                    if (graph.kind(e) == Kind.RAW || whole && graph.isAbbreviation(e)) continue
+                    if (graph.kind(e) == Kind.RAW || whole && graph.readsOtherwise(e)) continue
                     val m = graph.matches(e)
                     if ((0 until m.size).any { m.syllable(it) == units.syllables[k] }) go(graph.to(e), k + 1)?.let { return it }
                 }

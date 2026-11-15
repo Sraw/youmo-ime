@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.reading.CardReading
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
@@ -319,8 +320,8 @@ class KotlinHost(
 
     // ---- keys and the panel
 
-    override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int) =
-        onHost { key(KeySyms.fromString(key), states.toInt(), up, timestamp) }
+    override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int, touch: Touch?) =
+        onHost { key(KeySyms.fromString(key), states.toInt(), up, timestamp, touch) }
 
     // a UTF-16 unit, as native-lib read it: a lone surrogate is no key
     override suspend fun sendKey(c: Char, states: UInt, code: Int, up: Boolean, timestamp: Int) =
@@ -329,18 +330,20 @@ class KotlinHost(
     override suspend fun sendKey(sym: Int, states: UInt, code: Int, up: Boolean, timestamp: Int) =
         onHost { key(sym, states.toInt(), up, timestamp) }
 
-    override suspend fun sendKey(sym: KeySym, states: KeyStates, code: Int, up: Boolean, timestamp: Int) =
-        onHost { key(sym.sym, states.toInt(), up, timestamp) }
+    override suspend fun sendKey(sym: KeySym, states: KeyStates, code: Int, up: Boolean, timestamp: Int, touch: Touch?) =
+        onHost { key(sym.sym, states.toInt(), up, timestamp, touch) }
 
-    // the frontend's keyEvent: virtual is the state's bit, as fcitx's KeyEvent::isVirtual reads it
-    private fun HostCore.key(sym: Int, states: Int, up: Boolean, timestamp: Int) {
+    // the frontend's keyEvent: virtual is the state's bit, as fcitx's KeyEvent::isVirtual reads it; a
+    // tap's [touch] goes with it as the key's payload, the engine's Keyboard reads it there
+    private fun HostCore.key(sym: Int, states: Int, up: Boolean, timestamp: Int, touch: Touch? = null) {
         // a layout's own keyboard's groups as it last told them, before its key reaches a temporary mode or the engine
         // other groups while a code is typed on the ones before (060-render-p3 T10): the code committed as
         // Return commits it, not lost with the session made anew; the field's composing text is left alone
         val own = EngineState.ownKeys
         if (bridge.replaces(own)) commitCode()
         bridge.syncOwnKeys(own)
-        sendKey(Key(sym, states), release = up, virtual = states and HostKeyStates.VIRTUAL != 0, timestamp = timestamp)
+        val payload = touch?.takeUnless { up }?.let { Action.Key(KeySyms.toUnicode(sym).toChar(), touch = it) }
+        sendKey(Key(sym, states), release = up, virtual = states and HostKeyStates.VIRTUAL != 0, timestamp = timestamp, payload = payload)
     }
 
     override suspend fun select(idx: Int, text: String?): Boolean = onHost { select(idx, text) }

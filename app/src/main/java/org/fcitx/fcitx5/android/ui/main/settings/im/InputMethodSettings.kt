@@ -286,12 +286,12 @@ object InputMethodSettings {
         ),
         Section(
             R.string.shared_section_pinyin, listOf(
-                // the grouped keyboards, pinyin's and 双拼's, correct nothing (the user's 2026-11-03): their keys are no
-                // letters to slip, and 双拼's ü typed with its own key is not read there either (GroupedShuangpinSegmenter)
+                // pinyin's nine, 14 and 18 keys (a layout's own groups too) read a key tapped by its neighbour's edge as
+                // that key (061-neighbour-correction, the user's Q3/Q4); 双拼's grouped keyboards correct nothing: 双拼's
+                // ü typed with its own key is not read there either (GroupedShuangpinSegmenter)
                 Toggle(
                     "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary,
                     notFor = listOf(
-                        InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS,
                         InputMethodCatalog.SHUANGPIN_KEYS18, InputMethodCatalog.SHUANGPIN_KEYS14, InputMethodCatalog.SHUANGPIN_NINE,
                         InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN,
                     ),

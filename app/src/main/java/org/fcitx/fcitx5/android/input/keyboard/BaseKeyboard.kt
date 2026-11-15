@@ -497,7 +497,8 @@ abstract class BaseKeyboard(
         val g = key.keyGesture
         def.behaviors.forEach {
             when (it) {
-                is KeyDef.Behavior.Press -> key.onClick { k -> onAction(pressed(k.keyGesture.clickAt, k.keyGesture.clickDown, it.action)) }
+                // the press with where its tap fell (TypingKeys.kt); a click no touch made (TalkBack) as it is
+                is KeyDef.Behavior.Press -> key.onClick { k -> onAction(pressed(k.keyGesture.clickAt, k.keyGesture.clickDown, withTouch(it.action, k, this as? TypingKeys, resources.displayMetrics.density, canvas))) }
                 // hold to talk follows the finger that holds the space
                 is KeyDef.Behavior.LongPress -> key.onLongClick { k ->
                     val action = it.action

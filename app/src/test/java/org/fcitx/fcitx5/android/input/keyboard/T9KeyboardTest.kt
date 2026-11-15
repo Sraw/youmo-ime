@@ -240,7 +240,7 @@ class T9KeyboardTest {
     fun aClickReleasedOnAListSinceReplacedIsDropped() {
         val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
         val picked = ArrayList<KeyAction>()
-        keyboard.keyActionListener = KeyActionListener { action, _ -> picked += action }
+        keyboard.keyActionListener = KeyActionListener { action, _ -> picked += action.placeless() }
         // in a window, where View posts the click of a released item to the looper, as on a phone
         Robolectric.buildActivity(Activity::class.java).setup().get().setContentView(keyboard)
         val looper = shadowOf(Looper.getMainLooper())
@@ -288,7 +288,7 @@ class T9KeyboardTest {
         AppPrefs.getInstance().keyboard.t9MultiTap.setValue(multiTap)
         return T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, letters, semicolon = false).apply {
             setViewTreeLifecycleOwner(Owner())
-            keyActionListener = KeyActionListener { action, _ -> sent += action }
+            keyActionListener = KeyActionListener { action, _ -> sent += action.placeless() }
             popupActionListener = PopupActionListener { previews += it }
             // Chinese punctuation on: 1 types ，。？！
             onPunctuationUpdate(ZH)
@@ -500,7 +500,7 @@ class T9KeyboardTest {
         val sent = ArrayList<KeyAction>()
         val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, english = true, semicolon = false).apply {
             setViewTreeLifecycleOwner(Owner())
-            keyActionListener = KeyActionListener { action, _ -> sent += action }
+            keyActionListener = KeyActionListener { action, _ -> sent += action.placeless() }
         }
         keyboard.laidOut().shownKeyWithId(R.id.button_caps)!!.click()
         keyboard.key('4').click()
@@ -527,7 +527,7 @@ class T9KeyboardTest {
         for (english in listOf(false, true)) {
             val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, english = english, semicolon = false)
             val sent = mutableListOf<KeyAction>()
-            keyboard.keyActionListener = KeyActionListener { action, _ -> sent += action }
+            keyboard.keyActionListener = KeyActionListener { action, _ -> sent += action.placeless() }
             // the column: the scrolling list left of the keys
             val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
             fun column() = (0 until items.childCount).map { items.getChildAt(it) as TextView }.filter { it.isVisible }.map { it.text.toString() }
@@ -603,4 +603,11 @@ class T9KeyboardTest {
         // Chinese punctuation's map of 1's marks
         val ZH = mapOf("," to "，", "." to "。", "?" to "？", "!" to "！")
     }
+}
+
+// the action alone: where a key fell (061-neighbour-correction) is NeighbourTouchTest's
+private fun KeyAction.placeless(): KeyAction = when (this) {
+    is KeyAction.HostKeyAction -> copy(touch = null)
+    is KeyAction.SymAction -> copy(touch = null)
+    else -> this
 }

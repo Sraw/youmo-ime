@@ -53,7 +53,7 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLook
 class TextKeyboard(
     context: Context,
     theme: Theme,
-) : BaseKeyboard(context, theme, Layout, KeyNames.QWERTY), AutoCapsKeys {
+) : BaseKeyboard(context, theme, Layout, KeyNames.QWERTY), AutoCapsKeys, TypingKeys {
 
     // the halves (the scene splits the rows, SplitKeyboard): 双拼's ing is L's long press there (LS-29),
     // a table's code key has a key of its own
@@ -335,6 +335,15 @@ class TextKeyboard(
         return canvas?.shownKeys.orEmpty().mapNotNull { node ->
             val letter = letterSent(node) ?: return@mapNotNull null
             if (keyOf.getOrPut(letter) { node.id } != node.id) null else letter to scenePlace(node.id, node.copy == 1)
+        }
+    }
+
+    // every key typing a letter, both copies of a split row's (061-neighbour-correction), and 微软 双拼's `;`, a key of its scheme
+    override fun typingKeys(): List<Pair<Char, KeyRef>> {
+        val semicolon = semicolonKey(imeName, EngineState.shuangpinScheme)
+        return canvas?.shownKeys.orEmpty().mapNotNull { node ->
+            val typed = letterSent(node) ?: node.actions["send"]?.singleOrNull()?.takeIf { semicolon && it == ';' }
+            typed?.let { it to KeyRef(node.id, node.copy == 1) }
         }
     }
 

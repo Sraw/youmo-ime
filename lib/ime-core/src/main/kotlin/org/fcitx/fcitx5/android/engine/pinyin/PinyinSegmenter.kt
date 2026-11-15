@@ -16,8 +16,10 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
  * From each position the graph gets an edge for:
  * - every syllable the text there spells, of any length (`xian` and `xi`);
  * - with `neighbours`, every syllable it spells with a letter slipped onto the key next to it
- *   (`hap` for hao), where it spells nothing as typed; not in input of consonants alone, which
- *   is 简拼 (`wxhn` is no slip for wxun);
+ *   (`hap` for hao), costing as [SlipCost] has it by where the key was tapped; with no place (a
+ *   hardware key), only where it spells nothing as typed, nor is consonants alone, 简拼 (`kw` is
+ *   no slip for ke there: 你看完了 typed `nikwl`); none in input of consonants alone (`wxhn` is no
+ *   slip for wxun; 061-neighbour-correction §4.5, §4.6);
  * - the initial alone (简拼) where no longer syllable starts (`n` in `nh`), and also where one
  *   does if a consonant follows (`n` in `ng` for 那个, `ng` being a syllable too), but not if a
  *   vowel does (`n` in `nihao`). `a`, `e` and `o` stand for the syllables they start only
@@ -46,17 +48,20 @@ class PinyinSegmenter(
     neighbours: Boolean = false,
     private val latin: LatinWords? = null,
     private val userLatin: UserLatinWords? = null,
+    private val slipCost: SlipCost = SlipCost(),
 ) : Segmenter {
 
     // the settings' own, shared by the sessions made with them (SettingsMemo)
     private val index = SpellingIndex.of(fuzzy, typos, neighbours)
 
-    override fun segment(input: String): SyllableGraph {
+    override fun segment(input: String): SyllableGraph = segment(input, null, null)
+
+    override fun segment(input: String, taps: FloatArray?, touches: Array<Touch?>?): SyllableGraph {
         // read as slips, 简拼 turns into anything: 我喜欢你 into 网讯
         val slips = input.any { it in VOWELS }
         val letters = if (latin == null && userLatin == null) null else lettersOfWords(input)
         return GraphEdges.build(input) { at, edges ->
-            walk(input, at, edges, slips)
+            walk(input, at, edges, slips, touches)
             if (letters != null && letters[at]) edges.add(at, 1, Kind.LETTER, LETTERS[input[at] - 'a'])
         }
     }
@@ -76,7 +81,7 @@ class PinyinSegmenter(
     }
 
     /** Adds the edges leaving [at]: a walk down the spelling trie along the input. */
-    private fun walk(input: String, at: Int, edges: GraphEdges, slips: Boolean) {
+    private fun walk(input: String, at: Int, edges: GraphEdges, slips: Boolean, touches: Array<Touch?>?) {
         var node = index.root
         var longestSyllable = 0
         var initial = 0
@@ -99,7 +104,7 @@ class PinyinSegmenter(
             // Nor where the text may still become one: `zho` on the way to zhong is no zhi, nor
             // `zh` before `o`.
             if (slips && !growing(input, at + length, node, alone != null || more != null)) {
-                index.slip(node)?.let { edges.add(at, length, Kind.SYLLABLE, it) }
+                index.slip(node)?.let { slipped(input, at, length, it, full, touches, edges) }
             }
             if (alone != null) {
                 shorter = initialMatches
@@ -118,6 +123,60 @@ class PinyinSegmenter(
         }
     }
 
+    /**
+     * Adds the edge of [m], the syllables the [length] keys at [at] spell with one of them slipped,
+     * those [full] (what they spell as typed) has left out: each as [SlipCost] weighs where its
+     * slipped key was tapped, the key it is read as one of those around it; with no place, the
+     * 0.6.0 rule (a key next to it on QWERTY, [KeyNeighbours], and only keys that spell nothing).
+     * Keys that spell a syllable as typed, or are consonants alone (简拼), are legal (§4.5).
+     */
+    private fun slipped(input: String, at: Int, length: Int, m: SyllableMatches, full: SyllableMatches?, touches: Array<Touch?>?, edges: GraphEdges) {
+        var legal = full != null
+        if (!legal) legal = (at until at + length).none { input[it] in VOWELS }
+        var ids: IntArray? = null
+        var flags: IntArray? = null
+        var n = 0
+        val slips = Slips.Builder()
+        for (i in 0 until m.size) {
+            val s = m.syllable(i)
+            if (full != null && full.indexOf(s) >= 0 || !slip(input, at, length, Syllables.spelling(s), legal, touches, slips)) continue
+            if (ids == null || flags == null) {
+                ids = IntArray(m.size)
+                flags = IntArray(m.size)
+            }
+            ids[n] = s
+            flags[n++] = m.flags(i)
+        }
+        if (ids == null || flags == null) return
+        edges.add(at, length, Kind.SYLLABLE, SyllableMatches(ids.copyOf(n), flags.copyOf(n)), slip = slips.build())
+    }
+
+    // the likeliest slip by which the [length] keys at [at] spell [spelling], added to [slips]; false where none is read
+    private fun slip(input: String, at: Int, length: Int, spelling: String, legal: Boolean, touches: Array<Touch?>?, slips: Slips.Builder): Boolean {
+        var best = Float.NaN
+        var bestAt = -1
+        var bestMeant = ' '
+        // lüe is spelt lve and lue alike (SpellingIndex.finals)
+        for (ue in if (spelling.endsWith("ve")) BOTH else ONE) {
+            val k = oneOff(input, at, length, spelling, ue)
+            if (k < 0) continue
+            val meant = if (ue && k == length - 2) 'u' else spelling[k]
+            val touch = touches?.getOrNull(at + k)
+            val c = when {
+                touch != null -> touch.near(meant)?.let { slipCost.of(touch, it, legal) } ?: Float.NaN
+                legal || meant !in KeyNeighbours.of(input[at + k]) -> Float.NaN
+                else -> slipCost.fixed
+            }
+            if (!c.isNaN() && (best.isNaN() || c > best)) {
+                best = c
+                bestAt = k
+                bestMeant = meant
+            }
+        }
+        if (!best.isNaN()) slips.add(best, bestAt, bestMeant)
+        return !best.isNaN()
+    }
+
     /** Whether text spelled up to [node], ending at [end], [spells] the start of a syllable still being typed. */
     private fun growing(input: String, end: Int, node: Int, spells: Boolean): Boolean {
         if (!spells) return false
@@ -128,6 +187,25 @@ class PinyinSegmenter(
 
     private companion object {
         const val VOWELS = "aeiouv"
+
+        val ONE = booleanArrayOf(false)
+        val BOTH = booleanArrayOf(false, true)
+
+        /**
+         * Where the [length] keys of [input] at [at] differ from [spelling] (its final ve as ue
+         * where [ue]) at one letter alone: that place; -1 where they differ at none or more.
+         */
+        fun oneOff(input: String, at: Int, length: Int, spelling: String, ue: Boolean): Int {
+            if (spelling.length != length) return -1
+            var diff = -1
+            for (k in 0 until length) {
+                val want = if (ue && k == length - 2) 'u' else spelling[k]
+                if (input[at + k] == want) continue
+                if (diff >= 0) return -1
+                diff = k
+            }
+            return diff
+        }
 
         val LETTERS = Array(26) { SyllableMatches(intArrayOf(LatinWords.syllable('a' + it)), intArrayOf(0)) }
 

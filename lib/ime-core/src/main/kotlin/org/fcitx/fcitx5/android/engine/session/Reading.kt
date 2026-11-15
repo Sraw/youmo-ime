@@ -10,8 +10,17 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches
 
-/** How a word reads from one place of a syllable graph to another: what each syllable shows, where it ends, and its id. */
-internal class Reading(val shown: List<String>, val ends: List<Int>, val syllables: IntArray, val exact: Boolean = true)
+/**
+ * How a word reads from one place of a syllable graph to another: what each syllable shows, where it ends, and its id;
+ * [slips], each key read as the key next to it, its place in the graph to the key meant (learned so, 061-neighbour-correction §8.2);
+ * [otherwise], whether its path has an edge that [reads otherwise][SyllableGraph.readsOtherwise] than typed (简拼, a slip):
+ * the very test [SyllableGraph.withoutOtherReadings] drops edges by, as HabitOrder.readsAlong takes a path with none for
+ * one that graph keeps; a change to either is a change to both.
+ */
+internal class Reading(
+    val shown: List<String>, val ends: List<Int>, val syllables: IntArray, val exact: Boolean = true, val slips: Map<Int, Char> = emptyMap(),
+    val otherwise: Boolean = false,
+)
 
 /**
  * The syllables along a path of [graph] from [from] to [to] that spell [word], exact readings
@@ -28,6 +37,9 @@ internal fun reading(
     val syllables = ArrayList<Int>()
     // the syllables of the path read other than as typed (fuzzy, a slip): an imported word goes after the words read exactly
     var misread = 0
+    // the edges of the path read otherwise than typed
+    var otherwise = 0
+    val slips = HashMap<Int, Char>()
 
     val trie = Spelt(word, dictionary, own)
 
@@ -41,21 +53,28 @@ internal fun reading(
                 val child = trie.child(node, m.syllable(i))
                 if (child < 0) continue
                 val off = if (m.flags(i) and MISREAD != 0) 1 else 0
+                val other = if (graph.readsOtherwise(e)) 1 else 0
+                val slip = graph.slips(e)
+                val slipAt = if (slip == null) -1 else graph.from(e) + slip.at(i)
                 shown += show(e, m.syllable(i))
                 ends += graph.to(e)
                 syllables += m.syllable(i)
                 misread += off
+                otherwise += other
+                if (slip != null) slips[slipAt] = slip.meant(i)
                 if (walk(graph.to(e), child)) return true
                 shown.removeAt(shown.size - 1)
                 ends.removeAt(ends.size - 1)
                 syllables.removeAt(syllables.size - 1)
                 misread -= off
+                otherwise -= other
+                if (slip != null) slips.remove(slipAt)
             }
         }
         return false
     }
 
-    return if (walk(from, trie.root)) Reading(shown, ends, syllables.toIntArray(), misread == 0) else null
+    return if (walk(from, trie.root)) Reading(shown, ends, syllables.toIntArray(), misread == 0, slips, otherwise > 0) else null
 }
 
 private const val MISREAD = SyllableMatches.FUZZY or SyllableMatches.TYPO or SyllableMatches.NEIGHBOUR

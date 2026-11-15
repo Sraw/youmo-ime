@@ -1819,3 +1819,12 @@ def st133(d):
 
 
 case("ST-140", needs="jvm:KeyboardStyleSettingsUatTest.theTwoStylesInPlaceOfTheThree、KeyboardStyleSettingsUatTest.notSetShowsTheTurnedScreensOwn、KeyboardStyleSettingsUatTest.aStyleChangedFromTheKeyboardShowsAtOnce")(lambda d: None)
+
+
+# ---------------------------------------------------------------- 按偏的键按落点读 (061-neighbour-correction)
+
+
+case("ST-136", needs="jvm:SettingsUatTest.everyInputMethodsPageAndTheSharedOnes、NeighbourSlipTest.theNineKeysReadADigitAsTheOneItWasTappedTowards")(lambda d: None)
+
+
+case("ST-137", needs="jvm:SettingsUatTest.pinyinsKeyboardOnItsPageAndTheSharedOptionsSayingFourteenKeys")(lambda d: None)

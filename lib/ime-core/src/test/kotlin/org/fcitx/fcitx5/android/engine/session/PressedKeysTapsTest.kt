@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
 import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.junit.Assert.assertEquals
@@ -73,5 +74,39 @@ class PressedKeysTapsTest {
         keys.insert(2, g14("gh"), tapAt = 0.25f)
         keys.set(2, "h", multiTap = true)
         assertNull(keys.taps(0, 3))
+    }
+
+    // 061-neighbour-correction: each key's touch kept by its place, as its place is; a key read as the one
+    // beside it learned as that one (N1-A)
+    @Test
+    fun eachTouchIsAtItsPlaceAndASlipIsLearnedAsTheKeyMeant() {
+        val keys = PressedKeys()
+        val touch = TouchBoxes.tap(TouchBoxes.QWERTY, 's', dx = -0.4f)
+        keys.insert(0, "nih")
+        keys.insert(3, "s", touch = touch)
+        keys.insert(4, "o")
+        assertNull(keys.touches(0, 3))
+        assertEquals(listOf(null, touch, null), keys.touches(2, 5)!!.toList())
+        assertEquals("nihso", keys.keys(0, 5))
+        assertEquals("nihao", keys.keys(0, 5, mapOf(3 to 'a')))
+        assertEquals("hao", keys.keys(2, 5, mapOf(3 to 'a')))
+    }
+
+    // the slip is by the input's place, not by the keys' index: a separator is a place with no key, and 九键's
+    // syllable taken one run of several places, never swapped
+    @Test
+    fun aSlipAfterASeparatorIsSwappedAtItsPlace() {
+        val keys = PressedKeys()
+        "ni'hso".forEachIndexed { i, c -> keys.insert(i, c.toString()) }
+        assertEquals("nihso", keys.keys(0, 6))
+        assertEquals("nihao", keys.keys(0, 6, mapOf(4 to 'a')))
+        // the keys' index 3 is s, the place 3 h: by the place
+        assertEquals("nijso", keys.keys(0, 6, mapOf(3 to 'j')))
+        // a run of several places is no key's: as typed
+        val nine = PressedKeys()
+        nine.insert(0, "64")
+        nine.insert(2, "426")
+        nine.replace(0, 2, 2, "64")
+        assertEquals(nine.keys(0, 5), nine.keys(0, 5, mapOf(0 to '5')))
     }
 }

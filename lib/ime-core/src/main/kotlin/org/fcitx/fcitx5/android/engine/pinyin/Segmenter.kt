@@ -15,6 +15,14 @@ fun interface Segmenter {
      */
     fun segment(input: String, taps: FloatArray?): SyllableGraph = segment(input)
 
+    /**
+     * [input] as [segment] has it with [taps], and [touches] where each place's key was tapped and
+     * the keys around it (null for a place with none; null for none at all): a key read as the
+     * key next to it, as likely as where it was tapped says (061-neighbour-correction). Where a
+     * way of typing reads no slips, as without them.
+     */
+    fun segment(input: String, taps: FloatArray?, touches: Array<Touch?>?): SyllableGraph = segment(input, taps)
+
     /** Whether [c] is a key of this way of typing: what a keyboard hands to the engine. */
     fun reads(c: Char): Boolean = c in 'a'..'z'
 

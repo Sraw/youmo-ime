@@ -179,7 +179,8 @@ class InputMethodSettingsTest {
         assertEquals(emptyList<String>(), notFor(EngineSettings.BUILT_IN_PHRASES))
         assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
         assertEquals(emptyList<String>(), notFor(InputMethodSettings.PUNCTUATION))
-        assertEquals(listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.SHUANGPIN_KEYS18, InputMethodCatalog.SHUANGPIN_KEYS14, InputMethodCatalog.SHUANGPIN_NINE, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
+        // pinyin's nine, 14 and 18 keys read a key tapped by its neighbour's edge (061-neighbour-correction); 双拼's grouped keyboards nothing
+        assertEquals(listOf(InputMethodCatalog.SHUANGPIN_KEYS18, InputMethodCatalog.SHUANGPIN_KEYS14, InputMethodCatalog.SHUANGPIN_NINE, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
         // u and v are both on 8 (9 keys' 双拼 too): the pair alone is said to be no use to the nine keys, the others are
         val fuzzy = rows.filterIsInstance<Flags>().single()
         assertEquals(mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE)), fuzzy.notFor)

@@ -141,11 +141,11 @@ internal class CommitRecorder(
 
     private inline fun safely(block: () -> Unit) = safely(Unit, block)
 
-    fun code(from: Int, to: Int, words: List<Word>): Code = when {
+    fun code(from: Int, to: Int, words: List<Word>, slips: Map<Int, Char> = emptyMap()): Code = when {
         // a glide's letters are no keys: its words as full pinyin, whatever the keyboard
         pressed.glided(from, to) -> Code(Kinds.FULL, words.joinToString("") { it.reading.replace(" ", "") })
-        multiTapKind != null && pressed.multiTap(from, to) -> Code(multiTapKind, pressed.keys(from, to))
-        else -> Code(kind, pressed.keys(from, to))
+        multiTapKind != null && pressed.multiTap(from, to) -> Code(multiTapKind, pressed.keys(from, to, slips))
+        else -> Code(kind, pressed.keys(from, to, slips))
     }
 
     /** The app's [text] before the cursor, as what the next commit follows: [cleared] (Action.Context); none kept but [learning]. */
@@ -175,7 +175,9 @@ internal class CommitRecorder(
     fun commit(picks: List<CommitRows.Pick>, nineKeys: NineKeys?) = safely {
         val takes = if (layout == null) emptyList() else nineKeys?.takes(takeLayout).orEmpty()
         val prev = prev()
-        val rows = CommitRows.build(prev, picks, ::code, ::origin)
+        // a key read as the key next to it is learned as the key meant: the code typed so stays as it reads (061-neighbour-correction §8.2)
+        val slips = picks.fold(emptyMap<Int, Char>()) { all, p -> if (p.slips.isEmpty()) all else all + p.slips }
+        val rows = CommitRows.build(prev, picks, { from, to, words -> code(from, to, words, slips) }, ::origin)
         // commits deleted whole just before, typed again by this one: corrected to there (U-03)
         val deleted = journal.pending
         val again = if (deleted.isEmpty()) null else Retype.match(deleted, prev, Retype.syllables(prev, picks), rows, ::matcherOf, ::origin)
@@ -234,6 +236,7 @@ internal class CommitRecorder(
         taken: Boolean,
         firstPiece: Boolean,
         own: Boolean = false,
+        slips: Map<Int, Char> = emptyMap(),
     ): CommitRows.Pick? = safely(null) {
         val words = entries?.let(::words)
         val ends = if (words != null) IntArray(c.ends.size) { from + c.ends[it] } else intArrayOf(from + c.end)
@@ -247,7 +250,7 @@ internal class CommitRecorder(
         val reference = if (taken && firstPiece) firstAtTake.orEmpty().take(c.text.length) else firstShown(candidates, c.end, aside)?.text.orEmpty()
         val shown = firstShown(candidates, rest, aside)?.takeIf { s -> NO_WORD !in s.words }
             ?.let { s -> CommitRows.Shown(from, s.words.map(text), IntArray(s.ends.size) { from + s.ends[it] }) }
-        CommitRows.Pick(from, words ?: listOf(Word(c.text, "")), ends, how, reference, shown, own)
+        CommitRows.Pick(from, words ?: listOf(Word(c.text, "")), ends, how, reference, shown, own, slips)
     }
 
     /** Where [words] come from: the dictionary or a user dictionary, added by hand, neither. */

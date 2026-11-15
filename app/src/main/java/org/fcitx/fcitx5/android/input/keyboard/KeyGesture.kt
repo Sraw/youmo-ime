@@ -93,6 +93,19 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     var clickDown = Float.NaN
         private set
 
+    /**
+     * Where across and down the key ([clickAt], [clickDown]) the touch that clicks it came down,
+     * however far it went: a swipe's own click (KeySwipe's Tap) has it too, set before the Up goes to
+     * the swipe. For the click listener alone, NaN for a click no touch made (TalkBack): where a tap
+     * fell, the engine's to read a key next to it (061-neighbour-correction).
+     */
+    var fellAt = Float.NaN
+        private set
+
+    /** [fellAt]'s down the key. */
+    var fellDown = Float.NaN
+        private set
+
     var longPressEnabled
         get() = recognizer.longPressEnabled
         set(value) {
@@ -218,6 +231,8 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             MotionEvent.ACTION_CANCEL -> {
                 clickAt = Float.NaN
                 clickDown = Float.NaN
+                fellAt = Float.NaN
+                fellDown = Float.NaN
                 dispatchGestureEvent(GestureType.Up, x, y, cancelled = true)
                 cancelGestures()
             }
@@ -235,8 +250,11 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             downs[pointerId * 2] = downAt
             downs[pointerId * 2 + 1] = downDown
         }
+        // a click that threw last time leaves none of its places to this touch
         clickAt = Float.NaN
         clickDown = Float.NaN
+        fellAt = Float.NaN
+        fellDown = Float.NaN
         key.hotspot(x, y)
         key.showPressed(true)
         InputFeedbacks.hapticFeedback(key.feedback)
@@ -279,9 +297,14 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         InputFeedbacks.hapticFeedback(key.feedback, longPress = true, keyUp = true)
         clickAt = across(x)
         clickDown = downward(y)
+        // and where it fell, for the engine to read a key next to it (061-neighbour-correction)
+        fellAt = clickAt
+        fellDown = clickDown
         key.click()
         clickAt = Float.NaN
         clickDown = Float.NaN
+        fellAt = Float.NaN
+        fellDown = Float.NaN
     }
 
     private fun up(x: Float, y: Float, pointerId: Int, eventTime: Long) {
@@ -298,6 +321,8 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         // a swipe whose slot is nothing clicks the key at its Up (KeySwipe.Outcome.Tap): where it came down
         clickAt = at
         clickDown = atDown
+        fellAt = at
+        fellDown = atDown
         dispatchGestureEvent(GestureType.Up, x, y)
         val outcome = recognizer.onUp(
             nowMs = eventTime,
@@ -315,6 +340,8 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         }
         clickAt = Float.NaN
         clickDown = Float.NaN
+        fellAt = Float.NaN
+        fellDown = Float.NaN
     }
 
     private fun move(x: Float, y: Float): Boolean {

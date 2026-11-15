@@ -5,6 +5,10 @@
 # Needs an emulator (uat.py up; uat.py packs installs the debug APK and imports the text pack); INSTALL=0 runs
 # on the APKs installed by a run before, for several sets in a row.
 #   lib/ime-eval/run-on-device.sh [set=pinyin] [ime=engine-pinyin] [out-dir=build/eval]
+# A set tapped with a place (ime-eval's pinyin --touch … --touched lib/ime-eval/data/<name>.tsv, not committed) types
+# each key with its touch, as a finger's tap carries it (061-neighbour-correction). NINE=1 types a set of digits (ime-eval's
+# nine-key sets) as pinyin's nine keys send them, codes of their own, with ime=engine-pinyin; GROUPED=14 or 18 a set of
+# the 14 or 18 keys' codes (--scheme g14/g18) as those keys send them.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -53,7 +57,7 @@ REMOTE="/sdcard/Android/data/$PKG/files/eval/$SET-$IME.tsv"
 adb shell rm -f "$REMOTE"
 # am instrument exits 0 even when the run fails; its report is what tells
 REPORT=$(adb shell am instrument -w -e class org.fcitx.fcitx5.android.EngineEvalRunner \
-    -e evalSet "$SET" -e evalIme "$IME" "$PKG.test/androidx.test.runner.AndroidJUnitRunner")
+    -e evalSet "$SET" -e evalIme "$IME" ${NINE:+-e evalNine true} ${GROUPED:+-e evalGrouped "$GROUPED"} "$PKG.test/androidx.test.runner.AndroidJUnitRunner")
 if ! grep -q "^OK (1 test)" <<<"$REPORT"; then
     echo "$REPORT" >&2
     exit 1

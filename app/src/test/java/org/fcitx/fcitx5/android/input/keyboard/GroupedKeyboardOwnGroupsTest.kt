@@ -111,7 +111,8 @@ class GroupedKeyboardOwnGroupsTest {
     // made, not shown: KeyboardWindow's onAttach is each test's to call
     private fun GroupedKeyboard.wired() = apply {
         setViewTreeLifecycleOwner(Owner())
-        keyActionListener = KeyActionListener { action, _ -> sent += action }
+        // the codes alone: where each fell (061-neighbour-correction) is GroupedKeyboardTapTest's
+        keyActionListener = KeyActionListener { action, _ -> sent += (action as? KeyAction.SymAction)?.copy(touch = null) ?: action }
         popupActionListener = PopupActionListener { popups += it }
         laidOut(1080, 800)
     }

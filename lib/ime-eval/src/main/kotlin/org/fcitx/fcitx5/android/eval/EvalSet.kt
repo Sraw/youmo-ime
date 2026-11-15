@@ -4,26 +4,47 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
+
 /**
  * One thing a user types as [input], and what they meant by it, after [context] when there is
  * any: the text before the cursor. [taps]: where across its key each of [input] was tapped, for
- * the 14 keys ([Taps]); null for none.
+ * the 14 keys ([Taps]); null for none. [touches]: where each was tapped and the keys around it
+ * ([TouchSim]), null each one with no place.
  */
-data class Sample(val input: String, val expected: String, val tag: String, val context: String = "", val taps: List<Float>? = null)
+data class Sample(val input: String, val expected: String, val tag: String, val context: String = "", val taps: List<Float>? = null, val touches: List<Touch?>? = null)
 
 object EvalSet {
 
-    /** `input<TAB>expected<TAB>tag[<TAB>context]`; `#` starts a comment line. */
+    /**
+     * `input<TAB>expected<TAB>tag[<TAB>context[<TAB>touches]]`; `#` starts a comment line. The
+     * touches ([line]'s, `pinyin --touch … --touched`): each key's [Touch.text] a space apart, `-`
+     * one with no place; the context before them may be empty.
+     */
     fun parse(lines: Sequence<String>): List<Sample> = lines
         .mapIndexedNotNull { index, line ->
             if (line.isBlank() || line.startsWith("#")) return@mapIndexedNotNull null
             val fields = line.split('\t')
-            require(fields.size in 3..4 && fields.none { it.isEmpty() }) {
-                "line ${index + 1}: expected input<TAB>expected<TAB>tag[<TAB>context], got \"$line\""
+            require(fields.size in 3..5 && fields.withIndex().none { (i, f) -> f.isEmpty() && (i != CONTEXT || fields.size == CONTEXT + 1) }) {
+                "line ${index + 1}: expected input<TAB>expected<TAB>tag[<TAB>context[<TAB>touches]], got \"$line\""
             }
-            Sample(fields[0], fields[1], fields[2], fields.getOrElse(3) { "" })
+            val touches = fields.getOrNull(CONTEXT + 1)?.let(::touches)
+            require(touches == null || touches.size == fields[0].length) { "line ${index + 1}: a touch for each key of ${fields[0]}" }
+            Sample(fields[0], fields[1], fields[2], fields.getOrElse(3) { "" }, touches = touches)
         }
         .toList()
+
+    // [text]'s touches: each key's a space apart, `-` none; a touch that reads as none fails
+    private fun touches(text: String): List<Touch?> = text.split(' ').map { t ->
+        if (t == NO_TOUCH) null else requireNotNull(Touch.parse(t)) { "no touch: $t" }
+    }
+
+    /** [s] as a line [parse] reads, its touches too. */
+    fun line(s: Sample): String = listOf(s.input, s.expected, s.tag, s.context).joinToString("\t") +
+        s.touches?.joinToString(" ", "\t") { it?.text() ?: NO_TOUCH }.orEmpty()
+
+    private const val NO_TOUCH = "-"
+    private const val CONTEXT = 3
 }
 
 /**

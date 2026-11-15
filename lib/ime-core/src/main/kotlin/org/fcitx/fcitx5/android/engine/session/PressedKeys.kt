@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 
 /**
  * The keys pressed for each place of a [PinyinSession]'s input, kept beside it as it is edited:
@@ -21,9 +22,10 @@ internal class PressedKeys {
     /**
      * [length] places of the input, typed as [keys]; [glided], by a glide; [multiTap], a letter the
      * nine keys' 连按 chose; [at], where across its key a grouped keyboard's tap fell (NaN for none,
-     * and for a run of several: a syllable taken has its letters, no place).
+     * and for a run of several: a syllable taken has its letters, no place); [touch], where on its
+     * key it was tapped and the keys around it, for reading it as one of those (null for none, as [at]).
      */
-    class Run(val length: Int, val keys: String, val glided: Boolean = false, val multiTap: Boolean = false, val at: Float = Float.NaN)
+    class Run(val length: Int, val keys: String, val glided: Boolean = false, val multiTap: Boolean = false, val at: Float = Float.NaN, val touch: Touch? = null)
 
     private val runs = ArrayList<Run>()
 
@@ -36,20 +38,20 @@ internal class PressedKeys {
     }
 
     /**
-     * [text] typed at [at], a key a place, each as [keyOf] files it; [tapAt], where across its key
-     * a single key was tapped (a text of several has none). Within a run of several (a syllable
+     * [text] typed at [at], a key a place, each as [keyOf] files it; [tapAt] and [touch], where
+     * on its key a single key was tapped (a text of several has none). Within a run of several (a syllable
      * taken), that run is split first into a key a place of [input] (as it is before), as [delete]
      * splits it.
      */
-    fun insert(at: Int, text: String, glided: Boolean = false, tapAt: Float = Float.NaN, input: CharSequence? = null, letters: NineKeyLetters? = null) {
+    fun insert(at: Int, text: String, glided: Boolean = false, tapAt: Float = Float.NaN, input: CharSequence? = null, letters: NineKeyLetters? = null, touch: Touch? = null) {
         if (input != null) {
             runAt(at)?.takeIf { (i, start) -> start < at && runs[i].length > 1 }?.let { (i, start) ->
                 runs.addAll(i, split(runs.removeAt(i), start, input, letters) { true })
             }
         }
         var i = indexAt(at)
-        val place = if (text.length == 1) tapAt else Float.NaN
-        for (c in text) runs.add(i++, Run(1, keyOf(c), glided, at = place))
+        val one = text.length == 1
+        for (c in text) runs.add(i++, Run(1, keyOf(c), glided, at = if (one) tapAt else Float.NaN, touch = touch.takeIf { one }))
     }
 
     /**
@@ -96,10 +98,18 @@ internal class PressedKeys {
         runs.addAll(i, was)
     }
 
-    /** The keys pressed for the places from [from] up to [to]. */
-    fun keys(from: Int, to: Int): String {
+    /** The keys pressed for the places from [from] up to [to], those of [slips] (a place of one key to the key meant) as meant. */
+    fun keys(from: Int, to: Int, slips: Map<Int, Char> = emptyMap()): String {
         val (i, j) = indices(from, to)
-        return runs.subList(i, j).joinToString("") { it.keys }
+        if (slips.isEmpty()) return runs.subList(i, j).joinToString("") { it.keys }
+        val out = StringBuilder()
+        var place = (0 until i).sumOf { runs[it].length }
+        for (run in runs.subList(i, j)) {
+            val meant = if (run.length == 1) slips[place] else null
+            out.append(if (meant != null) keyOf(meant) else run.keys)
+            place += run.length
+        }
+        return out.toString()
     }
 
     /**
@@ -120,6 +130,22 @@ internal class PressedKeys {
             place += run.length
         }
         return out.takeIf { any }
+    }
+
+    /** Where each place from [from] up to [to] was tapped and the keys around it, as [taps] has its places; null where none has one. */
+    fun touches(from: Int, to: Int): Array<Touch?>? {
+        var out: Array<Touch?>? = null
+        var place = 0
+        for (run in runs) {
+            if (place >= to) break
+            val touch = run.touch
+            if (run.length == 1 && place >= from && touch != null) {
+                val o = out ?: arrayOfNulls<Touch>(to - from).also { out = it }
+                o[place - from] = touch
+            }
+            place += run.length
+        }
+        return out
     }
 
     fun glided(from: Int, to: Int): Boolean {

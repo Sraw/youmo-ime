@@ -63,8 +63,8 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev",
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>] [--touch <keyboard>:<hand>:<clean|slip>[:<seed>] [--touched <set.tsv>]]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev", "touch", "touched",
     ) { args, _, _ ->
         val (dataPath, setPath, resultPath) = args.operands
         runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options))
@@ -462,8 +462,10 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         // a merged dictionary's file is what is stale
         valid("stale") { "merged" in options },
         listOf("threads", "beam", "sentences").all { name -> valid(name) { (it.toIntOrNull() ?: 0) > 0 } },
-        // only full pinyin reads slips: 双拼 and the nine keys read none
-        valid("neighbours") { it in ON_OFF && (scheme == null || scheme == NO_LATIN) },
+        // a key read as the one beside it (061-neighbour-correction): full pinyin, 双拼's full keyboard, pinyin's nine, 14 and 18 keys
+        valid("neighbours") { it in ON_OFF && readsNeighbours(scheme) },
+        valid("touched") { "touch" in options },
+        valid("touch") { "taps" !in options && touchValid(it) },
         valid("typos") { it in ON_OFF && readsTypos(scheme) },
         // 双拼's 简拼 in the middle: off, the reading before it, or another extra penalty than the app's
         valid("sp-abbrev") { readsAbbrev(it, scheme) },
@@ -472,6 +474,14 @@ private fun optionsValid(options: Map<String, String>): Boolean {
 
 /** Whether `--sp-abbrev` [spec] is off or a penalty (finite, not above 0), under a scheme of the full keyboard's 双拼 (the grouped ones read none). */
 private fun readsAbbrev(spec: String, scheme: String?) = (spec == "off" || spec.toFloatOrNull()?.let { it.isFinite() && it <= 0f } == true) && scheme in ShuangpinSet.SCHEMES
+
+/** Whether [scheme]'s segmenter reads a key as the one beside it: full pinyin, 双拼's full keyboard, pinyin's nine, 14 and 18 keys (061-neighbour-correction). */
+private fun readsNeighbours(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES || scheme in T9Set.SCHEMES
+
+/** Whether `--touch` [spec] names a keyboard, a hand and clean or slip ([TouchSim.convert]). */
+private fun touchValid(spec: String) = spec.split(':').let { p ->
+    p.size in 3..4 && p[2] in setOf("clean", "slip") && runCatching { TouchSim.board(p[0]); TouchSim.hand(p[1]) }.isSuccess
+}
 
 /** Whether [scheme]'s segmenter reads common slips: full pinyin's and 双拼's; the grouped keyboards and zhuyin read none. */
 private fun readsTypos(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES
@@ -549,6 +559,12 @@ private class RunOptions(options: Map<String, String>) {
         require(scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) == NineKeyLetters.G14) { "--taps types the 14 keys: a 14-key --scheme, not $scheme" }
     }
 
+    /** Taps with a place ([TouchSim]): each key where a simulated hand tapped it, the keys around it; read where [neighbours] is on. */
+    val touch = options["touch"]?.also { require(taps == null) { "--touch or --taps, not both" } }
+
+    /** Where the set as [touch] tapped it goes, each key's touch in a column ([EvalSet.line]). */
+    val touched = options["touched"]
+
     /** Each syllable spelt out in the preedit, as the app shows 双拼 and the nine keys. */
     val spell = scheme != null && scheme != NO_LATIN
 
@@ -560,9 +576,9 @@ private class RunOptions(options: Map<String, String>) {
         null -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours, latin = LatinWords.of(data.dictionary))
         NO_LATIN -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours)
         in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = data.tones::allows)
-        in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme))
+        in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme), neighbours = neighbours)
         in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy) }
-        else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy, typos, abbreviations = abbreviations)
+        else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy, typos, abbreviations = abbreviations, neighbours = neighbours)
     }
 }
 
@@ -619,7 +635,11 @@ private fun runPinyin(dataPath: String, setPath: String, resultPath: String, opt
         val set = Halves.select(readSet(setPath), options.half)
         val selected = options.taps?.let { spec ->
             Taps.convert(set, spec).also { require(it.isNotEmpty()) { "--taps: no sample of $setPath has one exact reading (a set already of codes?)" } }
+        } ?: options.touch?.let { spec ->
+            TouchSim.convert(set, spec).also { require(it.isNotEmpty()) { "--touch: no sample of $setPath has a key on that keyboard" } }
         } ?: set
+        // the set as tapped, for the device's runner (EngineEvalRunner) to type the same
+        options.touched?.let { path -> File(path).printWriter().use { w -> selected.forEach { w.println(EvalSet.line(it)) } } }
         val results = dealt(selected, options.threads, {
             val data = loadData(dataPath)
             PinyinRun(

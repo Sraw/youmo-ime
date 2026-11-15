@@ -121,7 +121,7 @@ class T9Keyboard(
     private val semicolon: Boolean,
 ) : BaseKeyboard(
     context, theme, layout(letters, english, shuangpin, semicolon), themeBoard = KeyNames.NINE,
-), AutoCapsKeys {
+), AutoCapsKeys, TypingKeys {
 
     companion object {
         const val Name = "T9"
@@ -261,7 +261,7 @@ class T9Keyboard(
         internal fun coded(action: KeyAction, typing: Boolean, letters: NineKeyLetters): KeyAction {
             val key = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull() ?: return action
             val code = key.isDigit() && typing || key in '2'..'9' && letters.letters(key).isNotEmpty()
-            return if (code) KeyAction.SymAction(KeySym(UNICODE + Keyboard.pinyinNineKey(key)), KeyStates.Virtual) else action
+            return if (code) KeyAction.SymAction(KeySym(UNICODE + Keyboard.pinyinNineKey(key)), KeyStates.Virtual, (action as KeyAction.HostKeyAction).touch) else action
         }
 
         /** The code of 九键双拼's digit key [digit]: its group's, sent as a Unicode character. */
@@ -516,6 +516,10 @@ class T9Keyboard(
         }
 
     // each letter where the scene draws its digit's key (nine.xml's key N)
+    // the digit keys with letters, pinyin's (061-neighbour-correction): not 1 and 0, nor English's or 双拼's
+    override fun typingKeys(): List<Pair<Char, KeyRef>> =
+        if (english || shuangpin) emptyList() else ('2'..'9').filter { letters.letters(it).isNotEmpty() }.map { it to KeyRef(it.toString()) }
+
     private val sceneLetters: List<Pair<Char, ScenePlace>> = ('2'..'9').flatMap { d ->
         scenePlace(d.toString()).let { at -> letters.letters(d).map { it.lowercaseChar() to at } }
     }

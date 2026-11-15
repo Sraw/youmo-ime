@@ -10,11 +10,13 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.SceneShownKey
@@ -45,6 +47,9 @@ class GroupedKeyboardTapTest {
     private val context = RuntimeEnvironment.getApplication()
     private val sent = ArrayList<KeyAction>()
 
+    // where each code sent was tapped and the keys around it (061-neighbour-correction): kept apart, [sent] the codes alone
+    private val touches = ArrayList<Touch?>()
+
     // the keys' timers run in the view tree's lifecycle
     private class Owner : LifecycleOwner {
         override val lifecycle = LifecycleRegistry(this)
@@ -52,7 +57,10 @@ class GroupedKeyboardTapTest {
 
     private fun grouped() = GroupedKeyboard(context, TestThemes.PixelDark).apply {
         setViewTreeLifecycleOwner(Owner())
-        keyActionListener = KeyActionListener { action, _ -> sent += action }
+        keyActionListener = KeyActionListener { action, _ ->
+            touches += (action as? KeyAction.SymAction)?.touch
+            sent += (action as? KeyAction.SymAction)?.copy(touch = null) ?: action
+        }
         laidOut(1080, 800)
     }
 
@@ -129,6 +137,25 @@ class GroupedKeyboardTapTest {
         }
     }
 
+    // 061-neighbour-correction: a tap carries where it fell, from the key's centre in its size, and the
+    // group keys around it by their codes; a click no touch made (TalkBack), none
+    @Test
+    @Uat("PY-141")
+    fun aTapCarriesWhereItFellAndTheKeysAroundIt() = drawn {
+        val bn = key("BN")
+        touches.clear()
+        touch(bn, bn.width * 0.75f, down = 0.25f)
+        val touch = touches.single()!!
+        assertEquals(0.25f, touch.dx, 0.02f)
+        assertEquals(-0.25f, touch.dy, 0.02f)
+        // CV left, M right, GH and JK above
+        assertEquals(setOf(g14Code('c'), g14Code('m'), g14Code('g'), g14Code('j')), touch.near.map { it.char }.toSet())
+        assertTrue(touch.near(g14Code('m'))!!.nx > 0f)
+        touches.clear()
+        assertTrue(bn.click())
+        assertEquals(listOf<Touch?>(null), touches)
+    }
+
     @Test
     fun aFingerThatMovedALittleStillTapsWithItsPlace() = drawn {
         // a real finger moves a few pixels between down and up: no swipe, the place kept
@@ -144,6 +171,8 @@ class GroupedKeyboardTapTest {
         val bn = key("BN")
         touch(bn, bn.width * 0.75f, 0f to bn.height.toFloat() / 2 + 1, 0f to bn.height.toFloat() / 2 + 1)
         assertTrue(sent.toString(), sent.isNotEmpty() && sent.all { it == tap(g14Code('b'), 0.75f) })
+        // and where it fell goes with it: a slip read as a key beside it (061-neighbour-correction)
+        assertEquals(0.25f, touches.last()!!.dx, 0.02f)
     }
 
     // 060-render-v2 §15 按落点加权: whether a tap leans is its layout's (lean=), whichever draws the keys

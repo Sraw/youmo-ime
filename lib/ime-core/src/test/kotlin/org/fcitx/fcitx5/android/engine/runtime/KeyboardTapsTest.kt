@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.pinyin.nineSpCode
@@ -96,5 +98,23 @@ class KeyboardTapsTest {
         for (codePoint in listOf(g14Code('v').code, 0xF8C2, 0xF8FD, '⒈'.code, 0x249C, 'b'.code, Keyboard.letterKey('b', again = false), Keyboard.INK)) {
             assertNull(Integer.toHexString(codePoint), Keyboard.typedLetter(codePoint))
         }
+    }
+
+    // 061-neighbour-correction: the key's payload carries where it was tapped and the keys around it, to the
+    // session with the key: a letter's, 九键's digit's (its code), a 14-key tap's with its place
+    @Test
+    fun aKeysTouchGoesToTheSessionWithIt() {
+        val touch = TouchBoxes.tap(TouchBoxes.QWERTY, 's', dx = -0.4f)
+        val letters = RecordedSession(PinyinSession(sessionTestData(), PinyinSegmenter(), prediction = false))
+        Keyboard(letters, nineKeys = false).onEvent(EngineEvent.CHAR, 's'.code, payload = Action.Key('s', touch = touch))
+        assertEquals(Action.Key('s', touch = touch), letters.actions.single())
+        val nine = TouchBoxes.tap(TouchBoxes.NINE, '4', dy = 0.4f)
+        val digits = RecordedSession(PinyinSession(sessionTestData(), T9Segmenter(), spell = true, prediction = false))
+        Keyboard(digits, nineKeys = true).onEvent(EngineEvent.CHAR, Keyboard.pinyinNineKey('4'), payload = Action.Key('4', touch = nine))
+        assertEquals(Action.Key('4', touch = nine), digits.actions.single())
+        val g14 = TouchBoxes.tap(TouchBoxes.G14, g14Code('b'), dx = 0.45f)
+        val session = recorded()
+        Keyboard(session, nineKeys = false).onEvent(EngineEvent.CHAR, Keyboard.tapKey(g14Code('b'), 0.9375f), payload = Action.Key(g14Code('b'), touch = g14))
+        assertEquals(Action.Key(g14Code('b'), at = 0.9375f, touch = g14), session.actions.single())
     }
 }

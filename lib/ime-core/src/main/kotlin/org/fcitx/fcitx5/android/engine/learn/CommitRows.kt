@@ -28,7 +28,11 @@ object CommitRows {
      * phrases and emoji aside, or for 'H' the first when a syllable was taken); the first sentence
      * shown then ([shown]), if any; [own] the decoder's own first there, before the habits ranked it (F2739).
      */
-    class Pick(val from: Int, val words: List<Word>, val ends: IntArray, val how: Char, val reference: String, val shown: Shown?, val own: Boolean = false) {
+    class Pick(
+        val from: Int, val words: List<Word>, val ends: IntArray, val how: Char, val reference: String, val shown: Shown?, val own: Boolean = false,
+        /** Its keys read as the keys next to them, each place of the input to the key meant: learned as that key. */
+        val slips: Map<Int, Char> = emptyMap(),
+    ) {
         val to get() = ends.last()
         val text get() = words.joinToString("") { it.text }
     }

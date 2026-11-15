@@ -24,6 +24,8 @@ class SyllableGraph internal constructor(
     private val edgeMatches: Array<SyllableMatches>,
     // per edge, how far each of its matches' letters go against where their keys were tapped; null for none at all
     private val edgeAgainst: Array<FloatArray?>? = null,
+    // per edge of keys read as the keys next to them, what each match costs and which key it took for which; null for none at all
+    private val edgeSlips: Array<Slips?>? = null,
 ) {
     enum class Kind {
         /** Whole syllables, exactly or through [Fuzzy] or a typo. */
@@ -72,6 +74,19 @@ class SyllableGraph internal constructor(
      */
     fun against(edge: Int, i: Int): Float = edgeAgainst?.get(edge)?.get(i) ?: 0f
 
+    /**
+     * For an edge whose keys read as one of them slipped from the key next to it (every match
+     * [SyllableMatches.NEIGHBOUR]), what each match costs and which key it reads as which; null
+     * for any other edge (061-neighbour-correction §3).
+     */
+    fun slips(edge: Int): Slips? = edgeSlips?.get(edge)
+
+    /** Whether [edge] reads its keys as slipped ([slips]): never the keys as typed. */
+    fun isSlip(edge: Int): Boolean = edgeSlips?.get(edge) != null
+
+    /** What the [i]th match of [edge] costs as a slip (log10), 0 for none. */
+    fun slipCost(edge: Int, i: Int): Float = edgeSlips?.get(edge)?.cost(i) ?: 0f
+
     /** The typed text of [edge], without separators. */
     fun text(edge: Int): String = text(edgeFrom[edge], edgeTo[edge])
 
@@ -105,21 +120,28 @@ class SyllableGraph internal constructor(
     /** Whether any edge [isAbbreviation]: only 双拼's graphs have one. */
     val hasAbbreviations: Boolean by lazy(LazyThreadSafetyMode.NONE) { (0 until edgeCount).any(::isAbbreviation) }
 
+    /** Whether [edge] reads its keys otherwise than typed: an [isAbbreviation] or an [isSlip]. */
+    fun readsOtherwise(edge: Int): Boolean = isAbbreviation(edge) || isSlip(edge)
+
+    /** Whether any edge [readsOtherwise]. */
+    val hasOtherReadings: Boolean by lazy(LazyThreadSafetyMode.NONE) { hasAbbreviations || edgeSlips != null }
+
     /**
-     * This graph without [isAbbreviation]'s edges, nor what only they reach: the input read in
-     * whole syllables, a key alone an initial only where it and the next make none, as before 简拼
-     * in the middle. Itself where it has none (every way of typing but 双拼). Whether the input
-     * ends on a syllable, or `;` ends one, is asked of this: `lj;` in 微软 is 蓝 and ；, though `l`
-     * alone and `j;` (jing) read it too.
+     * This graph without the edges that [readsOtherwise], nor what only they reach: the input read
+     * in whole syllables as typed, a key alone an initial only where it and the next make none, as
+     * before 简拼 in the middle, and no key read as the key next to it. Itself where it has none.
+     * Whether the input ends on a syllable, or `;` ends one, is asked of this: `lj;` in 微软 is 蓝
+     * and ；, though `l` alone and `j;` (jing) read it too; `nihap` ends on no syllable, though hao
+     * reads its `hap`.
      */
-    fun withoutAbbreviations(): SyllableGraph = whole
+    fun withoutOtherReadings(): SyllableGraph = whole
 
     // made once a graph: asked of the same one on a key by the session and the ranking more than once
     private val whole: SyllableGraph by lazy(LazyThreadSafetyMode.NONE) {
-        if (hasAbbreviations) dropAbbreviations() else this
+        if (hasOtherReadings) dropOtherReadings() else this
     }
 
-    private fun dropAbbreviations(): SyllableGraph {
+    private fun dropOtherReadings(): SyllableGraph {
         val reached = BooleanArray(end + 1).also { it[start] = true }
         val kept = ArrayList<Int>(edgeCount)
         val first = IntArray(end + 2)
@@ -127,7 +149,7 @@ class SyllableGraph internal constructor(
             first[at] = kept.size
             if (!reached[at]) continue
             for (e in edges(at)) {
-                if (isAbbreviation(e)) continue
+                if (readsOtherwise(e)) continue
                 kept += e
                 reached[edgeTo[e]] = true
             }
@@ -137,12 +159,13 @@ class SyllableGraph internal constructor(
             input, start, first, IntArray(kept.size) { edgeFrom[kept[it]] }, IntArray(kept.size) { edgeTo[kept[it]] },
             Array(kept.size) { edgeKind[kept[it]] }, Array(kept.size) { edgeMatches[kept[it]] },
             edgeAgainst?.let { a -> Array(kept.size) { a[kept[it]] } },
+            edgeSlips?.let { a -> Array(kept.size) { a[kept[it]] } },
         )
     }
 
     /**
      * Whether the input from [from] to [to] reads as whole syllables, by [Kind.SYLLABLE] and
-     * [Kind.LETTER] edges that are no [isAbbreviation]: `xm` (xian) and `xwmm` (xia mian) in 自然码,
+     * [Kind.LETTER] edges that are no [isAbbreviation] nor [isSlip]: `xm` (xian) and `xwmm` (xia mian) in 自然码,
      * not `ufmuh`, whose h is only begun. A code so read is the user's whole syllables: the words
      * their habits raise under it are read so too, not by its keys as initials (HabitOrder).
      */
@@ -158,8 +181,9 @@ class SyllableGraph internal constructor(
         return ok[to]
     }
 
-    // a whole syllable or a letter, as typed: not a key read alone where it and the next make a syllable
-    private fun asTyped(e: Int) = edgeKind[e].let { it == Kind.SYLLABLE || it == Kind.LETTER } && !isAbbreviation(e)
+    // a whole syllable or a letter, as typed: not a key read alone where it and the next make a syllable,
+    // nor keys read as slipped (a slip of keys that spell nothing reads through, but is no syllable the user typed)
+    private fun asTyped(e: Int) = edgeKind[e].let { it == Kind.SYLLABLE || it == Kind.LETTER } && !readsOtherwise(e)
 
     /**
      * The first position whose edges, or the input up to it, differ from [other]'s; past both ends
@@ -183,6 +207,7 @@ class SyllableGraph internal constructor(
             val b = theirs.first + i
             if (edgeTo[a] != other.edgeTo[b] || edgeKind[a] != other.edgeKind[b] || !edgeMatches[a].sameAs(other.edgeMatches[b])) return false
             if (!java.util.Arrays.equals(edgeAgainst?.get(a), other.edgeAgainst?.get(b))) return false
+            if (edgeSlips?.get(a) != other.edgeSlips?.get(b)) return false
         }
         return true
     }

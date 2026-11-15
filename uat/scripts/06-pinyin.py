@@ -2,7 +2,7 @@
 前提/操作/预期."""
 import time
 
-from uat import (PKG, Blocked, block_candidate, case, check, choose, first, grouped_keys, open_url, script)
+from uat import (PKG, Blocked, block_candidate, case, check, choose, first, grouped_keys, keys_at, open_url, script)
 
 
 # ---------------------------------------------------------------- 打字
@@ -651,3 +651,41 @@ def py124(d):
     field = d.field_text()
     check(field == "银行", f"上屏后框里「{field}」")
     return "读音行、词卡、字卡、返回、上屏"
+
+
+# ---------------------------------------------------------------- 按偏的键按落点读 (061-neighbour-correction)
+
+
+case("PY-137", needs="jvm:NeighbourSlipTest.fullPinyinReadsAKeyAsTheOneItWasTappedTowards、NeighbourSlipTest.aLegalSlipIsReadOnlyNearTheKeyMeant、PinyinSessionSlipTest.aWordReadThroughASlipIsLearnedUnderTheKeyMeant、NeighbourTouchTest.theHostHandsTheTouchToTheEngineWithTheKey")(lambda d: None)
+
+
+case("PY-138", needs="jvm:NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle")(lambda d: None)
+
+
+case("PY-139", needs="jvm:PinyinSessionSlipTest.withNoPlaceAWordReadThroughASlipIsLearnedUnderTheKeyMeantToo、NeighbourSlipTest.withNoPlaceALegalSlipIsNotRead、PinyinUatTest.pinyinTypedWrongStillGivesTheWord")(lambda d: None)
+
+
+case("PY-140", needs="jvm:PinyinSessionSlipTest.aLegalSlipPickedIsLearnedUnderTheKeysMeantNotThoseTyped、PinyinSessionSlipTest.aLegalSlipPickedRaisesNothingUnderTheKeysTyped")(lambda d: None)
+
+
+case("PY-141", needs="jvm:NeighbourSlipTest.theFourteenKeysReadAKeyAsTheOneNextToItAndWeighItsLetters、PinyinSessionSlipTest.onTheFourteenKeysTheKeyMeantIsLearnedAsItsCode、GroupedKeyboardTapTest.aTapCarriesWhereItFellAndTheKeysAroundIt")(lambda d: None)
+
+
+case("PY-142", needs="jvm:NeighbourSlipTest.theEighteenKeysReadAKeyAsTheOneNextToIt")(lambda d: None)
+
+
+@case("PY-143")
+def py143(d):
+    # t tapped at 85% of its width, toward y (still on t): tama read as yama too (亚麻, 鸭毛 among the words); in the
+    # middle not
+    ya = ("亚麻", "鸭毛", "压埋")
+    keys_at(d, "tama", [(0.85, 0.5), None, None, None])
+    edge = d.all_cands()
+    d.shot("kb", "t 点在靠 y 的边上打 tama：候选栏或展开后的第一页有「亚麻」这类 ya ma 的词")
+    d.clear()
+    keys_at(d, "tama", [None] * 4)
+    mid = d.all_cands()
+    d.clear()
+    check(any(w in edge for w in ya), f"t 靠 y 点的 tama，候选和展开后的第一页没有 ya ma 的词：{edge[:14]}")
+    check(not any(w in mid for w in ya), f"四个键都点在正中的 tama，候选里有 ya ma 的词：{mid[:14]}")
+    return f"靠边 {[w for w in edge if w in ya]}；正中 {mid[:6]}"

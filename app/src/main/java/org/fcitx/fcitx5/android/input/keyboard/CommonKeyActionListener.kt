@@ -215,14 +215,14 @@ class CommonKeyActionListener :
                 is HostKeyAction -> {
                     val address = service.inAddressField
                     typeOrSend(keyAsIs(action.act, address, EngineState::shuangpinScheme)) {
-                        sendKey(action.act, action.states.states, action.code)
+                        sendKey(action.act, action.states.states, action.code, touch = action.touch)
                     }
                 }
                 // a keypad's too: through the engine KP_1 is 1, which picks a candidate
                 is SymAction -> {
                     val address = service.inAddressField
                     typeOrSend(symAsIs(action.sym.sym, address, EngineState::shuangpinScheme)) {
-                        sendKey(action.sym, action.states)
+                        sendKey(action.sym, action.states, touch = action.touch)
                     }
                 }
                 is CommitAction -> service.commitOverEngine(action.text, action.replacing, voice = action.voice)

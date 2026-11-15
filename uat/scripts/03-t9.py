@@ -3,7 +3,7 @@
 
 import time
 
-from uat import case, check, first, script
+from uat import case, check, first, keys_at, script
 
 
 def t9(d, digits, gap=0.35, after=0.6):
@@ -324,3 +324,28 @@ case("T9-61", needs="jvm:ZhuyinShortcutsUatTest.zhuyinNinesGroupsHaveNoneUntilOn
 
 case("T9-63", needs="jvm:SettingsPagesUatTest.anEditedNineKeysLongPressKeepsItsLettersWhenTheyChange")(lambda d: None)
 case("T9-64", needs="jvm:EnginesWordCardTest")(lambda d: None)
+
+
+# ---------------------------------------------------------------- 按偏的键按落点读 (061-neighbour-correction)
+
+
+case("T9-66", needs="jvm:NeighbourSlipTest.theNineKeysReadADigitAsTheOneItWasTappedTowards、NeighbourTouchTest.theNineKeysDigitsGoWithTheirPlaceButNotOneNorZero")(lambda d: None)
+
+
+case("T9-67", needs="jvm:PinyinSessionSlipTest.theNineKeysCodeShowsTheSyllableAsMeant")(lambda d: None)
+
+
+@case("T9-68", base="B0-九键")
+def t968(d):
+    # the second 9 tapped at 8% of its height, toward 6 above it: 96, wo, 我 first; both in the middle not
+    keys_at(d, "99", [None, (0.5, 0.08)])
+    c = d.cands()
+    code = d.preedit()
+    d.shot("kb", "9、9 靠上边缘：首选「我」，编码行是 wo")
+    d.clear()
+    keys_at(d, "99", [None, None])
+    mid = d.preedit()
+    d.clear()
+    check(c[:1] == ["我"] and code.replace(" ", "") == "wo", f"第二个 9 靠 6 点：编码行「{code}」，候选 {c[:6]}")
+    check(mid.replace(" ", "") != "wo", f"两个 9 都点在正中，编码行是「{mid}」")
+    return f"靠边「{code}」{c[:3]}；正中「{mid}」"

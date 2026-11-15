@@ -170,6 +170,23 @@ class StrokeUatTest {
 
     // two thumbs overlapping: q drifting 14dp down as a lands, q lifted, then a: both typed, q first, no stroke
     // (0.6.0 started a stroke at about 19dp down, and typed both)
+
+    // the tap a short stroke is (GlideTouch.Route.TAP_KEY) goes to the engine with where the finger came down,
+    // as a plain tap's does: a key tapped off-centre read as the one next to it (061-neighbour-correction)
+    @Test
+    fun aShortStrokesTapCarriesWhereTheFingerCameDown() {
+        harness(KeyboardHarness.PINYIN)
+        typed("hao")
+        h.api.touches.clear()
+        val s = h.key("s")
+        // down 10dp left of the middle, toward a; a stroke started (12dp) but lifted 15dp off, short of the lift distance (24dp)
+        h.touch(s, h.at(s, -10f, 0f), h.at(s, -4f, 0f, 16), h.at(s, 2f, 0f, 16), h.at(s, 5f, 0f, 16))
+        assertTrue(strokesSent().toString(), strokesSent().isEmpty())
+        val (key, touch) = h.api.touches.single()
+        assertTrue(key, "s" in key)
+        assertEquals(-10f, touch.dx * touch.widthDp, 1f)
+        assertTrue(touch.near.toString(), touch.near('a') != null)
+    }
     @Test
     @Uat("KB-101")
     fun aShortStrokeAsAnotherFingerLandsIsItsTapAndTheOtherKeyTypedToo() {

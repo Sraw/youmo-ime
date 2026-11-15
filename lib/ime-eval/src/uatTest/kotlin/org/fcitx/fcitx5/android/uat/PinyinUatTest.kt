@@ -101,7 +101,7 @@ class PinyinUatTest {
     }
 
     @Test
-    @Uat("PY-14")
+    @Uat("PY-14", "PY-139")
     fun pinyinTypedWrongStillGivesTheWord() = with(EngineReplay()) {
         for ((code, words) in listOf("zhagn" to listOf("张", "章"), "zhon" to listOf("中"), "jv" to listOf("句"), "nihso" to listOf("你好"))) {
             type(code)

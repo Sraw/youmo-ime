@@ -185,7 +185,7 @@ as they were for the full keyboard to be scored on, read with `--scheme <scheme>
 take is a usage error, exit 2), `english-glide` (glide
 typing on simulated paths, `--wobble` the key-width noise), `pinyin-glide` (the same per dictionary word
 of a pinyin set; `--shuangpin <scheme>`, `--keys nine`, `--table <table.data>`, `--word <pinyin>` one
-clean path's readings), `tune` (penalties); `pinyin --typos off` reads no common slip (`zhagn`, 双拼's `jv`), as with 纠错 off, `score` (compare a result with a baseline), `handwriting` (handwriting's sentence reading), `table` (a table's codes, optionally with pinyin and the models), `sentences` (each sample's sentences written out), `predict-learn` (联想 after learning; `--continuations off`: without the whole phrases, U-73), `learn-log-bench` (a heavy year's learning record opened, folded and opened again; `--counts <pinyin.data>`: what the ranking's counts cost on that record, attached, made anew and per key typed), `predict-set` (a 联想 set made from a set), `shuangpin` (a set turned into a 双拼 scheme's keys), `slips` (a set with slips put in; `--scheme <双拼 scheme>`: typed in that scheme, its fuzzy partners, ü typed with its own key and a key slipped onto its neighbour), `chars` (the data's characters), `lm` (a sentence model's scores of texts);
+clean path's readings), `tune` (penalties); `pinyin --typos off` reads no common slip (`zhagn`, 双拼's `jv`), as with 纠错 off; `pinyin --touch <keyboard>:<hand>:<clean|slip>[:<seed>]` taps each key with a place (`TouchSim`: qwerty, qwerty-ms, nine, k14, k18 (laid out as GroupedKeyboard lays the 18 keys); a hand `s<σ>[down]` or `s<σ>/<dx>/<dy>/<halves>` in key widths), `clean` each in its own key, `slip` one key a sample landed on a neighbour, and `--touched <set.tsv>` writes the set so tapped, each key's `Touch.text` in a fifth column, for `run-on-device.sh` to type the same (061-neighbour-correction), `score` (compare a result with a baseline), `handwriting` (handwriting's sentence reading), `table` (a table's codes, optionally with pinyin and the models), `sentences` (each sample's sentences written out), `predict-learn` (联想 after learning; `--continuations off`: without the whole phrases, U-73), `learn-log-bench` (a heavy year's learning record opened, folded and opened again; `--counts <pinyin.data>`: what the ranking's counts cost on that record, attached, made anew and per key typed), `predict-set` (a 联想 set made from a set), `shuangpin` (a set turned into a 双拼 scheme's keys), `slips` (a set with slips put in; `--scheme <双拼 scheme>`: typed in that scheme, its fuzzy partners, ü typed with its own key and a key slipped onto its neighbour), `chars` (the data's characters), `lm` (a sentence model's scores of texts);
 run `ime-eval` with no arguments for the full usage.
 
 A change to `merged.ymd`'s layout or reader is gated per key: `ime-eval pinyin <pinyin.data> <set.tsv>
@@ -207,7 +207,8 @@ fixture) and `WordCardUatTest` (`:lib:ime-eval:uatTest`: the first 100 of `pinyi
 `misreadings.tsv` word, both styles) hold the card's readings to `Snapshot.readings`, a code point at a time.
 
 `run-on-device.sh` runs a set through the APK's own engine on a device, for checking that the app
-decodes as the tool does.
+decodes as the tool does (`NINE=1`: a set of digits typed as pinyin's nine keys send them; `GROUPED=14` or `18`: a
+set of the 14 or 18 keys' codes as those keys send them).
 
 Roborazzi goldens (`app/src/test/screenshots/`) show the bar with its microphone and the space's
 voice hint: since 0.6.0 there is one build, and voice is everyone's default (the voice pack's absence

@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.reading.CandidateCard
 import org.fcitx.fcitx5.android.engine.reading.CardReading
 import org.fcitx.fcitx5.android.engine.reading.CharCard
@@ -278,9 +279,13 @@ class FakeHostApi : HostApi {
         if (ms > 0) kotlinx.coroutines.delay(ms)
     }
 
-    override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int) {
+    /** Each key sent with a tap's place, and the place ([TypingApi.sendKey]'s touch). */
+    val touches = ArrayList<Pair<String, Touch>>()
+
+    override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int, touch: Touch?) {
         slow()
         calls += "sendKey(key=$key, states=$states, code=$code, up=$up)"
+        if (touch != null) touches += key to touch
     }
 
     override suspend fun sendKey(c: Char, states: UInt, code: Int, up: Boolean, timestamp: Int) {
@@ -294,10 +299,11 @@ class FakeHostApi : HostApi {
     }
 
     override suspend fun sendKey(
-        sym: KeySym, states: KeyStates, code: Int, up: Boolean, timestamp: Int
+        sym: KeySym, states: KeyStates, code: Int, up: Boolean, timestamp: Int, touch: Touch?
     ) {
         slow()
         calls += "sendKey(sym=${sym.sym}, states=${states.states}, code=$code, up=$up)"
+        if (touch != null) touches += "sym=${sym.sym}" to touch
     }
 
     override suspend fun select(idx: Int, text: String?): Boolean {

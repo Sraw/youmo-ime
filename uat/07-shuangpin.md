@@ -104,6 +104,42 @@
 - **预期**：固定以后 k y 第一个是「可以」；选过两次以后「可以」比原来靠前，在第一页。在这串键上做的事按做的时候的读法算；别的拼法学到的词、手动加的词仍不按单个声母提上来（SP-34、SP-35）。
 - **JVM**：`ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
+### SP-38 [P1] 双拼小鹤：按偏的键按落点读
+- **前提**：B0-双拼，方案换成小鹤（SP-02）。
+- **操作**：点 `t`，再点 `q` 靠下边缘（靠 `a`），看候选，删光；点 `t`，再点 `s` 靠左边缘（靠 `a`），看候选，删光；同样两串键都点在正中各打一遍。
+- **预期**：`t q`（tiu 拼不成）首选「他」；`t s`（原样是 tong，也合法）候选里有「他」，点得越靠 `a` 越靠前；两串点在正中时，`t q` 不出 ta 的读法，`t s` 的首选和关掉 **纠正错拼和按偏的键** 时一样。
+- **JVM**：`NeighbourSlipTest.shuangpinReadsTwoKeysWithOneSlippedWhereTapped`、`eachShuangpinSchemeReadsTheKeyTappedTowards`（小鹤、自然码、微软）、`aSlipCostsByHowFarTheTapIsFromTheKeyMeant`；设备上不跑。
+
+### SP-39 [P1] 双拼自然码：按偏的键按落点读
+- **前提**：B0-双拼（自然码）。
+- **操作**：点 `t`，再点 `q` 靠下边缘（靠 `a`），看候选，删光；点 `t`，再点 `s` 靠左边缘（靠 `a`），看候选，删光；同样两串键都点在正中各打一遍。
+- **预期**：`t q`（tiu 拼不成）首选「他」；`t s`（原样是 tong，也合法）候选里有「他」，点得越靠 `a` 越靠前；两串点在正中时，`t q` 不出 ta 的读法，`t s` 的首选和关掉 **纠正错拼和按偏的键** 时一样。
+- **JVM**：`NeighbourSlipTest.eachShuangpinSchemeReadsTheKeyTappedTowards`（小鹤、自然码、微软）、`aSlipCostsByHowFarTheTapIsFromTheKeyMeant`；设备上不跑。
+
+### SP-40 [P1] 双拼微软：按偏的键按落点读
+- **前提**：B0-双拼，方案换成微软。
+- **操作**：点 `t`，再点 `q` 靠下边缘（靠 `a`），看候选，删光；点 `t`，再点 `s` 靠左边缘（靠 `a`），看候选，删光；同样两串键都点在正中各打一遍。
+- **预期**：`t q`（tiu 拼不成）首选「他」；`t s`（原样是 tong，也合法）候选里有「他」，点得越靠 `a` 越靠前；两串点在正中时，`t q` 不出 ta 的读法，`t s` 的首选和关掉 **纠正错拼和按偏的键** 时一样。
+- **JVM**：`NeighbourSlipTest.eachShuangpinSchemeReadsTheKeyTappedTowards`（小鹤、自然码、微软）、`aSlipCostsByHowFarTheTapIsFromTheKeyMeant`；设备上不跑。
+  微软的 `;` 是韵母键：`l` 点在靠 `;` 的边上，可以读成 `;`；在音节开头想按 `l` 却按到 `;` 时 `;` 照旧上屏成标点（已知限制）。
+
+### SP-41 [P1] 双拼的中间简拼：声母点在正中不读成按偏
+- **前提**：B0-双拼（自然码）。
+- **操作**：每个键点在正中，打首字全码、后面声母的一串（例如 n i k w l：你看完了）；删光，再打一遍，其中 `w` 点在靠 `e` 的边上。
+- **预期**：第一次首选和关掉 **纠正错拼和按偏的键** 时一样，候选里没有把相邻两个声母读成一个按偏的音节；第二次按偏的读法可以出现，但不是首选（照简拼读的排在前面）。
+- **JVM**：`NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle`；设备上不跑。
+
+### SP-42 [P1] 编码行显示纠正后的拼写
+- **前提**：B0-双拼（小鹤）。
+- **操作**：点 `t`，再点 `q` 靠下边缘（靠 `a`），看编码行；到 **外观 → 大小与样式 → 编码行** 选「输入框里（实验性）」，回来再打一遍，看输入框。
+- **预期**：两次都显示 `ta`（纠正后的拼音），不是 `tiu` 或原键。
+- **JVM**：`PinyinSessionSlipTest.shuangpinsCodeShowsTheSyllableAsMeant`；设备上不跑。
+
+### SP-47 [P1] 双拼小鹤：照真坐标点在键边上，按偏的键读出；点在正中不读
+- **前提**：B0-双拼，方案换成小鹤（SP-02）。
+- **操作**：点 `t`，再点 `q` 的右下角（键宽 85%、键高 95% 处，靠 `a`：`a` 的中间在 `q` 右边缘的正下方），看编码行和候选，删光；两个键都点在正中再打一遍，看编码行。
+- **预期**：第一次编码行是 `ta`、首选「他」（tiu 拼不成，`q` 读成 `a`）；第二次编码行是 `t q`（两个声母），不是 `ta`。
+
 ## 18 键和九键双拼
 
 前提 **B0-18键** / **B0-九键双拼**：B0，在 **输入法** 里添加"双拼"，在 **输入法 → 双拼** 里把 **键盘** 选成「18 键」/「九键」，回测试页点「普通文本」框，换到双拼（README「基线状态」）。下面「点 WE」指点键面是 WE 的那个键；18 键是 `Q WE RT Y U IO P` / `A SD FG H JK L` / `Z XC V BN M`（微软是 L;）。

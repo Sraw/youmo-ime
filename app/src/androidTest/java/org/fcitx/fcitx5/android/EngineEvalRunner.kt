@@ -18,9 +18,14 @@ import kotlinx.coroutines.withTimeout
 import org.fcitx.fcitx5.android.core.EngineBridge
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.HostInstance
+import org.fcitx.fcitx5.android.core.KeyStates
+import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.KotlinHost
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.store.RecordFormat
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.junit.Assert.assertEquals
@@ -46,6 +51,13 @@ class EngineEvalRunner {
 
     private var unrefined = 0
 
+    // -e evalNine true: digits as pinyin's nine keys send them, codes of their own (Keyboard.pinyinNineKey)
+    private var nine = false
+
+    // -e evalGrouped 14|18: a set's codes as pinyin's 14 keys send them (the group's code itself) or its 18 keys (codes of
+    // their own, Keyboard.pinyin18Key), as GroupedKeyboard wires them
+    private var grouped: String? = null
+
     @Test
     fun run() {
         val args = InstrumentationRegistry.getArguments()
@@ -53,13 +65,16 @@ class EngineEvalRunner {
         assumeTrue("pass -e evalSet <name> to run", set != null)
         checkThisInputMethodIsNotBound()
         val ime = args.getString("evalIme") ?: InputMethodCatalog.PINYIN
+        nine = args.getString("evalNine") == "true"
+        grouped = args.getString("evalGrouped")?.also { require(it == "14" || it == "18") { "evalGrouped $it" } }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val samples = testContext.assets.open("$set.tsv").bufferedReader().useLines { lines ->
             lines.filter { it.isNotBlank() && !it.startsWith("#") }.map { line ->
-                // input<TAB>expected<TAB>tag[<TAB>context], as EvalSet reads it
+                // input<TAB>expected<TAB>tag[<TAB>context[<TAB>touches]], as EvalSet reads it: each key's touch a space
+                // apart, `-` none (pinyin --touch … --touched writes them; 061-neighbour-correction)
                 val fields = line.split('\t')
-                Sample(fields[0], fields.getOrElse(3) { "" })
+                Sample(fields[0], fields.getOrElse(3) { "" }, fields.getOrNull(4)?.split(' ')?.map(Touch::parse))
             }.toList()
         }
         val dir = checkNotNull(context.getExternalFilesDir("eval")) { "external storage unavailable" }
@@ -136,9 +151,16 @@ class EngineEvalRunner {
         // after the reset, as the service tells it
         if (sample.context.isNotEmpty()) fcitx.engineContext(sample.context)
         fcitx.isEmpty()
-        val latencies = sample.input.map { c ->
+        val latencies = sample.input.mapIndexed { i, c ->
             val start = SystemClock.elapsedRealtimeNanos()
-            fcitx.sendKey(c)
+            val touch = sample.touches?.getOrNull(i)
+            when {
+                nine -> fcitx.sendKey(KeySym(UNICODE + Keyboard.pinyinNineKey(c)), KeyStates.Virtual, touch = touch)
+                grouped == "14" -> fcitx.sendKey(KeySym(UNICODE + c.code), KeyStates.Virtual, touch = touch)
+                grouped == "18" -> fcitx.sendKey(KeySym(UNICODE + Keyboard.pinyin18Key(c)), KeyStates.Virtual, touch = touch)
+                touch != null -> fcitx.sendKey(c.toString(), touch = touch)
+                else -> fcitx.sendKey(c)
+            }
             val micros = (SystemClock.elapsedRealtimeNanos() - start) / 1000
             fcitx.isEmpty()
             micros
@@ -178,7 +200,7 @@ class EngineEvalRunner {
     }.toList()
 
     /** A line of an evaluation set as it is typed: [input] after [context], the text before the cursor ("" for none). */
-    private data class Sample(val input: String, val context: String)
+    private data class Sample(val input: String, val context: String, val touches: List<Touch?>? = null)
 
     private companion object {
         const val UID = 0

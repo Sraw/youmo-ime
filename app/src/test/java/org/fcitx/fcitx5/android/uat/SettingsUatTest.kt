@@ -296,7 +296,7 @@ class SettingsUatTest {
     private fun listed(title: Int) = st.pref(title) as ListPreference
 
     @Test
-    @Uat("ST-33")
+    @Uat("ST-33", "ST-136")
     fun everyInputMethodsPageAndTheSharedOnes() {
         val c = InputMethodCatalog
         pages()
@@ -317,8 +317,9 @@ class SettingsUatTest {
         assertEquals(groups, st.titles().filter { it in groups })
         // 在键上划: the choice alone, which input methods each choice reaches the docs say
         assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
-        // 双拼's 18 and 14 keys too: they read no slip, ü typed with its own key either
-        assertTrue(summary(R.string.im_typos).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.SHUANGPIN_KEYS18, c.SHUANGPIN_KEYS14, c.SHUANGPIN_NINE, c.ZHUYIN_NINE, c.ZHUYIN)))
+        // 双拼's 18, 14 and nine keys: they read no slip, ü typed with its own key either; pinyin's nine, 14 and 18
+        // keys do (061-neighbour-correction)
+        assertTrue(summary(R.string.im_typos).endsWith(notFor(c.SHUANGPIN_KEYS18, c.SHUANGPIN_KEYS14, c.SHUANGPIN_NINE, c.ZHUYIN_NINE, c.ZHUYIN)))
         // no 不适用 line names English: the Chinese section's title says it for its rows, and every input
         // method's other rows are English's too
         val chinese = st.preferences().map { it.summary.toString() }
@@ -360,7 +361,7 @@ class SettingsUatTest {
     }
 
     @Test
-    @Uat("ST-40")
+    @Uat("ST-40", "ST-137")
     fun pinyinsKeyboardOnItsPageAndTheSharedOptionsSayingFourteenKeys() {
         val c = InputMethodCatalog
         val setting = AppPrefs.getInstance().keyboard.pinyinKeyboard
@@ -373,7 +374,8 @@ class SettingsUatTest {
             assertTrue(keyboard.summary.toString().contains(s(R.string.pinyin_keyboard_summary)))
             for (t in listOf(R.string.im_chaizi, R.string.im_latin_words)) assertTrue(summary(t), summary(t).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.ZHUYIN_NINE, c.ZHUYIN)))
             open(SettingsRoute.SharedInput)
-            assertTrue(summary(R.string.im_typos), c.PINYIN_KEYS.let { InputMethodNames.of(activity, it, it) } in summary(R.string.im_typos))
+            // 双拼's 14 keys named where the slips are not read, pinyin's not (061-neighbour-correction)
+            assertTrue(summary(R.string.im_typos), c.SHUANGPIN_KEYS14.let { InputMethodNames.of(activity, it, it) } in summary(R.string.im_typos))
             im(c.PINYIN)
             val keys14 = PinyinKeyboard.Keys14
             listed(R.string.pinyin_keyboard).let { if (it.callChangeListener(keys14.name)) it.value = keys14.name }

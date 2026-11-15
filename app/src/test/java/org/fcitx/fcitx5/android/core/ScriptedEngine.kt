@@ -17,6 +17,9 @@ import java.util.Collections
 /** Pinyin as far as a case needs: the letters typed are the preedit, two candidates, a pick commits one. */
 class ScriptedEngine(private val home: File) : KotlinHost.EngineSide, EngineHost {
     val events: MutableList<Int> = Collections.synchronizedList(ArrayList())
+
+    /** Each character key's payload, as the host handed it on ([EngineHost.event]'s). */
+    val payloads: MutableList<Action?> = Collections.synchronizedList(ArrayList())
     val settings: MutableList<EngineSettings> = Collections.synchronizedList(ArrayList())
     private var typed = ""
 
@@ -31,6 +34,7 @@ class ScriptedEngine(private val home: File) : KotlinHost.EngineSide, EngineHost
 
     override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot {
         events += event
+        if (event == EngineEvent.CHAR) payloads += payload
         var commit = ""
         when (event) {
             EngineEvent.CHAR -> if (arg !in 'a'.code..'z'.code) {

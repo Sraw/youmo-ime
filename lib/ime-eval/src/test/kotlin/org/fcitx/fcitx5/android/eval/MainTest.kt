@@ -144,8 +144,10 @@ class MainTest {
             arrayOf("pinyin", "d", "s", "r", "--scheme", "nope"),
             arrayOf("pinyin", "d", "s", "r", "--color", "red"),
             arrayOf("pinyin", "d", "s", "r", "--neighbours", "maybe"),
-            arrayOf("pinyin", "d", "s", "r", "--scheme", "ms", "--neighbours", "on"), // 双拼 reads none
-            arrayOf("pinyin", "d", "s", "r", "--scheme", "t9", "--neighbours", "on"), // nor the nine keys
+            arrayOf("pinyin", "d", "s", "r", "--scheme", "zy", "--neighbours", "on"), // zhuyin reads none
+            arrayOf("pinyin", "d", "s", "r", "--touch", "qwerty:s0.2"), // clean or slip
+            arrayOf("pinyin", "d", "s", "r", "--touch", "dvorak:s0.2:clean"), // no such keyboard
+            arrayOf("pinyin", "d", "s", "r", "--touch", "qwerty:s0.2:clean", "--taps", "sigma0.2:1", "--scheme", "g14"), // not both
             arrayOf("pinyin", "d", "s", "r", "--threads", "0"),
             arrayOf("pinyin", "d", "s", "r", "--stale"), // stale is a merged dictionary's
             arrayOf("pinyin", "d", "s", "r", "--beam", "x"),

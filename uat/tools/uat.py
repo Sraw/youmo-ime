@@ -2082,6 +2082,31 @@ def has_keyboard_code(t):
     return any(unicodedata.category(c) == "Co" for c in t or "")
 
 
+def keys_at(d, keys, at, after=0.6):
+    """tap the letter or digit keys of keys one by one, the key at i where at[i] says: None its centre, or (fx, fy)
+    within its bounds (0 its left or top edge, 1 its right or bottom), a finger off the middle toward a key
+    beside it (061-neighbour-correction)"""
+    if len(at) != len(keys):
+        raise ValueError(f"at {at} for {keys}")
+    k = d.keys(refresh=True)
+    s = d.screen()
+    pts = []
+    for ch, place in zip(keys, at):
+        if ch not in k:
+            raise Blocked(f"键盘上没有 {ch}：{sorted(k)[:20]}")
+        if place is None:
+            pts.append(k[ch])
+            continue
+        # the key's node by its centre (the nine keys' digit is no text of theirs)
+        kb = s.find(rid="keyboard_view", where="ime")
+        n = next((m for m in (kb.walk() if kb else []) if m.clickable and m.c == k[ch]), None)
+        if not n:
+            raise Blocked(f"键盘上没有 {ch} 的边界")
+        fx, fy = place
+        pts.append((int(n.b[0] + (n.b[2] - n.b[0]) * fx), int(n.b[1] + (n.b[3] - n.b[1]) * fy)))
+    d.taps(pts, gap=0.3, after=after)
+
+
 def grouped_keys(d, groups, *, after=0.6, at=None, drift=None):
     """tap the 14 or 18 keys by their letters ("bn ui gh"), a key a word; "'" is the separator key.
     at: where across each key to tap, a value a word (0 its left edge, 1 its right; None its centre),

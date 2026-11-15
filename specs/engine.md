@@ -114,7 +114,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    middle, as Rime's `abbrev`, at `Penalties.abbrev` (−2) on top of the initial's −1, the least that
    left input in whole syllables reading as before, dev/design/061-shuangpin-abbrev-measure.md;
    `ime-eval pinyin --sp-abbrev off` reads without it; what asks how the user typed reads the
-   graph without them, `SyllableGraph.withoutAbbreviations`: whether the input ends on a syllable
+   graph without them nor slips onto a neighbouring key, `SyllableGraph.withoutOtherReadings`: whether the input ends on a syllable
    (`endsOnSyllable`), whether `;` ends one (`readsAfter`), and a code `readsWhole` is the user's
    whole syllables to `HabitOrder` and `Retype` too: under `xm` (xian) a word used under
    other keys or added by hand that x'm spells does not come up, while what is pinned, first or used
@@ -124,6 +124,35 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    is `H`. The 2026-10-12 hybrid, read as keys too with a `Penalties.tapped`, went 2026-10-19: a
    learned 广告 overrode the h the key's preview showed). The 14 keys (拼音 14 键) are the same
    segmenter over a grouped layout: see [The 14 keys](#the-14-keys-grouped-keys) below.
+
+   **Keys tapped off-centre** (纠正错拼和按偏的键; dev/design/061-neighbour-correction.md). A typing key's
+   tap carries a `Touch` (pinyin/Touch.kt): where it fell across the key (`dx`, `dy`, ±0.5 its edges),
+   the key's size in dp and the keys around it (`Near`: what each types, its centre and size in the
+   tapped key's units). Where it fell is where the finger came down (`KeyGesture.fellAt`/`fellDown`),
+   for a tap that slid past the slop or out of the key too (the 14 keys' place on the key, `clickAt`,
+   stays NaN for those). The app measures it (`withTouch`, TypingKeys.kt, for the keyboards that are `TypingKeys`, from the keys drawn, by
+   `KeyBoxes.touch`: the next keys in the row and those of the rows above and below overlapping it;
+   a key on both halves of a split keyboard is the copy nearest), `HostKeyAction`/`SymAction` carry
+   it, the host passes it on as the key's payload (`Action.Key.touch`), `PressedKeys` keeps it by
+   place and `Segmenter.segment(input, taps, touches)` reads it. `SlipCost.of` scores reading a key as
+   one around it: the log of how much likelier the tap is under a finger aimed at it than at the key
+   hit (round Gaussians of σ 10 dp), never above 0, −2 more where the keys as typed spell a syllable
+   too (a legal slip, `ta` near `y`), none below −4 (−3 on the nine keys' digits: below it they cost the 6T more than
+   061-neighbour-correction §7.2 allows, below). So a tap in a key's middle reads as typed and
+   one at its edge reads the neighbour too. 全拼 (`PinyinSegmenter`: `SpellingIndex` has every
+   one-letter substitution, the segmenter keeps those the touches allow; never a syllable still
+   growing at the end of the input, nor consonants alone where tapped in the middle, 简拼 being
+   read), 双拼 on the full keyboard (`ShuangpinSegmenter`), 九键 (`T9Segmenter`, 1 and 0 no
+   neighbours) and the pinyin 14/18 keys (`T9Segmenter` over the groups, a tap put onto the key
+   meant at its edge nearest the key hit; 18 keys unweighted, the user's) read slips; 双拼's grouped
+   keyboards do not. A key with no place (a hardware keyboard, TalkBack's double tap): 全拼 reads a
+   slip only where the keys spell nothing (the 0.6.0 rule, `SlipCost.fixed`) and never consonants
+   alone; the others none. The decoder adds the slip's cost in the arc's score where it scores the syllable (`step`,
+   `startWords`), so `Lattice.same` sees it and a kept lattice is dropped where it changed; an arc over
+   a slip is marked as one over a 简拼 in the middle is (`ABBREVIATED`), which what reads the input
+   as typed in whole syllables leaves out (`takes()`, as `withoutOtherReadings` does in the graph); a code shows the syllable as meant (`Reading.slips`), and a word read
+   through a slip is learned under the keys meant (`CommitRecorder`, `PressedKeys.keys(…, slips)`),
+   so what the keys typed read as typed is not raised by it (user's N1-A).
 2. **Decode.** `PinyinDecoder` puts every dictionary word along every path into a lattice and beam
    searches it, scoring each step by `WordScorer` (the n-gram model, through `UserScorer` with the
    user's counts added; a word of the user's whose text the model has, added by hand or typed at a
@@ -145,7 +174,9 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    `PinyinDecoder.work` counts what a decode took (arcs; steps, which guard `collectOn`; words scored
    in the search; first words scored anew, which guard the scores kept), the same on any
    machine: `ShuangpinKeyWorkTest` (`:lib:ime-eval:uatTest`) holds a 小鹤 key on the app's data
-   under ceilings by it, and each key's reading to a decoder's made afresh.
+   under ceilings by it, and each key's reading to a decoder's made afresh; `NeighbourKeyWorkTest`
+   holds the keys read by where they were tapped (full pinyin, 小鹤, 九键, 14 keys, clean taps) to a
+   tenth over the same input with no place (061-neighbour-correction §7.2; it was 3.5% at most).
 3. **Rank.** At `ModelLevel.MEDIUM` and up, `Reranker` adds the 4M sentence model's score of the
    decoder's best whole-input readings (after the text before the cursor) to the decoder's score;
    at `HIGH`, while the user pauses, the 25M model refines the top readings in time slices
@@ -546,7 +577,7 @@ are offered where nothing is learned (a password field, `Session.learning` false
   and `t9:*` as the nine keys are from full pinyin; the words and their counts are shared. The kind
   and the codes are the record's format: never changed once in a release. 「已学条目」 names `qk:` as
   「14 键」 and shows its keys as letters (`bn ui`, `NineKeyLetters.shown`).
-- **What does not apply**: typos and neighbouring keys, glide, 拆字, 中英混输 (the hardware keyboard
+- **What does not apply**: typos (keys tapped off-centre are read, see Segment above), glide, 拆字, 中英混输 (the hardware keyboard
   still has the last two). Fuzzy pinyin, u↔v included, does; so do `rq`/`sj`/`xq` and the custom
   phrases' keys, typed as their letters' keys (`PhraseKeys`, A1).
 
@@ -1185,3 +1216,14 @@ alone. What is left is the reading itself: a 小鹤 key in whole syllables score
 where it scored 2,900 on 540 (`ShuangpinKeyWorkTest` prints them and holds them a quarter above:
 483 steps, 595 by initials; 114 and 127 first words scored anew), nearly all of them dropped by the model's score, which nothing cheaper
 bounds. So a slow phone is measured on the phone, and by counts where a time would not hold still.
+
+Keys tapped off-centre on the 6T (`EngineEvalRunner` with `-e evalNine true` for the digits, each key's
+`Touch` of `ime-eval --touch …:s0.2:clean --touched`, 30 samples of 60 keys, learned data on, 2026-11-14/15;
+a Chrome process took 75% of a core throughout, so rounds of one build differ by 2 ms): keys 41–60, the median
+of the rounds' p50 and p95, the feature against its base (946a4ab04): 全拼 +0.9/+1.3 ms, 小鹤 whole −0.3,
+initials −0.1, 九键 at floor −4 +2.7/+3.1 (19.7 → 22.4), at −3 +1.4/−0.9 (5 rounds against 5). The nine keys'
+cost was not the decoder: a touch gives nearly every graph a slip, so `HabitOrder.ranksHere` walked the
+code read whole once a candidate, a key (`readsAlong`), and `words` read each candidate's words again
+(host, through `PinyinSession`: `reading` 63k → 212k calls, 1.5M → 3.4M steps). Each word at its place is
+now read once an order (`Readings`), and walked on the code read whole only where its reading goes over an
+edge read otherwise (`Reading.otherwise`): 107k calls, 1.7M steps with touches.

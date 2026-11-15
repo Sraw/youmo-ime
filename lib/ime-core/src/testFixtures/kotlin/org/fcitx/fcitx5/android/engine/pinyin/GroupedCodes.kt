@@ -13,6 +13,9 @@ fun g14Code(first: Char): Char = (NineKeyLetters.G14_BLOCK.first + (first - 'a')
 /** The 14 keys' codes for [keys], groups by their letters a space apart (`"bn ui"`); `'` as itself. */
 fun g14(keys: String): String = keys.split(' ').joinToString("") { if (it == "'") it else g14Code(it[0]).toString() }
 
+/** The 18 keys' codes for the keys whose first letters are [keys], separated by spaces (as [g14]). */
+fun g18(keys: String): String = keys.split(' ').joinToString("") { NineKeyLetters.G18.key(it[0]).toString() }
+
 /** 九键双拼's code for its key [digit] (2 to 9). */
 fun nineSpCode(digit: Char): Char = (NineKeyLetters.NINE_SP_BLOCK.first + (digit - '2')).toChar()
 

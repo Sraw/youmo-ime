@@ -229,9 +229,9 @@ internal class HabitOrder(
         return if (go(0, 0, start)) Candidate(words.text, end, 0f, ids, ends) else null
     }
 
-    // whether a word may go on over [e] in [walk]: no raw input, nothing past [end], no key read alone where the code reads [whole]
+    // whether a word may go on over [e] in [walk]: no raw input, nothing past [end], no key read alone nor slipped where the code reads [whole]
     private fun passes(graph: SyllableGraph, e: Int, end: Int, whole: Boolean) =
-        graph.kind(e) != Kind.RAW && graph.to(e) <= end && !(whole && graph.isAbbreviation(e))
+        graph.kind(e) != Kind.RAW && graph.to(e) <= end && !(whole && graph.readsOtherwise(e))
 
     /** [words], one word of several syllables the model has not, as the fewest of the model's words; null if it is no such or they are none. */
     private fun sentence(words: Words): Words? {
@@ -263,8 +263,9 @@ internal class HabitOrder(
         return (user?.known(entry) ?: data.wordIndex.find(w.text)) >= 0
     }
 
-    // whether the code from [start] to [end] reads as whole syllables, where 双拼 reads its keys alone too
-    private fun wholeSyllables(graph: SyllableGraph, start: Int, end: Int) = graph.hasAbbreviations && graph.readsWhole(start, end)
+    // whether the code from [start] to [end] reads as whole syllables, where it reads otherwise too (双拼's keys alone, a key slipped):
+    // a legal slip (`ta` tapped near y, 呀) raises no word the user's habits or own words have under another code (061-neighbour-correction §8.2)
+    private fun wholeSyllables(graph: SyllableGraph, start: Int, end: Int) = graph.hasOtherReadings && graph.readsWhole(start, end)
 
     // a word of one piece with no reading: the decoder's arc, if it reads all of it
     private fun startWord(graph: SyllableGraph, start: Int, end: Int, id: Int, words: Words, whole: Boolean): Candidate? =
@@ -369,17 +370,20 @@ internal class HabitOrder(
         val putIn = levels.flatMap { it.injected }.mapTo(HashSet()) { it.text }
         val list = read.filterTo(ArrayList()) { it.text !in putIn }
         val ranks = HashMap<Candidate, HabitRanker.Ranked<Candidate>>()
+        // the candidates' words are mostly the same words at the same places (the sentences share most of theirs): each read
+        // once an order, not once a candidate, a walk of the graph each (on a phone a key's slips' graph took 6 ms of 25 so)
+        val readings = Readings()
         for ((k, level) in levels.withIndex()) {
             val at = if (k == 0) list.indexOfLast { it in sentences } + 1 else place(list, level.end, pageSize)
             list.addAll(at, level.injected)
             // a code read whole ranks no word only 简拼 in the middle reads (`xm`: 先, not 下面 used under
             // xwmm, nor the user's own), but for what was pinned, first or used under the code itself (ky: 可以)
-            val whole = if (wholeSyllables(graph, graph.start, level.end)) graph.withoutAbbreviations() else null
-            val slots = list.indices.filter { list[it].end == level.end && ranksHere(list[it], level, whole) }
+            val whole = if (wholeSyllables(graph, graph.start, level.end)) graph.withoutOtherReadings() else null
+            val slots = list.indices.filter { list[it].end == level.end && ranksHere(graph, list[it], level, whole, readings) }
             val injected = level.injected.toHashSet()
             // whether a word reads the keys exactly is asked only where an imported word needs its slot
             val imports = slots.any { imported(list[it]) }
-            val items = slots.map { item(graph, list[it], list[it] in injected, level.habitsHere, imports) }
+            val items = slots.map { item(graph, list[it], list[it] in injected, level.habitsHere, imports, readings) }
             val ranked = HabitRanker.rank(items, level.code, level.prev, view)
             for ((i, r) in ranked.withIndex()) {
                 list[slots[i]] = r.value
@@ -395,10 +399,10 @@ internal class HabitOrder(
         return slots.lastOrNull { it < pageSize }?.plus(1) ?: slots.firstOrNull() ?: list.size
     }
 
-    private fun item(graph: SyllableGraph, c: Candidate, injected: Boolean, habitsHere: Boolean, imports: Boolean): HabitRanker.Item<Candidate> {
+    private fun item(graph: SyllableGraph, c: Candidate, injected: Boolean, habitsHere: Boolean, imports: Boolean, readings: Readings): HabitRanker.Item<Candidate> {
         val letters = NO_WORD in c.words
         // no habit under the code: its words' readings matter to none, the user's own words go by their text
-        val words = if (letters || !habitsHere) Words.of(c.text) else words(graph, c) ?: Words.of(c.text)
+        val words = if (letters || !habitsHere) Words.of(c.text) else words(graph, c, readings) ?: Words.of(c.text)
         val single = c.text.codePointCount(0, c.text.length) == 1 && Han.all(c.text)
         val imported = imported(c)
         return HabitRanker.Item(
@@ -408,16 +412,33 @@ internal class HabitOrder(
     }
 
     // whether [c] takes a slot of [level]: anything where the code is not read whole ([whole] null), else what reads along [whole] or was [Level.recorded] there
-    private fun ranksHere(c: Candidate, level: Level, whole: SyllableGraph?) = whole == null || c.text in level.recorded || readsAlong(whole, c)
+    private fun ranksHere(graph: SyllableGraph, c: Candidate, level: Level, whole: SyllableGraph?, readings: Readings) =
+        whole == null || c.text in level.recorded || readsAlong(graph, whole, c, readings)
 
-    // whether each word of [c] reads along [graph] from its start: on one without 简拼 in the middle, whether the code typed whole reads it
-    private fun readsAlong(graph: SyllableGraph, c: Candidate): Boolean {
-        var from = graph.start
+    /**
+     * Whether each word of [c] reads along [whole] ([graph] without 简拼 in the middle nor slips, nor what only they
+     * reach) from its start: whether the code typed whole reads it. A word [graph] reads over no edge read otherwise,
+     * from a place the words before reached along [whole], reads along [whole] so, and one [graph] does not read does
+     * not; only the others are walked on [whole]. Past text kept as typed ([NO_WORD], an arc over any edge, a slip's
+     * too) the place may be one only a slip reaches, so the next word is walked. Internal for the test that holds it
+     * to the walk of every word (HabitOrderReadsAlongTest).
+     */
+    internal fun readsAlong(graph: SyllableGraph, whole: SyllableGraph, c: Candidate, readings: Readings): Boolean {
+        var from = whole.start
+        // whether [from] was reached along [whole]
+        var sure = true
         for (i in c.words.indices) {
             val word = c.words[i]
-            val own = user?.takeIf { word >= data.vocabulary.size }
-            if (word != NO_WORD && reading(graph, from, c.ends[i], word, data.dictionary, own) { _, _ -> "" } == null) return false
-            from = c.ends[i]
+            val to = c.ends[i]
+            if (word == NO_WORD) {
+                sure = false
+            } else {
+                val r = readings.reading(from, to, word) { spelt(graph, from, to, word) } ?: return false
+                val walked = r.otherwise || !sure
+                if (walked && !readings.along(from, to, word) { reading(whole, from, to, word, data.dictionary, ownOf(word)) { _, _ -> "" } != null }) return false
+                sure = true
+            }
+            from = to
         }
         return true
     }
@@ -440,19 +461,48 @@ internal class HabitOrder(
     // a Latin run read as letters (U-27): spelt as letters, never a syllable of pinyin
     private fun String.isLatin() = isNotEmpty() && split(' ').all { s -> Syllables.id(s).let { it >= 0 && LatinWords.isLetter(it) } }
 
-    /** [c]'s words as the learning record files them: each read along [graph]; null if one is not. */
-    fun words(graph: SyllableGraph, c: Candidate): Words? {
+    /** [c]'s words as the learning record files them: each read along [graph] (each once in [read]); null if one is not. */
+    private fun words(graph: SyllableGraph, c: Candidate, readings: Readings): Words? {
         var from = graph.start
         val out = ArrayList<Word>(c.words.size)
         for (i in c.words.indices) {
             val word = c.words[i]
             if (word == NO_WORD) return null
-            val own = user?.takeIf { word >= data.vocabulary.size }
-            val r = reading(graph, from, c.ends[i], word, data.dictionary, own) { _, s -> Syllables.spelling(s) } ?: return null
-            out += Word(if (own != null) own.text(word) else data.vocabulary.word(word), Syllables.spelled(r.syllables))
+            val r = readings.reading(from, c.ends[i], word) { spelt(graph, from, c.ends[i], word) } ?: return null
+            out += Word(ownOf(word)?.text(word) ?: data.vocabulary.word(word), Syllables.spelled(r.syllables))
             from = c.ends[i]
         }
         return Words(out)
+    }
+
+    // [word] read along [graph] from [from] to [to], each syllable spelt
+    private fun spelt(graph: SyllableGraph, from: Int, to: Int, word: Int) =
+        reading(graph, from, to, word, data.dictionary, ownOf(word)) { _, s -> Syllables.spelling(s) }
+
+    // the user's trie for the user's words
+    private fun ownOf(word: Int) = user?.takeIf { word >= data.vocabulary.size }
+
+    // what [readsAlong] and [words] found of a word at its place: [reading] on an order's graph, [along] on its part read whole
+    internal class Readings {
+        private val along = HashMap<Long, Boolean>()
+        private val readings = HashMap<Long, Reading?>()
+
+        fun along(from: Int, to: Int, word: Int, read: () -> Boolean): Boolean = along.getOrPut(key(from, to, word), read)
+
+        fun reading(from: Int, to: Int, word: Int, read: () -> Reading?): Reading? {
+            val k = key(from, to, word)
+            return if (readings.containsKey(k)) readings[k] else read().also { readings[k] = it }
+        }
+
+        // a place's two ends, each under 2^16 keys (an input is far shorter), and the word
+        private fun key(from: Int, to: Int, word: Int): Long {
+            require(from in 0 until PLACES && to in 0 until PLACES) { "a place past $PLACES keys" }
+            return from.toLong() shl 48 or (to.toLong() shl 32) or (word.toLong() and 0xffffffffL)
+        }
+
+        private companion object {
+            const val PLACES = 1 shl 16
+        }
     }
 
     companion object {
