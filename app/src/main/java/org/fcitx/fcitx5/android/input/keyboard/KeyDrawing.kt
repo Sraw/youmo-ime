@@ -17,3 +17,14 @@ enum class KeyDrawing(override val stringRes: Int) : ManagedPreferenceEnum {
     StrokeFilter(R.string.stroke_filter),
     Off(R.string.swipe_off),
 }
+
+/**
+ * 笔画筛选灵敏度: how far from where it went down a stroke drawn must have gone, at its lift, to be one
+ * ([GlideTouch]'s lift distance); short of it, the key it came down on is tapped. In dp, stored by name;
+ * glide typing does not read it. Medium the default, from synthetic taps (dev/design/061-swipe-eval.md §一).
+ */
+enum class StrokeLift(override val stringRes: Int, val dp: Float) : ManagedPreferenceEnum {
+    High(R.string.stroke_lift_high, 20f),
+    Medium(R.string.stroke_lift_medium, 24f),
+    Low(R.string.stroke_lift_low, 28f),
+}

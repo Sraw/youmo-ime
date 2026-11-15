@@ -181,6 +181,12 @@
 - **预期**：首选「系」。划一竖后编码行是 `xi 丨`，首选「吸」，「曦」在第一页，「系」「西」不见了。点 u 后编码行是 `xi u`，笔画没了，u 照常是下一个字的声母 sh（候选里有「系数」）。18 键、九键双拼上一样（这里只在全键盘上测；18 键、九键双拼打 xi 的键码再划一竖由 JVM 测，候选顺序不比；分组键盘上发笔画见 KB-42）。
 - **JVM**：`StrokeFilterUatTest.shuangpinXiThenADownStroke`（uatTest，真数据，自然码）、`StrokeFilterUatTest.shuangpinXiOnTheGroupedKeysThenADownStroke`（18 键、九键双拼：吸、曦在，系、西不在）；设备上不跑。
 
+### SP-37 [P1] 双拼画一笔后，首选后面跟两个单字
+- **前提**：B0-双拼（自然码），另外笔画筛选；**首页至少几个单字** 是 2（默认）。
+- **操作**：打 keyi（自然码的 ke、yi），划一横，看前几个候选。
+- **预期**：同 PY-135：首选不动，紧跟着两个一横起笔的单字，挪走的词按原来的次序在它们后面。
+- **JVM**：`StrokeFilterUatTest.keyiThenAHengPutsTwoCharactersAloneRightAfterTheFirst`（双拼那一行）；设备上不跑。
+
 ### SP-26 [P1] 双拼 14 键；微软没有
 - **前提**：B0-18键，**键盘** 改成「14 键」。
 - **操作**：看键盘；点 BN 键，量编码行；打 ni hao（自然码 n i h k：点 BN UI GH JK）看候选。然后把 **方案** 改成"微软"，不收起键盘，看键盘和 **输入法 → 双拼 → 键盘**；再把方案改回自然码。

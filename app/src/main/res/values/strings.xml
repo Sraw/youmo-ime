@@ -797,6 +797,13 @@
     <string name="key_drawing">Drawing on keys</string>
     <string name="glide_typing">Glide typing</string>
     <string name="stroke_filter">Stroke filter</string>
+    <string name="stroke_lift">Stroke filter sensitivity</string>
+    <string name="stroke_lift_summary">How far a finger goes before it is a stroke, not a tap of the key. High: short strokes are read; low: a tap that slides is still a tap. Glide typing does not use it</string>
+    <string name="stroke_lift_high">High</string>
+    <string name="stroke_lift_medium">Medium</string>
+    <string name="stroke_lift_low">Low</string>
+    <string name="stroke_singles">Single characters on the first page</string>
+    <string name="stroke_singles_summary">After a stroke, this many single characters come right after the first candidate</string>
     <string name="status_punctuation_chinese">Chinese punctuation</string>
     <string name="status_punctuation_english">English punctuation</string>
     <string name="status_full_width">Full-width</string>

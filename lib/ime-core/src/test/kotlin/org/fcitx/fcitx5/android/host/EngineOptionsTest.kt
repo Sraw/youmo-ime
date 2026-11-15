@@ -130,4 +130,15 @@ class EngineOptionsTest {
         assertEquals("Off", EngineOptions().apply { load("CandidateReading=Ruby\n") }["CandidateReading"])
     }
 
+    // 首页至少几个单字: 2 till set (a 0.6.0 file has no line), 0 to 5 as stored, anything else 2
+    @Test
+    fun strokeSinglesAreTwoTillSetAndAValueOutOfRangeIsTwo() {
+        assertEquals(2, EngineOptions().toSettings().strokeSingles)
+        assertEquals(0, EngineOptions().apply { load("StrokeSingles=0\n") }.toSettings().strokeSingles)
+        assertEquals(5, EngineOptions().apply { load("StrokeSingles=5\n") }.toSettings().strokeSingles)
+        for (bad in listOf("9", "x", "-1", "")) {
+            assertEquals(bad, 2, EngineOptions().apply { load("StrokeSingles=$bad\n") }.toSettings().strokeSingles)
+        }
+    }
+
 }

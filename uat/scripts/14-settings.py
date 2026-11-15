@@ -67,6 +67,8 @@ case("ST-33", needs="jvm:SettingsUatTest.pagesFromTopToBottom、SettingsUatTest.
 
 
 case("ST-34", needs="jvm:TablesUatTest.predictionOffHoldsForTablesToo")(lambda d: None)
+case("ST-134", needs="jvm:StrokeUatTest.theSensitivityIsReadAtEachTouch")(lambda d: None)
+case("ST-135", needs="jvm:InputMethodSettingsScreenTest.theStrokeRowsAreThereWhileStrokesAreDrawn")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 外观

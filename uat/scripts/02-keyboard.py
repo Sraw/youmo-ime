@@ -157,6 +157,33 @@ case("KB-42", needs="jvm:StrokeUatTest.aStrokeDrawnWhilePinyinIsTypedIsSentAsOne
 
 
 case("KB-43", needs="jvm:StrokeUatTest.withNothingTypedGlideChosenOrEnglishNoStrokeIsSent")(lambda d: None)
+case("KB-101", needs="jvm:StrokeUatTest.aFingerThatSlidesShortOfTheLiftDistanceIsTheKeysTap、StrokeUatTest.aShortStrokeAsAnotherFingerLandsIsItsTapAndTheOtherKeyTypedToo")(lambda d: None)
+case("KB-102", needs="jvm:StrokeUatTest.aTapNearTheEdgeSlidingOffTheKeyIsStillItsTap")(lambda d: None)
+case("KB-103", needs="jvm:StrokeUatTest.aSlowStrokeIsReadBeforeAnyLongPress")(lambda d: None)
+
+
+@case("KB-104", mutates=True)
+def kb104(d):
+    home(d, "通用输入")
+    choose(d, "在键上划", "笔画筛选")
+    d.open_page("text")
+    d.clear()
+    dp = d.dpx()
+    d.type("hao", after=0.6)
+    q = d.keys(refresh=True)["q"]
+    # 15dp sideways in 150ms: short of 笔画筛选灵敏度 (中, 24dp), the q key's tap
+    d.swipe(q, (q[0] + int(15 * dp), q[1]), 150, after=0.8)
+    short = d.preedit()
+    d.clear()
+    d.type("hao", after=0.6)
+    q = d.keys(refresh=True)["q"]
+    # 40dp: past it, a 横
+    d.swipe(q, (q[0] + int(40 * dp), q[1]), 150, after=0.8)
+    long = d.preedit()
+    d.clear()
+    check(short.replace(" ", "").replace("'", "") == "haoq", f"打 hao 后在 q 上横滑 15dp，编码行是「{short}」，不是 haoq")
+    check(long.endswith("一") and "q" not in long, f"打 hao 后在 q 上横划 40dp，编码行是「{long}」，末尾不是一笔横")
+    return f"15dp：「{short}」；40dp：「{long}」"
 
 
 case("KB-44", needs="jvm:AddressUatTest.anEmptyEmailFieldOffersTheSuffixesTheCursorStaysBeforeTheAt")(lambda d: None)

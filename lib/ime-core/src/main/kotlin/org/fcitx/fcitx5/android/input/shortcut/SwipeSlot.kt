@@ -108,6 +108,9 @@ class SwipeSlots private constructor(
     /** Whether a slot set holds a text of variables: its marks then drawn anew each minute (KeyState.minute). */
     val fillsIn: Boolean get() = table.values.any { it is SwipeSlot.Text && it.variables }
 
+    /** Whether the user set any slot to a stroke (KeyCommand.stroke): 首页单字 reorders what one filters too. */
+    val strokes: Boolean get() = table.values.any { it is SwipeSlot.Command && it.command.stroke != null }
+
     /** The keys the user set a slot of. */
     val keys: Set<String> get() = table.keys.mapTo(LinkedHashSet()) { it.substringBeforeLast('.') }
 

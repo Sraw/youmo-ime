@@ -307,6 +307,8 @@ case("PY-103", needs="jvm:StrokeFilterUatTest.xiThenFourStrokesOfXi")(lambda d: 
 
 
 case("PY-104", needs="jvm:StrokeFilterUatTest.haoThenADotThenBackspace")(lambda d: None)
+case("PY-135", needs="jvm:StrokeFilterUatTest.keyiThenAHengPutsTwoCharactersAloneRightAfterTheFirst")(lambda d: None)
+case("PY-136", needs="jvm:StrokeFilterTest.aMovedCandidatesOffersPinBlockReasonAndCardAreOfItsOwnPlace、StrokeFilterTest.theOrderIsMadeAgainAtEachStrokeAndBackspaceAndAPageTurnGoesOnFromIt")(lambda d: None)
 
 
 case("PY-105", needs="jvm:ImKeyboardsUatTest.pinyinsEighteenKeysShowTheGroupsAndSendTheirOwnCodes、GroupedKeyboardTest.talkBackReadsAGroupLetterByLetterWithItsCorner")(lambda d: None)

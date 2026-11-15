@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
+import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
@@ -252,6 +253,12 @@ class AppPrefsTest {
                     "在键上划", listOf("Glide", "StrokeFilter", "Off"), KeyDrawing.entries, "key_drawing", AppPrefs.KEY_DRAWING,
                     { it.keyboard.keyDrawing.setValue(KeyDrawing.StrokeFilter) }, "StrokeFilter", "Strokes",
                     { it.keyboard.keyDrawing.getValue() }, KeyDrawing.Off,
+                ),
+                // 笔画筛选灵敏度 since 0.6.1
+                Row(
+                    "笔画筛选灵敏度", listOf("High", "Medium", "Low"), StrokeLift.entries, "stroke_lift", AppPrefs.STROKE_LIFT,
+                    { it.keyboard.strokeLift.setValue(StrokeLift.High) }, "High", "Extreme",
+                    { it.keyboard.strokeLift.getValue() }, StrokeLift.Medium,
                 ),
                 Row(
                     "English's keyboard", listOf("Full", "NineKeys"), EnglishKeyboard.entries, "english_keyboard", AppPrefs.ENGLISH_KEYBOARD,

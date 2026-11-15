@@ -501,20 +501,32 @@ class KeyboardHarness(
         relayout()
     }
 
-    /** A second finger put down at [x], [y] beside the one down, then both lifted, the second first. */
-    fun secondFingerThenLift(x: Float, y: Float) {
+    /**
+     * A second finger put down at [x], [y] beside the one down, then both lifted, the second first; or the first
+     * first ([firstLifts]: two thumbs overlapping), each event's work done before the next.
+     */
+    fun secondFingerThenLift(x: Float, y: Float, firstLifts: Boolean = false) {
         val (fx, fy) = fingerAt
         val props = Array(2) { MotionEvent.PointerProperties().apply { id = it; toolType = MotionEvent.TOOL_TYPE_FINGER } }
         val coords = arrayOf(MotionEvent.PointerCoords().apply { this.x = fx; this.y = fy }, MotionEvent.PointerCoords().apply { this.x = x; this.y = y })
         val target = (inputView.parent as? ViewGroup) ?: inputView
         for (action in listOf(MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP)) {
             after(16)
-            val e = MotionEvent.obtain(downAt, SystemClock.uptimeMillis(), action or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+            val index = if (firstLifts && action == MotionEvent.ACTION_POINTER_UP) 0 else 1
+            val e = MotionEvent.obtain(downAt, SystemClock.uptimeMillis(), action or (index shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
                 2, props, coords, 0, 0, 1f, 1f, 0, 0, 0, 0)
             target.dispatchTouchEvent(e)
             e.recycle()
+            if (firstLifts) idle()
         }
-        finger(MotionEvent.ACTION_UP, fx, fy)
+        if (firstLifts) {
+            after(16)
+            val e = MotionEvent.obtain(downAt, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, 1, arrayOf(props[1]), arrayOf(coords[1]), 0, 0, 1f, 1f, 0, 0, 0, 0)
+            target.dispatchTouchEvent(e)
+            e.recycle()
+        } else {
+            finger(MotionEvent.ACTION_UP, fx, fy)
+        }
         idle()
         relayout()
     }

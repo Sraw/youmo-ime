@@ -434,7 +434,11 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   is never typed), `Action.Stroke` to the session. While something is typed it keeps, in the
   inner session's order, the candidates whose first character starts so in any of its orders
   (`Strokes.startsWith`, a sorted char → entries index made on first use); an emoji or mark goes
-  as the one before it, a Latin word goes. The next stroke is that character's next. It looks
+  as the one before it, a Latin word goes. The next stroke is that character's next. Then `singles`
+  (首页至少几个单字, `EngineSettings.strokeSingles`, 0–5, 2 by default) of the kept characters alone (one
+  ideographic code point, an emoji after one going with it) are put right after the kept first, the
+  words they passed after them in their order; a first that is one alone does not count. `inOrder`
+  is the kept list as filtered, `keptAt` the order shown, indices mapped through it. It looks
   through the inner candidates 32 at a time as a page asks, at most `LOOK_AHEAD` (2000); indices
   (`Select`, `Pick`, `Forget`, `Pin`, `offers`, `why`) are mapped back to the inner session's.
   Backspace takes the last stroke, then the pinyin; a pick or a key it reads ends the filter and is

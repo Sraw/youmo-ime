@@ -136,6 +136,7 @@ case("T9-56d", needs="jvm:NineKeysUatTest.digitsInFullLiftAWordUnderPartMultiTap
 
 
 case("T9-57", needs="jvm:StrokeFilterUatTest.nineKeysWangThenADot")(lambda d: None)
+case("T9-65", needs="jvm:StrokeFilterUatTest.keyiThenAHengPutsTwoCharactersAloneRightAfterTheFirst")(lambda d: None)
 
 
 case("T9-58", needs="jvm:T9UatTest.theGlobeGoesToEnglishOnItsOwnKeyboard")(lambda d: None)

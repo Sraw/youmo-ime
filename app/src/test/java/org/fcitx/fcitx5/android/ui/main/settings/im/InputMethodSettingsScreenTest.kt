@@ -31,6 +31,10 @@ import org.fcitx.fcitx5.android.host.ConfigTree
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
+import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.modified.hasDefault
@@ -237,6 +241,43 @@ class InputMethodSettingsScreenTest {
         } finally {
             TestShelves.use()
             keyboard.keyDrawing.setValue(KeyDrawing.Off)
+        }
+    }
+
+    // 笔画筛选灵敏度 there while 笔画筛选 is chosen, 首页单字 then or while a key's swipe is a stroke: each shown or
+    // hidden at once as 在键上划 changes; 首页单字 关 or 1 to 5, 2 by default
+    @Test
+    @Uat("ST-135")
+    fun theStrokeRowsAreThereWhileStrokesAreDrawn() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        val swipes = AppPrefs.getInstance().internal.keySwipes
+        try {
+            keyboard.keyDrawing.setValue(KeyDrawing.Glide)
+            val page = create(InputMethodSettings.SHARED, mutableMapOf(EngineSettings.STROKE_SINGLES to "2"))
+            val drawing = page.findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!
+            val lift = page.findPreference<ListPreference>(AppPrefs.STROKE_LIFT)!!
+            val singles = page.findPreference<ListPreference>(EngineSettings.STROKE_SINGLES)!!
+            assertFalse(lift.isVisible)
+            assertFalse(singles.isVisible)
+            assertTrue(drawing.callChangeListener(KeyDrawing.StrokeFilter.name))
+            assertTrue(lift.isVisible)
+            assertTrue(singles.isVisible)
+            assertEquals(listOf("High", "Medium", "Low"), lift.entryValues.map { it.toString() })
+            assertEquals(StrokeLift.Medium.name, lift.value)
+            assertEquals(listOf("0", "1", "2", "3", "4", "5"), singles.entryValues.map { it.toString() })
+            assertEquals(placeholder(R.string.swipe_off), singles.entries[0].toString())
+            assertEquals("2", singles.value)
+            assertTrue(drawing.callChangeListener(KeyDrawing.Off.name))
+            assertFalse(lift.isVisible)
+            assertFalse(singles.isVisible)
+            // a key's swipe set to a stroke: 首页单字 reorders what it filters too
+            swipes.setValue(SwipeSlots.Default.with("full/a", up = false, SwipeSlot.Command(KeyCommand.StrokeShu)).serialize())
+            val again = create(InputMethodSettings.SHARED, mutableMapOf(EngineSettings.STROKE_SINGLES to "2"))
+            assertFalse(again.findPreference<ListPreference>(AppPrefs.STROKE_LIFT)!!.isVisible)
+            assertTrue(again.findPreference<ListPreference>(EngineSettings.STROKE_SINGLES)!!.isVisible)
+        } finally {
+            keyboard.keyDrawing.setValue(KeyDrawing.Off)
+            swipes.setValue("")
         }
     }
 

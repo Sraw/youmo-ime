@@ -159,7 +159,7 @@ object SettingsIndex {
         for (item in items) when (item) {
             is InputMethodSettings.Toggle -> visit(item.title(context), text(item.summary), item.key, via, path)
             is InputMethodSettings.Flags -> visit(text(item.title), item.flags.joinToString(" ") { it.second }, item.path, via, path)
-            is InputMethodSettings.Titled -> visit(text(item.title), text(item.summary), item.key, via, path)
+            is InputMethodSettings.Titled -> visit(text(item.title), text(item.summary), item.key, item.via ?: via, path)
             is InputMethodSettings.Section -> items(context, item.items, path + text(item.title), item.via ?: via, visit)
         }
     }

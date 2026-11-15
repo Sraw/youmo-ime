@@ -117,6 +117,12 @@ class SceneKey(
 
     override fun onGesture(event: CustomGestureView.Event): Boolean? = gestureListener?.invoke(this, event)
 
+    /** A tap at ([x], [y]) in the keyboard, in [cell] (the keyboard's), its touch long cancelled ([KeyGesture.tap]). */
+    internal fun tap(cell: Rect, x: Float, y: Float) {
+        frame.set(cell)
+        keyGesture.tap(x - cell.left, y - cell.top)
+    }
+
     // [action] at ([x], [y]) in the keyboard, by a finger that came down in [cell] (the keyboard's)
     internal fun touch(cell: Rect, action: Int, x: Float, y: Float, pointerId: Int, eventTime: Long) {
         frame.set(cell)

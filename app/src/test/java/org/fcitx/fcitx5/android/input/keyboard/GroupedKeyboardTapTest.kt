@@ -138,11 +138,12 @@ class GroupedKeyboardTapTest {
     }
 
     @Test
-    fun aSwipeTheOtherWayIsATapWithNoPlace() = drawn {
-        // down, past the threshold, where BN has no shortcut: KeySwipe's Tap, the code alone
+    fun aSwipeTheOtherWayIsATapWhereTheFingerCameDown() = drawn {
+        // down, past the threshold, where BN has no shortcut: KeySwipe's Tap, with where it came down (as a tap's,
+        // what neighbour correction reads)
         val bn = key("BN")
         touch(bn, bn.width * 0.75f, 0f to bn.height.toFloat() / 2 + 1, 0f to bn.height.toFloat() / 2 + 1)
-        assertTrue(sent.toString(), sent.isNotEmpty() && sent.all { it == code(g14Code('b')) })
+        assertTrue(sent.toString(), sent.isNotEmpty() && sent.all { it == tap(g14Code('b'), 0.75f) })
     }
 
     // 060-render-v2 §15 按落点加权: whether a tap leans is its layout's (lean=), whichever draws the keys

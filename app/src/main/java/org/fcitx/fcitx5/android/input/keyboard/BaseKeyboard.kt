@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.content.Context
 import android.graphics.Canvas
+import android.os.SystemClock
 import android.view.MotionEvent
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
@@ -237,6 +238,9 @@ abstract class BaseKeyboard(
             down = down,
             strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
             stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction.stroke(it)) } },
+            strokeLift = { prefs.keyboard.strokeLift.getValue().dp },
+            // as a tap there types, a stroke drawn there lifted short
+            tapKey = { x, y -> sceneKeys.touch?.find(x, y)?.takeIf { it.enabled }?.let { it.key.tap(it.cell, x, y) } },
             ink = ink,
             writes = { keyWriting?.now == true },
             writingArea = { x, y -> letterArea?.at(canvas, x, y) == true },
@@ -468,6 +472,7 @@ abstract class BaseKeyboard(
             when (event.type) {
                 // must stay reachable: it resets what a cancelled swipe left behind
                 GestureType.Down -> {
+                    glide?.backspaced(SystemClock.uptimeMillis())
                     onAction(KeyAction.BeginSelectionSwipeAction)
                     false
                 }

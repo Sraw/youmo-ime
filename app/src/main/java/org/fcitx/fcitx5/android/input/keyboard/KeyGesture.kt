@@ -82,8 +82,9 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     /**
      * Where across the key the touch that clicks it came down ([downAt]), for the click listener
      * alone: set as the finger lifts, before the touch's state is reset, cleared once the click
-     * returns. NaN for a click no touch made (TalkBack), one that left the key or swiped past the
-     * threshold, and for a swipe's own click (KeySwipe's Tap, made at the Up before this is set).
+     * returns. NaN for a click no touch made (TalkBack), and for the touch's own click where it left the
+     * key or swiped past the threshold. A swipe's own click (KeySwipe's Tap, made at the Up) and a stroke
+     * lifted short ([tap]) have where it came down: where the finger landed is what neighbour correction reads.
      */
     var clickAt = Float.NaN
         private set
@@ -269,6 +270,20 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         recognizer.onDown(x, y)
     }
 
+    /**
+     * A tap at ([x], [y]) in the key's pixels after its touch was cancelled for a stroke drawn that, lifted short, was
+     * none (笔画筛选, GlideTouch.Route.TAP_KEY): its click as a tap's there, the key-up buzz with it (the down's was given).
+     */
+    fun tap(x: Float, y: Float) {
+        if (!key.keyEnabled) return
+        InputFeedbacks.hapticFeedback(key.feedback, longPress = true, keyUp = true)
+        clickAt = across(x)
+        clickDown = downward(y)
+        key.click()
+        clickAt = Float.NaN
+        clickDown = Float.NaN
+    }
+
     private fun up(x: Float, y: Float, pointerId: Int, eventTime: Long) {
         var at = downAt
         var atDown = downDown
@@ -280,6 +295,9 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         }
         key.showPressed(false)
         InputFeedbacks.hapticFeedback(key.feedback, longPress = true, keyUp = true)
+        // a swipe whose slot is nothing clicks the key at its Up (KeySwipe.Outcome.Tap): where it came down
+        clickAt = at
+        clickDown = atDown
         dispatchGestureEvent(GestureType.Up, x, y)
         val outcome = recognizer.onUp(
             nowMs = eventTime,

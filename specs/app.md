@@ -581,9 +581,13 @@ the two old keys dropped. The page's row is an `AppChoice` whose summary is the 
 `KeyboardWindow` sets from the preedit, not in a temporary mode: its panel alone has an aux line above) and a keyboard whose input method filters (`filters`:
 `InputMethodCatalog.filtersByStrokes` of the one shown, on `TextKeyboard`, `T9Keyboard` and
 `GroupedKeyboard`, the 14 and 18 keys, which have no glide). `GlideGesture` starts it far sooner than
-a glide (`STROKE`, 0.3 of a key any way, keys counted as wide and tall, before the long press): a
+a glide (`strokeDistance`, 12dp in any direction, `GlideInput.STROKE_START_DP`, before the long press): a
 竖 from the bottom row or a short 点 must be one before the key's swipe (36dp) is, so while pinyin
-is typed a key's swipe is a stroke; on the lift the path, in key widths both ways, is read by `StrokeShape` (ime-core) and
+is typed a key's swipe is a stroke. At the lift `GlideTouch` (`liftDistance`) looks at the farthest the finger went from its down:
+short of 笔画筛选灵敏度 (`AppPrefs.keyboard.strokeLift`, `StrokeLift` 高 20 / 中 24 / 低 28dp, read at each down;
+design 061-swipe-eval) it is `Route.TAP_KEY` and `GlideInput.tapKey` taps the key under the down point
+(`BaseKeyboard.tapKeyAt`, `KeyGesture.tap`), off its edge or not; the trail is drawn only past it (`GlideTouch.shown`).
+Past it, on the lift the path, in key widths both ways, is read by `StrokeShape` (ime-core) and
 sent as the engine's stroke key, `KeyAction.SymAction.stroke` (`Keyboard.strokeKey`); a shape it reads
 as none (up, up to the left) is dropped. `StrokeShape` reads a 折 only where the turn's two arms are
 each straight or bent themselves (issue #4: a bowed 撇, a 横 with a tick, were 折; `StrokeShapeRatesTest`).

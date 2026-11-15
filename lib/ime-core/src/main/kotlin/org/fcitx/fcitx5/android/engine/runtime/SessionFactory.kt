@@ -145,7 +145,7 @@ internal class SessionFactory(
     // each that [filtersByStrokes] wrapped in a StrokeFilter, which filters what is shown; each that
     // [writesOnKeys] wrapped, last, in an InkOver, whose handwriting's candidates are none to filter
     fun make(im: String): Session = made(im)
-        .let { if (filtersByStrokes(im)) StrokeFilter(it, assets::strokes, settings().pageSize) else it }
+        .let { if (filtersByStrokes(im)) StrokeFilter(it, assets::strokes, settings().pageSize, singles = settings().strokeSingles) else it }
         .let { if (writesOnKeys(im)) InkOver(it, ::handwritingSession) else it }
 
     /** Handwriting's session, as an [InkOver] writes with (and ime-eval measures alone). */

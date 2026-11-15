@@ -119,7 +119,7 @@ class InputMethodSettingsTest {
     @Test
     fun theSharedOptionsAreOnTheSharedPageAlone() {
         val shared = listOf(
-            AppPrefs.KEY_DRAWING, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM, InputMethodSettings.ADDRESSES, AppPrefs.HANDWRITING_PAUSE,
+            AppPrefs.KEY_DRAWING, AppPrefs.STROKE_LIFT, EngineSettings.STROKE_SINGLES, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM, InputMethodSettings.ADDRESSES, AppPrefs.HANDWRITING_PAUSE,
             EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.BUILT_IN_PHRASES, EngineSettings.MODEL_LEVEL, EngineSettings.CANDIDATE_READING, InputMethodSettings.PUNCTUATION,
             "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", EngineSettings.FUZZY,
         )

@@ -31,6 +31,14 @@ class SwipeSlotsTest {
     }
 
     @Test
+    fun aStrokeSetOnAnySlotIsSaid() {
+        assertFalse(SwipeSlots.Default.strokes)
+        assertFalse(SwipeSlots.Default.with("full/a", up = false, copy).strokes)
+        assertTrue(SwipeSlots.Default.with("full/a", up = false, Command(KeyCommand.StrokeShu)).strokes)
+        assertTrue(SwipeSlots.parse(SwipeSlots.Default.with("t9/2", up = true, Command(KeyCommand.StrokeHeng)).serialize()).strokes)
+    }
+
+    @Test
     fun aFunctionKeyHasItsOwnPresetsEitherOrientation() {
         for (s in listOf(SwipeSlots.Default, SwipeSlots.Default.applied(SwipeOrientation.FirstDown))) {
             assertEquals(Command(KeyCommand.EditMenu), s.resolve(space, up = true))

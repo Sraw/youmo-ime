@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
@@ -40,6 +41,8 @@ import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
+import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
+import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
@@ -75,6 +78,8 @@ object InputMethodSettings {
         @get:StringRes val summary: Int
         /** The input methods (unique names) it is no use to, said under it: on the shared page, which says it for all. */
         val notFor: List<String>
+        /** The row settings search points at while this one is hidden by its shown ([Section.via]'s, for one row). */
+        val via: String? get() = null
     }
 
     /** [key] (a/b for b under a) is "True" or "False", unless [read] and [write] say otherwise; [notFor] as [Titled.notFor]. */
@@ -87,7 +92,7 @@ object InputMethodSettings {
         val notFor: List<String> = emptyList(),
     ) : Item
 
-    /** One of [values]; a value stored that is not one of them shows as the one [nearest] to it. */
+    /** One of [values]; a value stored that is not one of them shows as the one [nearest] to it. [shown] as [AppChoice.shown]. */
     class Choice(
         override val key: String,
         @StringRes override val title: Int,
@@ -96,6 +101,8 @@ object InputMethodSettings {
         val label: (Context, String) -> String,
         val nearest: (String) -> String = { it },
         override val notFor: List<String> = emptyList(),
+        val shown: (Map<String, String>) -> Boolean = { true },
+        override val via: String? = null,
     ) : Titled
 
     /**
@@ -126,6 +133,7 @@ object InputMethodSettings {
         val offered: (Map<String, String>) -> List<T> = { values },
         val instead: (T, Map<String, String>) -> T? = { _, _ -> null },
         val shown: (Map<String, String>) -> Boolean = { true },
+        override val via: String? = null,
         val pref: () -> ManagedPreference.PStringLike<T>,
     ) : Titled where T : Enum<T>, T : ManagedPreferenceEnum
 
@@ -182,6 +190,10 @@ object InputMethodSettings {
 
     private val PAGE_SIZES = EngineSettings.PAGE_SIZES.map { it.toString() }
 
+    private val STROKE_SINGLES = StrokeFilter.SINGLES_RANGE.map { it.toString() }
+
+    private fun strokesDrawn() = AppPrefs.getInstance().keyboard.keyDrawing.getValue() == KeyDrawing.StrokeFilter
+
     private val READING_STYLES = mapOf(
         ReadingStyle.OFF to R.string.im_candidate_reading_off,
         ReadingStyle.PINYIN to R.string.im_candidate_reading_pinyin,
@@ -218,6 +230,20 @@ object InputMethodSettings {
                 // filtering pinyin's and 双拼's candidates (InputMethodCatalog.filtersByStrokes), or off; which input
                 // methods read each is the docs' (the summary is the choice alone)
                 AppChoice(AppPrefs.KEY_DRAWING, R.string.key_drawing, 0, KeyDrawing.entries) { AppPrefs.getInstance().keyboard.keyDrawing },
+                // search points at 在键上划 while they are hidden ([Titled.via]).
+                // What 笔画筛选 reads, there while it is chosen ([StrokeLift]); 首页单字 also where a key's swipe is set to a
+                // stroke, which the filter reorders the same (StrokeFilter.singles). Both shown again as 在键上划 changes
+                AppChoice(AppPrefs.STROKE_LIFT, R.string.stroke_lift, R.string.stroke_lift_summary, StrokeLift.entries, shown = { strokesDrawn() },
+                    via = AppPrefs.KEY_DRAWING) {
+                    AppPrefs.getInstance().keyboard.strokeLift
+                },
+                Choice(
+                    EngineSettings.STROKE_SINGLES, R.string.stroke_singles, STROKE_SINGLES, R.string.stroke_singles_summary,
+                    label = { ctx, v -> if (v == "0") ctx.getString(R.string.swipe_off) else v },
+                    nearest = numbers(StrokeFilter.SINGLES_RANGE),
+                    shown = { strokesDrawn() || SwipeSlotsCache.current.strokes },
+                    via = AppPrefs.KEY_DRAWING,
+                ),
                 AppToggle(AppPrefs.AUTO_PAIRS, R.string.auto_pairs, 0) { AppPrefs.getInstance().keyboard.autoPairs },
                 AppToggle(AppPrefs.CALCULATION_REPLACES_SUM, R.string.calculation_replaces_sum, 0) {
                     AppPrefs.getInstance().keyboard.calculationReplacesSum
@@ -610,6 +636,9 @@ object InputMethodSettings {
                 is Choice -> {
                     val slot = slotOf(item.key)
                     into(ListPreference(context).apply {
+                        val refresh = { isVisible = item.shown(options) }
+                        refresh()
+                        refreshers += refresh
                         // its dialog finds it by key (MyPreferenceFragment); still never stored
                         key = item.key
                         isPersistent = false

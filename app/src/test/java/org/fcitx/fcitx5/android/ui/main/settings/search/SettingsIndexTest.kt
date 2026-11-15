@@ -214,6 +214,24 @@ class SettingsIndexTest {
         }
     }
 
+    // 笔画筛选灵敏度 and 首页至少几个单字 are hidden unless strokes are drawn (在键上划 off by default): found, they name 在键上划,
+    // always on the shared page, to point at instead
+    @Test
+    fun theStrokeSettingsFoundNameTheKeyDrawingRowThatShowsThem() {
+        val ctx = context()
+        val shared = buildList<Entry<SettingsIndex.Target>> { SettingsIndex.sharedInput(ctx, this) }
+        val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.SHARED, mutableMapOf(), save = {}, open = {})
+        val row = screen.findPreference<Preference>(AppPrefs.KEY_DRAWING)
+        assertTrue(row != null && generateSequence(row) { it.parent }.all { it.isVisible })
+        for (key in listOf(AppPrefs.STROKE_LIFT, EngineSettings.STROKE_SINGLES)) {
+            val entry = shared.single { it.target.key == key }
+            assertEquals("$entry", SettingsRoute.SharedInput, entry.target.route)
+            assertEquals("$entry", AppPrefs.KEY_DRAWING, entry.target.via)
+            // hidden on the page as it opens (笔画筛选 not chosen): the row pointed at instead
+            assertFalse("$entry", screen.findPreference<Preference>(key)!!.isVisible)
+        }
+    }
+
     // 061 生僻字屏蔽 (§6.1): the page drawn by hand found by its name and by 生僻字
     @Test
     @Config(qualifiers = "zh-rCN")

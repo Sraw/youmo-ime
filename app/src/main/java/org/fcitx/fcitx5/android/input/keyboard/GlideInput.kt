@@ -8,9 +8,12 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
+import android.util.Log
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import androidx.annotation.VisibleForTesting
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import splitties.dimensions.dp
@@ -21,13 +24,18 @@ import splitties.dimensions.dp
  * the keys have none of the touch: they are cancelled as it starts, their preview and swipe with them.
  *
  * Where [strokes] says so as the finger goes down, the same touch is a stroke (笔画筛选) instead,
- * started far sooner ([GlideGesture.STROKE]): its path, in key widths both ways, given to [stroked]. The setting has one or the other, never both.
+ * started far sooner ([STROKE_START_DP] any way, the keys cancelled then): its path, in key widths both ways, given to [stroked].
+ * Lifted never [strokeLift] dp from its down, it was a tap: the key it came down on is tapped there ([tapKey]); its
+ * trail is drawn only past that. The setting has one or the other, never both.
  * A stroke may also start between a split keyboard's halves ([SplitGap]); a glide starts on a letter only.
  *
  * Where [writes] says so as the finger goes down (the toolbar's 手写, HandwritingMode.writes), a touch down in the
  * letter area ([writingArea]: the letters' hit areas, the gaps between them, Shift; a split keyboard's gap) is a
  * stroke written there instead, from its down ([ink]): put on its pad and drawn in ink, no key pressed, before
  * any glide or stroke filter (061-handwriting-toolbar §3.2). A touch down elsewhere is that key's as ever.
+ *
+ * In debug builds ([trace]), each touch down on a letter is logged as `YoumoStrokeTap`, a line of its geometry
+ * ([StrokeTapTrace]): what a real finger does, for the stroke threshold (dev/design/061-swipe-eval.md). It changes nothing.
  */
 class GlideInput(
     private val keyboard: ViewGroup,
@@ -42,6 +50,10 @@ class GlideInput(
     // whether a touch now is a stroke drawn rather than a glide (StrokeShape reads it)
     private val strokes: () -> Boolean = { false },
     private val stroked: (path: FloatArray) -> Unit = {},
+    // how far a stroke drawn goes, at its lift, to be one (笔画筛选灵敏度, StrokeLift), in dp
+    private val strokeLift: () -> Float = { 0f },
+    // the key at a place (the keyboard's pixels) tapped there: a stroke drawn lifted short of [strokeLift]
+    private val tapKey: (x: Float, y: Float) -> Unit = { _, _ -> },
     private val ink: KeyInk? = null,
     private val writes: () -> Boolean = { false },
     // whether a place (the keyboard's) is in the letter area written on: the letters' hit areas and Shift's
@@ -52,9 +64,20 @@ class GlideInput(
     private val touch = GlideTouch(down)
     private val trail = Path()
     private val rect = Rect()
+    private val strokeStart = keyboard.dp(STROKE_START_DP)
+    // debug builds alone; one a keyboard: its gap= is from the last lift on this keyboard, a switch starts it anew (enough for rhythm)
+    private val trace = if (BuildConfig.DEBUG) {
+        StrokeTapTrace(keyboard.resources.displayMetrics.density, ViewConfiguration.get(keyboard.context).scaledTouchSlop.toFloat())
+    } else {
+        null
+    }
+    // the keyboard's name in the trace's lines
+    private val traced = keyboard.javaClass.simpleName
 
-    // the touch, as it went down, a stroke's
+    // the touch, as it went down, a stroke's; where it went down
     private var stroking = false
+    private var downX = 0f
+    private var downY = 0f
 
     // the touch, as it went down, may be written ([ink] then); [fed] of its places on the pad so far, -1 while it is none
     private var inking: KeyInk? = null
@@ -77,19 +100,21 @@ class GlideInput(
         val masked = event.actionMasked
         val last = masked == MotionEvent.ACTION_UP || masked == MotionEvent.ACTION_CANCEL
         if (masked == MotionEvent.ACTION_POINTER_DOWN && writesAgain()) return downAgain(event)
-        if (touch.swallows(first = masked == MotionEvent.ACTION_DOWN, last = last)) return true
+        if (swallowed(event, last)) return true
         val i = event.actionIndex
         val route = when (masked) {
             MotionEvent.ACTION_DOWN -> down(event)
-            MotionEvent.ACTION_POINTER_DOWN -> pointerDown(event)
+            MotionEvent.ACTION_POINTER_DOWN -> pointerDown(event).also { trace?.otherFinger() }
             MotionEvent.ACTION_MOVE -> move(event)
             MotionEvent.ACTION_POINTER_UP -> pointerUp(event, i)
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> up(event, i, cancelled = masked == MotionEvent.ACTION_CANCEL)
             else -> GlideTouch.Route.KEYS
         }
+        routed(route, event.eventTime)
         // a stroke written is the pad's, not a path read
         touch.takeGlided()?.let { if (inking == null) send(it) }
-        if (route == GlideTouch.Route.KEYS) {
+        if (last) traceUp(event)
+        if (keys(route, masked)) {
             // a stroke may start where no key takes the down (the split keyboard's gap): the touch kept
             // all the same, else its moves never come here (the parent finds no target)
             return toKeys(event) || masked == MotionEvent.ACTION_DOWN && touch.pointer != GlideTouch.NO_POINTER
@@ -104,7 +129,33 @@ class GlideInput(
         return true
     }
 
+    // the keys': and a stroke short of its lift as another finger lands, the first's tap made, that finger the keys'
+    private fun keys(route: GlideTouch.Route, masked: Int) =
+        route == GlideTouch.Route.KEYS || route == GlideTouch.Route.TAP_KEY && masked == MotionEvent.ACTION_POINTER_DOWN
+
+    // swallowed (GlideTouch.swallows), the touch's trace line all the same: a stroke's other fingers are to the last lift
+    private fun swallowed(event: MotionEvent, last: Boolean): Boolean {
+        if (!touch.swallows(first = event.actionMasked == MotionEvent.ACTION_DOWN, last = last)) return false
+        if (last) traceUp(event)
+        return true
+    }
+
+    private fun traceUp(event: MotionEvent) {
+        trace?.up(event.eventTime, cancelled = event.actionMasked == MotionEvent.ACTION_CANCEL)?.let { Log.i(TRACE_TAG, it) }
+    }
+
+    // a stroke started (traced), or lifted short of its distance: the key under its down tapped after all
+    private fun routed(route: GlideTouch.Route, time: Long) {
+        if (route == GlideTouch.Route.CANCEL_KEYS) trace?.started(time)
+        if (route == GlideTouch.Route.TAP_KEY) {
+            trace?.tapped()
+            tapKey(downX, downY)
+        }
+    }
+
     private fun down(event: MotionEvent): GlideTouch.Route {
+        downX = event.x
+        downY = event.y
         // written on: before a glide or a stroke filter, whatever 在键上划 is (§3.2); the recognizer loadable (HandwritingMode)
         inking = ink?.takeIf { writes() && it.loadable }
         stroking = inking == null && strokes()
@@ -121,15 +172,37 @@ class GlideInput(
         val onLetter = if (inking != null) writingArea(event.x, event.y) else keys.any { (_, v) -> bounds(v).contains(x, y) }
         // a stroke may start between a split keyboard's halves too: no key there to tap
         val inGap = drawn && !onLetter && inGap(keys, event.x, event.y, keyWidth)
+        if (trace != null && inking == null) traceDown(event)
         touch.down(
             event.getPointerId(0), event.x, event.y, event.eventTime, onLetter,
             keyWidth, keyHeight, longPressMillis(), stroke = stroking, inGap = inGap, writes = inking != null,
+            strokeDistance = strokeStart, liftDistance = if (stroking) keyboard.dp(strokeLift()) else 0f,
         )
         // the writing goes on: a stroke from its down, no key pressed
         if (inking == null || !touch.gliding) return GlideTouch.Route.KEYS
         feed()
         return GlideTouch.Route.GLIDE
     }
+
+    // the touch traced from its down, where that is on a letter's cell
+    private fun traceDown(event: MotionEvent) {
+        val x = event.x.toInt()
+        val y = event.y.toInt()
+        val cell = letters().firstOrNull { bounds(it.second).contains(x, y) } ?: return
+        val b = bounds(cell.second)
+        tracedPointer = event.getPointerId(0)
+        trace?.down(
+            event.x, event.y, event.eventTime, b.left.toFloat(), b.top.toFloat(), b.right.toFloat(), b.bottom.toFloat(),
+            traced, stroking, longPressMillis(),
+        )
+    }
+
+    /** A backspace pressed at [time] (uptime), logged after the touches traced: a stroke taken back is a misread. */
+    fun backspaced(time: Long) {
+        trace?.let { Log.i(TRACE_TAG, it.backspace(time)) }
+    }
+
+    private var tracedPointer = -1
 
     // another finger down: the glide's while one glides. Written on, with a key held (a thumb on space or ⌫), one
     // down on the letters is a stroke all the same (the letters only write), the held key let go of
@@ -219,9 +292,15 @@ class GlideInput(
 
     /** Whether the path of a glide or stroke is drawn now (its trail). */
     @VisibleForTesting
-    internal val trailShown: Boolean get() = touch.gliding
+    internal val trailShown: Boolean get() = touch.shown
 
     private fun move(event: MotionEvent): GlideTouch.Route {
+        // the finger traced, whether or not it may glide (the keys' own touch, glide typing off)
+        trace?.let { t ->
+            val j = event.findPointerIndex(tracedPointer).takeIf { it >= 0 } ?: return@let
+            for (h in 0 until event.historySize) t.move(event.getHistoricalX(j, h), event.getHistoricalY(j, h))
+            t.move(event.getX(j), event.getY(j))
+        }
         val i = event.findPointerIndex(touch.pointer).takeIf { it >= 0 } ?: return touch.missing()
         for (h in 0 until event.historySize) touch.add(event.getHistoricalX(i, h), event.getHistoricalY(i, h))
         val route = touch.move(event.getX(i), event.getY(i), event.eventTime)
@@ -238,7 +317,11 @@ class GlideInput(
         val unitY = GlideTouch.unitY(rect.height().toFloat())
         if (unitX <= 0f || unitY <= 0f) return
         // a stroke's shape is read as drawn: down in key widths too
-        if (stroking) return stroked(FloatArray(path.size) { if (it % 2 == 0) path[it] else path[it] * unitY / unitX })
+        if (stroking) {
+            val drawn = FloatArray(path.size) { if (it % 2 == 0) path[it] else path[it] * unitY / unitX }
+            trace?.read(StrokeShape.classify(drawn))
+            return stroked(drawn)
+        }
         // every key a letter has: the split keyboard's G and V are on both halves
         val centres = keys.map { (c, v) -> bounds(v).let { b -> c to (b.exactCenterX() / unitX to b.exactCenterY() / unitY) } }
         glided(path, GlideLayout(centres))
@@ -266,7 +349,7 @@ class GlideInput(
     /** The path so far, over the keys; or the ink written there. */
     fun draw(canvas: Canvas) {
         ink?.draw(canvas)
-        if (!touch.gliding || inking != null) return
+        if (!touch.shown || inking != null) return
         val p = touch.points
         trail.rewind()
         trail.moveTo(p[0], p[1])
@@ -276,6 +359,10 @@ class GlideInput(
 
     companion object {
         private const val TRAIL_DP = 6f
+
+        /** Where a stroke drawn starts, any way: its keys cancelled, before their swipe (36dp) or long press. */
+        const val STROKE_START_DP = 12f
         private const val TRAIL_ALPHA = 0xB0
+        private const val TRACE_TAG = "YoumoStrokeTap"
     }
 }

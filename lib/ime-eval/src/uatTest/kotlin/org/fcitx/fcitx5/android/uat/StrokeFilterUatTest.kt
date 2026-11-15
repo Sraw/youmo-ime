@@ -121,4 +121,43 @@ class StrokeFilterUatTest {
         expectAmong("吸", "曦")
         expectNotAmong("系", "西")
     }
+
+    // 首页单字 (2 by default): keyi and 一, 可以 still first, the first two characters alone written from 一 right
+    // after it, the words they passed after them; 关, the order as filtered alone. The same on the nine keys and in 双拼
+    @Test
+    @Uat("PY-135", "T9-65", "SP-37")
+    fun keyiThenAHengPutsTwoCharactersAloneRightAfterTheFirst() = assertRows(
+        "全拼" to { singlesAfterTheFirst(InputMethodCatalog.PINYIN, "keyi") },
+        "九键" to { singlesAfterTheFirst(InputMethodCatalog.PINYIN, EngineReplay.nineKeys("5394")) },
+        // 自然码's ke and yi
+        "双拼" to { singlesAfterTheFirst(InputMethodCatalog.SHUANGPIN, "keyi") },
+    )
+
+    private fun singlesAfterTheFirst(im: String, keys: String) {
+        fun filtered(singles: Int) = with(EngineReplay(im = im)) {
+            engines.settings = engines.settings.copy(strokeSingles = singles)
+            type(keys)
+            stroke("h")
+            candidates
+        }
+        val off = filtered(0)
+        val two = filtered(2)
+        assertEquals(off.take(5).toString(), "可以", off.first())
+        // the first two characters alone after the first, in their order
+        val alone = off.drop(1).filter { it.codePointCount(0, it.length) == 1 && Character.isIdeographic(it.codePointAt(0)) }.take(2)
+        assertEquals(off.take(20).toString(), 2, alone.size)
+        assertTrue("${off.take(5)} already ${alone}", off.subList(1, 3) != alone)
+        assertEquals(listOf("可以") + alone, two.take(3))
+        // nothing else gone or added, the words passed in their order after them
+        assertEquals(off.sorted(), two.sorted())
+        assertEquals(off.filter { it !in alone }.take(20), two.filter { it !in alone }.take(20))
+        // picked at its place shown: that character, the reading's rest still typed after it
+        with(EngineReplay(im = im)) {
+            engines.settings = engines.settings.copy(strokeSingles = 2)
+            type(keys)
+            stroke("h")
+            pickAt(1)
+            assertTrue("$text|$preedit", (text + preedit).startsWith(alone[0]) && text + preedit != alone[0])
+        }
+    }
 }

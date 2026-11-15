@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
+import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
@@ -339,6 +340,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * 0.6.0's 键盘手写 is the toolbar's 手写 now ([migrateKeyHandwriting]).
          */
         val keyDrawing = stringLike(KEY_DRAWING, ManagedPreference.enumCodec<KeyDrawing>(), KeyDrawing.Off)
+
+        /** Shown under it while 笔画筛选 is chosen: how far a stroke drawn goes before it is no tap ([StrokeLift]). */
+        val strokeLift = stringLike(STROKE_LIFT, ManagedPreference.enumCodec<StrokeLift>(), StrokeLift.Medium)
 
         /** Shown on the shared page too: every input method types a bracket or a quote. */
         val autoPairs = bool(AUTO_PAIRS, true)
@@ -1039,6 +1043,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         private const val GLIDE_TYPING = "glide_typing"
         private const val STROKE_FILTER = "stroke_filter"
         const val KEY_DRAWING = "key_drawing"
+        const val STROKE_LIFT = "stroke_lift"
 
         // 0.6.0's 在键上划 = 键盘手写, now the toolbar's 手写 (migrateKeyHandwriting)
         private const val OLD_KEY_HANDWRITING = "Handwriting"

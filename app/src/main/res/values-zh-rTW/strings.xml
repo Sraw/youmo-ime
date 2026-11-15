@@ -777,6 +777,13 @@
     <string name="key_drawing">在鍵上劃</string>
     <string name="glide_typing">滑行輸入</string>
     <string name="stroke_filter">筆畫篩選</string>
+    <string name="stroke_lift">筆畫篩選靈敏度</string>
+    <string name="stroke_lift_summary">手指劃多遠才算筆畫、不算點按這個鍵。高：短筆畫也能認出；低：點按時手指滑一點也還是點按。滑行輸入不用這一項</string>
+    <string name="stroke_lift_high">高</string>
+    <string name="stroke_lift_medium">中</string>
+    <string name="stroke_lift_low">低</string>
+    <string name="stroke_singles">首頁至少幾個單字</string>
+    <string name="stroke_singles_summary">畫筆畫後，緊跟在第一個候選後面放幾個單字</string>
     <string name="status_punctuation_chinese">中文標點</string>
     <string name="status_punctuation_english">英文標點</string>
     <string name="status_full_width">全形</string>

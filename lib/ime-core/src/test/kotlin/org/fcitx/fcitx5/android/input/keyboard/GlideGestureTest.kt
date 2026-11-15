@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.cos
+import kotlin.math.sin
 
 class GlideGestureTest {
 
@@ -57,37 +59,36 @@ class GlideGestureTest {
         assertFalse(two.move(400f, 75f, 50))
     }
 
-    // keys 100 by 150: a stroke starts 0.3 of a key off, either way
-    private fun stroke() = GlideGesture(keyWidth = 100f, keyHeight = 150f, longPressMillis = 300, stroke = true)
+    // keys 100 by 150, 2 pixels a dp: a stroke drawn starts 12dp (24 pixels) off, any way
+    private fun stroke() = GlideGesture(keyWidth = 100f, keyHeight = 150f, longPressMillis = 300, stroke = true, strokeDistance = 24f)
 
     @Test
-    fun aStrokeStartsFarSoonerThanAGlide() {
-        // a 竖 from the bottom row: a third of a key's height down, where a glide needs 1.6
-        val down = stroke()
-        down.down(50f, 75f, 0, onLetter = true)
-        assertFalse(down.move(50f, 110f, 40))
-        assertTrue(down.move(50f, 125f, 60))
-        // a short 点, a quarter of a key each way
-        val dot = stroke()
-        dot.down(50f, 75f, 0, onLetter = true)
-        assertTrue(dot.move(75f, 112f, 50))
-        // a 横 a third of a key's width across, under half a glide's
-        val across = stroke()
-        across.down(50f, 75f, 0, onLetter = true)
-        assertFalse(across.move(75f, 75f, 40))
-        assertTrue(across.move(83f, 75f, 50))
-        // a tap's wobble (a tenth of a key) is no stroke: the tap is the key's
+    fun aStrokeStartsTwelveDpOffAnyWayAlikeWhateverTheKeysShape() {
+        for (deg in 0 until 360 step 30) {
+            val a = Math.toRadians(deg.toDouble())
+            fun at(d: Float) = floatArrayOf(50f + d * cos(a).toFloat(), 75f + d * sin(a).toFloat())
+            val g = stroke()
+            g.down(50f, 75f, 0, onLetter = true)
+            val short = at(23.8f)
+            assertFalse("$deg", g.move(short[0], short[1], 40))
+            val far = at(24.01f)
+            assertTrue("$deg", g.move(far[0], far[1], 50))
+        }
+        // a tap's wobble (5dp) is no stroke: the tap is the key's
         val tap = stroke()
         tap.down(50f, 75f, 0, onLetter = true)
         assertFalse(tap.move(58f, 82f, 30))
-        assertFalse(tap.move(60f, 87f, 60))
+        // a glide needs far more: 0.8 of a key across
+        val glide = GlideGesture(keyWidth = 100f, keyHeight = 150f, longPressMillis = 300)
+        glide.down(50f, 75f, 0, onLetter = true)
+        assertFalse(glide.move(75f, 75f, 40))
     }
 
     @Test
     fun aSlowStrokeIsOneOnceStartedBeforeTheLongPress() {
         val slow = stroke()
         slow.down(50f, 75f, 0, onLetter = true)
-        assertFalse(slow.move(55f, 100f, 150))
+        assertFalse(slow.move(52f, 90f, 150))
         assertTrue(slow.move(55f, 125f, 290))
         // drawn on well past the long press: still the stroke's
         assertTrue(slow.move(55f, 300f, 1200))
