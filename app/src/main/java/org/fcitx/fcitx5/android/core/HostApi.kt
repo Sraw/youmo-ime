@@ -91,7 +91,9 @@ interface TypingApi {
      */
     suspend fun select(idx: Int, text: String? = null): Boolean
     suspend fun isEmpty(): Boolean
-    suspend fun reset()
+
+    /** The input ended (what handwriting wrote put in), or with [drop] what is typed dropped, nothing put in. */
+    suspend fun reset(drop: Boolean = false)
 
     /** 联想's predictions shown dropped (the bar's ×), the 联想 setting as it was; false where none show. */
     suspend fun dropPredictions(): Boolean
@@ -149,14 +151,11 @@ interface TypingApi {
     )
 
     /**
-     * What the handwriting pad read of its [piece], shown by the Ink key that carries it: see
-     * [Engines.ink]. Whether the Ink key was sent: not where handwriting cannot load or is not the
-     * current input method (the engine told all the same, holding it for its next). [onKeys]: written on
-     * the letter keys (键盘手写), for the current input method's own handwriting (InkOver), not handwriting's;
-     * [takesBack], the letter typed by a tap taken back as the first dot deleted first if that alone is typed
-     * (Action.Ink.takesBack: decided on the fcitx thread, where what was typed is known).
+     * What was written on the letter keys (the toolbar's 手写) read of its [piece], shown by the Ink key that
+     * carries it: see [Engines.ink]. Whether the Ink key was sent: not where handwriting cannot load or the
+     * input method writes on no keys (EngineBridge.sendInk).
      */
-    suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean = false, takesBack: Boolean = false): Boolean
+    suspend fun offerInk(reading: InkReading, piece: Int): Boolean
 
     /**
      * A glide across the letters, read as the current input method reads it and carried by the
@@ -165,8 +164,8 @@ interface TypingApi {
      */
     suspend fun offerGlide(glide: Glide): Boolean
 
-    /** The handwriting pad's [piece] finished, told by the Ink key that carries it: see [Engines.ink]; taken as [offerInk]. */
-    suspend fun inkFinished(piece: Int, onKeys: Boolean = false): Boolean
+    /** The letter keys' handwriting's [piece] finished, told by the Ink key that carries it: see [Engines.ink]; taken as [offerInk]. */
+    suspend fun inkFinished(piece: Int): Boolean
 
     /** The keys no letter the table input method [im] reads now, as its session has them: see [Engines.tableKeys]. */
     suspend fun tableKeys(im: String): Set<Char>

@@ -285,7 +285,6 @@ class EngineOptions {
         InputMethodCatalog.PINYIN -> listOf(pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, candidateReading, fuzzy)
         InputMethodCatalog.SHUANGPIN -> listOf(shuangpin, pageSize, prediction, emoji, modelLevel, fuzzy)
         InputMethodCatalog.ENGLISH -> listOf(englishSuggest)
-        InputMethodCatalog.HANDWRITING -> listOf(pageSize, prediction, modelLevel)
         in tables -> listOf(pageSize, prediction, emoji, modelLevel)
         else -> null
     }

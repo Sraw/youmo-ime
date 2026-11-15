@@ -19,7 +19,6 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.theme.TestThemes
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -63,14 +62,12 @@ class DisplayIsTypedUatTest {
         made?.close()
     }
 
-    private val handwriting = InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false)
-
     private val zh = ChinesePunctuation.map
 
     private fun harness(im: InputMethodEntry, chosen: ImKeyboards.Chosen?, punctuation: Map<String, String>, inputType: Int): KeyboardHarness {
         made?.close()
         return KeyboardHarness(TestThemes.PixelLight, im, keyboards = chosen).apply {
-            api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, handwriting)
+            api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
             api.enabledIme = api.availableIme
         }.start(inputType).also { h ->
             made = h
@@ -101,7 +98,6 @@ class DisplayIsTypedUatTest {
         Board("zhuyin nine", KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_NINE)),
         Board("English full", KeyboardHarness.ENGLISH),
         Board("English nine", KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)),
-        Board("handwriting", handwriting),
         Board("number", KeyboardHarness.PINYIN, inputType = InputType.TYPE_CLASS_NUMBER),
         Board("symbols", KeyboardHarness.PINYIN) { tap(key("符")) },
         Board("emoji", KeyboardHarness.PINYIN) { emoji() },
@@ -204,7 +200,7 @@ class DisplayIsTypedUatTest {
         prefs.set(AppPrefs.getInstance().internal.keySwipes, slots.serialize())
         // the nine keys' 1 has no punctuation first: its long press's . alone
         val firsts = mapOf("fn/comma" to ".", "fn/period" to ",", "t9/1" to ".")
-        for (board in boards.filter { it.name in setOf("full", "nine", "handwriting", "emoji") }) {
+        for (board in boards.filter { it.name in setOf("full", "nine", "emoji") }) {
             val h = harness(board.im, board.chosen, zh, board.inputType)
             board.open(h)
             h.idle()

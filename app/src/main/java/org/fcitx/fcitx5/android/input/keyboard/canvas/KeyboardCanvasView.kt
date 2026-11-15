@@ -30,6 +30,7 @@ import androidx.customview.widget.ExploreByTouchHelper
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.PackDrawGuard
 import org.fcitx.fcitx5.android.input.PictureHost
+import org.fcitx.fcitx5.android.input.keyboard.HandwritingMode
 import org.fcitx.fcitx5.android.input.scene.CanvasFrame
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneA11y
@@ -400,7 +401,7 @@ class KeyboardCanvasView(
             // a software canvas (a bitmap's: screenshots) draws no RenderNode, keeps nothing to record again
             painter.missed = false
             painter.draw(canvas, drawnUnder)
-            faces.forEach { painter.draw(canvas, it.node.ops(it.down)) }
+            faces.forEach { painter.draw(canvas, drawn(it.node, it.down)) }
             // drawn, glyphs and pictures, here and now
             pack?.let(PackDrawGuard::frameDrawn)
             return
@@ -412,7 +413,7 @@ class KeyboardCanvasView(
             for (i in shown.indices) {
                 val face = shown[i]
                 val node = if (face.record) {
-                    record(f.node.id, f.node.bounds, f.node.ops(face.pressed)).also { if (face.pressed) f.pressed = it else f.normal = it }
+                    record(f.node.id, f.node.bounds, drawn(f.node, face.pressed)).also { if (face.pressed) f.pressed = it else f.normal = it }
                 } else {
                     (if (face.pressed) f.pressed else f.normal)!!
                 }
@@ -467,9 +468,9 @@ class KeyboardCanvasView(
     private fun RenderNode?.live(): RenderNode? = this?.takeIf { it.hasDisplayList() }
 
     private fun nodeOf(f: Faces): RenderNode = if (f.down) {
-        f.pressed.live() ?: record(f.node.id, f.node.bounds, f.node.ops(true)).also { f.pressed = it }
+        f.pressed.live() ?: record(f.node.id, f.node.bounds, drawn(f.node, true)).also { f.pressed = it }
     } else {
-        f.normal.live() ?: record(f.node.id, f.node.bounds, f.node.ops(false)).also { f.normal = it }
+        f.normal.live() ?: record(f.node.id, f.node.bounds, drawn(f.node, false)).also { f.normal = it }
     }
 
     // a node the size of what [ops] draw round [bounds] (a key's shadow reaches out of its cell), drawn where it is
@@ -489,6 +490,22 @@ class KeyboardCanvasView(
             endRecording()
         }
     }
+
+    /**
+     * The keys drawn faded (the letters while the toolbar's 手写 writes on them: HandwritingMode.faded); null, none.
+     * Set again with [refade].
+     */
+    var faded: ((KeyNode) -> Boolean)? = null
+
+    /** Which keys are [faded] changed: each key's face recorded again as it is next drawn, the scene kept. */
+    fun refade() {
+        faces.forEach(::discardFaces)
+        invalidate()
+    }
+
+    // what [node] draws [pressed] or not, its letters faded where [faded] says
+    private fun drawn(node: KeyNode, pressed: Boolean): List<Op> =
+        node.ops(pressed).let { ops -> if (faded?.invoke(node) == true) HandwritingMode.faded(ops) else ops }
 
     /** Key [ref] shown pressed or not, as its touch says ([SceneKey]): its node swapped, nothing else drawn anew. */
     fun showPressed(ref: KeyRef, on: Boolean) {
@@ -763,7 +780,7 @@ class KeyboardCanvasView(
     fun pressedNode(id: String, copy: Int = 0): RenderNode? {
         scene
         val f = faces.firstOrNull { it.node.id == id && it.node.copy == copy } ?: return null
-        val n = f.pressed.live() ?: record(f.node.id, f.node.bounds, f.node.ops(true)).also { f.pressed = it }
+        val n = f.pressed.live() ?: record(f.node.id, f.node.bounds, drawn(f.node, true)).also { f.pressed = it }
         if (f.node.motion != null) applyMotion(f)
         return n
     }

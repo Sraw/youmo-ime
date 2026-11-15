@@ -282,8 +282,6 @@ def hk30(d):
 case("HK-13", needs="jvm:HardwareKeyUatTest.shiftBackFromEnglishIsWubiNotPinyin")(lambda d: None)
 
 
-case("HK-14", needs="jvm:HardwareKeyUatTest.ctrlShiftGoesRoundSkippingHandwriting")(lambda d: None)
-
 
 case("HK-15", needs="jvm:HardwareKeyUatTest.shiftThenCtrlToo")(lambda d: None)
 
@@ -310,10 +308,6 @@ def hk17(d):
     return f"Meta+空格 后当前输入法 {cur.split('/')[0]}；幽默没报错"
 
 
-case("HK-18", needs="jvm:HardwareKeyUatTest.handwritingTypedOnIsPinyin")(lambda d: None)
-
-
-case("HK-19", needs="jvm:HardwareKeyUatTest.theTouchKeyboardBackIsHandwriting")(lambda d: None)
 
 
 case("HK-20", needs="jvm:HardwareKeyUatTest.nineKeysTypedOnAndBack")(lambda d: None)
@@ -321,8 +315,6 @@ case("HK-20", needs="jvm:HardwareKeyUatTest.nineKeysTypedOnAndBack")(lambda d: N
 
 case("HK-21", needs="jvm:HardwareKeysUatTest.returnPutsTheWrittenInThenGoesToTheApp")(lambda d: None)
 
-
-case("HK-22", needs="jvm:HardwareKeyUatTest.aShortcutsChoiceIsKeptWhenTheTouchKeyboardIsBack")(lambda d: None)
 
 
 case("HK-23", needs="jvm:HardwareKeysUatTest.englishTypesTheKeysAsPressed")(lambda d: None)
@@ -637,3 +629,5 @@ def hk45(d):
 
 case("HK-46", needs="manual:编码行在输入框里时实体键盘的悬浮候选窗没有拼音那一行：接 emu-keyboard.sh 的实体键盘手工看")(lambda d: None)
 case("HK-47", needs="jvm:HardwareKeyUatTest.theFloatingWindowsCardsAreOneColumn")(lambda d: None)
+
+case("HK-48", needs="jvm:HardwareKeysUatTest.aHardwareKeyPutsTheWrittenInThenTypes")(lambda d: None)

@@ -34,7 +34,7 @@
   };
   const BOARD_LABEL = {
     qwerty: '26 键', nine: '九键', k14: '14 键', k18: '18 键', zhuyin: '注音全键盘', 'zhuyin-nine': '注音九键',
-    number: '数字', symbols: '符号', emoji: '表情', handwriting: '手写',
+    number: '数字', symbols: '符号', emoji: '表情',
   };
   const MODE_LABEL = { normal: '普通', 'one-handed': '单手', floating: '悬浮' };
   const STATE_LABEL = { idle: '空闲', typing: '打字中', longpress: '长按', clipboard: '剪贴板' };

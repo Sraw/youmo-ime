@@ -106,7 +106,6 @@ import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
 import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
 import org.fcitx.fcitx5.android.input.editing.WatchedEditor
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
-import org.fcitx.fcitx5.android.input.handwriting.ReadingToggle
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
 import org.fcitx.fcitx5.android.input.keyboard.SpaceCursor
@@ -186,13 +185,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             // back in a field started on the hardware keyboard (its button, a tap, the keyboard
             // unplugged): its layout, Enter and password the field's, not the field's it was last up in
             if (inputViewStarted) currentInputEditorInfo?.let { inputView?.startInput(it, capabilityFlags) }
-            hardwareKeyboard.touchKeyboardBack()
         }
     }
 
     private val hardwareKeyboard = HardwareKeyboard(
         post = { postFcitxJob(it) },
-        typingOnTouch = { inputDeviceMgr.isVirtualKeyboard },
         inTextField = { currentInputEditorInfo?.isTypeNull() == false },
         shortcutsOn = { switchShortcuts },
     )
@@ -631,11 +628,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 replaceInputView(ThemeManager.activeTheme, start = true)
             }
         }
-        // the style last used, from the settings or the 注 key, whichever keyboard is up: what 注 turns on again
-        lifecycleScope.launch {
-            val last = AppPrefs.getInstance().internal.lastCandidateReading
-            EngineState.candidateReading.collect { last.setValue(ReadingToggle.last(it, last.getValue())) }
-        }
         pkgNameCache = PackageNameCache(this)
         getSystemService(InputManager::class.java).registerInputDeviceListener(inputDeviceListener, null)
         recreateInputViewPrefs.forEach {
@@ -798,7 +790,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // make the next quote a lone ”. Its context is read now, less the “: the key event sent
         // next may not have landed by a read after it
         if (quoteOpen && !editingSession.pairs.quoteOpen) {
-            postFcitxJob { reset() }
+            postFcitxJob { reset(drop = true) }
             tellContext(before = {
                 currentInputConnection?.getTextBeforeCursor(ContextChars + 1, 0)
                     ?.let { it.dropLast(CodePoints.lengthOfLast(it, 1) ?: 1) }
@@ -1097,6 +1089,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun rememberVoiceWord(ask: VoiceEdits.Ask) {
         postFcitxJob {
             val added = voiceRemember(ask)
+            // a commit, not a drop: tapped 记住 is no clearing, and text written meanwhile is the user's to keep
             if (added) reset()
             withContext(Dispatchers.Main) {
                 if (!added) return@withContext say(R.string.voice_ask_failed)
@@ -1477,15 +1470,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onEvaluateFullscreenMode() = false
 
-    /** [handOff]: the key may be typed by another input method ([HardwareKeyboard.mayHandOff]). */
-    private fun forwardKeyEvent(event: KeyEvent, handOff: Boolean = false): Boolean {
+    private fun forwardKeyEvent(event: KeyEvent): Boolean {
         val sym = KeySym.fromKeyEvent(event)
         if (sym != null) {
             val timestamp = keyEventRelay.remember(event)
             val states = KeyStates.fromKeyEvent(event)
             val up = event.action == KeyEvent.ACTION_UP
             postFcitxJob {
-                if (handOff) hardwareKeyboard.handOff(this)
                 sendKey(sym, states, event.scanCode, up, timestamp)
             }
             return true
@@ -1518,9 +1509,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             forceShowSelf()
         }
-        val modified = event.isCtrlPressed || event.isAltPressed || event.isMetaPressed
-        val handOff = hardwareKeyboard.mayHandOff(event.unicodeChar, modified)
-        return forwardKeyEvent(event, handOff) || super.onKeyDown(keyCode, event)
+        return forwardKeyEvent(event) || super.onKeyDown(keyCode, event)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {

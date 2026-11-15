@@ -101,7 +101,7 @@ class EnginesInvariantsTest : EnginesFixture() {
             row("sameCodes") { sameCodes(listOf("你"), listOf(InputMethodCatalog.WUBI)) }, row("englishWords") { englishWords() },
             row("importBatches") { importBatches() }, row("importedWords") { importedWords() }, row("dropImport") { dropImport(0) },
             row("restoreImport") { restoreImport(0) }, row("exportWords") { exportWords() }, row("useHabits get") { useHabits },
-            row("useHabits set") { useHabits = true }, row("ink") { ink(Action.Ink(0), shown = false) }, row("inkSent") { inkSent(Action.Ink(0)) },
+            row("useHabits set") { useHabits = true }, row("ink") { ink(Action.Ink(0), shown = false, im = InputMethodCatalog.PINYIN) }, row("inkSent") { inkSent(Action.Ink(0), im = InputMethodCatalog.PINYIN) },
             row("glide") { glide(InputMethodCatalog.ENGLISH, path) }, row("inkEnded") { inkEnded }, row("reload") { reload() },
         )
         assertRows(calls, { it.first }) { (_, call) ->

@@ -270,7 +270,7 @@ object LayoutReader {
             if (item.name != "item") return@mapNotNull null.also { p.add(item.line, "<${item.name}> is not allowed in <popup>") }
             val ia = Attributes(item, p)
             val text = ia.required("text")
-            val send = ia.value("send", "an action", ::action)
+            val send = if (retired(ia, "send")) null else ia.value("send", "an action", ::action)
             ia.done()
             text?.let { it to send }
         }
@@ -286,7 +286,7 @@ object LayoutReader {
             val a = Attributes(item, p)
             val label = a.required("label")
             val icon = a.matching("icon", IDENT, "an icon name")
-            val action = a.value("do", "an action", ::action) ?: a.required("do")
+            val action = if (retired(a, "do")) null else a.value("do", "an action", ::action) ?: a.required("do")
             a.done()
             if (label != null && action != null) MenuItem(label, icon, action) else null
         }
@@ -314,7 +314,7 @@ object LayoutReader {
         alt = a.value("alt", "text or one binding ({punct:} of one character)", ::oneMark),
         icon = a.value("icon", "an icon name or binding", ::icon),
         kind = a.oneOf("kind", KINDS),
-        role = a.oneOf("role", KeyNames.ROLES),
+        role = if (retired(a, "role")) null else a.oneOf("role", KeyNames.ROLES),
         classes = classes(a),
         textSize = a.decimal("text-size", 0.0, MAX_TEXT_DP, minIncluded = false),
         compactTextScale = a.decimal("compact-text-scale", 0.0, MAX_RATIO, minIncluded = false),
@@ -324,7 +324,7 @@ object LayoutReader {
         a11y = a.value("a11y", "text or one binding ({punct:} of one character)", ::oneMark),
         sound = a.oneOf("sound", listOf("standard", "space", "delete", "return")),
         badge = a.value("badge", "an icon name or binding", ::icon),
-        actions = ACTIONS.mapNotNull { name -> a.value(name, "an action", ::action)?.let { name to it } }.toMap() +
+        actions = ACTIONS.mapNotNull { name -> if (retired(a, name)) null else a.value(name, "an action", ::action)?.let { name to it } }.toMap() +
             listOfNotNull(
                 a.oneOf("swipe-axis", listOf("vertical", "both"))?.let { "swipe-axis" to it },
                 a.boolean("repeat")?.let { "repeat" to it.toString() },
@@ -366,6 +366,18 @@ object LayoutReader {
     private fun icon(raw: String): Text? = when {
         IDENT.matches(raw) -> Text.Literal(raw)
         else -> binding(raw)?.takeIf { it.name in Text.ICONS }
+    }
+
+    /**
+     * Whether [name] is 0.6.0's handwriting keyboard's 注 (role `reading`, action `reading` or `reading:<style>`), gone
+     * with that keyboard (061-handwriting-toolbar §7): a layout written for it still read, with a warning, that
+     * attribute nothing.
+     */
+    private fun retired(a: Attributes, name: String): Boolean {
+        val raw = a.string(name) ?: return false
+        if (raw != "reading" && (name == "role" || !raw.startsWith("reading:"))) return false
+        a.warn("$name=\"$raw\" does nothing: 0.6.0's handwriting keyboard's 注 is gone with it")
+        return true
     }
 
     /** [raw] where it is a word of the action vocabulary (layout-1.xsd's `action`). */
@@ -420,7 +432,7 @@ object LayoutReader {
     private val ACTION_PATTERNS = listOf(
         // one character, sent to the engine as typed: `:` too (the 18 keys' M swipes it, HostKeyAction(":"))
         Regex("\\S"),
-        Regex("(sym|picker|shortcut|reading):[A-Za-z0-9_.-]*"),
+        Regex("(sym|picker|shortcut):[A-Za-z0-9_.-]*"),
         // a layout named; emoji search on or off, as the app has it (KeyAction.EmojiSearchAction)
         Regex("layout:[A-Za-z0-9_.-]+"),
         Regex("emoji-search:(on|off)"),
@@ -434,7 +446,7 @@ object LayoutReader {
         Regex("keypad:[0-9]"),
         Regex("caps(:lock)?"),
         Regex(
-            "lang|ime-picker|quickphrase|unicode|panel-back|panel-lock|space-long-press|reading|begin-selection-swipe|" +
+            "lang|ime-picker|quickphrase|unicode|panel-back|panel-lock|space-long-press|begin-selection-swipe|" +
                 "delete-selection|move-selection|lookup",
         ),
     )

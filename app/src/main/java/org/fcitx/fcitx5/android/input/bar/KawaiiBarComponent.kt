@@ -69,6 +69,7 @@ import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.HandwritingMode
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
@@ -128,6 +129,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     // set elsewhere too (the ⋯ panel, the one-handed keyboard's full-width button): the buttons lit as it is
     @Keep
     private val onToggleUpdateListener = ManagedPreference.OnChangeListener<Any> { _, _ -> showToggles() }
+
+    // the toolbar's 手写 (061-handwriting-toolbar): flipped here, read by the keyboard (BaseKeyboard)
+    private val handwritingOpen = prefs.internal.handwritingOpen
+
+    @Keep
+    private val onHandwritingUpdateListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
+        showToggles()
+        showCandidateHandwriting()
+    }
 
     private val clipboardSuggestion = prefs.clipboard.clipboardSuggestion
     private val clipboardItemTimeout = prefs.clipboard.clipboardItemTimeout
@@ -365,6 +375,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                         null
                     }
                     ToolbarButton.Voice -> { _ -> commonKeyActionListener.voiceTap() }
+                    ToolbarButton.Handwriting -> { _ -> flipHandwriting() }
                     ToolbarButton.Undo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true) }
                     ToolbarButton.Redo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true) }
                     ToolbarButton.CursorMove -> { _ -> windowManager.attachWindow(TextEditingWindow()) }
@@ -436,6 +447,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 }
             }
             dropPredictionsButton.setOnClickListener { service.dropPredictions() }
+            // lit, as it is there only while handwriting is on: a tap turns it off (the user's Q4)
+            handwritingButton.setOnClickListener { flipHandwriting() }
+            handwritingButton.setOn(true)
         }
     }
 
@@ -538,6 +552,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         toolbarButtons.registerOnChangeListener(onToolbarButtonsUpdateListener)
         ThemeManager.prefs.oneHanded.registerOnChangeListener(onToggleUpdateListener)
         prefs.internal.useHabits.registerOnChangeListener(onToggleUpdateListener)
+        handwritingOpen.registerOnChangeListener(onHandwritingUpdateListener)
         statusEntries = fcitx.runImmediately { statusAreaCached }
         arrangeButtons()
     }
@@ -591,12 +606,30 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             tradSimp = tradSimpEntry() != null,
             oneHanded = panelActions.oneHandedOffered,
             keyboards = panelActions.keyboardsOffered,
+            handwriting = handwritingOffered(),
         )
         val stored = toolbarButtons.getValue()
         val config = parsed?.takeIf { it.first == stored }?.second
             ?: ToolbarConfig.parse(stored).also { parsed = stored to it }
         idleUi.arrange { config.layout(situation, it) }
         showToggles()
+        showCandidateHandwriting()
+    }
+
+    // the input method as last told (onImeUpdate), till then the one cached
+    private var imName: String? = null
+
+    // English types its keys and a password's are never written (HandwritingMode.offered)
+    private fun handwritingOffered() =
+        HandwritingMode.offered(imName ?: fcitx.runImmediately { inputMethodEntryCached }.uniqueName, service.inPasswordField)
+
+    // turned off, the character being written ends and what it read stays typed (the keyboard's listener)
+    private fun flipHandwriting() = handwritingOpen.setValue(!handwritingOpen.getValue())
+
+    // the candidate bar's 手写, left of ⌄: there while handwriting is on where the toolbar offers it
+    private fun showCandidateHandwriting() {
+        candidateUi.handwritingButton.visibility =
+            if (handwritingOpen.getValue() && handwritingOffered()) View.VISIBLE else View.GONE
     }
 
     // lit while on, as in the ⋯ panel; a button not made yet is lit as it is made
@@ -605,6 +638,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private fun showToggle(button: ToolbarButton, view: ToolButton) {
         when (button) {
             ToolbarButton.OneHanded -> view.setOn(panelActions.oneHanded)
+            ToolbarButton.Handwriting -> view.setOn(handwritingOpen.getValue())
             ToolbarButton.Floating -> view.setOn(panelActions.floating)
             ToolbarButton.Habits -> {
                 view.setOn(!panelActions.habitsOn)
@@ -623,7 +657,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     // 键盘 is there for an input method with keyboards to choose from
-    override fun onImeUpdate(ime: InputMethodEntry) = arrangeButtons()
+    override fun onImeUpdate(ime: InputMethodEntry) {
+        imName = ime.uniqueName
+        arrangeButtons()
+    }
 
     override fun onStatusAreaUpdate(entries: List<StatusEntry>) {
         statusEntries = entries

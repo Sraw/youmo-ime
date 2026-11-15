@@ -181,7 +181,7 @@ class KeyboardHalvesUatTest {
 
     @Test
     @Uat("HW-19")
-    fun handwritingsMenuHasNoPinItsBlockUndoneAndForgettingReordersAtOnce() = with(EngineReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.HANDWRITING)) {
+    fun handwritingsMenuHasNoPinItsBlockUndoneAndForgettingReordersAtOnce() = with(EngineReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.PINYIN)) {
         val ren = arrayOf("人", "入", "八")
         write(*ren)
         val order = candidates.take(3)

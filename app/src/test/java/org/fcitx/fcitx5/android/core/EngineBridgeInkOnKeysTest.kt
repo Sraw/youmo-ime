@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.core
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.junit.Assert.assertEquals
@@ -18,7 +19,7 @@ import java.io.FileNotFoundException
 
 /**
  * Ink written on the keys of an input method whose own session cannot be made (a code table that does not read):
- * that input method's failure, latched as its own, no key sent; handwriting's pad not latched, so it still loads.
+ * that input method's failure, latched as its own, no key sent; handwriting's recognizer not latched, so it still loads.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
@@ -32,12 +33,28 @@ class EngineBridgeInkOnKeysTest {
         bridge.makeOnKeys = { throw FileNotFoundException("its table") }
         var sent = 0
         try {
-            assertFalse(bridge.sendInk(Action.Ink(1), InputMethodCatalog.PINYIN, onKeys = true) { sent++ })
+            assertFalse(bridge.sendInk(Action.Ink(1), InputMethodCatalog.PINYIN) { sent++ })
             assertEquals(0, sent)
             assertTrue(InputMethodCatalog.PINYIN in bridge.unloadable)
-            assertFalse(InputMethodCatalog.HANDWRITING in bridge.unloadable)
+            assertFalse("handwriting" in bridge.unloadable)
         } finally {
             bridge.unloadable.clear()
+        }
+    }
+
+    // 061-handwriting-toolbar §3.4: handwriting's session given up, the toolbar's 手写 off, not drawing ink that reads nothing
+    @Test
+    fun handwritingsSessionGivenUpTurnsTheSwitchOff() {
+        val open = AppPrefs.getInstance().internal.handwritingOpen
+        bridge.unloadable.clear()
+        open.setValue(true)
+        try {
+            assertFalse(bridge.handwriting { throw FileNotFoundException("its data") })
+            assertFalse(open.getValue())
+            assertTrue("handwriting" in bridge.unloadable)
+        } finally {
+            bridge.unloadable.clear()
+            open.setValue(false)
         }
     }
 }

@@ -33,19 +33,47 @@ class GlideTouchTest {
         assertEquals(Route.KEYS, t.move(50f, 120f, 40))
     }
 
+    // 061-handwriting-toolbar §3.2: handwriting on, a touch on the letter area is a stroke from its down, never a key
     @Test
-    fun aStrokeDrawnIsAThirdOfAKeyWhateverCapIsGivenTheCapIsTheWritings() {
-        // 笔画筛选: the cap given (20 pixels) is not its own, 0.3 of a 140 pixel key down is
+    fun handwritingOnATouchOnTheLettersIsAStrokeFromItsDown() {
         val t = GlideTouch()
-        t.down(0, 50f, 70f, 0, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, stroke = true, strokeCap = 20f)
-        assertEquals(Route.KEYS, t.move(50f, 100f, 20))
-        assertEquals(Route.CANCEL_KEYS, t.move(50f, 113f, 40))
-        t.up(50f, 113f, cancelled = false)
-        // writing on the keys: 20 pixels down starts it, under the half key's 70
-        val ink = KeyInkGesture()
-        t.down(0, 50f, 70f, 1000, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, ink = ink, strokeCap = 20f)
-        assertEquals(Route.KEYS, t.move(50f, 85f, 1020))
-        assertEquals(Route.CANCEL_KEYS, t.move(50f, 90f, 1040))
+        t.down(0, 50f, 70f, 0, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, writes = true)
+        // the caller asks at once: no key pressed
+        assertTrue(t.gliding)
+        // not moved: a stroke still (a dot, 主's first)
+        assertEquals(Route.GLIDE, t.move(50f, 70f, 10))
+        // past a long press: still the stroke's
+        assertEquals(Route.GLIDE, t.move(51f, 71f, 1000))
+        // out of the letter area: the same stroke
+        assertEquals(Route.GLIDE, t.move(50f, 500f, 1100))
+        assertEquals(Route.GLIDE, t.up(50f, 500f, cancelled = false))
+        assertFalse(t.gliding)
+        // a second finger is no key either while it writes
+        t.down(0, 50f, 70f, 2000, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, writes = true)
+        assertEquals(Route.GLIDE, t.otherDown())
+        assertEquals(Route.GLIDE, t.pointerUp(1, 0f, 0f))
+    }
+
+    @Test
+    fun handwritingOnATouchOffTheLettersIsTheKeys() {
+        // ⌫, space: onLetter false (the caller's letter area), no gap
+        val t = GlideTouch()
+        t.down(0, 50f, 70f, 0, onLetter = false, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, writes = true)
+        assertFalse(t.gliding)
+        assertEquals(Route.KEYS, t.move(50f, 300f, 20))
+        assertEquals(Route.KEYS, t.up(50f, 300f, cancelled = false))
+        // a split keyboard's gap is written on
+        t.down(0, 50f, 70f, 0, onLetter = false, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, inGap = true, writes = true)
+        assertTrue(t.gliding)
+    }
+
+    @Test
+    fun handwritingOffTheLettersGlideAsBefore() {
+        val t = GlideTouch()
+        t.down(0, 50f, 70f, 0, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, writes = false)
+        assertFalse(t.gliding)
+        assertEquals(Route.KEYS, t.move(52f, 70f, 10))
+        assertEquals(Route.KEYS, t.up(52f, 70f, cancelled = false))
     }
 
     @Test
@@ -130,6 +158,35 @@ class GlideTouchTest {
         assertEquals(0, t.count)
         t.add(300f, 70f)
         assertEquals(0, t.count)
+    }
+
+    // a thumb resting while another finger writes (0.6.0's pad's): each lift of the writing finger a stroke, its next
+    // down on the letters the next one, off them nothing; the thumb's lift ends it all, and a glide never writes again
+    @Test
+    fun handwritingWithAThumbRestingEachDownOnTheLettersWritesAgain() {
+        val t = GlideTouch()
+        t.down(0, 50f, 70f, 0, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, writes = true)
+        assertEquals(Route.GLIDE, t.otherDown())
+        assertEquals(Route.GLIDE, t.pointerUp(0, 50f, 140f))
+        assertTrue(t.writesAgain)
+        assertTrue(t.swallows(first = false, last = false))
+        assertFalse("off the letters", t.downAgain(0, 50f, 900f, 100, onLetter = false))
+        assertTrue(t.downAgain(2, 150f, 70f, 200, onLetter = true))
+        assertTrue(t.gliding)
+        assertEquals(2, t.pointer)
+        assertFalse(t.swallows(first = false, last = false))
+        assertEquals(Route.GLIDE, t.move(250f, 70f, 220))
+        assertEquals(Route.GLIDE, t.pointerUp(2, 250f, 70f))
+        assertTrue(t.writesAgain)
+        assertTrue(t.swallows(first = false, last = true))
+        assertFalse(t.writesAgain)
+        // a glide's finger lifting with another down: swallowed, nothing written again
+        val g = touch()
+        g.move(150f, 70f, 40)
+        g.otherDown()
+        g.pointerUp(0, 250f, 70f)
+        assertFalse(g.writesAgain)
+        assertFalse(g.downAgain(1, 50f, 70f, 100, onLetter = true))
     }
 
     @Test

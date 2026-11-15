@@ -314,7 +314,7 @@ class GroupedKeyboard private constructor(
     }
 
     // the groups' keys where the scene draws them: each key's letters= (060-render-v2 §15), its first letter's
-    private fun groupPlaces(): List<Pair<Char, KeyPlace>> =
+    private fun groupPlaces(): List<Pair<Char, ScenePlace>> =
         canvas?.shownKeys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id, k.copy == 1) } }
 
     // no glide: a stroke drawn alone (笔画筛选), over the group keys, each its first letter's
@@ -322,7 +322,6 @@ class GroupedKeyboard private constructor(
         letters = { groupPlaces() },
         enabled = { false },
         filters = { InputMethodCatalog.filtersByStrokes(imeName) },
-        writes = { InputMethodCatalog.writesOnKeys(imeName) },
     ) { _, _ -> }
 
     // the code of the key [id] of [group]'s letters: the built-in keyboard's of its first letter (as always), a

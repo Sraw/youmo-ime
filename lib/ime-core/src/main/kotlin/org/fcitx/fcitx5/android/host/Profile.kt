@@ -72,6 +72,27 @@ class Profile private constructor(val groups: List<Group>, val order: List<Strin
         return Merged(Profile(merged, order), shown, changed, both)
     }
 
+    /** What [retireHandwriting] made: the [profile]; whether anything [changed]; whether pinyin [moved] first where handwriting was. */
+    data class Retired(val profile: Profile, val changed: Boolean, val moved: Boolean)
+
+    /**
+     * This with 0.6.0's handwriting input method gone from every group ([HandwritingRetire.group]), pinyin
+     * first where it was first. Read with [HandwritingRetire.OLD] among the input methods [load] keeps, or
+     * it is dropped before this (a group of it alone gone with it).
+     */
+    fun retireHandwriting(): Retired {
+        var changed = false
+        var moved = false
+        val retired = groups.map { group ->
+            val out = HandwritingRetire.group(group.items.map(Item::name), group.defaultInputMethod) ?: return@map group
+            changed = true
+            moved = moved || out.moved
+            val layouts = group.items.associate { it.name to it.layout }
+            group.copy(defaultInputMethod = out.defaultIm, items = out.items.map { Item(it, layouts[it].orEmpty()) })
+        }
+        return Retired(Profile(retired, order), changed, moved)
+    }
+
     /**
      * The file as fcitx writes it (`writeAsIni`, `fcitx-config/iniparser.cpp:102-148`), through
      * [IniFile]: a value equal to its option's default (the empty string for all of these) is

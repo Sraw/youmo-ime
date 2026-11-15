@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.host.ConfigWriter
 import org.fcitx.fcitx5.android.host.EngineHost
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.host.FilePkgDataDir
+import org.fcitx.fcitx5.android.host.HandwritingRetire
 import org.fcitx.fcitx5.android.host.HostCore
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.HostEvents
@@ -290,14 +291,13 @@ class KotlinHost(
         }
     }
 
-    override suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean, takesBack: Boolean) =
-        onHost { inkKey(Action.Ink(piece, reading, takesBack = onKeys && takesBack), onKeys) }
+    override suspend fun offerInk(reading: InkReading, piece: Int) = onHost { inkKey(Action.Ink(piece, reading)) }
 
-    override suspend fun inkFinished(piece: Int, onKeys: Boolean) = onHost { inkKey(Action.Ink(piece), onKeys) }
+    override suspend fun inkFinished(piece: Int) = onHost { inkKey(Action.Ink(piece)) }
 
-    // the Ink key carries what the pad told: it cannot come apart from it
-    private fun HostCore.inkKey(piece: Action.Ink, onKeys: Boolean) =
-        bridge.sendInk(piece, inputMethodEntryCached.uniqueName, onKeys) { sendVirtual(Keyboard.INK, piece) }
+    // the Ink key carries what the keys' ink told: it cannot come apart from it
+    private fun HostCore.inkKey(piece: Action.Ink) =
+        bridge.sendInk(piece, inputMethodEntryCached.uniqueName) { sendVirtual(Keyboard.INK, piece) }
 
     override suspend fun learning(op: LearningOp) = onHost {
         // 繁體: the menu names the candidate as shown, converted; the engine has it simplified. Each
@@ -345,7 +345,7 @@ class KotlinHost(
 
     override suspend fun select(idx: Int, text: String?): Boolean = onHost { select(idx, text) }
     override suspend fun isEmpty(): Boolean = onHost { isEmpty() }
-    override suspend fun reset() = onHost { reset() }
+    override suspend fun reset(drop: Boolean) = onHost { reset(drop) }
     override suspend fun dropPredictions() = onHost { dropPredictions() }
     override suspend fun clearTyped(keyboard: (im: String) -> Any?) = onHost { clearTyped(keyboard) }
     override suspend fun retype(typing: HostCore.Retyping, keyboard: Any?) = onHost { retype(typing, keyboard) }
@@ -530,11 +530,13 @@ class KotlinHost(
         step("punctuation maps, writer")
         val strings = AppHostStrings(context)
         val available = InputMethodCatalog.LISTED.map { it.name }.toSet()
-        val profile = mergeNineKeys(Profile.load(readConfig(PROFILE).getOrNull(), available + NineKeysMerge.OLD, strings.defaultGroup), directBoot)
+        val loaded = Profile.load(readConfig(PROFILE).getOrNull(), available + NineKeysMerge.OLD + HandwritingRetire.OLD, strings.defaultGroup)
+        val retired = retireHandwriting(mergeNineKeys(loaded, directBoot), directBoot)
         this.directBoot = directBoot
         loadOptions(readConfig(EngineOptions.PATH).getOrNull(), directBoot)
-        if (!directBoot) tellUnseen()
         for (path in CONF_FILES) confTexts[path] = readConfig(path).getOrNull()
+        retireTraditionalHandwriting(retired, directBoot)
+        if (!directBoot) tellUnseen()
         step("strings, profile, confs")
         val punctuationProfile = punctuationProfile()
         step("punctuation table")
@@ -556,7 +558,7 @@ class KotlinHost(
         step("ChineseModules")
         val wasFirstRun = firstRun
         val made = HostCore(
-            engine.host, dispatcher, profile, available, strings, firstRun = wasFirstRun,
+            engine.host, dispatcher, retired.profile, available, strings, firstRun = wasFirstRun,
             showInputMethodInformation = showInputMethodInformation, persist = ::persist, modules = chinese::build,
         )
         made.events += HostEvents(::forward)
@@ -768,6 +770,45 @@ class KotlinHost(
     }
 
     /**
+     * [loaded] without 0.6.0's handwriting input method (HandwritingRetire), at every start: an upgrade's profile
+     * and a 0.6.0 backup restored alike, nothing done where none names it; the profile written once it is
+     * unlocked ([directBoot] writes nothing). The user told whenever it retires one (§6.1: a 0.6.0 backup
+     * restored, handwriting added back there and upgraded again; [AppPrefs.Internal.handwritingRetiredUnseen],
+     * [tellUnseen]); once ([AppPrefs.Internal.handwritingRetired], which must not undo what the user did since,
+     * the button taken off the toolbar): the toolbar's 手写 pinned, turned on where handwriting was the first input
+     * method (pinyin there now).
+     */
+    private fun retireHandwriting(loaded: Profile, directBoot: Boolean): Profile.Retired {
+        val retired = loaded.retireHandwriting()
+        if (!retired.changed || directBoot) return retired.copy(changed = false)
+        val prefs = AppPrefs.getInstance()
+        if (!prefs.internal.handwritingRetired.getValue()) {
+            prefs.pinHandwriting()
+            if (retired.moved) prefs.internal.handwritingOpen.setValue(true)
+            prefs.internal.handwritingRetired.setValue(true)
+        }
+        prefs.internal.handwritingRetiredUnseen.setValue(if (retired.moved) "$RETIRED_TOOLBAR,$RETIRED_MOVED" else RETIRED_TOOLBAR)
+        persist(Persist.ProfileChanged(retired.profile))
+        return retired
+    }
+
+    /**
+     * chttrans' list without 0.6.0's handwriting (HandwritingRetire.traditional), written back: its 繁体 pinyin's
+     * where pinyin took its first place ([retired] moved), else gone, and the user told so as handwriting is
+     * retired ([retired] changed: the first time). [directBoot] writes nothing.
+     */
+    private fun retireTraditionalHandwriting(retired: Profile.Retired, directBoot: Boolean) {
+        if (directBoot) return
+        val old = confTexts[ModuleConfigs.CHTTRANS]
+        val out = HandwritingRetire.traditional(ModuleConfigs.chttrans(old), retired.moved) ?: return
+        val text = ModuleConfigs.chttransText(old, out.enabled)
+        confTexts[ModuleConfigs.CHTTRANS] = text
+        writer?.write(ModuleConfigs.CHTTRANS) { text }
+        val internal = AppPrefs.getInstance().internal
+        if (out.lost && retired.changed) internal.handwritingRetiredUnseen.setValue(internal.handwritingRetiredUnseen.getValue() + ",$RETIRED_TRADITIONAL")
+    }
+
+    /**
      * The options read, 双拼's scheme as 0.5 has them (SchemeMigration): an install from before 0.5
      * (not this one's first run, not [AppPrefs.Internal.schemeSettled]: a 0.4 backup's prefs restored
      * have neither) with none stored pinned to 自然码, a dropped one 小鹤 and the user told once;
@@ -810,6 +851,17 @@ class KotlinHost(
      */
     private fun tellUnseen() {
         val internal = AppPrefs.getInstance().internal
+        val handwriting = internal.handwritingRetiredUnseen.getValue().split(',').filterTo(HashSet()) { it.isNotEmpty() }
+        if (handwriting.isNotEmpty()) {
+            val more = buildString {
+                if (RETIRED_MOVED in handwriting) append(context.getString(R.string.handwriting_retired_moved))
+                if (RETIRED_TRADITIONAL in handwriting) append(context.getString(R.string.handwriting_retired_traditional))
+            }
+            EngineNotices.toldUntilSeen(R.string.handwriting_retired, more) { internal.handwritingRetiredUnseen.setValue("") }
+        }
+        if (internal.keyHandwritingUnseen.getValue()) {
+            EngineNotices.toldUntilSeen(R.string.key_handwriting_retired) { internal.keyHandwritingUnseen.setValue(false) }
+        }
         if (internal.nineKeysUnseen.getValue()) {
             EngineNotices.toldUntilSeen(R.string.nine_keys_merged) { internal.nineKeysUnseen.setValue(false) }
         }
@@ -895,6 +947,12 @@ class KotlinHost(
 
     private companion object {
         const val PROFILE = "profile"
+
+        // what the notice of handwriting moved onto the toolbar says besides that (Internal.handwritingRetiredUnseen,
+        // its markers comma-separated)
+        const val RETIRED_TOOLBAR = "toolbar"
+        const val RETIRED_MOVED = "moved"
+        const val RETIRED_TRADITIONAL = "traditional"
 
         // the modules' files, read at the start and again at reloadConfig
         val CONF_FILES = listOf(ModuleConfigs.PUNCTUATION, ModuleConfigs.CHTTRANS)

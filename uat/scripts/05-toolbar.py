@@ -448,3 +448,9 @@ def tb54(d):
         got.append(len(t))
         d.shot("kb", f"{way}粘贴后")
     return f"候选栏 {got[0]} 字、面板 {got[1]} 字，都整段"
+
+case("TB-55", needs="jvm:ToolbarConfigTest.handwritingIsPinnedByDefaultAndLeftOutWhereItDoesNotWrite、HandwritingUatTest.theToolbarsButtonTurnsHandwritingOffAndOn")(lambda d: None)
+
+case("TB-56", needs="jvm:BarToolbarThemeTest.theToolbarAndTheCodeAreTheThemes")(lambda d: None)
+
+case("TB-57", needs="jvm:ToolbarConfigTest.pinnedOnesWithNoRoomGoOntoTheToolbarInOrderBeforeTheMoreButton")(lambda d: None)

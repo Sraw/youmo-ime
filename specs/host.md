@@ -208,7 +208,7 @@ goes through the host's panel list (`HostCore`'s `TempModeCandidates`), which ru
   with a space and digits are typed; the user's entries commit through `commitAsIs` (no chttrans or
   full width) and their use goes to `QuickPhraseHooks.used` except in a `PASSWORD_OR_SENSITIVE`
   field; `withMine` false (借手机) hides them. `Panel.quickPhrase` tells the app the panel is quick
-  input's (the handwriting pad swaps for the full keyboard); `HostCore.quickPhraseAt` gives the
+  input's (the letters typed then, not written on: `HandwritingMode.writes`); `HostCore.quickPhraseAt` gives the
   entry under a long press.
 - `QuickPhraseBook`: the user's entries (`data/quickphrase.d/mine.mb`) in order of use (`mine.used`), then the built-in
   `QuickPhraseTable`; the user's match by key prefix case aside, the built-in ones case kept. An entry

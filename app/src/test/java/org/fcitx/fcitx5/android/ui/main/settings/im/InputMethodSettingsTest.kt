@@ -23,7 +23,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The app's own input methods, each of which has a page: handwriting too, which a list of them by hand left out. */
+/** The app's own input methods, each of which has a page. */
 internal val appInputMethods = InputMethodSettings.BUILT_IN
 
 internal fun List<Item>.flat(): List<Item> = flatMap { if (it is Section) it.items.flat() else listOf(it) }
@@ -49,6 +49,12 @@ class InputMethodSettingsTest {
     fun everyInputMethodOfTheAppHasAPageAndOthersNone() {
         appInputMethods.forEach { assertNotNull(it, InputMethodSettings.of(it)) }
         assertNull(InputMethodSettings.of("keyboard-de"))
+        // 0.6.0's handwriting, retired (061-handwriting-toolbar §6): no page; its pause is the shared page's
+        assertNull(InputMethodSettings.of(InputMethodCatalog.HANDWRITING_RETIRED))
+        // a route to it saved before opens 通用输入, where its 停笔时间 went (061-handwriting-toolbar §3.9)
+        assertEquals(SettingsRoute.SharedInput, SettingsRoute.now(SettingsRoute.InputMethodConfig("手写", InputMethodCatalog.HANDWRITING_RETIRED)))
+        val pinyin = SettingsRoute.InputMethodConfig("拼音", InputMethodCatalog.PINYIN)
+        assertEquals(pinyin, SettingsRoute.now(pinyin))
         // a route 0.4 saved to its 九键拼音 opens pinyin's page, not the tables' it would fall to by its engine- name
         assertSame(InputMethodSettings.of(InputMethodCatalog.PINYIN), InputMethodSettings.of(InputMethodCatalog.T9))
     }
@@ -60,7 +66,7 @@ class InputMethodSettingsTest {
     fun builtInIsEveryInputMethodTheEngineRegisters() {
         val registered = setOf(
             "engine-pinyin", "engine-shuangpin", "engine-wubi", "engine-cangjie",
-            "engine-ziranma", "engine-erbi", "engine-wubipinyin", "engine-handwriting", "keyboard-us"
+            "engine-ziranma", "engine-erbi", "engine-wubipinyin", "keyboard-us"
         )
         assertEquals(registered, InputMethodSettings.BUILT_IN.toSet())
         assertEquals(registered.size, InputMethodSettings.BUILT_IN.size)
@@ -113,7 +119,7 @@ class InputMethodSettingsTest {
     @Test
     fun theSharedOptionsAreOnTheSharedPageAlone() {
         val shared = listOf(
-            AppPrefs.KEY_DRAWING, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM, InputMethodSettings.ADDRESSES,
+            AppPrefs.KEY_DRAWING, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM, InputMethodSettings.ADDRESSES, AppPrefs.HANDWRITING_PAUSE,
             EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.BUILT_IN_PHRASES, EngineSettings.MODEL_LEVEL, EngineSettings.CANDIDATE_READING, InputMethodSettings.PUNCTUATION,
             "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", EngineSettings.FUZZY,
         )
@@ -135,7 +141,6 @@ class InputMethodSettingsTest {
         val own = mapOf(
             InputMethodCatalog.PINYIN to listOf(EngineSettings.CHAIZI, EngineSettings.LATIN_WORDS, AppPrefs.PINYIN_KEYBOARD) + nineKeys,
             InputMethodCatalog.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE, AppPrefs.SHUANGPIN_KEYBOARD),
-            InputMethodCatalog.HANDWRITING to listOf(AppPrefs.HANDWRITING_PAUSE),
             InputMethodCatalog.ENGLISH to listOf(
                 AppPrefs.ENGLISH_KEYBOARD, AppPrefs.T9_ENGLISH_TYPING, *nineKeys.toTypedArray(),
                 EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS,
@@ -169,8 +174,9 @@ class InputMethodSettingsTest {
         assertEquals(emptyList<String>(), notFor(AppPrefs.CALCULATION_REPLACES_SUM))
         // the Chinese input methods' section says English for all of it: under a row, only an exception within it
         assertEquals(emptyList<String>(), notFor(EngineSettings.PREDICTION))
-        assertEquals(listOf(InputMethodCatalog.HANDWRITING), notFor(EngineSettings.EMOJI))
-        assertEquals(listOf(InputMethodCatalog.HANDWRITING), notFor(EngineSettings.BUILT_IN_PHRASES))
+        // what is handwritten has none: said in their words (061-handwriting-toolbar §1.3), no input method to name
+        assertEquals(emptyList<String>(), notFor(EngineSettings.EMOJI))
+        assertEquals(emptyList<String>(), notFor(EngineSettings.BUILT_IN_PHRASES))
         assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
         assertEquals(emptyList<String>(), notFor(InputMethodSettings.PUNCTUATION))
         assertEquals(listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.SHUANGPIN_KEYS18, InputMethodCatalog.SHUANGPIN_KEYS14, InputMethodCatalog.SHUANGPIN_NINE, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))

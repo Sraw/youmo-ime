@@ -34,11 +34,10 @@
 ### 特色
 
 - **整句拼音**：全拼和双拼（小鹤、微软、自然码），键盘可选全键盘、18 键、两个字母一个键的 14 键或九键（按 `64426` 就是"你好"），也能用注音九键、大千注音全键盘打；简拼、半截输入，按到相邻键会自动纠正。
-- **笔画筛选**：打了拼音后在键盘上画一笔（横、竖、撇、点、折），只留第一个字这样起笔的候选，再画就按笔顺接着筛，不用翻页找字（默认关，和滑行输入、键盘手写三选一）。
+- **笔画筛选**：打了拼音后在键盘上画一笔（横、竖、撇、点、折），只留第一个字这样起笔的候选，再画就按笔顺接着筛，不用翻页找字（默认关，和滑行输入二选一）。
 - **自己训练的模型**：拼音和英文的 n-gram 模型从网页统计而来；两个小型句子模型参考前文，给整句重新排序。
 - **新词**：近几年的新词（显眼包、破防、红温……）逐个校对后收进词库，每次发版更新。
-- **手写**：一次写一个字，按整句理解，后写的字能改正前面认错的；长按单字看字卡（读音和例词、部首、笔顺）。候选上可以标出拼音或注音（默认关）。
-- **键盘手写**：没打字时直接在拼音、码表、注音的键盘上写汉字，不用换到手写输入法（默认关，和滑行输入、笔画筛选三选一）。
+- **手写**：点工具栏的「手写」，直接在拼音、码表、注音键盘的字母上写字，再点一下关掉；一次写一个字，按整句理解，后写的字能改正前面认错的；长按单字看字卡（读音和例词、部首、笔顺）。候选上可以标出拼音或注音（默认关）。
 - **码表**：五笔、仓颉、二笔、自然码、五笔拼音；重码按前文排，上屏后有联想。
 - **英文键盘**：自动纠错、补全、预测下一个词。
 - **滑行输入**：英文、拼音、九键、码表都能一笔划出一个词（默认关）。
@@ -107,11 +106,10 @@ English, and offline voice input once the voice pack is imported. It asks for no
 ### Features
 
 - **Whole-sentence pinyin**: full pinyin and shuangpin (小鹤, 微软, 自然码) on the full keyboard, 18 keys, 14 keys of two letters each or nine keys (`64426` is 你好), or with zhuyin on nine keys or the full Dachen keyboard; abbreviations, half-typed syllables, slipped keys corrected.
-- **Stroke filter**: after the pinyin, draw a stroke on the keyboard (horizontal, vertical, left-falling, dot, turning) to keep only the candidates whose first character starts with it; more strokes narrow it down further, so no paging for a character (off by default; one of three with glide typing and keyboard handwriting).
+- **Stroke filter**: after the pinyin, draw a stroke on the keyboard (horizontal, vertical, left-falling, dot, turning) to keep only the candidates whose first character starts with it; more strokes narrow it down further, so no paging for a character (off by default; one or the other with glide typing).
 - **Models of its own**: pinyin and English n-gram models counted from web pages; two small sentence models reorder sentences by the text before.
 - **New words**: the last few years' words, curated one by one, updated with every release.
-- **Handwriting**: one character at a time, read as a sentence, so a later character puts an earlier misread right; long-press a character for its card (readings and words, radical, stroke order). Candidates can show their pinyin or zhuyin (off by default).
-- **Keyboard handwriting**: with nothing typed, write characters straight on the pinyin, table or zhuyin keyboard, no switch to handwriting (off by default; one of three with glide typing and the stroke filter).
+- **Handwriting**: tap the toolbar's handwriting button and write straight on the letters of the pinyin, table or zhuyin keyboard, tap it again to stop; one character at a time, read as a sentence, so a later character puts an earlier misread right; long-press a character for its card (readings and words, radical, stroke order).
 - **Code tables**: Wubi, Cangjie, Erbi, Ziranma, Wubi-Pinyin; candidates ordered by the text before, next-word suggestions.
 - **English keyboard**: autocorrection, completions, next-word predictions.
 - **Glide typing**: one stroke for a word in English, pinyin, nine keys and the code tables (off by default).

@@ -16,17 +16,14 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.HostConfigDir
-import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.ui.main.MainActivity
@@ -50,15 +47,13 @@ import org.robolectric.shadows.ShadowToast
 import java.io.File
 
 /**
- * Quick input on the keyboard (uat/11 QU-12, QU-17, QU-18) over a fake engine: the handwriting pad
- * lending its place to the full keyboard, a candidate's card, the clipboard's 存为快速输入.
+ * Quick input on the keyboard (uat/11 QU-12, QU-17, QU-18) over a fake engine: the zhuyin keyboards
+ * lending their place to the full keyboard (the toolbar's 手写 pausing: KeyHandwritingUatTest), a candidate's card, the clipboard's 存为快速输入.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class QuickPhraseKeyboardUatTest {
-
-    private val handwriting = InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false)
 
     private var h = KeyboardHarness()
 
@@ -75,87 +70,18 @@ class QuickPhraseKeyboardUatTest {
 
     private fun s(id: Int, vararg args: Any) = h.service.getString(id, *args)
 
-    private fun onHandwriting() {
-        h.close()
-        h = KeyboardHarness(im = handwriting).apply {
-            api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, handwriting)
-            api.enabledIme = api.availableIme
-        }
-        h.start()
-    }
-
     private fun quickInput(on: Boolean) {
         val aux = if (on) FormattedText(arrayOf("快速输入: "), intArrayOf(0), -1) else FormattedText.Empty
         h.emit(HostEvent.InputPanel(FormattedText.Empty, aux, FormattedText.Empty, quickPhrase = on))
     }
 
-    private fun padShown() = KeyboardHarness.find<HandwritingPadView>(h.inputView)?.let { h.shown(it) } == true
-
     private fun lettersShown() = "q" in h.texts() && "p" in h.texts()
 
+    // the zhuyin keyboards send no letters: 大千 and 注音九键 give way to the full keyboard, and an input method
+    // chosen meanwhile keeps its own letters, the zhuyin keyboard not brought back over them
     @Test
     @Uat("QU-12")
-    fun handwritingLendsItsPlaceToTheFullKeyboardWhileQuickInputLasts() {
-        onHandwriting()
-        assertTrue(padShown())
-        quickInput(true)
-        assertFalse(padShown())
-        assertTrue(h.texts().toString(), lettersShown())
-        // a key typed keeps it: the panel again, still quick input's
-        quickInput(true)
-        assertTrue(lettersShown())
-        quickInput(false)
-        assertTrue(padShown())
-        // the pad's own panels bring nothing
-        quickInput(false)
-        assertTrue(padShown())
-    }
-
-    // review Q1: the input method changed under quick input, its change told before quick input's end:
-    // the new input method's letters stay, the pad is not brought back over them
-    @Test
-    fun anotherInputMethodChosenDuringQuickInputKeepsItsOwnLetters() {
-        onHandwriting()
-        quickInput(true)
-        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
-        quickInput(false)
-        assertFalse(padShown())
-        assertTrue(h.texts().toString(), lettersShown())
-        // and back on handwriting it is the pad, its own again
-        h.emit(HostEvent.InputMethodChanged(handwriting))
-        assertTrue(padShown())
-        // told the other way round, the same
-        quickInput(true)
-        quickInput(false)
-        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
-        assertFalse(padShown())
-        assertTrue(lettersShown())
-    }
-
-    // the user's call (2026-11-02): an input method chosen during quick input shows what it shows out of
-    // it. On handwriting's pad English's letters come, quick input or not, and stay after it
-    @Test
-    @Uat("QU-12")
-    fun anInputMethodChosenDuringQuickInputShowsWhatItShowsOutOfIt() {
-        onHandwriting()
-        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
-        val outOfIt = padShown() to lettersShown()
-        assertEquals(false to true, outOfIt)
-        h.emit(HostEvent.InputMethodChanged(handwriting))
-        assertTrue(padShown())
-        quickInput(true)
-        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
-        quickInput(false)
-        assertEquals(outOfIt, padShown() to lettersShown())
-        h.emit(HostEvent.InputMethodChanged(handwriting))
-        assertTrue(padShown())
-    }
-
-    // the zhuyin keyboards send no letters either: 大千 and 注音九键 give way as the pad does, and an
-    // input method chosen meanwhile keeps its own letters, the zhuyin keyboard not brought back over them
-    @Test
-    @Uat("QU-12")
-    fun theZhuyinKeyboardsLendTheirPlaceAsThePadDoes() {
+    fun theZhuyinKeyboardsLendTheirPlaceToTheFullKeyboard() {
         val told = AppPrefs.getInstance().internal.zhuyinTraditionalTold
         val wasTold = told.getValue()
         told.setValue(true)

@@ -434,7 +434,11 @@ object ThemeReader {
     private fun selectorWarnings(el: XmlElement, p: Problems, selectors: List<Selector>) {
         selectors.mapNotNull { it.reserved }.distinct().forEach { p.warn(el.line, ignored(it)) }
         selectors.flatMap { it.scenes }.filter { it.startsWith("im=") && it.removePrefix("im=") !in Selector.IMS }.distinct()
-            .forEach { p.warn(el.line, "@$it is no input method of this app: it selects nothing") }
+            .forEach {
+                // 0.6.0's handwriting input method, written over the keys of the one in use now (061-handwriting-toolbar §7)
+                if (it == "im=$PAD_BOARD") p.warn(el.line, "@$it selects nothing: handwriting is no input method now, it is written over the letters of the one in use")
+                else p.warn(el.line, "@$it is no input method of this app: it selects nothing")
+            }
     }
 
     // what a style's [values] name is there: its colours in <colors>, its fonts a <font>, its icons the app's or an <icon>
@@ -548,7 +552,7 @@ object ThemeReader {
         for (prop in props) {
             val (widget, whose) = when (prop) {
                 "blur" -> "voice" to "the voice mask's"
-                in PAD_PROPERTIES -> "key" to "the handwriting pad's (handwriting/pad)"
+                in PAD_PROPERTIES -> "key" to "the handwriting ink's (handwriting/pad)"
                 else -> continue
             }
             // the window's widgets and the candidates' warned of already, by what they read (unreadByWindow, unreadByBar)
@@ -557,15 +561,20 @@ object ThemeReader {
         }
     }
 
-    // the pad's ink and grid on a key named that is not the pad (`qwerty/q`, `handwriting/*`, which selects no slot, `*/enter`):
-    // it reads them alone; a class or a kind may be the pad's
+    // the handwriting board's rules (`handwriting/*`, `@keyboard=handwriting`): its keyboard gone, handwriting written over the
+    // letters (061-handwriting-toolbar §7), they select nothing but its pad's ink (PanelLooks.pad); its grid is not drawn.
+    // The pad's ink on a key named that is not the pad (`qwerty/q`, `*/enter`): it reads them alone; a class or a kind may be the pad's
     private fun unreadPad(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
+        for (s in selectors.filter { it.board == PAD_BOARD || "keyboard=$PAD_BOARD" in it.scenes }) {
+            val ink = s.board == PAD_BOARD && s.key == PAD_KEY && s.widget == "key" && s.scenes.none { it == "keyboard=$PAD_BOARD" }
+            props.filter { !ink || it !in INK_PROPERTIES }
+                .forEach { p.warn(line, "$it= on the handwriting keyboard does nothing: handwriting is written over the letters, only its pad's ink-color= and ink-width= are read") }
+        }
         val pad = props.filter { it in PAD_PROPERTIES }
         if (pad.isEmpty()) return
-        val named = selectors.filter { it.widget == "key" && (it.board != null || it.starRole != null) }
-            .filterNot { it.board == PAD_BOARD && it.key == PAD_KEY }
+        val named = selectors.filter { it.widget == "key" && it.board != PAD_BOARD && (it.board != null || it.starRole != null) }
             .map { s -> s.board?.let { "$it/${s.key ?: "*"}" } ?: "*/${s.starRole}" }.distinct()
-        for (at in named) pad.forEach { p.warn(line, "$it= on $at does nothing: it is the handwriting pad's (handwriting/pad)") }
+        for (at in named) pad.forEach { p.warn(line, "$it= on $at does nothing: it is the handwriting ink's (handwriting/pad)") }
     }
 
     // what [s] (a panel, its states and part) reads: in a state, only the picker's one shown
@@ -591,6 +600,7 @@ object ThemeReader {
     )
 
     private val PAD_PROPERTIES = setOf("ink-color", "ink-width", "grid-color", "grid")
+    private val INK_PROPERTIES = setOf("ink-color", "ink-width")
     private const val PAD_BOARD = "handwriting"
     private const val PAD_KEY = "pad"
 

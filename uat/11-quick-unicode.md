@@ -68,11 +68,11 @@
 - **预期**：编码显示 44，候选里先是 gh 的网址，再是内置的 ghost；空格上屏网址。改了九键字母后按新字母找。
 - **JVM**：`QuickPhraseMineTest.theNineKeysFindAKeyByItsLettersShowingDigits`、`the14KeysFindByTheWholeKeyAndBackspaceKeepsStep`。
 
-### QU-12 [P2] 九键、手写长按「符」进快速输入
-- **前提**：同 QU-10；九键用 B0-九键，手写在 B0 上换到手写键盘，注音九键用 B0-注音九键，大千用 B0-注音全键盘，注音两种先在 **按键 → 按键字符和快捷键** 里给一个键设上「快速输入」快捷键。
-- **操作**：九键、手写上长按「符」；注音九键、大千上从快捷键（或勾上的工具栏「快速输入」按钮）进快速输入。
-- **预期**：进快速输入；手写、注音九键、大千时换成全键盘，退出后回到原来的键盘；快速输入时换了输入法，和平时换输入法一样，退出后是新输入法的键盘。
-- **JVM**：`LayoutSwitchKeyTest.theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps`；换键盘 `QuickPhraseKeyboardUatTest.handwritingLendsItsPlaceToTheFullKeyboardWhileQuickInputLasts`，快速输入时按语言键换了输入法不回手写板 `anotherInputMethodChosenDuringQuickInputKeepsItsOwnLetters`，和不在快速输入时换的一样 `anInputMethodChosenDuringQuickInputShowsWhatItShowsOutOfIt`；注音两种键盘 `theZhuyinKeyboardsLendTheirPlaceAsThePadDoes`。
+### QU-12 [P2] 九键长按「符」进快速输入；手写开着时快速输入里照打
+- **前提**：同 QU-10；九键用 B0-九键，手写用 B0-手写，注音九键用 B0-注音九键，大千用 B0-注音全键盘，注音两种先在 **按键 → 按键字符和快捷键** 里给一个键设上「快速输入」快捷键。
+- **操作**：九键上长按「符」；手写开着时长按「符」进快速输入，点几个字母，退出后写「人」；注音九键、大千上从快捷键（或勾上的工具栏「快速输入」按钮）进快速输入。
+- **预期**：进快速输入；手写开着时快速输入里字母不变淡、点了就打，退出后接着写；注音九键、大千时换成全键盘，退出后回到原来的键盘；快速输入时换了输入法，和平时换输入法一样，退出后是新输入法的键盘。
+- **JVM**：`LayoutSwitchKeyTest.theNineKeysSymbolsKeyHoldsQuickInputItsNumbersKeyOnlyTaps`、`KeyHandwritingUatTest.outOfQuickInputTheLettersAreWrittenOnAgain`；注音两种键盘 `QuickPhraseKeyboardUatTest.theZhuyinKeyboardsLendTheirPlaceToTheFullKeyboard`。
 
 ### QU-13 [P1] 密码框里不记顺序
 - **前提**：同 QU-10，测试页的「密码」框。

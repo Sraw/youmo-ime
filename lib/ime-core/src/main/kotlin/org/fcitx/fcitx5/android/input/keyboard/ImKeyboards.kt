@@ -34,7 +34,6 @@ object ImKeyboards {
         ZHUYIN_NINE,
         ZHUYIN_FULL,
         ENGLISH_NINE,
-        HANDWRITING,
     }
 
     /** Each input method's keyboard as the user chose it: [ImKeyboard.FULL] for one never chosen. */
@@ -55,7 +54,7 @@ object ImKeyboards {
     private val ALL = listOf(ImKeyboard.FULL, ImKeyboard.KEYS18, ImKeyboard.KEYS14, ImKeyboard.NINE_KEYS)
 
     /**
-     * The keyboards [im] offers, in the order offered; none for one with no choice (a table, handwriting).
+     * The keyboards [im] offers, in the order offered; none for one with no choice (a table).
      * 双拼's 14 keys not under a [scheme] that types `;` (微软: ing), which no key of theirs has (I1 Q5).
      */
     fun choices(im: String, scheme: ShuangpinScheme): List<ImKeyboard> = when (im) {
@@ -107,7 +106,6 @@ object ImKeyboards {
     fun layoutOf(im: String, chosen: Chosen, scheme: ShuangpinScheme, password: Boolean = false): Layout {
         val keyboard = effective(im, chosen.of(im), scheme)
         return when (im) {
-            InputMethodCatalog.HANDWRITING -> Layout.HANDWRITING
             InputMethodCatalog.PINYIN -> when (keyboard) {
                 ImKeyboard.FULL -> Layout.TEXT
                 ImKeyboard.KEYS18 -> Layout.PINYIN18

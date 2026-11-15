@@ -1,6 +1,6 @@
 // 面板和窗口 (060-render-p3 §5.1 panel 7): the window round the keys (T7a: the floating keyboard's frame and handle,
 // the buttons beside a one-handed board, the split's gap, the navigation bar) and the app's panels (T7b: the
-// clipboard, the symbols' and emoji's picker, the editing panel, the voice mask, the handwriting pad). What each
+// clipboard, the symbols' and emoji's picker, the editing panel, the voice mask, the ink of handwriting over the letter keys). What each
 // reads is the engine's (ThemeReader's WINDOW_READS, PANEL_READS); the preview shows a sample (环境 → 面板样例).
 (function (root) {
   'use strict';
@@ -26,9 +26,11 @@
     { id: 'editing', title: '编辑面板', select: 'editing', props: [fill, radius] },
     { id: 'voice', title: '语音', select: 'voice', props: [fill, { prop: 'blur', label: '毛玻璃', kind: 'dp', max: 25, step: 0.5 }, icon] },
     { id: 'voice-mic', title: '语音的话筒', select: 'voice mic', props: [fill, icon] },
-    { id: 'pad', title: '手写板', select: 'handwriting/pad', props: [
-      { prop: 'ink-color', label: '笔迹颜色', kind: 'color' }, { prop: 'ink-width', label: '笔迹粗细', kind: 'dp', min: 1, max: 8, step: 0.5 },
-      { prop: 'grid-color', label: '格子颜色', kind: 'color' }, { prop: 'grid', label: '格子', kind: 'flag' },
+    // 0.6.1: no pad of its own, the ink drawn over the 26 keys' letters (工具栏的「手写」); the app takes the colour where it
+    // reads on the keys (3:1), else the keys' text colour. The preview draws no ink
+    { id: 'pad', title: '键上手写的笔迹', select: 'handwriting/pad', props: [
+      { prop: 'ink-color', label: '笔迹颜色', kind: 'color', note: '跟按键底色对比不够时用按键文字颜色' },
+      { prop: 'ink-width', label: '笔迹粗细', kind: 'dp', min: 1, max: 8, step: 0.5 },
     ] },
   ];
 

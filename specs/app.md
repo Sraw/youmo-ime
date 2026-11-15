@@ -39,6 +39,12 @@ bar's width changes. The ⋯ panel's own actions live in `PanelActions`, called 
 `StatusAreaWindow` and the bar's buttons alike. A new panel entry that should be a button too is a
 `ToolbarButton`, its `ToolbarButtonLooks`, its action in `PanelActions`, and an `on(…)` line in
 `KawaiiBarComponent`.
+The toolbar's 手写 (061-handwriting-toolbar) is such a button, pinned by default (`ToolbarConfig.DEFAULT`: 表情, 手写,
+语音, 收起; `withHandwritingPinned` for a bar arranged before, `AppPrefs.pinHandwriting`), offered where
+`HandwritingMode.offered` (not English, not a password). Its state is `Internal.handwritingOpen`, kept across
+keyboards, input methods and restarts; lit (`ToolButton.setOn`, checkable for TalkBack) while on, and as
+`CandidateUi`'s `candidate_handwriting_btn`, left of ⌄, while candidates show. Turned on it warms the recognizer;
+turned off it finishes the character being written and leaves what it read typed.
 The panel (`StatusAreaWindow`) is a notice line above the grid: as it attaches it asks the host for
 `statusArea()` and `learning(LearningOp.Saving)` on the fcitx thread (that flag alone, not the whole `Overview` with every
 list counted), and shows `learning_not_saving` (the 用户词库 page's sentence) while `LearningResult.Saving.saving` is
@@ -82,7 +88,7 @@ what later events bring. `KotlinHost.stop` empties the caches, so a view made af
 no dead engine's state. Why it is made anew is `ViewRebuild` (ime-core): a setting
 (`recreateInputViewPrefs`, the candidates' prefs, any theme pref but floating) first ends what was
 typed as leaving the field does (`focusOutIn`: pinyin's code dropped, the field's composing text,
-English's word or handwriting's, committed; user, 2026-10-27 and 2026-10-31), so no code typed on the
+English's word committed, what is written over the keys put in; user, 2026-10-27 and 2026-10-31), so no code typed on the
 14 keys reaches the full keyboard's session and no code row is left over an empty bar; then it tells
 the engine its context again, as the field stays and no input restarts to. `onConfigurationChanged`
 ends it the same way, so of dark mode's two (it and the theme's rebuild, in either order) the last
@@ -212,7 +218,7 @@ hidden or detached, they stop (detached, every node's drawing let go). `KeyEffec
 
 ### Keys
 
-A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `NumberKeyboard`, `HandwritingKeyboard`):
+A layout is a list of rows of `KeyDef`s (`TextKeyboard.Layout`, `T9Keyboard`, `NumberKeyboard`):
 an appearance (text, image, width, variant) and behaviours (`Press`, `LongPress`, `Repeat`,
 `Swipe`, `DoubleTap`), each a `KeyAction` (`HostKeyAction`, `SymAction`, `CommitAction`,
 `LayoutSwitchAction`, `QuickPhraseAction`, `UnicodeAction`, `LangSwitchAction`,
@@ -376,7 +382,7 @@ is the room, a plain view that takes no touch. Decided as the keyboard is made: 
 makes the input view anew (the theme editor's preview too, `KeyboardPreviewUi`). A first try with
 the halves against the gap and T, G, B on both left the edges ragged and empty (2026-10-14).
 
-While the letters split, every other board (number pad, nine keys, handwriting, the pickers, the
+While the letters split, every other board (number pad, nine keys, the pickers, the
 clipboard: anything but the letters, `SplitKeyboard.side`) goes to one side one thumb wide, the bar
 over it too, as Gboard's one-handed mode: across a 850 dp screen the number pad's middle was out of
 either thumb's reach. `SplitKeyboard.dockWidth`: 42% of the keyboard, 320–420 dp (about a phone
@@ -550,9 +556,8 @@ password is neither read nor learned; the space a glide puts before its word wou
 Keys there are typed as they are, and a finger sliding across them never starts a glide.
 
 The same touch is a stroke (笔画筛选) where that is chosen instead: one setting,
-`AppPrefs.keyboard.keyDrawing` (`KeyDrawing`: Off, Glide, StrokeFilter, Handwriting; the page lists
-Handwriting always, labelled as needing the text pack while that is not ready, as a ListPreference
-cannot disable one entry), so the two are never both on and English glides none while strokes are
+`AppPrefs.keyboard.keyDrawing` (`KeyDrawing`: Off, Glide, StrokeFilter; 0.6.0's Handwriting is read as Off,
+the toolbar's 手写 pinned and the user told once, `AppPrefs.migrateKeyHandwriting`), so the two are never both on and English glides none while strokes are
 chosen. 0.5's two switches (`glide_typing`, 0.4's key too, and `stroke_filter`) move over at the
 start (`AppPrefs.migrateKeyDrawing`, a backup's at the start after its import): glide if it was on,
 else strokes if they were, else off (both on, which only a backup or a hand edit holds, is glide),
@@ -576,22 +581,23 @@ from where the letters are, so only the 26 keys split have it), passed to `Glide
 `inGap`, and `GlideInput` keeps that down though no key takes it (else its moves would go nowhere);
 a tap there still does nothing, and a glide starts on a letter only.
 
-Writing on the keys (键盘手写, `KeyDrawing.Handwriting`; design 060-kbd-handwriting) is `GlideInput`'s
-third mode, decided at the down (`writes`: the setting, a word field, no temporary mode, TalkBack's
-touch exploration off, `InputMethodCatalog.writesOnKeys` of the keyboard's input method, the
-recognizer loadable). `KeyInk` (`input/keyboard`, one per keyboard made with its glide) holds the
-pad (`InkPad`), the gesture (ime-core's `KeyInkGesture`, fed by `GlideTouch`) and the ink drawn over
-the keys after them in `dispatchDraw` (the pad's colour by default: key text, 3.5 dp; faded over
-150 ms as a piece ends). The recognizer is the shared one (`HandwritingRecognition.shared`), made
-and warmed up the first time a touch may start a stroke, never for English. Keys go through
-`InkKeys` (shared with `HandwritingKeyboard`: in order behind the reads, backspace a stroke first, a
-key for the engine wiping the piece) only once the keyboard was written on and in an input method
-that writes. Readings go out through `KeyboardWindow` as `HostApi.offerInk(onKeys = true)`, the first
-of a piece whose first dot was a tap taken back marked `takesBack` (the engine deletes the letter if
-that tap alone is typed: no backspace is sent from here); pieces the engine ended come back through
-`EngineState.handwritingEnded`, and `EngineState.keysTyped` (re-emitted after every key) tells the
-gesture whether the input method has its own input typed. `restartInk` drops the pad at each new
-input; detaching finishes it.
+Writing on the keys (the toolbar's 手写; designs 060-kbd-handwriting, 061-handwriting-toolbar) is `BaseKeyboard`'s,
+with the glide's touch (`GlideInput`): while `HandwritingMode.writes` (the toggle on, an input method that writes, not a
+password field, no temporary mode, TalkBack's touch exploration off, the recognizer loadable), every down on the letter
+area (the letter keys by their hit areas, the gaps between them, Shift, a split's gap) is a stroke, from the first
+pixel: no tap, no long press, no swipe, no glide, a second finger nothing; the other keys stay keys. The letters show
+faded (`HandwritingMode.faded`, 35%, no grid, no pad). `KeyInk` (`input/keyboard`, one per keyboard made with its glide)
+holds the pad (`InkPad`) and the ink drawn over the keys after them in `dispatchDraw` (`HandwritingMode.inkColor`,
+3.5 dp; faded over 150 ms as a piece ends). The recognizer is the shared one (`HandwritingRecognition.shared`), made
+and warmed up as the toggle turns on, never for English. Keys go through `InkKeys` (in order behind the reads,
+backspace a stroke first, a key for the engine wiping the piece) while written on. Readings go out through
+`KeyboardWindow` as `HostApi.offerInk`; pieces the engine ended come back through `EngineState.handwritingEnded`.
+`restartInk` drops the pad at each new input; detaching finishes it.
+How long the pen stays up before a piece is done (`InkPad.finishMillis`) is the app's setting
+`AppPrefs.keyboard.handwritingPause` (`HandwritingPause`, 0.3–1.5 s), on 通用输入's 手写 section, read at each
+pen up. A piece so done is told to the engine (`HostApi.inkFinished`, an Ink key carrying the piece and no
+reading, after the piece's readings: `HandwritingRecognition.afterReads`), for the large sentence model to weigh
+the finished character's sentence. The recognizer skips a read only for a newer one of the same piece.
 
 The 060 redraw (`input/keyboard/canvas/`; the only drawing since 060-render-p2 S8a, which deleted the
 key views and the 开发者 → 新绘制键盘 switch, its stored key retired): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
@@ -796,7 +802,7 @@ told the engine as the keyboard is shown, not as it is made (`onAttach`, `Engine
 each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them). Other groups told while
 a code is typed on the ones before (`EngineBridge.replaces`: groups told before, now others): the code is committed first
 as Return commits it (`HostCore.commitCode`, pinyin's letters as typed), not lost with the session made anew; no reset, so
-the next word keeps its 前文. The field's composing text (handwriting's, English's word) is no such code and is left alone
+the next word keeps its 前文. The field's composing text (English's word) is no such code and is left alone
 (`KotlinHostOwnKeysTest`).
 Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
 groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
@@ -953,11 +959,11 @@ and goes on, through the host (no hotkeys of its own), to the app (an editor's c
 the keys then go to the host and the app as any other.
 The input method's name flashes by the cursor (fcitx's ShowInputMethodInformation).
 
-With the hardware keyboard, handwriting and the nine keys are skipped by Ctrl+Shift
-(`InputMethodCatalog.takesKeyboard`), and a character key pressed in one is typed by pinyin (全拼 or 双拼,
-whichever is listed first), else the first enabled Chinese input method that takes a keyboard, else
-English (`InputMethodSwitch.forKeyboard`), as Sogou and Baidu type pinyin whatever their touch
-layout; the touch one comes back with the touch keyboard (`HardwareKeyboard.touchInputMethod`, the host thread's; the hand-off runs in the key's own host job).
+With the hardware keyboard every input method types the keys itself (since 0.6.1, handwriting being the
+toolbar's switch and no input method, nothing is skipped by Ctrl+Shift nor handed to pinyin): pinyin on the
+nine keys types them as full pinyin and the nine keys come back with the touch keyboard (HK-20); with
+handwriting on, what is written and not yet put in goes in first, then the key (`InkOver.letter`, HK-48),
+and the switch is still on when the touch keyboard comes back (uat/17-hardware-keyboard.md「手写和九键遇上实体键盘」).
 `-`/`=` page the candidates while composing (`KeyRouter`, physical keys only).
 
 Testing one (`uat/tools/emu-keyboard.sh`, the cases in `uat/17-hardware-keyboard.md`): the emulator only, never a container device such as redroid (it shares the host kernel, and a uinput
@@ -1009,7 +1015,7 @@ four) and `englishKeyboard` (`EnglishKeyboard`: `Full`, `NineKeys`, key `english
 following pinyin's); each is in `recreateInputViewPrefs`. The router's IM stays `engine-pinyin` on
 every pinyin keyboard. The ⋯ panel's 「键盘」 entry is `KeyboardPicker` (`show(anchor)`): the current
 input method's `choices`, the one in use ticked; a pick sets that input method's pref, so the view is
-rebuilt at once. No entry where there is no choice (the tables, handwriting). The settings pages
+rebuilt at once. No entry where there is no choice (the tables). The settings pages
 show a section 「九键」 (`InputMethodSettings.NINE_KEYS`: 连按, 按键字母, one pref each, shared by
 pinyin's and English's nine keys; English's 九键英文打法 first in it; 双拼 has no such section, its
 letters the scheme's and no multi-tap; every nine key's symbols are on 按键字符和快捷键's 九键 tab) while 九键 is chosen, hidden and shown at once as 键盘 changes
@@ -1104,20 +1110,6 @@ on, read from `EngineState.englishSuggests`), a long press's letter then pinned 
 apostrophe then, else `. , ? ! ' -` in turn) and the column, comes from
 `EngineState.englishTyping`. ⇧ stands where 重输 is, its state `NineKeyShift` (ime-core), lit by
 auto-caps through `AutoCapsKeys`, which both boards implement. No glide on it.
-
-Handwriting's keyboard (`HandwritingKeyboard`, the letters layout of `InputMethodCatalog.HANDWRITING`) is a pad
-(`HandwritingPadView` over `InkPad`) and a column of backspace and marks. Each read goes to
-`HandwritingRecognition` (input/handwriting), its reading back to the engine through
-the key `Keyboard.INK` carrying it (`EngineBridge.ink`), with the piece it is of; the pad wipes the piece
-it writes once the engine has ended it (`EngineState.handwritingEnded`, the latest piece ended, so
-a value missed while detached is still seen), and ends it itself when detached and at each new
-input (`restart`, which also drops what was still being read). The
-recognizer skips a read only for a newer one of the same piece: a piece's last read is what it shows.
-How long the pen stays up before a piece is done (`InkPad.finishMillis`) is the app's setting
-`AppPrefs.keyboard.handwritingPause` (`HandwritingPause`, 0.3–1.5 s), on the handwriting page,
-read at each pen up. A piece so done is told to the engine (an Ink key carrying
-the piece and no reading, after the piece's readings: `HandwritingRecognition.afterReads`), for the large sentence model
-to weigh the finished character's sentence.
 
 ## Settings
 
@@ -1256,7 +1248,7 @@ All the keyboard draws reads `ThemeManager.shownLook(theme)`: the theme's look u
 
 Every key is drawn by `KeyFaceDrawable` (`input/keyboard/`; `View.drawAsKey`): shadow, fill, border, in
 the shape ime-core's `KeyFaceGeometry` gives (blocks or flat, `KeyDef.Appearance.Border` →
-`KeyFaceGeometry.Border`: a flat keyboard's T9 column and handwriting pad keep their face, `On`). The
+`KeyFaceGeometry.Border`: a flat keyboard's T9 column keeps its face, `On`). The
 fill is a colour, a nine-slice image (`NineSliceLayout`, drawn at the sample it was decoded at; the
 colour till the board's images are in, then `invalidateSelf`) or the picture showing through
 (`ThemePictureDrawable`/`PictureHost`: the picture as `PictureWindow.centerCrop` lays it under the
@@ -1286,10 +1278,10 @@ colour (not set, the keyboard's at `PanelLooks.MASK_ALPHA`), its frosted glass (
 box blurs of the radius, as the picture's, on the keys taken 2 to 8 times smaller, under 4 px a little more; 0, none, the keys plain
 under the colour; not set, the glass of before), the microphone's bubble and bars (the accent colour at
 `MIC_ALPHA`, and whole). The glass is one picture of the keys taken once on every API: RenderEffect is API 31's
-and blurs a view's own drawing, not what is under it. The handwriting pad's `ink-color`, `ink-width` (1–8 dp)
-and `grid` / `grid-color` are on its slot's style (`handwriting/pad`, as its fill): the engine puts the
-strokes' `Ink` on the slot (`HandwritingKeyboard` gives it to `HandwritingPadView`; not set, the keys' text,
-3.5 dp) and a 田字格 of 1 dp lines over the pad's face in its ops (`engine/Pads`; not set, none).
+and blurs a view's own drawing, not what is under it. The ink written over the letters is the
+style of 0.6.0's handwriting pad (`handwriting/pad`'s `ink-color`, `ink-width` 1–8 dp; `ScenePanels`, the board itself
+gone, its other rules and layout warned of as doing nothing): its colour where it stands out from the letter keys
+3:1 (`HandwritingMode.inkColor`), else the keys' text; 3.5 dp unset. `grid` / `grid-color` are warned of as doing nothing.
 
 `ThemeAssets` (`data/theme/`) decodes off the main thread and caches for one theme's files at a time:
 the picture once an orientation at the width it is drawn (halved while wider, and till it is at most

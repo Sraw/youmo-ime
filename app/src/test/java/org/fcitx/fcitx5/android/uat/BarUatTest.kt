@@ -330,6 +330,35 @@ class BarUatTest {
         assertFalse(again.isShowing)
     }
 
+    // the open toolbar's buttons where the bar has room for them all at 40 dp (14 sp): none narrower; where it has not,
+    // squeezed, never below 28 dp (ButtonsBarUi.MIN_SIZE). The room the bar's own, not the screen's. Whether it had room
+    private fun toolbarSqueezedNoMore(h: KeyboardHarness, sp: Int): Boolean {
+        val buttons = h.described(h.service.getString(R.string.undo)).parent as ViewGroup
+        val roomy = (buttons.parent as View).width >= buttons.childCount * h.service.dp(40)
+        val min = h.service.dp(if (sp <= 14 && roomy) 40 else 28)
+        for (d in listOf(R.string.undo, R.string.redo, R.string.text_editing, R.string.clipboard, R.string.status_area, R.string.handwriting)) {
+            val b = h.described(h.service.getString(d))
+            assertTrue("$d ${b.width} at $sp sp", b.width >= min)
+        }
+        return roomy
+    }
+
+    // MN-20 where the bar has room for the open toolbar: at 14 sp no button squeezed below 40 dp
+    @Test
+    @Uat("MN-20")
+    @Config(qualifiers = "w480dp-h851dp-port-440dpi")
+    fun aRoomyBarsToolbarIsNotSqueezed() {
+        val size = ThemeManager.prefs.candidateTextSize
+        try {
+            size.setValue(14)
+            val h = KeyboardHarness().also { harness = it }.start()
+            h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
+            assertTrue("no room for the toolbar at 480 dp", toolbarSqueezedNoMore(h, 14))
+        } finally {
+            size.setValue(size.defaultValue)
+        }
+    }
+
     private fun sizes(sp: Int, name: String): Pair<Int, Int> {
         ThemeManager.prefs.candidateTextSize.setValue(sp)
         val h = KeyboardHarness().also { harness = it }.start()
@@ -339,11 +368,7 @@ class BarUatTest {
             assertTrue("$d at $sp sp", h.described(h.service.getString(d)).width >= h.service.dp(40))
         }
         h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
-        val min = h.service.dp(if (sp <= 14) 40 else 28)
-        for (d in listOf(R.string.undo, R.string.redo, R.string.text_editing, R.string.clipboard, R.string.status_area)) {
-            val b = h.described(h.service.getString(d))
-            assertTrue("$d ${b.width} at $sp sp", b.width >= min)
-        }
+        toolbarSqueezedNoMore(h, sp)
         h.capture("BarUatTest/toolbar_${name}")
         // the panels' own bar keys are as high as the bar (F4175, F4189): the clipboard's 清空, the
         // status area's settings, the text-editing panel's 剪贴板

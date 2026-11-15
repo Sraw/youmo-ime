@@ -33,9 +33,8 @@ class KeyboardVariantsTest {
         assertTrue(sp.semicolon)
         assertFalse(KeyboardVariants.of(Form.Grouped18, InputMethodCatalog.SHUANGPIN_KEYS18, ShuangpinScheme.XIAOHE).semicolon)
         assertEquals(KeyboardVariants.SHUANGPIN_NINE, KeyboardVariants.of(Form.Nine, InputMethodCatalog.SHUANGPIN_NINE, ms).nineLetters)
-        // 注音's and 手写's keyboards are theirs whatever types on them
+        // 注音's keyboards are theirs whatever types on them
         assertEquals(KeyboardVariant(Form.ZhuyinNine), KeyboardVariants.of(Form.ZhuyinNine, InputMethodCatalog.ZHUYIN_NINE, ms))
-        assertEquals(KeyboardVariant(Form.Handwriting), KeyboardVariants.of(Form.Handwriting, InputMethodCatalog.SHUANGPIN, ms))
     }
 
     @Test

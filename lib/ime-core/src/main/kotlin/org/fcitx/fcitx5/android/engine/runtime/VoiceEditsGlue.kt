@@ -58,15 +58,17 @@ internal class VoiceEditsGlue(
 
     /**
      * [im]'s answer [s] to [event]: a commit, a Backspace the app takes. [predicting]: what showed
-     * before it was 联想, whose pick is no word typed. Nothing is followed where nothing is [learning].
+     * before it was 联想, whose pick is no word typed; [inking]: handwriting written over the keys showed
+     * before it (InkOver.inking), whose commit it is. Nothing is followed where nothing is [learning].
      */
-    fun answered(im: String, event: Int, s: Snapshot, predicting: Boolean, learning: Boolean, reading: String? = null) {
+    fun answered(im: String, event: Int, s: Snapshot, predicting: Boolean, learning: Boolean, reading: String? = null, inking: Boolean = false) {
         if (!edits.open) return
         // the engine taking back what was before the cursor (English's correction, say): not followed
         if (!learning || s.deleteBefore > 0) return edits.clear()
         if (event == EngineEvent.BACKSPACE && !s.handled && s.commit.isEmpty()) edits.backspace()
-        // handwriting's, read by the characters' readings it shares with what voice heard (§3)
-        if (s.commit.isNotEmpty()) edits.committed(s.commit, typed = im in TYPED && !predicting, reading.takeIf { im != InputMethodCatalog.HANDWRITING })
+        // handwriting's (written over the keys, [inking]: the commit is its), read by the characters' readings it
+        // shares with what voice heard (§3), not by the pinyin the input method's own last commit had
+        if (s.commit.isNotEmpty()) edits.committed(s.commit, typed = (inking || im in TYPED) && !predicting, reading.takeIf { !inking })
     }
 
     /** The host's context, as [Engines.context] has it. */
@@ -110,9 +112,9 @@ internal class VoiceEditsGlue(
         }
 
 
-        // pinyin's (全拼, 双拼, the nine keys and the rest of its keyboards) and handwriting's: the edits
+        // pinyin's (全拼, 双拼, the nine keys and the rest of its keyboards), and handwriting's ([answered]'s inking): the edits
         // the user's choice (r13 U-30, Q5) counts; a table's, English's not
-        private val TYPED = setOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.T9, InputMethodCatalog.HANDWRITING)
+        private val TYPED = setOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.T9)
 
         // [block] run to its end here: its suspensions are none (the engine answers at once, on this thread)
         private fun <T> now(block: suspend () -> T): T {

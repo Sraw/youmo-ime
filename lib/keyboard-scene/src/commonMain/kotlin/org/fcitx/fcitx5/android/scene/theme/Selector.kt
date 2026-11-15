@@ -114,7 +114,7 @@ data class Selector(
 
         /**
          * The scenes of what is typed ([org.fcitx.fcitx5.android.scene.engine.Env.scenes]): `@im=<input
-         * method>` (its kind, `pinyin` `shuangpin` `english` `table` `handwriting`, or a table's name, `wubi`),
+         * method>` (its kind, `pinyin` `shuangpin` `english` `table`, or a table's name, `wubi`),
          * `@field=<kind>` of these, `@keyboard=<board>` (a layout's id, `nine`).
          */
         val FIELDS = setOf("password", "url", "number", "email")
@@ -123,7 +123,7 @@ data class Selector(
          * The words of `@im=` that select (the app's SceneTyping, held to it by its test): the kinds, T9 and
          * zhuyin `pinyin` as their engine is, and the tables' names. Another is read, warned of, selects nothing.
          */
-        val IMS = setOf("pinyin", "shuangpin", "english", "table", "handwriting", "wubi", "cangjie", "ziranma", "erbi", "wubipinyin")
+        val IMS = setOf("pinyin", "shuangpin", "english", "table", "wubi", "cangjie", "ziranma", "erbi", "wubipinyin")
         private val IM = Regex("[a-z0-9]+(-[a-z0-9]+)*")
         private val BOARD = Regex("[a-z0-9]+(-[a-z0-9]+)*")
         private val CLASS = Regex("[a-z][a-z0-9-]*")

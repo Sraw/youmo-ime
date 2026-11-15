@@ -56,7 +56,8 @@ case("QU-10", needs="jvm:QuickPhraseMineTest.nothingTypedListsMineThenAddWithNot
 case("QU-11", needs="jvm:QuickPhraseMineTest.theNineKeysFindAKeyByItsLettersShowingDigits、QuickPhraseMineTest.the14KeysFindByTheWholeKeyAndBackspaceKeepsStep")(lambda d: None)
 
 
-case("QU-12", needs="jvm:LayoutSwitchKeyTest.theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps")(lambda d: None)
+case("QU-12", needs="jvm:LayoutSwitchKeyTest.theNineKeysSymbolsKeyHoldsQuickInputItsNumbersKeyOnlyTaps、KeyHandwritingUatTest.outOfQuickInputTheLettersAreWrittenOnAgain、"
+              "QuickPhraseKeyboardUatTest.theZhuyinKeyboardsLendTheirPlaceToTheFullKeyboard")(lambda d: None)
 
 
 case("QU-13", needs="jvm:QuickPhraseMineTest.inAPasswordFieldMineCommitsButItsUseIsNotKept")(lambda d: None)

@@ -315,8 +315,6 @@ class SettingsUatTest {
         open(SettingsRoute.SharedInput)
         val groups = listOf(R.string.shared_section_all, R.string.shared_section_chinese, R.string.shared_section_pinyin).map(::s)
         assertEquals(groups, st.titles().filter { it in groups })
-        assertTrue(summary(R.string.im_emoji).endsWith(notFor(c.HANDWRITING)))
-        assertTrue(summary(R.string.im_built_in_phrases).endsWith(notFor(c.HANDWRITING)))
         // 在键上划: the choice alone, which input methods each choice reaches the docs say
         assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
         // 双拼's 18 and 14 keys too: they read no slip, ü typed with its own key either
@@ -338,10 +336,10 @@ class SettingsUatTest {
         assertEquals(s(R.string.shared_input_link), st.titles().first())
         assertTrue(s(R.string.im_latin_words) in st.titles())
         assertTrue(st.titles().none { it in shared })
-        im(c.HANDWRITING)
-        assertEquals(s(R.string.shared_input_link), st.titles().first())
+        // 停笔时间: the shared page's 手写 (061-handwriting-toolbar §3.9), on no input method's
+        assertTrue(s(R.string.handwriting_pause) !in st.titles())
+        open(SettingsRoute.SharedInput)
         assertTrue(s(R.string.handwriting_pause) in st.titles())
-        assertTrue(st.titles().none { it in shared })
         im(c.SHUANGPIN)
         assertTrue(s(R.string.im_shuangpin_scheme) in st.titles())
         assertTrue(s(R.string.im_latin_words) !in st.titles())
@@ -429,10 +427,10 @@ class SettingsUatTest {
         }
     }
 
-    // 在键上划: one list, off till chosen, of 滑行输入, 笔画筛选, 键盘手写 and off; its summary the choice alone; a
-    // choice stored, the page opened again showing it. 键盘手写 says it needs the text pack while that is missing
+    // 在键上划: one list, off till chosen, of 滑行输入, 笔画筛选 and off; its summary the choice alone; a
+    // choice stored, the page opened again showing it (键盘手写 is the toolbar's 手写 now)
     @Test
-    @Uat("ST-46")
+    @Uat("ST-46", "ST-121")
     fun keyDrawingIsOneListOfItsChoices() {
         val keyboard = AppPrefs.getInstance().keyboard
         try {
@@ -442,7 +440,7 @@ class SettingsUatTest {
             open(SettingsRoute.SharedInput)
             val drawing = listed(R.string.key_drawing)
             assertEquals(
-                listOf(R.string.glide_typing, R.string.stroke_filter, R.string.key_drawing_handwriting, R.string.swipe_off).map(::s),
+                listOf(R.string.glide_typing, R.string.stroke_filter, R.string.swipe_off).map(::s),
                 drawing.entries.map { it.toString() },
             )
             assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
@@ -452,10 +450,6 @@ class SettingsUatTest {
             assertEquals(s(R.string.stroke_filter), summary(R.string.key_drawing))
             open(SettingsRoute.SharedInput)
             assertEquals(s(R.string.stroke_filter), summary(R.string.key_drawing))
-            TestShelves.use(text = false, voice = true)
-            open(SettingsRoute.SharedInput)
-            val needs = activity.getString(R.string.key_drawing_needs_text_pack, s(R.string.key_drawing_handwriting))
-            assertEquals(needs, listed(R.string.key_drawing).entries[2].toString())
         } finally {
             TestShelves.use()
             keyboard.keyDrawing.setValue(KeyDrawing.Off)
@@ -543,7 +537,7 @@ class SettingsUatTest {
 
     private companion object {
         val PAGED = InputMethodCatalog.run {
-            listOf(PINYIN, SHUANGPIN, HANDWRITING, WUBI, ERBI, CANGJIE, ZIRANMA, WUBI_PINYIN)
+            listOf(PINYIN, SHUANGPIN, WUBI, ERBI, CANGJIE, ZIRANMA, WUBI_PINYIN)
         }
     }
 }

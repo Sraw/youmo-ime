@@ -317,8 +317,7 @@ internal class LearningOps(
         val items = buildList {
             if (Offer.FORGET in offers) add(MenuItem.DELETE)
             if (Offer.BLOCK in offers) add(MenuItem.BLOCK)
-            // handwriting has no code a pin stands under (U-82, C18)
-            if (Offer.PIN in offers && im != InputMethodCatalog.HANDWRITING) add(MenuItem.PIN)
+            if (Offer.PIN in offers) add(MenuItem.PIN)
             if (Offer.UNPIN in offers) add(MenuItem.UNPIN)
             if (Offer.DELETE_PHRASE in offers) add(MenuItem.DELETE_PHRASE)
             if (Offer.DELETE_COMMON_WORD in offers) add(MenuItem.DELETE_COMMON_WORD)

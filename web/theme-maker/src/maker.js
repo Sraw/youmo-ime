@@ -466,7 +466,7 @@
   /** The keyboard's height in dp (the app's default, portrait and landscape). */
   const KEYBOARD_DP = { portrait: 267, landscape: 200 };
   const FORMS = ['normal', 'compact', 'floating', 'left', 'right', 'split', 'flat'];
-  const BOARDS = ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols', 'handwriting'];
+  const BOARDS = ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols'];
 
   /**
    * The preview's environment (060-render-p3 §5.1 预览环境): the device, the board and its form; the field and the
@@ -479,7 +479,7 @@
   };
   /** The fields and input methods the environment offers: the engine's (Selector.FIELDS, Selector.IMS). */
   const FIELDS = ['text', 'password', 'url', 'number', 'email'];
-  const IMES = ['pinyin', 'shuangpin', 'english', 'wubi', 'cangjie', 'handwriting'];
+  const IMES = ['pinyin', 'shuangpin', 'english', 'wubi', 'cangjie'];
 
   /**
    * Chinese punctuation as the app ships it (`punc.mb.zh_CN`), each key to its first, the one typed: what a new install

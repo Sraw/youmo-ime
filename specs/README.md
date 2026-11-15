@@ -21,8 +21,8 @@ user, and every setting, is in [`docs/`](../docs/README.md).
 - 幽默输入法 (Youmo IME), `io.github.sraw.youmo`: an offline Chinese input method for Android,
   branched from fcitx5-android and never merged back. Upstream compatibility is not a constraint.
 - The input method framework is fcitx5's, ported to Kotlin (`lib/ime-core`'s `host/`, settings still in
-  fcitx's INI files); the input methods themselves (pinyin, 九键, 双拼, five code tables, handwriting,
-  English) are this project's own engine in Kotlin, also in `lib/ime-core`. No native fcitx is left.
+  fcitx's INI files); the input methods themselves (pinyin, 九键, 双拼, five code tables, handwriting
+  over their keys, English) are this project's own engine in Kotlin, also in `lib/ime-core`. No native fcitx is left.
 - Ranking: an n-gram decoder over a word lattice, two small sentence models (4M, 25M) reranking its
   best sentences, and what the user typed. All on the phone; the app has no network permission.
 - One APK; the dictionaries and models are two resource packs the user imports: the text pack, and

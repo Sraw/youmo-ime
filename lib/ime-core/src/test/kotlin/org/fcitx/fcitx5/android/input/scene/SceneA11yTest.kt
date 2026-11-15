@@ -94,35 +94,16 @@ class SceneA11yTest {
     }
 
     private val said = mapOf(
-        "a11y_key_reading_on" to "注音，已开", "a11y_key_reading_off" to "注音，已关",
         "a11y_key_panel_lock_on" to "解锁", "a11y_key_panel_lock_off" to "锁定",
     )
 
     private fun Scene.said(id: String) = SceneA11y.of(keys.first { it.id == id }, said::get).description
-
-    // handwriting's 注: its words as it is on (KeyState.On) or off
-    @Test
-    fun theReadingKeySaidOnOrOff() {
-        assertEquals("注音，已关", board("handwriting.xml", SceneData.portrait).said("reading"))
-        assertEquals("注音，已开", board("handwriting.xml", SceneData.portrait.copy(states = mapOf("reading" to setOf(KeyState.On)))).said("reading"))
-    }
 
     // the symbol panel's lock: what a tap does, shut (KeyState.Locked) or open
     @Test
     fun theLockSaidAsWhatATapDoes() {
         assertEquals("锁定", board("symbols.xml", SceneData.portrait).said("lock"))
         assertEquals("解锁", board("symbols.xml", SceneData.portrait.copy(states = mapOf("lock" to setOf(KeyState.Locked)))).said("lock"))
-    }
-
-    // a toggle's words that are no string's name (a layout's own text) are said as they are, on or off
-    @Test
-    fun aTogglesWordsNotANameSaidAsTheyAre() {
-        val s = board("handwriting.xml", SceneData.portrait.copy(states = mapOf("reading" to setOf(KeyState.On))))
-        val k = s.keys.first { it.id == "reading" }
-        val plain = KeyNode(
-            k.id, k.copy, k.kind, k.role, k.shape, k.bounds, k.hit, k.anchor, k.up, k.states, k.faces, "注音", k.actions, k.label,
-        )
-        assertEquals("注音", SceneA11y.of(plain, said::get).description)
     }
 
     @Test

@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.KeyStates
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -91,7 +92,7 @@ class KotlinHostOwnKeysTest {
         assertFalse("not reset", EngineEvent.RESET in engine.events.takeLast(3))
     }
 
-    // review H1: the field's composing text (handwriting's, English's word) is no code of the groups: other groups
+    // review H1: the field's composing text (English's word) is no code of the groups: other groups
     // told while it is there leave it, nothing committed, nothing cleared; nor the first groups ever told
     @Test
     fun otherGroupsLeaveTheFieldsComposingTextAlone() = runBlocking {
@@ -100,14 +101,15 @@ class KotlinHostOwnKeysTest {
         fcitx.sendKey('n', 0u, 0, false, 0)
         fcitx.select(0, null)
         events.clear()
-        fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN, InputMethodCatalog.HANDWRITING))
-        fcitx.activateIme(InputMethodCatalog.HANDWRITING)
-        fcitx.sendKey('a', 0u, 0, false, 0)
-        assertEquals(ScriptedEngine.WRITTEN, fcitx.clientPreeditCached.toString())
+        fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH))
+        fcitx.activateIme(InputMethodCatalog.ENGLISH)
+        // the screen's keys: English composes its word from them, a hardware key's types itself
+        fcitx.sendKey('a', KeyStates.VIRTUAL.toUInt(), 0, false, 0)
+        assertEquals("a", fcitx.clientPreeditCached.toString())
         EngineState.ownKeys = OWN.reversed()
-        fcitx.sendKey('b', 0u, 0, false, 0)
+        fcitx.sendKey('b', KeyStates.VIRTUAL.toUInt(), 0, false, 0)
         assertEquals(emptyList<String>(), events.filterIsInstance<HostEvent.Commit>().map { it.text })
-        assertEquals(ScriptedEngine.WRITTEN.repeat(2), fcitx.clientPreeditCached.toString())
+        assertEquals("ab", fcitx.clientPreeditCached.toString())
     }
 
     private suspend fun focused() {

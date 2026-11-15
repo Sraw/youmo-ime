@@ -600,8 +600,6 @@
     <string name="im_erbi">二笔</string>
     <string name="im_wubipinyin">五笔拼音</string>
     <string name="im_english">英文</string>
-    <string name="im_handwriting">手写</string>
-    <string name="a11y_handwriting_pad">手写板</string>
     <string name="im_section_scheme">方案</string>
     <string name="im_shuangpin_scheme">双拼方案</string>
     <string name="shuangpin_ziranma">自然码</string>
@@ -619,9 +617,9 @@
     <string name="im_chaizi">拆字</string>
     <string name="im_chaizi_summary">不会读的字，先按 u 再打各部分的拼音：uniuniuniu 犇、ushuishuishui 淼</string>
     <string name="im_built_in_phrases">自带的日期时间</string>
-    <string name="im_built_in_phrases_summary">日期、时间、星期这几个词后面给出今天的日期、现在的时间、星期几；全拼里打 rq、sj、xq 也行</string>
+    <string name="im_built_in_phrases_summary">日期、时间、星期这几个词后面给出今天的日期、现在的时间、星期几；全拼里打 rq、sj、xq 也行；手写写的字没有</string>
     <string name="im_emoji">表情候选</string>
-    <string name="im_emoji_summary">打的词有对应的表情时，一并给出：哈哈 😄、点赞 👍</string>
+    <string name="im_emoji_summary">打的词有对应的表情时，一并给出：哈哈 😄、点赞 👍；手写写的字没有</string>
     <string name="t9_multi_tap">连按选字母</string>
     <string name="t9_multi_tap_summary">快速连按同一个键就是它的第几个字母（按两下是第二个），只有这一种读法；按一下仍由输入法判断；关着时每按一次都是一个键</string>
     <string name="t9_multi_tap_off">关</string>
@@ -648,6 +646,11 @@
     <string name="learning_kind_shuangpin_keys14">双拼 14 键</string>
     <string name="english_keyboard">键盘</string>
     <string name="english_keyboard_summary">屏幕上打英文用的键盘。实体键盘仍按字母打。</string>
+    <string name="handwriting">手写</string>
+    <string name="handwriting_retired">手写已并入工具栏：点工具栏上的手写按钮在键盘上写字，再点一下关掉%1$s</string>
+    <string name="handwriting_retired_moved">。输入法列表里已换成拼音</string>
+    <string name="handwriting_retired_traditional">。手写的字现在跟所在输入法的简繁走</string>
+    <string name="key_handwriting_retired">键盘手写已并入工具栏的手写按钮，在键上划已改为关</string>
     <string name="nine_keys_merged">九键拼音已并入拼音，在 ⋯ → 键盘里切换。</string>
     <string name="shuangpin_scheme_retired">你用的%1$s双拼已不再提供，已改成小鹤双拼，可在双拼设置里换。</string>
     <string name="status_keyboard">键盘</string>
@@ -769,8 +772,6 @@
     <string name="im_auto_caps">句首自动大写</string>
     <string name="im_auto_caps_summary">在句子开头自动打开 Shift（应用的输入框要求时）</string>
     <string name="key_drawing">在键上划</string>
-    <string name="key_drawing_handwriting">键盘手写</string>
-    <string name="key_drawing_needs_text_pack">%1$s（需要文字包）</string>
     <string name="glide_typing">滑行输入</string>
     <string name="stroke_filter">笔画筛选</string>
     <string name="status_punctuation_chinese">中文标点</string>

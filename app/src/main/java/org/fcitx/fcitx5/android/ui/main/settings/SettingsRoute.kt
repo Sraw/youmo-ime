@@ -15,6 +15,7 @@ import androidx.navigation.fragment.fragment
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.ui.main.AboutFragment
 import org.fcitx.fcitx5.android.ui.main.DeveloperFragment
@@ -162,6 +163,13 @@ sealed class SettingsRoute : Parcelable {
     data object Search : SettingsRoute()
 
     companion object {
+        /**
+         * [route] as it opens now: one to 0.6.0's 手写 page, saved before handwriting went to the toolbar (an older
+         * version's link, a back stack restored), 通用输入's, where its 停笔时间 went (061-handwriting-toolbar §3.9).
+         */
+        fun now(route: SettingsRoute): SettingsRoute =
+            if (route is InputMethodConfig && route.uniqueName == InputMethodCatalog.HANDWRITING_RETIRED) SharedInput else route
+
         fun createGraph(controller: NavController) = controller.createGraph(Index) {
             val ctx = controller.context
 

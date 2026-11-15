@@ -9,7 +9,7 @@ import org.fcitx.fcitx5.android.input.editing.EditorTraits
 
 /**
  * What is typed as a theme's scenes (060-render-p3 T5, [org.fcitx.fcitx5.android.scene.engine.Env.typed]):
- * `@im=` the input method by its kind (`pinyin`, `shuangpin`, `table`, `handwriting`, `english`) and a
+ * `@im=` the input method by its kind (`pinyin`, `shuangpin`, `table`, `english`) and a
  * table also by its name (`wubi`, `cangjie`, `ziranma`, `erbi`, `wubipinyin`); `@field=` a password,
  * an address (`url`, `email`) or a number's field; a text field none. The kinds are the words a
  * layout's `when=ime=` uses, so a theme and a layout name an input method alike.
@@ -31,7 +31,6 @@ object SceneTyping {
             name == InputMethodCatalog.PINYIN || name == InputMethodCatalog.T9 -> listOf("pinyin")
             name == InputMethodCatalog.SHUANGPIN -> listOf("shuangpin")
             InputMethodCatalog.hasTableKeys(name) -> listOf("table", name.removePrefix(ENGINE))
-            name == InputMethodCatalog.HANDWRITING -> listOf("handwriting")
             name == InputMethodCatalog.ENGLISH -> listOf("english")
             else -> emptyList()
         }

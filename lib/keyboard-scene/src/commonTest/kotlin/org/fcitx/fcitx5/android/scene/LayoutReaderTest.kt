@@ -140,6 +140,24 @@ class LayoutReaderTest {
         assertNull(LayoutReader.action("emoji-search:"))
     }
 
+    // 0.6.0's handwriting keyboard's 注 (role and action `reading`), gone with it: a layout written for it still reads,
+    // warned of, the key doing nothing of it (061-handwriting-toolbar §7)
+    @Test
+    fun theHandwritingKeyboardsReadingKeyIsWarnedOfAndRead() {
+        val l = LayoutReader.layout(
+            board(
+                "<row><key id=\"a\" label=\"注\" role=\"reading\" send=\"reading\" long-press=\"reading:tone\">" +
+                    "<popup from=\"list\"><item text=\"x\" send=\"reading\"/></popup>" +
+                    "<menu><item label=\"y\" do=\"reading\"/><item label=\"z\" do=\"lang\"/></menu></key></row>",
+            ),
+        )
+        assertEquals(emptyList(), l.problems().map { it.toString() })
+        assertEquals(5, l.warnings().size, "${l.warnings()}")
+        assertTrue(l.warnings().all { "注 is gone" in it.message }, "${l.warnings()}")
+        // what is not 0.6.0's still a problem: a role of reading: has no such style
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\" role=\"reading:tone\"/></row>")).isNotEmpty())
+    }
+
     // a key's preview= (060-render-p2 S4d: 注音九键's tones and ? ! ~ on, its slot off) read with its actions,
     // on or off and nothing else
     @Test

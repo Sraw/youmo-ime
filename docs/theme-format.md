@@ -50,7 +50,7 @@
 
 内置布局不再写 `swipe-up`、`alt`，功能键也不写 `<popup>`、`long-press`、`swipe-up`；网页主题制作的示例 `k17-motion/layouts/k18.xml` 仍保留旧写法，作为旧主题包能照常导入的样例。
 
-26 键布局（`qwerty.xml`）里，滑行输入、笔画筛选、键盘手写和按下时的气泡按键的 `send=` 找字母键：`send=` 是单个小写字母的键就是那个字母的键，键的 `id` 叫什么都行。两个键发同一个字母时只认布局里先出现的那个，后一个在这几项里不算字母键。写成 `code:U+0071` 的键原样打出那个字符，不随 Shift 变大小写，也不算字母键。
+26 键布局（`qwerty.xml`）里，滑行输入、笔画筛选、手写（写在字母键上）和按下时的气泡按键的 `send=` 找字母键：`send=` 是单个小写字母的键就是那个字母的键，键的 `id` 叫什么都行。两个键发同一个字母时只认布局里先出现的那个，后一个在这几项里不算字母键。写成 `code:U+0071` 的键原样打出那个字符，不随 Shift 变大小写，也不算字母键。
 
 ## theme.xml 的结构
 
@@ -230,8 +230,10 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 **部位**：键的 `label`（主字）、`mark`、`shortcut`（快捷图标，功能键的滑动提示也按它着色；`hidden` 只藏字符键上的）、`root`（字根）、`icon`、`hint`（只用 `hidden`：藏起功能键的滑动提示，如空格的光标、⌫ 的清除）、`badge`；候选的 `label`（序号）、`comment`；`picker categories`（符号面板的分类栏）、`voice mic`（语音面板的话筒）。
 
 **场景**（写在最前，`@` 开头）：`@compact`、`@landscape`、`@floating`、`@split`、`@one-handed`、`@dark`、`@flat`（平铺按键样式）；
-`@im=<输入方式>`（`pinyin`、`shuangpin`、`english`、`table`、`handwriting`，或码表名 `wubi`、`cangjie`、`ziranma`、`erbi`、`wubipinyin`）；
+`@im=<输入方式>`（`pinyin`、`shuangpin`、`english`、`table`，或码表名 `wubi`、`cangjie`、`ziranma`、`erbi`、`wubipinyin`）；
 `@field=password|url|number|email`；`@keyboard=<布局 id>`（如 `@keyboard=nine`）。
+
+0.6.1 起手写不是输入法、也没有书写板了，是写在字母键上的（工具栏的手写开关）。0.6.0 的主题照样能导入：`@im=handwriting`、`[board=handwriting]` 的规则和 `layouts/handwriting.xml` 不起作用，导入时提醒；书写板 `handwriting/pad` 上的 `ink-color`、`ink-width` 照旧读，是写在字母上的笔迹。
 
 **优先级**：键名像 CSS 的 id；类、角色、状态、场景、`qwerty/*` 各算一个 class；`*/角色` 算两个（比 `.enter` 这种种类高）；部件和部位算 element。一样高时后写的赢。
 
@@ -274,10 +276,10 @@ N 取：`0` `10` `50` `100` `200` `300` `400` `500` `600` `700` `800` `900` `100
 | `underline` | 正在输入的编码下划线，写法同 `border` |
 | `cursor-color` | 颜色：编码里光标的颜色 |
 | `blur` | 语音面板毛玻璃的模糊，0–25dp |
-| `ink-color` | 颜色：手写笔迹 |
-| `ink-width` | 手写笔迹粗细，1–8dp |
-| `grid-color` | 颜色：手写田字格 |
-| `grid` | `true`、`false`：显示田字格 |
+| `ink-color` | 颜色：手写笔迹（写在 `handwriting/pad` 上）。和按键颜色对比不够（不到 3:1）时不用，改用按键文字的颜色；不写也是按键文字的颜色 |
+| `ink-width` | 手写笔迹粗细，1–8dp（写在 `handwriting/pad` 上；不写是 3.5dp） |
+| `grid-color` | 0.6.0 书写板田字格的颜色；0.6.1 起没有书写板，不起作用 |
+| `grid` | 0.6.0 书写板显示田字格；0.6.1 起不起作用 |
 | `transition` | 键变到这个状态时的过渡：`时长ms 缓动`，如 `150ms ease-out`；时长 0–600ms，缓动 `linear`、`ease`、`ease-in`、`ease-out`、`ease-in-out`；写在 `popup`、`preview` 上是它消失时淡出的时长和缓动（`menu` 上不生效，会提醒）；写在 `key:pressed` 上只管按下时的缩放和下沉，最长 80ms（按下的样子总是立刻出现） |
 | `press-scale` | 按下时键面缩放（`key:pressed`），85%–110% |
 | `press-sink` | 按下时键面下沉（`key:pressed`），0–4dp |

@@ -69,11 +69,14 @@ class KeyRouter(
         send(ic, im, EngineEvent.RESET)
     }
 
-    /** `AndroidEngine::reset` (`:758-762`). */
-    fun reset(ic: InputContext, im: String) {
+    /**
+     * `AndroidEngine::reset` (`:758-762`): the input ended, what handwriting wrote put in; [drop]: what
+     * is shown dropped instead, nothing put in (清除, the backspace swipe; [EngineEvent.RESET_DROP]).
+     */
+    fun reset(ic: InputContext, im: String, drop: Boolean = false) {
         // a glide's word held belongs to the field and cursor it was glided at
         glidedAsIs = false
-        send(ic, im, EngineEvent.RESET)
+        send(ic, im, EngineEvent.RESET, if (drop) EngineEvent.RESET_DROP else 0)
     }
 
     /**
@@ -298,7 +301,7 @@ class KeyRouter(
      */
     fun clearTyped(ic: InputContext, im: String): List<Typed>? {
         val keys = typed?.toList()?.takeIf { it.isNotEmpty() && !ic.has(Capability.PASSWORD_OR_SENSITIVE) }
-        reset(ic, im)
+        reset(ic, im, drop = true)
         return keys
     }
 
@@ -322,7 +325,7 @@ class KeyRouter(
             // is not sent another till it answers
             if (event != EngineEvent.RESET && event != EngineEvent.REFINE && im in answered) {
                 try {
-                    host.event(im, EngineEvent.RESET, 0, learning, payload = null)
+                    host.event(im, EngineEvent.RESET, EngineEvent.RESET_DROP, learning, payload = null)
                 } catch (again: Throwable) {
                     failed("onEvent", im, EngineEvent.RESET, again)
                     answered.remove(im)

@@ -16,7 +16,6 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.keys.KeyId
-import kotlin.math.abs
 
 /** Whether a key's long press showed a popup in this touch: set by its popup's listener, read by its swipe. */
 internal class LongPopup {
@@ -45,8 +44,6 @@ internal class KeySwipes(
         /** Whether a character key's shortcut is marked on it: its swipe runs it all the same. */
         val charShortcutMarks: Boolean
 
-        /** Whether a stroke may begin on ，。 (the handwriting keyboard's, beside its ink pad): one lifted far sideways types nothing. */
-        val strokesBeginOnKeys: Boolean
         fun swipeText(def: KeyDef): BaseKeyboard.SwipeChoice
         fun onAction(action: KeyAction, source: KeyActionListener.Source = KeyActionListener.Source.Keyboard)
         fun onPopupAction(action: PopupAction)
@@ -159,7 +156,6 @@ internal class KeySwipes(
                 GestureType.Down -> {
                     began(v.ref)
                     held.menu = false
-                    held.downX = event.x
                     // a touch taken without an Up (BaseKeyboard's cancel) may have left 滑选 on
                     selectLifted(v, held)
                     longPopup.shown = false
@@ -173,7 +169,7 @@ internal class KeySwipes(
                 GestureType.Up -> when {
                     held.menu -> menuLifted(v, event, held)
                     held.select -> selectLifted(v, held)
-                    else -> lifted(v, def, event, held, builtIn, longPopup.shown)
+                    else -> lifted(v, def, event, builtIn, longPopup.shown)
                 }
             } || old?.invoke(v, event) ?: false
         }
@@ -183,22 +179,12 @@ internal class KeySwipes(
     private class Held {
         var menu = false
         var select = false
-        var downX = 0f
         val steps = SwipeSteps()
         val lines = CrossSteps()
     }
 
     // a key whose swipe to nothing is its tap: one that types a character, ，。 too, on every keyboard (060-keys-unify D3, §5.2)
     private fun tapsOnNothing(key: String) = SwipeSlots.typesAChar(key)
-
-    // the handwriting keyboard's ，。 beside the ink pad: a finger lifted more than half the key away
-    // sideways was a stroke begun on it, which types nothing
-    private fun wentSideways(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, held: Held): Boolean {
-        val name = def.shortcut?.let { KeyId.of(it).name } ?: return false
-        if (!keyboard.strokesBeginOnKeys || !SwipeSlots.isFunction(name) || !tapsOnNothing(name)) return false
-        val width = key.bounds?.width() ?: return false
-        return abs(event.x - held.downX) * 2 > width
-    }
 
     // the finger moved on, [held]: the menu's cell picked by where it is (no cursor moved under it either), or 滑选's steps
     private fun moved(key: KeyHandle, event: CustomGestureView.Event, held: Held): Boolean {
@@ -254,12 +240,9 @@ internal class KeySwipes(
         return true
     }
 
-    private fun lifted(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, held: Held, builtIn: KeyAction?, longPopup: Boolean): Boolean {
+    private fun lifted(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, builtIn: KeyAction?, longPopup: Boolean): Boolean {
         val outcome = KeySwipe.decide(reach(key.ref, def).key, ways, event.totalY, event.swipedY, event.consumed || longPopup, event.cancelled, keyboard.inPasswordField, KeyClock::calendar)
-        // a stroke off ，。 into the pad: no tap, nothing run, consumed as a swipe cancelled is. Only where the
-        // swipe reached no slot the user set: one that did runs however far the finger drifted sideways
-        val nothingSet = outcome == KeySwipe.Outcome.Tap || outcome == KeySwipe.Outcome.None
-        return if (nothingSet && wentSideways(key, def, event, held)) true else ran(key, def, outcome, builtIn)
+        return ran(key, def, outcome, builtIn)
     }
 
     private fun ran(key: KeyHandle, def: KeyDef, outcome: KeySwipe.Outcome, builtIn: KeyAction?): Boolean =

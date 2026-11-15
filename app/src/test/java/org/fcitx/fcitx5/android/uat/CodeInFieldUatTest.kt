@@ -18,9 +18,13 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.preedit.FloatingCodeStrip
 import org.junit.After
@@ -94,6 +98,36 @@ class CodeInFieldUatTest {
         if (strip.visibility != View.VISIBLE) return ""
         val row = h.inputView.findViewById<HorizontalScrollView>(R.id.code_row_text) ?: return ""
         return KeyboardHarness.all(row).filterIsInstance<TextView>().joinToString("") { it.text }
+    }
+
+    // the toolbar's 手写 with 编码行 输入框里: what is written is the session's code as typed code is (the host's panel
+    // says so, HostCoreEnginesTest), so it is in the field underlined while written, and stays there as the input ends
+    // (the host commits it then); no strip
+    @Test
+    fun handwritingsWrittenTextIsInTheFieldUnderlined() {
+        val shared = HandwritingRecognition.shared
+        val was = shared.reader
+        shared.reader = object : HandwritingRecognition.Reader {
+            override val loadable = true
+            override fun load() = Unit
+            override fun read(strokes: List<FloatArray>) = InkReading(listOf("人"), doubleArrayOf(-1.0))
+        }
+        try {
+            prefs.set(AppPrefs.getInstance().internal.handwritingOpen, true)
+            open(prefill = { it.setText("说："); it.setSelection(2) })
+            val t = h.key("t")
+            h.drag(t, h.box(t).exactCenterX(), h.box(t).bottom.toFloat())
+            assertTrue("written on", KeyboardHarness.find<TextKeyboard>(h.keyboard)!!.keyInkForTest!!.writtenOn)
+            typing("人")
+            assertEquals("说：人", text)
+            assertEquals(2 to 3, composing)
+            assertEquals("", stripCode())
+            chosen("人")
+            assertEquals("说：人", text)
+            assertEquals(-1 to -1, composing)
+        } finally {
+            shared.reader = was
+        }
     }
 
     @Test

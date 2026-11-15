@@ -37,7 +37,6 @@ object InputMethodNames {
         "engine-ziranma" to R.string.im_ziranma,
         "engine-erbi" to R.string.im_erbi,
         "engine-wubipinyin" to R.string.im_wubipinyin,
-        InputMethodCatalog.HANDWRITING to R.string.im_handwriting,
         InputMethodCatalog.ENGLISH to R.string.im_english,
     )
 

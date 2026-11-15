@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows as assertNamedRows
 import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.data.UserDataOrigin
 import org.fcitx.fcitx5.android.until

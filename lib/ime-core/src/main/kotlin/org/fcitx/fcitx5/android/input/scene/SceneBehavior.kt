@@ -44,9 +44,6 @@ sealed interface SceneAction {
     /** A swipe shortcut's command by its key (`shortcut:copy`). */
     data class Shortcut(val name: String) : SceneAction
 
-    /** The candidates' reading (`reading:pinyin`); [style] null (`reading`), the next. */
-    data class Reading(val style: String?) : SceneAction
-
     /** The emoji search (`emoji-search:on`). */
     data class EmojiSearch(val arg: String) : SceneAction
 
@@ -73,7 +70,6 @@ sealed interface SceneAction {
             if (m == null) {
                 return when (raw) {
                     "caps" -> Caps(false)
-                    "reading" -> Reading(null)
                     else -> Command(raw)
                 }
             }
@@ -91,7 +87,6 @@ sealed interface SceneAction {
             "keypad" -> arg.toIntOrNull()?.takeIf { it in 0..9 }?.let(::Keypad)
             "caps" -> if (arg == "lock") Caps(true) else null
             "shortcut" -> Shortcut(arg)
-            "reading" -> Reading(arg.ifEmpty { null })
             "emoji-search" -> arg.takeIf { it == "on" || it == "off" }?.let(::EmojiSearch)
             "action" -> Placeholder(arg)
             else -> null

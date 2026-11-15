@@ -14,86 +14,48 @@ import org.junit.Test
 class InputMethodSwitchTest {
 
     private val en = InputMethodCatalog.ENGLISH
-    private val list = listOf(InputMethodCatalog.PINYIN, en, InputMethodCatalog.HANDWRITING, InputMethodCatalog.WUBI)
-    private val any: (String) -> Boolean = { true }
-    private val keyboard: (String) -> Boolean = InputMethodCatalog::takesKeyboard
+    private val list = listOf(InputMethodCatalog.PINYIN, en, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.WUBI)
 
     @Test
     fun toggleGoesToEnglishAndBackToWhereItCameFrom() {
-        assertEquals(en, InputMethodSwitch.toggle(InputMethodCatalog.WUBI, list, null, en, keyboard))
-        assertEquals(InputMethodCatalog.WUBI, InputMethodSwitch.toggle(en, list, InputMethodCatalog.WUBI, en, keyboard))
+        assertEquals(en, InputMethodSwitch.toggle(InputMethodCatalog.WUBI, list, null, en))
+        assertEquals(InputMethodCatalog.WUBI, InputMethodSwitch.toggle(en, list, InputMethodCatalog.WUBI, en))
         // from nowhere known: the list's first Chinese
-        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.toggle(en, list, null, en, keyboard))
-        // the one it came from since removed, or not for this keyboard
-        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.toggle(en, list - InputMethodCatalog.WUBI, InputMethodCatalog.WUBI, en, keyboard))
-        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.toggle(en, list, InputMethodCatalog.HANDWRITING, en, keyboard))
-        assertEquals(InputMethodCatalog.HANDWRITING, InputMethodSwitch.toggle(en, list, InputMethodCatalog.HANDWRITING, en, any))
+        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.toggle(en, list, null, en))
+        // the one it came from since removed
+        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.toggle(en, list - InputMethodCatalog.WUBI, InputMethodCatalog.WUBI, en))
     }
 
     @Test
     fun toggleWithoutEnglishOrChineseGoesNowhere() {
-        assertNull(InputMethodSwitch.toggle(InputMethodCatalog.PINYIN, list - en, null, en, any))
-        assertNull(InputMethodSwitch.toggle(en, listOf(en), null, en, any))
+        assertNull(InputMethodSwitch.toggle(InputMethodCatalog.PINYIN, list - en, null, en))
+        assertNull(InputMethodSwitch.toggle(en, listOf(en), null, en))
     }
 
     @Test
-    fun nextGoesRoundSkippingWhatTheKeyboardCannotType() {
-        assertEquals(en, InputMethodSwitch.next(InputMethodCatalog.PINYIN, list, any))
-        assertEquals(InputMethodCatalog.HANDWRITING, InputMethodSwitch.next(en, list, any))
-        assertEquals(InputMethodCatalog.WUBI, InputMethodSwitch.next(en, list, keyboard))
+    fun nextGoesRound() {
+        assertEquals(en, InputMethodSwitch.next(InputMethodCatalog.PINYIN, list))
+        assertEquals(InputMethodCatalog.SHUANGPIN, InputMethodSwitch.next(en, list))
         // round to the start
-        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.next(InputMethodCatalog.WUBI, list, keyboard))
+        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.next(InputMethodCatalog.WUBI, list))
         // from one no longer in the list: the first
-        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.next("gone", list, any))
-        assertNull(InputMethodSwitch.next(InputMethodCatalog.PINYIN, listOf(InputMethodCatalog.PINYIN), any))
+        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.next("gone", list))
+        assertNull(InputMethodSwitch.next(InputMethodCatalog.PINYIN, listOf(InputMethodCatalog.PINYIN)))
     }
 
     @Test
     fun nextFromOneNotInTheListReachesTheLastToo() {
         // fcitx fallen back to an English the user removed, or its input method not read yet
-        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.next(en, listOf(InputMethodCatalog.PINYIN), any))
-        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.next(en, listOf(InputMethodCatalog.HANDWRITING, InputMethodCatalog.PINYIN), keyboard))
+        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.next(en, listOf(InputMethodCatalog.PINYIN)))
+        assertEquals(InputMethodCatalog.WUBI, InputMethodSwitch.next(en, listOf(InputMethodCatalog.WUBI, InputMethodCatalog.PINYIN)))
     }
 
     @Test
     fun aToggleCanGoOnlyWithEnglishAndAChineseOneToGoTo() {
-        assertTrue(InputMethodSwitch.canToggle(InputMethodCatalog.WUBI, list, en, keyboard))
-        assertTrue(InputMethodSwitch.canToggle(en, list, en, keyboard))
-        assertFalse(InputMethodSwitch.canToggle(InputMethodCatalog.PINYIN, listOf(InputMethodCatalog.PINYIN), en, any))
-        assertFalse(InputMethodSwitch.canToggle(InputMethodCatalog.PINYIN, list - en, en, any))
-        assertFalse(InputMethodSwitch.canToggle(en, listOf(en), en, any))
-        // on the hardware keyboard, English and only the touch screen's
-        assertFalse(InputMethodSwitch.canToggle(en, listOf(en, InputMethodCatalog.HANDWRITING), en, keyboard))
-    }
-
-    @Test
-    fun aTouchInputMethodHandsAKeyboardToTheFirstThatTakesOne() {
-        assertNull(InputMethodSwitch.forKeyboard(InputMethodCatalog.WUBI, list, en, keyboard))
-        assertNull(InputMethodSwitch.forKeyboard(en, list, en, keyboard))
-        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.forKeyboard(InputMethodCatalog.HANDWRITING, list, en, keyboard))
-        assertEquals(InputMethodCatalog.WUBI, InputMethodSwitch.forKeyboard(InputMethodCatalog.HANDWRITING, listOf(InputMethodCatalog.HANDWRITING, en, InputMethodCatalog.WUBI), en, keyboard))
-        // no Chinese one that does: English
-        assertEquals(en, InputMethodSwitch.forKeyboard(InputMethodCatalog.HANDWRITING, listOf(InputMethodCatalog.HANDWRITING, en), en, keyboard))
-        assertNull(InputMethodSwitch.forKeyboard(InputMethodCatalog.HANDWRITING, listOf(InputMethodCatalog.HANDWRITING), en, keyboard))
-    }
-
-    @Test
-    fun aTouchInputMethodHandsAKeyboardToPinyinFirst() {
-        // as Sogou and Baidu, pinyin though a table comes before it
-        assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.forKeyboard(InputMethodCatalog.HANDWRITING, listOf(InputMethodCatalog.HANDWRITING, InputMethodCatalog.WUBI, en, InputMethodCatalog.PINYIN), en, keyboard))
-        // 全拼 or 双拼, whichever the list has first
-        assertEquals(
-            InputMethodCatalog.SHUANGPIN,
-            InputMethodSwitch.forKeyboard(InputMethodCatalog.HANDWRITING, listOf(InputMethodCatalog.HANDWRITING, InputMethodCatalog.WUBI, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.PINYIN), en, keyboard)
-        )
-    }
-
-    @Test
-    fun handwritingAloneTakesNoKeyboard() {
-        // pinyin's nine keys a keyboard of pinyin, which a hardware keyboard types 全拼 on
-        assertTrue(InputMethodCatalog.takesKeyboard(InputMethodCatalog.PINYIN))
-        assertFalse(InputMethodCatalog.takesKeyboard(InputMethodCatalog.HANDWRITING))
-        assertTrue(InputMethodCatalog.takesKeyboard(InputMethodCatalog.SHUANGPIN))
-        assertTrue(InputMethodCatalog.takesKeyboard("engine-cangjie"))
+        assertTrue(InputMethodSwitch.canToggle(InputMethodCatalog.WUBI, list, en))
+        assertTrue(InputMethodSwitch.canToggle(en, list, en))
+        assertFalse(InputMethodSwitch.canToggle(InputMethodCatalog.PINYIN, listOf(InputMethodCatalog.PINYIN), en))
+        assertFalse(InputMethodSwitch.canToggle(InputMethodCatalog.PINYIN, list - en, en))
+        assertFalse(InputMethodSwitch.canToggle(en, listOf(en), en))
     }
 }

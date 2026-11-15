@@ -96,12 +96,6 @@ class KeyCapsBoardTest {
         check("大千", KeyNames.ZHUYIN, KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL))
     }
 
-    @Test
-    fun handwritingsCapsKeepTheKeyboardsMarks() {
-        val hw = InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "手", "zh_CN", "androidengine", false)
-        check("手写", KeyNames.HANDWRITING, hw, null)
-    }
-
     private companion object {
         const val SIZE = 154
     }

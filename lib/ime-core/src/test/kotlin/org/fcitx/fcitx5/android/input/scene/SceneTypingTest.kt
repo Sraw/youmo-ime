@@ -24,7 +24,6 @@ class SceneTypingTest {
         assertEquals(listOf("shuangpin"), SceneTyping.im(InputMethodCatalog.SHUANGPIN_NINE))
         assertEquals(listOf("table", "wubi"), SceneTyping.im(InputMethodCatalog.WUBI))
         assertEquals(listOf("table", "wubipinyin"), SceneTyping.im(InputMethodCatalog.WUBI_PINYIN))
-        assertEquals(listOf("handwriting"), SceneTyping.im(InputMethodCatalog.HANDWRITING))
         assertEquals(listOf("english"), SceneTyping.im(InputMethodCatalog.ENGLISH))
         assertEquals(emptyList<String>(), SceneTyping.im("keyboard-de"))
         assertEquals(emptyList<String>(), SceneTyping.im(null))
@@ -39,7 +38,7 @@ class SceneTypingTest {
         // what a theme's reader warns of as no input method (Selector.IMS): none of these, and each of them one
         val all = listOf(
             InputMethodCatalog.PINYIN, InputMethodCatalog.T9, InputMethodCatalog.ZHUYIN, InputMethodCatalog.SHUANGPIN,
-            InputMethodCatalog.HANDWRITING, InputMethodCatalog.ENGLISH,
+            InputMethodCatalog.ENGLISH,
         ) + InputMethodCatalog.TABLES.keys
         assertEquals(Selector.IMS, all.flatMap { SceneTyping.im(it) }.toSet())
     }

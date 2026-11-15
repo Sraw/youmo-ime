@@ -8,14 +8,12 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 
 /**
- * 在键上划: what a finger drawn across the keys does ([GlideInput]), one of four, stored by name: a word
- * glided across its keys (滑行输入), a stroke filtering pinyin's candidates (笔画筛选), a character
- * written on the keys (键盘手写, its recognizer the text pack's: InputMethodSettings says so while that is
- * missing), or nothing.
+ * 在键上划: what a finger drawn across the keys does ([GlideInput]), one of three, stored by name: a word
+ * glided across its keys (滑行输入), a stroke filtering pinyin's candidates (笔画筛选), or nothing. 0.6.0's
+ * fourth, 键盘手写, is the toolbar's 手写 (AppPrefs.migrateKeyHandwriting), which writes over all of them.
  */
 enum class KeyDrawing(override val stringRes: Int) : ManagedPreferenceEnum {
     Glide(R.string.glide_typing),
     StrokeFilter(R.string.stroke_filter),
-    Handwriting(R.string.key_drawing_handwriting),
     Off(R.string.swipe_off),
 }

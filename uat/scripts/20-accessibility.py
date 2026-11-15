@@ -102,11 +102,6 @@ def ax07(d):
     return explore(d)
 
 
-@case("AX-08", base="B0-手写")
-def ax08(d):
-    return explore(d)
-
-
 def emoji_panel(d):
     s = d.screen()
     e = s.find(desc="表情", where="ime")
@@ -157,7 +152,7 @@ def ax12(d):
     return explore(d, box=box, skip=lambda n: n.b in before, want=["屏蔽"], least=2)
 
 
-case("AX-13", needs="jvm:KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores")(lambda d: None)
+case("AX-13", needs="jvm:KeyHandwritingUatTest.notInAPasswordFieldNorEnglishNorQuickInputNorWhileTalkBackExplores")(lambda d: None)
 
 
 case("AX-17", needs="jvm:RareCharsPageUatTest.thePageHoldsBackAndLetsThrough")(lambda d: None)
@@ -166,3 +161,5 @@ case("AX-14", needs="jvm:ShiftKeyNameTest.theShiftKeyIsNamedOnItsCapAndToAScreen
 
 case("AX-15", needs="manual:TalkBack 读框里的拼音（设计页 M16）：手工听")(lambda d: None)
 case("AX-16", needs="manual:TalkBack 摸读音行、字行、返回行、上屏和复制，展开后焦点落在哪（JVM：CandidateMenuUatTest.talkBackReadsTheLineTheRowsAndTheWayBackAndIsTakenToWhatOpened 只断言节点和焦点调用）")(lambda d: None)
+
+case("AX-18", needs="jvm:HandwritingUatTest.theCandidateBarsButtonIsLitWhileHandwritingIsOnAndTurnsItOff")(lambda d: None)

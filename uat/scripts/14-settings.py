@@ -1416,7 +1416,7 @@ def st98(d):
 case("ST-99", needs="jvm:PopupOverridesFragmentTest$Dialog.selectedKeysAreSetAtOnce")(lambda d: None)
 
 
-case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress、PopupOverridesFragmentTest$Dialog.aListBackToTheEditorsDefaultStoresNothing、PopupOverridesFragmentTest$Row.anEmptiedListIsOffItsRowGoneToo、SwipeSlotsUatTest.aGroupKeysLongPressSetByName、HandwritingSceneGesturesTest.theCommasLongPressSetByNameIsTheUsers")(lambda d: None)
+case("ST-100", needs="jvm:PopupOverridesFragmentTest$Dialog.anotherKeyboardsLongPressIsSetByName、PopupOverridesFragmentTest$Dialog.everyKeysEditorStartsFromItsKeyboardsOwnLongPress、PopupOverridesFragmentTest$Dialog.aListBackToTheEditorsDefaultStoresNothing、PopupOverridesFragmentTest$Row.anEmptiedListIsOffItsRowGoneToo、SwipeSlotsUatTest.aGroupKeysLongPressSetByName")(lambda d: None)
 
 
 
@@ -1742,3 +1742,12 @@ case("ST-125", needs="jvm:PopupMarksEditorTest.aFieldOfVariablesIsOneItemOfThemP
 case("ST-126", needs="manual:导出备份、恢复，覆盖装 0.6.0 再装回；JVM 见 DowngradeTo060Test")(lambda d: None)
 
 case("ST-127", needs="jvm:PopupMarksEditorTest.noChinesePunctuationIsForTheMarksATableConverts")(lambda d: None)
+
+case("ST-121", needs="jvm:SettingsUatTest.keyDrawingIsOneListOfItsChoices、InputMethodSettingsScreenTest.keyDrawingIsOneChoiceSummarizedByItself、"
+               "InputMethodSettingsScreenTest.thePauseOnTheSharedPageIsTheAppsPreference、HandwritingUatTest.aShortAndALongPause")(lambda d: None)
+
+case("ST-122", needs="jvm:KotlinHostHandwritingTest.handwritingIsNoInputMethodToAdd")(lambda d: None)
+
+case("ST-123", needs="jvm:HandwritingModeTest.theThemesInkOnlyWhereItStandsOutFromTheLetters、PanelThemeTest.theInkOverTheLetters")(lambda d: None)
+
+case("ST-124", needs="jvm:InputMethodSettingsScreenTest.aSharedOptionSaysUnderItWhatItIsNoUseTo")(lambda d: None)

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard.canvas
 
+import org.fcitx.fcitx5.android.Uat
 import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -23,23 +24,16 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardEntryUi
 import org.fcitx.fcitx5.android.input.editing.TextEditingButton
-import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
-import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
-import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognitionTest.Queue
-import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognitionTest.Reader
-import org.fcitx.fcitx5.android.input.keyboard.HandwritingKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.laidOut
+import org.fcitx.fcitx5.android.input.keyboard.KeyInk
 import org.fcitx.fcitx5.android.input.picker.PickerData
 import org.fcitx.fcitx5.android.input.picker.PickerSideUi
 import org.fcitx.fcitx5.android.input.picker.PickerTabsUi
 import org.fcitx.fcitx5.android.input.voice.VoiceGlass
 import org.fcitx.fcitx5.android.input.voice.VoiceStyle
-import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.PressEffect
 import org.fcitx.fcitx5.android.scene.theme.Argb
-import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -223,24 +217,18 @@ class PanelThemeTest {
         assertNull(VoiceGlass.Blur.of(0.0))
     }
 
+    // the toolbar's 手写 (061-handwriting-toolbar §7): the pad's ink where it shows on the letter keys, else theirs, 3.5 dp
     @Test
-    fun theHandwritingPad() {
-        fun pad(): Pair<HandwritingPadView, KeyboardCanvasView> {
-            val k = HandwritingKeyboard(PlaceholderStrings(ctx), theme, deliver = { _, _ -> }, recognition = HandwritingRecognition(Queue(), Queue(), { -1 }, Reader())).also { ctx.setContentView(it) }.laidOut()
-            val views = (0 until k.childCount).map { k.getChildAt(it) }
-            return views.filterIsInstance<HandwritingPadView>().single() to views.filterIsInstance<KeyboardCanvasView>().single()
-        }
-        // before: the keys' text colour, 3.5 dp; no grid (the slot's face alone, its shadow and fill)
-        val (plain, plainCanvas) = pad()
-        assertEquals(theme.keyTextColor, plain.inkPaint.color)
-        assertEquals(3.5f * density, plain.inkPaint.strokeWidth, 1e-4f)
-        assertEquals(2, plainCanvas.scene!!.slots.single { it.id == "pad" }.ops.size)
+    @Uat("ST-123")
+    fun theInkOverTheLetters() {
+        assertEquals(theme.keyTextColor to KeyInk.INK_DP, ScenePanels.ink(ctx, theme))
         everything()
-        val (themed, canvas) = pad()
-        assertEquals(0xff990000.toInt(), themed.inkPaint.color)
-        assertEquals(2 * density, themed.inkPaint.strokeWidth, 1e-4f)
-        val lines = canvas.scene!!.slots.single { it.id == "pad" }.ops.drop(2)
-        assertTrue(lines.isNotEmpty() && lines.all { (it as Op.Fill).color == Argb(0xff00aa00.toInt()) })
+        assertEquals(0xff990000.toInt() to 2f, ScenePanels.ink(ctx, theme))
+        // a pad's white ink, lost on the light keys: the letters' colour, the theme's width
+        SceneThemes.source = { look, name, dark ->
+            LookTheme.xml(look, name, dark).replace("</theme>", "<style select=\"handwriting/pad\" ink-color=\"#ffffffff\" ink-width=\"2dp\"/>\n</theme>")
+        }
+        assertEquals(theme.keyTextColor to 2f, ScenePanels.ink(ctx, theme))
     }
 
     companion object {

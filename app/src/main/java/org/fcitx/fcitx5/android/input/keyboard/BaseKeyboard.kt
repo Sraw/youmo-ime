@@ -7,17 +7,10 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.content.Context
 import android.graphics.Canvas
 import android.view.MotionEvent
-import android.view.accessibility.AccessibilityManager
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
@@ -33,6 +26,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -44,6 +38,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
 import org.fcitx.fcitx5.android.input.keys.KeyResolver
 import org.fcitx.fcitx5.android.input.keys.KeyState
@@ -143,6 +138,7 @@ abstract class BaseKeyboard(
             if (field == value) return
             field = value
             updateSpaceBadges(spaceLongPress.getValue())
+            keyWriting?.update()
         }
 
     // what is typed ([SceneEnvs.typing]: the input method, the field) as the scene was last made anew for
@@ -175,21 +171,25 @@ abstract class BaseKeyboard(
 
     /** Set as a temporary mode (快速输入, Unicode) is on or off ([KeyboardWindow]): nothing is written on the keys in one. */
     var tempMode = false
+        set(value) { field = value; keyWriting?.update() }
 
-    /**
-     * Where what is written on the keys goes ([KeyboardWindow]): a reading of its piece, or null once the
-     * piece is done; takesBack, the first reading after a tap was taken back as its first dot (Action.Ink.takesBack).
-     */
-    var inkSink: ((InkReading?, piece: Int, takesBack: Boolean) -> Unit)? = null
+    /** Where what is written on the keys goes ([KeyboardWindow]): a reading of its piece, or null once the piece is done. */
+    var inkSink: ((InkReading?, piece: Int) -> Unit)? = null
 
-    // 键盘手写's pad, made with the glide ([glideInput]); the engine's answers watched while shown
+    // the toolbar's 手写's pad, made with the glide ([glideInput]); the engine's answers watched while shown
     private var keyInk: KeyInk? = null
-    private var inkScope: CoroutineScope? = null
-    // whether the input method writes on the keys ([glideInput]'s writes)
-    private var inkIm: () -> Boolean = { false }
+
+    // the toolbar's 手写 (061-handwriting-toolbar): whether the letters are written on now, faded while they are
+    private var keyWriting: KeyWriting? = null
+
+    // where the letters are written on (glideInput's)
+    private var letterArea: LetterArea? = null
 
     /** [keyInk], for a test to see the ink drawn. */
     internal val keyInkForTest: KeyInk? get() = keyInk
+
+    /** [letterArea], for a test to ask where the letters are written on. */
+    internal val letterAreaForTest: LetterArea? get() = letterArea
 
     /**
      * What a finger drawn over the layout's letters reads, if it has any ([glideInput]): glide typing
@@ -210,22 +210,25 @@ abstract class BaseKeyboard(
      * one: sent as the engine's stroke key (KeyAction.SymAction.stroke), the shape StrokeShape's; one it
      * reads as none is dropped.
      *
-     * Made also: the keyboard's 键盘手写 ([keyInk], the input method's [writes]); a keyboard that never calls
-     * this writes nothing on its keys ([onAction], [restartInk] and the pad's showing all go by it).
+     * Made also: the toolbar's 手写 over these letters ([keyInk]), the keys of [writesAlso] (Shift, unless a
+     * keyboard says otherwise) written on with them; a keyboard that never calls this writes nothing on its
+     * keys ([onAction], [restartInk] and the pad's showing all go by it).
      */
     protected fun glideInput(
-        letters: () -> List<Pair<Char, KeyPlace>>,
+        letters: () -> List<Pair<Char, ScenePlace>>,
         down: Float = GlideGesture.DOWN,
         enabled: () -> Boolean = { true },
         filters: () -> Boolean = { false },
-        writes: () -> Boolean = { false },
+        writesAlso: (KeyNode) -> Boolean = { it.role == SHIFT_ROLE },
         glided: (path: FloatArray, layout: GlideLayout) -> Unit,
     ): GlideInput {
+        val (color, width) = ScenePanels.ink(context, theme)
         val ink = KeyInk(
-            this, theme, pause = { prefs.keyboard.handwritingPause.getValue().millis },
-            deliver = { reading, piece, takesBack -> inkSink?.invoke(reading, piece, takesBack) }, finished = { inkSink?.invoke(null, it, false) },
+            this, color, width, pause = { prefs.keyboard.handwritingPause.getValue().millis },
+            deliver = { reading, piece -> inkSink?.invoke(reading, piece) }, finished = { inkSink?.invoke(null, it) },
         ).also { keyInk = it }
-        inkIm = writes
+        val area = LetterArea(letters, writesAlso).also { letterArea = it }
+        keyWriting = KeyWriting(this, ink, area, prefs.internal.handwritingOpen, { canvas }, { keysIm }, { inPasswordField }, { tempMode })
         return GlideInput(
             this, theme,
             enabled = { keyDrawing.getValue() == KeyDrawing.Glide && wordField() && enabled() },
@@ -235,22 +238,20 @@ abstract class BaseKeyboard(
             strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
             stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction.stroke(it)) } },
             ink = ink,
-            // 键盘手写: an input method written in [writes] says, in a field where words are typed, not in a
-            // temporary mode; not while TalkBack explores by touch, the finger feeling for keys, not writing
-            writes = { writing() && !tempMode && !touchExploring() && PackStore.ready(PackKind.TEXT) && writes() },
-            typed = { EngineState.keysTyped.value.typed },
+            writes = { keyWriting?.now == true },
+            writingArea = { x, y -> letterArea?.at(canvas, x, y) == true },
             glided = glided,
         )
     }
 
-    private fun writing() = keyDrawing.getValue() == KeyDrawing.Handwriting && wordField()
-
-    private fun touchExploring() = context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
-
-    /** Another input started (a field): what was written on the keys dropped, as the handwriting keyboard's pad is. */
+    /** Another input started (a field): what was written on the keys dropped. */
     fun restartInk() {
         keyInk?.restart()
+        keyWriting?.update()
     }
+
+    /** The input method shown changed ([KeyboardWindow], after [onInputMethodUpdate]): written on or not anew. */
+    fun inputMethodShown() = keyWriting?.update()
 
     private fun wordField() = !inPasswordField && address == AddressKeys.NONE
 
@@ -275,16 +276,9 @@ abstract class BaseKeyboard(
     // a line of the space's cursor up or down: well over a sideways step, so a slide's drift moves no line
     private val spaceLineStep = dp(28f)
 
-    /**
-     * Whether a stroke may begin on ，。 ([KeySwipes]): the handwriting keyboard's, beside its ink pad, where
-     * one lifted far sideways types nothing. Read at each lift, never while the subclass is made.
-     */
-    protected open val strokesBeginOnKeys: Boolean get() = false
-
     private val swipes = KeySwipes(this, inputSwipeThreshold, disabledSwipeThreshold, selectionSwipeThreshold, spaceLineStep, object : KeySwipes.Keyboard {
         override val inPasswordField get() = this@BaseKeyboard.inPasswordField
         override val charShortcutMarks get() = this@BaseKeyboard.charShortcutMarks
-        override val strokesBeginOnKeys get() = this@BaseKeyboard.strokesBeginOnKeys
         // a named key's the resolver's; a key of no name (a function key of no list too) its own swipe
         override fun swipeText(def: KeyDef) = def.shortcut?.let { resolving.swipe(it, placeholderOf(def)) } ?: SwipeChoice.BuiltIn
         override fun onAction(action: KeyAction, source: KeyActionListener.Source) = this@BaseKeyboard.onAction(action, source)
@@ -643,6 +637,8 @@ abstract class BaseKeyboard(
         releaseAllTouchTargets()
         spaceKeys.removeAll { it is SceneKey }
         view.drawsBase = sceneDrawsBase
+        // the letter area faded while written on (the toolbar's 手写)
+        view.faded = { letterArea?.faded(view, it) == true }
         canvas = view
         sceneKeys.byNodes(view, sceneTable) { old -> spaceKeys.remove(old) }
         add(view, lParams(0, 0) {
@@ -681,10 +677,7 @@ abstract class BaseKeyboard(
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}
 
     /** Where the scene drawn last has its key [id] (its second [copy], a split row's) in this keyboard, as a key's place is (glide typing's, strokes'): nowhere before it is drawn. */
-    protected fun scenePlace(id: String, copy: Boolean = false): KeyPlace = KeyPlace { _, out ->
-        val c = canvas
-        if (c != null && c.cell(KeyRef(id, copy), out)) out.offset(c.left, c.top) else out.setEmpty()
-    }
+    protected fun scenePlace(id: String, copy: Boolean = false): ScenePlace = ScenePlace(KeyRef(id, copy)) { canvas }
 
     /** The key wired for the scene's [node] ([SceneTouch.keyOf]): what a screen reader's actions on it do. */
     internal fun sceneKey(node: KeyNode): SceneKey? = sceneKeys.of(node)
@@ -778,7 +771,10 @@ abstract class BaseKeyboard(
     ) {
         val ink = keyInk
         // straight on unless written on, in an input method that writes (English's keys never wait on its reads)
-        if (ink?.writtenOn != true || !writing() || !inkIm()) return keyActionListener?.onKeyAction(action, source) ?: Unit
+        // (turned off meanwhile, still in order: a reading on its way goes in before the key)
+        if (ink?.writtenOn != true || !InputMethodCatalog.writesOnKeys(keysIm)) {
+            return keyActionListener?.onKeyAction(action, source) ?: Unit
+        }
         // in order with what is written on the keys: after its readings, backspace its strokes' first (InkKeys)
         ink.keys.onAction({ isAttachedToWindow }) { if (!ink.keys.took(action)) keyActionListener?.onKeyAction(action, source) }
     }
@@ -856,20 +852,12 @@ abstract class BaseKeyboard(
         typingChanged()
         showSwipeMarks()
         catchUpMinute()
-        keyInk?.let { ink ->
-            inkScope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
-                s.launch { EngineState.handwritingEnded.collect(ink::ended) }
-                // every answer, the same or not: a tap's mark replaced (KeyInkGesture.engineTyped)
-                s.launch { EngineState.keysTyped.collect { ink.gesture.engineTyped(it.typed, it.keysHeard) } }
-            }
-        }
+        keyWriting?.attached()
     }
 
     override fun onDetachedFromWindow() {
-        inkScope?.cancel()
-        inkScope = null
         // hidden, or another layout shown: what was written is done, as a pause would have it
-        keyInk?.hidden()
+        keyWriting?.detached()
         SceneEnvs.unwatch(onTyping)
         super.onDetachedFromWindow()
     }
@@ -951,6 +939,9 @@ abstract class BaseKeyboard(
     }
 
 }
+
+// Shift's role in a layout: written on with the letters it shifts (061-handwriting-toolbar Q13)
+private const val SHIFT_ROLE = "shift"
 
 /**
  * Whether the space's long press, set to [behavior], takes the touch from its swipe: not when it does

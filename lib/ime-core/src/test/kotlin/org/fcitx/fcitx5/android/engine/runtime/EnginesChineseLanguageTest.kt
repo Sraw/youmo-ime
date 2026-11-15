@@ -50,7 +50,7 @@ class EnginesChineseLanguageTest : EnginesFixture() {
     private var piece = 0
 
     private fun Engines.handwritten(text: String): List<String> {
-        onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(piece++, InkReading(listOf(text), doubleArrayOf(0.0))))
-        return onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.PICK, 0).candidates
+        onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(piece++, InkReading(listOf(text), doubleArrayOf(0.0))))
+        return onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0).candidates
     }
 }

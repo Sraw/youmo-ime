@@ -41,11 +41,10 @@ class LayoutSwitchKeyTest {
 
     @Test
     @Uat("QU-12")
-    fun theNineKeysAndHandwritingsSymbolsKeyHoldsQuickInputTheirNumbersKeyOnlyTaps() {
+    fun theNineKeysSymbolsKeyHoldsQuickInputItsNumbersKeyOnlyTaps() {
         val symbols = T9Keyboard.layout(NineKeyLetters.STANDARD).bottomKey("符")
         assertEquals(KeyAction.LayoutSwitchAction(PickerWindow.Key.Symbol.name), symbols.tapped())
         assertEquals(KeyAction.QuickPhraseAction, symbols.held())
-        assertEquals(KeyAction.QuickPhraseAction, HandwritingKeyboard.layout(RuntimeEnvironment.getApplication()).bottomKey("符").held())
         val numbers = T9Keyboard.layout(NineKeyLetters.STANDARD).bottomKey("123")
         assertEquals(KeyAction.LayoutSwitchAction(NumberKeyboard.Name), numbers.tapped())
         assertNull(numbers.held())

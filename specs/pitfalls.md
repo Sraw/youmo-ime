@@ -70,7 +70,7 @@ every keyboard is told every context, also of text another keyboard wrote.
 
 Most apps recreate their activity on rotation and save the field's text, composing text included,
 before the input method hears of it; a tap on another field or app has the app finish it as plain
-text first too. So only what is the text itself (English's word, handwriting's characters) goes
+text first too. So only what is the text itself (English's word) goes
 into the app as composing text; pinyin and a table's code show above the candidates
 ([architecture.md](architecture.md#a-key-from-the-finger-to-the-editor)). An input method whose preedit is a code must
 not be added to `composesText`.

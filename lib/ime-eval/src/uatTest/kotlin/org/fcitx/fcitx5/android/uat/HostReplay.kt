@@ -370,10 +370,10 @@ class HostReplay(
 
     /** A character written on the pad, read as [readings] (as EngineReplay.write: the recognizer's readings, then the ink key). */
     fun write(vararg readings: String) {
-        val ink = UatEngines.ink(engines, readings.toList(), lastPiece)
+        val ink = UatEngines.ink(engines, im, readings.toList(), lastPiece)
         lastPiece = ink.piece
         key(EngineReplay.symOf(Keyboard.INK), HostKeyStates.VIRTUAL, payload = ink)
-        engines.inkSent(ink)
+        engines.inkSent(ink, im)
         pause()
     }
 

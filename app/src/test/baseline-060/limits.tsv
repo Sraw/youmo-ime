@@ -4,7 +4,6 @@
 # a line says why: "5.3: <known>" is what 060-render-p2.md 5.3 accepted.
 #file	percent	why
 AMOLEDBlack/english-port.png	0.287	
-AMOLEDBlack/handwriting-port.png	0.078	5.3: handwriting-fixed-fullwidth-punct
 AMOLEDBlack/k14-port.png	0.130	
 AMOLEDBlack/k18-port.png	0.143	
 AMOLEDBlack/nine-port.png	0.208	5.3: nine-syllables-sp
@@ -18,7 +17,6 @@ AMOLEDBlack/symbols-port.png	2.012	0.6.1: the symbol panel's 123 second as text,
 AMOLEDBlack/zhuyin_full-port.png	1.584	
 AMOLEDBlack/zhuyin_nine-port.png	0.147	5.3: zhuyin-nine-shown-not-typed
 DeepBlue/english-port.png	0.283	
-DeepBlue/handwriting-port.png	0.078	5.3: handwriting-fixed-fullwidth-punct
 DeepBlue/k14-port.png	0.128	
 DeepBlue/k18-port.png	0.141	
 DeepBlue/nine-port.png	0.205	5.3: nine-syllables-sp
@@ -38,13 +36,6 @@ MaterialDark/english-land.png	0.091
 MaterialDark/english-one_handed_left.png	0.337	
 MaterialDark/english-port.png	0.270	
 MaterialDark/english-split_land.png	0.524	key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
-MaterialDark/handwriting-compact.png	4.997	5.3: handwriting-fixed-fullwidth-punct; key-spacing: rows closer at the compact height (060-key-spacing)
-MaterialDark/handwriting-flat.png	0.078	5.3: handwriting-fixed-fullwidth-punct
-MaterialDark/handwriting-floating.png	0.879	5.3: handwriting-fixed-fullwidth-punct,floating-height-cap; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
-MaterialDark/handwriting-land.png	0.029	5.3: handwriting-fixed-fullwidth-punct
-MaterialDark/handwriting-one_handed_left.png	0.518	5.3: handwriting-fixed-fullwidth-punct; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
-MaterialDark/handwriting-port.png	0.077	5.3: handwriting-fixed-fullwidth-punct
-MaterialDark/handwriting-split_land.png	0.074	5.3: handwriting-fixed-fullwidth-punct
 MaterialDark/k14-compact.png	9.707	key-spacing: rows closer at the compact height (060-key-spacing)
 MaterialDark/k14-flat.png	0.129	
 MaterialDark/k14-floating.png	1.770	5.3: floating-height-cap; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
@@ -106,7 +97,6 @@ MaterialDark/zhuyin_nine-one_handed_left.png	1.709	5.3: zhuyin-nine-shown-not-ty
 MaterialDark/zhuyin_nine-port.png	0.145	5.3: zhuyin-nine-shown-not-typed
 MaterialDark/zhuyin_nine-split_land.png	0.054	5.3: zhuyin-nine-shown-not-typed
 MaterialLight/english-port.png	0.269	
-MaterialLight/handwriting-port.png	0.074	5.3: handwriting-fixed-fullwidth-punct
 MaterialLight/k14-port.png	0.117	
 MaterialLight/k18-port.png	0.125	
 MaterialLight/nine-port.png	0.188	5.3: nine-syllables-sp
@@ -120,7 +110,6 @@ MaterialLight/symbols-port.png	1.994	0.6.1: the symbol panel's 123 second as tex
 MaterialLight/zhuyin_full-port.png	1.542	
 MaterialLight/zhuyin_nine-port.png	0.139	5.3: zhuyin-nine-shown-not-typed
 MonetDark/english-port.png	0.238	
-MonetDark/handwriting-port.png	0.061	5.3: handwriting-fixed-fullwidth-punct
 MonetDark/k14-port.png	0.084	
 MonetDark/k18-port.png	0.097	
 MonetDark/nine-port.png	0.140	5.3: nine-syllables-sp
@@ -134,7 +123,6 @@ MonetDark/symbols-port.png	2.026	0.6.1: the symbol panel's 123 second as text, t
 MonetDark/zhuyin_full-port.png	1.569	
 MonetDark/zhuyin_nine-port.png	0.119	5.3: zhuyin-nine-shown-not-typed
 MonetLight/english-port.png	0.241	
-MonetLight/handwriting-port.png	0.059	5.3: handwriting-fixed-fullwidth-punct
 MonetLight/k14-port.png	0.083	
 MonetLight/k18-port.png	0.091	
 MonetLight/nine-port.png	0.135	5.3: nine-syllables-sp
@@ -148,7 +136,6 @@ MonetLight/symbols-port.png	2.024	0.6.1: the symbol panel's 123 second as text, 
 MonetLight/zhuyin_full-port.png	1.596	
 MonetLight/zhuyin_nine-port.png	0.119	5.3: zhuyin-nine-shown-not-typed
 Monokai/english-port.png	0.244	
-Monokai/handwriting-port.png	0.064	5.3: handwriting-fixed-fullwidth-punct
 Monokai/k14-port.png	0.096	
 Monokai/k18-port.png	0.109	
 Monokai/nine-port.png	0.169	5.3: nine-syllables-sp
@@ -162,7 +149,6 @@ Monokai/symbols-port.png	0.535	0.6.1: the symbol panel's 123 second as text, the
 Monokai/zhuyin_full-port.png	1.462	
 Monokai/zhuyin_nine-port.png	0.129	5.3: zhuyin-nine-shown-not-typed
 NordDark/english-port.png	0.284	
-NordDark/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
 NordDark/k14-port.png	0.134	
 NordDark/k18-port.png	0.147	
 NordDark/nine-port.png	0.214	5.3: nine-syllables-sp
@@ -176,7 +162,6 @@ NordDark/symbols-port.png	0.581	0.6.1: the symbol panel's 123 second as text, th
 NordDark/zhuyin_full-port.png	1.510	
 NordDark/zhuyin_nine-port.png	0.151	5.3: zhuyin-nine-shown-not-typed
 NordLight/english-port.png	0.288	
-NordLight/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
 NordLight/k14-port.png	0.135	
 NordLight/k18-port.png	0.144	
 NordLight/nine-port.png	0.214	5.3: nine-syllables-sp
@@ -190,7 +175,6 @@ NordLight/symbols-port.png	0.579	0.6.1: the symbol panel's 123 second as text, t
 NordLight/zhuyin_full-port.png	1.544	
 NordLight/zhuyin_nine-port.png	0.151	5.3: zhuyin-nine-shown-not-typed
 PixelDark/english-port.png	0.276	
-PixelDark/handwriting-port.png	0.077	5.3: handwriting-fixed-fullwidth-punct
 PixelDark/k14-port.png	0.123	
 PixelDark/k18-port.png	0.135	
 PixelDark/nine-port.png	0.198	5.3: nine-syllables-sp
@@ -210,13 +194,6 @@ PixelLight/english-land.png	0.098
 PixelLight/english-one_handed_left.png	0.356	
 PixelLight/english-port.png	0.279	
 PixelLight/english-split_land.png	0.540	key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
-PixelLight/handwriting-compact.png	2.324	5.3: handwriting-fixed-fullwidth-punct; key-spacing: rows closer at the compact height (060-key-spacing)
-PixelLight/handwriting-flat.png	0.078	5.3: handwriting-fixed-fullwidth-punct
-PixelLight/handwriting-floating.png	0.871	5.3: handwriting-fixed-fullwidth-punct,floating-height-cap; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
-PixelLight/handwriting-land.png	0.028	5.3: handwriting-fixed-fullwidth-punct
-PixelLight/handwriting-one_handed_left.png	0.524	5.3: handwriting-fixed-fullwidth-punct; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
-PixelLight/handwriting-port.png	0.076	5.3: handwriting-fixed-fullwidth-punct
-PixelLight/handwriting-split_land.png	0.074	5.3: handwriting-fixed-fullwidth-punct
 PixelLight/k14-compact.png	3.856	key-spacing: rows closer at the compact height (060-key-spacing)
 PixelLight/k14-flat.png	0.130	
 PixelLight/k14-floating.png	1.809	5.3: floating-height-cap; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
@@ -278,7 +255,6 @@ PixelLight/zhuyin_nine-one_handed_left.png	1.781	5.3: zhuyin-nine-shown-not-type
 PixelLight/zhuyin_nine-port.png	0.144	5.3: zhuyin-nine-shown-not-typed
 PixelLight/zhuyin_nine-split_land.png	0.053	5.3: zhuyin-nine-shown-not-typed
 TransparentDark/english-port.png	0.280	
-TransparentDark/handwriting-port.png	0.081	5.3: handwriting-fixed-fullwidth-punct
 TransparentDark/k14-port.png	0.135	
 TransparentDark/k18-port.png	0.147	
 TransparentDark/nine-port.png	0.215	5.3: nine-syllables-sp
@@ -292,7 +268,6 @@ TransparentDark/symbols-port.png	2.055	0.6.1: the symbol panel's 123 second as t
 TransparentDark/zhuyin_full-port.png	1.492	
 TransparentDark/zhuyin_nine-port.png	0.152	5.3: zhuyin-nine-shown-not-typed
 TransparentLight/english-port.png	0.300	
-TransparentLight/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
 TransparentLight/k14-port.png	0.137	
 TransparentLight/k18-port.png	0.146	
 TransparentLight/nine-port.png	0.218	5.3: nine-syllables-sp
@@ -306,7 +281,6 @@ TransparentLight/symbols-port.png	0.590	0.6.1: the symbol panel's 123 second as 
 TransparentLight/zhuyin_full-port.png	1.619	
 TransparentLight/zhuyin_nine-port.png	0.154	5.3: zhuyin-nine-shown-not-typed
 color_dark/english-port.png	0.614	
-color_dark/handwriting-port.png	0.150	5.3: handwriting-fixed-fullwidth-punct
 color_dark/k14-port.png	0.342	
 color_dark/k18-port.png	0.411	
 color_dark/nine-port.png	0.417	5.3: nine-syllables-sp
@@ -316,7 +290,6 @@ color_dark/symbols-port.png	0.569	0.6.1: the symbol panel's 123 second as text, 
 color_dark/zhuyin_full-port.png	1.606	
 color_dark/zhuyin_nine-port.png	0.227	5.3: zhuyin-nine-shown-not-typed
 color_light/english-port.png	0.628	
-color_light/handwriting-port.png	0.151	5.3: handwriting-fixed-fullwidth-punct
 color_light/k14-port.png	0.349	
 color_light/k18-port.png	0.417	
 color_light/nine-port.png	0.417	5.3: nine-syllables-sp
@@ -326,7 +299,6 @@ color_light/symbols-port.png	1.841	0.6.1: the symbol panel's 123 second as text,
 color_light/zhuyin_full-port.png	1.647	
 color_light/zhuyin_nine-port.png	0.229	5.3: zhuyin-nine-shown-not-typed
 cutout_dark/english-port.png	0.254	
-cutout_dark/handwriting-port.png	0.081	5.3: handwriting-fixed-fullwidth-punct
 cutout_dark/k14-port.png	0.131	
 cutout_dark/k18-port.png	0.144	
 cutout_dark/nine-port.png	0.197	5.3: nine-syllables-sp
@@ -336,7 +308,6 @@ cutout_dark/symbols-port.png	2.012	0.6.1: the symbol panel's 123 second as text,
 cutout_dark/zhuyin_full-port.png	1.268	
 cutout_dark/zhuyin_nine-port.png	0.155	5.3: zhuyin-nine-shown-not-typed
 cutout_light/english-port.png	0.276	
-cutout_light/handwriting-port.png	0.076	5.3: handwriting-fixed-fullwidth-punct
 cutout_light/k14-port.png	0.116	
 cutout_light/k18-port.png	0.125	
 cutout_light/nine-port.png	0.195	5.3: nine-syllables-sp
@@ -346,7 +317,6 @@ cutout_light/symbols-port.png	2.052	0.6.1: the symbol panel's 123 second as text
 cutout_light/zhuyin_full-port.png	1.599	
 cutout_light/zhuyin_nine-port.png	0.146	5.3: zhuyin-nine-shown-not-typed
 each_key_dark/english-port.png	0.280	
-each_key_dark/handwriting-port.png	0.077	5.3: handwriting-fixed-fullwidth-punct
 each_key_dark/k14-port.png	0.123	
 each_key_dark/k18-port.png	0.135	
 each_key_dark/nine-port.png	0.198	5.3: nine-syllables-sp
@@ -356,7 +326,6 @@ each_key_dark/symbols-port.png	0.569	0.6.1: the symbol panel's 123 second as tex
 each_key_dark/zhuyin_full-port.png	1.524	
 each_key_dark/zhuyin_nine-port.png	0.144	5.3: zhuyin-nine-shown-not-typed
 each_key_light/english-port.png	0.279	
-each_key_light/handwriting-port.png	0.076	5.3: handwriting-fixed-fullwidth-punct
 each_key_light/k14-port.png	0.122	
 each_key_light/k18-port.png	0.131	
 each_key_light/nine-port.png	0.195	5.3: nine-syllables-sp
@@ -366,7 +335,6 @@ each_key_light/symbols-port.png	2.001	0.6.1: the symbol panel's 123 second as te
 each_key_light/zhuyin_full-port.png	1.581	
 each_key_light/zhuyin_nine-port.png	0.144	5.3: zhuyin-nine-shown-not-typed
 from-app-2.1/english-port.png	0.293	
-from-app-2.1/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
 from-app-2.1/k14-port.png	0.133	
 from-app-2.1/k18-port.png	0.145	
 from-app-2.1/nine-port.png	0.212	5.3: nine-syllables-sp
@@ -376,7 +344,6 @@ from-app-2.1/symbols-port.png	0.587	0.6.1: the symbol panel's 123 second as text
 from-app-2.1/zhuyin_full-port.png	1.616	
 from-app-2.1/zhuyin_nine-port.png	0.149	5.3: zhuyin-nine-shown-not-typed
 from-app/english-port.png	1.465	
-from-app/handwriting-port.png	0.257	5.3: handwriting-fixed-fullwidth-punct
 from-app/k14-port.png	0.310	
 from-app/k18-port.png	0.349	
 from-app/nine-port.png	0.386	5.3: nine-syllables-sp
@@ -386,7 +353,6 @@ from-app/symbols-port.png	2.051	0.6.1: the symbol panel's 123 second as text, th
 from-app/zhuyin_full-port.png	2.288	注音 glyphs a pixel off as on every theme (060-render-p2.md S4c, the yield's rounding)
 from-app/zhuyin_nine-port.png	0.809	5.3: zhuyin-nine-shown-not-typed
 from-web/english-port.png	2.216	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's
-from-web/handwriting-port.png	0.342	5.3: handwriting-fixed-fullwidth-punct
 from-web/k14-port.png	1.096	
 from-web/k18-port.png	1.218	
 from-web/nine-port.png	1.025	5.3: nine-syllables-sp
@@ -396,7 +362,6 @@ from-web/symbols-port.png	2.209	0.6.1: the symbol panel's 123 second as text, th
 from-web/zhuyin_full-port.png	2.461	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's; key marks per way (⌫/space marks moved or dropped, narrow boards’ icons ~4% smaller)
 from-web/zhuyin_nine-port.png	1.503	the theme's 1 KB font (full-font.ttf, no glyphs for most keys): its missing-glyph boxes placed a pixel or two otherwise than the old drawing's; 5.3: zhuyin-nine-shown-not-typed
 glass_dark/english-port.png	0.267	
-glass_dark/handwriting-port.png	0.080	5.3: handwriting-fixed-fullwidth-punct
 glass_dark/k14-port.png	0.131	
 glass_dark/k18-port.png	0.144	
 glass_dark/nine-port.png	0.211	5.3: nine-syllables-sp
@@ -406,7 +371,6 @@ glass_dark/symbols-port.png	2.026	0.6.1: the symbol panel's 123 second as text, 
 glass_dark/zhuyin_full-port.png	1.387	
 glass_dark/zhuyin_nine-port.png	0.153	5.3: zhuyin-nine-shown-not-typed
 glass_light/english-port.png	0.284	
-glass_light/handwriting-port.png	0.078	5.3: handwriting-fixed-fullwidth-punct
 glass_light/k14-port.png	0.125	
 glass_light/k18-port.png	0.134	
 glass_light/nine-port.png	0.201	5.3: nine-syllables-sp
@@ -416,7 +380,6 @@ glass_light/symbols-port.png	2.057	0.6.1: the symbol panel's 123 second as text,
 glass_light/zhuyin_full-port.png	1.601	
 glass_light/zhuyin_nine-port.png	0.147	5.3: zhuyin-nine-shown-not-typed
 nine_slice_font_dark/english-port.png	0.298	
-nine_slice_font_dark/handwriting-port.png	0.079	5.3: handwriting-fixed-fullwidth-punct
 nine_slice_font_dark/k14-port.png	0.121	
 nine_slice_font_dark/k18-port.png	0.121	
 nine_slice_font_dark/nine-port.png	0.196	5.3: nine-syllables-sp
@@ -426,7 +389,6 @@ nine_slice_font_dark/symbols-port.png	0.585	0.6.1: the symbol panel's 123 second
 nine_slice_font_dark/zhuyin_full-port.png	1.537	
 nine_slice_font_dark/zhuyin_nine-port.png	0.142	5.3: zhuyin-nine-shown-not-typed
 nine_slice_font_light/english-port.png	1.859	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
-nine_slice_font_light/handwriting-port.png	0.805	5.3: handwriting-fixed-fullwidth-punct; nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
 nine_slice_font_light/k14-port.png	1.387	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
 nine_slice_font_light/k18-port.png	1.467	nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)
 nine_slice_font_light/nine-port.png	1.422	5.3: nine-syllables-sp; nine-slice: pieces meet on whole pixels, no seam (KeyFaceGeometryTest.piecesMeetOnWholePixelsLeavingNoSeam)

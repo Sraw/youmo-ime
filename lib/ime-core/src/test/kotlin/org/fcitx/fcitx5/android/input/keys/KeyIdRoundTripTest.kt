@@ -17,7 +17,7 @@ import java.io.File
 /** Every key's name a layout gives, and names no layout gives yet, stored in `key_lists` and read back as they were (§6.4). */
 class KeyIdRoundTripTest {
     private val builtIn = listOf(
-        "qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "handwriting", "number", "symbols",
+        "qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "symbols",
         "emoji", "emoticon", "emoji-search", "expanded-side", "number-row",
     ).map { SceneData.read("$it.xml") }
 

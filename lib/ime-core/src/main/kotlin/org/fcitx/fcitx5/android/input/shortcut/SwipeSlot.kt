@@ -191,7 +191,7 @@ class SwipeSlots private constructor(
 
         /**
          * Whether [key] types a character: a character key, and the comma and the full stop, function keys
-         * that type one (the handwriting keyboard's ，。 swiped to nothing are tapped, as a character key is).
+         * that type one (swiped to nothing, they are tapped, as a character key is).
          */
         fun typesAChar(key: String) = !isFunction(key) || key == functionKey("comma") || key == functionKey("period")
 

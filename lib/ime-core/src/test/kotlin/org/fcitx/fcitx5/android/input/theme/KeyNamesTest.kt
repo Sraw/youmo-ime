@@ -38,7 +38,7 @@ class KeyNamesTest {
 
     @Test
     fun eachBoardsNamesAreTheDesignsAndApart() {
-        assertEquals(setOf("qwerty", "zhuyin", "nine", "zhuyin-nine", "k14", "k18", "number", "symbols", "emoji", "handwriting"), KeyNames.BOARDS)
+        assertEquals(setOf("qwerty", "zhuyin", "nine", "zhuyin-nine", "k14", "k18", "number", "symbols", "emoji"), KeyNames.BOARDS)
         assertEquals(26, KeyNames.POSITIONS.getValue("qwerty").size)
         assertEquals(41, KeyNames.POSITIONS.getValue("zhuyin").size)
         assertEquals(14, KeyNames.POSITIONS.getValue("k14").size)

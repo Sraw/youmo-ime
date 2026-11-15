@@ -16,6 +16,7 @@ import android.text.style.UnderlineSpan
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.TextFormatFlag
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -155,7 +156,9 @@ class BarToolbarThemeTest {
         assertEquals(keys - (dp(56) - dp(40)), KeyboardArea.keysHeight(ctx, 0))
     }
 
+    // TB-56: a toggle's button on (手写, 单手, 悬浮) is toolbar:selected's
     @Test
+    @Uat("TB-56")
     fun theToolbarAndTheCodeAreTheThemes() {
         styled(
             "<style select=\"toolbar\" fill=\"#ffeeeeee\" radius=\"8dp\" icon-color=\"#ff445566\"/>",

@@ -14,7 +14,7 @@ import tarfile
 # the app's input methods and what the driver calls their page (androidengine.cpp:347-357)
 PAGES = {
     "engine-pinyin": ("-", "pinyin"), "engine-shuangpin": ("-", "shuangpin"),
-    "keyboard-us": ("-", "english"), "engine-handwriting": ("-", "handwriting"),
+    "keyboard-us": ("-", "english"),
     "engine-wubi": ("Wubi", "Wubi"), "engine-cangjie": ("Cangjie", "Cangjie"), "engine-ziranma": ("Ziranma", "Ziranma"),
     "engine-erbi": ("Erbi", "Erbi"), "engine-wubipinyin": ("WubiPinyin", "WubiPinyin"),
 }
@@ -54,7 +54,7 @@ CASES = {
         ("engine-cangjie", "AutoSelect=False\n"),
         ("engine-cangjie", "Hint=bad\n"),
         ("engine-pinyin", "Prediction=nope\n"),
-        ("engine-handwriting", "ModelLevel=Low\n"),
+        ("engine-wubi", "ModelLevel=Low\n"),
         ("engine-pinyin", "[Fuzzy]\nZ_ZH=True\n"),
         ("engine-erbi", "Chaizi=False\nWubi/AutoSelect=False\n"),
         ("not-an-im", "PageSize=9\n"),

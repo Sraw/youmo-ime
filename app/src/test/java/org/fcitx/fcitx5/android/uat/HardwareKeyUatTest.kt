@@ -38,7 +38,6 @@ import org.fcitx.fcitx5.android.input.candidates.CharCardView
 import org.fcitx.fcitx5.android.input.candidates.WordCardView
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
-import org.fcitx.fcitx5.android.input.keyboard.HandwritingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
@@ -71,7 +70,6 @@ class HardwareKeyUatTest {
 
     private fun entry(name: String, label: String = name) = InputMethodEntry(name, name, "", "", label, "zh_CN", "androidengine", false)
     private val wubi = entry(InputMethodCatalog.WUBI, "五")
-    private val handwriting = entry(InputMethodCatalog.HANDWRITING, "写")
 
     private fun harness(
         vararg enabled: InputMethodEntry = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH),
@@ -81,7 +79,7 @@ class HardwareKeyUatTest {
     ) =
         KeyboardHarness(im = im, keyboards = keyboards, codeRow = codeRow).also {
             h = it
-            it.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, handwriting)
+            it.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi)
             it.api.enabledIme = arrayOf(*enabled)
         }
 
@@ -331,17 +329,6 @@ class HardwareKeyUatTest {
     }
 
     @Test
-    @Uat("HK-14")
-    fun ctrlShiftGoesRoundSkippingHandwriting() {
-        // pinyin on the nine keys: a hardware keyboard types full pinyin in it whatever its keyboard
-        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, handwriting, keyboards = KeyboardHarness.NINE_KEYS).start()
-        // typed on first: the hardware keyboard's turn, where handwriting takes no keys
-        h.type("a")
-        val seen = (1..4).map { h.ctrlShift(); h.current }
-        assertEquals(listOf(InputMethodCatalog.ENGLISH, InputMethodCatalog.WUBI, InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH), seen)
-    }
-
-    @Test
     @Uat("HK-15")
     fun shiftThenCtrlToo() {
         val h = harness().start()
@@ -370,31 +357,6 @@ class HardwareKeyUatTest {
     }
 
     @Test
-    @Uat("HK-18")
-    fun handwritingTypedOnIsPinyin() {
-        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, handwriting, im = handwriting).start()
-        h.synced()
-        assertTrue(h.showing<HandwritingKeyboard>())
-        h.type("ni ")
-        assertEquals(InputMethodCatalog.PINYIN, h.current)
-        assertFalse(h.touchKeyboardUp)
-        assertEquals("ni ".map { it.toString() }, h.sent())
-    }
-
-    @Test
-    @Uat("HK-19")
-    fun theTouchKeyboardBackIsHandwriting() {
-        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, handwriting, im = handwriting).start()
-        h.synced()
-        h.type("ni ")
-        h.touchKeyboardButton()
-        h.synced()
-        assertTrue(h.touchKeyboardUp)
-        assertEquals(InputMethodCatalog.HANDWRITING, h.current)
-        assertTrue(h.showing<HandwritingKeyboard>())
-    }
-
-    @Test
     @Uat("HK-20")
     fun nineKeysTypedOnAndBack() {
         val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, keyboards = KeyboardHarness.NINE_KEYS).start()
@@ -405,21 +367,6 @@ class HardwareKeyUatTest {
         h.synced()
         assertTrue(h.touchKeyboardUp)
         assertTrue(h.showing<T9Keyboard>())
-    }
-
-    @Test
-    @Uat("HK-22")
-    fun aShortcutsChoiceIsKeptWhenTheTouchKeyboardIsBack() {
-        val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, handwriting, im = handwriting).start()
-        h.synced()
-        h.type("ni ")
-        h.ctrlShift()
-        val chosen = h.current
-        h.press(KeyEvent.KEYCODE_ESCAPE)
-        h.touchKeyboardButton()
-        h.synced()
-        assertEquals(chosen, h.current)
-        assertFalse(h.showing<HandwritingKeyboard>())
     }
 
     @Test

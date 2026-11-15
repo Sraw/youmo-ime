@@ -39,7 +39,13 @@ enum class ToolbarButton(val key: String) {
     Keyboard("keyboard"),
 
     /** 快速输入, as a long press on 符 opens it */
-    QuickPhrase("quick_input");
+    QuickPhrase("quick_input"),
+
+    /**
+     * 手写: written over the letters of the input method in use, on or off (061-handwriting-toolbar); not in
+     * English nor a password field
+     */
+    Handwriting("handwriting");
 
     companion object {
         fun ofKey(key: String) = entries.firstOrNull { it.key == key }
@@ -95,14 +101,28 @@ data class ToolbarConfig(val items: List<Item>) {
         val oneHanded: Boolean,
         /** the input method has keyboards to choose from */
         val keyboards: Boolean,
+        /** handwriting may be written: not a password field, not English (HandwritingMode.offered) */
+        val handwriting: Boolean = true,
     ) {
         fun offers(button: ToolbarButton) = when (button) {
             ToolbarButton.Voice -> voice
+            ToolbarButton.Handwriting -> handwriting
             ToolbarButton.TradSimp -> tradSimp
             ToolbarButton.OneHanded -> oneHanded
             ToolbarButton.Keyboard -> keyboards
             else -> true
         }
+    }
+
+    /**
+     * This with 手写 shown first of the buttons at the right (after the divider), whatever the user had of it:
+     * once, as 0.6.0's handwriting input method or 键盘手写 becomes it (KotlinHost, AppPrefs), so it is there to tap.
+     */
+    fun withHandwritingPinned(): ToolbarConfig {
+        val rest = items.filterNot { it is Item.Button && it.button == ToolbarButton.Handwriting }
+        // none but where made so (parse puts one in): the bar's right begins after the rest, 手写 alone there
+        val divider = rest.indexOf(Item.Divider).takeIf { it >= 0 } ?: return ToolbarConfig(rest + Item.Divider + Item.Button(ToolbarButton.Handwriting, true))
+        return ToolbarConfig(rest.subList(0, divider + 1) + Item.Button(ToolbarButton.Handwriting, true) + rest.subList(divider + 1, rest.size))
     }
 
     /** [toolbar] in the middle when it is opened, [pinned] at the right, after the middle. */
@@ -116,7 +136,8 @@ data class ToolbarConfig(val items: List<Item>) {
          * The bar as it always was: what v0.4 had, and the panel's others hidden on the toolbar. 快速输入
          * among them, first: one to add, not on the bar till the user ticks it (the user's call,
          * 2026-11-02; 符's long press and the gestures' command open it as ever). A bar the user
-         * arranged gets it hidden too, as any button added later ([parse]).
+         * arranged gets it hidden too, as any button added later ([parse]). 手写 at the right among the
+         * always-there ones (the user's call, 061-handwriting-toolbar Q2).
          */
         val DEFAULT = ToolbarConfig(
             listOf(ToolbarButton.Undo, ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard)
@@ -126,7 +147,7 @@ data class ToolbarConfig(val items: List<Item>) {
                     ToolbarButton.ClearRecent, ToolbarButton.Theme, ToolbarButton.InputMethodSettings, ToolbarButton.Keyboard,
                 ).map { Item.Button(it, false) } +
                 Item.Divider +
-                listOf(ToolbarButton.Emoji, ToolbarButton.Voice, ToolbarButton.Hide).map { Item.Button(it, true) }
+                listOf(ToolbarButton.Emoji, ToolbarButton.Handwriting, ToolbarButton.Voice, ToolbarButton.Hide).map { Item.Button(it, true) }
         )
 
         /**

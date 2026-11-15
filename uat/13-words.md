@@ -458,7 +458,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-54 [P1] 生僻字屏蔽：手写、笔画查字、拆字、滑行里都不出（先勾「其它表外字」；笔画表里没有扩展区的字，笔画查字用其它表外字）
 - **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关、勾上「其它表外字」。
-- **操作**：手写写一个「龘」；拼音里 `u` 笔画查字、`u` 拆字查一个其它表外字；在键上划 选 **滑行输入** 划 da。
+- **操作**：打开手写，在字母区写一个「龘」；拼音里 `u` 笔画查字、`u` 拆字查一个其它表外字；在键上划 选 **滑行输入** 划 da。
 - **预期**：几处的候选里都没有其它表外字和扩展区的字，常用字照常。笔画表里没有扩展区的字（实测 0 个），所以笔画查字这一项用其它表外字查，不用扩展区的。
 - **JVM**：ime-eval `RareCharsUatTest.handwritingStrokesPartsAndGlideOfferNoneHeld`、`RareCharsUatTest.withEveryGroupHeldNoListedChineseInputMethodOffersOne`（每个列出的中文输入法，按键和滑行）、ime-core `RareCharContractTest.theHandwritingPadReadsAroundWhatIsHeld`；设备上不跑。
 

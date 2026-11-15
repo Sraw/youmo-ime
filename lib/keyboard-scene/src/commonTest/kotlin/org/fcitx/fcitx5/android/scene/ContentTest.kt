@@ -260,7 +260,7 @@ class ContentTest {
         // icon's whole px: a px of it, 2.2% of a 46 px one), and every shortcut and ⌫ icon within its face's
         // arcs (060-render-p2 S4e); some against them (within the half px the yields keep off the face's edges,
         // the most a pixel's rounding moves them), or the arcs were never in play
-        val boards = listOf("qwerty", "k14", "k18", "zhuyin", "handwriting").map { it to false } + ("zhuyin-nine" to true)
+        val boards = listOf("qwerty", "k14", "k18", "zhuyin").map { it to false } + ("zhuyin-nine" to true)
         var against = 0
         for (d in listOf(1.5, 2.0, 2.75, 3.5)) for ((board, compact) in boards) against += sweepSmoothly(d, board, Forms.floating.copy(compact = compact))
         assertTrue(against >= 10, "against the arcs: $against")
@@ -268,13 +268,13 @@ class ContentTest {
 
     @Test
     fun theFloatingBoardsTheSweepLeavesOutKeepTheirIconsWithinTheArcs() {
-        // what the sweep above does not run: floating compact qwerty, k14, zhuyin and handwriting at every density,
+        // what the sweep above does not run: floating compact qwerty, k14 and zhuyin at every density,
         // and every floating board at 2.625 and 3.0 px a dp; from their height down to 55% of it, and a px or two
         // less, every shortcut's and ⌫'s icon within its face's arcs (R20 F6519: the check F5911 merged away)
         val heights = listOf(1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55).flatMap { part -> listOf(0.0, 1.0, 2.0).map { px -> part to px } }
-        val compactBoards = listOf("qwerty", "k14", "zhuyin", "handwriting")
+        val compactBoards = listOf("qwerty", "k14", "zhuyin")
         val runs = listOf(2.0, 2.625, 2.75, 3.0, 3.5).flatMap { d -> compactBoards.map { Triple(d, it, true) } } +
-            listOf(2.625, 3.0).flatMap { d -> listOf("qwerty", "k14", "k18", "zhuyin", "handwriting").map { Triple(d, it, false) } + Triple(d, "zhuyin-nine", true) }
+            listOf(2.625, 3.0).flatMap { d -> listOf("qwerty", "k14", "k18", "zhuyin").map { Triple(d, it, false) } + Triple(d, "zhuyin-nine", true) }
         var against = 0
         for ((d, board, compact) in runs) {
             val k = d / Forms.DENSITY
@@ -364,7 +364,7 @@ class ContentTest {
         val small = Forms.compact.copy(width = SMALL_COMPACT_WIDTH, height = 407.0 * 2.625 / 2.75)
         for (form in listOf(Forms.compact, small)) for ((d, h) in listOf(3.5 to 409.2, 3.5 to 414.2, 2.75 to 322.8, 2.75 to 325.8, 2.75 to 326.8)) {
             val k = d / Forms.DENSITY
-            for (board in listOf("zhuyin", "zhuyin-nine", "handwriting")) {
+            for (board in listOf("zhuyin", "zhuyin-nine")) {
                 val e = Forms.env(board, form.copy(width = form.width * k, height = h, density = d))
                 Forms.scene(board, e).keys.forEach { iconsWithinArcs(it, "at $d, ${form.width} $board $h px") }
             }

@@ -294,11 +294,11 @@
 - **预期**：第二次照样问（判断时不算上一次加的「徐婧」）；手动添加的词里只有「徐靖」，上一次加的「徐婧」拿掉（本来就有的词不动）；第二个词加不上时，第一个留着。
 - **JVM**：ime-core `EnginesVoiceEditsTest.asked again at the place, the first word added gives way (review M4)`（真的 Engines：记住、删掉重打「徐靖」、问且换掉「徐婧」）、`EnginesVoiceEditsTest.a word that does not add leaves the first be (review S8)`、`VoiceEditsTest.asked again at the same place, the word it adds takes the first's place (review M4)`；设备上不跑。
 
-### VO-45 [P1] 切到手写改字也问
+### VO-45 [P1] 打开手写改字也问
 - **前提**：B0-语音。
-- **操作**：照 VO-41 说话，删掉「徐静」，切到手写输入法写「徐」「婧」上屏。
+- **操作**：照 VO-41 说话，删掉「徐静」，点工具栏的 **手写**，在字母区写「徐」「婧」上屏。
 - **预期**：照样问「让语音记住『徐婧』？」；拼音按两个字和语音听到的共有的读音（xu jing）。
-- **JVM**：ime-core `EnginesVoiceEditsTest.a word written again on the pad is asked about, read as the characters are`（真的 Engines、手写输入法）；设备上不跑。
+- **JVM**：ime-core `EnginesVoiceEditsTest.a word written again on the pad is asked about, read as the characters are`（真的 Engines、拼音键盘上手写）；设备上不跑。
 
 ### VO-46 [P1] 不记录的框里、不用我的输入习惯时不问
 - **前提**：B0-语音。

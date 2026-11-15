@@ -21,6 +21,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - **生僻字屏蔽**（**词库与短语 → 生僻字屏蔽**，默认关）：不想在候选里看到的生僻字一次挡掉，所有中文输入法的候选、联想、整句、手写、笔画查字、拆字、滑行和语音结果里都不出现，含它的词也不出。按《通用规范汉字表》分四组：三级字、繁体字、其它表外字、扩展区；一级、二级常用字永远不挡。打开后默认只挡扩展区（扩展 B 及以后），常用的字词一个不少；每组可以整组挡，也可以在网格里一个个挡、放行（按住拖动连选，能撤销），能按拼音搜、粘贴一个字定位。你的词里有挡掉的字时不给出但不删，用户词库里标着「含屏蔽的字」，点一下就能放行。跟着「备份全部」走，恢复一份没有它的备份后回到关。
 - **双拼中间、后面的字可以只打声母**：第一个字打全、后面只打声母也能出词，比如自然码 `ufmuh` 出「什么时候」、`yivz` 出「一直在」；以前两个键能拼成音节时只按音节读。拆开读的一般排在按音节读的后面，打全码时第一个候选不变；两个键成音节的（`xm`），别的打法学过的词、手动加的词不会按单个声母提到前面，在这串键上固定、选过的照样排上来。全打声母（`umuh`）也能出，但常在后几页。18 键、14 键和九键双拼不变。
 - **长按任何中文候选，菜单最上面一行是它的读音**，点开看字卡或词卡（8 个字以内；更长的只显示读音）：词卡有整个词的拼音和注音、每个字的读音、部首和笔画，点一个字看它的完整字卡（多音字在这个词里的读音排第一）。以前只有手写、拆字和笔画查字的字有字卡。在不学习的输入框（无痕模式等）里长按只出读音和卡，没有菜单项。
+- **手写并入工具栏**：工具栏右边新的 **手写** 按钮（新装时钉在常驻区：表情、手写、语音、收起），点一下就在当前键盘的字母上写字，字母变淡、按钮亮起；再点一下关掉。拼音（全拼、双拼，各种键盘）、五笔等码表、注音的键盘上都能写，英文和密码框里没有。开着时字母区（字母键、Shift、键之间的缝）只写字，点一下是一个点；⌫、空格、标点、回车照常是键；打字时候选栏 ⌄ 左边也有亮着的手写按钮，点它关掉。开关记着，换输入框、换输入法、重启都还开着。停笔时间挪到 **通用输入** 的「手写」一节。输入法列表里不再有「手写」，**在键上划** 也去掉了「键盘手写」（只剩滑行输入、笔画筛选）：原来把手写放在第一个的，升级后换成拼音、手写开着；放在别处或用键盘手写的，按钮钉上、关着；都提示一次。0.6.0 的备份恢复后也一样。
 
 ### 小改动
 
@@ -36,6 +37,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 联想时候选栏最右边多了 ×：点了只收起这一次的联想，「联想下一个词」设置不变。
 - 繁体输出时，手写、拆字、笔画查字的字长按也有字卡了。
 - 长按弹出的项太长、窄屏上缩到最小字号也放不下时，末尾显示「…」，不再挤出格子；读屏照样念全文。
+- 在拼音等键盘上手写的字，候选词注音标出全部读音（和原来的手写输入法一样）；语音改写记录里手写的字不再带上拼音的读音。
+- 原来只给手写开的繁体，升级后带给顶替它的拼音；手写不在第一个时，手写的字跟着所在输入法的简繁。
+- 给书写板配了笔迹颜色的主题照样能导入，键上手写用它的笔迹颜色（和按键颜色对比不够时用按键文字的颜色）；书写板的其它样式、`@im=handwriting` 和手写布局不起作用，导入时提醒。
+- 和 0.6.0 不同：写好还没上屏的字显示在键盘上方的编码行里（和拼音一样），不再像 0.6.0 的手写输入法那样带下划线出现在输入框里（编码行选了 **输入框里（实验性）** 时照样在框里）；在输入框里点别处时，写好的字上屏到新的光标处。
 
 ### Main changes
 
@@ -51,6 +56,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - **Rare characters** (**Words and phrases → Rare characters**, off by default): hold back the rare characters you never want among the candidates, in one go; they then never show in any Chinese input method's candidates, predictions, sentences, handwriting, stroke and parts look-up, glide typing or voice results, nor does any word with one. Four groups by the Table of General Standard Chinese Characters: level 3, traditional, other unlisted, and the extensions; levels 1 and 2 are never held back. Turned on, only the extensions (B and later) are held back at first, every common character and word still there; each group can be held back whole, or a character at a time in the grid (drag to set many, with undo), searched by pinyin or found by pasting it. Your words with a character held back are not offered but kept, marked 「含屏蔽的字」 in the user's words, let through with a tap. It goes with "Back up all"; restoring a backup without it turns it off.
 - **双拼 takes initials in the middle**: type the first syllable whole and the rest by their initials, as 自然码 `ufmuh` for 什么时候 or `yivz` for 一直在; before, two keys that made a syllable were read only as that syllable. Keys read apart usually come after the syllable they make, and input in whole syllables keeps its first candidate; where two keys make a syllable (`xm`), words learned from other spellings or added by hand are not raised by their initials, while what is pinned or picked under those very keys is. Initials only (`umuh`) work too, often further down. The 18, 14 and nine keys are unchanged.
 - **Hold any Chinese candidate: the menu's first line is its reading**; tap it for the character's card or, for a word of up to eight characters, a word card (longer candidates show the reading only): the whole word in pinyin and zhuyin, each character's reading, radical and strokes, and each character's full card a tap away (a polyphone's reading in this word first). Before, only handwritten characters and those looked up by parts or strokes had cards. In a field that learns nothing (an incognito tab and the like) the hold shows the reading and the cards alone, no menu items.
+- **Handwriting moves onto the toolbar**: a new **手写** (handwriting) button at the toolbar's right (pinned for a new install: emoji, handwriting, voice, hide) writes on the letters of the keyboard in use, the letters faded, the button lit; tap it again to stop. It writes on pinyin (full and 双拼, every keyboard), the tables and zhuyin; not in English nor a password field. While on, the letter area (the letters, Shift, the gaps) only writes, a tap a dot; ⌫, space, punctuation and enter stay keys; while typing, the candidate bar has the lit button too, left of ⌄. The toggle is kept across fields, input methods and restarts. The pen-up pause moved to **通用输入**'s 手写 section. Handwriting is no longer an input method, and **在键上划** loses 键盘手写 (glide and strokes left): handwriting first in your list becomes pinyin with handwriting on; listed elsewhere or 键盘手写 chosen, the button is pinned and off; you are told once. A 0.6.0 backup restored goes the same way.
 
 ### Smaller changes
 
@@ -66,6 +72,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 - With 联想 (next-word predictions) shown, the candidate bar has a × at its far right: it puts away these predictions alone, the setting unchanged.
 - With traditional output, a handwritten character (or one looked up by parts or strokes) has its card again on a long press.
 - A long press item too long for a narrow screen, even at the least text size, ends in 「…」 instead of running out of its cell; TalkBack still reads it whole.
+- Characters handwritten on the pinyin keyboard and the others show all their readings with 候选词注音 on (as the handwriting input method did); voice's edit record no longer gives them pinyin's reading.
+- Traditional characters turned on for handwriting alone go to pinyin where it takes handwriting's place; elsewhere what you write follows the input method you write in.
+- A theme that gave the handwriting pad an ink colour still imports, and the ink on the keys takes that colour (the key text's colour where it would not stand out); the pad's other styles, `@im=handwriting` and a handwriting layout do nothing, and the import says so.
+- Unlike 0.6.0: written characters not yet put in show in the code row above the keys (as pinyin does), no longer underlined in the text box as with 0.6.0's handwriting input method (still in the box where the code row is set to **In the text box (experimental)**); tapping elsewhere in the box puts them in at the new cursor.
 
 ---
 

@@ -137,9 +137,9 @@ class KeyboardPerfBaselineTest {
         // the theme of before the motion rows: the last memory rows not of the animated picture's decoder and frames
         onMain { themeWas?.let { ThemeManager.prefs.normalModeTheme.setValue(it) } }
         hideKeyboard()
-        memory("after the runs (handwriting's models loaded), hidden")
+        memory("after the runs, hidden")
         showKeyboard()
-        memory("after the runs (handwriting's models loaded), shown")
+        memory("after the runs, shown")
     }
 
     // ---- the device
@@ -167,7 +167,7 @@ class KeyboardPerfBaselineTest {
             it.setTurnScreenOn(true)
         }
         showKeyboard()
-        // pinyin on the 26 keys first; handwriting enabled for its pad
+        // pinyin on the 26 keys first
         AppPrefs.getInstance().keyboard.pinyinKeyboard.let { pref ->
             pinyinKeyboardWas = pref.getValue()
             if (pref.getValue() != PinyinKeyboard.Full) onMain { pref.setValue(PinyinKeyboard.Full) }
@@ -175,7 +175,7 @@ class KeyboardPerfBaselineTest {
         host {
             imsWere = enabledIme().map { it.uniqueName }.toTypedArray()
             imWas = currentIme().uniqueName
-            val wanted = listOf(PINYIN, HANDWRITING).filter { im -> enabledIme().none { it.uniqueName == im } }
+            val wanted = listOf(PINYIN).filter { im -> enabledIme().none { it.uniqueName == im } }
             if (wanted.isNotEmpty()) setEnabledIme(imsWere!! + wanted)
             activateIme(PINYIN)
         }
@@ -219,7 +219,6 @@ class KeyboardPerfBaselineTest {
         ZHUYIN_NINE("zhuyin 9 keys", PinyinKeyboard.ZhuyinNine),
         NUMBER("number", null),
         SYMBOLS("symbols", null),
-        HANDWRITING("handwriting", null),
     }
 
     private val built = linkedMapOf<Board, MutableList<KeyboardFrames.Sample>>()
@@ -227,9 +226,9 @@ class KeyboardPerfBaselineTest {
 
     /**
      * A keyboard picked in ⋯ is a setting, and the keyboards are made anew with it (the input view
-     * kept): counted from the setting to its first frame. The number and symbol keyboards and the
-     * handwriting pad are made the first time a fresh input view shows them: the 26 keys made anew
-     * (via 14 keys, a setting each), then counted from the tap's lift, or from handwriting asked for.
+     * kept): counted from the setting to its first frame. The number and symbol keyboards are made
+     * the first time a fresh input view shows them: the 26 keys made anew (via 14 keys, a setting
+     * each), then counted from the tap's lift.
      */
     private fun buildEachKeyboard() {
         val picked = Board.entries.filter { it.pinyin != null && it != Board.FULL }
@@ -242,19 +241,12 @@ class KeyboardPerfBaselineTest {
         }
         val number = keyAt(onKeyboard().text("123"))
         val symbols = keyAt(onKeyboard().text("符"))
-        val handwriting = host { availableIme().any { it.uniqueName == HANDWRITING } }
         repeat(warmUp + runs) {
             fresh()
             record(Board.NUMBER, tapTo(number, Board.NUMBER))
             fresh()
             record(Board.SYMBOLS, tapTo(symbols, Board.SYMBOLS))
-            if (handwriting) {
-                fresh()
-                record(Board.HANDWRITING, switchTo(HANDWRITING, Board.HANDWRITING))
-                switchTo(PINYIN, Board.FULL)
-            }
         }
-        if (!handwriting) log("handwriting\tnot in this build's input methods")
         fresh()
         for ((board, samples) in built) {
             val kept = samples.drop(warmUp)
@@ -302,14 +294,6 @@ class KeyboardPerfBaselineTest {
         return sample.also { settle() }.heap(Heap.now() - heap)
     }
 
-    private fun switchTo(im: String, board: Board): KeyboardFrames.Sample {
-        val mark = onMain { frames.mark(0) { shows(keyboardFrame(), board) } }
-        val heap = Heap.now()
-        mark.from = System.nanoTime()
-        host { activateIme(im) }
-        return frames.await(mark).also { settle() }.heap(Heap.now() - heap)
-    }
-
     /**
      * Whether [frame] shows [board]: the keyboard in it by its class; the symbols, a window of their own,
      * as the keyboard's frame gone. The one part to change for the new drawing, if its keyboards are
@@ -325,7 +309,6 @@ class KeyboardPerfBaselineTest {
             Board.KEYS14, Board.KEYS18 -> "GroupedKeyboard"
             Board.ZHUYIN, Board.ZHUYIN_NINE -> "ZhuyinKeyboard"
             Board.NUMBER -> "NumberKeyboard"
-            Board.HANDWRITING -> "HandwritingKeyboard"
             Board.SYMBOLS -> error("above")
         }
     }
@@ -809,7 +792,6 @@ class KeyboardPerfBaselineTest {
     internal companion object {
         const val TAG = "KeyboardPerf"
         const val PINYIN = InputMethodCatalog.PINYIN
-        const val HANDWRITING = InputMethodCatalog.HANDWRITING
         const val FLAT = "perf-baseline-flat"
         const val PICTURED = "perf-baseline-picture"
         const val UNSEEN = "perf-baseline-new"

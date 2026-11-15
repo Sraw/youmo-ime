@@ -68,7 +68,6 @@ class CompactKeyboardScreenshotTest {
         Board("english_nine", KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)),
         Board("wubi_names", entry(InputMethodCatalog.WUBI, "五笔"), table = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.NAMES, TableRoots.WUBI86)),
         Board("wubi_roots", entry(InputMethodCatalog.WUBI, "五笔"), table = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.ROOTS, TableRoots.WUBI86)),
-        Board("handwriting", entry(InputMethodCatalog.HANDWRITING, "手写")),
         Board("number", inputType = InputType.TYPE_CLASS_NUMBER),
     ) + zhuyin
 

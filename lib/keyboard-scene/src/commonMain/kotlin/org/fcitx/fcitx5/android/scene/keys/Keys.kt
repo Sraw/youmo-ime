@@ -80,7 +80,7 @@ data class KeyboardVariant(
     /** 双拼 of a scheme typing `;` (微软's ing): the 18 keys' L group has it; else the group is L alone. */
     val semicolon: Boolean = false,
 ) {
-    enum class Form { Full, Nine, Grouped14, Grouped18, ZhuyinFull, ZhuyinNine, Handwriting, Number, Panel }
+    enum class Form { Full, Nine, Grouped14, Grouped18, ZhuyinFull, ZhuyinNine, Number, Panel }
 
     companion object {
         val STANDARD_NINE: Map<Char, String> = mapOf(

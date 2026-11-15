@@ -99,11 +99,6 @@
 - **预期**：两次键盘重建后拼音栏都还是「ni」，候选栏照样有「你好」，框里是空的；不算改设置，拼音没有被清掉。
 - **JVM**：`StuckBarUatTest.floatingAndDockedMidPinyinKeepIt`（直接改悬浮开关，拖把手改的就是它）；设备上不跑。
 
-### LC-19 [P1] 手写的字没选时换主题：字上屏
-- **前提**：B0-手写（见 09-handwriting.md），写「中」，停笔，不选（「中」带下划线在框里）。
-- **操作**：键盘还在时换主题（JVM 上直接改，同 LC-15）；再写一个字。
-- **预期**：「中」照原样上屏留在框里，下划线没了；再写的是新的一个字，不接在「中」的笔画上（docs/other-input-methods.md）。
-- **JVM**：`StuckBarUatTest.aThemeChangedMidHandwritingCommitsIt`；设备上不跑（同 LC-15）。
 
 ### LC-20 [P2] 键盘一直没启动完时重启实例或换界面语言：提示可能没重启成
 <!-- R25r2 F7883 -->
@@ -197,3 +192,9 @@
 - **操作**：点 n i h a o、空格，点回车（发送）；再点 n i，看框和键盘上方；点空格。
 - **预期**：发送前框里是「你好」，发送后框是空的；再打的「ni」带着下划线在框里，键盘上方没有小条；空格后框里是「你」，没有上一次的字母留下。
 - **JVM**：没有。这条看的是各版本框架自己让输入法重来的方式，harness 只有一种 `restart()`；发送时框里已经没有编码，编码在框里时应用重启输入见 LC-26。设备上跑（API 36 模拟器；Android 10 用 youmo29）。
+
+### LC-35 [P1] 手写写了一半时转屏、换主题：写好的上屏，手写还开着
+- **前提**：B0-手写，写「中」，停笔，不选（「中」在编码处）。
+- **操作**：转屏（或换一个主题）；再写「人」。
+- **预期**：「中」上屏留在框里（键盘重建时写好的上屏，DECISIONS A2）；回来后手写还开着，写的「人」是新的一个字。
+- **JVM**：`HostCasesUatTest.aCharacterNotCommittedIsPutInWhenTheKeyboardGoes`（键盘走时写好的上屏）、`KeyHandwritingUatTest.theKeyboardHiddenAndShownAgainStillWrites`（键盘重建后还写得上）；设备上不跑。

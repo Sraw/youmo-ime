@@ -10,7 +10,6 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
@@ -58,12 +57,10 @@ class KeysEverywhereUatTest {
 
     private val internal get() = AppPrefs.getInstance().internal
 
-    private val handwriting = InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false)
-
     private fun harness(im: InputMethodEntry, chosen: ImKeyboards.Chosen? = null, punctuation: Map<String, String>? = null): KeyboardHarness {
         made?.close()
         return KeyboardHarness(TestThemes.PixelLight, im, keyboards = chosen).apply {
-            api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, handwriting)
+            api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
             api.enabledIme = api.availableIme
         }.start().also { h ->
             made = h
@@ -87,12 +84,11 @@ class KeysEverywhereUatTest {
         return shown.map { it.text } to shown.singleOrNull { it.focused }?.text
     }
 
-    // every keyboard with a ，: pinyin's full, 14 and 18 keys, 注音's two, handwriting; [punctuation] on where given
+    // every keyboard with a ，: pinyin's full, 14 and 18 keys, 注音's two; [punctuation] on where given
     private fun everyComma(punctuation: Map<String, String>? = null): Sequence<Pair<String, KeyboardHarness>> = sequence {
         for (k in listOf(ImKeyboard.FULL, ImKeyboard.KEYS14, ImKeyboard.KEYS18, ImKeyboard.ZHUYIN_FULL, ImKeyboard.ZHUYIN_NINE)) {
             yield(k.name to harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = k), punctuation))
         }
-        yield("handwriting" to harness(handwriting, punctuation = punctuation))
     }
 
     // the keys named [name] the board shows (注音九键 has two ，: the bottom row's and r4c4)
@@ -127,20 +123,6 @@ class KeysEverywhereUatTest {
             // the same items and the first focused; their places on the screen go by where the key is, so not their order
             for (k in keys) assertEquals("$board ${k.node.id}", comma.map { punct[it] ?: it }.sorted() to (punct["."] ?: "."), h.held(k).let { (items, focused) -> items.sorted() to focused })
         }
-    }
-
-    // handwriting's ，。 the keys every keyboard has: ，'s list KB-73's ([commaIsOneKey] holds it there too), 。's the
-    // full keyboard's, each as Chinese punctuation shows it (a stroke off them into the pad: HandwritingSceneGesturesTest)
-    @Test
-    @Uat("HW-39")
-    fun handwritingsCommaAndFullStopAreEveryKeyboards() {
-        val period = listOf(",", "?", "!", ":", ";", "_", "%", "$", "^", "&").map { zh[it] ?: it }.sorted()
-        val full = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.FULL), zh)
-        val fullsPeriod = full.held(full.named("fn/period").single()).let { (items, focused) -> items.sorted() to focused }
-        assertEquals(period, fullsPeriod.first)
-        val h = harness(handwriting, punctuation = zh)
-        assertEquals(fullsPeriod, h.held(h.named("fn/period").single()).let { (items, focused) -> items.sorted() to focused })
-        assertEquals(comma.map(zh::getValue).sorted() to "。", h.held(h.named("fn/comma").single()).let { (items, focused) -> items.sorted() to focused })
     }
 
     @Test

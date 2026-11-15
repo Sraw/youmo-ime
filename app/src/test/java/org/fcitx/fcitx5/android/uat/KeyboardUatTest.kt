@@ -352,7 +352,8 @@ class KeyboardUatTest {
         val key = h.describedKey("Backspace")
         val b = h.box(key)
         h.drag(key, b.exactCenterX() - h.service.resources.displayMetrics.widthPixels * 0.4f, b.exactCenterY(), steps = 16)
-        assertTrue(h.api.calls.toString(), "reset()" in h.api.calls)
+        // dropped, nothing put in: handwriting's text too
+        assertTrue(h.api.calls.toString(), "reset(drop)" in h.api.calls)
     }
 
     @Test

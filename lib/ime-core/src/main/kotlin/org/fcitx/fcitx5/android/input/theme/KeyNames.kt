@@ -32,13 +32,12 @@ object KeyNames {
     const val NUMBER = "number"
     const val SYMBOLS = "symbols"
     const val EMOJI = "emoji"
-    const val HANDWRITING = "handwriting"
 
     /** Function keys, the same name on every board. */
     val ROLES: List<String> = listOf(
         "shift", "backspace", "space", "enter", "confirm", "symbols", "numbers", "back", "lang",
         "comma", "period", "semicolon", "star", "apostrophe", "reset", "lookup", "lookup-on",
-        "slash", "at", "dot", "domain", "search", "lock", "emoji", "emoticon", "reading",
+        "slash", "at", "dot", "domain", "search", "lock", "emoji", "emoticon",
     )
 
     private val letters = ('a'..'z').map(Char::toString)
@@ -60,7 +59,6 @@ object KeyNames {
         NUMBER to (0..9).map(Int::toString) + listOf("+", "-", "*", "/", ",", "=", ".", "#", "(", ")", ":"),
         SYMBOLS to emptyList(),
         EMOJI to emptyList(),
-        HANDWRITING to emptyList(),
     )
 
     val BOARDS: Set<String> get() = POSITIONS.keys

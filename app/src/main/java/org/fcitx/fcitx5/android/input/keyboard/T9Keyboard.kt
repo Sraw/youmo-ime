@@ -517,7 +517,7 @@ class T9Keyboard(
         }
 
     // each letter where the scene draws its digit's key (nine.xml's key N)
-    private val sceneLetters: List<Pair<Char, KeyPlace>> = ('2'..'9').flatMap { d ->
+    private val sceneLetters: List<Pair<Char, ScenePlace>> = ('2'..'9').flatMap { d ->
         scenePlace(d.toString()).let { at -> letters.letters(d).map { it.lowercaseChar() to at } }
     }
 
@@ -528,7 +528,11 @@ class T9Keyboard(
         null
     } else {
         // the keys where the scene draws them (their centres, GlideGesture's)
-        glideInput(letters = { sceneLetters }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }, writes = { InputMethodCatalog.writesOnKeys(imeName) }) { path, layout ->
+        glideInput(
+            letters = { sceneLetters }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin }, filters = { InputMethodCatalog.filtersByStrokes(imeName) },
+            // written on: the 3×3 of the letters with 1 (punctuation), not the side columns' Shift (061-handwriting-toolbar §3.2)
+            writesAlso = { it.id == "1" },
+        ) { path, layout ->
             // a glide ends a run of presses: a key pressed soon after it is a press of its own, not 连按's next letter
             multiTap.reset()
             onAction(KeyAction.GlideAction(Glide(path, layout)))
@@ -876,8 +880,8 @@ class T9Keyboard(
 
     private val columnSlot = Rect()
 
-    // the column where the scene has its slot `side` (nine.xml), over the canvas, in the same pass as the canvas (as
-    // HandwritingKeyboard's pad): never a frame elsewhere; no scene (060-render-p2 U8), the column not shown either
+    // the column where the scene has its slot `side` (nine.xml), over the canvas, in the same pass as the canvas:
+    // never a frame elsewhere; no scene (060-render-p2 U8), the column not shown either
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val c = canvas ?: return

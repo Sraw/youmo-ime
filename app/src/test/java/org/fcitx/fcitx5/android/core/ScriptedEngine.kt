@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.core
 
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -34,11 +33,8 @@ class ScriptedEngine(private val home: File) : KotlinHost.EngineSide, EngineHost
         events += event
         var commit = ""
         when (event) {
-            // a letter in handwriting stands for a character written (the pad's reading is HandwritingUatTest's)
             EngineEvent.CHAR -> if (arg !in 'a'.code..'z'.code) {
                 return idle()
-            } else if (im == InputMethodCatalog.HANDWRITING) {
-                typed += WRITTEN
             } else {
                 typed += arg.toChar()
             }
@@ -73,8 +69,5 @@ class ScriptedEngine(private val home: File) : KotlinHost.EngineSide, EngineHost
 
     companion object {
         val WORDS = listOf("你好", "你")
-
-        /** What a letter typed in handwriting is written as. */
-        const val WRITTEN = "中"
     }
 }

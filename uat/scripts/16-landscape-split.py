@@ -86,8 +86,6 @@ case("LS-19", needs="jvm:LandscapeUatTest.clipboardAtTheSide")(lambda d: None)
 case("LS-20", needs="jvm:LandscapeUatTest.nineKeysAtTheSide")(lambda d: None)
 
 
-case("LS-21", needs="jvm:LandscapeUatTest.handwritingAtTheSide")(lambda d: None)
-
 
 case("LS-22", needs="jvm:LandscapeUatTest.fullWidthTakesTheWholeWidth")(lambda d: None)
 

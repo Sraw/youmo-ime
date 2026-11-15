@@ -178,47 +178,56 @@ class HostCasesUatTest {
         expectText("$first；")
     }
 
+    // written on the letters (the toolbar's 手写) over pinyin: shown where pinyin's code is, not yet in the field
     @Test
     @Uat("HW-02")
-    fun aCharacterWrittenIsComposingInTheFieldWithItsReadings() = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+    fun aCharacterWrittenIsShownAsTypedWithItsReadings() = with(HostReplay(im = InputMethodCatalog.PINYIN)) {
         write("人", "入", "八")
-        // composing (underlined), not committed
-        assertEquals("人", clientPreedit)
-        assertEquals(0 to 1, editor.composingStart to editor.composingEnd)
+        assertEquals("人", preedit)
         assertTrue(commits.isEmpty())
         assertTrue("人 among $page", "人" in page)
     }
 
+    // what is written is put in as the keyboard goes, pinyin's code is not (DECISIONS A2)
     @Test
-    @Uat("HW-09")
-    fun aCharacterNotCommittedStaysInTheFieldWhenTheKeyboardGoes() = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+    @Uat("HW-09", "LC-35")
+    fun aCharacterNotCommittedIsPutInWhenTheKeyboardGoes() = with(HostReplay(im = InputMethodCatalog.PINYIN)) {
         write("人", "入", "八")
         keyboardHidden()
         expectText("人")
-        assertEquals(-1 to -1, editor.composingStart to editor.composingEnd)
+        assertEquals("", preedit)
+        type("ni")
+        keyboardHidden()
+        expectText("人")
     }
 
-    // where the cursor goes after the commit is EditingSession's (ComposingTapUatTest, :lib:ime-core)
+    // the field tapped while characters are written: they go in as they are, where they were to go
     @Test
     @Uat("HW-25")
-    fun aTapOnCharactersNotInPutsThemInAsTheyAre() = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+    fun aTapInTheFieldPutsTheWrittenInAsItIs() = with(HostReplay(im = InputMethodCatalog.PINYIN)) {
         write("人", "入", "八")
         write("大", "太", "犬")
-        assertEquals("人大", clientPreedit)
-        // a tap before 人: the editor's cursor there, which the service passes on as the preedit's (MovePreeditCursor)
-        editor.setSelection(0, 0)
-        core.moveCursor(0)
-        pause()
+        assertEquals("人大", preedit)
+        tapField()
         expectText("人大")
         assertEquals(listOf("人大"), commits)
-        assertEquals(-1 to -1, editor.composingStart to editor.composingEnd)
-        assertEquals("", clientPreedit)
-        assertTrue("candidates left: $page", page.isEmpty())
-        // 十 a sentence of its own after 人大
+        assertEquals("", preedit)
         assertEquals(2, editor.selectionStart)
-        write("十", "千", "干")
-        expectText("人大十")
-        assertEquals(2 to 3, editor.composingStart to editor.composingEnd)
+    }
+
+    // the user's D1/D5: what is written is in the code row, not the field, so a tap elsewhere puts it in where the
+    // cursor went, not where it was written
+    @Test
+    @Uat("HW-25")
+    fun aTapElsewhereInTheFieldPutsTheWrittenInAtTheNewCursor() = with(HostReplay(im = InputMethodCatalog.PINYIN)) {
+        focus("说：", after = "。")
+        write("人", "入", "八")
+        expectText("说：。")
+        editor.setSelection(0, 0)
+        tapField()
+        expectText("人说：。")
+        assertEquals("", preedit)
+        assertEquals(1, editor.selectionStart)
     }
 
     // ------------------------------------------------------------------ 10 tables

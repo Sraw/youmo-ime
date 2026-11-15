@@ -29,6 +29,7 @@ data class ToolbarButtonLooks(@param:DrawableRes val icon: Int, @param:StringRes
             ToolbarButton.InputMethodSettings -> ToolbarButtonLooks(R.drawable.ic_baseline_language_24, R.string.input_method_options)
             ToolbarButton.Keyboard -> ToolbarButtonLooks(R.drawable.ic_baseline_dialpad_24, R.string.status_keyboard)
             ToolbarButton.QuickPhrase -> ToolbarButtonLooks(R.drawable.ic_quick_phrase, R.string.quick_phrases)
+            ToolbarButton.Handwriting -> ToolbarButtonLooks(R.drawable.ic_handwriting, R.string.handwriting)
         }
     }
 }

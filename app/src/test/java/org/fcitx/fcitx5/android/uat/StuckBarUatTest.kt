@@ -172,30 +172,6 @@ class StuckBarUatTest {
     }
 
     @Test
-    @Uat("LC-19")
-    fun aThemeChangedMidHandwritingCommitsIt() {
-        start()
-        h.service.postFcitxJob {
-            setEnabledIme(arrayOf(InputMethodCatalog.PINYIN, InputMethodCatalog.HANDWRITING))
-            activateIme(InputMethodCatalog.HANDWRITING)
-        }
-        until("handwriting", ::state) { fcitx.inputMethodEntryCached.uniqueName == InputMethodCatalog.HANDWRITING }
-        // a character written, not picked: the scripted engine's 中, composing in the field as handwriting's are
-        h.service.postFcitxJob { sendKey('z') }
-        until("中 composing", ::state) { BaseInputConnection.getComposingSpanStart(h.field.text) >= 0 && h.field.text.toString() == ScriptedEngine.WRITTEN }
-        engine.events.clear()
-        ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
-        h.idle()
-        until("中 committed", ::state) { BaseInputConnection.getComposingSpanStart(h.field.text) < 0 }
-        assertEquals(state(), ScriptedEngine.WRITTEN, h.field.text.toString())
-        assertTrue("the engine reset: ${engine.events}", EngineEvent.RESET in engine.events)
-        // the next character a new one after it
-        h.service.postFcitxJob { sendKey('z') }
-        until("the next composing", ::state) { h.field.text.toString() == ScriptedEngine.WRITTEN.repeat(2) }
-        assertEquals(state(), 1, BaseInputConnection.getComposingSpanStart(h.field.text))
-    }
-
-    @Test
     @Uat("LC-18")
     fun floatingAndDockedMidPinyinKeepIt() {
         start()

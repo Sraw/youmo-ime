@@ -321,3 +321,21 @@
 - **操作**：点候选栏上复制的建议；等框里排好字。再把测试台重新打开（框又是空的）、点「多行」，打开剪贴板面板，点最上面这一条。
 - **预期**：两次框里都是整段 29.7 万字，开头结尾都对（以前超过约 25 万字时一个字也粘不上）。粘贴时框所在的应用要排一两秒版，
   这期间应用和键盘都不动，排完恢复。
+
+### TB-55 [P1] 新装时常驻区是表情、手写、语音、收起
+- **前提**：B0（新装）。
+- **操作**：看工具栏；点 › 展开，看 **工具栏按钮** 设置页。
+- **预期**：常驻区依次是表情、手写、语音、收起（0.6.1 起手写钉在常驻区）；工具栏按钮页有「手写」一行；英文、密码框里没有手写按钮。
+- **JVM**：`ToolbarConfigTest.handwritingIsPinnedByDefaultAndLeftOutWhereItDoesNotWrite`（ime-core：默认钉上，不写字的地方去掉）、`HandwritingUatTest.theToolbarsButtonTurnsHandwritingOffAndOn`（工具栏上的手写按钮开关）；设备上 HW-41 一起看。
+
+### TB-56 [P1] 主题的 `toolbar:selected` 颜色给开着的手写按钮
+- **前提**：B0-设置，导入一个写了 `<style select="toolbar:selected" fill="…" icon-color="…"/>` 的主题。
+- **操作**：回测试页打开手写，看工具栏的手写按钮。
+- **预期**：开着时按钮是 `toolbar:selected` 的底色和图标颜色（和单手、悬浮开着时一样），关掉后回到平常的样子。
+- **JVM**：`BarToolbarThemeTest.theToolbarAndTheCodeAreTheThemes`（开着的按钮用 toolbar:selected 的底色和图标色）；设备上不跑。
+
+### TB-57 [P2] 常驻区放不下时手写挪进展开的工具栏
+- **前提**：B0-设置，**外观** 里候选字号调到 28sp（360dp 宽只放得下 3 个常驻按钮）。
+- **操作**：回测试页看工具栏；点 › 展开。
+- **预期**：放不下的常驻按钮按顺序挪进展开的工具栏，排在 ⋯ 前面；手写在展开里照样能点开、关。
+- **JVM**：`ToolbarConfigTest.pinnedOnesWithNoRoomGoOntoTheToolbarInOrderBeforeTheMoreButton`（ime-core）；设备上不跑。

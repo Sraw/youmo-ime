@@ -138,7 +138,7 @@ class SettingsPagesUatTest {
     @Test
     @Uat("SET-12")
     fun addingAnInputMethodOffersNoNineKeysAndWubiFirst() {
-        val all = listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH, "engine-erbi", "engine-cangjie", InputMethodCatalog.WUBI, "engine-ziranma", InputMethodCatalog.SHUANGPIN, "engine-wubipinyin", InputMethodCatalog.HANDWRITING)
+        val all = listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH, "engine-erbi", "engine-cangjie", InputMethodCatalog.WUBI, "engine-ziranma", InputMethodCatalog.SHUANGPIN, "engine-wubipinyin")
         api.availableIme = all.map(::entry).toTypedArray()
         api.enabledIme = arrayOf(entry(InputMethodCatalog.PINYIN), entry(InputMethodCatalog.ENGLISH))
         open(SettingsRoute.InputMethodList)
@@ -147,7 +147,7 @@ class SettingsPagesUatTest {
         idle()
         val list = dialog().listView
         val items = (0 until list.adapter.count).map { list.adapter.getItem(it).toString() }
-        assertEquals(7, items.size)
+        assertEquals(6, items.size)
         assertEquals("Wubi", items.first())
         assertTrue(items.toString(), items.none { "9" in it })
         list.performItemClick(list.getChildAt(0), 0, 0)

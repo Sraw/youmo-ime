@@ -13,6 +13,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.StateListDrawable
 import android.view.ViewPropertyAnimator
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
@@ -60,11 +61,26 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         add(image, lParams(wrapContent, wrapContent, gravityCenter))
     }
 
-    /** A toggle's button drawn on ([ToolbarLook.onIcon], [ToolbarLook.onFill]) or off, as the theme has it. */
+    // a toggle's state, said by TalkBack as checked or not; null: no toggle
+    private var on: Boolean? = null
+
+    /**
+     * A toggle's button drawn on ([ToolbarLook.onIcon], [ToolbarLook.onFill]) or off, as the theme has it, and
+     * said so: a checkable node, checked while on (061-handwriting-toolbar §3.8; stateDescription is API 30's).
+     */
     fun setOn(on: Boolean) {
+        this.on = on
         val look = toolbar ?: return
         setIconTint((if (on) look.onIcon else look.icon).value)
         if (look.fill != look.onFill) background = background(look, on)
+    }
+
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        on?.let {
+            info.isCheckable = true
+            info.isChecked = it
+        }
     }
 
     // no fill nor radius in this state: the press highlight's circle (a ripple) as ever, so a theme's

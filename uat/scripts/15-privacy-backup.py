@@ -433,3 +433,10 @@ def pr52b(d):
 case("PR-52a", needs="manual:系统文件选择器里选改过名的备份、不是备份的 zip、图片和条目太多的 zip；在真机或模拟器上手工跑")(lambda d: None)
 case("PR-53", needs="jvm:AppPrefsTest.theOneHandedSideRememberedIsNotResetByTheResetsOfHiddenSettings")(lambda d: None)
 case("PR-54", needs="jvm:CandidateMenuUatTest.aFieldThatLearnsNothingHasTheCardAndNoLines")(lambda d: None)
+
+case("PR-55", needs="jvm:KotlinHostHandwritingTest.zeroSixsHandwritingInputMethodMovesOntoTheToolbarAndTheUserIsToldOnce、HandwritingRetireTest.eachGroupWithoutHandwriting")(lambda d: None)
+case("PR-56", needs="jvm:AppPrefsTest.zeroSixsKeyHandwritingIsOffWithTheToolbarsHandwritingPinned、"
+               "KotlinHostHandwritingTest.zeroSixsHandwritingInputMethodMovesOntoTheToolbarAndTheUserIsToldOnce、HandwritingRetireTest.eachGroupWithoutHandwriting")(lambda d: None)
+case("PR-57", needs="manual:要 0.6.0 做的「备份全部」（列表里有手写、学过「澜」），恢复后看列表、手写开关和「澜」的排序")(lambda d: None)
+case("PR-58", needs="jvm:KotlinHostHandwritingTest.zeroSixsTraditionalHandwritingIsPinyinsWhereItTookItsPlace、"
+               "HandwritingRetireTest.traditionalHandwritingGoesToPinyinWhereItTookHandwritingsPlace")(lambda d: None)

@@ -653,67 +653,24 @@ class EngineBridgeTest {
             bridge.unloadable.clear()
             var calls = 0
             try {
-                assertTrue(bridge.handwriting(InputMethodCatalog.HANDWRITING) { calls++ })
+                assertTrue(bridge.handwriting { calls++ })
                 assertEquals(1, calls)
-                assertFalse(InputMethodCatalog.HANDWRITING in bridge.unloadable)
+                assertFalse("handwriting" in bridge.unloadable)
             } finally {
                 bridge.unloadable.clear()
             }
         }
 
-        /**
-         * Written on the letter keys (键盘手写): an Ink key goes to the input method's own handwriting (InkOver),
-         * not handwriting's; under English, none; and every answer of such an input method says whether its
-         * own input is typed, a new value each time (KeyInkGesture.engineTyped).
-         */
+        /** Written on the letters (the toolbar's 手写): under English, nothing asked of the engine and no Ink key. */
         @Test
-        fun inkWrittenOnTheKeysIsTheInputMethodsOwnAndEveryAnswerSaysWhatIsTyped() {
+        fun inkWrittenUnderEnglishIsNotSent() {
             bridge.unloadable.clear()
             var sent = 0
             try {
-                // taken for pinyin's own: the key goes out (handwriting's data aside, a JVM's packs have no model)
-                assertTrue(bridge.handwriting(InputMethodCatalog.PINYIN, onKeys = true) {})
-                assertFalse(bridge.handwriting(InputMethodCatalog.PINYIN) {})
-                // English is not written on: nothing asked of the engine, no key
-                assertFalse(bridge.sendInk(Action.Ink(1), InputMethodCatalog.ENGLISH, onKeys = true) { sent++ })
+                assertFalse(bridge.sendInk(Action.Ink(1), InputMethodCatalog.ENGLISH) { sent++ })
                 assertEquals(0, sent)
-                // the engine made: its answers followed
-                assertNotNull(bridge.engines)
-                val before = EngineState.keysTyped.value.answer
-                repeat(2) { bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { emptySnapshot() } }
-                assertEquals(before + 2, EngineState.keysTyped.value.answer)
-                assertFalse(EngineState.keysTyped.value.typed)
             } finally {
                 bridge.unloadable.clear()
-                bridge.close()
-            }
-        }
-
-        /**
-         * Every answer of an input method written on the keys carries the number of the last key sent whose job the fcitx
-         * thread took (EngineState.keyTaken), whatever its event: a space sent before a tap and answered after it carries
-         * the space's, not the tap's, so the tap's mark stays (KeyInkGesture.engineTyped).
-         */
-        @Test
-        fun anAnswerCarriesTheNumberOfTheLastKeyTaken() {
-            bridge.unloadable.clear()
-            try {
-                assertNotNull(bridge.engines)
-                val space = EngineState.keySent()
-                val tap = EngineState.keySent()
-                assertEquals(tap + 1, EngineState.nextKey())
-                EngineState.keyTaken(space)
-                bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { emptySnapshot() }
-                assertEquals(space, EngineState.keysTyped.value.keysHeard)
-                // a refining step's answer counts no key
-                bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { emptySnapshot() }
-                assertEquals(space, EngineState.keysTyped.value.keysHeard)
-                EngineState.keyTaken(tap)
-                bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { emptySnapshot() }
-                assertEquals(tap, EngineState.keysTyped.value.keysHeard)
-            } finally {
-                bridge.unloadable.clear()
-                bridge.close()
             }
         }
 
@@ -726,9 +683,9 @@ class EngineBridgeTest {
                 assertThrows(FileNotFoundException::class.java) {
                     bridge.unloadable.call(InputMethodCatalog.PINYIN) { throw FileNotFoundException("pinyin") }
                 }
-                assertFalse(bridge.sendInk(Action.Ink(1), InputMethodCatalog.PINYIN, onKeys = true) { sent++ })
+                assertFalse(bridge.sendInk(Action.Ink(1), InputMethodCatalog.PINYIN) { sent++ })
                 assertEquals(0, sent)
-                assertFalse(InputMethodCatalog.HANDWRITING in bridge.unloadable)
+                assertFalse("handwriting" in bridge.unloadable)
             } finally {
                 bridge.unloadable.clear()
             }
@@ -738,20 +695,6 @@ class EngineBridgeTest {
             commit = "", preedit = "", candidates = emptyList(), page = 0, hasPreviousPage = false,
             hasNextPage = false, handled = true, predicting = false, syllables = emptyList(), syllablesId = 0,
         )
-
-        /** A piece finished as the pad leaves for English: the engine is told, but no Ink key goes into keyboard-us. */
-        @Test
-        fun inkUnderAnotherInputMethodReachesTheEngineButIsNotTaken() {
-            bridge.unloadable.clear()
-            var calls = 0
-            try {
-                assertFalse(bridge.handwriting(InputMethodCatalog.ENGLISH) { calls++ })
-                assertEquals(1, calls)
-                assertFalse(InputMethodCatalog.HANDWRITING in bridge.unloadable)
-            } finally {
-                bridge.unloadable.clear()
-            }
-        }
 
         // Robolectric: a latch is said on the keyboard (EngineNotices)
         @Test
@@ -810,14 +753,14 @@ class EngineBridgeTest {
                 // each a character written: offerInk, inkFinished; none taken, so no Ink key is sent for it
                 repeat(3) {
                     assertFalse(
-                        bridge.handwriting(InputMethodCatalog.HANDWRITING) {
+                        bridge.handwriting {
                             calls++
                             throw FileNotFoundException("pinyin")
                         }
                     )
                 }
                 assertEquals(1, calls)
-                assertTrue(InputMethodCatalog.HANDWRITING in bridge.unloadable)
+                assertTrue("handwriting" in bridge.unloadable)
             } finally {
                 bridge.unloadable.clear()
             }

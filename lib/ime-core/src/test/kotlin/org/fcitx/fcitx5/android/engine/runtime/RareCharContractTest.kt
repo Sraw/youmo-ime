@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.WUBI
@@ -121,12 +120,12 @@ class RareCharContractTest : EnginesFixture() {
     private var piece = 0
 
     private fun Engines.written(vararg positions: List<String>): List<String> {
-        onEvent(HANDWRITING, EngineEvent.RESET, 0)
+        onEvent(PINYIN, EngineEvent.RESET, 0)
         for (texts in positions) {
             val ink = Action.Ink(piece++, InkReading(texts, DoubleArray(texts.size) { -it.toDouble() }))
-            preedit = onEvent(HANDWRITING, EngineEvent.CHAR, Keyboard.INK, payload = ink).preedit
+            preedit = onEvent(PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = ink).preedit
         }
-        return texts(HANDWRITING)
+        return texts(PINYIN)
     }
 
     // the candidates after 打 is put in: the predictions

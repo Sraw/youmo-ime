@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.pack.PackUnavailableException
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
@@ -239,7 +240,14 @@ internal class LoadingReader(
 }
 
 /** The recognizer of the text pack's files (AppData): its models opened and its files read as it loads. */
-private object AssetRecognizer {
+/**
+ * Nothing written on the keys can be read, the recognizer or handwriting's session given up: the toolbar's 手写
+ * turned off (061-handwriting-toolbar §3.4), not left on drawing ink that reads nothing; what failed is told
+ * where it did, once. Any thread: the switch's listeners hear it on the main one.
+ */
+internal fun handwritingCannotLoad() = AppPrefs.getInstance().internal.handwritingOpen.setValue(false)
+
+internal object AssetRecognizer {
 
     fun open(opened: MutableList<AutoCloseable>): InkRecognizer = InkRecognizer(
         net("char_image", opened), net("char_path", opened),
@@ -249,6 +257,7 @@ private object AssetRecognizer {
 
     fun told() {
         EngineNotices.failed(R.string.engine_unloadable)
+        handwritingCannotLoad()
     }
 
     // opened at once, not at its first run: one onnxruntime refuses is found as the recognizer loads

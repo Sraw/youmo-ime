@@ -330,7 +330,7 @@ class TextKeyboard(
     // of each id a–z (LayoutReader) but need not have it send that letter (PackLayouts.judge asks for none), and by
     // the id a glide, a stroke and writing on the keys read another letter than the key types. Two keys sending one
     // letter: the first in the layout's order is the letter's (both its copies, split), the other none's
-    private fun sceneLetters(): List<Pair<Char, KeyPlace>> {
+    private fun sceneLetters(): List<Pair<Char, ScenePlace>> {
         val keyOf = HashMap<Char, String>()
         return canvas?.shownKeys.orEmpty().mapNotNull { node ->
             val letter = letterSent(node) ?: return@mapNotNull null
@@ -338,7 +338,7 @@ class TextKeyboard(
         }
     }
 
-    override val glide = glideInput(letters = { sceneLetters() }, enabled = { glides }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }, writes = { InputMethodCatalog.writesOnKeys(imeName) }) { path, layout ->
+    override val glide = glideInput(letters = { sceneLetters() }, enabled = { glides }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
         onAction(KeyAction.GlideAction(Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
         // as a letter typed: Shift-once used up in any input method, as a tap uses it up (only English reads it)
         if (capsState == CapsState.Once) switchCapsState()

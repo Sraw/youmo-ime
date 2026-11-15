@@ -21,7 +21,6 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.ShuangpinNames
-import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.EnglishKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
@@ -44,7 +43,6 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
-import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 
@@ -218,8 +216,7 @@ object InputMethodSettings {
             R.string.shared_section_all, listOf(
                 // the keyboard's, one of: a word by gliding across its keys (InputMethodCatalog.glides), a stroke
                 // filtering pinyin's and 双拼's candidates (InputMethodCatalog.filtersByStrokes), or off; which input
-                // methods read each is the docs' (the summary is the choice alone). 键盘手写 always listed, said to need
-                // the text pack while it is missing (keyboardLabel): a ListPreference cannot disable one entry
+                // methods read each is the docs' (the summary is the choice alone)
                 AppChoice(AppPrefs.KEY_DRAWING, R.string.key_drawing, 0, KeyDrawing.entries) { AppPrefs.getInstance().keyboard.keyDrawing },
                 AppToggle(AppPrefs.AUTO_PAIRS, R.string.auto_pairs, 0) { AppPrefs.getInstance().keyboard.autoPairs },
                 AppToggle(AppPrefs.CALCULATION_REPLACES_SUM, R.string.calculation_replaces_sum, 0) {
@@ -228,14 +225,23 @@ object InputMethodSettings {
                 Page(ADDRESSES, R.string.address_suggestions, R.string.address_suggestions_summary, SettingsRoute.Addresses),
             )
         ),
+        // the toolbar's 手写, over the letters of every input method that writes (061-handwriting-toolbar §3.9)
+        Section(
+            R.string.handwriting, listOf(
+                // how soon the pen up ends a character
+                AppChoice(AppPrefs.HANDWRITING_PAUSE, R.string.handwriting_pause, R.string.handwriting_pause_summary, HandwritingPause.entries) {
+                    AppPrefs.getInstance().keyboard.handwritingPause
+                },
+            )
+        ),
         // the section's title says English reads none of these: only an exception within it is said under a row
         Section(
             R.string.shared_section_chinese, listOf(
                 Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary),
-                // handwriting writes no word an emoji stands for
-                Toggle(EngineSettings.EMOJI, text(R.string.im_emoji), R.string.im_emoji_summary, notFor = listOf(InputMethodCatalog.HANDWRITING)),
-                // 全拼's rq, sj, xq, and in each the words 日期, 时间, 星期 (PhraseBook.WORD_KEYS); handwriting writes none of them
-                Toggle(EngineSettings.BUILT_IN_PHRASES, text(R.string.im_built_in_phrases), R.string.im_built_in_phrases_summary, notFor = listOf(InputMethodCatalog.HANDWRITING)),
+                // what is handwritten gets no emoji (HandwritingSession offers none): its summary says so
+                Toggle(EngineSettings.EMOJI, text(R.string.im_emoji), R.string.im_emoji_summary),
+                // 全拼's rq, sj, xq, and in each the words 日期, 时间, 星期 (PhraseBook.WORD_KEYS); handwriting writes none of them, as its summary says
+                Toggle(EngineSettings.BUILT_IN_PHRASES, text(R.string.im_built_in_phrases), R.string.im_built_in_phrases_summary),
                 Choice(
                     EngineSettings.MODEL_LEVEL, R.string.im_model_level, ModelLevel.entries.map { it.key }, R.string.im_model_level_summary,
                     label = { ctx, v -> ctx.getString(MODEL_LEVELS.getValue(ModelLevel.entries.first { it.key == v })) },
@@ -438,18 +444,6 @@ object InputMethodSettings {
         ),
     )
 
-    private val handwriting = listOf(
-        sharedLink,
-        Section(
-            R.string.im_section_typing, listOf(
-                // the pad's: how soon the pen up ends a character
-                AppChoice(AppPrefs.HANDWRITING_PAUSE, R.string.handwriting_pause, R.string.handwriting_pause_summary, HandwritingPause.entries) {
-                    AppPrefs.getInstance().keyboard.handwritingPause
-                },
-            )
-        ),
-    )
-
     /** The English page's word list: its key. */
     const val ENGLISH_WORDS = "english_words"
 
@@ -460,17 +454,18 @@ object InputMethodSettings {
     const val RESET_TABLE_ORDER = "reset_table_order"
 
     /** The app's own input methods, each with a page in [of]. */
-    val BUILT_IN: List<String> = listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN) + InputMethodCatalog.TABLES.keys + InputMethodCatalog.HANDWRITING + InputMethodNames.KEYBOARD
+    val BUILT_IN: List<String> = listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN) + InputMethodCatalog.TABLES.keys + InputMethodNames.KEYBOARD
 
     /** The page of [uniqueName], or null for an input method the app does not know. */
     fun of(uniqueName: String): List<Item>? = when (uniqueName) {
         // 0.4's 九键拼音 (a route saved before NineKeysMerge made it pinyin's keyboard): pinyin's, not a table's
         InputMethodCatalog.PINYIN, InputMethodCatalog.T9 -> pinyin
         InputMethodCatalog.SHUANGPIN -> shuangpin
-        InputMethodCatalog.HANDWRITING -> handwriting
         InputMethodNames.KEYBOARD -> english
         InputMethodCatalog.CANGJIE -> cangjie
         InputMethodCatalog.WUBI, InputMethodCatalog.WUBI_PINYIN -> wubi
+        // 0.6.0's 手写 (a route saved before it went to the toolbar): no input method now, so no page; its 停笔时间 is SHARED's
+        InputMethodCatalog.HANDWRITING_RETIRED -> null
         else -> if (uniqueName.startsWith("engine-")) table else null
     }
 
@@ -721,9 +716,6 @@ object InputMethodSettings {
             is PinyinKeyboard -> InputMethodCatalog.PINYIN to choice.keyboard
             is ShuangpinKeyboard -> InputMethodCatalog.SHUANGPIN to choice.keyboard
             is EnglishKeyboard -> InputMethodCatalog.ENGLISH to choice.keyboard
-            // its recognizer is the text pack's
-            KeyDrawing.Handwriting ->
-                return if (PackStore.ready(PackKind.TEXT)) own else context.getString(R.string.key_drawing_needs_text_pack, own)
             else -> return own
         }
         return KeyboardLabels.label(context, im, keyboard, own)

@@ -115,7 +115,6 @@ class KeyboardWindowTest {
         // one input method's choice moves no other's
         val all = ImKeyboards.Chosen(ImKeyboard.NINE_KEYS, ImKeyboard.KEYS18, ImKeyboard.NINE_KEYS)
         assertEquals(TextKeyboard.Name, lettersOf(InputMethodCatalog.WUBI, all, sp))
-        assertEquals(HandwritingKeyboard.Name, lettersOf(InputMethodCatalog.HANDWRITING, all, sp))
         assertEquals(TextKeyboard.Name, lettersOf(InputMethodCatalog.ENGLISH, ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS), sp))
     }
 
@@ -149,11 +148,11 @@ class KeyboardWindowTest {
         }
     }
 
-    // quick input is typed in letters: the pad and the zhuyin keyboards, which send none, give way to
+    // quick input is typed in letters: the zhuyin keyboards, which send none, give way to
     // the full keyboard while it lasts; the keyboards with letters of their own stay
     @Test
     fun quickInputShowsTheFullKeyboardInPlaceOfOnesWithoutLetters() {
-        for (k in listOf(HandwritingKeyboard.Name, ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull)) {
+        for (k in listOf(ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull)) {
             assertEquals(k, TextKeyboard.Name, KeyboardWindow.quickInputStandIn(k))
         }
         for (k in listOf(TextKeyboard.Name, T9Keyboard.Name, GroupedKeyboard.Name14, GroupedKeyboard.Name18, NumberKeyboard.Name)) {
@@ -169,10 +168,8 @@ class KeyboardWindowTest {
             why to { assertEquals(expected, KeyboardWindow.afterQuickInput(stoodInFor, lettersThen, letters)) }
         assertRows(
             row("大千 stood in for, the letters the same: 大千", ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull),
-            row("the pad shown over another input method's letters stays the pad", HandwritingKeyboard.Name, TextKeyboard.Name, TextKeyboard.Name, HandwritingKeyboard.Name),
             row("大千's letters gone to the nine keys meanwhile: the nine keys", ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, T9Keyboard.Name, T9Keyboard.Name),
             row("注音九键's letters gone to 大千 meanwhile: 大千, not 大千 under the nine keys", ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull),
-            row("the pad over the nine keys, the letters gone to the 26 meanwhile: the pad, as out of quick input", HandwritingKeyboard.Name, T9Keyboard.Name, TextKeyboard.Name, HandwritingKeyboard.Name),
         )
     }
 
@@ -181,18 +178,16 @@ class KeyboardWindowTest {
     @Test
     fun theKeyboardStoodInForGivesWayAsItWouldShown() {
         fun outOfQuickInput(was: String, lettersThen: String, letters: String): Boolean {
-            val l = LettersLayout(setOf(TextKeyboard.Name, T9Keyboard.Name, HandwritingKeyboard.Name, ZhuyinKeyboard.NameFull), TextKeyboard.Name, "symbol")
+            val l = LettersLayout(setOf(TextKeyboard.Name, T9Keyboard.Name, ZhuyinKeyboard.NameFull), TextKeyboard.Name, "symbol")
             l.inputMethodChanged(lettersThen, l.letters)
             return l.inputMethodChanged(letters, was) != null
         }
         fun row(why: String, was: String, then: String, now: String) =
             why to { assertEquals("$was $then $now", outOfQuickInput(was, then, now), KeyboardWindow.givesWay(was, then, now)) }
         assertRows(
-            row("handwriting's pad, English chosen: English's letters", HandwritingKeyboard.Name, HandwritingKeyboard.Name, TextKeyboard.Name),
             row("大千, English chosen: English's letters", ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, TextKeyboard.Name),
             row("the same input method again: nothing changes", ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull, ZhuyinKeyboard.NameFull),
-            row("the pad over the nine keys, English chosen: the pad stays", HandwritingKeyboard.Name, T9Keyboard.Name, TextKeyboard.Name),
-            row("the pad over English's letters, English again: the pad stays", HandwritingKeyboard.Name, TextKeyboard.Name, TextKeyboard.Name),
+            row("注音九键 over the nine keys' letters then, English chosen: it stays", ZhuyinKeyboard.NameNine, T9Keyboard.Name, TextKeyboard.Name),
         )
     }
 }

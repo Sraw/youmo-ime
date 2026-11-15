@@ -9,8 +9,8 @@ import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 
 /**
- * A pad's strokes and the keys typed beside it, in order (the handwriting keyboard's, and the letters'
- * written on, 键盘手写): what the pad reads is handed to [deliver] with its piece, a piece done to
+ * A pad's strokes and the keys typed beside it, in order (the letters written on with the toolbar's
+ * 手写): what the pad reads is handed to [deliver] with its piece, a piece done to
  * [finished] after its readings; a key pressed while a stroke is read goes in after its reading, and
  * not at all if another input started meanwhile ([restart]). Backspace takes the pad's last stroke
  * back while it has one; a key for the engine commits the piece, its strokes wiped first.

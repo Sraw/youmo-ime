@@ -234,8 +234,8 @@ object KeyCaps {
     // the function keys qwerty has not: the board each is on (九键's 重输 and 0, 14/18 键's 分词)
     private val FUNCTION_BOARDS = mapOf("retype" to KeyNames.NINE, "zero" to KeyNames.NINE, "separator" to KeyNames.K14)
 
-    // each board's code row (handwriting's too, a function key's board of its own)
-    private val CODE_ROWS = BOARDS.values.toMap() + (KeyNames.HANDWRITING to ImKeyboards.Layout.HANDWRITING)
+    // each board's code row
+    private val CODE_ROWS = BOARDS.values.toMap()
 
     fun label(ctx: Context, text: String, size: Float = 18f) = TextView(ctx).apply {
         this.text = text

@@ -49,7 +49,6 @@ class ThemeKeyNamesTest {
         "k14" to listOf(GroupedKeyboard.layout(NineKeyLetters.G14).flatten()),
         "k18" to listOf(GroupedKeyboard.layout(NineKeyLetters.G18).flatten()),
         "number" to NumberPad.entries.map { NumberKeyboard.layout(it, context.getString(R.string.picker_back)).flatten() },
-        "handwriting" to listOf(HandwritingKeyboard.layout(context).flatten()),
         "zhuyin-nine" to listOf(ZhuyinKeyboard.nineLayout().flatten()),
         "zhuyin" to listOf(ZhuyinKeyboard.fullLayout().flatten(), ZhuyinKeyboard.fullLayout(compact = true).flatten()),
         "symbols" to listOf(PickerLayout.panelKeys(context, symbolPicker().switchKey)),

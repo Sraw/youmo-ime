@@ -30,7 +30,7 @@ object SceneA11y {
     private val RESOURCE = Regex("a11y_[a-z0-9_]+")
 
     // the keys said with their state in their words ([onOrOff])
-    private val TOGGLES = setOf("reading", "lock")
+    private val TOGGLES = setOf("lock")
 
     /** The node's extra holding the key's corner ([KeySpeech.alt]): UAT's (Dumper's `alt`), TalkBack reads no extras. */
     const val EXTRA_ALT = "youmo.alt"

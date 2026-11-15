@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
@@ -63,11 +62,11 @@ class EnginesAlikeBlockTest : EnginesFixture() {
     fun aHandwritingBlockPastThePageTakesTheAlikeAndNoOther() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
             val texts = fillers + "国" + "國"
-            e.onEvent(HANDWRITING, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(0, InkReading(texts, DoubleArray(texts.size) { -it.toDouble() })))
-            val list = e.candidates(HANDWRITING, 0, 30).map { it.text }
+            e.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(0, InkReading(texts, DoubleArray(texts.size) { -it.toDouble() })))
+            val list = e.candidates(PINYIN, 0, 30).map { it.text }
             val at = list.indexOf("国")
             assertTrue("$list", at >= 7 && "國" in list)
-            val done = e.learning(HANDWRITING, LearningOp.Block(at, "国"), traditional)
+            val done = e.learning(PINYIN, LearningOp.Block(at, "国"), traditional)
             assertTrue("$done", done is LearningResult.Done)
             assertEquals(setOf("国", "國"), e.blocked())
         }

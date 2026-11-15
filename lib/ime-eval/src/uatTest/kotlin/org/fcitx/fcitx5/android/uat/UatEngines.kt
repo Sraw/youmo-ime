@@ -204,12 +204,12 @@ object UatEngines {
 
     /**
      * The recognizer's [readings] (best first, scored as it ranks them) for a new ink piece, after
-     * [last] (the replay's last written) and after what the pad ended: what the Ink key carries.
+     * [last] (the replay's last written), written over the keys of [im] and after what the pad ended: what the Ink key carries.
      * EngineReplay's and HostReplay's one rule, so their handwriting cannot drift apart (F4299).
      */
-    fun ink(engines: Engines, readings: List<String>, last: Int): Action.Ink {
+    fun ink(engines: Engines, im: String, readings: List<String>, last: Int): Action.Ink {
         val piece = maxOf(last + 1, engines.inkEnded + 1)
-        return Action.Ink(piece, InkReading(readings, DoubleArray(readings.size) { -it.toDouble() })).also { engines.ink(it, shown = true) }
+        return Action.Ink(piece, InkReading(readings, DoubleArray(readings.size) { -it.toDouble() })).also { engines.ink(it, shown = true, im = im) }
     }
 
     /** The learning record as the engines wrote it ([LearnLog.FILE]), its background work done first; empty for none yet. */

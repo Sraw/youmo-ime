@@ -156,16 +156,16 @@ class ChineseModulesHostTest {
 
     @Test
     fun `toggling traditional sends the composing text again (ca chttrans cpp 214-215)`() {
-        // handwriting's composing text is the app's (client preedit), which a toggle must re-send
+        // the composing text is shown anew in the script toggled to
         host.preedit = "n"
         open(Capability.CLIENT_UNFOCUS_COMMIT or Capability.PREEDIT)
-        core.setInputMethods(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.HANDWRITING, ImGroup.KEYBOARD_US))
-        core.setCurrentInputMethod(InputMethodCatalog.HANDWRITING)
+        core.setInputMethods(listOf(InputMethodCatalog.PINYIN, ImGroup.KEYBOARD_US))
+        core.setCurrentInputMethod(InputMethodCatalog.PINYIN)
         core.sendKey(Key('n'.code), virtual = true)
-        assertTrue(log.toString(), log.any { it is HostEvent.ClientPreedit && it.text.toString() == "n" })
+        assertTrue(log.toString(), log.any { it is HostEvent.InputPanel && it.preedit.toString() == "n" })
         log.clear()
         core.activateAction(core.statusArea().first { it.name == "chttrans" }.id)
-        assertTrue(log.toString(), log.any { it is HostEvent.ClientPreedit && it.text.toString() == "n" })
+        assertTrue(log.toString(), log.any { it is HostEvent.InputPanel && it.preedit.toString() == "n" })
     }
 
     @Test

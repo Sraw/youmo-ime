@@ -508,9 +508,9 @@ class EnginesLearningTest : EnginesFixture() {
         engines.type(InputMethodCatalog.ENGLISH, "the")
         engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.CHAR, ' '.code)
         engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.RESET, 0)
-        engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(0, InkReading(listOf("拟"), doubleArrayOf(0.0))))
-        engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.PICK, 0)
-        engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.RESET, 0)
+        engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(0, InkReading(listOf("拟"), doubleArrayOf(0.0))))
+        engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0)
+        engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
         // nothing written while off
         assertEquals(logged, root.file(LearnLog.FILE).length())
         engines.op(LearningOp.UseHabits(true))

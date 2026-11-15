@@ -46,10 +46,6 @@
 - **操作**：摸每个键。
 - **预期**：共同的预期。
 
-### AX-08 [P1] 手写键盘探索触摸
-- **前提**：B0-手写，打开 TalkBack。
-- **操作**：摸书写板以外的每个键。
-- **预期**：共同的预期。
 
 ## 面板
 
@@ -68,11 +64,11 @@
 - **操作**：摸每个符号格子、左边的分类和底行的键。
 - **预期**：共同的预期；格子读符号本身（如「，」）。
 
-### AX-13 [P1] 触摸浏览时在键上划不写字
-- **前提**：B0-设置，**在键上划** 选 **键盘手写**，回测试页；打开 TalkBack。
+### AX-13 [P1] 触摸浏览时手写开着也不写字
+- **前提**：B0-手写；打开 TalkBack。
 - **操作**：在拼音键盘的字母上摸过去（手指移动超过小半个键）。
-- **预期**：不出笔迹、不写字，读屏照常读摸到的键。
-- **JVM**：`KeyHandwritingUatTest.notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores`（触摸浏览开着时不写）；设备上不跑。
+- **预期**：字母不变淡，不出笔迹、不写字，读屏照常读摸到的键（用户定：TalkBack 触摸浏览时不写，0.6.0 的在键上划也没有「键盘手写」了）。
+- **JVM**：`KeyHandwritingUatTest.notInAPasswordFieldNorEnglishNorQuickInputNorWhileTalkBackExplores`（触摸浏览开着时不写）；设备上不跑。
 
 ### AX-17 [P1] 生僻字屏蔽的网格
 <!-- 061-rare-char-block.md §6.4 -->
@@ -105,3 +101,9 @@
 - **操作**：打 yinhang，长按「银行」；摸读音行，双击；摸字行；双击「行」；摸返回行，双击；摸上屏、复制。打一整句，长按，摸第一行。
 - **预期**：读音行读「银行，yín háng，按钮，双击即可展开词卡」；双击后焦点在词卡的整词上（读「银行，读音 yín háng」）；字行各读「行，háng，部首 行，6 画」，双击看字卡；字卡上焦点在返回行，读「返回 银行」；上屏、复制各是一项；整句的读音行读成文字，不是按钮。
 - **JVM**：app `CandidateMenuUatTest.talkBackReadsTheLineTheRowsAndTheWayBackAndIsTakenToWhatOpened`（节点、描述、动作标签、48 dp，焦点只断言收到了 ACTION_ACCESSIBILITY_FOCUS）；焦点落在哪里在设备上看。
+
+### AX-18 [P1] 手写、单手、悬浮按钮读出是开关和开、关
+- **前提**：B0-手写，打开 TalkBack。
+- **操作**：摸工具栏的手写按钮；写一个字后摸候选栏上的手写按钮；打开单手、悬浮再摸它们的按钮。
+- **预期**：读成开关（「手写，开关，已开」这类，各机型读法略有不同），关掉后读「未开」。手写开着时摸字母区照旧读键、不写字（用户定：TalkBack 触摸浏览时不写，见 AX-13）。
+- **JVM**：`HandwritingUatTest.theCandidateBarsButtonIsLitWhileHandwritingIsOnAndTurnsItOff`（候选栏的手写按钮可勾选、已勾选；不是开关的按钮不读成开关）；真机上再听一遍读法。

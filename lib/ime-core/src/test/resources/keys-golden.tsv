@@ -479,22 +479,6 @@ fn/lang	zhuyin-nine	default	-	-	-	-
 fn/lang	zhuyin-nine	zh	-	-	-	-
 fn/return	zhuyin-nine	default	-	-	-	-
 fn/return	zhuyin-nine	zh	-	-	-	-
-fn/backspace	handwriting	default	-	-	i:delete-sweep	i:restore
-fn/backspace	handwriting	zh	-	-	i:delete-sweep	i:restore
-fn/comma	handwriting	default	| . ? ! : ; " ' ( ) ~	.	-	-
-fn/comma	handwriting	zh	| 。 ？ ！ ： ； “ ‘ （ ） ～	。	-	-
-fn/period	handwriting	default	| , ? ! : ; _ % $ ^ &	,	-	-
-fn/period	handwriting	zh	| ， ？ ！ ： ； —— % $ …… &	，	-	-
-fn/symbols	handwriting	default	-	-	-	-
-fn/symbols	handwriting	zh	-	-	-	-
-fn/numbers	handwriting	default	-	-	-	-
-fn/numbers	handwriting	zh	-	-	-	-
-fn/space	handwriting	default	-	-	i:cursor-move	-
-fn/space	handwriting	zh	-	-	i:cursor-move	-
-fn/lang	handwriting	default	-	-	-	-
-fn/lang	handwriting	zh	-	-	-	-
-fn/return	handwriting	default	-	-	-	-
-fn/return	handwriting	zh	-	-	-	-
 num/1	number	default	-	-	-	-
 num/1	number	zh	-	-	-	-
 num/2	number	default	-	-	-	-

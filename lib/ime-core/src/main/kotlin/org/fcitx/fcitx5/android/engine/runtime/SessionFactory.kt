@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS18
@@ -149,7 +148,7 @@ internal class SessionFactory(
         .let { if (filtersByStrokes(im)) StrokeFilter(it, assets::strokes, settings().pageSize) else it }
         .let { if (writesOnKeys(im)) InkOver(it, ::handwritingSession) else it }
 
-    /** Handwriting's session, as the input method has it and as an [InkOver] writes with. */
+    /** Handwriting's session, as an [InkOver] writes with (and ime-eval measures alone). */
     fun handwritingSession(): HandwritingSession {
         val s = settings()
         // read as pinyin reads a sentence: its words, the user's among them, and their counts
@@ -209,7 +208,6 @@ internal class SessionFactory(
                     phrases = EnglishPhrases(phraseBook(), learnClock::calendar), blocks = lexicon.englishBlocks,
                 )
             }
-            HANDWRITING -> handwritingSession()
             // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
             // glided as full pinyin, over the digits' keys: each letter typed as itself, as one chosen from a key's long press
             T9 -> {

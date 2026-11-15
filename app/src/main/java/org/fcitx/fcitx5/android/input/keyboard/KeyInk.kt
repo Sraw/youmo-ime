@@ -10,8 +10,12 @@ import android.graphics.Path
 import android.os.SystemClock
 import android.view.View
 import androidx.annotation.VisibleForTesting
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.core.EngineState
-import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.handwriting.InkKeys
@@ -19,19 +23,19 @@ import org.fcitx.fcitx5.android.input.handwriting.InkPad
 import splitties.dimensions.dp
 
 /**
- * Writing on the letter keys (键盘手写, design 060-kbd-handwriting §2, §6): the pad the strokes go on, in
- * [view]'s pixels ([InkPad], read by [recognition] as the handwriting keyboard's are), when a touch is a
- * stroke ([gesture], told by [GlideTouch]), the keys typed beside it in order ([keys]), and the ink drawn
- * over the keys, which stay shown: the piece's strokes and the one under the pen, faded out once the piece
- * is done. What is read goes to [deliver] (takesBack: the first reading of a piece whose first dot was a
- * tap, [dot]; the engine deletes that tap's letter, Action.Ink.takesBack), a piece done to [finished]; the pause is the user's
- * (HandwritingPause, [pause]), read at each stroke.
+ * Writing on the letter keys (the toolbar's 手写, 061-handwriting-toolbar §3): the pad the strokes go on, in
+ * [view]'s pixels ([InkPad], read by [recognition]), each touch down on the letters a stroke ([GlideTouch]),
+ * the keys typed beside it in order ([keys]), and the ink drawn over the keys, which stay shown: the piece's
+ * strokes and the one under the pen, faded out once the piece is done, in [color] [widthDp] wide. What is
+ * read goes to [deliver], a piece done to [finished]; the pause is the user's (HandwritingPause, [pause]),
+ * read at each stroke.
  */
 class KeyInk(
     private val view: View,
-    theme: Theme,
+    color: Int,
+    widthDp: Float,
     private val pause: () -> Long,
-    private val deliver: (InkReading, piece: Int, takesBack: Boolean) -> Unit,
+    private val deliver: (InkReading, piece: Int) -> Unit,
     private val finished: (piece: Int) -> Unit,
     // asked for once written on: a keyboard of one who never writes makes no recognizer (its thread)
     recognition: () -> HandwritingRecognition = { HandwritingRecognition.shared },
@@ -39,25 +43,10 @@ class KeyInk(
 
     override val pad = InkPad()
 
-    /** When a touch on the letters is a stroke. */
-    val gesture = KeyInkGesture().apply { nextKey = EngineState::nextKey }
-
     /** The keys typed while the pad is read, in order with it. */
-    val keys: InkKeys by lazy {
-        InkKeys(reads.value, this, { reading, piece -> deliver(reading, piece, consumeTakeBack(piece)) }, finished)
-    }
+    val keys: InkKeys by lazy { InkKeys(reads.value, this, deliver, finished) }
 
     private val reads = lazy(recognition)
-
-    // the piece whose first dot was a tap taken back, till its first reading is delivered
-    private var takingBack = NO_PIECE
-
-    // whether [piece]'s reading is the first since its tap was taken back: true once, the take-back spent
-    private fun consumeTakeBack(piece: Int): Boolean {
-        if (piece != takingBack) return false
-        takingBack = NO_PIECE
-        return true
-    }
 
     /** Whether a stroke was ever put on the pad: then the keys go in order with it ([keys]); else straight on. */
     var writtenOn = false
@@ -65,30 +54,31 @@ class KeyInk(
 
     /**
      * Whether strokes can be read now: the recognizer not given up (no stroke starts else, the touch a
-     * tap as ever). Asked as a touch may start one: the recognizer is made then, and loaded on its
-     * worker, so the first stroke does not wait for it.
+     * tap as ever). Asked as a touch may start one: the recognizer is [warmUp] then, if 手写 was not
+     * turned on here.
      */
     val loadable: Boolean get() {
-        val r = reads.value
-        if (!warmed) {
-            warmed = true
-            r.warmUp()
-        }
-        return r.loadable
+        warmUp()
+        return reads.value.loadable
     }
     private var warmed = false
+
+    /** The recognizer made and loaded on its worker, as 手写 is turned on: the first stroke does not wait for it. */
+    fun warmUp() {
+        if (warmed) return
+        warmed = true
+        reads.value.warmUp()
+    }
 
     /** Another input started: what was written dropped (InkKeys.restart); nothing to drop if never written on. */
     fun restart() {
         if (reads.isInitialized()) keys.restart() else next()
     }
 
-    // the theme's ink as the handwriting pad's when its theme says none (HandwritingPadView): on purpose, the
-    // typing boards have no ink slot of their own (the pad's is the handwriting board's scene, not theirs)
     private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = theme.keyTextColor
+        this.color = color
         style = Paint.Style.STROKE
-        strokeWidth = view.dp(INK_DP)
+        strokeWidth = view.dp(widthDp)
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
@@ -115,7 +105,6 @@ class KeyInk(
     fun down(x: Float, y: Float) {
         view.removeCallbacks(finishCheck)
         pad.finishMillis = pause()
-        gesture.pauseMillis = pad.finishMillis
         writtenOn = true
         pad.down(x, y)
     }
@@ -134,27 +123,12 @@ class KeyInk(
         if (pad.finished.isNotEmpty()) checkLater()
     }
 
-    /** A tap's [points] (x and y in turn) put on the pad as a stroke lifted at [time]: a first dot taken back, its letter deleted by the engine. */
-    fun dot(points: FloatArray, time: Long) {
-        takingBack = pad.piece
-        down(points[0], points[1])
-        for (k in 2 until points.size step 2) pad.move(points[k], points[k + 1])
-        pad.up(time)?.let(keys::read)
-    }
-
-    /** The pause set again for a touch down: the writing goes on as long as the pad's piece would. */
-    fun pauseNow() {
-        gesture.pauseMillis = pause()
-    }
-
     override fun undo(): Boolean {
         val now = SystemClock.uptimeMillis()
         val read = pad.undo(now) ?: return false
-        gesture.undone(now)
         // timed again from here, else the strokes left end the piece before the one taken back is rewritten
         if (read.strokes.isEmpty()) {
             view.removeCallbacks(finishCheck)
-            gesture.ended()
         } else {
             checkLater()
         }
@@ -166,7 +140,6 @@ class KeyInk(
     override fun next() {
         view.removeCallbacks(finishCheck)
         pad.next()
-        gesture.ended()
         view.invalidate()
     }
 
@@ -175,11 +148,27 @@ class KeyInk(
         val done = pad.finished.toList()
         if (!pad.ended(latest)) return
         view.removeCallbacks(finishCheck)
-        gesture.ended()
         fade(done)
     }
 
-    /** Hidden: a piece written is done, as a pause would have it; the pad afresh. */
+    private var scope: CoroutineScope? = null
+
+    /** On the window: the engine's pieces ended watched ([ended]). */
+    fun attached() {
+        if (scope != null) return
+        scope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
+            s.launch { EngineState.handwritingEnded.collect(::ended) }
+        }
+    }
+
+    /** Off the window, hidden or another layout shown: no longer watched, and [hidden]. */
+    fun detached() {
+        scope?.cancel()
+        scope = null
+        hidden()
+    }
+
+    /** Hidden, or 手写 turned off: a piece written is done, as a pause would have it (what it read stays typed); the pad afresh. */
     fun hidden() {
         if (pad.finished.isNotEmpty()) keys.finish(pad.piece)
         next()
@@ -229,10 +218,10 @@ class KeyInk(
         for (j in 2 until n step 2) path.lineTo(xy[j], xy[j + 1])
     }
 
-    private companion object {
+    companion object {
+        /** The ink's width where the theme says none (`handwriting/pad`'s ink-width). */
         const val INK_DP = 3.5f
-        const val FADE_MILLIS = 150L
-        const val DOT = 0.1f
-        const val NO_PIECE = Int.MIN_VALUE
+        private const val FADE_MILLIS = 150L
+        private const val DOT = 0.1f
     }
 }

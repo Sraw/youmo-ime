@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
@@ -14,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.session.Offer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -36,6 +38,24 @@ class EnginesInkOverTest : EnginesFixture() {
         assertEquals("ni", engines.type(PINYIN, "ni").preedit)
     }
 
+    // the input ended (the field left, the cursor moved) puts it in; 清除 (a reset that drops) and Escape do not
+    @Test
+    fun aResetPutsWhatIsWrittenInAndADropOrEscapeDoesNot() {
+        val engines = Engines(::load, null, warmUps = inPlace)
+        engines.write(PINYIN, 0, "好")
+        assertEquals("好", engines.onEvent(PINYIN, EngineEvent.RESET, 0).commit)
+        engines.write(PINYIN, 1, "好")
+        val dropped = engines.onEvent(PINYIN, EngineEvent.RESET, EngineEvent.RESET_DROP)
+        assertEquals("", dropped.commit)
+        assertEquals("", dropped.preedit)
+        engines.write(PINYIN, 2, "好")
+        val escaped = engines.onEvent(PINYIN, EngineEvent.ESCAPE, 0)
+        assertEquals("", escaped.commit)
+        assertEquals("", escaped.preedit)
+        // nothing left to put in when the input then ends
+        assertEquals("", engines.onEvent(PINYIN, EngineEvent.RESET, 0).commit)
+    }
+
     @Test
     fun aLetterAfterTheWritingPutsItInAndIsTyped() {
         val engines = Engines(::load, null, warmUps = inPlace)
@@ -53,7 +73,6 @@ class EnginesInkOverTest : EnginesFixture() {
         assertEquals("好", s.preedit)
         // English is written on by none: nothing held, nothing typed there
         engines.ink(Action.Ink(1, InkReading(listOf("你"), DoubleArray(1))), shown = false, im = InputMethodCatalog.ENGLISH)
-        assertFalse(engines.typedOnKeys(InputMethodCatalog.ENGLISH))
         // nor held for pinyin's writing: the next Ink with no piece shows what it showed, nothing added
         assertEquals("好", engines.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(HandwritingSession.NO_PIECE)).preedit)
     }
@@ -62,36 +81,46 @@ class EnginesInkOverTest : EnginesFixture() {
     fun twoCharactersWrittenWithAPauseBetweenAreOneSentence() {
         val engines = Engines(::load, null, warmUps = inPlace)
         engines.write(PINYIN, 0, "好")
-        // what shows is handwriting's: pinyin has nothing typed, so the keyboard writes on
-        assertFalse(engines.typedOnKeys(PINYIN))
         assertEquals("好拟", engines.write(PINYIN, 1, "拟").preedit)
-        engines.type(PINYIN, "n")
-        // a letter put it in and typed: pinyin's own now
-        assertTrue(engines.typedOnKeys(PINYIN))
+        // a letter puts it in and is typed: pinyin's own now
+        val s = engines.type(PINYIN, "n")
+        assertEquals("n", s.preedit)
     }
 
-    // a reading come while pinyin is typed is dropped: sent and taken, not held to come back in the next writing
+    // 061-handwriting-toolbar §15: what pinyin has typed (from before handwriting was on) goes in as space puts it, then the stroke is written
     @Test
-    fun anInkDroppedWhilePinyinIsTypedComesNeverBack() {
+    @Uat("HW-46")
+    fun aStrokeWhilePinyinIsTypedPutsItsFirstCandidateInThenIsWritten() {
         val engines = Engines(::load, null, warmUps = inPlace)
-        engines.type(PINYIN, "n")
-        val late = Action.Ink(0, InkReading(listOf("人"), DoubleArray(1)))
-        assertEquals("n", engines.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = late).preedit)
-        engines.inkSent(late, im = PINYIN)
-        assertEquals(0, engines.inkEnded)
-        engines.onEvent(PINYIN, EngineEvent.BACKSPACE, 0)
-        assertEquals("好", engines.write(PINYIN, 1, "好").preedit)
+        val first = engines.type(PINYIN, "ni").candidates.first()
+        val ink = Action.Ink(0, InkReading(listOf("人"), DoubleArray(1)))
+        val s = engines.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = ink)
+        assertEquals(first, s.commit)
+        assertEquals("人", s.preedit)
+        engines.inkSent(ink, im = PINYIN)
+        assertEquals("人", engines.onEvent(PINYIN, EngineEvent.CHAR, ' '.code).commit)
     }
 
-    // the first dot taken back on the nine keys and the 14 keys: one key typed, deleted, then written
+    // 061-handwriting-toolbar §3.5: what offers 固定首位 is what shows, not whether handwriting was ever written
     @Test
-    fun aKeyTakenBackAsTheFirstDotOnTheNineAndThe14Keys() {
+    @Uat("HW-51")
+    fun pinyinsOwnCandidatesOfferPinningAfterWritingHandwritingsDoNot() {
+        val engines = Engines(::load, null, warmUps = inPlace)
+        engines.write(PINYIN, 0, "好", "拟")
+        assertFalse(Offer.PIN in engines.offers(PINYIN, 1))
+        engines.onEvent(PINYIN, EngineEvent.PICK, 0)
+        engines.onEvent(PINYIN, EngineEvent.RESET, 0)
+        engines.type(PINYIN, "ni")
+        assertTrue(Offer.PIN in engines.offers(PINYIN, 1))
+    }
+
+    // typed on the nine keys and the 14 keys, deleted, then written
+    @Test
+    fun aKeyTypedAndDeletedOnTheNineAndThe14KeysThenWritten() {
         fun takenBack(im: String, key: Int) {
             val engines = Engines(::load, null, warmUps = inPlace)
             engines.onEvent(im, EngineEvent.CHAR, key)
-            assertTrue(im, engines.typedOnKeys(im))
             engines.onEvent(im, EngineEvent.BACKSPACE, 0)
-            assertFalse(im, engines.typedOnKeys(im))
             assertEquals(im, "主", engines.write(im, 0, "主").preedit)
         }
         takenBack(InputMethodCatalog.T9, '6'.code)

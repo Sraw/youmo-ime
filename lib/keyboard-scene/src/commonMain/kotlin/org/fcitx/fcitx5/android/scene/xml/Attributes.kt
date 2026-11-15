@@ -18,6 +18,9 @@ class Attributes(private val element: XmlElement, private val problems: Problems
 
     fun problem(message: String) = problems.add(element.line, "<${element.name}>: $message")
 
+    /** A warning, the element still read. */
+    fun warn(message: String) = problems.warn(element.line, "<${element.name}>: $message")
+
     fun string(name: String): String? {
         asked += name
         return element[name]

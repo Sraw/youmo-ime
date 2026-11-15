@@ -83,7 +83,6 @@ object DefaultMarks {
             "grouped" -> if (layout.id == "k18") KeyboardVariant.Form.Grouped18 else KeyboardVariant.Form.Grouped14
             "zhuyin" -> KeyboardVariant.Form.ZhuyinFull
             "zhuyin-nine" -> KeyboardVariant.Form.ZhuyinNine
-            "handwriting" -> KeyboardVariant.Form.Handwriting
             "number" -> KeyboardVariant.Form.Number
             else -> KeyboardVariant.Form.Panel
         },

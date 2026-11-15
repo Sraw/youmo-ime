@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession.Companion.NO_PIECE
+import org.fcitx.fcitx5.android.engine.handwriting.InkOver
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -26,8 +27,15 @@ object EngineEvent {
     /** A candidate tapped; the argument is its index among all of them. */
     const val PICK = 6
 
-    /** The app moved the cursor, or the input method was left. */
+    /**
+     * The app moved the cursor, or the input method was left: the input ended ([InkOver.endInput], what
+     * handwriting wrote put in); with the argument [RESET_DROP], what is shown dropped, nothing put in (清除,
+     * the backspace swipe).
+     */
     const val RESET = 7
+
+    /** [RESET]'s argument: drop what is shown, handwriting's too ([Action.Reset]). */
+    const val RESET_DROP = 1
 
     /** Any other key: an arrow, Home, Tab, Delete; the argument is its fcitx keysym. */
     const val OTHER = 8
@@ -128,7 +136,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             EngineEvent.ESCAPE -> if (composing || shown.predicting) session.apply(Action.Reset) else if (nineKeys) IDLE.copy(handled = true) else passOn()
             EngineEvent.PICK -> session.apply(Action.Pick(arg))
             EngineEvent.FORGET, EngineEvent.PIN, EngineEvent.UNPIN, EngineEvent.BLOCK -> session.apply(pressed(event, arg))
-            EngineEvent.RESET -> session.apply(Action.Reset).copy(handled = false)
+            EngineEvent.RESET -> reset(arg).copy(handled = false)
             EngineEvent.REFINE -> refine()
             EngineEvent.TYPED -> typed(arg)
             EngineEvent.DROP_PREDICTIONS -> if (shown.predicting) session.apply(Action.DropPredictions) else again(handled = false)
@@ -232,6 +240,9 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
     }
 
     // a key's pick: told as one ([Snapshot.picked]), never a key to type again (KeyRouter's log)
+    // the input ended keeps what is written on the keys (InkOver, outermost of the session); a drop does not
+    private fun reset(arg: Int) = (session as? InkOver)?.takeIf { arg != EngineEvent.RESET_DROP }?.endInput() ?: session.apply(Action.Reset)
+
     private fun select(index: Int) = session.apply(Action.Select(index)).copy(picked = true)
 
     // the app types the key after what the session committed; but one that left something composing

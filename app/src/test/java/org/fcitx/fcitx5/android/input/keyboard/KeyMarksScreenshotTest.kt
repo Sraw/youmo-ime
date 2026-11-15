@@ -25,8 +25,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 快捷键图标位置's six places and 标点位置's on the full keyboard, standard and 紧凑, and on 九键, 大千
- * and handwriting (uat/02 KB-66): the goldens under src/test/screenshots/KeyMarksScreenshotTest,
+ * 快捷键图标位置's six places and 标点位置's on the full keyboard, standard and 紧凑, and on 九键 and 大千
+ * (uat/02 KB-66): the goldens under src/test/screenshots/KeyMarksScreenshotTest,
  * named <board>_<标点位置>_<快捷键图标位置>, looked at one by one for a mark on another or on a letter
  * (KeyMarksEverywhereUatTest measures it everywhere).
  */
@@ -42,7 +42,6 @@ class KeyMarksScreenshotTest {
         "full" to (KeyboardHarness.PINYIN to ImKeyboards.Chosen()),
         "nine" to (KeyboardHarness.PINYIN to ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)),
         "zhuyin_full" to (KeyboardHarness.PINYIN to ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)),
-        "handwriting" to (InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "手", "zh_CN", "androidengine", false) to null),
     )
 
     // each shortcut place with the symbols top right (bottom right where the shortcuts are), each symbol

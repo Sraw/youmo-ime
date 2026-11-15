@@ -187,14 +187,15 @@ class InputMethodSettingsScreenTest {
         keyboard.t9EnglishTyping.setValue(T9EnglishTyping.Predictive)
     }
 
-    // as multi-tap: the pad's own, nothing of it in fcitx's config
+    // as multi-tap: handwriting's own, nothing of it in fcitx's config; on the shared page's 手写 (061-handwriting-toolbar §3.9)
     @Test
-    fun thePauseOnTheHandwritingPageIsTheAppsPreference() {
+    @Uat("ST-121")
+    fun thePauseOnTheSharedPageIsTheAppsPreference() {
         val pref = AppPrefs.getInstance().keyboard.handwritingPause
         pref.setValue(HandwritingPause.Medium)
         val cfg = mutableMapOf<String, String>()
         var saved = 0
-        val list = screen(InputMethodCatalog.HANDWRITING, cfg) { saved++ }.findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE)!!
+        val list = create(InputMethodSettings.SHARED, cfg) { saved++ }.findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE)!!
         assertEquals(HandwritingPause.Medium.name, list.value)
         assertTrue(list.callChangeListener(HandwritingPause.Slow.name))
         assertEquals(HandwritingPause.Slow, pref.getValue())
@@ -218,28 +219,21 @@ class InputMethodSettingsScreenTest {
         assertTrue(AppPrefs.ENGLISH_AUTO_CAPS !in cfg.flattened())
     }
 
-    // 在键上划: one list of 滑行输入, 笔画筛选, 键盘手写 and off, its summary the choice alone; a choice stored as
-    // it is picked; 键盘手写 said to need the text pack while it is missing
+    // 在键上划: one list of 滑行输入, 笔画筛选 and off, its summary the choice alone; a choice stored as it is picked
+    // (键盘手写 is the toolbar's 手写 now, 061-handwriting-toolbar)
     @Test
+    @Uat("ST-121")
     fun keyDrawingIsOneChoiceSummarizedByItself() {
         val keyboard = AppPrefs.getInstance().keyboard
         try {
             TestShelves.use()
             keyboard.keyDrawing.setValue(KeyDrawing.Glide)
             val drawing = create(InputMethodSettings.SHARED).findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!
-            assertEquals(listOf(KeyDrawing.Glide, KeyDrawing.StrokeFilter, KeyDrawing.Handwriting, KeyDrawing.Off).map { it.name }, drawing.entryValues.map { it.toString() })
-            val own = PlaceholderStrings(RuntimeEnvironment.getApplication()).getString(R.string.key_drawing_handwriting)
-            assertEquals(own, drawing.entries[2].toString())
+            assertEquals(listOf(KeyDrawing.Glide, KeyDrawing.StrokeFilter, KeyDrawing.Off).map { it.name }, drawing.entryValues.map { it.toString() })
             assertEquals(KeyDrawing.Glide.name, drawing.value)
             assertEquals(drawing.entry.toString(), drawing.summary?.toString())
             assertTrue(drawing.callChangeListener(KeyDrawing.StrokeFilter.name))
             assertEquals(KeyDrawing.StrokeFilter, keyboard.keyDrawing.getValue())
-            assertTrue(drawing.callChangeListener(KeyDrawing.Handwriting.name))
-            assertEquals(KeyDrawing.Handwriting, keyboard.keyDrawing.getValue())
-            TestShelves.use(text = false, voice = true)
-            val gated = create(InputMethodSettings.SHARED).findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!
-            assertEquals(PlaceholderStrings(RuntimeEnvironment.getApplication()).getString(R.string.key_drawing_needs_text_pack, own), gated.entries[2].toString())
-            assertEquals(KeyDrawing.Handwriting.name, gated.value)
         } finally {
             TestShelves.use()
             keyboard.keyDrawing.setValue(KeyDrawing.Off)
@@ -312,11 +306,13 @@ class InputMethodSettingsScreenTest {
 
     // the shared page says under each what it is no use to; an input method's page, its own alone, says nothing of the kind
     @Test
+    @Uat("ST-124")
     fun aSharedOptionSaysUnderItWhatItIsNoUseTo() {
         val shared = create(InputMethodSettings.SHARED)
         // in the Chinese input methods' section, whose title says English: only the exception within it
         assertEquals(placeholder(R.string.im_prediction_summary), shared.titled(R.string.im_prediction).summary?.toString())
-        assertEquals("${placeholder(R.string.im_emoji_summary)}\n${placeholder(R.string.im_not_for)}", shared.titled(R.string.im_emoji).summary?.toString())
+        // emoji for every Chinese input method now (handwriting, which had none, is the toolbar's over them)
+        assertEquals(placeholder(R.string.im_emoji_summary), shared.titled(R.string.im_emoji).summary?.toString())
         assertNull(shared.titled(R.string.auto_pairs).summary)
         // 在键上划: the choice alone, which input methods each reaches is the docs'
         val drawing = shared.findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!

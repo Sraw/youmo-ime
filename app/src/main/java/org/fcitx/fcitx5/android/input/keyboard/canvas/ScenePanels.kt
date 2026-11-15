@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 import android.content.Context
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.HandwritingMode
+import org.fcitx.fcitx5.android.input.keyboard.KeyInk
 import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 import org.fcitx.fcitx5.android.scene.theme.Argb
 
@@ -71,6 +73,16 @@ object ScenePanels {
         looks(theme)?.voice(scenes(context, theme)) ?: Argb(theme.accentKeyBackgroundColor).let { accent ->
             PanelLooks.Voice(PanelLooks.mask(Argb(theme.keyboardColor)), null, Argb((accent.value and RGB) or (PanelLooks.MIC_ALPHA shl ALPHA)), accent)
         }
+
+    /**
+     * The ink written on the letter keys (the toolbar's 手写) and its width, dp: the theme's `handwriting/pad` ink where
+     * it shows on the letter keys (HandwritingMode.inkColor), else the letters' own colour; its width else [KeyInk.INK_DP].
+     */
+    fun ink(context: Context, theme: Theme): Pair<Int, Float> {
+        val pad = looks(theme)?.pad(scenes(context, theme))
+        val color = HandwritingMode.inkColor(pad?.color?.value, theme.keyTextColor, theme.keyBackgroundColor)
+        return color to (pad?.widthDp?.toFloat() ?: KeyInk.INK_DP)
+    }
 
     private const val RGB = 0xFFFFFF
     private const val ALPHA = 24

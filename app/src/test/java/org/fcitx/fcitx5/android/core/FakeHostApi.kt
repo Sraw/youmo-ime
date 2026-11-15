@@ -241,9 +241,9 @@ class FakeHostApi : HostApi {
             (if (started) ", started" else "") + (after?.let { ", after $it" } ?: "") + (if (selected) ", selected" else "") + (if (said) ", said)" else ")")
     }
 
-    // written on the keys: marked so ([onKeys]), with its first reading
-    override suspend fun offerInk(reading: InkReading, piece: Int, onKeys: Boolean, takesBack: Boolean): Boolean {
-        calls += if (onKeys) "offerInk($piece, keys, ${reading.texts.firstOrNull()}${if (takesBack) ", takesBack" else ""})" else "offerInk($piece)"
+    // written on the letters, with its first reading
+    override suspend fun offerInk(reading: InkReading, piece: Int): Boolean {
+        calls += "offerInk($piece, ${reading.texts.firstOrNull()})"
         return true
     }
 
@@ -264,8 +264,8 @@ class FakeHostApi : HostApi {
         return true
     }
 
-    override suspend fun inkFinished(piece: Int, onKeys: Boolean): Boolean {
-        calls += if (onKeys) "inkFinished($piece, keys)" else "inkFinished($piece)"
+    override suspend fun inkFinished(piece: Int): Boolean {
+        calls += "inkFinished($piece)"
         return true
     }
 
@@ -307,8 +307,8 @@ class FakeHostApi : HostApi {
 
     override suspend fun isEmpty() = inputPanelCached.preedit.isEmpty() && candidates.isEmpty()
 
-    override suspend fun reset() {
-        calls += "reset()"
+    override suspend fun reset(drop: Boolean) {
+        calls += if (drop) "reset(drop)" else "reset()"
     }
 
     override suspend fun dropPredictions(): Boolean {

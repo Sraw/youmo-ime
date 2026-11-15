@@ -617,13 +617,13 @@ class ToolbarUatTest {
         assertEquals(
             ToolbarConfig.Layout(
                 listOf(ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard, ToolbarButton.QuickPhrase, ToolbarButton.More),
-                listOf(ToolbarButton.Theme, ToolbarButton.Emoji, ToolbarButton.Voice, ToolbarButton.Hide)
+                listOf(ToolbarButton.Theme, ToolbarButton.Emoji, ToolbarButton.Handwriting, ToolbarButton.Voice, ToolbarButton.Hide)
             ),
             config.layout(everywhere)
         )
         h.start()
         // the theme there before the toolbar is opened, the undo not even then; the microphone as ever
-        val pinned = listOf(R.string.theme, R.string.a11y_key_emoji, R.string.voice_input, R.string.hide_keyboard)
+        val pinned = listOf(R.string.theme, R.string.a11y_key_emoji, R.string.handwriting, R.string.voice_input, R.string.hide_keyboard)
         assertEquals(pinned.map(::s), barButtons())
         expand()
         assertEquals((listOf(R.string.redo, R.string.text_editing, R.string.clipboard, R.string.quick_phrases, R.string.status_area) + pinned).map(::s), barButtons())
@@ -642,10 +642,10 @@ class ToolbarUatTest {
             st.idle()
             val pinned = ToolbarConfig.parse(toolbarButtons.getValue()).layout(everywhere).pinned
             assertEquals(listOf(ToolbarButton.Voice, ToolbarButton.Hide, ToolbarButton.Emoji), pinned)
-            // the others above the divider: the microphone still below it
+            // the others above the divider (handwriting, pinned by default since 0.6.1, too): the microphone still below it
             (st.page as ToolbarButtonsFragment).reset()
             st.idle()
-            for (b in listOf(ToolbarButton.Emoji, ToolbarButton.Hide)) {
+            for (b in listOf(ToolbarButton.Emoji, ToolbarButton.Handwriting, ToolbarButton.Hide)) {
                 var at = adapter.indexOf(b)
                 while (at > adapter.entries.indexOf(ToolbarConfig.Item.Divider)) adapter.swapItem(at, --at)
                 st.idle()

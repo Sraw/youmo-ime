@@ -80,7 +80,7 @@ class KeyResolverTest {
 
     @Test
     fun commaIsTheSameOnEveryKeyboardAndShownAsThePunctuation() {
-        for ((board, form) in listOf("qwerty" to Form.Full, "k14" to Form.Grouped14, "handwriting" to Form.Handwriting, "zhuyin" to Form.ZhuyinFull)) {
+        for ((board, form) in listOf("qwerty" to Form.Full, "k14" to Form.Grouped14, "zhuyin" to Form.ZhuyinFull)) {
             val c = resolver(board, form).resolve(KeyId("fn/comma"), zh)
             assertEquals(board, Item("."), c.first)
             assertEquals(board, "。", c.firstShown)

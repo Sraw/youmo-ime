@@ -45,6 +45,7 @@ import org.fcitx.fcitx5.android.engine.store.Unsaved
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.EngineHost
 import org.fcitx.fcitx5.android.input.address.AddressStore
+import org.fcitx.fcitx5.android.input.handwriting.handwritingCannotLoad
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.pack.PackKind
@@ -71,37 +72,22 @@ import java.util.concurrent.TimeUnit
 class EngineBridge {
 
     /**
-     * What the handwriting pad read, or a piece of it finished ([piece]), for the Ink key to carry,
-     * [send] sending it, then [Engines.inkSent] holds it if the key never reached the session; with
-     * handwriting not [current], the input method, no key, the piece only held. Whether the key was
-     * sent. On the fcitx thread.
-     *
-     * [onKeys]: written on the letter keys (键盘手写): [current]'s own handwriting's (InkOver), sent while
-     * it writes on its keys. Switched meanwhile, the piece goes to the input method now current: dropped
+     * What was written on [current]'s letter keys (the toolbar's 手写), or a piece of it finished ([piece]), for
+     * the Ink key to carry: [current]'s own handwriting's (InkOver). [send] sends it, then [Engines.inkSent]
+     * holds it if the key never reached the session. Whether the key was sent: not where [current] writes on
+     * no keys or cannot load. Switched meanwhile, the piece goes to the input method now current: dropped
      * where that writes on no keys, else read there (piece numbers are global; a rare slip, not worth
-     * carrying the input method written on with every reading).
+     * carrying the input method written on with every reading). On the fcitx thread.
      */
-    fun sendInk(piece: Action.Ink, current: String, onKeys: Boolean = false, send: () -> Unit): Boolean {
-        if (onKeys) {
-            // an input method that cannot load writes on no keys: its session's failure is not handwriting's
-            if (!InputMethodCatalog.writesOnKeys(current) || current in unloadable) return false
-            // current's own session made first, under its own latch: a code table that cannot be read fails
-            // as current, not as handwriting (whose pad would then load nowhere)
-            if (!madeOnKeys(current)) return false
-            if (!handwriting(current, onKeys = true) { engines.ink(piece, shown = true, im = current) }) return false
-            send()
-            engines.inkSent(piece, current)
-            return true
-        }
-        if (current != InputMethodCatalog.HANDWRITING) {
-            handwriting(current) { engines.ink(piece, shown = false) }
-            return false
-        }
-        // only the session's making caught as handwriting's: a slip of the key sent after it is the key's,
-        // not a read untaken (else the pad would type it again as its character)
-        if (!handwriting(current) { engines.ink(piece, shown = true) }) return false
+    fun sendInk(piece: Action.Ink, current: String, send: () -> Unit): Boolean {
+        // an input method that cannot load writes on no keys: its session's failure is not handwriting's
+        if (!InputMethodCatalog.writesOnKeys(current) || current in unloadable) return false
+        // current's own session made first, under its own latch: a code table that cannot be read fails
+        // as current, not as handwriting (whose recognizer's readings would then load nowhere)
+        if (!madeOnKeys(current)) return false
+        if (!handwriting { engines.ink(piece, shown = true, im = current) }) return false
         send()
-        engines.inkSent(piece)
+        engines.inkSent(piece, current)
         return true
     }
 
@@ -142,16 +128,14 @@ class EngineBridge {
         }
     }
 
-    // these make the handwriting session, whose pinyin data may not load: as its keys, latched once
-    // and skipped after, the pad drawing on with nothing taken (not a load tried at every character).
-    // Whether it was taken: not, no Ink key is sent, which unanswered would be typed as its character.
-    // Handwriting's only: a piece finished as the pad leaves for English ([current]) is told the engine,
-    // but is not a key typed into keyboard-us
-    internal fun handwriting(current: String, onKeys: Boolean = false, call: () -> Unit): Boolean {
-        if (InputMethodCatalog.HANDWRITING in unloadable) return false
+    // these make the handwriting session, whose pinyin data may not load: latched once ([HANDWRITING]) and
+    // skipped after, the ink drawn on with nothing taken (not a load tried at every character). Whether
+    // it was taken: not, no Ink key is sent
+    internal fun handwriting(call: () -> Unit): Boolean {
+        if (HANDWRITING in unloadable) return false
         try {
-            unloadable.call(InputMethodCatalog.HANDWRITING, call)
-            return onKeys || current == InputMethodCatalog.HANDWRITING
+            unloadable.call(HANDWRITING, call)
+            return true
         } catch (e: IOException) {
             Timber.w(e, "handwriting engine")
         } catch (e: DataFormatException) {
@@ -286,6 +270,7 @@ class EngineBridge {
         // said on the keyboard (§3: not a toast, which Android 13 drops); a pack missing is told as such,
         // one damaged since it was last read through too (read through now, on this thread: review M-2)
         val pack = e.causes().filterIsInstance<PackUnavailableException>().firstOrNull()
+        if (im == HANDWRITING) handwritingCannotLoad()
         EngineNotices.failed(
             when {
                 pack != null -> R.string.pack_text_needed_short
@@ -662,15 +647,8 @@ class EngineBridge {
     // what the app keeps of an input method's session, after any call of it: one place as input methods come.
     // [engines] asked only for one followed: a call answered elsewhere (a test's) makes none
     private inline fun followed(im: String, engines: () -> Engines) {
-        if (im == InputMethodCatalog.HANDWRITING) EngineState.inkEnded.value = engines().inkEnded
-        // written on the keys (InkOver): its pieces ended, and whether its own input is typed, after every
-        // answer (KeyInkGesture.engineTyped: a tap's mark replaced each time, not only as it changes)
-        if (InputMethodCatalog.writesOnKeys(im) && im !in unloadable) {
-            val e = engines()
-            EngineState.inkEnded.value = e.inkEnded
-            // with the number of the last key sent the fcitx thread took (EngineState.keyTaken): which tap it is about
-            EngineState.answerKeysTyped(e.typedOnKeys(im), EngineState.keysHeard)
-        }
+        // written on the keys (InkOver): its pieces ended, after every answer
+        if (InputMethodCatalog.writesOnKeys(im) && im !in unloadable) EngineState.inkEnded.value = engines().inkEnded
         // a table's keyboard: its 拼 key turned, its settings changed (a field's context comes as it
         // shows); none of one that could not be read, whose keys say nothing
         if (im in InputMethodCatalog.TABLES && im !in unloadable) EngineState.tableKeyboardState.value = engines().tableKeyboard(im)
@@ -680,6 +658,10 @@ class EngineBridge {
     fun tableKeys(im: String): Set<Char> = made?.tableKeys(im).orEmpty()
 
     companion object {
+        // the latch of handwriting's session over the keys, whichever input method is written on: its
+        // recognizer's readings are pinyin's data, not that input method's
+        private const val HANDWRITING = "handwriting"
+
         // what the user changed on the keyboard (a common word deleted, a phrase pinned or deleted) not saved: said
         // as what is learned and not kept is, in words of its own (WordsFile, PhraseFile). Not learning_unkept: that
         // says the words learned are not saved, which is not so here, and its once a process would be spent on

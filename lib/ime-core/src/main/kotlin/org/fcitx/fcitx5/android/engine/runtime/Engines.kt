@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS_OWN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
@@ -374,8 +373,8 @@ class Engines(
     // by the session made in its place ([HandwritingSession.latestPiece])
     private var inkEndedBefore = HandwritingSession.NO_PIECE
 
-    // every handwriting session made: handwriting's own and those written over the keys ([InkOver])
-    private fun handwritingOf(s: Session): HandwritingSession? = (s as? HandwritingSession) ?: (s as? InkOver)?.handwritingMade
+    // every handwriting session made: those written over the keys ([InkOver])
+    private fun handwritingOf(s: Session): HandwritingSession? = (s as? InkOver)?.handwritingMade
 
     // the most of [of] over them and what the dropped ended, no list made: the pad asks at every stroke ([inkEnded])
     private inline fun inkMost(of: (HandwritingSession) -> Int): Int =
@@ -383,9 +382,6 @@ class Engines(
 
     // the latest piece any of them heard of: one made now starts with it ended, a pad numbering its pieces on across them
     private fun latestPiece(): Int = inkMost { it.latestPiece }
-
-    // the session [im]'s ink goes to: handwriting's own, or the one [im] shows (a pair's keyed one)
-    private fun inkedSession(im: String) = if (im == HANDWRITING) im else pairs.shownSession(im)
 
     // the input method's session as made, under what [SessionFactory.make] wraps it in (InkOver, StrokeFilter), whichever order
     private tailrec fun innermost(s: Session): Session = when (s) {
@@ -499,6 +495,8 @@ class Engines(
         val following = voiceEdits.edits.open
         val shownBefore = if (following) pairs.shownSession(im) else null
         val recordBefore = shownBefore?.let { sessions[it]?.lastCommit }
+        // handwriting shown before it: what this commits is the handwriting's, not the input method's typing
+        val inkingBefore = shownBefore != null && (sessions[shownBefore] as? InkOver)?.inking == true
         val s = pairs[im]?.onEvent(event, arg, learning, payload)
             ?: keyboard(im).onEvent(if (event == EngineEvent.HARD_CHAR) EngineEvent.CHAR else event, arg, learning, payload)
         // the session that typed it, shown before the event or after it: a new record of its last commit says
@@ -506,7 +504,7 @@ class Engines(
         // may be read; readingOf takes that only where it spells what went in (the same word, typed so then)
         val reading = if (s.commit.isEmpty() || !following) null else
             VoiceEditsGlue.readingOf(s.commit, listOf(shownBefore, pairs.shownSession(im)).firstNotNullOfOrNull { id -> sessions[id]?.lastCommit?.takeIf { it !== recordBefore } })
-        voiceEdits.answered(im, event, s, predicting, learning, reading)
+        voiceEdits.answered(im, event, s, predicting, learning, reading, inkingBefore)
         return annotated(im, s)
     }
 
@@ -567,7 +565,7 @@ class Engines(
         val style = settings.candidateReading
         val above = above(im, index, text, hint, if (style == ReadingStyle.OFF) ReadingStyle.PINYIN else style)
         if (above.isNotEmpty()) return above to ""
-        return (if (session == null) emptyList() else read(im, session, index, text, style)) to hint
+        return (if (session == null) emptyList() else read(session, index, text, style)) to hint
     }
 
     /**
@@ -576,15 +574,16 @@ class Engines(
      * bar never read a character apart (a misreading's true reading, 角色 jué sè, by its hint; any other as typed).
      */
     private fun readingsOf(im: String, session: Session, index: Int, text: String, hint: String, style: ReadingStyle): List<String> =
-        above(im, index, text, hint, style).ifEmpty { read(im, session, index, text, style) }
+        above(im, index, text, hint, style).ifEmpty { read(session, index, text, style) }
 
     // a pinyin's or 双拼's hint that is a reading, drawn above the candidate (readingAndHint)
     private fun above(im: String, index: Int, text: String, hint: String, style: ReadingStyle): List<String> =
         if (im in pairs) hintAbove(im, index, text, hint, style) else emptyList()
 
-    // the candidate at [index] of [session]'s as 候选词注音 writes it: handwriting's last character with all its readings
-    private fun read(im: String, session: Session, index: Int, text: String, style: ReadingStyle): List<String> {
-        val before = if (im == HANDWRITING) session.lookedUp(index) else null
+    // the candidate at [index] of [session]'s as 候选词注音 writes it: handwriting's last character with all its readings.
+    // Only while it shows handwriting: pinyin's own lookedUp (by parts, by strokes) is read as typed
+    private fun read(session: Session, index: Int, text: String, style: ReadingStyle): List<String> {
+        val before = if ((session as? InkOver)?.inking == true) session.lookedUp(index) else null
         return if (before != null) candidateReadings.allOf(text, style, before) else candidateReadings.of(text, style, session.readingOf(index))
     }
 
@@ -755,22 +754,18 @@ class Engines(
     /** Makes [im]'s session if it is not yet (its data read), for a caller that tells its failure from another's (the bridge's latches). */
     fun make(im: String) {
         hostThread.check()
-        session(inkedSession(im))
+        session(pairs.shownSession(im))
     }
 
     /**
      * Handwriting's session made for [ink], what the pad read or a piece of it finished, which the
-     * [Keyboard.INK] sent with it ([shown]) shows; with none sent, handwriting not the input method,
-     * held for the next ([HandwritingSession.hold]). [im] the input method written on: handwriting, or
-     * one written on over its keys ([InkOver], its handwriting made now). On the fcitx thread.
+     * [Keyboard.INK] sent with it ([shown]) shows; with none sent held for the next
+     * ([HandwritingSession.hold]). [im] the input method written on over its keys ([InkOver], its
+     * handwriting made now). On the fcitx thread.
      */
-    fun ink(ink: Action.Ink, shown: Boolean, im: String = HANDWRITING) {
+    fun ink(ink: Action.Ink, shown: Boolean, im: String) {
         hostThread.check()
-        val s = when (val made = session(inkedSession(im))) {
-            is HandwritingSession -> made
-            is InkOver -> made.handwriting()
-            else -> return
-        }
+        val s = (session(pairs.shownSession(im)) as? InkOver)?.handwriting() ?: return
         if (!shown) s.hold(ink)
     }
 
@@ -779,13 +774,9 @@ class Engines(
      * phrase or Unicode over handwriting, filtered the key; the field had lost focus) is held for the
      * next, as an [ink] told with no key is, so its piece is not lost. On the fcitx thread.
      */
-    fun inkSent(ink: Action.Ink, im: String = HANDWRITING) {
+    fun inkSent(ink: Action.Ink, im: String) {
         hostThread.check()
-        val s = when (val made = sessions[inkedSession(im)]) {
-            is HandwritingSession -> made
-            is InkOver -> made.handwritingMade
-            else -> null
-        } ?: return
+        val s = (sessions[pairs.shownSession(im)] as? InkOver)?.handwritingMade ?: return
         if (!s.took(ink)) s.hold(ink)
     }
 
@@ -806,14 +797,7 @@ class Engines(
         }
     }
 
-    /**
-     * Whether [im] has input of its own typed, not what is written over its keys ([InkOver.typing]): then
-     * the keyboard starts no stroke there (KeyInkGesture.mayWrite). False where nothing is written over
-     * the keys. On the fcitx thread.
-     */
-    fun typedOnKeys(im: String): Boolean = checked { (sessions[inkedSession(im)] as? InkOver)?.typing == true }
-
-    /** The latest piece of handwriting ended ([HandwritingSession.ended]; of those written over the keys too, [InkOver]), for the pad to wipe; on the fcitx thread. */
+    /** The latest piece of handwriting ended ([HandwritingSession.ended], of those written over the keys: [InkOver]), for the pad to wipe; on the fcitx thread. */
     val inkEnded: Int get() = checked { inkMost { it.ended } }
 
     /** Candidates of [im]'s input, from the [from]th, at most [count]; none if it has no session yet. */

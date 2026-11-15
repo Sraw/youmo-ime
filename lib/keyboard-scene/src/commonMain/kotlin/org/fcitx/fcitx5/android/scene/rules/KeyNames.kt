@@ -13,7 +13,7 @@ object KeyNames {
     val ROLES: List<String> = listOf(
         "shift", "backspace", "space", "enter", "confirm", "symbols", "numbers", "back", "lang",
         "comma", "period", "semicolon", "star", "apostrophe", "reset", "lookup", "lookup-on",
-        "slash", "at", "dot", "domain", "search", "lock", "emoji", "emoticon", "reading",
+        "slash", "at", "dot", "domain", "search", "lock", "emoji", "emoticon",
     )
 
     /** The boards' names (`qwerty/q`'s first half). */
@@ -71,10 +71,9 @@ object KeyNames {
         "domain" to "button_domain",
     )
 
-    /** The keys whose views had a name of their board's own (`board/key`), over [RESOURCES]: the number pad's space, handwriting's 注, the symbol panel's lock. */
+    /** The keys whose views had a name of their board's own (`board/key`), over [RESOURCES]: the number pad's space, the symbol panel's lock. */
     val BOARD_RESOURCES: Map<String, String> = mapOf(
         "number/space" to "button_mini_space",
-        "handwriting/reading" to "button_reading",
         "symbols/lock" to "button_panel_lock",
     )
 }

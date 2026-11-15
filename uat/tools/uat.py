@@ -1768,7 +1768,7 @@ def ensure_ime(d):
 # set to this before the page is opened again (B0-14键 and B0-九键 are 拼音's keyboards, their own branch in reset)
 IM_BASES = {"B0-五笔": ("五笔", "五笔", None),
             "B0-二笔": ("二笔", "二笔", None), "B0-仓颉": ("仓颉", "仓颉", None),
-            "B0-双拼": ("双拼", "双拼", None), "B0-手写": ("手写", "手写", None),
+            "B0-双拼": ("双拼", "双拼", None),
             "B0-自然码": ("自然码", "自然码", None), "B0-五笔拼音": ("五笔拼音", "五笔拼音", None),
             "B0-英文": (None, "英文", None),
             "B0-18键": ("双拼", "双拼", "18 键"), "B0-九键双拼": ("双拼", "双拼", "九键")}
@@ -1869,8 +1869,30 @@ def reset(d, base, page):
     elif base == "B0-横屏":
         d.rotate(1)
         d.open_page(page)
+    elif base == "B0-手写":
+        handwriting(d, True)
     elif base not in ("B0", "B0-实体", "B0-语音"):
         raise Blocked(f"unknown baseline {base}")
+
+
+def handwriting(d, on, offered=True):
+    """0.6.1: handwriting is the toolbar's 手写 toggle (pinned on a new install), kept across fields and
+    restarts: lit for B0-手写, off for every other baseline (a case before may have left it on). Where it
+    is [offered] (every Chinese input method) a missing button is a failure, turning it off too: a case
+    left on would go unseen; English, a password field and a hardware keyboard have none (the toggle is kept for
+    the next field it is offered in)"""
+    for _ in range(3):
+        s = d.screen()
+        b = s.find(desc="手写", where="ime")
+        if not b:
+            if not offered and not on:
+                return
+            raise Blocked("工具栏上没有「手写」")
+        if b.checked == on:
+            d._keys = None
+            return
+        d.tap(b.c, 0.6)
+    raise Blocked(f"「手写」按钮点了没变成{'开' if on else '关'}")
 
 
 def plug(d, base):
@@ -1919,6 +1941,8 @@ def soft_reset(d, base, page):
             d.open_page(page)
         d.clear()
     d.switch_im(IM_BASES[base][1] if base in IM_BASES else "拼音")
+    # no button where handwriting is not offered: English, a password field, a hardware keyboard (no toolbar on screen)
+    handwriting(d, base == "B0-手写", offered=base not in ("B0-英文", "B0-实体") and page != "password")
 
 
 # ---------------------------------------------------------------- helpers for the case scripts

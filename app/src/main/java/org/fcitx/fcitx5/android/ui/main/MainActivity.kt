@@ -135,7 +135,7 @@ class MainActivity : AppCompatActivity() {
                     if ((page as? QuickPhraseFragment)?.takeRequest(route) == true) return
                 }
                 navController.popBackStack(SettingsRoute.Index, false)
-                navController.navigateWithAnim(route)
+                navController.navigateWithAnim(SettingsRoute.now(route))
             }
         }
     }

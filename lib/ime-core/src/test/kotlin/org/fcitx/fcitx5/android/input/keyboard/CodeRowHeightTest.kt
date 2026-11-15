@@ -30,7 +30,6 @@ class CodeRowHeightTest {
             Layout.PINYIN_NINE to thin,
             Layout.ENGLISH_NINE to thin,
             Layout.TEXT to thin,
-            Layout.HANDWRITING to thin,
         )
         assertEquals(Layout.entries.toSet(), rows.keys)
         assertRows(rows.entries, { "${it.key}" }) { (layout, dp) ->

@@ -301,15 +301,15 @@ class EnginesTableTest {
             assertTrue("你好" in engines.type("engine-wubi", "wqv").candidates)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
             fun afterHao(): List<String> {
-                engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(engines.inkEnded + 1, InkReading(listOf("好"), doubleArrayOf(0.0))))
-                return engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.PICK, 0).candidates
+                engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(engines.inkEnded + 1, InkReading(listOf("好"), doubleArrayOf(0.0))))
+                return engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0).candidates
             }
             // picked: learned, to be forgotten
-            assertEquals("你好", engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.PICK, afterHao().indexOf("你好")).commit)
+            assertEquals("你好", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, afterHao().indexOf("你好")).commit)
             val i = afterHao().indexOf("你好")
-            assertTrue(Offer.FORGET in engines.offers(InputMethodCatalog.HANDWRITING, i))
-            engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.FORGET, i)
-            engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.RESET, 0)
+            assertTrue(Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, i))
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.FORGET, i)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
             assertFalse("你好" in engines.type("engine-wubi", "wqv").candidates)
         }
         assertEquals(listOf("你好"), forgotten(dir))
@@ -331,14 +331,14 @@ class EnginesTableTest {
             fun ninHao() = engines.userWords(UserWord.Kind.LEARNED).any { it.text == "你好" && it.pinyin == "nin hao" }
             assertTrue(ninHao())
             fun afterHao(): List<String> {
-                engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(engines.inkEnded + 1, InkReading(listOf("好"), doubleArrayOf(0.0))))
-                return engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.PICK, 0).candidates
+                engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(engines.inkEnded + 1, InkReading(listOf("好"), doubleArrayOf(0.0))))
+                return engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0).candidates
             }
-            assertEquals("你好", engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.PICK, afterHao().indexOf("你好")).commit)
+            assertEquals("你好", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, afterHao().indexOf("你好")).commit)
             val i = afterHao().indexOf("你好")
-            assertTrue(Offer.FORGET in engines.offers(InputMethodCatalog.HANDWRITING, i))
-            engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.FORGET, i)
-            engines.onEvent(InputMethodCatalog.HANDWRITING, EngineEvent.RESET, 0)
+            assertTrue(Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, i))
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.FORGET, i)
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
             assertFalse(ninHao())
         }
     }

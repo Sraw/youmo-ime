@@ -42,7 +42,6 @@ class KeyResolverGoldenTest {
         Board("shuangpin-18-ms", "k18", KeyboardVariant(Form.Grouped18, semicolon = true)),
         Board("zhuyin-full", "zhuyin", KeyboardVariant(Form.ZhuyinFull)),
         Board("zhuyin-nine", "zhuyin-nine", KeyboardVariant(Form.ZhuyinNine)),
-        Board("handwriting", "handwriting", KeyboardVariant(Form.Handwriting)),
         Board("number", "number", KeyboardVariant(Form.Number)),
         Board("symbols", "symbols", KeyboardVariant(Form.Panel)),
         Board("emoji", "emoji", KeyboardVariant(Form.Panel)),

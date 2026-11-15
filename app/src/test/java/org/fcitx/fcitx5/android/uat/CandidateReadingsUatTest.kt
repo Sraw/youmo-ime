@@ -110,20 +110,6 @@ class CandidateReadingsUatTest {
         assertTrue("made anew back off", h.inputView !== zhuyin)
     }
 
-    // the style last used kept whichever keyboard is up (review 051-hw-reading M3): pinyin's here, zhuyin set
-    // and then off in the settings; 注 turns zhuyin on again
-    @Test
-    fun theStyleLastUsedIsKeptFromTheSettingsToo() {
-        val last = AppPrefs.getInstance().internal.lastCandidateReading
-        prefs.set(last, "")
-        KeyboardHarness().also { harness = it }.start()
-        EngineState.candidateReadingState.value = ReadingStyle.ZHUYIN
-        shadowOf(Looper.getMainLooper()).idle()
-        EngineState.candidateReadingState.value = ReadingStyle.OFF
-        shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(ReadingStyle.ZHUYIN.key, last.getValue())
-    }
-
     // UAT HW-27: a handwritten character's readings, two and … for more, in the bar's height as for one
     @Test
     @Uat("HW-27")

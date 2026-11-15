@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
@@ -180,6 +181,28 @@ class AppPrefsTest {
         )
     }
 
+    // 0.6.0's 在键上划 = 键盘手写 is 关 now, the toolbar's 手写 pinned for it (not turned on) and the user told once;
+    // a toolbar never arranged has it pinned already (ToolbarConfig.DEFAULT); any other choice is left as it is
+    @Test
+    @Uat("PR-56")
+    fun zeroSixsKeyHandwritingIsOffWithTheToolbarsHandwritingPinned() {
+        fun row(why: String, drawing: String, bar: String, now: KeyDrawing, told: Boolean, barNow: String) =
+            why to {
+                sp.edit { clear(); putString(AppPrefs.KEY_DRAWING, drawing); if (bar.isNotEmpty()) putString("toolbar_buttons", bar) }
+                val prefs = AppPrefs(sp).apply { dropRetired() }
+                assertEquals(now, prefs.keyboard.keyDrawing.getValue())
+                assertEquals(told, prefs.internal.keyHandwritingUnseen.getValue())
+                assertFalse("not turned on", prefs.internal.handwritingOpen.getValue())
+                assertEquals(barNow, prefs.internal.toolbarButtons.getValue())
+            }
+        assertNamedRows(
+            row("键盘手写, the bar never arranged", "Handwriting", "", KeyDrawing.Off, true, ""),
+            row("键盘手写, the bar arranged", "Handwriting", "undo,|,voice,hide", KeyDrawing.Off, true,
+                ToolbarConfig.parse("undo,|,voice,hide").withHandwritingPinned().serialize()),
+            row("滑行输入: as it was", "Glide", "undo,|,voice,hide", KeyDrawing.Glide, false, "undo,|,voice,hide"),
+        )
+    }
+
     // a 0.5 backup imported: the start after it resets the hidden settings (the import's marker) and then
     // drops the retired ones, in FcitxApplication.onCreate's order; the two switches still move over
     @Test
@@ -224,9 +247,9 @@ class AppPrefsTest {
                     { it.keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys) }, "NineKeys", "Keys16",
                     { it.keyboard.shuangpinKeyboard.getValue() }, ShuangpinKeyboard.Full,
                 ),
-                // 在键上划 since 0.6; Handwriting stored before it is offered (a later version's backup)
+                // 在键上划 since 0.6; 0.6.0's Handwriting moved over at the start (migrateKeyHandwriting)
                 Row(
-                    "在键上划", listOf("Glide", "StrokeFilter", "Handwriting", "Off"), KeyDrawing.entries, "key_drawing", AppPrefs.KEY_DRAWING,
+                    "在键上划", listOf("Glide", "StrokeFilter", "Off"), KeyDrawing.entries, "key_drawing", AppPrefs.KEY_DRAWING,
                     { it.keyboard.keyDrawing.setValue(KeyDrawing.StrokeFilter) }, "StrokeFilter", "Strokes",
                     { it.keyboard.keyDrawing.getValue() }, KeyDrawing.Off,
                 ),

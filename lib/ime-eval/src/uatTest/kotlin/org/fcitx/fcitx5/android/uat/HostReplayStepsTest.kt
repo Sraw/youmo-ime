@@ -34,11 +34,12 @@ class HostReplayStepsTest {
     }
 
     @Test
-    fun inkWrittenShowsItsFirstReadingComposingInTheField() = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+    fun inkWrittenShowsItsFirstReadingAsTheCode() = with(HostReplay(im = InputMethodCatalog.PINYIN)) {
+        // written over pinyin: pinyin's code, as its typing is (no composing text of the engine's own)
         write("人", "入", "八")
-        assertEquals("人", clientPreedit)
-        assertEquals("人", text)
-        assertEquals(0 to 1, editor.composingStart to editor.composingEnd)
+        assertEquals("人", preedit)
+        assertEquals("", clientPreedit)
+        assertEquals("", text)
     }
 
     @Test

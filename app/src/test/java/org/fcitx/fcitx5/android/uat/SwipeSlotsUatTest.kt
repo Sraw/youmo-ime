@@ -123,7 +123,7 @@ class SwipeSlotsUatTest {
                 h.idle()
                 assertEquals("${h.sent()}", row.sent, h.sent().map { pie in it })
                 // what is typed is filtered, not committed or dropped first, and nothing reaches the field
-                assertEquals(emptyList<String>(), h.api.calls.filter { it.startsWith("select(") || it == "reset()" || it == "clearTyped()" })
+                assertEquals(emptyList<String>(), h.api.calls.filter { it.startsWith("select(") || it.startsWith("reset(") || it == "clearTyped()" })
                 assertEquals("", h.field.text.toString())
             } finally {
                 close()

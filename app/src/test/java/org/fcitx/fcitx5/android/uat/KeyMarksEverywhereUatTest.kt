@@ -90,7 +90,6 @@ class KeyMarksEverywhereUatTest {
         Board("英文九键", KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)),
         Board("大千", keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)),
         Board("注音九键", keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_NINE)),
-        Board("手写", entry(InputMethodCatalog.HANDWRITING, "手写")),
         Board(
             "五笔两行字根", entry(InputMethodCatalog.WUBI, "五笔"),
             table = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.ROOTS, TableRoots.WUBI86),

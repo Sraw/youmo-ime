@@ -5,7 +5,6 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.WUBI
@@ -36,7 +35,6 @@ class ImKeyboardsTest {
         assertEquals(listOf(FULL, KEYS18, KEYS14, NINE_KEYS), ImKeyboards.choices(SHUANGPIN, ziranma))
         assertEquals(listOf(FULL, NINE_KEYS), ImKeyboards.choices(ENGLISH, ziranma))
         assertEquals(emptyList<ImKeyboard>(), ImKeyboards.choices(WUBI, ziranma))
-        assertEquals(emptyList<ImKeyboard>(), ImKeyboards.choices(HANDWRITING, ziranma))
     }
 
     @Test
@@ -64,7 +62,6 @@ class ImKeyboardsTest {
         assertEquals(Layout.PINYIN_NINE, ImKeyboards.layoutOf(PINYIN, chosen, ziranma))
         assertEquals(Layout.SHUANGPIN18, ImKeyboards.layoutOf(SHUANGPIN, chosen, ziranma))
         assertEquals(Layout.ENGLISH_NINE, ImKeyboards.layoutOf(ENGLISH, chosen, ziranma))
-        assertEquals(Layout.HANDWRITING, ImKeyboards.layoutOf(HANDWRITING, chosen, ziranma))
         assertEquals(Layout.TEXT, ImKeyboards.layoutOf(WUBI, chosen, ziranma))
         val rows = listOf(
             Triple(PINYIN, FULL, Layout.TEXT),

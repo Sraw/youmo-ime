@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 
 /** Each board's default marks as the theme maker gets them, one file a board (data/default-marks), the same on JVM and JS. */
 class DefaultMarksTest {
-    private val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "handwriting")
+    private val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number")
 
     private fun marks(board: String) = DefaultMarks.shortcuts(Forms.layout(board), Forms.fragments)
 

@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.T9
@@ -87,9 +86,8 @@ class EnginesGlideTest : EnginesFixture() {
     }
 
     @Test
-    fun handwritingAndAnyOtherDoNotGlide() {
+    fun anInputMethodTheAppDoesNotKnowDoesNotGlide() {
         val engines = Engines(::load, null, warmUps = inPlace)
-        assertNull(engines.glide(HANDWRITING, pathOf("ni")))
         assertNull(engines.glide("keyboard-de", pathOf("ni")))
     }
 

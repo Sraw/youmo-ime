@@ -21,7 +21,6 @@ import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
-import org.fcitx.fcitx5.android.input.keyboard.HandwritingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
@@ -121,7 +120,7 @@ object SwipeFates {
         }
 
         private fun shown(imes: List<InputMethodEntry>, tableLabels: Map<String, String?>): List<Shown> {
-            val makers = keyboardMakers({ ctx }, { theme }) { HandwritingKeyboard(ctx, theme, deliver = { _, _ -> }) }
+            val makers = keyboardMakers({ ctx }, { theme })
             val prefs = AppPrefs.getInstance().keyboard
             val scheme = EngineState.shuangpinScheme
             val on = imes.ifEmpty { listOf(null) }
@@ -291,7 +290,6 @@ object SwipeFates {
             KeyNames.ZHUYIN_NINE -> R.string.shortcut_page_zy9
             KeyNames.ZHUYIN -> R.string.shortcut_page_zyfull
             KeyNames.NUMBER -> R.string.shortcut_page_number
-            KeyNames.HANDWRITING -> R.string.im_handwriting
             else -> R.string.shortcut_page_full
         },
     )

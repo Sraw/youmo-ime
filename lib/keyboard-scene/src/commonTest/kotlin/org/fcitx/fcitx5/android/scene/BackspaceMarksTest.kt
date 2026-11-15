@@ -28,7 +28,6 @@ class BackspaceMarksTest {
             "number" to setOf("delete-sweep", "restore"),
             "symbols" to setOf("delete-sweep", "restore"),
             "zhuyin" to setOf("delete-sweep"),
-            "handwriting" to setOf("delete-sweep"),
             "zhuyin-nine" to emptySet(),
         )
         for (d in listOf(2.0, 2.625, 2.75, 3.5)) for ((board, marks) in drawn) {
@@ -49,7 +48,7 @@ class BackspaceMarksTest {
         // meets ⌫'s icon on its left and is left out on most of them, so the docs name 右下 alone)
         val down = KeyMarks.At.BottomRight
         for (d in listOf(2.0, 2.625, 2.75, 3.5)) {
-            for (board in listOf("qwerty", "k14", "k18", "nine", "number", "symbols", "zhuyin", "handwriting", "zhuyin-nine")) {
+            for (board in listOf("qwerty", "k14", "k18", "nine", "number", "symbols", "zhuyin", "zhuyin-nine")) {
                 val k = d / Forms.DENSITY
                 val e = Forms.env(board, Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d))
                 val s = Forms.scene(board, e.copy(marks = e.marks.copy(upAt = KeyMarks.At.TopRight, downAt = down)))

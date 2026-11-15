@@ -104,7 +104,7 @@ object Forms {
     )
 
     /** Every board of rules C, by its file (KeyNames.BOARDS; emoji the emoji's row and the emoticons', S8a), and the small boards of 060-render-p2 S6. */
-    val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "handwriting", "symbols", "emoji", "emoticon", "emoji-search", "expanded-side", "number-row")
+    val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "symbols", "emoji", "emoticon", "emoji-search", "expanded-side", "number-row")
 
     private val layouts = mutableMapOf<String, Layout>()
 

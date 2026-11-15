@@ -36,3 +36,7 @@ case("MN-23", needs="jvm:BarUatTest.candidateSpacingFollowsTextSize")(lambda d: 
 
 
 case("MN-21", needs="jvm:MotionNoticeUatTest.landscapeLargestCandidatesStillCappedAtSevenTenths")(lambda d: None)
+
+case("MN-24", needs="jvm:KotlinHostHandwritingTest.theHandwritingNoticeNotSeenIsToldAtTheNextStart")(lambda d: None)
+
+case("MN-25", needs="jvm:KotlinHostHandwritingTest.bothHandwritingNoticesAreToldEachOnce")(lambda d: None)

@@ -233,8 +233,6 @@ case("LC-17", needs="jvm:StuckBarUatTest.aThemeChangedMidEnglishWordCommitsIt")(
 case("LC-18", needs="jvm:StuckBarUatTest.floatingAndDockedMidPinyinKeepIt")(lambda d: None)
 
 
-case("LC-19", needs="jvm:StuckBarUatTest.aThemeChangedMidHandwritingCommitsIt")(lambda d: None)
-
 
 case("LC-20", needs="jvm:DeveloperUatTest.aRestartGivenUpOnAHostStillStartingSaysItMayNotHaveRestarted,DeveloperUatTest.restartedTheInstanceSaysDone,AppLanguageUatTest.aLanguageChangedWhileTheHostStaysStartingSaysItMayNotHaveRestarted")(lambda d: None)
 
@@ -547,3 +545,5 @@ def lc34(d):
     check(not row, f"键盘上方还有「{row}」")
     check(end == "你", f"最后框里「{end}」")
     return f"「{before}」发出，再打「{t.get('text')}」→「{end}」"
+
+case("LC-35", needs="jvm:HostCasesUatTest.aCharacterNotCommittedIsPutInWhenTheKeyboardGoes、KeyHandwritingUatTest.theKeyboardHiddenAndShownAgainStillWrites")(lambda d: None)

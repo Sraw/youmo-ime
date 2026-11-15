@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.im
 
+import android.os.Bundle
+import android.view.View
+import androidx.navigation.fragment.findNavController
 import androidx.preference.PreferenceScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -36,9 +39,23 @@ class InputMethodConfigFragment : HostPreferenceFragment() {
             // options the app has no page for: none shown (HostPreferenceFragment says so)
             ?: preferenceManager.createPreferenceScreen(requireContext())
 
-    override suspend fun obtainConfig(fcitx: HostApi) = fcitx.imOptions(args.uniqueName)
+    // 0.6.0's 手写 page, its route restored (a back stack saved before): 通用输入 in its place, its options neither read nor written
+    private val retired get() = SettingsRoute.now(args) != args
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        if (retired) {
+            view.post {
+                findNavController().popBackStack()
+                findNavController().navigateWithAnim(SettingsRoute.now(args))
+            }
+        }
+    }
+
+    override suspend fun obtainConfig(fcitx: HostApi) = if (retired) emptyMap() else fcitx.imOptions(args.uniqueName)
 
     override suspend fun saveConfig(fcitx: HostApi, newConfig: Map<String, String>) {
+        if (retired) return
         // what the page shows alone: the shared options it read may have been changed on the shared page since
         fcitx.setImOptions(args.uniqueName, items?.let { InputMethodSettings.only(it, newConfig) } ?: newConfig)
     }

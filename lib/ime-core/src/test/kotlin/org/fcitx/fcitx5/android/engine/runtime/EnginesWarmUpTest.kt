@@ -85,17 +85,6 @@ class EnginesWarmUpTest : EnginesFixture() {
         assertEquals(1, later.size)
     }
 
-    /** Handwriting reads its sentences by pinyin's words: warmed up for as a pinyin is, off the fcitx thread; it shows no emoji, nor characters by their parts. */
-    @Test
-    fun aFieldStartedInHandwritingWarmsPinyinUp() {
-        val engines = Engines(::load, null, warmUps = warmUps)
-        engines.context(InputMethodCatalog.HANDWRITING, "")
-        assertEquals(emptyList<String>(), loaded)
-        assertEquals(1, later.size)
-        later.single().run()
-        assertEquals(listOf(InputMethodCatalog.PINYIN_DATA), loaded)
-    }
-
     /** What the settings turned off is not shown, so not read either. */
     @Test
     fun emojiAndCharactersByTheirPartsTurnedOffAreNotWarmedUp() {

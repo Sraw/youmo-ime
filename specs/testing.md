@@ -105,7 +105,7 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
   real model (`pinyin.data`); the evaluation is where the real data is judged.
 - 生僻字屏蔽's tests, what each covers (`./gradlew verify` runs the first two, not the third):
   - `RareCharContractTest` (ime-core, small data): 全拼, 双拼, the nine keys, the pinyin glide,
-    strokes (`u`), parts (`u`), 五笔 typed and glided, predictions, handwriting, the user's own word;
+    strokes (`u`), parts (`u`), 五笔 typed and glided, predictions, handwriting over pinyin's keys, the user's own word;
     hold → let through → hold on one `Engines`, with a gate made directly (so even 的 is held) and one
     through the default choice, a character of the basic plane and one beyond it (a surrogate pair).
     Not every `LISTED` method: the other tables, 注音 and the 14/18 keys go through the same session
@@ -113,7 +113,7 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
   - `HeldWordsTest` (ime-core): the gate by code point, the dictionary's words by id, the user's,
     imported words and learned whole phrases (continuations) by text.
   - `RareCharsUatTest` (ime-eval `uatTest`, the real data, minutes): every `LISTED` Chinese method
-    with every group held (注音, 双拼, the 14/18 keys, every table, handwriting), the real table's edges, 五笔's
+    with every group held (注音, 双拼, the 14/18 keys, every table, handwriting over their keys), the real table's edges, 五笔's
     auto-commit, 借手机.
   The levels in tests are `TestCharLevels` (ime-core testFixtures); the app's JVM tests have no APK
   assets and pass them to `RareCharsManager.useLevels`.
@@ -504,7 +504,7 @@ Every key's long press, first and marks on every keyboard is one reviewed table,
 bare text is `AsKey`, a `=` suffix `AsIs`, `#N` `Keypad(N)`, `@action` an `Action`, the row and the symbols split by `|`.
 The boards (`board`, as `KeyResolverGoldenTest.boards` names them) are pinyin full, nine, 14, 18, 双拼 nine and 18 (微软),
 English full and nine, a theme's own groups (`theme-k18`: the k17-motion example's `layouts/k18.xml`), both 注音,
-handwriting, the number pad, the symbol picker, emoji, kaomoji, emoji search and the expanded candidates; the states
+the number pad, the symbol picker, emoji, kaomoji, emoji search and the expanded candidates; the states
 `default`, `shift`, `zh` (Chinese punctuation) and `roots` (a table's roots).
 
 - Made once: before the resolver, a throwaway export test on the old code wrote what each key did then,

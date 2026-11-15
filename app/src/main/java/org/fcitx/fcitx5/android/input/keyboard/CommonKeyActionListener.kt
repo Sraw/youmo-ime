@@ -214,30 +214,20 @@ class CommonKeyActionListener :
                 // as the address keys are: through the engine a digit would pick a candidate, _ be ——
                 is HostKeyAction -> {
                     val address = service.inAddressField
-                    val n = EngineState.keySent()
                     typeOrSend(keyAsIs(action.act, address, EngineState::shuangpinScheme)) {
-                        EngineState.keyTaken(n)
                         sendKey(action.act, action.states.states, action.code)
                     }
                 }
                 // a keypad's too: through the engine KP_1 is 1, which picks a candidate
                 is SymAction -> {
                     val address = service.inAddressField
-                    val n = EngineState.keySent()
                     typeOrSend(symAsIs(action.sym.sym, address, EngineState::shuangpinScheme)) {
-                        EngineState.keyTaken(n)
                         sendKey(action.sym, action.states)
                     }
                 }
                 is CommitAction -> service.commitOverEngine(action.text, action.replacing, voice = action.voice)
                 // the engine sends the key that commits its word, carrying the glide, itself (HostApi.offerGlide)
-                is GlideAction -> {
-                    val n = EngineState.keySent()
-                    service.postFcitxJob {
-                        EngineState.keyTaken(n)
-                        offerGlide(action.glide)
-                    }
-                }
+                is GlideAction -> service.postFcitxJob { offerGlide(action.glide) }
                 // the field's own commands after what is typed is in, on the main thread where its editor is
                 is ShortcutAction -> when (val command = (action.shortcut as? KeyShortcut.Command)?.command) {
                     // 清除 drops what is typed, committing nothing; 恢复 leaves it be. The field's then, as
@@ -331,11 +321,11 @@ class CommonKeyActionListener :
                         // the engine first forgets what it committed, maybe deleted with the
                         // selection: the cursor reports of both are predicted and bring no Context
                         BackspaceSwipeBehavior.ReleaseEffect.DeleteSelection -> {
-                            service.postFcitxJob { reset() }
+                            service.postFcitxJob { reset(drop = true) }
                             service.deleteSelection()
                         }
                         BackspaceSwipeBehavior.ReleaseEffect.ResetComposition ->
-                            service.postFcitxJob { reset() }
+                            service.postFcitxJob { reset(drop = true) }
                         BackspaceSwipeBehavior.ReleaseEffect.None -> {}
                     }
                 }

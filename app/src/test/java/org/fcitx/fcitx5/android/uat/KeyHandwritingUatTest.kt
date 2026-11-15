@@ -4,21 +4,27 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.graphics.Rect
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
+import android.view.MotionEvent
 import android.view.accessibility.AccessibilityManager
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
+import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
@@ -41,11 +47,11 @@ import org.robolectric.annotation.GraphicsMode
 import org.fcitx.fcitx5.android.until as waitUntil
 
 /**
- * The keyboard's half of 键盘手写 (design 060-kbd-handwriting, S3): a stroke drawn over the letters is put
- * on the keyboard's pad, read, and offered as the input method's own handwriting (offerInk onKeys), no key
- * pressed; the piece finished at the pause; a tap just before taken back as its first dot (its letter
- * deleted by the engine, the first reading marked takesBack, no backspace sent); ⌫ takes a stroke back; space commits the piece. Not in a password, not in English, not while
- * TalkBack explores by touch. What the engine does with it is InkOver's (ime-core).
+ * The keyboard's half of the toolbar's 手写 (061-handwriting-toolbar): while it is on, a stroke or a tap over the
+ * letters (Shift too) is put on the keyboard's pad, read, and offered as the input method's handwriting
+ * (offerInk), no key pressed; the piece finished at the pause; ⌫ takes a stroke back; space commits the piece.
+ * Not in a password, not in English, not in quick input, not while TalkBack explores by touch; URL and email
+ * fields are written on. What the engine does with it is InkOver's (ime-core).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -70,14 +76,12 @@ class KeyHandwritingUatTest {
 
     @After
     fun close() {
-        // whatever a test left the engine's answer at: not typed, as a fresh process starts
-        EngineState.keysTypedState.value = EngineState.KeysTyped(EngineState.keysTyped.value.answer + 1, false)
         shared.reader = reader
         open?.close()
     }
 
     private fun harness(im: InputMethodEntry = KeyboardHarness.PINYIN, keyboards: ImKeyboards.Chosen? = null): KeyboardHarness {
-        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Handwriting)
+        prefs.set(AppPrefs.getInstance().internal.handwritingOpen, true)
         return KeyboardHarness(im = im, keyboards = keyboards).also { open = it }.start()
     }
 
@@ -98,10 +102,11 @@ class KeyHandwritingUatTest {
         h.drag(k, b.exactCenterX(), b.exactCenterY(), steps = 1)
     }
 
-    private fun inks() = h.api.calls.filter { it.startsWith("offerInk(") && ", keys," in it }
+    private fun inks() = h.api.calls.filter { it.startsWith("offerInk(") }
     private fun keysSent() = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
     private val backspace = "sym=${FcitxKeyMapping.FcitxKey_BackSpace},"
 
+    @Uat("HW-32", "HW-41")
     @Test
     fun aStrokeOnTheLettersIsReadAsTheInputMethodsHandwritingNoKeyPressed() {
         harness()
@@ -113,11 +118,11 @@ class KeyHandwritingUatTest {
         assertTrue("ink shown", board().keyInkForTest!!.shown)
         // the pause: the piece finished
         h.advance(1500)
-        until("finished") { h.api.calls.any { it.startsWith("inkFinished(") && ", keys" in it } }
+        until("finished") { h.api.calls.any { it.startsWith("inkFinished(") } }
         assertEquals(0, board().keyInkForTest!!.pad.finished.size)
     }
 
-    @Uat("HW-34")
+    @Uat("HW-34", "HW-42")
     @Test
     fun whileWritingATapIsAStrokeBackspaceTakesOneBackAndSpaceCommits() {
         harness()
@@ -133,86 +138,6 @@ class KeyHandwritingUatTest {
         assertEquals("wiped", 0, board().keyInkForTest!!.pad.finished.size)
     }
 
-    @Test
-    fun aTapThenAStrokeWithinThePauseTakesTheTapBackAsTheFirstDot() {
-        harness()
-        touchTap(h.key("d"))
-        assertTrue(keysSent().toString(), keysSent().isNotEmpty())
-        h.api.calls.clear()
-        draw(h.key("t"))
-        until("read") { inks().isNotEmpty() }
-        // the engine deletes the letter, if that tap alone is typed (InkOver): no backspace from here
-        assertEquals(keysSent().toString(), 0, keysSent().count { backspace in it })
-        assertTrue(inks().toString(), ", takesBack" in inks().first())
-        assertTrue(inks().toString(), inks().drop(1).none { ", takesBack" in it })
-        assertEquals("the dot, then the stroke", 2, board().keyInkForTest!!.pad.finished.size)
-    }
-
-    // the number the gesture takes for a tap (EngineState.nextKey, told just before its key is sent) is the one the
-    // key's job hands the engine's answers as it is taken on the fcitx thread: else the keyboard reads an answer to
-    // this tap as one from before it, or the other way round
-    @Test
-    fun aTapsKeyIsTakenUnderTheNumberTheGestureTookForIt() {
-        harness()
-        val n = EngineState.nextKey()
-        touchTap(h.key("d"))
-        until("taken") { EngineState.keysHeard >= n }
-        assertEquals(n, EngineState.keysHeard)
-    }
-
-    // design 060-kbd-handwriting-start: a tap dragged a little while typing is the key's, no writing started
-    @Uat("HW-38")
-    @Test
-    fun aTapDraggedUnderHalfAKeyTypesItsLetter() {
-        harness()
-        h.api.calls.clear()
-        val n = h.key("n")
-        val b = h.box(n)
-        h.drag(n, b.exactCenterX() + 0.4f * b.width(), b.exactCenterY(), steps = 2)
-        h.advance(100)
-        h.idle()
-        assertEquals(emptyList<String>(), inks())
-        assertTrue(h.api.calls.toString(), keysSent().isNotEmpty())
-        assertFalse("no writing", board().keyInkForTest!!.shown)
-    }
-
-    @Uat("HW-38")
-    @Test
-    fun theSecondLetterDraggedFarFromTheFirstIsTypedNotTakingItBack() {
-        harness()
-        h.api.calls.clear()
-        touchTap(h.key("w"))
-        // o, seven keys off w: no dot character's second stroke
-        draw(h.key("o"), across = 0f, down = 0.6f)
-        h.advance(100)
-        h.idle()
-        assertEquals(emptyList<String>(), inks())
-        assertEquals(h.api.calls.toString(), 2, keysSent().size)
-    }
-
-    @Uat("HW-38")
-    @Test
-    fun noWritingStartsRightAfterAKeyTypedOnlyHalfASecondOn() {
-        harness()
-        touchTap(h.keys().first { it.description?.let { d -> d == "Space" || d.startsWith("Space,") } == true })
-        h.api.calls.clear()
-        draw(h.key("t"), down = 1f)
-        h.advance(100)
-        h.idle()
-        assertEquals(emptyList<String>(), inks())
-        h.advance(600)
-        draw(h.key("t"))
-        until("read") { inks().isNotEmpty() }
-    }
-
-    @Test
-    fun aStrokeWithNoTapBeforeTakesNothingBack() {
-        harness()
-        draw(h.key("t"))
-        until("read") { inks().isNotEmpty() }
-        assertTrue(inks().toString(), inks().none { ", takesBack" in it })
-    }
-
     @Uat("HW-37")
     @Test
     fun englishKeysGoStraightOnTheRecognizerNotMade() {
@@ -221,23 +146,6 @@ class KeyHandwritingUatTest {
         h.tap(h.describedKey("Backspace"))
         assertFalse("not written on", board().keyInkForTest!!.writtenOn)
         assertEquals(keysSent().toString(), 2, keysSent().size)
-    }
-
-    @Test
-    fun pinyinTypedAStrokeIsNoWriting() {
-        harness()
-        touchTap(h.key("d"))
-        // the engine answered: its own input typed
-        EngineState.keysTypedState.value =
-            EngineState.KeysTyped(EngineState.keysTyped.value.answer + 1, true)
-        h.idle()
-        h.advance(1500)
-        h.api.calls.clear()
-        draw(h.key("t"))
-        h.advance(100)
-        // the reads run on the recognizer's own thread: drained, so a read let through lands before this
-        h.idle()
-        assertEquals(emptyList<String>(), inks())
     }
 
     // one reading only (人): the keyboards a stroke of one reading is written on
@@ -279,7 +187,7 @@ class KeyHandwritingUatTest {
         }
     }
 
-    @Uat("HW-36")
+    @Uat("HW-36", "HW-44")
     @Test
     fun theOtherKeyboardsAreWrittenOnToo() = onEach(
         listOf(
@@ -306,6 +214,18 @@ class KeyHandwritingUatTest {
                 assertTrue(KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)?.keyInkForTest != null)
                 h.key("ㄅ")
             },
+            Board("双拼's 26 keys") {
+                harness(InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false))
+                assertTrue(KeyboardHarness.find<TextKeyboard>(h.keyboard) != null)
+                h.key("t")
+            },
+            Board("the 18 keys") {
+                prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys18)
+                oneReading()
+                harness()
+                assertTrue(KeyboardHarness.find<GroupedKeyboard>(h.keyboard) != null)
+                h.key("BN")
+            },
             Board("the zhuyin nine keys") {
                 prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.ZhuyinNine)
                 oneReading()
@@ -316,9 +236,35 @@ class KeyHandwritingUatTest {
         ),
     ) { until("read") { inks().isNotEmpty() } }
 
-    @Uat("HW-37", "AX-13")
+    // URL and email fields are written on (061-handwriting-toolbar Q11), as on any other
+    @Uat("HW-37")
     @Test
-    fun notInAPasswordUrlOrEmailFieldNorEnglishNorWhileTalkBackExplores() = onEach(
+    fun urlAndEmailFieldsAreWrittenOn() = onEach(
+        listOf(
+            Board("a URL field") {
+                harness()
+                h.restart(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+                h.idle()
+                h.key("t")
+            },
+            Board("an email field") {
+                harness()
+                h.restart(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+                h.idle()
+                h.key("t")
+            },
+        ),
+    ) { until("read") { inks().isNotEmpty() } }
+
+    private fun quickInput(on: Boolean) {
+        val aux = if (on) FormattedText(arrayOf("快速输入: "), intArrayOf(0), -1) else FormattedText.Empty
+        h.emit(HostEvent.InputPanel(FormattedText.Empty, aux, FormattedText.Empty, quickPhrase = on))
+        h.idle()
+    }
+
+    @Uat("HW-37", "HW-49", "AX-13")
+    @Test
+    fun notInAPasswordFieldNorEnglishNorQuickInputNorWhileTalkBackExplores() = onEach(
         listOf(
             Board("a password field") {
                 harness()
@@ -330,16 +276,9 @@ class KeyHandwritingUatTest {
                 assertTrue(KeyboardHarness.find<TextKeyboard>(h.keyboard) != null)
                 h.key("t")
             },
-            Board("a URL field") {
+            Board("quick input") {
                 harness()
-                h.restart(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
-                h.idle()
-                h.key("t")
-            },
-            Board("an email field") {
-                harness()
-                h.restart(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
-                h.idle()
+                quickInput(true)
                 h.key("t")
             },
             Board("TalkBack exploring by touch") {
@@ -355,6 +294,7 @@ class KeyHandwritingUatTest {
         assertEquals(emptyList<String>(), inks())
     }
 
+    @Uat("HW-32", "HW-50")
     @Test
     fun aShortSwipeIsAStrokeNotTheKeysCorner() {
         harness()
@@ -365,21 +305,248 @@ class KeyHandwritingUatTest {
         assertEquals(emptyList<String>(), keysSent())
     }
 
+    // Shift is part of the letter area (Q13); ⌫ stays a key
+    @Uat("HW-43")
     @Test
-    fun aShortSwipeWhileTypingIsTheKeysCorner() {
+    fun shiftIsWrittenOn() {
         harness()
-        touchTap(h.key("n"))
-        // the engine answered: its own input typed
-        EngineState.keysTypedState.value =
-            EngineState.KeysTyped(EngineState.keysTyped.value.answer + 1, true)
-        h.idle()
-        h.advance(1500)
         h.api.calls.clear()
-        // typing: a short swipe down on w is w's corner symbol, not a stroke
-        draw(h.key("w"), down = 0.6f)
-        h.advance(100)
+        draw(h.describedKey("Shift"), down = -0.5f)
+        until("read") { inks().isNotEmpty() }
+        assertEquals(emptyList<String>(), keysSent())
+        // a tap on it a dot written, the case as it was
+        val case = h.describedKey("Shift").state
+        val strokes = board().keyInkForTest!!.pad.finished.size
+        touchTap(h.describedKey("Shift"))
+        h.idle()
+        assertEquals(strokes + 1, board().keyInkForTest!!.pad.finished.size)
+        assertEquals(case, h.describedKey("Shift").state)
+        assertEquals(emptyList<String>(), keysSent())
+    }
+
+    // the keys round the letters are keys (，), and a stroke that starts on the letters is a stroke wherever it goes:
+    // across space it types no space
+    @Uat("HW-43")
+    @Test
+    fun theCommaIsAKeyAndAStrokeAcrossSpaceTypesNoSpace() {
+        harness()
+        h.api.calls.clear()
+        touchTap(h.keyNamed("comma"))
+        h.idle()
+        assertEquals(h.api.calls.toString(), 1, keysSent().size)
+        assertEquals(emptyList<String>(), inks())
+        assertFalse(board().keyInkForTest!!.writtenOn)
+        h.api.calls.clear()
+        val v = h.box(h.key("v"))
+        val space = h.box(h.keyNamed("space"))
+        draw(h.key("v"), down = (space.exactCenterY() - v.exactCenterY()) / v.height())
+        until("read") { inks().isNotEmpty() }
+        assertEquals(emptyList<String>(), keysSent())
+    }
+
+    // pointers [points] (id, x, y in the window) as a device sends them to the input view, [action] of pointer [index]
+    private fun fingers(action: Int, index: Int, downAt: Long, vararg points: Triple<Int, Float, Float>) {
+        val root = IntArray(2).also(h.inputView::getLocationInWindow)
+        val props = points.map { p -> MotionEvent.PointerProperties().apply { id = p.first; toolType = MotionEvent.TOOL_TYPE_FINGER } }
+        val coords = points.map { p -> MotionEvent.PointerCoords().apply { x = p.second - root[0]; y = p.third - root[1]; pressure = 1f; size = 1f } }
+        val masked = if (points.size > 1 && action != MotionEvent.ACTION_MOVE) action or (index shl MotionEvent.ACTION_POINTER_INDEX_SHIFT) else action
+        val e = MotionEvent.obtain(downAt, SystemClock.uptimeMillis(), masked, points.size, props.toTypedArray(), coords.toTypedArray(), 0, 0, 1f, 1f, 0, 0, 0, 0)
+        h.inputView.dispatchTouchEvent(e)
+        e.recycle()
+        h.advance(16)
+    }
+
+    // a thumb resting on the letters while another finger writes (061-handwriting-toolbar §9: a second finger is
+    // not heard; down again after a lift is the next stroke, as 0.6.0's pad had it): each stroke of the writing
+    // finger is one, the thumb's moves no ink and its lifting no stroke
+    @Uat("HW-53")
+    @Test
+    fun aFingerRestingThroughSeveralStrokesIsNoInk() {
+        harness()
+        h.api.calls.clear()
+        val t = h.box(h.key("t"))
+        val g = h.box(h.key("g"))
+        val m = h.box(h.key("m"))
+        val pad = board().keyInkForTest!!.pad
+        val downAt = SystemClock.uptimeMillis()
+        fun pen(x: Float, y: Float) = Triple(0, x, y)
+        fun thumb(dx: Float = 0f) = Triple(1, m.exactCenterX() + dx, m.exactCenterY())
+        fingers(MotionEvent.ACTION_DOWN, 0, downAt, pen(t.exactCenterX(), t.exactCenterY()))
+        fingers(MotionEvent.ACTION_POINTER_DOWN, 1, downAt, pen(t.exactCenterX(), t.exactCenterY()), thumb())
+        for (i in 1..6) fingers(MotionEvent.ACTION_MOVE, 0, downAt, pen(t.exactCenterX(), t.exactCenterY() + i * t.height() / 6f), thumb(i.toFloat()))
+        fingers(MotionEvent.ACTION_POINTER_UP, 0, downAt, pen(t.exactCenterX(), t.bottom.toFloat()), thumb(6f))
+        assertEquals(1, pad.finished.size)
+        // down again while the thumb rests
+        fingers(MotionEvent.ACTION_POINTER_DOWN, 0, downAt, pen(g.exactCenterX(), g.exactCenterY()), thumb(6f))
+        for (i in 1..6) fingers(MotionEvent.ACTION_MOVE, 0, downAt, pen(g.exactCenterX() + i * g.width() / 6f, g.exactCenterY()), thumb(8f))
+        fingers(MotionEvent.ACTION_POINTER_UP, 0, downAt, pen(g.right.toFloat(), g.exactCenterY()), thumb(8f))
+        assertEquals(2, pad.finished.size)
+        // each stroke where the pen was, not the thumb
+        val kb = h.box(board())
+        for ((stroke, key) in pad.finished.zip(listOf(t, g))) {
+            assertTrue("${stroke.toList().take(2)} in $key", key.contains((stroke[0] + kb.left).toInt(), (stroke[1] + kb.top).toInt()))
+        }
+        fingers(MotionEvent.ACTION_UP, 0, downAt, thumb(8f))
+        assertEquals(2, pad.finished.size)
+        assertEquals(emptyList<String>(), keysSent())
+    }
+
+    // a thumb holding a key that is no letter (space) while another finger writes: the letters only write, so each
+    // stroke is one and no key is typed, the space's either (let go of as the first stroke starts)
+    @Uat("HW-53")
+    @Test
+    fun aThumbHoldingSpaceLetsTheLettersBeWrittenOn() {
+        harness()
+        h.api.calls.clear()
+        val t = h.box(h.key("t"))
+        val g = h.box(h.key("g"))
+        val space = h.box(h.keyNamed("space"))
+        val pad = board().keyInkForTest!!.pad
+        val downAt = SystemClock.uptimeMillis()
+        fun thumb(dx: Float = 0f) = Triple(0, space.exactCenterX() + dx, space.exactCenterY())
+        fun pen(x: Float, y: Float) = Triple(1, x, y)
+        fingers(MotionEvent.ACTION_DOWN, 0, downAt, thumb())
+        fingers(MotionEvent.ACTION_POINTER_DOWN, 1, downAt, thumb(), pen(t.exactCenterX(), t.exactCenterY()))
+        for (i in 1..6) fingers(MotionEvent.ACTION_MOVE, 0, downAt, thumb(1f), pen(t.exactCenterX(), t.exactCenterY() + i * t.height() / 6f))
+        fingers(MotionEvent.ACTION_POINTER_UP, 1, downAt, thumb(1f), pen(t.exactCenterX(), t.bottom.toFloat()))
+        assertEquals(1, pad.finished.size)
+        fingers(MotionEvent.ACTION_POINTER_DOWN, 1, downAt, thumb(1f), pen(g.exactCenterX(), g.exactCenterY()))
+        for (i in 1..6) fingers(MotionEvent.ACTION_MOVE, 0, downAt, thumb(2f), pen(g.exactCenterX() + i * g.width() / 6f, g.exactCenterY()))
+        fingers(MotionEvent.ACTION_POINTER_UP, 1, downAt, thumb(2f), pen(g.right.toFloat(), g.exactCenterY()))
+        fingers(MotionEvent.ACTION_UP, 0, downAt, thumb(2f))
+        h.idle()
+        assertEquals(2, pad.finished.size)
+        assertEquals(emptyList<String>(), keysSent())
+    }
+
+    // ⌫ taking a stroke back times the pause again (KeyInk.undo): what is left is not finished before the one taken
+    // back can be written again
+    @Uat("HW-06")
+    @Test
+    fun backspaceTimesThePauseAgain() {
+        harness()
+        val pause = AppPrefs.getInstance().keyboard.handwritingPause.getValue().millis
+        fun finished() = h.api.calls.count { it.startsWith("inkFinished(") }
+        draw(h.key("t"))
+        draw(h.key("g"))
+        until("read") { inks().isNotEmpty() }
+        h.advance(pause * 6 / 10)
+        h.tap(h.describedKey("Backspace"))
+        until("taken back") { board().keyInkForTest!!.pad.finished.size == 1 }
+        h.advance(pause * 6 / 10)
+        assertEquals("timed again from ⌫", 0, finished())
+        h.advance(pause * 5 / 10)
+        until("finished") { finished() == 1 }
+    }
+
+    // quick input over, the letters are written on again
+    @Uat("HW-49", "QU-12")
+    @Test
+    fun outOfQuickInputTheLettersAreWrittenOnAgain() {
+        harness()
+        quickInput(true)
+        touchTap(h.key("t"))
+        h.idle()
+        assertTrue(h.api.calls.toString(), keysSent().isNotEmpty())
+        quickInput(false)
+        h.api.calls.clear()
+        draw(h.key("t"))
+        until("read") { inks().isNotEmpty() }
+    }
+
+    // turned off, the letters are typed again
+    @Uat("HW-41")
+    @Test
+    fun turnedOffTheLettersAreTyped() {
+        harness()
+        prefs.set(AppPrefs.getInstance().internal.handwritingOpen, false)
+        h.idle()
+        h.api.calls.clear()
+        touchTap(h.key("q"))
         h.idle()
         assertEquals(emptyList<String>(), inks())
         assertTrue(h.api.calls.toString(), keysSent().isNotEmpty())
     }
+
+    // kept across input methods (§15): English types its letters, no 手写 on its bar (Q3); back in pinyin it writes
+    @Uat("HW-44", "HW-47")
+    @Test
+    fun anotherInputMethodAndBackTheToggleIsKept() {
+        harness()
+        // 123 and back: the letters still written on
+        h.tap(h.key("123"))
+        h.tap(h.key(h.service.getString(R.string.picker_back)))
+        h.api.calls.clear()
+        draw(h.key("t"))
+        until("read after 123") { inks().isNotEmpty() }
+        h.after(2_000)
+        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
+        assertFalse("no 手写 in English", toolbarHandwritingShown())
+        h.api.calls.clear()
+        touchTap(h.key("q"))
+        h.idle()
+        assertEquals(emptyList<String>(), inks())
+        assertTrue(h.api.calls.toString(), keysSent().isNotEmpty())
+        h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
+        assertTrue(AppPrefs.getInstance().internal.handwritingOpen.getValue())
+        h.api.calls.clear()
+        draw(h.key("t"))
+        until("read") { inks().isNotEmpty() }
+    }
+
+    // remembered (Q1): the keyboard hidden and shown again, or its view made anew, still writes
+    @Uat("HW-48", "LC-35")
+    @Test
+    fun theKeyboardHiddenAndShownAgainStillWrites() {
+        harness()
+        h.hide()
+        h.restart()
+        h.api.calls.clear()
+        draw(h.key("t"))
+        until("read") { inks().isNotEmpty() }
+        h.recreate()
+        h.api.calls.clear()
+        draw(h.key("t"))
+        until("read again") { inks().isNotEmpty() }
+    }
+
+    // while it writes, a finger over the letters is a stroke, not a glide (滑行输入 waits); turned off, a glide again
+    @Uat("HW-50")
+    @Test
+    fun glideTypingWaitsWhileHandwritingIsOn() {
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
+        harness()
+        val end = h.box(h.key("p"))
+        h.api.calls.clear()
+        h.drag(h.key("t"), end.exactCenterX(), end.exactCenterY())
+        until("read") { inks().isNotEmpty() }
+        assertFalse("no glide: ${h.api.calls}", "offerGlide" in h.api.calls)
+        h.after(2_000)
+        prefs.set(AppPrefs.getInstance().internal.handwritingOpen, false)
+        h.idle()
+        h.api.calls.clear()
+        h.drag(h.key("t"), end.exactCenterX(), end.exactCenterY())
+        h.idle()
+        assertEquals(emptyList<String>(), inks())
+        assertTrue("glided: ${h.api.calls}", "offerGlide" in h.api.calls)
+    }
+
+    // landscape's split keyboard: a stroke may start in the gap between its halves
+    @Uat("HW-52")
+    @Test
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    fun aStrokeStartsInTheSplitGap() {
+        harness()
+        val t = h.box(h.keysLabelled("t").first())
+        val y = h.box(h.keysLabelled("y").last())
+        assertTrue("split: $t $y", y.left - t.right > t.width())
+        val gap = Rect(t.right + t.width() / 4, t.top, y.left - t.width() / 4, t.bottom)
+        h.api.calls.clear()
+        h.drag(gap, gap.exactCenterX(), gap.exactCenterY() + 2 * t.height())
+        until("read") { inks().isNotEmpty() }
+        assertEquals(emptyList<String>(), keysSent())
+    }
+
+    private fun toolbarHandwritingShown() = KeyboardHarness.all(h.inputView).filterIsInstance<ToolButton>()
+        .any { h.shown(it) && it.contentDescription == h.service.getString(R.string.handwriting) }
 }

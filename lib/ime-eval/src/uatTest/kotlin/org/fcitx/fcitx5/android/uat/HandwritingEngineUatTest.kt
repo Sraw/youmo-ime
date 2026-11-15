@@ -28,11 +28,11 @@ class HandwritingEngineUatTest {
     private val ren = arrayOf("人", "入", "八")
     private val wo = arrayOf("我", "找", "伐")
 
-    private fun replay() = EngineReplay(im = InputMethodCatalog.HANDWRITING)
+    private fun replay() = EngineReplay(im = InputMethodCatalog.PINYIN)
 
     @Test
     @Uat("HW-03")
-    fun spaceCommitsTheSentenceWritten() = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+    fun spaceCommitsTheSentenceWritten() = with(HostReplay(im = InputMethodCatalog.PINYIN)) {
         write(*da)
         write(*ren)
         space()
@@ -44,11 +44,12 @@ class HandwritingEngineUatTest {
     // shows traditional at the toggle, with nothing more written; it goes in as shown
     @Test
     @Uat("HW-26")
-    fun aCharacterNotYetInIsShownTraditionalAtTheToggle() = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+    fun aCharacterNotYetInIsShownTraditionalAtTheToggle() = with(HostReplay(im = InputMethodCatalog.PINYIN)) {
+        // written over pinyin: the sentence is pinyin's code, on the code row (the app may write it in the field)
         write("国", "图", "固")
-        assertEquals("国", clientPreedit)
+        assertEquals("国", preedit)
         toggle("chttrans")
-        assertEquals("國", clientPreedit)
+        assertEquals("國", preedit)
         space()
         assertEquals("國", text)
     }
@@ -154,11 +155,11 @@ class HandwritingEngineUatTest {
 
     private fun card(vararg written: String): CharCard = cards.getOrPut(written.toList()) { cardOf(*written) }
 
-    private fun cardOf(vararg written: String): CharCard = with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+    private fun cardOf(vararg written: String): CharCard = with(HostReplay(im = InputMethodCatalog.PINYIN)) {
         write(*written)
         val i = candidates.indexOf(written[0])
         check(i >= 0) { "${written[0]} not among $candidates" }
-        checkNotNull((engines.card(InputMethodCatalog.HANDWRITING, i, written[0]) as? CandidateCard.Looked)?.card)
+        checkNotNull((engines.card(InputMethodCatalog.PINYIN, i, written[0]) as? CandidateCard.Looked)?.card)
     }
 
     // a reading's words a dictionary's, not the model's others: 荣和, 去呢, 弦数 are two words run together (the user, 2026-11-02)
@@ -266,10 +267,10 @@ class HandwritingEngineUatTest {
         assertEquals("huo", card("和", "口").readings.last().pinyin)
         assertEquals(listOf("tóu", "tou"), card("头", "口").readings.map { it.pinyin })
         // and so through the engine: handwriting's 头 one reading
-        with(HostReplay(im = InputMethodCatalog.HANDWRITING)) {
+        with(HostReplay(im = InputMethodCatalog.PINYIN)) {
             engines.settings = engines.settings.copy(candidateReading = ReadingStyle.PINYIN)
             write("头", "口")
-            assertEquals(listOf("tóu"), engines.candidates(InputMethodCatalog.HANDWRITING, 0, 1).single().readings)
+            assertEquals(listOf("tóu"), engines.candidates(InputMethodCatalog.PINYIN, 0, 1).single().readings)
         }
     }
 

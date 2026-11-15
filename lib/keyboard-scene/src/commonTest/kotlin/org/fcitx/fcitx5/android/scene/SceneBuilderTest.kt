@@ -139,7 +139,7 @@ class SceneBuilderTest {
     fun keysAreReadAsTheyWere() {
         fun keys(board: String, env: Env = Forms.env(board, Forms.block)) = Forms.scene(board, env).keys.associateBy { it.id }
         val rime = Forms.block.copy(texts = Forms.texts.copy(imeName = "Rime"))
-        for (board in listOf("qwerty", "nine", "k14", "zhuyin", "handwriting")) {
+        for (board in listOf("qwerty", "nine", "k14", "zhuyin")) {
             assertEquals("空格，${Forms.env(board, Forms.block).texts.imeName}", keys(board).getValue("space").a11y, board)
             val named = Forms.env(board, rime).let { it.copy(texts = it.texts.copy(imeName = "Rime")) }
             assertEquals("空格，Rime", keys(board, named).getValue("space").a11y, "$board: a Latin name is not spelt")

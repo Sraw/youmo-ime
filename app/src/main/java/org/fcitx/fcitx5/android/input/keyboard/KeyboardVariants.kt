@@ -43,5 +43,5 @@ object KeyboardVariants {
 
     /** Whether [im] on a keyboard of [form] is 双拼's: 注音's and 手写's keyboards are theirs whatever types. */
     fun isShuangpin(form: Form, im: String): Boolean =
-        form != Form.ZhuyinFull && form != Form.ZhuyinNine && form != Form.Handwriting && im.substringBefore('#') == InputMethodCatalog.SHUANGPIN
+        form != Form.ZhuyinFull && form != Form.ZhuyinNine && im.substringBefore('#') == InputMethodCatalog.SHUANGPIN
 }

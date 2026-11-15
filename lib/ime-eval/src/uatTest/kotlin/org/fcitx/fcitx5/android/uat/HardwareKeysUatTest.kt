@@ -85,7 +85,7 @@ class HardwareKeysUatTest {
 
     @Test
     @Uat("HK-21")
-    fun returnPutsTheWrittenInThenGoesToTheApp() = with(EngineReplay(im = InputMethodCatalog.HANDWRITING)) {
+    fun returnPutsTheWrittenInThenGoesToTheApp() = with(EngineReplay(im = InputMethodCatalog.PINYIN)) {
         write("人", "入", "八")
         expectPreedit("人")
         pressKey(EngineReplay.RETURN)
@@ -95,6 +95,17 @@ class HardwareKeysUatTest {
         // then the app's: the chat sends it
         pressKey(EngineReplay.RETURN)
         expectText("人\n")
+    }
+
+    // written on the letters (the toolbar's 手写), not yet in: a hardware key puts it in, then is typed
+    @Test
+    @Uat("HK-48")
+    fun aHardwareKeyPutsTheWrittenInThenTypes() = with(EngineReplay(im = InputMethodCatalog.PINYIN)) {
+        write("中", "申", "甲")
+        expectPreedit("中")
+        press("n")
+        expectText("中")
+        expectPreedit("n")
     }
 
     @Test

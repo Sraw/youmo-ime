@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceUi.Levels.Level
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.address.AddressLists
+import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
@@ -59,9 +60,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** The symbol panel's category picked last, by its [org.fcitx.fcitx5.android.input.picker.PickerData.Category.id] (`arrows`); empty, none yet (PAN-29). */
         val symbolPanelCategory = string("symbol_panel_category", "")
 
-        /** The 候选词注音 style last used but off (ReadingStyle's key; empty, none yet): what the handwriting pad's 注 turns on. */
-        val lastCandidateReading = string("last_candidate_reading", "")
-
         /**
          * U-93 「用我的输入习惯」, from the ⋯ menu or the lexicon page: off, the engine as installed but
          * for the blocks (Engines.useHabits), nothing learned, nothing shown of what was.
@@ -98,6 +96,30 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /** Whether [resetHiddenSettings] ran: on the first start of a version with it, and so once. */
         val hiddenSettingsReset = bool("hidden_settings_reset", false)
+
+        /**
+         * Whether the toolbar's 手写 is on (061-handwriting-toolbar §3.4, the user's Q1): the letters written on
+         * in every input method that writes (HandwritingMode), till the button is tapped again; kept across
+         * keyboards, input methods and restarts. On for a user whose first input method was 0.6.0's 手写
+         * (KotlinHost.retireHandwriting).
+         */
+        val handwritingOpen = bool("handwriting_open", false)
+
+        /**
+         * Whether 0.6.0's 手写 input method was moved onto the toolbar (KotlinHost.retireHandwriting): the toolbar's
+         * 手写 pinned and turned on once, though the profile could not be written back. Not a 0.6.0 backup's, so one
+         * restored is moved again.
+         */
+        val handwritingRetired = bool("handwriting_retired", false)
+
+        /**
+         * The notice of that still to be seen ([handwritingRetired]): what it says besides, KotlinHost's markers
+         * comma-separated, empty for none; kept till it is said on the keyboard.
+         */
+        val handwritingRetiredUnseen = string("handwriting_retired_unseen", "")
+
+        /** Whether 0.6.0's 键盘手写 (在键上划, now 关) is still to be told it is the toolbar's 手写 ([migrateKeyHandwriting]). */
+        val keyHandwritingUnseen = bool("key_handwriting_unseen", false)
 
         /** Whether a zhuyin keyboard has said once that 繁体 is in ⋯ (KeyboardWindow). */
         val zhuyinTraditionalTold = bool("zhuyin_traditional_told", false)
@@ -313,7 +335,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * for what a finger drawn across the keys does ([KeyDrawing], GlideInput): a word glided across
          * its keys in every input method that glides (InputMethodCatalog.glides), a stroke drawn while
          * pinyin is typed that filters its candidates (笔画筛选, InputMethodCatalog.filtersByStrokes),
-         * or nothing. Off till chosen: a fast tap may glide. 0.5's two switches move over ([dropRetired]).
+         * or nothing. Off till chosen: a fast tap may glide. 0.5's two switches move over ([dropRetired]);
+         * 0.6.0's 键盘手写 is the toolbar's 手写 now ([migrateKeyHandwriting]).
          */
         val keyDrawing = stringLike(KEY_DRAWING, ManagedPreference.enumCodec<KeyDrawing>(), KeyDrawing.Off)
 
@@ -331,7 +354,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val urlSuffixes = string("address_url_suffixes", AddressLists.serialize(AddressLists.DEFAULT_URL))
         val rememberAddresses = bool("address_remember", true)
 
-        /** Shown on the handwriting page (InputMethodSettings): how long the pen stays up before a character is done. */
+        /** Shown on the shared page (InputMethodSettings, under 在键上划): how long the pen stays up before a character written on the keys is done. */
         val handwritingPause = stringLike(HANDWRITING_PAUSE, ManagedPreference.enumCodec<HandwritingPause>(), HandwritingPause.Medium)
         val showLangSwitchKey =
             switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
@@ -796,13 +819,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     fun dropRetired() {
         // gone with the old drawing (060-render-p2 S8): 0.6's betas' switch of the redraw, vivo's touch routing to
         // the key views (the scene's keys always take their touches so), and 扩大按键触摸区 (the engine always
-        // gives a key its cell to the edge); and voice_polish, the voice's 整理 switch, gone with it always on;
+        // gives a key its cell to the edge); voice_polish, the voice's 整理 switch, gone with it always on; and
+        // last_candidate_reading, the 注音 style 0.6.0's handwriting pad's 注 key turned back on, gone with the pad;
         // a stored one, of any type, read by nothing
         val stale = RETIRED.filter(sharedPreferences::contains)
         if (stale.isNotEmpty()) sharedPreferences.edit { stale.forEach(::remove) }
         migrateSwipe()
         migrateSwipeSlots()
         migrateKeyDrawing()
+        migrateKeyHandwriting()
         settleMarkPositions()
         migrateKeyLists()
     }
@@ -926,6 +951,31 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     /**
+     * 0.6.0's 在键上划 = 键盘手写 as 关, the toolbar's 手写 pinned for it (061-handwriting-toolbar §6.2): not turned
+     * on, as one that wrote on the keys only now and then would find the letters not typing. The stored name is
+     * read as it is, not through [KeyDrawing], which no longer has it. Told once ([Internal.keyHandwritingUnseen]).
+     */
+    private fun migrateKeyHandwriting() {
+        val stored = runCatching { sharedPreferences.getString(KEY_DRAWING, null) }.getOrNull()
+        if (stored != OLD_KEY_HANDWRITING) return
+        sharedPreferences.edit {
+            putString(KEY_DRAWING, KeyDrawing.Off.name)
+            putBoolean(internal.keyHandwritingUnseen.key, true)
+        }
+        pinHandwriting()
+    }
+
+    /**
+     * The toolbar's 手写 shown first at the bar's right, where the user arranged the bar ([Internal.toolbarButtons]
+     * stored); one never arranged has it so already (ToolbarConfig.DEFAULT).
+     */
+    fun pinHandwriting() {
+        val stored = internal.toolbarButtons.getValue()
+        if (stored.isEmpty()) return
+        internal.toolbarButtons.setValue(ToolbarConfig.parse(stored).withHandwritingPinned().serialize())
+    }
+
+    /**
      * Puts the settings that have no UI back to their defaults ([ManagedPreferenceCategory.hidden]):
      * once, and [again] after an import of the user's data, for what an older version or a backup
      * set there could not be changed back. Every category registered here is reset, ThemePrefs too:
@@ -955,7 +1005,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         // 0.4's: English on the nine keys while 九键's 中/英 had brought it there, gone with the key (I1)
         private const val ENGLISH_ON_NINE_KEYS = "english_on_nine_keys"
-        private val RETIRED = listOf(ENGLISH_ON_NINE_KEYS, "canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area", "voice_polish")
+        private val RETIRED = listOf(
+            ENGLISH_ON_NINE_KEYS, "canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area", "voice_polish", "last_candidate_reading",
+        )
 
         // 0.5's swipe setting, and 0.5.1's that took its place
         private const val SWIPE_SYMBOL_BEHAVIOR = "swipe_symbol_behavior"
@@ -987,6 +1039,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         private const val GLIDE_TYPING = "glide_typing"
         private const val STROKE_FILTER = "stroke_filter"
         const val KEY_DRAWING = "key_drawing"
+
+        // 0.6.0's 在键上划 = 键盘手写, now the toolbar's 手写 (migrateKeyHandwriting)
+        private const val OLD_KEY_HANDWRITING = "Handwriting"
 
         const val AUTO_PAIRS = "auto_pairs"
         const val CALCULATION_REPLACES_SUM = "calculation_replaces_sum"

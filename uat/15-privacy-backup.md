@@ -287,3 +287,27 @@
 - **操作**：打 yinhang，长按「银行」，点读音行，点「行」；清空，再打 yinhang。
 - **预期**：只有读音行，点开词卡、字卡照常，没有屏蔽、固定首位等菜单项；之后打 yinhang「银行」的位置不变（没学）。
 - **JVM**：app `CandidateMenuUatTest.aFieldThatLearnsNothingHasTheCardAndNoLines`；设备上不跑。
+
+### PR-55 [P1] 从 0.6.0 升级：手写在列表第一个
+- **前提**：0.6.0 装着，输入法列表是手写、英文；装 0.6.1 覆盖升级。
+- **操作**：打开键盘；看 **输入法** 列表；看工具栏。
+- **预期**：列表变成拼音、英文（拼音顶替了手写的第一位）；打开键盘时手写已经开着（工具栏的 **手写** 亮着、钉在常驻区），可以接着写；键盘上方提示一次「手写已并入工具栏……拼音顶替了它在输入法列表里的位置」，以后不再提示。
+- **JVM**：`KotlinHostHandwritingTest.zeroSixsHandwritingInputMethodMovesOntoTheToolbarAndTheUserIsToldOnce`（列表、开着、写回的 profile 没有手写、只提示一次）、`HandwritingRetireTest.eachGroupWithoutHandwriting`（ime-core：各种组里去掉手写）；设备上不跑。
+
+### PR-56 [P1] 从 0.6.0 升级：手写不在第一个，在键上划是键盘手写
+- **前提**：0.6.0 装着，列表是拼音、英文、手写，**在键上划** 选了键盘手写；装 0.6.1 覆盖升级。
+- **操作**：打开键盘；看列表、**通用输入 → 在键上划**、工具栏。
+- **预期**：列表是拼音、英文；在键上划变成「关」；手写关着，按钮钉在常驻区；两条提示各一次（列表那条、在键上划那条）。
+- **JVM**：`AppPrefsTest.zeroSixsKeyHandwritingIsOffWithTheToolbarsHandwritingPinned`（键盘手写变成关、要提示；没排过的工具栏和排过的都把手写钉上；滑行输入不动）、`KotlinHostHandwritingTest.zeroSixsHandwritingInputMethodMovesOntoTheToolbarAndTheUserIsToldOnce`、`HandwritingRetireTest.eachGroupWithoutHandwriting`；设备上不跑。
+
+### PR-57 [P1] 恢复 0.6.0 的「备份全部」
+- **前提**：一份 0.6.0 的「备份全部」：列表里有手写（第一个），手写里学过「澜」（选过几次）。
+- **操作**：**备份与恢复 → 从备份恢复** 这一份；应用重启后打开键盘，写「澜」。
+- **预期**：和 PR-55 一样：列表是拼音、英文，手写开着、按钮钉上，提示一次；写「澜」的候选排序和 0.6.0 里一样（学过的手写记录照旧读）。
+- 要 0.6.0 做的备份，在真机或模拟器上手工跑；恢复后每次启动读 profile 时去掉手写，和升级走同一条路（PR-55 的 JVM 测试）。
+
+### PR-58 [P1] 从 0.6.0 升级：手写切成了繁体
+- **前提**：0.6.0 装着，列表是手写、英文，手写里打开了繁体；装 0.6.1 覆盖升级。
+- **操作**：打开键盘（手写开着），写「门」上屏；关掉手写打 men。
+- **预期**：上屏「門」；拼音打 men 也出繁体（拼音顶替了手写的第一位，也接过它的繁体，用户定 Q12）。手写不在第一个时它的繁体没了，提示里说一句「现在写的字跟着所在输入法的简繁」。
+- **JVM**：`KotlinHostHandwritingTest.zeroSixsTraditionalHandwritingIsPinyinsWhereItTookItsPlace`（拼音顶替时繁体给拼音；不在第一个时去掉并在提示里说）、`HandwritingRetireTest.traditionalHandwritingGoesToPinyinWhereItTookHandwritingsPlace`（ime-core）；设备上不跑。

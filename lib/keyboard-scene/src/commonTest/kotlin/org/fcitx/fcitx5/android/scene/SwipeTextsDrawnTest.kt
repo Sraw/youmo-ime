@@ -28,7 +28,7 @@ class SwipeTextsDrawnTest {
     // descender met a mark at 底部, 左下 or 右下
     private val forms: Map<String, Env> = Forms.all + Forms.all.filterValues { !it.landscape }.map { (n, e) -> "$n@360dp" to e.copy(density = NARROW) }
 
-    private val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "symbols", "handwriting")
+    private val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "symbols")
 
     // the character keys (`full/j`); a function key's marks have their own tests (BackspaceMarksTest)
     private fun names(s: Scene) = s.keys.mapNotNull { k -> k.shortcut?.takeIf { !KeyId(it).isFunction }?.let { k to it } }

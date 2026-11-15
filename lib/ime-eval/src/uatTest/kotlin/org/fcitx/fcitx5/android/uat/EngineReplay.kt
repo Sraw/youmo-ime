@@ -333,10 +333,10 @@ class EngineReplay(
      * (best first, as it scores them) offered for the next piece, then the pad's Ink key.
      */
     fun write(vararg readings: String) {
-        val ink = UatEngines.ink(engines, readings.toList(), lastPiece)
+        val ink = UatEngines.ink(engines, im, readings.toList(), lastPiece)
         lastPiece = ink.piece
         key(symOf(Keyboard.INK), virtual = true, payload = ink)
-        engines.inkSent(ink)
+        engines.inkSent(ink, im)
         pause()
     }
 

@@ -307,7 +307,8 @@ class HostCoreContractTest {
             fake.throwOn = { true }
             assertFalse(core.press('i'))
             assertTrue(core.isEmpty())
-            assertEquals("engine-pinyin ${EngineEvent.RESET} 0", fake.calls.last())
+            // dropped, as the panel is: nothing put in (handwriting's written text with the rest)
+            assertEquals("engine-pinyin ${EngineEvent.RESET} ${EngineEvent.RESET_DROP}", fake.calls.last())
             val n = fake.calls.size
             core.press('i')
             // the reset failed too: this time only the key
@@ -550,18 +551,18 @@ class HostCoreContractTest {
     }
 
     @Test
-    fun `a tap no one takes in handwriting's composing text commits it, then resets`() {
+    fun `a tap no one takes in English's composing text commits it, then resets`() {
         // fcitx/inputmethodengine.cpp:46-54 (defaultInvokeActionBehavior), F3788
         val core = core()
         core.open()
-        core.setInputMethods(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.HANDWRITING, ImGroup.KEYBOARD_US))
-        core.setCurrentInputMethod(InputMethodCatalog.HANDWRITING)
+        core.setInputMethods(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH, ImGroup.KEYBOARD_US))
+        core.setCurrentInputMethod(InputMethodCatalog.ENGLISH)
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "你") else snap(handled = false) }
         core.press('a')
         val log = core.log()
         core.moveCursor(0)
         assertTrue("$log ${fake.calls}", HostEvent.Commit("你", -1) in log)
-        assertTrue(fake.calls.toString(), fake.calls.last().startsWith("${InputMethodCatalog.HANDWRITING} ${EngineEvent.RESET} 0"))
+        assertTrue(fake.calls.toString(), fake.calls.last().startsWith("${InputMethodCatalog.ENGLISH} ${EngineEvent.RESET} 0"))
     }
 
     @Test

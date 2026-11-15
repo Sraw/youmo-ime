@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.ReadingSource
@@ -84,7 +83,7 @@ class EnginesVoiceEditsTest : EnginesFixture() {
 
     // the handwriting pad's reading of [piece] offered with its key (EnginesHandwritingTest)
     private fun Engines.write(piece: Int, text: String) = onEvent(
-        HANDWRITING, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(piece, InkReading(listOf(text), DoubleArray(1))),
+        PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(piece, InkReading(listOf(text), DoubleArray(1))),
     )
 
     private fun added(e: Engines) = e.userWords(UserWord.Kind.ADDED).map { it.text }
@@ -219,12 +218,12 @@ class EnginesVoiceEditsTest : EnginesFixture() {
     @Uat("VO-45")
     fun `a word written again on the pad is asked about, read as the characters are`() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
-            e.context(HANDWRITING, "", said = true)
+            e.context(PINYIN, "", said = true)
             e.voiceSaid("我找徐静", "我找徐静", hinted = false)
-            repeat(2) { assertFalse("the app's to delete", e.onEvent(HANDWRITING, EngineEvent.BACKSPACE, 0).handled) }
+            repeat(2) { assertFalse("the app's to delete", e.onEvent(PINYIN, EngineEvent.BACKSPACE, 0).handled) }
             e.write(0, "徐")
             e.write(1, "婧")
-            val commit = e.onEvent(HANDWRITING, EngineEvent.CHAR, ' '.code).commit
+            val commit = e.onEvent(PINYIN, EngineEvent.CHAR, ' '.code).commit
             val ask = e.voicePutIn(commit).ask?.let { e.voiceConfirm("我找$commit", "") }
             assertRows(
                 "written as 徐婧" to { assertEquals("徐婧", commit) },

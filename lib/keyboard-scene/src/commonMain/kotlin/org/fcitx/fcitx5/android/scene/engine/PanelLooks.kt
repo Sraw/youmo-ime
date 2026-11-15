@@ -16,8 +16,8 @@ import org.fcitx.fcitx5.android.scene.theme.Value
  * native parts know the theme's colours and a few properties): the clipboard's entries, the emoji
  * and symbol picker's categories, the editing panel's buttons, the voice mask. What a theme sets
  * is its own, as it says; what it does not, the default rule below, the look the app had worked
- * out itself, so a theme that sets none of it, theme 3.0's among them, looks as it did. The
- * handwriting pad's is the scene's ([Pads]).
+ * out itself, so a theme that sets none of it, theme 3.0's among them, looks as it did. And the ink
+ * of handwriting written over the letters ([pad]).
  *
  * [scenes] are the screen's and the settings' (the window's: what is typed aside).
  */
@@ -104,6 +104,16 @@ class PanelLooks(private val cascades: Cascades) {
         )
     }
 
+    /**
+     * The ink handwriting is written in over the letters (the toolbar's 手写, 061-handwriting-toolbar §7): what
+     * the handwriting pad's style (`handwriting/pad`, theme 3.0's look `letter`) sets, its keyboard gone. [Pad.color]
+     * null where it sets none: the app's, the letters' text unless the colour shows on them (HandwritingMode.inkColor).
+     */
+    fun pad(scenes: Set<String>): Pad {
+        val v = cascades.of(scenes).of(PAD)
+        return Pad(color(v[INK_COLOR]), (v[INK_WIDTH] as? Value.Number)?.number)
+    }
+
     // the keys' corners as the user's 按键圆角 has them, the letters' (WindowLooks.cornerDp's): `@flat` keys' faces are
     // square whatever it says, but what is round about them, their popups and panels, is as round as it
     private fun keyRadius(scenes: Set<String>) = KeyLook(cascades.of(scenes - FLAT).of(KEY), theme).radius
@@ -130,6 +140,9 @@ class PanelLooks(private val cascades: Cascades) {
      * app's of before, of the keys' [keyRadiusDp]; [round] a pill).
      */
     data class Editing(val fill: Argb?, val radiusDp: Double?, val round: Boolean, val keyRadiusDp: Double)
+
+    /** The ink over the letters: its colour and width (dp), null where the theme sets none. */
+    data class Pad(val color: Argb?, val widthDp: Double?)
 
     /** The voice mask: its colour ([fill]), its glass's blur (dp; null the app's own), its microphone's bubble and bars. */
     data class Voice(val fill: Argb, val blurDp: Double?, val micFill: Argb, val micColor: Argb)
@@ -165,6 +178,9 @@ class PanelLooks(private val cascades: Cascades) {
         private const val ACCENT_KEY = "accentKey"
         private const val CLIPBOARD_ENTRY = "clipboardEntry"
         private val CLIPBOARD = Selector.Target("clipboard")
+        private val PAD = Selector.Target("key", "handwriting", "pad", null, setOf("letter"), emptySet(), slot = true)
+        private const val INK_COLOR = "ink-color"
+        private const val INK_WIDTH = "ink-width"
         private val PICKER = Selector.Target("picker")
         private val CATEGORIES = Selector.Target("picker", part = "categories")
         private val CATEGORIES_SELECTED = Selector.Target("picker", states = setOf("selected"), part = "categories")

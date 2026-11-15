@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.bar
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton.Clipboard
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton.CursorMove
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton.Emoji
+import org.fcitx.fcitx5.android.input.bar.ToolbarButton.Handwriting
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton.Hide
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton.Keyboard
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton.More
@@ -32,9 +34,41 @@ class ToolbarConfigTest {
     fun neverSetTheBarIsZeroFoursBar() {
         assertEquals(ToolbarConfig.DEFAULT, ToolbarConfig.parse(""))
         assertEquals(
-            Layout(listOf(Undo, Redo, CursorMove, Clipboard, More), listOf(Emoji, Voice, Hide)),
+            Layout(listOf(Undo, Redo, CursorMove, Clipboard, More), listOf(Emoji, Handwriting, Voice, Hide)),
             ToolbarConfig.DEFAULT.layout(everything)
         )
+    }
+
+    // 061-handwriting-toolbar Q2, Q3: pinned by default, left out where it does not write (English, a password)
+    @Test
+    @Uat("TB-55")
+    fun handwritingIsPinnedByDefaultAndLeftOutWhereItDoesNotWrite() {
+        val none = everything.copy(handwriting = false)
+        assertEquals(listOf(Emoji, Voice, Hide), ToolbarConfig.DEFAULT.layout(none).pinned)
+        // a bar the user set before 0.6.1: it comes in hidden, before the divider
+        val old = ToolbarConfig.parse("undo,|,emoji,voice,hide")
+        assertEquals(Item.Button(Handwriting, false), old.items[old.items.indexOf(Item.Divider) - 1])
+    }
+
+    // 061-handwriting-toolbar §6.3: pinned for one who wrote with 0.6.0's handwriting, once, the user's order kept
+    @Test
+    fun pinningHandwritingPutsItFirstAfterTheDivider() {
+        val old = ToolbarConfig.parse("undo,-redo,|,voice,hide")
+        val pinned = old.withHandwritingPinned()
+        assertEquals(Layout(listOf(Undo, More), listOf(Handwriting, Voice, Hide)), pinned.layout(everything))
+        // shown already and elsewhere: moved, never twice
+        val twice = ToolbarConfig.parse("handwriting,undo,|,voice").withHandwritingPinned()
+        assertEquals(1, twice.items.count { it is Item.Button && it.button == Handwriting })
+        assertEquals(Layout(listOf(Undo, More), listOf(Handwriting, Voice)), twice.layout(everything))
+        assertEquals(pinned, ToolbarConfig.parse(pinned.serialize()))
+    }
+
+    // one made with no divider (parse always puts one in): 手写 pinned at the right alone, the rest on the toolbar
+    @Test
+    fun pinningHandwritingWithNoDividerPutsOneBeforeIt() {
+        val pinned = ToolbarConfig(listOf(Item.Button(Undo, true), Item.Button(Handwriting, true))).withHandwritingPinned()
+        assertEquals(listOf(Item.Button(Undo, true), Item.Divider, Item.Button(Handwriting, true)), pinned.items)
+        assertEquals(Layout(listOf(Undo, More), listOf(Handwriting)), pinned.layout(everything))
     }
 
     @Test
@@ -125,6 +159,7 @@ class ToolbarConfigTest {
     }
 
     @Test
+    @Uat("TB-57")
     fun pinnedOnesWithNoRoomGoOntoTheToolbarInOrderBeforeTheMoreButton() {
         val config = ToolbarConfig.parse("undo,|,emoji,voice,hide,theme")
         assertEquals(Layout(listOf(Undo, More), listOf(Emoji, Voice, Hide, Theme)), config.layout(everything, 4))

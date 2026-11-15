@@ -6,7 +6,7 @@ measurement that decided it.
 
 ## What every Chinese input method has
 
-Each Chinese input method the app ships (全拼, 双拼, 九键, the code tables, handwriting, and any added
+Each Chinese input method the app ships (全拼, 双拼, 九键, the code tables, handwriting over them, and any added
 later) has the same five, decided 2026-10-14; a new one is not done without them:
 
 1. **The word model** (the pinyin data's n-gram) in ranking, after the text before the cursor.
@@ -398,8 +398,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   candidate wider; zhuyin a column a reading). A settings change that touches only `candidateReading`
   keeps the sessions (`Engines.settings`); the host then sends `Keyboard.RECALL` (`HostCore.configure`)
   so what is composing is read again, and the app makes its views anew with `ViewRebuild.READING`, which
-  does not end the composition. Handwriting's 注 key (`ReadingToggle`: off ↔ the last style used)
-  sets the same option.
+  does not end the composition.
   A held candidate's card (`Engines.card(im, index, text, paged, shown)`, a `CandidateCard`; the text checked
   against the candidate as the learning menu checks it, a traditional shown 銀行 taken for the engine's 银行
   and its characters shown): `Looked`, a character's full card at once for a candidate the session
@@ -496,7 +495,12 @@ are offered where nothing is learned (a password field, `Session.learning` false
   when the profile is read; each read of a 0.4 profile merges it, but pinyin's keyboard is set and
   the user told only once, `Internal.nineKeysMerged`, so a profile not written back never undoes a
   keyboard chosen since; its notice waits in `Internal.nineKeysUnseen` till said on the keyboard, so a
-  process ended before any keyboard showed tells it at the next start; in direct boot the config is none of the user's and nothing is merged). On
+  process ended before any keyboard showed tells it at the next start; in direct boot the config is none of the user's and nothing is merged). 0.6.0's handwriting input method (`engine-handwriting`) is
+  dropped from every group the same way by `HandwritingRetire` (`host/`, through `Profile.retireHandwriting`,
+  run from `KotlinHost.retireHandwriting` at each read): first of a group, pinyin takes its place (moved, or
+  added); its 繁体 in chttrans goes to pinyin there, else is dropped (`HandwritingRetire.traditional`); once
+  (`Internal.handwritingRetired`) the toolbar's 手写 is pinned and, where it was first, turned on, and the user
+  told (`Internal.handwritingRetiredUnseen`, said on the keyboard as 九键's notice is). On
   the nine keys every digit is a `PINYIN_NINE` code while typing: one the engine doesn't read (0)
   ends the input with the first candidate and goes in after it (`Keyboard.char`), as 0.4 did. The router's IM is `engine-pinyin` on every pinyin keyboard;
   `ImKeyboards.session(im, keyboard)` names the session. `KeyboardPair` stands for 拼音's keyboard: a
@@ -881,34 +885,25 @@ pinyin set (`--shuangpin`, `--keys nine`, `--table`): on pinyin-chat (readings c
 96.5% in the first three, 0.4 ms; 双拼 (自然码) 82.1% / 94.2%; the nine keys 53.5% / 76.7% (a key three or four letters, the path reads far more; the weights moved it under a point); 五笔 70.6% / 90.0%,
 仓颉 94.5% / 99.3% (the characters it has). These times are with no user model: with one, a glide works out again only the words the user has counts of, at the nodes (pinyin) or entries (a table) it reaches, the rest kept till a word gets its first count, is forgotten or blocked; unmeasured. A table entry with no count of its own keeps its score meanwhile, though a counted word is in its likeliest split (你们 as 你 + 们). The setting is off by default: a sloppy fast tap may glide.
 
-Writing on the keys (键盘手写, design 060-kbd-handwriting): `InkOver` (`engine/handwriting`) wraps,
-outermost, the session of each input method that `InputMethodCatalog.writesOnKeys` (all but English
-and handwriting; over a `GlideSession` and a `StrokeFilter` where those are, which `Engines.glide`
-unwraps). An `Action.Ink` goes to a `HandwritingSession` of its own, made at the first as
-handwriting's is (`SessionFactory.handwritingSession`); while that shows anything (what is written,
-its 联想) every action is its, but a letter, which puts its best sentence in and is typed into the
-wrapped session in the same snapshot; what it put in is told the wrapped session as an
-`Action.Context`, and a new sentence written after the wrapped session put text in is told the text
-before anew. An Ink while the wrapped session has input typed (`InkOver.typing`, `Engines.typedOnKeys`)
-is dropped (`HandwritingSession.drop`: taken, so `inkSent` holds it not, its piece ended); one while it
-offers 联想 starts writing and drops the offer. A Backspace the app does and a key passed on reach
-the handwriting too, so a sentence it put in and deleted at once is taken back (U-03).
-`Engines.ink`/`inkSent` take the input method (its shown session, a pair's keyed one), and `inkEnded`
-and the pieces ended over a drop of the sessions count every handwriting session made. When a touch
-on the letters is a stroke is `KeyInkGesture` (`input/keyboard`), which `GlideTouch.down` takes (`ink`,
-and `typed`: `Engines.typedOnKeys`, false while what shows is handwriting's): `START`, half a key any
-way (up or down at most 32dp, `GlideInput`'s cap, so before the key's swipe; across always half a key), not within `TYPING_MILLIS` (500 ms)
-of a key typed (a letter, or another key lifted, `keyLifted`, unless after a stroke and no letter: a
-space in the writing is no typing; design 060-kbd-handwriting-start), then every touch a stroke from
-its down till the pause; a tap that started the input (nothing typed at its down, not typing), a
-stroke within the pause after it, `NEAR` it (2.5 keys), and no other key between (a long press, a cancel, a
-second finger, a touch in the gap forget it), taken back as the first dot (`takeTapped`), by state,
-not by text, as the nine keys and zhuyin show no letter of the key. The keyboard sends no backspace
-for it: the piece's first reading carries `Action.Ink.takesBack`, and `InkOver` deletes the letter
-(a Backspace to the wrapped session) only when that session's input is the one action that started
-it (`typedActions == 1`); anything else typed, picked or committed between, and nothing is deleted
-(the Ink then dropped as any while typing). Decided on the fcitx thread, where what was typed is
-known, not from the UI thread's guess of it.
+Writing on the keys (the toolbar's 手写, designs 060-kbd-handwriting and 061-handwriting-toolbar; 0.6.0's
+handwriting input method and 键盘手写 merged into it): `InkOver` (`engine/handwriting`) wraps,
+outermost, the session of each input method that `InputMethodCatalog.writesOnKeys` (all but English;
+over a `GlideSession` and a `StrokeFilter` where those are, which `Engines.glide` unwraps). An
+`Action.Ink` goes to a `HandwritingSession` of its own, made at the first (`SessionFactory.handwritingSession`,
+`Kinds.HANDWRITING`, no input method of the list); while that shows anything (what is written, its 联想) every
+action is its, but a letter, which puts its best sentence in and is typed into the wrapped session in the
+same snapshot; what it put in is told the wrapped session as an `Action.Context`, and a new sentence written
+after the wrapped session put text in is told the text before anew. An Ink while the wrapped session has
+input typed (from before 手写 was on, a hardware key, a swipe's command) first puts that in as space would,
+its first candidate (a pinyin's a word at a time, more than its longest typed as it is), and is written
+then, in one snapshot. One while it offers 联想 starts writing and drops the offer. A Backspace the app does
+and a key passed on reach the handwriting too, so a sentence it put in and deleted at once is taken back
+(U-03). A reset (the field left, the keyboard hidden or made anew) puts the written sentence in as it
+shows (DECISIONS A2). The last action the handwriting's (`lastInk`), what is read again is its though it
+shows nothing (its 联想 turned off, then taken back). `Engines.ink`/`inkSent` take the input method (its
+shown session, a pair's keyed one), and `inkEnded` and the pieces ended over a drop of the sessions count
+every handwriting session made. Which touch is a stroke is the app's: with 手写 on (`HandwritingMode.writes`),
+every touch on the letter area (`BaseKeyboard`), none elsewhere; no threshold, no taking a tap back.
 
 ## Handwriting
 

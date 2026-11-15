@@ -26,9 +26,9 @@ class EnginesSessionFactoryTest : EnginesFixture() {
     private fun Engines.resetEach(vararg ims: String) = ims.forEach { onEvent(it, EngineEvent.RESET, 0) }
 
     @Test
-    fun handwritingAndEveryTableShareOneLanguageAndEverySessionOneListOfCoarseWords() {
+    fun everyTableSharesOneLanguageAndEverySessionOneListOfCoarseWords() {
         Engines(::load, null, warmUps = inPlace).use { engines ->
-            engines.resetEach(InputMethodCatalog.PINYIN, InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.HANDWRITING, InputMethodCatalog.WUBI)
+            engines.resetEach(InputMethodCatalog.PINYIN, InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.WUBI)
             assertEquals(1, engines.factory.languagesMade)
             assertEquals(1, engines.factory.coarseMade)
             val language = engines.factory.language()

@@ -17,21 +17,19 @@ import org.junit.Test
 
 /**
  * A terminal's or a game's raw keys are the app's: Ctrl+Space was taken from Termux, and a Shift
- * tap switched the input method there. The user may turn the shortcuts off. A key typed in
- * handwriting goes to pinyin in its own job, and one typed in pinyin posts nothing more.
+ * tap switched the input method there. The user may turn the shortcuts off.
  */
 class HardwareKeyboardTest {
 
     private val api = FakeHostApi().apply {
-        availableIme = arrayOf(entry(InputMethodCatalog.PINYIN), entry(InputMethodCatalog.HANDWRITING), entry(InputMethodCatalog.ENGLISH))
+        availableIme = arrayOf(entry(InputMethodCatalog.PINYIN), entry(InputMethodCatalog.WUBI), entry(InputMethodCatalog.ENGLISH))
         enabledIme = availableIme
         inputMethodEntryCached = entry(InputMethodCatalog.PINYIN)
     }
     private val posted = mutableListOf<suspend HostApi.() -> Unit>()
-    private var onTouch = false
     private var textField = true
     private var shortcutsOn = true
-    private val keyboard = HardwareKeyboard({ posted += it }, { onTouch }, { textField }, { shortcutsOn })
+    private val keyboard = HardwareKeyboard({ posted += it }, { textField }, { shortcutsOn })
 
     private val current get() = api.inputMethodEntryCached.uniqueName
 
@@ -77,8 +75,6 @@ class HardwareKeyboardTest {
         assertFalse(ctrlSpaceDown(0))
         assertFalse(keyboard.up(KeyEvent.KEYCODE_SPACE, 50))
         assertFalse(shiftTap(1000))
-        api.inputMethodEntryCached = entry(InputMethodCatalog.HANDWRITING)
-        assertFalse("handwriting stays", keyboard.mayHandOff('n'.code, modified = false))
         assertTrue(posted.isEmpty())
     }
 
@@ -164,63 +160,12 @@ class HardwareKeyboardTest {
         assertFalse(ctrlSpaceDown(1030))
     }
 
+    // handwriting is the toolbar's now (061-handwriting-toolbar): every input method in the list takes the keyboard
     @Test
-    fun ctrlShiftOnTheHardwareKeyboardSkipsWhatItCannotTypeIn() {
+    fun ctrlShiftGoesToTheNextInputMethod() {
         assertFalse(ctrlShift(0))
         runPosted()
-        assertEquals("handwriting skipped", InputMethodCatalog.ENGLISH, current)
-
-        api.inputMethodEntryCached = entry(InputMethodCatalog.PINYIN)
-        onTouch = true
-        ctrlShift(1000)
-        runPosted()
-        assertEquals("the touch keyboard up", InputMethodCatalog.HANDWRITING, current)
-    }
-
-    @Test
-    fun aShortcutAfterAHandOffKeepsWhatItChose() {
-        api.inputMethodEntryCached = entry(InputMethodCatalog.HANDWRITING)
-        runBlocking { keyboard.handOff(api) }
-        assertEquals(InputMethodCatalog.PINYIN, current)
-        shiftTap(0)
-        runPosted()
-        assertEquals(InputMethodCatalog.ENGLISH, current)
-
-        keyboard.touchKeyboardBack()
-        runPosted()
-        assertEquals("not handwriting again", InputMethodCatalog.ENGLISH, current)
-    }
-
-    @Test
-    fun aKeyTypedInHandwritingIsTypedByPinyinUntilTheTouchKeyboardIsBack() {
-        api.inputMethodEntryCached = entry(InputMethodCatalog.HANDWRITING)
-        assertTrue(keyboard.mayHandOff('n'.code, modified = false))
-        runBlocking { keyboard.handOff(api) }
-        assertEquals(InputMethodCatalog.PINYIN, current)
-        // in the key's own job: none of its own
-        assertTrue(posted.isEmpty())
-
-        keyboard.touchKeyboardBack()
-        runPosted()
-        assertEquals(InputMethodCatalog.HANDWRITING, current)
-    }
-
-    @Test
-    fun aKeyTypedInPinyinChangesNothing() {
-        api.calls.clear()
-        runBlocking { keyboard.handOff(api) }
-        assertEquals(emptyList<String>(), api.calls)
-        assertEquals(InputMethodCatalog.PINYIN, current)
-    }
-
-    @Test
-    fun onlyACharacterTypedOnTheHardwareKeyboardIsHandedOff() {
-        assertFalse("Space", keyboard.mayHandOff(' '.code, modified = false))
-        assertFalse("Enter", keyboard.mayHandOff('\n'.code, modified = false))
-        assertFalse("Delete", keyboard.mayHandOff(0x7f, modified = false))
-        assertFalse("Ctrl+N", keyboard.mayHandOff('n'.code, modified = true))
-        onTouch = true
-        assertFalse("the touch keyboard up", keyboard.mayHandOff('n'.code, modified = false))
+        assertEquals(InputMethodCatalog.WUBI, current)
     }
 
     private companion object {

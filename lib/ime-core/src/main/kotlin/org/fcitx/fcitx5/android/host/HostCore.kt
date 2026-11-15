@@ -289,10 +289,13 @@ class HostCore(
     /** `isInputPanelEmpty`. */
     fun isEmpty() = contexts.active?.panel?.empty ?: true
 
-    /** `resetInputContext`: the engine reset, then the temp modes and modules (`instance.cpp:1155-1176`). */
-    fun reset() = pipeline.batch {
+    /**
+     * `resetInputContext`: the engine reset, then the temp modes and modules (`instance.cpp:1155-1176`);
+     * what handwriting wrote put in, or with [drop] dropped as all that is typed ([KeyRouter.reset]).
+     */
+    fun reset(drop: Boolean = false) = pipeline.batch {
         val ic = contexts.active?.takeIf { it.hasFocus } ?: return@batch
-        router.reset(ic, contexts.inputMethod(ic))
+        router.reset(ic, contexts.inputMethod(ic), drop)
         pipeline.reset(ic)
     }
 

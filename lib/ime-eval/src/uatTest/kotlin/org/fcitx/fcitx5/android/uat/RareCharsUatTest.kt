@@ -147,7 +147,7 @@ class RareCharsUatTest {
                 assertTrue("大 not offered", "大" in candidates)
             },
         )
-        ime(InputMethodCatalog.HANDWRITING)
+        ime(InputMethodCatalog.PINYIN)
         write("龘", "大")
         assertEquals("the pad's 龘 read as 大", listOf("大"), candidates)
     }
@@ -258,7 +258,7 @@ class RareCharsUatTest {
                 check("$im $code")
             }
         }
-        with(allHeld(InputMethodCatalog.HANDWRITING)) {
+        with(allHeld(InputMethodCatalog.PINYIN)) {
             write("龘", "大")
             write("裡", "里")
             write("闫", "门")

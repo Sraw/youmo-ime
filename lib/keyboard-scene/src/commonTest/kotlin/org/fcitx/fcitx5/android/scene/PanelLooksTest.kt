@@ -5,8 +5,11 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Pads
 import org.fcitx.fcitx5.android.scene.engine.PanelLooks
+import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Theme
@@ -177,7 +180,7 @@ class PanelLooksTest {
         // the blur the voice mask's alone, the ink and grid a key's (the pad's)
         assertEquals(listOf("blur= on key does nothing: it is the voice mask's"), warnings(withStyle("<style select=\"key\" blur=\"4dp\"/>")))
         assertEquals(
-            listOf("grid= on keyboard does nothing: it is the handwriting pad's (handwriting/pad)"),
+            listOf("grid= on keyboard does nothing: it is the handwriting ink's (handwriting/pad)"),
             warnings(withStyle("<style select=\"keyboard\" grid=\"true\"/>")),
         )
         assertEquals(
@@ -195,11 +198,22 @@ class PanelLooksTest {
         assertTrue(handle.single().startsWith("ink-color= on handle does nothing"), "$handle")
         // a key named that is not the pad: none of it read (a class may be the pad's)
         assertEquals(
-            listOf(
-                "ink-width= on qwerty/q does nothing: it is the handwriting pad's (handwriting/pad)",
-                "ink-width= on handwriting/* does nothing: it is the handwriting pad's (handwriting/pad)",
-            ),
-            warnings(withStyle("<style select=\"qwerty/q, handwriting/*, handwriting/pad, key.pen\" ink-width=\"2dp\"/>")),
+            listOf("ink-width= on qwerty/q does nothing: it is the handwriting ink's (handwriting/pad)"),
+            warnings(withStyle("<style select=\"qwerty/q, handwriting/pad, key.pen\" ink-width=\"2dp\"/>")),
+        )
+        // the handwriting keyboard gone (061-handwriting-toolbar §7): its rules select nothing but the pad's ink, its grid not drawn
+        val gone = "does nothing: handwriting is written over the letters, only its pad's ink-color= and ink-width= are read"
+        assertEquals(
+            listOf("fill= on the handwriting keyboard $gone", "ink-width= on the handwriting keyboard $gone"),
+            warnings(withStyle("<style select=\"handwriting/*\" fill=\"@key\" ink-width=\"2dp\"/>")),
+        )
+        assertEquals(
+            listOf("grid= on the handwriting keyboard $gone"),
+            warnings(withStyle("<style select=\"handwriting/pad\" ink-color=\"#ff0000\" grid=\"true\"/>")),
+        )
+        assertEquals(
+            listOf("@im=handwriting selects nothing: handwriting is no input method now, it is written over the letters of the one in use"),
+            warnings(withStyle("<style select=\"@im=handwriting key\" fill=\"@key\"/>")),
         )
         // a panel's fill a colour alone: the native view's
         assertTrue(
@@ -208,21 +222,41 @@ class PanelLooksTest {
         )
     }
 
+    // the ink of handwriting over the letters (061-handwriting-toolbar §7): the pad's style, the app's where none is set
+    @Test
+    fun theInkOverTheLettersIsThePadsStyle() {
+        assertEquals(PanelLooks.Pad(null, null), looks().pad(emptySet()))
+        val t = theme(withStyle("<style select=\"handwriting/pad\" ink-color=\"#ff0000\" ink-width=\"6dp\"/><style select=\"@dark handwriting/pad\" ink-color=\"@accentKey\"/>"))
+        assertEquals(PanelLooks.Pad(argb(0xffff0000), 6.0), looks(t).pad(emptySet()))
+        assertEquals(PanelLooks.Pad(accent, 6.0), looks(t).pad(setOf("dark")))
+        // theme 3.0's look: the letters' (`.letter`), which the pad was
+        assertEquals(PanelLooks.Pad(argb(0xff00ff00), null), looks(theme(withStyle("<style select=\"key.letter\" ink-color=\"#00ff00\"/>"))).pad(emptySet()))
+    }
+
+    // a layout of the user's may still have a pad (a slot of kind handwriting-pad): drawn as before
+    private fun padScene(env: Env, t: Theme = Fixtures.materialLight): Scene = SceneBuilder(t, env, FakeMeasurer).build(
+        LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"handwriting\" name=\"t\" family=\"handwriting\" columns=\"100\">" +
+                "<row><slot id=\"pad\" kind=\"handwriting-pad\" width=\"85\" rows=\"2\" look=\"letter\" face=\"keep\"/>" +
+                "<key id=\"backspace\" role=\"backspace\" kind=\"function\" width=\"15\" icon=\"backspace\" a11y=\"a11y_key_backspace\" send=\"sym:BackSpace\"/></row>" +
+                "<row><key id=\"comma\" role=\"comma\" kind=\"function\" width=\"15\" label=\",\" send=\",\"/></row></keyboard>",
+        ).ok(),
+        Forms.fragments,
+    ).ok()
+
     @Test
     fun thePadsInkNotSetIsTheAppsOfBefore() {
         val d = Forms.block.density
-        val pad = Forms.scene("handwriting", Forms.block).slots.single { it.kind == Pads.KIND }
+        val pad = padScene(Forms.block).slots.single { it.kind == Pads.KIND }
         assertEquals(Ink(keyText, 3.5 * d), pad.ink)
         assertEquals(listOf(Op.Shadow::class, Op.Fill::class), pad.ops.map { it::class }, "its face alone (its shadow, its fill), no grid")
-        // no other slot has ink
-        assertTrue(Forms.scene("handwriting", Forms.block).slots.filter { it.kind != Pads.KIND }.all { it.ink == null })
     }
 
     @Test
     fun thePadsInkAndGridATheme() {
         val d = Forms.block.density
         val t = theme(withStyle("<style select=\"handwriting/pad\" ink-color=\"#ff0000\" ink-width=\"6dp\" grid=\"true\"/>"))
-        val scene = Forms.scene("handwriting", Forms.block, t)
+        val scene = padScene(Forms.block, t)
         val pad = scene.slots.single { it.kind == Pads.KIND }
         assertEquals(Ink(argb(0xffff0000), 6.0 * d), pad.ink)
         val face = (pad.ops[1] as Op.Fill).shape.bounds
@@ -239,9 +273,9 @@ class PanelLooksTest {
         assertEquals(2 * n - 1 + (if (face.width - n * face.height >= 2 * w) 2 else 0), lines.size - 1)
         // the grid's colour of its own; under @flat as the scene's
         val coloured = theme(withStyle("<style select=\"handwriting/pad\" grid=\"true\" grid-color=\"@accentKey\"/><style select=\"@flat handwriting/pad\" grid=\"false\"/>"))
-        val g = Forms.scene("handwriting", Forms.block, coloured).slots.single { it.kind == Pads.KIND }
+        val g = padScene(Forms.block, coloured).slots.single { it.kind == Pads.KIND }
         assertTrue(g.ops.drop(2).all { (it as Op.Fill).color == accent } && g.ops.size > 2)
-        assertEquals(2, Forms.scene("handwriting", Forms.flat, coloured).slots.single { it.kind == Pads.KIND }.ops.size)
+        assertEquals(2, padScene(Forms.flat, coloured).slots.single { it.kind == Pads.KIND }.ops.size)
         // printed as the scene's text
         assertTrue("  ink #ffff0000 ${SceneText.n(6.0 * d)}" in SceneText.of(scene))
     }

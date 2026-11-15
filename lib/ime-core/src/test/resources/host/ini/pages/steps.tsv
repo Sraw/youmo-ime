@@ -5,7 +5,7 @@ engine-shuangpin	ShuangpinProfile=MS\n
 engine-cangjie	AutoSelect=False\n
 engine-cangjie	Hint=bad\n
 engine-pinyin	Prediction=nope\n
-engine-handwriting	ModelLevel=Low\n
+engine-wubi	ModelLevel=Low\n
 engine-pinyin	[Fuzzy]\nZ_ZH=True\n
 engine-erbi	Chaizi=False\nWubi/AutoSelect=False\n
 not-an-im	PageSize=9\n

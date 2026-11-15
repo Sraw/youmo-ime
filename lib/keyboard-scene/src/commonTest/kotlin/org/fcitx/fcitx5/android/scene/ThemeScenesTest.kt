@@ -72,7 +72,7 @@ class ThemeScenesTest {
     @Test
     fun cascadesAreKeptByTheScenesAThemeNames() {
         val ims = listOf(Input(ime = "pinyin"), Input(ime = "shuangpin"), Input(ime = "english"), Input(ime = "table", table = "wubi"),
-            Input(ime = "table", table = "cangjie"), Input(ime = "handwriting"), Input(ime = null))
+            Input(ime = "table", table = "cangjie"), Input(ime = null))
         val fields = listOf("text", "password", "url", "email", "number", null)
         fun made(theme: Theme, board: String): Int {
             val c = Cascades(theme)

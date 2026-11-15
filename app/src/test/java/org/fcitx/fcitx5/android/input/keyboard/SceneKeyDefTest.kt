@@ -12,7 +12,6 @@ import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
-import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
@@ -78,8 +77,6 @@ class SceneKeyDefTest {
             SceneAction.Keypad(7) to sym(FcitxKeyMapping.FcitxKey_KP_0 + 7),
             SceneAction.Caps(true) to KeyAction.CapsAction(true),
             SceneAction.Shortcut(KeyCommand.entries.first().key) to KeyAction.ShortcutAction(KeyShortcut.Command(KeyCommand.entries.first())),
-            SceneAction.Reading(null) to KeyAction.ReadingAction(),
-            SceneAction.Reading(ReadingStyle.entries.first().key) to KeyAction.ReadingAction(ReadingStyle.entries.first()),
             SceneAction.EmojiSearch("on") to KeyAction.EmojiSearchAction(true),
             SceneAction.EmojiSearch("off") to KeyAction.EmojiSearchAction(false),
             SceneAction.Command("lang") to KeyAction.LangSwitchAction,
@@ -93,7 +90,7 @@ class SceneKeyDefTest {
         // what the app has none of: nothing (logged), the key doing nothing; a group's code is the keyboard's (Table.group)
         val none = listOf(
             SceneAction.Sym("Hyper_L"), SceneAction.Picker("Nope"), SceneAction.Shortcut("nope"),
-            SceneAction.Reading("nope"), SceneAction.Command("launch"), SceneAction.Placeholder("tone-9"),
+            SceneAction.Command("launch"), SceneAction.Placeholder("tone-9"),
             SceneAction.Group("qw"),
         )
         none.forEach { assertNull("$it", SceneKeyDef.action(it) { name -> placeholders[name] }) }

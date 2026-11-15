@@ -28,7 +28,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
-import org.fcitx.fcitx5.android.input.handwriting.HandwritingPadView
 import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
@@ -306,16 +305,6 @@ class LandscapeUatTest {
             ?: error(h.texts(h.inputView).toString())
         assertTrue("${h.box(word)}", h.box(word).left >= b.left - 60)
         h.captureBoard("LandscapeUatTest/t9_right")
-    }
-
-    @Test
-    @Uat("LS-21")
-    fun handwritingAtTheSide() {
-        harness = KeyboardHarness(im = InputMethodEntry(InputMethodCatalog.HANDWRITING, "手写", "", "", "写", "zh_CN", "androidengine", false))
-        h.start()
-        val pad = KeyboardHarness.find<HandwritingPadView>(h.inputView)!!
-        assertTrue(h.shown(pad))
-        assertTrue("${h.box(pad)}", onRight(board()))
     }
 
     @Test

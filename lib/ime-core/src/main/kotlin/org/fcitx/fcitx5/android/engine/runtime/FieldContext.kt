@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAIZI_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.EMOJI_DATA
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog.HANDWRITING
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.READS_PINYIN_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.TABLES
@@ -106,12 +105,11 @@ internal class FieldContext(
     // of those reads them on the fcitx thread as it makes the session (activate's Reset). Whatever
     // reading them throws is dropped, the lazies left unset (WarmUp, quiet): the session reads them again
     // as it is made, on the fcitx thread, which hands it to the addon (EngineBridge.Unloadable).
-    // Beside it only what [im] shows as the settings have it, held from then on: no emoji in handwriting,
-    // characters by their parts and their readings (笔画查字's) only in full pinyin
+    // Beside it only what [im] shows as the settings have it, held from then on: characters by their parts and their readings (笔画查字's) only in full pinyin
     private fun warmUpPinyin(im: String) {
         val settings = settings()
         val aside = HashSet<String>()
-        if (settings.emoji && im != HANDWRITING) aside += EMOJI_DATA
+        if (settings.emoji) aside += EMOJI_DATA
         if (im == PINYIN && settings.chaizi) aside += CHAIZI_DATA
         if (im == PINYIN) aside += READINGS_ASIDE
         aside -= asideWarmedUp

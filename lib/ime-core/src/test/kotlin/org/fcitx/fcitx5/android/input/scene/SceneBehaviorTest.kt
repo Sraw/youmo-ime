@@ -52,8 +52,6 @@ class SceneBehaviorTest {
             "caps" to SceneAction.Caps(false),
             "caps:lock" to SceneAction.Caps(true),
             "shortcut:copy" to SceneAction.Shortcut("copy"),
-            "reading" to SceneAction.Reading(null),
-            "reading:pinyin" to SceneAction.Reading("pinyin"),
             "emoji-search:on" to SceneAction.EmojiSearch("on"),
             "lang" to SceneAction.Command("lang"),
             "action:zhuyin" to SceneAction.Placeholder("zhuyin"),
@@ -85,11 +83,11 @@ class SceneBehaviorTest {
     @Test
     fun everyWordTheReaderTakesIsAnAction() {
         val forms = listOf(
-            "q", ":", "😀", "sym:BackSpace", "sym:", "picker:", "picker:Emoji", "shortcut:copy", "shortcut:", "reading:", "reading:pinyin",
+            "q", ":", "😀", "sym:BackSpace", "sym:", "picker:", "picker:Emoji", "shortcut:copy", "shortcut:",
             "layout:Symbol", "layout:a", "emoji-search:on", "emoji-search:off", "action:zhuyin", "action:zhuyin-slot", "action:tone-1",
             "action:tone-5", "commit:.com", "commit::", "code:U+0000", "code:U+FF0C", "code:U+F0104", "code:U+10FFFF", "keypad:0",
             "keypad:9", "caps", "caps:lock", "lang", "ime-picker", "quickphrase", "unicode", "panel-back", "panel-lock",
-            "space-long-press", "reading", "begin-selection-swipe", "delete-selection", "move-selection", "lookup",
+            "space-long-press", "begin-selection-swipe", "delete-selection", "move-selection", "lookup",
         )
         for (form in forms) {
             assertEquals(form, form, LayoutReader.action(form))
@@ -250,7 +248,7 @@ class SceneBehaviorTest {
             "fn/lang" to SceneAction.Command("ime-picker"),
         )
         val seen = HashSet<String>()
-        for (board in listOf("qwerty", "nine", "k14", "handwriting", "number")) {
+        for (board in listOf("qwerty", "nine", "k14", "number")) {
             for (node in keys(board).values.filter { it.shortcut in want }) {
                 assertEquals("$board ${node.shortcut}", want[node.shortcut], SceneBehavior.of(node).longPress)
                 seen += "$board ${node.shortcut}"

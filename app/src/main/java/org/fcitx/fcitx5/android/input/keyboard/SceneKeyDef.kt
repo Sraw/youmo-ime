@@ -9,7 +9,6 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keys.KeyOutput
@@ -224,7 +223,6 @@ class SceneKeyDef(
             is SceneAction.Keypad -> KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + a.digit), KeyStates.Virtual)
             is SceneAction.Caps -> KeyAction.CapsAction(a.lock)
             is SceneAction.Shortcut -> KeyCommand.entries.firstOrNull { it.key == a.name }?.let { KeyAction.ShortcutAction(KeyShortcut.Command(it)) }
-            is SceneAction.Reading -> reading(a.style)
             is SceneAction.EmojiSearch -> KeyAction.EmojiSearchAction(a.arg == "on")
             is SceneAction.Command -> COMMANDS[a.name]
             is SceneAction.Placeholder -> placeholder(a.name)
@@ -237,12 +235,6 @@ class SceneKeyDef(
             KeyAction.PickerSwitchAction()
         } else {
             PickerWindow.Key.entries.firstOrNull { it.name == name }?.let { KeyAction.PickerSwitchAction(it) }
-        }
-
-        private fun reading(style: String?): KeyAction? = if (style == null) {
-            KeyAction.ReadingAction()
-        } else {
-            ReadingStyle.entries.firstOrNull { it.key.equals(style, ignoreCase = true) }?.let { KeyAction.ReadingAction(it) }
         }
     }
 }
