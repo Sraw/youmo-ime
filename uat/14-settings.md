@@ -134,8 +134,14 @@
 ### ST-10 [P1] 键盘高度
 - **前提**：B0-设置，**外观 → 大小与样式**。
 - **操作**：**键盘高度** 依次选"矮""很高"，每次回测试页看。
-- **预期**：预览和键盘的高度跟着变；"很高"明显比"矮"高。
-- **JVM**：`SettingsEffectUatTest.keyboardHeightFollowsTheSetting`（很高比矮高出三成以上）；设备上不跑。
+- **预期**：预览和键盘的高度跟着变；"很高"明显比"矮"高。横屏时按每行高度：常见手机三键导航"矮"每行约 41 dp，"很高"约 52 dp（再高被给应用留的 120 dp 压住）。
+- **JVM**：`SettingsEffectUatTest.keyboardHeightFollowsTheSetting`（很高比矮高出三成以上）、ime-core `KeyboardSizesTest.turnedTheRowIsTheSameOnEveryScreenOfAKind`（横屏五档的每行高度）；设备上不跑。
+
+### ST-141 [P2] 主题预览按横屏的新高度画
+- **前提**：B0-设置，常见手机，再在折叠屏展开（`wm size 1767x2208` + `wm density 420`）下各一次。
+- **操作**：横屏打开 **外观**，看主题预览；回测试页点「普通文本」框比一比；三键和手势导航各一次。
+- **预期**：预览里键区和键盘上的一样高（手机标准 4 × 48 dp，折叠屏 4 × 56 dp），手势导航下压矮时预览也一样压矮，不比键盘高。
+- **JVM**：`KeyboardAreaTest.theRoomPredictedLeavesTheStatusBarAndTheInputMethodsBarOut`（预览用的可用高度：去掉状态栏和输入法的导航条）；设备上看。
 
 ### ST-51 [P1] 键盘高度：紧凑
 - **前提**：B0-设置，**外观 → 大小与样式**；**按键 → 按键字符和快捷键** 里把 q 的下滑设成文字「你好」。

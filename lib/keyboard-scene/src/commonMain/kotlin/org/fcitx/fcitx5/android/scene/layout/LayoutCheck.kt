@@ -411,18 +411,53 @@ object LayoutCheck {
 
     private class Shown(val errors: List<Finding>, val padLacks: List<Finding>, val bottomLeft: Finding?)
 
-    /** A screen the scenes are made on: [widthDp] wide, [turned] sideways (61-wide-as-landscape: 横 by ScreenShape). */
-    data class Screen(val widthDp: Int, val turned: Boolean)
+    /**
+     * A screen the scenes are made on: [widthDp] wide, [tallDp] high, [turned] sideways (61-wide-as-landscape: 横 by
+     * ScreenShape).
+     */
+    data class Screen(val widthDp: Int, val turned: Boolean, val tallDp: Int) {
+        /** A foldable's inner screen, a tablet: the display's short side [LARGE_SHORT_SIDE_DP] or more (KeyboardHeightLevels). */
+        val large: Boolean get() = minOf(widthDp, tallDp) >= LARGE_SHORT_SIDE_DP
+    }
 
     /**
      * The screens (§3.2 第 5 条): two phones upright, one sideways, a foldable's inner screen upright (横 by its width) and its
      * outer one.
      */
-    val SCREENS = listOf(Screen(360, false), Screen(412, false), Screen(800, true), Screen(600, false), Screen(344, false))
+    val SCREENS = listOf(
+        Screen(360, false, 780), Screen(412, false, 915), Screen(800, true, 360), Screen(600, false, 841), Screen(344, false, 882),
+    )
+
+    /**
+     * The keys' height on [s], dp, as the app asks for it at 标准 or [compact] 紧凑: upright the level's share of the screen's
+     * height; 横 (ScreenShape) four rows of the level's row, a phone's or a [Screen.large] one's (061-landscape-height
+     * §5.1). The app's numbers are ime-core's (KeyboardSizes, KeyboardHeightLevels), which this module cannot read:
+     * ime-core's LayoutCheckHeightsTest holds these to them.
+     */
+    fun keysDp(s: Screen, compact: Boolean): Int = when {
+        !ScreenShape.landscape(s.turned, s.widthDp) -> s.tallDp * (if (compact) COMPACT_PERCENT else NORMAL_PERCENT) / PERCENT
+        else -> ROWS * if (s.large) (if (compact) LARGE_COMPACT_ROW_DP else LARGE_ROW_DP) else if (compact) COMPACT_ROW_DP else ROW_DP
+    }
+
+    /**
+     * The lowest the keys are let get turned (KeyboardHeightCap: four rows of 36 dp where the app keeps its 120 dp): a
+     * layout checked on [SCREENS] is checked there too, so its keys' marks and labels are seen at the height a small
+     * phone gives them.
+     */
+    const val LOWEST_DP = 4 * 36
+
+    // KeyboardHeightLevels' 标准 and 紧凑: upright percent, turned rows of dp; its large screen's short side
+    private const val NORMAL_PERCENT = 30
+    private const val COMPACT_PERCENT = 20
+    private const val PERCENT = 100
+    private const val ROWS = 4
+    private const val ROW_DP = 48
+    private const val COMPACT_ROW_DP = 34
+    private const val LARGE_ROW_DP = 56
+    private const val LARGE_COMPACT_ROW_DP = 48
+    private const val LARGE_SHORT_SIDE_DP = 600
 
     private const val DENSITY = 2.625
-    private const val HEIGHT_DP = 260
-    private const val LANDSCAPE_HEIGHT_DP = 200
 
     /** One environment a layout is built in, and how a finding names it. */
     class Scene(val name: String, val env: Env)
@@ -441,6 +476,7 @@ object LayoutCheck {
             val name = "${s.widthDp}dp" + (if (s.turned) " turned" else "") + (if (compact) " compact" else "") + (if (split) " split" else "")
             out += Scene(name, env(s, compact, split, first))
         }
+        for (s in SCREENS.filter { it.turned }) out += Scene("${s.widthDp}dp turned ${LOWEST_DP}dp", env(s, false, false, first, LOWEST_DP))
         val s = SCREENS.first()
         val inputs = if (pads.isNotEmpty()) {
             padInputs.drop(1).map { (pad, input) -> "pad=$pad" to input }
@@ -477,12 +513,11 @@ object LayoutCheck {
         }
     }.ifEmpty { listOf("" to Input()) }
 
-    private fun env(s: Screen, compact: Boolean, split: Boolean, input: Input): Env {
+    private fun env(s: Screen, compact: Boolean, split: Boolean, input: Input, heightDp: Int = keysDp(s, compact)): Env {
         val landscape = ScreenShape.landscape(s.turned, s.widthDp)
-        val height = if (s.turned) LANDSCAPE_HEIGHT_DP else HEIGHT_DP
         return Env(
             width = s.widthDp * DENSITY,
-            height = height * DENSITY,
+            height = heightDp * DENSITY,
             density = DENSITY,
             landscape = landscape,
             compact = compact,

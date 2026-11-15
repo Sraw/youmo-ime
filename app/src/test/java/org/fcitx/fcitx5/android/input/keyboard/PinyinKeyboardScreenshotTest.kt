@@ -74,7 +74,7 @@ class PinyinKeyboardScreenshotTest {
         }
     }
 
-    // landscape at 很高, where the 70% cap binds: the area stays put, the keys give up the row's 14 dp
+    // landscape at 很高, where the app's 120 dp binds: the area stays put, the keys give up the row's 14 dp
     // in pinyin on the 14 keys and take it back in English, recomputed on each switch
     @Test
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
@@ -89,14 +89,15 @@ class PinyinKeyboardScreenshotTest {
                 val density = h.inputView.resources.displayMetrics.density
                 val screenH = h.inputView.resources.displayMetrics.heightPixels
                 fun keys() = h.box(h.board).height()
-                fun area() = h.box(h.board).bottom - h.box(h.inputView.findViewById<View>(R.id.code_row_text)).top
                 val tall = keys()
-                assertTrue("area ${area()} of $screenH", area() <= 0.70 * screenH + 2)
+                // the app above the code row keeps its 120 dp
+                fun app() = h.box(h.inputView.findViewById<View>(R.id.code_row_text)).top - h.box(h.inputView).top
+                assertTrue("app ${app()} of $screenH", app() >= KeyboardHeightCap.MIN_APP_DP * density - 2)
                 val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "keyboard", false)
                 h.api.inputMethodEntryCached = english
                 h.emit(HostEvent.InputMethodChanged(english))
                 assertEquals(density * (CodeRowHeight.STRIP_DP - CodeRowHeight.THIN_DP), (keys() - tall).toFloat(), 2f)
-                assertTrue("area ${area()} of $screenH", area() <= 0.70 * screenH + 2)
+                assertTrue("app ${app()} of $screenH", app() >= KeyboardHeightCap.MIN_APP_DP * density - 2)
                 h.api.inputMethodEntryCached = KeyboardHarness.PINYIN
                 h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
                 assertEquals(tall, keys())

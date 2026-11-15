@@ -463,8 +463,22 @@
     { id: 'small', label: '小屏 720p', w: 720, h: 1280, density: 2 },
     { id: 'tablet', label: '平板 10"', w: 1600, h: 2560, density: 2 },
   ];
-  /** The keyboard's height in dp (the app's default, portrait and landscape). */
-  const KEYBOARD_DP = { portrait: 267, landscape: 200 };
+  /**
+   * The keyboard's height in dp, the app's default: upright 30% of a common phone; turned 标准's four rows, 48 dp on a
+   * phone, 56 dp on a large screen (a short side of 600 dp or more: a tablet, a foldable's inner screen;
+   * 061-landscape-height §5.1).
+   */
+  const KEYBOARD_DP = { portrait: 267, landscape: 192, landscapeLarge: 224 };
+  const LARGE_SHORT_SIDE_DP = 600;
+  // a window this wide is 横屏 held either way (ScreenShape.WIDE_DP): a tablet upright has the turned height, as in the app
+  const WIDE_DP = 600;
+
+  /** The keyboard's height in dp on [e]'s device as held ([KEYBOARD_DP]). */
+  function keyboardDp(e) {
+    const across = (e.landscape ? Math.max(e.w, e.h) : Math.min(e.w, e.h)) / e.density;
+    if (!e.landscape && across < WIDE_DP) return KEYBOARD_DP.portrait;
+    return Math.min(e.w, e.h) / e.density >= LARGE_SHORT_SIDE_DP ? KEYBOARD_DP.landscapeLarge : KEYBOARD_DP.landscape;
+  }
   const FORMS = ['normal', 'compact', 'floating', 'left', 'right', 'split', 'flat'];
   const BOARDS = ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols'];
 
@@ -500,7 +514,7 @@
     const across = e.landscape ? Math.max(e.w, e.h) : Math.min(e.w, e.h);
     const out = {
       width: across,
-      height: Math.round((e.landscape ? KEYBOARD_DP.landscape : KEYBOARD_DP.portrait) * e.density),
+      height: Math.round(keyboardDp(e) * e.density),
       density: e.density,
     };
     if (e.landscape) out.landscape = true;

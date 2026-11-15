@@ -1,387 +1,387 @@
-scene 2340x529
+scene 2340x504
 base
-  fill rect(0,0,2340,529) #ffeceff1
+  fill rect(0,0,2340,504) #ffeceff1
 key r1c1 kind=letter a11y="Q，1"
-  bounds 0,0,334,132
-  shape rect(7.88,10.5,326.13,121.5 r=10.5,10.5,10.5,10.5)
-  hit rect(0,0,334,132)
-  anchor 167,66 up 0,-1
+  bounds 0,0,334,126
+  shape rect(7.88,10.5,326.13,115.5 r=10.5,10.5,10.5,10.5)
+  hit rect(0,0,334,126)
+  anchor 167,63 up 0,-1
   text label="Q" alt="1"
   shortcut="g18/q" letters="q"
   normal
-    shadow rect(7.88,10.5,326.13,124.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(7.88,10.5,326.13,121.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "Q" 151.25,85.69 system 400 52.5 #ff37474f
+    shadow rect(7.88,10.5,326.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,10.5,326.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "Q" 151.25,82.69 system 400 52.5 #ff37474f
     text "1" 299.38,39.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(7.88,10.5,326.13,121.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(7.88,10.5,326.13,115.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r1c2 kind=letter a11y="W E，2"
-  bounds 334,0,669,132
-  shape rect(341.88,10.5,661.13,121.5 r=10.5,10.5,10.5,10.5)
-  hit rect(334,0,669,132)
-  anchor 501.5,66 up 0,-1
+  bounds 334,0,669,126
+  shape rect(341.88,10.5,661.13,115.5 r=10.5,10.5,10.5,10.5)
+  hit rect(334,0,669,126)
+  anchor 501.5,63 up 0,-1
   text label="WE" alt="2"
   shortcut="g18/we" letters="we" lean=off
   normal
-    shadow rect(341.88,10.5,661.13,124.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(341.88,10.5,661.13,121.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "WE" 470,85.69 system 400 52.5 #ff37474f
+    shadow rect(341.88,10.5,661.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(341.88,10.5,661.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "WE" 470,82.69 system 400 52.5 #ff37474f
     text "2" 634.38,39.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(341.88,10.5,661.13,121.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(341.88,10.5,661.13,115.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r1c3 kind=letter a11y="R T，3"
-  bounds 669,0,1003,132
-  shape rect(676.88,10.5,995.13,121.5 r=10.5,10.5,10.5,10.5)
-  hit rect(669,0,1003,132)
-  anchor 836,66 up 0,-1
+  bounds 669,0,1003,126
+  shape rect(676.88,10.5,995.13,115.5 r=10.5,10.5,10.5,10.5)
+  hit rect(669,0,1003,126)
+  anchor 836,63 up 0,-1
   text label="RT" alt="3"
   shortcut="g18/rt" letters="rt" lean=off
   normal
-    shadow rect(676.88,10.5,995.13,124.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(676.88,10.5,995.13,121.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "RT" 804.5,85.69 system 400 52.5 #ff37474f
+    shadow rect(676.88,10.5,995.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(676.88,10.5,995.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "RT" 804.5,82.69 system 400 52.5 #ff37474f
     text "3" 968.38,39.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(676.88,10.5,995.13,121.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(676.88,10.5,995.13,115.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r1c4 kind=letter a11y="Y，4"
-  bounds 1003,0,1337,132
-  shape rect(1010.88,10.5,1329.13,121.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1003,0,1337,132)
-  anchor 1170,66 up 0,-1
+  bounds 1003,0,1337,126
+  shape rect(1010.88,10.5,1329.13,115.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1003,0,1337,126)
+  anchor 1170,63 up 0,-1
   text label="Y" alt="4"
   shortcut="g18/y" letters="y"
   normal
-    shadow rect(1010.88,10.5,1329.13,124.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1010.88,10.5,1329.13,121.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "Y" 1154.25,85.69 system 400 52.5 #ff37474f
+    shadow rect(1010.88,10.5,1329.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1010.88,10.5,1329.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "Y" 1154.25,82.69 system 400 52.5 #ff37474f
     icon redo 1018,15,1047,44 #ff7a858a
     text "4" 1302.38,39.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(1010.88,10.5,1329.13,121.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1010.88,10.5,1329.13,115.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r1c5 kind=letter a11y="U，5"
-  bounds 1337,0,1671,132
-  shape rect(1344.88,10.5,1663.13,121.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1337,0,1671,132)
-  anchor 1504,66 up 0,-1
+  bounds 1337,0,1671,126
+  shape rect(1344.88,10.5,1663.13,115.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1337,0,1671,126)
+  anchor 1504,63 up 0,-1
   text label="U" alt="5"
   shortcut="g18/u" letters="u"
   normal
-    shadow rect(1344.88,10.5,1663.13,124.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1344.88,10.5,1663.13,121.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "U" 1488.25,85.69 system 400 52.5 #ff37474f
+    shadow rect(1344.88,10.5,1663.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1344.88,10.5,1663.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "U" 1488.25,82.69 system 400 52.5 #ff37474f
     text "5" 1636.38,39.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(1344.88,10.5,1663.13,121.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1344.88,10.5,1663.13,115.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r1c6 kind=letter a11y="I O，6"
-  bounds 1671,0,2006,132
-  shape rect(1678.88,10.5,1998.13,121.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1671,0,2006,132)
-  anchor 1838.5,66 up 0,-1
+  bounds 1671,0,2006,126
+  shape rect(1678.88,10.5,1998.13,115.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1671,0,2006,126)
+  anchor 1838.5,63 up 0,-1
   text label="IO" alt="6"
   shortcut="g18/io" letters="io" lean=off
   normal
-    shadow rect(1678.88,10.5,1998.13,124.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1678.88,10.5,1998.13,121.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "IO" 1807,85.69 system 400 52.5 #ff37474f
+    shadow rect(1678.88,10.5,1998.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1678.88,10.5,1998.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "IO" 1807,82.69 system 400 52.5 #ff37474f
     text "6" 1971.38,39.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(1678.88,10.5,1998.13,121.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1678.88,10.5,1998.13,115.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r1c7 kind=letter a11y="P，7"
-  bounds 2006,0,2340,132
-  shape rect(2013.88,10.5,2332.13,121.5 r=10.5,10.5,10.5,10.5)
-  hit rect(2006,0,2340,132)
-  anchor 2173,66 up 0,-1
+  bounds 2006,0,2340,126
+  shape rect(2013.88,10.5,2332.13,115.5 r=10.5,10.5,10.5,10.5)
+  hit rect(2006,0,2340,126)
+  anchor 2173,63 up 0,-1
   text label="P" alt="7"
   shortcut="g18/p" letters="p"
   normal
-    shadow rect(2013.88,10.5,2332.13,124.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(2013.88,10.5,2332.13,121.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "P" 2157.25,85.69 system 400 52.5 #ff37474f
+    shadow rect(2013.88,10.5,2332.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(2013.88,10.5,2332.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "P" 2157.25,82.69 system 400 52.5 #ff37474f
     text "7" 2305.38,39.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(2013.88,10.5,2332.13,121.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(2013.88,10.5,2332.13,115.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r2c1 kind=letter a11y="A，8"
-  bounds 0,132,390,265
-  shape rect(7.88,142.5,382.13,254.5 r=10.5,10.5,10.5,10.5)
-  hit rect(0,132,390,265)
-  anchor 195,198.5 up 0,-1
+  bounds 0,126,390,252
+  shape rect(7.88,136.5,382.13,241.5 r=10.5,10.5,10.5,10.5)
+  hit rect(0,126,390,252)
+  anchor 195,189 up 0,-1
   text label="A" alt="8"
   shortcut="g18/a" letters="a"
   normal
-    shadow rect(7.88,142.5,382.13,257.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(7.88,142.5,382.13,254.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "A" 179.25,218.19 system 400 52.5 #ff37474f
-    icon select-all 15,147,44,176 #ff7a858a
-    text "8" 355.38,171.9 system 700 28 #ff7a858a
+    shadow rect(7.88,136.5,382.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,136.5,382.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "A" 179.25,208.69 system 400 52.5 #ff37474f
+    icon select-all 15,141,44,170 #ff7a858a
+    text "8" 355.38,165.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(7.88,142.5,382.13,254.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(7.88,136.5,382.13,241.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r2c2 kind=letter a11y="S D，9"
-  bounds 390,132,780,265
-  shape rect(397.88,142.5,772.13,254.5 r=10.5,10.5,10.5,10.5)
-  hit rect(390,132,780,265)
-  anchor 585,198.5 up 0,-1
+  bounds 390,126,780,252
+  shape rect(397.88,136.5,772.13,241.5 r=10.5,10.5,10.5,10.5)
+  hit rect(390,126,780,252)
+  anchor 585,189 up 0,-1
   text label="SD" alt="9"
   shortcut="g18/sd" letters="sd" lean=off
   normal
-    shadow rect(397.88,142.5,772.13,257.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(397.88,142.5,772.13,254.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "SD" 553.5,218.19 system 400 52.5 #ff37474f
-    text "9" 745.38,171.9 system 700 28 #ff7a858a
+    shadow rect(397.88,136.5,772.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(397.88,136.5,772.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "SD" 553.5,208.69 system 400 52.5 #ff37474f
+    text "9" 745.38,165.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(397.88,142.5,772.13,254.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(397.88,136.5,772.13,241.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r2c3 kind=letter a11y="F G，0"
-  bounds 780,132,1170,265
-  shape rect(787.88,142.5,1162.13,254.5 r=10.5,10.5,10.5,10.5)
-  hit rect(780,132,1170,265)
-  anchor 975,198.5 up 0,-1
+  bounds 780,126,1170,252
+  shape rect(787.88,136.5,1162.13,241.5 r=10.5,10.5,10.5,10.5)
+  hit rect(780,126,1170,252)
+  anchor 975,189 up 0,-1
   text label="FG" alt="0"
   shortcut="g18/fg" letters="fg" lean=off
   normal
-    shadow rect(787.88,142.5,1162.13,257.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(787.88,142.5,1162.13,254.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "FG" 943.5,218.19 system 400 52.5 #ff37474f
-    text "0" 1135.38,171.9 system 700 28 #ff7a858a
+    shadow rect(787.88,136.5,1162.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(787.88,136.5,1162.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "FG" 943.5,208.69 system 400 52.5 #ff37474f
+    text "0" 1135.38,165.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(787.88,142.5,1162.13,254.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(787.88,136.5,1162.13,241.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r2c4 kind=letter a11y="H，（"
-  bounds 1170,132,1560,265
-  shape rect(1177.88,142.5,1552.13,254.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1170,132,1560,265)
-  anchor 1365,198.5 up 0,-1
+  bounds 1170,126,1560,252
+  shape rect(1177.88,136.5,1552.13,241.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1170,126,1560,252)
+  anchor 1365,189 up 0,-1
   text label="H" alt="（"
   shortcut="g18/h" letters="h"
   normal
-    shadow rect(1177.88,142.5,1552.13,257.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1177.88,142.5,1552.13,254.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "H" 1349.25,218.19 system 400 52.5 #ff37474f
-    text "（" 1513.62,171.9 system 700 28 #ff7a858a
+    shadow rect(1177.88,136.5,1552.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1177.88,136.5,1552.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "H" 1349.25,208.69 system 400 52.5 #ff37474f
+    text "（" 1513.62,165.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(1177.88,142.5,1552.13,254.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1177.88,136.5,1552.13,241.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r2c5 kind=letter a11y="J K，）"
-  bounds 1560,132,1950,265
-  shape rect(1567.88,142.5,1942.13,254.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1560,132,1950,265)
-  anchor 1755,198.5 up 0,-1
+  bounds 1560,126,1950,252
+  shape rect(1567.88,136.5,1942.13,241.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1560,126,1950,252)
+  anchor 1755,189 up 0,-1
   text label="JK" alt="）"
   shortcut="g18/jk" letters="jk" lean=off
   normal
-    shadow rect(1567.88,142.5,1942.13,257.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1567.88,142.5,1942.13,254.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "JK" 1723.5,218.19 system 400 52.5 #ff37474f
-    text "）" 1903.62,171.9 system 700 28 #ff7a858a
+    shadow rect(1567.88,136.5,1942.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1567.88,136.5,1942.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "JK" 1723.5,208.69 system 400 52.5 #ff37474f
+    text "）" 1903.62,165.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(1567.88,142.5,1942.13,254.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1567.88,136.5,1942.13,241.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r2c6 kind=letter a11y="L，-"
-  bounds 1950,132,2340,265
-  shape rect(1957.88,142.5,2332.13,254.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1950,132,2340,265)
-  anchor 2145,198.5 up 0,-1
+  bounds 1950,126,2340,252
+  shape rect(1957.88,136.5,2332.13,241.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1950,126,2340,252)
+  anchor 2145,189 up 0,-1
   text label="L" alt="-"
   shortcut="g18/l" letters="l;" lean=off
   normal
-    shadow rect(1957.88,142.5,2332.13,257.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1957.88,142.5,2332.13,254.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "L" 2129.25,218.19 system 400 52.5 #ff37474f
-    text "-" 2305.38,171.9 system 700 28 #ff7a858a
+    shadow rect(1957.88,136.5,2332.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1957.88,136.5,2332.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "L" 2129.25,208.69 system 400 52.5 #ff37474f
+    text "-" 2305.38,165.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(1957.88,142.5,2332.13,254.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1957.88,136.5,2332.13,241.5 r=10.5,10.5,10.5,10.5) #1f000000
 key apostrophe kind=function role=apostrophe a11y="a11y_key_separator"
-  bounds 0,265,351,397
-  shape rect(7.88,275.5,343.13,386.5 r=10.5,10.5,10.5,10.5)
-  hit rect(0,265,351,397)
-  anchor 175.5,331 up 0,-1
+  bounds 0,252,351,378
+  shape rect(7.88,262.5,343.13,367.5 r=10.5,10.5,10.5,10.5)
+  hit rect(0,252,351,378)
+  anchor 175.5,315 up 0,-1
   actions send="'"
   text label="分词"
   shortcut="fn/separator"
   normal
-    shadow rect(7.88,275.5,343.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(7.88,275.5,343.13,386.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "分词" 133.5,346.75 system 400 42 #ff7a858a
+    shadow rect(7.88,262.5,343.13,370.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,262.5,343.13,367.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "分词" 133.5,330.75 system 400 42 #ff7a858a
   pressed
-    +2 fill rect(7.88,275.5,343.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(7.88,262.5,343.13,367.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r3c1 kind=letter a11y="Z，～"
-  bounds 351,265,679,397
-  shape rect(358.88,275.5,671.13,386.5 r=10.5,10.5,10.5,10.5)
-  hit rect(351,265,679,397)
-  anchor 515,331 up 0,-1
+  bounds 351,252,679,378
+  shape rect(358.88,262.5,671.13,367.5 r=10.5,10.5,10.5,10.5)
+  hit rect(351,252,679,378)
+  anchor 515,315 up 0,-1
   text label="Z" alt="～"
   shortcut="g18/z" letters="z"
   normal
-    shadow rect(358.88,275.5,671.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(358.88,275.5,671.13,386.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "Z" 499.25,350.69 system 400 52.5 #ff37474f
-    icon undo 366,280,395,309 #ff7a858a
-    text "～" 632.62,304.9 system 700 28 #ff7a858a
+    shadow rect(358.88,262.5,671.13,370.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(358.88,262.5,671.13,367.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "Z" 499.25,334.69 system 400 52.5 #ff37474f
+    icon undo 366,267,395,296 #ff7a858a
+    text "～" 632.62,291.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(358.88,275.5,671.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(358.88,262.5,671.13,367.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r3c2 kind=letter a11y="X C，！"
-  bounds 679,265,1006,397
-  shape rect(686.88,275.5,998.13,386.5 r=10.5,10.5,10.5,10.5)
-  hit rect(679,265,1006,397)
-  anchor 842.5,331 up 0,-1
+  bounds 679,252,1006,378
+  shape rect(686.88,262.5,998.13,367.5 r=10.5,10.5,10.5,10.5)
+  hit rect(679,252,1006,378)
+  anchor 842.5,315 up 0,-1
   text label="XC" alt="！"
   shortcut="g18/xc" letters="xc" lean=off
   normal
-    shadow rect(686.88,275.5,998.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(686.88,275.5,998.13,386.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "XC" 811,350.69 system 400 52.5 #ff37474f
-    icon content-copy 694,280,723,309 #ff7a858a
-    text "！" 959.62,304.9 system 700 28 #ff7a858a
+    shadow rect(686.88,262.5,998.13,370.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(686.88,262.5,998.13,367.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "XC" 811,334.69 system 400 52.5 #ff37474f
+    icon content-copy 694,267,723,296 #ff7a858a
+    text "！" 959.62,291.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(686.88,275.5,998.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(686.88,262.5,998.13,367.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r3c3 kind=letter a11y="V，@"
-  bounds 1006,265,1334,397
-  shape rect(1013.88,275.5,1326.13,386.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1006,265,1334,397)
-  anchor 1170,331 up 0,-1
+  bounds 1006,252,1334,378
+  shape rect(1013.88,262.5,1326.13,367.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1006,252,1334,378)
+  anchor 1170,315 up 0,-1
   text label="V" alt="@"
   shortcut="g18/v" letters="v"
   normal
-    shadow rect(1013.88,275.5,1326.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1013.88,275.5,1326.13,386.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "V" 1154.25,350.69 system 400 52.5 #ff37474f
-    icon content-paste 1021,280,1050,309 #ff7a858a
-    text "@" 1299.38,304.9 system 700 28 #ff7a858a
+    shadow rect(1013.88,262.5,1326.13,370.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1013.88,262.5,1326.13,367.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "V" 1154.25,334.69 system 400 52.5 #ff37474f
+    icon content-paste 1021,267,1050,296 #ff7a858a
+    text "@" 1299.38,291.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(1013.88,275.5,1326.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1013.88,262.5,1326.13,367.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r3c4 kind=letter a11y="B N，？"
-  bounds 1334,265,1661,397
-  shape rect(1341.88,275.5,1653.13,386.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1334,265,1661,397)
-  anchor 1497.5,331 up 0,-1
+  bounds 1334,252,1661,378
+  shape rect(1341.88,262.5,1653.13,367.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1334,252,1661,378)
+  anchor 1497.5,315 up 0,-1
   text label="BN" alt="？"
   shortcut="g18/bn" letters="bn" lean=off
   normal
-    shadow rect(1341.88,275.5,1653.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1341.88,275.5,1653.13,386.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "BN" 1466,350.69 system 400 52.5 #ff37474f
-    text "？" 1614.62,304.9 system 700 28 #ff7a858a
+    shadow rect(1341.88,262.5,1653.13,370.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1341.88,262.5,1653.13,367.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "BN" 1466,334.69 system 400 52.5 #ff37474f
+    text "？" 1614.62,291.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(1341.88,275.5,1653.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1341.88,262.5,1653.13,367.5 r=10.5,10.5,10.5,10.5) #1f000000
 key r3c5 kind=letter a11y="M，："
-  bounds 1661,265,1989,397
-  shape rect(1668.88,275.5,1981.13,386.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1661,265,1989,397)
-  anchor 1825,331 up 0,-1
+  bounds 1661,252,1989,378
+  shape rect(1668.88,262.5,1981.13,367.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1661,252,1989,378)
+  anchor 1825,315 up 0,-1
   text label="M" alt="："
   shortcut="g18/m" letters="m"
   normal
-    shadow rect(1668.88,275.5,1981.13,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1668.88,275.5,1981.13,386.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "M" 1809.25,350.69 system 400 52.5 #ff37474f
-    text "：" 1942.62,304.9 system 700 28 #ff7a858a
+    shadow rect(1668.88,262.5,1981.13,370.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1668.88,262.5,1981.13,367.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "M" 1809.25,334.69 system 400 52.5 #ff37474f
+    text "：" 1942.62,291.9 system 700 28 #ff7a858a
   pressed
-    +2 fill rect(1668.88,275.5,1981.13,386.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1668.88,262.5,1981.13,367.5 r=10.5,10.5,10.5,10.5) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"
-  bounds 1989,265,2340,397
-  shape rect(1996.88,275.5,2332.12,386.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1989,265,2340,397)
-  anchor 2164.5,331 up 0,-1
+  bounds 1989,252,2340,378
+  shape rect(1996.88,262.5,2332.12,367.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1989,252,2340,378)
+  anchor 2164.5,315 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
   sound=delete shortcut="fn/backspace"
   normal
-    shadow rect(1996.88,275.5,2332.12,389.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1996.88,275.5,2332.12,386.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 2133,299.5,2196,362.5 #ff7a858a
-    icon delete-sweep 2295,280,2324,309 #ff7a858a
-    icon restore 2004,280,2033,309 #ff7a858a
+    shadow rect(1996.88,262.5,2332.12,370.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1996.88,262.5,2332.12,367.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon backspace 2133,283.5,2196,346.5 #ff7a858a
+    icon delete-sweep 2295,267,2324,296 #ff7a858a
+    icon restore 2004,267,2033,296 #ff7a858a
   pressed
-    +2 fill rect(1996.88,275.5,2332.12,386.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1996.88,262.5,2332.12,367.5 r=10.5,10.5,10.5,10.5) #1f000000
 key symbols kind=function role=symbols a11y="符"
-  bounds 0,397,281,529
-  shape rect(7.88,407.5,273.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(0,397,281,529)
-  anchor 140.5,463 up 0,-1
+  bounds 0,378,281,504
+  shape rect(7.88,388.5,273.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(0,378,281,504)
+  anchor 140.5,441 up 0,-1
   actions send="layout:Symbol"
   text label="符"
   shortcut="fn/symbols"
   normal
-    shadow rect(7.88,407.5,273.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(7.88,407.5,273.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "符" 118.45,478.75 system 700 42 #ff7a858a
+    shadow rect(7.88,388.5,273.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,388.5,273.13,493.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "符" 118.45,456.75 system 700 42 #ff7a858a
   pressed
-    +2 fill rect(7.88,407.5,273.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(7.88,388.5,273.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key numbers kind=function role=numbers a11y="123"
-  bounds 281,397,562,529
-  shape rect(288.88,407.5,554.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(281,397,562,529)
-  anchor 421.5,463 up 0,-1
+  bounds 281,378,562,504
+  shape rect(288.88,388.5,554.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(281,378,562,504)
+  anchor 421.5,441 up 0,-1
   actions send="layout:Number"
   text label="123"
   shortcut="fn/numbers"
   normal
-    shadow rect(288.88,407.5,554.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(288.88,407.5,554.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "123" 381.5,478.75 system 700 42 #ff7a858a
+    shadow rect(288.88,388.5,554.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(288.88,388.5,554.13,493.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "123" 381.5,456.75 system 700 42 #ff7a858a
   pressed
-    +2 fill rect(288.88,407.5,554.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(288.88,388.5,554.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key comma kind=function role=comma a11y="，"
-  bounds 562,397,796,529
-  shape rect(569.88,407.5,788.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(562,397,796,529)
-  anchor 679,463 up 0,-1
+  bounds 562,378,796,504
+  shape rect(569.88,388.5,788.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(562,378,796,504)
+  anchor 679,441 up 0,-1
   actions send=","
   text label="，"
   shortcut="fn/comma"
   normal
-    shadow rect(569.88,407.5,788.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(569.88,407.5,788.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "，" 648.81,485.64 system 400 60.38 #ff7a858a
+    shadow rect(569.88,388.5,788.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(569.88,388.5,788.13,493.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "，" 648.81,463.64 system 400 60.38 #ff7a858a
   pressed
-    +2 fill rect(569.88,407.5,788.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(569.88,388.5,788.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key space kind=space role=space a11y="空格，拼音"
-  bounds 796,397,1521,529
-  shape rect(803.88,407.5,1513.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(796,397,1521,529)
-  anchor 1158.5,463 up 0,-1
+  bounds 796,378,1521,504
+  shape rect(803.88,388.5,1513.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(796,378,1521,504)
+  anchor 1158.5,441 up 0,-1
   actions send="sym:space" swipe-axis="both"
   text label="拼音"
   sound=space shortcut="fn/space"
   normal
-    shadow rect(803.88,407.5,1513.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(803.88,407.5,1513.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    text "拼音" 1124,475.8 system 400 34.13 #ff37474f
-    icon cursor-move 1476,412,1505,441 #ff7a858a
+    shadow rect(803.88,388.5,1513.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(803.88,388.5,1513.13,493.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    text "拼音" 1124,453.8 system 400 34.13 #ff37474f
+    icon cursor-move 1476,393,1505,422 #ff7a858a
   pressed
-    +2 fill rect(803.88,407.5,1513.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(803.88,388.5,1513.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key period kind=function role=period a11y="。"
-  bounds 1521,397,1755,529
-  shape rect(1528.88,407.5,1747.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1521,397,1755,529)
-  anchor 1638,463 up 0,-1
+  bounds 1521,378,1755,504
+  shape rect(1528.88,388.5,1747.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1521,378,1755,504)
+  anchor 1638,441 up 0,-1
   actions send="."
   text label="。"
   shortcut="fn/period"
   normal
-    shadow rect(1528.88,407.5,1747.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1528.88,407.5,1747.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "。" 1607.81,485.64 system 400 60.38 #ff7a858a
+    shadow rect(1528.88,388.5,1747.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1528.88,388.5,1747.13,493.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "。" 1607.81,463.64 system 400 60.38 #ff7a858a
   pressed
-    +2 fill rect(1528.88,407.5,1747.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1528.88,388.5,1747.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key lang kind=letter role=lang a11y="a11y_key_switch_language"
-  bounds 1755,397,1989,529
-  shape rect(1762.88,407.5,1981.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1755,397,1989,529)
-  anchor 1872,463 up 0,-1
+  bounds 1755,378,1989,504
+  shape rect(1762.88,388.5,1981.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1755,378,1989,504)
+  anchor 1872,441 up 0,-1
   actions send="lang"
   shortcut="fn/lang"
   normal
-    shadow rect(1762.88,407.5,1981.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1762.88,407.5,1981.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon language 1840.5,431.5,1903.5,494.5 #ff7a858a
+    shadow rect(1762.88,388.5,1981.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1762.88,388.5,1981.13,493.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    icon language 1840.5,409.5,1903.5,472.5 #ff7a858a
   pressed
-    +2 fill rect(1762.88,407.5,1981.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1762.88,388.5,1981.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
-  bounds 1989,397,2340,529
-  shape rect(1996.88,407.5,2332.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1989,397,2340,529)
-  anchor 2164.5,463 up 0,-1
+  bounds 1989,378,2340,504
+  shape rect(1996.88,388.5,2332.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1989,378,2340,504)
+  anchor 2164.5,441 up 0,-1
   actions send="sym:Return"
   sound=return shortcut="fn/return"
   menu "Emoji" icon=emoji do="picker:"
   normal
-    shadow rect(1996.88,407.5,2332.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1996.88,407.5,2332.13,518.5 r=10.5,10.5,10.5,10.5) #ff5cb5ab
-    icon enter 2133,431.5,2196,494.5 #ffffffff
+    shadow rect(1996.88,388.5,2332.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1996.88,388.5,2332.13,493.5 r=10.5,10.5,10.5,10.5) #ff5cb5ab
+    icon enter 2133,409.5,2196,472.5 #ffffffff
   pressed
-    +2 fill rect(1996.88,407.5,2332.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1996.88,388.5,2332.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000

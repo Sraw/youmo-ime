@@ -194,4 +194,12 @@ class KeyCapsTest {
         // a key cap's size on the page, about 56dp at 440dpi
         const val SIZE = 154
     }
+
+    @Test
+    fun aZhuyinCapIsAKeyOfItsFiveRows() {
+        // 注音's keys share the keyboard's height five ways, the letters' four: a cap stands for its own board's key
+        val qwerty = KeyCaps.keyboardKeyHeight(ctx)
+        val zhuyin = KeyCaps.keyboardKeyHeight(ctx, "zhuyin")
+        assertEquals(qwerty * 4 / 5.0, zhuyin.toDouble(), 1.0)
+    }
 }

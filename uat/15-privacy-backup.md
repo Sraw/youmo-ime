@@ -311,3 +311,9 @@
 - **操作**：打开键盘（手写开着），写「门」上屏；关掉手写打 men。
 - **预期**：上屏「門」；拼音打 men 也出繁体（拼音顶替了手写的第一位，也接过它的繁体，用户定 Q12）。手写不在第一个时它的繁体没了，提示里说一句「现在写的字跟着所在输入法的简繁」。
 - **JVM**：`KotlinHostHandwritingTest.zeroSixsTraditionalHandwritingIsPinyinsWhereItTookItsPlace`（拼音顶替时繁体给拼音；不在第一个时去掉并在提示里说）、`HandwritingRetireTest.traditionalHandwritingGoesToPinyinWhereItTookHandwritingsPlace`（ime-core）；设备上不跑。
+
+### PR-61 [P1] 从 0.6.0 升级：横屏高度
+- **前提**：0.6.0 装着，**键盘高度** 选"高"，开过悬浮键盘并在横屏把它拖到中间；做一份「备份全部」。装 0.6.1 覆盖升级。
+- **操作**：看设置里的键盘高度；横屏点「普通文本」框；开悬浮键盘看；恢复刚才的备份再看；再装回 0.6.0。
+- **预期**：设置里仍显示"高"；横屏按新表（手机每行约 54 dp，碰到给应用留的 120 dp 时压矮）；横屏悬浮键盘的大小和位置和 0.6.0 一样；恢复备份后一样；装回 0.6.0 回到原来的高度（同一个数按 0.6.0 的百分比用）。
+- **JVM**：`KeyboardSizesTest.floatingKeepsThePercentOf060`（悬浮仍按 0.6.0 的百分比）、`KeyboardAreaTest.aPhoneTurnedAsksForFourRowsOf48`（横屏 4 × 48 dp、悬浮基准是屏高的 49%）；升级、降级在设备上做。

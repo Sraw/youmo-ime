@@ -55,7 +55,7 @@ object SceneEnvs {
 
     /**
      * [view]'s keys at [width] × [height] px in [look] ([dark] its theme's): landscape as the screen is,
-     * compact as the height setting is (KeyboardHeightCap), floating's text scale only in the input
+     * compact as the height setting is (KeyboardHeightLevels.isCompact), floating's text scale only in the input
      * method (not a settings page's preview), [split] where the keyboard splits its letters.
      */
     fun of(

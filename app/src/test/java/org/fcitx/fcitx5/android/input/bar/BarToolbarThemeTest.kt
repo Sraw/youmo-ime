@@ -146,7 +146,7 @@ class BarToolbarThemeTest {
 
     @Test
     fun theCapReachedTheKeysGiveTheBarItsRoom() {
-        // 90% asked: the cap (70% of the screen, the bar in it) binds, so a taller bar is the keys' loss
+        // 90% asked: the floor (the app keeps 120 dp, the bar in the room) binds, so a taller bar is the keys' loss
         val keyboard = AppPrefs.getInstance().keyboard
         prefs.set(keyboard.keyboardHeightFollowTheme, false)
         prefs.set(keyboard.keyboardHeightPercent, 90)

@@ -1,56 +1,56 @@
-scene 2340x367 no-preview no-popups
+scene 2340x357 no-preview no-popups
 base
-  fill rect(0,0,2340,367) #ffeceff1
+  fill rect(0,0,2340,357) #ffeceff1
 key page-up kind=function a11y="a11y_candidates_prev_page"
-  bounds 0,0,2340,92
-  shape rect(7.88,10.5,2332.13,81.5 r=10.5,10.5,10.5,10.5)
-  hit rect(0,0,2340,92)
-  anchor 1170,46 up 0,-1
+  bounds 0,0,2340,89
+  shape rect(7.88,10.5,2332.13,78.5 r=10.5,10.5,10.5,10.5)
+  hit rect(0,0,2340,89)
+  anchor 1170,44.5 up 0,-1
   actions send="action:page-up"
   normal
-    shadow rect(7.88,10.5,2332.13,84.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(7.88,10.5,2332.13,81.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon arrow-upward 1138.5,14.5,1201.5,77.5 #ff7a858a
+    shadow rect(7.88,10.5,2332.13,81.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,10.5,2332.13,78.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon arrow-upward 1138.5,13,1201.5,76 #ff7a858a
   pressed
-    +2 fill rect(7.88,10.5,2332.13,81.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(7.88,10.5,2332.13,78.5 r=10.5,10.5,10.5,10.5) #1f000000
 key page-down kind=function a11y="a11y_candidates_next_page"
-  bounds 0,92,2340,184
-  shape rect(7.88,102.5,2332.13,173.5 r=10.5,10.5,10.5,10.5)
-  hit rect(0,92,2340,184)
-  anchor 1170,138 up 0,-1
+  bounds 0,89,2340,179
+  shape rect(7.88,99.5,2332.13,168.5 r=10.5,10.5,10.5,10.5)
+  hit rect(0,89,2340,179)
+  anchor 1170,134 up 0,-1
   actions send="action:page-down"
   normal
-    shadow rect(7.88,102.5,2332.13,176.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(7.88,102.5,2332.13,173.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon arrow-downward 1138.5,106.5,1201.5,169.5 #ff7a858a
+    shadow rect(7.88,99.5,2332.13,171.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,99.5,2332.13,168.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon arrow-downward 1138.5,102.5,1201.5,165.5 #ff7a858a
   pressed
-    +2 fill rect(7.88,102.5,2332.13,173.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(7.88,99.5,2332.13,168.5 r=10.5,10.5,10.5,10.5) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"
-  bounds 0,184,2340,275
-  shape rect(7.88,194.5,2332.13,264.5 r=10.5,10.5,10.5,10.5)
-  hit rect(0,184,2340,275)
-  anchor 1170,229.5 up 0,-1
+  bounds 0,179,2340,268
+  shape rect(7.88,189.5,2332.13,257.5 r=10.5,10.5,10.5,10.5)
+  hit rect(0,179,2340,268)
+  anchor 1170,223.5 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
   sound=delete shortcut="fn/backspace"
   normal
-    shadow rect(7.88,194.5,2332.13,267.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(7.88,194.5,2332.13,264.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 1138.5,198,1201.5,261 #ff7a858a
-    icon delete-sweep 2305,197,2326,218 #ff7a858a
-    icon restore 13,197,34,218 #ff7a858a
+    shadow rect(7.88,189.5,2332.13,260.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,189.5,2332.13,257.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon backspace 1138.5,192,1201.5,255 #ff7a858a
+    icon delete-sweep 2305,192,2326,213 #ff7a858a
+    icon restore 13,192,34,213 #ff7a858a
   pressed
-    +2 fill rect(7.88,194.5,2332.13,264.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(7.88,189.5,2332.13,257.5 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
-  bounds 0,275,2340,367
-  shape rect(7.88,285.5,2332.13,356.5 r=10.5,10.5,10.5,10.5)
-  hit rect(0,275,2340,367)
-  anchor 1170,321 up 0,-1
+  bounds 0,268,2340,357
+  shape rect(7.88,278.5,2332.13,346.5 r=10.5,10.5,10.5,10.5)
+  hit rect(0,268,2340,357)
+  anchor 1170,312.5 up 0,-1
   actions send="sym:Return"
   sound=return shortcut="fn/return"
   menu "Emoji" icon=emoji do="picker:"
   normal
-    shadow rect(7.88,285.5,2332.13,359.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(7.88,285.5,2332.13,356.5 r=10.5,10.5,10.5,10.5) #ff5cb5ab
-    icon enter 1138.5,289.5,1201.5,352.5 #ffffffff
+    shadow rect(7.88,278.5,2332.13,349.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(7.88,278.5,2332.13,346.5 r=10.5,10.5,10.5,10.5) #ff5cb5ab
+    icon enter 1138.5,281,1201.5,344 #ffffffff
   pressed
-    +2 fill rect(7.88,285.5,2332.13,356.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(7.88,278.5,2332.13,346.5 r=10.5,10.5,10.5,10.5) #1f000000

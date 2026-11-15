@@ -178,18 +178,24 @@ class ThemeBaselineCompareTest {
 
     private val theme get() = ThemeManager.prefs
 
+    // 横屏 as high as 0.6.0's (49% of the screen), not 0.6.1's rows of dp: the drawing compared, not the height
+    private fun heightAs060(): () -> Unit {
+        KeyboardArea.turnedAs060 = true
+        return { KeyboardArea.turnedAs060 = false }
+    }
+
     private val upright = Form("port")
 
     private val forms = listOf(
-        Form("land", LANDSCAPE) { listOf(theme.splitKeyboard.during(SplitKeyboardMode.Off)) },
+        Form("land", LANDSCAPE) { listOf(theme.splitKeyboard.during(SplitKeyboardMode.Off), heightAs060()) },
         Form("compact") {
             val compact = KeyboardHeightLevels.ALL[KeyboardHeightLevels.COMPACT]
             val keyboard = AppPrefs.getInstance().keyboard
-            listOf(keyboard.keyboardHeightPercent.during(compact.portrait), keyboard.keyboardHeightPercentLandscape.during(compact.landscape))
+            listOf(keyboard.keyboardHeightPercent.during(compact.portrait), keyboard.keyboardHeightPercentLandscape.during(compact.landscapeLevel))
         },
         Form("floating") { listOf(theme.floatingKeyboard.during(true)) },
         Form("one_handed_left") { listOf(theme.oneHanded.during(OneHanded.Left)) },
-        Form("split_land", LANDSCAPE) { listOf(theme.splitKeyboard.during(SplitKeyboardMode.Always)) },
+        Form("split_land", LANDSCAPE) { listOf(theme.splitKeyboard.during(SplitKeyboardMode.Always), heightAs060()) },
         Form("flat") { listOf(theme.keyBorderChoice.during(ThemePrefs.KeyBorderChoice.Off)) },
     )
 

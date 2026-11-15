@@ -31,12 +31,25 @@ data class KeyboardSizes(
     private fun themed(setting: Setting, theme: Twin?): Twin? = theme?.takeIf { setting.follow }
 
     /**
-     * The keys' height asked for, px, out of [screen] px (KeyboardHeightCap cuts it after), on a screen [width] px
-     * wide. 横屏's percent is of the short side: a foldable's inner screen and a tablet upright are 横屏 (ScreenShape)
-     * and about as high as turned, not the landscape percent of their long side (061-wide-as-landscape §2.2): below API 35
-     * [screen] turned is the display less the navigation bar, so upright stands that bar's percent taller.
+     * The keys' height asked for, px (KeyboardHeightCap cuts it after). Upright, the level's percent of [screen] px.
+     * Turned (横屏: a foldable's inner screen and a tablet upright too, ScreenShape), [LANDSCAPE_ROWS] rows of the
+     * level's row, dp ([KeyboardHeightLevels.landscapeRowDp]; the theme's landscape `height` read the same way), [large]
+     * where the display's short side is [KeyboardHeightLevels.LARGE_SHORT_SIDE_DP] or more: no share of the screen, so a
+     * key is as tall on a phone of any height and the same on Android 14 and 15, whose screens' heights differ by the bar
+     * (061-landscape-height §5.1). [density] px a dp.
      */
-    fun heightPx(screen: Int, width: Int, landscape: Boolean): Int {
+    fun heightPx(screen: Int, landscape: Boolean, density: Float, large: Boolean): Int {
+        if (!landscape) return percentHeightPx(screen, screen, landscape = false)
+        val level = themed(height, theme.height)?.landscape ?: height.landscape.toDouble()
+        return (LANDSCAPE_ROWS * KeyboardHeightLevels.landscapeRowDp(level, large) * density).toInt()
+    }
+
+    /**
+     * The keys' height as 0.6.0 had it, px: the level's percent of [screen], turned of the short side of [screen] and
+     * [width] (061-wide-as-landscape §2.2). What a floating keyboard is made from turned as upright: it takes nothing
+     * of the app's, and keeps its size from 0.6.0 (061-landscape-height §5.4).
+     */
+    fun percentHeightPx(screen: Int, width: Int, landscape: Boolean): Int {
         val base = if (landscape) minOf(screen, width) else screen
         return themed(height, theme.height)?.let { (base * it.of(landscape) / PERCENT).toInt() }
             ?: (base * (if (landscape) height.landscape else height.portrait) / PERCENT.toInt())
@@ -64,7 +77,10 @@ data class KeyboardSizes(
     private fun dp(setting: Setting, theme: Twin?, landscape: Boolean): Double =
         themed(setting, theme)?.of(landscape) ?: (if (landscape) setting.landscape else setting.portrait).toDouble()
 
-    private companion object {
-        const val PERCENT = 100.0
+    companion object {
+        private const val PERCENT = 100.0
+
+        /** The rows 横屏's height is of: a layout of more rows has them shorter, as upright (§5.1). */
+        const val LANDSCAPE_ROWS = 4
     }
 }

@@ -5,14 +5,18 @@
 package org.fcitx.fcitx5.android.input.clipboard
 
 import android.content.Context
+import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import splitties.dimensions.dp
 import splitties.resources.drawable
+import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
+import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.endOfParent
 import splitties.views.dsl.constraintlayout.lParams
+import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.Ui
@@ -67,14 +71,21 @@ sealed class ClipboardInstructionUi(override val ctx: Context, protected val the
             setTextColor(theme.keyTextColor)
         }
 
+        // the icon 90 dp where there is room, smaller where not: turned, the panel can be four rows of 36 dp
+        // high (061-landscape-height), where a 90 dp icon pushed the words out of the bottom
         override val root = constraintLayout {
-            add(icon, lParams(dp(90), dp(90)) {
+            add(icon, lParams(dp(90), matchConstraints) {
                 topOfParent(dp(24))
+                above(instructionText, dp(16))
                 startOfParent()
                 endOfParent()
+                matchConstraintMaxHeight = dp(90)
+                verticalChainStyle = ConstraintLayout.LayoutParams.CHAIN_PACKED
+                verticalBias = 0f
             })
             add(instructionText, lParams(wrapContent, wrapContent) {
                 below(icon, dp(16))
+                bottomOfParent(dp(8))
                 startOfParent()
                 endOfParent()
             })

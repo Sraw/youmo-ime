@@ -1,87 +1,87 @@
-scene 2340x529 board 1358.25,0,2340,529
+scene 2340x504 board 1358.25,0,2340,504
 base
-  fill rect(0,0,2340,529) #ffeceff1
-slot symbol-categories categories 1358.25,0,1535,397
-slot symbol-grid grid 1535,0,2340,397
-slot side-buttons 0,0,1358.25,529
+  fill rect(0,0,2340,504) #ffeceff1
+slot symbol-categories categories 1358.25,0,1535,378
+slot symbol-grid grid 1535,0,2340,378
+slot side-buttons 0,0,1358.25,504
 key back kind=function role=back a11y="返回"
-  bounds 1358.25,397,1506,529
-  shape rect(1366.13,407.5,1498.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1358.25,397,1506,529)
-  anchor 1432.13,463 up 0,-1
+  bounds 1358.25,378,1506,504
+  shape rect(1366.13,388.5,1498.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1358.25,378,1506,504)
+  anchor 1432.13,441 up 0,-1
   actions send="panel-back"
   text label="返回"
   normal
-    shadow rect(1366.13,407.5,1498.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1366.13,407.5,1498.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "返回" 1387.63,478.75 system 700 42 #ff7a858a
+    shadow rect(1366.13,388.5,1498.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1366.13,388.5,1498.13,493.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "返回" 1387.63,456.75 system 700 42 #ff7a858a
   pressed
-    +2 fill rect(1366.13,407.5,1498.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1366.13,388.5,1498.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key numbers kind=function role=numbers a11y="123"
-  bounds 1506,397,1623,529
-  shape rect(1513.88,407.5,1615.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1506,397,1623,529)
-  anchor 1564.5,463 up 0,-1
+  bounds 1506,378,1623,504
+  shape rect(1513.88,388.5,1615.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1506,378,1623,504)
+  anchor 1564.5,441 up 0,-1
   actions send="layout:Number"
   text label="123"
   shortcut="fn/numbers"
   normal
-    shadow rect(1513.88,407.5,1615.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1513.88,407.5,1615.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "123" 1524.5,478.75 system 700 42 #ff7a858a
+    shadow rect(1513.88,388.5,1615.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1513.88,388.5,1615.13,493.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    text "123" 1524.5,456.75 system 700 42 #ff7a858a
   pressed
-    +2 fill rect(1513.88,407.5,1615.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1513.88,388.5,1615.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key lock kind=function role=lock a11y="a11y_key_panel_lock"
-  bounds 1623,397,1741,529
-  shape rect(1630.88,407.5,1733.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1623,397,1741,529)
-  anchor 1682,463 up 0,-1
+  bounds 1623,378,1741,504
+  shape rect(1630.88,388.5,1733.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1623,378,1741,504)
+  anchor 1682,441 up 0,-1
   actions send="panel-lock"
   normal
-    shadow rect(1630.88,407.5,1733.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1630.88,407.5,1733.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon lock-open 1650.5,431.5,1713.5,494.5 #ff7a858a
+    shadow rect(1630.88,388.5,1733.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1630.88,388.5,1733.13,493.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon lock-open 1650.5,409.5,1713.5,472.5 #ff7a858a
   pressed
-    +2 fill rect(1630.88,407.5,1733.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1630.88,388.5,1733.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key space kind=space role=space a11y="a11y_key_space"
-  bounds 1741,397,2045,529
-  shape rect(1748.88,407.5,2037.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(1741,397,2045,529)
-  anchor 1893,463 up 0,-1
+  bounds 1741,378,2045,504
+  shape rect(1748.88,388.5,2037.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(1741,378,2045,504)
+  anchor 1893,441 up 0,-1
   actions send="sym:space" swipe-axis="both"
   sound=space shortcut="fn/space"
   normal
-    shadow rect(1748.88,407.5,2037.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(1748.88,407.5,2037.13,518.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
-    icon cursor-move 2000,412,2029,441 #ff7a858a
+    shadow rect(1748.88,388.5,2037.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(1748.88,388.5,2037.13,493.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
+    icon cursor-move 2000,393,2029,422 #ff7a858a
   pressed
-    +2 fill rect(1748.88,407.5,2037.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(1748.88,388.5,2037.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key backspace kind=function role=backspace a11y="a11y_key_backspace"
-  bounds 2045,397,2193,529
-  shape rect(2052.88,407.5,2185.13,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(2045,397,2193,529)
-  anchor 2119,463 up 0,-1
+  bounds 2045,378,2193,504
+  shape rect(2052.88,388.5,2185.13,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(2045,378,2193,504)
+  anchor 2119,441 up 0,-1
   actions repeat="true" send="sym:BackSpace" swipe-axis="both"
   sound=delete shortcut="fn/backspace"
   normal
-    shadow rect(2052.88,407.5,2185.13,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(2052.88,407.5,2185.13,518.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    icon backspace 2087.5,431.5,2150.5,494.5 #ff7a858a
-    icon delete-sweep 2152.73,412.5,2181.73,441.5 #ff7a858a
-    icon restore 2056.48,412.5,2085.48,441.5 #ff7a858a
+    shadow rect(2052.88,388.5,2185.13,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(2052.88,388.5,2185.13,493.5 r=10.5,10.5,10.5,10.5) #ffdfe2e4
+    icon backspace 2087.5,409.5,2150.5,472.5 #ff7a858a
+    icon delete-sweep 2152.73,393.75,2181.73,422.75 #ff7a858a
+    icon restore 2056.48,393.75,2085.48,422.75 #ff7a858a
   pressed
-    +2 fill rect(2052.88,407.5,2185.13,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(2052.88,388.5,2185.13,493.5 r=10.5,10.5,10.5,10.5) #1f000000
 key enter kind=enter role=enter a11y="换行"
-  bounds 2193,397,2340,529
-  shape rect(2200.88,407.5,2332.12,518.5 r=10.5,10.5,10.5,10.5)
-  hit rect(2193,397,2340,529)
-  anchor 2266.5,463 up 0,-1
+  bounds 2193,378,2340,504
+  shape rect(2200.88,388.5,2332.12,493.5 r=10.5,10.5,10.5,10.5)
+  hit rect(2193,378,2340,504)
+  anchor 2266.5,441 up 0,-1
   actions send="sym:Return"
   sound=return shortcut="fn/return"
   menu "Emoji" icon=emoji do="picker:"
   normal
-    shadow rect(2200.88,407.5,2332.12,521.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
-    fill rect(2200.88,407.5,2332.12,518.5 r=10.5,10.5,10.5,10.5) #ff5cb5ab
-    icon enter 2235,431.5,2298,494.5 #ffffffff
+    shadow rect(2200.88,388.5,2332.12,496.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
+    fill rect(2200.88,388.5,2332.12,493.5 r=10.5,10.5,10.5,10.5) #ff5cb5ab
+    icon enter 2235,409.5,2298,472.5 #ffffffff
   pressed
-    +2 fill rect(2200.88,407.5,2332.12,518.5 r=10.5,10.5,10.5,10.5) #1f000000
+    +2 fill rect(2200.88,388.5,2332.12,493.5 r=10.5,10.5,10.5,10.5) #1f000000

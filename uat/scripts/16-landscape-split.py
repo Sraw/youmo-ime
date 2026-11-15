@@ -102,7 +102,7 @@ case("LS-24a", needs="jvm:LandscapeUatTest.portraitAlwaysSplitPanelsFull")(lambd
 case("LS-25", needs="jvm:LandscapeUatTest.numberFieldDocked")(lambda d: None)
 
 
-case("LS-27", needs="jvm:LandscapeUatTest.tallestIsCappedAtSevenTenths")(lambda d: None)
+case("LS-27", needs="jvm:LandscapeUatTest.tallestLeavesTheApp120dp")(lambda d: None)
 
 
 case("LS-28", needs="jvm:LandscapeUatTest.candidatesAcrossTheWidth")(lambda d: None)
@@ -132,3 +132,12 @@ case("LS-35", needs="manual:折叠屏模拟器上 adb emu fold/unfold（或 wm s
 case("LS-36", needs="jvm:WideScreenUatTest.aTabletUprightIsTurnedAndSplits、WideScreenUatTest.justNarrowerIsUpright、WideScreenUatTest.sixHundredWideIsTurned")(lambda d: None)
 case("LS-37", needs="jvm:WideScreenUatTest.theSettingsPreviewInHalfASplitScreenIsTheDisplays、KeyboardScreensTest.eachScreenIsLandscapeAsWideAsItIs")(lambda d: None)
 case("LS-38", needs="jvm:WideScreenUatTest.theLowKeysMarksAndTheCardAsTurned")(lambda d: None)
+case("LS-47", needs="jvm:ImeRoomViewTest.theAppKeeps120dpUnderEachBackground、KeyboardHeightCapTest.whereTheFloorBindsTheKeysGiveWay、"
+     "ImeRoomViewTest.theBarsInsetsComingWorkTheKeysOutAgain")(lambda d: None)
+case("LS-48", needs="jvm:LandscapeUatTest.tallestLeavesTheApp120dp、ImeRoomViewTest.theAppKeeps120dpUnderEachBackground")(lambda d: None)
+case("LS-49", needs="jvm:WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned、WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh、"
+     "WideScreenUatTest.aTabletUprightIsTurnedAndSplits、KeyboardAreaTest.aTabletAShortSideOver600IsLargeWhicheverWayHeld、"
+     "KeyboardScreensTest.aLargeScreenIsTheDisplaysShortSideNotTheWindows")(lambda d: None)
+case("LS-50", needs="jvm:KeyboardHeightCapTest.theRowsWinOverTheFloor、ImeRoomViewTest.aSmallPhonesZhuyinKeepsItsFiveRows、"
+     "ImeRoomTest.flushAndFullScreenAndASideBar、LowLandscapeScreenshotTest.thePanelsAtTheFloor、LowLandscapeScreenshotTest.zhuyinsFiveRowsOf36")(lambda d: None)
+case("LS-51", needs="manual:五档每行的高看截图，转屏 20 次看键盘不先矮后高；2026-11-14 在 API 33/36 模拟器上量过（061-landscape-height-impl-report）")(lambda d: None)

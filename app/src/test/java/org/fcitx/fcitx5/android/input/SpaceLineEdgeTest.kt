@@ -28,8 +28,9 @@ import org.robolectric.annotation.Config
 @Config(application = FcitxApplication::class)
 class SpaceLineEdgeTest {
 
-    private fun line(h: KeyboardHarness, sym: Int) =
-        h.emit(HostEvent.Key(sym, KeyStates.Virtual.states.toInt(), 0, false, 0))
+    private fun lineKey(sym: Int) = HostEvent.Key(sym, KeyStates.Virtual.states.toInt(), 0, false, 0)
+
+    private fun line(h: KeyboardHarness, sym: Int) = h.emit(lineKey(sym))
 
     // a multi-line field holding [text], the cursor at [at]; [onLine] what the editor does with a line key
     private fun field(text: String, at: Int, onLine: (EditText, Int) -> Unit): KeyboardHarness =
@@ -61,7 +62,10 @@ class SpaceLineEdgeTest {
 
     private fun slide(text: String, at: Int, editor: (EditText, Int) -> Unit, sym: Int, times: Int): Int =
         field(text, at, editor).use { h ->
-            repeat(times) { line(h, sym) }
+            // [later]'s lines come back to back, nothing of the main thread's run between them: on a loaded full run
+            // an idle between ran Robolectric's clock on 150 ms (a task run past its time), and they were no longer rushed
+            if (editor === later) repeat(times - 1) { check(h.api.events.tryEmit(lineKey(sym))) }
+            repeat(if (editor === later) 1 else times) { line(h, sym) }
             h.field.selectionStart
         }
 

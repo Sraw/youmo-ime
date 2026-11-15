@@ -23,6 +23,8 @@ import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
@@ -159,8 +161,9 @@ object SwipeFates {
                 val english = s.ime?.uniqueName == InputMethodCatalog.ENGLISH
                 val punctuation = if (english) emptyMap() else PunctuationStartKeys.known.orEmpty()
                 s.keyboard.onPunctuationUpdate(punctuation)
+                val rows = KeyboardWindow.rowUnits(s.keyboard, look)
                 listOf(upright, turned).mapNotNull { screen ->
-                    val size = size(screen, s.keyboard.themeBoard, s.codeRow)
+                    val size = size(screen, s.keyboard.themeBoard, s.codeRow, rows)
                     val (layout, env) = s.keyboard.shownAs(look, size.width, size.height) ?: return@mapNotNull null
                     // the marks as the keyboard's resolver makes them (key_lists' firsts, the nine keys' letters as the user
                     // set them, t9_letters), the ways as [slots] has them
@@ -200,17 +203,17 @@ object SwipeFates {
     internal data class Size(val width: Int, val height: Int, val floating: Double?, val split: Boolean)
 
     // InputView.updateKeyboardSize and placement: floating as narrow and short as there, docked one-handed or at a
-    // side as SplitKeyboard puts it, a docked handle counted in the cap
+    // side as SplitKeyboard puts it, a docked handle counted in the cap, [rows] the board's (注音's five give way less)
     @VisibleForTesting
-    internal fun size(s: KeyboardArea.Screen, board: String?, codeRow: ImKeyboards.Layout): Size {
+    internal fun size(s: KeyboardArea.Screen, board: String?, codeRow: ImKeyboards.Layout, rows: Double = KeyboardHeightCap.DEFAULT_ROWS): Size {
         val prefs = ThemeManager.prefs
         if (prefs.floatingKeyboard.getValue()) {
             val widthDp = FloatingKeyboard.widthDp(s.widthDp)
-            val height = FloatingKeyboard.height(KeyboardArea.requestedHeight(s), widthDp, s.widthDp)
+            val height = FloatingKeyboard.height(KeyboardArea.floatingBase(s), widthDp, s.widthDp)
             return Size(s.dp(widthDp.toDouble()), height, FloatingKeyboard.textScale(widthDp, s.widthDp).toDouble(), false)
         }
         val handle = if (prefs.alwaysShowHandle.getValue()) s.dp(FloatingHandle.HEIGHT_DP.toDouble()) else 0
-        val height = KeyboardArea.keysHeight(s, CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats()), handle)
+        val height = KeyboardArea.keysHeight(s, CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats()), handle, rows = rows)
         val letters = board == KeyNames.QWERTY
         val splitting = KeyboardArea.splits(s, floating = false)
         val widthDp = KeyboardArea.widthDp(s, floating = false)

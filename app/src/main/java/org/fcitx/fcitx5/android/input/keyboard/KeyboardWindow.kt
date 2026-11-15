@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -47,6 +48,7 @@ import org.fcitx.fcitx5.android.input.wm.EssentialWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.scene.engine.section
+import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.mechdancer.dependency.manager.must
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.frameLayout
@@ -93,6 +95,15 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
          */
         fun afterQuickInput(was: String, lettersThen: String, lettersNow: String): String =
             if (was == lettersThen) lettersNow else was
+
+        /**
+         * [keyboard]'s rows ([KeyboardHeightCap.rowUnits]) as it is shown in [look], as [rowUnits] counts them.
+         */
+        fun rowUnits(keyboard: BaseKeyboard, look: ThemeLook): Double {
+            val (layout, env) = keyboard.shownAs(look, keyboard.width.coerceAtLeast(1), keyboard.height.coerceAtLeast(1))
+                ?: return KeyboardHeightCap.DEFAULT_ROWS
+            return KeyboardHeightCap.rowUnits(layout.layout, layout.fragments, env)
+        }
     }
 
     override val key: EssentialWindow.Key
@@ -173,6 +184,18 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val currentKeyboard: BaseKeyboard?
         get() = makers[currentKeyboardName]?.let { keyboards.getOrPut(currentKeyboardName) { SceneTrace.section("make keyboard") { it() } } }
+
+    /**
+     * The rows the shown keyboard's layout has now, each counted by its height ([KeyboardHeightCap.rowUnits]): 注音's
+     * five, a custom layout's own. What the keys' least height is of where the app's room is short
+     * (061-landscape-height §5.2); four where no layout read. Expanded in the keyboard's size as last laid out, 1 × 1
+     * before it was (the keys are worked out before they are laid out): the built-in layouts' rows and their heights
+     * do not depend on the size; a layout whose rows did would be counted at 1 × 1 first.
+     */
+    fun rowUnits(): Double {
+        val keyboard = currentKeyboard ?: return KeyboardHeightCap.DEFAULT_ROWS
+        return rowUnits(keyboard, ThemeManager.shownLook(theme))
+    }
 
     private val spaceKeys = SpaceKeyInputMethod()
 

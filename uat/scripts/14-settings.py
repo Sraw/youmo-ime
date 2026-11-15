@@ -521,7 +521,8 @@ case("ST-35", needs="jvm:SettingsMenuUatTest.themesAreImportedAndOnesOwnExported
 case("ST-36", needs="jvm:SettingsMenuUatTest.followingTheSystemAThemeTappedTakesBothSlots、ThemeSlotsTest")(lambda d: None)
 
 
-case("ST-10", needs="jvm:SettingsEffectUatTest.keyboardHeightFollowsTheSetting")(lambda d: None)
+case("ST-10", needs="jvm:SettingsEffectUatTest.keyboardHeightFollowsTheSetting、KeyboardSizesTest.turnedTheRowIsTheSameOnEveryScreenOfAKind")(lambda d: None)
+case("ST-141", needs="jvm:KeyboardAreaTest.theRoomPredictedLeavesTheStatusBarAndTheInputMethodsBarOut")(lambda d: None)
 
 
 case("ST-11", needs="jvm:SettingsEffectUatTest.sideAndBottomMarginsNarrowAndLiftTheKeys")(lambda d: None)

@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
@@ -368,16 +369,17 @@ class LandscapeUatTest {
     }
 
     @Test
-    @Uat("LS-27")
-    fun tallestIsCappedAtSevenTenths() {
-        // 很高
+    @Uat("LS-27", "LS-48")
+    fun tallestLeavesTheApp120dp() {
+        // 很高: 4 × 59 dp asked; the app keeps 120 dp of the input method's window over the bar (061-landscape-height §5.2)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 60)
         h.start()
-        val screen = h.service.resources.displayMetrics.heightPixels
+        val density = h.service.resources.displayMetrics.density
         val top = KeyboardHarness.all(h.inputView).filter { h.shown(it) && it.contentDescription?.toString() in barButtons() }
             .minOf { h.box(it).top }
-        val bottom = h.box(h.keyboard).bottom
-        assertTrue("area ${bottom - top} of $screen", bottom - top <= 0.70 * screen + 8)
+        val app = top - h.box(h.inputView).top
+        assertTrue("app $app px", app >= KeyboardHeightCap.MIN_APP_DP * density - 2)
+        assertTrue("keys ${h.box(h.keyboard).height()}", h.box(h.keyboard).height() >= 4 * KeyboardHeightCap.MIN_ROW_DP * density - 2)
         h.capture("LandscapeUatTest/tallest")
     }
 

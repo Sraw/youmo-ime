@@ -369,8 +369,20 @@ the corner; 仓颉's by default, 五笔's 键名 or all its roots as its page sa
 the key's bubble kept inside the keyboard (`rootsOf`), and its 拼 key (`LookUpKey`, two keys, the one
 shown dark while `lookingUp`) in Shift's place, sending `Keyboard.LOOKUP`. While a code is typed
 (`ReturnKeyAppearance.composing`) 确定 (`ConfirmKey`, Return's action) stands in Return's place.
-The keyboard area never passes 70% of the screen's height
-(`KeyboardHeightCap`), so 很高 in landscape leaves the field room.
+The keyboard's height (0.6.1, 061-landscape-height): upright the level's percent of the screen's height; 横屏 four rows
+of the level's dp (`KeyboardSizes.heightPx`, `KeyboardHeightLevels.landscapeRowDp`: a phone's 34/41/48/54/59, a large
+screen's 48/52/56/60/64, a value between two levels between their rows), a large screen one whose display's short
+side is 600 dp or more (`Screen.shortSideDp`, the display's own, not the window's, which below API 35 left a bar out).
+The theme's landscape `height` is such a level (the user's Q8). `KeyboardHeightCap` keeps the app 120 dp of the room
+over the docked keyboard (its bar, an embedded code row, the bottom padding and a docked handle counted), the keys
+giving way, but never under 36 dp a row of the layout's own rows (`KeyboardWindow.rowUnits`: 注音's five), which wins
+over the 120 (the user's Q2). The room is `InputView`'s own height less the bar it keeps under the keyboard once laid
+out, and before that (the first frame of a turn, the settings' previews) `ImeRoom.available` of the display's height,
+its status bar and the input method's navigation bar (`navbarFrameHeight`: 48 dp under gestures), which errs to the
+app's side; `DockedRoom` (a layout that changed the view's height, `onApplyWindowInsets`) works the keys out again
+after the layout (`post`) where the room moved by more than a dp. The display's numbers are asked of the window manager once a configuration
+(`KeyboardArea.display`). Floating takes no room of the app's and keeps 0.6.0's size (`KeyboardArea.floatingBase`, the
+percent of the screen either way held).
 
 横屏 (0.6.1, 061-wide-as-landscape) is one answer, keyboard-scene's `ScreenShape.landscape(turned, widthDp)`:
 held sideways, or `WIDE_DP` (600) wide or wider either way up (a foldable's inner screen, a tablet upright). Every
@@ -383,8 +395,8 @@ configuration's `screenWidthDp` within a dp of the one worked out, so the two ag
 is the pair's one held now; `displayContext(ctx)` is a context of its configuration, in which the theme page's preview
 makes its keys and bar, so they are 横屏 and split as the keyboard is though the page's window is half a split screen
 or upright. A source scan (`LandscapeSourcesTest`) keeps `ORIENTATION_*` and a configuration's `orientation` to
-`KeyboardArea`, `ThemeFragment` (the page's own columns) and `DeviceInfo`. The height's percent of a 横屏 is of the screen's short side (`KeyboardSizes.heightPx`:
-the base or the width, the smaller), so a foldable upright is about as high as turned (below API 35 the turned height is the display's less the navigation bar, so upright stands some 49% of the bar taller). Nothing is kept by orientation: a
+`KeyboardArea`, `ThemeFragment` (the page's own columns) and `DeviceInfo`. A 横屏's height is rows of dp, so a foldable
+or a tablet is as high upright as turned. Nothing is kept by orientation: a
 fold or unfold remakes the input view as a turn does.
 
 On a screen `ScreenShape.WIDE_DP` wide or wider (auto) the letters split in two (`TextKeyboard.Split`, sized by
@@ -476,7 +488,7 @@ bar 候选字号 gives (`CandidateBarHeight.dp(…, percent)`, rounded to a dp; 
 after, unscaled): `KawaiiBarComponent.heightDp(context)` takes the active theme's in the window's scenes of
 that context (`SceneBar.heightPercent`, kept per theme file and scenes), so every view sized by the bar follows,
 the expanded grid's rows and a hint reading's baseline (CandidateItemUi, the grid's measure) too; the keys
-keep their height, the keyboard grows by the difference (the 70% cap, `KeyboardHeightCap`, counts the bar as
+keep their height, the keyboard grows by the difference (the app's 120 dp, `KeyboardHeightCap`, counts the bar as
 before), docked, floating and one-handed alike (`BarToolbarThemeTest`). The bar is one over every window
 form (`SceneWindow.scenes` is never floating, split or one-handed), so a bar widget's selector under
 `@floating`, `@split` or `@one-handed` never matches and is warned of. `toolbar` (fill, radius, icon-color;
@@ -530,7 +542,8 @@ on the docked keyboard, top or bottom as `floatingHandle` says, nothing at its r
 at a side it goes with it as the bars do (`floating/BoardFollowers`), its grip at the board's middle. Its 24 dp
 is added to the keyboard: the keys keep their height (the owner's rule, 2026-10-22: keys never give
 up room to what is put round them), except where `KeyboardHeightCap` binds (landscape, a tall level):
-the strip counts with the bars there and the cap wins (the owner, 2026-10-22), so the field still shows. All of this is
+the strip counts with the bars there and the app's 120 dp wins (the owner, 2026-10-22), so the field still shows,
+down to the rows' 36 dp each (the user, 2026-11-14). All of this is
 `floating/FloatingController` (the handle, the placer, the dock mark, the switches), the input view
 only placing its views and passing its insets, attach and detach on. The grip held for the system's
 long-press time (`GripPress` in ime-core) buzzes and sets `floatingKeyboard`: ThemeManager makes the

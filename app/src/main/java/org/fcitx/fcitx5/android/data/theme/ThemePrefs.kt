@@ -60,7 +60,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
             listOf(R.string.level_compact, R.string.level_low, R.string.level_standard, R.string.level_tall, R.string.level_taller)
                 // a level added or taken away in ime-core is a label to add or take away here, not one cut off
                 .also { require(it.size == KeyboardHeightLevels.ALL.size) { "a label for each keyboard height level" } }
-                .zip(KeyboardHeightLevels.ALL) { label, l -> Level(label, l.portrait, l.landscape) },
+                .zip(KeyboardHeightLevels.ALL) { label, l -> Level(label, l.portrait, l.landscapeLevel) },
             follow = keyboard.keyboardHeightFollowTheme,
         )
         levels(
@@ -165,7 +165,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val floatingHandle = enumList(R.string.floating_handle, "floating_handle", FloatingHandleSide.Bottom)
 
     // the handle on the docked keyboard too, where floatingHandle puts it, added to the keyboard (the
-    // keys keep their height unless the 70% cap binds, the user 2026-10-22);
+    // keys keep their height unless the app's 120 dp binds, KeyboardHeightCap; the user 2026-10-22);
     // its grip long pressed lets the keyboard go floating under the finger. Made anew for it
     val alwaysShowHandle = switch(R.string.always_show_floating_handle, "always_show_floating_handle", false)
 

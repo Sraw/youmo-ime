@@ -199,7 +199,7 @@
           const was = t.length && Number.isFinite(t[0]) ? [t[0], t[t.length - 1]] : [x, x];
           was[k] = x;
           put(p, 'twin', o)(was);
-        }, { min: p.min ?? 0, max: p.max, step: p.step ?? 1, unit: p.unit + ' ' + side }));
+        }, { min: p.min ?? 0, max: p.max, step: p.step ?? 1, unit: (p.shown ? p.shown[k] : p.unit) + ' ' + side }));
       } else if (p.kind === 'border') {
         const b = F.parseBorder(v);
         const putB = (patch) => put(p, 'border')(Object.assign({ width: 1, color: '#33000000' }, F.parseBorder(now(p.prop)), patch));

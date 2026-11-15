@@ -35,7 +35,7 @@ case("MN-22", needs="jvm:SettingsPagesUatTest.thePreviewsBarFollowsTheCandidateS
 case("MN-23", needs="jvm:BarUatTest.candidateSpacingFollowsTextSize")(lambda d: None)
 
 
-case("MN-21", needs="jvm:MotionNoticeUatTest.landscapeLargestCandidatesStillCappedAtSevenTenths")(lambda d: None)
+case("MN-21", needs="jvm:MotionNoticeUatTest.landscapeLargestCandidatesStillLeaveTheApp120dp")(lambda d: None)
 
 case("MN-24", needs="jvm:KotlinHostHandwritingTest.theHandwritingNoticeNotSeenIsToldAtTheNextStart")(lambda d: None)
 

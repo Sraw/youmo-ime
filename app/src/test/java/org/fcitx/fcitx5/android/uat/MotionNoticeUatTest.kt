@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -272,14 +273,16 @@ class MotionNoticeUatTest {
     @Test
     @Uat("MN-21")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
-    fun landscapeLargestCandidatesStillCappedAtSevenTenths() {
+    fun landscapeLargestCandidatesStillLeaveTheApp120dp() {
         prefs.set(ThemeManager.prefs.candidateTextSize, 28)
         prefs.set(ThemeManager.prefs.alwaysShowHandle, true)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 60)
         h.start()
-        val top = h.box(h.bar).top
-        val bottom = h.box(h.keyboard).bottom
-        assertTrue("area ${bottom - top} of $screenH", bottom - top <= 0.70 * screenH + 8)
+        val density = h.service.resources.displayMetrics.density
+        // the handle over the bar is the keyboard's: the app's room is above the topmost of them
+        val top = minOf(h.box(h.bar).top, grip()?.let { h.box(it).top } ?: Int.MAX_VALUE)
+        val app = top - h.box(h.inputView).top
+        assertTrue("app $app px of $screenH", app >= KeyboardHeightCap.MIN_APP_DP * density - 2)
         h.capture("MotionNoticeUatTest/landscape_28sp")
     }
 }

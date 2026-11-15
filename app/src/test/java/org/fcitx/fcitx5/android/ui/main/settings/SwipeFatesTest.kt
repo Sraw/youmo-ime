@@ -9,10 +9,17 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
@@ -31,6 +38,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -106,6 +114,25 @@ class SwipeFatesTest {
             assertTrue(seen.all { it.roots.isNotEmpty() })
             seen.forEach { s -> assertTrue(s.roots.toString(), s.roots.none { KeyId(it).isFunction }) }
             assertNotEquals(h.service.getString(R.string.swipe_fate_roots), SwipeFates.note(h.service, seen, "backspace", up = false))
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w780dp-h380dp-land-440dpi")
+    fun turnedZhuyinsNotesAreOfItsFiveRows() {
+        // a small phone turned at 很高: the letters' four rows give way to the app's 120 dp, 注音's five keep 36 dp each,
+        // as the keyboard has them (ImeRoomViewTest): the page's notes are of the keys as tall as there
+        prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 60)
+        prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
+        val turned = KeyboardArea.screens(RuntimeEnvironment.getApplication()).second
+        val four = SwipeFates.size(turned, "zhuyin", ImKeyboards.Layout.TEXT).height
+        val five = SwipeFates.size(turned, "zhuyin", ImKeyboards.Layout.TEXT, 5.0).height
+        assertEquals(turned.dp(5.0 * KeyboardHeightCap.MIN_ROW_DP), five)
+        assertTrue("$four < $five", four < five)
+        // the rows the page asks the board of (SwipeFates.jobs), the keyboard's own
+        KeyboardHarness(keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)).start().use { h ->
+            val board = KeyboardHarness.all(h.inputView).filterIsInstance<BaseKeyboard>().first { it.isShown }
+            assertEquals(5.0, KeyboardWindow.rowUnits(board, ThemeManager.shownLook(ThemeManager.activeTheme)), 0.0)
         }
     }
 }

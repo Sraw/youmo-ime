@@ -137,12 +137,13 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         // the display as held, the keyboard's screen: not this page's window, half of it in a split screen
         val screen = KeyboardArea.displayScreen(ctx)
         val w = screen.widthPx
-        val h = screen.heightPx
-        // capped as the real keyboard is (InputView), or a landscape 很高 preview stands taller than it;
-        // the docked handle (始终显示悬浮条) counted in the cap there too, though not drawn here
+        // the app's 120 dp kept as the real keyboard keeps it (InputView), in the room it predicts for that screen
+        // (ImeRoom: the status bar, the input method's navigation bar, the background), or a landscape 很高 preview
+        // stands taller than it; the docked handle (始终显示悬浮条) counted there too, though not drawn here
         val handle = if (ThemeManager.prefs.alwaysShowHandle.getValue()) ctx.dp(FloatingHandle.HEIGHT_DP) else 0
-        val requested = KeyboardArea.sizes().heightPx(h, w, screen.landscape)
-        return w to KeyboardHeightCap.keysHeight(requested, h, barHeight, keyboardBottomPaddingPx, handle)
+        val requested = KeyboardArea.requestedHeight(screen)
+        val room = KeyboardArea.predictedRoom(screen)
+        return w to KeyboardHeightCap.keysHeight(requested, room, barHeight, keyboardBottomPaddingPx, handle, density = screen.density)
     }
 
     // 紧凑 as the keys were last made (makeKeyboard): its text and marks are set as they are made.

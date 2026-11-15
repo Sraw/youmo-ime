@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
@@ -34,6 +35,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyId
@@ -55,9 +57,6 @@ import org.fcitx.fcitx5.android.scene.layout.Text as SceneText
  * so a page reads as the keyboard it changes rather than as a list of strings.
  */
 object KeyCaps {
-
-    // the letters' rows (qwerty without its number row): a key's height the keys' over these
-    private const val KEY_ROWS = 4
 
     // a dimmed cap's label, as the views' (0.4)
     private const val DIMMED = 0.4
@@ -120,7 +119,7 @@ object KeyCaps {
      * keyboard's: the settings' caps, and what the page tells of a way drawn otherwise than set (SwipeFates).
      */
     internal fun SceneKeyCell.onBoard(ctx: Context, shortcut: Shortcut?, board: SceneKeyCell.Board?) {
-        keyboardKeyHeight = keyboardKeyHeight(ctx)
+        keyboardKeyHeight = keyboardKeyHeight(ctx, board?.layout)
         this.board = board
         val layout = board?.let { SceneLayouts.of(ctx, it.layout) }
         val slots = shortcut?.slots ?: SwipeSlotsCache.current
@@ -151,8 +150,20 @@ object KeyCaps {
     /** The nine keys' letters as the user set them (t9_letters), as 九键's keyboard has them: the editor's rows of 2 to 9. */
     fun nineLetters(): Map<Char, String> = KeyListsCache.nineLettersOf(AppPrefs.getInstance().keyboard.t9Letters.getValue())
 
-    /** A qwerty key's height on the keyboard as the height settings make it now, px (InputView's keys' area, [KeyboardArea]). */
-    fun keyboardKeyHeight(ctx: Context): Int = SwipeFates.size(upright(ctx), KeyNames.QWERTY, ImKeyboards.Layout.TEXT).height / KEY_ROWS
+    /**
+     * A key's height on the keyboard as the height settings make it now, px (InputView's keys' area, [KeyboardArea]):
+     * the keys' over [layout]'s rows (注音's five, a qwerty's four; none given: qwerty's).
+     */
+    fun keyboardKeyHeight(ctx: Context, layout: String? = null): Int {
+        val rows = layout?.let { rowsOf(ctx, it) } ?: KeyboardHeightCap.DEFAULT_ROWS
+        return (SwipeFates.size(upright(ctx), layout ?: KeyNames.QWERTY, ImKeyboards.Layout.TEXT, rows).height / rows).toInt()
+    }
+
+    // [layout]'s rows as the keyboard counts them (KeyboardWindow.rowUnits); upright, at no size: the built-in boards'
+    // rows do not depend on it
+    private fun rowsOf(ctx: Context, layout: String): Double = SceneLayouts.of(ctx, layout)?.let {
+        KeyboardHeightCap.rowUnits(it.layout, it.fragments, Env(1.0, 1.0, ctx.resources.displayMetrics.density.toDouble()))
+    } ?: KeyboardHeightCap.DEFAULT_ROWS
 
     // the keyboard upright on this display, as the page's notes have it (SwipeFates), whatever way the page is turned
     private fun upright(ctx: Context) = thisTurn(UPRIGHT to Configuration(ctx.resources.configuration)) { KeyboardArea.screens(ctx).first }
@@ -182,7 +193,7 @@ object KeyCaps {
      */
     fun board(ctx: Context, shortcut: String, layout: String = defaultBoard(shortcut)): SceneKeyCell.Board {
         val screen = upright(ctx)
-        val size = SwipeFates.size(screen, layout, CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT)
+        val size = SwipeFates.size(screen, layout, CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT, rowsOf(ctx, layout))
         // the corners as the keyboard says them (BaseKeyboard.keyReadings: the long presses' firsts, the user's; none where the
         // first's way draws nothing); the marks drawn are the resolver's (onBoard)
         val alts = if (firstShown()) {

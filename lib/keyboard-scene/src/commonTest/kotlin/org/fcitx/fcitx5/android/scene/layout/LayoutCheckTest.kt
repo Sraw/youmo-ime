@@ -303,6 +303,10 @@ class LayoutCheckTest {
         assertTrue(scenes.first { it.name == "600dp" }.env.landscape)
         assertTrue(!scenes.first { it.name == "412dp" }.env.landscape)
         assertTrue(scenes.any { it.name == "800dp turned split" })
+        // turned, four rows of 48 dp; a large screen's 56; the lowest the app lets the keys get, four of 36 (061-landscape-height)
+        assertEquals(4 * 48 * 2.625, scenes.first { it.name == "800dp turned" }.env.height, 1e-9)
+        assertEquals(4 * 56 * 2.625, scenes.first { it.name == "600dp" }.env.height, 1e-9)
+        assertEquals(4 * 36 * 2.625, scenes.first { it.name == "800dp turned 144dp" }.env.height, 1e-9)
     }
 
     // the reports of a batch of layouts, held as text: the same on the JVM and JS (the app's import and the page agree)

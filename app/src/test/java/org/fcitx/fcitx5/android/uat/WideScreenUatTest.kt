@@ -62,13 +62,14 @@ class WideScreenUatTest {
     private fun scenes() = SceneWindow.scenes(ctx, ThemeManager.activeTheme)
 
     @Test
-    @Uat("LS-33")
+    @Uat("LS-33", "LS-49")
     fun anUnfoldedFoldableUprightIsLaidOutTurned() {
         noThemeSizes()
         val s = KeyboardArea.screen(ctx)
         assertTrue(s.landscape)
-        // the turned percent of the short side, its width here: as high as turned (the next test), not 30% of 841
-        assertEquals(s.widthPx * 49 / 100, KeyboardArea.requestedHeight(ctx))
+        // turned's rows, a large screen's (its short side 673 dp): 4 × 56 dp, as high as turned (the next test), not 30% of 841
+        assertTrue(s.large)
+        assertEquals(s.dp(4 * 56.0), KeyboardArea.requestedHeight(ctx))
         // the theme's `@landscape` and the gaps' turned ones, the split on its default (自动)
         assertTrue("landscape" in scenes())
         assertTrue(KeyboardArea.splits(s, floating = false))
@@ -79,14 +80,14 @@ class WideScreenUatTest {
     }
 
     @Test
-    @Uat("LS-33")
+    @Uat("LS-33", "LS-49")
     @Config(qualifiers = "w841dp-h673dp-land-420dpi")
     fun theUnfoldedFoldableTurnedIsAsHigh() {
         noThemeSizes()
         val s = KeyboardArea.screen(ctx)
         assertTrue(s.landscape)
-        // its height now is the short side: the same px as upright's width
-        assertEquals(s.heightPx * 49 / 100, KeyboardArea.requestedHeight(ctx))
+        // the same rows as upright: 4 × 56 dp
+        assertEquals(s.dp(4 * 56.0), KeyboardArea.requestedHeight(ctx))
     }
 
     @Test
@@ -103,15 +104,15 @@ class WideScreenUatTest {
     }
 
     @Test
-    @Uat("LS-36")
+    @Uat("LS-36", "LS-49")
     @Config(qualifiers = "w800dp-h1280dp-port-mdpi")
     fun aTabletUprightIsTurnedAndSplits() {
         noThemeSizes()
         val s = KeyboardArea.screen(ctx)
         assertTrue(s.landscape)
         assertTrue(KeyboardArea.splits(s, floating = false))
-        // as high as on its side, 49% of 800, not 30% of 1280
-        assertEquals(800 * 49 / 100, KeyboardArea.requestedHeight(ctx))
+        // as high as on its side, 4 × 56 dp at 1x, not 30% of 1280
+        assertEquals(4 * 56, KeyboardArea.requestedHeight(ctx))
     }
 
     @Test

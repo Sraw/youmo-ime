@@ -23,11 +23,12 @@ import org.fcitx.fcitx5.android.scene.theme.ThemeReader
  * The phone the snapshots are of, and the keyboard's size on it in each form, as the app works them
  * out (rules D §1, §2): 1080 × 2340 px at 2.625 (420 dpi), 411 dp across upright, 891 on its side.
  *
- * The keyboard's height is the screen's times the height setting: 30% upright and 49% on its side
- * by default, compact the setting's lowest level (20%, 34%; KeyboardHeightLevels). The cap, 70% of
- * the screen less the candidate bar, the code row and the bottom padding (KeyboardHeightCap), does
- * not bind at any of these. Floating: 70% of the width, kept to 300–420 dp, so 300 dp; 85% of the
- * upright height; its text 0.85 (FloatingKeyboard). One-handed: 80% of the width, 328 dp
+ * The keyboard's height upright is the screen's times the height setting, 30% by default, compact the
+ * setting's lowest level (20%); on its side four rows of a phone's dp (061-landscape-height §5.1): 48 dp
+ * by default, compact 34 (KeyboardHeightLevels). The floor, the app's 120 dp of the window over the candidate
+ * bar, the code row and the bottom padding (KeyboardHeightCap), does not bind at any of these. Floating:
+ * 70% of the width, kept to 300–420 dp, so 300 dp; 85% of the upright height, on its side of 0.6.0's 49%
+ * of the short side; its text 0.85 (FloatingKeyboard). One-handed: 80% of the width, 328 dp
  * (SplitKeyboard.placement); split on its side, the letters across the whole width, the other boards
  * docked right at 42% (the default split_dock; Mode.AUTO splits from 600 dp).
  */
@@ -37,8 +38,10 @@ object Forms {
     private const val SCREEN_SHORT = 1080.0
     private const val UPRIGHT = 0.30
     private const val UPRIGHT_COMPACT = 0.20
-    private const val SIDEWAYS = 0.49
-    private const val SIDEWAYS_COMPACT = 0.34
+    private const val SIDEWAYS_ROW_DP = 48.0
+    private const val SIDEWAYS_COMPACT_ROW_DP = 34.0
+    private const val ROWS = 4
+    private const val FLOATING_SIDEWAYS = 0.49
     private const val FLOATING_MAX_DP = 420.0
     private const val FLOATING_WIDTH_DP = 300.0
     private const val FLOATING_HEIGHT = 0.85
@@ -68,7 +71,7 @@ object Forms {
     val compact = base.copy(height = (SCREEN_LONG * UPRIGHT_COMPACT).toInt().toDouble(), compact = true)
 
     /** On its side, not split (split_mode off). */
-    val landscape = base.copy(width = SCREEN_LONG, height = (SCREEN_SHORT * SIDEWAYS).toInt().toDouble(), landscape = true)
+    val landscape = base.copy(width = SCREEN_LONG, height = (ROWS * SIDEWAYS_ROW_DP * DENSITY).toInt().toDouble(), landscape = true)
 
     /** On its side, split (Mode.AUTO at 891 dp). */
     val split = landscape.copy(split = true)
@@ -83,13 +86,16 @@ object Forms {
 
     val oneHandedRight = base.copy(oneHanded = SplitKeyboard.Dock.RIGHT)
 
-    /** On its side and compact: the setting's lowest level there, 34%. */
-    val landscapeCompact = landscape.copy(height = (SCREEN_SHORT * SIDEWAYS_COMPACT).toInt().toDouble(), compact = true)
+    /** On its side and compact: the setting's lowest level there, four rows of 34 dp. */
+    val landscapeCompact = landscape.copy(height = (ROWS * SIDEWAYS_COMPACT_ROW_DP * DENSITY).toInt().toDouble(), compact = true)
 
-    /** Floating on its side: 70% of 891 dp kept to 420; 85% of the docked height (the width's share, 47%, is under it). */
+    /**
+     * Floating on its side: 70% of 891 dp kept to 420; 85% of 0.6.0's docked height, 49% of the short side (floating
+     * keeps 0.6.0's size; the width's share, 47%, is under it).
+     */
     val floatingLandscape = landscape.copy(
         width = FLOATING_MAX_DP * DENSITY,
-        height = (landscape.height * FLOATING_HEIGHT).toInt().toDouble(),
+        height = ((SCREEN_SHORT * FLOATING_SIDEWAYS).toInt() * FLOATING_HEIGHT).toInt().toDouble(),
         floating = FLOATING_TEXT,
     )
 

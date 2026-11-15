@@ -291,6 +291,12 @@ test('the environment is the engine\'s: every board and form builds, its size th
   assert.deepEqual(M.envJson(M.ENV), { width: 1080, height: Math.round(267 * 2.625), density: 2.625, texts: { punctuation: M.ZH_PUNCTUATION } });
   assert.equal(M.envJson(Object.assign({}, M.ENV, { ime: 'english' })).texts, undefined, 'English: punctuation as written');
   assert.equal(M.envJson(Object.assign({}, M.ENV, { landscape: true })).width, 2340);
+  // turned, 标准's four rows: 48 dp on a phone, 56 dp where the short side is 600 dp or more (061-landscape-height)
+  assert.equal(M.envJson(Object.assign({}, M.ENV, { landscape: true })).height, Math.round(192 * 2.625));
+  const tablet = M.DEVICES.find((d) => d.id === 'tablet');
+  assert.equal(M.envJson(Object.assign({}, M.ENV, tablet, { landscape: true })).height, 224 * 2);
+  // a tablet upright is 800 dp wide: 横屏 either way up (ScreenShape), its turned height, not 30% of a phone
+  assert.equal(M.envJson(Object.assign({}, M.ENV, tablet)).height, 224 * 2);
 });
 
 test('what is wrong is said with its line: a theme the engine refuses has no scene', () => {

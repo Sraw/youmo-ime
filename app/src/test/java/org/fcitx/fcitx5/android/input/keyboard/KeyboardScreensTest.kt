@@ -8,6 +8,8 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea.NavBar
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -49,6 +51,22 @@ class KeyboardScreensTest {
             assertEquals("1080x2208/392" to "2208x1080/802", screens(1080, 2340, NavBar(132, 0), NavBar(0, 132), density = 2.75f, round = false))
         },
     )
+
+    @Test
+    @Uat("LS-49")
+    fun aLargeScreenIsTheDisplaysShortSideNotTheWindows() {
+        // a 601 × 962 dp tablet at 2x, its 48 dp bar at the bottom both ways (API 29–34 leave it out of the window):
+        // turned the window is 553 dp high, yet the display's short side, 601, says large (061-landscape-height §5.1)
+        val (up, turned) = KeyboardArea.screensOf(1202, 1924, 2f, NavBar(96, 0), NavBar(96, 0), 0, roundDp = true)
+        assertEquals(1202 - 96, turned.heightPx)
+        assertEquals(601 to 601, up.shortSideDp to turned.shortSideDp)
+        assertTrue(up.large && turned.large)
+        // a phone's 393: not large either way; the status bar and the input method's bar each way as given
+        val (pu, pt) = KeyboardArea.screensOf(1080, 2340, 2.75f, NavBar(132, 0), NavBar(0, 132), 0, roundDp = false,
+            statusBar = { if (it) 66 else 132 }, imeNav = { if (it) 0 else 132 })
+        assertFalse(pu.large || pt.large)
+        assertEquals(listOf(132, 132, 66, 0), listOf(pu.statusBarPx, pu.imeNavPx, pt.statusBarPx, pt.imeNavPx))
+    }
 
     private companion object {
         const val D = 2.625f

@@ -126,8 +126,8 @@
 ### LS-27 [P1] 横屏高度
 - **前提**：B0-设置，**键盘高度** 选"很高"。
 - **操作**：转横屏，回测试页点「普通文本」框。
-- **预期**：整个键盘区（拼音行、候选栏、键）最多占屏幕高度约七成（1080 px 高的横屏上约 663/948 px，键被压矮）。网页剩下的约三成里浏览器自己的栏占去大半，输入框是否露出来取决于浏览器把它滚到哪，不作要求。（高度随设置变由 ST-10 管；封顶的算法由 `KeyboardHeightCapTest` 钉住。）
-- **JVM**：`LandscapeUatTest.tallestIsCappedAtSevenTenths`（"很高"时栏到键底不超过屏高七成；图）；设备上不跑。
+- **预期**：键盘上方给应用留出至少 120 dp（输入法窗口里栏的上边到窗口顶），按键被压矮，但每行不矮于 36 dp。（高度随设置变由 ST-10 管；底线的算法由 `KeyboardHeightCapTest` 钉住，各种机型的数见 LS-47–51。）
+- **JVM**：`LandscapeUatTest.tallestLeavesTheApp120dp`（"很高"时栏上方至少 120 dp、键区至少 4 × 36 dp；图）；设备上不跑。
 
 ### LS-28 [P1] 横屏时打字照常出候选
 - **前提**：B0-横屏。
@@ -166,8 +166,8 @@
 ### LS-33 [P1] 折叠屏展开竖拿按横屏排
 - **前提**：B0，展开竖拿（673×841 dp）；**键盘高度** 跟随主题（内置主题是标准）。
 - **操作**：回测试页点「普通文本」框，看键盘；转成横拿再看。
-- **预期**：竖拿时键盘按横屏排：字母分体，间距是横屏的；高度和横拿差不多一样（标准档约 330 dp，键区约屏幕短边的 49%；Android 15 以下竖拿高出导航条高度的约一半），不是竖屏的 30%（约 252 dp）。
-- **JVM**：`WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned`（673×841 dp 竖拿：横屏、高度为宽的 49%、主题 `@landscape`、自动分体、设置页的一对屏两个都是横屏）、`WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh`（841×673 dp 横拿：高度为高的 49%）、`WideScreenUatTest.theExpandedCandidatesTakeTheTurnedColumnsUpright`（展开候选的列数取横屏那个设置）；设备上看一次（`wm size 1767x2208` + `wm density 420`）。
+- **预期**：竖拿时键盘按横屏排：字母分体，间距是横屏的；高度和横拿一样（标准档键区 4 × 56 dp，键盘约 312 dp 含导航条），不是竖屏的 30%（约 252 dp）。
+- **JVM**：`WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned`（673×841 dp 竖拿：横屏、大屏、键区 4 × 56 dp、主题 `@landscape`、自动分体、设置页的一对屏两个都是横屏）、`WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh`（841×673 dp 横拿：同样 4 × 56 dp）、`WideScreenUatTest.theExpandedCandidatesTakeTheTurnedColumnsUpright`（展开候选的列数取横屏那个设置）；设备上看一次（`wm size 1767x2208` + `wm density 420`）。
 
 ### LS-34 [P1] 折叠屏外屏、手机竖拿不变
 - **前提**：B0，外屏（412 dp 宽）或普通手机竖拿。
@@ -184,8 +184,8 @@
 ### LS-36 [P2] 平板竖拿算横屏，分体选「自动」时分体
 - **前提**：B0，平板竖拿（或模拟器竖屏 600 dp 以上，比如 `wm size 1600x2560` 加 `wm density 320`，800×1280 dp）；**分体键盘** 是默认的「屏幕够宽时」。
 - **操作**：点「普通文本」框，看键盘。
-- **预期**：字母分体；高度和平板横拿差不多一样（屏宽的 49%）。宽 599 dp 的竖屏不算横屏、不分体，600 dp 就算。
-- **JVM**：`WideScreenUatTest.aTabletUprightIsTurnedAndSplits`（800×1280 dp：横屏、分体、高度为 800 的 49%）、`WideScreenUatTest.justNarrowerIsUpright`（599 dp：竖屏、不分体，设置页的屏和键盘的一致）、`WideScreenUatTest.sixHundredWideIsTurned`（600 dp：横屏、分体）；设备上不跑。
+- **预期**：字母分体；高度和平板横拿一样（标准档键区 4 × 56 dp）。宽 599 dp 的竖屏不算横屏、不分体，600 dp 就算。
+- **JVM**：`WideScreenUatTest.aTabletUprightIsTurnedAndSplits`（800×1280 dp：横屏、分体、键区 4 × 56 dp）、`WideScreenUatTest.justNarrowerIsUpright`（599 dp：竖屏、不分体，设置页的屏和键盘的一致）、`WideScreenUatTest.sixHundredWideIsTurned`（600 dp：横屏、分体）；设备上不跑。
 
 ### LS-37 [P2] 设置页按这块屏的样子画
 - **前提**：折叠屏展开竖拿（673×841 dp）。
@@ -198,3 +198,37 @@
 - **操作**：看字母键；打 `unvzi`（拼音 u 拆字：女子），长按候选「好」看字卡。
 - **预期**：上滑的小字画在角上（右上），不画在字母下面；字卡分两栏（读音、例词在左，部首、拆字、笔顺在右），读音显示 3 行后可以滚动。
 - **JVM**：`WideScreenUatTest.theLowKeysMarksAndTheCardAsTurned`（673 dp 竖拿时场景是横屏，「底部」改到右上；字卡两栏、读音 3 行）；设备上不跑。
+
+## 横屏高度（按每行高度，给应用留底线）
+
+横屏键区是 4 行 ×「每行高度」：手机五档 34/41/48/54/59 dp，屏幕短边 600 dp 以上（平板、折叠屏内屏）48/52/56/60/64 dp；键盘上方至少给应用留 120 dp，键被压时每行最矮 36 dp（按布局实际行数），36 dp 优先。量法：`adb shell dumpsys window windows` 里输入法窗口和应用窗口的高，按键的高看截图（`uiautomator dump` 不列画布上的键）。
+
+### LS-47 [P1] 常见手机横屏、标准档：三键导航和手势导航
+- **前提**：常见手机（1080×2340@440，393×851 dp），B0；宿主是 webview_shell 打开 uat 的测试页 `fields.html`。
+- **操作**：横屏，点 textarea；三键导航、手势导航各看一次；手势导航时打 `nihao` 不选。
+- **预期**：三键导航时键盘约 232 dp、每行约 48 dp、应用窗口约 137 dp（网页 innerHeight 约 65）；手势导航时键盘约 249 dp、每行约 40 dp、应用窗口至少 120 dp（网页至少 48）。打拼音时浮在上方的编码行盖住应用最下面 18 dp，输入框所在那一行仍看得见。
+- **JVM**：ime-core `KeyboardHeightCapTest.whereTheFloorBindsTheKeysGiveWay`（可用 321 dp → 键区 161）、app `ImeRoomViewTest.theAppKeeps120dpUnderEachBackground`、`ImeRoomViewTest.theBarsInsetsComingWorkTheKeysOutAgain`（导航条的高后到时按键重算，差 1 dp 以内不重算）；设备上的数是 2026-11-14 在模拟器上量的（API 29/33/34/36，见 061-landscape-height-impl-report），不在每次 UAT 里跑。
+
+### LS-48 [P1] 横屏「很高」
+- **前提**：同 LS-47，**键盘高度** 选"很高"。
+- **操作**：三键导航、手势导航各看一次。
+- **预期**：三键导航每行约 52 dp、应用至少 120 dp；手势导航每行约 40 dp、应用至少 120 dp（"很高"和"标准"一样高：都碰到底线）。
+- **JVM**：`LandscapeUatTest.tallestLeavesTheApp120dp`；设备上的数是 2026-11-14 在模拟器上量的（API 29/33/34/36，见 061-landscape-height-impl-report），不在每次 UAT 里跑。
+
+### LS-49 [P1] 折叠屏展开、平板：四个方向一样高
+- **前提**：折叠屏展开（`wm size 1767x2208` + `wm density 420`）、平板（`wm size 1600x2560` + `wm density 320`），B0，标准档。
+- **操作**：横拿、竖拿各点一次「普通文本」框；把 **分体键盘** 改成关、开 **单手模式** 再看；测完 `wm size reset; wm density reset`。
+- **预期**：标准档键盘约 312 dp（含导航条），每行约 56 dp，四种方向一样高；关掉分体、开单手时也一样高。
+- **JVM**：`WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned`、`WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh`、`WideScreenUatTest.aTabletUprightIsTurnedAndSplits`、`KeyboardAreaTest.aTabletAShortSideOver600IsLargeWhicheverWayHeld`（601×962 dp 平板减掉导航条后仍是大屏）；设备上的数是 2026-11-14 在模拟器上量的（API 29/33/34/36，见 061-landscape-height-impl-report），不在每次 UAT 里跑。
+
+### LS-50 [P2] 小手机横屏：每行最矮 36 dp
+- **前提**：`wm size 720x1280` + `wm density 320`（360×640 dp），手势导航，B0。
+- **操作**：横屏点「普通文本」框；把 **编码行** 改成「嵌在键盘里」并换成拼音 14 键再看；换成注音再看；再在 Chrome 打开一个全屏网页视频页的输入框（状态栏隐藏）看；测完 `wm size reset; wm density reset`。
+- **预期**：每行 36 dp、字正常大小、应用约 104 dp；编码行嵌在键盘里、14 键时每行仍 36、应用约 72 dp；注音每行 36（5 行）、应用约 68 dp；全屏应用里每行约 38、键盘约 240 dp、应用约 120 dp。
+- **JVM**：`KeyboardHeightCapTest.theRowsWinOverTheFloor`、`ImeRoomViewTest.aSmallPhonesZhuyinKeepsItsFiveRows`（注音 5 行 × 36 dp，比 4 行的拼音多占应用）、`ImeRoomTest.flushAndFullScreenAndASideBar`（全屏时不减状态栏）、`LowLandscapeScreenshotTest`（每行 36 dp、28 dp 时符号、表情、剪贴板、语音、展开候选、数字键盘和注音的截图）；设备上的数是 2026-11-14 在模拟器上量的（API 29/33/34/36，见 061-landscape-height-impl-report），不在每次 UAT 里跑。
+
+### LS-51 [P2] 五档依次变高，切样式、转屏不跳
+- **前提**：大手机（`wm size 1344x2992` + `wm density 480`，448×997 dp），三键导航，B0。
+- **操作**：横屏，**键盘高度** 依次选五档；标准档时在普通、分体、单手之间切换；转屏 20 次（每次回到横屏）。
+- **预期**：五档每行依次约 34/41/48/54/59 dp；切样式时高度不变、不跳动；转屏时键盘不先矮后高（不往上滑一截）。
+- **JVM**：ime-core `KeyboardHeightLevelsTest.turnedALevelIsARowOfTheTable`、`KeyboardSizesTest.turnedTheRowIsTheSameOnEveryScreenOfAKind`；转屏看设备。

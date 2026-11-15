@@ -198,6 +198,9 @@ class InputView(
         setOnClickListener(placeholderOnClickListener)
     }
 
+    // the room the docked keys are worked out in: the window's, as laid out, each layout and insets checked again
+    private val dockedRoom = DockedRoom(this, bottomPaddingSpace, { !floating }) { updateKeyboardSize() }
+
     private val scope = DynamicScope()
     private val broadcaster = InputBroadcaster()
     @VisibleForTesting
@@ -360,8 +363,6 @@ class InputView(
         keyboardBottomPaddingFollowTheme,
         keyboardHeightPercentBase,
     )
-
-    private val keyboardHeightPx: Int get() = KeyboardArea.requestedHeight(context)
 
     private val keyboardSidePaddingPx: Int get() = KeyboardArea.sidePadding(context)
 
@@ -569,13 +570,13 @@ class InputView(
         val sidePadding = if (floating) 0 else keyboardSidePaddingPx
         val placement = if (floating) null else placement()
         val boardHeight = if (floating) {
-            FloatingKeyboard.height(keyboardHeightPx, TextKeyboard.widthDp(context), resources.configuration.screenWidthDp)
+            // floating's keys before its own width cuts them: 0.6.0's, a share of the screen (061-landscape-height §5.4)
+            FloatingKeyboard.height(KeyboardArea.floatingBase(context), TextKeyboard.widthDp(context), resources.configuration.screenWidthDp)
         } else {
-            // the whole docked area stays under ~70% of the screen, so the field shows in landscape.
-            // A docked handle (始终显示悬浮条) is added to the keyboard, the keys keeping their height,
-            // but counted in the cap: where it binds, the cap wins (the user, 2026-10-22)
+            // the app keeps 120 dp over the docked keyboard, the keys' rows 36 dp each, the rows winning (the user,
+            // 2026-11-14; KeyboardHeightCap). A docked handle (始终显示悬浮条) is added to the keyboard and counted
             val handle = if (floatingHandle != null) dp(FloatingHandle.HEIGHT_DP) else 0
-            KeyboardArea.keysHeight(context, codeRowDp, handle)
+            KeyboardArea.keysHeight(context, codeRowDp, handle, dockedRoom.take(), keyboardWindow.rowUnits())
         }
         val bottomPadding = if (floating) 0 else keyboardBottomPaddingPx
         oneHandedPlaced = placement != null && !TextKeyboard.splits(context)
@@ -708,6 +709,7 @@ class InputView(
             // 贴底: no room for the bar, for ROMs whose hidden gesture line still takes it
             bottomMargin = if (floating || KeyboardArea.bottomFlush()) 0 else navBar
         }
+        dockedRoom.check()
         paintNavbar()
         return insets
     }

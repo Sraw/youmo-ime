@@ -4,7 +4,10 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.graphics.Point
+import android.os.Build
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.scene.theme.Twin
@@ -13,6 +16,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,10 +40,19 @@ class KeyboardAreaTest {
     private val ctx get() = RuntimeEnvironment.getApplication()
     private val keyboard get() = AppPrefs.getInstance().keyboard
     private val was = KeyboardArea.themeSizes
+    private val realSize = KeyboardArea.realSizeOf
+
+    // the display asked anew: one a test before kept is no answer of this test's qualifiers
+    @Before
+    fun noDisplayKept() {
+        KeyboardArea.forgetDisplay()
+    }
 
     @After
     fun theThemesOwn() {
         KeyboardArea.themeSizes = was
+        KeyboardArea.realSizeOf = realSize
+        KeyboardArea.forgetDisplay()
     }
 
     private fun theme(sizes: ThemeSizes) {
@@ -95,9 +108,65 @@ class KeyboardAreaTest {
         theme(ThemeSizes(height = Twin(90.0, 90.0), bottomPadding = Twin(10.0, 10.0)))
         val screen = ctx.resources.displayMetrics.heightPixels
         val bars = ctx.dp(KawaiiBarComponent.heightDp())
-        // 90% asked, the cap (70% of the screen, the bars and the padding in it) what is given
-        assertEquals((screen * KeyboardHeightCap.MAX_FRACTION).toInt() - bars - ctx.dp(10), KeyboardArea.keysHeight(ctx, 0))
-        assertTrue(KeyboardArea.keysHeight(ctx, 0) < KeyboardArea.requestedHeight(ctx))
+        // 90% asked: the app keeps 120 dp of the room predicted, the bars and the padding in it (061-landscape-height §5.2)
+        val room = KeyboardArea.predictedRoom(KeyboardArea.screen(ctx))
+        val keys = KeyboardArea.keysHeight(ctx, 0)
+        assertEquals(ctx.dp(KeyboardHeightCap.MIN_APP_DP), room - bars - ctx.dp(10) - keys)
+        assertTrue(keys < KeyboardArea.requestedHeight(ctx))
+        assertTrue(room < screen)
+    }
+
+    @Test
+    @Uat("ST-141")
+    fun theRoomPredictedLeavesTheStatusBarAndTheInputMethodsBarOut() {
+        val s = KeyboardArea.screen(ctx)
+        // the display whole as held, its status bar, and gestures' 48 dp under the input method (or the buttons')
+        assertEquals(s.realHeightPx - s.statusBarPx - s.imeNavPx, KeyboardArea.predictedRoom(s))
+        assertTrue(s.statusBarPx > 0)
+        assertEquals(SHORT_SIDE_DP, s.shortSideDp)
+        assertFalse(s.large)
+        // 贴底 under 全部: nothing kept for the bar; below API 35 a background of 无 fits the window above it all the same
+        prefs.set(keyboard.keyboardBottomFlush, 1)
+        assertEquals(s.realHeightPx - s.statusBarPx, KeyboardArea.predictedRoom(s))
+    }
+
+    @Test
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    fun aDisplayNotYetTurnedIsNotKeptForTheTurn() {
+        // just turned the window manager may still say the size upright: not kept for the configuration, asked again
+        var asked = 0
+        var upright = true
+        KeyboardArea.realSizeOf = { asked++; if (upright) Point(1080, 2340) else Point(2340, 1080) }
+        assertEquals(SHORT_SIDE_DP, KeyboardArea.screen(ctx).shortSideDp)
+        KeyboardArea.screen(ctx)
+        assertEquals(2, asked)
+        upright = false
+        KeyboardArea.screen(ctx)
+        KeyboardArea.screen(ctx)
+        assertEquals("as turned now: kept", 3, asked)
+    }
+
+    @Test
+    @Uat("LS-49")
+    @Config(qualifiers = "w601dp-h962dp-port-mdpi")
+    fun aTabletAShortSideOver600IsLargeWhicheverWayHeld() {
+        // its bar may leave the window under 600 across: the display's short side is what says large
+        val s = KeyboardArea.screen(ctx)
+        assertEquals(601, s.shortSideDp)
+        assertTrue(s.large)
+        val (up, turned) = KeyboardArea.screens(ctx)
+        assertTrue(up.large && turned.large)
+    }
+
+    @Test
+    @Uat("PR-61")
+    @Config(qualifiers = "w851dp-h393dp-land-440dpi")
+    fun aPhoneTurnedAsksForFourRowsOf48() {
+        // 标准 turned: 4 × 48 dp, not 49% of the height (061-landscape-height §5.1, the user's Q1)
+        assertEquals(ctx.dp(4 * 48), KeyboardArea.requestedHeight(ctx))
+        // floating keeps 0.6.0's base: 49% of the screen's height
+        val s = KeyboardArea.screen(ctx)
+        assertEquals(s.heightPx * 49 / 100, KeyboardArea.floatingBase(ctx))
     }
 
     @Test
@@ -110,5 +179,10 @@ class KeyboardAreaTest {
         prefs.set(keyboard.keyboardBottomPaddingFollowTheme, false)
         assertTrue(KeyboardArea.bottomFlush())
         assertEquals(0, KeyboardArea.bottomPadding(ctx))
+    }
+
+    private companion object {
+        // 1080 px at 2.75: the configuration rounds its dp from API 30 (393), cuts them below (392), as KeyboardArea does
+        val SHORT_SIDE_DP = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) 393 else 392
     }
 }
