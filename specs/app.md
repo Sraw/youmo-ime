@@ -1722,9 +1722,10 @@ resets it and ends the engine's window.
 - The end mark: `VoiceEnd` (ime-core) by the field (`EditorTraits.sends`, `isMultiLine`, `isShortMessage`, a chat
   app's multi-line field) and 语音句末句号 (`keyboard.voiceEndMark`): a one-line field takes no end mark, a chat no
   「。」, anything else as said. Applied at the commit only; the composing text shows it as said.
-- The recognizer runs on 3 threads (one fewer than the cores on a phone of 3 or fewer): a 1.92 s chunk took 228 ms on 2, 182 on 3, 160 on 4 on a Snapdragon 845
-  (voice-eval `bench/stream_bench`), 3 leaving a big core to the UI. On the OnePlus 6T (2026-11-11, clip microphone, lifted at
-  the speech's end) the lift to the text took 1.1–1.7 s warm on 3 threads (1.2–1.8 s on 2): the 0.3 s tail, a
+- The recognizer runs on 3 threads (one fewer than the cores on a phone of 3 or fewer): a 1.92 s chunk took 350 ms on 1, 226 on 2, 181 on 3, 189 on 4 on a Snapdragon 845
+  (voice-eval `bench/stream_bench`, 2026-11-14), 3 leaving a big core to the UI. On the OnePlus 6T (2026-11-11, clip microphone, lifted at
+  the speech's end) the lift to the text took 1.1–1.7 s warm on 3 threads (1.2–1.8 s on 2), and over 40 aishell sentences on 3 threads
+  (2026-11-14) 1.38 s on average, 1.74 s at the 90th percentile: the 0.3 s tail, a
   chunk's decoding ~600 ms (the encoder ~180 ms of it, the rest the beam search over the hotwords), a second chunk
   as often as the padding asks; the polish ~30 ms, the homophones ~0; the first talk after the models were let go
   ~1 s more (their load, overlapped with the capture). Debug line at the end, numbers only:

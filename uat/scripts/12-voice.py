@@ -512,6 +512,36 @@ def vo54(d):
     return f"屏蔽前「{before}」，后「{after}」"
 
 
+# the lift to the text: the encoder's tail (TAIL_PADDING) decoded and polished; the lift at the speech's end
+@case("VO-55", base="B0-语音", mutates="learn", needs=EV)
+def vo55(d):
+    out = []
+    for clip, want in (("jintian", "今天天气很好"), ("zouba", "我们走吧")):
+        before_s = input_lag(d)
+        took = []
+
+        def attempt(before):
+            nonlocal before_s
+            t, off = lift_early(d, clip, before_s)
+            got = t[len(before):] if t.startswith(before) else t
+            ok = plain(got) == want
+            if off is NOTHING_HEARD:
+                return ok, f"没听到语音或语音被切成两段「{got}」（不算）", False, t
+            ms = re.search(r"stopToSaidMs=(-?\d+)", d.sh("logcat -d | grep 'voice timing:' | tail -1"))
+            check(ms and int(ms.group(1)) >= 0, "没有调试日志的 voice timing 一行")
+            note = f"{off:+.0f} ms 松开，{ms.group(1)} ms 出字「{got}」"
+            if -100 <= off <= 100:
+                took.append(int(ms.group(1)))
+                return ok, note, True, t
+            before_s += off / 2000
+            return ok, note + "（不在区间，不算）", False, t
+
+        out.append(verdict(clip, counted_tries(d, clip, attempt, most=10)))
+        median = sorted(took)[len(took) // 2]
+        # a loose bar: the same emulator's medians differed twice over (1029 and 509 ms); the phone's is the gate
+        check(median <= 1500, f"{clip}：松开到出字的中位数 {median} ms，超过 1500 ms（字对只是慢：只开一台模拟器重跑）：{took}")
+    return "；".join(out)
+
 case("VO-15", needs="jvm:SettingsPagesUatTest.theVoiceModelsDataIsCredited")(lambda d: None)
 
 
