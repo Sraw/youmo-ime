@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.CharLevels.Level
 import org.fcitx.fcitx5.android.engine.data.TestCharLevels
@@ -160,6 +161,7 @@ class RareChoiceTest {
 
     // §5.4: a user word's row names the characters held back in it
     @Test
+    @Uat("WD-56")
     fun theCharactersHeldInAWord() {
         val gate = RareChoice.parse(file("on\t1", "groups\tEXT", "block\t${str(out)}")).gate(levels)
         assertRows(

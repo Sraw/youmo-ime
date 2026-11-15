@@ -3283,7 +3283,8 @@ def junit_results(dirs):
                     bad = tc.find("error")
                 state = "跳过" if tc.find("skipped") is not None else ("失败" if bad is not None else "通过")
                 msg = ((bad.get("message") or "").splitlines() or [""])[0][:200] if bad is not None else ""
-                key = (tc.get("classname"), tc.get("name"))
+                # a multiplatform module's jvmTest (keyboard-scene) names its methods "name[jvm]"
+                key = (tc.get("classname"), re.sub(r"\[jvm\]$", "", tc.get("name")))
                 # the same test in two results (SDK 35's and 29's): the worse counts (a failure
                 # at one must not be hidden by the other read after it)
                 if key not in out or WORSE.index(state) < WORSE.index(out[key][0]):
@@ -3318,7 +3319,7 @@ def jvm_record(found, results, expected=()):
 def cmd_jvm(a):
     """the cases the app's and ime-core's JVM tests assert, recorded as a run of their own"""
     # one APK since 0.6.0: the speech flavors' testText and testVoice are gone
-    roots = [os.path.join(REPO, p) for p in ("app/src/test", "lib/ime-core/src/test", "lib/ime-eval/src/uatTest")]
+    roots = [os.path.join(REPO, p) for p in ("app/src/test", "lib/ime-core/src/test", "lib/ime-eval/src/uatTest", "lib/keyboard-scene/src/commonTest")]
     dirs = [os.path.join(REPO, p) for p in a.results.split(",")]
     load_scripts()
     expected = [c.id for c in CASES.values() if place(c.needs) == "jvm"]
@@ -3442,7 +3443,7 @@ def main():
     j = sub.add_parser("jvm")
     j.add_argument("--results", default="app/build/test-results/testDebugUnitTest,app/build/test-results/testDebugUnitTestAt29,"
                                          "lib/ime-core/build/test-results/test,"
-                                         "lib/ime-eval/build/test-results/uatTest")
+                                         "lib/ime-eval/build/test-results/uatTest,lib/keyboard-scene/build/test-results/jvmTest")
     sub.add_parser("counts")
     a = ap.parse_args()
     if a.cmd == "run":

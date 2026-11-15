@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.TestThemes
@@ -90,6 +91,7 @@ class KeyShortcutsScreenshotTest {
 
     // the space swiped up: the edit menu over it, paste (straight up) picked, the cells the finger reaches next beside it
     @Test
+    @Uat("KB-105")
     fun theEditMenuOverTheSpace() {
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()

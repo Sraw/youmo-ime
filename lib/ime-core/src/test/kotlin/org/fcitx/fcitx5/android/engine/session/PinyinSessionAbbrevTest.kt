@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.Learner
@@ -151,6 +152,7 @@ class PinyinSessionAbbrevTest {
     }
 
     @Test
+    @Uat("SP-46")
     fun withNoHabitsAKeyIsNotReadAlone() {
         val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false)
         assertTrue("什么时候" !in s.page("ufmuh"))
@@ -159,6 +161,7 @@ class PinyinSessionAbbrevTest {
 
     // typed counts as long as the counts do: 30 typing days (LearnState.WINDOW); a word added by hand for good
     @Test
+    @Uat("SP-44")
     fun aWordNotTypedForThirtyTypingDaysIsReadByWholeSyllablesOnlyAgain() {
         val learner = Learner(data)
         val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
@@ -181,6 +184,7 @@ class PinyinSessionAbbrevTest {
 
     // a word pinned under some keys is one typed while it is pinned, whenever last typed (DECISIONS 0.6.1 双拼中间简拼改 U)
     @Test
+    @Uat("SP-44")
     fun aWordPinnedIsReadByAKeyAloneThoughNotTypedForThirtyTypingDays() {
         val learner = Learner(data)
         val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
@@ -201,6 +205,7 @@ class PinyinSessionAbbrevTest {
 
     // picking a word read by a key alone is typing it: the 30 typing days count from that day
     @Test
+    @Uat("SP-44")
     fun aWordPickedUnderAKeyReadAloneIsTypedThatDay() {
         val learner = Learner(data)
         val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
@@ -245,6 +250,7 @@ class PinyinSessionAbbrevTest {
     }
 
     @Test
+    @Uat("SP-43")
     fun aWordAddedByHandIsReadByAKeyAlone() {
         val model = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
         fun session() = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = model, addedWords = { setOf("小明") })

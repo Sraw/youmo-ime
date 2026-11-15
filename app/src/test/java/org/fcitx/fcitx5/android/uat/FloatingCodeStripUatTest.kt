@@ -193,7 +193,7 @@ class FloatingCodeStripUatTest {
     }
 
     @Test
-    @Uat("ST-49")
+    @Uat("ST-49", "ST-118")
     fun theKeyboardIsAsHighOnEveryKeyboardAndLowerThanEmbedded() {
         fun heights(style: CodeRowStyle, keyboards: ImKeyboards.Chosen): Pair<Int, Int> {
             open(keyboards, style = style)

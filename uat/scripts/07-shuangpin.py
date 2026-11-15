@@ -76,7 +76,7 @@ case("SP-36", needs="jvm:ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWhol
 case("SP-43", needs="jvm:ShuangpinUatTest.aWordAddedByHandIsReadByAKeyAloneAtOnce、PinyinSessionAbbrevTest.aWordAddedByHandIsReadByAKeyAlone")(lambda d: None)
 
 
-case("SP-44", needs="jvm:PinyinSessionAbbrevTest.aWordNotTypedForThirtyTypingDaysIsReadByWholeSyllablesOnlyAgain、PinyinSessionAbbrevTest.aWordPinnedIsReadByAKeyAloneThoughNotTypedForThirtyTypingDays、HabitCountsTest.theNodesToAWordTypedAreThoseOfEachReadingItWasTypedAt")(lambda d: None)
+case("SP-44", needs="jvm:PinyinSessionAbbrevTest.aWordNotTypedForThirtyTypingDaysIsReadByWholeSyllablesOnlyAgain、PinyinSessionAbbrevTest.aWordPinnedIsReadByAKeyAloneThoughNotTypedForThirtyTypingDays、PinyinSessionAbbrevTest.aWordPickedUnderAKeyReadAloneIsTypedThatDay、HabitCountsTest.theNodesToAWordTypedAreThoseOfEachReadingItWasTypedAt")(lambda d: None)
 
 
 case("SP-45", needs="jvm:PinyinDecoderTypedTest.aKeyReadAloneReadsNoMergedOrImportedWordNeverTyped、PinyinDecoderTypedTest.aKeyReadAloneReadsOnlyTheWordsTypedOrChosen")(lambda d: None)

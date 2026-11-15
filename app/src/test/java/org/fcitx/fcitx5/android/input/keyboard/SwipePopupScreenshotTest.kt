@@ -99,9 +99,11 @@ class SwipePopupScreenshotTest {
     // the bubbles and the edit menu the engine's scenes (060-render-p2 S2, §5.3's differences from the views'
     // that were: their text dp, not sp; their shadow drawn)
     @Test
+    @Uat("KB-105")
     fun uprightOnTheCanvas() = shoot("port")
 
     @Test
+    @Uat("KB-105")
     fun compactOnTheCanvas() {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
@@ -109,12 +111,14 @@ class SwipePopupScreenshotTest {
     }
 
     @Test
+    @Uat("KB-105")
     fun floatingOnTheCanvas() {
         prefs.setStyle(KeyboardStyle.FLOATING)
         shoot("floating")
     }
 
     @Test
+    @Uat("KB-105")
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun turnedOnTheCanvas() = shoot("land")
 

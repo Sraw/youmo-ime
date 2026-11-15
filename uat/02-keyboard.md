@@ -232,7 +232,7 @@
 - **前提**：B0（全拼，全键盘）。
 - **操作**：点 ⇧（字母变大写），点 x i，点「分词」，点 a n，点空格；看字母。切到英文打 `he`，看 ⇧ 的位置；切到五笔打 `gg`，看那个位置。
 - **预期**：分词打出 `'`，不是大写的 `"`；上屏后 ⇧ 还亮着（字母大写，下一个字母大写）。英文打字时那里仍是 ⇧（点了下一个字母大写）；五笔打字时那里仍是「拼」键（反查），不是分词。按住 ⇧ 时打出第一个字母（另一指）、在分词上松手：打出分词，⇧ 不变。按住「分词」时上屏（另一指点空格）再松手：打出 `'`，⇧ 还亮着。主题自带全键盘布局（没写分词键）的 ⇧ 一直是 ⇧：打拼音时点它字母变大写，不打 `'`。
-- **JVM**：`ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas`（分词发 `'`、不带 Shift，打完 ⇧ 还开着）、`ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator`（⇧ 上按下、换成分词后松手发 `'`）、`ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce`（打完才松开的分词发 `'`，⇧ 不用掉）、`ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped`（没分词键的主题布局 ⇧ 照旧是 Shift，点、长按都不发 `'`）、`ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce`（主题里发 `'` 的普通键照旧：带 Shift，一次性大写用掉）、`KeyShortcutsHostTest.quickInputRunOpensItAfterWhatIsTyped`（菜单开快速输入先上屏）；ime-core `ShiftSeparatorTest.neverEnglishATableNorZhuyin`；设备上切英文、五笔看一眼。
+- **JVM**：`ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas`（分词发 `'`、不带 Shift，打完 ⇧ 还开着）、`ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator`（⇧ 上按下、换成分词后松手发 `'`）、`ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce`（打完才松开的分词发 `'`，⇧ 不用掉）、`ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped`（没分词键的主题布局 ⇧ 照旧是 Shift，点、长按都不发 `'`）、`ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce`（主题里发 `'` 的普通键照旧：带 Shift，一次性大写用掉）；ime-core `ShiftSeparatorTest.neverEnglishATableNorZhuyin`；设备上切英文、五笔看一眼。
 
 ### KB-41 [P2] 等长按时已滑出键的下边，弹出后第一下往旁边挪不关掉
 - **前提**：B0。
@@ -399,7 +399,7 @@
 - **前提**：B0，输入框里有字；主题依次换成 Material 浅色、Material 深色、Deep Blue（再看一个自己的 3.0 主题更好）；Android 12+ 的 Monet（动态取色）也看一眼。
 - **操作**：空格上滑不松手，左右挪到全选、剪切、复制、撤销；在密码框里同样上滑，挪到复制。
 - **预期**：没选的格子是长按弹出的底色、图标是长按弹出的字色，手指所在的那一格是回车键的颜色（白色或主题的回车字色图标），一眼看得出选的是哪一格，挪到哪格哪格变色；选中的格子比别的大一点、形状不变。密码框里复制、剪切是淡的，挪上去时那一格仍是回车色、只是淡下去，看得出选中了但不能用。
-- **JVM**：每个内置主题浅色深色里选中格和其它格的底色对比不低于 1.6:1 见 keyboard-scene `BuiltinThemeEquivalenceTest.theMenusCellInFocusStandsOutInEveryBuiltInTheme`；格子的颜色、大小、不能用的淡下去见 `PopupsTest.aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded`；3.0 主题换算见 `LookThemeTextTest`（data/look-theme）；画出来的样子见 `SwipePopupScreenshotTest` 的 `edit_menu_*` 金样。设备截图见报告。
+- **JVM**：画出来的样子见 `SwipePopupScreenshotTest` 的 `edit_menu_*` 金样（`uprightOnTheCanvas`、`compactOnTheCanvas`、`floatingOnTheCanvas`、`turnedOnTheCanvas`）和 `KeyShortcutsScreenshotTest.theEditMenuOverTheSpace`（选中「粘贴」）；每个内置主题浅色深色里选中格和其它格的底色对比不低于 1.6:1 见 keyboard-scene `BuiltinThemeEquivalenceTest.theMenusCellInFocusStandsOutInEveryBuiltInTheme`；格子的颜色、大小、不能用的淡下去见 keyboard-scene `PopupsTest.aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded`，选中的那格不能用时仍是回车色、只是淡下去见 `PopupsTest.aMenusCellInFocusThatIsDisabledKeepsReturnsColourFaded`；3.0 主题换算见 keyboard-scene `LookThemeTextTest`（data/look-theme，不在 `uat.py jvm` 的结果里）。设备截图见报告。
 
 ### KB-63 [P2] 自己设的文字快捷键
 - **前提**：B0，**按键字符和快捷键** 里把 Q 的下滑设成文字「你好」。

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.learn.Code
@@ -72,6 +73,7 @@ class HabitCountsTest {
     // 简拼 in the middle of 双拼 reads the words typed, along the dictionary's nodes to them
     // ([UserModel.typedBelow]): each reading a word was typed at, while it is counted
     @Test
+    @Uat("SP-44")
     fun theNodesToAWordTypedAreThoseOfEachReadingItWasTypedAt() {
         fun below(vararg reading: String) = model.typedBelow(data.dictionary.find(syl(*reading)))
         fun typed(text: String, vararg reading: String) = model.typed(model.known(UserModel.Entry(text, syl(*reading))))

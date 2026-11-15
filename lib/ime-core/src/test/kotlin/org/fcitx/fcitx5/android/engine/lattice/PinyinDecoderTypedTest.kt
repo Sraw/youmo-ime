@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.lattice
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -52,6 +53,7 @@ class PinyinDecoderTypedTest {
     // DECISIONS 0.6.1 双拼中间简拼改 U: over a key read alone where it and the next make a syllable, only
     // the words the user typed or chose. nhk is n and hao (and nang, k): 你好 by n alone
     @Test
+    @Uat("SP-45")
     fun aKeyReadAloneReadsOnlyTheWordsTypedOrChosen() {
         val nihao = UserModel.Entry("你好", syl("ni", "hao"))
         assertEquals(listOf("你好"), over(null, "nihk"))
@@ -89,6 +91,7 @@ class PinyinDecoderTypedTest {
     // the same of the dictionaries the user merged and of the words only imported: none over a key
     // read alone till typed or chosen, all of them in whole syllables
     @Test
+    @Uat("SP-45")
     fun aKeyReadAloneReadsNoMergedOrImportedWordNeverTyped() {
         val user = mergedModel()
         user.attachImports(ImportedWords().import("妮好" to "ni hao"))

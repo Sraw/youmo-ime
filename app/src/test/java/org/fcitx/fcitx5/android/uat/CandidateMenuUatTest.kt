@@ -460,7 +460,7 @@ class CandidateMenuUatTest {
 
     // no card from the engine (an emoji, English, a quick input entry: Q8): the title as before
     @Test
-    @Uat("PY-128")
+    @Uat("PY-128", "EN-29")
     fun noReadingLineWhereTheEngineHasNoCard() {
         engine(dictionary.copy(text = "hello"))
         h.start()

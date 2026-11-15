@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -318,6 +319,7 @@ class PopupsTest {
     }
 
     @Test
+    @Uat("KB-105")
     fun aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded() {
         val cells = listOf(MenuCell("全选", "select-all"), MenuCell("剪切", "cut"), MenuCell("复制", "copy"))
         val s = builder().menu(cells, listOf(0, 1, 2), selected = 1, disabled = setOf(2)).ok()
@@ -345,6 +347,24 @@ class PopupsTest {
         val faded = copy.ops(false).filterIsInstance<Op.Fill>().single().color
         assertEquals(Argb(color("popupBackground").value and 0xFFFFFF or (77 shl 24)), faded)
         assertEquals("全选", all.a11y)
+    }
+
+    // the cell in focus disabled (复制 in a password field, the finger on it): still Return's colour and larger, faded,
+    // so the pick shows though it does nothing; a disabled one beside it the long press's colour faded
+    @Test
+    @Uat("KB-105")
+    fun aMenusCellInFocusThatIsDisabledKeepsReturnsColourFaded() {
+        val cells = listOf(MenuCell("全选", "select-all"), MenuCell("剪切", "cut"), MenuCell("复制", "copy"))
+        val s = builder().menu(cells, listOf(0, 1, 2), selected = 2, disabled = setOf(1, 2)).ok()
+        val (_, cut, copy) = s.keys
+        fun faded(c: Argb) = Argb((c.value and 0xFFFFFF) or ((c.alpha * Popups.DISABLED_ALPHA).roundToInt() shl 24))
+        assertEquals(setOf(KeyState.Selected, KeyState.Disabled), copy.states)
+        assertEquals(px(Popups.MENU_SELECTED_DP), copy.shape.bounds.width, 1.0)
+        assertEquals(listOf(faded(color("accentKey"))), copy.ops(false).filterIsInstance<Op.Fill>().map { it.color })
+        assertEquals(faded(color("accentKeyText")), copy.ops(false).filterIsInstance<Op.Icon>().single().tint)
+        assertEquals(px(Popups.MENU_FACE_DP), cut.shape.bounds.width, 1.0)
+        assertEquals(listOf(faded(color("popupBackground"))), cut.ops(false).filterIsInstance<Op.Fill>().map { it.color })
+        assertEquals(faded(color("popupText")), cut.ops(false).filterIsInstance<Op.Icon>().single().tint)
     }
 
     // a faded cell's picture and image as they are, the colour over the one and under the other faded

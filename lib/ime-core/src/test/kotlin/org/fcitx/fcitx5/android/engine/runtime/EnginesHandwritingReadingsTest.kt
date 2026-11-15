@@ -101,7 +101,7 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
     }
 
     @Test
-    @Uat("HW-29")
+    @Uat("HW-29", "HW-40")
     fun theCardOfAWrittenCharacterOrOneLookedUp() {
         val e = engines(ReadingStyle.OFF)
         e.write(0, "银")

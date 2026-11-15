@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.input.keyboard.GlideTouch.Route
 import org.junit.Assert.assertArrayEquals
@@ -273,6 +274,7 @@ class GlideTouchTest {
     // a thumb resting while another finger writes (0.6.0's pad's): each lift of the writing finger a stroke, its next
     // down on the letters the next one, off them nothing; the thumb's lift ends it all, and a glide never writes again
     @Test
+    @Uat("HW-53")
     fun handwritingWithAThumbRestingEachDownOnTheLettersWritesAgain() {
         val t = GlideTouch()
         t.down(0, 50f, 70f, 0, onLetter = true, keyWidth = 100f, keyHeight = 140f, longPressMillis = 300, writes = true)

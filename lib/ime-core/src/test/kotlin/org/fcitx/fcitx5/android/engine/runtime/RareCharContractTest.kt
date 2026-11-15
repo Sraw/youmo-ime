@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
@@ -159,6 +160,7 @@ class RareCharContractTest : EnginesFixture() {
     }
 
     @Test
+    @Uat("WD-53")
     fun aGateMadeDirectlyHoldsBackEvenTheCommonest() = engines().use { e ->
         // 龘 too, for the strokes: their table has a character of the basic plane alone
         e.rareGate = CharGate.of { it == '的'.code || it == '是'.code || it == TestCharLevels.EXT || it == TestCharLevels.OUT }
@@ -282,6 +284,7 @@ class RareCharContractTest : EnginesFixture() {
     }
 
     @Test
+    @Uat("WD-54")
     fun theHandwritingPadReadsAroundWhatIsHeld() = engines().use { e ->
         file = "# youmo-rare-chars 1\non\t1\n"
         e.reload()

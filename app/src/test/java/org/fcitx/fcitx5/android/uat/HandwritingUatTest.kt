@@ -531,7 +531,7 @@ class HandwritingUatTest {
     // in Chinese, as the user reviews the image
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
     @Test
-    @Uat("HW-29")
+    @Uat("HW-29", "HW-40")
     fun aHeldCharactersCardThenItsButtonsAndTheMenu() {
         h.api.candidateCards["行"] = CandidateCard.Looked(hang)
         start()

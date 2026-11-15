@@ -175,7 +175,7 @@
 - **前提**：B0-手写。
 - **操作**：写「行」，长按候选「行」；点上屏后长按一个联想词。
 - **预期**：手写的字长按第一行直接是完整字卡（和以前一样）；联想词长按第一行是读音行，点开是词卡。
-- **JVM**：app `HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu`（图不变）；ime-core `EnginesHandwritingReadingsTest`（写的字 Looked，联想词 Word）；设备上不跑。
+- **JVM**：app `HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu`（图不变）；ime-core `EnginesHandwritingReadingsTest.theCardOfAWrittenCharacterOrOneLookedUp`（写的字 Looked，联想词 Word）；设备上不跑。
 
 ### HW-41 [P0] 点工具栏「手写」开、关
 - **前提**：B0。

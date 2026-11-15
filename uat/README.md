@@ -219,7 +219,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v、QU-20、ST-82、ST-85、ST-110 |
 | `release,scripted:…` | 发版时用发布包脚本跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
 | `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24、ST-68、ST-69、ST-70、ST-73、ST-74、TB-53、VO-37、ST-75、ST-76、ST-77、ST-78、ST-79、ST-80、ST-81、TB-46a、PR-51、ST-83、ST-84、ST-86、ST-87、ST-88、ST-89、ST-91、ST-92、ST-93、ST-94、ST-102、ST-103、KB-84、ST-111、WD-49、PR-52a、ST-116、KB-88、VO-40、PY-121a、LC-33、ST-131 |
-| `jvm:<测试>` | JVM 上的测试（`:app:testDebugUnitTest`、`:app:testDebugUnitTestAt29` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，`:lib:ime-core:test`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
+| `jvm:<测试>` | JVM 上的测试（`:app:testDebugUnitTest`、`:app:testDebugUnitTestAt29` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，`:lib:ime-core:test`，`:lib:keyboard-scene:jvmTest`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
@@ -275,19 +275,19 @@ debug 包（要先有 arm64-v8a debug 包），只当宿主应用、把它自己
 
 有些用例的 **预期** 在 JVM 上就能完整断言：`app/src/test` 里的 `KeyboardHarness` 在 Robolectric 里造出整个键盘
 （真的输入法服务和 `InputView`，引擎换成 `FakeHostApi`，候选等用假事件推进来），设置页用 `MainActivity` 加同一个假引擎；
-样子用 Roborazzi 截图，和 `app/src/test/screenshots/` 里提交的金图比。测试方法上标 `@Uat("<编号>")`，用例 .md 里多一行
+样子用 Roborazzi 截图，和 `app/src/test/screenshots/` 里提交的金图比。测试方法上标 `@Uat("<编号>")`（keyboard-scene 的测试用它自己的 `org.fcitx.fcitx5.android.scene.Uat`），用例 .md 里多一行
 **JVM** 写测试名；整条搬走的，脚本里是 `needs="jvm:…"`，设备上不跑。还在设备上留一条冒烟的（看引擎和界面之间的胶水），
 .md 里写明。
 
 ```sh
-./gradlew :app:testDebugUnitTest :app:testDebugUnitTestAt29 :lib:ime-core:test :lib:ime-eval:uatTest
-                                                 # 四个都要跑：jvm 读这四处的结果；截图默认就比对（gradle.properties 的 roborazzi.test.verify）
+./gradlew :app:testDebugUnitTest :app:testDebugUnitTestAt29 :lib:ime-core:test :lib:ime-eval:uatTest :lib:keyboard-scene:jvmTest
+                                                 # 五个都要跑：jvm 读这五处的结果；截图默认就比对（gradle.properties 的 roborazzi.test.verify）
 ./gradlew :app:testDebugUnitTest --tests '*UatTest' -Proborazzi.test.record=true -Proborazzi.test.verify=false   # 改了样子后重录
 uat/tools/uat.py jvm                             # 读 JUnit 结果，按编号写 runs/<日期>-jvm-<版本>.md
 ```
 
 `jvm` 读的是结果目录里现有的 XML，不看它是哪次构建留下的：少跑一个任务，那些用例就记成上一次（可能是旧提交）的结果，
-不会报"没有结果"。所以在 `jvm` 前把四个任务一起跑（或先删掉 `build/test-results`）。
+不会报"没有结果"。所以在 `jvm` 前把五个任务一起跑（或先删掉 `build/test-results`）。
 
 发版的"全部 P0 + 改过的功能区"照旧逐条对号：设备的 run 文件和 `jvm` 的 run 文件两份都要绿。
 

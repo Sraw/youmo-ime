@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.rare
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.CharLevels.Level
 import org.fcitx.fcitx5.android.engine.data.PinyinData
@@ -120,6 +121,7 @@ class RarePageTest {
     }
 
     @Test
+    @Uat("WD-52")
     fun aDragSetsTheRangeToTheStartsOppositeAndLeavesTheRestAsTheyWere() {
         // rows 0..9, row 4 a head; held: 1 and 6
         val held = setOf(1, 6)

@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.Forms
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.SceneText
+import org.fcitx.fcitx5.android.scene.Uat
 import org.fcitx.fcitx5.android.scene.engine.MenuCell
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.testData
@@ -65,6 +66,7 @@ class BuiltinThemeEquivalenceTest {
     // the edit menu's cell in focus told from the others at a glance (0.6.1: all were Return's colour, the one in
     // focus 12–20% darker or lighter, 1.05–1.44 to 1): its face against theirs, each over the version's own ground
     @Test
+    @Uat("KB-105")
     fun theMenusCellInFocusStandsOutInEveryBuiltInTheme() {
         val cells = listOf("select-all", "cut", "copy", "paste", "undo").map { MenuCell(it, it) }
         for (file in FILES) {

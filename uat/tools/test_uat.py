@@ -486,6 +486,13 @@ class JvmTest(unittest.TestCase):
                           "WD-35: needs= names LexiconUatTest.gone, which has no @Uat"],
                          uat.needs_problems(cases, found))
 
+    def test_a_multiplatform_jvm_tests_name_is_its_method(self):
+        # keyboard-scene's jvmTest names a method "name[jvm]": read as is, its case would have no result
+        self.write("k/TEST-org.x.PopupsTest.xml", '<testsuite name="org.x.PopupsTest">'
+                   '<testcase name="menu[jvm]" classname="org.x.PopupsTest" time="0.1"/></testsuite>')
+        results = uat.junit_results([os.path.join(self.tmp.name, "k")])
+        self.assertEqual("通过", uat.jvm_record({"KB-105": [("org.x.PopupsTest", "menu")]}, results)["KB-105"][0])
+
     def test_a_case_fails_with_any_of_its_tests_and_is_blocked_without_a_result(self):
         self.write("r/TEST-org.x.KeysTest.xml", '<testsuite name="org.x.KeysTest">'
                    '<testcase name="address" classname="org.x.KeysTest" time="0.5"/>'

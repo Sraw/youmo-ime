@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.picker
 
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 import org.junit.Assert.assertEquals
@@ -20,6 +21,7 @@ class PickerDataTest {
 
     // the symbol panel's pick kept by the category's id (PAN-29): each its own, found again by it; one no longer listed, none
     @Test
+    @Uat("PAN-29")
     fun everySymbolCategoryIsFoundAgainByItsId() {
         val categories = listOf(PickerData.RecentlyUsedCategory) + PickerData.Symbol.map { it.first }
         assertRows(
@@ -35,6 +37,7 @@ class PickerDataTest {
 
     // user 2026-11-13: 英文 without the digits (no use there), with the English comma and full stop it lacked
     @Test
+    @Uat("PAN-29")
     fun theEnglishTabHasNoDigitsButTheEnglishCommaAndFullStop() {
         val english = PickerData.Symbol.first { it.first.name == R.string.picker_ascii }.second.toList()
         assertRows(

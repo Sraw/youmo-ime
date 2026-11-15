@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
@@ -74,6 +75,7 @@ class HeldWordsTest {
     }
 
     @Test
+    @Uat("WD-56")
     fun theUserModelAsksItsWordsAsTheDictionarysAndTheUsersByText() {
         val model = UserModel(data.dictionary, data.vocabulary)
         val mine = model.own(UserModel.Entry("龘龘", syl("da", "da")))

@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -89,6 +90,7 @@ class ShiftSeparatorCanvasTest {
 
     // KB-106: 分词 types `'`, neither using up Shift once nor turning it off: typing done, Shift once as it was
     @Test
+    @Uat("KB-107")
     fun theSeparatorKeepsShiftAsItWas() = harness().use { h ->
         val im = KeyboardHarness.PINYIN.uniqueName
         try {
@@ -120,6 +122,7 @@ class ShiftSeparatorCanvasTest {
     // KB-107: a theme's or user's own qwerty with no 分词 key: its Shift stays Shift while pinyin is typed, drawn
     // and read as Shift, a tap Shift once, a long press caps lock; no `'` sent
     @Test
+    @Uat("KB-107")
     fun aThemesOwnShiftStaysShiftWhilePinyinIsTyped() {
         val app = RuntimeEnvironment.getApplication()
         val builtIn = BuiltInLayouts(app)
@@ -159,6 +162,7 @@ class ShiftSeparatorCanvasTest {
 
     // KB-107: a theme's own `'` key (its m sending it here) is no 分词: Shift once is used up on it, with Shift sent, as in 0.6.0
     @Test
+    @Uat("KB-107")
     fun aThemesPlainApostropheKeyUsesUpShiftOnce() {
         val app = RuntimeEnvironment.getApplication()
         val builtIn = BuiltInLayouts(app)
@@ -192,6 +196,7 @@ class ShiftSeparatorCanvasTest {
     // KB-107: Shift pressed as nothing was typed, lifted once 分词 is in its place (the first letter's answer in
     // between): 分词's `'`, Shift left off
     @Test
+    @Uat("KB-107")
     fun shiftDownAsTypingBeginsUpIsTheSeparator() = harness().use { h ->
         val im = KeyboardHarness.PINYIN.uniqueName
         try {
@@ -217,6 +222,7 @@ class ShiftSeparatorCanvasTest {
     // KB-107: 分词 pressed while typing, lifted once typing has ended (committed meanwhile): its `'` as ever, Shift
     // once kept, not used up on it
     @Test
+    @Uat("KB-107")
     fun theSeparatorLiftedAfterTypingEndedKeepsShiftOnce() = harness().use { h ->
         val im = KeyboardHarness.PINYIN.uniqueName
         try {

@@ -172,7 +172,7 @@ def kb106(d):
     return f"编码行「{pre}」，上屏「西安」"
 
 
-case("KB-107", needs="jvm:ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas、ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator、ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce、ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped、ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce、KeyShortcutsHostTest.quickInputRunOpensItAfterWhatIsTyped")(lambda d: None)
+case("KB-107", needs="jvm:ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas、ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator、ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce、ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped、ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce")(lambda d: None)
 
 
 case("KB-42", needs="jvm:StrokeUatTest.aStrokeDrawnWhilePinyinIsTypedIsSentAsOneTheKeysNone、StrokeUatTest.theNineAndFourteenKeysSendAStrokeToo、StrokeUatTest.aStrokeStartsInTheSplitGapTooATapOrAGlideThereDoNothing、StrokeUatTest.aSecondFingerOnALetterWhileOneRestsInTheGapTypesIt、StrokeUatTest.aStrokeFromTheGapCancelledSendsNothingAndLeavesNoTrail、StrokeUatTest.noOtherLayoutHasAGap、StrokeUatTest.theSweepFindsTheSplitGap")(lambda d: None)
@@ -265,7 +265,9 @@ case("KB-61", needs="jvm:BaseKeyboardTest.aLettersSwipeDownIsItsShortcutAndUpIts
 case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore、EditPlanTest、EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor、EditPlanTest.aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor、EditPlanTest.aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor、EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor、KeyShortcutsHostTest.aClearMadeBeforeTheCursorsReportIsInIsPutBackWithTheCursorWhereItIsReportedThen、HostCoreEnginesTest.what is typed is cleared without a commit and typed again、HostCoreEnginesTest.what is typed after a syllable taken off the nine keys' bar is never typed again、EnginesTest.aSyllableTakenOffTheBarIsAPick、SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels")(lambda d: None)
 
 
-case("KB-105", needs="jvm:BuiltinThemeEquivalenceTest.theMenusCellInFocusStandsOutInEveryBuiltInTheme、PopupsTest.aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded、LookThemeTextTest、SwipePopupScreenshotTest")(lambda d: None)
+case("KB-105", needs="jvm:SwipePopupScreenshotTest.uprightOnTheCanvas、SwipePopupScreenshotTest.compactOnTheCanvas、SwipePopupScreenshotTest.floatingOnTheCanvas、"
+     "SwipePopupScreenshotTest.turnedOnTheCanvas、KeyShortcutsScreenshotTest.theEditMenuOverTheSpace、BuiltinThemeEquivalenceTest.theMenusCellInFocusStandsOutInEveryBuiltInTheme、"
+     "PopupsTest.aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded、PopupsTest.aMenusCellInFocusThatIsDisabledKeepsReturnsColourFaded")(lambda d: None)
 
 
 case("KB-63", needs="jvm:BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns")(lambda d: None)

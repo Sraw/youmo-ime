@@ -234,7 +234,7 @@ case("LC-18", needs="jvm:StuckBarUatTest.floatingAndDockedMidPinyinKeepIt")(lamb
 
 
 
-case("LC-20", needs="jvm:DeveloperUatTest.aRestartGivenUpOnAHostStillStartingSaysItMayNotHaveRestarted,DeveloperUatTest.restartedTheInstanceSaysDone,AppLanguageUatTest.aLanguageChangedWhileTheHostStaysStartingSaysItMayNotHaveRestarted")(lambda d: None)
+case("LC-20", needs="jvm:DeveloperUatTest.aRestartGivenUpOnAHostStillStartingSaysItMayNotHaveRestarted、DeveloperUatTest.restartedTheInstanceSaysDone、AppLanguageUatTest.aLanguageChangedWhileTheHostStaysStartingSaysItMayNotHaveRestarted")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 编码行在输入框里（B-IF）
@@ -415,7 +415,7 @@ def lc24(d):
     return f"最后「{t}」" + ("（框丢了焦点，留在键盘上，点那一行写进去的）" if kept else "")
 
 
-case("LC-36", needs="jvm:CommitKeptUatTest.withTheCodeOnTheStripOrInTheBarWhatADeafFieldDroppedIsKeptTheSame,CommitKeptUatTest.aFieldThatTakesTheTextIsNeverSaidToHaveDroppedItHoweverLateItReports,CommitKeptUatTest.whatIsKeptGoesWithTheKeyboardAnotherFieldOrSomethingElseTypedAndStaysThroughATurnAndARestart")(lambda d: None)
+case("LC-36", needs="jvm:CommitKeptUatTest.withTheCodeOnTheStripOrInTheBarWhatADeafFieldDroppedIsKeptTheSame、CommitKeptUatTest.aFieldThatTakesTheTextIsNeverSaidToHaveDroppedItHoweverLateItReports、CommitKeptUatTest.whatIsKeptGoesWithTheKeyboardAnotherFieldOrSomethingElseTypedAndStaysThroughATurnAndARestart")(lambda d: None)
 
 
 case("LC-25", needs="manual:切到别的应用再回来、用输入法选择器换输入法：留下与否随系统，设备上手工看（设计页 M3、M6）")(lambda d: None)

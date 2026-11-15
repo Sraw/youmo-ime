@@ -240,7 +240,7 @@ def hw48(d):
     return f"候选 {c[:3]}"
 
 
-case("HW-40", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu、EnginesHandwritingReadingsTest")(lambda d: None)
+case("HW-40", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu、EnginesHandwritingReadingsTest.theCardOfAWrittenCharacterOrOneLookedUp")(lambda d: None)
 
 case("HW-49", needs="jvm:KeyHandwritingUatTest.notInAPasswordFieldNorEnglishNorQuickInputNorWhileTalkBackExplores、"
               "KeyHandwritingUatTest.outOfQuickInputTheLettersAreWrittenOnAgain")(lambda d: None)
