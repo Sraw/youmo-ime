@@ -186,7 +186,10 @@ object SceneLayouts {
         source.refuses(id, layout, fragments)?.let { why ->
             return null.also { Timber.e("scene layout %s of %s not taken: %s", id, source.key, why) }
         }
-        val held = source.keyData?.let { KeyData.of(id, layout, fragments, it) } ?: return SceneLayout(id, layout, fragments)
+        // a theme pack's board is of its own id, whatever based-on= it writes (refuses holds it to that one); a layout of
+        // one's own is of the board it is based on
+        val held = source.keyData?.let { KeyData.of(id, layout, fragments, it, layout.basedOn.takeIf { _ -> it == KeyData.Mode.Own }) }
+            ?: return SceneLayout(id, layout, fragments)
         return SceneLayout(id, held.layout, held.fragments)
     }
 }

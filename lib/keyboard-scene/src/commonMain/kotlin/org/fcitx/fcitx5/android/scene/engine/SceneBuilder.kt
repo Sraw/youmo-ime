@@ -571,6 +571,7 @@ class SceneBuilder(
             motion = motion(k.looks.getValue(k.states), k.looks.getValue(k.states + KeyState.Pressed), (normal.face ?: normal.pressed).bounds),
             // a way left out (no room even at its ladder's foot) said so, else how it was drawn
             fates = k.content.marks.zip(s.marks).mapNotNull { (m, d) -> m.way?.let { w -> w.up to (if (d == null) MarkFate.Dropped else w.fate) } }.toMap(),
+            head = k.placed.head,
         )
     }
 

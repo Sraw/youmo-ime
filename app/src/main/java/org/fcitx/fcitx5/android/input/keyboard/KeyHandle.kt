@@ -25,6 +25,9 @@ interface KeyHandle : KeyGesture.Key {
      */
     val bounds: Rect?
 
+    /** Where its bubble goes over it, as [bounds]: a key across rows' its first row's, the bubble over its top, not its foot. */
+    val previewBounds: Rect? get() = bounds
+
     /** Its touch: the gesture's settings and where the finger is. */
     val keyGesture: KeyGesture
 

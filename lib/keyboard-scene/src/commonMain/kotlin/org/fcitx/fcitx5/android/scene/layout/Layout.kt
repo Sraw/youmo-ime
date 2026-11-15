@@ -19,14 +19,26 @@ class Layout(
     /** Its keys pop up a preview as they are pressed, and their long press's keyboard or menu (the number pad's do not: rules C §7). */
     val preview: Boolean = true,
     val popups: Boolean = true,
+    /**
+     * `based-on=` (0.6.1, a custom layout's: 061-custom-layout §2.2): the app's board it was made from, what its
+     * required keys are held to and what is drawn in its place once it is gone; null where not written.
+     */
+    val basedOn: String? = null,
+    /** `<meta>` (0.6.1): who made it and the oldest app it is for; null where there is none. */
+    val meta: LayoutMeta? = null,
+    /** `pads=` (0.6.1, a number board's, §7): the number pads it is for, as written; null where not written (only `full`). */
+    val pads: List<String>? = null,
 ) {
     /**
      * This keyboard with [defaults], [parts] and [popups] in place of its own, everything else of it kept: the one place
      * a layout is made again of another (KeyData), so a member added here is carried over by adding it here alone.
      */
     fun with(defaults: KeyAttrs, parts: List<Part>, popups: Boolean): Layout =
-        Layout(id, name, family, columns, onSplit, defaults, parts, preview, popups)
+        Layout(id, name, family, columns, onSplit, defaults, parts, preview, popups, basedOn, meta, pads)
 }
+
+/** A layout's `<meta>` (061-custom-layout §2.2): as a theme's, with what it is ([description]) in place of a preview picture. */
+data class LayoutMeta(val author: String?, val version: String?, val license: String?, val minApp: String?, val description: String?)
 
 /** A row of a keyboard, or the rows of a fragment it includes. */
 sealed interface Part

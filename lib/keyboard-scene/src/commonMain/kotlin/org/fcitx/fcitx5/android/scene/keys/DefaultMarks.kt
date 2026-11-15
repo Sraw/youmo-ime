@@ -73,10 +73,11 @@ object DefaultMarks {
 
     /**
      * The variant a layout's family stands for, its default input method's. The 14 and 18 keys are told apart by the
-     * app's keyboard the layout is of, [basedOn] (`k18`): a theme pack's is of its own id (PackLayouts.judge), a user's
-     * layout of the one it was made from (061-custom-layout §5.3), whatever its own id.
+     * app's keyboard the layout is of, [basedOn] (`k18`): a theme pack's is of its own id (PackLayouts.judge), which its
+     * callers pass whatever `based-on=` it writes; a user's layout of the one it was made from (061-custom-layout §5.3),
+     * its `based-on=`, whatever its own id.
      */
-    fun variantOf(layout: Layout, basedOn: String = layout.id): KeyboardVariant = KeyboardVariant(
+    fun variantOf(layout: Layout, basedOn: String = layout.basedOn ?: layout.id): KeyboardVariant = KeyboardVariant(
         when (layout.family) {
             "letters" -> KeyboardVariant.Form.Full
             "nine" -> KeyboardVariant.Form.Nine

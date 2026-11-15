@@ -719,13 +719,13 @@ class KeyboardCanvasView(
 
     /**
      * Where a popup over key [ref] is placed, in the window, into [out]: its face across and its cell
-     * down; false where the scene drawn last has no such key.
+     * down ([head]: its first row's part, a bubble's, KeyNode.head); false where the scene drawn last has no such key.
      */
-    fun popupBounds(ref: KeyRef, out: Rect): Boolean {
+    fun popupBounds(ref: KeyRef, out: Rect, head: Boolean = false): Boolean {
         val k = current?.keys?.firstOrNull { it.of(ref) } ?: return false
         getLocationInWindow(viewAt)
         val face = k.shape.bounds
-        val cell = k.bounds
+        val cell = if (head) k.head else k.bounds
         out.set(
             viewAt[0] + face.left.roundToInt(), viewAt[1] + cell.top.roundToInt(),
             viewAt[0] + face.right.roundToInt(), viewAt[1] + cell.bottom.roundToInt(),

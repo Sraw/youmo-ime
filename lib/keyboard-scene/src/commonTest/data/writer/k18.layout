@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<keyboard xmlns="https://youmo-ime/layout/1" id="k18" name="18 键" family="grouped" columns="100">
+  <defaults kind="letter" text-size="20" width="fill"/>
+  <row>
+    <key id="r1c1" label="{group:q}" shortcut="g18/q" letters="q" lean="off"/>
+    <key id="r1c2" label="{group:we}" shortcut="g18/we" letters="we" lean="off"/>
+    <key id="r1c3" label="{group:rt}" shortcut="g18/rt" letters="rt" lean="off"/>
+    <key id="r1c4" label="{group:y}" shortcut="g18/y" letters="y" lean="off"/>
+    <key id="r1c5" label="{group:u}" shortcut="g18/u" letters="u" lean="off"/>
+    <key id="r1c6" label="{group:io}" shortcut="g18/io" letters="io" lean="off"/>
+    <key id="r1c7" label="{group:p}" shortcut="g18/p" letters="p" lean="off"/>
+  </row>
+  <row>
+    <key id="r2c1" label="{group:a}" shortcut="g18/a" width="fill" letters="a" lean="off"/>
+    <key id="r2c2" label="{group:sd}" shortcut="g18/sd" width="fill" letters="sd" lean="off"/>
+    <key id="r2c3" label="{group:fg}" shortcut="g18/fg" width="fill" letters="fg" lean="off"/>
+    <key id="r2c4" label="{group:h}" shortcut="g18/h" width="fill" letters="h" lean="off"/>
+    <key id="r2c5" label="{group:jk}" shortcut="g18/jk" width="fill" letters="jk" lean="off"/>
+    <key id="r2c6" label="{group:l}" shortcut="g18/l" width="fill" letters="l;" lean="off">
+      <variant when="ime=shuangpin scheme-types=semicolon" label="{group:l;}"/>
+    </key>
+  </row>
+  <row>
+    <key id="apostrophe" label="分词" kind="function" role="apostrophe" text-size="16" a11y="a11y_key_separator" send="'" shortcut="separator" width="15"/>
+    <key id="r3c1" label="{group:z}" shortcut="g18/z" width="14" letters="z" lean="off"/>
+    <key id="r3c2" label="{group:xc}" shortcut="g18/xc" width="14" letters="xc" lean="off"/>
+    <key id="r3c3" label="{group:v}" shortcut="g18/v" width="14" letters="v" lean="off"/>
+    <key id="r3c4" label="{group:bn}" shortcut="g18/bn" width="14" letters="bn" lean="off"/>
+    <key id="r3c5" label="{group:m}" shortcut="g18/m" width="14" letters="m" lean="off"/>
+    <key id="backspace" icon="backspace" kind="function" role="backspace" a11y="a11y_key_backspace" sound="delete" send="sym:BackSpace" swipe-axis="both" repeat="true" shortcut="backspace" width="15"/>
+  </row>
+  <include src="grouped-bottom"/>
+</keyboard>

@@ -70,11 +70,13 @@ class BuiltInKeyDataTest {
     // keys-golden.tsv, every key of every board as KeyResolver resolves it
     @Test
     fun theNamesAreTheGoldenKeys() {
-        val golden = readText("$TEST_DATA/../../../../ime-core/src/test/resources/keys-golden.tsv")!!
+        // ime-core's, reached across modules from this one's test data: the path in every message, should either move
+        val path = "$TEST_DATA/../../../../ime-core/src/test/resources/keys-golden.tsv"
+        val golden = (readText(path) ?: error("no keys-golden.tsv at $path"))
             .lines().drop(1).filter { it.isNotBlank() }.map { it.substringBefore('\t') }.toSet()
         val named = BuiltInKeyData.BOARDS.values.flatMap { it.named.keys }.toSet()
-        assertEquals(emptyList(), (golden - named).sorted(), "golden, no board's")
-        assertEquals(emptyList(), (named - golden).sorted(), "a board's, not golden")
+        assertEquals(emptyList(), (golden - named).sorted(), "in $path, no board's")
+        assertEquals(emptyList(), (named - golden).sorted(), "a board's, not in $path")
     }
 
     // the generated file: a function of each board, names sorted, data written only where there is some (one function

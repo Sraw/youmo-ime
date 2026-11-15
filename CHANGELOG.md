@@ -44,6 +44,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 和 0.6.0 不同：写好还没上屏的字显示在键盘上方的编码行里（和拼音一样），不再像 0.6.0 的手写输入法那样带下划线出现在输入框里（编码行选了 **输入框里（实验性）** 时照样在框里）；在输入框里点别处时，写好的字上屏到新的光标处。
 - **主题只管样子**：主题自带的键盘布局里写的长按列表、键角小字、上滑、下滑、双击和长按菜单不再起作用，这些都跟着键的名字，用输入法自带的同名键的，在 **按键 → 按键字符和快捷键** 里改；键的位置、样子、点了打什么照旧按主题的。导入这样的主题时提示一行「主题自带的布局里有 N 处……写法不起作用」，网页主题制作页在问题列表里列出行号。已经装着的主题也一样：主题写的默认首选不再生效，自己设过的不变。合并了键的 17 键这类布局，分组键的角标按键的名字取，不再因为前面少了一个键整体错一位。
 - 输入框收了字却没写进去时不再悄悄丢字：网页里的输入框在横屏、转屏时可能被键盘几乎盖满，这时它不再接收文字，以前上屏的字就没了。现在键盘上方写「没写进去：……，点一下输入框」，点一下输入框、再点这一行，字就写进去；接着打别的字、换输入框或收起键盘，这一行消失。密码框和要求不记录的输入框不检查。
+- 主题自带布局里跨几行的键（`rows=`）可以放在一行的中间，下面的行绕过它排；按下时的气泡对着它最上面那一行，不再对着整个高键（见主题格式）。
 
 ### Main changes
 
@@ -79,6 +80,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Unlike 0.6.0: written characters not yet put in show in the code row above the keys (as pinyin does), no longer underlined in the text box as with 0.6.0's handwriting input method (still in the box where the code row is set to **In the text box (experimental)**); tapping elsewhere in the box puts them in at the new cursor.
 - **A theme sets only the look**: what a theme's own keyboard layouts write of a key's long press list, corner character, swipes up and down, double tap and long-press menu no longer takes effect; these follow the key's name, the app's own key of that name, and are changed in **Keys → Key characters and shortcuts**. Where keys are, how they look and what a tap types stay the theme's. Importing such a theme says so in one line (N settings in its layouts do nothing); the web theme maker lists the lines among its problems. Themes already installed are the same: a default first the theme wrote no longer holds, one you set yourself stays. In a layout that merges keys, such as the 17 keys, a group key's corner goes by its name and no longer shifts one along for the key gone before it.
 - Text a text box took and never wrote is no longer lost in silence: a web page's box almost covered by the keyboard in landscape, or as the screen turns, may stop taking text while the keyboard stays up, and what was typed was gone. The keyboard now says 「没写进去：…，点一下输入框」 (Not typed in: …. Tap the text box) above the candidates; tap the box, then that line, and the text goes in. Typing something else, another box or the keyboard put away clears the line. Passwords and boxes that ask not to be recorded are not checked.
+- In a theme's own layouts a key across rows (`rows=`) may sit in the middle of its row, the rows under it laid out around it; its pressed bubble shows over its top row, no longer over the whole tall key (see the theme format).
 
 ---
 

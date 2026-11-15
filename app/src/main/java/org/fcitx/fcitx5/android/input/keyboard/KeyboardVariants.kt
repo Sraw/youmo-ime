@@ -29,7 +29,8 @@ object KeyboardVariants {
      * [nineLetters] the nine keys' letters as the keyboard has them (a user's t9_letters), else the language's.
      */
     fun of(layout: Layout, im: String, scheme: ShuangpinScheme, nineLetters: Map<Char, String>? = null): KeyboardVariant =
-        of(DefaultMarks.variantOf(layout).form, im, scheme, nineLetters)
+        // the app's and a theme pack's layouts (SceneLayouts): of their own ids, whatever based-on= a pack writes
+        of(DefaultMarks.variantOf(layout, layout.id).form, im, scheme, nineLetters)
 
     /** A keyboard of [form] (its layout's family's) shown for [im]: [of]. */
     fun of(form: Form, im: String, scheme: ShuangpinScheme, nineLetters: Map<Char, String>? = null): KeyboardVariant {

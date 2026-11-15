@@ -6,11 +6,14 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 
 import android.os.SystemClock
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.BoardImages
+import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
@@ -19,6 +22,13 @@ import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboardMode
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.scene.KeyRef
+import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.FixedMeasurer
+import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -31,6 +41,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.math.roundToInt
 
 /**
  * The keys the scene draws take their touches themselves (060-render-p2 S1, [SceneTouch]): each
@@ -281,6 +292,44 @@ class SceneTouchTest {
     }
 
     // a key the scene drawn last has not: no place for a popup over it, so none shown (not at the window's corner)
+    // a key across rows (rows=): its bubble over its first row, its long press's list over the whole key (KeyNode.head)
+    @Test
+    fun aKeyAcrossRowsHasItsBubbleOverItsFirstRow() {
+        KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
+            val kb = h.textKeyboard()
+            val theme = TestThemes.PixelLight
+            val look = ThemeManager.shownLook(theme)
+            val layout = LayoutReader.layout(
+                "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"3\">" +
+                    "<row><key id=\"a\" label=\"a\"/><key id=\"tall\" label=\"t\" rows=\"2\"/><key id=\"b\" label=\"b\"/></row>" +
+                    "<row><key id=\"c\" label=\"c\"/><key id=\"d\" label=\"d\"/></row></keyboard>",
+            ).let { (it as Parsed.Ok).value }
+            val canvas = KeyboardCanvasView(
+                h.inputView.context, BoardImages(),
+                object : KeyboardCanvasView.Host {
+                    override fun scene(width: Int, height: Int): KeyboardCanvasView.Drawn {
+                        val env = Env(width.toDouble(), height.toDouble(), 2.75, input = Input())
+                        val built = SceneBuilder(checkNotNull(SceneThemes.of(theme, look)), env, FixedMeasurer).build(layout)
+                        return KeyboardCanvasView.Drawn((built as Parsed.Ok).value, look, SceneFonts(look))
+                    }
+
+                    override fun key(node: KeyNode) = null
+                },
+            ).apply {
+                measure(View.MeasureSpec.makeMeasureSpec(600, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY))
+                layout(0, 0, 600, 400)
+            }
+            val node = checkNotNull(canvas.keyAt("tall"))
+            val q = checkNotNull(kb.sceneKey(checkNotNull(h.canvas()?.keyAt("q"))))
+            val tall = SceneKey(KeyRef.scene("tall", 0), q.def, canvas, kb)
+            val bubble = checkNotNull(tall.previewBounds)
+            val list = checkNotNull(tall.bounds)
+            assertEquals(node.head.bottom.roundToInt(), bubble.bottom)
+            assertEquals(node.bounds.bottom.roundToInt(), list.bottom)
+            assertTrue("$bubble $list", bubble.bottom < list.bottom - 50 && bubble.top == list.top)
+        }
+    }
+
     @Test
     fun aKeyTheSceneHasNotHasNoPopupPlace() {
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->

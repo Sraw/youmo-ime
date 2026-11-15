@@ -41,6 +41,7 @@ object SceneText {
         val states = if (k.states.isEmpty()) "" else " states=" + k.states.sorted().joinToString(",") { it.xml }
         appendLine("key ${k.id}$copy kind=${k.kind}${k.role?.let { " role=$it" }.orEmpty()}$states a11y=${q(k.a11y)}")
         appendLine("  bounds ${box(k.bounds)}")
+        if (k.head != k.bounds) appendLine("  head ${box(k.head)}")
         appendLine("  shape ${shape(k.shape)}")
         appendLine("  hit ${shape(k.hit)}")
         appendLine("  anchor ${n(k.anchor.x)},${n(k.anchor.y)} up ${n(k.up.x)},${n(k.up.y)}")

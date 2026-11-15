@@ -1,0 +1,48 @@
+# qwerty
+family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.1 commits []
+
+# k14
+family grouped ims [pinyin, shuangpin] pads [] min-app 0.6.1 commits []
+
+# k18
+family grouped ims [pinyin, shuangpin] pads [] min-app 0.6.1 commits []
+
+# nine
+family nine ims [pinyin, shuangpin, english] pads [] min-app 0.6.1 commits []
+
+# number
+family number ims [] pads [full] min-app 0.6.1 commits []
+
+# symbols
+family symbols ims [] pads [] min-app 0.6.1 commits []
+
+# k17
+family grouped ims [pinyin] pads [] min-app 0.6.1 commits []
+E base [it has no key [backspace]]
+W line 10: unnamed [r1c1]
+W line 11: unnamed [r1c2]
+W line 12: unnamed [r1c3]
+W line 13: unnamed [r1c4]
+W line 14: unnamed [r1c5]
+W line 15: unnamed [r1c6]
+W line 18: unnamed [r2c1]
+W line 19: unnamed [r2c2]
+W line 20: unnamed [r2c3]
+W line 21: unnamed [r2c4]
+W line 22: unnamed [r2c5]
+W line 23: unnamed [r2c6]
+W line 26: unnamed [r3c1]
+W line 27: unnamed [r3c2]
+W line 28: unnamed [r3c3]
+W line 29: unnamed [r3c4]
+W line 30: unnamed [r3c5]
+
+# the-app-qwerty
+family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.0 commits []
+E id-built-in [qwerty]
+E based-on []
+
+# pack-qwerty
+family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.0 commits []
+W id-built-in [qwerty]
+W based-on []

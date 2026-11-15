@@ -64,9 +64,12 @@ object LayoutReader {
         }
         val preview = a.oneOf("preview", ON_OFF) != "off"
         val popups = a.oneOf("popups", ON_OFF) != "off"
+        val basedOn = a.matching("based-on", IDENT, "a board's id")
+        val pads = pads(a, family)
         a.done()
+        val meta = meta(root, p)
         val defaults = defaults(root, p)
-        val parts = root.children.filter { it.name != "defaults" }.mapNotNull { child ->
+        val parts = root.children.filter { it.name != "defaults" && it.name != "meta" }.mapNotNull { child ->
             when (child.name) {
                 "row" -> row(child, p)
                 "include" -> include(child, p)
@@ -82,7 +85,16 @@ object LayoutReader {
                 ?.let { p.add(root.line, "a letters board lacks the keys ${it.joinToString(" ")}") }
         }
         val named = composedNamed(family, parts, p)
-        return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, named, preview, popups) }
+        return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, named, preview, popups, basedOn, meta, pads) }
+    }
+
+    // pads= (061-custom-layout §7): a number board's, each a pad NumberPad opens, once
+    private fun pads(a: Attributes, family: String?): List<String>? {
+        val pads = a.matching("pads", PAD_LIST, "number pads apart by a space (${PADS.joinToString(" ")})")?.split(' ') ?: return null
+        pads.filter { it !in PADS }.forEach { a.problem("pads=: \"$it\" is not one of ${PADS.joinToString("|")}") }
+        if (pads.toSet().size != pads.size) a.problem("pads= names a pad twice")
+        if (family != null && family != "number") a.problem("pads= is a number board's")
+        return pads
     }
 
     /**
@@ -136,12 +148,34 @@ object LayoutReader {
         if (a.string("xmlns") != NAMESPACE) a.problem("xmlns= must be $NAMESPACE")
     }
 
-    // ids unique within the file, but where each has a when= (the number pad's `-`, at a place a pad):
-    // the engine checks those shown are (Expand)
+    // ids unique within the file, but where each has a when=, its own or its row's (the number pad's `-`, at a place
+    // a pad; a custom number board's rows of one pad and another's, 061-custom-layout §7): the engine checks those
+    // shown are (Expand)
     private fun checkKeys(rows: List<Row>, p: Problems) {
-        rows.flatMap { it.cells }.filter { it.id != null }.groupBy { it.id }.forEach { (id, cells) ->
-            if (cells.size > 1 && cells.any { it.condition == null }) p.add(cells[1].line, "the id \"$id\" is used twice")
-        }
+        rows.flatMap { r -> r.cells.map { it to (it.condition != null || r.condition != null) } }.filter { it.first.id != null }
+            .groupBy { it.first.id }.forEach { (id, cells) ->
+                if (cells.size > 1 && cells.any { !it.second }) p.add(cells[1].first.line, "the id \"$id\" is used twice")
+            }
+    }
+
+    // `<meta>` (0.6.1, 061-custom-layout §2.2): once, before anything else; its texts as a theme's (ThemeReader)
+    private fun meta(parent: XmlElement, p: Problems): LayoutMeta? {
+        val all = parent.all("meta")
+        if (all.size > 1) p.add(all[1].line, "<meta> given twice")
+        val el = all.firstOrNull() ?: return null
+        if (parent.children.first() !== el) p.add(el.line, "<meta> must come first")
+        val a = Attributes(el, p)
+        fun text(name: String, max: Int = MAX_META) = a.value(name, "1–$max characters") { it.takeIf { v -> v.isNotBlank() && v.length <= max } }
+        val meta = LayoutMeta(
+            author = text("author"),
+            version = text("version"),
+            license = text("license"),
+            minApp = a.matching("min-app", APP_VERSION, "a version like 0.6.1"),
+            description = text("description", MAX_DESCRIPTION),
+        )
+        a.done()
+        noChildren(el, p)
+        return meta
     }
 
     // `split-side` is the side a board split goes to; one split in halves is on both, which no row can be yet
@@ -156,7 +190,8 @@ object LayoutReader {
     private fun defaults(parent: XmlElement, p: Problems): KeyAttrs {
         val all = parent.all("defaults")
         if (all.size > 1) p.add(all[1].line, "<defaults> given twice")
-        if (all.isNotEmpty() && parent.children.first() !== all[0]) p.add(all[0].line, "<defaults> must come first")
+        // first, or after <meta> where a keyboard has one
+        if (all.isNotEmpty() && parent.children.firstOrNull { it.name != "meta" } !== all[0]) p.add(all[0].line, "<defaults> must come first")
         val d = all.firstOrNull() ?: return KeyAttrs()
         val a = Attributes(d, p)
         val attrs = look(a).copy(width = width(a))
@@ -404,6 +439,13 @@ object LayoutReader {
     private const val MAX_TEXT_DP = 64.0
     private const val DEFAULT_COLUMNS = 10.0
     private val IDENT = Regex("[a-z0-9]+(-[a-z0-9]+)*")
+
+    /** The number pads a field may open (NumberPad), what `pad=` asks and `pads=` names (061-custom-layout §7). */
+    val PADS = listOf("full", "digits", "signed", "decimal", "signed-decimal", "phone", "datetime")
+    private val PAD_LIST = Regex("[a-z-]+( [a-z-]+)*")
+    private const val MAX_META = 64
+    private const val MAX_DESCRIPTION = 200
+    private val APP_VERSION = Regex("[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}")
     // KeyNames': 大千's `/` and the number pad's are keys too (a theme's `zhuyin//` is its own: Selector)
     private val KEY_ID = Regex("(?!view:)\\S{1,32}")
     private val CLASSES = Regex("[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*")

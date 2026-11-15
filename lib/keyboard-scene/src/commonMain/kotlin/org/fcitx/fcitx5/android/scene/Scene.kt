@@ -111,6 +111,8 @@ class KeyNode(
      * claim; [MarkFate.Dropped] only for a mark placed and then left out for room.
      */
     val fates: Map<Boolean, MarkFate> = emptyMap(),
+    /** The part of [bounds] in its first row: [bounds] but for a key across rows (`rows=`), whose bubble goes over its top row. */
+    val head: Box = bounds,
 ) {
     /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)

@@ -90,7 +90,7 @@ object KeyData {
         layout: Layout,
         fragments: Map<String, Fragment>,
         mode: Mode,
-        basedOn: String? = null,
+        basedOn: String? = layout.basedOn,
         app: Map<String, Board> = BuiltInKeyData.BOARDS,
     ): Result {
         val own = listOfNotNull(app[id], basedOn?.let { app[it] })

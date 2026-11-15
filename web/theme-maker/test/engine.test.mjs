@@ -173,6 +173,11 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   assert.deepEqual(E.defaultMarks(asPack.layout, {}), E.defaultMarks('zhuyin', {}));
   assert.deepEqual(E.readLayout(swiped, null).ignored, []);
   assert.deepEqual(E.readLayout(zhuyin, null, 'zhuyin').ignored, [], 'written as the app has it: nothing');
+  // a pack's k14.xml writing based-on="k18" is the 14 keys' still: held as the app's k14, its corners the 14 keys'
+  const as18 = E.readLayout(k14.replace('<keyboard ', '<keyboard based-on="k18" '), null, 'k14');
+  assert.ok(as18.ok, JSON.stringify(as18.problems));
+  assert.deepEqual(E.defaultMarks(as18.layout, {}), E.defaultMarks('k14', {}));
+  assert.equal(E.buildScene(as18.layout, light, env, fixed).scene.text(), E.buildScene('k14', light, env, fixed).scene.text());
   assert.ok(E.replaces('grouped-bottom') && E.replaces('emoticon') && !E.replaces('mine'));
   assert.equal(E.buildScene('nope', light, env, fixed).ok, false);
   assert.equal(E.buildScene('qwerty', light, { width: 1080 }, fixed).ok, false, 'an environment without its height');
@@ -556,4 +561,28 @@ test('readIcon gives each path its own colour (CSS order, alpha last) or null, a
   assert.equal(r.icon.paths[0].fill, null);
   assert.match(r.icon.paths[0].d, /^M2 2 ?L6 2/);
   assert.equal(r.icon.paths[1].fill >>> 0, 0x80ff0000);
+});
+
+// 061-custom-layout L1: the page's layout check and writer are the JVM's (LayoutCheckTest, LayoutWriterTest)
+test('checkLayout answers as the app\'s import would, and writeLayout writes what the JVM writes', () => {
+  const qwerty = read(scene, 'commonMain', 'layouts', 'qwerty.xml');
+  const own = qwerty.replace('id="qwerty"', 'id="my-qwerty" based-on="qwerty"');
+  const r = E.checkLayout(own, '0.6.1', null);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.equal(r.family, 'letters');
+  assert.equal(r.minApp, '0.6.1', 'based-on= is 0.6.1\'s');
+  assert.deepEqual(Array.from(r.pads), []);
+  // the commit: texts its base types (/ @ . .com) are not listed; another text on a base key is
+  assert.deepEqual(Array.from(r.commits), []);
+  assert.ok(!Array.from(r.warnings).some((w) => w.key === 'commits'));
+  const cn = E.checkLayout(own.replace('send="commit:.com"', 'send="commit:.cn"'), '0.6.1', null);
+  assert.deepEqual(Array.from(cn.commits), ['.cn']);
+  assert.ok(Array.from(cn.warnings).some((w) => w.key === 'commits'));
+  const newer = E.checkLayout(own.replace(/(<keyboard[^>]*>)/, '$1<meta min-app="9.0.0"/>'), '0.6.1', null);
+  assert.deepEqual(Array.from(newer.errors).map((e) => [e.key, Array.from(e.args)]), [['newer', ['9.0.0']]]);
+  const bad = E.checkLayout('<keyboard', '0.6.1', null);
+  assert.equal(bad.ok, false);
+  assert.equal(bad.errors[0].key, 'read');
+  assert.equal(E.checkLayout(42, '0.6.1', null).ok, false, 'a value of the wrong type is a problem');
+  assert.equal(E.writeLayout(E.layout('k18')), read(data, 'writer', 'k18.layout'));
 });

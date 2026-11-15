@@ -252,4 +252,136 @@ class PlaceTest {
         near(0.0, s.key("d").bounds.left, "the row under both is whole")
         assertNull(s.keyAt(5.0, side.centerY))
     }
+
+    // a key across rows (0.6.1's number pad's Return): its cell all its rows, its hit the same, the rows under it
+    // ending at its edge; its bubble's box (head) its first row's
+    @Test
+    fun aKeyAcrossRowsTakesItsRowsTouches() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"4\">" +
+                "<row><key id=\"a\" label=\"a\" width=\"1\"/><key id=\"b\" label=\"b\" width=\"fill\"/><key id=\"del\" label=\"x\" width=\"1\"/></row>" +
+                "<row><key id=\"c\" label=\"c\" width=\"fill\"/><key id=\"go\" label=\"go\" width=\"1\" rows=\"3\"/></row>" +
+                "<row><key id=\"d\" label=\"d\" width=\"fill\"/></row>" +
+                "<row><key id=\"e\" label=\"e\" width=\"1\" rows=\"1\"/><key id=\"f\" label=\"f\" width=\"fill\"/></row></keyboard>",
+        ).ok()
+        val s = Fixtures.scene(env, l)
+        val unit = env.width / 4
+        val go = s.key("go")
+        near(3 * unit, go.bounds.left)
+        near(env.width, go.bounds.right)
+        near(s.key("c").bounds.top, go.bounds.top, "its first row's top")
+        near(env.height, go.bounds.bottom, "down to the last row's foot")
+        near(s.key("c").bounds.bottom, go.head.bottom, "its bubble over its first row")
+        near(go.bounds.top, go.head.top)
+        assertEquals(go.bounds, (go.hit as Shape.Rect).box, "its whole cell takes its touch")
+        for (id in listOf("c", "d", "f")) near(3 * unit, s.key(id).bounds.right, "$id ends at its edge")
+        near(3 * unit, (s.key("f").hit as Shape.Rect).box.right, "and its hit too")
+        // a touch low in it, in the rows below, is its; beside it, the row's
+        assertEquals("go", s.keyAt(env.width - 5, env.height - 5)?.id)
+        assertEquals("go", s.keyAt(3 * unit + 1, s.key("d").bounds.centerY)?.id)
+        assertEquals("d", s.keyAt(3 * unit - 1, s.key("d").bounds.centerY)?.id)
+        // a key of one row: its head is its cell
+        assertEquals(s.key("a").bounds, s.key("a").head)
+    }
+
+    @Test
+    fun aKeyAcrossRowsFirstInItsRowKeepsTheLeftSide() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"4\">" +
+                "<row><key id=\"tall\" label=\"t\" width=\"1\" rows=\"2\"/><key id=\"a\" label=\"a\" width=\"fill\"/></row>" +
+                "<row><key id=\"b\" label=\"b\" width=\"fill\"/></row></keyboard>",
+        ).ok()
+        val s = Fixtures.scene(env, l)
+        val unit = env.width / 4
+        near(unit, s.key("b").bounds.left, "the row below starts at its edge")
+        near(unit, (s.key("b").hit as Shape.Rect).box.left)
+        near(env.height, s.key("tall").bounds.bottom)
+        assertEquals("tall", s.keyAt(1.0, env.height - 1)?.id)
+    }
+
+    // a key across rows in the middle of its row (061-custom-layout §18): the rows under it go past it, their units counted in
+    // the room it leaves; each stretch's end keys reach to its edge
+    @Test
+    fun aKeyAcrossRowsInsideItsRowLaysOut() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"3\">" +
+                "<row><key id=\"a\" label=\"a\" width=\"1\"/><key id=\"mid\" label=\"m\" width=\"1\" rows=\"2\"/><key id=\"b\" label=\"b\" width=\"1\"/></row>" +
+                "<row><key id=\"c\" label=\"c\" width=\"fill\"/><key id=\"d\" label=\"d\" width=\"fill\"/></row></keyboard>",
+        ).ok()
+        val s = Fixtures.scene(env, l)
+        val unit = env.width / 3
+        val mid = s.key("mid")
+        edge(unit, mid.bounds.left)
+        edge(2 * unit, mid.bounds.right)
+        near(env.height, mid.bounds.bottom, "down to the last row's foot")
+        near(s.key("a").bounds.bottom, mid.head.bottom, "its bubble over its first row")
+        // the row under it: c left of it, d right of it, each a unit (the two units it leaves, shared by the fills)
+        near(0.0, s.key("c").bounds.left)
+        edge(unit, s.key("c").bounds.right)
+        edge(2 * unit, s.key("d").bounds.left)
+        near(env.width, s.key("d").bounds.right)
+        edge(unit, (s.key("c").hit as Shape.Rect).box.right, "c's touch ends at its edge")
+        edge(2 * unit, (s.key("d").hit as Shape.Rect).box.left, "d's begins at its other")
+        assertEquals("mid", s.keyAt(1.5 * unit, s.key("c").bounds.centerY)?.id)
+    }
+
+    // a key under one across rows that reaches into its room (跨行冲突): a problem, the layout check's too
+    @Test
+    fun aKeyReachingIntoTheRoomOfOneAcrossRowsIsAProblem() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"4\">" +
+                "<row><key id=\"a\" label=\"a\" width=\"1\"/><key id=\"mid\" label=\"m\" width=\"1\" rows=\"2\"/><key id=\"b\" label=\"b\" width=\"2\"/></row>" +
+                "<row><key id=\"c\" label=\"c\" width=\"1.5\"/><key id=\"d\" label=\"d\" width=\"1\"/></row></keyboard>",
+        ).ok()
+        val built = SceneBuilder(Fixtures.materialLight, env, FakeMeasurer).build(l)
+        assertTrue(built.problems().any { "reaches into" in it.toString() }, "${built.problems()}")
+    }
+
+    // 跨列 (061-custom-layout §18 补充): a key n units wide takes n columns, its edges the row above's of n one-unit keys; the
+    // layout maker's drag snaps a width to 0.5 of a unit (1 on a board of 100), on these same edges, with no syntax of its own
+    @Test
+    fun aKeyNUnitsWideTakesNColumns() {
+        fun board(columns: Int, top: String, under: String) = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"$columns\"><row>$top</row><row>$under</row></keyboard>",
+        ).ok()
+        val ones = (0 until 10).joinToString("") { "<key id=\"t$it\" label=\"$it\" width=\"1\"/>" }
+        val s = Fixtures.scene(env, board(10, ones, "<key id=\"two\" label=\"2\" width=\"2\"/><key id=\"half\" label=\"h\" width=\"0.5\"/><key id=\"more\" label=\"m\" width=\"1.5\"/><key id=\"rest\" label=\"r\" width=\"fill\"/>"))
+        val unit = env.width / 10
+        assertEquals(s.key("t0").bounds.left, s.key("two").bounds.left)
+        assertEquals(s.key("t1").bounds.right, s.key("two").bounds.right, "two units: two columns")
+        span(2 * unit, unit / 2, s.key("half").bounds, "half")
+        assertEquals(s.key("t3").bounds.right, s.key("more").bounds.right, "0.5 + 1.5 end on a column's edge")
+        assertEquals(s.key("t4").bounds.left, s.key("rest").bounds.left)
+        near(env.width, s.key("rest").bounds.right, "fill: the six columns left")
+        // a board of 100: a width is a share of the row
+        val p = Fixtures.scene(env, board(100, "<key id=\"a\" label=\"a\" width=\"25\"/><key id=\"b\" label=\"b\" width=\"75\"/>", "<key id=\"c\" label=\"c\" width=\"12\"/><key id=\"d\" label=\"d\" width=\"13\"/><key id=\"e\" label=\"e\" width=\"fill\"/>"))
+        assertEquals(p.key("a").bounds.right, p.key("d").bounds.right, "12 + 13 = 25")
+        span(0.0, env.width * 0.12, p.key("c").bounds, "c")
+    }
+
+    // two across rows on one side, the second over the side the first keeps (0.6.0's pack layouts): the room counted once
+    @Test
+    fun aKeyAcrossRowsBesideOneAcrossMoreRowsTakesItsRoomOnce() {
+        val l = LayoutReader.layout(
+            "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"4\">" +
+                "<row><key id=\"a\" label=\"a\"/><key id=\"b\" label=\"b\"/><key id=\"c\" label=\"c\"/><key id=\"r\" label=\"r\" rows=\"3\"/></row>" +
+                "<row><key id=\"d\" label=\"d\"/><key id=\"e\" label=\"e\"/><key id=\"long\" label=\"l\" rows=\"2\"/></row>" +
+                "<row><key id=\"f\" label=\"f\"/><key id=\"g\" label=\"g\"/></row></keyboard>",
+        ).ok()
+        val built = SceneBuilder(Fixtures.materialLight, env, FakeMeasurer).build(l)
+        assertEquals(emptyList(), built.problems().map { it.toString() })
+        val s = Fixtures.scene(env, l)
+        val unit = env.width / 4
+        span(0.0, unit, s.key("f").bounds, "f")
+        span(unit, unit, s.key("g").bounds, "g")
+        span(2 * unit, unit, s.key("long").bounds, "long")
+        near(env.height, s.key("long").bounds.bottom)
+        near(env.width, s.key("r").bounds.right)
+        // the part in its first row, where its bubble goes, is in the scene's text (the snapshots): one line a key across rows
+        val text = SceneText.of(s)
+        assertEquals(2, text.lines().count { it.startsWith("  head ") }, text)
+        val long = s.key("long")
+        assertTrue(long.head.bottom < long.bounds.bottom - 1)
+        assertTrue("  head ${SceneText.box(long.head)}" in text, text)
+    }
 }

@@ -6,10 +6,12 @@ package org.fcitx.fcitx5.android.data.theme
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardVariants
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
@@ -19,6 +21,7 @@ import org.fcitx.fcitx5.android.input.keys.KeyState
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Form
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.Row
@@ -175,6 +178,27 @@ class ThemePackLayoutsTest {
             KeyboardLabels.label(appContext, InputMethodCatalog.PINYIN, ImKeyboard.FULL, "26"),
         )
         assertEquals("18", KeyboardLabels.label(appContext, InputMethodCatalog.PINYIN, ImKeyboard.KEYS18, "18"))
+    }
+
+    @Test
+    fun aPacksK14WritingAnotherBoardItIsBasedOnIsThe14KeysStill() {
+        // a pack's board is of its own id (judge holds it to k14's): based-on="k18" makes it no 18 keys
+        inUse("mine", mapOf("k14.xml" to builtIn.text("k14")!!.replaceFirst("<keyboard ", "<keyboard based-on=\"k18\" ")))
+        val pack = SceneLayouts.of(appContext, "k14")!!
+        assertEquals("k18", pack.layout.basedOn)
+        assertEquals(Form.Grouped14, KeyboardVariants.of(pack.layout, InputMethodCatalog.PINYIN, EngineState.shuangpinScheme).form)
+        val app = SceneLayouts.builtIn(appContext, "k14")!!
+        val groups = app.layout.parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>()
+            .mapNotNull { it.attrs.shortcut }.filter { it.startsWith("g14/") }
+        assertTrue(groups.isNotEmpty())
+        val drawn = SceneBoard.resolver(pack, "pinyin")
+        val asApp = SceneBoard.resolver(app, "pinyin")
+        val edited = KeyCaps.resolver(appContext, "k14")!!
+        for (name in groups) {
+            val corner = asApp.resolve(KeyId(name), KeyState()).corner
+            assertEquals(name, corner, drawn.resolve(KeyId(name), KeyState()).corner)
+            assertEquals(name, corner, edited.resolve(KeyId(name), KeyState()).corner)
+        }
     }
 
     @Test

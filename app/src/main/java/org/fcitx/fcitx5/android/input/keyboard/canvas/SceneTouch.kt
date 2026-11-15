@@ -65,6 +65,9 @@ class SceneKey(
     override val bounds: Rect?
         get() = window.takeIf { canvas.popupBounds(ref, it) }
 
+    override val previewBounds: Rect?
+        get() = Rect().takeIf { canvas.popupBounds(ref, it, head = true) }
+
     override val feedback: View get() = keyboard
 
     override val timers: CoroutineScope by lazy { keyboard.findViewTreeLifecycleOwner()!!.lifecycleScope }

@@ -15,8 +15,11 @@ import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import kotlin.math.abs
 import kotlin.math.floor
 
-/** An item where it goes: its [cell], and its [hit] (a key's: its cell, a row's blank end included). */
-class Placed(val item: Item, val copy: Int, val cell: Box, val hit: Box?)
+/**
+ * An item where it goes: its [cell], and its [hit] (a key's: its cell, a row's blank end included); [head] the part of
+ * its cell in its first row, the cell itself but for an item across rows (where a key's bubble goes over it).
+ */
+class Placed(val item: Item, val copy: Int, val cell: Box, val hit: Box?, val head: Box = cell)
 
 /**
  * Step 3 of §6 for `arrange="rows"`, in the [board] (the keyboard's area, or the part of it a board
@@ -25,14 +28,18 @@ class Placed(val item: Item, val copy: Int, val cell: Box, val hit: Box?)
  * the board's `columns=`, `fill` sharing what is left; a row narrower than the board centred (rules
  * A §1: 双拼's second row without `;`, 0.05 each side).
  *
- * An item `rows="n"` (the nine keys' column, the handwriting pad: rules C §2, §8) is as tall as its
- * row and the n − 1 under it, and comes first or last in its row; the rows under it are laid out in
- * what it leaves them, as if their side of the board ended at its edge. The rows counted are those
- * shown here, after `when=`: a row hidden in this environment is not one of its n.
+ * An item `rows="n"` (the nine keys' column, the handwriting pad: rules C §2, §8; a custom layout's tall
+ * key, anywhere in its row: 061-custom-layout §18) is as tall as its row and the n − 1 under it; the rows
+ * under it are laid out in what it leaves them: their items go left to right over the board, past the
+ * room it takes (at a side, as if their side of the board ended at its edge; in the middle, the items
+ * after it on its far side), their units and fills counted in the room left. An item that would reach
+ * into such room is a problem (an item across rows in its way). The rows counted are those shown here,
+ * after `when=`: a row hidden in this environment is not one of its n.
  *
  * The touch area (060-render-v2 §3, user's P0 decision): a key's whole cell, the gap inside it
  * included (rules B §2), and a row's blank ends belong to its end keys (A and L), so no touch on a row
- * falls on nothing but a `<gap>`. `expand_keypress_area` goes: that is what it did, now always.
+ * falls on nothing but a `<gap>`; beside an item across rows, a stretch's end keys' reach to its edge.
+ * `expand_keypress_area` goes: that is what it did, now always.
  *
  * Split (rules A §8, [OnSplit.Split] boards, the environment splitting): a [RowSplit.Halves] row's
  * keys but those `split="after"` five a side, the middle one on both where there are nine (G, V),
@@ -46,11 +53,10 @@ object Place {
     private const val ODD_HALVES = 9
     private const val HALF = 0.5
 
-    private enum class Side { Left, Right }
-
     // what an item across rows keeps of the rows under it: [left, right) px, down to row [last]; [at],
-    // [to]: its edges before they were put on whole pixels, what the rows' units are counted in
-    private class Kept(val side: Side, val left: Double, val right: Double, val last: Int, val at: Double, val to: Double)
+    // [to]: its edges before they were put on whole pixels, what the rows' units are counted in: from the board's
+    // edge for one first or last in its row (the rows under it end at its edge, a row's indent beside it theirs too)
+    private class Kept(val left: Double, val right: Double, val last: Int, val at: Double, val to: Double)
 
     fun rows(
         rows: List<ExpandedRow>,
@@ -65,52 +71,72 @@ object Place {
         val row = rowEdge(snap)
         val side = sideEdge(snap, board)
         val p = Problems()
-        val total = rows.sumOf { it.height }
         val unit = board.width / columns
         val sizes = if (env.split && onSplit == OnSplit.Split) SplitKeyboard.Sizes((board.width / env.density + EPSILON).toInt()) else null
-        val bottoms = ArrayList<Double>()
-        var y = board.top
-        rows.forEachIndexed { r, row ->
-            y = if (r == rows.lastIndex) board.bottom else y + board.height * row.height / total
-            bottoms += if (r == rows.lastIndex) y else row(y)
-        }
+        val bottoms = bottoms(rows, board, row)
         val out = ArrayList<Placed>()
         val kept = ArrayList<Kept>()
         rows.forEachIndexed { r, row ->
             val top = if (r == 0) board.top else bottoms[r - 1]
             kept.removeAll { it.last < r }
-            val (lo, hi) = left(kept, board, Kept::right) to right(kept, board, Kept::left)
-            val from = left(kept, board, Kept::to)
-            val room = (right(kept, board, Kept::at) - from) / unit
+            // the room the items across rows above leave this row, left to right; its units counted in what is left
+            val spans = kept.sortedBy { it.at }
+            val from = past(spans, board.left)
+            val room = (board.width - taken(spans)) / unit
             val laid = if (sizes == null) Laid(row.items.map { Triple(it, 0, it.width) }, row.indent, row.endIndent) else split(row, sizes, columns, warnings)
             val widths = laid.items
             val fixed = widths.sumOf { (it.third as? Width.Units)?.units ?: 0.0 } + laid.indent + laid.endIndent
             val fills = widths.count { it.third == Width.Fill }
-            if (fixed > room + EPSILON) p.add(row.line, "the row is ${SceneText.n(fixed)} units wide here, over the ${SceneText.n(room)} it has")
+            val over = fixed > room + EPSILON
+            if (over) p.add(row.line, "the row is ${SceneText.n(fixed)} units wide here, over the ${SceneText.n(room)} it has")
             val fillUnits = if (fills > 0) maxOf(0.0, room - fixed) / fills else 0.0
             val used = fixed + fillUnits * fills
             // what no fill takes, half each side (a row's own indents on top)
             var x = from + ((room - used) / 2 + laid.indent) * unit
+            // where an item starts a stretch between the room kept (the row's first, or the first past an item across rows)
+            val starts = BooleanArray(widths.size)
             val cells = widths.mapIndexed { i, (item, copy, width) ->
                 val w = (if (width is Width.Units) width.units else fillUnits) * unit
+                val at = past(spans, x)
+                starts[i] = i == 0 || at > x + EPSILON
+                x = at
+                // a row too wide for its room said so already
+                if (!over && reaches(spans, x, w)) p.add(row.line, "an item reaches into the room an item across rows above takes")
                 val n = item.rows
-                val bottom = if (n > 1) span(n, r, i, widths.size, bottoms, row.line, p) else bottoms[r]
                 if (n > 1 && width !is Width.Units) p.add(row.line, "an item across rows needs a width in units, not fill")
-                val cell = Box(side(x), top, side(x + w), bottom)
-                if (n > 1) kept += Kept(if (i == 0) Side.Left else Side.Right, cell.left, cell.right, minOf(r + n - 1, rows.lastIndex), x, x + w)
+                val cell = Box(side(x), top, side(x + w), span(n, r, bottoms, row.line, p))
+                if (n > 1) kept += keep(cell, minOf(r + n - 1, rows.lastIndex), x, w, i, widths.lastIndex, board)
                 x += w
                 Triple(item, copy, cell)
             }
             cells.forEachIndexed { i, (item, copy, cell) ->
-                val hit = if (item !is ExpandedKey) {
-                    null
-                } else {
-                    Box(if (i == 0) lo else cell.left, cell.top, if (i == cells.lastIndex) hi else cell.right, cell.bottom)
-                }
-                out += Placed(item, copy, cell, hit)
+                val hit = if (item is ExpandedKey) hit(cell, starts[i], i == cells.lastIndex || starts[i + 1], spans, board) else null
+                val head = if (item.rows > 1) Box(cell.left, cell.top, cell.right, bottoms[r]) else cell
+                out += Placed(item, copy, cell, hit, head)
             }
         }
         return p.result { out }
+    }
+
+    // each row's bottom: its share of the board's height, on a whole pixel ([row]) but the last's, the board's
+    private fun bottoms(rows: List<ExpandedRow>, board: Box, row: (Double) -> Double): List<Double> {
+        val total = rows.sumOf { it.height }
+        var y = board.top
+        return rows.mapIndexed { r, it ->
+            if (r == rows.lastIndex) {
+                board.bottom
+            } else {
+                y += board.height * it.height / total
+                row(y)
+            }
+        }
+    }
+
+    // a key's touch: a stretch's end keys ([start], [end]) reach to its ends, the board's edge or an item across rows'
+    private fun hit(cell: Box, start: Boolean, end: Boolean, spans: List<Kept>, board: Box): Box {
+        val left = if (start) spans.filter { it.to < cell.left + EPSILON + 1 }.maxOfOrNull { it.right } ?: board.left else cell.left
+        val right = if (end) spans.filter { it.at > cell.right - EPSILON - 1 }.minOfOrNull { it.left } ?: board.right else cell.right
+        return Box(left, cell.top, right, cell.bottom)
     }
 
     // an edge between two rows or two keys on a whole pixel, as the app's views were laid out (Android
@@ -125,14 +151,38 @@ object Place {
 
     private fun edge(x: Double, board: Box): Double = if (abs(x - board.left) < EPSILON || abs(x - board.right) < EPSILON) x else pixel(x)
 
-    // where the rows' items across rows leave a row: its left end, its right one, by an item's [edge]
-    private fun left(kept: List<Kept>, board: Box, edge: (Kept) -> Double) = kept.filter { it.side == Side.Left }.maxOfOrNull(edge) ?: board.left
+    // [x], or past the room kept it falls in ([spans] left to right; one ending where the next starts, past both)
+    private fun past(spans: List<Kept>, x: Double): Double {
+        var at = x
+        for (s in spans) if (at > s.at - EPSILON && at < s.to - EPSILON) at = s.to
+        return at
+    }
 
-    private fun right(kept: List<Kept>, board: Box, edge: (Kept) -> Double) = kept.filter { it.side == Side.Right }.minOfOrNull(edge) ?: board.right
+    // how wide the room kept of [spans] (left to right) is: one inside another's (a key across rows over the side another
+    // across more rows keeps) counted once, as 0.6.0 had it
+    private fun taken(spans: List<Kept>): Double {
+        var sum = 0.0
+        var end = Double.NEGATIVE_INFINITY
+        for (s in spans) {
+            val from = maxOf(s.at, end)
+            if (s.to > from) sum += s.to - from
+            end = maxOf(end, s.to)
+        }
+        return sum
+    }
 
-    // the bottom of an item [n] rows tall at [i] of [count] in row [r]: first or last in its row, the rows there
-    private fun span(n: Int, r: Int, i: Int, count: Int, bottoms: List<Double>, line: Int, p: Problems): Double {
-        if (i != 0 && i != count - 1) p.add(line, "an item across rows must come first or last in its row")
+    // whether an item from [x], [w] wide, reaches into the room kept of [spans]
+    private fun reaches(spans: List<Kept>, x: Double, w: Double): Boolean = spans.any { it.at > x - EPSILON && x + w > it.at + EPSILON }
+
+    // what an item across rows down to row [last] keeps, [cell] at [x], [w] wide, item [i] of a row's [lastIndex]
+    private fun keep(cell: Box, last: Int, x: Double, w: Double, i: Int, lastIndex: Int, board: Box): Kept {
+        val at = if (i == 0) board.left else x
+        val to = if (i != 0 && i == lastIndex) board.right else x + w
+        return Kept(cell.left, cell.right, last, at, to)
+    }
+
+    // the bottom of an item [n] rows tall in row [r]: the rows there
+    private fun span(n: Int, r: Int, bottoms: List<Double>, line: Int, p: Problems): Double {
         if (r + n - 1 > bottoms.lastIndex) p.add(line, "rows=\"$n\" but ${bottoms.size - r} rows from here")
         return bottoms[minOf(r + n - 1, bottoms.lastIndex)]
     }

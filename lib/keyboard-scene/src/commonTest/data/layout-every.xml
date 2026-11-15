@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- every attribute a layout writes (LayoutWriterTest): read, written, read again, the same -->
+<keyboard xmlns="https://youmo-ime/layout/1" id="every" name="每样 &amp; &quot;all&quot;" family="number" based-on="number"
+          columns="100" arrange="rows" on-split="none" preview="off" popups="off" pads="full decimal">
+  <meta author="某人" version="1.2" license="CC-BY-4.0" min-app="0.6.1" description="every &lt;attribute&gt;"/>
+  <defaults kind="letter" text-size="20" width="fill"/>
+  <row id="top" indent="2.5" end-indent="1" height="1.25" when="pad=full, compact" split="halves">
+    <defaults kind="function" text-style="bold"/>
+    <key id="a" when="!composing" label="{case:a}" alt="{punct:,}" kind="letter" role="comma" class="alt-text big"
+         text-size="23" compact-text-scale="0.9" text-style="normal" face="keep" margin="false" a11y="a11y_key_a" sound="standard"
+         badge="{hold-badge}" send="a" long-press="commit:啊" swipe-up="1" swipe-down="sym:Left" double-tap="caps:lock"
+         swipe-axis="both" repeat="true" preview="on" shortcut="every/a" mark="false" split="after" width="12.5" rows="2">
+      <variant when="roots" label="{root:a}" icon="language"/>
+      <popup from="list" as-is="true" in-row="3" preview="字" transform-punctuation="false" symbols-from="2" preview-alt="b">
+        <item text="ä"/><item text="à" send="commit:à"/>
+      </popup>
+      <menu>
+        <item label="剪切" icon="cut" do="shortcut:cut"/>
+      </menu>
+    </key>
+    <key id="b" label="b" letters="ab c" lean="off" shortcut="comma"/>
+    <key id="c" icon="{return-icon}" a11y="{return}"/>
+    <gap id="g" width="3" when="lang-key"/>
+    <slot id="s" kind="nine-side" width="20" rows="2" face="none" look="function" class="side" when="!split"/>
+  </row>
+  <row>
+    <key id="d" label="d" width="1"><popup from="preset" preset="q"/></key>
+    <key id="e" label="e"><popup from="none"/></key>
+  </row>
+  <include src="grouped-bottom" when="!roots"/>
+</keyboard>

@@ -25,9 +25,11 @@ import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.scene.json.EnvJson
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.layout.Fragment
-import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.KeyData
+import org.fcitx.fcitx5.android.scene.layout.Layout
+import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.layout.LayoutWriter
 import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
@@ -122,7 +124,7 @@ class YoumoScene internal constructor(internal val scene: Scene, internal val de
  * paint it on a canvas; a theme 3.0 made 4.0, a theme written; the app's layouts and themes. Every answer
  * that may fail is `{ok, problems: [{line, message}], warnings, …}`, never a throw: a user's file is data, and
  * so is what a page passes (a value of the wrong type is a problem, line 0). The few answering plainly (blankKeys,
- * refuses, writeTheme, layouts, layout, layoutSource) take the engine's own objects, as Kotlin types them, and
+ * refuses, writeTheme, writeLayout, layouts, layout, layoutSource) take the engine's own objects, as Kotlin types them, and
  * answer every file; a page passing another type there is a page's fault and throws.
  */
 @JsExport
@@ -162,7 +164,7 @@ object YoumoEngine {
         val layout = LayoutReader.layout(text(xml, "layout"))
         if (layout !is Parsed.Ok) return@checked result(layout) { "layout" to null }
         val includes = builtIns.includes(layout.value, own)
-        val held = optionalText(board, "board")?.let { id -> includes.orNull()?.let { KeyData.of(id, layout.value, it, KeyData.Mode.Pack) } }
+        val held = optionalText(board, "board")?.let { id -> includes.orNull()?.let { KeyData.of(id, layout.value, it, KeyData.Mode.Pack, basedOn = null) } }
         val answer = result(includes) { "layout" to (held?.let { h -> YoumoLayout(h.layout, h.fragments) } ?: YoumoLayout(layout.value, it)) }
         answer.ignored = held?.ignored.orEmpty().map { obj("file" to it.file, "line" to it.line, "what" to it.what) }.toTypedArray()
         answer
@@ -204,7 +206,7 @@ object YoumoEngine {
         }
         val map = HashMap<String, String>()
         if (punctuation != null) for (k in keys(punctuation, "punctuation")) map[k] = text(punctuation[k], "punctuation $k")
-        JSON.parse<dynamic>(DefaultMarks.json(DefaultMarks.shortcuts(l.layout, l.fragments, punctuation = map)))
+        JSON.parse<dynamic>(DefaultMarks.json(DefaultMarks.shortcuts(l.layout, l.fragments, DefaultMarks.variantOf(l.layout, l.layout.id), punctuation = map)))
     }
 
     /** The app's boards' ids (`qwerty`, `nine`…). */
@@ -498,6 +500,30 @@ object YoumoEngine {
 
     /** [theme] written as theme 4 (ThemeWriter: what the app saves, its styles canonical, comments gone). */
     fun writeTheme(theme: YoumoTheme): String = ThemeWriter.write(theme.theme)
+
+    /**
+     * [xml] checked as a layout of its own (`.layout`, LayoutCheck: what the app's import asks) for an app of [appVersion],
+     * the blank keys of [theme] (a [YoumoTheme], none: not asked) told: `{ok, errors, warnings, family, ims, pads, commits,
+     * minApp}`, each finding `{line, key, args}` (the page says it in its words, LayoutCheck.KEYS).
+     */
+    fun checkLayout(xml: dynamic, appVersion: dynamic, theme: dynamic): dynamic = checked {
+        val t = if (theme == null) null else theme as? YoumoTheme ?: throw NotOfType("theme: not a theme")
+        val r = LayoutCheck.check(text(xml, "layout"), checkSources, text(appVersion, "appVersion"), t?.theme)
+        fun findings(list: List<LayoutCheck.Finding>) = list.map { obj("line" to it.line, "key" to it.key, "args" to it.args.toTypedArray()) }.toTypedArray()
+        obj(
+            "ok" to r.ok, "errors" to findings(r.errors), "warnings" to findings(r.warnings), "family" to r.family,
+            "ims" to r.ims.toTypedArray(), "pads" to r.pads.toTypedArray(), "commits" to r.commits.toTypedArray(), "minApp" to r.minApp,
+        )
+    }
+
+    /** [layout] written as layout 1 (LayoutWriter: what the app exports, canonical, comments gone). */
+    fun writeLayout(layout: YoumoLayout): String = LayoutWriter.write(layout.layout)
+
+    // the app's boards and fragments as LayoutCheck reads them, its answers on them kept between checks
+    private val checkSources by lazy {
+        fun texts(ids: Collection<String>) = ids.mapNotNull { id -> builtIns.layoutText(id)?.let { id to it } }.toMap()
+        LayoutCheck.Sources(texts(builtIns.layouts), texts(builtIns.fragments.keys))
+    }
 
     // ------------------------------------------------------------------ inside
 

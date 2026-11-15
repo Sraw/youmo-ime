@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import org.fcitx.fcitx5.android.scene.layout.Groups
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -140,12 +141,12 @@ class NineKeyLetters private constructor(
 
     companion object {
         /** The most letters a key types. */
-        const val MAX = 5
+        const val MAX = Groups.MAX
 
         private const val TYPINGS = 64
 
         /** The most groups a layout's own keyboard ([custom]) has: its codes' block, [CUSTOM_BLOCK]. */
-        const val CUSTOM_MAX = 30
+        const val CUSTOM_MAX = Groups.CUSTOM_MAX
 
         // a two dimensional place: x plus twice (1 + its row of [PLACE_ROWS] places); a one dimensional one is x alone, 0 to 1.
         // Keyboard.TAP_ROWS is this: a tap's row sent is read back here
@@ -264,23 +265,8 @@ class NineKeyLetters private constructor(
         @Volatile
         private var current: NineKeyLetters? = null
 
-        /**
-         * What is wrong with [groups] (each a key's letters, rows apart by a space) for a keyboard of
-         * their own: a to z each on some key (ü as v), a key 1 to [MAX] letters of a to z and ;, none
-         * twice, at most [CUSTOM_MAX] keys; null where nothing is.
-         */
-        @Suppress("ReturnCount")
-        fun problem(groups: List<String>): String? {
-            if (groups.isEmpty() || groups.size > CUSTOM_MAX) return "${groups.size} keys, not 1 to $CUSTOM_MAX"
-            for (g in groups) {
-                val letters = g.replace(" ", "")
-                if (letters.isEmpty() || letters.length > MAX) return "\"$g\" is not 1 to $MAX letters"
-                if (letters.any { it !in 'a'..'z' && it != ';' } || g.split(' ').any { it.isEmpty() }) return "\"$g\" is not letters in rows"
-                if (letters.toSet().size != letters.length) return "\"$g\" has a letter twice"
-            }
-            val missing = ('a'..'z').filter { c -> groups.none { c in it } }
-            return if (missing.isEmpty()) null else "no key types ${missing.joinToString("")}"
-        }
+        /** What is wrong with [groups] for a keyboard of their own (keyboard-scene's [Groups.problem], which the layout check asks too); null where nothing is. */
+        fun problem(groups: List<String>): String? = Groups.problem(groups)
 
         /**
          * The grouped keyboard of [groups] (a layout's `letters=`, rows apart by a space; [problem]

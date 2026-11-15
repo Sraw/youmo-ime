@@ -553,7 +553,7 @@ abstract class BaseKeyboard(
                     if (event.type == GestureType.Down) swipes.began(k.ref)
                     if (popupOnKeyPress) {
                         when (event.type) {
-                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, bubbleOf(k, popup), it)) }
+                            GestureType.Down -> k.previewBounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, bubbleOf(k, popup), it)) }
                             GestureType.Move -> {
                                 onPopupAction(swipes.preview(k, def, event.totalY, popup, bubbleOf(k, popup)))
                             }
@@ -571,7 +571,7 @@ abstract class BaseKeyboard(
                 key.gestureListener = { k, event ->
                     if (popupOnKeyPress) {
                         when (event.type) {
-                            GestureType.Down -> k.bounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, bubbleOf(k, popup), it)) }
+                            GestureType.Down -> k.previewBounds?.let { onPopupAction(PopupAction.PreviewAction(k.ref, bubbleOf(k, popup), it)) }
                             GestureType.Up -> {
                                 onPopupAction(PopupAction.DismissAction(k.ref))
                             }

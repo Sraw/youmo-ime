@@ -315,6 +315,41 @@ class KeyDataTest {
     }
 
     @Test
+    fun aLayoutOfItsOwnKeepsWhatItIsBasedOnItsMetaAndPadsThroughKeyData() {
+        val text = testData("number.xml").replaceFirst(
+            "<keyboard ",
+            "<keyboard based-on=\"number\" pads=\"full phone\" ",
+        ).replaceFirst(Regex("(<keyboard [^>]*>)"), "$1<meta author=\"me\" version=\"2\" min-app=\"0.6.1\"/>")
+        val l = read(text)
+        assertEquals(listOf("number", "me", "0.6.1"), listOf(l.basedOn, l.meta?.author, l.meta?.minApp))
+        val r = KeyData.of("t1-number", l, emptyMap(), KeyData.Mode.Own)
+        assertEquals(listOf(l.basedOn, l.meta, l.pads), listOf(r.layout.basedOn, r.layout.meta, r.layout.pads))
+        assertEquals(listOf("full", "phone"), r.layout.pads)
+    }
+
+    @Test
+    fun aGroupedLayoutOfItsOwnIsToldByWhatItIsBasedOn() {
+        // a user's k18 under an id of its own: the 18 keys' by its based-on=, with no basedOn passed
+        val l = read(testData("k18.xml").replaceFirst("<keyboard ", "<keyboard based-on=\"k18\" ").replaceFirst("id=\"k18\"", "id=\"t1-k18\""))
+        assertEquals("t1-k18", l.id)
+        assertEquals(Form.Grouped18, DefaultMarks.variantOf(l).form)
+    }
+
+    @Test
+    fun aKeyOfItsOwnNameKeepsWhatAnIncludedFragmentsDefaultsGiveIt() {
+        val bottom = testData("grouped-bottom.xml").replaceFirst(Regex("(<fragment [^>]*>)"), "$1<defaults swipe-up=\"commit:zz\"/>")
+            .replace("shortcut=\"symbols\"", "shortcut=\"mine/sym\"")
+        val f = LayoutReader.fragment(bottom).ok()
+        assertEquals("commit:zz", f.defaults.actions["swipe-up"])
+        val r = pack("k18", testData("k18.xml"), mapOf("grouped-bottom" to f))
+        val g = r.fragments.getValue("grouped-bottom")
+        val laid = g.rows.flatMap { it.cells }.filterIsInstance<Key>().associateBy { it.id }
+        assertEquals("commit:zz", laid.getValue("symbols").attrs.over(g.defaults).over(r.layout.defaults).actions["swipe-up"])
+        // one of the app's name: the app's, the fragment's defaults not reaching it
+        assertNull(laid.getValue("numbers").attrs.over(g.defaults).over(r.layout.defaults).actions["swipe-up"])
+    }
+
+    @Test
     fun aGroupKeysCornerWrittenOnlyAsTheCornerIsNotTold() {
         // sym:1 is not the corner 1 written as typed: told
         val r = pack("k18", k17.replace("swipe-up=\"keypad:1\"", "swipe-up=\"sym:1\""), Forms.fragments.filterKeys { it == "grouped-bottom" })

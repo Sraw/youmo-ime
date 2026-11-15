@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.layout.Face
 import org.fcitx.fcitx5.android.scene.layout.Gap
 import org.fcitx.fcitx5.android.scene.layout.Key
+import org.fcitx.fcitx5.android.scene.layout.LayoutMeta
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.Letters
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
@@ -256,6 +257,36 @@ class LayoutReaderTest {
         assertEquals(emptyList(), problems(ok))
         val half = board("<row><key id=\"a\" label=\"a\" when=\"pad=signed\"/></row>\n<row><key id=\"a\" label=\"b\"/></row>")
         assertTrue(problems(half).single().contains("used twice"))
+        // a row's when= makes its keys as conditional: a number board's rows of one pad and another's
+        val rows = board("<row when=\"pad=signed\"><key id=\"a\" label=\"a\"/></row>\n<row when=\"pad=phone\"><key id=\"a\" label=\"b\"/></row>")
+        assertEquals(emptyList(), problems(rows))
+    }
+
+    // a layout of its own's (0.6.1, 061-custom-layout §2.2): <meta> first, based-on=, a number board's pads=
+    @Test
+    fun aLayoutOfItsOwnSaysWhoMadeItWhatItIsBasedOnAndItsPads() {
+        val row = "<row><key id=\"a\" label=\"a\"/></row>"
+        val meta = "<meta author=\"某人\" version=\"1.2\" license=\"CC-BY-4.0\" min-app=\"0.6.1\" description=\"H 和 JK 并成一个键\"/>"
+        val l = LayoutReader.layout(board("$meta\n<defaults kind=\"letter\"/>\n$row", " based-on=\"symbols\"")).ok()
+        assertEquals(LayoutMeta("某人", "1.2", "CC-BY-4.0", "0.6.1", "H 和 JK 并成一个键"), l.meta)
+        assertEquals("symbols", l.basedOn)
+        assertNull(l.pads)
+        assertEquals(1, l.parts.size, "<meta> is no part")
+        assertNull(Fixtures.qwerty.meta)
+        assertNull(Fixtures.qwerty.basedOn)
+        // <meta> once and first, <defaults> then after it; its texts 1–64, min-app a version
+        assertTrue(problems(board("$row\n$meta")).single().contains("<meta> must come first"))
+        assertTrue(problems(board("$meta\n$meta\n$row")).single().contains("twice"))
+        assertTrue(problems(board("<meta min-app=\"next\"/>\n$row")).single().contains("min-app"))
+        assertTrue(problems(board("<meta author=\"${"x".repeat(65)}\"/>\n$row")).single().contains("author"))
+        assertTrue(problems(board("<meta><x/></meta>\n$row")).single().contains("not allowed"))
+        assertTrue(problems(board(row, " based-on=\"Qwerty\"")).single().contains("based-on"))
+        // pads=: a number board's, the pads NumberPad opens, each once
+        val number = { pads: String -> board(row, " pads=\"$pads\"").replace("family=\"symbols\"", "family=\"number\"") }
+        assertEquals(listOf("full", "decimal"), LayoutReader.layout(number("full decimal")).ok().pads)
+        assertTrue(problems(number("full abacus")).single().contains("abacus"))
+        assertTrue(problems(number("full full")).single().contains("twice"))
+        assertTrue(problems(board(row, " pads=\"full\"")).single().contains("number board"))
     }
 
     @Test

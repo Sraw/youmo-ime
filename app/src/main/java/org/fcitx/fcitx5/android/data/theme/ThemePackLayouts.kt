@@ -106,7 +106,8 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
             }
             judge(id, layout, fragments, app(id))?.let { return Taken.Not(it) }
             // as it is drawn: what its keys do held or swiped the app's (SceneLayouts.load)
-            return KeyData.of(id, layout, fragments, KeyData.Mode.Pack).let { Taken.Yes(it.layout, it.fragments, it.ignored) }
+            // a pack's board is of its own id, whatever based-on= it writes (PackLayouts.judge holds it to that one)
+            return KeyData.of(id, layout, fragments, KeyData.Mode.Pack, basedOn = null).let { Taken.Yes(it.layout, it.fragments, it.ignored) }
         }
 
         /**

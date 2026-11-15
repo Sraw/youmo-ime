@@ -145,7 +145,7 @@ object KeyCaps {
      * its `:` (a scheme typing `;`'s: the item every keyboard but that one skips, §2).
      */
     fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.of(ctx, layout)?.let {
-        SceneBoard.resolver(it, KeyboardVariant(DefaultMarks.variantOf(it.layout).form, nineLetters(), semicolon = true))
+        SceneBoard.resolver(it, KeyboardVariant(DefaultMarks.variantOf(it.layout, it.layout.id).form, nineLetters(), semicolon = true))
     }
 
     /** The nine keys' letters as the user set them (t9_letters), as 九键's keyboard has them: the editor's rows of 2 to 9. */
