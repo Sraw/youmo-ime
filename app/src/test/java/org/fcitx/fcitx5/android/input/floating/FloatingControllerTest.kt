@@ -89,12 +89,12 @@ class FloatingControllerTest {
         keyboard.translationY = -500f
         controller.dockButton().performClick()
         assertTrue("sliding", floatingNow)
-        val x = AppPrefs.getInstance().internal.floatingKeyboardX.getValue()
+        val x = FloatingStore.spot(false).x
         controller.carried!!.drag(-300f, 0f)
         controller.carried!!.drop(lifted = true)
         controller.dockButton().performClick()
         assertTrue(floatingNow)
-        assertEquals("not dragged nor kept anew", x, AppPrefs.getInstance().internal.floatingKeyboardX.getValue())
+        assertEquals("not dragged nor kept anew", x, FloatingStore.spot(false).x)
         shadowOf(Looper.getMainLooper()).idleFor(400, TimeUnit.MILLISECONDS)
         assertFalse("docked once down", floatingNow)
         assertEquals(0f, keyboard.translationY, 0f)
@@ -107,9 +107,9 @@ class FloatingControllerTest {
         internal.floatingKeyboardY.setValue(0f)
         val (controller, keyboard) = floating { it.grab(500f, 1990f, FloatingSwitch.Bounds(0f, 1600f, 1000f, 400f)) }
         assertEquals("at the lowest of the room, 2000 less the mark's 32 and its 400", 1568f, keyboard.top + keyboard.translationY, 0.01f)
-        assertEquals("not kept while the finger is down", 0f, internal.floatingKeyboardY.getValue(), 0f)
+        assertEquals("not kept while the finger is down", 0f, FloatingStore.spot(false).y, 0f)
         controller.carried!!.drop(lifted = true)
-        assertEquals(1f, internal.floatingKeyboardY.getValue(), 0.001f)
+        assertEquals(1f, FloatingStore.spot(false).y, 0.001f)
     }
 
     // F3467/F3470: TalkBack's detach has no finger down and no drop to come: kept as it is laid out,
@@ -118,7 +118,7 @@ class FloatingControllerTest {
     fun grabbedWithNoFingerDownItIsKeptAtOnceAndTheNextDragMovesIt() {
         internal.floatingKeyboardY.setValue(0f)
         val (controller, keyboard) = floating { it.grab(500f, 1990f, FloatingSwitch.Bounds(0f, 1600f, 1000f, 400f), ended = true) }
-        assertEquals(1f, internal.floatingKeyboardY.getValue(), 0.001f)
+        assertEquals(1f, FloatingStore.spot(false).y, 0.001f)
         val top = keyboard.top + keyboard.translationY
         controller.carried!!.drag(0f, -100f)
         assertEquals(top - 100f, keyboard.top + keyboard.translationY, 0.01f)

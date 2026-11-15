@@ -37,7 +37,7 @@ class FloatingPlacerTest {
         val context = RuntimeEnvironment.getApplication()
         val parent = View(context).apply { layout(0, 0, 1000, 2000) }
         val view = View(context).apply { layout(0, 1600, 1000, 2000) }
-        return FloatingPlacer(parent, view).also { it.onZone = { inZone -> zone += inZone } }
+        return FloatingPlacer(parent, view, landscape = false).also { it.onZone = { inZone -> zone += inZone } }
     }
 
     private val view = View(RuntimeEnvironment.getApplication())
@@ -48,7 +48,7 @@ class FloatingPlacerTest {
         view.layout(300, 1600, 700, 2000)
         view.translationX = 0f
         view.translationY = 0f
-        return FloatingPlacer(parent, view)
+        return FloatingPlacer(parent, view, landscape = false)
     }
 
     @Test
@@ -56,13 +56,13 @@ class FloatingPlacerTest {
         val p = placer()
         p.drag(0f, -300f)
         assertFalse("not in the zone", p.drop(lifted = true))
-        val kept = prefs.floatingKeyboardY.getValue()
+        val kept = FloatingStore.spot(false).y
         // down into the zone, then the system takes the touch (or a second finger comes)
         p.drag(0f, 3000f)
         assertEquals(listOf(true), zone)
         assertFalse(p.drop(lifted = false))
         assertEquals(listOf(true, false), zone)
-        assertTrue("kept where the drag ended", prefs.floatingKeyboardY.getValue() != kept)
+        assertTrue("kept where the drag ended", FloatingStore.spot(false).y != kept)
     }
 
     @Test
@@ -70,12 +70,12 @@ class FloatingPlacerTest {
         val p = placer()
         p.drag(0f, -300f)
         p.drop(lifted = true)
-        val kept = prefs.floatingKeyboardX.getValue() to prefs.floatingKeyboardY.getValue()
+        val kept = FloatingStore.spot(false).let { it.x to it.y }
         p.drag(0f, 3000f)
         assertTrue(p.drop(lifted = true))
         assertEquals(listOf(true, false), zone)
         // not the bottom it was dragged to: the next float starts where it last floated
-        assertEquals(kept, prefs.floatingKeyboardX.getValue() to prefs.floatingKeyboardY.getValue())
+        assertEquals(kept, FloatingStore.spot(false).let { it.x to it.y })
     }
 
     // 始终显示悬浮条: let go of by the docked keyboard, its grip goes under the finger and stays
@@ -87,10 +87,10 @@ class FloatingPlacerTest {
         assertEquals("its left 300, where it is laid out", 0f, view.translationX, 0.01f)
         assertEquals("its top 612", 612f - 1600f, view.translationY, 0.01f)
         assertFalse(p.drop(lifted = true))
-        assertEquals(0.5f, prefs.floatingKeyboardX.getValue(), 0.001f)
-        assertEquals(612f / 1568f, prefs.floatingKeyboardY.getValue(), 0.001f)
+        assertEquals(0.5f, FloatingStore.spot(false).x, 0.001f)
+        assertEquals(612f / 1568f, FloatingStore.spot(false).y, 0.001f)
         grabbedPlacer().grabbed(fingerX = 500f, fingerY = 600f, gripX = 200f, gripY = 388f, keep = true)
-        assertEquals(212f / 1568f, prefs.floatingKeyboardY.getValue(), 0.001f)
+        assertEquals(212f / 1568f, FloatingStore.spot(false).y, 0.001f)
     }
 
     // N1: grabbed by accident and dragged straight back into the zone, the place it last floated at stays
@@ -102,7 +102,7 @@ class FloatingPlacerTest {
         p.grabbed(fingerX = 500f, fingerY = 1950f, gripX = 200f, gripY = 388f, keep = false)
         p.drag(0f, 100f)
         assertTrue("docks", p.drop(lifted = true))
-        assertEquals(0f to 0f, prefs.floatingKeyboardX.getValue() to prefs.floatingKeyboardY.getValue())
+        assertEquals(0f to 0f, FloatingStore.spot(false).let { it.x to it.y })
     }
 
     // F3470: lifted before it was laid out, no slack is left for the next drag to take up first

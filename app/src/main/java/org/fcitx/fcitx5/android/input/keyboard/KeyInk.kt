@@ -43,6 +43,15 @@ class KeyInk(
 
     override val pad = InkPad()
 
+    // a new width (the floating keyboard resized, 061-floating-resize §2.5): the pad's strokes are in the old size's
+    // pixels and would not go with the next ones, so the piece written is done, as a pause would have it (what it
+    // read stays typed)
+    init {
+        view.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (oldRight > oldLeft && right - left != oldRight - oldLeft) hidden()
+        }
+    }
+
     /** The keys typed while the pad is read, in order with it. */
     val keys: InkKeys by lazy { InkKeys(reads.value, this, deliver, finished) }
 

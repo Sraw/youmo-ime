@@ -72,6 +72,7 @@ data class ToolbarButtonLooks(val icon: BarIcons.Icon, @param:StringRes val labe
             BarIcons.Fallback.Backspace -> R.drawable.ic_baseline_backspace_24
             BarIcons.Fallback.ArrowPrev -> R.drawable.ic_baseline_arrow_prev_24
             BarIcons.Fallback.ArrowNext -> R.drawable.ic_baseline_arrow_next_24
+            BarIcons.Fallback.AspectRatio -> R.drawable.ic_baseline_aspect_ratio_24
         }
     }
 }

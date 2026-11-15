@@ -24,7 +24,7 @@ object BarIcons {
         ExpandMore, ExpandLess, Undo, Redo, CursorMove, Clipboard, MoreHoriz, TagFaces, Voice, ArrowDropDown,
         ChttransTrad, ChttransSimp, OpenWith, PanTool, ViewPrivate, DeleteSweep, Palette, Language, Dialpad,
         Keyboard, QuickPhrase, Handwriting, Close, OpenInFull, PuncActive, PuncInactive, FullwidthActive,
-        FullwidthInactive, PredictionActive, PredictionInactive, Settings, Backspace, ArrowPrev, ArrowNext,
+        FullwidthInactive, PredictionActive, PredictionInactive, Settings, Backspace, ArrowPrev, ArrowNext, AspectRatio,
     }
 
     /** A place's icon: the theme's of [name] where it has one, else [fallback]. */
@@ -69,6 +69,12 @@ object BarIcons {
 
     /** The floating keyboard's strip: back to the bottom. */
     val FLOATING_DOCK = Icon("floating-dock", Fallback.OpenInFull)
+
+    /**
+     * The floating keyboard's strip, at its left end: dragged, the keyboard resized (061-floating-resize). Not a
+     * diagonal arrow: [FLOATING_DOCK]'s is one, at the other end.
+     */
+    val FLOATING_RESIZE = Icon("floating-resize", Fallback.AspectRatio)
 
     /** One-handed, the empty side's button: the whole width again. */
     val ONE_HANDED_EXIT = Icon("one-handed-exit", Fallback.OpenInFull)
@@ -147,7 +153,7 @@ object BarIcons {
      */
     val BAR: List<Icon> = (
         listOf(TOOLBAR_EXPAND, TOOLBAR_COLLAPSE) + ToolbarButton.entries.map(::of) +
-            listOf(TRAD_SIMP, CANDIDATES_EXPAND, CANDIDATES_COLLAPSE, PREDICTIONS_CLOSE, HANDWRITING, CLIPBOARD, FLOATING_DOCK) +
+            listOf(TRAD_SIMP, CANDIDATES_EXPAND, CANDIDATES_COLLAPSE, PREDICTIONS_CLOSE, HANDWRITING, CLIPBOARD, FLOATING_DOCK, FLOATING_RESIZE) +
             listOf(ONE_HANDED_EXIT, TOUCH_KEYBOARD, CANDIDATES_PREV, CANDIDATES_NEXT)
         ).distinct()
 

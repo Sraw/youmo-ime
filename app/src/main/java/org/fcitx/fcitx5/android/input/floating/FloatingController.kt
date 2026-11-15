@@ -16,6 +16,8 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import kotlin.math.roundToInt
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -61,9 +63,22 @@ class FloatingController(
     private val side = prefs.floatingHandle.getValue()
     val handleAtBottom = side == FloatingHandleSide.Bottom
 
+    // floating, told as a resize changes its size ([FloatingStore] has it), its width set: the input view lays its keys out
+    private var onResize: () -> Unit = {}
+
+    // the handle's resize button's (061-floating-resize): declared before the handle, which is made with it
+    private val resizing = object : FloatingHandle.Resizing {
+        override fun start() = beginResize()
+        override fun move(dx: Float, dy: Float) {
+            resize?.let { resizeTo(it.widthDp(dx, dy)) }
+        }
+        override fun end() = endResize()
+        override fun step(bigger: Boolean): Boolean = stepResize(bigger)
+    }
+
     /** Floating, its handle; docked, the same strip if 始终显示悬浮条 (read once too), its grip held letting go. */
     val handle: FloatingHandle? = when {
-        floating -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Floating(::drag, ::drop, ::dock), handleLook())
+        floating -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Floating(::drag, ::drop, ::dock, resizing), handleLook())
         prefs.alwaysShowHandle.getValue() -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Docked(::detach), handleLook())
         else -> null
     }
@@ -97,9 +112,10 @@ class FloatingController(
         override fun drop(lifted: Boolean) = this@FloatingController.drop(lifted)
     }
 
-    /** The [keyboard] view, added to the root; floating, framed and placed, the mark under it. */
-    fun setUp(keyboard: View) {
+    /** The [keyboard] view, added to the root; floating, framed and placed, the mark under it; [onResize] as a resize changes its size. */
+    fun setUp(keyboard: View, onResize: () -> Unit = {}) {
         this.keyboard = keyboard
+        this.onResize = onResize
         if (!floating) return
         dockMark?.let {
             root.addView(it, root.indexOfChild(keyboard), ConstraintLayout.LayoutParams(0, context.dp(FloatingPlacer.DOCK_MARK_DP)).apply {
@@ -110,7 +126,7 @@ class FloatingController(
         }
         FloatingCorners.frame(keyboard, ::cornerPx, SceneWindow.px(context, frame.elevationDp), frame.shadowColor?.value)
         frame.border?.let { FloatingCorners.border(keyboard, SceneWindow.px(context, it.widthDp), it.color.value, ::cornerPx) }
-        placer = FloatingPlacer(root, keyboard).also { it.onZone = ::showDockMark }
+        placer = FloatingPlacer(root, keyboard, screenBuilt.landscape).also { it.onZone = ::showDockMark }
         keyboard.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> laidOut() }
     }
 
@@ -149,6 +165,9 @@ class FloatingController(
 
     /** The input view taken out: docked and shown, a floating one put in its place shrinks from here. */
     fun detached() {
+        // taken out mid-resize (a turn): what it was resized to so far is not kept, nor read on
+        if (resize != null) FloatingStore.resizing(screenBuilt.landscape, null)
+        resize = null
         if (!floating && keyboard.isShown && keyboard.isLaidOut) root.parent?.let { DockedBounds.leave(it, keyboard.bounds()) }
         // made anew under its slide down (a turn, a theme): docked all the same, once this is done with
         if (switch.slideOver()) Handler(Looper.getMainLooper()).post { KeyboardStyles.floatingOff(screenBuilt) }
@@ -157,9 +176,9 @@ class FloatingController(
     /** Hidden, or its field left. */
     fun inputEnded() = switch.inputEnded()
 
-    /** Floating, while it is dragged, scaled from or into the docked keyboard, or slid down to dock. */
+    /** Floating, while it is dragged or resized, scaled from or into the docked keyboard, or slid down to dock. */
     val moving: Boolean
-        get() = placer?.dragging == true || switch.docking || (floating && (keyboard.scaleX != 1f || keyboard.scaleY != 1f))
+        get() = placer?.dragging == true || resize != null || switch.docking || (floating && (keyboard.scaleX != 1f || keyboard.scaleY != 1f))
 
     private fun drag(dx: Float, dy: Float) {
         if (switch.drag(dx, dy)) placer?.drag(dx, dy)
@@ -229,6 +248,99 @@ class FloatingController(
         }
     }
 
+    // a resize under way ([resizing]): from the size it began at, a right corner staying at [stayX], [stayY] in the root
+    // (its top as it [growsDown], else its bottom: FloatingKeyboard.growsDown); the bars' height,
+    // which a resize leaves as it is; the width it is at now, dp, and the limit it is at, buzzed once as it gets there
+    private var resize: FloatingKeyboard.Resize? = null
+    private var stayX = 0f
+    private var stayY = 0f
+    private var growsDown = true
+    private var barsPx = 0f
+    private var startDp = 0
+    private var resizedDp = 0
+    private var limit = FloatingKeyboard.Limit.None
+
+    private fun beginResize() {
+        val placer = placer ?: return
+        if (!keyboard.isLaidOut || switch.docking) return
+        // not while dragged, nor while it still grows from the docked keyboard (scaled: its bounds not yet its own)
+        if (placer.dragging || keyboard.scaleX != 1f || keyboard.scaleY != 1f) return
+        val size = KeyboardArea.floatingSize(screenBuilt)
+        val left = keyboard.left + keyboard.translationX
+        val top = keyboard.top + keyboard.translationY
+        val w = keyboard.width.toFloat()
+        val h = keyboard.height.toFloat()
+        val roomTop = placer.topInset.toFloat()
+        val roomBottom = roomTop + placer.room
+        growsDown = FloatingKeyboard.growsDown(handleAtBottom, top, top + h, roomTop, roomBottom)
+        stayX = left + w
+        stayY = if (growsDown) top else top + h
+        barsPx = h - size.keysHeightPx
+        // from the staying corner to the room's edge it grows towards: its bottom, or its top
+        val along = if (growsDown) roomBottom - top else top + h - roomTop
+        val r = FloatingKeyboard.Resize(
+            size.widthDp, context.resources.displayMetrics.density, w, h, size.keysHeightPx.toFloat(), growsDown,
+            KeyboardArea.floatingBounds(screenBuilt), stayX, along,
+        )
+        resize = r
+        startDp = size.widthDp
+        resizedDp = size.widthDp
+        limit = r.limit(size.widthDp)
+    }
+
+    // at [dp] wide, laid out anew: the keys' scene made again at the size (their text and marks with it), the bars only
+    // wider; its staying corner where it was. A buzz (按键振动) as it gets to a limit
+    private fun resizeTo(dp: Int) {
+        val r = resize ?: return
+        val placer = placer ?: return
+        val now = r.limit(dp)
+        if (now != limit && now != FloatingKeyboard.Limit.None) InputFeedbacks.hapticFeedback(keyboard)
+        limit = now
+        if (dp == resizedDp) return
+        resizedDp = dp
+        FloatingStore.resizing(screenBuilt.landscape, dp)
+        val size = KeyboardArea.floatingSize(screenBuilt)
+        val w = context.dp(size.widthDp).toFloat()
+        val h = barsPx + size.keysHeightPx
+        placer.resized(stayX - w, (if (growsDown) stayY else stayY - h) - placer.topInset, w, h)
+        keyboard.updateLayoutParams { width = w.roundToInt() }
+        onResize()
+    }
+
+    // the finger lifted (or taken): the width and the place kept, the shape's own, if it changed
+    private fun endResize() {
+        resize ?: return
+        resize = null
+        if (resizedDp != startDp) {
+            FloatingStore.keepWidth(screenBuilt.landscape, resizedDp)
+            placer?.keep()
+        } else {
+            FloatingStore.resizing(screenBuilt.landscape, null)
+        }
+        // a frame drawn: the floating code strip, hidden while resized, shows again on one (InputView)
+        keyboard.invalidate()
+    }
+
+    // TalkBack's 放大 or 缩小 (no finger): a tenth at once, kept; at a limit a buzz and 已是最大 or 已是最小 said
+    private fun stepResize(bigger: Boolean): Boolean {
+        beginResize()
+        val r = resize ?: return false
+        val dp = r.step(resizedDp, bigger)
+        val changed = dp != resizedDp
+        resizeTo(dp)
+        endResize()
+        if (r.limit(dp) != FloatingKeyboard.Limit.None) {
+            if (!changed) InputFeedbacks.hapticFeedback(keyboard)
+            announce(context.getString(if (bigger) R.string.floating_keyboard_biggest else R.string.floating_keyboard_smallest))
+        }
+        return changed
+    }
+
+    // a word for TalkBack: announceForAccessibility is deprecated from API 36 for describing the UI, but nothing on
+    // screen says 已是最大 (BaseKeyboard.announce, the same)
+    @Suppress("DEPRECATION")
+    private fun announce(text: String) = handle?.announceForAccessibility(text)
+
     private fun slid() {
         if (switch.slideOver()) KeyboardStyles.floatingOff(screenBuilt)
     }
@@ -265,7 +377,8 @@ class FloatingController(
     private fun cornerPx(): Float {
         if (keyboard.width == corneredWidth && keyboard.height == corneredHeight) return corneredPx
         val f = frame
-        corneredPx = if (f.round) minOf(keyboard.width, keyboard.height) / 2f else SceneWindow.px(context, f.radiusDp)
+        // resized, as round as the keys, which are all as much bigger or smaller (061-floating-resize)
+        corneredPx = if (f.round) minOf(keyboard.width, keyboard.height) / 2f else SceneWindow.px(context, f.radiusDp) * KeyboardArea.floatingSize(screenBuilt).resize
         corneredWidth = keyboard.width
         corneredHeight = keyboard.height
         return corneredPx

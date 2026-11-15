@@ -47,7 +47,13 @@ class PrefsRule : ExternalResource() {
         set(AppPrefs.getInstance().internal.symbolPanelCategory, "")
         // the floating keyboard's spot, which a drag's end writes: another test's drag moved the theme maker's
         // floating shots (ThemeMakerLayoutTest)
-        AppPrefs.getInstance().internal.let { set(it.floatingKeyboardX, it.floatingKeyboardX.defaultValue); set(it.floatingKeyboardY, it.floatingKeyboardY.defaultValue) }
+        // and its width, 竖屏 and 横屏 each their own (061-floating-resize)
+        AppPrefs.getInstance().internal.run {
+            listOf(
+                floatingKeyboardX, floatingKeyboardY, floatingPortraitX, floatingPortraitY, floatingLandscapeX, floatingLandscapeY,
+                floatingPortraitWidthDp, floatingLandscapeWidthDp,
+            ).forEach { set(it, it.defaultValue) }
+        }
     }
 
     fun <T : Any> set(pref: ManagedPreference<T>, value: T) {

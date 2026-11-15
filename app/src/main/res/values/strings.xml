@@ -1015,6 +1015,11 @@
     <string name="one_handed_exit">Exit one-handed mode</string>
     <string name="floating_keyboard">Floating keyboard</string>
     <string name="floating_keyboard_dock">Dock the keyboard</string>
+    <string name="floating_keyboard_resize">Resize the floating keyboard</string>
+    <string name="floating_keyboard_bigger">Bigger</string>
+    <string name="floating_keyboard_smaller">Smaller</string>
+    <string name="floating_keyboard_biggest">Already the biggest</string>
+    <string name="floating_keyboard_smallest">Already the smallest</string>
     <string name="code_row_style">Code row</string>
     <string name="code_row_floating">Over the keyboard</string>
     <string name="code_row_embedded">In the keyboard</string>

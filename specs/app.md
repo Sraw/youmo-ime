@@ -349,7 +349,7 @@ two settings with one list of places (`KeyMarkPosition`, `KeyMarks.At`: 右上 �
 
 拼音键字母大小写 (`AppPrefs.keyboard.letterCase`, key `letter_case`, `LetterCaseChoice`: 总是小写 / 跟随 Shift / 总是大写, default 跟随 Shift) cases a Chinese input method's letter faces and press bubbles only; what is typed and Shift are untouched. The decision is keyboard-scene's pure `LetterCaseRule` (`forIme`: English always follows Shift, its case being what it types; `upper`: the setting, Shift's state, `shiftless` for 九键 and 14/18 键, which show capitals following Shift, and the hidden keep-uppercase). The keyboards pass it as `Texts.letterCase`; `Expand` reads it in `{case:x}`, `{nine-letters:N}` and `{group:qw}` (k14/k18's group faces); a key's screen reader text is the label as 跟随 Shift shows it, so it reads the same whichever is chosen. `TextKeyboard`/`GroupedKeyboard`/`T9Keyboard` case their bubbles by the same rule; `KeyCaps.board` (`SceneKeyCell.Board.letterCase`) and the 九键 letters page show it too. The hidden 键盘字母保持大写 (`keepLettersUppercase`, `keep_keyboard_letters_uppercase`) still holds under 跟随 Shift, 总是小写 over it; with it on, English's press bubble shows the capital its face shows while the letter typed still follows Shift. A table's letter with no root (`{root:x}` empty in `Texts.other`) falls back to `{case:x}`. In `remakeKeyboardsPrefs`. Held by `LetterCaseRuleTest`, `ExpandTest`, `LetterCaseScreenshotTest`.
 五笔's 全部字根 leaves the letters' shortcuts unmarked (`TextKeyboard.charShortcutMarks`: its roots start in the top left corner), shown as 键名 at 紧凑 though (`TableKeyboard.atHeight`, the setting kept); at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
-are made by `keyboardCompact()`) the symbol never under the letter, the shortcuts drawn as anywhere, smaller, and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
+are made by `keyboardCompact()`) the symbol never under the letter, the shortcuts drawn as anywhere, smaller, and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's, times a resized floating keyboard's `resize`; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
 makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`, as
 `floatingBuilt`); the theme page's preview does the same in `recalculateSize`. A key's glyph (label, icon) and its marks (shortcut icons and texts, a letter's symbol) keep apart only where their ink meets, worked out by the scene engine as it builds a key's content (`lib/keyboard-scene` `rules/KeyMarkYield`, run from `engine/Content`; 060-render-p2 S4e): one size for each class of glyph across a keyboard, no mark moved to another corner, a text that does not fit as the app gives it (two characters and 「…」) drawn a step down on that key alone, at its class's size (one at an edge's middle stepped down too until it fits between the corner marks on its edge, `Content.MIDDLE_GAP_DP`, 1 dp, from each, the corner marks not moved for it: review 061-small S6), its key then asking nothing of the mark classes (`MarkContent.Text.ladder`: its first character and 「…」, then `Icons.SHORT_TEXT`, a two-line icon drawn as the shortcut icons are, its ink the two lines (`Icons.SHORT_TEXT_INK`), not its square: a text is here; `SceneBuilder.roomless`, `Member.shortened`; 0.6.0-beta2: the owner's 「现在怎么样了」 on j), a mark that cannot fit at its least size left out (a mark wider than its key's face counts as not fitting: a long first the user set, a 0.5 backup's 「5%葡萄糖注射液100ml」, drawn over the next keys till R24; `KeyMarkYield.cornersIn`, `LongMarksStayOnTheirKeyTest`; a built-in one before one the user set, `MarkSettings.user` / `KeyMarkYield.Mark.user`; then the most expendable first: a function key's down shortcut, a shortcut; a symbol last); a mark is kept from the glyph by the gap less half a px (`FIT_SLACK`, L62/L65/L72: as L77's half px, too little to see), everywhere, so none jumps where it stops fitting. `KeyMarksEverywhereUatTest` measures every key of every keyboard (standard, 紧凑, floating, one-handed, landscape; every pair of places the settings allow) for nothing drawn over anything else and prints what was left out; the sweep leaves out no corner symbol (it prints "left out (0)"; 060-pending-decisions S4e recorded 22 corner symbols with 紧凑, one-handed and the symbol at 左下, 右下 or 底部 before `FIT_SLACK` and later changes); at nominal height 大千 with 下滑 at 底部 leaves out preset shortcut icons (`KeyMarksScreenshotTest` zhuyin_full_TopRight_Bottom). The icon 8 dp at 紧凑. `KeyCaps`' caps are scenes and yield as every scene key does (below, S6). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
 `zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutNames`; the tones and 注音九键's slot none, as 九键's 1). What each punctuation key types (。 or . by the punctuation mode) is the host's (`HostCore.startPunctuationKeys`), kept from the last run in `filesDir/punctuation-start-keys` (`PunctuationStartKeys`, written by the host as it changes, read on a thread of its own at the service's `onCreate`) so the keys show it before the host is up (060-render-p2 S7a); `PunctuationComponent.known` says whether it is known. None kept (a first install, the host not up yet): `KeyboardWindow` holds a punctuation key's tap back (not typed, its bubble not shown) and buzzes once. A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
@@ -391,7 +391,7 @@ its status bar and the input method's navigation bar (`navbarFrameHeight`: 48 dp
 app's side; `DockedRoom` (a layout that changed the view's height, `onApplyWindowInsets`) works the keys out again
 after the layout (`post`) where the room moved by more than a dp. The display's numbers are asked of the window manager once a configuration
 (`KeyboardArea.display`). Floating takes no room of the app's and keeps 0.6.0's size (`KeyboardArea.floatingBase`, the
-percent of the screen either way held).
+percent of the screen either way held) till the user resizes it (`KeyboardArea.floatingSize`).
 
 横屏 (0.6.1, 061-wide-as-landscape) is one answer, keyboard-scene's `ScreenShape.landscape(turned, widthDp)`:
 held sideways, or `WIDE_DP` (600) wide or wider either way up (a foldable's inner screen, a tablet upright). Every
@@ -533,8 +533,9 @@ page's preview bar (its base and height, of the theme shown) are the theme's `ba
 `size` stays unread: 候选字号 is the user's setting, and the bar's height the theme's.
 
 Floating (the style 悬浮, the status area's 悬浮键盘; the input view is made anew for
-it): `keyboardView` is `FloatingKeyboard.widthDp` wide (70% of the screen, 300–420 dp), its boards as
-much shorter (85% at least), with `FloatingHandle` at the bottom (24 dp: a short bar and the dock button;
+it): `keyboardView` is `KeyboardArea.floatingSize(s).widthDp` wide (by default `FloatingKeyboard.widthDp`, 70% of the
+screen, 300–420 dp, its boards as much shorter, 85% at least), with `FloatingHandle` at the bottom (24 dp: the resize
+button, a short bar and the dock button;
 `ThemePrefs.floatingHandle` puts it on top, the view made anew). The dock button is 56×24 dp, a
 smaller touch target than 48 dp, traded for a thin handle (review R11). The view is clipped to rounded corners
 with a shadow (`FloatingCorners`; users asked for both). Frame and handle are the theme's `frame` and
@@ -558,8 +559,27 @@ navigation's switch/collapse row, counted by `BaseInputView.floatingBottomInset`
 it is in the docking zone (`FloatingDrag` in ime-core; where a drag began at the bottom, it first
 floats there, only a push of `DOCK_SLOP_DP` on down): the strip shows the mark (accent, opening up from
 the bottom), a buzz under 按键振动, and let go there it docks: only a real lift docks (a cancel or a second finger never does), and docking keeps the last floating place. It is moved by translation
-(`FloatingPlacer`) to a spot kept as shares of the room it moves in (`AppPrefs.internal.floatingKeyboardX/Y`),
-so a turn keeps its corner. `FcitxInputMethodService.onComputeInsets` then gives the app the whole
+(`FloatingPlacer`) to a spot kept as shares of the room it moves in, 竖屏 and 横屏 each their own
+(`FloatingStore`: `AppPrefs.internal.floatingPortraitX/Y`, `floatingLandscapeX/Y`; -1 never kept, then the one place
+0.6.0 kept, `floatingKeyboardX/Y`, read for both and no longer written), written for the shape the view was built in
+(`FloatingController.screenBuilt`).
+
+Resized (061-floating-resize; the user's choices: all of it in proportion, the bars only wider; each shape its own):
+the strip's left button (`floating-resize`, 56×24 dp like the dock button) dragged along the keyboard's diagonal
+resizes it about a right corner (`FloatingKeyboard.Resize`; the top one, growing down, with the strip at the
+bottom, the bottom one with it on top, but the other way touching the room's edge on the strip's side, where it
+first floats, so it can grow at all: `FloatingKeyboard.growsDown`; ime-core: the move's projection on the diagonal,
+clamped to `FloatingKeyboard.bounds`, 260 dp (`MIN_RESIZE_DP`) to the docked width or as wide as the room's height
+takes, and to the screen's edges from the staying corner, never pushing it along). A width kept
+(`floatingPortraitWidthDp`/`floatingLandscapeWidthDp`, dp, -1 never) gives `FloatingKeyboard.size`: its keys'
+height and `resize`, its width over the default's (exactly 1 at the default, so a user who never resized has 0.6.0's
+size to the pixel). The keys are scaled by the scene's density times `resize` (`SceneEnvs.of`, `SwipeFates`,
+`SceneKeyCell.Board`), so gaps, corners, text and marks all keep their shape; the bars (`SceneEnvs.of(resized = false)`
+for the number row) and the strip keep their height and only get wider; the frame's corner is as much rounder. Each
+move lays it out anew in place (`FloatingController.resizeTo`: `FloatingStore.resizing` holds the width while the
+finger is down, the view's width set, `InputView.updateKeyboardSize`), the input view kept, so what is typed stays;
+the width and place are kept as the finger lifts. A buzz under 按键振动 at either limit; TalkBack's 放大 and 缩小
+(custom actions) step a tenth and say 已是最大 or 已是最小 at the end. `FcitxInputMethodService.onComputeInsets` then gives the app the whole
 height (it is not laid out again) and only `InputView.floatingRegion` takes touches
 (`TOUCHABLE_INSETS_REGION`). Floating, the letters never split (`TextKeyboard.splits`, `widthDp`).
 

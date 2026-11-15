@@ -25,11 +25,14 @@ import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
+import org.fcitx.fcitx5.android.input.floating.FloatingHandle
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.GroupedKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ZhuyinKeyboard
@@ -120,6 +123,32 @@ class KeyHandwritingUatTest {
         h.advance(1500)
         until("finished") { h.api.calls.any { it.startsWith("inkFinished(") } }
         assertEquals(0, board().keyInkForTest!!.pad.finished.size)
+    }
+
+    // resized while a piece is written (the floating keyboard, 061-floating-resize §2.5): its strokes, in the old size's
+    // pixels, would not go with the next; the piece is done as a pause would have it, its reading typed, and the next
+    // stroke starts another, read at the new size
+    @Uat("TB-62")
+    @Test
+    fun resizedWhileWritingThePieceIsDoneItsReadingStays() {
+        prefs.set(AppPrefs.getInstance().keyboard.handwritingPause, HandwritingPause.Slowest)
+        prefs.setStyle(KeyboardStyle.FLOATING)
+        harness()
+        h.api.calls.clear()
+        draw(h.key("t"))
+        until("read") { inks().isNotEmpty() }
+        assertEquals(1, board().keyInkForTest!!.pad.finished.size)
+        val width = board().width
+        val button = h.box(checkNotNull(KeyboardHarness.find<FloatingHandle>(h.inputView)!!.resizeButton))
+        h.drag(button, button.exactCenterX() - 60 * h.service.resources.displayMetrics.density, button.exactCenterY())
+        h.relayout()
+        assertTrue("resized: $width -> ${board().width}", board().width > width)
+        assertEquals("the piece done", 0, board().keyInkForTest!!.pad.finished.size)
+        until("finished") { h.api.calls.any { it.startsWith("inkFinished(") } }
+        h.api.calls.clear()
+        draw(h.key("t"))
+        until("read anew") { inks().isNotEmpty() }
+        assertEquals(1, board().keyInkForTest!!.pad.finished.size)
     }
 
     @Uat("HW-34", "HW-42")

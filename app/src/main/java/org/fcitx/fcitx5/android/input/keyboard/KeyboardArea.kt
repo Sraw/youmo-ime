@@ -20,7 +20,10 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
+import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
+import org.fcitx.fcitx5.android.input.floating.FloatingPlacer
+import org.fcitx.fcitx5.android.input.floating.FloatingStore
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.scene.rules.ScreenShape
 import org.fcitx.fcitx5.android.scene.theme.KeyboardSizes as ThemeSizes
@@ -440,9 +443,30 @@ object KeyboardArea {
 
     /** The keyboard's width, dp: the screen's less its side padding (InputView's), or floating its own (TextKeyboard.widthDp). */
     fun widthDp(s: Screen, floating: Boolean = KeyboardStyles.of(s).floating): Int {
-        if (floating) return FloatingKeyboard.widthDp(s.widthDp)
+        if (floating) return floatingSize(s).widthDp
         // the theme's where the setting follows it (sidePadding): a fraction of a dp cut, as there
         return (s.widthDp - 2 * sizes().sidePaddingDp(s.landscape)).toInt()
+    }
+
+    /**
+     * The floating keyboard's size on [s] (061-floating-resize §2.3): the one source of its width, its keys' height and
+     * their text, the input view's and a settings page's alike, its width as the user resized it on [s]'s shape
+     * ([FloatingStore]) within what [floatingBounds] allow there. A pure function of [s] and the settings: known before
+     * any view is laid out (the insets only move it, FloatingPlacer).
+     */
+    fun floatingSize(s: Screen): FloatingKeyboard.Size =
+        FloatingKeyboard.size(FloatingStore.widthDp(s.landscape), s.widthDp, floatingBase(s), floatingBounds(s))
+
+    /**
+     * How wide the user may resize the floating keyboard on [s]: up to the docked keyboard's width, or as wide as fits
+     * in the screen's height less the status bar, the input method's navigation bar and the docking zone's mark, the bar,
+     * the handle and the code row embedded at its tallest (the strip's) counted over the keys.
+     */
+    fun floatingBounds(s: Screen): FloatingKeyboard.Bounds {
+        val codeRow = if (KawaiiBarComponent.codeRowFloats()) 0 else CodeRowHeight.STRIP_DP
+        val bars = s.dp((barDp(s) + FloatingHandle.HEIGHT_DP + codeRow).toDouble())
+        val room = s.realHeightPx - s.statusBarPx - s.imeNavPx - s.dp(FloatingPlacer.DOCK_MARK_DP.toDouble())
+        return FloatingKeyboard.bounds(s.widthDp, widthDp(s, floating = false), floatingBase(s), bars, room)
     }
 
     /** Whether the letters are split on [s]: its shape's 键盘样式 is 分体, set or its default by the width (TextKeyboard.splits). */

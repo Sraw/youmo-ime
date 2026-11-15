@@ -206,7 +206,7 @@ object KeyCaps {
             emptyMap()
         }
         return SceneKeyCell.Board(layout, KeyId.of(shortcut).name, size.width, size.height, alts,
-            AppPrefs.getInstance().keyboard.letterCase.getValue().case, size.floating, size.split, screen.landscape)
+            AppPrefs.getInstance().keyboard.letterCase.getValue().case, size.floating, size.split, screen.landscape, size.resize)
     }
 
     /**

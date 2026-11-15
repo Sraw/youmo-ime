@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.input.floating
 
 import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 /**
  * The keyboard floating over the app, as Gboard's and Sogou's on a tablet: smaller than docked,
@@ -44,6 +46,124 @@ object FloatingKeyboard {
     private fun share(widthDp: Int, screenWidthDp: Int) =
         (widthDp.toFloat() / screenWidthDp.coerceAtLeast(1)).coerceIn(MIN_HEIGHT_SHARE, 1f)
 
+    /**
+     * The narrowest the user's resize makes it, dp (061-floating-resize Q1): the strip's three (resize 56, grip 120,
+     * dock 56) fit, and every panel's keys and bar were looked at there. A fixed floor, not the widest row's keys: one
+     * worked out from the layout would make the keyboard jump as the layout changes.
+     */
+    const val MIN_RESIZE_DP = 260
+
+    /**
+     * Its size: [widthDp] wide, its keys [keysHeightPx] high, their text at [textScale] (0.6.0's, the default size's).
+     * All of it, the keys' gaps, corners and marks too, [resize] times as big as at its default width: the keys keep
+     * their shape (061-floating-resize §2.1). The bars over and under the keys only get wider (the user's Q6).
+     */
+    data class Size(val widthDp: Int, val keysHeightPx: Int, val textScale: Float, val resize: Float)
+
+    /** How wide the user may make it, dp. */
+    data class Bounds(val minDp: Int, val maxDp: Int)
+
+    /**
+     * How wide the user may make it on a screen [screenWidthDp] wide: down to [MIN_RESIZE_DP], up to the docked
+     * keyboard's width [dockedWidthDp] or as wide as fits in [roomPx] of height, its keys as tall as that width makes
+     * them (of the docked keys' [dockedKeysPx]) and the bars ([barsPx]) under or over them, whichever is less. Never
+     * narrower nor wider than its default width ([widthDp]): that it always has, as it had in 0.6.0.
+     */
+    fun bounds(screenWidthDp: Int, dockedWidthDp: Int, dockedKeysPx: Int, barsPx: Int, roomPx: Int): Bounds {
+        val w0 = widthDp(screenWidthDp)
+        val keysPxPerDp = dockedKeysPx * share(w0, screenWidthDp) / w0.coerceAtLeast(1)
+        val fits = if (keysPxPerDp <= 0f) Int.MAX_VALUE else ((roomPx - barsPx) / keysPxPerDp).toInt()
+        return Bounds(minOf(MIN_RESIZE_DP, w0), maxOf(w0, minOf(dockedWidthDp, fits)))
+    }
+
+    /**
+     * Its size on a screen [screenWidthDp] wide, the docked keys [dockedKeysPx] high: [keptWidthDp] wide, the width the
+     * user resized it to (negative: never resized, the default [widthDp]), within [bounds]; its keys as tall, and their
+     * text as big, as their default's times its width over the default's. Never resized, as 0.6.0 had it to the pixel.
+     */
+    fun size(keptWidthDp: Float, screenWidthDp: Int, dockedKeysPx: Int, bounds: Bounds): Size {
+        val w0 = widthDp(screenWidthDp)
+        val w = if (keptWidthDp < 0f) w0 else keptWidthDp.roundToInt().coerceIn(bounds.minDp, bounds.maxDp)
+        val resize = if (w == w0) 1f else w.toFloat() / w0.coerceAtLeast(1)
+        val textScale = textScale(w0, screenWidthDp)
+        return Size(w, (dockedKeysPx * share(w0, screenWidthDp) * resize).toInt(), textScale, resize)
+    }
+
+    /**
+     * Where it is kept on a screen held one way (竖屏 and 横屏 each their own, 061-floating-resize §2.6): its own [x],
+     * [y] once kept (negative: never), else [old], the one place 0.6.0 kept for both, for both.
+     */
+    fun keptSpot(x: Float, y: Float, old: Spot): Spot = if (x < 0f || y < 0f) old else Spot(x, y)
+
+    /** A resize at its limits: [Min] as narrow as it goes, [Max] as wide. */
+    enum class Limit { None, Min, Max }
+
+    /**
+     * Whether a resize grows it down, its top right staying, or up, its bottom right staying: towards the strip
+     * ([handleBottom] or on top), the handle's corner moving; but touching the room's edge on that side (at the
+     * bottom, where it first floats), the other way, or it could not grow at all (the user's choice, 2026-11-15).
+     * Its [top] and [bottom], the room's [roomTop] and [roomBottom], px.
+     */
+    fun growsDown(handleBottom: Boolean, top: Float, bottom: Float, roomTop: Float, roomBottom: Float): Boolean =
+        if (handleBottom) bottom < roomBottom - EDGE_PX else top <= roomTop + EDGE_PX
+
+    /**
+     * The user's resize by the handle at the keyboard's left end ([FloatingKeyboard] floating), a right corner staying
+     * where it is: the top one as it grows [down], else the bottom one ([growsDown]). Begun at [startWidthDp]
+     * ([widthPx] by [heightPx], all of it; its keys [keysHeightPx] of that, the rest the bars, which keep their
+     * height), [density] px a dp, within [bounds] and the screen: [acrossPx] from the staying corner to the screen's
+     * left, [alongPx] to the room's edge it grows towards (its bottom, or its top).
+     */
+    class Resize(
+        private val startWidthDp: Int,
+        private val density: Float,
+        private val widthPx: Float,
+        private val heightPx: Float,
+        keysHeightPx: Float,
+        private val down: Boolean,
+        private val bounds: Bounds,
+        acrossPx: Float,
+        alongPx: Float,
+    ) {
+        private val barsPx = heightPx - keysHeightPx
+        private val keysPxPerDp = keysHeightPx / startWidthDp.coerceAtLeast(1)
+
+        // as wide as goes on the screen from the staying corner: never pushed along, it stops at an edge; never less
+        // than it is (laid out past an edge some other way, a resize does not shrink it on its own)
+        private val maxDp: Int = run {
+            val across = (acrossPx / density).toInt()
+            val along = if (keysPxPerDp <= 0f) Int.MAX_VALUE else ((alongPx - barsPx) / keysPxPerDp).toInt()
+            maxOf(minOf(bounds.maxDp, across, along), minOf(startWidthDp, bounds.maxDp), bounds.minDp)
+        }
+
+        /**
+         * Its width, dp, the handle moved by [dx], [dy] px since it went down: by the move's share of its diagonal
+         * away from the staying corner (out grows it, in shrinks it), within its bounds and the screen.
+         */
+        fun widthDp(dx: Float, dy: Float): Int {
+            val diagonal = hypot(widthPx, heightPx)
+            if (diagonal <= 0f) return startWidthDp
+            // the far corner from the staying one: to the left, and down or up
+            val out = (-dx * widthPx + (if (down) dy else -dy) * heightPx) / diagonal
+            return within(startWidthDp * (diagonal + out) / diagonal)
+        }
+
+        /** TalkBack's 放大 ([bigger]) or 缩小 from [nowDp]: a tenth of it, within its bounds and the screen. */
+        fun step(nowDp: Int, bigger: Boolean): Int = within(nowDp * if (bigger) 1f + STEP else 1f - STEP)
+
+        /** Whether [widthDp] is at a limit, and which. */
+        fun limit(widthDp: Int): Limit = when {
+            widthDp >= maxDp -> Limit.Max
+            widthDp <= bounds.minDp -> Limit.Min
+            else -> Limit.None
+        }
+
+        private fun within(dp: Float): Int = dp.roundToInt().coerceIn(bounds.minDp, maxDp)
+    }
+
+    /** TalkBack's 放大 and 缩小: a tenth each. */
+    const val STEP = 0.1f
+
     /** Its left and top, in pixels, at [spot] in a parent [parentW] by [parentH], it [w] by [h]. */
     fun place(spot: Spot, w: Float, h: Float, parentW: Float, parentH: Float): Pair<Float, Float> =
         spot.x.coerceIn(0f, 1f) * (parentW - w).coerceAtLeast(0f) to spot.y.coerceIn(0f, 1f) * (parentH - h).coerceAtLeast(0f)
@@ -77,6 +197,9 @@ object FloatingKeyboard {
 
     // closer to 1 than this the keyboard does not change size, and a pivot would be far off
     private const val NO_SCALE = 0.001f
+
+    // within a pixel of the room's edge: touching it (a place kept as a share comes back a hair off)
+    private const val EDGE_PX = 1f
 
     /**
      * Its corners' radius, in dp, as round as the keys (按键圆角): the keys' own [keyRadius] and

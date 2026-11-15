@@ -545,7 +545,8 @@ class InputView(
             centerHorizontally()
             bottomOfParent()
         })
-        floatingController.setUp(keyboardView)
+        // resized (061-floating-resize), its keys laid out as tall in place, the input view kept (what is typed stays)
+        floatingController.setUp(keyboardView, ::updateKeyboardSize)
         if (codeFloats) preedit.onShown = ::showCodeStrip
         codeStrip = if (!codeFloats) null else FloatingCodeStrip(context, theme, preedit.ui.root).also {
             // under the key previews, as the embedded row is
@@ -589,8 +590,9 @@ class InputView(
         val sidePadding = if (floating) 0 else keyboardSidePaddingPx
         val placement = if (floating) null else placement()
         val boardHeight = if (floating) {
-            // floating's keys before its own width cuts them: 0.6.0's, a share of the screen (061-landscape-height §5.4)
-            FloatingKeyboard.height(KeyboardArea.floatingBase(context), TextKeyboard.widthDp(context), resources.configuration.screenWidthDp)
+            // floating's keys from 0.6.0's, a share of the screen (061-landscape-height §5.4), as its width cuts them and the
+            // user resized it (061-floating-resize)
+            KeyboardArea.floatingSize(KeyboardArea.screen(context)).keysHeightPx
         } else {
             // the app keeps 120 dp over the docked keyboard, the keys' rows 36 dp each, the rows winning (the user,
             // 2026-11-14; KeyboardHeightCap). A docked handle (始终显示悬浮条) is added to the keyboard and counted

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.floating
 import android.app.Activity
 import android.os.Looper
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import org.fcitx.fcitx5.android.assertRows
@@ -55,7 +56,7 @@ class FloatingHandleTest {
     // each drop's lifted flag, for a drag ended by [end] and then a stray up
     private fun floatingDrops(end: Int): List<Boolean> {
         val drops = ArrayList<Boolean>()
-        val handle = FloatingHandle(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, FloatingHandleSide.entries.first(), FloatingHandle.Mode.Floating({ _, _ -> }, { drops += it }) {})
+        val handle = FloatingHandle(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, FloatingHandleSide.entries.first(), FloatingHandle.Mode.Floating({ _, _ -> }, { drops += it }, {}, NoResize))
         handle.onTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 0f, 0f, 0))
         handle.onTouchEvent(MotionEvent.obtain(0, 1, end, 0f, 0f, 0))
         // ended once: a second end is no drop
@@ -107,6 +108,59 @@ class FloatingHandleTest {
         // F3557: a slide past the slop disarms it before the long press is due
         "a slide off the grip" to { noHoldAfter(MotionEvent.ACTION_DOWN to 500f, MotionEvent.ACTION_MOVE to 700f) },
     )
+
+    // a second finger on the strip while the first resizes, on the resize button while it drags, or on the dock button
+    // while it resizes: it ends the first's resize (drag), and nothing of its own starts beside it
+    @Test
+    fun oneFingerAtATimeOnTheFloatingStrip() {
+        val log = ArrayList<String>()
+        val resize = object : FloatingHandle.Resizing {
+            override fun start() { log += "resize" }
+            override fun move(dx: Float, dy: Float) { log += "resize move" }
+            override fun end() { log += "resize end" }
+            override fun step(bigger: Boolean) = false
+        }
+        val handle = FloatingHandle(
+            PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, FloatingHandleSide.Bottom,
+            FloatingHandle.Mode.Floating({ _, _ -> log += "drag" }, { log += "drop" }, { log += "dock" }, resize),
+        )
+        Robolectric.buildActivity(Activity::class.java).setup().also(activities::add).get()
+            .setContentView(handle, ViewGroup.LayoutParams(1000, 24))
+        handle.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(24, View.MeasureSpec.EXACTLY))
+        handle.layout(0, 0, 1000, 24)
+        val button = handle.resizeButton!!
+        val onButton = button.left + button.width / 2f
+        fun two(action: Int, first: Float, second: Float) = MotionEvent.obtain(
+            0, 0, action, 2, arrayOf(MotionEvent.PointerProperties().apply { id = 0 }, MotionEvent.PointerProperties().apply { id = 1 }),
+            arrayOf(MotionEvent.PointerCoords().apply { x = first; y = 12f }, MotionEvent.PointerCoords().apply { x = second; y = 12f }),
+            0, 0, 1f, 1f, 0, 0, 0, 0,
+        )
+        assertRows(
+            "a resize, a second finger on the strip" to {
+                log.clear()
+                handle.dispatchTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, onButton, 12f, 0))
+                handle.dispatchTouchEvent(two(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), onButton, 500f))
+                handle.dispatchTouchEvent(two(MotionEvent.ACTION_MOVE, onButton - 30f, 400f))
+                assertEquals(listOf("resize", "resize end"), log)
+            },
+            "a drag, a second finger on the resize button" to {
+                log.clear()
+                handle.dispatchTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 500f, 12f, 0))
+                handle.dispatchTouchEvent(two(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 500f, onButton))
+                handle.dispatchTouchEvent(two(MotionEvent.ACTION_MOVE, 400f, onButton - 30f))
+                assertEquals(listOf("drop"), log)
+            },
+            "a resize, a second finger tapping the dock button" to {
+                log.clear()
+                val onDock = 1000f - 10f
+                handle.dispatchTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, onButton, 12f, 0))
+                handle.dispatchTouchEvent(two(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), onButton, onDock))
+                handle.dispatchTouchEvent(two(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), onButton, onDock))
+                handle.dispatchTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_UP, onButton, 12f, 0))
+                assertEquals(listOf("resize", "resize end"), log)
+            },
+        )
+    }
 
     // TalkBack's long press is no touch: nothing to carry on, or a later touch would be taken for it
     @Test

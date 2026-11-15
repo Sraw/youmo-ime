@@ -16,6 +16,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.VisibleForTesting
+import androidx.core.view.ViewCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
@@ -28,8 +29,8 @@ import splitties.dimensions.dp
 
 /**
  * The floating keyboard's handle ([FloatingKeyboard]), a strip along its bottom, as Gboard's, or its
- * top ([FloatingHandleSide]): a finger on it drags the keyboard, its button docks it again
- * ([Mode.Floating]). At the bottom it is the keyboard's own colour, under the keys; at the top a
+ * top ([FloatingHandleSide]): a finger on it drags the keyboard, its button at the right end docks it again,
+ * the one at the left end resizes it ([Mode.Floating], 061-floating-resize). At the bottom it is the keyboard's own colour, under the keys; at the top a
  * shade of the bar's, told apart from the bar under it.
  *
  * Docked (始终显示悬浮条, [Mode.Docked]): nothing at its right end (the user's choice), no drag;
@@ -49,12 +50,13 @@ class FloatingHandle(
         /**
          * The floating keyboard's: [onDrag] told how far the finger moved since the last, in pixels;
          * [onDrop] when the drag ends, lifted if the finger let go (not a second finger, nor the
-         * system taking the touch); [onDock] its button pressed.
+         * system taking the touch); [onDock] its button pressed; [resize] its resize button's.
          */
         class Floating(
             val onDrag: (dx: Float, dy: Float) -> Unit,
             val onDrop: (lifted: Boolean) -> Unit,
             val onDock: () -> Unit,
+            val resize: Resizing,
         ) : Mode
 
         /**
@@ -63,6 +65,18 @@ class FloatingHandle(
          * touch, the grip's middle and none.
          */
         class Docked(val onDetach: (rawX: Float, rawY: Float, touch: HandoffTouch?) -> Unit) : Mode
+    }
+
+    /**
+     * The floating keyboard resized by the button at the strip's left end: [start] as a finger goes down on it, [move]
+     * by how far it moved since, px, [end] as it lifts or is taken (a second finger, the system); TalkBack's 放大 and
+     * 缩小 a [step] each, false at its limit already.
+     */
+    interface Resizing {
+        fun start()
+        fun move(dx: Float, dy: Float)
+        fun end()
+        fun step(bigger: Boolean): Boolean
     }
 
     private var lastX = 0f
@@ -92,10 +106,56 @@ class FloatingHandle(
         }
     }
 
+    // floating, the button that resizes the keyboard, at the left end (a physical left: the keyboard's corner there
+    // moves, the opposite one stays), as wide as the dock button: with the grip's touch between, 232 of the 260 dp it
+    // can shrink to (061-floating-resize §2.4)
+    private val resizer = (mode as? Mode.Floating)?.resize?.let { resize ->
+        ImageView(context).apply {
+            background = borderlessRippleDrawable(theme.keyPressHighlightColor)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            contentDescription = context.getString(R.string.floating_keyboard_resize)
+            setPadding(dp(DOCK_PADDING_DP), dp(DOCK_PADDING_DP), dp(DOCK_PADDING_DP), dp(DOCK_PADDING_DP))
+            setOnTouchListener(ResizeTouch(resize))
+            ViewCompat.addAccessibilityAction(this, context.getString(R.string.floating_keyboard_bigger)) { _, _ -> resize.step(bigger = true) }
+            ViewCompat.addAccessibilityAction(this, context.getString(R.string.floating_keyboard_smaller)) { _, _ -> resize.step(bigger = false) }
+        }
+    }
+
+    // one finger resizes: a second ends it, as a drag of the strip
+    private class ResizeTouch(private val resize: Resizing) : OnTouchListener {
+        private var downX = 0f
+        private var downY = 0f
+        private var resizing = false
+
+        @SuppressLint("ClickableViewAccessibility")
+        override fun onTouch(v: View, e: MotionEvent): Boolean {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    resizing = true
+                    downX = e.rawX
+                    downY = e.rawY
+                    resize.start()
+                }
+                MotionEvent.ACTION_MOVE -> if (resizing) resize.move(e.rawX - downX, e.rawY - downY)
+                MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (resizing) {
+                    v.isPressed = false
+                    resizing = false
+                    resize.end()
+                }
+            }
+            return true
+        }
+    }
+
     // the look it is dressed in last ([dress])
     private var dressed: WindowLooks.Handle? = null
 
     init {
+        // one finger at a time on the whole strip: split, a second finger on the strip while the first resizes (or on
+        // the resize button while it drags) would start a drag (a resize) of its own beside the first, and the two
+        // fight over the keyboard; unsplit it comes to the first's view as a second finger, which ends it
+        isMotionEventSplittingEnabled = false
         addView(grip, LayoutParams(0, 0, Gravity.CENTER))
         dress(look)
         // TalkBack's long press is no touch: the grip's middle stands for the finger
@@ -108,6 +168,7 @@ class FloatingHandle(
             }
         }
         dock?.let { addView(it, LayoutParams(dp(DOCK_WIDTH_DP), dp(HEIGHT_DP), Gravity.END or Gravity.CENTER_VERTICAL)) }
+        resizer?.let { addView(it, LayoutParams(dp(DOCK_WIDTH_DP), dp(HEIGHT_DP), Gravity.LEFT or Gravity.CENTER_VERTICAL)) }
     }
 
     /**
@@ -133,17 +194,24 @@ class FloatingHandle(
         drawDock(look.iconColor.value)
     }
 
-    // the dock button's icon, a theme's `floating-dock` too (061-toolbar-icons), in the handle's icon colour
+    // the dock and resize buttons' icons, a theme's `floating-dock` and `floating-resize` too (061-toolbar-icons), in the
+    // handle's icon colour
     private fun drawDock(@ColorInt color: Int) {
-        val d = dock ?: return
-        BarIconDrawables.show(d, PackIcons.of(theme), BarIcons.FLOATING_DOCK, color, dp(HEIGHT_DP - 2 * DOCK_PADDING_DP)) {
-            if (dressed?.iconColor?.value == color) drawDock(color)
+        listOf(dock to BarIcons.FLOATING_DOCK, resizer to BarIcons.FLOATING_RESIZE).forEach { (view, icon) ->
+            view ?: return@forEach
+            BarIconDrawables.show(view, PackIcons.of(theme), icon, color, dp(HEIGHT_DP - 2 * DOCK_PADDING_DP)) {
+                if (dressed?.iconColor?.value == color) drawDock(color)
+            }
         }
     }
 
     /** The dock button's icon as drawn now (null: none, or the theme's not read yet). */
     @get:VisibleForTesting
     internal val dockDrawable: Drawable? get() = dock?.drawable
+
+    /** The resize button (null docked). */
+    @get:VisibleForTesting
+    internal val resizeButton: View? get() = resizer
 
     // raw (screen) places: the handle moves with the keyboard under the finger
     @SuppressLint("ClickableViewAccessibility")

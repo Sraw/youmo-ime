@@ -35,7 +35,7 @@ object Icons {
     val TOOLBAR = listOf(
         "toolbar-expand", "toolbar-collapse", "trad-simp-off", "more", "floating", "one-handed", "habits-off", "clear-recent",
         "theme", "input-method-settings", "handwriting", "candidates-expand", "candidates-collapse", "predictions-close",
-        "floating-dock", "one-handed-exit", "touch-keyboard", "candidates-prev", "candidates-next",
+        "floating-dock", "floating-resize", "one-handed-exit", "touch-keyboard", "candidates-prev", "candidates-next",
     )
 
     /** The status panel's own (§2.8): its cells the bar has no button of, the engine's toggles on and off, its gear. */

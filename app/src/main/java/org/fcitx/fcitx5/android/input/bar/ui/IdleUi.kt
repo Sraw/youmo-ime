@@ -161,7 +161,9 @@ class IdleUi(
         val layout = arranged ?: return
         if (layout == toolbarShown) return
         toolbarShown = layout
-        buttonsUi.show(layout.toolbar.map(::button))
+        // ⋯ last, never scrolled away (the way to the settings and out of floating)
+        val more = layout.toolbar.lastOrNull()?.takeIf { it == ToolbarButton.More }
+        buttonsUi.show((if (more == null) layout.toolbar else layout.toolbar.dropLast(1)).map(::button), more?.let(::button))
     }
 
     /**

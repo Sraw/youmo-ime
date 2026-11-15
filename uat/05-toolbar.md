@@ -139,13 +139,14 @@
 ### TB-22 [P1] 悬浮键盘：浮在应用上，拖到哪停在哪
 - **前提**：B0（竖屏）。
 - **操作**：在工具栏 **⋯** 里点 **悬浮键盘**；按住键盘最下面的拖动条往屏幕上半部分拖，松手；点键盘外露出来的「句子」框；再按住 a 键不松手。
-- **预期**：键盘变小（约屏幕宽度七成）、带阴影、四角跟按键一样圆（角上的按键不被切掉），字母和下面的数字不挨在一起（y 和 6 分得开），工具栏展开时图标和平常一样大、⋯ 也看得到，最下面是一条窄的拖动条（中间一根短横条，右边斜箭头），浮在页面上，页面不被顶起；拖到哪里就停在哪里；点键盘外的「句子」框照常把焦点移过去；按住 a 时放大的"a"出现在手指正上方（跟着拖动后的键盘，没有错位）。
+- **预期**：键盘变小（约屏幕宽度七成）、带阴影、四角跟按键一样圆（角上的按键不被切掉），字母和下面的数字不挨在一起（y 和 6 分得开），工具栏展开时图标和平常一样大、⋯ 也看得到（放不下的按钮在它前面左右滑，⋯ 一直在最右边，不跟着滑走），最下面是一条窄的拖动条（中间一根短横条，右边斜箭头，左边调大小的按钮），浮在页面上，页面不被顶起；拖到哪里就停在哪里；点键盘外的「句子」框照常把焦点移过去；按住 a 时放大的"a"出现在手指正上方（跟着拖动后的键盘，没有错位）。
+- **JVM**：`FloatingUatTest.theToolbarsMoreIsInViewAtItsEndFloatingAndResizedToTheLeast`（悬浮和调到最小 260 dp 时，展开的工具栏里 ⋯ 都在工具栏自己的区域里、点得开状态区域）、`BarUatTest.candidateTextSizeChangesBarNotKeys`（28sp 时 ⋯ 在展开工具栏的最右边）；设备上照跑（看样子、拖动和长按气泡）。
 
-### TB-23 [P1] 悬浮键盘下次打开和转屏后还在原处
+### TB-23 [P1] 悬浮键盘下次打开还在原处；竖屏、横屏各停各的
 - **前提**：B0，按 TB-22 开着悬浮键盘并拖到屏幕左上角附近。
-- **操作**：点系统返回收起键盘，再点「普通文本」框；把设备转成横屏（横屏键盘样式没设过，横过来停在底部：在 ⋯ 里再点 **悬浮键盘**），再转回竖屏。
-- **预期**：重新弹出后还在左上角；横屏开悬浮后停在同一个角（左上），转回竖屏还是悬浮、在左上角（竖屏、横屏的样式各记各的，位置共用）。
-- **JVM**：`FloatingUatTest.leftInACornerItIsThereNextTimeAndAfterARotation`（拖到左上角，再弹出还在原处；横屏、竖屏下新起的键盘也在左上角）；设备上留作冒烟：Robolectric 转屏不重排已显示的键盘，真转屏只在设备上看。
+- **操作**：点系统返回收起键盘，再点「普通文本」框；把设备转成横屏（横屏键盘样式没设过，横过来停在底部：在 ⋯ 里再点 **悬浮键盘**），把横屏的悬浮键盘拖到右上角；转回竖屏，再转成横屏。
+- **预期**：重新弹出后还在左上角；横屏第一次悬浮时在升级前（0.6.0）最后停的地方，没有就在底部中间，不跟着竖屏的左上角；拖到右上角后，转回竖屏还是悬浮、在左上角，再转成横屏在右上角（竖屏、横屏的样式、位置和大小各记各的）。
+- **JVM**：`FloatingUatTest.leftInACornerItIsThereNextTimeAndAfterARotation`（拖到左上角，再弹出还在原处；横屏没放过时在底部，拖到右上角后竖屏还在左上角、横屏在右上角）、`FloatingStoreTest`（没存过时竖横都读 0.6.0 的位置）；设备上留作冒烟：Robolectric 转屏不重排已显示的键盘，真转屏只在设备上看。
 
 ### TB-24 [P1] 悬浮键盘放回底部
 - **前提**：B0，按 TB-22 开着悬浮键盘。
@@ -345,6 +346,42 @@
 - **操作**：回测试页看工具栏；点 › 展开。
 - **预期**：放不下的常驻按钮按顺序挪进展开的工具栏，排在 ⋯ 前面；手写在展开里照样能点开、关。
 - **JVM**：`ToolbarConfigTest.pinnedOnesWithNoRoomGoOntoTheToolbarInOrderBeforeTheMoreButton`（ime-core）；设备上不跑。
+
+### TB-58 [P1] 悬浮键盘拖左下角的按钮调大小：键和字一起等比变，栏只变宽
+- **前提**：B0（竖屏），悬浮键盘开着，拖动条在下面，先把键盘往上拖到屏幕中间。
+- **操作**：按住拖动条左端的调大小按钮（方框里两个角），往左下拖一段，松手；再往右上拖回去一段，松手。打字时候选栏出来再看。再把键盘拖回屏幕最底下，按住调大小按钮往左上拖一段；设置 → 外观里 **悬浮键盘拖动条** 改成"上面"，把键盘拖到屏幕最顶上，往左下拖一段。
+- **预期**：往左下拖时整个键盘跟着手指变大，右上角不动；每个键变宽也变高，键上的字、角上的小字、键之间的缝、键盘的圆角一起按同样比例变大，键的形状不变；工具栏、候选栏、拖动条只变宽，高度和候选字号不变（栏变窄时放不下的工具栏按钮照旧挪进展开的工具栏）。往右上拖时一起变小。拖的时候键盘不闪、不跳，松手后不再变一下。停在最底下时往左上拖也能放大：右下角不动、键盘往上长，松手后仍贴着底边；拖动条在上面、停在最顶上时右上角不动、往下长。
+- **JVM**：`FloatingUatTest.resizedAllOfItIsAsMuchBiggerOrSmallerTheBarsOnlyWider`（键区高、q 键宽高、圆角同一比例，栏高不变、栏宽跟着，右上角不动）、`atTheBottomWhereItFirstFloatsItGrowsUpItsBottomRightStaying`、`theStripOnTopAtTheTopItGrowsDownItsTopRightStaying`、ime-core `FloatingKeyboardTest.atTheRoomsEdgeOnTheStripsSideItGrowsTheOtherWay`、`resizedItsKeysAndTextGoWithItsWidth`、`theHandleMovedAlongTheDiagonalResizesIt`；设备上留作冒烟（拖动跟手、右上角不动）。
+
+### TB-59 [P1] 调大小有上下限，不出屏幕，到头振一下
+- **前提**：B0（竖屏），悬浮键盘开着，在屏幕中间；**按键振动** 开着。
+- **操作**：按住调大小按钮一直往右上拖到底；再一直往左下拖到底（拖过屏幕左边）。
+- **预期**：最小到 260 dp 宽就不再变小（拖动条上的三样：调大小按钮、短横、斜箭头仍放得下）；放大时到屏幕左边或底部、或停靠键盘那么宽就停住，键盘不被推着走，也不出屏幕；到最小、最大时各振一下（「按键振动」关着时不振）。最小时各面板（工具栏、候选、展开的候选、数字、九键、符号、表情、剪贴板、语音、手写）都排得下、能用。
+- **JVM**：`FloatingUatTest.resizedNoSmallerThan260NorPastTheScreen`、ime-core `FloatingKeyboardTest.aResizeStopsAtItsBoundsAndTheScreensEdgesAndSaysSo`、`itIsResizedWithinItsBounds`（平板横屏按高度到头）；设备上不跑（最小时各面板 0.6.1 实现时在模拟器上截图看过）。
+
+### TB-60 [P1] 竖屏、横屏的悬浮大小各记各的
+- **前提**：竖屏、横屏键盘样式都是悬浮；按 TB-58 把竖屏的调小。
+- **操作**：转成横屏看悬浮键盘大小；在横屏把它调大一些；转回竖屏，再转成横屏。
+- **预期**：横屏第一次是默认大小（和 0.6.0 横屏一样），不跟竖屏变小；横屏调大后，竖屏还是调小的那个大小，横屏还是调大的那个。
+- **JVM**：`FloatingUatTest.uprightAndTurnedEachTheirOwnSize`；设备上留作冒烟：Robolectric 转屏是新起的键盘，真转屏在设备上看。
+
+### TB-61 [P2] 从 0.6.0 升级：位置竖屏、横屏都保留，大小和 0.6.0 一样；调过的大小记住
+- **前提**：0.6.0 里悬浮键盘拖到过左上角，升级到 0.6.1。
+- **操作**：竖屏、横屏各打开一次悬浮键盘看位置和大小；按 TB-58 把竖屏的调小一些；点系统返回收起键盘，再点输入框；点拖动条右边的斜箭头放回底部，再在 ⋯ 里点 **悬浮键盘**；在设置里 **停止输入法** 后再打开。
+- **预期**：升级后竖屏、横屏都先停在 0.6.0 的左上角，大小和 0.6.0 一样，一个像素不差；调小后每次悬浮都是调过的大小，停在原来的地方；放回底部时是平常的停靠键盘（不受调大小影响）。
+- **JVM**：`FloatingUatTest.itsSizeIsKeptShownAgainAndDockedAndFloatingAgain`、`FloatingStoreTest.neverKeptEitherWayItIsWhere060LeftIt`、`FloatingStoreTest.eachWayKeepsItsOwnAndTheOldKeysAreLeft`、ime-core `FloatingKeyboardTest.neverResizedItIsAsItWas`；设备上不跑。
+
+### TB-62 [P2] 打字打到一半调大小，打的字不丢
+- **前提**：悬浮键盘开着，在屏幕中间。
+- **操作**：打 `nihao` 不选候选；拖调大小按钮调小再调大；接着打 `ma` 选第一个候选。另开手写（工具栏 **手写**）写一个字不上屏，再调一次大小。再把 **停笔识别** 设成最慢，在键上写一笔、笔迹还在时马上调大小，然后再写一个字。
+- **预期**：调大小前后编码行的拼音和候选栏里的候选都还在，接着打能选上；手写写的字还在编码行里。键盘不重新生成（不闪）。写到一半调大小时，键上的笔迹消失，已写的笔画像停了笔一样识别，认出的字留在编码行里；接着写的字从头另认，不和调大小前的笔画连在一起。
+- **JVM**：`FloatingUatTest.resizedWhileTypingWhatIsTypedStays`（同一个输入视图，候选还在）、`KeyHandwritingUatTest.resizedWhileWritingThePieceIsDoneItsReadingStays`（写一笔后调大小：笔迹清掉、这一段按停笔识别交出去，下一笔另起一段）；设备上不跑。
+
+### TB-63 [P2] 调大小按钮看得清，跟着主题；读屏能放大、缩小，到头时说出来
+- **前提**：悬浮键盘开着，在屏幕中间；浅色、深色主题各一个；拖动条在下面、上面各看一次（设置 **悬浮键盘拖动条**）。
+- **操作**：看拖动条两端的按钮；开 TalkBack，把焦点移到拖动条左端的按钮，听它念什么；打开操作菜单（三指点按或上下滑），选 **放大**、**缩小**，一直选 **缩小** 到不能再小。再放回底部重新悬浮（停在底部默认位置），选 **放大**。
+- **预期**：调大小按钮和右边放回底部的按钮一个颜色，浅色、深色主题和拖动条在上、在下都看得清；主题包写了 `floating-resize` 的 `<icon>` 时画主题的图。读屏念「调整悬浮键盘大小」；每选一次放大或缩小，键盘大一成或小一成并记住；到最小时振一下并念「已是最小」，到最大时念「已是最大」。停在底部默认位置时放大，底边不动、往上长（右下角不动），和拖着调大小一样。
+- **JVM**：`BarIconsThemeTest.thePanelsButtonsDoingACommandsJobAreTheThemes`（主题的 `floating-resize`）、`FloatingUatTest.talkBacksBiggerAndSmallerATenthEachAndSaidAtTheLimit`（从底部默认位置放大、缩小，到头时说出来）、ime-core `FloatingKeyboardTest.talkBacksStepIsATenth`；设备上不跑。
 
 ### TB-64 [P2] 主题图标的按钮开着时用「开着」的图标颜色；简繁两态各自的图；冷启动不先闪自带的图
 - **前提**：B0-设置，跟随系统深色模式关；一个主题包带 `one-handed`、`trad-simp-off`、`undo` 的 `<icon>`，和 `<style select="toolbar:selected" icon-color="…"/>`；工具栏里放上简繁。

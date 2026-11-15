@@ -41,7 +41,7 @@ that leaves a preference, a file or a static set where the next test in its JVM 
 in some orders: `KeyboardHarness.close` puts back what a harness test may change, and a test
 that moves the floating keyboard puts its place back in its own teardown (`FloatingUatTest`, `FloatingCodeStripUatTest`, `FloatingPlacerTest`,
 `FloatingControllerTest`; `KeyboardHarness.close` cannot, `FloatingUatTest` reads the place a closed
-harness left), and a screenshot of the floating keyboard pins the place it is drawn at. Memory the same way: a JVM runs 40 classes in one 3 GB heap, so a harness's
+harness left; `PrefsRule` sets the place, the 竖屏 and 横屏 places and widths back to never kept at each test's start), and a screenshot of the floating keyboard pins the place it is drawn at. Memory the same way: a JVM runs 40 classes in one 3 GB heap, so a harness's
 close lets go of every Android object it made (the input method's window, its field's activity, a
 `SettingsHarness`'s MainActivity destroyed: one alive keeps its views in the main thread's GapWorker
 list for the rest of the JVM), held by `HarnessLeakTest`; an OOM ends the JVM and leaves its heap in

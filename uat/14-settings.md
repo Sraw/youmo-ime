@@ -754,9 +754,9 @@
 - **JVM**：`web/theme-maker/test/panels-smoke.mjs`（分组、两处的 undo、hide-keyboard 的注明）、`engine.test.mjs` 的 paintIcon 和 bar-icons 两条；`EnginePaintTest.theBarsIconsAreThePages` 生成分组；在电脑浏览器上手工看预览。
 
 ### ST-132 [P1] 主题换状态面板和编辑面板的图标；设置页还是自带的
-- **前提**：B0-设置，跟随系统深色模式关；一个主题包带 `theme`、`trad-simp-off`、`punctuation`、`keyboard-settings`、`app-settings`、`clipboard`、`backspace`、`floating-dock`、`one-handed-exit`、`touch-keyboard`、`candidates-prev` 的 `<icon>`。
-- **操作**：点这个主题；点开工具栏点 ⋯ 看各格和右上角的齿轮；点中文标点让它关掉再看；点开编辑面板看剪贴板和退格、方向键；打开符号面板看底排的 123、表情面板；开悬浮键盘看条上回到底部的按钮；开单手模式看旁边空白里的按钮；接实体键盘打字看浮动候选窗的键盘按钮和翻页箭头；进设置页看图标。
-- **预期**：主题、简体、中文标点（开着时）、虚拟键盘的格子和齿轮是主题的图；中文标点关掉后是自带的（`punctuation-off` 没写），其它没写的格子也是自带的；编辑面板的剪贴板、退格是主题的，方向键是自带的；123、表情跟着键上的 `number-pad`、`emoji`；悬浮键盘回到底部的按钮是主题的；单手模式旁边退出单手的按钮是主题的，左右挪的箭头是自带的；浮动候选窗的键盘按钮和往前翻的箭头是主题的，往后翻的是自带的；设置页里全是自带的。别的输入法自带的开关（比如 unikey 的）不换。
+- **前提**：B0-设置，跟随系统深色模式关；一个主题包带 `theme`、`trad-simp-off`、`punctuation`、`keyboard-settings`、`app-settings`、`clipboard`、`backspace`、`floating-dock`、`floating-resize`、`one-handed-exit`、`touch-keyboard`、`candidates-prev` 的 `<icon>`。
+- **操作**：点这个主题；点开工具栏点 ⋯ 看各格和右上角的齿轮；点中文标点让它关掉再看；点开编辑面板看剪贴板和退格、方向键；打开符号面板看底排的 123、表情面板；开悬浮键盘看条上回到底部和调大小的按钮；开单手模式看旁边空白里的按钮；接实体键盘打字看浮动候选窗的键盘按钮和翻页箭头；进设置页看图标。
+- **预期**：主题、简体、中文标点（开着时）、虚拟键盘的格子和齿轮是主题的图；中文标点关掉后是自带的（`punctuation-off` 没写），其它没写的格子也是自带的；编辑面板的剪贴板、退格是主题的，方向键是自带的；123、表情跟着键上的 `number-pad`、`emoji`；悬浮键盘回到底部、调大小的按钮是主题的；单手模式旁边退出单手的按钮是主题的，左右挪的箭头是自带的；浮动候选窗的键盘按钮和往前翻的箭头是主题的，往后翻的是自带的；设置页里全是自带的。别的输入法自带的开关（比如 unikey 的）不换。
 - **JVM**：`BarIconsThemeTest.theStatusPanelsCellsAndGearAreTheThemes`、`BarIconsThemeTest.thePanelsButtonsDoingACommandsJobAreTheThemes`、`BarIconsThemeTest.everyCellHasAName`、`BarIconsThemeTest.theButtonsBesideTheKeysAreTheThemes`、`BarIconsThemeTest.theFloatingCandidateWindowsKeyboardButtonIsTheThemes`；ime-core `BarIconsTest.theEnginesTogglesHaveANamePerState`；设备上不跑。
 
 ### ST-121 [P1] 通用输入：在键上划三项，下面是「手写」小节

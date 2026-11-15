@@ -144,6 +144,8 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         val split: Boolean = false,
         /** The keyboard upright as 横屏 or not (KeyboardArea.Screen.landscape): a foldable's inner screen and a tablet are. */
         val landscape: Boolean = false,
+        /** The floating keyboard resized: all of it drawn as much bigger or smaller (SceneEnvs.of's density). */
+        val resize: Double = 1.0,
     )
 
     var board: Board? = null
@@ -200,8 +202,11 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         val t = sceneTheme ?: return null.also { Timber.e("key cell: theme %s not converted; nothing drawn", theme.name) }
         board?.let { return onBoard(t, it) }
         // a grid's cell the text the size [attrs] gives it, not the keyboard's 紧凑 or floating scale (the cells'
-        // key views never took either); a key cap as the keyboard is, its marks' corners as there
-        val env = SceneEnvs.of(this, look, theme.isDark, (width / shrink).roundToInt(), (height / shrink).roundToInt(), Input(), texts = Texts(), marks = marks)
+        // key views never took either), nor its resize; a key cap as the keyboard is, its marks' corners as there
+        val env = SceneEnvs.of(
+            this, look, theme.isDark, (width / shrink).roundToInt(), (height / shrink).roundToInt(), Input(), texts = Texts(), marks = marks,
+            resized = !ownSize,
+        )
             .let { if (ownSize) it.copy(compact = false, floating = null) else it }
             .let { if (states.isEmpty()) it else it.copy(states = mapOf(KEY to states)) }
             .copy(keyStyle = overPack())
@@ -226,7 +231,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(alts = b.alts, letterCase = b.letterCase), marks = marks)
             // the keyboard upright, the page turned or not (KeyCaps.board's size)
             .copy(board = layout.id, keyStyle = overPack(), landscape = b.landscape)
-            .let { if (b.floating != null || b.split) it.copy(floating = b.floating ?: it.floating, split = b.split) else it }
+            .let { if (b.floating != null || b.split) it.copy(floating = b.floating ?: it.floating, split = b.split, density = it.density * b.resize) else it }
         return when (val s = SceneBuilder(t, env, measurer, cascades = SceneThemes.cascades(t)).build(layout.layout, layout.fragments)) {
             is Parsed.Ok -> s.value.also { v -> if (v.keys.none { it.shortcut == b.shortcut }) Timber.e("key cell: no key of %s on %s", b.shortcut, b.layout) }
             is Parsed.Failed -> null.also { Timber.e("key cell: no scene of %s: %s; nothing drawn", b.layout, s.problems) }

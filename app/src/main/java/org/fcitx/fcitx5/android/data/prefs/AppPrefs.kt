@@ -159,9 +159,21 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          */
         val keyboardButtonX = float("keyboard_button_x", -1f)
         val keyboardButtonY = float("keyboard_button_y", -1f)
-        // where the floating keyboard was dragged to: FloatingKeyboard.Spot, its middle at the bottom first
+        // where the floating keyboard was dragged to before 0.6.1, one place for 竖屏 and 横屏: FloatingKeyboard.Spot, its
+        // middle at the bottom first. Read, never written: each shape's own falls back to it (FloatingStore)
         val floatingKeyboardX = float("floating_keyboard_x", FloatingKeyboard.DEFAULT.x)
         val floatingKeyboardY = float("floating_keyboard_y", FloatingKeyboard.DEFAULT.y)
+
+        /**
+         * The floating keyboard's place and width (dp) the user dragged and resized it to, 竖屏 and 横屏 each its own
+         * (061-floating-resize §2.6; FloatingStore). Negative: never kept, the old place and the default width then.
+         */
+        val floatingPortraitX = float("floating_portrait_x", -1f)
+        val floatingPortraitY = float("floating_portrait_y", -1f)
+        val floatingLandscapeX = float("floating_landscape_x", -1f)
+        val floatingLandscapeY = float("floating_landscape_y", -1f)
+        val floatingPortraitWidthDp = float("floating_portrait_width_dp", -1f)
+        val floatingLandscapeWidthDp = float("floating_landscape_width_dp", -1f)
 
         /** U-106's switch, at the lexicon page's top beside 用我的输入习惯 (UserWordsFragment): a backup of the learning every few typing days. */
         val learningAutoBackup = bool("learning.auto_backup", true)

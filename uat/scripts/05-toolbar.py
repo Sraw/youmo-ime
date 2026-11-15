@@ -293,10 +293,14 @@ def tb23(d):
         f = next((n for n in s.app() if n.cls == "EditText" and n.rid != "url_field"), None)
         if f:
             d.tap(f.c, 1.2)
-    # 横屏键盘样式 is its own: not set, docked turned; floating there too, at the spot kept
+    # 横屏键盘样式 is its own: not set, docked turned; floating there too, at its own spot (061-floating-resize):
+    # never placed turned, 0.6.0's one place, here none, so the bottom; dragged to the top right, kept apart
     if not d.screen().find(desc="键盘放回底部", where="ime"):
         floating(d)
     b3 = kbox(d)
+    h, _ = handle(d)
+    drag(d, h, (2000, 150))
+    b3r = kbox(d)
     d.shot("full", "横屏")
     d.rotate(0)
     s = d.screen()
@@ -306,9 +310,10 @@ def tb23(d):
             d.tap(f.c, 1.2)
     b4 = kbox(d)
     check(b1 and b2 and abs(b1[1] - b2[1]) < 20 and abs(b1[0] - b2[0]) < 20, f"收起再出 {b1} → {b2}")
-    check(b3 and b3[0] < 400 and b3[1] < 500, f"横屏时 {b3}（应在左上）")
-    check(b4 and b4[0] < 300 and b4[1] < 900, f"转回竖屏 {b4}")
-    return f"左上 {b1}，再出 {b2}，横屏 {b3}，竖屏 {b4}"
+    check(b3 and b3[1] > 300, f"横屏时 {b3}（没放过，应在底部，不跟竖屏的左上）")
+    check(b3r and b3r[1] < 500 and b3r[2] > 1600, f"横屏拖到右上 {b3r}")
+    check(b4 and b4[0] < 300 and b4[1] < 900, f"转回竖屏 {b4}（还在左上）")
+    return f"左上 {b1}，再出 {b2}，横屏 {b3} → 右上 {b3r}，竖屏 {b4}"
 
 
 case("TB-24", needs="jvm:FloatingUatTest.theDockButtonPutsItBack")(lambda d: None)
@@ -460,6 +465,82 @@ case("TB-55", needs="jvm:ToolbarConfigTest.handwritingIsPinnedByDefaultAndLeftOu
 case("TB-56", needs="jvm:BarToolbarThemeTest.theToolbarAndTheCodeAreTheThemes")(lambda d: None)
 
 case("TB-57", needs="jvm:ToolbarConfigTest.pinnedOnesWithNoRoomGoOntoTheToolbarInOrderBeforeTheMoreButton")(lambda d: None)
+
+def resizer(d, s=None):
+    s = s or d.screen()
+    r = s.find(desc="调整悬浮键盘大小", where="ime")
+    if not r:
+        raise Blocked("悬浮键盘的条上没有调大小的按钮")
+    return r
+
+
+def kwidth(d):
+    b = kbox(d)
+    return b[2] - b[0] if b else 0
+
+
+# floating dragged up to the screen's middle: at the bottom, where it first floats, there is no room under it to grow
+def floating_up(d):
+    floating(d)
+    h, _ = handle(d)
+    drag(d, h, (h[0], 1300))
+
+
+@case("TB-58", mutates=True, visual=True)
+def tb58(d):
+    floating_up(d)
+    b1 = kbox(d)
+    r = resizer(d)
+    drag(d, r.c, (r.c[0] - 120, r.c[1] + 120))
+    b2 = kbox(d)
+    d.shot("ime", "放大")
+    r = resizer(d)
+    drag(d, r.c, (r.c[0] + 200, r.c[1] - 200))
+    b3 = kbox(d)
+    d.shot("ime", "缩小")
+    check(b1 and b2 and b2[2] - b2[0] > (b1[2] - b1[0]) + 40, f"放大 {b1} → {b2}")
+    check(b2 and abs(b2[2] - b1[2]) < 6 and abs(b2[1] - b1[1]) < 6, f"右上角不动 {b1} → {b2}")
+    check(b3 and b3[2] - b3[0] < (b1[2] - b1[0]) - 40, f"缩小 {b1} → {b3}")
+    return f"{b1} → 放大 {b2} → 缩小 {b3}"
+
+
+case("TB-59", needs="jvm:FloatingUatTest.resizedNoSmallerThan260NorPastTheScreen、FloatingKeyboardTest.aResizeStopsAtItsBoundsAndTheScreensEdgesAndSaysSo")(lambda d: None)
+
+
+@case("TB-60", mutates=True, visual=True)
+def tb60(d):
+    floating_up(d)
+    r = resizer(d)
+    drag(d, r.c, (r.c[0] + 120, r.c[1] - 120))
+    upright = kwidth(d)
+    d.rotate(1)
+    s = d.screen()
+    if not s.find(rid="keyboard_view", where="ime"):
+        f = next((n for n in s.app() if n.cls == "EditText" and n.rid != "url_field"), None)
+        if f:
+            d.tap(f.c, 1.2)
+    if not d.screen().find(desc="键盘放回底部", where="ime"):
+        floating(d)
+    turned = kwidth(d)
+    d.shot("ime", "横屏")
+    d.rotate(0)
+    s = d.screen()
+    if not s.find(rid="keyboard_view", where="ime"):
+        f = next((n for n in s.app() if n.cls == "EditText" and n.rid != "url_field"), None)
+        if f:
+            d.tap(f.c, 1.2)
+    again = kwidth(d)
+    check(upright and turned and turned != upright, f"横屏 {turned}，竖屏调过的 {upright}（横屏是自己那份）")
+    check(abs(again - upright) < 6, f"转回竖屏 {again}，应是 {upright}")
+    return f"竖屏 {upright}，横屏 {turned}，转回 {again}"
+
+
+case("TB-61", needs="jvm:FloatingUatTest.itsSizeIsKeptShownAgainAndDockedAndFloatingAgain、FloatingStoreTest.neverKeptEitherWayItIsWhere060LeftIt、"
+               "FloatingKeyboardTest.neverResizedItIsAsItWas")(lambda d: None)
+
+case("TB-62", needs="jvm:FloatingUatTest.resizedWhileTypingWhatIsTypedStays")(lambda d: None)
+
+case("TB-63", needs="jvm:FloatingUatTest.talkBacksBiggerAndSmallerATenthEachAndSaidAtTheLimit、BarIconsThemeTest.thePanelsButtonsDoingACommandsJobAreTheThemes")(lambda d: None)
 
 case("TB-64", needs="jvm:BarIconsThemeTest.aToggleOnDrawsItsIconInTheSelectedColour、BarIconsThemeTest.tradSimpsTwoStatesAreTwoNames、"
                "BarIconsThemeTest.aThemesIconNotReadYetIsNothingTillItIsNeverTheAppsFirst")(lambda d: None)

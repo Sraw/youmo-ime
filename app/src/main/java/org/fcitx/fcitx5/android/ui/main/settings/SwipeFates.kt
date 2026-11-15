@@ -18,7 +18,6 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
-import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
@@ -172,7 +171,7 @@ object SwipeFates {
                         .marks(KeysState(punctuation = punctuation, ways = on, spots = spots))
                         .let { if (it.charShortcuts == !s.rootsShown) it else it.copy(charShortcuts = !s.rootsShown) }
                     val shownEnv = env.copy(
-                        density = screen.density.toDouble(), landscape = screen.landscape, floating = size.floating,
+                        density = screen.density * size.resize, landscape = screen.landscape, floating = size.floating,
                         split = size.split, marks = marks, typed = null, board = layout.id, keyStyle = keyStyle,
                     )
                     // the turned one of the two, not 横屏: a foldable's inner screen is that both ways up
@@ -199,9 +198,12 @@ object SwipeFates {
         return Seen(job.label, job.landscape, fates, job.ways, roots)
     }
 
-    /** The size of the keys of a board ([board]: KeyNames') on [s], as InputView gives it; [floating] its text scale, [split] the letters halved. */
+    /**
+     * The size of the keys of a board ([board]: KeyNames') on [s], as InputView gives it; [floating] its text scale, [split]
+     * the letters halved, [resize] the floating keyboard resized (all of it drawn as much bigger: SceneEnvs.of's density).
+     */
     @VisibleForTesting
-    internal data class Size(val width: Int, val height: Int, val floating: Double?, val split: Boolean)
+    internal data class Size(val width: Int, val height: Int, val floating: Double?, val split: Boolean, val resize: Double = 1.0)
 
     // InputView.updateKeyboardSize and placement: floating as narrow and short as there, docked one-handed or at a
     // side as SplitKeyboard puts it, a docked handle counted in the cap, [rows] the board's (注音's five give way less)
@@ -211,9 +213,9 @@ object SwipeFates {
         // each screen by its own shape's 键盘样式: upright floating, turned split (061-wide-keyboard-style)
         val style = KeyboardStyles.of(s)
         if (style.floating) {
-            val widthDp = FloatingKeyboard.widthDp(s.widthDp)
-            val height = FloatingKeyboard.height(KeyboardArea.floatingBase(s), widthDp, s.widthDp)
-            return Size(s.dp(widthDp.toDouble()), height, FloatingKeyboard.textScale(widthDp, s.widthDp).toDouble(), false)
+            // as resized on [s]'s shape, its own (KeyboardArea.floatingSize)
+            val floating = KeyboardArea.floatingSize(s)
+            return Size(s.dp(floating.widthDp.toDouble()), floating.keysHeightPx, floating.textScale.toDouble(), false, floating.resize.toDouble())
         }
         val handle = if (prefs.alwaysShowHandle.getValue()) s.dp(FloatingHandle.HEIGHT_DP.toDouble()) else 0
         val height = KeyboardArea.keysHeight(s, CodeRowHeight.keyboardDp(codeRow, KawaiiBarComponent.codeRowFloats()), handle, rows = rows)

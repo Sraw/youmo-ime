@@ -95,9 +95,9 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
     // laid on the bar, no keyboard's fill under the digits
     override val sceneDrawsBase: Boolean get() = false
 
-    // no marks: the row's keys reach no shortcut
+    // no marks: the row's keys reach no shortcut; a bar's, not resized with a floating keyboard (only wider)
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
-        SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneEnvs.NO_MARKS)
+        SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneEnvs.NO_MARKS, resized = false)
 
     // last: the scene reads the keyboard's state
     init {

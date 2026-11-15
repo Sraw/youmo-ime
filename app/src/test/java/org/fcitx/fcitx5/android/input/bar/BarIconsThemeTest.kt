@@ -34,6 +34,7 @@ import org.fcitx.fcitx5.android.input.candidates.floating.PaginationUi
 import org.fcitx.fcitx5.android.input.editing.TextEditingButton
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
+import org.fcitx.fcitx5.android.input.floating.NoResize
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
@@ -363,9 +364,9 @@ class BarIconsThemeTest {
     }
 
     @Test
-    @Uat("ST-132")
+    @Uat("ST-132", "TB-63")
     fun thePanelsButtonsDoingACommandsJobAreTheThemes() {
-        val mine = pack("clipboard", "backspace", "floating-dock")
+        val mine = pack("clipboard", "backspace", "floating-dock", "floating-resize")
         val h = shown(mine)
         h.expand()
         h.tap(h.button(R.string.text_editing))
@@ -382,9 +383,10 @@ class BarIconsThemeTest {
         assertEquals("number-pad", SceneIcons.nameOf(R.drawable.ic_number_pad))
         assertEquals("emoji", SceneIcons.nameOf(R.drawable.ic_baseline_tag_faces_24))
         // the floating keyboard's strip
-        val handle = FloatingHandle(ctx, mine, FloatingHandleSide.Top, FloatingHandle.Mode.Floating({ _, _ -> }, {}, {}))
+        val handle = FloatingHandle(ctx, mine, FloatingHandleSide.Top, FloatingHandle.Mode.Floating({ _, _ -> }, {}, {}, NoResize))
         assertTrue(handle.dockDrawable.themed)
-        assertFalse(FloatingHandle(ctx, pack("undo"), FloatingHandleSide.Top, FloatingHandle.Mode.Floating({ _, _ -> }, {}, {})).dockDrawable.themed)
+        assertTrue((handle.resizeButton as ImageView).drawable.themed)
+        assertFalse(FloatingHandle(ctx, pack("undo"), FloatingHandleSide.Top, FloatingHandle.Mode.Floating({ _, _ -> }, {}, {}, NoResize)).dockDrawable.themed)
     }
 
     // beside the keys: one-handed's way back to the whole width, the floating candidate window's page arrows
