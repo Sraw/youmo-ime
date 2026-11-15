@@ -85,7 +85,15 @@ class KeyShortcutRunner(
             KeyCommand.SwipeSelect -> {}
             KeyCommand.Clipboard -> windowManager.attachWindow(ClipboardWindow())
             // a key's swipe opens it in CommonKeyActionListener, as 符's long press; from here (a menu's) the same
-            KeyCommand.QuickInput -> service.postFcitxJob { triggerQuickPhrase() }
+            // what is typed put in first, as 符's long press does: else its pinyin is the keyword's start, and the
+            // full keyboard's Shift still 分词 over it
+            KeyCommand.QuickInput -> {
+                val address = service.inAddressField
+                service.postFcitxJob {
+                    with(service) { commitAndReset(address) }
+                    triggerQuickPhrase()
+                }
+            }
             KeyCommand.Emoji -> windowManager.attachWindow(PickerWindow.Key.Emoji)
             KeyCommand.Voice -> voice()
             KeyCommand.TradSimp -> tradSimp()

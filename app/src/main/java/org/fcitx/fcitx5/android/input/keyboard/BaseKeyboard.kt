@@ -353,10 +353,10 @@ abstract class BaseKeyboard(
     private fun placeholderOf(def: KeyDef): (String) -> KeyAction? = (def as? SceneKeyDef)?.placeholder ?: { null }
 
     /**
-     * What a tap sends for its key's [action]: the action itself, but where a keyboard adds where it fell,
-     * [clickAt] across and [clickDown] down ([KeyGesture.clickAt], [KeyGesture.clickDown]).
+     * What a tap on [key] sends for its [action]: the action itself, but where a keyboard adds where it fell,
+     * [clickAt] across and [clickDown] down ([KeyGesture.clickAt], [KeyGesture.clickDown]), or which key it was.
      */
-    protected open fun pressed(clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = action
+    protected open fun pressed(key: KeyRef, clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = action
 
     /**
      * What [key] of [def], a key the scene draws (060-render-p2 S1), does: its sound, the space's and
@@ -498,7 +498,7 @@ abstract class BaseKeyboard(
         def.behaviors.forEach {
             when (it) {
                 // the press with where its tap fell (TypingKeys.kt); a click no touch made (TalkBack) as it is
-                is KeyDef.Behavior.Press -> key.onClick { k -> onAction(pressed(k.keyGesture.clickAt, k.keyGesture.clickDown, withTouch(it.action, k, this as? TypingKeys, resources.displayMetrics.density, canvas))) }
+                is KeyDef.Behavior.Press -> key.onClick { k -> onAction(pressed(k.ref, k.keyGesture.clickAt, k.keyGesture.clickDown, withTouch(it.action, k, this as? TypingKeys, resources.displayMetrics.density, canvas))) }
                 // hold to talk follows the finger that holds the space
                 is KeyDef.Behavior.LongPress -> key.onLongClick { k ->
                     val action = it.action

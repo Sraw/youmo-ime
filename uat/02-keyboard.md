@@ -222,6 +222,18 @@
   （0.3.0 发版前发现：加了 ; 键以后最下面一排一直显示大写。）
 - **JVM**：`KeyboardUatTest.shiftChangesAllThreeRows`（三排字母关/开/关；图）；设备上不跑。
 
+### KB-106 [P1] 全键盘打拼音时 ⇧ 是分词
+- **前提**：B0（全拼，全键盘）；读屏关。
+- **操作**：点 x i，看 ⇧ 的位置；点它，再点 a n，看编码行和候选；点「西安」。再把输入法换成双拼（自然码），点 x i、⇧ 的位置、a j（自然码的 an）。
+- **预期**：没打字时那里是 ⇧；打出 `xi` 后变成写着「分词」的键（字和 14 键的分词键一样，宽度和位置同 ⇧），点了编码行是 `xi'an`，候选有「西安」，选了框里是「西安」，键又变回 ⇧（字母小写）。双拼下一样：打字时是分词，编码里有分隔，选「西安」上屏。键盘没有闪一下或整个重画（其它键不动）。开着读屏时，打字中摸到这个键念「分词」。
+- **JVM**：`ShiftSeparatorTypedTest.shiftSplitsXianWhilePinyinIsTyped`（真引擎：xi 分词 an 是 xi'an，选西安上屏，分词的位置同 ⇧、读「Syllable separator」，上屏后是 ⇧）、`ShiftSeparatorTypedTest.shiftSplitsOnZiranmasFullKeyboard`（真引擎，自然码：xi 分词 aj，选西安上屏）、`ShiftSeparatorCanvasTest.pinyinTypedSwapsShiftKeepingTheScenes`（打字开始做一次画面，之后来回复用）、`ShiftSeparatorCanvasTest.aFieldsActionAndTheSeparatorReuseTheKeptScenes`（带「发送」的框：回车字样和分词分开变，之后各轮全用留着的画面）；ime-core `ShiftSeparatorTest`、`TextBoardSceneTest.separatingShowsTheSeparatorInShiftsPlace`；设备上截图看打字中的「分词」。
+
+### KB-107 [P1] 分词不动 ⇧ 的状态；英文、码表打字时 ⇧ 不变
+- **前提**：B0（全拼，全键盘）。
+- **操作**：点 ⇧（字母变大写），点 x i，点「分词」，点 a n，点空格；看字母。切到英文打 `he`，看 ⇧ 的位置；切到五笔打 `gg`，看那个位置。
+- **预期**：分词打出 `'`，不是大写的 `"`；上屏后 ⇧ 还亮着（字母大写，下一个字母大写）。英文打字时那里仍是 ⇧（点了下一个字母大写）；五笔打字时那里仍是「拼」键（反查），不是分词。按住 ⇧ 时打出第一个字母（另一指）、在分词上松手：打出分词，⇧ 不变。按住「分词」时上屏（另一指点空格）再松手：打出 `'`，⇧ 还亮着。主题自带全键盘布局（没写分词键）的 ⇧ 一直是 ⇧：打拼音时点它字母变大写，不打 `'`。
+- **JVM**：`ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas`（分词发 `'`、不带 Shift，打完 ⇧ 还开着）、`ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator`（⇧ 上按下、换成分词后松手发 `'`）、`ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce`（打完才松开的分词发 `'`，⇧ 不用掉）、`ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped`（没分词键的主题布局 ⇧ 照旧是 Shift，点、长按都不发 `'`）、`ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce`（主题里发 `'` 的普通键照旧：带 Shift，一次性大写用掉）、`KeyShortcutsHostTest.quickInputRunOpensItAfterWhatIsTyped`（菜单开快速输入先上屏）；ime-core `ShiftSeparatorTest.neverEnglishATableNorZhuyin`；设备上切英文、五笔看一眼。
+
 ### KB-41 [P2] 等长按时已滑出键的下边，弹出后第一下往旁边挪不关掉
 - **前提**：B0。
 - **操作**：长按 q，等弹出时手指往下挪到键的下边外约 3dp；弹出后往右挪约 25dp（不往下）松手。

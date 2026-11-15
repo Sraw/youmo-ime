@@ -67,6 +67,9 @@ class TextKeyboard(
         // the layout its keys are drawn from (lib/keyboard-scene's qwerty.xml)
         private const val LAYOUT = "qwerty"
 
+        // qwerty.xml's 分词 in Shift's place while pinyin is typed
+        private const val SEPARATOR_KEY = "apostrophe"
+
         // the letter the key of [node] types: its send=, one of a–z as the layouts write a letter's (lower case); null for any other key.
         // Not `code:U+0071` (R25r4 F7998): that is a code typed as it is (SceneKeyDef.action, a SymAction), not a letter Shift
         // cases (onAction's HostKeyAction), so no letter key to a glide, a stroke, writing on the keys or the bubble either
@@ -204,6 +207,12 @@ class TextKeyboard(
 
     private var scope: CoroutineScope? = null
 
+    // pinyin or 双拼 typed (ShiftSeparator, from EngineState.syllables as the nine keys' 1): Shift is 分词 meanwhile
+    private var separating = false
+
+    // what 分词 sends, told from any other `'` by identity ([pressed])
+    private val separatorTyped = KeyAction.HostKeyAction(ShiftSeparator.TYPED)
+
     // what the keys show now, as the scene engine's environment: the screen's and the settings' as every
     // keyboard's (SceneEnvs), this one's state, Shift, texts and marks its own
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
@@ -218,6 +227,7 @@ class TextKeyboard(
             langKey = showLangSwitchKey.getValue(),
             holdVoice = holdsToTalk,
             roots = table?.labelled == true,
+            separating = separating,
         )
         val texts = Texts(
             imeName = shownImeName.orEmpty(),
@@ -267,6 +277,7 @@ class TextKeyboard(
         super.onAttachedToWindow()
         scope = CoroutineScope(Dispatchers.Main.immediate + Job()).also { s ->
             s.launch { EngineState.tableKeyboard.collect(::showTable) }
+            s.launch { EngineState.syllables.collect { showSeparator(ShiftSeparator.on(imeName, it.im, it.composing)) } }
         }
     }
 
@@ -373,9 +384,34 @@ class TextKeyboard(
         canvas?.invalidateScene()
     }
 
+    // Shift's place 分词 or Shift again (its state as left): a scene only when that flips, kept ones reused (SceneBoard)
+    private fun showSeparator(on: Boolean) {
+        if (on == separating) return
+        separating = on
+        canvas?.invalidateScene()
+    }
+
     private fun transformPunctuation(p: String) = keysPunctuation.getOrDefault(p, p)
 
+    /**
+     * A tap's action: 分词's ([separatorTyped], whenever it lands), and Shift's tapped as typing began (down while
+     * Shift was drawn, up once 分词 is: the key a finger is on stays the one it went down on, SceneTouch.Pointer) the
+     * same. Only where the scene shows 分词: a theme's or user's qwerty with none keeps its Shift Shift.
+     */
+    override fun pressed(key: KeyRef, clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = when {
+        // 分词's alone: a theme's plain `'` key types as any other key (Shift once used up on it, as in 0.6.0)
+        key.id == SEPARATOR_KEY && action is KeyAction.HostKeyAction && action.act == ShiftSeparator.TYPED -> separatorTyped
+        action is KeyAction.CapsAction && separating && canvas?.shownKeys?.any { it.id == SEPARATOR_KEY } == true -> separatorTyped
+        else -> action
+    }
+
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
+        // the separator as the 14 keys send it, Shift's state neither used up nor changed (nor Shift held with it),
+        // a press that lands once typing has ended too
+        if (action === separatorTyped) {
+            super.onAction(action, source)
+            return
+        }
         var transformed = action
         when (action) {
             is KeyAction.HostKeyAction -> when (source) {
@@ -429,6 +465,8 @@ class TextKeyboard(
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         showInputMethodName(ime)
         imeName = ime.uniqueName
+        // what the engine said last, if of this one (another's typing is none of this one's)
+        EngineState.syllables.value.let { separating = ShiftSeparator.on(imeName, it.im, it.composing) }
         canvas?.invalidateScene()
         // what the engine said last, if of this one: a table's state comes with its first answer
         showTable(EngineState.tableKeyboard.value)

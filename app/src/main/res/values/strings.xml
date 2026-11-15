@@ -1224,7 +1224,7 @@
     <string name="fn_key_lang">Language</string>
     <string name="fn_key_retype">Retype (9 keys)</string>
     <string name="fn_key_zero">0 (9 keys)</string>
-    <string name="fn_key_separator">Separator (14/18 keys)</string>
+    <string name="fn_key_separator">Separator (14/18/26 keys)</string>
     <string name="quick_phrases">Quick input</string>
     <string name="quick_phrases_summary">Long press 符, type the start of a key and pick saved text; with nothing typed, all of it</string>
     <string name="quick_phrases_page_hint">Long press 符 to come here: type the start of a key to pick saved text, or nothing to list it all, like a notebook. For a short code that comes up as you type pinyin, use Custom phrases.</string>

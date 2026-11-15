@@ -368,7 +368,7 @@ class GroupedKeyboard private constructor(
 
     // a tap on a key of two letters as its code with where it fell; a click no touch made (TalkBack),
     // a swipe's, L and M as the code alone
-    override fun pressed(clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = tapped(action, clickAt, letters, leaning, clickDown)
+    override fun pressed(key: KeyRef, clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = tapped(action, clickAt, letters, leaning, clickDown)
 
     // the groups whose taps lean (按落点加权): the layout's lean=, whichever draws the keys, its groups the
     // keyboard's (060-render-v2 §15); a layout of other groups, or none read: as built in (SceneGroups.leaningOf)

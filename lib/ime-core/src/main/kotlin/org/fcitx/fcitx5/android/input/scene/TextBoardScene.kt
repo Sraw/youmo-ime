@@ -46,6 +46,8 @@ data class TextBoardState(
     val holdVoice: Boolean = false,
     /** A table's roots or their names over the letters (TableKeyboard.labelled): `{root:x}` on them. */
     val roots: Boolean = false,
+    /** Pinyin or 双拼 typed (ShiftSeparator.on): 分词 in Shift's place. */
+    val separating: Boolean = false,
 ) {
     fun input(): Input = Input(
         ime = when {
@@ -69,9 +71,10 @@ data class TextBoardState(
         voice = holdVoice,
         holdVoice = holdVoice,
         langKey = langKey,
-        // qwerty.xml asks it only of a table (确定 in Return's place): elsewhere the first key typed and
-        // the word committed would each give a new environment, so a scene made again the same as before
-        composing = composing && table,
+        // qwerty.xml asks it of a table (确定 in Return's place) and of pinyin's and 双拼's (分词 in Shift's): elsewhere
+        // (English's word) the first key typed and the word committed would each give a new environment, so a
+        // scene made again the same as before
+        composing = composing && table || separating,
         lookingUp = lookingUp,
     )
 }

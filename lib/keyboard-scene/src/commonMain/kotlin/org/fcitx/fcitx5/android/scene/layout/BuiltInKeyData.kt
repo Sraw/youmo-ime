@@ -272,6 +272,7 @@ internal object BuiltInKeyData {
             "fn/numbers" to NONE,
             "fn/period" to NONE,
             "fn/return" to Held(menu = listOf(MenuItem("Emoji", "emoji", "picker:"))),
+            "fn/separator" to NONE,
             "fn/shift" to Held(actions = mapOf("double-tap" to "caps:lock")),
             "fn/space" to NONE,
             "fn/symbols" to NONE,

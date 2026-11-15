@@ -63,19 +63,41 @@ class TextBoardSceneTest {
         assertFalse("enter" in typing)
         // composing elsewhere keeps Return
         assertTrue("enter" in keys(TextBoardState(composing = true)))
-        // and is no other environment: the keyboard keeps the scene it had (TextKeyboard.scene)
+        // and is no other environment (English's word): the keyboard keeps the scene it had (TextKeyboard.scene)
         assertEquals(TextBoardState(semicolonScheme = true).input(), TextBoardState(semicolonScheme = true, composing = true).input())
         assertNull(TextBoardState(tableExtra = 'x').input().tableExtra)
     }
 
-    // why input() may drop composing without a table: qwerty.xml asks it nowhere else. Every when= in
-    // it, every other term either way, holds alike composing or not once there is no table
+    // KB-106: pinyin or 双拼 typed, 分词 in Shift's place (as wide, the separator's reading); Return kept, a table's keys
+    // not shown; 分词 never on a table, which has its lookup key there
     @Test
-    fun qwertyAsksComposingOnlyOfATable() {
+    fun separatingShowsTheSeparatorInShiftsPlace() {
+        val typing = keys(TextBoardState(composing = true, separating = true))
+        assertTrue("apostrophe" in typing && "enter" in typing)
+        assertFalse("shift" in typing || "confirm" in typing || "lookup" in typing)
+        assertEquals(keys(TextBoardState()).map { if (it == "shift") "apostrophe" else it }, typing)
+        assertEquals(keys(TextBoardState(semicolonScheme = true)).map { if (it == "shift") "apostrophe" else it }, keys(TextBoardState(semicolonScheme = true, separating = true)))
+        assertFalse("apostrophe" in keys(TextBoardState(table = true, composing = true, separating = true)))
+        assertFalse("apostrophe" in keys(TextBoardState(composing = true)))
+        val env = SceneData.portrait.copy(input = TextBoardState(separating = true).input())
+        val scene = (SceneBuilder(theme, env, SceneData.measurer).build(SceneData.qwerty, emptyMap()) as Parsed.Ok).value
+        val plain = (SceneBuilder(theme, SceneData.portrait.copy(input = TextBoardState().input()), SceneData.measurer).build(SceneData.qwerty, emptyMap()) as Parsed.Ok).value
+        val separator = scene.keys.single { it.id == "apostrophe" }
+        assertEquals(plain.keys.single { it.id == "shift" }.bounds, separator.bounds)
+        assertEquals("分词", separator.label)
+        assertEquals("'", separator.actions["send"])
+        assertEquals("a11y_key_separator", separator.a11y)
+    }
+
+    // why input() may drop composing without a table or pinyin's typing: qwerty.xml asks it of nothing else. Every
+    // when= in it but Shift's and 分词's (ShiftSeparator's own), every other term either way, holds alike composing or
+    // not once there is no table
+    @Test
+    fun qwertyAsksComposingOnlyOfATableAndShift() {
         val layout = SceneData.qwerty
         val conditions = layout.parts.flatMap { part ->
             when (part) {
-                is Row -> listOfNotNull(part.condition) + part.cells.flatMap { cell ->
+                is Row -> listOfNotNull(part.condition) + part.cells.filter { (it as? Key)?.id !in setOf("shift", "apostrophe") }.flatMap { cell ->
                     listOfNotNull(cell.condition) + ((cell as? Key)?.variants?.map { it.condition } ?: emptyList())
                 }
                 is Include -> listOfNotNull(part.condition)

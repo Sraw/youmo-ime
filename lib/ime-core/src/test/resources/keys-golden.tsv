@@ -79,6 +79,10 @@ fn/shift	pinyin-full	default	-	-	-	-
 fn/shift	pinyin-full	zh	-	-	-	-
 fn/shift	pinyin-full	shift	-	-	-	-
 fn/shift	pinyin-full	roots	-	-	-	-
+fn/separator	pinyin-full	default	-	-	-	-
+fn/separator	pinyin-full	zh	-	-	-	-
+fn/separator	pinyin-full	shift	-	-	-	-
+fn/separator	pinyin-full	roots	-	-	-	-
 full/z	pinyin-full	default	| ' Z ` ž ź ż	'	s:'	i:undo
 full/z	pinyin-full	zh	| ‘ Z ` ž ź ż	‘	s:‘	i:undo
 full/z	pinyin-full	shift	| ' z ` Ž Ź Ż	'	s:'	i:undo

@@ -1197,7 +1197,7 @@
     <string name="fn_key_lang">切换输入法</string>
     <string name="fn_key_retype">重输（九键）</string>
     <string name="fn_key_zero">0（九键）</string>
-    <string name="fn_key_separator">分词（14/18 键）</string>
+    <string name="fn_key_separator">分词（14/18/26 键）</string>
     <string name="quick_phrases">快速输入</string>
     <string name="quick_phrases_summary">长按「符」，打关键词的开头挑一段存好的文字；什么都不打时列出全部</string>
     <string name="quick_phrases_page_hint">长按「符」进来，打关键词的开头挑一段存好的文字；什么都不打时列出全部，像翻笔记本。打拼音时顺手出的缩写，用「自定义短语」。</string>

@@ -153,6 +153,28 @@ case("KB-39", needs="jvm:KeyboardUatTest.shiftChangesAllThreeRows")(lambda d: No
 case("KB-41", needs="jvm:KeyboardUatTest.aFirstMoveSidewaysAfterSlippingOffKeepsThePopup")(lambda d: None)
 
 
+@case("KB-106", visual=True)
+def kb106(d):
+    d.open_page("text")
+    d.clear()
+    check("shift" in d.keys(refresh=True) and "分词" not in d.keys(), "没打字时 ⇧ 的位置不是 ⇧")
+    d.type("xi", after=0.6)
+    k = d.keys(refresh=True)
+    check("分词" in k and "shift" not in k, f"打 xi 后 ⇧ 的位置没变成分词：{sorted(k)}")
+    d.shot("kb", "打 xi 时 ⇧ 的位置是分词")
+    d.tap(k["分词"], after=0.4)
+    d.type("an", after=0.8)
+    pre = d.preedit()
+    check(pre.replace(" ", "'") == "xi'an", f"xi 分词 an 的编码行是「{pre}」，不是 xi'an")
+    d.pick("西安")
+    d.expect_field("西安")
+    check("shift" in d.keys(refresh=True), "上屏后没变回 ⇧")
+    return f"编码行「{pre}」，上屏「西安」"
+
+
+case("KB-107", needs="jvm:ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas、ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator、ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce、ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped、ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce、KeyShortcutsHostTest.quickInputRunOpensItAfterWhatIsTyped")(lambda d: None)
+
+
 case("KB-42", needs="jvm:StrokeUatTest.aStrokeDrawnWhilePinyinIsTypedIsSentAsOneTheKeysNone、StrokeUatTest.theNineAndFourteenKeysSendAStrokeToo、StrokeUatTest.aStrokeStartsInTheSplitGapTooATapOrAGlideThereDoNothing、StrokeUatTest.aSecondFingerOnALetterWhileOneRestsInTheGapTypesIt、StrokeUatTest.aStrokeFromTheGapCancelledSendsNothingAndLeavesNoTrail、StrokeUatTest.noOtherLayoutHasAGap、StrokeUatTest.theSweepFindsTheSplitGap")(lambda d: None)
 
 

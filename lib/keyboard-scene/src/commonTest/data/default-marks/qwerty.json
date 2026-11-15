@@ -39,6 +39,8 @@
   "full/l:down": {},
   "fn/shift:up": {},
   "fn/shift:down": {},
+  "fn/separator:up": {},
+  "fn/separator:down": {},
   "full/z:up": {"symbol": "'"},
   "full/z:down": {"icon": "undo"},
   "full/x:up": {"symbol": ":"},

@@ -372,6 +372,17 @@ class KeyShortcutsHostTest {
         assertEquals("", preedit)
     }
 
+    // 快速输入 run by the runner (a menu's, not a key's swipe) as the others open it: what is typed put in first, not
+    // left as the keyword's start (where the full keyboard's Shift would still be 分词)
+    @Test
+    fun quickInputRunOpensItAfterWhatIsTyped() {
+        start()
+        type("nihao")
+        KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}) { true }.run(KeyShortcut.Command(KeyCommand.QuickInput))
+        until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
+        assertEquals("", preedit)
+    }
+
     // 滑选 on q: up past the threshold, then sideways to each of [dxs] (dp from the key's middle; a
     // character each 10 dp, the backspace's selection's step), lifted at the last
     private fun swipeSelect(vararg dxs: Float, on: ShownKey? = null, then: (Int) -> Unit = {}) {

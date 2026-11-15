@@ -369,6 +369,15 @@ the corner; 仓颉's by default, 五笔's 键名 or all its roots as its page sa
 the key's bubble kept inside the keyboard (`rootsOf`), and its 拼 key (`LookUpKey`, two keys, the one
 shown dark while `lookingUp`) in Shift's place, sending `Keyboard.LOOKUP`. While a code is typed
 (`ReturnKeyAppearance.composing`) 确定 (`ConfirmKey`, Return's action) stands in Return's place.
+While pinyin or 双拼 is typed (0.6.1, ime-core `ShiftSeparator.on`: the keyboard's input method's own answer in
+`EngineState.syllables`, as the nine keys' 1) 分词 stands in Shift's place: qwerty.xml's `apostrophe` key (the 14 keys'
+label, reading and `separator` swipes, sending `'`), `TextBoardState.separating`; `TextKeyboard.showSeparator` asks a
+scene only when that flips. 分词's own `'` (`TextKeyboard.pressed`: the `apostrophe` key's tap, told from then on by identity; a theme's plain `'` key types as any key, Shift once used up) is sent untouched, Shift's
+state neither used nor changed, even when its press lands after typing ended (a finger keeps the key it went down on,
+SceneTouch's Pointer), so typing done Shift is back as it was left. A tap that went down on Shift before the swap and is
+lifted on 分词 is 分词's too, only where the scene shows the `apostrophe` key: a theme's or user's qwerty without it keeps
+its Shift Shift (drawn, read, tapped, locked and swiped as ever). 快速输入 run from a shortcut or menu
+(`KeyShortcutRunner`) commits what is typed first, as 符's long press does, so its keyword never starts on pinyin.
 The keyboard's height (0.6.1, 061-landscape-height): upright the level's percent of the screen's height; 横屏 four rows
 of the level's dp (`KeyboardSizes.heightPx`, `KeyboardHeightLevels.landscapeRowDp`: a phone's 34/41/48/54/59, a large
 screen's 48/52/56/60/64, a value between two levels between their rows), a large screen one whose display's short
@@ -663,10 +672,12 @@ method only, dark, flat; one-handed and dock FULL, InputView having placed the k
 which each of its show functions calls. It is made again only when what it is made of changed: the
 same theme, layout and measurer (by identity: `SceneThemes`, `SceneLayouts` keep theirs a process)
 and an equal `Env` return the last scene, which the view then neither records nor tells TalkBack
-again. `composing` reaches the `Input` only with a table (qwerty.xml asks it of nothing else) and on
+again. `composing` reaches the `Input` only with a table, while pinyin or 双拼 is typed (分词 in Shift's place;
+qwerty.xml asks it of nothing else), and on
 注音九键, its slot's typing (`ZhuyinKeyboard.typing`: the engine's, or a group or symbol just sent to pinyin, not a
 tone; `showTyping` calls `invalidateScene()`; zhuyin-nine.xml's `r4c4` variant), so
-pinyin's first key and its committed word make no scene elsewhere; in a field with an action, Return's label
+English's first key and its committed word make no scene (pinyin's typing makes one on its first key and its end,
+kept after: `SceneBoard`'s last four); in a field with an action, Return's label
 changing with the composing (Done to Enter) still does. `AndroidTextMeasurer` keeps the last 512
 texts it measured (text, font, weight, size, letter spacing: `Paint.letterSpacing`), so a scene made again measures only what is new.
 A text's `text-shadow` and `stroke` (060-render-p3 T4a) `ScenePainter` draws under its fill: the shadow (the glyphs
