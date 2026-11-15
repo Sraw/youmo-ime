@@ -46,6 +46,9 @@ class FloatingPlacer(private val parent: View, private val view: View, private v
     /** Told true as a drag goes into the docking zone, false as it leaves it or ends. */
     var onZone: (Boolean) -> Unit = {}
 
+    /** Told as it is placed ([place]): laid out, dragged, its insets changed. */
+    var onPlaced: () -> Unit = {}
+
     private val location = IntArray(2)
 
     /** The height it moves in, px, from [topInset] down. */
@@ -56,6 +59,7 @@ class FloatingPlacer(private val parent: View, private val view: View, private v
         val (left, top) = FloatingKeyboard.place(spot, view.width.toFloat(), view.height.toFloat(), parent.width.toFloat(), room)
         view.translationX = left - view.left
         view.translationY = top + topInset - view.top
+        onPlaced()
     }
 
     /** Moved by [dx], [dy], within the screen. */

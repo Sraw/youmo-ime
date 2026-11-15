@@ -167,4 +167,16 @@ class ToolbarConfigTest {
         assertEquals(Layout(listOf(Undo, Emoji, Voice, Hide, Theme, More), emptyList()), config.layout(everything, 0))
         assertEquals(Layout(listOf(Undo, Emoji, Voice, Hide, Theme, More), emptyList()), config.layout(everything, -1))
     }
+
+    // every cell on the open bar as wide (the user's call, 2026-11-15): the menu key, the toolbar's and the right's share
+    // the bar, each no wider than a bar button, no narrower than the least (scrolled past that)
+    @Test
+    fun theOpenBarsCellsShareItsWidthBetweenTheLeastAndAButtonsOwn() {
+        val layout = Layout(listOf(Undo, Redo, CursorMove, Clipboard, More), listOf(Emoji, Handwriting, Voice, Hide))
+        assertEquals("room for all at a button's own", 110, layout.cellPx(1200, 110, 77))
+        assertEquals("squeezed alike, ten cells", 82, layout.cellPx(825, 110, 77))
+        assertEquals("no narrower than the least", 77, layout.cellPx(700, 110, 77))
+        assertEquals("not laid out yet", 110, layout.cellPx(0, 110, 77))
+        assertEquals("nothing but the menu key and the right's", 50, Layout(emptyList(), listOf(Emoji)).cellPx(100, 110, 20))
+    }
 }

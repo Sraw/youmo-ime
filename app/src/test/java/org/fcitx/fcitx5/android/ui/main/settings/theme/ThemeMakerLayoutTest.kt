@@ -473,6 +473,8 @@ class ThemeMakerLayoutTest {
                 tint(v)?.let { putColor(it) }
                 // drawn turned this many degrees about its middle
                 v.rotation.roundToInt().takeIf { it % 360 != 0 }?.let { put("rot", it) }
+                // drawn mirrored left to right (the floating strip's resize arrow where it grows up and left)
+                if ((v as? FloatingHandle.MirroredIcon)?.mirrored == true) put("flip", true)
             }
         }
     }

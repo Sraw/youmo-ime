@@ -126,7 +126,16 @@ data class ToolbarConfig(val items: List<Item>) {
     }
 
     /** [toolbar] in the middle when it is opened, [pinned] at the right, after the middle. */
-    data class Layout(val toolbar: List<ToolbarButton>, val pinned: List<ToolbarButton>)
+    data class Layout(val toolbar: List<ToolbarButton>, val pinned: List<ToolbarButton>) {
+        /**
+         * Each button's cell on the bar with the toolbar open, px: the menu key's, the toolbar's and the right's alike,
+         * so they all stand evenly apart (the user's call, 2026-11-15): the bar's [rowPx] shared among them, no wider
+         * than [widestPx] (a bar button's own width: the room past that left after the toolbar), no narrower than
+         * [narrowestPx] (the toolbar scrolled past that). Not laid out yet ([rowPx] 0), [widestPx].
+         */
+        fun cellPx(rowPx: Int, widestPx: Int, narrowestPx: Int): Int =
+            if (rowPx <= 0) widestPx else (rowPx / (1 + toolbar.size + pinned.size)).coerceIn(narrowestPx, maxOf(narrowestPx, widestPx))
+    }
 
     companion object {
         const val DIVIDER = "|"

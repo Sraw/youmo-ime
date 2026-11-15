@@ -381,6 +381,12 @@ def lc24(d):
     d.type("hao")
     d.cands()
     d.space()
+    # a commit is judged 800 ms after it (CommitCheck.WAIT_MS); the screen turned back sooner restarts input in
+    # the field, which ends the wait unjudged (specs/pitfalls.md): a person does not turn it back that fast
+    try:
+        d.wait(lambda s: s.find(contains="没写进去", where="ime"), 1.5, step=0.3, what="没写进去")
+    except Blocked:
+        pass
     # read back in portrait: in landscape the keyboard leaves the page a strip about 40 px tall, the field under the
     # keyboard unless the page happened to scroll it into that strip, and a field not shown is not in the dump
     # (None, half the runs). The focused field, else the page's first, polled: a rebuilt page's field may not be focused

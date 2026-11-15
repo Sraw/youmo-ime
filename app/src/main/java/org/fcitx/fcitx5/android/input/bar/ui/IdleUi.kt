@@ -192,6 +192,23 @@ class IdleUi(
         val size = ctx.dp(KawaiiBarComponent.heightDp(ctx))
         val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
         layout.pinned.forEach { pinnedBar.addView(button(it), LinearLayout.LayoutParams(buttonWidth, size)) }
+        sizeCells()
+    }
+
+    // the toolbar open, every button's cell the same (ToolbarConfig.Layout.cellPx), the menu key's and the right's too,
+    // so all stand evenly apart, squeezed alike where the bar is narrow (the floating keyboard's); shut, a bar button's
+    // own width, the right's no narrower than a finger's target for a toolbar not open
+    private fun sizeCells() {
+        val layout = arranged ?: return
+        val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
+        val cell = if (currentState != Display.Toolbar) buttonWidth else layout.cellPx(idleBody.width, buttonWidth, ctx.dp(ButtonsBarUi.MIN_SIZE))
+        buttonsUi.cellPx = cell
+        (listOf<View>(menuButton) + (0 until pinnedBar.childCount).map(pinnedBar::getChildAt)).forEach {
+            if (it.layoutParams.width != cell) {
+                it.layoutParams.width = cell
+                it.requestLayout()
+            }
+        }
     }
 
     // what the bar shows with nothing else to: the address suggestions (AddressStrip), when there are
@@ -339,7 +356,12 @@ class IdleUi(
         add(idleBody, lParams(matchParent, matchParent))
         add(numberRow, lParams(matchParent, matchParent))
         addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
-            if (right - left != oldRight - oldLeft) layoutFor?.let { f -> post { place(f(roomForPinned(width))) } }
+            if (right - left != oldRight - oldLeft) layoutFor?.let { f ->
+                post {
+                    place(f(roomForPinned(width)))
+                    sizeCells()
+                }
+            }
         }
     }
 
@@ -461,6 +483,7 @@ class IdleUi(
             popup.dismissAll()
         }
         currentState = state
+        sizeCells()
         layOutWork()
         updateMenuButtonContentDescription()
         updateMenuButtonIcon(instant = !fromUser)

@@ -24,7 +24,7 @@ object BarIcons {
         ExpandMore, ExpandLess, Undo, Redo, CursorMove, Clipboard, MoreHoriz, TagFaces, Voice, ArrowDropDown,
         ChttransTrad, ChttransSimp, OpenWith, PanTool, ViewPrivate, DeleteSweep, Palette, Language, Dialpad,
         Keyboard, QuickPhrase, Handwriting, Close, OpenInFull, PuncActive, PuncInactive, FullwidthActive,
-        FullwidthInactive, PredictionActive, PredictionInactive, Settings, Backspace, ArrowPrev, ArrowNext, AspectRatio,
+        FullwidthInactive, PredictionActive, PredictionInactive, Settings, Backspace, ArrowPrev, ArrowNext, VerticalAlignBottom,
     }
 
     /** A place's icon: the theme's of [name] where it has one, else [fallback]. */
@@ -67,14 +67,14 @@ object BarIcons {
     val CANDIDATES_COLLAPSE = Icon("candidates-collapse", Fallback.ExpandLess)
     val PREDICTIONS_CLOSE = Icon("predictions-close", Fallback.Close)
 
-    /** The floating keyboard's strip: back to the bottom. */
-    val FLOATING_DOCK = Icon("floating-dock", Fallback.OpenInFull)
+    /** The floating keyboard's strip: back to the bottom. No diagonal: [FLOATING_RESIZE]'s is one, at the other end. */
+    val FLOATING_DOCK = Icon("floating-dock", Fallback.VerticalAlignBottom)
 
     /**
-     * The floating keyboard's strip, at its left end: dragged, the keyboard resized (061-floating-resize). Not a
-     * diagonal arrow: [FLOATING_DOCK]'s is one, at the other end.
+     * The floating keyboard's strip, at its left end: dragged, the keyboard resized (061-floating-resize). A diagonal
+     * double arrow, ⤢ as drawn: mirrored (⤡) where the keyboard grows up and left (the user's choice, 2026-11-15).
      */
-    val FLOATING_RESIZE = Icon("floating-resize", Fallback.AspectRatio)
+    val FLOATING_RESIZE = Icon("floating-resize", Fallback.OpenInFull)
 
     /** One-handed, the empty side's button: the whole width again. */
     val ONE_HANDED_EXIT = Icon("one-handed-exit", Fallback.OpenInFull)

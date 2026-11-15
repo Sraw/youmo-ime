@@ -902,7 +902,7 @@ test('the measured layout and icons have what the preview draws', () => {
     if (e.al !== undefined) assert.ok(['l', 'c', 'r'].includes(e.al) && Number.isFinite(e.x), JSON.stringify(e));
     // a is an alpha only
   };
-  const icon = (e) => { box(e.r); color(e.c); assert.ok(icons[e.i], e.i); assert.ok(e.rot === undefined || Number.isFinite(e.rot)); };
+  const icon = (e) => { box(e.r); color(e.c); assert.ok(icons[e.i], e.i); assert.ok(e.rot === undefined || Number.isFinite(e.rot)); assert.ok(e.flip === undefined || e.flip === true); };
   for (const v of layout.views) {
     assert.ok(phones.has(v.phone), v.phone);
     assert.ok(['normal', 'one-handed', 'floating'].includes(v.mode), v.mode);

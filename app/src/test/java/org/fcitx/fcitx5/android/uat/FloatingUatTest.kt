@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.floating.FloatingHandleSide
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
@@ -305,7 +306,7 @@ class FloatingUatTest {
 
     // ------------------------------------------------------------------ resized (061-floating-resize)
 
-    private fun resizer(): View = checkNotNull(KeyboardHarness.find<FloatingHandle>(h.inputView)!!.resizeButton).also { check(h.shown(it)) }
+    private fun resizer(): FloatingHandle.MirroredIcon = checkNotNull(KeyboardHarness.find<FloatingHandle>(h.inputView)!!.resizeButton).also { check(h.shown(it)) }
 
     // the resize button dragged along the keyboard's diagonal, out (left and down, or left and [up] as it grows up) by
     // [by] of it, in for less than 0
@@ -393,6 +394,42 @@ class FloatingUatTest {
         assertTrue("bigger: $first -> ${h.widthDp()}", h.widthDp() > first * 1.08f)
         assertEquals("its top right stays: $at -> $now", at.right.toFloat(), now.right.toFloat(), 2f)
         assertEquals("its top right stays: $at -> $now", at.top.toFloat(), now.top.toFloat(), 2f)
+    }
+
+    // the resize button's ⤢ drawn mirrored, as ⤡
+    private fun mirrored() = resizer().mirrored
+
+    // the resize button's arrow along the way it grows now, set as it is placed, dragged or resized (the user's call,
+    // 2026-11-15): at the bottom, where it first floats, up and left (⤡: mirrored); up mid-screen down and left (⤢)
+    @Test
+    @Uat("TB-58")
+    fun theResizeArrowPointsTheWayItGrows() {
+        prefs.setStyle(KeyboardStyle.FLOATING)
+        h.start()
+        assertTrue("at the bottom: ⤡", mirrored())
+        h.upFromTheBottom()
+        assertFalse("mid-screen: ⤢", mirrored())
+        h.resize(0.05f)
+        assertFalse("resized, still mid-screen: ⤢", mirrored())
+        // as it is dragged: down to the lowest, the finger still down (lifted there it docks)
+        val g = h.box(grip())
+        h.drag(grip(), g.exactCenterX(), screenH.toFloat(), lift = false)
+        assertTrue("dragged down to the bottom: ⤡", mirrored())
+    }
+
+    // the strip on top, the mirror of it: at the bottom up and left (⤡), at the top down and left (⤢)
+    @Test
+    @Uat("TB-58")
+    fun theResizeArrowWithTheStripOnTop() {
+        prefs.setStyle(KeyboardStyle.FLOATING)
+        prefs.set(ThemeManager.prefs.floatingHandle, FloatingHandleSide.Top)
+        h.start()
+        assertTrue("at the bottom: ⤡", mirrored())
+        val g = h.box(grip())
+        h.drag(grip(), g.exactCenterX(), 0f)
+        h.after(500)
+        h.relayout()
+        assertFalse("at the top: ⤢", mirrored())
     }
 
     @Test
@@ -523,6 +560,13 @@ class FloatingUatTest {
             h.after(1000)
             h.relayout()
         }
+        h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
+        h.relayout()
+        // every cell as wide, the toolbar's squeezed as the menu key and the right's are (the user's call, 2026-11-15):
+        // what is left over no more than the rounding, one px a cell
+        val cells = ToolbarSpacingUatTest.barCells(h)
+        ToolbarSpacingUatTest.assertEvenlyApart(cells, bigGapAfter = cells.indexOfFirst { it.first == h.service.getString(R.string.status_area) }, gap = cells.size)
+        assertTrue("squeezed: $cells", cells[0].second.width() < KawaiiBarComponent.buttonWidthDp(h.service) * dp)
         moreInView("300 dp")
         h.resize(-1f, up = true)
         assertEquals(FloatingKeyboard.MIN_RESIZE_DP.toFloat(), h.widthDp(), 1f)

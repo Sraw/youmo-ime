@@ -126,7 +126,10 @@ class FloatingController(
         }
         FloatingCorners.frame(keyboard, ::cornerPx, SceneWindow.px(context, frame.elevationDp), frame.shadowColor?.value)
         frame.border?.let { FloatingCorners.border(keyboard, SceneWindow.px(context, it.widthDp), it.color.value, ::cornerPx) }
-        placer = FloatingPlacer(root, keyboard, screenBuilt.landscape).also { it.onZone = ::showDockMark }
+        placer = FloatingPlacer(root, keyboard, screenBuilt.landscape).also {
+            it.onZone = ::showDockMark
+            it.onPlaced = ::showGrowth
+        }
         keyboard.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> laidOut() }
     }
 
@@ -272,7 +275,7 @@ class FloatingController(
         val h = keyboard.height.toFloat()
         val roomTop = placer.topInset.toFloat()
         val roomBottom = roomTop + placer.room
-        growsDown = FloatingKeyboard.growsDown(handleAtBottom, top, top + h, roomTop, roomBottom)
+        growsDown = growsDown(placer)
         stayX = left + w
         stayY = if (growsDown) top else top + h
         barsPx = h - size.keysHeightPx
@@ -286,6 +289,20 @@ class FloatingController(
         startDp = size.widthDp
         resizedDp = size.widthDp
         limit = r.limit(size.widthDp)
+    }
+
+    // whether a resize begun now grows it down (FloatingKeyboard.growsDown), where it is now
+    private fun growsDown(placer: FloatingPlacer): Boolean {
+        val top = keyboard.top + keyboard.translationY
+        val roomTop = placer.topInset.toFloat()
+        return FloatingKeyboard.growsDown(handleAtBottom, top, top + keyboard.height, roomTop, roomTop + placer.room)
+    }
+
+    // the resize button's arrow the way it grows now: as it is placed (laid out, dragged, its insets changed) and as a
+    // resize ends, not while one is under way (the way it grows is set as it begins)
+    private fun showGrowth() {
+        val placer = placer ?: return
+        if (resize == null) handle?.showGrowth(growsDown(placer))
     }
 
     // at [dp] wide, laid out anew: the keys' scene made again at the size (their text and marks with it), the bars only
@@ -317,6 +334,7 @@ class FloatingController(
         } else {
             FloatingStore.resizing(screenBuilt.landscape, null)
         }
+        showGrowth()
         // a frame drawn: the floating code strip, hidden while resized, shows again on one (InputView)
         keyboard.invalidate()
     }

@@ -386,6 +386,18 @@ class BarIconsThemeTest {
         val handle = FloatingHandle(ctx, mine, FloatingHandleSide.Top, FloatingHandle.Mode.Floating({ _, _ -> }, {}, {}, NoResize))
         assertTrue(handle.dockDrawable.themed)
         assertTrue((handle.resizeButton as ImageView).drawable.themed)
+        // growing up and left, the theme's own drawn mirrored as the app's is (⤢ as ⤡)
+        handle.showGrowth(down = false)
+        assertTrue(handle.resizeButton!!.mirrored && handle.resizeButton!!.drawable.themed)
+        // drawn mirrored: the left half of its picture is the right half's turned over
+        val b = android.graphics.Bitmap.createBitmap(56, 24, android.graphics.Bitmap.Config.ARGB_8888)
+        handle.resizeButton!!.apply { layout(0, 0, 56, 24); background = null; draw(android.graphics.Canvas(b)) }
+        val straight = android.graphics.Bitmap.createBitmap(56, 24, android.graphics.Bitmap.Config.ARGB_8888)
+        handle.showGrowth(down = true)
+        assertFalse(handle.resizeButton!!.mirrored)
+        handle.resizeButton!!.draw(android.graphics.Canvas(straight))
+        assertTrue("drawn at all", (0 until 56).any { x -> (0 until 24).any { y -> straight.getPixel(x, y) != 0 } })
+        assertTrue("mirrored", (0 until 56).all { x -> (0 until 24).all { y -> b.getPixel(x, y) == straight.getPixel(55 - x, y) } })
         assertFalse(FloatingHandle(ctx, pack("undo"), FloatingHandleSide.Top, FloatingHandle.Mode.Floating({ _, _ -> }, {}, {}, NoResize)).dockDrawable.themed)
     }
 

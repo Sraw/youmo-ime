@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.floating
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -110,7 +111,7 @@ class FloatingHandle(
     // moves, the opposite one stays), as wide as the dock button: with the grip's touch between, 232 of the 260 dp it
     // can shrink to (061-floating-resize §2.4)
     private val resizer = (mode as? Mode.Floating)?.resize?.let { resize ->
-        ImageView(context).apply {
+        MirroredIcon(context).apply {
             background = borderlessRippleDrawable(theme.keyPressHighlightColor)
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             contentDescription = context.getString(R.string.floating_keyboard_resize)
@@ -205,13 +206,42 @@ class FloatingHandle(
         }
     }
 
+    /** An icon drawn [mirrored] left to right or not, its background (the ripple) as it is: the resize button's ⤢ as ⤡. */
+    @SuppressLint("AppCompatCustomView")
+    class MirroredIcon(context: Context) : ImageView(context) {
+        var mirrored = false
+            set(value) {
+                if (value == field) return
+                field = value
+                invalidate()
+            }
+
+        override fun onDraw(canvas: Canvas) {
+            if (!mirrored) return super.onDraw(canvas)
+            val at = canvas.save()
+            canvas.scale(-1f, 1f, width / 2f, height / 2f)
+            super.onDraw(canvas)
+            canvas.restoreToCount(at)
+        }
+    }
+
+    /**
+     * The resize button's arrow along the diagonal the keyboard grows on now ([FloatingKeyboard.growsDown]), told as it
+     * is placed, dragged or resized, so it is right before the next touch: ⤢ as it grows [down] and left, mirrored to ⤡
+     * as it grows up and left: a theme's `floating-resize` mirrored the same. The image mirrored as drawn, not the view:
+     * a mirrored view's touches come mirrored too (rawX with them on Android 10), which would turn the resize around.
+     */
+    fun showGrowth(down: Boolean) {
+        resizer?.mirrored = !down
+    }
+
     /** The dock button's icon as drawn now (null: none, or the theme's not read yet). */
     @get:VisibleForTesting
     internal val dockDrawable: Drawable? get() = dock?.drawable
 
     /** The resize button (null docked). */
     @get:VisibleForTesting
-    internal val resizeButton: View? get() = resizer
+    internal val resizeButton: MirroredIcon? get() = resizer
 
     // raw (screen) places: the handle moves with the keyboard under the finger
     @SuppressLint("ClickableViewAccessibility")

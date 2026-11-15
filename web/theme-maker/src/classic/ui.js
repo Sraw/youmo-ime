@@ -531,7 +531,9 @@
     const fill = colorOf(e);
     // rot: the view turned about its middle (the bar's menu arrow is expand_more at -90°)
     const turn = e.rot ? `rotate(${e.rot} ${(l + r) / 2} ${(t + b) / 2}) ` : '';
-    return s('g', { transform: `${turn}translate(${(l + r) / 2 - (ic.vw * k) / 2},${(t + b) / 2 - (ic.vh * k) / 2}) scale(${k})` },
+    // flip: drawn mirrored left to right (the floating strip's resize arrow where the keyboard grows up and left)
+    const flip = e.flip ? `translate(${l + r} 0) scale(-1 1) ` : '';
+    return s('g', { transform: `${turn}${flip}translate(${(l + r) / 2 - (ic.vw * k) / 2},${(t + b) / 2 - (ic.vh * k) / 2}) scale(${k})` },
       ic.paths.map((p) => s('path', {
         d: p.d, transform: p.transform, 'fill-rule': p.rule === 'evenodd' ? 'evenodd' : undefined,
         fill: p.stroke ? 'none' : fill, stroke: p.stroke ? fill : undefined, 'stroke-width': p.stroke, opacity: p.alpha,

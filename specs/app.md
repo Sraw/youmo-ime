@@ -35,7 +35,7 @@ kept; Escape's reset lost them, and the context told again after it had English 
 bar) and, given the situation (not a password, chttrans offered, one-handed
 offered, the input method with keyboards to pick from: `KeyboardPicker` through `PanelActions.chooseKeyboard`, the ⋯ panel's 键盘 too) and how many fit at the right, says which go on the opened toolbar (⋯ fixed at its end,
 the right's overflow before it) and which at the right; `IdleUi.arrange` places them, again as the
-bar's width changes. The ⋯ panel's own actions live in `PanelActions`, called by
+bar's width changes. Open, every button's cell is `ToolbarConfig.Layout.cellPx` (the menu key's, the toolbar's, ⋯'s and the right's alike, so all stand evenly apart; the bar shared among them, a bar button's width at most, 28 dp at least, scrolled past that; the room left over after ⋯); shut, the menu key and the right's are a bar button's width. The ⋯ panel's own actions live in `PanelActions`, called by
 `StatusAreaWindow` and the bar's buttons alike. A new panel entry that should be a button too is a
 `ToolbarButton`, its `ToolbarButtonLooks`, its icon in `BarIcons.of` (a name a theme may replace; `Icons.TOOLBAR` if new), its action in `PanelActions`, and an `on(…)` line in
 `KawaiiBarComponent`.
@@ -535,7 +535,7 @@ page's preview bar (its base and height, of the theme shown) are the theme's `ba
 Floating (the style 悬浮, the status area's 悬浮键盘; the input view is made anew for
 it): `keyboardView` is `KeyboardArea.floatingSize(s).widthDp` wide (by default `FloatingKeyboard.widthDp`, 70% of the
 screen, 300–420 dp, its boards as much shorter, 85% at least), with `FloatingHandle` at the bottom (24 dp: the resize
-button, a short bar and the dock button;
+button, a short bar and the dock button, an arrow down to a bar (`floating-dock`), no diagonal;
 `ThemePrefs.floatingHandle` puts it on top, the view made anew). The dock button is 56×24 dp, a
 smaller touch target than 48 dp, traded for a thin handle (review R11). The view is clipped to rounded corners
 with a shadow (`FloatingCorners`; users asked for both). Frame and handle are the theme's `frame` and
@@ -565,7 +565,9 @@ the bottom), a buzz under 按键振动, and let go there it docks: only a real l
 (`FloatingController.screenBuilt`).
 
 Resized (061-floating-resize; the user's choices: all of it in proportion, the bars only wider; each shape its own):
-the strip's left button (`floating-resize`, 56×24 dp like the dock button) dragged along the keyboard's diagonal
+the strip's left button (`floating-resize`, 56×24 dp like the dock button, a diagonal double arrow: ⤢ as it grows
+down, its image mirrored to ⤡ as it grows up, `FloatingHandle.showGrowth`, told by `FloatingController` as it is
+placed, dragged and a resize ends; the image, not the view, as a mirrored view's touches come mirrored) dragged along the keyboard's diagonal
 resizes it about a right corner (`FloatingKeyboard.Resize`; the top one, growing down, with the strip at the
 bottom, the bottom one with it on top, but the other way touching the room's edge on the strip's side, where it
 first floats, so it can grow at all: `FloatingKeyboard.growsDown`; ime-core: the move's projection on the diagonal,

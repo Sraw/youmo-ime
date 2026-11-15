@@ -131,7 +131,7 @@
 
 ### LC-24 [P1] 输入框里打拼音时转屏
 - **前提**：B-IF，在「普通文本」框点 n i h a o。
-- **操作**：转成横屏，键盘收起了就点框；点 h a o 空格；转回竖屏。
+- **操作**：转成横屏，键盘收起了就点框；点 h a o 空格；停约 1 秒再转回竖屏。
 - **预期**：框里最后是「好」或者「ni hao好」（输入法自己重启输入时证明后拿走；应用重建了框就留下），不会少字、不会多出别的字母；转屏后打字正常。转屏时网页丢了焦点的那几次（键盘几乎盖满网页，API 36 模拟器上 5 次里约 3 次）：空格后框里没有「好」，键盘上方那一行写着「没写进去：好，点一下输入框」；点一下框、再点这一行，「好」进框，这一行消失（LC-36）。
 - **JVM**：`CodeInFieldUatTest.theScreenTurnedTakesTheCodeAwayProvenOurs`（输入法自己的重启：拿走）；`CodeInFieldUatTest.aScreenTheAppMakesAnewHasTheCodeLeftAsTextInTheNewField`（应用重建界面，先关旧连接，新框带着旧文字开始输入：「ni」留下，之后的拼音接着进新框）；`CommitKeptUatTest.theCodeInTheFieldWhenTheFieldDropsItsWritesAfterATurnIsKeptAndWrittenByATapOnItsLine`（转屏后框收了写入却不照办：编码改到小条，上屏的字留在键盘上，点那一行写进去）。
 
