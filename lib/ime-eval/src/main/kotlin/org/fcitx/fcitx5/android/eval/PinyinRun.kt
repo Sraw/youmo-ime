@@ -60,6 +60,8 @@ class PinyinRun(
     merged: DictionaryFile? = null,
     /** [merged] compiled against another base dictionary, as after an app update till the recompile. */
     mergedStale: Boolean = false,
+    /** Words typed before the run ([TypedHistory]'s lines), counted as the user's: what a 双拼 key read alone reads. */
+    typed: List<String>? = null,
 ) {
     // the user model is read only when scoring, by then made
     private val prior: LayerPrior? = layers?.let { spec ->
@@ -70,7 +72,7 @@ class PinyinRun(
         }
         LayerPrior.parse(data.layers, spec, listOfNotNull(pack?.layer), extra)
     }
-    private val user: UserModel? = if (pack == null && merged == null) {
+    private val user: UserModel? = if (pack == null && merged == null && typed == null) {
         null
     } else {
         UserModel(data.dictionary, data.vocabulary, index = data.wordIndex, merged = merged, mergedStale = mergedStale).also { u ->
@@ -78,6 +80,7 @@ class PinyinRun(
                 val layer = prior?.layer(p.layer) ?: 1
                 p.words.forEach { u.list(it.entry, it.score, layer, data.model.vocabularySize) }
             }
+            typed?.let { TypedHistory.count(u, data, it) }
         }
     }
     // as the app's session has them

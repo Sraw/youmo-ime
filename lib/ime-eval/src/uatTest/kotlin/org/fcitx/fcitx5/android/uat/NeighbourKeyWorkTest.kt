@@ -14,8 +14,10 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.eval.Sample
 import org.fcitx.fcitx5.android.eval.TouchSim
+import org.fcitx.fcitx5.android.eval.TypedHistory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -46,15 +48,21 @@ class NeighbourKeyWorkTest {
         }
     }
 
-    private fun decoder() = UatEngines.pinyinData.let { PinyinDecoder(it.dictionary, it.vocabulary, WordScorer.of(it.model), extensions = { extensions }) }
+    private fun decoder(user: UserModel? = null) = UatEngines.pinyinData.let { PinyinDecoder(it.dictionary, it.vocabulary, WordScorer.of(it.model), user = user, extensions = { extensions }) }
+
+    // a user who typed the [HISTORY] likeliest words: 双拼 reads a key alone only for the words typed, and
+    // with none typed a key takes so little that the slips' few arcs are more than a tenth of it
+    private val typed by lazy {
+        UatEngines.pinyinData.let { data -> UserModel(data.dictionary, data.vocabulary, index = data.wordIndex).also { TypedHistory.count(it, data, TypedHistory.likeliest(data, HISTORY)) } }
+    }
 
     private fun describe(d: Decoding) = (d.sentences + listOf(null) + d.words).map { c -> c?.let { "${it.text} ${it.end} ${it.score} ${it.words.toList()}" } }
 
     // each of [inputs] tapped cleanly on [board], a key at a time on one decoder: what a key took, arcs and scored words
-    private fun type(inputs: List<String>, board: String, segment: (String, Array<Touch?>?) -> SyllableGraph, placed: Boolean): Pair<Double, Double> {
+    private fun type(inputs: List<String>, board: String, segment: (String, Array<Touch?>?) -> SyllableGraph, placed: Boolean, user: UserModel? = null): Pair<Double, Double> {
         val tapped = TouchSim.convert(inputs.map { Sample(it, it, "") }, "$board:s0.2:clean")
         assertEquals(inputs.size, tapped.size)
-        val kept = decoder()
+        val kept = decoder(user)
         var arcs = 0L
         var scored = 0L
         var keys = 0
@@ -68,7 +76,7 @@ class NeighbourKeyWorkTest {
                 arcs += kept.work.arcs
                 scored += kept.work.scored
                 keys++
-                assertEquals(s.input.substring(0, length), describe(decoder().decode(graph)), read)
+                assertEquals(s.input.substring(0, length), describe(decoder(user).decode(graph)), read)
             }
         }
         return arcs.toDouble() / keys to scored.toDouble() / keys
@@ -92,8 +100,22 @@ class NeighbourKeyWorkTest {
         val off = ShuangpinSegmenter(ShuangpinScheme.XIAOHE)
         for (initials in listOf(false, true)) {
             val inputs = xiaohe(initials)
-            within("小鹤${if (initials) " initials" else ""}", type(inputs, "qwerty", { i, t -> on.segment(i, null, t) }, placed = true), type(inputs, "qwerty", { i, t -> off.segment(i, null, t) }, placed = false))
+            within("小鹤${if (initials) " initials" else ""}", type(inputs, "qwerty", { i, t -> on.segment(i, null, t) }, placed = true, user = typed), type(inputs, "qwerty", { i, t -> off.segment(i, null, t) }, placed = false, user = typed))
         }
+    }
+
+    // with nothing typed a 小鹤 key takes little (no key read alone finds a word), and a tenth of that
+    // would not hold the slips: held by how many arcs they add (193 when measured)
+    @Test
+    fun xiaoheWithNothingTypedTakesFewArcsMore() {
+        val on = ShuangpinSegmenter(ShuangpinScheme.XIAOHE, neighbours = true)
+        val off = ShuangpinSegmenter(ShuangpinScheme.XIAOHE)
+        val inputs = xiaohe(initials = false)
+        val read = type(inputs, "qwerty", { i, t -> on.segment(i, null, t) }, placed = true)
+        val plain = type(inputs, "qwerty", { i, t -> off.segment(i, null, t) }, placed = false)
+        println("小鹤, nothing typed: a key %.0f arcs, %.0f scored with the slips read; %.0f, %.0f without".format(read.first, read.second, plain.first, plain.second))
+        assertTrue("arcs ${read.first} of ${plain.first}", read.first - plain.first <= EMPTY_ARCS_MORE)
+        assertTrue("scored ${read.second} of ${plain.second}", read.second <= plain.second * AT_MOST)
     }
 
     @Test
@@ -109,6 +131,8 @@ class NeighbourKeyWorkTest {
     private companion object {
         const val KEYS = 40
         const val LINES = 8
+        const val HISTORY = 3000
+        const val EMPTY_ARCS_MORE = 250.0
         // 1.5 ms of a 双拼 key's 14.1 on the 6T (061-neighbour-correction §7.1)
         const val AT_MOST = 1.10
 

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
@@ -90,6 +91,9 @@ class PinyinSessionAbbrevTest {
     fun whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThereAsItReads() {
         val learner = Learner(data)
         val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        // never typed, 可以 is not read by k and y alone: only what was typed or chosen is
+        assertTrue("可以" !in s.type("ky").candidates.also { s.apply(Reset) })
+        s.pick("keyi", "可以")
         val fresh = s.type("ky").candidates.also { s.apply(Reset) }
         assertEquals("快", fresh.first())
         val at = fresh.indexOf("可以")
@@ -110,16 +114,143 @@ class PinyinSessionAbbrevTest {
 
     @Test
     fun backspaceOverAKeyReadAloneReadsWhatIsLeftAsTypedAfresh() {
-        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false)
+        val learner = Learner(data)
+        fun session() = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        val s = session()
+        s.pick("ufmeuihb", "什么时候")
         val whole = s.type("ufmuh")
         assertTrue("$whole", "什么时候" in whole.candidates)
         // each key taken off reads what is left as if typed so, down to uf; and the h again as at first
         for (n in 4 downTo 2) {
             val back = s.apply(Backspace)
-            val fresh = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false).type("ufmuh".take(n))
+            val fresh = session().type("ufmuh".take(n))
             assertEquals("${"ufmuh".take(n)}", fresh.preedit to fresh.candidates, back.preedit to back.candidates)
         }
         val again = s.type("muh")
         assertEquals(whole.preedit to whole.candidates, again.preedit to again.candidates)
+    }
+
+    // the rule (DECISIONS 0.6.1 双拼中间简拼改 U): a key alone where it and the next make a syllable reads
+    // only the words the user typed or chose; the first time, a word is typed in whole syllables
+    @Test
+    fun aKeyReadAloneReadsOnlyWordsTypedBefore() {
+        val learner = Learner(data)
+        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        // nothing typed yet: ufmuh is shen, mu, and h begun; x then mian is no 下面
+        val before = s.page("ufmuh")
+        assertTrue("$before", "什么时候" !in before)
+        assertTrue("下面" !in s.page("xmm"))
+        s.pick("ufmeuihb", "什么时候")
+        assertTrue("什么时候" in s.page("ufmuh"))
+        // and no other word for that: 下面 was not typed
+        assertTrue("下面" !in s.page("xmm"))
+        s.pick("xwmm", "下面")
+        assertTrue("下面" in s.page("xmm"))
+        // in whole syllables nothing was ever held back
+        assertEquals("先", s.page("xm").first())
+    }
+
+    @Test
+    fun withNoHabitsAKeyIsNotReadAlone() {
+        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false)
+        assertTrue("什么时候" !in s.page("ufmuh"))
+        assertEquals("什么时候", s.page("ufmeuihb").first())
+    }
+
+    // typed counts as long as the counts do: 30 typing days (LearnState.WINDOW); a word added by hand for good
+    @Test
+    fun aWordNotTypedForThirtyTypingDaysIsReadByWholeSyllablesOnlyAgain() {
+        val learner = Learner(data)
+        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        s.pick("ufmeuihb", "什么时候")
+        s.pick("xwmm", "下面")
+        learner.model.listByHand(UserModel.Entry("小明", intArrayOf(Syllables.id("xiao"), Syllables.id("ming"))))
+        assertTrue("什么时候" in s.page("ufmuh"))
+        assertTrue("下面" in s.page("xmm"))
+        repeat(LearnState.WINDOW) {
+            learner.clock.days(1)
+            s.pick("xm", "先")
+        }
+        assertTrue("什么时候" !in s.page("ufmuh"))
+        assertTrue("下面" !in s.page("xmm"))
+        assertTrue("小明" in s.page("xmy"))
+        // typed in full again, it is back
+        s.pick("ufmeuihb", "什么时候")
+        assertTrue("什么时候" in s.page("ufmuh"))
+    }
+
+    // a word pinned under some keys is one typed while it is pinned, whenever last typed (DECISIONS 0.6.1 双拼中间简拼改 U)
+    @Test
+    fun aWordPinnedIsReadByAKeyAloneThoughNotTypedForThirtyTypingDays() {
+        val learner = Learner(data)
+        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        s.pick("keyi", "可以")
+        s.type("ky").let { s.apply(Pin(it.candidates.indexOf("可以"))) }
+        s.apply(Reset)
+        assertEquals("可以", s.page("ky").first())
+        repeat(LearnState.WINDOW) {
+            learner.clock.days(1)
+            s.pick("xm", "先")
+        }
+        assertEquals("可以", s.page("ky").first())
+        // unpinned, it is a word not typed for 30 typing days as any other
+        s.type("ky").let { s.apply(Unpin(it.candidates.indexOf("可以"))) }
+        s.apply(Reset)
+        assertTrue("可以" !in s.page("ky"))
+    }
+
+    // picking a word read by a key alone is typing it: the 30 typing days count from that day
+    @Test
+    fun aWordPickedUnderAKeyReadAloneIsTypedThatDay() {
+        val learner = Learner(data)
+        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        s.pick("ufmeuihb", "什么时候")
+        repeat(LearnState.WINDOW - 1) {
+            learner.clock.days(1)
+            s.pick("xm", "先")
+        }
+        // the 30th typing day since: read still, and picked so
+        s.pick("ufmuh", "什么时候")
+        repeat(LearnState.WINDOW - 1) {
+            learner.clock.days(1)
+            s.pick("xm", "先")
+        }
+        assertTrue("什么时候" in s.page("ufmuh"))
+        learner.clock.days(1)
+        s.pick("xm", "先")
+        assertTrue("什么时候" !in s.page("ufmuh"))
+    }
+
+    // a word's first commit marks its nodes there and then: the nodes are not all marked anew on the
+    // next key (a millisecond or more on a phone with ten thousand words counted), only as a word goes
+    @Test
+    fun aWordTypedForTheFirstTimeDoesNotMarkEveryTypedWordsNodesAnew() {
+        val learner = Learner(data)
+        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        // the day's first commit makes the counts anew
+        s.pick("ufmeuihb", "什么时候")
+        assertTrue("什么时候" in s.page("ufmuh"))
+        val marked = learner.model.typedNodes.indexed
+        s.pick("xwmm", "下面")
+        s.pick("keyi", "可以")
+        learner.model.listByHand(UserModel.Entry("小明", intArrayOf(Syllables.id("xiao"), Syllables.id("ming"))))
+        assertTrue("下面" in s.page("xmm"))
+        assertTrue("可以" in s.page("ky"))
+        assertTrue("小明" in s.page("xmy"))
+        assertEquals(marked, learner.model.typedNodes.indexed)
+        // one gone: anew
+        learner.model.unlistByHand(UserModel.Entry("小明", intArrayOf(Syllables.id("xiao"), Syllables.id("ming"))))
+        assertTrue("小明" !in s.page("xmy"))
+        assertEquals(marked + 1, learner.model.typedNodes.indexed)
+    }
+
+    @Test
+    fun aWordAddedByHandIsReadByAKeyAlone() {
+        val model = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        fun session() = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = model, addedWords = { setOf("小明") })
+        // x then ming: 小明 is in no dictionary here
+        assertTrue("小明" !in session().page("xmy"))
+        model.listByHand(UserModel.Entry("小明", intArrayOf(Syllables.id("xiao"), Syllables.id("ming"))))
+        assertTrue("小明" in session().page("xmy"))
     }
 }

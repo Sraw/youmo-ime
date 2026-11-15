@@ -63,8 +63,8 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>] [--touch <keyboard>:<hand>:<clean|slip>[:<seed>] [--touched <set.tsv>]]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev", "touch", "touched",
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>] [--history <words.txt>] [--touch <keyboard>:<hand>:<clean|slip>[:<seed>] [--touched <set.tsv>]]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev", "history", "touch", "touched",
     ) { args, _, _ ->
         val (dataPath, setPath, resultPath) = args.operands
         runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options))
@@ -550,6 +550,9 @@ private class RunOptions(options: Map<String, String>) {
     val merged = options["merged"]
     val stale = "stale" in options
 
+    /** Words typed before the run, a file of [TypedHistory]'s lines: 双拼 reads a key alone for those only. */
+    val history = options["history"]
+
     /** 双拼 reads a key as an initial alone in the middle too (ShuangpinSegmenter): unless off, at this extra penalty. */
     val abbreviations = options["sp-abbrev"] != "off"
     val abbrevPenalty = options["sp-abbrev"]?.toFloatOrNull() ?: Penalties().abbrev
@@ -631,6 +634,7 @@ private fun runPinyin(dataPath: String, setPath: String, resultPath: String, opt
     val work = mergedPath?.let { Files.createTempDirectory("ime-eval-merged").toFile() }
     try {
         val merged = mergedPath?.let { compileMerged(it, loadData(dataPath), File(checkNotNull(work), "merged.ymd")) }
+        val typed = options.history?.let { File(it).readLines() }
         // a data file each: its buffers are not to be shared
         val set = Halves.select(readSet(setPath), options.half)
         val selected = options.taps?.let { spec ->
@@ -647,6 +651,7 @@ private fun runPinyin(dataPath: String, setPath: String, resultPath: String, opt
                 beam = options.beam, sentenceCount = options.sentences, layers = options.layers, pack = pack,
                 reranker = models.reranker, refiner = models.refiner,
                 merged = merged?.let { DictionaryFile.open(JvmFile(it), verify = false) }, mergedStale = options.stale,
+                typed = typed,
             )
         }) { hand -> run(hand) }
         File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }

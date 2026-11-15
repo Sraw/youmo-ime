@@ -342,7 +342,7 @@ class PinyinDecoderTest {
     fun buildingOnTheLastDecodeChangesNothingIn双拼() {
         // 自然码: ni hc(hao) ma zl(zai) jm(jian) wo vh(zhang) vs(zhong) hw(hua) rf(ren) mn(min), and keys alone
         val pieces = listOf("ni", "hc", "ma", "zl", "jm", "wo", "vh", "vs", "hw", "rf", "mn", "re", "n", "h", "z", "j", "v", "r", "m", "'", ";")
-        buildsOnTheLast(ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, abbreviations = true), pieces, Random(11))
+        buildsOnTheLast(ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, abbreviations = true), pieces, Random(11), readsAlone = true)
     }
 
     // the tones typed after a syllable on the zhuyin keys weigh the words collected: kept with them
@@ -384,9 +384,10 @@ class PinyinDecoderTest {
         steps: Int = 3000,
         toneAllows: ((Int, Int, Int) -> Boolean)? = null,
         atLeast: Int = steps / 4,
+        readsAlone: Boolean = false,
     ) {
         // the dictionaries the user merged among the tries walked
-        val user = mergedModel()
+        val user = mergedModel().also(::typeWords)
         user.attachImports(ImportedWords().import("妮好" to "ni hao", "中人" to "zhong ren", "热" to "re", "仁" to "ren"))
         val changes = listOf(
             { user.own(UserModel.Entry("你中", syl("ni", "zhong"))) },
@@ -398,7 +399,7 @@ class PinyinDecoderTest {
             // 热 and 仁, only imported, are then all that starts re and ren: the input is kept as typed beside them
             { user.block(UserModel.Entry("人民", syl("ren", "min"))) },
             { user.unblock(UserModel.Entry("人民", syl("ren", "min"))) },
-        )
+        ) + typedChanges(user)
         fun decoder() = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user, toneAllows = toneAllows)
         var typed = false // whether the last read's sentences keep some of the input as typed
         fun read(d: PinyinDecoder, graph: SyllableGraph): List<Any?> {
@@ -410,8 +411,7 @@ class PinyinDecoderTest {
         }
         val kept = decoder()
         var input = ""
-        var on = 0
-        var onTyped = 0
+        val went = WentOn()
         repeat(steps) { step ->
             if (step % 97 == 96) {
                 changes[step / 97 % changes.size]()
@@ -429,13 +429,13 @@ class PinyinDecoderTest {
             }
             val graph = segmenter.segment(input)
             assertEquals("step $step: $input", read(decoder(), graph), read(kept, graph))
-            on += kept.collectedOn
-            if (kept.collectedOn > 0 && typed) onTyped++
+            went.count(kept, graph, typed)
         }
+        assertTrue("went on over words read by a key alone ${went.alone} times", went.alone >= if (readsAlone) steps / 20 else 0)
         // going on from the last decode's steps (collectOn) was among what was compared, where it may be:
         // not while tones are typed, a word's asked of the whole path to it. And going on where input is
         // kept as typed, which a start-only word kept from the last decode once hid
-        if (toneAllows == null) assertTrue("went on $on times, $onTyped with input kept as typed", on >= atLeast && onTyped > 0) else assertEquals(0, on)
+        if (toneAllows == null) assertTrue("went on ${went.times} times, ${went.typed} with input kept as typed", went.times >= atLeast && went.typed > 0) else assertEquals(0, went.times)
     }
 
     @Test
@@ -754,5 +754,33 @@ class PinyinDecoderTest {
         assertEquals(0, sentencesWith("尼"))
         user.listByHand(UserModel.Entry("尼", syl("ni")))
         assertEquals(1, sentencesWith("尼"))
+    }
+}
+
+// words typed, of the dictionary's and a merged one's: a 双拼 key alone reads these only
+private fun typeWords(user: UserModel) {
+    for ((text, reading) in listOf("你好" to "ni hao", "再" to "zai", "见" to "jian", "中华" to "zhong hua", "人民" to "ren min", "吗" to "ma", "妮" to "ni")) {
+        UserModel.Entry(text, reading.split(' ').map { Syllables.id(it) }.toIntArray()).let { user.setCount(user.id(it), 1f, it) }
+    }
+}
+
+// a word typed no more, and again: what a 双拼 key alone reads changes
+private fun typedChanges(user: UserModel): List<() -> Unit> {
+    val nihao = UserModel.Entry("你好", intArrayOf(Syllables.id("ni"), Syllables.id("hao")))
+    return listOf({ user.setCount(user.id(nihao), 0f, nihao) }, { user.setCount(user.id(nihao), 2f, nihao) })
+}
+
+// what going on from the last decode was compared on: how often, with input kept as typed, with words over a key read alone
+private class WentOn {
+    var times = 0
+    var typed = 0
+    var alone = 0
+
+    fun count(d: PinyinDecoder, graph: SyllableGraph, keptTyped: Boolean) {
+        times += d.collectedOn
+        if (d.collectedOn == 0) return
+        if (keptTyped) typed++
+        // between two positions, more words than in whole syllables
+        if ((graph.start until graph.end).any { a -> (a + 1..graph.end).any { b -> d.arcsBetween(graph, a, b).size > d.arcsBetween(graph, a, b, true).size } }) alone++
     }
 }

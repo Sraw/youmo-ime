@@ -17,9 +17,14 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.session.PinyinSession
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.eval.EvalSet
 import org.fcitx.fcitx5.android.eval.PinyinRun
 import org.fcitx.fcitx5.android.eval.ShuangpinSet
+import org.fcitx.fcitx5.android.eval.TouchSim
+import org.fcitx.fcitx5.android.eval.TypedHistory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -87,11 +92,24 @@ class ShuangpinUatTest {
     @Test
     @Uat("SP-30")
     fun aWordTypedWithItsFirstSyllableWholeAndTheRestByInitials() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
-        // 自然码 shen = uf, then m, sh, h: mu and uh (shang) are syllables, each key read alone too
+        // 自然码 shen = uf, then m, sh, h: mu and uh (shang) are syllables, each key read alone too,
+        // for a word typed before; never typed, it is not read so
+        type("ufmuh")
+        assertTrue("ufmuh, never typed: $page", "什么时候" !in candidates)
+        focus("")
+        type("ufmeuihb")
+        pick("什么时候")
+        focus("")
         type("ufmuh")
         assertTrue("ufmuh: $page", "什么时候" in page)
-        backspace(5)
+        focus("")
         // zh's key alone: v and z make zhei
+        type("yivz")
+        assertTrue("yivz, never typed: $page", "一直在" !in candidates)
+        focus("")
+        type("yivizl")
+        pick("一直在")
+        focus("")
         type("yivz")
         assertTrue("yivz: $page", "一直在" in page)
     }
@@ -115,7 +133,9 @@ class ShuangpinUatTest {
         // the decoder and the sentence model, the first candidates the same (none changed when measured)
         val samples = ShuangpinSet.convert(File("data/pinyin-chat.tsv").useLines { EvalSet.parse(it) }, ShuangpinScheme.XIAOHE)
         val model = SentenceModel.load(UatEngines.data(InputMethodCatalog.SENTENCE_MODEL), unpack = true)
-        fun run(abbreviations: Boolean) = PinyinRun(UatEngines.pinyinData, ShuangpinSegmenter(ShuangpinScheme.XIAOHE, abbreviations = abbreviations), reranker = { Reranker(model) })
+        // a key alone reads the words typed before: the 3000 likeliest typed, both ways
+        val typed = TypedHistory.likeliest(UatEngines.pinyinData, HISTORY)
+        fun run(abbreviations: Boolean) = PinyinRun(UatEngines.pinyinData, ShuangpinSegmenter(ShuangpinScheme.XIAOHE, abbreviations = abbreviations), reranker = { Reranker(model) }, typed = typed)
         val (off, on) = run(false) to run(true)
         assertTrue("${samples.size}", samples.size > 1500)
         val changed = samples.filter { s -> off.candidates(s.input, s.context).firstOrNull() != on.candidates(s.input, s.context).firstOrNull() }
@@ -124,7 +144,7 @@ class ShuangpinUatTest {
         // as ShuangpinSegmenterTest keeps them): the first never changes, and what page 1 showed it
         // still shows first, but for a few; words fill a page a rare syllable's few characters left short
         for (scheme in ShuangpinSet.SCHEMES.values + DROPPED) {
-            fun twoKeys(abbreviations: Boolean) = PinyinRun(UatEngines.pinyinData, ShuangpinSegmenter(scheme, abbreviations = abbreviations), reranker = { Reranker(model) })
+            fun twoKeys(abbreviations: Boolean) = PinyinRun(UatEngines.pinyinData, ShuangpinSegmenter(scheme, abbreviations = abbreviations), reranker = { Reranker(model) }, typed = typed)
             val (was0, now0) = twoKeys(false) to twoKeys(true)
             val codes = (0 until Syllables.count).mapNotNull { scheme.encode(it) }.distinct()
             val displaced = ArrayList<String>()
@@ -140,7 +160,13 @@ class ShuangpinUatTest {
     @Test
     @Uat("SP-32")
     fun aWordTypedByItsInitialsOnly() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
-        // 自然码 sh m sh h: mu and uh are syllables, before them no way read 什么时候
+        // 自然码 sh m sh h: mu and uh are syllables, before them no way read 什么时候; a word typed before only
+        type("umuh")
+        assertTrue("umuh, never typed", "什么时候" !in candidates)
+        focus("")
+        type("ufmeuihb")
+        pick("什么时候")
+        focus("")
         type("umuh")
         expectAmong("什么时候")
     }
@@ -148,6 +174,10 @@ class ShuangpinUatTest {
     @Test
     @Uat("SP-33")
     fun aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        // typed in whole syllables once: read by keys alone from then on
+        type("ufmeuihb")
+        pick("什么时候")
+        focus("")
         type("ufmuh")
         assertTrue("$page", page.first() != "什么时候")
         pick("什么时候")
@@ -200,8 +230,14 @@ class ShuangpinUatTest {
     @Test
     @Uat("SP-36")
     fun whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere() {
-        // 自然码 ky is kuai; 可以 by k and y alone, low on its list
+        // 自然码 ky is kuai; 可以 by k and y alone, low on its list, once typed (keyi)
         val at = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+            type("ky")
+            assertTrue("ky, never typed", "可以" !in candidates)
+            focus("")
+            type("keyi")
+            pick("可以")
+            focus("")
             type("ky")
             val at = candidates.indexOf("可以")
             assertTrue("ky: ${candidates.take(40)}", at > 0)
@@ -212,6 +248,9 @@ class ShuangpinUatTest {
             at
         }
         with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+            type("keyi")
+            pick("可以")
+            focus("")
             repeat(2) {
                 focus("")
                 type("ky")
@@ -221,6 +260,65 @@ class ShuangpinUatTest {
             type("ky")
             assertTrue("ky: ${candidates.take(10)}", candidates.indexOf("可以") in 0 until minOf(at, EngineSettings.DEFAULT_PAGE_SIZE))
         }
+    }
+
+    // 自然码 u f, m, u, h: 什么时候 by its initials once typed, each key tapped in its middle or one by its
+    // edge (m by n, read as n too); never typed, there is no such reading wherever the keys are tapped
+    @Test
+    @Uat("SP-41")
+    fun initialsInTheMiddleReadTheWordsTypedWhereverTapped() {
+        val data = UatEngines.pinyinData
+        val board = TouchSim.board("qwerty").boxes
+        fun shown(user: UserModel, dx: Float): List<String> {
+            val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, neighbours = true), pageSize = 40, prediction = false, user = user)
+            return "ufmuh".map { c -> s.apply(Action.Key(c, touch = board.touch(c, 0f, 0f)!!.copy(dx = if (c == 'm') dx else 0f, dy = 0f))) }.last().candidates
+        }
+        val fresh = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        assertEquals(1, TypedHistory.count(user, data, listOf("什么时候\tshen me shi hou")))
+        for (dx in listOf(0f, -EDGE)) {
+            val before = shown(fresh, dx)
+            assertTrue("$dx: $before", "什么时候" !in before)
+            val typed = shown(user, dx)
+            // after the syllables the keys make (fm is fan, mu is mu), on the first page
+            assertEquals("$dx", before.first(), typed.first())
+            assertTrue("$dx: $typed", typed.indexOf("什么时候") in 1 until EngineSettings.DEFAULT_PAGE_SIZE)
+        }
+    }
+
+    // the user's own words are typed ones for good: read by a key alone with no count
+    @Test
+    @Uat("SP-43")
+    fun aWordAddedByHandIsReadByAKeyAloneAtOnce() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        // 自然码 x, then my (ming); xm is xian
+        type("xmy")
+        assertTrue("xmy, before", "小明" !in candidates)
+        focus("")
+        assertTrue(engines.addWord("小明", "xiao ming"))
+        type("xmy")
+        expectAmong("小明")
+    }
+
+    // 借手机: the habits off, nothing is typed before, and no key is read alone
+    @Test
+    @Uat("SP-46")
+    fun withTheHabitsOffNoKeyIsReadAlone() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        type("ufmeuihb")
+        pick("什么时候")
+        focus("")
+        type("ufmuh")
+        expectAmong("什么时候")
+        focus("")
+        engines.useHabits = false
+        type("ufmuh")
+        assertTrue("ufmuh, habits off", "什么时候" !in candidates)
+        focus("")
+        type("ufmeuihb")
+        expectFirst("什么时候")
+        focus("")
+        engines.useHabits = true
+        type("ufmuh")
+        expectAmong("什么时候")
     }
 
     // U-20 (D32 B) in 自然码: fghw twice lifts 奉化 under the part fgh (two keys are a syllable there: fh is fang); full pinyin's uses do not
@@ -356,6 +454,12 @@ class ShuangpinUatTest {
     }
 
     private companion object {
+        // the words typed before where a run needs some: a few months' of a user's
+        const val HISTORY = 3000
+
+        // a tap this far of a key's width from its middle: by its edge
+        const val EDGE = 0.42f
+
         const val SENTENCE = "我们今天去吃饭"
 
         // 紫光, 智能ABC and 国标, which 0.5 dropped (SchemeMigration): libime's tables, as ShuangpinSegmenterTest has them

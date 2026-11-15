@@ -324,13 +324,13 @@ class PinyinDecoder(
             val e = graph.edges(from).first + edge
             if (from < changed && graph.to(e) >= changed) {
                 read(graph, from, e)
-                path.abbreviated = abbreviated
-                arcs.abbreviated = abbreviated > 0
+                path.counted(abbreviated)
+                arcs.abbreviated = path.abbreviated > 0
                 val child = if (node < 0) -1 else dictionary.child(node, graph.matches(e).syllable(match))
                 step(graph, from, e, match, child, node, userNode, mergedNode, cost, short, limit)
             }
         }
-        path.abbreviated = 0
+        path.counted(0)
         arcs.abbreviated = false
         finish(graph, at)
     }
@@ -375,13 +375,19 @@ class PinyinDecoder(
         val merged = user?.mergedWords
         val matches = graph.matches(e)
         val syllable = matches.syllable(i)
+        // over a key read alone, here or before on the path, only the words the user typed or chose
+        // (UserWords.typed) and the nodes to them: a key alone stands for a score of syllables. A key read
+        // as its neighbour is not one (Path.alone): a slip reads the whole dictionary
+        val typedOnly = path.alone > 0 || matches.flags(i) and SyllableMatches.ABBREV != 0
+        @Suppress("NAME_SHADOWING")
+        val child = if (typedOnly) typedChild(child) else child
         val userChild = if (userNode < 0 || user == null) -1 else user.child(userNode, syllable)
-        val mergedChild = if (mergedNode < 0 || merged == null) -1 else merged.child(mergedNode, syllable)
+        val mergedChild = if (mergedNode < 0 || merged == null) -1 else merged.child(mergedNode, syllable).let { if (typedOnly) typedMergedChild(it) else it }
         if (child < 0 && userChild < 0 && mergedChild < 0) return
         steps++
         val kind = graph.kind(e)
         val to = graph.to(e)
-        if (to >= crossFrom) crossings.add(at, e - graph.edges(at).first, i, node, userNode, mergedNode, cost, short, path.abbreviated)
+        if (to >= crossFrom) crossings.add(at, e - graph.edges(at).first, i, node, userNode, mergedNode, cost, short, path.counts())
         val edgeShort = short || isShort(kind)
         val tone = toneOf(graph, e)
         val c = cost + penalties.ofKind(kind) + penalties.ofMatch(matches.flags(i)) + nasal(kind, syllable) + penalties.tap * graph.against(e, i) + graph.slipCost(e, i)
@@ -443,7 +449,7 @@ class PinyinDecoder(
                 for (w in 0 until starts.wordCount(child)) {
                     val word = starts.word(child, w)
                     // going on (collectOn), those ending before where it goes on from are there already
-                    if (to >= startFrom && user.startOnly(word) && !user.blocked(word, -1)) arcs.add(to, word, c + penalties.imported, short = edgeShort, startOnly = true)
+                    if (to >= startFrom && startOffered(user, word)) arcs.add(to, word, c + penalties.imported, short = edgeShort, startOnly = true)
                 }
                 if (to < graph.end && starts.childCount(child) > 0) collectStart(graph, to, starts, child, c, edgeShort)
                 abbreviated(matches.flags(i), -1)
@@ -451,14 +457,25 @@ class PinyinDecoder(
         }
     }
 
+    // whether [word], only imported, is offered from the start on the path collect is on
+    private fun startOffered(user: UserWords, word: Int) = user.startOnly(word) && !user.blocked(word, -1) && typedOver(word)
+
     // the first [words] of the dictionary's at [node], those the user blocked left out
     private fun addWords(to: Int, node: Int, words: Int, cost: Float, short: Boolean) {
         val first = dictionary.wordsOf(node)
         for (at in first until first + words) {
             val word = dictionary.wordAt(at)
-            if (user?.blocked(word, node) != true) arcs.add(to, word, cost + dictionary.weightAt(at) + coarseness(word) + toneCost(word), short = short)
+            if (user?.blocked(word, node) != true && typedOver(word)) arcs.add(to, word, cost + dictionary.weightAt(at) + coarseness(word) + toneCost(word), short = short)
         }
     }
+
+    // the dictionary's node [child] where a word typed or chosen is at it or below, else -1: with no user, none is
+    private fun typedChild(child: Int) = if (child >= 0 && user?.typedBelow(child) == true) child else -1
+
+    private fun typedMergedChild(child: Int) = if (child >= 0 && user?.mergedTypedBelow(child) == true) child else -1
+
+    // whether [word] is offered on the path collect is on: over a key read alone, one the user typed or chose only
+    private fun typedOver(word: Int) = path.alone == 0 || user?.typed(word) == true
 
     private fun coarseness(word: Int) = if (coarse.unasked(word, user, vocabulary.size)) CoarseWords.PENALTY else 0f
 
@@ -466,7 +483,7 @@ class PinyinDecoder(
     private fun addUserWords(to: Int, user: UserWords, node: Int, cost: Float, short: Boolean) {
         for (w in 0 until user.wordCount(node)) {
             val word = user.word(node, w)
-            if (!user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word) + toneCost(word), short = short)
+            if (!user.blocked(word, -1) && typedOver(word)) arcs.add(to, word, cost + coarseness(word) + toneCost(word), short = short)
         }
     }
 
@@ -505,7 +522,7 @@ class PinyinDecoder(
     private fun addMergedWords(to: Int, user: UserWords, merged: StartWords, node: Int, words: Int, cost: Float, short: Boolean) {
         for (w in 0 until words) {
             val word = merged.word(node, w)
-            if (!user.blocked(word, -1)) arcs.add(to, word, cost + coarseness(word) + toneCost(word), short = short)
+            if (!user.blocked(word, -1) && typedOver(word)) arcs.add(to, word, cost + coarseness(word) + toneCost(word), short = short)
         }
         // past the limit, the user's chosen ones still: a word they added, low in its dictionary (review S5)
         if (words < merged.wordCount(node) && user.anyMergedChosen()) {
@@ -566,6 +583,8 @@ class PinyinDecoder(
      * 咖 alone is rare. The text stays what was typed; the beam keeps the better of the two scores.
      */
     private fun lookAhead(kind: Kind, to: Int, node: Int, cost: Float, words: Int, short: Boolean) {
+        // not over a key read alone: a longer word never typed would raise the typed one that starts it
+        if (path.alone > 0) return
         if (kind != Kind.INITIAL && kind != Kind.PARTIAL || dictionary.childCount(node) == 0) return
         val cache = extensions
         val longer = cache[node] ?: extensionsOf(dictionary, vocabulary, scorer, node).also { cache[node] = it }
@@ -798,7 +817,8 @@ class PinyinDecoder(
      * The path [collect] is on: its syllables and the tones typed after them (0 none), [length] of them
      * and [toned] with a tone, and how many of them a 双拼 key read alone where it and the next make a
      * syllable ([SyllableMatches.ABBREV]) or a key read as the key next to it ([SyllableMatches.NEIGHBOUR]):
-     * neither is the input as typed in whole syllables.
+     * neither is the input as typed in whole syllables. [alone] counts the first kind only, over which
+     * only the words the user typed are read ([UserWords.typed]).
      */
     private class Path {
         var syllables = IntArray(PATH)
@@ -806,11 +826,22 @@ class PinyinDecoder(
         var length = 0
         var toned = 0
         var abbreviated = 0
+            private set
+        var alone = 0
+            private set
 
         fun clear() {
             length = 0
             toned = 0
-            abbreviated = 0
+            counted(0)
+        }
+
+        /** Both counts as one number, for [counted] to set them again. */
+        fun counts() = abbreviated or (alone shl ALONE_SHIFT)
+
+        fun counted(counts: Int) {
+            abbreviated = counts and (1 shl ALONE_SHIFT) - 1
+            alone = counts ushr ALONE_SHIFT
         }
 
         fun enter(syllable: Int, tone: Int, flags: Int) {
@@ -833,6 +864,7 @@ class PinyinDecoder(
 
         fun count(flags: Int, by: Int) {
             if (flags and (SyllableMatches.ABBREV or SyllableMatches.NEIGHBOUR) != 0) abbreviated += by
+            if (flags and SyllableMatches.ABBREV != 0) alone += by
         }
 
         /** [penalty] where a tone typed on the path is one a character of the word of [chars] chars, [charAt] each, does not have by [allows]. */
@@ -1068,7 +1100,7 @@ class PinyinDecoder(
     /**
      * Steps of [collect], each what [step] is called with: the position, the edge (counted from the
      * position's first), the match, the three tries' nodes, the cost so far, whether a syllable before
-     * was typed short, and how many keys before were read alone ([Path.abbreviated]).
+     * was typed short, and how many keys before were read alone or as a neighbour ([Path.counts]).
      */
     private class Crossings {
         private var ints = IntArray(0)
@@ -1134,6 +1166,9 @@ class PinyinDecoder(
         private const val SHORT = 1
         private const val START_ONLY = 2
         private const val ABBREVIATED = 4
+
+        // Path.counts: the keys read alone above this bit; a path is far shorter than 2^15 keys
+        private const val ALONE_SHIFT = 15
     }
 }
 

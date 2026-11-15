@@ -33,13 +33,20 @@ case("SP-13c", needs="jvm:ShuangpinUatTest.aWordTypedTwiceInFullGoesThirdUnderAP
 
 @case("SP-30", base="B0-双拼", mutates="learn")
 def sp30(d):
+    # only the words typed before are read by a key alone: each in whole syllables once first
+    d.type("ufmeuihb")
+    d.pick("什么时候")
+    d.clear()
     d.type("ufmuh")
     c = d.all_cands()
-    d.shot("kb", "自然码 ufmuh：候选栏或展开后的第一页有「什么时候」")
+    d.shot("kb", "自然码 ufmuh（全码打过一次以后）：候选栏或展开后的第一页有「什么时候」")
     check("什么时候" in c, f"ufmuh 的候选栏和展开后的第一页都没有「什么时候」：{c[:14]}")
     d.pick("什么时候")
     t = d.field_text()
     check(t == "什么时候", f"点「什么时候」后框里是「{t}」")
+    d.clear()
+    d.type("yivizl")
+    d.pick("一直在")
     d.clear()
     d.type("yivz")
     c2 = d.all_cands()
@@ -64,6 +71,18 @@ case("SP-35", needs="jvm:ShuangpinUatTest.aWordAddedByHandIsNotPutInUnderAPairIt
 
 
 case("SP-36", needs="jvm:ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere")(lambda d: None)
+
+
+case("SP-43", needs="jvm:ShuangpinUatTest.aWordAddedByHandIsReadByAKeyAloneAtOnce、PinyinSessionAbbrevTest.aWordAddedByHandIsReadByAKeyAlone")(lambda d: None)
+
+
+case("SP-44", needs="jvm:PinyinSessionAbbrevTest.aWordNotTypedForThirtyTypingDaysIsReadByWholeSyllablesOnlyAgain、PinyinSessionAbbrevTest.aWordPinnedIsReadByAKeyAloneThoughNotTypedForThirtyTypingDays、HabitCountsTest.theNodesToAWordTypedAreThoseOfEachReadingItWasTypedAt")(lambda d: None)
+
+
+case("SP-45", needs="jvm:PinyinDecoderTypedTest.aKeyReadAloneReadsNoMergedOrImportedWordNeverTyped、PinyinDecoderTypedTest.aKeyReadAloneReadsOnlyTheWordsTypedOrChosen")(lambda d: None)
+
+
+case("SP-46", needs="jvm:ShuangpinUatTest.withTheHabitsOffNoKeyIsReadAlone、PinyinSessionAbbrevTest.withNoHabitsAKeyIsNotReadAlone")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 18 键 and 九键双拼 (B0-18键, B0-九键双拼)
@@ -128,7 +147,7 @@ case("SP-39", needs="jvm:NeighbourSlipTest.eachShuangpinSchemeReadsTheKeyTappedT
 case("SP-40", needs="jvm:NeighbourSlipTest.eachShuangpinSchemeReadsTheKeyTappedTowards、NeighbourSlipTest.aSlipCostsByHowFarTheTapIsFromTheKeyMeant")(lambda d: None)
 
 
-case("SP-41", needs="jvm:NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle")(lambda d: None)
+case("SP-41", needs="jvm:ShuangpinUatTest.initialsInTheMiddleReadTheWordsTypedWhereverTapped、PinyinSessionAbbrevSlipTest.aWordTypedIsReadByItsInitialsBeforeASlipOfThem、NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle")(lambda d: None)
 
 
 case("SP-42", needs="jvm:PinyinSessionSlipTest.shuangpinsCodeShowsTheSyllableAsMeant")(lambda d: None)

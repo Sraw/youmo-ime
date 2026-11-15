@@ -69,6 +69,34 @@ class HabitCountsTest {
         assertEquals(0f, count("你", "ni"), 0f)
     }
 
+    // 简拼 in the middle of 双拼 reads the words typed, along the dictionary's nodes to them
+    // ([UserModel.typedBelow]): each reading a word was typed at, while it is counted
+    @Test
+    fun theNodesToAWordTypedAreThoseOfEachReadingItWasTypedAt() {
+        fun below(vararg reading: String) = model.typedBelow(data.dictionary.find(syl(*reading)))
+        fun typed(text: String, vararg reading: String) = model.typed(model.known(UserModel.Entry(text, syl(*reading))))
+        assertTrue(!below("le") && !below("liao") && !below("ni") && !typed("了", "le"))
+        commit(row("le", "了", "le"))
+        assertTrue(below("le") && typed("了", "le"))
+        assertTrue(!below("liao") && !below("ni"))
+        commit(row("liao", "了", "liao"))
+        assertTrue(below("le") && below("liao"))
+        commit(row("nihao", "你好", "ni hao"))
+        assertTrue(below("ni") && below("ni", "hao") && !below("hao") && !typed("你", "ni"))
+        // made anew from the record, both readings still
+        learner.counts.rebuild(learner.log.state)
+        assertTrue(below("le") && below("liao") && below("ni", "hao"))
+        // forgotten: typed no more
+        learner.habits.forget("了")
+        assertTrue(!below("le") && !below("liao") && below("ni") && !typed("了", "le"))
+        // and after 30 typing days of something else
+        repeat(org.fcitx.fcitx5.android.engine.learn.LearnState.WINDOW) {
+            learner.clock.days(1)
+            commit(row("jie", "解", "jie"))
+        }
+        assertTrue(!below("ni") && !below("ni", "hao") && below("jie"))
+    }
+
     // M1: a word twice in a commit is used twice
     @Test
     fun aWordTwiceInACommitCountsTwice() {

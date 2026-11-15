@@ -143,7 +143,10 @@ class LearnState {
         val commits = ArrayList<Commit>()
         var imports = false
 
-        fun isEmpty() = formed.isEmpty() && removed.isEmpty() && forgotten.isEmpty() && !recount && !window && commits.isEmpty() && !imports
+        /** Whether a word was pinned or unpinned ([LearnState.pins]): a pinned word is one typed to 双拼's keys read alone (UserModel.setPinned). */
+        var pins = false
+
+        fun isEmpty() = formed.isEmpty() && removed.isEmpty() && forgotten.isEmpty() && !recount && !window && commits.isEmpty() && !imports && !pins
 
         companion object {
             /** From [was] to [now], a state made anew (a log rewritten): the user's words that came and went, every count anew. */
@@ -235,6 +238,7 @@ class LearnState {
         } else if (pins[record.code]?.text == record.text) {
             pins.remove(record.code)
         }
+        changes.pins = true
     }
 
     // a snapshot's row, or a record kept as it is

@@ -104,6 +104,26 @@ interface UserWords {
     /** How many times the user committed [word]: 0 for a word never typed. */
     fun count(word: Int): Float = 0f
 
+    /**
+     * Whether [word] is one the user typed or chose: counted ([count]), their choice ([chosen]), or
+     * the dictionary's own word they added by hand.
+     * The only words read through a 双拼 key alone where it and the next make a syllable (简拼 in the
+     * middle): every key there stands for a score of syllables, and with all the dictionary's words
+     * behind them a key of full code took twice the time on a phone and the words meant were
+     * crowded out. A count fades with the typing days ([org.fcitx.fcitx5.android.engine.user.LearnState.WINDOW]);
+     * a choice does not.
+     */
+    fun typed(word: Int): Boolean = count(word) > 0f || chosen(word)
+
+    /**
+     * Whether the dictionary's [node] may have a [typed] word at it or below: false only where none
+     * is, so a walk over a key read alone leaves the node be. True unless the model keeps track.
+     */
+    fun typedBelow(node: Int): Boolean = true
+
+    /** [typedBelow] for a node of [mergedWords]. */
+    fun mergedTypedBelow(node: Int): Boolean = true
+
     /** The chance the user types [word] after [prev], from what they typed: 0 for a word never typed. */
     fun probability(prev: Int, word: Int): Float = 0f
 }

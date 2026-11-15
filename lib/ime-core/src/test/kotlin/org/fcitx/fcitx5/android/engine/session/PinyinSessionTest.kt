@@ -584,13 +584,18 @@ class PinyinSessionTest {
         assertEquals(woxian.candidates.first(), after.commit)
     }
 
-    // ; as ing where the data has no word of the syllable: x read alone, as 简拼 in the middle, ; shown as typed
+    // ; as ing where the data has no word of the syllable: x read alone, as 简拼 in the middle, for a
+    // word typed before, ; shown as typed; with none typed, both keys as typed
     @Test
     fun 双拼SemicolonWithNoWordOfItsSyllableIsShownAsTyped() {
-        val session = PinyinSession(pinyinDataOf(Triple("先", "xian", -3f)), ShuangpinSegmenter(ShuangpinScheme.MICROSOFT), spell = true)
+        val data = pinyinDataOf(Triple("先", "xian", -3f))
+        val session = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.MICROSOFT), spell = true)
         val typed = session.type("x;")
         assertTrue(typed.handled)
-        assertEquals("x ;", typed.preedit)
+        assertEquals("x;", typed.preedit)
+        val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
+        user.own(UserModel.Entry("先", intArrayOf(org.fcitx.fcitx5.android.engine.pinyin.Syllables.id("xian"))))
+        assertEquals("x ;", PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.MICROSOFT), spell = true, user = user).type("x;").preedit)
     }
 
     // review M2: a syllable typed whole and the next only begun is still being typed (小鹤 ni then h),

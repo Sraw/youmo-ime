@@ -64,8 +64,8 @@
 
 ### SP-30 [P1] 第一个字打全，后面的字只打声母
 - **前提**：B0-双拼（自然码）。
-- **操作**：点 u f m u h（自然码：shen = u f，然后 m、sh、h 各一个键），看候选栏和展开候选列表的第一页；点「什么时候」。删光，点 y i v z（yi，然后 zh、z），看候选。
-- **预期**：u f m u h 的候选栏或展开后的第一页有「什么时候」，点了框里是「什么时候」（m u、u h 连起来也是音节 mu、shang，每个键还能单独当声母，见 docs/pinyin.md「双拼」）；y i v z 的候选栏或展开后的第一页有「一直在」。
+- **操作**：（没打过这两个词）点 u f m u h（自然码：shen = u f，然后 m、sh、h 各一个键），翻看候选；删光。点 u f m e u i h b（全码），选「什么时候」，清空输入框。再点 u f m u h，看候选栏和展开候选列表的第一页；点「什么时候」。清空，点 y i v z（yi，然后 zh、z），翻看候选；删光，点 y i v i z l 选「一直在」，清空，再点 y i v z。
+- **预期**：没打过时 u f m u h 的候选里没有「什么时候」、y i v z 里没有「一直在」（只打声母只出打过的词，见 docs/pinyin.md「双拼」）。全码打过一次以后，u f m u h 的候选栏或展开后的第一页有「什么时候」，点了框里是「什么时候」（m u、u h 连起来也是音节 mu、shang，每个键还能单独当声母）；y i v z 的候选栏或展开后的第一页有「一直在」。
 - **JVM**：`ShuangpinUatTest.aWordTypedWithItsFirstSyllableWholeAndTheRestByInitials`（:lib:ime-eval:uatTest，真数据）；设备上留作冒烟（看胶水）。
 
 ### SP-31 [P1] 两个键成音节的仍先按音节读，打全码的首选不变
@@ -76,13 +76,13 @@
 
 ### SP-32 [P2] 全打声母
 - **前提**：B0-双拼（自然码）。
-- **操作**：点 u m u h（sh、m、sh、h），看候选（往后翻）。
-- **预期**：候选里有「什么时候」（多半不在第一页：m u、u h 先按音节读）。
+- **操作**：（没打过「什么时候」）点 u m u h（sh、m、sh、h），翻完候选；删光，点 u f m e u i h b 选「什么时候」，清空，再点 u m u h，看候选（往后翻）。
+- **预期**：没打过时候选里没有「什么时候」；全码打过一次以后有（多半不在第一页：m u、u h 先按音节读）。
 - **JVM**：`ShuangpinUatTest.aWordTypedByItsInitialsOnly`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### SP-33 [P1] 只打声母选过的词，在这串键下学
 - **前提**：B0-双拼（自然码）。
-- **操作**：点 u f m u h，看第一个候选；点「什么时候」；再做一次；点 u f m u h，看第一个候选；删光，点 u m u h。
+- **操作**：先点 u f m e u i h b（全码）选「什么时候」，清空。点 u f m u h，看第一个候选；点「什么时候」；再做一次；点 u f m u h，看第一个候选；删光，点 u m u h。
 - **预期**：第一次「什么时候」不是第一个；选过两次以后，u f m u h 下它第一；u m u h（另一串键）下它没有排到第一。
 - **JVM**：`ShuangpinUatTest.aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
@@ -100,8 +100,8 @@
 
 ### SP-36 [P2] 两个键成音节的码下，在这串键上置顶、选过的按声母读的词照样排上来
 - **前提**：B0-双拼（自然码）。
-- **操作**：点 k y（kuai），在候选里找到「可以」（k、y 各按声母读），长按 → 固定到第一个；删光，再点 k y。另起（清掉学到的）：点 k y 选「可以」，删光再做一次；再点 k y。
-- **预期**：固定以后 k y 第一个是「可以」；选过两次以后「可以」比原来靠前，在第一页。在这串键上做的事按做的时候的读法算；别的拼法学到的词、手动加的词仍不按单个声母提上来（SP-34、SP-35）。
+- **操作**：（没打过「可以」）点 k y（kuai），翻完候选；删光，点 k e y i（全码）选「可以」，清空。点 k y，在候选里找到「可以」（k、y 各按声母读），长按 → 固定到第一个；删光，再点 k y。另起（清掉学到的）：点 k e y i 选「可以」，清空；点 k y 选「可以」，删光再做一次；再点 k y。
+- **预期**：没打过时 k y 的候选里没有「可以」；全码打过一次以后有，排在按 kuai 读的后面。固定以后 k y 第一个是「可以」；选过两次以后「可以」比原来靠前，在第一页。在这串键上做的事按做的时候的读法算；别的拼法学到的词、手动加的词仍不按单个声母提上来（SP-34、SP-35）。
 - **JVM**：`ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### SP-38 [P1] 双拼小鹤：按偏的键按落点读
@@ -123,17 +123,41 @@
 - **JVM**：`NeighbourSlipTest.eachShuangpinSchemeReadsTheKeyTappedTowards`（小鹤、自然码、微软）、`aSlipCostsByHowFarTheTapIsFromTheKeyMeant`；设备上不跑。
   微软的 `;` 是韵母键：`l` 点在靠 `;` 的边上，可以读成 `;`；在音节开头想按 `l` 却按到 `;` 时 `;` 照旧上屏成标点（已知限制）。
 
-### SP-41 [P1] 双拼的中间简拼：声母点在正中不读成按偏
-- **前提**：B0-双拼（自然码）。
-- **操作**：每个键点在正中，打首字全码、后面声母的一串（例如 n i k w l：你看完了）；删光，再打一遍，其中 `w` 点在靠 `e` 的边上。
-- **预期**：第一次首选和关掉 **纠正错拼和按偏的键** 时一样，候选里没有把相邻两个声母读成一个按偏的音节；第二次按偏的读法可以出现，但不是首选（照简拼读的排在前面）。
-- **JVM**：`NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle`；设备上不跑。
+### SP-41 [P1] 双拼的中间简拼和按偏的键一起：只打声母的读法只看打没打过，不看点在哪
+- **前提**：B0-双拼（自然码），**纠正错拼和按偏的键** 开着，没打过「什么时候」。
+- **操作**：每个键点在正中打 u f m u h，看第一页；删光，再打一遍，其中 `m` 点在靠 `n` 的边上；删光，全码打一次「什么时候」（u f m e u i h b）并选上；再照前两种点法各打一遍 u f m u h。
+- **预期**：没打过时两种点法都没有「什么时候」；打过以后两种点法第一页都有它，排在按音节读的后面，首选和没打过时一样。相邻两个声母点在正中时不读成一个按偏的音节；按偏的键读出来的不限于打过的词（t 后面的 q 点在靠 a 的边上，没打过任何词也出「他」）。只打声母的读法和按偏的读法谁在前按各自的分数排，不另外保证。
+- **JVM**：`ShuangpinUatTest.initialsInTheMiddleReadTheWordsTypedWhereverTapped`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevSlipTest.aWordTypedIsReadByItsInitialsBeforeASlipOfThem`、`PinyinSessionAbbrevSlipTest.withNothingTypedAKeyReadAsItsNeighbourReadsTheDictionary`、`NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle`（:lib:ime-core:test）；设备上不跑。
 
 ### SP-42 [P1] 编码行显示纠正后的拼写
 - **前提**：B0-双拼（小鹤）。
 - **操作**：点 `t`，再点 `q` 靠下边缘（靠 `a`），看编码行；到 **外观 → 大小与样式 → 编码行** 选「输入框里（实验性）」，回来再打一遍，看输入框。
 - **预期**：两次都显示 `ta`（纠正后的拼音），不是 `tiu` 或原键。
 - **JVM**：`PinyinSessionSlipTest.shuangpinsCodeShowsTheSyllableAsMeant`；设备上不跑。
+
+### SP-43 [P1] 手动加的词不用先打，只打声母就有
+- **前提**：B0-双拼（自然码）。
+- **操作**：点 x m y（x，然后 ming），翻完候选；删光，在用户词库里手动加「小明」（xiao ming）；点 x m y，看候选。
+- **预期**：加之前候选里没有「小明」；加了以后有（你的词一直算打过的，不看 30 个打字日）。
+- **JVM**：`ShuangpinUatTest.aWordAddedByHandIsReadByAKeyAloneAtOnce`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.aWordAddedByHandIsReadByAKeyAlone`（:lib:ime-core:test）；设备上不跑。
+
+### SP-44 [P1] 30 个打字日没再打的词，不再按单个声母读
+- **前提**：B0-双拼（自然码）。
+- **操作**：全码打一次「什么时候」（u f m e u i h b）；点 u f m u h 看候选。之后 30 个不同的日子各打一点别的字，再点 u f m u h；再用全码打一次「什么时候」，再点 u f m u h。
+- **预期**：打过以后 u f m u h 有「什么时候」；30 个打字日没再打，没有了（按音节读的候选不变）；全码再打一次又有。在 u f m u h 下选它也算打了一次，30 个打字日从那天重新算。手动加的词、固定着的词（在哪串键下固定的都算）不受这个期限影响，取消固定以后和别的词一样。
+- **JVM**：`PinyinSessionAbbrevTest.aWordNotTypedForThirtyTypingDaysIsReadByWholeSyllablesOnlyAgain`、`PinyinSessionAbbrevTest.aWordPinnedIsReadByAKeyAloneThoughNotTypedForThirtyTypingDays`、`PinyinSessionAbbrevTest.aWordPickedUnderAKeyReadAloneIsTypedThatDay`、`HabitCountsTest.theNodesToAWordTypedAreThoseOfEachReadingItWasTypedAt`（:lib:ime-core:test，可拨的时钟）；设备上不跑。
+
+### SP-45 [P2] 合并、导入的词库里的词，打过或选定了才按单个声母读
+- **前提**：B0-双拼（自然码），合并了一个词库、导入了一个词库。
+- **操作**：用「第一个字只打声母」的打法打一个只在合并词库（或导入词库）里的词；用全码打出它并选上；再用同样的打法打。
+- **预期**：没打过时不出；全码选过以后出。全码下这些词照常出。
+- **JVM**：`PinyinDecoderTypedTest.aKeyReadAloneReadsNoMergedOrImportedWordNeverTyped`、`PinyinDecoderTypedTest.aKeyReadAloneReadsOnlyTheWordsTypedOrChosen`（:lib:ime-core:test）；设备上不跑。
+
+### SP-46 [P1] 关着「用我的输入习惯」时没有只打声母的读法
+- **前提**：B0-双拼（自然码），全码打过「什么时候」。
+- **操作**：点 u f m u h 看候选；清空，在学习设置里关掉「用我的输入习惯」，点 u f m u h；点 u f m e u i h b；打开「用我的输入习惯」，点 u f m u h。
+- **预期**：开着时有「什么时候」；关着时没有（按音节读），全码照常第一个是「什么时候」；再打开又有。
+- **JVM**：`ShuangpinUatTest.withTheHabitsOffNoKeyIsReadAlone`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.withNoHabitsAKeyIsNotReadAlone`（:lib:ime-core:test）；设备上不跑。
 
 ### SP-47 [P1] 双拼小鹤：照真坐标点在键边上，按偏的键读出；点在正中不读
 - **前提**：B0-双拼，方案换成小鹤（SP-02）。

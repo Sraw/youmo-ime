@@ -113,7 +113,20 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    syllable it reads the key alone too, an initial flagged `SyllableMatches.ABBREV`: 简拼 in the
    middle, as Rime's `abbrev`, at `Penalties.abbrev` (−2) on top of the initial's −1, the least that
    left input in whole syllables reading as before, dev/design/061-shuangpin-abbrev-measure.md;
-   `ime-eval pinyin --sp-abbrev off` reads without it; what asks how the user typed reads the
+   over such a key, there or before on the path, the decoder offers only the words the user typed
+   or chose, `UserWords.typed`: a count, which the learning record's 30 typing days give,
+   `chosen`, or pinned under any keys (`LearnState.pins`, `UserModel.setPinned`: typed while pinned); of the dictionary, the merged ones and the imported alike, and none with no user
+   model or the habits off. `UserModel.typedBelow` keeps the dictionary's and the merged file's
+   nodes to them (`TypedNodes`), at each reading a word was typed at: a word that comes has its nodes
+   marked there and then, and all are marked anew when asked after one went (a count to 0, a forget,
+   an unpin), not on the key after each new word's first commit;
+   `PinyinDecoder.step` leaves the other nodes be, and looks no word ahead over such a key. A key read
+   as its neighbour is no key read alone (`Path.alone` counts the first, `Path.abbreviated` both): a
+   slip reads the whole dictionary. The user's decision (DECISIONS.md 「0.6.1
+   双拼中间简拼改 U」, dev/design/061-shuangpin-abbrev-research.md): every word behind a score of
+   syllables a key doubled a key's time on a phone;
+   `ime-eval pinyin --sp-abbrev off` reads without it, `--history <words.txt>` types words before
+   the run (`TypedHistory`), without which a run reads no key alone; what asks how the user typed reads the
    graph without them nor slips onto a neighbouring key, `SyllableGraph.withoutOtherReadings`: whether the input ends on a syllable
    (`endsOnSyllable`), whether `;` ends one (`readsAfter`), and a code `readsWhole` is the user's
    whole syllables to `HabitOrder` and `Retype` too: under `xm` (xian) a word used under
@@ -176,7 +189,9 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    machine: `ShuangpinKeyWorkTest` (`:lib:ime-eval:uatTest`) holds a 小鹤 key on the app's data
    under ceilings by it, and each key's reading to a decoder's made afresh; `NeighbourKeyWorkTest`
    holds the keys read by where they were tapped (full pinyin, 小鹤, 九键, 14 keys, clean taps) to a
-   tenth over the same input with no place (061-neighbour-correction §7.2; it was 3.5% at most).
+   tenth over the same input with no place (061-neighbour-correction §7.2; it was 3.5% at most; 小鹤
+   with the 3000 likeliest words typed, 8% of the arcs: with none typed a key takes so little that
+   the slips' two hundred arcs are 12% of it).
 3. **Rank.** At `ModelLevel.MEDIUM` and up, `Reranker` adds the 4M sentence model's score of the
    decoder's best whole-input readings (after the text before the cursor) to the decoder's score;
    at `HIGH`, while the user pauses, the 25M model refines the top readings in time slices
@@ -1212,10 +1227,11 @@ the beam comparing before it looks for a state's double, and the first words kep
 start changed and none reads to the end, 14.1/20.1 and 20.3/28.0 (keys 1–20:
 7.7 → 15.3 → 12.0 ms whole), all candidates the same on the 双拼 sets; on the host JVM, through
 `PinyinSession`, a key 0.70 → 0.41 ms whole and 0.91 → 0.54 initials, 0.07 and 0.15 with no key read
-alone. What is left is the reading itself: a 小鹤 key in whole syllables scores 6,400 words on 13,500 arcs
-where it scored 2,900 on 540 (`ShuangpinKeyWorkTest` prints them and holds them a quarter above:
-483 steps, 595 by initials; 114 and 127 first words scored anew), nearly all of them dropped by the model's score, which nothing cheaper
-bounds. So a slow phone is measured on the phone, and by counts where a time would not hold still.
+alone. What was left was the reading itself: a 小鹤 key in whole syllables scored 6,400 words on 13,500 arcs
+where it scored 2,900 on 540, nearly all of them dropped by the model's score, which nothing cheaper
+bounds. So a key alone now reads only the words the user typed or chose (step 1 above): with the 3000 likeliest words typed a key in whole syllables scores 3,600 words on 2,300 arcs in 92 steps (6,800 on 3,700 in 148 by initials), with nothing typed 2,900 on 1,600 in 57, the words from the positions between a syllable's two keys, which nothing then reaches
+(`ShuangpinKeyWorkTest` prints them and holds them a quarter above); with each key tapped in a place and read as its neighbour too, 3,800 on 2,500 in 97 (7,000 on 4,000 in 157 by initials), the case a phone is timed on. A slow phone is measured on the
+phone, and by counts where a time would not hold still.
 
 Keys tapped off-centre on the 6T (`EngineEvalRunner` with `-e evalNine true` for the digits, each key's
 `Touch` of `ime-eval --touch …:s0.2:clean --touched`, 30 samples of 60 keys, learned data on, 2026-11-14/15;

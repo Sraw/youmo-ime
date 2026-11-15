@@ -73,6 +73,7 @@ class HabitCounts(private val user: UserModel) {
         for ((text, reading) in changes.removed) entry(text, reading)?.let(user::disown)
         for ((text, reading) in changes.formed) entry(text, reading)?.let(user::own)
         if (changes.recount || changes.removed.isNotEmpty()) return rebuild(state)
+        if (changes.pins) pinned(state)
         // a new typing day: the counts of the day before a while yet, made anew as a field starts
         // ([settle]), not on the key that began the day (review-1b S1: 4 to 10 ms on a desktop's
         // JVM for a heavy user, several times that on a phone); a commit's words are counted anew still
@@ -107,6 +108,8 @@ class HabitCounts(private val user: UserModel) {
         val from = from(state)
         val counted = HashMap<Int, Float>()
         val read = HashMap<Int, Entry>()
+        // a word's other readings: 简拼 in the middle of 双拼 reads a word typed at each ([TypedNodes.alsoRead])
+        val also = ArrayList<Pair<Int, Entry>>()
         for ((text, readings) in state.wordUses) {
             for ((reading, uses) in readings) {
                 // a table's or handwriting's, of no reading: never pinyin's to count (D28)
@@ -114,13 +117,27 @@ class HabitCounts(private val user: UserModel) {
                 val id = if (n > 0) id(state, text, reading) else NO_WORD
                 if (id == NO_WORD) continue
                 counted[id] = (counted[id] ?: 0f) + n
-                if (id !in read) entry(text, reading)?.let { read[id] = it }
+                if (id !in read) entry(text, reading)?.let { read[id] = it } else entry(text, reading)?.let { also += id to it }
             }
         }
         for ((id, n) in counted) user.setCount(id, n, read[id])
+        for ((id, entry) in also) user.typedNodes.alsoRead(id, entry.syllables)
         for ((key, c) in state.pairs) pair(state, key, c.count)
         user.continuations.clear()
         for ((text, c) in state.phrases) phrase(text, c)
+        pinned(state)
+    }
+
+    // the words pinned, with the readings pinned at: typed ones to 双拼's keys read alone, whenever
+    // last typed (a word pinned under some keys is one the user wants there for good)
+    private fun pinned(state: LearnState) {
+        val words = HashMap<Int, ArrayList<IntArray>>()
+        for (pin in state.pins.values) {
+            val entry = entry(pin.text, pin.reading) ?: continue
+            val id = id(state, pin.text, pin.reading)
+            if (id != NO_WORD) words.getOrPut(id) { ArrayList(1) } += entry.syllables
+        }
+        user.setPinned(words)
     }
 
     // a whole phrase (U-73), offered once used as often as a pair is (U-71)
@@ -155,14 +172,18 @@ class HabitCounts(private val user: UserModel) {
         val readings = state.wordUses[text] ?: return
         val counted = HashMap<Int, Float>()
         val read = HashMap<Int, Entry>()
+        val also = ArrayList<Pair<Int, Entry>>()
         for ((reading, uses) in readings) {
             // a table's or handwriting's, of no reading: never pinyin's to count (D28)
             val id = if (reading.isEmpty()) NO_WORD else id(state, text, reading)
             if (id == NO_WORD) continue
-            counted[id] = (counted[id] ?: 0f) + uses.sumFrom(from)
-            if (id !in read) entry(text, reading)?.let { read[id] = it }
+            val n = uses.sumFrom(from)
+            counted[id] = (counted[id] ?: 0f) + n
+            // a reading not used since is none the word was typed at: 了 typed as le is not read liao by a key alone
+            if (n > 0) entry(text, reading)?.let { if (id !in read) read[id] = it else also += id to it }
         }
         for ((id, n) in counted) user.setCount(id, n, read[id])
+        for ((id, entry) in also) user.typedNodes.alsoRead(id, entry.syllables)
     }
 
     private fun from(state: LearnState) = state.day - LearnState.WINDOW + 1

@@ -335,9 +335,9 @@ class EnginesTest : EnginesFixture() {
         assertEquals(setOf(Offer.PIN, Offer.BLOCK), engines.offers(InputMethodCatalog.PINYIN, 1))
         assertEquals(listOf("拟", "你"), engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PIN, 1).candidates)
         assertTrue(saved.isEmpty())
-        // 双拼 pins under its own codes (impl/design-1b.md §3); after them n alone, 简拼 in the middle,
-        // and i as typed (no word in the data starts with ch)
-        assertEquals(listOf("你", "拟", "你i", "拟i"), engines.type(InputMethodCatalog.SHUANGPIN, "ni").candidates)
+        // 双拼 pins under its own codes (impl/design-1b.md §3); n is read alone, 简拼 in the middle, for
+        // the words typed only, which a pinned one is and 你, never typed, is not
+        assertEquals(listOf("你", "拟", "拟i"), engines.type(InputMethodCatalog.SHUANGPIN, "ni").candidates)
         engines.onEvent(InputMethodCatalog.SHUANGPIN, EngineEvent.RESET, 0)
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
         engines.type(InputMethodCatalog.PINYIN, "ni")

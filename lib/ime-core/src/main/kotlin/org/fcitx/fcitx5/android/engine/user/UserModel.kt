@@ -169,35 +169,22 @@ class UserModel(
      * Goes up as a word of the user's gets an id or loses it: what [known] and [idsOfText] say of
      * a text is the same while this is, or while [textsChangedSince] does not name it.
      */
-    var idsChanged = 0
-        private set
+    val idsChanged: Int get() = idChanges.count
 
-    // the texts of the last words that got an id or lost it, the last of them at [idsChanged]
-    private val changedTexts = ArrayDeque<String>()
+    private val idChanges = ChangedTexts()
 
-    private fun wordChanged(text: String) {
-        idsChanged++
-        changedTexts.addLast(text)
-        if (changedTexts.size > CHANGED_KEPT) changedTexts.removeFirst()
-    }
-
-    // every text's ids may have changed (the words imported did): [textsChangedSince] says null
-    private fun allChanged() {
-        idsChanged += CHANGED_KEPT + 1
-        changedTexts.clear()
-    }
+    private fun wordChanged(text: String) = idChanges.word(text)
 
     // an imported word's id found by its text ([idsOfText]) once it has an entry: given one, its text changed
     internal fun entered(id: Int, entry: Entry) {
         if ((isImport(id) || isMerged(id)) && id !in entries) wordChanged(entry.text)
-        entries[id] = entry
+        val had = entries.put(id, entry)
+        // the reading it had is one it was typed at still ([typedBelow])
+        if (had != null && count(id) > 0f) typedNodes.alsoRead(id, had.syllables) else if (had == null && typed(id)) typedNodes.added(id)
     }
 
     /** The texts whose ids changed since [idsChanged] was [at], or null if more than are kept. */
-    fun textsChangedSince(at: Int): List<String>? {
-        val n = idsChanged - at
-        return if (at < 0 || n > changedTexts.size) null else changedTexts.subList(changedTexts.size - n, changedTexts.size)
-    }
+    fun textsChangedSince(at: Int): List<String>? = idChanges.since(at)
 
     /**
      * [entry] as the user's own word (impl/design-1b.md §3): in the trie if the dictionary lacks
@@ -243,7 +230,8 @@ class UserModel(
         heldImports.clear()
         changes++
         listings++
-        allChanged()
+        // every text's ids may have changed: [textsChangedSince] says null
+        idChanges.all()
     }
 
     /**
@@ -295,16 +283,7 @@ class UserModel(
     // listed: of the user's dictionaries (all of a merged one's), or added by hand
     private fun isListed(id: Int) = id in listed || isMerged(id)
 
-    override val mergedWords: StartWords? = merged?.let { file ->
-        object : StartWords {
-            override fun child(node: Int, syllable: Int) = file.child(node, syllable)
-            override fun firstChild(node: Int) = file.firstChild(node)
-            override fun childCount(node: Int) = file.childCount(node)
-            override fun syllable(node: Int) = file.nodeSyllable(node)
-            override fun wordCount(node: Int) = file.wordCount(node)
-            override fun word(node: Int, index: Int) = mergedBase + file.word(node, index)
-        }
-    }
+    override val mergedWords: StartWords? = merged?.let { MergedTrie(it, mergedBase) }
 
     // the trie's places only, as [idsOfText] and [mergedEntryOf]: one past trieWords is a base word's, in no trie (review F3342)
     override fun forEachMergedOfText(text: String, visit: (Int) -> Unit) {
@@ -328,6 +307,23 @@ class UserModel(
     // and a set's lookup boxes each id (S15 A8.3)
     private val ownedBase = java.util.BitSet()
 
+    // the nodes to the words typed or chosen: what a walk over a 双拼 key read alone keeps to ([typedBelow]);
+    // HabitCounts tells it each reading a counted word was typed at ([TypedNodes.alsoRead])
+    internal val typedNodes = TypedNodes(dictionary, merged, vocabulary.size, mergedBase until importBase, { entries[it]?.syllables }) { visit ->
+        counts.forEach { key, count -> if (first(key) == NO_WORD && count > 0f) visit(second(key)) }
+        owned.forEach(visit)
+        mergedByHand.forEach(visit)
+    }
+
+    override fun typed(word: Int): Boolean = count(word) > 0f || chosen(word) || typedNodes.kept(word)
+
+    /** The words pinned under some keys (LearnState.pins) are [words], each with the readings it is pinned at: [typed] while pinned, whenever last typed. */
+    internal fun setPinned(words: Map<Int, List<IntArray>>) = typedNodes.pinned(words).also { changes++ }
+
+    override fun typedBelow(node: Int): Boolean = typedNodes.below(node)
+
+    override fun mergedTypedBelow(node: Int): Boolean = typedNodes.mergedBelow(node)
+
     // [ownedBase] and [mergedChosen] kept in step with [owned], for [id] just owned or disowned
     private fun ownedChanged(id: Int) {
         if (id in 0 until vocabulary.size) ownedBase[id] = id in owned
@@ -337,12 +333,14 @@ class UserModel(
     // [mergedChosen] kept in step with [owned] and [mergedByHand], for [id] one of them just changed
     private fun mergedChoice(id: Int) {
         if (isMerged(id)) mergedChosen[id - mergedBase] = id in owned || id in mergedByHand
+        if (id in owned || id in mergedByHand) typedNodes.added(id) else typedNodes.stale = true
     }
 
-    // [mergedCounted] as [word]'s count went from [was] to [now]
+    // [mergedCounted] and the typed nodes as [word]'s count went from [was] to [now]
     private fun counted(word: Int, was: Float, now: Float) {
-        if (!isMerged(word) || (was > 0f) == (now > 0f)) return
-        if (now > 0f) mergedCounted++ else mergedCounted--
+        if ((was > 0f) == (now > 0f)) return
+        if (now > 0f) typedNodes.added(word) else typedNodes.stale = true
+        if (isMerged(word)) mergedCounted += if (now > 0f) 1 else -1
     }
 
     /**
@@ -384,13 +382,14 @@ class UserModel(
         typedTexts.clear()
         total = 0f
         mergedCounted = 0
+        typedNodes.forgetReadings()
         changes++
         countsVersion++
     }
 
     /** [word]'s count as [count]; [entry], its reading, kept for [forEachCount] if it has none yet (never a chosen word's own). */
     internal fun setCount(word: Int, count: Float, entry: Entry? = null) {
-        if (entry != null && word !in entries) entered(word, entry)
+        if (entry != null && word !in entries) entered(word, entry) else if (entry != null && count > 0f) typedNodes.alsoRead(word, entry.syllables)
         val key = key(NO_WORD, word)
         val was = counts[key]
         if (was == count) return
@@ -446,6 +445,7 @@ class UserModel(
         indexFollowers()
         indexTyped()
         recomputeTotal()
+        typedNodes.forgetReadings(forgotten)
     }
 
     private fun recomputeTotal() {
@@ -579,7 +579,8 @@ class UserModel(
                 mergedChoice(it)
             }
             Kind.USER -> byHand[it - vocabulary.size] = true
-            Kind.BASE -> Unit
+            // the dictionary's own word stays the dictionary's ([chosen]), but the user named it: typed, to [typed]
+            Kind.BASE -> typedNodes.byHand(it, entry.syllables, added = true)
         }
     }
 
@@ -593,7 +594,7 @@ class UserModel(
                 Kind.IMPORT -> importedByHand -= it
                 Kind.MERGED -> mergedByHand -= it
                 Kind.USER -> byHand[it - vocabulary.size] = false
-                Kind.BASE -> Unit
+                Kind.BASE -> typedNodes.byHand(it, entry.syllables, added = false)
             }
             mergedChoice(it)
         }
@@ -794,24 +795,6 @@ class UserModel(
     private val heldMerged = HeldCache()
     private val heldImports = HeldCache()
 
-    private class HeldCache {
-        private val asked = java.util.BitSet()
-        private val held = java.util.BitSet()
-
-        fun of(place: Int, text: () -> String, gate: CharGate): Boolean {
-            if (!asked[place]) {
-                asked.set(place)
-                if (gate.holds(text())) held.set(place)
-            }
-            return held[place]
-        }
-
-        fun clear() {
-            asked.clear()
-            held.clear()
-        }
-    }
-
     private fun isHeld(word: Int): Boolean {
         val h = held
         if (h === HeldWords.NONE || word < 0) return false
@@ -984,5 +967,59 @@ class UserModel(
         internal const val UNSEEN = 20f
         // how much a word's own share stands in for pairs not yet seen after prev
         internal const val PRIOR = 2f
+    }
+}
+
+// whether each word of a kind, by its place there, is held back: asked of the gate once
+private class HeldCache {
+    private val asked = java.util.BitSet()
+    private val held = java.util.BitSet()
+
+    fun of(place: Int, text: () -> String, gate: CharGate): Boolean {
+        if (!asked[place]) {
+            asked.set(place)
+            if (gate.holds(text())) held.set(place)
+        }
+        return held[place]
+    }
+
+    fun clear() {
+        asked.clear()
+        held.clear()
+    }
+}
+
+// a merged file's trie as the decoder walks it, its words by their ids from [base] up
+private class MergedTrie(private val file: DictionaryFile, private val base: Int) : StartWords {
+    override fun child(node: Int, syllable: Int) = file.child(node, syllable)
+    override fun firstChild(node: Int) = file.firstChild(node)
+    override fun childCount(node: Int) = file.childCount(node)
+    override fun syllable(node: Int) = file.nodeSyllable(node)
+    override fun wordCount(node: Int) = file.wordCount(node)
+    override fun word(node: Int, index: Int) = base + file.word(node, index)
+}
+
+// the texts of the last words that got an id or lost it, the last of them at [count]
+private class ChangedTexts {
+    var count = 0
+        private set
+    private val texts = ArrayDeque<String>()
+
+    fun word(text: String) {
+        count++
+        texts.addLast(text)
+        if (texts.size > UserModel.CHANGED_KEPT) texts.removeFirst()
+    }
+
+    // every text's ids may have changed (the words imported did): [since] says null
+    fun all() {
+        count += UserModel.CHANGED_KEPT + 1
+        texts.clear()
+    }
+
+    /** The texts whose ids changed since [count] was [at], or null if more than are kept. */
+    fun since(at: Int): List<String>? {
+        val n = count - at
+        return if (at < 0 || n > texts.size) null else texts.subList(texts.size - n, texts.size)
     }
 }

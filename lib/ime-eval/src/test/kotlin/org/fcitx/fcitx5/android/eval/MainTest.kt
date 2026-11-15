@@ -465,7 +465,7 @@ class MainTest {
     @Test
     fun spAbbrevOffReadsAKeyAloneOnlyWhereItAndTheNextMakeNoSyllable() {
         // 自然码 ufmuh: shen whole, then m, sh, h by their initials; mu and uh (shang) are pairs, so m
-        // and u alone are 简拼 in the middle: 什么时候 only with it read
+        // and u alone are 简拼 in the middle: 什么时候 only with it read, and only as a word typed before (--history)
         val data = tmp.newFile("abbrev.data").apply {
             writeBytes(
                 PinyinDataBuilder().layers(listOf(WordLayers.BASE)).unigram("<unk>", -7f, 0f).unigram("什么时候", -3f, 0f)
@@ -477,11 +477,15 @@ class MainTest {
         }
         val set = tmp.newFile("set.tsv").apply { writeText("ufmuh\t什么时候\tdaily\n") }
         val result = File(tmp.root, "result.tsv")
-        fun candidates(vararg abbrev: String): List<String> {
-            assertEquals(0, exit("pinyin", data.path, set.path, result.path, "--scheme", "ziranma", *abbrev, "--threads", "1"))
+        val history = tmp.newFile("history.txt").apply { writeText("什么时候\n和\tgone\n没有\n") }
+        fun candidates(vararg abbrev: String, typed: Boolean = true): List<String> {
+            val typedBefore = if (typed) arrayOf("--history", history.path) else emptyArray()
+            assertEquals(0, exit("pinyin", data.path, set.path, result.path, "--scheme", "ziranma", *abbrev, *typedBefore, "--threads", "1"))
             return result.useLines { RunResultFormat.parse(it) }.single().candidates
         }
         candidates().let { assertTrue("$it", "什么时候" in it) }
+        // never typed, no key alone reads it
+        assertFalse("什么时候" in candidates(typed = false))
         candidates("--sp-abbrev", "-1").let { assertTrue("$it", "什么时候" in it) }
         assertFalse("什么时候" in candidates("--sp-abbrev", "off"))
         // the penalty reaches the decoder: free, 什么时候 goes before the reading in whole syllables; at -4 after it
