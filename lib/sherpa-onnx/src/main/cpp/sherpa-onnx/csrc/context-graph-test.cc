@@ -148,4 +148,88 @@ TEST(ContextGraph, CompletingTokensOfASuffix) {
   EXPECT_TRUE(walk("").empty());
 }
 
+// youmo: the streaming decoder ranks and scores a hypothesis as Finalize()
+// ends the offline one's: a phrase begun but not finished gives back its score,
+// a finished one keeps it. Non-strict, as the beam search follows hotwords:
+// "JD" begins seven phrases, "QK" is one of its own, half as boosted a token;
+// "DX" lies inside the seven's path, so a walk through them reaches it by an
+// output link
+TEST(ContextGraph, FinalizedLogProbGivesBackAnUnfinishedPrefix) {
+  std::vector<std::vector<int32_t>> phrases = {{'Q', 'K'}, {'D', 'X'}};
+  std::vector<float> scores = {0.5f, 0.75f};
+  for (int32_t c = 'A'; c != 'H'; ++c) {
+    phrases.push_back({'J', 'D', 'X', c});
+    scores.push_back(1.0f);
+  }
+  ContextGraph graph(phrases, 1.0f, scores);
+  auto walk = [&](const std::string &s, float *sum) {
+    auto state = graph.Root();
+    *sum = 0;
+    for (auto c : s) {
+      auto res = graph.ForwardOneStep(state, c, false);
+      *sum += std::get<0>(res);
+      state = std::get<1>(res);
+    }
+    return state;
+  };
+  float jd = 0, qk = 0;
+  auto jd_state = walk("JD", &jd);
+  auto qk_state = walk("QK", &qk);
+  EXPECT_FLOAT_EQ(jd, 2.0f);  // a prefix's bonus, ahead of the finished word
+  EXPECT_FLOAT_EQ(qk, 1.0f);
+  EXPECT_FLOAT_EQ(FinalizedLogProb(-5.0 + jd, jd_state), -5.0);
+  EXPECT_FLOAT_EQ(FinalizedLogProb(-5.0 + qk, qk_state), -4.0);
+  EXPECT_DOUBLE_EQ(FinalizedLogProb(-5.0, nullptr), -5.0);  // no hotwords
+
+  // "JDX" completes "DX" by the output link and starts again at the root
+  float jdx = 0;
+  EXPECT_EQ(walk("JDX", &jdx), graph.Root());
+  EXPECT_FLOAT_EQ(FinalizedLogProb(jdx, graph.Root()), 1.5f);
+
+  // the trie's own node for `s` (from the root by `next` alone), or none
+  auto node = [&](const std::string &s) -> const ContextState * {
+    const ContextState *n = graph.Root();
+    for (auto c : s) {
+      auto it = n->next.find(c);
+      if (it == n->next.end()) return nullptr;
+      n = it->second.get();
+    }
+    return n;
+  };
+  // every walk, finished or not: as offline (the sum and Finalize()), and what
+  // is left is the scores of the phrases it completed and nothing else. A
+  // non-strict walk completes, at each token, the phrase that is the longest
+  // suffix since its last completion to be in the trie, or else the longest
+  // phrase that is a suffix of that one (its output link), then starts again
+  std::mt19937 rng(11);
+  const std::string letters = "JDQKXAB";
+  for (int32_t round = 0; round != 500; ++round) {
+    std::string s(1 + rng() % 8, ' ');
+    for (auto &c : s) c = letters[rng() % letters.size()];
+    float sum = 0;
+    auto state = walk(s, &sum);
+    EXPECT_FLOAT_EQ(FinalizedLogProb(sum, state),
+                    sum + graph.Finalize(state).first)
+        << s;
+
+    float completed = 0;
+    size_t from = 0;
+    for (size_t end = 1; end <= s.size(); ++end) {
+      std::string deepest;
+      for (size_t b = from; b < end && deepest.empty(); ++b) {
+        if (node(s.substr(b, end - b))) deepest = s.substr(b, end - b);
+      }
+      for (size_t b = 0; b < deepest.size(); ++b) {
+        auto n = node(deepest.substr(b));
+        if (n != nullptr && n->is_end) {
+          completed += n->node_score;
+          from = end;
+          break;
+        }
+      }
+    }
+    EXPECT_NEAR(FinalizedLogProb(sum, state), completed, 1e-4) << s;
+  }
+}
+
 }  // namespace sherpa_onnx

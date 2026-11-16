@@ -37,6 +37,14 @@ need only be made to the streaming recognizer; the changes below that predate 0.
   segments' sum by the new one's length, which favoured longer hypotheses.
   Unlike upstream, the new segment's beam also holds the blank hypothesis at 0, level with the best
   carried one (upstream's was far ahead of them all).
+- **Unfinished hotwords:** a hypothesis that ends inside a hotword it has not finished gets back none of
+  its bonus, as the offline decoder's `ContextGraph::Finalize` takes it at the end of its search
+  (`FinalizedLogProb`, `context-graph.h`): the streaming decoder never ends one, so a hotword's prefix
+  kept what it had added. `StripLeadingBlanks` ranks the n-best and scores it so, and an endpoint's
+  `Reset` carries each hypothesis so. The beam itself is searched as upstream's, a prefix's bonus
+  helping the hotword on while it is spoken, and on purpose an endpoint and its trailing blanks still
+  follow the beam's own best, not finalized. 酒店 begins seven of the pack's hotwords (酒店管理…) and
+  was 3.0 up on 九键 when the segment ended there.
 - **Hotwords graph:** `CreateStream(hotwords)` keeps the graph of the last hotwords it was given and
   returns it again for the same ones, rather than building the pack's hotwords into a new graph for
   each stream. The user's words are not written to the log, where upstream's streaming recognizer

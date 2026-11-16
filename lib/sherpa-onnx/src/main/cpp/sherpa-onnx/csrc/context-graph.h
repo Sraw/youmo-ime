@@ -104,5 +104,14 @@ class ContextGraph {
       const ContextState *state) const;
 };
 
+// youmo: `log_prob` of a hypothesis in `state` were its search to end there:
+// a hotword begun but not finished gives back what it added, as Finalize()
+// takes it at the end of the offline decoder's search. The streaming decoder
+// never ends one: a segment's hypotheses kept a hotword prefix's bonus (酒店,
+// the start of 酒店管理 and six more of the pack's, ended 3.0 up on 九键).
+inline double FinalizedLogProb(double log_prob, const ContextState *state) {
+  return state == nullptr ? log_prob : log_prob - state->node_score;
+}
+
 }  // namespace sherpa_onnx
 #endif  // SHERPA_ONNX_CSRC_CONTEXT_GRAPH_H_

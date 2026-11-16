@@ -1787,7 +1787,8 @@ resets it and ends the engine's window.
   n-best) decodes as the audio comes; no VAD cuts the segments (silero only says whether a short Latin segment was speech, **Quiet** below). Its endpoint rules (2.4 s of silence before
   anything, 1.2 s after something (set in `VoiceEngine.config()`; the Kotlin API's default is 1.4 s), 20 s at most) close a segment: `VoiceEngine.choose` picks its text among the
   n-best (`VoiceChoice`, the pinyin engine's model), and the stream is reset. The user's blocked words are in the
-  search graph (`createStream(hotwords, blocked)`), not searched again. After the microphone closes, 2.42 s of
+  search graph (`createStream(hotwords, blocked)`), not searched again. A hotword begun but not finished where a
+  segment ends adds nothing to its n-best's scores (0.6.1; `lib/sherpa-onnx/README.md`, "Unfinished hotwords"). After the microphone closes, 2.42 s of
   zeros pad the tail (`TAIL_PADDING`: a chunk and half a second, else the last words wait for a chunk that
   never comes; changing it must raise `voice.minVersion`, as the pack's tuning is measured with it; 2.92 s before 2026-11-11, the same CER and last characters on 1448 clips, a second chunk decoded
   after ~19% of stops instead of ~45%, the owner's choice) and the input is finished. Why endpoints and not the VAD: measured on six sets

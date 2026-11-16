@@ -60,6 +60,15 @@ void OnlineTransducerModifiedBeamSearchDecoder::StripLeadingBlanks(
   // youmo: the best from the n-best's own ranking, so on a tie it is still
   // the first of them
   std::vector<Hypothesis> topk = r->hyps.GetTopK(max_active_paths_, true);
+  // youmo: ranked and scored as if the search ended here (FinalizedLogProb):
+  // a hotword's prefix, not finished, is no reason to rank a hypothesis first
+  auto finalized = [](const Hypothesis &h) {
+    return FinalizedLogProb(h.TotalLogProb(), h.context_state) / h.ys.size();
+  };
+  std::stable_sort(topk.begin(), topk.end(),
+                   [&](const Hypothesis &a, const Hypothesis &b) {
+                     return finalized(a) > finalized(b);
+                   });
   Hypothesis &hyp = topk[0];
 
   r->nbest_tokens.clear();
@@ -76,7 +85,7 @@ void OnlineTransducerModifiedBeamSearchDecoder::StripLeadingBlanks(
     // it: dropped (were it kept, a rerank could pick "" and lose the segment)
     if (tokens.empty() && &h != &topk[0]) continue;
     r->nbest_tokens.push_back(std::move(tokens));
-    r->nbest_scores.push_back(h.TotalLogProb() / h.ys.size());
+    r->nbest_scores.push_back(finalized(h));
   }
   // nothing heard yet (the blank hyp alone): no n-best, as offline
   if (r->nbest_tokens.size() == 1 && r->nbest_tokens[0].empty()) {

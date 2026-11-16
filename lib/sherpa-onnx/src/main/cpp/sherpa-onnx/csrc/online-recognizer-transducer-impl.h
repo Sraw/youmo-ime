@@ -478,15 +478,17 @@ class OnlineRecognizerTransducerImpl : public OnlineRecognizerImpl {
       // length favoured long ones. Not as upstream for the beam: r starts with
       // the blank hyp at 0 (GetEmptyResult), now level with the best carried
       // one instead of far ahead of them all, and a carried hyp whose context
-      // is blanks log-adds into it
+      // is blanks log-adds into it. Each finalized first (FinalizedLogProb):
+      // its state goes back to the root below, its hotword's prefix with it
       double best = -std::numeric_limits<double>::infinity();
       for (const auto &it : last_result.hyps) {
-        best = std::max(best, it.second.log_prob);
+        best = std::max(best, FinalizedLogProb(it.second.log_prob,
+                                               it.second.context_state));
       }
       for (const auto &it : last_result.hyps) {
         auto h = it.second;
         r.hyps.Add({std::vector<int64_t>(h.ys.end() - context_size, h.ys.end()),
-                    h.log_prob - best});
+                    FinalizedLogProb(h.log_prob, h.context_state) - best});
       }
 
       r.tokens = std::vector<int64_t>(last_result.tokens.end() - context_size,
