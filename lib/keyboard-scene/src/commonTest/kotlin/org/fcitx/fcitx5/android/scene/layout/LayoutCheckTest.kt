@@ -550,6 +550,32 @@ class LayoutCheckTest {
         }
     }
 
+    // the sixth re-check: a mark beyond the BMP over a letter, and the null notehead, are not seen (SHOULD-1); the
+    // parenthesized and squared capitals are letters (SHOULD-2)
+    @Test
+    fun aMarkBeyondTheBmpIsNotSeenAndEveryEnclosedCapitalIsALetter() {
+        fun loaded(text: String) = when (val p = LayoutReader.layout(text)) {
+            is Parsed.Ok -> LayoutCheck.loaded(p.value, sources, "0.6.1").map { it.key }
+            else -> listOf("unread $p")
+        }
+        fun commands(text: String) = errors(text).filter { it == "command" }.distinct() to loaded(text).filter { it == "command" }.distinct()
+        val held = listOf("command") to listOf("command")
+        fun withRow(keys: String) = qwerty.replace("</keyboard>", "<row>$keys</row>\n</keyboard>")
+        fun text(cp: Int) = if (cp < 0x10000) cp.toChar().toString() else charArrayOf(
+            (((cp - 0x10000) shr 10) + 0xD800).toChar(), (((cp - 0x10000) and 0x3FF) + 0xDC00).toChar(),
+        ).concatToString()
+        fun swiping(label: String) =
+            "<key id=\"x2\" kind=\"function\" label=\"$label\" send=\"layout:Number\" swipe-up=\"shortcut:clear\" shortcut=\"my-qwerty/x2\"/>"
+        for (pad in listOf(0x1D165, 0x1D167, 0x1D16E, 0x101FD, 0x1E944, 0x1D159)) {
+            val label = "e" + text(pad)
+            for ((send, name) in listOf("sym:BackSpace" to "backspace", "sym:Return" to "return")) {
+                assertEquals(held, commands(withRow("<key id=\"c2\" kind=\"function\" label=\"$label\" send=\"$send\" shortcut=\"$name\"/>")), "$name ${pad.toString(16)}")
+            }
+            assertEquals(held, commands(withRow(swiping(label))), "swipe ${pad.toString(16)}")
+        }
+        for (cp in listOf(0x1F110, 0x1F129, 0x1F12B, 0x1F12E)) assertEquals(held, commands(withRow(swiping(text(cp)))), cp.toString(16))
+    }
+
     // the file drawn is not trusted: what needs no scene asked again as it is read to be drawn (L3)
     @Test
     fun aLayoutReadToBeDrawnIsHeldToWhatNeedsNoScene() {

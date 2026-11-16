@@ -863,10 +863,11 @@ private object Sight {
     private val KEY_WORDS = setOf("DEL", "ESC", "TAB", "FN", "ALT", "CTRL", "OK", "GO", "DONE", "NEXT", "SEND", "BACK", "EN")
 
     // [text]'s characters as the eye takes them ([sign]'s), what draws nothing left out: spaces, what Unicode says
-    // draws nothing (Default_Ignorable_Code_Point: a zero-width space, a tag, a 한글 filler), the braille blank, marks
-    // over a letter (e + ´)
+    // draws nothing (Default_Ignorable_Code_Point: a zero-width space, a tag, a 한글 filler), the braille blank and the
+    // null notehead, marks over a letter (e + ´, e + 𝅥: beyond the BMP by [ASTRAL_MARKS])
     private fun seen(text: String): List<Char> = codePoints(text).filterNot { cp ->
-        cp == BRAILLE_BLANK || IGNORABLE.any { cp in it } || (cp < 0x10000 && cp.toChar().let { it.isWhitespace() || it.category in UNSEEN })
+        cp in BLANKS || IGNORABLE.holds(cp) || ASTRAL_MARKS.holds(cp) ||
+            (cp < 0x10000 && cp.toChar().let { it.isWhitespace() || it.category in UNSEEN })
     }.map(::sign)
 
     // [text]'s code points, a surrogate pair one
@@ -890,14 +891,14 @@ private object Sight {
         if (cp >= 0x10000) {
             return when {
                 cp in 0x1D7CE..0x1D7FF -> 'D'
-                cp in 0x1D400..0x1D7CD || ASTRAL_LETTERS.any { cp in it } -> 'L'
+                cp in 0x1D400..0x1D7CD || ASTRAL_LETTERS.holds(cp) -> 'L'
                 else -> '?'
             }
         }
         val f = if (cp in 0xFF01..0xFF5E) (cp - 0xFEE0).toChar() else cp.toChar()
         return when {
             f == ';' -> ';'
-            NO_LETTERS.any { f.code in it } -> '?'
+            NO_LETTERS.holds(f.code) -> '?'
             f.isLetter() || f.code in 0x249C..0x24E9 -> 'L'
             f.category in NUMBERS -> 'D'
             else -> '?'
@@ -905,23 +906,40 @@ private object Sight {
     }
 
     // Unicode's Default_Ignorable_Code_Point (DerivedCoreProperties)
-    private val IGNORABLE = listOf(
-        0x00AD..0x00AD, 0x034F..0x034F, 0x061C..0x061C, 0x115F..0x1160, 0x17B4..0x17B5, 0x180B..0x180F, 0x200B..0x200F,
-        0x202A..0x202E, 0x2060..0x206F, 0x3164..0x3164, 0xFE00..0xFE0F, 0xFEFF..0xFEFF, 0xFFA0..0xFFA0, 0xFFF0..0xFFF8,
-        0x1BCA0..0x1BCA3, 0x1D173..0x1D17A, 0xE0000..0xE0FFF,
+    private val IGNORABLE = intArrayOf(
+        0x00AD, 0x00AD, 0x034F, 0x034F, 0x061C, 0x061C, 0x115F, 0x1160, 0x17B4, 0x17B5, 0x180B, 0x180F, 0x200B, 0x200F,
+        0x202A, 0x202E, 0x2060, 0x206F, 0x3164, 0x3164, 0xFE00, 0xFE0F, 0xFEFF, 0xFEFF, 0xFFA0, 0xFFA0, 0xFFF0, 0xFFF8,
+        0x1BCA0, 0x1BCA3, 0x1D173, 0x1D17A, 0xE0000, 0xE0FFF,
     )
-    private const val BRAILLE_BLANK = 0x2800
 
-    // the squared, circled and negative squared capitals (🄰 🅐 🅰) and the regional indicators
-    private val ASTRAL_LETTERS = listOf(0x1F130..0x1F149, 0x1F150..0x1F169, 0x1F170..0x1F189, 0x1F1E6..0x1F1FF)
+    // whether [cp] is in one of the ranges these pairs bound (first, last), as IntRanges would but smaller in the engine
+    private fun IntArray.holds(cp: Int): Boolean = (indices step 2).any { cp >= this[it] && cp <= this[it + 1] }
+
+    // the braille blank and the musical null notehead, drawn as nothing
+    private val BLANKS = setOf(0x2800, 0x1D159)
+
+    // the stretches beyond the BMP holding every Mn, Mc and Me of Unicode 17, those under 256 apart merged (made by
+    // a script over Python's unicodedata): what else lies between, those scripts' letters and the musical symbols,
+    // is no letter of [sign]'s, and left out with a letter beside it the label is held the stricter
+    private val ASTRAL_MARKS = intArrayOf(
+        0x101FD, 0x1037A, 0x10A01, 0x10AE6, 0x10D24, 0x10D6D, 0x10EAB, 0x1172B, 0x1182C, 0x11D97, 0x11EF3, 0x11F5A,
+        0x13440, 0x13455, 0x1611E, 0x1612F, 0x16AF0, 0x16B36, 0x16F4F, 0x16FF1, 0x1BC9D, 0x1BC9E, 0x1CF00, 0x1CF46,
+        0x1D165, 0x1D244, 0x1DA00, 0x1DAAF, 0x1E000, 0x1E136, 0x1E2AE, 0x1E2EF, 0x1E4EC, 0x1E6F5, 0x1E8D0, 0x1E94A,
+        0xE0100, 0xE01EF,
+    )
+
+    // the parenthesized, squared, circled and negative squared capitals (🄐 🄰 🅐 🅰) and the regional indicators
+    private val ASTRAL_LETTERS = intArrayOf(
+        0x1F110, 0x1F129, 0x1F12B, 0x1F12E, 0x1F130, 0x1F149, 0x1F150, 0x1F169, 0x1F170, 0x1F189, 0x1F1E6, 0x1F1FF,
+    )
 
     private val UNSEEN = setOf(CharCategory.FORMAT, CharCategory.NON_SPACING_MARK, CharCategory.ENCLOSING_MARK)
     private val NUMBERS = setOf(CharCategory.DECIMAL_DIGIT_NUMBER, CharCategory.LETTER_NUMBER, CharCategory.OTHER_NUMBER)
 
     // 한글 jamo, CJK radicals and symbols (〇), kana, 注音, compatibility jamo, 汉字 (A and the unified), 한글
     // syllables, compatibility ideographs, halfwidth kana and jamo
-    private val NO_LETTERS = listOf(
-        0x1100..0x11FF, 0x2E80..0x2FDF, 0x3000..0x31FF, 0x3400..0x4DBF, 0x4E00..0x9FFF, 0xA960..0xA97F, 0xAC00..0xD7FF,
-        0xF900..0xFAFF, 0xFF65..0xFFDC,
+    private val NO_LETTERS = intArrayOf(
+        0x1100, 0x11FF, 0x2E80, 0x2FDF, 0x3000, 0x31FF, 0x3400, 0x4DBF, 0x4E00, 0x9FFF, 0xA960, 0xA97F, 0xAC00, 0xD7FF,
+        0xF900, 0xFAFF, 0xFF65, 0xFFDC,
     )
 }
