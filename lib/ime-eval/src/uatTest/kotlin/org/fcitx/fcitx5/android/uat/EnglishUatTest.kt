@@ -7,6 +7,9 @@ package org.fcitx.fcitx5.android.uat
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.eval.TouchSim
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -187,5 +190,36 @@ class EnglishUatTest {
         space()
         // corrected still, to the next likeliest (they), never to the word blocked
         assertTrue("thw corrected to $text", text != "the " && text != "thw ")
+    }
+
+    // the nine keys as a phone 400 dp wide has them (TouchSim's nine: keys 88 by 56 dp), [digits] each pressed in
+    // its middle but the one at [at], tapped [dx] of its width across from its middle
+    private fun EngineReplay.nine(digits: String, at: Int = -1, dx: Float = 0f) {
+        val board = TouchSim.board("nine")
+        digits.forEachIndexed { i, d ->
+            val box = board.keys.getValue(d)
+            val touch = if (i == at) board.boxes.touch(d, box.cx + dx * box.w, box.cy) else null
+            key(EngineReplay.symOf(Keyboard.nineKey(d, upper = false)), payload = Action.Key(d, touch = touch))
+        }
+    }
+
+    // when (9436) with its 4 slipped to 5: at 5's edge by 4 (a twentieth of the key from it), when; in 5's middle,
+    // each key's first letter: 9536 spells nothing
+    @Test
+    @Uat("EN-31")
+    fun aNineKeyTappedAtTheEdgeOfTheNextIsReadAsIt() {
+        with(english()) {
+            nine("9536", at = 1, dx = -0.45f)
+            expectPreedit("when")
+        }
+        with(english()) {
+            nine("9536")
+            expectPreedit("wjdm")
+        }
+        // a tenth of the key from the edge: too far in
+        with(english()) {
+            nine("9536", at = 1, dx = -0.38f)
+            expectPreedit("wjdm")
+        }
     }
 }

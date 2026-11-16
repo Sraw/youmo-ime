@@ -825,7 +825,10 @@ On pinyin.tsv (2026-10-16), the table's order → the word model (low): 五笔 7
 ## English
 
 `EnglishSession`: word-at-a-time, as Gboard. The candidates are the word typed and what it may be
-(`EnglishDecoder`: spelt, started, or spelt with a slip); a word that is none is corrected and
+(`EnglishDecoder`: spelt, started, or spelt with a slip); a key typed as one beside it costs by where
+the tap fell (`Action.Key.touch`, kept a place each beside the input; 061-neighbour-english): pinyin's
+`SlipCost` (σ 10 dp, never below 0), at most `far` (a tap in a key's middle costs about as much: 2.2–2.8 on
+a phone's keys 32–36 dp wide), the fixed `near` where a key has no place (a hardware key, TalkBack); a word that is none is corrected and
 space commits the correction; backspace right after takes it back and that word is never corrected
 again; so is a word picked over its correction, and one whose correction a tap back takes back
 (`Corrections`: the cursor put right after a correction of the field's last few, the word typed is
@@ -878,7 +881,11 @@ On the nine keys English takes `Action.NineKey(digit, upper)` (the host `Keyboar
 (`'` from 1, kept in place) and `NineKeyWords` reads it: an `EnglishDecoder` whose substitution is
 `nineKeyCost` (a digit fits any of its `NineKeyLetters`, the same 按键字母 as pinyin's nine keys; a letter only
 itself) and whose every edit costs `NINE_KEY_COSTS`' `NEVER`, the user's own words matched the same
-way, then words as long as the keys first, completions after, each by score, in the case Shift gave
+way; a digit tapped with a place (`Action.NineKey.touch`) also fits the letters of the digit key next
+to it that the tap leans to (`EnglishDecoder.nineKeyTap`: pinyin nine keys' `SlipCost`, floor -3: on keys
+80–88 dp wide a tap within about a tenth of the width of that edge), 2
+dearer where some word of the keys as typed is among the words (`legalSlip`, as pinyin's legal slip:
+without it one word of 19669 typed on target went wrong, `not` read `you`), then words as long as the keys first, completions after, each by score, in the case Shift gave
 each key. A letter a long press pinned (`Action.NineKey` with the letter, `Keyboard.NINE_LETTERS`
 from 0xF0060; where English does not suggest the addon swallows the digits and types the letter) is
 itself among the keys, and marks the word the nine keys' (`pinned`) though no digit is left: never
@@ -888,7 +895,13 @@ preedit and `typed()` are the first candidate, else each key's first letter
 (`NineKeyWords.firstLetters`, a guess not learned), so space, punctuation, Enter and the
 arrows commit a word, never the digits; the cursor stays at the end; `keypad()` picks the nth
 candidate (`picksByDigit`). `ime-eval english --keys nine` measures it (2026-10-20, english.txt:
-95.9% first, 98.4% in the first three).
+95.9% first, 98.4% in the first three). `--hand s0.2` (TouchSim's hand, either keyboard) taps each key
+with a place and gives rows as the session reads it (`-t`) and as with `readsTouch` off (`-0`):
+clean, a slip a word (`slip1`, a key landing in one next to it) and, on the full keyboard, the
+`--noise` slips (`slips`). 2026-11-15, english.txt, s0.2: full keyboard clean 87 → 71 words wrong
+(26 put right, 10 newly wrong, as `rammy` → `army`), slips fixed 73.8% → 75.8%, a slip a word
+80.2% → 82.7% (first three 93.4% → 96.2%); a looser hand (s0.3): clean 87 → 74 wrong, but slips fixed
+73.8% → 73.4% and a slip a word 80.5% → 79.3%. Nine keys, s0.2: clean the same words, a slip a word 0% → 72.9%.
 Each char a screen key types there is sent as `EngineEvent.TYPED` (`Keyboard` passes it on, then
 `Session.typed`: the session's edge, and its known text if it knows the text before it). The
 screen's Backspace there goes the same way as `Session.ERASED`, as does the session's own

@@ -79,33 +79,40 @@ internal val COMMANDS = listOf(
         predict(dataPath, setPath, RunOptions(args.options).threads, args.options["offers"], args.options["rerank"], weight, out)
     },
     Command(
-        "english", "<english.data> <sentences.txt> [--keys nine] [--noise <rate>] [--max-correction <cost>] [--misses <out.tsv>] [--threads <n>]",
-        2..2, "keys", "noise", "max-correction", "misses", "threads",
+        "english", "<english.data> <sentences.txt> [--keys nine] [--noise <rate>] [--hand <s0.2>] [--max-correction <cost>] [--misses <out.tsv>] [--threads <n>]",
+        2..2, "keys", "noise", "hand", "max-correction", "misses", "threads",
     ) { args, out, _ ->
         if (args.options["keys"].let { it != null && it != "nine" }) return@Command null
         val (dataPath, setPath) = args.operands
         val sentences = File(setPath).readLines().filter { it.isNotBlank() && !it.startsWith("#") }
         // checked already: see optionsValid
         val nine = args.options["keys"] == "nine"
-        val run = EnglishRun(EnglishData.load(mapFile(dataPath)), maxCorrection = args.options["max-correction"]?.toFloat() ?: EnglishSession.MAX_CORRECTION, nineKeys = nine)
+        val data = EnglishData.load(mapFile(dataPath))
+        val maxCorrection = args.options["max-correction"]?.toFloat() ?: EnglishSession.MAX_CORRECTION
+        // taps with a place (TouchSim's hand, s0.2 as pinyin's): each set typed as 0.6.1 read it before (the place
+        // not read, `-0`) and as now (`-t`), and a set of a slip a word landing where the hand takes it (`slip1`)
+        val hand = args.options["hand"]?.let(TouchSim::hand)
+        val runs = if (hand == null) {
+            listOf("" to EnglishRun(data, maxCorrection = maxCorrection, nineKeys = nine))
+        } else {
+            listOf(false, true).map { reads -> (if (reads) "-t" else "-0") to EnglishRun(data, maxCorrection = maxCorrection, nineKeys = nine, hand = hand, readsTouch = reads) }
+        }
         val noise = args.options["noise"]?.toDouble() ?: ENGLISH_NOISE
         val threads = RunOptions(args.options).threads
-        if (nine) {
-            // each key meant: no slip to measure; a word not offered at all is spelled by its letters, pinned by long press
-            val r = run.run(sentences, 0.0, ENGLISH_SEED, threads)
-            out.appendLine(EnglishRun.Result.NINE_HEADER)
-            out.appendLine(r.nineRow())
-            args.options["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
-            return@Command 0
+        val misses = ArrayList<String>()
+        out.appendLine(if (nine) EnglishRun.Result.NINE_HEADER else EnglishRun.Result.HEADER)
+        for ((suffix, run) in runs) {
+            // the nine keys: each key meant, no slip of [noise]; a word not offered at all is spelled by its letters, pinned by long press
+            val sets = listOf("clean" to run.run(sentences, 0.0, ENGLISH_SEED, threads)) +
+                (if (nine) emptyList() else listOf("slips" to run.run(sentences, noise, ENGLISH_SEED, threads))) +
+                (if (hand == null) emptyList() else listOf("slip1" to run.run(sentences, 0.0, ENGLISH_SEED, threads, oneSlip = true)))
+            for ((name, r) in sets) {
+                val label = if (nine && hand == null) "nine" else name + suffix
+                out.appendLine(if (nine) r.nineRow(label) else r.row(label))
+                misses += r.misses.map { "$label\t$it" }
+            }
         }
-        out.appendLine(EnglishRun.Result.HEADER)
-        val clean = run.run(sentences, 0.0, ENGLISH_SEED, threads)
-        val slips = run.run(sentences, noise, ENGLISH_SEED, threads)
-        out.appendLine(clean.row("clean"))
-        out.appendLine(slips.row("slips"))
-        args.options["misses"]?.let { path ->
-            File(path).printWriter().use { w -> (clean.misses.map { "clean\t$it" } + slips.misses.map { "slips\t$it" }).forEach(w::println) }
-        }
+        args.options["misses"]?.let { path -> File(path).printWriter().use { w -> misses.forEach(w::println) } }
         0
     },
     Command(
@@ -466,6 +473,7 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("neighbours") { it in ON_OFF && readsNeighbours(scheme) },
         valid("touched") { "touch" in options },
         valid("touch") { "taps" !in options && touchValid(it) },
+        valid("hand") { runCatching { TouchSim.hand(it) }.isSuccess },
         valid("typos") { it in ON_OFF && readsTypos(scheme) },
         // 双拼's 简拼 in the middle: off, the reading before it, or another extra penalty than the app's
         valid("sp-abbrev") { readsAbbrev(it, scheme) },

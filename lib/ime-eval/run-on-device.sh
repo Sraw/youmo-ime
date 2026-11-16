@@ -7,7 +7,8 @@
 #   lib/ime-eval/run-on-device.sh [set=pinyin] [ime=engine-pinyin] [out-dir=build/eval]
 # A set tapped with a place (ime-eval's pinyin --touch … --touched lib/ime-eval/data/<name>.tsv, not committed) types
 # each key with its touch, as a finger's tap carries it (061-neighbour-correction). NINE=1 types a set of digits (ime-eval's
-# nine-key sets) as pinyin's nine keys send them, codes of their own, with ime=engine-pinyin; GROUPED=14 or 18 a set of
+# nine-key sets) as pinyin's nine keys send them, codes of their own, with ime=engine-pinyin (with ime=keyboard-us, as
+# English's nine keys send them); GROUPED=14 or 18 a set of
 # the 14 or 18 keys' codes (--scheme g14/g18) as those keys send them.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

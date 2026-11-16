@@ -377,7 +377,8 @@ class T9Keyboard(
             }
             if (spells) {
                 tap.reset()
-                return KeyAction.SymAction(KeySym(UNICODE + Keyboard.nineKey(key, upper)), KeyStates.Virtual)
+                // with where it fell, for English to read it as a digit key next to it (061-neighbour-english)
+                return KeyAction.SymAction(KeySym(UNICODE + Keyboard.nineKey(key, upper)), KeyStates.Virtual, (action as KeyAction.HostKeyAction).touch)
             }
             val next = tap.press(key, keyLetters, time)
             return cycled(tap, next, keyLetters) { cased(it, if (next == null) upper else runUpper) }
@@ -516,9 +517,9 @@ class T9Keyboard(
         }
 
     // each letter where the scene draws its digit's key (nine.xml's key N)
-    // the digit keys with letters, pinyin's (061-neighbour-correction): not 1 and 0, nor English's or 双拼's
+    // the digit keys with letters, pinyin's and English's (061-neighbour-correction, 061-neighbour-english): not 1 and 0, nor 双拼's
     override fun typingKeys(): List<Pair<Char, KeyRef>> =
-        if (english || shuangpin) emptyList() else ('2'..'9').filter { letters.letters(it).isNotEmpty() }.map { it to KeyRef(it.toString()) }
+        if (shuangpin) emptyList() else ('2'..'9').filter { letters.letters(it).isNotEmpty() }.map { it to KeyRef(it.toString()) }
 
     private val sceneLetters: List<Pair<Char, ScenePlace>> = ('2'..'9').flatMap { d ->
         scenePlace(d.toString()).let { at -> letters.letters(d).map { it.lowercaseChar() to at } }

@@ -147,6 +147,20 @@ class NeighbourTouchTest {
         assertEquals(1, h.api.touches.size)
     }
 
+    // English on the nine keys spelling a word: each digit with its place too, as the sym English reads it
+    // (061-neighbour-english)
+    @Test
+    @Uat("EN-31")
+    fun englishsNineKeysDigitsGoWithTheirPlace() {
+        val h = KeyboardHarness(im = KeyboardHarness.ENGLISH, keyboards = ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS))
+            .also { h = it }.start()
+        h.tapOff(h.keyNamed("5"), 0.3f)
+        val (key, touch) = h.api.touches.single()
+        assertTrue(key, key.startsWith("sym="))
+        assertEquals(0.3f, touch.dx, 0.03f)
+        assertEquals(setOf('2', '4', '6', '8'), near(touch))
+    }
+
     // through the host to the engine: the key's payload, the engine's Keyboard reads its touch
     @Test
     @Uat("PY-137")

@@ -88,27 +88,34 @@ object TouchSim {
             val input = StringBuilder(s.input)
             val touches = s.input.indices.map { i ->
                 val c = s.input[i]
-                val box = board.keys[c] ?: return@map null
-                val around = board.boxes.around(c).map { it.char }
+                if (c !in board.keys) return@map null
+                val onto = if (i == at) board.boxes.around(c).map { it.char } else listOf(c)
                 // a slip with nowhere to land (no key beside it): the sample left out
-                if (i == at && around.isEmpty()) return@mapIndexedNotNull null
-                var tries = 0
-                while (true) {
-                    if (++tries > MAX_TRIES) return@mapIndexedNotNull null
-                    val shift = if (hand.halves != 0f) (if (box.cx < middle) hand.halves else -hand.halves) else hand.dx
-                    val x = box.cx + (shift + random.nextGaussian().toFloat() * hand.sigma) * KEY_W
-                    val y = box.cy + (hand.dy + random.nextGaussian().toFloat() * hand.sigma) * KEY_W
-                    val hit = if (i == at) around.firstOrNull { board.keys.getValue(it).has(x, y) } else c.takeIf { box.has(x, y) }
-                    if (hit != null) {
-                        input.setCharAt(i, hit)
-                        return@map board.boxes.touch(hit, x, y)
-                    }
-                }
-                @Suppress("UNREACHABLE_CODE")
-                null
+                val (hit, touch) = tap(board, c, onto, hand, random, middle) ?: return@mapIndexedNotNull null
+                input.setCharAt(i, hit)
+                touch
             }
             s.copy(input = input.toString(), touches = touches, tag = if (slip) "slip" else s.tag)
         }
+    }
+
+    /**
+     * A tap of [hand] aimed at the key [c] of [board], landing in one of the keys [onto] (itself, or
+     * keys next to it, the first that has the tap): the key hit and the tap. Null where none of
+     * [onto] is on the board or none lands so in [MAX_TRIES].
+     */
+    fun tap(board: Board, c: Char, onto: List<Char>, hand: Hand, random: Random, middle: Float = board.keys.values.maxOf { it.right } / 2): Pair<Char, Touch>? {
+        val box = board.keys.getValue(c)
+        val boxes = onto.mapNotNull { d -> board.keys[d]?.let { d to it } }
+        if (boxes.isEmpty()) return null
+        repeat(MAX_TRIES) {
+            val shift = if (hand.halves != 0f) (if (box.cx < middle) hand.halves else -hand.halves) else hand.dx
+            val x = box.cx + (shift + random.nextGaussian().toFloat() * hand.sigma) * KEY_W
+            val y = box.cy + (hand.dy + random.nextGaussian().toFloat() * hand.sigma) * KEY_W
+            val hit = boxes.firstOrNull { it.second.has(x, y) }?.first
+            if (hit != null) return hit to checkNotNull(board.boxes.touch(hit, x, y))
+        }
+        return null
     }
 
     private fun KeyBoxes.Box.has(x: Float, y: Float) = x >= left && x < right && y >= top && y < bottom

@@ -51,8 +51,11 @@ class EngineEvalRunner {
 
     private var unrefined = 0
 
-    // -e evalNine true: digits as pinyin's nine keys send them, codes of their own (Keyboard.pinyinNineKey)
+    // -e evalNine true: digits as pinyin's nine keys send them, codes of their own (Keyboard.pinyinNineKey); for
+    // English as its nine keys do (Keyboard.nineKey)
     private var nine = false
+
+    private var english = false
 
     // -e evalGrouped 14|18: a set's codes as pinyin's 14 keys send them (the group's code itself) or its 18 keys (codes of
     // their own, Keyboard.pinyin18Key), as GroupedKeyboard wires them
@@ -66,6 +69,7 @@ class EngineEvalRunner {
         checkThisInputMethodIsNotBound()
         val ime = args.getString("evalIme") ?: InputMethodCatalog.PINYIN
         nine = args.getString("evalNine") == "true"
+        english = ime == InputMethodCatalog.ENGLISH
         grouped = args.getString("evalGrouped")?.also { require(it == "14" || it == "18") { "evalGrouped $it" } }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val testContext = InstrumentationRegistry.getInstrumentation().context
@@ -155,7 +159,7 @@ class EngineEvalRunner {
             val start = SystemClock.elapsedRealtimeNanos()
             val touch = sample.touches?.getOrNull(i)
             when {
-                nine -> fcitx.sendKey(KeySym(UNICODE + Keyboard.pinyinNineKey(c)), KeyStates.Virtual, touch = touch)
+                nine -> fcitx.sendKey(KeySym(UNICODE + if (english) Keyboard.nineKey(c, upper = false) else Keyboard.pinyinNineKey(c)), KeyStates.Virtual, touch = touch)
                 grouped == "14" -> fcitx.sendKey(KeySym(UNICODE + c.code), KeyStates.Virtual, touch = touch)
                 grouped == "18" -> fcitx.sendKey(KeySym(UNICODE + Keyboard.pinyin18Key(c)), KeyStates.Virtual, touch = touch)
                 touch != null -> fcitx.sendKey(c.toString(), touch = touch)

@@ -213,7 +213,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         keyedChar(codePoint)?.let { return keyed(codePoint, it, payload) }
         if (codePoint in NINE_DIGITS) {
             val n = codePoint - NINE_DIGITS.first
-            return session.apply(Action.NineKey('0' + n % DIGITS, upper = n >= DIGITS))
+            return session.apply(Action.NineKey('0' + n % DIGITS, upper = n >= DIGITS, touch = touch))
         }
         if (codePoint in NINE_LETTERS) {
             val n = codePoint - NINE_LETTERS.first

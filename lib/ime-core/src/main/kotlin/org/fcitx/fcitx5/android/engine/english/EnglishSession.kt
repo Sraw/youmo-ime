@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.EnCommit
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -108,11 +109,8 @@ class EnglishSession(
         return if (misspelling) user.neverCorrected(text) else user.count(text) > 0f
     }
 
-    private val input = StringBuilder()
+    private val input = TypedKeys()
     private var cursor = 0 // in input
-
-    // of the input, the nine keys' typed with Shift (a digit has no case of its own)
-    private val upperKeys = BitSet()
 
     // a nine key in the input (a digit: English reads none otherwise): its words are spelled by keys
     // a letter a long press pinned in (Action.NineKey) makes the word the nine keys' though no
@@ -227,7 +225,7 @@ class EnglishSession(
     }
 
     private fun act(action: Action): Snapshot = when (action) {
-        is Action.Key -> key(action.char)
+        is Action.Key -> key(action.char, action.touch)
         is Action.Glide -> glide(action.glide)
         Action.Backspace -> backspace()
         is Action.Select -> select(action.index)
@@ -236,7 +234,7 @@ class EnglishSession(
         Action.PreviousPage -> turn(pager.page - 1)
         // an arrow, a tab, enter: the word left as it is, maybe half typed, so not learned
         Action.CommitRaw -> commitRaw()
-        is Action.NineKey -> nineKey(action.digit, action.upper)
+        is Action.NineKey -> nineKey(action.digit, action.upper, action.touch)
         // the nine keys' input is no text to move about in: a tap on it leaves it as it is
         is Action.Cursor -> cursor(action.at)
         // the keyboard commits the word on an arrow (Keyboard.whileComposing): none comes here
@@ -453,7 +451,7 @@ class EnglishSession(
         return snapshot()
     }
 
-    private fun nineKey(digit: Char, upper: Boolean): Snapshot {
+    private fun nineKey(digit: Char, upper: Boolean, touch: Touch? = null): Snapshot {
         val letter = digit in 'a'..'z' || digit in 'A'..'Z'
         if (!letter && (digit !in '2'..'9' || nineKeys.letters(digit).isEmpty())) return snapshot()
         corrected = null
@@ -463,22 +461,20 @@ class EnglishSession(
         }
         // a word begun on the full keyboard (a hardware key's letters) goes on as the nine keys'
         pinned = pinned || letter
-        cursor = input.length
-        upperKeys[cursor] = upper
-        input.append(digit)
+        input.append(digit, upper, touch)
         cursor = input.length
         read()
         return snapshot()
     }
 
-    private fun key(c: Char): Snapshot {
+    private fun key(c: Char, touch: Touch? = null): Snapshot {
         corrected = null
         if (reads(c)) {
             if (input.isEmpty()) {
                 candidates = emptyList()
                 pinned = false
             }
-            input.insert(cursor++, c)
+            input.insert(cursor++, c, touch)
             read()
             return snapshot()
         }
@@ -567,8 +563,7 @@ class EnglishSession(
         last = ""
         // at the start of the word: nothing before it is the session's to delete
         if (cursor == 0) return snapshot()
-        input.deleteCharAt(--cursor)
-        upperKeys.clear(cursor)
+        input.deleteAt(--cursor)
         read()
         return snapshot()
     }
@@ -584,8 +579,7 @@ class EnglishSession(
         undo.made.seqs.forEach(user::undo)
         learn(typed, typed, EnCommit.REVERTED)
         reverted = typed
-        input.setLength(0)
-        input.append(typed)
+        input.set(typed)
         cursor = input.length
         keepTyped = true
         read()
@@ -630,7 +624,7 @@ class EnglishSession(
     }
 
     private fun clear() {
-        input.setLength(0)
+        input.clear()
         cursor = 0
         candidates = emptyList()
         pager.reset()
@@ -638,7 +632,6 @@ class EnglishSession(
         keepTyped = false
         reverted = null
         pinned = false
-        upperKeys.clear()
     }
 
     private fun forgetText() {
@@ -782,7 +775,7 @@ class EnglishSession(
         // no decoder, no correction: the context is not looked at
         val context = decoder?.context(before) ?: 0L
         scoredPrev = previous(before)
-        val found = decoder?.let { d -> offeredOf(SUGGESTED + 1, ::offered) { d.suggest(keys, context, it) } }.orEmpty()
+        val found = decoder?.let { d -> offeredOf(SUGGESTED + 1, ::offered) { d.suggest(keys, context, it, touches = input.keyTouches()) } }.orEmpty()
         // a capital the sentence's start does not account for is the user's: a name, not a slip
         val upper = typed.count { it.isUpperCase() }
         val name = upper > 1 || upper == 1 && !(typed[0].isUpperCase() && before.lastOrNull().let { it == null || it == EnglishText.START })
@@ -806,11 +799,11 @@ class EnglishSession(
         val context = nine.decoder.context(before)
         val prev = previous(before)
         scoredPrev = prev
-        val found = offeredOf(SUGGESTED + 1, ::offered) { nine.decoder.suggest(keys, context, it, exactFirst = true) }
+        val found = offeredOf(SUGGESTED + 1, ::offered) { nine.decoder.suggest(keys, context, it, exactFirst = true, touches = input.keyTouches()) }
             .map { NineKeyWords.Found(data.word(it.word), it.score, it.completes) }
         refreshUser(data)
         val own = userOnly.mapNotNull { if (blocked(it)) null else nine.own(it, keys, user.score(Float.NEGATIVE_INFINITY, prev, it)) }
-        val words = nine.ordered(found + own, input).map { nine.inCase(capitalI(it), input, upperKeys) }
+        val words = nine.ordered(found + own, input).map { nine.inCase(capitalI(it), input, input.upper) }
         // every letter pinned: that word first, as typed, though the data has longer ones it starts
         val pinnedWord = listOfNotNull(capitalI(input.toString()).takeIf { input.none { it in '2'..'9' } })
         candidates = (pinnedWord + words).distinct().take(SUGGESTED + 1)
@@ -871,7 +864,7 @@ class EnglishSession(
      * digit), for the user to mend.
      */
     private fun typed(): String {
-        if (nineKeyed()) return candidates.firstOrNull() ?: nine?.firstLetters(input, upperKeys) ?: input.toString()
+        if (nineKeyed()) return candidates.firstOrNull() ?: nine?.firstLetters(input, input.upper) ?: input.toString()
         return capitalI(input.toString())
     }
 

@@ -119,3 +119,27 @@ def en27(d):
 
 case("EN-28", needs="jvm:EnglishBlockOffersTest")(lambda d: None)
 case("EN-29", needs="jvm:EnginesWordCardTest、CandidateMenuUatTest.noReadingLineWhereTheEngineHasNoCard")(lambda d: None)
+case("EN-30", needs="jvm:EnglishTouchTest.whereAKeyWasTappedSaysWhetherItWasTheOneBeside、EnglishDecoderTest.aTapsPlaceSetsWhatTheKeyBesideItCosts")(lambda d: None)
+@case("EN-31", base="B0-英文", mutates=True)
+def en31(d):
+    from uat import choose, gear, keys_at
+    d.hide_keyboard()
+    gear(d, "英文")
+    choose(d, "键盘", "九键")
+    d.open_page("text")
+    d.switch_im("英文")
+    d.clear()
+    # when (9436) with its 4 slipped onto 5, tapped 3% of 5's width in from its left edge, by 4: when; all in the
+    # middle, each key's first letter (9536 spells nothing)
+    keys_at(d, "9536", [None, (0.03, 0.5), None, None])
+    # English's nine keys compose in the field (no code row)
+    edge = d.field_text()
+    c = d.cands()
+    d.shot("kb", "9、5 贴着靠 4 的左边、3、6：框里正在打的是 when，首选 when")
+    d.clear()
+    keys_at(d, "9536", [None] * 4)
+    mid = d.field_text()
+    d.clear()
+    check(edge == "when" and "when" in c[:3], f"5 贴左边点的 9536：框里「{edge}」，候选 {c[:4]}")
+    check(mid == "wjdm", f"四个键都点在正中的 9536：框里「{mid}」")
+    return f"贴边「{edge}」{c[:3]}；正中「{mid}」"

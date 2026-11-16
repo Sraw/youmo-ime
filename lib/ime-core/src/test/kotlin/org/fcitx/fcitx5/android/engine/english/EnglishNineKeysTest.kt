@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.engine.english
 
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.engine.pinyin.Near
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
@@ -25,6 +28,25 @@ class EnglishNineKeysTest {
 
     private fun EnglishSession.nine(keys: String, upper: Boolean = false): Snapshot =
         keys.map { if (it in '2'..'9') apply(Action.NineKey(it, upper)) else apply(Action.Key(it)) }.last()
+
+    // 6 tapped [dx] across from its middle, 5 left of it
+    private fun onSix(dx: Float) = Touch(dx, 0f, 88f, 56f, listOf(Near('5', -1f, 0f), Near('3', 0f, -1f), Near('9', 0f, 1f)))
+
+    @Test
+    @Uat("EN-31")
+    fun aDigitTappedAtTheEdgeOfTheNextIsReadAsThatOneToo() {
+        val session = session()
+        session.nine("435")
+        // hell's last 5 slipped onto 6, at its edge by 5
+        assertEquals("hell", session.apply(Action.NineKey('6', touch = onSix(-0.45f))).preedit)
+        session.apply(Action.Reset)
+        session.nine("435")
+        // in 6's middle: no word, each key's first letter
+        assertEquals("gdjm", session.apply(Action.NineKey('6', touch = onSix(0f))).preedit)
+        // no place: 6 alone
+        session.apply(Action.Reset)
+        assertEquals("gdjm", session.nine("4356").preedit)
+    }
 
     @Test
     fun onTheNineKeysTheFirstWordTheyMayBeIsShownAndCommittedForThem() {

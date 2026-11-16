@@ -245,9 +245,11 @@ sealed class Action {
     /**
      * A key of the nine keys typed for English: [digit] (2 to 9), any of its letters, the session
      * spelling the word ([upper]: that letter a capital, Shift on as it was pressed); or a letter
-     * a long press pinned there, itself, the word still the nine keys' (never corrected).
+     * a long press pinned there, itself, the word still the nine keys' (never corrected). [touch]:
+     * where on its key it was tapped and the keys around it, for reading it as one of those
+     * (061-neighbour-english); null for none.
      */
-    data class NineKey(val digit: Char, val upper: Boolean = false) : Action()
+    data class NineKey(val digit: Char, val upper: Boolean = false, val touch: Touch? = null) : Action()
 
     /** Commits what was typed, as typed (enter). */
     object CommitRaw : Action()

@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.engine.english
 import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.data.runEnd
 import org.fcitx.fcitx5.android.engine.pinyin.KeyNeighbours
+import org.fcitx.fcitx5.android.engine.pinyin.SlipCost
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 
 /**
  * What typing a word's keys otherwise costs, in the model's log10: a key beside the one meant
@@ -46,6 +48,11 @@ class EnglishDecoder(
     private val costs: TypingCosts = TypingCosts(),
     // what a key typed costs for the letter meant: by default a key beside it [TypingCosts.near], any other far
     private val keyCost: ((meant: Char, typed: Char) -> Float)? = null,
+    // what a key tapped at a place costs read as the one meant: by default [nearTap]'s
+    private val tapCost: ((touch: Touch, typed: Char, meant: Char) -> Float)? = null,
+    // what a word read through a tap's slip costs more where the keys as typed spell a word as long as them (as
+    // SlipCost.legal; the nine keys'), none past the limit; 0 for nothing more
+    private val legalSlip: Float = 0f,
     // a word's score after a context: the model's, or with what the user typed added
     private val score: (context: Long, word: Int) -> Float = data.model::scoreAfter,
 ) {
@@ -122,14 +129,26 @@ class EnglishDecoder(
     /**
      * The [limit] best words for [keys] (letters, lower case: [EnglishData.key]) after [context], best
      * first; [exactFirst], those as long as the keys before any longer (the nine keys', whose words
-     * all cost nothing).
+     * all cost nothing). [touches]: where each key was tapped and the keys around it, a key each
+     * (null for none): a key read as one around it costs by how far toward it the tap fell
+     * ([touchCost]), not [TypingCosts.near] alike.
      */
-    fun suggest(keys: String, context: Long, limit: Int, exactFirst: Boolean = false): List<Suggestion> {
+    fun suggest(keys: String, context: Long, limit: Int, exactFirst: Boolean = false, touches: Array<Touch?>? = null): List<Suggestion> {
         if (limit <= 0 || keys.isEmpty() || keys.length > MAX_KEYS) return emptyList()
-        val found = Search(keys, context, limit).run()
+        val tapped = touches?.takeIf { it.size == keys.length }
+        val found = Search(keys, context, limit, tapped).run().values
         val best = compareByDescending<Suggestion> { it.score }.thenBy { it.word }
         val order = if (exactFirst) compareBy<Suggestion> { it.completes }.then(best) else best
-        return found.values.sortedWith(order).take(limit)
+        return (if (tapped != null && legalSlip < 0f) legal(found) else found).sortedWith(order).take(limit)
+    }
+
+    // [found] with a slip read ([legalSlip]'s decoder, whose every other key costs nothing or never) costing
+    // [legalSlip] more where a word spelt as typed is among them
+    private fun legal(found: Collection<Suggestion>): Collection<Suggestion> {
+        if (found.none { !it.completes && it.cost == 0f }) return found
+        return found.mapNotNull { s ->
+            if (s.cost == 0f) s else (s.cost - legalSlip).takeIf { it <= costs.limit }?.let { Suggestion(s.word, s.lm, it, s.completes) }
+        }
     }
 
     /** The [limit] likeliest words after [context], best first: what may come next. */
@@ -147,7 +166,20 @@ class EnglishDecoder(
         return best
     }
 
-    private inner class Search(private val keys: String, private val context: Long, private val limit: Int) {
+    /**
+     * What reading the key [typed], tapped at [touch], as [meant] costs: nothing for the key itself;
+     * for a key around it, the log of how much likelier the tap is aimed at the key hit ([SlipCost],
+     * as pinyin reads a slip, 061-neighbour-english), but never more than a key anywhere
+     * ([TypingCosts.far]: a word misspelt, which is no matter of where a tap fell); far for any other.
+     */
+    private fun nearTap(touch: Touch, typed: Char, meant: Char): Float {
+        if (meant == typed) return 0f
+        val near = touch.near(meant) ?: return costs.far
+        val cost = -SLIP.of(touch, near, legal = false)
+        return if (cost.isNaN()) costs.far else minOf(costs.far, cost)
+    }
+
+    private inner class Search(private val keys: String, private val context: Long, private val limit: Int, private val touches: Array<Touch?>?) {
         private val n = keys.length
         private val rows = Array(MAX_KEYS + n + 2) { FloatArray(n + 1) }
         private val path = CharArray(MAX_KEYS + n + 2)
@@ -200,7 +232,7 @@ class EnglishDecoder(
             for (j in 1..n) {
                 val t = keys[j - 1]
                 val extra = if (j >= 2 && keys[j - 2] == t) costs.repeated else costs.extra
-                var v = prev[j - 1] + substitution(c, t)
+                var v = prev[j - 1] + substitution(c, t, j - 1)
                 v = minOf(v, prev[j] + missed, next[j - 1] + extra)
                 if (swapped(depth, j, c)) v = minOf(v, rows[depth - 1][j - 2] + costs.swapped)
                 next[j] = v
@@ -213,8 +245,16 @@ class EnglishDecoder(
         private fun swapped(depth: Int, j: Int, c: Char): Boolean =
             depth >= 1 && j >= 2 && c == keys[j - 2] && path[depth - 1] == keys[j - 1]
 
-        private fun substitution(meant: Char, typed: Char): Float = when {
-            keyCost != null -> keyCost(meant, typed)
+        private fun substitution(meant: Char, typed: Char, at: Int): Float {
+            val touch = touches?.get(at)
+            return when {
+                touch != null -> tapCost?.invoke(touch, typed, meant) ?: nearTap(touch, typed, meant)
+                keyCost != null -> keyCost(meant, typed)
+                else -> fixedCost(meant, typed)
+            }
+        }
+
+        private fun fixedCost(meant: Char, typed: Char): Float = when {
             meant == typed -> 0f
             typed in KeyNeighbours.of(meant) -> costs.near
             else -> costs.far
@@ -274,6 +314,28 @@ class EnglishDecoder(
             val fits = if (typed in '2'..'9') meant in letters(typed) else meant == typed
             if (fits) 0f else NEVER
         }
+
+        /**
+         * [nineKeyCost] for a key tapped at a place: a letter of a digit key around it besides, at
+         * what [slip] has the tap aimed at that key cost (none below its floor), as pinyin's nine
+         * keys read a slip (061-neighbour-english).
+         */
+        fun nineKeyTap(letters: (Char) -> String, slip: SlipCost): (Touch, Char, Char) -> Float {
+            val fits = nineKeyCost(letters)
+            return { touch, typed, meant ->
+                val own = fits(meant, typed)
+                if (own == 0f || typed !in '2'..'9') {
+                    own
+                } else {
+                    val near = touch.near.firstOrNull { it.char in '2'..'9' && meant in letters(it.char) }
+                    val cost = near?.let { -slip.of(touch, it, legal = false) } ?: Float.NaN
+                    if (cost.isNaN()) NEVER else cost
+                }
+            }
+        }
+
+        // a full keyboard's tap read as pinyin's full keyboard reads it
+        private val SLIP = SlipCost()
 
         /** Keys past this are no word the data has: nothing is searched for them. */
         const val MAX_KEYS = EnglishText.MAX_WORD

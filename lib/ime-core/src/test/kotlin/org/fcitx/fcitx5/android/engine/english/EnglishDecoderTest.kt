@@ -7,7 +7,10 @@ package org.fcitx.fcitx5.android.engine.english
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.pinyin.Near
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.SlipCost
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -186,6 +189,69 @@ class EnglishDecoderTest {
         assertEquals(emptyList<String>(), nineWords("4535"))
         assertEquals(listOf("hello"), nineWords("43556"))
         assertEquals(emptyList<String>(), nineWords("435556"))
+    }
+
+    // w tapped [dx] across from its middle (a QWERTY key 40 by 56 dp), q and e beside it
+    private fun onW(dx: Float) = Touch(dx, 0f, 40f, 56f, listOf(Near('q', -1f, 0f), Near('e', 1f, 0f)))
+
+    private fun helloCost(touches: Array<Touch?>?) =
+        decoder.suggest("hwllo", none, 5, touches = touches).first { data.word(it.word) == "hello" }.cost
+
+    @Test
+    fun aTapsPlaceSetsWhatTheKeyBesideItCosts() {
+        // with no place, the key beside one meant costs near alike
+        assertEquals(1.0f, helloCost(null), 1e-4f)
+        // tapped in the middle of w: no likelier e than any key (far); at its edge by e, nearly as likely as w
+        assertEquals(3.0f, helloCost(arrayOf(null, onW(0f), null, null, null)), 1e-4f)
+        val edge = helloCost(arrayOf(null, onW(0.45f), null, null, null))
+        assertEquals(-SlipCost().of(onW(0.45f), Near('e', 1f, 0f), legal = false), edge, 1e-4f)
+        assertTrue("$edge", edge < 0.5f)
+        // at the edge away from e: dearer than in the middle, never past far
+        assertEquals(3.0f, helloCost(arrayOf(null, onW(-0.45f), null, null, null)), 1e-4f)
+        // touches not a key each (a stale list): not read
+        assertEquals(1.0f, helloCost(arrayOf(onW(0f))), 1e-4f)
+    }
+
+    // 6 (2.2 keys wide) tapped [dx] across from its middle, 5 left of it
+    private fun onSix(dx: Float) = Touch(dx, 0f, 88f, 56f, listOf(Near('5', -1f, 0f), Near('3', 0f, -1f), Near('9', 0f, 1f)))
+
+    private val nineTapped = EnglishDecoder(
+        data, EnglishDecoder.NINE_KEY_COSTS.copy(limit = 3f), EnglishDecoder.nineKeyCost(NineKeyLetters.STANDARD::letters),
+        EnglishDecoder.nineKeyTap(NineKeyLetters.STANDARD::letters, SlipCost(floor = -3f)),
+    )
+
+    private fun nineTapped(keys: String, touches: Array<Touch?>) = nineTapped.suggest(keys, none, 10, exactFirst = true, touches = touches).map { data.word(it.word) }
+
+    @Test
+    fun onTheNineKeysADigitTappedByTheNextIsItsLettersToo() {
+        // 4356: hell's last key slipped to 6, tapped at its edge by 5
+        assertEquals(listOf("hell"), nineTapped("4356", arrayOf(null, null, null, onSix(-0.45f))))
+        // tapped in its middle: 6 alone, no word
+        assertEquals(emptyList<String>(), nineTapped("4356", arrayOf(null, null, null, onSix(0f))))
+        // the digit's own letters cost nothing wherever it is tapped
+        assertEquals(listOf("he", "hello", "help", "hell"), nineTapped("43", arrayOf(null, null)))
+    }
+
+    // as the app's NineKeyWords: a slip 2 dearer where a word of the keys as typed is among the words
+    private val nineLegal = EnglishDecoder(
+        data, EnglishDecoder.NINE_KEY_COSTS.copy(limit = 3f), EnglishDecoder.nineKeyCost(NineKeyLetters.STANDARD::letters),
+        EnglishDecoder.nineKeyTap(NineKeyLetters.STANDARD::letters, SlipCost(floor = -3f)), legalSlip = -2f,
+    )
+
+    private fun EnglishDecoder.costs(keys: String, touches: Array<Touch?>) =
+        suggest(keys, none, 10, exactFirst = true, touches = touches).associate { data.word(it.word) to it.cost }
+
+    @Test
+    fun aSlipOnTheNineKeysCostsMoreWhereTheKeysAsTypedSpellAWord() {
+        // 8439 they, its 9 tapped at the top edge by 6: then (8436) through the slip
+        val onNine = arrayOf(null, null, null, Touch(0f, -0.45f, 88f, 56f, listOf(Near('6', 0f, -1f), Near('8', -1f, 0f))))
+        val plain = nineTapped.costs("8439", onNine)
+        val legal = nineLegal.costs("8439", onNine)
+        assertEquals(0f, legal.getValue("they"), 0f)
+        assertEquals(plain.getValue("then") + 2f, legal.getValue("then"), 1e-4f)
+        // 4356 spells nothing as typed: hell's slip costs what it did
+        val onSix = arrayOf(null, null, null, onSix(-0.45f))
+        assertEquals(nineTapped.costs("4356", onSix), nineLegal.costs("4356", onSix))
     }
 
     @Test

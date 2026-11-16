@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.english
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.SlipCost
 import java.util.BitSet
 
 /**
@@ -12,11 +13,15 @@ import java.util.BitSet
  * whose letters are each on the key typed ([letters]), or the letter typed itself, as long as the
  * keys first, then longer ones; an apostrophe typed where the word has one; in the case typed.
  */
-internal class NineKeyWords(data: EnglishData, private val letters: NineKeyLetters, score: (context: Long, word: Int) -> Float) {
+internal class NineKeyWords(data: EnglishData, private val letters: NineKeyLetters, slip: SlipCost = SLIP, score: (context: Long, word: Int) -> Float) {
 
     private val fits = EnglishDecoder.nineKeyCost(letters::letters)
 
-    val decoder = EnglishDecoder(data, EnglishDecoder.NINE_KEY_COSTS, fits, score)
+    // a key tapped near another read as that one too, no dearer than the floor, and dearer where the keys as typed
+    // spell a word, as pinyin's nine keys read a legal slip (061-neighbour-english)
+    val decoder = EnglishDecoder(
+        data, EnglishDecoder.NINE_KEY_COSTS.copy(limit = -slip.floor), fits, EnglishDecoder.nineKeyTap(letters::letters, slip), slip.legal, score,
+    )
 
     /** A word offered: its [text], its [score], and whether it is longer than the keys. */
     class Found(val text: String, val score: Float, val completes: Boolean)
@@ -61,5 +66,10 @@ internal class NineKeyWords(data: EnglishData, private val letters: NineKeyLette
                 k++
             }
         }
+    }
+
+    private companion object {
+        // pinyin's nine keys' floor (061-neighbour-correction: the 6T's time)
+        val SLIP = SlipCost(floor = -3f)
     }
 }
