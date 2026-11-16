@@ -62,22 +62,29 @@ object SettingsIndex {
     /** The id of the five stroke commands, one result: five alike would fill the list. */
     const val STROKES = "cmd:stroke"
 
-    fun build(context: Context): List<Entry<Target>> {
+    /** The index in [context]'s language; [between] is called between pages (a cancelled build stops there). */
+    fun build(context: Context, between: () -> Unit = {}): List<Entry<Target>> {
         val keywords = SearchKeywords.of(context)
-        return raw(context).map { e ->
+        return raw(context, between).map { e ->
             // an input method's page's id says its page (@name); its other names are the setting's on any
             val named = keywords[e.id] ?: keywords[e.id.substringBefore('@')]
             if (named == null) e else e.copy(keywords = named)
         }
     }
 
-    private fun raw(context: Context): List<Entry<Target>> = buildList {
+    private fun raw(context: Context, between: () -> Unit): List<Entry<Target>> = buildList {
         fun page(@StringRes title: Int, route: SettingsRoute, vararg under: Int) =
             add(pageEntry(context, context.getString(title), route, under.map(context::getString)))
+
+        fun managed(@StringRes title: Int, route: SettingsRoute, build: (PreferenceScreen) -> Unit) {
+            between()
+            managed(context, title, route, build, this)
+        }
 
         // as the home page lists them (MainFragment.HOME), and its language row, which opens no page
         page(R.string.input_methods, SettingsRoute.InputMethodList)
         inputMethods(context, this)
+        between()
         sharedInput(context, this)
         page(R.string.word_packs, SettingsRoute.PinyinDict(""))
         page(R.string.my_words, SettingsRoute.UserWords, R.string.word_packs)
@@ -85,17 +92,17 @@ object SettingsIndex {
         page(R.string.common_words, SettingsRoute.CommonWords, R.string.word_packs)
         page(R.string.rare_chars, SettingsRoute.RareChars, R.string.word_packs)
         page(R.string.quick_phrases, SettingsRoute.QuickPhrase(), R.string.word_packs)
-        managed(context, R.string.theme_and_size, SettingsRoute.Theme, { ThemeSettingsFragment.build(it) }, this)
-        managed(context, R.string.virtual_keyboard, SettingsRoute.Keys, { KeysSettingsFragment.build(it) }, this)
+        managed(R.string.theme_and_size, SettingsRoute.Theme) { ThemeSettingsFragment.build(it) }
+        managed(R.string.virtual_keyboard, SettingsRoute.Keys) { KeysSettingsFragment.build(it) }
         val keys = listOf(context.getString(R.string.virtual_keyboard))
         add(Entry(context.getString(R.string.long_press_characters), context.getString(R.string.long_press_characters_summary),
             keys, Target(SettingsRoute.PopupOverrides, null), pageId(SettingsRoute.PopupOverrides), Kind.PAGE))
         commands(context, keys + context.getString(R.string.long_press_characters), this)
         add(Entry(context.getString(R.string.toolbar_buttons), context.getString(R.string.toolbar_buttons_summary),
             keys, Target(SettingsRoute.ToolbarButtons, null), pageId(SettingsRoute.ToolbarButtons), Kind.PAGE))
-        managed(context, R.string.section_sound_and_vibration, SettingsRoute.SoundAndVibration, { SoundSettingsFragment.build(it) }, this)
-        managed(context, R.string.clipboard_and_emoji, SettingsRoute.Clipboard, { ClipboardSettingsFragment.build(it) }, this)
-        managed(context, R.string.hardware_keyboard, SettingsRoute.HardwareKeyboard, { HardwareKeyboardFragment.build(it) }, this)
+        managed(R.string.section_sound_and_vibration, SettingsRoute.SoundAndVibration) { SoundSettingsFragment.build(it) }
+        managed(R.string.clipboard_and_emoji, SettingsRoute.Clipboard) { ClipboardSettingsFragment.build(it) }
+        managed(R.string.hardware_keyboard, SettingsRoute.HardwareKeyboard) { HardwareKeyboardFragment.build(it) }
         // added to that page once fcitx answers
         val hardware = listOf(context.getString(R.string.hardware_keyboard))
         items(context, InputMethodSettings.HARDWARE_KEYBOARD, hardware) { row -> add(row.entry(SettingsRoute.HardwareKeyboard, "")) }

@@ -84,7 +84,20 @@ abstract class ManagedPreferenceUi<T : Preference>(
         override fun createUi(context: Context) = object : ListPreference(context) {
             override fun getPersistedString(defaultReturnValue: String?) = current().toString()
 
-            override fun persistString(value: String?) = pick(value?.toIntOrNull() ?: -1)
+            // the level read as it opens is never written back: the keys may change between that read and
+            // pick's own (the search's index makes these off the main thread while the keyboard is up)
+            private var opening = false
+
+            override fun onSetInitialValue(defaultValue: Any?) {
+                opening = true
+                try {
+                    super.onSetInitialValue(defaultValue)
+                } finally {
+                    opening = false
+                }
+            }
+
+            override fun persistString(value: String?) = opening || pick(value?.toIntOrNull() ?: -1)
 
             // the user's pick of the level shown (an older value's nearest): setValue sees no change
             override fun callChangeListener(newValue: Any?): Boolean {
@@ -128,7 +141,20 @@ abstract class ManagedPreferenceUi<T : Preference>(
         override fun createUi(context: Context) = object : ListPreference(context) {
             override fun getPersistedString(defaultReturnValue: String?) = current(context).toString()
 
-            override fun persistString(value: String?) = persist(value, again = false)
+            // the one read as it opens is never written back: what is stored may change between that read and
+            // persist's own (the search's index makes these off the main thread while the keyboard is up)
+            private var opening = false
+
+            override fun onSetInitialValue(defaultValue: Any?) {
+                opening = true
+                try {
+                    super.onSetInitialValue(defaultValue)
+                } finally {
+                    opening = false
+                }
+            }
+
+            override fun persistString(value: String?) = opening || persist(value, again = false)
 
             // the one shown as the page opens (onSetInitialValue) is not written; the user's pick of it is
             private fun persist(value: String?, again: Boolean): Boolean {

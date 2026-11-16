@@ -16,6 +16,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.navigation.fragment.NavHostFragment
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -29,6 +32,7 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
+import org.fcitx.fcitx5.android.ui.main.settings.search.SettingsIndexModel
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeListAdapter
 import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.setup.SetupActivity
@@ -37,11 +41,14 @@ import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -55,12 +62,22 @@ import java.time.Duration
 class SettingsMenuUatTest {
 
     @Before
-    fun phone() = phoneStorage()
+    fun phone() {
+        phoneStorage()
+        // the index built where it is asked for: each case's results there after an idle; the cases of its own
+        // thread below set theirs
+        SettingsIndexModel.Hooks.dispatcher = Dispatchers.Unconfined
+        SettingsIndexModel.Hooks.builds.set(0)
+    }
 
     private val st = SettingsHarness()
 
     @After
-    fun close() = st.close()
+    fun close() {
+        st.close()
+        SettingsIndexModel.Hooks.dispatcher = Dispatchers.Default
+        SettingsIndexModel.Hooks.latest = null
+    }
 
     private fun texts() = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>()
         .filter { it.isShown }.map { it.text.toString() }.toList()
@@ -107,23 +124,110 @@ class SettingsMenuUatTest {
         assertTrue(route, "Addresses" in route)
     }
 
-    // the index is built on the page's first frame: what was typed before it is searched then
-    @Test
-    fun whatIsTypedBeforeTheIndexIsReadyIsSearchedOnceItIs() {
-        navController.navigate(SettingsRoute.Search)
-        (st.activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment).childFragmentManager.executePendingTransactions()
-        val field = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<EditText>().first()
-        field.setText("模糊音")
+    /** The titles of the search page's results, the list's rows (not the field, which holds the query). */
+    private fun resultTitles(): List<String> {
         val list = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<RecyclerView>().first()
-        assertEquals(0, list.adapter!!.itemCount)
-        st.idle()
-        assertTrue(list.adapter!!.itemCount > 0)
         list.measure(0, 0)
         list.layout(0, 0, 1080, 2000)
         st.idle()
-        // the list's rows, not the field, which holds the query anyway
-        val titles = (0 until list.childCount).map { KeyboardHarness.all(list.getChildAt(it)).filterIsInstance<TextView>().first().text.toString() }
-        assertTrue(titles.toString(), "模糊音" in titles)
+        return (0 until list.childCount).map { KeyboardHarness.all(list.getChildAt(it)).filterIsInstance<TextView>().first().text.toString() }
+    }
+
+    private fun type(query: String) =
+        KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<EditText>().first().setText(query)
+
+    // the index lands after the page is up: what was typed before is searched then, the last of it, with no
+    // 没有结果 shown meanwhile
+    @Test
+    fun whatIsTypedBeforeTheIndexLandsIsSearchedWhenItDoes() {
+        val build = StandardTestDispatcher()
+        SettingsIndexModel.Hooks.dispatcher = build
+        st.open(SettingsRoute.Search)
+        type(st.s(R.string.search_stroke_commands))
+        type("模糊音")
+        st.idle()
+        assertEquals(0, SettingsIndexModel.Hooks.builds.get())
+        assertEquals(emptyList<String>(), resultTitles())
+        assertFalse(texts().toString(), st.s(R.string.search_settings_none) in texts())
+        build.scheduler.runCurrent()
+        st.idle()
+        val titles = resultTitles()
+        assertTrue(titles.toString(), "模糊音" in titles && st.s(R.string.search_stroke_commands) !in titles)
+        assertEquals(1, SettingsIndexModel.Hooks.builds.get())
+    }
+
+    // a build not yet run when the page goes is cancelled with it: it never runs
+    @Test
+    fun aBuildNotDoneIsCancelledWithThePage() {
+        val build = StandardTestDispatcher()
+        SettingsIndexModel.Hooks.dispatcher = build
+        st.open(SettingsRoute.Search)
+        val pending = SettingsIndexModel.Hooks.latest!!
+        navController.popBackStack()
+        st.idle()
+        assertFalse(route, "Search" in route)
+        assertTrue(pending.isCancelled)
+        build.scheduler.runCurrent()
+        assertEquals(0, SettingsIndexModel.Hooks.builds.get())
+    }
+
+    // a rotation takes the build under way, or the one done, not another
+    @Test
+    fun aRotationKeepsTheBuild() {
+        val build = StandardTestDispatcher()
+        SettingsIndexModel.Hooks.dispatcher = build
+        st.open(SettingsRoute.Search)
+        val underWay = SettingsIndexModel.Hooks.latest
+        st.recreate()
+        assertTrue(route, "Search" in route)
+        assertSame(underWay, SettingsIndexModel.Hooks.latest)
+        build.scheduler.runCurrent()
+        st.idle()
+        st.recreate()
+        build.scheduler.runCurrent()
+        st.idle()
+        assertSame(underWay, SettingsIndexModel.Hooks.latest)
+        assertEquals(1, SettingsIndexModel.Hooks.builds.get())
+        type("模糊音")
+        st.idle()
+        assertTrue("模糊音" in resultTitles())
+    }
+
+    // the language changed while the page is up: the build of the old one is dropped, the new one built and searched
+    @Test
+    @Config(sdk = [35])
+    fun aNewLanguageBuildsTheIndexAnew() {
+        val build = StandardTestDispatcher()
+        SettingsIndexModel.Hooks.dispatcher = build
+        st.open(SettingsRoute.Search)
+        val chinese = SettingsIndexModel.Hooks.latest!!
+        RuntimeEnvironment.setQualifiers("en-rUS-w393dp-h851dp-port-440dpi")
+        st.recreate()
+        assertTrue(route, "Search" in route)
+        assertTrue(chinese.isCancelled)
+        build.scheduler.runCurrent()
+        st.idle()
+        // the Chinese one, cancelled before it ran, never did
+        assertEquals(1, SettingsIndexModel.Hooks.builds.get())
+        type("fuzzy")
+        st.idle()
+        val titles = resultTitles()
+        assertTrue(titles.toString(), titles.any { it.startsWith("Fuzzy") })
+    }
+
+    // 6T: 84 ms the first time, over a frame: never on the main thread (061-settings-search.md §4.11)
+    @Test
+    fun theIndexIsNotBuiltOnTheMainThread() {
+        SettingsIndexModel.Hooks.dispatcher = Dispatchers.Default
+        st.open(SettingsRoute.Search)
+        // done, however long it takes: no clock
+        runBlocking { SettingsIndexModel.Hooks.latest!!.await() }
+        st.idle()
+        assertEquals(1, SettingsIndexModel.Hooks.builds.get())
+        assertNotSame(Looper.getMainLooper().thread, SettingsIndexModel.Hooks.builtOn)
+        type("模糊音")
+        st.idle()
+        assertTrue("模糊音" in resultTitles())
     }
 
     /** Searches [query]: each result's title and the line under it, in order. */

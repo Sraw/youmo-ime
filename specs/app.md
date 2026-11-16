@@ -1363,6 +1363,15 @@ Rules for settings, all decided:
   the id whole in its three slots and reads `pref:` ids only (a page's controls, `view:`, are 0.6.2).
   `SettingsIndexTest` holds each id unique, every `SearchKeywords` id indexed in the three languages and
   the arrays in all three files, and 笔画筛选's four results in order in each language.
+  The index is built on `Dispatchers.Default` (`SettingsIndexModel`, the page's ViewModel: kept over a rotation,
+  built again in another language, cancelled with the page; checked between pages): 84 ms the first time on
+  the 6T. It may because it reads only what is safe from any thread and writes nothing: resources, and
+  SharedPreferences (Levels, Choice, StringList's Apart and `enableUiOn` read what is stored; Choice the window's
+  size too); the preferences it makes are never attached (`onAttached` registers `ManagedPreferenceUi`'s
+  listeners) and store through a `DiscardingDataStore`, and Levels and Choice, stored nowhere of their own, write
+  nothing as they open (`OpeningWritesNothingTest`: what they read may change before they would write it back).
+  No View is made; a PreferenceGroup's main-looper Handler is, safe from any thread. What is typed before the
+  index lands is searched when it does.
 - **Listeners see a snapshot.** `ManagedPreference.fireChange` and
   `ManagedPreferenceProvider.fireChange` walk a copy of their listeners: a listener may make views
   anew that unregister and register others in the same set (a theme change makes the input view

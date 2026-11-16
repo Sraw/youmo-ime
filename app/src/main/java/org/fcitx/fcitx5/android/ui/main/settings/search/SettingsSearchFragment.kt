@@ -18,6 +18,7 @@ import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -49,10 +50,10 @@ import timber.log.Timber
 /** Finds a setting by its name, or by what it says, on any page; a result opens its page at it. */
 class SettingsSearchFragment : Fragment() {
 
-    // built after the first frame is drawn, the field shown (061-settings-search.md §4.11), still on the main thread
-    // and so still inside the page's slide in: as the pages build the same preferences. Its time and each key's are
-    // logged, to be measured on a phone: over a frame (33 ms) there, it moves to Dispatchers.Default
+    // null until the index lands (SettingsIndexModel, off the main thread): what is typed meanwhile is searched then
     private var search: SettingsSearch<SettingsIndex.Target>? = null
+
+    private val index: SettingsIndexModel by viewModels()
 
     private val viewModel: MainViewModel by activityViewModels()
 
@@ -132,20 +133,10 @@ class SettingsSearchFragment : Fragment() {
             adapter = this@SettingsSearchFragment.adapter
             addItemDecoration(DividerItemDecoration(ctx, DividerItemDecoration.VERTICAL))
         }
-        // the keyboard at once only the first time: back from a result, the list is what is wanted. Posted before
-        // the index, so a cold build does not hold it back
+        // the keyboard at once only the first time: back from a result, the list is what is wanted
         if (query.isEmpty()) field.post {
             field.requestFocus()
             ctx.getSystemService<InputMethodManager>()?.showSoftInput(field, 0)
-        }
-        // run on the first frame drawn: what is typed before it is searched then
-        if (search == null) field.post {
-            // a view made again before the first one was drawn posted it too
-            if (search != null) return@post
-            val start = SystemClock.elapsedRealtime()
-            search = SettingsSearch(SettingsIndex.build(ctx))
-            Timber.d("settings index built in %d ms", SystemClock.elapsedRealtime() - start)
-            show(this.query)
         }
         show(query)
         return ctx.verticalLayout {
@@ -162,6 +153,17 @@ class SettingsSearchFragment : Fragment() {
         list = null
         none = null
         super.onDestroyView()
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        // started with the view, built on Dispatchers.Default while the page slides in; waited for only while the
+        // view lives, the build itself kept over a rotation and cancelled with the page (SettingsIndexModel). A build
+        // that throws throws here, at await(), on the main thread, as it did when it was built there
+        if (search == null) viewLifecycleOwner.lifecycleScope.launch {
+            search = index.index(requireContext()).await()
+            show(query)
+        }
     }
 
     // each time the page is back: an input method may have been added or removed on a result's page
