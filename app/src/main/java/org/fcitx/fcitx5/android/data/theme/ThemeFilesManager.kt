@@ -54,7 +54,7 @@ object ThemeFilesManager {
     // few json files and their images. Off the main thread the active theme would not be there to draw with.
     // one directory a process (HostConfigDir), asked for each time as the engine's data is
     private val themes get() = HostConfigDir.inUse(ConfigHome.THEME)
-    private val dir get() = themes.let { it.dir.also { dir -> if (it.writable) dir.mkdirs() } }
+    internal val dir get() = themes.let { it.dir.also { dir -> if (it.writable) dir.mkdirs() } }
 
     /** Whether a theme can be saved, deleted or imported: not while the themes are not settled (A4). */
     val writable get() = themes.writable
@@ -196,6 +196,11 @@ object ThemeFilesManager {
     fun listPacks(builtins: List<Theme.Builtin> = ThemeManager.BuiltinThemes): List<Theme.Pack> {
         // Q1: not while an import writes in SAVING (the first sweep can come after a start not settled, A4,
         // from the listing an import's packPlaced asks for): a later listing sweeps once none does
+        sweepPacksOnce()
+        return ThemePackFiles.list(dir, builtins)
+    }
+
+    internal fun sweepPacksOnce() {
         synchronized(writes) {
             // swept under the lock, as listThemes does: no import begins writing meanwhile; the packs read after
             if (writable && !packsSwept && writing == 0) {
@@ -203,7 +208,6 @@ object ThemeFilesManager {
                 ThemePackFiles.sweepPacks(dir)
             }
         }
-        return ThemePackFiles.list(dir, builtins)
     }
 
     // the imports writing in SAVING now (off the main thread); the sweeps wait till none is
@@ -485,7 +489,10 @@ object ThemeFilesManager {
                     // not placed: nothing replaced, the record as it was (one not written: dropped at the next start),
                     // the place's failure the one told
                     if (placed.isFailure) runCatching { replaced(names) }.onFailure { placed.exceptionOrNull()!!.addSuppressed(it) }
-                    placed.getOrThrow()
+                    placed.getOrThrow().also {
+                        // a pack of the name an old backup restored, imported over it before the next start: as written
+                        runCatching { ThemeSeparators.importedOverRestored(staged.name) }.onFailure { Timber.w(it, "Theme pack ${staged.name} left to be given 分词") }
+                    }
                 } finally {
                     discard()
                 }

@@ -231,7 +231,7 @@
 ### KB-107 [P1] 分词不动 ⇧ 的状态；英文、码表打字时 ⇧ 不变
 - **前提**：B0（全拼，全键盘）。
 - **操作**：点 ⇧（字母变大写），点 x i，点「分词」，点 a n，点空格；看字母。切到英文打 `he`，看 ⇧ 的位置；切到五笔打 `gg`，看那个位置。
-- **预期**：分词打出 `'`，不是大写的 `"`；上屏后 ⇧ 还亮着（字母大写，下一个字母大写）。英文打字时那里仍是 ⇧（点了下一个字母大写）；五笔打字时那里仍是「拼」键（反查），不是分词。按住 ⇧ 时打出第一个字母（另一指）、在分词上松手：打出分词，⇧ 不变。按住「分词」时上屏（另一指点空格）再松手：打出 `'`，⇧ 还亮着。主题自带全键盘布局（没写分词键）的 ⇧ 一直是 ⇧：打拼音时点它字母变大写，不打 `'`。
+- **预期**：分词打出 `'`，不是大写的 `"`；上屏后 ⇧ 还亮着（字母大写，下一个字母大写）。英文打字时那里仍是 ⇧（点了下一个字母大写）；五笔打字时那里仍是「拼」键（反查），不是分词。按住 ⇧ 时打出第一个字母（另一指）、在分词上松手：打出分词，⇧ 不变。按住「分词」时上屏（另一指点空格）再松手：打出 `'`，⇧ 还亮着。之后导入的、恢复 0.6.1 及以后做的备份带进来的主题自带全键盘布局（没写分词键）的 ⇧ 一直是 ⇧：打拼音时点它字母变大写，不打 `'`；升级时已装的见 ST-143，旧备份恢复的见 PR-63。
 - **JVM**：`ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas`（分词发 `'`、不带 Shift，打完 ⇧ 还开着）、`ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator`（⇧ 上按下、换成分词后松手发 `'`）、`ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce`（打完才松开的分词发 `'`，⇧ 不用掉）、`ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped`（没分词键的主题布局 ⇧ 照旧是 Shift，点、长按都不发 `'`）、`ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce`（主题里发 `'` 的普通键照旧：带 Shift，一次性大写用掉）；ime-core `ShiftSeparatorTest.neverEnglishATableNorZhuyin`；设备上切英文、五笔看一眼。
 
 ### KB-41 [P2] 等长按时已滑出键的下边，弹出后第一下往旁边挪不关掉

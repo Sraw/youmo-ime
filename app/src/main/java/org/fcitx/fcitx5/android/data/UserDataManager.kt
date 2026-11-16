@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
+import org.fcitx.fcitx5.android.data.theme.ThemeSeparators
 import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.backup.Backups
@@ -252,6 +253,16 @@ object UserDataManager {
         ThemePackFiles.dropStamps(themes)
     }
 
+    // the packs of this app's backup ([own]; an upstream one has none) of before 0.6.1 ([from] its themes, laid over)
+    // given 分词 at the start after, as the phone's were (FB12); not recorded, they are left as they are (logged), the
+    // restore whole
+    private fun restoredPacks(name: String, from: File, own: Boolean, versionCode: Long) {
+        if (name != ConfigHome.THEME.old || !own || versionCode >= FIRST_WITH_SEPARATOR) return
+        val packs = ThemePackFiles.folder(from).listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") })
+        runCatching { ThemeSeparators.restoredBeforeSeparator(packs.orEmpty().map { it.name }) }
+            .onFailure { Timber.w(it, "Theme packs restored not recorded to be given 分词") }
+    }
+
     // [from], the backup's directory of [name] (one of [Dirs.moved]), laid over the phone's [dir]
     private fun layOver(name: String, from: File, dir: File) {
         dir.mkdirs()
@@ -448,7 +459,10 @@ object UserDataManager {
             val external = File(tempDir, "external")
             for ((name, dir) in dirs.moved) {
                 val from = File(tempDir, "external-$name")
-                if (File(external, name).renameTo(from)) layOver(name, from, dir)
+                if (File(external, name).renameTo(from)) {
+                    layOver(name, from, dir)
+                    restoredPacks(name, from, origin == UserDataOrigin.Own, metadata.versionCode)
+                }
             }
             if (external.isDirectory) copyDir(external, dirs.external)
             // the settings are the backup's (PR-10): a config file it has not was at its defaults when it was
@@ -561,6 +575,9 @@ object UserDataManager {
     // 0.3.1's version code, its lowest ABI's (Versions.calculateVersionCode: the release's code × 10 + the
     // ABI's): this app's zip of a version before has its learning in the old logs alone
     private const val FIRST_WITH_THE_RECORD = 2130L
+
+    // 0.6.1's code, an ABI's (Versions.calculateVersionCode: 5130 + the ABI's 1-4): the first whose packs were given 分词
+    private const val FIRST_WITH_SEPARATOR = 5130L
 
     // an older build's log of learning (pinyin's, a table's, English's) or 0.4's mark beside a table's,
     // at the engine directory's top

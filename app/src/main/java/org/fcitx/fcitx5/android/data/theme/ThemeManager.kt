@@ -74,8 +74,12 @@ object ThemeManager {
     private val customThemes: MutableList<Theme.Custom> = listCustomThemes(prefs).first.toMutableList()
 
     // the user's theme 4.0 packs, each version one (060-render-p3 T8a); listed after the 3.0 themes, whose
-    // listing clears what a kill left of a save first
-    private var packs: List<Theme.Pack> = ThemeFilesManager.listPacks(builtinThemes)
+    // listing clears what a kill left of a save first. Those of before 0.6.1 given 分词 first, once (FB12): before
+    // anything of theirs is read, so nothing read is stale
+    private var packs: List<Theme.Pack> = run {
+        ThemeSeparators.addSeparatorsOnce()
+        ThemeFilesManager.listPacks(builtinThemes)
+    }
 
     // the built-in themes that are packs (BuiltinPacks), unpacked once a version; after the user's, whose
     // one of the same name (imported before it was built in) is shown instead

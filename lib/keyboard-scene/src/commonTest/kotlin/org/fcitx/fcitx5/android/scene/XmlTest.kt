@@ -115,4 +115,21 @@ class XmlTest {
         assertIs<Parsed.Failed>(Xml.parse("<!-- a -- b --><a/>"))
         assertEquals("a", Xml.parse("\uFEFF<a/>").ok().name)
     }
+
+    // where each element and value is, asked for (a pack's qwerty.xml rewritten in place, PackSeparator)
+    @Test
+    fun offsetsWhereAskedFor() {
+        val text = "<!-- <x a=\"no\"/> -->\n<a x = 'one'\n   y=\"t&amp;o\"><b z=\">\"/> </a>"
+        val root = Xml.parse(text, offsets = true).ok()
+        val a = root.offsets!!
+        assertEquals(text.indexOf("<a"), a.from)
+        assertEquals(text.indexOf("><b"), a.close)
+        assertEquals(text.length, a.to)
+        assertEquals("one", text.substring(a.values.getValue("x")))
+        assertEquals("t&amp;o", text.substring(a.values.getValue("y")))
+        val b = root.children.single().offsets!!
+        assertEquals("<b z=\">\"/>", text.substring(b.from, b.to))
+        assertEquals(text.indexOf("/> </a>"), b.close)
+        assertEquals(null, Xml.parse(text).ok().offsets)
+    }
 }

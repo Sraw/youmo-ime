@@ -16,6 +16,8 @@ class XmlElement(
     val children: List<XmlElement>,
     val text: String,
     val line: Int,
+    /** Where it is in the source, only where it was asked for ([Xml.parse]'s `offsets`). */
+    val offsets: XmlOffsets? = null,
 ) {
     operator fun get(attribute: String): String? = attributes[attribute]
 
@@ -24,6 +26,13 @@ class XmlElement(
 
     override fun toString(): String = "<$name> at line $line"
 }
+
+/**
+ * Where an element is in its source, by index: [from] its `<`, [close] its start tag's `/>` or `>`, [to] just past its
+ * end; [values] each attribute's value between its quotes, as written (references not read). What a rewrite of the
+ * text in place needs (a pack's qwerty.xml given 分词, PackLayouts.addSeparator), the rest of the file kept as it is.
+ */
+class XmlOffsets(val from: Int, val close: Int, val to: Int, val values: Map<String, IntRange>)
 
 /**
  * The XML a layout or a theme is written in, and no more (060-render-v2 §6): elements, attributes,
@@ -37,13 +46,13 @@ object Xml {
     const val MAX_CHARS = 1_000_000
     const val MAX_DEPTH = 32
 
-    /** The root element of [source], or why not. */
-    fun parse(source: String): Parsed<XmlElement> =
+    /** The root element of [source], or why not; [offsets]: each element with its [XmlOffsets]. */
+    fun parse(source: String, offsets: Boolean = false): Parsed<XmlElement> =
         if (source.length > MAX_CHARS) {
             Parsed.Failed(0, "the file is over $MAX_CHARS characters")
         } else {
             try {
-                Parsed.Ok(Reader(source).document())
+                Parsed.Ok(Reader(source, offsets).document())
             } catch (e: XmlException) {
                 Parsed.Failed(e.line, e.message.orEmpty())
             }
@@ -53,7 +62,7 @@ object Xml {
 /** Thrown inside the reader only, caught by [Xml.parse]: a parse stops at its first problem. */
 private class XmlException(val line: Int, message: String) : Exception(message)
 
-private class Reader(private val s: String) {
+private class Reader(private val s: String, private val offsets: Boolean) {
     private var i = 0
     private var line = 1
 
@@ -125,14 +134,18 @@ private class Reader(private val s: String) {
     private fun element(depth: Int): XmlElement {
         if (depth >= Xml.MAX_DEPTH) fail("elements nested over ${Xml.MAX_DEPTH} deep")
         val startLine = line
+        val from = i
         advance(1)
         val qName = name()
         // the files are in one namespace, the default one: a prefixed element (l:key) is another's, or one not declared
         if (':' in qName) fail("<$qName>: an element with a prefix (write the namespace as xmlns=)")
-        val attributes = attributes(qName)
+        val values = valuesAsked()
+        val attributes = attributes(qName, values)
+        val close = i
+        fun placed(to: Int) = offsetsOf(from, close, to, values)
         if (at("/>")) {
             advance(2)
-            return XmlElement(qName, attributes, emptyList(), "", startLine)
+            return XmlElement(qName, attributes, emptyList(), "", startLine, placed(i))
         }
         if (!at(">")) fail("'>' expected in <$qName>")
         advance(1)
@@ -148,7 +161,7 @@ private class Reader(private val s: String) {
                     skipSpace()
                     if (!at(">")) fail("'>' expected in </$qName>")
                     advance(1)
-                    return XmlElement(qName, attributes, children, text.toString(), startLine)
+                    return XmlElement(qName, attributes, children, text.toString(), startLine, placed(i))
                 }
                 at("<!--") -> comment()
                 at("<![CDATA[") -> fail("CDATA is not allowed")
@@ -170,7 +183,11 @@ private class Reader(private val s: String) {
         }
     }
 
-    private fun attributes(element: String): Map<String, String> {
+    private fun valuesAsked(): MutableMap<String, IntRange>? = if (offsets) LinkedHashMap() else null
+
+    private fun offsetsOf(from: Int, close: Int, to: Int, values: Map<String, IntRange>?) = values?.let { XmlOffsets(from, close, to, it) }
+
+    private fun attributes(element: String, values: MutableMap<String, IntRange>?): Map<String, String> {
         val out = LinkedHashMap<String, String>()
         while (true) {
             val spaced = i < s.length && s[i].isXmlSpace()
@@ -186,8 +203,10 @@ private class Reader(private val s: String) {
             val quote = s.getOrNull(i)
             if (quote != '"' && quote != '\'') fail("a quoted value expected for $name")
             advance(1)
+            val start = i
             val value = chars(quote, attribute = true)
             if (i >= s.length) fail("the value of $name not closed")
+            values?.put(name, start until i)
             advance(1)
             if (name in out) fail("$name given twice")
             out[name] = value

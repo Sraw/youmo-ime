@@ -1828,3 +1828,65 @@ case("ST-136", needs="jvm:SettingsUatTest.everyInputMethodsPageAndTheSharedOnes�
 
 
 case("ST-137", needs="jvm:SettingsUatTest.pinyinsKeyboardOnItsPageAndTheSharedOptionsSayingFourteenKeys")(lambda d: None)
+
+
+SHIFT060 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures", "theme-shift060")
+
+
+def push_shift060_pack(d, name):
+    """<name>.theme in 下载: Nord as a pack of its own with 0.6.0's 26 keys (uat/fixtures/theme-shift060), its Shift
+    `when="!table"` and no 分词"""
+    with open(os.path.join(SCENE, "themes", "nord.xml"), encoding="utf-8") as f:
+        xml = f.read()
+    assert 'name="nord"' in xml
+    p = os.path.join(tempfile.gettempdir(), f"{name}-{d.port}.theme")
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("theme.xml", xml.replace('name="nord"', f'name="{name}"', 1))
+        z.write(os.path.join(SHIFT060, "qwerty.xml"), "layouts/qwerty.xml")
+    push_download(d, p, name)
+
+
+def typing_xi(d):
+    """the keys' ids while xi is typed on the full keyboard, the field cleared after"""
+    d.open_page("text")
+    d.type("xi")
+    ids = set(d.keys(refresh=True))
+    d.clear()
+    return ids
+
+
+@case("ST-143", base="B0-设置", mutates=True)
+def st143(d):
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统深色模式", False)
+    push_shift060_pack(d, "uat-shift060")
+    d.step("导入旧包")
+    import_theme(d, "uat-shift060")
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "导入后主题列表里没有它")
+    d.tap(item.c, 1.5)
+    ids = typing_xi(d)
+    check("shift" in ids and "apostrophe" not in ids, f"导入的包没写分词键，打 xi 时那格应仍是 ⇧：{sorted(ids)[:40]}")
+    d.step("当作升级后第一次启动")
+    out = d.sh(f"run-as {PKG} rm no_backup/theme-separator-added; am force-stop {PKG}")
+    check("No such file" not in out, f"标记文件不在（第一次启动没写？）：{out.strip()[:120]}")
+    ids = typing_xi(d)
+    check("apostrophe" in ids and "shift" not in ids, f"重启后打 xi 时那格不是分词：{sorted(ids)[:40]}")
+    d.open_page("text")
+    d.type("xi")
+    d.tap(d.keys(refresh=True)["apostrophe"], 0.6)
+    d.type("an")
+    code = d.preedit()
+    d.clear()
+    check("xi'an" in code.replace(" ", ""), f"分词后编码不是 xi'an：{code!r}")
+    d.step("之后导入的不改")
+    push_shift060_pack(d, "uat-shift060b")
+    import_theme(d, "uat-shift060b")
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "导入后主题列表里没有它")
+    d.tap(item.c, 1.5)
+    ids = typing_xi(d)
+    check("shift" in ids and "apostrophe" not in ids, f"之后导入的包打 xi 时那格应是 ⇧：{sorted(ids)[:40]}")
+    return "旧包重启后打字时是分词（xi'an）；之后导入的仍是 ⇧"

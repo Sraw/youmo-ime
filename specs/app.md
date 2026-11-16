@@ -866,7 +866,18 @@ and every slot kind, function key of role backspace/enter/lang and digit key the
 `checkLayout`; its `Report.commits`, what the import's confirmation lists, are only the `commit:` texts the base does not
 type: a key of a base key's id typing a text that key types is left out, another text or a key of its own listed; `LayoutWriter` writes a layout back as canonical text, `writeLayout` on the page); a
 fragment it includes that the pack has not is the app's, a fragment of the pack's is read only by the pack's own
-keyboards. Block by block: a bad `k14.xml` falls back alone (`ThemePackLayoutsTest`). One taken is read as the app
+keyboards. Block by block: a bad `k14.xml` falls back alone (`ThemePackLayoutsTest`). The packs installed before 0.6.1 had
+their `qwerty.xml` given the app's 分词 once (FB12, dev/design/061-theme-separator-migration.md):
+`ThemeSeparators.addSeparatorsOnce`, run by `ThemeManager` before its first `listPacks` (Application.onCreate, main
+thread; nothing of a pack read yet, so no cache is stale), at the first start the themes are writable, marked done in
+`noBackupFilesDir/theme-separator-added` (not the prefs: a restore writes them over, and a backup of 0.6.1 brings packs
+imported after); a restore of this app's backup older than 0.6.1 (`metadata.versionCode` < 5130) adds its packs to
+`noBackupFilesDir/theme-separator-restored`, done at the start after (a pack of a name on it imported before then is
+taken off; the first start, doing all, clears it). Each pack's file is rewritten in place as text
+(`PackSeparator.addSeparator`, commonMain: Shift's `when=` and a 分词 key after it, every other byte kept; the XML
+reader's `offsets` say where), only where it reads, is judged as before, and drawn in each of composing × table shows
+exactly one of the two as wide; staged in `v4/.saving/sep-*`, renamed over. It never throws: a pack that fails is left
+as it was and the marker written all the same (`ThemeSeparatorMigrationTest`, `PackSeparatorTest`). One taken is read as the app
 takes a theme's (主题只管外观, 061-custom-layout §19; `LayoutSource.keyData`, `KeyData.Mode.Pack`, applied in
 `SceneLayouts.load`): what its keys do held or swiped (`<popup>`, `<menu>`, `alt=`, `long-press`/`swipe-up`/`swipe-down`/
 `double-tap`, on keys, variants and defaults, and the keyboard's `popups=`) is the app's key's of the same name

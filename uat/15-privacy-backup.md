@@ -329,3 +329,9 @@
 - **操作**：看设置里的键盘高度；横屏点「普通文本」框；开悬浮键盘看；恢复刚才的备份再看；再装回 0.6.0。
 - **预期**：设置里仍显示"高"；横屏按新表（手机每行约 54 dp，碰到给应用留的 120 dp 时压矮）；横屏悬浮键盘的大小和位置和 0.6.0 一样；恢复备份后一样；装回 0.6.0 回到原来的高度（同一个数按 0.6.0 的百分比用）。
 - **JVM**：`KeyboardSizesTest.floatingKeepsThePercentOf060`（悬浮仍按 0.6.0 的百分比）、`KeyboardAreaTest.aPhoneTurnedAsksForFourRowsOf48`（横屏 4 × 48 dp、悬浮基准是屏高的 49%）；升级、降级在设备上做。
+
+### PR-63 [P1] 从 0.6.0 升级：已装主题包的 ⇧ 变分词；恢复 0.6.0 的备份带进来的也变，0.6.1 的备份的不变
+- **前提**：发版前、正式签名；0.6.0 装着，「下载」里有 ST-143 的 `uat-shift060.theme`、`uat-shift060b.theme`，再改名做一个 `uat-shift060c.theme`。
+- **操作**：0.6.0 里导入 `uat-shift060` 并选用，再导入 `uat-shift060b`，做「备份全部」（备份 A），删掉 `uat-shift060b`。装 0.6.1 覆盖升级，打 `xi` 看 ⇧ 那格。恢复备份 A，重启后选用 `uat-shift060b` 打 `xi`。再在 0.6.1 里删掉 `uat-shift060b`、导入 `uat-shift060c`，做「备份全部」（备份 B），删掉 `uat-shift060c`，恢复备份 B，选用它打 `xi`。
+- **预期**：升级后 `uat-shift060` 打字时那格是「分词」；备份 A 带进来的 `uat-shift060b` 也是分词；备份 B 带进来的 `uat-shift060c` 仍是 ⇧。
+- **JVM**：`ThemeSeparatorMigrationTest.aRestoreOfABackupOfBefore061RecordsItsPacks`（0.6.0 的备份记下它的包，0.6.1 的不记）、`ThemeSeparatorMigrationTest.thePacksRestoredFromABackupOfBeforeAreGivenItAtTheNextStart`（记下的包下次启动改、手机上别的不动）；升级、恢复在设备上做。

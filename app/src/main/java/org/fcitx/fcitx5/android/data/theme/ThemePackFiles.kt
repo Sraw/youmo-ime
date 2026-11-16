@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.input.theme.ThemePackCheck
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.layout.PackLayouts
+import org.fcitx.fcitx5.android.scene.layout.PackSeparator
 import org.fcitx.fcitx5.android.scene.look.Crop
 import org.fcitx.fcitx5.android.scene.look.Insets
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
@@ -661,6 +662,44 @@ object ThemePackFiles {
             Timber.d(e, "Theme pack dir not synced")
         }
     }
+
+    /**
+     * The pack [dir]'s `layouts/qwerty.xml` given the app's 分词 in Shift's place while pinyin is typed ([PackSeparator],
+     * FB12: once, to the packs installed before 0.6.1), written whole in place as [place] does, `theme.xml` untouched;
+     * why not, where it is left as it is. [app]: the app's qwerty, [appText] its fragments' text. Not one that is not
+     * UTF-8 (a GBK comment): its other bytes would not be written back as they were.
+     */
+    internal fun addSeparator(themes: File, dir: File, app: SceneLayout, appText: (String) -> String?): String? {
+        val layouts = File(dir, LAYOUTS)
+        val file = File(layouts, SEPARATED)
+        if (!file.isFile) return "no $SEPARATED"
+        if (file.length() > ThemeAssetLimits.MAX_LAYOUT_BYTES) return "over the limit"
+        val bytes = file.readBytes()
+        val text = bytes.decodeToString()
+        if (!text.encodeToByteArray().contentEquals(bytes)) return "not UTF-8"
+        val bom = if (text.startsWith(BOM)) BOM else ""
+        val rewrite = PackSeparator.addSeparator(text.removePrefix(BOM), { ThemePackLayouts.read(layouts, it) }, appText, app.layout, app.fragments)
+        if (rewrite is PackSeparator.Rewrite.Kept) return rewrite.why
+        val out = (bom + (rewrite as PackSeparator.Rewrite.Done).text).encodeToByteArray()
+        // the mark counted, as PackLayouts.readable counts it
+        if (out.size > ThemeAssetLimits.MAX_LAYOUT_BYTES) return "over the limit rewritten"
+        val temp = File(File(folder(themes), SAVING).apply { mkdirs() }, SEPARATING + UUID.randomUUID())
+        var done = false
+        try {
+            FileOutputStream(temp).use { it.write(out); it.fd.sync() }
+            beforeInPlace?.invoke()
+            need(temp.renameTo(file), "cannot put ${file.name} in place")
+            sync(layouts)
+            done = true
+        } finally {
+            // the original as it was; what a kill leaves here the next sweep clears
+            if (!done) temp.delete()
+        }
+        return null
+    }
+
+    private const val SEPARATED = "qwerty.xml"
+    private const val SEPARATING = "sep-"
 
     /** The pack [file] in [themes] gone: moved aside at once, then deleted. */
     internal fun delete(themes: File, file: String) {
