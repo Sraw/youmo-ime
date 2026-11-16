@@ -11,19 +11,14 @@ import android.view.View
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.EditText
-import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
-import androidx.preference.Preference
-import androidx.preference.PreferenceFragmentCompat
-import androidx.preference.PreferenceGroup
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -35,19 +30,12 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
-import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.HostConfigDir
-import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
 import org.fcitx.fcitx5.android.engine.data.CharLevels.Level
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
-import org.fcitx.fcitx5.android.engine.data.ReadingSource
 import org.fcitx.fcitx5.android.engine.data.TestCharLevels
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.user.RareChoice.Change
-import org.fcitx.fcitx5.android.engine.user.RareGrid
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.ui.main.settings.LetterScroller
@@ -55,12 +43,11 @@ import org.fcitx.fcitx5.android.ui.main.settings.RareCharCell
 import org.fcitx.fcitx5.android.ui.main.settings.RareCharsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.RareCharsViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip
 import org.fcitx.fcitx5.android.ui.main.settings.rareSummary
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -71,137 +58,96 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import splitties.dimensions.dp
 import java.io.File
-import java.nio.ByteBuffer
 import java.time.Duration
-import org.fcitx.fcitx5.android.until as waitUntil
 
 /**
- * 生僻字屏蔽's page (dev/design/061-rare-char-block.md §6) and the marks on the user's words (§5.4),
- * over a grid of a few characters of each group, read as the real levels' table has them.
+ * 生僻字屏蔽's page (dev/design/061-rare-char-block.md §6; 061-settings-cards.md §3) and the marks on the
+ * user's words (§5.4).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
-class RareCharsPageUatTest {
-
-    private val api = FakeHostApi()
-    private val st = SettingsHarness(api)
-    private val activity get() = st.activity
-    private val glyph = RareCharsViewModel.hasGlyph
-
-    @Before
-    fun setUp() {
-        phoneStorage()
-        RareCharsManager.useLevels(TestCharLevels.levels)
-        api.rareGridAnswer = grid
-        // 龗 not drawn here: no cell, counted all the same
-        RareCharsViewModel.hasGlyph = { it != "龗" }
-    }
-
-    @After
-    fun close() {
-        RareCharsManager.useLevels(null)
-        RareCharsViewModel.hasGlyph = glyph
-        RareCharsViewModel.saving = null
-        st.close()
-    }
-
-    private fun idle() = st.idle()
-
-    private fun until(what: String, test: () -> Boolean) =
-        waitUntil(what, { "; shown ${shown()}" }, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }, done = test)
-
-    private fun s(id: Int, vararg args: Any) = st.s(id, *args)
-
-    private fun views() = KeyboardHarness.all(activity.window.decorView).filter { it.isShown }
-
-    private fun shown(): List<String> = views().filterIsInstance<TextView>().map { it.text.toString() }.toList()
-
-    private fun cells() = views().filterIsInstance<RareCharCell>().associateBy { it.char }
-
-    // [c]'s cell, the list scrolled to it where it is not shown: on a phone's height 其它表外字's cells, the last
-    // group's, are below 扩展区's head and the groups above (held by default, first)
-    private fun cell(c: String): RareCharCell {
-        for (way in intArrayOf(1, -1)) {
-            while (c !in cells()) {
-                // till the list moves no more: at its end, or held still (a drag under way)
-                val was = list().computeVerticalScrollOffset()
-                list().scrollBy(0, way * list().height / 4)
-                idle()
-                if (list().computeVerticalScrollOffset() == was) break
-            }
-        }
-        return cells()[c] ?: error("no cell $c in ${cells().keys}")
-    }
-
-    // what a screen reader is told of a cell: its node's description, and an event's the same
-    private fun said(cell: RareCharCell): String {
-        val info = AccessibilityNodeInfo.obtain()
-        cell.onInitializeAccessibilityNodeInfo(info)
-        val event = AccessibilityEvent.obtain(AccessibilityEvent.TYPE_VIEW_CLICKED)
-        cell.onInitializeAccessibilityEvent(event)
-        assertEquals("an event says what the node does", info.contentDescription?.toString(), event.contentDescription?.toString())
-        return info.contentDescription.toString()
-    }
-
-    private fun list() = views().filterIsInstance<RecyclerView>().first()
-
-    private fun switch() = views().filterIsInstance<MaterialSwitch>().single()
-
-    private fun box(group: Int) = views().filterIsInstance<MaterialCheckBox>().first { s(group) in it.contentDescription.toString() }
-
-    private fun note() = shown().first { s(R.string.rare_chars_note_off).substringAfter(" · ") in it }
-
-    private fun search(text: String) {
-        views().filterIsInstance<EditText>().single().setText(text)
-        idle()
-    }
-
-    private fun file() = RareCharsManager.load()
-
-    private fun leave() {
-        st.open(SettingsRoute.About)
-        until("saved") { "reloadEngine()" in api.calls }
-        api.calls.clear()
-    }
-
-    private fun openPage() {
-        st.open(SettingsRoute.RareChars)
-        until("the grid") { cells().isNotEmpty() }
-    }
-
-    private fun snackbarUndo() = views().filterIsInstance<TextView>().first { it.text.toString() == s(R.string.undo) && it.hasOnClickListeners() }
+class RareCharsPageUatTest : RarePageUat() {
 
     @Test
-    @Uat("WD-52", "AX-17")
-    fun thePageHoldsBackAndLetsThrough() {
+    @Uat("WD-60")
+    fun fourCardsAndOffOnlyToLookAt() {
         st.open(SettingsRoute.PinyinDict(""))
         until("关 on the words page") { rareRow()?.summary == s(R.string.rare_chars_off) }
         openPage()
         assertRows(
-            "off: the grid there to look at, nothing changed by a tap" to {
+            "four cards, 扩展区 first (held by default), each its name, what it holds and a few of its characters" to {
+                val names = listOf(R.string.rare_group_ext, R.string.rare_group_l3, R.string.rare_group_trad, R.string.rare_group_out)
+                assertEquals(names.map { s(it) }, cards().map { card -> KeyboardHarness.all(card).filterIsInstance<TextView>().first().text.toString() })
+                assertTrue(shown().toString(), s(R.string.rare_group_l3_about) in shown())
+                assertTrue(shown().toString(), "犇 堃 喆 淼 垚 芃" in shown())
+                assertEquals(listOf("view:rare/group/EXT", "view:rare/group/L3", "view:rare/group/TRAD", "view:rare/group/OUT"), cards().map { it.tag })
+            },
+            "no cell, no letters on the cards; the title the page's" to {
+                assertEquals(0, fragment().shownLayout.size)
+                assertTrue(cells().isEmpty())
+                assertTrue(views().none { it is LetterScroller })
+                assertEquals(s(R.string.rare_chars), title())
+            },
+            "the strips count each group's held out of all; off, 扩展区's is what turning on holds" to {
+                assertEquals(s(R.string.rare_chars_card_held, "1", "1"), strip(R.string.rare_group_ext).count.text.toString())
+                assertEquals(s(R.string.rare_chars_card_held, "0", "6"), strip(R.string.rare_group_out).count.text.toString())
+                assertEquals(MaterialCheckBox.STATE_CHECKED, strip(R.string.rare_group_ext).state)
+            },
+            "off: only the strips faded and inert, the cards' bodies as they are and open" to {
                 assertFalse(switch().isChecked)
+                val strip = strip(R.string.rare_group_trad)
+                assertEquals(0.5f, strip.alpha)
+                assertFalse(strip.isEnabled)
+                strip.performClick()
+                idle()
+                assertEquals(MaterialCheckBox.STATE_UNCHECKED, strip(R.string.rare_group_trad).state)
+                assertTrue(cards().all { it.alpha == 1f })
+                assertTrue(body(R.string.rare_group_trad).isEnabled)
+            },
+            "off, a group opened: its strip faded, said to be only to look at, a tap changes nothing" to {
+                openGroup(R.string.rare_group_out)
+                assertTrue(shown().toString(), s(R.string.rare_chars_view_only) in shown().joinToString("\n"))
+                assertFalse(strip(R.string.rare_group_out).isEnabled)
                 cell("龘").performClick()
                 idle()
                 assertFalse(cell("龘").held)
                 assertFalse(cell("龘").isEnabled)
             },
-            "the groups' heads, 扩展区 shut and first (held by default); what has no cell said under its group" to {
-                assertTrue(shown().toString(), shown().any { it.startsWith("▸ ${s(R.string.rare_group_ext)}") })
-                val heads = shown().filter { it.startsWith("▸ ") || it.startsWith("▾ ") }.map { it.substring(2).substringBeforeLast(' ') }
-                assertEquals(listOf(R.string.rare_group_ext, R.string.rare_group_l3, R.string.rare_group_trad, R.string.rare_group_out).map { s(it) }, heads)
-                assertTrue(shown().toString(), s(R.string.rare_chars_unread, "1") in shown().joinToString("\n"))
-                assertTrue(shown().toString(), s(R.string.rare_chars_unshown, "1") in shown().joinToString("\n"))
+            "a group's grid: its title, its cells alone, its letters; what the phone cannot draw said over it" to {
+                assertEquals(s(R.string.rare_group_out), title())
+                assertEquals(setOf("炟", "荅", "畣", "鎉", "龘"), cells().keys)
                 assertFalse("龗 not drawn here", "龗" in cells())
-                assertFalse("𤝰 in the shut group", "𤝰" in cells())
-                assertEquals("龗 not drawn: no L", listOf("B", "Z", "F", "D"), shown().filter { it.length == 1 && it[0].isUpperCase() }.distinct())
+                assertEquals(listOf('d'), views().filterIsInstance<LetterScroller>().single().letters)
+                assertTrue(shown().toString(), s(R.string.rare_chars_unshown, "1") in shown().joinToString("\n"))
+                assertTrue(views().none { it is MaterialCardView && it.tag != null })
             },
-            "on: 扩展区 held, counted without what has no reading" to {
+            "back: the cards again, still on the page; 扩展区's grid says what has no reading" to {
+                back()
+                assertEquals(4, cards().size)
+                assertTrue(st.page is RareCharsFragment)
+                assertEquals(s(R.string.rare_chars), title())
+                openGroup(R.string.rare_group_ext)
+                assertTrue(shown().toString(), s(R.string.rare_chars_unread, "1") in shown().joinToString("\n"))
+                back()
+            },
+        )
+    }
+
+    @Test
+    @Uat("WD-52", "AX-17")
+    fun thePageHoldsBackAndLetsThrough() {
+        openPage()
+        assertRows(
+            "on: 扩展区 held, counted without what has no reading; the strips usable" to {
                 switch().isChecked = true
                 idle()
                 assertEquals(s(R.string.rare_chars_note, s(R.string.rare_chars_held, "1")), note())
+                assertTrue(strip(R.string.rare_group_out).isEnabled)
+                assertEquals(1f, strip(R.string.rare_group_out).alpha)
             },
             "a tap holds one back, faded and struck, read out as checked, a screen reader told (review S5)" to {
+                openGroup(R.string.rare_group_out)
                 val told = ArrayList<Int>()
                 val tapped = cell("龘")
                 ViewCompat.setAccessibilityDelegate(tapped, object : AccessibilityDelegateCompat() {
@@ -222,19 +168,31 @@ class RareCharsPageUatTest {
                 assertEquals("龘, dá", said(cell("龘")))
                 assertEquals("荅, dā、dá", said(cell("荅")))
                 assertEquals("dā…", cell("荅").reading)
-                assertEquals(s(R.string.rare_chars_note, s(R.string.rare_chars_held, "2")), note())
+                assertEquals("the fixed strip counts it", s(R.string.rare_chars_card_held, "1", "6"), strip(R.string.rare_group_out).count.text.toString())
             },
-            "a group's box: some, then all held, the count told and undone" to {
-                assertEquals(MaterialCheckBox.STATE_INDETERMINATE, box(R.string.rare_group_out).checkedState)
-                box(R.string.rare_group_out).performClick()
+            "back on the cards: the card's strip some, then all held, the count told and undone" to {
+                back()
+                assertEquals(s(R.string.rare_chars_note, s(R.string.rare_chars_held, "2")), note())
+                assertEquals(MaterialCheckBox.STATE_INDETERMINATE, strip(R.string.rare_group_out).state)
+                strip(R.string.rare_group_out).performClick()
                 idle()
-                assertEquals(MaterialCheckBox.STATE_CHECKED, box(R.string.rare_group_out).checkedState)
+                assertEquals(MaterialCheckBox.STATE_CHECKED, strip(R.string.rare_group_out).state)
                 assertTrue(shown().toString(), s(R.string.rare_chars_changed_held, "5") in shown())
                 assertEquals("龗 held too, though not drawn", s(R.string.rare_chars_note, s(R.string.rare_chars_held, "7")), note())
                 snackbarUndo().performClick()
                 idle()
                 assertEquals(s(R.string.rare_chars_note, s(R.string.rare_chars_held, "2")), note())
+                openGroup(R.string.rare_group_out)
                 assertFalse(cell("畣").held)
+            },
+            "the fixed strip holds the whole group too" to {
+                strip(R.string.rare_group_out).performClick()
+                idle()
+                assertTrue(listOf("炟", "荅", "畣", "鎉", "龘").all { cell(it).held })
+                snackbarUndo().performClick()
+                idle()
+                assertFalse(cell("畣").held)
+                assertTrue(cell("龘").held)
             },
             "saved as the page is left, the engine told; the row says how many" to {
                 leave()
@@ -259,9 +217,16 @@ class RareCharsPageUatTest {
         RareCharsManager.update(listOf(Change.On(true)), TestCharLevels.levels)
         openPage()
         assertRows(
-            "a pinyin searched: its characters across the groups, 扩展区's too" to {
+            "a pinyin searched: its characters across the groups, 扩展区's too, in place of the cards" to {
                 search("DA")
                 assertEquals(setOf("炟", "荅", "畣", "鎉", "龘", "𤝰"), cells().keys)
+                assertTrue(cards().isEmpty())
+            },
+            "each group's section titled with how many, no box on it; no letters" to {
+                assertTrue(shown().toString(), s(R.string.rare_chars_found_in, s(R.string.rare_group_out), "5") in shown())
+                assertTrue(shown().toString(), s(R.string.rare_chars_found_in, s(R.string.rare_group_ext), "1") in shown())
+                assertTrue(views().none { it is CheckStrip || it is MaterialCheckBox })
+                assertTrue(views().none { it is LetterScroller })
             },
             "a character pasted: its cell; a common one, one not this page's, one without a cell said why" to {
                 search("龘")
@@ -275,19 +240,13 @@ class RareCharsPageUatTest {
                 assertTrue(s(R.string.rare_chars_no_cell, NO_READING, s(R.string.rare_group_ext)) in shown())
                 search("xyz")
                 assertTrue(s(R.string.rare_chars_none_found, "xyz") in shown())
+            },
+            "the search cleared: the cards" to {
                 search("")
-                cell("龘")
+                assertEquals(4, cards().size)
+                assertTrue(cells().isEmpty())
             },
         )
-    }
-
-    private fun rareRow(): Preference? {
-        val page = st.page as? PreferenceFragmentCompat ?: return null
-        fun all(g: PreferenceGroup): List<Preference> = (0 until g.preferenceCount).flatMap { i ->
-            val p = g.getPreference(i)
-            listOf(p) + ((p as? PreferenceGroup)?.let(::all) ?: emptyList())
-        }
-        return all(page.preferenceScreen).firstOrNull { it.title == s(R.string.rare_chars) }
     }
 
     // §6.2: a long press and a drag sets every cell between to the start's opposite, one undo for them all
@@ -296,11 +255,8 @@ class RareCharsPageUatTest {
     fun aDragHoldsBackARunAndOneUndoTakesItBack() {
         RareCharsManager.update(listOf(Change.On(true)), TestCharLevels.levels)
         openPage()
+        openGroup(R.string.rare_group_out)
         val list = list()
-        // the run's row (其它表外字's, the last group) shown, as far up as the list goes: a drag within EDGE_DP of
-        // an edge scrolls the list while it can
-        list.scrollBy(0, cell("炟").top - list.height / 2)
-        idle()
         fun at(c: String): Pair<Float, Float> {
             val v = cell(c)
             return (v.left + v.width / 2f) to (v.top + v.height / 2f)
@@ -346,6 +302,7 @@ class RareCharsPageUatTest {
         openPage()
         assertRows(
             "a turn: the change made kept, and saved as the old page stopped" to {
+                openGroup(R.string.rare_group_l3)
                 cell("犇").performClick()
                 idle()
                 st.recreate()
@@ -354,6 +311,7 @@ class RareCharsPageUatTest {
                 assertTrue(0x7287 in file().block)
             },
             "a turn: the search typed kept, and what it found" to {
+                back()
                 search("da")
                 st.recreate()
                 until("the grid again") { cells().isNotEmpty() }
@@ -361,19 +319,20 @@ class RareCharsPageUatTest {
                 assertEquals(setOf("炟", "荅", "畣", "鎉", "龘", "𤝰"), cells().keys)
                 search("")
             },
-            "恢复默认 asked first, then 扩展区 alone, undone, saved as the page is left" to {
+            "恢复默认 asked first, then 扩展区 alone, undone from the title bar, saved as the page is left" to {
                 (st.page as RareCharsFragment).reset()
                 idle()
                 val d = ShadowDialog.getLatestDialog() as AlertDialog
                 assertEquals(s(R.string.rare_chars_reset_confirm), d.findViewById<TextView>(android.R.id.message)!!.text.toString())
                 d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
                 idle()
-                assertFalse(cell("龘").held)
-                assertFalse(cell("犇").held)
+                assertEquals(MaterialCheckBox.STATE_UNCHECKED, strip(R.string.rare_group_l3).state)
+                assertEquals(MaterialCheckBox.STATE_UNCHECKED, strip(R.string.rare_group_out).state)
                 assertEquals(s(R.string.rare_chars_note, s(R.string.rare_chars_held, "1")), note())
-                snackbarUndo().performClick()
-                idle()
+                tapUndo()
+                openGroup(R.string.rare_group_l3)
                 assertTrue("undone: 犇 held again", cell("犇").held)
+                back()
                 (st.page as RareCharsFragment).reset()
                 idle()
                 (ShadowDialog.getLatestDialog() as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).performClick()
@@ -394,15 +353,21 @@ class RareCharsPageUatTest {
         File(HostConfigDir.inUse(ConfigHome.DATA).dir, RareCharsManager.FILE).apply { parentFile!!.mkdirs() }.writeText(later)
         openPage()
         assertRows(
-            "why said; the switch, the boxes and the cells not to be changed" to {
+            "why said; the switch, the strips and the cells not to be changed; the cards open" to {
                 assertTrue(s(R.string.rare_chars_newer) in shown())
                 assertFalse(switch().isEnabled)
-                assertFalse(box(R.string.rare_group_out).isEnabled)
+                assertFalse(strip(R.string.rare_group_out).isEnabled)
+                assertEquals(CheckStrip.DISABLED_ALPHA, strip(R.string.rare_group_out).alpha)
+                openGroup(R.string.rare_group_out)
+                assertTrue(s(R.string.rare_chars_newer) in shown())
+                assertFalse(strip(R.string.rare_group_out).isEnabled)
                 assertFalse(cell("龘").isEnabled)
                 cell("龘").performClick()
                 idle()
             },
-            "恢复默认 not offered" to {
+            "恢复默认 and ↶ not offered" to {
+                assertFalse(menuItem(R.string.rare_chars_reset).isEnabled)
+                assertFalse(menuItem(R.string.undo).isEnabled)
                 (st.page as RareCharsFragment).reset()
                 idle()
                 assertTrue(ShadowDialog.getLatestDialog()?.isShowing != true)
@@ -466,46 +431,6 @@ class RareCharsPageUatTest {
         )
     }
 
-    // review N12: a group's head read with its state, the letters as an adjustable
-    @Test
-    fun theHeadsAndTheLettersAreReadOut() {
-        openPage()
-        assertRows(
-            "扩展区's head read shut, without the arrow, a tap read as opening it" to {
-                val head = views().filterIsInstance<TextView>().first { it.text.startsWith("▸ ${s(R.string.rare_group_ext)}") }
-                assertEquals(s(R.string.rare_chars_group_shut), ViewCompat.getStateDescription(head))
-                assertFalse(head.contentDescription.toString(), "▸" in head.contentDescription)
-                val info = AccessibilityNodeInfo.obtain()
-                head.onInitializeAccessibilityNodeInfo(info)
-                assertEquals(s(R.string.rare_chars_expand), info.actionList.single { it.id == AccessibilityNodeInfo.ACTION_CLICK }.label)
-            },
-            "the letters read as an adjustable, a swipe the next letter (review N12)" to {
-                val letters = views().filterIsInstance<LetterScroller>().single()
-                fun at(): Int {
-                    val info = AccessibilityNodeInfo.obtain()
-                    letters.onInitializeAccessibilityNodeInfo(info)
-                    assertEquals(SeekBar::class.java.name, info.className)
-                    return info.rangeInfo.current.toInt()
-                }
-                assertEquals(0, at())
-                assertTrue(letters.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD, null))
-                idle()
-                assertEquals(1, at())
-                assertTrue(letters.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD, null))
-                idle()
-                assertEquals(0, at())
-            },
-            "the letter it is at read out, the next once gone to" to {
-                val letters = views().filterIsInstance<LetterScroller>().single()
-                val first = letters.letters.first().uppercase()
-                assertEquals(first, ViewCompat.getStateDescription(letters)?.toString())
-                assertTrue(letters.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD, null))
-                idle()
-                assertEquals(letters.letters[1].uppercase(), ViewCompat.getStateDescription(letters)?.toString())
-            },
-        )
-    }
-
     // review N6: the words page's count read after a save of the page just left, not before it
     @Test
     fun theCountWaitsForTheSaveUnderWay() = runBlocking {
@@ -545,34 +470,6 @@ class RareCharsPageUatTest {
             )
         } finally {
             RuntimeEnvironment.setFontScale(1f)
-        }
-    }
-
-    private companion object {
-        const val NO_READING = "𠀁" // U+20001: 扩展 B's, in the dictionary with no reading
-
-        private fun cp(c: String) = c.codePointAt(0)
-
-        // each group's few, as the test's table has them: 犇 and 㑇 三级, 髮 繁体, 𤝰 扩展 B, the rest past the
-        // table in the basic block (TestCharLevels; the JVM tests have no APK assets)
-        val grid: RareGrid by lazy {
-            val b = PinyinDataBuilder().unigram("<unk>", -7f, 0f)
-            fun read(c: String, vararg readings: Pair<String, Int>) = readings.forEach { (syllable, tone) ->
-                b.charReading(ReadingSource.MANDARIN, cp(c), Syllables.id(syllable), tone)
-            }
-            read("大", "da" to 4)
-            read("炟", "da" to 2)
-            read("犇", "ben" to 1)
-            read("㑇", "zhou" to 4)
-            read("髮", "fa" to 4)
-            read("荅", "da" to 1, "da" to 2)
-            read("畣", "da" to 2)
-            read("鎉", "da" to 2, "ta" to 4)
-            read("龘", "da" to 2)
-            read("龗", "ling" to 2)
-            read("𤝰", "da" to 2)
-            val data = PinyinData.load(ByteBuffer.wrap(b.build().toByteArray()))
-            RareGrid.copy(TestCharLevels.levels, data.charReadings, sequenceOf(cp(NO_READING)))
         }
     }
 }

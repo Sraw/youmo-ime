@@ -133,6 +133,38 @@ class RarePageTest {
         )
     }
 
+    // 061-settings-cards.md §3.2: a group opened from its card, alone, no head
+    @Test
+    fun aGroupAloneWithoutItsHeadStartsAtItsFirstLetter() {
+        val layout = RareLayout(listOf(RareLayout.Group(Level.L3, sorted.getValue(Level.L3), { grid.spelling(it)[0] }, open = true, head = false)))
+        // b, 犇, z, 㑇
+        assertRows(
+            "letters and cells, no head" to { assertEquals(listOf("LETTER", "CELL", "LETTER", "CELL"), (0 until layout.size).map { layout.kind(it).name }) },
+            "no head row" to { assertEquals(-1, layout.headOf(Level.L3)) },
+            "the cells' rows and characters" to {
+                assertEquals(1..3, layout.cellsOf(Level.L3))
+                assertEquals(TestCharLevels.AT_8104, grid.chars[layout.cell(1)])
+                assertEquals(3, layout.positionOf(at(TestCharLevels.AT_6501)))
+            },
+            "a letter a row, a cell a column, the first row 0" to {
+                assertEquals(listOf(4, 1, 4, 1), (0 until layout.size).map { layout.spanSize(it, 4) })
+                assertEquals(listOf(0, 1, 2, 3), (0 until layout.size).map { layout.spanGroupIndex(it, 4) })
+                assertEquals(0, layout.spanIndex(1, 4))
+            },
+            "the fast scroller's letters and where they go" to {
+                assertEquals(listOf('b', 'z'), layout.letters)
+                assertEquals(2, layout.positionOf('z', 0))
+                assertEquals(0, layout.positionOf('d', 3))
+            },
+            "the group's level at each row" to { assertEquals(setOf(Level.L3), (0 until layout.size).map { layout.level(it) }.toSet()) },
+            "a group with no cells: no rows" to {
+                val none = RareLayout(listOf(RareLayout.Group(Level.L3, IntArray(0), { 'a' }, open = true, head = false)))
+                assertEquals(0, none.size)
+                assertEquals(-1, none.positionOf('a'))
+            },
+        )
+    }
+
     @Test
     @Uat("WD-52")
     fun aDragSetsTheRangeToTheStartsOppositeAndLeavesTheRestAsTheyWere() {

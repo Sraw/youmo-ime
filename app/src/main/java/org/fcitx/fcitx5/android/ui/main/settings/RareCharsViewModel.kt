@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.engine.data.CharLevels.Level
 import org.fcitx.fcitx5.android.engine.user.RareChoice
 import org.fcitx.fcitx5.android.engine.user.RareGrid
 import org.fcitx.fcitx5.android.ui.rare.RareEdits
+import org.fcitx.fcitx5.android.ui.rare.RareSamples
 import timber.log.Timber
 import java.io.IOException
 import java.text.NumberFormat
@@ -51,8 +52,9 @@ class RareCharsViewModel : ViewModel() {
 
     /**
      * The grid as the page shows it: [sorted], each group's cells; [shown], those the phone can draw;
-     * [unshown], how many of each group it cannot; [edits], the choice as read with the page's
-     * changes, saved as the page is left ([unreadable]: the file not read, nothing changed or saved).
+     * [unshown], how many of each group it cannot; [samples], the few each group's card shows;
+     * [edits], the choice as read with the page's changes, saved as the page is left ([unreadable]:
+     * the file not read, nothing changed or saved).
      */
     class Page(
         val grid: RareGrid,
@@ -60,6 +62,7 @@ class RareCharsViewModel : ViewModel() {
         val sorted: Map<Level, IntArray>,
         val shown: Map<Level, IntArray>,
         val unshown: Map<Level, Int>,
+        val samples: Map<Level, List<String>>,
         val edits: RareEdits,
         val unreadable: Boolean,
     ) {
@@ -72,8 +75,14 @@ class RareCharsViewModel : ViewModel() {
     private val _state = MutableStateFlow<State>(State.Loading)
     val state: StateFlow<State> = _state
 
-    /** The groups shown open: 扩展区 shut at first (design §6.2). */
-    val open: MutableSet<Level> = mutableSetOf(Level.L3, Level.TRAD, Level.OUT)
+    /** The group opened from its card, its grid in the cards' place; null, the cards (061-settings-cards.md §3.2). */
+    var opened: Level? = null
+
+    /** Where each group's grid was scrolled to, its first row shown and that row's offset, kept as it is left. */
+    val scrolls: MutableMap<Level, Pair<Int, Int>> = mutableMapOf()
+
+    /** The last step to take back from the title bar's ↶ (§2.4); none after a save. */
+    var undo: RareEdits.Undo? = null
 
     private var loading: Job? = null
 
@@ -111,7 +120,7 @@ class RareCharsViewModel : ViewModel() {
     /** The search typed, kept over a turn. */
     var query: String = ""
 
-    /** The grid's scroll, kept over a turn. */
+    /** The search's results' scroll, kept over a turn. */
     var scroll: Parcelable? = null
 
     companion object {
@@ -132,7 +141,10 @@ class RareCharsViewModel : ViewModel() {
             val sorted = grid.sorted()
             val shown = sorted.mapValues { (_, cells) -> cells.filter { hasGlyph(String(Character.toChars(grid.chars[it]))) }.toIntArray() }
             val unshown = sorted.mapValues { (level, cells) -> cells.size - shown.getValue(level).size }
-            return Page(grid, levels, sorted, shown, unshown, RareEdits(grid, levels, choice), unreadable)
+            val samples = shown.mapValues { (level, cells) ->
+                RareSamples.of(level, cells.map { String(Character.toChars(grid.chars[it])) }, hasGlyph)
+            }
+            return Page(grid, levels, sorted, shown, unshown, samples, RareEdits(grid, levels, choice), unreadable)
         }
     }
 }

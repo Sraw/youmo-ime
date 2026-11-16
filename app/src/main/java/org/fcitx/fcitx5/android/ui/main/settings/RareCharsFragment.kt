@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -18,12 +19,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.MenuProvider
-import androidx.core.view.ViewCompat
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -35,6 +36,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.R as MaterialR
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -43,15 +45,20 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
 import org.fcitx.fcitx5.android.engine.data.CharLevels.Level
+import org.fcitx.fcitx5.android.ui.cards.CardColumns
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.RareCharsViewModel.Page
 import org.fcitx.fcitx5.android.ui.main.settings.RareCharsViewModel.State
+import org.fcitx.fcitx5.android.ui.main.settings.cards.CardGrid
+import org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip
+import org.fcitx.fcitx5.android.ui.main.settings.cards.GroupCard
 import org.fcitx.fcitx5.android.ui.rare.DragRange
 import org.fcitx.fcitx5.android.ui.rare.RareEdits
 import org.fcitx.fcitx5.android.ui.rare.RareEdits.Box
 import org.fcitx.fcitx5.android.ui.rare.RareEdits.Found
 import org.fcitx.fcitx5.android.ui.rare.RareLayout
 import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.materialTextInput
 import org.fcitx.fcitx5.android.utils.styledColor
 import org.fcitx.fcitx5.android.utils.toast
@@ -61,9 +68,11 @@ import java.io.IOException
 import java.text.NumberFormat
 
 /**
- * 生僻字屏蔽 (dev/design/061-rare-char-block.md §6): the switch, the four groups' cells to hold back or
- * let through one by one, by a drag or a group's box, and a search. Changes stay on the page and are
- * saved as it is left ([onStop]), the engine then reading them; a later version's file is shown, not changed.
+ * 生僻字屏蔽 (dev/design/061-rare-char-block.md §6; 061-settings-cards.md §3): the switch, a search, and a
+ * card for each of the four groups. A card's body opens its group's grid in the cards' place, back
+ * returns to them; its strip holds the whole group back or lets it through. In the grid cells are held
+ * back or let through one by one, or by a drag. Changes stay on the page and are saved as it is left
+ * ([onStop]), the engine then reading them; a later version's file is shown, not changed.
  */
 class RareCharsFragment : Fragment() {
 
@@ -74,13 +83,23 @@ class RareCharsFragment : Fragment() {
     private lateinit var switch: MaterialSwitch
     private lateinit var note: TextView
     private lateinit var warning: TextView
+    private lateinit var searchLayout: View
     private lateinit var message: TextView
     private lateinit var status: TextView
+    private lateinit var cardScroll: ScrollView
+    private val cards = LinkedHashMap<Level, GroupCard>()
+    private lateinit var head: LinearLayout
+    private lateinit var headStrip: CheckStrip
+    private lateinit var headNotes: TextView
     private lateinit var list: RecyclerView
     private lateinit var scroller: LetterScroller
+    private lateinit var back: OnBackPressedCallback
+    private var snackbar: Snackbar? = null
 
     private var page: Page? = null
     private var layout = RareLayout(emptyList())
+    // what the search found in each group, for its section's title
+    private var found = emptyMap<Level, Int>()
     private var drag: DragRange? = null
     private val adapter = CellAdapter()
     private val number = NumberFormat.getIntegerInstance()
@@ -91,6 +110,9 @@ class RareCharsFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val ctx = requireContext()
         val pad = ctx.dp(16)
+        val config = resources.configuration
+        // at most 600 dp wide, in the middle (§2.10)
+        val widthDp = minOf(config.screenWidthDp, MAX_WIDTH_DP)
         switch = MaterialSwitch(ctx).apply {
             setText(R.string.rare_chars_switch)
             setPadding(pad, ctx.dp(8), pad, 0)
@@ -98,6 +120,9 @@ class RareCharsFragment : Fragment() {
                 val page = page ?: return@setOnCheckedChangeListener
                 if (page.edits.choice.on == on) return@setOnCheckedChangeListener
                 page.edits.setOn(on)
+                // not a step of its own: ↶, or the snackbar's 撤销, would turn it back with the step before
+                dropUndo()
+                snackbar?.dismiss()
                 showState()
             }
         }
@@ -107,6 +132,7 @@ class RareCharsFragment : Fragment() {
             visibility = View.GONE
         }
         val (searchLayout, searchField) = ctx.materialTextInput { hint = getString(R.string.rare_chars_search_hint) }
+        this.searchLayout = searchLayout
         searchLayout.setPadding(pad, 0, pad, 0)
         searchField.apply {
             isSingleLine = true
@@ -118,6 +144,7 @@ class RareCharsFragment : Fragment() {
                     if (viewModel.query == s.toString()) return
                     viewModel.query = s.toString()
                     page?.let { relayout(it) }
+                    showScreen()
                 }
             })
         }
@@ -130,38 +157,19 @@ class RareCharsFragment : Fragment() {
             setPadding(pad, pad, pad, pad)
             setText(R.string.loading)
         }
-        val config = resources.configuration
-        val columns = RareCharCell.columns(config.screenWidthDp - SCROLLER_DP, config.fontScale)
-        list = RecyclerView(ctx).apply {
-            setHasFixedSize(true)
-            itemAnimator = null
-            // a letter's jump lays out a whole new screen of cells: the default pool keeps 5 a type and the
-            // rest were made anew each jump (gfxinfo, 2026-11-14: 60% janky frames dragging the letters).
-            // A screen's worth and two rows more
-            recycledViewPool.setMaxRecycledViews(
-                RareLayout.Kind.CELL.ordinal,
-                columns * (RareCharCell.rows(config.screenHeightDp, config.fontScale) + 2),
-            )
-            layoutManager = GridLayoutManager(ctx, columns).apply {
-                spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
-                    override fun getSpanSize(position: Int) = layout.spanSize(position, spanCount)
-                    override fun getSpanIndex(position: Int, spanCount: Int) = layout.spanIndex(position, spanCount)
-                    override fun getSpanGroupIndex(adapterPosition: Int, spanCount: Int) = layout.spanGroupIndex(adapterPosition, spanCount)
-                }
-            }
-            adapter = this@RareCharsFragment.adapter
-            addOnItemTouchListener(DragListener())
-            visibility = View.GONE
-        }
+        cardScroll = groupCards(ctx, widthDp, config.fontScale)
+        head = groupHead(ctx)
+        list = cellList(ctx, widthDp, config.screenHeightDp, config.fontScale)
         scroller = LetterScroller(ctx).apply {
             onLetter = { c ->
-                // in the group at the list's top: a drag there stays there (review S2)
                 val top = (list.layoutManager as GridLayoutManager).findFirstVisibleItemPosition()
                 val at = layout.positionOf(c, top)
                 if (at >= 0) (list.layoutManager as GridLayoutManager).scrollToPositionWithOffset(at, 0)
             }
+            visibility = View.GONE
         }
-        val grid = FrameLayout(ctx).apply {
+        val content = FrameLayout(ctx).apply {
+            addView(cardScroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             addView(list, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT).apply { marginEnd = ctx.dp(SCROLLER_DP) })
             addView(scroller, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END))
             addView(status, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -174,12 +182,94 @@ class RareCharsFragment : Fragment() {
             addView(warning, wrap)
             addView(searchLayout, wrap)
             addView(message, wrap)
-            addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(head, wrap)
+            addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         }
-        return root
+        return FrameLayout(ctx).apply {
+            val across = if (config.screenWidthDp > MAX_WIDTH_DP) ctx.dp(MAX_WIDTH_DP) else ViewGroup.LayoutParams.MATCH_PARENT
+            addView(root, FrameLayout.LayoutParams(across, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER_HORIZONTAL))
+        }
+    }
+
+    /** The four group cards, as many across as fit [widthDp] (§3.1), in a scroll of their own. */
+    private fun groupCards(ctx: Context, widthDp: Int, fontScale: Float): ScrollView {
+        val pad = ctx.dp(16)
+        val grid = CardGrid(ctx, CardColumns.columns(widthDp.toFloat(), fontScale, CardColumns.GROUP_MIN_DP, CardColumns.GROUP)).apply {
+            // its node holds the list a reader counts the cards in
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
+        var before: GroupCard? = null
+        for (level in RareLayout.ORDER) {
+            val card = GroupCard(ctx)
+            card.onOpen = { open(level) }
+            card.strip.onCheck = { checkGroup(level) }
+            // where the settings search lands (§7.4)
+            card.view.tag = "view:rare/group/${level.name}"
+            before?.let(card::readAfter)
+            before = card
+            cards[level] = card
+            grid.addView(card.view)
+        }
+        return ScrollView(ctx).apply {
+            setPadding(pad, ctx.dp(8), pad, pad)
+            clipToPadding = false
+            addView(grid, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            visibility = View.GONE
+        }
+    }
+
+    /** The opened group's strip, fixed above its grid, and what is said of the group under it (§3.2). */
+    private fun groupHead(ctx: Context): LinearLayout {
+        val pad = ctx.dp(16)
+        headStrip = CheckStrip(ctx, edgeDp = 16).apply { onCheck = { viewModel.opened?.let(::checkGroup) } }
+        headNotes = TextView(ctx).apply {
+            textSize = NOTES_SP
+            setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant))
+            setPadding(pad, 0, pad, ctx.dp(8))
+        }
+        return LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(headStrip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(headNotes, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(View(ctx).apply {
+                setBackgroundColor(ctx.styledColor(MaterialR.attr.colorOutlineVariant))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dp(1)))
+            visibility = View.GONE
+        }
+    }
+
+    /** The grid of cells, as many across as fit [widthDp] less the letters. */
+    private fun cellList(ctx: Context, widthDp: Int, heightDp: Int, fontScale: Float): RecyclerView {
+        val columns = RareCharCell.columns(widthDp - SCROLLER_DP, fontScale)
+        return RecyclerView(ctx).apply {
+            setHasFixedSize(true)
+            itemAnimator = null
+            // a letter's jump lays out a whole new screen of cells: the default pool keeps 5 a type and the
+            // rest were made anew each jump (gfxinfo, 2026-11-14: 60% janky frames dragging the letters).
+            // A screen's worth and two rows more
+            recycledViewPool.setMaxRecycledViews(
+                RareLayout.Kind.CELL.ordinal,
+                columns * (RareCharCell.rows(heightDp, fontScale) + 2),
+            )
+            layoutManager = GridLayoutManager(ctx, columns).apply {
+                spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                    override fun getSpanSize(position: Int) = layout.spanSize(position, spanCount)
+                    override fun getSpanIndex(position: Int, spanCount: Int) = layout.spanIndex(position, spanCount)
+                    override fun getSpanGroupIndex(adapterPosition: Int, spanCount: Int) = layout.spanGroupIndex(adapterPosition, spanCount)
+                }
+            }
+            adapter = this@RareCharsFragment.adapter
+            addOnItemTouchListener(DragListener())
+            visibility = View.GONE
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        back = object : OnBackPressedCallback(viewModel.opened != null) {
+            override fun handleOnBackPressed() = closeGroup()
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, back)
         viewModel.load(mainViewModel.fcitx)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -189,7 +279,14 @@ class RareCharsFragment : Fragment() {
         requireActivity().addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
                 val page = page
-                menu.add(R.string.rare_chars_reset).setEnabled(page != null && !page.readOnly).setOnMenuItemClickListener {
+                val can = page != null && !page.readOnly
+                val tint = requireContext().styledColor(android.R.attr.colorControlNormal)
+                menu.item(R.string.undo, R.drawable.ic_baseline_undo_24, tint, showAsAction = true) { undoLast() }.apply {
+                    isEnabled = can && viewModel.undo != null
+                    // a toolbar's disabled icon is drawn as it is: grayed here
+                    icon = icon?.mutate()?.apply { alpha = if (isEnabled) OPAQUE else DISABLED_ICON_ALPHA }
+                }
+                menu.add(R.string.rare_chars_reset).setEnabled(can).setOnMenuItemClickListener {
                     reset()
                     true
                 }
@@ -199,9 +296,14 @@ class RareCharsFragment : Fragment() {
         }, viewLifecycleOwner, Lifecycle.State.STARTED)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // after the navigation's own title, which a page made again (a turn) is given too
+        showTitle()
+    }
+
     private fun show(state: State) {
         status.visibility = if (state is State.Ready) View.GONE else View.VISIBLE
-        list.visibility = if (state is State.Ready) View.VISIBLE else View.GONE
         when (state) {
             State.Loading -> status.setText(R.string.loading)
             State.NoPack -> status.setText(R.string.pack_text_needed_short)
@@ -209,7 +311,12 @@ class RareCharsFragment : Fragment() {
             is State.Ready -> if (page !== state.page) {
                 page = state.page
                 relayout(state.page)
-                viewModel.scroll?.let { list.layoutManager?.onRestoreInstanceState(it) }
+                val opened = viewModel.opened
+                if (opened != null) {
+                    restoreScroll(opened)
+                } else if (viewModel.query.isNotBlank()) {
+                    viewModel.scroll?.let { list.layoutManager?.onRestoreInstanceState(it) }
+                }
                 requireActivity().invalidateMenu()
             }
         }
@@ -217,10 +324,36 @@ class RareCharsFragment : Fragment() {
             switch.isEnabled = false
             scroller.letters = emptyList()
         }
+        showScreen()
         showState()
     }
 
-    /** The switch, the note under it and why the page cannot be changed, as the edits now are. */
+    /**
+     * Which of the page's three shows: the cards, the search's cells, or a group's grid under its
+     * strip (§3.1–§3.3); the title and back as it has them.
+     */
+    private fun showScreen() {
+        val ready = page != null
+        val opened = viewModel.opened
+        val searching = opened == null && viewModel.query.isNotBlank()
+        val top = if (opened == null) View.VISIBLE else View.GONE
+        switch.visibility = top
+        note.visibility = top
+        searchLayout.visibility = top
+        if (!searching) message.visibility = View.GONE
+        head.visibility = if (ready && opened != null) View.VISIBLE else View.GONE
+        cardScroll.visibility = if (ready && opened == null && !searching) View.VISIBLE else View.GONE
+        list.visibility = if (ready && (opened != null || searching)) View.VISIBLE else View.GONE
+        scroller.visibility = if (ready && opened != null) View.VISIBLE else View.GONE
+        back.isEnabled = opened != null
+        showTitle()
+    }
+
+    private fun showTitle() {
+        mainViewModel.setToolbarTitle(getString(viewModel.opened?.let(::groupName) ?: R.string.rare_chars))
+    }
+
+    /** The switch, the note under it and why the page cannot be changed, the cards and strips, as the edits now are. */
     private fun showState() {
         val page = page
         val on = page?.edits?.choice?.on == true
@@ -231,35 +364,139 @@ class RareCharsFragment : Fragment() {
         if (page?.readOnly == true) warning.setText(if (page.unreadable) R.string.rare_chars_unreadable else R.string.rare_chars_newer)
         // off, the grid grayed but there to look at (§6.2)
         list.alpha = if (on || page == null) 1f else OFF_ALPHA
+        if (page != null) {
+            val samples = CardColumns.samples(resources.configuration.screenHeightDp.toFloat())
+            for ((level, card) in cards) {
+                val name = getString(groupName(level))
+                val held = page.edits.heldIn(level)
+                card.bind(
+                    name, getString(groupAbout(level)), if (samples) page.samples[level].orEmpty() else emptyList(),
+                    getString(R.string.rare_chars_card_a11y, name, number.format(page.grid.count(level)), number.format(held)),
+                    getString(R.string.rare_chars_card_open),
+                )
+                showStrip(card.strip, page, level, held)
+            }
+            viewModel.opened?.let { showHead(page, it) }
+        }
         adapter.notifyItemRangeChanged(0, adapter.itemCount, PAYLOAD_STATE)
+    }
+
+    /**
+     * A group's strip, [held] of its cells held: 「已屏蔽 held/all」, its box, what it reads out; off or
+     * read-only, faded and inert (§2.5: the switch off 50%, a later version's file 38%).
+     */
+    private fun showStrip(strip: CheckStrip, page: Page, level: Level, held: Int) {
+        val total = page.grid.count(level)
+        val box = when (held) {
+            0 -> Box.NONE
+            total -> Box.ALL
+            else -> Box.SOME
+        }
+        strip.state = when (box) {
+            Box.ALL -> MaterialCheckBox.STATE_CHECKED
+            Box.SOME -> MaterialCheckBox.STATE_INDETERMINATE
+            Box.NONE -> MaterialCheckBox.STATE_UNCHECKED
+        }
+        strip.count.text = getString(R.string.rare_chars_card_held, number.format(held), number.format(total))
+        val boxText = getString(
+            when (box) {
+                Box.ALL -> R.string.rare_chars_box_all
+                Box.SOME -> R.string.rare_chars_box_some
+                Box.NONE -> R.string.rare_chars_box_none
+            }
+        )
+        strip.contentDescription = getString(R.string.rare_chars_group_a11y, getString(groupName(level)), number.format(total), boxText)
+        strip.setUsable(editable(page), if (page.readOnly) CheckStrip.DISABLED_ALPHA else OFF_ALPHA)
+    }
+
+    /** The opened group's fixed strip, and under it what has no cell, what the phone cannot draw, and that off it is only to look at (§3.2). */
+    private fun showHead(page: Page, level: Level) {
+        showStrip(headStrip, page, level, page.edits.heldIn(level))
+        val unread = page.grid.unread[Level.GRID.indexOf(level)]
+        val unshown = page.unshown.getValue(level)
+        val notes = listOfNotNull(
+            unread.takeIf { it > 0 }?.let { getString(R.string.rare_chars_unread, number.format(it)) },
+            unshown.takeIf { it > 0 }?.let { getString(R.string.rare_chars_unshown, number.format(it)) },
+            getString(R.string.rare_chars_view_only).takeIf { !page.readOnly && !page.edits.choice.on },
+        )
+        headNotes.text = notes.joinToString("\n")
+        headNotes.visibility = if (notes.isEmpty()) View.GONE else View.VISIBLE
     }
 
     private fun editable(page: Page) = !page.readOnly && page.edits.choice.on
 
-    /** The rows anew: the groups as opened, or what the search finds. */
+    /** [level]'s group, every cell of it, held back, or let through where it all is (§2.4: some → all). */
+    private fun checkGroup(level: Level) {
+        val page = page ?: return
+        if (!editable(page)) return
+        val before = held(page)
+        changed(page, before, page.edits.setGroup(level, page.edits.box(level) != Box.ALL))
+    }
+
+    /** [level]'s grid in the cards' place, where it was left (§3.2). */
+    @VisibleForTesting
+    internal fun open(level: Level) {
+        val page = page ?: return
+        if (viewModel.opened != null) return
+        viewModel.opened = level
+        relayout(page)
+        restoreScroll(level)
+        showScreen()
+        showState()
+    }
+
+    /** Back to the cards from a group's grid, its place kept. */
+    private fun closeGroup() {
+        val page = page ?: return
+        keepScroll()
+        drag = null
+        viewModel.opened = null
+        relayout(page)
+        showScreen()
+        showState()
+    }
+
+    // the opened group's first row shown and its offset
+    private fun keepScroll() {
+        val level = viewModel.opened ?: return
+        val manager = list.layoutManager as GridLayoutManager
+        val first = manager.findFirstVisibleItemPosition()
+        if (first == RecyclerView.NO_POSITION) return
+        viewModel.scrolls[level] = first to (manager.findViewByPosition(first)?.top ?: 0) - list.paddingTop
+    }
+
+    private fun restoreScroll(level: Level) {
+        val (at, offset) = viewModel.scrolls[level] ?: (0 to 0)
+        (list.layoutManager as GridLayoutManager).scrollToPositionWithOffset(at.coerceIn(0, maxOf(0, layout.size - 1)), offset)
+    }
+
+    /** The rows anew: the opened group's alone, or what the search finds; on the cards, none. */
     private fun relayout(page: Page) {
         val query = viewModel.query
+        val opened = viewModel.opened
         message.visibility = View.GONE
-        val groups = if (query.isBlank()) {
-            RareLayout.ORDER.map { level -> RareLayout.Group(level, page.shown.getValue(level), page::letterOf, level in viewModel.open) }
-        } else {
-            when (val found = RareEdits.search(query, page.grid, page.levels, page.sorted)) {
+        found = emptyMap()
+        val groups = when {
+            opened != null -> listOf(RareLayout.Group(opened, page.shown.getValue(opened), page::letterOf, open = true, head = false))
+            query.isBlank() -> emptyList()
+            else -> when (val result = RareEdits.search(query, page.grid, page.levels, page.sorted)) {
                 is Found.Cells -> {
-                    if (found.cells.isEmpty()) say(getString(R.string.rare_chars_none_found, query.trim()))
+                    if (result.cells.isEmpty()) say(getString(R.string.rare_chars_none_found, query.trim()))
                     RareLayout.ORDER.mapNotNull { level ->
-                        found.cells.filter { page.grid.level(it) == level }.takeIf { it.isNotEmpty() }
+                        result.cells.filter { page.grid.level(it) == level }.takeIf { it.isNotEmpty() }
                             ?.let { RareLayout.Group(level, it.toIntArray(), page::letterOf, true) }
-                    }
+                    }.also { groups -> found = groups.associate { it.level to it.cells.size } }
                 }
-                is Found.Common -> emptyList<RareLayout.Group>().also { say(getString(R.string.rare_chars_common, text(found.codePoint))) }
-                is Found.NotOurs -> emptyList<RareLayout.Group>().also { say(getString(R.string.rare_chars_not_ours, text(found.codePoint))) }
+                is Found.Common -> emptyList<RareLayout.Group>().also { say(getString(R.string.rare_chars_common, text(result.codePoint))) }
+                is Found.NotOurs -> emptyList<RareLayout.Group>().also { say(getString(R.string.rare_chars_not_ours, text(result.codePoint))) }
                 is Found.NoCell -> emptyList<RareLayout.Group>().also {
-                    say(getString(R.string.rare_chars_no_cell, text(found.codePoint), getString(groupName(found.level))))
+                    say(getString(R.string.rare_chars_no_cell, text(result.codePoint), getString(groupName(result.level))))
                 }
             }
         }
         layout = RareLayout(groups)
-        scroller.letters = layout.letters
+        // the letters only in a group's grid: one group's, no guessing which (§3.2)
+        scroller.letters = if (opened != null) layout.letters else emptyList()
         adapter.notifyDataSetChanged()
     }
 
@@ -268,16 +505,41 @@ class RareCharsFragment : Fragment() {
         message.visibility = View.VISIBLE
     }
 
-    /** Takes [undo] back from the snackbar, the cells changed told: held or let through. */
+    /** A step taken, [undo] takes it back: from the title bar's ↶, and from the snackbar, the cells changed told. */
     private fun changed(page: Page, before: Int, undo: RareEdits.Undo) {
+        stepTaken(undo)
         val after = held(page)
         showState()
         if (after == before) return
         val text = if (after > before) getString(R.string.rare_chars_changed_held, number.format(after - before))
         else getString(R.string.rare_chars_changed_allowed, number.format(before - after))
-        Snackbar.make(root, text, Snackbar.LENGTH_LONG).setAction(R.string.undo) {
+        snackbar = Snackbar.make(root, text, Snackbar.LENGTH_LONG).setAction(R.string.undo) {
             if (page.edits.undo(undo)) showState()
-        }.show()
+            // a step after it went back with it
+            dropUndo()
+        }.also { it.show() }
+    }
+
+    // the last step, the one ↶ takes back (§2.4: the strips, a drag, a cell, 恢复默认)
+    private fun stepTaken(undo: RareEdits.Undo) {
+        viewModel.undo = undo
+        requireActivity().invalidateMenu()
+    }
+
+    private fun dropUndo() {
+        if (viewModel.undo == null) return
+        viewModel.undo = null
+        activity?.invalidateMenu()
+    }
+
+    /** The title bar's ↶: the last step taken back, a step its snackbar offered too. */
+    @VisibleForTesting
+    internal fun undoLast() {
+        val page = page ?: return
+        val undo = viewModel.undo ?: return
+        dropUndo()
+        snackbar?.dismiss()
+        if (page.edits.undo(undo)) showState()
     }
 
     // the cells held, on or off: what a change made is counted by
@@ -298,7 +560,9 @@ class RareCharsFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        keepScroll()
         viewModel.scroll = list.layoutManager?.onSaveInstanceState()
+        snackbar = null
         super.onDestroyView()
     }
 
@@ -310,6 +574,8 @@ class RareCharsFragment : Fragment() {
     /** The page's changes laid over the file as it is now, the engine then reading it; none, nothing done (§6.2). */
     private fun save() {
         val page = page ?: return
+        // a step before a save is no more to take back (RareEdits.undo): ↶ grayed at once, whatever is saved
+        dropUndo()
         if (page.readOnly || page.edits.changes.isEmpty()) return
         val changes = page.edits.changes.toList()
         // outlives the page, whose scope leaving cancels
@@ -357,7 +623,12 @@ class RareCharsFragment : Fragment() {
             val ctx = parent.context
             val view = when (RareLayout.Kind.entries[viewType]) {
                 RareLayout.Kind.CELL -> RareCharCell(ctx, paints ?: RareCharCell.Paints(ctx).also { paints = it })
-                RareLayout.Kind.HEAD -> GroupHead(ctx)
+                // a search's section: its group and how many found, no box (§3.3)
+                RareLayout.Kind.HEAD -> TextView(ctx).apply {
+                    textSize = NOTES_SP
+                    setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant))
+                    setPadding(ctx.dp(16), ctx.dp(12), ctx.dp(16), ctx.dp(4))
+                }
                 RareLayout.Kind.LETTER -> TextView(ctx).apply {
                     setPadding(ctx.dp(16), ctx.dp(8), ctx.dp(16), ctx.dp(2))
                     setTextColor(ctx.styledColor(android.R.attr.colorPrimary))
@@ -382,8 +653,12 @@ class RareCharsFragment : Fragment() {
                     view.setOnClickListener { toggle(holder) }
                     view.setOnLongClickListener { startDrag(holder) }
                 }
-                is GroupHead -> view.bind(layout.level(position))
-                is TextView -> view.text = layout.letter(position).uppercase()
+                is TextView -> view.text = if (layout.kind(position) == RareLayout.Kind.HEAD) {
+                    val level = layout.level(position)
+                    getString(R.string.rare_chars_found_in, getString(groupName(level)), number.format(found[level] ?: 0))
+                } else {
+                    layout.letter(position).uppercase()
+                }
             }
             bindState(holder, position)
         }
@@ -395,7 +670,6 @@ class RareCharsFragment : Fragment() {
                     view.setHeld(shown(page, position))
                     view.isEnabled = editable(page)
                 }
-                is GroupHead -> view.bind(layout.level(position))
             }
         }
     }
@@ -406,8 +680,8 @@ class RareCharsFragment : Fragment() {
         val page = page ?: return
         val position = holder.bindingAdapterPosition
         if (!editable(page) || position == RecyclerView.NO_POSITION) return
-        // one cell, seen changing under the finger: no undo (§6.2 gives one to a drag and a group's box)
-        page.edits.toggle(layout.cell(position))
+        // one cell, seen changing under the finger: no snackbar (§6.2), but a step ↶ takes back (§2.4)
+        stepTaken(page.edits.toggle(layout.cell(position)))
         showState()
     }
 
@@ -496,89 +770,30 @@ class RareCharsFragment : Fragment() {
         range.moveTo(position).forEach { adapter.notifyItemChanged(it, PAYLOAD_STATE) }
     }
 
-    /** A group's head (§6.2): its name and count, opened or shut by a tap; its box; what it holds; what has no cell. */
-    private inner class GroupHead(ctx: android.content.Context) : LinearLayout(ctx) {
-        private val name = TextView(ctx).apply {
-            textSize = HEAD_SP
-            setPadding(ctx.dp(16), ctx.dp(12), ctx.dp(8), ctx.dp(4))
-        }
-        private val box = MaterialCheckBox(ctx)
-        private val counts = TextView(ctx).apply { setPadding(ctx.dp(16), 0, ctx.dp(16), ctx.dp(8)) }
-        private var level = Level.L3
-
-        init {
-            orientation = VERTICAL
-            addView(LinearLayout(ctx).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                addView(name, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-                addView(box, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
-            }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-            addView(counts, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-            name.setOnClickListener {
-                if (viewModel.query.isNotBlank()) return@setOnClickListener
-                if (!viewModel.open.remove(level)) viewModel.open += level
-                page?.let { relayout(it) }
-            }
-            box.setOnClickListener {
-                val page = page ?: return@setOnClickListener
-                if (!editable(page)) return@setOnClickListener
-                val before = held(page)
-                changed(page, before, page.edits.setGroup(level, page.edits.box(level) != Box.ALL))
-            }
-        }
-
-        fun bind(level: Level) {
-            this.level = level
-            val page = page ?: return
-            val total = page.grid.count(level)
-            val open = viewModel.query.isNotBlank() || level in viewModel.open
-            name.text = "${if (open) "▾" else "▸"} ${getString(groupName(level))} ${number.format(total)}"
-            // read without the arrow, its state said and what a tap does (review N12)
-            name.contentDescription = "${getString(groupName(level))} ${number.format(total)}"
-            ViewCompat.setStateDescription(name, getString(if (open) R.string.rare_chars_group_open else R.string.rare_chars_group_shut))
-            ViewCompat.replaceAccessibilityAction(
-                name, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK,
-                getString(if (open) R.string.rare_chars_collapse else R.string.rare_chars_expand), null,
-            )
-            val state = page.edits.box(level)
-            box.checkedState = when (state) {
-                Box.ALL -> MaterialCheckBox.STATE_CHECKED
-                Box.SOME -> MaterialCheckBox.STATE_INDETERMINATE
-                Box.NONE -> MaterialCheckBox.STATE_UNCHECKED
-            }
-            box.isEnabled = editable(page)
-            val boxText = getString(
-                when (state) {
-                    Box.ALL -> R.string.rare_chars_box_all
-                    Box.SOME -> R.string.rare_chars_box_some
-                    Box.NONE -> R.string.rare_chars_box_none
-                }
-            )
-            box.contentDescription = getString(R.string.rare_chars_group_a11y, getString(groupName(level)), number.format(total), boxText)
-            val unread = page.grid.unread[Level.GRID.indexOf(level)]
-            val unshown = page.unshown.getValue(level)
-            counts.text = listOfNotNull(
-                getString(R.string.rare_chars_group_held, number.format(page.edits.heldIn(level))),
-                unread.takeIf { it > 0 }?.let { getString(R.string.rare_chars_unread, number.format(it)) },
-                unshown.takeIf { it > 0 }?.let { getString(R.string.rare_chars_unshown, number.format(it)) },
-            ).joinToString("\n")
-        }
-    }
-
     companion object {
         private const val PAYLOAD_STATE = "state"
         private const val SCROLLER_DP = 24
         private const val EDGE_DP = 48
         private const val SCROLL_DP = 12
-        private const val HEAD_SP = 16f
+        private const val NOTES_SP = 13f
         private const val OFF_ALPHA = 0.5f
         private const val LETTER_IDS = 1000L
+        private const val MAX_WIDTH_DP = 600
+        private const val OPAQUE = 255
+        private const val DISABLED_ICON_ALPHA = 97 // 38%
 
         fun groupName(level: Level) = when (level) {
             Level.L3 -> R.string.rare_group_l3
             Level.TRAD -> R.string.rare_group_trad
             Level.OUT -> R.string.rare_group_out
             else -> R.string.rare_group_ext
+        }
+
+        fun groupAbout(level: Level) = when (level) {
+            Level.L3 -> R.string.rare_group_l3_about
+            Level.TRAD -> R.string.rare_group_trad_about
+            Level.OUT -> R.string.rare_group_out_about
+            else -> R.string.rare_group_ext_about
         }
     }
 }

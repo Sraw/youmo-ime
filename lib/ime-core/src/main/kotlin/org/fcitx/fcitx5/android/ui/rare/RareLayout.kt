@@ -9,14 +9,18 @@ import org.fcitx.fcitx5.android.engine.user.RareChoice
 
 /**
  * The rows of 生僻字屏蔽's grid (dev/design/061-rare-char-block.md §6.2–§6.4): each group's head, then,
- * if open, a row for each first letter and its cells. Plain arrays, ~35,000 cells: a position's row
+ * if open, a row for each first letter and its cells. A group opened from its card (061-settings-cards.md
+ * §3.2) is alone and has no head: the page's title and its fixed strip say which it is. Plain arrays, ~35,000 cells: a position's row
  * kind, span index and row are found by a binary search over the blocks (a head or a letter and the
  * cells after it), not by counting from the top as GridLayoutManager's default lookup does.
  */
 class RareLayout(groups: List<Group>) {
 
-    /** A group as the page has it: its [cells] (grid indexes, in the grid's order), each one's first [letter], [open] or shut. */
-    class Group(val level: Level, val cells: IntArray, val letter: (Int) -> Char, val open: Boolean)
+    /**
+     * A group as the page has it: its [cells] (grid indexes, in the grid's order), each one's first
+     * [letter], [open] or shut, with a [head] row or not.
+     */
+    class Group(val level: Level, val cells: IntArray, val letter: (Int) -> Char, val open: Boolean, val head: Boolean = true)
 
     enum class Kind { HEAD, LETTER, CELL }
 
@@ -54,7 +58,7 @@ class RareLayout(groups: List<Group>) {
             at += 1 + to - from
         }
         for (g in groups) {
-            block(Kind.HEAD, g.level, ' ', 0, 0, g.cells)
+            if (g.head) block(Kind.HEAD, g.level, ' ', 0, 0, g.cells)
             if (!g.open) continue
             var i = 0
             while (i < g.cells.size) {
