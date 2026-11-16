@@ -254,6 +254,27 @@ class BarIconsThemeTest {
         assertNotNull(PackIcons.of(mine).file("hide-keyboard"))
     }
 
+    // the app's image drawn at its own size elsewhere first (another bar, a panel, an earlier case): a vector's raster
+    // only ever grows, shared by every drawable of the resource, so the button's smaller icon came out sharper than
+    // drawn alone (the low landscape bar's emoji, at random in a full run)
+    @Test
+    fun aButtonsIconIsDrawnAlikeWhateverDrewTheSameImageBefore() {
+        val image = ctx.getDrawable(ToolbarButtonLooks.drawable(BarIcons.EMOJI.fallback))!!
+        val side = image.intrinsicWidth * 5 / 6
+        fun shot(): Bitmap {
+            val b = ToolButton(ctx, BarIcons.EMOJI, ThemeManager.activeTheme)
+            b.fixIconSize(side)
+            val exactly = View.MeasureSpec.makeMeasureSpec(side, View.MeasureSpec.EXACTLY)
+            b.measure(exactly, exactly)
+            b.layout(0, 0, side, side)
+            return Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888).also { b.draw(Canvas(it)) }
+        }
+        val first = shot()
+        image.setBounds(0, 0, image.intrinsicWidth, image.intrinsicHeight)
+        image.draw(Canvas(Bitmap.createBitmap(image.intrinsicWidth, image.intrinsicHeight, Bitmap.Config.ARGB_8888)))
+        assertTrue(first.sameAs(shot()))
+    }
+
     @Test
     @Uat("TB-64")
     fun aToggleOnDrawsItsIconInTheSelectedColour() {

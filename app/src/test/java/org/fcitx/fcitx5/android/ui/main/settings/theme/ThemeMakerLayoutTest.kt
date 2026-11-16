@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.InputView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
@@ -462,7 +463,9 @@ class ThemeMakerLayoutTest {
         }
 
         private fun icon(v: ImageView): JsonObject? {
-            val res = ImageView::class.java.getDeclaredField("mResource").apply { isAccessible = true }.getInt(v)
+            // a toolbar button's image is its own drawable, read anew (ToolButton.showOwn): the button says which
+            val res = (v.parent as? ToolButton)?.iconRes?.takeIf { it != 0 }
+                ?: ImageView::class.java.getDeclaredField("mResource").apply { isAccessible = true }.getInt(v)
             if (res == 0 || v.drawable == null) return null
             val name = v.resources.getResourceEntryName(res)
             icons += name

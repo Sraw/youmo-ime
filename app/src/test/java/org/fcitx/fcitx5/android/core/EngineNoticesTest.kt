@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -23,6 +24,11 @@ import org.robolectric.shadows.ShadowToast
 class EngineNoticesTest {
 
     private val said = mutableListOf<String>()
+
+    // what another class left in the object of the same process (KotlinHost tells nine keys merged till seen): not
+    // this case's, said with its own failures
+    @Before
+    fun nothingTold() = EngineNotices.forgetToldOnce()
 
     @After
     fun noKeyboard() {

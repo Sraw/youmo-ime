@@ -80,14 +80,19 @@ class PinyinDictManagerTest {
             ),
             { it.why },
         ) { row ->
-            val cache = appContext.cacheDir.list().orEmpty().toSet()
+            val cache = importCopies()
             val refused = assertThrows(PinyinDictManager.Refusal::class.java) { row.import(endless(PinyinDictManager.maxImported(row.type)), row.name) }
             assertEquals(DictionaryFormat.Reason.TOO_LARGE, refused.reason)
             // what the page shows of it (WD-14z3): 格式不支持 and that the file is too large
             if (row.says) assertEquals(appContext.getString(R.string.dict_refused, appContext.getString(R.string.dict_refused_too_large)), refused.message)
-            assertEquals(cache, appContext.cacheDir.list().orEmpty().toSet())
+            assertEquals(emptySet<String>(), importCopies() - cache)
         }
     }
+
+    // an import's copies in the cache (PinyinDictManager's createTempFile "import…"), not the whole cache: it is the
+    // application's, written meanwhile by others (a temp dir, a theme's unpacking, an earlier test's work landing late),
+    // and compared whole the case failed on what was none of the import's
+    private fun importCopies() = appContext.cacheDir.list().orEmpty().filter { it.startsWith("import") }.toSet()
 
     // zeroes without end, failing the test if read past [cap]: what is copied stops there
     private fun endless(cap: Long) = object : InputStream() {

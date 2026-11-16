@@ -7,7 +7,9 @@ package org.fcitx.fcitx5.android.uat
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -19,7 +21,9 @@ import org.fcitx.fcitx5.android.core.keyboardOn
 import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.fcitx.fcitx5.android.utils.appContext
@@ -161,6 +165,29 @@ class BarUatTest {
     @Test
     @Uat("TB-17")
     fun theStatusPanelTurnsFullWidthOn() = onTheHost().toggled("fullwidth", R.string.status_half_width, R.string.status_full_width)
+
+    // the panel's own read of the status, and a status the host sends before that read is shown (the field focused as
+    // the panel opened, the host slow to start): the newer stays. Shown last, the read's older one took the input
+    // method's toggles off the panel till the next status (TB-15 timed out so at SDK 29)
+    @Test
+    fun aStatusSentAsThePanelOpensIsNotTakenBackByItsOwnOlderRead() {
+        val h = harness().start()
+        val simplified = listOf(StatusEntry(7, "chttrans", "fcitx-chttrans-inactive", "", false))
+        // the read finds no input method focused yet; the status comes while the panel asks its next question
+        h.api.statusAreaCached = emptyList()
+        h.api.whileLearning = { op ->
+            if (op == LearningOp.Saving) {
+                h.api.statusAreaCached = simplified
+                check(h.api.events.tryEmit(HostEvent.StatusArea(simplified, KeyboardHarness.PINYIN)))
+                // off the main thread and back, as the host's own: the status reaches the panel meanwhile
+                withContext(Dispatchers.Default) {}
+            }
+        }
+        h.statusPanel()
+        h.idle()
+        h.relayout()
+        assertTrue(h.texts(h.inputView).toString(), h.shownText(h.service.getString(R.string.status_simplified)))
+    }
 
     @Test
     @Uat("TB-19")

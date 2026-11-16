@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.bar.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -12,12 +13,14 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.StateListDrawable
+import android.util.TypedValue
 import android.view.ViewPropertyAnimator
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import androidx.annotation.VisibleForTesting
+import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
 import org.fcitx.fcitx5.android.input.bar.BarIcons
@@ -36,7 +39,6 @@ import splitties.views.dsl.core.imageView
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.wrapContent
 import splitties.views.gravityCenter
-import splitties.views.imageResource
 import splitties.views.padding
 
 class ToolButton(context: Context) : CustomGestureView(context) {
@@ -186,8 +188,32 @@ class ToolButton(context: Context) : CustomGestureView(context) {
     fun setIcon(@DrawableRes icon: Int) {
         shown = null
         drawn = null
-        image.imageResource = icon
+        showOwn(icon)
     }
+
+    // the image read anew, not the resource's shared one: a vector's raster only ever grows, and a copy (mutate) starts
+    // at the size its source grew to. Drawn at its own size elsewhere first (another bar, a panel), the shared one made
+    // this button's smaller icon sharper than drawn alone, its pixels hanging on what was drawn before
+    // (a toolbar image is a vector's XML, read as XML: lint takes getXml's id for an xml resource's alone. One that
+    // isn't (a bitmap) has no raster to grow, and is read the usual way, a copy of its own.) The same icon shown again
+    // (each arrangement, status and input method update sets it) keeps the image it has.
+    @SuppressLint("ResourceType")
+    private fun showOwn(@DrawableRes icon: Int) {
+        if (iconRes == icon && image.drawable != null) return
+        val res = context.resources
+        val file = TypedValue().also { res.getValue(icon, it, true) }.string
+        image.setImageDrawable(
+            if (file?.endsWith(".xml") == true) res.getXml(icon).use { Drawable.createFromXml(res, it, context.theme) }
+            else ContextCompat.getDrawable(context, icon)?.mutate()
+        )
+        iconRes = icon
+    }
+
+    /** The app's image shown, by its resource; 0 for a theme's. The ImageView, given the drawable, has none. */
+    @get:VisibleForTesting
+    @DrawableRes
+    internal var iconRes = 0
+        private set
 
     /** [icon]: the theme's of its name where it has one (nothing till it is read), else the app's ([BarIconDrawables]). */
     fun setIcon(icon: BarIcons.Icon) {
@@ -210,7 +236,7 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         if (!BarIconDrawables.themed(icons, icon)) {
             // the app's, in the tint list as ever
             drawn = null
-            image.imageResource = ToolbarButtonLooks.drawable(icon.fallback)
+            showOwn(ToolbarButtonLooks.drawable(icon.fallback))
             return
         }
         val px = iconPx.takeIf { it > 0 } ?: dp(DEFAULT_ICON_DP)
@@ -218,6 +244,7 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         if (now == drawn && image.drawable != null) return
         val d = BarIconDrawables.of(context, icons, icon, iconTint, px) { if (shown === icon) drawIcon() }
         drawn = now.takeIf { d != null }
+        iconRes = 0
         image.setImageDrawable(d)
     }
 

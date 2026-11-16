@@ -70,6 +70,9 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     // what fcitx last offered, for the entries to be shown again as one of the app's changes
     private var hostEntries = emptyList<StatusEntry>()
 
+    // the host's statuses told so far (onStatusAreaUpdate): one told while the panel's own read was on its way is the newer
+    private var statusesTold = 0
+
     private val staticEntries by lazy {
         arrayOf(
             StatusAreaEntry.Android(
@@ -107,7 +110,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                         FloatingToggle -> actions.toggleFloating()
                         HabitsToggle -> {
                             actions.toggleHabits()
-                            onStatusAreaUpdate(hostEntries)
+                            show(hostEntries)
                         }
                         ClearRecent -> actions.clearRecent(view)
                         KeyboardChoice -> actions.chooseKeyboard(view)
@@ -146,6 +149,11 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     }
 
     override fun onStatusAreaUpdate(entries: List<StatusEntry>) {
+        statusesTold++
+        show(entries)
+    }
+
+    private fun show(entries: List<StatusEntry>) {
         hostEntries = entries
         val floating = actions.floating
         val oneHanded = if (!actions.oneHandedOffered) emptyArray() else arrayOf(
@@ -224,6 +232,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     override fun onCreateBarExtension() = barExtension
 
     override fun onAttached() {
+        val told = statusesTold
         fcitx.launchOnReady {
             val data = it.statusArea()
             // only whether it saves, not the overview (the record's state and every list of the user's words
@@ -234,7 +243,9 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                 .getOrNull() ?: true
             imeScope.launch {
                 notSaving.isVisible = !saving
-                onStatusAreaUpdate(data)
+                // a status the host sent after this read (the field focused as the panel opened) came first: the read is
+                // the older, and shown last it stayed, the input method's toggles missing till the next status
+                show(if (statusesTold == told) data else hostEntries)
             }
         }
     }

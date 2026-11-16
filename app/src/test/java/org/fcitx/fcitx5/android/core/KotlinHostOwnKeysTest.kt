@@ -28,7 +28,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
-import java.util.Collections
 
 /** A layout's own groups (060-render-p3 T9b) through the real host to a scripted engine, as KotlinHostTest's keys. */
 @RunWith(RobolectricTestRunner::class)
@@ -39,14 +38,14 @@ class KotlinHostOwnKeysTest {
     private lateinit var fcitx: KotlinHost
     private lateinit var engine: ScriptedEngine
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-    private val events: MutableList<HostEvent> = Collections.synchronizedList(ArrayList())
+    private val events = HostLog<HostEvent>()
 
     @Before
     fun setUp() {
         home = File(appContext.filesDir, "kotlin-host").apply { deleteRecursively() }
         AppPrefs.getInstance().internal.firstRun.setValue(true)
         engine = ScriptedEngine(home)
-        fcitx = startedHost(engine, firstRun = false) { host -> scope.launch { host.eventFlow.collect { events += it } } }
+        fcitx = startedHost(engine, firstRun = false) { host -> scope.launch { host.eventFlow.collect(events::add) } }
     }
 
     @After
@@ -87,7 +86,7 @@ class KotlinHostOwnKeysTest {
         assertEquals("the same groups: typed on", "nih", fcitx.inputPanelCached.preedit.toString())
         EngineState.ownKeys = OWN.reversed()
         fcitx.sendKey('a', 0u, 0, false, 0)
-        assertEquals(listOf("nih"), events.filterIsInstance<HostEvent.Commit>().map { it.text })
+        assertEquals(listOf("nih"), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
         assertEquals("a", fcitx.inputPanelCached.preedit.toString())
         assertFalse("not reset", EngineEvent.RESET in engine.events.takeLast(3))
     }
@@ -108,7 +107,7 @@ class KotlinHostOwnKeysTest {
         assertEquals("a", fcitx.clientPreeditCached.toString())
         EngineState.ownKeys = OWN.reversed()
         fcitx.sendKey('b', KeyStates.VIRTUAL.toUInt(), 0, false, 0)
-        assertEquals(emptyList<String>(), events.filterIsInstance<HostEvent.Commit>().map { it.text })
+        assertEquals(emptyList<String>(), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
         assertEquals("ab", fcitx.clientPreeditCached.toString())
     }
 

@@ -254,8 +254,12 @@ class FakeHostApi : HostApi {
     /** What [learning] answers: a test puts its own; Done by default. */
     var learned: (LearningOp) -> LearningResult = { LearningResult.Done() }
 
+    /** Run in [learning] before [learned] answers: where a test waits on something else, as the host's thread would. */
+    var whileLearning: suspend (LearningOp) -> Unit = {}
+
     override suspend fun learning(op: LearningOp): LearningResult {
         calls += "learning($op)"
+        whileLearning(op)
         return learned(op)
     }
 

@@ -146,9 +146,10 @@ class AsIsPunctuationTypedTest {
 
     private fun typeLetters(word: String) {
         for (c in word) h.tap(h.keys().first { it.label.equals(c.toString(), ignoreCase = true) })
-        // pinyin's in the preedit, English's in the field as it is composed
+        // pinyin's in the preedit, English's in the field as it is composed: all of it, the host past the last key
+        // (its first letter alone shown, the next was still on its way as the case went on to the long press)
         until("$word typed", { "preedit [${fcitx.inputPanelCached.preedit}] field [${h.field.text}]" }) {
-            fcitx.inputPanelCached.preedit.isNotEmpty() || h.field.text.isNotEmpty()
+            fcitx.inputPanelCached.preedit.toString() == word || h.field.text.toString() == word
         }
     }
 
@@ -235,7 +236,7 @@ class AsIsPunctuationTypedTest {
         until("the pair gone", { shown() }) { shown() == "|" }
         typeLetters("ni")
         h.longPress(comma()!!, pick = "(")
-        until("你() typed", { shown() }) { shown() == "你(|)" }
+        until("你() typed", { "${shown()} preedit [${fcitx.inputPanelCached.preedit}]" }) { shown() == "你(|)" }
         h.tap(h.keyWithId(R.id.button_backspace)!!)
         until("the pair gone", { shown() }) { shown() == "你|" }
     }

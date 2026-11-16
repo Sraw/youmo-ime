@@ -31,3 +31,22 @@ fun startedHost(side: KotlinHost.EngineSide, firstRun: Boolean = true, beforeSta
 fun keyboardOn(host: KotlinHost) = KeyboardHarness(host = host).also { h ->
     h.service.postFcitxJob { activate(1, "org.example.app") }
 }
+
+/**
+ * What a [KotlinHost] told a case (its events, its notices), for the case to read. They come on the host's thread,
+ * and not only within a case's own calls: its timers send too (on a first run the input method's name shown 30 ms
+ * after the group is set, its panel and list sent again), so they are read as a copy taken under the lock. Iterated
+ * as the host added to it, a synchronized list threw ConcurrentModificationException.
+ */
+class HostLog<T> {
+    private val items = ArrayList<T>()
+
+    fun add(item: T) {
+        synchronized(items) { items += item }
+    }
+
+    fun clear() = synchronized(items) { items.clear() }
+
+    /** What was told till now, a copy. */
+    fun list(): List<T> = synchronized(items) { items.toList() }
+}
