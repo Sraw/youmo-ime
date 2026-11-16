@@ -586,6 +586,37 @@
 - **预期**：长按菜单是这个单字自己的（字卡、置顶、屏蔽都对着这个字，不是挪走的词）。置顶后这个字照规则排上来；屏蔽后不再出现，第二格换成下一个单字。翻页、再划一笔、⌫ 删笔画后候选照样对（⌫ 后回到划之前的样子）。
 - **JVM**：`StrokeFilterTest.aMovedCandidatesOffersPinBlockReasonAndCardAreOfItsOwnPlace`（ime-core：在第二格时 offers、置顶、取消置顶、屏蔽、为什么在这、读音、字卡查的都是这个字）、`StrokeFilterTest.theOrderIsMadeAgainAtEachStrokeAndBackspaceAndAPageTurnGoesOnFromIt`（翻页、再划一笔、⌫ 后顺序重排）；设备上不跑。
 
+### PY-145 [P1] 展开候选上画一笔：筛候选，这一页留着，上下拖不翻页
+- **前提**：B0，另外笔画筛选。
+- **操作**：打 shi，点 ⌄ 展开候选；在候选区中间往下划一竖（约 1 cm）；再在别的候选上划一横、一撇；然后手指从下往上拖过半页；点右边的 ↓、↑。
+- **预期**：每一笔编码行后面多一个笔画（`shi 丨一丿`），候选按笔画筛，这一页一直开着、留在第一页，划的时候候选区上画出线（和键上的一样颜色）；没有选上任何候选。往上拖不翻页、不发笔画也不选；↓ ↑ 照常翻页。
+- **再试**：**输入法 → 拼音 → 键盘** 依次换成 14 键、18 键、九键，各打 shi 展开候选划一竖：和全键盘一样筛、页留着；换成注音键盘（它的键上本来就不画笔画），展开候选往下划是照常拖着翻页，不发笔画。
+- **JVM**：`StrokePageUatTest.aStrokeDrawnOnThePageIsSentAndThePageStaysAndScrollsNot`、`thePageDrawsOverEachKeyboardAsItsKeysDo`（全键盘、14、18、九键画，注音不画，和键上一致）；手势的规则 ime-core `PageStrokeTouchTest`（`Draws` 各键盘的输入法、键和页同一条规则）；设备上看一遍线和翻页。
+
+### PY-146 [P1] 展开候选上：点照旧选、长按照旧弹菜单；划一点或划短了什么也不发生
+- **前提**：同 PY-145；长按那几步 **长按延迟** 依次试三档。
+- **操作**：打 shi 展开候选，点一个候选；再打 shi 展开，按住一个候选稍微挪一点（约 1.5 mm）抬起；再按住一个候选往下划约 3 mm（不到灵敏度「中」的 4 mm）抬起；**笔画筛选灵敏度** 改成「高」再划同样的 3 mm。然后按住一个候选不动到菜单弹出，再往下划一点抬起；再快速往下划一竖（长按时间到之前划出 2 mm）。
+- **预期**：点的那个候选上屏。挪一点和划短了都什么也不发生：不选候选、不发笔画，这一页还开着。灵敏度「高」时 3 mm 算一笔。按住不动时，长按延迟到了就弹出这个候选的菜单（读音行、置顶等），之后再划不发笔画；快速划的是一笔，不弹菜单。三档延迟都一样。
+- **JVM**：`StrokePageUatTest.aTapPicksADriftOrAStrokeLiftedShortPicksNothing`、`aLongPressStillOpensTheCandidatesMenu`；ime-core `PageStrokeTouchTest.theLongPressComingFirstIsTheCellsFromThenOn`；设备上手指再试一遍。
+
+### PY-147 [P1] 展开候选的翻页提示：头 3 次出，2 秒消失，不挡手指
+- **前提**：B0（清过数据：提示还没出过），另外笔画筛选。
+- **操作**：在键上划先选滑行输入，打 shi 展开候选；收起，在键上划改回笔画筛选，打 shi 展开（第 1 次）；趁提示还在，从提示那一行往下划一竖；收起再展开两次（第 2、3 次）；再收起展开（第 4 次）。
+- **预期**：滑行输入时不出提示。笔画筛选的第 1–3 次展开，候选区顶上出一行「这里划的是笔画，翻页用右边 ↑↓」，约 2 秒后淡出，不管手指在做什么；从提示上划的竖照常发出去（编码行多一个 丨）。第 4 次起不再出。没有设置项。开着 TalkBack 触摸浏览时这一页不画笔画（AX-20），提示也不出、不计数。
+- **JVM**：`StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn`（计数、只在笔画筛选时算、2 秒、不挡触摸）；ime-core `PageStrokeTouchTest.theHintShowsTheFirstThreeTimesAPageDraws`；设备上看一遍样子。
+
+### PY-148 [P1] 键上不画笔画的时候，展开候选照旧拖着翻
+- **前提**：B0。
+- **操作**：分别在：**在键上划** 关、选滑行输入；笔画筛选但没打拼音（联想时展开）；笔画筛选、工具栏手写开着；快速输入里——展开候选，上下拖。再在笔画筛选、打着拼音时用鼠标拖、触控板双指滑、鼠标滚轮。
+- **预期**：前几种都和以前一样，拖着翻页，不发笔画。鼠标拖、触控板双指滑、滚轮也照旧翻页。
+- **JVM**：`StrokePageUatTest.whereTheKeysDrawNoStrokeThePageScrollsAsBefore`、`aMouseDragOrATrackpadSwipeDrawsNone`（鼠标、触控板往下拖不发竖；触控板那行只在 SDK 34 以上跑）；鼠标、触控板设备上手工。
+
+### PY-149 [P1] 展开候选上筛得一个不剩：这一页留着，⌫ 撤回
+- **前提**：同 PY-145。
+- **操作**：打一个候选很少的拼音（如 nve），展开，画笔画直到候选筛空；点右边的 ⌫；一直按 ⌫ 到拼音删完。
+- **预期**：筛空时这一页留着，是空的（以前会收起）；⌫ 撤回最后一笔，候选回来；拼音删完时收起，回到键盘。
+- **JVM**：`StrokePageUatTest.aStrokeLeavingNoCandidateKeepsThePageAndItsBackspaceTakesItBack`。
+
 ### PY-105 [P1] 拼音 18 键
 - **前提**：B0，在 **输入法 → 拼音** 里把 **键盘** 选成「18 键」，回测试页点「普通文本」框。
 - **操作**：看键盘；点 N（BN 键）I（IO 键）H（H 键）A（A 键）O（IO 键），看编码行和候选；点「你好」。

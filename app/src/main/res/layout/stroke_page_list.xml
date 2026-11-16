@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 展开候选's list: splitties' recyclerview_with_scrollbars, as recyclerView {} built it before 0.6.1. Keep the style:
+     made in code without it (no scrollbars' attributes) the list's smooth page turn by the column's ↓ at times never
+     settled under Robolectric (SmallBoardsSceneGesturesTest.expandedColumn: the main looper never idled), the old
+     list's construction the one known good. -->
+<org.fcitx.fcitx5.android.input.candidates.expanded.StrokePageRecyclerView style="@style/WithScrollbarsStyle" />

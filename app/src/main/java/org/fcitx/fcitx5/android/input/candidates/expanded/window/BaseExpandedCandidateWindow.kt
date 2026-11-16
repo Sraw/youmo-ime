@@ -11,6 +11,7 @@ import android.graphics.drawable.shapes.RectShape
 import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.View
+import android.view.accessibility.AccessibilityManager
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.recyclerview.widget.LinearSmoothScroller
@@ -21,29 +22,37 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.daemon.launchOnReady
+import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesAttached
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesDetached
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
-import org.fcitx.fcitx5.android.input.candidates.expanded.CandidatesPagingSource
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
+import org.fcitx.fcitx5.android.input.candidates.expanded.CandidatesPagingSource
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayout
 import org.fcitx.fcitx5.android.input.candidates.expanded.PagingCandidateViewAdapter
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.imeScope
+import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.PageStrokeTouch
 import org.fcitx.fcitx5.android.input.motion.Motion
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.utils.interpolator
 import org.fcitx.fcitx5.android.utils.motionSettings
 import org.mechdancer.dependency.manager.must
@@ -64,6 +73,9 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
     private val horizontalCandidate: HorizontalCandidateComponent by manager.must()
     private val windowManager: InputWindowManager by manager.must()
     private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
+    private val preeditEmptyState: PreeditEmptyStateComponent by manager.must()
+    private val service by manager.inputMethodService()
+    private val prefs = AppPrefs.getInstance()
 
     // the pages' scroll too: 移除动画 does not scale RecyclerView's scroller, as it does an animator
     private val animates: Boolean get() = motionSettings().animates
@@ -114,9 +126,37 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
                         embeddedKeyboard.showPages(up = firstFullyVisible() > 0, down = lastFullyVisible() < count - 1)
                     }
                 })
+                draws = ::drawsStrokes
+                lift = { context.dp(prefs.keyboard.strokeLift.getValue().dp) }
+                longPressMillis = { prefs.keyboard.longPressDelay.getValue().toLong() }
+                stroked = { commonKeyActionListener.listener.onKeyAction(KeyAction.SymAction.stroke(it), KeyActionListener.Source.Keyboard) }
             }
         }
         return candidateLayout
+    }
+
+    // as the keys draw 笔画筛选's strokes (PageStrokeTouch.Draws, the keys' rule; BaseKeyboard.drawsStrokes), read as a
+    // finger comes down: the setting first, so a page of one who never chose it reads nothing more
+    private fun drawsStrokes(): Boolean {
+        if (prefs.keyboard.keyDrawing.getValue() != KeyDrawing.StrokeFilter) return false
+        val (entry, panel) = fcitx.runImmediately { inputMethodEntryCached to inputPanelCached }
+        val im = entry.uniqueName
+        val handwriting = prefs.internal.handwritingOpen.getValue()
+        return PageStrokeTouch.Draws().apply {
+            chosen = true
+            password = service.inPasswordField
+            address = service.inAddressField
+            composing = !preeditEmptyState.isEmpty
+            tempMode = panel.auxUp.isNotEmpty()
+            this.im = im
+            // the keyboard under the page: its keys draw none (注音's), the page none either
+            filters = (windowManager.getEssentialWindow(KeyboardWindow) as KeyboardWindow).filtersStrokes()
+            handwritingOpen = handwriting
+            textPack = PackStore.ready(PackKind.TEXT)
+            // asked only if it writes: a keyboard of one who never writes makes no recognizer
+            recognizerLoadable = handwriting && HandwritingRecognition.shared.loadable
+            exploring = context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
+        }.on
     }
 
     private val keyActionListener = KeyActionListener { it, source ->
@@ -171,17 +211,25 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     override fun onAttached() {
         bar.expandButtonStateMachine.push(ExpandedCandidatesAttached)
+        // the first times the page opens drawing strokes: that a finger draws here, the pages turned by ↑↓
+        val shown = prefs.internal.strokePageHintShown
+        if (PageStrokeTouch.Hint.shows(drawsStrokes(), shown.getValue())) {
+            shown.setValue(shown.getValue() + 1)
+            candidateLayout.showHint(PageStrokeTouch.Hint.MILLIS, animates)
+        }
         candidateLayout.embeddedKeyboard.also {
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
         }
         offsetJob = imeScope.launch {
             horizontalCandidate.expandedCandidateOffset.collect {
-                if (it <= 0) {
+                // none left past the bar's: closed, unless strokes are drawn here, pinyin typed still (笔画筛选 filtered
+                // them all away: the page stays, its ⌫ takes the stroke back)
+                if (it <= 0 && (preeditEmptyState.isEmpty || !drawsStrokes())) {
                     windowManager.attachWindow(KeyboardWindow)
                 } else {
                     candidateLayout.resetPosition()
-                    adapter.refreshWithOffset(it)
+                    adapter.refreshWithOffset(max(it, 0))
                 }
             }
         }
@@ -215,6 +263,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         candidatesSubmitJob?.cancel()
         offsetJob?.cancel()
         candidateLayout.embeddedKeyboard.keyActionListener = null
+        candidateLayout.hideHint()
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {

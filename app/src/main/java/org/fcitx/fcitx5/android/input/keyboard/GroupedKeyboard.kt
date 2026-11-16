@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -322,8 +321,9 @@ class GroupedKeyboard private constructor(
     override val glide = glideInput(
         letters = { groupPlaces() },
         enabled = { false },
-        filters = { InputMethodCatalog.filtersByStrokes(imeName) },
     ) { _, _ -> }
+
+    override val strokesDrawn get() = true
 
     // each group key, as its code is read by the engine (061-neighbour-correction, 061-neighbour-groups): the group's code
     // itself, not what [wire] sends it as. Pinyin's 18 keys' and 双拼's 14 keys' wire is past the BMP (Keyboard.keyedChar

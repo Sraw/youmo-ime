@@ -186,6 +186,12 @@ abstract class BaseKeyboard(
     // where the letters are written on (glideInput's)
     private var letterArea: LetterArea? = null
 
+    // whether 笔画筛选's strokes are drawn on these keys at all (a keyboard that glides, 注音's not), for 展开候选's page too
+    open val strokesDrawn: Boolean get() = false
+
+    // whether these keys draw 笔画筛选's strokes now: PageStrokeTouch.Draws.keys, the rule 展开候选's page draws by too
+    fun drawsStrokes() = PageStrokeTouch.Draws.keys(keyDrawing.getValue() == KeyDrawing.StrokeFilter, inPasswordField, address != AddressKeys.NONE, imTyping, tempMode, keysIm, strokesDrawn)
+
     /** [keyInk], for a test to see the ink drawn. */
     internal val keyInkForTest: KeyInk? get() = keyInk
 
@@ -207,7 +213,7 @@ abstract class BaseKeyboard(
     /**
      * Glide typing over [letters], taken where [enabled] says and 滑行输入 is on, in a field where
      * words are typed: not a password's or an address's. Where 笔画筛选 is chosen instead (one setting,
-     * [KeyDrawing]), a stroke drawn over them while pinyin is typed in an input method [filters] says reads
+     * [KeyDrawing]), a stroke drawn over them while pinyin is typed in an input method that reads
      * one: sent as the engine's stroke key (KeyAction.SymAction.stroke), the shape StrokeShape's; one it
      * reads as none is dropped.
      *
@@ -222,7 +228,6 @@ abstract class BaseKeyboard(
         letters: () -> List<Pair<Char, ScenePlace>>,
         down: Float = GlideGesture.DOWN,
         enabled: () -> Boolean = { true },
-        filters: () -> Boolean = { false },
         writesAlso: (KeyNode) -> Boolean = { it.role == SHIFT_ROLE },
         glided: (path: FloatArray, layout: GlideLayout) -> Unit,
     ): GlideInput {
@@ -235,11 +240,11 @@ abstract class BaseKeyboard(
         keyWriting = KeyWriting(this, ink, area, prefs.internal.handwritingOpen, { canvas }, { keysIm }, { inPasswordField }, { tempMode })
         return GlideInput(
             this, theme,
-            enabled = { keyDrawing.getValue() == KeyDrawing.Glide && wordField() && enabled() },
+            enabled = { keyDrawing.getValue() == KeyDrawing.Glide && !inPasswordField && address == AddressKeys.NONE && enabled() },
             letters = letters,
             longPressMillis = { longPressDelay.toLong() },
             down = down,
-            strokes = { keyDrawing.getValue() == KeyDrawing.StrokeFilter && wordField() && imTyping && filters() },
+            strokes = ::drawsStrokes,
             stroked = { path -> StrokeShape.classify(path)?.let { onAction(KeyAction.SymAction.stroke(it)) } },
             strokeLift = { prefs.keyboard.strokeLift.getValue().dp },
             // as a tap there types, a stroke drawn there lifted short
@@ -260,8 +265,6 @@ abstract class BaseKeyboard(
 
     /** The input method shown changed ([KeyboardWindow], after [onInputMethodUpdate]): written on or not anew. */
     fun inputMethodShown() = keyWriting?.update()
-
-    private fun wordField() = !inPasswordField && address == AddressKeys.NONE
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean =
         glide?.dispatch(ev) { super.dispatchTouchEvent(it) } ?: super.dispatchTouchEvent(ev)

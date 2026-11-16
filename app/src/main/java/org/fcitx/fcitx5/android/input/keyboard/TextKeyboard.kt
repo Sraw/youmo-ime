@@ -174,6 +174,7 @@ class TextKeyboard(
     private var imeName = ""
 
     override val keysIm: String get() = imeName
+    override val strokesDrawn get() = true
 
     // a table's roots in a letter's long press where the keys show them all (rootsOf), its letter in its corner where they show any
     override fun keyState(): KeysState = super.keyState().copy(
@@ -358,7 +359,7 @@ class TextKeyboard(
         }
     }
 
-    override val glide = glideInput(letters = { sceneLetters() }, enabled = { glides }, filters = { InputMethodCatalog.filtersByStrokes(imeName) }) { path, layout ->
+    override val glide = glideInput(letters = { sceneLetters() }, enabled = { glides }) { path, layout ->
         onAction(KeyAction.GlideAction(Glide(path, layout, shift = capsState == CapsState.Once, capsLock = capsState == CapsState.Lock)))
         // as a letter typed: Shift-once used up in any input method, as a tap uses it up (only English reads it)
         if (capsState == CapsState.Once) switchCapsState()

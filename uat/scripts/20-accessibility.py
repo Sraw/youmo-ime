@@ -164,3 +164,6 @@ case("AX-16", needs="manual:TalkBack 摸读音行、字行、返回行、上屏�
 
 case("AX-18", needs="jvm:HandwritingUatTest.theCandidateBarsButtonIsLitWhileHandwritingIsOnAndTurnsItOff")(lambda d: None)
 case("AX-19", needs="manual:TalkBack 读竖屏、横屏键盘样式两项，单手、悬浮按当时的方向读开关，斜箭头读「退出单手模式」，双击单手后焦点在单手按钮上：真机手工听")(lambda d: None)
+
+
+case("AX-20", needs="jvm:StrokePageUatTest.aScreenReadersTouchExplorationDrawsNone")(lambda d: None)

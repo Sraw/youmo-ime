@@ -751,3 +751,18 @@ def py143(d):
     check(any(w in edge for w in ya), f"t 靠 y 点的 tama，候选和展开后的第一页没有 ya ma 的词：{edge[:14]}")
     check(not any(w in mid for w in ya), f"四个键都点在正中的 tama，候选里有 ya ma 的词：{mid[:14]}")
     return f"靠边 {[w for w in edge if w in ya]}；正中 {mid[:6]}"
+
+
+case("PY-145", needs="jvm:StrokePageUatTest.aStrokeDrawnOnThePageIsSentAndThePageStaysAndScrollsNot")(lambda d: None)
+
+
+case("PY-146", needs="jvm:StrokePageUatTest.aTapPicksADriftOrAStrokeLiftedShortPicksNothing、StrokePageUatTest.aLongPressStillOpensTheCandidatesMenu")(lambda d: None)
+
+
+case("PY-147", needs="jvm:StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn")(lambda d: None)
+
+
+case("PY-148", needs="jvm:StrokePageUatTest.whereTheKeysDrawNoStrokeThePageScrollsAsBefore、StrokePageUatTest.aMouseDragOrATrackpadSwipeDrawsNone")(lambda d: None)
+
+
+case("PY-149", needs="jvm:StrokePageUatTest.aStrokeLeavingNoCandidateKeepsThePageAndItsBackspaceTakesItBack")(lambda d: None)

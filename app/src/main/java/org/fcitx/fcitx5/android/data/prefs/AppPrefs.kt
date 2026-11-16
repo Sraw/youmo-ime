@@ -125,6 +125,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          */
         val handwritingRetiredUnseen = string("handwriting_retired_unseen", "")
 
+        /** How often 展开候选 said its strokes are drawn there and its pages turned by ↑↓ (PageStrokeTouch.Hint). */
+        val strokePageHintShown = int("stroke_page_hint_shown", 0)
+
         /** Whether 0.6.0's 键盘手写 (在键上划, now 关) is still to be told it is the toolbar's 手写 ([migrateKeyHandwriting]). */
         val keyHandwritingUnseen = bool("key_handwriting_unseen", false)
 

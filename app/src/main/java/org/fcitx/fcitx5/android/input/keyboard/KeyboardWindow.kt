@@ -137,6 +137,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val keyboards = hashMapOf<String, BaseKeyboard>()
     private var currentKeyboardName = ""
+
+    /** Whether the keyboard shown last draws the input method's strokes at all (BaseKeyboard.strokesDrawn), for 展开候选's page over it. */
+    fun filtersStrokes(): Boolean = keyboards[currentKeyboardName]?.strokesDrawn == true
     private var lastSymbolType: String by AppPrefs.getInstance().internal.lastSymbolLayout
 
     // the space's badge asks what the hold to talk asks (CommonKeyActionListener), a shown password too

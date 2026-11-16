@@ -539,7 +539,7 @@ class T9Keyboard(
     } else {
         // the keys where the scene draws them (their centres, GlideGesture's)
         glideInput(
-            letters = { sceneLetters }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin }, filters = { InputMethodCatalog.filtersByStrokes(imeName) },
+            letters = { sceneLetters }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin },
             // written on: the 3×3 of the letters with 1 (punctuation), not the side columns' Shift (061-handwriting-toolbar §3.2);
             // a stroke drawn starts on the same 3×3 (a 横 along the top row starts on 1)
             writesAlso = { it.id == "1" },
@@ -840,6 +840,9 @@ class T9Keyboard(
     private var imeName = ""
 
     override val keysIm: String get() = imeName
+
+    // none on English's, which has no glide
+    override val strokesDrawn get() = glide != null
 
     // a getter, not a lazy: the scene may ask before this keyboard's fields past it are made. Made once after
     // (null till then), as the resolver's cache is asked on every swipe and compares it: the null branch is

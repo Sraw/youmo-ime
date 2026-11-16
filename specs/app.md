@@ -680,6 +680,26 @@ from where the letters are, so only the 26 keys split have it), passed to `Glide
 a tap there still does nothing, and a glide starts on a letter only. A stroke starts on the keys `BaseKeyboard.glideInput`'s
 `writesAlso` adds for 手写 too, Shift's but (`GlideInput.strokeKeys`, by the key's drawn cell, as the letters): `T9Keyboard`'s 1, the 3×3;
 a tap there that key's (the separator while typing), a glide never.
+展开候选's page draws strokes too (0.6.1, dev/design/061-stroke-on-candidate-page.md): its list is a
+`StrokePageRecyclerView`, which at each down asks `BaseExpandedCandidateWindow.drawsStrokes` (ime-core
+`PageStrokeTouch.Draws`: `keys`, the rule `BaseKeyboard.drawsStrokes` draws the keys' strokes by, its values read
+from the service, the cached panel and preedit state, and whether the keyboard under the page draws them at all
+from `KeyboardWindow.filtersStrokes` (its `BaseKeyboard.strokesDrawn`, 注音's never); `on`, that and no 手写 writing on the keys, no touch exploration;
+none read past 在键上划 not 笔画筛选) and passes a finger's events through `PageStrokeTouch`
+in `dispatchTouchEvent`. While it draws, the list never intercepts or drags (paging by the column's ↑↓ alone); the
+cell gets the down (its press, its long press by 长按延迟); a move 12dp off before the long press cancels the cell
+and is a stroke, read in the list's pixels (equal axes, no key-height scaling) by `StrokeShape` and sent as the
+keys' stroke through `CommonKeyActionListener`. At the lift within the cell's touch slop the cell under the down is
+tapped (`KeyGesture.tap`) unless the adapter changed under the finger (a generation bumped by its observer, appends at
+the end aside); past the slop and short of 12dp, or a stroke short of 笔画筛选灵敏度, nothing. A second finger is
+swallowed till all are up. A mouse (its tool type), a trackpad's `CLASSIFICATION_TWO_FINGER_SWIPE` (34;
+`getClassification` is 29's), a wheel (generic motion, untouched) and a down while the list still scrolls are the
+list's as before. With no candidate left past the bar's the page stays while it draws strokes and the preedit is not
+empty (the offset collector reads `PreeditEmptyStateComponent.isEmpty` and `drawsStrokes`), so its ⌫ takes the stroke
+back; elsewhere it closes as ever. The first three times the page
+opens drawing (`PageStrokeTouch.Hint`, counted in the internal pref `stroke_page_hint_shown`) `ExpandedCandidateLayout`
+shows 「这里划的是笔画，翻页用右边 ↑↓」 over the list's top for 2 s, not clickable (the list's touches under it), not
+focusable and not read (it never shows with touch exploration, where the page draws none).
 
 Writing on the keys (the toolbar's 手写; designs 060-kbd-handwriting, 061-handwriting-toolbar) is `BaseKeyboard`'s,
 with the glide's touch (`GlideInput`): while `HandwritingMode.writes` (the toggle on, an input method that writes, not a
@@ -1004,7 +1024,7 @@ default) says whether the canvas draws the board's base under the keys (`Keyboar
 three small boards say no and sit on what their panel draws. A picker's bottom row is a layout of
 its own (`PickerLayout`: symbols.xml in a panel, emoji.xml with 搜索, emoticon.xml without), its keys the scene's.
 `ExpandedCandidateLayout.Keyboard.showPages(up, down)` marks a page key `:disabled` where the list cannot turn
-(`BaseExpandedCandidateWindow`). `NumberRow`'s collapse swipe (`checkGesture`) is still its own, seen before
+(`BaseExpandedCandidateWindow`). While 笔画筛选 draws on the list (above) these keys are its only paging by touch. `NumberRow`'s collapse swipe (`checkGesture`) is still its own, seen before
 the scene's touch; a swipe told as one cancels the keys' press.
 
 `SceneKeyCell` (`input/keyboard/canvas`) is one key drawn by the engine on its own: a scene of a one-key layout

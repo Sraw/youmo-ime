@@ -303,6 +303,7 @@
     <string name="redo">重做</string>
     <string name="status_area">狀態區</string>
     <string name="expand_candidates_list">展開選字列表</string>
+    <string name="stroke_page_hint">這裡劃的是筆畫，翻頁用右邊 ↑↓</string>
     <string name="hide_candidates_list">隱藏選字列表</string>
     <string name="drop_predictions">收起聯想</string>
     <string name="hide_keyboard">隱藏鍵盤</string>

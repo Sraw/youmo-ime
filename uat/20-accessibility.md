@@ -113,3 +113,9 @@
 - **操作**：在 **外观 → 大小与样式** 摸 **竖屏键盘样式**、**横屏键盘样式**；横拿在 ⋯ 和工具栏上摸单手、悬浮；双击单手，键盘重建后摸单手旁的斜箭头；竖过来再摸 ⋯ 里的单手。
 - **预期**：两项读出名字和当前的样式；横拿分体时单手读「未开」，双击后键盘变单手，焦点落在单手按钮上，读「已开」；斜箭头读「退出单手模式」；竖过来 ⋯ 里的单手读「未开」（竖屏那项没变）。
 - **设备**：真机手工听（读法各机型不同）；开关的状态和名字由 `KeyboardStyleUatTest.theBarsOneHandedWhereSplitNotWhereFloating`、AX-18 的测试覆盖。
+
+### AX-20 [P1] 读屏触摸浏览时，展开候选上不画笔画，双指拖照旧翻页
+- **前提**：真机，B0，另外笔画筛选；打开 TalkBack。
+- **操作**：打 shi，双击 ⌄ 展开候选；单指摸过几个候选；双指上下拖；双击一个候选。
+- **预期**：单指摸读出候选，不发笔画；双指拖翻页（TalkBack 把双指拖当成一根手指的拖动交给键盘，这时不当笔画）；双击选上候选。关掉 TalkBack 后照 PY-145 画笔画。
+- **JVM**：`StrokePageUatTest.aScreenReadersTouchExplorationDrawsNone`；ime-core `PageStrokeTouchTest.aPageDrawsAsTheKeysDoAndNotWhereTheyDoNot`；真机上手工试一遍。

@@ -282,3 +282,12 @@
 - **操作**：横屏，**键盘高度** 依次选五档；标准档时在普通、分体、单手之间切换；转屏 20 次（每次回到横屏）。
 - **预期**：五档每行依次约 34/41/48/54/59 dp；切样式时高度不变、不跳动；转屏时键盘不先矮后高（不往上滑一截）。
 - **JVM**：ime-core `KeyboardHeightLevelsTest.turnedALevelIsARowOfTheTable`、`KeyboardSizesTest.turnedTheRowIsTheSameOnEveryScreenOfAKind`；转屏看设备。
+
+## 横屏的展开候选
+
+### LS-52 [P2] 横屏展开候选上也能画笔画
+- **前提**：B0，另外笔画筛选；横屏（分体或普通）。
+- **操作**：打 shi 展开候选，往下划一竖；上下拖；点一个候选。
+- **预期**：和竖屏一样：一竖筛候选、这一页留着；拖不翻页；点的候选上屏。
+- **再试**：换成悬浮键盘（竖屏、横屏各一次），打 shi 展开候选，同样划一竖、拖、点：结果同上。
+- **JVM**：`StrokePageUatTest.inLandscapeThePageDrawsAsWell`；悬浮键盘设备上手工。

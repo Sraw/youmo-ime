@@ -149,3 +149,6 @@ case("LS-49", needs="jvm:WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTur
 case("LS-50", needs="jvm:KeyboardHeightCapTest.theRowsWinOverTheFloor、ImeRoomViewTest.aSmallPhonesZhuyinKeepsItsFiveRows、"
      "ImeRoomTest.flushAndFullScreenAndASideBar、LowLandscapeScreenshotTest.thePanelsAtTheFloor、LowLandscapeScreenshotTest.zhuyinsFiveRowsOf36")(lambda d: None)
 case("LS-51", needs="manual:五档每行的高看截图，转屏 20 次看键盘不先矮后高；2026-11-14 在 API 33/36 模拟器上量过（061-landscape-height-impl-report）")(lambda d: None)
+
+
+case("LS-52", needs="jvm:StrokePageUatTest.inLandscapeThePageDrawsAsWell")(lambda d: None)
