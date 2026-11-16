@@ -1,3 +1,4 @@
 # the assembled pages (R25 B12): made by tools/assemble.mjs from src/ and generated/, never committed
 /index.html
 /classic/index.html
+/layout/index.html

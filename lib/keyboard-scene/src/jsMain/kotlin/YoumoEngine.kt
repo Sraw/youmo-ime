@@ -35,6 +35,7 @@ import org.fcitx.fcitx5.android.scene.layout.LayoutWriter
 import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
+import org.fcitx.fcitx5.android.scene.rules.ScreenShape
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
@@ -95,7 +96,13 @@ class YoumoTheme internal constructor(internal val theme: Theme) {
 
 /** A board's layout read ([YoumoEngine.readLayout], or a built-in's), the fragments it includes with it. */
 @JsExport
-class YoumoLayout internal constructor(internal val layout: Layout, internal val fragments: Map<String, Fragment>) {
+class YoumoLayout internal constructor(
+    internal val layout: Layout,
+    internal val fragments: Map<String, Fragment>,
+    // the app's board whose variant its marks are of: a theme pack's file of its own id (whatever `based-on=` it
+    // writes, PackLayouts.judge), a user's own layout of its `based-on=` (061-custom-layout §5.3: 17 keys of k18 are k18's)
+    internal val variantOf: String = layout.id,
+) {
     val id: String get() = layout.id
     val name: String get() = layout.name
     val family: String get() = layout.family
@@ -172,6 +179,46 @@ object YoumoEngine {
         answer
     }
 
+    /**
+     * [xml] read as the app reads a layout of the user's own (`.layout`, 061-custom-layout §19.2): its includes the app's
+     * fragments, its keys of the app's names held and swiped as the app's keys of those names, a name of its own as written
+     * (KeyData, [KeyData.Mode.Own], by its `based-on=`). `{ok, problems, warnings, layout, ignored}`, as [readLayout], its
+     * warnings the layout's own reading's as well as its includes'.
+     */
+    fun readOwnLayout(xml: dynamic): dynamic = checked {
+        val layout = LayoutReader.layout(text(xml, "layout"))
+        if (layout !is Parsed.Ok) return@checked result(layout) { "layout" to null }
+        val includes = builtIns.includes(layout.value)
+        val held = includes.orNull()?.let { KeyData.of(layout.value.id, layout.value, it, KeyData.Mode.Own) }
+        val basedOn = layout.value.basedOn ?: layout.value.id
+        val answer = result(includes) { "layout" to (held?.let { h -> YoumoLayout(h.layout, h.fragments, basedOn) } ?: YoumoLayout(layout.value, it, basedOn)) }
+        answer.ignored = held?.ignored.orEmpty().map { obj("file" to it.file, "line" to it.line, "what" to it.what) }.toTypedArray()
+        // the reader's warnings too (an attribute that does nothing): the page lists them, the checker does not
+        if (includes is Parsed.Ok) answer.warnings = problems(layout.warnings + includes.warnings)
+        answer
+    }
+
+    /**
+     * What the layout maker's page says and offers, the app's own lists (LayoutCheck): the newest app version the engine
+     * reads layouts for (`version`, what a file's `min-app` is held to), the `families`, the `bases` one starts from, the
+     * number `pads`, the key-name `prefixes` an id may not be, the ids of the app's boards and fragments (`builtIn`, what
+     * the checker's id-built-in refuses), the `limits` (`bytes`, `id`, `name`) and every finding's `keys` (the page's
+     * words cover each).
+     */
+    fun layoutFormat(): dynamic = obj(
+        "version" to LayoutCheck.FEATURES.values.fold(LayoutCheck.BASE_VERSION) { v, f -> if (ThemeReader.newer(f, v)) f else v },
+        "families" to LayoutCheck.FAMILIES.toTypedArray(),
+        "bases" to LayoutCheck.BASES.toTypedArray(),
+        "pads" to LayoutReader.PADS.toTypedArray(),
+        "prefixes" to LayoutCheck.NAME_PREFIXES.toTypedArray(),
+        "builtIn" to (builtIns.layouts + builtIns.fragments.keys).sorted().toTypedArray(),
+        "limits" to obj("bytes" to PackLayouts.MAX_BYTES.toInt(), "id" to LayoutCheck.MAX_ID, "name" to LayoutCheck.MAX_NAME),
+        "keys" to LayoutCheck.KEYS.toTypedArray(),
+    )
+
+    /** Whether a window [widthDp] wide, [turned] or not, is laid out as 横屏 (ScreenShape: the app's one rule, 061-wide-as-landscape). */
+    fun screenLandscape(turned: Boolean, widthDp: Int): Boolean = ScreenShape.landscape(turned, widthDp)
+
     /** Whether a theme pack's layout file [id] (`k18`, `grouped-bottom`) is read at all (PackLayouts.replaces): the app's and the page's one rule. */
     fun replaces(id: String): Boolean = PackLayouts.replaces(id)
 
@@ -208,7 +255,7 @@ object YoumoEngine {
         }
         val map = HashMap<String, String>()
         if (punctuation != null) for (k in keys(punctuation, "punctuation")) map[k] = text(punctuation[k], "punctuation $k")
-        JSON.parse<dynamic>(DefaultMarks.json(DefaultMarks.shortcuts(l.layout, l.fragments, DefaultMarks.variantOf(l.layout, l.layout.id), punctuation = map)))
+        JSON.parse<dynamic>(DefaultMarks.json(DefaultMarks.shortcuts(l.layout, l.fragments, DefaultMarks.variantOf(l.layout, l.variantOf), punctuation = map)))
     }
 
     /** The app's boards' ids (`qwerty`, `nine`…). */

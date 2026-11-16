@@ -4,51 +4,10 @@
 // and PR (unit_test.yml, with the runner's Chrome; R25 B13); it needs a Chromium (no jsdom here: no npm).
 // Run: node web/theme-maker/test/panels-smoke.mjs [chromium]
 // (default: Playwright's headless shell, as pixel-smoke.mjs finds it; CHROMIUM=<path> too). Exit 0 all kept, 1 not, 2 not run.
-import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { serve } from '../dev/serve.mjs';
-import { chromium } from './pixel-smoke.mjs';
+import { browser, chromium } from './pixel-smoke.mjs';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function browser(shell) {
-  const dir = mkdtempSync(join(tmpdir(), 'panels-smoke-'));
-  // CI only: GitHub's Ubuntu 24.04 runners keep unprivileged user namespaces from Chrome's sandbox (AppArmor), and
-  // the page is this checkout's own; a local run keeps the sandbox
-  const sandbox = process.env.CI ? ['--no-sandbox'] : [];
-  const proc = spawn(shell, ['--headless', '--disable-gpu', ...sandbox, '--remote-debugging-port=0', '--user-data-dir=' + dir, '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
-  const file = join(dir, 'DevToolsActivePort');
-  let ws;
-  try {
-    for (let i = 0; i < 100 && !existsSync(file); i++) await wait(100);
-    if (!existsSync(file)) throw new Error(shell + ' did not start (no DevToolsActivePort in 10 s)');
-    const port = readFileSync(file, 'utf8').split('\n')[0];
-    const pages = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
-    ws = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
-    await new Promise((r) => ws.addEventListener('open', r));
-  } catch (e) {
-    // a browser that never came up: no orphan Chromium, no profile left behind
-    proc.kill();
-    rmSync(dir, { recursive: true, force: true });
-    e.notRun = true;
-    throw e;
-  }
-  let id = 0;
-  const waiting = new Map();
-  ws.addEventListener('message', (e) => {
-    const m = JSON.parse(e.data);
-    if (m.id && waiting.has(m.id)) { waiting.get(m.id)(m); waiting.delete(m.id); }
-  });
-  const send = (method, params = {}) => new Promise((resolve, reject) => {
-    const n = ++id;
-    waiting.set(n, (m) => (m.error ? reject(new Error(method + ': ' + m.error.message)) : resolve(m.result)));
-    ws.send(JSON.stringify({ id: n, method, params }));
-  });
-  const close = () => { ws.close(); proc.kill(); rmSync(dir, { recursive: true, force: true }); };
-  return { send, close };
-}
 
 async function main() {
   const shell = chromium();
@@ -62,7 +21,7 @@ async function main() {
     server = await serve(0);
     b = await browser(shell);
   } catch (e) {
-    if (b) b.close();
+    if (b) await b.close();
     if (server) server.close();
     if (!e.notRun) throw e;
     console.log(e.message + ': not run');
@@ -373,7 +332,7 @@ async function main() {
     const stopped = await js(`[!document.getElementById('export-panel').open, window.__saved, document.getElementById('problems').textContent]`);
     check(stopped[0] && stopped[1] === 1 && /nope\.png/.test(stopped[2]), '保存 with an error: nothing saved, the error in 问题: ' + JSON.stringify(stopped.slice(0, 2)));
   } finally {
-    b.close();
+    await b.close();
     server.close();
   }
   return failed ? 1 : 0;

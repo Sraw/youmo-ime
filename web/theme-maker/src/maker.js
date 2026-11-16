@@ -425,12 +425,15 @@
     }
   }
 
-  /** IndexedDB as a draft store (pictures are too big for localStorage); null where the browser has none. */
-  function idbStore(idb) {
+  /**
+   * IndexedDB as a draft store (pictures are too big for localStorage); null where the browser has none. [name]: the
+   * page's own database (the layout maker keeps its draft apart from the theme maker's), its tabs' lock named after it.
+   */
+  function idbStore(idb, name = 'youmo-theme-maker') {
     if (!idb) return null;
     let db = null;
     const opened = () => (db ??= new Promise((ok, fail) => {
-      const r = idb.open('youmo-theme-maker', 1);
+      const r = idb.open(name, 1);
       r.onupgradeneeded = () => r.result.createObjectStore('kv');
       r.onsuccess = () => ok(r.result);
       r.onerror = () => fail(r.error);
@@ -448,7 +451,7 @@
       put: (k, v) => run('readwrite', (s) => s.put(v, k)),
       remove: (k) => run('readwrite', (s) => s.delete(k)),
       keys: () => run('readonly', (s) => s.getAllKeys()),
-      lock: locks ? (act) => locks.request('youmo-theme-maker-draft', act) : undefined,
+      lock: locks ? (act) => locks.request(name + '-draft', act) : undefined,
     };
   }
 

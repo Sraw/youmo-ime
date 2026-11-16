@@ -653,8 +653,10 @@ test("the page made without --engine holds no engine; the page built holds the b
   // no minifier without npm here, so not the plan's 600 KB: held just above what it is so that it grows only on purpose;
   // the history of each raise is in git (1.311 MB with 0.6.1's text variables; 061 主题只管外观: about 29 KB more, KeyData
   // and the table of the app's keys' held data it reads, BuiltInKeyData, 1.344 MB; 061-custom-layout's LayoutCheck and
-  // LayoutWriter: about 94 KB more, 1.438 MB)
-  assert.ok(Buffer.byteLength(engine) <= 1_445_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
+  // LayoutWriter: about 94 KB more, 1.438 MB; the layout maker's readOwnLayout, layoutFormat and screenLandscape: about
+  // 1.5 KB more, 1.446 MB; its builtIn ids and readOwnLayout's own warnings, with 0.6.1's pre-0.6.1 packs' Shift
+  // beside them: 1.447 MB, a little room left for the layout maker's next phases)
+  assert.ok(Buffer.byteLength(engine) <= 1_452_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   // the global a page reads it by (build.gradle.kts: the library's link names it)
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
   // all else as without it: the engine's script and the CSP's hash of it the only difference

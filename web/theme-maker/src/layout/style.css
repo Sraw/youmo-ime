@@ -1,0 +1,16 @@
+/* the layout maker's own (the theme maker's style.css first): the environment's bar under the preview */
+.inline { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+#preview-area { gap: 6px; }
+#env-bar { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; align-items: center; font-size: 12px; max-width: 100%; }
+#env-bar label { display: inline-flex; align-items: center; gap: 4px; }
+#env-bar label[hidden] { display: none; }
+#env-bar select { max-width: 11em; }
+#main { grid-template-rows: 48vh 1fr auto; }
+#preview { max-height: calc(48vh - 90px); }
+#bases button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+dialog label { display: flex; align-items: center; gap: 6px; }
+dialog input:not([type]) { flex: 1; }
+@media (min-width: 900px) {
+  #main { grid-template-rows: 1fr auto; }
+  #preview { max-height: calc(100vh - 230px); }
+}

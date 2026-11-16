@@ -4,9 +4,9 @@
 // within what anti-aliasing and two text rasterizers make different. Local only, not CI: it needs a Chromium.
 // Run: node web/theme-maker/test/pixel-smoke.mjs [chromium]   (default: Playwright's headless shell, the newest
 // in ~/Library/Caches/ms-playwright or ~/.cache/ms-playwright; CHROMIUM=<path> too)
-import { execFile } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { execFile, spawn } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
@@ -44,6 +44,57 @@ export function chromium() {
     }
   }
   return null;
+}
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * [shell] (a headless Chromium) started on a page of its own, driven over the DevTools protocol: `{send(method, params),
+ * close()}` (close: a promise, done once Chrome has exited and its profile is gone). One that never comes up throws with `notRun` set (the smoke tests' "not run", exit 2). The theme maker's and
+ * the layout maker's browser smoke tests share it.
+ */
+export async function browser(shell) {
+  const dir = mkdtempSync(join(tmpdir(), 'panels-smoke-'));
+  // CI only: GitHub's Ubuntu 24.04 runners keep unprivileged user namespaces from Chrome's sandbox (AppArmor), and
+  // the page is this checkout's own; a local run keeps the sandbox
+  const sandbox = process.env.CI ? ['--no-sandbox'] : [];
+  const proc = spawn(shell, ['--headless', '--disable-gpu', ...sandbox, '--remote-debugging-port=0', '--user-data-dir=' + dir, '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
+  const file = join(dir, 'DevToolsActivePort');
+  let ws;
+  try {
+    for (let i = 0; i < 100 && !existsSync(file); i++) await wait(100);
+    if (!existsSync(file)) throw new Error(shell + ' did not start (no DevToolsActivePort in 10 s)');
+    const port = readFileSync(file, 'utf8').split('\n')[0];
+    const pages = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
+    ws = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
+    await new Promise((r) => ws.addEventListener('open', r));
+  } catch (e) {
+    // a browser that never came up: no orphan Chromium, no profile left behind
+    proc.kill();
+    rmSync(dir, { recursive: true, force: true });
+    e.notRun = true;
+    throw e;
+  }
+  let id = 0;
+  const waiting = new Map();
+  ws.addEventListener('message', (e) => {
+    const m = JSON.parse(e.data);
+    if (m.id && waiting.has(m.id)) { waiting.get(m.id)(m); waiting.delete(m.id); }
+  });
+  const send = (method, params = {}) => new Promise((resolve, reject) => {
+    const n = ++id;
+    waiting.set(n, (m) => (m.error ? reject(new Error(method + ': ' + m.error.message)) : resolve(m.result)));
+    ws.send(JSON.stringify({ id: n, method, params }));
+  });
+  // the profile taken away once Chrome is gone: while it exits it still writes there (ENOTEMPTY now and then)
+  const exited = new Promise((r) => proc.once('exit', r));
+  const close = async () => {
+    ws.close();
+    proc.kill();
+    await Promise.race([exited, wait(5000)]);
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  };
+  return { send, close };
 }
 
 /** A PNG's pixels: {width, height, rgba} (8 bits a channel, RGB or RGBA, not interlaced: what both sides write). */
