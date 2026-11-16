@@ -932,6 +932,34 @@ def st95(d):
     return seen
 
 
+@case("ST-160", base="B0-设置", mutates=True, visual=True)
+def st160(d):
+    appearance_tab(d, "大小与样式")
+    d.tap_text("纵向间距", after=0.2, owe=None)
+    box = d.wait(lambda s: s.find(rid="select_dialog_listview"), 10, step=0.15)
+    shown = [n.text for n in box.walk() if n.text]
+    d.back()
+    levels = ["跟随主题", "很紧凑", "紧凑", "标准", "宽松"]
+    check(shown == levels, f"纵向间距的档不是{levels}：{shown}")
+    choose(d, "纵向间距", "很紧凑")
+    choose(d, "横向间距", "紧凑")
+    d.open_page("text")
+    v0, h0 = key_gaps(d)
+    d.shot("kb", "纵向很紧凑、横向紧凑")
+    appearance_tab(d, "大小与样式")
+    choose(d, "键盘高度", "紧凑")
+    d.open_page("text")
+    v1, h1 = key_gaps(d)
+    d.shot("kb", "键盘高度紧凑")
+    seen = f"上下/左右缝 dp：标准高度 {v0}/{h0}，紧凑高度 {v1}/{h1}"
+
+    def near(got, want):
+        return abs(got - want) <= 1.6
+    check(near(v0, 4) and near(h0, 4), f"很紧凑的缝不是约 4/4：{seen}")
+    check(near(v1, 2) and near(h1, 4), f"紧凑高度的缝不是约 2/4：{seen}")
+    return seen + "（横屏手工看）"
+
+
 @case("ST-66", base="B0-设置")
 def st66(d):
     out = []

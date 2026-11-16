@@ -5,12 +5,14 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyBorderChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyRadiusChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyHSpacingChoice
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.KeyVSpacingChoice
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightLevels
 import org.fcitx.fcitx5.android.input.theme.KeyStyleChoice
 import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.look.Gap
@@ -26,6 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import kotlin.math.abs
 
 /** The key style settings (大小与样式) over the theme in use, as the keyboard reads it, and the theme left as it is. */
 @RunWith(RobolectricTestRunner::class)
@@ -112,6 +115,39 @@ class KeyStyleThemeTest {
         }
         assertTrue("square", radii(KeyRadiusChoice.Square).all { it == 0.0 })
         assertTrue("round", radii(KeyRadiusChoice.Round).any { it > 0.0 })
+    }
+
+    // 纵向 很紧凑 drawn: each letter's face 2 dp in from its cell above and below, as across at 横向 紧凑; at
+    // the keyboard height 紧凑 1 dp (40% of 2, a gap kept)
+    @Uat("ST-160")
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun upAndDownVeryCompactIsDrawnTwoDpAndOneAtCompact() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        fun insets(): List<Double> = KeyboardHarness().start().use { h ->
+            h.relayout()
+            val dp = h.keyboard.resources.displayMetrics.density
+            val k = KeyboardHarness.boardCanvas(h.keyboard)!!.scene!!.keys.first { it.label == "w" }
+            val face = (k.shape as Shape.Rect).box
+            listOf(face.top - k.bounds.top, k.bounds.bottom - face.bottom, face.left - k.bounds.left).map { it / dp }
+        }
+        prefs.keyHSpacingChoice.setValue(KeyHSpacingChoice.Compact)
+        prefs.keyVSpacingChoice.setValue(KeyVSpacingChoice.VeryCompact)
+        insets().let { assertTrue("$it", it.all { d -> abs(d - 2.0) < 0.6 }) }
+        // 紧凑 as the level list sets it: both numbers (KeyboardHeightLevels.isCompact)
+        val height = listOf(keyboard.keyboardHeightPercent, keyboard.keyboardHeightPercentLandscape)
+        val was = keyboard.keyboardHeightFollowTheme.getValue() to height.map { it.getValue() }
+        try {
+            keyboard.keyboardHeightFollowTheme.setValue(false)
+            KeyboardHeightLevels.ALL.first().let {
+                height[0].setValue(it.portrait)
+                height[1].setValue(it.landscapeLevel)
+            }
+            insets().let { assertTrue("$it", abs(it[0] - 1.0) < 0.6 && abs(it[1] - 1.0) < 0.6 && abs(it[2] - 2.0) < 0.6) }
+        } finally {
+            keyboard.keyboardHeightFollowTheme.setValue(was.first)
+            height.zip(was.second) { p, v -> p.setValue(v) }
+        }
     }
 
     // a reader of the theme's own look in the keyboard would draw over what is chosen: none there (specs/app.md)

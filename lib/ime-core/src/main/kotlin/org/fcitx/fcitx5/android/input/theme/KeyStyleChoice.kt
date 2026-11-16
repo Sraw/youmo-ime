@@ -72,6 +72,9 @@ data class KeyStyleChoice(val blocks: Boolean?, val hGap: Spacing?, val vGap: Sp
         val H_COMPACT = Spacing(2, 2)
         val H_STANDARD = Spacing(3, 3)
         val H_LOOSE = Spacing(5, 5)
+
+        // up and down only, since 0.6.1: as tight as H_COMPACT, the gaps across and up and down alike (the user, 2026-11-16)
+        val V_VERY_COMPACT = Spacing(2, 2)
         val V_COMPACT = Spacing(5, 3)
         val V_STANDARD = Spacing(7, 4)
         val V_LOOSE = Spacing(9, 6)

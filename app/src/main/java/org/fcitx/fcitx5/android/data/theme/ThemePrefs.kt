@@ -304,11 +304,15 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     }
 
     /**
-     * 纵向间距: the room above and below a key; at the keyboard height 紧凑 less (Gap.vCompact). Its levels
-     * are named as [KeyHSpacingChoice]'s, which [migrateKeySpacing] reads 0.5.2's one by.
+     * 纵向间距: the room above and below a key; at the keyboard height 紧凑 less (Gap.vCompact). Stored by name,
+     * so a level added keeps the others' meaning; the four of [KeyHSpacingChoice] are named alike, which
+     * [migrateKeySpacing] reads 0.5.2's one by. [VeryCompact] (0.6.1) is up and down only: as tight as 横向's
+     * 紧凑, for the gaps alike both ways (the user, 2026-11-16); a version without it
+     * reads it as following and writes that back over it (readOrReset): reset there.
      */
     enum class KeyVSpacingChoice(override val stringRes: Int, val spacing: KeyStyleChoice.Spacing?) : ManagedPreferenceEnum {
         FollowTheme(R.string.follow_theme, null),
+        VeryCompact(R.string.level_very_compact, KeyStyleChoice.V_VERY_COMPACT),
         Compact(R.string.level_compact, KeyStyleChoice.V_COMPACT),
         Standard(R.string.level_standard, KeyStyleChoice.V_STANDARD),
         Loose(R.string.level_loose, KeyStyleChoice.V_LOOSE),

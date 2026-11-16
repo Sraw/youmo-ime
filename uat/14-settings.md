@@ -560,6 +560,12 @@
 - **预期**：**按键样式** 里有 **横向间距**、**纵向间距** 两项（没有一项叫 **按键间距** 的），默认「跟随主题」。标准高度时 w 和 s 两个键面之间的上下缝约 14 dp（一边 7 dp），q 和 w 之间的左右缝约 6 dp。紧凑时上下缝约 6 dp（缩到四成：一边 3 dp），左右缝不变，键面比上下缝不变时高（每个键约多 8 dp）；九键也一样，上下缝窄、键高。纵向选宽松后紧凑时上下缝约 8 dp（9 dp 的四成取整 4 dp 一边），左右不变；横向选宽松后左右缝约 10 dp，上下不变。
 - **JVM**：`KeySpacingMigrationTest`（0.5.2 的一项按键间距升级后两项都是那一档，恢复那时的备份一样）、`KeyStyleThemeTest.aChoiceIsOverTheThemeAndFollowingIsTheThemesOwn`（横向、纵向各盖自己那一半）、`ThemePrefsTest.theKeyStyleSectionIsItsFourAndALine`；keyboard-scene `LookThemeTest.atCompactTheRowsAreCloser`、`theCompactGapIsFortyPercentToTheNearestDp`；ime-core `KeyStyleChoiceTest.eachDirectionOfTheGapIsOverItsHalfOnly`；设备上量缝、截图（全键盘、九键）。
 
+### ST-160 [P2] 纵向间距「很紧凑」：上下缝和横向紧凑一样窄
+- **前提**：B0-设置。
+- **操作**：**外观 → 大小与样式 → 按键样式**：点开 **纵向间距** 看有哪几档；选「很紧凑」，**横向间距** 选「紧凑」，回测试页看全键盘；**键盘高度** 选「紧凑」，再看；换成横屏再看。
+- **预期**：**纵向间距** 的选项依次是 跟随主题、很紧凑、紧凑、标准、宽松（**横向间距** 仍是 跟随主题、紧凑、标准、宽松）。两项都选好后 w 和 s 两个键面之间的上下缝约 4 dp（一边 2 dp），q 和 w 之间的左右缝也约 4 dp，上下左右一样窄，键面比纵向「紧凑」时高。键盘高度紧凑时上下缝约 2 dp（2 dp 的四成取整，留 1 dp 一边），左右缝不变；横屏时上下、左右一边也都是 2 dp。
+- **JVM**：`KeySpacingMigrationTest.theUpAndDownLevelsAreStoredByName`（各档按名字存，加了很紧凑后原来存的档意思不变，列表顺序）、`KeyStyleThemeTest.upAndDownVeryCompactIsDrawnTwoDpAndOneAtCompact`（画出来的键上下各 2 dp，键盘高度紧凑时 1 dp）；ime-core `KeyStyleChoiceTest.upAndDownVeryCompactIsAsTightAsAcrossCompact`（和横向紧凑同宽、紧凑高度 1 dp、主题包上同一档）；设备上量缝、截图。
+
 ### ST-104 [P1] 4.0 主题包上按键间距、圆角、边框也生效
 - **前提**：B0-设置；主题选内置的 **国风·天青**。
 - **操作**：回测试页看全键盘；**外观 → 大小与样式 → 按键样式**：**横向间距** 选「宽松」、**纵向间距** 选「紧凑」，回测试页看全键盘（回车也看）；换成横屏再看；**键盘高度** 选「紧凑」再看；两项改回「跟随主题」再看；**按键圆角** 选「直角」再看，改回；**按键边框** 选「无边框」再看，改回。再换 **霓虹赛博**、**机械键帽**（纵向选「宽松」）、**多巴胺**（无边框）、一个导入的 `.theme` 包各做一遍。

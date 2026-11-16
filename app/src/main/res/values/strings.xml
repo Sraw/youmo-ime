@@ -1047,6 +1047,7 @@
     <string name="follow_theme">Follow the theme</string>
     <string name="key_border_on">Borders</string>
     <string name="key_border_off">No borders</string>
+    <string name="level_very_compact">Very compact</string>
     <string name="level_loose">Roomy</string>
     <string name="level_square">Square</string>
     <string name="level_rounded">Rounded</string>

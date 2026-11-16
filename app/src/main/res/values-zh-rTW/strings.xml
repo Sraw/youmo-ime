@@ -1023,6 +1023,7 @@
     <string name="follow_theme">跟隨主題</string>
     <string name="key_border_on">有邊框</string>
     <string name="key_border_off">無邊框</string>
+    <string name="level_very_compact">很緊湊</string>
     <string name="level_loose">寬鬆</string>
     <string name="level_square">直角</string>
     <string name="level_rounded">圓角</string>

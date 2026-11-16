@@ -66,6 +66,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 打拼音时按住 ⌫ 删完正在打的拼音就停，不再接着删框里已经有的字；要接着删，松手再按住。双拼、九键、14/18 键、形码的编码、笔画筛选、英文在框里打着的词一样；没在打字时按住照旧连删，实体键盘按住 Backspace 也一样。
 - **括号成对推广**：符号面板里点的括号、引号也成对出现、光标停在中间，紧接着退格一起删（以前只有键上打的成对）；勾了「不转中文标点」的长按项、网址和邮箱框里原样打出的也一样。电话号码框里不成对。新加 〖〗〘〙❨❩❲❳❴❵⟨⟩❛❜❝❞ «» ‹› 成对；全角 `＂` 和 `"` 一样。
 - **删掉「中文标点」设置页**：中文标点一律用自带的表。升级到 0.6.1 时删掉以前改过的标点表（只删一次，别的不动）；从备份恢复时备份里改过的标点表也不用。
+- **纵向间距** 多了一档 **很紧凑**（设置 → 外观 → 大小与样式 → 按键样式，排在紧凑前面）：每个键上下各留 2 dp（横屏也是），和 **横向间距** 的紧凑一样宽，两项都选它时上下左右的缝一样，键也高一些；**键盘高度** 是紧凑时缩到 1 dp。原来选的档不变。
 
 ### Main changes
 
@@ -123,6 +124,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Holding ⌫ while typing pinyin stops once what is typed is deleted, no longer going on into the text already in the box; let go and hold again to delete that. The same for 双拼, the nine, 14 and 18 keys, a 形码's code, the stroke filter and an English word being typed in the box; a hold with nothing typed deletes on as before, and a hardware keyboard's held Backspace does the same.
 - **Paired brackets everywhere**: a bracket or quote tapped on the symbol panel comes in pairs too, the cursor between, Backspace right after taking both (before, only those typed on the keys did); so do long press items marked 不转中文标点 (as they are) and what a URL or email field takes as it is. A phone number's field pairs nothing. 〖〗〘〙❨❩❲❳❴❵⟨⟩❛❜❝❞ «» ‹› pair now; a full-width `＂` is a `"`.
 - **The 中文标点 (Chinese punctuation) page is gone**: Chinese punctuation is the built-in table. An edited table is deleted on the upgrade to 0.6.1 (once, nothing else touched), and one a backup brings is not restored.
+- **Key spacing, up and down** has a tighter level, **Very compact** (Settings → Look → Size and style → Key style, before Compact): 2 dp above and below each key (in landscape too), as wide as **Key spacing, across** at Compact, so with both at it the gaps are alike every way and the keys a little taller; at the keyboard height Compact it is 1 dp. The level picked before stays as it was.
 
 ---
 

@@ -63,6 +63,32 @@ class KeySpacingMigrationTest {
         assertFalse(sp.contains(ThemePrefs.KEY_SPACING_052))
     }
 
+    // 纵向间距 is stored by its level's name: 0.6.1's 很紧凑 added before 紧凑 leaves what each stored name
+    // means (a backup of 0.6.0 brought back draws as it did); the list shows it first after following
+    @Uat("ST-160")
+    @Test
+    fun theUpAndDownLevelsAreStoredByName() {
+        assertEquals(
+            listOf("FollowTheme", "VeryCompact", "Compact", "Standard", "Loose"),
+            KeyVSpacingChoice.entries.map { it.name },
+        )
+        val spacing = mapOf(
+            "VeryCompact" to KeyStyleChoice.Spacing(2, 2),
+            "Compact" to KeyStyleChoice.Spacing(5, 3),
+            "Standard" to KeyStyleChoice.Spacing(7, 4),
+            "Loose" to KeyStyleChoice.Spacing(9, 6),
+        )
+        for ((name, gap) in spacing) {
+            sp.edit(commit = true) { clear(); putString(ThemePrefs.KEY_V_SPACING, name) }
+            val prefs = migrated()
+            assertEquals(name, KeyVSpacingChoice.valueOf(name), prefs.keyVSpacingChoice.getValue())
+            assertEquals(name, gap, prefs.keyStyleChoice().vGap)
+        }
+        // picked: stored as its name
+        ThemePrefs(sp).keyVSpacingChoice.setValue(KeyVSpacingChoice.VeryCompact)
+        assertEquals("VeryCompact", sp.getString(ThemePrefs.KEY_V_SPACING, null))
+    }
+
     @Test
     fun oneOfTheTwoStoredAlreadyIsKept() {
         sp.edit(commit = true) {
