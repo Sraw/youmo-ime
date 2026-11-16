@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
@@ -13,7 +14,6 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.navigation.fragment.findNavController
-import com.google.android.material.chip.Chip
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -48,6 +48,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowDialog
 
 /** The long-press and swipe editor: what it starts from is what the keyboard pops up, what it stores is key_lists. */
@@ -121,10 +122,7 @@ class PopupOverridesFragmentTest {
             st.open(SettingsRoute.PopupOverrides)
         }
 
-        private fun click(title: Int) {
-            KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }.performClick()
-            st.idle()
-        }
+        private fun click(title: Int) = clickText(title)
 
         // a list dialog's item picked: a preset, a way
         private fun pick(index: Int) {
@@ -136,6 +134,9 @@ class PopupOverridesFragmentTest {
         // a key tapped as a finger does, down and up through the window (not performClick): beta1's caps kept the
         // touch in the engine's cell, a gesture view, and no dialog came
         private fun tap(v: View) {
+            // scrolled into view first: the keyboards' cards above take the top of a small screen
+            v.requestRectangleOnScreen(android.graphics.Rect(0, 0, v.width, v.height), true)
+            st.idle()
             val at = IntArray(2).also(v::getLocationInWindow)
             val x = at[0] + v.width / 2f
             val y = at[1] + v.height / 2f
@@ -145,9 +146,9 @@ class PopupOverridesFragmentTest {
             st.idle()
         }
 
-        // a key cap on the page: a frame with its click (the tabs are chips, the buttons buttons)
+        // a key cap on the page: a frame with its click and its saying (a keyboard's card says its name as its text)
         private fun firstCap() = KeyboardHarness.all(st.activity.window.decorView)
-            .first { it is FrameLayout && it !is Chip && it.hasOnClickListeners() && it.contentDescription != null }
+            .first { it is FrameLayout && it.hasOnClickListeners() && it.contentDescription != null }
 
         @Test
         fun aTappedKeyOpensItsDialogOnEveryTab() {
@@ -209,7 +210,7 @@ class PopupOverridesFragmentTest {
                     .filter { it.id == R.id.swipe_slot_note && it.visibility == View.VISIBLE }.map { it.text.toString() }.toList()
                 assertEquals(listOf(iconNote), notes)
                 // a note given is shown, none hidden
-                val section = SwipeSlotSection(st.activity, "", off = false, initial = SwipeSlot.Text("x"))
+                val section = SwipeSlotSection(st.activity, off = false, initial = SwipeSlot.Text("x"))
                 section.note("n")
                 assertEquals("n", section.noted)
                 section.note(null)
@@ -292,19 +293,19 @@ class PopupOverridesFragmentTest {
             st.idle()
             val dialog = ShadowDialog.getLatestDialog() as AlertDialog
             val views = KeyboardHarness.all(dialog.window!!.decorView).toList()
-            // each way: the long press's first, a command, a text, nothing; 上滑 then 下滑
+            // each way: the long press's first, a command, nothing, a text (061-settings-cards §5.3); 上滑 then 下滑
             val radios = views.filterIsInstance<RadioButton>()
             assertEquals(8, radios.size)
             assertTrue("上滑 at its preset, the first", radios[0].isChecked)
-            radios[6].performClick()
+            radios[7].performClick()
             views.filterIsInstance<EditText>().last().setText("你好")
-            radios[3].performClick()
+            radios[2].performClick()
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
             assertEquals(SwipeSlot.Text("你好"), slots().resolve("full/q", up = false))
             assertEquals(SwipeSlot.Empty, slots().resolve("full/q", up = true))
             // 撤销: one step back
-            click(R.string.undo)
+            undo()
             assertEquals(SwipeSlots.Default, slots())
         }
 
@@ -429,7 +430,7 @@ class PopupOverridesFragmentTest {
             (ShadowDialog.getLatestDialog() as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             st.idle()
             assertEquals(SwipeSlots.Default.applied(SwipeOrientation.FirstDown), slots())
-            click(R.string.undo)
+            undo()
             assertEquals(edited, slots())
         }
 
@@ -440,7 +441,7 @@ class PopupOverridesFragmentTest {
             open()
             click(R.string.swipe_flip_all)
             st.open(SettingsRoute.PopupOverrides)
-            click(R.string.undo)
+            undo()
             assertEquals(SwipeSlots.Default, slots())
         }
 
@@ -476,10 +477,9 @@ class PopupOverridesFragmentTest {
             val flipped = slots()
             AppPrefs.getInstance().keyboard.swipeDown.setValue(false)
             st.open(SettingsRoute.PopupOverrides)
-            val undo = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(R.string.undo) }
-            assertFalse(undo.isEnabled)
-            undo.performClick()
-            st.idle()
+            // the title bar's ↶ dimmed, and a tap on it all the same takes nothing back
+            assertFalse(menuItem(R.string.undo).isEnabled)
+            undo()
             assertFalse(AppPrefs.getInstance().keyboard.swipeDown.getValue())
             assertEquals(flipped, slots())
         }
@@ -657,7 +657,7 @@ class PopupOverridesFragmentTest {
                 KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first().setText("①")
                 ok()
             }
-            click(R.string.undo)
+            undo()
             assertNull(p.storedKeyLists())
             assertEquals("?", KeyListsCache.user.current[KeyId("full/q")]?.items?.lastOrNull())
         }
@@ -722,8 +722,10 @@ class PopupOverridesFragmentTest {
             assertEquals(items, said)
         }
 
-        // review 4: a key turned off is said so, and stays off when only a slot is changed
+        // review 4: a key turned off is said so, and stays off when only a slot is changed; a phone's height, the
+        // editor opening on its long press card
         @Test
+        @Config(qualifiers = "w393dp-h851dp-port-440dpi")
         fun anOffKeyIsSaidSoAndKeptOff() {
             open()
             // 九键 5: a key with a row, which a save would have turned back on
@@ -767,7 +769,7 @@ class PopupOverridesFragmentTest {
                 emptyUp()
                 ok()
             }
-            click(R.string.undo)
+            undo()
             assertEquals(newer, AppPrefs.getInstance().internal.keyLists.getValue())
         }
 
@@ -787,6 +789,218 @@ class PopupOverridesFragmentTest {
         }
     }
 
+    // the page and the editor as cards (061-settings-cards §4, §5), on a phone's screen
+    @RunWith(RobolectricTestRunner::class)
+    @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
+    class Cards : EditorDialog() {
+
+        private val decor get() = st.activity.window.decorView
+
+        private fun open(swipes: SwipeSlots = SwipeSlots.Default) {
+            prefs.set(AppPrefs.getInstance().internal.keySwipes, swipes.serialize())
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER)
+            st.activity
+            st.open(SettingsRoute.PopupOverrides)
+        }
+
+        // each keyboard's card by its form, and its body: the one target and node
+        private fun board(form: String): View = KeyboardHarness.all(decor).first { it.tag == "view:keys/board/$form" }
+        private fun body(form: String): View = KeyboardHarness.all(board(form)).first { it.hasOnClickListeners() }
+
+        @Test
+        @Uat("ST-151")
+        fun theKeyboardsAreEightCardsToPickNotARowToSwipe() {
+            open()
+            assertTrue(KeyboardHarness.all(decor).none { it is android.widget.HorizontalScrollView })
+            val forms = KeyShortcutPages.all.map { it.form }
+            assertEquals(listOf("full", "t9", "g14", "g18", "zy9", "zyfull", "num", "fn"), forms)
+            val nodes = forms.map { body(it).createAccessibilityNodeInfo() }
+            assertTrue(nodes.all { it.className == RadioButton::class.java.name })
+            assertEquals(listOf(true) + List(7) { false }, nodes.map { it.isChecked })
+            // two rows of four on a phone, all on the first screen
+            assertEquals(board("full").top, board("g18").top)
+            assertTrue(board("zy9").top > board("full").bottom)
+            assertTrue(KeyboardHarness.all(decor).first { it is androidx.core.widget.NestedScrollView || it is android.widget.ScrollView }.height > board("fn").bottom)
+            // picked: its keys
+            body("g14").performClick()
+            st.idle()
+            assertTrue(body("g14").createAccessibilityNodeInfo().isChecked)
+            assertTrue("QW" in st.texts())
+        }
+
+        @Test
+        @Uat("ST-152")
+        fun aKeyboardsCardSaysHowManyOfItsKeysAreChanged() {
+            open(SwipeSlots.Default.with("full/q", true, SwipeSlot.Empty).with("t9/2", false, SwipeSlot.Empty))
+            fun said(form: String) = androidx.core.view.ViewCompat.getStateDescription(body(form)).toString()
+            val selected = st.s(R.string.shortcut_card_selected)
+            assertEquals(st.s(R.string.shortcut_card_edited, selected, 1), said("full"))
+            assertEquals(st.s(R.string.shortcut_card_edited, st.s(R.string.shortcut_card_unselected), 1), said("t9"))
+            assertEquals(st.s(R.string.shortcut_card_unselected), said("g14"))
+            // the badge drawn, none where none is changed
+            assertTrue(KeyboardHarness.all(board("full")).any { it is TextView && it.isShown && it.text.toString() == "1" })
+            assertTrue(KeyboardHarness.all(board("g14")).none { it is TextView && it.isShown && it.text.toString() == "0" })
+        }
+
+        @Test
+        @Uat("ST-152")
+        fun theFunctionKeysAreTwelveCellsFourAcross() {
+            open()
+            body("fn").performClick()
+            st.idle()
+            val grid = KeyboardHarness.all(decor).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CardGrid>().last()
+            assertEquals(12, grid.childCount)
+            assertEquals(4, grid.columns)
+            assertEquals(3, grid.rows)
+            // each cell a cap and its name under it, the name no node of its own
+            val name = KeyboardHarness.all(grid.getChildAt(1)).filterIsInstance<TextView>().first { it.text.toString() == st.s(R.string.fn_key_backspace) }
+            assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, name.importantForAccessibility)
+        }
+
+        // every name whole, as many lines as it takes: the longest, 分词's, in English on a small phone at a large font
+        // (three lines there: two, as it was capped, cut it)
+        @Test
+        @Config(qualifiers = "en-w360dp-h640dp-port-xhdpi", fontScale = 1.3f)
+        @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE) // text measured as drawn
+        fun theFunctionKeysNamesAreNeverCut() {
+            open()
+            body("fn").performClick()
+            st.idle()
+            val grid = KeyboardHarness.all(decor).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CardGrid>().last()
+            val names = (0 until grid.childCount).map { cell -> KeyboardHarness.all(grid.getChildAt(cell)).filterIsInstance<TextView>().last() }
+            assertTrue(names.any { it.text.toString() == st.s(R.string.fn_key_separator) })
+            names.forEach { name ->
+                val layout = name.layout!!
+                assertTrue(name.text.toString(), (0 until layout.lineCount).none { layout.getEllipsisCount(it) > 0 })
+                assertTrue(name.text.toString(), layout.height <= name.height - name.paddingTop - name.paddingBottom)
+                // inside its cell, the row's cells as high as their highest
+                assertTrue(name.text.toString(), name.bottom <= (name.parent as View).height)
+            }
+        }
+
+        @Test
+        @Uat("ST-152")
+        fun undoIsTheTitleBarsAndResetAllInItsMenu() {
+            open()
+            assertTrue(st.texts().none { it == st.s(R.string.undo) })
+            assertFalse(menuItem(R.string.undo).isEnabled)
+            assertTrue((menuItem(R.string.undo) as androidx.appcompat.view.menu.MenuItemImpl).requiresActionButton())
+            assertFalse(menuItem(R.string.reset_all).isEnabled)
+            clickText(R.string.swipe_flip_all)
+            assertTrue(menuItem(R.string.undo).isEnabled)
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER + "\nfull/q\toff")
+            st.open(SettingsRoute.PopupOverrides)
+            assertTrue(menuItem(R.string.reset_all).isEnabled)
+            val item = menuItem(R.string.reset_all)
+            item.javaClass.getMethod("invoke").invoke(item)
+            st.idle()
+            assertEquals(st.s(R.string.reset_all_long_press_message), (ShadowDialog.getLatestDialog() as AlertDialog).findViewById<TextView>(android.R.id.message)!!.text.toString())
+        }
+
+        @Test
+        @Uat("ST-155")
+        fun multiSelectsStripsChooseAKeyboardsKeysAllOrNone() {
+            open()
+            clickText(R.string.swipe_multi_select)
+            val strips = KeyboardHarness.all(decor).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().toList()
+            assertEquals(8, strips.size)
+            fun strip(form: String) = KeyboardHarness.all(board(form)).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().first()
+            assertEquals(com.google.android.material.checkbox.MaterialCheckBox.STATE_UNCHECKED, strip("full").state)
+            keyCalled("q").performClick()
+            st.idle()
+            assertEquals(com.google.android.material.checkbox.MaterialCheckBox.STATE_INDETERMINATE, strip("full").state)
+            assertEquals("1/26", strip("full").count.text.toString())
+            strip("full").performClick()
+            st.idle()
+            assertEquals(com.google.android.material.checkbox.MaterialCheckBox.STATE_CHECKED, strip("full").state)
+            assertTrue(st.texts().toString(), st.s(R.string.swipe_selected, 26) in st.texts())
+            // nothing stored: no step to take back
+            assertFalse(menuItem(R.string.undo).isEnabled)
+            strip("full").performClick()
+            st.idle()
+            assertEquals(com.google.android.material.checkbox.MaterialCheckBox.STATE_UNCHECKED, strip("full").state)
+            clickText(R.string.done)
+            assertTrue(KeyboardHarness.all(decor).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().none { it.isShown })
+        }
+
+        // the editor's three cards, their title rows found by the title
+        private fun AlertDialog.header(title: Int): View {
+            var v: View = KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }
+            while (!v.hasOnClickListeners()) v = v.parent as View
+            return v
+        }
+
+        private fun AlertDialog.expanded(title: Int) =
+            androidx.core.view.ViewCompat.getStateDescription(header(title)).toString() == st.s(R.string.settings_card_expanded)
+
+        @Test
+        @Uat("ST-153", "ST-154")
+        fun theEditorsCardsOpenOneAtATimeEachSayingWhatIsSet() {
+            open()
+            dialogOf("a").apply {
+                assertTrue(expanded(R.string.long_press_card))
+                assertFalse(expanded(R.string.swipe_up))
+                assertFalse(expanded(R.string.swipe_down))
+                // the ways' summaries: 长按首选 with the first, a command
+                val first = firstOf("full/a")!!
+                val up = header(R.string.swipe_up).contentDescription.toString()
+                assertEquals(st.s(R.string.swipe_ways_said, st.s(R.string.swipe_up), st.s(R.string.swipe_way_said, st.s(R.string.slot_first), first)), up)
+                assertTrue(header(R.string.swipe_down).contentDescription.toString(), st.s(R.string.shortcut_command) in header(R.string.swipe_down).contentDescription)
+                header(R.string.swipe_down).performClick()
+                st.idle()
+                assertFalse(expanded(R.string.long_press_card))
+                assertTrue(expanded(R.string.swipe_down))
+                // 空 picked on 下滑: its title row says so at once
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().filter { it.text.toString() == st.s(R.string.slot_empty) }.last().performClick()
+                st.idle()
+                assertEquals(st.s(R.string.swipe_ways_said, st.s(R.string.swipe_down), st.s(R.string.slot_empty)), header(R.string.swipe_down).contentDescription.toString())
+                // a text chosen with nothing typed: 确定 opens 下滑's card with its error, whichever was open
+                header(R.string.long_press_card).performClick()
+                st.idle()
+                KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().filter { it.text.toString() == st.s(R.string.shortcut_text) }.last().performClick()
+                ok()
+                assertTrue(isShowing)
+                assertTrue(expanded(R.string.swipe_down))
+                assertFalse(expanded(R.string.long_press_card))
+                dismiss()
+            }
+        }
+
+        // where a thing is on the screen
+        private fun View.y() = IntArray(2).also(::getLocationInWindow)[1]
+
+        @Test
+        @Uat("ST-154")
+        fun nothingMovesAsAnItemIsSelectedOrATextChosen() {
+            open()
+            dialogOf("a").apply {
+                val field = KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first()
+                val at = field.y()
+                // the two boxes under the field there before anything is typed
+                val boxes = KeyboardHarness.all(window!!.decorView).filterIsInstance<android.widget.CheckBox>().filter { it.isShown }.map { it.text.toString() }.toList()
+                assertEquals(listOf(st.s(R.string.text_variables_use), st.s(R.string.text_as_is)), boxes)
+                tapItem("â")
+                assertEquals(at, field.y())
+                tapItem("â")
+                assertEquals(at, field.y())
+                // 上滑 opened: its first three choices stay where they are as 文字 is chosen, its field shown under it
+                header(R.string.swipe_up).performClick()
+                st.idle()
+                val radios = KeyboardHarness.all(window!!.decorView).filterIsInstance<RadioButton>().filter { it.isShown }.toList()
+                assertEquals(4, radios.size)
+                assertEquals(st.s(R.string.shortcut_text), radios[3].text.toString())
+                val tops = radios.take(3).map { it.y() }
+                val upField = KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().toList()[1]
+                assertFalse(upField.isShown)
+                radios[3].performClick()
+                st.idle()
+                assertEquals(tops, radios.take(3).map { it.y() })
+                assertTrue(upField.isShown)
+                dismiss()
+            }
+        }
+    }
+
     // a page or function key ime-core adds with no title or name here: the page's title would throw
     // (an unknown page has no fallback) and the key show its bare name; caught here, not on a phone
     @Test
@@ -803,8 +1017,7 @@ class PopupOverridesFragmentTest {
             prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER)
             st.activity
             st.open(SettingsRoute.PopupOverrides)
-            KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(page) }.performClick()
-            st.idle()
+            clickText(page)
         }
 
         // every item deleted, the row's too: off, as any key (060-row-unlock §1.1)
@@ -870,6 +1083,26 @@ class PopupOverridesFragmentTest {
 
         @After
         fun close() = st.close()
+
+        // a text on the page tapped: where it is not its own target (a keyboard's card's name), the card or button it is on
+        protected fun clickText(title: Int) {
+            var v: View = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }
+            while (!v.hasOnClickListeners()) v = v.parent as View
+            v.performClick()
+            st.idle()
+        }
+
+        // an item of the title bar's menu (the ↶, the ⋮'s): MenuItemImpl's own invoke, what its button's tap calls
+        protected fun menuItem(title: Int): MenuItem {
+            val menu = shadowOf(st.activity).optionsMenu
+            return (0 until menu.size()).map(menu::getItem).first { it.title.toString() == st.s(title) }
+        }
+
+        protected fun undo() {
+            val item = menuItem(R.string.undo)
+            item.javaClass.getMethod("invoke").invoke(item)
+            st.idle()
+        }
 
         protected fun keyCalled(label: String) = KeyboardHarness.all(st.activity.window.decorView)
             .first { it.contentDescription?.toString()?.substringBefore(',') == label && it.hasOnClickListeners() }

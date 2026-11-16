@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.input.shortcut
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 
 /**
@@ -90,6 +92,20 @@ object KeyShortcutPages {
 
     /** Every tab in order. */
     val all = listOf(Full, Nine, Grouped14, Grouped18, ZhuyinNine, ZhuyinFull, Number, Function)
+
+    /**
+     * How many of [page]'s keys are changed, the ones its tab outlines: a slot set ([slots]) or a long press of the
+     * user's ([lists]; a function key's where it has one, ， and 。). A function key counts once for its two ways;
+     * a key in its place edited on another tab (注音九键's ，) is that tab's.
+     */
+    fun edited(page: Page, slots: SwipeSlots, lists: KeyLists): Int = if (page.form == KeyShortcuts.FUNCTION) {
+        page.rows.count { row ->
+            val name = row.first().label
+            slots.isSet(SwipeSlots.functionKey(name)) || (KeyDefaults.function(name) != null && lists[KeyId.function(name)] != null)
+        }
+    } else {
+        page.names.count { slots.isSet(it) || lists[KeyId.of(it)] != null }
+    }
 
     private fun grouped(form: String, letters: NineKeyLetters, sizes: IntArray): Page {
         // a key's name as the keyboard's: its letters, the `;` left off (GroupedKeyboard)

@@ -5,10 +5,10 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.view.View
+import android.widget.TextView
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
-import com.google.android.material.chip.Chip
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -150,10 +150,11 @@ class ZhuyinShortcutsUatTest {
     fun thePageHasZhuyinNinesTabBeforeDachens() {
         val st = SettingsHarness().also { settings = it }
         st.open(SettingsRoute.PopupOverrides)
-        val chips = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<Chip>().map { it.text.toString() }.toList()
-        val nine = chips.indexOf(st.s(R.string.shortcut_page_zy9))
-        assertTrue(chips.toString(), nine >= 0 && chips.getOrNull(nine + 1) == st.s(R.string.shortcut_page_zyfull))
-        KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<Chip>().first { it.text.toString() == chips[nine] }.performClick()
+        val boards = st.boards()
+        val names = boards.map { it.first }
+        val nine = names.indexOf(st.s(R.string.shortcut_page_zy9))
+        assertTrue(names.toString(), nine >= 0 && names.getOrNull(nine + 1) == st.s(R.string.shortcut_page_zyfull))
+        boards[nine].second.performClick()
         st.idle()
         val texts = st.texts()
         for (g in listOf("ㄅㄉㄚ", "ㄓㄗㄢㄦ", "ㄖㄥㄩ")) assertTrue("$g in $texts", g in texts)
@@ -164,8 +165,14 @@ class ZhuyinShortcutsUatTest {
     }
 
     // the 注音九键 tab's key labelled [label], opened (SettingsHarness on the page already)
+    // the page's keyboards in order, each its card's name and what picks it (the card's body: 061-settings-cards §4.1)
+    private fun SettingsHarness.boards(): List<Pair<String, View>> = KeyboardHarness.all(activity.window.decorView)
+        .filter { (it.tag as? String)?.startsWith("view:keys/board/") == true }
+        .map { card -> KeyboardHarness.all(card).filterIsInstance<TextView>().first().text.toString() to KeyboardHarness.all(card).first { it.hasOnClickListeners() } }
+        .toList()
+
     private fun SettingsHarness.zy9Key(label: String): View {
-        KeyboardHarness.all(activity.window.decorView).filterIsInstance<Chip>().first { it.text.toString() == s(R.string.shortcut_page_zy9) }.performClick()
+        boards().first { it.first == s(R.string.shortcut_page_zy9) }.second.performClick()
         idle()
         return KeyboardHarness.all(activity.window.decorView).first { it.contentDescription?.toString()?.substringBefore(',') == label && it.hasOnClickListeners() }
     }

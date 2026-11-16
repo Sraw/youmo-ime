@@ -37,8 +37,9 @@ import java.io.File
  * The long press editor's marks (061-text-variables §2.5: 使用变量; 061-no-cn-punct §2.3: 不转中文标点) and a swipe's
  * text of variables, as the page has them.
  */
+// a phone's height: the editor's titles stay put and it opens on its long press card (061-settings-cards §5.1)
 @RunWith(RobolectricTestRunner::class)
-@Config(application = FcitxApplication::class)
+@Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
 
     private fun open() {
@@ -226,6 +227,8 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
             // the long press's, then each way's
             assertEquals(3, boxes.size)
             val texts = views().filterIsInstance<EditText>().toList()
+            // 上滑's card opened (the long press's open first): its help shown under its field
+            openCard(R.string.swipe_up)
             texts[1].setText("\${fullhour}:\$minute")
             boxes[1].performClick()
             st.idle()
@@ -236,8 +239,19 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
         assertEquals(SwipeSlot.Text("\${fullhour}:\$minute", variables = true), slots.resolve("full/q", true))
     }
 
+    // a text tapped: where it is not its own target (a keyboard's card's name), what it is on
     private fun click(title: Int) {
-        KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }.performClick()
+        var v: View = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }
+        while (!v.hasOnClickListeners()) v = v.parent as View
+        v.performClick()
+        st.idle()
+    }
+
+    // a card of the editor opened by its title row
+    private fun AlertDialog.openCard(title: Int) {
+        var v: View = views().filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }
+        while (!v.hasOnClickListeners()) v = v.parent as View
+        v.performClick()
         st.idle()
     }
 }

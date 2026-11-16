@@ -69,8 +69,11 @@ class KeyShortcutsPageScreenshotTest {
         st.open(SettingsRoute.PopupOverrides)
     }
 
+    // a keyboard picked: its card's name, the card's body the target
     private fun tab(title: Int) {
-        KeyboardHarness.all(decor).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }.performClick()
+        var v: View = KeyboardHarness.all(decor).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }
+        while (!v.hasOnClickListeners()) v = v.parent as View
+        v.performClick()
         st.idle()
     }
 

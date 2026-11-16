@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.input.shortcut
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.input.keys.KeyLists
+import org.fcitx.fcitx5.android.input.keys.UserList
+import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -65,5 +68,34 @@ class KeyShortcutPagesTest {
         assertEquals(listOf("fn/space.up", "fn/space.down"), space.map { it.name })
         assertTrue(KeyShortcutPages.all.all { page -> page.names.all { KeyShortcuts.formOf(it) == page.form } })
         assertEquals(KeyShortcutPages.all.size, KeyShortcutPages.all.map { it.form }.toSet().size)
+    }
+
+    // the count on a keyboard's card (061-settings-cards §2.3): the keys its tab outlines
+    @Test
+    fun aPagesEditedKeysAreItsSlotsSetAndItsListsOfTheUsers() {
+        val pages = KeyShortcutPages
+        val none = SwipeSlots.Default
+        assertTrue(pages.all.all { pages.edited(it, none, KeyLists.Empty) == 0 })
+        // q's two ways one key; a's long press another; 九键's 5 is another page's
+        val slots = none.with("full/q", true, SwipeSlot.Empty).with("full/q", false, SwipeSlot.Text("x"))
+        val lists = KeyLists.of(mapOf(KeyId("full/a") to UserList.Off, KeyId("t9/5") to UserList.Off))
+        assertEquals(2, pages.edited(pages.Full, slots, lists))
+        assertEquals(1, pages.edited(pages.Nine, slots, lists))
+        assertEquals(0, pages.edited(pages.Grouped14, slots, lists))
+        // the same key set and listed counts once
+        assertEquals(1, pages.edited(pages.Full, slots, KeyLists.of(mapOf(KeyId("full/q") to UserList.Off))))
+    }
+
+    @Test
+    fun aFunctionKeyCountsOnceForItsWaysAndItsListAndNotOnAnotherTab() {
+        val pages = KeyShortcutPages
+        val space = SwipeSlots.functionKey("space")
+        val slots = SwipeSlots.Default.with(space, true, SwipeSlot.Empty).with(space, false, SwipeSlot.Empty)
+        // ，'s long press: the function keys' tab's, though 注音九键 draws it in place
+        val lists = KeyLists.of(mapOf(KeyId.function("comma") to UserList.Off, KeyId.function("space") to UserList.Off))
+        assertEquals(2, pages.edited(pages.Function, slots, lists))
+        assertEquals(0, pages.edited(pages.ZhuyinNine, slots, lists))
+        // a list stored for a key whose long press is an action is none of the page's
+        assertEquals(1, pages.edited(pages.Function, SwipeSlots.Default, lists))
     }
 }

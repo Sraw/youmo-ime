@@ -9,15 +9,18 @@ import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.engine.phrase.TextVariables
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
@@ -30,14 +33,17 @@ import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapContent
+import java.util.Calendar
 
 /**
- * One way of a key (上滑 or 下滑) chosen (060-swipe-slots): the long press's first, a command, a text,
- * or nothing. [off] says the way is switched off in the settings, its choice kept for when it is on.
+ * One way of a key (上滑 or 下滑) chosen (060-swipe-slots): the long press's first, a command, nothing, or a text,
+ * in that order, the text's field only while the text is chosen, under the last choice, so the three above never
+ * move (061-settings-cards §5.3). Drawn in the editor's card of the way, whose title row says [summary]; [off]
+ * says the way is switched off in the settings, its choice kept for when it is on.
  * [strokesDrawn]: 在键上划 is 笔画筛选 and the key one a stroke drawn starts on, where a short swipe while pinyin
  * is typed is a stroke drawn, so a stroke set here is not reached then (BaseKeyboard's glide): said under a stroke chosen.
  */
-class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, initial: SwipeSlot, private val strokesDrawn: Boolean = false) {
+class SwipeSlotSection(private val ctx: Context, off: Boolean, initial: SwipeSlot, private val strokesDrawn: Boolean = false) {
 
     private var command = (initial as? SwipeSlot.Command)?.command ?: KeyCommand.SelectAll
 
@@ -45,7 +51,7 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
     private val commandButton = RadioButton(ctx)
     private val textButton = RadioButton(ctx).apply { setText(R.string.shortcut_text) }
     private val empty = RadioButton(ctx).apply { setText(R.string.slot_empty) }
-    private val radios = listOf(first, commandButton, textButton, empty)
+    private val radios = listOf(first, commandButton, empty, textButton)
 
     private val field = EditText(ctx).apply {
         inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -74,29 +80,27 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
     /** Called when what is chosen may have changed (a way picked, a command, the text typed). */
     var onChange: (() -> Unit)? = null
 
+    /** The key's first of long press as the editor has it now, said after 长按首选 (none: the key has none). */
+    var firstChar: String? = null
+        set(value) {
+            field = value
+            first.text = value?.let { ctx.getString(R.string.swipe_way_said, ctx.getString(R.string.slot_first), it) } ?: ctx.getString(R.string.slot_first)
+        }
+
     // how the keyboard draws what is chosen where that is not as set (SwipeFates.note): none, hidden
-    private val noteView = TextView(ctx).apply {
+    private val noteView = small().apply {
         id = R.id.swipe_slot_note
-        textSize = 13f
-        setTextColor(ctx.styledColor(android.R.attr.textColorSecondary))
         visibility = View.GONE
     }
 
     // a stroke chosen while strokes are drawn on the keys: not reached while pinyin is typed (issue #4)
-    private val strokeView = TextView(ctx).apply {
-        textSize = 13f
-        setTextColor(ctx.styledColor(android.R.attr.textColorSecondary))
+    private val strokeView = small().apply {
         setText(R.string.slot_stroke_drawn)
         visibility = View.GONE
     }
 
     val view: LinearLayout = ctx.verticalLayout {
-        add(TextView(ctx).apply {
-            text = if (off) title + ctx.getString(R.string.slot_section_off) else title
-            textSize = 14f
-            setTextColor(ctx.styledColor(android.R.attr.colorPrimary))
-            setPadding(0, ctx.dp(12), 0, ctx.dp(4))
-        }, lParams(matchParent))
+        if (off) add(small().apply { setText(R.string.slot_card_off_note) }, lParams(matchParent) { bottomMargin = ctx.dp(4) })
         add(first, lParams(matchParent))
         add(ctx.horizontalLayout {
             gravity = Gravity.CENTER_VERTICAL
@@ -106,18 +110,25 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
                 setOnClickListener { chooseCommand() }
             }, lParams())
         }, lParams(matchParent))
-        add(strokeView, lParams(matchParent) { marginStart = ctx.dp(32) })
+        add(empty, lParams(matchParent))
         add(textButton, lParams(matchParent))
         add(field, lParams(matchParent) { marginStart = ctx.dp(32) })
         add(variables, lParams(matchParent) { marginStart = ctx.dp(32) })
         add(help.view, lParams(matchParent) { marginStart = ctx.dp(32) })
-        add(empty, lParams(matchParent))
-        add(noteView, lParams(matchParent) { marginStart = ctx.dp(32) })
+        // the notes that come and go at the foot: only the card's foot moves
+        add(strokeView, lParams(matchParent) { topMargin = ctx.dp(4) })
+        add(noteView, lParams(matchParent) { topMargin = ctx.dp(4) })
     }
 
     init {
         help.on = variables.isChecked
         radios.forEach { button -> button.setOnClickListener { pick(button) } }
+        // the text chosen by a tap: its field to type in at once
+        textButton.setOnClickListener {
+            pick(textButton)
+            field.requestFocus()
+            ctx.getSystemService(InputMethodManager::class.java)?.showSoftInput(field, 0)
+        }
         showCommand()
         pick(
             when (initial) {
@@ -131,6 +142,10 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
 
     private fun pick(button: RadioButton) {
         radios.forEach { it.isChecked = it === button }
+        // the field and what goes with it shown while the text is chosen, the variables' help while they are on too
+        field.isVisible = textButton.isChecked
+        variables.isVisible = textButton.isChecked
+        help.view.isVisible = textButton.isChecked && help.on
         strokeView.visibility = if (strokesDrawn && commandButton.isChecked && command.stroke != null) View.VISIBLE else View.GONE
         onChange?.invoke()
     }
@@ -180,6 +195,26 @@ class SwipeSlotSection(private val ctx: Context, title: String, off: Boolean, in
         textButton.isChecked -> text()
             ?: null.also { field.error = ctx.getString(R.string.invalid_value) }
         else -> SwipeSlot.Empty
+    }
+
+    /** What is chosen, one line for the card's title row: 长按首选 @, 命令：全选, 文字：what it types now, 空. */
+    fun summary(): String = when {
+        first.isChecked -> first.text.toString()
+        commandButton.isChecked -> commandButton.text.toString()
+        textButton.isChecked -> ctx.getString(
+            R.string.shortcut_command_is,
+            ctx.getString(R.string.shortcut_text),
+            field.text.toString().let { if (variables.isChecked) TextVariables.expand(it, Calendar.getInstance()) else it },
+        )
+        else -> ctx.getString(R.string.slot_empty)
+    }
+
+    /** The chosen command's icon, as the key draws it, for the summary; none for another choice. */
+    val summaryIcon: Int? get() = if (commandButton.isChecked) KeyShortcutLooks.of(command).icon else null
+
+    private fun small() = TextView(ctx).apply {
+        textSize = 13f
+        setTextColor(ctx.styledColor(android.R.attr.textColorSecondary))
     }
 
     companion object {

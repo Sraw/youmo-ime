@@ -208,7 +208,7 @@ class SettingsPagesUatTest {
         try {
             // 九键's long press edited where every key's is (060-keys-unify S5: 按键字符和快捷键's 九键 tab, ST-107)
             open(SettingsRoute.PopupOverrides)
-            view(s(R.string.shortcut_page_nine)).performClick()
+            clickable(view(s(R.string.shortcut_page_nine))).performClick()
             idle()
             fun nine(digit: Char) = KeyboardHarness.all(activity.window.decorView)
                 .first { it.isShown && it.contentDescription?.toString()?.substringBefore(',') == "$digit" && it.hasOnClickListeners() }
@@ -253,7 +253,7 @@ class SettingsPagesUatTest {
         val letters = AppPrefs.getInstance().keyboard.t9Letters
         try {
             open(SettingsRoute.PopupOverrides)
-            view(s(R.string.shortcut_page_nine)).performClick()
+            clickable(view(s(R.string.shortcut_page_nine))).performClick()
             idle()
             KeyboardHarness.all(activity.window.decorView)
                 .first { it.isShown && it.contentDescription?.toString()?.substringBefore(',') == "7" && it.hasOnClickListeners() }

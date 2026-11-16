@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -19,21 +20,45 @@ import splitties.views.dsl.core.wrapInScrollView
 
 /**
  * The scrolling page the key-editing settings (九键's letters and symbols, long press) draw their
- * keys on: [rebuild] fills [content] anew after each change.
+ * keys on: [rebuild] fills [content] anew after each change. [content] is at most [MAX_WIDTH_DP] wide,
+ * centred (keys stretched across a landscape screen were sparse, 061-settings-cards §2.10); [wide], above
+ * it and empty unless a page fills it, takes the whole width (the keyboard cards' row of 8).
  */
 abstract class KeyCapsPageFragment : Fragment() {
 
     protected lateinit var content: LinearLayout
 
+    protected lateinit var wide: LinearLayout
+
     protected abstract fun rebuild()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val ctx = requireContext()
-        content = ctx.verticalLayout {
-            val pad = ctx.dp(16)
+        val pad = ctx.dp(16)
+        wide = ctx.verticalLayout {
+            setPadding(pad, ctx.dp(8), pad, 0)
+            visibility = View.GONE
+            // a choice card's badge hangs over its corner into this padding (ChoiceCard.cell)
+            clipChildren = false
+            clipToPadding = false
+        }
+        content = object : LinearLayout(ctx) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val most = ctx.dp(MAX_WIDTH_DP)
+                val width = if (MeasureSpec.getSize(widthMeasureSpec) > most) MeasureSpec.makeMeasureSpec(most, MeasureSpec.EXACTLY) else widthMeasureSpec
+                super.onMeasure(width, heightMeasureSpec)
+            }
+        }.apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(pad, ctx.dp(8), pad, pad)
         }
-        return content.wrapInScrollView {
+        val page = ctx.verticalLayout {
+            addView(wide, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            })
+        }
+        return page.wrapInScrollView {
             clipToPadding = false
             ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
                 view.setPadding(0, 0, 0, insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom)
@@ -51,5 +76,9 @@ abstract class KeyCapsPageFragment : Fragment() {
         // before the first unlock the keyboard reads them from device-protected storage
         AppPrefs.getInstance().syncToDeviceEncryptedStorage()
         super.onStop()
+    }
+
+    companion object {
+        const val MAX_WIDTH_DP = 600
     }
 }

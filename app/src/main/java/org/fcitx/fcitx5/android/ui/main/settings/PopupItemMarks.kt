@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.ui.main.settings
 
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.text.TextUtils
 import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
@@ -32,8 +35,8 @@ import com.google.android.material.R as MaterialR
 
 /**
  * The long press editor's item marks (061-text-variables §2.5: 使用变量; 061-no-cn-punct §2.3: 不转中文标点): the
- * selected item's toggles on the button row, the line over it of what the selected item of variables types now, and
- * beside [field] the two check boxes of what is added (one or the other or none) with the help of each. [convertible]:
+ * selected item's toggles on the button row, the line over it, and beside [field] the two check boxes of what is
+ * added (one or the other or none) with the help of each. [convertible]:
  * the English marks a Chinese punctuation table converts, the ones 不转中文标点 is for; [changed] redraws the editor.
  */
 class PopupItemMarks(
@@ -43,13 +46,24 @@ class PopupItemMarks(
     private val convertible: Set<String>,
     private val changed: () -> Unit,
 ) {
-    /** What the selected item of variables types now, over the buttons. */
-    val selectedNow: TextView = small()
+    /**
+     * The line over the buttons, one line always there so nothing under it moves (061-settings-cards §5.2): with
+     * nothing selected how to start, with an item of variables selected what it types now, else blank.
+     */
+    val line: TextView = small().apply {
+        maxLines = 1
+        isSingleLine = true
+        ellipsize = TextUtils.TruncateAt.END
+    }
 
     private val toggles = MARKS.map { (mark, title) ->
-        val button = MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply {
-            setText(title)
+        val button = textButton(ctx, title).apply {
             isCheckable = true
+            // a text button has no border: a toggle on is filled, so on and off tell apart
+            backgroundTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(ctx.styledColor(MaterialR.attr.colorSecondaryContainer), Color.TRANSPARENT),
+            )
             setOnClickListener {
                 editor.toggle(mark)
                 changed()
@@ -88,7 +102,7 @@ class PopupItemMarks(
 
     /** The toggles put on the button row [actions], after its buttons. */
     fun addTo(actions: FlexboxLayout) = toggles.forEach { (button, _, _) ->
-        with(actions) { add(button, FlexboxLayout.LayoutParams(wrapContent, wrapContent).apply { marginEnd = ctx.dp(8) }) }
+        with(actions) { add(button, FlexboxLayout.LayoutParams(wrapContent, wrapContent)) }
     }
 
     /** What [item]'s cap says of its mark, null for none. */
@@ -104,8 +118,11 @@ class PopupItemMarks(
             ViewCompat.setStateDescription(button, ctx.getString(if (on) R.string.text_mark_on else R.string.text_mark_off))
         }
         val template = editor.items.getOrNull(editor.selected)?.takeIf { editor.selectedMark == ItemMark.Variables }
-        selectedNow.text = template?.let { TextVariableHelp.typedNow(ctx, it, Calendar.getInstance()) }
-        selectedNow.isVisible = template != null
+        line.text = when {
+            template != null -> TextVariableHelp.typedNow(ctx, template, Calendar.getInstance())
+            editor.selected !in editor.items.indices -> ctx.getString(R.string.long_press_card_line)
+            else -> ""
+        }
     }
 
     /** Under the field, each with its top margin in dp: the check boxes, the as-is hint, the variables' help. */
@@ -124,6 +141,22 @@ class PopupItemMarks(
     }
 
     companion object {
+        /** The editor's compact text button (§5.2): no border, 40 dp high, a disabled one only faded text. */
+        fun textButton(ctx: Context, @StringRes title: Int) = MaterialButton(ctx, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
+            setText(title)
+            insetTop = 0
+            insetBottom = 0
+            minHeight = ctx.dp(TEXT_BUTTON_DP)
+            minimumHeight = ctx.dp(TEXT_BUTTON_DP)
+            // as wide as its words: the four actions on one line of a phone, not Material's 88 dp each
+            minWidth = 0
+            minimumWidth = 0
+            setPaddingRelative(ctx.dp(TEXT_BUTTON_PAD_DP), paddingTop, ctx.dp(TEXT_BUTTON_PAD_DP), paddingBottom)
+        }
+
+        private const val TEXT_BUTTON_DP = 40
+        private const val TEXT_BUTTON_PAD_DP = 12
+
         // the marks an item can have, each its toggle's words
         private val MARKS = listOf(ItemMark.Variables to R.string.text_variables_use, ItemMark.AsIs to R.string.text_as_is)
 
