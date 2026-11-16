@@ -92,6 +92,9 @@ class TableDictionary(private val table: CodeTable) {
         return out.toIntArray()
     }
 
+    /** The first entry, in table order, whose code starts with [prefix] (no wildcard, no pinyin entry): -1 where none does. */
+    fun firstOf(prefix: String): Int = table.prefixRange(prefix).let { if (it.isEmpty()) -1 else it.first }
+
     /**
      * Whether some code starts with [pattern], [wildcard] standing for any key, or some pinyin
      * entry's: whether typing on can lead anywhere (a wildcard code, unlike [match], by its start

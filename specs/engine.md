@@ -732,7 +732,24 @@ setting either: it reads the codes.
 `noSortInputLength` in table order, then shorter codes first), the table's own before the words
 from outside it of a code as long (U-28). Auto-select commits a
 lone full code, or the first candidate when the next key leads nowhere; 空码 is dropped by the next
-key. The code keeps a cursor as pinyin's input does; a key typed before its end is put in there and
+key. A tap with a place (`Action.Key.touch`, 纠正错拼和按偏的键 on: `SessionFactory` hands it
+`TableSlips.SLIPS`, a `SlipCost` with floor −1.5) is read as a key around it only where the key as
+typed leads nowhere (an empty code, or 顶字) and that one leads on (`TableSlips`, asked by `TableSession.slipped` before
+anything else reads the key: the nearest, then the one whose first entry the word model weighs more;
+061-neighbour-table): never a code's first key, one past a full code or an end key, one put in before
+the code's end, the wildcard, the pinyin key, a selection key or an end key, nor a code with the wildcard,
+nor as one of them. Where the key would commit something (`TableSession.topped`: the first candidate shown,
+as `autoCommit` takes it, by 顶字 or for a code that waits, below; a 简码, or a part of a code that shows the
+character first, then the next code's first key, typed so on purpose most often) only past
+`SLIPS.toppingFloor` (−0.1: −0.5 changed a word typed on target, 覅 → 要饭) and for a key whose code's first table entry is another text the word model
+weighs at least as much (the table's first, not the order the session would show: that is weighed only for
+the code typed). Codes read toward pinyin entries alone (五笔拼音) are not read. A code with a key so read
+(`TableSlips.marks`, a bit per place, moved as keys are put in and deleted) never commits itself as it is
+typed; where its one candidate would have (`TableSession.waits`), the next key that cannot go on commits
+it through `autoCommit`, as a full code's next key does, so the space after it is the new code's (the
+user's call, DECISIONS「形码临键纠错：改读出的唯一码自动上屏」); else it waits for a space or a pick.
+`ime-eval table-slips` measures it on whole codes and on the parts that show a word first (`--plan prefix`). A code with entries, and
+typing on target, are as without a place. The code keeps a cursor as pinyin's input does; a key typed before its end is put in there and
 never commits by the next-key rule (the code is being mended, not full), a lone full code still
 commits. `pinyinKey` (五笔 `z`, 二笔 `[`) looks a character up by pinyin, showing its code (the
 cursor then the pinyin's);

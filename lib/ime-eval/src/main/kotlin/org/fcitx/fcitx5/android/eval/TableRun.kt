@@ -37,6 +37,9 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
     }
     private val longestWord = codes.keys.maxOfOrNull { it.codePointCount(0, it.length) } ?: 0
 
+    /** [word]'s codes the table types it by (no marker's), shortest first. */
+    fun codesOf(word: String): List<String> = codes[word].orEmpty()
+
     /** How one code went: [keys] pressed, [first] the word came first, [auto] it committed itself. */
     data class Typed(val keys: Int, val first: Boolean, val auto: Boolean)
 
@@ -183,6 +186,27 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
             }
         }
         return Outcome(cut.at.size - 1, missing, words, keys, first, auto, spared, nanos, actions, slowest)
+    }
+
+    /**
+     * A word of some text as [type] types it: by [code], as [typed] went, committed by the next word's first key [next] (顶字) or not (null);
+     * [follow] the next word's first key whatever commits this one (null: the last word).
+     */
+    data class Planned(val word: String, val code: String, val typed: Typed, val next: Char?, val follow: Char? = next)
+
+    /** The words of [text] the table has, cut and typed as [type] does it. */
+    fun plan(text: String): List<Planned> {
+        val cut = cut(text)
+        val path = cut.path
+        val out = ArrayList<Planned>()
+        for (k in 1 until path.size) {
+            val typed = cut.step[path[k]] ?: continue
+            val word = text.substring(cut.at[path[k - 1]], cut.at[path[k]])
+            val next = if (k + 1 < path.size) cut.step[path[k + 1]] else null
+            val spared = next != null && spares(typed, word, next.first[0])
+            out += Planned(word, typed.first, typed.second, if (spared) next!!.first[0] else null, next?.first?.get(0))
+        }
+        return out
     }
 
     /** Whether [word], picked first by [typed], needs no pick before a code starting with [next]. */

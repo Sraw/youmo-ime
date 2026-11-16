@@ -288,7 +288,8 @@ object InputMethodSettings {
             R.string.shared_section_pinyin, listOf(
                 // pinyin's nine, 14 and 18 keys (a layout's own groups too) read a key tapped by its neighbour's edge as
                 // that key (061-neighbour-correction, the user's Q3/Q4); 双拼's grouped keyboards correct nothing: 双拼's
-                // ü typed with its own key is not read there either (GroupedShuangpinSegmenter)
+                // ü typed with its own key is not read there either (GroupedShuangpinSegmenter). The tables follow it
+                // too, reading a slip only where the key would lead nowhere (TableSlips, 061-neighbour-table)
                 Toggle(
                     "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary,
                     notFor = listOf(

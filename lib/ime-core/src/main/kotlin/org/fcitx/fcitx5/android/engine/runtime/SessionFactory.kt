@@ -68,6 +68,7 @@ import org.fcitx.fcitx5.android.engine.table.SharedWords
 import org.fcitx.fcitx5.android.engine.table.TableLanguage
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
+import org.fcitx.fcitx5.android.engine.table.TableSlips
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.fcitx.fcitx5.android.engine.user.WordLists
@@ -275,6 +276,9 @@ internal class SessionFactory(
             TableSession(
                 table.dictionary, options, MadeOnUse { ForgetsInTables(lookUp()) }, if (learner.useHabits) table.saved else SavedPhrases(table.dictionary, im, { null }), sharedWords(table, im), language, uptimeMillis,
                 phrases = phraseBook(), clock = learnClock::calendar, lookUpMode = lookUpMode(im),
+                // a tap's slip read where the key would lead nowhere (an empty code, or 顶字 at the key's edge):
+                // 纠正错拼和按偏的键, every keyboard's one setting (Q3)
+                slips = if (s.typos) TableSlips.SLIPS else null,
             ),
             between = Action.Pick(0),
             blocked = glideHeldBack { false },

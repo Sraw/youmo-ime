@@ -38,6 +38,7 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableLanguage
+import org.fcitx.fcitx5.android.engine.table.TableSlips
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.LearningUse
@@ -355,6 +356,14 @@ internal val COMMANDS = listOf(
             0
         }
     },
+    Command(
+        "table-slips", "<table.data> <set.tsv> [--preset <preset>] [--hand <σ, TouchSim's: s0.2>] [--seed <n>] [--half tune|held-out] [--floor <log10>] [--topping-floor <log10>] [--words <pinyin.data>] [--plan whole|prefix] [--misses <out.tsv>] [--touched <out.tsv>]",
+        2..2, "preset", "hand", "seed", "half", "floor", "topping-floor", "words", "plan", "misses", "touched",
+    ) { args, out, err ->
+        val (dataPath, setPath) = args.operands
+        val o = args.options
+        tableSlips(dataPath, setPath, o["preset"] ?: DEFAULT_PRESET, o, out, err)
+    },
 )
 
 val USAGE = "usage: " + COMMANDS.joinToString("\n       ") { "${it.name} ${it.usage}" } + """
@@ -471,7 +480,8 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         listOf("threads", "beam", "sentences").all { name -> valid(name) { (it.toIntOrNull() ?: 0) > 0 } },
         // a key read as the one beside it (061-neighbour-correction): full pinyin, 双拼's full keyboard, pinyin's nine, 14 and 18 keys
         valid("neighbours") { it in ON_OFF && readsNeighbours(scheme) },
-        valid("touched") { "touch" in options },
+        // pinyin's with its touches; table-slips' are its own, by the preset
+        valid("touched") { "touch" in options || "preset" in options },
         valid("touch") { "taps" !in options && touchValid(it) },
         valid("hand") { runCatching { TouchSim.hand(it) }.isSuccess },
         valid("typos") { it in ON_OFF && readsTypos(scheme) },
@@ -1002,6 +1012,39 @@ private fun tableHomographs(dataPath: String, setPath: String, preset: String, p
     out.appendLine("重码 words: $n")
     languages.forEachIndexed { i, (label, _) -> out.appendLine(String.format(Locale.ROOT, "  %-24s first %.1f%%", label, 100.0 * first[i] / maxOf(n, 1))) }
 }
+
+// a table's codes tapped (061-neighbour-table): words of [setPath]'s texts, clean and with one key slipped, typed with slips read and without
+private fun tableSlips(dataPath: String, setPath: String, preset: String, o: Map<String, String>, out: Appendable, err: Appendable): Int {
+    val options = TableRun.PRESETS[preset] ?: run {
+        err.appendLine("table-slips: no preset $preset; one of ${TableRun.PRESETS.keys.joinToString()}")
+        return 2
+    }
+    if (o["plan"] !in setOf(null, "whole", "prefix")) {
+        err.appendLine("table-slips: --plan whole or prefix")
+        return 2
+    }
+    val floor = o["floor"]?.toFloatOrNull() ?: TableSlips.SLIPS.cost.floor
+    val topping = o["topping-floor"]?.toFloatOrNull() ?: TableSlips.SLIPS.toppingFloor
+    // the word model as the app's low tier weighs a table by
+    val language = o["words"]?.let { loadData(it) }?.let { TableLanguage(TextWords(it.model, it.wordIndex)) }
+    val run = TableSlipRun(CodeTable.load(mapFile(dataPath)), options, TableSlips.Costs(TableSlips.SLIPS.cost.copy(floor = floor), topping), language)
+    val texts = Halves.select(readSet(setPath), o["half"]).map { it.expected }.distinct()
+    val hand = o["hand"] ?: "s0.2"
+    val seed = o["seed"]?.toLongOrNull() ?: 1L
+    // prefix: each word by the shortest part of a code that shows it first, then the next word's key
+    val prefix = o["plan"] == "prefix"
+    val clean = run.units(texts, hand, slip = false, seed, prefix)
+    val slipped = run.units(texts, hand, slip = true, seed, prefix)
+    val misses = o["misses"]?.let { File(it).printWriter() }
+    val outcome = misses.use { run.measure(clean, slipped, it) }
+    val plan = if (prefix) "parts that show the word first (${run.partial(clean)} of ${clean.size} no whole code)" else "whole codes"
+    out.appendLine(TableSlipRun.report("$preset, $plan, floor $floor, topping $topping, $hand, ${o["half"] ?: "all"}: ${texts.size} texts", outcome))
+    o["touched"]?.let { path -> File(path).writeText((run.touchedSet(clean, TOUCHED_KEYS) + run.touchedSet(slipped, TOUCHED_KEYS)).joinToString("\n", postfix = "\n")) }
+    return 0
+}
+
+// a line of a set the device runner times, about as many keys as pinyin's (61–60 keys a sample)
+private const val TOUCHED_KEYS = 60
 
 private val ON_OFF = setOf("on", "off")
 

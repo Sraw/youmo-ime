@@ -231,3 +231,21 @@
 - **操作**：打 tadd，长按「长大」，点读音行；切到仓颉，打一个繁体字，长按。
 - **预期**：读音行「长大　zhǎng dà」，词卡照常；仓颉的繁体字按简体字的读音；候选旁的编码提示和长按前一样。
 - **JVM**：ime-core `EnginesWordCardTest`（五笔 好）；`WordCardUatTest.theExamplesReadAsTheDesignHasThem`（五笔 长大，真数据）；设备上不跑。
+
+### TBL-54 [P1] 仓颉按偏成空码时按旁边的键读
+- **前提**：B0-仓颉，**纠正错拼和按偏的键** 开（默认）。
+- **操作**：打 h d（禾），再按 `e`，手指落在 `e` 靠 `r` 的右边上；按空格。再打 y y m，同样按偏 `e`；再按 `x`。
+- **预期**：`hde` 是空码，按偏读成 `hdr`：编码栏是 竹木口，第一个候选「和」，空格上屏「和」。`yyme` 也是空码，读成 `yymr`：只有一个候选「这」，按原样它会自己上屏，这时先不上屏；按 `x`（接不上 `yymr`）时「这」上屏，`x`（難）开始新的编码。点在 `e` 的中间时照旧是空码，空格丢掉。
+- **JVM**：`TableSlipUatTest.cangjiesEmptyCodeIsReadAsTheKeyTheTapLeansTo`、`cangjiesLoneCodeReadFromASlipWaitsForTheNextKey`（:lib:ime-eval:uatTest，真数据）+ ime-core `TableSlipTest.aKeyThatMakesAnEmptyCodeIsReadAsTheOneItsTapLeansTo`、`theNearestKeyThatLeadsOnIsTaken`、`aCodeReadFromASlipWithOneCandidateIsCommittedByAKeyThatCannotGoOn`、`aCodeReadFromASlipWaitsOnlyWhereItWouldHaveCommittedItself`、`theKeyAfterAWaitingCodeIsReadAsAToppingKeyIs`、`aWaitingCodeIsCommittedByPunctuationASpaceOrASelectionKeyAsAnyCode`、`everyKeyReadKeepsItsMarkWhenAnotherGoes`、`aKeyPutInMidCodeIsNeverReadAndMovesTheMarks`、`noKeyIsReadAsASelectionKeyNorAnEndKey`、`erbiNeverTopsAndItsPinyinKeyIsNeverRead`、`EnginesTableSlipTest.aCodeReadFromASlipWaitsThenTheNextKeyThatCannotGoOnCommitsIt`；设备上不跑（点在键边上的落点要模拟）。
+
+### TBL-55 [P1] 顶字的键只在键边上才读成邻键；读过的码先不上屏
+- **前提**：B0-五笔，**纠正错拼和按偏的键** 开（默认）。
+- **操作**：打 e t n（「乃」的整码），再按 `j`，手指落在 `j` 靠 `h` 那边、离边还有一截；再来一次，手指落在 `j` 最靠 `h` 的边上，然后按空格；第三次同第二次，然后按 `w`。
+- **预期**：`etnj` 没有编码。离边一截时照旧顶字：「乃」上屏，`j` 开始新的编码。落在边上时读成 `etnh`（首选「用」不是「乃」、也不比它少见）：什么也不上屏，第一个候选「用」，打满且只有这一个字也不马上上屏，空格上屏「用」；或者按下一个编码的 `w`，「用」上屏一次，`w` 开始新的编码。打到想要的字排第一（编码没打完）再按下一个字的键，也一样只在键边上才改读，而且邻键打出的首选是同一个字时不改读。按原样有字的编码、编码第一个键、打满后的键、万能键 `z` 都不改。
+- **JVM**：`TableSlipUatTest.wubisToppingKeyIsReadOnlyAtTheEdge`（真数据）+ ime-core `TableSlipTest.aKeyAfterAWholeCodeIsReadOnlyAtTheEdge`、`aKeyIsNeverReadAsOneLeadingToTheTextItWouldCommit`、`aWaitingCodeIsCommittedOnceWhereTheTableTops`、`ziranmaTopsAsWubiDoes`、`wubiPinyinReadsNoKeyAsOneLeadingToPinyinAlone`、`aKeyAfterAWholeCodeIsReadOnlyForACodeTheWordModelWeighsAsMuch`、`aCodeWithAKeyReadAsItsNeighbourNeverCommitsItself`、`aCodeWithEntriesIsNeverChanged`、`aCodesFirstKeyIsNeverRead`、`aFullCodesNextKeyStartsTheNextCode`、`theWildcardIsNeverReadAsAnotherKey`；设备上不跑（点在键边上的落点要模拟）。
+
+### TBL-56 [P2] 关掉纠错时码表不纠按偏
+- **前提**：B0-仓颉；**拼音** 设置里关掉 **纠正错拼和按偏的键**。
+- **操作**：打 h d，再按 `e`，落点同 TBL-54；按空格。
+- **预期**：`hde` 照原样是空码，没有候选，空格丢掉，什么也不上屏。
+- **JVM**：`TableSlipUatTest.slipsOffLeaveTheEmptyCodeToBeDropped`（真数据）+ ime-core `EnginesTableSlipTest.aSlipIntoAnEmptyCodeIsReadAsTheKeyMeantUnlessSlipsAreOff`（设置接到码表）；设备上不跑。
