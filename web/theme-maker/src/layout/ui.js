@@ -1,11 +1,14 @@
 // The layout maker's page (061-custom-layout §12): the preview and its environment, 文件 (新建, 打开, 保存), undo and
-// redo, the source, the problems. What a change does is youmo-layout-maker's; the drawing is the engine's.
+// redo, the editing (a key selected on the preview, dragged, its tabs: 键, 行, 整块, 信息), the source, the problems.
+// What a change does is youmo-layout-maker's and youmo-layout-edit's; the drawing is the engine's.
 (function () {
   'use strict';
 
   const E = globalThis['youmo-engine'] && globalThis['youmo-engine'].YoumoEngine;
   const M = window.YoumoMaker;
   const LM = window.YoumoLayoutMaker;
+  const LE = window.YoumoLayoutEdit;
+  const F = window.YoumoForm;
   const $ = (id) => document.getElementById(id);
   const ICONS = JSON.parse($('youmo-engine-icons').textContent);
   const THEME_LABEL = { material: 'Material', pixel: 'Pixel', nord: 'Nord', 'deep-blue': 'Deep Blue', monokai: 'Monokai', 'amoled-black': 'AMOLED', monet: '系统取色' };
@@ -32,12 +35,13 @@
 
   // ---- the document ----
 
-  function set(xml, { fresh = false } = {}) {
+  // [external]: not a change of the tabs' own (the source typed in, a file, a draft)
+  function set(xml, { fresh = false, external = false } = {}) {
     const d = M.doc(xml);
     if (fresh || !history) history = new M.History(d);
     else if (!history.push(d)) return;
     else edited = true;
-    changed();
+    changed(fresh || external);
   }
 
   function keep() {
@@ -58,7 +62,8 @@
     });
   }
 
-  function changed() {
+  // [external]: undo, redo, the source, a file: the selection found again by its keys' ids, the tab's fields shown anew
+  function changed(external = false) {
     const xml = history.current.xml;
     if ($('source').value !== xml) $('source').value = xml;
     const i = LM.info(xml);
@@ -67,7 +72,9 @@
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
     keep();
+    if (external) relocate();
     preview();
+    fill(external);
   }
 
   // ---- the preview ----
@@ -91,14 +98,14 @@
     showProblems(r.problems);
     fillShape(r.info && r.info.family);
     if (!r.scene) {
+      shown = null;
       canvas.width = canvas.width; // cleared: a layout the engine cannot read draws nothing
       return;
     }
     canvas.width = r.scene.width;
     canvas.height = r.scene.height;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    E.paint(r.scene, ctx, { pressed: null, icons: ICONS, images: {}, fonts: FONTS });
+    shown = { scene: r.scene, keys: r.scene.json().keys, at: new Map() };
+    paintShown();
   }
 
   function showProblems(list) {
@@ -107,8 +114,18 @@
     for (const p of list) {
       const li = document.createElement('li');
       li.className = p.level;
-      li.textContent = (p.level === 'error' ? '错误' : '警告') + (p.line ? '（第 ' + p.line + ' 行）' : '') + '：' + p.message;
-      if (p.line) li.addEventListener('click', () => goToLine(p.line));
+      const text = (p.level === 'error' ? '错误' : '警告') + (p.line ? '（第 ' + p.line + ' 行）' : '') + '：' + p.message;
+      // a key's problem selects the key; any other's goes to its line: a button, reached by Tab and read as one
+      if (p.line) {
+        li.append(h('button', { type: 'button', onclick: () => {
+          const at = LE.atLine(history.current.xml, p.line);
+          if (!at) return goToLine(p.line);
+          sel = [withId(at)];
+          fragmentKey = null;
+          showTab('key');
+          paintShown();
+        } }, text));
+      } else li.textContent = text;
       ul.append(li);
     }
     const errors = list.filter((p) => p.level === 'error').length;
@@ -116,6 +133,7 @@
   }
 
   function goToLine(line) {
+    showTab('source');
     const ta = $('source');
     const lines = ta.value.split('\n');
     const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
@@ -159,6 +177,704 @@
     });
     keep();
     if (history) preview();
+  }
+
+  // ---- editing (§12.3, §12.5): the selection, the preview's drag, the tabs ----
+
+  // the selected cells, where they are written ({row, index}) and their keys' ids (found again by them after an undo,
+  // a redo, the source typed in); a fragment's key (the app's bottom row) by its scene id
+  let sel = [];
+  let fragmentKey = null; // {id, include}
+  let rowTarget = -1; // the row 行 chose: where 加键 puts a key with none selected
+  let tab = 'key';
+  let shown = null; // the preview's scene: {scene, keys, at: scene id -> cell (found once per preview)}
+  let press = null; // a press on the preview: {mode: pending|move|width, …}
+  let draggedPart = -1; // the row list's part dragged by its ☰
+
+  const h = (tag, props = {}, ...kids) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else if (k === 'className' || k === 'textContent' || k === 'value' || k === 'checked' || k === 'disabled' || k === 'title') e[k] = v;
+      else e.setAttribute(k, v);
+    }
+    e.append(...kids.filter((x) => x != null && x !== false));
+    return e;
+  };
+  const line = (what, ...controls) => h('div', { className: 'row' }, h('span', { className: 'what' }, what), ...controls);
+  const field = (value, commit, props = {}) => h('input', { value: value ?? '', onchange: (e) => commit(e.target.value), ...props });
+  const choice = (list, value, commit, props = {}) => {
+    const s = h('select', { onchange: (e) => commit(e.target.value), ...props });
+    for (const [v, label] of list) s.add(new Option(label, v));
+    s.value = value ?? '';
+    return s;
+  };
+  const button = (text, act, props = {}) => h('button', { type: 'button', onclick: act, ...props }, text);
+
+  const xmlNow = () => history.current.xml;
+  const keyboardAttrs = (xml) => { const k = F.elements(xml, 'keyboard')[0]; return k ? Object.fromEntries(k.attrs) : {}; };
+  const columnsOf = (xml) => parseFloat(keyboardAttrs(xml).columns) || 10;
+  const parsed = () => LE.parse(xmlNow());
+  // a fragment's text by its id (the app's bottom row): its keys' ids are the board's too
+  const source = (src) => { try { return E.layoutSource(src) || null; } catch (e) { return null; } };
+  const hasOwn = (o, k) => !!k && Object.hasOwn(o, k);
+
+  /** A change of the layout: [xml] the new text, [at] the selection after it (undefined: kept, null: none). */
+  function edit(xml, at) {
+    if (at !== undefined) {
+      // its key's id read once the text is the new one (tidy)
+      sel = at ? [{ row: at.row, index: at.index }] : [];
+      fragmentKey = null;
+    }
+    if (xml !== xmlNow()) set(xml);
+    else fill();
+  }
+
+  // [at] with the id of the key written there (a gap has none)
+  function withId(at) {
+    const c = LE.cellAt(parsed(), at);
+    return { row: at.row, index: at.index, id: c && c.a.id };
+  }
+
+  // the selection after a change not the tabs' own: each key where its id now is (one gone, or a gap, let go)
+  function relocate() {
+    const xml = xmlNow();
+    const seen = new Set();
+    sel = sel.map((s) => (s.id ? LE.locate(xml, s.id, drawnIds) : null)).filter(Boolean).map(withId).filter((s) => !seen.has(s.id) && seen.add(s.id));
+    if (fragmentKey) {
+      const include = LE.includeOf(xml, fragmentKey.id, source);
+      fragmentKey = include >= 0 ? { id: fragmentKey.id, include } : null;
+    }
+  }
+
+  // the ids the preview's scene of [text] draws: which of a key written twice (when=) is shown
+  function drawnIds(text) {
+    const r = E.readOwnLayout(text);
+    const theme = themeOf(env.theme);
+    if (!r.ok || !theme) return [];
+    const s = E.buildScene(r.layout, theme, LM.envJson(E, env, r.layout.family, r.layout), measurer || E.fixedMeasurer());
+    return s.ok ? s.scene.json().keys.map((k) => k.id) : [];
+  }
+
+  // where the preview's key [id] is written, asked once a preview (a drag asks at every move)
+  function locateShown(id) {
+    if (!shown) return LE.locate(xmlNow(), id, drawnIds);
+    if (!shown.at.has(id)) shown.at.set(id, LE.locate(xmlNow(), id, drawnIds));
+    return shown.at.get(id);
+  }
+
+  // a scene key's cell, or its fragment's include
+  function cellOfKey(key) {
+    const at = locateShown(key.id);
+    if (at) return { at: { row: at.row, index: at.index, id: key.id } };
+    const include = LE.includeOf(xmlNow(), key.id, source);
+    return include >= 0 ? { fragment: { id: key.id, include } } : null;
+  }
+
+  function select(key, add) {
+    const found = key ? cellOfKey(key) : null;
+    if (!found) {
+      if (!add) { sel = []; fragmentKey = null; }
+    } else if (found.fragment) {
+      sel = [];
+      fragmentKey = found.fragment;
+    } else if (add) {
+      fragmentKey = null;
+      const i = sel.findIndex((s) => s.row === found.at.row && s.index === found.at.index);
+      if (i >= 0) sel.splice(i, 1);
+      else sel.push(found.at);
+    } else {
+      sel = [found.at];
+      fragmentKey = null;
+    }
+    if (tab === 'key') fill(); else showTab('key');
+    paintShown();
+  }
+
+  // ---- the preview drawn, with the selection and the drag over it ----
+
+  function paintShown() {
+    const canvas = $('preview');
+    if (!shown) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    E.paint(shown.scene, ctx, { pressed: null, icons: ICONS, images: {}, fonts: FONTS });
+    const p = parsed();
+    const ids = new Set(sel.map((at) => LE.cellAt(p, at)).filter(Boolean).map((c) => c.a.id));
+    if (fragmentKey) ids.add(fragmentKey.id);
+    const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#3b6fd8';
+    ctx.save();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = accent;
+    for (const k of shown.keys) if (ids.has(k.id)) ctx.strokeRect(k.bounds[0] + 3, k.bounds[1] + 3, k.bounds[2] - k.bounds[0] - 6, k.bounds[3] - k.bounds[1] - 6);
+    if (press && press.mode === 'move' && press.target) {
+      const t = press.target;
+      ctx.fillStyle = accent;
+      ctx.fillRect(t.x - 4, t.y0, 8, t.y1 - t.y0);
+    }
+    if (press && press.mode === 'width' && press.units != null) {
+      const b = press.key.bounds;
+      ctx.setLineDash([12, 8]);
+      ctx.strokeRect(b[0], b[1], press.px, b[3] - b[1]);
+      ctx.setLineDash([]);
+      ctx.font = '600 40px sans-serif';
+      ctx.fillStyle = accent;
+      ctx.fillText(LE.num(press.units), b[0] + 10, b[1] + 44);
+    }
+    ctx.restore();
+  }
+
+  const toScene = (e) => {
+    const c = $('preview');
+    const r = c.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * c.width / r.width, y: (e.clientY - r.top) * c.height / r.height, scale: c.width / r.width };
+  };
+  const keyAtPoint = (p) => {
+    const i = shown ? shown.scene.keyAt(p.x, p.y) : -1;
+    return i >= 0 ? shown.keys[i] : null;
+  };
+
+  // where a dragged key goes: before or after the key under [p], by its middle; a line at that edge
+  function dropTarget(p) {
+    const key = keyAtPoint(p);
+    const at = key && locateShown(key.id);
+    if (!at) return null;
+    const before = p.x < (key.bounds[0] + key.bounds[2]) / 2;
+    return { row: at.row, index: before ? at.index : at.index + 1, x: before ? key.bounds[0] : key.bounds[2], y0: key.bounds[1], y1: key.bounds[3] };
+  }
+
+  // the width a drag of the right edge gives: the key's units as now per pixel, snapped (§12.3)
+  function widthAt(p) {
+    const k = press.key;
+    const kw = k.bounds[2] - k.bounds[0];
+    const px = Math.max(10, kw + p.x - press.x);
+    const pp = parsed();
+    const c = LE.cellAt(pp, sel[0]);
+    const columns = columnsOf(xmlNow());
+    const w = parseFloat(LE.widthOf(xmlNow(), pp, c));
+    const per = Number.isFinite(w) && kw > 0 ? w / kw : columns / shown.scene.json().width;
+    press.px = px;
+    press.units = LE.snap(px * per, columns);
+  }
+
+  function pointerDown(e) {
+    if (!shown || e.button > 0) return;
+    const p = toScene(e);
+    const key = keyAtPoint(p);
+    const one = sel.length === 1 && LE.cellAt(parsed(), sel[0]);
+    const mine = one && key && key.id === one.a.id;
+    const touch = e.pointerType === 'touch';
+    // the selected key's right edge: its width
+    // (a finger only after the 300 ms press, as a drag: else a swipe there would not scroll)
+    if (mine && Math.abs(p.x - key.bounds[2]) < 16 * p.scale) {
+      press = { mode: touch ? 'pending' : 'width', key, x: p.x, y: p.y, id: e.pointerId, touch };
+      if (touch) {
+        press.timer = setTimeout(() => {
+          if (!press || press.mode !== 'pending') return;
+          press.mode = 'width';
+          try { $('preview').setPointerCapture(press.id); } catch (e) { /* the finger already lifted */ }
+        }, 300);
+      } else $('preview').setPointerCapture(e.pointerId);
+      return;
+    }
+    if (touch) {
+      // a finger selects on lifting (a swipe over the preview scrolls the page, no tab changed under it) and drags
+      // only after a 300 ms press (§12.5)
+      press = { mode: 'pending', x: p.x, y: p.y, key, touch, id: e.pointerId };
+      press.timer = setTimeout(() => {
+        if (!press || press.mode !== 'pending' || !key) return;
+        select(key, false);
+        if (sel.length !== 1) { press = null; return; }
+        press.at = sel[0];
+        press.mode = 'move';
+        try { $('preview').setPointerCapture(press.id); } catch (e) { /* the finger already lifted */ }
+      }, 300);
+      return;
+    }
+    select(key, e.shiftKey || e.ctrlKey || e.metaKey);
+    if (!key || sel.length !== 1) return;
+    press = { mode: 'pending', x: p.x, y: p.y, at: sel[0], touch, id: e.pointerId };
+    $('preview').setPointerCapture(e.pointerId);
+  }
+
+  function pointerMove(e) {
+    if (!press || e.pointerId !== press.id) return;
+    const p = toScene(e);
+    const far = Math.hypot(p.x - press.x, p.y - press.y) / p.scale;
+    if (press.mode === 'pending') {
+      if (press.touch && far > 10) { clearTimeout(press.timer); press = null; return; }
+      if (!press.touch && far > 6) press.mode = 'move';
+    }
+    if (press.mode === 'move') press.target = dropTarget(p);
+    else if (press.mode === 'width') widthAt(p);
+    paintShown();
+  }
+
+  function pointerUp(e) {
+    if (!press || e.pointerId !== press.id) return;
+    const done = press;
+    clearTimeout(done.timer);
+    press = null;
+    if (done.mode === 'pending' && done.touch) select(done.key, false);
+    else if (done.mode === 'move' && done.target) {
+      const r = LE.move(xmlNow(), done.at, done.target);
+      edit(r.xml, r.at);
+    } else if (done.mode === 'width' && done.units != null) {
+      edit(LE.setAttrs(xmlNow(), sel[0], { width: LE.num(done.units) }));
+    }
+    paintShown();
+  }
+
+  // the arrow keys on the preview: the next key in the scene's order (← →), the nearest in the row above or below (↑ ↓)
+  function stepSelection(e) {
+    const dirs = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -2, ArrowDown: 2 };
+    if (!shown || !shown.keys.length || !(e.key in dirs)) return;
+    e.preventDefault();
+    const p = parsed();
+    const id = fragmentKey ? fragmentKey.id : sel.length ? (LE.cellAt(p, sel[sel.length - 1]) || { a: {} }).a.id : null;
+    const keys = shown.keys;
+    const now = keys.findIndex((k) => k.id === id);
+    const d = dirs[e.key];
+    let next = null;
+    if (now < 0) next = keys[0];
+    else if (Math.abs(d) === 1) next = keys[now + d] || keys[now];
+    else {
+      const mid = (k) => [(k.bounds[0] + k.bounds[2]) / 2, (k.bounds[1] + k.bounds[3]) / 2];
+      const [x, y] = mid(keys[now]);
+      const there = keys.filter((k) => (d < 0 ? k.bounds[3] <= keys[now].bounds[1] : k.bounds[1] >= keys[now].bounds[3]));
+      if (there.length) {
+        const rowY = mid(there.reduce((b, k) => (Math.abs(mid(k)[1] - y) < Math.abs(mid(b)[1] - y) ? k : b)))[1];
+        next = there.filter((k) => Math.abs(mid(k)[1] - rowY) < 1).reduce((b, k) => (Math.abs(mid(k)[0] - x) < Math.abs(mid(b)[0] - x) ? k : b));
+      } else next = keys[now];
+    }
+    select(next, false);
+  }
+
+  // ---- the tabs ----
+
+  function render(t) {
+    if (t === 'key') return keyTab(parsed());
+    if (t === 'row') return rowTab(parsed());
+    if (t === 'board') return boardTab();
+    if (t === 'meta') return metaTab();
+    return null;
+  }
+
+  // the selection and the row 行 chose kept to what the text has
+  function tidy() {
+    const p = parsed();
+    sel = sel.filter((at) => LE.cellAt(p, at)).map(withId);
+    if (rowTarget >= p.rows.length) rowTarget = -1;
+    if (fragmentKey && !p.includes[fragmentKey.include]) fragmentKey = null;
+    // what a screen reader is told is selected: the keys as they are now (one taken out, another found), said once
+    const say = fragmentKey ? '选中 ' + fragmentKey.id + '（App 的底行）' : sel.length ? '选中 ' + sel.map((s) => s.id || '空位').join('、') : '没有选中';
+    if ($('selected').textContent !== say) $('selected').textContent = say;
+  }
+
+  // a tab drawn whole (another chosen, or the change added or took controls): the control that had focus has it
+  // again where it still is, found by its place (controlKey)
+  function showTab(t) {
+    tab = t;
+    for (const b of $('tabs').children) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+    for (const el of document.querySelectorAll('#edit .tab')) el.hidden = el.id !== 'tab-' + t;
+    if (!history) return;
+    tidy();
+    const el = $('tab-' + t);
+    const kids = render(t);
+    if (!kids) return;
+    const key = el.contains(document.activeElement) && document.activeElement.matches(CONTROLS) ? controlKey(document.activeElement) : null;
+    el.replaceChildren(...kids);
+    const again = key && [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
+    if (again) again.focus({ preventScroll: true });
+  }
+
+  // the tab after a change, as the theme maker's (its refreshTab): its nodes kept, their values and texts made the
+  // new ones, so the field being typed in, its caret, a touch keyboard open over it, stay (a tab drawn anew took them).
+  // The field typed in keeps its text, but not where the change is not its own ([external]: undo, redo, the source).
+  function fill(external = false) {
+    if (!history) return;
+    const el = $('tab-' + tab);
+    if (!el || el.hidden || !el.childNodes.length) { showTab(tab); return; }
+    tidy();
+    const kids = render(tab);
+    if (!kids) return;
+    const fresh = h('div', {}, ...kids);
+    const active = document.activeElement;
+    const skip = !external && el.contains(active) && typedIn(active) && active === dirty ? active : null;
+    const key = el.contains(active) && active.matches(CONTROLS) ? controlKey(active) : null;
+    const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
+    if (!same) { rebuildSoon(); return; }
+    // a part put in whole took the focused control with it (a key moved by ←): focus its like in the new one
+    if (key && !el.contains(document.activeElement)) {
+      const again = [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
+      if (again) again.focus({ preventScroll: true });
+    }
+  }
+
+  // the field typed in since its last commit (input before its change): kept over a rebuild
+  let dirty = null;
+  const typedIn = (el) => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
+  const CONTROLS = 'input, select, textarea, button';
+
+  // [to] made to show what [from] shows, its nodes kept (the theme maker's sync): a control's value, a text; a part
+  // with no control put in whole (a canvas drawn). A part whose data-key differs (what its handlers were made for:
+  // the keys selected, the base whose function keys a button adds) is put in whole, never kept with old handlers.
+  // False where the controls differ: the tab is then drawn anew. [skip] keeps its value (the field being typed in).
+  function sync(to, from, skip) {
+    if (to.nodeType !== from.nodeType || to.nodeName !== from.nodeName) return false;
+    if (to.nodeType === Node.TEXT_NODE) { if (to.data !== from.data) to.data = from.data; return true; }
+    if (to.nodeType !== Node.ELEMENT_NODE) return true;
+    if (to.dataset.key !== from.dataset.key) {
+      if (to.contains(skip)) return false;
+      to.replaceWith(from);
+      return true;
+    }
+    const kids = to.childNodes.length === from.childNodes.length;
+    if (!to.matches(CONTROLS) && !to.querySelector(CONTROLS) && !from.querySelector(CONTROLS)) {
+      if (!kids || !to.isEqualNode(from)) to.replaceWith(from);
+      return true;
+    }
+    if (!kids || (to.tagName === 'INPUT' && to.type !== from.type)) return false;
+    // read before the children: an <option> synced across is moved out of [from], and its value with it
+    const value = 'value' in from ? from.value : undefined;
+    const checked = from.checked;
+    for (let i = from.childNodes.length - 1; i >= 0; i--) if (!sync(to.childNodes[i], from.childNodes[i], skip)) return false;
+    if (to.className !== from.className) to.className = from.className;
+    if (to.matches(CONTROLS) && to !== skip) {
+      if (value !== undefined && to.value !== value) to.value = value;
+      if (to.checked !== checked) to.checked = checked;
+      to.disabled = from.disabled;
+      to.title = from.title;
+      for (const name of ['placeholder', 'list']) {
+        if (to.getAttribute(name) !== from.getAttribute(name)) {
+          if (from.hasAttribute(name)) to.setAttribute(name, from.getAttribute(name)); else to.removeAttribute(name);
+        }
+      }
+    }
+    return true;
+  }
+
+  // a change that adds or takes away controls draws the tab anew, a task later: on touch the old field's change
+  // comes inside the next tap, before focus moves, so drawn at once the tab lost the field tapped. What was typed
+  // into the focused field and not yet committed is kept with its caret.
+  let rebuilding = null;
+  function rebuildSoon() {
+    clearTimeout(rebuilding);
+    rebuilding = setTimeout(() => {
+      const el = $('tab-' + tab);
+      const a = document.activeElement;
+      const typed = typedIn(a) && a === dirty && el.contains(a) ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, key: controlKey(a) } : null;
+      showTab(tab);
+      const b = document.activeElement;
+      if (typed && typedIn(b) && controlKey(b) === typed.key && b.value !== typed.value) {
+        b.value = typed.value;
+        dirty = b;
+        try { b.setSelectionRange(typed.from, typed.to); } catch (e) { /* a number field has no caret */ }
+      }
+    }, 0);
+  }
+
+  // a control's place in a tab, the same in the tab drawn anew: its row's label, its own, its place in the row
+  function controlKey(c) {
+    const row = c.closest('.row, li, p');
+    const what = row && row.querySelector('.what');
+    const inRow = row ? [...row.querySelectorAll(CONTROLS)].indexOf(c) : -1;
+    return c.tagName + '|' + (what ? what.textContent : '') + '|' + (c.getAttribute('aria-label') || '') + '|' + inRow + '|' + (what ? '' : c.textContent || c.type);
+  }
+
+  // 改成自己的底行 (§12.3): asked, then the fragment's rows copied in
+  async function ownBottom(include) {
+    const d = $('own-panel');
+    d.returnValue = '';
+    d.showModal();
+    const before = LE.parse(xmlNow()).includes[include];
+    const answer = await new Promise((ok) => d.addEventListener('close', () => ok(d.returnValue), { once: true }));
+    if (answer !== 'yes') return;
+    // the text changed while asked (an undo, the source): the include is another or gone
+    const inc = LE.parse(xmlNow()).includes[include];
+    const text = inc && before && inc.a.src === before.a.src ? source(inc.a.src) : null;
+    if (!text) return toast('底行已经不在了');
+    const id = fragmentKey && fragmentKey.id;
+    fragmentKey = null;
+    sel = [];
+    set(LE.ownRows(xmlNow(), include, text));
+    const at = id && LE.locate(xmlNow(), id, drawnIds);
+    if (at) { sel = [withId(at)]; fill(); paintShown(); }
+  }
+
+  // where 加键 puts a key: left of the one selected, else at the end of the row 行 chose, else of the last row
+  function insertAt(p) {
+    if (sel.length === 1) return sel[0];
+    const row = rowTarget >= 0 ? rowTarget : p.rows.length - 1;
+    return row >= 0 ? { row, index: p.rows[row].cells.length } : null;
+  }
+  function add(text) {
+    const xml = xmlNow();
+    const at = insertAt(LE.parse(xml));
+    if (!at) return toast('先加一行（「行」）');
+    edit(LE.insert(xml, at, LE.withFreeId(xml, text, source)), at);
+  }
+
+  function palette(p) {
+    const i = LM.info(xmlNow()) || {};
+    const base = i.basedOn && FORMAT.bases.includes(i.basedOn) ? i.basedOn : null;
+    const texts = base ? [source(base), ...LE.parse(source(base) || '').includes.map((x) => source(x.a.src))].filter(Boolean) : [];
+    const letters = field('', () => {}, { placeholder: 'q 或 we', maxlength: 5, 'aria-label': '字母', autocapitalize: 'off' });
+    const text = field('', () => {}, { placeholder: '一段文字', maxlength: 32, 'aria-label': '字符键打出的文字' });
+    const where = insertAt(p);
+    const fns = line('功能键', ...LE.functionKeys(texts).map((f) => button(f.label, () => add(f.text), { title: f.id })));
+    fns.dataset.key = base || '';
+    return [
+      h('h3', {}, '加键'),
+      h('p', { className: 'muted' }, sel.length === 1 ? '加在选中的键左边' : where ? '加在第 ' + (where.row + 1) + ' 行末尾' : '还没有行'),
+      line('字母键', letters, button('加', () => {
+        const v = letters.value.trim().toLowerCase();
+        const why = LE.lettersProblem(v);
+        if (why) return toast(why);
+        add(LE.letterKey(xmlNow(), v, source));
+      })),
+      line('字符键', text, button('加', () => { if (text.value) add(LE.charKey(xmlNow(), text.value, source)); })),
+      fns,
+      line('空位', button('加空位', () => add('<gap/>'))),
+    ];
+  }
+
+  // the group bar (§12.3): a–z, a letter no key types red, one two keys type yellow
+  function groupBar() {
+    const n = LE.coverage(xmlNow());
+    return h('div', { className: 'groups', 'aria-label': '分组字母' }, ...'abcdefghijklmnopqrstuvwxyz'.split('').map((ch) =>
+      h('span', { className: !n[ch] ? 'missing' : n[ch] > 1 ? 'twice' : '', title: !n[ch] ? '没有键打这个字母' : n[ch] > 1 ? n[ch] + ' 个键打这个字母' : '' }, ch)));
+  }
+
+  function iconPreview(name) {
+    // its data-key the icon: a canvas is put in anew only where it shows another (its pixels are not compared)
+    const c = h('canvas', { width: 48, height: 48, className: 'icon', 'data-key': name || '' });
+    // the muted ink: seen on the light and the dark page alike
+    if (hasOwn(ICONS, name)) E.paintIcon(c.getContext('2d'), { icons: ICONS }, name, 8, 8, 32, '#ff808890', 0);
+    return c;
+  }
+
+  const KINDS = [['', '默认'], ['letter', '字母键'], ['function', '功能键'], ['space', '空格'], ['enter', '回车']];
+  const LABELS = [['none', '不显示字'], ['text', '文字'], ['case', '随 Shift 大小写'], ['punct', '按标点转换'], ['other', '绑定（照写）']];
+  // where a long press comes from, a <popup> not a list of its own (§19.2)
+  const POPUP_FROM = { preset: '底稿里同 id 的键', nine: '九键的数字（from="nine"）', group: '键上的分组字母（from="group"）', none: '没有：长按不弹（from="none"）' };
+
+  function keyTab(p) {
+    const out = [];
+    const xml = xmlNow();
+    if (fragmentKey) {
+      const inc = p.includes[fragmentKey.include];
+      out.push(h('p', {}, '「' + fragmentKey.id + '」在 App 的底行里（' + (inc ? inc.a.src : '') + '）：App 改底行，这里跟着变。'),
+        button('改成这块键盘自己的底行…', () => ownBottom(fragmentKey.include)));
+    } else if (!sel.length) {
+      out.push(h('p', { className: 'muted' }, '点预览里的键选中它；Shift/Ctrl 点多选；预览有焦点时方向键换键、Delete 删除。拖键换位置，拖选中键的右边缘改宽度；手机上长按 0.3 秒再拖。'));
+    } else if (sel.length > 1) {
+      out.push(...manyKeys(p));
+    } else {
+      out.push(...oneKey(p, sel[0], LE.cellAt(p, sel[0]), xml));
+    }
+    // the selection's part: its handlers made for these keys, put in whole when they are others
+    const mine = h('div', { 'data-key': fragmentKey ? 'f:' + fragmentKey.id + ':' + fragmentKey.include : 'k:' + sel.map((s) => s.row + '.' + s.index).join(' ') }, ...out);
+    return [mine, ...palette(p)];
+  }
+
+  function manyKeys(p) {
+    const cells = sel.map((at) => LE.cellAt(p, at));
+    const family = (LM.info(xmlNow()) || {}).family;
+    const setAll = (values) => {
+      let xml = xmlNow();
+      for (const at of sel) xml = LE.setAttrs(xml, at, values);
+      edit(xml);
+    };
+    const canMerge = family === 'letters' && cells.every(LE.lettersOf);
+    return [
+      h('h3', {}, '选了 ' + sel.length + ' 个'),
+      line('宽度', field('', (v) => setAll({ width: v.trim() }), { type: 'number', min: 0.5, max: 100, step: 0.5, placeholder: '单位', 'aria-label': '宽度' })),
+      line('种类', choice(KINDS, '', (v) => setAll({ kind: v || null }), { 'aria-label': '种类' })),
+      canMerge && line('合并', button('合并成一个分组键', () => {
+        const r = LE.merge(xmlNow(), sel, source);
+        if (r.error) return toast(r.error);
+        edit(r.xml, r.at);
+        toast(LE.MERGED);
+      })),
+      line('', button('删除这些', removeSelected)),
+    ];
+  }
+
+  function removeSelected() {
+    let xml = xmlNow();
+    for (const at of sel.slice().sort((a, b) => b.row - a.row || b.index - a.index)) xml = LE.remove(xml, at);
+    edit(xml, null);
+  }
+
+  function oneKey(p, at, c, xml) {
+    const set1 = (values) => edit(LE.setAttrs(xmlNow(), at, values));
+    // the key as written now: a handler kept over a change reads it, not what the tab was drawn from
+    const now = () => (LE.cellAt(parsed(), at) || { a: {} }).a;
+    const go = (r) => edit(r.xml, r.at);
+    const moves = line('位置',
+      button('←', () => go(LE.step(xmlNow(), at, -1, 0)), { 'aria-label': '左移' }),
+      button('→', () => go(LE.step(xmlNow(), at, 1, 0)), { 'aria-label': '右移' }),
+      button('上一行', () => go(LE.step(xmlNow(), at, 0, -1))),
+      button('下一行', () => go(LE.step(xmlNow(), at, 0, 1))),
+      button('删除', () => edit(LE.remove(xmlNow(), at), null)));
+    const a = c.a;
+    const columns = columnsOf(xml);
+    const width = LE.widthOf(xml, p, c);
+    const fill = width === 'fill';
+    const units = fill ? '' : width;
+    const slider = h('input', { type: 'range', min: columns === 100 ? 1 : 0.5, max: Math.min(100, columns), step: columns === 100 ? 1 : 0.5, value: units || 1, disabled: fill, 'aria-label': '宽度滑块',
+      onchange: (e) => set1({ width: e.target.value }) });
+    const widths = line('宽度', field(a.width === 'fill' ? '' : a.width, (v) => set1({ width: v.trim() }), { type: 'number', min: 0, max: 100, step: 0.5, placeholder: units || '默认', disabled: fill, 'aria-label': '宽度' }),
+      h('label', { className: 'inline' }, h('input', { type: 'checkbox', checked: fill, onchange: (e) => set1({ width: e.target.checked ? 'fill' : null }) }), '占满'), slider);
+    const out = [h('h3', {}, (c.name === 'key' ? '键 ' : c.name === 'gap' ? '空位 ' : '位置 ') + (a.id || '')), moves, widths];
+    if (c.name !== 'key') return out;
+    const shared = LE.sharedName(a, FORMAT.prefixes);
+    const label = LE.labelParts(a.label);
+    // the label's text written with the kind chosen beside it; braces only as a binding (照写): refused, said why
+    const writeLabel = (type, arg) => {
+      const why = LE.labelProblem(type, arg);
+      if (why) return toast(why);
+      set1({ label: LE.labelText(type, arg) });
+    };
+    const labelInput = field(label.arg, (v) => writeLabel(labelKind.value, v), { 'aria-label': '显示的字', maxlength: 32, disabled: label.type === 'none' });
+    const labelKind = choice(LABELS, label.type, (v) => { labelInput.disabled = v === 'none'; writeLabel(v, labelInput.value); }, { 'aria-label': '显示的字是' });
+    const icons = [['', '无'], ...Object.keys(ICONS).sort().map((n) => [n, n])];
+    const iconName = a.icon && !/[{}]/.test(a.icon) ? a.icon : '';
+    out.push(
+      line('名字', h('code', {}, a.shortcut || '（没有，跟底稿同 id 的键）')),
+      line('显示的字', labelKind, labelInput),
+      line('图标', a.icon && !iconName ? h('code', {}, a.icon) : choice(icons, iconName, (v) => set1({ icon: v || null }), { 'aria-label': '图标' }), iconPreview(iconName)),
+      line('读屏念', field(a.a11y, (v) => set1({ a11y: v }), { 'aria-label': '读屏念什么', maxlength: 32 }),
+        a.icon && !a.label && !a.a11y ? h('span', { className: 'bad' }, '图标键必填') : null),
+      line('跨行', field(a.rows, (v) => set1({ rows: v === '1' ? null : v }), { type: 'number', min: 1, max: 4, step: 1, placeholder: '1', 'aria-label': '跨几行' })),
+      line('种类', choice(KINDS, a.kind || '', (v) => set1({ kind: v || null }), { 'aria-label': '种类' })),
+    );
+    if (a.letters || (LM.info(xml) || {}).family === 'grouped') {
+      out.push(groupBar(), line('分组字母', field(a.letters, (v) => {
+        const l = v.trim().toLowerCase();
+        if (l && LE.lettersProblem(l.replace(/ /g, ''))) return toast(LE.lettersProblem(l.replace(/ /g, '')));
+        set1({ letters: l || null, lean: l ? now().lean : null });
+      }, { 'aria-label': '分组字母', autocapitalize: 'off' })));
+      if (a.letters) out.push(line('落点', choice([['', '默认'], ['on', '偏向按到的字母'], ['off', '不偏']], a.lean || '', (v) => set1({ lean: v || null }), { 'aria-label': 'lean' })));
+    }
+    out.push(h('h3', {}, '动作'));
+    if (shared) out.push(h('p', { className: 'muted' }, shared));
+    else out.push(h('p', { className: 'muted' }, '这里写的是默认值：用户在 App 里改过的以用户的为准。'));
+    for (const [name, what] of LE.ACTIONS) {
+      const ap = LE.actionParts(a[name]);
+      const off = !!shared && name !== 'send';
+      const arg = field(ap.arg, (v) => set1({ [name]: LE.actionText(kind.value, v) }), { disabled: off || !ap.type, 'aria-label': what + '的参数', list: 'action-args-' + (ap.type || 'none') });
+      const kind = choice(LE.ACTION_TYPES, ap.type, (v) => {
+        arg.disabled = !v;
+        arg.setAttribute('list', 'action-args-' + (v || 'none'));
+        // a kind chosen waits for its parameter: written once there is one
+        if (!v || arg.value) set1({ [name]: v ? LE.actionText(v, arg.value) : null });
+        else arg.focus();
+      }, { disabled: off, 'aria-label': what });
+      out.push(line(what, kind, arg));
+    }
+    // the long press: a list of its own edited here; one from elsewhere said where, and a list written replaces it
+    const pop = LE.popupOf(xml, at);
+    const list = pop && pop.from === 'list';
+    if (pop && !list) {
+      out.push(h('p', { className: 'muted' }, '这个键的长按来自' + (pop.from === 'preset' && pop.preset ? '键 ' + pop.preset : POPUP_FROM[pop.from] || pop.from) + '；在下面写列表会换成自己的。'));
+    }
+    out.push(line('长按列表', field(list ? pop.items.map((x) => x.text).join(' ') : '', (v) => edit(LE.setPopup(xmlNow(), at, v.split(/\s+/).filter(Boolean))),
+      { disabled: !!shared, placeholder: list || !pop ? '空格分开，如 ， 。 ？' : '写了就换掉上面说的', 'aria-label': '长按列表' })));
+    return out;
+  }
+
+  function rowTab(p) {
+    const list = h('ol', { className: 'parts' });
+    p.parts.forEach((part, i) => {
+      const moves = [button('↑', () => edit(LE.movePart(xmlNow(), i, i - 1)), { disabled: i === 0, 'aria-label': '上移' }),
+        button('↓', () => edit(LE.movePart(xmlNow(), i, i + 2)), { disabled: i === p.parts.length - 1, 'aria-label': '下移' })];
+      let item;
+      if (part.include) {
+        item = h('li', { 'data-key': i + ':' + part.include.a.src }, h('span', { className: 'handle', 'aria-hidden': 'true' }, '☰'), 'App 的底行（' + part.include.a.src + '）', ...moves,
+          button('改成自己的…', () => ownBottom(part.include.index)));
+      } else {
+        const r = part.row;
+        const ra = r.a;
+        item = h('li', { className: rowTarget === r.index || (sel.length === 1 && sel[0].row === r.index) ? 'on' : '', 'data-key': i + ':' + r.index },
+          h('span', { className: 'handle', 'aria-hidden': 'true' }, '☰'),
+          button('第 ' + (r.index + 1) + ' 行 · ' + r.cells.length + ' 个', () => { rowTarget = r.index; sel = []; fragmentKey = null; fill(); paintShown(); }),
+          h('label', { className: 'inline' }, '行高', field(ra.height, (v) => edit(LE.setRow(xmlNow(), r.index, { height: v === '1' ? null : v })), { type: 'number', min: 0.1, max: 4, step: 0.1, placeholder: '1', 'aria-label': '行高' })),
+          h('label', { className: 'inline' }, '缩进', field(ra.indent, (v) => edit(LE.setRow(xmlNow(), r.index, { indent: v === '0' ? null : v })), { type: 'number', min: 0, max: 100, step: 0.5, placeholder: '0', 'aria-label': '缩进' })),
+          ...moves,
+          button('删除', () => edit(LE.removePart(xmlNow(), i), null)));
+      }
+      // the handle: drag the row to another place
+      const handle = item.querySelector('.handle');
+      handle.draggable = true;
+      handle.addEventListener('dragstart', (e) => { draggedPart = i; e.dataTransfer.setData('text/plain', String(i)); });
+      item.addEventListener('dragover', (e) => e.preventDefault());
+      item.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const from = draggedPart;
+        draggedPart = -1;
+        if (from >= 0 && from !== i) edit(LE.movePart(xmlNow(), from, from < i ? i + 1 : i));
+      });
+      list.append(item);
+    });
+    return [
+      h('p', { className: 'muted' }, '拖 ☰ 或用 ↑↓ 换行序；点「第 n 行」后，加键加在那一行末尾。'),
+      list,
+      button('加一行', addRow),
+    ];
+  }
+
+  // 加一行: after the row selected (a key's or 行's), else above the app's bottom row, else last
+  function addRow() {
+    const xml = xmlNow();
+    const p = LE.parse(xml);
+    const row = sel.length ? sel[sel.length - 1].row : rowTarget;
+    let part;
+    if (row >= 0 && row < p.rows.length) part = LE.partOfRow(xml, row) + 1;
+    else for (part = p.parts.length; part > 0 && p.parts[part - 1].include;) part--;
+    const out = LE.addRow(xml, part, '<gap/>');
+    rowTarget = p.parts.slice(0, part).filter((x) => x.row).length;
+    edit(out, null);
+    toast('加了第 ' + (rowTarget + 1) + ' 行（先放了一个空位，加了键后可以删掉它）：去「键」加键');
+  }
+
+  function boardTab() {
+    const xml = xmlNow();
+    const a = keyboardAttrs(xml);
+    const setK = (name, v) => edit(LM.setKeyboard(xmlNow(), name, v === '' ? null : v));
+    const out = [
+      line('名字', field(a.name, (v) => { const why = LM.nameProblem(v, FORMAT); if (why) return toast(why); setK('name', v.trim()); }, { maxlength: FORMAT.limits.name, 'aria-label': '名字' })),
+      line('id', h('code', {}, a.id || '')),
+      line('种类', choice(FORMAT.families.map((f) => [f, LM.FAMILY_LABEL[f] || f]), a.family, (v) => setK('family', v), { 'aria-label': 'family' })),
+      line('底稿', choice(FORMAT.bases.map((b) => [b, LM.BASE_LABEL[b] || b]), a['based-on'], (v) => setK('based-on', v), { 'aria-label': '底稿' })),
+      line('列数', field(a.columns, (v) => setK('columns', v), { type: 'number', min: 1, max: 100, step: 1, placeholder: '10', 'aria-label': '列数' })),
+      line('分体时', choice([['', '默认（放在一边）'], ['split', '分成两半'], ['side', '放在一边'], ['none', '不分']], a['on-split'] || '', (v) => setK('on-split', v), { 'aria-label': '分体方式' })),
+    ];
+    if (a.family === 'number') {
+      const pads = (x) => new Set((keyboardAttrs(x).pads || '').split(' ').filter(Boolean));
+      const on = pads(xml);
+      out.push(line('数字键盘', ...FORMAT.pads.map((pad) => h('label', { className: 'inline' }, h('input', { type: 'checkbox', checked: on.has(pad), onchange: (e) => {
+        // the pads as written now: a box kept over a change has not the set it was drawn with
+        const now = pads(xmlNow());
+        if (e.target.checked) now.add(pad); else now.delete(pad);
+        setK('pads', FORMAT.pads.filter((x) => now.has(x)).join(' '));
+      } }), LM.PAD_LABEL[pad] || pad))));
+    }
+    if (a.family === 'grouped') out.push(h('h3', {}, '分组字母'), groupBar());
+    return out;
+  }
+
+  function metaTab() {
+    const m = (LM.info(xmlNow()) || { meta: {} }).meta;
+    const setM = (name) => (v) => edit(LM.setMeta(xmlNow(), name, v.trim()));
+    return [
+      line('作者', field(m.author, setM('author'), { maxlength: 64, 'aria-label': '作者' })),
+      line('版本', field(m.version, setM('version'), { maxlength: 64, 'aria-label': '版本' })),
+      line('许可', field(m.license, setM('license'), { maxlength: 64, placeholder: '如 CC-BY-4.0', 'aria-label': '许可' })),
+      line('说明', field(m.description, setM('description'), { maxlength: 200, 'aria-label': '说明' })),
+      line('最低 App', h('code', {}, m['min-app'] || '（保存时写）')),
+    ];
   }
 
   // ---- files ----
@@ -273,8 +989,33 @@
       else if (act === 'open') openFile();
       else if (act === 'save') save();
     });
-    $('undo').addEventListener('click', () => { if (history.canUndo) { history.undo(); edited = true; changed(); } });
-    $('redo').addEventListener('click', () => { if (history.canRedo) { history.redo(); edited = true; changed(); } });
+    for (const b of $('tabs').children) b.addEventListener('click', () => showTab(b.dataset.tab));
+    const canvas = $('preview');
+    canvas.addEventListener('pointerdown', pointerDown);
+    canvas.addEventListener('pointermove', pointerMove);
+    canvas.addEventListener('pointerup', pointerUp);
+    canvas.addEventListener('pointercancel', () => { if (press) clearTimeout(press.timer); press = null; paintShown(); });
+    // a finger dragging a key or its edge: the page not scrolled under it (touch-action pan-y lets a swipe scroll)
+    canvas.addEventListener('touchmove', (e) => { if (press && (press.mode === 'move' || press.mode === 'width')) e.preventDefault(); }, { passive: false });
+    canvas.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') select(null, false);
+      else stepSelection(e);
+    });
+    // Delete takes the selected keys out where the preview has the focus (or nothing has), never under 源码
+    document.addEventListener('keydown', (e) => {
+      if ((e.key !== 'Delete' && e.key !== 'Backspace') || !history || !sel.length || tab === 'source' || document.querySelector('dialog[open]')) return;
+      if (e.target !== canvas && e.target !== document.body) return;
+      e.preventDefault();
+      removeSelected();
+    });
+    $('undo').addEventListener('click', () => { if (history.canUndo) { history.undo(); edited = true; changed(true); } });
+    $('redo').addEventListener('click', () => { if (history.canRedo) { history.redo(); edited = true; changed(true); } });
+    $('edit').addEventListener('input', (e) => { if (typedIn(e.target)) dirty = e.target; });
+    $('edit').addEventListener('change', (e) => { if (e.target === dirty) dirty = null; }, true);
+    // typed back to what it was: no change event, so the field is let go on leaving it
+    let focusValue = null;
+    $('edit').addEventListener('focusin', (e) => { focusValue = e.target.value; });
+    $('edit').addEventListener('focusout', (e) => { if (e.target === dirty && e.target.value === focusValue) dirty = null; });
     // the source read again a moment after typing stops: the checker builds every scene, not on every key
     let typing = null;
     document.addEventListener('keydown', (e) => {
@@ -282,16 +1023,25 @@
       const k = e.key.toLowerCase();
       if (e.target === $('source')) {
         // the textarea's own undo inside it; 保存 there takes what is typed now, not what the pause last read
-        if (k === 's') { e.preventDefault(); clearTimeout(typing); set($('source').value); save(); }
+        if (k === 's') { e.preventDefault(); clearTimeout(typing); set($('source').value, { external: true }); save(); }
         return;
       }
+      // a field typed in has its own undo; 保存 there commits what is typed first (a select, a box, a slider: no undo
+      // of their own, the layout's is theirs)
+      if (k === 's' && e.target.closest('input, textarea, select')) {
+        e.preventDefault();
+        if (typedIn(e.target)) e.target.blur();
+        save();
+        return;
+      }
+      if (typedIn(e.target)) return;
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); $('redo').click(); } else if (k === 's') { e.preventDefault(); save(); }
     });
     $('source').addEventListener('input', () => {
       clearTimeout(typing);
-      typing = setTimeout(() => set($('source').value), 300);
+      typing = setTimeout(() => set($('source').value, { external: true }), 300);
     });
-    $('source').addEventListener('change', () => { clearTimeout(typing); set($('source').value); });
+    $('source').addEventListener('change', () => { clearTimeout(typing); set($('source').value, { external: true }); });
 
     for (const b of FORMAT.bases) {
       const btn = document.createElement('button');

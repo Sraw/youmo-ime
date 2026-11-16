@@ -7,7 +7,13 @@
 
   // the comments of [xml] blanked (same length), so what is looked for is never found inside one
   const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '));
-  const unescape = (v) => v.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  // one pass, so &amp;#65; stays the text &#65;; a character reference as the reader takes it (an out-of-range one left)
+  const NAMED = { quot: '"', apos: "'", lt: '<', gt: '>', amp: '&' };
+  const unescape = (v) => v.replace(/&(?:#(\d+)|#x([0-9a-fA-F]+)|(quot|apos|lt|gt|amp));/g, (all, dec, hex, name) => {
+    if (name) return NAMED[name];
+    const n = dec ? Number(dec) : parseInt(hex, 16);
+    return n <= 0x10ffff ? String.fromCodePoint(n) : all;
+  });
   const escape = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const ATTR = /([\w:-]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
 

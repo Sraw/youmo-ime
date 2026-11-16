@@ -368,7 +368,7 @@
 
   root.YoumoLayoutMaker = {
     BASE_LABEL, FAMILY_LABEL, PAD_LABEL, IMES, SHIFTS, FIELDS, FORMS, AT, ENV, WORDS,
-    words, findings, info, setKeyboard, setMeta, idProblem, nameProblem, suggested, fromBuiltin, openText, fileName, saveCheck,
+    words, findings, info, withAttr, setKeyboard, setMeta, idProblem, nameProblem, suggested, fromBuiltin, openText, fileName, saveCheck,
     restoreEnv, shape, envJson, check, lineOfKey,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -64,6 +64,8 @@ test('values are written escaped and read back as written', () => {
   const out = F.setProp(BASE, 'key', 'fill', 'a"b<c&');
   assert.ok(out.includes('fill="a&quot;b&lt;c&amp;"'));
   assert.equal(F.valueOf(out, 'key', 'fill'), 'a"b<c&');
+  // character references read as the XML reader reads them, in one pass (&amp;#65; is the text &#65;)
+  assert.equal(F.unescape('&#65;&#x4e2d;&amp;#66;&lt;&apos;&#x110000;'), 'A中&#66;<\'&#x110000;');
 });
 
 test('colours: changed, added, taken out, a dark version made of the light one and dropped', () => {

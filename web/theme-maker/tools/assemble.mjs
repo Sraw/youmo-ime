@@ -137,7 +137,7 @@ export function assemble(src = join(root, 'src'), engine = null, fonts = join(ro
   const fill = (values) => page.replace(/\{\{([\w-]+)\}\}/g, (all, slot) => (slot in values ? values[slot] : all));
   // the CSP lets only these run: each script element's text, as the browser hashes it
   const filled = fill(text);
-  const hashes = [...filled.matchAll(/<script id="youmo-(?:lib|ui|engine|maker|form|panels|layout-maker)">([\s\S]*?)<\/script>/g)]
+  const hashes = [...filled.matchAll(/<script id="youmo-(?:lib|ui|engine|maker|form|panels|layout-maker|layout-edit)">([\s\S]*?)<\/script>/g)]
     .map((m) => "'sha256-" + createHash('sha256').update(m[1]).digest('base64') + "'");
   const scripts = [...filled.matchAll(/<script(?![^>]*type="application\/json")[^>]*>/g)].length;
   if (hashes.length !== scripts) throw new Error('a script not hashed: ' + hashes.length + ' of ' + scripts);

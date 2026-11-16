@@ -1,7 +1,11 @@
 // The layout maker in a real browser (061-custom-layout §12): 新建 from a board, the preview and its environment bar
 // (横屏 derived, the number pads), the source read again on typing, a problem's click to its line, undo, 保存 (min-app
 // written, the file named; Ctrl+S in the source), a text past the size limit, and the draft offered back (its
-// environment too; one that does not open offered to be dropped). CI runs it with the runner's Chrome, as panels-smoke.mjs.
+// environment too; one that does not open offered to be dropped); the editing (W2): a key selected and outlined, moved
+// by the buttons and dragged (a finger only after 300 ms), its width by its right edge, a character key added, its
+// actions (a shared name's read-only), keys merged into a group, the app's bottom row made the layout's own, rows,
+// 整块, 信息, the page at a phone's 360 px; by the keyboard (Delete, the arrows, Ctrl+Z in a field the field's), a field
+// kept focused over its commit, the selection following its key over an undo, a finger's tap and swipe. CI runs it with the runner's Chrome, as panels-smoke.mjs.
 // Run: node web/theme-maker/test/layout-smoke.mjs [chromium]   (SHOT=<file.png>: the page's picture saved there)
 // Exit 0 all kept, 1 not, 2 not run (no Chromium).
 import { writeFileSync } from 'node:fs';
@@ -89,7 +93,7 @@ async function main() {
     await type(`(t) => t.replace('<row>', '<row>\\n    <nope/>')`);
     const listed = await js(`[...document.querySelectorAll('#problems li.error')].map((li) => li.textContent)`);
     check(listed.length > 0 && listed.some((t) => /第 \d+ 行/.test(t)), 'an error typed in is listed with its line: ' + listed[0]);
-    await js(`[...document.querySelectorAll('#problems li.error')].find((li) => /第 \\d+ 行/.test(li.textContent)).click()`);
+    await js(`[...document.querySelectorAll('#problems li.error')].find((li) => /第 \\d+ 行/.test(li.textContent)).querySelector('button').click()`);
     const selected = await js(`(() => { const t = document.getElementById('source'); return t.value.slice(t.selectionStart, t.selectionEnd); })()`);
     check(/nope/.test(selected), 'its click selects the line: ' + selected.trim());
     await js(`document.getElementById('undo').click()`);
@@ -161,6 +165,265 @@ async function main() {
     await until(`!!document.getElementById('new-panel')?.open`, 'no 新建 after a draft that does not open', 15000);
     check(/^草稿打不开/.test(await js(`window.__asked || ''`)), 'a draft that does not open: asked to drop it: ' + (await js(`window.__asked || ''`)));
     check((await js(`window.YoumoMaker.draft(window.YoumoMaker.idbStore(indexedDB, 'youmo-layout-maker'))`)) === null, 'and dropped');
+
+    // ---- the editing (W2, §12.3, §12.5) ----
+    await js(`document.querySelector('#file-menu [data-act=new]').click()`);
+    await make('qwerty', 'my-qwerty');
+    await wait(300);
+    const fresh = await source();
+    // a key's middle in the page's pixels, by the scene the page draws (the bounds do not hang on the fonts)
+    const at = (id, dx = 0.5) => js(`(() => {
+      const E = window['youmo-engine'].YoumoEngine, LM = window.YoumoLayoutMaker;
+      const t = document.getElementById('source').value;
+      const r = LM.check(E, t, LM.ENV, E.readTheme(E.themeSource('material'), null, null).theme, E.fixedMeasurer(), E.layoutFormat().version);
+      const k = r.scene.json().keys.find((x) => x.id === ${JSON.stringify(id)});
+      const c = document.getElementById('preview'), rc = c.getBoundingClientRect(), s = rc.width / c.width;
+      return { x: rc.left + (k.bounds[0] + (k.bounds[2] - k.bounds[0]) * ${dx}) * s, y: rc.top + (k.bounds[1] + k.bounds[3]) / 2 * s, cx: k.bounds[0] + 4, cy: (k.bounds[1] + k.bounds[3]) / 2 };
+    })()`);
+    const mouse = async (type, p, modifiers = 0) => b.send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1, modifiers });
+    const click = async (id, modifiers = 0) => { const p = await at(id); await mouse('mousePressed', p, modifiers); await mouse('mouseReleased', p, modifiers); await wait(150); };
+    const drag = async (from, to) => {
+      await mouse('mousePressed', from);
+      for (let i = 1; i <= 5; i++) await mouse('mouseMoved', { x: from.x + (to.x - from.x) * i / 5, y: from.y + (to.y - from.y) * i / 5 });
+      await mouse('mouseReleased', to);
+      await wait(400);
+    };
+    const rowIds = (n) => js(`window.YoumoLayoutEdit.parse(document.getElementById('source').value).rows[${n}].cells.map((c) => c.a.id).join(' ')`);
+    const keyTab = () => js(`document.getElementById('tab-key').textContent`);
+    const press = (text) => js(`[...document.querySelectorAll('#edit button')].find((x) => x.textContent === ${JSON.stringify(text)} || x.getAttribute('aria-label') === ${JSON.stringify(text)}).click()`);
+
+    await click('q');
+    check(/键 q/.test(await keyTab()), 'a click on Q selects it: its panel');
+    const q = await at('q');
+    const px = await js(`Array.from(document.getElementById('preview').getContext('2d').getImageData(${q.cx}, ${q.cy}, 1, 1).data).slice(0, 3).join(',')`);
+    check(px === '59,111,216', 'the selected key outlined in the accent: ' + px);
+    await press('右移');
+    await wait(300);
+    check((await rowIds(0)).startsWith('w q e'), '→ moves it right: ' + await rowIds(0));
+    await drag(await at('q'), await at('a', 0.1));
+    check((await rowIds(1)).startsWith('q a s') && (await rowIds(0)).startsWith('w e'), 'Q dragged before A: ' + await rowIds(1));
+    await press('上一行');
+    await wait(300);
+    check((await rowIds(0)).endsWith('p q'), '上一行: at the end of the row above: ' + await rowIds(0));
+    await js(`document.getElementById('undo').click(); document.getElementById('undo').click(); document.getElementById('undo').click()`);
+    check((await source()) === fresh, 'undone three times: as it was');
+
+    // its width by its right edge, snapped to half a unit
+    await click('w');
+    const w0 = await at('w', 0.98);
+    const unit = (await at('e')).x - (await at('w')).x;
+    await drag(w0, { x: w0.x + unit * 0.55, y: w0.y });
+    check(/<key id="w"[^>]* width="1\.5"/.test(await source()), 'W\'s right edge dragged half a key: width="1.5": ' + /<key id="w"[^>]*>/.exec(await source())[0]);
+    await js(`document.getElementById('undo').click()`);
+
+    // a shared name: its actions but the tap read-only, said why
+    await click('e');
+    const shared = await js(`[document.getElementById('tab-key').textContent, document.querySelector('#tab-key select[aria-label=长按]').disabled, document.querySelector('#tab-key select[aria-label=点按]').disabled]`);
+    check(/跟内置的26 键 E，在 App 的按键字符和快捷键里改/.test(shared[0]) && shared[1] && !shared[2], 'E (full/e): its long press read-only, said why; its tap not');
+
+    // 加键: a character key left of E, its own name; its long press its layout's
+    await js(`(() => { const i = document.querySelector('#tab-key input[aria-label=字符键打出的文字]'); i.value = '你好'; })()`);
+    await js(`[...document.querySelectorAll('#tab-key button')].filter((x) => x.textContent === '加')[1].click()`);
+    await wait(300);
+    check(/<key id="c1" label="你好" send="commit:你好" shortcut="my-qwerty\/c1"\/>/.test(await source()) && (await rowIds(0)).startsWith('q w c1 e'), '字符键 加 left of E, its own name: ' + await rowIds(0));
+    await js(`(() => { const s = document.querySelector('#tab-key select[aria-label=长按]'); s.value = 'commit'; s.dispatchEvent(new Event('change')); })()`);
+    await wait(200);
+    await js(`(() => { const i = document.querySelector('#tab-key input[aria-label=长按的参数]'); i.value = '您好'; i.dispatchEvent(new Event('change')); })()`);
+    await wait(300);
+    check(/<key id="c1"[^>]* long-press="commit:您好"/.test(await source()), 'its long press set: commit:您好');
+    await js(`(() => { const i = document.querySelector('#tab-key input[aria-label=长按列表]'); i.value = '你 好'; i.dispatchEvent(new Event('change')); })()`);
+    await wait(300);
+    check(/<popup from="list"><item text="你"\/><item text="好"\/><\/popup>/.test(await source()), 'its long-press list written');
+    await press('删除');
+    await wait(300);
+    check(!/id="c1"/.test(await source()), '删除 takes it out');
+
+    // 合并: Q and W one group key, the board grouped, said what it means
+    await js(`document.getElementById('source').value = ${JSON.stringify(fresh)}`);
+    await js(`document.getElementById('source').dispatchEvent(new Event('change'))`);
+    await wait(500);
+    await click('q');
+    await click('w', 8);
+    await press('合并成一个分组键');
+    await wait(500);
+    const merged = await source();
+    check(/family="grouped"/.test(merged) && /<key id="qw" label="\{group:qw\}" letters="qw" shortcut="my-qwerty\/qw" width="2"\/>/.test(merged) && /变成分组键盘/.test(await js(`document.getElementById('toast').textContent`)),
+      '合并 Q W: one group key, the board grouped, the note shown');
+    check(/^0 个错误/.test(await count()) || (await count()) === '没有', 'merged: no errors: ' + (await count()));
+
+    // the keyboard: several keys selected and taken out by 删除这些, one by Delete on the preview, none by Backspace in a
+    // field; the arrows move the selection; Ctrl+Z in a field is the field's
+    const keyPress = async (k, code, vk, modifiers = 0) => {
+      for (const type of ['keyDown', 'keyUp']) await b.send('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers });
+      await wait(250);
+    };
+    const reset = async () => {
+      await js(`document.getElementById('source').value = ${JSON.stringify(fresh)}`);
+      await js(`document.getElementById('source').dispatchEvent(new Event('change'))`);
+      await wait(500);
+    };
+    await reset();
+    await click('q');
+    await click('w', 8);
+    await press('删除这些');
+    await wait(300);
+    check((await rowIds(0)).startsWith('e r t'), '删除这些: Q and W taken out: ' + await rowIds(0));
+    // (a letter board without them is refused, nothing drawn: back first)
+    await js(`document.getElementById('undo').click()`);
+    await wait(300);
+    await click('e');
+    check((await js(`document.activeElement.id`)) === 'preview', 'the preview takes the focus on a click');
+    await keyPress('Delete', 'Delete', 46);
+    check((await rowIds(0)).startsWith('q w r t'), 'Delete on the preview: E taken out: ' + await rowIds(0));
+    await js(`document.getElementById('undo').click()`);
+    await wait(300);
+    await click('r');
+    await js(`document.querySelector('#tab-key input[aria-label=字母]').focus()`);
+    await keyPress('Backspace', 'Backspace', 8);
+    check((await rowIds(0)).startsWith('q w e r t'), 'Backspace in a field: no key taken out');
+    await reset();
+    await click('q');
+    await keyPress('ArrowRight', 'ArrowRight', 39);
+    check(/键 w/.test(await keyTab()), '→ on the preview: W selected');
+    await keyPress('ArrowDown', 'ArrowDown', 40);
+    check(/键 [as]\b/.test(await keyTab()), '↓: a key of the row below: ' + /键 \S+/.exec(await keyTab()));
+    // the selection follows its key over an undo (its place another key's now)
+    await click('e');
+    await press('右移');
+    await wait(300);
+    await js(`document.getElementById('undo').click()`);
+    await wait(300);
+    check((await rowIds(0)).startsWith('q w e') && /键 e/.test(await keyTab()), 'undo: E selected still, where it is again');
+    // a field committed: the same field focused, not drawn anew (a touch keyboard stays open)
+    await js(`(() => { const i = document.querySelector('#tab-key input[aria-label=读屏念什么]'); window.__f = i; i.focus(); i.value = '一'; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(300);
+    check(/<key id="e"[^>]* a11y="一"/.test(await source()) && (await js(`document.activeElement === window.__f && window.__f.isConnected`)), 'a field committed: written, the field kept and focused');
+    const unUndone = await source();
+    await js(`document.querySelector('#tab-key input[aria-label=读屏念什么]').focus()`);
+    await keyPress('z', 'KeyZ', 90, 2);
+    check((await source()) === unUndone, 'Ctrl+Z in a field: the layout not undone');
+    // a select has no undo of its own: Ctrl+Z there is the layout's
+    await js(`(() => { const s = document.querySelector('#tab-key select[aria-label=种类]'); s.focus(); s.value = 'function'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(300);
+    const kinded = /<key id="e"[^>]* kind="function"/.test(await source());
+    await js(`document.querySelector('#tab-key select[aria-label=种类]').focus()`);
+    await keyPress('z', 'KeyZ', 90, 2);
+    check(kinded && (await source()) === unUndone, '种类 changed, Ctrl+Z on its select: undone');
+    // a label with braces refused, said why
+    await js(`(() => { const s = document.querySelector('#tab-key select[aria-label=显示的字是]'); s.value = 'text'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(300);
+    const plain = await source();
+    await js(`(() => { const i = document.querySelector('#tab-key input[aria-label=显示的字]'); i.value = 'e{'; i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(300);
+    check((await source()) === plain && /不能有 \{ 或 \}/.test(await js(`document.getElementById('toast').textContent`)), 'a label with { refused, said why');
+    await js(`(() => { const s = document.querySelector('#tab-key select[aria-label=显示的字是]'); s.value = 'none'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(300);
+    check(await js(`document.querySelector('#tab-key input[aria-label=显示的字]').disabled`), '不显示字: the label field off');
+    // a long press from elsewhere said, not an empty list over it
+    await type(`(t) => t.replace('</keyboard>', '  <row>\\n    <key id="z9" label="z" send="z"><popup from="preset" preset="q" in-row="2"/></key>\\n  </row>\\n</keyboard>')`);
+    await click('z9');
+    check(/这个键的长按来自键 q/.test(await keyTab()), 'a preset long press: where it comes from said');
+    await js(`(() => { const i = document.querySelector('#tab-key input[aria-label=长按列表]'); i.value = '甲'; i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(300);
+    check(/<popup from="list" in-row="2"><item text="甲"\/><\/popup>/.test(await source()), 'a list written over it: its in-row kept');
+
+    // an icon key: its icon chosen from the app's, shown
+    await js(`document.querySelector('#file-menu [data-act=new]').click()`);
+    await make('k18', 'my-k18');
+    await wait(300);
+    await click('backspace');
+    const icon = await js(`(() => { const c = document.querySelector('#tab-key canvas.icon'); return [document.querySelector('#tab-key select[aria-label=图标]').value, Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data).some((v, i) => i % 4 === 3 && v > 0)]; })()`);
+    check(icon[0] === 'backspace' && icon[1], '⌫: its icon chosen and drawn beside the list: ' + icon);
+    // a function key the app's bottom row has too, in a row of its own: an id of its own, saved clean
+    await js(`document.querySelector('#tabs [data-tab=row]').click()`);
+    await press('加一行');
+    await wait(300);
+    await js(`document.querySelector('#tabs [data-tab=key]').click()`);
+    await js(`document.querySelector('#tab-key button[title=comma]').click()`);
+    await wait(500);
+    check(/<key id="comma-2"/.test(await source()) && (/^0 个错误/.test(await count()) || (await count()) === '没有'), '，added on 18 keys: comma-2, no errors: ' + (await count()));
+    await js(`document.getElementById('undo').click(); document.getElementById('undo').click()`);
+    await wait(300);
+
+    // the app's bottom row made the layout's own, asked first
+    await click('space');
+    check(/在 App 的底行里/.test(await keyTab()), 'space: in the app\'s bottom row');
+    await press('改成这块键盘自己的底行…');
+    await js(`(() => { const d = document.getElementById('own-panel'); d.returnValue = 'yes'; d.close('yes'); })()`);
+    await wait(500);
+    check(!/<include/.test(await source()) && /<key id="space"/.test(await source()) && /键 space/.test(await keyTab()), 'yes: its rows copied in, space selected');
+
+    // 行: a row added and moved up; 整块 and 信息 written
+    await js(`document.querySelector('#tabs [data-tab=row]').click()`);
+    const rows = async () => js(`window.YoumoLayoutEdit.parse(document.getElementById('source').value).rows.length`);
+    const n = await rows();
+    await press('加一行');
+    await wait(300);
+    check((await rows()) === n + 1 && /<row>\s*<gap\/>\s*<\/row>\s*<\/keyboard>/.test(await source()), '加一行: a row of a gap at the end');
+    await js(`[...document.querySelectorAll('#tab-row button[aria-label=上移]')].pop().click()`);
+    await wait(300);
+    check(/<row>\s*<gap\/>\s*<\/row>\s*<row>/.test(await source()), '↑: moved up a row');
+    // its ☰ dragged below the next row
+    const order = async () => js(`window.YoumoLayoutEdit.parse(document.getElementById('source').value).rows.map((r) => r.cells.length).join(' ')`);
+    const was = await order();
+    await js(`(() => {
+      const items = [...document.querySelectorAll('#tab-row .parts li')];
+      const from = items.findIndex((li) => /· 1 个/.test(li.textContent));
+      const dt = new DataTransfer();
+      items[from].querySelector('.handle').dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+      items[from + 1].dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    })()`);
+    await wait(300);
+    const now = (await order()).split(' ');
+    const then = was.split(' ');
+    const i = then.indexOf('1');
+    check(now[i] === then[i + 1] && now[i + 1] === '1', 'the gap row\'s ☰ dragged onto the next: moved below it: ' + was + ' -> ' + now.join(' '));
+    await js(`document.querySelector('#tabs [data-tab=meta]').click()`);
+    await js(`(() => { const i = document.querySelector('#tab-meta input[aria-label=作者]'); i.value = '某人'; i.dispatchEvent(new Event('change')); })()`);
+    await wait(300);
+    check(/<meta author="某人"\/>/.test(await source()), '信息: the author in <meta>');
+    await js(`document.querySelector('#tabs [data-tab=board]').click()`);
+    await js(`(() => { const s = document.querySelector('#tab-board select[aria-label=分体方式]'); s.value = 'none'; s.dispatchEvent(new Event('change')); })()`);
+    await wait(300);
+    check(/<keyboard[^>]* on-split="none"/.test(await source()), '整块: on-split="none"');
+
+    // a phone's width (§12.5): nothing wider than the screen, the buttons doing what a drag does
+    await b.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 760, deviceScaleFactor: 2, mobile: true });
+    await wait(500);
+    await js(`document.querySelector('#tabs [data-tab=key]').click()`);
+    await click('r1c2');
+    const narrow = await js(`[document.documentElement.scrollWidth, document.getElementById('preview').getBoundingClientRect().bottom <= document.getElementById('edit').getBoundingClientRect().top + 1]`);
+    check(narrow[0] <= 360 && narrow[1], '360 px wide: no sideways scroll, the preview above the editing: ' + narrow);
+    await press('左移');
+    await wait(300);
+    check((await rowIds(0)).startsWith('r1c2 r1c1 r1c3'), '← on a phone: ' + await rowIds(0));
+    // a finger: a quick move scrolls, a 300 ms press then a move drags
+    const finger = async (from, to, hold) => {
+      await b.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y }] });
+      await wait(hold);
+      for (let i = 1; i <= 4; i++) await b.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + (to.x - from.x) * i / 4, y: from.y + (to.y - from.y) * i / 4 }] });
+      await b.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await wait(400);
+    };
+    const unmoved = await rowIds(0);
+    await finger(await at('r1c7'), await at('r1c2', 0.1), 0);
+    check((await rowIds(0)) === unmoved, 'a finger moved at once: nothing dragged');
+    await finger(await at('r1c7'), await at('r1c2', 0.1), 450);
+    check((await rowIds(0)).startsWith('r1c7 r1c2 r1c1'), 'held 300 ms, then moved: dragged: ' + await rowIds(0));
+    // a tap selects on lifting; a swipe over the preview leaves the tab as it was
+    const tap = async (p) => {
+      await b.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y }] });
+      await wait(50);
+      await b.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await wait(300);
+    };
+    await tap(await at('r1c3'));
+    check(/键 r1c3/.test(await keyTab()), 'a tap selects: r1c3');
+    await js(`document.querySelector('#tabs [data-tab=row]').click()`);
+    await finger(await at('r1c5'), { ...(await at('r1c5')), y: (await at('r1c5')).y + 120 }, 0);
+    check((await js(`document.getElementById('tab-row').hidden`)) === false, 'a swipe over the preview: the 行 tab still shown');
+    await b.send('Emulation.clearDeviceMetricsOverride');
+    await wait(300);
 
     // the picture: a new 18 keys upright
     await js(`document.querySelector('#file-menu [data-act=new]').click()`);
