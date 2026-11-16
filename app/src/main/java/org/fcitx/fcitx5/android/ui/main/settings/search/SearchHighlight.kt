@@ -25,12 +25,13 @@ import androidx.recyclerview.widget.RecyclerView
 object SearchHighlight {
 
     /**
-     * Has [entry], the page a search result has just opened, point at its preference [key], if any;
-     * at [via] instead while that one is hidden (a section only a keyboard choice shows).
+     * Has [entry], the page a search result has just opened, point at [id], if any: a preference's
+     * (pref:<key>); at [via] instead while that one is hidden (a section only a keyboard choice shows).
+     * Kept whole, the kind of id read as it is shown: the page's own controls (view:) come in 0.6.2.
      */
-    fun point(entry: NavBackStackEntry, key: String?, via: String? = null) {
-        if (key == null) return
-        entry.savedStateHandle[KEY] = key
+    fun point(entry: NavBackStackEntry, id: String?, via: String? = null) {
+        if (id == null) return
+        entry.savedStateHandle[KEY] = id
         entry.savedStateHandle[VIA] = via
         entry.savedStateHandle[AT] = SystemClock.uptimeMillis()
     }
@@ -44,7 +45,7 @@ object SearchHighlight {
         return state.contains(KEY) && isFresh(state)
     }
 
-    /** The setting [entry]'s page is to point at and the one it goes through, as [point] left them. */
+    /** The ids [entry]'s page is to point at and the one it goes through, as [point] left them. */
     internal fun pointedAt(entry: NavBackStackEntry): Pair<String?, String?> =
         entry.savedStateHandle.get<String>(KEY) to entry.savedStateHandle.get<String>(VIA)
 
@@ -57,8 +58,10 @@ object SearchHighlight {
 
     internal fun showIn(fragment: PreferenceFragmentCompat, entry: NavBackStackEntry) {
         val state = entry.savedStateHandle
-        val key = state.get<String>(KEY) ?: return
-        if (!isFresh(state)) {
+        val id = state.get<String>(KEY) ?: return
+        val key = prefKey(id)
+        // gone stale, or no preference's: nothing a preference page can point at
+        if (!isFresh(state) || key == null) {
             forget(state)
             return
         }
@@ -66,7 +69,7 @@ object SearchHighlight {
         val wanted = screen.findPreference<Preference>(key) ?: return
         // hidden, it or a group it is in: nowhere to scroll to, the page left at its top
         val shown = generateSequence(wanted) { it.parent }.all { it.isVisible }
-        val pref = if (shown) wanted else state.get<String>(VIA)?.let { screen.findPreference<Preference>(it) } ?: wanted
+        val pref = if (shown) wanted else prefKey(state.get<String>(VIA))?.let { screen.findPreference<Preference>(it) } ?: wanted
         forget(state)
         val list = fragment.listView
         whenListed(list) {
@@ -106,6 +109,11 @@ object SearchHighlight {
         state.remove<String>(VIA)
         state.remove<Long>(AT)
     }
+
+    /** A preference's id's kind: what follows is its key. */
+    const val PREF = "pref:"
+
+    private fun prefKey(id: String?): String? = id?.takeIf { it.startsWith(PREF) }?.substring(PREF.length)
 
     // beside the route's own arguments in the entry's saved state: names no route has
     private const val KEY = "search_highlight_key"

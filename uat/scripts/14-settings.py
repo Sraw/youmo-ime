@@ -1890,3 +1890,12 @@ def st143(d):
     ids = typing_xi(d)
     check("shift" in ids and "apostrophe" not in ids, f"之后导入的包打 xi 时那格应是 ⇧：{sorted(ids)[:40]}")
     return "旧包重启后打字时是分词（xi'an）；之后导入的仍是 ⇧"
+
+
+case("ST-156", needs="jvm:SettingsMenuUatTest.searchingAChoiceOpensItsSetting")(lambda d: None)
+
+case("ST-157", needs="jvm:SettingsMenuUatTest.searchingAKeyCommandOpensTheKeysPageWithAHint")(lambda d: None)
+
+case("ST-158", needs="jvm:SettingsMenuUatTest.searchingBySynonym")(lambda d: None)
+
+case("ST-159", needs="jvm:SettingsMenuUatTest.strokeFilterFindsTheSameFourInTraditionalChinese、SettingsMenuUatTest.strokeFilterFindsTheSameFourInEnglish")(lambda d: None)

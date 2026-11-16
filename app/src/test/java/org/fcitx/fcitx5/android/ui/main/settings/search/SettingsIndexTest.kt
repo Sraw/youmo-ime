@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.main.settings.search
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.preference.Preference
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceManager
@@ -15,6 +16,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
@@ -25,6 +27,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
 import org.fcitx.fcitx5.android.ui.main.settings.im.flat
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Entry
+import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Kind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -34,6 +37,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.File
+import java.util.Locale
 
 /** A search result for an input method's option opens the page that has it. */
 @RunWith(RobolectricTestRunner::class)
@@ -45,6 +50,9 @@ class SettingsIndexTest {
     private fun context(): Context = PlaceholderStrings(RuntimeEnvironment.getApplication())
 
     private fun entries(ctx: Context) = buildList<Entry<SettingsIndex.Target>> { SettingsIndex.inputMethods(ctx, this) }
+
+    // a page or a setting on it, not one of a list's choices nor a command
+    private val Entry<*>.isRow get() = kind == Kind.PAGE || kind == Kind.SETTING
 
     /** [uniqueName]'s page, as InputMethodConfigFragment draws it. */
     private fun pageOf(ctx: Context, uniqueName: String): PreferenceScreen =
@@ -62,7 +70,7 @@ class SettingsIndexTest {
     @Test
     fun everyOptionFoundOpensAnInputMethodsPageThatHasIt() {
         val ctx = context()
-        val options = entries(ctx).filter { it.target.key != null }
+        val options = entries(ctx).filter { it.target.key != null && it.isRow }
         assertTrue(options.isNotEmpty())
         val pages = mutableMapOf<String, PreferenceScreen>()
         for (entry in options) {
@@ -80,7 +88,7 @@ class SettingsIndexTest {
         val ctx = context()
         val found = buildList<Entry<SettingsIndex.Target>> { SettingsIndex.sharedInput(ctx, this) }
         val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.SHARED, mutableMapOf(), save = {}, open = {})
-        val options = found.filter { it.target.key != null }
+        val options = found.filter { it.target.key != null && it.isRow }
         // each row of the shared page, sections aside, once
         assertEquals(InputMethodSettings.SHARED.flat().size, options.size)
         for (entry in options) {
@@ -147,9 +155,9 @@ class SettingsIndexTest {
      */
     @Test
     fun eachPageIsFoundOnceAndEachSettingOnItByAKeyOfItsOwn() {
-        for ((route, on) in SettingsIndex.build(context()).groupBy { it.target.route }) {
-            // 网址和邮箱 is found as 通用输入's row that opens it, not as a page of its own
-            assertEquals("$route", if (route == SettingsRoute.Addresses) 0 else 1, on.count { it.target.key == null })
+        for ((route, on) in SettingsIndex.build(context()).filter { it.isRow }.groupBy { it.target.route }) {
+            // 网址和邮箱 is found as 通用输入's row that opens it, not as a page of its own; the home page by its language row
+            assertEquals("$route", if (route == SettingsRoute.Addresses || route == SettingsRoute.Index) 0 else 1, on.count { it.target.key == null })
             val keys = on.mapNotNull { it.target.key }
             assertEquals("$route: $keys", keys.size, keys.toSet().size)
         }
@@ -163,7 +171,7 @@ class SettingsIndexTest {
     fun noTwoResultsOpenTheSamePageUnderTheSameTitle() {
         val all = SettingsIndex.build(context())
         assertTrue(all.none { it.target.key == InputMethodSettings.SHARED_LINK })
-        val twice = all.groupBy { it.target.route to it.title }.filterValues { it.size > 1 }
+        val twice = all.filter { it.isRow }.groupBy { it.target.route to it.title }.filterValues { it.size > 1 }
         assertTrue("$twice", twice.isEmpty())
     }
 
@@ -224,7 +232,7 @@ class SettingsIndexTest {
         val row = screen.findPreference<Preference>(AppPrefs.KEY_DRAWING)
         assertTrue(row != null && generateSequence(row) { it.parent }.all { it.isVisible })
         for (key in listOf(AppPrefs.STROKE_LIFT, EngineSettings.STROKE_SINGLES)) {
-            val entry = shared.single { it.target.key == key }
+            val entry = shared.single { it.target.key == key && it.isRow }
             assertEquals("$entry", SettingsRoute.SharedInput, entry.target.route)
             assertEquals("$entry", AppPrefs.KEY_DRAWING, entry.target.via)
             // hidden on the page as it opens (笔画筛选 not chosen): the row pointed at instead
@@ -255,4 +263,126 @@ class SettingsIndexTest {
         assertTrue(found("上滑").toString(), found("上滑").any { it.route == SettingsRoute.Keys && it.key == AppPrefs.SWIPE_UP })
         assertTrue(found("下滑").toString(), found("下滑").any { it.route == SettingsRoute.Keys && it.key == AppPrefs.SWIPE_DOWN })
     }
+
+    // 061-settings-search.md §4.1: what keeps a result once, and what SearchKeywords hangs other names on
+    @Test
+    fun everyEntryHasAnIdOfItsOwn() {
+        val all = SettingsIndex.build(context())
+        assertTrue(all.none { it.id.isEmpty() })
+        val twice = all.groupBy { it.id }.filterValues { it.size > 1 }.keys
+        assertTrue("$twice", twice.isEmpty())
+        // an input method's option, by its page's name
+        assertTrue(all.any { it.id == "pref:${AppPrefs.T9_MULTI_TAP}@${InputMethodCatalog.PINYIN}" })
+        assertEquals("page:InputMethodConfig/${InputMethodCatalog.PINYIN}", SettingsIndex.pageId(SettingsRoute.InputMethodConfig("x", InputMethodCatalog.PINYIN)))
+        // by uri: its page's, whatever it was opened at
+        assertEquals("page:PinyinDict", SettingsIndex.pageId(SettingsRoute.PinyinDict("content://x")))
+    }
+
+    // a choice found opens the page of its setting and points at that, or at the row that shows it while it is hidden
+    @Test
+    @Config(qualifiers = "zh-rCN")
+    fun aChoiceFoundOpensItsSettingsPageAtItsRow() {
+        val all = SettingsIndex.build(RuntimeEnvironment.getApplication())
+        val nine = all.single { it.id == "value:${AppPrefs.T9_MULTI_TAP}=Fast@${InputMethodCatalog.PINYIN}" }
+        assertEquals(Kind.VALUE, nine.kind)
+        assertEquals(SettingsIndex.Target(SettingsRoute.InputMethodConfig("拼音", InputMethodCatalog.PINYIN), AppPrefs.T9_MULTI_TAP, AppPrefs.PINYIN_KEYBOARD), nine.target)
+        // the setting is where it is, not another name of the choice
+        assertTrue(nine.path.last() == RuntimeEnvironment.getApplication().getString(R.string.t9_multi_tap) && nine.keywords.isEmpty())
+        // a managed page's list too, and a choice worth one with a number in it
+        assertTrue(all.any { it.id == "value:${AppPrefs.PINYIN_KEYBOARD}=Keys18@${InputMethodCatalog.PINYIN}" })
+        assertTrue(all.any { it.id == "value:keyboard_height_level=1" && it.target == SettingsIndex.Target(SettingsRoute.Theme, "keyboard_height_level") })
+        // the keyboard style's stored numbers: kw_split hangs on "1", which must stay 分开
+        val split = RuntimeEnvironment.getApplication().getString(R.string.keyboard_style_split)
+        assertEquals(split, all.single { it.id == "value:keyboard_style_portrait_list=1" }.title)
+        assertEquals(split, all.single { it.id == "value:keyboard_style_landscape_list=1" }.title)
+        // 笔画筛选灵敏度's 高、中、低 and the page sizes' numbers: no choice worth a result
+        assertTrue(all.none { it.kind == Kind.VALUE && it.target.key in setOf(AppPrefs.STROKE_LIFT, EngineSettings.STROKE_SINGLES, EngineSettings.PAGE_SIZE) })
+    }
+
+    // a result's second line (ST-156): 未添加 only once fcitx has said which input methods are added, and not this one
+    @Test
+    @Config(qualifiers = "zh-rCN")
+    fun aResultSaysWhatItIsAndWhetherItsInputMethodIsAdded() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val all = SettingsIndex.build(ctx)
+        fun notes(id: String, added: Set<String>?, alias: String? = null) =
+            SettingsSearchFragment.notes(ctx, SettingsSearch.Found(all.single { it.id == id }, alias), added)
+        val choice = "value:${AppPrefs.T9_MULTI_TAP}=Fast@${InputMethodCatalog.PINYIN}"
+        assertEquals(listOf("选项"), notes(choice, null))
+        assertEquals(listOf("选项"), notes(choice, setOf(InputMethodCatalog.PINYIN)))
+        assertEquals(listOf("选项", "未添加"), notes(choice, emptySet()))
+        assertEquals(listOf("未添加"), notes("pref:${AppPrefs.T9_MULTI_TAP}@${InputMethodCatalog.PINYIN}", setOf("other")))
+        // a page that is no input method's never says so; a command says what it is, a synonym what it was found by
+        assertEquals(emptyList<String>(), notes("page:Theme", emptySet()))
+        assertEquals(listOf(ctx.getString(R.string.search_is_command), ctx.getString(R.string.search_also_called, "笔画")), notes(SettingsIndex.STROKES, emptySet(), "笔画"))
+    }
+
+    // what a key's swipe can run: each where a key's swipe is set, the five strokes one result
+    @Test
+    fun everyCommandIsFoundOnThePageOfTheKeysSwipes() {
+        val commands = SettingsIndex.build(context()).filter { it.kind == Kind.COMMAND }
+        assertEquals(KeyCommand.entries.size - 4, commands.size)
+        assertTrue(commands.all { it.target == SettingsIndex.Target(SettingsRoute.PopupOverrides, null) })
+        assertEquals(1, commands.count { it.id == SettingsIndex.STROKES })
+        assertTrue(commands.none { it.id == "cmd:stroke_h" })
+    }
+
+    // the home page's own words for its pages, found as theirs (061 §4.2); its language row, which has no page
+    @Test
+    @Config(qualifiers = "zh-rCN")
+    fun theHomePagesWordsAreItsPagesAndItsLanguageRowIsFound() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val all = SettingsIndex.build(ctx)
+        for (row in MainFragment.HOME) {
+            assertEquals("${row.route}", ctx.getString(row.summary), all.single { it.id == SettingsIndex.pageId(row.route) }.summary)
+        }
+        val search = SettingsSearch(all)
+        assertEquals(SettingsRoute.SharedInput, search.find("表情 模糊音").first().target.route)
+        assertEquals(SettingsIndex.Target(SettingsRoute.Index, MainFragment.LANGUAGE_KEY), search.find("界面语言").first().target)
+    }
+
+    // T5 (061 §4.10): a setting renamed or removed leaves no other names hanging on nothing; every language has each group
+    @Test
+    fun everyIdWithOtherNamesIsIndexed() {
+        val app = RuntimeEnvironment.getApplication()
+        // a choice is in the index only where its name is worth one: in each language
+        for (tag in listOf("zh-CN", "zh-TW", "en")) {
+            val ctx = app.createConfigurationContext(Configuration(app.resources.configuration).apply { setLocale(Locale.forLanguageTag(tag)) })
+            val ids = SettingsIndex.build(ctx).map { it.id }.flatMap { listOf(it, it.substringBefore('@')) }.toSet()
+            val missing = SearchKeywords.TABLE.flatMap { it.first }.filter { it !in ids }
+            assertTrue("$tag: $missing", missing.isEmpty())
+        }
+        val arrays = listOf("values", "values-zh-rCN", "values-zh-rTW").associateWith { dir ->
+            Regex("""<string-array name="(kw_\w+)">""").findAll(File("src/main/res/$dir/search_keywords.xml").readText()).map { it.groupValues[1] }.toSet()
+        }
+        val named = SearchKeywords.TABLE.map { RuntimeEnvironment.getApplication().resources.getResourceEntryName(it.second) }.toSet()
+        for ((dir, there) in arrays) assertEquals(dir, named, there)
+    }
+
+    /**
+     * 061 §4.5's example (ST-156, ST-159): 笔画筛选 finds four, in this order, in each language: the choice of
+     * 在键上划 itself, 笔画筛选灵敏度, then 首页至少几个单字 and the stroke commands, each also called so.
+     */
+    private fun strokeFilterFindsFour(query: String) {
+        val ctx = RuntimeEnvironment.getApplication()
+        val found = SettingsSearch(SettingsIndex.build(ctx)).find(query)
+        assertEquals(
+            found.map { it.entry.id }.toString(),
+            listOf("value:${AppPrefs.KEY_DRAWING}=StrokeFilter", "pref:${AppPrefs.STROKE_LIFT}", "pref:${EngineSettings.STROKE_SINGLES}", SettingsIndex.STROKES),
+            found.map { it.entry.id },
+        )
+        assertEquals(listOf(null, null, query, query), found.map { it.alias?.lowercase() })
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN")
+    fun strokeFilterFindsFourInSimplifiedChinese() = strokeFilterFindsFour("笔画筛选")
+
+    @Test
+    @Config(qualifiers = "zh-rTW")
+    fun strokeFilterFindsFourInTraditionalChinese() = strokeFilterFindsFour("筆畫篩選")
+
+    @Test
+    @Config(qualifiers = "en")
+    fun strokeFilterFindsFourInEnglish() = strokeFilterFindsFour("stroke filter")
 }

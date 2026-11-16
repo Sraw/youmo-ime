@@ -510,6 +510,14 @@
     <string name="search_settings">Search settings</string>
     <string name="search_settings_hint">Search settings</string>
     <string name="search_settings_none">No matching settings</string>
+    <string name="search_stroke_commands">Strokes: horizontal, vertical, left-falling, dot, turning</string>
+    <string name="search_strokes_one">one of the five stroke commands (Stroke: horizontal … Stroke: turning)</string>
+    <string name="search_command_hint">Tap a key, tap Change under Swipe up or Swipe down, and pick %1$s</string>
+    <string name="search_is_choice">choice</string>
+    <string name="search_is_command">a swipe up or down command</string>
+    <string name="search_also_called">also called %1$s</string>
+    <string name="search_not_added">not added</string>
+    <string name="search_got_it">Got it</string>
     <string name="custom_phrases">Custom phrases</string>
     <string name="word_packs">Words and phrases</string>
     <string name="word_pinyin_unknown">No reading found: please type the pinyin</string>

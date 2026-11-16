@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- other names a user may search a setting by: SearchKeywords.kt hangs each array on settings' ids -->
+<resources>
+    <string-array name="kw_stroke_filter">
+        <item>筆畫</item>
+        <item>筆順</item>
+        <item>五筆畫</item>
+        <item>橫豎撇點折</item>
+        <item>按筆畫</item>
+    </string-array>
+    <string-array name="kw_stroke_commands">
+        <item>筆畫篩選</item>
+        <item>筆順</item>
+        <item>橫豎撇點折</item>
+    </string-array>
+    <string-array name="kw_stroke_singles">
+        <item>筆畫篩選</item>
+    </string-array>
+    <string-array name="kw_glide">
+        <item>滑動輸入</item>
+        <item>劃詞</item>
+        <item>手勢輸入</item>
+    </string-array>
+    <string-array name="kw_rare_chars">
+        <item>罕見字</item>
+        <item>冷僻字</item>
+        <item>怪字</item>
+        <item>亂碼字</item>
+    </string-array>
+    <string-array name="kw_fuzzy">
+        <item>前後鼻音</item>
+        <item>平翹舌</item>
+        <item>方言</item>
+    </string-array>
+    <string-array name="kw_haptic">
+        <item>震動</item>
+        <item>震感</item>
+        <item>觸感</item>
+    </string-array>
+    <string-array name="kw_key_sound">
+        <item>聲音</item>
+        <item>音效</item>
+    </string-array>
+    <string-array name="kw_keyboard_height">
+        <item>鍵盤大小</item>
+        <item>變大</item>
+        <item>變小</item>
+    </string-array>
+    <string-array name="kw_dark_mode">
+        <item>夜間模式</item>
+        <item>暗黑模式</item>
+    </string-array>
+    <string-array name="kw_theme">
+        <item>皮膚</item>
+        <item>配色</item>
+        <item>背景圖</item>
+    </string-array>
+    <string-array name="kw_clipboard">
+        <item>黏貼簿</item>
+        <item>剪貼簿</item>
+        <item>複製紀錄</item>
+    </string-array>
+    <string-array name="kw_prediction">
+        <item>預測</item>
+        <item>聯想詞</item>
+    </string-array>
+    <string-array name="kw_trad_simp">
+        <item>繁體</item>
+        <item>簡繁</item>
+        <item>繁簡</item>
+    </string-array>
+    <string-array name="kw_nine_keys">
+        <item>九宮格</item>
+        <item>T9</item>
+    </string-array>
+    <string-array name="kw_full_keys">
+        <item>26 鍵</item>
+    </string-array>
+    <string-array name="kw_voice">
+        <item>說話</item>
+        <item>麥克風</item>
+        <item>語音辨識</item>
+    </string-array>
+    <string-array name="kw_backup">
+        <item>匯出</item>
+        <item>換手機</item>
+        <item>遷移</item>
+    </string-array>
+    <string-array name="kw_dictionaries">
+        <item>細胞詞庫</item>
+        <item>搜狗詞庫</item>
+        <item>詞典</item>
+        <item>併入基礎詞庫</item>
+    </string-array>
+    <string-array name="kw_user_words">
+        <item>自造詞</item>
+        <item>我的詞</item>
+    </string-array>
+    <string-array name="kw_popup_overrides">
+        <item>長按符號</item>
+        <item>角標</item>
+        <item>小字</item>
+    </string-array>
+    <string-array name="kw_space_cursor">
+        <item>移動游標</item>
+        <item>移動光標</item>
+    </string-array>
+    <string-array name="kw_auto_caps">
+        <item>首字母大寫</item>
+    </string-array>
+    <string-array name="kw_app_language">
+        <item>語言</item>
+        <item>English</item>
+        <item>简体</item>
+    </string-array>
+    <string-array name="kw_toolbar">
+        <item>頂欄</item>
+    </string-array>
+    <string-array name="kw_candidate_size">
+        <item>字太小</item>
+        <item>字體大小</item>
+    </string-array>
+    <string-array name="kw_typos">
+        <item>按錯</item>
+        <item>拼錯</item>
+        <item>糾錯</item>
+    </string-array>
+    <string-array name="kw_model_level">
+        <item>卡頓</item>
+        <item>慢</item>
+        <item>耗電</item>
+        <item>省電</item>
+    </string-array>
+    <string-array name="kw_code_row">
+        <item>拼音顯示在哪</item>
+        <item>拼音在輸入框</item>
+    </string-array>
+    <string-array name="kw_motion">
+        <item>動效</item>
+        <item>過渡</item>
+    </string-array>
+    <string-array name="kw_key_spacing">
+        <item>鍵間距</item>
+        <item>縫隙</item>
+    </string-array>
+    <string-array name="kw_custom_phrases">
+        <item>快捷短語</item>
+    </string-array>
+    <string-array name="kw_quick_phrases">
+        <item>顏文字</item>
+        <item>LaTeX</item>
+        <item>emoji 代碼</item>
+    </string-array>
+    <string-array name="kw_clipboard_limit">
+        <item>無上限</item>
+    </string-array>
+    <string-array name="kw_floating_handle">
+        <item>浮動鍵盤</item>
+        <item>懸浮</item>
+    </string-array>
+    <string-array name="kw_one_handed">
+        <item>單手模式</item>
+    </string-array>
+    <string-array name="kw_split">
+        <item>分離鍵盤</item>
+    </string-array>
+    <string-array name="kw_candidate_reading">
+        <item>顯示拼音</item>
+        <item>標註注音</item>
+    </string-array>
+    <string-array name="kw_hardware_shortcuts">
+        <item>切換輸入法快捷鍵</item>
+        <item>Ctrl+Space</item>
+    </string-array>
+</resources>

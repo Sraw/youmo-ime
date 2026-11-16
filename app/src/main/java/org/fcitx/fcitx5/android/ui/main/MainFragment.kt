@@ -80,6 +80,9 @@ class MainFragment : PaddingPreferenceFragment() {
                 addPreference(row.title, row.summary, row.icon) { navigateWithAnim(row.route) }
             }
             addPreference(Preference(context).apply {
+                // the settings search points at it by this; a row, not a setting: nothing kept under it
+                key = LANGUAGE_KEY
+                isPersistent = false
                 setup(
                     getString(R.string.app_language),
                     AppLanguage.name(context, AppLanguage.current()),
@@ -96,6 +99,8 @@ class MainFragment : PaddingPreferenceFragment() {
     internal class Row(@StringRes val title: Int, @StringRes val summary: Int, @DrawableRes val icon: Int, val route: SettingsRoute)
 
     companion object {
+        const val LANGUAGE_KEY = "app_language"
+
         /** The home page's rows, in order, but the app's language last, whose summary is its value. */
         internal val HOME = listOf(
             Row(R.string.input_methods, R.string.home_input_methods_summary, R.drawable.ic_baseline_language_24, SettingsRoute.InputMethodList),

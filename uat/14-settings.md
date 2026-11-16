@@ -372,6 +372,30 @@
 - **预期**：第一条打开拼音页，闪一下 **键盘** 那一行（选成九键才有这一项）。第二条打开 **通用输入 → 网址和邮箱**，闪一下 **邮箱后缀**。
 - **JVM**：`SettingsIndexTest.aNineKeysSettingFoundAlsoNamesTheKeyboardRowThatShowsIt`（搜到的九键设置带着显示它的「键盘」一行）、`SearchHighlightTest.aHiddenSettingPointsAtTheRowThatShowsIt`（藏着的设置闪的是显示它的那一行）、`SettingsMenuUatTest.searchingFindsTheNineKeysAndTheAddressRows`（两次搜索点结果后打开的页和闪的行）；设备上不跑。
 
+### ST-156 [P0] 搜选项名：搜「笔画筛选」第一条就是在键上划的那个选项
+- **前提**：B0-设置。
+- **操作**：点 🔍，输入「笔画筛选」，看结果，点第一条。
+- **预期**：结果依次是「笔画筛选」（下面写「通用输入 › 所有输入法 › 在键上划 · 选项」）、「笔画筛选灵敏度」、「首页至少几个单字」（写「也叫 笔画筛选」）、「笔画：横、竖、撇、点、折」（写「上滑或下滑的命令 · 也叫 笔画筛选」），共四条。点第一条打开通用输入，「在键上划」那一行闪一下；没有自动弹出选择框。
+- **JVM**：`SettingsMenuUatTest.searchingAChoiceOpensItsSetting`（四条的标题、顺序和第二行；点第一条打开通用输入、指着在键上划、没有对话框）、`SettingsIndexTest.strokeFilterFindsFourInSimplifiedChinese`（四条的 id 和别名）、`SettingsMenuUatTest.theLanguageRowGoesBackToTheHomePage`（搜「界面语言」点了回到已有的首页，不多一层）；设备上不单跑：闪由 `SearchHighlightTest` 管，搜索二期合入后的设备轮次里顺带看一次。
+
+### ST-157 [P1] 搜按键命令：打开按键字符和快捷键，提示怎么选
+- **前提**：B0-设置。
+- **操作**：点 🔍，输入「横竖撇点折」，点「笔画：横、竖、撇、点、折」；返回，再搜「复制」，点「复制」那条命令；等 30 秒，点「知道了」；返回，再点一次「复制」，按返回回到搜索页。
+- **预期**：两次都打开「按键字符和快捷键」，底部提示分别是「点一个键，在「上滑」或「下滑」里点「换」，选 五个笔画命令（笔画：横…笔画：折）之一」和「…选 复制」；提示一直留着（过 30 秒还在），点「知道了」收起；再打开一次后按返回回到搜索页，提示也不在了。
+- **JVM**：`SettingsMenuUatTest.searchingAKeyCommandOpensTheKeysPageWithAHint`（两次打开的页和底部提示的字；过 30 秒提示还在、点「知道了」收起、再打开后按返回回到搜索页提示不在）、`SettingsIndexTest.everyCommandIsFoundOnThePageOfTheKeysSwipes`（20 条命令，五个笔画一条）；设备上不跑。
+
+### ST-158 [P1] 搜别称：用户的叫法也找得到
+- **前提**：B0-设置。
+- **操作**：点 🔍，依次输入「震动」「罕见字」「夜间模式」「键盘高度」，每次看结果。
+- **预期**：「震动」第一条是「按键时振动」，下面带「也叫 震动」；「罕见字」第一条是「生僻字屏蔽」；「夜间模式」第一条是「跟随系统深色模式」；「键盘高度」第一条是「键盘高度」，结果里没有「紧凑」「标准」这些选项。
+- **JVM**：`SettingsMenuUatTest.searchingBySynonym`（四次搜索的第一条和「也叫」；键盘高度不带它的选项）、`SettingsIndexTest.everyIdWithOtherNamesIsIndexed`（别称表的每个 id 三种语言都在索引里，三份 xml 的组一样）；设备上不跑。
+
+### ST-159 [P2] 繁体、英文界面也搜得到选项
+- **前提**：B0-设置，界面语言先后改成繁体中文、English。
+- **操作**：繁体下搜「筆畫篩選」，英文下搜「stroke filter」。
+- **预期**：两种语言都是四条，顺序同 ST-156：繁体第一条「筆畫篩選」（在鍵上劃的選項）；英文第一条「Stroke filter」（Drawing on keys 的选项），第二条「Stroke filter sensitivity」。
+- **JVM**：`SettingsMenuUatTest.strokeFilterFindsTheSameFourInTraditionalChinese`、`strokeFilterFindsTheSameFourInEnglish`，`SettingsIndexTest.strokeFilterFindsFourInTraditionalChinese`、`strokeFilterFindsFourInEnglish`；设备上不跑。
+
 ### ST-48 [P0] 编码行浮在键盘上方：打字时出现，点得到，浮条外点到应用
 - **前提**：B0（新装，**外观 → 大小与样式 → 编码行** 是默认的「浮在键盘上方」）。
 - **操作**：回测试页点「普通文本」框，没打字时看键盘顶；点 n i h a o，看拼音显示在哪；点浮条上 ni 和 hao 之间；点浮条正上方 20dp、浮条右边 20dp 的网页空白处；按空格上屏后再点原来浮条的位置。浅色、深色主题各看一次全拼、14 键、九键、双拼 18 键。

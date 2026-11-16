@@ -1343,9 +1343,26 @@ Rules for settings, all decided:
   `ThemePrefsMigrationTest`, `KeyboardAreaTest`, `ThemeSizesUatTest`, ime-core `KeyboardSizesTest`.
 - **`hidden { }`** marks a preference with no UI: it is reset to its default once on upgrade and after
   a restore (`resetHiddenSettings`), so an old value set where the UI used to be cannot linger.
-- **Searchable.** `SettingsIndex` builds the search from the same declarations (managed categories
-  are walked, input method pages read from `InputMethodSettings`); a page drawn by hand must add
-  its entries there, with a test in `SettingsIndexTest`.
+- **Searchable** (`dev/design/061-settings-search.md`). `SettingsIndex` builds the search from the same
+  declarations (managed categories are walked, input method pages read from `InputMethodSettings`); a
+  page drawn by hand must add its entries there, with a test in `SettingsIndexTest`. Every entry has an
+  id, the same in every language: `page:<route class>` (an input method's page `/uniqueName`;
+  a route opened by a uri or the user's data is its parent page's), `pref:<key>`,
+  `value:<key>=<value>` for a list's choice, `cmd:<KeyCommand.key>` (the five strokes one,
+  `cmd:stroke`); an input method's page adds `@<uniqueName>` to its settings' and choices'. Results
+  are kept once by id. A choice is in the index if its label is worth one (ime-core
+  `SettingsSearch.isWorthAValue`: not one Han character, two Latin letters or a number) and found only
+  when a word of the query is in its own name; it opens its setting's row. A command opens 按键字符和快捷键
+  and says how to set it in a Snackbar. Pages carry the home page's line under them as their summary;
+  界面语言 pops back to the home page already under the search. Other names a user may type are
+  `SearchKeywords` (id → `R.array.kw_*`, in `res/values*/search_keywords.xml`, three languages); a
+  parent's or group's name is no other name. Ranking (ime-core `SettingsSearch`, NFKC and
+  `lowercase(Locale.ROOT)` on both sides): the title is the query; it starts with it, or another name
+  is it; the title has every word; other names have every word; the rest (summary, path); among equals
+  the shorter title, then the index's order; a `demoted` entry a tier lower. `SearchHighlight` keeps
+  the id whole in its three slots and reads `pref:` ids only (a page's controls, `view:`, are 0.6.2).
+  `SettingsIndexTest` holds each id unique, every `SearchKeywords` id indexed in the three languages and
+  the arrays in all three files, and 笔画筛选's four results in order in each language.
 - **Listeners see a snapshot.** `ManagedPreference.fireChange` and
   `ManagedPreferenceProvider.fireChange` walk a copy of their listeners: a listener may make views
   anew that unregister and register others in the same set (a theme change makes the input view
@@ -1374,7 +1391,8 @@ Rules for settings, all decided:
    with an `Item` in `InputMethodSettings`; `nearest` maps old or odd stored values to a shown one.
 4. Strings: `values/strings.xml` (English) and `values-zh-rCN`, `values-zh-rTW` at least; the other
    locales fall back to English. Write the summary as what the user gets, not how it works.
-5. Test the decision in ime-core; if the page is hand-drawn, the search index too.
+5. Test the decision in ime-core; if the page is hand-drawn, the search index too. Words a user may
+   search it by that are not in its title go in `SearchKeywords` (and the three `search_keywords.xml`).
 6. Describe it in `docs/settings.md`.
 
 ## Theme files (`data/theme/`)

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- other names a user may search a setting by: SearchKeywords.kt hangs each array on settings' ids -->
+<resources>
+    <string-array name="kw_stroke_filter">
+        <item>strokes</item>
+    </string-array>
+    <string-array name="kw_stroke_commands">
+        <item>stroke filter</item>
+    </string-array>
+    <string-array name="kw_stroke_singles">
+        <item>stroke filter</item>
+    </string-array>
+    <string-array name="kw_glide">
+        <item>swipe typing</item>
+        <item>gesture typing</item>
+        <item>glide</item>
+    </string-array>
+    <string-array name="kw_rare_chars">
+        <item>rare characters</item>
+    </string-array>
+    <string-array name="kw_fuzzy">
+        <item>fuzzy</item>
+    </string-array>
+    <string-array name="kw_haptic">
+        <item>haptic</item>
+        <item>vibrate</item>
+    </string-array>
+    <string-array name="kw_key_sound">
+        <item>sound</item>
+        <item>click</item>
+    </string-array>
+    <string-array name="kw_keyboard_height">
+        <item>keyboard size</item>
+        <item>bigger</item>
+        <item>smaller</item>
+    </string-array>
+    <string-array name="kw_dark_mode">
+        <item>dark mode</item>
+        <item>night mode</item>
+    </string-array>
+    <string-array name="kw_theme">
+        <item>skin</item>
+        <item>colors</item>
+        <item>background</item>
+    </string-array>
+    <string-array name="kw_clipboard">
+        <item>copy history</item>
+    </string-array>
+    <string-array name="kw_prediction">
+        <item>prediction</item>
+        <item>next word</item>
+    </string-array>
+    <string-array name="kw_trad_simp">
+        <item>traditional</item>
+        <item>simplified</item>
+    </string-array>
+    <string-array name="kw_nine_keys">
+        <item>T9</item>
+        <item>nine keys</item>
+    </string-array>
+    <string-array name="kw_full_keys">
+        <item>QWERTY</item>
+    </string-array>
+    <string-array name="kw_voice">
+        <item>voice</item>
+        <item>speech</item>
+        <item>microphone</item>
+        <item>dictation</item>
+    </string-array>
+    <string-array name="kw_backup">
+        <item>export</item>
+        <item>new phone</item>
+        <item>migrate</item>
+    </string-array>
+    <string-array name="kw_dictionaries">
+        <item>dictionary</item>
+        <item>dictionaries</item>
+    </string-array>
+    <string-array name="kw_user_words">
+        <item>my words</item>
+        <item>learned words</item>
+    </string-array>
+    <string-array name="kw_popup_overrides">
+        <item>long press</item>
+        <item>shortcuts</item>
+    </string-array>
+    <string-array name="kw_space_cursor">
+        <item>cursor</item>
+    </string-array>
+    <string-array name="kw_auto_caps">
+        <item>capitalize</item>
+        <item>capitals</item>
+    </string-array>
+    <string-array name="kw_app_language">
+        <item>language</item>
+        <item>Chinese</item>
+        <item>中文</item>
+    </string-array>
+    <string-array name="kw_toolbar">
+        <item>toolbar</item>
+    </string-array>
+    <string-array name="kw_candidate_size">
+        <item>font size</item>
+        <item>text size</item>
+    </string-array>
+    <string-array name="kw_typos">
+        <item>typos</item>
+        <item>autocorrect</item>
+    </string-array>
+    <string-array name="kw_model_level">
+        <item>battery</item>
+        <item>slow</item>
+        <item>lag</item>
+    </string-array>
+    <string-array name="kw_code_row">
+        <item>composing</item>
+        <item>preedit</item>
+    </string-array>
+    <string-array name="kw_motion">
+        <item>animation</item>
+    </string-array>
+    <string-array name="kw_key_spacing">
+        <item>key spacing</item>
+        <item>gap</item>
+    </string-array>
+    <string-array name="kw_custom_phrases">
+        <item>shortcuts</item>
+        <item>text expansion</item>
+    </string-array>
+    <string-array name="kw_quick_phrases">
+        <item>kaomoji</item>
+        <item>LaTeX</item>
+        <item>emoji codes</item>
+    </string-array>
+    <string-array name="kw_clipboard_limit">
+        <item>unlimited</item>
+    </string-array>
+    <string-array name="kw_floating_handle">
+        <item>floating keyboard</item>
+    </string-array>
+    <string-array name="kw_one_handed">
+        <item>one-handed</item>
+    </string-array>
+    <string-array name="kw_split">
+        <item>split keyboard</item>
+    </string-array>
+    <string-array name="kw_candidate_reading">
+        <item>show pinyin</item>
+    </string-array>
+    <string-array name="kw_hardware_shortcuts">
+        <item>Ctrl+Space</item>
+        <item>switch shortcut</item>
+    </string-array>
+</resources>

@@ -118,7 +118,7 @@ class SearchHighlightTest {
     @Test
     fun aPageOpenedAfterTheResultsOwnIsNotPointedAt() {
         val result = open(RESULT)
-        SearchHighlight.point(result, "wanted")
+        SearchHighlight.point(result, "pref:wanted")
         SearchHighlight.showIn(Page(screen("other")), result)
         val next = Page(screen("wanted"))
         SearchHighlight.showIn(next, open(OTHER))
@@ -132,7 +132,7 @@ class SearchHighlightTest {
             .supportFragmentManager.beginTransaction().add(android.R.id.content, page).commitNow()
         // as NavHostFragment would have it for findNavController
         Navigation.setViewNavController(page.requireView(), controller)
-        SearchHighlight.point(open(RESULT), "wanted")
+        SearchHighlight.point(open(RESULT), "pref:wanted")
         assertTrue(SearchHighlight.isWaiting(page))
         // the result's entry still holds the key, under the page opened after it
         open(OTHER)
@@ -148,7 +148,7 @@ class SearchHighlightTest {
     @Test
     fun theResultsPageFindsTheSettingOnceItsPreferencesArrive() {
         val result = open(RESULT)
-        SearchHighlight.point(result, "wanted")
+        SearchHighlight.point(result, "pref:wanted")
         val page = Page(screen())
         SearchHighlight.showIn(page, result)
         page.screen = screen("other", "wanted")
@@ -162,7 +162,7 @@ class SearchHighlightTest {
         // a result that is a page, not a setting on one
         SearchHighlight.point(result, null)
         assertFalse(SearchHighlight.isWaiting(result))
-        SearchHighlight.point(result, "wanted")
+        SearchHighlight.point(result, "pref:wanted")
         assertTrue(SearchHighlight.isWaiting(result))
         SearchHighlight.showIn(Page(screen("other")), result)
         assertTrue(SearchHighlight.isWaiting(result))
@@ -170,10 +170,23 @@ class SearchHighlightTest {
         assertFalse(SearchHighlight.isWaiting(result))
     }
 
+    // kept whole (061 §4.1): an id not a preference's, which no preference page has, pointed at nothing and let go
+    @Test
+    fun theIdIsKeptWholeAndOnlyAPreferencesIsPointedAt() {
+        val result = open(RESULT)
+        SearchHighlight.point(result, "pref:wanted", "pref:keyboard")
+        assertEquals("pref:wanted" to "pref:keyboard", SearchHighlight.pointedAt(result))
+        SearchHighlight.point(result, "view:wanted")
+        val page = Page(screen("wanted"))
+        SearchHighlight.showIn(page, result)
+        assertNull(page.scrolledTo)
+        assertFalse(SearchHighlight.isWaiting(result))
+    }
+
     @Test
     fun aSettingNotFoundWithinAFewSecondsIsNoLongerWaitedFor() {
         val result = open(RESULT)
-        SearchHighlight.point(result, "wanted")
+        SearchHighlight.point(result, "pref:wanted")
         ShadowSystemClock.advanceBy(6, TimeUnit.SECONDS)
         assertFalse(SearchHighlight.isWaiting(result))
         val page = Page(screen("wanted"))
@@ -212,12 +225,12 @@ class SearchHighlightTest {
     @Test
     fun aHiddenSettingPointsAtTheRowThatShowsIt() {
         val result = open(RESULT)
-        SearchHighlight.point(result, "wanted", "keyboard")
+        SearchHighlight.point(result, "pref:wanted", "pref:keyboard")
         val page = Page(screen("keyboard", "wanted").apply { findPreference<Preference>("wanted")!!.isVisible = false })
         SearchHighlight.showIn(page, result)
         assertEquals("keyboard", page.scrolledTo?.key)
         // as the pages hide one: the section's group hidden, the setting in it still visible itself
-        SearchHighlight.point(result, "wanted", "keyboard")
+        SearchHighlight.point(result, "pref:wanted", "pref:keyboard")
         val grouped = Page(screen("keyboard").apply {
             val section = PreferenceCategory(ctx).apply { key = "section"; isPersistent = false }
             addPreference(section)

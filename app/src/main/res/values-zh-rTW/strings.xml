@@ -499,6 +499,14 @@
     <string name="search_settings">搜尋設定</string>
     <string name="search_settings_hint">搜尋設定</string>
     <string name="search_settings_none">沒有找到相關的設定</string>
+    <string name="search_stroke_commands">筆畫：橫、豎、撇、點、折</string>
+    <string name="search_strokes_one">五個筆畫命令（筆畫：橫…筆畫：折）之一</string>
+    <string name="search_command_hint">點一個鍵，在「上滑」或「下滑」裡點「換」，選 %1$s</string>
+    <string name="search_is_choice">選項</string>
+    <string name="search_is_command">上滑或下滑的命令</string>
+    <string name="search_also_called">也叫 %1$s</string>
+    <string name="search_not_added">未新增</string>
+    <string name="search_got_it">知道了</string>
     <string name="custom_phrases">自訂短語</string>
     <string name="word_packs">詞庫與短語</string>
     <string name="word_pinyin_unknown">找不到讀音，請填寫拼音</string>

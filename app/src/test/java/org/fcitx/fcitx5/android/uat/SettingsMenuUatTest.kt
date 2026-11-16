@@ -9,6 +9,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.os.Looper
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -45,6 +46,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import java.time.Duration
 
 /** UAT cases of uat/14 on the settings app's own pages: search, help, language, about, themes. */
 @RunWith(RobolectricTestRunner::class)
@@ -96,22 +98,150 @@ class SettingsMenuUatTest {
         // a 九键 setting while pinyin is on the full keyboard: its page, pointed at the 键盘 row that shows it
         val (key, via) = searchAndOpen(st.s(R.string.t9_multi_tap)) { st.s(R.string.im_pinyin) in it }
         assertTrue(route, "InputMethodConfig" in route)
-        assertEquals(AppPrefs.T9_MULTI_TAP, key)
-        assertEquals(AppPrefs.PINYIN_KEYBOARD, via)
+        assertEquals("pref:" + AppPrefs.T9_MULTI_TAP, key)
+        assertEquals("pref:" + AppPrefs.PINYIN_KEYBOARD, via)
         st.activity.onBackPressedDispatcher.onBackPressed()
         st.idle()
         // a row of 网址和邮箱: that page, pointed at the row itself
-        assertEquals(AddressSettingsFragment.EMAIL_KEY to null, searchAndOpen(st.s(R.string.email_suffixes)) { true })
+        assertEquals("pref:" + AddressSettingsFragment.EMAIL_KEY to null, searchAndOpen(st.s(R.string.email_suffixes)) { true })
         assertTrue(route, "Addresses" in route)
     }
 
+    // the index is built on the page's first frame: what was typed before it is searched then
+    @Test
+    fun whatIsTypedBeforeTheIndexIsReadyIsSearchedOnceItIs() {
+        navController.navigate(SettingsRoute.Search)
+        (st.activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment).childFragmentManager.executePendingTransactions()
+        val field = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<EditText>().first()
+        field.setText("模糊音")
+        val list = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<RecyclerView>().first()
+        assertEquals(0, list.adapter!!.itemCount)
+        st.idle()
+        assertTrue(list.adapter!!.itemCount > 0)
+        list.measure(0, 0)
+        list.layout(0, 0, 1080, 2000)
+        st.idle()
+        // the list's rows, not the field, which holds the query anyway
+        val titles = (0 until list.childCount).map { KeyboardHarness.all(list.getChildAt(it)).filterIsInstance<TextView>().first().text.toString() }
+        assertTrue(titles.toString(), "模糊音" in titles)
+    }
+
+    /** Searches [query]: each result's title and the line under it, in order. */
+    private fun results(query: String): List<Pair<String, String>> {
+        if ("Search" !in route) st.open(SettingsRoute.Search)
+        val field = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<EditText>().first()
+        field.setText(query)
+        st.idle()
+        val list = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<RecyclerView>().first()
+        list.measure(0, 0)
+        list.layout(0, 0, 1080, 20000)
+        st.idle()
+        return (0 until list.childCount).map(list::getChildAt).map { r ->
+            val shown = KeyboardHarness.all(r).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+            shown[0] to shown.getOrElse(1) { "" }
+        }
+    }
+
+    /** ST-156, ST-159: 笔画筛选 finds four in this order, said as what each is. */
+    private fun strokeFilterFindsFour(query: String, alias: String) {
+        val found = results(query)
+        assertEquals(
+            found.toString(),
+            listOf(st.s(R.string.stroke_filter), st.s(R.string.stroke_lift), st.s(R.string.stroke_singles), st.s(R.string.search_stroke_commands)),
+            found.map { it.first },
+        )
+        assertTrue(found[0].second, found[0].second.lines().first().endsWith(" · " + st.s(R.string.search_is_choice)))
+        assertTrue(found[2].second, found[2].second.lines().first().endsWith(" · " + st.s(R.string.search_also_called, alias)))
+        assertTrue(found[3].second, found[3].second.lines().first().endsWith(" · " + st.s(R.string.search_is_command) + " · " + st.s(R.string.search_also_called, alias)))
+    }
+
+    @Test
+    @Uat("ST-156")
+    fun searchingAChoiceOpensItsSetting() {
+        strokeFilterFindsFour("笔画筛选", "笔画筛选")
+        val (key, via) = searchAndOpen(st.s(R.string.stroke_filter)) { st.s(R.string.search_is_choice) in it }
+        assertTrue(route, "SharedInput" in route)
+        assertEquals("pref:" + AppPrefs.KEY_DRAWING to null, key to via)
+        // the row pointed at, its list not opened
+        assertTrue(ShadowDialog.getLatestDialog()?.isShowing != true)
+    }
+
+    @Test
+    @Uat("ST-157")
+    fun searchingAKeyCommandOpensTheKeysPageWithAHint() {
+        val hint = { name: String -> st.s(R.string.search_command_hint, name) }
+        // by another name of the five, as ST-157 has it
+        searchAndOpen("横竖撇点折", title = st.s(R.string.search_stroke_commands)) { st.s(R.string.search_is_command) in it }
+        assertTrue(route, "PopupOverrides" in route)
+        assertTrue(texts().toString(), hint(st.s(R.string.search_strokes_one)) in texts())
+        st.activity.onBackPressedDispatcher.onBackPressed()
+        st.idle()
+        searchAndOpen(st.s(R.string.shortcut_copy)) { st.s(R.string.search_is_command) in it }
+        assertTrue(route, "PopupOverrides" in route)
+        assertTrue(texts().toString(), hint(st.s(R.string.shortcut_copy)) in texts())
+        // it stays while the user does what it says, until 知道了
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(30))
+        assertTrue(texts().toString(), hint(st.s(R.string.shortcut_copy)) in texts())
+        KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().single { it.text.toString() == st.s(R.string.search_got_it) }.performClick()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        assertFalse(texts().toString(), hint(st.s(R.string.shortcut_copy)) in texts())
+        // nor does it outlive the page it is about: back to the search, it is gone
+        st.activity.onBackPressedDispatcher.onBackPressed()
+        st.idle()
+        searchAndOpen(st.s(R.string.shortcut_copy)) { st.s(R.string.search_is_command) in it }
+        assertTrue(texts().toString(), hint(st.s(R.string.shortcut_copy)) in texts())
+        st.activity.onBackPressedDispatcher.onBackPressed()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        assertTrue(route, "Search" in route)
+        assertFalse(texts().toString(), hint(st.s(R.string.shortcut_copy)) in texts())
+    }
+
+    @Test
+    @Uat("ST-158")
+    fun searchingBySynonym() {
+        for ((query, title) in listOf(
+            "震动" to R.string.button_haptic_feedback,
+            "罕见字" to R.string.rare_chars,
+            "夜间模式" to R.string.follow_system_day_night_theme,
+        )) {
+            val first = results(query).first()
+            assertEquals(query, st.s(title), first.first)
+            assertTrue(first.second, st.s(R.string.search_also_called, query) in first.second)
+        }
+        val height = results("键盘高度")
+        assertEquals(st.s(R.string.keyboard_height), height.first().first)
+        // its choices are found by their own names, not by the setting's
+        assertTrue(height.toString(), height.none { it.first in setOf("紧凑", "标准", "很高") })
+    }
+
+    @Test
+    @Uat("ST-159")
+    @Config(qualifiers = "zh-rTW-w393dp-h851dp-port-440dpi")
+    fun strokeFilterFindsTheSameFourInTraditionalChinese() = strokeFilterFindsFour("筆畫篩選", "筆畫篩選")
+
+    @Test
+    @Uat("ST-159")
+    @Config(qualifiers = "en-w393dp-h851dp-port-440dpi")
+    fun strokeFilterFindsTheSameFourInEnglish() = strokeFilterFindsFour("stroke filter", "stroke filter")
+
+    // the home page's language row: back to the home page already under the search, pointed at the row
+    @Test
+    fun theLanguageRowGoesBackToTheHomePage() {
+        val depth = { navController.currentBackStack.value.size }
+        val home = depth()
+        val (key, _) = searchAndOpen(st.s(R.string.app_language)) { true }
+        assertEquals("pref:" + MainFragment.LANGUAGE_KEY, key)
+        assertTrue(route, "Index" in route)
+        assertEquals(home, depth())
+    }
+
     /**
-     * Searches [query] and opens the result titled so whose path [under] takes; the setting the
+     * Searches [query] and opens the result titled so ([title]) whose path [under] takes; the setting the
      * opened page is to point at and the row to point at while it is hidden. Read from the result's
      * entry as SearchHighlight keeps them: the flash itself waits for an input method page's
      * options, which come from the engine, not here.
      */
-    private fun searchAndOpen(query: String, under: (String) -> Boolean): Pair<String?, String?> {
+    private fun searchAndOpen(query: String, title: String = query, under: (String) -> Boolean): Pair<String?, String?> {
         if ("Search" !in route) st.open(SettingsRoute.Search)
         val field = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<EditText>().first()
         field.setText(query)
@@ -122,7 +252,7 @@ class SettingsMenuUatTest {
         st.idle()
         val row = (0 until list.childCount).map(list::getChildAt).first { r ->
             val shown = KeyboardHarness.all(r).filterIsInstance<TextView>().map { it.text.toString() }.toList()
-            query in shown && shown.any { it != query && under(it) }
+            title in shown && shown.any { it != title && under(it) }
         }
         row.performClick()
         val pointed = SearchHighlight.pointedAt(navController.currentBackStackEntry!!)
