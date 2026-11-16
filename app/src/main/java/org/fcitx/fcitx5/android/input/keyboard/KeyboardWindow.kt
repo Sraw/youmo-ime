@@ -126,7 +126,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     // each made when first shown: every new input view made 九键 too, which most never use
     // the window's context and theme asked as each is made: its dependencies, there once it is attached
-    private val makers: Map<String, () -> BaseKeyboard> = keyboardMakers({ context }, { theme })
+    private val makers: Map<String, (String?) -> BaseKeyboard> = keyboardMakers({ context }, { theme })
 
     // [tell] the engine of the keys' ink, in order with the keys; the call sends the Ink key carrying it itself (HostApi.offerInk)
     private fun ink(tell: suspend HostApi.() -> Unit) {
@@ -185,8 +185,17 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
     }
 
+    // a layout of the user's (KeyboardNames.custom): its keyboard made anew where its file is (a new stamp), the one of an
+    // older stamp dropped
     private val currentKeyboard: BaseKeyboard?
-        get() = makers[currentKeyboardName]?.let { keyboards.getOrPut(currentKeyboardName) { SceneTrace.section("make keyboard") { it() } } }
+        get() {
+            val name = currentKeyboardName
+            val maker = makers[KeyboardNames.base(name)] ?: return null
+            keyboards[name]?.let { return it }
+            val custom = KeyboardNames.custom(name)
+            custom?.let { c -> keyboards.keys.removeAll { it != name && KeyboardNames.sameLayout(it, c) } }
+            return SceneTrace.section("make keyboard") { maker(custom) }.also { keyboards[name] = it }
+        }
 
     /**
      * The rows the shown keyboard's layout has now, each counted by its height ([KeyboardHeightCap.rowUnits]): 注音's
@@ -296,7 +305,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private fun stripHidden() = syllablesOwned(stripOwned, KawaiiBarComponent.showsStrip(spaceKeys.current?.uniqueName))
 
     /** Whether the letters are the layout shown, which take the whole width, split. */
-    val lettersShown get() = currentKeyboardName == TextKeyboard.Name
+    val lettersShown get() = KeyboardNames.base(currentKeyboardName) == TextKeyboard.Name
 
     /** Told each layout shown: InputView, which puts the others at a side while the letters split. */
     var onLayoutShown: (() -> Unit)? = null
@@ -383,7 +392,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         standingInFor = null
         keyboards.values.forEach { it.restartInk() }
         noSuggestions = capFlags.has(CapabilityFlag.NoSpellCheck)
-        (keyboards[T9Keyboard.EnglishName] as? T9Keyboard)?.noSuggestions = noSuggestions
+        keyboards.filterKeys { KeyboardNames.base(it) == T9Keyboard.EnglishName }.values.forEach { (it as? T9Keyboard)?.noSuggestions = noSuggestions }
         // the layout may stay as it is, so the one shown is told now
         currentKeyboard?.inPasswordField = service.inPasswordField
         // shown again maybe a day later: its corners of variables of the minute now (061-text-variables §2.3)
@@ -510,30 +519,55 @@ internal fun syllablesOwned(owns: Boolean, showsStrip: Boolean): Boolean = owns 
  * Each keyboard by its name, made when asked: the input view's, and a settings page's that tells how the keys
  * draw (SwipeFates).
  */
-internal fun keyboardMakers(contextOf: () -> Context, themeOf: () -> Theme): Map<String, () -> BaseKeyboard> {
-    fun nineKeys(english: Boolean): T9Keyboard {
+internal fun keyboardMakers(contextOf: () -> Context, themeOf: () -> Theme): Map<String, (String?) -> BaseKeyboard> {
+    fun nineKeys(english: Boolean, custom: String?): T9Keyboard {
         val keyboard = AppPrefs.getInstance().keyboard
-        return T9Keyboard(contextOf(), themeOf(), NineKeyLetters.parse(keyboard.t9Letters.getValue()), english = english, semicolon = false)
+        return T9Keyboard(contextOf(), themeOf(), NineKeyLetters.parse(keyboard.t9Letters.getValue()), english = english, semicolon = false, custom = custom)
     }
+    // each given the layout of the user's it draws (KeyboardNames.custom), null for the app's; the keyboards no layout of
+    // the user's is offered for (注音's, the pads': 061-custom-layout §5.1, L5) take none
     return mapOf(
-        TextKeyboard.Name to { TextKeyboard(contextOf(), themeOf()) },
-        T9Keyboard.Name to { nineKeys(english = false) },
-        T9Keyboard.EnglishName to { nineKeys(english = true) },
+        TextKeyboard.Name to { c: String? -> TextKeyboard(contextOf(), themeOf(), c) },
+        T9Keyboard.Name to { c: String? -> nineKeys(english = false, c) },
+        T9Keyboard.EnglishName to { c: String? -> nineKeys(english = true, c) },
         // pinyin's: a theme's layout of its own groups typed as such (060-render-p3 T9b); 双拼's take the built-in groups alone
-        GroupedKeyboard.Name14 to { GroupedKeyboard(contextOf(), themeOf(), ownGroups = true) },
-        GroupedKeyboard.Name18 to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18) },
-        GroupedKeyboard.Name18Plain to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, semicolon = false) },
-        GroupedKeyboard.NamePinyin18 to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false, ownGroups = true) },
-        GroupedKeyboard.NameShuangpin14 to { GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G14, Keyboard::shuangpin14Key) },
+        GroupedKeyboard.Name14 to { c: String? -> GroupedKeyboard(contextOf(), themeOf(), ownGroups = true, custom = c) },
+        GroupedKeyboard.Name18 to { c: String? -> GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, custom = c) },
+        GroupedKeyboard.Name18Plain to { c: String? -> GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, semicolon = false, custom = c) },
+        GroupedKeyboard.NamePinyin18 to { c: String? ->
+            GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false, ownGroups = true, custom = c)
+        },
+        GroupedKeyboard.NameShuangpin14 to { c: String? -> GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G14, Keyboard::shuangpin14Key, custom = c) },
         // its letters are 全拼's alone
-        T9Keyboard.ShuangpinName to { T9Keyboard(contextOf(), themeOf(), shuangpin = true, semicolon = true) },
-        T9Keyboard.ShuangpinPlainName to { T9Keyboard(contextOf(), themeOf(), shuangpin = true, semicolon = false) },
-        ZhuyinKeyboard.NameNine to { ZhuyinKeyboard(contextOf(), themeOf(), nine = true) },
-        ZhuyinKeyboard.NameFull to { ZhuyinKeyboard(contextOf(), themeOf(), nine = false) },
-        NumberKeyboard.Name to { NumberKeyboard(contextOf(), themeOf()) },
+        T9Keyboard.ShuangpinName to { c: String? -> T9Keyboard(contextOf(), themeOf(), shuangpin = true, semicolon = true, custom = c) },
+        T9Keyboard.ShuangpinPlainName to { c: String? -> T9Keyboard(contextOf(), themeOf(), shuangpin = true, semicolon = false, custom = c) },
+        ZhuyinKeyboard.NameNine to { _: String? -> ZhuyinKeyboard(contextOf(), themeOf(), nine = true) },
+        ZhuyinKeyboard.NameFull to { _: String? -> ZhuyinKeyboard(contextOf(), themeOf(), nine = false) },
+        NumberKeyboard.Name to { _: String? -> NumberKeyboard(contextOf(), themeOf()) },
         // a number's, phone's or date's field's own (FieldPad)
-        *NumberPad.entries.filter { it != NumberPad.FULL }.map { pad -> pad.layout to { NumberKeyboard(contextOf(), themeOf(), pad) } }.toTypedArray(),
+        *NumberPad.entries.filter { it != NumberPad.FULL }.map { pad -> pad.layout to { _: String? -> NumberKeyboard(contextOf(), themeOf(), pad) } }.toTypedArray(),
     )
+}
+
+/**
+ * A keyboard's name with the layout of the user's it draws (061-custom-layout §5.3): `<the app's keyboard's>|<id>@<stamp>`,
+ * the keyboard it is typed as and the layout's file as read, so a file replaced is a keyboard made anew. What the
+ * keyboards are switched by ([LettersLayout], LayoutSwitchPolicy) is the name as a whole: the letters' own.
+ */
+internal object KeyboardNames {
+    private const val SEPARATOR = '|'
+
+    /** [name] drawing [custom] (null: the app's own layout). */
+    fun of(name: String, custom: CustomChoice?): String = if (custom == null) name else "$name$SEPARATOR${custom.id}@${custom.stamp}"
+
+    /** The app's keyboard [name] is typed as. */
+    fun base(name: String): String = name.substringBefore(SEPARATOR)
+
+    /** The layout of the user's [name] draws (`id@stamp`); null for none. */
+    fun custom(name: String): String? = name.substringAfter(SEPARATOR, "").ifEmpty { null }
+
+    /** Whether [name] draws the layout of [custom]'s id (any stamp). */
+    fun sameLayout(name: String, custom: String): Boolean = custom(name)?.substringBeforeLast('@') == custom.substringBeforeLast('@')
 }
 
 /**
@@ -545,7 +579,7 @@ internal fun lettersOf(
     chosen: ImKeyboards.Chosen = ImKeyboards.Chosen(),
     scheme: ShuangpinScheme = ShuangpinScheme.XIAOHE,
     password: Boolean = false,
-): String = nameOf(ImKeyboards.layoutOf(ime, chosen, scheme, password), scheme)
+): String = ImKeyboards.shown(ime, chosen, scheme, password).let { KeyboardNames.of(nameOf(it.layout, scheme), it.custom) }
 
 /** The keyboard [layout] is shown on, by its name; 双拼's 18 and nine keys show `;` only where [scheme] types it. */
 internal fun nameOf(layout: ImKeyboards.Layout, scheme: ShuangpinScheme = ShuangpinScheme.XIAOHE): String = when (layout) {

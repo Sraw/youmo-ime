@@ -279,14 +279,14 @@ class AppPrefsTest {
         )
         assertRows(
             listOf(
-                // 0.4's Full and Keys14 as they were; Keys18 and NineKeys since I1
+                // 0.4's Full and Keys14 as they were; Keys18 and NineKeys since I1; Custom (a layout of the user's) since 0.6.1
                 Row(
-                    "全拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys", "ZhuyinNine", "ZhuyinFull"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
+                    "全拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys", "ZhuyinNine", "ZhuyinFull", "Custom"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
                     { it.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14) }, "Keys14", "Keys16",
                     { it.keyboard.pinyinKeyboard.getValue() }, PinyinKeyboard.Full,
                 ),
                 Row(
-                    "双拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys"), ShuangpinKeyboard.entries, "shuangpin_keyboard", AppPrefs.SHUANGPIN_KEYBOARD,
+                    "双拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys", "Custom"), ShuangpinKeyboard.entries, "shuangpin_keyboard", AppPrefs.SHUANGPIN_KEYBOARD,
                     { it.keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys) }, "NineKeys", "Keys16",
                     { it.keyboard.shuangpinKeyboard.getValue() }, ShuangpinKeyboard.Full,
                 ),
@@ -303,7 +303,7 @@ class AppPrefsTest {
                     { it.keyboard.strokeLift.getValue() }, StrokeLift.Medium,
                 ),
                 Row(
-                    "English's keyboard", listOf("Full", "NineKeys"), EnglishKeyboard.entries, "english_keyboard", AppPrefs.ENGLISH_KEYBOARD,
+                    "English's keyboard", listOf("Full", "NineKeys", "Custom"), EnglishKeyboard.entries, "english_keyboard", AppPrefs.ENGLISH_KEYBOARD,
                     { it.keyboard.englishKeyboard.setValue(EnglishKeyboard.NineKeys) }, "NineKeys", "Keys14",
                     { it.keyboard.englishKeyboard.getValue() }, EnglishKeyboard.Full,
                 ),

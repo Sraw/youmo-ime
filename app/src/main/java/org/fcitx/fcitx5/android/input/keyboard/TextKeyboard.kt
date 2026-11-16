@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keys.KeyResolver
 import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -53,6 +54,8 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLook
 class TextKeyboard(
     context: Context,
     theme: Theme,
+    /** A layout of the user's drawn in place of the app's ([customLayout]: `id@stamp`); null for the app's. */
+    private val custom: String? = null,
 ) : BaseKeyboard(context, theme, Layout, KeyNames.QWERTY), AutoCapsKeys, TypingKeys {
 
     // the halves (the scene splits the rows, SplitKeyboard): 双拼's ing is L's long press there (LS-29),
@@ -554,7 +557,7 @@ class TextKeyboard(
         showSemicolonKey()
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
         // the keys drawn by the scene engine, each wired as qwerty.xml's node says (U4 B)
-        drawKeysWithScene(LAYOUT)
+        drawKeysWithScene(custom?.let { customLayout(context, it) } ?: SceneLayouts.of(context, LAYOUT))
     }
 }
 

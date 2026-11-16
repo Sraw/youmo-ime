@@ -152,7 +152,7 @@ class InputMethodSettingsScreenTest {
         appInputMethods.forEach { page ->
             val screen = screen(page)
             val lists = screen.lists()
-            assertEquals(page, InputMethodSettings.of(page)!!.flat().count { it is Choice || it is InputMethodSettings.AppChoice<*> }, lists.size)
+            assertEquals(page, InputMethodSettings.of(page)!!.flat().count { it is Choice || it is InputMethodSettings.AppChoice<*> || it is InputMethodSettings.TableKeyboard }, lists.size)
             lists.forEach {
                 assertNotNull(page, it.key)
                 assertSame("$page ${it.key}", it, screen.findPreference<ListPreference>(it.key))

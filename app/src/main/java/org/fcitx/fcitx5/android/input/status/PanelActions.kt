@@ -61,7 +61,7 @@ class PanelActions(
     private val keyboardPicker by lazy { KeyboardPicker(context) { fcitx.runImmediately { inputMethodEntryCached }.uniqueName } }
 
     /** Whether the input method on has keyboards to choose from (I1 Q1). */
-    val keyboardsOffered get() = keyboardPicker.offered() != null
+    val keyboardsOffered get() = keyboardPicker.offers()
 
     fun activate(action: StatusEntry) {
         fcitx.launchOnReady { it.activateAction(action.id) }

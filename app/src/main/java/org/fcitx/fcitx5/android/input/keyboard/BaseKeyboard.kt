@@ -981,3 +981,7 @@ private fun withHold(action: KeyAction, hold: BackspaceHold): KeyAction =
 private fun isBackspace(action: KeyAction) = action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace
 
 private const val MINUTE_MS = 60_000L
+
+/** The layout of the user's [custom] names (`id@stamp`, KeyboardNames.custom), [SceneLayouts.custom]; null where it is not drawn. */
+internal fun customLayout(context: Context, custom: String): SceneLayout? =
+    SceneLayouts.custom(context, custom.substringBeforeLast('@'), custom.substringAfterLast('@'))

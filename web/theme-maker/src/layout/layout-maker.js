@@ -52,6 +52,7 @@
     lacks: ([what]) => '少了必需的键：' + what,
     groups: ([why]) => '字母分组不对：' + why,
     'hidden-chars': ([field]) => field + '里有看不见的字符（控制字符、方向字符、零宽字符或换行）',
+    command: ([key, action]) => '键' + q(key) + '的 ' + action + ' 是命令：字母键和空格只能用底稿同一个键上有的命令',
     // warnings
     'no-way': (boards) => '没有键能切到' + boards.map((b) => BOARD_LABEL[b] || b).join('、'),
     narrow: ([key]) => '键' + q(key) + '很窄，可能不好按',

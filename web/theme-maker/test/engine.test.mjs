@@ -601,8 +601,9 @@ test('checkLayout answers as the app\'s import would, and writeLayout writes wha
   // the commit: texts its base types (/ @ . .com) are not listed; another text on a base key is
   assert.deepEqual(Array.from(r.commits), []);
   assert.ok(!Array.from(r.warnings).some((w) => w.key === 'commits'));
-  const cn = E.checkLayout(own.replace('send="commit:.com"', 'send="commit:.cn"'), '0.6.1', null);
-  assert.deepEqual(Array.from(cn.commits), ['.cn']);
+  // (.cn is the base's too: its .com key's list types it)
+  const cn = E.checkLayout(own.replace('send="commit:.com"', 'send="commit:.io"'), '0.6.1', null);
+  assert.deepEqual(Array.from(cn.commits), ['.io']);
   assert.ok(Array.from(cn.warnings).some((w) => w.key === 'commits'));
   const newer = E.checkLayout(own.replace(/(<keyboard[^>]*>)/, '$1<meta min-app="9.0.0"/>'), '0.6.1', null);
   assert.deepEqual(Array.from(newer.errors).map((e) => [e.key, Array.from(e.args)]), [['newer', ['9.0.0']]]);

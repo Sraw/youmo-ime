@@ -76,9 +76,12 @@ object LayoutCheck {
 
         internal val names: Set<String> by lazy { appNames(this) }
 
+        // each key of the app's boards taking a function name, its states' taps: what a true copy of it sends
+        internal val taps: Map<KeyId, List<Set<String>>> by lazy { tapsByName(this) }
+
         internal fun layout(id: String): Layout? = read[id]
 
-        internal fun fragment(id: String): Fragment? = readFragments[id]
+        fun fragment(id: String): Fragment? = readFragments[id]
     }
 
     /** The families a layout of its own may be (0.6.1). */
@@ -116,7 +119,7 @@ object LayoutCheck {
         // errors
         "read", "newer", "id-length", "id-built-in", "id-prefix", "name-length", "family", "based-on", "too-big",
         "too-many-keys", "commit-long", "too-many-commits", "label-long", "include", "layout-target", "base", "scene",
-        "blank", "name-no-slash", "name-prefix", "lacks", "groups", "hidden-chars",
+        "blank", "name-no-slash", "name-prefix", "lacks", "groups", "hidden-chars", "command",
         // warnings
         "no-way", "narrow", "commits", "theme-blank", "unnamed", "gap-look", "pad-lacks", "bottom-left",
     )
@@ -152,6 +155,8 @@ object LayoutCheck {
         val base = held(layout, fragments, sources, strict, errors)
         names(layout, sources).forEach(newRule)
         family(layout, fragments).forEach(newRule)
+        typedHidden(layout).forEach(newRule)
+        base?.let { b -> commands(layout, b, baseFragments(b, sources), sources).forEach(newRule) }
         val ims = ims(layout, sources)
         val shown = scenes(layout, fragments, ims, pads)
         shown.errors.forEach(newRule)
@@ -181,8 +186,11 @@ object LayoutCheck {
         actions(layout).filter { it.second.startsWith("layout:") && it.second.removePrefix("layout:") !in LAYOUT_TARGETS }
             .map { Finding(it.first, "layout-target", listOf(it.second)) }
 
-    // held to its base: the app's board it is made from, or its family's where that is of another family
-    private fun baseId(layout: Layout, sources: Sources): String? =
+    /**
+     * The app's board [layout] is held to, and drawn as where it cannot be: the one it is made from, or its family's where
+     * that is of another family (a `based-on` of another family's board is let in) or none.
+     */
+    fun baseId(layout: Layout, sources: Sources): String? =
         layout.basedOn?.let { b -> if (sources.layout(b)?.family == layout.family) b else FAMILY_BASE[layout.family] }
             ?: layout.id.takeIf { it in sources.layouts } ?: FAMILY_BASE[layout.family]
 
@@ -305,9 +313,11 @@ object LayoutCheck {
         actions(k).map { k.line to it }
     } + defaultsActions(layout).map { it.second to it.first }
 
-    // a key's: its tap's and swipes', its variants', its long press's, its menu's
+    // a key's: its tap's and swipes', its variants', its long press's, its menu's. A long press's list item types its
+    // text where it has no send= of its own (SceneKeyDef, SceneBehavior's Listed): a commit: of it, held to what one is
     private fun actions(k: Key): List<String> =
-        (listOf(k.attrs) + k.variants.map { it.attrs }).flatMap { written(it) } + k.popup?.items.orEmpty().mapNotNull { it.second } + k.menu.map { it.action }
+        (listOf(k.attrs) + k.variants.map { it.attrs }).flatMap { written(it) } +
+            k.popup?.items.orEmpty().flatMap { listOfNotNull("commit:" + it.first, it.second) } + k.menu.map { it.action }
 
     // its <defaults>' and its rows' (line 0: the layout's), each written once
     private fun defaultsActions(layout: Layout): List<Pair<String, Int>> =
@@ -354,6 +364,164 @@ object LayoutCheck {
         parsed.problems().takeIf { parsed !is Parsed.Ok }?.forEach { errors += Finding(it.line, "read", listOf(it.message)) }
         return (parsed as? Parsed.Ok)?.value
     }
+
+    /**
+     * What stops [layout], a file of the user's layouts read to be drawn, from being drawn (061-custom-layout §14, L3's
+     * security): the file is not trusted (one restored was held to the loose check alone, one of an older build to its
+     * rules), so the errors of [check] that need no scene are asked again: its `min-app` for an app of [appVersion], its
+     * id, family and base, the limits, the includes, the `layout:` targets, what its base has that must be typed on
+     * ([kept]), the keys' names, its family's keys, no [hidden] character typed, no command on a letter or the space its
+     * base has not there. Milliseconds: asked on the main thread as a keyboard is made. Empty where it may be drawn.
+     */
+    fun loaded(layout: Layout, sources: Sources, appVersion: String): List<Finding> {
+        val errors = ArrayList<Finding>()
+        layout.meta?.minApp?.let { if (ThemeReader.newer(it, appVersion)) errors += Finding(0, "newer", listOf(it)) }
+        // its name and <meta> shown plain wherever shown (Entry.name): nothing of them is drawn on a key nor typed
+        errors += identity(layout, sources).filter { it.key != "hidden-chars" && it.key != "name-length" }
+        errors += limits(layout)
+        val fragments = includes(layout, sources, errors)
+        if (errors.any { it.key in STOPS }) return errors
+        errors += targets(layout)
+        val base = held(layout, fragments, sources, true, errors)
+        errors += names(layout, sources)
+        errors += family(layout, fragments)
+        errors += typedHidden(layout)
+        base?.let { b -> errors += commands(layout, b, baseFragments(b, sources), sources) }
+        return errors
+    }
+
+    // a character typed (a send= of one, a commit:'s text, a code:) that is not seen: a direction mark turning around
+    // what is typed into another app, a control (L2 security review S4). Line breaks and tabs too: Return types those
+    private fun typedHidden(layout: Layout): List<Finding> {
+        fun hides(a: String): Boolean {
+            val text = when {
+                a.startsWith("commit:") -> a.removePrefix("commit:")
+                a.startsWith("code:") -> return LayoutReader.codePoint(a)?.let(::hiddenCode) == true
+                a.isNotEmpty() && a.codePointCount() == 1 -> a
+                else -> return false
+            }
+            return text.any(::hidden) || supplementary(text).any(::hiddenCode)
+        }
+        val keys = ownCells(layout).filterIsInstance<Key>().flatMap { k -> actions(k).filter(::hides).map { Finding(k.line, "hidden-chars", listOf(k.id)) } }
+        return keys + defaultsActions(layout).filter { hides(it.first) }.map { Finding(it.second, "hidden-chars", listOf("defaults")) }
+    }
+
+    // [text]'s code points past the BMP
+    private fun supplementary(text: String): List<Int> = buildList {
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            if (c.isHighSurrogate() && i + 1 < text.length && text[i + 1].isLowSurrogate()) {
+                add(((c.code - 0xD800) shl 10) + (text[i + 1].code - 0xDC00) + SUPPLEMENTARY)
+                i += 2
+            } else {
+                i++
+            }
+        }
+    }
+
+    private fun String.codePointCount(): Int = length - supplementary(this).size
+
+    // [cp] one [hidden] says, or a format character past the BMP (Kotlin's common Char has no category for those)
+    private fun hiddenCode(cp: Int): Boolean =
+        if (cp < SUPPLEMENTARY) hidden(cp.toChar()) else HIDDEN_ASTRAL.any { cp in it }
+
+    // Unicode's Cf past the BMP: Kaithi's and Egyptian's format controls, the shorthand ones, musical symbols', the tags
+    private val HIDDEN_ASTRAL = listOf(0x110BD..0x110BD, 0x110CD..0x110CD, 0x13430..0x1343F, 0x1BCA0..0x1BCA3, 0x1D173..0x1D17A, 0xE0001..0xE0001, 0xE0020..0xE007F)
+
+    /**
+     * What a letter's or the space's key does that its base's key of its id does not (L2 security review S4, the second
+     * way: a layout imported must not make a letter's swipe 清空 what is being written, nor a key that types make its tap
+     * act as another's). An allow-list over the key's every state, its root and each variant laid over it as Expand lays
+     * them (the L3 fix's second re-check: a deny-list of shapes let the next shape through):
+     * - a command (a `shortcut:`, a word of the app's, a symbol typing nothing: [isCommand]) written on a key any state
+     *   of which types or shows a letter ([typing]; a group's letters, a base letter's id too) is one only where the
+     *   base's key of its id has it. A key no state of which does may do any (符, 123): a function key, seen as one, its
+     *   swipes' and list's texts too (its tap visibly types none);
+     * - a name of the app's function keys (`shortcut="backspace"`: that key's tap, swipes, 清空 among them, and what is
+     *   set on it; a name not the app's is [names]'), on any key, is one only where the base's key of its id has it (on a
+     *   key that types, only where that key types too: the base's 删除 made a letter takes not its name), or
+     *   where the key is a true copy of a key of the app's taking that name: every state's tap a send that key's tap is
+     *   (the base's 分词 or 空格 added again, a 删除 labelled ⌫ or 删, the full keyboard's ⇧ kept on a board grouped),
+     *   never on a base letter's id (the space's among them), nor on a key showing a letter whose tap is a command (a
+     *   回车 or 删除 labelled e looks like e).
+     */
+    private fun commands(layout: Layout, base: Layout, baseFragments: Map<String, Fragment>, sources: Sources): List<Finding> {
+        val appNames = sources.names
+        val baseKeys = keysOf(base, baseFragments)
+        val theirs = baseKeys.groupBy({ it.first.id }, { actions(it.first) }).mapValues { (_, a) -> a.flatten().toSet() }
+        val theirNames = baseKeys.groupBy({ it.first.id }, { states(it.first, it.second).mapNotNull { s -> s.shortcut?.let(KeyId::of) } })
+            .mapValues { (_, n) -> n.flatten().toSet() }
+        val named = sources.taps
+        val letters = baseKeys.filter { (k, a) -> typing(k, a) }.map { it.first.id }.toSet()
+        fun copies(k: Key, a: KeyAttrs, name: KeyId): Boolean {
+            if (k.id in letters) return false
+            val states = states(k, a)
+            if (states.any { showsLetter(it.label) } && states.any { s -> s.actions["send"]?.let(::isCommand) == true }) return false
+            val taps = states.map { it.actions["send"].orEmpty() }
+            return taps.none { it.isEmpty() } && named[name].orEmpty().any { it.containsAll(taps) }
+        }
+        return keysOf(layout, emptyMap()).flatMap { (k, a) ->
+            val held = k.id in letters || typing(k, a)
+            val taken = states(k, a).mapNotNull { it.shortcut }.distinct().filter { it in appNames && KeyId.of(it).isFunction }
+            // a true copy's taps are its app key's (one showing a letter types: [copies] takes none whose tap is a command)
+            val copied = taken.filter { copies(k, a, KeyId.of(it)) }
+            val taps = if (copied.isEmpty()) emptySet() else states(k, a).mapNotNull { it.actions["send"] }.toSet()
+            // a base function key's id made a letter keeps none of its commands, as none of its name (the base's 回车 shown as e)
+            val kept = if (k.id in letters) theirs[k.id].orEmpty() else emptySet()
+            val commands = if (!held) emptyList() else actions(k).filter(::isCommand).filter { it !in kept && it !in taps }.distinct()
+            val names = taken.filter { !(KeyId.of(it) in theirNames[k.id].orEmpty() && (k.id in letters || !held)) && it !in copied }
+            commands.map { Finding(k.line, "command", listOf(k.id, it)) } + names.map { Finding(k.line, "command", listOf(k.id, "shortcut=$it")) }
+        } + defaultsActions(layout).filter { isCommand(it.first) }.map { Finding(it.second, "command", listOf("defaults", it.first)) }
+    }
+
+    // [layout]'s keys (its own rows' where [fragments] is empty), each with what its row's and the layout's defaults make of it
+    private fun keysOf(layout: Layout, fragments: Map<String, Fragment>): List<Pair<Key, KeyAttrs>> = layout.parts.flatMap { part ->
+        val rows = when (part) {
+            is Row -> listOf(part to layout.defaults)
+            is Include -> fragments[part.src]?.let { f -> f.rows.map { it to f.defaults.over(layout.defaults) } }.orEmpty()
+        }
+        rows.flatMap { (row, defaults) -> row.cells.filterIsInstance<Key>().map { it to it.attrs.over(row.defaults.over(defaults)) } }
+    }
+
+    // the keys of [sources]' boards (with what they include) by each function name they take, each its states' taps
+    private fun tapsByName(sources: Sources): Map<KeyId, List<Set<String>>> = sources.layouts.keys.mapNotNull(sources::layout).flatMap { b ->
+        keysOf(b, baseFragments(b, sources)).flatMap { (k, a) ->
+            val states = states(k, a)
+            val taps = states.mapNotNull { it.actions["send"] }.toSet()
+            states.mapNotNull { it.shortcut?.let(KeyId::of) }.distinct().filter { it.isFunction }.map { it to taps }
+        }
+    }.groupBy({ it.first }, { it.second })
+
+    // [k]'s states: [a], its root as its row and layout make it, and each variant laid over it (Expand's row)
+    private fun states(k: Key, a: KeyAttrs): List<KeyAttrs> = listOf(a) + k.variants.map { it.attrs.over(a) }
+
+    // whether a state of [k] types: a group's letters, a tap that types ([types]), or a letter shown ([showsLetter])
+    private fun typing(k: Key, a: KeyAttrs): Boolean = k.letters != null || states(k, a).any { types(it.actions["send"]) || showsLetter(it.label) }
+
+    // a label a letter's or a digit's: a letter binding ({case:e}, {group:qw}, {root:e}, {nine-letters:2}), or a text
+    // the eye takes for letters ([Sight.readsAsLetters]), written or a {punct:} with none of its own (Expand draws it as is).
+    // 符, 123, 拼, 中, Emoji are no letters
+    private fun showsLetter(label: Text?): Boolean = when (label) {
+        is Text.Literal -> Sight.readsAsLetters(label.text)
+        is Text.Binding -> label.name in Text.WITH_LETTER || label.name in Text.WITH_NUMBER || label.name == Text.GROUP ||
+            (label.name == Text.PUNCT && Sight.readsAsLetters(label.arg.orEmpty()))
+        null -> false
+    }
+
+    // whether [send] types anything: text of any length, a space, a digit, a tone, a zhuyin's symbol ([typed]'s)
+    private fun types(send: String?): Boolean =
+        typed(send)?.isNotEmpty() == true || send?.startsWith("code:") == true || send?.startsWith("action:zhuyin") == true
+
+    // a symbol is a command but one that types (the space's, a digit's, a keypad's): Return sends, BackSpace and Escape take away
+    private fun isCommand(a: String): Boolean =
+        a.startsWith("shortcut:") || a in COMMANDS || (a.startsWith("sym:") && !types(a))
+
+    // the bare words of the vocabulary (LayoutReader's) that do something to the text or the keyboard, Shift aside
+    private val COMMANDS = setOf(
+        "lang", "ime-picker", "quickphrase", "unicode", "panel-back", "panel-lock", "space-long-press", "begin-selection-swipe",
+        "delete-selection", "move-selection", "lookup",
+    )
 
     // what an app that cannot read it or build it, or a board too big to look through, says is enough: the rest told once it can
     private val STOPS = setOf("newer", "include", "too-many-keys")
@@ -594,16 +762,24 @@ object LayoutCheck {
         )
     }
 
-    // what a send= types: a character, or a keypad key's (sym:KP_1, sym:KP_Decimal)
+    // what a send= types: a character (not a word of the vocabulary, `lang`), a commit:'s text, a keypad key's (sym:KP_1,
+    // sym:KP_Decimal, keypad:1), a symbol's of one (sym:space, sym:5), a tone's mark
     private fun typed(send: String?): String? = when {
         send == null -> null
         send.startsWith("sym:KP_") -> KEYPAD[send.removePrefix("sym:KP_")]
+        send == "sym:space" -> " "
+        send.startsWith("sym:") -> send.removePrefix("sym:").takeIf { it.length == 1 }
+        send.startsWith("keypad:") -> send.removePrefix("keypad:")
+        send.startsWith("action:tone-") -> TONES[send.removePrefix("action:tone-")]
         send.startsWith("commit:") -> send.removePrefix("commit:")
         // one past the BMP is no pad's key
         send.startsWith("code:") -> LayoutReader.codePoint(send)?.takeIf { it < SUPPLEMENTARY }?.toChar()?.toString()
         ':' in send && send.length > 1 -> null
-        else -> send
+        else -> send.takeIf { it.codePointCount() == 1 }
     }
+
+    // 注音's tones 1–5 (LayoutReader's action:tone-n)
+    private val TONES = mapOf("1" to "ˉ", "2" to "ˊ", "3" to "ˇ", "4" to "ˋ", "5" to "˙")
 
     private const val SUPPLEMENTARY = 0x10000
 
@@ -671,4 +847,81 @@ object LayoutCheck {
 
     // the cells the file writes itself
     private fun ownCells(layout: Layout): List<Cell> = layout.parts.filterIsInstance<Row>().flatMap { it.cells }
+}
+
+// what the eye takes a label's text for ([LayoutCheck]'s letters shown)
+private object Sight {
+    // one letter or digit, or 1 to 4 letters (a `;` among them: a 14/18 键 key's), as [seen] reads them: e, ｅ, е, é,
+    // " e", qw, abc; not 123, .com, Emoji, nor a key's own name ([KEY_WORDS]: DEL)
+    fun readsAsLetters(text: String): Boolean {
+        val signs = seen(text)
+        if (signs.size == 1) return signs[0] == 'L' || signs[0] == 'D'
+        return signs.size in 2..4 && signs.all { it == 'L' || it == ';' } && 'L' in signs && text.trim().uppercase() !in KEY_WORDS
+    }
+
+    // a function key's name written as its label, not a letter key's letters
+    private val KEY_WORDS = setOf("DEL", "ESC", "TAB", "FN", "ALT", "CTRL", "OK", "GO", "DONE", "NEXT", "SEND", "BACK", "EN")
+
+    // [text]'s characters as the eye takes them ([sign]'s), what draws nothing left out: spaces, what Unicode says
+    // draws nothing (Default_Ignorable_Code_Point: a zero-width space, a tag, a 한글 filler), the braille blank, marks
+    // over a letter (e + ´)
+    private fun seen(text: String): List<Char> = codePoints(text).filterNot { cp ->
+        cp == BRAILLE_BLANK || IGNORABLE.any { cp in it } || (cp < 0x10000 && cp.toChar().let { it.isWhitespace() || it.category in UNSEEN })
+    }.map(::sign)
+
+    // [text]'s code points, a surrogate pair one
+    private fun codePoints(text: String): List<Int> {
+        val out = mutableListOf<Int>()
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            val pair = c.isHighSurrogate() && i + 1 < text.length && text[i + 1].isLowSurrogate()
+            out += if (pair) 0x10000 + ((c.code - 0xD800) shl 10) + (text[i + 1].code - 0xDC00) else c.code
+            i += if (pair) 2 else 1
+        }
+        return out
+    }
+
+    // L a letter, D a digit, ; itself, ? anything else. Fullwidth forms are their ASCII's (common code has no NFKC); a
+    // letter or number of 汉字, 注音, kana or 한글 is no letter; beyond the BMP only the mathematical letters and digits
+    // (𝐞), the boxed and circled capitals (🄰) and the regional indicators (🇪) are. The tone marks ˉ ˊ ˇ ˋ are letters
+    // (Lm) on purpose: a tone key types anyway
+    private fun sign(cp: Int): Char {
+        if (cp >= 0x10000) {
+            return when {
+                cp in 0x1D7CE..0x1D7FF -> 'D'
+                cp in 0x1D400..0x1D7CD || ASTRAL_LETTERS.any { cp in it } -> 'L'
+                else -> '?'
+            }
+        }
+        val f = if (cp in 0xFF01..0xFF5E) (cp - 0xFEE0).toChar() else cp.toChar()
+        return when {
+            f == ';' -> ';'
+            NO_LETTERS.any { f.code in it } -> '?'
+            f.isLetter() || f.code in 0x249C..0x24E9 -> 'L'
+            f.category in NUMBERS -> 'D'
+            else -> '?'
+        }
+    }
+
+    // Unicode's Default_Ignorable_Code_Point (DerivedCoreProperties)
+    private val IGNORABLE = listOf(
+        0x00AD..0x00AD, 0x034F..0x034F, 0x061C..0x061C, 0x115F..0x1160, 0x17B4..0x17B5, 0x180B..0x180F, 0x200B..0x200F,
+        0x202A..0x202E, 0x2060..0x206F, 0x3164..0x3164, 0xFE00..0xFE0F, 0xFEFF..0xFEFF, 0xFFA0..0xFFA0, 0xFFF0..0xFFF8,
+        0x1BCA0..0x1BCA3, 0x1D173..0x1D17A, 0xE0000..0xE0FFF,
+    )
+    private const val BRAILLE_BLANK = 0x2800
+
+    // the squared, circled and negative squared capitals (🄰 🅐 🅰) and the regional indicators
+    private val ASTRAL_LETTERS = listOf(0x1F130..0x1F149, 0x1F150..0x1F169, 0x1F170..0x1F189, 0x1F1E6..0x1F1FF)
+
+    private val UNSEEN = setOf(CharCategory.FORMAT, CharCategory.NON_SPACING_MARK, CharCategory.ENCLOSING_MARK)
+    private val NUMBERS = setOf(CharCategory.DECIMAL_DIGIT_NUMBER, CharCategory.LETTER_NUMBER, CharCategory.OTHER_NUMBER)
+
+    // 한글 jamo, CJK radicals and symbols (〇), kana, 注音, compatibility jamo, 汉字 (A and the unified), 한글
+    // syllables, compatibility ideographs, halfwidth kana and jamo
+    private val NO_LETTERS = listOf(
+        0x1100..0x11FF, 0x2E80..0x2FDF, 0x3000..0x31FF, 0x3400..0x4DBF, 0x4E00..0x9FFF, 0xA960..0xA97F, 0xAC00..0xD7FF,
+        0xF900..0xFAFF, 0xFF65..0xFFDC,
+    )
 }

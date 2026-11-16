@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardNames
 import org.fcitx.fcitx5.android.input.keyboard.keyboardMakers
 import org.fcitx.fcitx5.android.input.keyboard.lettersOf
 import org.fcitx.fcitx5.android.input.keyboard.nameOf
@@ -131,7 +132,7 @@ object SwipeFates {
             val made = on.mapNotNull { ime ->
                 val layout = ImKeyboards.layoutOf(ime?.uniqueName ?: InputMethodCatalog.ENGLISH, prefs.imKeyboards(), scheme)
                 val name = ime?.let { lettersOf(it.uniqueName, prefs.imKeyboards(), scheme) } ?: nameOf(layout, scheme)
-                val keyboard = keyboards[name] ?: makers[name]?.invoke()?.also { keyboards[name] = it } ?: return@mapNotNull null
+                val keyboard = keyboards[name] ?: makers[KeyboardNames.base(name)]?.invoke(KeyboardNames.custom(name))?.also { keyboards[name] = it } ?: return@mapNotNull null
                 // the roots fill the full keyboard's letters alone (a table on the nine keys has none drawn)
                 val roots = layout == ImKeyboards.Layout.TEXT && ime != null && ime.uniqueName in InputMethodCatalog.TABLES &&
                     KeyLabels.of(tableLabels[ime.uniqueName].orEmpty()) == KeyLabels.ROOTS && !keyboardCompact()

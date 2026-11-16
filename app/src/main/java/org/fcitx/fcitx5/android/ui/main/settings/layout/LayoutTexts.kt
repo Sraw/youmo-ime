@@ -50,6 +50,7 @@ object LayoutTexts {
         "lacks" to R.string.layout_finding_lacks,
         "groups" to R.string.layout_finding_groups,
         "hidden-chars" to R.string.layout_finding_hidden_chars,
+        "command" to R.string.layout_finding_command,
         "no-way" to R.string.layout_finding_no_way,
         "narrow" to R.string.layout_finding_narrow,
         "commits" to R.string.layout_finding_commits,

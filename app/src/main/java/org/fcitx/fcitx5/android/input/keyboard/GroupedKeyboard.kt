@@ -98,7 +98,9 @@ class GroupedKeyboard private constructor(
         semicolon: Boolean = true,
         /** Whether a layout's own groups are typed as such (pinyin's 14 and 18 keys); else they are gone by, as 双拼's. */
         ownGroups: Boolean = false,
-    ) : this(context, theme, letters, wire, semicolon, grouping(context, letters, ownGroups))
+        /** A layout of the user's drawn in place of the app's (`id@stamp`, [BaseKeyboard.customLayout]); null for the app's. */
+        custom: String? = null,
+    ) : this(context, theme, letters, wire, semicolon, grouping(context, letters, ownGroups, custom = custom))
 
     // whether [layout] is the one of the layout's own groups: not the app's own of its id, drawn where the engine
     // refused the pack's (SceneBoard.ownLayout), whose keys are the built-in groups' and are typed as such
@@ -148,9 +150,10 @@ class GroupedKeyboard private constructor(
          * (SceneGroups.taken, 060-render-p3 T9b): [builtIn]'s; a layout's own where [own] lets them be; any other
          * logged with why, and the layout as the app has it drawn instead ([SceneLayouts.builtIn]), the block gone by.
          */
-        internal fun grouping(context: Context, builtIn: NineKeyLetters, own: Boolean, log: Boolean = true): Grouping {
+        internal fun grouping(context: Context, builtIn: NineKeyLetters, own: Boolean, log: Boolean = true, custom: String? = null): Grouping {
             val id = layoutOf(builtIn)
-            val shown = SceneLayouts.of(context, id) ?: return Grouping(builtIn, null, null)
+            // a layout of the user's that does not read or is refused: the app's drawn (logged as it was read)
+            val shown = custom?.let { customLayout(context, it) } ?: SceneLayouts.of(context, id) ?: return Grouping(builtIn, null, null)
             return when (val taken = SceneGroups.taken(shown.layout, builtIn, own, shown.fragments)) {
                 SceneGroups.Taken.BuiltIn -> Grouping(builtIn, null, shown)
                 is SceneGroups.Taken.Own -> Grouping(taken.letters, taken.written, shown)

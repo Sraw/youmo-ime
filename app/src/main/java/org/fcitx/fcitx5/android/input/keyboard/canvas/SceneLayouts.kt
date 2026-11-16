@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 import android.content.Context
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.theme.ThemePackLayouts
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.layout.Fragment
@@ -85,8 +86,36 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
     }
 }
 
-/** A keyboard's layout and the fragments it includes (a shared bottom row), by their ids: what [SceneBuilder][org.fcitx.fcitx5.android.scene.engine.SceneBuilder.build] takes. */
-class SceneLayout(val id: String, val layout: Layout, val fragments: Map<String, Fragment>)
+/**
+ * A keyboard's layout and the fragments it includes (a shared bottom row), by their ids: what [SceneBuilder][org.fcitx.fcitx5.android.scene.engine.SceneBuilder.build] takes.
+ * [base]: the app's board it is drawn as where it cannot be, and whose marks and defaults it has (061-custom-layout §5.3):
+ * its own id but for a layout of the user's, its `based-on=`.
+ */
+class SceneLayout(val id: String, val layout: Layout, val fragments: Map<String, Fragment>, val base: String = id)
+
+/**
+ * Layout [id] of the user's own (061-custom-layout §5, L3), its file's [stamp] as read: what a keyboard that chose it
+ * draws. Kept by both ([key]), so a file replaced is read anew. The file is not trusted: held again to what it must be to
+ * be typed on as it is read ([refuses]: CustomKeyboards.refusal), refused whole, the base drawn in its place. Its keys'
+ * long press, corners and swipes are its own as written, what it does not write its base's ([KeyData.Mode.Own]).
+ */
+class CustomLayoutSource(private val id: String, private val stamp: String) : LayoutSource {
+    override fun text(id: String): String? = if (id == this.id) CustomKeyboards.text(id) else null
+
+    override val key: String = "$PREFIX$id@$stamp"
+
+    override fun refuses(id: String, layout: Layout, fragments: Map<String, Fragment>): String? = CustomKeyboards.refusal(this.id, stamp, layout)
+
+    /** The app's board it is drawn as where it cannot be: its own family's, whatever its `based-on` says (L3 review S2). */
+    fun base(layout: Layout): String = CustomKeyboards.baseOf(layout) ?: id
+
+    override val keyData: KeyData.Mode get() = KeyData.Mode.Own
+
+    companion object {
+        /** What the keys of the user's layouts' sources start with: [SceneLayouts] keeps them while a theme changes. */
+        const val PREFIX = "custom:"
+    }
+}
 
 /**
  * The keyboards' layouts, each read once a process from each source (main thread), one that did not
@@ -135,7 +164,7 @@ object SceneLayouts {
         // a pack left (re-imported, another in use): what was read of it dropped
         if (first.key != current) {
             current = first.key
-            read.keys.removeAll { it.first != first.key && it.first != back.key }
+            read.keys.removeAll { it.first != first.key && it.first != back.key && !it.first.startsWith(CustomLayoutSource.PREFIX) }
         }
         return readFrom(first, id, back) ?: readFrom(back, id, back)
     }
@@ -145,6 +174,16 @@ object SceneLayouts {
      * take its source's layout draws instead, the block gone by whole (a grouping it cannot type, 060-render-p3 T9b).
      */
     fun builtIn(context: Context, id: String): SceneLayout? = fallback(context.applicationContext ?: context).let { readFrom(it, id, it) }
+
+    /**
+     * Layout [id] of the user's as its file [stamp] is ([CustomLayoutSource]), its fragments the app's; null where it does
+     * not read or is refused (logged): the keyboard draws its base then. Read once a stamp; an older stamp's dropped.
+     */
+    fun custom(context: Context, id: String, stamp: String): SceneLayout? {
+        val source = CustomLayoutSource(id, stamp)
+        read.keys.removeAll { it.first.startsWith("${CustomLayoutSource.PREFIX}$id@") && it.first != source.key }
+        return readFrom(source, id, fallback(context.applicationContext ?: context))
+    }
 
     /** The app's layout [id] read anew, the cache (main thread only) left alone: for checks off the main thread (a pack's import). */
     fun parseBuiltIn(context: Context, id: String): SceneLayout? = fallback(context.applicationContext ?: context).let { load(it, id, it) }
@@ -188,8 +227,10 @@ object SceneLayouts {
         }
         // a theme pack's board is of its own id, whatever based-on= it writes (refuses holds it to that one); a layout of
         // one's own is of the board it is based on
-        val held = source.keyData?.let { KeyData.of(id, layout, fragments, it, layout.basedOn.takeIf { _ -> it == KeyData.Mode.Own }) }
-            ?: return SceneLayout(id, layout, fragments)
-        return SceneLayout(id, held.layout, held.fragments)
+        val own = (source as? CustomLayoutSource)?.base(layout)
+        val base = own ?: id
+        val held = source.keyData?.let { KeyData.of(id, layout, fragments, it, own) }
+            ?: return SceneLayout(id, layout, fragments, base)
+        return SceneLayout(id, held.layout, held.fragments, base)
     }
 }

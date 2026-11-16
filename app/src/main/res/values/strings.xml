@@ -669,6 +669,9 @@
     <string name="im_zhuyin">Pinyin (Zhuyin Dachen)</string>
     <string name="zhuyin_traditional_hint">Zhuyin is usually written in Traditional Chinese: tap Simplified in ⋯ to switch.</string>
     <string name="keyboard_nine">9 keys</string>
+    <string name="keyboard_custom">Your own layout</string>
+    <string name="keyboard_custom_named">%1$s (your own)</string>
+    <string name="keyboard_custom_unread">%1$s (unreadable, %2$s for now)</string>
     <string name="im_pinyin_keys18">Pinyin (18 keys)</string>
     <string name="im_shuangpin_keys14">Shuangpin (14 keys)</string>
     <string name="learning_kind_keys18">Pinyin, 18 keys</string>
@@ -676,6 +679,8 @@
     <string name="learning_kind_shuangpin_keys14">Shuangpin, 14 keys</string>
     <string name="english_keyboard">Keyboard</string>
     <string name="english_keyboard_summary">The on-screen keyboard English is typed on. A hardware keyboard still types letters.</string>
+    <string name="table_keyboard">Keyboard</string>
+    <string name="table_keyboard_summary">The on-screen keyboard every table input method is typed on: the full keyboard, or a layout of your own that has the ; and * keys.</string>
     <string name="handwriting">Handwriting</string>
     <string name="handwriting_not_here">Handwriting isn\'t available here: not in English nor a password field</string>
     <string name="handwriting_unavailable">%1$s, not available here</string>
@@ -1484,6 +1489,18 @@
     <string name="layout_info_unreadable">This layout’s file cannot be read: it can only be deleted.</string>
     <string name="delete_layout">Delete layout</string>
     <string name="delete_layout_msg">Delete %1$s? What you set for its keys’ long press and swipes stays, and comes back if you import it again.</string>
+    <string name="layout_use">Use for…</string>
+    <string name="layout_use_title">Use %1$s for</string>
+    <string name="layout_use_now">Use it for %1$s now?</string>
+    <string name="layout_use_now_many">Use it now for</string>
+    <string name="layout_use_yes">Use</string>
+    <string name="layout_use_no">Not now</string>
+    <string name="layout_use_none">No input method can type on %1$s</string>
+    <string name="layout_use_refused">This version cannot read %1$s: %2$s</string>
+    <string name="layout_used_by">Used for: %1$s</string>
+    <string name="layout_list_separator">", "</string>
+    <string name="layout_goes_back">%1$s goes back to %2$s</string>
+    <string name="delete_layout_in_use">Delete %1$s? %2$s uses it: %3$s. What you set for its keys’ long press and swipes stays, and comes back if you import it again.</string>
     <string name="layout_role_symbols">Sym</string>
     <string name="layout_role_back">Back</string>
     <string name="layout_role_numbers">123</string>
@@ -1511,6 +1528,7 @@
     <string name="layout_finding_lacks">A key it needs is missing: %1$s</string>
     <string name="layout_finding_groups">The letters’ groups are wrong: %1$s</string>
     <string name="layout_finding_hidden_chars">%1$s holds characters that are not shown (controls, direction marks, zero-width characters or line breaks)</string>
+    <string name="layout_finding_command">Key %1$s’s %2$s is a command: a letter key or the space may only have the commands its base’s same key has</string>
     <string name="layout_finding_no_way">No key switches to %1$s</string>
     <string name="layout_finding_narrow">Key %1$s is narrow, maybe hard to press</string>
     <string name="layout_finding_commits">%1$s keys type text written into the layout</string>

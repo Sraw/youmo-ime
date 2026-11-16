@@ -24,6 +24,8 @@ import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrie
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
+import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.CustomChoice
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
@@ -337,15 +339,52 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** Shown on the English page and in ⋯'s 键盘: the 26 keys for everyone, upgrades too (I1 Q3), or the nine keys. */
         val englishKeyboard = stringLike(ENGLISH_KEYBOARD, ManagedPreference.enumCodec<EnglishKeyboard>(), EnglishKeyboard.Full)
 
-        /** Each input method's keyboard as set, for ImKeyboards to decide the layout from. */
-        fun imKeyboards() = ImKeyboards.Chosen(pinyinKeyboard.getValue().keyboard, shuangpinKeyboard.getValue().keyboard, englishKeyboard.getValue().keyboard)
+        /**
+         * The layout of the user's each input method chose where its keyboard is [ImKeyboard.CUSTOM], by its id
+         * (061-custom-layout §5.2): pinyin's, 双拼's, English's; and the tables' one ("": the full keyboard, Q6). Left
+         * as they are where the file stops reading (§4.4: its base drawn meanwhile); set anew as it is deleted.
+         */
+        val pinyinKeyboardLayout = string(PINYIN_KEYBOARD_LAYOUT, "")
+        val shuangpinKeyboardLayout = string(SHUANGPIN_KEYBOARD_LAYOUT, "")
+        val englishKeyboardLayout = string(ENGLISH_KEYBOARD_LAYOUT, "")
+        val tableKeyboardLayout = string(TABLE_KEYBOARD_LAYOUT, "")
 
-        /** [im]'s keyboard set to [keyboard], one it offers (ImKeyboards.choices). */
-        fun setImKeyboard(im: String, keyboard: ImKeyboard) {
-            when (im) {
-                InputMethodCatalog.PINYIN -> pinyinKeyboard.setValue(PinyinKeyboard.of(keyboard))
-                InputMethodCatalog.SHUANGPIN -> shuangpinKeyboard.setValue(ShuangpinKeyboard.of(keyboard))
-                InputMethodCatalog.ENGLISH -> englishKeyboard.setValue(EnglishKeyboard.of(keyboard))
+        // [slot]'s ([ImKeyboards.slot]) layout of the user's
+        private fun layoutPref(slot: String) = when (slot) {
+            InputMethodCatalog.PINYIN -> pinyinKeyboardLayout
+            InputMethodCatalog.SHUANGPIN -> shuangpinKeyboardLayout
+            InputMethodCatalog.ENGLISH -> englishKeyboardLayout
+            else -> tableKeyboardLayout
+        }
+
+        /**
+         * Each input method's keyboard as set, for ImKeyboards to decide the layout from; the layouts of the user's chosen
+         * read by [custom] (null: one that does not read), the app's own by default (CustomKeyboards: a file stat each,
+         * read again where it changed).
+         */
+        fun imKeyboards(custom: (String) -> CustomChoice? = CustomKeyboards::choice): ImKeyboards.Chosen {
+            val layouts = ImKeyboards.SLOTS.associateWith { layoutPref(it).getValue() }.filterValues { it.isNotEmpty() }
+            val chosen = ImKeyboards.Chosen(
+                pinyinKeyboard.getValue().keyboard,
+                shuangpinKeyboard.getValue().keyboard,
+                englishKeyboard.getValue().keyboard,
+                if (ImKeyboards.TABLE in layouts) ImKeyboard.CUSTOM else ImKeyboard.FULL,
+                layouts,
+            )
+            val used = ImKeyboards.SLOTS.mapNotNull { slot -> layouts[slot]?.takeIf { slot == ImKeyboards.TABLE || chosen.of(slot) == ImKeyboard.CUSTOM } }.toSet()
+            // one that throws as it is read is one that does not read: its base drawn, never the keyboard (and the IME) gone
+            return chosen.copy(customs = used.mapNotNull { id -> runCatching { custom(id) }.getOrNull()?.let { id to it } }.toMap())
+        }
+
+        /** [im]'s keyboard set to [keyboard], one it offers (ImKeyboards.choices); [layout] the id of the user's layout where it is [ImKeyboard.CUSTOM]. */
+        fun setImKeyboard(im: String, keyboard: ImKeyboard, layout: String? = null) {
+            if (keyboard == ImKeyboard.CUSTOM) layoutPref(ImKeyboards.slot(im)).setValue(requireNotNull(layout))
+            when {
+                im == InputMethodCatalog.PINYIN -> pinyinKeyboard.setValue(PinyinKeyboard.of(keyboard))
+                im == InputMethodCatalog.SHUANGPIN -> shuangpinKeyboard.setValue(ShuangpinKeyboard.of(keyboard))
+                im == InputMethodCatalog.ENGLISH -> englishKeyboard.setValue(EnglishKeyboard.of(keyboard))
+                // the tables' one choice: the full keyboard, or the layout of the user's set above
+                InputMethodCatalog.hasTableKeys(im) && keyboard != ImKeyboard.CUSTOM -> tableKeyboardLayout.setValue("")
             }
         }
 
@@ -1045,6 +1084,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         const val SHUANGPIN_KEYBOARD = "shuangpin_keyboard"
         const val ENGLISH_KEYBOARD = "english_keyboard"
+        const val PINYIN_KEYBOARD_LAYOUT = "pinyin_keyboard_layout"
+        const val SHUANGPIN_KEYBOARD_LAYOUT = "shuangpin_keyboard_layout"
+        const val ENGLISH_KEYBOARD_LAYOUT = "english_keyboard_layout"
+        const val TABLE_KEYBOARD_LAYOUT = "table_keyboard_layout"
 
         // 0.4's: English on the nine keys while 九键's 中/英 had brought it there, gone with the key (I1)
         private const val ENGLISH_ON_NINE_KEYS = "english_on_nine_keys"
@@ -1123,7 +1166,10 @@ enum class PinyinKeyboard(override val stringRes: Int, val keyboard: ImKeyboard)
     Keys14(R.string.pinyin_keyboard_14, ImKeyboard.KEYS14),
     NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS),
     ZhuyinNine(R.string.keyboard_zhuyin_nine, ImKeyboard.ZHUYIN_NINE),
-    ZhuyinFull(R.string.keyboard_zhuyin_full, ImKeyboard.ZHUYIN_FULL);
+    ZhuyinFull(R.string.keyboard_zhuyin_full, ImKeyboard.ZHUYIN_FULL),
+
+    // a layout of the user's: which one, pinyinKeyboardLayout (061-custom-layout §5.2)
+    Custom(R.string.keyboard_custom, ImKeyboard.CUSTOM);
 
     companion object {
         fun of(keyboard: ImKeyboard) = entries.first { it.keyboard == keyboard }
@@ -1135,7 +1181,10 @@ enum class ShuangpinKeyboard(override val stringRes: Int, val keyboard: ImKeyboa
     Full(R.string.pinyin_keyboard_full, ImKeyboard.FULL),
     Keys18(R.string.keyboard_18, ImKeyboard.KEYS18),
     Keys14(R.string.pinyin_keyboard_14, ImKeyboard.KEYS14),
-    NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS);
+    NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS),
+
+    // a layout of the user's: which one, shuangpinKeyboardLayout
+    Custom(R.string.keyboard_custom, ImKeyboard.CUSTOM);
 
     companion object {
         fun of(keyboard: ImKeyboard) = entries.first { it.keyboard == keyboard }
@@ -1145,7 +1194,10 @@ enum class ShuangpinKeyboard(override val stringRes: Int, val keyboard: ImKeyboa
 /** English's on-screen keyboard ([ImKeyboard]): the 26 keys or the nine keys. Kept by name: never rename one. */
 enum class EnglishKeyboard(override val stringRes: Int, val keyboard: ImKeyboard) : ManagedPreferenceEnum {
     Full(R.string.pinyin_keyboard_full, ImKeyboard.FULL),
-    NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS);
+    NineKeys(R.string.keyboard_nine, ImKeyboard.NINE_KEYS),
+
+    // a layout of the user's: which one, englishKeyboardLayout
+    Custom(R.string.keyboard_custom, ImKeyboard.CUSTOM);
 
     companion object {
         fun of(keyboard: ImKeyboard) = entries.first { it.keyboard == keyboard }

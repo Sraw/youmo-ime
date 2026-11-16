@@ -650,6 +650,9 @@
     <string name="im_zhuyin">拼音 · 注音全鍵盤</string>
     <string name="zhuyin_traditional_hint">注音一般配繁體字：要繁體，在 ⋯ 裡點「簡體」切換。</string>
     <string name="keyboard_nine">九鍵</string>
+    <string name="keyboard_custom">自訂佈局</string>
+    <string name="keyboard_custom_named">%1$s（自訂）</string>
+    <string name="keyboard_custom_unread">%1$s（讀不出，暫用 %2$s）</string>
     <string name="im_pinyin_keys18">拼音 · 18 鍵</string>
     <string name="im_shuangpin_keys14">雙拼 · 14 鍵</string>
     <string name="learning_kind_keys18">拼音 18 鍵</string>
@@ -657,6 +660,8 @@
     <string name="learning_kind_shuangpin_keys14">雙拼 14 鍵</string>
     <string name="english_keyboard">鍵盤</string>
     <string name="english_keyboard_summary">螢幕上打英文用的鍵盤。實體鍵盤仍按字母打。</string>
+    <string name="table_keyboard">鍵盤</string>
+    <string name="table_keyboard_summary">螢幕上打所有碼表輸入法用的鍵盤：全鍵盤，或帶 ; 和 * 鍵的自訂佈局。</string>
     <string name="handwriting">手寫</string>
     <string name="handwriting_not_here">這裡不能手寫：英文和密碼框裡沒有手寫</string>
     <string name="handwriting_unavailable">%1$s，這裡用不了</string>
@@ -1457,6 +1462,18 @@
     <string name="layout_info_unreadable">這個佈局的檔案讀不出，只能刪除。</string>
     <string name="delete_layout">刪除佈局</string>
     <string name="delete_layout_msg">刪除「%1$s」嗎？給它的鍵設的長按、上下滑留著，再匯入同一個佈局就回來。</string>
+    <string name="layout_use">用在…</string>
+    <string name="layout_use_title">「%1$s」用在</string>
+    <string name="layout_use_now">現在就用在 %1$s 上嗎？</string>
+    <string name="layout_use_now_many">現在就用在</string>
+    <string name="layout_use_yes">用</string>
+    <string name="layout_use_no">先不用</string>
+    <string name="layout_use_none">沒有輸入法能用「%1$s」</string>
+    <string name="layout_use_refused">這個版本讀不了「%1$s」：%2$s</string>
+    <string name="layout_used_by">用在：%1$s</string>
+    <string name="layout_list_separator">、</string>
+    <string name="layout_goes_back">%1$s換回 %2$s</string>
+    <string name="delete_layout_in_use">刪除「%1$s」嗎？%2$s正在用它，刪掉後%3$s。給它的鍵設的長按、上下滑留著，再匯入同一個佈局就回來。</string>
     <string name="layout_role_symbols">符</string>
     <string name="layout_role_back">返回</string>
     <string name="layout_role_numbers">123</string>
@@ -1484,6 +1501,7 @@
     <string name="layout_finding_lacks">少了必需的鍵：%1$s</string>
     <string name="layout_finding_groups">字母分組不對：%1$s</string>
     <string name="layout_finding_hidden_chars">%1$s 裡有看不見的字元（控制字元、方向字元、零寬字元或換行）</string>
+    <string name="layout_finding_command">鍵 %1$s 的 %2$s 是命令：字母鍵和空白鍵只能用底稿同一個鍵上有的命令</string>
     <string name="layout_finding_no_way">沒有鍵能切到%1$s</string>
     <string name="layout_finding_narrow">鍵「%1$s」很窄，可能不好按</string>
     <string name="layout_finding_commits">%1$s 個鍵點按打出寫死的文字</string>

@@ -8,7 +8,7 @@ import tempfile
 import time
 import zipfile
 
-from uat import (PKG, Blocked, case, check, choose, home, pinyin_keyboard, script)
+from uat import (PKG, Blocked, case, check, choose, gear, home, pinyin_keyboard, script)
 
 
 def kb_box(d, s=None):
@@ -1982,12 +1982,25 @@ def import_layout(d, name):
     d.tap(n.c, 3.0)
 
 
+def skip_use(d):
+    """after 导入: 现在就用在…？ (L3, §4.2 step 5) answered 先不用"""
+    try:
+        d.wait_text("现在就用在", timeout=6, where="all", contains=True)
+    except Blocked:
+        raise Blocked(f"导入后没问现在就用在哪：{d.screen().texts('all')[:10]}")
+    d.tap_text("先不用", where="all", scroll=False, after=1.5)
+
+
 def layout_card(d, name):
     appearance_tab(d, "布局")
     n = d.screen().find(text=name)
     for _ in range(3):
         if n:
             break
+        d.swipe((540, 1800), (540, 1200), 300, after=1.0)
+        n = d.screen().find(text=name)
+    # the line under it (用在：…) on screen too
+    if n and n.c[1] > 1700:
         d.swipe((540, 1800), (540, 1200), 300, after=1.0)
         n = d.screen().find(text=name)
     return n
@@ -2031,6 +2044,7 @@ def st148(d):
         check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:12]}")
     d.shot("app", "导入确认框：预览、作者、版本、能用在哪、直接打出的文字")
     d.tap_text("导入", where="all", scroll=False, after=3.0)
+    skip_use(d)
     check(layout_card(d, "UAT 26 键"), "导入后列表里没有 UAT 26 键")
     import_layout(d, "uat-qwerty-1.1")
     check(d.wait_text("替换已有的『UAT 26 键』1.0 → 1.1", timeout=8, where="all", contains=True),
@@ -2039,6 +2053,7 @@ def st148(d):
     import_layout(d, "uat-qwerty-1.1")
     d.wait_text("替换已有的", timeout=8, where="all", contains=True)
     d.tap_text("导入", where="all", scroll=False, after=3.0)
+    skip_use(d)
     appearance_tab(d, "布局")
     check(len([n for n in d.screen().app() if n.text == "UAT 26 键"]) == 1, "替换后不止一张 UAT 26 键")
     card = layout_card(d, "UAT 26 键")
@@ -2076,6 +2091,7 @@ def st150(d):
     import_layout(d, "uat-qwerty-1.1")
     d.wait_text("导入布局 UAT 26 键？", timeout=8, where="all")
     d.tap_text("导入", where="all", scroll=False, after=3.0)
+    skip_use(d)
     card = layout_card(d, "UAT 26 键")
     check(card, "列表里没有 UAT 26 键")
     d.hold(card.c, 1000)
@@ -2107,3 +2123,115 @@ def st150(d):
     check(not d.screen().find(text="UAT 26 键"), "删除后卡片还在")
     d.sh("rm -f '/sdcard/Download/UAT 26 键.layout'")
     return "菜单 信息/导出/删除；信息写全；导出 UAT 26 键.layout 和导入的一样；问一次后删掉"
+
+
+# ---------------------------------------------------------------- 布局用在输入法上 (061-custom-layout §4.2–4.4, §5, L3)
+
+
+def import_uat_qwerty(d, use=None):
+    """uat-qwerty-1.0 imported; 现在就用在 answered with the input methods of use ticked (None: 先不用)"""
+    push_layout(d, "uat-qwerty-1.0")
+    import_layout(d, "uat-qwerty-1.0")
+    d.wait_text("导入布局 UAT 26 键？", timeout=8, where="all")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    if not use:
+        skip_use(d)
+        return
+    d.wait_text("现在就用在", timeout=6, where="all", contains=True)
+    for im in use:
+        d.tap_text(im, where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+
+
+def types_haha(d):
+    """the a key on the test page: what reaches the field (the layout's a commits 哈哈, the app's types a)"""
+    d.open_page("text")
+    d.tap(d.keys(refresh=True)["a"], 1.0)
+    text = d.field_text() or ""
+    d.clear()
+    return text
+
+
+@case("ST-161", base="B0-设置", mutates=True, visual=True)
+def st161(d):
+    d.step("导入时用在拼音上")
+    import_uat_qwerty(d, use=["拼音"])
+    card = layout_card(d, "UAT 26 键")
+    check(card, "导入后列表里没有 UAT 26 键")
+    check(d.wait_text("用在：拼音", timeout=5, where="all"), f"卡片下没写「用在：拼音」：{d.screen().texts()[:20]}")
+    d.shot("app", "导入后用在拼音上：卡片下写「用在：拼音」")
+    check("哈哈" in types_haha(d), "拼音用 UAT 26 键时 a 键没打出「哈哈」")
+    d.shot("ime", "拼音的键盘是导入的 UAT 26 键")
+    gear(d, "拼音")
+    check(d.wait_text("UAT 26 键（自定义）", timeout=5, contains=True), f"拼音的「键盘」没写 UAT 26 键（自定义）：{d.screen().texts()[:16]}")
+    d.step("英文没选它")
+    d.open_page("text")
+    d.switch_im("英文")
+    d.tap(d.keys(refresh=True)["a"], 1.0)
+    text = d.field_text() or ""
+    d.clear()
+    d.switch_im("拼音")
+    check("哈哈" not in text, f"英文没选它，a 键却打出了「哈哈」：{text!r}")
+    return "导入时勾拼音：卡片写用在：拼音，拼音的 a 打出哈哈，拼音的键盘写 UAT 26 键（自定义）；英文不受影响"
+
+
+@case("ST-162", base="B0-设置", mutates=True)
+def st162(d):
+    import_uat_qwerty(d)
+    card = layout_card(d, "UAT 26 键")
+    check(card, "导入后列表里没有 UAT 26 键")
+    check(not d.screen().find(contains="用在："), "没用在输入法上，卡片下却写了「用在：」")
+    d.step("点卡片 → 用在… 勾拼音、英文")
+    d.tap(card.c, 1.0)
+    d.tap_text("用在…", where="all", scroll=False, after=1.5)
+    check(d.wait_text("「UAT 26 键」用在", timeout=5, where="all"), f"没出「用在」勾选：{d.screen().texts('all')[:10]}")
+    for im in ("拼音", "双拼", "英文"):
+        check(d.screen().find(text=im, where="all"), f"用在… 里没有{im}")
+    for im in ("拼音", "英文"):
+        d.tap_text(im, where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    check(d.wait_text("用在：拼音、英文", timeout=5, where="all"), f"卡片下没写「用在：拼音、英文」：{d.screen().texts()[:20]}")
+    check("哈哈" in types_haha(d), "拼音的 a 键没打出「哈哈」")
+    d.step("再去掉拼音")
+    card = layout_card(d, "UAT 26 键")
+    d.tap(card.c, 1.0)
+    d.tap_text("用在…", where="all", scroll=False, after=1.5)
+    d.wait_text("「UAT 26 键」用在", timeout=5, where="all")
+    d.tap_text("拼音", where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    check(d.wait_text("用在：英文", timeout=5, where="all"), f"去掉拼音后卡片下不是「用在：英文」：{d.screen().texts()[:20]}")
+    check("哈哈" not in types_haha(d), "去掉拼音后拼音的 a 键仍打出「哈哈」")
+    return "点卡片 用在… 勾拼音、英文后卡片写用在：拼音、英文、拼音 a 打出哈哈；去掉拼音后换回全键盘"
+
+
+@case("ST-163", base="B0-设置", mutates=True)
+def st163(d):
+    import_uat_qwerty(d, use=["拼音"])
+    card = layout_card(d, "UAT 26 键")
+    check(card, "导入后列表里没有 UAT 26 键")
+    d.hold(card.c, 1000)
+    time.sleep(1.0)
+    d.tap_text("删除", scroll=False, after=1.5)
+    check(d.wait_text("拼音正在用它，删掉后拼音换回 全键盘", timeout=5, where="all", contains=True),
+          f"删除确认没说拼音正在用：{d.screen().texts('all')[:10]}")
+    d.shot("app", "删正在用的布局：写清拼音换回全键盘")
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    check(not d.screen().find(text="UAT 26 键"), "删除后卡片还在")
+    check("哈哈" not in types_haha(d), "删掉后拼音的 a 键仍打出「哈哈」")
+    gear(d, "拼音")
+    check(d.wait_text("全键盘\n屏幕上打拼音", timeout=5, contains=True), f"删掉后拼音的「键盘」不是全键盘：{d.screen().texts()[:16]}")
+    return "确认框写「拼音正在用它，删掉后拼音换回 全键盘」；删后拼音是全键盘，a 打 a"
+
+
+@case("ST-164", base="B0-设置", mutates=True)
+def st164(d):
+    import_uat_qwerty(d, use=["拼音"])
+    check("哈哈" in types_haha(d), "拼音的 a 键没打出「哈哈」")
+    d.step("布局文件不见了")
+    out = d.sh(f"run-as {PKG} rm files/layouts/uat-qwerty.xml")
+    check("No such file" not in out, f"布局文件不在：{out.strip()[:120]}")
+    check("哈哈" not in types_haha(d), "文件删了，拼音的 a 键仍打出「哈哈」")
+    gear(d, "拼音")
+    check(d.wait_text("（读不出，暂用 全键盘）", timeout=5, contains=True), f"拼音的「键盘」没说读不出：{d.screen().texts()[:16]}")
+    d.shot("app", "布局文件不见：键盘一项写「读不出，暂用 全键盘」")
+    return "文件不见后拼音画全键盘（a 打 a），设置写「uat-qwerty（读不出，暂用 全键盘）」，选择不改"

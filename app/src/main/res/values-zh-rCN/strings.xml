@@ -650,6 +650,9 @@
     <string name="im_zhuyin">拼音 · 注音全键盘</string>
     <string name="zhuyin_traditional_hint">注音一般配繁体字：要繁体，在 ⋯ 里点「简体」切换。</string>
     <string name="keyboard_nine">九键</string>
+    <string name="keyboard_custom">自定义布局</string>
+    <string name="keyboard_custom_named">%1$s（自定义）</string>
+    <string name="keyboard_custom_unread">%1$s（读不出，暂用 %2$s）</string>
     <string name="im_pinyin_keys18">拼音 · 18 键</string>
     <string name="im_shuangpin_keys14">双拼 · 14 键</string>
     <string name="learning_kind_keys18">拼音 18 键</string>
@@ -657,6 +660,8 @@
     <string name="learning_kind_shuangpin_keys14">双拼 14 键</string>
     <string name="english_keyboard">键盘</string>
     <string name="english_keyboard_summary">屏幕上打英文用的键盘。实体键盘仍按字母打。</string>
+    <string name="table_keyboard">键盘</string>
+    <string name="table_keyboard_summary">屏幕上打所有码表输入法用的键盘：全键盘，或带 ; 和 * 键的自定义布局。</string>
     <string name="handwriting">手写</string>
     <string name="handwriting_not_here">这里不能手写：英文和密码框里没有手写</string>
     <string name="handwriting_unavailable">%1$s，这里用不了</string>
@@ -1457,6 +1462,18 @@
     <string name="layout_info_unreadable">这个布局的文件读不出，只能删除。</string>
     <string name="delete_layout">删除布局</string>
     <string name="delete_layout_msg">删除「%1$s」吗？给它的键设的长按、上下滑留着，再导入同一个布局就回来。</string>
+    <string name="layout_use">用在…</string>
+    <string name="layout_use_title">「%1$s」用在</string>
+    <string name="layout_use_now">现在就用在 %1$s 上吗？</string>
+    <string name="layout_use_now_many">现在就用在</string>
+    <string name="layout_use_yes">用</string>
+    <string name="layout_use_no">先不用</string>
+    <string name="layout_use_none">没有输入法能用「%1$s」</string>
+    <string name="layout_use_refused">这个版本读不了「%1$s」：%2$s</string>
+    <string name="layout_used_by">用在：%1$s</string>
+    <string name="layout_list_separator">、</string>
+    <string name="layout_goes_back">%1$s换回 %2$s</string>
+    <string name="delete_layout_in_use">删除「%1$s」吗？%2$s正在用它，删掉后%3$s。给它的键设的长按、上下滑留着，再导入同一个布局就回来。</string>
     <string name="layout_role_symbols">符</string>
     <string name="layout_role_back">返回</string>
     <string name="layout_role_numbers">123</string>
@@ -1484,6 +1501,7 @@
     <string name="layout_finding_lacks">少了必需的键：%1$s</string>
     <string name="layout_finding_groups">字母分组不对：%1$s</string>
     <string name="layout_finding_hidden_chars">%1$s 里有看不见的字符（控制字符、方向字符、零宽字符或换行）</string>
+    <string name="layout_finding_command">键 %1$s 的 %2$s 是命令：字母键和空格只能用底稿同一个键上有的命令</string>
     <string name="layout_finding_no_way">没有键能切到%1$s</string>
     <string name="layout_finding_narrow">键「%1$s」很窄，可能不好按</string>
     <string name="layout_finding_commits">%1$s 个键点按打出写死的文字</string>

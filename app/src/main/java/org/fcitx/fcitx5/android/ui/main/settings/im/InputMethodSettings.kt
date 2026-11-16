@@ -17,9 +17,11 @@ import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.ShuangpinNames
+import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.EnglishKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
@@ -30,19 +32,22 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
-import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
+import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
+import org.fcitx.fcitx5.android.input.keyboard.CustomChoice
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
@@ -134,8 +139,25 @@ object InputMethodSettings {
         val instead: (T, Map<String, String>) -> T? = { _, _ -> null },
         val shown: (Map<String, String>) -> Boolean = { true },
         override val via: String? = null,
+        /**
+         * The input method whose keyboard it is, where the layouts of the user's it may be typed on are listed after the
+         * app's (061-custom-layout §5): its value `Custom` theirs, by id ([CUSTOM_VALUE]); null for a list of the app's alone.
+         */
+        val customIm: String? = null,
         val pref: () -> ManagedPreference.PStringLike<T>,
     ) : Titled where T : Enum<T>, T : ManagedPreferenceEnum
+
+    /**
+     * A table's keyboard (061-custom-layout Q6): the full keyboard or a layout of the user's of letters with the table's
+     * keys beside them ([ImKeyboards.usable]), one choice for every table ([ImKeyboards.TABLE]); there only while there is
+     * one such layout, or one is chosen.
+     */
+    class TableKeyboard(
+        override val key: String,
+        @StringRes override val title: Int,
+        @StringRes override val summary: Int,
+        override val notFor: List<String> = emptyList(),
+    ) : Titled
 
     /** A switch over the app's own preference [pref], as [AppChoice] is a list. */
     class AppToggle(
@@ -215,6 +237,12 @@ object InputMethodSettings {
 
     /** What every input method shares: its page's key, the one row on each input method's page that opens it. */
     const val SHARED_LINK = "shared_input"
+
+    // a keyboard list's values: the app's keyboards' enums' names, `Custom` for a layout of the user's, listed as
+    // `Custom:<id>`; a table's full keyboard
+    private const val CUSTOM = "Custom"
+    private const val CUSTOM_VALUE = "Custom:"
+    private const val FULL_VALUE = "Full"
 
     /** The shared page's row of the address suggestions (AddressSettingsFragment): its key. */
     const val ADDRESSES = "addresses"
@@ -327,10 +355,10 @@ object InputMethodSettings {
         sharedLink,
         // the keyboard's: the full keyboard, the 18 or 14 keys or the nine keys, the engine reading each (KeyboardPair). First,
         // the page's main choice, and in no section: a section 键盘 over a row 键盘 said it twice
-        AppChoice(AppPrefs.PINYIN_KEYBOARD, R.string.pinyin_keyboard, R.string.pinyin_keyboard_summary, PinyinKeyboard.entries) {
+        AppChoice(AppPrefs.PINYIN_KEYBOARD, R.string.pinyin_keyboard, R.string.pinyin_keyboard_summary, PinyinKeyboard.entries, customIm = InputMethodCatalog.PINYIN) {
             AppPrefs.getInstance().keyboard.pinyinKeyboard
         },
-        nineKeysSection(NINE_KEYS, AppPrefs.PINYIN_KEYBOARD) { AppPrefs.getInstance().keyboard.pinyinKeyboard.getValue() == PinyinKeyboard.NineKeys },
+        nineKeysSection(NINE_KEYS, AppPrefs.PINYIN_KEYBOARD) { drawn(InputMethodCatalog.PINYIN) == ImKeyboards.Layout.PINYIN_NINE },
         Section(
             R.string.im_section_typing, listOf(
                 // full pinyin's alone: 双拼's u is a key of its own, the grouped keyboards' no letter. Not hidden
@@ -365,6 +393,7 @@ object InputMethodSettings {
                     },
                     // the 14 keys under 微软 the 18, as the keyboard types and EngineBridge.configure stores them
                     instead = { chosen, options -> ShuangpinKeyboard.of(ImKeyboards.effective(InputMethodCatalog.SHUANGPIN, chosen.keyboard, schemeOf(options))) },
+                    customIm = InputMethodCatalog.SHUANGPIN,
                 ) {
                     AppPrefs.getInstance().keyboard.shuangpinKeyboard
                 },
@@ -372,9 +401,11 @@ object InputMethodSettings {
         ),
     )
 
-    // each table's own, under its group of the addon's config; [keys] what its keys show of its roots, where it has them
+    // each table's own, under its group of the addon's config; [keys] what its keys show of its roots, where it has them;
+    // first, as the others', its keyboard where a layout of the user's may be
     private fun table(keys: List<Item> = emptyList()) = listOf(
         sharedLink,
+        TableKeyboard(AppPrefs.TABLE_KEYBOARD_LAYOUT, R.string.table_keyboard, R.string.table_keyboard_summary),
         Section(
             R.string.im_section_typing, keys + listOf(
                 Toggle(TableSettings.AUTO_SELECT, text(R.string.im_auto_select), R.string.im_auto_select_summary),
@@ -426,13 +457,16 @@ object InputMethodSettings {
             ),
         ),
     )
-    private fun englishOnNineKeys() = AppPrefs.getInstance().keyboard.englishKeyboard.getValue() == EnglishKeyboard.NineKeys
+    private fun englishOnNineKeys() = drawn(InputMethodCatalog.ENGLISH) == ImKeyboards.Layout.ENGLISH_NINE
+
+    // the keyboard [im] is drawn as: a layout of the user's of the nine keys' family reads the nine keys' settings too (§5.4)
+    private fun drawn(im: String) = ImKeyboards.layoutOf(im, AppPrefs.getInstance().keyboard.imKeyboards(), EngineState.shuangpinScheme)
 
     // androidengine's English page (EngineEnglishPage)
     private val english = listOf(
         sharedLink,
         // the keyboard's: the 26 keys or the nine keys, first as pinyin's
-        AppChoice(AppPrefs.ENGLISH_KEYBOARD, R.string.english_keyboard, R.string.english_keyboard_summary, EnglishKeyboard.entries) {
+        AppChoice(AppPrefs.ENGLISH_KEYBOARD, R.string.english_keyboard, R.string.english_keyboard_summary, EnglishKeyboard.entries, customIm = InputMethodCatalog.ENGLISH) {
             AppPrefs.getInstance().keyboard.englishKeyboard
         },
         // how English types on the nine keys first, then what pinyin's share
@@ -505,7 +539,7 @@ object InputMethodSettings {
                 is Toggle -> copy(item.key)
                 is Choice -> copy(item.key)
                 is Flags -> item.flags.forEach { copy("${item.path}/${it.first}") }
-                is AppChoice<*>, is AppToggle, is Page, is Action -> Unit
+                is AppChoice<*>, is TableKeyboard, is AppToggle, is Page, is Action -> Unit
             }
         }
         items.forEach(::walk)
@@ -655,6 +689,7 @@ object InputMethodSettings {
                 }
                 is Flags -> into(flagsPreference(context, item, item.flags.map { slotOf("${item.path}/${it.first}") }, save))
                 is AppChoice<*> -> into(appChoice(context, item, options, refreshers, ::changed))
+                is TableKeyboard -> into(tableKeyboard(context, item, refreshers))
                 is Page -> into(page(context, item, open).also { p ->
                     val refresh = { p.isVisible = item.shown(options) }
                     refresh()
@@ -712,13 +747,17 @@ object InputMethodSettings {
             isSingleLineTitle = false
             setTitle(item.title)
             dialogTitle = title
+            val im = item.customIm
             fun refresh() {
-                val offered = item.offered(options)
-                entries = offered.map { keyboardLabel(context, it) }.toTypedArray()
-                entryValues = offered.map { it.name }.toTypedArray()
-                // one set and not offered now (双拼's 14 keys under 微软) shows as the one the keyboard types
+                // the app's keyboards; Custom is the layouts of the user's, each listed after them
+                val offered = item.offered(options).filter { it.name != CUSTOM }
                 val set = pref.getValue()
-                value = (set.takeIf { it in offered } ?: item.instead(set, options)?.takeIf { it in offered } ?: offered.first()).name
+                val customs = im?.let { customEntries(context, it, schemeOf(options)) }
+                entries = (offered.map { keyboardLabel(context, it) } + customs?.entries.orEmpty().map { it.second }).toTypedArray()
+                entryValues = (offered.map { it.name } + customs?.entries.orEmpty().map { it.first }).toTypedArray()
+                // one set and not offered now (双拼's 14 keys under 微软) shows as the one the keyboard types
+                value = customs?.chosen?.takeIf { set.name == CUSTOM }
+                    ?: (set.takeIf { it in offered } ?: item.instead(set, options)?.takeIf { it in offered } ?: offered.first()).name
                 isVisible = item.shown(options)
             }
             refresh()
@@ -726,11 +765,70 @@ object InputMethodSettings {
             val summary = summaryOf(context, item.summary, item.notFor)
             summaryProvider = Preference.SummaryProvider<ListPreference> { listOfNotNull(it.entry, summary).joinToString("\n") }
             setOnPreferenceChangeListener { _, value ->
-                pref.setValue(item.values.first { it.name == value })
+                val id = (value as String).removePrefix(CUSTOM_VALUE).takeIf { im != null && value.startsWith(CUSTOM_VALUE) }
+                if (id != null) {
+                    AppPrefs.getInstance().keyboard.setImKeyboard(im!!, ImKeyboard.CUSTOM, id)
+                } else {
+                    pref.setValue(item.values.first { it.name == value })
+                }
                 changed()
+                // the value stored now: a layout of the user's listed as it is
+                refresh()
                 true
             }
         }
+
+    // a table's keyboard: the full one or a layout of the user's; there while there is one to choose, or one is chosen
+    private fun tableKeyboard(context: Context, item: TableKeyboard, refreshers: MutableList<() -> Unit>) =
+        ListPreference(context).apply {
+            key = item.key
+            isPersistent = false
+            isIconSpaceReserved = false
+            isSingleLineTitle = false
+            setTitle(item.title)
+            dialogTitle = title
+            val im = InputMethodCatalog.TABLES.keys.first()
+            val pref = AppPrefs.getInstance().keyboard.tableKeyboardLayout
+            fun refresh() {
+                val customs = customEntries(context, im, EngineState.shuangpinScheme)
+                entries = (listOf(context.getString(R.string.pinyin_keyboard_full)) + customs.entries.map { it.second }).toTypedArray()
+                entryValues = (listOf(FULL_VALUE) + customs.entries.map { it.first }).toTypedArray()
+                value = customs.chosen?.takeIf { pref.getValue().isNotEmpty() } ?: FULL_VALUE
+                isVisible = customs.entries.isNotEmpty()
+            }
+            refresh()
+            refreshers += ::refresh
+            val summary = summaryOf(context, item.summary, item.notFor)
+            summaryProvider = Preference.SummaryProvider<ListPreference> { listOfNotNull(it.entry, summary).joinToString("\n") }
+            setOnPreferenceChangeListener { _, value ->
+                val id = (value as String).removePrefix(CUSTOM_VALUE).takeIf { value.startsWith(CUSTOM_VALUE) }
+                AppPrefs.getInstance().keyboard.setImKeyboard(im, if (id != null) ImKeyboard.CUSTOM else ImKeyboard.FULL, id)
+                refresh()
+                true
+            }
+        }
+
+    /** The layouts of the user's a keyboard's list offers ([entries]: value and label), and the value of the one chosen ([chosen]). */
+    private class CustomEntries(val entries: List<Pair<String, String>>, val chosen: String?)
+
+    /**
+     * The layouts of the user's [im] may be typed on under [scheme] (ImKeyboards.customs), 「17 键（自定义）」 each; the one
+     * it chose too where it is not among them (§4.4: its file refused as it was read, or one that does not read at all,
+     * 「17 键（读不出，暂用 18 键）」, what is drawn in its place said).
+     */
+    private fun customEntries(context: Context, im: String, scheme: ShuangpinScheme): CustomEntries {
+        val usable = ImKeyboards.customs(im, scheme, CustomKeyboards.all())
+        val entries = usable.map { CUSTOM_VALUE + it.id to KeyboardLabels.custom(context, it) }.toMutableList()
+        val chosen = AppPrefs.getInstance().keyboard.imKeyboards()
+        val id = chosen.layoutOf(im) ?: return CustomEntries(entries, null)
+        if (usable.none { it.id == id }) {
+            val layout = chosen.customOf(im)
+            val base = ImKeyboards.effective(im, ImKeyboard.CUSTOM, scheme, layout)
+            val name = layout ?: CustomChoice(id, id, "", null, drawn = false)
+            entries += CUSTOM_VALUE + id to KeyboardLabels.custom(context, name.copy(drawn = false), KeyboardLabels.builtInName(context, im, base))
+        }
+        return CustomEntries(entries, CUSTOM_VALUE + id)
+    }
 
     // a keyboard's name, with the theme's layout's it is drawn with (KeyboardLabels.label); any other choice's own
     private fun keyboardLabel(context: Context, choice: ManagedPreferenceEnum): String {

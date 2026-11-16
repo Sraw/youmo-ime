@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.WUBI
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.CUSTOM
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.FULL
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.KEYS14
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard.KEYS18
@@ -116,5 +117,106 @@ class ImKeyboardsTest {
         assertTrue("another scheme", ImKeyboards.typedWith(SHUANGPIN, Chosen(), xiaohe) != ImKeyboards.typedWith(SHUANGPIN, Chosen(), ShuangpinScheme.ZIRANMA))
         // the 14 keys under 微软 are the 18: the layout shown, not the choice
         assertEquals(Layout.SHUANGPIN18, ImKeyboards.typedWith(SHUANGPIN, chosen, ShuangpinScheme.MICROSOFT).layout)
+    }
+
+    // a layout of the user's own (061-custom-layout §5): who may use it, what is shown, what stands in for it
+    private val g18 = listOf("q", "we", "rt", "y", "u", "io", "p", "a", "sd", "fg", "h", "jk", "l;", "z", "xc", "v", "bn", "m")
+    private val g14 = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")
+    private val letters = CustomChoice("my-qwerty", "我的", "letters", "qwerty", tableExtras = true)
+    private val nine = CustomChoice("my-nine", "九", "nine", "nine")
+    private val k18 = CustomChoice("my-k18", "18", "grouped", "k18", g18.reversed())
+    private val k14 = CustomChoice("my-k14", "14", "grouped", "k14", g14)
+    private val k17 = CustomChoice("k17", "17", "grouped", "k18", listOf("qw", "er", "t", "y", "u", "io", "p", "as", "df", "g", "h", "jk", "l", "zx", "cv", "bn", "m"))
+
+    private fun chosen(im: String, layout: CustomChoice, table: Boolean = false) = Chosen(
+        pinyin = if (im == PINYIN) CUSTOM else FULL,
+        shuangpin = if (im == SHUANGPIN) CUSTOM else FULL,
+        english = if (im == ENGLISH) CUSTOM else FULL,
+        table = if (table) CUSTOM else FULL,
+        layouts = mapOf(ImKeyboards.slot(im) to layout.id),
+        customs = mapOf(layout.id to layout),
+    )
+
+    @Test
+    fun aLayoutOfOnesOwnIsUsedByTheInputMethodsItsFamilyTypes() {
+        val all = listOf(letters, nine, k18, k14, k17)
+        assertEquals(all, ImKeyboards.customs(PINYIN, ziranma, all))
+        // 双拼: the 14 or 18 keys' groups in any order, the 14 not under 微软; no grouping of its own
+        assertEquals(listOf(letters, nine, k18, k14), ImKeyboards.customs(SHUANGPIN, ziranma, all))
+        assertEquals(listOf(letters, nine, k18), ImKeyboards.customs(SHUANGPIN, microsoft, all))
+        assertEquals(listOf(letters, nine), ImKeyboards.customs(ENGLISH, ziranma, all))
+        // a table: letters with the keys it types beside them (Q6)
+        assertEquals(listOf(letters), ImKeyboards.customs(WUBI, ziranma, all))
+        assertEquals(emptyList<CustomChoice>(), ImKeyboards.customs(WUBI, ziranma, listOf(letters.copy(tableExtras = false))))
+        assertTrue(ImKeyboards.offers(WUBI, ziranma, all))
+        assertFalse(ImKeyboards.offers(WUBI, ziranma, listOf(nine)))
+        // one not drawn: none
+        assertFalse(ImKeyboards.usable(PINYIN, letters.copy(drawn = false), ziranma))
+        assertEquals(KEYS18, ImKeyboards.groupedAs(k18))
+        assertEquals(KEYS14, ImKeyboards.groupedAs(k14))
+        assertNull(ImKeyboards.groupedAs(k17))
+    }
+
+    @Test
+    fun aLayoutOfOnesOwnIsShownAsTheBuiltInOneItIsTypedAs() {
+        assertEquals(ImKeyboards.Shown(Layout.TEXT, letters), ImKeyboards.shown(PINYIN, chosen(PINYIN, letters), ziranma))
+        assertEquals(ImKeyboards.Shown(Layout.TEXT, letters), ImKeyboards.shown(WUBI, chosen(WUBI, letters, table = true), ziranma))
+        assertEquals(ImKeyboards.Shown(Layout.SHUANGPIN_NINE, nine), ImKeyboards.shown(SHUANGPIN, chosen(SHUANGPIN, nine), ziranma))
+        assertEquals(ImKeyboards.Shown(Layout.ENGLISH_NINE, nine), ImKeyboards.shown(ENGLISH, chosen(ENGLISH, nine), ziranma))
+        assertEquals(ImKeyboards.Shown(Layout.PINYIN18, k18), ImKeyboards.shown(PINYIN, chosen(PINYIN, k18), ziranma))
+        assertEquals(ImKeyboards.Shown(Layout.SHUANGPIN14, k14), ImKeyboards.shown(SHUANGPIN, chosen(SHUANGPIN, k14), ziranma))
+        // pinyin's keyboard of its own groups: the 14 keys', which takes a layout's own
+        assertEquals(ImKeyboards.Shown(Layout.PINYIN14, k17), ImKeyboards.shown(PINYIN, chosen(PINYIN, k17), ziranma))
+        assertEquals(Layout.PINYIN14, ImKeyboards.layoutOf(PINYIN, chosen(PINYIN, k17), ziranma))
+        // a password: letters stay; English's nine keys the full keyboard, the app's
+        assertEquals(ImKeyboards.Shown(Layout.TEXT, letters), ImKeyboards.shown(ENGLISH, chosen(ENGLISH, letters), ziranma, password = true))
+        assertEquals(ImKeyboards.Shown(Layout.TEXT), ImKeyboards.shown(ENGLISH, chosen(ENGLISH, nine), ziranma, password = true))
+        // the grouping typed with: another grouping, other codes
+        assertEquals(k17.groups, ImKeyboards.typedWith(PINYIN, chosen(PINYIN, k17), ziranma).groups)
+        assertNull(ImKeyboards.typedWith(PINYIN, chosen(PINYIN, letters), ziranma).groups)
+    }
+
+    @Test
+    fun aLayoutOfOnesOwnNotDrawnOrDeletedGivesWayToItsBase() {
+        // not drawn (its file refused): the base, the choice kept (§4.4)
+        val refused = k18.copy(drawn = false)
+        assertEquals(KEYS18, ImKeyboards.effective(PINYIN, CUSTOM, ziranma, refused))
+        assertEquals(ImKeyboards.Shown(Layout.PINYIN18), ImKeyboards.shown(PINYIN, chosen(PINYIN, refused), ziranma))
+        assertNull(ImKeyboards.fallback(PINYIN, CUSTOM, ziranma, refused))
+        // not read at all: no base known, the full keyboard
+        assertEquals(FULL, ImKeyboards.effective(PINYIN, CUSTOM, ziranma, null))
+        assertEquals(Layout.TEXT, ImKeyboards.layoutOf(PINYIN, Chosen(pinyin = CUSTOM, layouts = mapOf(PINYIN to "gone")), ziranma))
+        assertNull(ImKeyboards.fallback(PINYIN, CUSTOM, ziranma, null))
+        // one the scheme no longer has (the 14 keys' under 微软): stored as its base's nearest
+        assertEquals(KEYS18, ImKeyboards.fallback(SHUANGPIN, CUSTOM, microsoft, k14))
+        assertNull(ImKeyboards.fallback(SHUANGPIN, CUSTOM, ziranma, k14))
+        // English has no 18 keys: the full keyboard
+        assertEquals(FULL, ImKeyboards.effective(ENGLISH, CUSTOM, ziranma, k18))
+        // deleted: each one that chose it its base where it has it, else the full keyboard
+        val both = Chosen(pinyin = CUSTOM, english = CUSTOM, shuangpin = CUSTOM, layouts = mapOf(PINYIN to "my-k18", ENGLISH to "my-k18", SHUANGPIN to "other"))
+        assertEquals(mapOf(PINYIN to KEYS18, ENGLISH to FULL), ImKeyboards.afterDelete(both, "my-k18", k18, ziranma))
+        assertEquals(mapOf(PINYIN to FULL, ENGLISH to FULL), ImKeyboards.afterDelete(both, "my-k18", null, ziranma))
+        val table = Chosen(table = CUSTOM, layouts = mapOf(ImKeyboards.TABLE to "my-qwerty"))
+        assertEquals(mapOf(ImKeyboards.TABLE to FULL), ImKeyboards.afterDelete(table, "my-qwerty", letters, ziranma))
+        // a layout chosen, but the choice another keyboard since: not its
+        assertEquals(emptyMap<String, ImKeyboard>(), ImKeyboards.afterDelete(Chosen(layouts = mapOf(PINYIN to "my-k18")), "my-k18", k18, ziranma))
+    }
+
+    @Test
+    fun aLayoutsCardSaysWhoUsesItAndWhoMay() {
+        val both = Chosen(pinyin = CUSTOM, english = CUSTOM, table = CUSTOM, layouts = mapOf(PINYIN to "my-qwerty", ENGLISH to "my-qwerty", ImKeyboards.TABLE to "other"))
+        assertEquals(listOf(PINYIN, ENGLISH), ImKeyboards.usedBy(both, "my-qwerty"))
+        assertEquals(listOf(ImKeyboards.TABLE), ImKeyboards.usedBy(both, "other"))
+        // who may: letters every one (a table where it has ; and *), the 14 keys' groups not 双拼 under 微软
+        assertEquals(ImKeyboards.SLOTS, ImKeyboards.usableBy(letters, ziranma))
+        assertEquals(listOf(PINYIN, SHUANGPIN, ENGLISH), ImKeyboards.usableBy(letters.copy(tableExtras = false), ziranma))
+        assertEquals(listOf(PINYIN, SHUANGPIN), ImKeyboards.usableBy(k14, ziranma))
+        assertEquals(listOf(PINYIN), ImKeyboards.usableBy(k14, microsoft))
+        assertEquals(emptyList<String>(), ImKeyboards.usableBy(k18.copy(drawn = false), ziranma))
+        // 用在… set: ticked it; unticked where it was, its base; unticked elsewhere, as it is
+        val pinyin = Chosen(pinyin = CUSTOM, layouts = mapOf(PINYIN to "my-k18"))
+        assertEquals(CUSTOM, ImKeyboards.ticked(pinyin, SHUANGPIN, k18, true, ziranma))
+        assertEquals(KEYS18, ImKeyboards.ticked(pinyin, PINYIN, k18, false, ziranma))
+        assertNull(ImKeyboards.ticked(pinyin, SHUANGPIN, k18, false, ziranma))
     }
 }

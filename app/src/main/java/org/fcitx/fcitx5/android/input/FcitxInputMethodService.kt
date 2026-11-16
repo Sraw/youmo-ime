@@ -79,6 +79,7 @@ import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.pack.PackStore
+import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
@@ -516,6 +517,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.keyboard.pinyinKeyboard,
         prefs.keyboard.shuangpinKeyboard,
         prefs.keyboard.englishKeyboard,
+        // the layout of the user's each chose, the tables' one (061-custom-layout §5.2)
+        prefs.keyboard.pinyinKeyboardLayout,
+        prefs.keyboard.shuangpinKeyboardLayout,
+        prefs.keyboard.englishKeyboardLayout,
+        prefs.keyboard.tableKeyboardLayout,
         // every key's marks laid out anew, those no swipe marks too; was a theme setting's
         prefs.keyboard.swipeUpPosition,
         prefs.keyboard.swipeDownPosition,
@@ -758,6 +764,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         pickedLocalesChanged()
         // the punctuation keys the last run started with, read off this thread before the keyboard is made
         PunctuationStartKeys.preload(this)
+        // the user's layouts, listed off this thread: what each input start asks (KeyboardPicker.offers) reads no file
+        CustomKeyboards.relist()
         fcitx = HostDaemon.connect(javaClass.name)
         lifecycleScope.launch {
             jobs.consumeEach { it.join() }

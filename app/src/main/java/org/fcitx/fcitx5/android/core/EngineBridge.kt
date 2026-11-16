@@ -543,7 +543,9 @@ class EngineBridge {
         // Written here, on the fcitx thread: its listeners (the service's, which makes the input view anew) still run on
         // the main thread, as SharedPreferences hands its change listeners there; a change told another way must post
         val keyboards = AppPrefs.getInstance().keyboard
-        ImKeyboards.fallback(InputMethodCatalog.SHUANGPIN, keyboards.shuangpinKeyboard.getValue().keyboard, engines.settings.scheme)
+        // a layout of the user's of the 14 keys' groups alike (061-custom-layout §5.1); one not drawn left chosen
+        val chosen = keyboards.imKeyboards()
+        ImKeyboards.fallback(InputMethodCatalog.SHUANGPIN, chosen.shuangpin, engines.settings.scheme, chosen.customOf(InputMethodCatalog.SHUANGPIN))
             ?.let { keyboards.setImKeyboard(InputMethodCatalog.SHUANGPIN, it) }
     }
 

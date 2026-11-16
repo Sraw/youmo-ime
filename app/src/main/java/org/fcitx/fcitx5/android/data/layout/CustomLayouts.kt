@@ -39,6 +39,8 @@ object CustomLayouts {
 
     private const val SAVING = ".saving"
 
+    private const val SAVING_LEFT_MS = 60_000L
+
     /** Where the layouts are: the app's files' `layouts/`. */
     fun dir(context: Context = appContext): File = File(context.filesDir, DIR)
 
@@ -64,11 +66,15 @@ object CustomLayouts {
     // by the file's path, as last read (each read once while unchanged)
     private val kept = HashMap<String, Entry>()
 
-    /** The layouts in [dir], read where new or changed since; by name. A `.saving` left by a kill is deleted. */
+    /**
+     * The layouts in [dir], read where new or changed since; by name. A `.saving` left by a kill is deleted, one a minute
+     * old: one being written is younger (and written under this lock besides).
+     */
     @Synchronized
     fun list(dir: File = dir(), context: Context = appContext): List<Entry> {
         val files = dir.listFiles().orEmpty()
-        files.filter { it.name.endsWith(SAVING) }.forEach { it.delete() }
+        val now = System.currentTimeMillis()
+        files.filter { it.name.endsWith(SAVING) && now - it.lastModified() > SAVING_LEFT_MS }.forEach { it.delete() }
         val layouts = files.filter { it.isFile && CustomLayoutFiles.idOf(it.name) != null }
         kept.keys.retainAll(layouts.map { it.path }.toSet())
         return layouts.map { f ->
@@ -167,6 +173,7 @@ object CustomLayouts {
             if (!done) temp.delete()
         }
         kept.remove(target.path)
+        CustomKeyboards.changed(dir)
     }
 
     /** Layout [id] taken out of [dir]: whether it is gone. The settings under its keys' names stay (§4.4, Q8). */
@@ -174,7 +181,7 @@ object CustomLayouts {
     fun delete(id: String, dir: File = dir()): Boolean {
         val file = File(dir, CustomLayoutFiles.fileName(id))
         kept.remove(file.path)
-        return file.delete() || !file.exists()
+        return (file.delete() || !file.exists()).also { CustomKeyboards.changed(dir) }
     }
 
     /** Layout [id]'s file in [dir], as it is, into [out] (`<名字>.layout`, §2.1). */

@@ -146,8 +146,8 @@ class InputMethodSettingsTest {
                 EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS,
             ),
         ) + InputMethodCatalog.TABLES.mapValues { (_, method) ->
-            // what the keys show, where a table has roots on them (仓颉, 五笔)
-            TableSettings.KEYS.toList() + InputMethodSettings.RESET_TABLE_ORDER + listOfNotNull(TableSettings.KEY_LABELS.takeIf { method.options.roots != null })
+            // the tables' one keyboard (a layout of the user's, 061-custom-layout Q6), what the keys show, where a table has roots on them (仓颉, 五笔)
+            TableSettings.KEYS.toList() + InputMethodSettings.RESET_TABLE_ORDER + AppPrefs.TABLE_KEYBOARD_LAYOUT + listOfNotNull(TableSettings.KEY_LABELS.takeIf { method.options.roots != null })
         }
         assertEquals(appInputMethods.toSet(), own.keys)
         appInputMethods.forEach { page ->
@@ -205,7 +205,7 @@ class InputMethodSettingsTest {
         val fuzzy = InputMethodSettings.SHARED.flat().filterIsInstance<Flags>().single()
         assertEquals(EngineSettings.FUZZY, fuzzy.path)
         assertEquals(Fuzzy.entries.map { it.name }.sorted(), fuzzy.flags.map { it.first }.sorted())
-        assertEquals((TableSettings.KEYS + TableSettings.KEY_LABELS).sorted(), keys("engine-wubi").filter { it != InputMethodSettings.SHARED_LINK && it != InputMethodSettings.RESET_TABLE_ORDER }.sorted())
+        assertEquals((TableSettings.KEYS + TableSettings.KEY_LABELS).sorted(), keys("engine-wubi").filter { it !in listOf(InputMethodSettings.SHARED_LINK, InputMethodSettings.RESET_TABLE_ORDER, AppPrefs.TABLE_KEYBOARD_LAYOUT) }.sorted())
     }
 
     // the page's main choice, right under the way to the shared page

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.layout
 
 import android.content.Context
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -26,6 +27,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.snackbar.Snackbar
+import java.io.IOException
+import kotlin.math.max
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,9 +37,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.layout.CustomLayouts
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.input.keyboard.CustomChoice
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
@@ -59,14 +70,13 @@ import org.fcitx.fcitx5.android.utils.styledColor
 import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import timber.log.Timber
-import java.io.IOException
-import kotlin.math.max
 
 /**
  * 外观 → 布局 (061-custom-layout §4.3): the layouts by what they are (字母键盘, 数字键盘, 符号面板), the app's first, then
  * the user's own, each a card of its keys in little in the theme in use. A card tapped shows in the preview above (no
- * setting changed); one of the user's long pressed: 信息, 导出, 删除. **+**: import a `.layout` file, or open the layout
- * maker in the browser. Which keyboards use a layout is the keyboard options' (L3), not this page's.
+ * setting changed), one of the user's of letters offering 用在… (the input methods it may be typed on, ticked where they
+ * use it); one of the user's long pressed: 信息, 导出, 删除. **+**: import a `.layout` file, or open the layout maker in
+ * the browser. Under each of the user's, 「用在：拼音、英文」: the input methods whose keyboard it is (L3, §4.3).
  */
 class LayoutListFragment : Fragment() {
 
@@ -75,7 +85,15 @@ class LayoutListFragment : Fragment() {
         class Header(val title: Int) : Item
 
         /** A layout: the app's ([entry] null) or the user's; [scene] what the preview draws, null where it does not read. */
-        class Card(val id: String, val name: String, val entry: CustomLayouts.Entry?, val scene: SceneLayout?, val cells: List<LayoutThumbnail.Cell>) : Item
+        class Card(
+            val id: String,
+            val name: String,
+            val entry: CustomLayouts.Entry?,
+            val scene: SceneLayout?,
+            val cells: List<LayoutThumbnail.Cell>,
+            /** The input methods (ImKeyboards.slot) whose keyboard it is. */
+            val usedBy: List<String> = emptyList(),
+        ) : Item
     }
 
     private lateinit var importLauncher: ActivityResultLauncher<String>
@@ -169,9 +187,10 @@ class LayoutListFragment : Fragment() {
             val cells = runCatching { LayoutThumbnail.cells(scene.layout, scene.fragments) }.getOrDefault(emptyList())
             return Item.Card(id, scene.layout.name, null, scene, cells)
         }
+        val chosen = AppPrefs.getInstance().keyboard.imKeyboards()
         val own = CustomLayouts.list(context = ctx).map { e ->
             val scene = e.layout?.let { scene(e.id, it, e.fragments) }
-            Item.Card(e.id, e.name, e, scene, e.cells)
+            Item.Card(e.id, e.name, e, scene, e.cells, ImKeyboards.usedBy(chosen, e.id))
         }
         fun section(of: (String?) -> Boolean) = own.filter { of(it.entry?.family) }
         val out = ArrayList<Item>()
@@ -188,10 +207,12 @@ class LayoutListFragment : Fragment() {
         return out
     }
 
-    // a layout of one's own as the keyboard will draw it: the app's keys' long press and swipes on the app's names (KeyData.Own)
+    // a layout of one's own as the keyboard will draw it: the app's keys' long press and swipes on the app's names
+    // (KeyData.Own), its base of its own family's (CustomLayoutSource.base)
     private fun scene(id: String, layout: Layout, fragments: Map<String, org.fcitx.fcitx5.android.scene.layout.Fragment>): SceneLayout {
-        val held = runCatching { KeyData.of(id, layout, fragments, KeyData.Mode.Own, layout.basedOn) }.getOrNull()
-        return if (held != null) SceneLayout(id, held.layout, held.fragments) else SceneLayout(id, layout, fragments)
+        val base = runCatching { CustomKeyboards.baseOf(layout) }.getOrNull()
+        val held = runCatching { KeyData.of(id, layout, fragments, KeyData.Mode.Own, base) }.getOrNull()
+        return if (held != null) SceneLayout(id, held.layout, held.fragments, base ?: id) else SceneLayout(id, layout, fragments, base ?: id)
     }
 
     private fun addLayout() {
@@ -247,9 +268,14 @@ class LayoutListFragment : Fragment() {
             .setPositiveButton(R.string.theme_pack_import) { _, _ ->
                 lifecycleScope.withLoadingDialog(ctx) {
                     try {
-                        withContext(Dispatchers.IO) { CustomLayouts.save(layout.id, text) }
+                        val read = withContext(Dispatchers.IO) {
+                            CustomLayouts.save(layout.id, text)
+                            CustomKeyboards.choice(layout.id)
+                        }
                         ctx.toast(ctx.getString(R.string.layout_imported, name))
                         reload()
+                        // §4.2 step 5: on what now, where it may be (one: asked of it; more: ticked); later, the keyboard options
+                        read?.let { askUse(ctx, it, ask = true) }
                     } catch (e: IOException) {
                         ctx.importErrorDialog(e)
                     }
@@ -261,6 +287,64 @@ class LayoutListFragment : Fragment() {
 
     private fun select(card: Item.Card) {
         (parentFragment as? ThemeFragment)?.previewLayout(card.scene)
+        // the user's of letters: 用在… under the preview, the input methods it may be typed on
+        val entry = card.entry ?: return
+        if (entry.family !in LETTER_FAMILIES) return
+        val view = view ?: return
+        Snackbar.make(view, card.name, Snackbar.LENGTH_LONG)
+            .setAction(R.string.layout_use) {
+                val ctx = context ?: return@setAction
+                lifecycleScope.launch {
+                    val (read, problems) = withContext(Dispatchers.IO) { CustomKeyboards.choice(entry.id) to CustomKeyboards.problems(entry.id) }
+                    when {
+                        read == null -> Unit
+                        // refused under this version's rules (one let in by an older build, restored): why, not 「没有输入法能用」
+                        !read.drawn -> ctx.toast(ctx.getString(R.string.layout_use_refused, read.name, problems.firstOrNull()?.let { LayoutTexts.finding(ctx, it) }.orEmpty()))
+                        else -> askUse(ctx, read, ask = false)
+                    }
+                }
+            }
+            .show()
+    }
+
+    /**
+     * 用在… of [layout] (§4.3): the input methods it may be typed on, each ticked where its keyboard is it; set as ticked on
+     * OK, one unticked back on its base (§4.4). [ask]: just imported (§4.2 step 5), one input method asked of by name, none
+     * ticked. Nothing where none may use it (a refused one, one 双拼 alone cannot type on and so on).
+     */
+    private fun askUse(ctx: Context, layout: CustomChoice, ask: Boolean) {
+        val scheme = EngineState.shuangpinScheme
+        val slots = ImKeyboards.usableBy(layout, scheme)
+        if (slots.isEmpty()) {
+            if (!ask) ctx.toast(ctx.getString(R.string.layout_use_none, layout.name))
+            return
+        }
+        val prefs = AppPrefs.getInstance().keyboard
+        val names = slots.map { imName(ctx, it) }
+        fun done(ticked: List<String>) {
+            val chosen = prefs.imKeyboards()
+            for (slot in slots) {
+                val k = ImKeyboards.ticked(chosen, slot, layout, slot in ticked, scheme) ?: continue
+                prefs.setImKeyboard(ImKeyboards.imOf(slot), k, layout.id)
+            }
+            reload()
+        }
+        if (ask && slots.size == 1) {
+            AlertDialog.Builder(ctx)
+                .setMessage(ctx.getString(R.string.layout_use_now, names.single()))
+                .setPositiveButton(R.string.layout_use_yes) { _, _ -> done(slots) }
+                .setNegativeButton(R.string.layout_use_no, null)
+                .show()
+            return
+        }
+        val used = ImKeyboards.usedBy(prefs.imKeyboards(), layout.id)
+        val checked = BooleanArray(slots.size) { !ask && slots[it] in used }
+        AlertDialog.Builder(ctx)
+            .setTitle(if (ask) ctx.getString(R.string.layout_use_now_many) else ctx.getString(R.string.layout_use_title, layout.name))
+            .setMultiChoiceItems(names.toTypedArray(), checked) { _, i, on -> checked[i] = on }
+            .setPositiveButton(android.R.string.ok) { _, _ -> done(slots.filterIndexed { i, _ -> checked[i] }) }
+            .setNegativeButton(if (ask) R.string.layout_use_no else android.R.string.cancel, null)
+            .show()
     }
 
     private fun actions(card: Item.Card) {
@@ -306,15 +390,38 @@ class LayoutListFragment : Fragment() {
         }
     }
 
-    private fun delete(entry: CustomLayouts.Entry) {
+    private fun delete(entry: CustomLayouts.Entry) = lifecycleScope.launch {
         val ctx = requireContext()
+        val prefs = AppPrefs.getInstance().keyboard
+        val scheme = EngineState.shuangpinScheme
+        // §4.4: the input methods using it back on its base where they have it, else the full keyboard, said first; the
+        // files read off the main thread
+        val (chosen, read) = withContext(Dispatchers.IO) { prefs.imKeyboards() to CustomKeyboards.choice(entry.id) }
+        val after = ImKeyboards.afterDelete(chosen, entry.id, read, scheme)
+        val message = if (after.isEmpty()) {
+            ctx.getString(R.string.delete_layout_msg, entry.name)
+        } else {
+            val separator = ctx.getString(R.string.layout_list_separator)
+            val users = after.keys.joinToString(separator) { imName(ctx, it) }
+            val back = after.entries.joinToString(separator) { (slot, k) ->
+                ctx.getString(R.string.layout_goes_back, imName(ctx, slot), KeyboardLabels.builtInName(ctx, ImKeyboards.imOf(slot), k))
+            }
+            ctx.getString(R.string.delete_layout_in_use, entry.name, users, back)
+        }
         AlertDialog.Builder(ctx)
             .setTitle(R.string.delete_layout)
-            .setMessage(ctx.getString(R.string.delete_layout_msg, entry.name))
+            .setMessage(message)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 lifecycleScope.launch {
                     val gone = withContext(Dispatchers.IO) { CustomLayouts.delete(entry.id) }
                     if (!gone) ctx.toast(ctx.getString(R.string.layout_not_deleted, entry.name))
+                    // the preferences as it is gone, asked again (a keyboard chosen meanwhile kept): the input view made anew
+                    if (gone) {
+                        CustomKeyboards.forget(entry.id)
+                        ImKeyboards.afterDelete(prefs.imKeyboards(), entry.id, null, scheme).keys.forEach { slot ->
+                            after[slot]?.let { prefs.setImKeyboard(ImKeyboards.imOf(slot), it) }
+                        }
+                    }
                     (parentFragment as? ThemeFragment)?.previewLayout(null)
                     reload()
                 }
@@ -322,6 +429,16 @@ class LayoutListFragment : Fragment() {
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
+
+    // an input method's name as the layouts say it (LayoutTexts), by ImKeyboards.slot
+    private fun imName(ctx: Context, slot: String): String = ctx.getString(
+        when (slot) {
+            InputMethodCatalog.PINYIN -> R.string.layout_im_pinyin
+            InputMethodCatalog.SHUANGPIN -> R.string.layout_im_shuangpin
+            InputMethodCatalog.ENGLISH -> R.string.layout_im_english
+            else -> R.string.layout_im_table
+        },
+    )
 
     // [title] and [text], [preview] drawn above it in the theme in use; the text scrolls
     private fun dialog(ctx: Context, title: String, text: String, preview: SceneLayout?): AlertDialog.Builder {
@@ -359,7 +476,7 @@ class LayoutListFragment : Fragment() {
         }
     }
 
-    private inner class Holder(view: View, val ui: ThemeThumbnailUi?) : RecyclerView.ViewHolder(view)
+    private inner class Holder(view: View, val ui: ThemeThumbnailUi?, val usedBy: TextView? = null) : RecyclerView.ViewHolder(view)
 
     private inner class Adapter : RecyclerView.Adapter<Holder>() {
         var items: List<Item> = emptyList()
@@ -382,11 +499,23 @@ class LayoutListFragment : Fragment() {
                 return Holder(title.apply { layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT) }, null)
             }
             val ui = ThemeThumbnailUi(ctx)
-            val cell = FrameLayout(ctx).apply {
-                layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, ctx.dp(CARD_HEIGHT_DP) + ThemeNames.rowHeight(ctx) + ctx.dp(CARD_MARGIN_DP))
-                addView(ui.root, FrameLayout.LayoutParams(ctx.dp(CARD_WIDTH_DP), ctx.dp(CARD_HEIGHT_DP) + ThemeNames.rowHeight(ctx), Gravity.CENTER_HORIZONTAL or Gravity.TOP))
+            val row = ThemeNames.rowHeight(ctx)
+            // 「用在：拼音、英文」 under the name, a line of its own (the name's row is one line): every card as high
+            val usedBy = TextView(ctx).apply {
+                textSize = USED_BY_SP
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                gravity = Gravity.CENTER_HORIZONTAL
+                setTextColor(ctx.styledColor(android.R.attr.textColorSecondary))
             }
-            return Holder(cell, ui)
+            val cell = FrameLayout(ctx).apply {
+                layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, ctx.dp(CARD_HEIGHT_DP) + 2 * row + ctx.dp(CARD_MARGIN_DP))
+                addView(ui.root, FrameLayout.LayoutParams(ctx.dp(CARD_WIDTH_DP), ctx.dp(CARD_HEIGHT_DP) + row, Gravity.CENTER_HORIZONTAL or Gravity.TOP))
+                addView(usedBy, FrameLayout.LayoutParams(ctx.dp(CARD_WIDTH_DP), row, Gravity.CENTER_HORIZONTAL or Gravity.TOP).apply {
+                    topMargin = ctx.dp(CARD_HEIGHT_DP) + row
+                })
+            }
+            return Holder(cell, ui, usedBy)
         }
 
         override fun onBindViewHolder(holder: Holder, position: Int) {
@@ -400,6 +529,8 @@ class LayoutListFragment : Fragment() {
                     dynamicIcon.visibility = View.GONE
                     keys.background = ThemeThumbnailKeys(ThemeManager.shownLook(theme), ctx.resources.displayMetrics.density, ctx.dp(THUMBNAIL_BAR_DP).toFloat(), item.cells)
                     name.text = if (item.entry != null && item.entry.layout == null) ctx.getString(R.string.layout_unreadable, item.name) else item.name
+                    holder.usedBy?.text = item.usedBy.takeIf { it.isNotEmpty() }
+                        ?.let { u -> ctx.getString(R.string.layout_used_by, u.joinToString(ctx.getString(R.string.layout_list_separator)) { imName(ctx, it) }) }
                     root.setOnClickListener { select(item) }
                     root.setOnLongClickListener {
                         if (item.entry == null) return@setOnLongClickListener false
@@ -428,6 +559,7 @@ class LayoutListFragment : Fragment() {
         const val CARD_MARGIN_DP = 16
         const val THUMBNAIL_BAR_DP = 14
         const val HEADER_SP = 14f
+        const val USED_BY_SP = 11f
         const val FAB_MARGIN_DP = 16
         const val DIALOG_PADDING_DP = 24
         const val PREVIEW_DP = 160

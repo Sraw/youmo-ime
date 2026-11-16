@@ -50,6 +50,7 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -120,6 +121,8 @@ class T9Keyboard(
     private val shuangpin: Boolean = false,
     /** 九键双拼's 1 types `;` while typing, shown beside its digit: only under a scheme that types it (微软's ing). */
     private val semicolon: Boolean,
+    /** A layout of the user's drawn in place of the app's ([customLayout]: `id@stamp`); null for the app's. */
+    private val custom: String? = null,
 ) : BaseKeyboard(
     context, theme, layout(letters, english, shuangpin, semicolon), themeBoard = KeyNames.NINE,
 ), AutoCapsKeys, TypingKeys {
@@ -952,7 +955,7 @@ class T9Keyboard(
     // last: the scene reads the state above (the keys drawn by the scene engine, each wired as nine.xml's
     // node says; the column a native view in its slot)
     init {
-        drawKeysWithScene(LAYOUT)
+        drawKeysWithScene(custom?.let { customLayout(context, it) } ?: SceneLayouts.of(context, LAYOUT))
         column.bringToFront()
     }
 }

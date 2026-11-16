@@ -841,7 +841,7 @@
 ### ST-148 [P1] 导入布局：确认框，再导入新版本替换
 - **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/` 的 `uat-qwerty-1.0.layout`、`uat-qwerty-1.1.layout`（`adb push` 到 `/sdcard/Download/`）。
 - **操作**：**外观 → 布局** 点 **+**，看菜单；选 **导入布局文件**，选 `uat-qwerty-1.0.layout`，看确认框，点 **导入**；再导入 `uat-qwerty-1.1.layout`，看确认框，点 **取消**；再导入一次 1.1，点 **导入**。
-- **预期**：菜单有 **导入布局文件**、**在网页上做布局**（下面小字说做好后回来导入）。确认框标题含「UAT 26 键」，上面是按当前主题画的 26 键预览，下面写作者 UAT、版本 1.0、许可 CC0、说明「验收测试用……」、能用在拼音、双拼、英文、码表的键盘，以及有 1 个键会直接打出写好的文字「哈哈」。导入后提示已导入，字母键盘段 26 键、18 键、14 键、九键之后多一张「UAT 26 键」。1.1 的确认框写「替换已有的『UAT 26 键』1.0 → 1.1」；取消后长按看信息仍是 1.0；再导入后信息是 1.1，列表里仍只有一张。
+- **预期**：菜单有 **导入布局文件**、**在网页上做布局**（下面小字说做好后回来导入）。确认框标题含「UAT 26 键」，上面是按当前主题画的 26 键预览，下面写作者 UAT、版本 1.0、许可 CC0、说明「验收测试用……」、能用在拼音、双拼、英文、码表的键盘，以及有 1 个键会直接打出写好的文字「哈哈」。导入后问「现在就用在」哪些输入法（点 **先不用**），提示已导入，字母键盘段 26 键、18 键、14 键、九键之后多一张「UAT 26 键」。1.1 的确认框写「替换已有的『UAT 26 键』1.0 → 1.1」；取消后长按看信息仍是 1.0；再导入后信息是 1.1，列表里仍只有一张。
 - **JVM**：`LayoutImportTest.theUatsLayoutsAreJudgedAsItSays`（这三个文件的判定）、`CustomLayoutsTest.aLayoutImportedIsListedInItsFamilyAndReplacedByItsId`；确认框和列表在设备上看。
 
 ### ST-149 [P1] 导入不合格的布局：列出问题，什么都不留
@@ -852,7 +852,7 @@
 
 ### ST-150 [P1] 导入的布局：信息、导出、删除
 - **前提**：B0-设置；导入了 `uat-qwerty-1.1.layout`（UAT 26 键 1.1）。
-- **操作**：**外观 → 布局** 长按「UAT 26 键」，看菜单；选 **信息**；再长按选 **导出**，存到「下载」；再长按选 **删除**，确认。
+- **操作**：（导入后问现在就用在哪时点 **先不用**）**外观 → 布局** 长按「UAT 26 键」，看菜单；选 **信息**；再长按选 **导出**，存到「下载」；再长按选 **删除**，确认。
 - **预期**：菜单是 **信息**、**导出**、**删除**。信息里有预览、作者、版本、许可、说明、能用在哪和会直接打出的「哈哈」。导出的文件名是 `UAT 26 键.layout`，内容和导入的 `uat-qwerty-1.1.layout` 一样（`adb pull` 后 `cmp`）。删除前问一次，删后卡片不见，预览回到原来的键盘。
 - **JVM**：`CustomLayoutsTest.anExportIsTheFileAsItIs`、`CustomLayoutsTest.theListReadsEachFileOnceTillItChangesAndLeavesNoHalfWrittenOne`（读不出的文件列成「（读不出）」、能删）。
 
@@ -891,3 +891,27 @@
 - **预期**：多选后每张卡片下面多一条勾选框和「0/N」，整条能点，角上的数不画；勾了九键后写「已选 9 个」，九键那条是全选、「9/9」；换到全键盘点 q 后写「已选 10 个」，
   全键盘那条是半选、「1/26」，九键还是全选；完成后勾选条都不见了。
 - **JVM**：`PopupOverridesFragmentTest$Cards.multiSelectsStripsChooseAKeyboardsKeysAllOrNone`。
+
+### ST-161 [P1] 导入布局时用在拼音上，拼音用它打字
+- **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-qwerty-1.0.layout`（a 键直接打出「哈哈」）。
+- **操作**：**外观 → 布局 → + → 导入布局文件** 选它，点 **导入**；在「现在就用在」里勾 **拼音**，点 **确定**；看卡片；到测试页用拼音点 a；看 **输入法 → 拼音 → 键盘**；再切到英文点 a。
+- **预期**：「现在就用在」列出拼音、双拼、英文、五笔等码表（几个能用就列几个，只有一个时直接问「现在就用在 拼音 上吗？」）。卡片名字下写「用在：拼音」。拼音的 a 打出「哈哈」，键盘是导入的布局；拼音的 **键盘** 写「UAT 26 键（自定义）」。英文没选它，a 打出 a。
+- **JVM**：`CustomKeyboardTest.aLayoutOfTheUsersIsDrawnInPlaceOfTheApps`、`ImKeyboardsTest.aLayoutsCardSaysWhoUsesItAndWhoMay`。
+
+### ST-162 [P1] 点卡片「用在…」：勾上、去掉
+- **前提**：B0-设置；导入了 `uat-qwerty-1.0.layout`，导入后点了 **先不用**。
+- **操作**：**外观 → 布局** 点「UAT 26 键」卡片，点底下提示条的 **用在…**；勾 **拼音**、**英文**，点 **确定**；到测试页用拼音点 a；回来再点卡片 **用在…**，去掉 **拼音**，点 **确定**；再用拼音点 a。
+- **预期**：没用在输入法上时卡片下没有「用在：」。点卡片上方预览换成它，底下出带 **用在…** 的提示条；「「UAT 26 键」用在」里有拼音、双拼、英文，用着的打勾。勾后卡片写「用在：拼音、英文」，拼音的 a 打出「哈哈」。去掉拼音后卡片写「用在：英文」，拼音换回全键盘（a 打 a）。
+- **JVM**：`ImKeyboardsTest.aLayoutsCardSaysWhoUsesItAndWhoMay`（谁在用、谁能用、勾和去勾后各存什么）。
+
+### ST-163 [P1] 删掉正在用的布局：说清楚换回什么
+- **前提**：B0-设置；导入 `uat-qwerty-1.0.layout` 时用在了拼音上。
+- **操作**：**外观 → 布局** 长按「UAT 26 键」选 **删除**；看确认框，点 **确定**；到测试页用拼音点 a；看 **输入法 → 拼音 → 键盘**。
+- **预期**：确认框写「删除「UAT 26 键」吗？拼音正在用它，删掉后拼音换回 全键盘。……」。删后卡片不见；拼音的 a 打 a，**键盘** 是全键盘。（基于 18 键的布局删掉后换回 18 键。）
+- **JVM**：`CustomKeyboardTest.deletedWhileInUseEachInputMethodGoesBackToItsBase`、`ImKeyboardsTest`（afterDelete：有底稿换底稿，没有换全键盘）。
+
+### ST-164 [P1] 正在用的布局文件不见了：画底稿，设置写「读不出」
+- **前提**：B0-设置；导入 `uat-qwerty-1.0.layout` 时用在了拼音上；debug 构建（`run-as` 删文件）。
+- **操作**：确认拼音的 a 打出「哈哈」；`adb shell run-as <包名> rm files/layouts/uat-qwerty.xml`；到测试页用拼音点 a；看 **输入法 → 拼音 → 键盘**。
+- **预期**：文件删掉后拼音画全键盘（a 打 a），不崩；拼音的 **键盘** 写「uat-qwerty（读不出，暂用 全键盘）」，选择没被改掉（文件放回来就又用它）。
+- **JVM**：`CustomKeyboardTest.theKeyboardsListAndTheSettingsOfferItAndSayWhereItIsGone`、`CustomKeyboardTest.oneRefusedAsItIsReadDrawsItsBaseTheChoiceKept`（按这一版规则不合格的：字母键上放了底稿没有的命令，也画底稿）。

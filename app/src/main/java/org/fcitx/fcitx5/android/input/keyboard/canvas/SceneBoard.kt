@@ -125,7 +125,7 @@ class SceneBoard(
     // the scene's env asks the keyboard of that layout, so the keys touched are the ones drawn (BaseKeyboard.keyMarks).
     // Null where [layout] is the app's already: nothing else to draw
     private fun ownLayout(layout: SceneLayout): SceneLayout? =
-        SceneLayouts.builtIn(context, layout.id)?.takeIf { it !== layout }
+        SceneLayouts.builtIn(context, layout.base)?.takeIf { it !== layout }
 
     // what the keys of [layout] show now as the engine's environment, the board's id its theme's @keyboard= (060-render-p3 T5)
     // [keyStyle]: the key style settings over a pack's own keys (a look's has them in it)
@@ -299,7 +299,7 @@ class SceneBoard(
          */
         @MainThread
         fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null, slots: SwipeSlots = SwipeSlotsCache.current): KeyResolver =
-            resolver(layout, KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters), slots)
+            resolver(layout, KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters, layout.base), slots)
 
         /** [layout]'s resolver for [variant] as given: the long press editor's (060-row-unlock §2: 18 键's L with its `:`), as [resolver]. */
         @MainThread

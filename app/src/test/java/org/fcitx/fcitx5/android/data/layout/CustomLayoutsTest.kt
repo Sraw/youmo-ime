@@ -85,12 +85,15 @@ class CustomLayoutsTest {
     @Test
     fun theListReadsEachFileOnceTillItChangesAndLeavesNoHalfWrittenOne() {
         CustomLayouts.save("a", own("a"), dir)
-        File(dir, "x.saving").writeText("half")
+        // one a kill left, and one being written (younger than a minute: kept)
+        File(dir, "x.saving").apply { writeText("half") }.setLastModified(System.currentTimeMillis() - 120_000)
+        File(dir, "y.saving").writeText("being written")
         File(dir, "notes.txt").writeText("not a layout")
         // a file renamed by hand: its id not its name's, listed as one that does not read (to be deleted)
         File(dir, "b.xml").writeText(own("c"))
         val first = CustomLayouts.list(dir)
         assertFalse(File(dir, "x.saving").exists())
+        assertTrue(File(dir, "y.saving").exists())
         assertEquals(listOf("a", "b"), first.map { it.id })
         assertNull(first[1].layout)
         assertSame(first[0], CustomLayouts.list(dir)[0])
