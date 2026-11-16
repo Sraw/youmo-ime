@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import com.google.android.material.checkbox.MaterialCheckBox
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
 import org.fcitx.fcitx5.android.engine.data.TestCharLevels
@@ -50,6 +51,7 @@ class RareCharsCardsUatTest : RarePageUat() {
 
     // 061-settings-cards.md §2.4: the title bar's ↶ takes back the last step, the snackbar long gone; a save clears it
     @Test
+    @Uat("WD-63")
     fun theTitleBarsUndoTakesBackTheLastStepTillASave() {
         RareCharsManager.update(listOf(Change.On(true), Change.One(0x9F98, true)), TestCharLevels.levels)
         openPage()
@@ -168,8 +170,31 @@ class RareCharsCardsUatTest : RarePageUat() {
         assertEquals(emptyList<String>(), cut)
     }
 
+    // the cards at night, in the largest font and on the side (§8.1): switched on, 其它表外字 partly held
+    @Test
+    @Uat("LS-53")
+    @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-night-440dpi")
+    fun theCardsAtNight() = cardsCaptured("cards_night")
+
+    @Test
+    @Uat("LS-53")
+    @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi", fontScale = 1.5f)
+    fun theCardsInTheLargestFont() = cardsCaptured("cards_font15")
+
+    @Test
+    @Uat("LS-53")
+    @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
+    fun theCardsOnTheSide() = cardsCaptured("cards_landscape")
+
+    private fun cardsCaptured(name: String) {
+        RareCharsManager.update(listOf(Change.On(true), Change.One(0x9F98, true)), TestCharLevels.levels)
+        openPage()
+        st.capture("RareCharsCardsUatTest/$name")
+    }
+
     // 061-settings-cards.md §2.8: a card two nodes read one after the other, the cards a list; the letters as an adjustable (review N12)
     @Test
+    @Uat("AX-21")
     fun theCardsAndTheLettersAreReadOut() {
         openPage()
         fun node(v: View) = AccessibilityNodeInfo.obtain().also { v.onInitializeAccessibilityNodeInfo(it) }

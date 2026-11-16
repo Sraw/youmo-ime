@@ -361,27 +361,29 @@ def kb85(d):
     qx, qy = d.keys(refresh=True)["q"]
     sel = lambda: (ml()["selStart"], ml()["selEnd"])
     free = lambda a, b: a if b == anchor else b
-    d.touch(("down", qx, qy), ("move", qx, qy - 15 * p), ("move", qx, qy - 30 * p), ("sleep", 0.2),
-            ("move", qx - 10 * p, qy - 30 * p), ("sleep", 0.3))
+    # 42 dp up: past the keys' swipe threshold, 36 dp (BaseKeyboard.inputSwipeThreshold); 30 dp fell short, 滑选 never
+    # began and the lift typed q's 1
+    d.touch(("down", qx, qy), ("move", qx, qy - 21 * p), ("move", qx, qy - 42 * p), ("sleep", 0.2),
+            ("move", qx - 10 * p, qy - 42 * p), ("sleep", 0.3))
     s1 = sel()
     check(s1 in ((c0 - 1, c0), (c0, c0 - 1)), f"往左挪一个字后选区 {s1}，起点 {c0}")
     anchor = c0
     for i in range(1, 4):
-        d.touch(("move", qx - 10 * p, qy - 30 * p - i * 28 * p), ("sleep", 0.3))
+        d.touch(("move", qx - 10 * p, qy - 42 * p - i * 28 * p), ("sleep", 0.3))
     s2 = sel()
     f2 = free(*s2)
     d.shot("app", "滑选上挪三行：选区跨四行，起点不动")
     # three screen lines: some 15 to 80 letters a line, never the paragraph's start (a logical line up)
     check(anchor in s2 and 45 <= anchor - f2 <= 240 and f2 > 0, f"上挪三行后选区 {s2}，起点 {anchor}")
     for i in range(2, -3, -1):
-        d.touch(("move", qx - 10 * p, qy - 30 * p - i * 28 * p), ("sleep", 0.3))
+        d.touch(("move", qx - 10 * p, qy - 42 * p - i * 28 * p), ("sleep", 0.3))
     s3 = sel()
     f3 = free(*s3)
     check(anchor in s3 and 30 <= f3 - anchor <= 160, f"往下挪回五行后选区 {s3}，起点 {anchor}")
-    d.touch(("move", qx - 20 * p, qy - 30 * p + 2 * 28 * p), ("sleep", 0.3))
+    d.touch(("move", qx - 20 * p, qy - 42 * p + 2 * 28 * p), ("sleep", 0.3))
     s4 = sel()
     check(anchor in s4 and free(*s4) == f3 - 1, f"再往左挪一个字后选区 {s4}，之前 {s3}")
-    d.touch(("up", qx - 20 * p, qy - 30 * p + 2 * 28 * p), ("sleep", 0.5))
+    d.touch(("up", qx - 20 * p, qy - 42 * p + 2 * 28 * p), ("sleep", 0.5))
     after = ml()
     check(after["text"] == t and (after["selStart"], after["selEnd"]) == s4, f"松手后框里 {after['text'][:20]!r}…，选区 {(after['selStart'], after['selEnd'])}")
     d.step("单行框")
@@ -391,9 +393,9 @@ def kb85(d):
     time.sleep(0.3)
     one = lambda: d.testbed_state()["text"]
     qx, qy = d.keys(refresh=True)["q"]
-    d.touch(("down", qx, qy), ("move", qx, qy - 15 * p), ("move", qx, qy - 30 * p), ("sleep", 0.2),
-            ("move", qx - 10 * p, qy - 30 * p), ("sleep", 0.3), ("move", qx - 10 * p, qy - 30 * p - 50 * p), ("sleep", 0.3),
-            ("up", qx - 10 * p, qy - 30 * p - 50 * p), ("sleep", 0.3))
+    d.touch(("down", qx, qy), ("move", qx, qy - 21 * p), ("move", qx, qy - 42 * p), ("sleep", 0.2),
+            ("move", qx - 10 * p, qy - 42 * p), ("sleep", 0.3), ("move", qx - 10 * p, qy - 42 * p - 50 * p), ("sleep", 0.3),
+            ("up", qx - 10 * p, qy - 42 * p - 50 * p), ("sleep", 0.3))
     o = one()
     check(o["text"] == "hello" and (o["selStart"], o["selEnd"]) == (4, 5), f"单行框：{o['text']!r} 选区 {(o['selStart'], o['selEnd'])}，应只选中 o")
     return f"起点 {anchor}：上挪三行到 {f2}，下挪到 {f3}，左挪到 {free(*s4)}"

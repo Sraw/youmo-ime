@@ -10,11 +10,13 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.getSystemService
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
@@ -143,6 +145,12 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
     var expanded: Boolean = false
         set(value) {
             field = value
+            // folded over a focused field (下滑's text, typed in, then another title tapped): the keyboard put
+            // away and the focus let go, or the keys went on typing into a field no longer shown
+            if (!value) scroll.findFocus()?.let { f ->
+                f.context.getSystemService<InputMethodManager>()?.hideSoftInputFromWindow(f.windowToken, 0)
+                f.clearFocus()
+            }
             scroll.isVisible = value
             if (!value) infoShown = false
             arrow.setImageResource(if (value) R.drawable.ic_baseline_expand_less_24 else R.drawable.ic_baseline_expand_more_24)

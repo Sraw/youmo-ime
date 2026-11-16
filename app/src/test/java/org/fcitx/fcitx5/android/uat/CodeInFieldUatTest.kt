@@ -67,6 +67,9 @@ class CodeInFieldUatTest {
         terminal: Boolean = false,
         prefill: (android.widget.EditText) -> Unit = {},
     ): KeyboardHarness {
+        // the one before closed first: one left open keeps its service on the prefs' listeners, its keyboard made anew
+        // at a later test's change and hearing 手写's switch there (StrokePageUatTest's 手写 row turned off under it)
+        harness?.close()
         if (ThemeManager.prefs.codeRow.getValue() != style) prefs.set(ThemeManager.prefs.codeRow, style)
         return KeyboardHarness(codeRow = style).also {
             harness = it

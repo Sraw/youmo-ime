@@ -11,6 +11,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Button
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -65,6 +66,7 @@ class GroupCardTest {
     }
 
     @Test
+    @Uat("AX-21")
     fun `a card read body then strip, the next card after this strip`() {
         val first = card()
         val second = card()
@@ -92,6 +94,7 @@ class GroupCardTest {
     }
 
     @Test
+    @Uat("WD-64")
     fun `unusable, only the strip fades and stops, the body still opens`() {
         val card = card()
         var opened = false

@@ -446,9 +446,9 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-52 [P1] 生僻字屏蔽：勾上「其它表外字」后「龘」不出，单独放行「龘」又出；按住拖动连选、撤销
 - **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关。
-- **操作**：勾上组头「其它表外字（基本区和扩展 A）」的勾选框，看底部提示；返回，打 da 翻候选。再进这一页，搜 da，点「龘」那一格；返回，打 da。再进这一页，在「三级字」里长按一格，不抬手往后拖过几格、再往回拖一格，抬手；看这几格和底部提示，点 **撤销**。
-- **预期**：勾上后组头勾选框是勾上的，下面「已屏蔽」和组里的字数一样，底部提示「已屏蔽 N 个字」带 **撤销**；da 里没有「龘」，「大」照常。点「龘」后它不再变淡、没有斜线，组头勾选框变成部分勾选；da 里「龘」回来。拖动时从按住的那格到手指下那格都变成屏蔽（变淡加斜线），往回拖退出的那格恢复；抬手后底部提示「已屏蔽 N 个字」带 **撤销**，点了这几格都回到放行。
-- **JVM**：ime-eval `RareCharsUatTest.theOtherOutOfTableHeldThenOneLetThrough`（真数据）、`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（组的勾选框三态、点格、存下的文件）、`RareCharsPageUatTest.aDragHoldsBackARunAndOneUndoTakesItBack`（按住拖动、往回拖、撤销）、ime-core `RarePageTest.aDragSetsTheRangeToTheStartsOppositeAndLeavesTheRestAsTheyWere`；设备上不跑（拖动手势由 JVM 行查）。
+- **操作**：点「其它表外字」卡片下面的勾选条，看底部提示；返回，打 da 翻候选。再进这一页，搜 da，点「龘」那一格；返回，打 da。再进这一页，点「三级字」卡片进去，长按一格，不抬手往后拖过几格、再往回拖一格，抬手；看这几格和底部提示，点 **撤销**。
+- **预期**：勾上后勾选条是勾上的，写「已屏蔽 N/N」（两个数一样），底部提示「已屏蔽 N 个字」带 **撤销**；da 里没有「龘」，「大」照常。点「龘」后它不再变淡、没有斜线，其它表外字的勾选条变成半选；da 里「龘」回来。拖动时从按住的那格到手指下那格都变成屏蔽（变淡加斜线），往回拖退出的那格恢复；抬手后底部提示「已屏蔽 N 个字」带 **撤销**，点了这几格都回到放行。
+- **JVM**：ime-eval `RareCharsUatTest.theOtherOutOfTableHeldThenOneLetThrough`（真数据）、`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（勾选条三态、点格、存下的文件）、`RareCharsPageUatTest.aDragHoldsBackARunAndOneUndoTakesItBack`（按住拖动、往回拖、撤销）、ime-core `RarePageTest.aDragSetsTheRangeToTheStartsOppositeAndLeavesTheRestAsTheyWere`；设备上不跑（拖动手势由 JVM 行查）。
 
 ### WD-53 [P1] 生僻字屏蔽：含屏蔽字的词和联想也不出；五笔勾上「其它表外字」后打 adwe 直接上屏「期」（原来和「朞」重码），放行「朞」后又要选
 - **前提**：B0-设置；五笔的 **自动上屏** 开着（默认）。
@@ -476,19 +476,41 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-57 [P2] 生僻字屏蔽：搜拼音、粘贴一个字定位、粘贴一级字显示「不能屏蔽」、恢复默认、设置搜索能搜到这一页
 - **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关。
-- **操作**：在页上的搜索框打 da（拼音键盘打了按回车上屏字母）；清空，粘贴「大」；清空，粘贴「龘」；清空。勾上「三级字」，右上角菜单 → **恢复默认**，确定。设置首页搜「生僻」。转一下屏。
-- **预期**：搜 da 列出读 da 的字（跨组，格子上的读音是 dá、dà……）；粘贴「大」写「大：常用字，不能屏蔽」，没有格子；粘贴「龘」只有「龘」一格；恢复默认先问「回到只屏蔽扩展区，并清空单独屏蔽和放行的字？」，确定后三级字的勾选框回到不勾、扩展区的回到勾上，底部有 **撤销**；设置搜索里有「生僻字屏蔽」，点了进这一页；转屏后改动和搜的字都还在。
+- **操作**：在页上的搜索框打 da（拼音键盘打了按回车上屏字母）；清空，粘贴「大」；清空，粘贴「龘」；清空。点「三级字」卡片下面的勾选条，右上角菜单 → **恢复默认**，确定。设置首页搜「生僻」。转一下屏。
+- **预期**：搜 da 列出读 da 的字（跨组，格子上的读音是 dá、dà……）；粘贴「大」写「大：常用字，不能屏蔽」，没有格子；粘贴「龘」只有「龘」一格；恢复默认先问「回到只屏蔽扩展区，并清空单独屏蔽和放行的字？」，确定后三级字的勾选条回到不勾、扩展区的回到勾上，底部有 **撤销**；设置搜索里有「生僻字屏蔽」，点了进这一页；转屏后改动和搜的字都还在。
 - **JVM**：`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（搜拼音、粘贴一级字、粘贴一个字定位）、`RareCharsPageUatTest.resetATurnAndALaterVersionsFile`（恢复默认、转屏）、`SettingsIndexTest.theRareCharactersPageIsFound`、ime-core `RarePageTest.aSearchFindsASpellingOrThePastedCharacter`；设备上跑搜 da 和恢复默认。
 
 ### WD-60 [P1] 生僻字屏蔽：默认屏蔽的扩展区排第一，一打开开关第一栏就有屏蔽的字
 - **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 关着，没改过。
-- **操作**：进 **词库与短语 → 生僻字屏蔽**，看各组的顺序；打开开关，看第一组的组头和页顶的说明。
-- **预期**：组的顺序是 **扩展区（扩展 B 及以后）**、**三级字**、**繁体字**、**其它表外字（基本区和扩展 A）**：默认屏蔽的扩展区在最前（仍默认收起），其余三组照原来的先后。打开后第一组扩展区的组头勾上，下面写「已屏蔽 N」，N 大于 0，和页顶「已屏蔽 N 个字」的 N 一样；三级字写「已屏蔽 0」。
-- **JVM**：ime-core `RarePageTest.thePageListsTheGroupsHeldByDefaultFirstTheRestInTheirOrder`（页上的组序：默认屏蔽的在前，其余按原序；存的文件和组的编号不变）、`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（组头的先后：扩展区、三级字、繁体字、其它表外字）；设备上照跑。
+- **操作**：进 **词库与短语 → 生僻字屏蔽**，看四张卡片的顺序；打开开关，看第一张卡片的勾选条和页顶的说明。
+- **预期**：卡片两列两行，顺序是 **扩展区**、**三级字**、**繁体字**、**其它表外字**：默认屏蔽的扩展区在最前，其余三组照原来的先后。打开后扩展区卡片的勾选条勾着，写「已屏蔽 N/N」，N 大于 0，和页顶「已屏蔽 N 个字」的 N 一样；三级字写「已屏蔽 0/…」。
+- **JVM**：ime-core `RarePageTest.thePageListsTheGroupsHeldByDefaultFirstTheRestInTheirOrder`（页上的组序：默认屏蔽的在前，其余按原序；存的文件和组的编号不变）、`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（卡片的先后：扩展区、三级字、繁体字、其它表外字）；设备上照跑。
 
-### WD-61 [P1] 生僻字屏蔽：九键、全键盘来回切，照样挡；开关还开着，说明里写着默认挡什么
+### WD-61 [P1] 生僻字屏蔽：九键、全键盘来回切，照样挡；开关还开着，卡片上看得出默认挡什么
 <!-- 061-rare-switch-research.md：测试版 1 反馈「切到九键再切回全键盘不好使」 -->
 - **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 关着。
-- **操作**：到 **生僻字屏蔽** 看开关下的说明，打开开关（别的不动），返回。**输入法 → 拼音 → 键盘** 选 **九键**，回「普通文本」框点 3 4 6（din），看候选栏，清空。回 **词库与短语**，看这一行，进 **生僻字屏蔽** 看开关，返回。键盘选回 **全键盘**，打 din，看候选栏，清空。强制停止应用（`am force-stop`）后再打 din。
-- **预期**：说明里写着默认只挡扩展区、犇和夲这类字要勾三级字或其它表外字、改动在离开本页后生效。九键 346 和全键盘 din 的候选栏里都没有扩展区的字（码位 U+20000 以上，关着时 din 里有 𨈖）；中途这一行仍写「已屏蔽 N 个字」，开关仍开着；强制停止后再打 din 也没有。
+- **操作**：到 **生僻字屏蔽** 看开关下的说明和四张卡片，打开开关（别的不动），返回。**输入法 → 拼音 → 键盘** 选 **九键**，回「普通文本」框点 3 4 6（din），看候选栏，清空。回 **词库与短语**，看这一行，进 **生僻字屏蔽** 看开关，返回。键盘选回 **全键盘**，打 din，看候选栏，清空。强制停止应用（`am force-stop`）后再打 din。
+- **预期**：说明里写着改动在离开本页后生效；关着时扩展区卡片的勾选条也是勾着的（默认只挡扩展区），三级字卡片的样字里有犇（这类字要勾三级字才挡）。九键 346 和全键盘 din 的候选栏里都没有扩展区的字（码位 U+20000 以上，关着时 din 里有 𨈖）；中途这一行仍写「已屏蔽 N 个字」，开关仍开着；强制停止后再打 din 也没有。
 - **JVM**：ime-core `RareCharContractTest.theChoiceOutlivesAKeyboardSwitch`（关着时先在九键、全键盘、18 键上都打过，九键上打开，不重读就切全键盘、18 键、再九键：都不出，找挡的词只找一次）；设备上照跑。
+
+### WD-62 [P1] 生僻字屏蔽：进页是四张卡片，一屏看全
+<!-- 061-settings-cards.md §3 -->
+- **前提**：B0-设置。
+- **操作**：词库与短语 → 生僻字屏蔽，等页面读好；不滚动，看页面。
+- **预期**：开关、搜索框下面是四张卡片，两列两行：扩展区、三级字、繁体字、其它表外字；每张有一句说明、一行样字，下面一条是勾选框和「已屏蔽 N/总数」；
+  四张都在屏幕里（1080×2340），页面上没有格子，右边没有字母条。（窗口高不到 600 dp 的设备上没有样字那一行，四张的卡身和勾选条仍都在屏幕里。）
+- **JVM**：`RareCharsPageUatTest.fourCardsAndOffOnlyToLookAt`、`SettingsCardsLayoutTest.smallPhonesWindow`（360×568 和 393×851 字号 1.3、中英文，四张的卡身和勾选条都在可见区里）；设备上照跑，看一次样字画得出。
+
+### WD-63 [P1] 生僻字屏蔽：点卡片进去看字，返回回到卡片；勾选条是整组，标题栏能撤回
+- **前提**：B0-设置；生僻字屏蔽开着，默认。
+- **操作**：点「三级字」卡片的名字；看页面；点一个字；按返回键；看「三级字」卡片；点它下面的勾选条；等底部的提示自己消失；点标题栏的 ↶。
+- **预期**：进去后标题是「三级字」，只有三级字的格子，顶上一条写「已屏蔽 0/1,605」和勾选框，往下滚它不走；点的字变淡加斜线，顶上变「已屏蔽 1/1,605」；
+  返回后是四张卡片（没有退出本页），三级字写「已屏蔽 1/1,605」，勾选框是半选；点勾选条后是「已屏蔽 1,605/1,605」、全选，底部提示「已屏蔽 1,604 个字」；
+  提示消失后点 ↶，回到「已屏蔽 1/1,605」、半选，↶ 变灰。转屏会存一次，存过之后 ↶ 也变灰。
+- **JVM**：`RareCharsCardsUatTest.theTitleBarsUndoTakesBackTheLastStepTillASave`（整组勾、提示过后 ↶ 撤回、点一格也算一步、存过之后变灰）、`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（点格、组页的固定条）。
+
+### WD-64 [P2] 生僻字屏蔽：开关关着，只有勾选条变淡、勾不了，卡片还能进去看
+- **前提**：B0-设置；生僻字屏蔽关着。
+- **操作**：看四张卡片；点「繁体字」的勾选条；点「繁体字」卡片的名字；点一个字。
+- **预期**：组名、说明、样字不淡，四条勾选条是淡的；点勾选条不变；进去能看到格子，顶上写着开关关着只能看；点字不变。
+- **JVM**：`RareCharsPageUatTest.fourCardsAndOffOnlyToLookAt`、`GroupCardTest.unusable, only the strip fades and stops, the body still opens`、`SettingsCardsTest.an unusable strip is dimmed and inert`。

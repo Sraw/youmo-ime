@@ -16,6 +16,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.CollectionIn
 import com.google.android.material.checkbox.MaterialCheckBox
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -118,6 +119,7 @@ class SettingsCardsTest {
     }
 
     @Test
+    @Uat("WD-64")
     fun `an unusable strip is dimmed and inert`() {
         var asked = 0
         val strip = strip("0/9").apply { onCheck = { asked++ } }

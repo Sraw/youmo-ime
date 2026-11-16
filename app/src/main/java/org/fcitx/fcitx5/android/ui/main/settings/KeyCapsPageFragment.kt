@@ -14,6 +14,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.ui.main.settings.cards.ChoiceCard
 import splitties.dimensions.dp
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapInScrollView
@@ -36,9 +37,9 @@ abstract class KeyCapsPageFragment : Fragment() {
         val ctx = requireContext()
         val pad = ctx.dp(16)
         wide = ctx.verticalLayout {
-            setPadding(pad, ctx.dp(8), pad, 0)
-            visibility = View.GONE
             // a choice card's badge hangs over its corner into this padding (ChoiceCard.cell)
+            setPadding(pad, ctx.dp(ChoiceCard.OVERHANG_DP), pad, 0)
+            visibility = View.GONE
             clipChildren = false
             clipToPadding = false
         }

@@ -1028,15 +1028,42 @@ case("WD-56", needs="jvm:RareCharsPageUatTest.aUserWordWithACharacterHeldIsMarke
      "HeldWordsTest.theUserModelAsksItsWordsAsTheDictionarysAndTheUsersByText")(lambda d: None)
 
 
+@case("WD-62", base="B0-设置", visual=True)
+def wd62(d):
+    rare_page(d)
+    s = d.screen()
+    strips = sorted((n for n in s.app() if n.cls == "CheckBox" and n.desc.startswith(GROUPS)), key=lambda n: (n.c[1], n.c[0]))
+    names = [n.desc.split("，")[0] for n in strips]
+    counts = [n.text for n in s.app() if re.fullmatch(r"已屏蔽 [\d,]+/[\d,]+", n.text)]
+    # a strip's box is a CheckBox of its own with nothing said (the strip says it): a cell says its character
+    cells = [n.desc for n in s.app() if n.cls == "CheckBox" and n.desc and not n.desc.startswith(GROUPS)]
+    samples = [n.text for n in s.app() if "犇" in n.text]
+    bottom = d.screen_h()
+    d.shot("app", "四张卡片两列两行都在屏幕里，每张有说明、样字和勾选条；没有格子、没有字母条")
+    check(names == ["扩展区", "三级字", "繁体字", "其它表外字"], f"卡片的顺序：{names}")
+    check(len({n.c[1] for n in strips}) == 2, f"勾选条不是两行：{[n.c for n in strips]}")
+    check(all(n.b[3] <= bottom for n in strips), f"勾选条超出屏幕：{[n.b for n in strips]}")
+    check(len(counts) == 4, f"「已屏蔽 N/总数」：{counts}")
+    check(not cells, f"卡片页上有格子：{cells[:5]}")
+    check(samples, "三级字卡片上没有样字（犇）")
+    return f"{names}；{counts}"
+
+
+case("WD-63", needs="jvm:RareCharsCardsUatTest.theTitleBarsUndoTakesBackTheLastStepTillASave、RareCharsPageUatTest.thePageHoldsBackAndLetsThrough")(lambda d: None)
+case("WD-64", needs="jvm:RareCharsPageUatTest.fourCardsAndOffOnlyToLookAt、GroupCardTest.unusable, only the strip fades and stops, the body still opens、"
+     "SettingsCardsTest.an unusable strip is dimmed and inert")(lambda d: None)
+
+
 @case("WD-60", base="B0-设置", mutates=True)
 def wd60(d):
     sw = rare_page(d)
 
     def heads(s):
-        # the groups' heads shown, top to bottom: each one's name and box state, and the 「已屏蔽 N」 under each
-        boxes = sorted((n for n in s.app() if n.cls == "CheckBox" and n.desc.startswith(GROUPS)), key=lambda n: n.c[1])
-        held = sorted((n.c[1], int(m.group(1).replace(",", ""))) for n in s.app() if n.text
-                      for m in [re.match(r"已屏蔽 ([\d,]+)$", n.text.split("\n")[0])] if m)
+        # the groups' cards' strips in reading order (two rows of two): each one's name and box state, and the
+        # held of its 「已屏蔽 N/总数」
+        boxes = sorted((n for n in s.app() if n.cls == "CheckBox" and n.desc.startswith(GROUPS)), key=lambda n: (n.c[1], n.c[0]))
+        held = sorted(((n.c[1], n.c[0]), int(m.group(1).replace(",", ""))) for n in s.app() if n.text
+                      for m in [re.match(r"已屏蔽 ([\d,]+)/[\d,]+$", n.text)] if m)
         return [(b.desc.split("，")[0], b.desc.rsplit("，", 1)[-1]) for b in boxes], [h for _, h in held]
     off, _ = heads(d.screen())
     d.tap(sw.c, 0.8)
@@ -1044,11 +1071,11 @@ def wd60(d):
                       what="开关打开、第一组勾上")
     note = rare_note(d.screen())
     total = re.match(r"已屏蔽 ([\d,]+) 个字", note)
-    d.shot("app", "打开后第一组是扩展区，已屏蔽的字数和页顶一样")
+    d.shot("app", "打开后第一张卡片是扩展区，已屏蔽的字数和页顶一样")
     d.back(1.0)
     names = [n for n, _ in off]
-    check(len(names) >= 2 and names[0].startswith("扩展区") and names[1] == "三级字", f"组的顺序：{names}")
-    check(on[0][0].startswith("扩展区"), f"打开后第一组：{on[:1]}")
+    check(names == ["扩展区", "三级字", "繁体字", "其它表外字"], f"卡片的顺序：{names}")
+    check(on[0][0] == "扩展区", f"打开后第一张：{on[:1]}")
     check(total and held[0] > 0 and held[0] == int(total.group(1).replace(",", "")), f"第一组已屏蔽 {held[:2]}，页顶「{note}」")
     check(len(held) >= 2 and held[1] == 0, f"第二组（三级字）已屏蔽 {held[1:2]}")
     return f"组序 {names}；第一组已屏蔽 {held[0]}，页顶「{note.split(' · ')[0]}」"
@@ -1071,10 +1098,14 @@ def nine_cands(d, digits):
 @case("WD-61", base="B0-设置", mutates=True)
 def wd61(d):
     rare_page(d)
-    note = rare_note(d.screen())
+    s = d.screen()
+    note = rare_note(s)
+    held = (rare_box(s, "扩展区") or NO_BOX).desc
+    samples = [n.text for n in s.app() if "犇" in n.text]
     d.back(1.0)
-    check("默认只挡扩展区" in note and "犇" in note and "三级字" in note and "其它表外字" in note and "离开本页后生效" in note,
-          f"开关下的说明：{note!r}")
+    check("离开本页后生效" in note, f"开关下的说明：{note!r}")
+    check(held.endswith("全部屏蔽"), f"关着时扩展区的勾选条：{held!r}")
+    check(samples, "三级字卡片的样字里没有犇")
     d.step("打开，九键")
     row = rare_switch(d, True)
     check(row.startswith("已屏蔽 "), f"打开后那一行：{row!r}")

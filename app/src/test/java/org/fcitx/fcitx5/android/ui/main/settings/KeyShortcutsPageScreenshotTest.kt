@@ -186,6 +186,31 @@ class KeyShortcutsPageScreenshotTest {
         val b = KeyboardHarness.all(key("b")).filterIsInstance<SceneKeyCell>().single()
         assertEquals(0.4, b.labelAlpha, 0.0)
         capture("canvas_full_night")
+        // the cards' fill, border, chosen and badge, and the editor's (061-settings-cards §8.1, uat LS-53)
+        key("a").performClick()
+        captureScreen("dialog_letter_night")
+    }
+
+    // the largest font: the keyboards' cards three across, no name cut; the editor's titles (uat LS-53)
+    @Test
+    @Uat("LS-53")
+    @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi", fontScale = 1.5f)
+    fun theLargestFont() {
+        open()
+        capture("full_font15")
+        key("a").performClick()
+        captureScreen("dialog_letter_font15")
+    }
+
+    // 多选: each card's strip, 全键盘's partly checked
+    @Test
+    fun multiSelect() {
+        open()
+        var v: View = KeyboardHarness.all(decor).filterIsInstance<TextView>().first { it.text.toString() == st.s(R.string.swipe_multi_select) }
+        while (!v.hasOnClickListeners()) v = v.parent as View
+        v.performClick()
+        key("q").performClick()
+        capture("multi_select")
     }
 
     // 上滑图标位置 底部: the 14 keys' corners under their letters, as the keyboard draws them
@@ -201,12 +226,17 @@ class KeyShortcutsPageScreenshotTest {
     }
 
     @Test
+    @Uat("LS-53")
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun landscape() {
         open()
         capture("full_landscape")
         tab(R.string.shortcut_page_function)
         capture("function_landscape")
+        // all three folded at first, the whole scrolling (§5.1)
+        tab(R.string.shortcut_page_full)
+        key("a").performClick()
+        captureScreen("dialog_letter_landscape")
     }
 
     // 快捷键图标位置 and 标点位置 as the keyboard has them: each shortcut place's full and function keys,

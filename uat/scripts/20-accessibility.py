@@ -167,3 +167,8 @@ case("AX-19", needs="manual:TalkBack 读竖屏、横屏键盘样式两项，单�
 
 
 case("AX-20", needs="jvm:StrokePageUatTest.aScreenReadersTouchExplorationDrawsNone")(lambda d: None)
+
+case("AX-21", needs="jvm:GroupCardTest.a card read body then strip, the next card after this strip、"
+               "ChoiceCardTest.the body is one node read as a radio button named by the keyboard、"
+               "FoldCardTest.the title row is one button saying the summary and whether it is open、"
+               "RareCharsCardsUatTest.theCardsAndTheLettersAreReadOut")(lambda d: None)

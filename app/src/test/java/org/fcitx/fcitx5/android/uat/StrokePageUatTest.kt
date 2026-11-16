@@ -247,12 +247,14 @@ class StrokePageUatTest {
                 Row("nothing typed: 联想's", pinyin = ""),
                 Row("快速输入", aux = "快速输入"),
                 Row("手写 writing on the keys", set = {
-                    prefs.set(AppPrefs.getInstance().internal.handwritingOpen, true)
+                    // the reader in place before the switch turns on: a keyboard still hearing it warms the reader up,
+                    // and the app's cannot load in a JVM test, turning the switch off again on its worker
                     HandwritingRecognition.shared.reader = object : HandwritingRecognition.Reader {
                         override val loadable = true
                         override fun load() = Unit
                         override fun read(strokes: List<FloatArray>) = InkReading(listOf("人"), doubleArrayOf(-1.0))
                     }
+                    prefs.set(AppPrefs.getInstance().internal.handwritingOpen, true)
                 }),
             ),
             { it.why },

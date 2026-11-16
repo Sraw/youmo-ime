@@ -73,9 +73,9 @@
 ### AX-17 [P1] 生僻字屏蔽的网格
 <!-- 061-rare-char-block.md §6.4 -->
 - **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关；打开 TalkBack。
-- **操作**：摸组头的勾选框和几个格子；在一个格子上双击；摸右边的字母条。
-- **预期**：共同的预期；勾选框读组名、字数和「全部屏蔽 / 部分屏蔽 / 全部放行」；格子读成复选框：字和它的读音（多音字读出全部读音，如「荅，dā、dá」），屏蔽的读「已选中」；双击切换后读出的状态跟着变。
-- **JVM**：`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（格子的 `AccessibilityNodeInfo` 是可勾选的 CheckBox、屏蔽时已勾选，读的是字和全部读音；组头勾选框的描述）；TalkBack 本身在设备上手工看。
+- **操作**：点一张卡片进去，摸顶上那条勾选条和几个格子；在一个格子上双击；摸右边的字母条。
+- **预期**：共同的预期；勾选条读组名、字数和「全部屏蔽 / 部分屏蔽 / 全部放行」；格子读成复选框：字和它的读音（多音字读出全部读音，如「荅，dā、dá」），屏蔽的读「已选中」；双击切换后读出的状态跟着变。
+- **JVM**：`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（格子的 `AccessibilityNodeInfo` 是可勾选的 CheckBox、屏蔽时已勾选，读的是字和全部读音；勾选条的描述）；TalkBack 本身在设备上手工看。
 
 ## 长按候选
 
@@ -87,7 +87,7 @@
 ### AX-14 [P1] Shift 键叫「大小写」
 - **前提**：B0；系统语言简体中文、繁体中文（台湾）、English 各做一次。
 - **操作**：打开 TalkBack，摸全键盘左下的 Shift 键；关掉 TalkBack，打开 **按键 → 按键字符和快捷键 → 功能键** 页看这个键。
-- **预期**：简体下读「大小写」、功能键页写「大小写」；繁体下都是「大小寫」；English 下都是 Shift。
+- **预期**：简体下读「大小写」、功能键里写「大小写」；繁体下都是「大小寫」；English 下都是 Shift。
 - **JVM**：`ShiftKeyNameTest.theShiftKeyIsNamedOnItsCapAndToAScreenReader`（简体、繁体、英文三行；读屏读的和页面上写的是同一个字串）；设备上不跑。
 
 ### AX-15 [P2] 编码行在输入框里：读屏读框里的拼音
@@ -119,3 +119,11 @@
 - **操作**：打 shi，双击 ⌄ 展开候选；单指摸过几个候选；双指上下拖；双击一个候选。
 - **预期**：单指摸读出候选，不发笔画；双指拖翻页（TalkBack 把双指拖当成一根手指的拖动交给键盘，这时不当笔画）；双击选上候选。关掉 TalkBack 后照 PY-145 画笔画。
 - **JVM**：`StrokePageUatTest.aScreenReadersTouchExplorationDrawsNone`；ime-core `PageStrokeTouchTest.aPageDrawsAsTheKeysDoAndNotWhereTheyDoNot`；真机上手工试一遍。
+
+### AX-21 [P1] 读屏：分组卡两个节点挨着读，选择卡是单选，折叠卡读展开收起
+<!-- 061-settings-cards.md §2.8 -->
+- **前提**：B0-设置，开着 TalkBack。
+- **操作**：生僻字屏蔽页从开关往后逐个滑；按键字符和快捷键页逐个滑顶上的键盘；点 a 打开编辑框，逐个滑。
+- **预期**：生僻字页依次读「扩展区，14,802 个，已屏蔽 14,802，按钮」「扩展区，14,802 个，全部屏蔽，复选框」「三级字，……，按钮」……（一张卡的两个挨着），样字和箭头不单独读；
+  键盘读「全键盘，单选按钮，已选中，改过 N 个键，8 项中的第 1 项」；编辑框读「长按菜单，首选 @，共 N 个，已展开」「上滑，长按首选 @，已收起」，双击展开后下一个就是卡里的第一个单选。
+- **JVM**：`GroupCardTest.a card read body then strip, the next card after this strip`、`ChoiceCardTest.the body is one node read as a radio button named by the keyboard`、`FoldCardTest.the title row is one button saying the summary and whether it is open`、`RareCharsCardsUatTest.theCardsAndTheLettersAreReadOut`（节点的类名、文字、说法、状态、顺序）；TalkBack 本身真机上手工听一次。

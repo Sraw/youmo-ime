@@ -276,7 +276,7 @@ a row key's symbols put under its row as the editor shows it, by the user's 按�
 `KeyLists.needsMigration`: a later version's `@3` is kept as it is, read as no lists, never migrated over), leaving the old keys for a downgrade (into `RETIRED` at 0.7); `key_lists` is a
 plain `string` (not `hidden`, or a backup's import would reset it and the old keys come back) and is copied to device
 encrypted storage, where before the first unlock the cache migrates the old keys (or upgrades `@1`) in memory. The settings' editor
-(按键字符和快捷键, every tab one slot page, the 九键 tab replacing 0.5's 按键长按) draws the current theme's layouts,
+(按键字符和快捷键, eight keyboards' cards over one card of the picked board's keys, the 九键 one replacing 0.5's 按键长按) draws the current theme's layouts,
 starts a key from the resolver (`SceneBoard.resolver` with the variant given: `semicolon = true`, the user's 按键字母,
 so 18 键's L shows its `:`), every item moved, deleted and made the first alike, and saves the whole list through
 `KeyLists.with`. The symbol picker's cells keep a built-in long press (`PickerLongPress`), outside the model. Every key has two slots, up and down
@@ -1389,7 +1389,20 @@ Rules for settings, all decided:
   engine; no edit, no save. A later version's file, or one not read, makes the page read-only. The
   user-word lists mark a word with a character held (`CharGate.heldIn`) and offer 「放行」 through
   `RareCharsManager.allow`. JVM tests have no APK assets: `RareCharsManager.useLevels` takes
-  `TestCharLevels`.
+  `TestCharLevels`. The page opens on the four groups' cards (one `GroupCard` each, samples from ime-core
+  `RareSamples` where the window is 600 dp high); a card's body opens its group's grid under a fixed strip,
+  Back the cards again; the title bar's ↶ takes back the last step till a save (`onStop`, so a turn too).
+- **Cards** (`ui/main/settings/cards/`, `dev/design/061-settings-cards.md`): the shared look of the card pages.
+  `settingsCard` the card; `CheckStrip` the strip under a card, one node read as a checkbox, its box a
+  picture (never a target), a tap asking the owner; `CardGrid` the grid, columns from ime-core `CardColumns`
+  (`n` columns of at least a width × the font scale), a row as high as its highest. Three kinds: `GroupCard`
+  (生僻字屏蔽: a body that opens, a strip that checks the group; a tap on one never does the other's job),
+  `ChoiceCard` (按键字符和快捷键's keyboards: a radio button named by the keyboard, the keys changed said in its
+  stateDescription and drawn as a badge hung over its corner, `ChoiceCard.OVERHANG_DP` the room kept above a row),
+  `FoldCard` in `AccordionLayout` (the key editor: one card open at a time, ime-core `Accordion`; the titles stay
+  put with the open one capped while it has `Accordion.MIN_CONTENT_DP` × the font scale, else the whole scrolls,
+  all folded at the start; the first bounded measure decides; one view tree that never changes, so a focused
+  field keeps its input connection; a card folded over a focused field hides the keyboard and lets the focus go). A card's body and its strip are two nodes read one after the other.
 
 ### Adding a setting, the usual way
 

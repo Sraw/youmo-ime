@@ -70,7 +70,7 @@ import java.time.Duration
 class RareCharsPageUatTest : RarePageUat() {
 
     @Test
-    @Uat("WD-60")
+    @Uat("WD-60", "WD-62", "WD-64")
     fun fourCardsAndOffOnlyToLookAt() {
         st.open(SettingsRoute.PinyinDict(""))
         until("关 on the words page") { rareRow()?.summary == s(R.string.rare_chars_off) }
@@ -135,7 +135,7 @@ class RareCharsPageUatTest : RarePageUat() {
     }
 
     @Test
-    @Uat("WD-52", "AX-17")
+    @Uat("WD-52", "WD-63", "AX-17")
     fun thePageHoldsBackAndLetsThrough() {
         openPage()
         assertRows(

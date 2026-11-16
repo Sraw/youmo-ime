@@ -152,3 +152,6 @@ case("LS-51", needs="manual:五档每行的高看截图，转屏 20 次看键盘
 
 
 case("LS-52", needs="jvm:StrokePageUatTest.inLandscapeThePageDrawsAsWell")(lambda d: None)
+
+case("LS-53", needs="jvm:SettingsCardsLayoutTest.onItsSide、KeyShortcutsPageScreenshotTest.landscape、KeyShortcutsPageScreenshotTest.theLargestFont、"
+               "RareCharsCardsUatTest.theCardsAtNight、RareCharsCardsUatTest.theCardsInTheLargestFont、RareCharsCardsUatTest.theCardsOnTheSide")(lambda d: None)

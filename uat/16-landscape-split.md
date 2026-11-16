@@ -291,3 +291,11 @@
 - **预期**：和竖屏一样：一竖筛候选、这一页留着；拖不翻页；点的候选上屏。
 - **再试**：换成悬浮键盘（竖屏、横屏各一次），打 shi 展开候选，同样划一竖、拖、点：结果同上。
 - **JVM**：`StrokePageUatTest.inLandscapeThePageDrawsAsWell`；悬浮键盘设备上手工。
+
+### LS-53 [P2] 横屏、深色、字号最大时三处都能用
+<!-- 061-settings-cards.md §8.2 -->
+- **前提**：B0-设置；分别转成横屏、开深色、把系统字号调到最大各做一遍。
+- **操作**：进生僻字屏蔽；进按键字符和快捷键；点 a。
+- **预期**：横屏：四张卡片一行，键盘卡片一行八张，编辑框打开时三张都收起、三行摘要和「确定」都在屏幕里；深色：卡片的底、边、选中、角标都看得清，字不发灰；
+  大字号：键盘卡片 3 列，名字不被切，编辑框开头没有那一大段说明。
+- **JVM**：`SettingsCardsLayoutTest.onItsSide`（横屏一行、三张收起、标题行和「确定」在可见区里）；截图 `KeyShortcutsPageScreenshotTest.landscape`、`KeyShortcutsPageScreenshotTest.theLargestFont`、`RareCharsCardsUatTest.theCardsAtNight`、`RareCharsCardsUatTest.theCardsInTheLargestFont`、`RareCharsCardsUatTest.theCardsOnTheSide`；设备上各看一次。

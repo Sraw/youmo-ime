@@ -166,7 +166,7 @@ class ChoiceCard(ctx: Context, val name: String, private val glyph: KeyboardGlyp
         // centred on the card's top edge and BADGE_OUT_DP past its end, as Material's badges: it takes no room,
         // and its bottom stays above the picture, which keeps to the middle 70% (PAD_TOP_DP)
         cell.addView(badge, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, ctx.dp(BADGE_DP), Gravity.TOP or Gravity.END).apply {
-            topMargin = -ctx.dp(BADGE_DP / 2)
+            topMargin = -ctx.dp(OVERHANG_DP)
             marginEnd = -ctx.dp(BADGE_OUT_DP)
         })
         look()
@@ -199,5 +199,8 @@ class ChoiceCard(ctx: Context, val name: String, private val glyph: KeyboardGlyp
         const val NAME_EDGE_DP = 4
         private const val BADGE_DP = 16
         private const val BADGE_SP = 11f
+
+        /** How far the badge hangs above the card: whatever holds a row of these keeps at least this much room above it. */
+        const val OVERHANG_DP = BADGE_DP / 2
     }
 }

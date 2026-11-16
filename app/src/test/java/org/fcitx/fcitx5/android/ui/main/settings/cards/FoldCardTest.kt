@@ -4,10 +4,12 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.cards
 
+import android.app.Activity
 import android.view.ContextThemeWrapper
 import android.view.View
 import android.view.View.MeasureSpec
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -16,6 +18,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.ui.cards.Accordion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,8 +28,10 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import splitties.dimensions.dp
@@ -57,6 +62,7 @@ class FoldCardTest {
     private fun FoldCard.node() = AccessibilityNodeInfoCompat.wrap(header.createAccessibilityNodeInfo())
 
     @Test
+    @Uat("AX-21")
     fun `the title row is one button saying the summary and whether it is open`() {
         val c = card("下滑", 100)
         c.summary("命令：全选")
@@ -144,6 +150,26 @@ class FoldCardTest {
         a.layOut(250)
         assertEquals(0, a.open)
         assertSame(parent, field.parent)
+    }
+
+    @Test
+    @Uat("ST-153")
+    fun `a card folded over its focused field lets the focus and the keyboard go`() {
+        val cards = three()
+        val a = AccordionLayout(ctx, cards)
+        val host = Robolectric.buildActivity(Activity::class.java).setup().get()
+        host.setContentView(a)
+        a.layOut(700)
+        val field = cards[0].content.getChildAt(1) as EditText
+        field.requestFocus()
+        val imm = host.getSystemService(InputMethodManager::class.java)
+        imm.showSoftInput(field, 0)
+        assertTrue(field.hasFocus())
+        assertTrue(shadowOf(imm).isSoftInputVisible)
+        cards[1].header.performClick()
+        // the field's content GONE clears its focus anyway; the keyboard staying up over it was the bug
+        assertFalse(field.hasFocus())
+        assertFalse(shadowOf(imm).isSoftInputVisible)
     }
 
     @Test

@@ -144,6 +144,9 @@ class SettingsHarness(
     fun capture(path: String) {
         idle()
         val root = activity.window.decorView
+        // a check box or switch just set animates to its state on frames the paused looper never draws: drawn
+        // mid-way (a box empty that is checked, no "−")
+        root.jumpDrawablesToCurrentState()
         if (!comparesScreenshots) {
             // drawn all the same (see SCREENSHOT_SDK)
             root.draw(Canvas(Bitmap.createBitmap(root.width.coerceAtLeast(1), root.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)))

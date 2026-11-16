@@ -1168,7 +1168,8 @@ case("ST-93", needs="manual:主题制作网页；在电脑浏览器上手工跑�
 
 @case("ST-96", base="B0-设置")
 def st96(d):
-    """纠错's summary on the device: 双拼 only the ü-key slip, its 18 and 14 keys 不适用"""
+    """纠错's summary on the device: keys tapped off-centre read by where they land, 双拼's full keyboard the
+    ü-key slip; only 注音九键 不适用 (the pinyin and 双拼 group keyboards and 注音全键盘 read a key off-centre too)"""
     title = "纠正错拼和按偏的键"
     d.goto("通用输入")
     r = None
@@ -1181,9 +1182,10 @@ def st96(d):
             break
     check(r is not None, f"通用输入里没有「{title}」：{d.screen().texts()[:10]}")
     summary = " ".join(n.text for n in r.walk() if n.rid == "summary" and n.text)
-    check("双拼：只认" in summary, f"说明里没有「双拼：只认」：{summary}")
-    for im in ("双拼 · 18 键", "双拼 · 14 键", "双拼 · 九键"):
-        check(im in summary.split("不适用")[-1], f"不适用里没有「{im}」：{summary}")
+    check(summary.startswith("按在键的边上、靠着旁边哪个键，也按那个键读") and "双拼全键盘还认 j、q、x、y 后的 u 按成了 ü 的键" in summary,
+          f"说明不对：{summary}")
+    not_for = summary.split("不适用：")[-1] if "不适用：" in summary else ""
+    check(not_for == "拼音 · 注音九键。", f"不适用的不是只有注音九键：{summary}")
     d.shot("full", "纠正错拼和按偏的键的说明")
     return summary
 
@@ -1205,20 +1207,13 @@ def page_key(d, label):
 
 
 def slots_tab(d, tab):
-    """the 按键字符和快捷键 page on its tab [tab] (全键盘 … 功能键): the row of tabs scrolls sideways"""
+    """the 按键字符和快捷键 page on the keyboard [tab] (全键盘 … 功能键): its card tapped, all eight on the first screen"""
     slots_page(d)
-    for _ in range(3):
-        s = d.screen()
-        n = next((n for n in s.app() if n.cls.endswith("RadioButton") and n.text == tab), None)
-        if n:
-            d.tap(n.c, 1.5)
-            return
-        row = [n for n in s.app() if n.cls.endswith("RadioButton")]
-        if not row:
-            raise Blocked("按键字符和快捷键页上没有分页")
-        y = row[0].c[1]
-        d.swipe((row[-1].c[0], y), (row[0].c[0], y), 300, after=0.8)
-    raise Blocked(f"按键字符和快捷键页上没有「{tab}」页")
+    s = d.screen()
+    n = next((n for n in s.app() if n.cls.endswith("RadioButton") and n.text == tab), None)
+    if not n:
+        raise Blocked(f"按键字符和快捷键页上没有「{tab}」卡片：{[n.text for n in s.app() if n.cls.endswith('RadioButton')]}")
+    d.tap(n.c, 1.5)
 
 
 def key_dialog(d, label):
@@ -1229,12 +1224,53 @@ def key_dialog(d, label):
     if not n:
         raise Blocked(f"页上没有 {label} 键：{[n.desc for n in s.app() if n.clickable and n.desc][:12]}")
     d.tap(n.c, 0.5)
-    return d.wait(lambda s: s.find(text="设为首选"), 5, what=f"{label} 的对话框")
+    # 下滑's title row: every key's dialog has it, the last of its cards (so all three are laid out), open or
+    # folded, said 下滑（已关闭） where that way is off
+    return d.wait(lambda s: next((h for h in dialog_heads(s) if head_name(h) == "下滑"), None), 5, what=f"{label} 的对话框")
+
+
+CARDS = ("长按菜单", "上滑", "下滑")
+
+
+def head_name(n):
+    """which of the key dialog's cards a title row is (its node says the title, then what is set)"""
+    return next((c for c in CARDS if (n.desc or n.text).startswith(c)), None)
+
+
+def dialog_heads(s):
+    """the key dialog's cards' title rows on screen, top to bottom: the clickable rows said 长按菜单…, 上滑…, 下滑…"""
+    return sorted((n for n in s.app() if n.clickable and head_name(n)), key=lambda n: n.b[1])
+
+
+def dialog_card(d, title):
+    """the key dialog's card [title] (长按菜单, 上滑, 下滑) open: one is where something to tap lies between its title
+    row and the next one's (the last card's: 确定), only one open at a time"""
+    def opened(s, head):
+        heads = dialog_heads(s)
+        nxt = next((h for h in heads if h.b[1] > head.b[1]), None)
+        ok = s.find(text="确定")
+        end = nxt.b[1] if nxt else (ok.b[1] if ok else 10 ** 6)
+        return any(n.clickable and head.b[3] <= n.b[1] < end for n in s.app() if n is not head and not head_name(n))
+    for _ in range(3):
+        s = d.screen()
+        head = next((h for h in dialog_heads(s) if head_name(h) == title), None)
+        if not head:
+            dialog_scroll(d)
+            continue
+        if opened(s, head):
+            return
+        d.tap(head.c, 0.8)
+        s = d.screen()
+        head = next((h for h in dialog_heads(s) if head_name(h) == title), None)
+        if head and opened(s, head):
+            return
+    raise Blocked(f"对话框里打不开「{title}」：{[h.desc or h.text for h in dialog_heads(d.screen())]}")
 
 
 def dialog_add_digits(d, text):
     """添加 [text] (digits, typed on the keyboard's 123 page: adb's input text is a hardware keyboard's keys,
     which turn the soft keyboard into its small 实体键盘 bar) to the open key dialog's list"""
+    dialog_card(d, "长按菜单")
     s = d.screen()
     e = next((n for n in s.app() if n.cls.endswith("EditText") and n.text in ("", "添加字符，空格分隔")), None)
     if not e:
@@ -1255,6 +1291,7 @@ def dialog_add_digits(d, text):
 
 def dialog_pick(d, item):
     """an item of the open dialog's list selected (by what it reads out)"""
+    dialog_card(d, "长按菜单")
     s = d.screen()
     n = next((n for n in s.app() if n.clickable and n.desc == item), None)
     if not n:
@@ -1263,36 +1300,19 @@ def dialog_pick(d, item):
 
 
 def dialog_way(d, way, option):
-    """上滑 or 下滑's [option] (长按首选, 文字, 空) in the open dialog, scrolled to where it is"""
-    for _ in range(3):
-        s = d.screen()
-        heads = sorted((n for n in s.app() if n.text in ("上滑", "下滑") and not n.clickable), key=lambda n: n.b[1])
-        head = next((n for n in heads if n.text == way), None)
-        if head:
-            nxt = next((n for n in heads if n.b[1] > head.b[1]), None)
-            opts = [n for n in s.app() if n.text.startswith(option) and n.b[1] > head.b[1] and (not nxt or n.b[1] < nxt.b[1])]
-            if opts:
-                d.tap(min(opts, key=lambda n: n.b[1]).c, 0.4)
-                return
-        dialog_scroll(d)
-    raise Blocked(f"对话框里找不到{way}的「{option}」")
+    """上滑 or 下滑's [option] (长按首选, 命令, 空, 文字) in the open dialog: its card opened, the only one whose
+    choices are on screen"""
+    dialog_card(d, way)
+    s = d.screen()
+    opts = [n for n in s.app() if n.cls.endswith("RadioButton") and n.text.startswith(option)]
+    if not opts:
+        raise Blocked(f"对话框里找不到{way}的「{option}」：{[n.text for n in s.app() if n.cls.endswith('RadioButton')]}")
+    d.tap(opts[0].c, 0.4)
 
 
 def dialog_text(d, way, pinyin, word):
     """上滑 or 下滑 set to the text [word], typed as [pinyin] and picked from the candidates"""
-    dialog_way(d, way, "文字")
-    eds = []
-    for _ in range(3):
-        s = d.screen()
-        head = next((n for n in s.app() if n.text == way and not n.clickable), None)
-        picked = next((n for n in sorted(s.app(), key=lambda n: n.b[1]) if n.text == "文字" and head and n.b[1] > head.b[1]), None)
-        eds = [n for n in s.app() if n.cls.endswith("EditText") and picked and n.b[1] > picked.b[1]]
-        if eds:
-            break
-        dialog_scroll(d)
-    if not eds:
-        raise Blocked(f"{way}的文字框不在屏上")
-    ed = min(eds, key=lambda n: n.b[1])
+    ed = dialog_text_field(d, way)
     # at its right end, and what is in it backspaced first: the box opens with the text stored, and [word]
     # replaces it
     d.tap((ed.b[2] - 12, ed.c[1]), 0.8)
@@ -1311,6 +1331,26 @@ def dialog_text(d, way, pinyin, word):
     time.sleep(0.8)
 
 
+def dialog_text_field(d, way):
+    """上滑 or 下滑 set to 文字: its field, the one on screen (the other cards folded)"""
+    dialog_way(d, way, "文字")
+    eds = [n for n in d.screen().app() if n.cls.endswith("EditText")]
+    if len(eds) != 1:
+        raise Blocked(f"{way}的文字框不是屏上唯一的输入框：{[n.text for n in eds]}")
+    return eds[0]
+
+
+def dialog_note(d, way, test):
+    """the texts of [way]'s card that pass [test] (its notes are at its end): the card opened, scrolled where none shows"""
+    dialog_card(d, way)
+    for _ in range(3):
+        got = [t for t in d.screen().texts("all") if test(t)]
+        if got:
+            return got
+        dialog_scroll(d)
+    return []
+
+
 def dialog_scroll(d):
     """the open dialog's content moved up a third of the screen (its buttons stay)"""
     s = d.screen()
@@ -1327,24 +1367,10 @@ def dialog_ok(d):
 @case("ST-97", base="B0-设置", mutates=True, visual=True)
 def st97(d):
     slots_page(d)
-    d.tap(page_key(d, "q").c, 0.5)
-    # the dialog is taller than the screen: 上滑's 空 at the fold, 下滑's text field under it
-    s = d.wait(lambda s: s if any(n.text == "空" for n in s.app()) else None, 5, what="q 的对话框")
-    empties = sorted((n for n in s.app() if n.text == "空"), key=lambda n: n.b[1])
-    if not empties:
-        raise Blocked(f"对话框里没有上滑一段：{s.texts()[-16:]}")
-    d.tap(empties[0].c, 0.4)
-    e = empties[0].c
-    d.swipe((e[0], e[1]), (e[0], e[1] - 600), 400, after=0.8)
-    s = d.screen()
-    texts = sorted((n for n in s.app() if n.text == "文字"), key=lambda n: n.b[1])
-    if not texts:
-        raise Blocked(f"对话框里没有下滑一段：{s.texts()[-16:]}")
-    down = texts[-1]
-    eds = [n for n in s.app() if "Edit" in n.cls and n.b[1] > down.b[1]]
-    if not eds:
-        raise Blocked(f"下滑的文字框不在屏上：{s.texts()[-16:]}")
-    d.tap(min(eds, key=lambda n: n.b[1]).c, 0.8)
+    key_dialog(d, "q")
+    dialog_way(d, "上滑", "空")
+    ed = dialog_text_field(d, "下滑")
+    d.tap(ed.c, 0.8)
     d.type("okay")
     d.enter()
     d.hide_keyboard()
@@ -1362,7 +1388,8 @@ def st97(d):
     check("1" not in up, f"q 上滑是空槽，却打出了「{up}」")
     d.clear()
     slots_page(d)
-    d.tap_text("撤销", scroll=False, after=1.0)
+    # the title bar's ↶: no text, said 撤销
+    d.tap(d.wait(lambda s: next((n for n in s.app() if n.desc == "撤销" and n.clickable), None), 5, what="标题栏的 ↶").c, 1.0)
     d.open_page("text")
     d.clear()
     q = d.keys(refresh=True)["q"]
@@ -1560,9 +1587,7 @@ def st106(d):
     key_dialog(d, "j")
     dialog_text(d, "下滑", "xianzaizenmeyangle", "现在怎么样了")
     time.sleep(1.5)
-    dialog_scroll(d)
-    s = d.screen()
-    note = [t for t in s.texts("all") if "画不下" in t or "显示为" in t]
+    note = dialog_note(d, "下滑", lambda t: "画不下" in t or "显示为" in t)
     d.shot("full", "j 的对话框：下滑段下说键上画成什么")
     dialog_ok(d)
     s = d.screen()
@@ -1580,8 +1605,7 @@ def st106(d):
     key_dialog(d, "j")
     dialog_text(d, "下滑", "hao", "好")
     time.sleep(1.5)
-    dialog_scroll(d)
-    gone = [t for t in d.screen().texts("all") if "画不下" in t or "显示为" in t]
+    gone = dialog_note(d, "下滑", lambda t: "画不下" in t or "显示为" in t)
     dialog_ok(d)
     check(note, "下滑段下没有说键上画成什么")
     check(page and page[0].split("：", 1)[-1] == note[0], f"页面键下面的说明 {page} 和对话框的 {note} 不同")
@@ -1614,7 +1638,7 @@ def st112(d):
     s = d.screen()
     field = next((n for n in s.app() if n.cls.endswith("EditText") and n.text in ("", "添加字符，空格分隔")), None)
     check(s.find(rid="keyboard_view", where="ime") is None, "点完成后键盘没收起")
-    check(s.find(text="设为首选") is not None, "点完成后对话框关了")
+    check(any(head_name(h) == "下滑" for h in dialog_heads(s)), "点完成后对话框关了")
     check(any(n.clickable and n.desc == "7" for n in s.app()), "点完成后列表里没有 7")
     check(field is not None, f"点完成后添加框没清空：{[n.text for n in s.app() if n.cls.endswith('EditText')]}")
     dialog_ok(d)
@@ -1686,12 +1710,11 @@ def st120(d):
     slots_tab(d, "九键")
     key_dialog(d, "3")
     dialog_way(d, "上滑", "命令")
-    # its 换 (the first under 上滑's head) opens the commands' own list, a dialog over the key's
+    # its 换 (the only one on screen: 下滑's card folded) opens the commands' own list, a dialog over the key's
     s = d.screen()
-    head = next((n for n in s.app() if n.text == "上滑" and not n.clickable), None)
-    change = sorted((n for n in s.app() if n.text == "换" and head and n.b[1] > head.b[1]), key=lambda n: n.b[1])
-    if not change:
-        raise Blocked(f"上滑一段里没有「换」：{s.texts()[-16:]}")
+    change = [n for n in s.app() if n.text == "换"]
+    if len(change) != 1:
+        raise Blocked(f"上滑卡片里的「换」不是一个：{s.texts()[-16:]}")
     d.tap(change[0].c, 0.8)
     # the five strokes at the list's end
     for _ in range(4):
@@ -1733,7 +1756,7 @@ def st120(d):
     slots_tab(d, "九键")
     key_dialog(d, "3")
     note = "在键上划选了笔画筛选时，打着拼音滑这个键按画出的形状算，不发这一笔"
-    said = any(n.text == note for n in d.screen().app())
+    said = bool(dialog_note(d, "上滑", lambda t: t == note))
     d.shot("app", "笔画筛选时 3 的对话框：上滑的命令下面说打字时滑不到")
     check(said, "笔画筛选时 3 的对话框里没有说打着拼音时滑不到")
     d.back(after=0.5)
@@ -1893,6 +1916,17 @@ def st143(d):
 
 
 case("ST-156", needs="jvm:SettingsMenuUatTest.searchingAChoiceOpensItsSetting")(lambda d: None)
+
+case("ST-151", needs="jvm:PopupOverridesFragmentTest$Cards.theKeyboardsAreEightCardsToPickNotARowToSwipe、SettingsCardsLayoutTest.smallPhonesWindow")(lambda d: None)
+
+case("ST-152", needs="jvm:PopupOverridesFragmentTest$Cards.aKeyboardsCardSaysHowManyOfItsKeysAreChanged、PopupOverridesFragmentTest$Cards.theFunctionKeysAreTwelveCellsFourAcross、"
+               "PopupOverridesFragmentTest$Cards.undoIsTheTitleBarsAndResetAllInItsMenu")(lambda d: None)
+
+case("ST-153", needs="jvm:PopupOverridesFragmentTest$Cards.theEditorsCardsOpenOneAtATimeEachSayingWhatIsSet、SettingsCardsLayoutTest.smallPhonesWindow、FoldCardTest.a card folded over its focused field lets the focus and the keyboard go")(lambda d: None)
+
+case("ST-154", needs="jvm:PopupOverridesFragmentTest$Cards.theEditorsCardsOpenOneAtATimeEachSayingWhatIsSet、PopupOverridesFragmentTest$Cards.nothingMovesAsAnItemIsSelectedOrATextChosen")(lambda d: None)
+
+case("ST-155", needs="jvm:PopupOverridesFragmentTest$Cards.multiSelectsStripsChooseAKeyboardsKeysAllOrNone")(lambda d: None)
 
 case("ST-157", needs="jvm:SettingsMenuUatTest.searchingAKeyCommandOpensTheKeysPageWithAHint")(lambda d: None)
 

@@ -1430,7 +1430,7 @@
     <string name="rare_allow_this">Let this character through</string>
     <string name="rare_chars_unavailable">Rare characters cannot be held back here: the table of character levels could not be read</string>
     <string name="rare_chars_letters">Index by letter</string>
-    <string name="rare_group_ext_about">Very rare; most phones can\'t show</string>
+    <string name="rare_group_ext_about">Very rare; most phones lack the font</string>
     <string name="rare_group_l3_about">Mostly in names of people and places</string>
     <string name="rare_group_trad_about">Traditional forms of simplified ones</string>
     <string name="rare_group_out_about">Variants, Japanese kanji and the like</string>

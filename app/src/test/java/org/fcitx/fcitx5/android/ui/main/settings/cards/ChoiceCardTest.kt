@@ -14,6 +14,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.CollectionIn
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -38,6 +39,7 @@ class ChoiceCardTest {
     private fun ChoiceCard.node() = AccessibilityNodeInfoCompat.wrap(target.createAccessibilityNodeInfo())
 
     @Test
+    @Uat("AX-21")
     fun `the body is one node read as a radio button named by the keyboard`() {
         val c = card().apply { selected = true }
         val node = c.node()

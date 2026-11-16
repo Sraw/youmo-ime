@@ -121,6 +121,13 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
     auto-commit, 借手机.
   The levels in tests are `TestCharLevels` (ime-core testFixtures); the app's JVM tests have no APK
   assets and pass them to `RareCharsManager.useLevels`.
+  The page itself: `RareCharsPageUatTest`, `RareCharsCardsUatTest` (over `RarePageUat`'s grid), `GroupCardTest`.
+- The card pages laid out (061-settings-cards §8.1): `SettingsCardsLayoutTest` opens 生僻字屏蔽, 按键字符和快捷键,
+  its multi-select and a key's editor on the phones and font sizes that matter (360×640 and its 360×568 window,
+  393×851 at 1.3, on the side; Chinese and English) and asserts what must show unscrolled is in the window, no
+  name or count cut, the badge clear of the picture and the name, the editor's titles and OK in view with its
+  buttons stacked or not. Robolectric has no status or navigation bar: a window is given as the screen's
+  qualifiers. A change to a card's size or a page's top keeps it green.
 - No `@Ignore`, `.only`, skipped or placeholder tests left behind.
 - Kover: 90% lines overall in ime-core, 60% per package. A new package needs its tests.
 
