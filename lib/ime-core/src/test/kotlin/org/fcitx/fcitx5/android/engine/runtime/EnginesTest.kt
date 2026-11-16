@@ -16,10 +16,14 @@ import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
+import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -481,6 +485,29 @@ class EnginesTest : EnginesFixture() {
         assertEquals("好", engines.type(InputMethodCatalog.PINYIN, "hap").candidates.first())
         engines.settings = EngineSettings(typos = false)
         assertEquals(listOf("hap"), engines.type(InputMethodCatalog.PINYIN, "hap").candidates)
+    }
+
+    // 061-neighbour-groups: 双拼's 18 keys and 大千 read a key tapped by its neighbour's edge as that key unless 纠错 is
+    // off. 小鹤 [JK][XC] with JK tapped toward H is hao; 大千 ㄒㄠ (xao spells nothing) with ㄒ tapped toward ㄏ is hao
+    @Test
+    fun shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff() {
+        val engines = Engines(::load, null)
+        fun tapped(im: String, keys: String, touches: List<Touch>): List<String> {
+            keys.indices.forEach { engines.onEvent(im, EngineEvent.CHAR, keys[it].code, payload = Action.Key(keys[it], touch = touches[it])) }
+            return engines.candidates(im, 0, 20).map { it.text }.also { engines.onEvent(im, EngineEvent.RESET, 0) }
+        }
+        val g18 = NineKeyLetters.G18
+        val sp = "jc".map(g18::key).joinToString("")
+        val spTaps = listOf(TouchBoxes.tap(TouchBoxes.G18, g18.key('j'), dx = -0.45f), TouchBoxes.tap(TouchBoxes.G18, g18.key('c')))
+        val x = ZhuyinKeys.symbolCode('ㄒ')
+        val ao = ZhuyinKeys.symbolCode('ㄠ')
+        val zyTaps = listOf(TouchBoxes.tap(TouchBoxes.DACHEN, x, dx = -0.45f), TouchBoxes.tap(TouchBoxes.DACHEN, ao))
+        engines.settings = EngineSettings(shuangpin = EngineSettings.XIAOHE)
+        assertTrue("好" in tapped(InputMethodCatalog.SHUANGPIN_KEYS18, sp, spTaps))
+        assertTrue("好" in tapped(InputMethodCatalog.ZHUYIN, "$x$ao", zyTaps))
+        engines.settings = EngineSettings(shuangpin = EngineSettings.XIAOHE, typos = false)
+        assertFalse("好" in tapped(InputMethodCatalog.SHUANGPIN_KEYS18, sp, spTaps))
+        assertFalse("好" in tapped(InputMethodCatalog.ZHUYIN, "$x$ao", zyTaps))
     }
 
     @Test

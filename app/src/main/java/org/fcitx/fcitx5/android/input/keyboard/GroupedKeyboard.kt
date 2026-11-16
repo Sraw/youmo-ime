@@ -325,9 +325,11 @@ class GroupedKeyboard private constructor(
         filters = { InputMethodCatalog.filtersByStrokes(imeName) },
     ) { _, _ -> }
 
-    // each group key, as its code goes out (061-neighbour-correction); 双拼's engine reads no place
+    // each group key, as its code is read by the engine (061-neighbour-correction, 061-neighbour-groups): the group's code
+    // itself, not what [wire] sends it as. Pinyin's 18 keys' and 双拼's 14 keys' wire is past the BMP (Keyboard.keyedChar
+    // reads it back as the code), which as a Char was another character, no key the engine reads
     override fun typingKeys(): List<Pair<Char, KeyRef>> = canvas?.shownKeys.orEmpty().mapNotNull { k ->
-        k.letters?.let { l -> codeOf(l.group, k.id)?.let { wire(it).toChar() to KeyRef(k.id, k.copy == 1) } }
+        k.letters?.let { l -> codeOf(l.group, k.id)?.let { it to KeyRef(k.id, k.copy == 1) } }
     }
 
     // the code of the key [id] of [group]'s letters: the built-in keyboard's of its first letter (as always), a

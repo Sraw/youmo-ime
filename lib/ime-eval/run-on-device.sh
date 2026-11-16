@@ -9,7 +9,9 @@
 # each key with its touch, as a finger's tap carries it (061-neighbour-correction). NINE=1 types a set of digits (ime-eval's
 # nine-key sets) as pinyin's nine keys send them, codes of their own, with ime=engine-pinyin (with ime=keyboard-us, as
 # English's nine keys send them); GROUPED=14 or 18 a set of
-# the 14 or 18 keys' codes (--scheme g14/g18) as those keys send them.
+# pinyin's 14 or 18 keys' codes (--scheme g14/g18) as those keys send them; sp18, sp14 or sp9 双拼's 18, 14 or nine
+# keys' (shuangpin --keys 18|14|nine, ime=engine-shuangpin), zy9 or zy 注音九键's or 大千's (zhuyin --keys nine|full,
+# ime=engine-pinyin, which hands them on), each as its keyboard sends them.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"

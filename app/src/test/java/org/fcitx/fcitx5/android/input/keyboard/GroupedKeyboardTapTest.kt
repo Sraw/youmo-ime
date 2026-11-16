@@ -55,7 +55,9 @@ class GroupedKeyboardTapTest {
         override val lifecycle = LifecycleRegistry(this)
     }
 
-    private fun grouped() = GroupedKeyboard(context, TestThemes.PixelDark).apply {
+    private fun grouped() = wired(GroupedKeyboard(context, TestThemes.PixelDark))
+
+    private fun wired(k: GroupedKeyboard) = k.apply {
         setViewTreeLifecycleOwner(Owner())
         keyActionListener = KeyActionListener { action, _ ->
             touches += (action as? KeyAction.SymAction)?.touch
@@ -154,6 +156,31 @@ class GroupedKeyboardTapTest {
         touches.clear()
         assertTrue(bn.click())
         assertEquals(listOf<Touch?>(null), touches)
+    }
+
+    // 061-neighbour-groups: on each grouped keyboard as KeyboardWindow makes it, the keys around a tap are the codes the
+    // engine reads its keys by, whatever each is sent as (pinyin's 18 keys' and 双拼's 14 keys' past the BMP, read back
+    // by Keyboard.keyedChar): BN's has M's, and BN is B's
+    @Test
+    @Uat("PY-142", "SP-48", "SP-49")
+    fun everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem() {
+        val made = listOf(
+            "拼音 18" to GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false, ownGroups = true),
+            "双拼 18" to GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G18),
+            "双拼 14" to GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G14, Keyboard::shuangpin14Key),
+        )
+        for ((what, k) in made) {
+            keyboard = wired(k)
+            val letters = if (what.endsWith("18")) NineKeyLetters.G18 else NineKeyLetters.G14
+            assertEquals(what, letters.codes.toSet(), keyboard.typingKeys().map { it.first }.toSet())
+            sent.clear()
+            touches.clear()
+            val bn = key("BN")
+            touch(bn, bn.width * 0.9f)
+            val touch = touches.single()!!
+            assertTrue("$what ${touch.near}", touch.near(letters.key('m')) != null)
+            assertEquals(what, letters.key('b'), keyboard.typingKeys().single { it.second.id == bn.id && !it.second.copy }.first)
+        }
     }
 
     @Test

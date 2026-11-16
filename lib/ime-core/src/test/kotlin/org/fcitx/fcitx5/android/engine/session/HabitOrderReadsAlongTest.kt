@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.learn.Learner
+import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
@@ -18,6 +19,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -126,6 +128,10 @@ class HabitOrderReadsAlongTest {
         val full = PinyinSegmenter(neighbours = true)
         val shuangpin = listOf(ShuangpinScheme.XIAOHE, ShuangpinScheme.ZIRANMA).map { ShuangpinSegmenter(it, neighbours = true) }
         val nine = T9Segmenter(abbreviations = false, neighbours = true)
+        val grouped = listOf(NineKeyLetters.G18 to TouchBoxes.G18, NineKeyLetters.G14 to TouchBoxes.G14, NineKeyLetters.NINE_SP to TouchBoxes.NINE_SP)
+        val groupedShuangpin = grouped.associate { (letters, _) -> letters to GroupedShuangpinSegmenter(ShuangpinScheme.XIAOHE, letters, neighbours = true) }
+        val zhuyinDachen = T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, neighbours = true)
+        val zhuyinNine = T9Segmenter(abbreviations = false, letters = ZhuyinKeys.NINE, neighbours = true)
         repeat(400) {
             // 全拼: syllables, some cut to their initial (简拼), now and then a stray letter
             val pinyin = (1..random.nextInt(2, 5)).joinToString("") {
@@ -141,11 +147,21 @@ class HabitOrderReadsAlongTest {
             // 双拼: any letters, nearly every pair a syllable and every key an initial
             val keys = (1..random.nextInt(3, 10)).map { 'a' + random.nextInt(26) }.joinToString("")
             for (s in shuangpin) check("双拼", s, keys, touches(keys, TouchBoxes.QWERTY, random), counts)
+            // 双拼's grouped keyboards and zhuyin's (061-neighbour-groups): their slips read otherwise as the others'
+            for ((letters, board) in grouped) {
+                val codes = keys.map(letters::key).joinToString("")
+                check("双拼分组", groupedShuangpin.getValue(letters), codes, touches(codes, board, random), counts)
+            }
+            val symbols = (1..random.nextInt(2, 8)).map { ZhuyinKeys.SYMBOLS[random.nextInt(ZhuyinKeys.SYMBOLS.length)] }
+            val dachen = symbols.map(ZhuyinKeys::symbolCode).joinToString("")
+            check("注音", zhuyinDachen, dachen, touches(dachen, TouchBoxes.DACHEN, random), counts)
+            val nineZy = symbols.map { y -> ZhuyinKeys.groupCode(ZhuyinKeys.GROUP_SYMBOLS.indexOfFirst { y in it }) }.joinToString("")
+            check("注音", zhuyinNine, nineZy, touches(nineZy, TouchBoxes.ZHUYIN_NINE, random), counts)
         }
         // enough of each kind to hold: graphs with slips or 简拼, candidates that read, and ones read past text kept as typed
         assertTrue("${counts.graphs} graphs read otherwise", counts.graphs > 500)
         // of them, ones with a slip of each kind: 简拼 in 双拼 alone would fill the count above
-        for (kind in listOf("全拼", "九键", "双拼")) assertTrue("${counts.slipped[kind]} $kind graphs with a slip", (counts.slipped[kind] ?: 0) > 150)
+        for (kind in listOf("全拼", "九键", "双拼", "双拼分组", "注音")) assertTrue("${counts.slipped[kind]} $kind graphs with a slip", (counts.slipped[kind] ?: 0) > 150)
         assertTrue("${counts.read} of ${counts.candidates} read", counts.read > 5000 && counts.read < counts.candidates)
         assertTrue("${counts.pastKept} read past text kept as typed", counts.pastKept > 200)
         // and ones that read only if the word after text kept as typed is not walked again

@@ -742,7 +742,7 @@
     <string name="im_model_level_medium">中檔：每次按鍵按整句通順程度重排</string>
     <string name="im_model_level_high">高檔：停頓時再用大模型精挑首選，最準</string>
     <string name="im_typos">糾正錯拼和按偏的鍵</string>
-    <string name="im_typos_summary">按在鍵的邊上、靠著旁邊哪個鍵，也按那個鍵讀（點在鍵中間不改）；全拼還認 gn 當成 ng 這類錯拼，雙拼還認 j、q、x、y 後的 u 按成了 ü 的鍵</string>
+    <string name="im_typos_summary">按在鍵的邊上、靠著旁邊哪個鍵，也按那個鍵讀（點在鍵中間不改）；全拼還認 gn 當成 ng 這類錯拼，雙拼全鍵盤還認 j、q、x、y 後的 u 按成了 ü 的鍵</string>
     <string name="im_latin_words">中英混輸</string>
     <string name="im_latin_words_summary">拼音裡直接打英文單詞，比如 iphone 出 iPhone</string>
     <string name="engine_data_libime">拼音詞典和語言模型：libime</string>

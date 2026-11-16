@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.learn.RecordingHabits
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
+import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
@@ -19,6 +20,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.session.Action.Key
@@ -45,6 +47,7 @@ class PinyinSessionSlipTest {
                 .unigram("们", -3f, 0f)
                 .unigram("本", -3.5f, 0f)
                 .unigram("我", -2f, 0f)
+                .unigram("那", -3f, 0f)
                 .entry("你好", syl("ni", "hao"))
                 .entry("他", syl("ta"))
                 .entry("呀", syl("ya"))
@@ -52,6 +55,7 @@ class PinyinSessionSlipTest {
                 .entry("们", syl("men"))
                 .entry("本", syl("ben"))
                 .entry("我", syl("wo"))
+                .entry("那", syl("na"))
                 .build().toByteArray(),
         ),
     )
@@ -149,6 +153,34 @@ class PinyinSessionSlipTest {
         assertTrue(shown.candidates.toString(), "们" in s.candidates(0, 50).map { it.text })
         s.pick("们")
         assertEquals(listOf(g14("m e b")), habits.codes())
+    }
+
+    // 061-neighbour-groups: 双拼's 18 keys, 小鹤 [BN][F] (ben) with BN tapped toward M: 们 learned under [M][F], its codes
+    @Test
+    @Uat("SP-48")
+    fun onShuangpinsEighteenKeysTheKeyMeantIsLearnedAsItsCode() {
+        val habits = RecordingHabits()
+        val letters = NineKeyLetters.G18
+        val s = session(GroupedShuangpinSegmenter(XIAOHE, letters, neighbours = true), habits, spell = true)
+        val typed = "bf".map(letters::key).joinToString("")
+        s.tap(typed, listOf(TouchBoxes.tap(TouchBoxes.G18, letters.key('b'), dx = 0.45f), TouchBoxes.tap(TouchBoxes.G18, letters.key('f'))))
+        assertTrue(s.candidates(0, 50).toString(), "们" in s.candidates(0, 50).map { it.text })
+        s.pick("们")
+        assertEquals(listOf("mf".map(letters::key).joinToString("")), habits.codes())
+    }
+
+    // and 大千's: ㄇㄚ with ㄇ tapped toward ㄋ, 那 learned under ㄋㄚ
+    @Test
+    @Uat("PY-150")
+    fun onDachenTheSymbolMeantIsLearnedAsItsCode() {
+        val habits = RecordingHabits()
+        val s = session(T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, neighbours = true), habits, spell = true)
+        val m = ZhuyinKeys.symbolCode('ㄇ')
+        val a = ZhuyinKeys.symbolCode('ㄚ')
+        s.tap("$m$a", listOf(TouchBoxes.tap(TouchBoxes.DACHEN, m, dx = 0.45f), TouchBoxes.tap(TouchBoxes.DACHEN, a)))
+        assertTrue(s.candidates(0, 50).toString(), "那" in s.candidates(0, 50).map { it.text })
+        s.pick("那")
+        assertEquals(listOf("${ZhuyinKeys.symbolCode('ㄋ')}$a"), habits.codes())
     }
 
     // N2-A: the code shows the syllable as meant, not the keys: 小鹤 tq (tiu spells nothing) with q tapped by a is ta

@@ -153,6 +153,15 @@ case("SP-41", needs="jvm:ShuangpinUatTest.initialsInTheMiddleReadTheWordsTypedWh
 case("SP-42", needs="jvm:PinyinSessionSlipTest.shuangpinsCodeShowsTheSyllableAsMeant")(lambda d: None)
 
 
+case("SP-48", needs="jvm:NeighbourSlipTest.shuangpinsEighteenAndFourteenKeysReadAGroupAsTheOneNextToIt、EnginesTest.shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff、PinyinSessionSlipTest.onShuangpinsEighteenKeysTheKeyMeantIsLearnedAsItsCode、GroupedKeyboardTapTest.everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem、NeighbourTouchTest.aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem")(lambda d: None)
+
+
+case("SP-49", needs="jvm:NeighbourSlipTest.shuangpinsEighteenAndFourteenKeysReadAGroupAsTheOneNextToIt、GroupedKeyboardTapTest.everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem、NeighbourTouchTest.aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem")(lambda d: None)
+
+
+case("SP-50", needs="jvm:NeighbourSlipTest.shuangpinsNineKeysReadADigitAsTheOneItWasTappedTowards、T9ShuangpinKeyboardTest.aDigitKeysTapGoesWithWhereItFellAndTheKeysAroundItByTheirCodes、NeighbourTouchTest.shuangpinsNineKeysDigitsGoWithTheirCodesAround")(lambda d: None)
+
+
 @case("SP-47", base="B0-双拼", mutates=True)
 def sp47(d):
     # 小鹤 (q is iu, tiu no syllable): q tapped at its bottom right corner, toward a (whose middle is under q's right

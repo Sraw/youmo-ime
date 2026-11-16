@@ -46,10 +46,12 @@ import java.util.TreeMap
  * the spelling actually typed for it (a fuzzy partner's, üe's ue), kept beside the index as the
  * group's first or second letter of each key.
  *
- * With [neighbours] (pinyin's keys alone), a syllable some of the keys spell with one key slipped
- * from a key around it is read too, as likely as where it was tapped says ([SlipCost];
- * 061-neighbour-correction §4.3, §4.4): whole syllables only, legal (costing more) where the keys
- * as typed spell one. On a keyboard that weighs a key's letters by where it was tapped, the key
+ * With [neighbours], a syllable some of the keys spell with one key slipped from a key around it is
+ * read too, as likely as where it was tapped says ([SlipCost]; 061-neighbour-correction §4.3, §4.4):
+ * whole syllables only, legal (costing more) where the keys as typed spell one. In zhuyin a key
+ * around is a group key around (注音九键) or a symbol's key around (大千), never a tone's
+ * (061-neighbour-groups; the app reads them on 大千 alone: on 注音九键 a sentence typed on target with
+ * no tones went wrong). On a keyboard that weighs a key's letters by where it was tapped, the key
  * slipped to has its letters weighed by where the tap lies on it, the slipped key's own not at all.
  *
  * The keys may spell syllables in zhuyin's symbols instead ([KeySpelling], 注音九键 and 大千 of
@@ -63,8 +65,10 @@ class T9Segmenter(
     override val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? = null,
     neighbours: Boolean = false,
     // the nine keys' digits read the slips over -3 alone: on a phone (6T) those over -4 cost 2.7 ms a key at the
-    // 41st to 60th key, over the 1.5 the design allows, and found 1 point more (061-neighbour-correction §7.2, N3)
-    private val slipCost: SlipCost = if (letters.isGrouped) SlipCost() else SlipCost(floor = -3f),
+    // 41st to 60th key, over the 1.5 the design allows, and found 1 point more (061-neighbour-correction §7.2, N3);
+    // 大千's keys too, a symbol each: over -4 its keys typed with no tone took a quarter more arcs, over the tenth
+    // allowed (061-neighbour-groups)
+    private val slipCost: SlipCost = if (letters.isGrouped && letters != ZhuyinKeys.DACHEN) SlipCost() else SlipCost(floor = -3f),
 ) : KeyedSegmenter {
 
     // the tables below made once for the settings that shape them, shared by the sessions made anew
@@ -79,7 +83,7 @@ class T9Segmenter(
     private val wholeLetters = tables.wholeLetters
     private val startLetters = tables.startLetters
     private val initialLetters = tables.initialLetters
-    private val slips = neighbours && spelling == KeySpelling.Pinyin
+    private val slips = neighbours
 
     /**
      * How many times two spellings of a syllable kept for the same keys and flags had different

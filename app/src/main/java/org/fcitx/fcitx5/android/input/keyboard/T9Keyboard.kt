@@ -43,6 +43,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
@@ -248,7 +249,7 @@ class T9Keyboard(
                 return KeyAction.HostKeyAction("'")
             }
             tap.reset()
-            return codeOf(key)
+            return codeOf(key, (action as KeyAction.HostKeyAction).touch)
         }
 
         /**
@@ -264,9 +265,9 @@ class T9Keyboard(
             return if (code) KeyAction.SymAction(KeySym(UNICODE + Keyboard.pinyinNineKey(key)), KeyStates.Virtual, (action as KeyAction.HostKeyAction).touch) else action
         }
 
-        /** The code of 九键双拼's digit key [digit]: its group's, sent as a Unicode character. */
-        internal fun codeOf(digit: Char) =
-            KeyAction.SymAction(KeySym(UNICODE + NineKeyLetters.NINE_SP.codes[digit - '2'].code), KeyStates.Virtual)
+        /** The code of 九键双拼's digit key [digit]: its group's, sent as a Unicode character, with where it was tapped. */
+        internal fun codeOf(digit: Char, touch: Touch? = null) =
+            KeyAction.SymAction(KeySym(UNICODE + NineKeyLetters.NINE_SP.codes[digit - '2'].code), KeyStates.Virtual, touch)
 
         /** A digit as a keypad's, as the number keyboard's: typed, or its candidate picked while typing (EngineEvent.KEYPAD). */
         private fun keypad(digit: Char) = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + (digit - '0')), KeyStates.Virtual)
@@ -517,9 +518,14 @@ class T9Keyboard(
         }
 
     // each letter where the scene draws its digit's key (nine.xml's key N)
-    // the digit keys with letters, pinyin's and English's (061-neighbour-correction, 061-neighbour-english): not 1 and 0, nor 双拼's
+    // the digit keys with letters as the engine reads them (061-neighbour-correction, 061-neighbour-english): pinyin's
+    // and English's digits, 双拼's their NINE_SP codes (061-neighbour-groups); not 1 (双拼's `;` among them) and 0
     override fun typingKeys(): List<Pair<Char, KeyRef>> =
-        if (shuangpin) emptyList() else ('2'..'9').filter { letters.letters(it).isNotEmpty() }.map { it to KeyRef(it.toString()) }
+        if (shuangpin) {
+            ('2'..'9').map { NineKeyLetters.NINE_SP.codes[it - '2'] to KeyRef(it.toString()) }
+        } else {
+            ('2'..'9').filter { letters.letters(it).isNotEmpty() }.map { it to KeyRef(it.toString()) }
+        }
 
     private val sceneLetters: List<Pair<Char, ScenePlace>> = ('2'..'9').flatMap { d ->
         scenePlace(d.toString()).let { at -> letters.letters(d).map { it.lowercaseChar() to at } }

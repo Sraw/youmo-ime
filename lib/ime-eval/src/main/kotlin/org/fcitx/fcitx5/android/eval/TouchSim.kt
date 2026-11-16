@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.eval
 import org.fcitx.fcitx5.android.engine.pinyin.KeyBoxes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import java.util.Random
 import java.util.zip.CRC32
 
@@ -26,13 +27,14 @@ object TouchSim {
         val boxes = KeyBoxes(keys)
     }
 
-    // [rows] of keys, each its characters, where it starts and each key's width (in key widths)
-    private fun rows(vararg rows: Triple<String, Float, Float>): Board {
+    // [rows] of keys [height] high, each its characters (a space a key that types none: a place, no key), where it
+    // starts and each key's width (in key widths)
+    private fun rows(vararg rows: Triple<String, Float, Float>, height: Float = KEY_H): Board {
         val keys = LinkedHashMap<Char, KeyBoxes.Box>()
         rows.forEachIndexed { r, (chars, offset, width) ->
             chars.forEachIndexed { i, c ->
                 val left = (offset + i * width) * KEY_W
-                keys[c] = KeyBoxes.Box(left, r * KEY_H, left + width * KEY_W, (r + 1) * KEY_H)
+                if (c != ' ') keys[c] = KeyBoxes.Box(left, r * height, left + width * KEY_W, (r + 1) * height)
             }
         }
         return Board(keys)
@@ -45,19 +47,34 @@ object TouchSim {
     /**
      * `qwerty`, `qwerty-ms` (微软双拼's `;` ending the middle row), `nine` (nine.xml's digits with
      * letters), `k14` (each key its code), `k18` (each key its code, as GroupedKeyboard lays the 18
-     * keys out: a row's keys alike, a seventh, a sixth and 0.14 of the width, one letter or two each).
+     * keys out: a row's keys alike, a seventh, a sixth and 0.14 of the width, one letter or two each), `nine-sp`
+     * (双拼's nine keys, nine's digits each its [NineKeyLetters.NINE_SP] code), `zy9` (注音九键's 11 groups, three a
+     * row 0.24 of the width after the tones' column, zhuyin-nine.xml) and `zy` (大千's 37 symbols, zhuyin.xml: the
+     * number row's 11 alike, its tones no key here, then 10, 10 and 10 of 0.085). Zhuyin's keyboards have five rows
+     * where the others have four, in the same height: their rows 0.8 as high.
      */
     fun board(name: String): Board = when (name) {
         "qwerty" -> rows(Triple("qwertyuiop", 0f, 1f), Triple("asdfghjkl", 0.5f, 1f), Triple("zxcvbnm", 1.5f, 1f))
         "qwerty-ms" -> rows(Triple("qwertyuiop", 0f, 1f), Triple("asdfghjkl;", 0f, 1f), Triple("zxcvbnm", 1.5f, 1f))
         "nine" -> rows(Triple("23", 1.6f + 2.2f, 2.2f), Triple("456", 1.6f, 2.2f), Triple("789", 1.6f, 2.2f))
+        "nine-sp" -> rows(
+            Triple(grouped(NineKeyLetters.NINE_SP, "a d"), 1.6f + 2.2f, 2.2f),
+            Triple(grouped(NineKeyLetters.NINE_SP, "g j m"), 1.6f, 2.2f),
+            Triple(grouped(NineKeyLetters.NINE_SP, "p t w"), 1.6f, 2.2f),
+        )
+        "zy9" -> (0 until ZhuyinKeys.GROUPS).map(ZhuyinKeys::groupCode).joinToString("").let { g ->
+            rows(Triple(g.substring(0, 3), 1.4f, 2.4f), Triple(g.substring(3, 6), 1.4f, 2.4f), Triple(g.substring(6, 9), 1.4f, 2.4f), Triple(g.substring(9), 1.4f, 2.4f), height = ZHUYIN_ROW)
+        }
+        "zy" -> listOf("1234567890-", "qwertyuiop", "asdfghjkl;", "zxcvbnm,./").map { row ->
+            row.map { q -> ZhuyinKeys.DACHEN_QWERTY.getValue(q).let { c -> if (c in ZhuyinKeys.SYMBOLS) ZhuyinKeys.symbolCode(c) else ' ' } }.joinToString("")
+        }.let { r -> rows(Triple(r[0], 0f, ROW / 11), Triple(r[1], 0f, 1f), Triple(r[2], 0f, 1f), Triple(r[3], 0f, 0.85f), height = ZHUYIN_ROW) }
         "k14" -> rows(Triple(g14("q e t u o"), 0f, 2f), Triple(g14("a d g j l"), 0f, 2f), Triple(g14("z c b m"), 1f, 2f))
         "k18" -> rows(
             Triple(grouped(NineKeyLetters.G18, "q w r y u i p"), 0f, ROW / 7),
             Triple(grouped(NineKeyLetters.G18, "a s f h j l"), 0f, ROW / 6),
             Triple(grouped(NineKeyLetters.G18, "z x v b m"), (ROW - 5 * K18_LAST) / 2, K18_LAST),
         )
-        else -> throw IllegalArgumentException("no keyboard $name: qwerty, qwerty-ms, nine, k14, k18")
+        else -> throw IllegalArgumentException("no keyboard $name: qwerty, qwerty-ms, nine, k14, k18, nine-sp, zy9, zy")
     }
 
     /** σ and a shift across ([dx]) and down ([dy]), in key widths; [halves]: keys left of the middle tapped that far right, the others that far left (two thumbs reaching in). */
@@ -123,6 +140,7 @@ object TouchSim {
     // a row's width in QWERTY keys, and the 18 keys' last row's (GroupedKeyboard's Shape: 0.14 of the row)
     private const val ROW = 10f
     private const val K18_LAST = 1.4f
+    private const val ZHUYIN_ROW = KEY_H * 0.8f
     private const val SIGMA = 0.2f
     private const val DOWN = 0.15f
     private const val SEED_STEP = 1_000_003L

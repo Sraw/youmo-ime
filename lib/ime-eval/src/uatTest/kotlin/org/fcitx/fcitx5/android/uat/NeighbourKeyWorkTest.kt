@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.uat
 import org.fcitx.fcitx5.android.engine.lattice.Decoding
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
+import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -14,10 +15,12 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.eval.Sample
 import org.fcitx.fcitx5.android.eval.TouchSim
 import org.fcitx.fcitx5.android.eval.TypedHistory
+import org.fcitx.fcitx5.android.eval.ZhuyinSet
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -126,6 +129,39 @@ class NeighbourKeyWorkTest {
             val off = T9Segmenter(abbreviations = false, letters = letters)
             within(board, type(inputs, board, { i, t -> on.segment(i, null, t) }, placed = true), type(inputs, board, { i, t -> off.segment(i, null, t) }, placed = false))
         }
+    }
+
+    // 双拼's grouped keyboards (061-neighbour-groups): 小鹤 typed whole and the first syllable whole with initials after,
+    // on the 18, 14 and nine keys (the nine keys' digits read no slip under -3)
+    @Test
+    fun shuangpinsGroupedKeyboardsTakeAtMostATenthMore() {
+        for (initials in listOf(false, true)) {
+            for ((letters, board) in listOf(NineKeyLetters.G18 to "k18", NineKeyLetters.G14 to "k14", NineKeyLetters.NINE_SP to "nine-sp")) {
+                val inputs = xiaohe(initials).map { line -> line.map(letters::key).joinToString("") }
+                val on = GroupedShuangpinSegmenter(ShuangpinScheme.XIAOHE, letters, neighbours = true)
+                val off = GroupedShuangpinSegmenter(ShuangpinScheme.XIAOHE, letters)
+                within(
+                    "小鹤 $board${if (initials) " initials" else ""}",
+                    type(inputs, board, { i, t -> on.segment(i, null, t) }, placed = true, user = typed),
+                    type(inputs, board, { i, t -> off.segment(i, null, t) }, placed = false, user = typed),
+                )
+            }
+        }
+    }
+
+    // 大千 (061-neighbour-groups), the chat's lines typed in zhuyin with no tones (the tones' tables are the engine's
+    // download's, not the repository's: with them the slips took no more, 061-neighbour-scope-research); its slips over
+    // -3 alone, as T9Segmenter has them (over -4 they took a quarter more)
+    @Test
+    fun dachenTakesAtMostATenthMore() {
+        val samples = File("data/pinyin-chat.tsv").readLines().filter { it.isNotBlank() && !it.startsWith("#") }
+            .map { it.split('\t') }.map { Sample(it[0], it[1], "") }
+        val toneAllows = UatEngines.pinyinData.tones::allows
+        val inputs = ZhuyinSet.convert(samples, ZhuyinKeys.DACHEN).map { it.input }.filter { it.length in KEYS / 2..KEYS }.take(LINES)
+        assertEquals(LINES, inputs.size)
+        val on = T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = toneAllows, neighbours = true)
+        val off = T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = toneAllows)
+        within("大千", type(inputs, "zy", { i, t -> on.segment(i, null, t) }, placed = true), type(inputs, "zy", { i, t -> off.segment(i, null, t) }, placed = false))
     }
 
     private companion object {

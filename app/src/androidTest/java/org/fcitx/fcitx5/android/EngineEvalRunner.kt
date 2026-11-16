@@ -57,8 +57,10 @@ class EngineEvalRunner {
 
     private var english = false
 
-    // -e evalGrouped 14|18: a set's codes as pinyin's 14 keys send them (the group's code itself) or its 18 keys (codes of
-    // their own, Keyboard.pinyin18Key), as GroupedKeyboard wires them
+    // -e evalGrouped: a set's codes as a grouped keyboard sends them (GroupedKeyboard's wire, T9Keyboard's, ZhuyinKeyboard's):
+    // 14 pinyin's 14 keys (the group's code itself), 18 its 18 keys (codes of their own, Keyboard.pinyin18Key); sp18 and
+    // sp9 双拼's 18 and nine keys (the code itself), sp14 its 14 keys (Keyboard.shuangpin14Key); zy9 注音九键 and zy
+    // 大千 (their keys' codes, read back by Keyboard.keyedChar as the set's)
     private var grouped: String? = null
 
     @Test
@@ -70,7 +72,7 @@ class EngineEvalRunner {
         val ime = args.getString("evalIme") ?: InputMethodCatalog.PINYIN
         nine = args.getString("evalNine") == "true"
         english = ime == InputMethodCatalog.ENGLISH
-        grouped = args.getString("evalGrouped")?.also { require(it == "14" || it == "18") { "evalGrouped $it" } }
+        grouped = args.getString("evalGrouped")?.also { require(it in GROUPED) { "evalGrouped $it: one of $GROUPED" } }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val samples = testContext.assets.open("$set.tsv").bufferedReader().useLines { lines ->
@@ -160,8 +162,7 @@ class EngineEvalRunner {
             val touch = sample.touches?.getOrNull(i)
             when {
                 nine -> fcitx.sendKey(KeySym(UNICODE + if (english) Keyboard.nineKey(c, upper = false) else Keyboard.pinyinNineKey(c)), KeyStates.Virtual, touch = touch)
-                grouped == "14" -> fcitx.sendKey(KeySym(UNICODE + c.code), KeyStates.Virtual, touch = touch)
-                grouped == "18" -> fcitx.sendKey(KeySym(UNICODE + Keyboard.pinyin18Key(c)), KeyStates.Virtual, touch = touch)
+                grouped != null -> fcitx.sendKey(KeySym(UNICODE + wired(grouped!!, c)), KeyStates.Virtual, touch = touch)
                 touch != null -> fcitx.sendKey(c.toString(), touch = touch)
                 else -> fcitx.sendKey(c)
             }
@@ -203,6 +204,15 @@ class EngineEvalRunner {
         }
     }.toList()
 
+    // what the grouped keyboard [board] sends for the code [c] the engine reads
+    private fun wired(board: String, c: Char): Int = when (board) {
+        "18" -> Keyboard.pinyin18Key(c)
+        "sp14" -> Keyboard.shuangpin14Key(c)
+        "zy9" -> Keyboard.ZHUYIN_NINE.first { Keyboard.keyedChar(it) == c }
+        "zy" -> Keyboard.ZHUYIN_FULL.first { Keyboard.keyedChar(it) == c }
+        else -> c.code
+    }
+
     /** A line of an evaluation set as it is typed: [input] after [context], the text before the cursor ("" for none). */
     private data class Sample(val input: String, val context: String, val touches: List<Touch?>? = null)
 
@@ -222,5 +232,8 @@ class EngineEvalRunner {
         /** As Engines names the logs: pinyin.user, english.user, wubi.user. */
         const val LOG_SUFFIX = ".user"
         val SEPARATORS = Regex("[\t\r\n]")
+
+        // -e evalGrouped's keyboards
+        val GROUPED = setOf("14", "18", "sp18", "sp14", "sp9", "zy9", "zy")
     }
 }

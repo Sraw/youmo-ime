@@ -48,7 +48,8 @@ class GroupedShuangpinSegmenterTest {
 
     @Test
     fun noSlipIsReadNotEvenUTypedWithTheKeyOfU() {
-        // the 18, 14 and nine keys correct nothing (060-correction-fuzzy-report): 小鹤's jv is no ju there, as it is on 26 keys
+        // the 18, 14 and nine keys read slipped keys by where a tap fell (061-neighbour-groups), but no ü typo
+        // (060-correction-fuzzy-report): 小鹤's jv is no ju there, as it is on 26 keys
         for ((name, scheme) in EngineSettings.SCHEMES) {
             for (letters in listOf(G18, G14, NINE_SP)) {
                 val segmenter = GroupedShuangpinSegmenter(scheme, letters)

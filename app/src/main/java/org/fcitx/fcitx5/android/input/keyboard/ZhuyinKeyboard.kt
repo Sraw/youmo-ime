@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyNode
@@ -69,7 +70,7 @@ class ZhuyinKeyboard(
     if (nine) nineLayout() else fullLayout(keyboardCompact()),
     // 注音九键's keys are named by their place in its own 4×5 grid (the tones in the first column), ⌫ by its role
     themeBoard = if (nine) KeyNames.ZHUYIN_NINE else KeyNames.ZHUYIN,
-) {
+), TypingKeys {
 
     companion object {
         const val NameNine = "ZhuyinNine"
@@ -319,6 +320,14 @@ class ZhuyinKeyboard(
         // R25r3 F7962: action:zhuyin's code is made from the face as the key is made; a key kept through a face changed
         // (a pack's `<variant>`, its layout refused and the app's own drawn) went on sending the last face's symbol
         override fun reads(node: KeyNode): Any? = node.label.takeIf { ZHUYIN_ACTION in node.actions.values }
+    }
+
+    // 大千's symbol keys as the engine reads their codes: a tap goes with where it fell and the symbol keys around it
+    // (061-neighbour-groups); not a tone's. 注音九键's none: it reads no slipped key (one sentence typed on target
+    // there with no tones went wrong)
+    override fun typingKeys(): List<Pair<Char, KeyRef>> = if (nine) emptyList() else canvas?.shownKeys.orEmpty().mapNotNull { node ->
+        if (ZHUYIN_ACTION !in node.actions.values) return@mapNotNull null
+        node.label?.singleOrNull()?.let { codeOf(it, nine = false) }?.let(Keyboard::keyedChar)?.let { it to KeyRef(node.id, node.copy == 1) }
     }
 
     // what the bottom row shows now (grouped-bottom.xml's when= and bindings, as the grouped keyboards'): an

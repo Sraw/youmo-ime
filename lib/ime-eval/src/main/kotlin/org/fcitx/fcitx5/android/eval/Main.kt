@@ -493,8 +493,9 @@ private fun optionsValid(options: Map<String, String>): Boolean {
 /** Whether `--sp-abbrev` [spec] is off or a penalty (finite, not above 0), under a scheme of the full keyboard's 双拼 (the grouped ones read none). */
 private fun readsAbbrev(spec: String, scheme: String?) = (spec == "off" || spec.toFloatOrNull()?.let { it.isFinite() && it <= 0f } == true) && scheme in ShuangpinSet.SCHEMES
 
-/** Whether [scheme]'s segmenter reads a key as the one beside it: full pinyin, 双拼's full keyboard, pinyin's nine, 14 and 18 keys (061-neighbour-correction). */
-private fun readsNeighbours(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES || scheme in T9Set.SCHEMES
+/** Whether [scheme]'s segmenter reads a key as the one beside it: every one, 双拼's groups and zhuyin's too (061-neighbour-correction, 061-neighbour-groups). */
+private fun readsNeighbours(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES || scheme in T9Set.SCHEMES ||
+    scheme in ShuangpinSet.GROUPED || scheme in ZhuyinSet.SCHEMES
 
 /** Whether `--touch` [spec] names a keyboard, a hand and clean or slip ([TouchSim.convert]). */
 private fun touchValid(spec: String) = spec.split(':').let { p ->
@@ -596,9 +597,9 @@ private class RunOptions(options: Map<String, String>) {
     fun segmenter(data: PinyinData): Segmenter = when (scheme) {
         null -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours, latin = LatinWords.of(data.dictionary))
         NO_LATIN -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours)
-        in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = data.tones::allows)
+        in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = data.tones::allows, neighbours = neighbours)
         in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme), neighbours = neighbours)
-        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy) }
+        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy, neighbours = neighbours) }
         else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy, typos, abbreviations = abbreviations, neighbours = neighbours)
     }
 }

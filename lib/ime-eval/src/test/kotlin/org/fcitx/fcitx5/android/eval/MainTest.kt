@@ -144,7 +144,6 @@ class MainTest {
             arrayOf("pinyin", "d", "s", "r", "--scheme", "nope"),
             arrayOf("pinyin", "d", "s", "r", "--color", "red"),
             arrayOf("pinyin", "d", "s", "r", "--neighbours", "maybe"),
-            arrayOf("pinyin", "d", "s", "r", "--scheme", "zy", "--neighbours", "on"), // zhuyin reads none
             arrayOf("pinyin", "d", "s", "r", "--touch", "qwerty:s0.2"), // clean or slip
             arrayOf("pinyin", "d", "s", "r", "--touch", "dvorak:s0.2:clean"), // no such keyboard
             arrayOf("pinyin", "d", "s", "r", "--touch", "qwerty:s0.2:clean", "--taps", "sigma0.2:1", "--scheme", "g14"), // not both

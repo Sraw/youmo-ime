@@ -13,6 +13,10 @@ import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.keyboardOn
 import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
+import org.fcitx.fcitx5.android.engine.pinyin.nineSpCode
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.SlipCost
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
@@ -159,6 +163,73 @@ class NeighbourTouchTest {
         assertTrue(key, key.startsWith("sym="))
         assertEquals(0.3f, touch.dx, 0.03f)
         assertEquals(setOf('2', '4', '6', '8'), near(touch))
+    }
+
+    // 061-neighbour-groups: on the grouped keyboards the keys around a tap are the codes the engine reads (its input's
+    // Keyboard.keyedChar), whatever a key is sent as: pinyin's 18 keys' were cut to another character before
+    @Test
+    @Uat("PY-142", "SP-48", "SP-49")
+    fun aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem() {
+        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+        val made = listOf(
+            Triple("拼音 18", KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS18)) to NineKeyLetters.G18,
+            Triple("双拼 18", shuangpin, ImKeyboards.Chosen(shuangpin = ImKeyboard.KEYS18)) to NineKeyLetters.G18,
+            Triple("双拼 14", shuangpin, ImKeyboards.Chosen(shuangpin = ImKeyboard.KEYS14)) to NineKeyLetters.G14,
+        )
+        for ((board, letters) in made) {
+            val (what, im, keyboards) = board
+            val h = KeyboardHarness(im = im, keyboards = keyboards).also { h = it }.start()
+            h.idle()
+            h.relayout()
+            h.tapOff(h.keyNamed(if (letters == NineKeyLetters.G18) "r3c4" else "r3c3"), 0.45f)
+            val touch = h.api.touches.single().second
+            assertTrue("$what ${touch.near}", touch.near(letters.key('m'))!!.nx > 0f)
+            assertTrue("$what ${touch.near}", touch.near.all { it.char in letters.codes })
+            h.close()
+            this.h = null
+        }
+    }
+
+    // 双拼's nine keys: a digit's tap goes with the digits around it as their NINE_SP codes, as the engine reads them
+    @Test
+    @Uat("SP-50")
+    fun shuangpinsNineKeysDigitsGoWithTheirCodesAround() {
+        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+        val h = KeyboardHarness(im = shuangpin, keyboards = ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS)).also { h = it }.start()
+        h.idle()
+        h.relayout()
+        h.tapOff(h.keyNamed("5"), 0.3f)
+        val touch = h.api.touches.single().second
+        assertEquals("2468".map(::nineSpCode).toSet(), near(touch))
+        h.tapOff(h.keyNamed("1"), 0.3f)
+        assertEquals(1, h.api.touches.size)
+    }
+
+    // 大千: a symbol key's tap goes with the symbol keys around it by their codes; a tone key's none, nor is a tone key
+    // among the keys around (ㄉ has ㄅ to its left, ˇ to its right no neighbour). 注音九键 reads no slip: no tap goes
+    // with a place
+    @Test
+    @Uat("PY-150")
+    fun dachensSymbolKeysGoWithTheSymbolKeysAround() {
+        prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
+        val nine = KeyboardHarness(keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_NINE)).also { h = it }.start()
+        nine.idle()
+        nine.relayout()
+        nine.tapOff(nine.keyNamed("r2c2"), 0.3f)
+        nine.tapOff(nine.keyNamed("r1c1"), 0.3f)
+        assertEquals(0, nine.api.touches.size)
+        assertTrue(nine.api.calls.toString(), nine.api.calls.count { it.startsWith("sendKey(") } >= 2)
+        nine.close()
+        h = null
+        val dachen = KeyboardHarness(keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)).also { h = it }.start()
+        dachen.idle()
+        dachen.relayout()
+        dachen.tapOff(dachen.keyNamed("2"), 0.3f)
+        val d = dachen.api.touches.single().second
+        assertTrue("${d.near}", d.near(ZhuyinKeys.symbolCode('ㄅ'))!!.nx < 0f)
+        assertTrue("${d.near}", d.near.all { it.char in ZhuyinKeys.DACHEN.codes })
+        dachen.tapOff(dachen.keyNamed("3"), 0.3f)
+        assertEquals(1, dachen.api.touches.size)
     }
 
     // through the host to the engine: the key's payload, the engine's Keyboard reads its touch

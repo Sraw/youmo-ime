@@ -17,9 +17,13 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.pinyin.Near
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.pinyin.nineSpCode
+import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -62,6 +66,20 @@ class T9ShuangpinKeyboardTest {
         // pressed again soon: no 连按, the same code again
         assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 10L, composing = true, semicolon = false))
         assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 20L, composing = true, semicolon = false))
+    }
+
+    // 061-neighbour-groups: a digit key's tap goes with where it fell and the digit keys around it, as the engine reads
+    // them (their NINE_SP codes, not the digits); 1 (its separator, 微软's ;) none
+    @Test
+    @Uat("SP-50")
+    fun aDigitKeysTapGoesWithWhereItFellAndTheKeysAroundItByTheirCodes() {
+        val touch = Touch(0f, -0.45f, 72f, 50f, listOf(Near(nineSpCode('6'), 0f, -1f)))
+        val sent = T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("9", touch = touch), keys, MultiTap(0), 0L, composing = true, semicolon = false)
+        assertEquals(code(nineSpCode('9')).copy(touch = touch), sent)
+        val keyboard = T9Keyboard(context, TestThemes.PixelDark, shuangpin = true, semicolon = true)
+        assertEquals(('2'..'9').map { nineSpCode(it) to KeyRef(it.toString()) }, keyboard.typingKeys())
+        // 九键 pinyin's, its digits
+        assertEquals(('2'..'9').toList(), T9Keyboard(context, TestThemes.PixelDark, semicolon = false).typingKeys().map { it.first })
     }
 
     // Chinese punctuation on: 1's , as it maps it

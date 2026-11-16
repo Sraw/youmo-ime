@@ -671,7 +671,10 @@ case("PY-140", needs="jvm:PinyinSessionSlipTest.aLegalSlipPickedIsLearnedUnderTh
 case("PY-141", needs="jvm:NeighbourSlipTest.theFourteenKeysReadAKeyAsTheOneNextToItAndWeighItsLetters、PinyinSessionSlipTest.onTheFourteenKeysTheKeyMeantIsLearnedAsItsCode、GroupedKeyboardTapTest.aTapCarriesWhereItFellAndTheKeysAroundIt")(lambda d: None)
 
 
-case("PY-142", needs="jvm:NeighbourSlipTest.theEighteenKeysReadAKeyAsTheOneNextToIt")(lambda d: None)
+case("PY-142", needs="jvm:NeighbourSlipTest.theEighteenKeysReadAKeyAsTheOneNextToIt、GroupedKeyboardTapTest.everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem、NeighbourTouchTest.aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem")(lambda d: None)
+
+
+case("PY-150", needs="jvm:NeighbourSlipTest.dachenReadsASymbolAsTheOneNextToIt、PinyinSessionSlipTest.onDachenTheSymbolMeantIsLearnedAsItsCode、EnginesTest.shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff、NeighbourTouchTest.dachensSymbolKeysGoWithTheSymbolKeysAround")(lambda d: None)
 
 
 @case("PY-144", base="B0", visual=True)

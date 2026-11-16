@@ -151,14 +151,18 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    one around it: the log of how much likelier the tap is under a finger aimed at it than at the key
    hit (round Gaussians of σ 10 dp), never above 0, −2 more where the keys as typed spell a syllable
    too (a legal slip, `ta` near `y`), none below −4 (−3 on the nine keys' digits: below it they cost the 6T more than
-   061-neighbour-correction §7.2 allows, below). So a tap in a key's middle reads as typed and
+   061-neighbour-correction §7.2 allows, below; −3 on 大千's keys too, a symbol each: below it they took a quarter more
+   arcs, 061-neighbour-groups). So a tap in a key's middle reads as typed and
    one at its edge reads the neighbour too. 全拼 (`PinyinSegmenter`: `SpellingIndex` has every
    one-letter substitution, the segmenter keeps those the touches allow; never a syllable still
    growing at the end of the input, nor consonants alone where tapped in the middle, 简拼 being
    read), 双拼 on the full keyboard (`ShuangpinSegmenter`), 九键 (`T9Segmenter`, 1 and 0 no
    neighbours) and the pinyin 14/18 keys (`T9Segmenter` over the groups, a tap put onto the key
-   meant at its edge nearest the key hit; 18 keys unweighted, the user's) read slips; 双拼's grouped
-   keyboards do not. A key with no place (a hardware keyboard, TalkBack's double tap): 全拼 reads a
+   meant at its edge nearest the key hit; 18 keys unweighted, the user's), 双拼's 18, 14 and nine keys
+   (`GroupedShuangpinSegmenter`, by the same groups) and 大千 (`T9Segmenter` over `ZhuyinKeys.DACHEN`, a symbol
+   key's neighbours the symbol keys around it, a tone key none) read slips (061-neighbour-groups); 注音九键 does not
+   (with no tones typed one sentence of 983 typed on target went wrong, whatever the floor: its keyboard is no
+   `TypingKeys`). A key with no place (a hardware keyboard, TalkBack's double tap): 全拼 reads a
    slip only where the keys spell nothing (the 0.6.0 rule, `SlipCost.fixed`) and never consonants
    alone; the others none. The decoder adds the slip's cost in the arc's score where it scores the syllable (`step`,
    `startWords`), so `Lattice.same` sees it and a kept lattice is dropped where it changed; an arc over
@@ -188,8 +192,8 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    in the search; first words scored anew, which guard the scores kept), the same on any
    machine: `ShuangpinKeyWorkTest` (`:lib:ime-eval:uatTest`) holds a 小鹤 key on the app's data
    under ceilings by it, and each key's reading to a decoder's made afresh; `NeighbourKeyWorkTest`
-   holds the keys read by where they were tapped (full pinyin, 小鹤, 九键, 14 keys, clean taps) to a
-   tenth over the same input with no place (061-neighbour-correction §7.2; it was 3.5% at most; 小鹤
+   holds the keys read by where they were tapped (full pinyin, 小鹤, 九键, 14 keys, 双拼's 18, 14 and nine keys,
+   大千, clean taps) to a tenth over the same input with no place (061-neighbour-correction §7.2; it was 3.5% at most; 小鹤
    with the 3000 likeliest words typed, 8% of the arcs: with none typed a key takes so little that
    the slips' two hundred arcs are 12% of it).
 3. **Rank.** At `ModelLevel.MEDIUM` and up, `Reranker` adds the 4M sentence model's score of the
@@ -622,8 +626,11 @@ setting either: it reads the codes.
 - **Segmenter.** `GroupedShuangpinSegmenter(scheme, letters, fuzzy)`, built as
   `ShuangpinSegmenter` is (pairs, a key alone as PARTIAL/INITIAL, a/e/o alone, fuzzy), but reading no
   简拼 in the middle (a key alone only where it and the next make no syllable) and no
-  slip, not even ü typed with its own key: the grouped keyboards correct nothing (the user's 2026-11-03;
-  纠错 says 不适用 for them and its value is ignored).
+  spelling slip, not even ü typed with its own key (the user's 2026-11-03). With `neighbours` (纠错 on,
+  061-neighbour-groups) it reads a key tapped by its neighbour's edge as that key, as `T9Segmenter` does
+  over pinyin's groups: each key's touch onto the key meant (`slipped`), its cost `SlipCost`'s (floor −4,
+  −3 on the nine keys' digits as on pinyin's); a pair read through a slip is marked `ABBREVIATED` and
+  carries its slips, as 全键盘 双拼's do.
   It and `T9Segmenter` are `KeyedSegmenter`s: `letters`, `isKey`, `asTyped`, `initialsOf` (the
   bar's initials: the scheme's initials on the key's letters, 自然码's v zh) and `started` (a
   syllable not whole yet shows as its initial in 双拼, as many letters on the nine keys).
@@ -710,7 +717,9 @@ setting either: it reads the codes.
 - **Segmenter.** `T9Segmenter` over `ZhuyinKeys.NINE` / `DACHEN` with a `KeySpelling.Bopomofo`: each
   syllable spelt by `Zhuyin.of`, a symbol a fixed key, an initial its zhuyin initial. A tone is a separator
   (`SyllableGraph.isSeparator`); `SyllableGraph.tone(edge)` reads it after the edge. On 大千 a space after a
-  syllable with no tone is tone 1 (`KeyedSegmenter.tonesBySpace`), else it picks the first candidate.
+  syllable with no tone is tone 1 (`KeyedSegmenter.tonesBySpace`), else it picks the first candidate. With 纠错
+  on 大千 reads a symbol key tapped by its neighbour's edge as that one too (`ZhuyinKeyboard` a `TypingKeys` there,
+  tone keys none; 061-neighbour-groups); 注音九键 reads no slip.
 - **Keys and bar.** 注音九键 has the tones ˉ ˊ ˇ ˋ a key each down the left (˙ on ˉ's long press and
   swipe); the key after ㄖㄥㄩ's group is 分词 (tone 0) while something is typed, else a comma as punctuation
   maps it. A tone with nothing typed is not read (`PinyinSession.reads`): it types nothing. The bar's

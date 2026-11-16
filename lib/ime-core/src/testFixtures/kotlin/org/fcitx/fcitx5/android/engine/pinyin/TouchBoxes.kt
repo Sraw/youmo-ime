@@ -12,13 +12,14 @@ object TouchBoxes {
     const val KEY_W = 40f
     const val KEY_H = 56f
 
-    // [rows] of keys, each row its keys' characters, where it starts and each key's width (in key widths)
-    private fun rows(vararg rows: Triple<String, Float, Float>): KeyBoxes {
+    // [rows] of keys [height] high, each row its keys' characters (a space a place no key types), where it starts and
+    // each key's width (in key widths)
+    private fun rows(vararg rows: Triple<String, Float, Float>, height: Float = KEY_H): KeyBoxes {
         val keys = LinkedHashMap<Char, KeyBoxes.Box>()
         rows.forEachIndexed { r, (chars, offset, width) ->
             chars.forEachIndexed { i, c ->
                 val left = (offset + i * width) * KEY_W
-                keys[c] = KeyBoxes.Box(left, r * KEY_H, left + width * KEY_W, (r + 1) * KEY_H)
+                if (c != ' ') keys[c] = KeyBoxes.Box(left, r * height, left + width * KEY_W, (r + 1) * height)
             }
         }
         return KeyBoxes(keys)
@@ -49,6 +50,29 @@ object TouchBoxes {
         Triple(g18("a s f h j l"), 0f, 10f / 6),
         Triple(g18("z x v b m"), (10f - 5 * 10f / 7) / 2, 10f / 7),
     )
+
+    /** 双拼's nine keys: [NINE]'s digits as [NineKeyLetters.NINE_SP]'s codes. */
+    val NINE_SP = rows(
+        Triple("23".map(::nineSp).joinToString(""), 1.6f + 2.2f, 2.2f),
+        Triple("456".map(::nineSp).joinToString(""), 1.6f, 2.2f),
+        Triple("789".map(::nineSp).joinToString(""), 1.6f, 2.2f),
+    )
+
+    // zhuyin's keyboards have five rows in the height of the others' four
+    private const val ZHUYIN_H = KEY_H * 0.8f
+
+    /** 注音九键's 11 groups, each its code, three a row 0.24 of the width after the tones' column (zhuyin-nine.xml). */
+    val ZHUYIN_NINE = (0 until ZhuyinKeys.GROUPS).map(ZhuyinKeys::groupCode).joinToString("").let { g ->
+        rows(Triple(g.substring(0, 3), 1.4f, 2.4f), Triple(g.substring(3, 6), 1.4f, 2.4f), Triple(g.substring(6, 9), 1.4f, 2.4f), Triple(g.substring(9), 1.4f, 2.4f), height = ZHUYIN_H)
+    }
+
+    /** 大千's 37 symbols, each its code (zhuyin.xml): the number row's 11 alike, its tones no key here, then 10, 10 and 10 of 0.085. */
+    val DACHEN = listOf("1234567890-", "qwertyuiop", "asdfghjkl;", "zxcvbnm,./").map { row ->
+        row.map { q -> ZhuyinKeys.DACHEN_QWERTY.getValue(q).let { c -> if (c in ZhuyinKeys.SYMBOLS) ZhuyinKeys.symbolCode(c) else ' ' } }.joinToString("")
+    }.let { r -> rows(Triple(r[0], 0f, 10f / 11), Triple(r[1], 0f, 1f), Triple(r[2], 0f, 1f), Triple(r[3], 0f, 0.85f), height = ZHUYIN_H) }
+
+    /** [NINE_SP]'s code of the digit [d]. */
+    fun nineSp(d: Char): Char = NineKeyLetters.NINE_SP.codes[d - '2']
 
     /** A tap [dx] and [dy] (in its width and height) from the centre of the key [c] of [boxes]. */
     fun tap(boxes: KeyBoxes, c: Char, dx: Float = 0f, dy: Float = 0f): Touch {

@@ -199,9 +199,10 @@ internal class SessionFactory(
                 ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = own, neighbours = s.typos), spell = true))
             }
             // pinyin in zhuyin (design 051 §3.3): the nine keys' way with symbols for letters, a tone a separator
-            // the decoder weighs; learned under zy:nine and zy:dachen, apart from pinyin's keyboards
+            // the decoder weighs; learned under zy:nine and zy:dachen, apart from pinyin's keyboards. 大千 reads slipped
+            // keys, 注音九键 none (061-neighbour-groups: one sentence typed on target there with no tones went wrong)
             ZHUYIN_NINE -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.NINE, toneAllows = assets.pinyinData.tones::allows), spell = true, kind = Kinds.ZHUYIN_NINE))
-            ZHUYIN -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = assets.pinyinData.tones::allows), spell = true, kind = Kinds.ZHUYIN_DACHEN))
+            ZHUYIN -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = assets.pinyinData.tones::allows, neighbours = s.typos), spell = true, kind = Kinds.ZHUYIN_DACHEN))
             ENGLISH -> {
                 val data = englishData()
                 EnglishSession(
@@ -223,8 +224,10 @@ internal class SessionFactory(
                     blockOther = ::blockOtherReading,
                 ) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
-            // the 18, 14 and nine keys: as pinyin's 14 keys, no glide nor 笔画查字 nor 纠错 (the setting is ignored); learned under spk: (CommitRecorder)
-            SHUANGPIN_KEYS18, SHUANGPIN_KEYS14, SHUANGPIN_NINE -> ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy), spell = true, kind = Kinds.shuangpin(s.shuangpin)))
+            // the 18, 14 and nine keys: as pinyin's 14 keys, no glide nor 笔画查字; a slipped key read where tapped, no
+            // other typo (061-neighbour-groups); learned under spk: (CommitRecorder)
+            SHUANGPIN_KEYS18, SHUANGPIN_KEYS14, SHUANGPIN_NINE ->
+                ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy, neighbours = s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin)))
             SHUANGPIN -> {
                 val spelling = PinyinGlide.Spelling.shuangpin(s.scheme)
                 val pinyin = pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos, neighbours = s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin))

@@ -208,7 +208,8 @@ fixture) and `WordCardUatTest` (`:lib:ime-eval:uatTest`: the first 100 of `pinyi
 
 `run-on-device.sh` runs a set through the APK's own engine on a device, for checking that the app
 decodes as the tool does (`NINE=1`: a set of digits typed as pinyin's nine keys send them; `GROUPED=14` or `18`: a
-set of the 14 or 18 keys' codes as those keys send them).
+set of pinyin's 14 or 18 keys' codes as those keys send them; `sp18`, `sp14`, `sp9`, `zy9`, `zy`: 双拼's 18, 14 and nine
+keys' and 注音九键's and 大千's alike).
 
 Roborazzi goldens (`app/src/test/screenshots/`) show the bar with its microphone and the space's
 voice hint: since 0.6.0 there is one build, and voice is everyone's default (the voice pack's absence

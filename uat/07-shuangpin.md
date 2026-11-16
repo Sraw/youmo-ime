@@ -270,3 +270,21 @@
 - **操作**：打 ynhh，长按「银行」。
 - **预期**：读音行是「银行　yín háng」，和全拼打的一样。
 - **JVM**：ime-core `EnginesWordCardTest`（双拼 ynhh）；设备上不跑。
+
+### SP-48 [P1] 双拼 18 键：点在键边上读成旁边的键
+- **前提**：B0-18键，**方案** 是"小鹤"，**通用输入** 的 **纠正错拼和按偏的键** 开着。
+- **操作**：点 BN 键靠右边缘（靠 M），再点正中的 F，看候选和编码行，删光；两个键都点在正中再打一遍；到 **通用输入** 关掉 **纠正错拼和按偏的键**，回来照第一次打；方案换成自然码、微软各照第一次打一遍。
+- **预期**：第一次候选里有「们」（men：BN 读成 M），选它以后同样点在正中的 M F 也学到；两个键点在正中、和关掉以后都不出 men 的读法，首选和关掉时一样。自然码、微软也一样。j、q、x、y 后的 u 按成 ü 的键（小鹤 `jv`）在 18 键上照旧不纠。
+- **JVM**：`NeighbourSlipTest.shuangpinsEighteenAndFourteenKeysReadAGroupAsTheOneNextToIt`（小鹤、自然码、微软）、`EnginesTest.shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff`（纠错开关）、`PinyinSessionSlipTest.onShuangpinsEighteenKeysTheKeyMeantIsLearnedAsItsCode`、`GroupedKeyboardTapTest.everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem`、`NeighbourTouchTest.aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem`；设备上不跑。
+
+### SP-49 [P1] 双拼 14 键：点在键边上读成旁边的键
+- **前提**：B0-18键，**键盘** 改成「14 键」，**方案** 是"小鹤"。
+- **操作**：同 SP-48（14 键上 BN 右边是 M，F 在 DF 上）；再换自然码打一遍。
+- **预期**：同 SP-48。
+- **JVM**：`NeighbourSlipTest.shuangpinsEighteenAndFourteenKeysReadAGroupAsTheOneNextToIt`（小鹤、自然码）、`GroupedKeyboardTapTest.everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem`、`NeighbourTouchTest.aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem`；设备上不跑。
+
+### SP-50 [P1] 九键双拼：按偏的数字键按落点读
+- **前提**：B0-九键双拼，**方案** 是"小鹤"。
+- **操作**：点 9，再点 9 靠上边缘（键高 5% 处，靠 6），看候选；删光，两个 9 都点在正中再打一遍。
+- **预期**：第一次候选里有 wo（9 6）的字，例如「我」；点在正中时没有。九键双拼的数字键要点得很靠边才读成旁边的键：九键上两个键能读的音节很多，按偏的读法放宽了会让按准打的句子首选变错。1、0 不算邻键。
+- **JVM**：`NeighbourSlipTest.shuangpinsNineKeysReadADigitAsTheOneItWasTappedTowards`、`T9ShuangpinKeyboardTest.aDigitKeysTapGoesWithWhereItFellAndTheKeysAroundItByTheirCodes`、`NeighbourTouchTest.shuangpinsNineKeysDigitsGoWithTheirCodesAround`；设备上不跑。

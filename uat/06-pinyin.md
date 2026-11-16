@@ -138,6 +138,12 @@
 - **操作**：在「普通文本」框点 t a m a，其中 `t` 点在键宽 85% 处（靠 `y` 那边，还在 `t` 上），看候选，删光；四个键都点在正中再打一遍，看候选。
 - **预期**：第一次候选栏或展开后的第一页里有「亚麻」「鸭毛」这类 ya ma 的词（`t` 读成 `y`）；第二次没有。
 
+### PY-150 [P1] 注音全键盘（大千）：点在键边上读成旁边的键；注音九键不纠
+- **前提**：B0-注音全键盘，**通用输入** 的 **纠正错拼和按偏的键** 开着。
+- **操作**：点 ㄒ 靠左边缘（靠 ㄏ），再点 ㄠ，看候选，删光；两个键都点在正中再打一遍；点 ㄇ 靠右边缘（靠 ㄋ），再点 ㄚ，选「那」，删光，ㄋ ㄚ 都点在正中打一遍；点 ㄉ 靠右边缘（靠 ˇ）再点 ㄜ；到 **通用输入** 关掉 **纠正错拼和按偏的键**，照第一次打。最后换成 B0-注音九键，点 ㄏㄒㄠㄡ 靠上边缘再点 ㄏㄒㄠㄡ，看候选。
+- **预期**：第一次候选里有「好」（xao 拼不成，ㄒ 读成 ㄏ）；点在正中、关掉以后都没有。选的「那」学在 ㄋㄚ 下。ㄉ 靠 ˇ 点时不读成声调（声调键不算邻键）。注音九键不纠按偏的键：候选和点在正中时一样（不打声调时会把按准打的句子改错，没开）。
+- **JVM**：`NeighbourSlipTest.dachenReadsASymbolAsTheOneNextToIt`、`PinyinSessionSlipTest.onDachenTheSymbolMeantIsLearnedAsItsCode`、`EnginesTest.shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff`、`NeighbourTouchTest.dachensSymbolKeysGoWithTheSymbolKeysAround`（大千的落点和邻键，注音九键不带落点）；设备上不跑。
+
 ### PY-18 [P1] 常读错的词按错的读音打，候选上方标出正确读音
 - **前提**：B0。
 - **操作**：点 j i a o s e；清空，点 x x x u e z（简拼加半个字）。
@@ -550,7 +556,7 @@
 - **前提**：B0；**输入法 → 拼音** 的「键盘」选「18 键」。
 - **操作**：同 PY-141（18 键上 `bn` 右边是 `m`）；再点 `sd` 键靠右边缘（靠 `fg`）打一个音节的开头，看候选。
 - **预期**：同 PY-141；`sd` 那一次候选里有 `f`/`g` 开头的音节的字。18 键的落点不加按字母的左右权重（用户定）。
-- **JVM**：`NeighbourSlipTest.theEighteenKeysReadAKeyAsTheOneNextToIt`（18 键三种键宽）、`aTapIsPutOntoTheKeyMeantAtItsEdgeNearestTheKeyHit`；设备上不跑。
+- **JVM**：`NeighbourSlipTest.theEighteenKeysReadAKeyAsTheOneNextToIt`（18 键三种键宽）、`aTapIsPutOntoTheKeyMeantAtItsEdgeNearestTheKeyHit`、`GroupedKeyboardTapTest.everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem`、`NeighbourTouchTest.aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem`（18 键的码按引擎读的发）；设备上不跑。
 
 ## 笔画筛选
 
