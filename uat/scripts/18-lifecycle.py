@@ -424,6 +424,49 @@ def lc24(d):
 case("LC-36", needs="jvm:CommitKeptUatTest.withTheCodeOnTheStripOrInTheBarWhatADeafFieldDroppedIsKeptTheSame、CommitKeptUatTest.aFieldThatTakesTheTextIsNeverSaidToHaveDroppedItHoweverLateItReports、CommitKeptUatTest.whatIsKeptGoesWithTheKeyboardAnotherFieldOrSomethingElseTypedAndStaysThroughATurnAndARestart")(lambda d: None)
 
 
+@case("LC-37", mutates=True)
+def lc37(d):
+    in_field(d)
+    # the floating window's button, anywhere on the screen (it came up at the top left, over the app)
+    button = lambda: d.screen().find(desc="显示屏幕键盘", where="all")
+    seen = {}
+    seen["空框"] = button()
+    d.type("nihao")
+    d.cands()
+    seen["打字时"] = button()
+    d.space()
+    time.sleep(1.0)   # past the commit's check (CommitCheck.WAIT_MS)
+    seen["上屏后"] = button()
+    d.shot("full", "上屏后整屏")
+    d.rotate(1)
+    time.sleep(1.5)
+    seen["横屏"] = button()
+    # back in portrait to tap the field if the keyboard went: in landscape it may be under the keyboard, not in the dump
+    d.rotate(0)
+    try:
+        d.wait(lambda s: s.find(rid="keyboard_view", where="ime"), 8, step=0.3, what="the keyboard back")
+    except Blocked:
+        tap_field(d)
+    seen["转回竖屏"] = button()
+    # to the settings and back with recents pressed twice (the last app; an `am start` of the browser opens a blank one)
+    d.sh(f"am start -W -n {PKG}/org.fcitx.fcitx5.android.ui.main.MainActivity")
+    time.sleep(1.5)
+    d.sh("input keyevent KEYCODE_APP_SWITCH")
+    time.sleep(0.4)
+    d.sh("input keyevent KEYCODE_APP_SWITCH")
+    time.sleep(2.0)
+    if not keyboard_up(d):
+        tap_field(d)
+    d.type("ni")
+    d.cands()
+    d.space()
+    time.sleep(1.0)
+    seen["切走再回来"] = button()
+    shown = [k for k, n in seen.items() if n]
+    check(not shown, f"屏幕上出现了「显示屏幕键盘」按钮：{'、'.join(shown)}（{[seen[k].b for k in shown]}）")
+    return "空框、打字、上屏、转屏、切走再回来都没有那个按钮"
+
+
 case("LC-25", needs="manual:切到别的应用再回来、用输入法选择器换输入法：留下与否随系统，设备上手工看（设计页 M3、M6）")(lambda d: None)
 
 

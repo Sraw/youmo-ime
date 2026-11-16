@@ -1053,7 +1053,11 @@ of the window (`internal.keyboardButtonX/Y`), with a cursor only as an offset fo
 (`FloatingButtonPlacement` in ime-core); its
 touch window follows the lone button once the cursor rests (150 ms), not at every report. The touch
 keyboard brought back mid-field is started for that field (`InputView.startInput` from the
-`InputDeviceManager` callback). The
+`InputDeviceManager` callback). With the touch keyboard up the window is GONE and takes no events
+(`handleEvents` false); the service's news of the code moving into the field or out of it, or of a commit
+kept (`codePlaceChanged`), redraws it only while it takes them: redrawn, it was shown, its lone button and
+touch window over the app (at the top left where it had never been placed, a chat's back button under it;
+LC-37). The
 keyboard last typed on going away (`InputManager.InputDeviceListener.onInputDeviceRemoved`, the
 device id of the last key) brings it back too, hidden or shown: the configuration's `keyboard` cannot
 tell, a device with one built in (the emulator's `qwerty2`) reports QWERTY throughout.

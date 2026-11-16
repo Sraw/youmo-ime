@@ -22,18 +22,23 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.input.CandidatesView
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.input.preedit.FloatingCodeStrip
+import org.fcitx.fcitx5.android.input.editing.CommitCheck
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
@@ -465,5 +470,37 @@ class CodeInFieldUatTest {
         typed("h")
         // what the engine is told of the field after the commit: what is there, not the code typed since
         assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("engineContext(") && "h" in it.substringBefore(",") })
+    }
+
+    // the touch keyboard up: the floating window (the hardware keyboard's), with its 显示屏幕键盘 button, is
+    // never shown, nor its touch window over the app (a chat's back button under it took no taps). It came
+    // up at the screen's top left as the code moved into the field or out of it, or a commit was kept
+    @Test
+    @Uat("LC-37")
+    fun theTouchKeyboardUpShowsNoFloatingWindowAsTheCodeMovesOrACommitIsKept() {
+        fun floatingShown(): Boolean {
+            val window = KeyboardHarness.find<CandidatesView>(h.service.window.window!!.decorView)!!
+            return window.visibility == View.VISIBLE ||
+                shadowOf(RuntimeEnvironment.getApplication()).latestPopupWindow?.isShowing == true
+        }
+        open(prefill = { it.setText("说："); it.setSelection(2) })
+        typed("n", "ni")
+        val typing = floatingShown()
+        chosen("你")
+        val afterChoice = floatingShown()
+        // a field that took a commit and dropped it: the line 「没写进去」 on the keyboard, the code row floating
+        h.close()
+        harness = null
+        open(style = CodeRowStyle.Floating)
+        h.writesDropped = true
+        typed("h", "hao")
+        chosen("好")
+        h.advance(CommitCheck.WAIT_MS + 50)
+        val kept = floatingShown()
+        assertRows(
+            "the code in the field" to { assertFalse(typing) },
+            "a word chosen, the code out of it" to { assertFalse(afterChoice) },
+            "a commit kept" to { assertFalse(kept) },
+        )
     }
 }

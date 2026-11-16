@@ -188,8 +188,14 @@ class CandidatesView(
         }
     }
 
-    /** The code moved into the app's field or out of it (FcitxInputMethodService.codeInFieldNow): drawn anew. */
-    fun codePlaceChanged() = updateUi()
+    /**
+     * The code moved into the app's field or out of it (FcitxInputMethodService.codeInFieldNow), or a commit
+     * kept: drawn anew. Only as the floating window: with the touch keyboard up it takes no events and stays
+     * GONE (updateUi shows it), else its lone button came up over the app; drawn when it takes them again
+     */
+    fun codePlaceChanged() {
+        if (handleEvents) updateUi()
+    }
 
     private fun updateUi() {
         // the code in the field (编码行 输入框里, the hardware keyboard's too): the window draws none of it
