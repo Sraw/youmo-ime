@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputFilter
@@ -28,6 +29,10 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import java.io.File
+import java.io.IOException
+import kotlin.math.absoluteValue
+import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -44,6 +49,8 @@ import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
 import org.fcitx.fcitx5.android.ui.main.EditDeleteMenuProvider
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.NaiveDustman
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.materialTextInput
@@ -56,10 +63,6 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.setPaddingDp
 import timber.log.Timber
-import java.io.File
-import java.io.IOException
-import kotlin.math.absoluteValue
-import kotlin.math.min
 
 class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCustomPhrase> {
 
@@ -398,7 +401,13 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
         super.onDestroy()
     }
 
-    companion object {
+    companion object : SearchablePage {
+        // ⋮'s items: no View to point at, said where they are
+        override fun searchEntries(context: Context) = listOf(
+            PageEntry(context.getString(R.string.import_file), "view:phrases/import", where = R.string.search_where_menu),
+            PageEntry(context.getString(R.string.export_file), "view:phrases/export", where = R.string.search_where_menu),
+        )
+
         // the file's read; a test holds it to see the page while it waits
         @VisibleForTesting
         internal var load: () -> List<PinyinCustomPhrase> = { CustomPhraseManager.load() }

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.behavior
 
+import android.content.Context
 import android.os.Bundle
 import android.view.View
 import androidx.activity.result.ActivityResultLauncher
@@ -20,6 +21,9 @@ import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.pack.ImportResult
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.setup
 import org.fcitx.fcitx5.android.utils.toast
 
@@ -49,7 +53,7 @@ class PacksFragment : PaddingPreferenceFragment() {
         preferenceScreen = screen
         for (kind in PackKind.entries) {
             val row = Preference(ctx).apply {
-                key = "pack_${kind.id}"
+                key = rowKey(kind)
                 isSelectable = false
                 setup(PackImports.name(ctx, kind))
             }
@@ -166,7 +170,13 @@ class PacksFragment : PaddingPreferenceFragment() {
         super.onDestroyView()
     }
 
-    companion object {
+    companion object : SearchablePage {
         const val IMPORT_KEY = "pack_import"
+
+        private fun rowKey(kind: PackKind) = "pack_${kind.id}"
+
+        override fun searchEntries(context: Context) = PackKind.entries.map {
+            PageEntry(PackImports.name(context, it), SearchHighlight.PREF + rowKey(it))
+        } + PageEntry(context.getString(R.string.pack_import), SearchHighlight.PREF + IMPORT_KEY, summary = context.getString(R.string.pack_import_summary))
     }
 }

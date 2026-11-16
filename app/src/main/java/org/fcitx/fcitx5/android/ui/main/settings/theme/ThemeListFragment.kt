@@ -15,6 +15,7 @@ import androidx.annotation.Keep
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -140,6 +141,18 @@ class ThemeListFragment : Fragment() {
         return ResponsiveThemeListView(requireContext()).apply {
             adapter = themeListAdapter
             applyNavBarInsetsBottomPadding()
+        }
+    }
+
+    /** The built-in theme [file]'s card scrolled to and given to [found], once it is laid out. */
+    fun reveal(file: String, found: (View) -> Unit) {
+        val list = view as? RecyclerView ?: return
+        val at = themeListAdapter.entries.indexOfFirst { it is Theme.Builtin && it.file == file }.takeIf { it >= 0 } ?: return
+        val position = at + ThemeListAdapter.OFFSET
+        list.scrollToPosition(position)
+        list.post {
+            val holder = list.findViewHolderForAdapterPosition(position) as? ThemeListAdapter.ViewHolder ?: return@post
+            found((holder.ui as? ThemeThumbnailUi)?.card ?: holder.itemView)
         }
     }
 

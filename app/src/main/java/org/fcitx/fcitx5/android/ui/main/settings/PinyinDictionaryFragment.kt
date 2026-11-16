@@ -23,6 +23,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import com.google.android.material.snackbar.Snackbar
+import java.io.File
+import java.io.InputStream
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +35,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -38,7 +44,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -53,9 +58,9 @@ import org.fcitx.fcitx5.android.data.pinyin.PinyinDictManager
 import org.fcitx.fcitx5.android.data.pinyin.countWordLines
 import org.fcitx.fcitx5.android.data.pinyin.dict.PinyinDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.TextDictionary
+import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.ImportLayer
-import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.fcitx.fcitx5.android.engine.user.DictionaryFormat
 import org.fcitx.fcitx5.android.engine.user.ImportFiles
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
@@ -67,6 +72,10 @@ import org.fcitx.fcitx5.android.ui.common.withLoading
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
 import org.fcitx.fcitx5.android.ui.main.launchOutlivingPage
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.ReadyLater
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.addPreference
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.importErrorDialog
@@ -80,11 +89,6 @@ import splitties.resources.resolveThemeAttribute
 import splitties.views.dsl.core.textView
 import splitties.views.textAppearance
 import timber.log.Timber
-import java.io.File
-import java.io.InputStream
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.resume
 
 /**
  * The words and phrases (词库与短语): the user dictionary, then the base one, as they rank, and
@@ -95,7 +99,7 @@ import kotlin.coroutines.resume
  * asked; one merged can be turned off or deleted. Another input method's list read into the user
  * dictionary is imported as a batch (U-101), listed under 导入的词 to be undone whole (U-102).
  */
-class PinyinDictionaryFragment : PaddingPreferenceFragment() {
+class PinyinDictionaryFragment : PaddingPreferenceFragment(), ReadyLater {
 
     private val args by lazyRoute<SettingsRoute.PinyinDict>()
 
@@ -239,7 +243,7 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         user.addPreference(R.string.my_words, R.string.layer_user_summary) {
             navigateWithAnim(SettingsRoute.UserWords)
         }
-        user.addPreference(R.string.imported_lists, R.string.imported_lists_summary) { showImports() }
+        user.addPreference(R.string.imported_lists, R.string.imported_lists_summary, key = IMPORTED_KEY) { showImports() }
         val base = category(R.string.layer_base)
         base.addPreference(builtIn(R.string.builtin_base_title, R.string.builtin_base_summary))
         val work = MergedDictionary.work.value
@@ -261,7 +265,7 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
             base.addPreference(row)
         }
         val files = category(R.string.import_section)
-        files.addPreference(R.string.import_dict, R.string.import_dict_summary) { launcher.launch("*/*") }
+        files.addPreference(R.string.import_dict, R.string.import_dict_summary, key = IMPORT_KEY) { launcher.launch("*/*") }
         val phrases = category(R.string.section_phrases)
         phrases.addPreference(R.string.custom_phrases, R.string.custom_phrases_summary) {
             navigateWithAnim(SettingsRoute.PinyinCustomPhrase)
@@ -279,6 +283,8 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
             navigateWithAnim(SettingsRoute.QuickPhrase())
         }
         screen.addPreference(hint(ctx, R.string.words_page_hint))
+        // built once the list is read and counted, after the view: a search result's row is pointed at now
+        view?.post { SearchHighlight.ready(this) }
     }
 
     private fun hint(ctx: Context, @StringRes text: Int) = Preference(ctx).apply {
@@ -768,7 +774,16 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
         super.onStop()
     }
 
-    companion object {
+    // the rows that open a page of their own are found as that page (SettingsPages)
+    companion object : SearchablePage {
+        private const val IMPORTED_KEY = "imported_lists"
+        private const val IMPORT_KEY = "import_dict"
+
+        override fun searchEntries(context: Context) = listOf(
+            PageEntry(context.getString(R.string.imported_lists), SearchHighlight.PREF + IMPORTED_KEY, summary = context.getString(R.string.imported_lists_summary)),
+            PageEntry(context.getString(R.string.import_dict), SearchHighlight.PREF + IMPORT_KEY, summary = context.getString(R.string.import_dict_summary)),
+        )
+
         private const val SMALL = 0.85f
         private const val GAP = 0.6f
         private const val TITLE = 1.15f

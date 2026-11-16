@@ -157,7 +157,9 @@ class SettingsIndexTest {
     fun eachPageIsFoundOnceAndEachSettingOnItByAKeyOfItsOwn() {
         for ((route, on) in SettingsIndex.build(context()).filter { it.isRow }.groupBy { it.target.route }) {
             // 网址和邮箱 is found as 通用输入's row that opens it, not as a page of its own; the home page by its language row
-            assertEquals("$route", if (route == SettingsRoute.Addresses || route == SettingsRoute.Index) 0 else 1, on.count { it.target.key == null })
+            // the page itself: neither a row's, a control's (view:) nor one said where it is (↶, ⋮'s)
+            val page = on.count { it.target.key == null && it.target.view == null && it.target.where == 0 }
+            assertEquals("$route", if (route == SettingsRoute.Addresses || route == SettingsRoute.Index) 0 else 1, page)
             val keys = on.mapNotNull { it.target.key }
             assertEquals("$route: $keys", keys.size, keys.toSet().size)
         }
@@ -248,6 +250,15 @@ class SettingsIndexTest {
         for (term in listOf("生僻字屏蔽", "生僻字")) {
             assertTrue(term, SettingsIndex.Target(SettingsRoute.RareChars, null) in search.find(term).map { it.target })
         }
+    }
+
+    // 按键字母 (九键)'s own row is each input method's page's (NINE_KEYS): found there, not again as a page of its own under 输入法
+    @Test
+    @Config(qualifiers = "zh-rCN")
+    fun theNineKeysLettersAreFoundOnTheInputMethodsPagesOnly() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val found = SettingsSearch(SettingsIndex.build(ctx)).find(ctx.getString(R.string.t9_letters)).map { it.entry }
+        assertTrue(found.toString(), found.isNotEmpty() && found.none { it.id == "page:T9Letters" || it.target.route == SettingsRoute.T9Letters && it.target.key == null })
     }
 
     // 051-c §1.8: the shortcuts and the swipe found by the words a user would type, in the app's language

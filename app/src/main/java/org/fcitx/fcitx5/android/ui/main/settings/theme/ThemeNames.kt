@@ -35,6 +35,9 @@ object ThemeNames {
         else -> theme.name
     }
 
+    /** The built-in file [file]'s name, as its card shows it. */
+    fun shown(ctx: Context, file: String): String = BUILTIN[file]?.let(ctx::getString) ?: file
+
     /** Whether [theme] is named 我的主题 and a number: its name a UUID. */
     fun numbered(theme: Theme): Boolean = theme !is Theme.Builtin && theme !is Theme.Versioned && UUID.matches(theme.name)
 

@@ -507,6 +507,8 @@
     <string name="search_also_called">也叫 %1$s</string>
     <string name="search_not_added">未新增</string>
     <string name="search_got_it">知道了</string>
+    <string name="search_where_undo">標題列右上的 ↶</string>
+    <string name="search_where_menu">右上角 ⋮ 裡</string>
     <string name="custom_phrases">自訂短語</string>
     <string name="word_packs">詞庫與短語</string>
     <string name="word_pinyin_unknown">找不到讀音，請填寫拼音</string>

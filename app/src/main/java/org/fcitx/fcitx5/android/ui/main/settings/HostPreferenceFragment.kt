@@ -9,8 +9,8 @@ import android.view.View
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.preference.PreferenceScreen
 import androidx.navigation.fragment.findNavController
+import androidx.preference.PreferenceScreen
 import androidx.preference.isEmpty
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -22,9 +22,11 @@ import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
+import org.fcitx.fcitx5.android.ui.main.settings.search.ReadyLater
 import org.fcitx.fcitx5.android.utils.addPreference
 
-abstract class HostPreferenceFragment : PaddingPreferenceFragment() {
+// its preferences come once fcitx answers: a search result's waits for them (set as a new screen)
+abstract class HostPreferenceFragment : PaddingPreferenceFragment(), ReadyLater {
     abstract fun getPageTitle(): String
     /** The page's options by path; null if the host has none for it. */
     abstract suspend fun obtainConfig(fcitx: HostApi): Map<String, String>?

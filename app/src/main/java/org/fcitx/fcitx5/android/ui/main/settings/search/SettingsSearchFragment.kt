@@ -237,6 +237,8 @@ class SettingsSearchFragment : Fragment() {
                     SettingsSearch.Kind.COMMAND -> context.getString(R.string.search_is_command)
                     else -> null
                 },
+                // a page's own action with no row or button to flash (↶, ⋮'s): where it is
+                entry.target.where.takeIf { it != 0 }?.let(context::getString),
                 context.getString(R.string.search_not_added).takeIf { im != null && added?.contains(im) == false },
                 found.alias?.let { context.getString(R.string.search_also_called, it) },
             )

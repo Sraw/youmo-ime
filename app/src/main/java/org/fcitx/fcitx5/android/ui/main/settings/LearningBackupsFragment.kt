@@ -14,6 +14,9 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.engine.learn.backup.BackupInfo
@@ -21,12 +24,12 @@ import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.addPreference
 import org.fcitx.fcitx5.android.utils.formatDateTime
 import org.fcitx.fcitx5.android.utils.toast
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * The learning's backups (U-100, U-103, U-106, D31): made every few typing days in the keyboard's
@@ -58,13 +61,14 @@ class LearningBackupsFragment : PaddingPreferenceFragment() {
         val ctx = requireContext()
         val screen = preferenceManager.createPreferenceScreen(ctx)
         preferenceScreen = screen
-        screen.addPreference(R.string.learning_restore, R.string.learning_restore_summary) {
+        screen.addPreference(R.string.learning_restore, R.string.learning_restore_summary, key = RESTORE_KEY) {
             restoreLauncher.launch(arrayOf("*/*"))
         }
-        screen.addPreference(R.string.learning_save_copy, R.string.learning_save_copy_summary) {
+        screen.addPreference(R.string.learning_save_copy, R.string.learning_save_copy_summary, key = SAVE_COPY_KEY) {
             askSaveCopy(ctx, R.string.learning_save_copy, "youmo-learning", saveLauncher::launch)
         }
         revert = Preference(ctx).apply {
+            key = REVERT_KEY
             setTitle(R.string.learning_revert)
             setSummary(R.string.learning_revert_summary)
             isIconSpaceReserved = false
@@ -136,7 +140,18 @@ class LearningBackupsFragment : PaddingPreferenceFragment() {
 
     private fun saveTo(uri: Uri) = restore.saveCopy(uri, R.string.learning_saved)
 
-    companion object {
+    companion object : SearchablePage {
+        private const val RESTORE_KEY = "learning_restore"
+        private const val SAVE_COPY_KEY = "learning_save_copy"
+        // there while nothing has been restored too, greyed: the row is pointed at all the same
+        private const val REVERT_KEY = "learning_revert"
+
+        override fun searchEntries(context: Context) = listOf(
+            Triple(R.string.learning_restore, RESTORE_KEY, R.string.learning_restore_summary),
+            Triple(R.string.learning_save_copy, SAVE_COPY_KEY, R.string.learning_save_copy_summary),
+            Triple(R.string.learning_revert, REVERT_KEY, R.string.learning_revert_summary),
+        ).map { (title, key, summary) -> PageEntry(context.getString(title), SearchHighlight.PREF + key, summary = context.getString(summary)) }
+
         /**
          * Asks before a copy of the learning is saved (U-106): anyone holding the phone can take the
          * file, and what is typed often with it. [save] given its name, [prefix] and the day, on OK.

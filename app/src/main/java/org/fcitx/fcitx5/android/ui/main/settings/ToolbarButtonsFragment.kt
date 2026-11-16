@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
@@ -23,6 +24,8 @@ import org.fcitx.fcitx5.android.input.bar.ToolbarConfig.Item
 import org.fcitx.fcitx5.android.ui.common.BaseDynamicListUi
 import org.fcitx.fcitx5.android.ui.common.DynamicListUi
 import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 
 /**
  * The bar's buttons ([ToolbarConfig]) in one list: dragged to order, checked to show; the
@@ -101,4 +104,11 @@ class ToolbarButtonsFragment : Fragment(), OnItemChangedListener<Item> {
     override fun onItemSwapped(fromIdx: Int, toIdx: Int, item: Item) = save()
 
     override fun onItemUpdated(idx: Int, old: Item, new: Item) = save()
+
+    companion object : SearchablePage {
+        // ⋮'s items: no View to point at, said where they are
+        override fun searchEntries(context: Context) = listOf(
+            PageEntry(context.getString(R.string.toolbar_reset), "view:toolbar/reset", where = R.string.search_where_menu),
+        )
+    }
 }

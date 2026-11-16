@@ -13,6 +13,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.R as MaterialR
 import com.google.android.material.button.MaterialButton
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
@@ -24,6 +25,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
@@ -31,7 +34,6 @@ import splitties.views.dsl.core.horizontalLayout
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
-import kotlin.coroutines.CoroutineContext
 
 /**
  * Sets which letters each of 九键's digit keys types, on its keys drawn as the keyboard has them:
@@ -151,9 +153,12 @@ class NineKeyLettersFragment : KeyCapsPageFragment() {
         setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant))
     }
 
-    private companion object {
-        val Rows = listOf("123", "456", "789")
-        const val KeyHeight = 60
+    // the keys are the page's, found as the page; 全部恢复默认 is there only once a key is changed
+    companion object : SearchablePage {
+        private val Rows = listOf("123", "456", "789")
+        private const val KeyHeight = 60
+
+        override fun searchEntries(context: Context) = emptyList<PageEntry>()
     }
 }
 

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
@@ -24,6 +25,9 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import java.io.File
+import java.io.IOException
+import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +48,8 @@ import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
 import org.fcitx.fcitx5.android.ui.main.EditDeleteMenuProvider
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.materialTextInput
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
@@ -55,9 +61,6 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.setPaddingDp
 import timber.log.Timber
-import java.io.File
-import java.io.IOException
-import java.time.LocalDate
 
 /**
  * 常用词 (dev/design/060-common-words.md): a word, its pinyin and the replacements typing it offers
@@ -480,7 +483,14 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         super.onDestroy()
     }
 
-    companion object {
+    companion object : SearchablePage {
+        // ⋮'s items: no View to point at, said where they are
+        override fun searchEntries(context: Context) = listOf(
+            PageEntry(context.getString(R.string.import_file), "view:common/import", where = R.string.search_where_menu),
+            PageEntry(context.getString(R.string.export_file), "view:common/export", where = R.string.search_where_menu),
+            PageEntry(context.getString(R.string.delete_all), "view:common/delete_all", where = R.string.search_where_menu),
+        )
+
         private const val REASONS_SHOWN = 8
         private const val LINE_SHOWN = 24
 

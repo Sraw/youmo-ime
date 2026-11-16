@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
+import org.fcitx.fcitx5.android.ui.main.settings.search.ReadyLater
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 
 /**
@@ -23,7 +24,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
  * how many candidates the window shows, one of fcitx's options (InputMethodSettings.HARDWARE_KEYBOARD),
  * read from pinyin's config, which has those every input method shares, and added once fcitx answers.
  */
-class HardwareKeyboardFragment : ManagedPreferenceFragment(AppPrefs.getInstance().candidates) {
+class HardwareKeyboardFragment : ManagedPreferenceFragment(AppPrefs.getInstance().candidates), ReadyLater {
 
     private val viewModel: MainViewModel by activityViewModels()
 
@@ -41,7 +42,7 @@ class HardwareKeyboardFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                 fcitx.launchOnReady { save(it, shown) }
             }, open = {})
             // a search result for it opened the page before it was there
-            view?.post { SearchHighlight.showIn(this@HardwareKeyboardFragment) }
+            view?.post { SearchHighlight.ready(this@HardwareKeyboardFragment) }
         }
     }
 

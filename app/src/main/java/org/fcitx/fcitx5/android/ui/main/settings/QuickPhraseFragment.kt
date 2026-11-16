@@ -41,11 +41,14 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.R as MaterialR
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.snackbar.Snackbar
+import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -59,11 +62,14 @@ import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.host.QuickPhraseFiles
 import org.fcitx.fcitx5.android.host.QuickPhraseMine
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchAnchors
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.lazyRoute
 import org.fcitx.fcitx5.android.utils.materialTextInput
-import org.fcitx.fcitx5.android.utils.parcelable
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
+import org.fcitx.fcitx5.android.utils.parcelable
 import org.fcitx.fcitx5.android.utils.str
 import org.fcitx.fcitx5.android.utils.styledColor
 import org.fcitx.fcitx5.android.utils.toast
@@ -76,9 +82,6 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapContent
 import timber.log.Timber
-import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
-import com.google.android.material.R as MaterialR
 
 /**
  * 快速输入's page: the user's entries in the keyboard's order (the last used first), a row of their
@@ -86,7 +89,7 @@ import com.google.android.material.R as MaterialR
  * over keys, notes and content, the built-in tables' switches. Each change is saved as it is made
  * ([QuickPhraseManager]), and the keyboard reads them again.
  */
-class QuickPhraseFragment : ProgressFragment() {
+class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
 
     private val args by lazyRoute<SettingsRoute.QuickPhrase>()
 
@@ -681,9 +684,10 @@ class QuickPhraseFragment : ProgressFragment() {
     // the hint and the search first, the entries, then the built-in tables' switches
     private inner class Adapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-        private val tables = QuickPhraseManager.BUILT_IN.zip(
-            listOf(R.string.quick_phrase_built_in_emoji, R.string.quick_phrase_built_in_emoji_eac, R.string.quick_phrase_built_in_latex),
-        )
+        private val tables = QuickPhraseManager.BUILT_IN.zip(TABLES)
+
+        /** Where the built-in table [name]'s switch is in the list; -1 for none. */
+        fun tableAt(name: String) = tables.indexOfFirst { it.first == name }.let { if (it < 0) -1 else HEAD + shown.size + 1 + it }
 
         override fun getItemCount() = HEAD + shown.size + 1 + tables.size
 
@@ -725,6 +729,7 @@ class QuickPhraseFragment : ProgressFragment() {
                     val (name, label) = tables[position - HEAD - shown.size - 1]
                     s.setOnCheckedChangeListener(null)
                     s.setText(label)
+                    s.tag = TABLE + name
                     s.isChecked = on[name] != false
                     s.setOnCheckedChangeListener { _, checked ->
                         // before the change's list is bound again (filter): the row keeps what was turned
@@ -776,7 +781,7 @@ class QuickPhraseFragment : ProgressFragment() {
             chip(getString(R.string.quick_phrase_unfiled), Shelf.Unfiled)
             folders.forEach { f -> chip(f, Shelf.In(f)) { folderMenu(f) } }
             if (keyless > 0) chip(getString(R.string.quick_phrase_keyless_shelf, keyless), Shelf.Keyless)
-            chip(getString(R.string.quick_phrase_folder_new), null)
+            chip(getString(R.string.quick_phrase_folder_new), null).tag = NEW_FOLDER
         }
 
         private fun header(ctx: Context): HeaderHolder {
@@ -861,7 +866,29 @@ class QuickPhraseFragment : ProgressFragment() {
         super.onDestroyView()
     }
 
-    companion object {
+    // a built-in table's switch, at the list's end, or ＋目录 at its top: the list scrolled to it first
+    override fun reveal(id: String, found: (View) -> Unit) {
+        val at = if (id == NEW_FOLDER) 0 else adapter.tableAt(id.removePrefix(TABLE)).takeIf { it >= 0 } ?: return
+        list.scrollToPosition(at)
+        list.post { list.findViewHolderForAdapterPosition(at)?.itemView?.findViewWithTag<View>(id)?.let(found) }
+    }
+
+    companion object : SearchablePage {
+        private val TABLES = listOf(R.string.quick_phrase_built_in_emoji, R.string.quick_phrase_built_in_emoji_eac, R.string.quick_phrase_built_in_latex)
+        private const val TABLE = "view:quick/table/"
+        private const val NEW_FOLDER = "view:quick/new_folder"
+
+        // the folders' chips 全部 and 未分类 show the list otherwise, not a setting
+        override val notSearched = setOf(R.string.quick_phrase_all, R.string.quick_phrase_unfiled)
+
+        // the built-in tables' switches, ＋目录; ⋮'s items, no View to point at, said where they are
+        override fun searchEntries(context: Context) =
+            QuickPhraseManager.BUILT_IN.zip(TABLES) { name, label -> PageEntry(context.getString(label), TABLE + name) } + listOf(
+                PageEntry(context.getString(R.string.quick_phrase_folder_new), NEW_FOLDER),
+                PageEntry(context.getString(R.string.import_file), "view:quick/import", where = R.string.search_where_menu),
+                PageEntry(context.getString(R.string.export_file), "view:quick/export", where = R.string.search_where_menu),
+            )
+
         private const val ASKED = "asked"
         private const val EDITOR = "editor"
         private const val PENDING = "pending"

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.behavior
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +31,9 @@ import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.openInputStreamOrThrow
 import org.fcitx.fcitx5.android.ui.main.settings.openOutputStreamOrThrow
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.formatDateTime
@@ -152,13 +156,18 @@ class BackupFragment : PaddingPreferenceFragment() {
         })
     }
 
-    companion object {
-        // drawn here by hand: SettingsIndex finds them by these, their titles and their keys
+    // drawn here by hand: the search finds them by these, their titles and their keys
+    companion object : SearchablePage {
         @StringRes val EXPORT_USER_DATA = R.string.export_user_data
         @StringRes val EXPORT_USER_DATA_SUMMARY = R.string.export_user_data_summary
         @StringRes val IMPORT_USER_DATA = R.string.import_user_data
         const val EXPORT_USER_DATA_KEY = "export_user_data"
         const val IMPORT_USER_DATA_KEY = "import_user_data"
+
+        override fun searchEntries(context: Context) = listOf(
+            PageEntry(context.getString(EXPORT_USER_DATA), SearchHighlight.PREF + EXPORT_USER_DATA_KEY, summary = context.getString(EXPORT_USER_DATA_SUMMARY)),
+            PageEntry(context.getString(IMPORT_USER_DATA), SearchHighlight.PREF + IMPORT_USER_DATA_KEY),
+        )
     }
 }
 

@@ -25,6 +25,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.MenuProvider
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -33,10 +34,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.R as MaterialR
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.snackbar.Snackbar
-import com.google.android.material.R as MaterialR
+import java.io.IOException
+import java.text.NumberFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -52,6 +55,10 @@ import org.fcitx.fcitx5.android.ui.main.settings.RareCharsViewModel.State
 import org.fcitx.fcitx5.android.ui.main.settings.cards.CardGrid
 import org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip
 import org.fcitx.fcitx5.android.ui.main.settings.cards.GroupCard
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchAnchors
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.ui.rare.DragRange
 import org.fcitx.fcitx5.android.ui.rare.RareEdits
 import org.fcitx.fcitx5.android.ui.rare.RareEdits.Box
@@ -64,8 +71,6 @@ import org.fcitx.fcitx5.android.utils.styledColor
 import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import timber.log.Timber
-import java.io.IOException
-import java.text.NumberFormat
 
 /**
  * 生僻字屏蔽 (dev/design/061-rare-char-block.md §6; 061-settings-cards.md §3): the switch, a search, and a
@@ -74,7 +79,7 @@ import java.text.NumberFormat
  * back or let through one by one, or by a drag. Changes stay on the page and are saved as it is left
  * ([onStop]), the engine then reading them; a later version's file is shown, not changed.
  */
-class RareCharsFragment : Fragment() {
+class RareCharsFragment : Fragment(), SearchAnchors {
 
     private val mainViewModel: MainViewModel by activityViewModels()
     private val viewModel: RareCharsViewModel by viewModels()
@@ -115,6 +120,7 @@ class RareCharsFragment : Fragment() {
         val widthDp = minOf(config.screenWidthDp, MAX_WIDTH_DP)
         switch = MaterialSwitch(ctx).apply {
             setText(R.string.rare_chars_switch)
+            tag = SWITCH
             setPadding(pad, ctx.dp(8), pad, 0)
             setOnCheckedChangeListener { _, on ->
                 val page = page ?: return@setOnCheckedChangeListener
@@ -204,7 +210,7 @@ class RareCharsFragment : Fragment() {
             card.onOpen = { open(level) }
             card.strip.onCheck = { checkGroup(level) }
             // where the settings search lands (§7.4)
-            card.view.tag = "view:rare/group/${level.name}"
+            card.view.tag = GROUP + level.name
             before?.let(card::readAfter)
             before = card
             cards[level] = card
@@ -326,6 +332,16 @@ class RareCharsFragment : Fragment() {
         }
         showScreen()
         showState()
+        // the table read, or none to read: a search result's group card can be pointed at, if it is shown
+        if (state !is State.Loading) SearchHighlight.ready(this)
+    }
+
+    // the four cards shown again if a group's grid is open; never into a grid (§4.12)
+    override fun reveal(id: String, found: (View) -> Unit) {
+        if (viewModel.opened != null) closeGroup()
+        if (id == SWITCH) return found(switch)
+        val level = RareLayout.ORDER.firstOrNull { GROUP + it.name == id } ?: return
+        if (cardScroll.isVisible) cards[level]?.view?.let(found)
     }
 
     /**
@@ -770,7 +786,7 @@ class RareCharsFragment : Fragment() {
         range.moveTo(position).forEach { adapter.notifyItemChanged(it, PAYLOAD_STATE) }
     }
 
-    companion object {
+    companion object : SearchablePage {
         private const val PAYLOAD_STATE = "state"
         private const val SCROLLER_DP = 24
         private const val EDGE_DP = 48
@@ -781,6 +797,18 @@ class RareCharsFragment : Fragment() {
         private const val MAX_WIDTH_DP = 600
         private const val OPAQUE = 255
         private const val DISABLED_ICON_ALPHA = 97 // 38%
+
+        // where a settings search lands (dev/design/061-settings-search.md §4.12): the switch, a group's card; ↶ and
+        // ⋮'s 恢复默认 have no View, said where they are
+        private const val SWITCH = "view:rare/switch"
+        private const val GROUP = "view:rare/group/"
+
+        override fun searchEntries(context: Context): List<PageEntry> =
+            listOf(PageEntry(context.getString(R.string.rare_chars_switch), SWITCH)) +
+            RareLayout.ORDER.map { PageEntry(context.getString(groupName(it)), GROUP + it.name) } + listOf(
+                PageEntry(context.getString(R.string.undo), "view:rare/undo", where = R.string.search_where_undo),
+                PageEntry(context.getString(R.string.rare_chars_reset), "view:rare/reset", where = R.string.search_where_menu),
+            )
 
         fun groupName(level: Level) = when (level) {
             Level.L3 -> R.string.rare_group_l3

@@ -4,14 +4,12 @@
  */
 package org.fcitx.fcitx5.android.utils
 
-import android.content.Context
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceScreen
-import androidx.preference.PreferenceViewHolder
 import splitties.resources.drawable
 
 fun PreferenceScreen.addCategory(title: String, block: PreferenceCategory.() -> Unit) {
@@ -50,58 +48,37 @@ fun Preference.setup(
     }
 }
 
+/** A row; [key], where a settings search points at it (SearchablePage), the row's own id. */
 fun PreferenceGroup.addPreference(
     title: String,
     summary: String? = null,
     @DrawableRes icon: Int? = null,
+    key: String? = null,
     onClick: (() -> Unit)? = null
 ) {
-    addPreference(Preference(context).apply { setup(title, summary, icon, onClick) })
+    addPreference(Preference(context).apply {
+        setup(title, summary, icon, onClick)
+        this.key = key
+    })
 }
 
 fun PreferenceGroup.addPreference(
     @StringRes title: Int,
     summary: String,
     @DrawableRes icon: Int? = null,
+    key: String? = null,
     onClick: (() -> Unit)? = null
 ) {
-    addPreference(context.getString(title), summary, icon, onClick)
+    addPreference(context.getString(title), summary, icon, key, onClick)
 }
 
 fun PreferenceGroup.addPreference(
     @StringRes title: Int,
     @StringRes summary: Int? = null,
     @DrawableRes icon: Int? = null,
+    key: String? = null,
     onClick: (() -> Unit)? = null
 ) {
-    addPreference(context.getString(title), summary?.let(context::getString), icon, onClick)
+    addPreference(context.getString(title), summary?.let(context::getString), icon, key, onClick)
 }
 
-class LongClickPreference(context: Context) : Preference(context) {
-    private var onLongClick: (() -> Unit)? = null
-
-    fun setOnPreferenceLongClickListener(callback: (() -> Unit)? = null) {
-        onLongClick = callback
-    }
-
-    override fun onBindViewHolder(holder: PreferenceViewHolder) {
-        super.onBindViewHolder(holder)
-        holder.itemView.setOnLongClickListener {
-            onLongClick?.invoke()
-            true
-        }
-    }
-}
-
-fun PreferenceGroup.addPreference(
-    @StringRes title: Int,
-    @StringRes summary: Int? = null,
-    @DrawableRes icon: Int? = null,
-    onClick: (() -> Unit)? = null,
-    onLongClick: (() -> Unit)? = null,
-) {
-    addPreference(LongClickPreference(context).apply {
-        setup(context.getString(title), summary?.let { context.getString(it) }, icon, onClick)
-        setOnPreferenceLongClickListener(onLongClick)
-    })
-}

@@ -14,6 +14,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 import splitties.views.dsl.core.frameLayout
 
 abstract class ProgressFragment : Fragment() {
@@ -46,6 +47,8 @@ abstract class ProgressFragment : Fragment() {
             root.removeAllViews()
             root.addView(newView)
             newView.animate().setDuration(150L).alphaBy(1f)
+            // what it shows is there: a search result's control on it can be pointed at (SearchAnchors)
+            SearchHighlight.ready(this@ProgressFragment)
         }
     }
 }

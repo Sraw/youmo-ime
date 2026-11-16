@@ -8,7 +8,7 @@ import tempfile
 import time
 import zipfile
 
-from uat import (PKG, Blocked, case, check, choose, gear, home, pinyin_keyboard, script)
+from uat import (PKG, Blocked, Fail, case, check, choose, gear, home, pinyin_keyboard, script)
 
 
 def kb_box(d, s=None):
@@ -1933,6 +1933,88 @@ case("ST-157", needs="jvm:SettingsMenuUatTest.searchingAKeyCommandOpensTheKeysPa
 case("ST-158", needs="jvm:SettingsMenuUatTest.searchingBySynonym")(lambda d: None)
 
 case("ST-159", needs="jvm:SettingsMenuUatTest.strokeFilterFindsTheSameFourInTraditionalChinese、SettingsMenuUatTest.strokeFilterFindsTheSameFourInEnglish")(lambda d: None)
+
+
+def settings_search(d, code, word=None):
+    """the settings search (🔍 on the home page) with what code types: the candidate word picked, or the letters as typed"""
+    home(d)
+    d.tap(d.wait(lambda s: s.find(desc="搜索设置"), 8, what="首页的 🔍").c, 1.0)
+    field = d.wait(lambda s: next((n for n in s.app() if n.cls.endswith("EditText")), None), 8, what="搜索框")
+    if not d.screen().find(rid="candidate_view", where="ime") and not d.keys(refresh=True):
+        d.tap(field.c, 1.0)
+    d.type(code)
+    if word:
+        d.pick(word)
+    else:
+        d.enter()
+    d.hide_keyboard()
+
+
+def open_result(d, title, under):
+    """the result titled title whose line under it has under, tapped (the log emptied first: flash_shot reads it)"""
+    def row(s):
+        for t in s.app():
+            if t.text == title and any(under in n.text and t.b[1] < n.c[1] < t.b[1] + 260 for n in s.app()):
+                return t
+    n = d.wait(row, 10, step=0.3, what=f"「{title}」（{under}）那条结果")
+    d.sh("logcat -c")
+    d.tap(n.c, 0)
+
+
+def flash_shot(d, id, note):
+    """the screen the moment the page flashes id (SearchHighlight logs 「search: flashed <id>」): the press lasts
+    600 ms, past a dump of the screen; a page that never flashes it fails here"""
+    end = time.time() + 15
+    while "search: flashed " + id not in d.sh(f"logcat -d | grep -F 'search: flashed {id}'"):
+        if time.time() > end:
+            raise Fail(f"没有闪 {id}")
+        time.sleep(0.05)
+    d.shot("app", note, png=d.adb("exec-out", "screencap", "-p", binary=True))
+
+
+@case("ST-165", base="B0-设置", visual=True)
+def st165(d):
+    settings_search(d, "zhuyin", "注音")
+    open_result(d, "注音九键", "按键字符和快捷键")
+    flash_shot(d, "view:keys/board/zy9", "搜注音点注音九键：按键字符和快捷键，注音九键的卡片按下的样子")
+    s = d.wait(lambda s: sum(n.text == "注音九键" for n in s.app()) >= 2 and s, 8, step=0.3, what="选中注音九键（卡片和下面的标题）")
+    check(s.find(text="翻转上下滑"), f"不在按键字符和快捷键：{s.texts()[:10]}")
+    d.back(1.0)
+    field = d.wait(lambda s: next((n for n in s.app() if n.cls.endswith("EditText")), None), 8, what="回到搜索页")
+    d.tap(field.c, 1.0)
+    d.press("bksp", 4, after=0.3)
+    d.type("fanzhuan")
+    d.pick("翻转")
+    d.hide_keyboard()
+    open_result(d, "翻转上下滑", "按键字符和快捷键")
+    flash_shot(d, "view:keys/flip", "搜翻转点翻转上下滑：翻转上下滑按钮按下的样子")
+    return "注音九键选中，两张注音九键的字；翻转上下滑的页"
+
+
+@case("ST-166", base="B0-设置", visual=True)
+def st166(d):
+    groups = ("三级字", "繁体字", "其它表外字", "扩展区")
+    settings_search(d, "fanti", "繁体")
+    open_result(d, "繁体字", "生僻字屏蔽")
+    flash_shot(d, "view:rare/group/TRAD", "搜繁体点繁体字：生僻字屏蔽的四张卡片，繁体字那张按下的样子")
+    s = d.wait(lambda s: all(next((n for n in s.app() if n.desc.startswith(g + "，") or n.text == g), None) for g in groups) and s,
+               30, step=0.1, what="四张组卡片")
+    check(not s.find(text="全部屏蔽") or s.find(text="三级字"), "打开了繁体字的网格")
+    return "四张组卡片都在"
+
+
+case("ST-167", needs="jvm:SettingsMenuUatTest.anActionOfThePagesMenuSaysWhereItIs")(lambda d: None)
+
+case("ST-168", needs="jvm:SettingsMenuUatTest.aRowOfAPageDrawnByHandIsPointedAt、SettingsPagesTest.everyTappableTextOnAHandPageIsSearched")(lambda d: None)
+
+
+@case("ST-169", base="B0-设置", visual=True)
+def st169(d):
+    settings_search(d, "pixel")
+    open_result(d, "Pixel", "外观")
+    flash_shot(d, "view:theme/pixel", "搜 Pixel：外观的主题页，Pixel 那张按下的样子")
+    s = d.wait(lambda s: s.find(text="Pixel") and s.find(text="大小与样式") and s, 10, step=0.1, what="外观的主题页上的 Pixel")
+    return "外观的主题页，Pixel 看得见"
 
 
 # ---------------------------------------------------------------- 外观 → 布局 (061-custom-layout §4)

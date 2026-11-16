@@ -10,12 +10,15 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.os.Looper
+import android.view.View
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.navigation.fragment.NavHostFragment
 import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
+import java.time.Duration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -29,12 +32,12 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.deriveCustomNoBackground
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 import org.fcitx.fcitx5.android.ui.main.settings.search.SettingsIndexModel
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeListAdapter
-import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.setup.SetupActivity
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
@@ -42,6 +45,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -53,7 +57,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
-import java.time.Duration
 
 /** UAT cases of uat/14 on the settings app's own pages: search, help, language, about, themes. */
 @RunWith(RobolectricTestRunner::class)
@@ -327,6 +330,69 @@ class SettingsMenuUatTest {
     @Uat("ST-159")
     @Config(qualifiers = "en-w393dp-h851dp-port-440dpi")
     fun strokeFilterFindsTheSameFourInEnglish() = strokeFilterFindsFour("stroke filter", "stroke filter")
+
+    /** The control the page flashed after [query]'s result titled [title] under [under] was opened. */
+    private fun flashedFor(query: String, title: String = query, under: (String) -> Boolean): View? {
+        SearchHighlight.Hooks.flashed = null
+        searchAndOpen(query, title, under)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        return SearchHighlight.Hooks.flashed
+    }
+
+    private fun back() {
+        st.activity.onBackPressedDispatcher.onBackPressed()
+        st.idle()
+    }
+
+    // a keyboard's card of 按键字符和快捷键: that keyboard picked, its card flashed; a button of the bar flashed
+    @Test
+    @Uat("ST-165")
+    fun searchingAKeyboardOrAButtonOfTheKeysPageGoesToIt() {
+        val keys = st.s(R.string.long_press_characters)
+        val zy9 = st.s(R.string.shortcut_page_zy9)
+        val card = flashedFor(zy9) { keys in it }
+        assertTrue(route, "PopupOverrides" in route)
+        assertEquals("view:keys/board/zy9", card?.tag)
+        // its keys' card under the cards: named as the keyboard picked
+        assertTrue(texts().toString(), texts().count { it == zy9 } >= 2)
+        back()
+        assertEquals("view:keys/flip", flashedFor(st.s(R.string.swipe_flip_all)) { keys in it }?.tag)
+    }
+
+    // ⋮'s 全部恢复默认 and the title bar's ↶ have no View: the result says where they are, the page opens unflashed
+    @Test
+    @Uat("ST-167")
+    fun anActionOfThePagesMenuSaysWhereItIs() {
+        val keys = st.s(R.string.long_press_characters)
+        val menu = st.s(R.string.search_where_menu)
+        val found = results(st.s(R.string.reset_all))
+        assertTrue(found.toString(), found.any { (title, line) -> title == st.s(R.string.reset_all) && keys in line && menu in line })
+        assertTrue(results(st.s(R.string.undo)).toString(), results(st.s(R.string.undo)).any { st.s(R.string.search_where_undo) in it.second })
+        assertNull(flashedFor(st.s(R.string.reset_all)) { keys in it && menu in it })
+        assertTrue(route, "PopupOverrides" in route)
+    }
+
+    // a row of a page drawn by hand that has preferences (开发者, 词库与短语): pointed at by its key
+    @Test
+    @Uat("ST-168")
+    fun aRowOfAPageDrawnByHandIsPointedAt() {
+        assertEquals("pref:real_time_logs" to null, searchAndOpen(st.s(R.string.real_time_logs)) { st.s(R.string.developer) in it })
+        assertTrue(route, "Developer" in route)
+        back()
+        assertEquals("pref:imported_lists" to null, searchAndOpen(st.s(R.string.imported_lists)) { st.s(R.string.word_packs) in it })
+        assertTrue(route, "PinyinDict" in route)
+    }
+
+    // a built-in theme by its name: 外观 on its themes' tab, the theme's card flashed
+    @Test
+    @Uat("ST-169")
+    fun aBuiltInThemeIsFoundByItsName() {
+        val pixel = st.s(R.string.theme_name_pixel)
+        val card = flashedFor(pixel) { st.s(R.string.theme_and_size) in it }
+        assertTrue(route, "Theme" in route)
+        assertEquals(0, KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<ViewPager2>().first().currentItem)
+        assertTrue(card != null && KeyboardHarness.all(card.parent as View).filterIsInstance<TextView>().any { it.text.toString() == pixel })
+    }
 
     // the home page's language row: back to the home page already under the search, pointed at the row
     @Test

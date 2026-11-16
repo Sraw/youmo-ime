@@ -396,6 +396,36 @@
 - **预期**：两种语言都是四条，顺序同 ST-156：繁体第一条「筆畫篩選」（在鍵上劃的選項）；英文第一条「Stroke filter」（Drawing on keys 的选项），第二条「Stroke filter sensitivity」。
 - **JVM**：`SettingsMenuUatTest.strokeFilterFindsTheSameFourInTraditionalChinese`、`strokeFilterFindsTheSameFourInEnglish`，`SettingsIndexTest.strokeFilterFindsFourInTraditionalChinese`、`strokeFilterFindsFourInEnglish`；设备上不跑。
 
+### ST-165 [P1] 搜一块键盘、一个按钮：打开按键字符和快捷键，换到那块键盘，闪一下
+- **前提**：B0-设置。
+- **操作**：点 🔍，输入「注音」，点「注音九键」（下面写「虚拟键盘 › 按键字符和快捷键」）那条；返回，再搜「翻转上下滑」，点结果。
+- **预期**：第一条打开按键字符和快捷键，选中的是注音九键（下面键盘卡片的标题是注音九键），注音九键那张卡片闪一下（按下的样子，半秒多就恢复）。第二条打开同一页，「翻转上下滑」按钮闪一下，什么都没改。
+- **JVM**：`SettingsMenuUatTest.searchingAKeyboardOrAButtonOfTheKeysPageGoesToIt`（打开的页、闪的是注音九键的卡片和翻转上下滑按钮）、`SettingsPagesTest.everyTappableTextOnAHandPageIsSearched`（页上每个有字的按钮、卡片都搜得到，搜到的都闪得出来，多选时的也算）、`SearchHighlightTest.aControlFlashesUnderAVeilForAMoment`；设备上也跑（只看打开的页和选中的键盘，闪看截图）。
+
+### ST-166 [P1] 搜生僻字的一组：回到四张卡片，那一组闪一下
+- **前提**：B0-设置，文字包已导入。
+- **操作**：点 🔍，输入「繁体」，点「繁体字」（下面写「词库与短语 › 生僻字屏蔽」）那条。
+- **预期**：打开生僻字屏蔽，读完字表后是四张组卡片（没有打开繁体字的网格），繁体字那张闪一下；开关和每组的屏蔽都没变。
+- **JVM**：`RareCharsPageUatTest.searchingAGroupOpensThePageAtItsCard`（点结果后闪的是 TRAD 那张卡片，四张都在）、`SearchHighlightTest.aControlIsWaitedForUpToThirtySeconds`（字表读得慢也等到 30 秒）；设备上也跑。
+
+### ST-167 [P2] ↶ 和 ⋮ 里的项：结果下面写它在哪
+- **前提**：B0-设置。
+- **操作**：点 🔍，输入「全部恢复默认」，看结果，点按键字符和快捷键下面那条；返回，搜「撤销」。
+- **预期**：「全部恢复默认」有几条（按键字符和快捷键、生僻字屏蔽、工具栏按钮……），各自下面写所在页和「· 右上角 ⋮ 里」；点按键字符和快捷键那条打开那一页，不闪、不弹 ⋮、什么都没恢复。「撤销」的结果下面写「· 标题栏右上的 ↶」。
+- **JVM**：`SettingsMenuUatTest.anActionOfThePagesMenuSaysWhereItIs`；设备上不跑。
+
+### ST-168 [P2] 手画的页上的一行：词库与短语、开发者、关于这些页的行也搜得到
+- **前提**：B0-设置。
+- **操作**：点 🔍，输入「实时日志」，点结果；返回，搜「导入的词」，点结果。
+- **预期**：第一条在结果里排得靠后（开发者的都比别处的低一档），打开开发者页，「实时日志」那一行闪一下。第二条打开词库与短语，「导入的词」那一行闪一下。
+- **JVM**：`SettingsMenuUatTest.aRowOfAPageDrawnByHandIsPointedAt`（打开的页和指着的行）、`SettingsPagesTest.everyTappableTextOnAHandPageIsSearched`（这些页的每一行都有 key、都搜得到）；设备上不跑。
+
+### ST-169 [P2] 搜内置主题的名字：打开外观的主题页，那张主题闪一下
+- **前提**：B0-设置。
+- **操作**：点 🔍，输入「Pixel」，点「Pixel」（下面写「外观」）那条。
+- **预期**：打开外观，在「主题」页签上，Pixel 那张主题滚到看得见的地方闪一下；用着的主题没变。
+- **JVM**：`SettingsMenuUatTest.aBuiltInThemeIsFoundByItsName`、`SettingsPagesTest.everyBuiltInThemeIsRevealed`（四个内置主题都找得到、都闪得出来）；设备上也跑。
+
 ### ST-48 [P0] 编码行浮在键盘上方：打字时出现，点得到，浮条外点到应用
 - **前提**：B0（新装，**外观 → 大小与样式 → 编码行** 是默认的「浮在键盘上方」）。
 - **操作**：回测试页点「普通文本」框，没打字时看键盘顶；点 n i h a o，看拼音显示在哪；点浮条上 ni 和 hao 之间；点浮条正上方 20dp、浮条右边 20dp 的网页空白处；按空格上屏后再点原来浮条的位置。浅色、深色主题各看一次全拼、14 键、九键、双拼 18 键。

@@ -518,6 +518,8 @@
     <string name="search_also_called">also called %1$s</string>
     <string name="search_not_added">not added</string>
     <string name="search_got_it">Got it</string>
+    <string name="search_where_undo">in the title bar: ↶</string>
+    <string name="search_where_menu">in ⋮ at the top right</string>
     <string name="custom_phrases">Custom phrases</string>
     <string name="word_packs">Words and phrases</string>
     <string name="word_pinyin_unknown">No reading found: please type the pinyin</string>

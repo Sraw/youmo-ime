@@ -5,11 +5,18 @@
 package org.fcitx.fcitx5.android.ui.main.settings.search
 
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Bundle
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModelStore
@@ -26,8 +33,11 @@ import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import androidx.recyclerview.widget.RecyclerView
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -38,8 +48,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowSystemClock
-import java.time.Duration
-import java.util.concurrent.TimeUnit
 
 /**
  * A search result whose setting its page did not have once flashed a setting of the same title,
@@ -170,17 +178,22 @@ class SearchHighlightTest {
         assertFalse(SearchHighlight.isWaiting(result))
     }
 
-    // kept whole (061 §4.1): an id not a preference's, which no preference page has, pointed at nothing and let go
+    // kept whole (061 §4.1): an id not a preference's, which no preference page has, pointed at nothing and let go;
+    // a control's (view:) left for the page drawn by hand around the preferences (外观's tabs), which says when it is ready
     @Test
     fun theIdIsKeptWholeAndOnlyAPreferencesIsPointedAt() {
         val result = open(RESULT)
         SearchHighlight.point(result, "pref:wanted", "pref:keyboard")
         assertEquals("pref:wanted" to "pref:keyboard", SearchHighlight.pointedAt(result))
-        SearchHighlight.point(result, "view:wanted")
+        SearchHighlight.point(result, "page:wanted")
         val page = Page(screen("wanted"))
         SearchHighlight.showIn(page, result)
         assertNull(page.scrolledTo)
         assertFalse(SearchHighlight.isWaiting(result))
+        SearchHighlight.point(result, "view:wanted")
+        SearchHighlight.showIn(page, result)
+        assertNull(page.scrolledTo)
+        assertTrue(SearchHighlight.isWaiting(result))
     }
 
     @Test
@@ -239,5 +252,143 @@ class SearchHighlightTest {
         })
         SearchHighlight.showIn(grouped, result)
         assertEquals("keyboard", grouped.scrolledTo?.key)
+    }
+
+    // a page drawn by hand: what it was asked to reveal, and the control it gives, if any
+    class Anchored(val control: View? = null) : Fragment(), SearchAnchors {
+        val revealed = mutableListOf<String>()
+
+        override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
+            View(inflater.context)
+
+        override fun reveal(id: String, found: (View) -> Unit) {
+            revealed += id
+            control?.let(found)
+        }
+    }
+
+    // dev/design/061-settings-search.md §4.7: asked once the page says it is ready, then forgotten
+    @Test
+    fun aControlIsRevealedOnceThePageIsReadyAndOnlyOnce() {
+        val result = open(RESULT)
+        val page = Anchored(null)
+        SearchHighlight.point(result, "view:keys/flip")
+        SearchHighlight.ready(page, result)
+        assertEquals(listOf("view:keys/flip"), page.revealed)
+        assertFalse(SearchHighlight.isWaiting(result))
+        SearchHighlight.ready(page, result)
+        assertEquals(1, page.revealed.size)
+    }
+
+    // a preference's is the preference page's to point at: a page drawn by hand leaves it
+    @Test
+    fun aPageDrawnByHandLeavesAPreferencesId() {
+        val result = open(RESULT)
+        val page = Anchored(null)
+        SearchHighlight.point(result, "pref:wanted")
+        SearchHighlight.ready(page, result)
+        assertTrue(page.revealed.isEmpty())
+        assertTrue(SearchHighlight.isWaiting(result))
+    }
+
+    // 生僻字屏蔽 reads the whole table from the engine first, cold more than the 5 s a preference is waited for
+    @Test
+    fun aControlIsWaitedForUpToThirtySeconds() {
+        val result = open(RESULT)
+        val page = Anchored(null)
+        SearchHighlight.point(result, "view:rare/group/L3")
+        ShadowSystemClock.advanceBy(20, TimeUnit.SECONDS)
+        assertEquals("view:rare/group/L3", SearchHighlight.waitingFor(Hosted().also { host(it, result) }))
+        SearchHighlight.ready(page, result)
+        assertEquals(listOf("view:rare/group/L3"), page.revealed)
+        SearchHighlight.point(result, "view:rare/group/L3")
+        ShadowSystemClock.advanceBy(31, TimeUnit.SECONDS)
+        SearchHighlight.ready(page, result)
+        assertEquals(1, page.revealed.size)
+        assertFalse(SearchHighlight.isWaiting(result))
+    }
+
+    // the control gone (a button moved into ⋮): nothing flashed, the page left at its top, no crash
+    @Test
+    fun aControlThePageNoLongerHasLeavesThePageAtItsTop() {
+        val result = open(RESULT)
+        val page = Anchored(null)
+        SearchHighlight.point(result, "view:keys/gone")
+        SearchHighlight.ready(page, result)
+        assertEquals(listOf("view:keys/gone"), page.revealed)
+        assertFalse(SearchHighlight.isWaiting(result))
+    }
+
+    // a control with no ripple of its own, or disabled (a ripple shows nothing then): a veil of the theme's touch colour
+    // drawn over it while it is pressed, a moment after the page is there (it fades in), gone with the press
+    @Test
+    fun aControlFlashesUnderAVeilForAMoment() {
+        fun drawn(view: View) = Bitmap.createBitmap(100, 40, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }.getPixel(50, 20)
+        val plain = View(ctx)
+        val disabled = View(ctx).apply {
+            foreground = RippleDrawable(ColorStateList.valueOf(Color.BLACK), null, null)
+            isEnabled = false
+        }
+        for (control in listOf(plain, disabled)) {
+            control.layout(0, 0, 100, 40)
+            val before = drawn(control)
+            val result = open(RESULT)
+            SearchHighlight.point(result, "view:keys/flip")
+            SearchHighlight.ready(Anchored(control), result)
+            // pressed once the page has faded in
+            assertFalse(control.isPressed)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            assertTrue(control.isPressed)
+            assertNotEquals("$control: veiled", before, drawn(control))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            assertFalse(control.isPressed)
+            assertEquals("$control: unveiled", before, drawn(control))
+        }
+    }
+
+    // 外观's card shows its row's state (the name under it pressed with it): flashed through the row, its ripple pressed
+    @Test
+    fun aControlShowingItsParentsStateFlashesThroughIt() {
+        val card = View(ctx).apply {
+            foreground = RippleDrawable(ColorStateList.valueOf(Color.BLACK), null, ColorDrawable(Color.WHITE))
+            isDuplicateParentStateEnabled = true
+        }
+        val row = FrameLayout(ctx).apply { addView(card, 100, 40); measure(100, 40); layout(0, 0, 100, 40) }
+        val result = open(RESULT)
+        SearchHighlight.point(result, "view:theme/pixel")
+        SearchHighlight.ready(Anchored(card), result)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+        assertTrue(row.isPressed)
+        assertTrue(android.R.attr.state_pressed in card.drawableState)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        assertFalse(row.isPressed)
+        assertFalse(android.R.attr.state_pressed in card.drawableState)
+    }
+
+    // ready said by a page another was opened over (its read done late): the page on top is not pointed at, the page
+    // itself is once it is back on top and says it again
+    @Test
+    fun aPageReadyUnderAnotherPointsAtNothingThere() {
+        val result = open(RESULT)
+        val control = View(ctx).apply { layout(0, 0, 100, 40) }
+        val page = Anchored(control)
+        SearchHighlight.point(result, "view:keys/flip")
+        host(page, result, tag = result.id)
+        val other = open(OTHER)
+        SearchHighlight.point(other, "view:keys/multi")
+        SearchHighlight.ready(page)
+        assertEquals(emptyList<String>(), page.revealed)
+        assertTrue(SearchHighlight.isWaiting(other))
+        controller.popBackStack()
+        SearchHighlight.ready(page)
+        assertEquals(listOf("view:keys/flip"), page.revealed)
+    }
+
+    // the public overloads find the NavController by the fragment's view; tagged as FragmentNavigator tags a destination's
+    private fun host(fragment: Fragment, entry: NavBackStackEntry, tag: String? = null) {
+        val activity = Robolectric.buildActivity(FragmentActivity::class.java).setup().get()
+        activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment, tag).commitNow()
+        Navigation.setViewNavController(fragment.requireView(), controller)
+        assertEquals(entry, controller.currentBackStackEntry)
     }
 }

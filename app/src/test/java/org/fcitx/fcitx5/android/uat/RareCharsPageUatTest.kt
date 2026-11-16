@@ -15,11 +15,14 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputLayout
+import java.io.File
+import java.time.Duration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -45,6 +48,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.RareCharsViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip
 import org.fcitx.fcitx5.android.ui.main.settings.rareSummary
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -57,8 +61,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import splitties.dimensions.dp
-import java.io.File
-import java.time.Duration
 
 /**
  * 生僻字屏蔽's page (dev/design/061-rare-char-block.md §6; 061-settings-cards.md §3) and the marks on the
@@ -68,6 +70,29 @@ import java.time.Duration
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class RareCharsPageUatTest : RarePageUat() {
+
+    // a group found by its name: the page opened at the four cards, that group's flashed, its grid not opened
+    @Test
+    @Uat("ST-166")
+    fun searchingAGroupOpensThePageAtItsCard() {
+        SearchHighlight.Hooks.flashed = null
+        st.open(SettingsRoute.Search)
+        views().filterIsInstance<EditText>().first().setText(s(R.string.rare_group_trad))
+        val list = views().filterIsInstance<RecyclerView>().first()
+        fun row() = list.run {
+            measure(0, 0)
+            layout(0, 0, 1080, 2000)
+            (0 until childCount).map(::getChildAt).firstOrNull { r ->
+                val said = KeyboardHarness.all(r).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+                said.firstOrNull() == s(R.string.rare_group_trad) && said.any { s(R.string.rare_chars) in it }
+            }
+        }
+        until("found") { row() != null }
+        row()!!.performClick()
+        until("flashed") { SearchHighlight.Hooks.flashed != null }
+        assertEquals("view:rare/group/TRAD", SearchHighlight.Hooks.flashed?.tag)
+        assertEquals(4, cards().size)
+    }
 
     @Test
     @Uat("WD-60", "WD-62", "WD-64")

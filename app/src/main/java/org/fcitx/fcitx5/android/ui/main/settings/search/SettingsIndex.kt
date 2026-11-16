@@ -19,24 +19,18 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.ui.main.MainFragment
-import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.BackupFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.PacksFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.HardwareKeyboardFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeysSettingsFragment
-import org.fcitx.fcitx5.android.ui.main.settings.behavior.SoundSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
-import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeSettingsFragment
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Entry
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Kind
+import org.fcitx.fcitx5.android.ui.main.settings.search.SettingsPages.Source
 
 /**
  * Every setting the search finds, read from the pages themselves where they are built from a
  * list (the app's preference categories, the input methods' [InputMethodSettings]), so a setting
- * added there is found without a word here; the pages drawn by hand are listed by name. Each with
+ * added there is found without a word here; a page drawn by hand says what is on it ([SearchablePage]).
+ * [SettingsPages] has every page, and how it is read. Each with
  * its id (dev/design/061-settings-search.md §4.1), the other names [SearchKeywords] has for it,
  * and, for a list, each of its choices worth one ([SettingsSearch.isWorthAValue]).
  */
@@ -44,11 +38,14 @@ object SettingsIndex {
 
     /**
      * The page to open, and the setting on it to point at (its preference's key), if not the page
-     * itself; [via], the row to point at instead while that setting is hidden (InputMethodSettings.Section.via).
+     * itself; [via], the row to point at instead while that setting is hidden (InputMethodSettings.Section.via);
+     * on a page drawn by hand, [view], the control's id (view:), or [where] it is when it has no View (⋮'s).
      */
-    data class Target(val route: SettingsRoute, val key: String?, val via: String? = null) {
-        /** What [SearchHighlight] is given: the setting's id and the row's, a preference's (pref:). */
-        val highlight: String? get() = key?.let { SearchHighlight.PREF + it }
+    data class Target(
+        val route: SettingsRoute, val key: String?, val via: String? = null, val view: String? = null, @StringRes val where: Int = 0,
+    ) {
+        /** What [SearchHighlight] is given: the setting's id and the row's, a preference's (pref:) or a control's (view:). */
+        val highlight: String? get() = view ?: key?.let { SearchHighlight.PREF + it }
         val highlightVia: String? get() = via?.let { SearchHighlight.PREF + it }
     }
 
@@ -72,74 +69,59 @@ object SettingsIndex {
         }
     }
 
+    // as SettingsPages has them, in the home page's order
     private fun raw(context: Context, between: () -> Unit): List<Entry<Target>> = buildList {
-        fun page(@StringRes title: Int, route: SettingsRoute, vararg under: Int) =
-            add(pageEntry(context, context.getString(title), route, under.map(context::getString)))
-
-        fun managed(@StringRes title: Int, route: SettingsRoute, build: (PreferenceScreen) -> Unit) {
+        for ((_, source) in SettingsPages.PAGES) {
             between()
-            managed(context, title, route, build, this)
+            when (source) {
+                is Source.Listed -> source.more.add(context, emptyList(), this)
+                is Source.Managed -> {
+                    val path = listOf(context.getString(source.title))
+                    managed(context, source.title, source.open, source.build, this)
+                    source.also?.let { hand(context, it, source.open, path, demoted = false, into = this) }
+                    source.more?.add(context, path, this)
+                }
+                is Source.Hand -> {
+                    val under = source.under.map(context::getString)
+                    val title = context.getString(source.title)
+                    if (source.listed) add(pageEntry(context, title, source.open, under, source.summary).copy(demoted = source.demoted))
+                    hand(context, source.page, source.open, under + title, source.demoted, this)
+                    source.more?.add(context, under + title, this)
+                }
+                // on the home page, which is under every page: opening it goes back there (SettingsSearchFragment.open)
+                Source.Index -> add(setting(context.getString(R.string.app_language), "", emptyList(), SettingsRoute.Index, MainFragment.LANGUAGE_KEY))
+                is Source.Elsewhere, is Source.NotSearched -> Unit
+            }
         }
-
-        // as the home page lists them (MainFragment.HOME), and its language row, which opens no page
-        page(R.string.input_methods, SettingsRoute.InputMethodList)
-        inputMethods(context, this)
-        between()
-        sharedInput(context, this)
-        page(R.string.word_packs, SettingsRoute.PinyinDict(""))
-        page(R.string.my_words, SettingsRoute.UserWords, R.string.word_packs)
-        page(R.string.custom_phrases, SettingsRoute.PinyinCustomPhrase, R.string.word_packs)
-        page(R.string.common_words, SettingsRoute.CommonWords, R.string.word_packs)
-        page(R.string.rare_chars, SettingsRoute.RareChars, R.string.word_packs)
-        page(R.string.quick_phrases, SettingsRoute.QuickPhrase(), R.string.word_packs)
-        managed(R.string.theme_and_size, SettingsRoute.Theme) { ThemeSettingsFragment.build(it) }
-        managed(R.string.virtual_keyboard, SettingsRoute.Keys) { KeysSettingsFragment.build(it) }
-        val keys = listOf(context.getString(R.string.virtual_keyboard))
-        add(Entry(context.getString(R.string.long_press_characters), context.getString(R.string.long_press_characters_summary),
-            keys, Target(SettingsRoute.PopupOverrides, null), pageId(SettingsRoute.PopupOverrides), Kind.PAGE))
-        commands(context, keys + context.getString(R.string.long_press_characters), this)
-        add(Entry(context.getString(R.string.toolbar_buttons), context.getString(R.string.toolbar_buttons_summary),
-            keys, Target(SettingsRoute.ToolbarButtons, null), pageId(SettingsRoute.ToolbarButtons), Kind.PAGE))
-        managed(R.string.section_sound_and_vibration, SettingsRoute.SoundAndVibration) { SoundSettingsFragment.build(it) }
-        managed(R.string.clipboard_and_emoji, SettingsRoute.Clipboard) { ClipboardSettingsFragment.build(it) }
-        managed(R.string.hardware_keyboard, SettingsRoute.HardwareKeyboard) { HardwareKeyboardFragment.build(it) }
-        // added to that page once fcitx answers
-        val hardware = listOf(context.getString(R.string.hardware_keyboard))
-        items(context, InputMethodSettings.HARDWARE_KEYBOARD, hardware) { row -> add(row.entry(SettingsRoute.HardwareKeyboard, "")) }
-        // 通用输入 → 网址和邮箱, drawn by hand: its rows by keys of its own (the page itself is 通用输入's row)
-        val addresses = listOf(context.getString(R.string.shared_input), context.getString(R.string.address_suggestions))
-        for ((title, key, summary) in listOf(
-            Triple(R.string.email_suffixes, AddressSettingsFragment.EMAIL_KEY, 0),
-            Triple(R.string.url_suffixes, AddressSettingsFragment.URL_KEY, 0),
-            Triple(R.string.remember_addresses, AddressSettingsFragment.REMEMBER_KEY, R.string.remember_addresses_summary),
-            // 全部清空's row is in it only while an address is remembered: found by the group's result
-            Triple(R.string.remembered_addresses, AddressSettingsFragment.REMEMBERED_KEY, R.string.forget_all_addresses),
-        )) add(setting(context.getString(title), if (summary == 0) "" else context.getString(summary), addresses, SettingsRoute.Addresses, key))
-        // drawn by hand on that page: its own ids, so a title changed there is still the one pointed at
-        page(R.string.user_data, SettingsRoute.Backup)
-        val backup = listOf(context.getString(R.string.user_data))
-        add(setting(context.getString(BackupFragment.EXPORT_USER_DATA), context.getString(BackupFragment.EXPORT_USER_DATA_SUMMARY), backup,
-            SettingsRoute.Backup, BackupFragment.EXPORT_USER_DATA_KEY))
-        add(setting(context.getString(BackupFragment.IMPORT_USER_DATA), "", backup, SettingsRoute.Backup, BackupFragment.IMPORT_USER_DATA_KEY))
-        page(R.string.packs, SettingsRoute.Packs)
-        add(setting(context.getString(R.string.pack_import), context.getString(R.string.pack_import_summary), listOf(context.getString(R.string.packs)),
-            SettingsRoute.Packs, PacksFragment.IMPORT_KEY))
-        // on the home page, which is under every page: opening it goes back there (SettingsSearchFragment.open)
-        add(setting(context.getString(R.string.app_language), "", emptyList(), SettingsRoute.Index, MainFragment.LANGUAGE_KEY))
-        page(R.string.about, SettingsRoute.About)
     }
+
+    /** What a page drawn by hand says is on it ([SearchablePage]), each pointed at by its id, or said where it is. */
+    private fun hand(context: Context, page: SearchablePage, route: SettingsRoute, path: List<String>, demoted: Boolean, into: MutableList<Entry<Target>>) {
+        for (e in page.searchEntries(context)) {
+            val target = when {
+                e.where != 0 -> Target(route, null, where = e.where)
+                e.id.startsWith(SearchHighlight.PREF) -> Target(route, e.id.removePrefix(SearchHighlight.PREF))
+                else -> Target(route, null, view = e.id)
+            }
+            into += Entry(e.title, e.summary, path, target, e.id, demoted = demoted)
+        }
+    }
+
+    /** fcitx's own options of the hardware keyboard, added to that page once fcitx answers. */
+    internal fun hardwareItems(context: Context, path: List<String>, into: MutableList<Entry<Target>>) =
+        items(context, InputMethodSettings.HARDWARE_KEYBOARD, path) { row -> into += row.entry(SettingsRoute.HardwareKeyboard, "") }
 
     private fun setting(title: String, summary: String, path: List<String>, route: SettingsRoute, key: String) =
         Entry(title, summary, path, Target(route, key), "pref:$key")
 
-    // a page's entry, said as the home page says it if it is one of the home page's
-    private fun pageEntry(context: Context, title: String, route: SettingsRoute, path: List<String>): Entry<Target> {
-        val home = MainFragment.HOME.firstOrNull { it.route == route }?.summary
-        return Entry(title, home?.let(context::getString).orEmpty(), path, Target(route, null), pageId(route), Kind.PAGE)
+    // a page's entry, said as the home page says it if it is one of the home page's, else as its row says it ([summary])
+    private fun pageEntry(context: Context, title: String, route: SettingsRoute, path: List<String>, @StringRes summary: Int = 0): Entry<Target> {
+        val said = MainFragment.HOME.firstOrNull { it.route == route }?.summary ?: summary
+        return Entry(title, if (said == 0) "" else context.getString(said), path, Target(route, null), pageId(route), Kind.PAGE)
     }
 
     // what a key's swipe can run, each on the page that sets it, the five strokes as one
-    private fun commands(context: Context, path: List<String>, into: MutableList<Entry<Target>>) {
+    internal fun commands(context: Context, path: List<String>, into: MutableList<Entry<Target>>) {
         val target = Target(SettingsRoute.PopupOverrides, null)
         for (command in KeyCommand.entries.filter { it.group != KeyCommand.Group.Stroke }) {
             into += Entry(context.getString(KeyShortcutLooks.of(command).label), "", path, target, "cmd:${command.key}", Kind.COMMAND)
@@ -151,9 +133,9 @@ object SettingsIndex {
     @SuppressLint("RestrictedApi") // a PreferenceManager of our own, only to make the screen with
     private fun managed(
         context: Context, @StringRes title: Int, route: SettingsRoute, build: (PreferenceScreen) -> Unit,
-        into: MutableList<Entry<Target>>, @StringRes vararg under: Int,
+        into: MutableList<Entry<Target>>,
     ) {
-        val path = under.map(context::getString) + context.getString(title)
+        val path = listOf(context.getString(title))
         into += pageEntry(context, path.last(), route, path.dropLast(1))
         // over storage that keeps nothing: a preference attached saves its default, which would
         // pin every default the user never touched to what it is today
@@ -202,8 +184,10 @@ object SettingsIndex {
         }
     }
 
+    /** The list of input methods, and each built-in one's page and the settings on it. */
     internal fun inputMethods(context: Context, into: MutableList<Entry<Target>>) {
         val top = context.getString(R.string.input_methods)
+        into += pageEntry(context, top, SettingsRoute.InputMethodList, emptyList())
         for (name in InputMethodSettings.BUILT_IN) {
             val items = InputMethodSettings.of(name) ?: continue
             val page = InputMethodNames.of(context, name, name)

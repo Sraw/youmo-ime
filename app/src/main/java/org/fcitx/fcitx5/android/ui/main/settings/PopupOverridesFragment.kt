@@ -31,14 +31,15 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.CollectionInfoCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.CollectionInfoCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
+import com.google.android.material.R as MaterialR
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.snackbar.Snackbar
@@ -71,6 +72,10 @@ import org.fcitx.fcitx5.android.ui.main.settings.cards.ChoiceCard
 import org.fcitx.fcitx5.android.ui.main.settings.cards.FoldCard
 import org.fcitx.fcitx5.android.ui.main.settings.cards.KeyboardGlyphView
 import org.fcitx.fcitx5.android.ui.main.settings.cards.settingsCard
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchAnchors
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.onPositiveButtonClick
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
@@ -81,7 +86,6 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapContent
 import timber.log.Timber
-import com.google.android.material.R as MaterialR
 
 /**
  * 按键字符和快捷键 (060-swipe-slots): each keyboard's keys drawn as the user sees them, a tap editing a key's
@@ -92,7 +96,7 @@ import com.google.android.material.R as MaterialR
  * changed, then the picked one's keys; under them 预设, 翻转上下滑, 多选 (keys flipped, set to the first or
  * nothing, put back, at once). 撤销 (the last change back) is the title bar's ↶, 全部恢复默认 in its ⋮.
  */
-class PopupOverridesFragment : KeyCapsPageFragment() {
+class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
 
     private val viewModel: MainViewModel by activityViewModels()
 
@@ -232,6 +236,15 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
 
             override fun onMenuItemSelected(menuItem: MenuItem) = false
         }, viewLifecycleOwner, Lifecycle.State.STARTED)
+        // the cards made (KeyCapsPageFragment's rebuild): a search result's control can be pointed at
+        SearchHighlight.ready(this)
+    }
+
+    // a keyboard's card picked as a tap picks it, its keys shown under it; the bar's buttons as they are
+    override fun reveal(id: String, found: (View) -> Unit) {
+        val form = id.removePrefix(BOARD)
+        if (form != id) pages.firstOrNull { it.form == form }?.takeIf { it !== page }?.let { page = it; rebuild() }
+        view?.findViewWithTag<View>(id)?.let(found)
     }
 
     override fun rebuild() {
@@ -302,9 +315,9 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
     private fun actionBar(ctx: Context) = bar(
         ctx,
         listOf(
-            button(ctx, R.string.swipe_presets, anchor = "view:keys/presets") { choosePreset() },
-            button(ctx, R.string.swipe_flip_all, anchor = "view:keys/flip") { change { flipAll() } },
-            button(ctx, R.string.swipe_multi_select, anchor = "view:keys/multi") { selecting = true; rebuild() },
+            button(ctx, R.string.swipe_presets, anchor = PRESETS) { choosePreset() },
+            button(ctx, R.string.swipe_flip_all, anchor = FLIP) { change { flipAll() } },
+            button(ctx, R.string.swipe_multi_select, anchor = MULTI) { selecting = true; rebuild() },
         ),
     )
 
@@ -413,7 +426,7 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             val glyph = KeyboardGlyphView(ctx, p.rows.map { it.size }, bars = p.form == KeyShortcuts.FUNCTION)
             val card = ChoiceCard(ctx, names[i], glyph).apply {
                 // where a settings search's result lands (§7.4): the form's own name, 功能键's fn
-                cell.tag = "view:keys/board/${p.form}"
+                cell.tag = BOARD + p.form
                 this.nameSp = nameSp
                 nameLines = lines
                 selected = p === page
@@ -783,9 +796,30 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
             .show()
     }
 
-    companion object {
+    companion object : SearchablePage {
         // the one step back, kept past the page: the user leaves it to try the keys and comes back to take it back
         private var undo: Step? = null
+
+        // the controls a settings search points at (dev/design/061-settings-search.md §4.12): the keyboards' cards by
+        // their form, the bar's buttons; ↶ and ⋮'s 全部恢复默认 have no View, said where they are
+        private const val BOARD = "view:keys/board/"
+        private const val PRESETS = "view:keys/presets"
+        private const val FLIP = "view:keys/flip"
+        private const val MULTI = "view:keys/multi"
+
+        override fun searchEntries(context: Context): List<PageEntry> =
+            KeyShortcutPages.all.map { PageEntry(context.getString(pageTitle(it)), BOARD + it.form) } + listOf(
+                PageEntry(context.getString(R.string.swipe_presets), PRESETS),
+                PageEntry(context.getString(R.string.swipe_flip_all), FLIP),
+                PageEntry(context.getString(R.string.swipe_multi_select), MULTI),
+                PageEntry(context.getString(R.string.undo), "view:keys/undo", where = R.string.search_where_undo),
+                PageEntry(context.getString(R.string.reset_all), "view:keys/reset_all", where = R.string.search_where_menu),
+            )
+
+        // 多选's bar: a state of a moment, its buttons there only while keys are being chosen
+        override val notSearched = setOf(
+            R.string.select_all, R.string.swipe_flip, R.string.swipe_set_first, R.string.swipe_set_empty, R.string.swipe_reset, R.string.done,
+        )
 
         private const val STATE_PAGE = "page"
         private const val STATE_SELECTING = "selecting"

@@ -90,6 +90,7 @@
         <item>搜狗词库</item>
         <item>词典</item>
         <item>并入基础词库</item>
+        <item>基础词库</item>
     </string-array>
     <string-array name="kw_user_words">
         <item>自造词</item>

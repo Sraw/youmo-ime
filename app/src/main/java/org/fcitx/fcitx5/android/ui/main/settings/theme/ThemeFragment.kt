@@ -24,10 +24,14 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
+import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.ui.main.settings.layout.LayoutListFragment
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchAnchors
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -46,7 +50,7 @@ import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.wrapContent
 
-class ThemeFragment : Fragment() {
+class ThemeFragment : Fragment(), SearchAnchors {
 
     private lateinit var previewUi: KeyboardPreviewUi
 
@@ -100,8 +104,8 @@ class ThemeFragment : Fragment() {
             })
         }
 
-        // a search result here is a setting of the look, on the second tab (the first lists themes)
-        if (SearchHighlight.isWaiting(this@ThemeFragment)) viewPager.setCurrentItem(1, false)
+        // a search result here is a setting of the look, on the second tab, or a built-in theme, on the first
+        if (SearchHighlight.isWaiting(this@ThemeFragment) && SearchHighlight.waitingFor(this@ThemeFragment) == null) viewPager.setCurrentItem(1, false)
 
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
             tab.text = getString(
@@ -167,6 +171,22 @@ class ThemeFragment : Fragment() {
         }
     }
 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        // the themes are listed as the first tab is made: a search result's theme is pointed at once it is
+        SearchHighlight.ready(this)
+    }
+
+    // a built-in theme's card, on the first tab, its list scrolled to it
+    override fun reveal(id: String, found: (View) -> Unit) {
+        val file = id.removePrefix(THEME).takeIf { it != id } ?: return
+        viewPager.setCurrentItem(0, false)
+        // the tab's page is made as the pager is laid out
+        viewPager.post {
+            if (isAdded) childFragmentManager.fragments.filterIsInstance<ThemeListFragment>().firstOrNull()?.reveal(file, found)
+        }
+    }
+
     /**
      * The keyboard preview at half its size, taking half its size: a view scaled still takes its
      * whole size, which left the space a preview at full size would.
@@ -216,9 +236,15 @@ class ThemeFragment : Fragment() {
         super.onDestroy()
     }
 
-    companion object {
+    // the built-in themes, by their names in the list (Q5: the user's own are not searched, the list shows them)
+    companion object : SearchablePage {
         // 外观's third tab (061-custom-layout §4.3)
         private const val LAYOUTS_TAB = 2
+
+        private const val THEME = "view:theme/"
+
+        override fun searchEntries(context: Context) =
+            BuiltinThemeFiles.FILES.map { (file, _) -> PageEntry(ThemeNames.shown(context, file), THEME + file) }
 
         // the keys AppPrefs.Keyboard declares: one renamed there is renamed here
         private val SIZE_KEYS by lazy {

@@ -1374,13 +1374,27 @@ Rules for settings, all decided:
   `ThemePrefsMigrationTest`, `KeyboardAreaTest`, `ThemeSizesUatTest`, ime-core `KeyboardSizesTest`.
 - **`hidden { }`** marks a preference with no UI: it is reset to its default once on upgrade and after
   a restore (`resetHiddenSettings`), so an old value set where the UI used to be cannot linger.
-- **Searchable** (`dev/design/061-settings-search.md`). `SettingsIndex` builds the search from the same
-  declarations (managed categories are walked, input method pages read from `InputMethodSettings`); a
-  page drawn by hand must add its entries there, with a test in `SettingsIndexTest`. Every entry has an
+- **Searchable** (`dev/design/061-settings-search.md`). `SettingsIndex` builds the search from
+  `SettingsPages`, one line for each `SettingsRoute` in the home page's order saying how it is read: `Managed`
+  (its category's `build`, walked, never shown), `Listed` (the input methods' pages, read from
+  `InputMethodSettings`), `Hand` (a page drawn by hand: its companion is a `SearchablePage`, whose
+  `searchEntries` names its rows by `pref:<key>`, its controls by `view:<page>/<name>`, the View's tag, and an
+  action with no View, ↶ or an item of ⋮, by `where`, said under the result), `Index`, or `Elsewhere` /
+  `NotSearched` with the reason. A page drawn by hand whose rows are preferences gives each a key
+  (`addPreference(..., key = …)`); one with controls is a `SearchAnchors` and calls `SearchHighlight.ready`
+  once what it shows is there (its cards made, its table read): `reveal` does what a tap would to bring the
+  control into sight (picks the keyboard, closes a group's grid, scrolls a list) and gives it to be scrolled to
+  and flashed 250 ms later (the page fades in over 150 ms), its own ripple pressed (through the parent whose
+  state it shows: 外观's card) or, with none or disabled, a 12% veil of `colorControlHighlight`; logged at INFO,
+  `search: flashed <id>`, which the device UAT shoots on. An id is waited for 5 s, or up to 30 s by a page that
+  is `ReadyLater`, whose rows or controls come after a read (every `SearchAnchors`, the rare page reading the
+  engine's table; 词库与短语, 实体键盘 and the engine's option pages, `HostPreferenceFragment`): it says
+  `SearchHighlight.ready` once it has them, which points only the page on top (its back stack entry's id, the
+  fragment's tag); `SettingsPagesTest` waits for that too. Every entry has an
   id, the same in every language: `page:<route class>` (an input method's page `/uniqueName`;
   a route opened by a uri or the user's data is its parent page's), `pref:<key>`,
   `value:<key>=<value>` for a list's choice, `cmd:<KeyCommand.key>` (the five strokes one,
-  `cmd:stroke`); an input method's page adds `@<uniqueName>` to its settings' and choices'. Results
+  `cmd:stroke`), `view:<page>/<name>`; an input method's page adds `@<uniqueName>` to its settings' and choices'. Results
   are kept once by id. A choice is in the index if its label is worth one (ime-core
   `SettingsSearch.isWorthAValue`: not one Han character, two Latin letters or a number) and found only
   when a word of the query is in its own name; it opens its setting's row. A command opens 按键字符和快捷键
@@ -1391,9 +1405,17 @@ Rules for settings, all decided:
   `lowercase(Locale.ROOT)` on both sides): the title is the query; it starts with it, or another name
   is it; the title has every word; other names have every word; the rest (summary, path); among equals
   the shorter title, then the index's order; a `demoted` entry a tier lower. `SearchHighlight` keeps
-  the id whole in its three slots and reads `pref:` ids only (a page's controls, `view:`, are 0.6.2).
+  the id whole in its three slots; a preference page reads `pref:` ids, leaves `view:` ones to the page drawn
+  by hand around it (外观's tabs: a built-in theme's card is on the first), and lets any other go.
   `SettingsIndexTest` holds each id unique, every `SearchKeywords` id indexed in the three languages and
-  the arrays in all three files, and 笔画筛选's four results in order in each language.
+  the arrays in all three files, and 笔画筛选's four results in order in each language. `SettingsPagesTest`
+  keeps the rest in step: every route registered; every titled preference of a `Managed` page and each of
+  its list's choices worth one indexed; each `Hand` page opened with no data of the user's, every button and
+  switch with words on it, tagged control, item of its menu and row a tap does something on said by the page
+  (or by another page's title, or in its `notSearched`), and everything it says there, a row by its key, a
+  control revealed and shown (按键字符和快捷键 in its 多选 state too); every bold name of a table's first column
+  in docs/settings.md and docs/words.md found by that name. Its bound: what shows only with the user's data or
+  in a dialog is not seen, and a key cap or a card has no words of a TextView's.
   The index is built on `Dispatchers.Default` (`SettingsIndexModel`, the page's ViewModel: kept over a rotation,
   built again in another language, cancelled with the page; checked between pages): 84 ms the first time on
   the 6T. It may because it reads only what is safe from any thread and writes nothing: resources, and
@@ -1444,7 +1466,8 @@ Rules for settings, all decided:
    with an `Item` in `InputMethodSettings`; `nearest` maps old or odd stored values to a shown one.
 4. Strings: `values/strings.xml` (English) and `values-zh-rCN`, `values-zh-rTW` at least; the other
    locales fall back to English. Write the summary as what the user gets, not how it works.
-5. Test the decision in ime-core; if the page is hand-drawn, the search index too. Words a user may
+5. Test the decision in ime-core. A new page is a line in `SettingsPages`; a row or control on a page drawn by
+   hand is named in that page's `searchEntries` (`SettingsPagesTest` fails until it is). Words a user may
    search it by that are not in its title go in `SearchKeywords` (and the three `search_keywords.xml`).
 6. Describe it in `docs/settings.md`.
 

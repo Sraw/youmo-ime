@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.Context
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuInflater
@@ -27,6 +28,9 @@ import org.fcitx.fcitx5.android.ui.common.DynamicListUi
 import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
+import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
+import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.lazyRoute
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 
@@ -142,12 +146,22 @@ class AddressSettingsFragment : PaddingPreferenceFragment() {
         })
     }
 
-    companion object {
-        // the rows settings search points at (SettingsIndex): this page's own, not stored
+    companion object : SearchablePage {
+        // the rows settings search points at: this page's own, not stored
         const val EMAIL_KEY = "address_email_suffixes_row"
         const val URL_KEY = "address_url_suffixes_row"
         const val REMEMBER_KEY = "address_remember_row"
         const val REMEMBERED_KEY = "address_remembered_row"
+
+        override fun searchEntries(context: Context) = listOf(
+            Triple(R.string.email_suffixes, EMAIL_KEY, 0),
+            Triple(R.string.url_suffixes, URL_KEY, 0),
+            Triple(R.string.remember_addresses, REMEMBER_KEY, R.string.remember_addresses_summary),
+            // 全部清空's row is in it only while an address is remembered: found by the group's result
+            Triple(R.string.remembered_addresses, REMEMBERED_KEY, R.string.forget_all_addresses),
+        ).map { (title, key, summary) ->
+            PageEntry(context.getString(title), SearchHighlight.PREF + key, summary = if (summary == 0) "" else context.getString(summary))
+        }
     }
 }
 
