@@ -1899,3 +1899,177 @@ case("ST-157", needs="jvm:SettingsMenuUatTest.searchingAKeyCommandOpensTheKeysPa
 case("ST-158", needs="jvm:SettingsMenuUatTest.searchingBySynonym")(lambda d: None)
 
 case("ST-159", needs="jvm:SettingsMenuUatTest.strokeFilterFindsTheSameFourInTraditionalChinese、SettingsMenuUatTest.strokeFilterFindsTheSameFourInEnglish")(lambda d: None)
+
+
+# ---------------------------------------------------------------- 外观 → 布局 (061-custom-layout §4)
+
+
+LAYOUTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures", "layouts")
+
+
+def push_layout(d, name):
+    """uat/fixtures/layouts/<name>.layout into 下载, scanned so the file picker lists it"""
+    d.sh(f"rm -f /sdcard/Download/{name}*.layout")
+    d.adb("push", os.path.join(LAYOUTS, f"{name}.layout"), f"/sdcard/Download/{name}.layout")
+    d.sh(f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/{name}.layout")
+    time.sleep(1)
+
+
+def preview_png(d):
+    """the 外观 page's upper part, the preview, above the tabs"""
+    tab = d.screen().find(text="主题")
+    if not tab:
+        raise Blocked("外观页没有页签")
+    im = d.png().convert("L")
+    return im.crop((0, tab.b[1] // 3, im.size[0], tab.b[1] - 4)).resize((80, 40))
+
+
+def differs(a, b):
+    # measured on the emulator: 14 键 against 26 键 1.4, the same board drawn twice 0.3
+    return sum(abs(x - y) for x, y in zip(a.getdata(), b.getdata())) / (80 * 40) > 0.8
+
+
+def import_layout(d, name):
+    """布局's + → 导入布局文件 → [name] in the picker; the dialog that follows left open"""
+    appearance_tab(d, "布局")
+    plus = d.screen().find(desc="新增布局")
+    if not plus:
+        raise Blocked("布局页没有 +")
+    d.tap(plus.c, 1.5)
+    d.tap_text("导入布局文件", scroll=False, after=3.0)
+    s = d.screen()
+    n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
+    if not n and s.find(text="下载"):
+        d.tap(s.find(text="下载").c, 2.0)
+        s = d.screen()
+        n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
+    if not n:
+        raise Blocked(f"文件选择里没有 {name}：{s.texts()[:8]}")
+    d.tap(n.c, 3.0)
+
+
+def layout_card(d, name):
+    appearance_tab(d, "布局")
+    n = d.screen().find(text=name)
+    for _ in range(3):
+        if n:
+            break
+        d.swipe((540, 1800), (540, 1200), 300, after=1.0)
+        n = d.screen().find(text=name)
+    return n
+
+
+@case("ST-147", base="B0-设置", visual=True)
+def st147(d):
+    appearance_tab(d, "主题")
+    s = d.screen()
+    check(all(s.find(text=t) for t in ("主题", "大小与样式", "布局")), f"外观页签不是三页：{s.texts()[:10]}")
+    original = preview_png(d)
+    appearance_tab(d, "布局")
+    s = d.screen()
+    for t in ("字母键盘", "26 键", "18 键", "14 键", "九键", "数字键盘"):
+        check(s.find(text=t), f"布局页没有「{t}」：{s.texts()[:16]}")
+    check(s.find(desc="新增布局"), "布局页右下角没有 +")
+    d.shot("app", "外观 → 布局：字母键盘段的四块自带键盘")
+    d.tap(s.find(text="14 键").c, 1.5)
+    fourteen = preview_png(d)
+    check(differs(original, fourteen), "点 14 键后预览没变")
+    d.shot("app", "点 14 键：上方预览换成 14 键")
+    d.hold(s.find(text="26 键").c, 1000)
+    time.sleep(1.0)
+    check(not d.screen().find(text="删除"), "长按自带的布局出了菜单")
+    appearance_tab(d, "主题")
+    check(not differs(original, preview_png(d)), "切到主题页后预览没回到原来的键盘")
+    return "三页签；布局页四块字母键盘和数字键盘；点 14 键预览换了，回主题页换回"
+
+
+@case("ST-148", base="B0-设置", mutates=True, visual=True)
+def st148(d):
+    for n in ("uat-qwerty-1.0", "uat-qwerty-1.1"):
+        push_layout(d, n)
+    appearance_tab(d, "布局")
+    d.tap(d.screen().find(desc="新增布局").c, 1.5)
+    s = d.screen()
+    check(s.find(text="导入布局文件") and s.find(contains="在网页上做布局"), f"+ 的菜单不对：{s.texts()[:6]}")
+    d.back(after=1.0)
+    import_layout(d, "uat-qwerty-1.0")
+    for told in ("导入布局 UAT 26 键？", "UAT", "1.0", "CC0", "验收测试用", "拼音", "哈哈"):
+        check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:12]}")
+    d.shot("app", "导入确认框：预览、作者、版本、能用在哪、直接打出的文字")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    check(layout_card(d, "UAT 26 键"), "导入后列表里没有 UAT 26 键")
+    import_layout(d, "uat-qwerty-1.1")
+    check(d.wait_text("替换已有的『UAT 26 键』1.0 → 1.1", timeout=8, where="all", contains=True),
+          f"1.1 的确认框没写替换：{d.screen().texts('all')[:12]}")
+    d.tap_text("取消", where="all", scroll=False, after=2.0)
+    import_layout(d, "uat-qwerty-1.1")
+    d.wait_text("替换已有的", timeout=8, where="all", contains=True)
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    appearance_tab(d, "布局")
+    check(len([n for n in d.screen().app() if n.text == "UAT 26 键"]) == 1, "替换后不止一张 UAT 26 键")
+    card = layout_card(d, "UAT 26 键")
+    d.hold(card.c, 1000)
+    time.sleep(1.0)
+    d.tap_text("信息", scroll=False, after=2.0)
+    check(d.wait_text("1.1", timeout=5, where="all", contains=True), f"替换后信息里不是 1.1：{d.screen().texts('all')[:12]}")
+    d.back(after=1.0)
+    return "确认框写全；1.1 写「替换已有的『UAT 26 键』1.0 → 1.1」，取消不换，导入后只有一张、信息是 1.1"
+
+
+@case("ST-149", base="B0-设置", mutates=True)
+def st149(d):
+    push_layout(d, "uat-qwerty-bad")
+    import_layout(d, "uat-qwerty-bad")
+    check(d.wait_text("这个布局导入不了", timeout=8, where="all"), f"没说导入不了：{d.screen().texts('all')[:10]}")
+    check(d.wait_text("显示的字太长：最多 16 个字符", timeout=3, where="all", contains=True), f"没列出问题：{d.screen().texts('all')[:10]}")
+    d.shot("app", "不合格的布局：列出第几行什么问题")
+    d.tap_text("确定", where="all", scroll=False, after=1.5)
+    # a picture: not text
+    d.sh("cp /system/media/bootanimation.zip /sdcard/Download/uat-not-text.layout 2>/dev/null || "
+         "head -c 2048 /dev/urandom > /sdcard/Download/uat-not-text.layout")
+    d.sh("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/uat-not-text.layout")
+    time.sleep(1)
+    import_layout(d, "uat-not-text")
+    check(d.wait_text("这个文件不是布局", timeout=8, where="all", contains=True), f"没说不是布局：{d.screen().texts('all')[:10]}")
+    d.tap_text("确定", where="all", scroll=False, after=1.5)
+    check(d.sh(f"run-as {PKG} ls files/layouts 2>/dev/null").strip() == "", "拒绝后留下了文件")
+    return "不合格的列出「显示的字太长」；不是文字的说不是布局；什么都没留下"
+
+
+@case("ST-150", base="B0-设置", mutates=True)
+def st150(d):
+    push_layout(d, "uat-qwerty-1.1")
+    import_layout(d, "uat-qwerty-1.1")
+    d.wait_text("导入布局 UAT 26 键？", timeout=8, where="all")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    card = layout_card(d, "UAT 26 键")
+    check(card, "列表里没有 UAT 26 键")
+    d.hold(card.c, 1000)
+    time.sleep(1.0)
+    s = d.screen()
+    check(all(s.find(text=t) for t in ("信息", "导出", "删除")), f"长按菜单不对：{s.texts()[:6]}")
+    d.tap_text("信息", scroll=False, after=2.0)
+    for told in ("UAT", "1.1", "CC0", "哈哈"):
+        check(d.wait_text(told, timeout=5, where="all", contains=True), f"信息里没有「{told}」")
+    d.back(after=1.0)
+    before = set(d.sh("ls /sdcard/Download/ 2>/dev/null").splitlines())
+    d.hold(layout_card(d, "UAT 26 键").c, 1000)
+    time.sleep(1.0)
+    d.tap_text("导出", scroll=False, after=2.0)
+    if "documentsui" not in d.top_activity():
+        raise Blocked(f"导出后没出保存界面：{d.top_activity()}")
+    d.tap_text("保存", where="all", scroll=False, after=2.5)
+    new = sorted(set(d.sh("ls /sdcard/Download/ 2>/dev/null").splitlines()) - before)
+    check(new == ["UAT 26 键.layout"], f"导出的文件是 {new}")
+    out = os.path.join(tempfile.gettempdir(), f"uat-layout-{d.port}.layout")
+    d.adb("pull", "/sdcard/Download/UAT 26 键.layout", out)
+    with open(out, "rb") as a, open(os.path.join(LAYOUTS, "uat-qwerty-1.1.layout"), "rb") as b:
+        check(a.read() == b.read(), "导出的文件和导入的不一样")
+    d.hold(layout_card(d, "UAT 26 键").c, 1000)
+    time.sleep(1.0)
+    d.tap_text("删除", scroll=False, after=1.5)
+    check(d.wait_text("删除「UAT 26 键」吗", timeout=5, where="all", contains=True), "删除前没问")
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    check(not d.screen().find(text="UAT 26 键"), "删除后卡片还在")
+    d.sh("rm -f '/sdcard/Download/UAT 26 键.layout'")
+    return "菜单 信息/导出/删除；信息写全；导出 UAT 26 键.layout 和导入的一样；问一次后删掉"

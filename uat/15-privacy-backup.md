@@ -341,3 +341,9 @@
 - **操作**：0.6.0 里导入 `uat-shift060` 并选用，再导入 `uat-shift060b`，做「备份全部」（备份 A），删掉 `uat-shift060b`。装 0.6.1 覆盖升级，打 `xi` 看 ⇧ 那格。恢复备份 A，重启后选用 `uat-shift060b` 打 `xi`。再在 0.6.1 里删掉 `uat-shift060b`、导入 `uat-shift060c`，做「备份全部」（备份 B），删掉 `uat-shift060c`，恢复备份 B，选用它打 `xi`。
 - **预期**：升级后 `uat-shift060` 打字时那格是「分词」；备份 A 带进来的 `uat-shift060b` 也是分词；备份 B 带进来的 `uat-shift060c` 仍是 ⇧。
 - **JVM**：`ThemeSeparatorMigrationTest.aRestoreOfABackupOfBefore061RecordsItsPacks`（0.6.0 的备份记下它的包，0.6.1 的不记）、`ThemeSeparatorMigrationTest.thePacksRestoredFromABackupOfBeforeAreGivenItAtTheNextStart`（记下的包下次启动改、手机上别的不动）；升级、恢复在设备上做。
+
+### PR-64 [P1] 导入的键盘布局随备份走，恢复时和手机上的合并
+- **前提**：B0-设置；**外观 → 布局** 导入了 `uat-qwerty-1.0.layout`（ST-148）。
+- **操作**：**备份与恢复 → 备份全部**；导入 `uat-qwerty-1.1.layout` 替换它；**从备份恢复** 选刚才的备份，等应用重启后看 **外观 → 布局**，长按 UAT 26 键看信息。再恢复一份 0.6.0 做的备份（没有布局），看布局页。
+- **预期**：恢复后 UAT 26 键是备份里的 1.0（备份里有的同 id 换掉手机上的）；恢复 0.6.0 的备份后 UAT 26 键还在（备份里没有布局，不动手机上的）。
+- **JVM**：`BackupLayoutsTest.theLayoutsGoWithABackupAndAreLaidOverThePhones`（备份里有 `layouts/`、没写完的不进、同 id 换掉、手机上别的留着、`.converted` 合并）、`BackupLayoutsTest.aBackupWithoutLayoutsLeavesThePhonesAndOneForgedIsNotTakenAsItSays`（没有布局的备份不动手机上的；文件名和 id 对不上、读不了的不恢复）；设备上不跑。

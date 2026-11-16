@@ -50,6 +50,8 @@ internal fun dirsUnder(
     data = data,
     theme = theme,
     settled = settled,
+    // beside host-config in the app's files, as CustomLayouts.dir is on a phone
+    layouts = File(root, "files/layouts"),
 )
 
 // a backup as the app writes one ([versionCode]: this build's, or the release's that wrote it; [packageName] the app's,

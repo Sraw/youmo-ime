@@ -445,3 +445,6 @@ case("PR-60", needs="manual:要 0.6.0 的包：0.6.1 的备份恢复到 0.6.0 �
 case("PR-61", needs="jvm:KeyboardSizesTest.floatingKeepsThePercentOf060、KeyboardAreaTest.aPhoneTurnedAsksForFourRowsOf48")(lambda d: None)
 case("PR-62", needs="jvm:PunctuationRestoreTest.aRestoredPunctuationTableIsDropped、BackupUatTest.aBackupRestoredReplacesSettingsAndPhrasesItsPunctuationTableDropped")(lambda d: None)
 case("PR-63", needs="manual:要 0.6.0 的正式包：升级后已装主题包的 ⇧ 变分词，恢复 0.6.0 的备份带进来的包也变、0.6.1 的备份的不变；记录和改写由 ThemeSeparatorMigrationTest.aRestoreOfABackupOfBefore061RecordsItsPacks、ThemeSeparatorMigrationTest 查")(lambda d: None)
+
+
+case("PR-64", needs="jvm:BackupLayoutsTest.theLayoutsGoWithABackupAndAreLaidOverThePhones、BackupLayoutsTest.aBackupWithoutLayoutsLeavesThePhonesAndOneForgedIsNotTakenAsItSays")(lambda d: None)

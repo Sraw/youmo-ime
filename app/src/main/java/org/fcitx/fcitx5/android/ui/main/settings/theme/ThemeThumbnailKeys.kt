@@ -10,6 +10,7 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
+import org.fcitx.fcitx5.android.input.layout.LayoutThumbnail
 import org.fcitx.fcitx5.android.input.theme.KeyFace
 import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
@@ -18,12 +19,17 @@ import org.fcitx.fcitx5.android.scene.look.KeyKind
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 
 /**
- * A theme's keys in little, over its thumbnail's base: four rows as the 26 keys have them, each
- * kind's face in its colour, in the theme's shape (blocks or flat, corners, gaps, shadow, border) at
- * about a third of its size. A kind of an image or the picture is its colour (thumbnails decode no images).
- * The bar's strip above them is [barPx] tall, not drawn here.
+ * A theme's keys in little, over its thumbnail's base: four rows as the 26 keys have them, or a layout's keys where
+ * [cells] (a layout's card on 外观 → 布局, LayoutThumbnail), each kind's face in its colour, in the theme's shape (blocks
+ * or flat, corners, gaps, shadow, border) at about a third of its size. A kind of an image or the picture is its colour
+ * (thumbnails decode no images). The bar's strip above them is [barPx] tall, not drawn here.
  */
-class ThemeThumbnailKeys(private val look: ThemeLook, private val density: Float, private val barPx: Float) : Drawable() {
+class ThemeThumbnailKeys(
+    private val look: ThemeLook,
+    private val density: Float,
+    private val barPx: Float,
+    private val cells: List<LayoutThumbnail.Cell>? = null,
+) : Drawable() {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
@@ -43,6 +49,15 @@ class ThemeThumbnailKeys(private val look: ThemeLook, private val density: Float
         val unit = b.width() / 10f
         // the shape at a little of its size: the gaps and corners as they look beside the little keys
         val d = density * SCALE
+        if (cells != null) {
+            val w = b.width().toFloat()
+            val h = b.bottom - top
+            for (c in cells) {
+                val face = KeyFaceGeometry.of((c.right - c.left) * w, (c.bottom - c.top) * h, c.kind, look.keys, false, d)
+                draw(canvas, face, c.kind, b.left + c.left * w, top + c.top * h)
+            }
+            return
+        }
         rows.forEachIndexed { r, row ->
             val width = row.sumOf { it.second.toDouble() }.toFloat() * unit
             var x = b.left + (b.width() - width) / 2

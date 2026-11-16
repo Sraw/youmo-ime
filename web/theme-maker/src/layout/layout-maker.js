@@ -51,6 +51,7 @@
     'name-prefix': ([name]) => '按键名' + q(name) + '用了 App 的前缀，App 却没有这个键',
     lacks: ([what]) => '少了必需的键：' + what,
     groups: ([why]) => '字母分组不对：' + why,
+    'hidden-chars': ([field]) => field + '里有看不见的字符（控制字符、方向字符、零宽字符或换行）',
     // warnings
     'no-way': (boards) => '没有键能切到' + boards.map((b) => BOARD_LABEL[b] || b).join('、'),
     narrow: ([key]) => '键' + q(key) + '很窄，可能不好按',

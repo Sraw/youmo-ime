@@ -227,6 +227,7 @@ private class Reader(private val s: String, private val offsets: Boolean) {
         val start = i
         while (i < s.length && !plainEnds(s[i], end, attribute)) {
             if (s[i] == '<') fail("'<' in a value")
+            if (notXml(s[i])) fail("a character XML does not allow")
             advance(1)
         }
         // no reference in it (most values): the text as it is, not copied a character at a time
@@ -240,6 +241,7 @@ private class Reader(private val s: String, private val offsets: Boolean) {
                     b.append(' ')
                     advance(if (c == '\r' && s.getOrNull(i + 1) == '\n') 2 else 1)
                 } else {
+                    if (notXml(c)) fail("a character XML does not allow")
                     b.append(c)
                     advance(1)
                 }
@@ -247,6 +249,10 @@ private class Reader(private val s: String, private val offsets: Boolean) {
         }
         return b.toString()
     }
+
+    // written as it is, what a reference to it is refused for (NUL too): a value of the file is only ever XML's
+    // characters, whichever way it was written (a control or U+FFFF in a name the page and the app would show)
+    private fun notXml(c: Char): Boolean = c.code == 0 || c.code in NOT_XML
 
     private fun reference(): String {
         val end = s.indexOf(';', i)

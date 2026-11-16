@@ -106,6 +106,11 @@ class XmlTest {
             assertIs<Parsed.Failed>(Xml.parse("<a x=\"$r\"/>"), r)
         }
         Xml.parse("<a x=\"&#x10FFFF;\"/>").ok()
+        // written as they are, the same: before a reference in the value and after one
+        for (c in listOf('\u0000', '\u0001', '\u000B', '\u001F', '￾', '￿')) {
+            assertIs<Parsed.Failed>(Xml.parse("<a x=\"a${c}b\"/>"), c.code.toString())
+            assertIs<Parsed.Failed>(Xml.parse("<a x=\"&amp;${c}b\"/>"), c.code.toString())
+        }
     }
 
     @Test

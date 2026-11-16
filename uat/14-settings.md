@@ -831,3 +831,27 @@
 - **预期**：确认框写「此主题包含自定义布局：zhuyin……」，另有一行「主题自带的布局里有 2 处长按、角标、滑动的写法不起作用：0.6.1 起主题只管样子，这些由 按键 → 按键字符和快捷键 管。」；能导入。换上后 ㄅ 的键角和上滑打出的跟换主题前一样（内置的），不画 `!`、不打 ㄅㄅ。
 - **JVM**：`ThemePackLayoutsTest.aPacksZhuyinKeysAreHeldAndSwipedAsTheAppsTheUsersFirstKept`（报告 3 处不起作用、`commit:` 只数换过之后的；键的上滑是内置的，键角和首选等于内置的，用户设过首选的键用用户的）、`ThemePackLayoutsTest.theImportTellsTheKeyboardsUsedAndTheirCommitsEvenOnesWrittenAsReferences`（确认框那一行）、keyboard-scene 的 `KeyDataTest`；设备上跑。
 
+
+### ST-147 [P1] 外观 → 布局：三段列出自带的布局，点卡片只在预览里换
+- **前提**：B0-设置；没导入过布局。
+- **操作**：打开 **外观**，看页签；点 **布局**；看三段和卡片；点「14 键」卡片看上方预览；点「数字键盘」卡片看预览；长按「26 键」卡片；切到 **主题** 页看预览；回测试页打 `nihao`。
+- **预期**：页签是 主题、大小与样式、布局。布局页分 **字母键盘**（26 键、18 键、14 键、九键）、**数字键盘**、**符号面板** 三段，卡片按当前主题的颜色画出这块键盘的按键，下面是名字；右下角有 **+**。点 14 键，预览换成 14 键；点数字键盘，预览换成数字键盘。长按自带的卡片没有菜单。切到主题页，预览回到原来的键盘；测试页里用的键盘没变（只是预览）。
+- **设备**：模拟器。
+
+### ST-148 [P1] 导入布局：确认框，再导入新版本替换
+- **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/` 的 `uat-qwerty-1.0.layout`、`uat-qwerty-1.1.layout`（`adb push` 到 `/sdcard/Download/`）。
+- **操作**：**外观 → 布局** 点 **+**，看菜单；选 **导入布局文件**，选 `uat-qwerty-1.0.layout`，看确认框，点 **导入**；再导入 `uat-qwerty-1.1.layout`，看确认框，点 **取消**；再导入一次 1.1，点 **导入**。
+- **预期**：菜单有 **导入布局文件**、**在网页上做布局**（下面小字说做好后回来导入）。确认框标题含「UAT 26 键」，上面是按当前主题画的 26 键预览，下面写作者 UAT、版本 1.0、许可 CC0、说明「验收测试用……」、能用在拼音、双拼、英文、码表的键盘，以及有 1 个键会直接打出写好的文字「哈哈」。导入后提示已导入，字母键盘段 26 键、18 键、14 键、九键之后多一张「UAT 26 键」。1.1 的确认框写「替换已有的『UAT 26 键』1.0 → 1.1」；取消后长按看信息仍是 1.0；再导入后信息是 1.1，列表里仍只有一张。
+- **JVM**：`LayoutImportTest.theUatsLayoutsAreJudgedAsItSays`（这三个文件的判定）、`CustomLayoutsTest.aLayoutImportedIsListedInItsFamilyAndReplacedByItsId`；确认框和列表在设备上看。
+
+### ST-149 [P1] 导入不合格的布局：列出问题，什么都不留
+- **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-qwerty-bad.layout`，再放一个不是文字的文件，改名 `uat-not-text.layout`。
+- **操作**：**外观 → 布局 → + → 导入布局文件** 选 `uat-qwerty-bad.layout`；再选 `uat-not-text.layout`。
+- **预期**：第一个对话框说布局不能导入，列出「第 N 行：键「…」显示的字太长：最多 16 个字符」一条；第二个提示「这个文件不是布局（不是 UTF-8 文本）」。两次之后列表不变，手机上没有留下布局文件。
+- **JVM**：`LayoutImportTest.theUatsLayoutsAreJudgedAsItSays`、`CustomLayoutsTest.aFileTooBigOrNotTextOrWrongIsRefusedAndNothingKept`（超过 64 KB、不是文字、读不了、DOCTYPE、id 带 `../` 都拒且不留文件）、`LayoutTextsTest`（每种问题都有说法）。
+
+### ST-150 [P1] 导入的布局：信息、导出、删除
+- **前提**：B0-设置；导入了 `uat-qwerty-1.1.layout`（UAT 26 键 1.1）。
+- **操作**：**外观 → 布局** 长按「UAT 26 键」，看菜单；选 **信息**；再长按选 **导出**，存到「下载」；再长按选 **删除**，确认。
+- **预期**：菜单是 **信息**、**导出**、**删除**。信息里有预览、作者、版本、许可、说明、能用在哪和会直接打出的「哈哈」。导出的文件名是 `UAT 26 键.layout`，内容和导入的 `uat-qwerty-1.1.layout` 一样（`adb pull` 后 `cmp`）。删除前问一次，删后卡片不见，预览回到原来的键盘。
+- **JVM**：`CustomLayoutsTest.anExportIsTheFileAsItIs`、`CustomLayoutsTest.theListReadsEachFileOnceTillItChangesAndLeavesNoHalfWrittenOne`（读不出的文件列成「（读不出）」、能删）。

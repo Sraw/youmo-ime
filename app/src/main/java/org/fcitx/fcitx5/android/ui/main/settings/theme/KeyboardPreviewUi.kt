@@ -29,7 +29,9 @@ import org.fcitx.fcitx5.android.input.keyboard.CodeRowHeight
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
+import org.fcitx.fcitx5.android.ui.main.settings.layout.LayoutBoards
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
@@ -94,7 +96,11 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private var keyboardWidth = -1
     private var keyboardHeight = -1
-    private lateinit var fakeKeyboardWindow: TextKeyboard
+    // the keyboard's letters, or the layout shown in their place ([showLayout])
+    private lateinit var fakeKeyboardWindow: View
+
+    // the layout a card of 外观 → 布局 shows in the letters' place (061-custom-layout §4.3), none: the keyboard's
+    private var shownLayout: SceneLayout? = null
 
     private val fakeInputView = constraintLayout {
         add(bkg, lParams {
@@ -221,6 +227,13 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         if (compactShown == compact) makeKeyboard()
     }
 
+    /** [layout] drawn where the keyboard's letters are, nothing set by it; null, the keyboard's again. */
+    fun showLayout(layout: SceneLayout?) {
+        if (layout === shownLayout) return
+        shownLayout = layout
+        makeKeyboard()
+    }
+
     // what setTheme was last given: lateinit, as the init block above sets it
     private lateinit var shownTheme: Theme
 
@@ -230,9 +243,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             fakeInputView.removeView(fakeKeyboardWindow)
         }
         compactShown = keyboardCompact()
-        fakeKeyboardWindow = TextKeyboard(displayCtx, shownTheme).also {
-            it.onAttach()
-        }
+        fakeKeyboardWindow = shownLayout?.let { LayoutBoards.view(displayCtx, shownTheme, it) }
+            ?: TextKeyboard(displayCtx, shownTheme).also { it.onAttach() }
         fakeInputView.apply {
             add(fakeKeyboardWindow, lParams(matchConstraints, keyboardHeight) {
                 below(fakeKawaiiBar)

@@ -25,6 +25,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.ui.main.settings.layout.LayoutListFragment
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
@@ -83,12 +85,19 @@ class ThemeFragment : Fragment() {
 
         viewPager = ViewPager2(this).apply {
             adapter = object : FragmentStateAdapter(this@ThemeFragment) {
-                override fun getItemCount() = 2
+                override fun getItemCount() = 3
                 override fun createFragment(position: Int): Fragment = when (position) {
                     0 -> ThemeListFragment()
-                    else -> ThemeSettingsFragment()
+                    1 -> ThemeSettingsFragment()
+                    else -> LayoutListFragment()
                 }
             }
+            // a layout tapped on 布局 shows in the preview while that tab is open: the keyboard's again on another
+            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                override fun onPageSelected(position: Int) {
+                    if (position != LAYOUTS_TAB) previewUi.showLayout(null)
+                }
+            })
         }
 
         // a search result here is a setting of the look, on the second tab (the first lists themes)
@@ -98,7 +107,8 @@ class ThemeFragment : Fragment() {
             tab.text = getString(
                 when (position) {
                     0 -> R.string.theme
-                    else -> R.string.configure_look
+                    1 -> R.string.configure_look
+                    else -> R.string.layout_tab
                 }
             )
         }.attach()
@@ -190,6 +200,11 @@ class ThemeFragment : Fragment() {
         }
     }
 
+    /** [layout] shown in the preview in the keyboard's letters' place (外观 → 布局's card tapped), nothing set; null, the keyboard's. */
+    fun previewLayout(layout: SceneLayout?) {
+        if (::previewUi.isInitialized) previewUi.showLayout(layout)
+    }
+
     override fun onStop() {
         ThemeManager.syncToDeviceEncryptedStorage()
         super.onStop()
@@ -202,6 +217,9 @@ class ThemeFragment : Fragment() {
     }
 
     companion object {
+        // 外观's third tab (061-custom-layout §4.3)
+        private const val LAYOUTS_TAB = 2
+
         // the keys AppPrefs.Keyboard declares: one renamed there is renamed here
         private val SIZE_KEYS by lazy {
             with(AppPrefs.getInstance().keyboard) {

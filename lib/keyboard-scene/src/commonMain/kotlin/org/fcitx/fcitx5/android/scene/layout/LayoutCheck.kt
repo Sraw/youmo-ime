@@ -27,14 +27,15 @@ import org.fcitx.fcitx5.android.scene.xml.XmlElement
  * and the layout maker's page, so the two never disagree on a file. What is wrong comes back as [Finding]s, a key and its
  * words each ([KEYS]), the app and the page saying them in their own words.
  *
- * Errors (§3.2): it reads, its `min-app` is not past the app's; its id, name, family and `based-on=` as §2.2 has them; the
- * limits of §2.6; an `<include>` only of the app's fragments, a `layout:` only to Text, Number, Symbol; what its base has
- * that must be typed on kept ([kept]); every key's name its own (`<id>/<key>`, §3.2 第 7 条) or the app's; the keys its
- * family needs (§3.3); and a scene made in every environment of [scenes] (the screens a phone and a foldable show it on,
- * compact, split, the fields, the input methods it is for, the pads it is for) with no problem and no key without words or
- * a picture. Warnings: no way to the number pad or the symbols, a key narrower than half a letter's, `commit:`s (listed too,
- * the import's confirmation shows them), a key [theme] leaves blank, a key without a name, `<gap look= class=>` (0.6.0's,
- * no longer drawn), a number or symbols board whose bottom row's first two are not the way back and the other board.
+ * Errors (§3.2): it reads, its `min-app` is not past the app's; its id, name, family and `based-on=` as §2.2 has them,
+ * its name and `<meta>` with no [hidden] character; the limits of §2.6; an `<include>` only of the app's fragments, a
+ * `layout:` only to Text, Number, Symbol; what its base has that must be typed on kept ([kept]); every key's name its
+ * own (`<id>/<key>`, §3.2 第 7 条) or the app's; the keys its family needs (§3.3); and a scene made in every environment
+ * of [scenes] (the screens a phone and a foldable show it on, compact, split, the fields, the input methods it is for,
+ * the pads it is for) with no problem and no key without words or a picture. Warnings: no way to the number pad or the
+ * symbols, a key narrower than half a letter's, `commit:`s (listed too, the import's confirmation shows them), a key
+ * [theme] leaves blank, a key without a name, `<gap look= class=>` (0.6.0's, no longer drawn), a number or symbols
+ * board whose bottom row's first two are not the way back and the other board.
  *
  * Not [strict] (a theme pack's layout made into one of the list, on import, upgrade and restore, §3.2 两种检查强度): only
  * what 0.6.0 refused is an error (it reads, [kept]); the rest are warnings, but the gap's and the bottom row's, which the
@@ -115,7 +116,7 @@ object LayoutCheck {
         // errors
         "read", "newer", "id-length", "id-built-in", "id-prefix", "name-length", "family", "based-on", "too-big",
         "too-many-keys", "commit-long", "too-many-commits", "label-long", "include", "layout-target", "base", "scene",
-        "blank", "name-no-slash", "name-prefix", "lacks", "groups",
+        "blank", "name-no-slash", "name-prefix", "lacks", "groups", "hidden-chars",
         // warnings
         "no-way", "narrow", "commits", "theme-blank", "unnamed", "gap-look", "pad-lacks", "bottom-left",
     )
@@ -265,7 +266,23 @@ object LayoutCheck {
         if (layout.name.isBlank() || layout.name.length > MAX_NAME) add(Finding(0, "name-length", listOf(layout.name, MAX_NAME.toString())))
         if (layout.family !in FAMILIES) add(Finding(0, "family", listOf(layout.family)))
         if (layout.basedOn == null || layout.basedOn !in BASES) add(Finding(0, "based-on", listOf(layout.basedOn.orEmpty())))
+        // what the list, its dialogs and the file saver show: no direction mark turning it around, nothing unseen
+        val m = layout.meta
+        val shown = listOf("name" to layout.name, "author" to m?.author, "version" to m?.version, "license" to m?.license, "description" to m?.description)
+        shown.filter { (_, v) -> v != null && v.any(::hidden) }.forEach { (field, _) -> add(Finding(0, "hidden-chars", listOf(field))) }
     }
+
+    /**
+     * Whether [c] is one a layout's name and `<meta>` may not hold (L2 security review N2): a control (a line break among
+     * them), a format character (the direction marks and overrides, the zero-width ones), a line or paragraph separator.
+     * A name with one is refused strictly; one taken without the strict check is shown [plain].
+     */
+    fun hidden(c: Char): Boolean = c.category in HIDDEN
+
+    /** [text] without what [hidden] says. */
+    fun plain(text: String): String = text.filterNot(::hidden)
+
+    private val HIDDEN = setOf(CharCategory.CONTROL, CharCategory.FORMAT, CharCategory.LINE_SEPARATOR, CharCategory.PARAGRAPH_SEPARATOR)
 
     // §2.6's limits
     private fun limits(layout: Layout): List<Finding> = buildList {

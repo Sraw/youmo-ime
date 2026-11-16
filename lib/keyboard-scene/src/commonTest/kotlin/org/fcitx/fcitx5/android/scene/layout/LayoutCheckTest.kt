@@ -111,6 +111,14 @@ class LayoutCheckTest {
         assertEquals(listOf("id-length"), errors(qwerty.replace("id=\"my-qwerty\"", "id=\"${"a".repeat(33)}\"")))
         assertEquals(listOf("id-prefix"), errors(qwerty.replace("id=\"my-qwerty\"", "id=\"g18\"")))
         assertEquals(listOf("name-length"), errors(qwerty.replace("name=\"26 键\"", "name=\"${"名".repeat(25)}\"")))
+        // a direction override, a zero-width space, a line break written as a reference: in the name or the <meta>
+        for (c in listOf("&#x202E;", "&#x200B;", "&#10;", "&#x2028;")) {
+            assertEquals(listOf(LayoutCheck.Finding(0, "hidden-chars", listOf("name"))), check(qwerty.replace("name=\"26 键\"", "name=\"26${c}键\"")).errors, c)
+        }
+        val meta = qwerty.replaceFirst("<defaults", "<meta author=\"a&#x200F;b\" description=\"ok\"/>\n  <defaults")
+        assertEquals(listOf(LayoutCheck.Finding(0, "hidden-chars", listOf("author"))), check(meta).errors)
+        assertEquals(listOf("hidden-chars"), check(meta, strict = false).warnings.map { it.key }.filter { it == "hidden-chars" })
+        assertEquals("ab", LayoutCheck.plain("a‮​b\n"))
         assertEquals(listOf("based-on"), errors(qwerty.replace("based-on=\"qwerty\"", "based-on=\"zhuyin\"")))
         assertEquals(listOf("based-on"), errors(qwerty.replace(" based-on=\"qwerty\"", "")))
         // a family no layout of one's own is: zhuyin

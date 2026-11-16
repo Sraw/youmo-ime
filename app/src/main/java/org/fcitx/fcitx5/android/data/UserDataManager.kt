@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_DATABASE
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
+import org.fcitx.fcitx5.android.data.layout.CustomLayouts
 import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
@@ -118,6 +119,8 @@ object UserDataManager {
         // the three settled where they are written: if not, an export would take a stand-in and a restore
         // write where the next start does not read, so both refuse (user_data_not_settled)
         val settled: Boolean = true,
+        // the user's own layouts (CustomLayouts), beside the engine's store in the app's files
+        val layouts: File = File(engine.parentFile, CustomLayouts.DIR),
     ) {
         // each by its name in a backup's external/
         val moved get() = listOf(ConfigHome.CONFIG.old to config, ConfigHome.DATA.old to data, ConfigHome.THEME.old to theme)
@@ -138,6 +141,7 @@ object UserDataManager {
                 data.dir,
                 theme.dir,
                 settled = config.writable && data.writable && theme.writable,
+                layouts = CustomLayouts.dir(appContext),
             )
         }
 
@@ -224,6 +228,9 @@ object UserDataManager {
                         (learning != null && (path in LEARNED_FROM || isKeptAside(path))) || ((learning != null || oldLogsRead) && isOldLog(path))
                 }
             }
+            // the user's own layouts and the record of the packs whose layouts were listed (061-custom-layout §4.5),
+            // not one half written; 0.6.0 restores what it knows of the backup and leaves this
+            if (dirs.layouts.isDirectory) writeFileTree(dirs.layouts, CustomLayouts.DIR, zipStream, skipDir = { true }) { !CustomLayouts.backedUp(it) }
             learning?.let {
                 zipStream.putNextEntry(ZipEntry(RestoreStash.BACKUP))
                 zipStream.write(it)
@@ -476,6 +483,11 @@ object UserDataManager {
             // keep importing recently_used for backwards compatibility: an upstream Fcitx5 backup's recent symbols are
             // still taken (DECISIONS B3)
             copyDir(File(tempDir, "recently_used"), dirs.recentlyUsed)
+            // the backup's layouts over the phone's, as theme packs: one of an id replaces the phone's, the others stay
+            // (an older backup has none, the phone's as they were). Best effort: what fails here is logged, not the
+            // restore's failure, which would leave the settings and themes above the backup's and the engine's not
+            runCatching { CustomLayouts.restore(File(tempDir, CustomLayouts.DIR), dirs.layouts, ThemePackFiles.minAppVersion(BuildConfig.VERSION_NAME)) }
+                .onFailure { Timber.w(it, "layouts not restored") }
             // last: an import failing after it would start fcitx again on the logs it replaced
             val learning = File(tempDir, RestoreStash.BACKUP).takeIf { it.isFile }
             if (File(tempDir, "engine").exists() || learning != null) {
