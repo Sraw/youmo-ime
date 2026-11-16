@@ -674,6 +674,65 @@ case("PY-141", needs="jvm:NeighbourSlipTest.theFourteenKeysReadAKeyAsTheOneNextT
 case("PY-142", needs="jvm:NeighbourSlipTest.theEighteenKeysReadAKeyAsTheOneNextToIt")(lambda d: None)
 
 
+@case("PY-144", base="B0", visual=True)
+def py144(d):
+    """a word card's character and the way back change the card in the same window (FB4: it went blank
+    and grew again from the candidate on each tap): its left, right and the edge on the candidate bar where
+    they were, the other edge alone following the card, never over the bar; upright (over the bar) and turned
+    (under it); the frames themselves are the JVM test's and the recordings'"""
+    upright = py144_steps(d, "竖屏")
+    d.rotate(1)
+    try:
+        turned = py144_steps(d, "横屏")
+    finally:
+        d.rotate(0)
+    return f"竖屏 {upright}；横屏 {turned}"
+
+
+def py144_steps(d, how):
+    d.open_page("text")
+    d.type("yinhang")
+    d.long_pick("银行")
+    line = d.screen().find(desc="银行，yín háng", where="all")
+    check(line is not None, f"{how}：没有读音行")
+    d.tap(line.c, after=0.8)
+
+    # the window's left, right and the edge on the candidate bar, and its side of the bar: the lines under the
+    # card scroll with it where the card is taller than the room (a learned word's four lines under 行's card,
+    # seen; turned, off the window), so the window is found from the card's head
+    def placed(s, what):
+        head = next((n for n in s.nodes if n.desc.startswith(("银行，读音", "返回 银行"))), None)
+        check(head is not None, f"{how}{what}：弹窗里没有卡")
+        root = head
+        while root.parent is not None:
+            root = root.parent
+        bar = s.find(rid="candidate_view", where="ime")
+        check(bar is not None, f"{how}{what}：没有候选栏")
+        over = root.b[3] <= bar.b[1]
+        check(over or root.b[1] >= bar.b[3],
+              f"{how}{what}：弹窗压在候选栏上（弹窗 {root.b}，候选栏 {bar.b}）")
+        return root.b[0], root.b[2], ("上", root.b[3]) if over else ("下", root.b[1])
+
+    s = d.screen()
+    word = placed(s, "词卡")
+    row = next((n for n in s.nodes if n.desc.startswith("行，háng")), None)
+    check(row is not None, f"{how}：词卡里没有「行」那一行")
+    d.tap(row.c, after=0.8)
+    s = d.screen()
+    check(s.find(desc="返回 银行", where="all") is not None, f"{how}：点「行」后不是字卡")
+    char = placed(s, "字卡")
+    d.shot("full", f"{how}点「行」：字卡，弹窗的左右和贴着候选栏的那条边没动")
+    check(char == word, f"{how}换成字卡后弹窗动了（左、右、贴候选栏的边）：{word} → {char}")
+    d.tap(s.find(desc="返回 银行", where="all").c, after=0.8)
+    s = d.screen()
+    check(s.find(desc="银行，读音 yín háng", where="all") is not None, f"{how}：返回后不是词卡")
+    back = placed(s, "返回的词卡")
+    check(back == word, f"{how}返回词卡后弹窗动了（左、右、贴候选栏的边）：{word} → {back}")
+    d.back(0.6)
+    side, edge = word[2]
+    return f"弹窗在候选栏{side}，左 {word[0]}、右 {word[1]}、贴候选栏的边 {edge}，三次一样"
+
+
 @case("PY-143")
 def py143(d):
     # t tapped at 85% of its width, toward y (still on t): tama read as yama too (亚麻, 鸭毛 among the words); in the

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input
 
 import android.content.ClipData
 import android.graphics.Rect
+import android.os.Build
 import android.os.SystemClock
 import android.util.SparseArray
 import android.util.TypedValue
@@ -15,6 +16,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.ArrayAdapter
 import android.widget.FrameLayout
@@ -365,9 +367,7 @@ abstract class BaseInputView(
                     showHead()
                     menu.setContentWidth(width())
                     adapter.notifyDataSetChanged()
-                    menu.show()
-                    scrollbarShown(menu.listView, card = true)
-                    menu.listView?.rootView?.let { decor -> decor.doOnPreDraw { growFrom(decor, view) } }
+                    showStep(menu, nav, view)
                 }, pickChar = { row, c ->
                     charOfWord = c
                     nav.pick(row)
@@ -403,6 +403,8 @@ abstract class BaseInputView(
                 // not the platform's drop-down animation: grown out of the candidate pressed (Motion)
                 animationStyle = 0
                 show()
+                // its later updates (a card's step, lines swapped) move it there at once
+                listView?.rootView?.let(::notSlid)
                 scrollbarShown(listView, card = head != null)
                 listView?.rootView?.let { decor -> decor.doOnPreDraw { growFrom(decor, view) } }
             }
@@ -650,8 +652,56 @@ abstract class BaseInputView(
         context.clipboardManager.setPrimaryClip(ClipData.newPlainText(null, text))
     }
 
+    /**
+     * A card's step or lines swapped change the menu's height, and over the candidate its top with it: the
+     * system slid the window there from where it was, its new height drawn at the old top first, over the
+     * candidate bar. Put there at once. Set once on the window's
+     * params after its first show: `PopupWindow.update` changes the same params, the flag kept.
+     */
+    private fun notSlid(decor: View) {
+        val params = decor.layoutParams as? WindowManager.LayoutParams ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            params.setCanPlayMoveAnimation(false)
+            return
+        }
+        // before 34 the same switch is the private flag under it; privateFlags is hidden API on the greylist
+        // (reflection allowed whatever the targetSdk, logged so on API 29), and where it is missing the slide stays
+        try {
+            val field = WindowManager.LayoutParams::class.java.getField("privateFlags")
+            field.setInt(params, field.getInt(params) or PRIVATE_FLAG_NO_MOVE_ANIMATION)
+        } catch (e: ReflectiveOperationException) {
+            Timber.w(e, "menu window: no move animation flag")
+        }
+    }
+
+    /**
+     * A card's step shown: grown anew from the candidate [pressed] where the line opened to a card or the window
+     * went to the candidate's other side ([CardNav.growsAnew]: a word card under it, the character's taller one
+     * over it, seen on a floating keyboard moved up); else the card changed in place (grown again on each tap,
+     * it went blank for two frames and slid in from the candidate).
+     */
+    private fun showStep(menu: ListPopupWindow, nav: CardNav, pressed: View) {
+        val wasAbove = menu.listView?.rootView?.let { above(it, pressed) }
+        menu.show()
+        scrollbarShown(menu.listView, card = true)
+        val decor = menu.listView?.rootView ?: return
+        decor.doOnPreDraw { if (nav.growsAnew(wasAbove, above(decor, pressed))) growFrom(decor, pressed) }
+    }
+
+    // whether the menu's window is over the candidate [pressed] (its middle above the candidate's), else under it
+    private fun above(decor: View, pressed: View): Boolean {
+        val at = IntArray(2).also(decor::getLocationOnScreen)
+        val from = IntArray(2).also(pressed::getLocationOnScreen)
+        return at[1] + decor.height / 2 < from[1] + pressed.height / 2
+    }
+
+    /** How many times a candidate's menu window has grown from the candidate pressed, for tests. */
+    @VisibleForTesting
+    internal var menuGrown = 0
+
     // the menu's window [decor] grown from the middle of the candidate [pressed], wherever it opened
     private fun growFrom(decor: View, pressed: View) {
+        menuGrown++
         val at = IntArray(2).also(decor::getLocationOnScreen)
         val from = IntArray(2).also(pressed::getLocationOnScreen)
         decor.popIn((from[0] + pressed.width / 2 - at[0]).toFloat(), (from[1] + pressed.height / 2 - at[1]).toFloat())
@@ -738,6 +788,9 @@ abstract class BaseInputView(
         // 上屏 and 复制's height, as a menu line's
         const val BUTTON_HEIGHT = CharCardLayout.MIN_ROW_DP
         private const val CARD_TEXT_SP = 16f
+
+        // WindowManager.LayoutParams.PRIVATE_FLAG_NO_MOVE_ANIMATION (hidden; 0x40 from API 29 to 33)
+        private const val PRIVATE_FLAG_NO_MOVE_ANIMATION = 0x40
         private const val BACK = "‹ "
         private const val SPACE = "　"
     }

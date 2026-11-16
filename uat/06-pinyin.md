@@ -679,6 +679,12 @@
 - **预期**：菜单第一行是「银行　yín háng　›」，下面 **屏蔽**、**固定首位**、**为什么排在这** 和以前一样多、一样的顺序；点开后是词卡：大字「银行」、yín háng、ㄧㄣˊ ㄏㄤˊ，银、行各一行（读音、注音、部首、笔画、›），下面 **上屏**、**复制**；点「行」是行的字卡，háng 在第一行（强调色），最上面「‹ 银行　yín háng」，下面只有 **复制「行」**；返回后又是词卡；点上屏，框里是「银行」。
 - **JVM**：app `CandidateMenuUatTest.aHeldWordShowsItsReadingThenItsCardAndEachCharacters`（图 `reading_line`、`word_card_port`、`char_of_word`）、`CandidateMenuUatTest.copyFromAWordCardAndFromItsCharacter`、`CandidateMenuUatTest.theSameFromTheExpandedGrid`（展开的候选网格）；ime-core `EnginesWordCardTest`（全拼、简拼、双拼、九键、14/18 键、滑行、注音键盘各打一次「银行」，卡上读音和候选栏一样）；`:lib:ime-eval:uatTest` 的 `WordCardUatTest`（真数据：银行的读音和部首；聊天词前 100 个和全部常读错的词，卡上读音 == 候选栏读音，拼音、注音两种）；设备上照跑。
 
+### PY-144 [P1] 词卡点字、返回：整张卡在原处换，不闪、不从候选重新长出来，弹窗贴候选栏的边不动
+- **前提**：B0，「普通文本」框。
+- **操作**：打 yinhang，长按候选「银行」，点读音行；点「行」那一行；点「‹ 银行」。录屏或盯着看换卡的那一下。竖屏做一遍，横屏再做一遍。
+- **预期**：点「行」，词卡在同一个弹窗里一帧换成字卡：不先消失、不变淡、不从候选那里缩小再长大；弹窗贴着候选栏的那条边不动（竖屏弹窗在候选栏上面，是下边；横屏在下面，是上边）、左右不变，只有另一条边随卡的高度变，不滑过去，也不压到候选栏上（卡比地方高时，菜单照旧能往下滑着看下面的项）。点「‹ 银行」换回词卡也一样。点读音行展开时照旧从候选那里长出来。字卡比词卡高、放不下而换到候选另一边时（悬浮键盘挪到中间偏下能见到），在新的那一边从候选重新长出来。Android 14 以下也不滑。
+- **JVM**：app `CandidateMenuUatTest.aCharacterOfTheWordAndBackStayInTheSameWindow`（同一个弹窗、宽度不变、只在展开时从候选长出来、没变淡没缩小、系统的挪动动画关着，SDK 29 也跑）；ime-core `CardNavTest.onlyOpeningTheLineGrowsTheWindowAnew`、`CardNavTest.aStepToTheCandidatesOtherSideGrowsTheWindowAnew`；设备上照跑（竖屏、横屏：弹窗的左右和贴候选栏的边，不压候选栏）；逐帧录屏见 `dev/design/061-wordcard-shots/`。
+
 ### PY-125 [P1] 多音字由词定读音：行业的行读 háng，行走的行读 xíng；字卡里那个读音排第一
 - **前提**：B0，「普通文本」框。
 - **操作**：打 hangye，长按「行业」，点读音行，点「行」；清空，打 xingzou，长按「行走」，点读音行，点「行」。

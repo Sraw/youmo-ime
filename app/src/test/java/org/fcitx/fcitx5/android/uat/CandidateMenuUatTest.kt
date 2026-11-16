@@ -5,7 +5,9 @@
 package org.fcitx.fcitx5.android.uat
 
 import android.content.ClipboardManager
+import android.os.Build
 import android.view.View
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
@@ -406,6 +408,55 @@ class CandidateMenuUatTest {
         tapIn(head()!!, s(R.string.quick_phrase_commit))
         assertTrue(h.api.calls.toString(), "select(0, 银行)" in h.api.calls)
         assertEquals(null, menu)
+    }
+
+    // a word's character and the way back change the card in the same window: not shown anew, not grown again
+    // from the candidate (it went blank for two frames and slid in again on every tap), as wide as before
+    @Test
+    @Uat("PY-144")
+    fun aCharacterOfTheWordAndBackStayInTheSameWindow() {
+        engine(dictionary.copy(text = "银行"))
+        h.api.candidateCards["银行"] = wordCard
+        h.api.charCards["行"] = hang
+        h.start()
+        candidates("银行", "因为")
+        longPress("银行")
+        val m = menu!!
+        assertEquals(1, h.inputView.menuGrown)
+        check((head() as CompactLineView).performClick())
+        h.idle()
+        // the line opened: a wider window, grown from the candidate as the menu first was
+        assertEquals(2, h.inputView.menuGrown)
+        val decor = m.listView!!.rootView
+        val width = m.width
+        check((head() as WordCardView).rows[1].performClick())
+        h.idle()
+        assertTrue(head() is CharCardView)
+        assertSame(m, menu)
+        assertTrue(m.isShowing)
+        assertSame(decor, m.listView!!.rootView)
+        assertEquals(width, m.width)
+        assertEquals(2, h.inputView.menuGrown)
+        assertEquals(1f, decor.alpha)
+        assertEquals(1f, decor.scaleX)
+        assertEquals(1f, decor.scaleY)
+        // its top moved with the card's height: put there, not slid by the system (which showed the new height at the old top)
+        assertTrue(notSlid(decor))
+        tapIn(head()!!, "‹ 银行　yín háng")
+        assertTrue(head() is WordCardView)
+        assertSame(m, menu)
+        assertEquals(width, m.width)
+        assertEquals(2, h.inputView.menuGrown)
+        assertEquals(1f, decor.alpha)
+        assertEquals(1f, decor.scaleX)
+        assertTrue(notSlid(decor))
+    }
+
+    // the window's move animation off: API 34's switch, before it the private flag (0x40) it stands for
+    private fun notSlid(decor: View): Boolean {
+        val params = decor.layoutParams as WindowManager.LayoutParams
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return !params.canPlayMoveAnimation()
+        return WindowManager.LayoutParams::class.java.getField("privateFlags").getInt(params) and 0x40 != 0
     }
 
     // 复制 puts the word, or a character of it, on the clipboard, nothing typed

@@ -41,6 +41,39 @@ class CardNavTest {
         assertEquals(Triple(Head.WORD, -1, Focus.WORD), Triple(nav.head, nav.char, nav.focusTarget))
     }
 
+    // opened from the line the window grows anew from the candidate; a character and the way back keep it where it is
+    @Test
+    @Uat("PY-144")
+    fun onlyOpeningTheLineGrowsTheWindowAnew() {
+        val nav = CardNav(word)
+        assertFalse(nav.regrows)
+        assertTrue(nav.open())
+        assertTrue(nav.regrows)
+        assertTrue(nav.pick(0))
+        assertFalse(nav.regrows)
+        assertTrue(nav.back())
+        assertFalse(nav.regrows)
+        assertTrue(nav.pick(1))
+        assertFalse(nav.regrows)
+    }
+
+    // a character's card or the way back that took the window to the candidate's other side grows it anew from there
+    @Test
+    @Uat("PY-144")
+    fun aStepToTheCandidatesOtherSideGrowsTheWindowAnew() {
+        val nav = CardNav(word)
+        assertTrue(nav.open())
+        // opened: grown whatever the side
+        assertTrue(nav.growsAnew(wasAbove = false, above = false))
+        assertTrue(nav.pick(1))
+        assertFalse(nav.growsAnew(wasAbove = true, above = true))
+        assertFalse(nav.growsAnew(wasAbove = false, above = false))
+        assertTrue(nav.growsAnew(wasAbove = false, above = true))
+        assertTrue(nav.back())
+        assertTrue(nav.growsAnew(wasAbove = true, above = false))
+        assertFalse(nav.growsAnew(wasAbove = null, above = true))
+    }
+
     @Test
     @Uat("PY-126")
     fun aCharacterOpensItsCard() {

@@ -38,6 +38,23 @@ class CardNav(card: CandidateCard?) {
     var focusTarget: Focus = Focus.NONE
         private set
 
+    /**
+     * Whether the window grows anew from the candidate pressed after the last step: the line opened to a card, a
+     * wider window that may move to the other side of the candidate. A step within the card (a character, the way
+     * back) keeps the window where it is, its height alone following the card: grown anew, it went blank for
+     * two frames and slid in again from the candidate on every tap.
+     */
+    var regrows: Boolean = false
+        private set
+
+    /**
+     * Whether the window grows anew from the candidate once shown after the last step: [regrows], or it went to the
+     * candidate's other side, over it ([above]) where it was under it ([wasAbove]) or the other way: a word card that
+     * fits under the candidate, its character's taller card that does not (a floating keyboard moved up, seen).
+     * [wasAbove] null: not known, the side taken as kept.
+     */
+    fun growsAnew(wasAbove: Boolean?, above: Boolean): Boolean = regrows || (wasAbove != null && wasAbove != above)
+
     /** A card is shown, the menu as wide as one is ([CharCardLayout.width]); else as wide as the lines need. */
     val expanded: Boolean get() = head == Head.LOOKED || head == Head.CHAR || head == Head.WORD || head == Head.WORD_CHAR
 
@@ -50,6 +67,7 @@ class CardNav(card: CandidateCard?) {
         if (head != Head.COMPACT) return false
         head = if (word) Head.WORD else Head.CHAR
         focusTarget = if (word) Focus.WORD else Focus.CARD
+        regrows = true
         return true
     }
 
@@ -59,6 +77,7 @@ class CardNav(card: CandidateCard?) {
         head = Head.WORD_CHAR
         char = row
         focusTarget = Focus.BACK
+        regrows = false
         return true
     }
 
@@ -68,6 +87,7 @@ class CardNav(card: CandidateCard?) {
         head = Head.WORD
         char = -1
         focusTarget = Focus.WORD
+        regrows = false
         return true
     }
 }
