@@ -135,8 +135,10 @@ class UndoChip(
             ViewCompat.setAccessibilityPaneTitle(it, message)
         }
         val shownFor = anchor.context.getSystemService(AccessibilityManager::class.java)?.let { a ->
-            // as long as its user needs
-            a.getRecommendedTimeoutMillis(shownMs.toInt(), AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS).toLong()
+            // as long as its user needs: to read it, and to reach its button if it has one
+            val content = if (undo != null) AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS
+            else AccessibilityManager.FLAG_CONTENT_TEXT
+            a.getRecommendedTimeoutMillis(shownMs.toInt(), content).toLong()
         } ?: shownMs
         this.shownFor = shownFor
         // hidden: timed from when the menu goes ([uncovered])

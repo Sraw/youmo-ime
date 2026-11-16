@@ -40,7 +40,7 @@ class NoticeState<U : Any> {
     /**
      * A notice in the place of any shown (rule 5: one at a time), with [undo] to take back, or none.
      * [steady]: a failure, said once as a key fails; the key comes after it and must not put it away
-     * unseen, and it stays as long as one with 撤销 (rule 4), a line said 2 s being gone before it is read.
+     * unseen, and it stays [STEADY_MS] (rule 4), longer than a line said, read before it goes.
      * [hidden]: said while the edit menu is up where it would show: under the menu till it goes
      * ([uncover]), its time not started, any notice alike (none lost to the menu, none over it).
      */
@@ -50,7 +50,7 @@ class NoticeState<U : Any> {
         this.steady = steady
         leaving = false
         this.hidden = hidden
-        return Shown(lapsed, if (undo != null || steady) UNDO_MS else SAID_MS)
+        return Shown(lapsed, if (undo != null) UNDO_MS else if (steady) STEADY_MS else SAID_MS)
     }
 
     /** A key typed, a word put in: whether it puts the notice away, as a tap would. */
@@ -89,11 +89,15 @@ class NoticeState<U : Any> {
         return true
     }
 
+    // the user, 2026-11-15: shorter, out of the way sooner
     companion object {
-        // long enough to read a few words and reach for 撤销, short enough not to sit over the candidates
-        const val UNDO_MS = 6000L
+        // one with a button (撤销, 记住): long enough to reach for it
+        const val UNDO_MS = 3000L
 
-        // a line said, with nothing to reach for (the user, 2026-10-22)
-        const val SAID_MS = 2000L
+        // a failure the engine reports: read before it goes, though typing goes on
+        const val STEADY_MS = 2000L
+
+        // a line said, with nothing to reach for
+        const val SAID_MS = 1000L
     }
 }

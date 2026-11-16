@@ -20,10 +20,12 @@ class NoticeStateTest {
     @Test
     fun howLongEachStays() = assertRows(
         // rule 5: nothing to reach for
-        "a line said, 2 s" to { assertEquals(SAID_MS, NoticeState<String>().show(null, steady = false).ms) },
-        "one with 撤销, 6 s" to { assertEquals(UNDO_MS, NoticeState<String>().show("删", steady = false).ms) },
+        "a line said, 1 s" to { assertEquals(1000L, NoticeState<String>().show(null, steady = false).ms) },
+        "one with 撤销, 3 s" to { assertEquals(3000L, NoticeState<String>().show("删", steady = false).ms) },
         // F3464: rule 4, said once as a key fails, read before it goes
-        "a failure, 6 s" to { assertEquals(UNDO_MS, NoticeState<String>().show(null, steady = true).ms) },
+        "a failure, 2 s" to { assertEquals(2000L, NoticeState<String>().show(null, steady = true).ms) },
+        // a button to reach for wins
+        "a failure with a button, 3 s" to { assertEquals(3000L, NoticeState<String>().show("删", steady = true).ms) },
     )
 
     @Test

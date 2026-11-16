@@ -377,29 +377,49 @@ def hk35(d):
     typ(d, "a")   # the touch keyboard away first
     key(d, "ESC")
     d.step("Ctrl+. 后马上打字")
-    # timed from the shortcut to the last look, the screen reads on either side included: the tip
-    # can't be older than that, so under 1.8 s its 2 s timeout can't be what put it away (F3583)
-    t0 = time.time()
-    combo(d, "CTRL", "DOT", after=0)
-    t1 = tip_seen(d)
-    typ(d, "n", after=0.4)
-    gone1 = tip_seen(d, 0.3) is None
-    late = time.time() - t0
-    if t1 and gone1 and late >= 1.8:
-        # the 2 s timeout could have closed it by now: a pass would not show typing did
-        raise Blocked(f"按下 Ctrl+. 后 {late:.1f} 秒才看完提示，2 秒超时可能已经收起它")
+    # the tip's 1 s is shorter than the reads around the key take (~1.2 s on an emulator: the key
+    # tool's adb ~0.3 s a call, a dump ~0.15 s): for this step it is lengthened as accessibility asks
+    # (the time to read, 5 s), so only typing can have put it away. Timed from the shortcut to the
+    # last look, the screen reads on either side included: the tip can't be older than that (F3583)
+    # put back as it was after (a phone's own setting): "null" when it was never set
+    was = d.sh("settings get secure accessibility_non_interactive_ui_timeout_ms").strip()
+    d.sh("settings put secure accessibility_non_interactive_ui_timeout_ms 5000")
+    try:
+        time.sleep(0.5)   # the setting reaches the app's AccessibilityManager
+        t0 = time.time()
+        combo(d, "CTRL", "DOT", after=0)
+        t1 = tip_seen(d)
+        typ(d, "n", after=0.3)   # its way out (the slide)
+        gone1 = tip_seen(d, 0.1) is None
+        late = time.time() - t0
+    finally:
+        if was.isdigit():
+            d.sh(f"settings put secure accessibility_non_interactive_ui_timeout_ms {was}")
+        else:
+            d.sh("settings delete secure accessibility_non_interactive_ui_timeout_ms")
+    if t1 and gone1 and late >= 4.5:
+        # its 5 s could have run out by now: a pass would not show typing put it away
+        raise Blocked(f"按下 Ctrl+. 后 {late:.1f} 秒才看完提示，延长到 5 秒的超时也可能已经收起它")
+    time.sleep(0.5)   # the setting gone back to the app
     key(d, "ESC")
     d.step("Ctrl+. 后不打字")
+    t0 = time.time()
     combo(d, "CTRL", "DOT", after=0)
     t2 = tip_seen(d)
-    time.sleep(2.6)   # said for 2 s (rule 5), not the 6 s a failure stays
-    gone2 = tip_seen(d, 0.3) is None
+    # said for 1 s (rule 5), not the 2 s a failure stays: looked at 1.6 s from the shortcut, the key
+    # tool's ~0.3 s in it, so the tip is 1.3–1.6 s old and gone, slid out too, while a failure's is not
+    time.sleep(max(0.0, t0 + 1.6 - time.time()))
+    gone2 = tip_seen(d, 0.1) is None
+    late2 = time.time() - t0
+    if t2 and gone2 and late2 >= 1.95:
+        # a failure's 2 s could have run out too: a pass would not tell the tip from one
+        raise Blocked(f"按下 Ctrl+. 后 {late2:.1f} 秒才看完第二次提示，2 秒的出错提示也会收起")
     combo(d, "CTRL", "DOT", after=0)
     t3 = tip_seen(d)
     check(t1, "第一次 Ctrl+. 没有提示")
     check(gone1, f"打了 n 提示「{t1}」还在")
     check(t2 and t2 != t1, f"第二次 Ctrl+. 的提示「{t2}」（第一次「{t1}」）")
-    check(gone2, f"不打字约 2.6 秒后提示「{t2}」还在")
+    check(gone2, f"不打字约 {late2:.1f} 秒后提示「{t2}」还在")
     check(t3 == t1, f"第三次 Ctrl+. 的提示「{t3}」，和第一次「{t1}」不同")
     return f"「{t1}」→「{t2}」→「{t3}」，打字那次 {late:.1f} 秒内看完"
 

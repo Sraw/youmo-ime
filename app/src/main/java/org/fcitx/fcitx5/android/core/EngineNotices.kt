@@ -114,7 +114,7 @@ object EngineNotices {
 
     /**
      * A plain tip, what fcitx's own addons say (androidnotification's showTip: punctuation, full
-     * width, a group switched): said for 2 s and typed away, as any line said (rule 5, F3464).
+     * width, a group switched): said for 1 s and typed away, as any line said (rule 5, F3464).
      */
     fun tip(message: String) = post(steady = false) { message }
 

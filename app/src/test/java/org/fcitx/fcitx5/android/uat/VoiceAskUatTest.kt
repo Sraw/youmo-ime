@@ -130,11 +130,14 @@ class VoiceAskUatTest : VoiceTapUat() {
                 assertEquals(emptyList<String>(), h.noticeTexts())
                 assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("addUserWord") })
             },
-            "asked again: gone by itself in 6 s" to {
+            "asked again: gone by itself in 3 s" to {
                 h.api.voiceAsk = xujing
                 typed("徐婧")
                 assertEquals(string(R.string.voice_ask_remember, "徐婧"), h.noticeTexts().firstOrNull())
-                h.advance(7000)
+                // noticeTexts waits half a second each: about 2.5 s from the ask here
+                h.advance(1500)
+                assertEquals("still asked", string(R.string.voice_ask_remember, "徐婧"), h.noticeTexts().firstOrNull())
+                h.advance(1000)
                 assertEquals(emptyList<String>(), h.noticeTexts())
                 assertFalse(h.api.calls.any { it.startsWith("addUserWord") })
             },

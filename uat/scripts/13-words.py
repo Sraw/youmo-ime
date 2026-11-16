@@ -547,7 +547,7 @@ def wd14h(d):
     early = page_cands(d, "nihao")
     d.clear()
     # the idle bar says how far the upgrade is, typing going on meanwhile; then the notice. A
-    # release build compiles frost in ~20 s, done (the 2 s notice gone) before a slow dump looks:
+    # release build compiles frost in ~20 s, done (the 1 s notice gone) before a slow dump looks:
     # what was caught is reported, the end state is what is checked (the file, the compile's log, its words)
     d.open_page("text")
     caught = []
@@ -559,7 +559,7 @@ def wd14h(d):
         names = d.root(f"ls {dicts}").split()
         return ("merged.ymd" in names and "frost.txt" not in names) or None
 
-    # its own name, not merged.ymd.tmp being written, after the conversion; then the notice's 2 s
+    # its own name, not merged.ymd.tmp being written, after the conversion; then the notice's 1 s
     d.wait(look, timeout=300, step=0.5, what="merged.ymd")
     end = time.time() + 3
     while time.time() < end and "词库格式已升级" not in caught:

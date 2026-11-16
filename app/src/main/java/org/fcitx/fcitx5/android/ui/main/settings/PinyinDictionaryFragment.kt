@@ -13,7 +13,6 @@ import android.text.SpannableStringBuilder
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.view.View
-import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -739,7 +738,7 @@ class PinyinDictionaryFragment : PaddingPreferenceFragment() {
                     val app = view.context.applicationContext
                     fcitx.lifecycleScope.launch {
                         // the record read afresh since (a fold, a clear): nothing to put back, and said so
-                        if (!fcitx.runOnReady { restoreImport(batch.id) }) Toast.makeText(app, R.string.import_restore_failed, Toast.LENGTH_SHORT).show()
+                        if (!fcitx.runOnReady { restoreImport(batch.id) }) app.toast(R.string.import_restore_failed)
                     }
                 }
                 .show()

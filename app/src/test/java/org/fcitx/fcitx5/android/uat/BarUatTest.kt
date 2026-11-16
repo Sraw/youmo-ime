@@ -321,12 +321,14 @@ class BarUatTest {
         popup.contentView.performClick()
         ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
         assertFalse(popup.isShowing)
-        // again, left alone: gone after its two seconds
+        // again, left alone: gone after its one second
         h.service.say(R.string.text_copied)
         h.idle()
         val again = Shadows.shadowOf(RuntimeEnvironment.getApplication()).latestPopupWindow!!
         assertTrue(again.isShowing)
-        ShadowLooper.idleMainLooper(3, TimeUnit.SECONDS)
+        ShadowLooper.idleMainLooper(500, TimeUnit.MILLISECONDS)
+        assertTrue("still up at half a second", again.isShowing)
+        ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
         assertFalse(again.isShowing)
     }
 

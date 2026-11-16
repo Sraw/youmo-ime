@@ -367,10 +367,11 @@ class FloatingCodeStripUatTest {
         open()
         drawn()
         h.service.say("词库没装上", steady = true)
-        h.advance(1000)
+        // well inside its 2 s
+        h.advance(500)
         val before = h.noticeBox()
         typing("zhuang bu hao kuo ni hao a ni hao a ni hao")
-        h.advance(1000)
+        h.advance(500)
         val strip = region()!!
         val chip = h.noticeBox()
         assertTrue("$chip off $strip (was $before)", !Rect.intersects(chip, strip))

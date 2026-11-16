@@ -191,10 +191,10 @@ class MotionNoticeUatTest {
         val walk = h.entry("散步")!!
         h.drag(walk, h.box(walk).right - 10f, h.box(walk).exactCenterY(), steps = 6)
         h.waitFor("the notice") { h.notice() != null }
-        assertTrue(h.noticeTexts().toString(), h.service.resources.getString(R.string.num_items_deleted, 1) in h.noticeTexts())
+        h.noticeTexts().let { assertTrue(it.toString(), h.service.resources.getString(R.string.num_items_deleted, 1) in it) }
         deleteByMenu("公园")
         h.waitFor("2 deleted") { h.service.resources.getString(R.string.num_items_deleted, 2) in h.noticeTexts() }
-        assertTrue(h.noticeTexts().toString(), h.service.resources.getString(R.string.num_items_deleted, 2) in h.noticeTexts())
+        h.noticeTexts().let { assertTrue(it.toString(), h.service.resources.getString(R.string.num_items_deleted, 2) in it) }
         h.waitFor("both gone") { h.entry("公园") == null && h.entry("散步") == null }
         undo()
         h.waitFor("both back") { h.entry("公园") != null && h.entry("散步") != null }

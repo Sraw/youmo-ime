@@ -11,12 +11,15 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityManager
 import android.widget.FrameLayout
 import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.NoticeState.Companion.SAID_MS
+import org.fcitx.fcitx5.android.input.NoticeState.Companion.STEADY_MS
 import org.fcitx.fcitx5.android.input.NoticeState.Companion.UNDO_MS
 import org.fcitx.fcitx5.android.input.UndoChipPlacement
 import org.fcitx.fcitx5.android.input.clipboard.DeletedEntries
@@ -157,7 +160,7 @@ class UndoChipTest {
     }
 
     @Test
-    fun aLineSaidGoesInTwoSecondsOneWithUndoInSix() {
+    fun aLineSaidGoesInOneSecondOneWithUndoInThree() {
         val chip = chip()
         chip.show("已复制")
         // each pinned from both sides, from its show (F3500)
@@ -172,6 +175,33 @@ class UndoChipTest {
         idle(1)
         assertFalse(chip.showing)
         assertEquals(listOf("lapsed 删"), r.calls)
+    }
+
+    @Test
+    @Uat("MN-26")
+    fun aLongerTimeoutAskedOfTheSystemIsKept() {
+        val a11y = shadowOf(activity.getSystemService(AccessibilityManager::class.java))
+        // the time to read (non-interactive) for a line said; with a button, the time to act (interactive) too
+        a11y.setNonInteractiveUiTimeout(5000)
+        a11y.setInteractiveUiTimeout(8000)
+        val chip = chip()
+        chip.show("已复制")
+        idle(4999)
+        assertTrue("its 1 s lengthened to the time to read", chip.showing)
+        idle(1)
+        assertFalse(chip.showing)
+        idle(settled)
+        chip.show("删掉了", Record().undo("删"))
+        idle(7999)
+        assertTrue("its 3 s lengthened to the time to act", chip.showing)
+        idle(1)
+        assertFalse(chip.showing)
+        idle(settled)
+        // a line said is no control: the time to act alone does not lengthen it
+        a11y.setNonInteractiveUiTimeout(0)
+        chip.show("已复制")
+        idle(SAID_MS)
+        assertFalse(chip.showing)
     }
 
     @Test
@@ -372,19 +402,19 @@ class UndoChipTest {
 
         chip.show("读不出来", steady = true)
         val said = windows().single().find("读不出来")!!
-        idle(UNDO_MS - 1000)
+        idle(STEADY_MS - 1000)
         chip.covered(overChip)
         assertTrue("still up", chip.showing)
         assertFalse("but hidden under the menu", said.isShown)
         val flags = (windows().single().layoutParams as WindowManager.LayoutParams).flags
         assertTrue("taking no touch", (flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) != 0)
         // its time stopped while hidden: a long pick does not lose it
-        idle(UNDO_MS)
+        idle(STEADY_MS)
         assertTrue(chip.showing)
         chip.uncovered()
         assertTrue("back", said.isShown)
         // shown again for as long as at first
-        idle(UNDO_MS - 1)
+        idle(STEADY_MS - 1)
         assertTrue(chip.showing)
         idle(1)
         assertFalse(chip.showing)
@@ -452,8 +482,8 @@ class UndoChipTest {
         chip.show("读不出来", steady = true)
         chip.typed()
         assertTrue(chip.showing)
-        // said once, it stays as long as one with 撤销, counted from its show
-        idle(UNDO_MS - 1)
+        // said once, it stays its 2 s, counted from its show
+        idle(STEADY_MS - 1)
         assertTrue(chip.showing)
         idle(1)
         assertFalse(chip.showing)

@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.ui.main.settings.im
 import android.content.Context
 import android.widget.ArrayAdapter
 import android.widget.ListView
-import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.ListPreference
@@ -48,6 +47,7 @@ import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.utils.toast
 
 /** Does an [InputMethodSettings.Action], then tells whether it was done, on the main thread. */
 typealias ImAct = (InputMethodSettings.Action, done: (Boolean) -> Unit) -> Unit
@@ -564,7 +564,7 @@ object InputMethodSettings {
         setOnPreferenceClickListener {
             confirm(context, item) {
                 // told once it ran: a toast before it was "done" whether or not the engine did it
-                act(item) { ok -> Toast.makeText(context, if (ok) item.done else R.string.dict_change_failed, Toast.LENGTH_SHORT).show() }
+                act(item) { ok -> context.toast(if (ok) item.done else R.string.dict_change_failed) }
             }
             true
         }

@@ -73,9 +73,11 @@ def backup(d):
     name = next((n.text for n in s.app() if n.cls == "EditText"), "")
     d.tap_text("保存", where="all", scroll=False, after=0.3)
     # a toast's window is not in uiautomator's dump: 备份成功 is read off the picture. Frames grabbed
-    # at once, not through shot()'s settle(): waiting for a still screen outlasted the 2 s toast
-    for i in range(3):
-        time.sleep(0.6)
+    # at once, not through shot()'s settle(): waiting for a still screen outlasted the 1 s toast;
+    # at 0.2, 0.5 and 0.8 s after 保存 (or as soon after as the last screencap allows)
+    t0 = time.time()
+    for i, at in enumerate((0.2, 0.5, 0.8)):
+        time.sleep(max(0.0, t0 + at - time.time()))
         d.shot("full", f"备份后的提示（应为备份成功）{i + 1}/3",
                png=d.adb("exec-out", "screencap", "-p", binary=True))
     msgs = []

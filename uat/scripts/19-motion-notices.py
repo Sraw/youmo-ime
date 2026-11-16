@@ -40,3 +40,5 @@ case("MN-21", needs="jvm:MotionNoticeUatTest.landscapeLargestCandidatesStillLeav
 case("MN-24", needs="jvm:KotlinHostHandwritingTest.theHandwritingNoticeNotSeenIsToldAtTheNextStart")(lambda d: None)
 
 case("MN-25", needs="jvm:KotlinHostHandwritingTest.bothHandwritingNoticesAreToldEachOnce")(lambda d: None)
+
+case("MN-26", needs="jvm:ToastTest.shortGoesAfterOneSecond")(lambda d: None)

@@ -219,7 +219,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /**
      * [message] said as [say] says, with 撤销 doing [undo] if there is one; [steady], kept as keys
-     * are typed and 6 s (a failure, [EngineNotices.failed]). With no keyboard shown to say it on, a
+     * are typed and 2 s (a failure, [EngineNotices.failed]). With no keyboard shown to say it on, a
      * toast (long, steady), and nothing to take back: [undo] lapses.
      */
     fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false) {

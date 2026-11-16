@@ -321,7 +321,7 @@ class ToolbarUatTest {
         // still listed, passes "back" below at once, before the undo is in, and the next 全部删除 is asked of a
         // database still without 散步 (only 公园 left to delete, then 散步 coming back: SDK 29, full runs)
         h.waitFor("散步 gone") { h.entry("散步") == null }
-        assertTrue(h.noticeTexts().toString(), h.service.resources.getString(R.string.num_items_deleted, 1) in h.noticeTexts())
+        h.noticeTexts().let { assertTrue(it.toString(), h.service.resources.getString(R.string.num_items_deleted, 1) in it) }
         val undo = KeyboardHarness.all(h.notice()!!.contentView).filterIsInstance<TextView>().last { it.text.toString() == s(R.string.undo) }
         assertTrue(undo.performClick())
         h.waitFor("散步 back") { h.entry("散步") != null }
@@ -456,7 +456,7 @@ class ToolbarUatTest {
         h.tap(button(h.service.getString(android.R.string.copy)))
         assertEquals(0 to 0, h.field.selectionStart to h.field.selectionEnd)
         // nothing copied, nothing done: 选择 stays on as it shows, → selects (review M1)
-        assertTrue(h.noticeTexts().toString(), s(R.string.nothing_to_copy) in h.noticeTexts())
+        h.noticeTexts().let { assertTrue(it.toString(), s(R.string.nothing_to_copy) in it) }
         assertTrue(select.isActivated)
         h.tap(h.described(s(R.string.move_cursor_right)))
         assertEquals(0 to 1, h.field.selectionStart to h.field.selectionEnd)
@@ -470,14 +470,14 @@ class ToolbarUatTest {
         editing()
         h.tap(button(h.service.getString(android.R.string.selectAll)))
         h.tap(button(h.service.getString(android.R.string.copy)))
-        assertTrue(h.noticeTexts().toString(), s(R.string.text_copied) in h.noticeTexts())
+        h.noticeTexts().let { assertTrue(it.toString(), s(R.string.text_copied) in it) }
         h.tap(button(h.service.getString(android.R.string.selectAll)))
         h.tap(button(h.service.getString(android.R.string.cut)))
-        assertTrue(h.noticeTexts().toString(), s(R.string.text_cut) in h.noticeTexts())
+        h.noticeTexts().let { assertTrue(it.toString(), s(R.string.text_cut) in it) }
         h.after(3000)
         assertNull(h.notice())
         h.tap(button(h.service.getString(android.R.string.copy)))
-        assertTrue(h.noticeTexts().toString(), s(R.string.nothing_to_copy) in h.noticeTexts())
+        h.noticeTexts().let { assertTrue(it.toString(), s(R.string.nothing_to_copy) in it) }
     }
 
     @Test

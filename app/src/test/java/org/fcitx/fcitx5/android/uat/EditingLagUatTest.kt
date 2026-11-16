@@ -62,7 +62,7 @@ class EditingLagUatTest {
         h.selectionLags = true
         h.field.selectAll()
         h.tap(button(h.service.getString(android.R.string.copy)))
-        assertTrue(h.noticeTexts().toString(), s(R.string.text_copied) in h.noticeTexts())
+        h.noticeTexts().let { assertTrue(it.toString(), s(R.string.text_copied) in it) }
         assertEquals(0 to 6, h.field.selectionStart to h.field.selectionEnd)
     }
 }

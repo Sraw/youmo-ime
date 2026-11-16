@@ -279,8 +279,8 @@
 ### VO-42 [P1] 不点就什么都不记，下次再这样改还问
 - **前提**：B0-语音。
 - **操作**：照 VO-41 改出「徐婧」，问的时候不点，接着打一个字；再照样改一次，等 6 秒。
-- **预期**：提示随打字消失；6 秒后也自己消失；都没有加词。同一次说的里面只问一次，下次说、再这样改还会问。
-- **JVM**：`VoiceAskUatTest.notTappedNothingIsAdded`（打字收起、6 秒收起、不加词）、ime-core `VoiceEditsTest.asked once in a window, again in the next (Q6)`；设备上不跑。
+- **预期**：提示随打字消失；3 秒后也自己消失；都没有加词。同一次说的里面只问一次，下次说、再这样改还会问。
+- **JVM**：`VoiceAskUatTest.notTappedNothingIsAdded`（打字收起、3 秒收起、不加词）、ime-core `VoiceEditsTest.asked once in a window, again in the next (Q6)`；设备上不跑。
 
 ### VO-43 [P1] 这些改法不问
 - **前提**：B0-语音。
