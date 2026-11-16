@@ -10,7 +10,7 @@ import java.util.BitSet
 /**
  * The keys of the word [EnglishSession] is typing, each with where it was tapped (null: no place, a
  * hardware key's or one typed anew) and, on the nine keys, whether Shift was on ([upper]): edited
- * only here, so a key and its place keep in step (061-neighbour-english).
+ * only here, so a key, its place and its Shift keep in step (061-neighbour-english).
  */
 internal class TypedKeys : CharSequence {
     private val keys = StringBuilder()
@@ -29,6 +29,8 @@ internal class TypedKeys : CharSequence {
 
     /** [c] put in at [at], tapped at [touch]. */
     fun insert(at: Int, c: Char, touch: Touch?) {
+        for (i in keys.length downTo at + 1) upper[i] = upper[i - 1]
+        upper.clear(at)
         keys.insert(at, c)
         touches.add(at, touch)
     }
@@ -42,13 +44,15 @@ internal class TypedKeys : CharSequence {
 
     /** The key at [at] taken out. */
     fun deleteAt(at: Int) {
+        for (i in at until keys.length - 1) upper[i] = upper[i + 1]
+        upper.clear(keys.length - 1)
         keys.deleteCharAt(at)
         touches.removeAt(at)
-        upper.clear(at)
     }
 
-    /** The keys [text] in place of these, none with a place (a word put back, not tapped). */
+    /** The keys [text] in place of these, none with a place nor Shift (a word put back, not tapped). */
     fun set(text: String) {
+        upper.clear()
         keys.setLength(0)
         keys.append(text)
         touches.clear()
