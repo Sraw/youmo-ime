@@ -147,7 +147,7 @@
 - **前提**：B0-设置，模拟器、debug 包，**跟随系统深色模式** 关；「下载」里有 `uat-shift060.theme`、`uat-shift060b.theme`（内置 Nord 改名，带 `uat/fixtures/theme-shift060/qwerty.xml`：0.6.0 内置的 26 键原文，⇧ 写 `when="!table"`，没有分词键；脚本 `push_shift060_pack` 打包）。
 - **操作**：导入 `uat-shift060` 并选用，测试页打 `xi` 看 ⇧ 那格。`adb shell run-as <包名> rm no_backup/theme-separator-added`、`am force-stop <包名>`（等于从 0.6.0 升级后第一次启动），再打 `xi`，点那格，再打 `an`，看编码行；换五笔打一个码、换英文打 `he`，看那格。再导入 `uat-shift060b`、选用、打 `xi`。导出 `uat-shift060`，解开看 `layouts/qwerty.xml`。
 - **预期**：导入后、重启前打字时那格仍是 ⇧（导入的包照写的画）；重启后打字时是「分词」，编码 `xi'an`；五笔时是「拼」，英文时是 ⇧。后导入的 `uat-shift060b` 打字时仍是 ⇧，点了字母变大写。导出的文件里 ⇧ 是 `when="!table !composing"`，紧跟一行分词键（`when="composing !table"`），其余和原文一字不差。
-- **JVM**：`ThemeSeparatorMigrationTest`（改一次、`theme.xml` 时间不变、之后导入的不改、新装直接记下、存储不可写时不做、一个包出错其余照改、中途被杀下次接着改、不是 UTF-8 的不改、BOM 保留、App 不用的文件不改、导出带着改后的）；keyboard-scene `PackSeparatorTest`（0.6.0 的 26 键改完等于现在内置的、条件穷举、照抄的属性、各种写法、两个 ⇧、不改的情况、改完的检查）；设备上脚本 `st143`（导出那步手工看）。
+- **JVM**：`ThemeSeparatorMigrationTest`（改一次、`theme.xml` 时间不变、之后导入的不改、新装直接记下、存储不可写时不做、一个包出错其余照改、中途被杀下次接着改、启动中途出 Error 只多跑一次、不是 UTF-8 的不改、BOM 保留、连 BOM 改完超限的不改、App 不用的文件不改、导出带着改后的）；keyboard-scene `PackSeparatorTest`（0.6.0 的 26 键改完等于现在内置的、条件穷举、照抄的属性、各种写法、行条件、两个 ⇧（按键条件和按行条件）、包自己片段里的 ⇧ 不改、不改的情况、改完的检查）；设备上脚本 `st143` 查导入后、重启后、之后导入的三处和 `xi'an`，**五笔时是「拼」、英文时是 ⇧ 和导出那步手工看**（脚本不查）。
 
 ### ST-51 [P1] 键盘高度：紧凑
 - **前提**：B0-设置，**外观 → 大小与样式**；**按键 → 按键字符和快捷键** 里把 q 的下滑设成文字「你好」。

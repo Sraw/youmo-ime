@@ -4,16 +4,19 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.core.backupZip
 import org.fcitx.fcitx5.android.core.directBoot
 import org.fcitx.fcitx5.android.core.dirsUnder
-import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.data.LEGACY_APPLICATION_ID_ROOT
+import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -48,19 +51,23 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
 
     private val realMarker = ThemeSeparators.separatorsFile
     private val realRestored = ThemeSeparators.restoredFile
+    private val realTrying = ThemeSeparators.tryingFile
     private val marker get() = File(folder.root, "no_backup/theme-separator-added")
     private val restored get() = File(folder.root, "no_backup/theme-separator-restored")
+    private val trying get() = File(folder.root, "no_backup/theme-separator-trying")
 
     @Before
     fun noBackup() {
         ThemeSeparators.separatorsFile = { marker }
         ThemeSeparators.restoredFile = { restored }
+        ThemeSeparators.tryingFile = { trying }
     }
 
     @After
     fun realNoBackup() {
         ThemeSeparators.separatorsFile = realMarker
         ThemeSeparators.restoredFile = realRestored
+        ThemeSeparators.tryingFile = realTrying
     }
 
     // a pack of [name] with 0.6.0's qwerty, as one imported then (or [qwerty]'s bytes)
@@ -234,6 +241,88 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
             UserDataManager.import(backupZip(*packs("p"), versionCode = code), install("v$code")).getOrThrow()
             assertFalse("$code", restored.exists())
         }
+        // upstream's (fcitx5-android's, its own codes; it has no packs of these): not looked at
+        val upstream = LEGACY_APPLICATION_ID_ROOT + BuildConfig.APPLICATION_ID.removePrefix(BuildConfig.APPLICATION_ID_ROOT)
+        UserDataManager.import(backupZip(*packs("p"), versionCode = 300L, packageName = upstream), install("upstream")).getOrThrow()
+        assertFalse(restored.exists())
+    }
+
+    // restored from a backup of 0.6.0, then a pack of the same name imported before the next start: as it is written
+    @Test
+    fun aPackImportedOverOneAnOldBackupRestoredIsNotGivenIt() {
+        run()
+        val install = File(folder.root, "phone").let { dirsUnder(it, data = File(it, "files/host-data"), theme = File(it, "files/host-theme")) }
+        UserDataManager.import(backupZip("external/theme/v4/mine/theme.xml" to "<theme/>", versionCode = V060), install).getOrThrow()
+        assertEquals(listOf("mine"), restored.readLines())
+        val file = old("mine")
+        run()
+        assertFalse(file.separated())
+    }
+
+    // an Error out of a start (a StackOverflowError, an OOM, not caught): the next does it once more, marker and list
+    // first, and the one after that nothing; never a start lost to it each time
+    @Test
+    fun anErrorThatEndsTheStartCostsOneStartMoreNotEvery() {
+        old("a")
+        old("b")
+        ThemeSeparators.restoredBeforeSeparator(listOf("a"))
+        var calls = 0
+        ThemePackFiles.beforeInPlace = { calls++; throw Killed() }
+        assertThrows(Killed::class.java) { run() }
+        assertFalse(marker.exists())
+        assertTrue(trying.exists())
+        assertThrows(Killed::class.java) { run() }
+        assertTrue(marker.isFile)
+        assertFalse(restored.exists())
+        run()
+        assertEquals(2, calls)
+        assertFalse(trying.exists())
+        // the list path as well: once more, not again
+        ThemeSeparators.restoredBeforeSeparator(listOf("a"))
+        assertThrows(Killed::class.java) { run() }
+        assertThrows(Killed::class.java) { run() }
+        run()
+        assertEquals(4, calls)
+        assertFalse(trying.exists() || restored.exists())
+    }
+
+    // an Exception caught (the marker not written: a full disk, say) is not a start that died: the next tries in full,
+    // not as the one more after a crash
+    @Test
+    fun anExceptionCaughtIsNotTakenForAStartThatDied() {
+        val a = old("a")
+        val blocked = File(folder.root, "blocked").apply { writeText("a file, not a directory") }
+        ThemeSeparators.separatorsFile = { File(blocked, "theme-separator-added") }
+        run()
+        assertTrue(a.separated())
+        assertFalse(trying.exists())
+        ThemeSeparators.separatorsFile = { marker }
+        val b = old("b")
+        run()
+        assertTrue(b.separated())
+        assertTrue(marker.isFile)
+        assertFalse(trying.exists())
+    }
+
+    // a byte-order mark counted as the app reads it (ThemePackLayouts.read: the file's length): a file the rewrite puts a
+    // few bytes over with it is left, as it would no longer be drawn
+    @Test
+    fun overTheLimitWithItsByteOrderMarkIsLeft() {
+        val probe = old("probe")
+        val size = probe.length()
+        run()
+        val grows = probe.length() - size
+        marker.delete()
+        val limit = ThemeAssetLimits.MAX_LAYOUT_BYTES
+        val padding = "<!--  -->\n".length
+        // without the mark 65534 bytes once rewritten, under the limit; with it 65537, over
+        val text = v060.replaceFirst("\n", "\n<!-- " + "x".repeat((limit - 2 - grows - size - padding).toInt()) + " -->\n")
+        val big = old("big", "\uFEFF" + text)
+        assertTrue(big.length() <= limit)
+        assertEquals(limit - 2 + 3 - grows, big.length())
+        val bytes = big.readBytes()
+        run()
+        assertArrayEquals(bytes, big.readBytes())
     }
 
     // a pack of a name on the list imported before the next start (the restored one deleted, or replaced): as written

@@ -30,21 +30,43 @@ object ThemeSeparators {
     internal var restoredFile: () -> File = { File(appContext.noBackupFilesDir, "theme-separator-restored") }
 
     /**
+     * There while a start gives packs 分词: one that finds it there ended in the middle (killed, or an Error such as
+     * StackOverflowError out of Application.onCreate), and does it once more with the marker written and the list
+     * dropped first, so a pack that kills the app costs one start more, never every start.
+     */
+    @VisibleForTesting
+    internal var tryingFile: () -> File = { File(appContext.noBackupFilesDir, "theme-separator-trying") }
+
+    /**
      * FB12 (dev/design/061-theme-separator-migration.md): the packs installed before 0.6.1 given the app's 分词 in their
      * qwerty's Shift's place while pinyin is typed, as the app's own qwerty has it since ([ThemePackFiles.addSeparator]),
      * once an install, at the first start the themes can be written (A4: none before the phone is unlocked); and the
      * packs a backup of before 0.6.1 brought ([restoredBeforeSeparator]) at the start after its restore. The packs imported
      * after are as they are written. Run by ThemeManager before the packs are listed, on the main thread of
      * Application.onCreate: it never throws (a pack that fails is left as it was, logged, and not tried again).
+     * Under the lock [restoredBeforeSeparator] takes: a restore's list is not added to between its read and its deletion.
      */
+    @Synchronized
     @Suppress("TooGenericExceptionCaught")
     fun addSeparatorsOnce() {
         try {
             if (!ThemeFilesManager.writable) return
             val marker = separatorsFile()
             val restored = restoredFile()
+            val trying = tryingFile()
             val all = !marker.exists()
-            val names = if (all) null else if (restored.exists()) restored.readLines().filter { it.isNotEmpty() }.toSet() else return
+            val names = if (all) null else if (restored.exists()) restored.readLines().filter { it.isNotEmpty() }.toSet() else null
+            if (!all && names == null) {
+                trying.delete()
+                return
+            }
+            if (trying.exists()) {
+                // the last start ended in the middle: once more, not again
+                written(marker)
+                restored.delete()
+            } else {
+                written(trying)
+            }
             // a kill in the middle of an import put right first: the pack it replaced back, what it left cleared
             ThemeFilesManager.sweepPacksOnce()
             val dirs = ThemePackFiles.folder(ThemeFilesManager.dir).listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") && (names == null || it.name in names) })
@@ -52,17 +74,23 @@ object ThemeSeparators {
             val start = System.nanoTime()
             if (!dirs.isNullOrEmpty()) addSeparators(dirs.toList())
             Timber.i("Theme packs given 分词: ${dirs?.size ?: 0} looked at in ${(System.nanoTime() - start) / NANOS_A_MS} ms")
-            if (all) {
-                marker.parentFile?.mkdirs()
-                FileOutputStream(marker).use { it.fd.sync() }
-            }
+            if (all) written(marker)
             restored.delete()
+            trying.delete()
         } catch (e: Exception) {
             Timber.w(e, "Theme packs not given 分词")
+            // caught, the start went on: not one that died, the next tries in full
+            runCatching { tryingFile().delete() }
         }
     }
 
     private const val NANOS_A_MS = 1_000_000
+
+    // [file] there, empty, on the disk
+    private fun written(file: File) {
+        file.parentFile?.mkdirs()
+        FileOutputStream(file).use { it.fd.sync() }
+    }
 
     @Suppress("TooGenericExceptionCaught")
     private fun addSeparators(dirs: List<File>) {

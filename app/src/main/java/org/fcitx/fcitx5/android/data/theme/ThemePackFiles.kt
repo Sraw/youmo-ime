@@ -683,7 +683,8 @@ object ThemePackFiles {
         val out = (bom + (rewrite as PackSeparator.Rewrite.Done).text).encodeToByteArray()
         // the mark counted, as PackLayouts.readable counts it
         if (out.size > ThemeAssetLimits.MAX_LAYOUT_BYTES) return "over the limit rewritten"
-        val temp = File(File(folder(themes), SAVING).apply { mkdirs() }, SEPARATING + UUID.randomUUID())
+        // not UUID's: SecureRandom made at a cold start for this alone
+        val temp = File(File(folder(themes), SAVING).apply { mkdirs() }, SEPARATING + System.nanoTime())
         var done = false
         try {
             FileOutputStream(temp).use { it.write(out); it.fd.sync() }

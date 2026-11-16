@@ -30,7 +30,7 @@ class XmlElement(
 /**
  * Where an element is in its source, by index: [from] its `<`, [close] its start tag's `/>` or `>`, [to] just past its
  * end; [values] each attribute's value between its quotes, as written (references not read). What a rewrite of the
- * text in place needs (a pack's qwerty.xml given 分词, PackLayouts.addSeparator), the rest of the file kept as it is.
+ * text in place needs (a pack's qwerty.xml given 分词, PackSeparator.addSeparator), the rest of the file kept as it is.
  */
 class XmlOffsets(val from: Int, val close: Int, val to: Int, val values: Map<String, IntRange>)
 

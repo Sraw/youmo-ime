@@ -17,7 +17,7 @@ import org.fcitx.fcitx5.android.scene.xml.XmlElement
 /**
  * A theme pack's qwerty.xml given the app's 分词 in its Shift's place while pinyin or 双拼 is typed (0.6.1, FB12,
  * dev/design/061-theme-separator-migration.md): Shift's `when=` made to yield then, and after it a 分词 key in the same
- * place, as the app's own qwerty has them. Done once to the packs installed before 0.6.1 (ThemeFilesManager), the file
+ * place, as the app's own qwerty has them. Done once to the packs installed before 0.6.1 (ThemeSeparators), the file
  * itself rewritten: two places of its text changed, every other byte as it was (its comments, a 0.6.0 `<gap look=>`,
  * which LayoutWriter would not keep), so 0.6.0 reads it as before (there `composing` is only a table's).
  */
@@ -67,6 +67,8 @@ object PackSeparator {
         val ownFragments = fragments.filterKeys { own(it) != null }.values
         val rows = layout.parts.filterIsInstance<Row>() + ownFragments.flatMap { it.rows }
         hasSeparator(rows)?.let { return Rewrite.Kept(it) }
+        // a Shift in a fragment of its own: not in this file to be given 分词, and one 分词 here would show beside it
+        if (ownFragments.any { f -> f.rows.any { row -> row.cells.any { it is Key && isShift(it) } } }) return Rewrite.Kept("a Shift in a fragment of its own")
 
         val found = shifts(root, layout)
         found.why?.let { return Rewrite.Kept(it) }

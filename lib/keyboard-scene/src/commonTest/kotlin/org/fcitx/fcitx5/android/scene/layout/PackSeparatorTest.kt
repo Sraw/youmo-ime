@@ -6,6 +6,10 @@ package org.fcitx.fcitx5.android.scene.layout
 
 import org.fcitx.fcitx5.android.scene.Fixtures
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Expand
+import org.fcitx.fcitx5.android.scene.engine.ExpandedKey
+import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.testData
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -135,7 +139,28 @@ class PackSeparatorTest {
         check(text != v060)
         // the row hidden in landscape: kept, both under it, the app's other rows unchanged
         val out = done(text)
-        assertTrue("id=\"apostrophe\"" in out)
+        val from = out.indexOf("when=\"!landscape\">")
+        val row = out.substring(from, out.indexOf("</row>", from))
+        assertTrue("id=\"shift\"" in row && "id=\"apostrophe\"" in row, row)
+        // in landscape neither, typing or not
+        val layout = LayoutReader.layout(out).ok()
+        for (composing in listOf(false, true)) {
+            val env = Env(2340.0, 600.0, 2.625, landscape = true, input = Input(ime = "pinyin", composing = composing))
+            val ids = Expand.rows(layout, appFragments, env).ok().flatMap { r -> r.items.mapNotNull { (it as? ExpandedKey)?.key?.id } }
+            assertFalse("shift" in ids || "apostrophe" in ids, ids.toString())
+        }
+    }
+
+    // two Shifts in two rows: whether they show together is their rows' conditions too
+    @Test
+    fun twoShiftsInRowsThatNeverShowTogetherGetOneEach() {
+        val portrait = v060.replace("<row split=\"halves\">\n    <!-- 码表时", "<row split=\"halves\" when=\"!landscape\">\n    <!-- 码表时")
+        check(portrait != v060)
+        fun withRow(rowWhen: String) =
+            portrait.replace("</keyboard>", "  <row when=\"$rowWhen\"><key id=\"shift2\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table\"/></row>\n</keyboard>")
+        assertEquals(2, Regex("id=\"apostrophe\"").findAll(done(withRow("landscape"))).count())
+        // both rows there in portrait unless compact: both would be 分词 at once
+        kept(withRow("!compact"), "two Shifts")
     }
 
     @Test
@@ -187,6 +212,15 @@ class PackSeparatorTest {
         val own = bottom.replace("</row>", "<key id=\"sep\" send=\"'\" shortcut=\"separator\" when=\"field=never\"/></row>")
         check(own != bottom)
         kept(including, "a 分词", mapOf("grouped-bottom" to own))
+    }
+
+    // a Shift in the pack's own fragment is not in this file: left as it is, not one 分词 beside it
+    @Test
+    fun aShiftInThePacksOwnFragmentIsKept() {
+        val including = v060.replace("</keyboard>", "  <include src=\"grouped-bottom\"/>\n</keyboard>")
+        val own = bottom.replace("</row>", "<key id=\"shift2\" role=\"shift\" send=\"caps\" when=\"field=never\"/></row>")
+        check(own != bottom)
+        kept(including, "a Shift in a fragment", mapOf("grouped-bottom" to own))
     }
 
     @Test
