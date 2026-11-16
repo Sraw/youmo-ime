@@ -270,7 +270,7 @@
     <string name="exception_user_data_too_old">这个备份来自 0.3.0 或更早的版本，这一版不再读取那时学到的内容。请先在 0.4.x 里恢复它、打几个字、停一下、重新备份，再在这里恢复新的备份</string>
     <string name="user_data_imported">已导入来自 %1$s 的用户数据，正在重启…</string>
     <string name="user_data_exported">已备份到 %1$s</string>
-    <string name="confirm_import_user_data">导入用户数据会覆盖设置、自定义短语、常用词、快速输入、标点和剪贴板（备份里没有的，手机上的也删掉：0.5.1 以前的备份没有快速输入，自己加的条目会没了，关掉的自带表会重新打开；0.6.0 以前的备份没有常用词，手机上的会没了；备份里没有生僻字屏蔽的（0.6.1 以前的，或做备份时没开过它），恢复后它是关的），学到的和词库与手机上现有的合并；重启应用后生效。继续吗？</string>
+    <string name="confirm_import_user_data">导入用户数据会覆盖设置、自定义短语、常用词、快速输入和剪贴板，标点用自带的（备份里没有的，手机上的也删掉：0.5.1 以前的备份没有快速输入，自己加的条目会没了，关掉的自带表会重新打开；0.6.0 以前的备份没有常用词，手机上的会没了；备份里没有生僻字屏蔽的（0.6.1 以前的，或做备份时没开过它），恢复后它是关的），学到的和词库与手机上现有的合并；重启应用后生效。继续吗？</string>
     <string name="clear_clp_db_confirm">剪贴板数据库将会被完全清空，包括已置顶的条目。继续吗？</string>
     <string name="clear_clp_db_not_all">部分剪贴板数据未能清除，可能仍然存在，或在下次启动时重新出现；再次清空，或重启后再清空，或许有效。</string>
     <string name="lang_switch_key_behavior">语言切换键行为</string>
@@ -501,7 +501,6 @@
     <string name="custom_phrases">自定义短语</string>
     <string name="word_packs">词库与短语</string>
     <string name="word_pinyin_unknown">找不到读音，请填写拼音</string>
-    <string name="punctuation_map">中文标点</string>
     <string name="word_list_empty">还没有词</string>
     <plurals name="word_list_count">
         <item quantity="other">共 %1$d 个 · 长按可多选</item>
@@ -860,15 +859,6 @@
         <item>中文分</item>
         <item>中文秒</item>
     </string-array>
-    <string name="punctuation_page_hint">打中文时，按左边的键打出右边的标点；一个键对应几个标点时可以选。点一项可修改或删除。</string>
-    <string name="punctuation_pair">交替</string>
-    <string name="punctuation_key">按键</string>
-    <string name="punctuation_mapping">打出</string>
-    <string name="punctuation_alt_mapping">再按一次打出（可不填）</string>
-    <string name="punctuation_alt_mapping_helper">用于成对的标点，如引号：每按一次换另一个。</string>
-    <string name="punctuation_add">添加按键</string>
-    <string name="punctuation_choice">可选</string>
-    <string name="punctuation_first">排在这个键的候选首位</string>
     <string name="long_press_make_first">设为首选</string>
     <string name="long_press_move_left">左移</string>
     <string name="long_press_move_right">右移</string>
@@ -971,7 +961,7 @@
     <string name="config_unreadable">部分输入设置读取失败。这些设置原样保留：这次先按默认值打字，改动在重启手机前不会保存。</string>
     <string name="config_not_settled">输入设置暂时无法就位。这次打字可能用的是默认设置，改动在重启手机前不会保存。</string>
     <string name="theme_file_missing">你的某个主题缺了图片或字体文件（被删掉，或恢复的备份里没有），这个主题不再列出。重新导入它就能再用。</string>
-    <string name="user_data_unreadable">部分你添加的内容（自定义短语、快速输入、标点表、主题）读取失败或无法就位。它们原样保留、不会被覆盖：这次暂时缺失或改用内置的。重启手机后再试。</string>
+    <string name="user_data_unreadable">部分你添加的内容（自定义短语、快速输入、主题）读取失败或无法就位。它们原样保留、不会被覆盖：这次暂时缺失或改用内置的。重启手机后再试。</string>
     <string name="user_data_not_settled">你添加的内容和设置这次无法就位，暂时不能修改、备份或恢复。重启手机后再试。</string>
     <string name="learning_unkept">学到的词暂时无法保存：只记在内存里，输入法被系统停止或手机重启后就会丢失（以前存下的不受影响）。清出一些存储空间后会照常保存；还不行就重启手机，重启后仍然出现，请附上 开发者 → 实时日志 导出的日志报告问题。</string>
     <string name="learning_unkept_locked">手机解锁前学到的词不会保存；解锁后照常保存。</string>
@@ -1039,7 +1029,6 @@
     <string name="key_style_follow_theme">跟随主题：用主题里的样式；选别的会盖过主题里的。</string>
     <string name="key_style_moved">按键的圆角、边框、间距现在跟着主题走，已经存进你的主题里。</string>
     <string name="section_phrases">短语</string>
-    <string name="punctuation_map_summary">中文输入时每个标点打成什么，比如 , 打成 ，</string>
     <string name="custom_phrases_summary">打拼音时打一个缩写出一段话，比如 dz 出你的地址；长的、多行的、偶尔用的，存到「快速输入」</string>
     <string name="common_words">常用词</string>
     <string name="common_words_summary">打一个词的拼音或首字母，先出你定的替换项，比如 mzp 出「米」「糸」</string>
@@ -1062,7 +1051,7 @@
     <string name="learning_done_delete_common_word">已从常用词中删除「%1$s」</string>
     <string name="im_page_size_summary">只用于实体键盘的候选窗，所有输入法都用，包括英文</string>
     <string name="home_input_methods_summary">添加、排序，每种输入法自己的选项</string>
-    <string name="home_shared_input_summary">各输入法共用：联想、表情、滑行、模糊音、标点</string>
+    <string name="home_shared_input_summary">各输入法共用：联想、表情、滑行、模糊音</string>
     <string name="home_words_summary">你的词、导入的词库、自定义短语</string>
     <string name="home_look_summary">主题、键盘大小，单手 / 分体 / 悬浮</string>
     <string name="home_keys_summary">长按、划动、空格键、键上的字符</string>

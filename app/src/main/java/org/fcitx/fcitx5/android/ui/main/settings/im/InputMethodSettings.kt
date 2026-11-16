@@ -219,9 +219,6 @@ object InputMethodSettings {
     /** The shared page's row of the address suggestions (AddressSettingsFragment): its key. */
     const val ADDRESSES = "addresses"
 
-    /** The shared page's row of the Chinese punctuation: its key. */
-    const val PUNCTUATION = "punctuation"
-
     /** What every input method shares, each with those it is no use to (Engines has which reads what). */
     val SHARED: List<Item> = listOf(
         Section(
@@ -280,8 +277,6 @@ object InputMethodSettings {
                     label = { ctx, v -> ctx.getString(READING_STYLES.getValue(ReadingStyle.of(v))) },
                     nearest = { v -> ReadingStyle.of(v).key },
                 ),
-                // the punctuation addon's own page went with the list of addons
-                Page(PUNCTUATION, R.string.punctuation_map, R.string.punctuation_map_summary, SettingsRoute.Punctuation()),
             )
         ),
         Section(

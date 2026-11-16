@@ -72,9 +72,10 @@ class FieldPolicy(private val memory: ContextMemory) {
 
     /**
      * Brackets and quotes typed in pairs, where the user wants it ([autoPairs]): not in a
-     * password, where what is typed is all there is, nor where the editor takes key events only.
+     * password, where what is typed is all there is, nor where the editor takes key events only,
+     * nor in a phone number's field ([phone]), where a dialler formats what is typed as it goes.
      */
-    fun pairs(autoPairs: Boolean, rawKeys: Boolean): Boolean = autoPairs && !password && !rawKeys
+    fun pairs(autoPairs: Boolean, rawKeys: Boolean, phone: Boolean = false): Boolean = autoPairs && !password && !rawKeys && !phone
 
     /**
      * The engine's context where the editor shows [before] before the cursor at [now]; null, nothing

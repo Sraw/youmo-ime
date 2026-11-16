@@ -106,6 +106,7 @@ import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy
 import org.fcitx.fcitx5.android.input.editing.ForwardedKeys
 import org.fcitx.fcitx5.android.input.editing.InputConnectionEditor
 import org.fcitx.fcitx5.android.input.editing.KeyEventRelay
+import org.fcitx.fcitx5.android.input.editing.NumberKind
 import org.fcitx.fcitx5.android.input.editing.WatchedEditor
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
@@ -1001,7 +1002,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Brackets and quotes typed in pairs, where the user wants it -- not in a password, where
      * what is typed is all there is, nor where the editor takes key events only.
      */
-    private val pairing get() = fieldPolicy.pairs(autoPairs, rawKeys = currentInputEditorInfo.isTypeNull())
+    private val pairing get() = currentInputEditorInfo.let {
+        fieldPolicy.pairs(autoPairs, rawKeys = it.isTypeNull(), phone = it.toEditorTraits().number == NumberKind.PHONE)
+    }
 
     /** What the user typed, a key or the engine's commit: a bracket or quote may go in paired. */
     private fun commitTyped(text: String, cursor: Int = -1) {
@@ -1179,9 +1182,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * [replacing] stays: 1 pressed again before the editor reported the first types both, ，。.
      * Posted, it waits for fcitx (starting, or reloading for the nine keys' letters): by then
      * another field may have the focus, or none, and nothing goes in ([PostedCommit]). [voice]:
-     * a talk's text, gathered for 语音先问再记 ([VoiceAsk]).
+     * a talk's text, gathered for 语音先问再记 ([VoiceAsk]). [typed]: a key's (a `KeyAction.CommitAction`: the
+     * symbol panel, a long press's item as it is, 九键's 1, the number keyboard), one character replacing nothing
+     * goes in as the engine's commit does ([commitTyped]), a bracket or quote paired; not a paste or a result.
      */
-    fun commitOverEngine(text: String, replacing: String = "", voice: Boolean = false): Job {
+    fun commitOverEngine(text: String, replacing: String = "", voice: Boolean = false, typed: Boolean = false): Job {
         val address = inAddressField
         val asked = PostedCommit(startedWith, replacing, text)
         if (voice) voiceAsk.posting()
@@ -1196,7 +1201,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     if (voice) voiceAsk.landed(inField = false)
                     return@launch
                 }
-                if (!voice) return@launch lastPosted.putIn(asked, postedField, selection)
+                if (!voice) {
+                    val field = if (typed && replacing.isEmpty() && text.length == 1) typedField else postedField
+                    return@launch lastPosted.putIn(asked, field, selection)
+                }
                 voiceAsk.voice { lastPosted.putIn(asked, postedField, selection) }
                 voiceAsk.landed(inField = true)?.let(::tellVoiceSaid)
             }
@@ -1322,6 +1330,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
 
         override fun commit(text: String) = commitText(text)
+    }
+
+    // [postedField] for a key's character: committed as the engine's commit of it is, paired where brackets are
+    private val typedField = object : LastPosted.Field by postedField {
+        override fun commit(text: String) = commitTyped(text)
     }
 
     /**

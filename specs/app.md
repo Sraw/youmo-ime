@@ -1704,8 +1704,10 @@ or with old logs but neither the record nor a backup, is refused before anything
 (`exception_user_data_too_old`); one from before the renaming is not, having none of the engine's
 learning.
 The users' text files in `UserDataManager.FOLLOWED` (custom phrases, `commonwords.txt`,
-`rarechars.txt`, the quick phrases, punctuation) follow the backup: one the backup lacks is deleted from the
-phone, so a backup from before 0.6.1 (or made before 生僻字屏蔽 was ever turned on) leaves it off.
+`rarechars.txt`, the quick phrases) follow the backup: one the backup lacks is deleted from the
+phone, so a backup from before 0.6.1 (or made before 生僻字屏蔽 was ever turned on) leaves it off. A punctuation
+table is still backed up but none is restored: after the copy `PunctuationMaps.dropEdited` deletes it (this app's
+backups and upstream's alike), since 0.6.1 has no page to edit it and uses the built-in table.
 
 ## Permissions and privacy
 

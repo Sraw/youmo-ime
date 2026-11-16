@@ -271,7 +271,7 @@
     <string name="exception_user_data_too_old">This backup is from 0.3.0 or earlier, whose learning this version no longer reads. Restore it in 0.4.x, type a few characters and pause, back up again, then restore that here</string>
     <string name="user_data_imported">User data on %1$s has been imported, restarting…</string>
     <string name="user_data_exported">Backed up to %1$s</string>
-    <string name="confirm_import_user_data">Importing user data overrides the settings, custom phrases, common words, quick input, punctuation and the clipboard (what the backup lacks is deleted here too: a backup from before 0.5.1 has no quick input, so your own entries go and the built-in tables you turned off come back on; one from before 0.6.0 has no common words, so this phone\'s go; with no rare characters\' choice in it (one from before 0.6.1, or made before it was ever turned on), they are left off), and merges the words and what was learned with this phone\'s; the app restarts for it to take effect. Proceed?</string>
+    <string name="confirm_import_user_data">Importing user data overrides the settings, custom phrases, common words, quick input and the clipboard, uses the built-in punctuation (what the backup lacks is deleted here too: a backup from before 0.5.1 has no quick input, so your own entries go and the built-in tables you turned off come back on; one from before 0.6.0 has no common words, so this phone\'s go; with no rare characters\' choice in it (one from before 0.6.1, or made before it was ever turned on), they are left off), and merges the words and what was learned with this phone\'s; the app restarts for it to take effect. Proceed?</string>
     <string name="clear_clp_db_confirm">Clipboard database would be completely cleared, including pinned items. Proceed?</string>
     <string name="clear_clp_db_not_all">Some clipboard data could not be cleared. It may still be there or come back at the next start; clearing again, or after a restart, may help.</string>
     <string name="lang_switch_key_behavior">Language switch key behavior</string>
@@ -512,7 +512,6 @@
     <string name="custom_phrases">Custom phrases</string>
     <string name="word_packs">Words and phrases</string>
     <string name="word_pinyin_unknown">No reading found: please type the pinyin</string>
-    <string name="punctuation_map">Chinese punctuation</string>
     <string name="word_list_empty">No words yet</string>
     <plurals name="word_list_count">
         <item quantity="one">%1$d word · long-press to select several</item>
@@ -880,15 +879,6 @@
         <item>Minute in Chinese</item>
         <item>Second in Chinese</item>
     </string-array>
-    <string name="punctuation_page_hint">While typing Chinese, the key on the left types the punctuation on the right; a key with several offers a choice. Tap one to change or remove it.</string>
-    <string name="punctuation_pair">in turn</string>
-    <string name="punctuation_key">Key</string>
-    <string name="punctuation_mapping">Types</string>
-    <string name="punctuation_alt_mapping">Types the next time (optional)</string>
-    <string name="punctuation_alt_mapping_helper">For marks that come in pairs, such as quotes: each press types the other one.</string>
-    <string name="punctuation_add">Add a key</string>
-    <string name="punctuation_choice">choice</string>
-    <string name="punctuation_first">First among this key\'s choices</string>
     <string name="long_press_make_first">Make first</string>
     <string name="long_press_move_left">Move left</string>
     <string name="long_press_move_right">Move right</string>
@@ -995,7 +985,7 @@
     <string name="config_unreadable">Some of your input settings could not be read. They are left as they were: typing uses their defaults for now, and changes to them are not saved until the phone is restarted.</string>
     <string name="config_not_settled">Your input settings could not be put in place. Typing may use their defaults this time, and changes are not saved until the phone is restarted.</string>
     <string name="theme_file_missing">A picture or font of one of your themes is gone (deleted, or not in a backup restored): that theme is not listed. Import it again to use it.</string>
-    <string name="user_data_unreadable">Some of what you added (custom phrases, quick input, your punctuation table, themes) could not be read or put in place. It is left as it was and not saved over: for now it is missing or the built-in one is used. Restart the phone to try again.</string>
+    <string name="user_data_unreadable">Some of what you added (custom phrases, quick input, themes) could not be read or put in place. It is left as it was and not saved over: for now it is missing or the built-in one is used. Restart the phone to try again.</string>
     <string name="user_data_not_settled">What you added and your settings could not be put in place this time, so they cannot be changed, backed up or restored now. Restart the phone to try again.</string>
     <string name="learning_unkept">Words learned cannot be saved for now: they are kept in memory only and are lost once the system stops the keyboard or the phone restarts (what was saved before is not affected). Free some storage on the phone and they are saved as usual again; if they still are not, restart the phone, and if this shows again after that, report it with the log from Developer → Real-time logs.</string>
     <string name="learning_unkept_locked">Words learned before the phone is unlocked are not saved; once it is unlocked, they are saved as usual.</string>
@@ -1063,7 +1053,6 @@
     <string name="key_style_follow_theme">Follow the theme: the style in the theme; anything else is used over the theme\'s.</string>
     <string name="key_style_moved">Key corners, borders and spacing follow the theme now: yours are saved into your themes.</string>
     <string name="section_phrases">Phrases</string>
-    <string name="punctuation_map_summary">What each punctuation key types in Chinese, such as ， for ,</string>
     <string name="custom_phrases_summary">A short code for a longer text as you type pinyin, such as dz for your address; long, many-line or now-and-then text goes in Quick input</string>
     <string name="common_words">Common words</string>
     <string name="common_words_summary">Typing a word\'s pinyin or initials offers your replacements first, such as mzp for 米 and 糸</string>
@@ -1086,7 +1075,7 @@
     <string name="learning_done_delete_common_word">Deleted “%1$s” from common words</string>
     <string name="im_page_size_summary">Only in the physical keyboard\'s candidate window; every input method\'s, English too</string>
     <string name="home_input_methods_summary">Add and order them, and each one\'s own options</string>
-    <string name="home_shared_input_summary">Shared by every input method: prediction, emoji, glide typing, fuzzy pinyin, punctuation</string>
+    <string name="home_shared_input_summary">Shared by every input method: prediction, emoji, glide typing, fuzzy pinyin</string>
     <string name="home_words_summary">Your words, imported dictionaries, custom phrases</string>
     <string name="home_look_summary">Theme, keyboard size, one-handed / split / floating</string>
     <string name="home_keys_summary">Long press, swipes, the space key, the characters on the keys</string>

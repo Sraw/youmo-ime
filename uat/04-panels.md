@@ -23,7 +23,7 @@
 ### PAN-04 [P0] 符号面板：点符号打出并回到键盘
 - **前提**：B0。
 - **操作**：点 **符**；左边点"中文"分类；点「《」。
-- **预期**：符号面板左边是分类：常用、中文、英文、括号、箭头、数学、序号、图形、全角（用过符号以后，最上面多一个"最近"）；点「《」后框里是「《」，面板关掉回到字母键盘。
+- **预期**：符号面板左边是分类：常用、中文、英文、括号、箭头、数学、序号、图形、全角（用过符号以后，最上面多一个"最近"）；点「《」后框里是「《》」（成对，见 PAN-30），面板关掉回到字母键盘。
 - **JVM**：`PanelUatTest.symbolPanelTypesAndCloses`（分类顺序、「《」上屏并回到键盘、用过后多「最近」；图）；设备上不跑。
 
 ### PAN-29 [P1] 符号面板打开时的分类；英文一栏
@@ -31,6 +31,35 @@
 - **操作**：点 **符**，看左边哪个分类亮着；在「常用」里点「？」。再点 **符**；点「箭头」，点「→」；再点 **符**。最后点「英文」，看格子。
 - **预期**：第一次打开亮的是「常用」；用过「？」后再打开亮的是「最近」（第一个是「？」）；点过「箭头」以后再打开就是「箭头」（记住上次看的）。再强行停止输入法（或重启手机）后点 **符**，仍是「箭头」。「英文」里没有 1–0 十个数字，第二行开头是英文的 `,` `.`。
 - **JVM**：`PanelUatTest.thePanelOpensOnTheRecentlyUsedTillACategoryIsPicked`（三次打开亮的分类）、`PickerDataTest.theEnglishTabHasNoDigitsButTheEnglishCommaAndFullStop`（英文一栏没有数字、有 `,` `.`）、`SymbolPanelTest.tillACategoryIsPickedItOpensOnTheRecentlyUsedOnceThereAreAny`、`PanelUatTest.theCategoryPickedIsKeptForTheNextStart`（点过的分类重新建键盘后还在；只是重新打开不算点过；记着的分类已没有时照没点过处理）、`SymbolPanelTest.aRememberedPickOpensAsAPickMadeInThisRun`、`PickerDataTest.everySymbolCategoryIsFoundAgainByItsId`（每个分类按自己的 id 记、按 id 找回原处）；设备上不跑。
+
+### PAN-30 [P0] 符号面板里点的括号成对，⌫ 一起删
+- **前提**：B0（**按键 → 括号成对** 开着，默认）。
+- **操作**：点 **符**，点"中文"分类，点「《」；看框和光标；再点 ⌫。换"括号"分类，逐个点 〖 〘 ❨ ❲ ❴ ⟨ « ‹ ❛ ❝ 「 （ 【，每点一个后点 ⌫。
+- **预期**：点「《」后框里是「《》」，光标在两个中间；⌫ 把两个一起删掉，框空了。其余每个左括号、左引号也一样：成对出现、光标在中间、⌫ 一起删（和键盘上打的括号一样，KB-26）。
+- **JVM**：`PanelUatTest.aBracketFromThePanelGoesInPairedAndBackspaceTakesBoth`（「《|》」、⌫ 后空）；ime-core `AutoPairsTest.theSymbolPanelsBracketsPairEach`（新加的十对每对成对、跨过、⌫ 一起删）；设备上点「中文」第一页的「（」，看「（）」、⌫ 后空（`uat.py run`）。
+
+### PAN-31 [P1] 面板里点右括号，跨过成对补上的那个
+- **前提**：B0。
+- **操作**：点 **符** →"中文"→「「」；再点 **符** →"中文"→「」」。
+- **预期**：第一次后框里「「」」光标在中间；第二次不再多一个「」」，光标跳到「」」后面，框里仍是「「」」。
+- **JVM**：`PanelUatTest.theClosingOneFromThePanelStepsOverTheOnePutIn`；设备上不跑。
+
+### PAN-32 [P1] 电话号码框里括号不成对
+- **前提**：B0，测试页的「电话」框（数字键盘）。
+- **操作**：点 `(`，再点 `)`。
+- **预期**：点 `(` 后框里只有 `(`，没有补上 `)`；点 `)` 后框里是 `()`，光标在最后（拨号这类应用边打边排号码，多出来的括号碍事）。
+- **JVM**：`PanelUatTest.inAPhoneNumbersFieldThePadsBracketsAreAlone`；ime-core `FieldPolicyTest.aPasswordPairsNothingAndAShownOneIsStillOne`（电话号码框不成对）；设备上不跑。
+
+### PAN-33 [P1] 括号成对关掉、密码框里，面板的括号不成对
+- **前提**：B0-设置，**按键 → 括号成对** 关掉；另在测试页的「密码」框做一次（括号成对开着）。
+- **操作**：点 **符** →"中文"→「《」。
+- **预期**：两种情况框里都只有「《」，没有补上「》」。
+- **JVM**：`PanelUatTest.offOrInAPasswordThePanelsBracketIsAlone`；设备上不跑。
+### PAN-34 [P1] 网址框里面板的 ( 和键上打的 ) 跨过
+- **前提**：B0，测试页的「网址」框；全键盘 p 的长按里加上 `)`（**按键 → 按键字符和快捷键**）。
+- **操作**：点 **符** →"英文"→ `(`；再长按 p 选 `)`。
+- **预期**：点 `(` 后框里 `()`、光标在中间；选 `)` 后跨过补上的那个，框里仍是 `()`、光标在最后，不是 `())`（网址框里键上的 `)` 原样打出，不经输入法，照样跨过）。
+- **JVM**：`PanelUatTest.inAnAddressTheKeysClosingOneStepsOverThePanels`；设备上不跑。
 
 ### PAN-05 [P1] 锁住符号面板连续选几个
 - **前提**：B0，点 **符**。

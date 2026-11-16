@@ -62,6 +62,8 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 屏幕键盘开着时，屏幕上（左上角或光标旁）不再冒出带键盘图标的灰色小方块：那是接实体键盘时浮动候选窗上叫回屏幕键盘的按钮，0.6.1 测试版 1 里编码行选了 **输入框里（实验性）**、或上屏的字没写进输入框时会出现，还挡住应用在那里的按钮（比如聊天页左上角的返回）。
 - 提示收得更快：键盘上方只说一句的停 1 秒（以前 2 秒），带 **撤销**、**记住** 等按钮的停 3 秒（以前 6 秒），输入法报的「没做成」停 2 秒（以前 6 秒）；应用弹出的 toast 1 秒、2 秒就收起（系统自带的是 2 秒、3.5 秒）。在系统无障碍里调长了提示时间的，照系统建议停得更久。
 - 打拼音时按住 ⌫ 删完正在打的拼音就停，不再接着删框里已经有的字；要接着删，松手再按住。双拼、九键、14/18 键、形码的编码、笔画筛选、英文在框里打着的词一样；没在打字时按住照旧连删，实体键盘按住 Backspace 也一样。
+- **括号成对推广**：符号面板里点的括号、引号也成对出现、光标停在中间，紧接着退格一起删（以前只有键上打的成对）；勾了「不转中文标点」的长按项、网址和邮箱框里原样打出的也一样。电话号码框里不成对。新加 〖〗〘〙❨❩❲❳❴❵⟨⟩❛❜❝❞ «» ‹› 成对；全角 `＂` 和 `"` 一样。
+- **删掉「中文标点」设置页**：中文标点一律用自带的表。升级到 0.6.1 时删掉以前改过的标点表（只删一次，别的不动）；从备份恢复时备份里改过的标点表也不用。
 
 ### Main changes
 
@@ -115,6 +117,8 @@ Each release lists its **main changes** (new features, large improvements), its 
 - With the on-screen keyboard up, no grey square with a keyboard icon comes up on the screen (at its top left or beside the cursor) any more: it was the floating candidate window's button that brings the on-screen keyboard back when a hardware keyboard is used, shown in 0.6.1's test build 1 with the code row **输入框里（实验性）** (in the text box) or a commit the field did not take, and it covered an app's own button there (a chat's back at the top left).
 - Notices go sooner: above the keyboard, a line said stays 1 s (was 2 s), one with a button (Undo, Remember) 3 s (was 6 s), a failure the input method reports 2 s (was 6 s); the app's toasts go after 1 s and 2 s (Android's own lengths are 2 s and 3.5 s). With longer timeouts asked of the system (accessibility), they stay as long as asked.
 - Holding ⌫ while typing pinyin stops once what is typed is deleted, no longer going on into the text already in the box; let go and hold again to delete that. The same for 双拼, the nine, 14 and 18 keys, a 形码's code, the stroke filter and an English word being typed in the box; a hold with nothing typed deletes on as before, and a hardware keyboard's held Backspace does the same.
+- **Paired brackets everywhere**: a bracket or quote tapped on the symbol panel comes in pairs too, the cursor between, Backspace right after taking both (before, only those typed on the keys did); so do long press items marked 不转中文标点 (as they are) and what a URL or email field takes as it is. A phone number's field pairs nothing. 〖〗〘〙❨❩❲❳❴❵⟨⟩❛❜❝❞ «» ‹› pair now; a full-width `＂` is a `"`.
+- **The 中文标点 (Chinese punctuation) page is gone**: Chinese punctuation is the built-in table. An edited table is deleted on the upgrade to 0.6.1 (once, nothing else touched), and one a backup brings is not restored.
 
 ---
 

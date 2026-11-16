@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.ModuleConfigs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -106,6 +107,20 @@ class NineKeysTapUatTest {
         field.setText("")
         idle()
         api.calls.clear()
+    }
+
+    // FB9: what 1 types goes in as typed, a bracket paired. Not a uat case: the shipped table puts none on 1
+    // (，。？！), so a user never sees it; a map that does stands for it, the path the same whatever it types. A
+    // multi-tap run's later taps replace what the first typed (replacing set) and are never paired. So a run whose
+    // first mark is an opening bracket would pair it and leave the closer behind when a later tap replaces it; no
+    // shipped table has one
+    @Test
+    fun onesMarkGoesInAsTypedABracketPaired() {
+        val h = harness()
+        h.chinesePunctuation(marks = ChinesePunctuation.map + ("," to "「"))
+        h.tap(h.nineKey("1"))
+        assertEquals("「」", h.text)
+        assertEquals(1, h.field.selectionStart)
     }
 
     @Test

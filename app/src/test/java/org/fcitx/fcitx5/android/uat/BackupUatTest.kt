@@ -15,9 +15,11 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.dirsUnder
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardDatabase
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
+import org.fcitx.fcitx5.android.data.pack.TestShelves
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
@@ -33,6 +35,10 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.input.address.AddressBook
 import org.fcitx.fcitx5.android.input.address.AddressLists
 import org.fcitx.fcitx5.android.input.address.AddressStore
+import org.fcitx.fcitx5.android.pack.ImportResult
+import org.fcitx.fcitx5.android.pack.PackKind
+import org.fcitx.fcitx5.android.pack.PackShelf
+import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -193,7 +199,7 @@ class BackupUatTest {
 
     @Test
     @Uat("PR-10")
-    fun aBackupRestoredReplacesSettingsPhrasesAndPunctuation() {
+    fun aBackupRestoredReplacesSettingsAndPhrasesItsPunctuationTableDropped() {
         val old = install("old")
         val config = File(old.config, "conf").apply { mkdirs() }
         File(config, "androidengine.conf").writeText("PageSize=7\n")
@@ -210,7 +216,7 @@ class BackupUatTest {
         val entries = names(zip)
         assertTrue("$entries", "external/data/pinyin/dictionaries/dict-words.txt.gz" in entries)
         assertTrue("$entries", entries.none { it.endsWith(MergedDictionary.FILE) || it.endsWith(".tmp") })
-        // a phone with a phrase, a page size and a punctuation of its own since
+        // a phone with a phrase, a page size and a punctuation table of its own since
         val phone = install("phone")
         File(phone.config, "conf").mkdirs()
         File(phone.config, "conf/androidengine.conf").writeText("PageSize=5\n")
@@ -221,7 +227,8 @@ class BackupUatTest {
         UserDataManager.import(zip.inputStream(), phone).getOrThrow()
         assertEquals("PageSize=7\n", File(phone.config, "conf/androidengine.conf").readText())
         assertEquals("dz,1=北京市海淀区\n", File(phone.external, "data/pinyin/customphrase").readText())
-        assertEquals(", ，\n", File(phone.external, "data/punctuation/punc.mb.zh_CN").readText())
+        // no table, the backup's nor the phone's: the built-in one (0.6.1 has no page to edit it)
+        assertFalse(File(phone.external, "data/punctuation/punc.mb.zh_CN").exists())
         val restored = dictionaries(phone)
         started(restored)
         assertEquals(listOf("dict-words.txt.gz"), files(restored))
@@ -484,6 +491,40 @@ class BackupUatTest {
         } finally {
             internal.addressCounts.setValue("")
             internal.rememberedAddresses.setValue("")
+        }
+    }
+
+    // not a case: a restore never touches the resource packs, which live apart from the user's data (the
+    // device-protected files/packs) and are never in a backup; the app's directories, as 从备份恢复 restores into
+    @Test
+    fun aRestoreLeavesTheResourcePacksAsTheyWere() {
+        phoneStorage()
+        val root = File(appContext.createDeviceProtectedStorageContext().filesDir, "packs").apply { deleteRecursively() }
+        val shelf = PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
+        for (kind in listOf(PackKind.TEXT, PackKind.VOICE)) {
+            assertTrue("$kind", shelf.import(TestShelves.pack(kind).inputStream()) is ImportResult.Imported)
+        }
+        fun contents() = root.walkTopDown().filter { it.isFile }.associate { it.relativeTo(root).path to it.readBytes() }
+        val before = contents()
+        for (kind in listOf(PackKind.TEXT, PackKind.VOICE)) {
+            // `current` and the generation it names, each pack's
+            val dirs = File(root, kind.id).list()!!.toList()
+            assertTrue("$kind $dirs", PackShelf.CURRENT in dirs && dirs.any { it != PackShelf.CURRENT && File(root, "${kind.id}/$it").isDirectory })
+        }
+        val old = install("old")
+        File(old.external, "data/pinyin").mkdirs()
+        File(old.external, "data/pinyin/customphrase").writeText("dz,1=北京市海淀区\n")
+        UserDataManager.import(backup(old).inputStream()).getOrThrow()
+        assertEquals("dz,1=北京市海淀区\n", File(UserDataManager.appDirs.data, "pinyin/customphrase").readText())
+        val after = contents()
+        assertEquals(before.keys, after.keys)
+        for ((path, bytes) in before) assertArrayEquals(path, bytes, after.getValue(path))
+        val reopened = PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
+        for (kind in listOf(PackKind.TEXT, PackKind.VOICE)) {
+            // the same generation, its manifest still read as signed
+            assertEquals("$kind", shelf.dir(kind), reopened.dir(kind))
+            assertEquals("$kind", shelf.installed(kind)!!.version, reopened.installed(kind)?.version)
+            assertTrue("$kind", reopened.status(kind) is PackStatus.Ready)
         }
     }
 }

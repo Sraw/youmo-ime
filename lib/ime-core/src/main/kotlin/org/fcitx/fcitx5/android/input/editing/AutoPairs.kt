@@ -13,8 +13,8 @@ import org.fcitx.fcitx5.android.input.UnicodePunctuation
  * takes the closing one too.
  *
  * Only where it reads as starting something: before the end of the text, a space or punctuation,
- * not before a word (`(` before `abc` is a bracket put round it, closed later). An ASCII `"`
- * after a word or punctuation is a closing one (`say "hi"`), `'` never pairs (`don't`); only
+ * not before a word (`(` before `abc` is a bracket put round it, closed later). An ASCII `"` (or
+ * a full-width `＂`) after a word or punctuation is a closing one (`say "hi"`), `'` never pairs (`don't`); only
  * where the editor says what is after the cursor, or nothing put in could be stepped over.
  *
  * The closing ones put in are remembered, the innermost last, till the cursor goes anywhere this
@@ -148,13 +148,15 @@ class AutoPairs internal constructor(
     // nothing composing (a preedit is fcitx's to commit) and no selection (typing replaces it)
     private fun plainCursor() = editor.isAvailable && session.composing.isEmpty() && session.selection.latest.isEmpty()
 
-    private fun punctuation(c: Char) = c in UnicodePunctuation
+    // ❛❜❝❞ are symbols to Unicode, not punctuation: a bracket or quote of the pairs' is one here all the same
+    private fun punctuation(c: Char) = c in UnicodePunctuation || c in PAIRS || c in OPENERS
 
     // what a quote after it closes: a word (`say "hi"`), or what ends one (`"Stop."`)
     private fun quoteCloses(before: CharSequence?): Boolean {
         if (before.isNullOrEmpty()) return false
         val last = Character.codePointBefore(before, before.length)
-        return Character.isLetterOrDigit(last) || Character.getType(last).toByte() in ENDING
+        return Character.isLetterOrDigit(last) || Character.getType(last).toByte() in ENDING ||
+            (Character.isBmpCodePoint(last) && last.toChar() in OPENERS)
     }
 
     companion object {
@@ -164,6 +166,11 @@ class AutoPairs internal constructor(
             '（' to '）', '【' to '】', '〔' to '〕', '［' to '］', '｛' to '｝',
             '「' to '」', '『' to '』', '《' to '》', '〈' to '〉',
             '“' to '”', '‘' to '’',
+            // the symbol panel's (0.6.1): « and ‹ taken as opening, as in French and Chinese text
+            '〖' to '〗', '〘' to '〙', '❨' to '❩', '❲' to '❳', '❴' to '❵', '⟨' to '⟩',
+            '❛' to '❜', '❝' to '❞', '«' to '»', '‹' to '›',
+            // as `"`: opening or closing by what is before it
+            '＂' to '＂',
         )
         private val OPENERS = PAIRS.entries.associate { (open, close) -> close to open }
         private val QUOTE_CLOSERS = setOf('”', '’')

@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.data.theme.ThemeSeparators
 import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
@@ -468,6 +469,10 @@ object UserDataManager {
             // the settings are the backup's (PR-10): a config file it has not was at its defaults when it was
             // made, fcitx writing only what is set, so the phone's is dropped, not left over the backup's
             pruneAbsent(File(tempDir, "external-${ConfigHome.CONFIG.old}"), File(tempDir, "external-${ConfigHome.DATA.old}"), dirs)
+            // a punctuation table the backup brings (this app's before 0.6.1, upstream Fcitx5's) is not used: no page
+            // edits one since, the built-in table everyone's (HostConfigDir.resetPunctuationOnce). Not AppPrefs' mark
+            // here, which would write its copy over the imported one: the next start clears it (resetHiddenSettings)
+            if (!PunctuationMaps.dropEdited(dirs.data)) Timber.w("a restored punctuation table not deleted: tried again at the next start")
             // keep importing recently_used for backwards compatibility: an upstream Fcitx5 backup's recent symbols are
             // still taken (DECISIONS B3)
             copyDir(File(tempDir, "recently_used"), dirs.recentlyUsed)
@@ -603,9 +608,9 @@ object UserDataManager {
     private val STASHED = listOf(LearnLog.FILE, WordLists.ADDED, WordLists.BLOCKED, EnglishBlocks.FILE, Engines.TABLE_LOGS_READ)
 
     // in fcitx's data, beside the settings (punctuation.conf, androidengine.conf, ..., in the config's own
-    // directory): the custom phrases, 常用词 and 生僻字屏蔽's choice beside them, the quick phrases (fcitx's PkgData data/quickphrase.d) and the
-    // punctuation maps (PkgData punctuation/punc.mb.*)
-    private val FOLLOWED = listOf("pinyin/customphrase", CommonWordsManager.FILE, RareCharsManager.FILE, "data/quickphrase.d", "punctuation")
+    // directory): the custom phrases, 常用词 and 生僻字屏蔽's choice beside them and the quick phrases (fcitx's PkgData
+    // data/quickphrase.d); the punctuation maps (PkgData punctuation/punc.mb.*) are dropped whole after a restore
+    private val FOLLOWED = listOf("pinyin/customphrase", CommonWordsManager.FILE, RareCharsManager.FILE, "data/quickphrase.d")
 
     // the directories of the engine's that are the phone's alone, neither exported nor imported
     private val OWN_DIRS = setOf(Backups.DIR, RestoreStash.DIR, RestoreStash.UNREADABLE)

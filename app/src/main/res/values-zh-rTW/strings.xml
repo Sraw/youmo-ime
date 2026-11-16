@@ -270,7 +270,7 @@
     <string name="exception_user_data_too_old">這個備份來自 0.3.0 或更早的版本，這一版不再讀取那時學到的內容。請先在 0.4.x 裡還原它、打幾個字、停一下、重新備份，再在這裡還原新的備份</string>
     <string name="user_data_imported">已匯入來自 %1$s 的使用者資料，正在重新啟動</string>
     <string name="user_data_exported">已備份到 %1$s</string>
-    <string name="confirm_import_user_data">匯入使用者資料會覆寫設定、自訂短語、常用詞、快速輸入、標點和剪貼簿（備份裡沒有的，手機上的也刪掉：0.5.1 以前的備份沒有快速輸入，自己加的條目會沒了，關掉的內建表會重新打開；0.6.0 以前的備份沒有常用詞，手機上的會沒了；備份裡沒有生僻字屏蔽的（0.6.1 以前的，或做備份時沒開過它），恢復後它是關的），學到的和詞庫與手機上現有的合併；重新啟動後生效。是否繼續？</string>
+    <string name="confirm_import_user_data">匯入使用者資料會覆寫設定、自訂短語、常用詞、快速輸入和剪貼簿，標點用內建的（備份裡沒有的，手機上的也刪掉：0.5.1 以前的備份沒有快速輸入，自己加的條目會沒了，關掉的內建表會重新打開；0.6.0 以前的備份沒有常用詞，手機上的會沒了；備份裡沒有生僻字屏蔽的（0.6.1 以前的，或做備份時沒開過它），恢復後它是關的），學到的和詞庫與手機上現有的合併；重新啟動後生效。是否繼續？</string>
     <string name="clear_clp_db_confirm">剪貼簿資料庫將會被完全清空，包括已置頂條目。是否繼續？</string>
     <string name="clear_clp_db_not_all">部分剪貼簿資料未能清除，可能仍然存在，或在下次啟動時重新出現；再次清空，或重新啟動後再清空，或許有效。</string>
     <string name="lang_switch_key_behavior">語言切換鍵行為</string>
@@ -501,7 +501,6 @@
     <string name="custom_phrases">自訂短語</string>
     <string name="word_packs">詞庫與短語</string>
     <string name="word_pinyin_unknown">找不到讀音，請填寫拼音</string>
-    <string name="punctuation_map">中文標點</string>
     <string name="word_list_empty">還沒有詞</string>
     <plurals name="word_list_count">
         <item quantity="other">共 %1$d 個 · 長按可多選</item>
@@ -860,15 +859,6 @@
         <item>中文分</item>
         <item>中文秒</item>
     </string-array>
-    <string name="punctuation_page_hint">打中文時，按左邊的鍵打出右邊的標點；一個鍵對應幾個標點時可以選。點一項可修改或刪除。</string>
-    <string name="punctuation_pair">交替</string>
-    <string name="punctuation_key">按鍵</string>
-    <string name="punctuation_mapping">打出</string>
-    <string name="punctuation_alt_mapping">再按一次打出（可不填）</string>
-    <string name="punctuation_alt_mapping_helper">用於成對的標點，如引號：每按一次換另一個。</string>
-    <string name="punctuation_add">新增按鍵</string>
-    <string name="punctuation_choice">可選</string>
-    <string name="punctuation_first">排在這個鍵的候選首位</string>
     <string name="long_press_make_first">設為首選</string>
     <string name="long_press_move_left">左移</string>
     <string name="long_press_move_right">右移</string>
@@ -971,7 +961,7 @@
     <string name="config_unreadable">部分輸入設定讀取失敗。這些設定原樣保留：這次先按預設值打字，變更在重新啟動手機前不會儲存。</string>
     <string name="config_not_settled">輸入設定暫時無法就位。這次打字可能用的是預設設定，變更在重新啟動手機前不會儲存。</string>
     <string name="theme_file_missing">你的某個主題缺了圖片或字型檔案（被刪掉，或還原的備份裡沒有），這個主題不再列出。重新匯入它就能再用。</string>
-    <string name="user_data_unreadable">部分你新增的內容（自訂短語、快速輸入、標點表、主題）讀取失敗或無法就位。它們原樣保留、不會被覆蓋：這次暫時缺少或改用內建的。重新啟動手機後再試。</string>
+    <string name="user_data_unreadable">部分你新增的內容（自訂短語、快速輸入、主題）讀取失敗或無法就位。它們原樣保留、不會被覆蓋：這次暫時缺少或改用內建的。重新啟動手機後再試。</string>
     <string name="user_data_not_settled">你新增的內容和設定這次無法就位，暫時不能修改、備份或還原。重新啟動手機後再試。</string>
     <string name="learning_unkept">學到的詞暫時無法儲存：只記在記憶體裡，輸入法被系統停止或手機重新啟動後就會遺失（以前存下的不受影響）。清出一些儲存空間後會照常儲存；還不行就重新啟動手機，重新啟動後仍然出現，請附上 開發人員 → 即時紀錄檔 匯出的紀錄檔回報問題。</string>
     <string name="learning_unkept_locked">手機解鎖前學到的詞不會儲存；解鎖後照常儲存。</string>
@@ -1039,7 +1029,6 @@
     <string name="key_style_follow_theme">跟隨主題：用主題裡的樣式；選別的會蓋過主題裡的。</string>
     <string name="key_style_moved">按鍵的圓角、邊框、間距現在跟著主題走，已經存進你的主題裡。</string>
     <string name="section_phrases">短語</string>
-    <string name="punctuation_map_summary">中文輸入時每個標點打成什麼，例如 , 打成 ，</string>
     <string name="custom_phrases_summary">打拼音時打一個縮寫出一段話，例如 dz 出你的地址；長的、多行的、偶爾用的，存到「快速輸入」</string>
     <string name="common_words">常用詞</string>
     <string name="common_words_summary">打一個詞的拼音或首字母，先出你定的替換項，例如 mzp 出「米」「糸」</string>
@@ -1062,7 +1051,7 @@
     <string name="learning_done_delete_common_word">已從常用詞中刪除「%1$s」</string>
     <string name="im_page_size_summary">只用於實體鍵盤的候選窗，所有輸入法都用，包括英文</string>
     <string name="home_input_methods_summary">新增、排序，每種輸入法自己的選項</string>
-    <string name="home_shared_input_summary">各輸入法共用：聯想、表情、滑行、模糊音、標點</string>
+    <string name="home_shared_input_summary">各輸入法共用：聯想、表情、滑行、模糊音</string>
     <string name="home_words_summary">你的詞、匯入的詞庫、自訂短語</string>
     <string name="home_look_summary">主題、鍵盤大小，單手 / 分體 / 懸浮</string>
     <string name="home_keys_summary">長按、劃動、空白鍵、鍵上的字元</string>

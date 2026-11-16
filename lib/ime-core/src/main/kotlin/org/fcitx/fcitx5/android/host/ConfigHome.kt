@@ -101,7 +101,9 @@ object ConfigHome {
      * [external] and [fresh] as they are then), and every reader and writer after, whatever its
      * thread, gets that same place, a failed move too (tried again by the next process, never midway:
      * an editor holding the old directory would write where the engine no longer reads). [settled]
-     * hears each decision once, as it is made.
+     * hears each decision once, as it is made, before any reader gets it: what it changes there (the app's
+     * punctuation reset) is done before anything is read. One that throws still leaves the place decided:
+     * a move done is not made again, nor every reader after failing on it.
      */
     class Settled(
         private val files: UserFiles,
@@ -119,8 +121,11 @@ object ConfigHome {
         /** [which]'s place this process; one move at a time for each, the others asking waiting for it. */
         fun of(which: Home): Place = places[which] ?: synchronized(locks.getOrPut(which) { Any() }) {
             places[which] ?: settle(files, external(), which, fresh(), room()).also {
-                places[which] = it
-                settled(which, it)
+                try {
+                    settled(which, it)
+                } finally {
+                    places[which] = it
+                }
             }
         }
     }

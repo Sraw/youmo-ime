@@ -17,6 +17,7 @@ import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.button.MaterialButton
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.HostConfigDir
+import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.input.keys.ItemMark
@@ -145,7 +146,8 @@ class PopupItemMarks(
                     null
                 }
             }
-            val lang = PunctuationEditorFragment.DEFAULT_LANG
+            // the one language with a punctuation table
+            val lang = KotlinHost.ZH_CN
             return (maps.builtIn(lang) + maps.load(lang)).mapTo(HashSet()) { it.key }
         }
     }

@@ -101,6 +101,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** Whether [resetHiddenSettings] ran: on the first start of a version with it, and so once. */
         val hiddenSettingsReset = bool("hidden_settings_reset", false)
 
+        /** Whether the punctuation table the user edited before 0.6.1 was deleted (HostConfigDir.resetPunctuationOnce). */
+        val punctuationReset061 = bool("punctuation_reset_061", false)
+
         /**
          * Whether the toolbar's 手写 is on (061-handwriting-toolbar §3.4, the user's Q1): the letters written on
          * in every input method that writes (HandwritingMode), till the button is tapped again; kept across
@@ -1021,6 +1024,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         sharedPreferences.edit(commit = true) {
             providers.filterIsInstance<ManagedPreferenceCategory>().forEach { it.resetHidden(this@edit) }
             putBoolean(internal.hiddenSettingsReset.key, true)
+            // the punctuation mark an import brings is the backup's, saying nothing of this phone's data: cleared, the
+            // table a restore could not delete is tried again at this start (HostConfigDir.resetPunctuationOnce)
+            if (again) putBoolean(internal.punctuationReset061.key, false)
         }
         hiddenResetInProcess = true
         Timber.i("settings without a UI reset to their defaults%s", if (again) " after an import" else "")

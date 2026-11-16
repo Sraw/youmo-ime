@@ -450,7 +450,8 @@ class UserDataManagerTest {
         assertEquals("dz,1=北京\n", File(fresh.data, "pinyin/customphrase").readText())
         assertEquals("米字旁[mi'zi'pang]\t米\n", File(fresh.data, "pinyin/commonwords.txt").readText())
         assertEquals("# youmo-rare-chars 1\non\t1\n", File(fresh.data, "pinyin/rarechars.txt").readText())
-        assertEquals(", 、\n", File(fresh.data, "punctuation/punc.mb.zh_CN").readText())
+        // backed up as it is, but not restored: the built-in table everyone's since 0.6.1 (PunctuationRestoreTest)
+        assertFalse(File(fresh.data, "punctuation/punc.mb.zh_CN").exists())
         // dictionaries and themes merged with the phone's; the text files the user edits follow the backup
         assertEquals("phone's", File(fresh.data, "pinyin/dictionaries/theirs.txt.gz").readText())
         assertEquals("gz", File(fresh.data, "pinyin/dictionaries/mine.txt.gz").readText())
@@ -563,9 +564,11 @@ class UserDataManagerTest {
                 assertEquals("backup's", File(own().external, "data/pinyin/customphrase").readText())
             },
             "dictionaries are merged" to { assertTrue(File(full("dicts").external, "data/pinyin/dictionaries/mine.txt").exists()) },
-            "a zip without external/config keeps them all" to {
+            "a zip without external/config keeps them all but the punctuation table (no restore keeps one since 0.6.1)" to {
                 val dirs = bare()
-                phoneOwn.forEach { assertTrue(it, dirs.at(it).exists()) }
+                val table = "data/punctuation/punc.mb.zh_CN"
+                (phoneOwn - table).forEach { assertTrue(it, dirs.at(it).exists()) }
+                assertFalse(dirs.at(table).exists())
             },
         )
     }

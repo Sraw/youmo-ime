@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -151,6 +152,56 @@ class AutoPairsTest {
         val a = Typing("don")
         a.type("'t")
         assertEquals("don't|", a.shown)
+    }
+
+    /** The symbol panel's brackets and quotes (0.6.1): each pairs, its closing one steps over, Backspace takes both. */
+    @Test
+    @Uat("PAN-30")
+    fun theSymbolPanelsBracketsPairEach() {
+        val added = listOf("〖〗", "〘〙", "❨❩", "❲❳", "❴❵", "⟨⟩", "❛❜", "❝❞", "«»", "‹›")
+        for (pair in added) {
+            val (open, close) = pair[0].toString() to pair[1].toString()
+            val t = Typing("")
+            t.type(open)
+            assertEquals(pair, "$open|$close", t.shown)
+            t.type("书" + close)
+            assertEquals(pair, "${open}书$close|", t.shown)
+            val b = Typing("")
+            b.type(open)
+            b.backspace()
+            assertEquals(pair, "|", b.shown)
+        }
+    }
+
+    /** A full-width ＂ is an ASCII " in this: it opens where something starts, closes after a word. */
+    @Test
+    fun aFullWidthQuoteOpensAndClosesAsTheAsciiOne() {
+        val t = Typing("说 ")
+        t.type("＂")
+        assertEquals("说 ＂|＂", t.shown)
+        t.type("好＂")
+        assertEquals("说 ＂好＂|", t.shown)
+        val w = Typing("word")
+        w.type("＂")
+        assertEquals("word＂|", w.shown)
+        val b = Typing("")
+        b.type("＂")
+        b.backspace()
+        assertEquals("|", b.shown)
+    }
+
+    /** ❛❜❝❞ are symbols to Unicode: read as the brackets and quotes they are, before and after the cursor. */
+    @Test
+    fun theOrnamentQuotesCountAsPunctuation() {
+        val t = Typing("❜", cursor = 0)
+        t.type("(")
+        assertEquals("(|)❜", t.shown)
+        val c = Typing("❝hi❞")
+        c.type("\"")
+        assertEquals("❝hi❞\"|", c.shown)
+        val o = Typing("❝")
+        o.type("\"")
+        assertEquals("❝\"|\"", o.shown)
     }
 
     /** A letter beyond the basic plane is two units: the quote after it sees the whole letter. */

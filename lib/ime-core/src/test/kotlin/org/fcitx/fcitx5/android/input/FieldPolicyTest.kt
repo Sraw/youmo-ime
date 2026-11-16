@@ -158,6 +158,8 @@ class FieldPolicyTest {
         assertTrue(policy.pairs(autoPairs = true, rawKeys = false))
         assertFalse(policy.pairs(autoPairs = false, rawKeys = false))
         assertFalse(policy.pairs(autoPairs = true, rawKeys = true))
+        // a phone number's field: a dialler formats it, a bracket put in for it would be in its way
+        assertFalse(policy.pairs(autoPairs = true, rawKeys = false, phone = true))
         // an incognito field is no password: pairs and voice as anywhere
         policy.focusAnother("incognito", password = false, sensitive = true)
         assertTrue(policy.pairs(autoPairs = true, rawKeys = false))

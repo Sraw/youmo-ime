@@ -69,9 +69,20 @@ class RestoreWhileCompilingTest {
         }
     }.toByteArray().inputStream()
 
-    // the lock the compile thread waits to take, if it waits on one
-    private fun compileWaitsOn(): String? = Thread.getAllStackTraces().keys.firstOrNull { it.name == "dictionary-compile" }
-        ?.let { ManagementFactory.getThreadMXBean().getThreadInfo(it.id)?.takeIf { info -> info.threadState == Thread.State.BLOCKED }?.lockName }
+    // the locks each compile thread waits to take: this sandbox's and an idle one of another's in the same test JVM
+    // (each Robolectric sandbox its own MergedDictionary, its thread of the same name), told apart by the lock
+    private fun compileWaitsOn(): List<String> = Thread.getAllStackTraces().keys.filter { it.name == "dictionary-compile" }.map {
+        ManagementFactory.getThreadMXBean().getThreadInfo(it.id)?.takeIf { info -> info.threadState == Thread.State.BLOCKED }?.lockInfo.toString()
+    }
+
+    // this sandbox's compile thread waits for the sources lock, the one object here
+    private fun compileWaitsOnTheSourcesLock(): Boolean {
+        val lock = System.identityHashCode(ImportedDictionaries)
+        return Thread.getAllStackTraces().keys.filter { it.name == "dictionary-compile" }.any {
+            ManagementFactory.getThreadMXBean().getThreadInfo(it.id)
+                ?.let { info -> info.threadState == Thread.State.BLOCKED && info.lockInfo?.identityHashCode == lock } == true
+        }
+    }
 
     // an older build's text the copy has made and not yet written to as a conversion lists it: the conversion
     // waits for the copy and finds the text whole. Without the lock it was committed empty and deleted under the
@@ -93,7 +104,7 @@ class RestoreWhileCompilingTest {
                 File(target, "pinyin/dictionaries/big.txt").outputStream().use { out ->
                     val compile = checkNotNull(MergedDictionary.refresh(dictionaries))
                     until("the compile done or waiting on the sources lock", { "done ${compile.isDone}, waits on ${compileWaitsOn()}" }) {
-                        compile.isDone || compileWaitsOn()?.startsWith(ImportedDictionaries::class.java.name + "@") == true
+                        compile.isDone || compileWaitsOnTheSourcesLock()
                     }
                     out.write(bytes)
                 }

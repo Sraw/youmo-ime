@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.uat
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.startedHost
@@ -29,7 +28,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
-/** 中文标点 (uat/14 ST-28): the map saved as its page saves it, then the keyboard's ， typed through the Kotlin host. */
+/** The punctuation map in the Kotlin host's hands: a table saved whole (no page edits it since 0.6.1), then the keyboard's ， typed through it. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -65,11 +64,10 @@ class PunctuationMapUatTest {
     }
 
     @Test
-    @Uat("ST-28")
     fun theCommaMappedToAnotherMarkTypesIt() {
         fcitx = startedHost(ScriptedEngine(home))
         runBlocking {
-            // the page's table saved whole (the built-in one is not among the test's assets)
+            // a table saved whole (the built-in one is not among the test's assets)
             fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", "")))
             assertEquals(listOf(PunctuationMapEntry(",", "、", "")), fcitx.punctuationMap("zh_CN"))
         }

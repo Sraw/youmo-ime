@@ -8,6 +8,7 @@ import android.os.Environment
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
 import org.fcitx.fcitx5.android.host.ConfigHome
 import timber.log.Timber
@@ -73,6 +74,10 @@ internal object HostConfigDir {
                 ConfigHome.Problem.NOT_MOVED -> Timber.e(place.error, "%s not moved: used where it is, the move tried at the next start", which.name)
                 null -> {}
             }
+            if (which == ConfigHome.DATA && place.writable) {
+                // not one that stops the engine's start: tried again at the next
+                dir(which, place.use)?.let { runCatching { resetPunctuationOnce(it) }.onFailure { e -> Timber.w(e, "punctuation reset failed") } }
+            }
         }
     }
 
@@ -104,6 +109,19 @@ internal object HostConfigDir {
      */
     fun unsettled(which: ConfigHome.Home): File =
         File(FcitxApplication.getInstance().directBootAwareContext.cacheDir, "${which.name}.unsettled")
+
+    /**
+     * 0.6.1 has no 中文标点 page: a table edited before is deleted once, the first time [data] is settled where it
+     * can be written, and the built-in one used from then on; the mark says it is done. A restore drops a backup's
+     * table itself (UserDataManager); the mark it brings is cleared at the start after (AppPrefs.resetHiddenSettings),
+     * so one it could not delete is tried again here.
+     */
+    @VisibleForTesting
+    internal fun resetPunctuationOnce(data: File) {
+        val done = AppPrefs.getInstance().internal.punctuationReset061
+        if (done.getValue()) return
+        if (PunctuationMaps.dropEdited(data)) done.setValue(true) else Timber.w("an edited punctuation table not deleted: tried again at the next start")
+    }
 
     private fun dir(which: ConfigHome.Home, use: ConfigHome.Use): File? {
         val context = FcitxApplication.getInstance()

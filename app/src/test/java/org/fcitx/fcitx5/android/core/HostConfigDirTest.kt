@@ -7,8 +7,12 @@ package org.fcitx.fcitx5.android.core
 import android.os.Environment
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.pinyin.CustomPhraseManager
 import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
@@ -90,5 +94,81 @@ class HostConfigDirTest {
         } finally {
             appContext.filesDir.setWritable(true)
         }
+    }
+
+    // 0.6.1 has no 中文标点 page (DECISIONS FB9): the table edited before is deleted at the first start, the built-in one
+    // used; once, a table put in after it (a test's) staying, and nothing else of the data touched
+    @Test
+    @Uat("ST-145")
+    fun anEditedPunctuationTableIsDeletedOnceOnTheUpgrade() {
+        val done = AppPrefs.getInstance().internal.punctuationReset061
+        done.setValue(false)
+        val home = File(appContext.filesDir, "host-data")
+        val table = File(home, "punctuation/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }
+        table.writeText(", 、\n")
+        File(home, "pinyin").mkdirs()
+        File(home, "pinyin/customphrase").writeText("dz,1=北京\n")
+        phoneStorage()
+        val data = HostConfigDir.settle(ConfigHome.DATA)
+        assertEquals(home, data.dir)
+        assertFalse(table.exists())
+        assertTrue(done.getValue())
+        assertEquals("dz,1=北京\n", File(home, "pinyin/customphrase").readText())
+        val shipped = listOf(PunctuationMapEntry(",", "，", ""))
+        val maps = PunctuationMaps(data.dir) { ", ，\n".byteInputStream() }
+        assertEquals(shipped, maps.load("zh_CN"))
+        // the next start: done already
+        table.writeText(", 、\n")
+        HostConfigDir.forget()
+        HostConfigDir.settle(ConfigHome.DATA)
+        assertEquals(", 、\n", table.readText())
+    }
+
+    // the data not writable this start (an upgrade's external storage away): the table where it is left alone
+    // and the reset not marked done, made at the start that has the data
+    @Test
+    @Uat("ST-145")
+    fun withTheDataNotWritableThePunctuationResetWaits() {
+        val done = AppPrefs.getInstance().internal.punctuationReset061
+        done.setValue(false)
+        File(appContext.filesDir, "engine").mkdirs()
+        val table = File(external, "data/punctuation/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }
+        table.writeText(", 、\n")
+        ShadowEnvironment.setExternalStorageState(external, Environment.MEDIA_REMOVED)
+        HostConfigDir.forget()
+        assertEquals(ConfigHome.Problem.EXTERNAL_AWAY, HostConfigDir.settle(ConfigHome.DATA).problem)
+        assertEquals(", 、\n", table.readText())
+        assertFalse(done.getValue())
+        // the storage back, the next start: moved in, then the table deleted
+        phoneStorage()
+        val data = HostConfigDir.settle(ConfigHome.DATA)
+        assertEquals(File(appContext.filesDir, "host-data"), data.dir)
+        assertFalse(File(data.dir, "punctuation/punc.mb.zh_CN").exists())
+        assertTrue(done.getValue())
+    }
+
+    // a table that could not be deleted: not marked done, so the next start tries again
+    @Test
+    @Uat("ST-145")
+    fun aTableNotDeletedIsTriedAgainAtTheNextStart() {
+        val done = AppPrefs.getInstance().internal.punctuationReset061
+        done.setValue(false)
+        val home = File(appContext.filesDir, "host-data")
+        val dir = File(home, "punctuation").apply { mkdirs() }
+        val table = File(dir, "punc.mb.zh_CN").apply { writeText(", 、\n") }
+        try {
+            // root deletes anyway: a skip there, not a failure
+            assumeTrue("a directory not writable (not as root)", dir.setWritable(false) && !dir.canWrite())
+            phoneStorage()
+            assertTrue(HostConfigDir.settle(ConfigHome.DATA).writable)
+            assertTrue(table.exists())
+            assertFalse(done.getValue())
+        } finally {
+            dir.setWritable(true)
+        }
+        phoneStorage()
+        HostConfigDir.settle(ConfigHome.DATA)
+        assertFalse(table.exists())
+        assertTrue(done.getValue())
     }
 }

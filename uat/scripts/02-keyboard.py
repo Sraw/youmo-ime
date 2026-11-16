@@ -845,3 +845,9 @@ def kb98(d):
 case("KB-99", needs="jvm:AsIsPunctuationTypedTest.aMarkedFirstIsTypedBySwipingUp")(lambda d: None)
 
 case("KB-100", needs="jvm:AsIsPunctuationTypedTest.notMarkedItIsChinesePunctuationAsEver、AsIsPunctuationTypedTest.englishTypesTheSameMarkedOrNot")(lambda d: None)
+
+
+case("KB-110", needs="jvm:AsIsPunctuationTypedTest.aMarkedBracketGoesInPairedAfterTheCandidate")(lambda d: None)
+
+
+case("KB-111", needs="jvm:AsIsPunctuationTypedTest.englishPairsTheBracketMarkedOrNot")(lambda d: None)

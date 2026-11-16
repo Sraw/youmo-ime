@@ -296,7 +296,7 @@ class SettingsUatTest {
     private fun listed(title: Int) = st.pref(title) as ListPreference
 
     @Test
-    @Uat("ST-33", "ST-136")
+    @Uat("ST-28", "ST-33", "ST-136")
     fun everyInputMethodsPageAndTheSharedOnes() {
         val c = InputMethodCatalog
         pages()
@@ -315,6 +315,8 @@ class SettingsUatTest {
         open(SettingsRoute.SharedInput)
         val groups = listOf(R.string.shared_section_all, R.string.shared_section_chinese, R.string.shared_section_pinyin).map(::s)
         assertEquals(groups, st.titles().filter { it in groups })
+        // no 中文标点 page since 0.6.1 (FB9)
+        assertTrue(st.titles().toString(), st.titles().none { "punctuation" in it.lowercase() || "标点" in it })
         // 在键上划: the choice alone, which input methods each choice reaches the docs say
         assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
         // 注音九键 alone reads no slip; pinyin's nine, 14 and 18 keys do (061-neighbour-correction), 双拼's grouped

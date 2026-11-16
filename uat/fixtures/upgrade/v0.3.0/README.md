@@ -10,7 +10,7 @@ What was set, in order:
 3. 通用输入 → 性能档位 **中档** (`androidengine.conf`: `ModelLevel=Medium`, the only uncommented line: fcitx writes defaults as `# Key=Value`).
 4. 通用输入 → 括号和引号成对输入 **关** (shared preferences).
 5. 外观 → 大小与样式 → 键盘高度 **高** (shared preferences).
-6. 通用输入 → 中文标点: `,` → **、** (`data/punctuation/punc.mb.zh_CN`).
+6. 通用输入 → 中文标点: `,` → **、** (`data/punctuation/punc.mb.zh_CN`). 0.6.1 has no such page: an upgrade to it, or a restore, deletes this table, and `,` types the built-in ，.
 7. 自定义短语: `dz`, position 1, **北京市海淀区** (`data/pinyin/customphrase`).
 8. Learned: `jingmiaoyu` typed twice picking 鲸 喵 屿; afterwards 鲸喵屿 is the first candidate. Builds since 0.5 no longer read 0.3.0's learning (only 0.4.x converts it) and refuse this `backup.zip`: the gates expect 鲸喵屿 not first after the upgrade and the restore refused.
 9. Status panel → **繁体** (`chttrans.conf`: `[EnabledIM] 0=engine-pinyin`); `guojia` then typed 國家.

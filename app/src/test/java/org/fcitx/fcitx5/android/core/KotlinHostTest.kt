@@ -138,8 +138,8 @@ class KotlinHostTest {
         assertEquals(emptyList<PunctuationMapEntry>(), fcitx.punctuationMap("ja_JP"))
     }
 
-    // the keyboard's punctuation popups and the punctuation page read it so (PunctuationManager.load);
-    // the built-in table is an app asset, not on the JVM's classpath: the page's save gives one
+    // the keyboard's punctuation popups read it so (PunctuationManager.load); the built-in table is an
+    // app asset, not on the JVM's classpath: a save gives one (no page saves since 0.6.1, tests do)
     @Test
     fun thePunctuationMapSavedReadsBack() = runBlocking {
         val table = listOf(PunctuationMapEntry("(", "（", ""), PunctuationMapEntry(",", "，", ""))

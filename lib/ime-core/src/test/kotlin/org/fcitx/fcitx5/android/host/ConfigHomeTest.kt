@@ -6,6 +6,10 @@ package org.fcitx.fcitx5.android.host
 
 import java.io.IOException
 import java.io.InputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.platform.LogFile
 import org.fcitx.fcitx5.android.engine.platform.LogOutput
@@ -19,6 +23,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -273,6 +278,43 @@ class ConfigHomeTest {
         val next = ConfigHome.Settled(files, ext, { false })
         assertEquals(Use.EXTERNAL, next.of(ConfigHome.DATA).movedFrom)
         assertEquals("dz,1=北京\n", files.dir("host-data").text("pinyin/customphrase"))
+    }
+
+    // what [Settled]'s callback changes (the app's punctuation reset) is done before anyone reads the place: a
+    // second reader waits for it, not given the place while it runs
+    @Test
+    fun `a reader gets the place only after the callback has run`() {
+        val running = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val process = ConfigHome.Settled(files, { external }, { true }) { _, _ ->
+                running.countDown()
+                release.await()
+            }
+            val first = pool.submit<Place> { process.of(ConfigHome.DATA) }
+            assertTrue(running.await(5, TimeUnit.SECONDS))
+            val second = pool.submit<Place> { process.of(ConfigHome.DATA) }
+            assertThrows(TimeoutException::class.java) { second.get(200, TimeUnit.MILLISECONDS) }
+            release.countDown()
+            assertEquals(first.get(5, TimeUnit.SECONDS), second.get(5, TimeUnit.SECONDS))
+        } finally {
+            release.countDown()
+            pool.shutdownNow()
+        }
+    }
+
+    // a callback that throws leaves the place decided: not settled again, nor every reader after failing on it
+    @Test
+    fun `a callback that throws still records the place`() {
+        var calls = 0
+        val process = ConfigHome.Settled(files, { external }, { true }) { _, _ ->
+            calls++
+            throw IllegalStateException("reset failed")
+        }
+        assertThrows(IllegalStateException::class.java) { process.of(ConfigHome.DATA) }
+        assertEquals(Place(Use.HOME, writable = true), process.of(ConfigHome.DATA))
+        assertEquals(1, calls)
     }
 
     @Test

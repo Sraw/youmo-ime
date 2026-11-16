@@ -71,6 +71,18 @@ class AppPrefsTest {
         assertFalse(prefs.advanced.ignoreSystemCursor.getValue())
     }
 
+    // a restore that could not delete the backup's punctuation table: the mark the backup brings would keep the
+    // start's from trying again
+    @Test
+    fun anImportClearsThePunctuationMark() {
+        sp.edit { putBoolean("punctuation_reset_061", true) }
+        val prefs = AppPrefs(sp)
+        prefs.resetHiddenSettings()
+        assertTrue("not without an import", prefs.internal.punctuationReset061.getValue())
+        prefs.resetHiddenSettings(again = true)
+        assertFalse(prefs.internal.punctuationReset061.getValue())
+    }
+
     // the real application: ThemePrefs, which has the keyboard's size levels, is read through ThemeManager
     @Test
     @Config(application = FcitxApplication::class)

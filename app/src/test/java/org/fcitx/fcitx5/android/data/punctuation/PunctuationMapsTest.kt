@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -119,5 +120,22 @@ class PunctuationMapsTest {
                 root.delete()
             }
         }
+    }
+
+    // what the upgrade's reset and a restore go by: done only where no table is left, and a directory that
+    // cannot be listed is not taken for an empty one
+    @Test
+    fun `dropping the edited tables says whether none is left`() {
+        val data = tmp.newFolder("data")
+        assertTrue(PunctuationMaps.dropEdited(data))
+        val dir = File(data, PunctuationMaps.DIR)
+        dir.writeText("not a directory")
+        assertFalse(PunctuationMaps.dropEdited(data))
+        dir.delete()
+        dir.mkdirs()
+        File(dir, "punc.mb.zh_CN").writeText(", 、\n")
+        File(dir, ".libime").writeText("kept")
+        assertTrue(PunctuationMaps.dropEdited(data))
+        assertEquals(listOf(".libime"), dir.list()!!.toList())
     }
 }

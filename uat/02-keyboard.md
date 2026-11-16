@@ -653,3 +653,15 @@
 - **操作**：拼音下长按，键选 `?`；切到英文，打 `hello`，长按，键选 `.`；把 `.` 的 **不转中文标点** 关掉再做一次。
 - **预期**：拼音下 `?` 打出 `？`；英文下开不开都一样（刚打完一个词时也一样，比如句号后照旧自动加的空格），这个开关只在中文标点会转的时候起作用（061-no-cn-punct S4）。
 - **JVM**：`AsIsPunctuationTypedTest.notMarkedItIsChinesePunctuationAsEver`、`AsIsPunctuationTypedTest.englishTypesTheSameMarkedOrNot`（英文、刚打完 `hello` 和没打字两种，开不开打出的完全一样）；ime-core `KeyResolverMarksTest.anItemAsIsIsTheKeyWhereNothingIsConverted`。
+
+### KB-110 [P1] 「不转中文标点」的 `(`：成对，先上屏候选
+- **前提**：B0-设置；**按键 → 按键字符和快捷键 → 功能键**，点 **，键**，在列表里加 `(` 并点按钮排的 **不转中文标点**，确定。
+- **操作**：回测试页（拼音），打 n i，长按，键选 `(`；再点 ⌫。
+- **预期**：框里是「你()」，光标在两个括号中间（先上屏首选，再成对打出半角括号，和打出的括号一样）；⌫ 把 `()` 一起删掉，剩「你」。
+- **JVM**：`AsIsPunctuationTypedTest.aMarkedBracketGoesInPairedAfterTheCandidate`（真引擎：「你(|)」，⌫ 后「你|」）；设备上不跑。
+
+### KB-111 [P2] 英文下长按选的括号成对，开不开「不转中文标点」都一样
+- **前提**：KB-110 的 `(`。
+- **操作**：切到英文，长按，键选 `(`；把 `(` 的 **不转中文标点** 关掉再做一次。
+- **预期**：两次框里都是 `()`，光标在中间。
+- **JVM**：`AsIsPunctuationTypedTest.englishPairsTheBracketMarkedOrNot`；设备上不跑。

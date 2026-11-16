@@ -120,7 +120,7 @@ class InputMethodSettingsTest {
     fun theSharedOptionsAreOnTheSharedPageAlone() {
         val shared = listOf(
             AppPrefs.KEY_DRAWING, AppPrefs.STROKE_LIFT, EngineSettings.STROKE_SINGLES, AppPrefs.AUTO_PAIRS, AppPrefs.CALCULATION_REPLACES_SUM, InputMethodSettings.ADDRESSES, AppPrefs.HANDWRITING_PAUSE,
-            EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.BUILT_IN_PHRASES, EngineSettings.MODEL_LEVEL, EngineSettings.CANDIDATE_READING, InputMethodSettings.PUNCTUATION,
+            EngineSettings.PREDICTION, EngineSettings.EMOJI, EngineSettings.BUILT_IN_PHRASES, EngineSettings.MODEL_LEVEL, EngineSettings.CANDIDATE_READING,
             "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", EngineSettings.FUZZY,
         )
         assertEquals(shared, sharedKeys())
@@ -178,7 +178,6 @@ class InputMethodSettingsTest {
         assertEquals(emptyList<String>(), notFor(EngineSettings.EMOJI))
         assertEquals(emptyList<String>(), notFor(EngineSettings.BUILT_IN_PHRASES))
         assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
-        assertEquals(emptyList<String>(), notFor(InputMethodSettings.PUNCTUATION))
         // pinyin's nine, 14 and 18 keys, 双拼's grouped keyboards and 大千 read a key tapped by its neighbour's edge
         // (061-neighbour-correction, 061-neighbour-groups); 注音九键 nothing
         assertEquals(listOf(InputMethodCatalog.ZHUYIN_NINE), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))

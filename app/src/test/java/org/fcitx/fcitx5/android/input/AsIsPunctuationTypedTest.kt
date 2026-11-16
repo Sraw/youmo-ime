@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.HostConfig
 import org.fcitx.fcitx5.android.core.KotlinHost
@@ -124,7 +125,7 @@ class AsIsPunctuationTypedTest {
     private fun on(im: String) {
         home = File(appContext.filesDir, "as-is").apply { deleteRecursively() }
         // the unit tests have no assets, the built-in table with them: the marks it converts as the user's table
-        File(home, "data/punctuation/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }.writeText(". 。\n, ，\n? ？\n")
+        File(home, "data/punctuation/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }.writeText(". 。\n, ，\n? ？\n( （\n) ）\n")
         fcitx = startedHost(side(home))
         h = keyboardOn(fcitx)
         up = true
@@ -209,5 +210,49 @@ class AsIsPunctuationTypedTest {
             return h.field.text.toString().also { tearDown() }
         }
         for (word in listOf(false, true)) assertEquals("a word typed: $word", typed(marked = false, word), typed(marked = true, word))
+    }
+
+    // the comma key's list `(` `,` `?`, `(` marked 原样 where [marked]
+    private fun bracketList(marked: Boolean) {
+        val list = UserList(false, listOf("(", ",", "?"), First.Default, if (marked) mapOf("(" to ItemMark.AsIs) else emptyMap())
+        internal.keyLists.setValue(KeyLists.of(mapOf(KeyId("fn/comma") to list)).serialize())
+    }
+
+    // the field with | at the cursor
+    private fun shown() = h.field.text.toString().let { t -> t.substring(0, h.field.selectionStart) + "|" + t.substring(h.field.selectionStart) }
+
+    // FB9: an item typed as it is (原样) goes in paired as one typed through the engine does, after the candidate;
+    // Backspace in the empty pair takes both
+    @Test
+    @Uat("KB-110")
+    fun aMarkedBracketGoesInPairedAfterTheCandidate() {
+        bracketList(marked = true)
+        on(InputMethodCatalog.PINYIN)
+        // nothing typed: committed by the service itself, not through the engine
+        h.longPress(comma()!!, pick = "(")
+        until("() typed", { shown() }) { shown() == "(|)" }
+        h.tap(h.keyWithId(R.id.button_backspace)!!)
+        until("the pair gone", { shown() }) { shown() == "|" }
+        typeLetters("ni")
+        h.longPress(comma()!!, pick = "(")
+        until("你() typed", { shown() }) { shown() == "你(|)" }
+        h.tap(h.keyWithId(R.id.button_backspace)!!)
+        until("the pair gone", { shown() }) { shown() == "你|" }
+    }
+
+    // English types it the same, marked (committed as it is) or not (through the engine)
+    @Test
+    @Uat("KB-111")
+    fun englishPairsTheBracketMarkedOrNot() {
+        fun typed(marked: Boolean): String {
+            bracketList(marked)
+            on(InputMethodCatalog.ENGLISH)
+            h.longPress(comma()!!, pick = "(")
+            until("typed", { shown() }) { "(" in h.field.text }
+            h.after(200)
+            return shown().also { tearDown() }
+        }
+        assertEquals("(|)", typed(marked = false))
+        assertEquals("(|)", typed(marked = true))
     }
 }

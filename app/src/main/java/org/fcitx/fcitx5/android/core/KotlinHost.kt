@@ -383,10 +383,11 @@ class KotlinHost(
 
     override suspend fun setPunctuationMap(lang: String, entries: List<PunctuationMapEntry>) = onHost {
         if (lang != ZH_CN) return@onHost
-        // the edit page's table (PunctuationProfile::set) saved whole, then used
+        // a table (PunctuationProfile::set) saved whole, then used; no page edits it since 0.6.1 (the edits reset,
+        // PunctuationMaps.dropEdited), but a test's table is put in so
         val profile = PunctuationProfile.fromEntries(entries.map { PunctuationEntry(it.key, it.mapping, it.altMapping) })
-        // a save refused (the data not settled, the table not read) goes back to the page, which says so
-        // (PunctuationSaves): used here anyway, the edit would hold this run and be gone at the next
+        // a save refused (the data not settled, the table not read) goes back to the caller: used here anyway,
+        // the edit would hold this run and be gone at the next
         punctuationMaps.save(ZH_CN, profile.entries.map { PunctuationMapEntry(it.key, it.mapping, it.altMapping) })
         modules?.punctuation?.setProfile(profile)
         // with no context focused no status goes out: the keys' marks kept for the keyboard to come
@@ -948,22 +949,22 @@ class KotlinHost(
         eventsOut.tryEmit(event)
     }
 
-    private companion object {
-        const val PROFILE = "profile"
+    internal companion object {
+        private const val PROFILE = "profile"
 
         // what the notice of handwriting moved onto the toolbar says besides that (Internal.handwritingRetiredUnseen,
         // its markers comma-separated)
-        const val RETIRED_TOOLBAR = "toolbar"
-        const val RETIRED_MOVED = "moved"
-        const val RETIRED_TRADITIONAL = "traditional"
+        private const val RETIRED_TOOLBAR = "toolbar"
+        private const val RETIRED_MOVED = "moved"
+        private const val RETIRED_TRADITIONAL = "traditional"
 
         // the modules' files, read at the start and again at reloadConfig
-        val CONF_FILES = listOf(ModuleConfigs.PUNCTUATION, ModuleConfigs.CHTTRANS)
+        private val CONF_FILES = listOf(ModuleConfigs.PUNCTUATION, ModuleConfigs.CHTTRANS)
         const val ZH_CN = "zh_CN"
-        const val BUILT_IN = "pkgdata"
-        const val OPENCC = "engine/opencc-s2tw.data"
-        const val NANOS_PER_MILLI = 1_000_000L
-        const val IDLE_SECONDS = 30L
+        private const val BUILT_IN = "pkgdata"
+        private const val OPENCC = "engine/opencc-s2tw.data"
+        private const val NANOS_PER_MILLI = 1_000_000L
+        private const val IDLE_SECONDS = 30L
     }
 }
 

@@ -115,7 +115,7 @@ class CommonKeyActionListener :
 
     // [asIs] is asked on fcitx's side too: whether the field is an address's is read before, as the key is pressed
     private fun typeOrSend(asIs: (im: () -> String, composing: () -> Boolean, tableKeys: () -> Set<Char>) -> String?, sent: suspend HostApi.() -> Unit) =
-        typeAsIsOrSend(asIs, { service.postFcitxJob(it) }, { service.commitOverEngine(it) }, sent)
+        typeAsIsOrSend(asIs, { service.postFcitxJob(it) }, { service.commitOverEngine(it, typed = true) }, sent)
 
     /**
      * Tap to talk, started or stopped: the bar's microphone or a key's shortcut. What is said goes
@@ -232,7 +232,7 @@ class CommonKeyActionListener :
                 }
                 // what is typed as ⌫ goes down, in its turn: a hold begun so stops once that is deleted (BackspaceHold)
                 is BackspaceDownAction -> service.postFcitxJob { action.hold.press(composingCached) }
-                is CommitAction -> service.commitOverEngine(action.text, action.replacing, voice = action.voice)
+                is CommitAction -> service.commitOverEngine(action.text, action.replacing, voice = action.voice, typed = true)
                 // the engine sends the key that commits its word, carrying the glide, itself (HostApi.offerGlide)
                 is GlideAction -> service.postFcitxJob { offerGlide(action.glide) }
                 // the field's own commands after what is typed is in, on the main thread where its editor is

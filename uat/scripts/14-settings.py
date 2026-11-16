@@ -704,38 +704,10 @@ def st26(d):
             "复制的提示看图")
 
 
-def set_comma(d, mark):
-    """中文标点 → , set to mark, typed by its corner swipe up (、 is m's corner character)"""
-    corner = {"、": "m"}[mark]
-    home(d, "通用输入", "中文标点")
-    def comma(s):
-        return next((n for n in s.app() if n.text == ","), None)
-    try:
-        n = d.wait(comma, 10)   # 5 s ran out with four emulators busy at once
-    except Blocked:   # seen in PR-10: left on 通用输入 after the tap on 中文标点; once more
-        home(d, "通用输入", "中文标点")
-        n = None
-    try:
-        n = n or d.wait(comma, 10)
-    except Blocked:
-        raise Blocked(f"中文标点里没有 ,：{d.top_activity()} {d.screen().texts()[:12]}")
-    d.tap(n.row().c, 1.2)
-    s = d.screen()
-    eds = [n for n in s.app() if "Edit" in n.cls]
-    if len(eds) < 2:
-        raise Blocked(f"编辑框 {[(e.text) for e in eds]}")
-    d.tap(eds[1].c, 0.8)
-    d.clear()
-    m = d.keys()[corner]
-    d.swipe(m, (m[0], m[1] - 130), 150)
-    t = d.field_text()
-    if t != mark:
-        raise Blocked(f"改成「{mark}」没成功：框里「{t}」")
-    d.hide_keyboard()
-    d.tap_text("确定", scroll=False, after=1.0)
+case("ST-28", needs="jvm:SettingsUatTest.everyInputMethodsPageAndTheSharedOnes")(lambda d: None)
 
 
-case("ST-28", needs="jvm:PunctuationMapUatTest.theCommaMappedToAnotherMarkTypesIt")(lambda d: None)
+case("ST-145", needs="jvm:HostConfigDirTest.anEditedPunctuationTableIsDeletedOnceOnTheUpgrade")(lambda d: None)
 
 
 @case("ST-29", base="B0-设置", mutates=True)

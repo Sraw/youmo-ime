@@ -97,10 +97,6 @@ sealed class SettingsRoute : Parcelable {
         constructor(uri: Uri) : this(uri.toString())
     }
 
-    /** The punctuation editor, titled [title] (the app's own name for it when null). */
-    @Serializable
-    data class Punctuation(val title: String? = null, val lang: String? = null) : SettingsRoute()
-
     @Serializable
     data object PinyinCustomPhrase : SettingsRoute()
 
@@ -259,7 +255,6 @@ sealed class SettingsRoute : Parcelable {
             fragment<LearningBackupsFragment, LearningBackups> {
                 label = ctx.getString(R.string.learning_backups)
             }
-            fragment<PunctuationEditorFragment, Punctuation>()
             fragment<PinyinCustomPhraseFragment, PinyinCustomPhrase> {
                 label = ctx.getString(R.string.custom_phrases)
             }

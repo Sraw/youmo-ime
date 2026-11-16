@@ -342,7 +342,8 @@ backup read as they are, and v0.3.x reads what the host writes.
   (`EngineNotices.failedOnce`: once a process). An unreadable punctuation table gives the built-in one
   and is never saved over (`PunctuationMaps.save` throws); unreadable custom phrases are not saved.
 - `PunctuationTable` / app `PunctuationMaps`: `punc.mb.<lang>` as `ca/punctuation/punctuation.cpp:75-173`
-  reads and writes it; the user's file replaces the built-in table whole.
+  reads and writes it; the user's file replaces the built-in table whole. Since 0.6.1 no page writes one
+  and an edited one is deleted at the upgrade and after a restore (architecture.md, fcitx data).
 
 The golden files under `lib/ime-core/src/test/resources/host/ini` come from fcitx's own config code built
 on the host from upstream fcitx5 at 442edbc9 (`tools/upstream.sh`) with the former native engine's option
