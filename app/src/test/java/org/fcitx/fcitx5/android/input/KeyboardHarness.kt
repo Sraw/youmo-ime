@@ -709,7 +709,12 @@ class KeyboardHarness(
             after(500)
             relayout()
         }
-        tap(described(clipboard))
+        // no slot for it on the bar (one-handed, floating): ⋯'s panel has it
+        if (all(inputView).none { shown(it) && it.contentDescription == clipboard }) {
+            tap(described(service.getString(R.string.status_area)))
+            waitFor("$clipboard in ⋯'s panel") { relayout(); entry(clipboard) != null }
+        }
+        tap(entry(clipboard) ?: described(clipboard))
         if (shown != null) waitFor("$shown listed") { entry(shown) != null }
     }
 

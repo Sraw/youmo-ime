@@ -367,7 +367,7 @@
     <string name="section_sound_and_vibration">聲音與振動</string>
     <string name="long_press_characters_summary">長按彈出的字元，上滑和下滑做什麼：長按首選、快捷鍵（全選、複製、貼上、復原）、一段文字</string>
     <string name="toolbar_buttons">工具列按鈕</string>
-    <string name="toolbar_buttons_summary">鍵盤上方的按鈕：排順序、選顯示哪些。選單鍵一直在</string>
+    <string name="toolbar_buttons_summary">鍵盤上方的按鈕：排順序、選顯示哪些。選單鍵一直在；分隔線上面的當時一個都顯示不了時，選單鍵就是 ⋯，點了直接開選單</string>
     <string name="toolbar_divider">以下一直顯示在列的右邊</string>
     <string name="toolbar_reset">恢復預設</string>
     <string name="toolbar_trad_simp">簡繁切換</string>
@@ -650,6 +650,9 @@
     <string name="english_keyboard">鍵盤</string>
     <string name="english_keyboard_summary">螢幕上打英文用的鍵盤。實體鍵盤仍按字母打。</string>
     <string name="handwriting">手寫</string>
+    <string name="handwriting_not_here">這裡不能手寫：英文和密碼框裡沒有手寫</string>
+    <string name="handwriting_unavailable">%1$s，這裡用不了</string>
+    <string name="toolbar_more">更多</string>
     <string name="handwriting_retired">手寫已併入工具列：點工具列上的手寫按鈕在鍵盤上寫字，再點一下關掉%1$s</string>
     <string name="handwriting_retired_moved">。輸入法列表裡已換成拼音</string>
     <string name="handwriting_retired_traditional">。手寫的字現在跟所在輸入法的簡繁走</string>

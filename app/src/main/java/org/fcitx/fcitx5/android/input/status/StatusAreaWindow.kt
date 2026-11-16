@@ -18,6 +18,8 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.bar.BarIcons
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.bar.ToolbarButton
+import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.fcitx
@@ -25,6 +27,7 @@ import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editorinfo.EditorInfoWindow
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ClearRecent
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.FloatingToggle
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.HabitsToggle
@@ -58,6 +61,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     private val fcitx: HostConnection by manager.fcitx()
     private val theme by manager.theme()
     private val windowManager: InputWindowManager by manager.must()
+    private val bar: KawaiiBarComponent by manager.must()
 
     private val editorInfoInspector by AppPrefs.getInstance().internal.editorInfoInspector
 
@@ -90,6 +94,11 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
             override fun onItemClick(view: View, entry: StatusAreaEntry) {
                 when (entry) {
                     is StatusAreaEntry.Host -> actions.activate(entry.action)
+                    // back on the letters, then as the bar's button: what it opens over them, what it types into the app
+                    is StatusAreaEntry.Bar -> {
+                        windowManager.attachWindow(KeyboardWindow)
+                        bar.press(entry.button, view)
+                    }
                     is StatusAreaEntry.Android -> when (entry.type) {
                         InputMethod -> actions.inputMethodSettings()
                         Keyboard -> actions.keys()
@@ -150,7 +159,17 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
         val keyboards = if (!actions.keyboardsOffered) emptyArray() else arrayOf(
             StatusAreaEntry.Android(context.getString(R.string.status_keyboard), KeyboardChoice)
         )
+        // the toolbar's with no slot on the bar, first, in its order (the user's call, 2026-11-15: none scrolled); the
+        // panel's own already here below
+        val overflow = bar.overflow.filter { it !in PanelActions.OWN }.map {
+            val label = context.getString(ToolbarButtonLooks.of(it).label)
+            val available = bar.available(it)
+            // 手写 where it does not write greyed and said so, as on the bar
+            val said = if (available || it != ToolbarButton.Handwriting) label else context.getString(R.string.handwriting_unavailable, label)
+            StatusAreaEntry.Bar(it, said, active = bar.lit(it), available = available)
+        }
         adapter.entries = arrayOf(
+            *overflow.toTypedArray(),
             *staticEntries,
             *keyboards,
             *oneHanded,

@@ -97,6 +97,12 @@ class IdleUi(
     // the state the menu key's icon is drawn for
     private var menuDrawnOpen = menuOpen
 
+    // the menu key drawn as ⋯ (ToolbarConfig.Layout.moreOnly)
+    private var menuDrawnMore = false
+
+    /** Nothing of the toolbar's to show: the menu key is ⋯, a tap opening its panel (ToolbarConfig.Layout.moreOnly). */
+    val moreOnly: Boolean get() = arranged?.moreOnly == true
+
     val menuButton = ToolButton(ctx, BarIcons.menu(menuOpen), theme, toolbar).apply {
         iconRotation = menuRotation(menuOpen)
         fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
@@ -133,6 +139,7 @@ class IdleUi(
             fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
         }
         made[button] = view
+        view.available = button !in arranged?.unavailable.orEmpty()
         // the emoji, as Sogou's 表情: a long press on the comma was all there was, and nobody finds
         // that. Opens the emoji or kaomoji, whichever was last
         if (button == ToolbarButton.Emoji) view.setOnClickListener {
@@ -152,56 +159,48 @@ class IdleUi(
 
     private var arranged: ToolbarConfig.Layout? = null
 
-    private var layoutFor: ((Int) -> ToolbarConfig.Layout)? = null
+    // the bar's slots as last worked out for its width (ToolbarConfig.Layout.slots)
+    private var slots: ToolbarConfig.Slots? = null
 
-    // the layout whose toolbar [buttonsUi] holds; null while it holds an older one's or none
-    private var toolbarShown: ToolbarConfig.Layout? = null
+    // the buttons [buttonsUi] holds; null while it holds an older arrangement's or none
+    private var toolbarShown: List<ToolbarButton>? = null
+
+    /** The toolbar's buttons with no slot on the bar, in order: in ⋯'s panel (StatusAreaWindow). */
+    val overflow: List<ToolbarButton> get() = slots?.overflow.orEmpty()
 
     private fun showToolbar() {
-        val layout = arranged ?: return
-        if (layout == toolbarShown) return
-        toolbarShown = layout
-        // ⋯ last, never scrolled away (the way to the settings and out of floating)
-        val more = layout.toolbar.lastOrNull()?.takeIf { it == ToolbarButton.More }
-        buttonsUi.show((if (more == null) layout.toolbar else layout.toolbar.dropLast(1)).map(::button), more?.let(::button))
+        val shown = slots?.toolbar ?: return
+        if (shown == toolbarShown) return
+        toolbarShown = shown
+        buttonsUi.show(shown.map(::button))
     }
 
-    /**
-     * How many buttons fit at the right beside the menu key, the middle (a clipboard suggestion,
-     * a sum, the password's digits) kept [MIDDLE_BUTTONS] buttons wide: the rest go onto the toolbar.
-     */
-    private fun roomForPinned(width: Int): Int {
-        if (width <= 0) return Int.MAX_VALUE
-        val button = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
-        return (width - button * (1 + MIDDLE_BUTTONS)) / button
-    }
-
-    /** The buttons [layout] places given the room at the right, the others nowhere; again as the bar's width changes. */
-    fun arrange(layout: (maxPinned: Int) -> ToolbarConfig.Layout) {
-        layoutFor = layout
-        place(layout(roomForPinned(root.width)))
-    }
-
-    private fun place(layout: ToolbarConfig.Layout) {
+    /** The buttons [layout] places, the others nowhere; the same ones but for which are greyed only greyed anew. */
+    fun arrange(layout: ToolbarConfig.Layout) {
         if (layout == arranged) return
+        val placed = arranged?.let { it.toolbar == layout.toolbar && it.pinned == layout.pinned } == true
         arranged = layout
+        made.forEach { (button, view) -> view.available = button !in layout.unavailable }
+        showMenuKey()
+        if (placed) return
         made.values.forEach { (it.parent as? ViewGroup)?.removeView(it) }
         // the toolbar's buttons made and put on it as it is first opened
         toolbarShown = null
-        if (currentState == Display.Toolbar) showToolbar()
         val size = ctx.dp(KawaiiBarComponent.heightDp(ctx))
         val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
         layout.pinned.forEach { pinnedBar.addView(button(it), LinearLayout.LayoutParams(buttonWidth, size)) }
         sizeCells()
     }
 
-    // the toolbar open, every button's cell the same (ToolbarConfig.Layout.cellPx), the menu key's and the right's too,
-    // so all stand evenly apart, squeezed alike where the bar is narrow (the floating keyboard's); shut, a bar button's
-    // own width, the right's no narrower than a finger's target for a toolbar not open
+    // the bar in slots of one width (ToolbarConfig.Layout.slots), the menu key in the first, the right's in the last,
+    // the toolbar's between as it is open: nothing moves nor changes width as it opens or shuts, nor as 中/英 switch
+    // (the user's call, 2026-11-15); narrower where the bar is narrow (the floating keyboard's), every one at the right
+    // kept. An icon too big for its slot shrinks.
     private fun sizeCells() {
         val layout = arranged ?: return
-        val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
-        val cell = if (currentState != Display.Toolbar) buttonWidth else layout.cellPx(idleBody.width, buttonWidth, ctx.dp(ButtonsBarUi.MIN_SIZE))
+        val s = layout.slots(root.width, ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx)))
+        slots = s
+        val cell = s.cellPx
         buttonsUi.cellPx = cell
         (listOf<View>(menuButton) + (0 until pinnedBar.childCount).map(pinnedBar::getChildAt)).forEach {
             if (it.layoutParams.width != cell) {
@@ -209,6 +208,9 @@ class IdleUi(
                 it.requestLayout()
             }
         }
+        if (currentState == Display.Toolbar) showToolbar()
+        val icon = minOf(ctx.dp(KawaiiBarComponent.ICON_DP), cell - ctx.dp(ICON_MARGIN_DP)).coerceAtLeast(1)
+        (listOf(menuButton) + made.values).forEach { it.fixIconSize(icon) }
     }
 
     // what the bar shows with nothing else to: the address suggestions (AddressStrip), when there are
@@ -356,23 +358,40 @@ class IdleUi(
         add(idleBody, lParams(matchParent, matchParent))
         add(numberRow, lParams(matchParent, matchParent))
         addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
-            if (right - left != oldRight - oldLeft) layoutFor?.let { f ->
-                post {
-                    place(f(roomForPinned(width)))
-                    sizeCells()
-                }
+            if (right - left != oldRight - oldLeft) post { sizeCells() }
+        }
+    }
+
+    // ⋯ where the toolbar has nothing to show, else the menu key of its state
+    private fun showMenuKey() {
+        val more = moreOnly
+        if (more == menuDrawnMore) return
+        menuDrawnMore = more
+        menuButton.apply {
+            iconAnimate().cancel()
+            iconAlpha = 1f
+            if (more) {
+                setIcon(BarIcons.MORE)
+                iconRotation = 0f
+            } else {
+                menuDrawnOpen = menuOpen
+                setIcon(BarIcons.menu(menuOpen))
+                iconRotation = menuRotation(menuOpen)
             }
         }
+        updateMenuButtonContentDescription()
     }
 
     private fun updateMenuButtonContentDescription() {
         menuButton.contentDescription = when {
+            menuDrawnMore -> ctx.getString(R.string.toolbar_more)
             currentState == Display.Toolbar -> ctx.getString(R.string.hide_toolbar)
             else -> ctx.getString(R.string.expand_toolbar)
         }
     }
 
     private fun updateMenuButtonIcon(instant: Boolean = false) {
+        if (menuDrawnMore) return
         val open = menuOpen
         if (!menuTurns) return crossfadeMenuButton(open, instant)
         val targetRotation = menuRotation(open)
@@ -492,6 +511,7 @@ class IdleUi(
     companion object {
         private const val WORK_BAR_DP = 2
 
-        private const val MIDDLE_BUTTONS = 2
+        // the least room beside an icon in its cell, dp: a cell narrower than the icon and this shrinks the icon
+        private const val ICON_MARGIN_DP = 6
     }
 }

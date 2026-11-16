@@ -330,17 +330,17 @@ class BarUatTest {
         assertFalse(again.isShowing)
     }
 
-    // the open toolbar's buttons where the bar has room for them all at 40 dp (14 sp): none narrower; where it has not,
-    // squeezed, never below 28 dp (ButtonsBarUi.MIN_SIZE). The room the bar's own, not the screen's. Whether it had room
-    private fun toolbarSqueezedNoMore(h: KeyboardHarness, sp: Int): Boolean {
-        val buttons = h.described(h.service.getString(R.string.undo)).parent as ViewGroup
-        val roomy = (buttons.parent as View).width >= buttons.childCount * h.service.dp(40)
-        val min = h.service.dp(if (sp <= 14 && roomy) 40 else 28)
-        for (d in listOf(R.string.undo, R.string.redo, R.string.text_editing, R.string.clipboard, R.string.status_area, R.string.handwriting)) {
-            val b = h.described(h.service.getString(d))
-            assertTrue("$d ${b.width} at $sp sp", b.width >= min)
+    // the open toolbar's buttons in the bar's slots (the user's call, 2026-11-15): each as wide as the menu key, never
+    // under 28 dp, side by side from it, ⋯ last; [least] the narrowest the slots may be here
+    private fun toolbarInSlots(h: KeyboardHarness, sp: Int, least: Int = h.service.dp(28)) {
+        val menu = h.described(h.service.getString(R.string.hide_toolbar)).width
+        val row = h.described(h.service.getString(R.string.status_area)).parent as ViewGroup
+        assertEquals("⋯ last", h.service.getString(R.string.status_area), row.getChildAt(row.childCount - 1).contentDescription)
+        for (i in 0 until row.childCount) {
+            val b = row.getChildAt(i)
+            assertEquals("${b.contentDescription} at $sp sp", menu, b.width)
+            assertTrue("${b.contentDescription} ${b.width} at $sp sp", b.width >= least)
         }
-        return roomy
     }
 
     // MN-20 where the bar has room for the open toolbar: at 14 sp no button squeezed below 40 dp
@@ -353,7 +353,8 @@ class BarUatTest {
             size.setValue(14)
             val h = KeyboardHarness().also { harness = it }.start()
             h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
-            assertTrue("no room for the toolbar at 480 dp", toolbarSqueezedNoMore(h, 14))
+            // twelve slots of 40 dp
+            toolbarInSlots(h, 14, h.service.dp(40))
         } finally {
             size.setValue(size.defaultValue)
         }
@@ -363,12 +364,14 @@ class BarUatTest {
         ThemeManager.prefs.candidateTextSize.setValue(sp)
         val h = KeyboardHarness().also { harness = it }.start()
         val bar = h.described(h.service.getString(R.string.expand_toolbar)).parent as View
-        // idle bar's keys: none narrower than 40 dp
+        // the idle bar's keys in its slots, as wide as the open toolbar's (the user's call, 2026-11-15): about a
+        // button's own (a tenth of 393 dp at 14 sp), never under 28 dp
         for (d in listOf(R.string.expand_toolbar, R.string.a11y_key_emoji, R.string.hide_keyboard)) {
-            assertTrue("$d at $sp sp", h.described(h.service.getString(d)).width >= h.service.dp(40))
+            val w = h.described(h.service.getString(d)).width
+            assertTrue("$d $w at $sp sp", w >= minOf(h.service.dp(40), bar.width / 10) && w >= h.service.dp(28))
         }
         h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
-        toolbarSqueezedNoMore(h, sp)
+        toolbarInSlots(h, sp)
         h.capture("BarUatTest/toolbar_${name}")
         // the panels' own bar keys are as high as the bar (F4175, F4189): the clipboard's 清空, the
         // status area's settings, the text-editing panel's 剪贴板
@@ -382,7 +385,8 @@ class BarUatTest {
             R.string.text_editing to R.string.clipboard,
         )) {
             if (!has(R.string.hide_toolbar)) h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
-            h.tap(h.described(h.service.getString(open)))
+            // on the bar where it has a slot, else from ⋯'s panel (28 sp: seven slots, room for one and ⋯)
+            ToolbarSpacingUatTest.openFromToolbar(h, open)
             h.waitFor("${h.service.getString(d)} shown") { h.relayout(); has(d) }
             val b = h.described(h.service.getString(d))
             assertEquals("$d at $sp sp", bar.height, b.height)

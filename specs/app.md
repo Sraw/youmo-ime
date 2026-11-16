@@ -33,9 +33,19 @@ shown is still 联想's: `Action.DropPredictions`, the list alone put away, the 
 kept; Escape's reset lost them, and the context told again after it had English offer a correction's typed word; 0.6.1). Its buttons besides the menu key are the user's
 (`internal.toolbarButtons`, one string): `ToolbarConfig` in ime-core parses it (empty is the v0.4
 bar) and, given the situation (not a password, chttrans offered, one-handed
-offered, the input method with keyboards to pick from: `KeyboardPicker` through `PanelActions.chooseKeyboard`, the ⋯ panel's 键盘 too) and how many fit at the right, says which go on the opened toolbar (⋯ fixed at its end,
-the right's overflow before it) and which at the right; `IdleUi.arrange` places them, again as the
-bar's width changes. Open, every button's cell is `ToolbarConfig.Layout.cellPx` (the menu key's, the toolbar's, ⋯'s and the right's alike, so all stand evenly apart; the bar shared among them, a bar button's width at most, 28 dp at least, scrolled past that; the room left over after ⋯); shut, the menu key and the right's are a bar button's width. The ⋯ panel's own actions live in `PanelActions`, called by
+offered, the input method with keyboards to pick from: `KeyboardPicker` through `PanelActions.chooseKeyboard`, the ⋯ panel's 键盘 too), says which go on the opened toolbar (⋯ fixed at its end)
+and which at the right, every one of those however narrow the bar, 手写 where it is not written (English, a password field)
+kept in its place greyed (`Layout.unavailable`, `ToolButton.available`; its tap says why), so nothing moves as 中/英 switch;
+`IdleUi.arrange` places them. The bar is split into slots of one width, `ToolbarConfig.Layout.slots`, again as its width
+changes: as many as fit at about a bar button's own width, never fewer than the menu key, the right's and two between; the
+menu key in the first, the right's in the last, open or shut alike, so they never move; open, the toolbar's in the slots
+between, ⋯ last, none scrolled (`ButtonsBarUi`); the ones with no slot (`Slots.overflow`) are entries first in the ⋯ panel
+(`StatusAreaEntry.Bar`, tapped through `KawaiiBarComponent.press`, the panel's own entries not again; 手写 lit and greyed there
+as on the bar, `KawaiiBarComponent.lit`/`available`); icons shrink in a slot too narrow for them. A landscape bar's slots
+past ⋯ stay empty, the toolbar at the left and the right's at the right (the user's call). With nothing of the toolbar's to
+show (`Layout.moreOnly`: none ticked or none of use; a greyed 手写 counts) the menu key is ⋯ itself (`IdleUi.showMenuKey`,
+read 「更多」), a tap opening the panel, the toolbar never opened (`evalIdleUiState` passes no expansion).
+A bar arranged before 手写 was on the list (0.6.0's, `ToolbarConfig.handwritingNeverOffered`) gets it after 表情 at the start (`AppPrefs.offerHandwriting`, in `dropRetired`). The ⋯ panel's own actions live in `PanelActions`, called by
 `StatusAreaWindow` and the bar's buttons alike. A new panel entry that should be a button too is a
 `ToolbarButton`, its `ToolbarButtonLooks`, its icon in `BarIcons.of` (a name a theme may replace; `Icons.TOOLBAR` if new), its action in `PanelActions`, and an `on(…)` line in
 `KawaiiBarComponent`.

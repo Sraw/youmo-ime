@@ -81,7 +81,7 @@ def clip_item(d, text):
 case("TB-01", needs="jvm:BarUatTest.toolbarWhenIdleCandidatesWhileTyping")(lambda d: None)
 
 
-case("TB-02", needs="jvm:ToolbarUatTest.expandingTheToolbar")(lambda d: None)
+case("TB-02", needs="jvm:ToolbarUatTest.expandingTheToolbar、ToolbarSpacingUatTest.theBarsButtonsAreInSlotsOfOneWidthOpenOrShut")(lambda d: None)
 
 
 case("TB-03", needs="jvm:ToolbarUatTest.undoAndRedo")(lambda d: None)
@@ -228,7 +228,7 @@ def tb22(d):
     s = d.screen()
     b1 = kbox(d, s)
     f1 = [n.b for n in s.app() if n.cls == "EditText" and n.rid != "url_field"]
-    # the toolbar's buttons as big as docked, not squeezed by the narrower bar
+    # the bar in slots a little narrower than docked, the icons as big; the toolbar's with no slot in ⋯'s panel (TB-68)
     menu = s.find(desc="展开工具栏", where="ime")
     if menu:
         d.tap(menu.c, 0.8)
@@ -460,11 +460,16 @@ def tb54(d):
         d.shot("kb", f"{way}粘贴后")
     return f"候选栏 {got[0]} 字、面板 {got[1]} 字，都整段"
 
-case("TB-55", needs="jvm:ToolbarConfigTest.handwritingIsPinnedByDefaultAndLeftOutWhereItDoesNotWrite、HandwritingUatTest.theToolbarsButtonTurnsHandwritingOffAndOn")(lambda d: None)
+case("TB-55", needs="jvm:ToolbarConfigTest.handwritingIsPinnedByDefaultAndGreyedWhereItDoesNotWrite、HandwritingUatTest.theToolbarsButtonTurnsHandwritingOffAndOn")(lambda d: None)
 
 case("TB-56", needs="jvm:BarToolbarThemeTest.theToolbarAndTheCodeAreTheThemes")(lambda d: None)
 
-case("TB-57", needs="jvm:ToolbarConfigTest.pinnedOnesWithNoRoomGoOntoTheToolbarInOrderBeforeTheMoreButton")(lambda d: None)
+case("TB-57", needs="jvm:ToolbarConfigTest.everyPinnedOneStaysAtTheRight、FloatingUatTest.theBarsEndsAreAllThereAndStayFloatingAndResizedToTheLeast")(lambda d: None)
+
+case("TB-66", needs="jvm:ToolbarConfigTest.aBarArrangedBeforeHandwritingGetsItAfterTheEmoji、AppPrefsTest.aBarArrangedBeforeHandwritingGetsIt")(lambda d: None)
+case("TB-67", needs="jvm:ToolbarConfigTest.handwritingIsPinnedByDefaultAndGreyedWhereItDoesNotWrite、ToolbarSpacingUatTest.englishGreysHandwritingInItsPlaceAndNothingMoves、ToolbarMoreUatTest.handwritingInMoresPanelIsGreyedAndLitAsOnTheBar")(lambda d: None)
+case("TB-68", needs="jvm:FloatingUatTest.theToolbarsOverflowIsInMoresPanelFloatingAndResizedToTheLeast、ToolbarUatTest.theToolbarButtonsPageSetsTheBar、ToolbarMoreUatTest.theSmallestBarsMiddleHoldsAClipAndASum")(lambda d: None)
+case("TB-69", needs="jvm:ToolbarConfigTest.aToolbarWithNothingToShowIsMoreAlone、ToolbarMoreUatTest.aToolbarWithNothingToShowHasMoreForTheMenuKey")(lambda d: None)
 
 def resizer(d, s=None):
     s = s or d.screen()

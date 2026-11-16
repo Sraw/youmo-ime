@@ -95,6 +95,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          */
         val toolbarButtons = string("toolbar_buttons", "")
 
+        /** Whether [offerHandwriting] ran: its first look at [toolbarButtons], once. */
+        val toolbarHandwritingLooked = bool("toolbar_handwriting_looked", false)
+
         /** Whether [resetHiddenSettings] ran: on the first start of a version with it, and so once. */
         val hiddenSettingsReset = bool("hidden_settings_reset", false)
 
@@ -844,6 +847,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         migrateSwipeSlots()
         migrateKeyDrawing()
         migrateKeyHandwriting()
+        offerHandwriting()
         settleMarkPositions()
         migrateKeyLists()
     }
@@ -989,6 +993,20 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val stored = internal.toolbarButtons.getValue()
         if (stored.isEmpty()) return
         internal.toolbarButtons.setValue(ToolbarConfig.parse(stored).withHandwritingPinned().serialize())
+    }
+
+    /**
+     * The toolbar's 手写 shown at the bar's right after 表情 where the user arranged the bar before it was there to
+     * choose (ToolbarConfig.handwritingNeverOffered): at every start, a 0.6.0 backup restored too; one the user took
+     * off since is left so.
+     */
+    private fun offerHandwriting() {
+        val stored = internal.toolbarButtons.getValue()
+        val firstLook = !internal.toolbarHandwritingLooked.getValue()
+        if (ToolbarConfig.handwritingNeverOffered(stored, firstLook)) {
+            internal.toolbarButtons.setValue(ToolbarConfig.parse(stored).withHandwritingOffered().serialize())
+        }
+        if (firstLook) internal.toolbarHandwritingLooked.setValue(true)
     }
 
     /**

@@ -148,10 +148,22 @@ class ToolButton(context: Context) : CustomGestureView(context) {
             image.alpha = value
         }
 
+    /**
+     * False: of no use here (手写 in English), drawn greyed, the theme's icon or the app's alike, and still in its place
+     * so that nothing moves (the user's call, 2026-11-15); its tap says why (KawaiiBarComponent).
+     */
+    var available = true
+        set(value) {
+            if (value == field) return
+            field = value
+            alpha = if (value) 1f else UNAVAILABLE_ALPHA
+        }
+
     fun iconAnimate(): ViewPropertyAnimator = image.animate()
 
     /** The icon [px] square whatever the button's size: a button made narrower keeps it as it was. */
     fun fixIconSize(px: Int) {
+        if (px == iconPx) return
         image.padding = 0
         image.layoutParams = image.layoutParams.apply {
             width = px
@@ -216,8 +228,11 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         borderlessRippleDrawable(color, dp(20))
     }
 
-    private companion object {
+    companion object {
         // the app's vectors' side
-        const val DEFAULT_ICON_DP = 24
+        private const val DEFAULT_ICON_DP = 24
+
+        /** Material's disabled content: a button of no use here (⋯'s panel's cell for it too) */
+        const val UNAVAILABLE_ALPHA = 0.38f
     }
 }

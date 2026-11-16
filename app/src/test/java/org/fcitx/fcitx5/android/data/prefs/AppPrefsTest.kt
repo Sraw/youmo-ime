@@ -200,8 +200,38 @@ class AppPrefsTest {
             row("键盘手写, the bar never arranged", "Handwriting", "", KeyDrawing.Off, true, ""),
             row("键盘手写, the bar arranged", "Handwriting", "undo,|,voice,hide", KeyDrawing.Off, true,
                 ToolbarConfig.parse("undo,|,voice,hide").withHandwritingPinned().serialize()),
-            row("滑行输入: as it was", "Glide", "undo,|,voice,hide", KeyDrawing.Glide, false, "undo,|,voice,hide"),
+            row("滑行输入: as it was, but for 手写 put on a bar from before it", "Glide", "undo,|,voice,hide", KeyDrawing.Glide, false,
+                ToolbarConfig.parse("undo,|,voice,hide").withHandwritingOffered().serialize()),
         )
+    }
+
+    // a bar arranged in 0.6.0 (no 手写 in it) gets 手写 shown after 表情 at every start, a 0.6.0 backup restored too; the
+    // first test build's, written with it unticked where parse put it, the first start only; one the user took off since
+    // left so; never arranged, nothing written (the default has it)
+    @Test
+    @Uat("TB-66")
+    fun aBarArrangedBeforeHandwritingGetsIt() {
+        val zeroSix = "undo,redo,cursor_move,clipboard,|,emoji,voice,hide"
+        val offered = ToolbarConfig.parse(zeroSix).withHandwritingOffered().serialize()
+        fun start(bar: String, looked: Boolean = false): String {
+            sp.edit {
+                clear()
+                if (bar.isNotEmpty()) putString("toolbar_buttons", bar)
+                putBoolean("toolbar_handwriting_looked", looked)
+            }
+            return AppPrefs(sp).apply { dropRetired() }.internal.toolbarButtons.getValue()
+        }
+        assertTrue(offered, offered.startsWith("undo,redo,cursor_move,clipboard,") && offered.endsWith(",|,emoji,handwriting,voice,hide"))
+        assertEquals("0.6.0's", offered, start(zeroSix))
+        assertEquals("0.6.0's restored after a start", offered, start(zeroSix, looked = true))
+        val beta = ToolbarConfig.parse(zeroSix).serialize()
+        assertEquals("the first test build's", offered, start(beta))
+        assertEquals("unticked on the toolbar since", beta, start(beta, looked = true))
+        val off = offered.replace("handwriting", "-handwriting")
+        assertEquals("unticked at the right", off, start(off))
+        assertEquals("never arranged", "", start(""))
+        val prefs = AppPrefs(sp).apply { dropRetired() }
+        assertTrue("looked at once", prefs.internal.toolbarHandwritingLooked.getValue())
     }
 
     // a 0.5 backup imported: the start after it resets the hidden settings (the import's marker) and then

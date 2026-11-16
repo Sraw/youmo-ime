@@ -152,5 +152,11 @@ class PanelActions(
     companion object {
         /** fcitx's 简繁 action (chttrans), by the name it gives it */
         const val TRAD_SIMP = "chttrans"
+
+        /** The bar's buttons that are the panel's own entries too: one with no slot on the bar is there already */
+        val OWN = setOf(
+            ToolbarButton.TradSimp, ToolbarButton.Floating, ToolbarButton.OneHanded, ToolbarButton.Habits, ToolbarButton.ClearRecent,
+            ToolbarButton.Theme, ToolbarButton.InputMethodSettings, ToolbarButton.Keyboard,
+        )
     }
 }

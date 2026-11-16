@@ -11,7 +11,6 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Vibrator
 import android.view.View
 import android.widget.TextView
-import android.widget.ViewAnimator
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -535,42 +534,61 @@ class FloatingUatTest {
         assertTrue("a buzz at the most", vibrator.isVibrating)
     }
 
-    // the open toolbar's ⋯ (the way to the settings and out of floating) always in view at its end, at the floating
-    // keyboard's width and at the narrowest it is resized to, where more buttons go onto the toolbar (TB-57): the
-    // others scrolled before it
+    // the floating keyboard's bar in slots of one width (the user's call, 2026-11-15), at its width and at the narrowest
+    // it is resized to: open, the toolbar's in the slots between, ⋯ last and in view; the ones with no slot first in
+    // ⋯'s panel, in order, none scrolled, and tapped there as on the bar
     @Test
-    @Uat("TB-22")
-    fun theToolbarsMoreIsInViewAtItsEndFloatingAndResizedToTheLeast() {
+    @Uat("TB-22", "TB-68")
+    fun theToolbarsOverflowIsInMoresPanelFloatingAndResizedToTheLeast() {
         prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
-        fun has(d: Int) = KeyboardHarness.all(h.inputView).any { h.shown(it) && it.contentDescription?.toString() == h.service.getString(d) }
-        fun moreInView(at: String) {
-            if (!has(R.string.hide_toolbar)) h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
+        fun s(d: Int) = h.service.getString(d)
+        fun has(d: Int) = KeyboardHarness.all(h.inputView).any { h.shown(it) && it.contentDescription?.toString() == s(d) }
+        val toolbar = listOf(R.string.undo, R.string.redo, R.string.text_editing, R.string.clipboard).map(::s)
+        fun overflowInMore(at: String): List<String> {
+            if (!has(R.string.hide_toolbar)) h.tap(h.described(s(R.string.expand_toolbar)))
             h.relayout()
-            val more = h.described(h.service.getString(R.string.status_area))
-            val m = h.box(more)
-            // the toolbar's own room in the bar, the pinned buttons right of it
-            val room = h.box(generateSequence(more.parent as View) { it.parent as? View }.first { it is ViewAnimator })
-            assertTrue("$at: ⋯ $m in the toolbar's room $room", h.shown(more) && m.left >= room.left - 1 && m.right <= room.right + 1)
-            assertTrue("$at: ⋯ ${m.width()} px wide", m.width() >= 28 * dp - 1)
-            // the button it is: the status area opens
-            h.tap(more)
+            val cells = ToolbarSpacingUatTest.barCells(h)
+            ToolbarSpacingUatTest.assertOnSlots(cells)
+            val more = cells.indexOfFirst { it.first == s(R.string.status_area) }
+            assertTrue("$at: ⋯ in view: $cells", more > 0)
+            val onBar = cells.subList(1, more).map { it.first }
+            val overflow = toolbar - onBar.toSet()
+            assertEquals("$at: the toolbar's in order, none scrolled: $cells", toolbar, onBar + overflow)
+            h.tap(h.described(s(R.string.status_area)))
             h.waitFor("$at: the status area") { h.relayout(); has(R.string.open_input_method_settings) }
-            h.tap(h.described(h.service.getString(R.string.back_to_keyboard)))
+            assertEquals("$at: first in ⋯'s panel", overflow, ToolbarSpacingUatTest.panelEntries(h).take(overflow.size))
+            h.tap(h.described(s(R.string.back_to_keyboard)))
             h.after(1000)
             h.relayout()
+            return overflow
         }
-        h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
-        h.relayout()
-        // every cell as wide, the toolbar's squeezed as the menu key and the right's are (the user's call, 2026-11-15):
-        // what is left over no more than the rounding, one px a cell
-        val cells = ToolbarSpacingUatTest.barCells(h)
-        ToolbarSpacingUatTest.assertEvenlyApart(cells, bigGapAfter = cells.indexOfFirst { it.first == h.service.getString(R.string.status_area) }, gap = cells.size)
-        assertTrue("squeezed: $cells", cells[0].second.width() < KawaiiBarComponent.buttonWidthDp(h.service) * dp)
-        moreInView("300 dp")
+        val at300 = overflowInMore("300 dp")
+        assertTrue("squeezed: ${ToolbarSpacingUatTest.barCells(h)}", ToolbarSpacingUatTest.barCells(h)[0].second.width() < KawaiiBarComponent.buttonWidthDp(h.service) * dp)
         h.resize(-1f, up = true)
         assertEquals(FloatingKeyboard.MIN_RESIZE_DP.toFloat(), h.widthDp(), 1f)
-        moreInView("260 dp")
+        val at260 = overflowInMore("260 dp")
+        assertTrue("fewer slots, more in ⋯: $at300 $at260", at260.size > at300.size && s(R.string.text_editing) in at260)
+        // 文本编辑 from the panel: its panel opens over the keyboard, as from the bar
+        ToolbarSpacingUatTest.openFromToolbar(h, R.string.text_editing)
+        h.waitFor("the text editing panel") { h.relayout(); has(R.string.clipboard) }
+    }
+
+    // every one at the bar's right there at the floating keyboard's width and at the narrowest it is resized to,
+    // narrower with the bar, none left out (TB-57); they and the menu key never move nor change width as the toolbar
+    // opens and shuts (the user's call, 2026-11-15)
+    @Test
+    @Uat("TB-22", "TB-57")
+    fun theBarsEndsAreAllThereAndStayFloatingAndResizedToTheLeast() {
+        prefs.setStyle(KeyboardStyle.FLOATING)
+        h.start()
+        ToolbarSpacingUatTest.assertTheEndsStay(h, "300 dp")
+        h.resize(-1f, up = true)
+        assertEquals(FloatingKeyboard.MIN_RESIZE_DP.toFloat(), h.widthDp(), 1f)
+        ToolbarSpacingUatTest.assertTheEndsStay(h, "260 dp")
+        val cells = ToolbarSpacingUatTest.barCells(h)
+        assertEquals("the menu key and the right's four: $cells", 5, cells.size)
+        assertTrue("a finger's least: $cells", cells.all { it.second.width() >= 28 * dp - 1 })
     }
 
     // a symbol's or an emoji's cell in a panel the size its grid gives it, the keyboard resized or not (only the keys

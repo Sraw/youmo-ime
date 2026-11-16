@@ -78,17 +78,21 @@ data class ToolbarConfig(val items: List<Item>) {
     }
 
     /**
-     * What the bar has in [situation], with room for [maxPinned] at the right: the ones after that
-     * go onto the toolbar, in order, before the fixed ⋯ at its end. No divider: all on the toolbar.
+     * What the bar has in [situation]: the toolbar's, then the fixed ⋯ at its end; every one shown after the divider
+     * at the right, however narrow the bar (the user's call, 2026-11-15: never one left out, [Layout.slots]). 手写 where
+     * it is not written (English, a password field) keeps its place, [Layout.unavailable]: nothing moves as 中/英
+     * switch (the user's call, 2026-11-15). No divider: all on the toolbar.
      */
-    fun layout(situation: Situation, maxPinned: Int = Int.MAX_VALUE): Layout {
+    fun layout(situation: Situation): Layout {
         val divider = items.indexOf(Item.Divider).takeIf { it >= 0 } ?: items.size
         fun shown(range: List<Item>) = range.filterIsInstance<Item.Button>()
-            .filter { it.shown && it.button != ToolbarButton.More && situation.offers(it.button) }
+            .filter { it.shown && it.button != ToolbarButton.More && (it.button == ToolbarButton.Handwriting || situation.offers(it.button)) }
             .map { it.button }
-        val pinned = shown(items.subList(minOf(divider + 1, items.size), items.size))
-        val fits = pinned.take(maxPinned.coerceAtLeast(0))
-        return Layout(shown(items.subList(0, divider)) + pinned.drop(fits.size) + ToolbarButton.More, fits)
+        return Layout(
+            shown(items.subList(0, divider)) + ToolbarButton.More,
+            shown(items.subList(minOf(divider + 1, items.size), items.size)),
+            if (situation.handwriting) emptySet() else setOf(ToolbarButton.Handwriting),
+        )
     }
 
     /** What the keyboard is in, for the buttons that are of use only in some. */
@@ -101,7 +105,7 @@ data class ToolbarConfig(val items: List<Item>) {
         val oneHanded: Boolean,
         /** the input method has keyboards to choose from */
         val keyboards: Boolean,
-        /** handwriting may be written: not a password field, not English (HandwritingMode.offered) */
+        /** handwriting may be written: not a password field, not English (HandwritingMode.offered); else greyed in its place */
         val handwriting: Boolean = true,
     ) {
         fun offers(button: ToolbarButton) = when (button) {
@@ -125,20 +129,68 @@ data class ToolbarConfig(val items: List<Item>) {
         return ToolbarConfig(rest.subList(0, divider + 1) + Item.Button(ToolbarButton.Handwriting, true) + rest.subList(divider + 1, rest.size))
     }
 
-    /** [toolbar] in the middle when it is opened, [pinned] at the right, after the middle. */
-    data class Layout(val toolbar: List<ToolbarButton>, val pinned: List<ToolbarButton>) {
-        /**
-         * Each button's cell on the bar with the toolbar open, px: the menu key's, the toolbar's and the right's alike,
-         * so they all stand evenly apart (the user's call, 2026-11-15): the bar's [rowPx] shared among them, no wider
-         * than [widestPx] (a bar button's own width: the room past that left after the toolbar), no narrower than
-         * [narrowestPx] (the toolbar scrolled past that). Not laid out yet ([rowPx] 0), [widestPx].
-         */
-        fun cellPx(rowPx: Int, widestPx: Int, narrowestPx: Int): Int =
-            if (rowPx <= 0) widestPx else (rowPx / (1 + toolbar.size + pinned.size)).coerceIn(narrowestPx, maxOf(narrowestPx, widestPx))
+    /**
+     * This with 手写 shown at the bar's right after 表情 (where [DEFAULT] has it; first there without 表情): for a bar
+     * arranged before 手写 was there to choose ([handwritingNeverOffered]).
+     */
+    fun withHandwritingOffered(): ToolbarConfig {
+        val rest = items.filterNot { it is Item.Button && it.button == ToolbarButton.Handwriting }.toMutableList()
+        if (Item.Divider !in rest) rest += Item.Divider
+        val divider = rest.indexOf(Item.Divider)
+        val emoji = rest.indexOfFirst { it is Item.Button && it.button == ToolbarButton.Emoji }
+        rest.add(if (emoji > divider) emoji + 1 else divider + 1, Item.Button(ToolbarButton.Handwriting, true))
+        return ToolbarConfig(rest)
     }
+
+    /**
+     * [toolbar] in the middle when it is opened, [pinned] at the right, after the middle; [unavailable] in their place
+     * all the same, drawn greyed, a tap saying why.
+     */
+    data class Layout(
+        val toolbar: List<ToolbarButton>,
+        val pinned: List<ToolbarButton>,
+        val unavailable: Set<ToolbarButton> = emptySet(),
+    ) {
+        /**
+         * Nothing of the toolbar's to show here, none ticked or none of use ([layout]; a greyed 手写 holds its slot, so
+         * counts): the menu key is ⋯ itself, a tap opening its panel, the toolbar never opened, 默认展开工具栏 of no
+         * effect (the user's call, 2026-11-15).
+         */
+        val moreOnly: Boolean get() = toolbar.all { it == ToolbarButton.More }
+
+        /**
+         * The bar of [rowPx] split into slots of one width (the user's call, 2026-11-15): as many as fit at about
+         * [preferredPx] (a bar button's own), the menu key in the first, [pinned] in the last, the toolbar open or shut
+         * alike, so nothing moves nor changes width as it opens. Never fewer than the menu key, [pinned] and
+         * [MIDDLE_SLOTS] between: a narrow bar (the floating keyboard's) has its slots narrower, every one at the right
+         * kept. Open, the toolbar's in the slots between, ⋯ last; those with no slot left are in ⋯'s panel, none
+         * scrolled. Not laid out yet ([rowPx] 0): [preferredPx] wide, all on the toolbar.
+         */
+        fun slots(rowPx: Int, preferredPx: Int): Slots {
+            if (rowPx <= 0 || preferredPx <= 0) return Slots(0, preferredPx, toolbar, emptyList())
+            val count = maxOf((rowPx + preferredPx / 2) / preferredPx, 1 + MIDDLE_SLOTS + pinned.size)
+            val more = toolbar.filter { it == ToolbarButton.More }
+            val others = toolbar - more.toSet()
+            val room = count - 1 - pinned.size - more.size
+            return if (others.size <= room) Slots(count, rowPx / count, toolbar, emptyList())
+            else Slots(count, rowPx / count, others.take(room) + more, others.drop(room))
+        }
+    }
+
+    /**
+     * The bar split into [count] slots [cellPx] wide (what is left over, less than a slot, after the toolbar's);
+     * [toolbar] the open toolbar's, ⋯ last; [overflow] the toolbar's with no slot, in ⋯'s panel in this order.
+     */
+    data class Slots(val count: Int, val cellPx: Int, val toolbar: List<ToolbarButton>, val overflow: List<ToolbarButton>)
 
     companion object {
         const val DIVIDER = "|"
+
+        /**
+         * The least slots between the menu key and the right's: shut, a clipboard suggestion's or a sum's room; open,
+         * one of the toolbar's and ⋯.
+         */
+        const val MIDDLE_SLOTS = 2
         private const val HIDDEN = "-"
 
         /**
@@ -178,6 +230,22 @@ data class ToolbarConfig(val items: List<Item>) {
             val missing = ToolbarButton.settable.filter { b -> items.none { it is Item.Button && it.button == b } }
             items.addAll(items.indexOf(Item.Divider), missing.map { Item.Button(it, false) })
             return ToolbarConfig(items)
+        }
+
+        /**
+         * Whether [raw], a bar the user arranged, is one from before 手写 was on the list to choose: 0.6.0's, no 手写 in
+         * it (parse adds it hidden, as any button added later, but this one the user's call has on the bar, 2026-11-15);
+         * or, [firstLook] (the first start of a version with this), 0.6.1's first test build's, where the settings page
+         * wrote it unticked before the divider, as parse put it in. One the user took off since it was there to choose
+         * (unticked at the right, or moved) stays so. Empty: never arranged, [DEFAULT] has it.
+         */
+        fun handwritingNeverOffered(raw: String, firstLook: Boolean): Boolean {
+            if (raw.isEmpty()) return false
+            val tokens = raw.split(',')
+            val at = tokens.indexOfFirst { it.removePrefix(HIDDEN) == ToolbarButton.Handwriting.key }
+            if (at < 0) return true
+            val divider = tokens.indexOf(DIVIDER).takeIf { it >= 0 } ?: tokens.size
+            return firstLook && at < divider && tokens[at].startsWith(HIDDEN)
         }
 
         private fun Item.sameAs(other: Item) = when (this) {

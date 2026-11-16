@@ -66,6 +66,7 @@ class ClipboardSuggestionUi(override val ctx: Context, private val theme: Theme)
             centerVertically()
         })
         add(text, lParams(wrapContent, wrapContent) {
+            constrainedWidth = true
             after(icon, spacing)
             endOfParent(spacing)
             centerVertically()
@@ -78,7 +79,9 @@ class ClipboardSuggestionUi(override val ctx: Context, private val theme: Theme)
     }
 
     override val root = constraintLayout {
+        // no wider than the room between the menu key and the right's (the narrowest floating bar's ~74 dp), shortened
         add(suggestionView, lParams(wrapContent, matchConstraints) {
+            constrainedWidth = true
             centerInParent()
             verticalMargin = dp(4)
         })

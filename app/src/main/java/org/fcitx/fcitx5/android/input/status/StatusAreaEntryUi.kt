@@ -16,6 +16,7 @@ import android.widget.ImageView
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
+import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import splitties.dimensions.dp
@@ -119,6 +120,7 @@ class StatusAreaEntryUi(override val ctx: Context, private val theme: Theme) : U
         bkgDrawable.paint.color =
             if (entry.active) theme.genericActiveBackgroundColor else theme.keyBackgroundColor
         label.text = entry.label
+        root.alpha = if (entry.available) 1f else ToolButton.UNAVAILABLE_ALPHA
     }
 
     private fun getFirstCharacter(s: String): String {

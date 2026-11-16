@@ -367,7 +367,7 @@
     <string name="section_sound_and_vibration">声音与振动</string>
     <string name="long_press_characters_summary">长按弹出的字符，上滑和下滑做什么：长按首选、快捷键（全选、复制、粘贴、撤销）、一段文字</string>
     <string name="toolbar_buttons">工具栏按钮</string>
-    <string name="toolbar_buttons_summary">键盘上方的按钮：排顺序、选显示哪些。菜单键一直在</string>
+    <string name="toolbar_buttons_summary">键盘上方的按钮：排顺序、选显示哪些。菜单键一直在；分隔线上面的当时一个都显示不了时，菜单键就是 ⋯，点了直接开菜单</string>
     <string name="toolbar_divider">以下一直显示在栏的右边</string>
     <string name="toolbar_reset">恢复默认</string>
     <string name="toolbar_trad_simp">简繁切换</string>
@@ -650,6 +650,9 @@
     <string name="english_keyboard">键盘</string>
     <string name="english_keyboard_summary">屏幕上打英文用的键盘。实体键盘仍按字母打。</string>
     <string name="handwriting">手写</string>
+    <string name="handwriting_not_here">这里不能手写：英文和密码框里没有手写</string>
+    <string name="handwriting_unavailable">%1$s，这里用不了</string>
+    <string name="toolbar_more">更多</string>
     <string name="handwriting_retired">手写已并入工具栏：点工具栏上的手写按钮在键盘上写字，再点一下关掉%1$s</string>
     <string name="handwriting_retired_moved">。输入法列表里已换成拼音</string>
     <string name="handwriting_retired_traditional">。手写的字现在跟所在输入法的简繁走</string>

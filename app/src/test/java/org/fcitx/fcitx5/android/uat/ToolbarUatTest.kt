@@ -627,7 +627,9 @@ class ToolbarUatTest {
         val pinned = listOf(R.string.theme, R.string.a11y_key_emoji, R.string.handwriting, R.string.voice_input, R.string.hide_keyboard)
         assertEquals(pinned.map(::s), barButtons())
         expand()
-        assertEquals((listOf(R.string.redo, R.string.text_editing, R.string.clipboard, R.string.quick_phrases, R.string.status_area) + pinned).map(::s), barButtons())
+        // ten slots: the menu key, five at the right, three of the toolbar's and ⋯; 快速输入 with no slot in ⋯'s panel
+        assertEquals((listOf(R.string.redo, R.string.text_editing, R.string.clipboard, R.string.status_area) + pinned).map(::s), barButtons())
+        assertEquals(s(R.string.quick_phrases), ToolbarSpacingUatTest.openMore(h).first())
     }
 
     @Test
@@ -725,7 +727,8 @@ class ToolbarUatTest {
     @Test
     @Uat("TB-43")
     fun floatingTheBarFitsAndHasNoOneHanded() {
-        // more at the right than a floating bar holds: the rest on the toolbar, the menu key and ⋯ reachable
+        // more at the right than a floating bar holds at a button's width: all of them there, narrower (the user's call,
+        // 2026-11-15), none over the menu key, ⋯ reachable
         prefs.set(toolbarButtons, "undo,|,emoji,voice,hide,theme,floating,one_handed,habits,clear_recent,input_method_settings,redo")
         prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
@@ -733,13 +736,13 @@ class ToolbarUatTest {
         val menu = h.box(h.described(s(R.string.expand_toolbar)))
         val bar = h.box(h.bar)
         val right = barButtons()
-        assertTrue(right.toString(), right.size in 1..6)
+        assertEquals(right.toString(), 9, right.size)
         for (name in right) {
             val b = h.box(h.described(name))
             assertTrue("$name $b over the menu key $menu", b.left >= menu.right && b.right <= bar.right)
         }
         assertFalse(s(R.string.one_handed) in right)
-        // lit wherever it went, the right or the toolbar
+        // lit at the right
         expand()
         assertTrue(lit(R.string.floating_keyboard))
         val all = barButtons()

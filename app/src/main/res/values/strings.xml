@@ -372,7 +372,7 @@
     <string name="section_sound_and_vibration">Sound &amp; vibration</string>
     <string name="long_press_characters_summary">What a long press offers, and what swiping up and down does: the first of the long press, a shortcut (select all, copy, paste, undo), a text</string>
     <string name="toolbar_buttons">Toolbar buttons</string>
-    <string name="toolbar_buttons_summary">Order the buttons above the keyboard and choose which show. The menu key is always there</string>
+    <string name="toolbar_buttons_summary">Order the buttons above the keyboard and choose which show. The menu key is always there; with none of those above the line to show, it is ⋯ and opens the menu</string>
     <string name="toolbar_divider">Below: always on the bar\'s right</string>
     <string name="toolbar_reset">Reset to default</string>
     <string name="toolbar_trad_simp">Simplified / Traditional</string>
@@ -669,6 +669,9 @@
     <string name="english_keyboard">Keyboard</string>
     <string name="english_keyboard_summary">The on-screen keyboard English is typed on. A hardware keyboard still types letters.</string>
     <string name="handwriting">Handwriting</string>
+    <string name="handwriting_not_here">Handwriting isn\'t available here: not in English nor a password field</string>
+    <string name="handwriting_unavailable">%1$s, not available here</string>
+    <string name="toolbar_more">More</string>
     <string name="handwriting_retired">Handwriting is on the toolbar now: tap its handwriting button to write on the keyboard, tap again to stop%1$s</string>
     <string name="handwriting_retired_moved">. Pinyin took its place in your input methods</string>
     <string name="handwriting_retired_traditional">. What you write now follows the simplified/traditional setting of the input method you write in</string>

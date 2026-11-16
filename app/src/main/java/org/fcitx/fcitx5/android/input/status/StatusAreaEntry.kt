@@ -9,6 +9,7 @@ import androidx.annotation.DrawableRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.bar.BarIcons
+import org.fcitx.fcitx5.android.input.bar.ToolbarButton
 import org.fcitx.fcitx5.android.input.bar.ToolbarButtonLooks
 
 /**
@@ -21,6 +22,8 @@ sealed class StatusAreaEntry(
     val icon: Int,
     val active: Boolean,
     val named: BarIcons.Icon?,
+    /** false: drawn greyed (a toolbar button of no use here, as on the bar) */
+    val available: Boolean = true,
 ) {
     class Android(label: String, val type: Type, active: Boolean = false) :
         StatusAreaEntry(label, ToolbarButtonLooks.drawable(iconOf(type).fallback), active, iconOf(type)) {
@@ -41,6 +44,12 @@ sealed class StatusAreaEntry(
             KeyboardChoice
         }
     }
+
+    /** A button of the toolbar's with no slot on the bar (ToolbarConfig.Layout.slots), as on it: lit, greyed */
+    class Bar(val button: ToolbarButton, label: String, active: Boolean, available: Boolean) :
+        StatusAreaEntry(
+            label, ToolbarButtonLooks.drawable(ToolbarButtonLooks.of(button).icon.fallback), active, ToolbarButtonLooks.of(button).icon, available,
+        )
 
     class Host(val action: StatusEntry, label: String, icon: Int, active: Boolean) :
         StatusAreaEntry(label, icon, active, BarIcons.engine(action.icon))
