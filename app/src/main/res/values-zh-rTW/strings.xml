@@ -1386,4 +1386,7 @@
     <string name="rare_chars_expand">展開</string>
     <string name="rare_chars_collapse">收起</string>
     <string name="rare_chars_letters">按字母跳轉</string>
+    <string name="settings_card_expand">展開</string>
+    <string name="settings_card_collapse">收起</string>
+    <string name="settings_card_partial">部分選中</string>
 </resources>

@@ -1413,4 +1413,7 @@
     <string name="rare_chars_expand">Expand</string>
     <string name="rare_chars_collapse">Collapse</string>
     <string name="rare_chars_letters">Index by letter</string>
+    <string name="settings_card_expand">Expand</string>
+    <string name="settings_card_collapse">Collapse</string>
+    <string name="settings_card_partial">Partially checked</string>
 </resources>
