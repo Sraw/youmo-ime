@@ -1386,8 +1386,8 @@
     <string name="rare_chars_off">Off</string>
     <string name="rare_chars_held">%1$s characters held back</string>
     <string name="rare_chars_switch">Hold back rare characters</string>
-    <string name="rare_chars_note">%1$s · Never in candidates, predictions, handwriting or voice · Changes take effect when you leave this page</string>
-    <string name="rare_chars_note_off">Off · Changes take effect when you leave this page</string>
+    <string name="rare_chars_note">%1$s · Never in candidates, predictions, handwriting or voice · By default only the extensions are held back; for characters like 犇 and 夲, tick Level 3 characters or Other unlisted · Changes take effect when you leave this page</string>
+    <string name="rare_chars_note_off">Off · By default only the extensions are held back; for characters like 犇 and 夲, tick Level 3 characters or Other unlisted · Changes take effect when you leave this page</string>
     <string name="rare_chars_search_hint">Search by pinyin, or paste a character</string>
     <string name="rare_chars_common">%1$s: a common character, cannot be held back</string>
     <string name="rare_chars_not_ours">%1$s: not a character this page manages</string>

@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.phrase.Chaizi
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
@@ -328,6 +329,48 @@ class RareCharContractTest : EnginesFixture() {
                 e.typed(PINYIN, "da")
                 assertEquals(2, e.rareHeldMade)
             },
+        )
+    }
+
+    // pinyin's 18 keys' codes for [letters], as the keyboard hands them
+    private fun Engines.keys18(letters: String): List<String> {
+        onEvent(PINYIN, EngineEvent.RESET, 0)
+        letters.forEach { onEvent(PINYIN, EngineEvent.CHAR, Keyboard.pinyin18Key(NineKeyLetters.G18.key(it))) }
+        return texts(PINYIN)
+    }
+
+    /**
+     * 0.6.1 测试版 1's report (dev/design/061-rare-switch-research.md): one choice for every keyboard, so
+     * going from the nine keys to the full one and the 18 keys, each a session of its own
+     * ([KeyboardPair]), with no reload between, holds back the same once a reload made the sessions anew,
+     * and it is found once.
+     */
+    @Test
+    @Uat("WD-61")
+    fun theChoiceOutlivesAKeyboardSwitch() = engines().use { e ->
+        assertRows(
+            "off: 龘 on each keyboard (the sessions made now, before it is on)" to {
+                some(out, e.nineKeys("32"))
+                some(out, e.typed(PINYIN, "da"))
+                some(out, e.keys18("da"))
+            },
+            "turned on while on the nine keys: 龘 and 𤝰 not there" to {
+                file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
+                e.reload()
+                none(out, e.nineKeys("32"))
+                none(ext, e.nineKeys("32"))
+            },
+            "the full keyboard next, no reload: not there either" to {
+                none(out, e.typed(PINYIN, "da"))
+                none(ext, e.typed(PINYIN, "da"))
+                some("大", e.typed(PINYIN, "da"))
+            },
+            "the 18 keys, then the nine keys again, then the full one: none" to {
+                none(out, e.keys18("da"))
+                none(out, e.nineKeys("32"))
+                none(out, e.typed(PINYIN, "da"))
+            },
+            "the words held found once for all the keyboards" to { assertEquals(1, e.rareHeldMade) },
         )
     }
 

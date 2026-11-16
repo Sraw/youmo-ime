@@ -9,7 +9,7 @@ import tempfile
 import time
 import unicodedata
 
-from uat import Blocked, PKG, case, check, first, home, sym_char, in_picker
+from uat import Blocked, PKG, case, check, ensure_ime, first, home, pinyin_keyboard, sym_char, in_picker
 
 FIXTURES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fixtures")
 DOWNLOAD = "/sdcard/Download"
@@ -1052,6 +1052,55 @@ def wd60(d):
     check(total and held[0] > 0 and held[0] == int(total.group(1).replace(",", "")), f"第一组已屏蔽 {held[:2]}，页顶「{note}」")
     check(len(held) >= 2 and held[1] == 0, f"第二组（三级字）已屏蔽 {held[1:2]}")
     return f"组序 {names}；第一组已屏蔽 {held[0]}，页顶「{note.split(' · ')[0]}」"
+
+
+# the nine keys' letter keys by the digit they stand for (their keys are named by their letters)
+NINE_KEYS = dict(zip("23456789", ["abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz"]))
+
+
+def nine_cands(d, digits):
+    d.open_page("text")
+    d.switch_im("拼音")
+    k = d.keys(refresh=True)
+    d.taps([k[NINE_KEYS[c]] for c in digits], gap=0.35, after=0.6)
+    got = d.cands()
+    d.clear()
+    return got
+
+
+@case("WD-61", base="B0-设置", mutates=True)
+def wd61(d):
+    rare_page(d)
+    note = rare_note(d.screen())
+    d.back(1.0)
+    check("默认只挡扩展区" in note and "犇" in note and "三级字" in note and "其它表外字" in note and "离开本页后生效" in note,
+          f"开关下的说明：{note!r}")
+    d.step("打开，九键")
+    row = rare_switch(d, True)
+    check(row.startswith("已屏蔽 "), f"打开后那一行：{row!r}")
+    pinyin_keyboard(d, "九键")
+    nine = nine_cands(d, "346")
+    check(nine and not ext(nine), f"九键 346：{nine[:10]}，扩展区的 {ext(nine)}")
+    d.step("开关还开着")
+    home(d, "词库与短语")
+    again = rare_row(d)
+    check(again == row, f"切到九键后那一行：{again!r}，原来 {row!r}")
+    sw = rare_page(d)
+    check(sw.checked, "切到九键后开关是关的")
+    d.back(1.0)
+    d.step("全键盘")
+    pinyin_keyboard(d, "全键盘")
+    full = page_cands(d, "din")
+    d.clear()
+    check(full and not ext(full), f"切回全键盘 din：{full[:10]}，扩展区的 {ext(full)}")
+    d.step("强制停止后")
+    d.sh(f"am force-stop {PKG}")
+    time.sleep(1)
+    ensure_ime(d)
+    after = page_cands(d, "din")
+    d.clear()
+    check(after and not ext(after), f"强制停止后 din：{after[:10]}，扩展区的 {ext(after)}")
+    return f"{row}；九键 346 首 {nine[:3]}，全键盘 din 首 {full[:3]}，重启后 {after[:3]}"
 
 
 @case("WD-57", base="B0-设置", mutates=True)

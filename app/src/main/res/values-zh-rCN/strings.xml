@@ -1359,8 +1359,8 @@
     <string name="rare_chars_off">关</string>
     <string name="rare_chars_held">已屏蔽 %1$s 个字</string>
     <string name="rare_chars_switch">屏蔽生僻字</string>
-    <string name="rare_chars_note">%1$s · 候选、联想、手写、语音里都不出现 · 改动在离开本页后生效</string>
-    <string name="rare_chars_note_off">关 · 改动在离开本页后生效</string>
+    <string name="rare_chars_note">%1$s · 候选、联想、手写、语音里都不出现 · 默认只挡扩展区，犇、夲 这类字要勾上三级字或其它表外字 · 改动在离开本页后生效</string>
+    <string name="rare_chars_note_off">关 · 默认只挡扩展区，犇、夲 这类字要勾上三级字或其它表外字 · 改动在离开本页后生效</string>
     <string name="rare_chars_search_hint">搜拼音或粘贴一个字</string>
     <string name="rare_chars_common">%1$s：常用字，不能屏蔽</string>
     <string name="rare_chars_not_ours">%1$s：不是这里管的字</string>
