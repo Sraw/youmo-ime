@@ -479,3 +479,9 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **操作**：在页上的搜索框打 da（拼音键盘打了按回车上屏字母）；清空，粘贴「大」；清空，粘贴「龘」；清空。勾上「三级字」，右上角菜单 → **恢复默认**，确定。设置首页搜「生僻」。转一下屏。
 - **预期**：搜 da 列出读 da 的字（跨组，格子上的读音是 dá、dà……）；粘贴「大」写「大：常用字，不能屏蔽」，没有格子；粘贴「龘」只有「龘」一格；恢复默认先问「回到只屏蔽扩展区，并清空单独屏蔽和放行的字？」，确定后三级字的勾选框回到不勾、扩展区的回到勾上，底部有 **撤销**；设置搜索里有「生僻字屏蔽」，点了进这一页；转屏后改动和搜的字都还在。
 - **JVM**：`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（搜拼音、粘贴一级字、粘贴一个字定位）、`RareCharsPageUatTest.resetATurnAndALaterVersionsFile`（恢复默认、转屏）、`SettingsIndexTest.theRareCharactersPageIsFound`、ime-core `RarePageTest.aSearchFindsASpellingOrThePastedCharacter`；设备上跑搜 da 和恢复默认。
+
+### WD-60 [P1] 生僻字屏蔽：默认屏蔽的扩展区排第一，一打开开关第一栏就有屏蔽的字
+- **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 关着，没改过。
+- **操作**：进 **词库与短语 → 生僻字屏蔽**，看各组的顺序；打开开关，看第一组的组头和页顶的说明。
+- **预期**：组的顺序是 **扩展区（扩展 B 及以后）**、**三级字**、**繁体字**、**其它表外字（基本区和扩展 A）**：默认屏蔽的扩展区在最前（仍默认收起），其余三组照原来的先后。打开后第一组扩展区的组头勾上，下面写「已屏蔽 N」，N 大于 0，和页顶「已屏蔽 N 个字」的 N 一样；三级字写「已屏蔽 0」。
+- **JVM**：ime-core `RarePageTest.thePageListsTheGroupsHeldByDefaultFirstTheRestInTheirOrder`（页上的组序：默认屏蔽的在前，其余按原序；存的文件和组的编号不变）、`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（组头的先后：扩展区、三级字、繁体字、其它表外字）；设备上照跑。

@@ -659,7 +659,9 @@ Stored as a command key in format 1 (0.6.0 skips the line, that slot back to its
 (`SplitGap`, ime-core: in a row of letters, room between two of them at least half a key wide, found
 from where the letters are, so only the 26 keys split have it), passed to `GlideTouch.down` as
 `inGap`, and `GlideInput` keeps that down though no key takes it (else its moves would go nowhere);
-a tap there still does nothing, and a glide starts on a letter only.
+a tap there still does nothing, and a glide starts on a letter only. A stroke starts on the keys `BaseKeyboard.glideInput`'s
+`writesAlso` adds for 手写 too, Shift's but (`GlideInput.strokeKeys`, by the key's drawn cell, as the letters): `T9Keyboard`'s 1, the 3×3;
+a tap there that key's (the separator while typing), a glide never.
 
 Writing on the keys (the toolbar's 手写; designs 060-kbd-handwriting, 061-handwriting-toolbar) is `BaseKeyboard`'s,
 with the glide's touch (`GlideInput`): while `HandwritingMode.writes` (the toggle on, an input method that writes, not a
@@ -1300,7 +1302,8 @@ Rules for settings, all decided:
   by the engine at `reloadEngine`. The page copies the grid off the engine in one `HostApi.rareGrid`,
   sorts it and drops what `Paint.hasGlyph` cannot draw off the main thread (`RareCharsViewModel`,
   kept over a turn), keeps its edits in ime-core `RareEdits` (`DragRange` for the drag, `RareLayout`
-  for the rows), and saves them laid over the file as it then is at `onStop`, then reloads the
+  for the rows; `RareLayout.ORDER` lists the groups held by default first, 扩展区, so the page turned on shows
+  a group with characters held at its top; the file and the grid keep `Level.GRID`'s order), and saves them laid over the file as it then is at `onStop`, then reloads the
   engine; no edit, no save. A later version's file, or one not read, makes the page read-only. The
   user-word lists mark a word with a character held (`CharGate.heldIn`) and offer 「放行」 through
   `RareCharsManager.allow`. JVM tests have no APK assets: `RareCharsManager.useLevels` takes

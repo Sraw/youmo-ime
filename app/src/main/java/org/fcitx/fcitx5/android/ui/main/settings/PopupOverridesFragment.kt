@@ -553,11 +553,11 @@ class PopupOverridesFragment : KeyCapsPageFragment() {
         return SwipeSlotSection(ctx, getString(if (up) R.string.swipe_up else R.string.swipe_down), !on, slots.resolve(slotKey, up), strokesDrawn)
     }
 
-    // a key a stroke drawn starts on (GlideTouch.down: a letter key): the full keyboard's, 九键's 2 to 9, the
-    // grouped keyboards'; not 九键's 1, 注音's (they draw none), the numbers' nor a function key
+    // a key a stroke drawn starts on (GlideInput.down: a letter key, or a key of BaseKeyboard.glideInput's writesAlso
+    // but Shift, 九键's 1): the full keyboard's, 九键's 1 to 9, the grouped keyboards'; not 注音's (they draw none),
+    // the numbers' nor a function key
     private fun startsStroke(slotKey: String): Boolean =
-        listOf(KeyShortcutPages.Full, KeyShortcutPages.Grouped14, KeyShortcutPages.Grouped18).any { slotKey in it.names } ||
-            slotKey in KeyShortcutPages.Nine.names && slotKey != KeyShortcuts.charKey(KeyShortcutPreset.NINE, "1")
+        listOf(KeyShortcutPages.Full, KeyShortcutPages.Nine, KeyShortcutPages.Grouped14, KeyShortcutPages.Grouped18).any { slotKey in it.names }
 
     private fun LinearLayout.keyParams(ctx: Context, weight: Float) = lParams(0, ctx.dp(KeyHeight)) {
         this.weight = weight

@@ -1028,6 +1028,32 @@ case("WD-56", needs="jvm:RareCharsPageUatTest.aUserWordWithACharacterHeldIsMarke
      "HeldWordsTest.theUserModelAsksItsWordsAsTheDictionarysAndTheUsersByText")(lambda d: None)
 
 
+@case("WD-60", base="B0-设置", mutates=True)
+def wd60(d):
+    sw = rare_page(d)
+
+    def heads(s):
+        # the groups' heads shown, top to bottom: each one's name and box state, and the 「已屏蔽 N」 under each
+        boxes = sorted((n for n in s.app() if n.cls == "CheckBox" and n.desc.startswith(GROUPS)), key=lambda n: n.c[1])
+        held = sorted((n.c[1], int(m.group(1).replace(",", ""))) for n in s.app() if n.text
+                      for m in [re.match(r"已屏蔽 ([\d,]+)$", n.text.split("\n")[0])] if m)
+        return [(b.desc.split("，")[0], b.desc.rsplit("，", 1)[-1]) for b in boxes], [h for _, h in held]
+    off, _ = heads(d.screen())
+    d.tap(sw.c, 0.8)
+    on, held = d.wait(lambda s: (lambda h: h if h[0] and h[0][0][1] == "全部屏蔽" and h[1] else None)(heads(s)), timeout=8, step=0.3,
+                      what="开关打开、第一组勾上")
+    note = rare_note(d.screen())
+    total = re.match(r"已屏蔽 ([\d,]+) 个字", note)
+    d.shot("app", "打开后第一组是扩展区，已屏蔽的字数和页顶一样")
+    d.back(1.0)
+    names = [n for n, _ in off]
+    check(len(names) >= 2 and names[0].startswith("扩展区") and names[1] == "三级字", f"组的顺序：{names}")
+    check(on[0][0].startswith("扩展区"), f"打开后第一组：{on[:1]}")
+    check(total and held[0] > 0 and held[0] == int(total.group(1).replace(",", "")), f"第一组已屏蔽 {held[:2]}，页顶「{note}」")
+    check(len(held) >= 2 and held[1] == 0, f"第二组（三级字）已屏蔽 {held[1:2]}")
+    return f"组序 {names}；第一组已屏蔽 {held[0]}，页顶「{note.split(' · ')[0]}」"
+
+
 @case("WD-57", base="B0-设置", mutates=True)
 def wd57(d):
     rare_switch(d, True)

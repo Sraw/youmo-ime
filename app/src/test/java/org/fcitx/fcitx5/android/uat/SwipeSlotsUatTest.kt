@@ -89,7 +89,8 @@ class SwipeSlotsUatTest {
     // swiped up, the engine's stroke key sent and never the key's letters, nothing committed first (it filters what
     // is typed), with 在键上划 off and with nothing typed under 笔画筛选 (the engine does nothing with it then:
     // StrokeFilterTest); under 笔画筛选 with pinyin typed the swipe on a letter key is a stroke drawn (KB-42), up none;
-    // 九键's 1 starts no stroke (GlideTouch.down), so its slot's sent then too
+    // 九键's 1 starts one too (the 3×3 drawn over), so its slot's sent only where no stroke is drawn: nothing typed,
+    // 在键上划 off or 滑行输入 chosen (the nine keys never glide)
     @Test
     @Uat("ST-120")
     fun aStrokeSlotSendsItsStroke() {
@@ -101,7 +102,10 @@ class SwipeSlotsUatTest {
                 Row("nine keys, 在键上划 off, nothing typed: the stroke key still, never DEF (the engine drops it)", ImKeyboard.NINE_KEYS, KeyDrawing.Off, "", listOf(true)),
                 Row("nine keys, 笔画筛选, nothing typed: no stroke drawn then, so the slot's", ImKeyboard.NINE_KEYS, KeyDrawing.StrokeFilter, "", listOf(true)),
                 Row("nine keys, 笔画筛选, pinyin typed: a stroke drawn, up none; the slot not reached", ImKeyboard.NINE_KEYS, KeyDrawing.StrokeFilter, "wang", listOf()),
-                Row("nine keys' 1, 笔画筛选, pinyin typed: no stroke starts on it, the slot's sent", ImKeyboard.NINE_KEYS, KeyDrawing.StrokeFilter, "wang", listOf(true), nine = "1"),
+                Row("nine keys' 1, 笔画筛选, pinyin typed: a stroke starts on it too (the 3×3), up none; the slot not reached", ImKeyboard.NINE_KEYS, KeyDrawing.StrokeFilter, "wang", listOf(), nine = "1"),
+                Row("nine keys' 1, 笔画筛选, nothing typed: no stroke drawn then, so the slot's", ImKeyboard.NINE_KEYS, KeyDrawing.StrokeFilter, "", listOf(true), nine = "1"),
+                Row("nine keys' 1, 在键上划 off, pinyin typed: the slot's", ImKeyboard.NINE_KEYS, KeyDrawing.Off, "wang", listOf(true), nine = "1"),
+                Row("nine keys' 1, 滑行输入, pinyin typed: no stroke drawn (the nine keys never glide), so the slot's", ImKeyboard.NINE_KEYS, KeyDrawing.Glide, "wang", listOf(true), nine = "1"),
                 Row("full keyboard, 在键上划 off, pinyin typed: the same key, any keyboard", ImKeyboard.FULL, KeyDrawing.Off, "wo", listOf(true)),
             ),
             { it.why },

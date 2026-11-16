@@ -241,12 +241,12 @@ class RareCharsFragment : Fragment() {
         val query = viewModel.query
         message.visibility = View.GONE
         val groups = if (query.isBlank()) {
-            Level.GRID.map { level -> RareLayout.Group(level, page.shown.getValue(level), page::letterOf, level in viewModel.open) }
+            RareLayout.ORDER.map { level -> RareLayout.Group(level, page.shown.getValue(level), page::letterOf, level in viewModel.open) }
         } else {
             when (val found = RareEdits.search(query, page.grid, page.levels, page.sorted)) {
                 is Found.Cells -> {
                     if (found.cells.isEmpty()) say(getString(R.string.rare_chars_none_found, query.trim()))
-                    Level.GRID.mapNotNull { level ->
+                    RareLayout.ORDER.mapNotNull { level ->
                         found.cells.filter { page.grid.level(it) == level }.takeIf { it.isNotEmpty() }
                             ?.let { RareLayout.Group(level, it.toIntArray(), page::letterOf, true) }
                     }
@@ -439,7 +439,8 @@ class RareCharsFragment : Fragment() {
                     y > list.height - edge -> list.context.dp(SCROLL_DP)
                     else -> 0
                 }
-                if (by == 0) return
+                // at the list's end it stops (a move starts it again): else on and on, a frame at a time, till the lift
+                if (by == 0 || !list.canScrollVertically(by)) return
                 list.scrollBy(0, by)
                 moveTo(x, y)
                 list.postOnAnimation(this)

@@ -321,7 +321,7 @@ class PopupOverridesFragmentTest {
                 listOf(
                     Row("笔画筛选, a stroke on q: said", KeyDrawing.StrokeFilter, R.string.shortcut_page_full, "full/q", "q", pie, true),
                     Row("笔画筛选, a stroke on 九键's 3, a letter key: said", KeyDrawing.StrokeFilter, R.string.shortcut_page_nine, "t9/3", "3", pie, true),
-                    Row("笔画筛选, a stroke on 九键's 1: no stroke starts there, the slot's sent, nothing to say", KeyDrawing.StrokeFilter, R.string.shortcut_page_nine, "t9/1", "1", pie, false),
+                    Row("笔画筛选, a stroke on 九键's 1: a stroke starts there too (the 3×3), said", KeyDrawing.StrokeFilter, R.string.shortcut_page_nine, "t9/1", "1", pie, true),
                     Row("在键上划 off, a stroke: always reached, nothing to say", KeyDrawing.Off, R.string.shortcut_page_full, "full/q", "q", pie, false),
                     Row("笔画筛选, another command: not a stroke", KeyDrawing.StrokeFilter, R.string.shortcut_page_full, "full/q", "q", SwipeSlot.Command(KeyCommand.Paste), false),
                     Row("笔画筛选, a text", KeyDrawing.StrokeFilter, R.string.shortcut_page_full, "full/q", "q", SwipeSlot.Text("x"), false),

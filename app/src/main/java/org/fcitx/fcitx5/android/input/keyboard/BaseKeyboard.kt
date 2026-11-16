@@ -211,6 +211,9 @@ abstract class BaseKeyboard(
      * one: sent as the engine's stroke key (KeyAction.SymAction.stroke), the shape StrokeShape's; one it
      * reads as none is dropped.
      *
+     * A stroke may start on the keys of [writesAlso] too but Shift (a function key, its own slots): 九键's 1, a tap there that key's as ever;
+     * by their cells, as on the letters, so a down in the gap between 1 and 2 goes as one between 2 and 3 does.
+     *
      * Made also: the toolbar's 手写 over these letters ([keyInk]), the keys of [writesAlso] (Shift, unless a
      * keyboard says otherwise) written on with them; a keyboard that never calls this writes nothing on its
      * keys ([onAction], [restartInk] and the pad's showing all go by it).
@@ -241,6 +244,7 @@ abstract class BaseKeyboard(
             strokeLift = { prefs.keyboard.strokeLift.getValue().dp },
             // as a tap there types, a stroke drawn there lifted short
             tapKey = { x, y -> sceneKeys.touch?.find(x, y)?.takeIf { it.enabled }?.let { it.key.tap(it.cell, x, y) } },
+            strokeKeys = { canvas?.scene?.keys.orEmpty().filter { it.role != SHIFT_ROLE && writesAlso(it) }.map { scenePlace(it.id, it.copy == 1) } },
             ink = ink,
             writes = { keyWriting?.now == true },
             writingArea = { x, y -> letterArea?.at(canvas, x, y) == true },

@@ -76,6 +76,19 @@ class RarePageTest {
         },
     )
 
+    // the page turned on shows a group with characters held at its top: 扩展区, the default's, first (it was last,
+    // under 三级字's 0 held); the rest as before. Only the page's order: the grid and the file keep GRID's
+    @Test
+    fun thePageListsTheGroupsHeldByDefaultFirstTheRestInTheirOrder() = assertRows(
+        "扩展区 first, then 三级字, 繁体字, 其它表外字" to { assertEquals(listOf(Level.EXT, Level.L3, Level.TRAD, Level.OUT), RareLayout.ORDER) },
+        "the default's groups ahead of every other" to {
+            val held = RareLayout.ORDER.takeWhile { it in RareChoice.DEFAULT }
+            assertEquals(RareChoice.DEFAULT, held.toSet())
+            assertEquals(Level.GRID.filter { it !in RareChoice.DEFAULT }, RareLayout.ORDER.drop(held.size))
+        },
+        "the grid's groups unchanged" to { assertEquals(listOf(Level.L3, Level.TRAD, Level.OUT, Level.EXT), Level.GRID) },
+    )
+
     @Test
     fun theRowsAreFoundByBinarySearch() {
         val layout = RareLayout(

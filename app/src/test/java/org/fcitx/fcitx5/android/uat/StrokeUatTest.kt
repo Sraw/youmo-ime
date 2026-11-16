@@ -8,6 +8,7 @@ import android.graphics.Rect
 import android.view.MotionEvent
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.UNICODE
@@ -355,6 +356,48 @@ class StrokeUatTest {
         h.api.calls.clear()
         draw(h.nineKey("2"), across = 0.8f, down = 1.2f)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('n') in it })
+    }
+
+    // the bug: a stroke started on 九键's 1 (top left: a 横 along the top row) was no stroke, the letters' keys alone
+    // taken as where one starts; 1 is in the 3×3 drawn over as the toolbar's 手写 writes there. A tap on it is the separator still
+    @Test
+    @Uat("T9-69")
+    fun theNineKeysOneStartsAStrokeAsTheLettersDoATapIsStillTheSeparator() {
+        harness(KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS)
+        typed("wang")
+        h.api.calls.clear()
+        draw(h.nineKey("1"), across = 2f, down = 0f)
+        assertEquals(downs().toString(), listOf(true), downs().map { stroke('h') in it })
+        h.api.calls.clear()
+        draw(h.nineKey("1"), across = 0.8f, down = 1.2f)
+        assertEquals(downs().toString(), listOf(true), downs().map { stroke('n') in it })
+        // the engine's word that nine keys are typed: 1's tap its code (PINYIN_NINE's 1), the engine's separator
+        EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, composing = true, syllables = listOf("wang"), id = 1)
+        try {
+            h.idle()
+            h.api.calls.clear()
+            h.tap(h.nineKey("1"))
+            assertEquals(h.api.calls.toString(), listOf("sym=${UNICODE + Keyboard.pinyinNineKey('1')},"), downs().map { it.substringAfter('(').substringBefore(' ') })
+        } finally {
+            EngineState.syllablesState.value = EngineState.SyllableState()
+        }
+        close()
+        // 双拼's nine keys the same
+        harness(shuangpin, keyboards = ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS))
+        typed("hk")
+        h.api.calls.clear()
+        draw(h.nineKey("1"), across = 2f, down = 0f)
+        assertEquals(downs().toString(), listOf(true), downs().map { stroke('h') in it })
+        // and a tap on its 1 while typing the separator ' still (SP-22), no stroke
+        EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("hk"), id = 1)
+        try {
+            h.idle()
+            h.api.calls.clear()
+            h.tap(h.nineKey("1"))
+            assertEquals(h.api.calls.toString(), listOf("key='"), downs().map { it.substringAfter('(').substringBefore(',') })
+        } finally {
+            EngineState.syllablesState.value = EngineState.SyllableState()
+        }
     }
 
     // the split keyboard's gap: a stroke may start there (no key to tap); a tap there, or a glide, still does nothing

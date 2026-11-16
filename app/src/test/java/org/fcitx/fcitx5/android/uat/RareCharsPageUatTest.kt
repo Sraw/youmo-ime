@@ -119,7 +119,20 @@ class RareCharsPageUatTest {
 
     private fun cells() = views().filterIsInstance<RareCharCell>().associateBy { it.char }
 
-    private fun cell(c: String) = cells()[c] ?: error("no cell $c in ${cells().keys}")
+    // [c]'s cell, the list scrolled to it where it is not shown: on a phone's height 其它表外字's cells, the last
+    // group's, are below 扩展区's head and the groups above (held by default, first)
+    private fun cell(c: String): RareCharCell {
+        for (way in intArrayOf(1, -1)) {
+            while (c !in cells()) {
+                // till the list moves no more: at its end, or held still (a drag under way)
+                val was = list().computeVerticalScrollOffset()
+                list().scrollBy(0, way * list().height / 4)
+                idle()
+                if (list().computeVerticalScrollOffset() == was) break
+            }
+        }
+        return cells()[c] ?: error("no cell $c in ${cells().keys}")
+    }
 
     // what a screen reader is told of a cell: its node's description, and an event's the same
     private fun said(cell: RareCharCell): String {
@@ -173,8 +186,10 @@ class RareCharsPageUatTest {
                 assertFalse(cell("龘").held)
                 assertFalse(cell("龘").isEnabled)
             },
-            "the groups' heads, 扩展区 shut; what has no cell said under its group" to {
+            "the groups' heads, 扩展区 shut and first (held by default); what has no cell said under its group" to {
                 assertTrue(shown().toString(), shown().any { it.startsWith("▸ ${s(R.string.rare_group_ext)}") })
+                val heads = shown().filter { it.startsWith("▸ ") || it.startsWith("▾ ") }.map { it.substring(2).substringBeforeLast(' ') }
+                assertEquals(listOf(R.string.rare_group_ext, R.string.rare_group_l3, R.string.rare_group_trad, R.string.rare_group_out).map { s(it) }, heads)
                 assertTrue(shown().toString(), s(R.string.rare_chars_unread, "1") in shown().joinToString("\n"))
                 assertTrue(shown().toString(), s(R.string.rare_chars_unshown, "1") in shown().joinToString("\n"))
                 assertFalse("龗 not drawn here", "龗" in cells())
@@ -261,7 +276,7 @@ class RareCharsPageUatTest {
                 search("xyz")
                 assertTrue(s(R.string.rare_chars_none_found, "xyz") in shown())
                 search("")
-                assertTrue("龘" in cells())
+                cell("龘")
             },
         )
     }
@@ -282,6 +297,10 @@ class RareCharsPageUatTest {
         RareCharsManager.update(listOf(Change.On(true)), TestCharLevels.levels)
         openPage()
         val list = list()
+        // the run's row (其它表外字's, the last group) shown, as far up as the list goes: a drag within EDGE_DP of
+        // an edge scrolls the list while it can
+        list.scrollBy(0, cell("炟").top - list.height / 2)
+        idle()
         fun at(c: String): Pair<Float, Float> {
             val v = cell(c)
             return (v.left + v.width / 2f) to (v.top + v.height / 2f)

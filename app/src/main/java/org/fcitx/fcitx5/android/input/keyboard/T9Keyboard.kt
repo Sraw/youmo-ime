@@ -534,7 +534,8 @@ class T9Keyboard(
         // the keys where the scene draws them (their centres, GlideGesture's)
         glideInput(
             letters = { sceneLetters }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin }, filters = { InputMethodCatalog.filtersByStrokes(imeName) },
-            // written on: the 3×3 of the letters with 1 (punctuation), not the side columns' Shift (061-handwriting-toolbar §3.2)
+            // written on: the 3×3 of the letters with 1 (punctuation), not the side columns' Shift (061-handwriting-toolbar §3.2);
+            // a stroke drawn starts on the same 3×3 (a 横 along the top row starts on 1)
             writesAlso = { it.id == "1" },
         ) { path, layout ->
             // a glide ends a run of presses: a key pressed soon after it is a press of its own, not 连按's next letter

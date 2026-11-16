@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.ui.rare
 
 import org.fcitx.fcitx5.android.engine.data.CharLevels.Level
+import org.fcitx.fcitx5.android.engine.user.RareChoice
 
 /**
  * The rows of 生僻字屏蔽's grid (dev/design/061-rare-char-block.md §6.2–§6.4): each group's head, then,
@@ -170,5 +171,13 @@ class RareLayout(groups: List<Group>) {
         val exact = group.firstOrNull { blockLetter[it] == letter }
         val before = group.lastOrNull { blockLetter[it] < letter }
         return blockStart[exact ?: before ?: group.first()]
+    }
+
+    companion object {
+        /**
+         * The groups in the page's order: those held by default first (扩展区), so the page turned on shows a
+         * group with characters held at its top; the rest in [Level.GRID]'s order. The file and the grid keep GRID's.
+         */
+        val ORDER: List<Level> = Level.GRID.sortedBy { it !in RareChoice.DEFAULT }
     }
 }

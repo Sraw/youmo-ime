@@ -27,7 +27,8 @@ import splitties.dimensions.dp
  * started far sooner ([STROKE_START_DP] any way, the keys cancelled then): its path, in key widths both ways, given to [stroked].
  * Lifted never [strokeLift] dp from its down, it was a tap: the key it came down on is tapped there ([tapKey]); its
  * trail is drawn only past that. The setting has one or the other, never both.
- * A stroke may also start between a split keyboard's halves ([SplitGap]); a glide starts on a letter only.
+ * A stroke may also start between a split keyboard's halves ([SplitGap]) and on the keys of [strokeKeys] (九键's 1);
+ * a glide starts on a letter only.
  *
  * Where [writes] says so as the finger goes down (the toolbar's 手写, HandwritingMode.writes), a touch down in the
  * letter area ([writingArea]: the letters' hit areas, the gaps between them, Shift; a split keyboard's gap) is a
@@ -54,6 +55,9 @@ class GlideInput(
     private val strokeLift: () -> Float = { 0f },
     // the key at a place (the keyboard's pixels) tapped there: a stroke drawn lifted short of [strokeLift]
     private val tapKey: (x: Float, y: Float) -> Unit = { _, _ -> },
+    // the keys besides the letters a stroke may start on (九键's 1), by their cells as the letters are: the gap
+    // between one and a letter goes as one between two letters does
+    private val strokeKeys: () -> List<KeyPlace> = { emptyList() },
     private val ink: KeyInk? = null,
     private val writes: () -> Boolean = { false },
     // whether a place (the keyboard's) is in the letter area written on: the letters' hit areas and Shift's
@@ -168,8 +172,13 @@ class GlideInput(
         val keyHeight = first?.height()?.toFloat() ?: 0f
         val x = event.x.toInt()
         val y = event.y.toInt()
-        // written on: the letter area as the keys' hit areas share it out, Shift too; else on a letter as drawn
-        val onLetter = if (inking != null) writingArea(event.x, event.y) else keys.any { (_, v) -> bounds(v).contains(x, y) }
+        // written on: the letter area as the keys' hit areas share it out, Shift too; else on a letter as drawn,
+        // or a stroke on a key of its own area (九键's 1: the 3×3 the hand draws over)
+        val onLetter = if (inking != null) {
+            writingArea(event.x, event.y)
+        } else {
+            keys.any { (_, v) -> bounds(v).contains(x, y) } || stroking && strokeKeys().any { bounds(it).contains(x, y) }
+        }
         // a stroke may start between a split keyboard's halves too: no key there to tap
         val inGap = drawn && !onLetter && inGap(keys, event.x, event.y, keyWidth)
         if (trace != null && inking == null) traceDown(event)
