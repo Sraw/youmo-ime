@@ -28,8 +28,13 @@ sealed class KeyAction {
         override fun toString() = "HostKeyAction(act=$act, code=$code, states=$states${touch?.let { ", touch=$it" }.orEmpty()})"
     }
 
-    /** A key typed as [sym]; [touch] as [HostKeyAction]'s. */
-    data class SymAction(val sym: KeySym, val states: KeyStates = KeyStates.Virtual, val touch: Touch? = null) : KeyAction() {
+    /** A key typed as [sym]; [touch] as [HostKeyAction]'s; [hold], a held ⌫'s repeat's, which stops it ([BackspaceHold]). */
+    data class SymAction(
+        val sym: KeySym,
+        val states: KeyStates = KeyStates.Virtual,
+        val touch: Touch? = null,
+        val hold: BackspaceHold? = null,
+    ) : KeyAction() {
         override fun toString() = "SymAction(sym=$sym, states=$states${touch?.let { ", touch=$it" }.orEmpty()})"
 
         companion object {
@@ -37,6 +42,9 @@ sealed class KeyAction {
             fun stroke(stroke: Char) = SymAction(KeySym(UNICODE + Keyboard.strokeKey(stroke)), KeyStates.Virtual)
         }
     }
+
+    /** ⌫ going down, to be held maybe: what is typed as it does, told [hold] in its turn on the host's thread. */
+    class BackspaceDownAction(val hold: BackspaceHold) : KeyAction()
 
     /**
      * [text] put in by the app, in place of [replacing] if that is what is before the cursor. [punctuation]: a mark as the

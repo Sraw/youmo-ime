@@ -110,6 +110,7 @@ import org.fcitx.fcitx5.android.input.editing.WatchedEditor
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import org.fcitx.fcitx5.android.input.hardware.TakenKey
 import org.fcitx.fcitx5.android.input.keyboard.AddressKeys
+import org.fcitx.fcitx5.android.input.keyboard.BackspaceHold
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyleState
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
@@ -1331,7 +1332,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     suspend fun HostApi.commitAndReset(address: Boolean) {
         val resolution = PendingInputPolicy.resolve(
             inputMethodEntryCached.languageCode,
-            hasPreedit = clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty(),
+            hasPreedit = composingCached,
             address = address
         )
         when (resolution) {
@@ -1671,14 +1672,27 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onEvaluateFullscreenMode() = false
 
+    // a hardware Backspace held: its press and auto-repeats, which stop as the keyboard's ⌫'s do (BackspaceHold)
+    private var backspaceHold: BackspaceHold? = null
+
     private fun forwardKeyEvent(event: KeyEvent): Boolean {
         val sym = KeySym.fromKeyEvent(event)
         if (sym != null) {
+            val up = event.action == KeyEvent.ACTION_UP
+            // let go, the hold is over: a press after never takes on one stopped
+            if (event.keyCode == KeyEvent.KEYCODE_DEL && up) backspaceHold = null
+            val hold = if (event.keyCode != KeyEvent.KEYCODE_DEL || up) {
+                null
+            } else {
+                if (event.repeatCount == 0 || backspaceHold == null) backspaceHold = BackspaceHold()
+                backspaceHold
+            }
             val timestamp = keyEventRelay.remember(event)
             val states = KeyStates.fromKeyEvent(event)
-            val up = event.action == KeyEvent.ACTION_UP
             postFcitxJob {
-                sendKey(sym, states, event.scanCode, up, timestamp)
+                if (hold == null || hold.repeat(composingCached)) {
+                    sendKey(sym, states, event.scanCode, up, timestamp)
+                }
             }
             return true
         }

@@ -92,18 +92,29 @@ class InkKeys(
      * pad had none then.
      */
     fun took(action: KeyAction): Boolean {
+        // ⌫ going down on strokes it would take back, which the host does not see: something typed as its hold begins
+        if (action is KeyAction.BackspaceDownAction) {
+            if (pad.pad.finished.isNotEmpty()) action.hold.taken()
+            return false
+        }
         if (action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace) {
             val held = commits
             when {
                 // as pressed: the stroke it takes back is the last one then, not one drawn while it waited
-                held == null || held == NONE -> if (held == null && pad.undo()) return true
-                held == pad.pad.piece && pad.pad.finished.size > commitsStrokes -> return true
-                held == pad.pad.piece && pad.undo() -> return true
+                held == null || held == NONE -> if (held == null && pad.undo()) return taken(action)
+                held == pad.pad.piece && pad.pad.finished.size > commitsStrokes -> return taken(action)
+                held == pad.pad.piece && pad.undo() -> return taken(action)
             }
         }
         val wipes = commits?.let { it == pad.pad.piece } ?: pad.pad.finished.isNotEmpty()
         if ((action is KeyAction.SymAction || action is KeyAction.HostKeyAction) && wipes) pad.next()
         return false
+    }
+
+    // a held ⌫'s repeat that took back a stroke: something was typed as its hold began, which stops short of the field for it
+    private fun taken(action: KeyAction.SymAction): Boolean {
+        action.hold?.taken()
+        return true
     }
 
     private companion object {

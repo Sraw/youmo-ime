@@ -516,8 +516,10 @@ abstract class BaseKeyboard(
                 }
                 is KeyDef.Behavior.Repeat -> {
                     g.repeatEnabled = true
+                    // past the keyboard's own handling of keys (T9's, Shift's): it types nothing
+                    g.holdBegan = if (isBackspace(it.action)) { h -> listened(KeyAction.BackspaceDownAction(h)) } else null
                     key.onRepeat { k ->
-                        onAction(it.action)
+                        onAction(withHold(it.action, k.keyGesture.hold))
                         if (hapticOnRepeat) InputFeedbacks.hapticFeedback(k.feedback)
                     }
                 }
@@ -775,10 +777,9 @@ abstract class BaseKeyboard(
     }
 
     @CallSuper
-    protected open fun onAction(
-        action: KeyAction,
-        source: KeyActionListener.Source = KeyActionListener.Source.Keyboard
-    ) {
+    protected open fun onAction(action: KeyAction, source: KeyActionListener.Source = KeyActionListener.Source.Keyboard) = listened(action, source)
+
+    private fun listened(action: KeyAction, source: KeyActionListener.Source = KeyActionListener.Source.Keyboard) {
         val ink = keyInk
         // straight on unless written on, in an input method that writes (English's keys never wait on its reads)
         // (turned off meanwhile, still in order: a reading on its way goes in before the key)
@@ -968,5 +969,12 @@ internal fun spaceLabel(name: String, subMode: InputMethodSubMode): String {
     val mode = subMode.label.ifEmpty { subMode.name }
     return if (mode.isEmpty()) name else "$name ($mode)"
 }
+
+// a held ⌫'s repeat, [action] the key's: with its touch's [hold], decided in its turn on the host's thread, which stops
+// the hold once what was typed as it began is all deleted (user 2026-11-15); any other key's as it is
+private fun withHold(action: KeyAction, hold: BackspaceHold): KeyAction =
+    if (isBackspace(action)) (action as KeyAction.SymAction).copy(hold = hold) else action
+
+private fun isBackspace(action: KeyAction) = action is KeyAction.SymAction && action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace
 
 private const val MINUTE_MS = 60_000L

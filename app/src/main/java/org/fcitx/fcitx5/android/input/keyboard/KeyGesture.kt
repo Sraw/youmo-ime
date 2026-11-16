@@ -131,6 +131,17 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         }
     private var repeatJob: Job? = null
 
+    /**
+     * This touch's hold, made anew as it goes down: a held ⌫'s repeats carry it ([BackspaceHold]), and once it is
+     * seen stopped the key repeats no more (what was typed as it began all deleted). It stops on the host's thread:
+     * a repeat or two already on their way are felt still, though not sent.
+     */
+    var hold = BackspaceHold()
+        private set
+
+    /** Told [hold] as a touch of a key that repeats goes down: a ⌫'s, for what is typed then. */
+    var holdBegan: ((BackspaceHold) -> Unit)? = null
+
     var swipeEnabled
         get() = recognizer.swipeEnabled
         set(value) {
@@ -273,11 +284,12 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         }
         if (repeatEnabled) {
             repeatJob?.cancel()
+            hold = BackspaceHold().also { holdBegan?.invoke(it) }
             repeatJob = key.timers.launch {
                 delay(longPressDelay.toLong())
                 repeatStarted = true
                 var lastTriggerTime: Long
-                while (isActive && key.keyEnabled) {
+                while (isActive && key.keyEnabled && !hold.stopped) {
                     lastTriggerTime = SystemClock.uptimeMillis()
                     key.repeat()
                     val t = lastTriggerTime + RepeatInterval - SystemClock.uptimeMillis()

@@ -26,6 +26,7 @@ class PreeditEmptyStateComponent :
         clientPreedit: FormattedText = fcitx.runImmediately { clientPreeditCached },
         preedit: FormattedText = fcitx.runImmediately { inputPanelCached.preedit }
     ) {
+        // HostApi.composingCached's test, on the main thread: what the ⌫ swipe reads (CommonKeyActionListener)
         val empty = clientPreedit.isEmpty() && preedit.isEmpty()
         if (isEmpty == empty) return
         isEmpty = empty

@@ -803,7 +803,10 @@ from the corner of the key's cell as a view's was from its own (a finger in a ro
 it, as it was left of A's view). `BaseKeyboard.wire` gives a `KeyHandle` its sound (`SceneBehavior.sound`, the class a theme's `<sounds>` plays,
 and `systemSound`, the system click it always had: `InputFeedbacks.soundEffect` → `KeySoundChoice`; the
 theme's samples in `ThemeSounds`, a SoundPool on its own HandlerThread, made anew per theme and stamp), the space's and
-backspace's swipes, its press, long press, repeat, double tap, swipes (`KeySwipes`) and popups: the
+backspace's swipes, its press, long press, repeat (⌫'s carrying its hold, `BackspaceHold`: one begun with something
+typed stops once that is deleted: what is typed as ⌫ goes down told by `KeyAction.BackspaceDownAction` in its turn on the host's thread (another finger's
+commit in the long press's wait does not count), each repeat decided in its turn there, both by `HostApi.composingCached`, the ⌫ swipe's test of something
+typed (`PreeditEmptyStateComponent` is its main-thread mirror, which lags); a hardware Backspace's auto-repeat the same, in `FcitxInputMethodService.forwardKeyEvent`), double tap, swipes (`KeySwipes`) and popups: the
 `SceneKey` made of its node's `SceneKeyDef` (`drawKeysWithScene`), so a key does what its view did
 before S8a. Its press is shown by the canvas (`showPressed(KeyRef)`), a popup over it placed
 at its face across and its cell down in the window (`popupBounds`), as a view's `bounds` were; glide

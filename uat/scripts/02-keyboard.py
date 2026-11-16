@@ -46,6 +46,29 @@ case("KB-10", needs="jvm:KeyboardFieldsUatTest.backspaceTakesAnEmojiWithItsSkinT
 case("KB-11", needs="jvm:KeyboardUatTest.holdingBackspaceRepeatsFasterTillLetGo")(lambda d: None)
 
 
+@case("KB-112")
+def kb112(d):
+    d.open_page("text")
+    d.clear()
+    d.type("nihao")
+    d.cands(want="你好")
+    d.space()
+    d.expect_field("你好")
+    d.type("nihao")
+    d.cands(want="你好")
+    bksp = d.keys(refresh=True)["bksp"]
+    # 4 s: the pinyin gone in well under a second, then held on past the stop; letting go deletes nothing either
+    d.hold(bksp, 4000)
+    d.idle()
+    s = d.screen()
+    p, t = d.preedit(s), d.field_text(s)
+    check(not p, f"按住 4 秒后编码行还有「{p}」")
+    check(t == "你好", f"打拼音时按住退格（删完后接着按住再松手），框里成了「{t}」")
+    d.hold(bksp, 2000)
+    d.expect_field("", msg="没在打字时按住退格，框里还剩「{got}」")
+    return "第一次按住 4 秒：删光拼音、停住后再松手，框里留着「你好」；第二次按住删空"
+
+
 case("KB-12", needs="jvm:KeyboardUatTest.swipingBackspaceLeftSelectsAndDeletes")(lambda d: None)
 
 

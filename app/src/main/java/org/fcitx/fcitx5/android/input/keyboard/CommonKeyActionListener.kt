@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.dialog.AddMoreInputMethodsPrompt
 import org.fcitx.fcitx5.android.input.dialog.InputMethodPickerDialog
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.BackspaceDownAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.BeginSelectionSwipeAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.BeginSwipeSelectAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
@@ -221,10 +222,16 @@ class CommonKeyActionListener :
                 // a keypad's too: through the engine KP_1 is 1, which picks a candidate
                 is SymAction -> {
                     val address = service.inAddressField
+                    val hold = action.hold
                     typeOrSend(symAsIs(action.sym.sym, address, EngineState::shuangpinScheme)) {
-                        sendKey(action.sym, action.states, touch = action.touch)
+                        // a held ⌫'s repeat, in its turn: not sent once what was typed as the hold began is gone (BackspaceHold)
+                        if (hold == null || hold.repeat(composingCached)) {
+                            sendKey(action.sym, action.states, touch = action.touch)
+                        }
                     }
                 }
+                // what is typed as ⌫ goes down, in its turn: a hold begun so stops once that is deleted (BackspaceHold)
+                is BackspaceDownAction -> service.postFcitxJob { action.hold.press(composingCached) }
                 is CommitAction -> service.commitOverEngine(action.text, action.replacing, voice = action.voice)
                 // the engine sends the key that commits its word, carrying the glide, itself (HostApi.offerGlide)
                 is GlideAction -> service.postFcitxJob { offerGlide(action.glide) }
@@ -441,7 +448,7 @@ internal fun typeAsIsOrSend(
     post {
         val im = inputMethodEntryCached.uniqueName
         // as commitAndReset reads it
-        val composing = clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()
+        val composing = composingCached
         // only a table's, while something is typed, as readsAsKey asks for them: another input method has none, not asked across threads
         val keys = if (composing && InputMethodCatalog.hasTableKeys(im)) tableKeys(im) else emptySet<Char>()
         if (asIs({ im }, { composing }, { keys }) == null) {

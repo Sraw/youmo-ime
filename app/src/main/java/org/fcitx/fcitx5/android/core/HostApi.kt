@@ -60,6 +60,14 @@ interface HostApi : TypingApi, InputMethodsApi, EngineSettingsApi, PunctuationAp
     val inputPanelCached: HostEvent.InputPanel
 
     /**
+     * Something typed, as the host left it: a preedit in the field or on the panel (联想's words with nothing typed
+     * are not). The one test of it: the ⌫ swipe's (PreeditEmptyStateComponent mirrors these two on the main thread;
+     * HostCore.clearTyped asks the panel the same), a held ⌫'s repeats (BackspaceHold), what is typed put in first.
+     * Read in a fcitx job it is exact, every key before it handled; the main thread's mirror lags behind.
+     */
+    val composingCached: Boolean get() = clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()
+
+    /**
      * The candidates last sent, for the touch keyboard's bar: a view made anew shows them as the
      * engine has them (A2), not an empty bar under a half-typed code. [HostEvent.Candidates.EMPTY]
      * once a page ([pagedCached]) was sent since.

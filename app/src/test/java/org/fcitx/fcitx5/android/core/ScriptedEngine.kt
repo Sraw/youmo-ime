@@ -14,7 +14,7 @@ import org.fcitx.fcitx5.android.host.EngineHost
 import java.io.File
 import java.util.Collections
 
-/** Pinyin as far as a case needs: the letters typed are the preedit, two candidates, a pick commits one. */
+/** Pinyin as far as a case needs: the letters typed are the preedit, Backspace takes one off, two candidates, a pick commits one. */
 class ScriptedEngine(private val home: File) : KotlinHost.EngineSide, EngineHost {
     val events: MutableList<Int> = Collections.synchronizedList(ArrayList())
 
@@ -47,6 +47,8 @@ class ScriptedEngine(private val home: File) : KotlinHost.EngineSide, EngineHost
                 typed = ""
             }
             EngineEvent.RESET -> typed = ""
+            // a letter taken off what is typed; with nothing typed it is the field's
+            EngineEvent.BACKSPACE -> if (typed.isNotEmpty()) typed = typed.dropLast(1) else return idle()
             // Return: what is typed committed as it is (pinyin's raw letters)
             EngineEvent.ENTER -> if (typed.isNotEmpty()) {
                 commit = typed
