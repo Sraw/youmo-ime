@@ -67,6 +67,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - **纵向间距** 多了一档 **很紧凑**（设置 → 外观 → 大小与样式 → 按键样式，排在紧凑前面）：每个键上下各留 2 dp（横屏也是），和 **横向间距** 的紧凑一样宽，两项都选它时上下左右的缝一样，键也高一些；**键盘高度** 是紧凑时缩到 1 dp。原来选的档不变。
 - **空格键长按行为** 选了 **轮换输入法**、只启用了一个输入法时，长按空格提示去添加，和语言键一样。
 - 自定义短语、快速输入的 **导入** 最多加到 5000 条，超出的不导入，提示里写着另有几条没导入；以前就超过 5000 条的不删，手动添加不受这个限制。
+- **提示条一样高**：带「撤销」的提示条和只说一句的一样高（不再大一圈），撤销两侧的留白也对齐了。
 
 ### 修复
 
@@ -140,6 +141,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - **Key spacing, up and down** has a tighter level, **Very compact** (Settings → Look → Size and style → Key style, before Compact): 2 dp above and below each key (in landscape too), as wide as **Key spacing, across** at Compact, so with both at it the gaps are alike every way and the keys a little taller; at the keyboard height Compact it is 1 dp. The level picked before stays as it was.
 - **Space key long press behavior** at **Enumerate input methods** with only one input method enabled: a long press on space says to add one, as the language key does.
 - An **import** of custom phrases or quick input fills the list to 5000 entries at most, the rest not imported and the notice saying how many; a list already longer is not cut, and adding by hand is not limited.
+- **Notices are one height**: a notice with Undo is now as tall as one that only says something (no longer a size bigger), and Undo keeps even room on both sides.
 
 ### Fixes
 

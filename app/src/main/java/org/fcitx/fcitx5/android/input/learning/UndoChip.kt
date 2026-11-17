@@ -378,9 +378,11 @@ class UndoChip(
             val line = View(ctx).apply { setBackgroundColor(theme.dividerColor) }
             val button = undoButton(undo)
             row.add(line, row.lParams(ctx.dp(1), ctx.dp(DIVIDER_DP)))
-            // to the chip's end: a thumb a little off 撤销 still takes back, it does not tap the chip
-            // away (which lapses the act, and purges the clipboard's deletes for good)
-            row.add(button, row.lParams(row.wrapContent, row.wrapContent))
+            // the words' height, as tall as a notice that only says: every notice one size, its
+            // 撤销 under 48 dp (the user, 2026-11-17). To the chip's end: a thumb a little off 撤销
+            // still takes back, it does not tap the chip away (which lapses the act, and purges the
+            // clipboard's deletes for good)
+            row.add(button, row.lParams(row.wrapContent, ViewGroup.LayoutParams.MATCH_PARENT))
             row.tag = button
             row.addOnLayoutChangeListener { v, left, top, right, bottom, _, _, _, _ ->
                 // none once replaced: its 撤销 is let go of
@@ -397,7 +399,7 @@ class UndoChip(
             button.measure(UNSPECIFIED, UNSPECIFIED)
             room -= button.measuredWidth + ctx.dp(1)
         }
-        text.maxWidth = room.coerceAtLeast(ctx.dp(MIN_TOUCH_DP))
+        text.maxWidth = room.coerceAtLeast(ctx.dp(MIN_WORDS_DP))
         row.measure(UNSPECIFIED, UNSPECIFIED)
         // its own size whatever the box's: as the box eases from one to another, neither row re-wraps
         row.layoutParams = FrameLayout.LayoutParams(row.measuredWidth, row.measuredHeight, Gravity.CENTER)
@@ -410,17 +412,16 @@ class UndoChip(
         setTextColor(undoColour(theme))
         typeface = Typeface.DEFAULT_BOLD
         textSize = 14f
-        setPaddingDp(12, 0, 16, 0)
-        // a button to a screen reader, and one a finger finds (review-E-ui S7)
+        // a button to a screen reader; its words in the middle of the row's height it takes
         gravity = gravityCenter
-        minHeight = dp(MIN_TOUCH_DP)
-        minWidth = dp(MIN_TOUCH_DP)
         accessibilityDelegate = ButtonRole
         val mask = GradientDrawable().apply {
             setColor(Color.WHITE)
             cornerRadius = dp(CORNER_DP - RIPPLE_INSET_DP).toFloat()
         }
         background = RippleDrawable(ColorStateList.valueOf(theme.keyPressHighlightColor), null, InsetDrawable(mask, dp(RIPPLE_INSET_DP)))
+        // after the background: the inset's own padding (4 dp) would replace it
+        setPaddingDp(12, 0, 16, 0)
         setOnClickListener {
             // one replaced, fading, has lapsed: its act stands, and the notice now shown stays
             if (!state.undo(undo)) return@setOnClickListener
@@ -439,8 +440,8 @@ class UndoChip(
     }
 
     internal companion object {
-        // the smallest a target is to be touched surely (Material's accessibility guidance)
-        const val MIN_TOUCH_DP = 48
+        // the words' narrowest, on a screen too narrow for them and 撤销 beside them
+        const val MIN_WORDS_DP = 48
 
         const val CORNER_DP = 18
         const val RIPPLE_INSET_DP = 4

@@ -331,6 +331,29 @@ class UndoChipTest {
         assertFalse(chip.showing)
     }
 
+    // every notice one size, its words' (the user, 2026-11-17): 撤销 takes the row's height, it
+    // does not stretch the chip to a 48 dp touch target
+    @Test
+    fun aNoticeWithUndoIsAsTallAsOneThatOnlySays() {
+        val chip = chip()
+        chip.show("已复制")
+        idle()
+        val said = shownRow("已复制")
+        val saidHeight = said.height
+        assertEquals("a line said is its words' height", said.getChildAt(0).height, saidHeight)
+        chip.show("已删除", Record().undo("删"))
+        idle()
+        val row = shownRow("已删除")
+        assertEquals(saidHeight, row.height)
+        assertEquals(saidHeight, windows().single().height)
+        val button = row.find(undoLabel)!!
+        assertEquals("撤销 the row's height", saidHeight, button.height)
+        // its own padding, not the ripple's inset's (which setting the background put in its place)
+        val dp = activity.resources.displayMetrics.density
+        assertEquals((12 * dp).toInt(), button.paddingStart)
+        assertEquals((16 * dp).toInt(), button.paddingEnd)
+    }
+
     // F4143: a notice said before the keyboard's first layout wraps at the screen's width, not at
     // nothing: as wide as the same notice once the keyboard is laid out
     @Test

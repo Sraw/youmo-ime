@@ -145,6 +145,8 @@ toward the screen's middle (`floating`, fed the keyboard's rect and the room by
    hidden from the start (`show(hidden)`), shown and timed as the menu goes; one elsewhere (over
    the bar) is left alone. A
    replaced row's 撤销 takes nothing back, and the fading row swallows taps (none reaches the box).
+   Every notice is its words' height, with a button or not: the button takes the row's height,
+   its touch area under 48 dp (the user, 2026-11-17).
 6. **In the keyboard only this notice**: no `Toast` (Android 13 drops an input method's, see
    [pitfalls](pitfalls.md)), no `Snackbar`. A toast only when no keyboard is shown to say it on.
 
