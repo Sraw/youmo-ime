@@ -61,8 +61,12 @@ object KeyData {
         Own,
     }
 
-    /** Something written that is not taken: in the file [file] (the board's id or a fragment's), the key's [line], the attribute or element [what]. */
-    data class Ignored(val file: String, val line: Int, val what: String)
+    /**
+     * Something written that is not taken: in the file [file] (the board's id or a fragment's), the key's [line], the
+     * attribute or element [what]; [key] the name it was written under (a variant's own, else its key's), else the key's
+     * id (a name has a `/`, an id none), so two keys of a line are told apart (L6 review N1).
+     */
+    data class Ignored(val file: String, val line: Int, val what: String, val key: String = "")
 
     class Result(val layout: Layout, val fragments: Map<String, Fragment>, val ignored: List<Ignored>)
 
@@ -120,11 +124,11 @@ object KeyData {
             return if (keepOwn) Taken.Written(place) else Taken.App(NONE, place)
         }
 
-        fun note(file: String, line: Int, written: Held, taken: Held) {
-            if (written.alt != null && written.alt != taken.alt) ignored += Ignored(file, line, "alt")
-            for ((name, action) in written.actions) if (action != taken.actions[name]) ignored += Ignored(file, line, name)
-            if (written.popup != null && written.popup != taken.popup) ignored += Ignored(file, line, "popup")
-            if (written.menu.isNotEmpty() && written.menu != taken.menu) ignored += Ignored(file, line, "menu")
+        fun note(file: String, line: Int, key: String, written: Held, taken: Held) {
+            if (written.alt != null && written.alt != taken.alt) ignored += Ignored(file, line, "alt", key)
+            for ((name, action) in written.actions) if (action != taken.actions[name]) ignored += Ignored(file, line, name, key)
+            if (written.popup != null && written.popup != taken.popup) ignored += Ignored(file, line, "popup", key)
+            if (written.menu.isNotEmpty() && written.menu != taken.menu) ignored += Ignored(file, line, "menu", key)
         }
 
         fun key(file: String, k: Key, under: KeyAttrs): Key {
@@ -133,7 +137,7 @@ object KeyData {
             if (t is Taken.Written) {
                 // its own: what it writes and what its <defaults> and row's give it, those being cleared; a variant
                 // of a name the app has, the app's
-                val variants = k.variants.map { v -> if (v.attrs.shortcut != null) variant(file, v) else v }
+                val variants = k.variants.map { v -> if (v.attrs.shortcut != null) variant(file, v, a.shortcut ?: k.id) else v }
                 return k.with(k.attrs.holding(Held(a.alt, held(a.actions))), k.popup, k.menu, variants, t.place)
             }
             t as Taken.App
@@ -141,17 +145,17 @@ object KeyData {
             // `alt="{punct:(}" swipe-up="("`, as k17-motion does): the same as taken, no notice of it
             val corner = t.place?.takeIf { it >= 0 && t.held.alt == null }?.let { KeyDefaults.corner(form, it) }
             val written = Held(a.alt, held(a.actions), k.popup, k.menu)
-            note(file, k.line, corner?.let { written.besides(it) } ?: written, t.held)
-            return k.with(k.attrs.holding(t.held), t.held.popup, t.held.menu, k.variants.map { variant(file, it) }, t.place)
+            note(file, k.line, a.shortcut ?: k.id, corner?.let { written.besides(it) } ?: written, t.held)
+            return k.with(k.attrs.holding(t.held), t.held.popup, t.held.menu, k.variants.map { variant(file, it, a.shortcut ?: k.id) }, t.place)
         }
 
         // a variant of a name of its own: that name's (its own where the app has none and the layout keeps them); any
-        // other its key's, so none of its own
-        fun variant(file: String, v: Variant): Variant {
+        // other its key's ([key]: its name, else its id), so none of its own
+        fun variant(file: String, v: Variant, key: String): Variant {
             val t = v.attrs.shortcut?.let { take(it, null, false) } ?: Taken.App(NONE, null)
             if (t is Taken.Written) return v
             val taken = (t as Taken.App).held
-            note(file, v.line, Held(v.attrs.alt, held(v.attrs.actions)), taken)
+            note(file, v.line, v.attrs.shortcut ?: key, Held(v.attrs.alt, held(v.attrs.actions)), taken)
             return Variant(v.condition, v.attrs.holding(taken), v.line)
         }
 

@@ -1212,6 +1212,8 @@
     <string name="shortcut_page_zyfull">注音全鍵盤</string>
     <string name="shortcut_page_number">數字鍵盤</string>
     <string name="shortcut_page_function">功能鍵</string>
+    <string name="shortcut_shared_tag">共用</string>
+    <string name="shortcut_shared_with">和「%1$s」共用：這裡改了，那邊的同名鍵也跟著變</string>
     <string name="shortcut_key_elsewhere">在功能鍵頁改 %s</string>
     <string name="fn_key_space">空白</string>
     <string name="fn_key_backspace">退格</string>
@@ -1531,6 +1533,14 @@
     <string name="layout_finding_commits">%1$s 個鍵點按打出寫死的文字</string>
     <string name="layout_finding_theme_blank">目前主題下這個鍵什麼都不顯示：%1$s</string>
     <string name="layout_finding_unnamed">鍵「%1$s」沒有按鍵名（shortcut=）：在 App 裡改不了它的長按、上下滑</string>
+    <string name="layout_finding_held">%1$s 是%2$s的鍵，這裡寫的長按、角標、滑動不起作用</string>
+    <string name="layout_finding_held_letters">%1$s 是%2$s的鍵，長按跟它走，不按這裡寫的字母；要用這些字母，給它取個自己的鍵名</string>
+    <string name="layout_finding_held_popups">這裡寫的 popups= 不起作用，跟%1$s一樣</string>
+    <string name="layout_board_emoji">表情</string>
+    <string name="layout_board_emoticon">顏文字</string>
+    <string name="layout_board_emoji_search">表情搜尋</string>
+    <string name="layout_board_expanded_side">展開候選</string>
+    <string name="layout_board_number_row">數字列</string>
     <string name="layout_finding_gap_look">空位（gap）的 look=、class= 不起作用</string>
     <string name="layout_finding_pad_lacks">數字鍵盤「%1$s」缺 %2$s：這種輸入框裡打不出來</string>
     <string name="layout_finding_bottom_left">左下角通常是 %1$s（和 App 內建的一樣）</string>

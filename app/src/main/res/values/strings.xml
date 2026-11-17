@@ -1242,6 +1242,8 @@
     <string name="shortcut_page_zyfull">Zhuyin full</string>
     <string name="shortcut_page_number">Number pad</string>
     <string name="shortcut_page_function">Function keys</string>
+    <string name="shortcut_shared_tag">Shared</string>
+    <string name="shortcut_shared_with">Shared with %1$s: a change here is a change there too</string>
     <string name="shortcut_key_elsewhere">%s is a function key: change it on the Function keys tab</string>
     <string name="fn_key_space">Space</string>
     <string name="fn_key_backspace">Backspace</string>
@@ -1561,6 +1563,14 @@
     <string name="layout_finding_commits">%1$s keys type text written into the layout</string>
     <string name="layout_finding_theme_blank">With the theme in use, this key shows nothing: %1$s</string>
     <string name="layout_finding_unnamed">Key %1$s has no key name (shortcut=): its long press and swipes cannot be changed in the app</string>
+    <string name="layout_finding_held">%1$s is a key of the app’s %2$s: the long press, corner and swipes written here are not used</string>
+    <string name="layout_finding_held_letters">%1$s is a key of the app’s %2$s: its long press is that key’s, not the letters written here; for these letters, give it a name of its own</string>
+    <string name="layout_finding_held_popups">popups= written here is not used: as on the app’s %1$s</string>
+    <string name="layout_board_emoji">Emoji</string>
+    <string name="layout_board_emoticon">Emoticons</string>
+    <string name="layout_board_emoji_search">Emoji search</string>
+    <string name="layout_board_expanded_side">Expanded candidates</string>
+    <string name="layout_board_number_row">Number row</string>
     <string name="layout_finding_gap_look">look= and class= of a gap do nothing</string>
     <string name="layout_finding_pad_lacks">The number keyboard %1$s lacks %2$s: it cannot be typed in such fields</string>
     <string name="layout_finding_bottom_left">The bottom left is usually %1$s (as in the app’s)</string>

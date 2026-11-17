@@ -227,7 +227,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
 
     // the whole keyboard of [b], as it is docked (the marks the page's)
     private fun onBoard(t: org.fcitx.fcitx5.android.scene.theme.Theme, b: Board): Scene? {
-        val layout = SceneLayouts.of(context, b.layout) ?: return null
+        val layout = SceneLayouts.board(context, b.layout) ?: return null
         val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(alts = b.alts, letterCase = b.letterCase), marks = marks)
             // the keyboard upright, the page turned or not (KeyCaps.board's size)
             .copy(board = layout.id, keyStyle = overPack(), landscape = b.landscape)

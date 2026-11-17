@@ -542,8 +542,8 @@
 ### ST-74 [P1] 主题包自带字母分组的键盘上打拼音
 - **前提**：同 ST-73，导入（**一起导入** 勾着）并选用「薄荷（17 键、动效）」；**输入法 → 拼音** 的 **键盘** 选「薄荷 · 17 键（自定义）」（0.6.1 起主题带的 17 键放在 外观 → 布局 里，不再顶替 18 键）。
 - **操作**：回测试页按分组打 n i h a o（H 和 JK 并成了一个键），看候选；点「你好」。再打一次，长按候选「你好」选 **固定首位**；打开 **词库与短语 → 用户词库 → 固定的词** 看这一条。
-- **预期**：键盘是 17 键（H、JK 一个键）；「你好」在前三个候选里，点了上屏「你好」；固定的词里这一条标「拼音 主题键盘」，按键按主题的键组显示，不是自带 18 键的分组。
-- **JVM**：主题带的布局转成自己的布局见 `ThemeLayoutsToListTest`、keyboard-scene `PackConvertTest`；按布局的分组打拼音、学到的按键显示没有 JVM 测试，真机或模拟器上手工跑，不在自动跑里。
+- **预期**：键盘是 17 键（H、JK 一个键）；长按 HJK 弹出的是 h、j、k（它转成了自己的键，不跟自带 18 键的 H 走），**外观 → 布局** 导入这块时的确认框和卡片信息里没有「g18/h 是18 键的键」的提醒；「你好」在前三个候选里，点了上屏「你好」；固定的词里这一条标「拼音 主题键盘」，按键按主题的键组显示，不是自带 18 键的分组。
+- **JVM**：主题带的布局转成自己的布局见 `ThemeLayoutsToListTest`、keyboard-scene `PackConvertTest`（HJK 改名、长按 hjk：`aKeyOfTheAppsNameWithLettersOfItsOwnIsAKeyOfItsOwn`）；按布局的分组打拼音、学到的按键显示没有 JVM 测试，真机或模拟器上手工跑，不在自动跑里。
 
 ### ST-67 [P0] 升级后键盘大小不变；新装和没改过的跟随主题
 - **前提**：两台（或先后两次）：A 装 0.5.x，**键盘高度** 选「很高」、**键盘底部边距** 选「贴底」，两侧边距不动；B 装 0.5.x 什么都不改。"下载"里有 0.6.0 的 APK。
@@ -996,4 +996,29 @@
 - **操作**：导入它，看确认框，问「现在就用作数字键盘吗？」时点 **用**；到测试页普通框点 **123**，看键盘，点 1、2、⌫、5；再到小数框（`#decimal`）、电话框看数字键盘。
 - **预期**：确认框写「数字键盘：123、只有数字、小数」。卡片下写「用在：数字键盘」。123 打开的是它：一行四个键（1 2 3 ⌫），回车竖着占两行，左下是 **符**、**返回**，没有 `=`、`,`；点 1、2、⌫、5 打出 15。小数框也是它，6 右边是 `.`；电话框还是 App 自带的数字键盘。
 - **JVM**：`ExampleLayoutsTest.eachChecksCleanWhereItSaysItIsUsed`、`ExampleLayoutsTest.eachDrawnInEveryFormAsHeld`（每种输入框各画一次）、`CustomPanelTest.aNumberBoardIsDrawnForThePadsItIsForTheAppsForTheRest`；网页：`test/layout-maker.test.mjs`（大按键数字键盘的几何和 pads）。
+
+### ST-185 [P1] 按键字符和快捷键：正在用的布局多一张卡片，同名键写「共用」
+<!-- 061-custom-layout §9 (L6) -->
+- **前提**：B0-设置；「下载」里有 `uat/fixtures/layouts/uat-names.layout`（18 键的 H、JK 并成 `HJK`，底排上面多一个打「哈」的键：上滑写「哈哈」，长按写「嘿」）。
+- **操作**：**外观 → 布局 → + → 导入布局文件** 选它，点 **导入**，「现在就用在 拼音 上吗？」点 **用**；**按键 → 按键字符和快捷键**，看顶上的卡片；点「UAT 键名」；看 `WE`、`HJK`、`哈` 三个键；点 `WE`，看对话框顶上，取消；点 `哈`，看长按菜单和上滑。
+- **预期**：卡片多出一张「UAT 键名」，在「功能键」前面。点它后下面画的是 17 键：`WE` 键帽下边写「共用」，`HJK`、`哈` 没有；`WE` 的对话框顶上写「和「18 键」共用：这里改了，那边的同名键也跟着变」；`哈` 的长按菜单里有「哈哈」（带框，是长按首选）和「嘿」，上滑是「长按首选 哈哈」。
+- **JVM**：`PopupOverridesLayoutTabTest.aLayoutInUseHasATabOfItsOwnKeys`、`KeyShortcutPagesTest.aLayoutsTabIsMadeFromItsKeys`、`KeyDataTest.aUsersNewNamesDefaultsAreWhatItsLayoutWrites`。
+
+### ST-186 [P2] 按键字符和快捷键：导入了没用的布局没有卡片
+- **前提**：B0-设置；「下载」里有 `uat-names.layout`。
+- **操作**：导入它，「现在就用在」点 **先不用**；**按键 → 按键字符和快捷键**，数顶上的卡片；回 **外观 → 布局** 点「UAT 键名」→ **用在…** 勾 **拼音**、**确定**；再看按键字符和快捷键；再去掉拼音，再看。
+- **预期**：没用时还是八张，没有「UAT 键名」；用在拼音上后多出它；去掉后又不见。
+- **JVM**：`PopupOverridesLayoutTabTest.aLayoutNotInUseHasNoTab`、`ImKeyboardsTest.theLayoutsInUseAreThoseDrawn`。
+
+### ST-187 [P2] 画不全的提示：导入的布局按它的名字说
+- **前提**：B0-设置；导入 `uat-names.layout` 时用在了拼音上；**外观 → 大小与样式** 的 **键盘高度** 拉到最低；**下滑图标位置** 选「底部」。
+- **操作**：**按键 → 按键字符和快捷键** 选「功能键」，点 ⌫，下滑选「文字」填「删掉这一整句话删掉这一整句话」，确定；看 ⌫ 下面的灰字。
+- **预期**：画不全时说的键盘名是「UAT 键名」（如「UAT 键名：画不下，键上显示为……」，或几块键盘画得一样时不带键盘名），不是「18 键」也不是「自定义」。
+- **JVM**：`SwipeFatesTest.aLayoutOfTheUsersIsNamedByItsName`。
+
+### ST-188 [P1] 导入时提醒：用了自带键的名字又写了滑动，写的不起作用
+- **前提**：B0-设置；「下载」里有 `uat-names.layout`（它的 `WE` 用 18 键的名字 `g18/we`，又写了下滑「我们」）。
+- **操作**：**外观 → 布局 → + → 导入布局文件** 选它；看确认框；点 **导入**，「现在就用在 拼音 上吗？」点 **用**；到测试页用拼音在 `WE` 上下滑。
+- **预期**：确认框能导入，要注意的地方里写「第 14 行：g18/we 是18 键的键，这里写的长按、角标、滑动不起作用」，会直接打出的文字里有「哈」。导入后 `WE` 下滑做的是 18 键 `WE` 的下滑（默认是快捷键），不打出「我们」。
+- **JVM**：`LayoutImportTest.theUatsLayoutOfNamesIsTakenItsHeldKeyTold`、`LayoutCheckTest.aKeyOfTheAppsNameWritingWhatItDoesHeldIsTold`、`LayoutTextsTest`；用了自带键名又写了不同分组字母的另提醒「……长按跟它走，不按这里写的字母……」：`LayoutCheckTest.aKeyOfTheAppsNameIsTheAppsKeyEachToldAndPopupsToo`。
 

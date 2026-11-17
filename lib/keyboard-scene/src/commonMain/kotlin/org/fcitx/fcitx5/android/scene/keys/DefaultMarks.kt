@@ -5,9 +5,11 @@
 package org.fcitx.fcitx5.android.scene.keys
 
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
+import org.fcitx.fcitx5.android.scene.layout.BuiltInKeyData
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Include
 import org.fcitx.fcitx5.android.scene.layout.Key
+import org.fcitx.fcitx5.android.scene.layout.KeyData
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.layout.Text
@@ -19,16 +21,17 @@ import org.fcitx.fcitx5.android.scene.layout.Text
  */
 object DefaultMarks {
 
-    /** [layout]'s keys and its [fragments]' (by id) on [variant] (else the one its family says). */
+    /** [layout]'s keys and its [fragments]' (by id) on [variant] (else the one its family says), their [nodes] as given (a user's layout's: [ownNodes]). */
     fun shortcuts(
         layout: Layout,
         fragments: Map<String, Fragment>,
         variant: KeyboardVariant = variantOf(layout),
         punctuation: Map<String, String> = emptyMap(),
         firstUp: Boolean = true,
+        nodes: List<Pair<String, NodeFacts>> = nodes(layout, fragments),
     ): Map<String, MarkContent> {
         val marks = LinkedHashMap<String, MarkContent>()
-        for ((name, facts) in nodes(layout, fragments)) {
+        for ((name, facts) in nodes) {
             val id = KeyId.of(name)
             // a key of `mark="false"` (a character's, not a function's) draws no first of its defaults'
             val list = KeyDefaults.of(id, variant, facts)?.takeUnless { facts.markOff && !id.isFunction }
@@ -118,6 +121,32 @@ object DefaultMarks {
             for (name in names.distinct()) out += name to facts
         }
         return out.distinctBy { it.first }
+    }
+
+    /**
+     * [layout]'s [nodes] as a user's layout's keys have them (061-custom-layout §19.2; L6 review S2, team-lead's decision):
+     * a key of a name of the app's is that key of the app's, its long press and corner the app's board's node of the
+     * name's ([appBoard]), whatever letters= or alt= the layout writes (LayoutCheck's `held` tells of them); a name of
+     * its own, what the layout writes. [basedOn]: the board KeyData held it to (the app: CustomKeyboards.baseOf). [board]
+     * reads one of the app's boards, its fragments with it, by its id.
+     */
+    fun ownNodes(
+        layout: Layout,
+        fragments: Map<String, Fragment>,
+        basedOn: String? = layout.basedOn,
+        board: (String) -> Pair<Layout, Map<String, Fragment>>?,
+    ): List<Pair<String, NodeFacts>> {
+        val read = HashMap<String, Map<String, NodeFacts>>()
+        return nodes(layout, fragments).map { (name, facts) ->
+            val id = appBoard(name, basedOn) ?: return@map name to facts
+            name to (read.getOrPut(id) { board(id)?.let { (l, f) -> nodes(l, f).toMap() }.orEmpty() }[name] ?: facts)
+        }
+    }
+
+    /** The app's board key [name] is of, looked for as KeyData looks: [basedOn]'s, then [KeyData.ORDER]'s, then any other's by id; null where none has it. */
+    fun appBoard(name: String, basedOn: String?): String? {
+        val boards = BuiltInKeyData.BOARDS
+        return (listOfNotNull(basedOn) + KeyData.ORDER + boards.keys.sorted()).firstOrNull { boards[it]?.named?.containsKey(name) == true }
     }
 
     // a send= that is a character (`q`, `,`, `:`) rather than an action (`sym:BackSpace`, `action:zhuyin`)

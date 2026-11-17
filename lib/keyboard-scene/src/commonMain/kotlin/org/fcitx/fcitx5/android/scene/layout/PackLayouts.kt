@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene.layout
 
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.keys.NodeFacts
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
@@ -98,7 +99,10 @@ object PackLayouts {
      *   `<include>` (a layout of the user's includes the app's alone); one the pack has not stays an include of the app's;
      * - a key's name §3.2 第 7 条 refuses (`fn/x` the app has not, `g18/x` the app has not) `<new id>/<key id>`, each name
      *   read renamed once (two keys sharing one still share it), returned for the caller to copy the settings under it;
-     *   one a `<defaults>` gives (the layout's, a row's, the pack's fragment's) alike (`<new id>/<row id>`, `…/keys`).
+     *   one a `<defaults>` gives (the layout's, a row's, the pack's fragment's) alike (`<new id>/<row id>`, `…/keys`);
+     *   a group key of one of the app's names with letters other than that key's (0.6.0's 17 keys' HJK on `g18/h`)
+     *   `<new id>/<its letters>`, a key of its own keeping its letters, long press and corner as 0.6.0 drew them (a key
+     *   of the app's name is the app's key, L6 review S2; W3's `k17/hjk` alike).
      * Its [Converted.Done.problems]: [LayoutCheck.check]'s loose one ([appVersion]) of the text made, its errors refusing it.
      */
     fun convert(
@@ -127,7 +131,7 @@ object PackLayouts {
         val app = sources.layout(id)
         val appFragments = app?.parts?.filterIsInstance<Include>()?.mapNotNull { inc -> sources.fragment(inc.src)?.let { inc.src to it } }?.toMap().orEmpty()
         judge(id, layout, fragments, app, appFragments)?.let { return Converted.Not(it) }
-        val (defaults, parts, renames) = renameKeys(layout.defaults, convertRows(layout.parts, own), newId, sources)
+        val (defaults, parts, renames) = renameKeys(layout.defaults, convertRows(layout.parts, own), newId, sources, appKeys(sources, id))
         val name = name(theme, layout.name, id)
         fun made(pads: List<String>?): Made {
             val converted = Layout(
@@ -176,20 +180,27 @@ object PackLayouts {
      * id>` (`-2`… where taken; a row's `<defaults>` `<newId>/<row id>`, else `row<n>`; the layout's `<newId>/keys`), each
      * name renamed once; the renames, the name read to the new one.
      */
-    private fun renameKeys(defaults: KeyAttrs, parts: List<Part>, newId: String, sources: LayoutCheck.Sources): Renamed {
+    private fun renameKeys(defaults: KeyAttrs, parts: List<Part>, newId: String, sources: LayoutCheck.Sources, app: (String) -> NodeFacts?): Renamed {
         val renames = LinkedHashMap<String, String>()
         val named = HashSet<String>()
         val rows = parts.filterIsInstance<Row>()
         rows.flatMap { it.cells }.filterIsInstance<Key>()
             .forEach { k -> (listOf(k.attrs) + k.variants.map { it.attrs }).mapNotNullTo(named) { it.shortcut } }
         (listOf(defaults) + rows.map { it.defaults }).mapNotNullTo(named) { it.shortcut }
+        fun free(base: String): String = sequenceOf("$newId/$base").plus(
+            generateSequence(2) { it + 1 }.map { n -> "$newId/${base.take(MAX_KEY_ID - 1 - n.toString().length)}-$n" },
+        ).first { it !in named }.also { named += it }
         fun renamed(base: String, name: String?): String? {
             if (name == null || LayoutCheck.nameProblem(name, sources) == null) return name
-            return renames.getOrPut(name) {
-                val first = "$newId/$base"
-                generateSequence(2) { it + 1 }.map { n -> "$newId/${base.take(MAX_KEY_ID - 1 - n.toString().length)}-$n" }
-                    .let { sequenceOf(first) + it }.first { it !in named }.also { named += it }
-            }
+            return renames.getOrPut(name) { free(base) }
+        }
+        // a group key under one of the app's names (its own or its row's or the layout's <defaults>') writing other letters
+        val ownLetters = HashMap<Pair<String, String>, String>()
+        fun lettered(name: String?, letters: Letters?): String? {
+            val group = letters?.group ?: return null
+            val theirs = name?.let(app)?.letters ?: return null
+            if (theirs == group) return null
+            return ownLetters.getOrPut(name to group) { free(group.filter { it in 'a'..'z' }.ifEmpty { "keys" }).also { renames.getOrPut(name) { it } } }
         }
         var row = 0
         val out = parts.map { part ->
@@ -199,9 +210,10 @@ object PackLayouts {
             Row(part.id, part.indent, part.endIndent, part.height, part.condition, part.split, rowDefaults, part.cells, part.line).withCells(
                 part.cells.map { c ->
                     if (c !is Key) return@map c
+                    val own = lettered(c.attrs.shortcut ?: part.defaults.shortcut ?: defaults.shortcut, c.letters)
                     Key(
-                        c.id, c.condition, c.attrs.copy(shortcut = renamed(c.id, c.attrs.shortcut)), c.popup, c.menu, c.line,
-                        c.variants.map { v -> Variant(v.condition, v.attrs.copy(shortcut = renamed(c.id, v.attrs.shortcut)), v.line) },
+                        c.id, c.condition, c.attrs.copy(shortcut = own ?: renamed(c.id, c.attrs.shortcut)), c.popup, c.menu, c.line,
+                        c.variants.map { v -> Variant(v.condition, v.attrs.copy(shortcut = v.attrs.shortcut?.let { lettered(it, c.letters) ?: renamed(c.id, it) }), v.line) },
                         c.letters, c.lean, c.place,
                     )
                 },

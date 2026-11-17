@@ -6,6 +6,10 @@ package org.fcitx.fcitx5.android.scene.layout
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.TEST_DATA
+import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
+import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.readText
 import org.fcitx.fcitx5.android.scene.recording
 import org.fcitx.fcitx5.android.scene.testData
@@ -47,8 +51,8 @@ class PackConvertTest {
         val c = done(convert(k17, theme = "薄荷 17 键"))
         assertEquals("t${PackLayouts.hash("薄荷 17 键")}-k18", c.id)
         assertEquals("薄荷 17 键 · 17 键", c.name)
-        // its names all the app's: none renamed
-        assertEquals(emptyMap(), c.renames)
+        // its names all the app's, but HJK's: g18/h writing hjk, a key of its own (below)
+        assertEquals(mapOf("g18/h" to "${c.id}/hjk"), c.renames)
         val file = "$TEST_DATA/convert/k17-motion.layout"
         if (recording()) writeText(file, c.text)
         assertEquals(readText(file), c.text, "convert/k17-motion.layout: -Psnapshots.record=true")
@@ -100,7 +104,7 @@ class PackConvertTest {
         val c = done(convert(text))
         val id = c.id
         // a bare name is fn/'s as read; the two keys sharing one still share it
-        assertEquals(mapOf("fn/mine" to "$id/r1c1", "g18/nope" to "$id/r1c3"), c.renames)
+        assertEquals(mapOf("fn/mine" to "$id/r1c1", "g18/nope" to "$id/r1c3", "g18/h" to "$id/hjk"), c.renames)
         val keys = LayoutReader.layout(c.text).ok().parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>().associateBy { it.id }
         assertEquals("$id/r1c1", keys.getValue("r1c2").attrs.shortcut)
         assertEquals(emptyList(), LayoutCheck.loaded(LayoutReader.layout(c.text).ok(), sources, "0.6.1"))
@@ -112,7 +116,7 @@ class PackConvertTest {
             Regex("(<key id=\"r1c1\"[^>]*?)/>"),
         ) { it.groupValues[1].replace("shortcut=\"g18/q\"", "shortcut=\"a\"") + "><variant when=\"landscape\" shortcut=\"b\"/></key>" }
         val c = done(convert(text))
-        assertEquals(mapOf("fn/a" to "${c.id}/r1c1", "fn/b" to "${c.id}/r1c1-2"), c.renames)
+        assertEquals(mapOf("fn/a" to "${c.id}/r1c1", "fn/b" to "${c.id}/r1c1-2", "g18/h" to "${c.id}/hjk"), c.renames)
     }
 
     // a <defaults>' name (the layout's, a row's, the pack's fragment's) is every key's under it that names none of its
@@ -138,8 +142,31 @@ class PackConvertTest {
     fun theIdItIsGivenIsTheOneMadeAndItsKeysNamedUnder() {
         val c = done(PackLayouts.convert("薄荷", meta, "k18", k17.replace("shortcut=\"g18/q\"", "shortcut=\"mine\""), emptyMap(), sources, "0.6.1", "t1-k18-2"))
         assertEquals("t1-k18-2", c.id)
-        assertEquals(mapOf("fn/mine" to "t1-k18-2/r1c1"), c.renames)
+        assertEquals(mapOf("fn/mine" to "t1-k18-2/r1c1", "g18/h" to "t1-k18-2/hjk"), c.renames)
         assertEquals("t" + PackLayouts.hash("薄荷") + "-k18", PackLayouts.idOf("薄荷", "k18"))
+    }
+
+    // a group key of one of the app's names writing letters other than that key's (0.6.0's 17 keys' HJK on g18/h): named
+    // <new id>/<its letters>, a key of its own, its long press its letters' and nothing held; one writing the app key's
+    // letters keeps the name, the app's key (verifier R-S1, L6 review S2)
+    @Test
+    fun aKeyOfTheAppsNameWithLettersOfItsOwnIsAKeyOfItsOwn() {
+        val c = done(convert(k17))
+        val read = LayoutReader.layout(c.text).ok()
+        val keys = read.parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>().associateBy { it.id }
+        assertEquals("${c.id}/hjk", keys.getValue("r2c4").attrs.shortcut)
+        assertEquals("g18/sd", keys.getValue("r2c2").attrs.shortcut)
+        assertEquals("g18/l", keys.getValue("r2c6").attrs.shortcut)
+        assertTrue(c.problems.none { it.key.startsWith("held") }, c.problems.toString())
+        val nodes = DefaultMarks.ownNodes(read, mapOf("grouped-bottom" to LayoutReader.fragment(testData("grouped-bottom.xml")).ok())) { id ->
+            sources.layout(id)?.let { it to LayoutCheck.baseFragments(it, sources) }
+        }.toMap()
+        val hjk = KeyDefaults.of(KeyId("${c.id}/hjk"), KeyboardVariant(KeyboardVariant.Form.Grouped18), nodes.getValue("${c.id}/hjk"))!!
+        assertTrue(listOf("h", "j", "k").all { l -> hjk.items.any { it.text == l } }, hjk.items.toString())
+        // its letters written as the app's key's: the app's key, as it was
+        val same = done(convert(k17.replace("letters=\"hjk\"", "letters=\"h\"")))
+        assertTrue("shortcut=\"g18/h\"" in same.text)
+        assertEquals(emptyMap(), same.renames)
     }
 
     // a pack's layout's own <meta min-app> newer than the app: not made (L7 review NIT3; the made one writes none)
@@ -150,12 +177,16 @@ class PackConvertTest {
         done(convert(k17.replace("<defaults kind", "<meta min-app=\"0.6.0\"/>\n<defaults kind")))
     }
 
-    // what its keys type that the base's do not, counted for the import's confirmation (§13; L7 review S1)
+    // what its keys type that the base's do not, counted for the import's confirmation (§13; L7 review S1); a key of the
+    // app's name is the app's key, what it writes held and told, not typed (L6 review S2)
     @Test
     fun itsNewCommitsAreCounted() {
         assertEquals(emptyList(), done(convert(k17)).commits)
-        val c = done(convert(k17.replace("swipe-up=\"keypad:1\"", "swipe-up=\"commit:hello\"")))
-        assertEquals(listOf("hello"), c.commits)
+        val own = done(convert(k17.replace("swipe-up=\"keypad:1\"\nshortcut=\"g18/q\"", "swipe-up=\"commit:hello\"\nshortcut=\"fn/mine\"")))
+        assertEquals(listOf("hello"), own.commits)
+        val held = done(convert(k17.replace("swipe-up=\"keypad:1\"", "swipe-up=\"commit:hello\"")))
+        assertEquals(emptyList(), held.commits)
+        assertTrue(held.problems.any { it.key == "held" && it.args.first() == "g18/q" }, held.problems.toString())
     }
 
     // 0.6.0's number board stood for every pad: one without pads= is made for each it serves, so a phone's, a date's and

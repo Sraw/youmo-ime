@@ -209,17 +209,21 @@ case("PY-77b", needs="jvm:PinyinUatTest.aWordGlidedTwiceGoesThirdUnderItsInitial
 
 def import_grouped(d, name, title):
     """uat/fixtures/layouts/<name>.layout imported through 外观 → 布局 (14-settings' helpers); its 导入 tapped,
-    the 现在就用在 question that follows left open"""
+    the 现在就用在 question that follows left open; the confirm dialog's texts returned"""
     st = script("14-settings")
     st.push_layout(d, name)
     st.import_layout(d, name)
     check(d.wait_text(f"导入布局 {title}？", timeout=8, where="all"), f"没出导入确认框：{d.screen().texts('all')[:10]}")
+    told = d.screen().texts("all")
     d.tap_text("导入", where="all", scroll=False, after=3.0)
+    return told
 
 
 @case("PY-153", mutates=True, visual=True)
 def py153(d):
-    import_grouped(d, "uat-k17-1.0", "UAT 17 键")
+    told = import_grouped(d, "uat-k17-1.0", "UAT 17 键")
+    held = [t for t in told if "是18 键的键" in t]
+    check(not held, f"确认框提醒了 App 的键：{held}")
     check(d.wait_text("现在就用在 拼音 上吗？", timeout=6, where="all"), f"没只问拼音：{d.screen().texts('all')[:10]}")
     d.tap_text("用", where="all", scroll=False, after=2.0)
     d.open_page("text")
@@ -234,7 +238,17 @@ def py153(d):
     text = d.field_text()
     d.clear()
     check(text == "你好", f"框里是 {text!r}")
-    return f"只问拼音；17 键画出来；候选 {c[:3]}；点「你好」上屏"
+    # HJK a key of its own name: its long press its own letters', not the app's H's (L6 verifier R-S1/R-N1)
+    st = script("14-settings")
+    st.slots_page(d)
+    st.slots_tab(d, "UAT 17 键")
+    st.key_dialog(d, "HJK")
+    st.dialog_card(d, "长按菜单")
+    items = [n.desc for n in d.screen().app() if n.clickable and n.desc and len(n.desc) == 1]
+    d.shot("full", "按键字符和快捷键的 UAT 17 键：HJK 的长按菜单有 h j k")
+    d.tap_text("取消", where="all", scroll=False, after=1.0)
+    check(all(x in items for x in "hjk"), f"HJK 的长按菜单没有 h、j、k：{items}")
+    return f"只问拼音、没提醒；17 键画出来；候选 {c[:3]}；点「你好」上屏；HJK 长按 {items}"
 
 
 case("PY-154", needs="jvm:NineKeyLettersCustomTest.theBuiltInGroupsInAnotherOrderAreThatKeyboardAndItsRecord、KeyboardCustomTest.theBuiltInGroupsRearrangedAreTheBuiltInKeyboardOnEitherInputMethod、ImKeyboardsTest.aLayoutOfOnesOwnIsShownAsTheBuiltInOneItIsTypedAs、GroupedKeyboardOwnGroupsTest.theEighteenKeysRearrangedAreDrawnAsWrittenAndTypedAsTheEighteenKeys")(lambda d: None)

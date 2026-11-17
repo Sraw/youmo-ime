@@ -44,11 +44,14 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.snackbar.Snackbar
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.TableSettings
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keys.KeyEdit
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.KeyListsCache
@@ -139,8 +142,11 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         }
         set(value) = prefs.internal.keySwipes.setValue(value.serialize())
 
-    // the keyboard picked ([pages]), kept as the page is rebuilt
+    // the keyboard picked ([pages]), kept as the page is rebuilt (by its form: a layout's tab is made anew each time)
     private var page = KeyShortcutPages.Full
+
+    // the tabs of the user's layouts in use as last made ([layoutPages]): made again as the page is rebuilt
+    private var layoutTabs: List<KeyShortcutPages.Page>? = null
 
     // 多选: on, and the keys chosen (their slots' names), kept across keyboards
     private var selecting = false
@@ -212,7 +218,22 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         if (isAdded && view != null) rebuild() else AppPrefs.getInstance().syncToDeviceEncryptedStorage()
     }
 
-    private val pages get() = KeyShortcutPages.all
+    private val pages get() = KeyShortcutPages.all(layoutTabs ?: layoutPages().also { layoutTabs = it })
+
+    // a tab of each layout of the user's an input method draws (061-custom-layout §9, Q4), made from it as it reads now;
+    // one with no key of a character's name (nothing to set) none
+    private fun layoutPages(): List<KeyShortcutPages.Page> {
+        val ctx = context ?: return emptyList()
+        return ImKeyboards.inUse(prefs.keyboard.imKeyboards(), EngineState.shuangpinScheme).mapNotNull { c ->
+            SceneLayouts.board(ctx, c.id)?.let { KeyShortcutPages.of(c.id, c.name, it.layout, it.fragments) }?.takeIf { it.rows.isNotEmpty() }
+        }
+    }
+
+    // a tab's name: the app's keyboard's, a layout's its own
+    private fun titleOf(page: KeyShortcutPages.Page): String = page.title ?: getString(pageTitle(page))
+
+    // the board a tab's keys are drawn and their long press read on: a layout's tab its layout, else the form's
+    private fun boardOf(page: KeyShortcutPages.Page, name: String = page.names.first()): String = page.layout ?: KeyCaps.defaultBoard(name)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -252,6 +273,9 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         // what the step would put back was changed since by another page (按键's 上滑, 下滑 and their places,
         // the page left and come back to): taking it back would undo that too, unseen, so there is none
         if (undo?.after?.let { it != snapshot() } == true) undo = null
+        // the layouts in use as they are now (one chosen, changed or let go since); the tab picked kept where it still is
+        layoutTabs = null
+        page = pages.firstOrNull { it.form == page.form } ?: KeyShortcutPages.Full
         val stored = slots
         val user = lists
         wide.apply {
@@ -274,7 +298,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             val pad = ctx.dp(KEY_CARD_PAD_DP)
             setPadding(pad, pad, pad, pad)
             add(TextView(ctx).apply {
-                setText(pageTitle(page))
+                text = titleOf(page)
                 textSize = 14f
                 setTextColor(ctx.styledColor(android.R.attr.colorPrimary))
             }, lParams(matchParent))
@@ -414,7 +438,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         val width = config.screenWidthDp.toFloat()
         val columns = CardColumns.columns(width, config.fontScale, CardColumns.CHOICE_MIN_DP, CardColumns.CHOICE)
         val nameSp = CardColumns.nameSp(CardColumns.cardWidth(width, columns), config.fontScale)
-        val names = pages.map { getString(pageTitle(it)) }
+        val names = pages.map(::titleOf)
         // a name that breaks makes every name two lines high, so the cards of a row are as high as one another
         // and their pictures line up
         val paint = TextPaint().apply { textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, nameSp.toFloat(), resources.displayMetrics) }
@@ -429,7 +453,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
                 cell.tag = BOARD + p.form
                 this.nameSp = nameSp
                 nameLines = lines
-                selected = p === page
+                selected = p.form == page.form
                 edited = KeyShortcutPages.edited(p, stored, user)
                 onPick = { page = p; rebuild() }
             }
@@ -478,7 +502,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
      * (注音九键's 14 and 24) draw at one height and line up as the keyboard's columns.
      */
     private fun cellWeights(ctx: Context, page: KeyShortcutPages.Page): (String) -> Float {
-        val widths = KeyCaps.widths(ctx, KeyCaps.defaultBoard(page.names.first()), page.names.first())
+        val widths = KeyCaps.widths(ctx, boardOf(page), page.names.first())
         // a key the board has none of is logged where its cap is drawn (SceneKeyCell.onBoard); its cell a letter's share
         return { name -> (widths[KeyId.of(name).name] ?: widths.values.minOrNull() ?: 1.0).toFloat() }
     }
@@ -526,14 +550,16 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             val note = getString(R.string.shortcut_key_elsewhere, key.label)
             // drawn as the board's own key (its r4c4), fitted as its neighbours, not a lone key filling the cell
             return KeyCaps.key(ctx, key.label, "", marked = false, dimmed = false, state = note,
-                shortcut = KeyCaps.Shortcut(key.name, stored, layout = KeyCaps.defaultBoard(page.names.first()))).apply {
+                shortcut = KeyCaps.Shortcut(key.name, stored, layout = boardOf(page))).apply {
                 setOnClickListener { v -> Snackbar.make(v, note, Snackbar.LENGTH_SHORT).show() }
             }
         }
         val (name, slotKey, label) = pageKey(page, key)
         val longPress = longPressOf(page, key, name)
-        // the engine's cap: a character key by its name, a function key by its own (its up and down)
-        val shortcut = KeyCaps.Shortcut(name, stored)
+        // the engine's cap: a character key by its name, a function key by its own (its up and down); a layout's tab's on it
+        val shortcut = KeyCaps.Shortcut(name, stored, layout = page.layout)
+        // a layout's key of a name another tab has too (Q4): marked, its editor saying which
+        val shared = page.layout?.let { KeyShortcutPages.sharedWith(page, key.name, pages) }?.let(::titleOf)
         // the key's first as a screen reader says it beside the label (the cap draws it where the keyboard does)
         val first = longPress?.let { resolverOf(ctx, it)?.edit(it.id)?.first }
         val hint = first?.takeIf { it != label }.orEmpty()
@@ -544,17 +570,22 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             getString(R.string.edited_x, label).takeIf { marked },
             getString(R.string.long_press_none).takeIf { set?.off == true },
         ).joinToString(" ").ifEmpty { null }
-        return KeyCaps.key(ctx, label, hint, marked = marked, dimmed = set?.off == true, selected = slotKey in selected, state = state, said = said(slotKey, stored), shortcut = shortcut).apply {
-            setOnClickListener { tapped(slotKey) { edit(label, slotKey, longPress) } }
+        return KeyCaps.key(
+            ctx, label, hint, marked = marked, dimmed = set?.off == true, selected = slotKey in selected, state = state, said = said(slotKey, stored), shortcut = shortcut,
+            tag = shared?.let { getString(R.string.shortcut_shared_tag) },
+        ).apply {
+            setOnClickListener { tapped(slotKey) { edit(label, slotKey, longPress, shared?.let { getString(R.string.shortcut_shared_with, it) }) } }
         }
     }
 
     /** Whose long press a dialog edits: the key's one name, and the board its page draws it on (whose resolver starts it). */
     private data class LongPress(val id: KeyId, val board: String)
 
-    // a character key's long press, and the function keys' with a list of characters (， 。)
+    // a character key's long press, and the function keys' with a list of characters (， 。); a layout's tab's key of a name
+    // another tab has (共用) the app's key: its list started and defaulted on the app's board, the one its tab edits (L6 review S2)
     private fun longPressOf(page: KeyShortcutPages.Page, key: KeyShortcutPages.Key, name: String): LongPress? = when {
-        page.form != KeyShortcuts.FUNCTION -> LongPress(KeyId.of(name), KeyCaps.defaultBoard(name))
+        page.form != KeyShortcuts.FUNCTION ->
+            LongPress(KeyId.of(name), page.layout?.takeIf { KeyShortcutPages.sharedWith(page, key.name, pages) == null } ?: KeyCaps.defaultBoard(name))
         KeyDefaults.function(key.label) != null -> LongPress(KeyId.function(key.label), KeyCaps.defaultBoard(key.label))
         else -> null
     }
@@ -722,7 +753,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
      * key alone as its cap shows it, on every keyboard (q, XC, ，键, 空格): the dialog edits the slots too, so no 长按
      * before it.
      */
-    private fun edit(title: String, slotKey: String, longPress: LongPress?) {
+    private fun edit(title: String, slotKey: String, longPress: LongPress?, shared: String? = null) {
         val ctx = requireContext()
         val resolver = longPress?.let { resolverOf(ctx, it) }
         // a later version's key_lists (§4.3) is never written over: its long presses not edited here
@@ -753,6 +784,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         val compute = notes(slotKey, sections) { open }
         val builder = AlertDialog.Builder(ctx)
             .setTitle(title)
+            .setMessage(shared)
             .setView(cards.layout)
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)

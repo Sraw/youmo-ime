@@ -10,6 +10,8 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.theme.ThemePackLayouts
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
+import org.fcitx.fcitx5.android.scene.keys.NodeFacts
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Include
 import org.fcitx.fcitx5.android.scene.layout.KeyData
@@ -91,7 +93,24 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
  * [base]: the app's board it is drawn as where it cannot be, and whose marks and defaults it has (061-custom-layout §5.3):
  * its own id but for a layout of the user's, its `based-on=`.
  */
-class SceneLayout(val id: String, val layout: Layout, val fragments: Map<String, Fragment>, val base: String = id)
+class SceneLayout(
+    val id: String,
+    val layout: Layout,
+    val fragments: Map<String, Fragment>,
+    val base: String = id,
+    private val appBoard: ((String) -> SceneLayout?)? = null,
+) {
+    /**
+     * Its named keys with what their nodes tell their long press (KeyResolver's), read when first asked: a user's
+     * layout's ([appBoard] given: the app's boards by id) of the app's names the app's boards' (DefaultMarks.ownNodes;
+     * L6 review S2: a key of the app's name is the app's key, whatever letters it writes), found from [base] as KeyData
+     * found its data (CustomKeyboards.baseOf, verifier R-N2).
+     */
+    val nodes: List<Pair<String, NodeFacts>> by lazy {
+        appBoard?.let { board -> DefaultMarks.ownNodes(layout, fragments, base) { id -> board(id)?.let { it.layout to it.fragments } } }
+            ?: DefaultMarks.nodes(layout, fragments)
+    }
+}
 
 /**
  * Layout [id] of the user's own (061-custom-layout §5, L3), its file's [stamp] as read: what a keyboard that chose it
@@ -185,6 +204,13 @@ object SceneLayouts {
         return readFrom(source, id, fallback(context.applicationContext ?: context))
     }
 
+    /**
+     * The board a settings page draws a key on by [id] (KeyCaps, SceneKeyCell): the keyboards' ([of]), else the user's
+     * layout [id] as its file is now where it is drawn ([custom]; 按键字符和快捷键's tab of it, 061-custom-layout §9).
+     */
+    fun board(context: Context, id: String): SceneLayout? =
+        of(context, id) ?: CustomKeyboards.choice(id)?.takeIf { it.drawn }?.let { custom(context, id, it.stamp) }
+
     /** The app's layout [id] read anew, the cache (main thread only) left alone: for checks off the main thread (a pack's import). */
     fun parseBuiltIn(context: Context, id: String): SceneLayout? = fallback(context.applicationContext ?: context).let { load(it, id, it) }
 
@@ -231,6 +257,7 @@ object SceneLayouts {
         val base = own ?: id
         val held = source.keyData?.let { KeyData.of(id, layout, fragments, it, own) }
             ?: return SceneLayout(id, layout, fragments, base)
-        return SceneLayout(id, held.layout, held.fragments, base)
+        // the app's boards a user's layout's keys of their names are of: read as the resolver first asks, on the main thread
+        return SceneLayout(id, held.layout, held.fragments, base, appBoard = if (own != null) { b -> readFrom(back, b, back) } else null)
     }
 }

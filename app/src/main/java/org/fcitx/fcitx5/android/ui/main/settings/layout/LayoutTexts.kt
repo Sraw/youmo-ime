@@ -56,6 +56,9 @@ object LayoutTexts {
         "commits" to R.string.layout_finding_commits,
         "theme-blank" to R.string.layout_finding_theme_blank,
         "unnamed" to R.string.layout_finding_unnamed,
+        "held" to R.string.layout_finding_held,
+        "held-letters" to R.string.layout_finding_held_letters,
+        "held-popups" to R.string.layout_finding_held_popups,
         "gap-look" to R.string.layout_finding_gap_look,
         "pad-lacks" to R.string.layout_finding_pad_lacks,
         "bottom-left" to R.string.layout_finding_bottom_left,
@@ -68,6 +71,9 @@ object LayoutTexts {
             "based-on" -> if (a.firstOrNull().isNullOrEmpty()) ctx.getString(R.string.layout_finding_based_on_missing) else ctx.getString(R.string.layout_finding_based_on, a[0])
             "too-big" -> ctx.getString(R.string.layout_finding_too_big, a.getOrElse(0) { "" }, ((a.getOrNull(1)?.toLongOrNull() ?: 0L) / KB).toString())
             "no-way" -> ctx.getString(R.string.layout_finding_no_way, a.joinToString(sep) { board(ctx, it) })
+            // a key of the app's and its board by the name its key page has, whichever it is told of
+            "held", "held-letters" -> ctx.getString(STRINGS.getValue(f.key), a.getOrElse(0) { "" }, a.getOrNull(1)?.let { appBoard(ctx, it) } ?: "")
+            "held-popups" -> ctx.getString(R.string.layout_finding_held_popups, a.getOrNull(0)?.let { appBoard(ctx, it) } ?: "")
             "pad-lacks" -> ctx.getString(R.string.layout_finding_pad_lacks, a.getOrNull(0)?.let { pad(ctx, it) } ?: "", a.getOrElse(1) { "" })
             "bottom-left" -> ctx.getString(R.string.layout_finding_bottom_left, a.getOrElse(0) { "" }.split(' ').filter { it.isNotEmpty() }.joinToString(sep) { role(ctx, it) })
             else -> string(f.key)?.let { ctx.getString(it, *Array(ARGS) { i -> a.getOrElse(i) { "" } }) }
@@ -78,6 +84,24 @@ object LayoutTexts {
     private fun board(ctx: Context, b: String): String = when (b) {
         "Number" -> ctx.getString(R.string.layout_section_number)
         "Symbol" -> ctx.getString(R.string.layout_section_symbols)
+        else -> b
+    }
+
+    // one of the app's boards (LayoutCheck's held: KeyData's ids) by the name its key page has
+    private fun appBoard(ctx: Context, b: String): String = when (b) {
+        "qwerty" -> ctx.getString(R.string.shortcut_page_full)
+        "k14" -> ctx.getString(R.string.shortcut_page_g14)
+        "k18" -> ctx.getString(R.string.shortcut_page_g18)
+        "nine" -> ctx.getString(R.string.shortcut_page_nine)
+        "zhuyin" -> ctx.getString(R.string.shortcut_page_zyfull)
+        "zhuyin-nine" -> ctx.getString(R.string.shortcut_page_zy9)
+        "number" -> ctx.getString(R.string.layout_section_number)
+        "symbols" -> ctx.getString(R.string.layout_section_symbols)
+        "emoji" -> ctx.getString(R.string.layout_board_emoji)
+        "emoticon" -> ctx.getString(R.string.layout_board_emoticon)
+        "emoji-search" -> ctx.getString(R.string.layout_board_emoji_search)
+        "expanded-side" -> ctx.getString(R.string.layout_board_expanded_side)
+        "number-row" -> ctx.getString(R.string.layout_board_number_row)
         else -> b
     }
 

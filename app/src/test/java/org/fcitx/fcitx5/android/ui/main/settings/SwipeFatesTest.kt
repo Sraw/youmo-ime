@@ -6,7 +6,9 @@ package org.fcitx.fcitx5.android.ui.main.settings
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -17,6 +19,7 @@ import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -36,6 +39,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -53,6 +57,9 @@ class SwipeFatesTest {
 
     @get:Rule
     val prefs = PrefsRule()
+
+    @get:Rule
+    val folder = TemporaryFolder()
 
     // both sides measure a character alike (Robolectric measures no text)
     @Before
@@ -114,6 +121,34 @@ class SwipeFatesTest {
             assertTrue(seen.all { it.roots.isNotEmpty() })
             seen.forEach { s -> assertTrue(s.roots.toString(), s.roots.none { KeyId(it).isFunction }) }
             assertNotEquals(h.service.getString(R.string.swipe_fate_roots), SwipeFates.note(h.service, seen, "backspace", up = false))
+        }
+    }
+
+    // a layout of the user's an input method draws: its keyboard named by the layout's name (061-custom-layout §9, L6)
+    @Test
+    @Uat("ST-187")
+    fun aLayoutOfTheUsersIsNamedByItsName() {
+        val slots = setBackspace()
+        val dir = java.io.File(folder.root, "layouts").apply { mkdirs() }
+        val dirWas = CustomKeyboards.dir
+        CustomKeyboards.dir = { dir }
+        try {
+            val ctx = RuntimeEnvironment.getApplication()
+            java.io.File(dir, "my-qwerty.xml").writeText(BuiltInLayouts(ctx).text("qwerty")!!.replaceFirst("id=\"qwerty\" name=\"26 键\"", "id=\"my-qwerty\" name=\"我的 26 键\" based-on=\"qwerty\""))
+            CustomKeyboards.forget("my-qwerty")
+            val k = AppPrefs.getInstance().keyboard
+            prefs.set(k.pinyinKeyboard, k.pinyinKeyboard.getValue())
+            prefs.set(k.pinyinKeyboardLayout, "")
+            k.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, "my-qwerty")
+            KeyboardHarness(TestThemes.PixelLight).start().use { h ->
+                val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
+                val seen = SwipeFates.Page(h.service, listOf(KeyboardHarness.PINYIN, english), emptyMap()).jobs(slots).map(SwipeFates::made)
+                // pinyin's the layout's name, English's (the app's 26 keys) the app's: two keyboards, no input method's name after either
+                assertEquals(setOf("我的 26 键", h.service.getString(R.string.shortcut_page_full)), seen.map { it.label }.toSet())
+            }
+        } finally {
+            CustomKeyboards.dir = dirWas
+            CustomKeyboards.forget("my-qwerty")
         }
     }
 

@@ -624,9 +624,10 @@ test("a pack's layout made one of the user's is the JVM's, byte for byte", () =>
   assert.ok(c.ok, c.why);
   assert.equal(c.text, read(data, 'convert', 'k17-motion.layout'));
   assert.equal(c.name, '薄荷 17 键 · 17 键');
-  assert.deepEqual(Object.keys(c.renames), []);
+  // its HJK on H's name a key of its own, its letters' (L6 verifier R-S1)
+  assert.deepEqual(Object.assign({}, c.renames), { 'g18/h': c.id + '/hjk' });
   const named = E.convertPackLayout('薄荷', null, 'k18', k18.replace('shortcut="g18/q"', 'shortcut="mine"'), null, '0.6.1');
-  assert.deepEqual(Object.assign({}, named.renames), { 'fn/mine': named.id + '/r1c1' });
+  assert.deepEqual(Object.assign({}, named.renames), { 'fn/mine': named.id + '/r1c1', 'g18/h': named.id + '/hjk' });
   // a board a pack still stands for: not made one, why said
   const zhuyin = E.convertPackLayout('薄荷', null, 'zhuyin', E.layoutSource('zhuyin'), null, '0.6.1');
   assert.equal(zhuyin.ok, false);

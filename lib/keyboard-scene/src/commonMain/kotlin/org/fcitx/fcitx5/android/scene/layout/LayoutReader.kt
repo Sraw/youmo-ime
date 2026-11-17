@@ -418,6 +418,12 @@ object LayoutReader {
     /** [raw] where it is a word of the action vocabulary (layout-1.xsd's `action`). */
     fun action(raw: String): String? = raw.takeIf { a -> ACTION_PATTERNS.any { it.matches(a) } && (!a.startsWith("code:") || codePoint(a) != null) }
 
+    /** The vocabulary's bare words, an action each with no argument (`caps` aside): never text to type (KeyDefaults.itemOf). */
+    val WORDS = listOf(
+        "lang", "ime-picker", "quickphrase", "unicode", "panel-back", "panel-lock", "space-long-press", "begin-selection-swipe",
+        "delete-selection", "move-selection", "lookup",
+    )
+
     /**
      * The code point of a `code:U+…` action: a Unicode scalar value, U+10FFFF at most and no surrogate
      * (a half of a pair is no character to send); null for any other.
@@ -487,9 +493,6 @@ object LayoutReader {
         Regex("code:U\\+[0-9A-F]{4,6}"),
         Regex("keypad:[0-9]"),
         Regex("caps(:lock)?"),
-        Regex(
-            "lang|ime-picker|quickphrase|unicode|panel-back|panel-lock|space-long-press|begin-selection-swipe|" +
-                "delete-selection|move-selection|lookup",
-        ),
+        Regex(WORDS.joinToString("|")),
     )
 }

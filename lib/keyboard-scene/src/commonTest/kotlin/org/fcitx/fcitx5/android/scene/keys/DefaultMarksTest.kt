@@ -9,8 +9,10 @@ import org.fcitx.fcitx5.android.scene.Forms
 import org.fcitx.fcitx5.android.scene.TEST_DATA
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.json.EnvJson
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.readText
 import org.fcitx.fcitx5.android.scene.recording
+import org.fcitx.fcitx5.android.scene.testData
 import org.fcitx.fcitx5.android.scene.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,5 +78,33 @@ class DefaultMarksTest {
     fun aFunctionKeysBareNameIsReadAsItsOneName() {
         val env = EnvJson.read("""{"width": 1080, "height": 700, "density": 2.625, "marks": {"shortcuts": {"space:up": {"icon": "x"}, "full/q:down": {}}}}""").ok()
         assertEquals(mapOf("fn/space:up" to MarkContent.Icon("x"), "full/q:down" to MarkContent.Empty), env.marks.shortcuts)
+    }
+
+    // a user's layout's key of the app's name is the app's key: its long press and corner the app's board's node's,
+    // whatever letters it writes; a name of its own, what it writes (L6 review S2)
+    @Test
+    fun aUsersKeyOfTheAppsNameIsTheAppsKey() {
+        val mine = testData("k18.xml").replaceFirst("id=\"k18\"", "id=\"my-k18\" based-on=\"k18\"")
+            .replace("letters=\"h\" shortcut=\"g18/h\"", "letters=\"hjk\" shortcut=\"g18/h\"")
+            .replace("letters=\"we\" shortcut=\"g18/we\"", "letters=\"wex\" shortcut=\"my-k18/wex\"")
+            .replace("</keyboard>", "<row><key id=\"h2\" label=\"H\" send=\"h\" shortcut=\"g18/h\"/></row>\n</keyboard>")
+        val layout = LayoutReader.layout(mine).ok()
+        val app = DefaultMarks.nodes(Forms.layout("k18"), Forms.fragments).toMap()
+        val written = DefaultMarks.nodes(layout, Forms.fragments).toMap()
+        assertEquals("hjk", written.getValue("g18/h").letters)
+        val asked = ArrayList<String>()
+        val nodes = DefaultMarks.ownNodes(layout, Forms.fragments) { id -> asked += id; Forms.layout(id) to Forms.fragments }.toMap()
+        assertEquals(app.getValue("g18/h"), nodes.getValue("g18/h"))
+        assertEquals(written.getValue("my-k18/wex"), nodes.getValue("my-k18/wex"))
+        assertEquals(listOf("k18"), asked, "each board read once")
+        // its corner and long press the app's H's, never what the letters HJK would give
+        val marks = DefaultMarks.shortcuts(layout, Forms.fragments, nodes = DefaultMarks.ownNodes(layout, Forms.fragments) { Forms.layout(it) to Forms.fragments })
+        assertEquals(marks("k18")["g18/h:up"], marks["g18/h:up"])
+        val variant = DefaultMarks.variantOf(Forms.layout("k18"))
+        assertEquals(KeyDefaults.of(KeyId("g18/h"), variant, app.getValue("g18/h")), KeyDefaults.of(KeyId("g18/h"), variant, nodes.getValue("g18/h")))
+        // a name looked up as KeyData looks: its base's first, another board's where its base has none
+        assertEquals("k18", DefaultMarks.appBoard("g18/h", "qwerty"))
+        assertEquals("qwerty", DefaultMarks.appBoard("full/q", "k18"))
+        assertEquals(null, DefaultMarks.appBoard("my-k18/wex", "k18"))
     }
 }

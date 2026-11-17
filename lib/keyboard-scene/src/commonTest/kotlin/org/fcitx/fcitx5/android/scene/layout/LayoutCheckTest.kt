@@ -617,6 +617,92 @@ class LayoutCheckTest {
         for (cp in listOf(0x1F110, 0x1F129, 0x1F12B, 0x1F12E)) assertEquals(held, commands(withRow(swiping(text(cp)))), cp.toString(16))
     }
 
+    // a key of the app's name writing a long press or swipe of its own: the app's is taken, the file told by line (§19.4, L6)
+    @Test
+    fun aKeyOfTheAppsNameWritingWhatItDoesHeldIsTold() {
+        val k18 = own("k18")
+        assertTrue(check(k18).warnings.none { it.key == "held" }, "the app's board as it is: nothing written")
+        val swiped = k18.replace("letters=\"h\" shortcut=\"g18/h\"", "letters=\"h\" shortcut=\"g18/h\" swipe-down=\"x\"")
+        val line = swiped.lines().indexOfFirst { "swipe-down=\"x\"" in it } + 1
+        assertEquals(listOf(LayoutCheck.Finding(line, "held", listOf("g18/h", "k18"))), check(swiped).warnings.filter { it.key == "held" })
+        // a name of another of the app's boards: that board's; two things written on one key, one finding
+        val borrowed = qwerty.replace("</keyboard>", "<row><key id=\"h2\" label=\"H\" send=\"commit:h\" shortcut=\"g18/h\" alt=\"!\" swipe-up=\"commit:嗨\"/></row>\n</keyboard>")
+        assertEquals(listOf(listOf("g18/h", "k18")), check(borrowed).warnings.filter { it.key == "held" }.map { it.args })
+        // what it types is its tap alone: the swiped 「嗨」 the app's key's, not among the texts it types
+        assertEquals(listOf("h"), check(borrowed).commits)
+        // a name of its own keeps what it writes: nothing told
+        val own = qwerty.replace("</keyboard>", "<row><key id=\"h2\" label=\"H\" send=\"commit:h\" shortcut=\"my-qwerty/h2\" swipe-up=\"commit:嗨\"/></row>\n</keyboard>")
+        assertTrue(check(own).warnings.none { it.key == "held" })
+        assertEquals(listOf("h", "嗨"), check(own).commits)
+        // a key of no name whose base's key of its id has data: that key's, told by its id
+        val bare = check(own("number").replaceFirst("send=\"sym:KP_Add\"", "send=\"sym:KP_Add\" swipe-up=\"x\"")).warnings.filter { it.key == "held" }
+        assertEquals(listOf(listOf("+", "number")), bare.map { it.args })
+    }
+
+    // a key of the app's name is the app's key: letters= other than its make its long press none of theirs, told; two keys
+    // of a line each told; a popups= not taken told (L6 review S2, N1, N2)
+    @Test
+    fun aKeyOfTheAppsNameIsTheAppsKeyEachToldAndPopupsToo() {
+        val k18 = own("k18")
+        fun held(text: String) = check(text).warnings.filter { it.key.startsWith("held") && it.key != "held-popups" }
+        // the letters of its own: HJK under H's name, told as letters (verifier R-N1); a swipe too, both
+        val merged = k18.replace("letters=\"h\" shortcut=\"g18/h\"", "letters=\"hjk\" shortcut=\"g18/h\"")
+        val line = merged.lines().indexOfFirst { "letters=\"hjk\"" in it } + 1
+        assertEquals(listOf(LayoutCheck.Finding(line, "held-letters", listOf("g18/h", "k18"))), held(merged))
+        assertEquals(listOf("held", "held-letters"), held(merged.replace("letters=\"hjk\"", "letters=\"hjk\" swipe-down=\"x\"")).map { it.key })
+        // its own name: its letters its own, nothing told
+        assertTrue(held(merged.replace("shortcut=\"g18/h\"", "shortcut=\"my-k18/hjk\"")).isEmpty())
+        // a key writing no letters under a group's name (a qwerty board's): the app's letters, nothing told
+        assertTrue(held(qwerty.replace("</keyboard>", "<row><key id=\"h2\" label=\"H\" send=\"h\" shortcut=\"g18/h\"/></row>\n</keyboard>")).isEmpty())
+        // two keys of the app's names on a line, each writing a swipe: each told
+        val two = qwerty.replace(
+            "</keyboard>",
+            "<row><key id=\"a2\" send=\"a\" shortcut=\"full/a\" swipe-down=\"x\"/><key id=\"b2\" send=\"b\" shortcut=\"full/b\" swipe-down=\"y\"/></row>\n</keyboard>",
+        )
+        assertEquals(listOf(listOf("full/a", "qwerty"), listOf("full/b", "qwerty")), held(two).map { it.args })
+        // a variant of another of the app's names on the key's line: told by its own name
+        val variant = qwerty.replace(
+            "</keyboard>",
+            "<row><key id=\"a2\" send=\"a\" shortcut=\"full/a\"><variant when=\"ime=english\" shortcut=\"full/b\" swipe-down=\"y\"/></key></row>\n</keyboard>",
+        )
+        assertTrue(listOf("full/b", "qwerty") in held(variant).map { it.args })
+        // popups="off" on a layout whose base has them: its base's taken, told once
+        val off = k18.replaceFirst("family=\"grouped\"", "family=\"grouped\" popups=\"off\"")
+        assertEquals(listOf(LayoutCheck.Finding(0, "held-popups", listOf("k18"))), check(off).warnings.filter { it.key == "held-popups" })
+        assertTrue(check(k18).warnings.none { it.key == "held-popups" })
+    }
+
+    // a literal alt= of a key of its own is its long press's first where no swipe-up= is, typed (KeyDefaults): held to
+    // what a commit: is (no hidden character, no longer than one) and listed with the texts it types (L6 review M2)
+    @Test
+    fun aLiteralAltTypedAsAFirstIsHeldToWhatACommitIs() {
+        fun ownKey(attrs: String) = qwerty.replace("</keyboard>", "<row><key id=\"zz\" label=\"Z\" send=\"commit:z\" shortcut=\"my-qwerty/zz\" $attrs/></row>\n</keyboard>")
+        assertEquals(listOf("hidden-chars"), errors(ownKey("alt=\"\u202Emoc.live\"")))
+        assertEquals(listOf("hidden-chars"), errors(ownKey("alt=\"a\u200Bb\" swipe-up=\"commit:z\"")), "drawn and maybe typed: never hidden")
+        assertTrue("hidden-chars" in errors(qwerty.replace("</keyboard>", "<row><defaults alt=\"\u202E\"/><key id=\"zz\" label=\"Z\" send=\"commit:z\" shortcut=\"my-qwerty/zz\"/></row>\n</keyboard>")), "a row's")
+        assertEquals(listOf("commit-long"), errors(ownKey("alt=\"${"x".repeat(LayoutCheck.MAX_COMMIT + 1)}\"")))
+        // what it types, not what it writes (verifier R-M1): a code: decoded, on a key, a variant and a row's <defaults>
+        assertEquals(listOf("hidden-chars"), errors(ownKey("alt=\"code:U+202E\"")))
+        assertEquals(listOf("hidden-chars"), errors(ownKey("alt=\"code:U+202E\" swipe-up=\"commit:z\"")))
+        val variant = qwerty.replace("</keyboard>", "<row><key id=\"zz\" label=\"Z\" send=\"commit:z\" shortcut=\"my-qwerty/zz\"><variant when=\"ime=english\" alt=\"code:U+200B\"/></key></row>\n</keyboard>")
+        assertEquals(listOf("hidden-chars"), errors(variant))
+        assertTrue("hidden-chars" in errors(qwerty.replace("</keyboard>", "<row><defaults alt=\"code:U+2066\"/><key id=\"zz\" label=\"Z\" send=\"commit:z\" shortcut=\"my-qwerty/zz\"/></row>\n</keyboard>")), "a row's code:")
+        // a code: of too many digits is no character: an action, typing nothing, nothing hidden
+        assertEquals(emptyList(), errors(ownKey("alt=\"code:U+000202E\"")))
+        assertEquals(listOf("z"), check(ownKey("alt=\"code:U+000202E\"")).commits)
+        // its length is what it types: a commit: of one too many, too long; one of the most, held as it is
+        assertEquals(listOf("commit-long"), errors(ownKey("alt=\"commit:${"x".repeat(LayoutCheck.MAX_COMMIT + 1)}\"")))
+        assertEquals(emptyList(), errors(ownKey("alt=\"commit:${"x".repeat(LayoutCheck.MAX_COMMIT)}\"")))
+        assertEquals(listOf("z", "zz!"), check(ownKey("alt=\"zz!\"")).commits)
+        // a swipe-up= first: it, not the alt; an action word types nothing; a key of the app's name, the app's
+        assertEquals(listOf("z", "q"), check(ownKey("alt=\"zz!\" swipe-up=\"commit:q\"")).commits)
+        assertEquals(listOf("z"), check(ownKey("alt=\"ime-picker\"")).commits)
+        assertEquals(listOf("z"), check(ownKey("alt=\"zz!\"").replace("my-qwerty/zz", "full/z")).commits)
+        // a row's shortcut= making a key the app's: its swipe the app's, not listed (N4)
+        val rowNamed = qwerty.replace("</keyboard>", "<row><defaults shortcut=\"full/z\"/><key id=\"zz\" label=\"Z\" send=\"commit:z\" swipe-up=\"commit:哈\"/></row>\n</keyboard>")
+        assertEquals(listOf("z"), check(rowNamed).commits)
+    }
+
     // the file drawn is not trusted: what needs no scene asked again as it is read to be drawn (L3)
     @Test
     fun aLayoutReadToBeDrawnIsHeldToWhatNeedsNoScene() {

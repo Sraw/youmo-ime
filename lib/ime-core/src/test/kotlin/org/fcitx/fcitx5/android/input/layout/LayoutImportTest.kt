@@ -123,4 +123,14 @@ class LayoutImportTest {
         assertEquals("symbols", symbols.layout.family)
         assertEquals(emptyList<LayoutCheck.Finding>(), symbols.report.warnings)
     }
+
+    // the settings UAT's layout of names (uat/fixtures/layouts/uat-names.layout, 061-custom-layout §9, L6): taken, its
+    // WE's 下滑 told (the 18 keys' is used) and not among what it types; its own key's 哈 and long press are
+    @Test
+    @Uat("ST-188")
+    fun theUatsLayoutOfNamesIsTakenItsHeldKeyTold() {
+        val ok = judge(File("../../uat/fixtures/layouts/uat-names.layout").readText()) as Verdict.Ok
+        assertEquals(listOf(LayoutCheck.Finding(14, "held", listOf("g18/we", "k18"))), ok.report.warnings.filter { it.key == "held" })
+        assertEquals(listOf("哈", "哈哈", "嘿"), ok.commits)
+    }
 }

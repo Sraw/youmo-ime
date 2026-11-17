@@ -906,7 +906,10 @@ A pack's boards of `KeyData.LISTED` become layouts of the user's (061-custom-lay
 (reads, its includes read, `judge`; the loose check of §3.2), id `t<FNV-1a of the theme name, 8 hex>-<board>`,
 `based-on` the board, named 「theme · own name」 within 24, the pack's `grouped-bottom` written in, key names the rule
 refuses (a key's, a variant's, a `<defaults>`' of the layout, a row, a pack fragment: `<id>/keys`, `<id>/<row id>`)
-renamed `<id>/<key id>` and the user's `key_lists`/`key_swipes` under the old copied under the new (`RenamedKeys`,
+renamed `<id>/<key id>`, a group key of one of the app's names writing letters other than that key's (`appKeys`, as
+LayoutCheck's held finds it) `<id>/<its letters>` (0.6.0's 17 keys' HJK on `g18/h`: a key of its own, its long press
+its letters' as 0.6.0 drew it, since a user's layout's key of the app's name is the app's key), and the user's
+`key_lists`/`key_swipes` under the old copied under the new (`RenamedKeys`,
 ime-core); not made where its own `<meta min-app>` is newer than the app; a number board without `pads=` written for
 `LayoutReader.PADS` but those it lacks a key of (`lacks pad=`; none: not made), one with `pads=` not made where one
 lacks; `Done.commits` its new `commit:` texts (§13, counted in the import's confirmation). Where it goes:
@@ -1295,6 +1298,26 @@ where it does not read, a file that does not read at all listed under the panel 
 `PanelLayouts.missing`: its file gone), an import asks 现在就用作数字键盘吗？ (not where it is the panel's choice already:
 said so), a delete puts each panel using it back on the app's. A restore takes no number board a pad of which lacks
 what a field of it types (`lacks pad=…`, `CustomLayoutFiles.restorable`): as it is read no pad's scene is built again.
+
+Their key names (061-custom-layout §9, §19.4, L6). 按键字符和快捷键 adds a card per letters layout of the user's in use
+(`ImKeyboards.inUse`: the slots' `shown(…).custom`, drawn ones, each once) before 功能键: ime-core's
+`KeyShortcutPages.of` makes its page from the layout (every named key and own-named variant whatever its `when=`, no
+`fn/` names, each once; a built-in name its built-in tab's label, unless a group key's letters differ, an own name the
+layout's literal or binding argument), form `layout:<id>`, titled the layout's name; `KeyShortcutPages.sharedWith`
+names the first other tab with the name, whose caps there carry 共用 and whose editor says 和「18 键」共用, its list
+started and defaulted on the app's board of the name (`KeyCaps.defaultBoard`). Such a tab draws and resolves on the
+layout itself (`SceneLayouts.board`: built-in, else `custom(id, stamp)` where drawn), sized by its base. A key of one of
+the app's names is the app's key: a user's layout's `SceneLayout.nodes` are `DefaultMarks.ownNodes`, those names'
+nodes the app's board's (`DefaultMarks.appBoard` from the base KeyData took, `CustomKeyboards.baseOf`), so its long press and corner never follow its
+`letters=` or `alt=` (the layout maker's `defaultMarks` alike). An own name's defaults are what the layout writes
+(`KeyData.keepOwn`); one with a first written and no list has that first as its list (`KeyDefaults.of`), a bare word
+of the vocabulary (`ime-picker`) being an action, none. `LayoutCheck`'s `held` warning tells, by line and key, a key or
+variant of one of the app's names writing data unlike the app's (KeyData's `ignored`, keyed by name), `held-letters` a
+group key writing letters unlike its key's (a key writing none has the app's), `held-popups` a `popups=` not taken. A
+literal `alt=` is held to a commit's rules (`hidden-chars`, `commit-long`) by what it types (`KeyDefaults.itemOf`: a
+`code:U+…` decoded) and, on a key of its own without `swipe-up=`, counted in `commits`; `commits` counts a key of the app's
+name's tap alone (its name as its row's and `<defaults>`' make it). SwipeFates names a custom keyboard by the layout's
+name (`Made.custom`).
 
 The 14 keys (`GroupedKeyboard`, `GroupedKeyboard.Name14`) are 拼音's touch keyboard when
 `pinyinKeyboard` is `Keys14`.

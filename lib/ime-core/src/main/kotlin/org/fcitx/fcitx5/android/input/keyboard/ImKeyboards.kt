@@ -219,6 +219,13 @@ object ImKeyboards {
     /** The [SLOTS] whose keyboard is layout [id] of the user's ([chosen]): 用在：… under its card (§4.3). */
     fun usedBy(chosen: Chosen, id: String): List<String> = SLOTS.filter { chosen.layoutOf(imOf(it)) == id }
 
+    /**
+     * The layouts of the user's an input method draws ([shown]: chosen, and drawn under [scheme]), each once in [SLOTS]'
+     * order: those 按键字符和快捷键 has a tab of (061-custom-layout §9; one chosen and not drawn has none).
+     */
+    fun inUse(chosen: Chosen, scheme: ShuangpinScheme): List<CustomChoice> =
+        SLOTS.mapNotNull { shown(imOf(it), chosen, scheme).custom }.distinctBy { it.id }
+
     /** The [SLOTS] that may be typed on [layout] under [scheme] ([usable]): 用在… of its card, the question after its import (§4.2 step 5). */
     fun usableBy(layout: CustomChoice, scheme: ShuangpinScheme): List<String> = SLOTS.filter { usable(imOf(it), layout, scheme) }
 

@@ -145,6 +145,25 @@ class KeyDefaultsTest {
         assertEquals(0, l.focus)
     }
 
+    // a user's layout's new key of no list (it types `commit:` text): the first it writes alone; none written, none
+    @Test
+    fun aFirstWrittenOnAKeyOfNoListIsItsListAlone() {
+        val full = KeyboardVariant(Form.Full)
+        val l = KeyDefaults.of(KeyId("mine/ha"), full, NodeFacts(layoutFirst = "commit:哈哈"))!!
+        assertEquals(listOf("哈哈"), texts(l))
+        assertEquals(Item("哈哈", Commit.AsIs), l.first)
+        assertNull(KeyDefaults.of(KeyId("mine/ha"), full, NodeFacts()))
+        // an action first names no item of a list: none
+        assertNull(KeyDefaults.of(KeyId("mine/ha"), full, NodeFacts(layoutFirst = "sym:BackSpace")))
+        // nor a bare word of the vocabulary: an action, never its letters typed (L6 review M1)
+        for (word in listOf("ime-picker", "lang", "panel-back", "space-long-press", "caps")) {
+            assertNull(KeyDefaults.of(KeyId("mine/globe"), full, NodeFacts(layoutFirst = word)), word)
+            assertEquals(Item("", Commit.Action(word)), KeyDefaults.itemOf(word))
+        }
+        // on a key of a list: no first of it either
+        assertEquals(KeyDefaults.of(KeyId("full/q"), full, NodeFacts(text = "q", typing = true)), KeyDefaults.of(KeyId("full/q"), full, NodeFacts(text = "q", typing = true, layoutFirst = "lang")))
+    }
+
     @Test
     fun thePresetTableReadsMarksAsWritten() {
         assertEquals(listOf("¢", "€", "£", "¥", "₹", "₽", "₺", "₩", "₱", "₿"), PresetLists.of("$"))

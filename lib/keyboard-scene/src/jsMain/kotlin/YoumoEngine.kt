@@ -103,6 +103,8 @@ class YoumoLayout internal constructor(
     // the app's board whose variant its marks are of: a theme pack's file of its own id (whatever `based-on=` it
     // writes, PackLayouts.judge), a user's own layout of its `based-on=` (061-custom-layout §5.3: 17 keys of k18 are k18's)
     internal val variantOf: String = layout.id,
+    // a user's own layout (readOwnLayout): a key of the app's name is the app's key, its marks the app's board's (DefaultMarks.ownNodes)
+    internal val own: Boolean = false,
 ) {
     val id: String get() = layout.id
     val name: String get() = layout.name
@@ -192,7 +194,7 @@ object YoumoEngine {
         val includes = builtIns.includes(layout.value)
         val held = includes.orNull()?.let { KeyData.of(layout.value.id, layout.value, it, KeyData.Mode.Own) }
         val basedOn = layout.value.basedOn ?: layout.value.id
-        val answer = result(includes) { "layout" to (held?.let { h -> YoumoLayout(h.layout, h.fragments, basedOn) } ?: YoumoLayout(layout.value, it, basedOn)) }
+        val answer = result(includes) { "layout" to (held?.let { h -> YoumoLayout(h.layout, h.fragments, basedOn, own = true) } ?: YoumoLayout(layout.value, it, basedOn, own = true)) }
         answer.ignored = held?.ignored.orEmpty().map { obj("file" to it.file, "line" to it.line, "what" to it.what) }.toTypedArray()
         // the reader's warnings too (an attribute that does nothing): the page lists them, the checker does not
         if (includes is Parsed.Ok) answer.warnings = problems(layout.warnings + includes.warnings)
@@ -256,7 +258,8 @@ object YoumoEngine {
         }
         val map = HashMap<String, String>()
         if (punctuation != null) for (k in keys(punctuation, "punctuation")) map[k] = text(punctuation[k], "punctuation $k")
-        JSON.parse<dynamic>(DefaultMarks.json(DefaultMarks.shortcuts(l.layout, l.fragments, DefaultMarks.variantOf(l.layout, l.variantOf), punctuation = map)))
+        val nodes = if (l.own) DefaultMarks.ownNodes(l.layout, l.fragments) { id -> layout(id)?.let { it.layout to it.fragments } } else DefaultMarks.nodes(l.layout, l.fragments)
+        JSON.parse<dynamic>(DefaultMarks.json(DefaultMarks.shortcuts(l.layout, l.fragments, DefaultMarks.variantOf(l.layout, l.variantOf), punctuation = map, nodes = nodes)))
     }
 
     /** The app's boards' ids (`qwerty`, `nine`…). */

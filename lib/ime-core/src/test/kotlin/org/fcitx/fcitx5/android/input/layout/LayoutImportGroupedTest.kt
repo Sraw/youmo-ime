@@ -38,6 +38,10 @@ class LayoutImportGroupedTest {
         val groups = SceneGroups.written(k17.layout)
         assertEquals(17, groups.size)
         assertTrue("hjk" in groups)
+        // HJK under a name of its own: nothing held (under g18/h it would be the app's H, told as held-letters)
+        assertTrue(k17.report.warnings.toString(), k17.report.warnings.none { it.key.startsWith("held") })
+        val underH = File("../../uat/fixtures/layouts/uat-k17-1.0.layout").readText().replace("uat-k17/hjk", "g18/h")
+        assertEquals(listOf("held-letters"), LayoutCheck.check(underH, sources, "0.6.1").warnings.map { it.key }.filter { it.startsWith("held") })
         assertTrue(SceneGroups.letters(groups)!!.codes.all { it.code in NineKeyLetters.CUSTOM_BLOCK })
         // its taps lean by where they fall (按落点加权): no key writes lean="off"
         assertEquals(groups.filter { it.length > 1 }.toSet(), SceneGroups.leaning(k17.layout))

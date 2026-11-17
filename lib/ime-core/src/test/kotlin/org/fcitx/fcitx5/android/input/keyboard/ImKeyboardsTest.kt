@@ -216,6 +216,23 @@ class ImKeyboardsTest {
         assertEquals(emptyMap<String, ImKeyboard>(), ImKeyboards.afterDelete(Chosen(layouts = mapOf(PINYIN to "my-k18")), "my-k18", k18, ziranma))
     }
 
+    // 按键字符和快捷键's tabs of the user's layouts (061-custom-layout §9, L6): each drawn once, in the slots' order
+    @Test
+    fun theLayoutsInUseAreThoseDrawn() {
+        val customs = listOf(letters, nine, k14).associateBy { it.id }
+        val chosen = Chosen(
+            pinyin = CUSTOM, shuangpin = CUSTOM, english = CUSTOM, table = CUSTOM,
+            layouts = mapOf(PINYIN to "my-nine", SHUANGPIN to "my-k14", ENGLISH to "my-qwerty", ImKeyboards.TABLE to "my-qwerty"),
+            customs = customs,
+        )
+        assertEquals(listOf("my-nine", "my-k14", "my-qwerty"), ImKeyboards.inUse(chosen, ziranma).map { it.id })
+        // 双拼 under 微软 types ; on the 14 keys' groups: its base drawn, not the layout
+        assertEquals(listOf("my-nine", "my-qwerty"), ImKeyboards.inUse(chosen, microsoft).map { it.id })
+        // chosen once, the choice another keyboard since; one that does not read: none
+        assertEquals(emptyList<String>(), ImKeyboards.inUse(Chosen(layouts = mapOf(PINYIN to "my-nine"), customs = customs), ziranma).map { it.id })
+        assertEquals(emptyList<String>(), ImKeyboards.inUse(Chosen(pinyin = CUSTOM, layouts = mapOf(PINYIN to "gone"), customs = customs), ziranma).map { it.id })
+    }
+
     @Test
     fun aLayoutsCardSaysWhoUsesItAndWhoMay() {
         val both = Chosen(pinyin = CUSTOM, english = CUSTOM, table = CUSTOM, layouts = mapOf(PINYIN to "my-qwerty", ENGLISH to "my-qwerty", ImKeyboards.TABLE to "other"))

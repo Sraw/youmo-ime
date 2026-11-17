@@ -121,7 +121,7 @@ object KeyCaps {
     internal fun SceneKeyCell.onBoard(ctx: Context, shortcut: Shortcut?, board: SceneKeyCell.Board?) {
         keyboardKeyHeight = keyboardKeyHeight(ctx, board?.layout)
         this.board = board
-        val layout = board?.let { SceneLayouts.of(ctx, it.layout) }
+        val layout = board?.let { SceneLayouts.board(ctx, it.layout) }
         val slots = shortcut?.slots ?: SwipeSlotsCache.current
         val charShortcuts = shortcut?.charShortcuts ?: true
         // the marks as the keyboard's resolver has them (060-keys-unify §1.3): each key's first from key_lists, its
@@ -143,8 +143,8 @@ object KeyCaps {
      * lists, one list a key for every input method (060-row-unlock), shown with the user's 按键字母 and 18 键's L with
      * its `:` (a scheme typing `;`'s: the item every keyboard but that one skips, §2).
      */
-    fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.of(ctx, layout)?.let {
-        SceneBoard.resolver(it, KeyboardVariant(DefaultMarks.variantOf(it.layout, it.layout.id).form, nineLetters(), semicolon = true))
+    fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.board(ctx, layout)?.let {
+        SceneBoard.resolver(it, KeyboardVariant(DefaultMarks.variantOf(it.layout, it.base).form, nineLetters(), semicolon = true))
     }
 
     /** The nine keys' letters as the user set them (t9_letters), as 九键's keyboard has them: the editor's rows of 2 to 9. */
@@ -161,7 +161,7 @@ object KeyCaps {
 
     // [layout]'s rows as the keyboard counts them (KeyboardWindow.rowUnits); upright, at no size: the built-in boards'
     // rows do not depend on it
-    private fun rowsOf(ctx: Context, layout: String): Double = SceneLayouts.of(ctx, layout)?.let {
+    private fun rowsOf(ctx: Context, layout: String): Double = SceneLayouts.board(ctx, layout)?.let {
         KeyboardHeightCap.rowUnits(it.layout, it.fragments, Env(1.0, 1.0, ctx.resources.displayMetrics.density.toDouble()))
     } ?: KeyboardHeightCap.DEFAULT_ROWS
 
@@ -189,11 +189,13 @@ object KeyCaps {
     /**
      * The keyboard the key of [shortcut] (a shortcut page's name: `full/a`, `zyfull/1`, a function key's `space`) is on,
      * at its keys' size as InputView makes it upright (SwipeFates.size: the height settings, the bar, the board's code row, the
-     * paddings, the cap, one-handed, floating, split): [layout] the board, a function key's qwerty's unless given.
+     * paddings, the cap, one-handed, floating, split): [layout] the board, a function key's qwerty's unless given; a layout
+     * of the user's at its base's size (its code row, split as the letters where it is of them: KeyboardWindow's).
      */
     fun board(ctx: Context, shortcut: String, layout: String = defaultBoard(shortcut)): SceneKeyCell.Board {
         val screen = upright(ctx)
-        val size = SwipeFates.size(screen, layout, CODE_ROWS[layout] ?: ImKeyboards.Layout.TEXT, rowsOf(ctx, layout))
+        val base = SceneLayouts.board(ctx, layout)?.base ?: layout
+        val size = SwipeFates.size(screen, base, CODE_ROWS[base] ?: ImKeyboards.Layout.TEXT, rowsOf(ctx, layout))
         // the corners as the keyboard says them (BaseKeyboard.keyReadings: the long presses' firsts, the user's; none where the
         // first's way draws nothing); the marks drawn are the resolver's (onBoard)
         val alts = if (firstShown()) {

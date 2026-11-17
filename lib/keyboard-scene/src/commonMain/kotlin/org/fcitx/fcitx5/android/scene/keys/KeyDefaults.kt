@@ -86,7 +86,9 @@ object KeyDefaults {
      */
     fun of(id: KeyId?, variant: KeyboardVariant, node: NodeFacts, caps: Boolean = false): DefaultList? {
         if (id != null && id.isFunction) return function(id.key)
-        val made = made(id, variant, node, caps) ?: return null
+        // a first written on a key of no list (a user's layout's new key typing `commit:` text, 061-custom-layout §9):
+        // that first alone, not none
+        val made = made(id, variant, node, caps) ?: return node.layoutFirst?.let { NO_LIST.withFirst(it) }?.takeIf { it.first != null }
         return node.layoutFirst?.let { made.withFirst(it) } ?: made
     }
 
@@ -177,7 +179,7 @@ object KeyDefaults {
     /**
      * A written first (`keypad:3`, `action:tone-5`, `~`) as an item; a layout's `swipe-up=` read as its actions are
      * (SceneAction, 060-s6-review M2): `commit:qq` committed as it is, `key:`/`code:U+…` typed as a key, any other action
-     * (`sym:BackSpace`) the action, of no text to draw.
+     * (`sym:BackSpace`, a bare word: `ime-picker`) the action, of no text to draw.
      */
     fun itemOf(written: String): Item = when {
         written.startsWith("keypad:") && written.length == "keypad:".length + 1 ->
@@ -186,6 +188,8 @@ object KeyDefaults {
         written.startsWith("key:") -> Item(written.removePrefix("key:"))
         written.startsWith("code:") -> LayoutReader.codePoint(written)?.let { Item(text(it)) } ?: Item("", Commit.Action(written))
         ACTION.matches(written) -> Item("", Commit.Action(written))
+        // a bare word (`ime-picker`, `lang`, `caps`) is an action as the reader reads it, never its letters typed (L6 review M1)
+        written == "caps" || written in LayoutReader.WORDS -> Item("", Commit.Action(written))
         else -> Item(written)
     }
 
@@ -221,6 +225,8 @@ object KeyDefaults {
     // a cased letter (every letter of a Latin key's presets has a case: ê, ß's SS, ı's I) or an ASCII digit: not
     // Char.isLetterOrDigit, whose Unicode tables would grow the theme maker's engine by tens of KB
     private fun isLetterOrDigit(c: Char): Boolean = c in '0'..'9' || c.toString().let { it.lowercase() != it.uppercase() }
+
+    private val NO_LIST = DefaultList(emptyList(), emptyList(), null)
 
     private fun plain(texts: List<String>): DefaultList = texts.map(::Item).let { DefaultList(emptyList(), it, it.first()) }
 

@@ -372,8 +372,8 @@
 
 ### PY-153 [P1] 导入的 17 键（H 和 JK 并成一键）用在拼音上，按自己的分组打字
 - **前提**：B0；没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-k17-1.0.layout`（App 的 18 键把第 2 行的 H 和 JK 并成一个 HJK 键）。
-- **操作**：**设置 → 外观 → 布局 → + → 导入布局文件** 选它，点 **导入**；问「现在就用在 拼音 上吗？」时点 **用**；回测试页点「普通文本」框，依次点 BN、IO、HJK、A、IO，每个键点在要打的那个字母那边（BN 点右半 N、IO 先点左半 I、HJK 点最左的 H、A 点中间、IO 再点右半 O），看候选，点「你好」。
-- **预期**：只有拼音能用自己分组的键盘，所以只问拼音。键盘是导入的 17 键：第 2 行是 A、SD、FG、HJK、L 五个键，没有单独的 H、JK 键。首选是「你好」（两个以上字母的键按点在哪边加权，和 App 的 18 键一样），点了框里是「你好」。
+- **操作**：**设置 → 外观 → 布局 → + → 导入布局文件** 选它，点 **导入**；问「现在就用在 拼音 上吗？」时点 **用**；回测试页点「普通文本」框，依次点 BN、IO、HJK、A、IO，每个键点在要打的那个字母那边（BN 点右半 N、IO 先点左半 I、HJK 点最左的 H、A 点中间、IO 再点右半 O），看候选，点「你好」；再到 **按键 → 按键字符和快捷键** 点「UAT 17 键」，点 HJK 看长按菜单。
+- **预期**：确认框里没有「……是18 键的键……」的提醒（HJK 用的是自己的键名 `uat-k17/hjk`）。只有拼音能用自己分组的键盘，所以只问拼音。键盘是导入的 17 键：第 2 行是 A、SD、FG、HJK、L 五个键，没有单独的 H、JK 键。首选是「你好」（两个以上字母的键按点在哪边加权，和 App 的 18 键一样），点了框里是「你好」。HJK 的长按菜单里有 h、j、k。
 - **JVM**：ime-eval `CustomGroupsUatTest.theSeventeenKeysTypeNihaoByTheirOwnCodes`（真数据）、ime-core `LayoutImportGroupedTest.theUatsGroupedLayoutsAreTheSeventeenKeysAndTheEighteenRearranged`、`KeyboardCustomTest.theSeventeenKeysSegmentAndOfferWhatIsTyped`；设备上留作冒烟（导入、画出来、码送到引擎）。
 
 ### PY-154 [P1] 重排的 18 键用在拼音上：按它自己的位置画，打字和学的词跟 App 的 18 键一样

@@ -44,6 +44,12 @@ class LayoutTextsTest {
         assertEquals("没有键能切到数字键盘、符号面板", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "no-way", listOf("Number", "Symbol"))))
         assertEquals("文件 70000 字节，超过 64 KB", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "too-big", listOf("70000", "65536"))))
         assertEquals("左下角通常是 符、返回（和 App 自带的一样）", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "bottom-left", listOf("symbols back"))))
+        assertEquals("第 30 行：g18/h 是18 键的键，这里写的长按、角标、滑动不起作用", LayoutTexts.finding(zh(), LayoutCheck.Finding(30, "held", listOf("g18/h", "k18"))))
+        assertEquals("第 4 行：+ 是数字键盘的键，这里写的长按、角标、滑动不起作用", LayoutTexts.finding(zh(), LayoutCheck.Finding(4, "held", listOf("+", "number"))))
+        // every board of the app's by its name, never its id (L6 review N3); a popups= not taken (N2)
+        assertEquals("第 2 行：fn/x 是数字行的键，这里写的长按、角标、滑动不起作用", LayoutTexts.finding(zh(), LayoutCheck.Finding(2, "held", listOf("fn/x", "number-row"))))
+        assertEquals("第 30 行：g18/h 是18 键的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名", LayoutTexts.finding(zh(), LayoutCheck.Finding(30, "held-letters", listOf("g18/h", "k18"))))
+        assertEquals("这里写的 popups= 不起作用，跟18 键一样", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "held-popups", listOf("k18"))))
         assertEquals("数字键盘「电话」缺 + *：这种输入框里打不出来", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "pad-lacks", listOf("phone", "+ *"))))
     }
 

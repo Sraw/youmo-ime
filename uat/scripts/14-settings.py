@@ -8,7 +8,7 @@ import tempfile
 import time
 import zipfile
 
-from uat import (PKG, Blocked, Fail, case, check, choose, gear, home, pinyin_keyboard, script)
+from uat import (PKG, Blocked, Fail, case, check, choose, gear, home, in_picker, pinyin_keyboard, script)
 
 
 def kb_box(d, s=None):
@@ -2148,21 +2148,42 @@ def differs(a, b):
 def import_layout(d, name):
     """布局's + → 导入布局文件 → [name] in the picker; the dialog that follows left open"""
     appearance_tab(d, "布局")
-    plus = d.screen().find(desc="新增布局")
-    if not plus:
-        raise Blocked("布局页没有 +")
+    # the + a moment after the tab (seen missing on the first case after a boot)
+    plus = d.wait(lambda s: s.find(desc="新增布局"), 8, what="布局页的 +")
     d.tap(plus.c, 1.5)
-    d.tap_text("导入布局文件", scroll=False, after=3.0)
-    s = d.screen()
-    n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
-    if not n and s.find(text="下载"):
-        d.tap(s.find(text="下载").c, 2.0)
-        s = d.screen()
-        n = next((k for k in s.app() if k.text and k.text.startswith(name)), None)
-    if not n:
-        raise Blocked(f"文件选择里没有 {name}：{s.texts()[:8]}")
-    d.tap(n.c, 3.0)
+    d.tap_text("导入布局文件", scroll=False, after=0.5)
+    # the picker cold-started after a boot takes seconds to draw: until DocumentsUI is the top activity and shows nodes
+    # of its own. Before it does the screen holds only the launcher's taskbar, whose 返回 主屏幕 最近用过 are its
+    # buttons' content-desc, no picker's (L6 review S3); so only DocumentsUI's nodes are read below
+    in_picker(d, timeout=15)
+    if "documentsui" not in d.top_activity():
+        raise Blocked(f"没出文件选择：{d.top_activity()}")
 
+    def picker(s):
+        return [k for k in s.nodes if k.pkg.endswith("documentsui")]
+
+    def file(s):
+        return next((k for k in picker(s) if k.text and k.text.startswith(name)), None)
+
+    def titled(s, *texts):
+        return next((k for k in picker(s) if k.text in texts), None)
+
+    s = d.screen()
+    n = file(s)
+    if not n and titled(s, "下载", "Downloads"):
+        d.tap(titled(s, "下载", "Downloads").c, 2.0)
+        s = d.screen()
+        n = file(s)
+    # opened on DocumentsUI's 最近用过, 下载 not on screen: the drawer's ☰, as 15-privacy-backup has it
+    if not n and titled(s, "最近用过", "近期的文件", "最近", "Recent"):
+        menu = next((k for k in picker(s) if k.desc in ("显示根目录", "Show roots")), None)
+        d.tap(menu.c if menu else (77, 148), 1.0)
+        d.tap_text("下载", scroll=False, after=2.0)
+        s = d.screen()
+        n = file(s)
+    if not n:
+        raise Blocked(f"文件选择里没有 {name}：{[k.text for k in picker(s) if k.text][:8]}")
+    d.tap(n.c, 3.0)
 
 def skip_use(d):
     """after 导入: 现在就用在…？ (L3, §4.2 step 5) answered 先不用"""
@@ -2176,10 +2197,11 @@ def skip_use(d):
 def layout_card(d, name):
     appearance_tab(d, "布局")
     n = d.screen().find(text=name)
-    for _ in range(3):
+    # down the list, then back up: the tab comes back where it was left, possibly past the card
+    for frm, to in [((540, 1800), (540, 1200))] * 3 + [((540, 900), (540, 1500))] * 6:
         if n:
             break
-        d.swipe((540, 1800), (540, 1200), 300, after=1.0)
+        d.swipe(frm, to, 300, after=1.0)
         n = d.screen().find(text=name)
     # the line under it (用在：…) on screen too
     if n and n.c[1] > 1700:
@@ -2686,3 +2708,102 @@ def st179(d):
     check("enter" in keys and "1" in keys and keys["enter"][3] - keys["enter"][1] < 1.5 * (keys["1"][3] - keys["1"][1]),
           f"电话框的数字键盘不是自带的：{sorted(keys)}")
     return "确认框写 123、只有数字、小数；卡片写用在：数字键盘；123 一行四个、回车跨两行、1 2 ⌫ 5 打出 15；小数框是它，电话框是自带的"
+
+
+# ---------------------------------------------------------------- 布局的键名 (061-custom-layout §9, §19.4, L6)
+
+
+def import_uat_names(d, use=True):
+    """uat-names imported; 现在就用在 拼音 上吗？ answered 用 (or 先不用); the confirm dialog's texts returned"""
+    push_layout(d, "uat-names")
+    import_layout(d, "uat-names")
+    d.wait_text("导入布局 UAT 键名？", timeout=8, where="all")
+    told = d.screen().texts("all")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    if not use:
+        skip_use(d)
+        return told
+    d.wait_text("现在就用在 拼音 上吗？", timeout=6, where="all")
+    d.tap_text("用", where="all", scroll=False, after=2.0)
+    return told
+
+
+def slots_tabs(d):
+    """the 按键字符和快捷键 page's keyboard cards, as they read"""
+    slots_page(d)
+    return [n.text for n in d.screen().app() if n.cls.endswith("RadioButton")]
+
+
+@case("ST-185", base="B0-设置", mutates=True, visual=True)
+def st185(d):
+    import_uat_names(d)
+    tabs = slots_tabs(d)
+    check("UAT 键名" in tabs, f"按键字符和快捷键里没有「UAT 键名」：{tabs}")
+    check(tabs.index("UAT 键名") == tabs.index("功能键") - 1, f"「UAT 键名」不在功能键前面：{tabs}")
+    slots_tab(d, "UAT 键名")
+    d.shot("full", "按键字符和快捷键的 UAT 键名：WE 下写共用，HJK、哈 没有")
+    we, hjk, ha = page_key(d, "WE"), page_key(d, "HJK"), page_key(d, "哈")
+    check(we.desc.endswith("共用"), f"WE 没写共用：{we.desc!r}")
+    check(not hjk.desc.endswith("共用") and not ha.desc.endswith("共用"), f"HJK、哈 写了共用：{hjk.desc!r} {ha.desc!r}")
+    key_dialog(d, "WE")
+    check(d.wait_text("和「18 键」共用：这里改了，那边的同名键也跟着变", timeout=5, where="all"), f"WE 的对话框没说和 18 键共用：{d.screen().texts('all')[:8]}")
+    d.tap_text("取消", where="all", scroll=False, after=1.0)
+    key_dialog(d, "哈")
+    dialog_card(d, "长按菜单")
+    s = d.screen()
+    items = [n.desc for n in s.app() if n.clickable and n.desc in ("哈哈", "嘿")]
+    check(items == ["哈哈", "嘿"], f"哈 的长按菜单不是 哈哈、嘿：{items}")
+    up = next((h.desc or h.text for h in dialog_heads(s) if head_name(h) == "上滑"), "")
+    check("哈哈" in up, f"哈 的上滑不是长按首选 哈哈：{up!r}")
+    d.shot("full", "哈 的对话框：长按菜单 哈哈（首选）、嘿")
+    d.tap_text("取消", where="all", scroll=False, after=1.0)
+    return f"卡片 {tabs}；WE 共用、对话框说和 18 键共用；哈 的长按 {items}，上滑「{up}」"
+
+
+@case("ST-186", base="B0-设置", mutates=True)
+def st186(d):
+    import_uat_names(d, use=False)
+    tabs = slots_tabs(d)
+    check(len(tabs) == 8 and "UAT 键名" not in tabs, f"没用的布局却有卡片：{tabs}")
+    card = layout_card(d, "UAT 键名")
+    check(card, f"列表里没有 UAT 键名：{d.screen().texts()[:30]}")
+    d.tap(card.c, 1.0)
+    d.tap_text("用在…", where="all", scroll=False, after=1.5)
+    d.wait_text("「UAT 键名」用在", timeout=5, where="all")
+    d.tap_text("拼音", where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    used = slots_tabs(d)
+    check("UAT 键名" in used, f"用在拼音上后没有卡片：{used}")
+    card = layout_card(d, "UAT 键名")
+    d.tap(card.c, 1.0)
+    d.tap_text("用在…", where="all", scroll=False, after=1.5)
+    d.wait_text("「UAT 键名」用在", timeout=5, where="all")
+    d.tap_text("拼音", where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    gone = slots_tabs(d)
+    check("UAT 键名" not in gone, f"去掉拼音后卡片还在：{gone}")
+    return f"没用 {len(tabs)} 张；用在拼音上多出 UAT 键名；去掉后 {len(gone)} 张"
+
+
+# which keyboard a function key's note names depends on how each draws it (a prefix only where they differ): held
+# to the label by SwipeFates' own test, not to one screen's drawing
+case("ST-187", needs="jvm:SwipeFatesTest.aLayoutOfTheUsersIsNamedByItsName")(lambda d: None)
+
+
+@case("ST-188", base="B0-设置", mutates=True)
+def st188(d):
+    told = import_uat_names(d)
+    warn = "第 14 行：g18/we 是18 键的键，这里写的长按、角标、滑动不起作用"
+    check(any(warn in t for t in told), f"确认框没提醒 WE 写的不起作用：{told[:12]}")
+    check(any("哈" in t and "直接打出" in t for t in told) or any(t == "哈" for t in told), f"确认框没列出直接打出的「哈」：{told[:12]}")
+    d.open_page("text")
+    d.clear()
+    k = d.keys(refresh=True)
+    we = k.get("we") or k.get("WE")
+    if not we:
+        raise Blocked(f"拼音的键盘上没有 WE：{sorted(k)[:24]}")
+    d.swipe(we, (we[0], we[1] + 130), 150, after=0.8)
+    text = d.field_text() or ""
+    d.clear()
+    check("我们" not in text, f"WE 下滑打出了布局里写的「我们」：{text!r}")
+    return f"确认框提醒「{warn}」；WE 下滑没打出我们（{text!r}）"

@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.data.layout.CustomLayouts
 import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -259,16 +260,22 @@ class ThemePackLayoutsTest {
     @Uat("ST-72")
     fun theImportTellsTheLayoutsItWouldList() {
         val k18 = builtIn.text("k18")!!.replace("name=\"18 键\"", "name=\"17 键\"")
-        val pack = opened("薄荷", mapOf("qwerty.xml" to qwerty(), "k18.xml" to k18, "nine.xml" to "<keyboard/>", "grouped-bottom.xml" to builtIn.text("grouped-bottom")!!))
+        // e named its own (a key of the theme's): its swipe-up commit its own, counted
+        val qwerty = qwerty().replace("send=\"e\" shortcut=\"full/e\"", "send=\"e\" shortcut=\"mint/e\" swipe-up=\"commit:ee\"")
+        check("mint/e" in qwerty)
+        val pack = opened("薄荷", mapOf("qwerty.xml" to qwerty, "k18.xml" to k18, "nine.xml" to "<keyboard/>", "grouped-bottom.xml" to builtIn.text("grouped-bottom")!!))
         val report = pack.staged.layoutReport
         assertEquals(listOf("薄荷 · 主题 26 键", "薄荷 · 17 键"), report.listed)
         assertEquals(emptyList<String>(), report.used)
         assertEquals(listOf("nine"), report.unused.map { it.first })
         val text = ThemePackDialogs.confirmText(appContext, pack)
         assertTrue(text, text.contains(appContext.resources.getQuantityString(R.plurals.theme_pack_layouts_listed, 2, 2, report.listed.joinToString(appContext.getString(R.string.list_separator)))))
-        // what their keys type written in them (§13; L7 review S1): the 26 keys' q and w swiped up
-        assertEquals(2, report.listedCommits)
-        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts_listed_commits, 2)))
+        // what their keys type written in them (§13; L7 review S1): its own e's swipe up; the app-named q's and w's are the
+        // app's keys' (L6 review S2), held and told by the layout's check, not counted
+        assertEquals(1, report.listedCommits)
+        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts_listed_commits, 1)))
+        val made = PackLayouts.convert("薄荷", null, "qwerty", qwerty, emptyMap(), CustomLayouts.sources, "0.6.1") as PackLayouts.Converted.Done
+        assertEquals(listOf("full/q", "full/w"), made.problems.filter { it.key == "held" }.map { it.args.first() })
         // none: nothing said of them
         assertTrue(opened("none", mapOf("zhuyin.xml" to zhuyin())).staged.layoutReport.listed.isEmpty())
     }

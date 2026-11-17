@@ -15,7 +15,7 @@
     <key id="r2c1" label="{group:a}" alt="8" swipe-up="keypad:8" shortcut="g18/a" width="fill" letters="a"/>
     <key id="r2c2" label="{group:sd}" alt="9" swipe-up="keypad:9" shortcut="g18/sd" width="fill" letters="sd"/>
     <key id="r2c3" label="{group:fg}" alt="0" swipe-up="keypad:0" shortcut="g18/fg" width="fill" letters="fg"/>
-    <key id="r2c4" label="HJK" alt="{punct:(}" swipe-up="(" shortcut="g18/h" width="fill" letters="hjk"/>
+    <key id="r2c4" label="HJK" alt="{punct:(}" swipe-up="(" shortcut="t698bc6f4-k18/hjk" width="fill" letters="hjk"/>
     <key id="r2c6" label="{group:l}" alt="{punct:-}" swipe-up="-" shortcut="g18/l" width="fill" letters="l;">
       <variant when="ime=shuangpin scheme-types=semicolon" label="{group:l;}"/>
     </key>

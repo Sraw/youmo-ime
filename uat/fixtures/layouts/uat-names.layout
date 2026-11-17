@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UAT 的键名布局（ST-185–188，uat/14-settings.md）：照 18 键（k18）改的自定义布局。
+  H 和 JK 并成一个自己起名的键 HJK（uat-names/hjk），多一个自己起名的键「哈」（uat-names/ha）：点按打「哈」，
+  上滑「哈哈」、长按列表「嘿」，都是布局里写的。WE 仍用 18 键的名字 g18/we，是 App 自带的那个键（「共用」）：
+  它写的下滑「我们」不起作用，导入时提醒第 14 行。别的键照抄 18 键。
+  改这个文件时保持 WE 在第 14 行（LayoutImportTest、ST-188 按行号断言）。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="uat-names" based-on="k18" name="UAT 键名" family="grouped" columns="100">
+  <meta author="UAT" version="1.0" license="CC0" description="验收测试用：18 键的 H、JK 并成 HJK，多一个打「哈」的键；WE 上写的下滑不起作用"/>
+  <defaults kind="letter" text-size="20" width="fill"/>
+  <row>
+    <key id="r1c1" label="{group:q}" letters="q" lean="off" shortcut="g18/q"/>
+    <key id="r1c2" label="{group:we}" letters="we" lean="off" shortcut="g18/we" swipe-down="commit:我们"/>
+    <key id="r1c3" label="{group:rt}" letters="rt" lean="off" shortcut="g18/rt"/>
+    <key id="r1c4" label="{group:y}" letters="y" lean="off" shortcut="g18/y"/>
+    <key id="r1c5" label="{group:u}" letters="u" lean="off" shortcut="g18/u"/>
+    <key id="r1c6" label="{group:io}" letters="io" lean="off" shortcut="g18/io"/>
+    <key id="r1c7" label="{group:p}" letters="p" lean="off" shortcut="g18/p"/>
+  </row>
+  <row>
+    <key id="r2c1" width="fill" label="{group:a}" letters="a" lean="off" shortcut="g18/a"/>
+    <key id="r2c2" width="fill" label="{group:sd}" letters="sd" lean="off" shortcut="g18/sd"/>
+    <key id="r2c3" width="fill" label="{group:fg}" letters="fg" lean="off" shortcut="g18/fg"/>
+    <key id="hjk" width="fill" label="HJK" letters="hjk" lean="off" shortcut="uat-names/hjk"/>
+    <key id="r2c6" width="fill" label="{group:l}" letters="l;" lean="off" shortcut="g18/l">
+      <variant when="ime=shuangpin scheme-types=semicolon" label="{group:l;}"/>
+    </key>
+  </row>
+  <row>
+    <key id="apostrophe" role="apostrophe" kind="function" width="15" label="分词" text-size="16" a11y="a11y_key_separator"
+         send="'" shortcut="separator"/>
+    <key id="r3c1" width="14" label="{group:z}" letters="z" lean="off" shortcut="g18/z"/>
+    <key id="r3c2" width="14" label="{group:xc}" letters="xc" lean="off" shortcut="g18/xc"/>
+    <key id="r3c3" width="14" label="{group:v}" letters="v" lean="off" shortcut="g18/v"/>
+    <key id="r3c4" width="14" label="{group:bn}" letters="bn" lean="off" shortcut="g18/bn"/>
+    <key id="r3c5" width="14" label="{group:m}" letters="m" lean="off" shortcut="g18/m"/>
+    <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
+         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
+  </row>
+  <row><key id="ha" label="哈" send="commit:哈" shortcut="uat-names/ha" swipe-up="commit:哈哈"><popup from="list"><item text="嘿"/></popup></key></row>
+  <include src="grouped-bottom"/>
+</keyboard>

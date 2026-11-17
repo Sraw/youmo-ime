@@ -258,6 +258,34 @@ class KeyDataTest {
         assertNull(keys(r.layout).getValue("r").attrs.over(r.layout.defaults).actions["swipe-up"])
     }
 
+    // a user's layout (L6, §9, §19.7 step 3): a new name's long press is what the layout writes, its first the swipe-up
+    // (else a literal alt=), its list the <popup>'s; a new group key of no corner written has its letters, no corner
+    @Test
+    fun aUsersNewNamesDefaultsAreWhatItsLayoutWrites() {
+        val text = testData("qwerty.xml").replaceFirst("id=\"qwerty\"", "id=\"mine\" based-on=\"qwerty\"").replace(
+            "</keyboard>",
+            "<row><key id=\"ha\" label=\"哈\" send=\"commit:哈\" shortcut=\"mine/ha\" swipe-up=\"commit:哈哈\" swipe-down=\"commit:呵\">" +
+                "<popup from=\"list\"><item text=\"嘿\"/><item text=\"嗨\"/></popup></key>" +
+                "<key id=\"lit\" label=\"L\" send=\"commit:l\" shortcut=\"mine/lit\" alt=\"\$year\"/>" +
+                "<key id=\"xy\" label=\"{group:xy}\" letters=\"xy\" shortcut=\"mine/xy\"/></row>\n</keyboard>",
+        )
+        val r = KeyData.of("mine", read(text), emptyMap(), KeyData.Mode.Own, basedOn = "qwerty")
+        assertEquals(emptyList(), r.ignored, "a new name's own: nothing told")
+        val variant = DefaultMarks.variantOf(r.layout, "qwerty")
+        val nodes = DefaultMarks.nodes(r.layout, r.fragments).toMap()
+        val ha = KeyDefaults.of(KeyId("mine/ha"), variant, nodes.getValue("mine/ha"))!!
+        assertEquals("哈哈", ha.first?.text)
+        assertEquals(listOf("哈哈", "嘿", "嗨"), ha.symbols.map { it.text }, "the first, then the <popup>'s")
+        assertEquals("commit:呵", keys(r.layout).getValue("ha").attrs.over(r.layout.defaults).actions["swipe-down"])
+        // literal text: no variable made of it
+        assertEquals("\$year", KeyDefaults.of(KeyId("mine/lit"), variant, nodes.getValue("mine/lit"))!!.first?.text)
+        val xy = KeyDefaults.of(KeyId("mine/xy"), variant, nodes.getValue("mine/xy"))!!
+        assertEquals(listOf("X", "Y", "x", "y"), xy.row.map { it.text })
+        assertNull(xy.first)
+        // a key of the app's name on it keeps none of its own: the app's (full/q's 1)
+        assertEquals("1", KeyDefaults.of(KeyId("full/q"), variant, nodes.getValue("full/q"))!!.first?.text)
+    }
+
     @Test
     fun aVariantOfTheAppsNameOnAKeyOfItsOwnIsTheApps() {
         val text = testData("qwerty.xml").replace(

@@ -23,6 +23,11 @@
   };
   const ROLE_LABEL = { symbols: '符', back: '返回', numbers: '123' };
   const BOARD_LABEL = { Number: '数字键盘', Symbol: '符号面板' };
+  /** The app's boards a key's name is of (LayoutCheck's held), as the app's key page names them. */
+  const APP_BOARD_LABEL = {
+    qwerty: '全键盘', k14: '14 键', k18: '18 键', nine: '九键', zhuyin: '注音全键盘', 'zhuyin-nine': '注音九键', number: '数字键盘', symbols: '符号面板',
+    emoji: '表情', emoticon: '颜文字', 'emoji-search': '表情搜索', 'expanded-side': '展开候选', 'number-row': '数字行',
+  };
 
   // ---- the checker's findings in words (LayoutCheck.KEYS: the test holds the table to the engine's list) ----
 
@@ -59,6 +64,9 @@
     commits: ([n]) => n + ' 个键点按打出写死的文字（导入时 App 会列给用户看）',
     'theme-blank': ([where]) => '预览主题下这个键什么都不显示：' + where,
     unnamed: ([key]) => '键' + q(key) + '没有按键名（shortcut=）：用户在 App 里改不了它的长按、上下滑',
+    held: ([key, board]) => key + ' 是' + (APP_BOARD_LABEL[board] || board) + '的键，这里写的长按、角标、滑动不起作用',
+    'held-letters': ([key, board]) => key + ' 是' + (APP_BOARD_LABEL[board] || board) + '的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名',
+    'held-popups': ([board]) => '这里写的 popups= 不起作用，跟' + (APP_BOARD_LABEL[board] || board) + '一样',
     'gap-look': () => '空位（gap）的 look=、class= 不起作用',
     'pad-lacks': ([pad, keys]) => '数字键盘「' + (PAD_LABEL[pad] || pad) + '」缺 ' + keys + '：这种输入框里打不出来',
     'bottom-left': ([want]) => '左下角通常是 ' + want.split(' ').map((r) => ROLE_LABEL[r] || r).join('、') + '（和 App 自带的一样）',

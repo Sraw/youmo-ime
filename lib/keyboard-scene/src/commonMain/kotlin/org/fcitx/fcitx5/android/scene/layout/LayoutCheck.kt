@@ -13,8 +13,11 @@ import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Item
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.keys.Commit
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
+import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.NodeFacts
 import org.fcitx.fcitx5.android.scene.rules.ScreenShape
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
@@ -34,8 +37,9 @@ import org.fcitx.fcitx5.android.scene.xml.XmlElement
  * of [scenes] (the screens a phone and a foldable show it on, compact, split, the fields, the input methods it is for,
  * the pads it is for) with no problem and no key without words or a picture. Warnings: no way to the number pad or the
  * symbols, a key narrower than half a letter's, `commit:`s (listed too, the import's confirmation shows them), a key
- * [theme] leaves blank, a key without a name, `<gap look= class=>` (0.6.0's, no longer drawn), a number or symbols
- * board whose bottom row's first two are not the way back and the other board.
+ * [theme] leaves blank, a key without a name, a key of the app's name writing what it does held or swiped (the app's
+ * key's is taken: [KeyData], §19.4), `<gap look= class=>` (0.6.0's, no longer drawn), a number or symbols board whose
+ * bottom row's first two are not the way back and the other board.
  *
  * Not [strict] (a theme pack's layout made into one of the list, on import, upgrade and restore, §3.2 两种检查强度): only
  * what 0.6.0 refused is an error (it reads, [kept]); the rest are warnings, but the gap's and the bottom row's, which the
@@ -121,7 +125,7 @@ object LayoutCheck {
         "too-many-keys", "commit-long", "too-many-commits", "label-long", "include", "layout-target", "base", "scene",
         "blank", "name-no-slash", "name-prefix", "lacks", "groups", "hidden-chars", "command",
         // warnings
-        "no-way", "narrow", "commits", "theme-blank", "unnamed", "gap-look", "pad-lacks", "bottom-left",
+        "no-way", "narrow", "commits", "theme-blank", "unnamed", "held", "held-letters", "held-popups", "gap-look", "pad-lacks", "bottom-left",
     )
 
     const val MAX_ID = 32
@@ -160,9 +164,10 @@ object LayoutCheck {
         val ims = ims(layout, sources)
         val shown = scenes(layout, fragments, ims, pads)
         shown.errors.forEach(newRule)
-        val commits = newCommits(layout, base, base?.let { baseFragments(it, sources) }.orEmpty())
+        val commits = newCommits(layout, base, base?.let { baseFragments(it, sources) }.orEmpty(), sources.names)
         warnings += told(layout, fragments, commits, theme)
         base?.let { b -> unnamed(layout, b, baseFragments(b, sources)).forEach { warnings += it } }
+        warnings += heldData(layout, fragments, sources, baseId(layout, sources))
         shown.padLacks.forEach { warnings += it }
         if (strict) {
             gapLooks(source).forEach { warnings += it }
@@ -299,6 +304,8 @@ object LayoutCheck {
         if (keys.size > MAX_KEYS) add(Finding(0, "too-many-keys", listOf(keys.size.toString(), MAX_KEYS.toString())))
         val commits = actions(layout).filter { it.second.startsWith("commit:") }
         commits.filter { it.second.length - "commit:".length > MAX_COMMIT }.forEach { add(Finding(it.first, "commit-long", listOf(MAX_COMMIT.toString()))) }
+        // an alt= by what it types (`code:U+…` one character, `commit:` its text), as the long press has it
+        alts(layout).filter { (firstTyped(it.second)?.length ?: 0) > MAX_COMMIT }.forEach { add(Finding(it.first, "commit-long", listOf(MAX_COMMIT.toString()))) }
         if (commits.size > MAX_COMMITS) add(Finding(0, "too-many-commits", listOf(commits.size.toString(), MAX_COMMITS.toString())))
         for (k in keys) {
             for (a in listOf(k.attrs) + k.variants.map { it.attrs }) {
@@ -317,21 +324,46 @@ object LayoutCheck {
     // a key's: its tap's and swipes', its variants', its long press's, its menu's. A long press's list item types its
     // text where it has no send= of its own (SceneKeyDef, SceneBehavior's Listed): a commit: of it, held to what one is
     private fun actions(k: Key): List<String> =
-        (listOf(k.attrs) + k.variants.map { it.attrs }).flatMap { written(it) } +
-            k.popup?.items.orEmpty().flatMap { listOfNotNull("commit:" + it.first, it.second) } + k.menu.map { it.action }
+        (listOf(k.attrs) + k.variants.map { it.attrs }).flatMap { written(it) } + listed(k)
+
+    // its long press's and menu's
+    private fun listed(k: Key): List<String> = k.popup?.items.orEmpty().flatMap { listOfNotNull("commit:" + it.first, it.second) } + k.menu.map { it.action }
 
     // its <defaults>' and its rows' (line 0: the layout's), each written once
     private fun defaultsActions(layout: Layout): List<Pair<String, Int>> =
         written(layout.defaults).map { it to 0 } + layout.parts.filterIsInstance<Row>().flatMap { r -> written(r.defaults).map { it to r.line } }
 
     // the commit: texts it types its [base] does not, in order: a key of a base key's id typing a text that key types is
-    // the base's (qwerty's / @ . .com), one typing another or a key of its own is new; its defaults' always are
-    private fun newCommits(layout: Layout, base: Layout?, baseFragments: Map<String, Fragment>): List<String> {
+    // the base's (qwerty's / @ . .com), one typing another or a key of its own is new; its defaults' always are. A key or
+    // variant of the [app]'s names (its row's and <defaults>' laid on it, as KeyData has them) types its tap alone, the
+    // rest the app's key's (KeyData; the `held` warning). A key of its own with no swipe-up= types its literal alt= as
+    // its first (DefaultMarks.nodes' layoutFirst, L6 review M2): `commit:` of it
+    private fun newCommits(layout: Layout, base: Layout?, baseFragments: Map<String, Fragment>, app: Set<String>): List<String> {
         fun texts(actions: List<String>) = actions.filter { it.startsWith("commit:") }.map { it.removePrefix("commit:") }
-        val theirs = base?.let { b -> cells(b, baseFragments).filterIsInstance<Key>().flatMap { k -> texts(actions(k)).map { k.id to it } } }.orEmpty().toSet()
-        return ownCells(layout).filterIsInstance<Key>().flatMap { k -> texts(actions(k)).filter { (k.id to it) !in theirs } } +
+        fun typed(k: Key, under: KeyAttrs): List<String> {
+            val a = k.attrs.over(under)
+            val each = (listOf(k.attrs) + k.variants.map { it.attrs }).flatMap { v -> if ((v.shortcut ?: a.shortcut) in app) listOfNotNull(v.actions["send"]) else written(v) }
+            if (a.shortcut in app) return each
+            return each + listed(k) + listOfNotNull((a.alt as? Text.Literal)?.text?.takeIf { a.actions["swipe-up"] == null }?.let(::firstTyped)?.let { "commit:$it" })
+        }
+        val theirs = base?.let { b -> cells(b, baseFragments).filterIsInstance<Key>().flatMap { k -> (texts(actions(k)) + alts(k).mapNotNull(::firstTyped)).map { k.id to it } } }.orEmpty().toSet()
+        return layout.parts.filterIsInstance<Row>().flatMap { r -> r.cells.filterIsInstance<Key>().flatMap { k -> texts(typed(k, r.defaults.over(layout.defaults))).filter { (k.id to it) !in theirs } } } +
             texts(defaultsActions(layout).map { it.first })
     }
+
+    // the text a literal alt= types as a long press's first (KeyDefaults.itemOf): none where it is an action (`ime-picker`)
+    private fun firstTyped(alt: String): String? = KeyDefaults.itemOf(alt).takeIf { it.commit !is Commit.Action }?.text?.ifEmpty { null }
+
+    // a key's literal alt= and its variants': what its long press may type as its first (KeyDefaults' layoutFirst)
+    private fun alts(k: Key): List<String> = (listOf(k.attrs) + k.variants.map { it.attrs }).mapNotNull { (it.alt as? Text.Literal)?.text }
+
+    // every literal alt= it writes, with its line: its keys' and variants', its <defaults>' and rows' ([defaultsAlts])
+    private fun alts(layout: Layout): List<Pair<Int, String>> =
+        ownCells(layout).filterIsInstance<Key>().flatMap { k -> alts(k).map { k.line to it } } + defaultsAlts(layout).map { it.second to it.first }
+
+    // its <defaults>' literal alt= and its rows' (line 0: the layout's), as [defaultsActions]
+    private fun defaultsAlts(layout: Layout): List<Pair<String, Int>> = (listOf(layout.defaults to 0) + layout.parts.filterIsInstance<Row>().map { it.defaults to it.line })
+        .mapNotNull { (d, line) -> (d.alt as? Text.Literal)?.let { it.text to line } }
 
     private fun written(a: KeyAttrs): Collection<String> = a.actions.filterKeys { it in ACTION_ATTRS }.values
 
@@ -428,8 +460,14 @@ object LayoutCheck {
             }
             return text.any(::hidden) || supplementary(text).any(::hiddenCode)
         }
-        val keys = ownCells(layout).filterIsInstance<Key>().flatMap { k -> actions(k).filter(::hides).map { Finding(k.line, "hidden-chars", listOf(k.id)) } }
-        return keys + defaultsActions(layout).filter { hides(it.first) }.map { Finding(it.second, "hidden-chars", listOf("defaults")) }
+        // a literal alt= is typed as a long press's first where no swipe-up= is (L6 review M2): what it types (KeyDefaults.itemOf:
+        // a `code:U+202E` decoded, verifier R-M1) held to what a commit: is
+        fun typed(alt: String) = firstTyped(alt)?.let { "commit:$it" }
+        val keys = ownCells(layout).filterIsInstance<Key>().flatMap { k ->
+            (actions(k) + alts(k).mapNotNull(::typed)).filter(::hides).distinct().map { Finding(k.line, "hidden-chars", listOf(k.id)) }
+        }
+        return keys + (defaultsActions(layout) + defaultsAlts(layout).mapNotNull { (alt, line) -> typed(alt)?.let { it to line } }).filter { hides(it.first) }
+            .map { Finding(it.second, "hidden-chars", listOf("defaults")) }
     }
 
     // [text]'s code points past the BMP
@@ -863,7 +901,7 @@ object LayoutCheck {
     }
 
     // the base's fragments, the app's
-    private fun baseFragments(base: Layout, sources: Sources): Map<String, Fragment> =
+    internal fun baseFragments(base: Layout, sources: Sources): Map<String, Fragment> =
         base.parts.filterIsInstance<Include>().mapNotNull { inc -> sources.fragment(inc.src)?.let { inc.src to it } }.toMap()
 
     // every cell of [layout], its includes' rows in place
@@ -971,4 +1009,42 @@ private object Sight {
         0x1100, 0x11FF, 0x2E80, 0x2FDF, 0x3000, 0x31FF, 0x3400, 0x4DBF, 0x4E00, 0x9FFF, 0xA960, 0xA97F, 0xAC00, 0xD7FF,
         0xF900, 0xFAFF, 0xFF65, 0xFFDC,
     )
+}
+
+/**
+ * A key of the app's name (or of no name, its base's key of its id having none either) that writes a long press, a
+ * corner, a swipe, a double tap or a menu other than the app's key's: not taken, the app's is ([KeyData.Mode.Own],
+ * §19.2), so the file is told (§19.4, L6): 「第 30 行：g18/h 是 18 键的键，这里写的长按、角标、滑动不起作用」. A key of
+ * the app's name whose letters= are not that key's too: it is the app's key, its long press the app's
+ * ([DefaultMarks.ownNodes]; L6 review S2). Its args: the name (the id of a key of none) and the app's board it is that
+ * board's key of ([DefaultMarks.appBoard]); one a key or variant a line (KeyData.Ignored's key, L6 review N1). A
+ * `popups=` not taken, its base's being, is `held-popups` (N2).
+ */
+// outside LayoutCheck, as its size allows (detekt's LargeClass)
+private fun heldData(layout: Layout, fragments: Map<String, Fragment>, sources: LayoutCheck.Sources, base: String?): List<LayoutCheck.Finding> {
+    val ignored = KeyData.of(layout.id, layout, fragments, KeyData.Mode.Own, base).ignored.filter { it.file == layout.id }
+    val told = ignored.filter { it.line > 0 }.map { Triple(it.line, "held", it.key) }.toMutableSet()
+    val app = appKeys(sources, base)
+    // letters of its own on a key of the app's name: told apart, a name of its own being the way (verifier R-N1); a key
+    // writing none (a qwerty board's of a group's name) has the app's
+    for (row in layout.parts.filterIsInstance<Row>()) for (k in row.cells.filterIsInstance<Key>()) {
+        val name = k.attrs.over(row.defaults.over(layout.defaults)).shortcut
+        val letters = name?.let(app)?.letters
+        if (k.letters != null && letters != null && k.letters.group != letters) told += Triple(k.line, "held-letters", name)
+    }
+    val held = told.sortedWith(compareBy({ it.first }, { it.second })).map { (line, what, key) -> LayoutCheck.Finding(line, what, listOf(key, (DefaultMarks.appBoard(key, base) ?: base).orEmpty())) }
+    return held + listOfNotNull(base?.takeIf { ignored.any { it.what == "popups" } }?.let { LayoutCheck.Finding(0, "held-popups", listOf(it)) })
+}
+
+/**
+ * The app's key of a name, as KeyData finds it for a board of [base] (DefaultMarks.appBoard): its node on that board, each
+ * board read once; null for a name of none of the app's. LayoutCheck's held and PackLayouts' renaming share it.
+ */
+internal fun appKeys(sources: LayoutCheck.Sources, base: String?): (String) -> NodeFacts? {
+    val boards = HashMap<String, Map<String, NodeFacts>>()
+    return { name ->
+        DefaultMarks.appBoard(name, base)?.let { board ->
+            boards.getOrPut(board) { sources.layout(board)?.let { b -> DefaultMarks.nodes(b, LayoutCheck.baseFragments(b, sources)).toMap() }.orEmpty() }[name]
+        }
+    }
 }

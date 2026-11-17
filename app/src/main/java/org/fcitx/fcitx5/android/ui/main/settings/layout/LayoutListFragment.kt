@@ -236,7 +236,11 @@ class LayoutListFragment : Fragment() {
     private fun scene(id: String, layout: Layout, fragments: Map<String, org.fcitx.fcitx5.android.scene.layout.Fragment>): SceneLayout {
         val base = runCatching { CustomKeyboards.baseOf(layout) }.getOrNull()
         val held = runCatching { KeyData.of(id, layout, fragments, KeyData.Mode.Own, base) }.getOrNull()
-        return if (held != null) SceneLayout(id, held.layout, held.fragments, base ?: id) else SceneLayout(id, layout, fragments, base ?: id)
+        // its keys of the app's names the app's keys, as the keyboard has them, should a preview read them: made off the
+        // main thread (the list is read on IO), so read anew, not through the keyboards' main-thread cache
+        val ctx = requireContext().applicationContext
+        val app: (String) -> SceneLayout? = { b -> SceneLayouts.parseBuiltIn(ctx, b) }
+        return if (held != null) SceneLayout(id, held.layout, held.fragments, base ?: id, app) else SceneLayout(id, layout, fragments, base ?: id, app)
     }
 
     private fun addLayout() {

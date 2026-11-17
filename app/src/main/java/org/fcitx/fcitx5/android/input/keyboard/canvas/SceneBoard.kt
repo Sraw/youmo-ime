@@ -33,7 +33,6 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.engine.section
-import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
@@ -308,7 +307,7 @@ class SceneBoard(
             val lists = KeyListsCache.user.current
             val of = ResolverFor(layout, variant, KeyListsCache.user.version, lists, slots)
             return resolvers.getOrPut(of) {
-                KeyResolver(of.variant, of.lists, of.slots, DefaultMarks.nodes(layout.layout, layout.fragments), KeyClock)
+                KeyResolver(of.variant, of.lists, of.slots, layout.nodes, KeyClock)
             }
         }
 

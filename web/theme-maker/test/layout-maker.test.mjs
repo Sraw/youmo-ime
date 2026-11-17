@@ -81,6 +81,10 @@ test('each finding is said in Chinese with what it names; one the table lacks as
   assert.equal(LM.words({ key: 'bottom-left', args: ['back numbers'] }), '左下角通常是 返回、123（和 App 自带的一样）');
   assert.equal(LM.words({ key: 'label-long', args: ['hjk', '16'] }), '键「hjk」显示的字太长：最多 16 个字符');
   assert.equal(LM.words({ key: 'gap-look', args: [] }), '空位（gap）的 look=、class= 不起作用');
+  assert.equal(LM.words({ key: 'held', args: ['g18/h', 'k18'] }), 'g18/h 是18 键的键，这里写的长按、角标、滑动不起作用');
+  assert.equal(LM.words({ key: 'held', args: ['fn/x', 'number-row'] }), 'fn/x 是数字行的键，这里写的长按、角标、滑动不起作用');
+  assert.equal(LM.words({ key: 'held-letters', args: ['g18/h', 'k18'] }), 'g18/h 是18 键的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名');
+  assert.equal(LM.words({ key: 'held-popups', args: ['k18'] }), '这里写的 popups= 不起作用，跟18 键一样');
   assert.equal(LM.words({ key: 'later', args: ['a'] }), 'later：a');
 });
 
@@ -236,6 +240,10 @@ test('the problems: the checker\'s with their lines, the preview environment\'s 
   const unnamed = LM.check(E, xml.replace(/(<key id="q"[^>]*?) shortcut="[^"]*"/, '$1'), LM.ENV, material, fixed, FORMAT.version);
   const u = unnamed.problems.find((p) => /没有按键名/.test(p.message));
   assert.ok(u && u.line === LM.lineOfKey(xml, 'q'), JSON.stringify(unnamed.problems));
+  // a key of the app's name writing a swipe of its own: told by its line (the app's is taken)
+  const held = LM.check(E, xml.replace(/(<key id="q"[^>]*?) shortcut="full\/q"/, '$1 shortcut="full/q" swipe-down="x"'), LM.ENV, material, fixed, FORMAT.version);
+  const h = held.problems.find((p) => p.message === 'full/q 是全键盘的键，这里写的长按、角标、滑动不起作用');
+  assert.ok(h && h.level === 'warning' && h.line === LM.lineOfKey(xml, 'q'), JSON.stringify(held.problems));
   // an engine that throws is a problem, not a page that stops
   const thrown = LM.check({ checkLayout: () => { throw new Error('boom'); } }, xml, LM.ENV, material, fixed, FORMAT.version);
   assert.deepEqual(thrown.problems, [{ level: 'error', line: 0, message: '引擎出错：boom' }]);

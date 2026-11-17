@@ -98,7 +98,8 @@ object SwipeFates {
     private class Shown(val label: String, val keyboard: BaseKeyboard, val ime: InputMethodEntry?, val codeRow: ImKeyboards.Layout, val rootsShown: Boolean)
 
     /** A keyboard made for an input method, before the page names it. */
-    private class Made(val ime: InputMethodEntry?, val keyboard: BaseKeyboard, val layout: ImKeyboards.Layout, val roots: Boolean)
+    // [custom] the name of the layout of the user's it draws (061-custom-layout §9), if any
+    private class Made(val ime: InputMethodEntry?, val keyboard: BaseKeyboard, val layout: ImKeyboards.Layout, val roots: Boolean, val custom: String? = null)
 
     /**
      * A settings page's keyboards: one a keyboard of [imes] (the input methods on), [tableLabels] each table's
@@ -129,20 +130,21 @@ object SwipeFates {
             val on = imes.ifEmpty { listOf(null) }
             // one keyboard a layout, told each input method's own as its scene is asked of ([jobs])
             val keyboards = HashMap<String, BaseKeyboard>()
+            val chosen = prefs.imKeyboards()
             val made = on.mapNotNull { ime ->
-                val layout = ImKeyboards.layoutOf(ime?.uniqueName ?: InputMethodCatalog.ENGLISH, prefs.imKeyboards(), scheme)
-                val name = ime?.let { lettersOf(it.uniqueName, prefs.imKeyboards(), scheme) } ?: nameOf(layout, scheme)
+                val layout = ImKeyboards.layoutOf(ime?.uniqueName ?: InputMethodCatalog.ENGLISH, chosen, scheme)
+                val name = ime?.let { lettersOf(it.uniqueName, chosen, scheme) } ?: nameOf(layout, scheme)
                 val keyboard = keyboards[name] ?: makers[KeyboardNames.base(name)]?.invoke(KeyboardNames.custom(name))?.also { keyboards[name] = it } ?: return@mapNotNull null
                 // the roots fill the full keyboard's letters alone (a table on the nine keys has none drawn)
                 val roots = layout == ImKeyboards.Layout.TEXT && ime != null && ime.uniqueName in InputMethodCatalog.TABLES &&
                     KeyLabels.of(tableLabels[ime.uniqueName].orEmpty()) == KeyLabels.ROOTS && !keyboardCompact()
-                Made(ime, keyboard, layout, roots)
+                Made(ime, keyboard, layout, roots, ime?.let { ImKeyboards.shown(it.uniqueName, chosen, scheme).custom?.name })
             }
-            // a board named by its page's name; two input methods on one board, each by its own too
-            val boards = made.groupBy { it.keyboard.themeBoard }
-            return made.map { m ->
-                val board = boardName(ctx, m.keyboard.themeBoard)
-                val label = if (boards[m.keyboard.themeBoard].orEmpty().size > 1 && m.ime != null) "$board（${InputMethodNames.of(ctx, m.ime)}）" else board
+            // a board named by its page's name, a layout of the user's by its own; two input methods on one, each by its own too
+            val names = made.map { it.custom ?: boardName(ctx, it.keyboard.themeBoard) }
+            return made.mapIndexed { i, m ->
+                val board = names[i]
+                val label = if (names.count { it == board } > 1 && m.ime != null) "$board（${InputMethodNames.of(ctx, m.ime)}）" else board
                 Shown(label, m.keyboard, m.ime, m.layout, m.roots)
             }
         }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 验收测试用（061-custom-layout L4）：App 的 18 键，第 2 行 H 和 JK 并成一个键 HJK，成了 17 键：拼音用自己的分组打 -->
+<!-- 验收测试用（061-custom-layout L4）：App 的 18 键，第 2 行 H 和 JK 并成一个键 HJK，成了 17 键：拼音用自己的分组打。
+     HJK 用自己的键名 uat-k17/hjk：用 App 的 g18/h 就是 App 的 H 键，长按跟 H 走，导入时提醒（held-letters） -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="uat-k17" based-on="k18" name="UAT 17 键" family="grouped" columns="100">
   <meta author="UAT" version="1.0" license="CC0" description="验收测试用：H 和 JK 并成一键的 17 键"/>
   <defaults kind="letter" text-size="20" width="fill"/>
@@ -16,7 +17,7 @@
     <key id="r2c1" width="fill" label="{group:a}" letters="a" shortcut="g18/a"/>
     <key id="r2c2" width="fill" label="{group:sd}" letters="sd" shortcut="g18/sd"/>
     <key id="r2c3" width="fill" label="{group:fg}" letters="fg" shortcut="g18/fg"/>
-    <key id="r2c4" width="fill" label="HJK" letters="hjk" shortcut="g18/h"/>
+    <key id="r2c4" width="fill" label="HJK" letters="hjk" shortcut="uat-k17/hjk"/>
     <key id="r2c6" width="fill" label="{group:l}" letters="l;" shortcut="g18/l">
       <variant when="ime=shuangpin scheme-types=semicolon" label="{group:l;}"/>
     </key>
