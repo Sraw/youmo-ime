@@ -6,10 +6,13 @@ package org.fcitx.fcitx5.android.uat
 
 import android.net.Uri
 import android.os.Looper
+import android.view.View
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.snackbar.BaseTransientBottomBar
+import com.google.android.material.snackbar.Snackbar
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -21,6 +24,7 @@ import org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase
 import org.fcitx.fcitx5.android.engine.phrase.CommonWords
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.ui.main.settings.CommonWordsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.PinyinCustomPhraseFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.junit.After
@@ -34,6 +38,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import org.robolectric.shadows.ShadowToast
 import java.io.ByteArrayInputStream
 import java.time.Duration
 
@@ -128,6 +133,50 @@ class ListPagesReadUatTest {
             )
         } finally {
             CommonWordsManager.write(CommonWords.EMPTY)
+        }
+    }
+
+    // UAT WD-37: an import's count was a toast besides the batch's own bar 「已添加 1 个项目」, unseen under it; the one
+    // bar says the count now, its undo taking back this import's rows alone. An import adding none has no bar: a toast
+    @Test
+    @Uat("WD-37")
+    fun anImportSaysItsCountOnTheUndoBarThatTakesBackOnlyIt() {
+        CustomPhraseManager.save(listOf(PinyinCustomPhrase("bj", 1, "北京")))
+        try {
+            st.open(SettingsRoute.PinyinCustomPhrase)
+            until("listed") { shown().any { "北京" in it } }
+            val toasts = ShadowToast.shownToastCount()
+            val file = Uri.parse("content://phrases.test/import.txt")
+            shadowOf(activity.contentResolver).registerInputStream(file, ByteArrayInputStream("bj,1=北京\nsh,1=上海\n".toByteArray()))
+            (st.page as PinyinCustomPhraseFragment).importPhrases(file)
+            until("said") { s(R.string.import_phrases_done, 1) in shown() }
+            assertTrue(shown().toString(), s(R.string.added_n_items, 1) !in shown())
+            assertEquals(toasts, ShadowToast.shownToastCount())
+            // a long bar's time and lines, for the over-limit text (~80 characters); its time read off the bar, which
+            // Robolectric never takes down on its own
+            val text = KeyboardHarness.all(activity.window.decorView).first { it.isShown && it is TextView && it.text.toString() == s(R.string.import_phrases_done, 1) } as TextView
+            assertTrue("max lines ${text.maxLines}", text.maxLines >= 3)
+            // the bar's layout class is protected: reached by name
+            val layoutClass = Class.forName("com.google.android.material.snackbar.BaseTransientBottomBar\$SnackbarBaseLayout")
+            val layout = generateSequence(text as View) { it.parent as? View }.first(layoutClass::isInstance)
+            val bar = layoutClass.getDeclaredField("baseTransientBottomBar").apply { isAccessible = true }.get(layout)
+            // the duration set, not getDuration's: that is the accessibility manager's timeout for it, the same here for both
+            val duration = BaseTransientBottomBar::class.java.getDeclaredField("duration").apply { isAccessible = true }.getInt(bar)
+            assertEquals(Snackbar.LENGTH_LONG, duration)
+            KeyboardHarness.all(activity.window.decorView).first { it.isShown && it is TextView && it.text.toString() == s(R.string.undo) }.performClick()
+            until("undone") { shown().none { "上海" in it } }
+            assertTrue(shown().toString(), shown().any { "北京" in it })
+            // nothing new: no bar to say it on, so the toast
+            val again = Uri.parse("content://phrases.test/again.txt")
+            shadowOf(activity.contentResolver).registerInputStream(again, ByteArrayInputStream("bj,1=北京\n".toByteArray()))
+            (st.page as PinyinCustomPhraseFragment).importPhrases(again)
+            until("toast") { ShadowToast.getTextOfLatestToast() == s(R.string.import_phrases_done, 0) }
+            // the page left: the undo took the import back whole, nothing to save, the file as it was
+            st.open(SettingsRoute.About)
+            idle()
+            assertEquals(listOf("bj,1=北京"), CustomPhraseManager.load().map { "${it.key},${it.order}=${it.value}" })
+        } finally {
+            CustomPhraseManager.save(emptyList())
         }
     }
 }

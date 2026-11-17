@@ -113,6 +113,9 @@ abstract class BaseDynamicListUi<T>(
      */
     private var suspendUndo = false
 
+    /** What the bar of the batch [addItems] with a message is adding says, in place of 已添加 N 个项目; null otherwise. */
+    private var addedMessage: String? = null
+
     init {
         initEditButton = when (mode) {
             is Mode.ChooseOne -> { _ -> visibility = View.GONE }
@@ -166,16 +169,32 @@ abstract class BaseDynamicListUi<T>(
 
             override fun onItemAddedBatch(indexed: List<Pair<Int, T>>) {
                 updateFAB()
-                showSnackbar(ctx.getString(R.string.added_n_items, indexed.size)) {
+                val message = addedMessage
+                showSnackbar(message ?: ctx.getString(R.string.added_n_items, indexed.size), long = message != null) {
                     removeItems(indexed.first().first, indexed.size)
                 }
             }
         })
     }
 
-    private fun showSnackbar(text: String, action: () -> Unit) {
+    /**
+     * Adds [items] as [addItems] does, its undo bar saying [message] instead: an import's count, which a toast of its
+     * own under the bar went unseen (WD-37).
+     */
+    fun addItems(items: List<T>, message: String) {
+        addedMessage = message
+        try {
+            addItems(items)
+        } finally {
+            addedMessage = null
+        }
+    }
+
+    /** [long]: a message of a sentence or two (an import's, its over-limit text ~80 characters), given time and lines to be read. */
+    private fun showSnackbar(text: String, long: Boolean = false, action: () -> Unit) {
         if (suspendUndo) return
-        val snackbar = Snackbar.make(root, text, Snackbar.LENGTH_SHORT)
+        val snackbar = Snackbar.make(root, text, if (long) Snackbar.LENGTH_LONG else Snackbar.LENGTH_SHORT)
+        if (long) snackbar.setTextMaxLines(LONG_TEXT_LINES)
         if (enableUndo) {
             snackbar.setAction(R.string.undo) {
                 suspendUndo = true
@@ -387,3 +406,6 @@ abstract class BaseDynamicListUi<T>(
  */
 internal fun <T> removedTail(size: Int, removed: List<Pair<Int, T>>): List<T>? =
     if (removed.firstOrNull()?.first == size && removed.last().first - size == removed.lastIndex) removed.map { it.second } else null
+
+/** Lines a long undo bar's message may take: the import's over-limit text is two or three. */
+private const val LONG_TEXT_LINES = 4

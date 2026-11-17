@@ -688,11 +688,11 @@ class SettingsPagesUatTest {
             idle()
             read.countDown()
             until("listed") { shown().any { "上海" in it } }
+            // the file's phrase not counted again; said on the import's undo bar (WD-37)
+            until("said") { s(R.string.import_phrases_done, 1) in shown() }
             until("addable") { fab.visibility == View.VISIBLE }
             until("importable") { usable() == listOf(true, true) }
             until("exported") { "bj,1=北京" in exported.toString(Charsets.UTF_8) }
-            // the file's phrase not counted again
-            assertEquals(s(R.string.import_phrases_done, 1), ShadowToast.getTextOfLatestToast())
             assertEquals(listOf("bj,1=北京", "sh,1=上海"), phrasesSaved())
         } finally {
             read.countDown()
@@ -717,7 +717,7 @@ class SettingsPagesUatTest {
             shadowOf(activity.contentResolver).registerInputStream(file, ByteArrayInputStream("aa,1=甲\nbb,1=乙\ncc,1=丙\n".toByteArray()))
             (page as PinyinCustomPhraseFragment).importPhrases(file)
             val said = s(R.string.import_over_limit, s(R.string.import_phrases_done, 1), 2, max)
-            until("said") { ShadowToast.getTextOfLatestToast() == said }
+            until("said") { said in shown() }
             // the limit is the import's alone: one more added through + past it is kept (WD-37a, R25r3 F7932)
             KeyboardHarness.all(activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
             idle()

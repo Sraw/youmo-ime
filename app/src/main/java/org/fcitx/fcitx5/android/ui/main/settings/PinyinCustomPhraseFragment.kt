@@ -311,10 +311,12 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
                 }
                 // up to the limit: the whole list is written at each save and read by the engine at each start
                 val kept = phrases.take((MAX_PHRASES - ui.entries.size).coerceAtLeast(0))
-                ui.addItems(kept)
                 val done = getString(R.string.import_phrases_done, kept.size)
                 val over = phrases.size - kept.size
-                ctx.toast(if (over == 0) done else getString(R.string.import_over_limit, done, over, MAX_PHRASES))
+                val said = if (over == 0) done else getString(R.string.import_over_limit, done, over, MAX_PHRASES)
+                // one bar, the count with the undo of this import's rows: a toast besides went unseen under it (WD-37);
+                // none added, no bar, so the toast
+                if (kept.isEmpty()) ctx.toast(said) else ui.addItems(kept, said)
             }
         }
     }
