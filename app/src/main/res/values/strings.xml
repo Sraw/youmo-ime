@@ -321,7 +321,7 @@
     <string name="redo">Redo</string>
     <string name="status_area">Status area</string>
     <string name="expand_candidates_list">Expand candidates list</string>
-    <string name="stroke_page_hint">Strokes are drawn here; turn pages with ↑↓ on the right</string>
+    <string name="stroke_page_hint">Draw strokes here; ↑↓ on the right turn pages</string>
     <string name="hide_candidates_list">Hide candidates list</string>
     <string name="drop_predictions">Close predictions</string>
     <string name="hide_keyboard">Hide keyboard</string>

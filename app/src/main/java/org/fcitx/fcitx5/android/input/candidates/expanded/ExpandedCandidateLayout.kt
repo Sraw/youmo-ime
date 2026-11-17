@@ -8,7 +8,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.view.Gravity
 import android.view.LayoutInflater
-import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -44,7 +43,6 @@ import splitties.views.dsl.constraintlayout.rightOfParent
 import splitties.views.dsl.constraintlayout.rightToLeftOf
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
-import splitties.views.dsl.core.wrapContent
 
 @SuppressLint("ViewConstructor")
 class ExpandedCandidateLayout(context: Context, theme: Theme, bar: BarLook = SceneBar.of(context, theme)) : ConstraintLayout(context) {
@@ -146,27 +144,6 @@ class ExpandedCandidateLayout(context: Context, theme: Theme, bar: BarLook = Sce
 
     val embeddedKeyboard = Keyboard(context, theme)
 
-    /**
-     * 「这里划的是笔画，翻页用右边 ↑↓」 atop the list ([showHint]): over it, taking no touch (not clickable, the list's
-     * strokes under it), not read (shown only where a finger draws: never with a screen reader's touch exploration).
-     */
-    val hint = TextView(context).apply {
-        setText(R.string.stroke_page_hint)
-        gravity = Gravity.CENTER
-        textSize = HINT_SP
-        setTextColor(theme.popupTextColor)
-        backgroundColor = theme.popupBackgroundColor
-        val pad = dp(HINT_PAD_DP)
-        setPadding(pad, pad, pad, pad)
-        isClickable = false
-        isFocusable = false
-        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-        visibility = GONE
-    }
-
-    private val hintTimeout = Runnable { hideHint(fade = true) }
-    private var fades = true
-
     init {
         id = R.id.expanded_candidate_view
 
@@ -186,11 +163,6 @@ class ExpandedCandidateLayout(context: Context, theme: Theme, bar: BarLook = Sce
             rightToLeftOf(embeddedKeyboard)
             bottomOfParent()
         })
-        add(hint, lParams(0, wrapContent) {
-            topOfParent()
-            leftOfParent()
-            rightToLeftOf(embeddedKeyboard)
-        })
         add(embeddedKeyboard, lParams {
             matchConstraintPercentWidth = 0.15f
             topOfParent()
@@ -202,36 +174,5 @@ class ExpandedCandidateLayout(context: Context, theme: Theme, bar: BarLook = Sce
 
     fun resetPosition() {
         recyclerView.scrollToPosition(0)
-    }
-
-    /** The hint shown, gone [millis] after; faded out if [fade] (移除动画 off). */
-    fun showHint(millis: Long, fade: Boolean) {
-        fades = fade
-        removeCallbacks(hintTimeout)
-        hint.animate().cancel()
-        hint.alpha = 1f
-        hint.visibility = VISIBLE
-        postDelayed(hintTimeout, millis)
-    }
-
-    /** The hint gone now (the page closed). */
-    fun hideHint() {
-        removeCallbacks(hintTimeout)
-        hideHint(fade = false)
-    }
-
-    private fun hideHint(fade: Boolean) {
-        hint.animate().cancel()
-        if (fade && fades && hint.visibility == VISIBLE) {
-            hint.animate().alpha(0f).setDuration(HINT_FADE_MILLIS).withEndAction { hint.visibility = GONE }
-        } else {
-            hint.visibility = GONE
-        }
-    }
-
-    private companion object {
-        const val HINT_SP = 14f
-        const val HINT_PAD_DP = 6
-        const val HINT_FADE_MILLIS = 250L
     }
 }

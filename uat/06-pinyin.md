@@ -637,11 +637,11 @@
 - **预期**：点的那个候选上屏。挪一点和划短了都什么也不发生：不选候选、不发笔画，这一页还开着。灵敏度「高」时 3 mm 算一笔。按住不动时，长按延迟到了就弹出这个候选的菜单（读音行、置顶等），之后再划不发笔画；快速划的是一笔，不弹菜单。三档延迟都一样。
 - **JVM**：`StrokePageUatTest.aTapPicksADriftOrAStrokeLiftedShortPicksNothing`、`aLongPressStillOpensTheCandidatesMenu`；ime-core `PageStrokeTouchTest.theLongPressComingFirstIsTheCellsFromThenOn`；设备上不跑。
 
-### PY-147 [P1] 展开候选的翻页提示：头 3 次出，2 秒消失，不挡手指
+### PY-147 [P1] 展开候选的翻页提示：头 3 次出，提示条停 2 秒，不盖候选
 - **前提**：B0（清过数据：提示还没出过），另外笔画筛选。
-- **操作**：在键上划先选滑行输入，打 shi 展开候选；收起，在键上划改回笔画筛选，打 shi 展开（第 1 次）；趁提示还在，从提示那一行往下划一竖；收起再展开两次（第 2、3 次）；再收起展开（第 4 次）。
-- **预期**：滑行输入时不出提示。笔画筛选的第 1–3 次展开，候选区顶上出一行「这里划的是笔画，翻页用右边 ↑↓」，约 2 秒后淡出，不管手指在做什么；从提示上划的竖照常发出去（编码行多一个 丨）。第 4 次起不再出。没有设置项。开着 TalkBack 触摸浏览时这一页不画笔画（AX-20），提示也不出、不计数。
-- **JVM**：`StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn`（计数、只在笔画筛选时算、2 秒、不挡触摸）；ime-core `PageStrokeTouchTest.theHintShowsTheFirstThreeTimesAPageDraws`；设备上不跑。
+- **操作**：在键上划先选滑行输入，打 shi 展开候选；收起，在键上划改回笔画筛选，打 shi 展开（第 1 次）；收起再展开两次（第 2、3 次）；再收起展开（第 4 次）。
+- **预期**：滑行输入时不出提示。笔画筛选的第 1–3 次展开，键盘上方弹出提示条「这里划笔画，翻页用右边 ↑↓」（在候选栏上面，不盖展开的候选），约 2 秒后收起（比只说一句的 1 秒长；划一笔就收起）。第 4 次起不再出。没有设置项。开着 TalkBack 触摸浏览时这一页不画笔画（AX-20），提示也不出、不计数。
+- **JVM**：`StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn`（计数、只在笔画筛选时算、提示条在候选栏上面、2 秒）；ime-core `PageStrokeTouchTest.theHintShowsTheFirstThreeTimesAPageDraws`；设备上不跑。
 
 ### PY-148 [P1] 键上不画笔画的时候，展开候选照旧拖着翻
 - **前提**：B0。

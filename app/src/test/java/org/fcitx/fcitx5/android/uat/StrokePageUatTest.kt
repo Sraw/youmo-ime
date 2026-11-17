@@ -325,12 +325,15 @@ class StrokePageUatTest {
         }
     }
 
-    // the line atop the page the first three times it opens drawing strokes: said once, gone in 2 s, taking no touch
+    // the notice the first three times the page opens drawing strokes: above the keyboard, off the list, gone in 2 s
     @Test
     @Uat("PY-147")
     fun theFirstThreePagesDrawingSayHowTheyTurn() {
         val shown = AppPrefs.getInstance().internal.strokePageHintShown
-        fun hint() = KeyboardHarness.find<ExpandedCandidateLayout>(h.inputView)!!.hint
+        fun said() = h.notice()?.let { n ->
+            val line = h.service.getString(R.string.stroke_page_hint)
+            KeyboardHarness.all(n.contentView).filterIsInstance<TextView>().any { it.visibility == View.VISIBLE && it.text.toString() == line }
+        } == true
         fun closeAndOpen() {
             typed("")
             candidates()
@@ -339,35 +342,29 @@ class StrokePageUatTest {
             candidates(*Array(80) { "字$it" })
             h.tap(h.described(h.service.getString(R.string.expand_candidates_list)))
         }
-        // where the keys draw none: no line, none counted
+        // where the keys draw none: nothing said, none counted
         page(drawing = KeyDrawing.Glide)
-        assertFalse(h.shown(hint()))
+        assertFalse(said())
         assertEquals(0, shown.getValue())
         prefs.set(keyboard.keyDrawing, KeyDrawing.StrokeFilter)
         for (n in 1..3) {
             closeAndOpen()
             val shownAt = SystemClock.uptimeMillis()
-            assertTrue("open $n", h.shown(hint()))
+            assertNotNull("open $n: the page", list())
+            assertTrue("open $n", said())
             assertEquals(n, shown.getValue())
-            if (n == 1) {
-                // a stroke drawn from under it: the list's, sent
-                h.api.calls.clear()
-                val b = h.box(hint())
-                h.drag(b, b.exactCenterX(), b.exactCenterY() + 40 * h.service.resources.displayMetrics.density, steps = 8)
-                assertEquals(h.api.calls.toString(), 1, strokesSent().size)
-                assertTrue("whatever the finger did", h.shown(hint()))
-                typed("hao")
-                candidates(*Array(80) { "字$it" })
-            }
-            // from when it showed (the drag above took some of it)
-            h.after(shownAt + 1000 - SystemClock.uptimeMillis())
-            assertTrue("open $n: still at 1 s, ${SystemClock.uptimeMillis() - shownAt}", h.shown(hint()))
+            // above the bar: the page's first row not under it
+            val chip = h.noticeBox()
+            assertTrue("open $n: $chip over ${h.box(h.bar)}", chip.bottom <= h.box(h.bar).top + 2)
+            // its own 2 s, not a said line's 1 s
+            h.after(shownAt + 1500 - SystemClock.uptimeMillis())
+            assertTrue("open $n: still at 1.5 s, ${SystemClock.uptimeMillis() - shownAt}", said())
             h.after(shownAt + 2500 - SystemClock.uptimeMillis())
-            assertFalse("gone after 2 s", h.shown(hint()))
+            assertFalse("gone after 2 s", said())
         }
         // the fourth time: none, and never again
         closeAndOpen()
-        assertFalse(h.shown(hint()))
+        assertFalse(said())
         assertEquals(3, shown.getValue())
     }
 

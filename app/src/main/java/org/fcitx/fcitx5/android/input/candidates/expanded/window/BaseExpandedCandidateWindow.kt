@@ -21,6 +21,7 @@ import androidx.transition.Transition
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -211,11 +212,14 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     override fun onAttached() {
         bar.expandButtonStateMachine.push(ExpandedCandidatesAttached)
-        // the first times the page opens drawing strokes: that a finger draws here, the pages turned by ↑↓
+        // the first times the page opens drawing strokes: that a finger draws here, the pages turned by ↑↓. The notice,
+        // above the keyboard (off the list), for the hint's own 2 s (a said line's 1 s is too short to read it);
+        // counted only once said
         val shown = prefs.internal.strokePageHintShown
-        if (PageStrokeTouch.Hint.shows(drawsStrokes(), shown.getValue())) {
+        if (PageStrokeTouch.Hint.shows(drawsStrokes(), shown.getValue()) &&
+            inputView.say(context.getString(R.string.stroke_page_hint), ms = PageStrokeTouch.Hint.MILLIS)
+        ) {
             shown.setValue(shown.getValue() + 1)
-            candidateLayout.showHint(PageStrokeTouch.Hint.MILLIS, animates)
         }
         candidateLayout.embeddedKeyboard.also {
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
@@ -263,7 +267,6 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         candidatesSubmitJob?.cancel()
         offsetJob?.cancel()
         candidateLayout.embeddedKeyboard.keyActionListener = null
-        candidateLayout.hideHint()
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {

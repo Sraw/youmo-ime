@@ -221,9 +221,8 @@ class PageStrokeTouch {
     }
 
     /**
-     * The line atop the page, 「这里划的是笔画，翻页用右边 ↑↓」 (the user's): shown as the page opens drawing strokes
-     * ([Draws.on]), the first [TIMES] times so, [MILLIS] and gone whatever the finger does; no setting. [shown]: how
-     * often it was, kept; counted only when it shows.
+     * The notice 「这里划笔画，翻页用右边 ↑↓」 (the user's): said as the page opens drawing strokes ([Draws.on]), the
+     * first [TIMES] times so, for [MILLIS]; no setting. [shown]: how often it was, kept; counted only when it shows.
      */
     object Hint {
         const val TIMES = 3

@@ -317,7 +317,7 @@
     <string name="redo">重做</string>
     <string name="status_area">状态区域</string>
     <string name="expand_candidates_list">展开候选词列表</string>
-    <string name="stroke_page_hint">这里划的是笔画，翻页用右边 ↑↓</string>
+    <string name="stroke_page_hint">这里划笔画，翻页用右边 ↑↓</string>
     <string name="hide_candidates_list">隐藏候选词列表</string>
     <string name="drop_predictions">收起联想</string>
     <string name="hide_keyboard">隐藏键盘</string>

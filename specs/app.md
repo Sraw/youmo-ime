@@ -697,9 +697,10 @@ swallowed till all are up. A mouse (its tool type), a trackpad's `CLASSIFICATION
 list's as before. With no candidate left past the bar's the page stays while it draws strokes and the preedit is not
 empty (the offset collector reads `PreeditEmptyStateComponent.isEmpty` and `drawsStrokes`), so its ⌫ takes the stroke
 back; elsewhere it closes as ever. The first three times the page
-opens drawing (`PageStrokeTouch.Hint`, counted in the internal pref `stroke_page_hint_shown`) `ExpandedCandidateLayout`
-shows 「这里划的是笔画，翻页用右边 ↑↓」 over the list's top for 2 s, not clickable (the list's touches under it), not
-focusable and not read (it never shows with touch exploration, where the page draws none).
+opens drawing (`PageStrokeTouch.Hint`, counted in the internal pref `stroke_page_hint_shown`, only once said)
+`BaseExpandedCandidateWindow` says 「这里划笔画，翻页用右边 ↑↓」 in the [notice](#notices) (`BaseInputView.say`, docked above
+the bar, off the list; floating, beside the keyboard) for 2 s (`ms`; a said line's 1 s is too short for it), put away
+by a tap or typing as any line said; never with touch exploration, where the page draws none.
 
 Writing on the keys (the toolbar's 手写; designs 060-kbd-handwriting, 061-handwriting-toolbar) is `BaseKeyboard`'s,
 with the glide's touch (`GlideInput`): while `HandwritingMode.writes` (the toggle on, an input method that writes, not a
