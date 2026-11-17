@@ -112,7 +112,9 @@ object CustomLayoutFiles {
      * family the list has a section for ([LayoutCheck.FAMILIES]: another would be shown nowhere, not to be deleted, and
      * counted), an id no board of the app's has nor a key name's prefix; and taken by the check a theme pack's made one is
      * held to ([LayoutCheck.check] not strict, §3.2: it reads, its `min-app` not past [appVersion], it keeps what its base
-     * must be typed on). The rest of the strict check's rules are the 信息's to tell, as for such a pack's.
+     * must be typed on), except that a number board whose pad lacks a key that pad's fields type (a `lacks pad=…`
+     * finding) is refused, since that pad would be drawn without it. The rest of the strict check's rules are the 信息's
+     * to tell, as for such a pack's.
      */
     fun restorable(fileName: String, bytes: ByteArray, sources: LayoutCheck.Sources, appVersion: String): Boolean {
         val id = idOf(fileName) ?: return false
@@ -122,11 +124,16 @@ object CustomLayoutFiles {
         val layout = runCatching { LayoutImport.layout(text) }.getOrNull() ?: return false
         if (layout.id != id || layout.family !in LayoutCheck.FAMILIES) return false
         val report = runCatching { LayoutCheck.check(text, sources, appVersion, strict = false) }.getOrNull() ?: return false
-        return report.ok && report.warnings.none { it.key in NOT_RESTORED }
+        return report.ok && report.warnings.none { it.key in NOT_RESTORED || padLacks(it) }
     }
 
     // what the check not strict only tells of, a restore refuses (the family's is above)
     private val NOT_RESTORED = setOf("id-built-in", "id-prefix", "family")
+
+    // a number board's pad without what a field of it types (a decimal one's `.`, a digit, the way back): as it is read
+    // no pad's scene is built again (LayoutCheck.loaded), so one restored would be drawn in such a field (L5 review N1)
+    private fun padLacks(finding: LayoutCheck.Finding): Boolean =
+        finding.key == "lacks" && finding.args.firstOrNull()?.startsWith("pad=") == true
 
     /**
      * Which of a backup's layout files [fileNames] a restore looks at: layouts' names, the first [MAX_LAYOUTS] of them by

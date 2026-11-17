@@ -24,7 +24,8 @@ enum class ImKeyboard { FULL, KEYS18, KEYS14, NINE_KEYS, ZHUYIN_NINE, ZHUYIN_FUL
  * LayoutCheck.baseId); a grouped one's [groups] (each key's letters, in order: SceneGroups.of); whether it is [drawn] (its file
  * held to what it must be as it is read: CustomLayoutSource; else its base is drawn in its place, §4.4); whether it has the
  * keys a table types beside the letters ([tableExtras], qwerty's `table-extra=` keys); its file's [stamp], which changes
- * with it (a keyboard made anew for a layout replaced).
+ * with it (a keyboard made anew for a layout replaced); a number board's [pads], the fields it is for (its `pads=`, `full`
+ * where it says none: 061-custom-layout §7, L5; empty for any other family).
  */
 data class CustomChoice(
     val id: String,
@@ -35,6 +36,7 @@ data class CustomChoice(
     val drawn: Boolean = true,
     val tableExtras: Boolean = false,
     val stamp: String = "",
+    val pads: List<String> = emptyList(),
 )
 
 /**

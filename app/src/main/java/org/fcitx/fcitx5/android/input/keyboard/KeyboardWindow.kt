@@ -185,15 +185,15 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
     }
 
-    // a layout of the user's (KeyboardNames.custom): its keyboard made anew where its file is (a new stamp), the one of an
-    // older stamp dropped
+    // a layout of the user's (KeyboardNames.custom): its keyboard made anew where its file is (a new stamp), the ones of an
+    // older stamp dropped; another name of the same stamp (a number board's other pads) kept
     private val currentKeyboard: BaseKeyboard?
         get() {
             val name = currentKeyboardName
             val maker = makers[KeyboardNames.base(name)] ?: return null
             keyboards[name]?.let { return it }
             val custom = KeyboardNames.custom(name)
-            custom?.let { c -> keyboards.keys.removeAll { it != name && KeyboardNames.sameLayout(it, c) } }
+            custom?.let { c -> keyboards.keys.removeAll { KeyboardNames.stale(it, c) } }
             return SceneTrace.section("make keyboard") { maker(custom) }.also { keyboards[name] = it }
         }
 
@@ -407,6 +407,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         // a number's, phone's or date's field its pad, any other the letters: leaving the one for
         // another, the input method's letters come back, the nine keys, the 14 keys as they were
         fieldPad.field = NumberPad.of(traits.number)
+        // the user's number board as its file is now (one stat): a file replaced or a choice changed is shown anew, the
+        // 123 key's too (061-custom-layout §7)
+        fieldPad.numbers = keyboardPrefs.drawnPanelLayout(PanelLayouts.Panel.NUMBER)
         // English in a password field is the full keyboard whatever it chose, and its own again in the
         // next field: the same input method fires no update, so its letters are picked again here and,
         // shown anew, shown now (switchLayout below would find the letters already there)
@@ -504,7 +507,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     // 1) the keyboard window was newly attached
     // 2) currently keyboard window is attached and switchLayout was used
     private fun notifyBarLayoutChanged() {
-        bar.onKeyboardLayoutSwitched(currentKeyboardName in NumberPad.layouts)
+        bar.onKeyboardLayoutSwitched(NumberPad.shownBy(currentKeyboardName) != null)
     }
 }
 
@@ -525,7 +528,7 @@ internal fun keyboardMakers(contextOf: () -> Context, themeOf: () -> Theme): Map
         return T9Keyboard(contextOf(), themeOf(), NineKeyLetters.parse(keyboard.t9Letters.getValue()), english = english, semicolon = false, custom = custom)
     }
     // each given the layout of the user's it draws (KeyboardNames.custom), null for the app's; the keyboards no layout of
-    // the user's is offered for (注音's, the pads': 061-custom-layout §5.1, L5) take none
+    // the user's is offered for (注音's: 061-custom-layout §5.1) take none
     return mapOf(
         TextKeyboard.Name to { c: String? -> TextKeyboard(contextOf(), themeOf(), c) },
         T9Keyboard.Name to { c: String? -> nineKeys(english = false, c) },
@@ -543,31 +546,10 @@ internal fun keyboardMakers(contextOf: () -> Context, themeOf: () -> Theme): Map
         T9Keyboard.ShuangpinPlainName to { c: String? -> T9Keyboard(contextOf(), themeOf(), shuangpin = true, semicolon = false, custom = c) },
         ZhuyinKeyboard.NameNine to { _: String? -> ZhuyinKeyboard(contextOf(), themeOf(), nine = true) },
         ZhuyinKeyboard.NameFull to { _: String? -> ZhuyinKeyboard(contextOf(), themeOf(), nine = false) },
-        NumberKeyboard.Name to { _: String? -> NumberKeyboard(contextOf(), themeOf()) },
-        // a number's, phone's or date's field's own (FieldPad)
-        *NumberPad.entries.filter { it != NumberPad.FULL }.map { pad -> pad.layout to { _: String? -> NumberKeyboard(contextOf(), themeOf(), pad) } }.toTypedArray(),
+        // the number keyboard's pads (a number's, phone's or date's field's own: FieldPad), each the user's number board
+        // where it is for that pad (FieldPad.numbers, 061-custom-layout §7)
+        *NumberPad.entries.map { pad -> pad.layout to { c: String? -> NumberKeyboard(contextOf(), themeOf(), pad, c) } }.toTypedArray(),
     )
-}
-
-/**
- * A keyboard's name with the layout of the user's it draws (061-custom-layout §5.3): `<the app's keyboard's>|<id>@<stamp>`,
- * the keyboard it is typed as and the layout's file as read, so a file replaced is a keyboard made anew. What the
- * keyboards are switched by ([LettersLayout], LayoutSwitchPolicy) is the name as a whole: the letters' own.
- */
-internal object KeyboardNames {
-    private const val SEPARATOR = '|'
-
-    /** [name] drawing [custom] (null: the app's own layout). */
-    fun of(name: String, custom: CustomChoice?): String = if (custom == null) name else "$name$SEPARATOR${custom.id}@${custom.stamp}"
-
-    /** The app's keyboard [name] is typed as. */
-    fun base(name: String): String = name.substringBefore(SEPARATOR)
-
-    /** The layout of the user's [name] draws (`id@stamp`); null for none. */
-    fun custom(name: String): String? = name.substringAfter(SEPARATOR, "").ifEmpty { null }
-
-    /** Whether [name] draws the layout of [custom]'s id (any stamp). */
-    fun sameLayout(name: String, custom: String): Boolean = custom(name)?.substringBeforeLast('@') == custom.substringBeforeLast('@')
 }
 
 /**

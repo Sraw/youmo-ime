@@ -81,4 +81,38 @@ class NumberPadTest {
         assertEquals("Number", outcome.remember)
         assertEquals(Target.Keyboard("Number.DIGITS"), pad.shown(outcome.target, "Text"))
     }
+
+    @Test
+    fun eachPadIsNamedAsALayoutsPadsNameIt() {
+        assertEquals(listOf("full", "digits", "signed", "decimal", "signed-decimal", "phone", "datetime"), NumberPad.entries.map { it.id })
+        assertEquals(NumberPad.PHONE, NumberPad.shownBy("Number.PHONE"))
+        assertEquals(NumberPad.FULL, NumberPad.shownBy("Number|my-num@1-2"))
+        assertNull(NumberPad.shownBy("Text|my-num@1-2"))
+    }
+
+    @Test
+    fun theUsersNumberBoardIsShownForThePadsItIsForTheAppsForTheRest() {
+        // a board for 123's pad and the phone's (061-custom-layout §7, L5)
+        val mine = CustomChoice("my-num", "大数字", "number", "number", stamp = "1-2", pads = listOf("full", "phone"))
+        val pad = FieldPad().apply { numbers = mine }
+        val full = "Number|my-num@1-2"
+        // the 123 key in a text field: the user's
+        assertEquals(Target.Keyboard(full), pad.shown(Target.Keyboard("Number"), "Text"))
+        // shown already: as it is; the switching knows it as the number keyboard
+        assertEquals(Target.Unchanged, pad.shown(Target.Unchanged, full))
+        assertEquals("Number", pad.known(full))
+        // a phone field: the user's phone pad; a PIN's, which it is not for, the app's
+        pad.field = NumberPad.PHONE
+        assertEquals(Target.Keyboard("Number.PHONE|my-num@1-2"), pad.shown(Target.Unchanged, full))
+        pad.field = NumberPad.DIGITS
+        assertEquals(Target.Keyboard("Number.DIGITS"), pad.shown(Target.Keyboard("Number"), "Text"))
+        // the file replaced (another stamp): shown anew; the app's again where none is chosen
+        pad.field = null
+        pad.numbers = mine.copy(stamp = "3-4")
+        assertEquals(Target.Keyboard("Number|my-num@3-4"), pad.shown(Target.Unchanged, full))
+        pad.numbers = null
+        assertEquals(Target.Keyboard("Number"), pad.shown(Target.Unchanged, full))
+        // the letters, whatever draws them, left to the switching
+        assertEquals(Target.Unchanged, pad.shown(Target.Unchanged, "Text|my-qwerty@1-2"))
+    }
 }

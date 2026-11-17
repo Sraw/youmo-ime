@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  验收测试用（ST-172）：符号面板，改自 App 的 symbols。返回键写「回去」；分类栏和符号格子两个槽左右对调（格子 82 在左，分类 18 在右），
+  看先打开过的面板换上它后，分类栏和格子到了新槽里。其余同 App 的。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="uat-symbols" based-on="symbols" name="UAT 符号" family="symbols" columns="100">
+  <meta author="UAT" version="1.0" license="CC0" description="验收测试用：符号面板，返回键写「回去」，分类栏在右"/>
+  <row height="3">
+    <slot id="grid" kind="symbol-grid" width="82"/>
+    <slot id="categories" kind="symbol-categories" width="18"/>
+  </row>
+  <row height="1">
+    <key id="back" role="back" kind="function" width="15" label="回去" text-size="16" text-style="bold" send="panel-back"/>
+    <key id="numbers" role="numbers" kind="function" width="12" label="123" text-size="16" text-style="bold" send="layout:Number"
+         shortcut="numbers"/>
+    <key id="lock" role="lock" kind="function" width="12" icon="{lock-icon}" a11y="a11y_key_panel_lock" send="panel-lock"/>
+    <key id="space" role="space" kind="space" face="special" width="fill" text-size="13" a11y="a11y_key_space" badge="{hold-badge}" sound="space" send="sym:space"
+         swipe-axis="both" shortcut="space"/>
+    <key id="backspace" role="backspace" kind="function" width="15" icon="backspace" a11y="a11y_key_backspace"
+         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
+    <key id="enter" role="enter" kind="enter" face="special" width="15" icon="{return-icon}" a11y="{return}"
+         sound="return" send="sym:Return" shortcut="return">
+      <menu>
+        <item label="Emoji" icon="emoji" do="picker:"/>
+      </menu>
+    </key>
+  </row>
+</keyboard>

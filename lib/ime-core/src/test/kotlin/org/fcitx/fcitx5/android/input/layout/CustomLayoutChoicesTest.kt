@@ -58,4 +58,21 @@ class CustomLayoutChoicesTest {
         assertEquals(ImKeyboard.KEYS18, ImKeyboards.baseOf(r.choice))
         assertEquals(ImKeyboard.KEYS18, ImKeyboards.effective(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, ShuangpinScheme.ZIRANMA, r.choice))
     }
+
+    @Test
+    fun aNumberBoardIsForThePadsItNamesAndDrawnThere() {
+        // 061-custom-layout §7 (L5): 123's alone where it names none; the pads it names, each held to its keys as it is checked
+        val full = read(own("number")).choice
+        assertTrue(full.drawn)
+        assertEquals("number", full.family)
+        assertEquals(listOf("full"), full.pads)
+        val two = read(own("number").replaceFirst("based-on=\"number\"", "based-on=\"number\" pads=\"full phone\"")).choice
+        assertEquals(listOf("full", "phone"), two.pads)
+        assertTrue(two.drawn)
+        // the symbols' none
+        val symbols = read(own("symbols")).choice
+        assertEquals("symbols", symbols.family)
+        assertEquals(emptyList<String>(), symbols.pads)
+        assertTrue(symbols.drawn)
+    }
 }

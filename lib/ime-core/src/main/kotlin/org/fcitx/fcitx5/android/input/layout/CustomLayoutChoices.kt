@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.layout
 
 import org.fcitx.fcitx5.android.input.keyboard.CustomChoice
+import org.fcitx.fcitx5.android.input.keyboard.PanelLayouts
 import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Include
@@ -37,6 +38,7 @@ object CustomLayoutChoices {
             drawn = problems.isEmpty(),
             tableExtras = TABLE_EXTRAS.all { tableExtra(layout, fragments, it) },
             stamp = stamp,
+            pads = PanelLayouts.pads(layout),
         )
         return Read(choice, problems)
     }

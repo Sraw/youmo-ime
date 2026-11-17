@@ -47,6 +47,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.CustomChoice
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
+import org.fcitx.fcitx5.android.input.keyboard.PanelLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
@@ -76,7 +77,9 @@ import timber.log.Timber
  * the user's own, each a card of its keys in little in the theme in use. A card tapped shows in the preview above (no
  * setting changed), one of the user's of letters offering 用在… (the input methods it may be typed on, ticked where they
  * use it); one of the user's long pressed: 信息, 导出, 删除. **+**: import a `.layout` file, or open the layout maker in
- * the browser. Under each of the user's, 「用在：拼音、英文」: the input methods whose keyboard it is (L3, §4.3).
+ * the browser. Under each of the user's, 「用在：拼音、英文」: the input methods whose keyboard it is (L3, §4.3). The number
+ * keyboard's and the symbol panel's are one choice each (L5, §7, §8): a card of theirs tapped offers 数字键盘用这个 (the
+ * app's one too, to go back to it), the one in use says 「用在：数字键盘」.
  */
 class LayoutListFragment : Fragment() {
 
@@ -93,6 +96,13 @@ class LayoutListFragment : Fragment() {
             val cells: List<LayoutThumbnail.Cell>,
             /** The input methods (ImKeyboards.slot) whose keyboard it is. */
             val usedBy: List<String> = emptyList(),
+            /** The panel it is for (a number board's, the symbols'; the app's too); null for letters. */
+            val panel: PanelLayouts.Panel? = null,
+            /** Whether [panel] uses it; [unread]: chosen, not drawn (its file refused as it is read: the app's drawn meanwhile). */
+            val panelUsed: Boolean = false,
+            val unread: Boolean = false,
+            /** The app's, used as the layout chosen for [panel] is no card of it (§4.4). */
+            val missing: Boolean = false,
         ) : Item
     }
 
@@ -182,17 +192,28 @@ class LayoutListFragment : Fragment() {
     }
 
     private fun items(ctx: Context): List<Item> {
+        val prefs = AppPrefs.getInstance().keyboard
+        // each panel's choice: the app's ("") used where none of the user's is
+        val panels = prefs.panelLayouts()
+        val chosen = prefs.imKeyboards()
+        val own = CustomLayouts.list(context = ctx).map { e ->
+            val scene = e.layout?.let { scene(e.id, it, e.fragments) }
+            val panel = PanelLayouts.listedUnder(e.family, e.id, panels)
+            val used = panel != null && panels[panel] == e.id
+            val unread = panel != null && used && PanelLayouts.unread(panel, e.id, CustomKeyboards.choice(e.id))
+            Item.Card(e.id, e.name, e, scene, e.cells, ImKeyboards.usedBy(chosen, e.id), panel, used, unread)
+        }
+        // the app's: the panel's where none of the user's is chosen, or the one chosen is no card of the panel's (its file
+        // gone, a backup restored without it; another family's now): said so (L5 review S1)
         fun builtIn(id: String): Item.Card? {
             val scene = SceneLayouts.parseBuiltIn(ctx, id) ?: return null
             val cells = runCatching { LayoutThumbnail.cells(scene.layout, scene.fragments) }.getOrDefault(emptyList())
-            return Item.Card(id, scene.layout.name, null, scene, cells)
+            val panel = PanelLayouts.Panel.of(scene.layout.family)
+            val missing = panel != null && PanelLayouts.missing(panel, panels, own.associate { it.id to it.panel })
+            val used = panel != null && (panels[panel].isNullOrEmpty() || missing)
+            return Item.Card(id, scene.layout.name, null, scene, cells, panel = panel, panelUsed = used, missing = missing)
         }
-        val chosen = AppPrefs.getInstance().keyboard.imKeyboards()
-        val own = CustomLayouts.list(context = ctx).map { e ->
-            val scene = e.layout?.let { scene(e.id, it, e.fragments) }
-            Item.Card(e.id, e.name, e, scene, e.cells, ImKeyboards.usedBy(chosen, e.id))
-        }
-        fun section(of: (String?) -> Boolean) = own.filter { of(it.entry?.family) }
+        fun section(of: (String?) -> Boolean) = own.filter { of(it.panel?.family ?: it.entry?.family) }
         val out = ArrayList<Item>()
         out += Item.Header(R.string.layout_section_letters)
         out += LETTERS.mapNotNull(::builtIn)
@@ -287,6 +308,18 @@ class LayoutListFragment : Fragment() {
 
     private fun select(card: Item.Card) {
         (parentFragment as? ThemeFragment)?.previewLayout(card.scene)
+        // one that does not read is only to be deleted (its long press)
+        if (card.entry != null && card.entry.layout == null) return
+        // the number keyboard's, the symbols': 数字键盘用这个, the app's one too
+        card.panel?.let { panel ->
+            val view = view ?: return
+            Snackbar.make(view, card.name, Snackbar.LENGTH_LONG)
+                .setAction(if (panel == PanelLayouts.Panel.NUMBER) R.string.layout_use_number else R.string.layout_use_symbols) {
+                    context?.let { usePanel(it, panel, card.entry?.id.orEmpty(), card.name) }
+                }
+                .show()
+            return
+        }
         // the user's of letters: 用在… under the preview, the input methods it may be typed on
         val entry = card.entry ?: return
         if (entry.family !in LETTER_FAMILIES) return
@@ -308,11 +341,47 @@ class LayoutListFragment : Fragment() {
     }
 
     /**
+     * [panel] set to layout [id] of the user's ("": the app's), [name] (§4.3: a single choice), said so; one refused under
+     * this version's rules is not set, why said.
+     */
+    private fun usePanel(ctx: Context, panel: PanelLayouts.Panel, id: String, name: String) = lifecycleScope.launch {
+        if (id.isNotEmpty()) {
+            val (read, problems) = withContext(Dispatchers.IO) { CustomKeyboards.choice(id) to CustomKeyboards.problems(id) }
+            if (read == null) {
+                ctx.toast(ctx.getString(R.string.layout_info_unreadable))
+                return@launch
+            }
+            if (PanelLayouts.drawn(panel, read) == null) {
+                ctx.toast(ctx.getString(R.string.layout_use_refused, read.name, problems.firstOrNull()?.let { LayoutTexts.finding(ctx, it) }.orEmpty()))
+                return@launch
+            }
+        }
+        AppPrefs.getInstance().keyboard.panelLayout(panel).setValue(id)
+        ctx.toast(ctx.getString(R.string.layout_panel_uses, panelName(ctx, panel), name))
+        reload()
+    }
+
+    /**
      * 用在… of [layout] (§4.3): the input methods it may be typed on, each ticked where its keyboard is it; set as ticked on
      * OK, one unticked back on its base (§4.4). [ask]: just imported (§4.2 step 5), one input method asked of by name, none
      * ticked. Nothing where none may use it (a refused one, one 双拼 alone cannot type on and so on).
      */
     private fun askUse(ctx: Context, layout: CustomChoice, ask: Boolean) {
+        // a number board, a symbols one: 现在就用作数字键盘吗？ (§4.2 step 5)
+        PanelLayouts.Panel.of(layout.family)?.let { panel ->
+            if (!ask || PanelLayouts.drawn(panel, layout) == null) return
+            // one replacing the panel's choice (or a file of it come back) is used as it is: said, not asked of
+            if (AppPrefs.getInstance().keyboard.panelLayout(panel).getValue() == layout.id) {
+                ctx.toast(ctx.getString(R.string.layout_panel_uses, panelName(ctx, panel), layout.name))
+                return
+            }
+            AlertDialog.Builder(ctx)
+                .setMessage(ctx.getString(R.string.layout_use_now_panel, panelName(ctx, panel)))
+                .setPositiveButton(R.string.layout_use_yes) { _, _ -> usePanel(ctx, panel, layout.id, layout.name) }
+                .setNegativeButton(R.string.layout_use_no, null)
+                .show()
+            return
+        }
         val scheme = EngineState.shuangpinScheme
         val slots = ImKeyboards.usableBy(layout, scheme)
         if (slots.isEmpty()) {
@@ -398,10 +467,14 @@ class LayoutListFragment : Fragment() {
         // files read off the main thread
         val (chosen, read) = withContext(Dispatchers.IO) { prefs.imKeyboards() to CustomKeyboards.choice(entry.id) }
         val after = ImKeyboards.afterDelete(chosen, entry.id, read, scheme)
-        val message = if (after.isEmpty()) {
+        // the number keyboard, the symbol panel using it: back on the app's
+        val panels = PanelLayouts.usedBy(prefs.panelLayouts(), entry.id)
+        val separator = ctx.getString(R.string.layout_list_separator)
+        val message = if (panels.isNotEmpty()) {
+            ctx.getString(R.string.delete_layout_in_use_panel, entry.name, panels.joinToString(separator) { panelName(ctx, it) })
+        } else if (after.isEmpty()) {
             ctx.getString(R.string.delete_layout_msg, entry.name)
         } else {
-            val separator = ctx.getString(R.string.layout_list_separator)
             val users = after.keys.joinToString(separator) { imName(ctx, it) }
             val back = after.entries.joinToString(separator) { (slot, k) ->
                 ctx.getString(R.string.layout_goes_back, imName(ctx, slot), KeyboardLabels.builtInName(ctx, ImKeyboards.imOf(slot), k))
@@ -421,6 +494,7 @@ class LayoutListFragment : Fragment() {
                         ImKeyboards.afterDelete(prefs.imKeyboards(), entry.id, null, scheme).keys.forEach { slot ->
                             after[slot]?.let { prefs.setImKeyboard(ImKeyboards.imOf(slot), it) }
                         }
+                        PanelLayouts.usedBy(prefs.panelLayouts(), entry.id).forEach { prefs.panelLayout(it).setValue("") }
                     }
                     (parentFragment as? ThemeFragment)?.previewLayout(null)
                     reload()
@@ -439,6 +513,25 @@ class LayoutListFragment : Fragment() {
             else -> R.string.layout_im_table
         },
     )
+
+    // 用在：… under [card]: the panel it is used for (读不出 / the one chosen gone, the app's meanwhile), the input methods
+    private fun usedBy(ctx: Context, card: Item.Card): String? {
+        if (card.panel != null) {
+            if (!card.panelUsed) return null
+            val text = when {
+                card.unread -> R.string.layout_used_by_unread
+                card.missing -> R.string.layout_used_by_missing
+                else -> R.string.layout_used_by
+            }
+            return ctx.getString(text, panelName(ctx, card.panel))
+        }
+        if (card.usedBy.isEmpty()) return null
+        return ctx.getString(R.string.layout_used_by, card.usedBy.joinToString(ctx.getString(R.string.layout_list_separator)) { imName(ctx, it) })
+    }
+
+    // a panel's name as a sentence says it (English's not its section's title: 「the number keyboard」)
+    private fun panelName(ctx: Context, panel: PanelLayouts.Panel): String =
+        ctx.getString(if (panel == PanelLayouts.Panel.NUMBER) R.string.layout_panel_number else R.string.layout_panel_symbols)
 
     // [title] and [text], [preview] drawn above it in the theme in use; the text scrolls
     private fun dialog(ctx: Context, title: String, text: String, preview: SceneLayout?): AlertDialog.Builder {
@@ -529,8 +622,7 @@ class LayoutListFragment : Fragment() {
                     dynamicIcon.visibility = View.GONE
                     keys.background = ThemeThumbnailKeys(ThemeManager.shownLook(theme), ctx.resources.displayMetrics.density, ctx.dp(THUMBNAIL_BAR_DP).toFloat(), item.cells)
                     name.text = if (item.entry != null && item.entry.layout == null) ctx.getString(R.string.layout_unreadable, item.name) else item.name
-                    holder.usedBy?.text = item.usedBy.takeIf { it.isNotEmpty() }
-                        ?.let { u -> ctx.getString(R.string.layout_used_by, u.joinToString(ctx.getString(R.string.layout_list_separator)) { imName(ctx, it) }) }
+                    holder.usedBy?.text = usedBy(ctx, item)
                     root.setOnClickListener { select(item) }
                     root.setOnLongClickListener {
                         if (item.entry == null) return@setOnLongClickListener false

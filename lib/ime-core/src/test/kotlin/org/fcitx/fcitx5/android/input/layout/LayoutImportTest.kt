@@ -110,4 +110,17 @@ class LayoutImportTest {
         val bad = judge(fixture("uat-qwerty-bad")) as Verdict.Refused
         assertEquals("label-long", bad.errors.single().key)
     }
+
+    // the number keyboard's and the symbol panel's (L5): taken with no warning, the number one for 123's pad and a phone's
+    @Test
+    @Uat("ST-170", "ST-172")
+    fun theUatsPanelLayoutsAreTakenWithNoWarning() {
+        fun fixture(name: String) = File("../../uat/fixtures/layouts/$name.layout").readText()
+        val numbers = judge(fixture("uat-number-1.0")) as Verdict.Ok
+        assertEquals(listOf("full", "phone"), numbers.layout.pads)
+        assertEquals(emptyList<LayoutCheck.Finding>(), numbers.report.warnings)
+        val symbols = judge(fixture("uat-symbols-1.0")) as Verdict.Ok
+        assertEquals("symbols", symbols.layout.family)
+        assertEquals(emptyList<LayoutCheck.Finding>(), symbols.report.warnings)
+    }
 }

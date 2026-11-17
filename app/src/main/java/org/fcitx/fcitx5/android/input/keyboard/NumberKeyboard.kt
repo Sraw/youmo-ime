@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -27,6 +28,8 @@ class NumberKeyboard(
     context: Context,
     theme: Theme,
     private val pad: NumberPad = NumberPad.FULL,
+    /** The user's number board drawn in place of the app's pad ([customLayout]: `id@stamp`, 061-custom-layout §7); null for the app's. */
+    private val custom: String? = null,
 ) : BaseKeyboard(context, theme, layout(pad, context.getString(R.string.picker_back)), themeBoard = KeyNames.NUMBER) {
 
     companion object {
@@ -37,9 +40,6 @@ class NumberKeyboard(
          * every pad's, each by its `pad=` (xsd README 24), one board a theme styles (`number/<key>`).
          */
         internal const val LAYOUT = KeyNames.NUMBER
-
-        /** [pad] as number.xml's `pad=` names it: `full`, `signed-decimal`… */
-        internal fun padOf(pad: NumberPad): String = pad.name.lowercase().replace('_', '-')
 
         // the keypad's own keys where it has them: no input method takes them for punctuation of its own (，for ,)
         private val KEYPAD = mapOf("+" to 0xffab, "-" to 0xffad, "*" to 0xffaa, "/" to 0xffaf, "," to 0xffac, "=" to 0xffbd, "." to 0xffae)
@@ -95,11 +95,12 @@ class NumberKeyboard(
             // the way back to the letters, 返回 as the symbol panel's (061-layout-survey Q2)
             back = context.getString(R.string.picker_back),
         )
-        return SceneEnvs.of(this, look, theme.isDark, width, height, Input(pad = padOf(pad)), texts = texts, marks = keyMarks(layout))
+        return SceneEnvs.of(this, look, theme.isDark, width, height, Input(pad = pad.id), texts = texts, marks = keyMarks(layout))
     }
 
-    // last: the scene reads the pad (the keys drawn by the scene engine; number.xml's preview="off" popups="off")
+    // last: the scene reads the pad (the keys drawn by the scene engine; number.xml's preview="off" popups="off"); the
+    // user's board where it reads and is taken (its pads by its own when=pad=…), the app's where it is not
     init {
-        drawKeysWithScene(LAYOUT)
+        drawKeysWithScene(custom?.let { customLayout(context, it) } ?: SceneLayouts.of(context, LAYOUT))
     }
 }

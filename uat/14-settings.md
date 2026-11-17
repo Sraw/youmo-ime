@@ -945,3 +945,24 @@
 - **操作**：确认拼音的 a 打出「哈哈」；`adb shell run-as <包名> rm files/layouts/uat-qwerty.xml`；到测试页用拼音点 a；看 **输入法 → 拼音 → 键盘**。
 - **预期**：文件删掉后拼音画全键盘（a 打 a），不崩；拼音的 **键盘** 写「uat-qwerty（读不出，暂用 全键盘）」，选择没被改掉（文件放回来就又用它）。
 - **JVM**：`CustomKeyboardTest.theKeyboardsListAndTheSettingsOfferItAndSayWhereItIsGone`、`CustomKeyboardTest.oneRefusedAsItIsReadDrawsItsBaseTheChoiceKept`（按这一版规则不合格的：字母键上放了底稿没有的命令，也画底稿）。
+
+### ST-170 [P1] 导入数字键盘布局并用上：只管它写的那几种
+- **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-number-1.0.layout`（1 键上写「壹」，打出的仍是 1；`pads="full phone"`）。
+- **操作**：**外观 → 布局 → + → 导入布局文件** 选它，看确认框，点 **导入**；问「现在就用作数字键盘吗？」时点 **用**；看卡片；到测试页普通框点 **123**，点「壹」；再到电话框、数字框看数字键盘。
+- **预期**：确认框写「数字键盘：123、电话」。导入后问「现在就用作数字键盘吗？」（不问用在哪些输入法），点 **用** 后提示「数字键盘现在用「UAT 数字」」，「UAT 数字」卡片在数字键盘段，下写「用在：数字键盘」。普通框点 123 出的数字键盘 1 键写「壹」，点了打出 1；电话框的数字键盘也是它；数字框（不是它写的那种）还是 App 自带的，1 键写 1。
+- **JVM**：`CustomPanelTest.aNumberBoardIsDrawnForThePadsItIsForTheAppsForTheRest`、`CustomPanelTest.aNumberBoardNamingNoPadsIs123sAlone`、`CustomPanelTest.aNumberBoardForTwoPadsIsMadeOnceForEach`、`KeyboardNamesTest`、`LayoutImportTest.theUatsPanelLayoutsAreTakenWithNoWarning`、`PanelLayoutsTest`。
+### ST-171 [P1] 点卡片「数字键盘用这个」：换回内置的、再换上
+- **前提**：B0-设置；导入了 `uat-number-1.0.layout`，导入后点了 **先不用**。
+- **操作**：**外观 → 布局** 点数字键盘段的「UAT 数字」卡片，点提示条的 **数字键盘用这个**；到测试页点 **123** 看 1 键；回来点 App 自带的「数字」卡片，点 **数字键盘用这个**；再点 **123** 看 1 键。
+- **预期**：没用上时卡片下没有「用在：」，App 自带的「数字」卡片下写「用在：数字键盘」。点「UAT 数字」后提示条写它的名字，带 **数字键盘用这个**；点了提示「数字键盘现在用「UAT 数字」」，它下面写「用在：数字键盘」，自带的那张不再写；123 的 1 键写「壹」。点自带的那张换回后 123 的 1 键写 1，「用在：数字键盘」回到自带的卡片下。
+- **JVM**：`CustomPanelTest.aNumberBoardIsDrawnForThePadsItIsForTheAppsForTheRest`、`PanelLayoutsTest.aPanelDrawsTheUsersOfItsFamilyWhereItIsDrawnTheAppsElse`。
+### ST-172 [P1] 符号面板用自己的布局
+- **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-symbols-1.0.layout`（返回键写「回去」，分类栏在右边、符号格子在左边）。
+- **操作**：先到测试页点 **符** 打开一次自带的符号面板，点 **返回**；再导入它，问「现在就用作符号面板吗？」时点 **用**；看卡片；回测试页点 **符**，看面板；点「回去」。
+- **预期**：自带的面板分类在左。卡片在符号面板段，下写「用在：符号面板」。再打开时符号面板的返回键写「回去」（没有「返回」），分类栏到了右边、符号格子在左边，都不压在键上；「回去」回到字母键盘。
+- **JVM**：`CustomPanelTest.theSymbolPanelIsTheUsersAsItOpens`、`CustomPanelTest.aPanelOpenedBeforeHasItsCategoriesAndGridInTheNewBoardsSlots`、`LayoutImportTest.theUatsPanelLayoutsAreTakenWithNoWarning`。
+### ST-173 [P1] 删掉正在用的数字键盘布局：换回内置的
+- **前提**：B0-设置；导入 `uat-number-1.0.layout` 时点了 **用**。
+- **操作**：**外观 → 布局** 长按「UAT 数字」选 **删除**；看确认框，点 **确定**；到测试页点 **123**。
+- **预期**：确认框写「删除「UAT 数字」吗？数字键盘正在用它，删掉后换回内置的。」。删后卡片不见，自带的「数字」卡片下写「用在：数字键盘」；123 的 1 键写 1。（文件读不出时选择留着，先画自带的，卡片下写「用在：数字键盘（读不出，暂用内置的）」；选的文件不见了，自带的卡片下写「用在：数字键盘（选的布局不见了，暂用内置的）」：JVM 测。）
+- **JVM**：`CustomPanelTest.oneRefusedAsItIsReadDrawsTheAppsTheChoiceKept`、`PanelLayoutsTest.thePanelsUsingALayoutGoBackOnTheAppsAsItIsDeleted`、`PanelLayoutsTest.aChoiceNotReadIsListedUnderItsPanelOneGoneOnTheAppsCard`、`CustomLayoutFilesTest.aBackupsFileIsRestoredOnlyAsTheLayoutItsNameSays`。

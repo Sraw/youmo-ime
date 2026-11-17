@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.CustomChoice
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.keyboard.PanelLayouts
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
@@ -348,6 +349,27 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val shuangpinKeyboardLayout = string(SHUANGPIN_KEYBOARD_LAYOUT, "")
         val englishKeyboardLayout = string(ENGLISH_KEYBOARD_LAYOUT, "")
         val tableKeyboardLayout = string(TABLE_KEYBOARD_LAYOUT, "")
+
+        /**
+         * The number keyboard's and the symbol panel's layout of the user's, by its id ("": the app's), one for every input
+         * method (061-custom-layout §7, §8, L5: 外观 → 布局). Left as they are where the file stops reading (the app's drawn
+         * meanwhile); set back to the app's as it is deleted.
+         */
+        val numberKeyboardLayout = string(NUMBER_KEYBOARD_LAYOUT, "")
+        val symbolsPanelLayout = string(SYMBOLS_PANEL_LAYOUT, "")
+
+        /** [panel]'s layout of the user's ([numberKeyboardLayout], [symbolsPanelLayout]). */
+        fun panelLayout(panel: PanelLayouts.Panel) = when (panel) {
+            PanelLayouts.Panel.NUMBER -> numberKeyboardLayout
+            PanelLayouts.Panel.SYMBOLS -> symbolsPanelLayout
+        }
+
+        /** Each panel's id as set ("": the app's). */
+        fun panelLayouts(): Map<PanelLayouts.Panel, String> = PanelLayouts.Panel.entries.associateWith { panelLayout(it).getValue() }
+
+        /** The layout of the user's [panel] draws as its file reads now (read by [custom]); null where the app's is drawn. */
+        fun drawnPanelLayout(panel: PanelLayouts.Panel, custom: (String) -> CustomChoice? = CustomKeyboards::choice): CustomChoice? =
+            panelLayout(panel).getValue().takeIf { it.isNotEmpty() }?.let { id -> PanelLayouts.drawn(panel, runCatching { custom(id) }.getOrNull()) }
 
         // [slot]'s ([ImKeyboards.slot]) layout of the user's
         private fun layoutPref(slot: String) = when (slot) {
@@ -1088,6 +1110,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         const val SHUANGPIN_KEYBOARD_LAYOUT = "shuangpin_keyboard_layout"
         const val ENGLISH_KEYBOARD_LAYOUT = "english_keyboard_layout"
         const val TABLE_KEYBOARD_LAYOUT = "table_keyboard_layout"
+        const val NUMBER_KEYBOARD_LAYOUT = "number_keyboard_layout"
+        const val SYMBOLS_PANEL_LAYOUT = "symbols_panel_layout"
 
         // 0.4's: English on the nine keys while 九键's 中/英 had brought it there, gone with the key (I1)
         private const val ENGLISH_ON_NINE_KEYS = "english_on_nine_keys"

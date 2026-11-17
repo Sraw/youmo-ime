@@ -2317,3 +2317,131 @@ def st164(d):
     check(d.wait_text("（读不出，暂用 全键盘）", timeout=5, contains=True), f"拼音的「键盘」没说读不出：{d.screen().texts()[:16]}")
     d.shot("app", "布局文件不见：键盘一项写「读不出，暂用 全键盘」")
     return "文件不见后拼音画全键盘（a 打 a），设置写「uat-qwerty（读不出，暂用 全键盘）」，选择不改"
+
+
+# ---------------------------------------------------------------- 数字键盘、符号面板用自己的布局 (061-custom-layout §7, §8, L5)
+
+
+def import_panel_layout(d, name, shown, use):
+    """uat/fixtures/layouts/<name>.layout imported; 现在就用作数字键盘/符号面板吗？ answered 用 or 先不用"""
+    push_layout(d, name)
+    import_layout(d, name)
+    d.wait_text(f"导入布局 {shown}？", timeout=8, where="all")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    try:
+        d.wait_text("现在就用作", timeout=6, where="all", contains=True)
+    except Blocked:
+        raise Blocked(f"导入后没问现在就用作：{d.screen().texts('all')[:10]}")
+    d.tap_text("用" if use else "先不用", where="all", scroll=False, after=2.0)
+
+
+def number_ones(d, page="text"):
+    """on the test page [page]: the number keyboard's 1 key as it is labelled (壹: uat-number's), 123 tapped on a text field"""
+    d.open_page(page)
+    keys = d.keys(refresh=True)
+    if page == "text":
+        d.tap(keys["123"], 1.0)
+        d.keys(refresh=True)
+    # by the faces: keys() also knows a key by its scene id, and the 壹 key's id is 1
+    faces = {n.texts()[0] for n in d.need_keyboard().walk() if n.clickable and n.texts()}
+    return [k for k in ("1", "壹") if k in faces]
+
+
+@case("ST-170", base="B0-设置", mutates=True, visual=True)
+def st170(d):
+    push_layout(d, "uat-number-1.0")
+    import_layout(d, "uat-number-1.0")
+    d.wait_text("导入布局 UAT 数字？", timeout=8, where="all")
+    check(d.screen().find(contains="数字键盘：123、电话", where="all"), f"确认框没写数字键盘：123、电话：{d.screen().texts('all')[:16]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    check(d.wait_text("现在就用作数字键盘吗？", timeout=6, where="all"), f"导入后没问现在就用作数字键盘：{d.screen().texts('all')[:10]}")
+    check(not d.screen().find(contains="现在就用在", where="all"), "数字键盘布局还问了用在哪些输入法")
+    d.tap_text("用", where="all", scroll=False, after=2.0)
+    check(layout_card(d, "UAT 数字"), "导入后列表里没有 UAT 数字")
+    check(d.wait_text("用在：数字键盘", timeout=5, where="all"), f"卡片下没写「用在：数字键盘」：{d.screen().texts()[:20]}")
+    d.shot("app", "导入数字键盘布局后用上：卡片下写「用在：数字键盘」")
+    d.step("123、电话框用它，数字框用自带的")
+    check(number_ones(d) == ["壹"], f"123 的数字键盘不是导入的：{number_ones(d)}")
+    d.shot("ime", "123 的数字键盘：1 键写「壹」")
+    d.tap(d.keys(refresh=True)["壹"], 1.0)
+    typed = d.field_text() or ""
+    d.clear()
+    check("1" in typed, f"点「壹」打出的不是 1：{typed!r}")
+    check(number_ones(d, "tel") == ["壹"], "电话框的数字键盘不是导入的")
+    check(number_ones(d, "number") == ["1"], "数字框的数字键盘不是自带的")
+    return "确认框写数字键盘：123、电话；问现在就用作数字键盘；卡片写用在：数字键盘；123 和电话框 1 键写壹（打出 1），数字框是自带的"
+
+
+@case("ST-171", base="B0-设置", mutates=True)
+def st171(d):
+    import_panel_layout(d, "uat-number-1.0", "UAT 数字", use=False)
+    card = layout_card(d, "UAT 数字")
+    check(card, "导入后列表里没有 UAT 数字")
+    d.step("点卡片 → 数字键盘用这个")
+    d.tap(card.c, 1.0)
+    d.tap_text("数字键盘用这个", where="all", scroll=False, after=2.0)
+    check(d.wait_text("用在：数字键盘", timeout=5, where="all"), f"用上后卡片下没写「用在：数字键盘」：{d.screen().texts()[:20]}")
+    check(number_ones(d) == ["壹"], "用上后 123 的数字键盘不是导入的")
+    d.step("点自带的「数字」→ 换回")
+    builtin = layout_card(d, "数字")
+    check(builtin, "数字键盘段没有自带的「数字」")
+    d.tap(builtin.c, 1.0)
+    d.tap_text("数字键盘用这个", where="all", scroll=False, after=2.0)
+    # 用在：数字键盘 back under the app's card: the one line of it, below 数字 and above UAT 数字
+    # the cards two a row: the line under the app's card, in its column, and none under UAT 数字's
+    builtin = layout_card(d, "数字")
+    s = d.screen()
+    mine = s.find(text="UAT 数字")
+    under = lambda card: [n for n in s.app() if n.text == "用在：数字键盘" and card.b[0] <= n.c[0] <= card.b[2] and n.c[1] > card.c[1]]
+    check(builtin and mine and under(builtin) and not under(mine),
+          f"换回后「用在：数字键盘」不在自带的卡片下：{[(n.text, n.b) for n in s.app() if len(n.text) > 1][-8:]}")
+    check(number_ones(d) == ["1"], "换回后 123 的数字键盘不是自带的")
+    return "点 UAT 数字 → 数字键盘用这个：卡片写用在、123 1 键写壹；点自带的数字换回，用在回到自带的卡片下，1 键写 1"
+
+
+@case("ST-172", base="B0-设置", mutates=True, visual=True)
+def st172(d):
+    def panel():
+        """the symbol panel opened on the test page: its nodes (no keyboard_view: read off the input method's window),
+        the categories' x against the panel's middle"""
+        d.open_page("text")
+        d.tap(d.keys(refresh=True)["符"], 1.5)
+        s = d.screen()
+        nodes = list(s.ime())
+        shown = [n.text or n.desc for n in nodes if n.text or n.desc]
+        cats = [n for n in nodes if n.text in ("常用", "最近")]
+        check(cats, f"符号面板没有分类：{shown[:24]}")
+        middle = (min(n.b[0] for n in nodes) + max(n.b[2] for n in nodes)) / 2
+        return s, shown, cats[0].c[0] > middle
+    # the app's panel made once before (the board then put in place of its own: L5 review S3)
+    d.step("先用自带的打开一次符号面板")
+    s, shown, right = panel()
+    check("返回" in shown and not right, f"自带的符号面板不是分类在左、返回键写返回：{shown[:24]}")
+    d.tap(s.find(text="返回", where="ime").c, 1.0)
+    d.step("导入、用上 UAT 符号（分类栏在右边）")
+    import_panel_layout(d, "uat-symbols-1.0", "UAT 符号", use=True)
+    check(layout_card(d, "UAT 符号"), "导入后列表里没有 UAT 符号")
+    check(d.wait_text("用在：符号面板", timeout=5, where="all"), f"卡片下没写「用在：符号面板」：{d.screen().texts()[:20]}")
+    s, shown, right = panel()
+    check("回去" in shown and "返回" not in shown, f"符号面板的返回键不是「回去」：{shown[:24]}")
+    check(right, f"换板后分类栏没到右边的槽：{shown[:24]}")
+    d.shot("ime", "符号面板用导入的布局：返回键写「回去」，分类在右、格子在左")
+    d.tap(s.find(text="回去", where="ime").c, 1.0)
+    check("q" in d.keys(refresh=True), "点「回去」没回到字母键盘")
+    return "先开过自带的面板；导入后卡片写用在：符号面板；面板返回键写回去，分类栏换到右边的槽，回去回到字母键盘"
+
+
+@case("ST-173", base="B0-设置", mutates=True)
+def st173(d):
+    import_panel_layout(d, "uat-number-1.0", "UAT 数字", use=True)
+    card = layout_card(d, "UAT 数字")
+    check(card, "导入后列表里没有 UAT 数字")
+    d.hold(card.c, 1000)
+    time.sleep(1.0)
+    d.tap_text("删除", scroll=False, after=1.5)
+    check(d.wait_text("数字键盘正在用它，删掉后换回内置的", timeout=5, where="all", contains=True),
+          f"删除确认没说数字键盘正在用：{d.screen().texts('all')[:10]}")
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    check(not d.screen().find(text="UAT 数字"), "删除后卡片还在")
+    check(number_ones(d) == ["1"], "删掉后 123 的数字键盘不是自带的")
+    return "确认框写数字键盘正在用它、换回内置的；删后 123 是自带的"

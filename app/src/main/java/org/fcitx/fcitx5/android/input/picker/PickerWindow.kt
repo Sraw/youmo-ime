@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.PanelLayouts
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -247,7 +248,12 @@ class PickerWindow(
         }
     }
 
-    override fun onCreateView() = PickerLayout(context, theme, switchKey, density, panel, if (search) SearchKey else null).apply {
+    // the user's symbols board as its file is now (one stat), `id@stamp`; null, the app's (061-custom-layout §8): asked as the
+    // panel is made and each time it opens, so a choice changed or a file replaced is drawn the next time it is shown
+    private fun customBoard(): String? =
+        if (panel) AppPrefs.getInstance().keyboard.drawnPanelLayout(PanelLayouts.Panel.SYMBOLS)?.let { "${it.id}@${it.stamp}" } else null
+
+    override fun onCreateView() = PickerLayout(context, theme, switchKey, density, panel, if (search) SearchKey else null, customBoard()).apply {
         pickerLayout = this
         val bordered = followKeyBorder && ThemeManager.shownLook(theme).keys.blocks
         adapter = PickerGridAdapter(grid, keyActionListener, popupActionListener, data(), key.name, bordered, policy)
@@ -308,6 +314,8 @@ class PickerWindow(
     override val title: String get() = if (panel) context.getString(R.string.picker_title) else ""
 
     override fun onAttached() {
+        // first, so what follows is told to the board shown
+        pickerLayout.drawKeys(customBoard())
         // the punctuation as it is now: changed while another window was shown, not told here
         pickerLayout.embeddedKeyboard.onPunctuationUpdate(punctuation.mapping)
         adapter.habits = habits.getValue()

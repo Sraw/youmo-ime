@@ -522,6 +522,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         prefs.keyboard.shuangpinKeyboardLayout,
         prefs.keyboard.englishKeyboardLayout,
         prefs.keyboard.tableKeyboardLayout,
+        // the number keyboard's (FieldPad.numbers, read as the input starts again); the symbol panel's is asked as it opens
+        prefs.keyboard.numberKeyboardLayout,
         // every key's marks laid out anew, those no swipe marks too; was a theme setting's
         prefs.keyboard.swipeUpPosition,
         prefs.keyboard.swipeDownPosition,

@@ -1216,6 +1216,28 @@ toolbar without 键盘 (the next start has it); the toolbar is not arranged agai
 keyboard (the 九键 section of 拼音 and English) go by the keyboard drawn, `ImKeyboards.layoutOf`: a `nine` layout of
 the user's shows them.
 
+The number keyboard's and the symbol panel's layout of the user's (061-custom-layout §7, §8, L5): one string pref
+each, for every input method (`number_keyboard_layout`, `symbols_panel_layout`, "" the app's; `panelLayout(Panel)`,
+`panelLayouts()`). ime-core's `PanelLayouts` decides: `drawn(panel, choice)` takes a `CustomChoice` of the panel's
+family that is `drawn`, else the app's, the pref left as it is (`unread`: 读不出，暂用内置的); a number board is for
+the pads its `pads=` names (`CustomChoice.pads`, `full` alone where it names none; `draws`). `AppPrefs.drawnPanelLayout`
+reads it through `CustomKeyboards.choice` (a stat while unchanged). `KeyboardWindow.onStartInput` gives it to
+`FieldPad.numbers`, and `FieldPad.shown` names the pad's keyboard `Number.PHONE|<id>@<stamp>` (`KeyboardNames`, moved
+to ime-core) where it draws it, the plain name else: one maker per pad (`NumberPad.layout`), given the `id@stamp`,
+`NumberKeyboard` drawing `customLayout` in place of number.xml; a file replaced is a new stamp, so a new keyboard (the
+older stamp's dropped, `KeyboardNames.stale`; the other pads' of the same stamp kept). The
+pref is in `remakeKeyboardsPrefs`. The symbol panel is made once per input view: `PickerWindow` asks the choice as it
+is made and at each `onAttached`, `PickerLayout.drawKeys(id@stamp)` putting a new board in place of the one drawn when
+it changed (its `categories` and `grid` slots placed as the app's). The layout's own pad checks (`pads=`, each pad's
+scene, `pad-lacks`, `bottom-left`) are `LayoutCheck`'s at import (L1); as it is read only `LayoutCheck.loaded`. 外观 →
+布局: a number or symbols card, the app's too, tapped offers 数字键盘用这个 / 符号面板用这个 (one refused under this
+version's rules: why, not set), the one in use says 用在：数字键盘 (the app's where none is chosen; `layout_used_by_unread`
+where it does not read, a file that does not read at all listed under the panel that chose it,
+`PanelLayouts.listedUnder`; the app's card says `layout_used_by_missing` where the choice is no card of the panel's,
+`PanelLayouts.missing`: its file gone), an import asks 现在就用作数字键盘吗？ (not where it is the panel's choice already:
+said so), a delete puts each panel using it back on the app's. A restore takes no number board a pad of which lacks
+what a field of it types (`lacks pad=…`, `CustomLayoutFiles.restorable`): as it is read no pad's scene is built again.
+
 The 14 keys (`GroupedKeyboard`, `GroupedKeyboard.Name14`) are 拼音's touch keyboard when
 `pinyinKeyboard` is `Keys14`.
 A tap sends its key's code (`SymAction`, as a syllable is), on a key of two letters with where the
